@@ -8,6 +8,7 @@
   "controlPlaneCanary": {
     "enabled": true,
     "fingerprintPaths": [
+      ".gitignore",
       "scripts/codex-autopilot/codex-autopilot.config.json",
       "scripts/codex-autopilot/autopilot-run-continuous.ps1",
       "scripts/codex-autopilot/autopilot-exec-issue.ps1",

@@ -86,17 +86,17 @@ function Get-AutopilotRecoveryDecision {
           if ($LASTEXITCODE -ne 0) { throw 'base branch diverged after Issue dispatch' }
           if ($worktreeHead -ne $oldBase) { throw 'Issue worktree HEAD no longer matches its dispatched base' }
           $permitted = @($PermittedBaseAdvancePaths | ForEach-Object { ([string]$_).Replace('\','/').Trim() } | Where-Object { $_ } | Sort-Object -Unique)
-          $baseAdvancePaths = @(& git -c core.quotePath=false -C $repoRoot diff --name-only $oldBase $mainHead -- 2>$null | ForEach-Object { ([string]$_).Replace('\','/').Trim() } | Where-Object { $_ })
+          $baseAdvancePaths = @(& git -c core.quotePath=false -c core.autocrlf=false -c core.safecrlf=false -C $repoRoot diff --name-only $oldBase $mainHead -- 2>$null | ForEach-Object { ([string]$_).Replace('\','/').Trim() } | Where-Object { $_ })
           if ($LASTEXITCODE -ne 0 -or $baseAdvancePaths.Count -eq 0) { throw 'cannot prove the base branch advance' }
           $unexpectedBasePaths = @($baseAdvancePaths | Where-Object { $_ -notin $permitted })
           if ($unexpectedBasePaths.Count -gt 0) { throw "base branch advanced outside permitted control-plane paths: $($unexpectedBasePaths -join ', ')" }
-          $issuePaths = @(& git -c core.quotePath=false -C $checkpoint.worktree diff --name-only $oldBase -- 2>$null | ForEach-Object { ([string]$_).Replace('\','/').Trim() } | Where-Object { $_ })
+          $issuePaths = @(& git -c core.quotePath=false -c core.autocrlf=false -c core.safecrlf=false -C $checkpoint.worktree diff --name-only $oldBase -- 2>$null | ForEach-Object { ([string]$_).Replace('\','/').Trim() } | Where-Object { $_ })
           if ($LASTEXITCODE -ne 0) { throw 'cannot prove the preserved Issue diff before base advance' }
           $overlap = @($issuePaths | Where-Object { $_ -in $baseAdvancePaths })
           if ($overlap.Count -gt 0) { throw "control-plane base advance overlaps the Issue diff: $($overlap -join ', ')" }
           $oldDiffHash = Get-AutopilotRecoveryDiffHash -Worktree $checkpoint.worktree -BaseCommit $oldBase
           if ($checkpoint.evidence.diffHash -and $oldDiffHash -ne [string]$checkpoint.evidence.diffHash) { throw 'Issue diff hash no longer matches checkpoint before base advance' }
-          & git -C $checkpoint.worktree merge --ff-only $mainHead 2>$null | Out-Null
+          & git -c core.autocrlf=false -c core.safecrlf=false -C $checkpoint.worktree merge --ff-only $mainHead 2>$null | Out-Null
           if ($LASTEXITCODE -ne 0) { throw 'Issue worktree could not safely fast-forward to the permitted control-plane base' }
           $newDiffHash = Get-AutopilotRecoveryDiffHash -Worktree $checkpoint.worktree -BaseCommit $mainHead
           $checkpoint = Move-AutopilotIssueCheckpointBaseForward -Path $checkpointPath -BaseCommit $mainHead -DiffHash $newDiffHash

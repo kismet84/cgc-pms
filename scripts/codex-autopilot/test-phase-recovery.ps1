@@ -20,7 +20,8 @@ try {
   $worktree = Join-Path $root '.worktrees\autopilot\issue-040-022'
   New-Item -ItemType Directory -Path (Split-Path -Parent $worktree) -Force | Out-Null
   & git -C $root worktree add -q -b codex/autopilot/issue-040-022 $worktree $base
-  'implementation' | Set-Content -LiteralPath (Join-Path $worktree 'implementation.txt') -Encoding UTF8
+  & git -C $root config core.autocrlf true
+  [IO.File]::WriteAllText((Join-Path $worktree 'implementation.txt'), "implementation`n", [Text.UTF8Encoding]::new($false))
   $issueDir = Join-Path $autoDir 'runs\old\ISSUE-040-022'
   New-Item -ItemType Directory -Path $issueDir -Force | Out-Null
   $resultPath = Join-Path $issueDir 'result.json'

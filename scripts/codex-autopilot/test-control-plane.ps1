@@ -58,6 +58,9 @@ if ($config.taskScoring.effectiveFrom -ne 'NEXT_NEW_IMPLEMENTATION_READY' -or !$
 if ($null -ne $config.taskScoring.candidateVersion -or $config.taskScoring.candidateEnabled -ne $false -or $null -ne $config.taskScoring.candidateApprovalStatus) { throw 'promoted v2 must no longer remain as a pending candidate' }
 if ($config.taskScoring.previousVersion -ne 'autopilot-task-score/v1') { throw 'v1 history boundary is missing after v2 activation' }
 if (!$config.controlPlaneCanary -or $config.controlPlaneCanary.enabled -ne $true -or @($config.controlPlaneCanary.fingerprintPaths).Count -lt 5) { throw 'control-plane single-Issue canary gate is not enabled' }
+if (@($config.controlPlaneCanary.fingerprintPaths) -notcontains '.gitignore') { throw 'control-plane fingerprint must cover local checkpoint ignore rules' }
+& git -C $repoRoot check-ignore -q -- '.codex-autopilot/checkpoints/issue-test.json'
+if ($LASTEXITCODE -ne 0) { throw 'durable local checkpoints must not dirty the base worktree' }
 if (!$config.retrospective -or $config.retrospective.enabled -ne $true -or [int]$config.retrospective.threshold -ne 20) { throw 'approved retrospective config is invalid' }
 if (!(Test-AutopilotRetrospectiveActive -TaskScoringConfig $config.taskScoring -RetrospectiveConfig $config.retrospective)) { throw 'approved scoring and retrospective config did not activate together' }
 if ([int]$config.maxParallel -ne 1 -or [int]$config.maxParallelIssues -ne 1) { throw 'unattended rollout must start with maxParallel=1' }

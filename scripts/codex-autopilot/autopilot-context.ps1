@@ -14,10 +14,10 @@ function Get-AutopilotDiffHash {
 
 function Get-AutopilotDiffText {
   param([string]$Worktree, [string]$BaseCommit)
-  $diff = (& git -c core.autocrlf=false -C $Worktree diff --binary $BaseCommit -- 2>$null | Out-String)
+  $diff = (& git -c core.autocrlf=false -c core.safecrlf=false -C $Worktree diff --binary $BaseCommit -- 2>$null | Out-String)
   if ($LASTEXITCODE -ne 0) { throw 'cannot calculate worktree diff hash' }
-  foreach ($path in @(& git -c core.quotePath=false -C $Worktree ls-files --others --exclude-standard)) {
-    $untrackedDiff = (& git -c core.autocrlf=false -C $Worktree diff --no-index --binary -- NUL $path 2>$null | Out-String)
+  foreach ($path in @(& git -c core.quotePath=false -c core.autocrlf=false -c core.safecrlf=false -C $Worktree ls-files --others --exclude-standard)) {
+    $untrackedDiff = (& git -c core.autocrlf=false -c core.safecrlf=false -C $Worktree diff --no-index --binary -- NUL $path 2>$null | Out-String)
     if ($LASTEXITCODE -notin @(0,1)) { throw "cannot include untracked file in diff: $path" }
     $diff += $untrackedDiff
   }
