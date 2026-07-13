@@ -27,7 +27,7 @@ const createForm = reactive<CreateMenuPayload>(defaultCreateForm())
 const isAdmin = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
 )
-const canCreateMenu = computed(() => isAdmin.value || userStore.hasPermission('system:menu:add'))
+const canCreateMenu = computed(() => isAdmin.value)
 const parentTreeData = computed(() => [
   {
     title: '根节点',

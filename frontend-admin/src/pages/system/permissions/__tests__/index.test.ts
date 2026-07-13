@@ -128,7 +128,15 @@ describe('permission governance menu creation', () => {
     mocks.error.mockReset()
   })
 
-  it('hides the entry without ADMIN/SUPER_ADMIN or system:menu:add', async () => {
+  it('hides the entry for a non-admin', async () => {
+    const wrapper = mountPage()
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="create-menu-open"]').exists()).toBe(false)
+  })
+
+  it('keeps the admin-only route boundary even with system:menu:add', async () => {
+    mocks.permissions = ['system:menu:add']
     const wrapper = mountPage()
     await flushPromises()
 
@@ -138,7 +146,6 @@ describe('permission governance menu creation', () => {
   it.each([
     { roles: ['ADMIN'], permissions: [] },
     { roles: ['SUPER_ADMIN'], permissions: [] },
-    { roles: ['USER'], permissions: ['system:menu:add'] },
   ])('shows the entry for an authorized identity', async ({ roles, permissions }) => {
     mocks.roles = roles
     mocks.permissions = permissions
@@ -149,7 +156,7 @@ describe('permission governance menu creation', () => {
   })
 
   it('validates required fields before submitting', async () => {
-    mocks.permissions = ['system:menu:add']
+    mocks.roles = ['ADMIN']
     const wrapper = mountPage()
     await flushPromises()
     await wrapper.get('[data-testid="create-menu-open"]').trigger('click')
@@ -161,7 +168,7 @@ describe('permission governance menu creation', () => {
   })
 
   it('submits the selected parent and refreshes the tree on success', async () => {
-    mocks.permissions = ['system:menu:add']
+    mocks.roles = ['ADMIN']
     const wrapper = mountPage()
     await flushPromises()
     await wrapper.get('[data-testid="create-menu-open"]').trigger('click')
@@ -189,7 +196,7 @@ describe('permission governance menu creation', () => {
   })
 
   it('keeps the form open and does not refresh after a failed create', async () => {
-    mocks.permissions = ['system:menu:add']
+    mocks.roles = ['ADMIN']
     mocks.createMenu.mockRejectedValueOnce(new Error('父菜单不存在'))
     const wrapper = mountPage()
     await flushPromises()
