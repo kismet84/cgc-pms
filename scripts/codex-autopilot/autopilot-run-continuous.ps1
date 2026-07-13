@@ -1076,6 +1076,8 @@ function Invoke-IssueExecutor {
             $result | Add-Member -NotePropertyName failureFingerprint -NotePropertyValue $currentFingerprint -Force
           } elseif ($reviewDisposition.action -eq 'BLOCK') {
             $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_FAILED'
+          } elseif ($reviewDisposition.action -eq 'BLOCK_TOOL') {
+            $result.status = 'blocked'; $result.failureCategory = 'tool_config'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEWER_TOOL_FAILURE'
           }
         }
       }

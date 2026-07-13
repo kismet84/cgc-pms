@@ -47,6 +47,10 @@ try {
   if ($disposition.action -ne 'REPAIR' -or !$disposition.failureFingerprint) { throw 'needs_repair was not routed to a bounded repair' }
   $blockedDisposition = Get-AutopilotReviewDisposition -ReviewResult ([pscustomobject]@{ decision='blocked'; findings=@() })
   if ($blockedDisposition.action -ne 'BLOCK') { throw 'blocked review was incorrectly made repairable' }
+  $sandboxBlocked = [pscustomobject]@{ issueId='ISSUE-900-030'; decision='blocked'; findings=@([pscustomobject]@{ risk='orchestrator_helper_launch_failed: Windows sandbox 初始化失败 (os error 3)'; requiredEvidence='retry reviewer' }); reviewedDiffHash='unavailable' }
+  if (!(Test-AutopilotReviewerSandboxFailure -ReviewResult $sandboxBlocked)) { throw 'Reviewer sandbox failure was not recognized' }
+  $sandboxDisposition = Get-AutopilotReviewDisposition -ReviewResult $sandboxBlocked -ExpectedIssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256
+  if ($sandboxDisposition.action -ne 'BLOCK_TOOL') { throw 'Reviewer sandbox failure was not classified as tool_config' }
   if (Test-AutopilotCodeRepairAllowed -FailureCategory 'environment' -StopReason 'STOP_VERIFICATION_FAILED') { throw 'environment failure was routed to code repair' }
   if (!(Test-AutopilotCodeRepairAllowed -FailureCategory 'quality_security' -StopReason 'STOP_VERIFICATION_FAILED')) { throw 'quality failure lost bounded repair' }
 
