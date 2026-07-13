@@ -538,8 +538,8 @@ function Write-RunEvent {
     decision = if ($Data.decision) { $Data.decision } else { "" }
     status = if ($Data.status) { $Data.status } else { "" }
     stopReason = if ($Data.stopReason) { $Data.stopReason } else { "" }
-    dryRun = [bool]$DryRun
-    apply = [bool]$ApplyBacklogSplit
+    dryRun = [bool]$dryRunMode
+    apply = [bool]$applyMode
     maxIterations = $script:IterationLimit
     from = if ($Data.from) { $Data.from } else { '' }
     to = if ($Data.to) { $Data.to } elseif ($Data.status) { [string]$Data.status } else { $Event }
@@ -1397,7 +1397,7 @@ $script:IssuePhase = ''
 $script:LastCanaryFingerprint = ''
 $script:LastCanaryReport = ''
 $script:RecoveryDecision = $null
-Initialize-IterationProgress $autoDir $readyPath $MaxIterations ([bool]$DryRun -or [bool]$ExplainNextAction)
+Initialize-IterationProgress $autoDir $readyPath $MaxIterations $dryRunMode
 $existingStatePath = Join-Path $autoDir 'state.json'
 if (Test-Path -LiteralPath $existingStatePath) {
   try {
@@ -1502,7 +1502,7 @@ try {
     $boundedReviewDue = $null -ne $boundaryState.iterationLimit -and [int]$boundaryState.remainingIterations -le 0
     if (!$script:RecoveryDecision -and [bool]$boundaryState.retrospectiveDue -and ($null -eq $boundaryState.iterationLimit -or $boundedReviewDue)) {
       Write-RunEvent 'stop' ([pscustomobject]@{ decision='STOP'; status='STOP_RETROSPECTIVE_REQUIRED'; stopReason='STOP_RETROSPECTIVE_REQUIRED'; reviewCycleId=$boundaryState.reviewCycleId; reviewCycleCompletedCount=$boundaryState.reviewCycleCompletedCount })
-      Write-State $autoDir 'STOP_RETROSPECTIVE_REQUIRED' ([bool]$DryRun) 'RETROSPECTIVE_REQUIRED' '' 'pending retrospective blocks new task dispatch' 'STOP_RETROSPECTIVE_REQUIRED'
+      Write-State $autoDir 'STOP_RETROSPECTIVE_REQUIRED' $dryRunMode 'RETROSPECTIVE_REQUIRED' '' 'pending retrospective blocks new task dispatch' 'STOP_RETROSPECTIVE_REQUIRED'
       Write-Host 'STOP_RETROSPECTIVE_REQUIRED'
       exit 0
     }
@@ -1511,7 +1511,7 @@ try {
   if (!$script:RecoveryDecision -and $null -ne $script:IterationLimit -and $script:IterationCompleted -ge $script:IterationLimit) {
     Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = "STOP_ITERATION_LIMIT_REACHED"; stopReason = "STOP_ITERATION_LIMIT_REACHED" })
     Remove-Item -LiteralPath (Join-Path $autoDir 'enabled.flag') -Force -ErrorAction SilentlyContinue
-    Write-State $autoDir "STOP_ITERATION_LIMIT_REACHED" ([bool]$DryRun) "STOP" "" "STOP_ITERATION_LIMIT_REACHED" "STOP_ITERATION_LIMIT_REACHED"
+    Write-State $autoDir "STOP_ITERATION_LIMIT_REACHED" $dryRunMode "STOP" "" "STOP_ITERATION_LIMIT_REACHED" "STOP_ITERATION_LIMIT_REACHED"
     Write-Host "STOP_ITERATION_LIMIT_REACHED"
     exit 0
   }
@@ -1525,7 +1525,7 @@ try {
         Write-RunEvent 'checkpoint.active-issue-closeout' ([pscustomobject]@{ checkpoint=$checkpoint; decision=$script:RecoveryDecision.action; status='RECOVERING'; reason='stop/pause prevents new selection but does not abandon the already-started durable Issue' })
       } else {
       Write-RunEvent "stop" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "STOP"; status = $checkpoint; stopReason = $checkpoint; loop = $loop })
-      Write-State $autoDir $checkpoint ([bool]$DryRun) "STOP" "" $checkpoint $checkpoint
+      Write-State $autoDir $checkpoint $dryRunMode "STOP" "" $checkpoint $checkpoint
       Write-Host $checkpoint
       exit 0
       }
@@ -1556,7 +1556,7 @@ try {
            failureCategory = $readyIssues[0].lint.failureCategory
            errorCode = $readyIssues[0].lint.errorCode
         })
-        Write-State $autoDir "STOP_READY_LINT_FAILED" ([bool]$DryRun) "STOP" $readyIssues[0].title "STOP_READY_LINT_FAILED" "STOP_READY_LINT_FAILED"
+        Write-State $autoDir "STOP_READY_LINT_FAILED" $dryRunMode "STOP" $readyIssues[0].title "STOP_READY_LINT_FAILED" "STOP_READY_LINT_FAILED"
         Write-Host "STOP_READY_LINT_FAILED"
         Write-Host "selected=$($readyIssues[0].title)"
          Write-Host "missingGate=ready-lint"
@@ -1581,7 +1581,7 @@ try {
       $selectedIssue = $batchIssues[0]
       $selectedRoute = if ($selectedIssue.contract) { Get-AutopilotRoute -Issue $selectedIssue.contract } else { $null }
       $readyStatus = if ($batchPlan.parallel) { "READY_ISSUE_BATCH_FOUND" } else { "READY_ISSUE_FOUND" }
-      Write-State $autoDir $readyStatus ([bool]$DryRun) $readyStatus $selectedIssue.title $readyStatus ""
+      Write-State $autoDir $readyStatus $dryRunMode $readyStatus $selectedIssue.title $readyStatus ""
       Write-RunEvent "decision" ([pscustomobject]@{
         issueId = $selectedIssue.lint.issueId
         title = $selectedIssue.title
@@ -1606,7 +1606,7 @@ try {
         $issue = $batchIssues[$index]
         Write-Host ("parallelIssue[{0}]={1}" -f ($index + 1), $issue.title)
       }
-      if ($DryRun -or $batchPlan.parallel) {
+      if ($dryRunMode -or $batchPlan.parallel) {
         for ($index = 0; $index -lt $batchIssues.Count; $index++) {
           $issue = $batchIssues[$index]
           $commandText = Get-ExecutorCommand $RepoRoot $ConfigPath $issue.title
@@ -1616,7 +1616,7 @@ try {
             Write-Host ("executorCommand[{0}]={1}" -f ($index + 1), $commandText)
           }
         }
-        if ($batchPlan.parallel -and !$DryRun) {
+        if ($batchPlan.parallel -and !$dryRunMode) {
           Write-Host "PARALLEL_BATCH_PLAN_ONLY"
         }
       } else {

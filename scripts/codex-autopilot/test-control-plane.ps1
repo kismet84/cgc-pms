@@ -10,6 +10,8 @@ $runnerSource = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'a
 
 if ($runnerSource -notmatch '\[System\.Collections\.Generic\.List\[string\]\]\$evidencePaths\s*=\s*\[System\.Collections\.Generic\.List\[string\]\]::new\(\)') { throw 'verification evidence paths must retain list semantics from the first item' }
 if ($runnerSource -match '\$evidencePaths\s*\+=\s*\$evidencePath') { throw 'verification evidence paths must not use scalar string concatenation' }
+if ($runnerSource -match 'if\s*\(\$DryRun\s+-or\s+\$batchPlan\.parallel\)') { throw 'switchless dry-run must not bypass applyMode and dispatch an executor' }
+if ($runnerSource -notmatch 'if\s*\(\$dryRunMode\s+-or\s+\$batchPlan\.parallel\)') { throw 'executor dispatch must be gated by the derived apply mode' }
 
 $normalizedStdinArgs = @(Get-AutopilotCodexRedirectedStdinArguments -Arguments @('exec','--ephemeral','-','--model','gpt-5.6-sol'))
 if (($normalizedStdinArgs -join '|') -ne 'exec|--ephemeral|--model|gpt-5.6-sol') { throw 'redirected stdin arguments must omit the Codex prompt marker even when route arguments are appended later' }
