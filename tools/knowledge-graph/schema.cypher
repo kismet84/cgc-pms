@@ -4,8 +4,18 @@ CREATE CONSTRAINT section_id IF NOT EXISTS FOR (n:Section) REQUIRE n.id IS UNIQU
 CREATE CONSTRAINT commit_hash IF NOT EXISTS FOR (n:GitCommit) REQUIRE n.hash IS UNIQUE;
 CREATE CONSTRAINT episode_id IF NOT EXISTS FOR (n:Episode) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT entity_id IF NOT EXISTS FOR (n:Entity) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT source_key IF NOT EXISTS FOR (n:Source) REQUIRE n.key IS UNIQUE;
+CREATE CONSTRAINT source_cursor_key IF NOT EXISTS FOR (n:SourceCursor) REQUIRE n.sourceKey IS UNIQUE;
+CREATE CONSTRAINT collection_run_id IF NOT EXISTS FOR (n:CollectionRun) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT artifact_version_id IF NOT EXISTS FOR (n:ArtifactVersion) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT evidence_id IF NOT EXISTS FOR (n:Evidence) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT decision_id IF NOT EXISTS FOR (n:Decision) REQUIRE n.id IS UNIQUE;
 CREATE INDEX artifact_path IF NOT EXISTS FOR (n:Artifact) ON (n.path);
 CREATE INDEX artifact_kind IF NOT EXISTS FOR (n:Artifact) ON (n.kind);
 CREATE INDEX artifact_active IF NOT EXISTS FOR (n:Artifact) ON (n.active);
 CREATE INDEX episode_occurred_at IF NOT EXISTS FOR (n:Episode) ON (n.occurredAt);
+CREATE INDEX collection_run_started_at IF NOT EXISTS FOR (n:CollectionRun) ON (n.startedAt);
+CREATE INDEX collection_run_status IF NOT EXISTS FOR (n:CollectionRun) ON (n.status);
+CREATE INDEX artifact_version_sha IF NOT EXISTS FOR (n:ArtifactVersion) ON (n.sha256);
 CREATE FULLTEXT INDEX knowledge_text IF NOT EXISTS FOR (n:Artifact|Section|Episode|Entity) ON EACH [n.title, n.name, n.summary, n.content];
+CREATE FULLTEXT INDEX knowledge_evidence IF NOT EXISTS FOR (n:Evidence|Decision) ON EACH [n.title, n.summary, n.sourceRef];

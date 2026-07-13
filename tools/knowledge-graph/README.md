@@ -21,6 +21,17 @@ npm run status
 npm test
 ```
 
+采集采用事件驱动与定时对账组合：任务收口可调用 `kg_record_episode` 后执行
+`scripts/collect.ps1 -Trigger closeout`；Windows 定时对账安装器默认只预演：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-schedule.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-schedule.ps1 -Install
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/uninstall-schedule.ps1 -Confirm
+```
+
+定时任务每 30 分钟运行一次，只补充本地图谱，不启动业务任务、不修改仓库、不提交或 push。
+
 默认从 `%USERPROFILE%\.cgc-pms-secrets\neo4j.env` 读取 Neo4j 凭据，可使用 `CGC_KG_*` 环境变量覆盖。
 
 ## Codex MCP
@@ -33,6 +44,6 @@ codex mcp add cgc-pms-knowledge-graph -- node D:\projects-test\cgc-pms\tools\kno
 
 ## Schema
 
-核心节点：`Project`、`Artifact`、`Section`、`GitCommit`、`Episode`、`Entity`。
+核心节点：`Project`、`Artifact`、`ArtifactVersion`、`Section`、`GitCommit`、`Episode`、`Evidence`、`Decision`、`Source`、`SourceCursor`、`CollectionRun`、`Entity`。
 
-核心关系：`IN_PROJECT`、`CONTAINS`、`REFERENCES`；后续受控抽取可扩展 `RELATES_TO`、`VERIFIES`、`IMPLEMENTS`、`BLOCKS`、`DEPENDS_ON`、`SUPERSEDES` 和 `DERIVED_FROM`，但不得在缺乏来源证据时自动创建事实关系。
+核心关系：`IN_PROJECT`、`CONTAINS`、`CURRENT_VERSION`、`VERSION_OF`、`REFERENCES`、`CHANGES`、`DERIVED_FROM`、`COLLECTED_IN`、`USED_CURSOR`；后续受控抽取可扩展 `RELATES_TO`、`VERIFIES`、`IMPLEMENTS`、`BLOCKS`、`DEPENDS_ON` 和 `SUPERSEDES`，但不得在缺乏来源证据时自动创建事实关系。

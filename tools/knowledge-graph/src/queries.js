@@ -1,5 +1,6 @@
-import crypto from "node:crypto";
 import { execute, jsonSafe } from "./neo4j.js";
+import { recentCollectionRuns } from "./collection-run.js";
+export { recordEpisode } from "./episode-collector.js";
 
 function rows(result) {
   return jsonSafe(result);
@@ -8,12 +9,14 @@ function rows(result) {
 export async function status(driver, config) {
   return rows(await execute(driver, config.neo4jDatabase, `
     MATCH (p:Project {key: $projectKey})
-    OPTIONAL MATCH (a:Artifact)-[:IN_PROJECT]->(p)
-    OPTIONAL MATCH (c:GitCommit)-[:IN_PROJECT]->(p)
-    OPTIONAL MATCH (e:Episode)-[:IN_PROJECT]->(p)
-    RETURN p.key AS project, count(DISTINCT a) AS artifacts,
-           count(DISTINCT c) AS commits, count(DISTINCT e) AS episodes,
-           max(a.indexedAt) AS lastIndexedAt
+    CALL (p) { OPTIONAL MATCH (a:Artifact)-[:IN_PROJECT]->(p) RETURN count(a) AS artifacts, max(a.lastSeenAt) AS lastIndexedAt }
+    CALL (p) { OPTIONAL MATCH (c:GitCommit)-[:IN_PROJECT]->(p) RETURN count(c) AS commits }
+    CALL (p) { OPTIONAL MATCH (e:Episode)-[:IN_PROJECT]->(p) RETURN count(e) AS episodes }
+    CALL (p) { OPTIONAL MATCH (r:CollectionRun)-[:IN_PROJECT]->(p) WITH r ORDER BY r.startedAt DESC LIMIT 1 RETURN r.status AS lastRunStatus, r.startedAt AS lastRunAt, r.failed AS lastRunFailures }
+    OPTIONAL MATCH (cursor:SourceCursor)-[:CURSOR_FOR]->(source:Source)-[:IN_PROJECT]->(p)
+    RETURN p.key AS project, artifacts, commits, episodes, lastIndexedAt,
+           lastRunStatus, lastRunAt, lastRunFailures,
+           collect({source: source.key, cursor: cursor.cursor, lastSuccessAt: cursor.lastSuccessAt}) AS cursors
   `, { projectKey: config.projectKey }));
 }
 
@@ -33,10 +36,29 @@ export async function search(driver, config, query, limit = 20) {
 export async function getArtifact(driver, config, sourcePath) {
   return rows(await execute(driver, config.neo4jDatabase, `
     MATCH (a:Artifact {path: $path})
+    OPTIONAL MATCH (a)-[:CURRENT_VERSION]->(current:ArtifactVersion)
+    OPTIONAL MATCH (version:ArtifactVersion)-[:VERSION_OF]->(a)
     OPTIONAL MATCH (a)-[:CONTAINS]->(s:Section)
-    RETURN a { .id, .path, .title, .kind, .sha256, .modifiedAt, .indexedAt, .active } AS artifact,
-           collect(s { .id, .title, .level, .ordinal, .content }) AS sections
+    RETURN a { .id, .path, .title, .kind, .sha256, .modifiedAt, .lastSeenAt, .active } AS artifact,
+           current { .id, .sha256, .modifiedAt, .createdAt } AS currentVersion,
+           collect(DISTINCT version { .id, .sha256, .modifiedAt, .createdAt }) AS versions,
+           collect(DISTINCT s { .id, .title, .level, .ordinal, .content }) AS sections
   `, { path: sourcePath }));
+}
+
+export async function collectionRuns(driver, config, limit = 20) {
+  return recentCollectionRuns(driver, config, limit);
+}
+
+export async function unresolvedReferences(driver, config, limit = 20) {
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
+  return rows(await execute(driver, config.neo4jDatabase, `
+    MATCH (r:CollectionRun)-[:IN_PROJECT]->(:Project {key: $projectKey})
+    WHERE r.unresolvedReferences > 0
+    RETURN r.id AS runId, r.startedAt AS startedAt,
+           r.unresolvedReferences AS unresolvedReferences, r.status AS status
+    ORDER BY r.startedAt DESC LIMIT toInteger($limit)
+  `, { projectKey: config.projectKey, limit: safeLimit }));
 }
 
 export async function neighbors(driver, config, id, depth = 1) {
@@ -65,22 +87,4 @@ export async function readOnlyQuery(driver, config, query, params = {}) {
   const normalized = query.trim().replace(/;+$/, "");
   const bounded = /\bLIMIT\s+\d+\s*$/i.test(normalized) ? normalized : `${normalized}\nLIMIT 200`;
   return rows(await execute(driver, config.neo4jDatabase, bounded, params));
-}
-
-export async function recordEpisode(driver, config, input) {
-  const allowedKinds = new Set(["conversation", "decision", "run", "log-summary", "observation"]);
-  if (!allowedKinds.has(input.kind)) throw new Error(`Unsupported episode kind: ${input.kind}`);
-  if (!input.summary?.trim() || input.summary.length > 12000) throw new Error("summary is required and must be <= 12000 characters.");
-  if (!input.sourceRef?.trim() || input.sourceRef.length > 1000) throw new Error("sourceRef is required and must be <= 1000 characters.");
-  const occurredAt = input.occurredAt ?? new Date().toISOString();
-  const id = input.id ?? `${config.projectKey}:episode:${crypto.createHash("sha256").update(`${input.kind}|${input.sourceRef}|${occurredAt}`).digest("hex")}`;
-  return rows(await execute(driver, config.neo4jDatabase, `
-    MATCH (p:Project {key: $projectKey})
-    MERGE (e:Episode {id: $id})
-    SET e.kind = $kind, e.title = $title, e.summary = $summary,
-        e.sourceRef = $sourceRef, e.occurredAt = datetime($occurredAt),
-        e.updatedAt = datetime()
-    MERGE (e)-[:IN_PROJECT]->(p)
-    RETURN e { .id, .kind, .title, .sourceRef, .occurredAt } AS episode
-  `, { projectKey: config.projectKey, id, kind: input.kind, title: input.title ?? "", summary: input.summary, sourceRef: input.sourceRef, occurredAt }, "WRITE"));
 }

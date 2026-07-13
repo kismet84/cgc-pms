@@ -1,13 +1,16 @@
 {
   "name": "cgc-pms-knowledge-graph",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Local Neo4j knowledge collector and MCP server for cgc-pms.",
   "scripts": {
     "schema": "node src/cli.js schema",
-    "collect": "node src/cli.js collect",
+    "collect": "node src/cli.js collect --trigger manual",
+    "collect:scheduled": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/collect.ps1 -Trigger scheduled",
+    "schedule:dry-run": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install-schedule.ps1",
     "status": "node src/cli.js status",
+    "acceptance": "node src/acceptance.js",
     "mcp": "node src/server.js",
     "test": "node --test",
     "test:mcp": "node test/mcp-smoke.js"

@@ -7,3 +7,4 @@
 ## 当前报告
 
 - [第37条主线：项目地图、竞品情报与迭代决策闭环验收报告](mainline-37-product-intelligence-acceptance.md)
+- [第39条主线：项目知识图谱采集机制验收报告](knowledge-graph-collector-acceptance-2026-07-13.md)

@@ -15,6 +15,12 @@
 - 候选来源依次为 [Ad-hoc 计划](ad-hoc-plan.md)、[长期增强计划](cgc-pms-production-enhancement-plan.md)。
 - v1.0 的完成记录、测试数量和质量结论不得直接作为 v1.5 验收证据。
 
+## 2026-07-13 项目知识图谱治理状态
+
+- 第39条主线已完成本地知识采集闭环：文档版本、Git 游标、采集运行、失败状态、会话/日志摘要脱敏、MCP 观测和 30 分钟定时对账均已落地。
+- 该能力是旁路工程治理工具，不替代仓库、Git、backlog 或正式质量报告，也不得替代产品 Candidate/Ready 决策。
+- 非阻塞边界：不扫描 Codex 私有历史、不保存原始大日志、不做 LLM 正式事实抽取、不自动删除历史版本；如需扩展必须重新立项。
+
 ## 2026-07-13 全量审计闭环状态
 
 - `docs/quality/code-audit-2026-07-12-full-develop-1.5.md` 的 7 项原阻塞已完成本地根因闭环；后端 1723 tests、前端 505 tests、MySQL 8 Flyway、SQL safety、构建后 JAR Trivy、UI smoke 与内置浏览器验收均通过。

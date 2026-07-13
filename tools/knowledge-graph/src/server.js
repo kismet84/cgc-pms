@@ -3,13 +3,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { loadConfig } from "./config.js";
 import { createDriver } from "./neo4j.js";
-import { getArtifact, neighbors, readOnlyQuery, recordEpisode, search, status } from "./queries.js";
+import { getArtifact, neighbors, readOnlyQuery, search, status, collectionRuns, unresolvedReferences } from "./queries.js";
+import { recordEpisode, episodeInputSchema } from "./episode-collector.js";
 
 const config = loadConfig();
 const driver = createDriver(config);
 await driver.verifyConnectivity();
 
-const server = new McpServer({ name: "cgc-pms-knowledge-graph", version: "0.1.0" });
+const server = new McpServer({ name: "cgc-pms-knowledge-graph", version: "0.2.0" });
 const result = (value) => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }], structuredContent: { result: value } });
 
 server.registerTool("kg_status", { description: "Return cgc-pms knowledge graph coverage and last indexing time." }, async () => result(await status(driver, config)));
@@ -31,12 +32,16 @@ server.registerTool("kg_query", {
 }, async ({ query, params }) => result(await readOnlyQuery(driver, config, query, params)));
 server.registerTool("kg_record_episode", {
   description: "Controlled write for a sourced conversation, decision, run, log summary, or observation. Raw logs should remain outside the graph.",
-  inputSchema: {
-    kind: z.enum(["conversation", "decision", "run", "log-summary", "observation"]),
-    title: z.string().max(500).optional(), summary: z.string().min(1).max(12000),
-    sourceRef: z.string().min(1).max(1000), occurredAt: z.string().datetime().optional(), id: z.string().max(500).optional(),
-  },
+  inputSchema: episodeInputSchema.shape,
 }, async (input) => result(await recordEpisode(driver, config, input)));
+server.registerTool("kg_collection_runs", {
+  description: "Return recent collection runs, metrics, status, and failure summaries.",
+  inputSchema: { limit: z.number().int().min(1).max(100).optional() },
+}, async ({ limit }) => result(await collectionRuns(driver, config, limit)));
+server.registerTool("kg_unresolved_references", {
+  description: "Return recent collection runs that contain unresolved document references.",
+  inputSchema: { limit: z.number().int().min(1).max(100).optional() },
+}, async ({ limit }) => result(await unresolvedReferences(driver, config, limit)));
 
 const shutdown = async () => { await driver.close(); process.exit(0); };
 process.on("SIGINT", shutdown);

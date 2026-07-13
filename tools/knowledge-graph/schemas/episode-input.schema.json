@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cgc-pms.local/schemas/episode-input.schema.json",
+  "title": "cgc-pms knowledge episode input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["kind", "summary", "sourceRef"],
+  "properties": {
+    "id": { "type": "string", "maxLength": 500 },
+    "kind": { "enum": ["conversation", "decision", "run", "log-summary", "observation"] },
+    "title": { "type": "string", "maxLength": 500 },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 12000 },
+    "sourceRef": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "sha256": { "type": "string", "pattern": "^[a-fA-F0-9]{64}$" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "command": { "type": "string", "maxLength": 2000 },
+        "exitCode": { "type": "integer" },
+        "classification": { "enum": ["tool_config", "environment", "real_quality", "success"] }
+      }
+    }
+  }
+}

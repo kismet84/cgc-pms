@@ -32,6 +32,8 @@ export function loadConfig() {
     neo4jPassword: process.env.CGC_KG_NEO4J_PASSWORD ?? fileEnv.NEO4J_PASSWORD,
     neo4jDatabase: process.env.CGC_KG_NEO4J_DATABASE ?? "neo4j",
     secretsFile,
+    collectorVersion: "0.2.0",
+    runtimeDir: path.join(repoRoot, ".agent-runtime", "knowledge-graph"),
   };
 }
 
