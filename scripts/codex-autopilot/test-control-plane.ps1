@@ -5,6 +5,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = (Resolve-Path (Join-Path $scriptDir '..\..')).Path
 $config = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw | ConvertFrom-Json
 . (Join-Path $scriptDir 'autopilot-command.ps1')
+. (Join-Path $scriptDir 'autopilot-task-score.ps1')
 
 $normalizedStdinArgs = @(Get-AutopilotCodexRedirectedStdinArguments -Arguments @('exec','--ephemeral','-','--model','gpt-5.6-sol'))
 if (($normalizedStdinArgs -join '|') -ne 'exec|--ephemeral|--model|gpt-5.6-sol') { throw 'redirected stdin arguments must omit the Codex prompt marker even when route arguments are appended later' }
@@ -44,6 +45,12 @@ if ($parseFailures.Count -gt 0) { throw "AutoPilot scripts must parse through Wi
 
 if ($config.controlPlane -ne 'scripts\codex-autopilot\autopilot-run-continuous.ps1') { throw 'single controlPlane is not configured' }
 if (!$config.issueGraph -or $config.issueGraph.enabled -ne $true -or $config.issueGraph.allowRegistryFallback -ne $false -or [int]$config.issueGraph.queryLimit -gt 200) { throw 'knowledge-graph-first refill fail-close config is invalid' }
+if (!$config.taskScoring -or $config.taskScoring.enabled -ne $true -or $config.taskScoring.activeVersion -ne 'autopilot-task-score/v1' -or $config.taskScoring.approvalStatus -ne 'APPROVED') { throw 'approved task scoring v1 must be active' }
+$weights = $config.taskScoring.weights
+if ([int]$weights.deliveryCorrectness -ne 35 -or [int]$weights.zeroDanglingIssues -ne 25 -or [int]$weights.firstPassAcceptance -ne 20 -or [int]$weights.cycleEfficiency -ne 10 -or [int]$weights.stockIssueReduction -ne 10) { throw 'approved task scoring v1 weights changed unexpectedly' }
+if ($config.taskScoring.effectiveFrom -ne 'NEXT_NEW_IMPLEMENTATION_READY' -or !$config.taskScoring.approvalSource) { throw 'task scoring approval evidence or effective boundary is missing' }
+if (!$config.retrospective -or $config.retrospective.enabled -ne $true -or [int]$config.retrospective.threshold -ne 20) { throw 'approved retrospective config is invalid' }
+if (!(Test-AutopilotRetrospectiveActive -TaskScoringConfig $config.taskScoring -RetrospectiveConfig $config.retrospective)) { throw 'approved scoring and retrospective config did not activate together' }
 if ([int]$config.maxParallel -ne 1 -or [int]$config.maxParallelIssues -ne 1) { throw 'unattended rollout must start with maxParallel=1' }
 if (@($config.issueExecutor.args) -contains 'gpt-5.5') { throw 'executor still pins a legacy model' }
 foreach ($profile in 'mechanical','normal','highRisk','formalReview') {

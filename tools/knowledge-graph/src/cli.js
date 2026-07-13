@@ -1,9 +1,10 @@
 import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
 import { loadConfig } from "./config.js";
 import { createDriver } from "./neo4j.js";
 import { applySchema } from "./schema.js";
 import { collect } from "./collector.js";
-import { listIssues, status } from "./queries.js";
+import { listIssues, recordEpisode, status } from "./queries.js";
 
 function requiredValue(args, index, option) {
   const value = args[index + 1];
@@ -50,6 +51,17 @@ export function parseIssueOptions(args) {
   return options;
 }
 
+export function parseEpisodeOptions(args, read = readFileSync) {
+  if (args.length !== 2 || args[0] !== "--input") throw new Error("episode requires exactly --input <json-file>");
+  const inputPath = requiredValue(args, 0, "--input");
+  let input;
+  try { input = JSON.parse(read(inputPath, "utf8")); } catch (error) { throw new Error(`episode input is invalid JSON: ${error instanceof Error ? error.message : String(error)}`); }
+  if (!input || typeof input !== "object" || Array.isArray(input)) throw new Error("episode input must be a JSON object");
+  if (!input.id || typeof input.id !== "string") throw new Error("episode input requires an explicit stable id");
+  if (!input.sourceRef || typeof input.sourceRef !== "string") throw new Error("episode input requires sourceRef");
+  return input;
+}
+
 export async function runCli(argv = process.argv.slice(2), dependencies = {}) {
   const command = argv[0] ?? "status";
   const commandArgs = argv.slice(1);
@@ -58,6 +70,7 @@ export async function runCli(argv = process.argv.slice(2), dependencies = {}) {
     ? requiredValue(commandArgs, triggerIndex, "--trigger")
     : process.env.CGC_KG_TRIGGER ?? "manual";
   const issueOptions = command === "issues" ? parseIssueOptions(commandArgs) : null;
+  const episodeInput = command === "episode" ? parseEpisodeOptions(commandArgs, dependencies.readFileSync ?? readFileSync) : null;
   const config = (dependencies.loadConfig ?? loadConfig)();
   const driver = (dependencies.createDriver ?? createDriver)(config);
   try {
@@ -69,6 +82,10 @@ export async function runCli(argv = process.argv.slice(2), dependencies = {}) {
       result = await collect(driver, config, { trigger });
     } else if (command === "status") result = await status(driver, config);
     else if (command === "issues") result = await listIssues(driver, config, issueOptions);
+    else if (command === "episode") {
+      await applySchema(driver, config);
+      result = await recordEpisode(driver, config, episodeInput);
+    }
     else throw new Error(`Unknown command: ${command}`);
     return result;
   } finally {

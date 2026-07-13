@@ -48,12 +48,17 @@ try {
         $reasons += 'stop.flag present'
     }
     if (Test-Path -LiteralPath $pausePath) {
-        $decision = 'pause'
+        if ($decision -ne 'stop') { $decision = 'pause' }
         $reasons += 'pause.flag present'
     }
     if (-not (Test-Path -LiteralPath $enabledPath)) {
         if ($decision -eq 'go') { $decision = 'disabled' }
         $reasons += 'enabled.flag missing'
+    }
+    $boundedBatchComplete = $state -and $null -ne $state.iterationLimit -and [int]$state.remainingIterations -le 0
+    if ($decision -in @('go', 'disabled') -and $state -and [bool]$state.retrospectiveDue -and ($null -eq $state.iterationLimit -or $boundedBatchComplete)) {
+        $decision = 'retrospective_required'
+        $reasons += 'retrospective is due before a new batch can start'
     }
     if ($decision -in @('go', 'disabled') -and $state -and (
         $state.status -eq 'LIMIT_REACHED' -or
@@ -75,6 +80,11 @@ try {
         healthGate = $health
         decision = $decision
         reasons = $reasons
+        reviewCycleCompletedCount = if ($state) { $state.reviewCycleCompletedCount } else { 0 }
+        retrospectiveDue = if ($state) { [bool]$state.retrospectiveDue } else { $false }
+        retrospectiveStatus = if ($state) { $state.retrospectiveStatus } else { 'IDLE' }
+        retrospectivePhase = if ($state) { $state.retrospectivePhase } else { 'NONE' }
+        activeScoringVersion = if ($state) { $state.activeScoringVersion } else { $null }
     }
 
     if ($AsJson -or $true) {

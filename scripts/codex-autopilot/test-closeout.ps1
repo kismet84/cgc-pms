@@ -3,6 +3,7 @@
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-worktree.ps1')
+. (Join-Path $scriptDir 'autopilot-task-score.ps1')
 . (Join-Path $scriptDir 'autopilot-closeout.ps1')
 
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-closeout-test-' + [guid]::NewGuid().ToString('N'))
@@ -62,8 +63,37 @@ try {
   if ((Get-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'docs\backlog\done-issues.md') -Raw) -notmatch 'ISSUE-900-040') { throw 'done ledger was not updated' }
   $again = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base
   if ($again.commit -ne $result.commit -or !$again.idempotent) { throw 'closeout retry was not idempotent' }
+
+  Add-Content -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Encoding UTF8 -Value "`r`n### ISSUE-900-041：Scored closeout`r`n状态：Ready`r`n"
+  @'
+# ISSUE-900-041
+
+- 新增后续项：0
+- 关闭后续项：0
+- 后续项净变化：0
+'@ | Set-Content -LiteralPath (Join-Path $root 'docs\quality\issue-900-041.md') -Encoding UTF8
+  & git -C $root add .; & git -C $root commit -qm 'scored fixture'
+  $scoredBase = (& git -C $root rev-parse HEAD).Trim()
+  $scoredWorktree = New-AutopilotIssueWorktree -RepoRoot $root -IssueId 'ISSUE-900-041' -BaseCommit $scoredBase
+  'implementation' | Set-Content -LiteralPath (Join-Path $scoredWorktree.path 'implementation.txt') -Encoding UTF8
+  $scoredIssue = [pscustomobject]@{ issueId = 'ISSUE-900-041'; title = 'ISSUE-900-041：Scored closeout'; archiveReport = 'docs/quality/issue-900-041.md' }
+  $scoreEvidence = [ordered]@{
+    issueId='ISSUE-900-041';implementationCommit=('0'*40);scoringVersion='autopilot-task-score/v1';hardGatesPassed=$true;
+    acceptanceCriteriaCovered=$true;targetValidationPassed=$true;scopeConsistent=$true;discoveriesDispositionComplete=$true;
+    followupGovernanceComplete=$true;attempt=0;cycleEvidenceComplete=$true;avoidableReworkCount=0;stockIssueTarget=$false;
+    stockIssueClosed=$false;sameRootIssueAdded=$false;followupNetChange=0;sourceRefs=@('docs/quality/issue-900-041.md')
+  }
+  $scoreConfig = [pscustomobject]@{ enabled=$true; activeVersion='autopilot-task-score/v1'; approvalStatus='APPROVED' }
+  $scored = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $scoredWorktree.path -Issue $scoredIssue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $scoredBase -ScoreEvidence $scoreEvidence -TaskScoringConfig $scoreConfig
+  if (!$scored.merged -or !$scored.score -or $scored.implementationCommit -eq $scored.closeoutCommit) { throw 'scored closeout did not produce two distinct commits' }
+  $closeoutParent = (& git -C $root rev-parse "$($scored.closeoutCommit)^" | Select-Object -First 1).Trim()
+  if ($closeoutParent -ne $scored.implementationCommit) { throw 'score closeout commit is not based on implementationCommit' }
+  if ((Get-Content -LiteralPath (Join-Path $root 'docs\quality\issue-900-041.md') -Raw -Encoding UTF8) -notmatch [regex]::Escape($scored.score.key)) { throw 'formal report does not contain the bound score' }
+  $scoredAgain = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $scoredWorktree.path -Issue $scoredIssue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $scoredBase -ScoreEvidence $scoreEvidence -TaskScoringConfig $scoreConfig
+  if (!$scoredAgain.idempotent -or $scoredAgain.closeoutCommit -ne $scored.closeoutCommit) { throw 'scored closeout retry is not idempotent' }
   Write-Host 'closeout self-test passed'
 } finally {
   if (Test-Path -LiteralPath (Join-Path $root '.git')) { & git -C $root worktree remove --force (Join-Path $root '.worktrees\autopilot\issue-900-040') 2>$null | Out-Null }
+  if (Test-Path -LiteralPath (Join-Path $root '.git')) { & git -C $root worktree remove --force (Join-Path $root '.worktrees\autopilot\issue-900-041') 2>$null | Out-Null }
   Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }

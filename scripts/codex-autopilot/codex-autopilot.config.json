@@ -24,6 +24,27 @@
     "allowRegistryFallback": false,
     "queryLimit": 200
   },
+  "taskScoring": {
+    "enabled": true,
+    "candidateVersion": "autopilot-task-score/v1",
+    "activeVersion": "autopilot-task-score/v1",
+    "approvalStatus": "APPROVED",
+    "approvedAt": "2026-07-13T18:30:59.8101265+08:00",
+    "effectiveFrom": "NEXT_NEW_IMPLEMENTATION_READY",
+    "approvalSource": "docs/iterations/AutoPilot任务评分v1批准决策-2026-07-13.md",
+    "weights": {
+      "deliveryCorrectness": 35,
+      "zeroDanglingIssues": 25,
+      "firstPassAcceptance": 20,
+      "cycleEfficiency": 10,
+      "stockIssueReduction": 10
+    }
+  },
+  "retrospective": {
+    "enabled": true,
+    "threshold": 20,
+    "requireUserRestart": true
+  },
   "cycleIntervalMinutes": 30,
   "issueExecutor": {
     "command": "codex",

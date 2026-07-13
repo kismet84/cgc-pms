@@ -18,7 +18,7 @@
 ## D 测试/回归
 
 - 输入：目标测试、实现结果、既定验收命令
-- 输出：通过/不通过、失败分类、`category/subcategory/confidence/evidence/suggestedNextAction/retryPolicy`、阻塞/非阻塞、repair-request 或通过证据
+- 输出：通过/不通过、失败分类、`category/subcategory/confidence/evidence/suggestedNextAction/retryPolicy`、阻塞/非阻塞、首次正式验收/补修次数、repair-request 或通过证据
 
 ## E 代码审查/安全审查
 
@@ -28,7 +28,7 @@
 ## F 文档/上线清单
 
 - 输入：D/E 结论、正式交付物列表、git 状态、A 的图谱路由证据
-- 输出：quality/done/blocked/iteration 片段、图谱检索证据或不适用原因、local commit 建议、剩余风险
+- 输出：quality/done/blocked/iteration 片段、图谱检索证据或不适用原因、后续项净变化、local commit 建议、剩余风险；评分已批准并激活时还要区分 `implementationCommit` / `closeoutCommit`，输出带版本评分证据和回顾周期登记结果
 
 ## 统一边界
 
@@ -38,3 +38,5 @@
 4. loop runner 只负责串联 phase 和建议动作，不替代主线程最终裁决。
 5. 知识图谱只负责发现、筛选和关联导航；候选进入 Ready 前必须核实当前分支事实与唯一正式载体，图谱异常或过期时 fail-close。
 6. Ready allow/forbid 完全覆盖矛盾属于 `ready_issue_config`，必须在 executor/worktree 前拒绝；合法窄禁止 carve-out 不得误伤。
+7. 评分只对通过全部硬门禁的实施型 Ready 生效；低分不改变任务裁决。未批准 scoring candidate 不计数，已激活版本按跨批次周期累计。
+8. 回顾只提出并正式承接 `NEEDS_CONFIRMATION` 改进方案；报告、问题事实、图谱游标和稳定 Episode 未完成可恢复收口前不得清零周期或恢复派发。

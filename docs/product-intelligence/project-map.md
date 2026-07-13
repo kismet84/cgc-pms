@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-13 增量：AutoPilot 任务评分与20任务自动改进回顾候选控制面
+
+- 已落地确定性五维评分器、评分 schema、`implementationCommit` / `closeoutCommit` 两阶段收口、v2→v3 状态迁移、跨批次回顾计数、无界20任务门禁、有界18+3整批回顾、改进提案聚合、稳定 Episode CLI 与可恢复阶段状态。
+- 评分版本批准门已由用户明确通过：`autopilot-task-score/v1` 权重为35/25/20/10/10，配置 `enabled=true`、`activeVersion=autopilot-task-score/v1`、`approvalStatus=APPROVED`；从批准配置提交后启动的下一项新实施型 Ready 起正式评分并累计20任务回顾周期。
+- 历史样本回放显示交付、零悬空和存量变化证据可用，但首次验收、周期效率及两阶段提交缺少结构化字段，因此不回算历史任务。低分仍不改变硬门禁裁决，回顾改进提案仍须逐项用户确认后才能实施。
+
 ## 2026-07-13 增量：知识图谱优先问题路由与 Ready 契约门禁
 
 - 第41条主线将普通存量问题查询和 AutoPilot 补货统一到 `kg_status` / `kg_list_issues` 同语义入口；脚本侧通过轻量 `issues` CLI 复用 `listIssues`，不复制 Cypher、不建立第二份问题缓存。

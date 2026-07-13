@@ -35,7 +35,8 @@ try {
   $state = New-TestState
   Write-AutopilotStateAtomic -Path $statePath -State $state | Out-Null
   $read = Read-AutopilotState -Path $statePath
-  if ($read.schemaVersion -ne 2 -or $read.status -ne 'IDLE') { throw 'state round-trip failed' }
+  if ($read.schemaVersion -ne 3 -or $read.status -ne 'IDLE') { throw 'state v2 to v3 round-trip migration failed' }
+  if ($read.reviewCycleCompletedCount -ne 0 -or @($read.reviewCycleCompletedIssueIds).Count -ne 0 -or $read.activeScoringVersion) { throw 'state migration fabricated historical scoring data' }
 
   $oldHeartbeat = [datetimeoffset]$read.lastHeartbeatAt
   Start-Sleep -Milliseconds 20
@@ -50,6 +51,7 @@ try {
   Add-AutopilotCompletedIssue -Path $statePath -IssueId 'ISSUE-TEST-001' | Out-Null
   $deduplicated = Add-AutopilotCompletedIssue -Path $statePath -IssueId 'ISSUE-TEST-001'
   if ($deduplicated.completedImplementationIssues -ne 1) { throw 'duplicate issue incremented completion count' }
+  if ($deduplicated.reviewCycleCompletedCount -ne 0) { throw 'legacy completion count leaked into the review cycle' }
 
   $beforeInvalidWrite = Get-Content -Encoding UTF8 -LiteralPath $statePath -Raw
   $invalid = New-TestState

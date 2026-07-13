@@ -217,6 +217,11 @@ CI 与验收失败分类规则：
 - F 必须在每个 Issue 收口时统计 `新增后续项`、`关闭后续项` 与 `后续项净变化`，并更新对应唯一载体；若净变化大于 `0`，下一轮默认优先消化已登记后续项，除非 `current-focus.md` 已写明继续当前产品目标的证据与不先处理的风险依据
 - 若连续 `2` 个 Issue 的后续项净变化均大于 `0`，连续模式必须暂停选择新的`能力新增`任务，先进入缺口修复、运维治理或阻塞核实，直到后续项总量不高于这两个 Issue 开始前的基线；不得通过改名、拆分、重复迁移载体规避止涨门槛
 - F 每次写 AutoPilot state / backlog 收口状态时，必须同步刷新 `lastHeartbeatAt`；若未刷新，不得把该次 state 写入视为最新心跳
+- AutoPilot 任务评分只对已通过全部硬门禁、完成正式归档并产生不同的 `implementationCommit` 与 `closeoutCommit` 的实施型 Ready Issue 生效；评分绑定实施提交，评分收口提交与 closeout ledger 登记成功后才可计入回顾周期。低分只用于周期观测，不得改变 DONE 裁决、触发自动补修或抵消既有质量/安全门禁。
+- 评分配置必须区分 candidate 与 active；只有用户明确批准 `scoringVersion`、五维权重和生效时间后，才允许设置 `approvalStatus=APPROVED`、激活版本并增加正式回顾计数。未批准候选只能用于 disabled 回放和测试，不得写入正式累计。
+- 正式评分按独立于单次 `iterationLimit` 的回顾周期跨批次累计并以任务/评分幂等键去重。无界模式在第20个有效任务安全收口后禁止选择第21个任务；有界 `启动迭代-N` 可完成当前 N，随后对本周期全部任务统一回顾，超出20的部分不结转。
+- 达到回顾阈值后必须保持 `RETROSPECTIVE_REQUIRED` / 暂停状态，直到回顾报告已提交、改进提案去重写入唯一问题事实源、知识图谱 Git 游标追平、稳定 Episode 可读回且最终 state 成功清零。任一阶段失败都保留累计任务并幂等续跑；清零后仍须用户重新启动，不自动恢复。
+- 自动回顾只能按可复现聚合规则生成 `NEEDS_CONFIRMATION` 改进提案，不得自动修改代码、规则、权重或环境。提案证据或验收标准不足时关闭，不得新建孤立改进清单或制造悬空 backlog。
 - 任何“剩余风险”都必须按“非阻塞问题零悬空规则”完成修复、唯一载体承接或有依据关闭；禁止只停留在 `docs/quality/**` 报告备注中
 - checkpoint 固定最小输出为 `branch`、`git status`、`stop.flag`、`pause.flag`、`enabled.flag`；如怀疑需清理工作区，只能先执行 `git clean -fdn` 预览，不得直接清理
 - 可后续沉淀为脚本或技能的候选资产仅记录为：`autopilot-checkpoint`、`ready-issue-writer`、`issue-closeout`、`test-failure-classifier`、`local-commit-closeout`；未明确立项前不要求实现

@@ -21,14 +21,22 @@ function Read-JsonFile {
 function Test-Checkpoint {
   param([string]$AutoDir)
 
-  if (!(Test-Path (Join-Path $AutoDir "enabled.flag"))) {
-    return "STOP_DISABLED"
+  if (Test-Path (Join-Path $AutoDir "stop.flag")) {
+    return "STOP_STOP_FLAG"
   }
   if (Test-Path (Join-Path $AutoDir "pause.flag")) {
     return "STOP_PAUSE_FLAG"
   }
-  if (Test-Path (Join-Path $AutoDir "stop.flag")) {
-    return "STOP_STOP_FLAG"
+  if (!(Test-Path (Join-Path $AutoDir "enabled.flag"))) {
+    return "STOP_DISABLED"
+  }
+  $statePath = Join-Path $AutoDir 'state.json'
+  if (Test-Path -LiteralPath $statePath) {
+    $state = Read-AutopilotState -Path $statePath
+    $boundedBatchComplete = $null -ne $state.iterationLimit -and [int]$state.remainingIterations -le 0
+    if ([bool]$state.retrospectiveDue -and ($null -eq $state.iterationLimit -or $boundedBatchComplete)) {
+      return 'STOP_RETROSPECTIVE_REQUIRED'
+    }
   }
   return "CONTINUE"
 }
@@ -389,15 +397,15 @@ function Write-State {
   $now = [datetimeoffset]::Now.ToString('o')
   $existing = $null
   if (Test-Path -LiteralPath $statePath) {
-    try { $existing = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $existing = $null }
+    try { $existing = Read-AutopilotState -Path $statePath } catch { throw "AutoPilot state cannot be updated safely: $($_.Exception.Message)" }
   }
   $completedIds = @()
   if ($null -ne $existing -and $existing.PSObject.Properties.Name -contains 'completedIssueIds') { $completedIds = @($existing.completedIssueIds) }
   while ($completedIds.Count -lt $script:IterationCompleted) { $completedIds += "legacy-completed-$($completedIds.Count + 1)" }
-  $stateStatus = if ($script:AutopilotStatuses -contains $Status) { $Status } elseif ($Status -eq 'STOP_ITERATION_LIMIT_REACHED') { 'LIMIT_REACHED' } elseif ($Status -eq 'STOP_PAUSE_FLAG') { 'PAUSED' } elseif ($Status -eq 'STOP_DISABLED') { 'DISABLED' } elseif ($Status -like 'STOP*') { 'STOPPED' } elseif ($Status -like 'READY_ISSUE*') { 'PLANNING' } elseif ($Status -like '*SPLIT*') { 'REFILLING' } else { 'CHECKPOINT' }
+  $stateStatus = if ($script:AutopilotStatuses -contains $Status) { $Status } elseif ($Status -eq 'STOP_ITERATION_LIMIT_REACHED') { 'LIMIT_REACHED' } elseif ($Status -eq 'STOP_RETROSPECTIVE_REQUIRED') { 'RETROSPECTIVE_REQUIRED' } elseif ($Status -eq 'STOP_PAUSE_FLAG') { 'PAUSED' } elseif ($Status -eq 'STOP_DISABLED') { 'DISABLED' } elseif ($Status -like 'STOP*') { 'STOPPED' } elseif ($Status -like 'READY_ISSUE*') { 'PLANNING' } elseif ($Status -like '*SPLIT*') { 'REFILLING' } else { 'CHECKPOINT' }
   $phase = $stateStatus.ToLowerInvariant()
   $state = [ordered]@{
-    schemaVersion = 2
+    schemaVersion = 3
     runId = if ($script:RunContext) { $script:RunContext.id } else { 'run-' + [datetimeoffset]::Now.ToString('yyyyMMdd-HHmmss-fff') }
     status = $stateStatus
     phase = $phase
@@ -421,6 +429,23 @@ function Write-State {
     retiredExecutors = @($script:RetiredExecutors)
     lastCommit = $script:LastCommit
     failureFingerprint = $script:FailureFingerprint
+    reviewCycleId = [string](Get-AutopilotStateProperty $existing 'reviewCycleId' '')
+    reviewCycleStartedAt = Get-AutopilotStateProperty $existing 'reviewCycleStartedAt'
+    reviewCycleCompletedIssueIds = @(Get-AutopilotStateProperty $existing 'reviewCycleCompletedIssueIds' @())
+    reviewCycleScoreKeys = @(Get-AutopilotStateProperty $existing 'reviewCycleScoreKeys' @())
+    reviewCycleCompletedCount = [int](Get-AutopilotStateProperty $existing 'reviewCycleCompletedCount' 0)
+    retrospectiveDue = [bool](Get-AutopilotStateProperty $existing 'retrospectiveDue' $false)
+    retrospectiveStatus = [string](Get-AutopilotStateProperty $existing 'retrospectiveStatus' 'IDLE')
+    retrospectivePhase = [string](Get-AutopilotStateProperty $existing 'retrospectivePhase' 'NONE')
+    retrospectiveRequiredAt = Get-AutopilotStateProperty $existing 'retrospectiveRequiredAt'
+    retrospectiveReportCommit = Get-AutopilotStateProperty $existing 'retrospectiveReportCommit'
+    retrospectiveFactsCommit = Get-AutopilotStateProperty $existing 'retrospectiveFactsCommit'
+    retrospectiveGraphGitCursor = Get-AutopilotStateProperty $existing 'retrospectiveGraphGitCursor'
+    retrospectiveEpisodeId = Get-AutopilotStateProperty $existing 'retrospectiveEpisodeId'
+    retrospectiveFailureCategory = Get-AutopilotStateProperty $existing 'retrospectiveFailureCategory'
+    lastRetrospectiveAt = Get-AutopilotStateProperty $existing 'lastRetrospectiveAt'
+    lastRetrospectiveReport = Get-AutopilotStateProperty $existing 'lastRetrospectiveReport'
+    activeScoringVersion = if ($script:TaskScoringActive) { [string]$config.taskScoring.activeVersion } else { $null }
     enabled = Test-Path (Join-Path $AutoDir 'enabled.flag')
     mode = 'continuous-runner'
     iterationCompleted = $script:IterationCompleted
@@ -1061,13 +1086,26 @@ function Invoke-IssueExecutor {
       }
       if ($result.status -eq 'done' -and $config.closeout -and $config.closeout.enabled -eq $true) {
         Write-State $autoDir 'COMMITTING' $false 'CLOSEOUT_START' $Issue.title 'COMMITTING' ''
-        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge ([bool]$config.autoMerge) -BaseBranch $configuredBaseBranch -ExpectedBaseCommit $baseCommit
+        $scoreEvidence = $null
+        if ($script:TaskScoringActive) {
+          $reportPath = Join-Path $worktree.path $Issue.contract.archiveReport
+          $isStockIssue = (Get-IssueBodyByTitle (Join-Path $worktree.path 'docs\backlog\ready-issues.md') $Issue.title) -match '\[stock:[^\]]+\]'
+          $scoreEvidence = New-AutopilotTaskScoreEvidenceFromResult -Result $result -ReportPath $reportPath -ImplementationCommit ('0' * 40) -StockIssueTarget $isStockIssue
+        }
+        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge ([bool]$config.autoMerge) -BaseBranch $configuredBaseBranch -ExpectedBaseCommit $baseCommit -ScoreEvidence $scoreEvidence -TaskScoringConfig $(if ($script:TaskScoringActive) { $config.taskScoring } else { $null })
         $script:LastCommit = $closeout.commit
         $result.gitSummary | Add-Member -NotePropertyName commit -NotePropertyValue $closeout.commit -Force
+        $result.gitSummary | Add-Member -NotePropertyName implementationCommit -NotePropertyValue $closeout.implementationCommit -Force
+        $result.gitSummary | Add-Member -NotePropertyName closeoutCommit -NotePropertyValue $closeout.closeoutCommit -Force
+        if ($closeout.score) { $result | Add-Member -NotePropertyName taskScore -NotePropertyValue $closeout.score -Force }
         $result | Add-Member -NotePropertyName merged -NotePropertyValue $closeout.merged -Force
         $result.nextAction = 'CHECKPOINT'
         $closeoutKey = Get-AutopilotCloseoutKey -IssueId $Issue.lint.issueId -Commit $closeout.commit -ReportPath $Issue.contract.archiveReport
         Register-AutopilotCloseout -LedgerPath (Join-Path $autoDir 'closeouts.ndjson') -Key $closeoutKey | Out-Null
+        if ($script:RetrospectiveActive) {
+          $remainingAfterCloseout = if ($null -eq $script:IterationLimit) { $null } else { [Math]::Max(0, [int]$script:RemainingIterations - 1) }
+          Add-AutopilotReviewCycleIssue -Path (Join-Path $autoDir 'state.json') -IssueId $Issue.lint.issueId -ScoreKey $closeout.score.key -ScoringVersion $closeout.score.scoringVersion -Threshold ([int]$config.retrospective.threshold) -BoundedBatchRemaining $remainingAfterCloseout | Out-Null
+        }
         Write-RunEvent 'closeout' ([pscustomobject]@{ issueId = $Issue.lint.issueId; title = $Issue.title; decision = 'DONE'; status = 'CLOSING'; reason = 'local commit closeout'; evidencePath = $Issue.contract.archiveReport; commit = $closeout.commit })
         $closed = $true
       }
@@ -1088,6 +1126,7 @@ function Invoke-IssueExecutor {
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-state.ps1')
+. (Join-Path $scriptDir 'autopilot-task-score.ps1')
 . (Join-Path $scriptDir 'autopilot-ready.ps1')
 . (Join-Path $scriptDir 'autopilot-route.ps1')
 . (Join-Path $scriptDir 'autopilot-worktree.ps1')
@@ -1102,6 +1141,8 @@ if (!$ConfigPath) {
   $ConfigPath = Join-Path $scriptDir "codex-autopilot.config.json"
 }
 $config = Read-JsonFile $ConfigPath
+$script:TaskScoringActive = if ($config.PSObject.Properties.Name -contains 'taskScoring') { Test-AutopilotTaskScoringActive $config.taskScoring } else { $false }
+$script:RetrospectiveActive = Test-AutopilotRetrospectiveActive $(if ($config.PSObject.Properties.Name -contains 'taskScoring') { $config.taskScoring } else { $null }) $(if ($config.PSObject.Properties.Name -contains 'retrospective') { $config.retrospective } else { $null })
 if ($config.repoRoot) {
   $RepoRoot = $config.repoRoot
 }
@@ -1205,6 +1246,18 @@ try {
       exit 0
     }
     $script:RunLock = New-RunLock $autoDir $maxRunMinutes "apply-backlog-split"
+  }
+
+  $boundaryStatePath = Join-Path $autoDir 'state.json'
+  if (Test-Path -LiteralPath $boundaryStatePath) {
+    $boundaryState = Read-AutopilotState -Path $boundaryStatePath
+    $boundedReviewDue = $null -ne $boundaryState.iterationLimit -and [int]$boundaryState.remainingIterations -le 0
+    if ([bool]$boundaryState.retrospectiveDue -and ($null -eq $boundaryState.iterationLimit -or $boundedReviewDue)) {
+      Write-RunEvent 'stop' ([pscustomobject]@{ decision='STOP'; status='STOP_RETROSPECTIVE_REQUIRED'; stopReason='STOP_RETROSPECTIVE_REQUIRED'; reviewCycleId=$boundaryState.reviewCycleId; reviewCycleCompletedCount=$boundaryState.reviewCycleCompletedCount })
+      Write-State $autoDir 'STOP_RETROSPECTIVE_REQUIRED' ([bool]$DryRun) 'RETROSPECTIVE_REQUIRED' '' 'pending retrospective blocks new task dispatch' 'STOP_RETROSPECTIVE_REQUIRED'
+      Write-Host 'STOP_RETROSPECTIVE_REQUIRED'
+      exit 0
+    }
   }
 
   if ($null -ne $script:IterationLimit -and $script:IterationCompleted -ge $script:IterationLimit) {

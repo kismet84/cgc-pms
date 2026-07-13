@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseIssueOptions } from "../src/cli.js";
+import { parseEpisodeOptions, parseIssueOptions } from "../src/cli.js";
 
 test("issues CLI parses bounded list filters without changing query semantics", () => {
   assert.deepEqual(parseIssueOptions([
@@ -13,6 +13,20 @@ test("issues CLI parses bounded list filters without changing query semantics", 
     priority: "P0", parentIssueKey: "A-01", blocking: false,
     currentOnly: true, query: "tenant",
   });
+});
+
+test("episode CLI requires a sourced payload with an explicit stable id", () => {
+  const input = parseEpisodeOptions(["--input", "episode.json"], () => JSON.stringify({
+    id: "cgc-pms:episode:autopilot-retrospective:review-1:v1",
+    kind: "run",
+    summary: "retrospective",
+    sourceRef: "docs/iterations/review.md",
+    occurredAt: "2026-07-13T12:00:00+08:00",
+  }));
+  assert.equal(input.kind, "run");
+  assert.throws(() => parseEpisodeOptions([], () => "{}"), /--input/);
+  assert.throws(() => parseEpisodeOptions(["--input", "x"], () => "{}"), /stable id/);
+  assert.throws(() => parseEpisodeOptions(["--input", "x"], () => "not-json"), /invalid JSON/);
 });
 
 test("issues CLI rejects unknown, missing, and invalid arguments before connecting", () => {

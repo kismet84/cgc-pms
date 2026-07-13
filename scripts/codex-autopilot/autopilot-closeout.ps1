@@ -48,7 +48,16 @@ function Assert-AutopilotStockIssueClosed {
 }
 
 function Complete-AutopilotIssueCloseout {
-  param([string]$RepoRoot, [string]$Worktree, [object]$Issue, [bool]$AutoMerge = $true, [string]$BaseBranch = 'master', [string]$ExpectedBaseCommit = '')
+  param(
+    [string]$RepoRoot,
+    [string]$Worktree,
+    [object]$Issue,
+    [bool]$AutoMerge = $true,
+    [string]$BaseBranch = 'master',
+    [string]$ExpectedBaseCommit = '',
+    [object]$ScoreEvidence = $null,
+    [object]$TaskScoringConfig = $null
+  )
   $currentBranch = (& git -C $RepoRoot branch --show-current).Trim()
   if ($currentBranch -ne $BaseBranch) { throw "closeout requires base branch $BaseBranch, actual=$currentBranch" }
   $archivePath = Join-Path $Worktree $Issue.archiveReport
@@ -56,12 +65,40 @@ function Complete-AutopilotIssueCloseout {
   $readyPath = Join-Path $Worktree 'docs\backlog\ready-issues.md'
   $donePath = Join-Path $Worktree 'docs\backlog\done-issues.md'
   $worktreeHead = (& git -C $Worktree rev-parse HEAD).Trim()
+  $scoringActive = $null -ne $TaskScoringConfig -and (Test-AutopilotTaskScoringActive $TaskScoringConfig)
   & git -C $RepoRoot merge-base --is-ancestor $worktreeHead HEAD 2>$null
   if ($LASTEXITCODE -eq 0 -and (Get-Content -LiteralPath (Join-Path $RepoRoot 'docs\backlog\ready-issues.md') -Raw -Encoding UTF8) -match ('(?ms)^###\s+' + [regex]::Escape($Issue.title) + '.*?^状态：Done\s*$')) {
-    return [pscustomobject]@{ commit = $worktreeHead; merged = $true; idempotent = $true }
+    $implementationCommit = if ($scoringActive) { (& git -C $Worktree rev-parse "$worktreeHead^" 2>$null | Select-Object -First 1).Trim() } else { $worktreeHead }
+    return [pscustomobject]@{ commit = $worktreeHead; implementationCommit = $implementationCommit; closeoutCommit = $worktreeHead; merged = $true; idempotent = $true; score = $null }
   }
   if ($ExpectedBaseCommit -and (& git -C $RepoRoot rev-parse HEAD).Trim() -ne $ExpectedBaseCommit) { throw 'base branch advanced during Issue execution; closeout requires a fresh isolated retry' }
   Assert-AutopilotStockIssueClosed -Worktree $Worktree -ReadyPath $readyPath -IssueTitle $Issue.title
+  $implementationCommit = $null
+  $score = $null
+  if ($scoringActive) {
+    if ($null -eq $ScoreEvidence) { throw 'active task scoring requires deterministic ScoreEvidence' }
+    $subject = (& git -C $Worktree log -1 --pretty=%s 2>$null | Select-Object -First 1).Trim()
+    if ($subject -eq "feat(autopilot): implement $($Issue.issueId.ToLowerInvariant())") {
+      $implementationCommit = (& git -C $Worktree rev-parse HEAD).Trim()
+    } else {
+      & git -C $Worktree diff --check
+      if ($LASTEXITCODE -ne 0) { throw 'implementation commit failed git diff --check' }
+      & git -C $Worktree add -A
+      if ($LASTEXITCODE -ne 0) { throw 'implementation commit failed to stage changes' }
+      & git -C $Worktree diff --cached --quiet
+      if ($LASTEXITCODE -eq 0) {
+        $implementationCommit = (& git -C $Worktree rev-parse HEAD).Trim()
+        if ($implementationCommit -eq $ExpectedBaseCommit) { throw 'active scoring closeout has no implementation artifacts to commit' }
+      } else {
+        & git -C $Worktree commit -m "feat(autopilot): implement $($Issue.issueId.ToLowerInvariant())" | Out-Null
+        if ($LASTEXITCODE -ne 0) { throw 'implementation local commit failed' }
+        $implementationCommit = (& git -C $Worktree rev-parse HEAD).Trim()
+      }
+    }
+    Set-AutopilotScoreProperty $ScoreEvidence 'implementationCommit' $implementationCommit
+    $score = New-AutopilotTaskScore $ScoreEvidence
+    Add-AutopilotTaskScoreToReport -ReportPath $archivePath -Score $score | Out-Null
+  }
   Set-AutopilotReadyDone -ReadyPath $readyPath -IssueTitle $Issue.title | Out-Null
   if (!(Test-Path -LiteralPath $donePath)) { '# Done Issues' | Set-Content -LiteralPath $donePath -Encoding UTF8 }
   $doneText = Get-Content -LiteralPath $donePath -Raw -Encoding UTF8
@@ -72,7 +109,8 @@ function Complete-AutopilotIssueCloseout {
   if ($LASTEXITCODE -ne 0) { throw 'closeout failed git diff --check' }
   & git -C $Worktree add -A
   if ($LASTEXITCODE -ne 0) { throw 'closeout failed to stage changes' }
-  & git -C $Worktree commit -m "feat(autopilot): complete $($Issue.issueId.ToLowerInvariant())" | Out-Null
+  $commitMessage = if ($scoringActive) { "chore(autopilot): score and close $($Issue.issueId.ToLowerInvariant())" } else { "feat(autopilot): complete $($Issue.issueId.ToLowerInvariant())" }
+  & git -C $Worktree commit -m $commitMessage | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'closeout local commit failed' }
   $commit = (& git -C $Worktree rev-parse HEAD).Trim()
   $merged = $false
@@ -84,5 +122,6 @@ function Complete-AutopilotIssueCloseout {
     if ($LASTEXITCODE -ne 0) { throw 'local fast-forward merge failed' }
     $merged = $true
   }
-  return [pscustomobject]@{ commit = $commit; merged = $merged; idempotent = $false }
+  if (!$implementationCommit) { $implementationCommit = $commit }
+  return [pscustomobject]@{ commit = $commit; implementationCommit = $implementationCommit; closeoutCommit = $commit; merged = $merged; idempotent = $false; score = $score }
 }

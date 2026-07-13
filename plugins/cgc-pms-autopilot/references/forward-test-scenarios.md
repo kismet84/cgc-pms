@@ -65,3 +65,33 @@
 - 输入：`-DryRun -EnableLocalCommit -Scenario closeout`
 - 预期：仍保持 dry-run，不触发真实 commit
 - 通过条件：输出 `dryRun=true`，且 closeout 分支最多只到 dry-run 预览
+
+## 场景8：候选评分版本未批准
+
+- 输入：`taskScoring.enabled=false`、`activeVersion=null`、`approvalStatus=NEEDS_CONFIRMATION`
+- 预期：允许确定性评分器单测和历史样本字段回放，不写正式评分、不增加回顾周期计数
+- 通过条件：runner 沿用既有单阶段行为；任何试图以未批准版本启用计数的配置均 fail-close
+
+## 场景9：评分两阶段收口与幂等重试
+
+- 输入：已批准 active 版本、硬门禁通过、同一 Issue 重复 closeout
+- 预期：产生不同的 `implementationCommit` 和 `closeoutCommit`；评分只绑定前者，重复执行复用同一评分键和提交登记
+- 通过条件：正式报告只有一段评分、ledger 只有一条有效登记、回顾周期只增加一次
+
+## 场景10：无界20任务回顾门禁
+
+- 输入：无界连续模式完成第20个有效评分任务
+- 预期：状态进入 `RETROSPECTIVE_REQUIRED`，下一 checkpoint 阻断第21个任务
+- 通过条件：周期计数为20且唯一 Issue/评分键各20个；回顾未完整收口前不能启动新批次
+
+## 场景11：有界18+3整批回顾
+
+- 输入：跨批次已有18个有效任务，执行 `启动迭代-3`
+- 预期：第20个任务只置待回顾，当前批次完成到21个后统一回顾
+- 通过条件：回顾覆盖21个任务，成功后全部清零且不结转；系统保持暂停，等待用户重新启动
+
+## 场景12：回顾阶段恢复
+
+- 输入：分别在报告提交、问题写回、图谱刷新或 Episode 写入后中断
+- 预期：保持累计与暂停，按 `REPORT_COMMITTED → ISSUES_WRITTEN → GRAPH_REFRESHED → EPISODE_RECORDED` 单向续跑
+- 通过条件：阶段乱序和提前清零被拒绝；改进提案始终为 `NEEDS_CONFIRMATION`，没有自动实施

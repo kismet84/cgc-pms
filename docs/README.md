@@ -27,6 +27,7 @@
 | 11 | [安全规范](standards/11-安全规范.md) |
 | 12 | [Codex Subagents 实施方案](standards/12-codex-subagents-implementation-plan.md) |
 | 13 | [驾驶舱摘要字段规范](standards/13-驾驶舱摘要字段生成与展示规范.md) |
+| 14 | [AutoPilot 任务评分与自动改进回顾规范](standards/14-AutoPilot任务评分与自动改进回顾规范.md) |
 
 ## 当前工作入口
 
