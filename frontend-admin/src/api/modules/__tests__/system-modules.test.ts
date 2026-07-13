@@ -31,6 +31,7 @@ import {
   getMenuTree,
   getRoles,
   getUserList,
+  updateMenu,
   updateRoleMenus,
 } from '../system'
 
@@ -85,6 +86,56 @@ describe('system-related API modules', () => {
       method: 'delete',
     })
     expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+  })
+
+  it('builds an exact menu update request with business fields only', () => {
+    const payload = {
+      parentId: '10',
+      menuName: '菜单概览（修改）',
+      menuType: 'MENU' as const,
+      path: '/system/overview-v2',
+      component: 'system/overview/index',
+      perms: 'system:menu:edit',
+      icon: 'menu',
+      orderNum: 8,
+      status: 'ENABLE',
+      visible: 1,
+    }
+
+    updateMenu('13', payload)
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/menus/13',
+      method: 'put',
+      data: payload,
+    })
+    expect(Object.keys(mockRequest.mock.calls[0][0].data).sort()).toEqual(
+      [
+        'parentId',
+        'menuName',
+        'menuType',
+        'path',
+        'component',
+        'perms',
+        'icon',
+        'orderNum',
+        'status',
+        'visible',
+      ].sort(),
+    )
+    for (const forbiddenField of [
+      'id',
+      'tenantId',
+      'createdBy',
+      'createdAt',
+      'updatedBy',
+      'updatedAt',
+      'deletedFlag',
+      'children',
+    ]) {
+      expect(payload).not.toHaveProperty(forbiddenField)
+    }
   })
 
   it('builds a bodyless menu detail request', () => {

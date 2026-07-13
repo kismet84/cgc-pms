@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -80,10 +81,82 @@ public class SysMenuService {
     @Transactional(rollbackFor = Exception.class)
     public void update(SysMenu menu) {
         Long tenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
-        SysMenu existing = sysMenuMapper.selectById(menu.getId());
-        if (existing == null || !existing.getTenantId().equals(tenantId))
+        List<SysMenu> tenantMenus = lockTenantMenus(tenantId);
+        SysMenu existing = findTenantMenu(tenantMenus, menu.getId());
+        if (existing == null)
             throw new BusinessException("MENU_NOT_FOUND", "菜单不存在");
-        sysMenuMapper.updateById(menu);
+        if (!MENU_TYPES.contains(menu.getMenuType())) {
+            throw new BusinessException("MENU_TYPE_INVALID", "菜单类型不合法");
+        }
+
+        Long parentId = menu.getParentId() == null ? 0L : menu.getParentId();
+        validateUpdateParent(menu.getId(), parentId, tenantMenus);
+
+        if ("BUTTON".equals(menu.getMenuType())) {
+            if (tenantMenus.stream().anyMatch(candidate -> Objects.equals(candidate.getParentId(), menu.getId()))) {
+                throw new BusinessException("MENU_HAS_CHILDREN", "存在子节点的菜单不能改为按钮");
+            }
+        }
+
+        // Only copy mutable business fields. Tenant, audit, logical-delete, remark and children
+        // must never be controlled by the request body.
+        SysMenu safeUpdate = new SysMenu();
+        safeUpdate.setId(existing.getId());
+        safeUpdate.setParentId(parentId);
+        safeUpdate.setMenuName(menu.getMenuName());
+        safeUpdate.setMenuType(menu.getMenuType());
+        safeUpdate.setPath(menu.getPath());
+        safeUpdate.setComponent(menu.getComponent());
+        safeUpdate.setPerms(menu.getPerms());
+        safeUpdate.setIcon(menu.getIcon());
+        safeUpdate.setOrderNum(menu.getOrderNum());
+        safeUpdate.setStatus(menu.getStatus());
+        safeUpdate.setVisible(menu.getVisible());
+        sysMenuMapper.updateById(safeUpdate);
+    }
+
+    private List<SysMenu> lockTenantMenus(Long tenantId) {
+        return sysMenuMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysMenu>()
+                        .eq(SysMenu::getTenantId, tenantId)
+                        .orderByAsc(SysMenu::getId)
+                        .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+    }
+
+    private SysMenu findTenantMenu(List<SysMenu> tenantMenus, Long menuId) {
+        return tenantMenus.stream()
+                .filter(candidate -> Objects.equals(candidate.getId(), menuId))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void validateUpdateParent(Long menuId, Long parentId, List<SysMenu> tenantMenus) {
+        if (parentId == 0L) return;
+        if (Objects.equals(menuId, parentId)) {
+            throw new BusinessException("MENU_TREE_CYCLE", "菜单不能以自身作为父节点");
+        }
+
+        SysMenu parent = findTenantMenu(tenantMenus, parentId);
+        if (parent == null || "BUTTON".equals(parent.getMenuType())) {
+            throw new BusinessException("MENU_PARENT_INVALID", "父菜单不存在或不可作为父节点");
+        }
+
+        Set<Long> visited = new HashSet<>();
+        visited.add(parentId);
+        Long ancestorId = parent.getParentId() == null ? 0L : parent.getParentId();
+        while (ancestorId != 0L) {
+            if (Objects.equals(menuId, ancestorId)) {
+                throw new BusinessException("MENU_TREE_CYCLE", "菜单不能以任一后代作为父节点");
+            }
+            if (!visited.add(ancestorId)) {
+                throw new BusinessException("MENU_TREE_CYCLE", "父菜单链存在环");
+            }
+            SysMenu ancestor = findTenantMenu(tenantMenus, ancestorId);
+            if (ancestor == null) {
+                throw new BusinessException("MENU_PARENT_INVALID", "父菜单不存在或不可作为父节点");
+            }
+            ancestorId = ancestor.getParentId() == null ? 0L : ancestor.getParentId();
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)

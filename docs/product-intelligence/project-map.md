@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-13 增量：系统菜单修改管理员入口与树约束
+
+- `ISSUE-040-023` 在既有 admin-only `/system/permissions` 页面增加“修改菜单”入口，从完整菜单树选择目标并加载详情，精确发送 `PUT /system/menus/{id}`；成功后刷新菜单树、平铺列表与详情，失败保留目标和表单。
+- 页面入口仅 ADMIN/SUPER_ADMIN 可见；后端既有 ADMIN/SUPER_ADMIN 或 `system:menu:edit` 授权保持不变。更新以路径 ID 和当前租户锁定目标，只复制10个业务字段，并拒绝非法类型、非法父节点、自环/后代环与带子节点改 BUTTON；角色菜单关系保持不变。
+- `A-01-MENU-UPDATE` 已关闭；A-01 当前守恒为有用户入口229、前端调用但无独立页面58、内部/集成/运维4、需补入口19、待废弃0、需要确认11，共321。本切片未扩展为拖拽排序、批量修改、动态路由或完整菜单管理平台。
+
 ## 2026-07-13 增量：AutoPilot 跨 Run 阶段恢复与任务执行效率评分
 
 - 控制面新增原子 Issue phase checkpoint，绑定 Ready 内容、base、worktree/branch、scope、diff/evidence、阶段产物和派发指标；死进程接管不再删除有效 worktree 或重新派发 implementation，而是从 validation、Reviewer 或 closeout 的首个未完成阶段继续。

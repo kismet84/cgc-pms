@@ -3,6 +3,8 @@ package com.cgcpms.system;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.ratelimit.FallbackRateLimitCounterStore;
+import com.cgcpms.system.entity.SysMenu;
+import com.cgcpms.system.mapper.SysMenuMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
@@ -15,6 +17,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -30,6 +33,7 @@ class SysMenuControllerTest {
     @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private FallbackRateLimitCounterStore counterStore;
+    @Autowired private SysMenuMapper menuMapper;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
 
     @BeforeEach
@@ -42,8 +46,12 @@ class SysMenuControllerTest {
     }
 
     private Cookie cookie(List<String> roles, List<String> permissions) {
+        return cookie(TENANT_ID, roles, permissions);
+    }
+
+    private Cookie cookie(long tenantId, List<String> roles, List<String> permissions) {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
-                jwtUtils.generateToken(ADMIN_ID, "menu-test", TENANT_ID, roles, permissions));
+                jwtUtils.generateToken(ADMIN_ID, "menu-test", tenantId, roles, permissions));
     }
 
     @Test @Order(1) @DisplayName("GET /system/menus without JWT -> 401")
@@ -194,7 +202,103 @@ class SysMenuControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-    @Test @Order(16) @DisplayName("DELETE /system/menus/{id} ADMIN -> 200")
+    @Test @Order(16) @DisplayName("PUT /system/menus/{id} ADMIN -> path id wins and only business fields update")
+    void testUpdate_Admin_PathIdAndSafeFields() throws Exception {
+        long targetId = createMenu(adminCookie(), "管理员修改目标", "MENU", 0L);
+        long bodyId = createMenu(adminCookie(), "请求体ID目标", "MENU", 0L);
+
+        mockMvc.perform(u("/system/menus/" + targetId).cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"id\":" + bodyId + ",\"tenantId\":999,\"parentId\":0,"
+                                + "\"menuName\":\"管理员已修改\",\"menuType\":\"DIR\","
+                                + "\"path\":\"/updated\",\"component\":\"system/updated/index\","
+                                + "\"perms\":\"system:menu:updated\",\"icon\":\"updated\","
+                                + "\"orderNum\":8,\"status\":\"DISABLE\",\"visible\":0,"
+                                + "\"createdBy\":999,\"updatedBy\":999,\"deletedFlag\":1,"
+                                + "\"remark\":\"客户端不得覆盖\",\"children\":[{\"id\":999}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+
+        mockMvc.perform(g("/system/menus/" + targetId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(targetId))
+                .andExpect(jsonPath("$.data.parentId").value(0))
+                .andExpect(jsonPath("$.data.menuName").value("管理员已修改"))
+                .andExpect(jsonPath("$.data.menuType").value("DIR"))
+                .andExpect(jsonPath("$.data.path").value("/updated"))
+                .andExpect(jsonPath("$.data.component").value("system/updated/index"))
+                .andExpect(jsonPath("$.data.perms").value("system:menu:updated"))
+                .andExpect(jsonPath("$.data.icon").value("updated"))
+                .andExpect(jsonPath("$.data.orderNum").value(8))
+                .andExpect(jsonPath("$.data.status").value("DISABLE"))
+                .andExpect(jsonPath("$.data.visible").value(0));
+
+        SysMenu saved = menuMapper.selectById(targetId);
+        assertEquals(TENANT_ID, saved.getTenantId());
+        assertNotEquals(999L, saved.getCreatedBy());
+        assertNotEquals(999L, saved.getUpdatedBy());
+        assertEquals(0, saved.getDeletedFlag());
+        assertNull(saved.getRemark());
+        assertEquals("请求体ID目标", menuMapper.selectById(bodyId).getMenuName());
+    }
+
+    @Test @Order(17) @DisplayName("PUT /system/menus/{id} SUPER_ADMIN -> 200")
+    void testUpdate_SuperAdmin() throws Exception {
+        long menuId = createMenu(adminCookie(), "超级管理员修改目标", "MENU", 0L);
+        mockMvc.perform(u("/system/menus/" + menuId)
+                        .cookie(cookie(List.of("SUPER_ADMIN"), List.of()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody("超级管理员已修改")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(18) @DisplayName("PUT /system/menus/{id} system:menu:edit -> 200")
+    void testUpdate_WithPermission() throws Exception {
+        long menuId = createMenu(adminCookie(), "权限码修改目标", "MENU", 0L);
+        mockMvc.perform(u("/system/menus/" + menuId)
+                        .cookie(cookie(List.of("USER"), List.of("system:menu:edit")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody("权限码已修改")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(19) @DisplayName("PUT /system/menus/{id} without role or permission -> 403 and unchanged")
+    void testUpdate_Forbidden() throws Exception {
+        long menuId = createMenu(adminCookie(), "越权修改保留菜单", "MENU", 0L);
+        mockMvc.perform(u("/system/menus/" + menuId)
+                        .cookie(cookie(List.of("USER"), List.of("system:menu:query")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody("越权修改")))
+                .andExpect(status().isForbidden());
+
+        assertEquals("越权修改保留菜单", menuMapper.selectById(menuId).getMenuName());
+    }
+
+    @Test @Order(20) @DisplayName("PUT /system/menus/{id} without JWT -> 401")
+    void testUpdate_Unauthorized() throws Exception {
+        mockMvc.perform(u("/system/menus/1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody("未登录修改")))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test @Order(21) @DisplayName("PUT missing and cross-tenant menus -> MENU_NOT_FOUND")
+    void testUpdate_NotFoundAndCrossTenantUseSameCode() throws Exception {
+        Cookie foreignAdmin = cookie(777L, List.of("ADMIN"), List.of());
+        long foreignMenuId = createMenu(foreignAdmin, "其他租户菜单", "MENU", 0L);
+
+        for (long id : List.of(999999L, foreignMenuId)) {
+            mockMvc.perform(u("/system/menus/" + id).cookie(adminCookie())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(updateBody("不可修改")))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("MENU_NOT_FOUND"));
+        }
+    }
+
+    @Test @Order(30) @DisplayName("DELETE /system/menus/{id} ADMIN -> 200")
     void testDelete_Admin() throws Exception {
         long menuId = createDeletableMenu("管理员删除菜单");
         mockMvc.perform(d("/system/menus/" + menuId).cookie(adminCookie()))
@@ -202,7 +306,7 @@ class SysMenuControllerTest {
                 .andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(17) @DisplayName("DELETE /system/menus/{id} SUPER_ADMIN -> 200")
+    @Test @Order(31) @DisplayName("DELETE /system/menus/{id} SUPER_ADMIN -> 200")
     void testDelete_SuperAdmin() throws Exception {
         long menuId = createDeletableMenu("超级管理员删除菜单");
         mockMvc.perform(d("/system/menus/" + menuId)
@@ -211,7 +315,7 @@ class SysMenuControllerTest {
                 .andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(18) @DisplayName("DELETE /system/menus/{id} system:menu:delete -> 200")
+    @Test @Order(32) @DisplayName("DELETE /system/menus/{id} system:menu:delete -> 200")
     void testDelete_WithPermission() throws Exception {
         long menuId = createDeletableMenu("权限码删除菜单");
         mockMvc.perform(d("/system/menus/" + menuId)
@@ -220,7 +324,7 @@ class SysMenuControllerTest {
                 .andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(19) @DisplayName("DELETE /system/menus/{id} without role or permission -> 403 and target remains")
+    @Test @Order(33) @DisplayName("DELETE /system/menus/{id} without role or permission -> 403 and target remains")
     void testDelete_Forbidden() throws Exception {
         long menuId = createDeletableMenu("越权删除保留菜单");
         mockMvc.perform(d("/system/menus/" + menuId)
@@ -233,17 +337,29 @@ class SysMenuControllerTest {
     }
 
     private long createDeletableMenu(String menuName) throws Exception {
-        String response = mockMvc.perform(p("/system/menus").cookie(adminCookie())
+        return createMenu(adminCookie(), menuName, "MENU", 0L);
+    }
+
+    private long createMenu(Cookie actor, String menuName, String menuType, Long parentId) throws Exception {
+        String response = mockMvc.perform(p("/system/menus").cookie(actor)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"parentId\":0,\"menuName\":\"" + menuName
-                                + "\",\"menuType\":\"MENU\"}"))
+                        .content("{\"parentId\":" + parentId + ",\"menuName\":\"" + menuName
+                                + "\",\"menuType\":\"" + menuType + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andReturn().getResponse().getContentAsString();
         return objectMapper.readTree(response).path("data").asLong();
     }
 
+    private String updateBody(String menuName) {
+        return "{\"parentId\":0,\"menuName\":\"" + menuName
+                + "\",\"menuType\":\"MENU\",\"path\":\"/updated\","
+                + "\"component\":\"system/updated/index\",\"perms\":\"system:menu:edit\","
+                + "\"icon\":\"menu\",\"orderNum\":1,\"status\":\"ENABLE\",\"visible\":1}";
+    }
+
     private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }
     private MockHttpServletRequestBuilder p(String p) { return post("/api" + p).contextPath("/api"); }
+    private MockHttpServletRequestBuilder u(String p) { return put("/api" + p).contextPath("/api"); }
     private MockHttpServletRequestBuilder d(String p) { return delete("/api" + p).contextPath("/api"); }
 }

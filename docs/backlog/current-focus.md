@@ -15,6 +15,13 @@
 - 补货顺序固定为：已有合格 Ready → [当前问题唯一快照](current-issues.json) 中可执行存量 → 当前 focus 可解除阻塞 → [Ad-hoc 计划](ad-hoc-plan.md) 中已过决策门候选 → 产品情报刷新；[长期增强计划](cgc-pms-production-enhancement-plan.md) 只提供研究输入，不得直接拆 Ready。
 - v1.0 的完成记录、测试数量和质量结论不得直接作为 v1.5 验收证据。
 
+## 2026-07-13 AutoPilot 单任务恢复：系统菜单修改入口
+
+- `ISSUE-040-023` 已复用 durable checkpoint 保留既有 B/C diff，并完成 D/E/F：管理员可在既有权限清单页修改单个菜单，后端补齐类型、父节点、环和子节点约束；未重做或扩大 B/C 实现。
+- Ready lint、后端专项59/59、前端专项37/37、类型检查与差异检查通过；权限、租户、路径 ID、字段白名单、角色绑定与拒绝路径原子性均有自动化和静态复核证据。
+- `A-01-MENU-UPDATE` 已从唯一当前问题台账移除；A-01 当前守恒为有用户入口229、前端调用无独立页面58、内部/集成/运维4、需补入口19、待废弃0、需要确认11，共321。
+- 本 Issue 业务验收已通过；控制面仍须在两阶段提交、closeout ledger、state 与知识图谱 Git cursor 全部读回后，才能登记本次单任务金丝雀成功，本文不提前替代该控制面裁决。
+
 ## 2026-07-13 第42条主线：AutoPilot 跨 Run 恢复与效率评分
 
 - `AUTOPILOT-CROSS-RUN-PHASE-RECOVERY` 已完成实现与自动化验收：活动 Issue 使用 durable phase checkpoint 绑定 Ready/base/worktree/branch/scope/diff/evidence；有效现场只从 validation、Reviewer 或 closeout 恢复，closeout 已合并后的崩溃窗口也可幂等完成 ledger/state/图谱登记，禁止删除 worktree 后重派 B/C。

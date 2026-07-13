@@ -51,3 +51,16 @@ export interface CreateMenuPayload {
   icon?: string
   orderNum?: number
 }
+
+export interface UpdateMenuPayload {
+  parentId: number | string
+  menuName: string
+  menuType: MenuType
+  path: string
+  component: string
+  perms: string
+  icon: string
+  orderNum: number
+  status: string
+  visible: number
+}

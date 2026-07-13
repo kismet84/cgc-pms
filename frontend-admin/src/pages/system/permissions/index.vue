@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import {
+  DeleteOutlined,
+  EditOutlined,
+  EyeOutlined,
+  PlusOutlined,
+  ReloadOutlined,
+} from '@ant-design/icons-vue'
 import axios from 'axios'
 import {
   createMenu,
@@ -10,9 +16,16 @@ import {
   getMenuList,
   getMenuTree,
   getRoles,
+  updateMenu,
 } from '@/api/modules/system'
 import { useUserStore } from '@/stores/user'
-import type { CreateMenuPayload, MenuTreeVO, SysMenuVO, SysRoleVO } from '@/types/system'
+import type {
+  CreateMenuPayload,
+  MenuTreeVO,
+  SysMenuVO,
+  SysRoleVO,
+  UpdateMenuPayload,
+} from '@/types/system'
 
 interface PermissionRow {
   id: string
@@ -30,6 +43,13 @@ const userStore = useUserStore()
 const createOpen = ref(false)
 const creating = ref(false)
 const createForm = reactive<CreateMenuPayload>(defaultCreateForm())
+const updateOpen = ref(false)
+const updating = ref(false)
+const updateTargetId = ref<number | string>()
+const updateForm = reactive<UpdateMenuPayload>(defaultUpdateForm())
+const updateReady = ref(false)
+const updateError = ref('')
+let updateRequestSequence = 0
 const deleteOpen = ref(false)
 const deleting = ref(false)
 const deleteTargetId = ref<number | string>()
@@ -49,6 +69,7 @@ const isAdmin = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
 )
 const canCreateMenu = computed(() => isAdmin.value)
+const canUpdateMenu = computed(() => isAdmin.value)
 const canDeleteMenu = computed(() => isAdmin.value)
 const canViewMenuDetail = computed(() => isAdmin.value)
 const canViewMenuList = computed(() => isAdmin.value)
@@ -61,6 +82,13 @@ const parentTreeData = computed(() => [
 ])
 const deleteTreeData = computed(() => toDeleteTreeData(menuTree.value))
 const detailTreeData = computed(() => toDeleteTreeData(menuTree.value))
+const updateParentTreeData = computed(() => [
+  {
+    title: '根节点',
+    value: 0,
+    children: toUpdateParentTreeData(menuTree.value, updateTargetId.value),
+  },
+])
 const selectedDeleteMenu = computed(() => findMenu(menuTree.value, deleteTargetId.value))
 
 const rows = computed(() => flattenPermissions(menuTree.value, boundMenuIds.value))
@@ -114,6 +142,21 @@ function defaultCreateForm(): CreateMenuPayload {
   }
 }
 
+function defaultUpdateForm(): UpdateMenuPayload {
+  return {
+    parentId: 0,
+    menuName: '',
+    menuType: 'MENU',
+    path: '',
+    component: '',
+    perms: '',
+    icon: '',
+    orderNum: 0,
+    status: 'ENABLE',
+    visible: 1,
+  }
+}
+
 function toParentTreeData(nodes: MenuTreeVO[]): Array<{
   title: string
   value: number | string
@@ -142,6 +185,26 @@ function toDeleteTreeData(nodes: MenuTreeVO[]): Array<{
   }))
 }
 
+function toUpdateParentTreeData(
+  nodes: MenuTreeVO[],
+  excludedId?: number | string,
+): Array<{
+  title: string
+  value: number | string
+  children?: ReturnType<typeof toUpdateParentTreeData>
+}> {
+  return nodes.flatMap((node) => {
+    if (String(node.id) === String(excludedId) || node.menuType === 'BUTTON') return []
+    return [
+      {
+        title: node.menuName,
+        value: node.id,
+        children: toUpdateParentTreeData(node.children ?? [], excludedId),
+      },
+    ]
+  })
+}
+
 function findMenu(nodes: MenuTreeVO[], id?: number | string): MenuTreeVO | undefined {
   if (id === undefined || id === null || id === '') return undefined
   for (const node of nodes) {
@@ -159,6 +222,66 @@ function openCreate() {
 
 function closeCreate() {
   if (!creating.value) createOpen.value = false
+}
+
+function resetUpdateForm() {
+  Object.assign(updateForm, defaultUpdateForm())
+  updateReady.value = false
+}
+
+function applyUpdateDetail(detail: SysMenuVO) {
+  Object.assign(updateForm, {
+    parentId: detail.parentId ?? 0,
+    menuName: detail.menuName,
+    menuType: detail.menuType,
+    path: detail.path ?? '',
+    component: detail.component ?? '',
+    perms: detail.perms ?? '',
+    icon: detail.icon ?? '',
+    orderNum: detail.orderNum ?? 0,
+    status: detail.status,
+    visible: detail.visible ?? 1,
+  })
+  updateReady.value = true
+}
+
+function openUpdate() {
+  updateRequestSequence += 1
+  updateTargetId.value = undefined
+  updateError.value = ''
+  resetUpdateForm()
+  updateOpen.value = true
+}
+
+function closeUpdate() {
+  if (updating.value) return
+  updateRequestSequence += 1
+  updateOpen.value = false
+  updateTargetId.value = undefined
+  updateError.value = ''
+  resetUpdateForm()
+}
+
+async function selectUpdateTarget(menuId: number | string) {
+  updateTargetId.value = menuId
+  updateError.value = ''
+  resetUpdateForm()
+  const requestSequence = ++updateRequestSequence
+
+  try {
+    const detail = await getMenuDetail(menuId)
+    if (
+      requestSequence === updateRequestSequence &&
+      String(updateTargetId.value) === String(menuId)
+    ) {
+      applyUpdateDetail(detail)
+    }
+  } catch (error: unknown) {
+    if (requestSequence !== updateRequestSequence) return
+    console.error(error)
+    updateError.value = errorMessage(error, '菜单详情加载失败')
+    message.error(updateError.value)
+  }
 }
 
 function openDelete() {
@@ -298,6 +421,57 @@ async function submitCreate() {
   }
 }
 
+async function submitUpdate() {
+  const targetId = updateTargetId.value
+  const menuName = updateForm.menuName.trim()
+  if (targetId === undefined || !updateReady.value) {
+    message.error('请选择要修改的菜单并等待详情加载完成')
+    return
+  }
+  if (!menuName || !updateForm.menuType) {
+    message.error('请填写菜单名称和菜单类型')
+    return
+  }
+
+  const payload: UpdateMenuPayload = {
+    parentId: updateForm.parentId ?? 0,
+    menuName,
+    menuType: updateForm.menuType,
+    path: updateForm.path.trim(),
+    component: updateForm.component.trim(),
+    perms: updateForm.perms.trim(),
+    icon: updateForm.icon.trim(),
+    orderNum: Number(updateForm.orderNum ?? 0),
+    status: updateForm.status,
+    visible: Number(updateForm.visible),
+  }
+
+  updating.value = true
+  updateError.value = ''
+  let updated = false
+  try {
+    await updateMenu(targetId, payload)
+    updated = true
+    const [nextMenus, nextFlatMenus, nextDetail] = await Promise.all([
+      getMenuTree(),
+      getMenuList(),
+      getMenuDetail(targetId),
+    ])
+    menuTree.value = nextMenus
+    flatMenus.value = nextFlatMenus
+    menuDetail.value = nextDetail
+    applyUpdateDetail(nextDetail)
+    message.success(`菜单“${nextDetail.menuName}”已修改`)
+  } catch (error: unknown) {
+    console.error(error)
+    const detail = errorMessage(error, updated ? '请手动刷新菜单数据' : '菜单修改失败')
+    updateError.value = updated ? `菜单已修改，但刷新菜单数据失败：${detail}` : detail
+    message.error(updateError.value)
+  } finally {
+    updating.value = false
+  }
+}
+
 async function submitDelete() {
   const target = selectedDeleteMenu.value
   if (!target) {
@@ -378,6 +552,10 @@ onMounted(fetchData)
             <a-button v-if="canViewMenuDetail" data-testid="detail-menu-open" @click="openDetail">
               <template #icon><EyeOutlined /></template>
               查看详情
+            </a-button>
+            <a-button v-if="canUpdateMenu" data-testid="update-menu-open" @click="openUpdate">
+              <template #icon><EditOutlined /></template>
+              修改菜单
             </a-button>
             <a-button v-if="canViewMenuList" data-testid="menu-list-open" @click="openMenuList">
               菜单列表
@@ -492,6 +670,96 @@ onMounted(fetchData)
             创建
           </a-button>
         </div>
+      </a-form>
+    </a-modal>
+
+    <a-modal :open="updateOpen" title="修改菜单" :footer="null" @cancel="closeUpdate">
+      <a-form layout="vertical">
+        <a-form-item label="目标菜单" required>
+          <a-tree-select
+            :value="updateTargetId"
+            data-testid="update-menu-target"
+            :tree-data="detailTreeData"
+            :disabled="updating"
+            tree-default-expand-all
+            placeholder="请选择目录、菜单或按钮"
+            @change="selectUpdateTarget"
+          />
+        </a-form-item>
+        <a-alert
+          v-if="updateError"
+          type="error"
+          show-icon
+          data-testid="update-menu-error"
+          :message="updateError"
+        />
+        <template v-if="updateReady">
+          <a-form-item label="菜单名称" required>
+            <a-input v-model:value="updateForm.menuName" data-testid="update-menu-name" />
+          </a-form-item>
+          <a-form-item label="菜单类型" required>
+            <a-select v-model:value="updateForm.menuType" data-testid="update-menu-type">
+              <a-select-option value="DIR">目录</a-select-option>
+              <a-select-option value="MENU">菜单</a-select-option>
+              <a-select-option value="BUTTON">按钮</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="父节点">
+            <a-tree-select
+              v-model:value="updateForm.parentId"
+              data-testid="update-menu-parent"
+              :tree-data="updateParentTreeData"
+              tree-default-expand-all
+            />
+          </a-form-item>
+          <a-form-item label="路由路径">
+            <a-input v-model:value="updateForm.path" data-testid="update-menu-path" />
+          </a-form-item>
+          <a-form-item label="组件">
+            <a-input v-model:value="updateForm.component" data-testid="update-menu-component" />
+          </a-form-item>
+          <a-form-item label="权限码">
+            <a-input v-model:value="updateForm.perms" data-testid="update-menu-perms" />
+          </a-form-item>
+          <a-form-item label="图标">
+            <a-input v-model:value="updateForm.icon" data-testid="update-menu-icon" />
+          </a-form-item>
+          <a-form-item label="排序">
+            <a-input-number
+              v-model:value="updateForm.orderNum"
+              data-testid="update-menu-order"
+              :min="0"
+              class="lg-full-control"
+            />
+          </a-form-item>
+          <a-form-item label="状态">
+            <a-select v-model:value="updateForm.status" data-testid="update-menu-status">
+              <a-select-option value="ENABLE">启用</a-select-option>
+              <a-select-option value="DISABLE">停用</a-select-option>
+            </a-select>
+          </a-form-item>
+          <a-form-item label="可见性">
+            <a-select v-model:value="updateForm.visible" data-testid="update-menu-visible">
+              <a-select-option :value="1">可见</a-select-option>
+              <a-select-option :value="0">隐藏</a-select-option>
+            </a-select>
+          </a-form-item>
+          <div class="lg-form-actions">
+            <a-button :disabled="updating" @click="closeUpdate">取消</a-button>
+            <a-button
+              type="primary"
+              :loading="updating"
+              data-testid="update-menu-submit"
+              @click="submitUpdate"
+            >
+              保存修改
+            </a-button>
+          </div>
+        </template>
+        <div v-else-if="updateTargetId && !updateError" class="lg-empty-text">
+          正在加载菜单详情…
+        </div>
+        <div v-else-if="!updateTargetId" class="lg-empty-text">请选择要修改的菜单</div>
       </a-form>
     </a-modal>
 
