@@ -22,6 +22,7 @@
 - 当前唯一上线阻塞：整改已获 commit/push 授权并进入远端取证阶段；在同一待合并 SHA 的 11 个 required checks 全绿前仍不可上线。
 - 已完成依赖与格式治理：413 条纯 Prettier 告警已降为 0，ECharts 6.1.0 / vue-echarts 8.0.1 升级后 `pnpm audit --audit-level moderate` 为 0 漏洞；格式化后全量前端与 E2E 通过。
 - Trivy Java DB 已在 `supply-chain-security` 增加按 UTC 日期缓存与历史缓存回退；国内网络风险收敛为首次冷缓存下载时延，不采用未经项目验证的第三方镜像。
+- GitHub Actions 当前仍产生 Node.js 20 弃用注解；runner 已强制切换到 Node.js 24 且门禁全绿，列为非阻塞的上游 action 版本治理观察项。
 - 本机临时项：损坏 ACL 的旧 `node_modules` 已隔离并尝试清理，残留文件仍受原 ACL 保护；用户 Chrome 与 Trivy DB 缓存位于 `.codex-autopilot/runs/`，均不进入版本管理或运行构建。
 
 ## 当前方向决策
