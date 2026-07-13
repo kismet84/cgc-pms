@@ -10,6 +10,14 @@ export function getMenuTree() {
   })
 }
 
+/** 获取平铺菜单列表 */
+export function getMenuList() {
+  return request<SysMenuVO[]>({
+    url: '/system/menus',
+    method: 'get',
+  })
+}
+
 /** 获取菜单详情 */
 export function getMenuDetail(menuId: number | string) {
   return request<SysMenuVO>({

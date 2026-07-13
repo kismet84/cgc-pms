@@ -3,7 +3,14 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { DeleteOutlined, EyeOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
-import { createMenu, deleteMenu, getMenuDetail, getMenuTree, getRoles } from '@/api/modules/system'
+import {
+  createMenu,
+  deleteMenu,
+  getMenuDetail,
+  getMenuList,
+  getMenuTree,
+  getRoles,
+} from '@/api/modules/system'
 import { useUserStore } from '@/stores/user'
 import type { CreateMenuPayload, MenuTreeVO, SysMenuVO, SysRoleVO } from '@/types/system'
 
@@ -32,6 +39,11 @@ const detailTargetId = ref<number | string>()
 const menuDetail = ref<SysMenuVO>()
 const detailError = ref('')
 let detailRequestSequence = 0
+const listOpen = ref(false)
+const listLoading = ref(false)
+const flatMenus = ref<SysMenuVO[]>([])
+const listError = ref('')
+let listRequestSequence = 0
 
 const isAdmin = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
@@ -39,6 +51,7 @@ const isAdmin = computed(() =>
 const canCreateMenu = computed(() => isAdmin.value)
 const canDeleteMenu = computed(() => isAdmin.value)
 const canViewMenuDetail = computed(() => isAdmin.value)
+const canViewMenuList = computed(() => isAdmin.value)
 const parentTreeData = computed(() => [
   {
     title: '根节点',
@@ -174,6 +187,34 @@ function closeDetail() {
   detailTargetId.value = undefined
   menuDetail.value = undefined
   detailError.value = ''
+}
+
+async function openMenuList() {
+  listOpen.value = true
+  flatMenus.value = []
+  listError.value = ''
+  listLoading.value = true
+  const requestSequence = ++listRequestSequence
+
+  try {
+    const menus = await getMenuList()
+    if (requestSequence === listRequestSequence) flatMenus.value = menus
+  } catch (error: unknown) {
+    if (requestSequence !== listRequestSequence) return
+    console.error(error)
+    listError.value = errorMessage(error, '菜单列表加载失败')
+    message.error(listError.value)
+  } finally {
+    if (requestSequence === listRequestSequence) listLoading.value = false
+  }
+}
+
+function closeMenuList() {
+  if (listLoading.value) return
+  listRequestSequence += 1
+  listOpen.value = false
+  flatMenus.value = []
+  listError.value = ''
 }
 
 async function selectDetailTarget(menuId: number | string) {
@@ -337,6 +378,9 @@ onMounted(fetchData)
             <a-button v-if="canViewMenuDetail" data-testid="detail-menu-open" @click="openDetail">
               <template #icon><EyeOutlined /></template>
               查看详情
+            </a-button>
+            <a-button v-if="canViewMenuList" data-testid="menu-list-open" @click="openMenuList">
+              菜单列表
             </a-button>
             <a-button
               v-if="canDeleteMenu"
@@ -555,6 +599,54 @@ onMounted(fetchData)
       </dl>
       <div v-else class="lg-empty-text">请选择一个菜单节点查看详情</div>
     </a-modal>
+
+    <a-modal
+      :open="listOpen"
+      title="菜单列表"
+      :footer="null"
+      width="1120px"
+      @cancel="closeMenuList"
+    >
+      <div v-if="listLoading" data-testid="menu-list-loading" class="lg-empty-text">
+        正在加载菜单列表…
+      </div>
+      <a-alert
+        v-else-if="listError"
+        type="error"
+        show-icon
+        data-testid="menu-list-error"
+        :message="listError"
+      />
+      <div v-else-if="flatMenus.length" class="lg-menu-list-wrap">
+        <table data-testid="menu-list-table" class="lg-menu-list-table">
+          <thead>
+            <tr>
+              <th>名称</th>
+              <th>类型</th>
+              <th>父节点</th>
+              <th>路径</th>
+              <th>权限码</th>
+              <th>排序</th>
+              <th>状态</th>
+              <th>可见性</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="menu in flatMenus" :key="String(menu.id)" data-testid="menu-list-row">
+              <td>{{ displayValue(menu.menuName) }}</td>
+              <td>{{ menuTypeLabel(menu.menuType) }}</td>
+              <td>{{ displayValue(menu.parentId) }}</td>
+              <td>{{ displayValue(menu.path) }}</td>
+              <td>{{ displayValue(menu.perms) }}</td>
+              <td>{{ displayValue(menu.orderNum) }}</td>
+              <td>{{ statusLabel(menu.status) }}</td>
+              <td>{{ visibleLabel(menu.visible) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-else data-testid="menu-list-empty" class="lg-empty-text">暂无菜单</div>
+    </a-modal>
   </div>
 </template>
 
@@ -578,5 +670,30 @@ onMounted(fetchData)
 .lg-detail-list dd {
   margin: 4px 0 0;
   overflow-wrap: anywhere;
+}
+
+.lg-menu-list-wrap {
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.lg-menu-list-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.lg-menu-list-table th,
+.lg-menu-list-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--lg-border-color, #e5e7eb);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.lg-menu-list-table th {
+  color: var(--lg-text-secondary, #6b7280);
+  font-weight: 600;
+  background: var(--lg-fill-secondary, #f9fafb);
 }
 </style>

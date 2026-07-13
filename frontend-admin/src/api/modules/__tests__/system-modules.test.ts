@@ -27,6 +27,7 @@ import {
   createMenu,
   deleteMenu,
   getMenuDetail,
+  getMenuList,
   getMenuTree,
   getRoles,
   getUserList,
@@ -92,6 +93,18 @@ describe('system-related API modules', () => {
     expect(mockRequest).toHaveBeenCalledOnce()
     expect(mockRequest).toHaveBeenCalledWith({
       url: '/system/menus/13',
+      method: 'get',
+    })
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('params')
+  })
+
+  it('builds a bodyless flat menu list request', () => {
+    getMenuList()
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/menus',
       method: 'get',
     })
     expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
