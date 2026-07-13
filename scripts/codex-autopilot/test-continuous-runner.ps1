@@ -93,12 +93,13 @@ if ("$ExecutorMode" -eq "fail") {
   Write-Host "mock executor failed for `$IssueId"
   exit 7
 }
+`$artifactName = if ("$ExecutorMode" -eq "commit") { "系统菜单验收报告.md" } else { "mock-execution.txt" }
 if ("$ExecutorMode" -ne "no-change") {
   New-Item -ItemType Directory -Path (Join-Path `$RepoRoot "docs\quality") -Force | Out-Null
-  "executed `$IssueId with `$PromptPath" | Out-File -Encoding utf8 (Join-Path `$RepoRoot "docs\quality\mock-execution.txt")
+  "executed `$IssueId with `$PromptPath" | Out-File -Encoding utf8 (Join-Path `$RepoRoot "docs\quality\`$artifactName")
 }
 if ("$ExecutorMode" -eq "commit") {
-  & git -C `$RepoRoot add docs/quality/mock-execution.txt
+  & git -C `$RepoRoot add "docs/quality/`$artifactName"
   & git -C `$RepoRoot commit -qm "mock executor commit"
 }
 Write-Host "mock executor completed for `$IssueId"
@@ -840,8 +841,8 @@ try {
   Assert-ResultSchema $CommittedResult
   if ($CommittedResult.status -ne "done") { throw "Expected committed executor status done. Actual: $($CommittedResult | ConvertTo-Json -Compress -Depth 8)" }
   if ($CommittedResult.failureCategory -ne "none") { throw "Expected committed executor failureCategory none" }
-  if (!(($CommittedResult.validation | Where-Object { $_.name -eq "execution-artifacts" }).message -like "*commit:docs/quality/mock-execution.txt*")) {
-    throw "Expected committed executor artifact to be recorded"
+  if (!(($CommittedResult.validation | Where-Object { $_.name -eq "execution-artifacts" }).message -like "*commit:docs/quality/系统菜单验收报告.md*")) {
+    throw "Expected committed Unicode executor artifact to be recorded without Git path quoting"
   }
 
   $NoExecutorConfig = Join-Path $TempRoot "no-executor.config.json"

@@ -71,7 +71,7 @@ function Get-GitSummary {
   param([string]$Root)
 
   $branch = (& git -C $Root branch --show-current 2>$null | Out-String).Trim()
-  $status = @(& git -C $Root status --short --untracked-files=all 2>$null)
+  $status = @(& git -c core.quotePath=false -C $Root status --short --untracked-files=all 2>$null)
   return [pscustomobject]@{
     branch = $branch
     isClean = ($status.Count -eq 0)
@@ -413,7 +413,7 @@ function Invoke-ConfiguredIssueExecutor {
   $afterHead = (& git -C $RepoRoot rev-parse HEAD 2>$null | Out-String).Trim()
   $committedPaths = @()
   if ($beforeHead -and $afterHead -and $beforeHead -ne $afterHead) {
-    $committedPaths = @(& git -C $RepoRoot diff --name-only $beforeHead $afterHead -- 2>$null)
+    $committedPaths = @(& git -c core.quotePath=false -C $RepoRoot diff --name-only $beforeHead $afterHead -- 2>$null)
   }
   $after = @(Get-BusinessGitStatus @($afterSummary.statusShort))
   $afterFingerprints = Get-BusinessFileFingerprints -Root $RepoRoot -StatusLines $after

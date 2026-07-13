@@ -11,11 +11,11 @@
 
 旧实现只通过 `git status` 判断执行器是否产生业务产物。执行器在隔离 worktree 中自行提交后，工作区恢复干净，导致控制面错误返回 `STOP_NO_EXECUTION_ARTIFACTS`；后续范围检查也无法看到已提交文件。
 
-修复后，执行器产物识别同时比较执行前后 HEAD，并把提交差异纳入产物清单；连续 runner 的范围门禁、路由判断和最终检查统一使用“基线提交到当前 HEAD 的差异 + 未提交差异”。未提交执行路径保持不变。
+修复后，执行器产物识别同时比较执行前后 HEAD，并把提交差异纳入产物清单；连续 runner 的范围门禁、路由判断和最终检查统一使用“基线提交到当前 HEAD 的差异 + 未提交差异”。Git 路径读取显式设置 `core.quotePath=false`，确保中文报告路径不会被八进制转义后误判为 allowlist 外文件。未提交执行路径保持不变。
 
 ## 验收证据
 
-- `scripts/codex-autopilot/test-continuous-runner.ps1`：通过；新增执行器提交产物后仍返回 `done`、产物路径可追踪的回归断言。
+- `scripts/codex-autopilot/test-continuous-runner.ps1`：通过；新增执行器提交中文文件名产物后仍返回 `done`、原始 Unicode 路径可追踪且范围匹配通过的回归断言。
 - PowerShell 语法解析：四个变更脚本无解析错误。
 - `git diff --check`：通过。
 

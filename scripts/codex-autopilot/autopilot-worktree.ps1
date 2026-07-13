@@ -57,7 +57,7 @@ function New-AutopilotIssueWorktree {
 
 function Get-AutopilotWorktreeChanges {
   param([Parameter(Mandatory)][string]$Worktree)
-  return @(& git -C $Worktree status --porcelain=v1 --untracked-files=all | ForEach-Object {
+  return @(& git -c core.quotePath=false -C $Worktree status --porcelain=v1 --untracked-files=all | ForEach-Object {
     $raw = if ($_.Length -ge 4) { $_.Substring(3).Trim() } else { '' }
     if ($raw -match '\s+->\s+') { ($raw -split '\s+->\s+')[-1].Trim('"') } elseif ($raw) { $raw.Trim('"') }
   } | Where-Object { $_ } | Select-Object -Unique)
@@ -69,7 +69,7 @@ function Get-AutopilotIssueChanges {
     [Parameter(Mandatory)][string]$BaseCommit
   )
 
-  $committed = @(& git -C $Worktree diff --name-only $BaseCommit HEAD -- 2>$null)
+  $committed = @(& git -c core.quotePath=false -C $Worktree diff --name-only $BaseCommit HEAD -- 2>$null)
   if ($LASTEXITCODE -ne 0) { throw "failed to inspect committed issue changes from base: $BaseCommit" }
   return @($committed + @(Get-AutopilotWorktreeChanges -Worktree $Worktree) | Where-Object { $_ } | ForEach-Object { ConvertTo-AutopilotPath $_ } | Select-Object -Unique)
 }
