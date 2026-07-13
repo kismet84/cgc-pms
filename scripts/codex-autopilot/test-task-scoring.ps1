@@ -63,6 +63,7 @@ try {
   $candidateActivationRejected = $false
   try { Test-AutopilotTaskScoringActive ([pscustomobject]@{enabled=$true;activeVersion='autopilot-task-score/v2-candidate';approvalStatus='APPROVED'}) | Out-Null } catch { $candidateActivationRejected = $true }
   if (!$candidateActivationRejected) { throw 'disabled v2 candidate became an active scoring version' }
+  if (!(Test-AutopilotTaskScoringActive ([pscustomobject]@{enabled=$true;activeVersion='autopilot-task-score/v2';approvalStatus='APPROVED'}))) { throw 'approved v2 scoring did not activate' }
 
   $report = Join-Path $root 'iteration.md'
   '# Iteration' | Set-Content -LiteralPath $report -Encoding UTF8
@@ -86,6 +87,8 @@ try {
   $v2Evidence.executionEvidenceComplete = $true
   $v2 = New-AutopilotTaskScoreV2Shadow $v2Evidence
   if ($v2.shadow -ne $true -or $v2.dimensions.taskExecutionEfficiency.score -ne 10 -or $v2.total -ne 85) { throw 'v2 shadow did not award deterministic full task execution efficiency' }
+  $v2Formal = New-AutopilotTaskScoreV2 $v2Evidence
+  if ($v2Formal.shadow -ne $false -or $v2Formal.scoringVersion -ne 'autopilot-task-score/v2' -or $v2Formal.dimensions.taskExecutionEfficiency.score -ne 10 -or $v2Formal.total -ne 85 -or $v2Formal.key -eq $v2.key) { throw 'formal v2 score did not use its approved version and efficiency dimension' }
   $v2Evidence.toolConfigBlockCount = 1
   $v2Evidence.runResumeCount = 1
   $v2Retry = New-AutopilotTaskScoreV2Shadow $v2Evidence

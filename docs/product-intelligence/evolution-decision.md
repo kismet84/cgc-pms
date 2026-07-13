@@ -4,7 +4,7 @@
 
 - 事实：`ISSUE-040-022` 的实现和验证曾已完成，但 Reviewer Windows sandbox `tool_config` 阻塞后，新 run 丢失阶段摘要并再次进入 B/C；旧 recovery 会删除未合并 worktree，v1 周期效率又只读取单 run attempt，无法反映近两小时的跨 run 浪费。
 - 决策：活动 Issue 必须维护 durable phase checkpoint；证据一致时从 D/E/F 首个未完成阶段恢复，Reviewer 工具故障不得触发业务重做。控制面指纹变化后，必须先通过一次用户启动的单任务金丝雀，才允许 N>1 或无界连续执行。
-- 评分：下一评分版本必须纳入10分任务执行效率；先以 `autopilot-task-score/v2-candidate` disabled shadow 回放，v1历史不回算。正式 `scoringVersion`、35/25/20/10/10权重和生效时间仍需用户完整批准。
+- 评分：`autopilot-task-score/v2` 已由用户批准正式启用，五维权重35/25/20/10/10，10分维度为 `taskExecutionEfficiency`；自批准配置提交后的下一项新实施型 Ready 生效。v1历史不回算、不覆盖，同一任务不双计数。
 - 非目标：不自动恢复当前剩余9项、不移除 `pause.flag`、不发布生产、不连接生产库、不自动 push，也不以效率分裁剪测试、Reviewer或两阶段收口。
 - 回滚：回退 checkpoint/recovery、v2 shadow 和控制面指纹提交；保留 v1正式评分、现有 durable stall 修复与业务提交，继续暂停批量迭代。
 

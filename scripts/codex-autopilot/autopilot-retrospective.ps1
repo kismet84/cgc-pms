@@ -51,16 +51,19 @@ function New-AutopilotRetrospective {
     [Nullable[double]]$PreviousMedianCycleSeconds = $null
   )
   if ($TaskRecords.Count -lt 1) { throw 'retrospective requires at least one task record' }
-  $dimensionNames = @('deliveryCorrectness','zeroDanglingIssues','firstPassAcceptance','cycleEfficiency','stockIssueReduction')
+  $dimensionNames = @('deliveryCorrectness','zeroDanglingIssues','firstPassAcceptance','cycleEfficiency','taskExecutionEfficiency','stockIssueReduction')
   $dimensionStats = [ordered]@{}
   foreach ($name in $dimensionNames) {
-    $values = @($TaskRecords | ForEach-Object { [double]$_.score.dimensions.$name.score })
-    $max = [int]$TaskRecords[0].score.dimensions.$name.max
+    $dimensionRecords = @($TaskRecords | Where-Object { $null -ne $_.score.dimensions -and $_.score.dimensions.PSObject.Properties.Name -contains $name })
+    if ($dimensionRecords.Count -eq 0) { continue }
+    $values = @($dimensionRecords | ForEach-Object { [double]$_.score.dimensions.$name.score })
+    $max = [int]$dimensionRecords[0].score.dimensions.$name.max
     $dimensionStats[$name] = [ordered]@{
       average = [Math]::Round((($values | Measure-Object -Average).Average), 2)
       median = [Math]::Round((Get-AutopilotMedian $values), 2)
       minimum = [Math]::Round((($values | Measure-Object -Minimum).Minimum), 2)
       max = $max
+      taskCount = $dimensionRecords.Count
     }
   }
   $totals = @($TaskRecords | ForEach-Object { [double]$_.score.total })
@@ -71,10 +74,11 @@ function New-AutopilotRetrospective {
   $medianCycle = Get-AutopilotMedian $cycleValues
   $proposals = New-Object System.Collections.Generic.List[object]
 
-  foreach ($name in $dimensionNames) {
+  foreach ($name in @($dimensionStats.Keys)) {
     $stats = $dimensionStats[$name]
     if ([double]$stats.average -lt ([double]$stats.max * 0.8)) {
-      $proposals.Add((New-AutopilotImprovementProposal -Rule 'DIMENSION_AVERAGE_BELOW_80' -Subject $name -Summary "周期平均分 $($stats.average)/$($stats.max)，低于 80%。" -AcceptanceCriteria "该维度连续一个完整回顾周期平均分达到满分的 80% 及以上，且不降低硬门禁。" -ReviewCycleId $ReviewCycleId -SourceIssueIds @($TaskRecords.issueId)))
+      $dimensionIssueIds = @($TaskRecords | Where-Object { $_.score.dimensions.PSObject.Properties.Name -contains $name } | ForEach-Object issueId)
+      $proposals.Add((New-AutopilotImprovementProposal -Rule 'DIMENSION_AVERAGE_BELOW_80' -Subject $name -Summary "周期平均分 $($stats.average)/$($stats.max)，低于 80%。" -AcceptanceCriteria "该维度连续一个完整回顾周期平均分达到满分的 80% 及以上，且不降低硬门禁。" -ReviewCycleId $ReviewCycleId -SourceIssueIds $dimensionIssueIds))
     }
   }
   if ($firstPassRate -lt 0.8) {
@@ -94,10 +98,12 @@ function New-AutopilotRetrospective {
     $proposals.Add((New-AutopilotImprovementProposal -Rule 'CYCLE_MEDIAN_REGRESSION' -Subject '周期中位耗时恶化' -Summary "中位耗时从 $PreviousMedianCycleSeconds 秒增加到 $medianCycle 秒。" -AcceptanceCriteria '在不裁剪必需验证的前提下，中位耗时恢复到上周期的 120% 以内。' -ReviewCycleId $ReviewCycleId -SourceIssueIds @($TaskRecords.issueId)))
   }
 
+  $scoringVersions = @($TaskRecords | ForEach-Object { if ($_.score.PSObject.Properties.Name -contains 'scoringVersion' -and $_.score.scoringVersion) { [string]$_.score.scoringVersion } else { $ScoringVersion } } | Sort-Object -Unique)
   return [pscustomobject][ordered]@{
     schemaVersion = 1
     reviewCycleId = $ReviewCycleId
     scoringVersion = $ScoringVersion
+    scoringVersions = @($scoringVersions)
     generatedAt = [datetimeoffset]::Now.ToString('o')
     taskCount = $TaskRecords.Count
     taskIssueIds = @($TaskRecords.issueId)
@@ -131,7 +137,8 @@ function Write-AutopilotRetrospectiveReport {
   $fence = ([string][char]96) + ([string][char]96) + ([string][char]96)
   $markdown = @(
     "# AutoPilot 任务周期回顾：$($Retrospective.reviewCycleId)", '',
-    "- 评分版本：$($Retrospective.scoringVersion)",
+    "- 当前评分版本：$($Retrospective.scoringVersion)",
+    "- 周期包含版本：$(@($Retrospective.scoringVersions) -join ', ')",
     "- 有效任务：$($Retrospective.taskCount)",
     "- 平均总分：$($Retrospective.total.average)",
     "- 首次验收通过率：$($Retrospective.firstPassRate)",

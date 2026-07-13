@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference = 'Stop'
 
 $script:AutopilotTaskScoreVersion = 'autopilot-task-score/v1'
+$script:AutopilotTaskScoreV2Version = 'autopilot-task-score/v2'
 $script:AutopilotTaskScoreV2CandidateVersion = 'autopilot-task-score/v2-candidate'
 $script:AutopilotTaskScoreWeights = [ordered]@{
   deliveryCorrectness = 35
@@ -50,7 +51,7 @@ function Test-AutopilotTaskScoringActive {
   if ($null -eq $Config -or (Get-AutopilotScoreProperty $Config 'enabled' $false) -ne $true) { return $false }
   $activeVersion = [string](Get-AutopilotScoreProperty $Config 'activeVersion' '')
   if (!$activeVersion) { throw 'task scoring cannot be enabled without an approved activeVersion' }
-  if ($activeVersion -ne $script:AutopilotTaskScoreVersion) { throw "unsupported active task scoring version: $activeVersion" }
+  if ($activeVersion -notin @($script:AutopilotTaskScoreVersion, $script:AutopilotTaskScoreV2Version)) { throw "unsupported active task scoring version: $activeVersion" }
   if ([string](Get-AutopilotScoreProperty $Config 'approvalStatus' '') -ne 'APPROVED') { throw 'task scoring activeVersion requires approvalStatus=APPROVED' }
   return $true
 }
@@ -178,8 +179,12 @@ function Assert-AutopilotTaskScoreV2Evidence {
   if (@($Evidence.sourceRefs).Count -eq 0) { throw 'task score v2 requires at least one formal sourceRef' }
 }
 
-function New-AutopilotTaskScoreV2Shadow {
-  param([Parameter(Mandatory)][object]$Evidence)
+function New-AutopilotTaskScoreV2Score {
+  param(
+    [Parameter(Mandatory)][object]$Evidence,
+    [Parameter(Mandatory)][string]$ScoringVersion,
+    [Parameter(Mandatory)][bool]$Shadow
+  )
   Assert-AutopilotTaskScoreV2Evidence $Evidence
   $delivery = 0
   if ([bool]$Evidence.acceptanceCriteriaCovered) { $delivery += 20 }
@@ -217,13 +222,13 @@ function New-AutopilotTaskScoreV2Shadow {
     if ([int]$Evidence.followupNetChange -le 0 -and ![bool]$Evidence.sameRootIssueAdded) { 5 } else { 0 }
   }
   $sourceRefs = @($Evidence.sourceRefs | ForEach-Object { [string]$_ } | Where-Object { $_ } | Sort-Object -Unique)
-  $key = Get-AutopilotTaskScoreKey -IssueId $Evidence.issueId -ImplementationCommit $Evidence.implementationCommit -ScoringVersion $script:AutopilotTaskScoreV2CandidateVersion
+  $key = Get-AutopilotTaskScoreKey -IssueId $Evidence.issueId -ImplementationCommit $Evidence.implementationCommit -ScoringVersion $ScoringVersion
   return [pscustomobject][ordered]@{
     schemaVersion = 2
     key = $key
     issueId = [string]$Evidence.issueId
     implementationCommit = ([string]$Evidence.implementationCommit).ToLowerInvariant()
-    scoringVersion = $script:AutopilotTaskScoreV2CandidateVersion
+    scoringVersion = $ScoringVersion
     scoredAt = [datetimeoffset]::Now.ToString('o')
     total = $delivery + $dangling + $firstPass + $executionEfficiency + $stock
     dimensions = [ordered]@{
@@ -236,8 +241,18 @@ function New-AutopilotTaskScoreV2Shadow {
     hardGatesPassed = $true
     followupNetChange = [int]$Evidence.followupNetChange
     sourceRefs = @($sourceRefs)
-    shadow = $true
+    shadow = $Shadow
   }
+}
+
+function New-AutopilotTaskScoreV2 {
+  param([Parameter(Mandatory)][object]$Evidence)
+  return New-AutopilotTaskScoreV2Score -Evidence $Evidence -ScoringVersion $script:AutopilotTaskScoreV2Version -Shadow $false
+}
+
+function New-AutopilotTaskScoreV2Shadow {
+  param([Parameter(Mandatory)][object]$Evidence)
+  return New-AutopilotTaskScoreV2Score -Evidence $Evidence -ScoringVersion $script:AutopilotTaskScoreV2CandidateVersion -Shadow $true
 }
 
 function Add-AutopilotTaskScoreV2ShadowToReport {
@@ -265,9 +280,9 @@ function Get-AutopilotTaskScoreFromReport {
 }
 
 function New-AutopilotTaskScoreV2EvidenceFromResult {
-  param([Parameter(Mandatory)][object]$Result, [Parameter(Mandatory)][string]$ReportPath, [Parameter(Mandatory)][string]$ImplementationCommit, [Parameter(Mandatory)][bool]$StockIssueTarget)
+  param([Parameter(Mandatory)][object]$Result, [Parameter(Mandatory)][string]$ReportPath, [Parameter(Mandatory)][string]$ImplementationCommit, [Parameter(Mandatory)][bool]$StockIssueTarget, [switch]$Formal)
   $evidence = New-AutopilotTaskScoreEvidenceFromResult -Result $Result -ReportPath $ReportPath -ImplementationCommit $ImplementationCommit -StockIssueTarget $StockIssueTarget
-  Set-AutopilotScoreProperty $evidence 'scoringVersion' $script:AutopilotTaskScoreV2CandidateVersion
+  Set-AutopilotScoreProperty $evidence 'scoringVersion' $(if ($Formal) { $script:AutopilotTaskScoreV2Version } else { $script:AutopilotTaskScoreV2CandidateVersion })
   $metricNames = @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount')
   $complete = $true
   foreach ($name in $metricNames) {

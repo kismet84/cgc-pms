@@ -1223,8 +1223,12 @@ function Invoke-IssueExecutor {
           foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds')) {
             $result | Add-Member -NotePropertyName $metricName -NotePropertyValue (Get-AutopilotCheckpointProperty $checkpoint.metrics $metricName 0) -Force
           }
-          $scoreEvidence = New-AutopilotTaskScoreEvidenceFromResult -Result $result -ReportPath $reportPath -ImplementationCommit ('0' * 40) -StockIssueTarget $isStockIssue
-          if ($config.taskScoring.candidateVersion -eq $script:AutopilotTaskScoreV2CandidateVersion -and $config.taskScoring.candidateEnabled -ne $true) {
+          if ([string]$config.taskScoring.activeVersion -eq $script:AutopilotTaskScoreV2Version) {
+            $scoreEvidence = New-AutopilotTaskScoreV2EvidenceFromResult -Result $result -ReportPath $reportPath -ImplementationCommit ('0' * 40) -StockIssueTarget $isStockIssue -Formal
+          } else {
+            $scoreEvidence = New-AutopilotTaskScoreEvidenceFromResult -Result $result -ReportPath $reportPath -ImplementationCommit ('0' * 40) -StockIssueTarget $isStockIssue
+          }
+          if ([string]$config.taskScoring.activeVersion -eq $script:AutopilotTaskScoreVersion -and $config.taskScoring.candidateVersion -eq $script:AutopilotTaskScoreV2CandidateVersion -and $config.taskScoring.candidateEnabled -ne $true) {
             $scoreShadowEvidence = New-AutopilotTaskScoreV2EvidenceFromResult -Result $result -ReportPath $reportPath -ImplementationCommit ('0' * 40) -StockIssueTarget $isStockIssue
           }
         }
@@ -1271,7 +1275,7 @@ function Invoke-IssueExecutor {
             if ([string]$canaryState.lastCanaryFingerprint -ne $script:ControlPlaneFingerprint -or [string]$canaryState.lastCanaryReport -ne [string]$Issue.contract.archiveReport) { throw 'control-plane canary state read-back failed' }
             Write-RunEvent 'control-plane.canary-passed' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='PASS'; status='CANARY_PASSED'; controlPlaneFingerprint=$script:ControlPlaneFingerprint; evidencePath=$Issue.contract.archiveReport; graphGitCursor=$graphSnapshot.cursor })
           }
-          if ($script:TaskScoringActive -and $config.taskScoring.candidateVersion -eq $script:AutopilotTaskScoreV2CandidateVersion -and $config.taskScoring.candidateEnabled -ne $true) {
+          if ($script:TaskScoringActive -and [string]$config.taskScoring.activeVersion -eq $script:AutopilotTaskScoreVersion -and $config.taskScoring.candidateVersion -eq $script:AutopilotTaskScoreV2CandidateVersion -and $config.taskScoring.candidateEnabled -ne $true) {
             $finalCheckpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
             foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds')) {
               $result | Add-Member -NotePropertyName $metricName -NotePropertyValue (Get-AutopilotCheckpointProperty $finalCheckpoint.metrics $metricName 0) -Force

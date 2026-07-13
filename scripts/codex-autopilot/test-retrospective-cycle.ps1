@@ -29,6 +29,14 @@ try {
   Add-AutopilotReviewCycleIssue -Path $unboundedPath -IssueId 'ISSUE-20' -ScoreKey $duplicateKey -ScoringVersion 'autopilot-task-score/v1' -Threshold 20 | Out-Null
   if ((Read-AutopilotState $unboundedPath).reviewCycleCompletedCount -ne 20) { throw 'duplicate closeout incremented the cycle' }
 
+  $mixedStatePath = Join-Path $root 'mixed-state.json'; New-State $mixedStatePath
+  $v1Key = Get-AutopilotTaskScoreKey -IssueId 'MIXED-V1' -ImplementationCommit ('1'.PadLeft(40,'0')) -ScoringVersion 'autopilot-task-score/v1'
+  Add-AutopilotReviewCycleIssue -Path $mixedStatePath -IssueId 'MIXED-V1' -ScoreKey $v1Key -ScoringVersion 'autopilot-task-score/v1' -Threshold 20 | Out-Null
+  $mixedState = Read-AutopilotState $mixedStatePath; Set-AutopilotProperty $mixedState 'activeScoringVersion' 'autopilot-task-score/v2'; Write-AutopilotStateAtomic -Path $mixedStatePath -State $mixedState | Out-Null
+  $v2Key = Get-AutopilotTaskScoreKey -IssueId 'MIXED-V2' -ImplementationCommit ('2'.PadLeft(40,'0')) -ScoringVersion 'autopilot-task-score/v2'
+  Add-AutopilotReviewCycleIssue -Path $mixedStatePath -IssueId 'MIXED-V2' -ScoreKey $v2Key -ScoringVersion 'autopilot-task-score/v2' -Threshold 20 | Out-Null
+  if ((Read-AutopilotState $mixedStatePath).reviewCycleCompletedCount -ne 2) { throw 'v2 activation discarded or blocked the existing v1 review-cycle task' }
+
   $boundedPath = Join-Path $root 'bounded.json'; New-State $boundedPath
   $bounded = Read-AutopilotState $boundedPath; Set-AutopilotProperty $bounded 'iterationLimit' 3; Set-AutopilotProperty $bounded 'remainingIterations' 3; Write-AutopilotStateAtomic -Path $boundedPath -State $bounded | Out-Null
   for ($i=1; $i -le 21; $i++) {
@@ -61,10 +69,13 @@ try {
   $reset = Reset-AutopilotReviewCycle -Path $boundedPath
   if ($reset.reviewCycleCompletedCount -ne 0 -or $reset.status -ne 'PAUSED' -or $reset.retrospectiveDue) { throw 'successful retrospective did not clear and remain paused' }
 
-  $score = [pscustomobject]@{total=70;dimensions=[pscustomobject]@{deliveryCorrectness=[pscustomobject]@{score=30;max=35};zeroDanglingIssues=[pscustomobject]@{score=20;max=25};firstPassAcceptance=[pscustomobject]@{score=10;max=20};cycleEfficiency=[pscustomobject]@{score=5;max=10};stockIssueReduction=[pscustomobject]@{score=5;max=10}}}
+  $score = [pscustomobject]@{scoringVersion='autopilot-task-score/v1';total=70;dimensions=[pscustomobject]@{deliveryCorrectness=[pscustomobject]@{score=30;max=35};zeroDanglingIssues=[pscustomobject]@{score=20;max=25};firstPassAcceptance=[pscustomobject]@{score=10;max=20};cycleEfficiency=[pscustomobject]@{score=5;max=10};stockIssueReduction=[pscustomobject]@{score=5;max=10}}}
   $records = @(1..20 | ForEach-Object { [pscustomobject]@{issueId="R-$_";score=$score;attempt=1;followupNetChange=0;cycleSeconds=120;rootCause=$(if($_ -le 3){'ready-config'}else{$null});stockIssueTarget=$false} })
   $review = New-AutopilotRetrospective -ReviewCycleId 'review-sample' -TaskRecords $records -ScoringVersion 'autopilot-task-score/v1'
   if ($review.taskCount -ne 20 -or $review.firstPassRate -ne 0 -or @($review.proposals | Where-Object rule -eq 'REPEATED_ROOT_CAUSE').Count -ne 1) { throw 'retrospective aggregate rules are incorrect' }
+  $v2Score = [pscustomobject]@{scoringVersion='autopilot-task-score/v2';total=75;dimensions=[pscustomobject]@{deliveryCorrectness=[pscustomobject]@{score=30;max=35};zeroDanglingIssues=[pscustomobject]@{score=20;max=25};firstPassAcceptance=[pscustomobject]@{score=10;max=20};taskExecutionEfficiency=[pscustomobject]@{score=10;max=10};stockIssueReduction=[pscustomobject]@{score=5;max=10}}}
+  $mixedReview = New-AutopilotRetrospective -ReviewCycleId 'review-mixed' -TaskRecords @($records[0],[pscustomobject]@{issueId='R-V2';score=$v2Score;attempt=0;followupNetChange=0;cycleSeconds=100;rootCause=$null;stockIssueTarget=$false}) -ScoringVersion 'autopilot-task-score/v2'
+  if (@($mixedReview.scoringVersions).Count -ne 2 -or $mixedReview.dimensions.cycleEfficiency.taskCount -ne 1 -or $mixedReview.dimensions.taskExecutionEfficiency.taskCount -ne 1) { throw 'mixed v1/v2 retrospective did not aggregate efficiency dimensions by scoring version' }
   if ((Get-AutopilotRetrospectiveEpisodeId 'review-sample' 'autopilot-task-score/v1') -ne (Get-AutopilotRetrospectiveEpisodeId 'review-sample' 'autopilot-task-score/v1')) { throw 'Episode id is not stable' }
 
   $registryPath = Join-Path $root 'issues.json'; '{"schemaVersion":1,"issues":[]}' | Set-Content -LiteralPath $registryPath -Encoding UTF8

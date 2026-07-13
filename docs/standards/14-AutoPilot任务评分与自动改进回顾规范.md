@@ -53,14 +53,15 @@
 
 不连接生产、不发布生产、不自动 push，不因效率评分裁剪必需验证。运行态索引不是正式事实源；原始日志、截图和一次性 run id 不进入长期规则或正式回顾。
 
-## 8. v2 任务执行效率候选
+## 8. v2 任务执行效率正式版本
 
-- 用户已确认下一评分版本必须把任务执行效率纳入正式五维；候选版本为 `autopilot-task-score/v2-candidate`，保持 disabled 与 `NEEDS_CONFIRMATION`。
-- 建议五维权重为35/25/20/10/10，其中 `taskExecutionEfficiency=10` 替代 v1 的 `cycleEfficiency=10`；其余四维语义不变。
+- 用户已批准 `autopilot-task-score/v2` 正式启用，五维权重为35/25/20/10/10，其中 `taskExecutionEfficiency=10` 替代 v1 的 `cycleEfficiency=10`；其余四维语义不变。
+- 生效边界为批准配置提交后的下一项新实施型 Ready Issue。v1 历史评分不回算、不覆盖；每项任务只允许一个正式评分版本和一个回顾周期计数。
+- 当前20任务周期中批准前已经登记的 v1 任务继续保留；回顾报告分别聚合 v1 `cycleEfficiency` 与 v2 `taskExecutionEfficiency`，不得把缺失的异版本维度按0分混算。
 - 10分要求 implementation 仅派发一次，validation/Reviewer/closeout 派发次数符合任务路由，`runResumeCount=0`，且无阶段回退、人工恢复、Reviewer/环境工具阻塞或被门禁拦截的重复派发，端到端证据完整。
 - implementation 仍仅派发一次、无阶段回退和人工恢复，但恰有一次已分类工具/环境重试或一次被门禁阻断的重复派发时为5分；重复 implementation、阶段回退、人工恢复、多次工具重试或证据不完整时为0分。
 - `wallClockSeconds` 与分阶段耗时进入20任务趋势和异常分析，不按固定分钟数直接扣分。效率低分不改变业务正确性、硬门禁或 DONE 裁决，`tool_config` 也不得写成业务质量失败。
-- v2 shadow 必须绑定 `implementationCommit`，但不得写 activeVersion、正式 closeout ledger 评分键或 `reviewCycleScoreKeys`。closeout/ledger/state/图谱读回完成后，最终端到端 shadow 可按 closeout key 幂等写入独立本地 `candidate-score-shadows.ndjson`；它不进入正式20任务累计。正式版本名、五维权重和生效时间未全部获批前，v1 继续作为唯一正式评分。
+- v2 正式分必须绑定 `implementationCommit`，由独立 `closeoutCommit` 写入正式报告；closeout ledger 登记后才能加入 `reviewCycleScoreKeys`。历史 candidate shadow 继续只作批准前回放证据，不迁移到正式 ledger，也不参与20任务累计。
 
 ## 9. 跨 run 评分证据
 

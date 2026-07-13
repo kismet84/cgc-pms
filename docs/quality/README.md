@@ -13,6 +13,7 @@
 - [第41条主线：知识图谱优先问题路由与 Ready 契约前置门禁验收报告](mainline-41-knowledge-graph-first-refill-and-ready-scope-acceptance-2026-07-13.md)
 - [第41-1条主线：AutoPilot 任务评分与20任务自动改进回顾验收报告](mainline-41-1-autopilot-scoring-retrospective-acceptance-2026-07-13.md)
 - [第42条主线：AutoPilot 跨 Run 阶段恢复与端到端效率计分修复验收报告](mainline-42-autopilot-cross-run-recovery-and-efficiency-acceptance-2026-07-13.md)
+- [AutoPilot 任务评分 v2 正式启用验收报告](autopilot-task-score-v2-activation-acceptance-2026-07-13.md)
 - [ISSUE-040-001：预警批量评估独立权限码修复验收报告](ISSUE-040-001-预警批量评估独立权限码修复验收报告.md)
 - [ISSUE-040-018：AutoPilot 存量问题优先补货机制验收报告](ISSUE-040-018-AutoPilot存量问题优先补货机制验收报告.md)
 - [AutoPilot Codex stdin 启动参数修复验收报告](autopilot-codex-stdin-launcher-fix-2026-07-13.md)

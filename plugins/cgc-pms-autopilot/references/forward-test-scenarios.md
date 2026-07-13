@@ -74,9 +74,9 @@
 
 ## 场景9：评分两阶段收口与幂等重试
 
-- 输入：已批准 active 版本、硬门禁通过、同一 Issue 重复 closeout
-- 预期：产生不同的 `implementationCommit` 和 `closeoutCommit`；评分只绑定前者，重复执行复用同一评分键和提交登记
-- 通过条件：正式报告只有一段评分、ledger 只有一条有效登记、回顾周期只增加一次
+- 输入：已批准 active `autopilot-task-score/v2`、硬门禁通过、同一 Issue 重复 closeout
+- 预期：产生不同的 `implementationCommit` 和 `closeoutCommit`；正式分包含 `taskExecutionEfficiency` 且只绑定前者，重复执行复用同一评分键和提交登记
+- 通过条件：正式报告只有一段 v2 评分、没有同任务 v1/shadow 双计数，ledger 只有一条有效登记、回顾周期只增加一次
 
 ## 场景10：无界20任务回顾门禁
 

@@ -221,7 +221,7 @@ CI 与验收失败分类规则：
 - Reviewer `tool_config` 与业务 `NEEDS_REPAIR` 必须隔离：同一 diff 的 Reviewer 工具故障只允许一次跨 run 重试，第二次仍失败进入 `PAUSED/REVIEW_TOOL_BLOCKED`；不得触发 implementation executor。只有绑定同一 Issue/diff 且 finding 完整的 `NEEDS_REPAIR` 才允许有界 repair。
 - AutoPilot 任务评分只对已通过全部硬门禁、完成正式归档并产生不同的 `implementationCommit` 与 `closeoutCommit` 的实施型 Ready Issue 生效；评分绑定实施提交，评分收口提交与 closeout ledger 登记成功后才可计入回顾周期。低分只用于周期观测，不得改变 DONE 裁决、触发自动补修或抵消既有质量/安全门禁。
 - 评分配置必须区分 candidate 与 active；只有用户明确批准 `scoringVersion`、五维权重和生效时间后，才允许设置 `approvalStatus=APPROVED`、激活版本并增加正式回顾计数。未批准候选只能用于 disabled 回放和测试，不得写入正式累计。
-- 下一评分版本必须把任务执行效率作为正式10分维度，取证覆盖跨 run implementation 重派、阶段回退、人工恢复、工具/环境重试和证据完整性；绝对耗时只进入20任务趋势分析，不按固定分钟数直接扣分。`autopilot-task-score/v2-candidate` 在版本、35/25/20/10/10权重和生效时间完整批准前保持 disabled，不能覆盖 v1 历史评分或形成第二份正式计数。
+- `autopilot-task-score/v2` 已获用户批准并作为 active 正式版本，五维权重为35/25/20/10/10，其中 `taskExecutionEfficiency=10`；自批准配置提交后的下一项新实施型 Ready Issue 生效。取证覆盖跨 run implementation 重派、阶段回退、人工恢复、工具/环境重试和证据完整性；绝对耗时只进入20任务趋势分析，不按固定分钟数直接扣分。v1 历史评分不得回算或覆盖，同一任务不得形成 v1/v2 双重正式计数。
 - 正式评分按独立于单次 `iterationLimit` 的回顾周期跨批次累计并以任务/评分幂等键去重。无界模式在第20个有效任务安全收口后禁止选择第21个任务；有界 `启动迭代-N` 可完成当前 N，随后对本周期全部任务统一回顾，超出20的部分不结转。
 - 达到回顾阈值后必须保持 `RETROSPECTIVE_REQUIRED` / 暂停状态，直到回顾报告已提交、改进提案去重写入唯一问题事实源、知识图谱 Git 游标追平、稳定 Episode 可读回且最终 state 成功清零。任一阶段失败都保留累计任务并幂等续跑；清零后仍须用户重新启动，不自动恢复。
 - 自动回顾只能按可复现聚合规则生成 `NEEDS_CONFIRMATION` 改进提案，不得自动修改代码、规则、权重或环境。提案证据或验收标准不足时关闭，不得新建孤立改进清单或制造悬空 backlog。

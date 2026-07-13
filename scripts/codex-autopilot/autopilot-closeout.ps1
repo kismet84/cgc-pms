@@ -67,6 +67,7 @@ function Complete-AutopilotIssueCloseout {
   $donePath = Join-Path $Worktree 'docs\backlog\done-issues.md'
   $worktreeHead = (& git -C $Worktree rev-parse HEAD).Trim()
   $scoringActive = $null -ne $TaskScoringConfig -and (Test-AutopilotTaskScoringActive $TaskScoringConfig)
+  $activeScoringVersion = if ($scoringActive) { [string](Get-AutopilotScoreProperty $TaskScoringConfig 'activeVersion' '') } else { '' }
   & git -C $RepoRoot merge-base --is-ancestor $worktreeHead HEAD 2>$null
   if ($LASTEXITCODE -eq 0 -and (Get-Content -LiteralPath (Join-Path $RepoRoot 'docs\backlog\ready-issues.md') -Raw -Encoding UTF8) -match ('(?ms)^###\s+' + [regex]::Escape($Issue.title) + '.*?^状态：Done\s*$')) {
     $score = if ($scoringActive) { Get-AutopilotTaskScoreFromReport -ReportPath $archivePath } else { $null }
@@ -78,7 +79,7 @@ function Complete-AutopilotIssueCloseout {
   if ($scoringActive -and $existingSubject -eq "chore(autopilot): score and close $($Issue.issueId.ToLowerInvariant())") {
     $implementationCommit = (& git -C $Worktree rev-parse "$worktreeHead^" 2>$null | Select-Object -First 1).Trim()
     $score = Get-AutopilotTaskScoreFromReport -ReportPath $archivePath
-    if ($null -eq $score -or [string]$score.implementationCommit -ne $implementationCommit) { throw 'existing closeout commit lacks its bound v1 task score' }
+    if ($null -eq $score -or [string]$score.implementationCommit -ne $implementationCommit -or [string]$score.scoringVersion -ne $activeScoringVersion) { throw 'existing closeout commit lacks its bound active task score' }
     $scoreShadow = Get-AutopilotTaskScoreFromReport -ReportPath $archivePath -Shadow
     $merged = $false
     if ($AutoMerge) {
@@ -117,12 +118,16 @@ function Complete-AutopilotIssueCloseout {
       }
     }
     Set-AutopilotScoreProperty $ScoreEvidence 'implementationCommit' $implementationCommit
-    if ($null -ne $ScoreShadowEvidence) {
+    if ($activeScoringVersion -eq $script:AutopilotTaskScoreVersion -and $null -ne $ScoreShadowEvidence) {
       Set-AutopilotScoreProperty $ScoreShadowEvidence 'implementationCommit' $implementationCommit
       $scoreShadow = New-AutopilotTaskScoreV2Shadow $ScoreShadowEvidence
       Add-AutopilotTaskScoreV2ShadowToReport -ReportPath $archivePath -Score $scoreShadow | Out-Null
     }
-    $score = New-AutopilotTaskScore $ScoreEvidence
+    $score = if ($activeScoringVersion -eq $script:AutopilotTaskScoreV2Version) {
+      New-AutopilotTaskScoreV2 $ScoreEvidence
+    } else {
+      New-AutopilotTaskScore $ScoreEvidence
+    }
     Add-AutopilotTaskScoreToReport -ReportPath $archivePath -Score $score | Out-Null
   }
   Set-AutopilotReadyDone -ReadyPath $readyPath -IssueTitle $Issue.title | Out-Null

@@ -4,7 +4,7 @@
 
 - 控制面新增原子 Issue phase checkpoint，绑定 Ready 内容、base、worktree/branch、scope、diff/evidence、阶段产物和派发指标；死进程接管不再删除有效 worktree 或重新派发 implementation，而是从 validation、Reviewer 或 closeout 的首个未完成阶段继续。
 - Reviewer 结果新增结构化 `tool_blocked` 路由。Windows sandbox/tool_config 失败只重试同一 diff 的 Reviewer，累计两次仍失败暂停当前 Issue；业务 `NEEDS_REPAIR` 继续要求完整 finding 并执行有界 repair。
-- v1 的35/25/20/10/10正式评分和历史记录保持不变；disabled `autopilot-task-score/v2-candidate` 将10分维度升级为 `taskExecutionEfficiency`，覆盖 `runResumeCount`、各阶段派发、人工恢复、工具重试与证据完整性。最终 shadow 仅写独立本地候选账本，v2 未经完整批准不进入正式 ledger 或20任务计数。
+- `autopilot-task-score/v2` 已按35/25/20/10/10正式激活，10分维度升级为 `taskExecutionEfficiency`，覆盖 `runResumeCount`、各阶段派发、人工恢复、工具/环境重试与证据完整性；从批准配置提交后的下一项新实施型 Ready 生效。v1 历史记录保持不变，不回算、不覆盖、不与 v2 双计数。
 - 控制面指纹覆盖行为配置并阻止未经单任务证明的 N>1/无界放量；真实金丝雀仍须用户明确执行 `启动迭代-1`，只有 closeout ledger、state 与知识图谱 Git cursor 全部读回才登记成功，不会由本主线自动启动。
 
 ## 2026-07-13 增量：系统菜单平铺列表管理员入口
@@ -24,7 +24,7 @@
 ## 2026-07-13 增量：AutoPilot 任务评分与20任务自动改进回顾候选控制面
 
 - 已落地确定性五维评分器、评分 schema、`implementationCommit` / `closeoutCommit` 两阶段收口、v2→v3 状态迁移、跨批次回顾计数、无界20任务门禁、有界18+3整批回顾、改进提案聚合、稳定 Episode CLI 与可恢复阶段状态。
-- 评分版本批准门已由用户明确通过：`autopilot-task-score/v1` 权重为35/25/20/10/10，配置 `enabled=true`、`activeVersion=autopilot-task-score/v1`、`approvalStatus=APPROVED`；从批准配置提交后启动的下一项新实施型 Ready 起正式评分并累计20任务回顾周期。
+- v1 曾按35/25/20/10/10正式生效并保留历史评分；2026-07-13 用户进一步批准 `autopilot-task-score/v2`，当前配置为 `enabled=true`、`activeVersion=autopilot-task-score/v2`、`approvalStatus=APPROVED`，同权重中的10分维度改为 `taskExecutionEfficiency`，从本次批准配置提交后的下一项新实施型 Ready 起正式计入20任务回顾周期。
 - 历史样本回放显示交付、零悬空和存量变化证据可用，但首次验收、周期效率及两阶段提交缺少结构化字段，因此不回算历史任务。低分仍不改变硬门禁裁决，回顾改进提案仍须逐项用户确认后才能实施。
 
 ## 2026-07-13 增量：知识图谱优先问题路由与 Ready 契约门禁

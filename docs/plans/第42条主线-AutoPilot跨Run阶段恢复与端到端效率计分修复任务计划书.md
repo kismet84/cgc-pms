@@ -6,8 +6,8 @@
 **Depends On:** 第41条与第41-1条主线、`ISSUE-040-022` 异常恢复复盘、当前已修复的 durable stall progress 门禁。
 **Tech Stack:** Windows PowerShell 5.1/PowerShell 7兼容语法、JSON/JSON Schema、Git worktree、现有 AutoPilot runner、Reviewer、任务评分与回顾周期状态。
 
-**Implementation Status:** M0–M4 已于2026-07-13完成实现、故障注入、完整回归和独立 Reviewer 验收；正式报告见 `docs/quality/mainline-42-autopilot-cross-run-recovery-and-efficiency-acceptance-2026-07-13.md`。真实 `启动迭代-1` 金丝雀仍需用户明确启动，v2 正式版本/权重/生效时间仍需另行批准。
-**计划状态:** Planned；尚未实施。跨 run 恢复按 P0 运维治理处理，评分 v2 按 `NEEDS_CONFIRMATION` 决策门处理。
+**Implementation Status:** M0–M4 已于2026-07-13完成实现、故障注入、完整回归和独立 Reviewer 验收；正式报告见 `docs/quality/mainline-42-autopilot-cross-run-recovery-and-efficiency-acceptance-2026-07-13.md`。用户随后批准 `autopilot-task-score/v2`、35/25/20/10/10和自下一项新实施型 Ready 生效；真实 `启动迭代-1` 金丝雀仍需用户明确启动。
+**计划状态:** Completed；跨 run 恢复、效率证据和 v2 正式激活均已完成，批量放量只剩控制面单任务金丝雀门。
 
 ## 1. 正式承接的问题
 
@@ -16,7 +16,7 @@
 | 稳定键 | 优先级 | 当前状态 | 问题 | 解除条件 |
 | --- | --- | --- | --- | --- |
 | `AUTOPILOT-CROSS-RUN-PHASE-RECOVERY` | P0 | Planned / blocking | 已完成实现或验证的 Issue 在 runner 重启后可能走 `RESTART_ISSUE`，删除残留 worktree 并重新派发 B/C；Reviewer `tool_config` 失败没有与业务实现隔离 | 故障注入证明 implement 后、review 后、closeout 前三类中断均只从首个未完成阶段恢复，业务实现派发次数精确为1 |
-| `AUTOPILOT-END-TO-END-EFFICIENCY-EVIDENCE` | P1 | Planned / activation needs confirmation | v1 的 `avoidableReworkCount` 主要来自单 run 的 `attempt`，未覆盖跨 run 重复派发、人工恢复和阶段重启，95分可能掩盖端到端低效 | 正式记录跨 run 指标；v2 将任务执行效率作为10分正式维度并可确定性回放，激活参数由用户另行批准 |
+| `AUTOPILOT-END-TO-END-EFFICIENCY-EVIDENCE` | P1 | Completed / v2 active | v1 的 `avoidableReworkCount` 主要来自单 run 的 `attempt`，未覆盖跨 run 重复派发、人工恢复和阶段重启，95分可能掩盖端到端低效 | 正式记录跨 run 指标；v2 将任务执行效率作为10分正式维度并可确定性回放，激活参数已获用户批准 |
 
 在 P0 恢复能力验收前，`pause.flag` 应继续阻止无人值守多任务派发；允许执行 dry-run、测试夹具和用户明确启动的单任务金丝雀，不自动恢复剩余9项。
 
@@ -199,10 +199,9 @@ READY_SELECTED
 ### 5.3 批准门
 
 - 可以实施指标采集、schema、测试和 disabled 影子回放。
-- “任务执行效率进入正式评分”这一方向已经确认，不再作为可选项；仍待批准的是 v2 的正式版本名、完整五维权重和生效时间。
-- v2 候选不得写入 `activeVersion`，不得替换 v1，不得增加第二份正式回顾计数；最终端到端 shadow 只允许写入独立本地 `candidate-score-shadows.ndjson`，并在 checkpoint 退役前按同一 closeout key 幂等覆盖，不能混入正式 closeout ledger。
-- 建议批准参数为：`scoringVersion=autopilot-task-score/v2`、权重35/25/20/10/10、`taskExecutionEfficiency=10`，自批准后的下一项新实施型 Ready Issue 生效；这些参数未被完整明确批准前不得激活。
-- 未批准时继续使用 v1；回顾报告可以同时展示 v1 正式分和 v2 shadow 分，但必须明确后者不生效。
+- 用户已批准 `scoringVersion=autopilot-task-score/v2`、权重35/25/20/10/10、`taskExecutionEfficiency=10`，自批准配置提交后的下一项新实施型 Ready Issue 生效。
+- v2 active 每个新任务只写一个正式评分键和一个回顾计数，不再生成 v1 正式分或 candidate shadow 双计数。
+- 批准前 shadow 保持历史回放证据，不迁移到正式 closeout ledger。
 - 历史 v1 分数不回算、不覆盖；`ISSUE-040-022` 的95分保留原始事实，回顾中另注明跨 run 盲区。
 
 ## 6. 控制面金丝雀门
@@ -322,12 +321,12 @@ READY_SELECTED
 **Tasks:**
 
 - [ ] 从 checkpoint 聚合第5.1节指标，禁止用模型主观判断补齐缺失值。
-- [ ] v1 继续按现行批准口径生成正式分；新增指标进入正式报告、周期回顾输入和 v2 `taskExecutionEfficiency` 计分证据。
-- [ ] 实现 disabled v2 shadow 评分，五维总权重固定校验为100，按同一输入重复计算结果完全一致。
-- [ ] v2 shadow 缺少端到端证据时任务执行效率为0，不得猜测为首次成功。
-- [ ] v2 激活后每个新任务只能产生一个正式评分版本和一个回顾计数，不允许 v1/v2 双计数。
-- [ ] 影子分不得写入 activeVersion、closeout ledger 正式评分键或 reviewCycleScoreKeys。
-- [ ] 增加用户批准门回归，未批准配置无法激活。
+- [x] v1 历史按原批准口径保留；新增指标进入正式报告、周期回顾输入和 v2 `taskExecutionEfficiency` 计分证据。
+- [x] 实现 disabled v2 shadow 评分，五维总权重固定校验为100，按同一输入重复计算结果完全一致。
+- [x] v2 shadow 缺少端到端证据时任务执行效率为0，不得猜测为首次成功。
+- [x] v2 激活后每个新任务只能产生一个正式评分版本和一个回顾计数，不允许 v1/v2 双计数。
+- [x] 影子分不得写入 activeVersion、closeout ledger 正式评分键或 reviewCycleScoreKeys。
+- [x] 增加用户批准门回归，未批准配置无法激活。
 
 **GREEN 验收:** 使用 `ISSUE-040-022` 的结构化回放样本时，v1 历史95分保持不变；v2 shadow 能识别重复 implementation dispatch/人工恢复并给出任务执行效率0，且不增加正式回顾计数。批准门测试还需证明激活后该10分维度进入正式总分和20任务聚合。
 
@@ -379,7 +378,7 @@ READY_SELECTED
 - [ ] 正式报告统计新增后续项、关闭后续项和后续项净变化；P0/P1 稳定键必须关闭、转待确认或正式承接。
 - [ ] 本地主线提交后刷新知识图谱并验证 Git cursor 追平；不 push。
 
-**收口验收:** 当前分支干净、正式报告存在、图谱游标追平、P0 恢复问题关闭；v2 未批准时保持 `NEEDS_CONFIRMATION`，不能为了“零悬空”伪装已批准。
+**收口验收:** 当前分支干净、正式报告存在、图谱游标追平、P0 恢复问题关闭；v2 批准状态、active 配置与生效边界必须一致，不能为了“零悬空”伪装批准或激活。
 
 ## 8. 实施顺序与阶段门
 
@@ -412,7 +411,7 @@ READY_SELECTED
 
 - 完成 Task 7。
 - 独立 Reviewer 复核恢复矩阵、Reviewer 工具边界、v1/v2 隔离和 zero-dangling。
-- 用户确认 v2 的正式版本名、五维权重和生效时间；暂缓激活不影响 P0 恢复主线通过，但任务执行效率不得从 v2 目标模型中移除。
+- 用户已确认 v2 的正式版本名、五维权重和生效时间；正式激活回归通过。
 
 ## 9. 验收矩阵
 
@@ -429,8 +428,8 @@ READY_SELECTED
 | Ready 或基线变化 | quarantine，禁止静默复用或删除现场 |
 | worktree 长路径清理 | 仅在正式收口或显式放弃后执行，目录与 branch 均移除 |
 | CPU-only 辅助进程持续活动 | 不刷新 durable progress；既有 stall 测试继续通过 |
-| v1 正式评分 | 历史和新任务仍按批准口径，不被 shadow 改写 |
-| v2 shadow | `taskExecutionEfficiency` 能识别跨 run 重派、阶段回退、人工恢复和工具重试，未激活前不计入正式20任务周期 |
+| v1 正式评分 | 历史评分继续按原版本保留，不被 v2 重算或覆盖 |
+| v2 正式评分 | `taskExecutionEfficiency` 能识别跨 run 重派、阶段回退、人工恢复和工具重试，自批准配置提交后的下一项新实施型 Ready 起计入正式20任务周期 |
 | v2 批准后新任务 | 任务执行效率10分进入正式总分和20任务聚合，同一任务不得同时记 v1/v2 |
 | 控制面指纹变化后请求 N>1 | 金丝雀未通过前安全停止，不启动任务 |
 
@@ -491,7 +490,7 @@ git diff --check
 - implementation、validation、review、closeout 四个中断点均可幂等恢复。
 - durable stall、长路径 worktree、两阶段 closeout、Ready lint 和评分 v1 回归全部通过。
 - 端到端指标进入正式报告、回顾输入和 v2 任务执行效率计分证据，不含临时路径、run id 或原始日志。
-- v2 目标模型明确包含10分 `taskExecutionEfficiency`；候选在完整批准前保持 disabled/NEEDS_CONFIRMATION，activeVersion 仍为 v1。
+- v2 正式模型包含10分 `taskExecutionEfficiency`；已按35/25/20/10/10批准激活，activeVersion 为 v2，v1 历史不回算。
 - 控制面指纹金丝雀门通过自动化测试；真实 `启动迭代-1` 只在用户明确启动后执行。
 - 正式报告、Current Focus、项目地图、迭代决策、Git 和知识图谱游标一致。
 - 新增后续项、关闭后续项和后续项净变化已统计；不存在只有会话备注而没有唯一承接载体的问题。
@@ -500,6 +499,6 @@ git diff --check
 ## 13. 决策建议
 
 1. 先批准实施 M0–M3 的 P0 恢复、指标采集和金丝雀基础设施；这些动作不改变正式评分版本。
-2. M2 完成后单独提交 v2 shadow 回放报告；“纳入任务执行效率”不再待决，只需用户确认 `autopilot-task-score/v2`、35/25/20/10/10和生效时间后即可激活。
+2. M2 shadow 回放和批准门均已完成；用户已确认 `autopilot-task-score/v2`、35/25/20/10/10和自下一项新实施型 Ready 生效。
 3. M1 未通过前不再执行 `启动迭代-10`；M3 自动化通过后先执行一次用户明确启动的 `启动迭代-1`。
 4. 本计划不自动启动实施、不移除当前 `pause.flag`、不提交、不 push；进入实施需用户再次明确授权。
