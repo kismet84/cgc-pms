@@ -17,6 +17,36 @@ function Set-AutopilotReadyDone {
   return $true
 }
 
+function Assert-AutopilotStockIssueClosed {
+  param([string]$Worktree, [string]$ReadyPath, [string]$IssueTitle)
+  $readyText = Get-Content -LiteralPath $ReadyPath -Raw -Encoding UTF8
+  $pattern = '(?ms)^###\s+' + [regex]::Escape($IssueTitle) + '\s*\r?\n(.*?)(?=^###\s+ISSUE-|\z)'
+  $match = [regex]::Match($readyText, $pattern)
+  if (!$match.Success) { throw "Ready block not found for stock issue closeout: $IssueTitle" }
+  $marker = [regex]::Match($match.Groups[1].Value, '\[stock:([^\]]+)\]')
+  if (!$marker.Success) { return }
+
+  $issueKey = $marker.Groups[1].Value.Trim()
+  $registryPath = Join-Path $Worktree 'docs\backlog\current-issues.json'
+  if (!(Test-Path -LiteralPath $registryPath -PathType Leaf)) {
+    throw "stock issue registry is missing during closeout: $issueKey"
+  }
+  $registry = Get-Content -LiteralPath $registryPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $current = @($registry.issues | Where-Object { [string]$_.issueKey -eq $issueKey })
+  if ($current.Count -eq 0) { return }
+
+  $eligibleStatuses = @('OPEN', 'OBSERVATION')
+  $eligibleClassifications = @('STILL_APPLICABLE', 'NON_BLOCKING_OBSERVATION', 'OPERATIONAL_RISK')
+  $stillEligible = @($current | Where-Object {
+    -not [bool]$_.blocking -and
+    $eligibleStatuses -contains ([string]$_.status).ToUpperInvariant() -and
+    $eligibleClassifications -contains ([string]$_.classification).ToUpperInvariant()
+  })
+  if ($stillEligible.Count -gt 0) {
+    throw "stock issue remains eligible after implementation; remove or formally reclassify it before closeout: $issueKey"
+  }
+}
+
 function Complete-AutopilotIssueCloseout {
   param([string]$RepoRoot, [string]$Worktree, [object]$Issue, [bool]$AutoMerge = $true, [string]$BaseBranch = 'master', [string]$ExpectedBaseCommit = '')
   $currentBranch = (& git -C $RepoRoot branch --show-current).Trim()
@@ -31,6 +61,7 @@ function Complete-AutopilotIssueCloseout {
     return [pscustomobject]@{ commit = $worktreeHead; merged = $true; idempotent = $true }
   }
   if ($ExpectedBaseCommit -and (& git -C $RepoRoot rev-parse HEAD).Trim() -ne $ExpectedBaseCommit) { throw 'base branch advanced during Issue execution; closeout requires a fresh isolated retry' }
+  Assert-AutopilotStockIssueClosed -Worktree $Worktree -ReadyPath $readyPath -IssueTitle $Issue.title
   Set-AutopilotReadyDone -ReadyPath $readyPath -IssueTitle $Issue.title | Out-Null
   if (!(Test-Path -LiteralPath $donePath)) { '# Done Issues' | Set-Content -LiteralPath $donePath -Encoding UTF8 }
   $doneText = Get-Content -LiteralPath $donePath -Raw -Encoding UTF8

@@ -2,9 +2,15 @@
 
 ## 场景1：Ready 空
 
-- 输入：`ready` 队列为空，`current-focus` 可继续拆题
-- 预期：A 进入拆题；不写业务代码；输出新的 Ready 或明确停止原因
+- 输入：`ready` 队列为空，`current-issues.json` 存在合格 `OPEN` / `OBSERVATION` 叶子问题
+- 预期：A 优先从存量问题拆题；保留 `[stock:<issueKey>]`；不写业务代码；输出新的 Ready 或明确停止原因
 - 通过条件：只有 backlog/计划层动作，没有业务代码 diff
+
+## 场景1a：存量问题过滤与后备顺序
+
+- 输入：同时存在生产 `RELEASE_GATE`、`FROZEN`、`NEEDS_CONFIRMATION`、聚合父问题、合格存量叶子问题、当前 focus 阻塞和 Ad-hoc Candidate
+- 预期：只选择合格存量叶子问题；其余存量项不自动拆 Ready。合格存量问题耗尽后，才按当前 focus 可解除阻塞 → Ad-hoc Candidate → 产品情报刷新推进
+- 通过条件：长期增强计划不能直接生成 Ready；没有 Ready Planner 时正式补货 fail-close，不生成宽范围通用草稿
 
 ## 场景1b：无 Ready 证据直接调用 runner
 

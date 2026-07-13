@@ -63,5 +63,5 @@
 - 每轮最多并行 3 个完全无关联且无代码关联的 Ready Issue，不能证明无关联时串行。
 - 测试数据重置必须同时满足 dev/test/demo、host 为 localhost/127.0.0.1、存在 `ALLOW_TEST_DATA_RESET` marker。
 - `autoPush=false` / `no push` 禁止自动 push；显式 push 必须获得用户授权并通过其他门禁。
-- 收口需通过对应验证与 `git diff --check`、更新 iteration/backlog 并复查 flag；Ready 为空但当前 focus/阶段仍有可处理前置阻塞时先解阻，停止条件按项目规则执行。
+- 收口需通过对应验证与 `git diff --check`、更新 iteration/backlog 并复查 flag；Ready 为空时先从 `current-issues.json` 拆合格存量问题，存量问题耗尽后再处理当前 focus/阶段可解除阻塞，停止条件按项目规则执行。
 - 不自动发布生产，不连接生产数据库，不删除仓库外文件。

@@ -28,6 +28,7 @@ function New-Fixture {
     [int]$MaxParallelIssues = 3,
     [string]$ParallelSafetyMode = "strict-independent-only",
     [string]$ExecutorMode = "success",
+    [string]$CurrentIssues = '',
     [switch]$Enabled,
     [switch]$SkipStrictDefaults
   )
@@ -101,6 +102,10 @@ Write-Host "mock executor completed for `$IssueId"
   $Ready | Out-File -Encoding utf8 (Join-Path $BacklogDir "ready-issues.md")
   $Focus | Out-File -Encoding utf8 (Join-Path $BacklogDir "current-focus.md")
   $Plan | Out-File -Encoding utf8 (Join-Path $BacklogDir "cgc-pms-production-enhancement-plan.md")
+  if (!$CurrentIssues) {
+    $CurrentIssues = '{"schemaVersion":1,"versionScope":"v1.5","updatedAt":"2026-07-13T14:00:00+08:00","issues":[]}'
+  }
+  $CurrentIssues | Out-File -Encoding utf8 (Join-Path $BacklogDir "current-issues.json")
   ".worktrees/`r`n.codex-autopilot/" | Out-File -Encoding utf8 (Join-Path $Root '.gitignore')
   & git -C $Root init -q 2>$null
   & git -C $Root config user.email 'autopilot@test.local'
@@ -673,7 +678,7 @@ try {
   $BadTextOutput = Invoke-Runner $ReadyRoot -MaxIterations "abc"
   Assert-Contains $BadTextOutput "MaxIterations"
 
-  $SplitRoot = New-Fixture -Name "split" -Enabled -Ready "# Ready Issues`n" -Plan @"
+  $SplitRoot = New-Fixture -Name "split" -Enabled -Ready "# Ready Issues`n" -CurrentIssues '{"schemaVersion":1,"versionScope":"v1.5","updatedAt":"2026-07-13T14:00:00+08:00","issues":[{"issueKey":"OBS-STOCK-001","title":"存量回归缺口","status":"OBSERVATION","classification":"NON_BLOCKING_OBSERVATION","priority":"P1","blocking":false,"summary":"验证既有行为","acceptanceCriteria":"形成可执行验证并完成收口","sourceRefs":["docs/backlog/current-focus.md"]}]}' -Plan @"
 # Plan
 
 ## 8.1 报表中心
@@ -681,6 +686,8 @@ try {
 "@
   $SplitOutput = Invoke-Runner $SplitRoot
   Assert-Contains $SplitOutput "SPLIT_MODE"
+  Assert-Contains $SplitOutput "candidateSource=current-issues.json"
+  Assert-Contains $SplitOutput "splitCandidate[1]=[stock:OBS-STOCK-001]"
   Assert-Contains $SplitOutput "DRY_RUN_NO_BACKLOG_WRITE"
   $SplitReadyAfterDryRun = Get-Content -Encoding UTF8 -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
   Assert-NotContains $SplitReadyAfterDryRun "状态：Ready"
@@ -692,6 +699,7 @@ try {
   Assert-Contains $ExplainSplitOutput "nextAction=SPLIT_BACKLOG"
   Assert-Contains $ExplainSplitOutput "shouldSplitBacklog=true"
   Assert-Contains $ExplainSplitOutput "wouldCreateReadyIssueDrafts=1"
+  Assert-Contains $ExplainSplitOutput "candidateSource=current-issues.json"
   $SplitReadyAfterExplain = Get-Content -Encoding UTF8 -Raw (Join-Path $SplitRoot "docs\backlog\ready-issues.md")
   Assert-NotContains $SplitReadyAfterExplain "状态：Ready"
   if (Test-Path (Join-Path $SplitRoot ".codex-autopilot\run.lock")) { throw "ExplainNextAction should not leave run.lock" }
@@ -700,7 +708,7 @@ try {
   Assert-Contains $SplitDryRunOutput "DRY_RUN_NO_BACKLOG_WRITE"
   if (Test-Path (Join-Path $SplitRoot ".codex-autopilot\run.lock")) { throw "DryRun should not leave run.lock" }
 
-  $ApplyRoot = New-Fixture -Name "apply" -Enabled -Ready "# Ready Issues`n" -Plan @"
+  $ApplyRoot = New-Fixture -Name "apply" -Enabled -Ready "# Ready Issues`n" -CurrentIssues '{"schemaVersion":1,"versionScope":"v1.5","updatedAt":"2026-07-13T14:00:00+08:00","issues":[{"issueKey":"OBS-STOCK-001","title":"存量回归缺口","status":"OBSERVATION","classification":"NON_BLOCKING_OBSERVATION","priority":"P1","blocking":false,"summary":"验证既有行为","acceptanceCriteria":"形成可执行验证并完成收口","sourceRefs":["docs/backlog/current-focus.md"]}]}' -Plan @"
 # Plan
 
 ## 8. 中期开发计划
@@ -712,26 +720,18 @@ try {
 建设预警规则版本、启停和回归。
 "@
   $ApplyOutput = Invoke-Runner $ApplyRoot -Apply
-  Assert-Contains $ApplyOutput "BACKLOG_SPLIT_APPLIED"
-  Assert-Contains $ApplyOutput "postSplitCheckpoint=CONTINUE"
-  Assert-Contains $ApplyOutput "REFILL_ROUND_COMPLETE"
+  Assert-Contains $ApplyOutput "STOP_READY_PLANNER_UNAVAILABLE"
   Assert-NotContains $ApplyOutput "READY_ISSUE_FOUND"
   Assert-NotContains $ApplyOutput "EXECUTOR_RESULT_WRITTEN"
   $ApplyReady = Get-Content -Encoding UTF8 -Raw (Join-Path $ApplyRoot "docs\backlog\ready-issues.md")
-  Assert-Contains $ApplyReady "状态：Ready"
-  Assert-Contains $ApplyReady "验证命令："
-  Assert-Contains $ApplyReady "来源锚点："
+  Assert-NotContains $ApplyReady "状态：Ready"
   $ApplyState = Get-Content -Encoding UTF8 -Raw (Join-Path $ApplyRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($ApplyState.mode -ne "continuous-runner") { throw "Expected state.mode=continuous-runner" }
-  if ($ApplyState.lastAction -ne "BACKLOG_SPLIT_APPLIED") { throw "Expected state.lastAction=BACKLOG_SPLIT_APPLIED" }
-  if ($ApplyState.status -ne "REFILLING") { throw "Expected state.status=REFILLING" }
-  if ($ApplyState.lastIssue) { throw "Expected refill round not to select an implementation issue" }
-  if ($ApplyState.lastReason -ne "BACKLOG_SPLIT_APPLIED") { throw "Expected state.lastReason=BACKLOG_SPLIT_APPLIED" }
-  if ($ApplyState.stopReason) { throw "Expected state.stopReason to be empty for ready issue handoff" }
-  if ($ApplyState.iterationCompleted -ne 0) { throw "Expected split/ready handoff not to increment iterationCompleted" }
+  if ($ApplyState.status -ne "BLOCKED") { throw "Expected missing planner to fail closed" }
+  if ($ApplyState.stopReason -ne "STOP_READY_PLANNER_UNAVAILABLE") { throw "Expected planner-unavailable stop reason" }
   if (Test-Path (Join-Path $ApplyRoot ".codex-autopilot\run.lock")) { throw "ApplyBacklogSplit should release run.lock" }
   $refillCommit = (& git -C $ApplyRoot log -1 --pretty=%s).Trim()
-  if ($refillCommit -ne 'chore(autopilot): refill ready queue') { throw 'Expected refill round local commit' }
+  if ($refillCommit -ne 'fixture') { throw 'Missing planner must not create a refill commit' }
 
   $FailRoot = New-Fixture -Name "executor-fail" -Enabled -ExecutorMode "fail" -Ready @"
 # Ready Issues

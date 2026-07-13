@@ -16,8 +16,25 @@ try {
 # Ready Issues
 ### ISSUE-900-040：Closeout
 状态：Ready
+存量问题键：[stock:STOCK-900-040]
 '@ | Set-Content -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Encoding UTF8
   '# Done Issues' | Set-Content -LiteralPath (Join-Path $root 'docs\backlog\done-issues.md') -Encoding UTF8
+  @'
+{
+  "schemaVersion": 1,
+  "issues": [
+    {
+      "issueKey": "STOCK-900-040",
+      "priority": "P1",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
+      "blocking": false,
+      "acceptanceCriteria": ["完成收口门禁测试"],
+      "sourceRefs": ["docs/backlog/ready-issues.md"]
+    }
+  ]
+}
+'@ | Set-Content -LiteralPath (Join-Path $root 'docs\backlog\current-issues.json') -Encoding UTF8
   & git -C $root add .; & git -C $root commit -qm 'base'
   $base = (& git -C $root rev-parse HEAD).Trim()
   $worktree = New-AutopilotIssueWorktree -RepoRoot $root -IssueId 'ISSUE-900-040' -BaseCommit $base
@@ -30,6 +47,15 @@ try {
   try { Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base | Out-Null } catch { $wrongBranchRejected = $true }
   if (!$wrongBranchRejected) { throw 'closeout merged into a non-base branch' }
   & git -C $root switch -q $baseBranch
+  $staleStockRejected = $false
+  try { Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base | Out-Null } catch {
+    $staleStockRejected = $_.Exception.Message -match 'stock issue remains eligible'
+  }
+  if (!$staleStockRejected) { throw 'closeout accepted a Ready whose stock issue remained eligible' }
+  $registryPath = Join-Path $worktree.path 'docs\backlog\current-issues.json'
+  $registry = Get-Content -LiteralPath $registryPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $registry.issues[0].status = 'FROZEN'
+  $registry | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $registryPath -Encoding UTF8
   $result = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base
   if (!$result.commit -or !$result.merged) { throw 'closeout did not commit and merge' }
   if ((Get-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Raw) -notmatch '状态：Done') { throw 'Ready was not closed as Done' }

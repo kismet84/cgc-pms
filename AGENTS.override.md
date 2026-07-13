@@ -150,7 +150,7 @@ CI 与验收失败分类规则：
 
 ## 产品情报与迭代决策规则
 
-- 当用户要求判断产品方向、生成下一轮计划，或 Ready 为空且没有已通过决策门的候选时，先读取 `docs/product-intelligence/`，按“项目地图 → 竞品情报 → 迭代决策 → Ad-hoc Candidate → Ready → 实施 → 地图回写”推进。
+- 当用户要求判断产品方向、生成下一轮计划，或 Ready 为空且 `docs/backlog/current-issues.json` 中没有可自动拆分的存量问题、也没有已通过决策门的候选时，先读取 `docs/product-intelligence/`，按“项目地图 → 竞品情报 → 迭代决策 → Ad-hoc Candidate → Ready → 实施 → 地图回写”推进。
 - 项目事实以当前分支代码、配置、现行规范和当前验证为准；`docs/archive/v1.0/` 只作历史参考，不能替代当前证据，`archive/v1.0/private/` 继续禁止读取。
 - 竞品事实必须来自官方文档、官方产品资料或一手仓库，并记录来源和核验时间；竞品具备某项能力不等于 CGC-PMS 必须实现。
 - 产品 Candidate 必须引用当前 `project-map.md` 和 `evolution-decision.md`，明确用户价值、最小闭环、非目标、依赖、风险和待确认项；前置未核实或证据过期时保持 Candidate，不得强行拆成 Ready。
@@ -175,9 +175,9 @@ CI 与验收失败分类规则：
 ### Ready Issue 与 checkpoint
 
 - 进入 AutoPilot 连续迭代的业务或治理变更前，必须先确认任务来自 `docs/backlog/ready-issues.md`；普通交互任务与用户明确指定的其他治理流程按各自授权和载体执行
-- AutoPilot 任务来源顺序为：a. `docs/backlog/ready-issues.md` 中已有合格 Ready；b. `docs/backlog/ad-hoc-plan.md` 中已引用当前产品情报决策且前置完整的 `ReadyToSplit` / 高优先级 `Candidate`；c. 没有合格候选时先刷新 `docs/product-intelligence/`。长期增强计划只能提供研究输入，不得直接拆 Ready。
+- AutoPilot 任务来源顺序为：a. `docs/backlog/ready-issues.md` 中已有合格 Ready；b. `docs/backlog/current-issues.json` 中可自动处理的存量问题；c. 当前 focus 的可解除前置阻塞；d. `docs/backlog/ad-hoc-plan.md` 中已引用当前产品情报决策且前置完整的 `ReadyToSplit` / 高优先级 `Candidate`；e. 没有合格候选时刷新 `docs/product-intelligence/`。存量问题筛选必须排除 `blocking=true`、`RELEASE_GATE`、`FROZEN`、`NEEDS_CONFIRMATION`、仍有子项的聚合父问题和证据/验收标准不完整项，按 `P0 → P1 → P2`、明确问题优先于观察项、叶子问题优先于宽泛根问题排序；Ready 必须保留唯一 `[stock:<issueKey>]` 标记，收口后同步更新或移除原存量问题。长期增强计划只能提供研究输入，不得直接拆 Ready。
 - Ready 队列允许只有 1 条合格任务，最多 5 条；不得为凑数量放宽证据、前置或字段要求。补货轮只更新产品情报与 backlog，不直接修改业务代码；形成至少 1 条合格 Ready 后，若未命中 `stop.flag` / `pause.flag`，才能进入实施轮。
-- 连续执行模式下，若 `Ready` 队列为空且 `blocked` 中存在当前 `focus/阶段` 的前置阻塞，不得直接停止；必须先由主线程按自适应路由直接处理、单派或多派完成阻塞核实或解除，再决定是否继续拆 Ready。阻塞解除任务可属于运维、事实采集、测试数据前置或验收复核，但必须继续遵守测试数据重置边界，以及开始前、执行中、收口前的 `stop.flag` / `pause.flag` checkpoint
+- 连续执行模式下，若 `Ready` 队列为空，先从 `current-issues.json` 拆分合格存量问题；没有合格存量问题且 `blocked` 中存在当前 `focus/阶段` 的前置阻塞时，不得直接停止，必须先由主线程按自适应路由直接处理、单派或多派完成阻塞核实或解除，再决定是否继续拆 Ready。阻塞解除任务可属于运维、事实采集、测试数据前置或验收复核，但必须继续遵守测试数据重置边界，以及开始前、执行中、收口前的 `stop.flag` / `pause.flag` checkpoint
 - 若前置阻塞已解除，应先由 F 更新 `backlog/blocked/ready` 状态，再由 A 重新拆 Ready；只有阻塞被确认无法处理、已安全写入 `blocked`，或同时不存在可拆任务时，才允许进入连续模式停止判断
 - 每个关键 checkpoint 都要检查 `.codex-autopilot/stop.flag` 和 `.codex-autopilot/pause.flag`；若是在当前任务开始前发现，则不得启动下一个任务；若是在当前任务执行中发现，则只做安全收口，不强制中断
 - 至少在开始前、选任务后、改代码前、跑验证前、自动合并前、更新报告后检查一次 stop/pause
@@ -222,10 +222,10 @@ CI 与验收失败分类规则：
 ### 项目级关键词协议
 
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动预演` 时，视为请求执行插件 dry-run 预演：`powershell -NoProfile -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot\scripts\autopilot-loop-runner.ps1 -DryRun -ReadyIssuePath D:\projects-test\cgc-pms\docs\backlog\ready-issues.md`；该语义只做受控预演，不启动下一任务、不提交、不 push。
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动迭代` 时，视为请求开启 `enabled.flag` 并进入连续迭代模式：优先走插件 runner / checkpoint / classifier 链路，并基于 `docs/backlog/ready-issues.md` 连续执行。A–F 是职责检查表，由主线程按净收益直接承担、单派或多派，不机械创建六个线程；每轮最多允许 3 个完全无关联的 Ready 并行，不能证明无关联时按串行处理，涉及同一文件、模块、业务域、数据库、权限、安全、租户、金额或审批状态机的任务不得并行。若 Ready 为空，先处理当前 focus 的可解除阻塞，再检查有决策证据的 Ad-hoc Candidate；仍无合格候选时刷新产品情报，不得从长期计划凑 Ready。形成至少 1 条合格 Ready 且未命中 stop/pause 后才能实施；每轮结束后检查 stop/pause/enabled，并保持 `no push` 边界。
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动迭代` 时，视为请求开启 `enabled.flag` 并进入连续迭代模式：优先走插件 runner / checkpoint / classifier 链路，并基于 `docs/backlog/ready-issues.md` 连续执行。A–F 是职责检查表，由主线程按净收益直接承担、单派或多派，不机械创建六个线程；每轮最多允许 3 个完全无关联的 Ready 并行，不能证明无关联时按串行处理，涉及同一文件、模块、业务域、数据库、权限、安全、租户、金额或审批状态机的任务不得并行。若 Ready 为空，先从 `current-issues.json` 的合格存量问题拆 Ready，再处理当前 focus 的可解除阻塞，之后才检查有决策证据的 Ad-hoc Candidate；仍无合格候选时刷新产品情报，不得从长期计划凑 Ready。形成至少 1 条合格 Ready 且未命中 stop/pause 后才能实施；每轮结束后检查 stop/pause/enabled，并保持 `no push` 边界。
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语格式 `启动迭代-N` 时，视为带迭代上限的连续执行模式；`N` 必须为 1 到 50 的正整数，表示最多完成 N 个实施型 Ready Issue 后退出；N=0、非数字或超过 50 必须拒绝。dry-run、拆单、health gate、runtime refresh 不计入 N；无 `-N` 参数时保持上一条无上限连续语义。
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止迭代` 时，视为请求执行安全停止：设置停止标记并关闭 `enabled.flag`，用于阻断下一任务启动，不强杀当前任务。
-- 连续执行模式的停止条件包括：收到 `停止迭代` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 为空且无合格 Candidate、产品情报无法形成可执行方向且不存在可解除的当前 focus 前置阻塞、当前 Issue 连续自修后仍失败并已写入 blocked、前置阻塞已确认无法解除并已安全写入 blocked、带 `-N` 参数时已触达完成上限、或触达系统/会话限制。
+- 连续执行模式的停止条件包括：收到 `停止迭代` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 为空且无合格存量问题或 Candidate、产品情报无法形成可执行方向且不存在可解除的当前 focus 前置阻塞、当前 Issue 连续自修后仍失败并已写入 blocked、前置阻塞已确认无法解除并已安全写入 blocked、带 `-N` 参数时已触达完成上限、或触达系统/会话限制。
 - 连续执行模式仍保持以下边界：`autoPush=false`、不发布生产、不连接生产库、不删除仓库外文件；若涉及自动合并，仍必须先通过既有门禁与前置校验
 - 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动预演`、`启动迭代`、`启动迭代-N`、`停止迭代` 才能触发对应动作，避免误触发。
 - 触发前仍需通过授权门；项目总负责人主线程默认直接执行，只有运维卸载或独立证据等净收益明确时才派工

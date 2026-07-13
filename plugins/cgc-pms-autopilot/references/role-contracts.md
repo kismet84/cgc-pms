@@ -2,7 +2,7 @@
 
 ## A 需求/架构分析
 
-- 输入：`ready` / `blocked` / `current-focus`、计划书、既有规则
+- 输入：`ready` / `current-issues` / `blocked` / `current-focus`、计划书、既有规则
 - 输出：问题分类、最小实现边界、依赖判断、建议验证命令、是否需要重新分档、图谱路由判断、查询目的、命中摘要、交叉核验
 
 ## B 前端/UI 实现

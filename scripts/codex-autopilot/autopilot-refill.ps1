@@ -18,6 +18,65 @@ function Test-AutopilotReadyPlanningAllowed {
   return $Action -eq 'PLAN_READY'
 }
 
+function Get-AutopilotStockIssueCandidates {
+  param(
+    [Parameter(Mandatory)][string]$RepoRoot,
+    [int]$Limit = 5
+  )
+
+  $backlog = Join-Path $RepoRoot 'docs\backlog'
+  $registerPath = Join-Path $backlog 'current-issues.json'
+  if (!(Test-Path -LiteralPath $registerPath)) { return @() }
+
+  try {
+    $register = Get-Content -LiteralPath $registerPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  } catch {
+    throw "current-issues.json is invalid: $($_.Exception.Message)"
+  }
+  if ($register.schemaVersion -ne 1 -or $register.PSObject.Properties.Name -notcontains 'issues') {
+    throw 'current-issues.json does not match the supported schemaVersion=1 contract'
+  }
+
+  $existingText = ''
+  foreach ($name in @('ready-issues.md', 'done-issues.md', 'blocked-issues.md')) {
+    $path = Join-Path $backlog $name
+    if (Test-Path -LiteralPath $path) { $existingText += "`n" + (Get-Content -LiteralPath $path -Raw -Encoding UTF8) }
+  }
+  $parentKeys = @($register.issues | Where-Object { $_.parentIssueKey } | ForEach-Object { [string]$_.parentIssueKey } | Select-Object -Unique)
+  $priorityOrder = @{ P0 = 0; P1 = 1; P2 = 2 }
+  $statusOrder = @{ OPEN = 0; OBSERVATION = 1 }
+
+  $candidates = foreach ($issue in @($register.issues)) {
+    $issueKey = [string]$issue.issueKey
+    $marker = "[stock:$issueKey]"
+    if (!$issueKey -or $issue.blocking -eq $true) { continue }
+    if ([string]$issue.status -notin @('OPEN', 'OBSERVATION')) { continue }
+    if ([string]$issue.classification -notin @('STILL_APPLICABLE', 'NON_BLOCKING_OBSERVATION', 'OPERATIONAL_RISK')) { continue }
+    if ($parentKeys -contains $issueKey) { continue }
+    if (!$issue.acceptanceCriteria -or @($issue.sourceRefs).Count -eq 0) { continue }
+    if ($existingText.Contains($marker)) { continue }
+
+    [pscustomobject]@{
+      name = [string]$issue.title
+      status = [string]$issue.status
+      source = 'current-issues.json'
+      issueKey = $issueKey
+      marker = $marker
+      priority = [string]$issue.priority
+      classification = [string]$issue.classification
+      parentIssueKey = if ($issue.parentIssueKey) { [string]$issue.parentIssueKey } else { $null }
+      summary = [string]$issue.summary
+      acceptanceCriteria = [string]$issue.acceptanceCriteria
+      sourceRefs = @($issue.sourceRefs)
+      priorityOrder = if ($priorityOrder.ContainsKey([string]$issue.priority)) { $priorityOrder[[string]$issue.priority] } else { 99 }
+      statusOrder = if ($statusOrder.ContainsKey([string]$issue.status)) { $statusOrder[[string]$issue.status] } else { 99 }
+      specificityOrder = if ($issue.parentIssueKey) { 0 } else { 1 }
+    }
+  }
+
+  return @($candidates | Sort-Object priorityOrder,statusOrder,specificityOrder,issueKey | Select-Object -First ([Math]::Max(0, [Math]::Min($Limit, 5))))
+}
+
 function Get-AutopilotRefillDecision {
   param([Parameter(Mandatory)][string]$RepoRoot)
   $autoDir = Join-Path $RepoRoot '.codex-autopilot'
@@ -25,9 +84,19 @@ function Get-AutopilotRefillDecision {
   if (Test-Path -LiteralPath (Join-Path $autoDir 'stop.flag')) { return [pscustomobject]@{ action = 'STOP'; targetReadyCount = 0; candidates = @(); reason = 'stop.flag present' } }
   if (Test-Path -LiteralPath (Join-Path $autoDir 'pause.flag')) { return [pscustomobject]@{ action = 'PAUSE'; targetReadyCount = 0; candidates = @(); reason = 'pause.flag present' } }
   $readyPath = Join-Path $backlog 'ready-issues.md'
-  $readyText = if (Test-Path -LiteralPath $readyPath) { Get-Content -LiteralPath $readyPath -Raw -Encoding UTF8 } else { '' }
   $readyCount = if (Test-Path -LiteralPath $readyPath) { @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $RepoRoot).Count } else { 0 }
   if ($readyCount -ge 1) { return [pscustomobject]@{ action = 'READY_SUFFICIENT'; targetReadyCount = $readyCount; candidates = @(); reason = 'Ready queue already has at least one item' } }
+
+  $needed = [Math]::Max(0, 1 - $readyCount)
+  $stockCandidates = @(Get-AutopilotStockIssueCandidates -RepoRoot $RepoRoot -Limit ([Math]::Min($needed, 5 - $readyCount)))
+  if ($stockCandidates.Count -gt 0) {
+    return [pscustomobject]@{
+      action = 'PLAN_READY'
+      targetReadyCount = $readyCount + $stockCandidates.Count
+      candidates = $stockCandidates
+      reason = 'eligible current stock issues take precedence over blockers, ad-hoc candidates, and product discovery'
+    }
+  }
 
   $focusPath = Join-Path $backlog 'current-focus.md'; $blockedPath = Join-Path $backlog 'blocked-issues.md'
   $focusText = if (Test-Path -LiteralPath $focusPath) { Get-Content -LiteralPath $focusPath -Raw -Encoding UTF8 } else { '' }
@@ -46,21 +115,9 @@ function Get-AutopilotRefillDecision {
     }
     $candidates = @($candidates | Sort-Object @{Expression={ if ($_.status -eq 'ReadyToSplit') { 0 } else { 1 } }} | Select-Object -Unique name,status,source)
   }
-  $needed = [Math]::Max(0, 1 - $readyCount)
-  if ($candidates.Count -lt $needed) {
-    $planPath = Join-Path $backlog 'cgc-pms-production-enhancement-plan.md'
-    if (Test-Path -LiteralPath $planPath) {
-      $planText = Get-Content -LiteralPath $planPath -Raw -Encoding UTF8
-      foreach ($match in [regex]::Matches($planText, '(?m)^###\s+([0-9]+(?:\.[0-9]+)+)\s+(.+?)\s*$')) {
-        if ([int]$match.Groups[1].Value.Split('.')[0] -lt 7) { continue }
-        $name = $match.Groups[2].Value.Trim()
-        if ($candidates.name -notcontains $name) { $candidates += [pscustomobject]@{ name = $name; status = 'Candidate'; source = "long-term:$($match.Groups[1].Value)" } }
-      }
-    }
-  }
   $selected = @($candidates | Select-Object -First ([Math]::Min($needed, 5 - $readyCount)))
-  if ($selected.Count -eq 0) { return [pscustomobject]@{ action = 'NO_CANDIDATES'; targetReadyCount = $readyCount; candidates = @(); reason = 'no safe candidate is available for planner split' } }
-  return [pscustomobject]@{ action = 'PLAN_READY'; targetReadyCount = $readyCount + $selected.Count; candidates = $selected; reason = 'fresh Planner must turn candidates into strict Ready contracts before implementation' }
+  if ($selected.Count -eq 0) { return [pscustomobject]@{ action = 'NO_CANDIDATES'; targetReadyCount = $readyCount; candidates = @(); reason = 'no eligible stock issue or decision-backed ad-hoc candidate; refresh product intelligence before splitting Ready' } }
+  return [pscustomobject]@{ action = 'PLAN_READY'; targetReadyCount = $readyCount + $selected.Count; candidates = $selected; reason = 'stock issues are exhausted; fresh Planner may split decision-backed ad-hoc candidates' }
 }
 
 function Import-AutopilotReadyPlan {
@@ -90,11 +147,16 @@ function Invoke-AutopilotReadyPlanner {
   $codex = Resolve-AutopilotCodexInvocation
   $candidateJson = $Candidates | ConvertTo-Json -Depth 5 -Compress
   $prompt = @"
-Act as the fresh AutoPilot Planner for cgc-pms. Read AGENTS.override.md, AGENTS.md, docs/backlog/current-focus.md,
-docs/backlog/ready-issues.md, docs/backlog/blocked-issues.md, docs/backlog/ad-hoc-plan.md and the long-term plan.
+Act as the fresh AutoPilot Planner for cgc-pms. Read AGENTS.override.md, AGENTS.md, docs/backlog/current-issues.json,
+docs/backlog/current-focus.md, docs/backlog/ready-issues.md, docs/backlog/blocked-issues.md, docs/backlog/ad-hoc-plan.md,
+docs/product-intelligence/project-map.md and docs/product-intelligence/evolution-decision.md.
 Turn only these candidates into 1..5 strict Ready Issue Markdown blocks: $candidateJson
 Each block must satisfy scripts/codex-autopilot/autopilot-ready.ps1, use real existing paths and validation entrypoints,
 state explicit non-goals/migration/risk/runtime/reviewer requirements, and must not modify business code.
+For a current-issues.json candidate, preserve its exact marker as a line like 存量问题键：[stock:ISSUE_KEY], cite the
+registry and sourceRefs, keep the smallest executable acceptance slice, and require closeout to update/remove that source
+issue in current-issues.json after verification. Never turn RELEASE_GATE, blocking=true, FROZEN, NEEDS_CONFIRMATION,
+an aggregate parent with children, or an evidence-incomplete item into Ready. Never split directly from the long-term plan.
 Return JSON matching $SchemaPath.
 "@
   $args = @('exec','--ephemeral','--sandbox','danger-full-access','--model',$Model,'-c',"model_reasoning_effort=$Thinking",'--cd',$RepoRoot,'--output-schema',$SchemaPath,'--output-last-message',$OutputPath,'-')

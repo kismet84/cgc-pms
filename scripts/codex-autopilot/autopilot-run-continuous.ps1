@@ -366,132 +366,6 @@ function Invoke-ReadyLint {
   }
 }
 
-function Get-SplitCandidates {
-  param(
-    [string]$FocusPath,
-    [string]$PlanPath,
-    [string]$ReadyPath,
-    [int]$Limit
-  )
-
-  if (!(Test-Path $FocusPath) -or !(Test-Path $PlanPath)) {
-    return @()
-  }
-
-  $focus = Get-Content -Encoding UTF8 -Raw $FocusPath
-  $ready = if (Test-Path $ReadyPath) { Get-Content -Encoding UTF8 -Raw $ReadyPath } else { "" }
-  $forbidden = "财务|生产数据库|生产发布|总工程师|BIM|AI"
-  $allowed = "报表|规则治理|通知|WBS|进度|甘特图|供应商|采购增强"
-  $candidates = @()
-  foreach ($line in Get-Content -Encoding UTF8 $PlanPath) {
-    if ($line -match "^#{2,3}\s+([0-9]+\.[0-9]+)\s+(.+)$") {
-      $section = $matches[1].Trim()
-      $name = $matches[2].Trim()
-      $anchor = "$section $name"
-      $anchorToken = '`' + $anchor + '`'
-      if ($anchor -match $allowed -and $anchor -notmatch $forbidden -and $focus -match $allowed -and $ready -notmatch [regex]::Escape($anchorToken)) {
-        $candidates += [pscustomobject]@{
-          section = $section
-          name = $name
-          anchor = $anchor
-        }
-      }
-    }
-    if ($candidates.Count -ge $Limit) {
-      break
-    }
-  }
-  return $candidates
-}
-
-function Get-NextIssueId {
-  param(
-    [string]$ReadyText,
-    [string]$Section,
-    [int]$Offset
-  )
-
-  $prefix = "{0:000}" -f [int]($Section.Split(".")[0])
-  $max = 0
-  foreach ($match in [regex]::Matches($ReadyText, "ISSUE-$prefix-([0-9]+)")) {
-    $max = [Math]::Max($max, [int]$match.Groups[1].Value)
-  }
-  $suffix = "{0:000}" -f ($max + $Offset)
-  return "ISSUE-$prefix-$suffix"
-}
-
-function New-ReadyIssueDraft {
-  param(
-    [pscustomobject]$Candidate,
-    [string]$IssueId
-  )
-
-  $slug = ($Candidate.name -replace "[^\p{L}\p{Nd}]+", "-").Trim("-").ToLowerInvariant()
-  @"
-
-### ${IssueId}：$($Candidate.name) 最小可行回归
-
-优先级：P2
-类型：生产增强 / 回归 / 最小实现
-任务性质：回归证明
-状态：Ready
-自动合并：auto-merge/local-commit-only
-来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``$($Candidate.anchor)`` 节
-是否需要新增 migration：否；如执行中确认必须新增表/字段，先转 Blocked 并回报人工裁决。
-Migration：不需要
-依赖：无
-风险等级：中
-运行态要求：按验收命令判断
-Reviewer要求：跨前后端时需要
-目标：
-- 基于现有架构补齐“$($Candidate.name)”的一轮最小可验收能力或回归断言。
-- 不扩大为完整平台化改造，不连接生产环境。
-非目标：
-- 不新增平台、依赖或生产能力。
-允许修改：
-- ``backend/**``
-- ``frontend-admin/**``
-- ``docs/quality/**``
-- ``docs/iterations/**``
-- ``docs/backlog/**``
-禁止修改：
-- 已应用 Flyway migration
-- 生产凭据、生产数据库连接、生产发布配置
-- 与本 Issue 无关的大范围重构或新依赖
-验收标准：
-- 至少留下一个能证明核心口径或页面/接口行为的自动化验证。
-- 不放宽现有鉴权、租户、项目边界。
-- 更新 iteration 或 quality 报告，并同步 backlog 状态。
-验证命令：
-- ``cd backend; .\mvnw.cmd test``
-- ``cd frontend-admin; pnpm type-check``
-- ``git diff --check``
-归档报告：``docs/quality/$($IssueId.ToLowerInvariant())-$slug.md``
-"@
-}
-
-function Add-ReadyIssueDrafts {
-  param(
-    [string]$ReadyPath,
-    [object[]]$Candidates
-  )
-
-  if ($Candidates.Count -eq 0) {
-    return 0
-  }
-
-  $readyText = if (Test-Path $ReadyPath) { Get-Content -Encoding UTF8 -Raw $ReadyPath } else { "# Ready Issues`r`n" }
-  $drafts = @()
-  for ($index = 0; $index -lt $Candidates.Count; $index++) {
-    $issueId = Get-NextIssueId $readyText $Candidates[$index].section ($index + 1)
-    $drafts += New-ReadyIssueDraft $Candidates[$index] $issueId
-  }
-
-  $appendText = ($drafts -join "`r`n")
-  Add-Content -Encoding utf8 -Path $ReadyPath -Value $appendText
-  return $Candidates.Count
-}
-
 function Write-State {
   param(
     [string]$AutoDir,
@@ -814,7 +688,8 @@ function Write-NextActionExplanation {
     [string]$Checkpoint,
     [object[]]$ReadyIssues,
     [object[]]$Candidates,
-    [string]$StopReason
+    [string]$StopReason,
+    [object]$RefillDecision
   )
 
   Write-Host "EXPLAIN_NEXT_ACTION"
@@ -856,6 +731,16 @@ function Write-NextActionExplanation {
     return
   }
 
+  if ($RefillDecision -and $RefillDecision.action -eq 'UNBLOCK_FIRST') {
+    Write-Host "nextAction=UNBLOCK_FIRST"
+    Write-Host "stopReason="
+    Write-Host "missingGate=blocked-prerequisite"
+    Write-Host "shouldSplitBacklog=false"
+    Write-Host "selectedIssue="
+    Write-Host "refillReason=$($RefillDecision.reason)"
+    return
+  }
+
   if ($Candidates.Count -gt 0) {
     Write-Host "nextAction=SPLIT_BACKLOG"
     Write-Host "stopReason="
@@ -863,8 +748,10 @@ function Write-NextActionExplanation {
     Write-Host "shouldSplitBacklog=true"
     Write-Host "selectedIssue="
     Write-Host "wouldCreateReadyIssueDrafts=$($Candidates.Count)"
+    Write-Host "candidateSource=$($Candidates[0].source)"
     for ($index = 0; $index -lt $Candidates.Count; $index++) {
-      Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $Candidates[$index].anchor)
+      $candidateRef = if ($Candidates[$index].marker) { $Candidates[$index].marker } elseif ($Candidates[$index].anchor) { $Candidates[$index].anchor } else { $Candidates[$index].name }
+      Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $candidateRef)
     }
     return
   }
@@ -1237,9 +1124,6 @@ $script:MaxParallelIssues = $maxParallelIssues
 $script:ParallelSafetyMode = $parallelSafetyMode
 
 $readyPath = Join-Path $RepoRoot "docs\backlog\ready-issues.md"
-$focusPath = Join-Path $RepoRoot "docs\backlog\current-focus.md"
-$planPath = Join-Path $RepoRoot "docs\backlog\cgc-pms-production-enhancement-plan.md"
-$splitLimit = 5
 $applyMode = [bool]$ApplyBacklogSplit -and -not [bool]$DryRun -and -not [bool]$ExplainNextAction
 $dryRunMode = -not $applyMode
 $script:RunLock = $null
@@ -1286,10 +1170,11 @@ if ($ExplainNextAction) {
   $checkpoint = Test-Checkpoint $autoDir
   Write-RunEvent "checkpoint" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "EXPLAIN" })
   $readyIssues = if ($checkpoint -eq "CONTINUE") { @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir) } else { @() }
-  $candidates = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0) { @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit) } else { @() }
+  $refillDecision = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0) { Get-AutopilotRefillDecision -RepoRoot $RepoRoot } else { $null }
+  $candidates = if ($refillDecision -and $refillDecision.action -eq 'PLAN_READY') { @($refillDecision.candidates) } else { @() }
   $stopReason = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0 -and $candidates.Count -eq 0) { Get-StopReasonForEmptyPool $readyPath } else { $checkpoint }
   $batchPlan = if ($readyIssues.Count -gt 0 -and $readyIssues[0].lint.status -eq "pass") { Get-ReadyIssueBatchPlan $readyIssues $maxParallelIssues $parallelSafetyMode } else { $null }
-  $decision = if ($checkpoint -ne "CONTINUE") { "STOP" } elseif ($readyIssues.Count -gt 0 -and $readyIssues[0].lint.status -ne "pass") { "STOP_READY_LINT_FAILED" } elseif ($readyIssues.Count -gt 0) { $batchPlan.decision } elseif ($candidates.Count -gt 0) { "SPLIT_BACKLOG" } else { "STOP" }
+  $decision = if ($checkpoint -ne "CONTINUE") { "STOP" } elseif ($readyIssues.Count -gt 0 -and $readyIssues[0].lint.status -ne "pass") { "STOP_READY_LINT_FAILED" } elseif ($readyIssues.Count -gt 0) { $batchPlan.decision } elseif ($refillDecision -and $refillDecision.action -eq 'UNBLOCK_FIRST') { "UNBLOCK_FIRST" } elseif ($candidates.Count -gt 0) { "SPLIT_BACKLOG" } else { "STOP" }
   Write-RunEvent "decision" ([pscustomobject]@{
     decision = $decision
     issueId = if ($readyIssues.Count -gt 0) { $readyIssues[0].lint.issueId } else { "" }
@@ -1301,7 +1186,7 @@ if ($ExplainNextAction) {
     parallelBatchSize = if ($batchPlan) { @($batchPlan.issues).Count } else { 0 }
     parallelDecision = if ($batchPlan) { $batchPlan.reason } else { "" }
   })
-  Write-NextActionExplanation $checkpoint $readyIssues $candidates $stopReason
+  Write-NextActionExplanation $checkpoint $readyIssues $candidates $stopReason $refillDecision
   exit 0
 }
 
@@ -1420,7 +1305,8 @@ try {
     }
 
     $refillDecision = Get-AutopilotRefillDecision -RepoRoot $RepoRoot
-    if ($applyMode -and $config.readyPlanner -and $config.readyPlanner.enabled -eq $true -and (Test-AutopilotReadyPlanningAllowed -Action $refillDecision.action)) {
+    $readyPlannerEnabled = ($config.PSObject.Properties.Name -contains 'readyPlanner') -and $null -ne $config.readyPlanner -and $config.readyPlanner.enabled -eq $true
+    if ($applyMode -and $readyPlannerEnabled -and (Test-AutopilotReadyPlanningAllowed -Action $refillDecision.action)) {
       Write-State $autoDir 'REFILLING' $false 'READY_PLANNER_START' '' $refillDecision.reason ''
       $planResultPath = Join-Path $script:RunContext.dir 'ready-plan.json'
       $planSchemaPath = Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\ready-plan.schema.json'
@@ -1439,10 +1325,23 @@ try {
       Write-Host 'STOP_UNBLOCK_PLANNER_UNAVAILABLE'
       exit 0
     }
+    if ($refillDecision.action -eq 'NO_CANDIDATES') {
+      $stopReason = Get-StopReasonForEmptyPool $readyPath
+      Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = $stopReason; stopReason = $stopReason; reason = $refillDecision.reason })
+      Write-State $autoDir $stopReason $dryRunMode "STOP" "" $refillDecision.reason $stopReason
+      Write-Host $stopReason
+      Write-Host "refillReason=$($refillDecision.reason)"
+      exit 0
+    }
+    if ($applyMode -and $refillDecision.action -eq 'PLAN_READY' -and !$readyPlannerEnabled) {
+      Write-State $autoDir 'BLOCKED' $false 'READY_PLANNER_REQUIRED' '' $refillDecision.reason 'STOP_READY_PLANNER_UNAVAILABLE'
+      Write-Host 'STOP_READY_PLANNER_UNAVAILABLE'
+      exit 0
+    }
 
     Write-Host "SPLIT_MODE"
-    Write-Host "focusPath=$focusPath"
-    $candidates = @(Get-SplitCandidates $focusPath $planPath $readyPath $splitLimit)
+    Write-Host "candidateSource=$($refillDecision.candidates[0].source)"
+    $candidates = @($refillDecision.candidates)
     if ($candidates.Count -eq 0) {
       $stopReason = Get-StopReasonForEmptyPool $readyPath
       Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = $stopReason; stopReason = $stopReason })
@@ -1459,7 +1358,8 @@ try {
       splitCandidateCount = $candidates.Count
     })
     for ($index = 0; $index -lt $candidates.Count; $index++) {
-      Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $candidates[$index].anchor)
+      $candidateRef = if ($candidates[$index].marker) { $candidates[$index].marker } elseif ($candidates[$index].anchor) { $candidates[$index].anchor } else { $candidates[$index].name }
+      Write-Host ("splitCandidate[{0}]={1}" -f ($index + 1), $candidateRef)
     }
 
     if ($dryRunMode) {
@@ -1468,25 +1368,7 @@ try {
       Write-Host "DRY_RUN_NO_BACKLOG_WRITE"
       exit 0
     }
-
-    $createdCount = Add-ReadyIssueDrafts $readyPath $candidates
-    $refillCommit = Commit-ReadyRefill $RepoRoot $readyPath
-    Write-State $autoDir "BACKLOG_SPLIT_APPLIED" $false "BACKLOG_SPLIT_APPLIED" "" "BACKLOG_SPLIT_APPLIED" ""
-    Write-RunEvent "split.applied" ([pscustomobject]@{ decision = "BACKLOG_SPLIT_APPLIED"; status = "BACKLOG_SPLIT_APPLIED"; shouldSplitBacklog = $true; createdReadyIssueDrafts = $createdCount; commit = $refillCommit })
-    Write-Host "BACKLOG_SPLIT_APPLIED"
-    Write-Host "createdReadyIssueDrafts=$createdCount"
-
-    $checkpoint = Test-Checkpoint $autoDir
-    Write-RunEvent "checkpoint" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "POST_SPLIT_CHECKPOINT" })
-    Write-Host "postSplitCheckpoint=$checkpoint"
-    if ($checkpoint -ne "CONTINUE") {
-      Write-RunEvent "stop" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "STOP"; status = $checkpoint; stopReason = $checkpoint })
-      Write-State $autoDir $checkpoint $false "STOP" "" $checkpoint $checkpoint
-      Write-Host $checkpoint
-      exit 0
-    }
-    Write-Host 'REFILL_ROUND_COMPLETE'
-    exit 0
+    throw 'unreachable refill path: non-dry-run Ready creation requires the configured Ready Planner'
   }
 
   Write-RunEvent "stop" ([pscustomobject]@{ decision = "STOP"; status = "STOP_SESSION_LIMIT"; stopReason = "STOP_SESSION_LIMIT" })

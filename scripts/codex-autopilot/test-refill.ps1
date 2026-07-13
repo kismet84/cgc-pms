@@ -9,6 +9,22 @@ $autoDir = Join-Path $root '.codex-autopilot'
 $backlog = Join-Path $root 'docs\backlog'
 New-Item -ItemType Directory -Path $autoDir,$backlog -Force | Out-Null
 try {
+  function Write-CurrentIssues([object[]]$Issues) {
+    [ordered]@{
+      schemaVersion = 1
+      versionScope = 'v1.5'
+      updatedAt = '2026-07-13T14:00:00+08:00'
+      issues = $Issues
+    } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $backlog 'current-issues.json') -Encoding UTF8
+  }
+  function New-StockIssue([string]$Key,[string]$Title,[string]$Status,[string]$Classification,[string]$Priority,[bool]$Blocking,[string]$Parent = '') {
+    return [ordered]@{
+      issueKey = $Key; title = $Title; status = $Status; classification = $Classification
+      priority = $Priority; blocking = $Blocking; parentIssueKey = if ($Parent) { $Parent } else { $null }
+      summary = "Summary for $Key"; acceptanceCriteria = "Acceptance for $Key"; sourceRefs = @('docs/backlog/current-focus.md')
+    }
+  }
+
   '# Ready Issues' | Set-Content -LiteralPath (Join-Path $backlog 'ready-issues.md') -Encoding UTF8
   @'
 # Ad-hoc
@@ -21,15 +37,30 @@ try {
   '# Plan' | Set-Content -LiteralPath (Join-Path $backlog 'cgc-pms-production-enhancement-plan.md') -Encoding UTF8
   '当前 focus：Candidate A' | Set-Content -LiteralPath (Join-Path $backlog 'current-focus.md') -Encoding UTF8
   '# Blocked Issues' | Set-Content -LiteralPath (Join-Path $backlog 'blocked-issues.md') -Encoding UTF8
+  Write-CurrentIssues @(
+    (New-StockIssue 'A-01' 'Aggregate parent' 'OPEN' 'STILL_APPLICABLE' 'P0' $false),
+    (New-StockIssue 'A-01-LEAF' 'Stock leaf' 'OPEN' 'STILL_APPLICABLE' 'P1' $false 'A-01'),
+    (New-StockIssue 'REL-GATE' 'Production release gate' 'RELEASE_GATE' 'RELEASE_PREREQUISITE' 'P0' $true),
+    (New-StockIssue 'NEEDS-HUMAN' 'Needs human confirmation' 'NEEDS_CONFIRMATION' 'NEEDS_CONFIRMATION' 'P0' $false),
+    (New-StockIssue 'OBS-LOCAL' 'Local observation' 'OBSERVATION' 'NON_BLOCKING_OBSERVATION' 'P2' $false)
+  )
 
   $decision = Get-AutopilotRefillDecision -RepoRoot $root
-  if ($decision.action -ne 'PLAN_READY' -or $decision.targetReadyCount -ne 1 -or $decision.candidates.Count -ne 1) { throw 'refill must select only the highest-priority candidate' }
-  if ($decision.candidates[0].name -ne 'Candidate A') { throw 'refill did not keep candidate priority' }
+  if ($decision.action -ne 'PLAN_READY' -or $decision.targetReadyCount -ne 1 -or $decision.candidates.Count -ne 1) { throw 'refill must select exactly one eligible stock issue' }
+  if ($decision.candidates[0].issueKey -ne 'A-01-LEAF' -or $decision.candidates[0].source -ne 'current-issues.json') { throw 'stock issue priority or aggregate/release/confirmation filtering failed' }
+  if ($decision.candidates[0].marker -ne '[stock:A-01-LEAF]') { throw 'stock issue marker was not preserved for deduplication' }
+
+  Write-CurrentIssues @(
+    (New-StockIssue 'REL-GATE' 'Production release gate' 'RELEASE_GATE' 'RELEASE_PREREQUISITE' 'P0' $true),
+    (New-StockIssue 'NEEDS-HUMAN' 'Needs human confirmation' 'NEEDS_CONFIRMATION' 'NEEDS_CONFIRMATION' 'P0' $false)
+  )
+  $adHocDecision = Get-AutopilotRefillDecision -RepoRoot $root
+  if ($adHocDecision.action -ne 'PLAN_READY' -or $adHocDecision.candidates[0].name -ne 'Candidate A' -or $adHocDecision.candidates[0].source -ne 'ad-hoc-plan.md') { throw 'ad-hoc candidate was not used after eligible stock issues were exhausted' }
 
   '# Ad-hoc' | Set-Content -LiteralPath (Join-Path $backlog 'ad-hoc-plan.md') -Encoding UTF8
   "# Plan`n### 2.1 当前技术栈`n### 8.1 报表中心" | Set-Content -LiteralPath (Join-Path $backlog 'cgc-pms-production-enhancement-plan.md') -Encoding UTF8
   $longTermDecision = Get-AutopilotRefillDecision -RepoRoot $root
-  if ($longTermDecision.candidates.Count -ne 1 -or $longTermDecision.candidates[0].source -ne 'long-term:8.1') { throw 'long-term refill admitted a descriptive heading or rejected a development plan heading' }
+  if ($longTermDecision.action -ne 'NO_CANDIDATES' -or $longTermDecision.candidates.Count -ne 0 -or $longTermDecision.reason -notmatch 'refresh product intelligence') { throw 'long-term plan was still allowed to bypass stock/ad-hoc evidence gates' }
 
   'stop' | Set-Content -LiteralPath (Join-Path $autoDir 'stop.flag') -Encoding UTF8
   if ((Get-AutopilotRefillDecision -RepoRoot $root).action -ne 'STOP') { throw 'stop flag did not stop refill' }
