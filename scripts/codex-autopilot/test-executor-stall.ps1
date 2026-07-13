@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -55,16 +55,25 @@ Start-Sleep -Seconds 20
   $configPath = Join-Path $fixtureScripts 'codex-autopilot.config.json'
   [ordered]@{
     repoRoot=$root;autopilotDir=$autoDir;maxIssuesPerRun=1;maxParallelIssues=1;parallelSafetyMode='strict-independent-only';autoMerge=$true;autoPush=$false;maxRunMinutes=30
-    issueExecutor=[ordered]@{command='powershell';args=@('-NoProfile','-ExecutionPolicy','Bypass','-File','{repoRoot}\scripts\codex-autopilot\mock-executor.ps1','-RepoRoot','{repoRoot}','-IssueId','{issueId}','-PromptPath','{promptFile}');timeoutSeconds=60;stallInspectSeconds=2;stallTerminateSeconds=4;heartbeatMilliseconds=250;requireChangedFiles=$true;longRunningCommands=@([ordered]@{command='declared-but-not-running';expectedSeconds=601})}
+    issueExecutor=[ordered]@{command='pwsh';args=@('-NoProfile','-ExecutionPolicy','Bypass','-File','{repoRoot}\scripts\codex-autopilot\mock-executor.ps1','-RepoRoot','{repoRoot}','-IssueId','{issueId}','-PromptPath','{promptFile}');timeoutSeconds=60;stallInspectSeconds=2;stallTerminateSeconds=4;heartbeatMilliseconds=250;requireChangedFiles=$true;longRunningCommands=@([ordered]@{command='declared-but-not-running';expectedSeconds=601})}
     closeout=[ordered]@{enabled=$true};repair=[ordered]@{enabled=$true;maxRepairAttempts=2};readyPlanner=[ordered]@{enabled=$false}
   } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding UTF8
   & git -C $root init -q
   & git -C $root config user.email 'autopilot@test.local'
   & git -C $root config user.name 'AutoPilot Test'
+  & git -C $root config core.autocrlf false
+  & git -C $root config core.eol lf
+  & git -C $root config core.safecrlf false
+  [IO.File]::WriteAllText((Join-Path $root '.gitattributes'), "* text=auto eol=lf`n*.cmd text eol=crlf`n", [Text.UTF8Encoding]::new($false))
   & git -C $root add .
   & git -C $root commit -qm 'stall base'
   . (Join-Path $scriptDir 'autopilot-progress.ps1')
-  $cpuWorker = Start-Process powershell -ArgumentList '-NoProfile','-Command','$until=[datetime]::UtcNow.AddSeconds(4); while([datetime]::UtcNow -lt $until){ [Math]::Sqrt(12345) | Out-Null }' -PassThru -WindowStyle Hidden
+  $semanticEvidencePath = Join-Path $autoDir 'semantic-evidence.json'
+  $semanticBefore = Get-AutopilotProgressFingerprint -Worktree $root -SemanticEvidencePaths @($semanticEvidencePath)
+  '{"phase":"VALIDATED"}' | Set-Content -LiteralPath $semanticEvidencePath -Encoding UTF8
+  $semanticAfter = Get-AutopilotProgressFingerprint -Worktree $root -SemanticEvidencePaths @($semanticEvidencePath)
+  if ($semanticBefore -eq $semanticAfter) { throw 'durable checkpoint/result evidence was not treated as semantic progress' }
+  $cpuWorker = Start-Process pwsh -ArgumentList '-NoProfile','-Command','$until=[datetime]::UtcNow.AddSeconds(4); while([datetime]::UtcNow -lt $until){ [Math]::Sqrt(12345) | Out-Null }' -PassThru -WindowStyle Hidden
   try {
     $fingerprintBeforeCpu = Get-AutopilotProgressFingerprint -Worktree $root -RootPid $cpuWorker.Id
     Start-Sleep -Seconds 1
@@ -73,7 +82,7 @@ Start-Sleep -Seconds 20
   } finally {
     if (!$cpuWorker.HasExited) { & taskkill.exe /PID $cpuWorker.Id /T /F 2>$null | Out-Null }
   }
-  $longChild = Start-Process powershell -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 30' -PassThru -WindowStyle Hidden
+  $longChild = Start-Process pwsh -ArgumentList '-NoProfile','-Command','Start-Sleep -Seconds 30' -PassThru -WindowStyle Hidden
   try {
     Start-Sleep -Seconds 1
     $active = Get-AutopilotActiveLongCommand -RootPid $PID -Declarations @([pscustomobject]@{command='Start-Sleep -Seconds 30';expectedSeconds=601}) -StartedAt ([datetimeoffset]::Now.AddSeconds(-5))
@@ -85,7 +94,7 @@ Start-Sleep -Seconds 20
     & taskkill.exe /PID $longChild.Id /T /F 2>$null | Out-Null
   }
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
+  $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
   $ErrorActionPreference = $old
   $state = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $autoDir 'state.json') -Raw | ConvertFrom-Json
   if ($state.status -ne 'BLOCKED' -or $state.stopReason -ne 'STOP_EXECUTOR_STALL_RETRY_EXHAUSTED') { throw "stalled executor did not stop safely: $output" }

@@ -1,4 +1,6 @@
 $ErrorActionPreference = 'Stop'
+$nativeLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $nativeLibrary)) { . $nativeLibrary }
 
 $checkpointLibrary = Join-Path $PSScriptRoot 'autopilot-issue-checkpoint.ps1'
 if (!(Get-Command Read-AutopilotIssueCheckpoint -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $checkpointLibrary)) {
@@ -13,10 +15,29 @@ function Get-AutopilotStallLevel {
   return 'HEALTHY'
 }
 
+function Get-AutopilotRecoveryFailureCategory {
+  param([Parameter(Mandatory)][string]$Message)
+  if ($Message -match '(?i)Native command failed|not installed|not available|cannot read run\.lock|AUTOPILOT_POWERSHELL7_REQUIRED') { return 'tool_config' }
+  if ($Message -match '(?i)ECONNREFUSED|Docker|database|port|runtime') { return 'environment_prereq' }
+  return 'integrity_conflict'
+}
+
+function Test-AutopilotBoundChildResult {
+  param([Parameter(Mandatory)][object]$Result, [Parameter(Mandatory)][object]$Checkpoint)
+  if ([string]$Result.status -ne 'done') { return $false }
+  if ($Result.PSObject.Properties.Name -contains 'runInstanceId' -and [string]$Result.runInstanceId) {
+    return [string]$Result.runInstanceId -eq [string]$Checkpoint.runInstanceId -and
+      [string]$Result.leaseEpoch -eq [string]$Checkpoint.leaseEpoch -and
+      (!$Result.controlPlaneFingerprint -or [string]$Result.controlPlaneFingerprint -eq [string]$Checkpoint.controlPlaneFingerprint)
+  }
+  return $true
+}
+
 function Get-AutopilotRecoveryDecision {
   param(
     [Parameter(Mandatory)][string]$AutoDir,
-    [string[]]$PermittedBaseAdvancePaths = @()
+    [string[]]$PermittedBaseAdvancePaths = @(),
+    [object]$CurrentRunLock = $null
   )
   $lockPath = Join-Path $AutoDir 'run.lock'
   $statePath = Join-Path $AutoDir 'state.json'
@@ -25,7 +46,8 @@ function Get-AutopilotRecoveryDecision {
     try { $lock = Get-Content -LiteralPath $lockPath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { return [pscustomobject]@{ action = 'QUARANTINE'; reason = 'run.lock is unreadable' } }
   }
   $process = if ($lock.pid) { Get-Process -Id ([int]$lock.pid) -ErrorAction SilentlyContinue } else { $null }
-  if ($process) { return [pscustomobject]@{ action = 'REFUSE_SECOND_INSTANCE'; reason = 'owner PID is alive'; runId = $lock.runId } }
+  $ownedByCurrentRun = $CurrentRunLock -and [string]$lock.runInstanceId -eq [string]$CurrentRunLock.runInstanceId -and [string]$lock.leaseEpoch -eq [string]$CurrentRunLock.leaseEpoch
+  if ($process -and !$ownedByCurrentRun) { return [pscustomobject]@{ action = 'REFUSE_SECOND_INSTANCE'; reason = 'owner PID is alive'; runId = $lock.runId } }
   $state = $null
   if (Test-Path -LiteralPath $statePath) { try { $state = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch {} }
   $checkpointPath = $null
@@ -56,10 +78,10 @@ function Get-AutopilotRecoveryDecision {
     $boundManualReviewPass = $false
     try {
       if (!(Test-Path -LiteralPath $checkpoint.worktree -PathType Container)) { throw 'recoverable Issue worktree is missing' }
-      $actualBranch = (& git -C $checkpoint.worktree branch --show-current 2>$null | Select-Object -First 1).Trim()
+      $actualBranch = (Invoke-AutopilotGit -RepoRoot $checkpoint.worktree -Arguments @('branch','--show-current') -ThrowOnFailure).stdout.Trim()
       if ($actualBranch -ne [string]$checkpoint.branch) { throw 'Issue worktree branch no longer matches checkpoint' }
-      $mainHead = (& git -C $repoRoot rev-parse HEAD 2>$null | Select-Object -First 1).Trim()
-      $worktreeHead = (& git -C $checkpoint.worktree rev-parse HEAD 2>$null | Select-Object -First 1).Trim()
+      $mainHead = (Invoke-AutopilotGit -RepoRoot $repoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
+      $worktreeHead = (Invoke-AutopilotGit -RepoRoot $checkpoint.worktree -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
       if (!$mainHead -or !$worktreeHead) { throw 'cannot resolve recovery Git heads' }
       $terminalPhases = @('CLOSING','CLOSEOUT_COMMITTED','REGISTERED','CLOSED')
       if ([string]$checkpoint.phase -in $terminalPhases) {
@@ -71,8 +93,8 @@ function Get-AutopilotRecoveryDecision {
       if ($closeoutCommitPresent) {
         $expectedCloseout = [string](Get-AutopilotCheckpointProperty $checkpoint.evidence 'closeoutCommit' '')
         if ($expectedCloseout -and $worktreeHead -ne $expectedCloseout) { throw 'worktree HEAD no longer matches the checkpoint closeout commit' }
-        & git -C $repoRoot merge-base --is-ancestor $worktreeHead $mainHead 2>$null
-        $closeoutAlreadyMerged = $LASTEXITCODE -eq 0
+        $ancestor = Invoke-AutopilotGit -RepoRoot $repoRoot -Arguments @('merge-base','--is-ancestor',$worktreeHead,$mainHead) -AcceptedExitCodes @(0,1)
+        $closeoutAlreadyMerged = $ancestor.exitCode -eq 0
         if ($closeoutAlreadyMerged) {
           $mainNormalizedHash = Get-AutopilotReadyContractHash -ReadyPath $readyPath -IssueId $checkpoint.issueId -NormalizeDoneStatus
           if ($mainNormalizedHash -ne [string]$checkpoint.readyContentHash) { throw 'merged Ready contract no longer matches the dispatch contract' }
@@ -82,22 +104,23 @@ function Get-AutopilotRecoveryDecision {
         if ($readyHash -ne [string]$checkpoint.readyContentHash) { throw 'Ready contract hash changed after Issue dispatch' }
         if ($mainHead -ne [string]$checkpoint.baseCommit) {
           $oldBase = [string]$checkpoint.baseCommit
-          & git -C $repoRoot merge-base --is-ancestor $oldBase $mainHead 2>$null
-          if ($LASTEXITCODE -ne 0) { throw 'base branch diverged after Issue dispatch' }
+          $baseAncestor = Invoke-AutopilotGit -RepoRoot $repoRoot -Arguments @('merge-base','--is-ancestor',$oldBase,$mainHead) -AcceptedExitCodes @(0,1)
+          if ($baseAncestor.exitCode -ne 0) { throw 'base branch diverged after Issue dispatch' }
           if ($worktreeHead -ne $oldBase) { throw 'Issue worktree HEAD no longer matches its dispatched base' }
           $permitted = @($PermittedBaseAdvancePaths | ForEach-Object { ([string]$_).Replace('\','/').Trim() } | Where-Object { $_ } | Sort-Object -Unique)
-          $baseAdvancePaths = @(& git -c core.quotePath=false -c core.autocrlf=false -c core.safecrlf=false -C $repoRoot diff --name-only $oldBase $mainHead -- 2>$null | ForEach-Object { ([string]$_).Replace('\','/').Trim() } | Where-Object { $_ })
-          if ($LASTEXITCODE -ne 0 -or $baseAdvancePaths.Count -eq 0) { throw 'cannot prove the base branch advance' }
+          $baseAdvanceResult = Invoke-AutopilotGit -RepoRoot $repoRoot -Arguments @('diff','--name-only',$oldBase,$mainHead,'--') -ThrowOnFailure
+          $baseAdvancePaths = @(Get-AutopilotNativeOutputLines $baseAdvanceResult.stdout | ForEach-Object { ([string]$_).Replace('\','/').Trim() } | Where-Object { $_ })
+          if ($baseAdvancePaths.Count -eq 0) { throw 'cannot prove the base branch advance' }
           $unexpectedBasePaths = @($baseAdvancePaths | Where-Object { $_ -notin $permitted })
           if ($unexpectedBasePaths.Count -gt 0) { throw "base branch advanced outside permitted control-plane paths: $($unexpectedBasePaths -join ', ')" }
-          $issuePaths = @(& git -c core.quotePath=false -c core.autocrlf=false -c core.safecrlf=false -C $checkpoint.worktree diff --name-only $oldBase -- 2>$null | ForEach-Object { ([string]$_).Replace('\','/').Trim() } | Where-Object { $_ })
-          if ($LASTEXITCODE -ne 0) { throw 'cannot prove the preserved Issue diff before base advance' }
+          $issueResult = Invoke-AutopilotGit -RepoRoot $checkpoint.worktree -Arguments @('diff','--name-only',$oldBase,'--') -ThrowOnFailure
+          $issuePaths = @(Get-AutopilotNativeOutputLines $issueResult.stdout | ForEach-Object { ([string]$_).Replace('\','/').Trim() } | Where-Object { $_ })
           $overlap = @($issuePaths | Where-Object { $_ -in $baseAdvancePaths })
           if ($overlap.Count -gt 0) { throw "control-plane base advance overlaps the Issue diff: $($overlap -join ', ')" }
           $oldDiffHash = Get-AutopilotRecoveryDiffHash -Worktree $checkpoint.worktree -BaseCommit $oldBase
           if ($checkpoint.evidence.diffHash -and $oldDiffHash -ne [string]$checkpoint.evidence.diffHash) { throw 'Issue diff hash no longer matches checkpoint before base advance' }
-          & git -c core.autocrlf=false -c core.safecrlf=false -C $checkpoint.worktree merge --ff-only $mainHead 2>$null | Out-Null
-          if ($LASTEXITCODE -ne 0) { throw 'Issue worktree could not safely fast-forward to the permitted control-plane base' }
+          if (Get-Command Assert-CurrentControlPlaneFence -ErrorAction SilentlyContinue) { Assert-CurrentControlPlaneFence | Out-Null }
+          Invoke-AutopilotGit -RepoRoot $checkpoint.worktree -Arguments @('merge','--ff-only',$mainHead) -ThrowOnFailure | Out-Null
           $newDiffHash = Get-AutopilotRecoveryDiffHash -Worktree $checkpoint.worktree -BaseCommit $mainHead
           $checkpoint = Move-AutopilotIssueCheckpointBaseForward -Path $checkpointPath -BaseCommit $mainHead -DiffHash $newDiffHash
           $worktreeHead = $mainHead
@@ -112,10 +135,22 @@ function Get-AutopilotRecoveryDecision {
         } catch { $boundManualReviewPass = $false }
       }
     } catch {
+      $category = Get-AutopilotRecoveryFailureCategory -Message $_.Exception.Message
+      if ($category -ne 'integrity_conflict') {
+        return [pscustomobject]@{ action=$(if ($category -eq 'environment_prereq') { 'PAUSE_RECOVERY_ENVIRONMENT' } else { 'PAUSE_RECOVERY_TOOL_CONFIG' }); reason=$_.Exception.Message; failureCategory=$category; runId=$lock.runId; worktree=$checkpoint.worktree; checkpointPath=$checkpointPath; issueId=$checkpoint.issueId }
+      }
       try { Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase QUARANTINED -QuarantineReason $_.Exception.Message | Out-Null } catch {}
-      return [pscustomobject]@{ action='QUARANTINE'; reason=$_.Exception.Message; runId=$lock.runId; worktree=$checkpoint.worktree; checkpointPath=$checkpointPath; issueId=$checkpoint.issueId }
+      return [pscustomobject]@{ action='QUARANTINE'; reason=$_.Exception.Message; failureCategory='integrity_conflict'; runId=$lock.runId; worktree=$checkpoint.worktree; checkpointPath=$checkpointPath; issueId=$checkpoint.issueId }
     }
     $action = if ($closeoutAlreadyMerged -and [string]$checkpoint.phase -ne 'CLOSED') { 'RESUME_FINALIZE' } else { switch ([string]$checkpoint.phase) {
+      'IMPLEMENTING' {
+        $implementationResultPath = [string](Get-AutopilotCheckpointProperty $checkpoint.artifacts 'resultPath' '')
+        $implementationDone = $false
+        if ($implementationResultPath -and (Test-Path -LiteralPath $implementationResultPath -PathType Leaf)) {
+          try { $implementationDone = Test-AutopilotBoundChildResult -Result (Get-Content -LiteralPath $implementationResultPath -Raw -Encoding UTF8 | ConvertFrom-Json) -Checkpoint $checkpoint } catch { $implementationDone = $false }
+        }
+        if ($implementationDone) { 'RESUME_VALIDATION' } else { 'VERIFY_UNCOMMITTED' }
+      }
       'IMPLEMENTED' { if ([int](Get-AutopilotCheckpointProperty $checkpoint.metrics 'environmentRetryCount' 0) -ge 2) { 'PAUSE_ENVIRONMENT_RETRY_EXHAUSTED' } else { 'RESUME_VALIDATION' } }
       'VALIDATING' { 'RESUME_VALIDATION' }
       'VALIDATED' { 'RESUME_REVIEW' }
@@ -126,7 +161,7 @@ function Get-AutopilotRecoveryDecision {
         $repairResultPath = [string](Get-AutopilotCheckpointProperty $checkpoint.artifacts 'resultPath' '')
         $repairDone = $false
         if ($repairResultPath -and (Test-Path -LiteralPath $repairResultPath -PathType Leaf)) {
-          try { $repairDone = [string](Get-Content -LiteralPath $repairResultPath -Raw -Encoding UTF8 | ConvertFrom-Json).status -eq 'done' } catch { $repairDone = $false }
+          try { $repairDone = Test-AutopilotBoundChildResult -Result (Get-Content -LiteralPath $repairResultPath -Raw -Encoding UTF8 | ConvertFrom-Json) -Checkpoint $checkpoint } catch { $repairDone = $false }
         }
         if ($repairDone) { 'RESUME_VALIDATION' } else { 'VERIFY_UNCOMMITTED' }
       }
@@ -142,23 +177,23 @@ function Get-AutopilotRecoveryDecision {
     return [pscustomobject]@{ action=$action; reason=$reason; runId=$lock.runId; worktree=$checkpoint.worktree; checkpointPath=$checkpointPath; checkpoint=$checkpoint; issueId=$checkpoint.issueId }
   }
   if ($state -and $state.worktree -and (Test-Path -LiteralPath $state.worktree)) {
-    $changes = @(& git -C $state.worktree status --porcelain=v1 2>$null)
+    $changes = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $state.worktree -Arguments @('status','--porcelain=v1') -ThrowOnFailure).stdout)
     if ($changes.Count -eq 0) {
       $repoRoot = Split-Path -Parent $AutoDir
-      $mainHead = (& git -C $repoRoot rev-parse HEAD 2>$null | Select-Object -First 1).Trim()
-      $worktreeHead = (& git -C $state.worktree rev-parse HEAD 2>$null | Select-Object -First 1).Trim()
+      $mainHead = (Invoke-AutopilotGit -RepoRoot $repoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
+      $worktreeHead = (Invoke-AutopilotGit -RepoRoot $state.worktree -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
       if ($mainHead -and $worktreeHead -and $mainHead -ne $worktreeHead) {
-        & git -C $repoRoot merge-base --is-ancestor $mainHead $worktreeHead 2>$null
-        if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ action = 'QUARANTINE'; reason = 'unmerged issue commit lacks a durable Issue checkpoint; worktree preserved for manual evidence recovery'; runId = $lock.runId; worktree = $state.worktree; commit = $worktreeHead } }
+        $unmergedAncestor = Invoke-AutopilotGit -RepoRoot $repoRoot -Arguments @('merge-base','--is-ancestor',$mainHead,$worktreeHead) -AcceptedExitCodes @(0,1)
+        if ($unmergedAncestor.exitCode -eq 0) { return [pscustomobject]@{ action = 'QUARANTINE'; reason = 'unmerged issue commit lacks a durable Issue checkpoint; worktree preserved for manual evidence recovery'; runId = $lock.runId; worktree = $state.worktree; commit = $worktreeHead } }
       }
     }
   }
   if ($state -and $state.lastCommit -and $state.status -in @('CLOSING','COMMITTING','MERGING')) { return [pscustomobject]@{ action = 'QUARANTINE'; reason = 'closeout commit exists without a safely recoverable worktree'; runId = $lock.runId } }
   if ($state -and $state.worktree -and (Test-Path -LiteralPath $state.worktree)) {
-    $changes = @(& git -C $state.worktree status --porcelain=v1 2>$null)
+    $changes = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $state.worktree -Arguments @('status','--porcelain=v1') -ThrowOnFailure).stdout)
     if ($changes.Count -gt 0) { return [pscustomobject]@{ action = 'VERIFY_UNCOMMITTED'; reason = 'dead executor left a diff'; runId = $lock.runId; worktree = $state.worktree } }
   }
-  if (!$lock) { return [pscustomobject]@{ action = 'NEW_RUN'; reason = 'no run.lock and no residual worktree' } }
+  if (!$lock -or $ownedByCurrentRun) { return [pscustomobject]@{ action = 'NEW_RUN'; reason = 'owned run.lock has no recoverable residual worktree' } }
   return [pscustomobject]@{ action = 'RESUME_FROM_CHECKPOINT'; reason = 'owner PID is gone and no unsafe diff was found'; runId = $lock.runId }
 }
 
@@ -167,15 +202,14 @@ function Remove-AutopilotResidualWorktree {
   $repoFull = [IO.Path]::GetFullPath($RepoRoot).TrimEnd('\')
   $worktreeFull = [IO.Path]::GetFullPath($Worktree).TrimEnd('\')
   if (!$worktreeFull.StartsWith($repoFull + '\.worktrees\', [StringComparison]::OrdinalIgnoreCase)) { throw 'residual worktree is outside the repository isolation root' }
-  $branch = (& git -C $Worktree branch --show-current 2>$null | Select-Object -First 1).Trim()
-  & git -c core.longpaths=true -C $RepoRoot worktree remove --force $Worktree | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw 'failed to remove residual issue worktree' }
+  $branch = (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('branch','--show-current') -ThrowOnFailure).stdout.Trim()
+  Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('-c','core.longpaths=true','worktree','remove','--force',$Worktree) -ThrowOnFailure | Out-Null
   if (Test-Path -LiteralPath $worktreeFull) {
     $deletePath = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { '\\?\' + $worktreeFull } else { $worktreeFull }
     Remove-Item -LiteralPath $deletePath -Recurse -Force
   }
   if (Test-Path -LiteralPath $worktreeFull) { throw 'residual issue worktree directory still exists after removal' }
-  if ($branch) { & git -C $RepoRoot branch -D $branch 2>$null | Out-Null }
+  if ($branch) { Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('branch','-D',$branch) -AcceptedExitCodes @(0,1) | Out-Null }
   return [pscustomobject]@{ removed=$true; branch=$branch }
 }
 

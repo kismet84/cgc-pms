@@ -61,6 +61,8 @@
 - 10分要求 implementation 仅派发一次，validation/Reviewer/closeout 派发次数符合任务路由，`runResumeCount=0`，且无阶段回退、人工恢复、Reviewer/环境工具阻塞或被门禁拦截的重复派发，端到端证据完整。
 - implementation 仍仅派发一次、无阶段回退和人工恢复，但恰有一次已分类工具/环境重试或一次被门禁阻断的重复派发时为5分；重复 implementation、阶段回退、人工恢复、多次工具重试或证据不完整时为0分。
 - `wallClockSeconds` 与分阶段耗时进入20任务趋势和异常分析，不按固定分钟数直接扣分。效率低分不改变业务正确性、硬门禁或 DONE 裁决，`tool_config` 也不得写成业务质量失败。
+- 执行效率聚合必须区分业务实施耗时与控制面/工具恢复耗时；后者记录 `tool_config`、环境重试、恢复次数和停滞区间，不得伪装为业务实现复杂度。
+- stall 进度只采信工作区内容、durable checkpoint、result 或正式 evidence 的可复现变化；PID 存活、心跳刷新、CPU 微小变化和无产物的 MCP 活动不算语义进度。
 - v2 正式分必须绑定 `implementationCommit`，由独立 `closeoutCommit` 写入正式报告；closeout ledger 登记后才能加入 `reviewCycleScoreKeys`。历史 candidate shadow 继续只作批准前回放证据，不迁移到正式 ledger，也不参与20任务累计。
 
 ## 9. 跨 run 评分证据

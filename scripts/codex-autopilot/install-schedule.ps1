@@ -10,7 +10,7 @@ $StartAt = [datetime]::Today.Add([timespan]::ParseExact($StartTime, "hh\:mm", $n
 $StopAt = [datetime]::Today.Add([timespan]::ParseExact($StopTime, "hh\:mm", $null))
 
 $StartAction = New-ScheduledTaskAction `
-  -Execute "powershell.exe" `
+  -Execute "pwsh" `
   -Argument "-ExecutionPolicy Bypass -File `"$StartScript`""
 
 $StartTrigger = New-ScheduledTaskTrigger -Daily -At $StartAt
@@ -23,7 +23,7 @@ Register-ScheduledTask `
   -Force | Out-Null
 
 $StopAction = New-ScheduledTaskAction `
-  -Execute "powershell.exe" `
+  -Execute "pwsh" `
   -Argument "-ExecutionPolicy Bypass -File `"$StopScript`""
 
 $StopTrigger = New-ScheduledTaskTrigger -Daily -At $StopAt

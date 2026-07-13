@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$RepoRoot = "D:\projects-test\cgc-pms",
   [string]$ConfigPath = "",
   [switch]$AllowStopped
@@ -51,7 +51,7 @@ function Get-FirstReadyIssueTitle {
 function Invoke-JsonScript {
   param([string[]]$Arguments)
 
-  $output = & powershell @Arguments 2>&1 | Out-String
+  $output = & pwsh @Arguments 2>&1 | Out-String
   try {
     return [pscustomobject]@{
       ok = $true

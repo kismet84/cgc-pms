@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 $contextScript = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-context.ps1'
 if (Test-Path -LiteralPath $contextScript) { . $contextScript }
+$nativeCommandLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
 
 function Test-AutopilotPostExecutionVerificationRequired {
   param([Parameter(Mandatory)][string]$Command)
@@ -21,7 +23,7 @@ function Invoke-AutopilotVerificationCommand {
   $wrappedCommand = "& { $Command }; if (`$null -ne `$LASTEXITCODE) { exit `$LASTEXITCODE }"
   $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($wrappedCommand))
   $startInfo = [Diagnostics.ProcessStartInfo]::new()
-  $startInfo.FileName = 'powershell'
+  $startInfo.FileName = 'pwsh'
   $startInfo.Arguments = "-NoProfile -EncodedCommand $encoded"
   $startInfo.WorkingDirectory = $Worktree
   $startInfo.UseShellExecute = $false
@@ -43,7 +45,7 @@ function Invoke-AutopilotVerificationCommand {
   [IO.File]::WriteAllText($LogPath, "[stdout]`r`n$stdout`r`n[stderr]`r`n$stderr", [Text.UTF8Encoding]::new($false))
   $summarySource = if ($exitCode -eq 0) { $stdout } else { "$stderr`n$stdout" }
   $summaryLines = @($summarySource -split '\r?\n' | Where-Object { $_ } | Select-Object -Last 20)
-  $commit = (& git -C $Worktree rev-parse HEAD).Trim()
+  $commit = (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
   $evidence = [ordered]@{
     schemaVersion = 1
     issueId = $IssueId
@@ -97,7 +99,7 @@ function New-AutopilotReadyLintEvidence {
     schemaVersion = 1
     issueId = $IssueId
     baseCommit = $BaseCommit
-    commit = (& git -C $Worktree rev-parse HEAD).Trim()
+    commit = (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
     diffHash = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $BaseCommit
     command = $Command
     startedAt = $started.ToString('o')
@@ -153,7 +155,7 @@ function Invoke-AutopilotRuntimePreflight {
   if (!$RuntimeRefresh -or $RuntimeRefresh.enabled -ne $true -or !$RuntimeRefresh.command) { return [pscustomobject]@{ status='fail'; refreshed=$false; before=$before; after=$before; reason='runtime refresh is unavailable' } }
   $timeoutSeconds = if ($RuntimeRefresh.timeoutSeconds) { [int]$RuntimeRefresh.timeoutSeconds } else { 900 }
   $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("& { $($RuntimeRefresh.command) }; if (`$null -ne `$LASTEXITCODE) { exit `$LASTEXITCODE }"))
-  $process = Start-Process -FilePath powershell -ArgumentList '-NoProfile','-EncodedCommand',$encoded -WorkingDirectory $RepoRoot -PassThru -WindowStyle Hidden
+  $process = Start-Process -FilePath pwsh -ArgumentList '-NoProfile','-EncodedCommand',$encoded -WorkingDirectory $RepoRoot -PassThru -WindowStyle Hidden
   if (!$process.WaitForExit($timeoutSeconds * 1000)) { & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null; return [pscustomobject]@{ status='fail'; refreshed=$true; before=$before; after=$null; reason='runtime refresh timed out' } }
   if ($process.ExitCode -ne 0) { return [pscustomobject]@{ status='fail'; refreshed=$true; before=$before; after=$null; reason="runtime refresh exitCode=$($process.ExitCode)" } }
   $waitSeconds = if ($RuntimeRefresh.waitSeconds) { [int]$RuntimeRefresh.waitSeconds } else { 180 }

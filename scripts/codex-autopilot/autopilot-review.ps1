@@ -3,6 +3,8 @@ $commandLibrary = Join-Path $PSScriptRoot 'autopilot-command.ps1'
 if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
 $contextLibrary = Join-Path $PSScriptRoot 'autopilot-context.ps1'
 if (Test-Path -LiteralPath $contextLibrary) { . $contextLibrary }
+$nativeCommandLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
 
 function Write-AutopilotReviewDiff {
   param([Parameter(Mandatory)][string]$Text, [Parameter(Mandatory)][string]$OutputPath)
@@ -146,7 +148,7 @@ function Invoke-AutopilotReviewer {
     [string]$Thinking = 'high',
     [int]$TimeoutSeconds = 1200
 )
-  $headBefore = (& git -C $Worktree rev-parse HEAD).Trim()
+  $headBefore = (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
   $fingerprintBefore = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $headBefore
   try {
     $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'read-only'
@@ -162,7 +164,7 @@ function Invoke-AutopilotReviewer {
       if ($_.Exception.Message -notmatch '(?i)orchestrator_helper_launch_failed|sandbox.{0,80}initialization failed|os error 3') { throw }
       $review = New-AutopilotReviewerToolBlockedResult -RequestPath $RequestPath -ResultPath $ResultPath -Reason $_.Exception.Message
     }
-    $headAfter = (& git -C $Worktree rev-parse HEAD).Trim()
+    $headAfter = (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
     $fingerprintAfter = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $headAfter
     if ($headAfter -ne $headBefore -or $fingerprintAfter -ne $fingerprintBefore) { throw 'independent Reviewer fallback modified the issue worktree' }
   }

@@ -186,7 +186,7 @@ CI 与验收失败分类规则：
 - Docker / backend / frontend 未启动、端口不通、dev-login 无法打通时，先归类为环境前置类；不得直接定性为业务代码失败
 - Ready Issue 中的验证命令必须先校验测试类、测试方法选择器或脚本入口是否真实存在；若不存在，先归类为 Ready Issue 配置问题，可做最小等价替换并把替换结果写入 iteration / quality / blocked / done 正式报告，不直接判测试失败
 - Ready Issue 的 `allowedPaths` / `forbiddenPaths` 必须在 executor 与 issue worktree 创建前完成确定性矛盾检查；完全相同、精确允许文件被禁止目录覆盖、允许子树被禁止父树完全覆盖均归类为 `ready_issue_config` / `READY_SCOPE_CONTRADICTION`。允许宽目录配合更窄禁止子目录的安全 carve-out，运行时 `forbidden` 优先门禁继续保留。
-- Windows PowerShell 下包含逗号的 Maven 参数必须写成单参数字符串，例如 `.\mvnw.cmd "-Dtest=FileServiceTest,InvoiceServiceTest" test`；首次出现 `ParserError` 或参数拆分异常时，先归类为命令调用问题，不直接判测试失败
+- PowerShell 7 下包含逗号的 Maven 参数必须写成单参数字符串，例如 `.\mvnw.cmd "-Dtest=FileServiceTest,InvoiceServiceTest" test`；首次出现 `ParserError` 或参数拆分异常时，先归类为命令调用问题，不直接判测试失败。AutoPilot 控制面固定使用 `pwsh`，缺少 PowerShell 7 时归类为 `tool_config/AUTOPILOT_POWERSHELL7_REQUIRED` 并安全停止，不得静默回退到 Windows PowerShell 5.1
 
 ### 测试数据重置边界
 
@@ -232,7 +232,7 @@ CI 与验收失败分类规则：
 
 ### 项目级关键词协议
 
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动预演` 时，视为请求执行插件 dry-run 预演：`powershell -NoProfile -ExecutionPolicy Bypass -File D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot\scripts\autopilot-loop-runner.ps1 -DryRun -ReadyIssuePath D:\projects-test\cgc-pms\docs\backlog\ready-issues.md`；该语义只做受控预演，不启动下一任务、不提交、不 push。
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动预演` 时，视为请求执行插件 dry-run 预演：`pwsh -NoProfile -File D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot\scripts\autopilot-loop-runner.ps1 -DryRun -ReadyIssuePath D:\projects-test\cgc-pms\docs\backlog\ready-issues.md`；该语义只做受控预演，不启动下一任务、不提交、不 push。
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动迭代` 时，视为请求开启 `enabled.flag` 并进入连续迭代模式：优先走插件 runner / checkpoint / classifier 链路，并基于 `docs/backlog/ready-issues.md` 连续执行。A–F 是职责检查表，由主线程按净收益直接承担、单派或多派，不机械创建六个线程；每轮最多允许 3 个完全无关联的 Ready 并行，不能证明无关联时按串行处理，涉及同一文件、模块、业务域、数据库、权限、安全、租户、金额或审批状态机的任务不得并行。若 Ready 为空，先经知识图谱健康/HEAD 游标门禁拉取合格存量问题并按来源核实，再处理当前 focus 的可解除阻塞，之后才检查有决策证据的 Ad-hoc Candidate；仍无合格候选时刷新产品情报，不得从长期计划凑 Ready。图谱异常时安全停止，不静默扫描台账补货。形成至少 1 条合格 Ready 且未命中 stop/pause 后才能实施；每轮结束后检查 stop/pause/enabled，并保持 `no push` 边界。
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语格式 `启动迭代-N` 时，视为带迭代上限的连续执行模式；`N` 必须为 1 到 50 的正整数，表示最多完成 N 个实施型 Ready Issue 后退出；N=0、非数字或超过 50 必须拒绝。dry-run、拆单、health gate、runtime refresh 不计入 N；无 `-N` 参数时保持上一条无上限连续语义。
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止迭代` 时，视为请求执行安全停止：设置停止标记并关闭 `enabled.flag`，用于阻断下一任务启动，不强杀当前任务。

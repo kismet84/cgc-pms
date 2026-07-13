@@ -43,7 +43,12 @@
     "issueCheckpointPath",
     "currentIssuePhase",
     "lastCanaryFingerprint",
-    "lastCanaryReport"
+    "lastCanaryReport",
+    "runInstanceId",
+    "leaseEpoch",
+    "transitionId",
+    "generation",
+    "controlPlaneFingerprint"
   ],
   "properties": {
     "schemaVersion": {
@@ -132,6 +137,11 @@
     "currentIssuePhase": { "type": "string" },
     "lastCanaryFingerprint": { "type": "string", "pattern": "^$|^[a-f0-9]{64}$" },
     "lastCanaryReport": { "type": "string" },
+    "runInstanceId": { "type": "string" },
+    "leaseEpoch": { "type": "string" },
+    "transitionId": { "type": "string" },
+    "generation": { "type": "integer", "minimum": 0 },
+    "controlPlaneFingerprint": { "type": "string", "pattern": "^$|^[a-f0-9]{64}$" },
     "enabled": { "type": "boolean" },
     "mode": { "type": "string" },
     "iterationCompleted": { "type": "integer", "minimum": 0 },

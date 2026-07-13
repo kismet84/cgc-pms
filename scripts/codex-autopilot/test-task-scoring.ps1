@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -89,8 +89,12 @@ try {
   $v2Evidence.environmentRetryCount = 0
   $v2Evidence.duplicateDispatchBlockedCount = 0
   $v2Evidence.executionEvidenceComplete = $true
+  $v2Evidence.wallClockSeconds = 120
+  $v2Evidence.phaseDurationsSeconds = [pscustomobject]@{IMPLEMENTING=40;VALIDATING=20;CLOSING=10;RECOVERY_WAIT=50}
+  $v2Evidence.semanticProgressAt = '2026-07-14T12:00:00+08:00'
   $v2 = New-AutopilotTaskScoreV2Shadow $v2Evidence
   if ($v2.shadow -ne $true -or $v2.dimensions.taskExecutionEfficiency.score -ne 10 -or $v2.total -ne 85) { throw 'v2 shadow did not award deterministic full task execution efficiency' }
+  if ($v2.executionTiming.businessPhaseSeconds -ne 70 -or $v2.executionTiming.controlPlaneSeconds -ne 50 -or !$v2.executionTiming.livenessSignalsExcluded) { throw 'v2 timing evidence did not separate business work from control-plane overhead' }
   $v2Formal = New-AutopilotTaskScoreV2 $v2Evidence
   if ($v2Formal.shadow -ne $false -or $v2Formal.scoringVersion -ne 'autopilot-task-score/v2' -or $v2Formal.dimensions.taskExecutionEfficiency.score -ne 10 -or $v2Formal.total -ne 85 -or $v2Formal.key -eq $v2.key) { throw 'formal v2 score did not use its approved version and efficiency dimension' }
   $v2Evidence.toolConfigBlockCount = 1

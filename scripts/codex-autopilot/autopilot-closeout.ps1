@@ -1,4 +1,25 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
+
+$nativeCommandLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
+
+function Invoke-AutopilotCloseoutGit {
+  param(
+    [Parameter(Mandatory)][string]$RepoRoot,
+    [Parameter(Mandatory)][string[]]$Arguments,
+    [int[]]$AcceptedExitCodes = @(0),
+    [switch]$Mutating
+  )
+  if ($Mutating -and (Get-Command Assert-CurrentControlPlaneFence -ErrorAction SilentlyContinue)) {
+    Assert-CurrentControlPlaneFence | Out-Null
+  }
+  return Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments $Arguments -AcceptedExitCodes $AcceptedExitCodes -ThrowOnFailure
+}
+
+function Get-AutopilotCloseoutGitText {
+  param([Parameter(Mandatory)][object]$Result)
+  return ([string]$Result.stdout).Trim()
+}
 
 function Set-AutopilotReadyDone {
   param([string]$ReadyPath, [string]$IssueTitle)
@@ -71,62 +92,58 @@ function Complete-AutopilotIssueCloseout {
     [object]$ScoreShadowEvidence = $null,
     [object]$TaskScoringConfig = $null
   )
-  $currentBranch = (& git -C $RepoRoot branch --show-current).Trim()
+  $currentBranch = Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('branch','--show-current'))
   if ($currentBranch -ne $BaseBranch) { throw "closeout requires base branch $BaseBranch, actual=$currentBranch" }
   $archivePath = Join-Path $Worktree $Issue.archiveReport
   if (!(Test-Path -LiteralPath $archivePath -PathType Leaf)) { throw "formal archive report is missing: $($Issue.archiveReport)" }
   $readyPath = Join-Path $Worktree 'docs\backlog\ready-issues.md'
   $donePath = Join-Path $Worktree 'docs\backlog\done-issues.md'
-  $worktreeHead = (& git -C $Worktree rev-parse HEAD).Trim()
+  $worktreeHead = Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD'))
   $scoringActive = $null -ne $TaskScoringConfig -and (Test-AutopilotTaskScoringActive $TaskScoringConfig)
   $activeScoringVersion = if ($scoringActive) { [string](Get-AutopilotScoreProperty $TaskScoringConfig 'activeVersion' '') } else { '' }
-  & git -C $RepoRoot merge-base --is-ancestor $worktreeHead HEAD 2>$null
-  if ($LASTEXITCODE -eq 0 -and (Get-Content -LiteralPath (Join-Path $RepoRoot 'docs\backlog\ready-issues.md') -Raw -Encoding UTF8) -match ('(?ms)^###\s+' + [regex]::Escape($Issue.title) + '.*?^状态：Done\s*$')) {
+  $ancestorResult = Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('merge-base','--is-ancestor',$worktreeHead,'HEAD') -AcceptedExitCodes @(0,1)
+  if ($ancestorResult.exitCode -eq 0 -and (Get-Content -LiteralPath (Join-Path $RepoRoot 'docs\backlog\ready-issues.md') -Raw -Encoding UTF8) -match ('(?ms)^###\s+' + [regex]::Escape($Issue.title) + '.*?^状态：Done\s*$')) {
     $score = if ($scoringActive) { Get-AutopilotTaskScoreFromReport -ReportPath $archivePath } else { $null }
-    $implementationCommit = if ($score) { [string]$score.implementationCommit } elseif ($scoringActive) { (& git -C $Worktree rev-parse "$worktreeHead^" 2>$null | Select-Object -First 1).Trim() } else { $worktreeHead }
+    $implementationCommit = if ($score) { [string]$score.implementationCommit } elseif ($scoringActive) { Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('rev-parse',"$worktreeHead^")) } else { $worktreeHead }
     $scoreShadow = if ($scoringActive) { Get-AutopilotTaskScoreFromReport -ReportPath $archivePath -Shadow } else { $null }
     return [pscustomobject]@{ commit = $worktreeHead; implementationCommit = $implementationCommit; closeoutCommit = $worktreeHead; merged = $true; idempotent = $true; score = $score; scoreShadow = $scoreShadow }
   }
-  $existingSubject = (& git -C $Worktree log -1 --pretty=%s 2>$null | Select-Object -First 1).Trim()
+  $existingSubject = Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('log','-1','--pretty=%s'))
   if ($scoringActive -and $existingSubject -eq "chore(autopilot): score and close $($Issue.issueId.ToLowerInvariant())") {
-    $implementationCommit = (& git -C $Worktree rev-parse "$worktreeHead^" 2>$null | Select-Object -First 1).Trim()
+    $implementationCommit = Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('rev-parse',"$worktreeHead^"))
     $score = Get-AutopilotTaskScoreFromReport -ReportPath $archivePath
     if ($null -eq $score -or [string]$score.implementationCommit -ne $implementationCommit -or [string]$score.scoringVersion -ne $activeScoringVersion) { throw 'existing closeout commit lacks its bound active task score' }
     $scoreShadow = Get-AutopilotTaskScoreFromReport -ReportPath $archivePath -Shadow
     $merged = $false
     if ($AutoMerge) {
-      $mainChanges = @(& git -C $RepoRoot status --porcelain=v1)
+      $mainChanges = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('status','--porcelain=v1')).stdout)
       if ($mainChanges.Count -gt 0) { throw 'main worktree is dirty; local merge refused' }
-      if ($ExpectedBaseCommit -and (& git -C $RepoRoot rev-parse HEAD).Trim() -ne $ExpectedBaseCommit) { throw 'base branch advanced before recovered merge; local merge refused' }
-      & git -C $RepoRoot merge --ff-only $worktreeHead | Out-Null
-      if ($LASTEXITCODE -ne 0) { throw 'recovered local fast-forward merge failed' }
+      if ($ExpectedBaseCommit -and (Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD'))) -ne $ExpectedBaseCommit) { throw 'base branch advanced before recovered merge; local merge refused' }
+      Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('merge','--ff-only',$worktreeHead) -Mutating | Out-Null
       $merged = $true
     }
     return [pscustomobject]@{ commit=$worktreeHead; implementationCommit=$implementationCommit; closeoutCommit=$worktreeHead; merged=$merged; idempotent=$true; score=$score; scoreShadow=$scoreShadow }
   }
-  if ($ExpectedBaseCommit -and (& git -C $RepoRoot rev-parse HEAD).Trim() -ne $ExpectedBaseCommit) { throw 'base branch advanced during Issue execution; closeout requires a fresh isolated retry' }
+  if ($ExpectedBaseCommit -and (Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD'))) -ne $ExpectedBaseCommit) { throw 'base branch advanced during Issue execution; closeout requires a fresh isolated retry' }
   Assert-AutopilotStockIssueClosed -Worktree $Worktree -ReadyPath $readyPath -IssueTitle $Issue.title
   $implementationCommit = $null
   $score = $null
   $scoreShadow = $null
   if ($scoringActive) {
     if ($null -eq $ScoreEvidence) { throw 'active task scoring requires deterministic ScoreEvidence' }
-    $subject = (& git -C $Worktree log -1 --pretty=%s 2>$null | Select-Object -First 1).Trim()
+    $subject = Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('log','-1','--pretty=%s'))
     if ($subject -eq "feat(autopilot): implement $($Issue.issueId.ToLowerInvariant())") {
-      $implementationCommit = (& git -C $Worktree rev-parse HEAD).Trim()
+      $implementationCommit = Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD'))
     } else {
-      & git -C $Worktree diff --check
-      if ($LASTEXITCODE -ne 0) { throw 'implementation commit failed git diff --check' }
-      & git -C $Worktree add -A
-      if ($LASTEXITCODE -ne 0) { throw 'implementation commit failed to stage changes' }
-      & git -C $Worktree diff --cached --quiet
-      if ($LASTEXITCODE -eq 0) {
-        $implementationCommit = (& git -C $Worktree rev-parse HEAD).Trim()
+      Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('diff','--check') | Out-Null
+      Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('add','-A') -Mutating | Out-Null
+      $cachedDiff = Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('diff','--cached','--quiet') -AcceptedExitCodes @(0,1)
+      if ($cachedDiff.exitCode -eq 0) {
+        $implementationCommit = Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD'))
         if ($implementationCommit -eq $ExpectedBaseCommit) { throw 'active scoring closeout has no implementation artifacts to commit' }
       } else {
-        & git -C $Worktree commit -m "feat(autopilot): implement $($Issue.issueId.ToLowerInvariant())" | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw 'implementation local commit failed' }
-        $implementationCommit = (& git -C $Worktree rev-parse HEAD).Trim()
+        Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('commit','-m',"feat(autopilot): implement $($Issue.issueId.ToLowerInvariant())") -Mutating | Out-Null
+        $implementationCommit = Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD'))
       }
     }
     Set-AutopilotScoreProperty $ScoreEvidence 'implementationCommit' $implementationCommit
@@ -148,21 +165,17 @@ function Complete-AutopilotIssueCloseout {
   if ($doneText -notmatch [regex]::Escape($Issue.issueId)) {
     Add-Content -LiteralPath $donePath -Encoding UTF8 -Value "`r`n### $($Issue.title)`r`n`r`n状态：Done`r`n归档报告：``$($Issue.archiveReport)``"
   }
-  & git -C $Worktree diff --check
-  if ($LASTEXITCODE -ne 0) { throw 'closeout failed git diff --check' }
-  & git -C $Worktree add -A
-  if ($LASTEXITCODE -ne 0) { throw 'closeout failed to stage changes' }
+  Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('diff','--check') | Out-Null
+  Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('add','-A') -Mutating | Out-Null
   $commitMessage = if ($scoringActive) { "chore(autopilot): score and close $($Issue.issueId.ToLowerInvariant())" } else { "feat(autopilot): complete $($Issue.issueId.ToLowerInvariant())" }
-  & git -C $Worktree commit -m $commitMessage | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw 'closeout local commit failed' }
-  $commit = (& git -C $Worktree rev-parse HEAD).Trim()
+  Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('commit','-m',$commitMessage) -Mutating | Out-Null
+  $commit = Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD'))
   $merged = $false
   if ($AutoMerge) {
-    $mainChanges = @(& git -C $RepoRoot status --porcelain=v1)
+    $mainChanges = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('status','--porcelain=v1')).stdout)
     if ($mainChanges.Count -gt 0) { throw 'main worktree is dirty; local merge refused' }
-    if ($ExpectedBaseCommit -and (& git -C $RepoRoot rev-parse HEAD).Trim() -ne $ExpectedBaseCommit) { throw 'base branch advanced before merge; local merge refused' }
-    & git -C $RepoRoot merge --ff-only $commit | Out-Null
-    if ($LASTEXITCODE -ne 0) { throw 'local fast-forward merge failed' }
+    if ($ExpectedBaseCommit -and (Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD'))) -ne $ExpectedBaseCommit) { throw 'base branch advanced before merge; local merge refused' }
+    Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('merge','--ff-only',$commit) -Mutating | Out-Null
     $merged = $true
   }
   if (!$implementationCommit) { $implementationCommit = $commit }
@@ -175,12 +188,11 @@ function Merge-AutopilotIssueCloseoutCommit {
     [Parameter(Mandatory)][string]$Commit,
     [string]$ExpectedBaseCommit = ''
   )
-  & git -C $RepoRoot merge-base --is-ancestor $Commit HEAD 2>$null
-  if ($LASTEXITCODE -eq 0) { return [pscustomobject]@{ merged=$true; idempotent=$true; commit=$Commit } }
-  $mainChanges = @(& git -C $RepoRoot status --porcelain=v1)
+  $ancestorResult = Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('merge-base','--is-ancestor',$Commit,'HEAD') -AcceptedExitCodes @(0,1)
+  if ($ancestorResult.exitCode -eq 0) { return [pscustomobject]@{ merged=$true; idempotent=$true; commit=$Commit } }
+  $mainChanges = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('status','--porcelain=v1')).stdout)
   if ($mainChanges.Count -gt 0) { throw 'main worktree is dirty; local merge refused' }
-  if ($ExpectedBaseCommit -and (& git -C $RepoRoot rev-parse HEAD).Trim() -ne $ExpectedBaseCommit) { throw 'base branch advanced before durable closeout merge; local merge refused' }
-  & git -C $RepoRoot merge --ff-only $Commit | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw 'durable closeout fast-forward merge failed' }
+  if ($ExpectedBaseCommit -and (Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD'))) -ne $ExpectedBaseCommit) { throw 'base branch advanced before durable closeout merge; local merge refused' }
+  Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('merge','--ff-only',$Commit) -Mutating | Out-Null
   return [pscustomobject]@{ merged=$true; idempotent=$false; commit=$Commit }
 }

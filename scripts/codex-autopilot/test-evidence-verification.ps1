@@ -19,7 +19,7 @@ try {
   'changed' | Set-Content -LiteralPath (Join-Path $root 'file.txt') -Encoding UTF8
 
   $evidencePath = Join-Path $root 'evidence.json'
-  $evidence = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'powershell -NoProfile -Command "exit 0"' -EvidencePath $evidencePath -LogPath (Join-Path $root 'pass.log') -TimeoutSeconds 20
+  $evidence = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'pwsh -NoProfile -Command "exit 0"' -EvidencePath $evidencePath -LogPath (Join-Path $root 'pass.log') -TimeoutSeconds 20
   if ($evidence.exitCode -ne 0 -or $evidence.classification -ne 'pass') { throw 'passing command was not recorded as pass' }
   Assert-AutopilotEvidenceCurrent -Evidence $evidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base | Out-Null
 
@@ -38,10 +38,10 @@ try {
   $unicodeDiffHash = Get-AutopilotDiffHash -Worktree $root -BaseCommit $base
   if ($unicodeDiffHash -notmatch '^[a-f0-9]{64}$') { throw 'Unicode untracked path did not produce a stable diff hash' }
 
-  $failed = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'powershell -NoProfile -Command "exit 7"' -EvidencePath (Join-Path $root 'failed-evidence.json') -LogPath (Join-Path $root 'fail.log') -TimeoutSeconds 20
+  $failed = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'pwsh -NoProfile -Command "exit 7"' -EvidencePath (Join-Path $root 'failed-evidence.json') -LogPath (Join-Path $root 'fail.log') -TimeoutSeconds 20
   if ($failed.exitCode -ne 7 -or $failed.classification -eq 'pass') { throw 'nonzero exit code was recorded as pass' }
 
-  if (Test-AutopilotPostExecutionVerificationRequired -Command 'powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot .') { throw 'post-execution verification attempted to rerun the pre-dispatch Ready lint' }
+  if (Test-AutopilotPostExecutionVerificationRequired -Command 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot .') { throw 'post-execution verification attempted to rerun the pre-dispatch Ready lint' }
   if (!(Test-AutopilotPostExecutionVerificationRequired -Command 'git diff --check')) { throw 'post-execution verification skipped a required non-lint command' }
 
   $readyHash = ('a' * 64)

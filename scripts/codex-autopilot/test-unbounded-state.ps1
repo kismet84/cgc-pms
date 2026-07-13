@@ -17,7 +17,7 @@ try {
   [ordered]@{repoRoot=$root;autopilotDir=$autoDir;maxIssuesPerRun=1;maxParallelIssues=1;parallelSafetyMode='strict-independent-only';autoMerge=$true;autoPush=$false;maxRunMinutes=30;readyPlanner=[ordered]@{enabled=$false}} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configPath -Encoding UTF8
   & git -C $root init -q; & git -C $root config user.email 'autopilot@test.local'; & git -C $root config user.name 'AutoPilot Test'; & git -C $root add .; & git -C $root commit -qm 'base'
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
+  $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
   $exitCode = $LASTEXITCODE
   $ErrorActionPreference = $old
   if ($exitCode -ne 0) { throw "unbounded runner failed: $output" }

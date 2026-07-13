@@ -1,4 +1,4 @@
-﻿param()
+param()
 $ErrorActionPreference='Stop'
 $scriptDir=Split-Path -Parent $MyInvocation.MyCommand.Path
 $runner=Join-Path $scriptDir 'autopilot-run-continuous.ps1'
@@ -24,7 +24,7 @@ try{
 状态：Ready
 来源锚点：${tick}docs/plans/source.md${tick}
 验证命令：
-- ${tick}powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/generate-forbidden.ps1${tick}
+- ${tick}pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/generate-forbidden.ps1${tick}
 归档报告：${tick}docs/quality/issue-993-001.md${tick}
 Migration：不需要
 依赖：无
@@ -36,9 +36,9 @@ Reviewer要求：不需要
   ".worktrees/`r`n.codex-autopilot/"|Set-Content (Join-Path $root '.gitignore');'enabled'|Set-Content (Join-Path $autoDir 'enabled.flag')
   "param([string]`$RepoRoot)`nNew-Item -ItemType Directory -Path (Join-Path `$RepoRoot 'docs\quality') -Force|Out-Null`n'ok'|Set-Content (Join-Path `$RepoRoot 'docs\quality\issue-993-001.md')"|Set-Content (Join-Path $scripts 'mock.ps1')
   "New-Item -ItemType Directory -Path deploy -Force|Out-Null`n'generated'|Set-Content deploy/generated.txt`nexit 0"|Set-Content (Join-Path $scripts 'generate-forbidden.ps1')
-  $config=Join-Path $scripts 'config.json';[ordered]@{repoRoot=$root;autopilotDir=$autoDir;maxIssuesPerRun=1;maxParallelIssues=1;parallelSafetyMode='strict-independent-only';autoMerge=$true;autoPush=$false;maxRunMinutes=30;issueExecutor=[ordered]@{command='powershell';args=@('-NoProfile','-File','{repoRoot}\scripts\codex-autopilot\mock.ps1','-RepoRoot','{repoRoot}');timeoutSeconds=30;requireChangedFiles=$true};closeout=[ordered]@{enabled=$true};repair=[ordered]@{enabled=$false};readyPlanner=[ordered]@{enabled=$false}}|ConvertTo-Json -Depth 8|Set-Content $config
+  $config=Join-Path $scripts 'config.json';[ordered]@{repoRoot=$root;autopilotDir=$autoDir;maxIssuesPerRun=1;maxParallelIssues=1;parallelSafetyMode='strict-independent-only';autoMerge=$true;autoPush=$false;maxRunMinutes=30;issueExecutor=[ordered]@{command='pwsh';args=@('-NoProfile','-File','{repoRoot}\scripts\codex-autopilot\mock.ps1','-RepoRoot','{repoRoot}');timeoutSeconds=30;requireChangedFiles=$true};closeout=[ordered]@{enabled=$true};repair=[ordered]@{enabled=$false};readyPlanner=[ordered]@{enabled=$false}}|ConvertTo-Json -Depth 8|Set-Content $config
   & git -C $root init -q;& git -C $root config user.email a@b.c;& git -C $root config user.name test;& git -C $root add .;& git -C $root commit -qm base
-  $old=$ErrorActionPreference;$ErrorActionPreference='Continue';$output=& powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $config -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1|Out-String;$code=$LASTEXITCODE;$ErrorActionPreference=$old
+  $old=$ErrorActionPreference;$ErrorActionPreference='Continue';$output=& pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $config -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1|Out-String;$code=$LASTEXITCODE;$ErrorActionPreference=$old
   if($code -ne 0){throw "runner failed: $output"}
   $result=Get-ChildItem (Join-Path $autoDir 'runs') -Filter result.json -Recurse|Select-Object -First 1|ForEach-Object{Get-Content -Encoding UTF8 $_.FullName -Raw|ConvertFrom-Json}
   if($result.status -ne 'blocked' -or $result.stopReason -ne 'STOP_SCOPE_VIOLATION'){throw 'final scope violation was not blocked'}

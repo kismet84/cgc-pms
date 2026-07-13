@@ -1,4 +1,6 @@
 $ErrorActionPreference = 'Stop'
+$nativeLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $nativeLibrary)) { . $nativeLibrary }
 
 function Get-AutopilotTextHash {
   param([string]$Text)
@@ -17,12 +19,12 @@ function Get-AutopilotDiffText {
   # Keep the repository's checkout normalization active. Forcing autocrlf=false on
   # Windows compares checked-out CRLF bytes with LF blobs and turns small document
   # edits into whole-file review noise.
-  $diff = (& git -c core.safecrlf=false -C $Worktree diff --binary $BaseCommit -- 2>$null | Out-String)
-  if ($LASTEXITCODE -ne 0) { throw 'cannot calculate worktree diff hash' }
-  foreach ($path in @(& git -c core.quotePath=false -c core.autocrlf=false -c core.safecrlf=false -C $Worktree ls-files --others --exclude-standard)) {
-    $untrackedDiff = (& git -c core.safecrlf=false -C $Worktree diff --no-index --binary -- NUL $path 2>$null | Out-String)
-    if ($LASTEXITCODE -notin @(0,1)) { throw "cannot include untracked file in diff: $path" }
-    $diff += $untrackedDiff
+  $diffResult = Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('-c','core.safecrlf=false','diff','--binary',$BaseCommit,'--') -ThrowOnFailure
+  $diff = $diffResult.stdout
+  $untrackedResult = Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('-c','core.autocrlf=false','-c','core.safecrlf=false','ls-files','--others','--exclude-standard') -ThrowOnFailure
+  foreach ($path in @(Get-AutopilotNativeOutputLines $untrackedResult.stdout)) {
+    $untrackedDiff = Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('-c','core.safecrlf=false','diff','--no-index','--binary','--','NUL',$path) -AcceptedExitCodes @(0,1) -ThrowOnFailure
+    $diff += $untrackedDiff.stdout
   }
   return $diff
 }
@@ -44,8 +46,7 @@ function New-AutopilotContextPack {
   if (@($RelevantSymbols).Count -gt 12) { throw 'context source budget exceeded: max 12 relevant symbols/files' }
   if ([Text.Encoding]::UTF8.GetByteCount($PreviousPhaseSummary) -gt 5120) { throw 'previous phase summary budget exceeded: max 5 KB' }
   if (@($ChangedPaths).Count -gt 20) { throw 'changed file budget exceeded: max 20 files' }
-  $baseCommit = (& git -C $Worktree rev-parse HEAD).Trim()
-  if ($LASTEXITCODE -ne 0) { throw 'cannot resolve worktree base commit' }
+  $baseCommit = (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
   $context = [ordered]@{
     schemaVersion = 1
     issueId = $Issue.issueId

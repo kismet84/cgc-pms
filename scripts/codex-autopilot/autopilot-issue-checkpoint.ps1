@@ -1,11 +1,48 @@
 $ErrorActionPreference = 'Stop'
 
+$nativeCommandLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
+
 $script:AutopilotIssueCheckpointVersion = 1
 $script:AutopilotIssuePhases = @(
   'IMPLEMENTING','IMPLEMENTED','VALIDATING','VALIDATED','REVIEWING','REVIEW_TOOL_BLOCKED',
   'REVIEWED','REPAIRING','CLOSING','IMPLEMENTATION_COMMITTED','CLOSEOUT_COMMITTED',
   'REGISTERED','CLOSED','QUARANTINED'
 )
+
+$script:AutopilotCheckpointFenceContext = $null
+
+function Set-AutopilotCheckpointFenceContext {
+  param(
+    [Parameter(Mandatory)][string]$LockPath,
+    [Parameter(Mandatory)][string]$RunInstanceId,
+    [Parameter(Mandatory)][string]$LeaseEpoch,
+    [string]$ControlPlaneFingerprint = ''
+  )
+  $script:AutopilotCheckpointFenceContext = [pscustomobject]@{ lockPath=$LockPath; runInstanceId=$RunInstanceId; leaseEpoch=$LeaseEpoch; controlPlaneFingerprint=$ControlPlaneFingerprint }
+}
+
+function Assert-AutopilotCheckpointFenceContext {
+  if (!$script:AutopilotCheckpointFenceContext) { return $true }
+  try { $lock = Get-Content -LiteralPath $script:AutopilotCheckpointFenceContext.lockPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+  catch { throw 'AUTOPILOT_FENCE_REJECTED: checkpoint writer cannot read run.lock.' }
+  if ([string]$lock.runInstanceId -ne [string]$script:AutopilotCheckpointFenceContext.runInstanceId -or [string]$lock.leaseEpoch -ne [string]$script:AutopilotCheckpointFenceContext.leaseEpoch) {
+    throw 'AUTOPILOT_FENCE_REJECTED: stale process cannot write Issue checkpoint.'
+  }
+  return $true
+}
+
+function ConvertTo-AutopilotIssueCheckpointCurrent {
+  param([Parameter(Mandatory)][object]$Checkpoint)
+  foreach ($entry in @(
+    @('runInstanceId',''), @('leaseEpoch',''), @('transitionId',''), @('generation',0), @('controlPlaneFingerprint',''), @('semanticProgressAt',$null), @('failureRecoveryKeys',@())
+  )) {
+    $name = [string]$entry[0]
+    $present = ($Checkpoint -is [Collections.IDictionary] -and $Checkpoint.Contains($name)) -or ($Checkpoint.PSObject.Properties.Name -contains $name)
+    if (!$present) { Set-AutopilotCheckpointProperty $Checkpoint $name $entry[1] }
+  }
+  return $Checkpoint
+}
 
 function Get-AutopilotCheckpointProperty {
   param([object]$Object, [string]$Name, [object]$Default = $null)
@@ -26,6 +63,31 @@ function Get-AutopilotCheckpointSha256 {
   $sha = [Security.Cryptography.SHA256]::Create()
   try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Text)))).Replace('-', '').ToLowerInvariant() }
   finally { $sha.Dispose() }
+}
+
+function Get-AutopilotFailureRecoveryKey {
+  param(
+    [Parameter(Mandatory)][string]$FailureFingerprint,
+    [Parameter(Mandatory)][string]$Phase,
+    [Parameter(Mandatory)][string]$DiffHash
+  )
+  return Get-AutopilotCheckpointSha256 ((@($FailureFingerprint.Trim(), $Phase.Trim().ToUpperInvariant(), $DiffHash.Trim().ToLowerInvariant())) -join '|')
+}
+
+function Register-AutopilotFailureRecovery {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$FailureFingerprint,
+    [Parameter(Mandatory)][string]$Phase,
+    [Parameter(Mandatory)][string]$DiffHash
+  )
+  $checkpoint = Read-AutopilotIssueCheckpoint -Path $Path
+  $key = Get-AutopilotFailureRecoveryKey -FailureFingerprint $FailureFingerprint -Phase $Phase -DiffHash $DiffHash
+  if (@($checkpoint.failureRecoveryKeys) -contains $key) { return $false }
+  Set-AutopilotCheckpointProperty $checkpoint 'failureRecoveryKeys' (@($checkpoint.failureRecoveryKeys) + $key)
+  Set-AutopilotCheckpointProperty $checkpoint 'semanticProgressAt' ([datetimeoffset]::Now.ToString('o'))
+  Write-AutopilotIssueCheckpointAtomic -Path $Path -Checkpoint $checkpoint | Out-Null
+  return $true
 }
 
 function Get-AutopilotReadyContractHash {
@@ -57,9 +119,8 @@ function Get-AutopilotRecoveryDiffHash {
   if (Get-Command Get-AutopilotDiffHash -ErrorAction SilentlyContinue) {
     return Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $BaseCommit
   }
-  $diff = @(& git -c core.autocrlf=false -c core.quotePath=false -C $Worktree diff --binary $BaseCommit -- 2>$null) -join "`n"
-  if ($LASTEXITCODE -ne 0) { throw 'failed to calculate recovery diff' }
-  $untracked = @(& git -c core.quotePath=false -C $Worktree ls-files --others --exclude-standard 2>$null | Sort-Object)
+  $diff = (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('diff','--binary',$BaseCommit,'--') -ThrowOnFailure).stdout
+  $untracked = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('ls-files','--others','--exclude-standard') -ThrowOnFailure).stdout | Sort-Object)
   $untrackedEvidence = foreach ($relative in $untracked) {
     $full = Join-Path $Worktree $relative
     $hash = if (Test-Path -LiteralPath $full -PathType Leaf) { (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant() } else { '' }
@@ -79,13 +140,15 @@ function Assert-AutopilotIssueCheckpoint {
   $required = @(
     'schemaVersion','issueId','readyPath','readyContentHash','baseCommit','worktree','branch',
     'allowedPathsHash','forbiddenPathsHash','phase','createdAt','updatedAt','phaseStartedAt',
-    'lastHeartbeatAt','artifacts','evidence','metrics','quarantineReason'
+    'lastHeartbeatAt','artifacts','evidence','metrics','quarantineReason','runInstanceId','leaseEpoch',
+    'transitionId','generation','controlPlaneFingerprint','semanticProgressAt','failureRecoveryKeys'
   )
   foreach ($name in $required) {
     $present = ($Checkpoint -is [System.Collections.IDictionary] -and $Checkpoint.Contains($name)) -or ($Checkpoint.PSObject.Properties.Name -contains $name)
     if (!$present) { throw "Issue checkpoint missing required property: $name" }
   }
   if ([int]$Checkpoint.schemaVersion -ne $script:AutopilotIssueCheckpointVersion) { throw "Unsupported Issue checkpoint schemaVersion: $($Checkpoint.schemaVersion)" }
+  if ([int]$Checkpoint.generation -lt 0) { throw 'Issue checkpoint generation cannot be negative' }
   if ([string]$Checkpoint.issueId -notmatch '^ISSUE-[0-9-]+$') { throw 'Issue checkpoint has invalid issueId' }
   if ([string]$Checkpoint.readyContentHash -notmatch '^[a-f0-9]{64}$') { throw 'Issue checkpoint has invalid readyContentHash' }
   if ([string]$Checkpoint.baseCommit -notmatch '^[a-f0-9]{40}$') { throw 'Issue checkpoint has invalid baseCommit' }
@@ -106,9 +169,18 @@ function Assert-AutopilotIssueCheckpoint {
 
 function Write-AutopilotIssueCheckpointAtomic {
   param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][object]$Checkpoint)
+  Assert-AutopilotCheckpointFenceContext | Out-Null
+  $Checkpoint = ConvertTo-AutopilotIssueCheckpointCurrent $Checkpoint
   $now = [datetimeoffset]::Now.ToString('o')
   Set-AutopilotCheckpointProperty $Checkpoint 'updatedAt' $now
   Set-AutopilotCheckpointProperty $Checkpoint 'lastHeartbeatAt' $now
+  Set-AutopilotCheckpointProperty $Checkpoint 'generation' ([int](Get-AutopilotCheckpointProperty $Checkpoint 'generation' 0) + 1)
+  Set-AutopilotCheckpointProperty $Checkpoint 'transitionId' ([guid]::NewGuid().ToString('N'))
+  if ($script:AutopilotCheckpointFenceContext) {
+    Set-AutopilotCheckpointProperty $Checkpoint 'runInstanceId' ([string]$script:AutopilotCheckpointFenceContext.runInstanceId)
+    Set-AutopilotCheckpointProperty $Checkpoint 'leaseEpoch' ([string]$script:AutopilotCheckpointFenceContext.leaseEpoch)
+    Set-AutopilotCheckpointProperty $Checkpoint 'controlPlaneFingerprint' ([string]$script:AutopilotCheckpointFenceContext.controlPlaneFingerprint)
+  }
   $json = $Checkpoint | ConvertTo-Json -Depth 16
   $parsed = $json | ConvertFrom-Json
   Assert-AutopilotIssueCheckpoint $parsed | Out-Null
@@ -132,6 +204,7 @@ function Read-AutopilotIssueCheckpoint {
   if (!(Test-Path -LiteralPath $Path -PathType Leaf)) { throw "Issue checkpoint is missing: $Path" }
   try { $checkpoint = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json }
   catch { throw "Issue checkpoint is invalid JSON: $Path" }
+  $checkpoint = ConvertTo-AutopilotIssueCheckpointCurrent $checkpoint
   Assert-AutopilotIssueCheckpoint $checkpoint | Out-Null
   return $checkpoint
 }
@@ -170,6 +243,13 @@ function New-AutopilotIssueCheckpoint {
     updatedAt = $now
     phaseStartedAt = $now
     lastHeartbeatAt = $now
+    runInstanceId = ''
+    leaseEpoch = ''
+    transitionId = ''
+    generation = 0
+    controlPlaneFingerprint = ''
+    semanticProgressAt = $now
+    failureRecoveryKeys = @()
     artifacts = [ordered]@{ issueDirectory=$ArtifactDirectory; resultPath=''; evidencePaths=@(); reviewRequestPath=''; reviewResultPath=''; archiveReport='' }
     evidence = [ordered]@{ diffHash=''; verificationDiffHash=''; reviewDiffHash=''; implementationCommit=''; closeoutCommit='' }
     metrics = [ordered]@{
@@ -224,6 +304,7 @@ function Set-AutopilotIssueCheckpointPhase {
   if ($Phase -eq 'QUARANTINED') { Set-AutopilotCheckpointProperty $checkpoint 'quarantineReason' $QuarantineReason }
   Set-AutopilotCheckpointProperty $checkpoint 'phase' $Phase
   Set-AutopilotCheckpointProperty $checkpoint 'phaseStartedAt' $now.ToString('o')
+  if ($Phase -ne $previousPhase -or $Artifacts.Count -gt 0 -or $Evidence.Count -gt 0) { Set-AutopilotCheckpointProperty $checkpoint 'semanticProgressAt' $now.ToString('o') }
   Set-AutopilotCheckpointProperty $checkpoint.metrics 'wallClockSeconds' ([Math]::Max(0, [int][Math]::Round(($now - [datetimeoffset]$checkpoint.createdAt).TotalSeconds)))
   return Write-AutopilotIssueCheckpointAtomic -Path $Path -Checkpoint $checkpoint
 }

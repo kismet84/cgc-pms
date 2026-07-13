@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -25,7 +25,7 @@ try {
 状态：Ready
 来源锚点：${tick}docs/plans/source.md${tick}
 验证命令：
-- ${tick}powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/check-repair.ps1${tick}
+- ${tick}pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/check-repair.ps1${tick}
 归档报告：${tick}docs/quality/issue-991-001.md${tick}
 Migration：不需要
 依赖：无
@@ -52,12 +52,12 @@ if ($attempt -lt 2) { Write-Error 'deterministic first-attempt failure'; exit 1 
   $configPath = Join-Path $scripts 'codex-autopilot.config.json'
   [ordered]@{
     repoRoot=$root;autopilotDir=$autoDir;maxIssuesPerRun=1;maxParallelIssues=1;parallelSafetyMode='strict-independent-only';autoMerge=$true;autoPush=$false;maxRunMinutes=30
-    issueExecutor=[ordered]@{command='powershell';args=@('-NoProfile','-ExecutionPolicy','Bypass','-File','{repoRoot}\scripts\codex-autopilot\mock-executor.ps1','-RepoRoot','{repoRoot}','-IssueId','{issueId}','-PromptPath','{promptFile}');timeoutSeconds=30;requireChangedFiles=$true}
+    issueExecutor=[ordered]@{command='pwsh';args=@('-NoProfile','-ExecutionPolicy','Bypass','-File','{repoRoot}\scripts\codex-autopilot\mock-executor.ps1','-RepoRoot','{repoRoot}','-IssueId','{issueId}','-PromptPath','{promptFile}');timeoutSeconds=30;requireChangedFiles=$true}
     closeout=[ordered]@{enabled=$true};repair=[ordered]@{enabled=$true;maxRepairAttempts=2};readyPlanner=[ordered]@{enabled=$false}
   } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding UTF8
   & git -C $root init -q; & git -C $root config user.email 'autopilot@test.local'; & git -C $root config user.name 'AutoPilot Test'; & git -C $root add .; & git -C $root commit -qm 'repair base'
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
+  $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
   $ErrorActionPreference = $old
   $canonical = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Directory | Where-Object Name -notmatch '-repair-' | Select-Object -First 1
   $result = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $canonical.FullName 'result.json') -Raw | ConvertFrom-Json

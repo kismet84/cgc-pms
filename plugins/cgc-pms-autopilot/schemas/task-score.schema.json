@@ -32,6 +32,18 @@
     },
     "hardGatesPassed": { "const": true },
     "followupNetChange": { "type": "integer" },
+    "executionTiming": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wallClockSeconds", "businessPhaseSeconds", "controlPlaneSeconds", "semanticProgressAt", "livenessSignalsExcluded"],
+      "properties": {
+        "wallClockSeconds": { "type": "integer", "minimum": 0 },
+        "businessPhaseSeconds": { "type": "integer", "minimum": 0 },
+        "controlPlaneSeconds": { "type": "integer", "minimum": 0 },
+        "semanticProgressAt": { "type": "string" },
+        "livenessSignalsExcluded": { "const": true }
+      }
+    },
     "sourceRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
     "shadow": { "type": "boolean" }
   },

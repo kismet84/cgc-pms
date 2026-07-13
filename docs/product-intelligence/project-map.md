@@ -1,5 +1,12 @@
 # CGC-PMS 项目地图
 
+## 2026-07-14 增量：AutoPilot PowerShell 7 与控制面一致性
+
+- AutoPilot 控制面固定使用 PowerShell 7 `pwsh`，不再支持 Windows PowerShell 5.1；普通临时 Git fixture 使用仓库本地换行规则，CRLF warning 专项 fixture 单独保留。
+- 执行模式、原生命令结果、原子运行锁、fencing token、控制面指纹、state/checkpoint/result 过渡和语义 stall 已形成统一控制面事实；stderr warning、tool_config 与环境前置不再自动进入业务 quarantine 或 BC repair。
+- 任务执行效率证据新增业务阶段耗时与控制面返工耗时拆分，继续沿用已批准 v2 35/25/20/10/10，不按固定分钟数扣分。
+- 当前工程能力状态为“实现与夹具验收通过、真实单任务金丝雀待用户启动”；金丝雀登记前 N>1/无界连续执行保持 fail-close。本次未改变任何产品业务能力或候选排序。
+
 ## 2026-07-13 增量：系统菜单修改管理员入口与树约束
 
 - `ISSUE-040-023` 在既有 admin-only `/system/permissions` 页面增加“修改菜单”入口，从完整菜单树选择目标并加载详情，精确发送 `PUT /system/menus/{id}`；成功后刷新菜单树、平铺列表与详情，失败保留目标和表单。

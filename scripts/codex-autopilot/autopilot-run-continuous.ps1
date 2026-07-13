@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$RepoRoot = "D:\projects-test\cgc-pms",
   [string]$ConfigPath = "",
   [switch]$DryRun,
@@ -9,6 +9,12 @@
 )
 
 $ErrorActionPreference = "Stop"
+
+$powerShellHostLibrary = Join-Path $PSScriptRoot 'autopilot-powershell-host.ps1'
+if (!(Test-Path -LiteralPath $powerShellHostLibrary -PathType Leaf)) { throw 'AUTOPILOT_POWERSHELL7_REQUIRED: host resolver is missing.' }
+. $powerShellHostLibrary
+Assert-AutopilotPowerShell7 | Out-Null
+$script:PowerShellHost = Resolve-AutopilotPowerShellHost
 
 function Read-JsonFile {
   param([string]$Path)
@@ -43,13 +49,8 @@ function Test-Checkpoint {
 
 function Read-RunLock {
   param([string]$LockPath)
-
-  if (!(Test-Path $LockPath)) {
-    return $null
-  }
-  try {
-    return Get-Content -Encoding UTF8 -Raw $LockPath | ConvertFrom-Json
-  } catch {
+  try { return Read-AutopilotRunLockFile -LockPath $LockPath -AllowMissing }
+  catch {
     return [pscustomobject]@{
       owner = "unknown"
       pid = $null
@@ -68,27 +69,9 @@ function Test-RunLockStale {
     [int]$MaxRunMinutes
   )
 
-  if (!$Lock) {
-    return $false
-  }
-  if ($Lock.unreadable) {
-    return $true
-  }
-
-  [datetime]$heartbeat = [datetime]::MinValue
-  if ($Lock.heartbeatAt -and [datetime]::TryParse([string]$Lock.heartbeatAt, [ref]$heartbeat)) {
-    if (((Get-Date) - $heartbeat).TotalMinutes -gt $MaxRunMinutes) {
-      return $true
-    }
-  }
-
-  if ($Lock.pid) {
-    $process = Get-Process -Id ([int]$Lock.pid) -ErrorAction SilentlyContinue
-    if (!$process) {
-      return $true
-    }
-  }
-  return $false
+  if (!$Lock) { return $false }
+  if ($Lock.unreadable) { return $true }
+  return Test-AutopilotRunLockStale -Lock $Lock -MaxRunMinutes $MaxRunMinutes
 }
 
 function Write-RunLock {
@@ -97,8 +80,7 @@ function Write-RunLock {
     [object]$Lock
   )
 
-  $Lock.heartbeatAt = Get-Date -Format o
-  $Lock | ConvertTo-Json -Depth 5 | Out-File -Encoding utf8 $LockPath
+  Update-AutopilotRunLock -LockPath $LockPath -Lock $Lock | Out-Null
 }
 
 function New-RunLock {
@@ -108,50 +90,14 @@ function New-RunLock {
     [string]$Mode
   )
 
-  if (!(Test-Path $AutoDir)) {
-    New-Item -ItemType Directory -Path $AutoDir -Force | Out-Null
-  }
-
-  $lockPath = Join-Path $AutoDir "run.lock"
-  $existing = Read-RunLock $lockPath
-  if ($existing) {
-    if (Test-RunLockStale $existing $MaxRunMinutes) {
-      Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
-      Write-Host "STALE_RUN_LOCK_REMOVED"
-    } else {
-      Write-Host "RUN_LOCK_ACTIVE"
-      Write-Host "lockOwner=$($existing.owner)"
-      Write-Host "lockPid=$($existing.pid)"
-      Write-Host "lockHeartbeatAt=$($existing.heartbeatAt)"
-      throw "Another AutoPilot run is active."
-    }
-  }
-
-  $stream = $null
   try {
-    $stream = [System.IO.File]::Open($lockPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
-    $lock = [pscustomobject]@{
-      owner = "$env:USERNAME@$env:COMPUTERNAME"
-      pid = $PID
-      runId = if ($script:RunContext) { $script:RunContext.id } else { '' }
-      host = $env:COMPUTERNAME
-      workspaceRoot = $RepoRoot
-      startedAt = Get-Date -Format o
-      heartbeatAt = Get-Date -Format o
-      mode = $Mode
-      issueId = ""
-    }
-    $json = $lock | ConvertTo-Json -Depth 5
-    $bytes = [System.Text.Encoding]::UTF8.GetBytes($json)
-    $stream.Write($bytes, 0, $bytes.Length)
+    $lock = New-AutopilotRunLock -AutoDir $AutoDir -RepoRoot $RepoRoot -RunId $(if ($script:RunContext) { $script:RunContext.id } else { 'run-' + [guid]::NewGuid().ToString('N') }) -Mode $Mode -ControlPlaneFingerprint ([string]$script:ControlPlaneFingerprint) -MaxRunMinutes $MaxRunMinutes
+    if ($lock.tookOverStale) { Write-Host 'STALE_RUN_LOCK_REMOVED'; Write-Host 'STALE_RUN_LOCK_TAKEN_OVER' }
     Write-Host "RUN_LOCK_ACQUIRED"
     return $lock
   } catch {
+    if ($_.Exception.Message -match 'Another AutoPilot run is active') { Write-Host 'RUN_LOCK_ACTIVE' }
     throw "Failed to acquire run.lock: $($_.Exception.Message)"
-  } finally {
-    if ($stream) {
-      $stream.Dispose()
-    }
   }
 }
 
@@ -166,11 +112,27 @@ function Remove-RunLock {
   }
 
   $lockPath = Join-Path $AutoDir "run.lock"
-  $existing = Read-RunLock $lockPath
-  if ($existing -and $existing.pid -eq $Lock.pid -and $existing.startedAt -eq $Lock.startedAt) {
-    Remove-Item -LiteralPath $lockPath -Force -ErrorAction SilentlyContinue
+  if (Remove-AutopilotRunLock -LockPath $lockPath -Lock $Lock) {
     Write-Host "RUN_LOCK_RELEASED"
   }
+}
+
+function Assert-CurrentControlPlaneFence {
+  if (!$script:RunLock) { return $true }
+  $lockPath = Join-Path $autoDir 'run.lock'
+  if (!(Test-AutopilotRunFence -LockPath $lockPath -RunInstanceId ([string]$script:RunLock.runInstanceId) -LeaseEpoch ([string]$script:RunLock.leaseEpoch))) {
+    $script:FenceValid = $false
+    throw 'AUTOPILOT_FENCE_REJECTED: current process no longer owns run.lock.'
+  }
+  if ($controlPlaneCanaryEnabled) {
+    $currentFingerprint = Get-AutopilotControlPlaneFingerprint -RepoRoot $RepoRoot -Paths @($config.controlPlaneCanary.fingerprintPaths)
+    if ($currentFingerprint -ne $script:ControlPlaneFingerprint) {
+      $script:FenceValid = $false
+      throw 'AUTOPILOT_CONTROL_PLANE_GENERATION_CHANGED: stale process cannot write, dispatch, merge, or close out.'
+    }
+  }
+  $script:FenceValid = $true
+  return $true
 }
 
 function Get-ReadyIssues {
@@ -379,7 +341,7 @@ function Invoke-ReadyLint {
     }
   }
 
-  $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $lintPath -RepoRoot $RepoRoot -ReadyPath $ReadyPath -IssueTitle $IssueTitle 2>&1 | Out-String
+  $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $lintPath -RepoRoot $RepoRoot -ReadyPath $ReadyPath -IssueTitle $IssueTitle 2>&1 | Out-String
   try {
     return $output | ConvertFrom-Json
   } catch {
@@ -409,6 +371,7 @@ function Write-State {
   }
 
   if ($script:RunLock) {
+    Assert-CurrentControlPlaneFence | Out-Null
     Write-RunLock (Join-Path $AutoDir "run.lock") $script:RunLock
   }
 
@@ -438,7 +401,7 @@ function Write-State {
     completedImplementationIssues = $script:IterationCompleted
     completedIssueIds = @($completedIds)
     worktree = if ($script:CurrentWorktree) { $script:CurrentWorktree } else { '' }
-    branch = if ($script:CurrentBranch) { $script:CurrentBranch } else { (& git -C $RepoRoot branch --show-current 2>$null | Select-Object -First 1) }
+    branch = if ($script:CurrentBranch) { $script:CurrentBranch } else { (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('branch','--show-current') -ThrowOnFailure).stdout.Trim() }
     executorPid = $script:ExecutorPid
     executorStartedAt = $script:ExecutorStartedAt
     lastProgressAt = $script:LastProgressAt
@@ -484,7 +447,14 @@ function Write-State {
     autoPush = $false
     allowTestDataReset = Test-Path (Join-Path $AutoDir 'ALLOW_TEST_DATA_RESET')
   }
-  Write-AutopilotStateAtomic -Path $statePath -State $state | Out-Null
+  $transitionId = ''
+  if ($issueStateBinding.checkpointPath -and (Test-Path -LiteralPath $issueStateBinding.checkpointPath -PathType Leaf)) {
+    $phaseCheckpoint = Read-AutopilotIssueCheckpoint -Path $issueStateBinding.checkpointPath
+    if (!$script:RunLock -or ([string]$phaseCheckpoint.runInstanceId -eq [string]$script:RunLock.runInstanceId -and [string]$phaseCheckpoint.leaseEpoch -eq [string]$script:RunLock.leaseEpoch)) {
+      $transitionId = [string]$phaseCheckpoint.transitionId
+    }
+  }
+  Write-AutopilotStateAtomic -Path $statePath -State $state -TransitionId $transitionId | Out-Null
 }
 
 function Commit-ReadyRefill {
@@ -493,15 +463,15 @@ function Commit-ReadyRefill {
   $readyFull = [IO.Path]::GetFullPath($ReadyPath)
   if (!$readyFull.StartsWith($repoPrefix, [StringComparison]::OrdinalIgnoreCase)) { throw 'Ready path is outside repository.' }
   $relativeReady = $readyFull.Substring($repoPrefix.Length).Replace('\','/')
-  $otherChanges = @(& git -C $RepoRoot status --porcelain=v1 | Where-Object { $_.Substring(3).Trim('"').Replace('\','/') -ne $relativeReady })
+  $statusLines = Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('status','--porcelain=v1') -ThrowOnFailure).stdout
+  $otherChanges = @($statusLines | Where-Object { $_.Length -lt 4 -or $_.Substring(3).Trim('"').Replace('\','/') -ne $relativeReady })
   if ($otherChanges.Count -gt 0) { throw 'Cannot commit Ready refill while unrelated worktree changes exist.' }
-  & git -C $RepoRoot add -- $relativeReady
-  if ($LASTEXITCODE -ne 0) { throw 'Failed to stage Ready refill.' }
-  & git -C $RepoRoot diff --cached --check
-  if ($LASTEXITCODE -ne 0) { throw 'Ready refill failed git diff --check.' }
-  & git -C $RepoRoot commit -m 'chore(autopilot): refill ready queue' | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw 'Failed to commit Ready refill.' }
-  return (& git -C $RepoRoot rev-parse HEAD).Trim()
+  Assert-CurrentControlPlaneFence | Out-Null
+  Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('add','--',$relativeReady) -ThrowOnFailure | Out-Null
+  Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('diff','--cached','--check') -ThrowOnFailure | Out-Null
+  Assert-CurrentControlPlaneFence | Out-Null
+  Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('commit','-m','chore(autopilot): refill ready queue') -ThrowOnFailure | Out-Null
+  return (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
 }
 
 function New-RunContext {
@@ -825,7 +795,7 @@ function Get-ExecutorCommand {
   )
 
   $executorPath = Join-Path $scriptDir "autopilot-exec-issue.ps1"
-  return "powershell -NoProfile -ExecutionPolicy Bypass -File `"$executorPath`" -RepoRoot `"$RepoRoot`" -ConfigPath `"$ConfigPath`" -Title `"$IssueTitle`""
+  return "pwsh -NoProfile -ExecutionPolicy Bypass -File `"$executorPath`" -RepoRoot `"$RepoRoot`" -ConfigPath `"$ConfigPath`" -Title `"$IssueTitle`""
 }
 
 function Write-ExecutorStallBlockedIssue {
@@ -858,6 +828,7 @@ function Invoke-ChildWithHeartbeat {
     [int]$StallTerminateSeconds = 600,
     [int]$HeartbeatMilliseconds = 30000,
     [object[]]$LongRunningCommands = @(),
+    [string[]]$SemanticEvidencePaths = @(),
     [string]$Task = ''
   )
   function Stop-ChildProcessTree([Diagnostics.Process]$Child) {
@@ -866,7 +837,7 @@ function Invoke-ChildWithHeartbeat {
   }
   function Quote-ChildArgument([string]$Value) { if ($Value -match '[\s"]') { return '"' + $Value.Replace('"','\"') + '"' }; return $Value }
   $startInfo = [Diagnostics.ProcessStartInfo]::new()
-  $startInfo.FileName = 'powershell'
+  $startInfo.FileName = 'pwsh'
   $startInfo.Arguments = ($Arguments | ForEach-Object { Quote-ChildArgument $_ }) -join ' '
   $startInfo.WorkingDirectory = $WorkingDirectory
   $startInfo.UseShellExecute = $false
@@ -892,10 +863,10 @@ function Invoke-ChildWithHeartbeat {
   $stallTimedOut = $false
   $stallInspected = $false
   $lastProgressAt = $startedAt
-  $progressFingerprint = Get-AutopilotProgressFingerprint -Worktree $WorkingDirectory -RootPid $process.Id
+  $progressFingerprint = Get-AutopilotProgressFingerprint -Worktree $WorkingDirectory -RootPid $process.Id -SemanticEvidencePaths $SemanticEvidencePaths
   while (!$process.WaitForExit($HeartbeatMilliseconds)) {
     if ($script:RunLock) { Write-RunLock (Join-Path $autoDir 'run.lock') $script:RunLock }
-    $currentFingerprint = Get-AutopilotProgressFingerprint -Worktree $WorkingDirectory -RootPid $process.Id
+    $currentFingerprint = Get-AutopilotProgressFingerprint -Worktree $WorkingDirectory -RootPid $process.Id -SemanticEvidencePaths $SemanticEvidencePaths
     if ($currentFingerprint -ne $progressFingerprint) {
       $progressFingerprint = $currentFingerprint
       $lastProgressAt = [datetimeoffset]::Now
@@ -966,7 +937,7 @@ function Invoke-IssueExecutor {
       return
     }
   }
-  $baseCommit = if ($resuming) { [string]$ResumeCheckpoint.baseCommit } else { (& git -C $RepoRoot rev-parse HEAD).Trim() }
+  $baseCommit = if ($resuming) { [string]$ResumeCheckpoint.baseCommit } else { (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim() }
   $worktree = if ($resuming) {
     [pscustomobject]@{ path=[string]$ResumeCheckpoint.worktree; branch=[string]$ResumeCheckpoint.branch; baseCommit=$baseCommit; reused=$true }
   } else {
@@ -986,7 +957,7 @@ function Invoke-IssueExecutor {
     $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase REPAIRING -Artifacts @{resultPath=$resultPath;issueDirectory=$issueDir} -IncrementDispatch repair
   } else {
     $checkpoint = New-AutopilotIssueCheckpoint -AutoDir $autoDir -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $RepoRoot 'docs\backlog\ready-issues.md') -BaseCommit $baseCommit -Worktree $worktree.path -Branch $worktree.branch -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths -ArtifactDirectory $issueDir
-    $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase IMPLEMENTING -IncrementDispatch implementation
+    $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase IMPLEMENTING -Artifacts @{resultPath=$resultPath;issueDirectory=$issueDir} -IncrementDispatch implementation
   }
   $script:IssueCheckpointPath = $checkpointPath
   $script:IssuePhase = [string]$checkpoint.phase
@@ -1005,20 +976,28 @@ function Invoke-IssueExecutor {
     '-ContextPath',$contextPath,
     '-Model',$Route.modelBaseline,
     '-Thinking',$Route.thinkingBaseline,
-    '-ExecutorRole',$Route.executorRole
+    '-ExecutorRole',$Route.executorRole,
+    '-RunInstanceId',([string]$script:RunLock.runInstanceId),
+    '-LeaseEpoch',([string]$script:RunLock.leaseEpoch)
   )
+    if ($script:ControlPlaneFingerprint) { $executorArgs += @('-ControlPlaneFingerprint',([string]$script:ControlPlaneFingerprint)) }
     if ($Route.reviewRequired) { $executorArgs += '-ReviewRequired' }
     $executorTimeout = if ($config.issueExecutor.timeoutSeconds) { [int]$config.issueExecutor.timeoutSeconds + 120 } else { 2820 }
     $stallInspectSeconds = if ($config.issueExecutor.stallInspectSeconds) { [int]$config.issueExecutor.stallInspectSeconds } else { 300 }
     $stallTerminateSeconds = if ($config.issueExecutor.stallTerminateSeconds) { [int]$config.issueExecutor.stallTerminateSeconds } else { 600 }
     $heartbeatMilliseconds = if ($config.issueExecutor.heartbeatMilliseconds) { [int]$config.issueExecutor.heartbeatMilliseconds } else { 30000 }
-    $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout -StallInspectSeconds $stallInspectSeconds -StallTerminateSeconds $stallTerminateSeconds -HeartbeatMilliseconds $heartbeatMilliseconds -LongRunningCommands $longRunningCommands -Task $Phase
+    $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout -StallInspectSeconds $stallInspectSeconds -StallTerminateSeconds $stallTerminateSeconds -HeartbeatMilliseconds $heartbeatMilliseconds -LongRunningCommands $longRunningCommands -SemanticEvidencePaths @($checkpointPath,$resultPath) -Task $Phase
     if ($childResult.exitCode -ne 0) {
     if ($childResult.stallTimedOut -and $config.repair -and $config.repair.enabled -eq $true -and $Attempt -lt 1) {
-      Write-State $autoDir 'REPAIRING' $false 'EXECUTOR_STALL_REPAIR' $Issue.title 'executor timed out without worktree progress' ''
-      Write-RunEvent 'executor.stall.retry-request' ([pscustomobject]@{ issueId = $Issue.lint.issueId; task = 'repair'; status = 'RETRY_REQUESTED'; executorPid = $childResult.executorPid; startedAt = $script:ExecutorStartedAt; lastProgressAt = $script:LastProgressAt; retryCount = 1; timeoutReason = 'no new evidence; retry scope limited to unfinished acceptance items with missing context supplied'; retiredAt = $script:RetiredAt; retiredStatus = $script:RetiredStatus })
-      Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt 1 -Phase 'repair' -PreviousSummary '首次 executor 因 600 秒无新证据已退役；仅处理未完成验收项，补充缺失上下文，不得扩大范围或再次重派。'
-      return
+      $stallDiffHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
+      $retryAllowed = Register-AutopilotFailureRecovery -Path $checkpointPath -FailureFingerprint 'executor_stall_timeout' -Phase $Phase -DiffHash $stallDiffHash
+      if ($retryAllowed) {
+        Write-State $autoDir 'REPAIRING' $false 'EXECUTOR_STALL_REPAIR' $Issue.title 'executor timed out without semantic progress' ''
+        Write-RunEvent 'executor.stall.retry-request' ([pscustomobject]@{ issueId = $Issue.lint.issueId; task = 'repair'; status = 'RETRY_REQUESTED'; executorPid = $childResult.executorPid; startedAt = $script:ExecutorStartedAt; lastProgressAt = $script:LastProgressAt; retryCount = 1; timeoutReason = 'no new evidence; retry scope limited to unfinished acceptance items with missing context supplied'; retiredAt = $script:RetiredAt; retiredStatus = $script:RetiredStatus })
+        Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt 1 -Phase 'repair' -PreviousSummary '首次 executor 因 600 秒无新证据已退役；仅处理未完成验收项，补充缺失上下文，不得扩大范围或再次重派。'
+        return
+      }
+      Write-RunEvent 'executor.stall.retry-suppressed' ([pscustomobject]@{ issueId=$Issue.lint.issueId; task=$Phase; status='PAUSED'; retryCount=1; timeoutReason='same failureFingerprint + phase + diffHash already consumed its automatic recovery budget' })
     }
     if ($childResult.stallTimedOut) {
       $blockedPath = Write-ExecutorStallBlockedIssue -RepoRoot $RepoRoot -Issue $Issue -RetiredExecutors $script:RetiredExecutors
@@ -1168,6 +1147,7 @@ function Invoke-IssueExecutor {
         $result | Add-Member -NotePropertyName $metricName -NotePropertyValue (Get-AutopilotCheckpointProperty $checkpoint.metrics $metricName 0) -Force
       }
       $result | Add-Member -NotePropertyName phaseDurationsSeconds -NotePropertyValue $checkpoint.metrics.phaseDurationsSeconds -Force
+      $result | Add-Member -NotePropertyName semanticProgressAt -NotePropertyValue ([string]$checkpoint.semanticProgressAt) -Force
       $result | Add-Member -NotePropertyName resumedFromPhase -NotePropertyValue $(if ($resuming) { $resumePhase } else { '' }) -Force
       $closed = $false
       if ($result.status -eq 'done') { $script:FailureFingerprint = $null }
@@ -1301,7 +1281,7 @@ function Invoke-IssueExecutor {
           if ([string]$registeredState.issueCheckpointPath -ne $checkpointPath -or [string]$registeredState.currentIssuePhase -ne 'REGISTERED') { throw 'registered AutoPilot state read-back failed' }
           if ($controlPlaneCanaryEnabled -and $null -ne $script:IterationLimit -and [int]$script:IterationLimit -eq 1) {
             $graphSnapshot = Get-AutopilotKnowledgeGraphIssueSnapshot -RepoRoot $RepoRoot
-            $mergedHead = (& git -C $RepoRoot rev-parse HEAD).Trim()
+            $mergedHead = (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
             if (!$graphSnapshot.available -or [string]$graphSnapshot.cursor -ne $mergedHead) { throw "control-plane canary knowledge-graph cursor gate failed: $($graphSnapshot.stopReason) $($graphSnapshot.message)" }
             $script:LastCanaryFingerprint = $script:ControlPlaneFingerprint
             $script:LastCanaryReport = [string]$Issue.contract.archiveReport
@@ -1351,6 +1331,9 @@ function Invoke-IssueExecutor {
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-state.ps1')
+. (Join-Path $scriptDir 'autopilot-execution-mode.ps1')
+. (Join-Path $scriptDir 'autopilot-native-command.ps1')
+. (Join-Path $scriptDir 'autopilot-run-lock.ps1')
 . (Join-Path $scriptDir 'autopilot-control-plane-fingerprint.ps1')
 . (Join-Path $scriptDir 'autopilot-task-score.ps1')
 . (Join-Path $scriptDir 'autopilot-ready.ps1')
@@ -1374,7 +1357,7 @@ if ($config.repoRoot) {
   $RepoRoot = $config.repoRoot
 }
 $configuredBaseBranch = if ($config.baseBranch) { [string]$config.baseBranch } else { 'master' }
-$actualBaseBranch = (& git -C $RepoRoot branch --show-current 2>$null | Select-Object -First 1).Trim()
+$actualBaseBranch = (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('branch','--show-current') -ThrowOnFailure).stdout.Trim()
 if ($actualBaseBranch -ne $configuredBaseBranch) { throw "AutoPilot control plane requires base branch $configuredBaseBranch, actual=$actualBaseBranch" }
 
 $autoDir = if ($config.autopilotDir) { $config.autopilotDir } else { Join-Path $RepoRoot ".codex-autopilot" }
@@ -1394,9 +1377,12 @@ $script:MaxParallelIssues = $maxParallelIssues
 $script:ParallelSafetyMode = $parallelSafetyMode
 
 $readyPath = Join-Path $RepoRoot "docs\backlog\ready-issues.md"
-$applyMode = [bool]$ApplyBacklogSplit -and -not [bool]$DryRun -and -not [bool]$ExplainNextAction
-$dryRunMode = -not $applyMode
+$executionMode = Resolve-AutopilotExecutionMode -DryRun ([bool]$DryRun) -ExplainNextAction ([bool]$ExplainNextAction) -ApplyBacklogSplit ([bool]$ApplyBacklogSplit)
+$applyMode = [string]$executionMode.mode -eq 'APPLY'
+$dryRunMode = [string]$executionMode.mode -ne 'APPLY'
 $script:RunLock = $null
+$script:FenceValid = $false
+$script:RecoveryCheckedAfterLock = $false
 $script:CurrentWorktree = ''
 $script:CurrentBranch = ''
 $script:ExecutorPid = $null
@@ -1426,7 +1412,7 @@ if (Test-Path -LiteralPath $existingStatePath) {
 }
 $script:RunContext = New-RunContext $autoDir
 Write-RunEvent "runner.start" ([pscustomobject]@{
-  decision = if ($ExplainNextAction) { "EXPLAIN_NEXT_ACTION" } elseif ($applyMode) { "APPLY_BACKLOG_SPLIT" } else { "DRY_RUN" }
+  decision = [string]$executionMode.mode
   status = "STARTED"
   applyMode = $applyMode
 })
@@ -1443,7 +1429,7 @@ Write-Host "autoPush=$($config.autoPush)"
 Write-Host "dryRun=$dryRunMode"
 Write-Host "applyBacklogSplit=$applyMode"
 
-if ($ExplainNextAction) {
+if ($executionMode.isExplain) {
   $checkpoint = Test-Checkpoint $autoDir
   Write-RunEvent "checkpoint" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "EXPLAIN" })
   $readyIssues = if ($checkpoint -eq "CONTINUE") { @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir) } else { @() }
@@ -1469,17 +1455,19 @@ if ($ExplainNextAction) {
 
 try {
   if ($applyMode) {
-    $recovery = Get-AutopilotRecoveryDecision -AutoDir $autoDir -PermittedBaseAdvancePaths @($config.controlPlaneCanary.fingerprintPaths)
-    if ($recovery.action -eq 'REFUSE_SECOND_INSTANCE') { Write-Host 'RUN_LOCK_ACTIVE'; throw 'Another AutoPilot run is active.' }
+    $script:RunLock = New-RunLock $autoDir $maxRunMinutes 'APPLY'
+    $script:FenceValid = Assert-CurrentControlPlaneFence
+    Set-AutopilotStateFenceContext -LockPath (Join-Path $autoDir 'run.lock') -RunInstanceId ([string]$script:RunLock.runInstanceId) -LeaseEpoch ([string]$script:RunLock.leaseEpoch) -ControlPlaneFingerprint ([string]$script:ControlPlaneFingerprint)
+    Set-AutopilotCheckpointFenceContext -LockPath (Join-Path $autoDir 'run.lock') -RunInstanceId ([string]$script:RunLock.runInstanceId) -LeaseEpoch ([string]$script:RunLock.leaseEpoch) -ControlPlaneFingerprint ([string]$script:ControlPlaneFingerprint)
+    $recovery = Get-AutopilotRecoveryDecision -AutoDir $autoDir -PermittedBaseAdvancePaths @($config.controlPlaneCanary.fingerprintPaths) -CurrentRunLock $script:RunLock
+    $script:RecoveryCheckedAfterLock = $true
     $resumeActions = @('RESUME_VALIDATION','RESUME_REVIEW','RESUME_CLOSEOUT','RESUME_SCORE_AND_CLOSEOUT','RESUME_MERGE_AND_REGISTER','RESUME_FINALIZE')
     if ($recovery.action -eq 'CLEAN_CLOSED_CHECKPOINT') {
-      Remove-Item -LiteralPath (Join-Path $autoDir 'run.lock') -Force -ErrorAction SilentlyContinue
       Remove-AutopilotIssueCheckpoint -Path $recovery.checkpointPath -Closed
       Write-RunEvent 'recovery' ([pscustomobject]@{ decision='CLEAN_CLOSED_CHECKPOINT'; status='RECOVERED'; reason='final state was already read back before checkpoint retirement' })
       $recovery = [pscustomobject]@{ action='NEW_RUN'; reason='closed checkpoint retired' }
     }
     if ($recovery.action -in @('RESUME_FROM_CHECKPOINT') + $resumeActions) {
-      Remove-Item -LiteralPath (Join-Path $autoDir 'run.lock') -Force -ErrorAction SilentlyContinue
       if ($recovery.action -in $resumeActions) {
         $resumeMetricArgs = @{ Path=$recovery.checkpointPath; Phase=[string]$recovery.checkpoint.phase; IncrementRunResume=$true }
         if ([string]$recovery.checkpoint.phase -in @('VALIDATING','REVIEWING','CLOSING','REPAIRING')) { $resumeMetricArgs.IncrementPhaseRestart = $true }
@@ -1488,7 +1476,7 @@ try {
         $script:IssueCheckpointPath = [string]$recovery.checkpointPath
         $script:IssuePhase = [string]$recovery.checkpoint.phase
       }
-      Write-Host 'STALE_RUN_LOCK_REMOVED'
+      Write-Host 'STALE_RUN_LOCK_TAKEN_OVER'
       Write-RunEvent 'recovery' ([pscustomobject]@{ decision = $recovery.action; status = 'RECOVERED'; reason = $recovery.reason })
     } elseif ($recovery.action -eq 'PAUSE_REVIEW_TOOL_BLOCKED') {
       Write-State $autoDir 'PAUSED' $false 'REVIEW_TOOL_BLOCKED' ([string]$recovery.issueId) $recovery.reason 'STOP_REVIEWER_TOOL_RETRY_EXHAUSTED'
@@ -1498,12 +1486,19 @@ try {
       Write-State $autoDir 'PAUSED' $false 'ENVIRONMENT_RETRY_EXHAUSTED' ([string]$recovery.issueId) $recovery.reason 'STOP_ENVIRONMENT_RETRY_EXHAUSTED'
       Write-Host 'STOP_ENVIRONMENT_RETRY_EXHAUSTED'
       exit 0
+    } elseif ($recovery.action -eq 'PAUSE_RECOVERY_TOOL_CONFIG') {
+      Write-State $autoDir 'PAUSED' $false 'RECOVERY_TOOL_CONFIG' ([string]$recovery.issueId) $recovery.reason 'STOP_RECOVERY_TOOL_CONFIG'
+      Write-Host 'STOP_RECOVERY_TOOL_CONFIG'
+      exit 0
+    } elseif ($recovery.action -eq 'PAUSE_RECOVERY_ENVIRONMENT') {
+      Write-State $autoDir 'PAUSED' $false 'RECOVERY_ENVIRONMENT' ([string]$recovery.issueId) $recovery.reason 'STOP_RECOVERY_ENVIRONMENT'
+      Write-Host 'STOP_RECOVERY_ENVIRONMENT'
+      exit 0
     } elseif ($recovery.action -in @('VERIFY_UNCOMMITTED','QUARANTINE')) {
       Write-State $autoDir 'BLOCKED' $false 'RECOVERY_REVIEW_REQUIRED' '' $recovery.reason 'STOP_RECOVERY_REVIEW_REQUIRED'
       Write-Host 'STOP_RECOVERY_REVIEW_REQUIRED'
       exit 0
     }
-    $script:RunLock = New-RunLock $autoDir $maxRunMinutes "apply-backlog-split"
   }
 
   $boundaryStatePath = Join-Path $autoDir 'state.json'
@@ -1637,6 +1632,7 @@ try {
           Write-Host "PARALLEL_BATCH_PLAN_ONLY"
         }
       } else {
+        Assert-AutopilotDispatchAuthority -ExecutionMode $executionMode -LockOwned ($null -ne $script:RunLock) -RecoveryCheckedAfterLock $script:RecoveryCheckedAfterLock -FenceValid (Assert-CurrentControlPlaneFence) | Out-Null
         if ($script:RecoveryDecision -and $selectedIssue.lint.issueId -eq $script:RecoveryDecision.issueId) {
           Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $selectedIssue -Route $selectedRoute -ResumeCheckpoint $script:RecoveryDecision.checkpoint
         } else {

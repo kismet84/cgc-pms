@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$RepoRoot = "D:\projects-test\cgc-pms",
   [string]$ConfigPath = "",
   [string]$IssueId = "",
@@ -9,6 +9,9 @@
   [string]$Model = "",
   [string]$Thinking = "",
   [string]$ExecutorRole = "",
+  [string]$RunInstanceId = "",
+  [string]$LeaseEpoch = "",
+  [string]$ControlPlaneFingerprint = "",
   [switch]$ReviewRequired,
   [switch]$DryRun,
   [switch]$Noop
@@ -17,6 +20,8 @@
 $ErrorActionPreference = "Stop"
 $commandLibrary = Join-Path $PSScriptRoot 'autopilot-command.ps1'
 if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
+$nativeCommandLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
 
 function Read-JsonFile {
   param([string]$Path)
@@ -70,8 +75,8 @@ function Select-Issue {
 function Get-GitSummary {
   param([string]$Root)
 
-  $branch = (& git -C $Root branch --show-current 2>$null | Out-String).Trim()
-  $status = @(& git -c core.quotePath=false -C $Root status --short --untracked-files=all 2>$null)
+  $branch = (Invoke-AutopilotGit -RepoRoot $Root -Arguments @('branch','--show-current') -ThrowOnFailure).stdout.Trim()
+  $status = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $Root -Arguments @('status','--short','--untracked-files=all') -ThrowOnFailure).stdout)
   return [pscustomobject]@{
     branch = $branch
     isClean = ($status.Count -eq 0)
@@ -381,7 +386,7 @@ function Invoke-ConfiguredIssueExecutor {
 
   $promptPath = New-IssuePromptFile $Issue $RunDir
   $logPath = Join-Path $RunDir "executor.log"
-  $beforeHead = (& git -C $RepoRoot rev-parse HEAD 2>$null | Out-String).Trim()
+  $beforeHead = (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
   $before = @(Get-BusinessGitStatus @((Get-GitSummary $RepoRoot).statusShort))
   $beforeFingerprints = Get-BusinessFileFingerprints -Root $RepoRoot -StatusLines $before
   $args = @()
@@ -411,10 +416,10 @@ function Invoke-ConfiguredIssueExecutor {
   }
 
   $afterSummary = Get-GitSummary $RepoRoot
-  $afterHead = (& git -C $RepoRoot rev-parse HEAD 2>$null | Out-String).Trim()
+  $afterHead = (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
   $committedPaths = @()
   if ($beforeHead -and $afterHead -and $beforeHead -ne $afterHead) {
-    $committedPaths = @(& git -c core.quotePath=false -C $RepoRoot diff --name-only $beforeHead $afterHead -- 2>$null)
+    $committedPaths = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('diff','--name-only',$beforeHead,$afterHead,'--') -ThrowOnFailure).stdout)
   }
   $after = @(Get-BusinessGitStatus @($afterSummary.statusShort))
   $afterFingerprints = Get-BusinessFileFingerprints -Root $RepoRoot -StatusLines $after
@@ -588,7 +593,25 @@ if (!$issue) {
 }
 
 $resultPath = Join-Path $runDir "result.json"
-$result | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 $resultPath
+if ($RunInstanceId -or $LeaseEpoch) {
+  try { $currentLock = Get-Content -LiteralPath (Join-Path $autoDir 'run.lock') -Raw -Encoding UTF8 | ConvertFrom-Json }
+  catch { throw 'AUTOPILOT_FENCE_REJECTED: executor cannot read current run.lock before writing result.' }
+  if ([string]$currentLock.runInstanceId -ne $RunInstanceId -or [string]$currentLock.leaseEpoch -ne $LeaseEpoch -or ($ControlPlaneFingerprint -and [string]$currentLock.controlPlaneFingerprint -ne $ControlPlaneFingerprint)) {
+    throw 'AUTOPILOT_FENCE_REJECTED: stale executor cannot write result.json.'
+  }
+}
+$result['runInstanceId'] = $RunInstanceId
+$result['leaseEpoch'] = $LeaseEpoch
+$result['controlPlaneFingerprint'] = $ControlPlaneFingerprint
+$result['transitionId'] = [guid]::NewGuid().ToString('N')
+$resultJson = $result | ConvertTo-Json -Depth 8
+$resultTemp = "$resultPath.$([guid]::NewGuid().ToString('N')).tmp"
+try {
+  [IO.File]::WriteAllText($resultTemp, $resultJson, [Text.UTF8Encoding]::new($false))
+  if (Test-Path -LiteralPath $resultPath) { [IO.File]::Move($resultTemp, $resultPath, $true) } else { [IO.File]::Move($resultTemp, $resultPath) }
+} finally {
+  Remove-Item -LiteralPath $resultTemp -Force -ErrorAction SilentlyContinue
+}
 Write-RunEvent $runDir "executor.result" ([pscustomobject]@{
   issueId = $result.issueId
   title = $result.title

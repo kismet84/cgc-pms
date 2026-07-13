@@ -1,4 +1,6 @@
 $ErrorActionPreference = 'Stop'
+$nativeLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $nativeLibrary)) { . $nativeLibrary }
 
 function ConvertTo-AutopilotPath {
   param([string]$Path)
@@ -35,29 +37,29 @@ function New-AutopilotIssueWorktree {
   $rootFull = [System.IO.Path]::GetFullPath($WorktreeRoot).TrimEnd('\')
   if (!$rootFull.StartsWith($repoFull + '\', [StringComparison]::OrdinalIgnoreCase)) { throw 'worktree root must stay inside repository' }
   $relativeRoot = $rootFull.Substring($repoFull.Length + 1).Replace('\','/')
-  & git -C $RepoRoot check-ignore -q $relativeRoot
-  if ($LASTEXITCODE -ne 0) { throw "worktree root is not git-ignored: $relativeRoot" }
+  $ignored = Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('check-ignore','-q',$relativeRoot) -AcceptedExitCodes @(0,1)
+  if ($ignored.exitCode -ne 0) { throw "worktree root is not git-ignored: $relativeRoot" }
   $slug = $IssueId.ToLowerInvariant()
   $path = Join-Path $rootFull $slug
   $branch = "codex/autopilot/$slug"
   if (Test-Path -LiteralPath $path) {
-    $actualBranch = (& git -C $path branch --show-current 2>$null | Select-Object -First 1).Trim()
+    $actualBranch = (Invoke-AutopilotGit -RepoRoot $path -Arguments @('branch','--show-current') -ThrowOnFailure).stdout.Trim()
     if ($actualBranch -ne $branch) { throw "worktree path belongs to another branch: $actualBranch" }
-    $actualHead = (& git -C $path rev-parse HEAD 2>$null | Select-Object -First 1).Trim()
+    $actualHead = (Invoke-AutopilotGit -RepoRoot $path -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
     if ($actualHead -ne $BaseCommit) { throw "worktree HEAD does not match requested base: actual=$actualHead expected=$BaseCommit" }
-    $changes = @(& git -C $path status --porcelain=v1 --untracked-files=all 2>$null)
+    $changes = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $path -Arguments @('status','--porcelain=v1','--untracked-files=all') -ThrowOnFailure).stdout)
     if ($changes.Count -gt 0 -and !$AllowDirtyReuse) { throw 'worktree contains residual changes and cannot be reused for a fresh implementation attempt' }
     return [pscustomobject]@{ path = $path; branch = $branch; baseCommit = $BaseCommit; reused = $true }
   }
   New-Item -ItemType Directory -Path $rootFull -Force | Out-Null
-  & git -C $RepoRoot worktree add --quiet $path -b $branch $BaseCommit | Out-Null
-  if ($LASTEXITCODE -ne 0) { throw "git worktree add failed for $IssueId" }
+  Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('worktree','add','--quiet',$path,'-b',$branch,$BaseCommit) -ThrowOnFailure | Out-Null
   return [pscustomobject]@{ path = $path; branch = $branch; baseCommit = $BaseCommit; reused = $false }
 }
 
 function Get-AutopilotWorktreeChanges {
   param([Parameter(Mandatory)][string]$Worktree)
-  return @(& git -c core.quotePath=false -C $Worktree status --porcelain=v1 --untracked-files=all | ForEach-Object {
+  $lines = Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('status','--porcelain=v1','--untracked-files=all') -ThrowOnFailure).stdout
+  return @($lines | ForEach-Object {
     $raw = if ($_.Length -ge 4) { $_.Substring(3).Trim() } else { '' }
     if ($raw -match '\s+->\s+') { ($raw -split '\s+->\s+')[-1].Trim('"') } elseif ($raw) { $raw.Trim('"') }
   } | Where-Object { $_ } | Select-Object -Unique)
@@ -69,7 +71,6 @@ function Get-AutopilotIssueChanges {
     [Parameter(Mandatory)][string]$BaseCommit
   )
 
-  $committed = @(& git -c core.quotePath=false -C $Worktree diff --name-only $BaseCommit HEAD -- 2>$null)
-  if ($LASTEXITCODE -ne 0) { throw "failed to inspect committed issue changes from base: $BaseCommit" }
+  $committed = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('diff','--name-only',$BaseCommit,'HEAD','--') -ThrowOnFailure).stdout)
   return @($committed + @(Get-AutopilotWorktreeChanges -Worktree $Worktree) | Where-Object { $_ } | ForEach-Object { ConvertTo-AutopilotPath $_ } | Select-Object -Unique)
 }

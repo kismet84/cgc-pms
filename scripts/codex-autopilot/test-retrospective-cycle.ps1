@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -55,7 +55,7 @@ try {
   Copy-Item -LiteralPath $boundedPath -Destination (Join-Path $checkpointRoot '.codex-autopilot\state.json')
   'enabled' | Set-Content -LiteralPath (Join-Path $checkpointRoot '.codex-autopilot\enabled.flag') -Encoding UTF8
   $checkpointScript = Join-Path (Split-Path -Parent (Split-Path -Parent $scriptDir)) 'plugins\cgc-pms-autopilot\scripts\autopilot-checkpoint.ps1'
-  $checkpoint = & powershell -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -RepoRoot $checkpointRoot -AsJson | ConvertFrom-Json
+  $checkpoint = & pwsh -NoProfile -ExecutionPolicy Bypass -File $checkpointScript -RepoRoot $checkpointRoot -AsJson | ConvertFrom-Json
   if ($checkpoint.decision -ne 'retrospective_required' -or $checkpoint.reviewCycleCompletedCount -ne 21) { throw 'checkpoint did not block the next batch for retrospective' }
   $earlyResetRejected = $false
   try { Reset-AutopilotReviewCycle -Path $boundedPath | Out-Null } catch { $earlyResetRejected = $true }

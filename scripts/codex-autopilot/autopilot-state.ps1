@@ -28,6 +28,28 @@ $script:AutopilotTransitions = @{
   RETROSPECTIVE_REQUIRED = @('PAUSED','CHECKPOINT','STOPPED','FAILED')
 }
 
+$script:AutopilotStateFenceContext = $null
+
+function Set-AutopilotStateFenceContext {
+  param(
+    [Parameter(Mandatory)][string]$LockPath,
+    [Parameter(Mandatory)][string]$RunInstanceId,
+    [Parameter(Mandatory)][string]$LeaseEpoch,
+    [string]$ControlPlaneFingerprint = ''
+  )
+  $script:AutopilotStateFenceContext = [pscustomobject]@{ lockPath=$LockPath; runInstanceId=$RunInstanceId; leaseEpoch=$LeaseEpoch; controlPlaneFingerprint=$ControlPlaneFingerprint }
+}
+
+function Assert-AutopilotStateFenceContext {
+  if (!$script:AutopilotStateFenceContext) { return $true }
+  try { $lock = Get-Content -LiteralPath $script:AutopilotStateFenceContext.lockPath -Raw -Encoding UTF8 | ConvertFrom-Json }
+  catch { throw 'AUTOPILOT_FENCE_REJECTED: state writer cannot read run.lock.' }
+  if ([string]$lock.runInstanceId -ne [string]$script:AutopilotStateFenceContext.runInstanceId -or [string]$lock.leaseEpoch -ne [string]$script:AutopilotStateFenceContext.leaseEpoch) {
+    throw 'AUTOPILOT_FENCE_REJECTED: stale process cannot write AutoPilot state.'
+  }
+  return $true
+}
+
 function Set-AutopilotProperty {
   param([object]$Object, [string]$Name, [object]$Value)
   if ($Object -is [System.Collections.IDictionary]) {
@@ -66,7 +88,8 @@ function ConvertTo-AutopilotStateV3 {
   elseif ($State.PSObject.Properties.Name -contains 'schemaVersion') { $version = [int]$State.schemaVersion }
   if ($version -eq 3) {
     foreach ($entry in @(
-      @('issueCheckpointPath',''), @('currentIssuePhase',''), @('lastCanaryFingerprint',''), @('lastCanaryReport','')
+      @('issueCheckpointPath',''), @('currentIssuePhase',''), @('lastCanaryFingerprint',''), @('lastCanaryReport',''),
+      @('runInstanceId',''), @('leaseEpoch',''), @('transitionId',''), @('generation',0), @('controlPlaneFingerprint','')
     )) {
       $name = [string]$entry[0]
       $present = ($State -is [System.Collections.IDictionary] -and $State.Contains($name)) -or ($State.PSObject.Properties.Name -contains $name)
@@ -98,6 +121,11 @@ function ConvertTo-AutopilotStateV3 {
   Set-AutopilotProperty $State 'currentIssuePhase' ''
   Set-AutopilotProperty $State 'lastCanaryFingerprint' ''
   Set-AutopilotProperty $State 'lastCanaryReport' ''
+  Set-AutopilotProperty $State 'runInstanceId' ''
+  Set-AutopilotProperty $State 'leaseEpoch' ''
+  Set-AutopilotProperty $State 'transitionId' ''
+  Set-AutopilotProperty $State 'generation' 0
+  Set-AutopilotProperty $State 'controlPlaneFingerprint' ''
   return $State
 }
 
@@ -112,7 +140,8 @@ function Assert-AutopilotState {
     'retrospectiveStatus','retrospectivePhase','retrospectiveRequiredAt','retrospectiveReportCommit',
     'retrospectiveFactsCommit','retrospectiveGraphGitCursor','retrospectiveEpisodeId',
     'retrospectiveFailureCategory','lastRetrospectiveAt','lastRetrospectiveReport','activeScoringVersion',
-    'issueCheckpointPath','currentIssuePhase','lastCanaryFingerprint','lastCanaryReport'
+    'issueCheckpointPath','currentIssuePhase','lastCanaryFingerprint','lastCanaryReport',
+    'runInstanceId','leaseEpoch','transitionId','generation','controlPlaneFingerprint'
   )
   foreach ($name in $required) {
     if ($State.PSObject.Properties.Name -notcontains $name -and !($State -is [System.Collections.IDictionary] -and $State.Contains($name))) {
@@ -120,6 +149,7 @@ function Assert-AutopilotState {
     }
   }
   if ([int]$State.schemaVersion -ne 3) { throw "Unsupported AutoPilot state schemaVersion: $($State.schemaVersion)" }
+  if ([int]$State.generation -lt 0) { throw 'AutoPilot state generation cannot be negative' }
   if ($script:AutopilotStatuses -notcontains [string]$State.status) { throw "Invalid AutoPilot state status: $($State.status)" }
   if ([int]$State.attempt -lt 0 -or [int]$State.completedImplementationIssues -lt 0) { throw 'AutoPilot counters cannot be negative' }
   foreach ($name in 'startedAt','phaseStartedAt','lastHeartbeatAt') {
@@ -156,19 +186,27 @@ function Read-AutopilotState {
   param([Parameter(Mandatory)][string]$Path)
   if (!(Test-Path -LiteralPath $Path -PathType Leaf)) { throw "AutoPilot state not found: $Path" }
   try { $state = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json } catch { throw "AutoPilot state is invalid JSON: $Path" }
-  $requiresShapeUpgrade = [int]$state.schemaVersion -eq 2 -or $state.PSObject.Properties.Name -notcontains 'issueCheckpointPath'
-  if ($requiresShapeUpgrade) {
-    $state = ConvertTo-AutopilotStateV3 $state
-    Write-AutopilotStateAtomic -Path $Path -State $state | Out-Null
-  }
+  $state = ConvertTo-AutopilotStateV3 $state
   Assert-AutopilotState $state
   return $state
 }
 
 function Write-AutopilotStateAtomic {
-  param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][object]$State)
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][object]$State,
+    [string]$TransitionId = ''
+  )
 
+  Assert-AutopilotStateFenceContext | Out-Null
   $State = ConvertTo-AutopilotStateV3 $State
+  Set-AutopilotProperty $State 'generation' ([int](Get-AutopilotStateProperty $State 'generation' 0) + 1)
+  Set-AutopilotProperty $State 'transitionId' $(if ($TransitionId) { $TransitionId } else { [guid]::NewGuid().ToString('N') })
+  if ($script:AutopilotStateFenceContext) {
+    Set-AutopilotProperty $State 'runInstanceId' ([string]$script:AutopilotStateFenceContext.runInstanceId)
+    Set-AutopilotProperty $State 'leaseEpoch' ([string]$script:AutopilotStateFenceContext.leaseEpoch)
+    Set-AutopilotProperty $State 'controlPlaneFingerprint' ([string]$script:AutopilotStateFenceContext.controlPlaneFingerprint)
+  }
   $json = $State | ConvertTo-Json -Depth 12
   try { $parsed = $json | ConvertFrom-Json } catch { throw 'AutoPilot state cannot be serialized as JSON' }
   Assert-AutopilotState $parsed

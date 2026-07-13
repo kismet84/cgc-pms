@@ -1,5 +1,13 @@
 # Current Focus
 
+## 2026-07-14 第42-1条主线：AutoPilot 控制面一致性修复
+
+- 控制面实现与自动化回归已收敛到 PowerShell 7 `pwsh`；缺失时按 `tool_config/AUTOPILOT_POWERSHELL7_REQUIRED` 安全停止，不再回退 Windows PowerShell 5.1。原生命令按退出码裁决，stderr warning 只保留诊断。
+- DRY_RUN/EXPLAIN/APPLY 使用单一不可变模式对象；APPLY 先原子获取或接管带 `runInstanceId + leaseEpoch` 的锁，再重读恢复现场。state、Issue checkpoint、child result 与 Git 收口均受 fencing token 和控制面指纹约束。
+- stall 只采信工作区、checkpoint、result 和 evidence 的语义变化；CPU、PID、心跳或无产物 MCP 活动不再续命。同一 `failureFingerprint + phase + diffHash` 自动恢复最多一次。
+- 自动化实现验收通过；本轮未运行真实 AutoPilot，也未派发业务 Ready。控制面指纹变化后的 N>1/无界放量仍须用户另行明确启动一次 `启动迭代-1`，并满足 implementationCommit、closeoutCommit、ledger、state、知识图谱 Git cursor 与金丝雀指纹全部读回一致；未完成前保持放量阻塞。
+- 原 2026-07-12 “本机未安装 PowerShell 7、5.1 为当前控制面”的记录仅保留历史语义，已被本节取代。
+
 ## 当前版本
 
 - 分支：`develop/1.5`

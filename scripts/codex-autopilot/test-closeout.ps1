@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -12,6 +12,10 @@ try {
   & git -C $root init -q
   & git -C $root config user.email 'autopilot@test.local'
   & git -C $root config user.name 'AutoPilot Test'
+  & git -C $root config core.autocrlf false
+  & git -C $root config core.eol lf
+  & git -C $root config core.safecrlf false
+  [IO.File]::WriteAllText((Join-Path $root '.gitattributes'), "* text=auto eol=lf`n*.cmd text eol=crlf`n", [Text.UTF8Encoding]::new($false))
   ".worktrees/`r`n.codex-autopilot/" | Set-Content -LiteralPath (Join-Path $root '.gitignore') -Encoding UTF8
   @'
 # Ready Issues

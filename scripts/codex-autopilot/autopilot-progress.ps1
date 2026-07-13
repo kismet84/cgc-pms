@@ -1,9 +1,13 @@
 $ErrorActionPreference = 'Stop'
 
+$nativeCommandLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
+
 function Get-AutopilotWorktreeContentSnapshot {
   param([Parameter(Mandatory)][string]$Worktree)
   $rows = @()
-  foreach ($line in @(& git -C $Worktree status --porcelain=v1 --untracked-files=all 2>$null)) {
+  $status = Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('status','--porcelain=v1','--untracked-files=all') -ThrowOnFailure
+  foreach ($line in @(Get-AutopilotNativeOutputLines $status.stdout)) {
     if (!$line -or $line.Length -lt 4) { continue }
     $raw = $line.Substring(3).Trim().Trim('"')
     if ($raw -match '\s+->\s+') { $raw = ($raw -split '\s+->\s+')[-1].Trim('"') }
@@ -20,8 +24,21 @@ function Get-AutopilotWorktreeContentSnapshot {
 }
 
 function Get-AutopilotProgressFingerprint {
-  param([Parameter(Mandatory)][string]$Worktree, [int]$RootPid = 0)
-  $source = Get-AutopilotWorktreeContentSnapshot -Worktree $Worktree
+  param(
+    [Parameter(Mandatory)][string]$Worktree,
+    [int]$RootPid = 0,
+    [string[]]$SemanticEvidencePaths = @()
+  )
+  $rows = @('worktree:' + (Get-AutopilotWorktreeContentSnapshot -Worktree $Worktree))
+  foreach ($path in @($SemanticEvidencePaths | Where-Object { $_ } | Sort-Object -Unique)) {
+    if (Test-Path -LiteralPath $path -PathType Leaf) {
+      $item = Get-Item -LiteralPath $path
+      $rows += "evidence:$path|$($item.Length)|$((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash)"
+    } else {
+      $rows += "evidence:$path|missing"
+    }
+  }
+  $source = $rows -join "`n"
   $sha = [Security.Cryptography.SHA256]::Create()
   try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($source)))).Replace('-', '') } finally { $sha.Dispose() }
 }

@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 
 $script:AutopilotTaskScoreVersion = 'autopilot-task-score/v1'
 $script:AutopilotTaskScoreV2Version = 'autopilot-task-score/v2'
@@ -227,6 +227,13 @@ function New-AutopilotTaskScoreV2Score {
     if ([int]$Evidence.followupNetChange -le 0 -and ![bool]$Evidence.sameRootIssueAdded) { 5 } else { 0 }
   }
   $sourceRefs = @($Evidence.sourceRefs | ForEach-Object { [string]$_ } | Where-Object { $_ } | Sort-Object -Unique)
+  $wallClockSeconds = [Math]::Max(0, [int](Get-AutopilotScoreProperty $Evidence 'wallClockSeconds' 0))
+  $phaseDurations = Get-AutopilotScoreProperty $Evidence 'phaseDurationsSeconds' ([pscustomobject]@{})
+  $businessPhaseSeconds = 0
+  foreach ($phaseName in @('IMPLEMENTING','VALIDATING','REVIEWING','REPAIRING','CLOSING')) {
+    $businessPhaseSeconds += [Math]::Max(0, [int](Get-AutopilotScoreProperty $phaseDurations $phaseName 0))
+  }
+  $controlPlaneSeconds = [Math]::Max(0, $wallClockSeconds - $businessPhaseSeconds)
   $key = Get-AutopilotTaskScoreKey -IssueId $Evidence.issueId -ImplementationCommit $Evidence.implementationCommit -ScoringVersion $ScoringVersion
   return [pscustomobject][ordered]@{
     schemaVersion = 2
@@ -245,6 +252,13 @@ function New-AutopilotTaskScoreV2Score {
     }
     hardGatesPassed = $true
     followupNetChange = [int]$Evidence.followupNetChange
+    executionTiming = [ordered]@{
+      wallClockSeconds = $wallClockSeconds
+      businessPhaseSeconds = $businessPhaseSeconds
+      controlPlaneSeconds = $controlPlaneSeconds
+      semanticProgressAt = [string](Get-AutopilotScoreProperty $Evidence 'semanticProgressAt' '')
+      livenessSignalsExcluded = $true
+    }
     sourceRefs = @($sourceRefs)
     shadow = $Shadow
   }
@@ -299,6 +313,9 @@ function New-AutopilotTaskScoreV2EvidenceFromResult {
   if (!$reviewRequiredPresent) { $complete = $false }
   Set-AutopilotScoreProperty $evidence 'reviewRequired' ([bool](Get-AutopilotScoreProperty $Result 'reviewRequired' $false))
   Set-AutopilotScoreProperty $evidence 'executionEvidenceComplete' $complete
+  Set-AutopilotScoreProperty $evidence 'wallClockSeconds' ([int](Get-AutopilotScoreProperty $Result 'wallClockSeconds' 0))
+  Set-AutopilotScoreProperty $evidence 'phaseDurationsSeconds' (Get-AutopilotScoreProperty $Result 'phaseDurationsSeconds' ([pscustomobject]@{}))
+  Set-AutopilotScoreProperty $evidence 'semanticProgressAt' ([string](Get-AutopilotScoreProperty $Result 'semanticProgressAt' ''))
   return $evidence
 }
 

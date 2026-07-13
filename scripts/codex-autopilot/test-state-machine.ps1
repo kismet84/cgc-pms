@@ -38,6 +38,7 @@ try {
   if ($read.schemaVersion -ne 3 -or $read.status -ne 'IDLE') { throw 'state v2 to v3 round-trip migration failed' }
   if ($read.reviewCycleCompletedCount -ne 0 -or @($read.reviewCycleCompletedIssueIds).Count -ne 0 -or $read.activeScoringVersion) { throw 'state migration fabricated historical scoring data' }
   if ($read.issueCheckpointPath -ne '' -or $read.currentIssuePhase -ne '' -or $read.lastCanaryFingerprint -ne '') { throw 'state migration fabricated recovery or canary evidence' }
+  if ($read.runInstanceId -ne '' -or $read.leaseEpoch -ne '' -or [string]::IsNullOrWhiteSpace([string]$read.transitionId) -or $read.generation -lt 1 -or $read.controlPlaneFingerprint -ne '') { throw 'state migration or transition metadata is invalid' }
 
   $bound = Resolve-AutopilotIssueStateBinding -Existing ([pscustomobject]@{issueCheckpointPath='old.json';currentIssuePhase='REGISTERED'})
   if ($bound.checkpointPath -ne 'old.json' -or $bound.phase -ne 'REGISTERED') { throw 'active Issue state binding was not preserved' }

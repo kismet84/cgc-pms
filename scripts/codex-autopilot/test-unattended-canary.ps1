@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -62,7 +62,7 @@ New-Item -ItemType Directory -Path $quality -Force | Out-Null
   [ordered]@{
     repoRoot = $root; autopilotDir = $autoDir; maxIssuesPerRun = 1; maxParallel = 1; maxParallelIssues = 1
     parallelSafetyMode = 'strict-independent-only'; autoMerge = $true; autoPush = $false; maxRunMinutes = 30
-    issueExecutor = [ordered]@{ command = 'powershell'; args = @('-NoProfile','-ExecutionPolicy','Bypass','-File','{repoRoot}\scripts\codex-autopilot\mock-executor.ps1','-RepoRoot','{repoRoot}','-IssueId','{issueId}','-PromptPath','{promptFile}'); timeoutSeconds = 30; requireChangedFiles = $true }
+    issueExecutor = [ordered]@{ command = 'pwsh'; args = @('-NoProfile','-ExecutionPolicy','Bypass','-File','{repoRoot}\scripts\codex-autopilot\mock-executor.ps1','-RepoRoot','{repoRoot}','-IssueId','{issueId}','-PromptPath','{promptFile}'); timeoutSeconds = 30; requireChangedFiles = $true }
     closeout = [ordered]@{ enabled = $true; localCommit = $true; localFastForwardMerge = $true }
     readyPlanner = [ordered]@{ enabled = $false }
   } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding UTF8
@@ -71,13 +71,13 @@ New-Item -ItemType Directory -Path $quality -Force | Out-Null
   $oldErrorActionPreference = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
   for ($index = 1; $index -le 20; $index++) {
-    $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 20 -MaxLoops 2 -ApplyBacklogSplit 2>&1 | Out-String
+    $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 20 -MaxLoops 2 -ApplyBacklogSplit 2>&1 | Out-String
     if ($output -notmatch 'EXECUTOR_RESULT_WRITTEN') { throw "canary $index did not execute: $output" }
     $result = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Filter result.json -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { Get-Content -Encoding UTF8 -LiteralPath $_.FullName -Raw | ConvertFrom-Json }
     if ($result.status -ne 'done' -or !$result.gitSummary.commit -or @($result.evidencePaths).Count -eq 0) { throw "canary $index lacks completion integrity" }
     if (!$result.firstPassSuccess -or $result.manualInterventionCount -ne 0 -or $result.scopeViolationCount -ne 0) { throw "canary $index lacks unattended qualification fields" }
   }
-  $limitOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 20 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
+  $limitOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 20 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
   $ErrorActionPreference = $oldErrorActionPreference
   if ($limitOutput -notmatch 'STOP_ITERATION_LIMIT_REACHED') { throw 'canary did not stop at 20/20' }
   $qualification = Get-AutopilotQualification -RunsDir (Join-Path $autoDir 'runs') -WindowSize 20

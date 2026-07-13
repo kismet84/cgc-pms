@@ -1,8 +1,10 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 $readyLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-ready.ps1'
 if (Test-Path -LiteralPath $readyLibrary) { . $readyLibrary }
 $commandLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-command.ps1'
 if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
+$nativeCommandLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
 
 function Test-AutopilotDomainContinuationAllowed {
   param([string[]]$RecentTitles, [string]$Domain, [string]$FocusText)
@@ -59,8 +61,8 @@ function Get-AutopilotKnowledgeGraphIssueSnapshot {
     $cliFull = if ([IO.Path]::IsPathRooted($cliPath)) { $cliPath } else { Join-Path $RepoRoot $cliPath }
     if (!(Test-Path -LiteralPath $cliFull -PathType Leaf) -and !$CommandInvoker) { throw "issueGraph.cli does not exist: $cliPath" }
     $limit = [Math]::Max(1, [Math]::Min([int]$config.issueGraph.queryLimit, 200))
-    $head = (& git -C $RepoRoot rev-parse HEAD).Trim()
-    if ($LASTEXITCODE -ne 0 -or !$head) { throw 'cannot resolve current Git HEAD' }
+    $head = (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
+    if (!$head) { throw 'cannot resolve current Git HEAD' }
 
     $readStatus = {
       $value = Invoke-AutopilotKnowledgeGraphCli -RepoRoot $RepoRoot -CliPath $cliFull -Arguments @('status') -CommandInvoker $CommandInvoker

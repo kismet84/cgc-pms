@@ -1,4 +1,4 @@
-﻿$ErrorActionPreference = 'Stop'
+$ErrorActionPreference = 'Stop'
 
 function Get-AutopilotIssueBlocks {
   param([Parameter(Mandatory)][string]$Path)
@@ -62,7 +62,7 @@ function Test-AutopilotValidationEntry {
     if (!(Test-Path (Join-Path $workDir 'package.json'))) { return "验证命令入口不存在：$Command" }
   } elseif ($commandText -match '^git\s+diff\s+--check\b') {
     return ''
-  } elseif ($commandText -match '^powershell(?:\.exe)?\s+[^;&|<>]*-File\s+([^\s]+\.ps1)\b') {
+  } elseif ($commandText -match '^pwsh(?:\.exe)?\s+[^;&|<>]*-File\s+([^\s]+\.ps1)\b') {
     $scriptPath = $matches[1].Trim('"', "'")
     if (!(Test-Path (Join-Path $workDir $scriptPath))) { return "验证命令入口不存在：$Command" }
   } else {

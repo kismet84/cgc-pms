@@ -29,9 +29,13 @@ try {
   $checkpoint = New-AutopilotIssueCheckpoint -AutoDir $autoDir -IssueId 'ISSUE-040-022' -ReadyPath (Join-Path $root 'docs\backlog\ready-issues.md') -BaseCommit $base -Worktree $worktree -Branch 'codex/autopilot/issue-040-022' -AllowedPaths @('implementation.txt') -ArtifactDirectory $issueDir
   $path = Get-AutopilotIssueCheckpointPath $autoDir 'ISSUE-040-022'
   $diffHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree -BaseCommit $base
-  Set-AutopilotIssueCheckpointPhase -Path $path -Phase IMPLEMENTING -IncrementDispatch implementation | Out-Null
-  Set-AutopilotIssueCheckpointPhase -Path $path -Phase IMPLEMENTED -Artifacts @{resultPath=$resultPath} -Evidence @{diffHash=$diffHash} | Out-Null
+  Set-AutopilotIssueCheckpointPhase -Path $path -Phase IMPLEMENTING -Artifacts @{resultPath=$resultPath} -IncrementDispatch implementation | Out-Null
   [ordered]@{pid=999999;runId='dead';issueId='ISSUE-040-022'} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $autoDir 'run.lock') -Encoding UTF8
+  $childDoneDecision = Get-AutopilotRecoveryDecision -AutoDir $autoDir
+  if ($childDoneDecision.action -ne 'RESUME_VALIDATION') { throw "completed child result was not consumed from IMPLEMENTING: $($childDoneDecision | ConvertTo-Json -Compress)" }
+  Set-AutopilotIssueCheckpointPhase -Path $path -Phase IMPLEMENTED -Artifacts @{resultPath=$resultPath} -Evidence @{diffHash=$diffHash} | Out-Null
+  if (!(Register-AutopilotFailureRecovery -Path $path -FailureFingerprint 'tool_config/same' -Phase 'VALIDATING' -DiffHash $diffHash)) { throw 'first failure recovery budget was rejected' }
+  if (Register-AutopilotFailureRecovery -Path $path -FailureFingerprint 'tool_config/same' -Phase 'VALIDATING' -DiffHash $diffHash) { throw 'same failure recovery budget was granted twice' }
   $decision = Get-AutopilotRecoveryDecision -AutoDir $autoDir
   if ($decision.action -ne 'RESUME_VALIDATION') { throw "implemented checkpoint did not resume validation: $($decision | ConvertTo-Json -Compress)" }
 

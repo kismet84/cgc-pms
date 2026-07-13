@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $ErrorActionPreference = "Stop"
 
@@ -68,7 +68,7 @@ function New-Fixture {
     "queryLimit": 200
   },
   "issueExecutor": {
-    "command": "powershell",
+    "command": "pwsh",
     "args": [
       "-NoProfile",
       "-ExecutionPolicy",
@@ -104,6 +104,15 @@ if ("$ExecutorMode" -eq "fail") {
 if ("$ExecutorMode" -ne "no-change") {
   New-Item -ItemType Directory -Path (Join-Path `$RepoRoot "docs\quality") -Force | Out-Null
   "executed `$IssueId with `$PromptPath" | Out-File -Encoding utf8 (Join-Path `$RepoRoot "docs\quality\`$artifactName")
+  `$readyText = Get-Content -LiteralPath (Join-Path `$RepoRoot "docs\backlog\ready-issues.md") -Raw -Encoding UTF8
+  `$issueBlock = [regex]::Match(`$readyText, '(?ms)^###\s+' + [regex]::Escape(`$IssueId) + '(?=[^0-9-]).*?(?=^###\s+ISSUE-|\z)').Value
+  `$archiveMatch = [regex]::Match(`$issueBlock, '(?m)^归档报告[：:]\s*(.+?)\s*`$')
+  if (`$archiveMatch.Success) {
+    `$archiveRelative = `$archiveMatch.Groups[1].Value.Trim().Trim([char]96)
+    `$archivePath = Join-Path `$RepoRoot `$archiveRelative
+    New-Item -ItemType Directory -Path (Split-Path -Parent `$archivePath) -Force | Out-Null
+    "# Mock acceptance`r`n`r`n新增后续项：0`r`n关闭后续项：0`r`n后续项净变化：0`r`n" | Out-File -Encoding utf8 `$archivePath
+  }
 }
 if ("$ExecutorMode" -eq "commit") {
   & git -C `$RepoRoot add "docs/quality/`$artifactName"
@@ -137,12 +146,18 @@ if (command === 'status') {
     $CurrentIssues = '{"schemaVersion":1,"versionScope":"v1.5","updatedAt":"2026-07-13T14:00:00+08:00","issues":[]}'
   }
   $CurrentIssues | Out-File -Encoding utf8 (Join-Path $BacklogDir "current-issues.json")
-  ".worktrees/`r`n.codex-autopilot/" | Out-File -Encoding utf8 (Join-Path $Root '.gitignore')
-  & git -C $Root init -q 2>$null
-  & git -C $Root config user.email 'autopilot@test.local'
-  & git -C $Root config user.name 'AutoPilot Test'
-  & git -C $Root add .
-  & git -C $Root commit -qm 'fixture'
+  [IO.File]::WriteAllText((Join-Path $Root '.gitignore'), ".worktrees/`n.codex-autopilot/`n", [Text.UTF8Encoding]::new($false))
+  [IO.File]::WriteAllText((Join-Path $Root '.gitattributes'), "* text=auto eol=lf`n*.cmd text eol=crlf`n", [Text.UTF8Encoding]::new($false))
+  & git -C $Root init -q 2>$null | Out-Null
+  & git -C $Root config user.email 'autopilot@test.local' | Out-Null
+  & git -C $Root config user.name 'AutoPilot Test' | Out-Null
+  & git -C $Root config --local core.autocrlf false | Out-Null
+  & git -C $Root config --local core.eol lf | Out-Null
+  & git -C $Root config --local core.safecrlf false | Out-Null
+  & git -C $Root add . 2>$null | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "fixture git add failed: $Root" }
+  & git -C $Root commit -qm 'fixture' 2>$null | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "fixture git commit failed: $Root" }
   return $Root
 }
 
@@ -169,7 +184,7 @@ function Invoke-Runner {
   $oldErrorActionPreference = $ErrorActionPreference
   $ErrorActionPreference = "Continue"
   try {
-    & powershell @args 2>&1 | Out-String
+    & pwsh @args 2>&1 | Out-String
   } finally {
     $ErrorActionPreference = $oldErrorActionPreference
   }
@@ -191,7 +206,7 @@ function Invoke-Executor {
   if ($Noop) {
     $args += "-Noop"
   }
-  & powershell @args 2>&1 | Out-String
+  & pwsh @args 2>&1 | Out-String
 }
 
 function Invoke-Readiness {
@@ -203,7 +218,7 @@ function Invoke-Readiness {
   if (!$Config) {
     $Config = Join-Path $Root "scripts\codex-autopilot\codex-autopilot.config.json"
   }
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $ReadinessScript -RepoRoot $Root -ConfigPath $Config -AllowStopped 2>&1 | Out-String
+  & pwsh -NoProfile -ExecutionPolicy Bypass -File $ReadinessScript -RepoRoot $Root -ConfigPath $Config -AllowStopped 2>&1 | Out-String
 }
 
 function Set-IssueStatus {
@@ -701,7 +716,7 @@ try {
   if (Test-Path (Join-Path $ContradictionRoot '.worktrees')) { throw 'scope contradiction created an issue worktree' }
 
   $ReadyLint = Join-Path $ScriptDir "ready-lint.ps1"
-  $ReadyLintOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $ReadyLint -RepoRoot $ReadyRoot -IssueTitle "ISSUE-100-001：Runner ready branch" 2>&1 | Out-String
+  $ReadyLintOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $ReadyLint -RepoRoot $ReadyRoot -IssueTitle "ISSUE-100-001：Runner ready branch" 2>&1 | Out-String
   $ReadyLintJson = $ReadyLintOutput | ConvertFrom-Json
   if ($ReadyLintJson.status -ne "pass") { throw "Expected ready-lint status=pass. Actual: $ReadyLintOutput" }
   if ($ReadyLintJson.issueId -ne "ISSUE-100-001") { throw "Expected ready-lint issueId=ISSUE-100-001. Actual: $ReadyLintOutput" }
@@ -725,7 +740,7 @@ try {
 - ``cd missing-backend; .\mvnw.cmd test``
 归档报告：``docs/quality/issue-100-001.md``
 "@ -Plan "# Plan`n"
-  $MissingCommandOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $ReadyLint -RepoRoot $MissingCommandRoot -IssueTitle "ISSUE-100-001：Runner missing command entry" 2>&1 | Out-String
+  $MissingCommandOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $ReadyLint -RepoRoot $MissingCommandRoot -IssueTitle "ISSUE-100-001：Runner missing command entry" 2>&1 | Out-String
   $MissingCommandJson = $MissingCommandOutput | ConvertFrom-Json
   if ($MissingCommandJson.status -ne "fail") { throw "Expected missing command entry to fail. Actual: $MissingCommandOutput" }
   Assert-Contains ($MissingCommandJson.errors -join "`n") "验证命令入口不存在"
@@ -920,7 +935,7 @@ try {
   Assert-Contains $ActiveLockOutput "RUN_LOCK_ACTIVE"
   Assert-Contains $ActiveLockOutput "Another AutoPilot run is active"
   if (!(Test-Path (Join-Path $ActiveLockRoot ".codex-autopilot\run.lock"))) { throw "Active run.lock should be kept" }
-  $ActiveLockStatus = & powershell -NoProfile -ExecutionPolicy Bypass -File $StatusScript -Repo $ActiveLockRoot 2>&1 | Out-String
+  $ActiveLockStatus = & pwsh -NoProfile -ExecutionPolicy Bypass -File $StatusScript -Repo $ActiveLockRoot 2>&1 | Out-String
   $ActiveLockStatusJson = $ActiveLockStatus | ConvertFrom-Json
   if (!$ActiveLockStatusJson.lockExists) { throw "Expected status to report lockExists=true" }
   if ($ActiveLockStatusJson.lockStale) { throw "Expected active lock not to be stale" }
@@ -940,13 +955,13 @@ try {
 
   $KillStaleRoot = New-Fixture -Name "kill-stale-lock" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
   Write-TestRunLock $KillStaleRoot 999999 ((Get-Date).AddMinutes(-180).ToString("o"))
-  $KillStaleOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $KillScript -Repo $KillStaleRoot 2>&1 | Out-String
+  $KillStaleOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $KillScript -Repo $KillStaleRoot 2>&1 | Out-String
   Assert-Contains $KillStaleOutput "run.lock removed."
   if (Test-Path (Join-Path $KillStaleRoot ".codex-autopilot\run.lock")) { throw "kill should remove stale run.lock" }
 
   $KillActiveRoot = New-Fixture -Name "kill-active-lock" -Enabled -Ready "# Ready Issues`n" -Plan "# Plan`n"
   Write-TestRunLock $KillActiveRoot $PID (Get-Date -Format o)
-  $KillActiveOutput = & powershell -NoProfile -ExecutionPolicy Bypass -File $KillScript -Repo $KillActiveRoot 2>&1 | Out-String
+  $KillActiveOutput = & pwsh -NoProfile -ExecutionPolicy Bypass -File $KillScript -Repo $KillActiveRoot 2>&1 | Out-String
   Assert-Contains $KillActiveOutput "Active run.lock kept"
   if (!(Test-Path (Join-Path $KillActiveRoot ".codex-autopilot\run.lock"))) { throw "kill without ForceKill should keep active run.lock" }
 
@@ -985,9 +1000,9 @@ try {
   if ($LimitOneState.remainingIterations -ne 0) { throw "Expected MaxIterations=1 remainingIterations=0" }
   if ($LimitOneState.stopReason -ne "STOP_ITERATION_LIMIT_REACHED") { throw "Expected STOP_ITERATION_LIMIT_REACHED stopReason" }
   if (Test-Path (Join-Path $LimitOneRoot ".codex-autopilot\enabled.flag")) { throw "Iteration limit must disable future dispatch" }
-  $LimitCheckpoint = & powershell -NoProfile -ExecutionPolicy Bypass -File $CheckpointScript -RepoRoot $LimitOneRoot -AsJson | ConvertFrom-Json
+  $LimitCheckpoint = & pwsh -NoProfile -ExecutionPolicy Bypass -File $CheckpointScript -RepoRoot $LimitOneRoot -AsJson | ConvertFrom-Json
   if ($LimitCheckpoint.decision -ne 'limit_reached') { throw "Checkpoint must report limit_reached, got $($LimitCheckpoint.decision)" }
-  $LimitStatus = & powershell -NoProfile -ExecutionPolicy Bypass -File $StatusScript -Repo $LimitOneRoot | ConvertFrom-Json
+  $LimitStatus = & pwsh -NoProfile -ExecutionPolicy Bypass -File $StatusScript -Repo $LimitOneRoot | ConvertFrom-Json
   if ($LimitStatus.lastIssue -ne $LimitOneState.iterationLastCountedIssue) { throw "Status must expose iterationLastCountedIssue as lastIssue" }
   if ($LimitStatus.recoveryAction -ne 'NONE') { throw "Terminal limit state must not advertise NEW_RUN recovery" }
 
@@ -1122,7 +1137,7 @@ try {
   "iterationLastCountedIssue": "ISSUE-008-007：通知平台 最小可行回归"
 }
 "@ | Out-File -Encoding utf8 (Join-Path $StartStateRoot ".codex-autopilot\state.json")
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $StartScript -Repo $StartStateRoot 2>&1 | Out-String | Out-Null
+  & pwsh -NoProfile -ExecutionPolicy Bypass -File $StartScript -Repo $StartStateRoot 2>&1 | Out-String | Out-Null
   $StartState = Get-Content -Encoding UTF8 -Raw (Join-Path $StartStateRoot ".codex-autopilot\state.json") | ConvertFrom-Json
   if ($StartState.iterationCompleted -ne 2) { throw "Expected start to preserve iterationCompleted" }
   if ($StartState.remainingIterations -ne 1) { throw "Expected start to preserve remainingIterations" }

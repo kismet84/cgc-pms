@@ -34,6 +34,14 @@ function Get-ExistingStateValue {
   return $Default
 }
 
+function Get-ExistingTimestampString {
+  param([string]$Name, [string]$Default)
+  $value = Get-ExistingStateValue $Name $Default
+  if ($value -is [datetimeoffset]) { return $value.ToString('o') }
+  if ($value -is [datetime]) { return $value.ToString('yyyy-MM-ddTHH:mm:ssK') }
+  return [string]$value
+}
+
 $reset = $null -ne $MaxIterations
 $existingLimit = Get-ExistingStateValue 'iterationLimit'
 $existingCompletedV2 = Get-ExistingStateValue 'completedImplementationIssues'
@@ -51,7 +59,7 @@ $state = [ordered]@{
   phase = 'idle'
   currentIssue = ''
   attempt = 0
-  startedAt = if (!$reset -and (Get-ExistingStateValue 'startedAt')) { [string](Get-ExistingStateValue 'startedAt') } else { $now }
+  startedAt = if (!$reset -and (Get-ExistingStateValue 'startedAt')) { Get-ExistingTimestampString 'startedAt' $now } else { $now }
   phaseStartedAt = $now
   lastHeartbeatAt = $now
   iterationLimit = $limit

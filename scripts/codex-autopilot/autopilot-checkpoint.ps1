@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path,
   [string]$AutopilotDir = '.codex-autopilot',
   [switch]$CheckHealth,
@@ -19,5 +19,5 @@ $arguments = @(
 if ($CheckHealth) { $arguments += '-CheckHealth' }
 if ($CheckGit) { $arguments += '-CheckGit' }
 if ($AsJson) { $arguments += '-AsJson' }
-& powershell @arguments
+& pwsh @arguments
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
