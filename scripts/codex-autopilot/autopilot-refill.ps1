@@ -1,6 +1,8 @@
 ﻿$ErrorActionPreference = 'Stop'
 $readyLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-ready.ps1'
 if (Test-Path -LiteralPath $readyLibrary) { . $readyLibrary }
+$commandLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-command.ps1'
+if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
 
 function Test-AutopilotDomainContinuationAllowed {
   param([string[]]$RecentTitles, [string]$Domain, [string]$FocusText)
@@ -85,13 +87,7 @@ function Import-AutopilotReadyPlan {
 
 function Invoke-AutopilotReadyPlanner {
   param([string]$RepoRoot, [object[]]$Candidates, [string]$OutputPath, [string]$SchemaPath, [string]$Model = 'gpt-5.6-sol', [string]$Thinking = 'high', [int]$TimeoutSeconds = 1200)
-  $codex = if (Get-Command Resolve-AutopilotCodexCommand -ErrorAction SilentlyContinue) { Resolve-AutopilotCodexCommand } else {
-    $command = Get-Command codex -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($command) { $command.Source } else {
-      $package = Get-AppxPackage -Name 'OpenAI.Codex' -ErrorAction SilentlyContinue
-      if ($package) { Join-Path $package.InstallLocation 'app\resources\codex.exe' } else { throw 'Codex CLI command is unavailable' }
-    }
-  }
+  $codex = Resolve-AutopilotCodexInvocation
   $candidateJson = $Candidates | ConvertTo-Json -Depth 5 -Compress
   $prompt = @"
 Act as the fresh AutoPilot Planner for cgc-pms. Read AGENTS.override.md, AGENTS.md, docs/backlog/current-focus.md,
@@ -102,8 +98,8 @@ state explicit non-goals/migration/risk/runtime/reviewer requirements, and must 
 Return JSON matching $SchemaPath.
 "@
   $args = @('exec','--ephemeral','--sandbox','danger-full-access','--model',$Model,'-c',"model_reasoning_effort=$Thinking",'--cd',$RepoRoot,'--output-schema',$SchemaPath,'--output-last-message',$OutputPath,'-')
-  $startInfo = [Diagnostics.ProcessStartInfo]::new(); $startInfo.FileName = $codex
-  $startInfo.Arguments = ($args | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }) -join ' '
+  $startInfo = [Diagnostics.ProcessStartInfo]::new(); $startInfo.FileName = $codex.fileName
+  $startInfo.Arguments = (@($codex.argumentPrefix) + $args | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }) -join ' '
   $startInfo.WorkingDirectory = $RepoRoot; $startInfo.UseShellExecute = $false; $startInfo.RedirectStandardInput = $true; $startInfo.RedirectStandardOutput = $true; $startInfo.RedirectStandardError = $true
   $process = [Diagnostics.Process]::new(); $process.StartInfo = $startInfo; [void]$process.Start()
   $stdoutTask = $process.StandardOutput.ReadToEndAsync(); $stderrTask = $process.StandardError.ReadToEndAsync(); $process.StandardInput.Write($prompt); $process.StandardInput.Close()

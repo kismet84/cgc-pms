@@ -4,6 +4,22 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = (Resolve-Path (Join-Path $scriptDir '..\..')).Path
 $config = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw | ConvertFrom-Json
+. (Join-Path $scriptDir 'autopilot-command.ps1')
+
+if ($env:OS -eq 'Windows_NT') {
+  $codexInvocation = Resolve-AutopilotCodexInvocation
+  if ([IO.Path]::GetFileName($codexInvocation.fileName) -notin @('powershell.exe','powershell')) { throw "AutoPilot must use the PowerShell host for the npm Codex shim on Windows, actual=$($codexInvocation.fileName)" }
+  if (@($codexInvocation.argumentPrefix) -notcontains '-File' -or [IO.Path]::GetExtension([string]$codexInvocation.argumentPrefix[-1]) -ine '.ps1') { throw 'Codex invocation must include the npm codex.ps1 shim' }
+  if ([string]$config.issueExecutor.command -ne 'codex') { throw "issueExecutor.command must stay portable and resolve through the shared launcher, actual=$($config.issueExecutor.command)" }
+  $versionStart = [Diagnostics.ProcessStartInfo]::new()
+  $versionStart.FileName = $codexInvocation.fileName
+  $versionStart.Arguments = (@($codexInvocation.argumentPrefix) + '--version' | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }) -join ' '
+  $versionStart.UseShellExecute = $false
+  $versionStart.RedirectStandardOutput = $true
+  $versionProcess = [Diagnostics.Process]::new(); $versionProcess.StartInfo = $versionStart; [void]$versionProcess.Start()
+  $versionOutput = $versionProcess.StandardOutput.ReadToEnd(); $versionProcess.WaitForExit()
+  if ($versionProcess.ExitCode -ne 0 -or $versionOutput -notmatch '^codex-cli ') { throw "resolved Codex invocation is not executable: exit=$($versionProcess.ExitCode), output=$versionOutput" }
+}
 
 $autopilotScriptRoots = @(
   $scriptDir

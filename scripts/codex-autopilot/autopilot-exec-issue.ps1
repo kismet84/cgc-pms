@@ -15,6 +15,8 @@
 )
 
 $ErrorActionPreference = "Stop"
+$commandLibrary = Join-Path $PSScriptRoot 'autopilot-command.ps1'
+if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
 
 function Read-JsonFile {
   param([string]$Path)
@@ -264,9 +266,14 @@ function Invoke-ExecutorProcess {
     return '"' + ($Argument.Replace('"', '\"')) + '"'
   }
 
+  $invocation = if ($Command -match '^codex(?:\.exe|\.cmd|\.ps1)?$') {
+    Resolve-AutopilotCodexInvocation -Command 'codex'
+  } else {
+    [pscustomobject]@{ fileName = Resolve-ExecutorCommand $Command; argumentPrefix = @() }
+  }
   $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-  $startInfo.FileName = Resolve-ExecutorCommand $Command
-  $startInfo.Arguments = (@($Arguments) | ForEach-Object { Quote-ProcessArgument $_ }) -join " "
+  $startInfo.FileName = $invocation.fileName
+  $startInfo.Arguments = (@($invocation.argumentPrefix) + @($Arguments) | ForEach-Object { Quote-ProcessArgument $_ }) -join " "
   $startInfo.WorkingDirectory = $WorkingDirectory
   $startInfo.UseShellExecute = $false
   $startInfo.RedirectStandardOutput = $true
