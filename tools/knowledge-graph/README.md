@@ -5,7 +5,9 @@
 ## 边界
 
 - Neo4j 是关联索引，仓库文件和 Git 仍是事实源。
-- 默认不读取 `.omc/`、`.omo/`、`.opencode/`、`.claude/`、`.mimocode/`、`graphify-out/`、`.sisyphus/`、`.archive/`、`archive/v1.0/private/` 和历史 `docs/archive/v1.0/`。
+- 默认不读取 `.omc/`、`.omo/`、`.opencode/`、`.claude/`、`.mimocode/`、`graphify-out/`、`.sisyphus/`、`.archive/` 和 `archive/v1.0/private/`。
+- `docs/archive/v1.0/` 是 Git 跟踪的正式历史资料，允许只读采集，但统一标记 `historical=true`、`versionScope=v1.0`；默认搜索不返回历史结果。
+- Markdown 显式链接若指向仓库内的非文档文件或目录，只建立 `referenceOnly` 轻量路径节点和 `REFERENCES` 边，不读取目标正文；不存在、越界或命中禁止区的目标仍保持未解析。
 - 不把原始日志写入图谱；使用 `kg_record_episode(kind="log-summary")` 记录摘要、来源和时间。
 - 不扫描 Codex 私有会话目录；任务收口时使用 `kg_record_episode(kind="conversation")` 写入结构化摘要。
 - `kg_query` 只接受受限只读 Cypher；写入仅通过固定字段的 `kg_record_episode`。
@@ -41,6 +43,8 @@ codex mcp add cgc-pms-knowledge-graph -- node D:\projects-test\cgc-pms\tools\kno
 ```
 
 注册后新建 Codex 任务，使 MCP 工具列表刷新。
+
+`kg_search` 支持 `scope=current|historical|all`，默认 `current`。历史资料只用于回溯和分类，不能替代当前代码、配置、backlog 与新鲜验证证据。
 
 ## Schema
 

@@ -8,3 +8,7 @@
 
 - [第37条主线：项目地图、竞品情报与迭代决策闭环验收报告](mainline-37-product-intelligence-acceptance.md)
 - [第39条主线：项目知识图谱采集机制验收报告](knowledge-graph-collector-acceptance-2026-07-13.md)
+- [第40条主线：v1.0 历史问题分类治理验收报告](v1.0-historical-issue-classification-acceptance-2026-07-13.md)
+- [第40条主线 M0：历史阻塞状态归一化验收报告](mainline-40-m0-historical-blocker-normalization-acceptance-2026-07-13.md)
+- [ISSUE-040-001：预警批量评估独立权限码修复验收报告](ISSUE-040-001-预警批量评估独立权限码修复验收报告.md)
+- [ISSUE-040-002～006：M1 五项历史风险复验与修复验收报告](ISSUE-040-002-006-M1五项历史风险复验与修复验收报告.md)

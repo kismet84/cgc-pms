@@ -3,6 +3,7 @@ import { execute, jsonSafe } from "./neo4j.js";
 
 export const SOURCE_DEFINITIONS = [
   { key: "documents", kind: "repository", description: "Allowlisted project documents" },
+  { key: "references", kind: "repository-metadata", description: "Explicit document link targets without content ingestion" },
   { key: "git", kind: "git", description: "Local Git commit history" },
   { key: "episodes", kind: "mcp", description: "Controlled Codex and log summaries" },
 ];

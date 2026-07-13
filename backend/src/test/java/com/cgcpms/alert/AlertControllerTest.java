@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -43,6 +44,7 @@ class AlertControllerTest {
     @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils; @Autowired private AlertLogMapper alertLogMapper;
     @Autowired private OperationAuditLogMapper operationAuditLogMapper;
     @Autowired private PmProjectMapper projectMapper; @Autowired private PmProjectMemberMapper projectMemberMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
     private static final long DIFFERENT_PROJECT_MEMBER_ID = 92001L; private static final long OTHER_PROJECT_ID = 82001L;
     private static final long NO_ACCESS_MEMBER_ID = 92002L; private static final long PURCHASE_MANAGER_ID = 92003L;
@@ -202,6 +204,31 @@ class AlertControllerTest {
     void testBatchEvaluate() throws Exception {
         mockMvc.perform(p("/alerts/batch-evaluate").cookie(adminCookie()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(4) @DisplayName("POST /alerts/batch-evaluate requires dedicated alert:evaluate permission")
+    void testBatchEvaluateRequiresDedicatedPermission() throws Exception {
+        Method method = com.cgcpms.alert.controller.AlertController.class.getMethod("batchEvaluate");
+        PreAuthorize preAuthorize = method.getAnnotation(PreAuthorize.class);
+        assertNotNull(preAuthorize);
+        assertEquals("hasAuthority('alert:evaluate') or hasAnyRole('ADMIN','SUPER_ADMIN')", preAuthorize.value());
+
+        mockMvc.perform(p("/alerts/batch-evaluate")
+                        .cookie(memberCookie(NO_ACCESS_MEMBER_ID, "alert:edit")))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(p("/alerts/batch-evaluate")
+                        .cookie(memberCookie(NO_ACCESS_MEMBER_ID, "alert:evaluate")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(4) @DisplayName("V146 keeps ordinary edit and batch evaluate permissions separate")
+    void testAlertPermissionMigrationApplied() {
+        assertEquals("alert:edit", jdbcTemplate.queryForObject(
+                "SELECT perms FROM sys_menu WHERE id = 767", String.class));
+        assertEquals("alert:evaluate", jdbcTemplate.queryForObject(
+                "SELECT perms FROM sys_menu WHERE id = 768", String.class));
     }
 
     @Test @Order(5) @DisplayName("PUT /alerts/{id}/status -> 200")

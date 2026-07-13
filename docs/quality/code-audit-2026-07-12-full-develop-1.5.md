@@ -5,12 +5,13 @@
 - **整改结论：通过（本地与已授权远端治理范围）**
 - **原报告问题：7 项均已完成根因闭环**
 - **本地质量门禁：通过**
-- **是否可直接上线：否**
-- **上线阻塞：是，仅剩同一待合并提交的远端 required checks 尚未产生**
+- **是否可进入发布流程：是，CI 合并门禁已通过**
+- **当前是否已上线：否**
+- **上线阻塞：无已确认的 CI 合并门禁阻塞；生产发布仍需独立授权与发布前核验**
 - **审计对象：** `develop/1.5`，整改基线 HEAD `3f654dd20894cca754b29492a179671a84e2d806`
 - **执行边界：** 未连接生产环境或生产数据库，未发布；本地整改完成后用户已于 2026-07-13 授权提交并推送 `develop/1.5`，进入同一待合并 SHA 的远端 CI 取证阶段。
 
-本轮已经关闭原审计中的后端测试污染、陈旧菜单 ID 契约、前端 lint、前端测试契约、SQL 安全标记、E2E/浏览器环境和分支保护缺口。当前本地证据支持提交与远端 CI；提交/push 已获授权，但在目标 SHA 的 11 个 required checks 实际完成前，不能提前给出上线通过结论。
+本轮已经关闭原审计中的后端测试污染、陈旧菜单 ID 契约、前端 lint、前端测试契约、SQL 安全标记、E2E/浏览器环境和分支保护缺口。PR #334 目标提交的 11 个 required checks 已全部成功，并于 2026-07-13 合并；本报告不代表生产已经发布。
 
 ## 原阻塞项闭环
 
@@ -105,7 +106,7 @@ trivy rootfs --scanners vuln --pkg-types library --severity HIGH,CRITICAL --exit
 - 公式修复提交 `27410fa2` 的 CI 全量运行 11 个 required checks 全绿，`build-summary` 同步成功；GitHub 复读结果为 `mergeable=MERGEABLE`、`mergeStateStatus=CLEAN`。
 - Node 24 action 治理首轮验证发现 `pnpm/action-setup@v6` 的 `version: 11` 会范围漂移并在自安装更新时失败，分类为工具配置兼容性问题；改为读取 `frontend-admin/package.json` 中带校验哈希的精确 `pnpm@11.0.9` 后根因解除。
 - 配置提交 `b455ca53` 的 11 个 required checks 全绿，E2E、artifact 上传下载、Trivy 缓存与构建后供应链扫描均通过；逐 job 复读 12 条 annotation，Node 20 命中为 0，GitHub 状态恢复 `MERGEABLE/CLEAN`。
-- 因此：**全量审计整改通过，远端合并门禁通过；PR 可进入人工审阅/合并，但本次授权不包含执行合并。**
+- PR #334 已于 2026-07-13 09:12:45（Asia/Shanghai）合并为 `master` 提交 `76ec42a0b4f386a4fd432abc62205a3135a1b65d`。因此：**全量审计整改通过，远端合并门禁通过；当前未执行生产发布。**
 
 ## 依赖与格式治理补充闭环
 

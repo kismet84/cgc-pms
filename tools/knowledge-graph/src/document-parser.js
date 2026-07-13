@@ -28,7 +28,10 @@ export function parseMarkdown(content) {
 
 export function markdownLinks(content, sourcePath, isBlocked = () => false) {
   const links = new Set();
-  for (const match of content.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
+  const prose = content
+    .replace(/^(?:```|~~~)[^\r\n]*[\r\n][\s\S]*?^(?:```|~~~)\s*$/gm, "")
+    .replace(/`[^`\r\n]*`/g, "");
+  for (const match of prose.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
     const raw = match[1].trim().replace(/^<|>$/g, "").split("#", 1)[0];
     if (!raw || /^(https?:|mailto:|data:)/i.test(raw)) continue;
     let decoded;

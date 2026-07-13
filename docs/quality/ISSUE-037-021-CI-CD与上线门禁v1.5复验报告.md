@@ -1,5 +1,7 @@
 # ISSUE-037-021 CI/CD 与上线门禁 v1.5 复验报告
 
+> 状态提示：本报告保存 2026-07-12 首次失败快照。第40条主线 M0 已于 2026-07-13 以 PR #334 合并、11 个 required checks 全绿和当前分支保护 API 将原三条阻塞裁决为 `VerifiedResolved`；当前状态见 [M0 验收报告](mainline-40-m0-historical-blocker-normalization-acceptance-2026-07-13.md)。
+
 ## 裁决
 
 - 核验时间：2026-07-12 15:52:44 +08:00

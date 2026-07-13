@@ -10,14 +10,18 @@ const config = loadConfig();
 const driver = createDriver(config);
 await driver.verifyConnectivity();
 
-const server = new McpServer({ name: "cgc-pms-knowledge-graph", version: "0.2.0" });
+const server = new McpServer({ name: "cgc-pms-knowledge-graph", version: "0.3.0" });
 const result = (value) => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }], structuredContent: { result: value } });
 
 server.registerTool("kg_status", { description: "Return cgc-pms knowledge graph coverage and last indexing time." }, async () => result(await status(driver, config)));
 server.registerTool("kg_search", {
   description: "Full-text search project plans, reports, backlog, sections, and recorded episodes with source paths.",
-  inputSchema: { query: z.string().min(1), limit: z.number().int().min(1).max(50).optional() },
-}, async ({ query, limit }) => result(await search(driver, config, query, limit)));
+  inputSchema: {
+    query: z.string().min(1),
+    limit: z.number().int().min(1).max(50).optional(),
+    scope: z.enum(["current", "historical", "all"]).optional(),
+  },
+}, async ({ query, limit, scope }) => result(await search(driver, config, query, limit, scope)));
 server.registerTool("kg_get_artifact", {
   description: "Get one indexed artifact and its sections by repository-relative source path.",
   inputSchema: { path: z.string().min(1) },

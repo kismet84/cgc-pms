@@ -13,6 +13,8 @@ CREATE CONSTRAINT decision_id IF NOT EXISTS FOR (n:Decision) REQUIRE n.id IS UNI
 CREATE INDEX artifact_path IF NOT EXISTS FOR (n:Artifact) ON (n.path);
 CREATE INDEX artifact_kind IF NOT EXISTS FOR (n:Artifact) ON (n.kind);
 CREATE INDEX artifact_active IF NOT EXISTS FOR (n:Artifact) ON (n.active);
+CREATE INDEX artifact_historical IF NOT EXISTS FOR (n:Artifact) ON (n.historical);
+CREATE INDEX artifact_version_scope IF NOT EXISTS FOR (n:Artifact) ON (n.versionScope);
 CREATE INDEX episode_occurred_at IF NOT EXISTS FOR (n:Episode) ON (n.occurredAt);
 CREATE INDEX collection_run_started_at IF NOT EXISTS FOR (n:CollectionRun) ON (n.startedAt);
 CREATE INDEX collection_run_status IF NOT EXISTS FOR (n:CollectionRun) ON (n.status);

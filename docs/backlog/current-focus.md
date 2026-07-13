@@ -20,12 +20,19 @@
 - 第39条主线已完成本地知识采集闭环：文档版本、Git 游标、采集运行、失败状态、会话/日志摘要脱敏、MCP 观测和 30 分钟定时对账均已落地。
 - 该能力是旁路工程治理工具，不替代仓库、Git、backlog 或正式质量报告，也不得替代产品 Candidate/Ready 决策。
 - 非阻塞边界：不扫描 Codex 私有历史、不保存原始大日志、不做 LLM 正式事实抽取、不自动删除历史版本；如需扩展必须重新立项。
+- 第40条主线已建立 [v1.0 历史问题四态分类](v1.0-historical-issue-classification.md)：92 个历史 Issue 保留“v1.0 已解决”语义，10 个仍适用问题域保持 Candidate/Frozen，6 类旧状态判为已过期，8 个风险域进入需要复验。
+- 正式历史 `docs/archive/v1.0/**` 可只读入图并带 `historical=true/versionScope=v1.0`；默认搜索排除历史。`archive/v1.0/private/**` 继续禁止读取、扫描和入图。
+- 索引风险已闭环：目录或文档语料外文件的显式链接现在以不读取正文的轻量路径节点建立 `REFERENCES` 边；16 个 `referenceOnly` 节点正文数量为 0，连续两轮采集 `unresolvedReferences=0`。非 Markdown 日志中的 `[值](类型)` 不再误判为链接，私有封存区继续禁止入图。
+- 第40条主线已进入执行：M0 已用 PR #334 合并、11 checks 全绿和当前分支保护证据关闭 3 条旧阻塞；后续按 [存量问题全量修复计划](../plans/第40条主线-v1.0历史问题分类治理任务计划书.md) 处理 10 个仍适用域和 8 个需要复验域，不批量越过 Candidate/Ready 决策门。
+- `ISSUE-040-001` 已完成 V-01 首个权限债修复：预警普通处理保留 `alert:edit`，租户级批量评估收紧为 `alert:evaluate`；V146 保留菜单/角色关系，22 项专项与 SQL safety 通过。后续三类真实角色与双端权限复验已在 ISSUE-040-002 中关闭 V-01 M1。
+- `ISSUE-040-002～006` 的五个 M1 风险域均已通过：V-02 53 项、V-03 112 项；V-04 三类真实角色浏览器正负样本；V-06 修复 Windows 备份恢复脚本、隔离恢复 74 表并完成本机 MySQL/Redis/MinIO/JWT/Jasypt 真实轮换。
+- M1 已整体通过。A-01 的入口建设台账进入 M2；未来生产发布必须在实际目标环境重新执行凭据轮换和双人复核，但当前无可识别生产环境，不再作为本地历史债阻塞 M1。
 
 ## 2026-07-13 全量审计闭环状态
 
 - `docs/quality/code-audit-2026-07-12-full-develop-1.5.md` 的 7 项原阻塞已完成本地根因闭环；后端 1723 tests、前端 505 tests、MySQL 8 Flyway、SQL safety、构建后 JAR Trivy、UI smoke 与内置浏览器验收均通过。
 - `master` 分支保护已启用管理员强制与 required conversation resolution，11 个 required checks 和 strict 语义保持不变。
-- PR #334 最新配置提交的 11 个 required checks 已全绿，GitHub 复读为 `MERGEABLE/CLEAN`；当前无 CI 合并门禁阻塞，本次仍未执行合并或生产发布。
+- PR #334 的 11 个 required checks 已全绿，并于 2026-07-13 合并为 `master` 提交 `76ec42a0`；当前无 CI 合并门禁阻塞，尚未执行生产发布。
 - 已完成依赖与格式治理：413 条纯 Prettier 告警已降为 0，ECharts 6.1.0 / vue-echarts 8.0.1 升级后 `pnpm audit --audit-level moderate` 为 0 漏洞；格式化后全量前端与 E2E 通过。
 - Trivy Java DB 已在 `supply-chain-security` 增加按 UTC 日期缓存与历史缓存回退；国内网络风险收敛为首次冷缓存下载时延，不采用未经项目验证的第三方镜像。
 - GitHub Actions Node.js 20 弃用注解已关闭：官方 actions 已升级到声明 Node 24 的主版本，`pnpm/action-setup@v6` 改为读取 `frontend-admin/package.json` 的精确 `packageManager`；全量 CI 后 Node 20 annotation 为 0。
@@ -75,8 +82,8 @@
 - 后续边界：入口补建、接口废弃或兼容性清理按责任域另拆 Ready；外部客户端调用和动态菜单证据不足项先保持需要确认。
 - 本次 `启动迭代-10` 当前完成 3/10；Ready 清空后继续补货。静态盘点不代表真实角色、动态菜单或运行态可见性通过。
 - `ISSUE-037-020` 已完成：长期计划补货只接纳第 7–9 章开发计划，2–6 章现状/对标/差距/目标标题不再误入 Candidate；本次当前完成 4/10，继续补货。
-- `ISSUE-037-021` 已通过独立 Reviewer 证据复核：master 最新 CI run 29146534529 的 frontend-lint、frontend-test、e2e 为 required 红灯，且分支保护 `enforce_admins=false`、未启用 push restrictions；当前裁决维持不通过、阻塞、不可上线。
-- 当前工作树的原本地差异已完成根因治理：后端 `verify` 为 1723 tests、0 failure、0 error（1 skipped），SQL safety scan 通过；剩余阻塞仅为尚未获得 commit/push 授权及同一待合并 SHA 的远端 required checks 证据。
+- `ISSUE-037-021` 的红灯与 `enforce_admins=false` 仅保留为首次复验历史快照；第40条 M0 已以 PR #334 合并、11 checks 全绿和当前分支保护 API 将 A/B/C 三条阻塞统一裁决为 `VerifiedResolved`。
+- 当前 API 未返回 required pull-request review 和 push restrictions；原管理员绕过已关闭，但是否额外要求审批人数或推送主体白名单保持“需要确认”，未获授权前不修改远端。
 - CI 工具链观察：GitHub annotation 提示 Node 20 action 被强制运行于 Node 24；当前不是三个红灯的退出根因，升级 Actions 需另行授权。
 - `停止迭代` 已生效：本次 `启动迭代-10` 最终完成 4/10 条实施型 Ready；`ISSUE-037-021` 仅作为不通过的回归证明归档，不计入实施数，当前不再派发下一任务。
 - 新一轮 `启动迭代-1` 在控制面选单前稳定复现 Windows PowerShell 5.1 ParserError；已按 `tool_config` 分类并建立 `ISSUE-037-022`，仅恢复 AutoPilot 脚本 UTF-8 解析兼容与回归保护，不改变业务或生产边界。

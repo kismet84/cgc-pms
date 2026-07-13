@@ -1,5 +1,18 @@
 # CGC-PMS 项目地图
 
+## 2026-07-13 增量：第40条首个权限历史债闭环
+
+- `ISSUE-040-001` 将预警租户级 `batch-evaluate` 从普通 `alert:edit` 拆为独立 `alert:evaluate`，关闭第10A历史安全门禁曾否决但未修复的高低风险共码。
+- V146 仅更新菜单 768，菜单 767 和既有角色—菜单关系保持不变；普通权限负样本 403、独立权限/管理员正样本 200，H2 实际迁移与 22 项专项通过。
+- 该结果只关闭 V-01 的一个最小债务点，不代表权限注册表、审批入口、动态菜单和真实角色全域复验完成；MySQL 实跑仍需环境或远端门禁证据。
+
+## 2026-07-13 增量：v1.0 历史问题四态分类
+
+- 254 个 v1.0 正式历史 Markdown 已纳入可追溯历史索引；历史节点统一标记，不参与默认 current 搜索。
+- 92 个唯一历史 Issue 保留“v1.0 已解决”语义，但不得替代 v1.5 当前验证。
+- 当前仍适用的产品问题归并为 10 个 Candidate/Frozen 域；权限、租户、数据一致性、真实角色、外部集成与工具链共 8 个风险域保持“需要复验”。
+- 旧 SHA/PR、旧工作区、旧测试选择器、旧浏览器能力和旧批次时间窗等 6 类记录判为已过期，不再进入当前优先级排序。
+
 ## 2026-07-13 增量：项目知识图谱采集机制
 
 - 本地工程知识索引已从单次文档采集升级为可追溯增量机制：正式文档保留 ArtifactVersion，Git 使用 commit 游标，采集运行具备 SourceCursor、CollectionRun 和失败状态。
@@ -14,7 +27,7 @@
 - 前端主机依赖已恢复；413 条纯 Prettier 告警已治理至 lint 0 error / 0 warning；ECharts 已升级到 6.1.0、vue-echarts 升级到 8.0.1，依赖审计为 0 漏洞；类型检查/构建/bundle 通过、91 files / 505 tests 全过；用户提供的 Chrome 149 完成 UI smoke 7/7，内置浏览器也已真实到达驾驶舱。
 - 供应链门禁确认 `trivy fs` 不覆盖 post-build JAR，现由 `supply-chain-security` 对构建目录执行 `trivy rootfs`；本地识别 fat JAR 并得到 HIGH/CRITICAL 0。
 - `master` 已启用 `enforce_admins=true` 与 `required_conversation_resolution=true`，原 11 个 required checks、`strict=true`、禁止 force push/delete 保持不变。
-- 当前状态为“本地整改通过、上线仍阻塞”：本轮未获 commit/push 授权，尚无同一待合并 SHA 的远端 11 checks 全绿证据；不得以本地通过替代远端上线门禁。
+- PR #334 目标提交的 11 个 required checks 已全绿，并于 2026-07-13 合并为 `master` 提交 `76ec42a0`；CI 合并门禁与原管理员绕过阻塞均已解除，生产仍未发布。
 
 ## 2026-07-12 增量：AutoPilot Windows PowerShell 5.1 编码阻塞
 
@@ -22,11 +35,12 @@
 - 该缺口直接阻塞 Ready 选单、实施和正式收口，按 `ISSUE-037-022` 进入最小治理 Ready；范围仅限编码兼容、控制面回归与状态回写，不替代产品方向。
 - 实施回写：`ISSUE-037-022` 已统一脚本源码 BOM 与运行期显式 UTF-8 读取；Windows PowerShell 5.1 控制面自测、连续 runner 自测及真实 `ISSUE-037-022` 路由均通过，Ready 准入恢复为可用。
 
-## 2026-07-12 增量：CI/CD 与上线门禁 v1.5 复验
+## 2026-07-12 增量：CI/CD 与上线门禁 v1.5 复验（历史快照，已由第40条 M0 更新）
 
-- `ISSUE-037-021` 已完成只读复验：当前 master commit `781b41661cd96b2a2f7eed825f98ff3d9bdf137b` 的 11 个 required checks 中 `frontend-lint`、`frontend-test`、`e2e` 为 failure，结论为不通过、阻塞、不可上线。
-- required checks 与现行 workflow job 一一对应且 `strict=true`；`enforce_admins=false` 与未启用 push restrictions 仍保留绕过风险。
+- `ISSUE-037-021` 首次只读复验时，master commit `781b41661cd96b2a2f7eed825f98ff3d9bdf137b` 的 `frontend-lint`、`frontend-test`、`e2e` 为 failure，当时结论为不通过、阻塞、不可上线。
+- 当时 required checks 与 workflow job 一一对应且 `strict=true`，但 `enforce_admins=false`；该状态已被后续治理和第40条 M0 新鲜证据取代。
 - 红灯与治理缺口已按责任域进入 Blocked；本次未修改业务代码、workflow 或远端设置。
+- 以上为 2026-07-12 首次复验快照；第40条 M0 已用 PR #334 合并、11 checks 全绿及 `enforce_admins=true` 的新鲜证据将三条 Blocked 统一关闭。
 
 ## 2026-07-12 增量：系统审查与 Ready 恢复
 
@@ -175,9 +189,9 @@ Docker Compose + Nginx + Actuator + Prometheus
 
 | 边界 | 当前规则 | 地图结论 |
 | --- | --- | --- |
-| 租户 | 后端强制隔离，Service 必须校验 | 代码与规范存在，当前跨租户回归待复验 |
-| 项目 | 大多数业务对象的主线维度 | 当前项目成员和接口范围待真实角色复验 |
-| 权限 | `@PreAuthorize` 是安全边界，前端隐藏仅为体验 | 不能仅靠菜单可见性判定通过 |
+| 租户 | 后端强制隔离，Service 必须校验 | ISSUE-040-003 的第二租户与跨租户专项通过；V-04 三类真实角色浏览器正负样本通过 |
+| 项目 | 大多数业务对象的主线维度 | ISSUE-040-003 的跨项目、成员与附件项目校验通过；V-04 浏览器体验通过 |
+| 权限 | `@PreAuthorize` 是安全边界，前端隐藏仅为体验 | V-01 三类真实角色正负 API、前端 42 项与 V-04 浏览器交互通过 |
 | 审批 | 合同、变更、付款、结算等必须校验状态 | 跨业务状态一致性是高风险验收项 |
 | 金额 | 成本、合同、采购、库存、分包、付款、结算共同影响 | 任何改动必须给出来源、月份和回滚证据 |
 | 数据库 | 只新增 migration，不修改已应用脚本 | v1.5 业务候选默认优先无 migration 的最小闭环 |
@@ -193,6 +207,7 @@ Docker Compose + Nginx + Actuator + Prometheus
 | 候选补货 | `autopilot-refill.ps1` | Implemented | 先读 Ad-hoc；长期计划仅接纳第 7–9 章开发计划，排除现状/对标/差距/目标等描述性标题 |
 | 连续执行 | `autopilot-run-continuous.ps1` | Implemented | 已具备隔离执行、本地提交、上限停止、300/600 秒停滞处置、一次有限重派、第二次 blocked 和有界长命令声明 |
 | 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-021 正式验收报告 |
+| Windows MySQL 备份恢复与本机凭据轮换 | `scripts/mysql-backup.ps1`、`scripts/mysql-restore.ps1`、`deploy/.env`（忽略） | Implemented（本地） | ISSUE-040-006 已修复二进制安全问题，隔离恢复与轮换后均保留 74 表；MySQL/Redis/MinIO/JWT/Jasypt 注入、旧 JWT 失效和新登录通过。未来生产轮换由上线门禁重新验收 |
 
 ## 当前明确缺口
 
@@ -214,8 +229,8 @@ Docker Compose + Nginx + Actuator + Prometheus
 
 ## Unknown 与待复验
 
-- 当前 CI 红灯与分支保护绕过风险的解除时间；目标 commit 变化后需重新核验。
-- 当前本地 Docker、后端和前端运行态。
+- CI 红灯与管理员绕过已于第40条 M0 复核解除；required pull-request review 与 push restrictions 是否作为附加治理要求仍需确认。
+- 当前本地 Docker、后端和前端 health gate 及三类低权限浏览器正负样本已于 ISSUE-040-005 验证通过。
 - 五类驾驶舱角色的真实账号与数据可见范围。
 - 当前全量后端、前端单元测试结果。
 - 现有长期计划中所有“已完成”项在 v1.5 的复验状态。

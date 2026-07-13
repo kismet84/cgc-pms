@@ -4,7 +4,58 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前 Ready 队列为空；`ISSUE-037-021` 已完成只读复验，但上线门禁仍阻塞，未解除项已进入 `blocked-issues.md`。
+当前 Ready 队列为空；`ISSUE-040-001` 已完成，`ISSUE-037-021-A/B/C` 已在第40条 M0 归一化并关闭。
+
+### ISSUE-040-001：预警批量评估独立权限码修复
+
+优先级：P0
+任务性质：缺口修复
+类型：权限 / 预警中心 / 高风险批处理 / MySQL/H2 Migration / 后端安全测试
+状态：Done（2026-07-13）
+来源锚点：第40条主线 V-01；v1.0 第10A主线对 `alert:edit` 高低风险动作共码的安全否决；当前 CodeGraph 与 `codebase-memory-mcp` 复核
+关联产品目标：消除预警中心低风险单条处理与租户级批量评估共用授权码的历史债，保持最小权限和现有角色菜单语义。
+阻塞证据：当前 `AlertController` 的单条/批量已读、状态处理和 `POST /alerts/batch-evaluate` 均使用 `alert:edit`；V40 的菜单 767“标记已读”和 768“批量评估”也均为 `alert:edit`。批量评估会遍历当前租户可访问活动项目并生成预警，风险显著高于标记已读。
+解除条件：菜单 768 与 `batch-evaluate` 使用独立 `alert:evaluate`；只有 `alert:edit` 的非管理员请求被 403 拒绝，管理员和持有 `alert:evaluate` 的请求保持可用；既有角色—菜单关系不重写。
+Migration：需要新增 V146，MySQL/H2 同号；禁止修改已应用 V40。
+依赖：复用 `sys_menu` 768、既有 `sys_role_menu` 关系、Spring Method Security 和当前预警 Service；不新增表、角色或权限平台。
+风险等级：高
+运行态要求：先完成后端 H2 专项和迁移完整性验证；MySQL Flyway 仅在本地测试环境可用时复验，不连接生产。
+Reviewer要求：复核权限拆分只影响批量评估，不放宽 `alert:edit`、管理员、租户/项目范围或角色授权；确认迁移可前向应用且不改历史 migration。
+最小回滚：迁移应用前可回退本 Issue 文件；迁移应用后不得编辑 V146，应新增前向迁移恢复权限码，并同步回退 Controller 权限。
+目标：
+- 将 `POST /alerts/batch-evaluate` 从 `alert:edit` 收紧为 `alert:evaluate`。
+- 用 V146 将菜单 768 的权限码改为 `alert:evaluate`，保留菜单 ID 和全部既有角色关系。
+- 增加权限正负样本与迁移契约测试。
+非目标：
+- 不拆分标记已读与状态处理，不新增可编辑权限平台，不重构角色体系。
+- 不新增预警页面按钮，不修改预警生成逻辑、租户/项目范围或业务数据。
+- 不修改 V40/V42/V53 等已应用迁移，不连接生产数据库，不修改远端设置。
+允许修改：
+- `backend/src/main/java/com/cgcpms/alert/controller/AlertController.java`
+- `backend/src/main/resources/db/migration/V146__split_alert_evaluate_permission.sql`
+- `backend/src/main/resources/db/migration-h2/V146__split_alert_evaluate_permission.sql`
+- `backend/src/test/java/com/cgcpms/alert/**`
+- `docs/backlog/**`、`docs/plans/**`、`docs/product-intelligence/**`、`docs/quality/**`
+禁止修改：
+- 既有 migration
+- `frontend-admin/**`
+- 预警 Service、Entity、Mapper 与业务数据
+- `deploy/**`、`.github/**`、生产凭据、生产数据库和仓库外文件
+验收标准：
+- `batchEvaluate` 的 `@PreAuthorize` 精确要求 `alert:evaluate` 或 ADMIN/SUPER_ADMIN。
+- 仅持有 `alert:edit` 的普通角色请求返回 403；持有 `alert:evaluate` 或管理员请求返回 200。
+- V146 只更新 `sys_menu.id=768` 且只在旧值为 `alert:edit` 时改为 `alert:evaluate`；菜单 767 和角色关系不变。
+- MySQL/H2 迁移版本唯一，后端专项、迁移契约和 `git diff --check` 通过。
+验证命令：
+- `cd backend; .\mvnw.cmd "-Dtest=AlertControllerTest,AlertPermissionMigrationTest,MigrationVersionUniquenessTest" test`
+- `git diff --check`
+
+执行结果：
+- 修复前专项 21 tests 按预期出现 2 个失败，分别证明 Controller 仍使用 `alert:edit` 和 V146 尚不存在。
+- 修复后专项 22 tests 全部通过；H2 实际迁移后菜单 767=`alert:edit`、768=`alert:evaluate`。
+- 仅持有 `alert:edit` 的普通角色请求 `batch-evaluate` 返回 403；持有 `alert:evaluate` 或管理员返回 200。
+- SQL safety 通过；MySQL smoke 因 `SPRING_DATASOURCE_URL` 未配置未执行，保留给远端 MySQL 门禁。
+- 正式报告：`docs/quality/ISSUE-040-001-预警批量评估独立权限码修复验收报告.md`。
 
 ### ISSUE-037-022：Windows PowerShell 5.1 AutoPilot 脚本编码兼容修复
 

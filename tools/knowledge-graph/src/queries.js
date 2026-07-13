@@ -9,28 +9,43 @@ function rows(result) {
 export async function status(driver, config) {
   return rows(await execute(driver, config.neo4jDatabase, `
     MATCH (p:Project {key: $projectKey})
-    CALL (p) { OPTIONAL MATCH (a:Artifact)-[:IN_PROJECT]->(p) RETURN count(a) AS artifacts, max(a.lastSeenAt) AS lastIndexedAt }
+    CALL (p) {
+      OPTIONAL MATCH (a:Artifact)-[:IN_PROJECT]->(p)
+      WHERE coalesce(a.active, true) = true
+      RETURN count(a) AS artifacts,
+             count(CASE WHEN coalesce(a.historical, false) = false THEN 1 END) AS currentArtifacts,
+             count(CASE WHEN a.historical = true THEN 1 END) AS historicalArtifacts,
+             max(a.lastSeenAt) AS lastIndexedAt
+    }
     CALL (p) { OPTIONAL MATCH (c:GitCommit)-[:IN_PROJECT]->(p) RETURN count(c) AS commits }
     CALL (p) { OPTIONAL MATCH (e:Episode)-[:IN_PROJECT]->(p) RETURN count(e) AS episodes }
     CALL (p) { OPTIONAL MATCH (r:CollectionRun)-[:IN_PROJECT]->(p) WITH r ORDER BY r.startedAt DESC LIMIT 1 RETURN r.status AS lastRunStatus, r.startedAt AS lastRunAt, r.failed AS lastRunFailures }
     OPTIONAL MATCH (cursor:SourceCursor)-[:CURSOR_FOR]->(source:Source)-[:IN_PROJECT]->(p)
-    RETURN p.key AS project, artifacts, commits, episodes, lastIndexedAt,
+    RETURN p.key AS project, artifacts, currentArtifacts, historicalArtifacts,
+           commits, episodes, lastIndexedAt,
            lastRunStatus, lastRunAt, lastRunFailures,
            collect({source: source.key, cursor: cursor.cursor, lastSuccessAt: cursor.lastSuccessAt}) AS cursors
   `, { projectKey: config.projectKey }));
 }
 
-export async function search(driver, config, query, limit = 20) {
+export async function search(driver, config, query, limit = 20, scope = "current") {
   const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 50));
+  if (!["current", "historical", "all"].includes(scope)) throw new Error(`Unsupported search scope: ${scope}`);
   return rows(await execute(driver, config.neo4jDatabase, `
-    CALL db.index.fulltext.queryNodes('knowledge_text', $query, {limit: $limit})
+    CALL db.index.fulltext.queryNodes('knowledge_text', $query, {limit: $candidateLimit})
     YIELD node, score
     OPTIONAL MATCH (a:Artifact)-[:CONTAINS]->(node)
+    WITH node, score, a, coalesce(node.historical, a.historical, false) AS historical
+    WHERE $scope = 'all'
+       OR ($scope = 'historical' AND historical = true)
+       OR ($scope = 'current' AND historical = false)
     RETURN labels(node) AS labels, node.id AS id, node.title AS title,
            coalesce(node.path, a.path) AS sourcePath,
-           coalesce(node.summary, left(node.content, 500)) AS excerpt, score
+           coalesce(node.summary, left(node.content, 500)) AS excerpt,
+           historical, coalesce(node.versionScope, a.versionScope) AS versionScope, score
     ORDER BY score DESC
-  `, { query, limit: safeLimit }));
+    LIMIT toInteger($limit)
+  `, { query, limit: safeLimit, candidateLimit: Math.min(safeLimit * 10, 500), scope }));
 }
 
 export async function getArtifact(driver, config, sourcePath) {
