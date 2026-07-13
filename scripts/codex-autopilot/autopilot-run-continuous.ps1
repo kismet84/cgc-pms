@@ -604,7 +604,12 @@ function Get-IterationProgressFromRuns {
       return
     }
 
-    if (!$result.issueId -or [string]$result.status -ne 'done') {
+    $durablyClosed = [string]$result.status -eq 'done' -and
+      [bool]$result.merged -and
+      [string]$result.nextAction -eq 'CHECKPOINT' -and
+      $null -ne $result.gitSummary -and
+      [string]$result.gitSummary.closeoutCommit
+    if (!$result.issueId -or !$durablyClosed) {
       return
     }
 

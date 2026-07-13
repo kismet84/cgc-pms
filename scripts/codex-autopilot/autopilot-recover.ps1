@@ -49,6 +49,11 @@ function Remove-AutopilotResidualWorktree {
   $branch = (& git -C $Worktree branch --show-current 2>$null | Select-Object -First 1).Trim()
   & git -c core.longpaths=true -C $RepoRoot worktree remove --force $Worktree | Out-Null
   if ($LASTEXITCODE -ne 0) { throw 'failed to remove residual issue worktree' }
+  if (Test-Path -LiteralPath $worktreeFull) {
+    $deletePath = if ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT) { '\\?\' + $worktreeFull } else { $worktreeFull }
+    Remove-Item -LiteralPath $deletePath -Recurse -Force
+  }
+  if (Test-Path -LiteralPath $worktreeFull) { throw 'residual issue worktree directory still exists after removal' }
   if ($branch) { & git -C $RepoRoot branch -D $branch 2>$null | Out-Null }
   return [pscustomobject]@{ removed=$true; branch=$branch }
 }
