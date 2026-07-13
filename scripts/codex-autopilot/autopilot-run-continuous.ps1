@@ -1035,6 +1035,8 @@ function Invoke-IssueExecutor {
   }
   if (Test-Path -LiteralPath $resultPath) {
     $result = Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $failureSummary = ''
+    $currentFingerprint = ''
     if ($resuming -and $script:RecoveryDecision.action -eq 'RESUME_VALIDATION' -and [string]$result.status -eq 'blocked') {
       if ([string]$result.failureCategory -eq 'environment' -and [string]$result.stopReason -eq 'STOP_VERIFICATION_FAILED') {
         $result.status = 'done'; $result.failureCategory = 'none'; $result.nextAction = 'VERIFY'; $result.stopReason = ''
@@ -1064,6 +1066,17 @@ function Invoke-IssueExecutor {
         $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
         $result.validation += [pscustomobject]@{ name = 'scope-allowlist'; status = 'fail'; message = $_.Exception.Message }
       }
+      if ($result.status -eq 'done') {
+        try {
+          Assert-AutopilotImplementationCloseoutArtifacts -Worktree $worktree.path -Issue $Issue.contract | Out-Null
+        } catch {
+          $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'REPAIR'; $result.stopReason = 'STOP_CLOSEOUT_ARTIFACTS_MISSING'
+          $failureSummary = "D/E 尚未开始；只补齐 F 文档与治理回写，不得重做或扩大 BC 实现。缺失项：$($_.Exception.Message)"
+          $currentFingerprint = Get-AutopilotTextHash ("closeout-artifacts|" + $_.Exception.Message)
+          $result | Add-Member -NotePropertyName failureFingerprint -NotePropertyValue $currentFingerprint -Force
+          $result.validation += [pscustomobject]@{ name='implementation-closeout-artifacts'; status='fail'; message=$_.Exception.Message }
+        }
+      }
       $resumePhase = if ($resuming) { [string]$checkpoint.phase } else { '' }
       $skipValidation = $resuming -and $resumePhase -in @('VALIDATED','REVIEWING','REVIEW_TOOL_BLOCKED','REVIEWED','CLOSING','IMPLEMENTATION_COMMITTED','CLOSEOUT_COMMITTED','REGISTERED')
       [System.Collections.Generic.List[string]]$evidencePaths = [System.Collections.Generic.List[string]]::new()
@@ -1074,8 +1087,6 @@ function Invoke-IssueExecutor {
           }
         }
       }
-      $failureSummary = ''
-      $currentFingerprint = ''
       if ($result.status -eq 'done' -and !$skipValidation) {
         $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase VALIDATING -IncrementDispatch validation
         $script:IssuePhase = 'VALIDATING'

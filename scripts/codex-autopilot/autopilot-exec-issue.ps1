@@ -246,6 +246,7 @@ $contextInstruction
 - 只处理该 Ready Issue 声明的允许修改范围。
 - 不连接生产库，不发布生产，不自动 push。
 - 完成后留下可验收的文件改动和验证证据；无法完成时按 blocked/failed 收口。
+- 返回 done 前必须完成 Ready 验收要求中的 F 职责：正式归档报告、存量问题唯一载体更新、项目地图/焦点回写，以及新增后续项、关闭后续项、后续项净变化统计；缺任一项不得声称完成。
 "@ | Out-File -Encoding utf8 $promptPath
   return $promptPath
 }

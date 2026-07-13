@@ -77,6 +77,7 @@ try {
   $scoredWorktree = New-AutopilotIssueWorktree -RepoRoot $root -IssueId 'ISSUE-900-041' -BaseCommit $scoredBase
   'implementation' | Set-Content -LiteralPath (Join-Path $scoredWorktree.path 'implementation.txt') -Encoding UTF8
   $scoredIssue = [pscustomobject]@{ issueId = 'ISSUE-900-041'; title = 'ISSUE-900-041：Scored closeout'; archiveReport = 'docs/quality/issue-900-041.md' }
+  Assert-AutopilotImplementationCloseoutArtifacts -Worktree $scoredWorktree.path -Issue $scoredIssue | Out-Null
   $scoreEvidence = [ordered]@{
     issueId='ISSUE-900-041';implementationCommit=('0'*40);scoringVersion='autopilot-task-score/v1';hardGatesPassed=$true;
     acceptanceCriteriaCovered=$true;targetValidationPassed=$true;scopeConsistent=$true;discoveriesDispositionComplete=$true;

@@ -62,6 +62,7 @@ try {
   if ($structuredToolBlocked.decision -ne 'tool_blocked' -or (Get-AutopilotReviewDisposition -ReviewResult $structuredToolBlocked -ExpectedIssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256).action -ne 'BLOCK_TOOL') { throw 'structured Reviewer tool block was not isolated from business repair' }
   if (Test-AutopilotCodeRepairAllowed -FailureCategory 'environment' -StopReason 'STOP_VERIFICATION_FAILED') { throw 'environment failure was routed to code repair' }
   if (!(Test-AutopilotCodeRepairAllowed -FailureCategory 'quality_security' -StopReason 'STOP_VERIFICATION_FAILED')) { throw 'quality failure lost bounded repair' }
+  if (!(Test-AutopilotCodeRepairAllowed -FailureCategory 'quality_security' -StopReason 'STOP_CLOSEOUT_ARTIFACTS_MISSING')) { throw 'missing F artifacts lost bounded repair' }
 
   if (Test-AutopilotRetryAllowed -PreviousFingerprint 'same' -CurrentFingerprint 'same' -Attempt 1) { throw 'same failure fingerprint was retried' }
   if (!(Test-AutopilotRetryAllowed -PreviousFingerprint 'old' -CurrentFingerprint 'new' -Attempt 1)) { throw 'new failure fingerprint was not allowed within budget' }

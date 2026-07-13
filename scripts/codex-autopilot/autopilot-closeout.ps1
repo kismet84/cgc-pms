@@ -47,6 +47,18 @@ function Assert-AutopilotStockIssueClosed {
   }
 }
 
+function Assert-AutopilotImplementationCloseoutArtifacts {
+  param([Parameter(Mandatory)][string]$Worktree, [Parameter(Mandatory)][object]$Issue)
+  $archivePath = Join-Path $Worktree $Issue.archiveReport
+  if (!(Test-Path -LiteralPath $archivePath -PathType Leaf)) { throw "formal archive report is missing: $($Issue.archiveReport)" }
+  $report = Get-Content -LiteralPath $archivePath -Raw -Encoding UTF8
+  foreach ($field in @('新增后续项','关闭后续项','后续项净变化')) {
+    if ($report -notmatch ('(?m)(?:本轮)?' + [regex]::Escape($field) + '[：:]')) { throw "formal archive report is missing $field" }
+  }
+  Assert-AutopilotStockIssueClosed -Worktree $Worktree -ReadyPath (Join-Path $Worktree 'docs\backlog\ready-issues.md') -IssueTitle $Issue.title
+  return $true
+}
+
 function Complete-AutopilotIssueCloseout {
   param(
     [string]$RepoRoot,
