@@ -41,6 +41,7 @@
 - [v1.5 迭代记录](iterations/README.md)
 - [未来开发计划](未来开发计划.md)
 - [历史开发记录](历史开发记录.md)
+- [项目知识图谱工具](../tools/knowledge-graph/README.md)
 
 ## 历史边界
 

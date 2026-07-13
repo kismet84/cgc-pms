@@ -1,0 +1,11 @@
+CREATE CONSTRAINT project_key IF NOT EXISTS FOR (n:Project) REQUIRE n.key IS UNIQUE;
+CREATE CONSTRAINT artifact_id IF NOT EXISTS FOR (n:Artifact) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT section_id IF NOT EXISTS FOR (n:Section) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT commit_hash IF NOT EXISTS FOR (n:GitCommit) REQUIRE n.hash IS UNIQUE;
+CREATE CONSTRAINT episode_id IF NOT EXISTS FOR (n:Episode) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT entity_id IF NOT EXISTS FOR (n:Entity) REQUIRE n.id IS UNIQUE;
+CREATE INDEX artifact_path IF NOT EXISTS FOR (n:Artifact) ON (n.path);
+CREATE INDEX artifact_kind IF NOT EXISTS FOR (n:Artifact) ON (n.kind);
+CREATE INDEX artifact_active IF NOT EXISTS FOR (n:Artifact) ON (n.active);
+CREATE INDEX episode_occurred_at IF NOT EXISTS FOR (n:Episode) ON (n.occurredAt);
+CREATE FULLTEXT INDEX knowledge_text IF NOT EXISTS FOR (n:Artifact|Section|Episode|Entity) ON EACH [n.title, n.name, n.summary, n.content];

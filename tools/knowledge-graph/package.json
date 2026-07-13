@@ -1,0 +1,23 @@
+{
+  "name": "cgc-pms-knowledge-graph",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local Neo4j knowledge collector and MCP server for cgc-pms.",
+  "scripts": {
+    "schema": "node src/cli.js schema",
+    "collect": "node src/cli.js collect",
+    "status": "node src/cli.js status",
+    "mcp": "node src/server.js",
+    "test": "node --test",
+    "test:mcp": "node test/mcp-smoke.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "neo4j-driver": "6.2.0",
+    "zod": "4.4.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
