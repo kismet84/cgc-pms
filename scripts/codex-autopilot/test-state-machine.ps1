@@ -39,6 +39,11 @@ try {
   if ($read.reviewCycleCompletedCount -ne 0 -or @($read.reviewCycleCompletedIssueIds).Count -ne 0 -or $read.activeScoringVersion) { throw 'state migration fabricated historical scoring data' }
   if ($read.issueCheckpointPath -ne '' -or $read.currentIssuePhase -ne '' -or $read.lastCanaryFingerprint -ne '') { throw 'state migration fabricated recovery or canary evidence' }
 
+  $bound = Resolve-AutopilotIssueStateBinding -Existing ([pscustomobject]@{issueCheckpointPath='old.json';currentIssuePhase='REGISTERED'})
+  if ($bound.checkpointPath -ne 'old.json' -or $bound.phase -ne 'REGISTERED') { throw 'active Issue state binding was not preserved' }
+  $cleared = Resolve-AutopilotIssueStateBinding -Existing ([pscustomobject]@{issueCheckpointPath='old.json';currentIssuePhase='REGISTERED'}) -Clear
+  if ($cleared.checkpointPath -ne '' -or $cleared.phase -ne '') { throw 'closed Issue state binding was restored from stale state' }
+
   $oldHeartbeat = [datetimeoffset]$read.lastHeartbeatAt
   Start-Sleep -Milliseconds 20
   $moved = Move-AutopilotState -Path $statePath -ToStatus 'CHECKPOINT' -Phase 'checkpoint' -Reason 'test'

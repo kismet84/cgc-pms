@@ -37,6 +37,20 @@ function Set-AutopilotProperty {
   }
 }
 
+function Resolve-AutopilotIssueStateBinding {
+  param(
+    [object]$Existing,
+    [AllowEmptyString()][string]$CheckpointPath = '',
+    [AllowEmptyString()][string]$Phase = '',
+    [switch]$Clear
+  )
+  if ($Clear) { return [pscustomobject]@{ checkpointPath=''; phase='' } }
+  return [pscustomobject]@{
+    checkpointPath = if ($CheckpointPath) { $CheckpointPath } else { [string](Get-AutopilotStateProperty $Existing 'issueCheckpointPath' '') }
+    phase = if ($Phase) { $Phase } else { [string](Get-AutopilotStateProperty $Existing 'currentIssuePhase' '') }
+  }
+}
+
 function Get-AutopilotStateProperty {
   param([object]$Object, [string]$Name, [object]$Default = $null)
   if ($null -eq $Object) { return $Default }

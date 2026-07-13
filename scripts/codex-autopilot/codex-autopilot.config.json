@@ -21,6 +21,7 @@
       "scripts/codex-autopilot/test-phase-recovery.ps1",
       "scripts/codex-autopilot/test-closeout.ps1",
       "scripts/codex-autopilot/test-review-repair.ps1",
+      "scripts/codex-autopilot/test-state-machine.ps1",
       "scripts/codex-autopilot/autopilot-review.ps1",
       "scripts/codex-autopilot/autopilot-closeout.ps1",
       "scripts/codex-autopilot/autopilot-state.ps1",

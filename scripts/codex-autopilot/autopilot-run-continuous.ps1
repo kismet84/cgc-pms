@@ -423,6 +423,7 @@ function Write-State {
   while ($completedIds.Count -lt $script:IterationCompleted) { $completedIds += "legacy-completed-$($completedIds.Count + 1)" }
   $stateStatus = if ($script:AutopilotStatuses -contains $Status) { $Status } elseif ($Status -eq 'STOP_ITERATION_LIMIT_REACHED') { 'LIMIT_REACHED' } elseif ($Status -eq 'STOP_RETROSPECTIVE_REQUIRED') { 'RETROSPECTIVE_REQUIRED' } elseif ($Status -eq 'STOP_PAUSE_FLAG') { 'PAUSED' } elseif ($Status -eq 'STOP_DISABLED') { 'DISABLED' } elseif ($Status -like 'STOP*') { 'STOPPED' } elseif ($Status -like 'READY_ISSUE*') { 'PLANNING' } elseif ($Status -like '*SPLIT*') { 'REFILLING' } else { 'CHECKPOINT' }
   $phase = $stateStatus.ToLowerInvariant()
+  $issueStateBinding = Resolve-AutopilotIssueStateBinding -Existing $existing -CheckpointPath ([string]$script:IssueCheckpointPath) -Phase ([string]$script:IssuePhase) -Clear:($LastAction -eq 'ISSUE_CLOSED')
   $state = [ordered]@{
     schemaVersion = 3
     runId = if ($script:RunContext) { $script:RunContext.id } else { 'run-' + [datetimeoffset]::Now.ToString('yyyyMMdd-HHmmss-fff') }
@@ -465,8 +466,8 @@ function Write-State {
     lastRetrospectiveAt = Get-AutopilotStateProperty $existing 'lastRetrospectiveAt'
     lastRetrospectiveReport = Get-AutopilotStateProperty $existing 'lastRetrospectiveReport'
     activeScoringVersion = if ($script:TaskScoringActive) { [string]$config.taskScoring.activeVersion } else { $null }
-    issueCheckpointPath = if ($script:IssueCheckpointPath) { [string]$script:IssueCheckpointPath } else { [string](Get-AutopilotStateProperty $existing 'issueCheckpointPath' '') }
-    currentIssuePhase = if ($script:IssuePhase) { [string]$script:IssuePhase } else { [string](Get-AutopilotStateProperty $existing 'currentIssuePhase' '') }
+    issueCheckpointPath = $issueStateBinding.checkpointPath
+    currentIssuePhase = $issueStateBinding.phase
     lastCanaryFingerprint = if ($script:LastCanaryFingerprint) { [string]$script:LastCanaryFingerprint } else { [string](Get-AutopilotStateProperty $existing 'lastCanaryFingerprint' '') }
     lastCanaryReport = if ($script:LastCanaryReport) { [string]$script:LastCanaryReport } else { [string](Get-AutopilotStateProperty $existing 'lastCanaryReport' '') }
     enabled = Test-Path (Join-Path $AutoDir 'enabled.flag')
