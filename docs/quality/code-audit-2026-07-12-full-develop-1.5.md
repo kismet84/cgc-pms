@@ -100,8 +100,9 @@ trivy rootfs --scanners vuln --pkg-types library --severity HIGH,CRITICAL --exit
 ## 远端 CI 与上线边界
 
 - `master` 的 11 个 required checks 仍为：`backend-test`、`backend-test-mysql`、`backend-dependency-scan`、`frontend-lint`、`type-check`、`frontend-build`、`frontend-test`、`frontend-dependency-audit`、`sql-safety-scan`、`e2e`、`supply-chain-security`。
-- 本轮已获得 commit/push 授权；本报告随整改提交进入远端 CI，最终裁决仍以实际推送后同一待合并 SHA 的 required checks 结果为准。
-- 因此：**本地整改通过；合并/上线裁决暂不通过，阻塞项仅为提交与远端 CI 证据缺失。**
+- PR #334 首轮 `backend-test` 在 `Phase3IntegrationTest.test03_dynamicCostFormula` 暴露公式漂移：科目行使用 `confirmedRevenue-dynamicCost`，而 V27 回填、项目级汇总、批量汇总和既有契约均使用 `contractIncome-dynamicCost`。该失败分类为真实质量/数据一致性问题，不是工具或环境波动。
+- 已恢复科目行公式契约，并在 `CostSummaryServiceTest.testRefreshSummaryDynamicCostReportAmounts` 固定“合同收入与确认收入可区分”的回归数据。修复前该断言稳定失败，修复后目标测试与 `Phase3IntegrationTest` 共 8 项通过，后端全量 `verify` 再次通过。
+- 修复提交推送后需以 PR 最新待合并 SHA 的 11 个 required checks 全绿作为最终裁决；在此之前：**本地整改通过，远端合并门禁仍阻塞。**
 
 ## 依赖与格式治理补充闭环
 
@@ -112,4 +113,4 @@ trivy rootfs --scanners vuln --pkg-types library --severity HIGH,CRITICAL --exit
 ## 剩余风险
 
 1. Trivy Java DB 冷缓存首次下载约 891.5 MiB，国内网络较慢；CI 已加入按日缓存和历史缓存回退，因此该风险只剩首次冷启动时延，不影响扫描正确性或已完成的 0 命中结论。
-2. 未经 commit/push 与同 SHA 远端 11 checks 全绿，不得把本报告解释为可直接上线批准。
+2. PR #334 的公式修复尚待最新 SHA 的 11 checks 全绿，不得把本报告解释为可直接上线批准。
