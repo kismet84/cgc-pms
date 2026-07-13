@@ -1096,7 +1096,11 @@ function Invoke-IssueExecutor {
         for ($index = 0; $index -lt $Issue.contract.validationCommands.Count; $index++) {
           $validationCommand = [string]$Issue.contract.validationCommands[$index]
           if (!(Test-AutopilotPostExecutionVerificationRequired -Command $validationCommand)) {
-            $result.validation += [pscustomobject]@{ name = "ready-command-$($index + 1)"; status = 'pass'; message = 'Ready lint passed before executor dispatch; post-closeout status is expected to be Done.' }
+            $evidencePath = Join-Path $verifyDir ("evidence-{0:00}.json" -f ($index + 1))
+            $logPath = Join-Path $verifyDir ("command-{0:00}.log" -f ($index + 1))
+            $evidence = New-AutopilotReadyLintEvidence -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit -Command $validationCommand -ReadyContentHash ([string]$Issue.lint.readyContentHash) -ExpectedReadyContentHash ([string]$checkpoint.readyContentHash) -EvidencePath $evidencePath -LogPath $logPath
+            [void]$evidencePaths.Add($evidencePath)
+            $result.validation += [pscustomobject]@{ name = "ready-command-$($index + 1)"; status = $evidence.classification; message = "exitCode=$($evidence.exitCode); evidence=$evidencePath" }
             continue
           }
           $evidencePath = Join-Path $verifyDir ("evidence-{0:00}.json" -f ($index + 1))

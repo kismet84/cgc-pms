@@ -14,10 +14,13 @@ function Get-AutopilotDiffHash {
 
 function Get-AutopilotDiffText {
   param([string]$Worktree, [string]$BaseCommit)
-  $diff = (& git -c core.autocrlf=false -c core.safecrlf=false -C $Worktree diff --binary $BaseCommit -- 2>$null | Out-String)
+  # Keep the repository's checkout normalization active. Forcing autocrlf=false on
+  # Windows compares checked-out CRLF bytes with LF blobs and turns small document
+  # edits into whole-file review noise.
+  $diff = (& git -c core.safecrlf=false -C $Worktree diff --binary $BaseCommit -- 2>$null | Out-String)
   if ($LASTEXITCODE -ne 0) { throw 'cannot calculate worktree diff hash' }
   foreach ($path in @(& git -c core.quotePath=false -c core.autocrlf=false -c core.safecrlf=false -C $Worktree ls-files --others --exclude-standard)) {
-    $untrackedDiff = (& git -c core.autocrlf=false -c core.safecrlf=false -C $Worktree diff --no-index --binary -- NUL $path 2>$null | Out-String)
+    $untrackedDiff = (& git -c core.safecrlf=false -C $Worktree diff --no-index --binary -- NUL $path 2>$null | Out-String)
     if ($LASTEXITCODE -notin @(0,1)) { throw "cannot include untracked file in diff: $path" }
     $diff += $untrackedDiff
   }

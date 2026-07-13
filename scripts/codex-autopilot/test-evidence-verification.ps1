@@ -44,6 +44,14 @@ try {
   if (Test-AutopilotPostExecutionVerificationRequired -Command 'powershell -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot .') { throw 'post-execution verification attempted to rerun the pre-dispatch Ready lint' }
   if (!(Test-AutopilotPostExecutionVerificationRequired -Command 'git diff --check')) { throw 'post-execution verification skipped a required non-lint command' }
 
+  $readyHash = ('a' * 64)
+  $readyEvidence = New-AutopilotReadyLintEvidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'ready-lint.ps1' -ReadyContentHash $readyHash -ExpectedReadyContentHash $readyHash -EvidencePath (Join-Path $root 'ready-evidence.json') -LogPath (Join-Path $root 'ready.log')
+  Assert-AutopilotEvidenceCurrent -Evidence $readyEvidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base | Out-Null
+  if ($readyEvidence.readyContentHash -ne $readyHash -or $readyEvidence.summary -notmatch 'production parser') { throw 'normalized terminal Ready lint evidence is incomplete' }
+  $mismatchRejected = $false
+  try { New-AutopilotReadyLintEvidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'ready-lint.ps1' -ReadyContentHash $readyHash -ExpectedReadyContentHash ('b' * 64) -EvidencePath (Join-Path $root 'bad-ready-evidence.json') -LogPath (Join-Path $root 'bad-ready.log') | Out-Null } catch { $mismatchRejected = $true }
+  if (!$mismatchRejected) { throw 'mismatched terminal Ready contract hash produced pass evidence' }
+
   $secondEvidencePath = Join-Path $root 'evidence-02.json'
   Copy-Item -LiteralPath $evidencePath -Destination $secondEvidencePath
   $recoveredEvidencePaths = @(Get-AutopilotConcatenatedEvidencePaths -Message ("Cannot find path '$evidencePath$secondEvidencePath' because it does not exist."))

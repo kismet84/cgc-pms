@@ -74,6 +74,46 @@ function Assert-AutopilotEvidenceCurrent {
   return $true
 }
 
+function New-AutopilotReadyLintEvidence {
+  param(
+    [Parameter(Mandatory)][string]$IssueId,
+    [Parameter(Mandatory)][string]$Worktree,
+    [Parameter(Mandatory)][string]$BaseCommit,
+    [Parameter(Mandatory)][string]$Command,
+    [Parameter(Mandatory)][string]$ReadyContentHash,
+    [Parameter(Mandatory)][string]$ExpectedReadyContentHash,
+    [Parameter(Mandatory)][string]$EvidencePath,
+    [Parameter(Mandatory)][string]$LogPath
+  )
+  if ($ReadyContentHash -notmatch '^[a-f0-9]{64}$' -or $ReadyContentHash -ne $ExpectedReadyContentHash) {
+    throw 'normalized terminal Ready lint hash does not match the dispatched contract'
+  }
+  $started = [datetimeoffset]::Now
+  $summary = "Normalized terminal Ready contract passed the production parser; readyContentHash=$ReadyContentHash"
+  $parent = Split-Path -Parent $LogPath
+  if ($parent -and !(Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+  [IO.File]::WriteAllText($LogPath, $summary, [Text.UTF8Encoding]::new($false))
+  $evidence = [ordered]@{
+    schemaVersion = 1
+    issueId = $IssueId
+    baseCommit = $BaseCommit
+    commit = (& git -C $Worktree rev-parse HEAD).Trim()
+    diffHash = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $BaseCommit
+    command = $Command
+    startedAt = $started.ToString('o')
+    durationSeconds = [Math]::Round(([datetimeoffset]::Now - $started).TotalSeconds, 3)
+    exitCode = 0
+    classification = 'pass'
+    summary = $summary
+    rawLogPath = $LogPath
+    readyContentHash = $ReadyContentHash
+  }
+  $evidenceParent = Split-Path -Parent $EvidencePath
+  if ($evidenceParent -and !(Test-Path -LiteralPath $evidenceParent)) { New-Item -ItemType Directory -Path $evidenceParent -Force | Out-Null }
+  [IO.File]::WriteAllText($EvidencePath, ($evidence | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+  return [pscustomobject]$evidence
+}
+
 function Get-AutopilotConcatenatedEvidencePaths {
   param([AllowEmptyString()][string]$Message)
   if ([string]::IsNullOrWhiteSpace($Message)) { return @() }
