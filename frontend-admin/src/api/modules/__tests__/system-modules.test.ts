@@ -23,7 +23,7 @@ import {
   updateDictType,
 } from '../dict'
 import { deleteFile, getFileUrl, listFiles, uploadFile } from '../file'
-import { getMenuTree, getRoles, getUserList, updateRoleMenus } from '../system'
+import { createMenu, getMenuTree, getRoles, getUserList, updateRoleMenus } from '../system'
 
 describe('system-related API modules', () => {
   beforeEach(() => {
@@ -31,23 +31,40 @@ describe('system-related API modules', () => {
   })
 
   it('builds system management requests', () => {
+    const createPayload = {
+      parentId: '10',
+      menuName: '采购看板',
+      menuType: 'MENU' as const,
+      path: '/purchase-board',
+      orderNum: 3,
+    }
     getMenuTree()
+    createMenu(createPayload)
     getRoles()
     updateRoleMenus(12, [1, 2])
     getUserList({ pageNum: 1, pageSize: 20 })
 
     expect(mockRequest).toHaveBeenNthCalledWith(1, { url: '/system/menus/tree', method: 'get' })
-    expect(mockRequest).toHaveBeenNthCalledWith(2, { url: '/system/roles', method: 'get' })
-    expect(mockRequest).toHaveBeenNthCalledWith(3, {
+    expect(mockRequest).toHaveBeenNthCalledWith(2, {
+      url: '/system/menus',
+      method: 'post',
+      data: createPayload,
+    })
+    expect(mockRequest).toHaveBeenNthCalledWith(3, { url: '/system/roles', method: 'get' })
+    expect(mockRequest).toHaveBeenNthCalledWith(4, {
       url: '/system/roles/12/menus',
       method: 'put',
       data: { menuIds: [1, 2] },
     })
-    expect(mockRequest).toHaveBeenNthCalledWith(4, {
+    expect(mockRequest).toHaveBeenNthCalledWith(5, {
       url: '/system/users',
       method: 'get',
       params: { pageNum: 1, pageSize: 20 },
     })
+    expect(createPayload).not.toHaveProperty('id')
+    expect(createPayload).not.toHaveProperty('tenantId')
+    expect(createPayload).not.toHaveProperty('children')
+    expect(createPayload).not.toHaveProperty('createdAt')
   })
 
   it('builds alert requests', () => {

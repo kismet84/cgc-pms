@@ -12,14 +12,19 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "jwt.secret=issue-040-019-test-secret-at-least-32-chars"
+})
 @AutoConfigureMockMvc @ActiveProfiles("local")
 @DisplayName("SysMenuController integration tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Transactional
 class SysMenuControllerTest {
     @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
     @Autowired private FallbackRateLimitCounterStore counterStore;
@@ -31,8 +36,12 @@ class SysMenuControllerTest {
     }
 
     private Cookie adminCookie() {
+        return cookie(List.of("ADMIN"), List.of());
+    }
+
+    private Cookie cookie(List<String> roles, List<String> permissions) {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
-                jwtUtils.generateToken(ADMIN_ID, "admin", TENANT_ID, List.of("ADMIN"), List.of()));
+                jwtUtils.generateToken(ADMIN_ID, "menu-test", TENANT_ID, roles, permissions));
     }
 
     @Test @Order(1) @DisplayName("GET /system/menus without JWT -> 401")
@@ -101,6 +110,34 @@ class SysMenuControllerTest {
     void testCreate_Missing() throws Exception {
         mockMvc.perform(p("/system/menus").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test @Order(6) @DisplayName("POST /system/menus ADMIN -> 200")
+    void testCreate_Admin() throws Exception {
+        mockMvc.perform(p("/system/menus").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parentId\":0,\"menuName\":\"管理员新建菜单\",\"menuType\":\"MENU\",\"path\":\"/admin-created\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").exists());
+    }
+
+    @Test @Order(7) @DisplayName("POST /system/menus system:menu:add -> 200")
+    void testCreate_WithPermission() throws Exception {
+        mockMvc.perform(p("/system/menus")
+                        .cookie(cookie(List.of("USER"), List.of("system:menu:add")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parentId\":0,\"menuName\":\"权限码新建菜单\",\"menuType\":\"DIR\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(8) @DisplayName("POST /system/menus without role or permission -> 403")
+    void testCreate_Forbidden() throws Exception {
+        mockMvc.perform(p("/system/menus")
+                        .cookie(cookie(List.of("USER"), List.of("system:menu:query")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"parentId\":0,\"menuName\":\"越权新建菜单\",\"menuType\":\"MENU\"}"))
+                .andExpect(status().isForbidden());
     }
 
     private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }

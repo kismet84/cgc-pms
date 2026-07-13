@@ -1,12 +1,21 @@
 import { request } from '@/api/request'
 import type { PageParams, PageResult } from '@/types/api'
-import type { MenuTreeVO, SysRoleVO } from '@/types/system'
+import type { CreateMenuPayload, MenuTreeVO, SysRoleVO } from '@/types/system'
 
 /** 获取菜单树 */
 export function getMenuTree() {
   return request<MenuTreeVO[]>({
     url: '/system/menus/tree',
     method: 'get',
+  })
+}
+
+/** 新建菜单 */
+export function createMenu(data: CreateMenuPayload) {
+  return request<number | string>({
+    url: '/system/menus',
+    method: 'post',
+    data,
   })
 }
 

@@ -110,6 +110,7 @@ class SysMenuServiceTest {
     @DisplayName("创建菜单 — 自动设置tenantId")
     void testCreate_TenantIdAutoSet() {
         SysMenu menu = new SysMenu();
+        menu.setTenantId(999L);
         menu.setParentId(0L);
         menu.setMenuName("租户菜单");
         menu.setMenuType("MENU");
@@ -523,5 +524,105 @@ class SysMenuServiceTest {
         assertEquals("二级菜单", l1Node.getChildren().get(0).getMenuName());
 
         System.out.println("testGetTree_MultiLevelNesting 通过: l1 children=" + l1Node.getChildren().size());
+    }
+
+    @Test
+    @Order(22)
+    @Transactional
+    @DisplayName("创建根菜单 — parentId为空时统一为0")
+    void testCreate_NormalizesRootParent() {
+        SysMenu menu = menu("空父节点根菜单", "DIR", null);
+
+        Long id = menuService.create(menu);
+
+        assertEquals(0L, menuMapper.selectById(id).getParentId());
+    }
+
+    @Test
+    @Order(23)
+    @Transactional
+    @DisplayName("创建菜单 — 非法menuType被拒绝")
+    void testCreate_InvalidMenuType() {
+        SysMenu menu = menu("非法类型菜单", "UNKNOWN", 0L);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> menuService.create(menu));
+
+        assertEquals("MENU_TYPE_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Order(24)
+    @Transactional
+    @DisplayName("创建菜单 — 不存在的父节点被拒绝")
+    void testCreate_MissingParent() {
+        SysMenu menu = menu("孤立菜单", "MENU", 999999L);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> menuService.create(menu));
+
+        assertEquals("MENU_PARENT_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Order(25)
+    @Transactional
+    @DisplayName("创建菜单 — 其他租户父节点被拒绝")
+    void testCreate_CrossTenantParent() {
+        setTenant(998L);
+        Long foreignParentId = menuService.create(menu("其他租户父菜单", "DIR", 0L));
+        setTenant(TENANT_0);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> menuService.create(menu("跨租户子菜单", "MENU", foreignParentId)));
+
+        assertEquals("MENU_PARENT_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Order(26)
+    @Transactional
+    @DisplayName("创建菜单 — BUTTON不能作为父节点")
+    void testCreate_ButtonParent() {
+        Long buttonId = menuService.create(menu("父按钮", "BUTTON", 0L));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> menuService.create(menu("按钮子菜单", "MENU", buttonId)));
+
+        assertEquals("MENU_PARENT_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Order(27)
+    @Transactional
+    @DisplayName("创建菜单 — 合法同租户父节点写入正确树位置")
+    void testCreate_ValidParentAppearsInTree() {
+        Long parentId = menuService.create(menu("树约束父菜单", "DIR", 0L));
+        Long childId = menuService.create(menu("树约束子菜单", "MENU", parentId));
+
+        SysMenu saved = menuMapper.selectById(childId);
+        assertEquals(parentId, saved.getParentId());
+        assertEquals(TENANT_0, saved.getTenantId());
+
+        MenuTreeVO parent = menuService.getTree().stream()
+                .filter(node -> parentId.equals(node.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(parent.getChildren().stream().anyMatch(node -> childId.equals(node.getId())));
+    }
+
+    private SysMenu menu(String name, String type, Long parentId) {
+        SysMenu menu = new SysMenu();
+        menu.setParentId(parentId);
+        menu.setMenuName(name);
+        menu.setMenuType(type);
+        menu.setPath("/" + name);
+        return menu;
+    }
+
+    private void setTenant(Long tenantId) {
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", tenantId)
+                .build());
     }
 }

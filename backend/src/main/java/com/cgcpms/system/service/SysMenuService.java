@@ -14,12 +14,16 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class SysMenuService {
+
+    private static final Set<String> MENU_TYPES = Set.of("DIR", "MENU", "BUTTON");
 
     private final SysMenuMapper sysMenuMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
@@ -49,8 +53,23 @@ public class SysMenuService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(SysMenu menu) {
+        Long tenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
+        if (!MENU_TYPES.contains(menu.getMenuType())) {
+            throw new BusinessException("MENU_TYPE_INVALID", "菜单类型不合法");
+        }
+
+        Long parentId = menu.getParentId() == null ? 0L : menu.getParentId();
+        menu.setParentId(parentId);
+        if (parentId != 0L) {
+            SysMenu parent = sysMenuMapper.selectById(parentId);
+            if (parent == null || !Objects.equals(parent.getTenantId(), tenantId)
+                    || "BUTTON".equals(parent.getMenuType())) {
+                throw new BusinessException("MENU_PARENT_INVALID", "父菜单不存在或不可作为父节点");
+            }
+        }
+
         // Force tenantId from authenticated context, ignore client-supplied value
-        menu.setTenantId(com.cgcpms.auth.context.UserContext.getCurrentTenantId());
+        menu.setTenantId(tenantId);
         if (menu.getStatus() == null) menu.setStatus("ENABLE");
         if (menu.getVisible() == null) menu.setVisible(1);
         sysMenuMapper.insert(menu);
