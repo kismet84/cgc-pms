@@ -1,6 +1,6 @@
 {
   "name": "cgc-pms-knowledge-graph",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "Local Neo4j knowledge collector and MCP server for cgc-pms.",

@@ -10,6 +10,7 @@ CREATE CONSTRAINT collection_run_id IF NOT EXISTS FOR (n:CollectionRun) REQUIRE 
 CREATE CONSTRAINT artifact_version_id IF NOT EXISTS FOR (n:ArtifactVersion) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT evidence_id IF NOT EXISTS FOR (n:Evidence) REQUIRE n.id IS UNIQUE;
 CREATE CONSTRAINT decision_id IF NOT EXISTS FOR (n:Decision) REQUIRE n.id IS UNIQUE;
+CREATE CONSTRAINT issue_id IF NOT EXISTS FOR (n:Issue) REQUIRE n.id IS UNIQUE;
 CREATE INDEX artifact_path IF NOT EXISTS FOR (n:Artifact) ON (n.path);
 CREATE INDEX artifact_kind IF NOT EXISTS FOR (n:Artifact) ON (n.kind);
 CREATE INDEX artifact_active IF NOT EXISTS FOR (n:Artifact) ON (n.active);
@@ -19,5 +20,10 @@ CREATE INDEX episode_occurred_at IF NOT EXISTS FOR (n:Episode) ON (n.occurredAt)
 CREATE INDEX collection_run_started_at IF NOT EXISTS FOR (n:CollectionRun) ON (n.startedAt);
 CREATE INDEX collection_run_status IF NOT EXISTS FOR (n:CollectionRun) ON (n.status);
 CREATE INDEX artifact_version_sha IF NOT EXISTS FOR (n:ArtifactVersion) ON (n.sha256);
+CREATE INDEX issue_key IF NOT EXISTS FOR (n:Issue) ON (n.issueKey);
+CREATE INDEX issue_current IF NOT EXISTS FOR (n:Issue) ON (n.current);
+CREATE INDEX issue_status IF NOT EXISTS FOR (n:Issue) ON (n.status);
+CREATE INDEX issue_classification IF NOT EXISTS FOR (n:Issue) ON (n.classification);
+CREATE INDEX issue_priority IF NOT EXISTS FOR (n:Issue) ON (n.priority);
 CREATE FULLTEXT INDEX knowledge_text IF NOT EXISTS FOR (n:Artifact|Section|Episode|Entity) ON EACH [n.title, n.name, n.summary, n.content];
 CREATE FULLTEXT INDEX knowledge_evidence IF NOT EXISTS FOR (n:Evidence|Decision) ON EACH [n.title, n.summary, n.sourceRef];

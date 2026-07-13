@@ -1,10 +1,18 @@
 import { loadConfig } from "./config.js";
 import { createDriver, execute, jsonSafe } from "./neo4j.js";
-import { search } from "./queries.js";
+import { listIssues, search } from "./queries.js";
+import { loadIssueRegister } from "./issue-registry.js";
 
 const config = loadConfig();
 const driver = createDriver(config);
 try {
+  const issueRegister = loadIssueRegister(config.repoRoot).register;
+  const issueQueryStartedAt = performance.now();
+  const structuredIssueSummary = await listIssues(driver, config, { view: "summary" });
+  const issueSummaryElapsedMs = performance.now() - issueQueryStartedAt;
+  const issueListStartedAt = performance.now();
+  const structuredIssueList = await listIssues(driver, config, { view: "list", limit: 200 });
+  const issueListElapsedMs = performance.now() - issueListStartedAt;
   const evidence = {
     versions: await execute(driver, config.neo4jDatabase, `
       MATCH (a:Artifact) WHERE a.sha256 IS NOT NULL
@@ -29,8 +37,9 @@ try {
       ORDER BY r.startedAt DESC LIMIT 1
     `, { projectKey: config.projectKey }),
     sensitive: await execute(driver, config.neo4jDatabase, `
-      MATCH (n) WHERE any(k IN keys(n)
-        WHERE toString(n[k]) CONTAINS 'hunter2' OR toString(n[k]) CONTAINS 'secret-value')
+      MATCH (n) WHERE any(k IN keys(n) WHERE any(value IN
+        CASE WHEN valueType(n[k]) STARTS WITH 'LIST' THEN n[k] ELSE [n[k]] END
+        WHERE toString(value) CONTAINS 'hunter2' OR toString(value) CONTAINS 'secret-value'))
       RETURN count(n) AS matches
     `),
     historyMarkdown: await execute(driver, config.neo4jDatabase, `
@@ -52,6 +61,32 @@ try {
              count(CASE WHEN a.content IS NOT NULL THEN 1 END) AS withContent,
              count(CASE WHEN NOT (a)-[:DERIVED_FROM]->(:Source {key: 'references'}) THEN 1 END) AS missingSource
     `),
+    issues: await execute(driver, config.neo4jDatabase, `
+      MATCH (i:Issue)-[:IN_PROJECT]->(:Project {key: $projectKey})
+      WHERE i.current = true
+      OPTIONAL MATCH (i)-[defined:DEFINED_IN]->(:Artifact {path: 'docs/backlog/current-issues.json'})
+      OPTIONAL MATCH (i)-[supported:SUPPORTED_BY]->(:Artifact)
+      WITH i, count(DISTINCT defined) AS registerRelations,
+              count(DISTINCT supported) AS supportedRelations
+      RETURN count(i) AS issues,
+             sum(CASE WHEN registerRelations = 0 THEN 1 ELSE 0 END) AS missingRegister,
+             sum(CASE WHEN supportedRelations = 0 THEN 1 ELSE 0 END) AS missingEvidence,
+             sum(CASE WHEN i.blocking = true THEN 1 ELSE 0 END) AS blocking,
+             sum(size(i.sourceRefs)) AS expectedEvidenceRelations,
+             sum(supportedRelations) AS evidenceRelations
+    `, { projectKey: config.projectKey }),
+    issueParents: await execute(driver, config.neo4jDatabase, `
+      MATCH (i:Issue)-[:IN_PROJECT]->(:Project {key: $projectKey})
+      WHERE i.current = true AND i.parentIssueKey IS NOT NULL
+      OPTIONAL MATCH (i)-[parent:PART_OF]->(:Issue {issueKey: i.parentIssueKey})
+      RETURN count(i) AS children, count(parent) AS parentRelations
+    `, { projectKey: config.projectKey }),
+    issueQuery: [{
+      total: structuredIssueSummary.total,
+      returned: structuredIssueList.returned,
+      summaryElapsedMs: issueSummaryElapsedMs,
+      listElapsedMs: issueListElapsedMs,
+    }],
   };
   const currentSearch = await search(driver, config, "剩余风险", 20, "current");
   const historicalSearch = await search(driver, config, "剩余风险", 20, "historical");
@@ -78,6 +113,25 @@ try {
   if (safe.privateArchive[0].artifacts !== 0) throw new Error("Private v1.0 archive content entered the graph.");
   if (safe.referenceOnly[0].withContent !== 0 || safe.referenceOnly[0].missingSource !== 0) {
     throw new Error("Reference-only artifacts contain content or lack provenance.");
+  }
+  const issues = safe.issues[0];
+  if (issues.issues !== issueRegister.issues.length
+      || issues.missingRegister !== 0
+      || issues.missingEvidence !== 0
+      || issues.expectedEvidenceRelations !== issues.evidenceRelations) {
+    throw new Error("Current issue registry coverage or provenance is incomplete.");
+  }
+  if (issues.blocking !== issueRegister.issues.filter((issue) => issue.blocking).length) {
+    throw new Error("Current issue blocking count differs from the canonical register.");
+  }
+  if (safe.issueParents[0].children !== safe.issueParents[0].parentRelations) {
+    throw new Error("Current issue parent relationships are incomplete.");
+  }
+  if (safe.issueQuery[0].total !== issueRegister.issues.length
+      || safe.issueQuery[0].returned !== issueRegister.issues.length
+      || safe.issueQuery[0].summaryElapsedMs > 2000
+      || safe.issueQuery[0].listElapsedMs > 2000) {
+    throw new Error("Structured current issue query is incomplete or exceeds the 2 second acceptance budget.");
   }
   if (safe.searchScopes[0].currentHistoricalMatches !== 0 || safe.searchScopes[0].historicalCurrentMatches !== 0) {
     throw new Error("Current and historical search scopes are not isolated.");

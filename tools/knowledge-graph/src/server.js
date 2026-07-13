@@ -3,14 +3,14 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { loadConfig } from "./config.js";
 import { createDriver } from "./neo4j.js";
-import { getArtifact, neighbors, readOnlyQuery, search, status, collectionRuns, unresolvedReferences } from "./queries.js";
+import { getArtifact, listIssues, neighbors, readOnlyQuery, search, status, collectionRuns, unresolvedReferences } from "./queries.js";
 import { recordEpisode, episodeInputSchema } from "./episode-collector.js";
 
 const config = loadConfig();
 const driver = createDriver(config);
 await driver.verifyConnectivity();
 
-const server = new McpServer({ name: "cgc-pms-knowledge-graph", version: "0.3.0" });
+const server = new McpServer({ name: "cgc-pms-knowledge-graph", version: "0.4.0" });
 const result = (value) => ({ content: [{ type: "text", text: JSON.stringify(value, null, 2) }], structuredContent: { result: value } });
 
 server.registerTool("kg_status", { description: "Return cgc-pms knowledge graph coverage and last indexing time." }, async () => result(await status(driver, config)));
@@ -22,6 +22,26 @@ server.registerTool("kg_search", {
     scope: z.enum(["current", "historical", "all"]).optional(),
   },
 }, async ({ query, limit, scope }) => result(await search(driver, config, query, limit, scope)));
+server.registerTool("kg_list_issues", {
+  description: "Return a bounded structured summary or list of normalized current project issues without full-text document expansion.",
+  inputSchema: {
+    view: z.enum(["summary", "list"]).optional(),
+    status: z.enum(["OPEN", "NEEDS_CONFIRMATION", "FROZEN", "OBSERVATION", "RELEASE_GATE"]).optional(),
+    classification: z.enum([
+      "STILL_APPLICABLE",
+      "NEEDS_CONFIRMATION",
+      "NON_BLOCKING_OBSERVATION",
+      "OPERATIONAL_RISK",
+      "RELEASE_PREREQUISITE",
+    ]).optional(),
+    priority: z.enum(["P0", "P1", "P2"]).optional(),
+    parentIssueKey: z.string().min(1).max(200).optional(),
+    blocking: z.boolean().optional(),
+    currentOnly: z.boolean().optional(),
+    query: z.string().min(1).max(500).optional(),
+    limit: z.number().int().min(1).max(200).optional(),
+  },
+}, async (options) => result(await listIssues(driver, config, options)));
 server.registerTool("kg_get_artifact", {
   description: "Get one indexed artifact and its sections by repository-relative source path.",
   inputSchema: { path: z.string().min(1) },

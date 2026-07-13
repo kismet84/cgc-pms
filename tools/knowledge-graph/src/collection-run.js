@@ -31,7 +31,7 @@ export async function startCollectionRun(driver, config, trigger = "manual") {
       id: $id, status: 'RUNNING', trigger: $trigger,
       collectorVersion: $collectorVersion, startedAt: datetime(),
       added: 0, updated: 0, skipped: 0, removed: 0, failed: 0,
-      unresolvedReferences: 0
+      unresolvedReferences: 0, issuesIndexed: 0, issuesDeactivated: 0
     })
     MERGE (r)-[:IN_PROJECT]->(p)
   `, { projectKey: config.projectKey, id, trigger, collectorVersion: config.collectorVersion }, "WRITE");
@@ -45,12 +45,15 @@ export async function finishCollectionRun(driver, config, runId, metrics, errors
     SET r.status = $status, r.finishedAt = datetime(), r.added = $added,
         r.updated = $updated, r.skipped = $skipped, r.removed = $removed,
         r.failed = $failed, r.unresolvedReferences = $unresolvedReferences,
+        r.issuesIndexed = $issuesIndexed, r.issuesDeactivated = $issuesDeactivated,
         r.errorSummary = $errorSummary
   `, {
     runId, status,
     added: metrics.added ?? 0, updated: metrics.updated ?? 0,
     skipped: metrics.skipped ?? 0, removed: metrics.removed ?? 0,
     failed: errors.length, unresolvedReferences: metrics.unresolvedReferences ?? 0,
+    issuesIndexed: metrics.issuesIndexed ?? 0,
+    issuesDeactivated: metrics.issuesDeactivated ?? 0,
     errorSummary: errors.slice(0, 20).map((error) => `${error.source}: ${error.message}`).join("\n"),
   }, "WRITE");
   return status;
@@ -77,6 +80,7 @@ export async function recentCollectionRuns(driver, config, limit = 20) {
     MATCH (r:CollectionRun)-[:IN_PROJECT]->(:Project {key: $projectKey})
     RETURN r { .id, .status, .trigger, .collectorVersion, .startedAt, .finishedAt,
                .added, .updated, .skipped, .removed, .failed, .unresolvedReferences,
+               .issuesIndexed, .issuesDeactivated,
                .errorSummary } AS run
     ORDER BY r.startedAt DESC LIMIT toInteger($limit)
   `, { projectKey: config.projectKey, limit: safeLimit }));

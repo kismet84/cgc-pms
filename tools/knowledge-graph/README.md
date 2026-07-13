@@ -11,6 +11,7 @@
 - 不把原始日志写入图谱；使用 `kg_record_episode(kind="log-summary")` 记录摘要、来源和时间。
 - 不扫描 Codex 私有会话目录；任务收口时使用 `kg_record_episode(kind="conversation")` 写入结构化摘要。
 - `kg_query` 只接受受限只读 Cypher；写入仅通过固定字段的 `kg_record_episode`。
+- 当前问题以 `docs/backlog/current-issues.json` 为机器可读唯一快照；采集器确定性校验后生成 `Issue` 节点，不从任意报告文字猜测状态。
 
 ## 本地命令
 
@@ -46,8 +47,16 @@ codex mcp add cgc-pms-knowledge-graph -- node D:\projects-test\cgc-pms\tools\kno
 
 `kg_search` 支持 `scope=current|historical|all`，默认 `current`。历史资料只用于回溯和分类，不能替代当前代码、配置、backlog 与新鲜验证证据。
 
+查询当前问题优先使用 `kg_list_issues`，不要用宽泛全文检索重建台账：
+
+```json
+{ "view": "summary" }
+```
+
+需要明细时使用 `{ "view": "list", "parentIssueKey": "A-01", "limit": 100 }`；可按 `status`、`classification`、`priority`、`blocking` 和关键字继续过滤。默认只返回 `current=true` 的问题，摘要查询不展开文档正文或历史版本。
+
 ## Schema
 
-核心节点：`Project`、`Artifact`、`ArtifactVersion`、`Section`、`GitCommit`、`Episode`、`Evidence`、`Decision`、`Source`、`SourceCursor`、`CollectionRun`、`Entity`。
+核心节点：`Project`、`Artifact`、`ArtifactVersion`、`Section`、`Issue`、`GitCommit`、`Episode`、`Evidence`、`Decision`、`Source`、`SourceCursor`、`CollectionRun`、`Entity`。
 
-核心关系：`IN_PROJECT`、`CONTAINS`、`CURRENT_VERSION`、`VERSION_OF`、`REFERENCES`、`CHANGES`、`DERIVED_FROM`、`COLLECTED_IN`、`USED_CURSOR`；后续受控抽取可扩展 `RELATES_TO`、`VERIFIES`、`IMPLEMENTS`、`BLOCKS`、`DEPENDS_ON` 和 `SUPERSEDES`，但不得在缺乏来源证据时自动创建事实关系。
+核心关系：`IN_PROJECT`、`CONTAINS`、`CURRENT_VERSION`、`VERSION_OF`、`DEFINED_IN`、`SUPPORTED_BY`、`PART_OF`、`REFERENCES`、`CHANGES`、`DERIVED_FROM`、`COLLECTED_IN`、`USED_CURSOR`；后续受控抽取可扩展 `RELATES_TO`、`VERIFIES`、`IMPLEMENTS`、`BLOCKS`、`DEPENDS_ON` 和 `SUPERSEDES`，但不得在缺乏来源证据时自动创建事实关系。

@@ -5,6 +5,7 @@ import { execute } from "./neo4j.js";
 import { parseMarkdown, markdownLinks, normalizePath } from "./document-parser.js";
 import { startCollectionRun, finishCollectionRun, advanceCursor } from "./collection-run.js";
 import { collectGit } from "./git-collector.js";
+import { collectIssueRegistry } from "./issue-registry.js";
 import { ALLOWED_ROOTS, BLOCKED_SEGMENTS, historyScope, isBlocked } from "./policy.js";
 export { isBlocked } from "./policy.js";
 
@@ -187,7 +188,10 @@ async function upsertArtifact(driver, config, runId, absolutePath) {
 
 export async function collect(driver, config, options = {}) {
   const runId = await startCollectionRun(driver, config, options.trigger ?? "manual");
-  const metrics = { processed: 0, added: 0, updated: 0, skipped: 0, removed: 0, unresolvedReferences: 0 };
+  const metrics = {
+    processed: 0, added: 0, updated: 0, skipped: 0, removed: 0,
+    unresolvedReferences: 0, issuesIndexed: 0, issuesDeactivated: 0,
+  };
   const errors = [];
   try {
     const files = ALLOWED_ROOTS.flatMap((root) => walkAllowed(path.join(config.repoRoot, root), config.repoRoot));
@@ -231,6 +235,13 @@ export async function collect(driver, config, options = {}) {
       RETURN count(a) AS count
     `, { paths }, "WRITE");
     metrics.removed = Number(removed[0]?.count ?? 0);
+    try {
+      const issueResult = await collectIssueRegistry(driver, config, runId);
+      metrics.issuesIndexed = issueResult.indexed;
+      metrics.issuesDeactivated = issueResult.deactivated;
+    } catch (error) {
+      errors.push({ source: "docs/backlog/current-issues.json", message: error.message });
+    }
     if (errors.length === 0) {
       await advanceCursor(driver, config, "documents", crypto.createHash("sha256").update(paths.sort().join("\n")).digest("hex"), runId);
     }
