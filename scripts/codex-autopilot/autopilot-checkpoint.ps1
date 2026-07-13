@@ -9,5 +9,15 @@
 $ErrorActionPreference = 'Stop'
 $pluginCheckpoint = Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\scripts\autopilot-checkpoint.ps1'
 if (!(Test-Path -LiteralPath $pluginCheckpoint -PathType Leaf)) { throw "plugin checkpoint is missing: $pluginCheckpoint" }
-& powershell -NoProfile -ExecutionPolicy Bypass -File $pluginCheckpoint -RepoRoot $RepoRoot -AutopilotDir $AutopilotDir -CheckHealth:$CheckHealth -CheckGit:$CheckGit -AsJson:$AsJson
+$arguments = @(
+  '-NoProfile',
+  '-ExecutionPolicy', 'Bypass',
+  '-File', $pluginCheckpoint,
+  '-RepoRoot', $RepoRoot,
+  '-AutopilotDir', $AutopilotDir
+)
+if ($CheckHealth) { $arguments += '-CheckHealth' }
+if ($CheckGit) { $arguments += '-CheckGit' }
+if ($AsJson) { $arguments += '-AsJson' }
+& powershell @arguments
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
