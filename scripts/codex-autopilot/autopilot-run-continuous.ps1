@@ -1055,7 +1055,14 @@ function Invoke-IssueExecutor {
       }
       $resumePhase = if ($resuming) { [string]$checkpoint.phase } else { '' }
       $skipValidation = $resuming -and $resumePhase -in @('VALIDATED','REVIEWING','REVIEW_TOOL_BLOCKED','REVIEWED','CLOSING','IMPLEMENTATION_COMMITTED','CLOSEOUT_COMMITTED','REGISTERED')
-      $evidencePaths = if ($skipValidation) { @($checkpoint.artifacts.evidencePaths) } else { @() }
+      [System.Collections.Generic.List[string]]$evidencePaths = [System.Collections.Generic.List[string]]::new()
+      if ($skipValidation) {
+        foreach ($savedEvidencePath in @($checkpoint.artifacts.evidencePaths)) {
+          if (![string]::IsNullOrWhiteSpace([string]$savedEvidencePath)) {
+            [void]$evidencePaths.Add([string]$savedEvidencePath)
+          }
+        }
+      }
       $failureSummary = ''
       $currentFingerprint = ''
       if ($result.status -eq 'done' -and !$skipValidation) {
@@ -1073,7 +1080,7 @@ function Invoke-IssueExecutor {
           $evidencePath = Join-Path $verifyDir ("evidence-{0:00}.json" -f ($index + 1))
           $logPath = Join-Path $verifyDir ("command-{0:00}.log" -f ($index + 1))
           $evidence = Invoke-AutopilotVerificationCommand -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit -Command $validationCommand -EvidencePath $evidencePath -LogPath $logPath
-          $evidencePaths += $evidencePath
+          [void]$evidencePaths.Add($evidencePath)
           $result.validation += [pscustomobject]@{ name = "ready-command-$($index + 1)"; status = $evidence.classification; message = "exitCode=$($evidence.exitCode); evidence=$evidencePath" }
           if ($evidence.exitCode -ne 0) {
             $classifierPath = Join-Path (Resolve-Path (Join-Path $scriptDir '..\..')).Path 'plugins\cgc-pms-autopilot\scripts\test-failure-classifier.ps1'

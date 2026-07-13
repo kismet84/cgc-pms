@@ -4,8 +4,12 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = (Resolve-Path (Join-Path $scriptDir '..\..')).Path
 $config = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw | ConvertFrom-Json
+$runnerSource = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'autopilot-run-continuous.ps1') -Raw
 . (Join-Path $scriptDir 'autopilot-command.ps1')
 . (Join-Path $scriptDir 'autopilot-task-score.ps1')
+
+if ($runnerSource -notmatch '\[System\.Collections\.Generic\.List\[string\]\]\$evidencePaths\s*=\s*\[System\.Collections\.Generic\.List\[string\]\]::new\(\)') { throw 'verification evidence paths must retain list semantics from the first item' }
+if ($runnerSource -match '\$evidencePaths\s*\+=\s*\$evidencePath') { throw 'verification evidence paths must not use scalar string concatenation' }
 
 $normalizedStdinArgs = @(Get-AutopilotCodexRedirectedStdinArguments -Arguments @('exec','--ephemeral','-','--model','gpt-5.6-sol'))
 if (($normalizedStdinArgs -join '|') -ne 'exec|--ephemeral|--model|gpt-5.6-sol') { throw 'redirected stdin arguments must omit the Codex prompt marker even when route arguments are appended later' }
