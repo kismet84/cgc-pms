@@ -976,11 +976,13 @@ function Invoke-IssueExecutor {
   $script:CurrentBranch = $worktree.branch
   $issueDir = if ($resuming -and $ResumeCheckpoint.artifacts.issueDirectory) { [string]$ResumeCheckpoint.artifacts.issueDirectory } else { Join-Path $script:RunContext.dir $Issue.lint.issueId }
   New-Item -ItemType Directory -Path $issueDir -Force | Out-Null
+  $executionRunId = if ($Attempt -eq 0) { $script:RunContext.id } else { "$($script:RunContext.id)-repair-$Attempt" }
+  $resultPath = Join-Path (Join-Path $autoDir "runs\$executionRunId") 'result.json'
   $checkpointPath = if ($resuming) { [string]$script:RecoveryDecision.checkpointPath } else { Get-AutopilotIssueCheckpointPath -AutoDir $autoDir -IssueId $Issue.lint.issueId }
   if ($resuming) {
     $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
   } elseif ($Phase -eq 'repair' -and (Test-Path -LiteralPath $checkpointPath)) {
-    $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase REPAIRING -IncrementDispatch repair
+    $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase REPAIRING -Artifacts @{resultPath=$resultPath;issueDirectory=$issueDir} -IncrementDispatch repair
   } else {
     $checkpoint = New-AutopilotIssueCheckpoint -AutoDir $autoDir -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $RepoRoot 'docs\backlog\ready-issues.md') -BaseCommit $baseCommit -Worktree $worktree.path -Branch $worktree.branch -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths -ArtifactDirectory $issueDir
     $checkpoint = Set-AutopilotIssueCheckpointPhase -Path $checkpointPath -Phase IMPLEMENTING -IncrementDispatch implementation
@@ -1026,8 +1028,6 @@ function Invoke-IssueExecutor {
     Write-State $autoDir 'BLOCKED' $false 'EXECUTOR_PROCESS_FAILED' $Issue.title 'tool_config' 'STOP_EXECUTOR_PROCESS_FAILED'
     return
     }
-    $executionRunId = if ($Attempt -eq 0) { $script:RunContext.id } else { "$($script:RunContext.id)-repair-$Attempt" }
-    $resultPath = Join-Path (Join-Path $autoDir "runs\$executionRunId") 'result.json'
   } else {
     $resultPath = [string]$ResumeCheckpoint.artifacts.resultPath
     if (!$resultPath) { throw 'recoverable Issue checkpoint is missing resultPath' }

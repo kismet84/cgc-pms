@@ -52,6 +52,11 @@ try {
   $environmentDecision = Get-AutopilotRecoveryDecision -AutoDir $autoDir
   if ($environmentDecision.action -ne 'RESUME_VALIDATION' -or [int]$environmentDecision.checkpoint.metrics.environmentRetryCount -ne 1) { throw 'single classified environment retry did not preserve implementation and resume validation' }
 
+  Set-AutopilotIssueCheckpointPhase -Path $path -Phase REPAIRING -Artifacts @{resultPath=$resultPath} -IncrementDispatch repair | Out-Null
+  $repairDecision = Get-AutopilotRecoveryDecision -AutoDir $autoDir
+  if ($repairDecision.action -ne 'RESUME_VALIDATION') { throw 'completed repair result did not resume validation' }
+  Set-AutopilotIssueCheckpointPhase -Path $path -Phase IMPLEMENTED | Out-Null
+
   Set-AutopilotIssueCheckpointPhase -Path $path -Phase VALIDATED -Evidence @{verificationDiffHash=$diffHash} -IncrementDispatch validation | Out-Null
   $decision = Get-AutopilotRecoveryDecision -AutoDir $autoDir
   if ($decision.action -ne 'RESUME_REVIEW') { throw 'validated checkpoint did not resume Reviewer' }

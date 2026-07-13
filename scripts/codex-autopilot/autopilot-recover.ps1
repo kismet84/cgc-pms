@@ -122,6 +122,14 @@ function Get-AutopilotRecoveryDecision {
       'REVIEWING' { 'RESUME_REVIEW' }
       'REVIEW_TOOL_BLOCKED' { if ($boundManualReviewPass) { 'RESUME_REVIEW' } elseif ([int]$checkpoint.metrics.reviewDispatchCount -ge 2) { 'PAUSE_REVIEW_TOOL_BLOCKED' } else { 'RESUME_REVIEW' } }
       'REVIEWED' { 'RESUME_CLOSEOUT' }
+      'REPAIRING' {
+        $repairResultPath = [string](Get-AutopilotCheckpointProperty $checkpoint.artifacts 'resultPath' '')
+        $repairDone = $false
+        if ($repairResultPath -and (Test-Path -LiteralPath $repairResultPath -PathType Leaf)) {
+          try { $repairDone = [string](Get-Content -LiteralPath $repairResultPath -Raw -Encoding UTF8 | ConvertFrom-Json).status -eq 'done' } catch { $repairDone = $false }
+        }
+        if ($repairDone) { 'RESUME_VALIDATION' } else { 'VERIFY_UNCOMMITTED' }
+      }
       'CLOSING' { 'RESUME_CLOSEOUT' }
       'IMPLEMENTATION_COMMITTED' { 'RESUME_SCORE_AND_CLOSEOUT' }
       'CLOSEOUT_COMMITTED' { 'RESUME_MERGE_AND_REGISTER' }

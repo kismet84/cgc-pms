@@ -34,6 +34,10 @@ try {
   try { Assert-AutopilotEvidenceCurrent -Evidence $fresh -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base | Out-Null } catch { $untrackedRejected = $true }
   if (!$untrackedRejected) { throw 'untracked content did not invalidate evidence' }
 
+  '验收' | Set-Content -LiteralPath (Join-Path $root '中文报告.md') -Encoding UTF8
+  $unicodeDiffHash = Get-AutopilotDiffHash -Worktree $root -BaseCommit $base
+  if ($unicodeDiffHash -notmatch '^[a-f0-9]{64}$') { throw 'Unicode untracked path did not produce a stable diff hash' }
+
   $failed = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'powershell -NoProfile -Command "exit 7"' -EvidencePath (Join-Path $root 'failed-evidence.json') -LogPath (Join-Path $root 'fail.log') -TimeoutSeconds 20
   if ($failed.exitCode -ne 7 -or $failed.classification -eq 'pass') { throw 'nonzero exit code was recorded as pass' }
 
