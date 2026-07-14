@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(resolve(currentDir, '../ledger.vue'), 'utf-8')
+const apiSource = readFileSync(resolve(currentDir, '../../../api/modules/cost.ts'), 'utf-8')
 const componentDir = resolve(currentDir, '../components')
 
 function readLocalComponent(name: string) {
@@ -16,6 +17,45 @@ const overviewSource = readLocalComponent('CostLedgerOverview.vue')
 const tablePanelSource = readLocalComponent('CostLedgerTablePanel.vue')
 
 describe('CostLedger production guards', () => {
+  it('only exposes overhead execution to admins or users holding both required permissions', () => {
+    expect(source).toContain("import { useUserStore } from '@/stores/user'")
+    expect(source).toMatch(
+      /const canExecuteAllocation = computed\([\s\S]*isAllocationAdmin\.value[\s\S]*userStore\.hasPermission\('cost:ledger:query'\)[\s\S]*userStore\.hasPermission\('overhead:execute'\)/,
+    )
+    expect(source).toContain('v-if="canExecuteAllocation"')
+    expect(source).toContain('data-testid="execute-overhead-allocation"')
+  })
+
+  it('converts the selected month to month-end, disables incomplete months, and never sends tenantId', () => {
+    expect(source).toContain(
+      "dayjs(`${allocationMonth.value}-01`).endOf('month').format('YYYY-MM-DD')",
+    )
+    expect(source).toContain(
+      "return !current.startOf('month').isBefore(dayjs().startOf('month'))",
+    )
+    expect(source).toContain(':disabled-date="disableIncompleteMonth"')
+    expect(source).toContain('仅可选择已完整结束的月份')
+    expect(apiSource).toMatch(/params:\s*\{ period \}/)
+    expect(apiSource).not.toMatch(/executeOverheadAllocation[\s\S]*tenantId/)
+  })
+
+  it('requires a second confirmation and keeps the modal open on failure', () => {
+    expect(source).toContain('title="确认执行间接费分摊"')
+    expect(source).toContain('ok-text="确认执行"')
+    expect(source).toContain('@ok="confirmAllocation"')
+    expect(source).toMatch(
+      /const result = await executeOverheadAllocation\(allocationPeriod\.value\)[\s\S]*allocationModalOpen\.value = false[\s\S]*handleSearch\(\)[\s\S]*catch \(error: unknown\) \{[\s\S]*message\.error/,
+    )
+    const catchBlock = source.match(/catch \(error: unknown\) \{[\s\S]*?\n  \} finally/)?.[0] ?? ''
+    expect(catchBlock).not.toContain('allocationModalOpen.value = false')
+    expect(source).toContain('相同租户、规则和月份不可重复生成')
+  })
+
+  it('shows a dedicated idempotent result and refreshes the ledger after success', () => {
+    expect(source).toMatch(/if \(result\.idempotent\) \{[\s\S]*已执行，无需重复生成成本/)
+    expect(source).toMatch(/allocationModalOpen\.value = false\s*\n\s*handleSearch\(\)/)
+  })
+
   it('uses pageNo instead of legacy pageNum in refs and request params', () => {
     expect(source).toContain('const pageNo = ref(1)')
     expect(source).toMatch(/const params: CostLedgerQueryParams = \{\s*pageNo:\s*pageNo\.value/)

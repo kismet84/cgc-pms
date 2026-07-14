@@ -1,5 +1,11 @@
 # Current Focus
 
+## 2026-07-14 增量：间接费执行入口与金额安全边界
+
+- `ISSUE-040-024` 已在既有 `/cost/ledger` 提供受控的月度间接费执行入口：仅 ADMIN/SUPER_ADMIN 或同时具备 `cost:ledger:query` 与 `overhead:execute` 的用户可见，月份统一转换为自然月月末并经过二次确认。
+- 后端新增租户+规则+月份执行事实与 V149 MySQL/H2 migration，定时和手工执行复用同一幂等门禁；来源排除既有分摊，三种既有依据保持不变，尾差按分归集，执行事实、成本明细和汇总刷新同事务回滚。
+- `A-01-OVERHEAD-EXECUTE` 已关闭；A-01 当前守恒为有用户入口230、前端调用但无独立页面58、内部/集成/运维4、需补入口18、待废弃0、需要确认11，共321。新增后续项0、关闭后续项1、后续项净变化-1；当前优先级判断未改变，独立 Reviewer 仍需复核高风险权限、租户、金额与 migration 证据。
+
 ## 2026-07-14 第44条主线：AutoPilot 分层补货与同轮续跑
 
 - 存量候选新增权威 ReadySpec 确定性快路径；字段、来源、范围、验证入口或候选证据提交不完整时降级到有界 Planner，不推断补值。Ready Plan v2 对每个候选强制记录 CREATED、REJECTED 或 BLOCKED，零 Ready 合法且不写 backlog。

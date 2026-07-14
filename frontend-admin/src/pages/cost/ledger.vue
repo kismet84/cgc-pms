@@ -1,14 +1,21 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { message } from 'ant-design-vue'
-import { getCostLedger, getCostLedgerSummary, getCostLedgerDetail } from '@/api/modules/cost'
+import {
+  getCostLedger,
+  getCostLedgerSummary,
+  getCostLedgerDetail,
+  executeOverheadAllocation,
+} from '@/api/modules/cost'
 import { getCostSubjectList } from '@/api/modules/costSubject'
 import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO } from '@/types/cost'
 import { COST_TYPE_DICT, getCostTypeLabel, getSourceTypeLabel } from '@/types/cost'
 import type { PageResult } from '@/types/api'
 import { useReferenceStore } from '@/stores/reference'
+import { useUserStore } from '@/stores/user'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { fetchDictData } from '@/utils/dict'
 import CostLedgerOverview from './components/CostLedgerOverview.vue'
@@ -19,6 +26,58 @@ import CostLedgerDetailDrawer from './components/CostLedgerDetailDrawer.vue'
 const MOBILE_BP = 768
 const isMobile = ref(window.innerWidth < MOBILE_BP)
 const route = useRoute()
+const userStore = useUserStore()
+
+const isAllocationAdmin = computed(() =>
+  userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
+)
+const canExecuteAllocation = computed(
+  () =>
+    isAllocationAdmin.value ||
+    (userStore.hasPermission('cost:ledger:query') && userStore.hasPermission('overhead:execute')),
+)
+const allocationModalOpen = ref(false)
+const allocationSubmitting = ref(false)
+const allocationMonth = ref<string>()
+const allocationPeriod = computed(() =>
+  allocationMonth.value
+    ? dayjs(`${allocationMonth.value}-01`).endOf('month').format('YYYY-MM-DD')
+    : '',
+)
+
+function disableIncompleteMonth(current: Dayjs) {
+  return !current.startOf('month').isBefore(dayjs().startOf('month'))
+}
+
+function openAllocationModal() {
+  allocationMonth.value = dayjs().subtract(1, 'month').format('YYYY-MM')
+  allocationModalOpen.value = true
+}
+
+async function confirmAllocation() {
+  if (!allocationPeriod.value) {
+    message.warning('请选择目标月份')
+    return
+  }
+  allocationSubmitting.value = true
+  try {
+    const result = await executeOverheadAllocation(allocationPeriod.value)
+    if (result.idempotent) {
+      message.info(`${result.period} 已执行，无需重复生成成本`)
+    } else {
+      message.success(
+        `分摊完成：生成 ${result.costItemCount} 条成本，共 ¥${result.allocatedAmount}`,
+      )
+    }
+    allocationModalOpen.value = false
+    handleSearch()
+  } catch (error: unknown) {
+    console.error(error)
+    message.error('间接费分摊失败，未生成部分成本，请核对后重试')
+  } finally {
+    allocationSubmitting.value = false
+  }
+}
 
 function onResize() {
   isMobile.value = window.innerWidth < MOBILE_BP
@@ -368,6 +427,14 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <a-breadcrumb-item>成本列表</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
+      <a-button
+        v-if="canExecuteAllocation"
+        type="primary"
+        data-testid="execute-overhead-allocation"
+        @click="openAllocationModal"
+      >
+        执行间接费分摊
+      </a-button>
     </div>
 
     <div class="lg-grid cost-ledger-grid">
@@ -426,6 +493,35 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       :cost-type-label="costTypeLabel"
       @close="closeDetail"
     />
+
+    <a-modal
+      v-model:open="allocationModalOpen"
+      title="确认执行间接费分摊"
+      ok-text="确认执行"
+      cancel-text="取消"
+      :confirm-loading="allocationSubmitting"
+      :ok-button-props="{ disabled: !allocationPeriod }"
+      :mask-closable="!allocationSubmitting"
+      @ok="confirmAllocation"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="目标月份" required>
+          <a-date-picker
+            v-model:value="allocationMonth"
+            picker="month"
+            value-format="YYYY-MM"
+            :disabled-date="disableIncompleteMonth"
+            style="width: 100%"
+          />
+        </a-form-item>
+      </a-form>
+      <a-alert type="warning" show-icon>
+        <template #message>期间：{{ allocationPeriod || '请选择月份' }}</template>
+        <template #description>
+          仅可选择已完整结束的月份。将按现有启用规则向活跃项目生成已确认成本并刷新成本汇总。相同租户、规则和月份不可重复生成；提交后请等待结果，不要重复点击。
+        </template>
+      </a-alert>
+    </a-modal>
   </div>
 </template>
 
