@@ -34,6 +34,9 @@ try {
 
   $pass = [pscustomobject]@{ schemaVersion = 1; issueId = 'ISSUE-900-030'; decision = 'pass'; findings = @(); reviewedDiffHash = $request.diffSha256; reviewedAt = [datetimeoffset]::Now.ToString('o') }
   Assert-AutopilotReviewGate -Route $route -ReviewResult $pass | Out-Null
+  $historicalBlockedResult = [pscustomobject]@{ status='blocked'; failureCategory='quality_security'; nextAction='STOP'; stopReason='STOP_REVIEW_NEEDS_REPAIR' }
+  $restoredResult = Restore-AutopilotReviewedResultForCloseout -Result $historicalBlockedResult -ReviewResult $pass -IssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256
+  if ($restoredResult.status -ne 'done' -or $restoredResult.failureCategory -ne 'none' -or $restoredResult.nextAction -ne 'CHECKPOINT' -or $restoredResult.stopReason -or $restoredResult.review.decision -ne 'pass') { throw 'bound Reviewer PASS did not restore the historical blocked result for closeout' }
   $mismatchRejected = $false
   try { Get-AutopilotReviewDisposition -ReviewResult $pass -ExpectedIssueId 'ISSUE-OTHER' -ExpectedDiffHash $request.diffSha256 | Out-Null } catch { $mismatchRejected = $true }
   if (!$mismatchRejected) { throw 'Reviewer identity mismatch was accepted' }
@@ -45,6 +48,9 @@ try {
   $needsRepair.reviewedDiffHash = $request.diffSha256
   $disposition = Get-AutopilotReviewDisposition -ReviewResult $needsRepair -ExpectedIssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256
   if ($disposition.action -ne 'REPAIR' -or !$disposition.failureFingerprint) { throw 'needs_repair was not routed to a bounded repair' }
+  $repairRestoreRejected = $false
+  try { Restore-AutopilotReviewedResultForCloseout -Result ([pscustomobject]@{status='blocked'}) -ReviewResult $needsRepair -IssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256 | Out-Null } catch { $repairRestoreRejected = $true }
+  if (!$repairRestoreRejected) { throw 'needs_repair was allowed to restore a result for closeout' }
   foreach ($invalidFindings in @(@(), @([pscustomobject]@{ severity='blocking'; file=''; line=$null; risk=''; requiredEvidence='' }))) {
     $invalidRepairRejected = $false
     try {

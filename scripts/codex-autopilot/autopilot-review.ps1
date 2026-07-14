@@ -85,6 +85,29 @@ function Get-AutopilotReviewDisposition {
   return [pscustomobject]@{ action='REPAIR'; failureFingerprint=$fingerprint; summary=$summary }
 }
 
+function Restore-AutopilotReviewedResultForCloseout {
+  param(
+    [Parameter(Mandatory)][object]$Result,
+    [Parameter(Mandatory)][object]$ReviewResult,
+    [Parameter(Mandatory)][string]$IssueId,
+    [Parameter(Mandatory)][string]$ExpectedDiffHash
+  )
+  $disposition = Get-AutopilotReviewDisposition -ReviewResult $ReviewResult -ExpectedIssueId $IssueId -ExpectedDiffHash $ExpectedDiffHash
+  if ($disposition.action -ne 'PASS') { throw 'only a bound Reviewer PASS can restore a result for closeout' }
+  foreach ($entry in @(
+    @('status','done'),
+    @('failureCategory','none'),
+    @('nextAction','CHECKPOINT'),
+    @('stopReason','')
+  )) {
+    $name = [string]$entry[0]
+    if ($Result.PSObject.Properties.Name -contains $name) { $Result.$name = $entry[1] }
+    else { $Result | Add-Member -NotePropertyName $name -NotePropertyValue $entry[1] }
+  }
+  $Result | Add-Member -NotePropertyName review -NotePropertyValue $ReviewResult -Force
+  return $Result
+}
+
 function Test-AutopilotReviewerSandboxFailure {
   param([Parameter(Mandatory)][object]$ReviewResult)
   if ($ReviewResult.decision -eq 'tool_blocked') { return $true }

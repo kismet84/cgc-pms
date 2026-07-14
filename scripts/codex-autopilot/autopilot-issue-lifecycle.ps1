@@ -104,10 +104,19 @@ function Invoke-IssueExecutor {
     if (!$resultPath) { throw 'recoverable Issue checkpoint is missing resultPath' }
     Write-RunEvent 'issue.phase.resume' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision=$script:RecoveryDecision.action; status='RECOVERED'; reason=$script:RecoveryDecision.reason; checkpointPath=$checkpointPath })
   }
+  $closed = $false
   if (Test-Path -LiteralPath $resultPath) {
     $result = Get-Content -LiteralPath $resultPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $failureSummary = ''
     $currentFingerprint = ''
+    if ($resuming -and $script:RecoveryDecision.action -eq 'RESUME_CLOSEOUT' -and [string]$checkpoint.phase -eq 'REVIEWED') {
+      $reviewPath = [string]$checkpoint.artifacts.reviewResultPath
+      if (!$reviewPath -or !(Test-Path -LiteralPath $reviewPath -PathType Leaf)) { throw 'reviewed checkpoint is missing bound Reviewer result' }
+      $review = Get-Content -LiteralPath $reviewPath -Raw -Encoding UTF8 | ConvertFrom-Json
+      $reviewHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
+      $result = Restore-AutopilotReviewedResultForCloseout -Result $result -ReviewResult $review -IssueId $Issue.lint.issueId -ExpectedDiffHash $reviewHash
+      Write-RunEvent 'review.pass-result-restored' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='PASS'; status='RECOVERED'; reason='bound Reviewer PASS supersedes the historical blocked executor result for closeout'; reviewedDiffHash=$reviewHash })
+    }
     if ($resuming -and $script:RecoveryDecision.action -eq 'RESUME_VALIDATION' -and [string]$result.status -eq 'blocked') {
       if ([string]$result.failureCategory -eq 'environment' -and [string]$result.stopReason -eq 'STOP_VERIFICATION_FAILED') {
         $result.status = 'done'; $result.failureCategory = 'none'; $result.nextAction = 'VERIFY'; $result.stopReason = ''
@@ -240,7 +249,6 @@ function Invoke-IssueExecutor {
       $result | Add-Member -NotePropertyName phaseDurationsSeconds -NotePropertyValue $checkpoint.metrics.phaseDurationsSeconds -Force
       $result | Add-Member -NotePropertyName semanticProgressAt -NotePropertyValue ([string]$checkpoint.semanticProgressAt) -Force
       $result | Add-Member -NotePropertyName resumedFromPhase -NotePropertyValue $(if ($resuming) { $resumePhase } else { '' }) -Force
-      $closed = $false
       if ($result.status -eq 'done') { $script:FailureFingerprint = $null }
       if ($result.status -eq 'done' -and $effectiveRoute.reviewRequired -and $resuming -and $resumePhase -eq 'REVIEW_TOOL_BLOCKED') {
         $manualReviewPath = [string]$checkpoint.artifacts.reviewResultPath
