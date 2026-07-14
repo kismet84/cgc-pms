@@ -67,6 +67,14 @@ export function getRoles() {
   })
 }
 
+/** 获取角色详情 */
+export function getRoleDetail(roleId: number | string) {
+  return request<SysRoleVO>({
+    url: `/system/roles/${roleId}`,
+    method: 'get',
+  })
+}
+
 /** 新建普通自定义角色 */
 export function createRole(data: CreateRolePayload) {
   return request<number | string>({

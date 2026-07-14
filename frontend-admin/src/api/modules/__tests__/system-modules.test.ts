@@ -30,6 +30,7 @@ import {
   getMenuDetail,
   getMenuList,
   getMenuTree,
+  getRoleDetail,
   getRoles,
   getUserList,
   updateMenu,
@@ -122,6 +123,18 @@ describe('system-related API modules', () => {
     ]) {
       expect(payload).not.toHaveProperty(forbiddenField)
     }
+  })
+
+  it('builds a bodyless role detail request', () => {
+    getRoleDetail('12')
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/roles/12',
+      method: 'get',
+    })
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('params')
   })
 
   it('builds an exact menu update request with business fields only', () => {

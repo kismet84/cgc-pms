@@ -170,7 +170,67 @@ class SysRoleControllerTest {
     void testGetById() throws Exception {
         Assertions.assertNotNull(roleId);
         mockMvc.perform(g("/system/roles/" + roleId).cookie(adminCookie()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data.id").exists());
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.id").value(roleId.toString()))
+                .andExpect(jsonPath("$.data.roleCode").exists())
+                .andExpect(jsonPath("$.data.roleName").exists())
+                .andExpect(jsonPath("$.data.roleType").exists())
+                .andExpect(jsonPath("$.data.status").exists())
+                .andExpect(jsonPath("$.data.dataScope").exists())
+                .andExpect(jsonPath("$.data.menuIds").isArray())
+                .andExpect(jsonPath("$.data.createdAt").exists())
+                .andExpect(jsonPath("$.data.tenantId").doesNotExist())
+                .andExpect(jsonPath("$.data.roleLevel").doesNotExist())
+                .andExpect(jsonPath("$.data.createdBy").doesNotExist())
+                .andExpect(jsonPath("$.data.updatedBy").doesNotExist())
+                .andExpect(jsonPath("$.data.deletedFlag").doesNotExist());
+    }
+
+    @Test @Order(5) @DisplayName("GET /system/roles/{id} supports system:role:query")
+    void testGetById_WithExplicitPermission() throws Exception {
+        Assertions.assertNotNull(roleId);
+        mockMvc.perform(g("/system/roles/" + roleId)
+                        .cookie(authCookie(TENANT_ID, List.of("USER"), List.of("system:role:query"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(roleId.toString()));
+    }
+
+    @Test @Order(5) @DisplayName("GET /system/roles/{id} supports SUPER_ADMIN")
+    void testGetById_WithSuperAdminRole() throws Exception {
+        Assertions.assertNotNull(roleId);
+        mockMvc.perform(g("/system/roles/" + roleId)
+                        .cookie(authCookie(TENANT_ID, List.of("SUPER_ADMIN"), List.of())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.id").value(roleId.toString()));
+    }
+
+    @Test @Order(5) @DisplayName("GET /system/roles/{id} rejects requests without role:query")
+    void testGetById_Forbidden() throws Exception {
+        Assertions.assertNotNull(roleId);
+        mockMvc.perform(g("/system/roles/" + roleId)
+                        .cookie(authCookie(TENANT_ID, List.of("USER"), List.of())))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+    }
+
+    @Test @Order(5) @DisplayName("GET /system/roles/{id} without JWT -> 401")
+    void testGetById_Unauthorized() throws Exception {
+        Assertions.assertNotNull(roleId);
+        mockMvc.perform(g("/system/roles/" + roleId))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test @Order(5) @DisplayName("GET /system/roles/{id} hides cross-tenant and missing roles")
+    void testGetById_HidesCrossTenantAndMissing() throws Exception {
+        Assertions.assertNotNull(roleId);
+        mockMvc.perform(g("/system/roles/" + roleId)
+                        .cookie(authCookie(999L, List.of("ADMIN"), List.of())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"));
+        mockMvc.perform(g("/system/roles/9223372036854775806").cookie(adminCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"));
     }
 
     @Test @Order(6) @DisplayName("PUT /system/roles/{id} -> 200")

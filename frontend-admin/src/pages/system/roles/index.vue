@@ -3,7 +3,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { message } from 'ant-design-vue'
 import { MoreOutlined, PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
-import { createRole, getRoles } from '@/api/modules/system'
+import { createRole, getRoleDetail, getRoles } from '@/api/modules/system'
 import { useUserStore } from '@/stores/user'
 import type { CreateRolePayload, SysRoleVO } from '@/types/system'
 import PermissionModal from './PermissionModal.vue'
@@ -39,11 +39,19 @@ const filter = reactive({
 
 const permissionModalVisible = ref(false)
 const selectedRole = ref<SysRoleVO | null>(null)
+const detailModalVisible = ref(false)
+const detailLoading = ref(false)
+const detailTarget = ref<SysRoleVO | null>(null)
+const roleDetail = ref<SysRoleVO | null>(null)
+let detailRequestSequence = 0
 const createModalVisible = ref(false)
 const creating = ref(false)
 const createForm = reactive<CreateRolePayload>(defaultCreateForm())
 
 const canCreateRole = computed(() =>
+  userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
+)
+const canViewRoleDetail = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
 )
 
@@ -183,6 +191,33 @@ function handleEditPermission(record: SysRoleVO) {
   permissionModalVisible.value = true
 }
 
+async function openRoleDetail(record: SysRoleVO) {
+  const requestSequence = ++detailRequestSequence
+  detailTarget.value = record
+  roleDetail.value = null
+  detailModalVisible.value = true
+  detailLoading.value = true
+  try {
+    const detail = await getRoleDetail(record.id)
+    if (requestSequence === detailRequestSequence) roleDetail.value = detail
+  } catch (error: unknown) {
+    if (requestSequence === detailRequestSequence) {
+      roleDetail.value = null
+      message.error(errorMessage(error) || '加载角色详情失败')
+    }
+  } finally {
+    if (requestSequence === detailRequestSequence) detailLoading.value = false
+  }
+}
+
+function closeRoleDetail() {
+  detailRequestSequence += 1
+  detailModalVisible.value = false
+  detailLoading.value = false
+  detailTarget.value = null
+  roleDetail.value = null
+}
+
 function handlePermissionSaved() {
   permissionModalVisible.value = false
   fetchData()
@@ -284,6 +319,13 @@ onMounted(() => {
                 </a-button>
                 <template #overlay>
                   <a-menu>
+                    <a-menu-item
+                      v-if="canViewRoleDetail"
+                      :data-testid="`view-role-detail-${row.id}`"
+                      @click="openRoleDetail(row)"
+                    >
+                      查看详情
+                    </a-menu-item>
                     <a-menu-item @click="handleEditPermission(row)">编辑权限</a-menu-item>
                   </a-menu>
                 </template>
@@ -386,6 +428,39 @@ onMounted(() => {
       </a-form>
     </a-modal>
 
+    <a-modal
+      :open="detailModalVisible"
+      :title="`角色详情${detailTarget ? `：${detailTarget.roleName}` : ''}`"
+      :footer="null"
+      :confirm-loading="detailLoading"
+      data-testid="role-detail-modal"
+      @cancel="closeRoleDetail"
+    >
+      <a-spin :spinning="detailLoading">
+        <dl v-if="roleDetail" class="role-detail-list" data-testid="role-detail-content">
+          <dt>角色名称</dt>
+          <dd>{{ roleDetail.roleName }}</dd>
+          <dt>角色编码</dt>
+          <dd>{{ roleDetail.roleCode }}</dd>
+          <dt>角色类型</dt>
+          <dd>{{ roleDetail.roleType || '-' }}</dd>
+          <dt>状态</dt>
+          <dd>{{ statusLabel(roleDetail.status) }}</dd>
+          <dt>数据范围</dt>
+          <dd>{{ roleDetail.dataScope || '-' }}</dd>
+          <dt>菜单 ID</dt>
+          <dd>{{ roleDetail.menuIds?.join(', ') || '无' }}</dd>
+          <dt>创建时间</dt>
+          <dd>{{ roleDetail.createdAt || '-' }}</dd>
+        </dl>
+        <a-empty
+          v-else-if="!detailLoading"
+          description="角色详情加载失败，请关闭后重试"
+          data-testid="role-detail-empty"
+        />
+      </a-spin>
+    </a-modal>
+
     <!-- Permission Modal -->
     <PermissionModal
       v-model:open="permissionModalVisible"
@@ -394,3 +469,36 @@ onMounted(() => {
     />
   </div>
 </template>
+
+<style scoped>
+.role-detail-list {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--ant-color-border, #f0f0f0);
+  border-radius: 6px;
+}
+
+.role-detail-list dt,
+.role-detail-list dd {
+  min-width: 0;
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ant-color-border, #f0f0f0);
+}
+
+.role-detail-list dt {
+  color: var(--ant-color-text-secondary, rgb(0 0 0 / 45%));
+  background: var(--ant-color-fill-alter, #fafafa);
+}
+
+.role-detail-list dd {
+  overflow-wrap: anywhere;
+}
+
+.role-detail-list dt:nth-last-of-type(1),
+.role-detail-list dd:last-child {
+  border-bottom: 0;
+}
+</style>

@@ -8,6 +8,7 @@ function flushPromises() {
 
 // ── Mock API module ──
 const mockGetRoles = vi.fn()
+const mockGetRoleDetail = vi.fn()
 const mockCreateRole = vi.fn()
 const mockGetMenuTree = vi.fn()
 const mockUpdateRoleMenus = vi.fn()
@@ -18,6 +19,7 @@ const mockAccess = vi.hoisted(() => ({
 
 vi.mock('@/api/modules/system', () => ({
   getRoles: (...args: unknown[]) => mockGetRoles(...args),
+  getRoleDetail: (...args: unknown[]) => mockGetRoleDetail(...args),
   createRole: (...args: unknown[]) => mockCreateRole(...args),
   getMenuTree: (...args: unknown[]) => mockGetMenuTree(...args),
   updateRoleMenus: (...args: unknown[]) => mockUpdateRoleMenus(...args),
@@ -211,7 +213,13 @@ const AModalStub = defineComponent({
             h('div', { class: 'mock-modal-footer' }, [
               h(
                 'button',
-                { class: 'mock-modal-cancel', onClick: () => emit('update:open', false) },
+                {
+                  class: 'mock-modal-cancel',
+                  onClick: () => {
+                    emit('cancel')
+                    emit('update:open', false)
+                  },
+                },
                 '取消',
               ),
               h(
@@ -253,6 +261,69 @@ const ATreeStub = defineComponent({
   },
 })
 
+const VxeGridStub = defineComponent({
+  name: 'VxeGridStub',
+  props: { data: Array, columns: Array, loading: Boolean },
+  setup(props, { slots }) {
+    return () =>
+      h(
+        'div',
+        { class: 'mock-vxe-grid' },
+        ((props.data as Record<string, unknown>[]) ?? []).map((row) =>
+          h(
+            'div',
+            { class: 'mock-vxe-row', key: String(row.id) },
+            ((props.columns as Record<string, unknown>[]) ?? []).map((column) => {
+              const slotName = (column.slots as { default?: string } | undefined)?.default
+              return h(
+                'div',
+                { class: 'mock-vxe-cell' },
+                slotName && slots[slotName]
+                  ? slots[slotName]?.({ row })
+                  : String(row[String(column.field ?? '')] ?? ''),
+              )
+            }),
+          ),
+        ),
+      )
+  },
+})
+
+const ADropdownStub = defineComponent({
+  name: 'ADropdownStub',
+  setup(_, { slots }) {
+    return () => h('div', { class: 'mock-dropdown' }, [slots.default?.(), slots.overlay?.()])
+  },
+})
+
+const AMenuStub = defineComponent({
+  name: 'AMenuStub',
+  setup(_, { slots }) {
+    return () => h('div', { class: 'mock-menu' }, slots.default?.())
+  },
+})
+
+const AMenuItemStub = defineComponent({
+  name: 'AMenuItemStub',
+  emits: ['click'],
+  setup(_, { emit, slots }) {
+    return () =>
+      h(
+        'button',
+        { class: 'mock-menu-item', type: 'button', onClick: () => emit('click') },
+        slots.default?.(),
+      )
+  },
+})
+
+const AEmptyStub = defineComponent({
+  name: 'AEmptyStub',
+  props: { description: String },
+  setup(props) {
+    return () => h('div', { class: 'mock-empty' }, props.description)
+  },
+})
+
 const stubs = {
   'a-table': ATableStub,
   'a-input': AInputStub,
@@ -264,6 +335,11 @@ const stubs = {
   'a-spin': ASpinStub,
   'a-modal': AModalStub,
   'a-tree': ATreeStub,
+  'a-empty': AEmptyStub,
+  'a-dropdown': ADropdownStub,
+  'a-menu': AMenuStub,
+  'a-menu-item': AMenuItemStub,
+  'vxe-grid': VxeGridStub,
   PermissionModal: true,
 }
 
@@ -310,6 +386,7 @@ describe('RoleListPage', () => {
     mockAccess.roles.splice(0, mockAccess.roles.length, 'ADMIN')
     mockAccess.permissions.splice(0)
     mockGetRoles.mockResolvedValue(mockRoles)
+    mockGetRoleDetail.mockResolvedValue({ ...mockRoles[0], dataScope: 'ALL' })
   })
 
   it('fetches roles on mount', async () => {
@@ -368,6 +445,62 @@ describe('RoleListPage', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="create-role-button"]').exists()).toBe(false)
+  })
+
+  it.each(['ADMIN', 'SUPER_ADMIN'])('shows and loads role detail for %s', async (role) => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, role)
+    const detail = { ...mockRoles[0], dataScope: 'ALL' }
+    mockGetRoleDetail.mockResolvedValue(detail)
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="view-role-detail-1"]').trigger('click')
+    await flushPromises()
+
+    expect(mockGetRoleDetail).toHaveBeenCalledWith(1)
+    expect(wrapper.find('[data-testid="role-detail-content"]').text()).toContain('管理员')
+    expect(wrapper.find('[data-testid="role-detail-content"]').text()).toContain('ADMIN')
+    expect(wrapper.find('[data-testid="role-detail-content"]').text()).toContain('ALL')
+    expect(wrapper.find('[data-testid="role-detail-content"]').text()).toContain('1, 2')
+    expect(mockCreateRole).not.toHaveBeenCalled()
+    expect(mockUpdateRoleMenus).not.toHaveBeenCalled()
+  })
+
+  it('hides the detail entry from ordinary users even with system:role:query', async () => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, 'USER')
+    mockAccess.permissions.push('system:role:query')
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="view-role-detail-1"]').exists()).toBe(false)
+    expect(mockGetRoleDetail).not.toHaveBeenCalled()
+  })
+
+  it('clears old detail, keeps the selected target on failure, and refetches after reopening', async () => {
+    mockGetRoleDetail.mockResolvedValueOnce({ ...mockRoles[0], dataScope: 'ALL' })
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-testid="view-role-detail-1"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="role-detail-content"]').text()).toContain('管理员')
+    await wrapper.find('[data-testid="role-detail-modal"] .mock-modal-cancel').trigger('click')
+
+    mockGetRoleDetail.mockRejectedValueOnce(new Error('角色不存在'))
+    await wrapper.find('[data-testid="view-role-detail-2"]').trigger('click')
+    await flushPromises()
+
+    expect(mockGetRoleDetail).toHaveBeenNthCalledWith(1, 1)
+    expect(mockGetRoleDetail).toHaveBeenNthCalledWith(2, 2)
+    expect(wrapper.find('[data-testid="role-detail-modal"] .mock-modal-title').text()).toContain(
+      '普通用户',
+    )
+    expect(wrapper.find('[data-testid="role-detail-content"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="role-detail-empty"]').exists()).toBe(true)
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('角色不存在')
+    expect(mockCreateRole).not.toHaveBeenCalled()
+    expect(mockUpdateRoleMenus).not.toHaveBeenCalled()
   })
 
   it('validates required fields and length limits before creating', async () => {
