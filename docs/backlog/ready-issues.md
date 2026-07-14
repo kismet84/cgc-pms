@@ -4,7 +4,72 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-028` 已完成，当前无待实施 Ready；连续迭代将在知识图谱刷新并通过 checkpoint 后补货。
+`ISSUE-040-028` 已完成；`ISSUE-040-029` 已由知识图谱存量问题补货，等待本轮实施与验收。
+
+### ISSUE-040-029：共享列表中窄视口表格高度链修复
+
+优先级：P1
+任务性质：缺口修复
+类型：前端 / 共享列表布局 / 响应式 / 表格可达性 / 跨页面回归
+状态：Ready
+来源锚点：项目知识图谱当前问题 `UI-ROLE-RESPONSIVE-TABLE-ZERO-HEIGHT`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-040-027-系统角色删除管理员入口与安全边界验收报告.md`；本轮又在 `ISSUE-040-028` 真实浏览器验收中稳定复现。
+存量问题键：[stock:UI-ROLE-RESPONSIVE-TABLE-ZERO-HEIGHT]
+关联产品目标：恢复共享 `lg-list-page` 在中窄视口下的表格可见性与操作可达性，使角色管理及同布局页面在响应式断点内仍能完成列表读取与行操作。
+核验结论：问题仍存在——共享 `global-list-table.css` 将 `.lg-table-wrap` 设为 `height: 0; flex: 1`，桌面态依赖父级 flex 高度链；`global-app-redesign.css` 在 `max-width: 1200px` 把 `.lg-grid` 改为 block，却继续把表格面板最小高度设为 0。真实浏览器在 CSS 宽度 921px 时测得角色页 `.lg-table-wrap` 高度为 0，切换到 1233px 后恢复约 480px。CodeGraph 对共享样式召回不足，已立即用 `rg` 补查；`codebase-memory-mcp` 与当前分支直接读取共同确认该类被多页面复用，最终事实以当前 CSS、角色页结构和浏览器测量为准。
+候选对比：P0 可自动处理叶子已在上一 Issue 关闭；本项为 P1 明确问题，已有两轮真实浏览器证据、唯一台账、可执行验收标准和最小共享样式修复路径。其他 P1 投标、间接费等候选涉及独立业务链，当前不与本项并行。
+阻塞证据：在 `max-width: 1200px` 断点内，角色表格高度归零，首行与操作菜单不可见、不可交互；这直接阻断中窄视口角色管理，不是纯视觉偏好。
+解除条件：共享响应式规则在不恢复固定整页桌面高度的前提下为表格面板建立有界最小高度；角色页在 CSS 宽度 1036px、1200px 的表格容器高度均大于 0，首行及操作菜单可见可交互；1201px 以上桌面双栏、高度、分页和既有角色 CRUD 不回退；共享样式契约测试、类型检查、目标 ESLint、构建或等价静态验证和浏览器验收通过。
+Migration：不需要
+依赖：复用现有 `lg-list-page`、`lg-grid`、`lg-list-table-panel`、`lg-table-wrap` 共享类及角色管理页；不新增组件、路由、接口、状态管理或第三方依赖。
+风险等级：中
+风险说明：共享响应式样式会影响多个列表页，必须以最小选择器和跨断点证据控制回归。
+运行态要求：自动化只在 local/dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，任一失败先归类为环境前置并使用 runtime refresh，稳定等待180秒后复验；验收仅浏览现有角色数据，不新增、修改、删除或重置业务数据。
+Reviewer要求：按共享前端布局中风险变更复核断点选择器只作用于 `lg-list-page` 的表格面板、不会覆盖桌面 `min-width: 1201px` 工作区高度；检查表格内部 100% 高度链、分页、分析栏和页面纵向滚动边界；以绑定 diff、静态契约测试及 1036/1200/1201 三个 CSS 宽度的浏览器尺寸证据给出 PASS/NEEDS_REPAIR。
+归档报告：`docs/quality/ISSUE-040-029-共享列表中窄视口表格高度链修复验收报告.md`
+最小回滚：回退本 Issue 对共享响应式 CSS、专项目录测试和治理载体的修改；不改业务页面、角色数据、接口或数据库，无数据回滚。
+目标：
+- 在共享 ≤1200px 规则中恢复列表表格面板的有界最小高度，使零高度 flex 表格容器获得可计算空间。
+- 保持 1201px 以上既有固定工作区与双栏布局；中窄视口继续采用单栏和页面纵向滚动，不引入角色页特例。
+- 增加共享 CSS 契约测试，锁定断点、作用域、非零最小高度及桌面规则边界，并用真实浏览器验证角色页首行与操作菜单。
+非目标：
+- 不重构全部列表布局、不逐页改写 `lg-*` 类、不调整表格列、分页数据、角色 CRUD、权限或后端接口。
+- 不顺带修复其他页面的视觉偏好，不修改用户当前工作区中已有的业务页面和测试文件。
+- 不连接生产数据库、不发布生产、不自动 push。
+允许修改：
+- `frontend-admin/src/assets/styles/global-app-redesign.css`
+- `frontend-admin/src/assets/styles/__tests__/global-list-responsive.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-040-029-共享列表中窄视口表格高度链修复验收报告.md`
+禁止修改：
+- `frontend-admin/src/pages/**`
+- `frontend-admin/src/api/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/assets/styles/global-list-table.css`
+- `backend/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 共享样式在 ≤1200px 下只为 `lg-list-page` 内三种既有表格面板容器建立有界且非零的最小高度；不改变 `.lg-table-wrap` 的桌面 flex 高度策略，不给角色页增加局部样式。
+- CSS 契约测试验证 1200px 响应式块仍保持单栏布局、表格面板最小高度不是 0，并验证 `min-width: 1201px` 桌面工作区高度规则仍存在；测试不依赖用户未跟踪的二级页面视觉测试。
+- 真实浏览器从 dev-login 进入 `/system/roles`，分别在 CSS 宽度 1036px、1200px 测得 `.lg-table-wrap` 高度大于 0，首个数据行与 `.lg-row-action-trigger` 可见可交互；在 1201px 以上确认桌面布局、表格高度和分页可见，控制台无新增 error/warn。
+- 共享类影响面通过 `rg` 与当前分支交叉核验；若浏览器发现本次 diff 直接引入其他共享布局问题，必须本轮修复并复验，超出范围项按唯一载体规则处置，不得口头悬空。
+- 收口必须引用 `docs/backlog/current-issues.json` 及本项 `sourceRefs`；全部通过后移除 `UI-ROLE-RESPONSIVE-TABLE-ZERO-HEIGHT`，未完全通过则用证据更新其唯一状态或分类，并同步更新 Ready、current-focus 和 project-map。
+- 归档报告统计新增后续项、关闭后续项和后续项净变化；Ready lint、前端专项、类型检查、目标 ESLint、`git diff --check` 与浏览器验收全部通过，首次失败先分类并复验。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-029`
+- `cd frontend-admin; pnpm test:unit -- src/assets/styles/__tests__/global-list-responsive.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/assets/styles/__tests__/global-list-responsive.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-028：系统角色修改管理员入口与安全边界
 
