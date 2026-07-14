@@ -1534,3 +1534,67 @@ Reviewer要求：独立 Reviewer 按高风险权限变更复核 ADMIN/SUPER_ADMI
 - 独立 Reviewer 首轮识别复核摘要仍绑定旧恢复哈希且混入提前生成的收口草稿，归类为 `tool_config/证据绑定与阶段边界错误`；撤出草稿并重跑全部命令后，Reviewer 对实现差异哈希 `6bec1258709186652b431968716e2f8ec99c822d24c4bf812a2a2d6fa3f3ac59` 给出 `PASS`，findings=无。
 - `A-01-ROLE-CREATE` 已从 `docs/backlog/current-issues.json` 移除；A-01 守恒更新为有用户入口231、前端调用但无独立页面58、内部/集成/运维4、需补入口17、待废弃0、需要确认11，共321。
 - 正式报告：`docs/quality/ISSUE-040-025-系统角色新建管理员入口与权限边界验收报告.md`。新增后续项0、关闭后续项1（`A-01-ROLE-CREATE`）、后续项净变化-1；未新增阻塞项。
+
+### ISSUE-040-026：系统角色详情管理员入口与权限边界
+
+优先级：P0
+任务性质：缺口修复
+类型：系统管理 / 角色详情入口 / 只读权限 / 租户隔离
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-ROLE-DETAIL`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；并引用当前 `docs/product-intelligence/project-map.md` 与 `docs/product-intelligence/evolution-decision.md` 的 A-01 治理决策；candidateEvidenceHead=4e3b55341e6ed86511310be093f2bf6c206adcf5
+存量问题键：[stock:A-01-ROLE-DETAIL]
+关联产品目标：在既有 admin-only 角色管理页让管理员可达已实现的角色详情能力，关闭 A-01 中 `GET /system/roles/{id}` 后端存在但用户不可达的最小叶子缺口；详情保持只读，不扩展角色修改、删除或菜单授权。
+核验结论：问题仍存在——后端 `SysRoleController.getById` 已受 ADMIN/SUPER_ADMIN 或 `system:role:query` 保护，`SysRoleService.getById` 已按当前租户 fail-close 并返回 `SysRoleVO`，但前端系统 API 和角色页没有详情调用或交互；用户价值明确——管理员可核对角色编码、类型、状态、数据范围、菜单集合与创建时间；验收可执行——现有角色列表、详情 Controller/Service、前端页面与测试夹具均可复用；依赖已满足——不需要 schema、migration、菜单、路由或新权限码；去重通过——Ready/Done/Blocked 无相同 marker 或同接口任务。
+候选对比：同级 P0 叶子还包括角色修改与角色删除；本任务是只读详情，复用现有接口且不引入写入、解绑、系统角色保护或破坏性确认风险，能以更小范围先关闭可验证缺口，因此本轮优先。
+检索交叉核验：CodeGraph 命中后端 Controller/Service 与部分测试，但未完整召回当前角色页，归类为工具召回不足；`codebase-memory-mcp` 命中 Controller、Service、admin-only 路由、现有 API/页面测试关系；最终以当前分支 `rg`、直接文件读取和正式测试为准。
+阻塞证据：`GET /system/roles/{id}` 已返回当前租户角色详情且跨租户/不存在目标统一 `ROLE_NOT_FOUND`，前端目前只有角色列表、新建与菜单授权调用，表格操作菜单只有“编辑权限”，用户无法触发详情请求或查看只读字段。
+解除条件：角色表格提供 ADMIN/SUPER_ADMIN 可见的“查看详情”入口，按所选 ID 调用详情 API；加载时不显示上一角色旧数据，失败保留所选目标并显示错误，成功展示允许字段；后端授权、401/403、租户 fail-close、字段白名单和既有新建/菜单授权能力均不回退。
+Migration：不需要
+依赖：复用现有 `/system/roles` 页面、`SysRoleVO`、系统 API request、`SysRoleController.getById`、`SysRoleService.getById`、`UserContext`、角色列表和既有前后端测试夹具。
+风险等级：高
+运行态要求：自动化只在 local/dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，任一失败先归类为环境前置并 runtime refresh，稳定等待180秒后复验；从 dev-login 进入 `/system/roles`，对现有角色验证详情入口、加载、字段展示、关闭后重新打开和失败不残留旧数据。详情为只读，不创建、修改或删除测试数据。
+Reviewer要求：独立 Reviewer 按权限与租户边界复核 ADMIN/SUPER_ADMIN 页面可见性、父路由 admin-only、后端 ADMIN/SUPER_ADMIN 或 `system:role:query` 授权、无权限403、未登录401、跨租户/不存在 `ROLE_NOT_FOUND`；复核前端详情请求无 body/params、目标切换先清空旧数据、错误不伪报成功，展示字段不包含 tenantId、审计人、逻辑删除或其他敏感持久化字段；对绑定 diff 给出 PASS/NEEDS_REPAIR。
+归档报告：`docs/quality/ISSUE-040-026-系统角色详情管理员入口与权限边界验收报告.md`
+最小回滚：回退本 Issue 的前端详情 API、角色页详情交互、对应测试与报告/载体回写；不回退角色列表、新建与菜单授权能力，不涉及 schema 或数据回滚。
+目标：
+- 在前端系统 API 增加类型化 `getRoleDetail(roleId)`，精确调用无 body、无 params 的 `GET /system/roles/{id}` 并返回 `SysRoleVO`。
+- 在既有 admin-only 角色管理页的行操作中增加“查看详情”，仅 ADMIN/SUPER_ADMIN 可见；打开新目标时先清空旧详情，成功展示角色名称、编码、类型、状态、数据范围、菜单 ID 集合和创建时间，失败保留目标并显示后端错误。
+- 补齐 Controller/API/页面正负样本，证明 `system:role:query`、无权限403、未登录401、跨租户/不存在 fail-close、只读字段白名单和既有新建/菜单授权交互不回退。
+非目标：
+- 不新增或修改后端生产接口、Service、实体、Mapper、数据库迁移、菜单、路由、权限码或默认角色授权。
+- 不实现角色修改、删除、复制、导出、批量操作或在详情弹窗内授权菜单。
+- 不连接生产数据库、不发布生产、不 push。
+允许修改：
+- `frontend-admin/src/api/modules/system.ts`
+- `frontend-admin/src/api/modules/__tests__/system-modules.test.ts`
+- `frontend-admin/src/pages/system/roles/index.vue`
+- `frontend-admin/src/pages/system/roles/__tests__/index.test.ts`
+- `backend/src/test/java/com/cgcpms/system/SysRoleControllerTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-040-026-系统角色详情管理员入口与权限边界验收报告.md`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/types/system.ts`
+- AutoPilot 控制面脚本、配置、规则和状态文件之外的正式源码
+验收标准：
+- 前端 API 测试精确断言 `GET /system/roles/{id}` 无 body、无 params；页面测试覆盖 ADMIN/SUPER_ADMIN 可见、普通用户即使持有 `system:role:query` 仍因 admin-only 页面不可见、加载新目标清空旧数据、失败保留目标且不展示旧详情、成功展示允许字段、关闭后重新打开重新请求。
+- Controller 专项覆盖 ADMIN/SUPER_ADMIN 与仅持 `system:role:query` 的已认证请求成功、无权限403、未登录401、跨租户/不存在返回 `ROLE_NOT_FOUND`；响应不暴露 tenantId、createdBy、updatedBy、deletedFlag 等持久化敏感字段。
+- 详情只读交互不调用创建、更新、删除或菜单授权；既有角色列表、新建和编辑权限测试不回退。
+- 收口必须引用 `docs/backlog/current-issues.json` 及该条目的 `sourceRefs`；全部验证通过后移除 `A-01-ROLE-DETAIL`，未完全通过则用证据更新其唯一状态或分类。通过时同步更新 A-01 守恒为有用户入口232、前端调用但无独立页面58、内部/集成/运维4、需补入口16、待废弃0、需要确认11、总数321，并回写 Ready、current-focus、project-map；若差距或优先级判断变化，再更新 evolution-decision。
+- 归档报告统计新增后续项、关闭后续项和后续项净变化；所有发现项必须本轮修复、唯一载体承接或有依据关闭，存在悬空项不得通过。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint 和 `git diff --check` 全部通过；首次失败先按 tool_config、环境前置、真实质量/安全分类并复验。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-026`
+- `cd backend; .\mvnw.cmd "-Dtest=SysRoleControllerTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/system-modules.test.ts src/pages/system/roles/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/system.ts src/pages/system/roles/index.vue src/pages/system/roles/__tests__/index.test.ts`
+- `git diff --check`
