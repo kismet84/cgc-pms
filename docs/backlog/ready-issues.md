@@ -1459,7 +1459,7 @@ Reviewer要求：独立 Reviewer 必须按高风险金额写入裁决，复核 `
 优先级：P0
 任务性质：缺口修复
 类型：系统管理 / 角色新建入口 / 权限 / 租户隔离 / 越权防护
-状态：Ready
+状态：Done
 来源锚点：正式唯一问题载体 `docs/backlog/current-issues.json` 的 `A-01-ROLE-CREATE`；其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；并引用 `docs/product-intelligence/project-map.md` 与 `docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-13-02`；candidateEvidenceHead=8cf39ab3b46ffbf9036db62593a01322cb4c3923
 存量问题键：[stock:A-01-ROLE-CREATE]
 关联产品目标：在既有管理员角色管理页让管理员可达已实现的角色新建能力，关闭 A-01 中 `POST /system/roles` 后端存在但用户不可达的最小叶子缺口；创建结果必须是当前租户内、无菜单权限的普通自定义角色，后续授权继续走既有独立入口。
@@ -1527,3 +1527,10 @@ Reviewer要求：独立 Reviewer 按高风险权限变更复核 ADMIN/SUPER_ADMI
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm exec eslint src/api/modules/system.ts src/types/system.ts src/pages/system/roles/index.vue src/pages/system/roles/__tests__/index.test.ts`
 - `git diff --check`
+
+执行收口（2026-07-14，desktop-native 金丝雀）：
+- 前端在既有 admin-only 角色页提供 ADMIN/SUPER_ADMIN 可见的新建入口，精确调用 `POST /system/roles`；后端保留 ADMIN/SUPER_ADMIN 或 `system:role:add` 授权，并将认证租户、CUSTOM、roleLevel=2、ENABLE/SELF 安全默认和空菜单集合固化为服务端事实。
+- Ready lint、后端38项、前端26项、类型检查、目标 ESLint 与差异检查通过；真实浏览器完成唯一角色创建、重复编码失败保留表单、成功列表回读，数据库读回 tenantId=0/CUSTOM/ENABLE/SELF/roleLevel=2/空菜单，并在 localhost dev 库按固定角色 ID 精确清理至零残留。
+- 独立 Reviewer 首轮识别复核摘要仍绑定旧恢复哈希且混入提前生成的收口草稿，归类为 `tool_config/证据绑定与阶段边界错误`；撤出草稿并重跑全部命令后，Reviewer 对实现差异哈希 `6bec1258709186652b431968716e2f8ec99c822d24c4bf812a2a2d6fa3f3ac59` 给出 `PASS`，findings=无。
+- `A-01-ROLE-CREATE` 已从 `docs/backlog/current-issues.json` 移除；A-01 守恒更新为有用户入口231、前端调用但无独立页面58、内部/集成/运维4、需补入口17、待废弃0、需要确认11，共321。
+- 正式报告：`docs/quality/ISSUE-040-025-系统角色新建管理员入口与权限边界验收报告.md`。新增后续项0、关闭后续项1（`A-01-ROLE-CREATE`）、后续项净变化-1；未新增阻塞项。

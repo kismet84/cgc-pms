@@ -14,6 +14,13 @@
 - 收口改为 `PreCloseoutFacts → 报告自动事实区 → closeout commit → 冻结 final result → Closeout Record v2 → REGISTERED`；旧 `key + registeredAt` ledger 只读兼容，同 key 异 payload 按 `integrity_conflict` 拒绝。
 - M0b 基线证明低风险标准路径已经是 1 次 Executor、0 次 Reviewer，Owner 快速通道以 `NO_MEASURABLE_BENEFIT` 关闭，未新增 route/config/Skill 分支。控制面指纹已变化，N>1/无界放量继续等待用户另行明确执行一次 `启动迭代-1` 金丝雀。
 
+## 2026-07-14 增量：系统角色新建入口完成
+
+- `ISSUE-040-025` 已在既有 admin-only 角色页提供 ADMIN/SUPER_ADMIN 可见的新建入口；后端保留 ADMIN/SUPER_ADMIN 或 `system:role:add` 授权，并固定认证租户、CUSTOM、roleLevel=2、ENABLE/SELF 安全默认和初始空菜单集合。
+- 自动化、真实浏览器与 localhost dev 数据库读回/精确清理均通过；独立 Reviewer 对绑定实现差异给出 `PASS`，findings=无。首轮证据哈希/阶段边界错误已修复并全量复验，不构成业务失败。
+- `A-01-ROLE-CREATE` 已从唯一存量问题载体移除；A-01 守恒为有用户入口231、前端调用但无独立页面58、内部/集成/运维4、需补入口17、待废弃0、需要确认11，共321。
+- 新增后续项0、关闭后续项1、后续项净变化-1；当前产品候选排序不变。
+
 ## 2026-07-14 增量：间接费执行入口与金额安全边界
 
 - `ISSUE-040-024` 已在既有 `/cost/ledger` 提供受控的月度间接费执行入口：仅 ADMIN/SUPER_ADMIN 或同时具备 `cost:ledger:query` 与 `overhead:execute` 的用户可见，月份统一转换为自然月月末并经过二次确认。
