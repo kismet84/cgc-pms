@@ -1540,7 +1540,7 @@ Reviewer要求：独立 Reviewer 按高风险权限变更复核 ADMIN/SUPER_ADMI
 优先级：P0
 任务性质：缺口修复
 类型：系统管理 / 角色详情入口 / 只读权限 / 租户隔离
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `A-01-ROLE-DETAIL`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；并引用当前 `docs/product-intelligence/project-map.md` 与 `docs/product-intelligence/evolution-decision.md` 的 A-01 治理决策；candidateEvidenceHead=4e3b55341e6ed86511310be093f2bf6c206adcf5
 存量问题键：[stock:A-01-ROLE-DETAIL]
 关联产品目标：在既有 admin-only 角色管理页让管理员可达已实现的角色详情能力，关闭 A-01 中 `GET /system/roles/{id}` 后端存在但用户不可达的最小叶子缺口；详情保持只读，不扩展角色修改、删除或菜单授权。

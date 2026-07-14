@@ -14,6 +14,13 @@
 - 收口改为 `PreCloseoutFacts → 报告自动事实区 → closeout commit → 冻结 final result → Closeout Record v2 → REGISTERED`；旧 `key + registeredAt` ledger 只读兼容，同 key 异 payload 按 `integrity_conflict` 拒绝。
 - M0b 基线证明低风险标准路径已经是 1 次 Executor、0 次 Reviewer，Owner 快速通道以 `NO_MEASURABLE_BENEFIT` 关闭，未新增 route/config/Skill 分支。控制面指纹已变化，N>1/无界放量继续等待用户另行明确执行一次 `启动迭代-1` 金丝雀。
 
+## 2026-07-14 增量：系统角色详情入口完成
+
+- `ISSUE-040-026` 已在既有 admin-only 角色页提供 ADMIN/SUPER_ADMIN 可见的只读详情入口，复用 `GET /system/roles/{id}`，展示角色名称、编码、类型、状态、数据范围、菜单 ID 集合和创建时间，不引入修改、删除或菜单授权写操作。
+- 后端专项、前端专项、类型检查、目标 ESLint、Ready lint、差异检查与真实浏览器均通过；独立 Reviewer 首轮要求补齐 SUPER_ADMIN Controller 成功样本，修复并全量复验后对差异哈希 `8417e82ec3d8a4f4db9a982795b311c681baa3cb1243beafec2f196057652524` 给出 `PASS`，findings=无。
+- `A-01-ROLE-DETAIL` 已从唯一存量问题载体移除；A-01 守恒为有用户入口232、前端调用但无独立页面58、内部/集成/运维4、需补入口16、待废弃0、需要确认11，共321。
+- 新增后续项0、关闭后续项1、后续项净变化-1；当前产品候选排序不变。
+
 ## 2026-07-14 增量：系统角色新建入口完成
 
 - `ISSUE-040-025` 已在既有 admin-only 角色页提供 ADMIN/SUPER_ADMIN 可见的新建入口；后端保留 ADMIN/SUPER_ADMIN 或 `system:role:add` 授权，并固定认证租户、CUSTOM、roleLevel=2、ENABLE/SELF 安全默认和初始空菜单集合。
