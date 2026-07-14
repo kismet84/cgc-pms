@@ -107,7 +107,37 @@ public class SysRoleService {
         SysRole existing = sysRoleMapper.selectById(role.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
-        sysRoleMapper.updateById(role);
+
+        String existingRoleCode = existing.getRoleCode() == null
+                ? "" : existing.getRoleCode().trim().toUpperCase();
+        if (RESERVED_ROLE_CODES.contains(existingRoleCode)
+                || "SYSTEM".equalsIgnoreCase(existing.getRoleType())
+                || (existing.getRoleLevel() != null && existing.getRoleLevel() < 2)) {
+            throw new BusinessException("ROLE_UPDATE_PROTECTED", "系统或高等级角色不允许修改");
+        }
+
+        String requestRoleCode = role.getRoleCode() == null ? "" : role.getRoleCode().trim();
+        if (!requestRoleCode.equals(existing.getRoleCode())) {
+            throw new BusinessException("ROLE_UPDATE_IMMUTABLE_FIELD", "角色编码不允许修改");
+        }
+
+        String roleName = role.getRoleName() == null ? "" : role.getRoleName().trim();
+        String status = role.getStatus() == null
+                ? existing.getStatus() : role.getStatus().trim().toUpperCase();
+        String dataScope = role.getDataScope() == null
+                ? existing.getDataScope() : role.getDataScope().trim().toUpperCase();
+        if (roleName.isEmpty() || roleName.length() > 100
+                || !ALLOWED_STATUSES.contains(status)
+                || !ALLOWED_DATA_SCOPES.contains(dataScope)) {
+            throw new BusinessException("ROLE_UPDATE_INVALID_FIELD", "角色名称、状态或数据范围不合法");
+        }
+
+        existing.setRoleName(roleName);
+        existing.setStatus(status);
+        existing.setDataScope(dataScope);
+        if (sysRoleMapper.updateById(existing) != 1) {
+            throw new BusinessException("ROLE_UPDATE_FAILED", "角色修改失败，请重试");
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)

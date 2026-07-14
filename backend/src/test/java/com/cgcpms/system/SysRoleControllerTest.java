@@ -233,12 +233,85 @@ class SysRoleControllerTest {
                 .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"));
     }
 
-    @Test @Order(6) @DisplayName("PUT /system/roles/{id} -> 200")
+    @Test @Order(6) @DisplayName("PUT /system/roles/{id} updates only whitelisted fields")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(roleId);
-        String body = "{\"roleCode\":\"ROLE-UPD-" + System.nanoTime() + "\",\"roleName\":\"更新角色\",\"roleType\":\"CUSTOM\"}";
+        SysRole before = roleMapper.selectById(roleId);
+        long menuCount = roleMenuMapper.selectCount(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId));
+        String body = "{\"id\":999999,\"tenantId\":777,\"roleCode\":\"" + before.getRoleCode()
+                + "\",\"roleName\":\"更新角色\",\"status\":\"DISABLE\",\"dataScope\":\"DEPT\""
+                + ",\"roleType\":\"SYSTEM\",\"roleLevel\":0}";
         mockMvc.perform(u("/system/roles/" + roleId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+
+        SysRole saved = roleMapper.selectById(roleId);
+        Assertions.assertEquals("更新角色", saved.getRoleName());
+        Assertions.assertEquals("DISABLE", saved.getStatus());
+        Assertions.assertEquals("DEPT", saved.getDataScope());
+        Assertions.assertEquals(before.getRoleCode(), saved.getRoleCode());
+        Assertions.assertEquals(before.getTenantId(), saved.getTenantId());
+        Assertions.assertEquals(before.getRoleType(), saved.getRoleType());
+        Assertions.assertEquals(before.getRoleLevel(), saved.getRoleLevel());
+        Assertions.assertEquals(menuCount, roleMenuMapper.selectCount(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId)));
+    }
+
+    @Test @Order(6) @DisplayName("PUT /system/roles/{id} supports system:role:edit")
+    void testUpdate_WithExplicitPermission() throws Exception {
+        Assertions.assertNotNull(roleId);
+        SysRole before = roleMapper.selectById(roleId);
+        String body = "{\"roleCode\":\"" + before.getRoleCode()
+                + "\",\"roleName\":\"显式权限修改\",\"status\":\"ENABLE\",\"dataScope\":\"SELF\"}";
+        mockMvc.perform(u("/system/roles/" + roleId)
+                        .cookie(authCookie(TENANT_ID, List.of("USER"), List.of("system:role:edit")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(6) @DisplayName("PUT /system/roles/{id} rejects missing role:edit")
+    void testUpdate_Forbidden() throws Exception {
+        Assertions.assertNotNull(roleId);
+        SysRole before = roleMapper.selectById(roleId);
+        String body = "{\"roleCode\":\"" + before.getRoleCode() + "\",\"roleName\":\"无权限修改\"}";
+        mockMvc.perform(u("/system/roles/" + roleId)
+                        .cookie(authCookie(TENANT_ID, List.of("USER"), List.of()))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+    }
+
+    @Test @Order(6) @DisplayName("PUT /system/roles/{id} without JWT -> 401")
+    void testUpdate_Unauthorized() throws Exception {
+        Assertions.assertNotNull(roleId);
+        SysRole before = roleMapper.selectById(roleId);
+        String body = "{\"roleCode\":\"" + before.getRoleCode() + "\",\"roleName\":\"未登录修改\"}";
+        mockMvc.perform(u("/system/roles/" + roleId)
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test @Order(6) @DisplayName("PUT /system/roles/{id} hides cross-tenant roles")
+    void testUpdate_CrossTenant() throws Exception {
+        Assertions.assertNotNull(roleId);
+        SysRole before = roleMapper.selectById(roleId);
+        String body = "{\"roleCode\":\"" + before.getRoleCode() + "\",\"roleName\":\"跨租户修改\"}";
+        mockMvc.perform(u("/system/roles/" + roleId)
+                        .cookie(authCookie(999L, List.of("ADMIN"), List.of()))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"));
+    }
+
+    @Test @Order(6) @DisplayName("PUT /system/roles/{id} rejects immutable role code changes")
+    void testUpdate_RejectsRoleCodeChange() throws Exception {
+        Assertions.assertNotNull(roleId);
+        String body = "{\"roleCode\":\"CHANGED_CODE\",\"roleName\":\"越权修改\"}";
+        mockMvc.perform(u("/system/roles/" + roleId).cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ROLE_UPDATE_IMMUTABLE_FIELD"));
     }
 
     @Test @Order(7) @DisplayName("DELETE /system/roles/{id} -> 200")

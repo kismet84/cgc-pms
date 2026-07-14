@@ -7,6 +7,7 @@ import type {
   SysMenuVO,
   SysRoleVO,
   UpdateMenuPayload,
+  UpdateRolePayload,
 } from '@/types/system'
 
 /** 获取菜单树 */
@@ -80,6 +81,15 @@ export function createRole(data: CreateRolePayload) {
   return request<number | string>({
     url: '/system/roles',
     method: 'post',
+    data,
+  })
+}
+
+/** 修改普通自定义角色的业务字段 */
+export function updateRole(roleId: number | string, data: UpdateRolePayload) {
+  return request<void>({
+    url: `/system/roles/${roleId}`,
+    method: 'put',
     data,
   })
 }

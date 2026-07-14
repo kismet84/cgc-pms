@@ -28,6 +28,14 @@ export interface CreateRolePayload {
   dataScope?: 'ALL' | 'DEPT' | 'DEPT_AND_CHILD' | 'SELF' | 'CUSTOM'
 }
 
+export interface UpdateRolePayload {
+  /** Existing immutable code required by the backend entity validation contract. */
+  roleCode: string
+  roleName: string
+  status: 'ENABLE' | 'DISABLE'
+  dataScope: 'ALL' | 'DEPT' | 'DEPT_AND_CHILD' | 'SELF' | 'CUSTOM'
+}
+
 export interface SysMenuVO {
   id: number | string
   parentId: number | string

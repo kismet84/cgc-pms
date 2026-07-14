@@ -11,6 +11,7 @@ const mockGetRoles = vi.fn()
 const mockGetRoleDetail = vi.fn()
 const mockCreateRole = vi.fn()
 const mockDeleteRole = vi.fn()
+const mockUpdateRole = vi.fn()
 const mockGetMenuTree = vi.fn()
 const mockUpdateRoleMenus = vi.fn()
 const mockAccess = vi.hoisted(() => ({
@@ -23,6 +24,7 @@ vi.mock('@/api/modules/system', () => ({
   getRoleDetail: (...args: unknown[]) => mockGetRoleDetail(...args),
   createRole: (...args: unknown[]) => mockCreateRole(...args),
   deleteRole: (...args: unknown[]) => mockDeleteRole(...args),
+  updateRole: (...args: unknown[]) => mockUpdateRole(...args),
   getMenuTree: (...args: unknown[]) => mockGetMenuTree(...args),
   updateRoleMenus: (...args: unknown[]) => mockUpdateRoleMenus(...args),
 }))
@@ -393,6 +395,7 @@ describe('RoleListPage', () => {
     mockGetRoles.mockResolvedValue(mockRoles)
     mockGetRoleDetail.mockResolvedValue({ ...mockRoles[0], dataScope: 'ALL' })
     mockDeleteRole.mockResolvedValue(undefined)
+    mockUpdateRole.mockResolvedValue(undefined)
   })
 
   it('fetches roles on mount', async () => {
@@ -476,6 +479,92 @@ describe('RoleListPage', () => {
 
     expect(wrapper.find('[data-testid="delete-role-2"]').exists()).toBe(false)
     expect(mockDeleteRole).not.toHaveBeenCalled()
+  })
+
+  it.each(['ADMIN', 'SUPER_ADMIN'])(
+    'shows update only for unprotected roles to %s',
+    async (role) => {
+      mockAccess.roles.splice(0, mockAccess.roles.length, role)
+
+      const wrapper = mount(RoleListPage, { global: { stubs } })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="update-role-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="update-role-2"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="update-role-3"]').exists()).toBe(false)
+    },
+  )
+
+  it('hides update from ordinary users even with system:role:edit', async () => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, 'USER')
+    mockAccess.permissions.push('system:role:edit')
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="update-role-2"]').exists()).toBe(false)
+    expect(mockUpdateRole).not.toHaveBeenCalled()
+  })
+
+  it('prefills immutable code and validates role name before updating', async () => {
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="update-role-2"]').trigger('click')
+
+    expect(
+      (wrapper.find('[data-testid="update-role-code"]').element as HTMLInputElement).value,
+    ).toBe('USER')
+    expect(
+      (wrapper.find('[data-testid="update-role-name"]').element as HTMLInputElement).value,
+    ).toBe('普通用户')
+
+    await wrapper.find('[data-testid="update-role-name"]').setValue('   ')
+    await wrapper.find('[data-testid="update-role-submit"]').trigger('click')
+    expect(vi.mocked(message.error)).toHaveBeenLastCalledWith('请填写角色名称')
+
+    await wrapper.find('[data-testid="update-role-name"]').setValue('角'.repeat(101))
+    await wrapper.find('[data-testid="update-role-submit"]').trigger('click')
+    expect(vi.mocked(message.error)).toHaveBeenLastCalledWith('角色名称不能超过100个字符')
+    expect(mockUpdateRole).not.toHaveBeenCalled()
+  })
+
+  it('keeps the update form open and reports the backend error', async () => {
+    mockUpdateRole.mockRejectedValueOnce(new Error('系统或高等级角色不允许修改'))
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="update-role-2"]').trigger('click')
+    await wrapper.find('[data-testid="update-role-name"]').setValue('修改失败仍保留')
+    await wrapper.find('[data-testid="update-role-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('系统或高等级角色不允许修改')
+    expect(wrapper.find('[data-testid="update-role-modal"]').exists()).toBe(true)
+    expect(
+      (wrapper.find('[data-testid="update-role-name"]').element as HTMLInputElement).value,
+    ).toBe('修改失败仍保留')
+    expect(mockGetRoles).toHaveBeenCalledTimes(1)
+  })
+
+  it('updates the selected role, closes the form, and refreshes without changing menus', async () => {
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="update-role-2"]').trigger('click')
+    await wrapper.find('[data-testid="update-role-name"]').setValue('项目成员')
+    await wrapper.find('[data-testid="update-role-status"]').setValue('DISABLE')
+    await wrapper.find('[data-testid="update-role-data-scope"]').setValue('DEPT')
+    await wrapper.find('[data-testid="update-role-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mockUpdateRole).toHaveBeenCalledWith(2, {
+      roleCode: 'USER',
+      roleName: '项目成员',
+      status: 'DISABLE',
+      dataScope: 'DEPT',
+    })
+    expect(vi.mocked(message.success)).toHaveBeenCalledWith('角色修改成功')
+    expect(wrapper.find('[data-testid="update-role-modal"]').exists()).toBe(false)
+    expect(mockGetRoles).toHaveBeenCalledTimes(2)
+    expect(mockUpdateRoleMenus).not.toHaveBeenCalled()
   })
 
   it('does not call delete until the destructive confirmation is accepted', async () => {

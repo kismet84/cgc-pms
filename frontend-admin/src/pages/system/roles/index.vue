@@ -3,9 +3,9 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { MoreOutlined, PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
-import { createRole, deleteRole, getRoleDetail, getRoles } from '@/api/modules/system'
+import { createRole, deleteRole, getRoleDetail, getRoles, updateRole } from '@/api/modules/system'
 import { useUserStore } from '@/stores/user'
-import type { CreateRolePayload, SysRoleVO } from '@/types/system'
+import type { CreateRolePayload, SysRoleVO, UpdateRolePayload } from '@/types/system'
 import PermissionModal from './PermissionModal.vue'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
@@ -47,6 +47,15 @@ let detailRequestSequence = 0
 const createModalVisible = ref(false)
 const creating = ref(false)
 const createForm = reactive<CreateRolePayload>(defaultCreateForm())
+const updateModalVisible = ref(false)
+const updating = ref(false)
+const updateTarget = ref<SysRoleVO | null>(null)
+const updateForm = reactive<UpdateRolePayload>({
+  roleCode: '',
+  roleName: '',
+  status: 'ENABLE',
+  dataScope: 'SELF',
+})
 
 const canCreateRole = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
@@ -55,6 +64,9 @@ const canViewRoleDetail = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
 )
 const canDeleteRole = computed(() =>
+  userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
+)
+const canUpdateRole = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
 )
 
@@ -192,6 +204,57 @@ function handleReset() {
 function handleEditPermission(record: SysRoleVO) {
   selectedRole.value = record
   permissionModalVisible.value = true
+}
+
+function openUpdateModal(record: SysRoleVO) {
+  updateTarget.value = record
+  updateForm.roleCode = record.roleCode
+  updateForm.roleName = record.roleName
+  updateForm.status = record.status === 'DISABLE' ? 'DISABLE' : 'ENABLE'
+  updateForm.dataScope =
+    record.dataScope &&
+    ['ALL', 'DEPT', 'DEPT_AND_CHILD', 'SELF', 'CUSTOM'].includes(record.dataScope)
+      ? (record.dataScope as UpdateRolePayload['dataScope'])
+      : 'SELF'
+  updateModalVisible.value = true
+}
+
+function closeUpdateModal() {
+  if (!updating.value) {
+    updateModalVisible.value = false
+    updateTarget.value = null
+  }
+}
+
+async function handleUpdateRole() {
+  if (!updateTarget.value) return
+  const roleName = updateForm.roleName.trim()
+  if (!roleName) {
+    message.error('请填写角色名称')
+    return
+  }
+  if (roleName.length > 100) {
+    message.error('角色名称不能超过100个字符')
+    return
+  }
+
+  updating.value = true
+  try {
+    await updateRole(updateTarget.value.id, {
+      roleCode: updateTarget.value.roleCode,
+      roleName,
+      status: updateForm.status,
+      dataScope: updateForm.dataScope,
+    })
+    updateModalVisible.value = false
+    updateTarget.value = null
+    message.success('角色修改成功')
+    await fetchData()
+  } catch (error: unknown) {
+    message.error(errorMessage(error) || '角色修改失败')
+  } finally {
+    updating.value = false
+  }
 }
 
 function isProtectedRole(record: SysRoleVO): boolean {
@@ -359,6 +422,13 @@ onMounted(() => {
                     >
                       查看详情
                     </a-menu-item>
+                    <a-menu-item
+                      v-if="canUpdateRole && !isProtectedRole(row)"
+                      :data-testid="`update-role-${row.id}`"
+                      @click="openUpdateModal(row)"
+                    >
+                      编辑角色
+                    </a-menu-item>
                     <a-menu-item @click="handleEditPermission(row)">编辑权限</a-menu-item>
                     <a-menu-item
                       v-if="canDeleteRole && !isProtectedRole(row)"
@@ -464,6 +534,55 @@ onMounted(() => {
             @click="handleCreateRole"
           >
             创建
+          </a-button>
+        </div>
+      </a-form>
+    </a-modal>
+
+    <a-modal
+      :open="updateModalVisible"
+      :title="`编辑角色${updateTarget ? `：${updateTarget.roleName}` : ''}`"
+      :footer="null"
+      :closable="!updating"
+      :mask-closable="false"
+      data-testid="update-role-modal"
+      @cancel="closeUpdateModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="角色编码">
+          <a-input v-model:value="updateForm.roleCode" disabled data-testid="update-role-code" />
+        </a-form-item>
+        <a-form-item label="角色名称" required>
+          <a-input
+            v-model:value="updateForm.roleName"
+            :maxlength="100"
+            data-testid="update-role-name"
+          />
+        </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="updateForm.status" data-testid="update-role-status">
+            <a-select-option value="ENABLE">启用</a-select-option>
+            <a-select-option value="DISABLE">禁用</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="数据范围">
+          <a-select v-model:value="updateForm.dataScope" data-testid="update-role-data-scope">
+            <a-select-option value="SELF">仅本人</a-select-option>
+            <a-select-option value="DEPT">本部门</a-select-option>
+            <a-select-option value="DEPT_AND_CHILD">本部门及以下</a-select-option>
+            <a-select-option value="ALL">全部数据</a-select-option>
+            <a-select-option value="CUSTOM">自定义</a-select-option>
+          </a-select>
+        </a-form-item>
+        <div class="lg-form-actions">
+          <a-button :disabled="updating" @click="closeUpdateModal">取消</a-button>
+          <a-button
+            type="primary"
+            :loading="updating"
+            data-testid="update-role-submit"
+            @click="handleUpdateRole"
+          >
+            保存
           </a-button>
         </div>
       </a-form>
