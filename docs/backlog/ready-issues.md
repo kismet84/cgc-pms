@@ -4,7 +4,79 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-029` 已完成，当前无待实施 Ready；连续迭代将在知识图谱刷新并通过 checkpoint 后继续补货。
+`ISSUE-040-029` 已完成；`ISSUE-040-030` 已由知识图谱存量问题补货，等待本轮实施与验收。
+
+### ISSUE-040-030：成本汇总历史只读入口与项目数据边界
+
+优先级：P1
+任务性质：缺口修复
+类型：成本管理 / 历史快照 / 用户入口 / 权限 / 租户隔离 / 项目数据范围 / 金额只读
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-COST-HISTORY`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`。
+存量问题键：[stock:A-01-COST-HISTORY]
+关联产品目标：在现有成本核对页提供项目成本汇总历史快照的只读入口，使已实现且受 `cost:summary:view` 与项目访问控制保护的接口对合格用户可达，并保持金额与租户边界。
+核验结论：问题仍存在——后端 `GET /cost-summary/{projectId}/history` 已返回按汇总日期倒序的科目快照，并由 `cost:summary:view`、认证租户和 `ProjectAccessChecker` 保护；现有 Controller/Service 测试覆盖未登录、同租户无项目访问及正向读取，但前端成本 API 和 `/cost/summary` 页面均未调用或展示历史。前端当前聚合 `CostSummaryVO` 与后端历史行级 `CostSummaryVO` 结构不同，必须建立独立历史类型，不能把行级快照伪装为项目聚合对象。
+候选对比：上一轮已关闭角色域共享布局缺口，本轮主动切换到成本域。P1 投标和间接费写操作涉及新增状态或金额写入，风险与闭环更大；A-02至A-05为需先过产品决策门的聚合父项。`A-01-COST-HISTORY` 是证据完整的只读叶子，已有页面、接口和测试夹具，最适合作为本次有界第三轮。
+检索交叉核验：CodeGraph 命中 `CostSummaryService`、成本核对页及相关类型，但对精确路由召回偏噪，归类为工具召回不足；`codebase-memory-mcp` 补充确认 Controller→Service→Mapper 与前端 API/页面/测试关系；最终以当前分支精确 `rg`、直接文件读取、唯一台账与源报告为准。
+阻塞证据：合格用户只能查看当前成本聚合，无法从现有页面访问既有历史快照接口，成本核对缺少最小时间追溯入口；直接复用聚合类型会丢失汇总日期与科目行语义。
+解除条件：前端增加类型化历史请求并在现有成本核对页提供选定项目后的只读历史入口，明确展示汇总日期、科目和关键金额，覆盖加载、空态、错误保留；后端历史接口的401、无权限403、同租户无项目访问403、跨租户隐藏和合法访问证据齐全；当前汇总与重算能力不回退。
+Migration：不需要
+依赖：复用现有 `/cost/summary` 页面、成本 API request、项目选择器、`GET /cost-summary/{projectId}/history`、`CostSummaryController`、`CostSummaryService`、`ProjectAccessChecker` 及现有前后端测试夹具；不新增路由、菜单、权限码、后端主代码、表或定时任务。
+风险等级：高
+风险说明：历史快照包含项目成本金额，虽然本次只增加读取入口，但必须证明权限、租户和项目数据范围未被前端可达性变化放宽。
+运行态要求：自动化只在 local/dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，任一失败先归类为环境前置并使用 runtime refresh，稳定等待180秒后复验；从 dev-login 进入 `/cost/summary`，选择现有可访问项目后只读打开历史，不刷新汇总、不修改或重置业务数据。
+Reviewer要求：按高风险金额只读与项目数据范围变更复核前端只向选定 projectId 发起 GET 且无 tenantId、无写操作；复核路由既有 `cost:summary:view` 门禁、后端未登录401、无权限403、同租户无项目访问403、跨租户隐藏及合法项目读取；复核历史行级类型不与项目聚合类型混淆，错误不伪报空数据，当前汇总、重算和移动端布局不回退，并对绑定 diff 给出 PASS/NEEDS_REPAIR。
+归档报告：`docs/quality/ISSUE-040-030-成本汇总历史只读入口与项目数据边界验收报告.md`
+最小回滚：回退本 Issue 的前端历史类型、API、页面入口、测试和治理回写，以及后端新增的精确安全测试；不删除历史快照或业务数据，不改变既有接口、表、当前汇总和定时刷新。
+目标：
+- 在成本 API 增加类型化项目历史请求，只调用既有历史 GET 路径，不发送 tenantId、请求体或写参数。
+- 在现有成本核对页增加选定项目后可用的历史入口，以只读弹窗展示汇总日期、成本科目、目标成本、实际成本、动态成本和偏差，覆盖加载、空态、错误与关闭重开。
+- 补齐前端 API/页面行为测试，并在既有后端 Controller 测试中增加历史接口无权限与跨租户精确样本，证明项目金额数据 fail-close。
+非目标：
+- 不新增历史表、分页接口、快照生成、对比图、导出、恢复、删除、重算或手工写入能力，不改变历史排序和后端返回结构。
+- 不修改路由、菜单、权限码、Service、Mapper、实体、数据库迁移、定时任务或项目访问规则，不把行级历史快照聚合成新的财务口径。
+- 不连接生产数据库、不发布生产、不自动 push，不新增、修改、删除或重置本地业务数据。
+允许修改：
+- `frontend-admin/src/api/modules/cost.ts`
+- `frontend-admin/src/api/modules/__tests__/cost.test.ts`
+- `frontend-admin/src/types/cost.ts`
+- `frontend-admin/src/pages/cost/summary.vue`
+- `frontend-admin/src/pages/cost/__tests__/CostSummaryProduction.test.ts`
+- `backend/src/test/java/com/cgcpms/cost/CostSummaryControllerTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-040-030-成本汇总历史只读入口与项目数据边界验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/test/java/com/cgcpms/cost/CostSummaryServiceTest.java`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/pages/cost/components/**`
+- `frontend-admin/src/pages/cost/ledger.vue`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 前端 API 测试精确断言历史请求为 `GET /cost-summary/{projectId}/history`，无 body、params 与 tenantId；独立历史类型保留汇总日期、科目和金额字段，不复用项目聚合 `subjects` 语义。
+- 历史按钮未选择项目时禁用；选择项目后点击才发请求并打开只读弹窗，成功展示日期、科目和关键金额，空数组显示明确空态，失败显示错误且弹窗保持可见、不伪报成功，关闭重开重新读取当前选定项目。
+- 未登录历史请求返回401；已登录但无 `cost:summary:view` 返回403；持权限但无目标项目访问返回403；跨租户项目不可见；合法 ADMIN/SUPER_ADMIN 或持权限且满足项目数据范围的用户可读取，响应仍只含既有历史行字段。
+- 既有当前成本汇总读取、动态成本重算、项目选择、移动端卡片、桌面表格和列设置测试不回退；浏览器验收只读选择现有项目并打开历史，控制台无新增 error/warn。
+- 收口必须引用 `docs/backlog/current-issues.json` 及本项 `sourceRefs`；全部通过后移除 `A-01-COST-HISTORY`，未完全通过则用证据更新其唯一状态或分类。通过时同步更新 A-01 守恒为有用户入口235、前端调用但无独立页面58、内部/集成/运维4、需补入口13、待废弃0、需要确认11、总数321，并回写 Ready、current-focus、project-map；若差距或优先级判断变化，再更新 evolution-decision。
+- 归档报告统计新增后续项、关闭后续项和后续项净变化；所有发现项必须本轮修复、唯一载体承接或有依据关闭，存在悬空项不得通过。金额、权限、租户、项目数据范围或历史类型证据不足时判不通过。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint 与 `git diff --check` 全部通过；首次失败先按 tool_config、环境前置、真实质量/安全分类并复验。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-030`
+- `cd backend; .\mvnw.cmd "-Dtest=CostSummaryControllerTest,CostSummaryServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/cost.test.ts src/pages/cost/__tests__/CostSummaryProduction.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/cost.ts src/api/modules/__tests__/cost.test.ts src/types/cost.ts src/pages/cost/summary.vue src/pages/cost/__tests__/CostSummaryProduction.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-029：共享列表中窄视口表格高度链修复
 
