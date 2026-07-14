@@ -888,11 +888,14 @@ input:focus-visible,
 
   .lg-list-page .lg-grid,
   .lg-list-page .lg-left,
-  .lg-list-page .ct-main-column,
+  .lg-list-page .ct-main-column {
+    min-height: 0;
+  }
+
   .lg-list-page .lg-left > .lg-list-table-panel,
   .lg-list-page .ct-main-column > .lg-list-table-panel,
   .lg-list-page .lg-grid > .lg-list-table-panel {
-    min-height: 0;
+    min-height: clamp(420px, 58vh, 640px);
   }
 
   .lg-pagination,
@@ -903,4 +906,3 @@ input:focus-visible,
     justify-content: flex-start;
   }
 }
-
