@@ -29,7 +29,7 @@
 - 报告投影：同一 PreCloseout Facts 重复渲染字节一致，人工裁决区保留，自动区不包含 closeoutCommit、reportHash、resultHash 或 REGISTERED 自引用字段。
 - 冻结结果：重复写入相同 payload 幂等；不同 payload 触发完整性冲突。
 - 换行：临时 Git fixture 显式使用 `core.autocrlf=false`、`core.eol=lf`；最终测试 `WARNING_COUNT=0`，本轮改动文件无混合 CRLF，UTF-8 无 BOM。
-- 当前控制面指纹：`863b29b5039bd7a2cbb365a0ca2f94c7adafccaf8bbb3e4ca8b393ebf70c8ffa`。
+- 当前控制面指纹：`220473b3de1012674700ee8ad5c2f3336513534fa444b154afdece580861ce87`。
 
 ## 失败分类与处置
 
@@ -38,6 +38,7 @@
 - done ledger 追加 CRLF 导致 `git diff --check` trailing whitespace：归类为文本写入缺口；改为 UTF-8 无 BOM、LF 写入。
 - v2 样本为空时 percentile 参数绑定失败：归类为空样本边界缺口；纯函数显式允许空集合并返回 `insufficient_sample`。
 - 非评分任务重复进入未合并 closeout commit 时仍错误要求评分证据：归类为幂等恢复分支缺口；评分校验改为仅在评分激活时执行，并补充“非评分两阶段提交、重复收口、再快进合并”回归，相关收口测试复验通过。
+- 真实金丝雀首次补货时 Ready Planner 的结构化输出 Schema 被 API 拒绝：归类为 `tool_config`；`ready-plan.schema.json` 改为严格输出兼容形态，补齐 `schemaVersion` 类型、将条件字段改为必填 nullable，并由 importer 继续执行 CREATED/REJECTED/BLOCKED 语义校验；refill、runner compatibility 与 artifact 校验复验通过。
 
 ## 后续项治理
 

@@ -4,6 +4,13 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-refill.ps1')
 
+$plannerSchema = Get-Content -LiteralPath (Join-Path $scriptDir '..\..\plugins\cgc-pms-autopilot\schemas\ready-plan.schema.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+$decisionSchema = $plannerSchema.properties.candidateDecisions.items
+if ($plannerSchema.properties.schemaVersion.type -ne 'integer' -or $decisionSchema.PSObject.Properties.Name -contains 'allOf') { throw 'Ready Planner schema is not compatible with strict structured output' }
+foreach ($name in @('candidateRef','outcome','reason','readyIssueId','failureCategory')) {
+  if ($name -notin @($decisionSchema.required)) { throw "Ready Planner schema must require nullable decision field: $name" }
+}
+
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-refill-test-' + [guid]::NewGuid().ToString('N'))
 $autoDir = Join-Path $root '.codex-autopilot'
 $backlog = Join-Path $root 'docs\backlog'
