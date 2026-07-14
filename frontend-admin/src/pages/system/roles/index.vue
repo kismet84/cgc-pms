@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { MoreOutlined, PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
-import { createRole, getRoleDetail, getRoles } from '@/api/modules/system'
+import { createRole, deleteRole, getRoleDetail, getRoles } from '@/api/modules/system'
 import { useUserStore } from '@/stores/user'
 import type { CreateRolePayload, SysRoleVO } from '@/types/system'
 import PermissionModal from './PermissionModal.vue'
@@ -54,6 +54,9 @@ const canCreateRole = computed(() =>
 const canViewRoleDetail = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
 )
+const canDeleteRole = computed(() =>
+  userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
+)
 
 const gridColumns = computed(() => [
   { field: 'roleName', title: '角色名称', width: 150 },
@@ -61,7 +64,7 @@ const gridColumns = computed(() => [
   { field: 'roleType', title: '角色类型', width: 120 },
   { field: 'status', title: '状态', width: 88, slots: { default: 'status' } },
   { field: 'createdAt', title: '创建时间', width: 160 },
-  { title: '操作', width: 76, slots: { default: 'action' } },
+  { title: '操作', width: 96, slots: { default: 'action' } },
 ])
 
 const {
@@ -189,6 +192,36 @@ function handleReset() {
 function handleEditPermission(record: SysRoleVO) {
   selectedRole.value = record
   permissionModalVisible.value = true
+}
+
+function isProtectedRole(record: SysRoleVO): boolean {
+  const roleCode = String(record.roleCode || '')
+    .trim()
+    .toUpperCase()
+  const roleType = String(record.roleType || '')
+    .trim()
+    .toUpperCase()
+  return ['ADMIN', 'SUPER_ADMIN'].includes(roleCode) || ['SYSTEM', '系统角色'].includes(roleType)
+}
+
+function handleDeleteRole(record: SysRoleVO) {
+  Modal.confirm({
+    title: '确认删除角色',
+    content: `确定要删除角色“${record.roleName}”吗？删除后不可恢复。`,
+    okText: '删除',
+    cancelText: '取消',
+    okType: 'danger',
+    onOk: async () => {
+      try {
+        await deleteRole(record.id)
+        message.success('角色删除成功')
+        await fetchData()
+      } catch (error: unknown) {
+        message.error(errorMessage(error) || '角色删除失败')
+        throw error
+      }
+    },
+  })
 }
 
 async function openRoleDetail(record: SysRoleVO) {
@@ -327,6 +360,14 @@ onMounted(() => {
                       查看详情
                     </a-menu-item>
                     <a-menu-item @click="handleEditPermission(row)">编辑权限</a-menu-item>
+                    <a-menu-item
+                      v-if="canDeleteRole && !isProtectedRole(row)"
+                      danger
+                      :data-testid="`delete-role-${row.id}`"
+                      @click="handleDeleteRole(row)"
+                    >
+                      删除
+                    </a-menu-item>
                   </a-menu>
                 </template>
               </a-dropdown>

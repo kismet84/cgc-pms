@@ -84,6 +84,14 @@ export function createRole(data: CreateRolePayload) {
   })
 }
 
+/** 删除未绑定用户的普通自定义角色 */
+export function deleteRole(roleId: number | string) {
+  return request<void>({
+    url: `/system/roles/${roleId}`,
+    method: 'delete',
+  })
+}
+
 /** 更新角色菜单权限 */
 export function updateRoleMenus(roleId: number | string, menuIds: number[]) {
   return request<void>({

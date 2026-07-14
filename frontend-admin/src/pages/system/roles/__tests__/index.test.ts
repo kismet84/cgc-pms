@@ -10,6 +10,7 @@ function flushPromises() {
 const mockGetRoles = vi.fn()
 const mockGetRoleDetail = vi.fn()
 const mockCreateRole = vi.fn()
+const mockDeleteRole = vi.fn()
 const mockGetMenuTree = vi.fn()
 const mockUpdateRoleMenus = vi.fn()
 const mockAccess = vi.hoisted(() => ({
@@ -21,6 +22,7 @@ vi.mock('@/api/modules/system', () => ({
   getRoles: (...args: unknown[]) => mockGetRoles(...args),
   getRoleDetail: (...args: unknown[]) => mockGetRoleDetail(...args),
   createRole: (...args: unknown[]) => mockCreateRole(...args),
+  deleteRole: (...args: unknown[]) => mockDeleteRole(...args),
   getMenuTree: (...args: unknown[]) => mockGetMenuTree(...args),
   updateRoleMenus: (...args: unknown[]) => mockUpdateRoleMenus(...args),
 }))
@@ -43,10 +45,13 @@ vi.mock('ant-design-vue', async () => {
       info: vi.fn(),
       warning: vi.fn(),
     },
+    Modal: {
+      confirm: vi.fn(),
+    },
   }
 })
 
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import RoleListPage from '@/pages/system/roles/index.vue'
 import PermissionModal from '@/pages/system/roles/PermissionModal.vue'
 
@@ -387,6 +392,7 @@ describe('RoleListPage', () => {
     mockAccess.permissions.splice(0)
     mockGetRoles.mockResolvedValue(mockRoles)
     mockGetRoleDetail.mockResolvedValue({ ...mockRoles[0], dataScope: 'ALL' })
+    mockDeleteRole.mockResolvedValue(undefined)
   })
 
   it('fetches roles on mount', async () => {
@@ -445,6 +451,79 @@ describe('RoleListPage', () => {
     await flushPromises()
 
     expect(wrapper.find('[data-testid="create-role-button"]').exists()).toBe(false)
+  })
+
+  it.each(['ADMIN', 'SUPER_ADMIN'])(
+    'shows delete only for unprotected roles to %s',
+    async (role) => {
+      mockAccess.roles.splice(0, mockAccess.roles.length, role)
+
+      const wrapper = mount(RoleListPage, { global: { stubs } })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="delete-role-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="delete-role-2"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="delete-role-3"]').exists()).toBe(false)
+    },
+  )
+
+  it('hides delete from ordinary users even with system:role:delete', async () => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, 'USER')
+    mockAccess.permissions.push('system:role:delete')
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="delete-role-2"]').exists()).toBe(false)
+    expect(mockDeleteRole).not.toHaveBeenCalled()
+  })
+
+  it('does not call delete until the destructive confirmation is accepted', async () => {
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-testid="delete-role-2"]').trigger('click')
+
+    expect(vi.mocked(Modal.confirm)).toHaveBeenCalledOnce()
+    expect(vi.mocked(Modal.confirm).mock.calls[0][0]).toMatchObject({
+      title: '确认删除角色',
+      okText: '删除',
+      cancelText: '取消',
+      okType: 'danger',
+    })
+    expect(mockDeleteRole).not.toHaveBeenCalled()
+  })
+
+  it('deletes the selected role and refreshes after confirmation', async () => {
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="delete-role-2"]').trigger('click')
+
+    const options = vi.mocked(Modal.confirm).mock.calls[0][0] as {
+      onOk: () => Promise<void>
+    }
+    await options.onOk()
+    await flushPromises()
+
+    expect(mockDeleteRole).toHaveBeenCalledWith(2)
+    expect(vi.mocked(message.success)).toHaveBeenCalledWith('角色删除成功')
+    expect(mockGetRoles).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the list and reports the backend error when deletion fails', async () => {
+    mockDeleteRole.mockRejectedValueOnce(new Error('角色仍绑定用户，无法删除'))
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="delete-role-2"]').trigger('click')
+
+    const options = vi.mocked(Modal.confirm).mock.calls[0][0] as {
+      onOk: () => Promise<void>
+    }
+    await expect(options.onOk()).rejects.toThrow('角色仍绑定用户，无法删除')
+
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('角色仍绑定用户，无法删除')
+    expect(mockGetRoles).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(message.success)).not.toHaveBeenCalledWith('角色删除成功')
   })
 
   it.each(['ADMIN', 'SUPER_ADMIN'])('shows and loads role detail for %s', async (role) => {

@@ -454,6 +454,60 @@ class SysRoleServiceTest {
         System.out.println("testDelete_NotFound 通过");
     }
 
+    @Test
+    @Order(16)
+    @Transactional
+    @DisplayName("删除角色 — 系统、保留编码和高等级角色均受保护")
+    void testDelete_ProtectedRolesRejectedWithoutSideEffects() {
+        SysRole systemRole = insertRawRole("DELETE_SYSTEM", "SYSTEM", 2);
+        SysRole reservedRole = insertRawRole("ADMIN", "CUSTOM", 2);
+        SysRole elevatedRole = insertRawRole("DELETE_LEVEL_ONE", "CUSTOM", 1);
+
+        for (SysRole role : List.of(systemRole, reservedRole, elevatedRole)) {
+            SysRoleMenu menu = new SysRoleMenu();
+            menu.setRoleId(role.getId());
+            menu.setMenuId(201L);
+            roleMenuMapper.insert(menu);
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> roleService.delete(role.getId()));
+            assertEquals("ROLE_DELETE_PROTECTED", ex.getCode());
+            assertNotNull(roleMapper.selectById(role.getId()));
+            assertEquals(1, roleMenuMapper.selectCount(
+                    new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, role.getId())));
+        }
+    }
+
+    @Test
+    @Order(16)
+    @Transactional
+    @DisplayName("删除角色 — 存在用户绑定时拒绝且保留全部关系")
+    void testDelete_UserBindingRejectedWithoutSideEffects() {
+        SysRole role = new SysRole();
+        role.setRoleCode("DELETE_IN_USE");
+        role.setRoleName("被用户使用角色");
+        Long roleId = roleService.create(role);
+
+        SysRoleMenu menu = new SysRoleMenu();
+        menu.setRoleId(roleId);
+        menu.setMenuId(201L);
+        roleMenuMapper.insert(menu);
+
+        SysUserRole userRole = new SysUserRole();
+        userRole.setUserId(900001L);
+        userRole.setRoleId(roleId);
+        userRoleMapper.insert(userRole);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> roleService.delete(roleId));
+        assertEquals("ROLE_IN_USE", ex.getCode());
+        assertNotNull(roleMapper.selectById(roleId));
+        assertEquals(1, roleMenuMapper.selectCount(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId)));
+        assertEquals(1, userRoleMapper.selectCount(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, roleId)));
+    }
+
     // ═══════════════════════════════════════════════════════════
     // assignMenus tests
     // ═══════════════════════════════════════════════════════════
@@ -687,5 +741,18 @@ class SysRoleServiceTest {
         BusinessException error = assertThrows(BusinessException.class, () -> roleService.create(role));
         assertEquals("ROLE_CREATE_PRIVILEGE_ESCALATION", error.getCode());
         assertEquals(before, roleMapper.selectCount(null), "拒绝越权载荷后不得插入角色");
+    }
+
+    private SysRole insertRawRole(String roleCode, String roleType, Integer roleLevel) {
+        SysRole role = new SysRole();
+        role.setTenantId(TENANT_0);
+        role.setRoleCode(roleCode);
+        role.setRoleName("受保护角色");
+        role.setRoleType(roleType);
+        role.setRoleLevel(roleLevel);
+        role.setStatus("ENABLE");
+        role.setDataScope("SELF");
+        roleMapper.insert(role);
+        return role;
     }
 }

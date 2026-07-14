@@ -27,6 +27,7 @@ import {
   createMenu,
   createRole,
   deleteMenu,
+  deleteRole,
   getMenuDetail,
   getMenuList,
   getMenuTree,
@@ -132,6 +133,18 @@ describe('system-related API modules', () => {
     expect(mockRequest).toHaveBeenCalledWith({
       url: '/system/roles/12',
       method: 'get',
+    })
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('params')
+  })
+
+  it('builds a bodyless role deletion request', () => {
+    deleteRole('12')
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/roles/12',
+      method: 'delete',
     })
     expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
     expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('params')

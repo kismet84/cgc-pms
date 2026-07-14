@@ -6,6 +6,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.entity.SysMenu;
 import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysRoleMenu;
+import com.cgcpms.system.entity.SysUserRole;
 import com.cgcpms.system.mapper.SysMenuMapper;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
@@ -115,11 +116,24 @@ public class SysRoleService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
 
-        // Clean up role-menu and user-role associations to prevent orphan records
+        String roleCode = existing.getRoleCode() == null ? "" : existing.getRoleCode().trim().toUpperCase();
+        if (RESERVED_ROLE_CODES.contains(roleCode)
+                || "SYSTEM".equalsIgnoreCase(existing.getRoleType())
+                || (existing.getRoleLevel() != null && existing.getRoleLevel() < 2)) {
+            throw new BusinessException("ROLE_DELETE_PROTECTED", "系统或高等级角色不允许删除");
+        }
+
+        long userBindingCount = sysUserRoleMapper.selectCount(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, id));
+        if (userBindingCount > 0) {
+            throw new BusinessException("ROLE_IN_USE", "角色仍绑定用户，无法删除");
+        }
+
         sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenu>()
                 .eq(SysRoleMenu::getRoleId, id));
-        // Note: sys_user_role cleanup is handled by SysUserRoleMapper (if it exists)
-        sysRoleMapper.deleteById(id);
+        if (sysRoleMapper.deleteById(id) != 1) {
+            throw new BusinessException("ROLE_DELETE_FAILED", "角色删除失败，请重试");
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)

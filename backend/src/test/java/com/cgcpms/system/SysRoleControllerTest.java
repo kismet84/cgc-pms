@@ -248,6 +248,55 @@ class SysRoleControllerTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }
 
+    @Test @Order(8) @DisplayName("DELETE /system/roles/{id} supports system:role:delete")
+    void testDelete_WithExplicitPermission() throws Exception {
+        Long targetId = createDeletableRole("DELETE-PERMISSION-");
+
+        mockMvc.perform(d("/system/roles/" + targetId)
+                        .cookie(authCookie(TENANT_ID, List.of("USER"), List.of("system:role:delete"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+        Assertions.assertNull(roleMapper.selectById(targetId));
+    }
+
+    @Test @Order(9) @DisplayName("DELETE /system/roles/{id} rejects requests without role:delete")
+    void testDelete_Forbidden() throws Exception {
+        Long targetId = createDeletableRole("DELETE-FORBIDDEN-");
+        try {
+            mockMvc.perform(d("/system/roles/" + targetId)
+                            .cookie(authCookie(TENANT_ID, List.of("USER"), List.of())))
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+            Assertions.assertNotNull(roleMapper.selectById(targetId));
+        } finally {
+            mockMvc.perform(d("/system/roles/" + targetId).cookie(adminCookie()))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test @Order(10) @DisplayName("DELETE /system/roles/{id} without JWT -> 401")
+    void testDelete_Unauthorized() throws Exception {
+        Long targetId = createDeletableRole("DELETE-UNAUTHORIZED-");
+        try {
+            mockMvc.perform(d("/system/roles/" + targetId))
+                    .andExpect(status().isUnauthorized());
+            Assertions.assertNotNull(roleMapper.selectById(targetId));
+        } finally {
+            mockMvc.perform(d("/system/roles/" + targetId).cookie(adminCookie()))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    private Long createDeletableRole(String codePrefix) throws Exception {
+        String body = "{\"roleCode\":\"" + codePrefix + System.nanoTime()
+                + "\",\"roleName\":\"待删除角色\"}";
+        String response = mockMvc.perform(p("/system/roles").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return Long.parseLong(response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+    }
+
     private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }
     private MockHttpServletRequestBuilder p(String p) { return post("/api" + p).contextPath("/api"); }
     private MockHttpServletRequestBuilder u(String p) { return put("/api" + p).contextPath("/api"); }
