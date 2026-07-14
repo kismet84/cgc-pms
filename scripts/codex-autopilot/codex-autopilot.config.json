@@ -168,7 +168,7 @@
     "enabled": true,
     "model": "gpt-5.6-sol",
     "thinking": "high",
-    "timeoutSeconds": 300,
+    "timeoutSeconds": 600,
     "heartbeatSeconds": 30
   },
   "closeout": {

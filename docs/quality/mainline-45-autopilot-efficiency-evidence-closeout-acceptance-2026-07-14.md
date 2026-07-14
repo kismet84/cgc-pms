@@ -3,8 +3,8 @@
 ## 裁决
 
 - 实现与自动化验收：通过。
-- N>1 或无界连续执行放量：阻塞，必须由用户另行明确发出 `启动迭代-1`，并以新控制面指纹完成真实单 Issue 金丝雀。
-- 控制面基线已完成提交前复验，本报告随该基线提交纳入版本管理；新指纹 AutoPilot 金丝雀尚未启动，未 push。
+- N>1 或无界连续执行放量：阻塞；用户已明确发出 `启动迭代-1`，真实单 Issue 金丝雀正在执行，成功登记新控制面指纹前不得放量。
+- 控制面基线已提交；真实金丝雀补货阶段暴露的结构化 Schema 与 300 秒超时预算缺口已按 `tool_config` 修复并复验，尚未形成成功 Closeout Record，未 push。
 
 ## 范围与正式交付物
 
@@ -29,7 +29,7 @@
 - 报告投影：同一 PreCloseout Facts 重复渲染字节一致，人工裁决区保留，自动区不包含 closeoutCommit、reportHash、resultHash 或 REGISTERED 自引用字段。
 - 冻结结果：重复写入相同 payload 幂等；不同 payload 触发完整性冲突。
 - 换行：临时 Git fixture 显式使用 `core.autocrlf=false`、`core.eol=lf`；最终测试 `WARNING_COUNT=0`，本轮改动文件无混合 CRLF，UTF-8 无 BOM。
-- 当前控制面指纹：`220473b3de1012674700ee8ad5c2f3336513534fa444b154afdece580861ce87`。
+- 当前控制面指纹：`9a32a85462fd834336ea132e5070a71edf676884a48cfa3afedec7670382f876`。
 
 ## 失败分类与处置
 
@@ -39,13 +39,14 @@
 - v2 样本为空时 percentile 参数绑定失败：归类为空样本边界缺口；纯函数显式允许空集合并返回 `insufficient_sample`。
 - 非评分任务重复进入未合并 closeout commit 时仍错误要求评分证据：归类为幂等恢复分支缺口；评分校验改为仅在评分激活时执行，并补充“非评分两阶段提交、重复收口、再快进合并”回归，相关收口测试复验通过。
 - 真实金丝雀首次补货时 Ready Planner 的结构化输出 Schema 被 API 拒绝：归类为 `tool_config`；`ready-plan.schema.json` 改为严格输出兼容形态，补齐 `schemaVersion` 类型、将条件字段改为必填 nullable，并由 importer 继续执行 CREATED/REJECTED/BLOCKED 语义校验；refill、runner compatibility 与 artifact 校验复验通过。
+- Schema 修复后 Planner 两次均在 300 秒边界稳定超时，期间持续写入心跳且未生成 Ready、worktree 或业务 diff：归类为 `tool_config`，不判业务代码失败；将有界预算提高到 600 秒并增加配置回归断言，未降低模型、推理强度、候选核验或 Ready 门禁。
 
 ## 后续项治理
 
 - 新增后续项：0。
 - 关闭后续项：0。
 - 后续项净变化：0。
-- 真实金丝雀不是口头悬空建议，而是既有控制面放量授权门；本报告不伪称已执行。用户授权前仅阻塞 N>1/无界放量，不否定本轮实现与自动化验收通过。
+- 真实金丝雀不是口头悬空建议，而是已获授权并处于执行中的既有控制面放量门；成功 Closeout Record 尚未登记，因此继续阻塞 N>1/无界放量。
 
 ## 剩余风险
 

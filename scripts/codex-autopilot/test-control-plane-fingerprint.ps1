@@ -7,6 +7,7 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $realConfig = Get-Content -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/codex-autopilot/codex-autopilot.config.json') { throw 'control-plane fingerprint does not cover its behavior configuration' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/control-plane-policy.md') { throw 'control-plane fingerprint does not cover its behavior policy' }
+if ([int]$realConfig.readyPlanner.timeoutSeconds -lt 600) { throw 'ready Planner timeout budget is below the proven local planning floor' }
 $realPolicy = Get-AutopilotControlPlanePolicyDescriptor -RepoRoot (Resolve-Path (Join-Path $scriptDir '..\..')).Path -PolicyPath $realConfig.controlPlaneCanary.policyPath
 if ($realPolicy.version -ne '1' -or $realPolicy.hash -notmatch '^[a-f0-9]{64}$') { throw 'control-plane policy descriptor is invalid' }
 

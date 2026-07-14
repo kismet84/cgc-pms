@@ -9,11 +9,11 @@
 - M0b、M1、M2、M3 与自动化 M4 验收已完成，正式证据见 `docs/quality/mainline-45-autopilot-efficiency-evidence-closeout-acceptance-2026-07-14.md`。
 - Task 4 证据门结论为 `NO_MEASURABLE_BENEFIT`：低风险标准路径已经是 1 次 Executor、0 次 Reviewer，未新增 Owner 快速通道路由、配置、Skill 或测试。
 - 最终自动化矩阵 24/24 通过，换行 warning 为 0；当前正式 v2 closeout 样本为 0/20，聚合按契约返回 `insufficient_sample`。
-- 新控制面指纹的真实单 Issue 金丝雀尚未执行；本轮遵守普通交互边界未启动 AutoPilot。用户另行明确发出 `启动迭代-1` 并成功登记前，N>1/无界放量继续阻塞。
+- 用户已明确发出 `启动迭代-1`；真实单 Issue 金丝雀补货阶段先后修复严格输出 Schema 与 Planner 300 秒超时预算缺口，当前按 600 秒有界预算待重新执行。成功登记前，N>1/无界放量继续阻塞。
 
 **Depends On:** 第43条控制面模块化基线；第44条自动化验收完成且新控制面指纹的 `启动迭代-1` 金丝雀成功登记。M0a 可在此前进行只读基线盘点；M0b～M4 在第44条金丝雀通过前不得修改控制面，除非用户明确调整前置并重新批准合并后的金丝雀策略。
 
-**计划状态:** Implementation Complete / New Fingerprint Canary Pending；实现与提交前复验已完成，本计划随控制面基线提交纳入版本管理；真实单 Issue 金丝雀尚未执行，未 push。
+**计划状态:** Implementation Complete / New Fingerprint Canary In Progress；控制面基线已提交，金丝雀暴露的两项 `tool_config` 缺口已最小修复并通过相关自动化复验；成功 Closeout Record 尚未登记，未 push。
 
 ## 1. 背景与现状证据
 

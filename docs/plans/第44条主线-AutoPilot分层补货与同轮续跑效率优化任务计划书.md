@@ -54,7 +54,7 @@
 - Ad-hoc `ReadyToSplit` 或已通过决策门的 Product Candidate 需要从产品目标拆成最小实施闭环或补齐权威 ReadySpec。
 - 存量问题来源存在冲突、验收标准需要最小等价替换或跨模块影响需要判断。
 
-Planner 不再是常规补货必经阶段。配置默认超时由1200秒收敛到300秒；每30秒写入一次不改变业务阶段的运行心跳，并在产生候选核验、拒绝或 Ready 草案等事实时写入语义进度。超时只结束本次 Planner，不得伪造 Ready 或直接升级为业务代码失败。
+Planner 不再是常规补货必经阶段。配置默认超时由1200秒收敛到600秒；每30秒写入一次不改变业务阶段的运行心跳，并在产生候选核验、拒绝或 Ready 草案等事实时写入语义进度。超时只结束本次 Planner，不得伪造 Ready 或直接升级为业务代码失败。最初300秒预算在真实高推理候选核验中连续两次达到边界，故按实测证据提高为600秒，未改为无界等待。
 
 ### 2.3 补货后在同一 APPLY 实例续跑
 
@@ -112,7 +112,7 @@ Ready为空
 
 ```text
 候选需要语义判断
-→ Planner（最长300秒，30秒心跳）
+→ Planner（最长600秒，30秒心跳）
 → CREATED / REJECTED / BLOCKED（逐候选完整决策）
 → CREATED时严格导入并同轮续跑
 → 其余结果按分类安全停止或正式承接
@@ -211,7 +211,7 @@ Ready为空
 - 增加 `schemaVersion=2`、逐候选 `candidateDecisions` 和 `CREATED / REJECTED / BLOCKED` 判别联合约束，禁止决策、候选集合、`readyIssueId` 与 `readyBlocks` 数量矛盾。
 - Planner prompt 仅接收经过筛选的有界候选，并要求逐候选返回创建或拒绝证据。
 - Importer 必须显式接收本次 Planner 输入的 `ExpectedCandidateRefs`，逐项核对 `candidateDecisions`，不得仅凭 Planner 输出自行认定候选集合。
-- 默认超时改为300秒；增加30秒运行心跳和语义进度记录。
+- 默认超时改为600秒；增加30秒运行心跳和语义进度记录。
 - Planner stderr、退出码、超时和 Schema 错误继续按原生命令契约分类，不把 warning 误判为失败。
 - 同一候选同一 run 最多调用一次 Planner，失败后保留诊断证据并安全停止；按第2.4节固定映射到现有失败分类。
 
@@ -362,10 +362,10 @@ Ready为空
 | 已有合格 Ready | 不补货，直接走正常选单 |
 | 携带完整权威 ReadySpec 的存量问题 | Planner 调用0次，确定性生成1条 Ready |
 | 存量候选缺少 ReadySpec 任一字段、验收或来源 | 不伪造字段，降级慢路径或 REJECTED |
-| Ad-hoc/Product Candidate | 进入最长300秒 Planner 慢路径 |
+| Ad-hoc/Product Candidate | 进入最长600秒 Planner 慢路径 |
 | Planner 拒绝全部候选 | `REJECTED + 0 readyBlocks`，不写 Ready、不提交 |
 | Planner 遗漏/重复/伪造候选决策 | Schema/Importer 拒绝，不写 Ready、不提交 |
-| Planner 超时 | 300秒内终止，分类为工具/运行问题，不判业务代码失败 |
+| Planner 超时 | 600秒内终止，分类为工具/运行问题，不判业务代码失败 |
 | Planner 等待 | 每30秒有运行心跳，只有事实变化算语义进度 |
 | 补货提交成功 | 同一 Runner 刷新双基线、读回 Run transition 并进入选单；选单前不创建 Issue checkpoint |
 | 补货提交推进 HEAD | 图谱证据仍绑定 `candidateEvidenceHead`，实施绑定 `executionBaseCommit`，二者不混用 |
@@ -467,7 +467,7 @@ git diff --check
 只有同时满足以下条件，第44条主线才可判定通过：
 
 - 携带完整权威 ReadySpec 的常见存量补货不启动 Planner，fixture 性能目标达成；缺失字段不会被猜测补齐。
-- Planner 慢路径有300秒硬上限、30秒运行心跳和独立语义进度。
+- Planner 慢路径有600秒硬上限、30秒运行心跳和独立语义进度。
 - Planner 可以合法返回0条 Ready，不产生假失败或空提交。
 - 补货提交后同一 Runner 能按双 Git 基线和 RUN 级合法迁移进入实施。
 - 主线 Skill 只保留稳定负责人流程，普通交互任务不误触发，动态配置变化无需同步修改 Skill。
