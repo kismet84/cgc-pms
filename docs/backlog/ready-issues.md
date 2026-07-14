@@ -4,7 +4,82 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前 Ready 队列为空；`ISSUE-040-001`、`ISSUE-040-012～018` 已完成，`ISSUE-037-021-A/B/C` 已在第40条 M0 归一化并关闭。
+当前 Ready 队列包含 1 条经知识图谱与当前分支交叉核验的 P0 存量叶子问题。
+
+### ISSUE-040-027：系统角色删除管理员入口与安全边界
+
+优先级：P0
+任务性质：缺口修复
+类型：系统管理 / 角色删除入口 / 权限 / 租户隔离 / 关联保护 / 破坏性操作
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-ROLE-DELETE`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=0e4f793ff48be77416da2f8672348c12f3896167
+存量问题键：[stock:A-01-ROLE-DELETE]
+关联产品目标：在既有 admin-only 角色管理页让管理员可达已实现的角色删除能力，同时补齐当前 Service 对系统角色、用户绑定和角色菜单关系的 fail-close 边界，关闭 A-01 中 `DELETE /system/roles/{id}` 的最小叶子缺口。
+核验结论：问题仍存在——后端 `SysRoleController.delete` 已由 ADMIN/SUPER_ADMIN 或 `system:role:delete` 保护，但前端系统 API 和角色页无删除调用或交互；当前 `SysRoleService.delete` 只校验当前租户，随后删除角色菜单并删除角色，未保护 SYSTEM/ADMIN/SUPER_ADMIN，且注入的 `SysUserRoleMapper` 未用于用户绑定门禁。用户价值与风险均明确，现有角色页、Controller、Service、Mapper 和前后端测试夹具可形成最小闭环。
+候选对比：同级 P0 叶子还有 `A-01-ROLE-UPDATE`。知识图谱有界结果按叶子顺序首先返回删除项；删除入口虽风险更高，但当前后端已暴露可调用 DELETE 且缺少关键关联保护，优先补齐后端 fail-close 后再开放入口，可同时消除既有接口安全缺口。修改入口不作为本轮顺带范围。
+检索交叉核验：CodeGraph 命中 `SysRoleController.delete`、`SysRoleService.delete`、`SysUserRoleMapper` 与角色管理相关测试，并显示 Service 的用户角色 Mapper 已注入但删除路径未使用；`codebase-memory-mcp` 补充确认删除调用链、用户角色关联实体和现有角色测试影响范围；最终以当前分支源码、唯一问题载体和正式验证为准。
+阻塞证据：`DELETE /system/roles/{id}` 当前用户不可达；若直接补前端按钮，当前 Service 会删除系统角色，并在存在用户绑定时继续删除角色与菜单关系，可能破坏认证授权一致性。
+解除条件：既有角色管理页提供受控删除入口；API 精确调用 DELETE；后端保留授权与租户 fail-close，拒绝系统/保留角色和任何仍绑定用户的角色；仅无用户绑定的当前租户自定义角色可删除，并清理其菜单关系；正负样本、现有创建/详情/菜单授权回归和破坏性确认交互全部通过。
+Migration：不需要
+依赖：复用现有 `/system/roles` 页面、`SysRoleVO`、系统 API request、`SysRoleController.delete`、`SysRoleService.delete`、`SysRoleMenuMapper`、`SysUserRoleMapper`、`UserContext` 和现有前后端测试夹具；不新增表、路由、侧栏、权限码或角色种子。
+风险等级：高
+运行态要求：自动化只在 local/dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，任一失败先归类为环境前置并 runtime refresh，稳定等待 180 秒后复验。若做真实删除，只能创建并删除本 Issue 唯一测试角色；不得删除既有角色。清理/重置测试数据必须同时满足 dev/test/demo、数据库 host 为 localhost/127.0.0.1 和 `.codex-autopilot/ALLOW_TEST_DATA_RESET`，否则不得执行。
+Reviewer要求：按高风险权限与数据一致性变更复核 ADMIN/SUPER_ADMIN 与 `system:role:delete` 授权未放宽、无权限 403、未登录 401、父路由 admin-only；复核跨租户统一 `ROLE_NOT_FOUND`，SYSTEM/ADMIN/SUPER_ADMIN 与角色等级保护，用户绑定门禁先于任何关联删除，成功路径只删除目标角色及其菜单关系；复核前端危险确认、失败不刷新/不伪报成功、成功刷新且不影响创建、详情、菜单授权，并对绑定 diff 给出 PASS/NEEDS_REPAIR。
+归档报告：`docs/quality/ISSUE-040-027-系统角色删除管理员入口与安全边界验收报告.md`
+最小回滚：回退本 Issue 的前端删除 API、页面确认交互、Service 删除保护、测试与治理回写；不恢复或删除任何业务数据，不修改 schema，不回退既有角色创建、详情与菜单授权能力。
+目标：
+- 在前端系统 API 增加类型化 `deleteRole(roleId)`，精确调用无 body、无 params 的 `DELETE /system/roles/{id}`。
+- 在既有 admin-only 角色管理页增加 ADMIN/SUPER_ADMIN 可见的“删除”危险操作；二次确认明确角色名称，取消不调用接口，失败保留列表并显示后端错误，成功刷新列表。
+- 收敛后端删除路径：当前租户外或不存在目标统一 `ROLE_NOT_FOUND`；SYSTEM、ADMIN、SUPER_ADMIN 或等价受保护角色 fail-close；存在任一 `sys_user_role` 绑定时返回稳定业务错误且不删除任何关系；合法自定义未绑定角色才清理角色菜单并删除角色。
+- 补齐 Controller/Service 与前端 API/页面正负样本，证明权限、租户、系统角色、用户绑定、事务原子性和既有角色能力不回退。
+非目标：
+- 不实现角色修改、批量删除、强制解绑、级联删除用户、回收在线会话、删除审计平台或完整角色 CRUD 重构。
+- 不修改角色创建、详情、菜单授权接口语义，不新增数据库迁移、权限码、菜单、路由或默认授权。
+- 不连接生产数据库、不发布生产、不 push，不删除任何既有开发数据。
+允许修改：
+- `frontend-admin/src/api/modules/system.ts`
+- `frontend-admin/src/api/modules/__tests__/system-modules.test.ts`
+- `frontend-admin/src/pages/system/roles/index.vue`
+- `frontend-admin/src/pages/system/roles/__tests__/index.test.ts`
+- `backend/src/main/java/com/cgcpms/system/service/SysRoleService.java`
+- `backend/src/test/java/com/cgcpms/system/SysRoleControllerTest.java`
+- `backend/src/test/java/com/cgcpms/system/SysRoleServiceTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/iterations/**`
+- `docs/quality/ISSUE-040-027-系统角色删除管理员入口与安全边界验收报告.md`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/system/controller/**`
+- `backend/src/main/java/com/cgcpms/system/entity/**`
+- `backend/src/main/java/com/cgcpms/system/mapper/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/pages/system/permissions/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 前端 API 测试精确断言 `DELETE /system/roles/{id}` 无 body、无 params；页面测试覆盖 ADMIN/SUPER_ADMIN 可见、普通用户即使持 `system:role:delete` 仍因 admin-only 页面不可见、确认/取消、失败不刷新且不伪报成功、成功刷新，以及 SYSTEM/ADMIN/SUPER_ADMIN 行不提供删除操作。
+- 管理员或仅持 `system:role:delete` 的已认证请求可删除合格目标；既非管理员也无该权限返回 403，未登录返回 401。前端 admin-only 可见性与后端细粒度授权分别留证。
+- 当前租户外或不存在目标返回 `ROLE_NOT_FOUND` 且无副作用；roleType=SYSTEM、roleCode=ADMIN/SUPER_ADMIN、roleLevel&lt;2 或其他等价受保护目标返回稳定错误且角色、用户绑定、菜单关系均不变。
+- 目标存在任一用户绑定时返回 `ROLE_IN_USE`（或项目既有等价稳定错误码），角色及其菜单/用户关系均不变；合法当前租户 CUSTOM、roleLevel=2、无用户绑定目标删除成功，目标角色和角色菜单关系不可回读，不影响其他角色关系。
+- 删除保护与关联清理在同一事务内；任一步失败整体回滚。既有角色列表、新建、详情、编辑权限、高危系统权限拒绝、自角色保护、超级管理员保护和授权审计测试不回退。
+- 收口必须引用 `docs/backlog/current-issues.json` 及该条目的 `sourceRefs`；全部验证通过后移除 `A-01-ROLE-DELETE`，未完全通过则用证据更新其唯一状态或分类。通过时同步更新 A-01 守恒为有用户入口233、前端调用但无独立页面58、内部/集成/运维4、需补入口15、待废弃0、需要确认11、总数321，并回写 Ready、current-focus、project-map；若差距或优先级判断变化，再更新 evolution-decision。
+- 归档报告统计新增后续项、关闭后续项和后续项净变化；所有发现项必须本轮修复、唯一载体承接或有依据关闭，存在悬空项不得通过。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint 和 `git diff --check` 全部通过；首次失败先按 tool_config、环境前置、真实质量/安全分类并复验。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-027`
+- `cd backend; .\mvnw.cmd "-Dtest=SysRoleControllerTest,SysRoleServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/system-modules.test.ts src/pages/system/roles/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/system.ts src/pages/system/roles/index.vue src/pages/system/roles/__tests__/index.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-018：AutoPilot 存量问题优先补货与闭环门禁
 
