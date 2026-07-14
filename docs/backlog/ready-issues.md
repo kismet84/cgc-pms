@@ -4,7 +4,83 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-本轮唯一 P0 存量叶子问题已完成，当前没有待派发 Ready；达到 `启动迭代-1` 上限后不再补货或启动下一任务。
+当前 Ready 为 `ISSUE-040-028`。该任务来自健康且 Git 游标覆盖当前 HEAD 的知识图谱 P0 叶子问题 `A-01-ROLE-UPDATE`，按串行模式实施。
+
+### ISSUE-040-028：系统角色修改管理员入口与安全边界
+
+优先级：P0
+任务性质：缺口修复
+类型：系统管理 / 角色修改入口 / 权限 / 租户隔离 / 字段白名单 / 越权防护
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-ROLE-UPDATE`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=e6ac6994b121a4eb980ef167dd6fdb59269bce59
+存量问题键：[stock:A-01-ROLE-UPDATE]
+关联产品目标：在既有 admin-only 角色管理页让管理员可达已实现的角色修改能力，并把现有实体直绑更新收敛为当前租户普通自定义角色的字段白名单更新，关闭 A-01 中 `PUT /system/roles/{id}` 的最小叶子缺口。
+核验结论：问题仍存在——后端 `SysRoleController.update` 已由 ADMIN/SUPER_ADMIN 或 `system:role:edit` 保护，但前端系统 API 与角色页没有角色基本信息修改调用或交互；当前 `SysRoleService.update` 仅校验租户后直接 `updateById` 请求实体，未固定角色编码、类型、等级、租户和既有菜单集合。用户价值与越权风险均明确，现有角色页、Controller、Service、角色菜单关系和前后端测试夹具可形成最小闭环。
+候选对比：知识图谱当前唯一 P0 叶子为 `A-01-ROLE-UPDATE`；其父项 `A-01` 仍有子项，不作为可执行聚合任务。P1 `UI-ROLE-RESPONSIVE-TABLE-ZERO-HEIGHT` 与投标成本/间接费等候选均不应越过当前 P0 叶子。
+检索交叉核验：CodeGraph 命中后端 PUT 路由、`system:role:edit` 与 Service 更新路径，但未完整召回当前角色页，归类为工具召回不足；`codebase-memory-mcp` 补充确认 Controller、Service、前端角色页、API 测试和角色测试关系；最终使用当前分支精确 `rg`、直接文件读取、唯一问题载体与源报告交叉确认前端无 `updateRole`，当前 HEAD 与图谱 Git 游标一致。
+阻塞证据：`PUT /system/roles/{id}` 当前用户不可达；若直接补前端入口，现有 Service 会把请求实体整体写回，可能覆盖 roleCode、roleType、roleLevel、tenantId 等服务端事实，并缺少对系统/保留角色的修改保护。
+解除条件：既有角色管理页提供受控修改入口并精确调用 PUT；后端保留 `system:role:edit` 与认证租户 fail-close，只允许普通自定义角色更新名称、状态和数据范围，角色编码、类型、等级、租户与菜单集合不可由该接口改变；管理员、显式权限、无权限、未登录、跨租户、保留角色和提权载荷正负样本全部通过。
+Migration：不需要
+依赖：复用现有 `/system/roles` 页面、`SysRoleVO`、系统 API request、`SysRoleController.update`、`SysRoleService.update`、`UserContext`、角色与角色菜单表及现有测试夹具；不新增表、路由、侧栏、权限码、角色种子或后端接口。
+风险等级：高
+运行态要求：自动化只在 local/dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，任一失败先归类为环境前置并使用 runtime refresh，稳定等待180秒后复验；从 dev-login 进入 `/system/roles`，仅对本 Issue 唯一测试角色验证修改成功、失败保留和列表回读。创建、修改、还原或删除测试数据必须同时满足 dev/test/demo、数据库 host 为 localhost/127.0.0.1 和 `.codex-autopilot/ALLOW_TEST_DATA_RESET`，否则不得执行并应判定收口未完成。不得连接或发布生产。
+Reviewer要求：按高风险权限与数据一致性变更复核 ADMIN/SUPER_ADMIN 与 `system:role:edit` 授权未放宽、无权限403、未登录401、前端入口仍受 admin-only 页面约束；复核路径 ID 覆盖请求 ID，tenantId、roleCode、roleType、roleLevel、menuIds、审计与逻辑删除字段不能造成提权或权限集合变化，跨租户与系统/保留角色统一 fail-close；复核失败不关闭弹窗或伪报成功、成功刷新列表且既有新建/详情/删除/菜单授权链不回退，并对绑定 diff 给出 PASS/NEEDS_REPAIR。
+归档报告：`docs/quality/ISSUE-040-028-系统角色修改管理员入口与安全边界验收报告.md`
+最小回滚：回退本 Issue 的前端修改 API、类型、角色页表单、Service 白名单更新及对应测试与治理回写；不删除已有角色或权限数据，不回退角色列表、新建、详情、删除与菜单授权能力，无 schema 或数据迁移回滚。
+目标：
+- 在前端系统 API 增加类型化 `updateRole(roleId, payload)`，只发送 roleName、status 和 dataScope，精确调用 `PUT /system/roles/{id}`。
+- 在既有 admin-only 角色管理页增加普通自定义角色的“编辑角色”入口；表单不允许编辑角色编码、类型、等级、租户或菜单集合，校验必填与长度，失败保留弹窗和用户输入，成功关闭并刷新列表。
+- 收敛后端更新路径：按路径 ID 和认证租户读取现有角色，拒绝系统/保留/高等级角色，只把允许字段写入现有实体；任何请求中的 id、tenantId、roleCode、roleType、roleLevel 或菜单相关字段不得改变服务端事实。
+- 补齐 Controller/Service 与前端 API/页面正负样本，证明 `system:role:edit`、无权限拒绝、租户隔离、字段白名单、菜单集合不变和既有角色管理能力不回退。
+非目标：
+- 不修改角色编码，不实现批量修改、复制、默认授权、菜单授权合并、权限差异审计平台或完整角色 CRUD 重构。
+- 不修改用户分配角色、菜单管理、认证/JWT、动态路由、数据库 schema、Mapper、实体或种子数据，不新增权限码。
+- 不连接生产数据库、不发布生产、不自动 push。
+允许修改：
+- `frontend-admin/src/api/modules/system.ts`
+- `frontend-admin/src/api/modules/__tests__/system-modules.test.ts`
+- `frontend-admin/src/types/system.ts`
+- `frontend-admin/src/pages/system/roles/index.vue`
+- `frontend-admin/src/pages/system/roles/__tests__/index.test.ts`
+- `backend/src/main/java/com/cgcpms/system/service/SysRoleService.java`
+- `backend/src/test/java/com/cgcpms/system/SysRoleControllerTest.java`
+- `backend/src/test/java/com/cgcpms/system/SysRoleServiceTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-040-028-系统角色修改管理员入口与安全边界验收报告.md`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/system/controller/**`
+- `backend/src/main/java/com/cgcpms/system/entity/**`
+- `backend/src/main/java/com/cgcpms/system/mapper/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/pages/system/permissions/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 前端 API 测试精确断言 `PUT /system/roles/{id}` 只发送 roleName、status、dataScope；页面测试覆盖 ADMIN/SUPER_ADMIN 可见、普通用户不可见、系统/保留角色不可编辑、打开时回填白名单字段、必填/长度校验、失败保留、成功关闭并刷新。
+- ADMIN/SUPER_ADMIN 或仅持 `system:role:edit` 的已认证请求可修改当前租户普通自定义角色；既非管理员也无该权限返回403，未登录返回401；跨租户、不存在、系统/保留/高等级角色均 fail-close 且无部分更新。
+- 请求体中的 id、tenantId、roleCode、roleType、roleLevel 和等价提权字段不能覆盖服务端事实；合法更新只改变 roleName、status、dataScope，角色菜单集合、用户绑定、创建事实和审计边界不变。
+- 空白/超长名称及非法状态、数据范围被拒绝且数据库不变；既有角色列表、新建、详情、删除、编辑权限、高危系统权限拒绝、自角色/系统角色保护和授权审计测试不回退。
+- 收口必须引用 `docs/backlog/current-issues.json` 及该条目的 `sourceRefs`；全部验证通过后移除 `A-01-ROLE-UPDATE`，未完全通过则用证据更新其唯一状态或分类。通过时同步更新 A-01 守恒为有用户入口234、前端调用但无独立页面58、内部/集成/运维4、需补入口14、待废弃0、需要确认11、总数321，并回写 Ready、current-focus、project-map；若差距或优先级判断变化，再更新 evolution-decision。
+- 归档报告统计新增后续项、关闭后续项和后续项净变化；所有发现项必须本轮修复、唯一载体承接或有依据关闭，存在悬空项不得通过。权限、租户、字段白名单、菜单集合不变或运行态还原证据不足时判不通过并正式写入唯一阻塞载体。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint 和 `git diff --check` 全部通过；首次失败先按 tool_config、环境前置、真实质量/安全分类并复验。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-028`
+- `cd backend; .\mvnw.cmd "-Dtest=SysRoleControllerTest,SysRoleServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/system-modules.test.ts src/pages/system/roles/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/system.ts src/types/system.ts src/pages/system/roles/index.vue src/pages/system/roles/__tests__/index.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-027：系统角色删除管理员入口与安全边界
 
