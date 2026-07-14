@@ -100,7 +100,7 @@ async function ensureReferenceTargets(driver, config, runId, links) {
   `, { projectKey: config.projectKey, runId, targets }, "WRITE");
 }
 
-async function upsertArtifact(driver, config, runId, absolutePath) {
+export async function upsertArtifact(driver, config, runId, absolutePath) {
   const relativePath = normalizePath(path.relative(config.repoRoot, absolutePath));
   const content = fs.readFileSync(absolutePath, "utf8");
   const stat = fs.statSync(absolutePath);
@@ -110,9 +110,17 @@ async function upsertArtifact(driver, config, runId, absolutePath) {
   const historical = versionScope !== null;
   const digest = sha256(content);
   const versionId = `${id}:version:${digest}`;
-  const existing = await execute(driver, config.neo4jDatabase, "MATCH (a:Artifact {id: $id}) RETURN a.sha256 AS sha256", { id });
+  const expectedSectionIds = parsed.headings.map((section) => `${versionId}:section:${section.ordinal}`);
+  const existing = await execute(driver, config.neo4jDatabase, `
+    MATCH (a:Artifact {id: $id})
+    OPTIONAL MATCH (a)-[:CONTAINS]->(s:Section)
+    RETURN a.sha256 AS sha256, collect(s.id) AS sectionIds
+  `, { id });
   const existed = existing.length > 0;
-  const changed = existing[0]?.sha256 !== digest;
+  const existingSectionIds = new Set((existing[0]?.sectionIds ?? []).filter(Boolean));
+  const sectionsCurrent = existingSectionIds.size === expectedSectionIds.length
+    && expectedSectionIds.every((sectionId) => existingSectionIds.has(sectionId));
+  const changed = existing[0]?.sha256 !== digest || !sectionsCurrent;
   await execute(driver, config.neo4jDatabase, `
     MATCH (p:Project {key: $projectKey}), (r:CollectionRun {id: $runId}), (source:Source {key: 'documents'})
     MERGE (a:Artifact {id: $id})
@@ -154,9 +162,10 @@ async function upsertArtifact(driver, config, runId, absolutePath) {
       const sectionId = `${versionId}:section:${section.ordinal}`;
       await execute(driver, config.neo4jDatabase, `
       MATCH (a:Artifact {id: $artifactId}), (v:ArtifactVersion {id: $versionId})
-      CREATE (s:Section {id: $sectionId, title: $title, level: $level, ordinal: $ordinal,
-                         content: $content, sourcePath: $sourcePath,
-                         historical: $historical, versionScope: $versionScope})
+      MERGE (s:Section {id: $sectionId})
+      SET s.title = $title, s.level = $level, s.ordinal = $ordinal,
+          s.content = $content, s.sourcePath = $sourcePath,
+          s.historical = $historical, s.versionScope = $versionScope
       MERGE (a)-[:CONTAINS]->(s)
       MERGE (v)-[:CONTAINS]->(s)
       `, { artifactId: id, versionId, sectionId, sourcePath: relativePath, historical, versionScope, ...section }, "WRITE");

@@ -13,7 +13,7 @@
     "issues": "node src/cli.js issues",
     "acceptance": "node src/acceptance.js",
     "mcp": "node src/server.js",
-    "test": "node --test",
+    "test": "node --test --test-concurrency=1",
     "test:mcp": "node test/mcp-smoke.js"
   },
   "dependencies": {
