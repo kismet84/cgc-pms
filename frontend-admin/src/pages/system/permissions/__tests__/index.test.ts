@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   getRoles: vi.fn(),
   getMenuDetail: vi.fn(),
   getMenuList: vi.fn(),
-  createMenu: vi.fn(),
   updateMenu: vi.fn(),
   deleteMenu: vi.fn(),
   success: vi.fn(),
@@ -29,7 +28,6 @@ vi.mock('@/api/modules/system', () => ({
   getRoles: mocks.getRoles,
   getMenuDetail: mocks.getMenuDetail,
   getMenuList: mocks.getMenuList,
-  createMenu: mocks.createMenu,
   updateMenu: mocks.updateMenu,
   deleteMenu: mocks.deleteMenu,
 }))
@@ -189,7 +187,7 @@ function mountPage() {
           props: ['open', 'title'],
           emits: ['cancel'],
           template:
-            "<div v-if=\"open\" :data-testid=\"title === '删除菜单' ? 'delete-menu-modal' : title === '修改菜单' ? 'update-menu-modal' : title === '菜单详情' ? 'detail-menu-modal' : title === '菜单列表' ? 'menu-list-modal' : 'create-menu-modal'\"><button data-testid=\"modal-cancel\" @click=\"$emit('cancel')\">close</button><slot /></div>",
+            "<div v-if=\"open\" :data-testid=\"title === '删除菜单' ? 'delete-menu-modal' : title === '修改菜单' ? 'update-menu-modal' : title === '菜单详情' ? 'detail-menu-modal' : title === '菜单列表' ? 'menu-list-modal' : 'unknown-menu-modal'\"><button data-testid=\"modal-cancel\" @click=\"$emit('cancel')\">close</button><slot /></div>",
         },
         AAlert: {
           props: ['message'],
@@ -202,7 +200,6 @@ function mountPage() {
         ABreadcrumbItem: true,
         ATag: true,
         VxeGrid: true,
-        PlusOutlined: true,
         DeleteOutlined: true,
         ReloadOutlined: true,
         EyeOutlined: true,
@@ -220,7 +217,6 @@ describe('permission governance menu management', () => {
     mocks.getRoles.mockReset().mockResolvedValue([])
     mocks.getMenuDetail.mockReset().mockResolvedValue(menuDetail)
     mocks.getMenuList.mockReset().mockResolvedValue(flatMenus)
-    mocks.createMenu.mockReset().mockResolvedValue('100')
     mocks.updateMenu.mockReset().mockResolvedValue(undefined)
     mocks.deleteMenu.mockReset().mockResolvedValue(undefined)
     mocks.success.mockReset()
@@ -231,20 +227,19 @@ describe('permission governance menu management', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="create-menu-open"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="update-menu-open"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="delete-menu-open"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="detail-menu-open"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="menu-list-open"]').exists()).toBe(false)
-    expect(mocks.getMenuList).not.toHaveBeenCalled()
+    expect(mocks.getMenuList).toHaveBeenCalledOnce()
   })
 
-  it('keeps the admin-only route boundary even with system:menu:add', async () => {
+  it('does not expose a local create entry even with system:menu:add', async () => {
     mocks.permissions = ['system:menu:add']
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="create-menu-open"]').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('新建权限')
   })
 
   it('keeps the admin-only route boundary even with system:menu:delete', async () => {
@@ -280,30 +275,33 @@ describe('permission governance menu management', () => {
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="create-menu-open"]').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('新建权限')
     expect(wrapper.find('[data-testid="update-menu-open"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="delete-menu-open"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="detail-menu-open"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="menu-list-open"]').exists()).toBe(true)
-    expect(mocks.getMenuList).not.toHaveBeenCalled()
+    expect(mocks.getMenuList).toHaveBeenCalledOnce()
   })
 
-  it('loads the complete flat menu list once on demand and only renders safe fields', async () => {
+  it('loads governance status and refreshes the complete flat menu list on demand', async () => {
     mocks.roles = ['ADMIN']
     let resolveList: ((value: SysMenuVO[]) => void) | undefined
-    mocks.getMenuList.mockReset().mockImplementationOnce(
-      () =>
-        new Promise<SysMenuVO[]>((resolve) => {
-          resolveList = resolve
-        }),
-    )
+    mocks.getMenuList
+      .mockReset()
+      .mockResolvedValueOnce(flatMenus)
+      .mockImplementationOnce(
+        () =>
+          new Promise<SysMenuVO[]>((resolve) => {
+            resolveList = resolve
+          }),
+      )
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(mocks.getMenuList).not.toHaveBeenCalled()
+    expect(mocks.getMenuList).toHaveBeenCalledOnce()
     await wrapper.get('[data-testid="menu-list-open"]').trigger('click')
     await wrapper.vm.$nextTick()
-    expect(mocks.getMenuList).toHaveBeenCalledOnce()
+    expect(mocks.getMenuList).toHaveBeenCalledTimes(2)
     expect(wrapper.find('[data-testid="menu-list-loading"]').exists()).toBe(true)
 
     resolveList?.(flatMenus)
@@ -329,25 +327,27 @@ describe('permission governance menu management', () => {
 
   it('shows an empty state for an empty flat menu list', async () => {
     mocks.roles = ['SUPER_ADMIN']
-    mocks.getMenuList.mockResolvedValueOnce([])
+    mocks.getMenuList.mockResolvedValueOnce(flatMenus).mockResolvedValueOnce([])
     const wrapper = mountPage()
     await flushPromises()
     await wrapper.get('[data-testid="menu-list-open"]').trigger('click')
     await flushPromises()
 
-    expect(mocks.getMenuList).toHaveBeenCalledOnce()
+    expect(mocks.getMenuList).toHaveBeenCalledTimes(2)
     expect(wrapper.get('[data-testid="menu-list-empty"]').text()).toContain('暂无菜单')
   })
 
   it('keeps the list entry open and shows an understandable error when loading fails', async () => {
     mocks.roles = ['ADMIN']
-    mocks.getMenuList.mockRejectedValueOnce(new Error('菜单列表暂不可用'))
+    mocks.getMenuList
+      .mockResolvedValueOnce(flatMenus)
+      .mockRejectedValueOnce(new Error('菜单列表暂不可用'))
     const wrapper = mountPage()
     await flushPromises()
     await wrapper.get('[data-testid="menu-list-open"]').trigger('click')
     await flushPromises()
 
-    expect(mocks.getMenuList).toHaveBeenCalledOnce()
+    expect(mocks.getMenuList).toHaveBeenCalledTimes(2)
     expect(mocks.error).toHaveBeenCalledWith('菜单列表暂不可用')
     expect(wrapper.get('[data-testid="menu-list-error"]').text()).toContain('菜单列表暂不可用')
     expect(wrapper.find('[data-testid="menu-list-modal"]').exists()).toBe(true)
@@ -358,6 +358,7 @@ describe('permission governance menu management', () => {
     mocks.roles = ['ADMIN']
     mocks.getMenuList
       .mockReset()
+      .mockResolvedValueOnce(flatMenus)
       .mockResolvedValueOnce([flatMenus[0]])
       .mockResolvedValueOnce([flatMenus[2]])
     const wrapper = mountPage()
@@ -372,7 +373,7 @@ describe('permission governance menu management', () => {
     await wrapper.get('[data-testid="menu-list-open"]').trigger('click')
     await flushPromises()
 
-    expect(mocks.getMenuList).toHaveBeenCalledTimes(2)
+    expect(mocks.getMenuList).toHaveBeenCalledTimes(3)
     const listText = wrapper.get('[data-testid="menu-list-table"]').text()
     expect(listText).toContain('查询按钮')
     expect(listText).not.toContain('系统管理')
@@ -469,12 +470,12 @@ describe('permission governance menu management', () => {
 
     expect(mocks.getMenuDetail).toHaveBeenCalledOnce()
     expect(mocks.getMenuDetail).toHaveBeenCalledWith('11')
-    expect((wrapper.get('[data-testid="update-menu-name"]').element as HTMLInputElement).value).toBe(
-      '菜单概览',
-    )
-    expect((wrapper.get('[data-testid="update-menu-perms"]').element as HTMLInputElement).value).toBe(
-      '',
-    )
+    expect(
+      (wrapper.get('[data-testid="update-menu-name"]').element as HTMLInputElement).value,
+    ).toBe('菜单概览')
+    expect(
+      (wrapper.get('[data-testid="update-menu-perms"]').element as HTMLInputElement).value,
+    ).toBe('')
   })
 
   it('clears the previous update form while a new target detail is loading', async () => {
@@ -525,9 +526,15 @@ describe('permission governance menu management', () => {
         ),
       },
     ]
-    mocks.getMenuDetail.mockReset().mockResolvedValueOnce(menuDetail).mockResolvedValueOnce(updatedDetail)
+    mocks.getMenuDetail
+      .mockReset()
+      .mockResolvedValueOnce(menuDetail)
+      .mockResolvedValueOnce(updatedDetail)
     mocks.getMenuTree.mockReset().mockResolvedValueOnce(menuTree).mockResolvedValueOnce(updatedTree)
-    mocks.getMenuList.mockReset().mockResolvedValueOnce([updatedDetail])
+    mocks.getMenuList
+      .mockReset()
+      .mockResolvedValueOnce(flatMenus)
+      .mockResolvedValueOnce([updatedDetail])
     const wrapper = mountPage()
     await flushPromises()
     await wrapper.get('[data-testid="update-menu-open"]').trigger('click')
@@ -570,7 +577,7 @@ describe('permission governance menu management', () => {
       ].sort(),
     )
     expect(mocks.getMenuTree).toHaveBeenCalledTimes(2)
-    expect(mocks.getMenuList).toHaveBeenCalledOnce()
+    expect(mocks.getMenuList).toHaveBeenCalledTimes(2)
     expect(mocks.getMenuDetail).toHaveBeenCalledTimes(2)
     expect(wrapper.get('[data-testid="update-menu-name"]').attributes('value')).toBe(
       '菜单概览（修改）',
@@ -591,73 +598,15 @@ describe('permission governance menu management', () => {
     await flushPromises()
 
     expect(mocks.getMenuTree).toHaveBeenCalledOnce()
-    expect(mocks.getMenuList).not.toHaveBeenCalled()
+    expect(mocks.getMenuList).toHaveBeenCalledOnce()
     expect(mocks.getMenuDetail).toHaveBeenCalledOnce()
     expect(mocks.success).not.toHaveBeenCalled()
     expect(mocks.error).toHaveBeenCalledWith('父菜单不可用')
     expect(wrapper.get('[data-testid="update-menu-error"]').text()).toContain('父菜单不可用')
-    expect((wrapper.get('[data-testid="update-menu-target"]').element as HTMLSelectElement).value).toBe(
-      '11',
-    )
-    expect(wrapper.get('[data-testid="update-menu-name"]').attributes('value')).toBe('保留的修改值')
-  })
-
-  it('validates required fields before submitting', async () => {
-    mocks.roles = ['ADMIN']
-    const wrapper = mountPage()
-    await flushPromises()
-    await wrapper.get('[data-testid="create-menu-open"]').trigger('click')
-    await wrapper.get('[data-testid="create-menu-submit"]').trigger('click')
-
-    expect(mocks.createMenu).not.toHaveBeenCalled()
-    expect(mocks.error).toHaveBeenCalledWith('请填写菜单名称和菜单类型')
-    expect(wrapper.find('[data-testid="create-menu-modal"]').exists()).toBe(true)
-  })
-
-  it('submits the selected parent and refreshes the tree on success', async () => {
-    mocks.roles = ['ADMIN']
-    const wrapper = mountPage()
-    await flushPromises()
-    await wrapper.get('[data-testid="create-menu-open"]').trigger('click')
-    await wrapper.get('[data-testid="create-menu-name"]').setValue('采购菜单')
-    await wrapper.get('[data-testid="create-menu-parent"]').setValue('10')
-    await wrapper.get('[data-testid="create-menu-perms"]').setValue('purchase:query')
-    await wrapper.get('[data-testid="create-menu-submit"]').trigger('click')
-    await flushPromises()
-
-    expect(mocks.createMenu).toHaveBeenCalledWith({
-      parentId: '10',
-      menuName: '采购菜单',
-      menuType: 'MENU',
-      perms: 'purchase:query',
-      orderNum: 0,
-    })
-    const payload = mocks.createMenu.mock.calls[0][0]
-    expect(payload).not.toHaveProperty('id')
-    expect(payload).not.toHaveProperty('tenantId')
-    expect(payload).not.toHaveProperty('children')
-    expect(payload).not.toHaveProperty('createdAt')
-    expect(mocks.getMenuTree).toHaveBeenCalledTimes(2)
-    expect(mocks.success).toHaveBeenCalledWith('菜单创建成功')
-    expect(wrapper.find('[data-testid="create-menu-modal"]').exists()).toBe(false)
-  })
-
-  it('keeps the form open and does not refresh after a failed create', async () => {
-    mocks.roles = ['ADMIN']
-    mocks.createMenu.mockRejectedValueOnce(new Error('父菜单不存在'))
-    const wrapper = mountPage()
-    await flushPromises()
-    await wrapper.get('[data-testid="create-menu-open"]').trigger('click')
-    await wrapper.get('[data-testid="create-menu-name"]').setValue('失败菜单')
-    await wrapper.get('[data-testid="create-menu-submit"]').trigger('click')
-    await flushPromises()
-
-    expect(mocks.getMenuTree).toHaveBeenCalledTimes(1)
-    expect(mocks.error).toHaveBeenCalledWith('父菜单不存在')
-    expect(wrapper.find('[data-testid="create-menu-modal"]').exists()).toBe(true)
     expect(
-      (wrapper.get('[data-testid="create-menu-name"]').element as HTMLInputElement).value,
-    ).toBe('失败菜单')
+      (wrapper.get('[data-testid="update-menu-target"]').element as HTMLSelectElement).value,
+    ).toBe('11')
+    expect(wrapper.get('[data-testid="update-menu-name"]').attributes('value')).toBe('保留的修改值')
   })
 
   it('offers directory, menu, button, and permissionless nodes as delete targets', async () => {
@@ -791,6 +740,10 @@ describe('permission governance menu management', () => {
     expect(source).toContain('updateMenu')
     expect(source).toContain('deleteMenu')
     expect(source).toContain('getMenuDetail')
+    expect(source).not.toContain('<h1>')
+    expect(source).not.toContain('统一查看与维护系统功能权限及接口授权')
+    expect(source).not.toContain('createMenu')
+    expect(source).not.toContain('新建权限')
     expect(source).not.toContain('级联删除选项')
     expect(source).not.toContain('强制解绑选项')
     expect(source).not.toContain('拖拽排序')
