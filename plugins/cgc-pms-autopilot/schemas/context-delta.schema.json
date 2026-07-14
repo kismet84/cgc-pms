@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cgc-pms.local/plugins/cgc-pms-autopilot/schemas/context-delta.schema.json",
+  "title": "CGC PMS AutoPilot Context Delta v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["deltaId", "contentHash", "schemaVersion", "contextType", "issueId", "phase", "baseId", "baseHash", "baseCommit", "readyContentHash", "diffHash", "changedPaths", "previousPhaseSummary", "acceptedDecisions", "openRisks"],
+  "properties": {
+    "deltaId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "contentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "schemaVersion": { "const": 1 },
+    "contextType": { "const": "delta" },
+    "issueId": { "type": "string", "pattern": "^ISSUE-[0-9-]+$" },
+    "phase": { "enum": ["implement", "repair", "validate", "review"] },
+    "baseId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "baseHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "baseCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "readyContentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "diffHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "changedPaths": { "type": "array", "maxItems": 20, "items": { "type": "string", "minLength": 1 } },
+    "previousPhaseSummary": { "type": ["string", "null"], "maxLength": 5120 },
+    "acceptedDecisions": { "type": "array", "items": { "type": "string" } },
+    "openRisks": { "type": "array", "items": { "type": "string" } }
+  }
+}

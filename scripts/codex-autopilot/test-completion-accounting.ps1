@@ -14,7 +14,7 @@ try{
   [ordered]@{issueId='ISSUE-1';title='ISSUE-1：Blocked';status='blocked';createdAt=[datetimeoffset]::Now.ToString('o')}|ConvertTo-Json|Set-Content (Join-Path $runDir 'result.json')
   [ordered]@{issueId='ISSUE-2';title='ISSUE-2：Executor done only';status='done';nextAction='VALIDATE_AND_MERGE';merged=$false;gitSummary=[ordered]@{};createdAt=[datetimeoffset]::Now.ToString('o')}|ConvertTo-Json -Depth 4|Set-Content (Join-Path $unclosedRunDir 'result.json')
   $config=Join-Path $scripts 'config.json';[ordered]@{repoRoot=$root;autopilotDir=$autoDir;baseBranch='master';maxIssuesPerRun=1;maxParallelIssues=1;parallelSafetyMode='strict-independent-only';autoPush=$false;readyPlanner=[ordered]@{enabled=$false}}|ConvertTo-Json -Depth 5|Set-Content $config
-  & git -C $root init -q;& git -C $root config user.email a@b.c;& git -C $root config user.name test;& git -C $root add .;& git -C $root commit -qm base
+  & git -C $root init -q;& git -C $root config user.email a@b.c;& git -C $root config user.name test;& git -C $root config core.autocrlf false;& git -C $root config core.eol lf;& git -C $root add .;& git -C $root commit -qm base
   $output=& pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $config -MaxIterations 2 -MaxLoops 1 -ExplainNextAction 2>&1|Out-String
   if($output -notmatch 'iterationCompleted=0' -or $output -notmatch 'remainingIterations=2'){throw "blocked or unclosed executor result consumed completion quota: $output"}
   Write-Host 'completion accounting self-test passed'

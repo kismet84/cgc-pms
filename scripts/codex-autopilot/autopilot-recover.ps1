@@ -11,6 +11,10 @@ $transitionLibrary = Join-Path $PSScriptRoot 'autopilot-transition.ps1'
 if (!(Get-Command Move-AutopilotIssuePhase -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $transitionLibrary)) {
   . $transitionLibrary
 }
+$contextLibrary = Join-Path $PSScriptRoot 'autopilot-context.ps1'
+if (!(Get-Command Get-AutopilotCanonicalHash -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $contextLibrary)) { . $contextLibrary }
+$metricsLibrary = Join-Path $PSScriptRoot 'autopilot-metrics.ps1'
+if (!(Get-Command Get-AutopilotMetricPercentiles -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $metricsLibrary)) { . $metricsLibrary }
 
 function Get-AutopilotStallLevel {
   param([Parameter(Mandatory)][datetimeoffset]$LastProgressAt)
@@ -225,27 +229,77 @@ function Get-AutopilotCloseoutKey {
   try { return ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($source)))).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
 }
 
+function Get-AutopilotCloseoutRecord {
+  param([Parameter(Mandatory)][string]$LedgerPath, [Parameter(Mandatory)][string]$Key)
+  if (!(Test-Path -LiteralPath $LedgerPath -PathType Leaf)) { return $null }
+  foreach ($line in Get-Content -Encoding UTF8 -LiteralPath $LedgerPath) {
+    if (!$line.Trim()) { continue }
+    try { $entry = $line | ConvertFrom-Json } catch { continue }
+    if ([string]$entry.key -eq $Key) { return $entry }
+  }
+  return $null
+}
+
+function Get-AutopilotCloseoutPayloadHash {
+  param([Parameter(Mandatory)][object]$Record)
+  $payload = [ordered]@{}
+  foreach ($property in @($Record.PSObject.Properties | Sort-Object Name)) {
+    if ($property.Name -ne 'registeredAt') { $payload[$property.Name] = $property.Value }
+  }
+  return Get-AutopilotCanonicalHash ([pscustomobject]$payload)
+}
+
 function Register-AutopilotCloseout {
-  param([string]$LedgerPath, [string]$Key)
+  param([string]$LedgerPath, [string]$Key = '', [object]$Record = $null)
+  if ($null -eq $Record) {
+    if (!$Key) { throw 'closeout key is required' }
+    $Record = [pscustomobject][ordered]@{ key=$Key }
+  } else {
+    if ([int]$Record.schemaVersion -ne 2) { throw 'closeout record schemaVersion must be 2' }
+    foreach ($name in @('key','issueId','readyContentHash','outcome','implementationCommit','closeoutCommit','reportPath','reportHash','resultHash','preCloseoutFactsHash','evidenceManifestHash','reviewRequired','reviewDecision','verifiedDiffHash','followupsAdded','followupsClosed','followupsNetChange','metricsSummary','metricsHash','controlPlaneFingerprint','graphCursorRequired','graphGitCursor')) {
+      if ($Record.PSObject.Properties.Name -notcontains $name) { throw "closeout record is missing $name" }
+    }
+    $expectedKey = Get-AutopilotCloseoutKey -IssueId ([string]$Record.issueId) -Commit ([string]$Record.closeoutCommit) -ReportPath ([string]$Record.reportPath)
+    if ([string]$Record.key -ne $expectedKey) { throw 'closeout record key does not match its identity fields' }
+    if ([bool]$Record.graphCursorRequired -and (![string]$Record.graphGitCursor -or [string]$Record.graphGitCursor -ne [string]$Record.closeoutCommit)) { throw 'required graph Git cursor does not match closeout commit' }
+    $Key = [string]$Record.key
+  }
   $parent = Split-Path -Parent $LedgerPath
   if ($parent -and !(Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
-  if (Test-Path -LiteralPath $LedgerPath) {
-    foreach ($line in Get-Content -Encoding UTF8 -LiteralPath $LedgerPath) {
-      try { if (($line | ConvertFrom-Json).key -eq $Key) { return $false } } catch {}
-    }
+  $existing = Get-AutopilotCloseoutRecord -LedgerPath $LedgerPath -Key $Key
+  if ($null -ne $existing) {
+    if ($existing.PSObject.Properties.Name -notcontains 'schemaVersion') { return [pscustomobject]@{ status='LEGACY_REGISTERED'; record=$existing; idempotent=$true } }
+    if ((Get-AutopilotCloseoutPayloadHash $existing) -ne (Get-AutopilotCloseoutPayloadHash $Record)) { throw 'integrity_conflict: closeout key already has a different payload' }
+    return [pscustomobject]@{ status='REGISTERED'; record=$existing; idempotent=$true }
   }
-  $entry = [ordered]@{ key = $Key; registeredAt = [datetimeoffset]::Now.ToString('o') } | ConvertTo-Json -Compress
-  [IO.File]::AppendAllText($LedgerPath, $entry + [Environment]::NewLine, [Text.UTF8Encoding]::new($false))
-  return $true
+  $entry = [ordered]@{}
+  foreach ($property in $Record.PSObject.Properties) { if ($property.Name -ne 'registeredAt') { $entry[$property.Name] = $property.Value } }
+  $entry.registeredAt = [datetimeoffset]::Now.ToString('o')
+  [IO.File]::AppendAllText($LedgerPath, (($entry | ConvertTo-Json -Depth 24 -Compress) + [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
+  $readBack = Get-AutopilotCloseoutRecord -LedgerPath $LedgerPath -Key $Key
+  if ($null -eq $readBack -or (Get-AutopilotCloseoutPayloadHash $readBack) -ne (Get-AutopilotCloseoutPayloadHash ([pscustomobject]$entry))) { throw 'closeout ledger read-back failed' }
+  return [pscustomobject]@{ status='REGISTERED'; record=$readBack; idempotent=$false }
 }
 
 function Test-AutopilotCloseoutRegistered {
   param([Parameter(Mandatory)][string]$LedgerPath, [Parameter(Mandatory)][string]$Key)
-  if (!(Test-Path -LiteralPath $LedgerPath -PathType Leaf)) { return $false }
-  foreach ($line in Get-Content -Encoding UTF8 -LiteralPath $LedgerPath) {
-    try { if (($line | ConvertFrom-Json).key -eq $Key) { return $true } } catch {}
+  return $null -ne (Get-AutopilotCloseoutRecord -LedgerPath $LedgerPath -Key $Key)
+}
+
+function Get-AutopilotRecentCloseoutMetrics {
+  param([Parameter(Mandatory)][string]$LedgerPath, [ValidateRange(1,100)][int]$WindowSize = 20)
+  $unique = @{}
+  foreach ($line in $(if (Test-Path -LiteralPath $LedgerPath -PathType Leaf) { Get-Content -Encoding UTF8 -LiteralPath $LedgerPath } else { @() })) {
+    if (!$line.Trim()) { continue }
+    try { $entry = $line | ConvertFrom-Json } catch { continue }
+    if ([int]$entry.schemaVersion -ne 2 -or [string]$entry.outcome -ne 'PASSED' -or $null -eq $entry.metricsSummary) { continue }
+    if (!$unique.ContainsKey([string]$entry.key)) { $unique[[string]$entry.key] = $entry }
   }
-  return $false
+  $records = @($unique.Values | Sort-Object { [datetimeoffset]$_.registeredAt } -Descending | Select-Object -First $WindowSize)
+  $metricNames = @('executorInvocationCount','reviewerInvocationCount','plannerInvocationCount','contextBaseBuildCount','contextDeltaBuildCount','validationExecutedCount','validationReusedCount','reportProjectionCount','wallClockSeconds')
+  $aggregate = Get-AutopilotMetricPercentiles -Samples @($records | ForEach-Object { $_.metricsSummary }) -MetricNames $metricNames
+  $status = if ($records.Count -lt $WindowSize) { 'insufficient_sample' } else { 'ready' }
+  return [pscustomobject]@{ status=$status; requestedSampleCount=$WindowSize; actualSampleCount=$records.Count; aggregate=$aggregate }
 }
 
 function Set-AutopilotCloseoutCandidateScore {

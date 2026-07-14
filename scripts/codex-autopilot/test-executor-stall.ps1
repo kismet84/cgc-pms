@@ -116,9 +116,12 @@ Start-Sleep -Seconds 20
     }
   }
   if (@($state.retiredExecutors).Count -ne 2 -or [int]$state.retryCount -ne 1) { throw 'retired executor state was not persisted' }
-  $repairContext = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Recurse -Filter context.json | Where-Object FullName -match 'repair-1' | Select-Object -First 1
-  $context = Get-Content -Encoding UTF8 -LiteralPath $repairContext.FullName -Raw | ConvertFrom-Json
-  if ($context.phase -ne 'repair' -or !$context.previousPhaseSummary -or @($context.longRunningCommands).Count -ne 1) { throw 'repair context did not carry narrowed scope, timeout reason, and long-command declaration' }
+  $repairContext = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Recurse -Filter 'repair-1.delta.json' | Select-Object -First 1
+  $baseContext = Get-ChildItem -LiteralPath (Join-Path $autoDir 'runs') -Recurse -Filter 'base.json' | Select-Object -First 1
+  if ($null -eq $repairContext -or $null -eq $baseContext) { throw 'repair context base/delta pair was not persisted' }
+  $delta = Get-Content -Encoding UTF8 -LiteralPath $repairContext.FullName -Raw | ConvertFrom-Json
+  $baseContextValue = Get-Content -Encoding UTF8 -LiteralPath $baseContext.FullName -Raw | ConvertFrom-Json
+  if ($delta.phase -ne 'repair' -or !$delta.previousPhaseSummary -or @($baseContextValue.longRunningCommands).Count -ne 1 -or $delta.baseId -ne $baseContextValue.baseId) { throw 'repair context pair did not carry narrowed scope, timeout reason, and long-command declaration' }
   $blocked = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $backlog 'blocked-issues.md') -Raw
   if ($blocked -notmatch '两个 executorPid 永久退役' -or $blocked -notmatch '未完成验收项') { throw 'blocked backlog closeout is incomplete' }
   Write-Host 'executor stall self-test passed'

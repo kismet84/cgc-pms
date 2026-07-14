@@ -41,6 +41,43 @@ function ConvertTo-AutopilotIssueCheckpointCurrent {
     $present = ($Checkpoint -is [Collections.IDictionary] -and $Checkpoint.Contains($name)) -or ($Checkpoint.PSObject.Properties.Name -contains $name)
     if (!$present) { Set-AutopilotCheckpointProperty $Checkpoint $name $entry[1] }
   }
+  $metrics = Get-AutopilotCheckpointProperty $Checkpoint 'metrics'
+  if ($null -ne $metrics) {
+    foreach ($entry in @(
+      @('executorInvocationCount',0), @('reviewerInvocationCount',0),
+      @('contextBaseBuildCount',0), @('contextDeltaBuildCount',0),
+      @('validationExecutedCount',0), @('validationReusedCount',0), @('reportProjectionCount',0),
+      @('metricObservationKeys',@()), @('tokenUsageStatus','not_available'),
+      @('inputTokens',$null), @('outputTokens',$null), @('totalTokens',$null)
+    )) {
+      $name = [string]$entry[0]
+      $present = ($metrics -is [Collections.IDictionary] -and $metrics.Contains($name)) -or ($metrics.PSObject.Properties.Name -contains $name)
+      if (!$present) { Set-AutopilotCheckpointProperty $metrics $name $entry[1] }
+    }
+  }
+  $artifacts = Get-AutopilotCheckpointProperty $Checkpoint 'artifacts'
+  if ($null -ne $artifacts) {
+    foreach ($entry in @(
+      @('contextBasePath',''), @('contextBaseHash',''), @('contextBaseId',''),
+      @('contextDeltaPaths',@()), @('contextDeltaHashes',@()), @('contextDeltaIds',@()),
+      @('preCloseoutFactsPath',''), @('finalResultPath','')
+    )) {
+      $name = [string]$entry[0]
+      $present = ($artifacts -is [Collections.IDictionary] -and $artifacts.Contains($name)) -or ($artifacts.PSObject.Properties.Name -contains $name)
+      if (!$present) { Set-AutopilotCheckpointProperty $artifacts $name $entry[1] }
+    }
+  }
+  $evidence = Get-AutopilotCheckpointProperty $Checkpoint 'evidence'
+  if ($null -ne $evidence) {
+    foreach ($entry in @(
+      @('preCloseoutFactsHash',''), @('reportHash',''), @('resultHash',''),
+      @('evidenceManifestHash',''), @('metricsHash',''), @('graphGitCursor','')
+    )) {
+      $name = [string]$entry[0]
+      $present = ($evidence -is [Collections.IDictionary] -and $evidence.Contains($name)) -or ($evidence.PSObject.Properties.Name -contains $name)
+      if (!$present) { Set-AutopilotCheckpointProperty $evidence $name $entry[1] }
+    }
+  }
   return $Checkpoint
 }
 
@@ -161,9 +198,10 @@ function Assert-AutopilotIssueCheckpoint {
     if (![datetimeoffset]::TryParse([string](Get-AutopilotCheckpointProperty $Checkpoint $name ''), [ref]$parsed)) { throw "Issue checkpoint has invalid timestamp: $name" }
   }
   $metrics = $Checkpoint.metrics
-  foreach ($name in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount')) {
+  foreach ($name in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','executorInvocationCount','reviewerInvocationCount','contextBaseBuildCount','contextDeltaBuildCount','validationExecutedCount','validationReusedCount','reportProjectionCount')) {
     if ([int](Get-AutopilotCheckpointProperty $metrics $name -1) -lt 0) { throw "Issue checkpoint has invalid metric: $name" }
   }
+  if ([string](Get-AutopilotCheckpointProperty $metrics 'tokenUsageStatus' '') -notin @('available','not_available')) { throw 'Issue checkpoint has invalid tokenUsageStatus' }
   return $true
 }
 
@@ -250,16 +288,51 @@ function New-AutopilotIssueCheckpoint {
     controlPlaneFingerprint = ''
     semanticProgressAt = $now
     failureRecoveryKeys = @()
-    artifacts = [ordered]@{ issueDirectory=$ArtifactDirectory; resultPath=''; evidencePaths=@(); reviewRequestPath=''; reviewResultPath=''; archiveReport='' }
-    evidence = [ordered]@{ diffHash=''; verificationDiffHash=''; reviewDiffHash=''; implementationCommit=''; closeoutCommit='' }
+    artifacts = [ordered]@{
+      issueDirectory=$ArtifactDirectory; resultPath=''; evidencePaths=@(); reviewRequestPath=''; reviewResultPath=''; archiveReport=''
+      contextBasePath=''; contextBaseHash=''; contextBaseId=''; contextDeltaPaths=@(); contextDeltaHashes=@(); contextDeltaIds=@(); preCloseoutFactsPath=''; finalResultPath=''
+    }
+    evidence = [ordered]@{ diffHash=''; verificationDiffHash=''; reviewDiffHash=''; implementationCommit=''; closeoutCommit=''; preCloseoutFactsHash=''; reportHash=''; resultHash=''; evidenceManifestHash=''; metricsHash=''; graphGitCursor='' }
     metrics = [ordered]@{
       implementationDispatchCount=0; validationDispatchCount=0; reviewDispatchCount=0; repairDispatchCount=0; closeoutDispatchCount=0
       runResumeCount=0; phaseRestartCount=0; manualRecoveryCount=0; toolConfigBlockCount=0; environmentRetryCount=0; duplicateDispatchBlockedCount=0
       wallClockSeconds=0; phaseDurationsSeconds=[ordered]@{}
+      executorInvocationCount=0; reviewerInvocationCount=0
+      contextBaseBuildCount=0; contextDeltaBuildCount=0; validationExecutedCount=0; validationReusedCount=0; reportProjectionCount=0
+      metricObservationKeys=@(); tokenUsageStatus='not_available'; inputTokens=$null; outputTokens=$null; totalTokens=$null
     }
     quarantineReason = $null
   }
   return Write-AutopilotIssueCheckpointAtomic -Path $path -Checkpoint $checkpoint
+}
+
+function Register-AutopilotIssueMetricObservation {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][ValidateSet('executorInvocationCount','reviewerInvocationCount','contextBaseBuildCount','contextDeltaBuildCount','validationExecutedCount','validationReusedCount','reportProjectionCount')][string]$MetricName,
+    [Parameter(Mandatory)][string]$ObservationId
+  )
+  if (!$ObservationId.Trim()) { throw 'metric observationId cannot be empty' }
+  $checkpoint = Read-AutopilotIssueCheckpoint -Path $Path
+  $key = "$MetricName|$ObservationId"
+  $keys = @($checkpoint.metrics.metricObservationKeys)
+  if ($keys -contains $key) { return $checkpoint }
+  Set-AutopilotCheckpointProperty $checkpoint.metrics $MetricName ([int](Get-AutopilotCheckpointProperty $checkpoint.metrics $MetricName 0) + 1)
+  Set-AutopilotCheckpointProperty $checkpoint.metrics 'metricObservationKeys' (@($keys + $key | Sort-Object -Unique))
+  return Write-AutopilotIssueCheckpointAtomic -Path $Path -Checkpoint $checkpoint
+}
+
+function Sync-AutopilotIssueInvocationMetrics {
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string[]]$EventPaths,
+    [Parameter(Mandatory)][string]$IssueId
+  )
+  foreach ($event in @(Read-AutopilotMetricEvents -EventPaths $EventPaths | Where-Object { $_.event -eq 'model.invocation' -and [string]$_.issueId -eq $IssueId -and $_.invocationId })) {
+    $metricName = if ([string]$event.role -eq 'EXECUTOR') { 'executorInvocationCount' } elseif ([string]$event.role -eq 'REVIEWER') { 'reviewerInvocationCount' } else { '' }
+    if ($metricName) { Register-AutopilotIssueMetricObservation -Path $Path -MetricName $metricName -ObservationId ([string]$event.invocationId) | Out-Null }
+  }
+  return Read-AutopilotIssueCheckpoint -Path $Path
 }
 
 function Set-AutopilotIssueCheckpointPhase {

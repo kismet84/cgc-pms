@@ -5,6 +5,8 @@ $contextLibrary = Join-Path $PSScriptRoot 'autopilot-context.ps1'
 if (Test-Path -LiteralPath $contextLibrary) { . $contextLibrary }
 $nativeCommandLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
 if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
+$metricsLibrary = Join-Path $PSScriptRoot 'autopilot-metrics.ps1'
+if (!(Get-Command New-AutopilotInvocationId -ErrorAction SilentlyContinue)) { . $metricsLibrary }
 
 function Write-AutopilotReviewDiff {
   param([Parameter(Mandatory)][string]$Text, [Parameter(Mandatory)][string]$OutputPath)
@@ -19,19 +21,27 @@ function New-AutopilotReviewRequest {
     [string]$ReadyPath,
     [string]$DiffPath,
     [string[]]$EvidencePaths,
+    [string]$ContextBasePath = '',
+    [string]$ContextBaseHash = '',
+    [string]$ContextDeltaPath = '',
+    [string]$ContextDeltaHash = '',
     [string]$OutputPath
   )
   $forbidden = @($EvidencePaths | Where-Object { (Split-Path -Leaf $_) -match '^(executor\.log|issue-prompt\.md|conversation|session)' })
   if ($forbidden.Count -gt 0) { throw 'Reviewer input must not contain Implementer reasoning or raw executor logs' }
   $request = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     issueId = $IssueId
     readyPath = $ReadyPath
+    contextBasePath = $ContextBasePath
+    contextBaseHash = $ContextBaseHash
+    contextDeltaPath = $ContextDeltaPath
+    contextDeltaHash = $ContextDeltaHash
     diffPath = $DiffPath
     diffSha256 = (Get-FileHash -LiteralPath $DiffPath -Algorithm SHA256).Hash.ToLowerInvariant()
     evidencePaths = @($EvidencePaths)
     instructions = @(
-      'Review only the Ready contract, final diff, required source, project rules, and bound verification evidence.',
+      'Review only the verified context base, review delta, Ready contract, final diff, required source, project rules, and bound verification evidence.',
       'Return pass, needs_repair, blocked, or tool_blocked with file/line evidence.',
       'Set reviewedDiffHash to the exact diffSha256 from this request and preserve the exact issueId.',
       'Do not infer success from the Implementer report.'
@@ -132,7 +142,7 @@ function New-AutopilotReviewerToolBlockedResult {
 }
 
 function Invoke-AutopilotReviewerProcess {
-  param([string]$Worktree, [string]$RequestPath, [string]$ResultPath, [string]$SchemaPath, [string]$Model, [string]$Thinking, [int]$TimeoutSeconds, [string]$Sandbox)
+  param([string]$Worktree, [string]$RequestPath, [string]$ResultPath, [string]$SchemaPath, [string]$Model, [string]$Thinking, [int]$TimeoutSeconds, [string]$Sandbox, [string]$IssueId, [string]$RunId, [scriptblock]$InvocationWriter)
   $codex = Resolve-AutopilotCodexInvocation
   $prompt = "Act as an independent reviewer. Read only the structured request at $RequestPath and files it references. Return JSON matching $SchemaPath."
   $arguments = @('exec','--ephemeral','--sandbox',$Sandbox,'--model',$Model,'-c',"model_reasoning_effort=$Thinking",'--cd',$Worktree,'--output-schema',$SchemaPath,'--output-last-message',$ResultPath,'-')
@@ -146,7 +156,12 @@ function Invoke-AutopilotReviewerProcess {
   $startInfo.RedirectStandardOutput = $true
   $startInfo.RedirectStandardError = $true
   $process = [Diagnostics.Process]::new(); $process.StartInfo = $startInfo
+  $startedAt = [datetimeoffset]::Now.ToString('o')
   [void]$process.Start()
+  $invocationId = New-AutopilotInvocationId -Role REVIEWER -Scope ISSUE -ScopeId $IssueId -ProcessId $process.Id -StartedAt $startedAt
+  $invocationEvent = New-AutopilotModelInvocationEvent -Role REVIEWER -Scope ISSUE -ScopeId $IssueId -InvocationId $invocationId -IssueId $IssueId -RunId $RunId -ProcessId $process.Id -StartedAt $startedAt
+  if ($InvocationWriter) { & $InvocationWriter $invocationEvent }
+  elseif (Get-Command Write-RunEvent -ErrorAction SilentlyContinue) { Write-RunEvent 'model.invocation' $invocationEvent }
   $stdoutTask = $process.StandardOutput.ReadToEndAsync(); $stderrTask = $process.StandardError.ReadToEndAsync()
   $process.StandardInput.Write($prompt); $process.StandardInput.Close()
   if (!$process.WaitForExit($TimeoutSeconds * 1000)) { $process.Kill($true); throw 'independent Reviewer timed out' }
@@ -169,12 +184,16 @@ function Invoke-AutopilotReviewer {
     [string]$SchemaPath,
     [string]$Model = 'gpt-5.6-sol',
     [string]$Thinking = 'high',
-    [int]$TimeoutSeconds = 1200
+    [int]$TimeoutSeconds = 1200,
+    [string]$IssueId = '',
+    [string]$RunId = '',
+    [scriptblock]$InvocationWriter
 )
+  if (!$IssueId) { $IssueId = [string](Get-Content -LiteralPath $RequestPath -Raw -Encoding UTF8 | ConvertFrom-Json).issueId }
   $headBefore = (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
   $fingerprintBefore = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $headBefore
   try {
-    $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'read-only'
+    $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'read-only' -IssueId $IssueId -RunId $RunId -InvocationWriter $InvocationWriter
   } catch {
     if ($_.Exception.Message -notmatch '(?i)orchestrator_helper_launch_failed|sandbox.{0,80}initialization failed|os error 3') { throw }
     $review = New-AutopilotReviewerToolBlockedResult -RequestPath $RequestPath -ResultPath $ResultPath -Reason $_.Exception.Message
@@ -182,7 +201,7 @@ function Invoke-AutopilotReviewer {
   if (Test-AutopilotReviewerSandboxFailure -ReviewResult $review) {
     Remove-Item -LiteralPath $ResultPath -Force -ErrorAction SilentlyContinue
     try {
-      $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'danger-full-access'
+      $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'danger-full-access' -IssueId $IssueId -RunId $RunId -InvocationWriter $InvocationWriter
     } catch {
       if ($_.Exception.Message -notmatch '(?i)orchestrator_helper_launch_failed|sandbox.{0,80}initialization failed|os error 3') { throw }
       $review = New-AutopilotReviewerToolBlockedResult -RequestPath $RequestPath -ResultPath $ResultPath -Reason $_.Exception.Message

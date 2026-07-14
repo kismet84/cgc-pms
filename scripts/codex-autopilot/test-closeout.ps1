@@ -61,8 +61,12 @@ try {
   $registry = Get-Content -LiteralPath $registryPath -Raw -Encoding UTF8 | ConvertFrom-Json
   $registry.issues[0].status = 'FROZEN'
   $registry | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $registryPath -Encoding UTF8
-  $result = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base
-  if (!$result.commit -or !$result.merged) { throw 'closeout did not commit and merge' }
+  $result = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $false -BaseBranch $baseBranch -ExpectedBaseCommit $base
+  if (!$result.commit -or $result.merged) { throw 'unscored closeout did not produce an isolated closeout commit' }
+  $unmergedAgain = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $false -BaseBranch $baseBranch -ExpectedBaseCommit $base
+  if (!$unmergedAgain.idempotent -or $unmergedAgain.score -or $unmergedAgain.closeoutCommit -ne $result.closeoutCommit) { throw 'unscored closeout retry incorrectly required scoring evidence' }
+  $unscoredMerge = Merge-AutopilotIssueCloseoutCommit -RepoRoot $root -Commit $result.closeoutCommit -ExpectedBaseCommit $base
+  if (!$unscoredMerge.merged -or $unscoredMerge.idempotent) { throw 'unscored closeout commit did not fast-forward after idempotent retry' }
   if ((Get-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Raw) -notmatch '状态：Done') { throw 'Ready was not closed as Done' }
   if ((Get-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'docs\backlog\done-issues.md') -Raw) -notmatch 'ISSUE-900-040') { throw 'done ledger was not updated' }
   $again = Complete-AutopilotIssueCloseout -RepoRoot $root -Worktree $worktree.path -Issue $issue -AutoMerge $true -BaseBranch $baseBranch -ExpectedBaseCommit $base

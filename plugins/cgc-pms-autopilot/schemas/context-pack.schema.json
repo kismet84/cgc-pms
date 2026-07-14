@@ -1,29 +1,31 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cgc-pms.local/plugins/cgc-pms-autopilot/schemas/context-pack.schema.json",
-  "title": "CGC PMS AutoPilot Context Pack",
+  "title": "CGC PMS AutoPilot Immutable Context Base v3",
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schemaVersion", "issueId", "phase", "baseCommit", "executionBaseCommit", "candidateEvidenceHead", "controlPlanePolicyVersion", "controlPlanePolicyHash", "controlPlanePolicyRefs", "contextGeneratedAt", "readyContentHash",
-    "diffHash", "goal", "nonGoals", "allowedPaths", "forbiddenPaths", "requiredCommands", "archiveReport",
-    "relevantSymbols", "acceptedDecisions", "openRisks", "previousPhaseSummary"
+    "baseId", "contentHash", "schemaVersion", "contextType", "issueId", "baseCommit", "executionBaseCommit",
+    "candidateEvidenceHead", "controlPlanePolicyVersion", "controlPlanePolicyHash", "controlPlanePolicyRefs",
+    "readyContentHash", "goal", "nonGoals", "acceptanceCriteria", "allowedPaths", "forbiddenPaths",
+    "requiredCommands", "archiveReport", "relevantSymbols", "acceptedDecisions", "openRisks", "longRunningCommands"
   ],
   "properties": {
-    "schemaVersion": { "const": 2 },
+    "baseId": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "contentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "schemaVersion": { "const": 3 },
+    "contextType": { "const": "base" },
     "issueId": { "type": "string", "pattern": "^ISSUE-[0-9-]+$" },
-    "phase": { "enum": ["implement", "repair", "review"] },
-    "baseCommit": { "type": "string", "minLength": 7 },
+    "baseCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "executionBaseCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
     "candidateEvidenceHead": { "type": "string", "pattern": "^(?:[a-f0-9]{40})?$" },
     "controlPlanePolicyVersion": { "type": "string", "minLength": 1 },
     "controlPlanePolicyHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "controlPlanePolicyRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
-    "contextGeneratedAt": { "type": "string", "format": "date-time" },
-    "readyContentHash": { "type": "string", "minLength": 1 },
-    "diffHash": { "type": "string", "minLength": 64, "maxLength": 64 },
+    "readyContentHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "goal": { "type": "array", "minItems": 1, "items": { "type": "string" } },
     "nonGoals": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+    "acceptanceCriteria": { "type": "array", "minItems": 1, "items": { "type": "string" } },
     "allowedPaths": { "type": "array", "minItems": 1, "items": { "type": "string" } },
     "forbiddenPaths": { "type": "array", "items": { "type": "string" } },
     "requiredCommands": { "type": "array", "minItems": 1, "items": { "type": "string" } },
@@ -42,7 +44,6 @@
           "expectedSeconds": { "type": "integer", "minimum": 601 }
         }
       }
-    },
-    "previousPhaseSummary": { "type": ["string", "null"], "maxLength": 5120 }
+    }
   }
 }

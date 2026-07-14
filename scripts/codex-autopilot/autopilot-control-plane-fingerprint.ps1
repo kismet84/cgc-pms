@@ -11,9 +11,13 @@ function Get-AutopilotControlPlanePolicyDescriptor {
   $text = Get-Content -LiteralPath $full -Raw -Encoding UTF8
   $versionMatch = [regex]::Match($text, '(?m)^Policy-Version:\s*([A-Za-z0-9._-]+)\s*$')
   if (!$versionMatch.Success) { throw 'control-plane policy is missing Policy-Version' }
+  $normalizedText = $text -replace "`r`n?", "`n"
+  $sha = [Security.Cryptography.SHA256]::Create()
+  try { $policyHash = ([BitConverter]::ToString($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($normalizedText)))).Replace('-', '').ToLowerInvariant() }
+  finally { $sha.Dispose() }
   return [pscustomobject]@{
     version = $versionMatch.Groups[1].Value
-    hash = (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant()
+    hash = $policyHash
     path = $relative
   }
 }

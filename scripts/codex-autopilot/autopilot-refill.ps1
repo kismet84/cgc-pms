@@ -5,6 +5,8 @@ $commandLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'a
 if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
 $nativeCommandLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-native-command.ps1'
 if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
+$metricsLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-metrics.ps1'
+if (!(Get-Command New-AutopilotInvocationId -ErrorAction SilentlyContinue)) { . $metricsLibrary }
 
 function Test-AutopilotDomainContinuationAllowed {
   param([string[]]$RecentTitles, [string]$Domain, [string]$FocusText)
@@ -415,7 +417,10 @@ function Invoke-AutopilotReadyPlanner {
     [string]$Thinking = 'high',
     [int]$TimeoutSeconds = 300,
     [int]$HeartbeatSeconds = 30,
-    [scriptblock]$HeartbeatWriter
+    [scriptblock]$HeartbeatWriter,
+    [Parameter(Mandatory)][string]$RunId,
+    [string[]]$CandidateRefs = @(),
+    [scriptblock]$InvocationWriter
   )
   $codex = Resolve-AutopilotCodexInvocation
   $candidateJson = $Candidates | ConvertTo-Json -Depth 5 -Compress
@@ -447,7 +452,13 @@ Return JSON matching $SchemaPath.
   $startInfo = [Diagnostics.ProcessStartInfo]::new(); $startInfo.FileName = $codex.fileName
   $startInfo.Arguments = (@($codex.argumentPrefix) + $args | ForEach-Object { if ($_ -match '[\s"]') { '"' + $_.Replace('"','\"') + '"' } else { $_ } }) -join ' '
   $startInfo.WorkingDirectory = $RepoRoot; $startInfo.UseShellExecute = $false; $startInfo.RedirectStandardInput = $true; $startInfo.RedirectStandardOutput = $true; $startInfo.RedirectStandardError = $true
-  $process = [Diagnostics.Process]::new(); $process.StartInfo = $startInfo; [void]$process.Start()
+  $process = [Diagnostics.Process]::new(); $process.StartInfo = $startInfo
+  $startedAt = [datetimeoffset]::Now.ToString('o')
+  [void]$process.Start()
+  $invocationId = New-AutopilotInvocationId -Role PLANNER -Scope RUN -ScopeId $RunId -ProcessId $process.Id -StartedAt $startedAt
+  $invocationEvent = New-AutopilotModelInvocationEvent -Role PLANNER -Scope RUN -ScopeId $RunId -InvocationId $invocationId -RunId $RunId -CandidateRefs $CandidateRefs -ProcessId $process.Id -StartedAt $startedAt
+  if ($InvocationWriter) { & $InvocationWriter $invocationEvent }
+  elseif (Get-Command Write-RunEvent -ErrorAction SilentlyContinue) { Write-RunEvent 'model.invocation' $invocationEvent }
   $stdoutTask = $process.StandardOutput.ReadToEndAsync(); $stderrTask = $process.StandardError.ReadToEndAsync(); $process.StandardInput.Write($prompt); $process.StandardInput.Close()
   $deadline = [datetimeoffset]::Now.AddSeconds($TimeoutSeconds)
   $nextHeartbeat = [datetimeoffset]::Now.AddSeconds([Math]::Max(1, $HeartbeatSeconds))

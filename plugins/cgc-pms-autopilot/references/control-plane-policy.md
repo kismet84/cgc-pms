@@ -36,3 +36,11 @@ Status: active
 - 状态迁移：`scripts/codex-autopilot/autopilot-transition.ps1`
 - 恢复规则：`plugins/cgc-pms-autopilot/references/rerun-policy.md`
 - 角色边界：`plugins/cgc-pms-autopilot/references/owner-boundary.md`
+
+## 上下文、证据与收口事实链
+
+- 模型输入由不可变 Context Base 与逐阶段 Context Delta 组成；恢复时必须同时核验 Ready、base commit、候选取证提交、控制面策略和当前 diff，禁止用后续阶段覆盖基础上下文。
+- Evidence v2 只允许在同一 Issue、同一命令、同一上下文身份、同一 diff 和相同环境指纹下按类别复用；静态廉价检查、集成测试和浏览器验收仍按策略重新执行，v1 证据只读兼容但不得复用。
+- 正式报告的自动事实区只由提交前 `PreCloseoutFacts` 确定性投影，不得包含报告自身的 closeout commit、report hash、result hash 或 `REGISTERED` 状态；人工裁决区不得被投影覆盖。
+- 合并后先冻结 final result snapshot，再幂等登记 Closeout Record v2；同 key 不同 payload 必须进入 `integrity_conflict`，ledger 写后读回成功前不得迁移到 `REGISTERED`。
+- 历史 `key + registeredAt` 记录按 v1 只读，不原地升级，也不进入 v2 最近收口指标样本。

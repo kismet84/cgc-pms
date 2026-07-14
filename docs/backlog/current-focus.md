@@ -1,5 +1,12 @@
 # Current Focus
 
+## 2026-07-14 第45条主线：AutoPilot 模型往返证据复用与收口事实源
+
+- Executor、Reviewer 与 Planner 的真实进程启动点写入稳定 invocationId；Issue 与 RUN 分开计数，Planner 只保存候选引用、不向候选 Issue 扇出，token 不可得时明确标记 `not_available`。
+- 单 Issue 上下文改为一个不可变 Context Base 加 implement/repair/validate/review 阶段 Delta；Evidence v2 绑定 Ready、上下文、候选取证提交、执行基线、策略、命令、diff 和环境指纹，仅 `UNIT_BUILD` 在全部身份一致时允许有界复用，v1 只读不复用。
+- 收口改为 `PreCloseoutFacts → 报告自动事实区 → closeout commit → 冻结 final result → Closeout Record v2 → REGISTERED`；旧 `key + registeredAt` ledger 只读兼容，同 key 异 payload 按 `integrity_conflict` 拒绝。
+- M0b 基线证明低风险标准路径已经是 1 次 Executor、0 次 Reviewer，Owner 快速通道以 `NO_MEASURABLE_BENEFIT` 关闭，未新增 route/config/Skill 分支。控制面指纹已变化，N>1/无界放量继续等待用户另行明确执行一次 `启动迭代-1` 金丝雀。
+
 ## 2026-07-14 增量：间接费执行入口与金额安全边界
 
 - `ISSUE-040-024` 已在既有 `/cost/ledger` 提供受控的月度间接费执行入口：仅 ADMIN/SUPER_ADMIN 或同时具备 `cost:ledger:query` 与 `overhead:execute` 的用户可见，月份统一转换为自然月月末并经过二次确认。

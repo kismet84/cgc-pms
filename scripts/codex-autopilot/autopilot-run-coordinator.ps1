@@ -16,6 +16,7 @@ function Invoke-AutopilotRunCoordinator {
   . (Join-Path $scriptDir 'autopilot-native-command.ps1')
   . (Join-Path $scriptDir 'autopilot-run-lock.ps1')
   . (Join-Path $scriptDir 'autopilot-control-plane-fingerprint.ps1')
+  . (Join-Path $scriptDir 'autopilot-metrics.ps1')
   . (Join-Path $scriptDir 'autopilot-task-score.ps1')
   . (Join-Path $scriptDir 'autopilot-ready.ps1')
   . (Join-Path $scriptDir 'autopilot-route.ps1')
@@ -338,15 +339,15 @@ function Invoke-AutopilotRunCoordinator {
         Write-State $autoDir 'REFILLING' $false 'READY_PLANNER_START' '' $refillDecision.reason ''
         $planResultPath = Join-Path $script:RunContext.dir 'ready-plan.json'
         $planSchemaPath = Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\ready-plan.schema.json'
+        $expectedCandidateRefs = @($refillDecision.candidates | ForEach-Object { Get-AutopilotCandidateRef -Candidate $_ })
         if ($refillDecision.action -eq 'GENERATE_READY') {
           $deterministicPlan = New-AutopilotDeterministicReadyPlan -Candidate $refillDecision.candidates[0] -RepoRoot $RepoRoot
           [IO.File]::WriteAllText($planResultPath, ($deterministicPlan | ConvertTo-Json -Depth 12), [Text.UTF8Encoding]::new($false))
         } else {
           $plannerHeartbeatSeconds = if ($config.readyPlanner.PSObject.Properties.Name -contains 'heartbeatSeconds') { [int]$config.readyPlanner.heartbeatSeconds } else { 30 }
           $heartbeatWriter = { param($heartbeat) Write-State $autoDir 'REFILLING' $false 'READY_PLANNER_HEARTBEAT' '' $refillDecision.reason '' }
-          Invoke-AutopilotReadyPlanner -RepoRoot $RepoRoot -Candidates $refillDecision.candidates -OutputPath $planResultPath -SchemaPath $planSchemaPath -Model $config.readyPlanner.model -Thinking $config.readyPlanner.thinking -TimeoutSeconds $config.readyPlanner.timeoutSeconds -HeartbeatSeconds $plannerHeartbeatSeconds -HeartbeatWriter $heartbeatWriter | Out-Null
+          Invoke-AutopilotReadyPlanner -RepoRoot $RepoRoot -Candidates $refillDecision.candidates -OutputPath $planResultPath -SchemaPath $planSchemaPath -Model $config.readyPlanner.model -Thinking $config.readyPlanner.thinking -TimeoutSeconds $config.readyPlanner.timeoutSeconds -HeartbeatSeconds $plannerHeartbeatSeconds -HeartbeatWriter $heartbeatWriter -RunId $script:RunContext.id -CandidateRefs $expectedCandidateRefs | Out-Null
         }
-        $expectedCandidateRefs = @($refillDecision.candidates | ForEach-Object { Get-AutopilotCandidateRef -Candidate $_ })
         $imported = Import-AutopilotReadyPlan -PlanPath $planResultPath -ReadyPath $readyPath -RepoRoot $RepoRoot -ExpectedCandidateRefs $expectedCandidateRefs
         if ($imported.createdCount -eq 0) {
           $outcomes = @($imported.candidateDecisions | ForEach-Object { [string]$_.outcome } | Select-Object -Unique)

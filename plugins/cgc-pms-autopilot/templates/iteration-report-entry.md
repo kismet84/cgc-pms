@@ -9,3 +9,4 @@
 - 决策：{{decision}}
 - 阻塞：{{blocking}}
 - 剩余风险：{{residual_risk}}
+<!-- AutoPilot 机器事实只引用正式质量报告中的 AUTOPILOT-FACTS 区；提交后事实以 Closeout Record v2 为准。 -->

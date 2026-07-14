@@ -56,7 +56,7 @@ if ($attempt -lt 2) { Write-Error 'deterministic first-attempt failure'; exit 1 
     issueExecutor=[ordered]@{command='pwsh';args=@('-NoProfile','-ExecutionPolicy','Bypass','-File','{repoRoot}\scripts\codex-autopilot\mock-executor.ps1','-RepoRoot','{repoRoot}','-IssueId','{issueId}','-PromptPath','{promptFile}');timeoutSeconds=30;requireChangedFiles=$true}
     closeout=[ordered]@{enabled=$true};repair=[ordered]@{enabled=$true;maxRepairAttempts=2};readyPlanner=[ordered]@{enabled=$false}
   } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $configPath -Encoding UTF8
-  & git -C $root init -q; & git -C $root config user.email 'autopilot@test.local'; & git -C $root config user.name 'AutoPilot Test'; & git -C $root add .; & git -C $root commit -qm 'repair base'
+  & git -C $root init -q; & git -C $root config user.email 'autopilot@test.local'; & git -C $root config user.name 'AutoPilot Test'; & git -C $root config core.autocrlf false; & git -C $root config core.eol lf; & git -C $root add .; & git -C $root commit -qm 'repair base'
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
   $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
   $ErrorActionPreference = $old
@@ -64,7 +64,8 @@ if ($attempt -lt 2) { Write-Error 'deterministic first-attempt failure'; exit 1 
   $result = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $canonical.FullName 'result.json') -Raw | ConvertFrom-Json
   if ($result.status -ne 'done' -or !$result.gitSummary.commit) { throw "repair integration did not close: $output" }
   if ([int](Get-Content -Encoding UTF8 -LiteralPath (Join-Path $root 'docs\quality\attempt.txt') -Raw) -ne 2) { throw 'repair did not use exactly one fresh retry' }
-  if (!(Test-Path -LiteralPath (Join-Path $canonical.FullName 'ISSUE-991-001\repair-1\context.json'))) { throw 'repair context was not isolated' }
+  $contextRoot = Join-Path $canonical.FullName 'ISSUE-991-001\context'
+  if (!(Test-Path -LiteralPath (Join-Path $contextRoot 'base.json')) -or !(Test-Path -LiteralPath (Join-Path $contextRoot 'repair-1.delta.json'))) { throw 'repair context base/delta pair was not isolated' }
   Write-Host 'repair integration self-test passed'
 } finally {
   if (Test-Path -LiteralPath (Join-Path $root '.git')) { & git -C $root worktree prune 2>$null | Out-Null }

@@ -17,9 +17,15 @@ try {
   & git -C $root commit -qm 'base'
   $base = (& git -C $root rev-parse HEAD).Trim()
   'changed' | Set-Content -LiteralPath (Join-Path $root 'file.txt') -Encoding UTF8
+  $readyHash = ('a' * 64)
+  $identity = @{
+    ReadyContentHash=$readyHash; ContextBaseId=('b' * 64); ContextBaseHash=('b' * 64)
+    ContextDeltaId=('c' * 64); ContextDeltaHash=('c' * 64); CandidateEvidenceHead=('d' * 40)
+    ExecutionBaseCommit=$base; ControlPlanePolicyHash=('e' * 64); AcceptanceRef="ready:$readyHash"
+  }
 
   $evidencePath = Join-Path $root 'evidence.json'
-  $evidence = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'pwsh -NoProfile -Command "exit 0"' -EvidencePath $evidencePath -LogPath (Join-Path $root 'pass.log') -TimeoutSeconds 20
+  $evidence = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'pwsh -NoProfile -Command "exit 0"' -EvidencePath $evidencePath -LogPath (Join-Path $root 'pass.log') -TimeoutSeconds 20 @identity
   if ($evidence.exitCode -ne 0 -or $evidence.classification -ne 'pass') { throw 'passing command was not recorded as pass' }
   Assert-AutopilotEvidenceCurrent -Evidence $evidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base | Out-Null
 
@@ -28,7 +34,7 @@ try {
   try { Assert-AutopilotEvidenceCurrent -Evidence $evidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base | Out-Null } catch { $staleRejected = $true }
   if (!$staleRejected) { throw 'stale evidence was accepted after diff change' }
 
-  $fresh = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'git diff --check' -EvidencePath (Join-Path $root 'fresh-evidence.json') -LogPath (Join-Path $root 'fresh.log') -TimeoutSeconds 20
+  $fresh = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'git diff --check' -EvidencePath (Join-Path $root 'fresh-evidence.json') -LogPath (Join-Path $root 'fresh.log') -TimeoutSeconds 20 @identity
   'untracked' | Set-Content -LiteralPath (Join-Path $root 'new-file.txt') -Encoding UTF8
   $untrackedRejected = $false
   try { Assert-AutopilotEvidenceCurrent -Evidence $fresh -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base | Out-Null } catch { $untrackedRejected = $true }
@@ -38,18 +44,17 @@ try {
   $unicodeDiffHash = Get-AutopilotDiffHash -Worktree $root -BaseCommit $base
   if ($unicodeDiffHash -notmatch '^[a-f0-9]{64}$') { throw 'Unicode untracked path did not produce a stable diff hash' }
 
-  $failed = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'pwsh -NoProfile -Command "exit 7"' -EvidencePath (Join-Path $root 'failed-evidence.json') -LogPath (Join-Path $root 'fail.log') -TimeoutSeconds 20
+  $failed = Invoke-AutopilotVerificationCommand -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'pwsh -NoProfile -Command "exit 7"' -EvidencePath (Join-Path $root 'failed-evidence.json') -LogPath (Join-Path $root 'fail.log') -TimeoutSeconds 20 @identity
   if ($failed.exitCode -ne 7 -or $failed.classification -eq 'pass') { throw 'nonzero exit code was recorded as pass' }
 
   if (Test-AutopilotPostExecutionVerificationRequired -Command 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot .') { throw 'post-execution verification attempted to rerun the pre-dispatch Ready lint' }
   if (!(Test-AutopilotPostExecutionVerificationRequired -Command 'git diff --check')) { throw 'post-execution verification skipped a required non-lint command' }
 
-  $readyHash = ('a' * 64)
-  $readyEvidence = New-AutopilotReadyLintEvidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'ready-lint.ps1' -ReadyContentHash $readyHash -ExpectedReadyContentHash $readyHash -EvidencePath (Join-Path $root 'ready-evidence.json') -LogPath (Join-Path $root 'ready.log')
+  $readyEvidence = New-AutopilotReadyLintEvidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'ready-lint.ps1' -ExpectedReadyContentHash $readyHash -EvidencePath (Join-Path $root 'ready-evidence.json') -LogPath (Join-Path $root 'ready.log') @identity
   Assert-AutopilotEvidenceCurrent -Evidence $readyEvidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base | Out-Null
   if ($readyEvidence.readyContentHash -ne $readyHash -or $readyEvidence.summary -notmatch 'production parser') { throw 'normalized terminal Ready lint evidence is incomplete' }
   $mismatchRejected = $false
-  try { New-AutopilotReadyLintEvidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'ready-lint.ps1' -ReadyContentHash $readyHash -ExpectedReadyContentHash ('b' * 64) -EvidencePath (Join-Path $root 'bad-ready-evidence.json') -LogPath (Join-Path $root 'bad-ready.log') | Out-Null } catch { $mismatchRejected = $true }
+  try { New-AutopilotReadyLintEvidence -IssueId 'ISSUE-900-020' -Worktree $root -BaseCommit $base -Command 'ready-lint.ps1' -ExpectedReadyContentHash ('f' * 64) -EvidencePath (Join-Path $root 'bad-ready-evidence.json') -LogPath (Join-Path $root 'bad-ready.log') @identity | Out-Null } catch { $mismatchRejected = $true }
   if (!$mismatchRejected) { throw 'mismatched terminal Ready contract hash produced pass evidence' }
 
   $secondEvidencePath = Join-Path $root 'evidence-02.json'

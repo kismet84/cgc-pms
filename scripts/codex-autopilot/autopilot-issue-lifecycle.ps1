@@ -54,9 +54,35 @@ function Invoke-IssueExecutor {
   $script:IssueCheckpointPath = $checkpointPath
   $script:IssuePhase = [string]$checkpoint.phase
   if (!$resuming) {
-    $contextPath = Join-Path $issueDir ("$Phase-$Attempt\context.json")
     $longRunningCommands = if ($config.issueExecutor.longRunningCommands) { @($config.issueExecutor.longRunningCommands) } else { @() }
-    New-AutopilotContextPack -Issue $Issue.contract -Phase $Phase -RepoRoot $RepoRoot -Worktree $worktree.path -OutputPath $contextPath -PreviousPhaseSummary $PreviousSummary -LongRunningCommands $longRunningCommands | Out-Null
+    $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+    $contextBasePath = [string]$checkpoint.artifacts.contextBasePath
+    if (!$contextBasePath) {
+      $contextBasePath = Join-Path (Join-Path $issueDir 'context') 'base.json'
+      $contextBase = New-AutopilotContextBase -Issue $Issue.contract -RepoRoot $RepoRoot -Worktree $worktree.path -OutputPath $contextBasePath -LongRunningCommands $longRunningCommands
+      Register-AutopilotIssueMetricObservation -Path $checkpointPath -MetricName contextBaseBuildCount -ObservationId $contextBase.baseId | Out-Null
+      Write-RunEvent 'context.base-built' ([pscustomobject]@{ issueId=$Issue.lint.issueId; scope='ISSUE'; scopeId=$Issue.lint.issueId; operationId=$contextBase.baseId; contextPath=$contextBasePath; contextHash=$contextBase.contentHash })
+      $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+      Set-AutopilotCheckpointProperty $checkpoint.artifacts 'contextBasePath' $contextBasePath
+      Set-AutopilotCheckpointProperty $checkpoint.artifacts 'contextBaseHash' ([string]$contextBase.contentHash)
+      Set-AutopilotCheckpointProperty $checkpoint.artifacts 'contextBaseId' ([string]$contextBase.baseId)
+      Write-AutopilotIssueCheckpointAtomic -Path $checkpointPath -Checkpoint $checkpoint | Out-Null
+    } else {
+      if (!(Test-Path -LiteralPath $contextBasePath -PathType Leaf)) { throw 'checkpoint context base is missing' }
+      $contextBase = Get-Content -LiteralPath $contextBasePath -Raw -Encoding UTF8 | ConvertFrom-Json
+      if ([string]$checkpoint.artifacts.contextBaseHash -ne [string]$contextBase.contentHash -or [string]$checkpoint.artifacts.contextBaseId -ne [string]$contextBase.baseId) { throw 'checkpoint context base identity mismatch' }
+    }
+    $contextDeltaPath = Join-Path (Join-Path $issueDir 'context') ("$Phase-$Attempt.delta.json")
+    $changedPaths = @(Get-AutopilotIssueChanges -Worktree $worktree.path -BaseCommit $baseCommit)
+    $contextDelta = New-AutopilotContextDelta -Base $contextBase -Phase $Phase -Worktree $worktree.path -OutputPath $contextDeltaPath -ChangedPaths $changedPaths -PreviousPhaseSummary $PreviousSummary
+    Assert-AutopilotContextPairCurrent -Base $contextBase -Delta $contextDelta -Issue $Issue.contract -Worktree $worktree.path -ExpectedBaseCommit $baseCommit | Out-Null
+    Register-AutopilotIssueMetricObservation -Path $checkpointPath -MetricName contextDeltaBuildCount -ObservationId $contextDelta.deltaId | Out-Null
+    Write-RunEvent 'context.delta-built' ([pscustomobject]@{ issueId=$Issue.lint.issueId; scope='ISSUE'; scopeId=$Issue.lint.issueId; operationId=$contextDelta.deltaId; contextPath=$contextDeltaPath; contextHash=$contextDelta.contentHash; phase=$Phase })
+    $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+    Set-AutopilotCheckpointProperty $checkpoint.artifacts 'contextDeltaPaths' (@($checkpoint.artifacts.contextDeltaPaths) + $contextDeltaPath)
+    Set-AutopilotCheckpointProperty $checkpoint.artifacts 'contextDeltaHashes' (@($checkpoint.artifacts.contextDeltaHashes) + [string]$contextDelta.contentHash)
+    Set-AutopilotCheckpointProperty $checkpoint.artifacts 'contextDeltaIds' (@($checkpoint.artifacts.contextDeltaIds) + [string]$contextDelta.deltaId)
+    Write-AutopilotIssueCheckpointAtomic -Path $checkpointPath -Checkpoint $checkpoint | Out-Null
     Write-State $autoDir 'EXECUTING' $false 'EXECUTOR_START' $Issue.title 'EXECUTING' ''
     $executorArgs = @(
     '-NoProfile','-ExecutionPolicy','Bypass','-File',$executorPath,
@@ -65,7 +91,8 @@ function Invoke-IssueExecutor {
     '-ReadyPath',(Join-Path $worktree.path 'docs\backlog\ready-issues.md'),
     '-Title',$Issue.title,
     '-RunId',$(if ($Attempt -eq 0) { $script:RunContext.id } else { "$($script:RunContext.id)-repair-$Attempt" }),
-    '-ContextPath',$contextPath,
+    '-ContextBasePath',$contextBasePath,
+    '-ContextDeltaPath',$contextDeltaPath,
     '-Model',$Route.modelBaseline,
     '-Thinking',$Route.thinkingBaseline,
     '-ExecutorRole',$Route.executorRole,
@@ -79,6 +106,8 @@ function Invoke-IssueExecutor {
     $stallTerminateSeconds = if ($config.issueExecutor.stallTerminateSeconds) { [int]$config.issueExecutor.stallTerminateSeconds } else { 600 }
     $heartbeatMilliseconds = if ($config.issueExecutor.heartbeatMilliseconds) { [int]$config.issueExecutor.heartbeatMilliseconds } else { 30000 }
     $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout -StallInspectSeconds $stallInspectSeconds -StallTerminateSeconds $stallTerminateSeconds -HeartbeatMilliseconds $heartbeatMilliseconds -LongRunningCommands $longRunningCommands -SemanticEvidencePaths @($checkpointPath,$resultPath) -Task $Phase
+    $executorEventPath = Join-Path (Join-Path $autoDir "runs\$executionRunId") 'events.jsonl'
+    if (Test-Path -LiteralPath $executorEventPath -PathType Leaf) { Sync-AutopilotIssueInvocationMetrics -Path $checkpointPath -EventPaths @($executorEventPath) -IssueId $Issue.lint.issueId | Out-Null }
     if ($childResult.exitCode -ne 0) {
     if ($childResult.stallTimedOut -and $config.repair -and $config.repair.enabled -eq $true -and $Attempt -lt 1) {
       $stallDiffHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
@@ -173,19 +202,64 @@ function Invoke-IssueExecutor {
         Write-State $autoDir 'VERIFYING' $false 'EXECUTOR_COMPLETED' $Issue.title 'VERIFYING' ''
         $verifyDir = Join-Path $issueDir 'verify'
         New-Item -ItemType Directory -Path $verifyDir -Force | Out-Null
+        $validationCheckpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+        $validationContextBasePath = [string]$validationCheckpoint.artifacts.contextBasePath
+        if (!$validationContextBasePath) { throw 'validation context base identity is missing' }
+        $validationContextBase = Get-Content -LiteralPath $validationContextBasePath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $validationContextDeltaPath = Join-Path (Join-Path $issueDir 'context') ("validate-$Attempt.delta.json")
+        $validationChangedPaths = @(Get-AutopilotIssueChanges -Worktree $worktree.path -BaseCommit $baseCommit)
+        $validationContextDelta = New-AutopilotContextDelta -Base $validationContextBase -Phase validate -Worktree $worktree.path -OutputPath $validationContextDeltaPath -ChangedPaths $validationChangedPaths
+        Assert-AutopilotContextPairCurrent -Base $validationContextBase -Delta $validationContextDelta -Issue $Issue.contract -Worktree $worktree.path -ExpectedBaseCommit $baseCommit | Out-Null
+        Register-AutopilotIssueMetricObservation -Path $checkpointPath -MetricName contextDeltaBuildCount -ObservationId $validationContextDelta.deltaId | Out-Null
+        Write-RunEvent 'context.delta-built' ([pscustomobject]@{ issueId=$Issue.lint.issueId; scope='ISSUE'; scopeId=$Issue.lint.issueId; operationId=$validationContextDelta.deltaId; contextPath=$validationContextDeltaPath; contextHash=$validationContextDelta.contentHash; phase='validate' })
+        $validationCheckpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+        Set-AutopilotCheckpointProperty $validationCheckpoint.artifacts 'contextDeltaPaths' (@($validationCheckpoint.artifacts.contextDeltaPaths) + $validationContextDeltaPath)
+        Set-AutopilotCheckpointProperty $validationCheckpoint.artifacts 'contextDeltaHashes' (@($validationCheckpoint.artifacts.contextDeltaHashes) + [string]$validationContextDelta.contentHash)
+        Set-AutopilotCheckpointProperty $validationCheckpoint.artifacts 'contextDeltaIds' (@($validationCheckpoint.artifacts.contextDeltaIds) + [string]$validationContextDelta.deltaId)
+        Write-AutopilotIssueCheckpointAtomic -Path $checkpointPath -Checkpoint $validationCheckpoint | Out-Null
+        $priorEvidencePaths = @($validationCheckpoint.artifacts.evidencePaths)
+        $validationEnvironment = Get-AutopilotVerificationEnvironment -Worktree $worktree.path
+        $candidateEvidenceHead = if ($Issue.contract.PSObject.Properties.Name -contains 'candidateEvidenceHead') { [string]$Issue.contract.candidateEvidenceHead } else { '' }
+        $acceptanceRef = "ready:$([string]$Issue.lint.readyContentHash)"
         for ($index = 0; $index -lt $Issue.contract.validationCommands.Count; $index++) {
           $validationCommand = [string]$Issue.contract.validationCommands[$index]
           if (!(Test-AutopilotPostExecutionVerificationRequired -Command $validationCommand)) {
             $evidencePath = Join-Path $verifyDir ("evidence-{0:00}.json" -f ($index + 1))
             $logPath = Join-Path $verifyDir ("command-{0:00}.log" -f ($index + 1))
-            $evidence = New-AutopilotReadyLintEvidence -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit -Command $validationCommand -ReadyContentHash ([string]$Issue.lint.readyContentHash) -ExpectedReadyContentHash ([string]$checkpoint.readyContentHash) -EvidencePath $evidencePath -LogPath $logPath
+            $evidence = New-AutopilotReadyLintEvidence -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit -Command $validationCommand -ReadyContentHash ([string]$Issue.lint.readyContentHash) -ExpectedReadyContentHash ([string]$checkpoint.readyContentHash) -EvidencePath $evidencePath -LogPath $logPath -ContextBaseId $validationContextBase.baseId -ContextBaseHash $validationContextBase.contentHash -ContextDeltaId $validationContextDelta.deltaId -ContextDeltaHash $validationContextDelta.contentHash -CandidateEvidenceHead $candidateEvidenceHead -ExecutionBaseCommit $validationContextBase.executionBaseCommit -ControlPlanePolicyHash $validationContextBase.controlPlanePolicyHash -AcceptanceRef $acceptanceRef
+            $validationObservationId = (Get-FileHash -LiteralPath $evidencePath -Algorithm SHA256).Hash.ToLowerInvariant()
+            Register-AutopilotIssueMetricObservation -Path $checkpointPath -MetricName validationExecutedCount -ObservationId $validationObservationId | Out-Null
+            Write-RunEvent 'validation.executed' ([pscustomobject]@{ issueId=$Issue.lint.issueId; scope='ISSUE'; scopeId=$Issue.lint.issueId; operationId=$validationObservationId; evidencePath=$evidencePath; commandIndex=$index })
             [void]$evidencePaths.Add($evidencePath)
             $result.validation += [pscustomobject]@{ name = "ready-command-$($index + 1)"; status = $evidence.classification; message = "exitCode=$($evidence.exitCode); evidence=$evidencePath" }
             continue
           }
           $evidencePath = Join-Path $verifyDir ("evidence-{0:00}.json" -f ($index + 1))
           $logPath = Join-Path $verifyDir ("command-{0:00}.log" -f ($index + 1))
-          $evidence = Invoke-AutopilotVerificationCommand -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit -Command $validationCommand -EvidencePath $evidencePath -LogPath $logPath
+          $evidenceCategory = Get-AutopilotEvidenceCategory -Command $validationCommand
+          $currentValidationDiffHash = Get-AutopilotDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
+          $sourceEvidence = $null
+          foreach ($sourcePath in $priorEvidencePaths) {
+            if (!(Test-Path -LiteralPath $sourcePath -PathType Leaf)) { continue }
+            try { $candidateSource = Get-Content -LiteralPath $sourcePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { continue }
+            if ([string]$candidateSource.command -eq $validationCommand) { $sourceEvidence = $candidateSource; break }
+          }
+          $reuseDecision = if ($null -ne $sourceEvidence) {
+            Test-AutopilotEvidenceReusable -Evidence $sourceEvidence -IssueId $Issue.lint.issueId -ReadyContentHash ([string]$Issue.lint.readyContentHash) -ContextBaseId $validationContextBase.baseId -ContextBaseHash $validationContextBase.contentHash -ContextDeltaId $validationContextDelta.deltaId -ContextDeltaHash $validationContextDelta.contentHash -CandidateEvidenceHead $candidateEvidenceHead -ExecutionBaseCommit $validationContextBase.executionBaseCommit -ControlPlanePolicyHash $validationContextBase.controlPlanePolicyHash -Command $validationCommand -DiffHash $currentValidationDiffHash -EnvironmentFingerprint $validationEnvironment.fingerprint
+          } else { [pscustomobject]@{reusable=$false;reasonCode='SOURCE_EVIDENCE_MISSING';sourceEvidenceId=$null} }
+          if ($reuseDecision.reusable) {
+            if ($sourcePath -eq $evidencePath) { $evidencePath = Join-Path $verifyDir ("evidence-{0:00}-reused-{1}.json" -f ($index + 1), ([string]$sourceEvidence.evidenceId).Substring(0,8)) }
+            $evidence = New-AutopilotReusedEvidence -SourceEvidence $sourceEvidence -EvidencePath $evidencePath
+            $validationObservationId = [string]$evidence.evidenceId
+            Register-AutopilotIssueMetricObservation -Path $checkpointPath -MetricName validationReusedCount -ObservationId $validationObservationId | Out-Null
+            Write-RunEvent 'validation.reused' ([pscustomobject]@{ issueId=$Issue.lint.issueId; scope='ISSUE'; scopeId=$Issue.lint.issueId; operationId=$validationObservationId; evidencePath=$evidencePath; sourceEvidenceId=$evidence.sourceEvidenceId; reasonCode=$reuseDecision.reasonCode; commandIndex=$index })
+          } else {
+            Write-RunEvent 'validation.reuse-rejected' ([pscustomobject]@{ issueId=$Issue.lint.issueId; scope='ISSUE'; scopeId=$Issue.lint.issueId; reasonCode=$reuseDecision.reasonCode; sourceEvidenceId=$reuseDecision.sourceEvidenceId; commandIndex=$index })
+            $evidence = Invoke-AutopilotVerificationCommand -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit -Command $validationCommand -EvidencePath $evidencePath -LogPath $logPath -ReadyContentHash ([string]$Issue.lint.readyContentHash) -ContextBaseId $validationContextBase.baseId -ContextBaseHash $validationContextBase.contentHash -ContextDeltaId $validationContextDelta.deltaId -ContextDeltaHash $validationContextDelta.contentHash -CandidateEvidenceHead $candidateEvidenceHead -ExecutionBaseCommit $validationContextBase.executionBaseCommit -ControlPlanePolicyHash $validationContextBase.controlPlanePolicyHash -AcceptanceRef $acceptanceRef -EvidenceCategory $evidenceCategory
+            $validationObservationId = [string]$evidence.evidenceId
+            Register-AutopilotIssueMetricObservation -Path $checkpointPath -MetricName validationExecutedCount -ObservationId $validationObservationId | Out-Null
+            Write-RunEvent 'validation.executed' ([pscustomobject]@{ issueId=$Issue.lint.issueId; scope='ISSUE'; scopeId=$Issue.lint.issueId; operationId=$validationObservationId; evidencePath=$evidencePath; evidenceCategory=$evidence.evidenceCategory; commandIndex=$index })
+          }
           [void]$evidencePaths.Add($evidencePath)
           $result.validation += [pscustomobject]@{ name = "ready-command-$($index + 1)"; status = $evidence.classification; message = "exitCode=$($evidence.exitCode); evidence=$evidencePath" }
           if ($evidence.exitCode -ne 0) {
@@ -207,10 +281,14 @@ function Invoke-IssueExecutor {
         }
       }
       if ($result.status -eq 'done') {
+        $boundCheckpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+        $boundContextBase = Get-Content -LiteralPath ([string]$boundCheckpoint.artifacts.contextBasePath) -Raw -Encoding UTF8 | ConvertFrom-Json
+        $boundCandidateEvidenceHead = if ($Issue.contract.PSObject.Properties.Name -contains 'candidateEvidenceHead') { [string]$Issue.contract.candidateEvidenceHead } else { '' }
         foreach ($evidencePath in $evidencePaths) {
           try {
             $boundEvidence = Get-Content -LiteralPath $evidencePath -Raw -Encoding UTF8 | ConvertFrom-Json
-            Assert-AutopilotEvidenceCurrent -Evidence $boundEvidence -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit | Out-Null
+            Assert-AutopilotEvidenceCurrent -Evidence $boundEvidence -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit -ReadyContentHash ([string]$Issue.lint.readyContentHash) -ContextBaseId $boundContextBase.baseId -ContextBaseHash $boundContextBase.contentHash -CandidateEvidenceHead $boundCandidateEvidenceHead -ExecutionBaseCommit $boundContextBase.executionBaseCommit -ControlPlanePolicyHash $boundContextBase.controlPlanePolicyHash | Out-Null
+            if ([int]$boundEvidence.schemaVersion -eq 2 -and @($boundCheckpoint.artifacts.contextDeltaIds) -notcontains [string]$boundEvidence.contextDeltaId) { throw 'Evidence v2 context delta is not bound to the checkpoint' }
           } catch {
             $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_EVIDENCE_STALE'
             $result.validation += [pscustomobject]@{ name='evidence-current'; status='fail'; message=$_.Exception.Message }
@@ -243,7 +321,7 @@ function Invoke-IssueExecutor {
       $result | Add-Member -NotePropertyName firstPassSuccess -NotePropertyValue ($effectiveAttempt -eq 0 -and $result.status -eq 'done') -Force
       $result | Add-Member -NotePropertyName manualInterventionCount -NotePropertyValue 0 -Force
       $result | Add-Member -NotePropertyName scopeViolationCount -NotePropertyValue $(if ($result.stopReason -eq 'STOP_SCOPE_VIOLATION') { 1 } else { 0 }) -Force
-      foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds')) {
+      foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds','executorInvocationCount','reviewerInvocationCount','contextBaseBuildCount','contextDeltaBuildCount','validationExecutedCount','validationReusedCount','reportProjectionCount')) {
         $result | Add-Member -NotePropertyName $metricName -NotePropertyValue (Get-AutopilotCheckpointProperty $checkpoint.metrics $metricName 0) -Force
       }
       $result | Add-Member -NotePropertyName phaseDurationsSeconds -NotePropertyValue $checkpoint.metrics.phaseDurationsSeconds -Force
@@ -286,13 +364,28 @@ function Invoke-IssueExecutor {
         $reviewDir = Join-Path $issueDir 'review'; New-Item -ItemType Directory -Path $reviewDir -Force | Out-Null
         $diffPath = Join-Path $reviewDir 'final.diff'
         Write-AutopilotReviewDiff -Text (Get-AutopilotDiffText -Worktree $worktree.path -BaseCommit $baseCommit) -OutputPath $diffPath
+        $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+        $reviewContextBasePath = [string]$checkpoint.artifacts.contextBasePath
+        if (!$reviewContextBasePath -or !(Test-Path -LiteralPath $reviewContextBasePath -PathType Leaf)) { throw 'Reviewer context base is missing' }
+        $reviewContextBase = Get-Content -LiteralPath $reviewContextBasePath -Raw -Encoding UTF8 | ConvertFrom-Json
+        $reviewContextDeltaPath = Join-Path $reviewDir 'context-delta.json'
+        $reviewContextDelta = New-AutopilotContextDelta -Base $reviewContextBase -Phase review -Worktree $worktree.path -OutputPath $reviewContextDeltaPath -ChangedPaths @(Get-AutopilotIssueChanges -Worktree $worktree.path -BaseCommit $baseCommit) -PreviousPhaseSummary 'Implementation and validation completed; independently review only the final diff and bound evidence.'
+        Assert-AutopilotContextPairCurrent -Base $reviewContextBase -Delta $reviewContextDelta -Issue $Issue.contract -Worktree $worktree.path -ExpectedBaseCommit $baseCommit | Out-Null
+        Register-AutopilotIssueMetricObservation -Path $checkpointPath -MetricName contextDeltaBuildCount -ObservationId $reviewContextDelta.deltaId | Out-Null
+        Write-RunEvent 'context.delta-built' ([pscustomobject]@{ issueId=$Issue.lint.issueId; scope='ISSUE'; scopeId=$Issue.lint.issueId; operationId=$reviewContextDelta.deltaId; contextPath=$reviewContextDeltaPath; contextHash=$reviewContextDelta.contentHash; phase='review' })
+        $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+        Set-AutopilotCheckpointProperty $checkpoint.artifacts 'contextDeltaPaths' (@($checkpoint.artifacts.contextDeltaPaths) + $reviewContextDeltaPath)
+        Set-AutopilotCheckpointProperty $checkpoint.artifacts 'contextDeltaHashes' (@($checkpoint.artifacts.contextDeltaHashes) + [string]$reviewContextDelta.contentHash)
+        Set-AutopilotCheckpointProperty $checkpoint.artifacts 'contextDeltaIds' (@($checkpoint.artifacts.contextDeltaIds) + [string]$reviewContextDelta.deltaId)
+        Write-AutopilotIssueCheckpointAtomic -Path $checkpointPath -Checkpoint $checkpoint | Out-Null
         $requestPath = Join-Path $reviewDir 'request.json'
-        $request = New-AutopilotReviewRequest -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $worktree.path 'docs\backlog\ready-issues.md') -DiffPath $diffPath -EvidencePaths $evidencePaths -OutputPath $requestPath
+        $request = New-AutopilotReviewRequest -IssueId $Issue.lint.issueId -ReadyPath (Join-Path $worktree.path 'docs\backlog\ready-issues.md') -ContextBasePath $reviewContextBasePath -ContextBaseHash $reviewContextBase.contentHash -ContextDeltaPath $reviewContextDeltaPath -ContextDeltaHash $reviewContextDelta.contentHash -DiffPath $diffPath -EvidencePaths $evidencePaths -OutputPath $requestPath
         if (!$config.issueReviewer -or $config.issueReviewer.enabled -ne $true) {
           $result.status = 'blocked'; $result.failureCategory = 'tool_config'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEWER_REQUIRED'
         } else {
           $reviewPath = Join-Path $reviewDir 'result.json'
-          $review = Invoke-AutopilotReviewer -Worktree $worktree.path -RequestPath $requestPath -ResultPath $reviewPath -SchemaPath (Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Model $config.issueReviewer.model -Thinking $config.issueReviewer.thinking
+          $review = Invoke-AutopilotReviewer -Worktree $worktree.path -RequestPath $requestPath -ResultPath $reviewPath -SchemaPath (Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Model $config.issueReviewer.model -Thinking $config.issueReviewer.thinking -IssueId $Issue.lint.issueId -RunId $script:RunContext.id
+          Sync-AutopilotIssueInvocationMetrics -Path $checkpointPath -EventPaths @($script:RunContext.events) -IssueId $Issue.lint.issueId | Out-Null
           $result | Add-Member -NotePropertyName review -NotePropertyValue $review -Force
           $result | Add-Member -NotePropertyName reviewedDiffHashExpected -NotePropertyValue $request.diffSha256 -Force
           $reviewDisposition = Get-AutopilotReviewDisposition -ReviewResult $review -ExpectedIssueId $Issue.lint.issueId -ExpectedDiffHash $request.diffSha256
@@ -334,7 +427,7 @@ function Invoke-IssueExecutor {
           $reportPath = Join-Path $worktree.path $Issue.contract.archiveReport
           $isStockIssue = (Get-IssueBodyByTitle (Join-Path $worktree.path 'docs\backlog\ready-issues.md') $Issue.title) -match '\[stock:[^\]]+\]'
           $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
-          foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds')) {
+          foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds','executorInvocationCount','reviewerInvocationCount','contextBaseBuildCount','contextDeltaBuildCount','validationExecutedCount','validationReusedCount','reportProjectionCount')) {
             $result | Add-Member -NotePropertyName $metricName -NotePropertyValue (Get-AutopilotCheckpointProperty $checkpoint.metrics $metricName 0) -Force
           }
           if ([string]$config.taskScoring.activeVersion -eq $script:AutopilotTaskScoreV2Version) {
@@ -346,7 +439,37 @@ function Invoke-IssueExecutor {
             $scoreShadowEvidence = New-AutopilotTaskScoreV2EvidenceFromResult -Result $result -ReportPath $reportPath -ImplementationCommit ('0' * 40) -StockIssueTarget $isStockIssue
           }
         }
-        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge $false -BaseBranch $configuredBaseBranch -ExpectedBaseCommit $baseCommit -ScoreEvidence $scoreEvidence -ScoreShadowEvidence $scoreShadowEvidence -TaskScoringConfig $(if ($script:TaskScoringActive) { $config.taskScoring } else { $null })
+        $checkpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
+        $runEfficiency = Get-AutopilotRunEfficiencyMetrics -EventPaths @($script:RunContext.events) -RunId $script:RunContext.id
+        $plannerCandidateRefs = @(Read-AutopilotMetricEvents -EventPaths @($script:RunContext.events) | Where-Object { $_.event -eq 'model.invocation' -and $_.role -eq 'PLANNER' -and $_.runId -eq $script:RunContext.id } | ForEach-Object { @($_.candidateRefs) } | Where-Object { $_ } | Sort-Object -Unique)
+        $metricsSummary = New-AutopilotMetricsSummary -Metrics $checkpoint.metrics -PlannerInvocationCount ([int]$runEfficiency.plannerInvocationCount) -PlannerCandidateRefs $plannerCandidateRefs -IncludeProjection
+        $closeoutControlFingerprint = [string]$script:ControlPlaneFingerprint
+        if (!$closeoutControlFingerprint) {
+          $closeoutContextBase = Get-Content -LiteralPath ([string]$checkpoint.artifacts.contextBasePath) -Raw -Encoding UTF8 | ConvertFrom-Json
+          $closeoutControlFingerprint = [string]$closeoutContextBase.controlPlanePolicyHash
+        }
+        $Issue.contract | Add-Member -NotePropertyName readyContentHash -NotePropertyValue ([string]$Issue.lint.readyContentHash) -Force
+        $reviewDecision = if ([bool]$effectiveRoute.reviewRequired) { 'PASS' } else { 'NOT_REQUIRED' }
+        $closeoutFactsInput = [pscustomobject]@{
+          evidencePaths=@($evidencePaths)
+          reviewRequired=[bool]$effectiveRoute.reviewRequired
+          reviewDecision=$reviewDecision
+          verifiedDiffHash=[string]$checkpoint.evidence.verificationDiffHash
+          metricsSummary=$metricsSummary
+          controlPlaneFingerprint=$closeoutControlFingerprint
+        }
+        $closeout = Complete-AutopilotIssueCloseout -RepoRoot $RepoRoot -Worktree $worktree.path -Issue $Issue.contract -AutoMerge $false -BaseBranch $configuredBaseBranch -ExpectedBaseCommit $baseCommit -ScoreEvidence $scoreEvidence -ScoreShadowEvidence $scoreShadowEvidence -TaskScoringConfig $(if ($script:TaskScoringActive) { $config.taskScoring } else { $null }) -CloseoutFactsInput $closeoutFactsInput
+        if ($null -eq $closeout.preCloseoutFacts) {
+          $followups = Get-AutopilotReportFollowupSummary -ReportPath (Join-Path $worktree.path $Issue.contract.archiveReport)
+          $recoveredFacts = New-AutopilotPreCloseoutFacts -Issue $Issue.contract -ImplementationCommit $closeout.implementationCommit -EvidencePaths @($evidencePaths) -ReviewRequired ([bool]$effectiveRoute.reviewRequired) -ReviewDecision $reviewDecision -VerifiedDiffHash ([string]$checkpoint.evidence.verificationDiffHash) -Followups $followups -MetricsSummary $metricsSummary -ControlPlaneFingerprint $closeoutControlFingerprint
+          $reportText = Get-Content -LiteralPath (Join-Path $worktree.path $Issue.contract.archiveReport) -Raw -Encoding UTF8
+          if ($reportText -notmatch [regex]::Escape([string]$recoveredFacts.preCloseoutFactsHash)) { throw 'existing closeout report is not bound to the recovered PreCloseout Facts' }
+          $closeout | Add-Member -NotePropertyName preCloseoutFacts -NotePropertyValue $recoveredFacts -Force
+          $closeout | Add-Member -NotePropertyName projection -NotePropertyValue ([pscustomobject]@{ reportHash=((Get-FileHash -LiteralPath (Join-Path $worktree.path $Issue.contract.archiveReport) -Algorithm SHA256).Hash.ToLowerInvariant()); projectionHash=(Get-AutopilotTextHash ([string]$recoveredFacts.preCloseoutFactsHash)) }) -Force
+        }
+        $preCloseoutFactsPath = Join-Path $issueDir 'pre-closeout-facts.json'
+        Write-AutopilotContextJson -Path $preCloseoutFactsPath -Value $closeout.preCloseoutFacts
+        Register-AutopilotIssueMetricObservation -Path $checkpointPath -MetricName reportProjectionCount -ObservationId ([string]$closeout.preCloseoutFacts.preCloseoutFactsHash) | Out-Null
         $script:LastCommit = $closeout.commit
         $result.gitSummary | Add-Member -NotePropertyName commit -NotePropertyValue $closeout.commit -Force
         $result.gitSummary | Add-Member -NotePropertyName implementationCommit -NotePropertyValue $closeout.implementationCommit -Force
@@ -355,7 +478,7 @@ function Invoke-IssueExecutor {
         if ($closeout.scoreShadow) { $result | Add-Member -NotePropertyName taskScoreV2Shadow -NotePropertyValue $closeout.scoreShadow -Force }
         $result.nextAction = 'CHECKPOINT'
         $closeoutDiffHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
-        $checkpoint = Move-AutopilotIssuePhase -Path $checkpointPath -Phase CLOSEOUT_COMMITTED -Evidence @{implementationCommit=[string]$closeout.implementationCommit;closeoutCommit=[string]$closeout.closeoutCommit;diffHash=$closeoutDiffHash}
+        $checkpoint = Move-AutopilotIssuePhase -Path $checkpointPath -Phase CLOSEOUT_COMMITTED -Artifacts @{preCloseoutFactsPath=$preCloseoutFactsPath} -Evidence @{implementationCommit=[string]$closeout.implementationCommit;closeoutCommit=[string]$closeout.closeoutCommit;diffHash=$closeoutDiffHash;preCloseoutFactsHash=[string]$closeout.preCloseoutFacts.preCloseoutFactsHash;reportHash=[string]$closeout.projection.reportHash;evidenceManifestHash=[string]$closeout.preCloseoutFacts.evidenceManifestHash;metricsHash=[string]$closeout.preCloseoutFacts.metricsHash}
         $script:IssuePhase = 'CLOSEOUT_COMMITTED'
         $merged = $false
         if ([bool]$config.autoMerge) {
@@ -366,8 +489,35 @@ function Invoke-IssueExecutor {
         if ($merged) {
           $closeoutKey = Get-AutopilotCloseoutKey -IssueId $Issue.lint.issueId -Commit $closeout.commit -ReportPath $Issue.contract.archiveReport
           $ledgerPath = Join-Path $autoDir 'closeouts.ndjson'
-          Register-AutopilotCloseout -LedgerPath $ledgerPath -Key $closeoutKey | Out-Null
-          if (!(Test-AutopilotCloseoutRegistered -LedgerPath $ledgerPath -Key $closeoutKey)) { throw 'closeout ledger read-back failed' }
+          $graphCursorRequired = $controlPlaneCanaryEnabled -and $null -ne $script:IterationLimit -and [int]$script:IterationLimit -eq 1
+          $graphGitCursor = ''
+          if ($graphCursorRequired) {
+            $graphSnapshot = Get-AutopilotKnowledgeGraphIssueSnapshot -RepoRoot $RepoRoot
+            $mergedHead = (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
+            if (!$graphSnapshot.available -or [string]$graphSnapshot.cursor -ne $mergedHead) { throw "control-plane canary knowledge-graph cursor gate failed: $($graphSnapshot.stopReason) $($graphSnapshot.message)" }
+            $graphGitCursor = [string]$graphSnapshot.cursor
+          }
+          $frozenResultPath = Join-Path $issueDir 'final-result.json'
+          $frozenPayload = [pscustomobject][ordered]@{
+            schemaVersion=1; issueId=[string]$Issue.lint.issueId; outcome='PASSED'; readyContentHash=[string]$Issue.lint.readyContentHash
+            implementationCommit=[string]$closeout.implementationCommit; closeoutCommit=[string]$closeout.closeoutCommit; reportPath=[string]$Issue.contract.archiveReport
+            reportHash=[string]$closeout.projection.reportHash; preCloseoutFactsHash=[string]$closeout.preCloseoutFacts.preCloseoutFactsHash
+            evidenceManifestHash=[string]$closeout.preCloseoutFacts.evidenceManifestHash; metricsSummary=$metricsSummary; metricsHash=[string]$closeout.preCloseoutFacts.metricsHash
+            graphCursorRequired=[bool]$graphCursorRequired; graphGitCursor=$graphGitCursor; finalized=$true
+          }
+          $frozen = Write-AutopilotFrozenResultSnapshot -Path $frozenResultPath -Result $frozenPayload
+          $checkpoint = Move-AutopilotIssuePhase -Path $checkpointPath -Phase CLOSEOUT_COMMITTED -Artifacts @{finalResultPath=$frozenResultPath} -Evidence @{resultHash=[string]$frozen.resultHash;graphGitCursor=$graphGitCursor}
+          $closeoutRecord = [pscustomobject][ordered]@{
+            schemaVersion=2; key=$closeoutKey; issueId=[string]$Issue.lint.issueId; readyContentHash=[string]$Issue.lint.readyContentHash; outcome='PASSED'
+            implementationCommit=[string]$closeout.implementationCommit; closeoutCommit=[string]$closeout.closeoutCommit; reportPath=([string]$Issue.contract.archiveReport).Replace('\','/')
+            reportHash=[string]$closeout.projection.reportHash; resultHash=[string]$frozen.resultHash; preCloseoutFactsHash=[string]$closeout.preCloseoutFacts.preCloseoutFactsHash
+            evidenceManifestHash=[string]$closeout.preCloseoutFacts.evidenceManifestHash; reviewRequired=[bool]$effectiveRoute.reviewRequired; reviewDecision=$reviewDecision
+            verifiedDiffHash=[string]$closeout.preCloseoutFacts.verifiedDiffHash; followupsAdded=[int]$closeout.preCloseoutFacts.followupsAdded; followupsClosed=[int]$closeout.preCloseoutFacts.followupsClosed
+            followupsNetChange=[int]$closeout.preCloseoutFacts.followupsNetChange; metricsSummary=$metricsSummary; metricsHash=[string]$closeout.preCloseoutFacts.metricsHash
+            controlPlaneFingerprint=$closeoutControlFingerprint; graphCursorRequired=[bool]$graphCursorRequired; graphGitCursor=$graphGitCursor
+          }
+          $registration = Register-AutopilotCloseout -LedgerPath $ledgerPath -Record $closeoutRecord
+          if ($registration.status -notin @('REGISTERED','LEGACY_REGISTERED') -or !(Test-AutopilotCloseoutRegistered -LedgerPath $ledgerPath -Key $closeoutKey)) { throw 'closeout ledger read-back failed' }
           if ($script:RetrospectiveActive) {
             $remainingAfterCloseout = if ($null -eq $script:IterationLimit) { $null } else { [Math]::Max(0, [int]$script:RemainingIterations - 1) }
             Add-AutopilotReviewCycleIssue -Path (Join-Path $autoDir 'state.json') -IssueId $Issue.lint.issueId -ScoreKey $closeout.score.key -ScoringVersion $closeout.score.scoringVersion -Threshold ([int]$config.retrospective.threshold) -BoundedBatchRemaining $remainingAfterCloseout | Out-Null
@@ -378,10 +528,7 @@ function Invoke-IssueExecutor {
           Write-State $autoDir 'REGISTERED' $false 'CLOSEOUT_REGISTERED' $Issue.title 'REGISTERED' ''
           $registeredState = Read-AutopilotState -Path (Join-Path $autoDir 'state.json')
           if ([string]$registeredState.issueCheckpointPath -ne $checkpointPath -or [string]$registeredState.currentIssuePhase -ne 'REGISTERED') { throw 'registered AutoPilot state read-back failed' }
-          if ($controlPlaneCanaryEnabled -and $null -ne $script:IterationLimit -and [int]$script:IterationLimit -eq 1) {
-            $graphSnapshot = Get-AutopilotKnowledgeGraphIssueSnapshot -RepoRoot $RepoRoot
-            $mergedHead = (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
-            if (!$graphSnapshot.available -or [string]$graphSnapshot.cursor -ne $mergedHead) { throw "control-plane canary knowledge-graph cursor gate failed: $($graphSnapshot.stopReason) $($graphSnapshot.message)" }
+          if ($graphCursorRequired) {
             $script:LastCanaryFingerprint = $script:ControlPlaneFingerprint
             $script:LastCanaryReport = [string]$Issue.contract.archiveReport
             Write-State $autoDir 'REGISTERED' $false 'CONTROL_PLANE_CANARY_PASSED' $Issue.title 'REGISTERED' ''
@@ -391,7 +538,7 @@ function Invoke-IssueExecutor {
           }
           if ($script:TaskScoringActive -and [string]$config.taskScoring.activeVersion -eq $script:AutopilotTaskScoreVersion -and $config.taskScoring.candidateVersion -eq $script:AutopilotTaskScoreV2CandidateVersion -and $config.taskScoring.candidateEnabled -ne $true) {
             $finalCheckpoint = Read-AutopilotIssueCheckpoint -Path $checkpointPath
-            foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds')) {
+            foreach ($metricName in @('implementationDispatchCount','validationDispatchCount','reviewDispatchCount','repairDispatchCount','closeoutDispatchCount','runResumeCount','phaseRestartCount','manualRecoveryCount','toolConfigBlockCount','environmentRetryCount','duplicateDispatchBlockedCount','wallClockSeconds','executorInvocationCount','reviewerInvocationCount','contextBaseBuildCount','contextDeltaBuildCount','validationExecutedCount','validationReusedCount','reportProjectionCount')) {
               $result | Add-Member -NotePropertyName $metricName -NotePropertyValue (Get-AutopilotCheckpointProperty $finalCheckpoint.metrics $metricName 0) -Force
             }
             $finalV2Evidence = New-AutopilotTaskScoreV2EvidenceFromResult -Result $result -ReportPath (Join-Path $worktree.path $Issue.contract.archiveReport) -ImplementationCommit $closeout.implementationCommit -StockIssueTarget ([bool]$isStockIssue)

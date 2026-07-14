@@ -6,6 +6,8 @@ param(
   [string]$ReadyPath = "",
   [string]$RunId = "",
   [string]$ContextPath = "",
+  [string]$ContextBasePath = "",
+  [string]$ContextDeltaPath = "",
   [string]$Model = "",
   [string]$Thinking = "",
   [string]$ExecutorRole = "",
@@ -22,6 +24,8 @@ $commandLibrary = Join-Path $PSScriptRoot 'autopilot-command.ps1'
 if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
 $nativeCommandLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
 if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
+$metricsLibrary = Join-Path $PSScriptRoot 'autopilot-metrics.ps1'
+if (!(Get-Command New-AutopilotInvocationId -ErrorAction SilentlyContinue)) { . $metricsLibrary }
 
 function Read-JsonFile {
   param([string]$Path)
@@ -236,7 +240,12 @@ function New-IssuePromptFile {
   )
 
   $promptPath = Join-Path $RunDir "issue-prompt.md"
-  $contextInstruction = if ($ContextPath) { "只读取并遵守上下文包：$ContextPath" } else { "任务正文：`n$($Issue.body)" }
+  if (($ContextBasePath -and !$ContextDeltaPath) -or (!$ContextBasePath -and $ContextDeltaPath)) { throw 'context base and delta must be supplied together' }
+  $contextInstruction = if ($ContextBasePath) {
+    "只读取并遵守不可变基础上下文：$ContextBasePath`n只读取并遵守本阶段增量上下文：$ContextDeltaPath`n发生冲突时停止并报告，不得自行合并矛盾身份。"
+  } elseif ($ContextPath) {
+    "只读取并遵守兼容版 v2 上下文包：$ContextPath"
+  } else { "任务正文：`n$($Issue.body)" }
   @"
 你是被 AutoPilot 明确派工的执行智能体，不是主线程；在本 Ready Issue 范围内可以执行授权动作。
 
@@ -263,7 +272,10 @@ function Invoke-ExecutorProcess {
     [string]$WorkingDirectory,
     [string]$StdinPath,
     [string]$LogPath,
-    [int]$TimeoutSeconds
+    [int]$TimeoutSeconds,
+    [Parameter(Mandatory)][string]$IssueId,
+    [Parameter(Mandatory)][string]$RunId,
+    [Parameter(Mandatory)][string]$RunDir
   )
 
   function Quote-ProcessArgument {
@@ -299,6 +311,9 @@ function Invoke-ExecutorProcess {
 
   $startedAt = Get-Date -Format o
   [void]$process.Start()
+  $invocationId = New-AutopilotInvocationId -Role EXECUTOR -Scope ISSUE -ScopeId $IssueId -ProcessId $process.Id -StartedAt $startedAt
+  $invocationEvent = New-AutopilotModelInvocationEvent -Role EXECUTOR -Scope ISSUE -ScopeId $IssueId -InvocationId $invocationId -IssueId $IssueId -RunId $RunId -ProcessId $process.Id -StartedAt $startedAt
+  Write-RunEvent -RunDir $RunDir -Event 'model.invocation' -Data $invocationEvent
   $stdoutTask = $process.StandardOutput.ReadToEndAsync()
   $stderrTask = $process.StandardError.ReadToEndAsync()
 
@@ -337,6 +352,7 @@ function Invoke-ExecutorProcess {
   return [pscustomobject]@{
     exitCode = if ($timedOut) { 124 } else { [int]$process.ExitCode }
     timedOut = $timedOut
+    invocationId = $invocationId
   }
 }
 
@@ -408,7 +424,10 @@ function Invoke-ConfiguredIssueExecutor {
       -WorkingDirectory $RepoRoot `
       -StdinPath $stdinPath `
       -LogPath $logPath `
-      -TimeoutSeconds $timeoutSeconds
+      -TimeoutSeconds $timeoutSeconds `
+      -IssueId $Issue.issueId `
+      -RunId $RunId `
+      -RunDir $RunDir
     $exitCode = [int]$processResult.exitCode
   } catch {
     $_.Exception.Message | Out-File -Encoding utf8 $logPath
@@ -517,6 +536,7 @@ function Write-RunEvent {
 
   $eventPath = Join-Path $RunDir "events.jsonl"
   $payload = [ordered]@{
+    runId = $runId
     timestamp = Get-Date -Format o
     event = $Event
     mode = if ($DryRun) { "dry-run" } elseif ($Noop) { "noop" } else { "execute" }
