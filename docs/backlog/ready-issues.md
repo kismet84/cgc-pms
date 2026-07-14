@@ -1453,3 +1453,77 @@ Reviewer要求：独立 Reviewer 必须按高风险金额写入裁决，复核 `
 - health gate 与 dev-login 通过；真实浏览器完成月份/月末展示、二次确认、成功回读、重复执行幂等提示，并以临时仅具 `cost:ledger:query` 的普通用户证明页面可达但执行入口 DOM 数量为 0。验收专用零金额规则、执行事实、临时角色关系、成本与审计已按固定 ID/时间窗精确清理并读回零残留；控制器专项同时证明无执行权限直接调用返回 403。
 - `A-01-OVERHEAD-EXECUTE` 已从 `docs/backlog/current-issues.json` 移除；A-01 守恒更新为有用户入口230、前端调用但无独立页面58、内部/集成/运维4、需补入口18、待废弃0、需要确认11，共321。
 - 正式报告：`docs/quality/ISSUE-040-024-间接费执行分摊用户入口与金额安全边界验收报告.md`。新增后续项0、关闭后续项1（`A-01-OVERHEAD-EXECUTE`）、后续项净变化-1；未新增阻塞项，独立 Reviewer 已对绑定 diff 给出 `PASS`，发现项0。
+
+### ISSUE-040-025：系统角色新建管理员入口与权限边界
+
+优先级：P0
+任务性质：缺口修复
+类型：系统管理 / 角色新建入口 / 权限 / 租户隔离 / 越权防护
+状态：Ready
+来源锚点：正式唯一问题载体 `docs/backlog/current-issues.json` 的 `A-01-ROLE-CREATE`；其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；并引用 `docs/product-intelligence/project-map.md` 与 `docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-13-02`；candidateEvidenceHead=8cf39ab3b46ffbf9036db62593a01322cb4c3923
+存量问题键：[stock:A-01-ROLE-CREATE]
+关联产品目标：在既有管理员角色管理页让管理员可达已实现的角色新建能力，关闭 A-01 中 `POST /system/roles` 后端存在但用户不可达的最小叶子缺口；创建结果必须是当前租户内、无菜单权限的普通自定义角色，后续授权继续走既有独立入口。
+核验结论：问题仍存在——当前前端系统 API 只有 `GET /system/roles` 与 `PUT /system/roles/{id}/menus`，角色页只有列表和编辑权限，没有 POST 新建调用或交互；用户价值明确——管理员无需后台调用即可建立待授权角色；验收可执行——既有角色页、Controller、Service、菜单集合、前后端专项测试和 dev-login 均有真实入口；依赖已满足——复用现有角色表、租户上下文、角色列表和独立菜单授权链，不依赖角色修改或删除入口；去重通过——唯一台账中该项为 `OPEN`、`STILL_APPLICABLE`、`blocking=false` 的 P0 叶子，Ready/Done/Blocked 无相同 marker 或同接口任务。
+检索交叉核验：CodeGraph 与 codebase-memory 命中后端 POST 路由、角色服务、前端角色列表和既有菜单授权函数，但没有命中前端创建函数；codebase-memory 的精确文本补查出现零召回，已按工具召回不足使用当前分支精确 `rg` 和直接文件读取确认。当前 HEAD 与候选取证提交一致。
+阻塞证据：`SysRoleController.create` 已由 ADMIN/SUPER_ADMIN 或 `system:role:add` 保护并返回新角色 ID，但前端无入口；同时现有实体直绑允许客户端提交 roleType、dataScope 和 roleLevel，Service 仅补 status/tenantId，未拒绝保留角色编码或低等级角色伪造。开放用户入口前必须在同一切片内证明新角色初始菜单集合为空，并拒绝通过创建载荷伪造 ADMIN/SUPER_ADMIN、SYSTEM 或 roleLevel 0/1。
+解除条件：既有 admin-only 角色管理页提供受控新建入口，精确调用现有 POST 并刷新列表；后端保持 `system:role:add` 授权和认证租户边界，将创建对象收敛为普通自定义角色且初始菜单集合为空；管理员、显式权限、无权限、未登录、保留角色伪造与跨租户注入的正负样本全部通过。
+Migration：不需要
+依赖：复用既有 `/system/roles` 页面、`SysRoleVO`、系统 API request、`SysRoleController.create`、`SysRoleService.create`、`UserContext`、角色表默认值和现有角色/菜单测试夹具；创建与菜单授权保持两步边界，不新增表、路由、侧栏、权限码、角色种子或后端接口。
+风险等级：高
+运行态要求：自动化只在 local/dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，任一失败先归类为环境前置并 runtime refresh，稳定等待 180 秒后复验；从 dev-login 进入 `/system/roles` 验证新建、失败保留与成功刷新。运行态只创建本 Issue 唯一测试角色；删除或重置测试数据必须同时满足 dev/test/demo、数据库 host 为 localhost/127.0.0.1 和 `.codex-autopilot/ALLOW_TEST_DATA_RESET`，否则不得清理并应判定收口未完成。不得连接或发布生产。
+Reviewer要求：独立 Reviewer 按高风险权限变更复核 ADMIN/SUPER_ADMIN 与 `system:role:add` 授权未放宽、无权限 403、未登录 401、前端入口仍受父路由 admin-only 且仅 ADMIN/SUPER_ADMIN 可见；复核请求中的 id、tenantId、roleLevel、SYSTEM 类型、保留角色编码和菜单集合不能造成提权，创建结果固定为普通自定义角色、认证租户、允许的数据范围且 menuIds 为空；复核角色编码唯一性、失败不伪报成功、既有编辑权限链不回退，并对绑定 diff 给出 PASS/NEEDS_REPAIR。
+归档报告：`docs/quality/ISSUE-040-025-系统角色新建管理员入口与权限边界验收报告.md`
+最小回滚：回退本 Issue 的前端创建 API、类型、角色页表单、Service 创建收敛及对应测试；不删除已有角色或权限数据，不回退既有角色列表和菜单授权能力，无 schema 或数据迁移回滚。
+目标：
+- 在前端系统 API 增加类型化角色创建调用，只发送 roleCode、roleName、status 和 dataScope 等允许的普通角色业务字段，精确调用 `POST /system/roles` 并返回角色 ID。
+- 在既有 admin-only 角色管理页增加“新建角色”交互，仅 ADMIN/SUPER_ADMIN 可见；校验必填和长度，提交失败保留表单并显示后端错误，成功关闭表单、刷新列表且不自动授予菜单权限。
+- 收敛后端创建路径，拒绝 ADMIN/SUPER_ADMIN 等保留编码、SYSTEM 类型和 roleLevel 0/1 伪造；tenantId 必须来自认证上下文，新建角色固定为普通可编辑等级，省略值使用安全默认，初始角色菜单集合为空。
+- 补齐 Controller/Service 与前端 API/页面正负样本，证明 `system:role:add`、未授权拒绝、租户注入无效、权限集合为空和既有菜单授权入口不回退。
+非目标：
+- 不实现角色详情、修改、删除、复制、批量创建或完整角色 CRUD 重构，不新增页面路由、侧栏项、角色或默认授权。
+- 不把创建与菜单授权合并为新的原子接口，不在创建时自动授予任何菜单，不放宽或重构既有 `system:role:assign`、高危权限 diff、自角色保护或超级管理员保护规则。
+- 不修改用户分配角色、菜单管理、认证/JWT、动态路由、数据库 schema 或种子数据，不修改已应用 migration，不连接生产数据库、不发布生产、不自动 push。
+允许修改：
+- `frontend-admin/src/api/modules/system.ts`
+- `frontend-admin/src/api/modules/__tests__/system-modules.test.ts`
+- `frontend-admin/src/types/system.ts`
+- `frontend-admin/src/pages/system/roles/index.vue`
+- `frontend-admin/src/pages/system/roles/__tests__/index.test.ts`
+- `backend/src/main/java/com/cgcpms/system/service/SysRoleService.java`
+- `backend/src/test/java/com/cgcpms/system/SysRoleControllerTest.java`
+- `backend/src/test/java/com/cgcpms/system/SysRoleServiceTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-040-025-系统角色新建管理员入口与权限边界验收报告.md`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/system/controller/**`
+- `backend/src/main/java/com/cgcpms/system/entity/**`
+- `backend/src/main/java/com/cgcpms/system/mapper/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/pages/system/permissions/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 前端 API 测试精确断言创建调用为 `POST /system/roles`，载荷不含 id、tenantId、roleLevel、menuIds、审计或逻辑删除字段；页面测试覆盖 ADMIN/SUPER_ADMIN 可见、普通用户不可见、普通用户即使仅持 `system:role:add` 仍因 admin-only 页面不可见、必填/长度校验、重复编码失败保留、成功关闭并刷新。
+- 管理员或仅持 `system:role:add` 的已认证请求可创建安全的普通自定义角色；既非管理员也无该权限返回 403，未登录返回 401。前端 admin-only 可见性与后端细粒度授权分别留证，不混为同一边界。
+- 请求体中的 id 和 tenantId 不能覆盖服务端事实；roleCode 为 ADMIN/SUPER_ADMIN、roleType 为 SYSTEM、roleLevel 为 0/1 或其他等价提权载荷均 fail-close，且不得插入角色或角色菜单关系。合法创建固定 roleType=CUSTOM、roleLevel=2，status 省略时为 ENABLE，dataScope 省略时为 SELF。
+- 合法创建返回 ID，并能从当前租户列表回读 roleCode、roleName、CUSTOM、ENABLE、SELF 和空 menuIds；另一租户不可见。创建不得隐式调用菜单授权或写入 sys_role_menu，后续仍只能通过既有编辑权限入口和 `system:role:assign` 边界授权。
+- 重复角色编码仍返回 `ROLE_CODE_EXISTS` 且无部分写入；既有角色列表、编辑权限、高危系统权限拒绝、自角色保护、超级管理员保护和授权审计测试不回退。
+- 收口必须引用 `docs/backlog/current-issues.json` 及该条目的 `sourceRefs`；全部验证通过后移除 `A-01-ROLE-CREATE`，未完全通过则用证据更新其唯一状态或分类，禁止 Done 后仍保留原 OPEN。通过时同步更新 A-01 守恒为有用户入口 231、前端调用但无独立页面 58、内部/集成/运维 4、需补入口 17、待废弃 0、需要确认 11、总数 321，并回写 Ready、current-focus、project-map；若差距或优先级判断变化，再更新 evolution-decision。
+- 归档报告统计新增后续项、关闭后续项和后续项净变化；所有发现项必须本轮修复、唯一载体承接或有依据关闭，存在悬空项不得通过。权限、租户、初始权限集合、越权拒绝或运行态清理证据不足时判不通过并正式写入唯一阻塞载体。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint 和 `git diff --check` 全部通过；首次失败先按 tool_config、环境前置、真实质量/安全分类并复验。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-025`
+- `cd backend; .\mvnw.cmd "-Dtest=SysRoleControllerTest,SysRoleServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/system-modules.test.ts src/pages/system/roles/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/system.ts src/types/system.ts src/pages/system/roles/index.vue src/pages/system/roles/__tests__/index.test.ts`
+- `git diff --check`
