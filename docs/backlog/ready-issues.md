@@ -4,14 +4,14 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前 Ready 为 `ISSUE-040-028`。该任务来自健康且 Git 游标覆盖当前 HEAD 的知识图谱 P0 叶子问题 `A-01-ROLE-UPDATE`，按串行模式实施。
+`ISSUE-040-028` 已完成，当前无待实施 Ready；连续迭代将在知识图谱刷新并通过 checkpoint 后补货。
 
 ### ISSUE-040-028：系统角色修改管理员入口与安全边界
 
 优先级：P0
 任务性质：缺口修复
 类型：系统管理 / 角色修改入口 / 权限 / 租户隔离 / 字段白名单 / 越权防护
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `A-01-ROLE-UPDATE`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=e6ac6994b121a4eb980ef167dd6fdb59269bce59
 存量问题键：[stock:A-01-ROLE-UPDATE]
 关联产品目标：在既有 admin-only 角色管理页让管理员可达已实现的角色修改能力，并把现有实体直绑更新收敛为当前租户普通自定义角色的字段白名单更新，关闭 A-01 中 `PUT /system/roles/{id}` 的最小叶子缺口。
