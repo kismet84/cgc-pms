@@ -4,14 +4,14 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-028` 已完成；`ISSUE-040-029` 已由知识图谱存量问题补货，等待本轮实施与验收。
+`ISSUE-040-029` 已完成，当前无待实施 Ready；连续迭代将在知识图谱刷新并通过 checkpoint 后继续补货。
 
 ### ISSUE-040-029：共享列表中窄视口表格高度链修复
 
 优先级：P1
 任务性质：缺口修复
 类型：前端 / 共享列表布局 / 响应式 / 表格可达性 / 跨页面回归
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `UI-ROLE-RESPONSIVE-TABLE-ZERO-HEIGHT`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-040-027-系统角色删除管理员入口与安全边界验收报告.md`；本轮又在 `ISSUE-040-028` 真实浏览器验收中稳定复现。
 存量问题键：[stock:UI-ROLE-RESPONSIVE-TABLE-ZERO-HEIGHT]
 关联产品目标：恢复共享 `lg-list-page` 在中窄视口下的表格可见性与操作可达性，使角色管理及同布局页面在响应式断点内仍能完成列表读取与行操作。
