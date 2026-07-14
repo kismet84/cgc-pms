@@ -4,9 +4,10 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $runner = Join-Path $scriptDir 'autopilot-run-continuous.ps1'
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-repair-' + [guid]::NewGuid().ToString('N'))
-$backlog = Join-Path $root 'docs\backlog'; $scripts = Join-Path $root 'scripts\codex-autopilot'; $autoDir = Join-Path $root '.codex-autopilot'
-New-Item -ItemType Directory -Path $backlog,$scripts,$autoDir -Force | Out-Null
+$backlog = Join-Path $root 'docs\backlog'; $scripts = Join-Path $root 'scripts\codex-autopilot'; $autoDir = Join-Path $root '.codex-autopilot'; $policyDir = Join-Path $root 'plugins\cgc-pms-autopilot\references'
+New-Item -ItemType Directory -Path $backlog,$scripts,$autoDir,$policyDir -Force | Out-Null
 try {
+  "# Fixture Policy`n`nPolicy-Version: 1`nStatus: active" | Set-Content -LiteralPath (Join-Path $policyDir 'control-plane-policy.md') -Encoding UTF8
   $tick = [char]96
   @"
 # Ready Issues
@@ -43,7 +44,7 @@ param([string]$RepoRoot,[string]$IssueId,[string]$PromptPath)
 $quality = Join-Path $RepoRoot 'docs\quality'; New-Item -ItemType Directory -Path $quality -Force | Out-Null
 $attemptPath = Join-Path $quality 'attempt.txt'; $attempt = if (Test-Path $attemptPath) { [int](Get-Content $attemptPath -Raw) + 1 } else { 1 }
 $attempt | Set-Content -LiteralPath $attemptPath -Encoding ascii
-"repair $attempt" | Set-Content -LiteralPath (Join-Path $quality 'issue-991-001.md') -Encoding UTF8
+"# Repair $attempt`n`n新增后续项：0`n关闭后续项：0`n后续项净变化：0" | Set-Content -LiteralPath (Join-Path $quality 'issue-991-001.md') -Encoding UTF8
 '@ | Set-Content -LiteralPath (Join-Path $scripts 'mock-executor.ps1') -Encoding UTF8
   @'
 $attempt = [int](Get-Content -LiteralPath 'docs\quality\attempt.txt' -Raw)

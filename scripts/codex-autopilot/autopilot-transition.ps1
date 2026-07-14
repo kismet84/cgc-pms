@@ -103,6 +103,27 @@ $script:AutopilotIssuePhaseTransitions = @{
   QUARANTINED = @()
 }
 
+function Move-AutopilotRunPhase {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][ValidateSet('DISABLED','IDLE','CHECKPOINT','REFILLING','SELECTING','PLANNING','EXECUTING','VERIFYING','REVIEWING','REPAIRING','CLOSING','COMMITTING','MERGING','PAUSED','BLOCKED','RETROSPECTIVE_REQUIRED','LIMIT_REACHED','STOPPED','FAILED')][string]$Status,
+    [Parameter(Mandatory)][string]$Phase,
+    [string]$Reason = ''
+  )
+  $before = Read-AutopilotState -Path $Path
+  $from = [string]$before.status
+  $written = Move-AutopilotState -Path $Path -ToStatus $Status -Phase $Phase -Reason $Reason
+  $readBack = Read-AutopilotState -Path $Path
+  if ([string]$readBack.status -ne $Status -or [string]$readBack.phase -ne $Phase -or [string]::IsNullOrWhiteSpace([string]$readBack.transitionId) -or [int]$readBack.generation -le [int]$before.generation) {
+    throw "AutoPilot Run transition read-back failed: $from -> $Status"
+  }
+  if ([string]$written.transitionId -ne [string]$readBack.transitionId -or [int]$written.generation -ne [int]$readBack.generation) {
+    throw "AutoPilot Run transition identity mismatch: $from -> $Status"
+  }
+  return $readBack
+}
+
 function Move-AutopilotIssuePhase {
   [CmdletBinding()]
   param(

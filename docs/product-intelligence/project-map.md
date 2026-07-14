@@ -1,5 +1,12 @@
 # CGC-PMS 项目地图
 
+## 2026-07-14 增量：AutoPilot 分层补货、同轮续跑与策略契约
+
+- Ready 为空时，排名第一且携带完整权威 ReadySpec 的存量候选可确定性生成一条 Ready；不完整候选继续走有界语义 Planner。Planner v2 必须逐候选给出 CREATED/REJECTED/BLOCKED，允许零 Ready 安全结束。
+- 补货提交后不再固定退出：RUN 作用域 StageResult 与唯一 transition writer 完成 `transitionId + generation` 写后读回，同一 run 重新经过 checkpoint 后可选择新 Ready。候选证据提交和实施基线提交保持独立。
+- AutoPilot 行为策略已从主线负责人 Skill 拆到 `plugins/cgc-pms-autopilot/references/control-plane-policy.md`，策略版本与哈希纳入控制面指纹、运行上下文、阶段上下文和结果证据；动态版本、权重、阈值、模型和超时继续由配置、Schema 与批准来源承担。
+- 自动化控制面与兼容矩阵通过；真实单 Issue 金丝雀仍是新指纹允许 N>1/无界放量前的用户授权门。
+
 ## 2026-07-14 增量：AutoPilot 控制面模块化与状态机瘦身
 
 - 第43条主线将原 1725 行连续 Runner 拆为薄入口、显式 RuntimeContext、run coordinator、Issue lifecycle、Executor supervisor、StageResult 和 transition writer；Ready、恢复、Reviewer、评分、stop/pause 与两阶段收口语义不变。

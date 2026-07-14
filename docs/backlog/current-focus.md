@@ -1,5 +1,13 @@
 # Current Focus
 
+## 2026-07-14 第44条主线：AutoPilot 分层补货与同轮续跑
+
+- 存量候选新增权威 ReadySpec 确定性快路径；字段、来源、范围、验证入口或候选证据提交不完整时降级到有界 Planner，不推断补值。Ready Plan v2 对每个候选强制记录 CREATED、REJECTED 或 BLOCKED，零 Ready 合法且不写 backlog。
+- Planner 硬超时收敛到配置的 300 秒并维护独立心跳；补货创建 Ready 后通过 RUN 级 transition writer 写后读回，再在同一 run 重新检查 stop/pause、回顾与迭代上限后选单。
+- StageResult v2 区分 RUN/ISSUE，并兼容读取 v1；`candidateEvidenceHead` 与 `executionBaseCommit` 分离绑定，策略版本/哈希/引用进入指纹、RuntimeContext、context pack 和 StageResult。
+- 主线负责人 Skill 已收窄为明确主线/Backlog/AutoPilot/正式裁决/跨模块收口场景；动态评分、阈值、模型和超时改从配置、Schema 与批准来源读取，AutoPilot 专项行为统一引用插件策略契约。
+- 自动化验收通过，未启动真实 Ready、未提交、未 push。控制面指纹已变化，N>1/无界放量仍阻塞于用户另行明确启动并成功收口一次单 Issue 金丝雀。
+
 ## 2026-07-14 第43条主线：AutoPilot 控制面模块化与状态机瘦身
 
 - 控制面入口已瘦身为参数、PowerShell 7 门禁和协调器调用；运行上下文、run 协调、Issue 生命周期、Executor 监管、阶段结果与 transition writer 已分离，外部命令行与第42-1安全语义保持兼容。

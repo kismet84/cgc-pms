@@ -3,6 +3,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-state.ps1')
+. (Join-Path $scriptDir 'autopilot-transition.ps1')
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('autopilot-state-test-' + [guid]::NewGuid().ToString('N'))
 $statePath = Join-Path $tempRoot 'state.json'
@@ -50,6 +51,9 @@ try {
   $moved = Move-AutopilotState -Path $statePath -ToStatus 'CHECKPOINT' -Phase 'checkpoint' -Reason 'test'
   if ($moved.status -ne 'CHECKPOINT') { throw 'legal transition failed' }
   if ([datetimeoffset]$moved.lastHeartbeatAt -le $oldHeartbeat) { throw 'heartbeat was not refreshed' }
+  Move-AutopilotRunPhase -Path $statePath -Status REFILLING -Phase 'refill' -Reason 'test refill' | Out-Null
+  $runTransition = Move-AutopilotRunPhase -Path $statePath -Status CHECKPOINT -Phase 'refill-complete' -Reason 'same-run continuation'
+  if ($runTransition.status -ne 'CHECKPOINT' -or $runTransition.phase -ne 'refill-complete' -or !$runTransition.transitionId) { throw 'Run transition writer did not read back same-run continuation' }
 
   $illegalRejected = $false
   try { Move-AutopilotState -Path $statePath -ToStatus 'MERGING' -Phase 'merge' -Reason 'illegal' | Out-Null } catch { $illegalRejected = $true }

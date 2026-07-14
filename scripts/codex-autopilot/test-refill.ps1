@@ -22,17 +22,26 @@ try {
     return [pscustomobject]@{
       available = $true
       source = 'knowledge-graph'
-      head = 'test-head'
-      cursor = 'test-head'
+      head = ('a' * 40)
+      cursor = ('a' * 40)
       refreshed = $false
       issues = @($script:GraphIssues)
     }
   }
-  function New-StockIssue([string]$Key,[string]$Title,[string]$Status,[string]$Classification,[string]$Priority,[bool]$Blocking,[string]$Parent = '') {
+  function New-StockIssue([string]$Key,[string]$Title,[string]$Status,[string]$Classification,[string]$Priority,[bool]$Blocking,[string]$Parent = '',[object]$ReadySpec = $null) {
     return [ordered]@{
       issueKey = $Key; title = $Title; status = $Status; classification = $Classification
       priority = $Priority; blocking = $Blocking; parentIssueKey = if ($Parent) { $Parent } else { $null }
       summary = "Summary for $Key"; acceptanceCriteria = "Acceptance for $Key"; sourceRefs = @('docs/backlog/current-focus.md')
+      readySpec = $ReadySpec
+    }
+  }
+  function New-ReadySpec([string]$Id) {
+    return [ordered]@{
+      readyIssueId = $Id; taskNature = '缺口修复'; goal = @('Close the verified gap.'); nonGoals = @('No production deployment.')
+      allowedPaths = @('docs/quality/**'); forbiddenPaths = @('deploy/**'); acceptanceCriteria = @('Evidence is recorded.')
+      validationCommands = @('git diff --check'); archiveReport = "docs/quality/$($Id.ToLowerInvariant()).md"; migration = '不需要'
+      dependencies = '无'; riskLevel = '低'; runtimeRequirement = '无'; reviewerRequirement = '不需要'
     }
   }
 
@@ -61,6 +70,23 @@ try {
   if ($decision.candidates[0].issueKey -ne 'A-01-LEAF' -or $decision.candidates[0].source -ne 'knowledge-graph') { throw 'knowledge graph issue priority or aggregate/release/confirmation filtering failed' }
   if ($decision.candidates[0].marker -ne '[stock:A-01-LEAF]') { throw 'stock issue marker was not preserved for deduplication' }
 
+  Write-CurrentIssues @((New-StockIssue 'FAST-01' 'Fast stock leaf' 'OPEN' 'STILL_APPLICABLE' 'P0' $false '' (New-ReadySpec 'ISSUE-901-010')))
+  $fastDecision = Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot (Get-TestKnowledgeGraphSnapshot)
+  if ($fastDecision.action -ne 'GENERATE_READY' -or $fastDecision.candidates[0].candidateEvidenceHead -ne ('a' * 40)) { throw 'authoritative ReadySpec did not select deterministic fast path' }
+  $fastPlanA = New-AutopilotDeterministicReadyPlan -Candidate $fastDecision.candidates[0] -RepoRoot $root
+  $fastPlanB = New-AutopilotDeterministicReadyPlan -Candidate $fastDecision.candidates[0] -RepoRoot $root
+  if (($fastPlanA | ConvertTo-Json -Depth 8 -Compress) -cne ($fastPlanB | ConvertTo-Json -Depth 8 -Compress)) { throw 'deterministic Ready generation was not byte stable' }
+  if ($fastPlanA.readyBlocks[0] -notmatch 'candidateEvidenceHead=' + ('a' * 40)) { throw 'candidate evidence head was not bound into generated Ready' }
+  $fastDurations = @(1..10 | ForEach-Object {
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    $iterationPlan = New-AutopilotDeterministicReadyPlan -Candidate $fastDecision.candidates[0] -RepoRoot $root
+    $watch.Stop()
+    if (($iterationPlan | ConvertTo-Json -Depth 8 -Compress) -cne ($fastPlanA | ConvertTo-Json -Depth 8 -Compress)) { throw 'repeated deterministic Ready generation drifted' }
+    $watch.Elapsed.TotalSeconds
+  } | Sort-Object)
+  $medianFastSeconds = ($fastDurations[4] + $fastDurations[5]) / 2
+  if ($medianFastSeconds -gt 10 -or $fastDurations[-1] -gt 30) { throw "deterministic refill performance budget exceeded: median=$medianFastSeconds max=$($fastDurations[-1])" }
+
   Write-CurrentIssues @(
     (New-StockIssue 'REL-GATE' 'Production release gate' 'RELEASE_GATE' 'RELEASE_PREREQUISITE' 'P0' $true),
     (New-StockIssue 'NEEDS-HUMAN' 'Needs human confirmation' 'NEEDS_CONFIRMATION' 'NEEDS_CONFIRMATION' 'P0' $false)
@@ -87,6 +113,7 @@ try {
   if ($unblockDecision.targetReadyCount -ne 1) { throw 'blocked prerequisite still forced a three-item target' }
   if (Test-AutopilotReadyPlanningAllowed -Action 'UNBLOCK_FIRST') { throw 'blocked prerequisite was allowed into Ready Planner' }
   if (!(Test-AutopilotReadyPlanningAllowed -Action 'PLAN_READY')) { throw 'normal candidate refill was rejected' }
+  if (!(Test-AutopilotReadyPlanningAllowed -Action 'GENERATE_READY')) { throw 'deterministic candidate refill was rejected' }
 
   $titles = @('报表中心 A','报表中心 B','报表中心 C')
   if (Test-AutopilotDomainContinuationAllowed -RecentTitles $titles -Domain '报表中心' -FocusText '继续做报表') { throw 'three-item domain streak skipped candidate comparison' }
@@ -138,6 +165,8 @@ Reviewer要求：不需要
   & git -C $root init -q 2>$null
   & git -C $root config user.email 'kg-refill@test.local'
   & git -C $root config user.name 'KG Refill Test'
+  & git -C $root config core.autocrlf false
+  & git -C $root config core.eol lf
   & git -C $root add .
   & git -C $root commit -qm 'fixture'
   $testHead = (& git -C $root rev-parse HEAD).Trim()
@@ -168,18 +197,34 @@ Reviewer要求：不需要
   if ($environmentStop.stopReason -ne 'STOP_KG_REFILL_UNAVAILABLE' -or $environmentStop.failureCategory -ne 'environment_prereq') { throw 'Neo4j outage was not classified as environment prerequisite' }
 
   $planPath = Join-Path $root 'ready-plan.json'
-  [ordered]@{ readyBlocks = @((New-PlannedBlock 'ISSUE-901-001'),(New-PlannedBlock 'ISSUE-901-002'),(New-PlannedBlock 'ISSUE-901-003')) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $planPath -Encoding UTF8
-  $imported = Import-AutopilotReadyPlan -PlanPath $planPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root
+  [ordered]@{ schemaVersion = 2; candidateDecisions = @(
+      [ordered]@{ candidateRef='candidate-1'; outcome='CREATED'; reason='valid'; readyIssueId='ISSUE-901-001' },
+      [ordered]@{ candidateRef='candidate-2'; outcome='CREATED'; reason='valid'; readyIssueId='ISSUE-901-002' },
+      [ordered]@{ candidateRef='candidate-3'; outcome='CREATED'; reason='valid'; readyIssueId='ISSUE-901-003' }
+    ); readyBlocks = @((New-PlannedBlock 'ISSUE-901-001'),(New-PlannedBlock 'ISSUE-901-002'),(New-PlannedBlock 'ISSUE-901-003')) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $planPath -Encoding UTF8
+  $imported = Import-AutopilotReadyPlan -PlanPath $planPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root -ExpectedCandidateRefs @('candidate-1','candidate-2','candidate-3')
   if ($imported.createdCount -ne 3) { throw 'validated planner output was not imported' }
   $invalidPlanPath = Join-Path $root 'invalid-ready-plan.json'
-  [ordered]@{ readyBlocks = @((New-PlannedBlock 'ISSUE-901-004').Replace('状态：Ready','状态：Blocked')) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $invalidPlanPath -Encoding UTF8
+  [ordered]@{ schemaVersion=2; candidateDecisions=@([ordered]@{candidateRef='candidate-4';outcome='CREATED';reason='invalid block';readyIssueId='ISSUE-901-004'}); readyBlocks = @((New-PlannedBlock 'ISSUE-901-004').Replace('状态：Ready','状态：Blocked')) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $invalidPlanPath -Encoding UTF8
   $blockedRejected = $false
   try { Import-AutopilotReadyPlan -PlanPath $invalidPlanPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root | Out-Null } catch { $blockedRejected = $true }
   if (!$blockedRejected) { throw 'Planner Blocked block was imported into Ready backlog' }
-  [ordered]@{ readyBlocks = @((New-PlannedBlock 'ISSUE-901-005') + "`r`n" + (New-PlannedBlock 'ISSUE-901-006').Replace('状态：Ready','状态：Blocked')) } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $invalidPlanPath -Encoding UTF8
+  [ordered]@{ schemaVersion=2; candidateDecisions=@([ordered]@{candidateRef='candidate-5';outcome='CREATED';reason='mixed block';readyIssueId='ISSUE-901-005'}); readyBlocks = @((New-PlannedBlock 'ISSUE-901-005') + "`r`n" + (New-PlannedBlock 'ISSUE-901-006').Replace('状态：Ready','状态：Blocked')) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $invalidPlanPath -Encoding UTF8
   $mixedRejected = $false
   try { Import-AutopilotReadyPlan -PlanPath $invalidPlanPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root | Out-Null } catch { $mixedRejected = $true }
   if (!$mixedRejected) { throw 'mixed multi-Issue Planner block was imported' }
+
+  [ordered]@{ schemaVersion=2; candidateDecisions=@([ordered]@{candidateRef='candidate-r';outcome='REJECTED';reason='duplicate'}); readyBlocks=@() } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $invalidPlanPath -Encoding UTF8
+  $rejected = Import-AutopilotReadyPlan -PlanPath $invalidPlanPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root -ExpectedCandidateRefs @('candidate-r')
+  if ($rejected.createdCount -ne 0) { throw 'REJECTED-only planner result created Ready content' }
+  [ordered]@{ schemaVersion=2; candidateDecisions=@([ordered]@{candidateRef='candidate-b';outcome='BLOCKED';reason='runtime unavailable';failureCategory='environment_prereq'}); readyBlocks=@() } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $invalidPlanPath -Encoding UTF8
+  $blocked = Import-AutopilotReadyPlan -PlanPath $invalidPlanPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root -ExpectedCandidateRefs @('candidate-b')
+  if ($blocked.createdCount -ne 0) { throw 'BLOCKED-only planner result created Ready content' }
+  if ((Get-AutopilotRefillStageFailureCategory -CandidateDecisions $blocked.candidateDecisions) -ne 'environment_prereq') { throw 'blocked Planner category was not preserved for StageResult' }
+  if ((Get-AutopilotRefillStageFailureCategory -CandidateDecisions @([pscustomobject]@{outcome='BLOCKED';failureCategory='needs_confirmation'})) -ne 'ready_issue_config') { throw 'needs_confirmation was not mapped into the stable StageResult category set' }
+  $candidateMismatchRejected = $false
+  try { Import-AutopilotReadyPlan -PlanPath $invalidPlanPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root -ExpectedCandidateRefs @('different-candidate') | Out-Null } catch { $candidateMismatchRejected = $true }
+  if (!$candidateMismatchRejected) { throw 'planner decision escaped the bounded candidate set' }
 
   Write-Host 'refill self-test passed'
 } finally {

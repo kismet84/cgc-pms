@@ -1,14 +1,47 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cgc-pms.local/plugins/cgc-pms-autopilot/schemas/ready-plan.schema.json",
-  "title": "CGC PMS AutoPilot Ready Planner Result",
+  "title": "CGC PMS AutoPilot Ready Planner Result v2",
   "type": "object",
   "additionalProperties": false,
-  "required": ["readyBlocks"],
+  "required": ["schemaVersion", "candidateDecisions", "readyBlocks"],
   "properties": {
-    "readyBlocks": {
+    "schemaVersion": { "const": 2 },
+    "candidateDecisions": {
       "type": "array",
       "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["candidateRef", "outcome", "reason"],
+        "properties": {
+          "candidateRef": { "type": "string", "minLength": 1 },
+          "outcome": { "enum": ["CREATED", "REJECTED", "BLOCKED"] },
+          "reason": { "type": "string", "minLength": 1 },
+          "readyIssueId": { "type": "string", "pattern": "^ISSUE-[0-9-]+$" },
+          "failureCategory": {
+            "enum": ["ready_issue_config", "tool_config", "environment_prereq", "quality_security", "needs_confirmation"]
+          }
+        },
+        "allOf": [
+          {
+            "if": { "properties": { "outcome": { "const": "CREATED" } }, "required": ["outcome"] },
+            "then": { "required": ["readyIssueId"], "not": { "required": ["failureCategory"] } }
+          },
+          {
+            "if": { "properties": { "outcome": { "const": "BLOCKED" } }, "required": ["outcome"] },
+            "then": { "required": ["failureCategory"], "not": { "required": ["readyIssueId"] } }
+          },
+          {
+            "if": { "properties": { "outcome": { "const": "REJECTED" } }, "required": ["outcome"] },
+            "then": { "not": { "anyOf": [{ "required": ["readyIssueId"] }, { "required": ["failureCategory"] }] } }
+          }
+        ]
+      }
+    },
+    "readyBlocks": {
+      "type": "array",
       "maxItems": 5,
       "items": { "type": "string", "minLength": 100 }
     }

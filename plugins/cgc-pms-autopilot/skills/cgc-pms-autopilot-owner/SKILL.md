@@ -59,10 +59,10 @@ Legacy 兼容短语继续有效：
 6. 验收时先做失败分类，再给通过/不通过、阻塞/非阻塞结论；分类结果至少看 `category/subcategory/confidence/evidence/suggestedNextAction/retryPolicy`。
 7. F 收口后先做 `local-commit-closeout.ps1 -DryRun`，确认 `git diff --check` 和文件范围，再决定是否本地 commit。
 8. D/E 不通过时，优先用 `../../templates/repair-request.md` 生成结构化补修请求；沉淀稳定经验时用 `../../templates/reflection-entry.md`。
-9. 仅当项目配置存在用户批准的 active `scoringVersion` 时，才启用两阶段评分收口：`implementationCommit` 冻结正式证据，评分绑定该提交，`closeoutCommit` 写入评分与收口事实；后者合入并登记后才增加跨批次回顾计数。candidate/disabled 版本不得计数。
+9. 仅当项目配置存在用户批准的 active 评分版本时，才启用两阶段评分收口：`implementationCommit` 冻结正式证据，评分绑定该提交，`closeoutCommit` 写入评分与收口事实；后者合入并登记后才增加跨批次回顾计数。版本、权重和生效点从配置及批准来源读取，candidate/disabled 版本不得计数。
 10. 死进程或新 run 接管活动 Issue 时先校验 durable phase checkpoint；Ready、base、worktree/branch、scope、diff 和 evidence 一致时，只恢复 validation、review 或 closeout。不得删除有效 worktree 后重派 implementation；Reviewer `tool_config` 跨 run 重试一次仍失败则暂停，不得转 business repair。
-11. 控制面指纹变化后，N>1 或无界执行必须先通过用户明确启动的 `启动迭代-1`。`autopilot-task-score/v2` 已按35/25/20/10/10获批并激活，10分维度使用 `taskExecutionEfficiency`；v1 历史不回算，同一任务不得双计数。
-10. 回顾周期独立于单次 `iterationLimit`：无界模式在20个有效任务后停止派发；有界模式完成当前 N 后对全部累计任务整批回顾且不结转。回顾只生成 `NEEDS_CONFIRMATION` 提案，不自动改代码、规则、权重或环境；报告、唯一问题事实源、图谱 Git 游标与稳定 Episode 未全部确认前不得清零或启动新批次。
+11. 控制面指纹变化后，多任务或无界执行必须先通过用户明确启动的单 Issue 金丝雀；具体行为契约读取 `../../references/control-plane-policy.md`。
+12. 回顾周期独立于单次 `iterationLimit`；阈值从配置读取。回顾只生成 `NEEDS_CONFIRMATION` 提案，不自动改代码、规则、权重或环境；报告、唯一问题事实源、图谱 Git 游标与稳定 Episode 未全部确认前不得清零或启动新批次。
 
 ## Role boundaries
 
@@ -74,6 +74,7 @@ Legacy 兼容短语继续有效：
 细则见：
 
 - `../../references/owner-boundary.md`
+- `../../references/control-plane-policy.md`
 - `../../references/failure-classification.md`
 - `../../references/classifier-rules.md`
 - `../../references/output-contract.md`

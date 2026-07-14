@@ -3,9 +3,10 @@ $ErrorActionPreference='Stop'
 $scriptDir=Split-Path -Parent $MyInvocation.MyCommand.Path
 $runner=Join-Path $scriptDir 'autopilot-run-continuous.ps1'
 $root=Join-Path ([IO.Path]::GetTempPath()) ('autopilot-final-scope-'+[guid]::NewGuid().ToString('N'))
-$backlog=Join-Path $root 'docs\backlog';$scripts=Join-Path $root 'scripts\codex-autopilot';$autoDir=Join-Path $root '.codex-autopilot'
-New-Item -ItemType Directory -Path $backlog,$scripts,$autoDir -Force|Out-Null
+$backlog=Join-Path $root 'docs\backlog';$scripts=Join-Path $root 'scripts\codex-autopilot';$autoDir=Join-Path $root '.codex-autopilot';$policyDir=Join-Path $root 'plugins\cgc-pms-autopilot\references'
+New-Item -ItemType Directory -Path $backlog,$scripts,$autoDir,$policyDir -Force|Out-Null
 try{
+  "# Fixture Policy`n`nPolicy-Version: 1`nStatus: active"|Set-Content (Join-Path $policyDir 'control-plane-policy.md')
   $tick=[char]96
   @"
 # Ready Issues
@@ -34,13 +35,13 @@ Reviewer要求：不需要
 "@|Set-Content (Join-Path $backlog 'ready-issues.md') -Encoding UTF8
   '# Done'|Set-Content (Join-Path $backlog 'done-issues.md');'# Focus'|Set-Content (Join-Path $backlog 'current-focus.md');'# Plan'|Set-Content (Join-Path $backlog 'cgc-pms-production-enhancement-plan.md')
   ".worktrees/`r`n.codex-autopilot/"|Set-Content (Join-Path $root '.gitignore');'enabled'|Set-Content (Join-Path $autoDir 'enabled.flag')
-  "param([string]`$RepoRoot)`nNew-Item -ItemType Directory -Path (Join-Path `$RepoRoot 'docs\quality') -Force|Out-Null`n'ok'|Set-Content (Join-Path `$RepoRoot 'docs\quality\issue-993-001.md')"|Set-Content (Join-Path $scripts 'mock.ps1')
+  "param([string]`$RepoRoot)`nNew-Item -ItemType Directory -Path (Join-Path `$RepoRoot 'docs\quality') -Force|Out-Null`n'# Evidence`n新增后续项：0`n关闭后续项：0`n后续项净变化：0'|Set-Content (Join-Path `$RepoRoot 'docs\quality\issue-993-001.md')"|Set-Content (Join-Path $scripts 'mock.ps1')
   "New-Item -ItemType Directory -Path deploy -Force|Out-Null`n'generated'|Set-Content deploy/generated.txt`nexit 0"|Set-Content (Join-Path $scripts 'generate-forbidden.ps1')
   $config=Join-Path $scripts 'config.json';[ordered]@{repoRoot=$root;autopilotDir=$autoDir;maxIssuesPerRun=1;maxParallelIssues=1;parallelSafetyMode='strict-independent-only';autoMerge=$true;autoPush=$false;maxRunMinutes=30;issueExecutor=[ordered]@{command='pwsh';args=@('-NoProfile','-File','{repoRoot}\scripts\codex-autopilot\mock.ps1','-RepoRoot','{repoRoot}');timeoutSeconds=30;requireChangedFiles=$true};closeout=[ordered]@{enabled=$true};repair=[ordered]@{enabled=$false};readyPlanner=[ordered]@{enabled=$false}}|ConvertTo-Json -Depth 8|Set-Content $config
   & git -C $root init -q;& git -C $root config user.email a@b.c;& git -C $root config user.name test;& git -C $root add .;& git -C $root commit -qm base
   $old=$ErrorActionPreference;$ErrorActionPreference='Continue';$output=& pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $config -MaxIterations 1 -MaxLoops 1 -ApplyBacklogSplit 2>&1|Out-String;$code=$LASTEXITCODE;$ErrorActionPreference=$old
   if($code -ne 0){throw "runner failed: $output"}
   $result=Get-ChildItem (Join-Path $autoDir 'runs') -Filter result.json -Recurse|Select-Object -First 1|ForEach-Object{Get-Content -Encoding UTF8 $_.FullName -Raw|ConvertFrom-Json}
-  if($result.status -ne 'blocked' -or $result.stopReason -ne 'STOP_SCOPE_VIOLATION'){throw 'final scope violation was not blocked'}
+  if($result.status -ne 'blocked' -or $result.stopReason -ne 'STOP_SCOPE_VIOLATION'){throw "final scope violation was not blocked: status=$($result.status), stopReason=$($result.stopReason), output=$output"}
   Write-Host 'final scope gate self-test passed'
 }finally{if(Test-Path (Join-Path $root '.git')){& git -C $root worktree prune 2>$null|Out-Null};Remove-Item $root -Recurse -Force -ErrorAction SilentlyContinue}

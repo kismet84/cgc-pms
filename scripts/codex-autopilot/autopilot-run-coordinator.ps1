@@ -44,6 +44,11 @@ function Invoke-AutopilotRunCoordinator {
   $autoDir = $runtimeContext.autoDir
   $controlPlaneCanaryEnabled = $runtimeContext.controlPlaneCanaryEnabled
   $script:ControlPlaneFingerprint = $runtimeContext.controlPlaneFingerprint
+  $script:ControlPlanePolicyVersion = $runtimeContext.controlPlanePolicyVersion
+  $script:ControlPlanePolicyHash = $runtimeContext.controlPlanePolicyHash
+  $script:ControlPlanePolicyRefs = @($runtimeContext.controlPlanePolicyRefs)
+  $script:CandidateEvidenceHead = ''
+  $script:ExecutionBaseCommit = $runtimeContext.executionBaseCommit
   $maxIssuesPerRun = if ($config.maxIssuesPerRun) { [int]$config.maxIssuesPerRun } else { 1 }
   $maxParallelIssues = if ($config.maxParallelIssues) { [int]$config.maxParallelIssues } else { 3 }
   $parallelSafetyMode = if ($config.parallelSafetyMode) { [string]$config.parallelSafetyMode } else { "strict-independent-only" }
@@ -115,7 +120,7 @@ function Invoke-AutopilotRunCoordinator {
     Write-RunEvent "checkpoint" ([pscustomobject]@{ checkpoint = $checkpoint; decision = "EXPLAIN" })
     $readyIssues = if ($checkpoint -eq "CONTINUE") { @(Get-ReadyIssues $readyPath $RepoRoot $scriptDir) } else { @() }
     $refillDecision = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0) { Get-AutopilotRefillDecision -RepoRoot $RepoRoot } else { $null }
-    $candidates = if ($refillDecision -and $refillDecision.action -eq 'PLAN_READY') { @($refillDecision.candidates) } else { @() }
+    $candidates = if ($refillDecision -and $refillDecision.action -in @('PLAN_READY','GENERATE_READY')) { @($refillDecision.candidates) } else { @() }
     $stopReason = if ($checkpoint -eq "CONTINUE" -and $readyIssues.Count -eq 0 -and $candidates.Count -eq 0) { Get-StopReasonForEmptyPool $readyPath } else { $checkpoint }
     $batchPlan = if ($readyIssues.Count -gt 0 -and $readyIssues[0].lint.status -eq "pass") { Get-ReadyIssueBatchPlan $readyIssues $maxParallelIssues $parallelSafetyMode } else { $null }
     $decision = if ($checkpoint -ne "CONTINUE") { "STOP" } elseif ($readyIssues.Count -gt 0 -and $readyIssues[0].lint.status -ne "pass") { "STOP_READY_LINT_FAILED" } elseif ($readyIssues.Count -gt 0) { $batchPlan.decision } elseif ($refillDecision -and $refillDecision.action -eq 'UNBLOCK_FIRST') { "UNBLOCK_FIRST" } elseif ($candidates.Count -gt 0) { "SPLIT_BACKLOG" } else { "STOP" }
@@ -273,6 +278,8 @@ function Invoke-AutopilotRunCoordinator {
         $batchIssues = @($batchPlan.issues)
         $selectedIssue = $batchIssues[0]
         $selectedRoute = if ($selectedIssue.contract) { Get-AutopilotRoute -Issue $selectedIssue.contract } else { $null }
+        $script:CandidateEvidenceHead = if ($selectedIssue.contract -and $selectedIssue.contract.candidateEvidenceHead) { [string]$selectedIssue.contract.candidateEvidenceHead } else { '' }
+        $script:ExecutionBaseCommit = (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim().ToLowerInvariant()
         $readyStatus = if ($batchPlan.parallel) { "READY_ISSUE_BATCH_FOUND" } else { "READY_ISSUE_FOUND" }
         Write-State $autoDir $readyStatus $dryRunMode $readyStatus $selectedIssue.title $readyStatus ""
         Write-RunEvent "decision" ([pscustomobject]@{
@@ -326,19 +333,50 @@ function Invoke-AutopilotRunCoordinator {
 
       $refillDecision = Get-AutopilotRefillDecision -RepoRoot $RepoRoot
       $readyPlannerEnabled = ($config.PSObject.Properties.Name -contains 'readyPlanner') -and $null -ne $config.readyPlanner -and $config.readyPlanner.enabled -eq $true
-      if ($applyMode -and $readyPlannerEnabled -and (Test-AutopilotReadyPlanningAllowed -Action $refillDecision.action)) {
+      $canApplyRefill = $applyMode -and (Test-AutopilotReadyPlanningAllowed -Action $refillDecision.action) -and ($refillDecision.action -eq 'GENERATE_READY' -or $readyPlannerEnabled)
+      if ($canApplyRefill) {
         Write-State $autoDir 'REFILLING' $false 'READY_PLANNER_START' '' $refillDecision.reason ''
         $planResultPath = Join-Path $script:RunContext.dir 'ready-plan.json'
         $planSchemaPath = Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\ready-plan.schema.json'
-        Invoke-AutopilotReadyPlanner -RepoRoot $RepoRoot -Candidates $refillDecision.candidates -OutputPath $planResultPath -SchemaPath $planSchemaPath -Model $config.readyPlanner.model -Thinking $config.readyPlanner.thinking -TimeoutSeconds $config.readyPlanner.timeoutSeconds | Out-Null
-        $imported = Import-AutopilotReadyPlan -PlanPath $planResultPath -ReadyPath $readyPath -RepoRoot $RepoRoot
+        if ($refillDecision.action -eq 'GENERATE_READY') {
+          $deterministicPlan = New-AutopilotDeterministicReadyPlan -Candidate $refillDecision.candidates[0] -RepoRoot $RepoRoot
+          [IO.File]::WriteAllText($planResultPath, ($deterministicPlan | ConvertTo-Json -Depth 12), [Text.UTF8Encoding]::new($false))
+        } else {
+          $plannerHeartbeatSeconds = if ($config.readyPlanner.PSObject.Properties.Name -contains 'heartbeatSeconds') { [int]$config.readyPlanner.heartbeatSeconds } else { 30 }
+          $heartbeatWriter = { param($heartbeat) Write-State $autoDir 'REFILLING' $false 'READY_PLANNER_HEARTBEAT' '' $refillDecision.reason '' }
+          Invoke-AutopilotReadyPlanner -RepoRoot $RepoRoot -Candidates $refillDecision.candidates -OutputPath $planResultPath -SchemaPath $planSchemaPath -Model $config.readyPlanner.model -Thinking $config.readyPlanner.thinking -TimeoutSeconds $config.readyPlanner.timeoutSeconds -HeartbeatSeconds $plannerHeartbeatSeconds -HeartbeatWriter $heartbeatWriter | Out-Null
+        }
+        $expectedCandidateRefs = @($refillDecision.candidates | ForEach-Object { Get-AutopilotCandidateRef -Candidate $_ })
+        $imported = Import-AutopilotReadyPlan -PlanPath $planResultPath -ReadyPath $readyPath -RepoRoot $RepoRoot -ExpectedCandidateRefs $expectedCandidateRefs
+        if ($imported.createdCount -eq 0) {
+          $outcomes = @($imported.candidateDecisions | ForEach-Object { [string]$_.outcome } | Select-Object -Unique)
+          $zeroReadyStatus = if ($outcomes -contains 'BLOCKED') { 'READY_CANDIDATES_BLOCKED' } else { 'READY_CANDIDATES_REJECTED' }
+          $refillStageResult = if ($outcomes -contains 'BLOCKED') {
+            $refillFailureCategory = Get-AutopilotRefillStageFailureCategory -CandidateDecisions $imported.candidateDecisions
+            New-AutopilotStageResult -Scope RUN -SubjectId $script:RunContext.id -Stage REFILL -Outcome BLOCKED -FailureCategory $refillFailureCategory -StopReason $zeroReadyStatus -Reason $refillDecision.reason -TransitionIntent STOP
+          } else {
+            New-AutopilotStageResult -Scope RUN -SubjectId $script:RunContext.id -Stage REFILL -Outcome TERMINAL -Reason $refillDecision.reason -TransitionIntent STOP
+          }
+          Write-RunEvent 'refill.decided' ([pscustomobject]@{ decision=$zeroReadyStatus; status=$zeroReadyStatus; reason=$refillDecision.reason; createdReadyIssueDrafts=0; candidateDecisions=$imported.candidateDecisions; stageResult=$refillStageResult })
+          Write-State $autoDir 'REFILLING' $false $zeroReadyStatus '' $refillDecision.reason $zeroReadyStatus
+          $zeroTarget = if ($outcomes -contains 'BLOCKED') { 'BLOCKED' } else { 'STOPPED' }
+          Move-AutopilotRunPhase -Path (Join-Path $autoDir 'state.json') -Status $zeroTarget -Phase 'refill-no-ready' -Reason $zeroReadyStatus | Out-Null
+          Write-Host $zeroReadyStatus
+          exit 0
+        }
         $refillCommit = Commit-ReadyRefill $RepoRoot $readyPath
-        Write-RunEvent 'refill.planned' ([pscustomobject]@{ decision = 'BACKLOG_SPLIT_APPLIED'; status = 'BACKLOG_SPLIT_APPLIED'; reason = $refillDecision.reason; createdReadyIssueDrafts = $imported.createdCount; commit = $refillCommit })
+        $runtimeContext.executionBaseCommit = $refillCommit.ToLowerInvariant()
+        $runtimeContext.candidateEvidenceHead = [string]$refillDecision.candidateEvidenceHead
+        $script:ExecutionBaseCommit = $runtimeContext.executionBaseCommit
+        $script:CandidateEvidenceHead = $runtimeContext.candidateEvidenceHead
+        $refillStageResult = New-AutopilotStageResult -Scope RUN -SubjectId $script:RunContext.id -Stage REFILL -Outcome SUCCEEDED -NextStage SELECT -Reason $refillDecision.reason -SemanticProgress $true -EvidencePaths @($planResultPath,$readyPath) -TransitionIntent SELECT
+        Write-RunEvent 'refill.planned' ([pscustomobject]@{ decision = 'BACKLOG_SPLIT_APPLIED'; status = 'BACKLOG_SPLIT_APPLIED'; reason = $refillDecision.reason; createdReadyIssueDrafts = $imported.createdCount; commit = $refillCommit; candidateDecisions=$imported.candidateDecisions; stageResult=$refillStageResult })
         Write-State $autoDir 'REFILLING' $false 'BACKLOG_SPLIT_APPLIED' '' 'BACKLOG_SPLIT_APPLIED' ''
+        Move-AutopilotRunPhase -Path (Join-Path $autoDir 'state.json') -Status CHECKPOINT -Phase 'refill-complete' -Reason 'Ready created; continue same run' | Out-Null
         Write-Host 'BACKLOG_SPLIT_APPLIED'
         Write-Host "createdReadyIssueDrafts=$($imported.createdCount)"
-        Write-Host 'REFILL_ROUND_COMPLETE'
-        exit 0
+        Write-Host 'REFILL_CONTINUE_SAME_RUN'
+        continue
       }
       if ($refillDecision.action -in @('STOP_KG_REFILL_UNAVAILABLE','STOP_KG_REFILL_STALE')) {
         Write-RunEvent 'refill.graph-stop' ([pscustomobject]@{ decision = 'STOP'; status = $refillDecision.action; stopReason = $refillDecision.action; reason = $refillDecision.reason; failureCategory = $refillDecision.failureCategory })

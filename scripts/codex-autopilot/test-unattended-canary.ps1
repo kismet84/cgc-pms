@@ -9,7 +9,8 @@ $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-canary-' + [guid]::NewG
 $backlog = Join-Path $root 'docs\backlog'
 $fixtureScripts = Join-Path $root 'scripts\codex-autopilot'
 $autoDir = Join-Path $root '.codex-autopilot'
-New-Item -ItemType Directory -Path $backlog,$fixtureScripts,$autoDir -Force | Out-Null
+$policyDir = Join-Path $root 'plugins\cgc-pms-autopilot\references'
+New-Item -ItemType Directory -Path $backlog,$fixtureScripts,$autoDir,$policyDir -Force | Out-Null
 
 function New-CanaryBlock([int]$Index) {
   $id = 'ISSUE-990-{0:000}' -f $Index
@@ -41,6 +42,7 @@ Reviewer要求：不需要
 }
 
 try {
+  "# Fixture Policy`n`nPolicy-Version: 1`nStatus: active" | Set-Content -LiteralPath (Join-Path $policyDir 'control-plane-policy.md') -Encoding UTF8
   $blocks = 1..20 | ForEach-Object { New-CanaryBlock $_ }
   ("# Ready Issues`r`n`r`n" + ($blocks -join "`r`n")) | Set-Content -LiteralPath (Join-Path $backlog 'ready-issues.md') -Encoding UTF8
   '# Done Issues' | Set-Content -LiteralPath (Join-Path $backlog 'done-issues.md') -Encoding UTF8

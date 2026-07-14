@@ -1,6 +1,8 @@
 $ErrorActionPreference = 'Stop'
 $nativeLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
 if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $nativeLibrary)) { . $nativeLibrary }
+$fingerprintLibrary = Join-Path $PSScriptRoot 'autopilot-control-plane-fingerprint.ps1'
+if (!(Get-Command Get-AutopilotControlPlanePolicyDescriptor -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $fingerprintLibrary)) { . $fingerprintLibrary }
 
 function Get-AutopilotTextHash {
   param([string]$Text)
@@ -47,11 +49,17 @@ function New-AutopilotContextPack {
   if ([Text.Encoding]::UTF8.GetByteCount($PreviousPhaseSummary) -gt 5120) { throw 'previous phase summary budget exceeded: max 5 KB' }
   if (@($ChangedPaths).Count -gt 20) { throw 'changed file budget exceeded: max 20 files' }
   $baseCommit = (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
+  $policy = Get-AutopilotControlPlanePolicyDescriptor -RepoRoot $RepoRoot
   $context = [ordered]@{
-    schemaVersion = 1
+    schemaVersion = 2
     issueId = $Issue.issueId
     phase = $Phase
     baseCommit = $baseCommit
+    executionBaseCommit = $baseCommit
+    candidateEvidenceHead = if ($Issue.PSObject.Properties.Name -contains 'candidateEvidenceHead') { [string]$Issue.candidateEvidenceHead } else { '' }
+    controlPlanePolicyVersion = $policy.version
+    controlPlanePolicyHash = $policy.hash
+    controlPlanePolicyRefs = @($policy.path)
     contextGeneratedAt = [datetimeoffset]::Now.ToString('o')
     readyContentHash = $Issue.readyContentHash
     diffHash = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $baseCommit
@@ -83,6 +91,11 @@ function Assert-AutopilotContextCurrent {
   if ($Context.issueId -ne $Issue.issueId) { throw 'context Issue ID mismatch' }
   if ($Context.readyContentHash -ne $Issue.readyContentHash) { throw 'context Ready hash mismatch' }
   if ($Context.baseCommit -ne $ExpectedBaseCommit) { throw 'context base commit mismatch' }
+  if ($Context.executionBaseCommit -ne $ExpectedBaseCommit) { throw 'context execution base commit mismatch' }
+  $expectedCandidateHead = if ($Issue.PSObject.Properties.Name -contains 'candidateEvidenceHead') { [string]$Issue.candidateEvidenceHead } else { '' }
+  if ([string]$Context.candidateEvidenceHead -ne $expectedCandidateHead) { throw 'context candidate evidence head mismatch' }
+  $policy = Get-AutopilotControlPlanePolicyDescriptor -RepoRoot $(if ($Worktree) { $Worktree } else { Split-Path -Parent $Context.controlPlanePolicyRefs[0] }) -PolicyPath $Context.controlPlanePolicyRefs[0]
+  if ($Context.controlPlanePolicyVersion -ne $policy.version -or $Context.controlPlanePolicyHash -ne $policy.hash) { throw 'context control-plane policy binding is stale' }
   $actualHash = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $Context.baseCommit
   if ($Context.diffHash -ne $actualHash) { throw 'context diff hash is stale' }
   return $true

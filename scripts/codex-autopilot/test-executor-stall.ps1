@@ -8,8 +8,10 @@ $backlog = Join-Path $root 'docs\backlog'
 $fixtureScripts = Join-Path $root 'scripts\codex-autopilot'
 $autoDir = Join-Path $root '.codex-autopilot'
 $counterPath = Join-Path $root 'executor-attempts.txt'
-New-Item -ItemType Directory -Path $backlog,$fixtureScripts,$autoDir -Force | Out-Null
+$policyDir = Join-Path $root 'plugins\cgc-pms-autopilot\references'
+New-Item -ItemType Directory -Path $backlog,$fixtureScripts,$autoDir,$policyDir -Force | Out-Null
 try {
+  "# Fixture Policy`n`nPolicy-Version: 1`nStatus: active" | Set-Content -LiteralPath (Join-Path $policyDir 'control-plane-policy.md') -Encoding UTF8
   $defaults = Get-Content -Encoding UTF8 -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw | ConvertFrom-Json
   if ([int]$defaults.issueExecutor.stallInspectSeconds -ne 300 -or [int]$defaults.issueExecutor.stallTerminateSeconds -ne 600) { throw 'production stall thresholds must remain 300/600 seconds' }
   $runnerText = @(

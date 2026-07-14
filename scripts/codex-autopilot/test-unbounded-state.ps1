@@ -4,9 +4,10 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $runner = Join-Path $scriptDir 'autopilot-run-continuous.ps1'
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-unbounded-' + [guid]::NewGuid().ToString('N'))
-$backlog = Join-Path $root 'docs\backlog'; $autoDir = Join-Path $root '.codex-autopilot'; $fixtureScripts = Join-Path $root 'scripts\codex-autopilot'
-New-Item -ItemType Directory -Path $backlog,$autoDir,$fixtureScripts -Force | Out-Null
+$backlog = Join-Path $root 'docs\backlog'; $autoDir = Join-Path $root '.codex-autopilot'; $fixtureScripts = Join-Path $root 'scripts\codex-autopilot'; $policyDir = Join-Path $root 'plugins\cgc-pms-autopilot\references'
+New-Item -ItemType Directory -Path $backlog,$autoDir,$fixtureScripts,$policyDir -Force | Out-Null
 try {
+  "# Fixture Policy`n`nPolicy-Version: 1`nStatus: active" | Set-Content -LiteralPath (Join-Path $policyDir 'control-plane-policy.md') -Encoding UTF8
   '# Ready Issues' | Set-Content -LiteralPath (Join-Path $backlog 'ready-issues.md') -Encoding UTF8
   '# Current Focus' | Set-Content -LiteralPath (Join-Path $backlog 'current-focus.md') -Encoding UTF8
   '# Plan' | Set-Content -LiteralPath (Join-Path $backlog 'cgc-pms-production-enhancement-plan.md') -Encoding UTF8

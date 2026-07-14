@@ -5,15 +5,20 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schemaVersion", "issueId", "phase", "baseCommit", "contextGeneratedAt", "readyContentHash",
+    "schemaVersion", "issueId", "phase", "baseCommit", "executionBaseCommit", "candidateEvidenceHead", "controlPlanePolicyVersion", "controlPlanePolicyHash", "controlPlanePolicyRefs", "contextGeneratedAt", "readyContentHash",
     "diffHash", "goal", "nonGoals", "allowedPaths", "forbiddenPaths", "requiredCommands", "archiveReport",
     "relevantSymbols", "acceptedDecisions", "openRisks", "previousPhaseSummary"
   ],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "issueId": { "type": "string", "pattern": "^ISSUE-[0-9-]+$" },
     "phase": { "enum": ["implement", "repair", "review"] },
     "baseCommit": { "type": "string", "minLength": 7 },
+    "executionBaseCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "candidateEvidenceHead": { "type": "string", "pattern": "^(?:[a-f0-9]{40})?$" },
+    "controlPlanePolicyVersion": { "type": "string", "minLength": 1 },
+    "controlPlanePolicyHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "controlPlanePolicyRefs": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
     "contextGeneratedAt": { "type": "string", "format": "date-time" },
     "readyContentHash": { "type": "string", "minLength": 1 },
     "diffHash": { "type": "string", "minLength": 64, "maxLength": 64 },

@@ -26,6 +26,7 @@ $requiredPaths = @(
     'examples/classification-ready-config.example.json',
     'examples/classification-real-quality.example.json',
     'references/loop-budget-policy.md',
+    'references/control-plane-policy.md',
     'references/rerun-policy.md',
     'references/role-contracts.md',
     'references/forward-test-scenarios.md',

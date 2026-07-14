@@ -6,6 +6,9 @@ function Read-JsonFile {
   return Get-Content -Encoding UTF8 -Raw $Path | ConvertFrom-Json
 }
 
+$runtimeFingerprintLibrary = Join-Path $PSScriptRoot 'autopilot-control-plane-fingerprint.ps1'
+if (!(Get-Command Get-AutopilotControlPlanePolicyDescriptor -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $runtimeFingerprintLibrary)) { . $runtimeFingerprintLibrary }
+
 function New-AutopilotRuntimeContext {
   [CmdletBinding()]
   param(
@@ -28,22 +31,30 @@ function New-AutopilotRuntimeContext {
   }
 
   $executionMode = Resolve-AutopilotExecutionMode -DryRun $DryRun -ExplainNextAction $ExplainNextAction -ApplyBacklogSplit $ApplyBacklogSplit
+  $executionBaseCommit = (Invoke-AutopilotGit -RepoRoot $resolvedRepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim().ToLowerInvariant()
   $autoDir = if ($config.autopilotDir) { [string]$config.autopilotDir } else { Join-Path $resolvedRepoRoot '.codex-autopilot' }
   $canaryEnabled = $null -ne $config.controlPlaneCanary -and $config.controlPlaneCanary.enabled -eq $true
   $fingerprint = if ($canaryEnabled) {
     Get-AutopilotControlPlaneFingerprint -RepoRoot $resolvedRepoRoot -Paths @($config.controlPlaneCanary.fingerprintPaths)
   } else { '' }
+  $policyPath = if ($null -ne $config.controlPlaneCanary -and $config.controlPlaneCanary.PSObject.Properties.Name -contains 'policyPath') { [string]$config.controlPlaneCanary.policyPath } else { 'plugins/cgc-pms-autopilot/references/control-plane-policy.md' }
+  $policy = Get-AutopilotControlPlanePolicyDescriptor -RepoRoot $resolvedRepoRoot -PolicyPath $policyPath
 
   return [pscustomobject]@{
-    schemaVersion = 1
+    schemaVersion = 2
     repoRoot = $resolvedRepoRoot
     configPath = $resolvedConfigPath
     config = $config
     executionMode = $executionMode
     baseBranch = $configuredBaseBranch
+    executionBaseCommit = $executionBaseCommit
+    candidateEvidenceHead = ''
     autoDir = $autoDir
     readyPath = Join-Path $resolvedRepoRoot 'docs\backlog\ready-issues.md'
     controlPlaneFingerprint = $fingerprint
+    controlPlanePolicyVersion = $policy.version
+    controlPlanePolicyHash = $policy.hash
+    controlPlanePolicyRefs = @($policy.path)
     controlPlaneCanaryEnabled = $canaryEnabled
     runLock = $null
     runInstanceId = ''

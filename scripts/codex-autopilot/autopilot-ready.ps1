@@ -125,6 +125,10 @@ function ConvertTo-AutopilotReadyIssue {
   if ($migration -and @('需要','不需要') -notcontains $migration) { $errors += "Migration 必须为需要或不需要，当前：$migration" }
   $risk = Get-AutopilotFieldValue $Block.body '风险等级'
   if ($risk -and @('低','中','高') -notcontains $risk) { $errors += "风险等级无效：$risk" }
+  $sourceAnchor = Get-AutopilotFieldValue $Block.body '来源锚点'
+  $candidateEvidenceHead = ''
+  $candidateEvidenceMatch = [regex]::Match($sourceAnchor, '(?i)(?:^|[;；,，\s])candidateEvidenceHead=([a-f0-9]{40})(?:$|[;；,，\s])')
+  if ($candidateEvidenceMatch.Success) { $candidateEvidenceHead = $candidateEvidenceMatch.Groups[1].Value.ToLowerInvariant() }
   $allowedPaths = @(Get-AutopilotCodeValues (Get-AutopilotSectionLines $Block.body '允许修改'))
   if ($allowedPaths.Count -eq 0) { $errors += '允许修改必须包含代码格式路径' }
   $forbiddenPaths = @(Get-AutopilotCodeValues (Get-AutopilotSectionLines $Block.body '禁止修改'))
@@ -155,6 +159,8 @@ function ConvertTo-AutopilotReadyIssue {
     runtimeRequirement = Get-AutopilotFieldValue $Block.body '运行态要求'
     reviewerRequirement = Get-AutopilotFieldValue $Block.body 'Reviewer要求'
     archiveReport = (Get-AutopilotFieldValue $Block.body '归档报告').Trim('`')
+    sourceAnchor = $sourceAnchor
+    candidateEvidenceHead = $candidateEvidenceHead
   }
 }
 

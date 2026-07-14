@@ -6,10 +6,25 @@ $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 $realConfig = Get-Content -LiteralPath (Join-Path $scriptDir 'codex-autopilot.config.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/codex-autopilot/codex-autopilot.config.json') { throw 'control-plane fingerprint does not cover its behavior configuration' }
+if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/control-plane-policy.md') { throw 'control-plane fingerprint does not cover its behavior policy' }
+$realPolicy = Get-AutopilotControlPlanePolicyDescriptor -RepoRoot (Resolve-Path (Join-Path $scriptDir '..\..')).Path -PolicyPath $realConfig.controlPlaneCanary.policyPath
+if ($realPolicy.version -ne '1' -or $realPolicy.hash -notmatch '^[a-f0-9]{64}$') { throw 'control-plane policy descriptor is invalid' }
 
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-control-plane-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root -Force | Out-Null
 try {
+  $policyDir = Join-Path $root 'plugins\cgc-pms-autopilot\references'
+  New-Item -ItemType Directory -Path $policyDir -Force | Out-Null
+  $policyPath = Join-Path $policyDir 'control-plane-policy.md'
+  "# Policy`n`nPolicy-Version: 1`nStatus: active" | Set-Content -LiteralPath $policyPath -Encoding UTF8
+  $policyBefore = Get-AutopilotControlPlanePolicyDescriptor -RepoRoot $root
+  "`n- changed behavior" | Add-Content -LiteralPath $policyPath -Encoding UTF8
+  $policyAfter = Get-AutopilotControlPlanePolicyDescriptor -RepoRoot $root
+  if ($policyBefore.hash -eq $policyAfter.hash) { throw 'control-plane policy behavior change did not change policy hash' }
+  Remove-Item -LiteralPath $policyPath -Force
+  $missingPolicyRejected = $false
+  try { Get-AutopilotControlPlanePolicyDescriptor -RepoRoot $root | Out-Null } catch { $missingPolicyRejected = $true }
+  if (!$missingPolicyRejected) { throw 'missing control-plane policy did not fail close' }
   'alpha' | Set-Content -LiteralPath (Join-Path $root 'a.ps1') -Encoding UTF8
   'beta' | Set-Content -LiteralPath (Join-Path $root 'b.json') -Encoding UTF8
   $first = Get-AutopilotControlPlaneFingerprint -RepoRoot $root -Paths @('b.json','a.ps1')

@@ -3,9 +3,10 @@ $ErrorActionPreference='Stop'
 $scriptDir=Split-Path -Parent $MyInvocation.MyCommand.Path
 $runner=Join-Path $scriptDir 'autopilot-run-continuous.ps1'
 $root=Join-Path ([IO.Path]::GetTempPath()) ('autopilot-count-'+[guid]::NewGuid().ToString('N'))
-$backlog=Join-Path $root 'docs\backlog';$autoDir=Join-Path $root '.codex-autopilot';$scripts=Join-Path $root 'scripts\codex-autopilot';$runDir=Join-Path $autoDir 'runs\blocked-run';$unclosedRunDir=Join-Path $autoDir 'runs\executor-done-only'
-New-Item -ItemType Directory -Path $backlog,$scripts,$runDir,$unclosedRunDir -Force|Out-Null
+$backlog=Join-Path $root 'docs\backlog';$autoDir=Join-Path $root '.codex-autopilot';$scripts=Join-Path $root 'scripts\codex-autopilot';$runDir=Join-Path $autoDir 'runs\blocked-run';$unclosedRunDir=Join-Path $autoDir 'runs\executor-done-only';$policyDir=Join-Path $root 'plugins\cgc-pms-autopilot\references'
+New-Item -ItemType Directory -Path $backlog,$scripts,$runDir,$unclosedRunDir,$policyDir -Force|Out-Null
 try{
+  "# Fixture Policy`n`nPolicy-Version: 1`nStatus: active"|Set-Content (Join-Path $policyDir 'control-plane-policy.md')
   '# Ready Issues'|Set-Content (Join-Path $backlog 'ready-issues.md');'# Focus'|Set-Content (Join-Path $backlog 'current-focus.md');'# Plan'|Set-Content (Join-Path $backlog 'cgc-pms-production-enhancement-plan.md')
   ".worktrees/`r`n.codex-autopilot/"|Set-Content (Join-Path $root '.gitignore')
   $started=[datetimeoffset]::Now.AddMinutes(-5).ToString('o')

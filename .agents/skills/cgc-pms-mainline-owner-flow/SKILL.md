@@ -1,50 +1,87 @@
 ---
 name: cgc-pms-mainline-owner-flow
-description: Use when cgc-pms 项目需要由主线程以总负责人身份推进主线、计划、实施、验收或收口。
+description: Use when the user explicitly requests cgc-pms mainline, Backlog or AutoPilot governance, formal acceptance/release adjudication, or cross-module closeout.
 ---
 
 # cgc-pms 主线总负责人流转
 
-1. 先读仓库根 `AGENTS.override.md`、`AGENTS.md` 并通过授权门；授权后主线程是默认执行者，并对实施、验证与收口负责。
-2. 任何代码、配置、文档、Git 或运行环境状态变更前，实际执行者至少核对：
+版本=2
+最后复核日期=2026-07-14
+规则来源=`AGENTS.override.md`、`AGENTS.md`
+动态事实来源=`scripts/codex-autopilot/codex-autopilot.config.json`
+AutoPilot 行为契约=`plugins/cgc-pms-autopilot/references/control-plane-policy.md`
+验证入口=`scripts/codex-autopilot/test-mainline-owner-flow.ps1`
+
+## 适用范围
+
+只在以下场景使用：
+
+- 用户明确要求按主线、Backlog 或 AutoPilot 治理流程推进。
+- 用户要求正式验收、上线裁决或跨模块收口。
+- 当前任务需要把多个阶段或多个正式载体统一归档、裁决。
+
+普通问答、审查、单文件修复或已授权的普通交互实施，不因出现“计划”或“实施”字样自动升级为本流程。
+
+## 启动门
+
+1. 完整读取仓库根 `AGENTS.override.md` 与 `AGENTS.md`；本 Skill 不覆盖更高优先级规则。
+2. 先判断用户是否授权修改、实施、运行测试、Git 操作或运行环境变更；未授权时只分析、计划或验收。
+3. 任何状态变更前，实际执行者核对：
    - `git branch --show-current`
    - `git status --short`
-   - `git worktree list` 仅在怀疑并行隔离或分支归属冲突时补充
-3. 从用户目标提炼单条主线：目标、边界、非目标、验收口径、风险点。
-   - 普通当前问题查询先用 `kg_status` + 有界 `kg_list_issues`；准备处理、深入分析、正式验收或图谱异常/过期时，再按 `sourceRefs` 交叉核验当前代码、配置、唯一台账和正式报告。
-4. 需要计划书时，写入 `docs/plans/第N条主线-<主题>任务计划书.md`；首段必须包含 `**Goal:**` 与 `**Architecture:**`。
-5. 每个阶段按风险、耦合、并行收益、上下文传递成本和独立证据需要选择执行路由；只有派工净收益明确高于派工与回收成本时才单派或多派，否则由主线程直接执行。
-6. 仅在实际派工时使用 `docs/prompt/subagent-dispatch-template.md`，并填写：
-   - `任务名称`
-   - `角色边界`
-   - `目标`
-   - `范围`
-   - `禁止事项`
-   - `model`
-   - `thinking`
-   - `reason`
-   - `验收输出`
-   同时派出两个及以上子智能体时，才先给出模型分配表；单派不需要分配表。
-7. 阶段切换、首次阻塞、不通过或验收口径变化时，重新评估直接执行是否仍安全，或重新分档。子智能体超时或悬挂时先只读核验，再按风险收回直接执行、补充上下文或重派，不持续硬等。
-8. 收口时由主线程统一验收，只看正式交付物、验收证据、git 状态、阻塞项和剩余风险，不把临时日志、截图名、run id 写入长期规则。
-   - 若 AutoPilot 已激活任务评分，先确认硬门禁全部通过，再区分 `implementationCommit` 与 `closeoutCommit`；评分绑定前者，后者及 ledger 登记成功后才增加跨批次回顾计数。
-   - 未经用户明确批准的评分版本只能处于 candidate/disabled 状态。达到20个有效任务后，无界模式不得选择第21个任务；有界批次完成当前 N 后整批回顾且不结转。
-   - AutoPilot 恢复先读取 durable Issue phase checkpoint；证据有效时保留 worktree 并从 D/E/F 首个未完成阶段继续，Reviewer `tool_config` 不得回退到 B/C。控制面指纹变化后，N>1/无界执行必须先通过用户明确启动的单任务金丝雀。
-   - AutoPilot 固定通过 PowerShell 7 `pwsh` 运行；缺失时按 `tool_config/AUTOPILOT_POWERSHELL7_REQUIRED` 安全停止，不回退 5.1。Git/原生命令按退出码和命令契约裁决，stderr warning 只保留为诊断。
-   - AutoPilot 控制面阶段处理器只返回经过校验的 `StageResult`；活动 Issue checkpoint 的阶段变化统一调用 `autopilot-transition.ps1`，核验合法边、fencing、控制面指纹和 `transitionId + generation` 写后读回。发现绕过该入口的业务阶段写入时，验收结论为不通过。
-   - APPLY 派发、状态落盘和 Git 变更前核验 `runInstanceId + leaseEpoch + controlPlaneFingerprint` fencing token；stall 只认工作区或 durable checkpoint/result/evidence 的语义进度，不以 CPU/心跳变化续命。
-   - `autopilot-task-score/v2` 已按35/25/20/10/10获批，`taskExecutionEfficiency=10` 自批准配置提交后的下一项新实施型 Ready 生效；v1 历史不回算，同一任务只允许一个正式评分版本和一个20任务计数。
-   - 回顾只生成并去重写入唯一问题事实源的 `NEEDS_CONFIRMATION` 提案；报告、事实写回、图谱游标和稳定 Episode 未全部读回前不得清零，也不得自动实施提案或恢复迭代。
-9. 最终结论至少明确：
-   - `结论=通过 / 不通过`
-   - `阻塞=阻塞 / 非阻塞`
-   - `是否可上线=可上线 / 不可上线 / 需要确认`
+   - 仅在怀疑并行隔离或分支归属冲突时补 `git worktree list`
+4. 明确主线五要素：目标、范围、非目标、验收标准、风险与回滚边界。
 
-## 默认输出骨架
+## 计划与路由
 
-```text
-决策建议=
-执行任务=
-验收标准=
-风险点=
-```
+需要计划书时写入 `docs/plans/第N条主线-<主题>任务计划书.md`，首段包含 `**Goal:**` 与 `**Architecture:**`。
+
+按风险和范围选择计划深度：
+
+- 轻量：单模块、低风险，保留目标、架构、范围/非目标、任务、验收、风险/回滚。
+- 标准：跨模块或控制面变更，增加阶段门、验收矩阵、文件范围和失败分类。
+- 高风险：权限、金额、租户、数据一致性或状态机，增加风险分析、故障注入、恢复矩阵与金丝雀。
+
+授权通过后默认由主线程直接执行。只有派工净收益明确时才派工，判断至少覆盖：风险、耦合、并行收益、上下文传递成本、独立证据需要。不要机械打分。
+
+实际派工时使用 `docs/prompt/subagent-dispatch-template.md`，并填全任务名称、角色边界、目标、范围、禁止事项、model、thinking、reason、验收输出；两个及以上子智能体才输出模型分配表。
+
+## 阶段控制
+
+在以下节点重新评估执行路由和证据强度：
+
+- 一个阶段完成并进入下一阶段前。
+- 首次出现阻塞或不通过后。
+- 从实现切换为验收、审计或上线裁决时。
+- 用户新增约束、缩小范围或提高验收标准时。
+
+子智能体超时或悬挂时先只读核验，再按剩余风险收回直接执行、补充上下文或重派，不持续硬等。
+
+涉及 AutoPilot 时只读取专项行为契约、配置和实际 Schema；本 Skill 不维护评分版本、权重、回顾阈值、模型、超时或状态机字段副本。控制面行为变化必须更新策略指纹覆盖并通过相应金丝雀门禁。
+
+## 验收与零悬空收口
+
+主线程负责最终裁决，只采信正式交付物、绑定的验证证据、Git 状态和正式问题载体。临时日志、截图名、run id 和会话草稿不得写入长期规则。
+
+每个发现项只能归入：本轮修复并复验、超出范围并正式承接、证据不足或无价值而关闭。存在口头后续或无唯一载体的问题时不得判定通过。
+
+收口统计新增后续项、关闭后续项和后续项净变化，并核对剩余风险与回滚条件。
+
+## 按任务类型输出
+
+| 任务类型 | 最小输出 |
+| --- | --- |
+| 分析 | 结论、证据、待确认项 |
+| 计划 | 正式计划书、范围、验收、实施前置、是否可进入实施 |
+| 实施 | 修改内容、验证结果、Git 状态、剩余风险 |
+| 验收 | 通过/不通过、阻塞/非阻塞、依据、剩余风险 |
+| 上线裁决 | 是否可上线、回滚条件、数据与环境风险 |
+
+## 维护检查
+
+修改本 Skill 时必须验证：
+
+- 引用文件存在，计划入口可执行。
+- 没有复制配置中的动态值。
+- 没有与 `AGENTS.override.md` 或 `AGENTS.md` 冲突。
+- 行为性修改是否需要更新 AutoPilot 策略指纹和单 Issue 金丝雀。

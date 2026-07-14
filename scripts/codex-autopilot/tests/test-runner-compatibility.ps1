@@ -46,7 +46,9 @@ function New-Fixture {
   $BackendDir = Join-Path $Root "backend"
   $FrontendDir = Join-Path $Root "frontend-admin"
   $QualityDir = Join-Path $Root "docs\quality"
-  New-Item -ItemType Directory -Path $AutoDir, $BacklogDir, $ScriptDir, $BackendDir, $FrontendDir, $QualityDir -Force | Out-Null
+  $PolicyDir = Join-Path $Root "plugins\cgc-pms-autopilot\references"
+  New-Item -ItemType Directory -Path $AutoDir, $BacklogDir, $ScriptDir, $BackendDir, $FrontendDir, $QualityDir, $PolicyDir -Force | Out-Null
+  "# Fixture Policy`r`n`r`nPolicy-Version: 1`r`nStatus: active" | Out-File -Encoding utf8 (Join-Path $PolicyDir 'control-plane-policy.md')
   "" | Out-File -Encoding ascii (Join-Path $BackendDir "mvnw.cmd")
   "{}" | Out-File -Encoding utf8 (Join-Path $FrontendDir "package.json")
   if ($Enabled) {

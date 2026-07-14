@@ -7,15 +7,19 @@
   "controlPlane": "scripts\\codex-autopilot\\autopilot-run-continuous.ps1",
   "controlPlaneCanary": {
     "enabled": true,
+    "policyPath": "plugins/cgc-pms-autopilot/references/control-plane-policy.md",
     "fingerprintPaths": [
       ".gitignore",
       ".gitattributes",
       "scripts/codex-autopilot/codex-autopilot.config.json",
+      "plugins/cgc-pms-autopilot/references/control-plane-policy.md",
       "scripts/codex-autopilot/autopilot-run-continuous.ps1",
       "scripts/codex-autopilot/autopilot-readiness-check.ps1",
       "scripts/codex-autopilot/autopilot-run-coordinator.ps1",
       "scripts/codex-autopilot/autopilot-run-coordinator-support.ps1",
       "scripts/codex-autopilot/autopilot-runtime-context.ps1",
+      "scripts/codex-autopilot/autopilot-refill.ps1",
+      "scripts/codex-autopilot/autopilot-ready.ps1",
       "scripts/codex-autopilot/autopilot-issue-lifecycle.ps1",
       "scripts/codex-autopilot/autopilot-executor-supervisor.ps1",
       "scripts/codex-autopilot/autopilot-stage-result.ps1",
@@ -40,6 +44,7 @@
       "scripts/codex-autopilot/tests/test-runner-compatibility.ps1",
       "scripts/codex-autopilot/tests/test-stage-result-contract.ps1",
       "scripts/codex-autopilot/tests/test-transition-writer.ps1",
+      "scripts/codex-autopilot/tests/test-refill-continuation.ps1",
       "scripts/codex-autopilot/tests/test-execution-modes.ps1",
       "scripts/codex-autopilot/tests/test-lock-and-fencing.ps1",
       "scripts/codex-autopilot/tests/test-recovery-reconciliation.ps1",
@@ -53,6 +58,8 @@
       "scripts/codex-autopilot/test-review-repair.ps1",
       "scripts/codex-autopilot/test-state-machine.ps1",
       "scripts/codex-autopilot/test-task-scoring.ps1",
+      "scripts/codex-autopilot/test-refill.ps1",
+      "scripts/codex-autopilot/test-mainline-owner-flow.ps1",
       "scripts/codex-autopilot/autopilot-review.ps1",
       "scripts/codex-autopilot/autopilot-closeout.ps1",
       "scripts/codex-autopilot/autopilot-state.ps1",
@@ -60,7 +67,9 @@
       "plugins/cgc-pms-autopilot/schemas/issue-checkpoint.schema.json",
       "plugins/cgc-pms-autopilot/schemas/loop-state.schema.json",
       "plugins/cgc-pms-autopilot/schemas/review-result.schema.json",
-      "plugins/cgc-pms-autopilot/schemas/task-score.schema.json"
+      "plugins/cgc-pms-autopilot/schemas/task-score.schema.json",
+      "plugins/cgc-pms-autopilot/schemas/ready-plan.schema.json",
+      "plugins/cgc-pms-autopilot/schemas/context-pack.schema.json"
     ]
   },
   "continuousRunnerEntry": "scripts\\codex-autopilot\\autopilot-run-continuous.ps1",
@@ -144,7 +153,8 @@
     "enabled": true,
     "model": "gpt-5.6-sol",
     "thinking": "high",
-    "timeoutSeconds": 1200
+    "timeoutSeconds": 300,
+    "heartbeatSeconds": 30
   },
   "closeout": {
     "enabled": true,
