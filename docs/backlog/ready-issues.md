@@ -4,14 +4,14 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-029` 已完成；`ISSUE-040-030` 已由知识图谱存量问题补货，等待本轮实施与验收。
+`ISSUE-040-030` 已完成，当前无待实施 Ready；本次 `启动迭代-3` 已达到三条实施上限。
 
 ### ISSUE-040-030：成本汇总历史只读入口与项目数据边界
 
 优先级：P1
 任务性质：缺口修复
 类型：成本管理 / 历史快照 / 用户入口 / 权限 / 租户隔离 / 项目数据范围 / 金额只读
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `A-01-COST-HISTORY`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`。
 存量问题键：[stock:A-01-COST-HISTORY]
 关联产品目标：在现有成本核对页提供项目成本汇总历史快照的只读入口，使已实现且受 `cost:summary:view` 与项目访问控制保护的接口对合格用户可达，并保持金额与租户边界。
