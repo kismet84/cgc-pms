@@ -1,5 +1,12 @@
 # Current Focus
 
+## 2026-07-15 增量：系统角色删除入口与安全边界完成
+
+- `ISSUE-040-027` 已在既有 admin-only 角色页提供 ADMIN/SUPER_ADMIN 可见的危险删除入口；后端保留细粒度授权与租户 fail-close，并新增系统/保留/高等级角色保护、用户绑定前置门禁和事务内角色菜单清理。
+- Ready lint、后端48项、前端38项、类型检查、目标 ESLint、差异检查、180秒稳定观察与真实浏览器均通过；唯一验收角色已确认删除且零残留，SUPER_ADMIN 行无删除项，控制台无 error/warn。主线程结构化复核为 `PASS`，findings=无。
+- `A-01-ROLE-DELETE` 已从唯一存量问题载体移除；A-01 守恒为有用户入口233、前端调用但无独立页面58、内部/集成/运维4、需补入口15、待废弃0、需要确认11，共321。
+- 新增后续项1（`UI-ROLE-RESPONSIVE-TABLE-ZERO-HEIGHT`）、关闭后续项1、后续项净变化0；新项已在唯一台账正式承接，当前产品候选排序不变。
+
 ## 2026-07-14 第46条主线：Codex 桌面原生 AutoPilot 执行宿主
 
 - 生产默认配置已切换为 `executionHost=desktop-native`：精确触发连续迭代后，由当前 Codex 桌面主线程读取 durable checkpoint 并直接推进 A-F；PowerShell 仅承担 checkpoint、状态迁移、验证、失败分类、Ready/复核/收口结果校验和 Git 边界等确定性原子动作。

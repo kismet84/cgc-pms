@@ -4,14 +4,14 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-当前 Ready 队列包含 1 条经知识图谱与当前分支交叉核验的 P0 存量叶子问题。
+本轮唯一 P0 存量叶子问题已完成，当前没有待派发 Ready；达到 `启动迭代-1` 上限后不再补货或启动下一任务。
 
 ### ISSUE-040-027：系统角色删除管理员入口与安全边界
 
 优先级：P0
 任务性质：缺口修复
 类型：系统管理 / 角色删除入口 / 权限 / 租户隔离 / 关联保护 / 破坏性操作
-状态：Ready
+状态：Done（2026-07-15）
 来源锚点：项目知识图谱当前问题 `A-01-ROLE-DELETE`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=0e4f793ff48be77416da2f8672348c12f3896167
 存量问题键：[stock:A-01-ROLE-DELETE]
 关联产品目标：在既有 admin-only 角色管理页让管理员可达已实现的角色删除能力，同时补齐当前 Service 对系统角色、用户绑定和角色菜单关系的 fail-close 边界，关闭 A-01 中 `DELETE /system/roles/{id}` 的最小叶子缺口。
@@ -80,6 +80,14 @@ Reviewer要求：按高风险权限与数据一致性变更复核 ADMIN/SUPER_AD
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm exec eslint src/api/modules/system.ts src/pages/system/roles/index.vue src/pages/system/roles/__tests__/index.test.ts`
 - `git diff --check`
+
+执行收口（2026-07-15，desktop-native 金丝雀）：
+- 既有 admin-only 角色页已增加 ADMIN/SUPER_ADMIN 可见的危险删除入口，精确调用无 body、无 params 的 `DELETE /system/roles/{id}`；系统/保留/高等级角色不提供前端删除项，删除前展示角色名称与不可逆二次确认。
+- 后端保留 ADMIN/SUPER_ADMIN 或 `system:role:delete` 授权与租户 fail-close；SYSTEM、ADMIN、SUPER_ADMIN、roleLevel<2 和任何仍绑定用户的角色均在关联删除前拒绝，合法未绑定自定义角色才在同一事务中清理角色菜单并删除角色。
+- Ready lint、后端48项、前端38项、类型检查、目标 ESLint 与差异检查通过；运行态切换至当前 worktree 后稳定观察180秒，真实浏览器完成唯一测试角色创建、确认删除、成功列表回读及 SUPER_ADMIN 无删除项验证，测试角色零残留，控制台无 error/warn。
+- 主线程按高风险权限与数据一致性独立阶段完成结构化复核，对实现差异哈希 `06566e5890d1d5b7341f9295431c7fb010aa53fe09655ea0dc777e24b16f217d` 给出 `PASS`，findings=无；未派子智能体，未伪造独立 Reviewer 进程证据。
+- `A-01-ROLE-DELETE` 已从 `docs/backlog/current-issues.json` 移除；A-01 守恒更新为有用户入口233、前端调用无独立页面58、内部4、需补入口15、需要确认11，总数321。
+- 正式报告：`docs/quality/ISSUE-040-027-系统角色删除管理员入口与安全边界验收报告.md`；新增后续项1（`UI-ROLE-RESPONSIVE-TABLE-ZERO-HEIGHT`）、关闭后续项1（`A-01-ROLE-DELETE`）、后续项净变化0。新项为既有响应式布局缺陷，不阻断本轮宽屏桌面管理员入口，已写入唯一台账，产品候选排序不变。
 
 ### ISSUE-040-018：AutoPilot 存量问题优先补货与闭环门禁
 
