@@ -21,6 +21,13 @@ export interface SysRoleVO {
   createdAt: string
 }
 
+export interface CreateRolePayload {
+  roleCode: string
+  roleName: string
+  status?: 'ENABLE' | 'DISABLE'
+  dataScope?: 'ALL' | 'DEPT' | 'DEPT_AND_CHILD' | 'SELF' | 'CUSTOM'
+}
+
 export interface SysMenuVO {
   id: number | string
   parentId: number | string

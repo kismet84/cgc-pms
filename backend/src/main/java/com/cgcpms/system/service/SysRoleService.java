@@ -29,6 +29,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SysRoleService {
 
+    private static final Set<String> RESERVED_ROLE_CODES = Set.of("ADMIN", "SUPER_ADMIN");
+    private static final Set<String> ALLOWED_STATUSES = Set.of("ENABLE", "DISABLE");
+    private static final Set<String> ALLOWED_DATA_SCOPES =
+            Set.of("ALL", "DEPT", "DEPT_AND_CHILD", "SELF", "CUSTOM");
+
     private final SysRoleMapper sysRoleMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
     private final SysMenuMapper sysMenuMapper;
@@ -52,16 +57,48 @@ public class SysRoleService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(SysRole role) {
         Long tenantId = UserContext.getCurrentTenantId();
+        normalizeAndValidateCreate(role);
         if (sysRoleMapper.selectCount(new LambdaQueryWrapper<SysRole>()
                 .eq(SysRole::getRoleCode, role.getRoleCode())
                 .eq(SysRole::getTenantId, tenantId)) > 0) {
             throw new BusinessException("ROLE_CODE_EXISTS", "角色编码已存在");
         }
-        if (role.getStatus() == null) role.setStatus("ENABLE");
+        role.setId(null);
         role.setTenantId(tenantId);
+        role.setRoleType("CUSTOM");
+        role.setRoleLevel(2);
         sysRoleMapper.insert(role);
         log.info("Creating role: {}", role.getRoleCode());
         return role.getId();
+    }
+
+    private void normalizeAndValidateCreate(SysRole role) {
+        String roleCode = role.getRoleCode() == null ? "" : role.getRoleCode().trim();
+        String roleName = role.getRoleName() == null ? "" : role.getRoleName().trim();
+        if (roleCode.isEmpty() || roleName.isEmpty()) {
+            throw new BusinessException("ROLE_CREATE_INVALID_FIELD", "角色编码和角色名称不能为空");
+        }
+        if (roleCode.length() > 50 || roleName.length() > 100) {
+            throw new BusinessException("ROLE_CREATE_INVALID_FIELD", "角色编码或角色名称长度超限");
+        }
+        if (RESERVED_ROLE_CODES.contains(roleCode.toUpperCase())
+                || (role.getRoleType() != null && !"CUSTOM".equalsIgnoreCase(role.getRoleType().trim()))
+                || (role.getRoleLevel() != null && !Integer.valueOf(2).equals(role.getRoleLevel()))) {
+            throw new BusinessException("ROLE_CREATE_PRIVILEGE_ESCALATION", "不允许创建系统或高等级角色");
+        }
+
+        String status = role.getStatus() == null || role.getStatus().isBlank()
+                ? "ENABLE" : role.getStatus().trim().toUpperCase();
+        String dataScope = role.getDataScope() == null || role.getDataScope().isBlank()
+                ? "SELF" : role.getDataScope().trim().toUpperCase();
+        if (!ALLOWED_STATUSES.contains(status) || !ALLOWED_DATA_SCOPES.contains(dataScope)) {
+            throw new BusinessException("ROLE_CREATE_INVALID_FIELD", "角色状态或数据范围不合法");
+        }
+
+        role.setRoleCode(roleCode);
+        role.setRoleName(roleName);
+        role.setStatus(status);
+        role.setDataScope(dataScope);
     }
 
     @Transactional(rollbackFor = Exception.class)

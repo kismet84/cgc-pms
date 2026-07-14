@@ -94,6 +94,11 @@ class SysRoleServiceTest {
         assertEquals("TEST_ROLE_1", saved.getRoleCode());
         assertEquals("测试角色一", saved.getRoleName());
         assertEquals("CUSTOM", saved.getRoleType());
+        assertEquals(2, saved.getRoleLevel());
+        assertEquals("ENABLE", saved.getStatus());
+        assertEquals("SELF", saved.getDataScope());
+        assertEquals(0, roleMenuMapper.selectCount(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, id)));
 
         System.out.println("testCreate_Success 通过: roleCode=" + saved.getRoleCode());
     }
@@ -127,11 +132,13 @@ class SysRoleServiceTest {
         SysRole r2 = new SysRole();
         r2.setRoleCode("DUP_CODE");
         r2.setRoleName("重复编码角色2");
+        long before = roleMapper.selectCount(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> roleService.create(r2),
                 "重复角色编码应抛出BusinessException");
         assertEquals("ROLE_CODE_EXISTS", ex.getCode());
+        assertEquals(before, roleMapper.selectCount(null), "重复编码不得产生部分写入");
 
         System.out.println("testCreate_DuplicateRoleCode 通过: code=" + ex.getCode());
     }
@@ -142,14 +149,51 @@ class SysRoleServiceTest {
     @DisplayName("创建角色 — 自动设置tenantId")
     void testCreate_TenantIdAutoSet() {
         SysRole role = new SysRole();
+        role.setId(999999L);
+        role.setTenantId(888L);
         role.setRoleCode("TENANT_ROLE");
         role.setRoleName("租户角色");
 
         Long id = roleService.create(role);
         SysRole saved = roleMapper.selectById(id);
         assertEquals(TENANT_0, saved.getTenantId(), "tenantId应自动从UserContext获取");
+        assertNotEquals(999999L, id, "客户端指定ID不得覆盖服务端生成ID");
 
         System.out.println("testCreate_TenantIdAutoSet 通过");
+    }
+
+    @Test
+    @Order(4)
+    @Transactional
+    @DisplayName("创建角色 — 拒绝保留编码、系统类型和高等级伪造")
+    void testCreate_RejectsPrivilegeEscalation() {
+        assertCreateRejected("ADMIN", null, null);
+        assertCreateRejected(" super_admin ", null, null);
+        assertCreateRejected("SYSTEM_TYPE_ROLE", "SYSTEM", null);
+        assertCreateRejected("LEVEL_ZERO_ROLE", null, 0);
+        assertCreateRejected("LEVEL_ONE_ROLE", null, 1);
+    }
+
+    @Test
+    @Order(4)
+    @Transactional
+    @DisplayName("创建角色 — 拒绝非法状态和数据范围")
+    void testCreate_RejectsInvalidStatusAndDataScope() {
+        SysRole invalidStatus = new SysRole();
+        invalidStatus.setRoleCode("INVALID_STATUS_ROLE");
+        invalidStatus.setRoleName("非法状态角色");
+        invalidStatus.setStatus("UNKNOWN");
+        BusinessException statusError = assertThrows(BusinessException.class,
+                () -> roleService.create(invalidStatus));
+        assertEquals("ROLE_CREATE_INVALID_FIELD", statusError.getCode());
+
+        SysRole invalidScope = new SysRole();
+        invalidScope.setRoleCode("INVALID_SCOPE_ROLE");
+        invalidScope.setRoleName("非法范围角色");
+        invalidScope.setDataScope("TENANT_ALL");
+        BusinessException scopeError = assertThrows(BusinessException.class,
+                () -> roleService.create(invalidScope));
+        assertEquals("ROLE_CREATE_INVALID_FIELD", scopeError.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -500,8 +544,13 @@ class SysRoleServiceTest {
         SysRole role = new SysRole();
         role.setRoleCode("ROLE_LEVEL_ZERO");
         role.setRoleName("冻结级别角色");
+        role.setTenantId(TENANT_0);
+        role.setRoleType("SYSTEM");
+        role.setStatus("ENABLE");
+        role.setDataScope("ALL");
         role.setRoleLevel(0);
-        Long roleId = roleService.create(role);
+        roleMapper.insert(role);
+        Long roleId = role.getId();
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> roleService.assignMenus(roleId, List.of(201L)));
@@ -625,5 +674,18 @@ class SysRoleServiceTest {
         menu.setStatus("ENABLE");
         menu.setVisible(0);
         menuMapper.insert(menu);
+    }
+
+    private void assertCreateRejected(String roleCode, String roleType, Integer roleLevel) {
+        long before = roleMapper.selectCount(null);
+        SysRole role = new SysRole();
+        role.setRoleCode(roleCode);
+        role.setRoleName("越权角色");
+        role.setRoleType(roleType);
+        role.setRoleLevel(roleLevel);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> roleService.create(role));
+        assertEquals("ROLE_CREATE_PRIVILEGE_ESCALATION", error.getCode());
+        assertEquals(before, roleMapper.selectCount(null), "拒绝越权载荷后不得插入角色");
     }
 }

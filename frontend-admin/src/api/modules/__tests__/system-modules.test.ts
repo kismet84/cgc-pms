@@ -25,6 +25,7 @@ import {
 import { deleteFile, getFileUrl, listFiles, uploadFile } from '../file'
 import {
   createMenu,
+  createRole,
   deleteMenu,
   getMenuDetail,
   getMenuList,
@@ -86,6 +87,41 @@ describe('system-related API modules', () => {
       method: 'delete',
     })
     expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+  })
+
+  it('builds an exact role creation request with ordinary business fields only', () => {
+    const payload = {
+      roleCode: 'COST_AUDITOR',
+      roleName: '成本审计员',
+      status: 'ENABLE' as const,
+      dataScope: 'SELF' as const,
+    }
+
+    createRole(payload)
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/roles',
+      method: 'post',
+      data: payload,
+    })
+    expect(Object.keys(mockRequest.mock.calls[0][0].data).sort()).toEqual(
+      ['roleCode', 'roleName', 'status', 'dataScope'].sort(),
+    )
+    for (const forbiddenField of [
+      'id',
+      'tenantId',
+      'roleType',
+      'roleLevel',
+      'menuIds',
+      'createdBy',
+      'createdAt',
+      'updatedBy',
+      'updatedAt',
+      'deletedFlag',
+    ]) {
+      expect(payload).not.toHaveProperty(forbiddenField)
+    }
   })
 
   it('builds an exact menu update request with business fields only', () => {

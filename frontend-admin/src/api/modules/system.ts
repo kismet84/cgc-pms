@@ -2,6 +2,7 @@ import { request } from '@/api/request'
 import type { PageParams, PageResult } from '@/types/api'
 import type {
   CreateMenuPayload,
+  CreateRolePayload,
   MenuTreeVO,
   SysMenuVO,
   SysRoleVO,
@@ -63,6 +64,15 @@ export function getRoles() {
   return request<SysRoleVO[]>({
     url: '/system/roles',
     method: 'get',
+  })
+}
+
+/** 新建普通自定义角色 */
+export function createRole(data: CreateRolePayload) {
+  return request<number | string>({
+    url: '/system/roles',
+    method: 'post',
+    data,
   })
 }
 

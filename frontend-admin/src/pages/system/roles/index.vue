@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { message } from 'ant-design-vue'
-import { MoreOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, PlusOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import axios from 'axios'
-import { getRoles } from '@/api/modules/system'
-import type { SysRoleVO } from '@/types/system'
+import { createRole, getRoles } from '@/api/modules/system'
+import { useUserStore } from '@/stores/user'
+import type { CreateRolePayload, SysRoleVO } from '@/types/system'
 import PermissionModal from './PermissionModal.vue'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton } from '@/components/list-page'
@@ -27,6 +28,7 @@ function statusColor(status: string | undefined): string {
 
 const loading = ref(false)
 const allRoles = ref<SysRoleVO[]>([])
+const userStore = useUserStore()
 const pageNo = ref(1)
 const pageSize = ref(20)
 
@@ -37,6 +39,13 @@ const filter = reactive({
 
 const permissionModalVisible = ref(false)
 const selectedRole = ref<SysRoleVO | null>(null)
+const createModalVisible = ref(false)
+const creating = ref(false)
+const createForm = reactive<CreateRolePayload>(defaultCreateForm())
+
+const canCreateRole = computed(() =>
+  userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
+)
 
 const gridColumns = computed(() => [
   { field: 'roleName', title: '角色名称', width: 150 },
@@ -97,6 +106,65 @@ async function fetchData() {
     allRoles.value = []
   } finally {
     loading.value = false
+  }
+}
+
+function defaultCreateForm(): CreateRolePayload {
+  return {
+    roleCode: '',
+    roleName: '',
+    status: 'ENABLE',
+    dataScope: 'SELF',
+  }
+}
+
+function errorMessage(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    return (error.response?.data as { message?: string })?.message || error.message
+  }
+  return error instanceof Error ? error.message : ''
+}
+
+function openCreateModal() {
+  Object.assign(createForm, defaultCreateForm())
+  createModalVisible.value = true
+}
+
+function closeCreateModal() {
+  if (!creating.value) createModalVisible.value = false
+}
+
+async function handleCreateRole() {
+  const roleCode = createForm.roleCode.trim()
+  const roleName = createForm.roleName.trim()
+  if (!roleCode || !roleName) {
+    message.error('请填写角色编码和角色名称')
+    return
+  }
+  if (roleCode.length > 50) {
+    message.error('角色编码不能超过50个字符')
+    return
+  }
+  if (roleName.length > 100) {
+    message.error('角色名称不能超过100个字符')
+    return
+  }
+
+  creating.value = true
+  try {
+    await createRole({
+      roleCode,
+      roleName,
+      status: createForm.status,
+      dataScope: createForm.dataScope,
+    })
+    createModalVisible.value = false
+    message.success('角色创建成功')
+    await fetchData()
+  } catch (error: unknown) {
+    message.error(errorMessage(error) || '角色创建失败')
+  } finally {
+    creating.value = false
   }
 }
 
@@ -164,6 +232,15 @@ onMounted(() => {
         <!-- 工具栏 -->
         <div class="lg-toolbar">
           <div class="lg-toolbar-left">
+            <a-button
+              v-if="canCreateRole"
+              type="primary"
+              data-testid="create-role-button"
+              @click="openCreateModal"
+            >
+              <template #icon><PlusOutlined /></template>
+              新建角色
+            </a-button>
             <a-button title="刷新角色列表" aria-label="刷新角色列表" @click="fetchData">
               <template #icon><ReloadOutlined /></template>
               刷新
@@ -254,6 +331,60 @@ onMounted(() => {
         </div>
       </aside>
     </div>
+
+    <a-modal
+      :open="createModalVisible"
+      title="新建角色"
+      :footer="null"
+      :closable="!creating"
+      :mask-closable="false"
+      @cancel="closeCreateModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="角色编码" required>
+          <a-input
+            v-model:value="createForm.roleCode"
+            :maxlength="50"
+            placeholder="请输入角色编码"
+            data-testid="create-role-code"
+          />
+        </a-form-item>
+        <a-form-item label="角色名称" required>
+          <a-input
+            v-model:value="createForm.roleName"
+            :maxlength="100"
+            placeholder="请输入角色名称"
+            data-testid="create-role-name"
+          />
+        </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="createForm.status" data-testid="create-role-status">
+            <a-select-option value="ENABLE">启用</a-select-option>
+            <a-select-option value="DISABLE">禁用</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="数据范围">
+          <a-select v-model:value="createForm.dataScope" data-testid="create-role-data-scope">
+            <a-select-option value="SELF">仅本人</a-select-option>
+            <a-select-option value="DEPT">本部门</a-select-option>
+            <a-select-option value="DEPT_AND_CHILD">本部门及以下</a-select-option>
+            <a-select-option value="ALL">全部数据</a-select-option>
+            <a-select-option value="CUSTOM">自定义</a-select-option>
+          </a-select>
+        </a-form-item>
+        <div class="lg-form-actions">
+          <a-button :disabled="creating" @click="closeCreateModal">取消</a-button>
+          <a-button
+            type="primary"
+            :loading="creating"
+            data-testid="create-role-submit"
+            @click="handleCreateRole"
+          >
+            创建
+          </a-button>
+        </div>
+      </a-form>
+    </a-modal>
 
     <!-- Permission Modal -->
     <PermissionModal

@@ -8,13 +8,26 @@ function flushPromises() {
 
 // ── Mock API module ──
 const mockGetRoles = vi.fn()
+const mockCreateRole = vi.fn()
 const mockGetMenuTree = vi.fn()
 const mockUpdateRoleMenus = vi.fn()
+const mockAccess = vi.hoisted(() => ({
+  roles: ['ADMIN'] as string[],
+  permissions: [] as string[],
+}))
 
 vi.mock('@/api/modules/system', () => ({
   getRoles: (...args: unknown[]) => mockGetRoles(...args),
+  createRole: (...args: unknown[]) => mockCreateRole(...args),
   getMenuTree: (...args: unknown[]) => mockGetMenuTree(...args),
   updateRoleMenus: (...args: unknown[]) => mockUpdateRoleMenus(...args),
+}))
+
+vi.mock('@/stores/user', () => ({
+  useUserStore: () => ({
+    roles: mockAccess.roles,
+    hasPermission: (permission: string) => mockAccess.permissions.includes(permission),
+  }),
 }))
 
 // ── Mock ant-design-vue message ──
@@ -128,6 +141,33 @@ const ATagStub = defineComponent({
   },
 })
 
+const ASelectStub = defineComponent({
+  name: 'ASelectStub',
+  props: { value: String },
+  emits: ['update:value'],
+  setup(props, { emit, slots }) {
+    return () =>
+      h(
+        'select',
+        {
+          class: 'mock-select',
+          value: props.value,
+          onChange: (event: Event) =>
+            emit('update:value', (event.target as HTMLSelectElement).value),
+        },
+        slots.default?.(),
+      )
+  },
+})
+
+const ASelectOptionStub = defineComponent({
+  name: 'ASelectOptionStub',
+  props: { value: String },
+  setup(props, { slots }) {
+    return () => h('option', { value: props.value }, slots.default?.())
+  },
+})
+
 const APaginationStub = defineComponent({
   name: 'APaginationStub',
   props: {
@@ -218,6 +258,8 @@ const stubs = {
   'a-input': AInputStub,
   'a-button': AButtonStub,
   'a-tag': ATagStub,
+  'a-select': ASelectStub,
+  'a-select-option': ASelectOptionStub,
   'a-pagination': APaginationStub,
   'a-spin': ASpinStub,
   'a-modal': AModalStub,
@@ -265,6 +307,9 @@ const mockMenuTree = [
 describe('RoleListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockAccess.roles.splice(0, mockAccess.roles.length, 'ADMIN')
+    mockAccess.permissions.splice(0)
+    mockGetRoles.mockResolvedValue(mockRoles)
   })
 
   it('fetches roles on mount', async () => {
@@ -304,6 +349,84 @@ describe('RoleListPage', () => {
     await flushPromises()
 
     expect(vi.mocked(message.error)).toHaveBeenCalledWith('Network error')
+  })
+
+  it.each(['ADMIN', 'SUPER_ADMIN'])('shows create entry for %s', async (role) => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, role)
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="create-role-button"]').exists()).toBe(true)
+  })
+
+  it('hides create entry from ordinary users even with system:role:add', async () => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, 'USER')
+    mockAccess.permissions.push('system:role:add')
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="create-role-button"]').exists()).toBe(false)
+  })
+
+  it('validates required fields and length limits before creating', async () => {
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="create-role-button"]').trigger('click')
+
+    await wrapper.find('[data-testid="create-role-submit"]').trigger('click')
+    expect(vi.mocked(message.error)).toHaveBeenLastCalledWith('请填写角色编码和角色名称')
+
+    await wrapper.find('[data-testid="create-role-code"]').setValue('R'.repeat(51))
+    await wrapper.find('[data-testid="create-role-name"]').setValue('普通角色')
+    await wrapper.find('[data-testid="create-role-submit"]').trigger('click')
+    expect(vi.mocked(message.error)).toHaveBeenLastCalledWith('角色编码不能超过50个字符')
+
+    await wrapper.find('[data-testid="create-role-code"]').setValue('NORMAL_ROLE')
+    await wrapper.find('[data-testid="create-role-name"]').setValue('角'.repeat(101))
+    await wrapper.find('[data-testid="create-role-submit"]').trigger('click')
+    expect(vi.mocked(message.error)).toHaveBeenLastCalledWith('角色名称不能超过100个字符')
+    expect(mockCreateRole).not.toHaveBeenCalled()
+  })
+
+  it('keeps the form open and shows the backend error when role code is duplicated', async () => {
+    mockCreateRole.mockRejectedValue(new Error('角色编码已存在'))
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="create-role-button"]').trigger('click')
+    await wrapper.find('[data-testid="create-role-code"]').setValue('DUPLICATE_ROLE')
+    await wrapper.find('[data-testid="create-role-name"]').setValue('重复角色')
+    await wrapper.find('[data-testid="create-role-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('角色编码已存在')
+    expect(wrapper.find('.mock-modal').exists()).toBe(true)
+    expect(
+      (wrapper.find('[data-testid="create-role-code"]').element as HTMLInputElement).value,
+    ).toBe('DUPLICATE_ROLE')
+  })
+
+  it('closes the form and refreshes the list after successful creation', async () => {
+    mockCreateRole.mockResolvedValue('1001')
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="create-role-button"]').trigger('click')
+    await wrapper.find('[data-testid="create-role-code"]').setValue('NEW_ROLE')
+    await wrapper.find('[data-testid="create-role-name"]').setValue('新角色')
+    await wrapper.find('[data-testid="create-role-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mockCreateRole).toHaveBeenCalledWith({
+      roleCode: 'NEW_ROLE',
+      roleName: '新角色',
+      status: 'ENABLE',
+      dataScope: 'SELF',
+    })
+    expect(vi.mocked(message.success)).toHaveBeenCalledWith('角色创建成功')
+    expect(wrapper.find('.mock-modal').exists()).toBe(false)
+    expect(mockGetRoles).toHaveBeenCalledTimes(2)
+    expect(mockUpdateRoleMenus).not.toHaveBeenCalled()
   })
 })
 
