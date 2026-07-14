@@ -263,23 +263,27 @@ describe('cash journal page', () => {
     },
   )
 
-  it('contains the wide table scroll inside the page and wraps primary actions at 440px', () => {
+  it('matches the project-list page rhythm and keeps the wide table responsive', () => {
     const source = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
-    expect(source).toMatch(
-      /\.cash-journal-page\s*\{[^}]*min-width:\s*0;[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+    expect(source).toContain('class="lg-list-page lg-page app-page cash-journal-page"')
+    expect(source).toContain('class="lg-grid cash-journal-workspace"')
+    expect(source).toContain('class="lg-analysis-rail cash-journal-analysis-rail"')
+    expect(source).not.toContain('<h1>')
+    expect(source.indexOf('class="lg-kpi-strip cash-journal-kpis"')).toBeLessThan(
+      source.indexOf('class="lg-search-bar cash-journal-filters"'),
     )
+    expect(source.indexOf('class="lg-search-bar cash-journal-filters"')).toBeLessThan(
+      source.indexOf('class="lg-list-table-panel cash-journal-table-card"'),
+    )
+    expect(source).toMatch(/\.cash-journal-page\s*\{[^}]*min-width:\s*0;/s)
+    expect(source).toMatch(/\.cash-journal-kpis\s*\{[^}]*gap:\s*0;/s)
+    expect(source).toMatch(/\.cash-journal-analysis-rail\s*\{[^}]*display:\s*flex\s*!important;/s)
     expect(source).toMatch(/\.cash-journal-table-card\s*\{[^}]*min-width:\s*0;/s)
     expect(source).toMatch(
       /\.cash-journal-table-wrap\s*\{[^}]*max-width:\s*100%;[^}]*overflow-x:\s*auto;/s,
     )
     expect(source).toMatch(
-      /@media \(max-width: 440px\)[\s\S]*?\.cash-journal-primary-actions\s*\{[^}]*position:\s*static;[^}]*width:\s*100%;/s,
-    )
-    expect(source).toMatch(
-      /@media \(max-width: 440px\)[\s\S]*?\.cash-journal-primary-actions :deep\(\.ant-btn\)\s*\{[^}]*flex:\s*1 1 132px;/s,
-    )
-    expect(source).toMatch(
-      /@media \(max-width: 440px\)[\s\S]*?\.filter-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/s,
+      /@media \(max-width: 768px\)[\s\S]*?\.cash-journal-filter-grid,[\s\S]*?grid-template-columns:\s*1fr;/s,
     )
   })
 })

@@ -178,4 +178,25 @@ describe('accounting entry page', () => {
     expect(source).not.toContain('/generate')
     expect(source).toContain('凭证生成入口暂未开放')
   })
+
+  it('uses the ledger layout with KPI context and an analysis rail', () => {
+    const source = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
+    expect(source).toContain('class="lg-list-page lg-page app-page accounting-entry-page"')
+    expect(source).toContain('class="lg-kpi-strip accounting-entry-kpis"')
+    expect(source).toContain('class="lg-list-table-panel accounting-entry-table-panel"')
+    expect(source).toContain('class="lg-analysis-rail accounting-entry-analysis-rail"')
+    expect(source).not.toContain('<h1>')
+    expect(source).not.toContain('<a-alert')
+    expect(source.indexOf('class="lg-kpi-strip accounting-entry-kpis"')).toBeLessThan(
+      source.indexOf('class="lg-search-bar accounting-entry-filter"'),
+    )
+    expect(source.indexOf('class="lg-search-bar accounting-entry-filter"')).toBeLessThan(
+      source.indexOf('class="lg-list-table-panel accounting-entry-table-panel"'),
+    )
+    expect(source).toMatch(/\.accounting-entry-kpis\s*\{[^}]*gap:\s*0;/s)
+    expect(source).toMatch(
+      /\.accounting-entry-analysis-rail\s*\{[^}]*display:\s*flex\s*!important;/s,
+    )
+    expect(source).toMatch(/\.accounting-entry-table-panel\s*\{[^}]*min-width:\s*0;/s)
+  })
 })

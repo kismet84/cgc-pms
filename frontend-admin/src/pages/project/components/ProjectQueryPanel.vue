@@ -38,7 +38,6 @@ const emit = defineEmits<{
           placeholder="全部类型"
           allow-clear
           class="project-search-select"
-          size="large"
           @change="emit('search')"
         >
           <a-select-option v-for="item in projectTypeOptions" :key="item" :value="item">
@@ -53,7 +52,6 @@ const emit = defineEmits<{
           placeholder="全部状态"
           allow-clear
           class="project-search-select"
-          size="large"
           @change="emit('search')"
         >
           <a-select-option v-for="item in projectStatusOptions" :key="item" :value="item">
@@ -69,20 +67,19 @@ const emit = defineEmits<{
           placeholder="搜索项目编号、名称、类型、建设单位"
           allow-clear
           class="project-search-input"
-          size="large"
           @press-enter="emit('search')"
         >
           <template #prefix><SearchOutlined class="project-search-icon" /></template>
         </a-input>
       </div>
       <div class="project-search-actions">
-        <a-button type="primary" size="large" @click="emit('search')">搜索</a-button>
-        <a-button size="large" @click="emit('reset')">
+        <a-button type="primary" @click="emit('search')">搜索</a-button>
+        <a-button @click="emit('reset')">
           <template #icon><ReloadOutlined /></template>
           重置
         </a-button>
         <a-dropdown trigger="click">
-          <a-button size="large">
+          <a-button>
             <template #icon><SettingOutlined /></template>
             筛选栏设置
           </a-button>
@@ -107,16 +104,24 @@ const emit = defineEmits<{
 
 <style scoped>
 .project-query-panel {
-  align-items: stretch;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-rows: 25px 40px;
+  row-gap: 10px;
   width: 100%;
+  height: 95px;
+  min-height: 95px;
+  box-sizing: border-box;
+  padding: 10px 14px;
   margin: 0;
+  border: 0;
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    var(--shadow-soft);
 }
 
 .project-filter-grid {
   display: flex;
-  flex-wrap: wrap;
-  flex: 1 0 100%;
+  height: 25px;
   gap: 12px;
   width: 100%;
   min-width: 0;
@@ -124,6 +129,7 @@ const emit = defineEmits<{
 
 .project-filter-item {
   flex: 1 1 180px;
+  height: 25px;
   min-width: 0;
 }
 
@@ -134,6 +140,30 @@ const emit = defineEmits<{
 .project-filter-item :deep(.ant-select),
 .project-filter-item :deep(.ant-input-affix-wrapper) {
   width: 100%;
+  height: 25px;
+}
+
+.project-filter-item :deep(.ant-select-selector) {
+  height: 25px !important;
+  min-height: 25px !important;
+  padding-inline: 10px !important;
+}
+
+.project-filter-item :deep(.ant-select-selection-item),
+.project-filter-item :deep(.ant-select-selection-placeholder) {
+  font-size: 13px;
+  line-height: 23px !important;
+}
+
+.project-filter-item :deep(.ant-input-affix-wrapper) {
+  min-height: 25px;
+  padding-block: 0;
+  padding-inline: 10px;
+}
+
+.project-filter-item :deep(.ant-input) {
+  font-size: 13px;
+  line-height: 23px;
 }
 
 .project-search-select {
@@ -146,9 +176,8 @@ const emit = defineEmits<{
 
 .project-filter-foot {
   display: flex;
-  flex: 1 0 100%;
-  flex-wrap: wrap;
   align-items: center;
+  height: 40px;
   gap: 10px;
   margin-top: 0;
   width: 100%;
@@ -157,10 +186,20 @@ const emit = defineEmits<{
 
 .project-filter-item-keyword {
   flex: 1 1 320px;
+  height: 40px;
 }
 
 .project-search-input {
   min-width: 0;
+}
+
+.project-filter-item-keyword :deep(.ant-input-affix-wrapper) {
+  height: 40px;
+  min-height: 40px;
+}
+
+.project-filter-item-keyword :deep(.ant-input) {
+  line-height: 38px;
 }
 
 .project-search-actions {
@@ -171,6 +210,22 @@ const emit = defineEmits<{
   margin-left: auto;
 }
 
+.project-search-actions :deep(.ant-btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  min-width: 52px;
+  padding-inline: 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.project-search-actions :deep(.ant-btn .anticon) {
+  line-height: 1;
+}
+
 @media (max-width: 1200px) {
   .project-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -178,13 +233,21 @@ const emit = defineEmits<{
 }
 
 @media (max-width: 768px) {
+  .project-query-panel {
+    display: flex;
+    height: auto;
+    min-height: 95px;
+  }
+
   .project-filter-grid {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    height: auto;
   }
 
   .project-filter-foot {
     flex-direction: column;
     align-items: stretch;
+    height: auto;
   }
 
   .project-search-actions {

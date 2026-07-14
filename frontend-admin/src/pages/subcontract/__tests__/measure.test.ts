@@ -50,7 +50,7 @@ describe('SubcontractMeasurePage submit-approval button', () => {
     const mainColumnClose = source.indexOf('</div>\n\n      <SubcontractMeasureAnalysisRail')
     expect(mainColumnClose).toBeGreaterThan(-1)
     expect(source).toMatch(
-      /<div class="lg-grid">[\s\S]*<div class="subcontract-measure-main-column">[\s\S]*<\/main>\s*<\/div>\s*<SubcontractMeasureAnalysisRail/,
+      /<div class="lg-grid subcontract-measure-workspace">[\s\S]*<div class="lg-left subcontract-measure-main-column">[\s\S]*<\/main>\s*<\/div>\s*<SubcontractMeasureAnalysisRail/,
     )
     expect(analysisRailSource).toContain(
       '<aside class="lg-analysis-rail subcontract-measure-analysis-rail"',
@@ -80,7 +80,7 @@ describe('SubcontractMeasurePage submit-approval button', () => {
   })
 
   it('keeps KPI template classes and matching scoped style selectors', () => {
-    expect(source).toContain('class="subcontract-measure-kpi-summary"')
+    expect(source).toContain('class="lg-kpi-strip subcontract-measure-kpi-summary"')
     expect(source).toContain('class="subcontract-measure-kpi-item"')
     expect(source).toContain('class="subcontract-measure-kpi-icon is-blue"')
     expect(source).toContain('class="subcontract-measure-kpi-label"')

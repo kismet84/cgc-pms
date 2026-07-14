@@ -58,7 +58,7 @@ function dotColor(label: string): string {
 
 <template>
   <aside class="lg-analysis-rail invoice-analysis-rail" aria-label="发票辅助分析">
-    <div class="invoice-analysis-panel">
+    <div class="lg-analysis-panel invoice-analysis-panel">
       <header class="invoice-analysis-head">
         <div>
           <div class="invoice-analysis-title">发票分析</div>
@@ -124,19 +124,20 @@ function dotColor(label: string): string {
 
 <style scoped>
 .invoice-analysis-rail {
-  width: 336px;
+  width: var(--lg-rail-width, 240px);
 }
 
 .invoice-analysis-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 0;
   height: 100%;
-  padding: 18px;
+  padding: 0;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
 .invoice-analysis-head,
@@ -145,6 +146,11 @@ function dotColor(label: string): string {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+
+.invoice-analysis-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .invoice-analysis-title {
@@ -165,7 +171,7 @@ function dotColor(label: string): string {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding-top: 16px;
+  padding: 12px 16px;
   border-top: 1px solid var(--border-subtle);
 }
 
