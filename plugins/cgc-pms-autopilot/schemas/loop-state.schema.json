@@ -142,6 +142,7 @@
     "transitionId": { "type": "string" },
     "generation": { "type": "integer", "minimum": 0 },
     "controlPlaneFingerprint": { "type": "string", "pattern": "^$|^[a-f0-9]{64}$" },
+    "executionHost": { "enum": ["desktop-native", "cli-legacy"] },
     "enabled": { "type": "boolean" },
     "mode": { "type": "string" },
     "iterationCompleted": { "type": "integer", "minimum": 0 },

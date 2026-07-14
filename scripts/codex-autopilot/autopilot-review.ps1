@@ -7,6 +7,21 @@ $nativeCommandLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
 if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
 $metricsLibrary = Join-Path $PSScriptRoot 'autopilot-metrics.ps1'
 if (!(Get-Command New-AutopilotInvocationId -ErrorAction SilentlyContinue)) { . $metricsLibrary }
+$executionHostLibrary = Join-Path $PSScriptRoot 'autopilot-execution-host.ps1'
+if (!(Get-Command Assert-AutopilotLegacyModelProcessAllowed -ErrorAction SilentlyContinue)) { . $executionHostLibrary }
+
+function Import-AutopilotDesktopReviewResult {
+  param(
+    [Parameter(Mandatory)][string]$RequestPath,
+    [Parameter(Mandatory)][string]$ResultPath
+  )
+  if (!(Test-Path -LiteralPath $RequestPath -PathType Leaf)) { throw 'desktop review request is missing' }
+  if (!(Test-Path -LiteralPath $ResultPath -PathType Leaf)) { throw 'desktop review result is missing' }
+  $request = Get-Content -LiteralPath $RequestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  $result = Get-Content -LiteralPath $ResultPath -Raw -Encoding UTF8 | ConvertFrom-Json
+  Get-AutopilotReviewDisposition -ReviewResult $result -ExpectedIssueId ([string]$request.issueId) -ExpectedDiffHash ([string]$request.diffSha256) | Out-Null
+  return $result
+}
 
 function Write-AutopilotReviewDiff {
   param([Parameter(Mandatory)][string]$Text, [Parameter(Mandatory)][string]$OutputPath)
@@ -142,7 +157,8 @@ function New-AutopilotReviewerToolBlockedResult {
 }
 
 function Invoke-AutopilotReviewerProcess {
-  param([string]$Worktree, [string]$RequestPath, [string]$ResultPath, [string]$SchemaPath, [string]$Model, [string]$Thinking, [int]$TimeoutSeconds, [string]$Sandbox, [string]$IssueId, [string]$RunId, [scriptblock]$InvocationWriter)
+  param([string]$Worktree, [string]$RequestPath, [string]$ResultPath, [string]$SchemaPath, [string]$Model, [string]$Thinking, [int]$TimeoutSeconds, [string]$Sandbox, [string]$IssueId, [string]$RunId, [scriptblock]$InvocationWriter, [string]$ExecutionHost = 'cli-legacy')
+  Assert-AutopilotLegacyModelProcessAllowed -ExecutionHost $ExecutionHost -Role 'REVIEWER' | Out-Null
   $codex = Resolve-AutopilotCodexInvocation
   $prompt = "Act as an independent reviewer. Read only the structured request at $RequestPath and files it references. Return JSON matching $SchemaPath."
   $arguments = @('exec','--ephemeral','--sandbox',$Sandbox,'--model',$Model,'-c',"model_reasoning_effort=$Thinking",'--cd',$Worktree,'--output-schema',$SchemaPath,'--output-last-message',$ResultPath,'-')
@@ -187,13 +203,15 @@ function Invoke-AutopilotReviewer {
     [int]$TimeoutSeconds = 1200,
     [string]$IssueId = '',
     [string]$RunId = '',
-    [scriptblock]$InvocationWriter
+    [scriptblock]$InvocationWriter,
+    [string]$ExecutionHost = 'cli-legacy'
 )
+  Assert-AutopilotLegacyModelProcessAllowed -ExecutionHost $ExecutionHost -Role 'REVIEWER' | Out-Null
   if (!$IssueId) { $IssueId = [string](Get-Content -LiteralPath $RequestPath -Raw -Encoding UTF8 | ConvertFrom-Json).issueId }
   $headBefore = (Invoke-AutopilotGit -RepoRoot $Worktree -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
   $fingerprintBefore = Get-AutopilotDiffHash -Worktree $Worktree -BaseCommit $headBefore
   try {
-    $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'read-only' -IssueId $IssueId -RunId $RunId -InvocationWriter $InvocationWriter
+    $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'read-only' -IssueId $IssueId -RunId $RunId -InvocationWriter $InvocationWriter -ExecutionHost $ExecutionHost
   } catch {
     if ($_.Exception.Message -notmatch '(?i)orchestrator_helper_launch_failed|sandbox.{0,80}initialization failed|os error 3') { throw }
     $review = New-AutopilotReviewerToolBlockedResult -RequestPath $RequestPath -ResultPath $ResultPath -Reason $_.Exception.Message
@@ -201,7 +219,7 @@ function Invoke-AutopilotReviewer {
   if (Test-AutopilotReviewerSandboxFailure -ReviewResult $review) {
     Remove-Item -LiteralPath $ResultPath -Force -ErrorAction SilentlyContinue
     try {
-      $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'danger-full-access' -IssueId $IssueId -RunId $RunId -InvocationWriter $InvocationWriter
+      $review = Invoke-AutopilotReviewerProcess -Worktree $Worktree -RequestPath $RequestPath -ResultPath $ResultPath -SchemaPath $SchemaPath -Model $Model -Thinking $Thinking -TimeoutSeconds $TimeoutSeconds -Sandbox 'danger-full-access' -IssueId $IssueId -RunId $RunId -InvocationWriter $InvocationWriter -ExecutionHost $ExecutionHost
     } catch {
       if ($_.Exception.Message -notmatch '(?i)orchestrator_helper_launch_failed|sandbox.{0,80}initialization failed|os error 3') { throw }
       $review = New-AutopilotReviewerToolBlockedResult -RequestPath $RequestPath -ResultPath $ResultPath -Reason $_.Exception.Message

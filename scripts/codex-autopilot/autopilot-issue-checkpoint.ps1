@@ -35,7 +35,7 @@ function Assert-AutopilotCheckpointFenceContext {
 function ConvertTo-AutopilotIssueCheckpointCurrent {
   param([Parameter(Mandatory)][object]$Checkpoint)
   foreach ($entry in @(
-    @('runInstanceId',''), @('leaseEpoch',''), @('transitionId',''), @('generation',0), @('controlPlaneFingerprint',''), @('semanticProgressAt',$null), @('failureRecoveryKeys',@())
+    @('runInstanceId',''), @('leaseEpoch',''), @('transitionId',''), @('generation',0), @('controlPlaneFingerprint',''), @('executionHost','cli-legacy'), @('semanticProgressAt',$null), @('failureRecoveryKeys',@())
   )) {
     $name = [string]$entry[0]
     $present = ($Checkpoint -is [Collections.IDictionary] -and $Checkpoint.Contains($name)) -or ($Checkpoint.PSObject.Properties.Name -contains $name)
@@ -178,7 +178,7 @@ function Assert-AutopilotIssueCheckpoint {
     'schemaVersion','issueId','readyPath','readyContentHash','baseCommit','worktree','branch',
     'allowedPathsHash','forbiddenPathsHash','phase','createdAt','updatedAt','phaseStartedAt',
     'lastHeartbeatAt','artifacts','evidence','metrics','quarantineReason','runInstanceId','leaseEpoch',
-    'transitionId','generation','controlPlaneFingerprint','semanticProgressAt','failureRecoveryKeys'
+    'transitionId','generation','controlPlaneFingerprint','executionHost','semanticProgressAt','failureRecoveryKeys'
   )
   foreach ($name in $required) {
     $present = ($Checkpoint -is [System.Collections.IDictionary] -and $Checkpoint.Contains($name)) -or ($Checkpoint.PSObject.Properties.Name -contains $name)
@@ -186,6 +186,7 @@ function Assert-AutopilotIssueCheckpoint {
   }
   if ([int]$Checkpoint.schemaVersion -ne $script:AutopilotIssueCheckpointVersion) { throw "Unsupported Issue checkpoint schemaVersion: $($Checkpoint.schemaVersion)" }
   if ([int]$Checkpoint.generation -lt 0) { throw 'Issue checkpoint generation cannot be negative' }
+  if ([string]$Checkpoint.executionHost -notin @('desktop-native','cli-legacy')) { throw 'Issue checkpoint executionHost is invalid' }
   if ([string]$Checkpoint.issueId -notmatch '^ISSUE-[0-9-]+$') { throw 'Issue checkpoint has invalid issueId' }
   if ([string]$Checkpoint.readyContentHash -notmatch '^[a-f0-9]{64}$') { throw 'Issue checkpoint has invalid readyContentHash' }
   if ([string]$Checkpoint.baseCommit -notmatch '^[a-f0-9]{40}$') { throw 'Issue checkpoint has invalid baseCommit' }
@@ -206,14 +207,16 @@ function Assert-AutopilotIssueCheckpoint {
 }
 
 function Write-AutopilotIssueCheckpointAtomic {
-  param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][object]$Checkpoint)
+  param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][object]$Checkpoint, [string]$ExecutionHost = '')
   Assert-AutopilotCheckpointFenceContext | Out-Null
   $Checkpoint = ConvertTo-AutopilotIssueCheckpointCurrent $Checkpoint
+  if (!$ExecutionHost -and $script:ExecutionHost) { $ExecutionHost = [string]$script:ExecutionHost }
   $now = [datetimeoffset]::Now.ToString('o')
   Set-AutopilotCheckpointProperty $Checkpoint 'updatedAt' $now
   Set-AutopilotCheckpointProperty $Checkpoint 'lastHeartbeatAt' $now
   Set-AutopilotCheckpointProperty $Checkpoint 'generation' ([int](Get-AutopilotCheckpointProperty $Checkpoint 'generation' 0) + 1)
   Set-AutopilotCheckpointProperty $Checkpoint 'transitionId' ([guid]::NewGuid().ToString('N'))
+  if ($ExecutionHost) { Set-AutopilotCheckpointProperty $Checkpoint 'executionHost' $ExecutionHost }
   if ($script:AutopilotCheckpointFenceContext) {
     Set-AutopilotCheckpointProperty $Checkpoint 'runInstanceId' ([string]$script:AutopilotCheckpointFenceContext.runInstanceId)
     Set-AutopilotCheckpointProperty $Checkpoint 'leaseEpoch' ([string]$script:AutopilotCheckpointFenceContext.leaseEpoch)
@@ -257,7 +260,8 @@ function New-AutopilotIssueCheckpoint {
     [Parameter(Mandatory)][string]$Branch,
     [string[]]$AllowedPaths = @(),
     [string[]]$ForbiddenPaths = @(),
-    [string]$ArtifactDirectory = ''
+    [string]$ArtifactDirectory = '',
+    [string]$ExecutionHost = 'cli-legacy'
   )
   $path = Get-AutopilotIssueCheckpointPath -AutoDir $AutoDir -IssueId $IssueId
   if (Test-Path -LiteralPath $path) { throw "Issue checkpoint already exists; fresh implementation dispatch refused: $IssueId" }
@@ -286,6 +290,7 @@ function New-AutopilotIssueCheckpoint {
     transitionId = ''
     generation = 0
     controlPlaneFingerprint = ''
+    executionHost = $ExecutionHost
     semanticProgressAt = $now
     failureRecoveryKeys = @()
     artifacts = [ordered]@{
@@ -303,7 +308,7 @@ function New-AutopilotIssueCheckpoint {
     }
     quarantineReason = $null
   }
-  return Write-AutopilotIssueCheckpointAtomic -Path $path -Checkpoint $checkpoint
+  return Write-AutopilotIssueCheckpointAtomic -Path $path -Checkpoint $checkpoint -ExecutionHost $ExecutionHost
 }
 
 function Register-AutopilotIssueMetricObservation {

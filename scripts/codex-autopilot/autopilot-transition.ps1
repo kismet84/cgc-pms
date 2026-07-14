@@ -42,7 +42,7 @@ function New-RunLock {
   )
 
   try {
-    $lock = New-AutopilotRunLock -AutoDir $AutoDir -RepoRoot $RepoRoot -RunId $(if ($script:RunContext) { $script:RunContext.id } else { 'run-' + [guid]::NewGuid().ToString('N') }) -Mode $Mode -ControlPlaneFingerprint ([string]$script:ControlPlaneFingerprint) -MaxRunMinutes $MaxRunMinutes
+    $lock = New-AutopilotRunLock -AutoDir $AutoDir -RepoRoot $RepoRoot -RunId $(if ($script:RunContext) { $script:RunContext.id } else { 'run-' + [guid]::NewGuid().ToString('N') }) -Mode $Mode -ControlPlaneFingerprint ([string]$script:ControlPlaneFingerprint) -ExecutionHost $(if ($script:ExecutionHost) { [string]$script:ExecutionHost } else { 'cli-legacy' }) -MaxRunMinutes $MaxRunMinutes
     if ($lock.tookOverStale) { Write-Host 'STALE_RUN_LOCK_REMOVED'; Write-Host 'STALE_RUN_LOCK_TAKEN_OVER' }
     Write-Host "RUN_LOCK_ACQUIRED"
     return $lock
@@ -258,6 +258,7 @@ function Write-State {
     autoMerge = if ($config.PSObject.Properties.Name -contains 'autoMerge') { [bool]$config.autoMerge } else { $true }
     autoPush = $false
     allowTestDataReset = Test-Path (Join-Path $AutoDir 'ALLOW_TEST_DATA_RESET')
+    executionHost = if ($script:ExecutionHost) { [string]$script:ExecutionHost } else { [string](Get-AutopilotStateProperty $existing 'executionHost' 'cli-legacy') }
   }
   $transitionId = ''
   if ($issueStateBinding.checkpointPath -and (Test-Path -LiteralPath $issueStateBinding.checkpointPath -PathType Leaf)) {
@@ -266,5 +267,5 @@ function Write-State {
       $transitionId = [string]$phaseCheckpoint.transitionId
     }
   }
-  Write-AutopilotStateAtomic -Path $statePath -State $state -TransitionId $transitionId | Out-Null
+  Write-AutopilotStateAtomic -Path $statePath -State $state -TransitionId $transitionId -ExecutionHost $state.executionHost | Out-Null
 }

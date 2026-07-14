@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-14 增量：Codex 桌面原生 AutoPilot 执行宿主
+
+- AutoPilot 生产控制权从 PowerShell 嵌套 Planner/Executor/Reviewer 模型进程迁移到当前 Codex 桌面主线程；脚本保留为确定性原子工具，默认 runner 入口在桌面宿主下只返回结构化 handoff。
+- 旧 CLI 路径保留为显式兼容和紧急回退，缺失新字段的历史配置仍可读取；`desktop-native` 对所有旧模型进程入口 fail-close，不允许静默降级。state、Issue checkpoint、run lock 与只读 checkpoint 汇总共同记录执行宿主和恢复事实。
+- 本次是本地治理控制面迁移，不改变产品业务能力、权限、租户、金额或候选排序。自动化兼容矩阵已通过，但真实单 Issue 金丝雀尚未由用户启动；在 closeout ledger、state、KG cursor 与 flags 完整读回前，N>1/无界继续阻塞。
+
 ## 2026-07-14 增量：AutoPilot Evidence v2 与收口事实链
 
 - AutoPilot 已具备模型调用、Context Base/Delta 构造、验证执行/复用和报告投影的去重计数；RUN Planner 与 Issue Executor/Reviewer 保持作用域隔离，缺失 token 数据不再伪记为 0。

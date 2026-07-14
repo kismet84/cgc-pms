@@ -1,3 +1,6 @@
+$executionHostLibrary = Join-Path $PSScriptRoot 'autopilot-execution-host.ps1'
+if (!(Get-Command Assert-AutopilotLegacyModelProcessAllowed -ErrorAction SilentlyContinue)) { . $executionHostLibrary }
+
 function Get-ExecutorCommand {
   param(
     [string]$RepoRoot,
@@ -40,8 +43,10 @@ function Invoke-ChildWithHeartbeat {
     [int]$HeartbeatMilliseconds = 30000,
     [object[]]$LongRunningCommands = @(),
     [string[]]$SemanticEvidencePaths = @(),
-    [string]$Task = ''
+    [string]$Task = '',
+    [string]$ExecutionHost = 'cli-legacy'
   )
+  Assert-AutopilotLegacyModelProcessAllowed -ExecutionHost $ExecutionHost -Role 'EXECUTOR_SUPERVISOR' | Out-Null
   function Stop-ChildProcessTree([Diagnostics.Process]$Child) {
     & taskkill.exe /PID $Child.Id /T /F 2>$null | Out-Null
     if (!$Child.HasExited) { $Child.Kill() }

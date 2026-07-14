@@ -65,6 +65,7 @@ function New-AutopilotRunLock {
     [Parameter(Mandatory)][string]$RunId,
     [Parameter(Mandatory)][string]$Mode,
     [string]$ControlPlaneFingerprint = '',
+    [string]$ExecutionHost = 'cli-legacy',
     [int]$MaxRunMinutes = 120
   )
   if (!(Test-Path -LiteralPath $AutoDir)) { New-Item -ItemType Directory -Path $AutoDir -Force | Out-Null }
@@ -91,6 +92,7 @@ function New-AutopilotRunLock {
       heartbeatAt = $now.ToString('o')
       mode = $Mode
       controlPlaneFingerprint = $ControlPlaneFingerprint
+      executionHost = $ExecutionHost
       issueId = ''
       tookOverStale = $tookOverStale
     }

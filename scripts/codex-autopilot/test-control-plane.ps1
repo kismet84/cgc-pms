@@ -58,6 +58,7 @@ $parseFailures = @(
 if ($parseFailures.Count -gt 0) { throw "AutoPilot scripts must parse through PowerShell 7 -File defaults: $($parseFailures | ConvertTo-Json -Compress -Depth 4)" }
 
 if ($config.controlPlane -ne 'scripts\codex-autopilot\autopilot-run-continuous.ps1') { throw 'single controlPlane is not configured' }
+if ($config.executionHost -ne 'desktop-native' -or $config.legacyFallbackEnabled -ne $true) { throw 'desktop-native execution host or explicit legacy fallback is not configured' }
 if (!$config.issueGraph -or $config.issueGraph.enabled -ne $true -or $config.issueGraph.allowRegistryFallback -ne $false -or [int]$config.issueGraph.queryLimit -gt 200) { throw 'knowledge-graph-first refill fail-close config is invalid' }
 if (!$config.taskScoring -or $config.taskScoring.enabled -ne $true -or $config.taskScoring.activeVersion -ne 'autopilot-task-score/v2' -or $config.taskScoring.approvalStatus -ne 'APPROVED') { throw 'approved task scoring v2 must be active' }
 $weights = $config.taskScoring.weights

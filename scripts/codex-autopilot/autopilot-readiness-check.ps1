@@ -5,6 +5,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$executionHostLibrary = Join-Path $PSScriptRoot 'autopilot-execution-host.ps1'
+. $executionHostLibrary
 
 function Add-Gate {
   param(
@@ -219,7 +221,10 @@ if ($executorMissing.Count -eq 0) {
 
 $realExecutorMissing = Test-FileContains $executorPath @("Invoke-ConfiguredIssueExecutor", "STOP_NO_EXECUTION_ARTIFACTS", "STOP_EXECUTOR_COMMAND_MISSING")
 $issueExecutor = $config.issueExecutor
-if ($realExecutorMissing.Count -gt 0) {
+$executionHost = Get-AutopilotExecutionHost -Config $config
+if ($executionHost -eq 'desktop-native') {
+  Add-Gate $gates "executor.realExecution" "pass" "Codex desktop main thread is the configured implementation host; legacy CLI remains fenced." @{ executionHost=$executionHost; nestedModelCliInvocationAllowed=$false }
+} elseif ($realExecutorMissing.Count -gt 0) {
   Add-Gate $gates "executor.realExecution" "fail" "Executor script does not expose a real configured execution path." @{ missing = $realExecutorMissing }
 } elseif (!$issueExecutor -or !$issueExecutor.command) {
   Add-Gate $gates "executor.realExecution" "fail" "issueExecutor.command is required; noop-only execution cannot enter unattended mode." $null

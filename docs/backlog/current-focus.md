@@ -1,5 +1,12 @@
 # Current Focus
 
+## 2026-07-14 第46条主线：Codex 桌面原生 AutoPilot 执行宿主
+
+- 生产默认配置已切换为 `executionHost=desktop-native`：精确触发连续迭代后，由当前 Codex 桌面主线程读取 durable checkpoint 并直接推进 A-F；PowerShell 仅承担 checkpoint、状态迁移、验证、失败分类、Ready/复核/收口结果校验和 Git 边界等确定性原子动作。
+- 旧 Planner、Executor、Reviewer 与 Executor supervisor 在启动模型链前统一执行宿主门禁；桌面宿主只返回结构化 handoff，新增自测证明嵌套模型 CLI 调用数为 0。缺少宿主字段的旧 fixture 继续按 `cli-legacy` 兼容，回退不得静默发生。
+- state、Issue checkpoint 与 run lock 支持 `executionHost` 事实；历史 JSON Schema 保持可选字段兼容，读取后迁移。只读 checkpoint 汇总当前 config/state/checkpoint/run-lock/指纹/worktree，不改写恢复现场。
+- 自动化实现验收通过；`ISSUE-040-025` 的 `REPAIRING` checkpoint 与 worktree 原样保留，`pause.flag` 阻止下一任务派发。本次未执行真实 `启动迭代-1`，因此新指纹的 N>1/无界放量及 desktop-native 默认宿主最终可用性仍等待用户另行明确金丝雀。
+
 ## 2026-07-14 第45条主线：AutoPilot 模型往返证据复用与收口事实源
 
 - Executor、Reviewer 与 Planner 的真实进程启动点写入稳定 invocationId；Issue 与 RUN 分开计数，Planner 只保存候选引用、不向候选 Issue 扇出，token 不可得时明确标记 `not_available`。

@@ -244,6 +244,8 @@ CI 与验收失败分类规则：
 
 ### 连续执行效率与收口优化规则
 
+- 生产配置 `executionHost=desktop-native` 时，连续迭代由当前 Codex 桌面主线程直接推进；PowerShell 只用于 checkpoint、状态迁移、验证、失败分类、Ready/复核/收口结果校验和 Git 边界等确定性原子动作。禁止 runner 启动嵌套 Planner、Executor、Reviewer `codex exec`，也不得静默回退 `cli-legacy`。
+- `cli-legacy` 仅用于显式兼容测试或用户明确授权的紧急回退；无论宿主为何都不得绕过 Ready、stop/pause、fencing、控制面指纹、验证、复核、收口和 no-push 门禁。
 - 连续模式下每个 Ready Issue 默认按 `checkpoint -> A 拆解 -> C/B 最小实现 -> D 回归 -> E 审查 -> 必要时 C/B 补修 -> D 最终复验 -> F 归档 -> 本地 commit -> stop/pause/ready 检查` 覆盖职责；A–F 不自动映射为独立线程，可由主线程直接承担、单派或多派，但 D/E 的适用证据不可省略
 - A 拆 Ready 时必须给每条 Ready 明确标注 `任务性质`，至少属于以下之一：`能力新增`、`缺口修复`、`回归证明`、`运维治理`；若为 `回归证明`，目标、验收标准和收口结论都不得把“已证明现有能力生效”偷换成“新增能力已完成”或“整个平台化已完成”
 - 若同一能力域在同一连续执行轮次中已连续进入 `3` 条 Ready，A 下一次继续拆同域 Ready 前必须先在 `current-focus.md` 写出至少一组候选域对比与未切换原因；若已连续进入 `5` 条 Ready，继续拆同域 Ready 前必须额外写明“为何仍需继续当前域、为何其他候选域不应先做”的明确理由；缺少这些依据时不得继续同域续跑
@@ -272,7 +274,7 @@ CI 与验收失败分类规则：
 ### 项目级关键词协议
 
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动预演` 时，视为请求执行插件 dry-run 预演：`pwsh -NoProfile -File D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot\scripts\autopilot-loop-runner.ps1 -DryRun -ReadyIssuePath D:\projects-test\cgc-pms\docs\backlog\ready-issues.md`；该语义只做受控预演，不启动下一任务、不提交、不 push。
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动迭代` 时，视为请求开启 `enabled.flag` 并进入连续迭代模式：优先走插件 runner / checkpoint / classifier 链路，并基于 `docs/backlog/ready-issues.md` 连续执行。A–F 是职责检查表，由主线程按净收益直接承担、单派或多派，不机械创建六个线程；每轮最多允许 3 个完全无关联的 Ready 并行，不能证明无关联时按串行处理，涉及同一文件、模块、业务域、数据库、权限、安全、租户、金额或审批状态机的任务不得并行。若 Ready 为空，先经知识图谱健康/HEAD 游标门禁拉取合格存量问题并按来源核实，再处理当前 focus 的可解除阻塞，之后才检查有决策证据的 Ad-hoc Candidate；仍无合格候选时刷新产品情报，不得从长期计划凑 Ready。图谱异常时安全停止，不静默扫描台账补货。形成至少 1 条合格 Ready 且未命中 stop/pause 后才能实施；每轮结束后检查 stop/pause/enabled，并保持 `no push` 边界。
+- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动迭代` 时，视为请求开启 `enabled.flag` 并进入连续迭代模式：生产默认由当前 Codex 桌面主线程读取 checkpoint 后直接连续执行，调用原子 checkpoint / classifier / transition / closeout 工具，但不调用旧 runner 启动嵌套模型。A–F 是职责检查表，由主线程按净收益直接承担、单派或多派，不机械创建六个线程；每轮最多允许 3 个完全无关联的 Ready 并行，不能证明无关联时按串行处理，涉及同一文件、模块、业务域、数据库、权限、安全、租户、金额或审批状态机的任务不得并行。若 Ready 为空，先经知识图谱健康/HEAD 游标门禁拉取合格存量问题并按来源核实，再处理当前 focus 的可解除阻塞，之后才检查有决策证据的 Ad-hoc Candidate；仍无合格候选时刷新产品情报，不得从长期计划凑 Ready。图谱异常时安全停止，不静默扫描台账补货。形成至少 1 条合格 Ready 且未命中 stop/pause 后才能实施；每轮结束后检查 stop/pause/enabled，并保持 `no push` 边界。
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语格式 `启动迭代-N` 时，视为带迭代上限的连续执行模式；`N` 必须为 1 到 50 的正整数，表示最多完成 N 个实施型 Ready Issue 后退出；N=0、非数字或超过 50 必须拒绝。dry-run、拆单、health gate、runtime refresh 不计入 N；无 `-N` 参数时保持上一条无上限连续语义。
 - 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止迭代` 时，视为请求执行安全停止：设置停止标记并关闭 `enabled.flag`，用于阻断下一任务启动，不强杀当前任务。
 - 连续执行模式的停止条件包括：收到 `停止迭代` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 为空且无合格存量问题或 Candidate、产品情报无法形成可执行方向且不存在可解除的当前 focus 前置阻塞、当前 Issue 连续自修后仍失败并已写入 blocked、前置阻塞已确认无法解除并已安全写入 blocked、带 `-N` 参数时已触达完成上限、或触达系统/会话限制。

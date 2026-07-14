@@ -34,9 +34,10 @@ different failure -> collect stronger evidence
 
 ## 跨 run 阶段恢复
 
-1. 活动 Issue 存在 durable phase checkpoint 时，必须先校验 Ready 内容、baseCommit、worktree/branch、scope、diff 与 evidence；全部一致才允许恢复。
-2. `IMPLEMENTED/VALIDATING` 从 validation 恢复，`VALIDATED/REVIEWING` 从 Reviewer 恢复，`REVIEWED/CLOSING` 从 closeout 恢复；不得重新派发 implementation。
-3. Reviewer `tool_config` 仅重试同一 diff 的 Reviewer；累计两次仍失败进入 `PAUSED/REVIEW_TOOL_BLOCKED`，不转 repair。若人工独立 Reviewer 写入绑定同一 Issue/diff 的结构化 PASS，应消费该证据并从 closeout 继续。
-4. closeout commit 必须先写 checkpoint 再快进合并；合并后中断可用 worktree 中归一化后的 Done 合同、closeout commit 祖先关系和原始 Ready 哈希恢复 final registration。
-5. closeout ledger、state、候选效率 shadow 与适用的知识图谱游标必须读回成功后才退役 checkpoint。
-6. 任一绑定证据变化进入 `QUARANTINE` 并保留 worktree；没有 checkpoint 的残留提交也只允许人工证据恢复或显式放弃。
+1. 先读取配置与 checkpoint 的 `executionHost`。生产配置为 `desktop-native` 时，恢复由 Codex 桌面主线程完成，禁止回退到旧 Planner/Executor/Reviewer 模型进程。
+2. 活动 Issue 存在 durable phase checkpoint 时，必须先校验 Ready 内容、baseCommit、worktree/branch、scope、diff 与 evidence；全部一致才允许恢复。
+3. `IMPLEMENTED/VALIDATING` 从 validation 恢复，`VALIDATED/REVIEWING` 从 Reviewer 恢复，`REVIEWED/CLOSING` 从 closeout 恢复；不得重新派发 implementation。
+4. Reviewer `tool_config` 仅重试同一 diff 的 Reviewer；累计两次仍失败进入 `PAUSED/REVIEW_TOOL_BLOCKED`，不转 repair。若人工独立 Reviewer 写入绑定同一 Issue/diff 的结构化 PASS，应消费该证据并从 closeout 继续。
+5. closeout commit 必须先写 checkpoint 再快进合并；合并后中断可用 worktree 中归一化后的 Done 合同、closeout commit 祖先关系和原始 Ready 哈希恢复 final registration。
+6. closeout ledger、state、候选效率 shadow 与适用的知识图谱游标必须读回成功后才退役 checkpoint。
+7. 任一绑定证据变化进入 `QUARANTINE` 并保留 worktree；没有 checkpoint 的残留提交也只允许人工证据恢复或显式放弃。

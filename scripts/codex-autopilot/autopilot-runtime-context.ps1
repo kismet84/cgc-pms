@@ -6,6 +6,9 @@ function Read-JsonFile {
   return Get-Content -Encoding UTF8 -Raw $Path | ConvertFrom-Json
 }
 
+$executionHostLibrary = Join-Path $PSScriptRoot 'autopilot-execution-host.ps1'
+if (!(Get-Command Get-AutopilotExecutionHost -ErrorAction SilentlyContinue)) { . $executionHostLibrary }
+
 $runtimeFingerprintLibrary = Join-Path $PSScriptRoot 'autopilot-control-plane-fingerprint.ps1'
 if (!(Get-Command Get-AutopilotControlPlanePolicyDescriptor -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $runtimeFingerprintLibrary)) { . $runtimeFingerprintLibrary }
 
@@ -23,6 +26,7 @@ function New-AutopilotRuntimeContext {
 
   $resolvedConfigPath = if ($ConfigPath) { $ConfigPath } else { Join-Path $ScriptDirectory 'codex-autopilot.config.json' }
   $config = Read-JsonFile -Path $resolvedConfigPath
+  $executionHost = Get-AutopilotExecutionHost -Config $config
   $resolvedRepoRoot = if ($config.repoRoot) { [string]$config.repoRoot } else { $RepoRoot }
   $configuredBaseBranch = if ($config.baseBranch) { [string]$config.baseBranch } else { 'master' }
   $actualBaseBranch = (Invoke-AutopilotGit -RepoRoot $resolvedRepoRoot -Arguments @('branch','--show-current') -ThrowOnFailure).stdout.Trim()
@@ -45,6 +49,7 @@ function New-AutopilotRuntimeContext {
     repoRoot = $resolvedRepoRoot
     configPath = $resolvedConfigPath
     config = $config
+    executionHost = $executionHost
     executionMode = $executionMode
     baseBranch = $configuredBaseBranch
     executionBaseCommit = $executionBaseCommit

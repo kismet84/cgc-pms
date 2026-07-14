@@ -7,6 +7,8 @@ $nativeCommandLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Pa
 if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
 $metricsLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-metrics.ps1'
 if (!(Get-Command New-AutopilotInvocationId -ErrorAction SilentlyContinue)) { . $metricsLibrary }
+$executionHostLibrary = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) 'autopilot-execution-host.ps1'
+if (!(Get-Command Assert-AutopilotLegacyModelProcessAllowed -ErrorAction SilentlyContinue)) { . $executionHostLibrary }
 
 function Test-AutopilotDomainContinuationAllowed {
   param([string[]]$RecentTitles, [string]$Domain, [string]$FocusText)
@@ -420,8 +422,10 @@ function Invoke-AutopilotReadyPlanner {
     [scriptblock]$HeartbeatWriter,
     [Parameter(Mandatory)][string]$RunId,
     [string[]]$CandidateRefs = @(),
-    [scriptblock]$InvocationWriter
+    [scriptblock]$InvocationWriter,
+    [string]$ExecutionHost = 'cli-legacy'
   )
+  Assert-AutopilotLegacyModelProcessAllowed -ExecutionHost $ExecutionHost -Role 'PLANNER' | Out-Null
   $codex = Resolve-AutopilotCodexInvocation
   $candidateJson = $Candidates | ConvertTo-Json -Depth 5 -Compress
   $prompt = @"

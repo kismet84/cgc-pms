@@ -43,5 +43,6 @@
   "issueCheckpointPath": ".codex-autopilot/checkpoints/issue-900-001.json",
   "currentIssuePhase": "VALIDATING",
   "lastCanaryFingerprint": "",
-  "lastCanaryReport": ""
+  "lastCanaryReport": "",
+  "executionHost": "desktop-native"
 }

@@ -12,6 +12,7 @@ function Invoke-AutopilotRunCoordinator {
 
   $scriptDir = $PSScriptRoot
   . (Join-Path $scriptDir 'autopilot-state.ps1')
+  . (Join-Path $scriptDir 'autopilot-execution-host.ps1')
   . (Join-Path $scriptDir 'autopilot-execution-mode.ps1')
   . (Join-Path $scriptDir 'autopilot-native-command.ps1')
   . (Join-Path $scriptDir 'autopilot-run-lock.ps1')
@@ -39,6 +40,11 @@ function Invoke-AutopilotRunCoordinator {
   $ConfigPath = $runtimeContext.configPath
   $RepoRoot = $runtimeContext.repoRoot
   $config = $runtimeContext.config
+  $executionHost = [string]$runtimeContext.executionHost
+  $script:ExecutionHost = $executionHost
+  if ($executionHost -eq 'desktop-native') {
+    return New-AutopilotDesktopHandoff -RepoRoot $RepoRoot -ConfigPath $ConfigPath -MaxIterations $MaxIterations -DryRun ([bool]$DryRun) -ApplyBacklogSplit ([bool]$ApplyBacklogSplit) -ExplainNextAction ([bool]$ExplainNextAction)
+  }
   $configuredBaseBranch = $runtimeContext.baseBranch
   $script:TaskScoringActive = if ($config.PSObject.Properties.Name -contains 'taskScoring') { Test-AutopilotTaskScoringActive $config.taskScoring } else { $false }
   $script:RetrospectiveActive = Test-AutopilotRetrospectiveActive $(if ($config.PSObject.Properties.Name -contains 'taskScoring') { $config.taskScoring } else { $null }) $(if ($config.PSObject.Properties.Name -contains 'retrospective') { $config.retrospective } else { $null })
@@ -346,7 +352,7 @@ function Invoke-AutopilotRunCoordinator {
         } else {
           $plannerHeartbeatSeconds = if ($config.readyPlanner.PSObject.Properties.Name -contains 'heartbeatSeconds') { [int]$config.readyPlanner.heartbeatSeconds } else { 30 }
           $heartbeatWriter = { param($heartbeat) Write-State $autoDir 'REFILLING' $false 'READY_PLANNER_HEARTBEAT' '' $refillDecision.reason '' }
-          Invoke-AutopilotReadyPlanner -RepoRoot $RepoRoot -Candidates $refillDecision.candidates -OutputPath $planResultPath -SchemaPath $planSchemaPath -Model $config.readyPlanner.model -Thinking $config.readyPlanner.thinking -TimeoutSeconds $config.readyPlanner.timeoutSeconds -HeartbeatSeconds $plannerHeartbeatSeconds -HeartbeatWriter $heartbeatWriter -RunId $script:RunContext.id -CandidateRefs $expectedCandidateRefs | Out-Null
+          Invoke-AutopilotReadyPlanner -RepoRoot $RepoRoot -Candidates $refillDecision.candidates -OutputPath $planResultPath -SchemaPath $planSchemaPath -Model $config.readyPlanner.model -Thinking $config.readyPlanner.thinking -TimeoutSeconds $config.readyPlanner.timeoutSeconds -HeartbeatSeconds $plannerHeartbeatSeconds -HeartbeatWriter $heartbeatWriter -RunId $script:RunContext.id -CandidateRefs $expectedCandidateRefs -ExecutionHost $executionHost | Out-Null
         }
         $imported = Import-AutopilotReadyPlan -PlanPath $planResultPath -ReadyPath $readyPath -RepoRoot $RepoRoot -ExpectedCandidateRefs $expectedCandidateRefs
         if ($imported.createdCount -eq 0) {

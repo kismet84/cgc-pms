@@ -32,12 +32,18 @@ $requiredPaths = @(
     'examples/classification-real-quality.example.json',
     'references/loop-budget-policy.md',
     'references/control-plane-policy.md',
+    'references/desktop-execution-policy.md',
+    'references/owner-boundary.md',
     'references/rerun-policy.md',
     'references/role-contracts.md',
     'references/forward-test-scenarios.md',
     'references/classifier-rules.md',
     'scripts/autopilot-loop-runner.ps1',
+    'scripts/autopilot-checkpoint.ps1',
+    'scripts/ready-issue-writer.ps1',
     'scripts/test-failure-classifier.ps1',
+    'scripts/issue-closeout.ps1',
+    'scripts/local-commit-closeout.ps1',
     'skills/cgc-pms-autopilot-owner/SKILL.md'
 )
 

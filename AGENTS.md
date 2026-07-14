@@ -18,6 +18,7 @@
 - AutoPilot 控制面、子进程和测试入口统一使用 PowerShell 7 `pwsh`；缺失时归类为 `tool_config/AUTOPILOT_POWERSHELL7_REQUIRED` 并安全停止，不得回退到 Windows PowerShell 5.1。原生命令以退出码和命令契约裁决，stderr warning 仅作诊断证据。
 - AutoPilot 只有持有当前 `runInstanceId + leaseEpoch + controlPlaneFingerprint` fencing token 的 APPLY 实例可以派发、写状态或执行 Git 变更；CPU/心跳变化不算任务进度，进度只由工作区内容或 durable checkpoint/result/evidence 变化推进。
 - AutoPilot 各阶段统一返回可校验 `StageResult`，不得以自由文本路由；活动 Issue 的 checkpoint 阶段迁移只能经 `autopilot-transition.ps1`，并校验合法边、fencing、控制面指纹及 `transitionId + generation` 读回，state/checkpoint 底层模块不得自行决定业务阶段。
+- AutoPilot 生产默认宿主为 Codex 桌面主线程（`executionHost=desktop-native`）：主线程直接推进 checkpoint 与 A-F 职责，PowerShell 只做确定性原子动作；禁止 runner 启动嵌套 Planner、Executor、Reviewer `codex exec`。`cli-legacy` 仅可显式兼容或经授权紧急回退，不得静默降级。
 - `autoPush=false` / `no push` 禁止自动推送；提交或 push 只可在用户明确授权且其他适用门禁通过后执行。
 - 修改代码后必须运行相关验证：后端至少跑相关测试/构建，前端至少跑类型检查/测试/构建中的相关项。
 - 不要修改已经应用过的 Flyway 迁移脚本；数据库结构变化必须新增版本化 migration。

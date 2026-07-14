@@ -25,6 +25,7 @@
     "transitionId": { "type": "string" },
     "generation": { "type": "integer", "minimum": 0 },
     "controlPlaneFingerprint": { "type": "string", "pattern": "^$|^[a-f0-9]{64}$" },
+    "executionHost": { "enum": ["desktop-native", "cli-legacy"] },
     "semanticProgressAt": { "type": ["string", "null"], "format": "date-time" },
     "failureRecoveryKeys": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
     "artifacts": { "type": "object" },

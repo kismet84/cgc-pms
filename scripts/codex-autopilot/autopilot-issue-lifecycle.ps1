@@ -105,7 +105,7 @@ function Invoke-IssueExecutor {
     $stallInspectSeconds = if ($config.issueExecutor.stallInspectSeconds) { [int]$config.issueExecutor.stallInspectSeconds } else { 300 }
     $stallTerminateSeconds = if ($config.issueExecutor.stallTerminateSeconds) { [int]$config.issueExecutor.stallTerminateSeconds } else { 600 }
     $heartbeatMilliseconds = if ($config.issueExecutor.heartbeatMilliseconds) { [int]$config.issueExecutor.heartbeatMilliseconds } else { 30000 }
-    $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout -StallInspectSeconds $stallInspectSeconds -StallTerminateSeconds $stallTerminateSeconds -HeartbeatMilliseconds $heartbeatMilliseconds -LongRunningCommands $longRunningCommands -SemanticEvidencePaths @($checkpointPath,$resultPath) -Task $Phase
+    $childResult = Invoke-ChildWithHeartbeat -Arguments $executorArgs -WorkingDirectory $worktree.path -TimeoutSeconds $executorTimeout -StallInspectSeconds $stallInspectSeconds -StallTerminateSeconds $stallTerminateSeconds -HeartbeatMilliseconds $heartbeatMilliseconds -LongRunningCommands $longRunningCommands -SemanticEvidencePaths @($checkpointPath,$resultPath) -Task $Phase -ExecutionHost (Get-AutopilotExecutionHost -Config $config)
     $executorEventPath = Join-Path (Join-Path $autoDir "runs\$executionRunId") 'events.jsonl'
     if (Test-Path -LiteralPath $executorEventPath -PathType Leaf) { Sync-AutopilotIssueInvocationMetrics -Path $checkpointPath -EventPaths @($executorEventPath) -IssueId $Issue.lint.issueId | Out-Null }
     if ($childResult.exitCode -ne 0) {
@@ -384,7 +384,7 @@ function Invoke-IssueExecutor {
           $result.status = 'blocked'; $result.failureCategory = 'tool_config'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEWER_REQUIRED'
         } else {
           $reviewPath = Join-Path $reviewDir 'result.json'
-          $review = Invoke-AutopilotReviewer -Worktree $worktree.path -RequestPath $requestPath -ResultPath $reviewPath -SchemaPath (Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Model $config.issueReviewer.model -Thinking $config.issueReviewer.thinking -IssueId $Issue.lint.issueId -RunId $script:RunContext.id
+          $review = Invoke-AutopilotReviewer -Worktree $worktree.path -RequestPath $requestPath -ResultPath $reviewPath -SchemaPath (Join-Path $RepoRoot 'plugins\cgc-pms-autopilot\schemas\review-result.schema.json') -Model $config.issueReviewer.model -Thinking $config.issueReviewer.thinking -IssueId $Issue.lint.issueId -RunId $script:RunContext.id -ExecutionHost (Get-AutopilotExecutionHost -Config $config)
           Sync-AutopilotIssueInvocationMetrics -Path $checkpointPath -EventPaths @($script:RunContext.events) -IssueId $Issue.lint.issueId | Out-Null
           $result | Add-Member -NotePropertyName review -NotePropertyValue $review -Force
           $result | Add-Member -NotePropertyName reviewedDiffHashExpected -NotePropertyValue $request.diffSha256 -Force

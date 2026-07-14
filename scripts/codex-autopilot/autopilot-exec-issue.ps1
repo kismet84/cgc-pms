@@ -26,6 +26,8 @@ $nativeCommandLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
 if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
 $metricsLibrary = Join-Path $PSScriptRoot 'autopilot-metrics.ps1'
 if (!(Get-Command New-AutopilotInvocationId -ErrorAction SilentlyContinue)) { . $metricsLibrary }
+$executionHostLibrary = Join-Path $PSScriptRoot 'autopilot-execution-host.ps1'
+if (!(Get-Command Assert-AutopilotLegacyModelProcessAllowed -ErrorAction SilentlyContinue)) { . $executionHostLibrary }
 
 function Read-JsonFile {
   param([string]$Path)
@@ -376,6 +378,8 @@ function Invoke-ConfiguredIssueExecutor {
     [object]$Config
   )
 
+  $executionHost = Get-AutopilotExecutionHost -Config $Config
+  Assert-AutopilotLegacyModelProcessAllowed -ExecutionHost $executionHost -Role 'EXECUTOR' | Out-Null
   $executor = $Config.issueExecutor
   if (!$executor -or !$executor.command) {
     return [pscustomobject]@{
@@ -566,6 +570,11 @@ if (!$ConfigPath) {
 $config = Read-JsonFile $ConfigPath
 if ($config.repoRoot -and !$PSBoundParameters.ContainsKey('RepoRoot')) {
   $RepoRoot = $config.repoRoot
+}
+if (Test-AutopilotDesktopNativeHost -Config $config) {
+  $handoff = New-AutopilotDesktopHandoff -RepoRoot $RepoRoot -ConfigPath $ConfigPath
+  Write-Output ($handoff | ConvertTo-Json -Depth 5)
+  return
 }
 if (!$ReadyPath) {
   $ReadyPath = Join-Path $RepoRoot "docs\backlog\ready-issues.md"

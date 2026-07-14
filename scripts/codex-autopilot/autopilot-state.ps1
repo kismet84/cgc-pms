@@ -89,7 +89,7 @@ function ConvertTo-AutopilotStateV3 {
   if ($version -eq 3) {
     foreach ($entry in @(
       @('issueCheckpointPath',''), @('currentIssuePhase',''), @('lastCanaryFingerprint',''), @('lastCanaryReport',''),
-      @('runInstanceId',''), @('leaseEpoch',''), @('transitionId',''), @('generation',0), @('controlPlaneFingerprint','')
+      @('runInstanceId',''), @('leaseEpoch',''), @('transitionId',''), @('generation',0), @('controlPlaneFingerprint',''), @('executionHost','cli-legacy')
     )) {
       $name = [string]$entry[0]
       $present = ($State -is [System.Collections.IDictionary] -and $State.Contains($name)) -or ($State.PSObject.Properties.Name -contains $name)
@@ -126,6 +126,7 @@ function ConvertTo-AutopilotStateV3 {
   Set-AutopilotProperty $State 'transitionId' ''
   Set-AutopilotProperty $State 'generation' 0
   Set-AutopilotProperty $State 'controlPlaneFingerprint' ''
+  Set-AutopilotProperty $State 'executionHost' 'cli-legacy'
   return $State
 }
 
@@ -141,7 +142,7 @@ function Assert-AutopilotState {
     'retrospectiveFactsCommit','retrospectiveGraphGitCursor','retrospectiveEpisodeId',
     'retrospectiveFailureCategory','lastRetrospectiveAt','lastRetrospectiveReport','activeScoringVersion',
     'issueCheckpointPath','currentIssuePhase','lastCanaryFingerprint','lastCanaryReport',
-    'runInstanceId','leaseEpoch','transitionId','generation','controlPlaneFingerprint'
+    'runInstanceId','leaseEpoch','transitionId','generation','controlPlaneFingerprint','executionHost'
   )
   foreach ($name in $required) {
     if ($State.PSObject.Properties.Name -notcontains $name -and !($State -is [System.Collections.IDictionary] -and $State.Contains($name))) {
@@ -150,6 +151,7 @@ function Assert-AutopilotState {
   }
   if ([int]$State.schemaVersion -ne 3) { throw "Unsupported AutoPilot state schemaVersion: $($State.schemaVersion)" }
   if ([int]$State.generation -lt 0) { throw 'AutoPilot state generation cannot be negative' }
+  if ([string]$State.executionHost -notin @('desktop-native','cli-legacy')) { throw 'AutoPilot state executionHost is invalid' }
   if ($script:AutopilotStatuses -notcontains [string]$State.status) { throw "Invalid AutoPilot state status: $($State.status)" }
   if ([int]$State.attempt -lt 0 -or [int]$State.completedImplementationIssues -lt 0) { throw 'AutoPilot counters cannot be negative' }
   foreach ($name in 'startedAt','phaseStartedAt','lastHeartbeatAt') {
@@ -195,13 +197,16 @@ function Write-AutopilotStateAtomic {
   param(
     [Parameter(Mandatory)][string]$Path,
     [Parameter(Mandatory)][object]$State,
-    [string]$TransitionId = ''
+    [string]$TransitionId = '',
+    [string]$ExecutionHost = ''
   )
 
   Assert-AutopilotStateFenceContext | Out-Null
   $State = ConvertTo-AutopilotStateV3 $State
+  if (!$ExecutionHost -and $script:ExecutionHost) { $ExecutionHost = [string]$script:ExecutionHost }
   Set-AutopilotProperty $State 'generation' ([int](Get-AutopilotStateProperty $State 'generation' 0) + 1)
   Set-AutopilotProperty $State 'transitionId' $(if ($TransitionId) { $TransitionId } else { [guid]::NewGuid().ToString('N') })
+  if ($ExecutionHost) { Set-AutopilotProperty $State 'executionHost' $ExecutionHost }
   if ($script:AutopilotStateFenceContext) {
     Set-AutopilotProperty $State 'runInstanceId' ([string]$script:AutopilotStateFenceContext.runInstanceId)
     Set-AutopilotProperty $State 'leaseEpoch' ([string]$script:AutopilotStateFenceContext.leaseEpoch)

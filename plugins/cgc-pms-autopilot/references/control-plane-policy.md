@@ -1,12 +1,15 @@
 # AutoPilot Control Plane Policy
 
-Policy-Version: 1
+Policy-Version: 2
 Status: active
 
 本文件是会改变 AutoPilot 调度、恢复、审查、评分与收口行为的稳定策略契约。当前激活版本、权重、阈值、模型、推理强度和超时等动态事实必须从 `scripts/codex-autopilot/codex-autopilot.config.json`、对应 Schema 与批准来源读取，不在本文件或负责人 Skill 中复制。
 
 ## 执行与边界
 
+- 默认执行宿主由配置的 `executionHost` 决定；生产配置固定为 `desktop-native`，详细契约见 `desktop-execution-policy.md`。
+- 桌面原生宿主由当前 Codex 桌面主线程直接编排，PowerShell 仅执行确定性原子动作；不得由 runner 启动嵌套 Planner、Executor 或 Reviewer 模型进程。
+- `cli-legacy` 只作为显式兼容与紧急回退路径，不能成为 `desktop-native` 的静默降级。
 - 控制面固定使用 PowerShell 7；缺失时按 `tool_config` fail-close。
 - APPLY 派发、状态落盘和 Git 变更前必须核验 run lock、fencing token 与控制面指纹。
 - stop/pause 在每个关键 checkpoint 生效；已启动 Issue 只允许安全收口，不得据此启动下一任务。
@@ -36,6 +39,7 @@ Status: active
 - 状态迁移：`scripts/codex-autopilot/autopilot-transition.ps1`
 - 恢复规则：`plugins/cgc-pms-autopilot/references/rerun-policy.md`
 - 角色边界：`plugins/cgc-pms-autopilot/references/owner-boundary.md`
+- 桌面执行宿主：`plugins/cgc-pms-autopilot/references/desktop-execution-policy.md`
 
 ## 上下文、证据与收口事实链
 

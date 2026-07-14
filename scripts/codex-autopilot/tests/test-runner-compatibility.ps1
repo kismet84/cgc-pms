@@ -918,6 +918,7 @@ try {
 
   $NoExecutorConfig = Join-Path $TempRoot "no-executor.config.json"
   $ActualConfig = Get-Content -Encoding UTF8 -Raw (Join-Path $ScriptDir "codex-autopilot.config.json") | ConvertFrom-Json
+  $ActualConfig.executionHost = 'cli-legacy'
   $ActualConfig.PSObject.Properties.Remove("issueExecutor")
   $ActualConfig | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 $NoExecutorConfig
   $NoExecutorReadiness = Invoke-Readiness (Split-Path -Parent (Split-Path -Parent $ScriptDir)) $NoExecutorConfig | ConvertFrom-Json
