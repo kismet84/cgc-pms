@@ -1,6 +1,11 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO } from '@/types/cost'
+import type {
+  CostLedgerVO,
+  CostLedgerQueryParams,
+  CostLedgerSummaryVO,
+  CostSummaryHistoryVO,
+} from '@/types/cost'
 
 export interface OverheadAllocationExecutionResult {
   period: string
@@ -54,6 +59,14 @@ import type { CostSummaryVO } from '@/types/cost'
 export function getCostSummary(projectId: string) {
   return request<CostSummaryVO>({
     url: `/cost-summary/${projectId}`,
+    method: 'get',
+  })
+}
+
+/** 获取项目成本汇总历史快照；租户与项目数据范围由服务端认证上下文确定。 */
+export function getCostSummaryHistory(projectId: string) {
+  return request<CostSummaryHistoryVO[]>({
+    url: `/cost-summary/${projectId}/history`,
     method: 'get',
   })
 }

@@ -195,3 +195,24 @@ export interface CostSummaryVO {
   expectedProfit: string
   subjects: CostSubjectSummaryVO[]
 }
+
+/** Historical cost summary snapshot for one cost subject. */
+export interface CostSummaryHistoryVO {
+  id: string
+  projectId: string
+  projectName: string
+  summaryDate: string
+  costSubjectId: string
+  costSubjectName: string
+  targetCost: string
+  contractLockedCost: string
+  actualCost: string
+  paidAmount: string
+  estimatedRemainingCost: string
+  dynamicCost: string
+  contractIncome: string
+  confirmedRevenue: string
+  expectedProfit: string
+  costDeviation: string
+  createdAt: string
+}

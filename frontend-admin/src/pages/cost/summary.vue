@@ -10,10 +10,10 @@ import {
   SearchOutlined,
   WarningOutlined,
 } from '@ant-design/icons-vue'
-import { getCostSummary, refreshCostSummary } from '@/api/modules/cost'
+import { getCostSummary, getCostSummaryHistory, refreshCostSummary } from '@/api/modules/cost'
 import { getProjectList } from '@/api/modules/project'
 import type { SelectOption } from '@/types/ui'
-import type { CostSummaryVO } from '@/types/cost'
+import type { CostSummaryHistoryVO, CostSummaryVO } from '@/types/cost'
 import type { ProjectVO } from '@/types/project'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { normalizeArray } from '@/utils/normalizeArray'
@@ -36,6 +36,10 @@ const selectedProjectId = ref<string | undefined>(undefined)
 const keyword = ref('')
 const loading = ref(false)
 const summary = ref<CostSummaryVO | null>(null)
+const historyOpen = ref(false)
+const historyLoading = ref(false)
+const historyRows = ref<CostSummaryHistoryVO[]>([])
+const historyError = ref('')
 
 function parseAmount(val: string | undefined): number {
   if (!val) return 0
@@ -87,9 +91,34 @@ async function handleRefresh() {
   }
 }
 
+async function openHistory() {
+  if (!selectedProjectId.value) {
+    message.warning('请先选择项目')
+    return
+  }
+  historyOpen.value = true
+  historyLoading.value = true
+  historyRows.value = []
+  historyError.value = ''
+  try {
+    historyRows.value = normalizeArray<CostSummaryHistoryVO>(
+      await getCostSummaryHistory(selectedProjectId.value),
+    )
+  } catch (e: unknown) {
+    console.error(e)
+    historyError.value = '历史快照加载失败，请稍后重试'
+    message.error('加载成本历史快照失败')
+  } finally {
+    historyLoading.value = false
+  }
+}
+
 function handleProjectChange(val: string | undefined) {
   selectedProjectId.value = val
   summary.value = null
+  historyOpen.value = false
+  historyRows.value = []
+  historyError.value = ''
   if (val) fetchSummary()
 }
 
@@ -154,6 +183,13 @@ function handleReset() {
   selectedProjectId.value = undefined
   keyword.value = ''
   summary.value = null
+  historyOpen.value = false
+  historyRows.value = []
+  historyError.value = ''
+}
+
+function fmtDate(val: string | undefined): string {
+  return val ? val.slice(0, 10) : '-'
 }
 
 const selectedProject = computed(() =>
@@ -315,6 +351,21 @@ const gridColumns = computed(() => [
   },
 ])
 
+const historyColumns = [
+  { dataIndex: 'summaryDate', key: 'summaryDate', title: '汇总日期', width: 120 },
+  { dataIndex: 'costSubjectName', key: 'costSubjectName', title: '成本科目', width: 180 },
+  { dataIndex: 'targetCost', key: 'targetCost', title: '成本目标', width: 130, align: 'right' },
+  { dataIndex: 'actualCost', key: 'actualCost', title: '实际成本', width: 130, align: 'right' },
+  { dataIndex: 'dynamicCost', key: 'dynamicCost', title: '动态成本', width: 130, align: 'right' },
+  {
+    dataIndex: 'costDeviation',
+    key: 'costDeviation',
+    title: '成本偏差',
+    width: 130,
+    align: 'right',
+  },
+]
+
 const {
   visibleColumns: visibleGridColumns,
   columnSettings,
@@ -435,6 +486,14 @@ onUnmounted(() => {
               >
                 查询
               </a-button>
+              <a-button
+                data-testid="cost-summary-history-button"
+                size="large"
+                :disabled="!selectedProjectId"
+                @click="openHistory"
+              >
+                历史快照
+              </a-button>
               <a-button size="large" @click="handleReset">重置</a-button>
             </div>
           </div>
@@ -472,6 +531,55 @@ onUnmounted(() => {
         :go="go"
       />
     </div>
+
+    <a-modal
+      v-model:open="historyOpen"
+      :title="`${selectedProject?.projectName || '当前项目'}成本历史快照`"
+      :footer="null"
+      width="1120px"
+    >
+      <div class="cost-summary-history-dialog" data-testid="cost-summary-history-dialog">
+        <a-spin :spinning="historyLoading">
+          <a-alert v-if="historyError" type="error" show-icon :message="historyError" />
+          <a-empty
+            v-else-if="!historyLoading && historyRows.length === 0"
+            description="暂无历史快照"
+          />
+          <a-table
+            v-else
+            class="cost-summary-history-table"
+            :columns="historyColumns"
+            :data-source="historyRows"
+            :loading="historyLoading"
+            :pagination="false"
+            :row-key="(row: CostSummaryHistoryVO) => row.id"
+            :scroll="{ x: 820 }"
+            size="small"
+          >
+            <template #bodyCell="{ column, record }">
+              <template v-if="column.key === 'summaryDate'">
+                {{ fmtDate(record.summaryDate) }}
+              </template>
+              <template
+                v-else-if="
+                  ['targetCost', 'actualCost', 'dynamicCost', 'costDeviation'].includes(column.key)
+                "
+              >
+                {{
+                  column.key === 'costDeviation'
+                    ? fmtDeviation(record[column.key])
+                    : fmtAmount(record[column.key])
+                }}
+                万元
+              </template>
+              <template v-else>
+                {{ record[column.key] || '-' }}
+              </template>
+            </template>
+          </a-table>
+        </a-spin>
+      </div>
+    </a-modal>
   </div>
 </template>
 
@@ -559,6 +667,14 @@ onUnmounted(() => {
 .cost-summary-project-select {
   width: 100%;
   min-width: 0;
+}
+
+.cost-summary-history-dialog {
+  min-height: 220px;
+}
+
+.cost-summary-history-table {
+  margin-top: 4px;
 }
 
 .cost-reconcile-badges {
