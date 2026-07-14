@@ -264,7 +264,7 @@ CI 与验收失败分类规则：
 - 评分配置必须区分 candidate 与 active；只有用户明确批准 `scoringVersion`、五维权重和生效时间后，才允许设置 `approvalStatus=APPROVED`、激活版本并增加正式回顾计数。未批准候选只能用于 disabled 回放和测试，不得写入正式累计。
 - `autopilot-task-score/v2` 已获用户批准并作为 active 正式版本，五维权重为35/25/20/10/10，其中 `taskExecutionEfficiency=10`；自批准配置提交后的下一项新实施型 Ready Issue 生效。取证覆盖跨 run implementation 重派、阶段回退、人工恢复、工具/环境重试和证据完整性；绝对耗时只进入20任务趋势分析，不按固定分钟数直接扣分。v1 历史评分不得回算或覆盖，同一任务不得形成 v1/v2 双重正式计数。
 - 正式评分按独立于单次 `iterationLimit` 的回顾周期跨批次累计并以任务/评分幂等键去重。无界模式在第20个有效任务安全收口后禁止选择第21个任务；有界 `启动迭代-N` 可完成当前 N，随后对本周期全部任务统一回顾，超出20的部分不结转。
-- 达到回顾阈值后必须保持 `RETROSPECTIVE_REQUIRED` / 暂停状态，直到回顾报告已提交、改进提案去重写入唯一问题事实源、知识图谱 Git 游标追平、稳定 Episode 可读回且最终 state 成功清零。任一阶段失败都保留累计任务并幂等续跑；清零后仍须用户重新启动，不自动恢复。
+- 达到回顾阈值后必须保持 `RETROSPECTIVE_REQUIRED` / 暂停状态。报告阶段按 `reviewCycleId` 将 `ready-issues.md` 中全部完整 Done 块迁入单独的 `docs/backlog/ready-history/ready-issues-<reviewCycleId>.md`，每次复盘一个文件；`ready-issues.md` 对历史项只保留 Issue 主题和归档链接，当前 Ready 继续保留完整契约。直到回顾报告与历史归档已提交、改进提案去重写入唯一问题事实源、知识图谱 Git 游标追平、稳定 Episode 可读回且最终 state 成功清零前都不得继续；任一阶段失败保留累计任务并按同一周期幂等续跑，既有同名归档内容冲突时 fail-close；清零后仍须用户重新启动，不自动恢复。
 - 自动回顾只能按可复现聚合规则生成 `NEEDS_CONFIRMATION` 改进提案，不得自动修改代码、规则、权重或环境。提案证据或验收标准不足时关闭，不得新建孤立改进清单或制造悬空 backlog。
 - 任何“剩余风险”都必须按“非阻塞问题零悬空规则”完成修复、唯一载体承接或有依据关闭；禁止只停留在 `docs/quality/**` 报告备注中
 - checkpoint 固定最小输出为 `branch`、`git status`、`stop.flag`、`pause.flag`、`enabled.flag`；如怀疑需清理工作区，只能先执行 `git clean -fdn` 预览，不得直接清理

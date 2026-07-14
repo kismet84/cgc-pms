@@ -124,8 +124,87 @@ function Get-AutopilotRetrospectiveEpisodeId {
   return ('cgc-pms:episode:autopilot-retrospective:{0}:{1}' -f $ReviewCycleId, $versionKey)
 }
 
+function Move-AutopilotReadyHistory {
+  param(
+    [Parameter(Mandatory)][string]$ReadyPath,
+    [Parameter(Mandatory)][string]$ArchivePath,
+    [Parameter(Mandatory)][string]$ReviewCycleId
+  )
+  if ($ReviewCycleId -notmatch '^[A-Za-z0-9._-]+$') { throw 'reviewCycleId contains characters that are unsafe for a history archive path' }
+  if (!(Test-Path -LiteralPath $ReadyPath -PathType Leaf)) { throw "Ready backlog is missing: $ReadyPath" }
+
+  $readyText = (Get-Content -LiteralPath $ReadyPath -Raw -Encoding UTF8) -replace "`r`n", "`n"
+  $issuePattern = '(?ms)^###\s+(?<title>ISSUE-[^\r\n]+)\r?\n(?<body>.*?)(?=^###\s+ISSUE-|^##\s+|\z)'
+  $doneBlocks = @([regex]::Matches($readyText, $issuePattern) | Where-Object {
+    $_.Groups['body'].Value -match '(?m)^状态[：:]\s*Done(?:（[^\r\n]*）)?\s*$'
+  })
+
+  if ($doneBlocks.Count -eq 0) {
+    if (!(Test-Path -LiteralPath $ArchivePath -PathType Leaf)) { throw 'retrospective history migration found no Done Ready blocks and no existing cycle archive' }
+    $existingArchive = Get-Content -LiteralPath $ArchivePath -Raw -Encoding UTF8
+    if ($existingArchive -notmatch ('(?m)^- 回顾周期：`' + [regex]::Escape($ReviewCycleId) + '`$') -or $existingArchive -notmatch '(?m)^###\s+ISSUE-') {
+      throw 'existing Ready history archive does not match the retrospective cycle contract'
+    }
+    $archivedCount = @([regex]::Matches($existingArchive, '(?m)^###\s+ISSUE-')).Count
+    return [pscustomobject]@{ archivePath=$ArchivePath; migratedCount=$archivedCount; idempotent=$true }
+  }
+
+  $archiveParent = Split-Path -Parent $ArchivePath
+  if ($archiveParent -and !(Test-Path -LiteralPath $archiveParent)) { New-Item -ItemType Directory -Path $archiveParent -Force | Out-Null }
+  $archiveBlocks = @($doneBlocks | ForEach-Object { $_.Value.Trim() })
+  $archiveText = @(
+    "# Ready Issue 历史归档：$ReviewCycleId",
+    '',
+    "- 回顾周期：``$ReviewCycleId``",
+    '- 来源：`docs/backlog/ready-issues.md`',
+    '- 说明：本文件保存该次复盘时从 Ready 队列迁出的完整 Done Issue 契约；正式完成结论仍以 Done 索引、质量报告和 Git 历史为准。',
+    '',
+    '## 已迁移完整记录',
+    '',
+    ($archiveBlocks -join "`n`n")
+  ) -join "`n"
+  $archiveText += "`n"
+  if (Test-Path -LiteralPath $ArchivePath -PathType Leaf) {
+    $existingArchive = (Get-Content -LiteralPath $ArchivePath -Raw -Encoding UTF8) -replace "`r`n", "`n"
+    if ($existingArchive -ne $archiveText) { throw 'Ready history archive already exists with different content' }
+  } else {
+    [IO.File]::WriteAllText($ArchivePath, $archiveText, [Text.UTF8Encoding]::new($false))
+  }
+
+  $compacted = $readyText
+  foreach ($block in @($doneBlocks | Sort-Object Index -Descending)) {
+    $compacted = $compacted.Remove($block.Index, $block.Length)
+  }
+  $compacted = [regex]::Replace($compacted, "`n{3,}", "`n`n").TrimEnd() + "`n"
+
+  $readyParent = Split-Path -Parent ([IO.Path]::GetFullPath($ReadyPath))
+  $archiveLink = [IO.Path]::GetRelativePath($readyParent, [IO.Path]::GetFullPath($ArchivePath)).Replace('\', '/')
+  $topicLines = @($doneBlocks | ForEach-Object {
+    '- [{0}]({1})' -f $_.Groups['title'].Value.Trim(), $archiveLink
+  })
+  $historyHeading = '## 历史 Issue 主题'
+  $historyMatch = [regex]::Match($compacted, '(?ms)^##\s+历史 Issue 主题\s*\n(?<body>.*?)(?=^##\s+|\z)')
+  if ($historyMatch.Success) {
+    $existingTopics = @($historyMatch.Groups['body'].Value -split "`n" | Where-Object { $_ -match '^- \[' })
+    $mergedTopics = @($existingTopics + $topicLines | Select-Object -Unique)
+    $replacement = $historyHeading + "`n`n" + ($mergedTopics -join "`n") + "`n`n"
+    $compacted = $compacted.Substring(0, $historyMatch.Index) + $replacement + $compacted.Substring($historyMatch.Index + $historyMatch.Length)
+  } else {
+    $compacted = $compacted.TrimEnd() + "`n`n$historyHeading`n`n" + ($topicLines -join "`n") + "`n`n## 当前 Ready Issue`n"
+  }
+  [IO.File]::WriteAllText($ReadyPath, $compacted, [Text.UTF8Encoding]::new($false))
+  return [pscustomobject]@{ archivePath=$ArchivePath; migratedCount=$doneBlocks.Count; idempotent=$false }
+}
+
 function Write-AutopilotRetrospectiveReport {
-  param([Parameter(Mandatory)][object]$Retrospective, [Parameter(Mandatory)][string]$Path)
+  param(
+    [Parameter(Mandatory)][object]$Retrospective,
+    [Parameter(Mandatory)][string]$Path,
+    [Parameter(Mandatory)][string]$RepoRoot
+  )
+  $readyPath = Join-Path $RepoRoot 'docs\backlog\ready-issues.md'
+  $historyRelativePath = 'docs/backlog/ready-history/ready-issues-{0}.md' -f $Retrospective.reviewCycleId
+  $historyArchive = Move-AutopilotReadyHistory -ReadyPath $readyPath -ArchivePath (Join-Path $RepoRoot $historyRelativePath) -ReviewCycleId $Retrospective.reviewCycleId
   $parent = Split-Path -Parent $Path
   if ($parent -and !(Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
   if (@($Retrospective.proposals).Count -eq 0) {
@@ -142,10 +221,11 @@ function Write-AutopilotRetrospectiveReport {
     "- 有效任务：$($Retrospective.taskCount)",
     "- 平均总分：$($Retrospective.total.average)",
     "- 首次验收通过率：$($Retrospective.firstPassRate)",
-    "- 后续项净变化：$($Retrospective.followupNetChange)", '',
+    "- 后续项净变化：$($Retrospective.followupNetChange)",
+    "- Ready 历史归档：``$historyRelativePath``（迁移 $($historyArchive.migratedCount) 条）", '',
     '## 改进提案', '', $proposalLines, '',
     '## 结构化数据', '', ($fence + 'json'), $json, $fence, ''
-  ) -join "`r`n"
+  ) -join "`n"
   [IO.File]::WriteAllText($Path, $markdown, [Text.UTF8Encoding]::new($false))
   return $Path
 }

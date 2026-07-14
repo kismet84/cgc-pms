@@ -11,7 +11,7 @@ New-Item -ItemType Directory -Path $root -Force | Out-Null
 try {
   function New-State([string]$Path) {
     $now = [datetimeoffset]::Now.ToString('o')
-    $state = [ordered]@{schemaVersion=2;runId='run-review';status='CHECKPOINT';phase='checkpoint';currentIssue='';attempt=0;startedAt=$now;phaseStartedAt=$now;lastHeartbeatAt=$now;iterationLimit=$null;completedImplementationIssues=0;completedIssueIds=@();worktree='';branch='test';executorPid=$null;lastCommit=$null;failureFingerprint=$null}
+    $state = [ordered]@{schemaVersion=2;runId='run-review';status='CHECKPOINT';phase='checkpoint';currentIssue='';attempt=0;startedAt=$now;phaseStartedAt=$now;lastHeartbeatAt=$now;iterationLimit=$null;completedImplementationIssues=0;completedIssueIds=@();worktree='';branch='test';executorPid=$null;lastCommit=$null;failureFingerprint=$null;stopReason=''}
     Write-AutopilotStateAtomic -Path $Path -State $state | Out-Null
     $migrated = Read-AutopilotState -Path $Path
     Set-AutopilotProperty $migrated 'activeScoringVersion' 'autopilot-task-score/v1'
@@ -77,6 +77,43 @@ try {
   $mixedReview = New-AutopilotRetrospective -ReviewCycleId 'review-mixed' -TaskRecords @($records[0],[pscustomobject]@{issueId='R-V2';score=$v2Score;attempt=0;followupNetChange=0;cycleSeconds=100;rootCause=$null;stockIssueTarget=$false}) -ScoringVersion 'autopilot-task-score/v2'
   if (@($mixedReview.scoringVersions).Count -ne 2 -or $mixedReview.dimensions.cycleEfficiency.taskCount -ne 1 -or $mixedReview.dimensions.taskExecutionEfficiency.taskCount -ne 1) { throw 'mixed v1/v2 retrospective did not aggregate efficiency dimensions by scoring version' }
   if ((Get-AutopilotRetrospectiveEpisodeId 'review-sample' 'autopilot-task-score/v1') -ne (Get-AutopilotRetrospectiveEpisodeId 'review-sample' 'autopilot-task-score/v1')) { throw 'Episode id is not stable' }
+
+  $reviewRepo = Join-Path $root 'review-repo'
+  $reviewBacklog = Join-Path $reviewRepo 'docs\backlog'
+  New-Item -ItemType Directory -Path $reviewBacklog -Force | Out-Null
+  @'
+# Ready Issues
+
+## Ready 队列状态
+
+### ISSUE-ARCHIVE-001：first completed issue
+
+状态：Done
+完整契约：first
+
+### ISSUE-ARCHIVE-002：second completed issue
+
+状态：Done（2026-07-14）
+完整契约：second
+
+### ISSUE-READY-003：current ready issue
+
+状态：Ready
+完整契约：keep
+'@ | Set-Content -LiteralPath (Join-Path $reviewBacklog 'ready-issues.md') -Encoding UTF8
+  $reviewReport = Join-Path $reviewRepo 'docs\iterations\review-sample.md'
+  Write-AutopilotRetrospectiveReport -Retrospective $review -Path $reviewReport -RepoRoot $reviewRepo | Out-Null
+  $historyArchive = Join-Path $reviewBacklog 'ready-history\ready-issues-review-sample.md'
+  $readyAfterArchive = Get-Content -LiteralPath (Join-Path $reviewBacklog 'ready-issues.md') -Raw -Encoding UTF8
+  $historyAfterArchive = Get-Content -LiteralPath $historyArchive -Raw -Encoding UTF8
+  if ($readyAfterArchive -match '(?m)^状态：Done' -or $readyAfterArchive -notmatch 'ISSUE-READY-003：current ready issue' -or @([regex]::Matches($readyAfterArchive, '(?m)^- \[ISSUE-ARCHIVE-')).Count -ne 2) { throw 'Ready history migration did not retain only compact historical topics and current Ready contracts' }
+  if ($historyAfterArchive -notmatch '完整契约：first' -or $historyAfterArchive -notmatch '完整契约：second') { throw 'Ready history archive lost completed Issue contracts' }
+  $readyHash = (Get-FileHash -LiteralPath (Join-Path $reviewBacklog 'ready-issues.md') -Algorithm SHA256).Hash
+  $archiveHash = (Get-FileHash -LiteralPath $historyArchive -Algorithm SHA256).Hash
+  $reportHash = (Get-FileHash -LiteralPath $reviewReport -Algorithm SHA256).Hash
+  Write-AutopilotRetrospectiveReport -Retrospective $review -Path $reviewReport -RepoRoot $reviewRepo | Out-Null
+  if ((Get-FileHash -LiteralPath (Join-Path $reviewBacklog 'ready-issues.md') -Algorithm SHA256).Hash -ne $readyHash -or (Get-FileHash -LiteralPath $historyArchive -Algorithm SHA256).Hash -ne $archiveHash -or (Get-FileHash -LiteralPath $reviewReport -Algorithm SHA256).Hash -ne $reportHash) { throw 'Ready history migration is not idempotent' }
+  if ((Get-Content -LiteralPath $reviewReport -Raw -Encoding UTF8) -notmatch 'docs/backlog/ready-history/ready-issues-review-sample.md') { throw 'retrospective report did not reference the Ready history archive' }
 
   $registryPath = Join-Path $root 'issues.json'; '{"schemaVersion":1,"issues":[]}' | Set-Content -LiteralPath $registryPath -Encoding UTF8
   $merge1 = Merge-AutopilotImprovementProposals -RegistryPath $registryPath -Proposals $review.proposals -ReportPath 'docs/iterations/review.md'

@@ -42,7 +42,8 @@
 
 `REPORT_COMMITTED → ISSUES_WRITTEN → GRAPH_REFRESHED → EPISODE_RECORDED`
 
-- 报告写入 `docs/iterations/` 并先形成正式本地提交。
+- 报告写入 `docs/iterations/`；同一报告阶段必须把 `ready-issues.md` 中全部完整 Done 块迁入 `docs/backlog/ready-history/ready-issues-<reviewCycleId>.md`，每次复盘恰好形成一个独立归档文件。`ready-issues.md` 只保留历史 Issue 主题及其归档链接，当前 Ready Issue 继续保留完整契约。
+- 回顾报告、Ready 历史归档和压缩后的 Ready 队列共同形成正式本地提交；迁移必须按 `reviewCycleId` 幂等，既有同名归档内容冲突时 fail-close，不得覆盖历史。
 - 提案去重写入唯一问题事实源，并形成事实提交。
 - 知识图谱 Git 游标必须追平事实提交。
 - Episode 使用 `reviewCycleId + scoringVersion` 派生的稳定 ID，并以正式报告为 `sourceRef`。
