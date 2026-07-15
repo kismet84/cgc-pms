@@ -4,14 +4,14 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-034` 已完成；本次 `启动迭代-5` 已完成 1 条，当前执行 `ISSUE-040-035`。
+`ISSUE-040-034`、`ISSUE-040-035` 已完成；本次 `启动迭代-5` 已完成 2 条，下一条待 checkpoint 后选择。
 
 ### ISSUE-040-035：间接费规则只读列表入口与租户边界
 
 优先级：P1
 任务性质：缺口修复
 类型：间接费 / 规则列表 / 用户入口 / 权限 / 租户隔离
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `A-01-OVERHEAD-LIST`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=5cec5beb458496888a7e62f6da76704a79b06cd1
 存量问题键：[stock:A-01-OVERHEAD-LIST]
 归档报告：`docs/quality/ISSUE-040-035-间接费规则只读列表入口与租户边界验收报告.md`
@@ -63,6 +63,8 @@ Reviewer要求：复核列表入口仅对 `overhead:query` 或管理员可见，
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm exec eslint src/api/modules/cost.ts src/pages/cost/ledger.vue src/pages/cost/__tests__/CostLedgerProduction.test.ts`
 - `git diff --check`
+
+收口结论：间接费规则只读入口、服务端分页、失败清空与请求竞态门禁、权限和认证租户边界均通过自动化及 180 秒稳定运行态验收；`A-01-OVERHEAD-LIST` 已从唯一台账移除。新增后续项0、关闭后续项1、后续项净变化-1。
 
 ### ISSUE-040-034：工作流个人效率统计只读入口与数据范围
 
