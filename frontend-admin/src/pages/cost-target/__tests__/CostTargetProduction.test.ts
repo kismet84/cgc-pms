@@ -337,19 +337,18 @@ describe('CostTarget production guards', () => {
     expect(source).toMatch(/<div v-else class="lg-table-wrap ct-table-wrap">/)
   })
 
-  it('右侧分析栏拆到页面私有组件后仍保留原 class 和刷新交互', () => {
+  it('右侧分析栏拆到页面私有组件后保留原 class 且不再提供按钮', () => {
     expect(source).toMatch(
       /import\s+CostTargetAnalysisRail\s+from\s+['"]\.\/components\/CostTargetAnalysisRail\.vue['"]/,
     )
     expect(source).toMatch(
-      /<CostTargetAnalysisRail[\s\S]*:total="total"[\s\S]*:target-status-summary="targetStatusSummary"[\s\S]*:target-version-summary="targetVersionSummary"[\s\S]*:recent-targets="recentTargets"[\s\S]*@refresh="fetchData"/,
+      /<CostTargetAnalysisRail[\s\S]*:total="total"[\s\S]*:target-status-summary="targetStatusSummary"[\s\S]*:target-version-summary="targetVersionSummary"[\s\S]*:recent-targets="recentTargets"/,
     )
     expect(analysisRailSource).toMatch(
       /class="lg-analysis-rail ct-analysis-rail project-operation-analysis-rail"[\s\S]*aria-label="成本目标辅助分析"/,
     )
-    expect(analysisRailSource).toMatch(
-      /<a-button type="link" size="small" @click="emit\('refresh'\)">刷新<\/a-button>/,
-    )
+    expect(analysisRailSource).not.toMatch(/<a-button|<button/)
+    expect(source).not.toMatch(/<CostTargetAnalysisRail[\s\S]*@refresh=/)
     expect(analysisRailSource).toMatch(/\.ct-analysis-panel\s*\{[\s\S]*display:\s*flex;/)
   })
 

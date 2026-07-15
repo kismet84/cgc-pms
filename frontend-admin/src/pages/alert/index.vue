@@ -1056,13 +1056,18 @@ onMounted(async () => {
         :class="{ 'alert-analysis-rail--mobile-open': mobileDetailVisible }"
       >
         <div class="lg-analysis-panel lg-fill-card alert-analysis-card">
-          <div v-if="isMobile" class="alert-mobile-detail-head">
-            <strong>预警详情</strong>
-            <a-button type="text" @click="mobileDetailVisible = false">关闭</a-button>
+          <div
+            v-if="isMobile"
+            class="alert-mobile-detail-head"
+            @click="mobileDetailVisible = false"
+          >
+            <strong>预警详情 · 点击关闭</strong>
           </div>
-          <div class="alert-analysis-head">
-            <strong>辅助分析</strong>
-            <span>预警概览与处理详情</span>
+          <div class="alert-analysis-head lg-analysis-header">
+            <div>
+              <strong class="lg-analysis-heading">辅助分析</strong>
+              <span class="lg-analysis-description">预警概览与处理详情</span>
+            </div>
           </div>
           <section class="alert-analysis-kpis" aria-label="预警概览">
             <article

@@ -506,11 +506,13 @@ onMounted(() => {
       </div>
 
       <aside class="lg-analysis-rail partner-analysis-rail" aria-label="合作方辅助分析">
-        <div class="partner-analysis-panel">
-          <header class="partner-analysis-head">
+        <div class="partner-analysis-panel lg-analysis-panel lg-fill-card">
+          <header class="partner-analysis-head lg-analysis-header">
             <div>
-              <div class="partner-analysis-title">合作方分析</div>
-              <div class="partner-analysis-subtitle">类型、状态与近期维护</div>
+              <div class="partner-analysis-title lg-analysis-heading">辅助分析</div>
+              <div class="partner-analysis-subtitle lg-analysis-description">
+                类型、状态与近期维护
+              </div>
             </div>
           </header>
           <section class="partner-analysis-section">

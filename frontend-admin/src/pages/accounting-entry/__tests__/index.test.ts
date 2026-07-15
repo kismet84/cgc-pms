@@ -181,17 +181,18 @@ describe('accounting entry page', () => {
 
   it('uses the ledger layout with KPI context and an analysis rail', () => {
     const source = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
-    expect(source).toContain('class="lg-list-page lg-page app-page accounting-entry-page"')
-    expect(source).toContain('class="lg-kpi-strip accounting-entry-kpis"')
-    expect(source).toContain('class="lg-list-table-panel accounting-entry-table-panel"')
-    expect(source).toContain('class="lg-analysis-rail accounting-entry-analysis-rail"')
+    expect(source).toContain('total.value = Number(result.total ?? 0)')
+    expect(source).toContain('accounting-entry-page settlement-domain-page')
+    expect(source).toContain('accounting-entry-kpis settlement-domain-kpi')
+    expect(source).toContain('accounting-entry-table-panel settlement-domain-table-panel')
+    expect(source).toContain('accounting-entry-analysis-rail settlement-domain-analysis-rail')
     expect(source).not.toContain('<h1>')
     expect(source).not.toContain('<a-alert')
-    expect(source.indexOf('class="lg-kpi-strip accounting-entry-kpis"')).toBeLessThan(
-      source.indexOf('class="lg-search-bar accounting-entry-filter"'),
+    expect(source.indexOf('accounting-entry-kpis settlement-domain-kpi')).toBeLessThan(
+      source.indexOf('aria-label="会计凭证筛选"'),
     )
-    expect(source.indexOf('class="lg-search-bar accounting-entry-filter"')).toBeLessThan(
-      source.indexOf('class="lg-list-table-panel accounting-entry-table-panel"'),
+    expect(source.indexOf('aria-label="会计凭证筛选"')).toBeLessThan(
+      source.indexOf('accounting-entry-table-panel settlement-domain-table-panel'),
     )
     expect(source).toMatch(/\.accounting-entry-kpis\s*\{[^}]*gap:\s*0;/s)
     expect(source).toMatch(

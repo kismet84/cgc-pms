@@ -277,22 +277,30 @@ onMounted(fetchRows)
         aria-label="投标成本辅助分析"
       >
         <div class="lg-analysis-panel lg-fill-card bid-cost-analysis-panel">
-          <header><strong>辅助分析</strong><span>投标状态与近期项目</span></header>
-          <section>
-            <h3>投标概览</h3>
-            <div class="bid-cost-analysis-row">
-              <span>项目总数</span><b>{{ total }} 个</b>
+          <header class="lg-analysis-header" aria-label="投标成本分析概览">
+            <div>
+              <strong class="lg-analysis-heading">辅助分析</strong>
+              <span class="lg-analysis-description">投标状态与近期项目</span>
             </div>
-            <div v-for="item in statusCounts" :key="item.status" class="bid-cost-analysis-row">
-              <span>{{ item.label }}</span
-              ><b>{{ item.count }} 个</b>
+          </header>
+          <section class="lg-analysis-section">
+            <div class="lg-analysis-section-title">投标概览</div>
+            <div class="lg-analysis-overview-list">
+              <div class="lg-analysis-overview-row">
+                <span>项目总数</span><strong>{{ total }} 个</strong>
+              </div>
+              <div v-for="item in statusCounts" :key="item.status" class="lg-analysis-overview-row">
+                <span>{{ item.label }}</span
+                ><strong>{{ item.count }} 个</strong>
+              </div>
             </div>
           </section>
-          <section>
-            <h3>近期投标</h3>
-            <div v-for="row in recentRows" :key="row.id" class="bid-cost-recent-row">
-              <span>{{ row.bidProjectName }}</span>
-              <small>{{ statusMeta[row.bidStatus].label }}</small>
+          <section class="lg-analysis-section">
+            <div class="lg-analysis-section-title">近期投标</div>
+            <div v-for="row in recentRows" :key="row.id" class="lg-type-row">
+              <span class="lg-type-dot lg-analysis-dot-primary"></span>
+              <span class="lg-type-label">{{ row.bidProjectName }}</span>
+              <span class="lg-type-pct">{{ statusMeta[row.bidStatus].label }}</span>
             </div>
             <div v-if="!recentRows.length" class="bid-cost-analysis-empty">暂无投标项目</div>
           </section>

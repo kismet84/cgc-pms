@@ -1,0 +1,130 @@
+.settlement-domain-page {
+  --lg-search-min-height: 60px;
+
+  background: var(--surface-subtle);
+}
+
+.settlement-domain-page .settlement-domain-workspace {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 20vw;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: clamp(8px, 1.2vw, 12px);
+}
+
+.settlement-domain-main-column {
+  display: contents !important;
+}
+
+.settlement-domain-kpi {
+  display: none !important;
+}
+
+.settlement-domain-main-column > .list-query-panel {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.settlement-domain-main-column > .settlement-domain-table-panel {
+  grid-column: 1;
+  grid-row: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0 !important;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+.settlement-domain-workspace > .settlement-domain-analysis-rail {
+  grid-column: 2;
+  grid-row: 2;
+  width: auto !important;
+  min-width: 0;
+  margin-top: 0 !important;
+}
+
+.settlement-domain-toolbar {
+  flex: 0 0 auto;
+  min-height: 0 !important;
+  box-sizing: border-box;
+  padding: 10px 14px !important;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settlement-domain-toolbar
+  :is(.settlement-table-heading, .payment-table-heading, .invoice-table-heading) {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 8px;
+}
+
+.settlement-domain-table-panel > .settlement-domain-table-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.settlement-domain-pagination {
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 55px;
+}
+
+@media (width < 500px) {
+  .settlement-domain-page {
+    --lg-search-min-height: 0;
+
+    gap: 8px;
+    padding: 0;
+  }
+
+  .settlement-domain-page .settlement-domain-workspace {
+    display: block !important;
+  }
+
+  .settlement-domain-main-column {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .settlement-domain-table-panel {
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .settlement-domain-toolbar {
+    display: none !important;
+  }
+
+  .settlement-domain-table-panel > .settlement-domain-table-wrap {
+    flex: 0 0 auto;
+    height: auto !important;
+    min-height: 280px !important;
+    max-height: none !important;
+    overflow: auto;
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .settlement-domain-pagination {
+    min-height: 47px;
+    padding-inline: 8px;
+  }
+
+  .settlement-domain-analysis-rail {
+    display: none !important;
+  }
+}

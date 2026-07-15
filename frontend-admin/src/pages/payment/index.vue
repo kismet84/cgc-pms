@@ -677,7 +677,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page payment-page">
+  <div class="lg-list-page lg-page app-page payment-page settlement-domain-page">
     <div v-if="linkedCashJournal" class="linked-cash-journal-banner">
       <div>
         <strong>关联资金流水 {{ linkedCashJournal.entryNo }}</strong>
@@ -714,8 +714,8 @@ onMounted(() => {
       :approval-breakdown="approvalBreakdown"
       :pending-payments="pendingPayments"
     >
-      <main class="lg-list-table-panel payment-table-panel">
-        <div class="lg-toolbar payment-toolbar">
+      <main class="lg-list-table-panel payment-table-panel settlement-domain-table-panel">
+        <div class="lg-toolbar payment-toolbar settlement-domain-toolbar">
           <div class="lg-toolbar-left">
             <div class="payment-table-heading">
               <span class="payment-table-title">付款申请明细</span>
@@ -739,7 +739,7 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="lg-table-wrap">
+        <div class="lg-table-wrap settlement-domain-table-wrap">
           <div v-if="listError" class="payment-list-feedback">
             <a-result status="error" title="付款列表加载失败" :sub-title="listError">
               <template #extra>
@@ -818,7 +818,7 @@ onMounted(() => {
           </vxe-grid>
         </div>
 
-        <div class="lg-pagination">
+        <div class="lg-pagination settlement-domain-pagination">
           <span class="lg-total">共 {{ total }} 条</span>
           <a-pagination
             v-model:current="pageNo"

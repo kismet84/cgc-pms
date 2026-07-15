@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
-import { SearchOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import { ref } from 'vue'
+import { FilterOutlined, SearchOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import type { WarehouseVO } from '@/types/inventory'
 import type { SelectOption } from '@/types/ui'
 
@@ -23,27 +23,16 @@ const emit = defineEmits<{
   reset: []
 }>()
 
-const filterVisibility = reactive({
-  projectId: true,
-  warehouseId: true,
-  materialId: true,
-})
-const filterSettingItems = [
-  { key: 'projectId', label: '项目' },
-  { key: 'warehouseId', label: '仓库' },
-  { key: 'materialId', label: '物料' },
-] as const
-
-function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
-  filterVisibility[key] = !filterVisibility[key]
-}
+const filterPanelOpen = ref(false)
 </script>
 
 <template>
-  <div class="lg-search-bar">
-    <div class="stock-search-fields">
+  <div class="lg-search-bar procurement-subcontract-query-panel">
+    <div
+      class="stock-search-fields procurement-subcontract-filter-panel"
+      :class="{ 'is-open': filterPanelOpen }"
+    >
       <a-select
-        v-if="filterVisibility.projectId"
         :value="projectId"
         placeholder="全部项目"
         allow-clear
@@ -60,7 +49,6 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
         </a-select-option>
       </a-select>
       <a-select
-        v-if="filterVisibility.warehouseId"
         :value="warehouseId"
         placeholder="全部仓库"
         allow-clear
@@ -82,7 +70,6 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
         </a-select-option>
       </a-select>
       <a-select
-        v-if="filterVisibility.materialId"
         :value="materialId"
         placeholder="全部物料"
         allow-clear
@@ -104,7 +91,7 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
         </a-select-option>
       </a-select>
     </div>
-    <div class="stock-search-keyword-row">
+    <div class="stock-search-keyword-row procurement-subcontract-query-row">
       <a-input
         :value="keyword"
         placeholder="搜索流水编号、来源单号"
@@ -115,31 +102,31 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
       >
         <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
       </a-input>
-      <div class="stock-search-actions">
-        <a-button type="primary" size="large" @click="emit('search')">查询</a-button>
-        <a-button size="large" @click="emit('reset')">
+      <div class="stock-search-actions procurement-subcontract-query-actions">
+        <a-button
+          class="procurement-subcontract-desktop-action"
+          type="primary"
+          size="large"
+          @click="emit('search')"
+          >搜索</a-button
+        >
+        <a-button
+          class="procurement-subcontract-desktop-action"
+          size="large"
+          @click="emit('reset')"
+        >
           <template #icon><ReloadOutlined /></template>
           重置
         </a-button>
-        <a-dropdown trigger="click">
-          <a-button size="large">
-            <template #icon><SettingOutlined /></template>
-            筛选栏设置
-          </a-button>
-          <template #overlay>
-            <a-menu>
-              <a-menu-item
-                v-for="item in filterSettingItems"
-                :key="item.key"
-                @click="toggleFilterVisibility(item.key)"
-              >
-                <a-checkbox :checked="filterVisibility[item.key]">
-                  {{ item.label }}
-                </a-checkbox>
-              </a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
+        <a-button
+          class="procurement-subcontract-filter-toggle"
+          size="large"
+          :aria-expanded="filterPanelOpen"
+          @click="filterPanelOpen = !filterPanelOpen"
+        >
+          <template #icon><FilterOutlined /></template>
+          筛选
+        </a-button>
       </div>
     </div>
   </div>

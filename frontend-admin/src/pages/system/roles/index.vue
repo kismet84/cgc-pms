@@ -461,26 +461,34 @@ onMounted(() => {
         </div>
       </main>
 
-      <aside class="lg-analysis-rail">
-        <div class="lg-panel">
-          <div class="lg-panel-title">角色状态</div>
-          <div class="lg-type-list">
-            <div v-for="item in roleStatusSummary" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot" :class="`is-${item.tone}`"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <strong>{{ item.count }}</strong>
+      <aside class="lg-analysis-rail" aria-label="角色辅助分析">
+        <div class="lg-analysis-panel lg-fill-card system-analysis-panel">
+          <header class="lg-analysis-header">
+            <div>
+              <div class="lg-analysis-heading">辅助分析</div>
+              <div class="lg-analysis-description">角色状态与近期角色</div>
             </div>
-          </div>
-        </div>
-        <div class="lg-panel">
-          <div class="lg-panel-title">近期角色</div>
-          <div class="lg-rail-list">
-            <div v-for="item in recentRoles" :key="item.id" class="lg-rail-item">
-              <span class="lg-type-dot"></span>
-              <span>{{ item.roleName }}</span>
+          </header>
+          <section class="lg-panel">
+            <div class="lg-panel-title">角色状态</div>
+            <div class="lg-type-list">
+              <div v-for="item in roleStatusSummary" :key="item.label" class="lg-type-row">
+                <span class="lg-type-dot" :class="`is-${item.tone}`"></span>
+                <span class="lg-type-label">{{ item.label }}</span>
+                <strong>{{ item.count }}</strong>
+              </div>
             </div>
-            <div v-if="!recentRoles.length" class="lg-empty-text">暂无角色</div>
-          </div>
+          </section>
+          <section class="lg-panel">
+            <div class="lg-panel-title">近期角色</div>
+            <div class="lg-rail-list">
+              <div v-for="item in recentRoles" :key="item.id" class="lg-rail-item">
+                <span class="lg-type-dot"></span>
+                <span>{{ item.roleName }}</span>
+              </div>
+              <div v-if="!recentRoles.length" class="lg-empty-text">暂无角色</div>
+            </div>
+          </section>
         </div>
       </aside>
     </div>

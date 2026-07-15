@@ -21,8 +21,17 @@ defineProps<{
 </script>
 
 <template>
-  <aside class="lg-analysis-rail subcontract-measure-analysis-rail" aria-label="分包计量辅助分析">
+  <aside
+    class="lg-analysis-rail subcontract-measure-analysis-rail procurement-subcontract-analysis-rail"
+    aria-label="分包计量辅助分析"
+  >
     <div class="lg-analysis-panel subcontract-measure-analysis-panel">
+      <header class="lg-analysis-header">
+        <div>
+          <div class="lg-analysis-heading">辅助分析</div>
+          <div class="lg-analysis-description">计量状态、金额进度与近期计量</div>
+        </div>
+      </header>
       <section class="subcontract-measure-analysis-section">
         <div class="subcontract-measure-section-head">
           <strong>计量状态分布</strong>
@@ -49,11 +58,11 @@ defineProps<{
           <strong>金额审核</strong>
           <span>{{ approvedRate }}%</span>
         </div>
-        <div class="subcontract-measure-amount-box">
-          <div>
+        <div class="lg-analysis-overview-list">
+          <div class="lg-analysis-overview-row">
             <span>申报</span><strong>{{ fmtWan(kpiMeasureTotal) }} 万元</strong>
           </div>
-          <div>
+          <div class="lg-analysis-overview-row">
             <span>审核</span><strong>{{ fmtWan(kpiApproved) }} 万元</strong>
           </div>
         </div>
@@ -130,8 +139,7 @@ defineProps<{
 }
 
 .subcontract-measure-bar-meta,
-.subcontract-measure-recent-item,
-.subcontract-measure-amount-box div {
+.subcontract-measure-recent-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -155,8 +163,7 @@ defineProps<{
 }
 
 .subcontract-measure-bar-meta strong,
-.subcontract-measure-recent-item strong,
-.subcontract-measure-amount-box strong {
+.subcontract-measure-recent-item strong {
   color: #0f172a;
   font-weight: 600;
   white-space: nowrap;
@@ -174,20 +181,6 @@ defineProps<{
   display: block;
   height: 100%;
   border-radius: inherit;
-}
-
-.subcontract-measure-amount-box {
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #f8fafc;
-}
-
-.subcontract-measure-amount-box span {
-  font-size: 12px;
-  color: #64748b;
 }
 
 .subcontract-measure-recent-item {

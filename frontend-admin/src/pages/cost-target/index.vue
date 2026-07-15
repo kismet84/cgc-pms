@@ -577,7 +577,6 @@ onMounted(() => {
         :target-status-summary="targetStatusSummary"
         :target-version-summary="targetVersionSummary"
         :recent-targets="recentTargets"
-        @refresh="fetchData"
       />
     </div>
 

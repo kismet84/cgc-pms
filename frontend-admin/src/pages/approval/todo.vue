@@ -731,9 +731,11 @@ watch(
 
       <aside v-if="!isMobile" class="lg-analysis-rail approval-analysis-rail">
         <div class="lg-analysis-panel lg-fill-card approval-analysis-card">
-          <div class="approval-analysis-head">
-            <strong>辅助分析</strong>
-            <span>审批概览与近期动态</span>
+          <div class="approval-analysis-head lg-analysis-header">
+            <div>
+              <strong class="lg-analysis-heading">辅助分析</strong>
+              <span class="lg-analysis-description">审批概览与近期动态</span>
+            </div>
           </div>
           <section class="approval-analysis-section">
             <div class="lg-panel-title">审批分类</div>

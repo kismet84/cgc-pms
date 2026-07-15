@@ -13,10 +13,10 @@ defineEmits<{ replenish: [] }>()
 <template>
   <aside class="lg-analysis-rail stock-analysis-rail" aria-label="库存辅助分析">
     <div class="lg-analysis-panel lg-fill-card stock-analysis-panel">
-      <header class="stock-analysis-head">
+      <header class="stock-analysis-head lg-analysis-header">
         <div>
-          <div class="stock-analysis-title">库存分析</div>
-          <div class="stock-analysis-subtitle">预警、出入库与当前结构</div>
+          <div class="stock-analysis-title lg-analysis-heading">辅助分析</div>
+          <div class="stock-analysis-subtitle lg-analysis-description">预警、出入库与当前结构</div>
         </div>
       </header>
       <section class="stock-analysis-section">
@@ -38,9 +38,7 @@ defineEmits<{ replenish: [] }>()
               ></span>
             </span>
             <span class="lg-type-num" style="color: #ef4444">{{ w.qty }}</span>
-            <a-button class="lg-type-pct" type="link" size="small" @click="$emit('replenish')">
-              补货
-            </a-button>
+            <span class="lg-type-pct">低库存</span>
           </div>
           <div v-if="lowStockWarn.length === 0" class="lg-type-row">
             <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>

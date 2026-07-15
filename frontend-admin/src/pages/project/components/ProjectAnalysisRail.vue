@@ -32,10 +32,10 @@ defineProps<{
 <template>
   <aside class="lg-analysis-rail project-analysis-rail" aria-label="项目辅助分析">
     <div class="lg-analysis-panel lg-fill-card project-analysis-panel">
-      <header class="project-analysis-head">
+      <header class="project-analysis-head lg-analysis-header">
         <div>
-          <div class="project-analysis-title">辅助分析</div>
-          <div class="project-analysis-subtitle">项目概览与重点分组</div>
+          <div class="project-analysis-title lg-analysis-heading">辅助分析</div>
+          <div class="project-analysis-subtitle lg-analysis-description">项目概览与重点分组</div>
         </div>
       </header>
 

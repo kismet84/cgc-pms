@@ -75,7 +75,7 @@ const canEditStock = computed(
 )
 
 // ---- 移动端检测 ----
-const MOBILE_BP = 768
+const MOBILE_BP = 500
 const isMobile = ref(window.innerWidth < MOBILE_BP)
 function onResize() {
   isMobile.value = window.innerWidth < MOBILE_BP
@@ -92,7 +92,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page stock-page">
+  <div class="lg-list-page lg-page app-page stock-page procurement-subcontract-list-page">
     <div class="lg-page-head stock-page-head">
       <div class="stock-page-meta-row">
         <a-breadcrumb class="stock-breadcrumb">
@@ -197,7 +197,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           </div>
         </div>
 
-        <main class="lg-list-table-panel">
+        <main class="lg-list-table-panel procurement-subcontract-table-panel">
           <!-- 工具栏 -->
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
@@ -234,6 +234,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <!-- 桌面端表格 -->
           <StockTxnTable
             v-else-if="!isMobile"
+            class="procurement-subcontract-desktop-table"
             :txn-list="txnList"
             :loading="loading"
             :grid-columns="visibleGridColumns"
@@ -340,6 +341,7 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 
       <!-- 右侧分析面板 -->
       <StockAnalysisPanel
+        class="procurement-subcontract-analysis-rail"
         :low-stock-warn="lowStockWarn"
         :kpi="kpi"
         :in-out-stats="inOutStats"

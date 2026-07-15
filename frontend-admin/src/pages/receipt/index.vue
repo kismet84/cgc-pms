@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { onMounted, computed, reactive } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   MoreOutlined,
+  FilterOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
-  SettingOutlined,
 } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import type { SelectOption } from '@/types/ui'
@@ -26,20 +26,10 @@ import { useColumnSettings } from '@/composables/useColumnSettings'
 const route = useRoute()
 const router = useRouter()
 const referenceStore = useReferenceStore()
+const filterPanelOpen = ref(false)
 const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 const partnerList = computed(() => referenceStore.partners ?? [])
-
-const filterVisibility = reactive({
-  projectId: true,
-  orderId: true,
-  qualityStatus: true,
-})
-const filterSettingItems = [
-  { key: 'projectId', label: '项目' },
-  { key: 'orderId', label: '订单' },
-  { key: 'qualityStatus', label: '质量状态' },
-] as const
 
 const {
   filter,
@@ -138,10 +128,6 @@ function statusPct(status: string) {
   return Math.round((count / base) * 100)
 }
 
-function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
-  filterVisibility[key] = !filterVisibility[key]
-}
-
 onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchContracts(
@@ -155,7 +141,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page receipt-page">
+  <div class="lg-list-page lg-page app-page receipt-page procurement-subcontract-list-page">
     <div class="lg-page-head receipt-page-head">
       <div class="receipt-page-meta-row">
         <a-breadcrumb class="receipt-breadcrumb">
@@ -175,10 +161,12 @@ onMounted(() => {
           :fmt-amount="fmtAmount"
         />
 
-        <div class="lg-search-bar receipt-search-bar">
-          <div class="receipt-search-fields">
+        <div class="lg-search-bar receipt-search-bar procurement-subcontract-query-panel">
+          <div
+            class="receipt-search-fields procurement-subcontract-filter-panel"
+            :class="{ 'is-open': filterPanelOpen }"
+          >
             <a-select
-              v-if="filterVisibility.projectId"
               v-model:value="filter.projectId"
               placeholder="全部项目"
               allow-clear
@@ -201,7 +189,6 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
-              v-if="filterVisibility.orderId"
               v-model:value="filter.orderId"
               placeholder="全部订单"
               allow-clear
@@ -218,7 +205,6 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
-              v-if="filterVisibility.qualityStatus"
               v-model:value="filter.qualityStatus"
               placeholder="全部质量状态"
               allow-clear
@@ -231,7 +217,7 @@ onMounted(() => {
               <a-select-option value="PENDING">待检验</a-select-option>
             </a-select>
           </div>
-          <div class="receipt-search-keyword-row">
+          <div class="receipt-search-keyword-row procurement-subcontract-query-row">
             <a-input
               v-model:value="filter.receiptCode"
               placeholder="搜索验收单号"
@@ -241,36 +227,36 @@ onMounted(() => {
             >
               <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
             </a-input>
-            <div class="receipt-search-actions">
-              <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-              <a-button size="large" @click="handleReset">
+            <div class="receipt-search-actions procurement-subcontract-query-actions">
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                type="primary"
+                size="large"
+                @click="handleSearch"
+                >搜索</a-button
+              >
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                size="large"
+                @click="handleReset"
+              >
                 <template #icon><ReloadOutlined /></template>
                 重置
               </a-button>
-              <a-dropdown trigger="click">
-                <a-button size="large">
-                  <template #icon><SettingOutlined /></template>
-                  筛选栏设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item
-                      v-for="item in filterSettingItems"
-                      :key="item.key"
-                      @click="toggleFilterVisibility(item.key)"
-                    >
-                      <a-checkbox :checked="filterVisibility[item.key]">
-                        {{ item.label }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
+              <a-button
+                class="procurement-subcontract-filter-toggle"
+                size="large"
+                :aria-expanded="filterPanelOpen"
+                @click="filterPanelOpen = !filterPanelOpen"
+              >
+                <template #icon><FilterOutlined /></template>
+                筛选
+              </a-button>
             </div>
           </div>
         </div>
 
-        <main class="lg-list-table-panel receipt-table-panel">
+        <main class="lg-list-table-panel receipt-table-panel procurement-subcontract-table-panel">
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
               <div class="receipt-table-title">
@@ -309,6 +295,7 @@ onMounted(() => {
             </div>
             <vxe-grid
               v-else
+              class="procurement-subcontract-desktop-table"
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -358,6 +345,30 @@ onMounted(() => {
                 </a-dropdown>
               </template>
             </vxe-grid>
+            <div v-if="!listError && !showEmptyState" class="procurement-subcontract-mobile-list">
+              <button
+                v-for="row in tableData"
+                :key="row.id"
+                class="procurement-subcontract-mobile-card"
+                type="button"
+                @click="handleView(row)"
+              >
+                <span class="procurement-subcontract-mobile-card-title">{{
+                  row.receiptCode || '-'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-status">
+                  <a-tag :color="QUALITY_STATUS_COLOR[row.qualityStatus || ''] || 'default'">{{
+                    QUALITY_STATUS_LABEL[row.qualityStatus || ''] || row.qualityStatus || '-'
+                  }}</a-tag>
+                </span>
+                <span class="procurement-subcontract-mobile-card-subtitle">{{
+                  row.projectName || '未关联项目'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-meta"
+                  >{{ row.orderCode || '订单待维护' }} · {{ row.receiptDate || '日期待维护' }}</span
+                >
+              </button>
+            </div>
           </div>
 
           <!-- 分页 -->
@@ -377,14 +388,18 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail receipt-analysis-rail" aria-label="材料验收辅助分析">
+      <aside
+        class="lg-analysis-rail receipt-analysis-rail procurement-subcontract-analysis-rail"
+        aria-label="材料验收辅助分析"
+      >
         <div class="lg-analysis-panel lg-fill-card receipt-analysis-panel">
-          <header class="receipt-analysis-head">
+          <header class="receipt-analysis-head lg-analysis-header">
             <div>
-              <div class="receipt-analysis-title">辅助分析</div>
-              <div class="receipt-analysis-subtitle">质量状态、验收风险与近期单据</div>
+              <div class="receipt-analysis-title lg-analysis-heading">辅助分析</div>
+              <div class="receipt-analysis-subtitle lg-analysis-description">
+                质量状态、验收风险与近期单据
+              </div>
             </div>
-            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
           </header>
           <section class="receipt-analysis-focus">
             <span>本页重点</span>
@@ -413,10 +428,12 @@ onMounted(() => {
               <strong>验收风险</strong>
               <span>{{ qualityRiskCount }} 单</span>
             </div>
-            <div class="receipt-risk-box">
-              <span>不合格批次</span>
-              <strong>{{ qualityRiskCount }}</strong>
-              <em>需跟踪退换货、让步接收或整改闭环。</em>
+            <div class="lg-analysis-overview-list">
+              <div class="lg-analysis-overview-row">
+                <span>不合格批次</span>
+                <strong>{{ qualityRiskCount }} 单</strong>
+              </div>
+              <div class="lg-analysis-note">需跟踪退换货、让步接收或整改闭环。</div>
             </div>
           </section>
           <section class="receipt-analysis-section">
@@ -736,28 +753,6 @@ onMounted(() => {
   display: block;
   height: 100%;
   border-radius: inherit;
-}
-
-.receipt-risk-box {
-  display: grid;
-  gap: 4px;
-  padding: 14px;
-  border-radius: 8px;
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
-}
-
-.receipt-risk-box span,
-.receipt-risk-box em {
-  font-size: 12px;
-  color: #64748b;
-  font-style: normal;
-}
-
-.receipt-risk-box strong {
-  font-size: 24px;
-  line-height: 30px;
-  color: #dc2626;
 }
 
 .receipt-recent-item {

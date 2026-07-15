@@ -346,6 +346,7 @@ onMounted(() => {
             </div>
             <a-table
               v-else
+              class="site-daily-desktop-table"
               :loading="loading"
               :columns="columns"
               :data-source="records"
@@ -397,31 +398,33 @@ onMounted(() => {
         aria-label="现场日报辅助分析"
       >
         <div class="lg-analysis-panel lg-fill-card site-daily-analysis-panel">
-          <header><strong>辅助分析</strong><span>日报状态与近期记录</span></header>
-          <section>
-            <h3>日报概览</h3>
-            <div class="site-daily-analysis-row">
-              <span>当前记录</span><b>{{ total }} 条</b>
+          <header class="lg-analysis-header">
+            <div>
+              <strong class="lg-analysis-heading">辅助分析</strong>
+              <span class="lg-analysis-description">日报状态与近期记录</span>
             </div>
-            <div class="site-daily-analysis-row">
-              <span>已提交</span><b>{{ submittedCount }} 条</b>
-            </div>
-            <div class="site-daily-analysis-row">
-              <span>草稿</span><b>{{ draftCount }} 条</b>
+          </header>
+          <section class="lg-analysis-section">
+            <div class="lg-analysis-section-title">日报概览</div>
+            <div class="lg-analysis-overview-list">
+              <div class="lg-analysis-overview-row">
+                <span>当前记录</span><strong>{{ total }} 条</strong>
+              </div>
+              <div class="lg-analysis-overview-row">
+                <span>已提交</span><strong>{{ submittedCount }} 条</strong>
+              </div>
+              <div class="lg-analysis-overview-row">
+                <span>草稿</span><strong>{{ draftCount }} 条</strong>
+              </div>
             </div>
           </section>
-          <section>
-            <h3>近期日报</h3>
-            <button
-              v-for="record in recentRecords"
-              :key="record.id"
-              type="button"
-              class="site-daily-recent-row"
-              @click="openRecord(record)"
-            >
-              <span>{{ record.projectName || '-' }}</span
-              ><small>{{ record.reportDate }}</small>
-            </button>
+          <section class="lg-analysis-section">
+            <div class="lg-analysis-section-title">近期日报</div>
+            <div v-for="record in recentRecords" :key="record.id" class="lg-type-row">
+              <span class="lg-type-dot lg-analysis-dot-primary"></span>
+              <span class="lg-type-label">{{ record.projectName || '-' }}</span>
+              <span class="lg-type-pct">{{ record.reportDate }}</span>
+            </div>
             <div v-if="!recentRecords.length" class="site-daily-analysis-empty">暂无日报</div>
           </section>
         </div>
@@ -715,6 +718,33 @@ onMounted(() => {
 
 .site-daily-table-wrap {
   flex: 1 1 auto;
+  overflow: auto;
+}
+
+.site-daily-table-wrap :deep(.site-daily-desktop-table),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-spin-nested-loading),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-spin-container),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table-container) {
+  height: 100%;
+  min-height: 0;
+}
+
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-spin-container),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table-container) {
+  display: flex;
+  flex-direction: column;
+}
+
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table-container),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table-content) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table-content) {
+  height: 100% !important;
   overflow: auto;
 }
 

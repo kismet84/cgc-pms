@@ -6,11 +6,11 @@ import {
   ClockCircleOutlined,
   DatabaseOutlined,
   FolderOpenOutlined,
+  FilterOutlined,
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
-  SettingOutlined,
   StopOutlined,
 } from '@ant-design/icons-vue'
 import {
@@ -31,15 +31,7 @@ const filter = reactive({
   warehouseName: '',
   status: undefined as string | undefined,
 })
-const filterVisibility = reactive({
-  projectId: true,
-  status: true,
-})
-const filterSettingItems = [
-  { key: 'projectId', label: '项目' },
-  { key: 'status', label: '状态' },
-] as const
-
+const filterPanelOpen = ref(false)
 const loading = ref(false)
 const tableData = ref<WarehouseVO[]>([])
 const total = ref(0)
@@ -132,10 +124,6 @@ function handlePageSizeChange(_cur: number, size: number) {
   pageSize.value = size
   pageNo.value = 1
   fetchData()
-}
-
-function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
-  filterVisibility[key] = !filterVisibility[key]
 }
 
 function handleAdd() {
@@ -249,7 +237,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page warehouse-page">
+  <div class="lg-list-page lg-page app-page warehouse-page procurement-subcontract-list-page">
     <!-- Page head -->
     <div class="lg-page-head warehouse-page-head">
       <div class="warehouse-page-meta-row">
@@ -291,10 +279,12 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="lg-search-bar warehouse-search-bar">
-          <div class="warehouse-search-fields">
+        <div class="lg-search-bar warehouse-search-bar procurement-subcontract-query-panel">
+          <div
+            class="warehouse-search-fields procurement-subcontract-filter-panel"
+            :class="{ 'is-open': filterPanelOpen }"
+          >
             <a-select
-              v-if="filterVisibility.projectId"
               v-model:value="filter.projectId"
               placeholder="全部项目"
               allow-clear
@@ -306,7 +296,6 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
-              v-if="filterVisibility.status"
               v-model:value="filter.status"
               placeholder="全部状态"
               allow-clear
@@ -317,7 +306,7 @@ onMounted(() => {
               <a-select-option value="DISABLE">停用</a-select-option>
             </a-select>
           </div>
-          <div class="warehouse-search-keyword-row">
+          <div class="warehouse-search-keyword-row procurement-subcontract-query-row">
             <a-input
               v-model:value="filter.keyword"
               placeholder="搜索仓库编号、名称"
@@ -327,36 +316,36 @@ onMounted(() => {
             >
               <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
             </a-input>
-            <div class="warehouse-search-actions">
-              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-              <a-button size="large" @click="handleReset">
+            <div class="warehouse-search-actions procurement-subcontract-query-actions">
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                type="primary"
+                size="large"
+                @click="handleSearch"
+                >搜索</a-button
+              >
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                size="large"
+                @click="handleReset"
+              >
                 <template #icon><ReloadOutlined /></template>
                 重置
               </a-button>
-              <a-dropdown trigger="click">
-                <a-button size="large">
-                  <template #icon><SettingOutlined /></template>
-                  筛选栏设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item
-                      v-for="item in filterSettingItems"
-                      :key="item.key"
-                      @click="toggleFilterVisibility(item.key)"
-                    >
-                      <a-checkbox :checked="filterVisibility[item.key]">
-                        {{ item.label }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
+              <a-button
+                class="procurement-subcontract-filter-toggle"
+                size="large"
+                :aria-expanded="filterPanelOpen"
+                @click="filterPanelOpen = !filterPanelOpen"
+              >
+                <template #icon><FilterOutlined /></template>
+                筛选
+              </a-button>
             </div>
           </div>
         </div>
 
-        <main class="lg-list-table-panel">
+        <main class="lg-list-table-panel procurement-subcontract-table-panel">
           <!-- 工具栏 -->
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
@@ -383,6 +372,7 @@ onMounted(() => {
           <!-- 表格 -->
           <div class="lg-table-wrap">
             <vxe-grid
+              class="procurement-subcontract-desktop-table"
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -410,6 +400,30 @@ onMounted(() => {
                 </a-dropdown>
               </template>
             </vxe-grid>
+            <div class="procurement-subcontract-mobile-list">
+              <button
+                v-for="row in tableData"
+                :key="row.id"
+                class="procurement-subcontract-mobile-card"
+                type="button"
+                @click="handleEdit(row)"
+              >
+                <span class="procurement-subcontract-mobile-card-title">{{
+                  row.warehouseName || '-'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-status">
+                  <a-tag :color="STATUS_COLOR[row.status]">{{
+                    STATUS_LABEL[row.status] ?? row.status
+                  }}</a-tag>
+                </span>
+                <span class="procurement-subcontract-mobile-card-subtitle">{{
+                  row.warehouseCode || '编号待维护'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-meta"
+                  >{{ row.projectName || '未关联项目' }} · {{ row.remark || '暂无备注' }}</span
+                >
+              </button>
+            </div>
           </div>
 
           <!-- 分页 -->
@@ -429,14 +443,18 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail warehouse-analysis-rail" aria-label="仓库辅助分析">
+      <aside
+        class="lg-analysis-rail warehouse-analysis-rail procurement-subcontract-analysis-rail"
+        aria-label="仓库辅助分析"
+      >
         <div class="lg-analysis-panel lg-fill-card warehouse-analysis-panel">
-          <header class="warehouse-analysis-head">
+          <header class="warehouse-analysis-head lg-analysis-header">
             <div>
-              <div class="warehouse-analysis-title">仓库分析</div>
-              <div class="warehouse-analysis-subtitle">状态、项目与近期维护</div>
+              <div class="warehouse-analysis-title lg-analysis-heading">辅助分析</div>
+              <div class="warehouse-analysis-subtitle lg-analysis-description">
+                状态、项目与近期维护
+              </div>
             </div>
-            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
           </header>
           <section class="warehouse-analysis-section">
             <div class="warehouse-section-title">仓库状态分布</div>

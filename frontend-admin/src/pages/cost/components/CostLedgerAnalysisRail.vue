@@ -31,11 +31,11 @@ const hasWarningItems = computed(() =>
     aria-label="成本辅助分析"
   >
     <div class="lg-analysis-panel lg-fill-card cost-ledger-analysis-panel">
-      <header class="cost-ledger-analysis-head">
+      <header class="cost-ledger-analysis-head lg-analysis-header">
         <div>
-          <div class="cost-ledger-analysis-title">成本分析</div>
+          <div class="cost-ledger-analysis-title lg-analysis-heading">辅助分析</div>
+          <div class="lg-analysis-description">科目、来源与预算预警</div>
         </div>
-        <a-button type="link" size="small" @click="handleSearch">刷新</a-button>
       </header>
 
       <section class="cost-ledger-analysis-section">

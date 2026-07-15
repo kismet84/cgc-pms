@@ -57,12 +57,17 @@ function dotColor(label: string): string {
 </script>
 
 <template>
-  <aside class="lg-analysis-rail invoice-analysis-rail" aria-label="发票辅助分析">
+  <aside
+    class="lg-analysis-rail invoice-analysis-rail settlement-domain-analysis-rail"
+    aria-label="发票辅助分析"
+  >
     <div class="lg-analysis-panel invoice-analysis-panel">
-      <header class="invoice-analysis-head">
+      <header class="invoice-analysis-head lg-analysis-header">
         <div>
-          <div class="invoice-analysis-title">发票分析</div>
-          <div class="invoice-analysis-subtitle">核验状态、类型分布与异常提醒</div>
+          <div class="invoice-analysis-title lg-analysis-heading">辅助分析</div>
+          <div class="invoice-analysis-subtitle lg-analysis-description">
+            核验状态、类型分布与异常提醒
+          </div>
         </div>
       </header>
 

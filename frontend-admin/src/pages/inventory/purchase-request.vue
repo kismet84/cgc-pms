@@ -602,7 +602,9 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page purchase-request-page">
+  <div
+    class="lg-list-page lg-page app-page purchase-request-page procurement-subcontract-list-page"
+  >
     <div class="lg-page-head purchase-request-page-head">
       <div class="purchase-request-page-meta-row">
         <a-breadcrumb class="purchase-request-breadcrumb">
@@ -677,7 +679,9 @@ onMounted(async () => {
           @reset="handleReset"
         />
 
-        <main class="lg-list-table-panel purchase-request-table-panel">
+        <main
+          class="lg-list-table-panel purchase-request-table-panel procurement-subcontract-table-panel"
+        >
           <!-- 工具栏 -->
           <div class="lg-toolbar purchase-request-toolbar">
             <div class="lg-toolbar-left">
@@ -704,6 +708,7 @@ onMounted(async () => {
           <!-- 表格 -->
           <div class="lg-table-wrap">
             <vxe-grid
+              class="procurement-subcontract-desktop-table"
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -747,6 +752,31 @@ onMounted(async () => {
                 </a-dropdown>
               </template>
             </vxe-grid>
+            <div class="procurement-subcontract-mobile-list">
+              <button
+                v-for="row in tableData"
+                :key="row.id"
+                class="procurement-subcontract-mobile-card"
+                type="button"
+                @click="handleView(row)"
+              >
+                <span class="procurement-subcontract-mobile-card-title">{{
+                  row.requestCode || '-'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-status">
+                  <a-tag :color="businessStatusColor(row.status)">{{
+                    businessStatusLabel(row.status)
+                  }}</a-tag>
+                </span>
+                <span class="procurement-subcontract-mobile-card-subtitle">{{
+                  row.projectName || '未关联项目'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-meta"
+                  >{{ row.contractName || '未关联合同' }} ·
+                  {{ row.createdTime || '时间待维护' }}</span
+                >
+              </button>
+            </div>
           </div>
 
           <!-- 分页 -->

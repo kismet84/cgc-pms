@@ -23,12 +23,13 @@ defineProps<{
 <template>
   <aside class="lg-analysis-rail" aria-label="采购订单辅助分析">
     <div class="lg-analysis-panel lg-fill-card purchase-order-analysis-panel">
-      <header class="purchase-order-analysis-head">
+      <header class="purchase-order-analysis-head lg-analysis-header">
         <div>
-          <div class="purchase-order-analysis-title">辅助分析</div>
-          <div class="purchase-order-analysis-subtitle">状态、类型与待履约金额</div>
+          <div class="purchase-order-analysis-title lg-analysis-heading">辅助分析</div>
+          <div class="purchase-order-analysis-subtitle lg-analysis-description">
+            状态、类型与待履约金额
+          </div>
         </div>
-        <a-button type="link" size="small" @click="onRefresh">刷新</a-button>
       </header>
 
       <section class="purchase-order-analysis-focus">

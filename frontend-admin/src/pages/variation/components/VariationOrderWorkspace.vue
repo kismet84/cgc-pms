@@ -476,9 +476,10 @@ defineProps({
       aria-label="变更签证辅助分析"
     >
       <div class="lg-analysis-panel lg-fill-card vo-analysis-panel">
-        <header class="vo-analysis-head">
+        <header class="vo-analysis-head lg-analysis-header">
           <div>
-            <div class="vo-analysis-title">签证分析</div>
+            <div class="vo-analysis-title lg-analysis-heading">辅助分析</div>
+            <div class="lg-analysis-description">类型、审批与近期变更</div>
           </div>
         </header>
 

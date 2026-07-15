@@ -56,21 +56,6 @@ const filter = reactive({
   keyword: '',
   orderCode: '',
 })
-const filterVisibility = reactive({
-  projectId: true,
-  contractId: true,
-  partnerId: true,
-  orderType: true,
-  orderStatus: true,
-})
-const filterSettingItems = [
-  { key: 'projectId', label: '项目' },
-  { key: 'contractId', label: '合同' },
-  { key: 'partnerId', label: '供应商' },
-  { key: 'orderType', label: '订单类型' },
-  { key: 'orderStatus', label: '订单状态' },
-] as const
-
 const loading = ref(false)
 const hasLoaded = ref(false)
 const listError = ref<string | null>(null)
@@ -305,10 +290,6 @@ function handlePageSizeChange(_cur: number, size: number) {
   pageSize.value = size
   pageNo.value = 1
   fetchData()
-}
-
-function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
-  filterVisibility[key] = !filterVisibility[key]
 }
 
 function handleAdd() {
@@ -668,7 +649,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page purchase-order-page">
+  <div class="lg-list-page lg-page app-page purchase-order-page procurement-subcontract-list-page">
     <div class="lg-page-head purchase-order-page-head">
       <div class="purchase-order-page-meta-row">
         <a-breadcrumb class="purchase-order-breadcrumb">
@@ -735,8 +716,6 @@ onMounted(() => {
         <PurchaseOrderSearchBar
           class="purchase-order-search-bar"
           :filter="filter"
-          :filter-visibility="filterVisibility"
-          :filter-setting-items="filterSettingItems"
           :project-list="projectList"
           :contract-list="contractList"
           :supplier-list="supplierList"
@@ -746,10 +725,11 @@ onMounted(() => {
           :on-project-change="onFilterProjectChange"
           :on-search="handleSearch"
           :on-reset="handleReset"
-          :on-toggle-filter-visibility="toggleFilterVisibility"
         />
 
-        <main class="lg-list-table-panel purchase-order-table-panel">
+        <main
+          class="lg-list-table-panel purchase-order-table-panel procurement-subcontract-table-panel"
+        >
           <!-- 工具栏 -->
           <div class="lg-toolbar purchase-order-toolbar">
             <div class="lg-toolbar-left">
@@ -792,6 +772,7 @@ onMounted(() => {
             </div>
             <vxe-grid
               v-else
+              class="procurement-subcontract-desktop-table"
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -844,6 +825,35 @@ onMounted(() => {
                 </a-dropdown>
               </template>
             </vxe-grid>
+            <div v-if="!listError && !showEmptyState" class="procurement-subcontract-mobile-list">
+              <button
+                v-for="row in tableData"
+                :key="row.id"
+                class="procurement-subcontract-mobile-card"
+                type="button"
+                @click="handleView(row)"
+              >
+                <span class="procurement-subcontract-mobile-card-title">{{
+                  row.orderCode || '-'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-status">
+                  <a-tag :color="orderStatusColor(row.orderStatus)">{{
+                    orderStatusLabel(row.orderStatus)
+                  }}</a-tag>
+                </span>
+                <span class="procurement-subcontract-mobile-card-subtitle">{{
+                  row.projectName || '未关联项目'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-meta"
+                  >{{ row.partnerName || '供应商待维护' }} ·
+                  {{
+                    row.totalAmount
+                      ? `${Number(row.totalAmount).toLocaleString('zh-CN')} 元`
+                      : '金额待维护'
+                  }}</span
+                >
+              </button>
+            </div>
           </div>
 
           <!-- 分页 -->
@@ -865,7 +875,7 @@ onMounted(() => {
 
       <!-- 右侧分析面板 -->
       <PurchaseOrderAnalysisRail
-        class="purchase-order-analysis-rail"
+        class="purchase-order-analysis-rail procurement-subcontract-analysis-rail"
         :focus-amount="fmtWan(kpiUnreceived)"
         :order-status-breakdown="orderStatusBreakdown"
         :order-type-breakdown="orderTypeBreakdown"

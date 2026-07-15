@@ -255,6 +255,7 @@ describe('cash journal page', () => {
         },
       })
       await flushPromises()
+      await wrapper.find('.list-query-filter-button').trigger('click')
 
       expect(mocks.fetchProjects).toHaveBeenCalledTimes(loadsProjects ? 1 : 0)
       expect(mocks.fetchContracts).toHaveBeenCalledTimes(loadsContracts ? 1 : 0)
@@ -265,15 +266,15 @@ describe('cash journal page', () => {
 
   it('matches the project-list page rhythm and keeps the wide table responsive', () => {
     const source = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
-    expect(source).toContain('class="lg-list-page lg-page app-page cash-journal-page"')
-    expect(source).toContain('class="lg-grid cash-journal-workspace"')
-    expect(source).toContain('class="lg-analysis-rail cash-journal-analysis-rail"')
+    expect(source).toContain('cash-journal-page settlement-domain-page')
+    expect(source).toContain('cash-journal-workspace settlement-domain-workspace')
+    expect(source).toContain('cash-journal-analysis-rail settlement-domain-analysis-rail')
     expect(source).not.toContain('<h1>')
-    expect(source.indexOf('class="lg-kpi-strip cash-journal-kpis"')).toBeLessThan(
-      source.indexOf('class="lg-search-bar cash-journal-filters"'),
+    expect(source.indexOf('cash-journal-kpis settlement-domain-kpi')).toBeLessThan(
+      source.indexOf('aria-label="资金日记账筛选"'),
     )
-    expect(source.indexOf('class="lg-search-bar cash-journal-filters"')).toBeLessThan(
-      source.indexOf('class="lg-list-table-panel cash-journal-table-card"'),
+    expect(source.indexOf('aria-label="资金日记账筛选"')).toBeLessThan(
+      source.indexOf('cash-journal-table-card settlement-domain-table-panel'),
     )
     expect(source).toMatch(/\.cash-journal-page\s*\{[^}]*min-width:\s*0;/s)
     expect(source).toMatch(/\.cash-journal-kpis\s*\{[^}]*gap:\s*0;/s)
