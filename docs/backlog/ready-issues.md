@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P1
 任务性质：缺口修复
 类型：投标成本 / 中标状态 / 费用结转 / 权限 / 租户 / 项目数据范围
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `A-01-BID-WON`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=8dfa9ebfc8ba9dcd74ed0b8de2b066333d97c465
 存量问题键：[stock:A-01-BID-WON]
 关联产品目标：在既有投标成本页提供受控“标记中标”入口，复用既有中标端点和项目列表，将投标费用结转到用户有权访问的项目，并关闭 A-01 的最小叶子缺口。
