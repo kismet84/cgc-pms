@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P2
 任务性质：缺口修复
 类型：WBS / 前置门禁 / Axios 拦截器 / 错误提示 / Vue 行为测试
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `OBS-WBS-DUPLICATE-ERROR`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=5b2ac921a683273afa0d4026ca5df3b96bd03bc4
 存量问题键：[stock:OBS-WBS-DUPLICATE-ERROR]
 关联产品目标：确保 WBS 前置任务未完成等后端门禁错误只向用户提示一次，同时保留页面对非请求错误的兜底提示。

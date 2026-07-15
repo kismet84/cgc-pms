@@ -38,3 +38,84 @@
 - 本轮关闭后续项：1
 - 关闭问题键：OBS-WBS-DUPLICATE-ERROR
 - 本轮后续项净变化：-1
+
+<!-- AUTOPILOT-FACTS:START -->
+## AutoPilot 自动事实
+
+- Issue：ISSUE-040-049
+- Ready 哈希：a3d960deb609af4cf8f997ab61f6094aaffac1ba0c7af9b1372a50c0fc3a0145
+- 实施提交：e4b13d1952c6a8b60c77479a12a2db38f9b9a971
+- 验证差异哈希：8d6024810d71601dadd625d1d6c0f2bafa60fc2f325a45ca9624ef6b9f1aff4f
+- Evidence manifest：e2302a8d3f29163c3ccc7597f00937a5c67957979f61139c6904f9996757d006
+- Reviewer：required=True; decision=PASS
+- 后续项：added=0; closed=1; net=-1
+- 指标：{"closeoutDispatchCount":1,"contextBaseBuildCount":0,"contextDeltaBuildCount":0,"executorInvocationCount":0,"implementationDispatchCount":1,"inputTokens":null,"outputTokens":null,"phaseDurationsSeconds":{"IMPLEMENTED":0,"IMPLEMENTING":1482,"REVIEWED":14,"REVIEWING":0,"VALIDATED":0,"VALIDATING":0},"phaseRestartCount":0,"plannerCandidateRefs":[],"plannerInvocationCount":0,"repairDispatchCount":0,"reportProjectionCount":1,"reviewDispatchCount":1,"reviewerInvocationCount":0,"runResumeCount":0,"tokenUsageStatus":"not_available","totalTokens":null,"validationDispatchCount":1,"validationExecutedCount":1,"validationReusedCount":0,"wallClockSeconds":1497}
+- 控制面指纹：93a0a2677a888b909ef128a07c3bcff648115707190edb8b9555709baf6c5e74
+- PreCloseout Facts：910f17f4811eb74ad9e5f2b7b682b07fb1f0b13c70ad7b32a37e21cce9682a9f
+<!-- AUTOPILOT-FACTS:END -->
+
+<!-- AUTOPILOT-TASK-SCORE:BEGIN key=c154e28275d8c142f389b9cdd75b5545dd2d652c2b59fed9dcc120d1a418fa31 -->
+## AutoPilot 任务评分
+
+```json
+{
+  "schemaVersion": 2,
+  "key": "c154e28275d8c142f389b9cdd75b5545dd2d652c2b59fed9dcc120d1a418fa31",
+  "issueId": "ISSUE-040-049",
+  "implementationCommit": "e4b13d1952c6a8b60c77479a12a2db38f9b9a971",
+  "scoringVersion": "autopilot-task-score/v2",
+  "scoredAt": "2026-07-16T05:23:15.3168946+08:00",
+  "total": 95,
+  "dimensions": {
+    "deliveryCorrectness": {
+      "score": 35,
+      "max": 35,
+      "evidence": [
+        "docs/quality/ISSUE-040-049-WBS前置门禁错误单次提示与行为回归验收报告.md"
+      ]
+    },
+    "zeroDanglingIssues": {
+      "score": 25,
+      "max": 25,
+      "evidence": [
+        "docs/quality/ISSUE-040-049-WBS前置门禁错误单次提示与行为回归验收报告.md"
+      ]
+    },
+    "firstPassAcceptance": {
+      "score": 20,
+      "max": 20,
+      "evidence": [
+        "docs/quality/ISSUE-040-049-WBS前置门禁错误单次提示与行为回归验收报告.md"
+      ]
+    },
+    "taskExecutionEfficiency": {
+      "score": 5,
+      "max": 10,
+      "evidence": [
+        "docs/quality/ISSUE-040-049-WBS前置门禁错误单次提示与行为回归验收报告.md"
+      ]
+    },
+    "stockIssueReduction": {
+      "score": 10,
+      "max": 10,
+      "evidence": [
+        "docs/quality/ISSUE-040-049-WBS前置门禁错误单次提示与行为回归验收报告.md"
+      ]
+    }
+  },
+  "hardGatesPassed": true,
+  "followupNetChange": -1,
+  "executionTiming": {
+    "wallClockSeconds": 1497,
+    "businessPhaseSeconds": 1482,
+    "controlPlaneSeconds": 15,
+    "semanticProgressAt": "07/16/2026 05:23:12",
+    "livenessSignalsExcluded": true
+  },
+  "sourceRefs": [
+    "docs/quality/ISSUE-040-049-WBS前置门禁错误单次提示与行为回归验收报告.md"
+  ],
+  "shadow": false
+}
+```
+<!-- AUTOPILOT-TASK-SCORE:END -->

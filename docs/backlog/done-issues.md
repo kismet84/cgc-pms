@@ -126,3 +126,8 @@ v1.0 已完成任务及其报告入口保留在 [backlog 快照](../archive/v1.0
 
 状态：Done
 归档报告：`docs/quality/ISSUE-040-048-PowerShell7控制面与UTF8兼容回归验收报告.md`
+
+### ISSUE-040-049：WBS前置门禁错误单次提示与行为回归
+
+状态：Done
+归档报告：`docs/quality/ISSUE-040-049-WBS前置门禁错误单次提示与行为回归验收报告.md`
