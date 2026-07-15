@@ -6,7 +6,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047`、`ISSUE-040-048`、`ISSUE-040-049` 与 `ISSUE-040-050` 已完成；`启动迭代-20` 当前完成 13/20。日报领料联动真实浏览器证据已收口，下一候选按现行产品决策门选择。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047`、`ISSUE-040-048`、`ISSUE-040-049`、`ISSUE-040-050`、阻塞修复 `ISSUE-047-002` 与 `ISSUE-040-051` 已完成；`启动迭代-20` 当前完成 15/20。供应商默认提前期与订单交货日期预填已收口，下一候选按现行产品决策门选择。
 
 ### ISSUE-047-002：V155双数据库迁移镜像与H2测试隔离修复
 
@@ -73,7 +73,7 @@ Reviewer要求：确认双方言 V155 版本和列语义一致、没有 `IF NOT 
 优先级：P1
 任务性质：能力新增
 类型：合作方 / 供应商 / 自然日提前期 / 采购订单 / 交货日期预填
-状态：Ready
+状态：Done
 来源锚点：产品决策 `PI-2026-07-16-01`；项目知识图谱当前聚合问题 `A-02`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/product-intelligence/evolution-decision.md`,`docs/product-intelligence/competitor-analysis.md`,`docs/product-intelligence/project-map.md`; candidateEvidenceHead=73eada76ff4ef2fe9db48e89a698e4e60c6b00f5
 存量问题键：[stock:A-02-SUPPLIER-DEFAULT-LEAD-DAYS]
 关联产品目标：在既有供应商、采购合同与采购订单日期链上增加可空的供应商默认自然日提前期，减少采购员重复计算交货日期，同时保留订单级人工覆盖。
