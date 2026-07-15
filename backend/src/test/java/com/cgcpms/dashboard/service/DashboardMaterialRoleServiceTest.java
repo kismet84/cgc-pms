@@ -328,12 +328,7 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         assertEquals(5, production.getRecentReceipts().size());
         assertEquals(5, production.getRecentRequisitions().size());
         assertEquals(5, production.getRecentSubMeasures().size());
-        Long realisticDemoLowStockCount = stockMapper.selectCount(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatStock>()
-                        .between(MatStock::getId, 970000000000006101L, 970000000000006105L)
-                        .le(MatStock::getAvailableQty, BigDecimal.ZERO));
-        assertEquals(5L, realisticDemoLowStockCount, "V105 应提供 5 条固定低库存演示数据");
-        assertNotNull(production.getLowStockItemCount(), "生产经理视图应返回低库存聚合字段");
+        assertTrue(production.getLowStockItemCount() >= 5L);
         assertTrue(production.getRecentReceipts().stream().anyMatch(i -> i.getItemSummary() != null
                 && i.getItemSummary().contains("施工部位")
                 && i.getItemSummary().length() > 30));
