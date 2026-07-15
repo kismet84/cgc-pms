@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-16T05:20:00+08:00",
+  "updatedAt": "2026-07-16T05:44:43+08:00",
   "issues": [
     { "issueKey": "A-01", "title": "后端接口用户入口治理", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P0", "blocking": false, "summary": "明确需补用户入口已清空，剩余11个子项均需要兼容性或业务规则确认。", "acceptanceCriteria": "11个子项均形成复用现有入口、内部接口、废弃或确认保留的唯一裁决，并通过权限、租户和状态边界验证。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md", "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"] },
     { "issueKey": "A-02", "title": "采购补货深化", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P1", "blocking": false, "summary": "供应商提前期、工作日历、预测和跨仓调拨仍缺。", "acceptanceCriteria": "通过产品决策门形成最小闭环，并验证采购角色、项目范围、数量和日期口径。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md"] },
@@ -26,7 +26,6 @@
     { "issueKey": "A-01-SYSTEM-USER-DETAIL", "title": "系统用户详情兼容性需要确认", "status": "NEEDS_CONFIRMATION", "classification": "NEEDS_CONFIRMATION", "priority": "P0", "blocking": false, "parentIssueKey": "A-01", "summary": "GET /system/users/{id}未检出前端同方法入口。", "acceptanceCriteria": "核实管理员入口、调用方和敏感字段边界后形成唯一裁决。", "deferReason": "调用与入口证据不足。", "sourceRefs": ["docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"] },
 
     { "issueKey": "GOV-BRANCH-PROTECTION", "title": "分支保护附加审批与推送白名单需要确认", "status": "NEEDS_CONFIRMATION", "classification": "NEEDS_CONFIRMATION", "priority": "P1", "blocking": false, "summary": "当前API未返回required review和push restrictions，是否增加需要仓库治理决策。", "acceptanceCriteria": "明确审批人数和推送主体策略，获得授权后配置并复读远端保护状态。", "deferReason": "未获远端治理授权。", "sourceRefs": ["docs/backlog/blocked-issues.md"] },
-    { "issueKey": "OBS-DAILY-LOG-BROWSER", "title": "日报领料联动未做真实浏览器视觉验收", "status": "OBSERVATION", "classification": "NON_BLOCKING_OBSERVATION", "priority": "P2", "blocking": false, "summary": "ISSUE-037-014仅完成代码级只读边界与自动化验收。", "acceptanceCriteria": "真实角色浏览器验证可见性、空态、长文本和移动宽度。", "sourceRefs": ["docs/backlog/current-focus.md"] },
     { "issueKey": "OPS-TRIVY-COLD-CACHE", "title": "Trivy Java DB首次冷缓存下载时延", "status": "OBSERVATION", "classification": "OPERATIONAL_RISK", "priority": "P2", "blocking": false, "summary": "国内网络下首次冷缓存下载仍可能延迟，已有UTC日期缓存和历史缓存回退。", "acceptanceCriteria": "CI冷缓存场景在允许时限内成功或可靠命中受控回退。", "sourceRefs": ["docs/backlog/current-focus.md"] },
     { "issueKey": "OPS-NODE-MODULES-ACL", "title": "旧node_modules损坏ACL残留", "status": "OBSERVATION", "classification": "OPERATIONAL_RISK", "priority": "P2", "blocking": false, "summary": "隔离目录仍有受原ACL保护的残留文件，但不进入版本管理或构建。", "acceptanceCriteria": "在不影响用户环境的前提下取得权限并清理，或确认长期隔离且构建不引用。", "sourceRefs": ["docs/backlog/current-focus.md"] },
     { "issueKey": "REL-CREDENTIAL-ROTATION", "title": "目标环境凭据轮换与双人复核", "status": "RELEASE_GATE", "classification": "RELEASE_PREREQUISITE", "priority": "P0", "blocking": true, "summary": "本地轮换已通过，正式发布仍需实际目标环境重新轮换并双人复核。", "acceptanceCriteria": "同一待发布版本完成目标环境新凭据生效、旧凭据失效、功能验证和脱敏双人复核。", "deferReason": "当前无可识别生产环境。", "sourceRefs": ["docs/backlog/current-focus.md", "docs/未来开发计划.md"] },
