@@ -52,3 +52,10 @@ export function markBidCostAsWon(id: string, projectId: string) {
     params: { projectId },
   })
 }
+
+export function markBidCostAsLost(id: string) {
+  return request<void>({
+    url: `/bid-cost/${id}/lost`,
+    method: 'put',
+  })
+}

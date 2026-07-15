@@ -272,6 +272,10 @@ class BidCostServiceTest {
         bid.setBidProjectName("未中标项目");
         Long id = bidCostService.create(bid);
         insertBidCostItem(id);
+        BidCost otherBid = new BidCost();
+        otherBid.setBidProjectName("其他投标项目");
+        Long otherId = bidCostService.create(otherBid);
+        insertBidCostItem(otherId);
 
         bidCostService.markAsLost(id);
 
@@ -284,6 +288,17 @@ class BidCostServiceTest {
                 .eq(CostItem::getSourceId, id));
         assertNotNull(item);
         assertEquals("WRITE_OFF", item.getCostStatus());
+
+        CostItem otherItem = costItemMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getTenantId, TENANT_ID)
+                .eq(CostItem::getSourceType, "BID_COST")
+                .eq(CostItem::getSourceId, otherId));
+        assertNotNull(otherItem);
+        assertEquals("CONFIRMED", otherItem.getCostStatus());
+
+        BusinessException repeat = assertThrows(BusinessException.class, () -> bidCostService.markAsLost(id));
+        assertEquals("BID_STATUS_INVALID", repeat.getCode());
+        assertEquals("WRITE_OFF", costItemMapper.selectById(item.getId()).getCostStatus());
     }
 
     @Test

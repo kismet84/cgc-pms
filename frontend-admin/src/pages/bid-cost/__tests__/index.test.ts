@@ -24,7 +24,6 @@ describe('bid cost page contract', () => {
     expect(source).toContain('bidProjectName,')
     expect(source).toContain('remark: createForm.remark.trim() || undefined')
     expect(source).toContain("message.error(errorMessage(error, '新建投标项目失败'))")
-    expect(source).not.toMatch(/标记未中标|markAsLost/)
     expect(source).not.toContain('tenantId')
     expect(source).not.toContain('projectId:')
     expect(source).not.toContain('amount')
@@ -46,7 +45,6 @@ describe('bid cost page contract', () => {
     expect(source).toContain('关联项目')
     expect(source).toContain('更新时间')
     expect(source).not.toContain('tenantId')
-    expect(source).not.toMatch(/markAsLost/)
   })
 
   it('offers a permission and state guarded controlled edit for desktop and mobile', () => {
@@ -92,7 +90,22 @@ describe('bid cost page contract', () => {
     expect(source).toContain('selectedWonProject.projectName')
     expect(source).toContain("message.error(errorMessage(error, '标记中标失败'))")
     expect(source).toContain('await fetchRows()')
-    expect(source).not.toMatch(/标记未中标|markAsLost/)
+    expect(source).not.toContain('tenantId')
+  })
+
+  it('offers a permission and state guarded lost transition with an explicit write-off warning', () => {
+    expect(source).toContain("userStore.hasPermission('bid:status')")
+    expect(source).toContain("canChangeStatus && record.bidStatus === 'BIDDING'")
+    expect(source).toContain("canChangeStatus && row.bidStatus === 'BIDDING'")
+    expect(source).toContain('data-testid="mark-lost-button"')
+    expect(source).toContain('data-testid="mobile-mark-lost-button"')
+    expect(source).toContain(
+      'content: `确认将“${row.bidProjectName}”标记为未中标吗？该投标的 BID_COST 费用将被核销。`',
+    )
+    expect(source).toContain('await markBidCostAsLost(row.id)')
+    expect(source).toContain("message.error(errorMessage(error, '标记未中标失败'))")
+    expect(source).toContain('throw error')
+    expect(source).toContain('await fetchRows()')
     expect(source).not.toContain('tenantId')
   })
 })

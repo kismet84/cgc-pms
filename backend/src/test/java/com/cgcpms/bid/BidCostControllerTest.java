@@ -411,6 +411,67 @@ class BidCostControllerTest {
         }
     }
 
+    @Test @Order(6) @DisplayName("PUT /bid-cost/{id}/lost enforces status permission, tenant and state")
+    void testMarkAsLost_PermissionAndBoundaryContract() throws Exception {
+        long base = 970000000000L + Math.abs(System.nanoTime() % 10000000L) * 10;
+        long allowedId = base + 1;
+        long adminId = base + 2;
+        long crossTenantId = base + 3;
+        long invalidStateId = base + 4;
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, allowedId, TENANT_ID, "BID-LOST-PERMISSION-" + allowedId);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, adminId, TENANT_ID, "BID-LOST-ADMIN-" + adminId);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, crossTenantId, 9001L, "BID-LOST-CROSS-TENANT-" + crossTenantId);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'WON', 0)
+                """, invalidStateId, TENANT_ID, "BID-LOST-INVALID-STATE-" + invalidStateId);
+        try {
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost"))
+                    .andExpect(status().isUnauthorized());
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost")
+                            .cookie(userCookie(TENANT_ID, List.of("bid:query"))))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost")
+                            .cookie(userCookie(TENANT_ID, List.of("bid:edit"))))
+                    .andExpect(status().isForbidden());
+
+            Cookie statusCookie = userCookie(TENANT_ID, List.of("bid:status"));
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost").cookie(statusCookie))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"));
+            assertEquals("LOST", jdbcTemplate.queryForObject(
+                    "SELECT bid_status FROM bid_cost WHERE id = ?", String.class, allowedId));
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost").cookie(statusCookie))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_STATUS_INVALID"));
+
+            mockMvc.perform(putWith("/bid-cost/" + adminId + "/lost").cookie(adminCookie()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"));
+            mockMvc.perform(putWith("/bid-cost/999999999999/lost").cookie(statusCookie))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_COST_NOT_FOUND"));
+            mockMvc.perform(putWith("/bid-cost/" + crossTenantId + "/lost").cookie(statusCookie))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_COST_NOT_FOUND"));
+            mockMvc.perform(putWith("/bid-cost/" + invalidStateId + "/lost").cookie(statusCookie))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_STATUS_INVALID"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM bid_cost WHERE id IN (?, ?, ?, ?)",
+                    allowedId, adminId, crossTenantId, invalidStateId);
+        }
+    }
+
     @Test @Order(6) @DisplayName("PUT /bid-cost/{id} validates controlled fields")
     void testUpdate_ValidationBoundary() throws Exception {
         Assertions.assertNotNull(bidId);

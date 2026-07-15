@@ -9,6 +9,7 @@ import {
   deleteBidCost,
   getBidCost,
   getBidCosts,
+  markBidCostAsLost,
   markBidCostAsWon,
   updateBidCost,
 } from '../bid'
@@ -97,6 +98,18 @@ describe('bid cost API contract', () => {
       method: 'put',
       params: { projectId: '20001' },
     })
+    expect(requestMock.mock.calls[0]?.[0]).not.toHaveProperty('data')
+    expect(JSON.stringify(requestMock.mock.calls[0]?.[0])).not.toContain('tenantId')
+  })
+
+  it('marks one bid as lost without parameters or request body', async () => {
+    await markBidCostAsLost('10001')
+
+    expect(requestMock).toHaveBeenCalledWith({
+      url: '/bid-cost/10001/lost',
+      method: 'put',
+    })
+    expect(requestMock.mock.calls[0]?.[0]).not.toHaveProperty('params')
     expect(requestMock.mock.calls[0]?.[0]).not.toHaveProperty('data')
     expect(JSON.stringify(requestMock.mock.calls[0]?.[0])).not.toContain('tenantId')
   })

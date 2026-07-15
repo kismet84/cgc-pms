@@ -8,6 +8,7 @@ import {
   deleteBidCost,
   getBidCost,
   getBidCosts,
+  markBidCostAsLost,
   markBidCostAsWon,
   updateBidCost,
 } from '@/api/modules/bid'
@@ -188,6 +189,26 @@ function confirmDelete(row: BidCostVO) {
         await fetchRows()
       } catch (error: unknown) {
         message.error(errorMessage(error, '删除投标项目失败'))
+        throw error
+      }
+    },
+  })
+}
+
+function confirmMarkLost(row: BidCostVO) {
+  Modal.confirm({
+    title: '标记未中标',
+    content: `确认将“${row.bidProjectName}”标记为未中标吗？该投标的 BID_COST 费用将被核销。`,
+    okText: '确认未中标',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        await markBidCostAsLost(row.id)
+        message.success('投标项目已标记为未中标')
+        await fetchRows()
+      } catch (error: unknown) {
+        message.error(errorMessage(error, '标记未中标失败'))
         throw error
       }
     },
@@ -409,6 +430,15 @@ onMounted(fetchRows)
                   标记中标
                 </a-button>
                 <a-button
+                  v-if="canChangeStatus && row.bidStatus === 'BIDDING'"
+                  type="link"
+                  danger
+                  data-testid="mobile-mark-lost-button"
+                  @click="confirmMarkLost(row)"
+                >
+                  标记未中标
+                </a-button>
+                <a-button
                   v-if="canDelete && row.bidStatus === 'BIDDING'"
                   type="link"
                   danger
@@ -457,6 +487,15 @@ onMounted(fetchRows)
                     @click="openMarkWon(record)"
                   >
                     标记中标
+                  </a-button>
+                  <a-button
+                    v-if="canChangeStatus && record.bidStatus === 'BIDDING'"
+                    type="link"
+                    danger
+                    data-testid="mark-lost-button"
+                    @click="confirmMarkLost(record)"
+                  >
+                    标记未中标
                   </a-button>
                   <a-button
                     v-if="canDelete && record.bidStatus === 'BIDDING'"
