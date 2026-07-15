@@ -6,7 +6,74 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040` 与 `ISSUE-040-041` 已完成；`启动迭代-20` 当前完成 4/20。下一条 Ready 继续关闭间接费规则修改入口，并收紧更新字段、科目和租户边界。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041` 与 `ISSUE-040-042` 已完成；`启动迭代-20` 当前完成 5/20。下一条 Ready 关闭间接费规则最后一个明确叶子：受控删除与执行事实保护。
+
+### ISSUE-040-043：间接费规则受控删除入口与执行事实保护
+
+优先级：P1
+任务性质：缺口修复
+类型：间接费规则 / 删除 / 权限 / 租户 / 引用状态 / 二次确认
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-OVERHEAD-DELETE`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=1688e2e5e1afda82bf26312d0b39ef693cd1e562
+存量问题键：[stock:A-01-OVERHEAD-DELETE]
+关联产品目标：在既有间接费规则弹窗提供最小受控删除入口，让 `overhead:delete` 用户删除尚未产生执行事实的规则，同时保护租户边界和历史分摊可追溯性。
+候选对比：间接费规则新建与修改已完成，删除是该域最后一个明确叶子且复用同页、同一权限模型和现有软删除；它只新增引用状态门禁，不扩展数据模型，优先于需要产品决策门的新业务域。
+核验结论：后端 DELETE `/overhead-allocation/rules/{id}` 已存在并校验认证租户，但未检查 `overhead_allocation_run` 引用；前端无删除动作。CodeGraph 已命中 Controller、Service 和执行事实链，前端局部召回不足由当前分支精确 `rg` 与文件读取补充核验。
+阻塞证据：合格用户无法从产品页面删除误建且未执行的规则；若直接开放现有端点，已产生执行事实的规则仍会被软删除，破坏历史规则导航和审计可追溯性。
+解除条件：删除前按认证租户检查目标与执行事实；存在任何 run 时 fail-close；前端权限动作和包含科目/依据/历史影响说明的二次确认通过；取消不 DELETE，成功刷新、失败保留。
+Migration：不需要
+依赖：复用既有规则弹窗、DELETE `/overhead-allocation/rules/{id}`、`OverheadAllocationRunMapper`、现有 Controller/Service 专项和 V80 表结构。
+风险等级：高
+运行态要求：仅 local/dev/test；浏览器只打开可用确认并取消，dev 无自然规则时验证真实空态且禁止造数；不得提交 DELETE、修改/重置业务数据、连接或发布生产。
+Reviewer要求：确认仅 `overhead:delete` 或管理员可见；跨租户/不存在目标统一隐藏；同租户存在任何执行 run 时拒绝删除；确认文案包含科目、依据与历史事实保护；失败不移除行、不伪报成功。
+归档报告：`docs/quality/ISSUE-040-043-间接费规则受控删除入口与执行事实保护验收报告.md`
+最小回滚：回退 Service 引用检查、前端 API/删除动作、专项测试和治理回写；不恢复或清理任何业务数据。
+目标：
+- 删除前验证目标属于认证租户，并按 tenantId+ruleId 查询执行事实；已执行规则 fail-close，未执行规则沿用软删除。
+- 在规则列表提供 `overhead:delete`/管理员可见动作，二次确认展示目标科目、依据和历史事实保护说明。
+- 取消不请求，成功后刷新列表，失败保留服务端行且不伪报成功。
+非目标：
+- 不实现强制删除、级联删除、恢复、启停、批量删除或执行事实清理。
+- 不新增表、迁移、权限节点、路由或页面，不改变分摊算法、运行幂等和历史成本。
+- 不连接生产、不发布生产、不 push；浏览器不确认删除。
+允许修改：
+- `backend/src/main/java/com/cgcpms/overhead/service/OverheadAllocationService.java`
+- `backend/src/test/java/com/cgcpms/overhead/OverheadAllocationControllerTest.java`
+- `backend/src/test/java/com/cgcpms/overhead/OverheadAllocationServiceTest.java`
+- `frontend-admin/src/api/modules/cost.ts`
+- `frontend-admin/src/api/modules/__tests__/cost.test.ts`
+- `frontend-admin/src/pages/cost/ledger.vue`
+- `frontend-admin/src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-043-间接费规则受控删除入口与执行事实保护验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/**`
+- `backend/src/main/java/com/cgcpms/overhead/entity/**`
+- `backend/src/main/java/com/cgcpms/overhead/mapper/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 未登录401、无权限403、显式 `overhead:delete`/管理员成功；跨租户和不存在规则统一 RULE_NOT_FOUND 且不泄露存在性。
+- 同租户规则存在任一 `overhead_allocation_run` 时返回 RULE_ALREADY_EXECUTED 或等价业务错误且规则保留；无引用时仅软删除目标规则，不影响其他租户。
+- 删除入口仅权限用户可见；确认文案含成本科目 ID、分摊依据及“已有执行事实不可删除”，取消不 DELETE，成功刷新，失败保留行。
+- 收口移除 `A-01-OVERHEAD-DELETE`，A-01 更新为有用户入口248、前端调用无独立页面58、内部/集成/运维4、需补入口0、待废弃0、需要确认11，共321；新增后续项0、关闭1、净变化-1。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint、`git diff --check` 和只取消/空态浏览器验收通过；高风险复核 PASS。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-043`
+- `cd backend; .\mvnw.cmd "-Dtest=OverheadAllocationControllerTest,OverheadAllocationServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/cost.test.ts src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/cost.ts src/api/modules/__tests__/cost.test.ts src/pages/cost/ledger.vue src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-042：间接费规则受控修改入口与字段状态边界
 
