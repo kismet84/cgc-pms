@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P1
 任务性质：缺口修复
 类型：间接费规则 / 新建 / 权限 / 科目 / 租户 / 白名单 DTO
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `A-01-OVERHEAD-CREATE`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=81437003e6a827630266df4859aa5ee811ed82f3
 存量问题键：[stock:A-01-OVERHEAD-CREATE]
 关联产品目标：在既有成本列表的间接费规则弹窗提供最小受控新建入口，让 `overhead:add` 用户配置科目、依据与周期，同时保持认证租户和规则白名单边界。
