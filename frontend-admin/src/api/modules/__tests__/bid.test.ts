@@ -4,7 +4,14 @@ const requestMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/api/request', () => ({ request: requestMock }))
 
-import { createBidCost, deleteBidCost, getBidCost, getBidCosts, updateBidCost } from '../bid'
+import {
+  createBidCost,
+  deleteBidCost,
+  getBidCost,
+  getBidCosts,
+  markBidCostAsWon,
+  updateBidCost,
+} from '../bid'
 
 describe('bid cost API contract', () => {
   beforeEach(() => requestMock.mockReset().mockResolvedValue({}))
@@ -78,6 +85,18 @@ describe('bid cost API contract', () => {
       method: 'delete',
     })
     expect(requestMock.mock.calls[0]?.[0]).not.toHaveProperty('params')
+    expect(requestMock.mock.calls[0]?.[0]).not.toHaveProperty('data')
+    expect(JSON.stringify(requestMock.mock.calls[0]?.[0])).not.toContain('tenantId')
+  })
+
+  it('marks one bid as won with only the selected project id', async () => {
+    await markBidCostAsWon('10001', '20001')
+
+    expect(requestMock).toHaveBeenCalledWith({
+      url: '/bid-cost/10001/won',
+      method: 'put',
+      params: { projectId: '20001' },
+    })
     expect(requestMock.mock.calls[0]?.[0]).not.toHaveProperty('data')
     expect(JSON.stringify(requestMock.mock.calls[0]?.[0])).not.toContain('tenantId')
   })

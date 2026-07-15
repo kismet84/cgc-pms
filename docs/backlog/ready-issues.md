@@ -90,6 +90,8 @@ Reviewer要求：按高风险权限、租户、项目范围和金额事实复核
 - `cd frontend-admin; pnpm exec eslint src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
 - `git diff --check`
 
+收口结论：独立 `bid:status`、桌面/移动 BIDDING 可见性、授权项目候选、双名称二次确认、取消不请求、成功刷新与失败保留均通过；后端专项证明401/403、显式权限、管理员、投标租户隐藏、项目数据范围、非法状态和重复操作边界，合法中标只结转一次 BID_COST 费用。测试进程默认 JWT 密钥不足归类为环境前置，注入合格测试密钥后38项稳定通过；原生 Vite 超过180秒稳定观察及浏览器取消闭环完成，中标 PUT 计数保持0。`A-01-BID-WON` 已移除；新增后续项0、关闭后续项1、净变化-1。
+
 ### ISSUE-040-038：投标成本受控删除入口与状态租户边界
 
 优先级：P1

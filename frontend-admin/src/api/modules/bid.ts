@@ -44,3 +44,11 @@ export function deleteBidCost(id: string) {
     method: 'delete',
   })
 }
+
+export function markBidCostAsWon(id: string, projectId: string) {
+  return request<void>({
+    url: `/bid-cost/${id}/won`,
+    method: 'put',
+    params: { projectId },
+  })
+}
