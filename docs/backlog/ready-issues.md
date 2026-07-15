@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P2
 任务性质：回归证明
 类型：现场日报 / 已审批领料 / 只读详情 / 空态 / 长文本 / 响应式浏览器
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `OBS-DAILY-LOG-BROWSER`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=8adffabe709ea8e3662cd0d948d77de3863903be
 存量问题键：[stock:OBS-DAILY-LOG-BROWSER]
 关联产品目标：用真实浏览器补齐 `ISSUE-037-014` 当日已审批且已出库领料只读联动的可见性、空态、长文本和窄视口证据，不重复实现既有能力。
