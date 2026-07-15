@@ -4,7 +4,87 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-030` 已完成，当前无待实施 Ready；本次 `启动迭代-3` 已达到三条实施上限。
+`ISSUE-040-032` 已补充为当前唯一待实施 Ready；本次 `自动迭代-1` 上限为一条。
+
+### ISSUE-040-032：投标成本受控新建入口与租户状态边界
+
+优先级：P1
+任务性质：缺口修复
+类型：投标成本 / 用户入口 / 受控新建 / 权限 / 租户隔离 / 状态边界 / 菜单迁移
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-BID-CREATE`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；候选证据基于当前 HEAD `163db3d0560ce3fca1c856601cee0e6d1025e0df`。
+存量问题键：[stock:A-01-BID-CREATE]
+关联产品目标：在现有投标成本列表提供最小受控新建入口，让具备 `bid:add` 的用户创建投标头，同时保持当前租户、初始状态和金额域边界。
+核验结论：问题仍存在——后端 `POST /bid-cost` 已由 `bid:add` 或 ADMIN/SUPER_ADMIN 保护，但前端仅有只读列表，未调用创建接口；Controller 直接接收 `BidCost` 实体，当前 Service 虽覆盖 tenantId 和状态，却未显式清空 projectId。`BidCost` 头表不存金额，金额完全由 `cost_item` 聚合，因此本轮只能创建项目名称与备注，不能虚构金额字段。
+候选对比：`A-01-BID-CREATE` 是当前 P1、Open、非阻塞、证据完整的最高排序叶子；上一轮 `A-01-BID-LIST` 已解除“无承载页面”前置。DETAIL 为只读但排序在后，UPDATE/DELETE/WON/LOST 涉及既有记录状态流转，本轮先完成最小创建闭环。
+检索交叉核验：CodeGraph 命中 Controller、Service、实体及调用范围，但未完整召回既有前端同域文件，归类为工具召回不足；已用 `rg` 和直接文件读取补查，并由只读 `codebase-memory-mcp` 交叉确认 Controller→Service→Mapper、路由、前端页面与测试关系。最终以当前分支源码、唯一台账与源报告为准。
+阻塞证据：持 `bid:add` 用户没有管理端创建入口；过宽实体载荷使客户端可尝试提交租户、状态和项目关联字段，当前测试也未证明细粒度权限、注入字段覆盖与 V151 权限注册。
+解除条件：现有 `/bid-cost` 页面新增仅对 `bid:add` 或管理员可见的新建入口；请求 DTO 只接受项目名称和备注；后端强制当前租户、`BIDDING`、projectId 为空；V151 注册 `bid:add` 按钮权限并绑定既有投标菜单角色；正负权限、租户、状态、金额无写入边界和前端成功/失败态证据齐全。
+Migration：需要
+依赖：复用既有 `/bid-cost` 页面、类型化 request、`POST /bid-cost`、`BidCostController`、`BidCostService`、`UserContext`、V150 投标菜单及 `sys_menu` / `sys_role_menu`；新增 V151 权限按钮迁移，不改表结构。
+风险等级：高
+风险说明：该入口会写入租户业务数据并扩大角色可达能力，必须证明客户端不能指定 tenantId、projectId、状态或金额，且无权限请求 fail-close。
+运行态要求：自动化只在 local/dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，任一失败先归类为环境前置并执行 runtime refresh，稳定等待180秒后复验；浏览器仅验证入口可见性和表单边界，不提交或重置业务数据。
+Reviewer要求：按高风险写入、权限、租户和状态边界复核；确认前端仅发送名称与可选备注，Controller 使用专用 DTO，Service 覆盖当前租户/初始状态并清空项目关联，V151 不放宽查询/编辑/删除权限；复核401/403、`bid:add` 正样本、管理员旁路、注入字段覆盖、金额无写入和页面错误保留，对绑定 diff 给出 PASS/NEEDS_REPAIR。
+归档报告：`docs/quality/ISSUE-040-032-投标成本受控新建入口与租户状态边界验收报告.md`
+最小回滚：回退本 Issue 的创建 DTO、Controller/Service 收窄、前端创建类型/API/表单、V151 权限迁移、专项测试与治理回写；不删除或重置任何投标或成本业务数据，不改变既有列表、详情、更新、删除和状态接口。
+目标：
+- 为 `POST /bid-cost` 增加仅含 `bidProjectName` 与可选 `remark` 的创建 DTO，后端强制当前 tenantId、`BIDDING` 和空 projectId。
+- 在既有投标成本页增加受 `bid:add` 或管理员权限控制的新建弹窗，覆盖校验、提交加载、成功关闭并刷新、失败保留表单。
+- 新增 V151 `bid:add` 按钮权限及既有角色绑定，补齐前端 API/页面和后端 Controller/Service/迁移正负边界测试。
+非目标：
+- 不创建、录入或聚合成本项/金额；不开放详情、编辑、删除、中标、未中标、项目转换、批量、导入或导出。
+- 不修改既有查询路由/菜单权限、状态机、表结构、Mapper、成本汇总或项目访问规则；不允许客户端发送 tenantId、projectId、bidStatus、金额或审计字段。
+- 不连接生产数据库、不发布生产、不自动 push，不在浏览器验收中提交、修改、删除或重置业务数据。
+允许修改：
+- `backend/src/main/java/com/cgcpms/bid/dto/BidCostCreateRequest.java`
+- `backend/src/main/java/com/cgcpms/bid/controller/BidCostController.java`
+- `backend/src/main/java/com/cgcpms/bid/service/BidCostService.java`
+- `backend/src/main/resources/db/migration/V151__add_bid_cost_create_permission.sql`
+- `backend/src/main/resources/db/migration-h2/V151__add_bid_cost_create_permission.sql`
+- `backend/src/test/java/com/cgcpms/bid/BidCostControllerTest.java`
+- `backend/src/test/java/com/cgcpms/bid/BidCostServiceTest.java`
+- `frontend-admin/src/types/bid.ts`
+- `frontend-admin/src/api/modules/bid.ts`
+- `frontend-admin/src/api/modules/__tests__/bid.test.ts`
+- `frontend-admin/src/pages/bid-cost/index.vue`
+- `frontend-admin/src/pages/bid-cost/__tests__/index.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-040-032-投标成本受控新建入口与租户状态边界验收报告.md`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/bid/entity/**`
+- `backend/src/main/java/com/cgcpms/bid/mapper/**`
+- `backend/src/main/java/com/cgcpms/cost/**`
+- `frontend-admin/src/api/request.ts`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 创建 API 测试精确断言 `POST /bid-cost` body 仅含去空格后的 `bidProjectName` 与可选 `remark`，不含 tenantId、projectId、bidStatus、amount 或审计字段；空名称、超长名称和超长备注返回4xx。
+- 未登录创建返回401；已登录无 `bid:add` 返回403；持 `bid:add` 或 ADMIN/SUPER_ADMIN 成功。即使客户端尝试注入 tenantId、projectId 和 bidStatus，落库仍为当前租户、projectId 空、`BIDDING`，且不创建 `cost_item` 或任何金额事实。
+- 页面新建按钮只对 `bid:add` 或管理员可见；表单只含项目名称和备注，成功关闭、重置并刷新列表，失败显示错误且保持弹窗与输入；只读查询、筛选、分页和空态不回退。
+- V151 仅在 V150 投标菜单下新增 `bid:add` BUTTON 并绑定 SUPER_ADMIN、ADMIN、COST_MANAGER，不授予 `bid:edit` 或 `bid:delete`，MySQL/H2 迁移语义一致。
+- 收口必须引用唯一台账及 `sourceRefs`；全部通过后移除 `A-01-BID-CREATE`，同步更新 A-01 守恒为有用户入口237、前端调用但无独立页面58、内部/集成/运维4、需补入口11、待废弃0、需要确认11、总数321，并回写 Ready、current-focus、project-map；若差距或优先级判断变化，再更新 evolution-decision。
+- 归档报告统计新增后续项、关闭后续项和后续项净变化；所有发现项必须本轮修复、唯一载体承接或有依据关闭，存在悬空项不得通过。权限、租户、状态、金额无写入或迁移证据不足时判不通过。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint、SQL 安全检查与 `git diff --check` 全部通过；首次失败先按 tool_config、环境前置、真实质量/安全分类并复验。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-032`
+- `cd backend; .\mvnw.cmd "-Dtest=BidCostControllerTest,BidCostServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/types/bid.ts src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
+- `pwsh -NoProfile -File scripts/check-sql-safety.ps1`
+- `git diff --check`
 
 ### ISSUE-040-030：成本汇总历史只读入口与项目数据边界
 
