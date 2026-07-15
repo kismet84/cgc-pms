@@ -80,6 +80,30 @@ describe('approval work list route titles', () => {
     expect(source).not.toContain('count: mineData.value.length')
   })
 
+  it('loads tenant-scoped personal workflow efficiency with the current filters', () => {
+    expect(workflowApiSource).toContain('export interface WfEfficiencyVO')
+    expect(workflowApiSource).toContain('export function getMyEfficiency')
+    expect(workflowApiSource).toContain("url: '/workflow/statistics/efficiency'")
+    expect(workflowApiSource).toMatch(/getMyEfficiency[\s\S]*?method: 'get'[\s\S]*?params/)
+    expect(source).toContain('function buildEfficiencyParams()')
+    expect(source).toContain('overdueHours: 48')
+    expect(source).toContain('efficiency.value = null')
+    expect(source).toContain('const requestId = ++efficiencyRequestId')
+    expect(source).toContain('if (requestId === efficiencyRequestId) efficiency.value = result')
+    expect(source).toContain(
+      'if (requestId === efficiencyRequestId) efficiencyLoading.value = false',
+    )
+    expect(source).toContain('getMyEfficiency(buildEfficiencyParams())')
+    expect(source).toContain('void fetchEfficiency()')
+    expect(source).toContain('个人效率（48小时逾期）')
+    expect(source).toContain('efficiency.pendingCount')
+    expect(source).toContain('efficiency.overduePendingCount')
+    expect(source).toContain('efficiency.doneCount')
+    expect(source).toContain('efficiency.handledTaskCount')
+    expect(source).toContain('efficiency.averageHandleMinutes')
+    expect(source).not.toMatch(/getMyEfficiency\([\s\S]{0,120}(userId|tenantId)/)
+  })
+
   it('uses tab-specific empty-state text without changing detail entry', () => {
     expect(source).toContain("return '暂无待办任务'")
     expect(source).toContain("return '暂无已处理记录'")

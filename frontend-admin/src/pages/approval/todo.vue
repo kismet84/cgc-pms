@@ -18,6 +18,7 @@ import {
   getMyDone,
   getMyCc,
   getMyInitiatedInstances,
+  getMyEfficiency,
   rejectTask,
   resubmitInstance,
   withdrawInstance,
@@ -26,6 +27,7 @@ import {
   type WfCcVO,
   type WfMineInstanceVO,
   type WfInstanceVO,
+  type WfEfficiencyVO,
 } from '@/api/modules/workflow'
 import type { PageParams, PageResult } from '@/types/api'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
@@ -81,6 +83,9 @@ const todoData = ref<WfTaskVO[]>([])
 const doneData = ref<WfRecordVO[]>([])
 const ccData = ref<WfCcVO[]>([])
 const mineData = ref<WfMineInstanceVO[]>([])
+const efficiencyLoading = ref(false)
+const efficiency = ref<WfEfficiencyVO | null>(null)
+let efficiencyRequestId = 0
 const detailVisible = ref(false)
 const detailLoading = ref(false)
 const detail = ref<WfInstanceVO | null>(null)
@@ -170,10 +175,37 @@ function buildQueryParams(): PageParams {
   return params
 }
 
+function buildEfficiencyParams() {
+  const params = buildQueryParams()
+  return {
+    keyword: params.keyword as string | undefined,
+    businessType: params.businessType as string | undefined,
+    instanceStatus: params.instanceStatus as string | undefined,
+    startTime: params.startTime as string | undefined,
+    endTime: params.endTime as string | undefined,
+    overdueHours: 48,
+  }
+}
+
+async function fetchEfficiency() {
+  const requestId = ++efficiencyRequestId
+  efficiencyLoading.value = true
+  efficiency.value = null
+  try {
+    const result = await getMyEfficiency(buildEfficiencyParams())
+    if (requestId === efficiencyRequestId) efficiency.value = result
+  } catch (e: unknown) {
+    console.error(e)
+  } finally {
+    if (requestId === efficiencyRequestId) efficiencyLoading.value = false
+  }
+}
+
 async function fetchData() {
   listError.value = null
   await syncRouteQuery()
   loading.value = true
+  void fetchEfficiency()
   try {
     const params = buildQueryParams()
 
@@ -738,6 +770,39 @@ watch(
             </div>
           </div>
           <section class="approval-analysis-section">
+            <div class="lg-panel-title">个人效率（48小时逾期）</div>
+            <a-spin :spinning="efficiencyLoading" size="small">
+              <div v-if="efficiency" class="lg-type-list approval-efficiency-list">
+                <div class="lg-type-row">
+                  <span class="lg-type-dot efficiency-dot pending"></span>
+                  <span class="lg-type-label">待办</span
+                  ><strong>{{ efficiency.pendingCount }}</strong>
+                </div>
+                <div class="lg-type-row">
+                  <span class="lg-type-dot efficiency-dot overdue"></span>
+                  <span class="lg-type-label">逾期待办</span
+                  ><strong>{{ efficiency.overduePendingCount }}</strong>
+                </div>
+                <div class="lg-type-row">
+                  <span class="lg-type-dot efficiency-dot done"></span>
+                  <span class="lg-type-label">已办记录</span
+                  ><strong>{{ efficiency.doneCount }}</strong>
+                </div>
+                <div class="lg-type-row">
+                  <span class="lg-type-dot efficiency-dot handled"></span>
+                  <span class="lg-type-label">已处理任务</span
+                  ><strong>{{ efficiency.handledTaskCount }}</strong>
+                </div>
+                <div class="lg-type-row">
+                  <span class="lg-type-dot efficiency-dot average"></span>
+                  <span class="lg-type-label">平均处理</span
+                  ><strong>{{ efficiency.averageHandleMinutes }} 分钟</strong>
+                </div>
+              </div>
+              <div v-else-if="!efficiencyLoading" class="lg-empty-text">效率统计暂不可用</div>
+            </a-spin>
+          </section>
+          <section class="approval-analysis-section">
             <div class="lg-panel-title">审批分类</div>
             <div class="lg-type-list">
               <div v-for="item in approvalSummary" :key="item.label" class="lg-type-row">
@@ -1091,6 +1156,31 @@ watch(
 
 .approval-analysis-section + .approval-analysis-section {
   border-top: 1px solid var(--border-subtle);
+}
+
+.approval-efficiency-list .lg-type-row {
+  grid-template-columns: 9px minmax(72px, 1fr) auto !important;
+}
+
+.approval-efficiency-list .lg-type-label {
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.efficiency-dot.pending {
+  background: var(--info);
+}
+.efficiency-dot.overdue {
+  background: var(--danger);
+}
+.efficiency-dot.done {
+  background: var(--success);
+}
+.efficiency-dot.handled {
+  background: var(--primary);
+}
+.efficiency-dot.average {
+  background: var(--warning);
 }
 
 .approval-pagination {

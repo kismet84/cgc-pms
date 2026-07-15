@@ -4,7 +4,65 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-033` 已完成；本次 `启动迭代-1` 达到一条上限，当前无待实施 Ready。
+`ISSUE-040-033` 已完成；本次 `启动迭代-5` 已通过控制面金丝雀放量门禁，当前执行 `ISSUE-040-034`。
+
+### ISSUE-040-034：工作流个人效率统计只读入口与数据范围
+
+优先级：P1
+任务性质：缺口修复
+类型：工作流 / 用户入口 / 个人效率 / 只读统计 / 身份与租户隔离
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-WORKFLOW-EFFICIENCY`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=4365b297325c0b20528375a0e7f82449bfdae918
+存量问题键：[stock:A-01-WORKFLOW-EFFICIENCY]
+归档报告：`docs/quality/ISSUE-040-034-工作流个人效率统计只读入口与数据范围验收报告.md`
+Migration：不需要
+依赖：复用现有审批工作台、筛选条件、`GET /workflow/statistics/efficiency`、`WfEfficiencyVO` 与 `WorkflowQueryService.getMyEfficiency`。
+风险等级：高
+运行态要求：仅在 local/dev/test 验证；浏览器验收前检查 8080 health、5173 与 dev-login，失败先按环境前置处理；验收只读，不创建、修改、删除或重置数据。
+Reviewer要求：复核请求只携带当前筛选和 overdueHours，不携带 userId/tenantId；接口仅使用认证用户与租户，失败不展示旧统计；后端统计口径和既有审批列表不回退。
+最小回滚：回退本 Issue 的前端类型、API、分析栏展示、专项测试及治理回写；不修改后端生产逻辑或数据。
+目标：
+- 为现有审批工作台增加个人效率只读统计，展示待办、逾期待办、已办、已处理任务和平均处理分钟数。
+- 统计请求复用当前关键词、业务类型、实例状态和时间筛选，固定 48 小时逾期阈值；列表筛选刷新时同步刷新统计。
+- 补齐前端契约测试，并以既有后端查询服务测试证明用户、租户和统计口径。
+非目标：
+- 不新增路由、菜单、权限码、后端生产代码、数据库迁移或跨用户/跨租户统计。
+- 不新增图表平台、导出、团队排名、趋势预测或可配置阈值。
+- 不连接生产、不发布生产、不自动 push，不写业务数据。
+允许修改：
+- `frontend-admin/src/api/modules/workflow.ts`
+- `frontend-admin/src/pages/approval/todo.vue`
+- `frontend-admin/src/pages/approval/__tests__/ApprovalWorkList.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-034-工作流个人效率统计只读入口与数据范围验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 精确调用 `GET /workflow/statistics/efficiency`，params 仅来自当前筛选并含 `overdueHours: 48`，不含 userId、tenantId、body 或写请求。
+- 分析栏显示五项个人效率；加载或失败时不展示旧统计，列表筛选、重置、分页、四个审批 tab 与移动端布局不回退。
+- 既有 `WorkflowQueryServiceTest` 证明 tenantId、userId、筛选、逾期和平均处理时长口径；未认证接口仍由 `isAuthenticated()` fail-close。
+- 收口移除 `A-01-WORKFLOW-EFFICIENCY`，更新 A-01 守恒、Ready、current-focus、project-map；新增后续项0、关闭后续项1、净变化-1。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint 与 `git diff --check` 通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-034`
+- `cd backend; .\mvnw.cmd "-Dtest=WorkflowQueryServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/pages/approval/__tests__/ApprovalWorkList.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/workflow.ts src/pages/approval/todo.vue src/pages/approval/__tests__/ApprovalWorkList.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-033：投标成本详情只读入口与租户边界
 

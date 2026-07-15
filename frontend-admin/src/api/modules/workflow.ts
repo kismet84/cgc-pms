@@ -77,6 +77,25 @@ export interface WfMineInstanceVO {
   currentNodeName?: string
 }
 
+export interface WfEfficiencyVO {
+  pendingCount: number
+  doneCount: number
+  overduePendingCount: number
+  handledTaskCount: number
+  averageHandleMinutes: number
+  overdueHours: number
+  instanceStatusCounts: Record<string, number>
+}
+
+export interface WorkflowEfficiencyParams {
+  keyword?: string
+  businessType?: string
+  instanceStatus?: string
+  startTime?: string
+  endTime?: string
+  overdueHours: number
+}
+
 export interface WfInstanceVO {
   id: string
   templateId: string
@@ -279,6 +298,15 @@ export function getMyCc(params: PageParams) {
 export function getMyInitiatedInstances(params: PageParams) {
   return request<PageResult<WfMineInstanceVO>>({
     url: '/workflow/instances/mine',
+    method: 'get',
+    params,
+  })
+}
+
+/** 当前用户的审批效率统计 */
+export function getMyEfficiency(params: WorkflowEfficiencyParams) {
+  return request<WfEfficiencyVO>({
+    url: '/workflow/statistics/efficiency',
     method: 'get',
     params,
   })
