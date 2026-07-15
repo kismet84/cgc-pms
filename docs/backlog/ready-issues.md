@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P2
 任务性质：缺口修复
 类型：驾驶舱 / 性能回归 / 测试契约 / 文案一致性
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `OBS-DASHBOARD-PERF-LABEL`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=6673afc8d292743e45cdc5e820017942ff9cc302
 存量问题键：[stock:OBS-DASHBOARD-PERF-LABEL]
 关联产品目标：让驾驶舱批量查询性能回归的显示名、说明、控制台输出与真实 `count <= 20` 断言采用同一门槛，避免 CI 和验收人员误读性能基线。
