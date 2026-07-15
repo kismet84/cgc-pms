@@ -29,7 +29,7 @@ defineProps<{
 </script>
 
 <template>
-  <section class="lg-list-table-panel cost-summary-panel">
+  <section class="lg-list-table-panel cost-summary-panel project-operation-table-panel">
     <div class="lg-toolbar cost-toolbar">
       <div class="lg-toolbar-left">
         <div class="cost-toolbar-heading">

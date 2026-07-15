@@ -85,6 +85,7 @@ declare module 'vue' {
     LgPageHeader: typeof import('./components/list-page/LgPageHeader.vue')['default']
     LgSearchBar: typeof import('./components/list-page/LgSearchBar.vue')['default']
     LgToolbar: typeof import('./components/list-page/LgToolbar.vue')['default']
+    ListQueryPanel: typeof import('./components/list-page/ListQueryPanel.vue')['default']
     NotificationBell: typeof import('./components/NotificationBell.vue')['default']
     PaymentTermEditor: typeof import('./components/PaymentTermEditor.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

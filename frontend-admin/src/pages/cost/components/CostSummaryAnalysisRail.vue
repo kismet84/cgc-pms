@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CheckCircleOutlined, LinkOutlined, WarningOutlined } from '@ant-design/icons-vue'
+import { CheckCircleOutlined, WarningOutlined } from '@ant-design/icons-vue'
 import type { CostSummaryVO } from '@/types/cost'
 
 type CostSubjectSummary = CostSummaryVO['subjects'][number]
@@ -17,11 +17,12 @@ defineProps<{
 </script>
 
 <template>
-  <aside class="lg-analysis-rail cost-reconcile-rail">
+  <aside class="lg-analysis-rail cost-reconcile-rail project-operation-analysis-rail">
     <div class="lg-analysis-panel lg-fill-card cost-reconcile-rail-body">
-      <header class="cost-reconcile-rail-head">
+      <header class="cost-reconcile-rail-head lg-analysis-header">
         <div>
-          <div class="cost-reconcile-rail-title">辅助分析</div>
+          <div class="cost-reconcile-rail-title lg-analysis-heading">辅助分析</div>
+          <div class="lg-analysis-description">核对结论、差额与风险提示</div>
         </div>
       </header>
 
@@ -61,33 +62,21 @@ defineProps<{
       <section class="lg-panel">
         <div class="lg-panel-title">成本来源对比</div>
         <div class="cost-source-rail-list">
-          <button
-            v-for="item in sourceRows"
-            :key="item.key"
-            type="button"
-            class="cost-source-rail-row"
-          >
+          <div v-for="item in sourceRows" :key="item.key" class="cost-source-rail-row">
             <span>{{ item.label }}</span>
             <strong>{{ item.value }}</strong>
             <span>{{ item.unit }}</span>
-          </button>
+          </div>
         </div>
       </section>
 
       <section class="lg-panel">
         <div class="lg-panel-title">数据来源</div>
         <div class="cost-source-rail-list">
-          <button
-            v-for="card in sourceCards"
-            :key="card.key"
-            type="button"
-            class="cost-source-rail-row"
-            @click="go(card.path)"
-          >
+          <div v-for="card in sourceCards" :key="card.key" class="cost-source-rail-row">
             <span>{{ card.label }}</span>
             <strong>{{ fmtAmount(card.value) }} 万</strong>
-            <LinkOutlined />
-          </button>
+          </div>
         </div>
       </section>
 

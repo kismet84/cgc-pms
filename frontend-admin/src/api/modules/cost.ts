@@ -17,6 +17,22 @@ export interface OverheadAllocationExecutionResult {
   idempotent: boolean
 }
 
+export interface OverheadAllocationRuleVO {
+  id: string
+  costSubjectId: string
+  allocationBasis: string
+  allocationCycle: string
+  status: string
+}
+
+export function getOverheadAllocationRules(pageNo: number, pageSize: number) {
+  return request<PageResult<OverheadAllocationRuleVO>>({
+    url: '/overhead-allocation/rules',
+    method: 'get',
+    params: { pageNo, pageSize },
+  })
+}
+
 /** 成本列表分页查询 */
 export function getCostLedger(params: CostLedgerQueryParams) {
   return request<PageResult<CostLedgerVO>>({

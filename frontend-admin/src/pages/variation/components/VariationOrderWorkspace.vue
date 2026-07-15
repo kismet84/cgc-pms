@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import type { PropType } from 'vue'
+import { ref, type PropType } from 'vue'
 import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   FileTextOutlined,
+  FilterOutlined,
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
-  SettingOutlined,
   WalletOutlined,
 } from '@ant-design/icons-vue'
 import { ColumnSettingsButton } from '@/components/list-page'
 import type { VarOrderVO } from '@/types/variation'
+
+const mobileFiltersOpen = ref(false)
 
 type FilterState = {
   projectId?: string
@@ -209,9 +211,9 @@ defineProps({
 </script>
 
 <template>
-  <div class="lg-grid vo-workspace">
-    <div class="lg-left vo-main-column">
-      <div class="lg-kpi-strip vo-kpi-summary" aria-label="变更签证关键指标">
+  <div class="lg-grid vo-workspace project-operation-workspace">
+    <div class="lg-left vo-main-column project-operation-main-column">
+      <div class="lg-kpi-strip vo-kpi-summary project-operation-kpi" aria-label="变更签证关键指标">
         <div class="vo-kpi-item">
           <span class="vo-kpi-icon is-total"><FileTextOutlined /></span>
           <span class="vo-kpi-label">签证总数</span>
@@ -234,8 +236,15 @@ defineProps({
         </div>
       </div>
 
-      <section class="lg-search-bar vo-query-panel" aria-label="变更签证查询条件">
-        <div class="vo-query-primary">
+      <section
+        class="lg-search-bar vo-query-panel project-operation-query-panel"
+        aria-label="变更签证查询条件"
+      >
+        <div
+          id="variation-filter-panel"
+          class="vo-query-primary project-operation-filter-panel"
+          :class="{ 'is-open': mobileFiltersOpen }"
+        >
           <a-select
             v-if="filterVisibility.projectId"
             v-model:value="filter.projectId"
@@ -288,35 +297,35 @@ defineProps({
             <template #prefix><SearchOutlined class="vo-search-prefix-icon" /></template>
           </a-input>
           <div class="vo-query-actions">
-            <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-            <a-button size="large" @click="handleReset">
+            <a-button
+              class="project-operation-desktop-query-action"
+              type="primary"
+              size="large"
+              @click="handleSearch"
+              >搜索</a-button
+            >
+            <a-button
+              class="project-operation-desktop-query-action"
+              size="large"
+              @click="handleReset"
+            >
               <template #icon><ReloadOutlined /></template>
               重置
             </a-button>
-            <a-dropdown trigger="click">
-              <a-button size="large">
-                <template #icon><SettingOutlined /></template>
-                筛选栏设置
-              </a-button>
-              <template #overlay>
-                <a-menu>
-                  <a-menu-item
-                    v-for="item in filterSettingItems"
-                    :key="item.key"
-                    @click="toggleFilterVisibility(item.key)"
-                  >
-                    <a-checkbox :checked="filterVisibility[item.key]">
-                      {{ item.label }}
-                    </a-checkbox>
-                  </a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
+            <a-button
+              class="project-operation-filter-toggle"
+              size="large"
+              :aria-expanded="mobileFiltersOpen"
+              aria-controls="variation-filter-panel"
+              @click="mobileFiltersOpen = !mobileFiltersOpen"
+            >
+              <template #icon><FilterOutlined /></template>筛选
+            </a-button>
           </div>
         </div>
       </section>
 
-      <main class="lg-list-table-panel vo-table-panel">
+      <main class="lg-list-table-panel vo-table-panel project-operation-table-panel">
         <div class="lg-toolbar vo-table-toolbar">
           <div class="lg-toolbar-left">
             <div class="vo-table-heading">
@@ -462,11 +471,15 @@ defineProps({
       </main>
     </div>
 
-    <aside class="lg-analysis-rail vo-analysis-rail" aria-label="变更签证辅助分析">
+    <aside
+      class="lg-analysis-rail vo-analysis-rail project-operation-analysis-rail"
+      aria-label="变更签证辅助分析"
+    >
       <div class="lg-analysis-panel lg-fill-card vo-analysis-panel">
-        <header class="vo-analysis-head">
+        <header class="vo-analysis-head lg-analysis-header">
           <div>
-            <div class="vo-analysis-title">签证分析</div>
+            <div class="vo-analysis-title lg-analysis-heading">辅助分析</div>
+            <div class="lg-analysis-description">类型、审批与近期变更</div>
           </div>
         </header>
 

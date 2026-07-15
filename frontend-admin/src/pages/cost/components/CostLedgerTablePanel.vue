@@ -25,7 +25,7 @@ defineProps<{
 </script>
 
 <template>
-  <main class="lg-list-table-panel cost-ledger-table-panel">
+  <main class="lg-list-table-panel cost-ledger-table-panel project-operation-table-panel">
     <div class="lg-toolbar cost-toolbar">
       <div class="lg-toolbar-left">
         <div class="cost-ledger-table-heading">

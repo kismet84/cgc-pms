@@ -430,11 +430,13 @@ onMounted(fetchData)
       </div>
 
       <aside class="lg-analysis-rail material-analysis-rail" aria-label="材料辅助分析">
-        <div class="material-analysis-panel">
-          <header class="material-analysis-head">
+        <div class="material-analysis-panel lg-analysis-panel lg-fill-card">
+          <header class="material-analysis-head lg-analysis-header">
             <div>
-              <div class="material-analysis-title">材料分析</div>
-              <div class="material-analysis-subtitle">单位、状态与近期维护</div>
+              <div class="material-analysis-title lg-analysis-heading">辅助分析</div>
+              <div class="material-analysis-subtitle lg-analysis-description">
+                单位、状态与近期维护
+              </div>
             </div>
           </header>
           <section class="material-analysis-section">

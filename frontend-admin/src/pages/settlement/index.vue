@@ -36,6 +36,7 @@ import {
 import { formatWanAmount } from '@/composables/listTablePresets'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
+import ListQueryPanel from '@/components/list-page/ListQueryPanel.vue'
 import { SETTLEMENT_GRID_COLUMNS, SETTLEMENT_STATUS_COLOR_MAP } from './pageConfig'
 
 const route = useRoute()
@@ -345,7 +346,7 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page settlement-page">
+  <div class="lg-list-page lg-page app-page settlement-page settlement-domain-page">
     <div class="lg-page-head settlement-page-head">
       <a-breadcrumb class="settlement-breadcrumb">
         <a-breadcrumb-item>结算管理</a-breadcrumb-item>
@@ -353,10 +354,14 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
       </a-breadcrumb>
     </div>
 
-    <div class="lg-grid settlement-workspace">
-      <div class="lg-left settlement-main-column">
+    <div class="lg-grid settlement-workspace settlement-domain-workspace">
+      <div class="lg-left settlement-main-column settlement-domain-main-column">
         <!-- KPI 横条 -->
-        <div v-if="!isMobile" class="lg-kpi-strip settlement-kpi-summary" aria-label="结算关键指标">
+        <div
+          v-if="!isMobile"
+          class="lg-kpi-strip settlement-kpi-summary settlement-domain-kpi"
+          aria-label="结算关键指标"
+        >
           <div class="settlement-kpi-item">
             <span class="settlement-kpi-icon is-total"><FileDoneOutlined /></span>
             <span class="settlement-kpi-label">结算总数</span>
@@ -406,13 +411,24 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
           </div>
         </div>
 
-        <div class="lg-search-bar settlement-search-bar">
-          <div class="settlement-filter-grid">
+        <ListQueryPanel aria-label="结算查询条件" @search="handleSearch" @reset="handleReset">
+          <template #primary>
+            <a-input
+              v-model:value="filter.keyword"
+              placeholder="搜索结算编号、项目、合同"
+              allow-clear
+              @press-enter="handleSearch"
+            >
+              <template #prefix>
+                <SearchOutlined class="settlement-search-prefix-icon" />
+              </template>
+            </a-input>
+          </template>
+          <template #filters>
             <a-select
               v-model:value="filter.projectId"
               placeholder="全部项目"
               allow-clear
-              size="large"
               @change="onProjectChange"
             >
               <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
@@ -423,38 +439,17 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
               v-model:value="filter.settlementStatus"
               placeholder="全部结算状态"
               allow-clear
-              size="large"
             >
               <a-select-option value="DRAFT">草稿</a-select-option>
               <a-select-option value="FINALIZED">已定案</a-select-option>
               <a-select-option value="CANCELLED">已作废</a-select-option>
             </a-select>
-          </div>
-          <div class="settlement-filter-foot">
-            <a-input
-              v-model:value="filter.keyword"
-              placeholder="搜索结算编号、项目、合同"
-              allow-clear
-              size="large"
-              @press-enter="handleSearch"
-            >
-              <template #prefix>
-                <SearchOutlined class="settlement-search-prefix-icon" />
-              </template>
-            </a-input>
-            <div class="settlement-search-actions">
-              <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-              <a-button size="large" @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </a-button>
-            </div>
-          </div>
-        </div>
+          </template>
+        </ListQueryPanel>
 
-        <main class="lg-list-table-panel settlement-table-panel">
+        <main class="lg-list-table-panel settlement-table-panel settlement-domain-table-panel">
           <!-- 工具栏 -->
-          <div class="lg-toolbar settlement-toolbar">
+          <div class="lg-toolbar settlement-toolbar settlement-domain-toolbar">
             <div class="lg-toolbar-left">
               <div class="settlement-table-heading">
                 <span class="settlement-table-title">结算记录明细</span>
@@ -479,7 +474,7 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
           </div>
 
           <!-- 表格 -->
-          <div class="lg-table-wrap">
+          <div class="lg-table-wrap settlement-domain-table-wrap">
             <div v-if="listError" class="settlement-list-feedback">
               <a-result status="error" title="结算列表加载失败" :sub-title="listError">
                 <template #extra>
@@ -547,7 +542,7 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
           </div>
 
           <!-- 分页 -->
-          <div class="lg-pagination">
+          <div class="lg-pagination settlement-domain-pagination">
             <span class="lg-total">共 {{ total }} 条</span>
             <a-pagination
               v-model:current="pageNo"
@@ -564,14 +559,18 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
       </div>
 
       <!-- 右侧分析面板 -->
-      <aside class="lg-analysis-rail settlement-analysis-rail" aria-label="结算辅助分析">
+      <aside
+        class="lg-analysis-rail settlement-analysis-rail settlement-domain-analysis-rail"
+        aria-label="结算辅助分析"
+      >
         <div class="lg-analysis-panel settlement-analysis-panel">
-          <header class="settlement-analysis-head">
+          <header class="settlement-analysis-head lg-analysis-header">
             <div>
-              <div class="settlement-analysis-title">辅助分析</div>
-              <div class="settlement-analysis-subtitle">状态、金额结构与付款提醒</div>
+              <div class="settlement-analysis-title lg-analysis-heading">辅助分析</div>
+              <div class="settlement-analysis-subtitle lg-analysis-description">
+                状态、金额结构与付款提醒
+              </div>
             </div>
-            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
           </header>
 
           <section class="settlement-analysis-focus">

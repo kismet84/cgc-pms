@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ReloadOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import { ref } from 'vue'
+import { FilterOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import type { SelectOption } from '@/types/ui'
 
 defineProps<{
@@ -11,8 +12,6 @@ defineProps<{
     orderType?: string
     keyword: string
   }
-  filterVisibility: Record<string, boolean>
-  filterSettingItems: { key: string; label: string }[]
   projectList: Array<{ id: string; projectName?: string }>
   contractList: Array<{ id: string; contractName?: string }>
   supplierList: Array<{ id: string; partnerName?: string }>
@@ -22,15 +21,18 @@ defineProps<{
   onProjectChange: (value: string | undefined) => void
   onSearch: () => void
   onReset: () => void
-  onToggleFilterVisibility: (key: string) => void
 }>()
+
+const filterPanelOpen = ref(false)
 </script>
 
 <template>
-  <div class="lg-search-bar">
-    <div class="purchase-order-search-fields">
+  <div class="lg-search-bar procurement-subcontract-query-panel">
+    <div
+      class="purchase-order-search-fields procurement-subcontract-filter-panel"
+      :class="{ 'is-open': filterPanelOpen }"
+    >
       <a-select
-        v-if="filterVisibility.projectId"
         v-model:value="filter.projectId"
         class="purchase-order-search-select"
         placeholder="全部项目"
@@ -43,7 +45,6 @@ defineProps<{
         </a-select-option>
       </a-select>
       <a-select
-        v-if="filterVisibility.contractId"
         v-model:value="filter.contractId"
         class="purchase-order-search-select"
         placeholder="全部合同"
@@ -61,7 +62,6 @@ defineProps<{
         </a-select-option>
       </a-select>
       <a-select
-        v-if="filterVisibility.partnerId"
         v-model:value="filter.partnerId"
         class="purchase-order-search-select"
         placeholder="全部供应商"
@@ -79,7 +79,6 @@ defineProps<{
         </a-select-option>
       </a-select>
       <a-select
-        v-if="filterVisibility.orderType"
         v-model:value="filter.orderType"
         class="purchase-order-search-select is-compact"
         placeholder="类型"
@@ -92,7 +91,6 @@ defineProps<{
         </a-select-option>
       </a-select>
       <a-select
-        v-if="filterVisibility.orderStatus"
         v-model:value="filter.orderStatus"
         class="purchase-order-search-select is-compact"
         placeholder="状态"
@@ -105,7 +103,7 @@ defineProps<{
         </a-select-option>
       </a-select>
     </div>
-    <div class="purchase-order-search-keyword-row">
+    <div class="purchase-order-search-keyword-row procurement-subcontract-query-row">
       <a-input
         v-model:value="filter.keyword"
         class="purchase-order-search-input"
@@ -116,31 +114,27 @@ defineProps<{
       >
         <template #prefix><SearchOutlined class="purchase-order-search-prefix-icon" /></template>
       </a-input>
-      <div class="purchase-order-search-actions">
-        <a-button type="primary" size="large" @click="onSearch">搜索</a-button>
-        <a-button size="large" @click="onReset">
+      <div class="purchase-order-search-actions procurement-subcontract-query-actions">
+        <a-button
+          class="procurement-subcontract-desktop-action"
+          type="primary"
+          size="large"
+          @click="onSearch"
+          >搜索</a-button
+        >
+        <a-button class="procurement-subcontract-desktop-action" size="large" @click="onReset">
           <template #icon><ReloadOutlined /></template>
           重置
         </a-button>
-        <a-dropdown trigger="click">
-          <a-button size="large">
-            <template #icon><SettingOutlined /></template>
-            筛选栏设置
-          </a-button>
-          <template #overlay>
-            <a-menu>
-              <a-menu-item
-                v-for="item in filterSettingItems"
-                :key="item.key"
-                @click="onToggleFilterVisibility(item.key)"
-              >
-                <a-checkbox :checked="filterVisibility[item.key]">
-                  {{ item.label }}
-                </a-checkbox>
-              </a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
+        <a-button
+          class="procurement-subcontract-filter-toggle"
+          size="large"
+          :aria-expanded="filterPanelOpen"
+          @click="filterPanelOpen = !filterPanelOpen"
+        >
+          <template #icon><FilterOutlined /></template>
+          筛选
+        </a-button>
       </div>
     </div>
   </div>

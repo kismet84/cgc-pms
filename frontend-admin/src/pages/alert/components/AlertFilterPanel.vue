@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import type { Dayjs } from 'dayjs'
-import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { FilterOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 
-defineProps<{
+const props = defineProps<{
   filter: {
     keyword: string
     projectId?: string
@@ -21,13 +22,62 @@ defineProps<{
   handleSearch: () => void
   handleReset: () => void
 }>()
+
+const advancedFiltersOpen = ref(false)
+const hasActiveFilters = computed(() =>
+  Boolean(
+    props.filter.keyword.trim() ||
+    props.filter.projectId ||
+    props.filter.severity ||
+    props.filter.isRead !== undefined ||
+    props.filter.processStatus ||
+    props.filter.triggeredAtRange?.length ||
+    props.filter.onlyDefaultScope,
+  ),
+)
+
+function applyFilters() {
+  advancedFiltersOpen.value = false
+  props.handleSearch()
+}
+
+function resetFilters() {
+  advancedFiltersOpen.value = false
+  props.handleReset()
+}
 </script>
 
 <template>
-  <section class="alert-panel alert-filter-panel">
-    <div class="alert-filter-grid">
+  <section class="lg-search-bar alert-filter-panel" aria-label="预警查询条件">
+    <div class="alert-search-row">
+      <a-input
+        v-model:value="filter.keyword"
+        allow-clear
+        placeholder="搜索告警ID、消息摘要或业务单据号"
+        class="alert-search-input"
+        @press-enter="applyFilters"
+      >
+        <template #prefix><SearchOutlined class="alert-search-icon" /></template>
+      </a-input>
+      <a-button type="primary" class="alert-search-button" @click="applyFilters">搜索</a-button>
+      <a-button class="alert-reset-button" @click="resetFilters">
+        <template #icon><ReloadOutlined /></template>
+        重置
+      </a-button>
+      <a-button
+        class="alert-filter-button"
+        :class="{ 'alert-filter-button--active': hasActiveFilters }"
+        :aria-expanded="advancedFiltersOpen"
+        aria-controls="alert-advanced-filters"
+        @click="advancedFiltersOpen = !advancedFiltersOpen"
+      >
+        <template #icon><FilterOutlined /></template>
+        筛选
+      </a-button>
+    </div>
+
+    <div v-if="advancedFiltersOpen" id="alert-advanced-filters" class="alert-filter-grid">
       <div class="alert-filter-item">
-        <label>项目</label>
         <a-select
           v-model:value="filter.projectId"
           allow-clear
@@ -43,7 +93,6 @@ defineProps<{
         />
       </div>
       <div class="alert-filter-item">
-        <label>严重度</label>
         <a-select
           v-model:value="filter.severity"
           allow-clear
@@ -56,7 +105,6 @@ defineProps<{
         />
       </div>
       <div class="alert-filter-item">
-        <label>已读状态</label>
         <a-select
           v-model:value="filter.isRead"
           allow-clear
@@ -68,7 +116,6 @@ defineProps<{
         />
       </div>
       <div class="alert-filter-item">
-        <label>处理状态</label>
         <a-select
           v-model:value="filter.processStatus"
           allow-clear
@@ -77,57 +124,84 @@ defineProps<{
         />
       </div>
       <div class="alert-filter-item alert-filter-item-range">
-        <label>触发时间</label>
         <a-range-picker
           v-model:value="filter.triggeredAtRange"
           value-format=""
           style="width: 100%"
         />
       </div>
-    </div>
-    <div class="alert-filter-foot">
-      <div class="alert-filter-item alert-filter-item-keyword">
-        <a-input
-          v-model:value="filter.keyword"
-          allow-clear
-          placeholder="告警ID/消息摘要/业务单据号"
-        >
-          <template #prefix>
-            <SearchOutlined />
-          </template>
-        </a-input>
-      </div>
-      <div class="alert-filter-actions">
-        <a-button type="primary" @click="handleSearch">搜索</a-button>
-        <a-button @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
       <div v-if="hasDefaultScopeDomain" class="alert-filter-scope">
         <a-checkbox v-model:checked="filter.onlyDefaultScope">仅看默认范围</a-checkbox>
+      </div>
+      <div class="alert-filter-actions">
+        <a-button @click="resetFilters">重置</a-button>
+        <a-button type="primary" @click="applyFilters">应用筛选</a-button>
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.alert-panel {
-  background: #fff;
-  border: 1px solid #e8edf5;
-  border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(31, 35, 41, 0.04);
+.alert-filter-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-height: 60px;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  margin: 0;
+  border: 0;
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    var(--shadow-soft);
 }
 
-.alert-filter-panel {
-  padding: 12px 18px;
+.alert-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-search-input,
+.alert-search-button,
+.alert-reset-button,
+.alert-filter-button {
+  height: 40px;
+  min-height: 40px;
+  border-radius: var(--radius-md);
+}
+
+.alert-search-button,
+.alert-reset-button,
+.alert-filter-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding-inline: 10px;
+}
+
+.alert-filter-button {
+  min-width: 76px;
+}
+
+.alert-filter-button--active,
+.alert-search-icon {
+  color: var(--primary);
 }
 
 .alert-filter-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  align-items: center;
+  gap: 8px;
   width: 100%;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
 }
 
 .alert-filter-item {
@@ -140,73 +214,45 @@ defineProps<{
   width: 100%;
 }
 
-.alert-filter-item label {
-  display: block;
-  margin-bottom: 4px;
-  color: #3b4554;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.alert-filter-item-keyword {
-  min-width: 0;
-}
-
-.alert-filter-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.alert-filter-foot .alert-filter-item-keyword {
-  flex: 1 1 auto;
-}
-
 .alert-filter-actions {
   display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
   gap: 8px;
-  flex: 0 0 auto;
 }
 
 .alert-filter-scope {
-  margin-left: auto;
-  color: #5f6b7a;
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
-@media (max-width: 1100px) {
+@media (width < 900px) {
   .alert-filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .alert-filter-foot {
-    flex-wrap: wrap;
-  }
-
-  .alert-filter-item-keyword {
-    flex-basis: 100%;
-  }
-
-  .alert-filter-scope {
-    width: 100%;
-    margin-left: 0;
-  }
 }
 
-@media (max-width: 768px) {
+@media (width < 500px) {
+  .alert-filter-panel {
+    min-height: 40px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .alert-search-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+
+  .alert-search-button,
+  .alert-reset-button {
+    display: none;
+  }
+
   .alert-filter-grid {
     grid-template-columns: 1fr;
-  }
-
-  .alert-filter-foot,
-  .alert-filter-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .alert-filter-scope {
-    width: auto;
   }
 }
 </style>

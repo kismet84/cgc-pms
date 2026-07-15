@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, reactive } from 'vue'
@@ -429,6 +429,22 @@ function mountAlertPage(stubs: Record<string, unknown> = {}) {
   })
 }
 
+beforeAll(() => {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
+})
+
 beforeEach(() => {
   vi.clearAllMocks()
   setActivePinia(createPinia())
@@ -476,6 +492,7 @@ describe('alert/index.vue', () => {
 
     const wrapper = mountAlertPage()
     await flushPromises()
+    await wrapper.get('.alert-filter-button').trigger('click')
 
     expect(wrapper.exists()).toBe(true)
     expect(wrapper.text()).toContain('仅看默认范围')
@@ -500,18 +517,21 @@ describe('alert/index.vue', () => {
 
     const wrapper = mountAlertPage()
     await flushPromises()
+    await wrapper.get('.alert-filter-button').trigger('click')
 
     expect(wrapper.find('.alert-filter-panel').exists()).toBe(true)
     expect(wrapper.find('.alert-table-panel').exists()).toBe(true)
     expect(wrapper.find('.alert-detail-panel').exists()).toBe(true)
     expect(wrapper.find('.a-modal-stub').exists()).toBe(true)
 
-    const filterActions = wrapper.findAll('.alert-filter-actions button').map((item) => item.text())
-    const toolbarButtons = wrapper.findAll('.alert-toolbar-left button').map((item) => item.text())
+    const filterActions = wrapper.findAll('.alert-search-row button').map((item) => item.text())
+    const toolbarButtons = wrapper
+      .findAll('.alert-toolbar-actions button')
+      .map((item) => item.text())
     const detailButtons = wrapper.findAll('.alert-detail-actions button').map((item) => item.text())
 
-    expect(filterActions).toEqual(['搜索', '重置'])
-    expect(toolbarButtons).toEqual(['批量处理', '标记已读', '归档', '导出'])
+    expect(filterActions).toEqual(['搜索', '重置', '筛选'])
+    expect(toolbarButtons).toEqual(['批量处理', '标记已读', '归档', '导出', '列设置'])
     expect(detailButtons).toEqual(['标记已读', '归档', '查看业务单据', '保存处理结果'])
     expect(wrapper.find('.alert-filter-scope').text()).toContain('仅看默认范围')
     expect(wrapper.find('.alert-message-button').text()).toContain('采购订单逾期')
@@ -819,7 +839,7 @@ describe('alert/index.vue', () => {
     await flushPromises()
 
     const exportButton = wrapper
-      .findAll('.alert-toolbar-left button')
+      .findAll('.alert-toolbar-actions button')
       .find((item) => item.text() === '导出')
     expect(exportButton).toBeTruthy()
     expect(exportButton!.attributes('disabled')).toBeUndefined()
@@ -875,7 +895,7 @@ describe('alert/index.vue', () => {
     const emptyWrapper = mountAlertPage()
     await flushPromises()
     const emptyExportButton = emptyWrapper
-      .findAll('.alert-toolbar-left button')
+      .findAll('.alert-toolbar-actions button')
       .find((item) => item.text() === '导出')
     expect(emptyExportButton).toBeTruthy()
     expect(emptyExportButton!.attributes('disabled')).toBeDefined()
@@ -899,7 +919,7 @@ describe('alert/index.vue', () => {
     await flushPromises()
 
     const exportButton = wrapper
-      .findAll('.alert-toolbar-left button')
+      .findAll('.alert-toolbar-actions button')
       .find((item) => item.text() === '导出')
     expect(exportButton).toBeTruthy()
 
@@ -928,7 +948,7 @@ describe('alert/index.vue', () => {
     await flushPromises()
 
     const exportButton = wrapper
-      .findAll('.alert-toolbar-left button')
+      .findAll('.alert-toolbar-actions button')
       .find((item) => item.text() === '导出')
     expect(exportButton).toBeTruthy()
     expect(exportButton!.attributes('disabled')).toBeUndefined()
@@ -970,7 +990,7 @@ describe('alert/index.vue', () => {
     await flushPromises()
 
     const exportButton = wrapper
-      .findAll('.alert-toolbar-left button')
+      .findAll('.alert-toolbar-actions button')
       .find((item) => item.text() === '导出')
     expect(exportButton).toBeTruthy()
     expect(exportButton!.attributes('disabled')).toBeUndefined()
@@ -1050,12 +1070,14 @@ describe('alert/index.vue', () => {
     expect(pageSource).toContain("slots: { default: 'message' }")
     expect(pageSource).toContain("field: 'triggeredAt'")
     expect(pageSource).toContain("slots: { default: 'triggeredAt' }")
-    expect(pageSource).toContain('@media (max-width: 1200px)')
-    expect(pageSource).not.toContain('@media (max-width: 1440px)')
-    expect(pageSource).toContain('grid-template-columns: minmax(0, 1fr) 360px')
+    expect(pageSource).toContain("from '@/composables/useMobileViewport'")
+    expect(pageSource).toContain(':is-mobile="isMobile"')
+    expect(pageSource).toContain('@media (width < 500px)')
+    expect(pageSource).toContain('grid-template-columns: minmax(0, 1fr) 20vw')
+    expect(pageSource).toContain('class="alert-analysis-kpis"')
 
     expect(filterPanelSource).toContain('仅看默认范围')
-    expect(filterPanelSource).toContain('告警ID/消息摘要/业务单据号')
+    expect(filterPanelSource).toContain('搜索告警ID、消息摘要或业务单据号')
     expect(filterPanelSource).toContain('.alert-filter-scope')
 
     expect(tablePanelSource).toContain('标记已读')
@@ -1069,14 +1091,15 @@ describe('alert/index.vue', () => {
     expect(tablePanelSource).toContain(
       '<a-button type="primary" @click="handleRetry">重试</a-button>',
     )
-    expect(tablePanelSource).toContain('.alert-toolbar-left')
+    expect(tablePanelSource).toContain('.alert-toolbar-actions')
+    expect(tablePanelSource).toContain('class="alert-mobile-list"')
     expect(tablePanelSource).toContain('flex-wrap: wrap')
 
     expect(detailPanelSource).toContain('查看业务单据')
     expect(detailPanelSource).toContain('openBusinessEntry(activeRecord)')
     expect(detailPanelSource).toContain('保存处理结果')
     expect(detailPanelSource).toContain('通知订阅')
-    expect(detailPanelSource).toContain('position: sticky')
+    expect(detailPanelSource).toContain('overflow-y: auto')
 
     expect(subscriptionModalSource).toContain('接收通知')
     expect(subscriptionModalSource).toContain('最低严重度')
@@ -1085,7 +1108,7 @@ describe('alert/index.vue', () => {
 })
 
 describe('alert 子组件 DOM/结构证据', () => {
-  it('过滤面板保持关键 class、按钮顺序和默认范围区块', () => {
+  it('过滤面板保持关键 class、按钮顺序和默认范围区块', async () => {
     const wrapper = mount(AlertFilterPanel, {
       props: {
         filter: reactive({
@@ -1111,18 +1134,21 @@ describe('alert 子组件 DOM/结构证据', () => {
       },
     })
 
-    const labels = wrapper
-      .findAll('.alert-filter-grid .alert-filter-item > label')
-      .map((item) => item.text())
+    expect(wrapper.find('.alert-filter-panel').exists()).toBe(true)
+    expect(wrapper.find('.alert-search-row').exists()).toBe(true)
+    expect(wrapper.find('.alert-filter-grid').exists()).toBe(false)
+
+    await wrapper.get('.alert-filter-button').trigger('click')
+
     const actions = wrapper.findAll('.alert-filter-actions button').map((item) => item.text())
 
-    expect(wrapper.find('.alert-filter-panel').exists()).toBe(true)
     expect(wrapper.find('.alert-filter-grid').exists()).toBe(true)
-    expect(wrapper.find('.alert-filter-foot').exists()).toBe(true)
+    expect(wrapper.find('.alert-filter-actions').exists()).toBe(true)
     expect(wrapper.find('.alert-filter-scope').exists()).toBe(true)
-    expect(labels).toEqual(['项目', '严重度', '已读状态', '处理状态', '触发时间'])
-    expect(actions).toEqual(['搜索', '重置'])
-    expect(wrapper.find('input[placeholder="告警ID/消息摘要/业务单据号"]').exists()).toBe(true)
+    expect(actions).toEqual(['重置', '应用筛选'])
+    expect(wrapper.find('input[placeholder="搜索告警ID、消息摘要或业务单据号"]').exists()).toBe(
+      true,
+    )
   })
 
   it('表格面板保持工具栏顺序、消息按钮和分页结构', () => {
@@ -1144,6 +1170,7 @@ describe('alert 子组件 DOM/结构证据', () => {
         showEmptyState: false,
         hasActiveFilters: false,
         exportDisabled: false,
+        isMobile: false,
         toggleCol: vi.fn(),
         togglePageSelection: vi.fn(),
         isRowSelected: vi.fn(() => false),
@@ -1173,15 +1200,17 @@ describe('alert 子组件 DOM/结构证据', () => {
       },
     })
 
-    const toolbarButtons = wrapper.findAll('.alert-toolbar-left button').map((item) => item.text())
+    const toolbarButtons = wrapper
+      .findAll('.alert-toolbar-actions button')
+      .map((item) => item.text())
     const actionButtons = wrapper.findAll('.alert-row-actions button').map((item) => item.text())
 
     expect(wrapper.find('.alert-table-panel').exists()).toBe(true)
-    expect(wrapper.find('.alert-toolbar-left').exists()).toBe(true)
+    expect(wrapper.find('.alert-toolbar-actions').exists()).toBe(true)
     expect(wrapper.find('.alert-message-button').exists()).toBe(true)
     expect(wrapper.find('.alert-pagination').exists()).toBe(true)
     expect(wrapper.find('.alert-grid-wrap').exists()).toBe(true)
-    expect(toolbarButtons).toEqual(['批量处理', '标记已读', '归档', '导出'])
+    expect(toolbarButtons).toEqual(['批量处理', '标记已读', '归档', '导出', '列设置'])
     expect(actionButtons).toEqual(['标记已读', '处理', '归档', '详情'])
   })
 
@@ -1204,6 +1233,7 @@ describe('alert 子组件 DOM/结构证据', () => {
         showEmptyState: false,
         hasActiveFilters: false,
         exportDisabled: false,
+        isMobile: false,
         toggleCol: vi.fn(),
         togglePageSelection: vi.fn(),
         isRowSelected: vi.fn(() => false),
@@ -1233,10 +1263,12 @@ describe('alert 子组件 DOM/结构证据', () => {
       },
     })
 
-    const toolbarButtons = wrapper.findAll('.alert-toolbar-left button').map((item) => item.text())
+    const toolbarButtons = wrapper
+      .findAll('.alert-toolbar-actions button')
+      .map((item) => item.text())
     const actionButtons = wrapper.findAll('.alert-row-actions button').map((item) => item.text())
 
-    expect(toolbarButtons).toEqual([])
+    expect(toolbarButtons).toEqual(['列设置'])
     expect(actionButtons).toEqual(['详情'])
     expect(wrapper.find('.alert-toolbar-meta').exists()).toBe(false)
   })

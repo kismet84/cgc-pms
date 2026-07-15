@@ -8,6 +8,7 @@ import {
   ClockCircleOutlined,
   DollarOutlined,
   FileDoneOutlined,
+  FilterOutlined,
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -48,6 +49,7 @@ import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/di
 const route = useRoute()
 const router = useRouter()
 
+const filterPanelOpen = ref(false)
 const filter = reactive({
   projectId: undefined as string | undefined,
   contractId: undefined as string | undefined,
@@ -545,7 +547,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page subcontract-measure-page">
+  <div
+    class="lg-list-page lg-page app-page subcontract-measure-page procurement-subcontract-list-page"
+  >
     <div class="lg-page-head subcontract-measure-page-head">
       <a-breadcrumb class="lg-breadcrumb">
         <a-breadcrumb-item>分包管理</a-breadcrumb-item>
@@ -600,8 +604,13 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="lg-search-bar subcontract-measure-search-bar">
-          <div class="subcontract-measure-filter-grid">
+        <div
+          class="lg-search-bar subcontract-measure-search-bar procurement-subcontract-query-panel"
+        >
+          <div
+            class="subcontract-measure-filter-grid procurement-subcontract-filter-panel"
+            :class="{ 'is-open': filterPanelOpen }"
+          >
             <a-select
               v-model:value="filter.projectId"
               placeholder="全部项目"
@@ -634,7 +643,7 @@ onMounted(() => {
               <a-select-option value="COMPLETED">已完成</a-select-option>
             </a-select>
           </div>
-          <div class="subcontract-measure-filter-foot">
+          <div class="subcontract-measure-filter-foot procurement-subcontract-query-row">
             <a-input
               v-model:value="filter.keyword"
               placeholder="搜索计量编号…"
@@ -646,17 +655,38 @@ onMounted(() => {
                 <SearchOutlined style="color: var(--text-secondary)" />
               </template>
             </a-input>
-            <div class="subcontract-measure-filter-actions">
-              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-              <a-button size="large" @click="handleReset">
+            <div class="subcontract-measure-filter-actions procurement-subcontract-query-actions">
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                type="primary"
+                size="large"
+                @click="handleSearch"
+                >搜索</a-button
+              >
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                size="large"
+                @click="handleReset"
+              >
                 <template #icon><ReloadOutlined /></template>
                 重置
+              </a-button>
+              <a-button
+                class="procurement-subcontract-filter-toggle"
+                size="large"
+                :aria-expanded="filterPanelOpen"
+                @click="filterPanelOpen = !filterPanelOpen"
+              >
+                <template #icon><FilterOutlined /></template>
+                筛选
               </a-button>
             </div>
           </div>
         </div>
 
-        <main class="lg-list-table-panel subcontract-measure-table-panel">
+        <main
+          class="lg-list-table-panel subcontract-measure-table-panel procurement-subcontract-table-panel"
+        >
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
               <div class="subcontract-measure-table-title">
@@ -683,6 +713,7 @@ onMounted(() => {
 
           <div class="lg-table-wrap">
             <vxe-grid
+              class="procurement-subcontract-desktop-table"
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -758,6 +789,35 @@ onMounted(() => {
                 </a-dropdown>
               </template>
             </vxe-grid>
+            <div class="procurement-subcontract-mobile-list">
+              <button
+                v-for="row in tableData"
+                :key="row.id"
+                class="procurement-subcontract-mobile-card"
+                type="button"
+                @click="handleView(row)"
+              >
+                <span class="procurement-subcontract-mobile-card-title">{{
+                  row.measureCode || '-'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-status">
+                  <a-tag :color="measureStatusColor(row.status)">{{
+                    measureStatusLabel(row.status)
+                  }}</a-tag>
+                </span>
+                <span class="procurement-subcontract-mobile-card-subtitle">{{
+                  row.subTaskName || row.projectName || '任务待维护'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-meta"
+                  >{{
+                    row.reportedAmount
+                      ? `${Number(row.reportedAmount).toLocaleString('zh-CN')} 元`
+                      : '金额待维护'
+                  }}
+                  · {{ row.measureDate || row.measurePeriod || '期间待维护' }}</span
+                >
+              </button>
+            </div>
           </div>
 
           <!-- 分页 -->

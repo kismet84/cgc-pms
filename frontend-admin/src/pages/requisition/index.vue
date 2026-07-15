@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { onMounted, computed, reactive, ref } from 'vue'
+import { onMounted, computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   MoreOutlined,
+  FilterOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
-  SettingOutlined,
 } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { getUserList } from '@/api/modules/user'
@@ -26,6 +26,7 @@ const APPROVAL_DRAFT = 'DRAFT'
 const APPROVAL_APPROVING = 'APPROVING'
 const APPROVAL_APPROVED = 'APPROVED'
 const APPROVAL_REJECTED = 'REJECTED'
+const filterPanelOpen = ref(false)
 const APPROVAL_STATUS_DICT = 'approval_status'
 const APPROVAL_STATUS_LABEL: Record<string, string> = {
   [APPROVAL_DRAFT]: '草稿',
@@ -47,17 +48,6 @@ const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 
 const userList = ref<SysUserVO[]>([])
-const filterVisibility = reactive({
-  projectId: true,
-  warehouseId: true,
-  approvalStatus: true,
-})
-const filterSettingItems = [
-  { key: 'projectId', label: '项目' },
-  { key: 'warehouseId', label: '仓库' },
-  { key: 'approvalStatus', label: '审批状态' },
-] as const
-
 const {
   filter,
   loading,
@@ -178,10 +168,6 @@ function statusPct(count: number) {
   return Math.round((count / base) * 100)
 }
 
-function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
-  filterVisibility[key] = !filterVisibility[key]
-}
-
 async function fetchUsers() {
   try {
     const res = await getUserList({ pageNo: 1, pageSize: 200 })
@@ -202,7 +188,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page requisition-page">
+  <div class="lg-list-page lg-page app-page requisition-page procurement-subcontract-list-page">
     <div class="lg-page-head requisition-page-head">
       <div class="requisition-page-meta-row">
         <a-breadcrumb class="lg-breadcrumb">
@@ -223,10 +209,12 @@ onMounted(() => {
           :fmt-amount="fmtAmount"
         />
 
-        <div class="lg-search-bar requisition-search-bar">
-          <div class="requisition-search-fields">
+        <div class="lg-search-bar requisition-search-bar procurement-subcontract-query-panel">
+          <div
+            class="requisition-search-fields procurement-subcontract-filter-panel"
+            :class="{ 'is-open': filterPanelOpen }"
+          >
             <a-select
-              v-if="filterVisibility.projectId"
               v-model:value="filter.projectId"
               placeholder="全部项目"
               allow-clear
@@ -249,7 +237,6 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
-              v-if="filterVisibility.warehouseId"
               v-model:value="filter.warehouseId"
               placeholder="全部仓库"
               allow-clear
@@ -261,7 +248,6 @@ onMounted(() => {
               </a-select-option>
             </a-select>
             <a-select
-              v-if="filterVisibility.approvalStatus"
               v-model:value="filter.approvalStatus"
               placeholder="全部审批状态"
               allow-clear
@@ -274,7 +260,7 @@ onMounted(() => {
               <a-select-option value="REJECTED">已驳回</a-select-option>
             </a-select>
           </div>
-          <div class="requisition-search-keyword-row">
+          <div class="requisition-search-keyword-row procurement-subcontract-query-row">
             <a-input
               v-model:value="filter.requisitionCode"
               placeholder="搜索领料单号"
@@ -284,36 +270,38 @@ onMounted(() => {
             >
               <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
             </a-input>
-            <div class="requisition-search-actions">
-              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-              <a-button size="large" @click="handleReset">
+            <div class="requisition-search-actions procurement-subcontract-query-actions">
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                type="primary"
+                size="large"
+                @click="handleSearch"
+                >搜索</a-button
+              >
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                size="large"
+                @click="handleReset"
+              >
                 <template #icon><ReloadOutlined /></template>
                 重置
               </a-button>
-              <a-dropdown trigger="click">
-                <a-button size="large">
-                  <template #icon><SettingOutlined /></template>
-                  筛选栏设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item
-                      v-for="item in filterSettingItems"
-                      :key="item.key"
-                      @click="toggleFilterVisibility(item.key)"
-                    >
-                      <a-checkbox :checked="filterVisibility[item.key]">
-                        {{ item.label }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
+              <a-button
+                class="procurement-subcontract-filter-toggle"
+                size="large"
+                :aria-expanded="filterPanelOpen"
+                @click="filterPanelOpen = !filterPanelOpen"
+              >
+                <template #icon><FilterOutlined /></template>
+                筛选
+              </a-button>
             </div>
           </div>
         </div>
 
-        <main class="lg-list-table-panel requisition-table-panel">
+        <main
+          class="lg-list-table-panel requisition-table-panel procurement-subcontract-table-panel"
+        >
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
               <div class="requisition-table-title">
@@ -354,6 +342,7 @@ onMounted(() => {
             </div>
             <vxe-grid
               v-else
+              class="procurement-subcontract-desktop-table"
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -403,6 +392,31 @@ onMounted(() => {
                 </a-dropdown>
               </template>
             </vxe-grid>
+            <div v-if="!listError && !showEmptyState" class="procurement-subcontract-mobile-list">
+              <button
+                v-for="row in tableData"
+                :key="row.id"
+                class="procurement-subcontract-mobile-card"
+                type="button"
+                @click="handleView(row)"
+              >
+                <span class="procurement-subcontract-mobile-card-title">{{
+                  row.requisitionCode || '-'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-status">
+                  <a-tag :color="row.stockOutFlag === 1 ? 'success' : 'default'">{{
+                    row.stockOutFlag === 1 ? '已出库' : '未出库'
+                  }}</a-tag>
+                </span>
+                <span class="procurement-subcontract-mobile-card-subtitle">{{
+                  row.projectName || '未关联项目'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-meta"
+                  >{{ row.warehouseId ? '已指定仓库' : '仓库待维护' }} ·
+                  {{ row.requisitionDate || '日期待维护' }}</span
+                >
+              </button>
+            </div>
           </div>
 
           <!-- 分页 -->
@@ -422,14 +436,18 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail requisition-analysis-rail" aria-label="领料申请辅助分析">
+      <aside
+        class="lg-analysis-rail requisition-analysis-rail procurement-subcontract-analysis-rail"
+        aria-label="领料申请辅助分析"
+      >
         <div class="lg-analysis-panel lg-fill-card requisition-analysis-panel">
-          <header class="requisition-analysis-head">
+          <header class="requisition-analysis-head lg-analysis-header">
             <div>
-              <div class="requisition-analysis-title">辅助分析</div>
-              <div class="requisition-analysis-subtitle">出库、审批与近期单据</div>
+              <div class="requisition-analysis-title lg-analysis-heading">辅助分析</div>
+              <div class="requisition-analysis-subtitle lg-analysis-description">
+                出库、审批与近期单据
+              </div>
             </div>
-            <a-button type="link" size="small" @click="fetchData">刷新</a-button>
           </header>
           <section class="requisition-analysis-focus">
             <span>本页重点</span>
@@ -462,15 +480,13 @@ onMounted(() => {
               <strong>审批状态</strong>
               <span>{{ pendingApprovalCount }} 待处理</span>
             </div>
-            <div class="requisition-chip-list">
-              <span
-                v-for="item in approvalSummary"
-                :key="item.label"
-                class="requisition-chip"
-                :style="{ borderColor: item.color, color: item.color }"
-              >
-                {{ item.label }} {{ item.count }}
-              </span>
+            <div class="lg-analysis-distribution-list">
+              <div v-for="item in approvalSummary" :key="item.label" class="lg-type-row">
+                <span class="lg-type-dot" :style="{ background: item.color }"></span>
+                <span class="lg-type-label">{{ item.label }}</span>
+                <span class="lg-type-num">{{ item.count }}</span>
+                <span class="lg-type-pct">单</span>
+              </div>
             </div>
           </section>
           <section class="requisition-analysis-section">
@@ -728,8 +744,7 @@ onMounted(() => {
 }
 
 .requisition-bar-list,
-.requisition-recent-list,
-.requisition-chip-list {
+.requisition-recent-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -778,21 +793,6 @@ onMounted(() => {
   display: block;
   height: 100%;
   border-radius: inherit;
-}
-
-.requisition-chip-list {
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.requisition-chip {
-  padding: 5px 9px;
-  border: 1px solid;
-  border-radius: 999px;
-  font-size: 12px;
-  line-height: 18px;
-  background: #fff;
 }
 
 .requisition-recent-item {

@@ -5,20 +5,24 @@ defineProps<{
   recentRequests: { id: string; projectName?: string; requestCode: string }[]
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   refresh: []
 }>()
 </script>
 
 <template>
-  <aside class="lg-analysis-rail purchase-request-analysis-rail" aria-label="采购申请辅助分析">
+  <aside
+    class="lg-analysis-rail purchase-request-analysis-rail procurement-subcontract-analysis-rail"
+    aria-label="采购申请辅助分析"
+  >
     <div class="lg-analysis-panel lg-fill-card purchase-request-analysis-panel">
-      <header class="purchase-request-analysis-head">
+      <header class="purchase-request-analysis-head lg-analysis-header">
         <div>
-          <div class="purchase-request-analysis-title">申请分析</div>
-          <div class="purchase-request-analysis-subtitle">业务状态、审批状态与近期申请</div>
+          <div class="purchase-request-analysis-title lg-analysis-heading">辅助分析</div>
+          <div class="purchase-request-analysis-subtitle lg-analysis-description">
+            业务状态、审批状态与近期申请
+          </div>
         </div>
-        <a-button type="link" size="small" @click="emit('refresh')">刷新</a-button>
       </header>
 
       <section class="purchase-request-analysis-section">

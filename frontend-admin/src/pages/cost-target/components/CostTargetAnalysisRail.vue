@@ -14,10 +14,6 @@ const props = defineProps<{
   recentTargets: CostTargetVO[]
 }>()
 
-const emit = defineEmits<{
-  refresh: []
-}>()
-
 function targetPercent(value: number): number {
   if (!props.total) return 0
   return Math.round((value / props.total) * 100)
@@ -25,13 +21,16 @@ function targetPercent(value: number): number {
 </script>
 
 <template>
-  <aside class="lg-analysis-rail ct-analysis-rail" aria-label="成本目标辅助分析">
+  <aside
+    class="lg-analysis-rail ct-analysis-rail project-operation-analysis-rail"
+    aria-label="成本目标辅助分析"
+  >
     <div class="lg-analysis-panel lg-fill-card ct-analysis-panel">
-      <header class="ct-analysis-head">
+      <header class="ct-analysis-head lg-analysis-header">
         <div>
-          <div class="ct-analysis-title">成本目标分析</div>
+          <div class="ct-analysis-title lg-analysis-heading">辅助分析</div>
+          <div class="lg-analysis-description">审批状态、金额与近期目标</div>
         </div>
-        <a-button type="link" size="small" @click="emit('refresh')">刷新</a-button>
       </header>
 
       <section class="ct-analysis-section">

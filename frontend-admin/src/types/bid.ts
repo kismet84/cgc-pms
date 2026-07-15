@@ -12,6 +12,11 @@ export interface BidCostCreatePayload {
   remark?: string
 }
 
+export interface BidCostUpdatePayload {
+  bidProjectName: string
+  remark?: string
+}
+
 export interface BidCostVO {
   id: string
   projectId?: string | null

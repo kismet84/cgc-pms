@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   AppstoreOutlined,
+  FilterOutlined,
   InboxOutlined,
   LoginOutlined,
   LogoutOutlined,
@@ -15,6 +16,7 @@ import type { WarehouseVO } from '@/types/inventory'
 import type { SelectOption } from '@/types/ui'
 
 const activeTab = ref<'in' | 'out'>('in')
+const filterPanelOpen = ref(false)
 
 const warehouseList = ref<WarehouseVO[]>([])
 const referenceStore = useReferenceStore()
@@ -153,7 +155,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page transaction-page">
+  <div class="lg-list-page lg-page app-page transaction-page procurement-subcontract-list-page">
     <!-- 页面头部 -->
     <div class="lg-page-head transaction-page-head">
       <div class="transaction-page-meta">
@@ -197,8 +199,11 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="lg-search-bar transaction-search-bar">
-          <div class="transaction-search-fields">
+        <div class="lg-search-bar transaction-search-bar procurement-subcontract-query-panel">
+          <div
+            class="transaction-search-fields procurement-subcontract-filter-panel"
+            :class="{ 'is-open': filterPanelOpen }"
+          >
             <a-select
               v-model:value="activeForm.warehouseId"
               placeholder="选择仓库"
@@ -245,7 +250,7 @@ onMounted(() => {
               </a-select-option>
             </a-select>
           </div>
-          <div class="transaction-search-keyword-row">
+          <div class="transaction-search-keyword-row procurement-subcontract-query-row">
             <a-input
               v-model:value="keyword"
               class="transaction-search-input"
@@ -258,14 +263,36 @@ onMounted(() => {
                 <SearchOutlined />
               </template>
             </a-input>
-            <div class="transaction-search-actions">
-              <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-              <a-button size="large" @click="handleReset">重置</a-button>
+            <div class="transaction-search-actions procurement-subcontract-query-actions">
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                type="primary"
+                size="large"
+                @click="handleSearch"
+                >搜索</a-button
+              >
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                size="large"
+                @click="handleReset"
+                >重置</a-button
+              >
+              <a-button
+                class="procurement-subcontract-filter-toggle"
+                size="large"
+                :aria-expanded="filterPanelOpen"
+                @click="filterPanelOpen = !filterPanelOpen"
+              >
+                <template #icon><FilterOutlined /></template>
+                筛选
+              </a-button>
             </div>
           </div>
         </div>
 
-        <main class="lg-list-table-panel transaction-form-panel">
+        <main
+          class="lg-list-table-panel transaction-form-panel procurement-subcontract-table-panel"
+        >
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
               <span class="transaction-section-title">库存变动登记</span>
@@ -380,27 +407,32 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail transaction-rail">
+      <aside class="lg-analysis-rail transaction-rail procurement-subcontract-analysis-rail">
         <section class="lg-analysis-panel transaction-analysis-panel transaction-rail-card">
-          <header class="transaction-analysis-head">
+          <header class="transaction-analysis-head lg-analysis-header">
             <div>
-              <div class="transaction-rail-title">操作提示</div>
-              <div class="transaction-analysis-subtitle">入库、出库与权限状态</div>
+              <div class="transaction-rail-title lg-analysis-heading">辅助分析</div>
+              <div class="transaction-analysis-subtitle lg-analysis-description">
+                操作提示与库存域入口
+              </div>
             </div>
           </header>
-          <ul class="transaction-rail-list">
-            <li><span>入库</span><b>增加可用库存</b></li>
-            <li><span>出库</span><b>扣减可用库存</b></li>
-            <li>
-              <span>权限</span><b>{{ canSubmitTransaction ? '可提交' : '仅查看' }}</b>
-            </li>
-          </ul>
-        </section>
-        <section class="lg-analysis-panel transaction-analysis-panel transaction-rail-card">
-          <div class="transaction-rail-title">库存域入口</div>
-          <div class="transaction-rail-text">
-            登记完成后可返回库存台账，按仓库、物料或来源单据搜索流水。
-          </div>
+          <section class="transaction-analysis-section">
+            <div class="transaction-rail-title">操作提示</div>
+            <ul class="transaction-rail-list">
+              <li><span>入库</span><b>增加可用库存</b></li>
+              <li><span>出库</span><b>扣减可用库存</b></li>
+              <li>
+                <span>权限</span><b>{{ canSubmitTransaction ? '可提交' : '仅查看' }}</b>
+              </li>
+            </ul>
+          </section>
+          <section class="transaction-analysis-section">
+            <div class="transaction-rail-title">库存域入口</div>
+            <div class="transaction-rail-text">
+              登记完成后可返回库存台账，按仓库、物料或来源单据搜索流水。
+            </div>
+          </section>
         </section>
       </aside>
     </div>
@@ -628,7 +660,7 @@ onMounted(() => {
 }
 
 .transaction-rail-card {
-  padding: 16px;
+  padding: 0;
 }
 
 .transaction-analysis-panel {
@@ -637,7 +669,18 @@ onMounted(() => {
 }
 
 .transaction-analysis-head {
-  margin-bottom: 12px;
+  margin-bottom: 0;
+}
+
+.transaction-analysis-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
+.transaction-analysis-section + .transaction-analysis-section {
+  border-top: 1px solid var(--border-subtle);
 }
 
 .transaction-rail-title {

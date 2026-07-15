@@ -53,14 +53,14 @@ describe('SubcontractMeasurePage submit-approval button', () => {
       /<div class="lg-grid subcontract-measure-workspace">[\s\S]*<div class="lg-left subcontract-measure-main-column">[\s\S]*<\/main>\s*<\/div>\s*<SubcontractMeasureAnalysisRail/,
     )
     expect(analysisRailSource).toContain(
-      '<aside class="lg-analysis-rail subcontract-measure-analysis-rail"',
+      'subcontract-measure-analysis-rail procurement-subcontract-analysis-rail',
     )
   })
 
   it('keeps the key page shell classes and core action entry', () => {
-    expect(source).toContain('class="lg-list-page lg-page app-page subcontract-measure-page"')
-    expect(source).toContain('class="lg-search-bar subcontract-measure-search-bar"')
-    expect(source).toContain('class="lg-list-table-panel subcontract-measure-table-panel"')
+    expect(source).toContain('subcontract-measure-page procurement-subcontract-list-page')
+    expect(source).toContain('subcontract-measure-search-bar procurement-subcontract-query-panel')
+    expect(source).toContain('subcontract-measure-table-panel procurement-subcontract-table-panel')
     expect(source).toContain('class="subcontract-measure-code-link"')
     expect(source).toContain('@click="handleAdd"')
   })

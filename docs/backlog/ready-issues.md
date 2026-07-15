@@ -4,7 +4,407 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-032` 已完成；本次 `自动迭代-1` 达到一条上限，当前无待实施 Ready。
+`ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
+
+### ISSUE-040-038：投标成本受控删除入口与状态租户边界
+
+优先级：P1
+任务性质：缺口修复
+类型：投标成本 / 删除 / 二次确认 / 权限 / 租户 / 状态
+状态：Done
+来源锚点：项目知识图谱当前问题 `A-01-BID-DELETE`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=0d63f6739d0d2dcbc7610ec3c61e1bbc276ca7b0
+存量问题键：[stock:A-01-BID-DELETE]
+归档报告：`docs/quality/ISSUE-040-038-投标成本受控删除入口与状态租户边界验收报告.md`
+Migration：需要
+Migration说明：MySQL/H2 V153 仅注册 `bid:delete` BUTTON 并绑定既有 SUPER_ADMIN、ADMIN、COST_MANAGER。
+依赖：复用 `/bid-cost` 页面、既有 `DELETE /bid-cost/{id}`、`BidCostService.delete` 的认证租户隐藏与 BIDDING 状态门禁。
+风险等级：高
+运行态要求：仅 local/dev/test；浏览器只打开并取消删除确认，不提交 DELETE、不新增、修改、删除或重置业务数据。
+Reviewer要求：确认删除入口仅对 `bid:delete` 或管理员可见且只在 BIDDING 行展示；确认文案包含目标名称；取消不请求，失败不移除行或伪报成功；后端401/403、跨租户/不存在统一隐藏、非 BIDDING 拒绝。
+最小回滚：回退 V153、前端删除 API/确认入口/测试及治理回写；后端生产删除逻辑不变，浏览器无数据回滚。
+目标：
+- 为 BIDDING 投标提供桌面和移动受控删除入口，以目标项目名称二次确认。
+- 注册独立 `bid:delete` 权限；成功后刷新服务端列表，失败保留当前行并显示错误。
+- 补齐权限、租户、状态、请求契约和取消不写入证据。
+非目标：
+- 不实现批量删除、撤销/恢复、物理清理、中标、失标或关联项目/金额/成本项修改。
+- 不修改后端生产 Service、实体、Mapper、状态结转或冲销逻辑，不新增路由、页面或表。
+- 不连接/发布生产、不 push；浏览器不确认删除。
+允许修改：
+- `backend/src/main/resources/db/migration/V153__add_bid_cost_delete_permission.sql`
+- `backend/src/main/resources/db/migration-h2/V153__add_bid_cost_delete_permission.sql`
+- `backend/src/test/java/com/cgcpms/bid/BidCostControllerTest.java`
+- `frontend-admin/src/api/modules/bid.ts`
+- `frontend-admin/src/api/modules/__tests__/bid.test.ts`
+- `frontend-admin/src/pages/bid-cost/index.vue`
+- `frontend-admin/src/pages/bid-cost/__tests__/index.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-038-投标成本受控删除入口与状态租户边界验收报告.md`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration/V150__*`
+- `backend/src/main/resources/db/migration/V151__*`
+- `backend/src/main/resources/db/migration/V152__*`
+- `backend/src/main/resources/db/migration-h2/V150__*`
+- `backend/src/main/resources/db/migration-h2/V151__*`
+- `backend/src/main/resources/db/migration-h2/V152__*`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `frontend-admin/src/types/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 精确调用 `DELETE /bid-cost/{id}`，不发送 params、body、tenantId 或其他业务字段。
+- 入口仅对 `bid:delete` 或 ADMIN/SUPER_ADMIN 可见且仅 BIDDING 展示；确认文案包含项目名称；取消不请求，成功刷新，失败保留当前行。
+- 未登录401、无 `bid:delete` 403、显式权限或管理员成功；跨租户/不存在统一 `BID_COST_NOT_FOUND`，WON/LOST 返回 `BID_STATUS_NOT_DELETABLE`。
+- V153 两方言等价且只绑定既有三类角色；列表、新建、详情、编辑、状态动作和金额事实不回退。
+- 收口移除 `A-01-BID-DELETE`，A-01 更新为有用户入口243、需补入口5；新增后续项0、关闭1、净变化-1。
+- Ready lint、后端专项、前端专项、类型、ESLint、SQL 静态、diff 与只取消浏览器验收通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-038`
+- `cd backend; .\mvnw.cmd "-Dtest=BidCostControllerTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
+- `git diff --check`
+
+收口结论：独立 `bid:delete`、桌面/移动 BIDDING 可见性、目标名称二次确认、取消不请求、成功刷新与失败保留均通过；后端专项证明401/403、显式权限、管理员、跨租户隐藏及 WON/LOST 拒绝。Docker 5173 端口转发失效归类为环境前置，改用同工作区原生 Vite 后完成205秒稳定观察与浏览器取消闭环，DELETE 计数保持0。`A-01-BID-DELETE` 已移除；新增后续项0、关闭后续项1、净变化-1。
+
+### ISSUE-040-037：投标成本受控修改入口与状态租户边界
+
+优先级：P1
+任务性质：缺口修复
+类型：投标成本 / 修改 / 白名单 DTO / 权限 / 租户 / 状态
+状态：Done
+来源锚点：项目知识图谱当前问题 `A-01-BID-UPDATE`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=0a801fb178c4a380bfb237d5b23ba65d5edca081
+存量问题键：[stock:A-01-BID-UPDATE]
+归档报告：`docs/quality/ISSUE-040-037-投标成本受控修改入口与状态租户边界验收报告.md`
+Migration：需要
+Migration说明：MySQL/H2 V152 仅注册 `bid:edit` BUTTON 并绑定既有 SUPER_ADMIN、ADMIN、COST_MANAGER。
+依赖：复用 `/bid-cost` 页面、详情、新建 DTO 约束、`PUT /bid-cost/{id}`、BIDDING 状态与租户隐藏语义。
+风险等级：高
+运行态要求：仅 local/dev/test；浏览器仅打开并取消编辑，不提交 PUT 或写业务数据。
+Reviewer要求：确认更新 DTO/Service 仅写名称和备注，客户端字段不能覆盖 ID、tenantId、projectId、bidStatus、金额或审计事实；非 BIDDING 和跨租户 fail-close。
+最小回滚：回退 V152、更新 DTO/白名单、前端编辑/API/测试及治理回写；浏览器无数据回滚。
+目标：
+- 为 BIDDING 投标提供桌面和移动受控编辑入口，仅修改名称与备注。
+- 服务端把实体直写收敛为专用 DTO 和既有实体白名单更新。
+- 注册独立 `bid:edit` 权限并补齐权限、租户、状态和不可覆盖字段证据。
+非目标：
+- 不修改状态、关联项目、金额/成本项，不实现删除、中标、失标或批量编辑。
+- 不新增路由、页面或表，不改变成本结转/冲销逻辑。
+- 不连接/发布生产、不 push；浏览器不提交编辑。
+允许修改：
+- `backend/src/main/java/com/cgcpms/bid/controller/BidCostController.java`
+- `backend/src/main/java/com/cgcpms/bid/service/BidCostService.java`
+- `backend/src/main/java/com/cgcpms/bid/dto/BidCostUpdateRequest.java`
+- `backend/src/main/resources/db/migration/V152__add_bid_cost_edit_permission.sql`
+- `backend/src/main/resources/db/migration-h2/V152__add_bid_cost_edit_permission.sql`
+- `backend/src/test/java/com/cgcpms/bid/BidCostControllerTest.java`
+- `frontend-admin/src/types/bid.ts`
+- `frontend-admin/src/api/modules/bid.ts`
+- `frontend-admin/src/api/modules/__tests__/bid.test.ts`
+- `frontend-admin/src/pages/bid-cost/index.vue`
+- `frontend-admin/src/pages/bid-cost/__tests__/index.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-037-投标成本受控修改入口与状态租户边界验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/V150__*`
+- `backend/src/main/resources/db/migration/V151__*`
+- `backend/src/main/resources/db/migration-h2/V150__*`
+- `backend/src/main/resources/db/migration-h2/V151__*`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- PUT body 仅含 trim 后名称与可选备注；路径 ID 为唯一目标，tenantId/projectId/bidStatus/金额/审计字段不可覆盖。
+- 入口仅对 `bid:edit` 或管理员可见且仅 BIDDING 展示；取消不请求，成功刷新，失败保留表单。
+- 401/403、合法修改、跨租户/不存在统一隐藏、非 BIDDING 拒绝及白名单不变量通过。
+- V152 两方言等价且只绑定既有三类角色；列表、新建、详情和金额事实不回退。
+- 收口移除 `A-01-BID-UPDATE`，A-01 更新为有用户入口242、需补入口6；新增后续项0、关闭1、净变化-1。
+- Ready lint、后端专项、前端专项、类型、ESLint、SQL 静态、diff 与只取消浏览器验收通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-037`
+- `cd backend; .\mvnw.cmd "-Dtest=BidCostControllerTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/types/bid.ts src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
+- `git diff --check`
+
+收口结论：名称/备注白名单修改、独立 `bid:edit`、租户隐藏、BIDDING 状态门禁及客户端越权字段不可覆盖均通过；审查中发现并修复原状态接口复用 `bid:edit` 的权限耦合，状态迁移改用 `bid:status` 且专项证明编辑权限不能迁移状态。浏览器只打开并取消编辑，后端 PUT 前后均为0。`A-01-BID-UPDATE` 已从唯一台账移除；新增后续项0、关闭后续项1、后续项净变化-1。
+
+### ISSUE-040-036：项目受控归档入口与项目数据范围
+
+优先级：P1
+任务性质：缺口修复
+类型：项目 / 归档 / 写操作 / 权限 / 项目数据范围 / 依赖门禁
+状态：Done
+来源锚点：项目知识图谱当前问题 `A-01-PROJECT-ARCHIVE`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=688fc11553918cb2c25c46a9ae2dc83225a2a1af
+存量问题键：[stock:A-01-PROJECT-ARCHIVE]
+归档报告：`docs/quality/ISSUE-040-036-项目受控归档入口与项目数据范围验收报告.md`
+Migration：不需要
+依赖：复用现有项目列表、项目 API、`PUT /projects/{id}/archive`、`project:edit`、`ProjectAccessChecker` 和 `PmProjectArchiveTest`。
+风险等级：高
+运行态要求：仅在 local/dev/test 验收；先通过三项 health gate，浏览器只打开并取消归档确认，不确认归档、不新增、修改、删除或重置业务数据。
+Reviewer要求：复核入口仅对 `project:edit` 或管理员可见且已归档行隐藏；后端在依赖查询前执行项目数据范围校验；跨租户、无项目范围、重复归档及活动依赖均 fail-close。
+最小回滚：回退项目归档 API、列表动作、数据范围补强、专项测试及治理回写；浏览器不写数据，不需要数据回滚。
+目标：
+- 在桌面项目列表的既有操作菜单增加受控“归档”动作，明确展示项目名称并要求二次确认。
+- 精确调用既有项目归档接口；成功后刷新列表，失败保留当前列表并展示服务端门禁原因。
+- 补齐服务端项目数据范围检查及前后端权限、状态、依赖门禁测试。
+非目标：
+- 不开放移动端写操作，不实现批量归档、撤销归档、物理删除或自动关闭依赖。
+- 不改变项目归档状态值、合同/付款/结算/流程门禁规则，不新增路由、菜单、权限码或数据库迁移。
+- 不连接生产、不发布生产、不自动 push；浏览器验收不提交归档。
+允许修改：
+- `backend/src/main/java/com/cgcpms/project/service/PmProjectService.java`
+- `backend/src/test/java/com/cgcpms/project/PmProjectArchiveTest.java`
+- `backend/src/test/java/com/cgcpms/project/PmProjectControllerTest.java`
+- `frontend-admin/src/api/modules/project.ts`
+- `frontend-admin/src/pages/project/index.vue`
+- `frontend-admin/src/pages/project/components/ProjectTablePanel.vue`
+- `frontend-admin/src/pages/project/__tests__/ProjectLedgerProduction.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-036-项目受控归档入口与项目数据范围验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 精确调用 `PUT /projects/{id}/archive`，不发送 params、body、tenantId 或其他项目字段。
+- 归档入口仅对 `project:edit` 或 ADMIN/SUPER_ADMIN 可见，仅未归档行展示；确认文案包含项目名称，取消不发请求，成功刷新，失败不删除或伪改列表。
+- 未登录401、无 `project:edit` 403；具备权限但无项目数据范围403；跨租户隐藏；管理员或可访问项目用户进入既有活动合同、付款、结算、流程、重复归档门禁。
+- 归档 Service 在依赖查询和状态更新前复用 `ProjectAccessChecker`；物理删除、项目编辑、列表、移动卡片及现有依赖判断不回退。
+- 收口移除 `A-01-PROJECT-ARCHIVE`，A-01 更新为有用户入口241、需补入口7；新增后续项0、关闭后续项1、净变化-1。
+- Ready lint、前后端专项、类型检查、目标 ESLint、`git diff --check` 和只取消不提交的浏览器验收通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-036`
+- `cd backend; .\mvnw.cmd "-Dtest=PmProjectArchiveTest,PmProjectControllerTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/pages/project/__tests__/ProjectLedgerProduction.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/project.ts src/pages/project/index.vue src/pages/project/components/ProjectTablePanel.vue src/pages/project/__tests__/ProjectLedgerProduction.test.ts`
+- `git diff --check`
+
+收口结论：项目归档精确 PUT、权限可见性、二次确认、项目数据范围、跨租户隐藏和既有四类依赖门禁均通过自动化与 180 秒稳定运行态验收；浏览器只取消确认且后端归档 PUT 前后均为0。`A-01-PROJECT-ARCHIVE` 已从唯一台账移除；新增后续项0、关闭后续项1、后续项净变化-1。
+
+### ISSUE-040-035：间接费规则只读列表入口与租户边界
+
+优先级：P1
+任务性质：缺口修复
+类型：间接费 / 规则列表 / 用户入口 / 权限 / 租户隔离
+状态：Done
+来源锚点：项目知识图谱当前问题 `A-01-OVERHEAD-LIST`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=5cec5beb458496888a7e62f6da76704a79b06cd1
+存量问题键：[stock:A-01-OVERHEAD-LIST]
+归档报告：`docs/quality/ISSUE-040-035-间接费规则只读列表入口与租户边界验收报告.md`
+Migration：不需要
+依赖：复用成本台账页面、成本 API、`GET /overhead-allocation/rules`、`overhead:query` 与既有 Controller/Service 测试。
+风险等级：高
+运行态要求：仅在 local/dev/test 以只读方式验收；先通过三项 health gate，不新增、修改、删除或重置规则及成本数据。
+Reviewer要求：复核列表入口仅对 `overhead:query` 或管理员可见，请求不含 tenantId，跨租户数据不可见；不得放宽执行权限或引入规则写操作。
+最小回滚：回退前端规则类型/API/弹窗入口、专项测试及治理回写，不涉及数据回滚。
+目标：
+- 在现有成本台账页为具备间接费查询权限的用户或管理员提供规则只读列表弹窗。
+- 展示成本科目 ID、分摊依据、周期和状态，支持服务端分页；失败保留弹窗且不显示旧数据。
+- 补齐前后端权限、租户、请求契约及页面交互测试。
+非目标：
+- 不实现规则新建、修改、删除、执行或详情，不新增路由、菜单、权限码或数据库迁移。
+- 不修改后端生产代码、成本科目模型、分摊算法或金额事实。
+- 不连接生产、不发布生产、不自动 push，不写业务数据。
+允许修改：
+- `frontend-admin/src/api/modules/cost.ts`
+- `frontend-admin/src/pages/cost/ledger.vue`
+- `frontend-admin/src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `backend/src/test/java/com/cgcpms/overhead/OverheadAllocationControllerTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-035-间接费规则只读列表入口与租户边界验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 精确调用 `GET /overhead-allocation/rules`，params 仅含 pageNo/pageSize，不含 tenantId、body 或写操作。
+- 入口仅对 `overhead:query` 或 ADMIN/SUPER_ADMIN 可见；打开加载第一页，分页加载，失败清空旧数据并保留弹窗。
+- 未登录返回401，无权限403，`overhead:query` 或管理员成功；Service 使用认证 tenantId，跨租户规则不返回。
+- 既有间接费执行权限、月份校验、幂等与成本台账能力不回退；收口移除 `A-01-OVERHEAD-LIST`，A-01 更新为有用户入口240、需补入口8。
+- 新增后续项0、关闭后续项1、净变化-1；Ready lint、前后端专项、类型检查、目标 ESLint、`git diff --check` 通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-035`
+- `cd backend; .\mvnw.cmd "-Dtest=OverheadAllocationControllerTest,TenantBoundaryTask2Test" test`
+- `cd frontend-admin; pnpm test:unit -- src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/cost.ts src/pages/cost/ledger.vue src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `git diff --check`
+
+收口结论：间接费规则只读入口、服务端分页、失败清空与请求竞态门禁、权限和认证租户边界均通过自动化及 180 秒稳定运行态验收；`A-01-OVERHEAD-LIST` 已从唯一台账移除。新增后续项0、关闭后续项1、后续项净变化-1。
+
+### ISSUE-040-034：工作流个人效率统计只读入口与数据范围
+
+优先级：P1
+任务性质：缺口修复
+类型：工作流 / 用户入口 / 个人效率 / 只读统计 / 身份与租户隔离
+状态：Done
+来源锚点：项目知识图谱当前问题 `A-01-WORKFLOW-EFFICIENCY`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=4365b297325c0b20528375a0e7f82449bfdae918
+存量问题键：[stock:A-01-WORKFLOW-EFFICIENCY]
+归档报告：`docs/quality/ISSUE-040-034-工作流个人效率统计只读入口与数据范围验收报告.md`
+Migration：不需要
+依赖：复用现有审批工作台、筛选条件、`GET /workflow/statistics/efficiency`、`WfEfficiencyVO` 与 `WorkflowQueryService.getMyEfficiency`。
+风险等级：高
+运行态要求：仅在 local/dev/test 验证；浏览器验收前检查 8080 health、5173 与 dev-login，失败先按环境前置处理；验收只读，不创建、修改、删除或重置数据。
+Reviewer要求：复核请求只携带当前筛选和 overdueHours，不携带 userId/tenantId；接口仅使用认证用户与租户，失败不展示旧统计；后端统计口径和既有审批列表不回退。
+最小回滚：回退本 Issue 的前端类型、API、分析栏展示、专项测试及治理回写；不修改后端生产逻辑或数据。
+目标：
+- 为现有审批工作台增加个人效率只读统计，展示待办、逾期待办、已办、已处理任务和平均处理分钟数。
+- 统计请求复用当前关键词、业务类型、实例状态和时间筛选，固定 48 小时逾期阈值；列表筛选刷新时同步刷新统计。
+- 补齐前端契约测试，并以既有后端查询服务测试证明用户、租户和统计口径。
+非目标：
+- 不新增路由、菜单、权限码、后端生产代码、数据库迁移或跨用户/跨租户统计。
+- 不新增图表平台、导出、团队排名、趋势预测或可配置阈值。
+- 不连接生产、不发布生产、不自动 push，不写业务数据。
+允许修改：
+- `frontend-admin/src/api/modules/workflow.ts`
+- `frontend-admin/src/pages/approval/todo.vue`
+- `frontend-admin/src/pages/approval/__tests__/ApprovalWorkList.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-034-工作流个人效率统计只读入口与数据范围验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 精确调用 `GET /workflow/statistics/efficiency`，params 仅来自当前筛选并含 `overdueHours: 48`，不含 userId、tenantId、body 或写请求。
+- 分析栏显示五项个人效率；加载或失败时不展示旧统计，列表筛选、重置、分页、四个审批 tab 与移动端布局不回退。
+- 既有 `WorkflowQueryServiceTest` 证明 tenantId、userId、筛选、逾期和平均处理时长口径；未认证接口仍由 `isAuthenticated()` fail-close。
+- 收口移除 `A-01-WORKFLOW-EFFICIENCY`，更新 A-01 守恒、Ready、current-focus、project-map；新增后续项0、关闭后续项1、净变化-1。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint 与 `git diff --check` 通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-034`
+- `cd backend; .\mvnw.cmd "-Dtest=WorkflowQueryServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/pages/approval/__tests__/ApprovalWorkList.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/workflow.ts src/pages/approval/todo.vue src/pages/approval/__tests__/ApprovalWorkList.test.ts`
+- `git diff --check`
+
+收口结论：个人效率统计 API、当前筛选同步、请求竞态门禁、五项分析栏展示、身份与租户统计口径均通过自动化和 180 秒稳定运行态验收；`A-01-WORKFLOW-EFFICIENCY` 已从唯一台账移除。新增后续项0、关闭后续项1、后续项净变化-1。
+
+### ISSUE-040-033：投标成本详情只读入口与租户边界
+
+优先级：P1
+任务性质：缺口修复
+类型：投标成本 / 用户入口 / 只读详情 / 权限 / 租户隔离 / 不存在记录 fail-close
+状态：Done
+来源锚点：项目知识图谱当前问题 `A-01-BID-DETAIL`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；候选证据基于当前 HEAD `d28d71a83a6709560166e028d64bf5b72a365ccd`。
+存量问题键：[stock:A-01-BID-DETAIL]
+关联产品目标：在既有投标成本列表提供最小只读详情入口，让具备 `bid:query` 的用户查看当前租户投标头信息，同时保持跨租户与不存在记录统一隐藏。
+核验结论：问题仍存在——后端 `GET /bid-cost/{id}` 已由 `bid:query` 或 ADMIN/SUPER_ADMIN 保护，`BidCostService.requireExisting` 对不存在和跨租户记录统一抛出 `BID_COST_NOT_FOUND`；前端同域 API 与 `/bid-cost` 页面只实现列表和受控新建，没有详情请求或入口，现有 Controller 测试也未精确覆盖详情权限与跨租户拒绝路径。
+候选对比：当前 P1 Open 叶子中，DETAIL 复用刚完成的投标列表页面与既有只读接口，不新增状态、金额或业务写入；UPDATE/DELETE/WON/LOST 和间接费 CRUD 均涉及写状态、金额或删除，风险与回滚成本更高，因此本次单 Issue 金丝雀选择 DETAIL。
+检索交叉核验：CodeGraph 命中 `BidCostController.getById`、`BidCostService.getById/requireExisting` 与租户判断，但未完整召回前端同域精确文件，归类为工具召回不足；已用 `rg` 和直接文件读取确认前端缺口，并由只读 `codebase-memory-mcp` 交叉确认 Controller→Service 以及前后端 `/bid-cost` 关系。最终以当前分支源码、唯一台账与源报告为准。
+阻塞证据：具备查询权限的用户只能从列表看到有限列，无法访问后端已有详情；详情接口缺少未登录、无权限、跨租户和不存在记录的精确集成测试证据。
+解除条件：前端增加类型化详情 GET 并在桌面表格和移动卡片提供只读详情入口；详情弹窗覆盖加载、成功、失败保留和关闭重开；后端详情的 401、403、跨租户与不存在记录 fail-close、合法读取证据齐全，列表与新建能力不回退。
+Migration：不需要
+依赖：复用既有 `/bid-cost` 页面、`BidCostVO`、类型化 request、`GET /bid-cost/{id}`、`BidCostController`、`BidCostService.requireExisting`、V150 `bid:query` 菜单权限及现有前后端测试夹具；不新增路由、菜单、权限码、后端主代码、表或状态机。
+风险等级：高
+风险说明：详情会扩大单条租户业务数据的前端可达性，必须证明无 `bid:query`、跨租户和不存在记录均 fail-close，且前端不发送 tenantId、不引入写操作。
+运行态要求：自动化只在 local/dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，任一失败先归类为环境前置并执行 runtime refresh，稳定等待180秒后复验；浏览器只读打开现有投标详情，不创建、修改、删除或重置业务数据。
+Reviewer要求：按高风险只读权限与租户边界复核；确认前端只向所选记录 ID 发起 GET、无 tenantId/请求体/写操作，详情入口不另行放宽权限；复核后端 401、无权限403、跨租户与不存在记录统一隐藏、合法读取，页面失败不伪报空数据，列表、新建、筛选、分页与移动端布局不回退；对绑定 diff 给出 PASS/NEEDS_REPAIR。
+归档报告：`docs/quality/ISSUE-040-033-投标成本详情只读入口与租户边界验收报告.md`
+最小回滚：回退本 Issue 的前端详情 API、页面入口/弹窗、专项测试与治理回写，以及后端新增的详情安全测试；不删除或重置投标、项目或成本数据，不改变既有接口、列表、新建、状态和金额逻辑。
+目标：
+- 在投标 API 增加类型化详情请求，只调用既有 `GET /bid-cost/{id}`，不发送 tenantId、params、body 或写请求。
+- 在既有投标成本页为桌面表格与移动卡片增加只读详情入口，以弹窗展示项目名称、状态、关联项目、备注、创建和更新时间，覆盖加载、失败保留与关闭重开。
+- 补齐前端 API/页面契约测试，并在既有后端 Controller 集成测试中增加详情权限、租户及不存在记录的精确样本。
+非目标：
+- 不开放编辑、删除、中标、失标、项目转换、金额/成本项、批量、导入或导出，不新增详情路由或独立页面。
+- 不修改后端 Controller/Service/实体/Mapper、数据库迁移、菜单、权限码、状态机、成本汇总或项目访问规则，不在前端显示 tenantId 或审计主体字段。
+- 不连接生产数据库、不发布生产、不自动 push，不新增、修改、删除或重置本地业务数据。
+允许修改：
+- `backend/src/test/java/com/cgcpms/bid/BidCostControllerTest.java`
+- `frontend-admin/src/api/modules/bid.ts`
+- `frontend-admin/src/api/modules/__tests__/bid.test.ts`
+- `frontend-admin/src/pages/bid-cost/index.vue`
+- `frontend-admin/src/pages/bid-cost/__tests__/index.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-040-033-投标成本详情只读入口与租户边界验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/test/java/com/cgcpms/bid/BidCostServiceTest.java`
+- `frontend-admin/src/types/bid.ts`
+- `frontend-admin/src/api/request.ts`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 前端 API 测试精确断言详情请求为 `GET /bid-cost/{id}`，无 body、params 与 tenantId；复用 `BidCostVO`，不新增或展示租户字段。
+- 桌面表格与移动卡片均可打开详情；点击后显示加载态，成功展示项目名称、状态、关联项目、备注、创建和更新时间；失败显示错误并保持弹窗可见且不展示上一条记录，关闭后清空，再次打开按当前记录重新请求。
+- 未登录详情请求返回401；已登录但无 `bid:query` 返回403；持 `bid:query` 或 ADMIN/SUPER_ADMIN 可读取当前租户记录；跨租户 ID 与不存在 ID 均返回相同业务错误且不泄露记录内容。
+- 既有列表查询、筛选、分页、空态、受控新建及移动端列表测试不回退；浏览器验收只读打开现有记录详情，控制台无新增 error/warn。
+- 收口必须引用 `docs/backlog/current-issues.json` 及本项 `sourceRefs`；全部通过后移除 `A-01-BID-DETAIL`，同步更新 A-01 守恒为有用户入口238、前端调用但无独立页面58、内部/集成/运维4、需补入口10、待废弃0、需要确认11、总数321，并回写 Ready、current-focus、project-map；若差距或优先级判断变化，再更新 evolution-decision。
+- 归档报告统计新增后续项、关闭后续项和后续项净变化；所有发现项必须本轮修复、唯一载体承接或有依据关闭，存在悬空项不得通过。权限、租户或不存在记录 fail-close 证据不足时判不通过。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint 与 `git diff --check` 全部通过；首次失败先按 tool_config、环境前置、真实质量/安全分类并复验。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-033`
+- `cd backend; .\mvnw.cmd "-Dtest=BidCostControllerTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
+- `git diff --check`
+
+收口结论：投标详情 API、桌面/移动入口、只读弹窗、请求竞态防护，以及 `bid:query`、401/403、跨租户与不存在记录 fail-close 均已通过自动化和运行态核验；`A-01-BID-DETAIL` 已从唯一台账移除。新增后续项0、关闭后续项1、后续项净变化-1。
 
 ### ISSUE-040-032：投标成本受控新建入口与租户状态边界
 

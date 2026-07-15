@@ -29,12 +29,16 @@ describe('purchase request modal filters', () => {
     expect(source).toContain(
       "import PurchaseRequestModal from './components/PurchaseRequestModal.vue'",
     )
-    expect(source).toContain('<div class="lg-list-page lg-page app-page purchase-request-page">')
+    expect(source).toContain('purchase-request-page procurement-subcontract-list-page')
     expect(source).toContain('<PurchaseRequestSearchBar')
     expect(source).toContain('<PurchaseRequestAnalysisPanel')
     expect(source).toContain('<PurchaseRequestModal')
-    expect(searchBarSource).toContain('class="lg-search-bar purchase-request-search-bar"')
-    expect(analysisPanelSource).toContain('class="lg-analysis-rail purchase-request-analysis-rail"')
+    expect(searchBarSource).toContain(
+      'purchase-request-search-bar procurement-subcontract-query-panel',
+    )
+    expect(analysisPanelSource).toContain(
+      'purchase-request-analysis-rail procurement-subcontract-analysis-rail',
+    )
   })
 
   it('uses a narrower material column', () => {

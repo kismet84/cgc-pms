@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -7,6 +7,7 @@ import {
   getProjectDetail,
   createProject,
   updateProject,
+  archiveProject,
   deleteProject,
 } from '@/api/modules/project'
 import {
@@ -16,6 +17,8 @@ import {
   formatWanAmountWithUnit,
 } from '@/composables/listTablePresets'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { useMobileViewport } from '@/composables/useMobileViewport'
+import { useUserStore } from '@/stores/user'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
 import { fetchDictData, getDictLabelSync } from '@/utils/dict'
@@ -28,15 +31,6 @@ const filter = reactive({
   projectType: undefined as string | undefined,
   status: undefined as string | undefined,
 })
-const filterVisibility = reactive({
-  projectType: true,
-  status: true,
-})
-const filterSettingItems = [
-  { key: 'projectType', label: '项目类型' },
-  { key: 'status', label: '状态' },
-] as const
-
 const loading = ref(false)
 const tableData = ref<ProjectVO[]>([])
 const total = ref(0)
@@ -47,6 +41,15 @@ const createVisible = ref(false)
 const createLoading = ref(false)
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
+const { isMobile } = useMobileViewport()
+const isProjectAdmin = computed(() =>
+  userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
+)
+const canArchiveProjects = computed(
+  () => isProjectAdmin.value || userStore.hasPermission('project:edit'),
+)
+const PROJECT_LIST_SCROLL_KEY = 'project-list-scroll-position'
 const createFormRef = ref()
 const createForm = reactive({
   projectName: '',
@@ -172,6 +175,28 @@ function handleDelete(record: ProjectVO) {
   })
 }
 
+function handleArchive(record: ProjectVO) {
+  Modal.confirm({
+    title: '确认归档项目',
+    content: `确定要归档项目“${record.projectName}”吗？归档前请确认合同、付款、结算和审批均已完成。`,
+    okText: '确认归档',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await archiveProject(record.id)
+        message.success('项目归档成功')
+        await fetchData()
+      } catch (error: unknown) {
+        console.error(error)
+        Modal.error({
+          title: '项目归档失败',
+          content: error instanceof Error ? error.message : '项目归档失败，请稍后重试',
+        })
+      }
+    },
+  })
+}
+
 async function handleCreateSubmit() {
   try {
     await createFormRef.value?.validate()
@@ -237,9 +262,6 @@ function handleReset() {
   pageNo.value = 1
   fetchData()
 }
-function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
-  filterVisibility[key] = !filterVisibility[key]
-}
 function handlePageChange(page: number) {
   pageNo.value = page
   fetchData()
@@ -284,15 +306,18 @@ onMounted(async () => {
   restoreFilterFromRoute()
   await fetchDictData(PROJECT_TYPE_DICT)
   await fetchData()
+  await nextTick()
+  const savedScroll = Number(sessionStorage.getItem(PROJECT_LIST_SCROLL_KEY))
+  if (Number.isFinite(savedScroll) && savedScroll > 0) {
+    window.scrollTo({ top: savedScroll })
+  }
+  sessionStorage.removeItem(PROJECT_LIST_SCROLL_KEY)
 })
 
-const MOBILE_BP = 768
-const isMobile = ref(window.innerWidth < MOBILE_BP)
-function onResize() {
-  isMobile.value = window.innerWidth < MOBILE_BP
+function openProjectOverview(record: ProjectVO) {
+  sessionStorage.setItem(PROJECT_LIST_SCROLL_KEY, String(window.scrollY))
+  router.push(`/project/${record.id}/overview`)
 }
-onMounted(() => window.addEventListener('resize', onResize))
-onUnmounted(() => window.removeEventListener('resize', onResize))
 
 function amountYuanToWan(val?: string): number | undefined {
   const amount = Number(val)
@@ -312,6 +337,7 @@ const STATUS_LABEL: Record<string, string> = {
   COMPLETED: '已竣工',
   SUSPENDED: '已暂停',
   CLOSED: '已关闭',
+  ARCHIVED: '已归档',
 }
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'processing',
@@ -320,6 +346,7 @@ const STATUS_COLOR: Record<string, string> = {
   COMPLETED: 'green',
   SUSPENDED: 'warning',
   CLOSED: 'error',
+  ARCHIVED: 'default',
 }
 
 const APPROVAL_STATUS_LABEL: Record<string, string> = {
@@ -370,7 +397,15 @@ const PROJECT_TYPE_LABEL: Record<string, string> = {
 }
 
 const PROJECT_TYPE_BASE_OPTIONS = Object.keys(PROJECT_TYPE_COLOR)
-const PROJECT_STATUS_OPTIONS = ['DRAFT', 'ACTIVE', 'ONGOING', 'COMPLETED', 'SUSPENDED', 'CLOSED']
+const PROJECT_STATUS_OPTIONS = [
+  'DRAFT',
+  'ACTIVE',
+  'ONGOING',
+  'COMPLETED',
+  'SUSPENDED',
+  'CLOSED',
+  'ARCHIVED',
+]
 
 function projectTypeLabel(value: string | undefined) {
   const label = getDictLabelSync(PROJECT_TYPE_DICT, value ?? '', PROJECT_TYPE_LABEL)
@@ -519,8 +554,11 @@ const {
 </script>
 
 <template>
-  <div class="project-list-page lg-list-page lg-page app-page">
-    <div class="lg-page-head project-page-head">
+  <div
+    class="project-list-page lg-list-page lg-page app-page"
+    :class="{ 'project-list-page--mobile': isMobile }"
+  >
+    <div v-if="!isMobile" class="lg-page-head project-page-head">
       <div class="project-page-meta-row">
         <a-breadcrumb class="project-breadcrumb">
           <a-breadcrumb-item>项目管理</a-breadcrumb-item>
@@ -687,15 +725,12 @@ const {
       <div class="lg-left project-main-column">
         <ProjectQueryPanel
           :filter="filter"
-          :filter-visibility="filterVisibility"
-          :filter-setting-items="filterSettingItems"
           :project-type-options="projectTypeOptions"
           :project-type-label="projectTypeLabel"
           :project-status-options="PROJECT_STATUS_OPTIONS"
           :status-label="STATUS_LABEL"
           @search="handleSearch"
           @reset="handleReset"
-          @toggle-filter-visibility="toggleFilterVisibility"
         />
 
         <ProjectTablePanel
@@ -715,11 +750,13 @@ const {
           :project-type-label="projectTypeLabel"
           :project-type-color="projectTypeColor"
           :fmt-amount="formatWanAmountWithUnit"
+          :can-archive="canArchiveProjects"
           @toggle-col="toggleCol"
           @refresh="fetchData"
           @create="handleCreateModalOpen"
-          @overview="router.push(`/project/${$event.id}/overview`)"
+          @overview="openProjectOverview"
           @edit="handleEditModalOpen"
+          @archive="handleArchive"
           @delete="handleDelete"
           @page-change="handlePageChange"
           @page-size-change="handlePageSizeChange"
@@ -727,6 +764,7 @@ const {
       </div>
 
       <ProjectAnalysisRail
+        v-if="!isMobile"
         :project-stats="projectStats"
         :total-contract-amount="totalContractAmount"
         :type-distribution="typeDistribution"
@@ -740,7 +778,7 @@ const {
 
 <style scoped>
 .project-list-page {
-  --lg-search-min-height: 95px;
+  --lg-search-min-height: 60px;
 
   background: var(--surface-subtle);
 }
@@ -830,16 +868,59 @@ const {
 }
 
 .project-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20vw;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: clamp(8px, 1.2vw, 12px);
 }
 
 .project-main-column {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
+  display: contents;
+}
+
+.project-main-column > :deep(.project-query-panel) {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+.project-main-column > :deep(.project-table-panel) {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+}
+
+.project-workspace > :deep(.project-analysis-rail) {
+  grid-column: 2;
+  grid-row: 2;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
 }
 
 .pj-create-form {
   padding-top: 16px;
+}
+
+@media (width < 500px) {
+  .project-list-page {
+    --lg-search-min-height: 0;
+
+    gap: 8px;
+    padding: 0;
+    background: var(--surface-subtle);
+  }
+
+  .project-workspace {
+    display: block;
+  }
+
+  .project-main-column {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+  }
 }
 </style>

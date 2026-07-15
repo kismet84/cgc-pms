@@ -32,10 +32,10 @@ defineProps<{
 <template>
   <aside class="lg-analysis-rail project-analysis-rail" aria-label="项目辅助分析">
     <div class="lg-analysis-panel lg-fill-card project-analysis-panel">
-      <header class="project-analysis-head">
+      <header class="project-analysis-head lg-analysis-header">
         <div>
-          <div class="project-analysis-title">辅助分析</div>
-          <div class="project-analysis-subtitle">项目概览与重点分组</div>
+          <div class="project-analysis-title lg-analysis-heading">辅助分析</div>
+          <div class="project-analysis-subtitle lg-analysis-description">项目概览与重点分组</div>
         </div>
       </header>
 
@@ -126,6 +126,10 @@ defineProps<{
 
 <style scoped>
 .project-analysis-rail {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
 }
 
 .project-analysis-panel {
@@ -255,9 +259,53 @@ defineProps<{
   white-space: nowrap;
 }
 
-@media (max-width: 1200px) {
-  .project-analysis-rail {
-    width: 100%;
+@media (500px <= width < 900px) {
+  .project-analysis-panel {
+    padding-bottom: clamp(6px, 1.2vw, 12px);
+  }
+
+  .project-analysis-head {
+    padding: clamp(7px, 1.6vw, 12px) clamp(7px, 1.8vw, 16px);
+  }
+
+  .project-analysis-section {
+    gap: clamp(3px, 0.8vw, 6px);
+    padding: clamp(6px, 1.2vw, 10px) clamp(7px, 1.8vw, 16px) 0;
+  }
+
+  .project-analysis-section + .project-analysis-section {
+    margin-top: clamp(5px, 1.2vw, 10px);
+    padding-top: clamp(6px, 1.4vw, 12px);
+  }
+
+  .project-analysis-title {
+    font-size: clamp(11px, 1.7vw, 15px);
+  }
+
+  .project-analysis-subtitle,
+  .project-warning-count,
+  .project-overview-row,
+  .project-analysis-section :deep(.lg-type-num),
+  .project-analysis-section .lg-type-num,
+  .project-analysis-section :deep(.lg-type-pct),
+  .project-analysis-section .lg-type-pct,
+  .project-risk-status {
+    font-size: clamp(9px, 1.4vw, 12px);
+  }
+
+  .project-section-title,
+  .project-overview-row strong {
+    font-size: clamp(10px, 1.6vw, 14px);
+  }
+
+  .project-overview-row {
+    gap: clamp(3px, 1vw, 12px);
+  }
+
+  .project-analysis-section :deep(.lg-type-row),
+  .project-analysis-section .lg-type-row {
+    grid-template-columns: clamp(5px, 1vw, 9px) minmax(0, 1fr) auto auto;
+    column-gap: clamp(2px, 0.8vw, 8px);
   }
 }
 

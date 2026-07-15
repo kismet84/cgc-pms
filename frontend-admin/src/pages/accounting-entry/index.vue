@@ -24,6 +24,7 @@ import type {
   AccountingEntryStatus,
   AccountingEntryVO,
 } from '@/types/accounting'
+import ListQueryPanel from '@/components/list-page/ListQueryPanel.vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() =>
@@ -103,7 +104,7 @@ async function fetchEntries() {
   try {
     const result = await getAccountingEntries(query)
     rows.value = result.records ?? []
-    total.value = result.total ?? 0
+    total.value = Number(result.total ?? 0)
   } catch (error: unknown) {
     console.error(error)
     rows.value = []
@@ -203,7 +204,7 @@ onMounted(fetchEntries)
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page accounting-entry-page">
+  <div class="lg-list-page lg-page app-page accounting-entry-page settlement-domain-page">
     <div class="lg-page-head accounting-entry-page-head">
       <a-breadcrumb class="accounting-entry-breadcrumb">
         <a-breadcrumb-item>结算收付</a-breadcrumb-item>
@@ -211,9 +212,12 @@ onMounted(fetchEntries)
       </a-breadcrumb>
     </div>
 
-    <div class="lg-grid accounting-entry-workspace">
-      <div class="lg-left accounting-entry-main-column">
-        <section class="lg-kpi-strip accounting-entry-kpis" aria-label="会计凭证关键指标">
+    <div class="lg-grid accounting-entry-workspace settlement-domain-workspace">
+      <div class="lg-left accounting-entry-main-column settlement-domain-main-column">
+        <section
+          class="lg-kpi-strip accounting-entry-kpis settlement-domain-kpi"
+          aria-label="会计凭证关键指标"
+        >
           <article class="accounting-entry-kpi-item">
             <div class="accounting-entry-kpi-content">
               <span>凭证总数</span><strong>{{ total }} <small>张</small></strong>
@@ -249,33 +253,31 @@ onMounted(fetchEntries)
           </article>
         </section>
 
-        <section class="lg-search-bar accounting-entry-filter" aria-label="会计凭证筛选">
-          <div class="accounting-entry-filter-grid">
-            <a-input v-model:value="query.entryType" placeholder="凭证类型" allow-clear />
+        <ListQueryPanel aria-label="会计凭证筛选" @search="handleSearch" @reset="handleReset">
+          <template #primary>
+            <a-input
+              v-model:value="query.entryType"
+              placeholder="搜索凭证类型"
+              allow-clear
+              @press-enter="handleSearch"
+            />
+          </template>
+          <template #filters>
             <a-input v-model:value="query.sourceType" placeholder="来源类型" allow-clear />
             <a-select v-model:value="query.entryStatus" placeholder="全部凭证状态" allow-clear>
               <a-select-option value="DRAFT">草稿</a-select-option>
               <a-select-option value="POSTED">已过账</a-select-option>
               <a-select-option value="REVERSED">已冲销</a-select-option>
             </a-select>
-          </div>
-          <div class="accounting-entry-filter-foot">
             <a-input v-model:value="query.startDate" type="date" aria-label="开始日期" />
             <a-input v-model:value="query.endDate" type="date" aria-label="结束日期" />
-            <div class="accounting-entry-filter-actions">
-              <a-button type="primary" data-testid="search-button" @click="handleSearch"
-                >搜索</a-button
-              >
-              <a-button data-testid="reset-button" @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </a-button>
-            </div>
-          </div>
-        </section>
+          </template>
+        </ListQueryPanel>
 
-        <section class="lg-list-table-panel accounting-entry-table-panel">
-          <div class="lg-toolbar accounting-entry-toolbar">
+        <section
+          class="lg-list-table-panel accounting-entry-table-panel settlement-domain-table-panel"
+        >
+          <div class="lg-toolbar accounting-entry-toolbar settlement-domain-toolbar">
             <div class="lg-toolbar-left">
               <strong>凭证记录</strong>
               <span>共 {{ total }} 条</span>
@@ -287,7 +289,7 @@ onMounted(fetchEntries)
               </a-button>
             </div>
           </div>
-          <div class="lg-table-wrap">
+          <div class="lg-table-wrap settlement-domain-table-wrap">
             <a-table
               row-key="id"
               :columns="columns"
@@ -345,7 +347,7 @@ onMounted(fetchEntries)
             </a-table>
           </div>
 
-          <div class="lg-pagination accounting-entry-pagination">
+          <div class="lg-pagination accounting-entry-pagination settlement-domain-pagination">
             <span>共 {{ total }} 条</span>
             <a-pagination
               :current="query.pageNo"
@@ -360,12 +362,15 @@ onMounted(fetchEntries)
         </section>
       </div>
 
-      <aside class="lg-analysis-rail accounting-entry-analysis-rail" aria-label="凭证辅助分析">
+      <aside
+        class="lg-analysis-rail accounting-entry-analysis-rail settlement-domain-analysis-rail"
+        aria-label="凭证辅助分析"
+      >
         <div class="lg-analysis-panel accounting-entry-analysis-panel">
-          <div class="accounting-entry-analysis-head">
+          <div class="accounting-entry-analysis-head lg-analysis-header">
             <div>
-              <strong>凭证分析</strong>
-              <span>当前页状态与借贷平衡</span>
+              <strong class="lg-analysis-heading">辅助分析</strong>
+              <span class="lg-analysis-description">当前页状态与借贷平衡</span>
             </div>
           </div>
 

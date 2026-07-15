@@ -52,6 +52,7 @@ function New-AutopilotDesktopHandoff {
     explainNextAction = $ExplainNextAction
     nestedModelCliInvocationCount = 0
     checkpointCommand = "pwsh -NoProfile -File scripts/codex-autopilot/autopilot-checkpoint.ps1 -RepoRoot `"$RepoRoot`""
+    registerCanaryCommand = "pwsh -NoProfile -File scripts/codex-autopilot/autopilot-register-canary.ps1 -RepoRoot `"$RepoRoot`" -IssueId <issueId> -ReportPath <reportPath> -GraphGitCursor <graphGitCursor>"
     nextAction = 'Return control to the current Codex desktop main thread and continue from the durable checkpoint.'
   }
 }

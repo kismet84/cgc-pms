@@ -15,6 +15,7 @@ import InvoiceKpiStrip from './components/InvoiceKpiStrip.vue'
 import InvoiceVerifyPanel from './components/InvoiceVerifyPanel.vue'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import ListQueryPanel from '@/components/list-page/ListQueryPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -112,7 +113,7 @@ defineExpose({
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page invoice-page">
+  <div class="lg-list-page lg-page app-page invoice-page settlement-domain-page">
     <!-- 页面头部 -->
     <div class="lg-page-head invoice-page-head">
       <a-breadcrumb class="invoice-breadcrumb">
@@ -121,18 +122,27 @@ defineExpose({
       </a-breadcrumb>
     </div>
 
-    <div class="lg-grid invoice-workspace">
-      <div class="lg-left invoice-main-column">
+    <div class="lg-grid invoice-workspace settlement-domain-workspace">
+      <div class="lg-left invoice-main-column settlement-domain-main-column">
         <!-- KPI 横条 -->
-        <InvoiceKpiStrip :data="tableData" />
+        <InvoiceKpiStrip :data="tableData" class="settlement-domain-kpi" />
 
-        <div class="lg-search-bar invoice-search-bar">
-          <div class="invoice-filter-grid">
+        <ListQueryPanel aria-label="发票查询条件" @search="handleSearch" @reset="handleReset">
+          <template #primary>
+            <a-input
+              v-model:value="filter.keyword"
+              placeholder="搜索发票号码"
+              allow-clear
+              @press-enter="handleSearch"
+            >
+              <template #prefix><SearchOutlined class="invoice-search-prefix-icon" /></template>
+            </a-input>
+          </template>
+          <template #filters>
             <a-select
               v-model:value="filter.payRecordId"
               placeholder="全部付款记录"
               allow-clear
-              size="large"
               @change="handleSearch"
             >
               <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
@@ -143,37 +153,18 @@ defineExpose({
               v-model:value="filter.verifyStatus"
               placeholder="全部核验状态"
               allow-clear
-              size="large"
               @change="handleSearch"
             >
               <a-select-option value="PENDING">待核验</a-select-option>
               <a-select-option value="VERIFIED">已认证</a-select-option>
               <a-select-option value="ABNORMAL">异常</a-select-option>
             </a-select>
-          </div>
-          <div class="invoice-filter-foot">
-            <a-input
-              v-model:value="filter.keyword"
-              placeholder="搜索发票号码"
-              allow-clear
-              size="large"
-              @press-enter="handleSearch"
-            >
-              <template #prefix><SearchOutlined class="invoice-search-prefix-icon" /></template>
-            </a-input>
-            <div class="invoice-search-actions">
-              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-              <a-button size="large" @click="handleReset">
-                <template #icon><ReloadOutlined /></template>
-                重置
-              </a-button>
-            </div>
-          </div>
-        </div>
+          </template>
+        </ListQueryPanel>
 
-        <main class="lg-list-table-panel invoice-table-panel">
+        <main class="lg-list-table-panel invoice-table-panel settlement-domain-table-panel">
           <!-- 工具栏 -->
-          <div class="lg-toolbar invoice-toolbar">
+          <div class="lg-toolbar invoice-toolbar settlement-domain-toolbar">
             <div class="lg-toolbar-left">
               <div class="invoice-table-heading">
                 <span class="invoice-table-title">发票记录</span>
@@ -198,7 +189,7 @@ defineExpose({
           </div>
 
           <!-- 表格 -->
-          <div class="lg-table-wrap">
+          <div class="lg-table-wrap settlement-domain-table-wrap">
             <div v-if="listError" class="invoice-list-feedback">
               <a-result status="error" title="发票列表加载失败" :sub-title="listError">
                 <template #extra>
@@ -277,7 +268,7 @@ defineExpose({
           </div>
 
           <!-- 分页 -->
-          <div class="lg-pagination">
+          <div class="lg-pagination settlement-domain-pagination">
             <span class="lg-total">共 {{ total }} 条</span>
             <a-pagination
               v-model:current="pageNo"
@@ -294,7 +285,7 @@ defineExpose({
       </div>
 
       <!-- 右侧分析面板 -->
-      <InvoiceVerifyPanel :data="tableData" />
+      <InvoiceVerifyPanel :data="tableData" class="settlement-domain-analysis-rail" />
     </div>
 
     <!-- Add/Edit Modal -->

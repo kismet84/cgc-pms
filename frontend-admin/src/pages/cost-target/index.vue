@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   ClockCircleOutlined,
@@ -7,10 +7,10 @@ import {
   ReloadOutlined,
   CheckCircleOutlined,
   FileTextOutlined,
+  FilterOutlined,
   SafetyCertificateOutlined,
   SearchOutlined,
   MoreOutlined,
-  SettingOutlined,
   WarningOutlined,
 } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
@@ -30,6 +30,7 @@ import {
 import { ColumnSettingsButton } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
+import { useMobileViewport } from '@/composables/useMobileViewport'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -37,13 +38,9 @@ const APPROVAL_APPROVING = 'APPROVING'
 const APPROVAL_APPROVED = 'APPROVED'
 const APPROVAL_REJECTED = 'REJECTED'
 
-const MOBILE_BP = 768
-const isMobile = ref(window.innerWidth < MOBILE_BP)
+const { isMobile } = useMobileViewport()
+const mobileFiltersOpen = ref(false)
 const router = useRouter()
-
-function onResize() {
-  isMobile.value = window.innerWidth < MOBILE_BP
-}
 
 // ---- Dropdown data ----
 const referenceStore = useReferenceStore()
@@ -85,16 +82,6 @@ const filter = reactive({
   approvalStatus: undefined as string | undefined,
   isActive: undefined as number | undefined,
 })
-const filterVisibility = reactive({
-  projectId: true,
-  approvalStatus: true,
-  isActive: true,
-})
-const filterSettingItems = [
-  { key: 'projectId', label: '项目' },
-  { key: 'approvalStatus', label: '审批状态' },
-  { key: 'isActive', label: '启用状态' },
-] as const
 
 // ---- Table state ----
 const loading = ref(false)
@@ -160,10 +147,6 @@ function handlePageSizeChange(_cur: number, size: number) {
   pageNo.value = 1
   fetchData()
 }
-function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
-  filterVisibility[key] = !filterVisibility[key]
-}
-
 // ---- Actions ----
 function handleCreate() {
   router.push('/cost-target/create')
@@ -308,20 +291,15 @@ function targetPercent(value: number): number {
 }
 
 onMounted(() => {
-  window.addEventListener('resize', onResize)
   fetchDictData(APPROVAL_STATUS_DICT)
   fetchDictData(TARGET_STATUS_DICT)
   referenceStore.fetchProjects()
   fetchData()
 })
-
-onUnmounted(() => {
-  window.removeEventListener('resize', onResize)
-})
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page ct-page">
+  <div class="lg-list-page lg-page app-page ct-page project-operation-list-page">
     <div class="lg-page-head ct-page-head">
       <div class="ct-page-head-main">
         <a-breadcrumb class="ct-breadcrumb">
@@ -331,9 +309,12 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="lg-grid ct-content-grid">
-      <main class="lg-left ct-main-column">
-        <section class="lg-kpi-strip ct-kpi-summary" aria-label="成本目标关键指标">
+    <div class="lg-grid ct-content-grid project-operation-workspace">
+      <main class="lg-left ct-main-column project-operation-main-column">
+        <section
+          class="lg-kpi-strip ct-kpi-summary project-operation-kpi"
+          aria-label="成本目标关键指标"
+        >
           <div class="ct-kpi-item">
             <span class="ct-kpi-icon is-total"><FileTextOutlined /></span>
             <span class="ct-kpi-label">版本总数</span>
@@ -367,10 +348,13 @@ onUnmounted(() => {
           </div>
         </section>
 
-        <div class="lg-search-bar ct-search-bar">
-          <div class="ct-search-fields">
+        <div class="lg-search-bar ct-search-bar project-operation-query-panel">
+          <div
+            id="cost-target-filter-panel"
+            class="ct-search-fields project-operation-filter-panel"
+            :class="{ 'is-open': mobileFiltersOpen }"
+          >
             <a-select
-              v-if="filterVisibility.projectId"
               v-model:value="filter.projectId"
               class="ct-search-select"
               placeholder="全部项目"
@@ -388,7 +372,6 @@ onUnmounted(() => {
               }}</a-select-option>
             </a-select>
             <a-select
-              v-if="filterVisibility.approvalStatus"
               v-model:value="filter.approvalStatus"
               class="ct-search-select"
               placeholder="审批状态"
@@ -401,7 +384,6 @@ onUnmounted(() => {
               </a-select-option>
             </a-select>
             <a-select
-              v-if="filterVisibility.isActive"
               v-model:value="filter.isActive"
               class="ct-search-select"
               placeholder="启用状态"
@@ -430,35 +412,35 @@ onUnmounted(() => {
               <template #prefix><SearchOutlined class="ct-search-prefix-icon" /></template>
             </a-input>
             <div class="ct-search-actions">
-              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-              <a-button size="large" @click="handleReset">
+              <a-button
+                class="project-operation-desktop-query-action"
+                type="primary"
+                size="large"
+                @click="handleSearch"
+                >搜索</a-button
+              >
+              <a-button
+                class="project-operation-desktop-query-action"
+                size="large"
+                @click="handleReset"
+              >
                 <template #icon><ReloadOutlined /></template>
                 重置
               </a-button>
-              <a-dropdown trigger="click">
-                <a-button size="large">
-                  <template #icon><SettingOutlined /></template>
-                  筛选栏设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item
-                      v-for="item in filterSettingItems"
-                      :key="item.key"
-                      @click="toggleFilterVisibility(item.key)"
-                    >
-                      <a-checkbox :checked="filterVisibility[item.key]">
-                        {{ item.label }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
+              <a-button
+                class="project-operation-filter-toggle"
+                size="large"
+                :aria-expanded="mobileFiltersOpen"
+                aria-controls="cost-target-filter-panel"
+                @click="mobileFiltersOpen = !mobileFiltersOpen"
+              >
+                <template #icon><FilterOutlined /></template>筛选
+              </a-button>
             </div>
           </div>
         </div>
 
-        <main class="lg-list-table-panel ct-table-panel">
+        <main class="lg-list-table-panel ct-table-panel project-operation-table-panel">
           <div class="lg-toolbar ct-table-toolbar">
             <div class="lg-toolbar-left">
               <div class="ct-table-heading">
@@ -595,7 +577,6 @@ onUnmounted(() => {
         :target-status-summary="targetStatusSummary"
         :target-version-summary="targetVersionSummary"
         :recent-targets="recentTargets"
-        @refresh="fetchData"
       />
     </div>
 

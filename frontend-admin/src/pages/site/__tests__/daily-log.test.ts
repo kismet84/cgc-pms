@@ -30,6 +30,13 @@ describe('site daily log page', () => {
     expect(source).toContain('暂无现场日报')
   })
 
+  it('keeps the desktop horizontal scrollbar above the bottom pagination', () => {
+    expect(source).toContain('class="site-daily-desktop-table"')
+    expect(source).toMatch(
+      /\.site-daily-table-wrap\s+:deep\(\.site-daily-desktop-table \.ant-table-content\)\s*\{[\s\S]*height:\s*100%\s*!important;/,
+    )
+  })
+
   it('renders approved material deliveries as read-only daily facts', () => {
     expect(source).toContain('当日材料到货')
     expect(source).toContain('getSiteDailyLog')

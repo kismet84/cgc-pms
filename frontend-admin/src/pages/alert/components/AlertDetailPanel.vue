@@ -50,7 +50,7 @@ const statusRemarkModel = computed({
 </script>
 
 <template>
-  <aside class="alert-detail-panel">
+  <div class="alert-detail-panel">
     <div class="alert-detail-head">
       <div class="alert-detail-title">告警详情</div>
     </div>
@@ -189,20 +189,16 @@ const statusRemarkModel = computed({
       <div class="alert-detail-empty-title">未选择预警</div>
       <div class="alert-detail-empty-text">请从左侧列表选择一条告警查看详情。</div>
     </div>
-  </aside>
+  </div>
 </template>
 
 <style scoped>
 .alert-detail-panel {
-  position: sticky;
-  top: 0;
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
   padding: 0 0 10px;
-  background: #fff;
-  border: 1px solid #e8edf5;
-  border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(31, 35, 41, 0.04);
+  overflow-y: auto;
+  background: transparent;
 }
 
 .alert-detail-head {
@@ -337,7 +333,7 @@ const statusRemarkModel = computed({
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  height: 420px;
+  min-height: 280px;
   color: #8a94a6;
   text-align: center;
 }
@@ -351,12 +347,5 @@ const statusRemarkModel = computed({
 .alert-detail-empty-text {
   margin-top: 8px;
   font-size: 13px;
-}
-
-@media (max-width: 1200px) {
-  .alert-detail-panel {
-    position: static;
-    min-height: 0;
-  }
 }
 </style>

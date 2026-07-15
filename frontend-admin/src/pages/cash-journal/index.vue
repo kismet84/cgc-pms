@@ -44,6 +44,7 @@ import { downloadBlobFile } from '@/utils/download'
 import CashJournalDetailDrawer from './components/CashJournalDetailDrawer.vue'
 import CashJournalFormModal from './components/CashJournalFormModal.vue'
 import FundAccountModal from './components/FundAccountModal.vue'
+import ListQueryPanel from '@/components/list-page/ListQueryPanel.vue'
 
 const CASH_JOURNAL_BUSINESS_TYPE = 'CASH_JOURNAL'
 const route = useRoute()
@@ -338,7 +339,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page cash-journal-page">
+  <div class="lg-list-page lg-page app-page cash-journal-page settlement-domain-page">
     <div class="lg-page-head cash-journal-page-head">
       <a-breadcrumb class="cash-journal-breadcrumb">
         <a-breadcrumb-item>结算收付</a-breadcrumb-item>
@@ -346,9 +347,12 @@ onMounted(async () => {
       </a-breadcrumb>
     </div>
 
-    <div class="lg-grid cash-journal-workspace">
-      <div class="lg-left cash-journal-main-column">
-        <section class="lg-kpi-strip cash-journal-kpis" aria-label="资金日记账关键指标">
+    <div class="lg-grid cash-journal-workspace settlement-domain-workspace">
+      <div class="lg-left cash-journal-main-column settlement-domain-main-column">
+        <section
+          class="lg-kpi-strip cash-journal-kpis settlement-domain-kpi"
+          aria-label="资金日记账关键指标"
+        >
           <article class="cash-journal-kpi-item">
             <div class="cash-journal-kpi-content">
               <span>现金余额</span><strong>{{ money(summary.cashBalance) }}</strong>
@@ -381,8 +385,16 @@ onMounted(async () => {
           </article>
         </section>
 
-        <section class="lg-search-bar cash-journal-filters" aria-label="资金日记账筛选">
-          <div class="cash-journal-filter-grid">
+        <ListQueryPanel aria-label="资金日记账筛选" @search="search" @reset="resetFilters">
+          <template #primary>
+            <input
+              v-model="filter.keyword"
+              class="cash-journal-keyword"
+              placeholder="搜索流水号、摘要或往来单位"
+              @keyup.enter="search"
+            />
+          </template>
+          <template #filters>
             <select v-model="filter.accountId">
               <option :value="undefined">全部账户</option>
               <option v-for="account in accounts" :key="account.id" :value="account.id">
@@ -421,14 +433,6 @@ onMounted(async () => {
               <option value="PAY_RECORD">付款回写</option>
               <option value="REVERSAL">红冲</option>
             </select>
-          </div>
-          <div class="cash-journal-filter-foot">
-            <input
-              v-model="filter.keyword"
-              class="cash-journal-keyword"
-              placeholder="流水号 / 摘要 / 往来单位"
-              @keyup.enter="search"
-            />
             <input v-model="filter.businessDateStart" type="date" aria-label="开始日期" />
             <input v-model="filter.businessDateEnd" type="date" aria-label="结束日期" />
             <select v-model="filter.status">
@@ -443,15 +447,11 @@ onMounted(async () => {
               <option :value="true">已有附件</option>
               <option :value="false">缺少附件</option>
             </select>
-            <div class="cash-journal-filter-actions">
-              <a-button type="primary" @click="search">搜索</a-button>
-              <a-button @click="resetFilters"><ReloadOutlined />重置</a-button>
-            </div>
-          </div>
-        </section>
+          </template>
+        </ListQueryPanel>
 
-        <section class="lg-list-table-panel cash-journal-table-card">
-          <div class="lg-toolbar table-heading">
+        <section class="lg-list-table-panel cash-journal-table-card settlement-domain-table-panel">
+          <div class="lg-toolbar table-heading settlement-domain-toolbar">
             <div class="lg-toolbar-left">
               <strong>收支流水</strong>
               <span>共 {{ total }} 条</span>
@@ -471,7 +471,7 @@ onMounted(async () => {
               >
             </div>
           </div>
-          <div class="lg-table-wrap cash-journal-table-wrap">
+          <div class="lg-table-wrap cash-journal-table-wrap settlement-domain-table-wrap">
             <table>
               <thead>
                 <tr>
@@ -531,7 +531,7 @@ onMounted(async () => {
               </tbody>
             </table>
           </div>
-          <div class="lg-pagination cash-journal-pagination">
+          <div class="lg-pagination cash-journal-pagination settlement-domain-pagination">
             <span>共 {{ total }} 条</span>
             <a-pagination
               v-model:current="pageNo"
@@ -544,12 +544,15 @@ onMounted(async () => {
         </section>
       </div>
 
-      <aside class="lg-analysis-rail cash-journal-analysis-rail" aria-label="资金辅助分析">
+      <aside
+        class="lg-analysis-rail cash-journal-analysis-rail settlement-domain-analysis-rail"
+        aria-label="资金辅助分析"
+      >
         <div class="lg-analysis-panel cash-journal-analysis-panel">
-          <div class="cash-journal-analysis-head">
+          <div class="cash-journal-analysis-head lg-analysis-header">
             <div>
-              <strong>资金概览</strong>
-              <span>余额、收支结构与归档提醒</span>
+              <strong class="lg-analysis-heading">辅助分析</strong>
+              <span class="lg-analysis-description">余额、收支结构与归档提醒</span>
             </div>
           </div>
 

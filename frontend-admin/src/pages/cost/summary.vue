@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import {
   CheckCircleOutlined,
   FileSearchOutlined,
+  FilterOutlined,
   LinkOutlined,
   ReloadOutlined,
   SearchOutlined,
@@ -19,15 +20,13 @@ import { useColumnSettings } from '@/composables/useColumnSettings'
 import { normalizeArray } from '@/utils/normalizeArray'
 import CostSummaryTablePanel from './components/CostSummaryTablePanel.vue'
 import CostSummaryAnalysisRail from './components/CostSummaryAnalysisRail.vue'
+import { useMobileViewport } from '@/composables/useMobileViewport'
 
 type CostSubjectSummary = CostSummaryVO['subjects'][number]
 type CheckStatus = 'overrun' | 'saving' | 'balanced'
 
-const MOBILE_BP = 768
-const isMobile = ref(window.innerWidth < MOBILE_BP)
-function onResize() {
-  isMobile.value = window.innerWidth < MOBILE_BP
-}
+const { isMobile } = useMobileViewport()
+const mobileFiltersOpen = ref(false)
 
 const router = useRouter()
 
@@ -374,17 +373,12 @@ const {
 } = useColumnSettings('cost_reconcile_cols_v1', gridColumns)
 
 onMounted(() => {
-  window.addEventListener('resize', onResize)
   fetchProjects()
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', onResize)
 })
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page cost-summary-page">
+  <div class="lg-list-page lg-page app-page cost-summary-page project-operation-list-page">
     <div class="lg-page-head cost-summary-page-head">
       <div class="cost-summary-head-main">
         <a-breadcrumb class="cost-summary-breadcrumb">
@@ -394,9 +388,9 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="lg-grid cost-summary-grid">
-      <div class="lg-left cost-summary-main">
-        <div class="lg-kpi-strip cost-reconcile-kpis">
+    <div class="lg-grid cost-summary-grid project-operation-workspace">
+      <div class="lg-left cost-summary-main project-operation-main-column">
+        <div class="lg-kpi-strip cost-reconcile-kpis project-operation-kpi">
           <div class="lg-kpi-card">
             <span class="cost-summary-kpi-icon is-target"><FileSearchOutlined /></span>
             <span class="lg-kpi-card-label">成本目标</span>
@@ -442,8 +436,12 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <div class="lg-search-bar cost-summary-search">
-          <div class="cost-summary-search-row cost-summary-search-row--filters">
+        <div class="lg-search-bar cost-summary-search project-operation-query-panel">
+          <div
+            id="cost-summary-filter-panel"
+            class="cost-summary-search-row cost-summary-search-row--filters project-operation-filter-panel"
+            :class="{ 'is-open': mobileFiltersOpen }"
+          >
             <div class="cost-summary-search-main">
               <a-select
                 v-model:value="selectedProjectId"
@@ -479,14 +477,16 @@ onUnmounted(() => {
             </a-input>
             <div class="cost-summary-search-actions">
               <a-button
+                class="project-operation-desktop-query-action"
                 type="primary"
                 size="large"
                 :disabled="!selectedProjectId"
                 @click="handleSearch"
               >
-                查询
+                搜索
               </a-button>
               <a-button
+                class="project-operation-desktop-query-action"
                 data-testid="cost-summary-history-button"
                 size="large"
                 :disabled="!selectedProjectId"
@@ -494,7 +494,21 @@ onUnmounted(() => {
               >
                 历史快照
               </a-button>
-              <a-button size="large" @click="handleReset">重置</a-button>
+              <a-button
+                class="project-operation-desktop-query-action"
+                size="large"
+                @click="handleReset"
+                >重置</a-button
+              >
+              <a-button
+                class="project-operation-filter-toggle"
+                size="large"
+                :aria-expanded="mobileFiltersOpen"
+                aria-controls="cost-summary-filter-panel"
+                @click="mobileFiltersOpen = !mobileFiltersOpen"
+              >
+                <template #icon><FilterOutlined /></template>筛选
+              </a-button>
             </div>
           </div>
         </div>
@@ -626,7 +640,7 @@ onUnmounted(() => {
 
 .cost-summary-search-row {
   display: flex;
-  flex: 1 0 100%;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;

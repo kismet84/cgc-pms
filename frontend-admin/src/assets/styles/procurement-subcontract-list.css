@@ -1,0 +1,349 @@
+.procurement-subcontract-list-page {
+  --lg-layout-gap: clamp(8px, 1.2vw, 12px);
+  --lg-workspace-height: calc(100vh - 74px);
+
+  min-width: 0;
+  background: var(--surface-subtle);
+}
+
+.procurement-subcontract-list-page > .lg-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20vw;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: var(--lg-layout-gap);
+  width: 100%;
+  height: var(--lg-workspace-height);
+  min-height: 0;
+}
+
+.procurement-subcontract-list-page > .lg-grid > .lg-left {
+  display: contents !important;
+}
+
+.procurement-subcontract-list-page .lg-kpi-strip {
+  display: none !important;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-query-panel {
+  display: flex !important;
+  flex-direction: column !important;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  align-items: stretch;
+  width: 100%;
+  min-width: 0;
+  height: 60px !important;
+  min-height: 60px !important;
+  margin: 0 !important;
+  padding: 10px 12px !important;
+  gap: 0 !important;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-query-panel:has(.procurement-subcontract-filter-panel.is-open) {
+  height: auto !important;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-query-row,
+.procurement-subcontract-list-page .procurement-subcontract-query-actions {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-query-row {
+  display: flex !important;
+  flex: 1 1 auto;
+  flex-flow: row nowrap;
+  gap: 8px;
+  width: 100%;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-query-row > .ant-input-affix-wrapper,
+.procurement-subcontract-list-page .procurement-subcontract-query-row > .ant-select {
+  flex: 1 1 0;
+  width: 0 !important;
+  min-width: 0 !important;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-query-actions {
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin-left: 0;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-query-panel .ant-btn,
+.procurement-subcontract-list-page .procurement-subcontract-query-panel .ant-input-affix-wrapper,
+.procurement-subcontract-list-page .procurement-subcontract-query-panel .ant-select-selector {
+  height: 40px !important;
+  min-height: 40px;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-query-panel .ant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-filter-panel {
+  display: none !important;
+  order: 2;
+  flex-flow: row wrap;
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-filter-panel.is-open {
+  display: flex !important;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-filter-panel > .ant-select,
+.procurement-subcontract-list-page .procurement-subcontract-filter-panel > .ant-picker {
+  flex: 1 1 180px;
+  width: auto !important;
+  min-width: 150px;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-filter-toggle {
+  display: inline-flex !important;
+  min-width: 76px;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-table-panel {
+  grid-column: 1;
+  grid-row: 2;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-table-panel > .lg-toolbar {
+  min-height: 0;
+  padding: 10px 14px;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-table-panel > .lg-toolbar,
+.procurement-subcontract-list-page .procurement-subcontract-table-panel > .lg-toolbar .lg-toolbar-left,
+.procurement-subcontract-list-page .procurement-subcontract-table-panel > .lg-toolbar .lg-toolbar-right {
+  align-items: center;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-analysis-rail {
+  display: flex !important;
+  grid-column: 2;
+  grid-row: 2;
+  width: auto !important;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+
+.procurement-subcontract-list-page .procurement-subcontract-analysis-rail > .lg-analysis-panel,
+.procurement-subcontract-list-page .procurement-subcontract-analysis-rail > .lg-fill-card {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 100%;
+  max-height: 100%;
+  overflow: auto;
+}
+
+.procurement-subcontract-mobile-list {
+  display: none;
+}
+
+@media (width < 500px) {
+  .procurement-subcontract-list-page {
+    gap: 8px;
+    height: auto;
+    min-height: calc(100vh - 50px);
+    padding: 0;
+    overflow: visible;
+  }
+
+  .procurement-subcontract-list-page > .lg-page-head,
+  .procurement-subcontract-list-page .lg-kpi-strip,
+  .procurement-subcontract-list-page .lg-kpi-single,
+  .procurement-subcontract-list-page .procurement-subcontract-analysis-rail,
+  .procurement-subcontract-list-page .procurement-subcontract-table-panel > .lg-toolbar {
+    display: none !important;
+  }
+
+  .procurement-subcontract-list-page > .lg-grid {
+    display: block;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+  }
+
+  .procurement-subcontract-list-page > .lg-grid > .lg-left {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-query-panel {
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 0 !important;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-query-panel:has(.procurement-subcontract-filter-panel.is-open) {
+    height: auto !important;
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-query-row {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+    align-items: center !important;
+    height: 40px;
+    gap: 6px;
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-query-actions {
+    flex: 0 0 auto !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    width: max-content !important;
+    margin-left: 0 !important;
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-query-row > .ant-input-affix-wrapper,
+  .procurement-subcontract-list-page .procurement-subcontract-query-row > .ant-select {
+    width: 100% !important;
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-filter-toggle {
+    flex: 0 0 auto !important;
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-desktop-action {
+    display: none !important;
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-filter-panel.is-open {
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-filter-panel > .ant-select,
+  .procurement-subcontract-list-page .procurement-subcontract-filter-panel > .ant-picker {
+    flex: 0 0 40px !important;
+    height: 40px !important;
+    width: 100% !important;
+    min-width: 0;
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-table-panel {
+    min-height: calc(100vh - 98px);
+  }
+
+  .procurement-subcontract-list-page .procurement-subcontract-desktop-table {
+    display: none !important;
+  }
+
+  .procurement-subcontract-list-page .subcontract-task-wbs-panel {
+    display: none;
+  }
+
+  .procurement-subcontract-list-page.stock-page .lg-card-list {
+    gap: 0;
+    min-height: calc(100vh - 146px);
+    background: var(--surface);
+  }
+
+  .procurement-subcontract-list-page.stock-page .lg-card-item {
+    min-height: 86px;
+    padding: 10px 12px;
+    border: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .procurement-subcontract-mobile-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    min-height: calc(100vh - 146px);
+    background: var(--surface);
+  }
+
+  .procurement-subcontract-mobile-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 10px;
+    min-height: 86px;
+    padding: 10px 12px;
+    color: var(--text);
+    text-align: left;
+    background: var(--surface);
+    border: 0;
+    border-bottom: 1px solid var(--border-subtle);
+    cursor: pointer;
+  }
+
+  .procurement-subcontract-mobile-card:active {
+    background: var(--surface-subtle);
+  }
+
+  .procurement-subcontract-mobile-card-title,
+  .procurement-subcontract-mobile-card-subtitle,
+  .procurement-subcontract-mobile-card-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .procurement-subcontract-mobile-card-title {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 22px;
+  }
+
+  .procurement-subcontract-mobile-card-status {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: center;
+  }
+
+  .procurement-subcontract-mobile-card-subtitle,
+  .procurement-subcontract-mobile-card-meta {
+    grid-column: 1 / -1;
+    color: var(--text-secondary);
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  .procurement-subcontract-list-page .lg-pagination {
+    justify-content: center;
+    min-height: 48px;
+    margin-top: 0;
+    padding: 8px;
+  }
+
+  .procurement-subcontract-list-page.transaction-page .procurement-subcontract-table-panel > .lg-toolbar {
+    display: flex !important;
+    flex-wrap: wrap;
+    padding: 8px 10px;
+  }
+
+  .procurement-subcontract-list-page.transaction-page .transaction-form-body {
+    padding: 14px 12px;
+  }
+}

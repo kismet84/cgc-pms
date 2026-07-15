@@ -383,26 +383,34 @@ onMounted(() => {
         </div>
       </main>
 
-      <aside class="lg-analysis-rail">
-        <div class="lg-panel">
-          <div class="lg-panel-title">用户状态</div>
-          <div class="lg-type-list">
-            <div v-for="item in userStatusSummary" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot" :class="`is-${item.tone}`"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <strong>{{ item.count }}</strong>
+      <aside class="lg-analysis-rail" aria-label="用户辅助分析">
+        <div class="lg-analysis-panel lg-fill-card system-analysis-panel">
+          <header class="lg-analysis-header">
+            <div>
+              <div class="lg-analysis-heading">辅助分析</div>
+              <div class="lg-analysis-description">用户状态与近期用户</div>
             </div>
-          </div>
-        </div>
-        <div class="lg-panel">
-          <div class="lg-panel-title">近期用户</div>
-          <div class="lg-rail-list">
-            <div v-for="item in recentUsers" :key="item.id" class="lg-rail-item">
-              <span class="lg-type-dot"></span>
-              <span>{{ item.realName || item.username }}</span>
+          </header>
+          <section class="lg-panel">
+            <div class="lg-panel-title">用户状态</div>
+            <div class="lg-type-list">
+              <div v-for="item in userStatusSummary" :key="item.label" class="lg-type-row">
+                <span class="lg-type-dot" :class="`is-${item.tone}`"></span>
+                <span class="lg-type-label">{{ item.label }}</span>
+                <strong>{{ item.count }}</strong>
+              </div>
             </div>
-            <div v-if="!recentUsers.length" class="lg-empty-text">暂无用户</div>
-          </div>
+          </section>
+          <section class="lg-panel">
+            <div class="lg-panel-title">近期用户</div>
+            <div class="lg-rail-list">
+              <div v-for="item in recentUsers" :key="item.id" class="lg-rail-item">
+                <span class="lg-type-dot"></span>
+                <span>{{ item.realName || item.username }}</span>
+              </div>
+              <div v-if="!recentUsers.length" class="lg-empty-text">暂无用户</div>
+            </div>
+          </section>
         </div>
       </aside>
     </div>

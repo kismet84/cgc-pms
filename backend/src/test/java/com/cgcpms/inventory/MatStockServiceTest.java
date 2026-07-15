@@ -32,6 +32,7 @@ class MatStockServiceTest {
     private static final long USER_ADMIN = 1L;
     private static final long TENANT_ID = 0L;
     private static final long WAREHOUSE_ID = 100L;
+    private static final long SETTINGS_WAREHOUSE_ID = 930L;
     private static final long MATERIAL_ID = 1001L;
 
     @Autowired
@@ -42,9 +43,7 @@ class MatStockServiceTest {
 
     @BeforeEach
     void setupContext() {
-        // Clean up any cross-test data pollution from other test classes
-        jdbcTemplate.update("DELETE FROM mat_stock_txn WHERE tenant_id = ?", TENANT_ID);
-        jdbcTemplate.update("DELETE FROM mat_stock WHERE tenant_id = ?", TENANT_ID);
+        cleanupConcurrentFixtures();
 
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ADMIN)
@@ -55,7 +54,19 @@ class MatStockServiceTest {
 
     @AfterEach
     void clearContext() {
+        cleanupConcurrentFixtures();
         UserContext.clear();
+    }
+
+    private void cleanupConcurrentFixtures() {
+        // Non-transactional concurrency cases use only these dedicated warehouses.
+        // Tenant-wide deletes race with dashboard tests and remove Flyway demo stock.
+        jdbcTemplate.update(
+                "DELETE FROM mat_stock_txn WHERE tenant_id = ? AND warehouse_id IN (?, ?, ?)",
+                TENANT_ID, 901L, 908L, 920L);
+        jdbcTemplate.update(
+                "DELETE FROM mat_stock WHERE tenant_id = ? AND warehouse_id IN (?, ?, ?)",
+                TENANT_ID, 901L, 908L, 920L);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -630,25 +641,25 @@ class MatStockServiceTest {
     @Transactional
     @DisplayName("安全库存阈值默认兼容 10 并驱动 KPI")
     void testSafetyStockThresholdDrivesKpi() {
-        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+        MatStock stock = createSettingsStock(new BigDecimal("80.0000"));
 
-        MatStockLedgerVO initial = stockService.getLedger(1L, MATERIAL_ID, 10001L,
+        MatStockLedgerVO initial = stockService.getLedger(SETTINGS_WAREHOUSE_ID, MATERIAL_ID, 10001L,
                 null, null, null, 1, 20);
         assertEquals(0, new BigDecimal("10.0000").compareTo(initial.getStock().getSafetyStockQty()));
-        assertEquals(0, stockService.getKpi(1L, 10001L).getLowStockCount());
+        assertEquals(0, stockService.getKpi(SETTINGS_WAREHOUSE_ID, 10001L).getLowStockCount());
 
         stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("100.0000"));
-        assertEquals(1, stockService.getKpi(1L, 10001L).getLowStockCount());
+        assertEquals(1, stockService.getKpi(SETTINGS_WAREHOUSE_ID, 10001L).getLowStockCount());
 
         stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("50.0000"));
-        assertEquals(0, stockService.getKpi(1L, 10001L).getLowStockCount());
+        assertEquals(0, stockService.getKpi(SETTINGS_WAREHOUSE_ID, 10001L).getLowStockCount());
     }
 
     @Test
     @Transactional
     @DisplayName("安全库存阈值拒绝负数和超过四位小数")
     void testSafetyStockThresholdValidation() {
-        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("8.0000"));
+        MatStock stock = createSettingsStock(new BigDecimal("8.0000"));
 
         assertThrows(BusinessException.class,
                 () -> stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("-0.0001")));
@@ -660,7 +671,7 @@ class MatStockServiceTest {
     @Transactional
     @DisplayName("补货设置原子保存目标量并保持 KPI 仍由安全阈值驱动")
     void testReplenishmentSettingsAreAtomicAndKpiUsesSafetyThreshold() {
-        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+        MatStock stock = createSettingsStock(new BigDecimal("80.0000"));
 
         MatStock updated = stockService.updateReplenishmentSettings(
                 stock.getId(), new BigDecimal("100.0000"), new BigDecimal("150.0000"), 7);
@@ -668,9 +679,9 @@ class MatStockServiceTest {
         assertEquals(0, new BigDecimal("100.0000").compareTo(updated.getSafetyStockQty()));
         assertEquals(0, new BigDecimal("150.0000").compareTo(updated.getReplenishmentTargetQty()));
         assertEquals(7, updated.getReplenishmentLeadDays());
-        assertEquals(1, stockService.getKpi(1L, 10001L).getLowStockCount());
+        assertEquals(1, stockService.getKpi(SETTINGS_WAREHOUSE_ID, 10001L).getLowStockCount());
         assertEquals(0, new BigDecimal("150.0000").compareTo(
-                stockService.getLedger(1L, MATERIAL_ID, 10001L, null, null, null, 1, 20)
+                stockService.getLedger(SETTINGS_WAREHOUSE_ID, MATERIAL_ID, 10001L, null, null, null, 1, 20)
                         .getStock().getReplenishmentTargetQty()));
     }
 
@@ -678,7 +689,7 @@ class MatStockServiceTest {
     @Transactional
     @DisplayName("补货目标量可清空且不得低于安全库存")
     void testReplenishmentTargetValidationAndNullFallback() {
-        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+        MatStock stock = createSettingsStock(new BigDecimal("80.0000"));
 
         assertThrows(BusinessException.class, () -> stockService.updateReplenishmentSettings(
                 stock.getId(), new BigDecimal("100.0000"), new BigDecimal("99.9999"), null));
@@ -695,7 +706,7 @@ class MatStockServiceTest {
     @Transactional
     @DisplayName("旧安全阈值接口不得破坏已有补货目标量关系")
     void testLegacySafetyThresholdCannotExceedReplenishmentTarget() {
-        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+        MatStock stock = createSettingsStock(new BigDecimal("80.0000"));
         stockService.updateReplenishmentSettings(
                 stock.getId(), new BigDecimal("100.0000"), new BigDecimal("150.0000"), 0);
 
@@ -707,7 +718,7 @@ class MatStockServiceTest {
     @Transactional
     @DisplayName("人工补货提前期只接受 0 到 3650 的整数并与设置原子保存")
     void testReplenishmentLeadDaysValidation() {
-        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+        MatStock stock = createSettingsStock(new BigDecimal("80.0000"));
 
         assertEquals(0, stockService.updateReplenishmentSettings(
                 stock.getId(), new BigDecimal("10.0000"), null, 0).getReplenishmentLeadDays());
@@ -723,7 +734,7 @@ class MatStockServiceTest {
     @Transactional
     @DisplayName("旧组合设置省略提前期时保留原值，显式 NULL 才清空")
     void testOmittedLeadDaysPreservesExistingValue() {
-        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("80.0000"));
+        MatStock stock = createSettingsStock(new BigDecimal("80.0000"));
         stockService.updateReplenishmentSettings(
                 stock.getId(), new BigDecimal("10.0000"), null, 7);
 
@@ -740,7 +751,7 @@ class MatStockServiceTest {
     @Transactional
     @DisplayName("安全库存阈值更新按租户 fail-close")
     void testSafetyStockThresholdRejectsCrossTenantStock() {
-        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("8.0000"));
+        MatStock stock = createSettingsStock(new BigDecimal("8.0000"));
         jdbcTemplate.update("UPDATE mat_stock SET tenant_id = 1 WHERE id = ?", stock.getId());
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -752,7 +763,7 @@ class MatStockServiceTest {
     @Transactional
     @DisplayName("安全库存阈值更新拒绝无项目访问权")
     void testSafetyStockThresholdRejectsInaccessibleProject() {
-        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("8.0000"));
+        MatStock stock = createSettingsStock(new BigDecimal("8.0000"));
         UserContext.set(Jwts.claims()
                 .add("userId", 99999L)
                 .add("username", "no_project_access")
@@ -768,8 +779,8 @@ class MatStockServiceTest {
     @Transactional
     @DisplayName("安全库存阈值更新拒绝禁用仓库")
     void testSafetyStockThresholdRejectsDisabledWarehouse() {
-        MatStock stock = stockService.stockIn(1L, MATERIAL_ID, new BigDecimal("8.0000"));
-        jdbcTemplate.update("UPDATE mat_warehouse SET status = 'DISABLE' WHERE id = 1");
+        MatStock stock = createSettingsStock(new BigDecimal("8.0000"));
+        jdbcTemplate.update("UPDATE mat_warehouse SET status = 'DISABLE' WHERE id = ?", SETTINGS_WAREHOUSE_ID);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> stockService.updateSafetyStockThreshold(stock.getId(), new BigDecimal("20.0000")));
@@ -1101,6 +1112,11 @@ class MatStockServiceTest {
 
     private void insertWarehouse(long warehouseId, long projectId, String code) {
         insertWarehouse(warehouseId, projectId, code, "ENABLE");
+    }
+
+    private MatStock createSettingsStock(BigDecimal quantity) {
+        insertWarehouse(SETTINGS_WAREHOUSE_ID, 10001L, "WH-STOCK-SETTINGS");
+        return stockService.stockIn(SETTINGS_WAREHOUSE_ID, MATERIAL_ID, quantity);
     }
 
     private void insertWarehouse(long warehouseId, long projectId, String code, String status) {

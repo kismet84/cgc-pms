@@ -36,6 +36,7 @@ import {
   type AlertSubscriptionResponse,
 } from '@/types/alert'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { useMobileViewport } from '@/composables/useMobileViewport'
 import {
   readPositiveIntQuery,
   readStringQuery,
@@ -52,8 +53,10 @@ const route = useRoute()
 const store = useAlertStore()
 const userStore = useUserStore()
 const referenceStore = useReferenceStore()
+const { isMobile } = useMobileViewport()
 
 const subscriptionVisible = ref(false)
+const mobileDetailVisible = ref(false)
 const subscriptionLoading = ref(false)
 const subscriptionSaving = ref(false)
 const exportLoading = ref(false)
@@ -514,6 +517,7 @@ function getSelectedRows(): AlertLogVO[] {
 
 function openDetail(record: AlertLogVO) {
   activeRecord.value = { ...record }
+  if (isMobile.value) mobileDetailVisible.value = true
 }
 
 async function handleMarkRead(record: AlertLogVO) {
@@ -983,7 +987,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="lg-page app-page alert-page">
+  <div class="lg-list-page lg-page app-page alert-page">
     <div class="lg-page-head">
       <div>
         <a-breadcrumb class="lg-page-head-breadcrumb">
@@ -993,102 +997,116 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div class="alert-shell">
-      <div class="alert-main">
-        <section class="alert-kpi-grid">
-          <article
-            v-for="card in kpiCards"
-            :key="card.key"
-            class="alert-kpi-card"
-            :class="`is-${card.tone}`"
-          >
-            <div class="alert-kpi-content">
-              <div class="alert-kpi-label">
-                <span>{{ card.titleCn }}</span>
-                <small v-if="card.titleEn">{{ card.titleEn }}</small>
-              </div>
-              <div class="alert-kpi-value">{{ card.value }}</div>
-              <div class="alert-kpi-hint">{{ card.hint }}</div>
-            </div>
-            <div class="alert-kpi-icon">
-              <component :is="card.icon" />
-            </div>
-          </article>
-        </section>
+    <AlertFilterPanel
+      :filter="filter"
+      :projects-loading="projectsLoading"
+      :project-options="projectOptions"
+      :process-status-options="processStatusOptions"
+      :has-default-scope-domain="hasDefaultScopeDomain"
+      :handle-search="handleSearch"
+      :handle-reset="handleReset"
+    />
 
-        <AlertFilterPanel
-          :filter="filter"
-          :projects-loading="projectsLoading"
-          :project-options="projectOptions"
-          :process-status-options="processStatusOptions"
-          :has-default-scope-domain="hasDefaultScopeDomain"
-          :handle-search="handleSearch"
-          :handle-reset="handleReset"
-        />
-
-        <AlertTablePanel
-          :alerts="alerts"
-          :column-settings="columnSettings"
-          :col-visible="colVisible"
-          :table-columns="tableColumns"
-          :loading="store.loading"
-          :table-height="tableHeight"
-          :all-page-selected="allPageSelected"
-          :page-selection-indeterminate="pageSelectionIndeterminate"
-          :total="total"
-          :page-no="pageNo"
-          :page-size="pageSize"
-          :selected-count="selectedCount"
-          :list-error="listError"
-          :show-empty-state="showEmptyState"
-          :has-active-filters="hasActiveFilters"
-          :can-manage-alerts="canManageAlerts"
-          :can-export-alerts="canExportAlerts"
-          :export-disabled="exportDisabled"
-          :toggle-col="toggleCol"
-          :toggle-page-selection="togglePageSelection"
-          :is-row-selected="isRowSelected"
-          :toggle-row-selection="toggleRowSelection"
-          :open-detail="openDetail"
-          :get-project-name="getProjectName"
-          :get-alert-domain-label="getAlertDomainLabel"
-          :get-alert-tag-label="getAlertTagLabel"
-          :get-process-status-label="getProcessStatusLabel"
-          :format-severity-text="formatSeverityText"
-          :format-date-time="formatDateTime"
-          :get-alert-message-text="getAlertMessageText"
-          :handle-mark-read="handleMarkRead"
-          :handle-change-status="handleChangeStatus"
-          :handle-batch-status="handleBatchStatus"
-          :handle-batch-mark-read="handleBatchMarkRead"
-          :handle-page-change="handlePageChange"
-          :handle-page-size-change="handlePageSizeChange"
-          :handle-reset="handleReset"
-          :handle-retry="fetchData"
-          :export-current-view="exportCurrentView"
-        />
-      </div>
-
-      <AlertDetailPanel
-        :active-record="activeRecord"
-        :status-remark-draft="statusRemarkDraft"
-        :current-operator="activeOperator"
-        :subscription-rows="subscriptionRows"
-        :subscription-summary-text="subscriptionSummaryText"
+    <div class="lg-grid alert-workspace">
+      <AlertTablePanel
+        :alerts="alerts"
+        :column-settings="columnSettings"
+        :col-visible="colVisible"
+        :table-columns="tableColumns"
+        :loading="store.loading"
+        :is-mobile="isMobile"
+        :table-height="tableHeight"
+        :all-page-selected="allPageSelected"
+        :page-selection-indeterminate="pageSelectionIndeterminate"
+        :total="total"
+        :page-no="pageNo"
+        :page-size="pageSize"
+        :selected-count="selectedCount"
+        :list-error="listError"
+        :show-empty-state="showEmptyState"
+        :has-active-filters="hasActiveFilters"
+        :can-manage-alerts="canManageAlerts"
+        :can-export-alerts="canExportAlerts"
+        :export-disabled="exportDisabled"
+        :toggle-col="toggleCol"
+        :toggle-page-selection="togglePageSelection"
+        :is-row-selected="isRowSelected"
+        :toggle-row-selection="toggleRowSelection"
+        :open-detail="openDetail"
+        :get-project-name="getProjectName"
+        :get-alert-domain-label="getAlertDomainLabel"
+        :get-alert-tag-label="getAlertTagLabel"
+        :get-process-status-label="getProcessStatusLabel"
         :format-severity-text="formatSeverityText"
         :format-date-time="formatDateTime"
-        :get-alert-domain-label="getAlertDomainLabel"
-        :get-project-name="getProjectName"
         :get-alert-message-text="getAlertMessageText"
-        :get-process-status-label="getProcessStatusLabel"
-        :open-subscription-modal="openSubscriptionModal"
         :handle-mark-read="handleMarkRead"
         :handle-change-status="handleChangeStatus"
-        :can-open-business-entry="canOpenBusinessEntry"
-        :open-business-entry="openBusinessEntry"
-        :handle-save-active-result="handleSaveActiveResult"
-        @update:status-remark-draft="statusRemarkDraft = $event"
+        :handle-batch-status="handleBatchStatus"
+        :handle-batch-mark-read="handleBatchMarkRead"
+        :handle-page-change="handlePageChange"
+        :handle-page-size-change="handlePageSizeChange"
+        :handle-reset="handleReset"
+        :handle-retry="fetchData"
+        :export-current-view="exportCurrentView"
       />
+
+      <aside
+        class="lg-analysis-rail alert-analysis-rail"
+        :class="{ 'alert-analysis-rail--mobile-open': mobileDetailVisible }"
+      >
+        <div class="lg-analysis-panel lg-fill-card alert-analysis-card">
+          <div
+            v-if="isMobile"
+            class="alert-mobile-detail-head"
+            @click="mobileDetailVisible = false"
+          >
+            <strong>预警详情 · 点击关闭</strong>
+          </div>
+          <div class="alert-analysis-head lg-analysis-header">
+            <div>
+              <strong class="lg-analysis-heading">辅助分析</strong>
+              <span class="lg-analysis-description">预警概览与处理详情</span>
+            </div>
+          </div>
+          <section class="alert-analysis-kpis" aria-label="预警概览">
+            <article
+              v-for="card in kpiCards"
+              :key="card.key"
+              class="alert-analysis-kpi"
+              :class="`is-${card.tone}`"
+            >
+              <span class="alert-analysis-kpi-icon"><component :is="card.icon" /></span>
+              <span class="alert-analysis-kpi-content">
+                <span>{{ card.titleCn }}</span>
+                <strong>{{ card.value }}</strong>
+                <small>{{ card.hint }}</small>
+              </span>
+            </article>
+          </section>
+
+          <AlertDetailPanel
+            :active-record="activeRecord"
+            :status-remark-draft="statusRemarkDraft"
+            :current-operator="activeOperator"
+            :subscription-rows="subscriptionRows"
+            :subscription-summary-text="subscriptionSummaryText"
+            :format-severity-text="formatSeverityText"
+            :format-date-time="formatDateTime"
+            :get-alert-domain-label="getAlertDomainLabel"
+            :get-project-name="getProjectName"
+            :get-alert-message-text="getAlertMessageText"
+            :get-process-status-label="getProcessStatusLabel"
+            :open-subscription-modal="openSubscriptionModal"
+            :handle-mark-read="handleMarkRead"
+            :handle-change-status="handleChangeStatus"
+            :can-open-business-entry="canOpenBusinessEntry"
+            :open-business-entry="openBusinessEntry"
+            :handle-save-active-result="handleSaveActiveResult"
+            @update:status-remark-draft="statusRemarkDraft = $event"
+          />
+        </div>
+      </aside>
     </div>
 
     <AlertSubscriptionModal
@@ -1109,151 +1127,169 @@ onMounted(async () => {
 
 <style scoped>
 .alert-page {
-  gap: 16px;
+  gap: 12px;
   min-height: 100%;
-  background: #f5f7fb;
+  background: var(--page-bg);
 }
 
-.alert-shell {
+.alert-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 20vw;
   align-items: stretch;
-  height: calc(100vh - 74px);
-  min-height: 720px;
-}
-
-.alert-main {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-width: 0;
+  width: 100%;
   min-height: 0;
 }
 
-.alert-kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-  overflow: hidden;
-  background: #fff;
-  border: 1px solid #e8edf5;
-  border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(31, 35, 41, 0.04);
-}
-
-.alert-kpi-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 18px;
-  min-height: 72px;
-}
-
-.alert-kpi-card + .alert-kpi-card {
-  border-left: 1px solid #eef2f7;
-}
-
-.alert-kpi-content {
+.alert-analysis-rail {
+  width: 20vw;
   min-width: 0;
 }
 
-.alert-kpi-label {
+.alert-analysis-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.alert-analysis-head,
+.alert-mobile-detail-head {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.alert-analysis-head strong,
+.alert-mobile-detail-head strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.alert-analysis-head span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.alert-mobile-detail-head {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.alert-analysis-kpis {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.alert-analysis-kpi {
   display: flex;
   align-items: center;
-  gap: 4px;
-  color: #5f6b7a;
-  font-size: 13px;
-  font-weight: 600;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px 12px;
 }
 
-.alert-kpi-label small {
-  color: #8a94a6;
-  font-size: 12px;
-  font-weight: 500;
+.alert-analysis-kpi:nth-child(even) {
+  border-left: 1px solid var(--border-subtle);
 }
 
-.alert-kpi-value {
-  margin-top: 4px;
-  font-size: 24px;
-  font-weight: 700;
-  line-height: 1;
+.alert-analysis-kpi:nth-child(n + 3) {
+  border-top: 1px solid var(--border-subtle);
 }
 
-.alert-kpi-hint {
-  margin-top: 6px;
-  color: #8a94a6;
-  font-size: 12px;
-}
-
-.alert-kpi-icon {
+.alert-analysis-kpi-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  font-size: 18px;
-  border-radius: 10px;
+  width: 30px;
+  height: 30px;
+  color: var(--primary);
+  background: var(--primary-soft);
+  border-radius: var(--radius-md);
   flex: 0 0 auto;
 }
 
-.alert-kpi-card.is-danger .alert-kpi-value {
-  color: #ff4d4f;
+.alert-analysis-kpi-content {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
 }
 
-.alert-kpi-card.is-danger .alert-kpi-icon {
-  color: #ff4d4f;
-  background: #fff1f0;
+.alert-analysis-kpi-content span,
+.alert-analysis-kpi-content small {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.alert-kpi-card.is-warning .alert-kpi-value {
-  color: #fa8c16;
+.alert-analysis-kpi-content strong {
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.15;
 }
 
-.alert-kpi-card.is-warning .alert-kpi-icon {
-  color: #fa8c16;
-  background: #fff7e8;
+.alert-analysis-kpi.is-danger .alert-analysis-kpi-icon,
+.alert-analysis-kpi.is-danger .alert-analysis-kpi-content strong {
+  color: var(--error);
 }
 
-.alert-kpi-card.is-primary .alert-kpi-value {
-  color: #1677ff;
+.alert-analysis-kpi.is-warning .alert-analysis-kpi-icon,
+.alert-analysis-kpi.is-warning .alert-analysis-kpi-content strong {
+  color: var(--warning);
 }
 
-.alert-kpi-card.is-primary .alert-kpi-icon {
-  color: #1677ff;
-  background: #eaf2ff;
+.alert-analysis-kpi.is-success .alert-analysis-kpi-icon,
+.alert-analysis-kpi.is-success .alert-analysis-kpi-content strong {
+  color: var(--success);
 }
 
-.alert-kpi-card.is-success .alert-kpi-value {
-  color: #16a34a;
-}
-
-.alert-kpi-card.is-success .alert-kpi-icon {
-  color: #16a34a;
-  background: #edf9f0;
-}
-
-@media (max-width: 1200px) {
-  .alert-shell {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 1100px) {
-  .alert-kpi-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 768px) {
-  .alert-kpi-grid {
-    grid-template-columns: 1fr;
+@media (width < 500px) {
+  .alert-page {
+    gap: 10px;
   }
 
-  .alert-kpi-card + .alert-kpi-card {
-    border-top: 1px solid #eef2f7;
-    border-left: 0;
+  .alert-page > .lg-page-head {
+    display: none;
+  }
+
+  .alert-workspace {
+    display: block;
+  }
+
+  .alert-analysis-rail {
+    display: none;
+  }
+
+  .alert-analysis-rail--mobile-open {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    display: block;
+    width: 100vw;
+    height: 100dvh;
+    padding: 0;
+    background: var(--surface);
+  }
+
+  .alert-analysis-card {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .alert-analysis-head,
+  .alert-analysis-kpis {
+    display: none;
   }
 }
 </style>

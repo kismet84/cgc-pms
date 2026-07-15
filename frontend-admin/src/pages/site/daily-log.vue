@@ -2,6 +2,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
+import { FilterOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { useUserStore } from '@/stores/user'
 import {
@@ -14,11 +15,14 @@ import {
 import { deleteFile, getFileUrl, listFiles, uploadFile } from '@/api/modules/file'
 import type { SiteDailyLogCommand, SiteDailyLogVO } from '@/types/site-daily-log'
 import type { SysFileVO } from '@/types/file'
+import { useMobileViewport } from '@/composables/useMobileViewport'
 
 const SITE_DAILY_LOG = 'SITE_DAILY_LOG'
 const referenceStore = useReferenceStore()
 const userStore = useUserStore()
 const { projects } = storeToRefs(referenceStore)
+const { isMobile } = useMobileViewport()
+const mobileFiltersOpen = ref(false)
 const canEdit = computed(
   () =>
     userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role)) ||
@@ -68,6 +72,14 @@ const columns = [
   { title: '提交时间', dataIndex: 'submittedAt', key: 'submittedAt', width: 170 },
   { title: '操作', key: 'action', width: 220 },
 ]
+
+const submittedCount = computed(
+  () => records.value.filter((record) => record.status === 'SUBMITTED').length,
+)
+const draftCount = computed(
+  () => records.value.filter((record) => record.status === 'DRAFT').length,
+)
+const recentRecords = computed(() => records.value.slice(0, 4))
 
 async function fetchData() {
   loading.value = true
@@ -191,6 +203,13 @@ function resetFilters() {
   filter.endDate = undefined
   filter.status = undefined
   pageNo.value = 1
+  mobileFiltersOpen.value = false
+  fetchData()
+}
+
+function applyMobileFilters() {
+  mobileFiltersOpen.value = false
+  pageNo.value = 1
   fetchData()
 }
 
@@ -205,90 +224,212 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-page site-daily-page">
-    <div class="lg-page-head">
-      <div>
-        <h1>现场日报</h1>
-        <p>按项目和日期沉淀施工内容、问题与次日计划。</p>
+  <div class="lg-list-page lg-page app-page site-daily-page project-operation-list-page">
+    <div class="lg-page-head site-daily-page-head">
+      <a-breadcrumb>
+        <a-breadcrumb-item>项目经营</a-breadcrumb-item>
+        <a-breadcrumb-item>现场日报</a-breadcrumb-item>
+      </a-breadcrumb>
+    </div>
+
+    <div class="lg-grid site-daily-workspace project-operation-workspace">
+      <div class="lg-left site-daily-main project-operation-main-column">
+        <section
+          class="lg-search-bar site-daily-query project-operation-query-panel"
+          aria-label="现场日报查询条件"
+        >
+          <div class="site-daily-search-row">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="搜索项目名称"
+              allow-clear
+              show-search
+              size="large"
+              class="site-daily-project-select"
+            >
+              <a-select-option v-for="project in projects" :key="project.id" :value="project.id">
+                {{ project.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-button
+              type="primary"
+              class="site-daily-search-button project-operation-desktop-query-action"
+              @click="fetchData"
+            >
+              <template #icon><SearchOutlined /></template>搜索
+            </a-button>
+            <a-button
+              class="site-daily-reset-button project-operation-desktop-query-action"
+              @click="resetFilters"
+            >
+              <template #icon><ReloadOutlined /></template>重置
+            </a-button>
+            <a-button
+              class="site-daily-filter-button project-operation-filter-toggle"
+              :aria-expanded="mobileFiltersOpen"
+              aria-controls="site-daily-filter-panel"
+              @click="mobileFiltersOpen = !mobileFiltersOpen"
+            >
+              <template #icon><FilterOutlined /></template>筛选
+            </a-button>
+          </div>
+          <div
+            id="site-daily-filter-panel"
+            class="site-daily-filter-panel project-operation-filter-panel"
+            :class="{ 'is-open': mobileFiltersOpen }"
+          >
+            <a-date-picker
+              v-model:value="filter.startDate"
+              value-format="YYYY-MM-DD"
+              placeholder="开始日期"
+            />
+            <a-date-picker
+              v-model:value="filter.endDate"
+              value-format="YYYY-MM-DD"
+              placeholder="结束日期"
+            />
+            <a-select v-model:value="filter.status" placeholder="全部状态" allow-clear>
+              <a-select-option value="DRAFT">草稿</a-select-option>
+              <a-select-option value="SUBMITTED">已提交</a-select-option>
+            </a-select>
+            <div class="site-daily-filter-actions">
+              <a-button @click="resetFilters">重置</a-button>
+              <a-button type="primary" @click="applyMobileFilters">应用筛选</a-button>
+            </div>
+          </div>
+        </section>
+
+        <main class="lg-list-table-panel site-daily-table-panel project-operation-table-panel">
+          <div class="lg-toolbar site-daily-toolbar">
+            <div class="lg-toolbar-left">
+              <strong>现场日报</strong><span>共 {{ total }} 条</span>
+            </div>
+            <div class="lg-toolbar-right">
+              <a-button v-if="canEdit" type="primary" @click="openCreate">
+                <template #icon><PlusOutlined /></template>新建日报
+              </a-button>
+              <a-button v-if="!isMobile" @click="fetchData">
+                <template #icon><ReloadOutlined /></template>刷新
+              </a-button>
+            </div>
+          </div>
+
+          <div class="lg-table-wrap site-daily-table-wrap">
+            <a-result
+              v-if="listError"
+              status="error"
+              title="现场日报加载失败"
+              :sub-title="listError"
+            >
+              <template #extra
+                ><a-button type="primary" @click="fetchData">重试</a-button></template
+              >
+            </a-result>
+            <a-empty
+              v-else-if="hasLoaded && !loading && !records.length"
+              description="暂无现场日报"
+            />
+            <div v-else-if="isMobile" class="site-daily-mobile-list">
+              <article v-for="record in records" :key="record.id" class="site-daily-mobile-card">
+                <div class="site-daily-mobile-card-head">
+                  <strong>{{ record.projectName || '-' }}</strong>
+                  <a-tag :color="record.status === 'DRAFT' ? 'default' : 'success'">
+                    {{ record.status === 'DRAFT' ? '草稿' : '已提交' }}
+                  </a-tag>
+                </div>
+                <div class="site-daily-mobile-date">{{ record.reportDate }}</div>
+                <div class="site-daily-mobile-content">{{ record.constructionContent || '-' }}</div>
+                <button type="button" class="site-daily-card-hitarea" @click="openRecord(record)">
+                  查看详情
+                </button>
+              </article>
+            </div>
+            <a-table
+              v-else
+              class="site-daily-desktop-table"
+              :loading="loading"
+              :columns="columns"
+              :data-source="records"
+              :pagination="false"
+              row-key="id"
+              :scroll="{ x: 900 }"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'status'">
+                  <a-tag :color="record.status === 'DRAFT' ? 'default' : 'success'">
+                    {{ record.status === 'DRAFT' ? '草稿' : '已提交' }}
+                  </a-tag>
+                </template>
+                <template v-else-if="column.key === 'action'">
+                  <a-space>
+                    <a-button type="link" @click="openRecord(record)">查看</a-button>
+                    <a-button
+                      v-if="canEdit && record.status === 'DRAFT'"
+                      type="link"
+                      @click="openRecord(record, true)"
+                      >编辑</a-button
+                    >
+                    <a-button
+                      v-if="canEdit && record.status === 'DRAFT'"
+                      type="link"
+                      @click="submitRecord(record)"
+                      >提交</a-button
+                    >
+                  </a-space>
+                </template>
+              </template>
+            </a-table>
+          </div>
+          <div class="lg-pagination site-daily-pagination">
+            <span class="lg-total">共 {{ total }} 条</span>
+            <a-pagination
+              v-model:current="pageNo"
+              v-model:page-size="pageSize"
+              :total="total"
+              :show-size-changer="!isMobile"
+              @change="fetchData"
+            />
+          </div>
+        </main>
       </div>
-      <a-button v-if="canEdit" type="primary" @click="openCreate">新建日报</a-button>
-    </div>
-    <div class="lg-search-bar">
-      <a-select
-        v-model:value="filter.projectId"
-        placeholder="全部项目"
-        allow-clear
-        style="width: 220px"
-        ><a-select-option v-for="project in projects" :key="project.id" :value="project.id">{{
-          project.projectName
-        }}</a-select-option></a-select
+
+      <aside
+        class="lg-analysis-rail site-daily-analysis project-operation-analysis-rail"
+        aria-label="现场日报辅助分析"
       >
-      <a-date-picker
-        v-model:value="filter.startDate"
-        value-format="YYYY-MM-DD"
-        placeholder="开始日期"
-      />
-      <a-date-picker
-        v-model:value="filter.endDate"
-        value-format="YYYY-MM-DD"
-        placeholder="结束日期"
-      />
-      <a-select
-        v-model:value="filter.status"
-        placeholder="全部状态"
-        allow-clear
-        style="width: 130px"
-        ><a-select-option value="DRAFT">草稿</a-select-option
-        ><a-select-option value="SUBMITTED">已提交</a-select-option></a-select
-      >
-      <a-button type="primary" @click="fetchData">查询</a-button
-      ><a-button @click="resetFilters">重置</a-button>
+        <div class="lg-analysis-panel lg-fill-card site-daily-analysis-panel">
+          <header class="lg-analysis-header">
+            <div>
+              <strong class="lg-analysis-heading">辅助分析</strong>
+              <span class="lg-analysis-description">日报状态与近期记录</span>
+            </div>
+          </header>
+          <section class="lg-analysis-section">
+            <div class="lg-analysis-section-title">日报概览</div>
+            <div class="lg-analysis-overview-list">
+              <div class="lg-analysis-overview-row">
+                <span>当前记录</span><strong>{{ total }} 条</strong>
+              </div>
+              <div class="lg-analysis-overview-row">
+                <span>已提交</span><strong>{{ submittedCount }} 条</strong>
+              </div>
+              <div class="lg-analysis-overview-row">
+                <span>草稿</span><strong>{{ draftCount }} 条</strong>
+              </div>
+            </div>
+          </section>
+          <section class="lg-analysis-section">
+            <div class="lg-analysis-section-title">近期日报</div>
+            <div v-for="record in recentRecords" :key="record.id" class="lg-type-row">
+              <span class="lg-type-dot lg-analysis-dot-primary"></span>
+              <span class="lg-type-label">{{ record.projectName || '-' }}</span>
+              <span class="lg-type-pct">{{ record.reportDate }}</span>
+            </div>
+            <div v-if="!recentRecords.length" class="site-daily-analysis-empty">暂无日报</div>
+          </section>
+        </div>
+      </aside>
     </div>
-    <a-result v-if="listError" status="error" title="现场日报加载失败" :sub-title="listError"
-      ><template #extra
-        ><a-button type="primary" @click="fetchData">重试</a-button></template
-      ></a-result
-    >
-    <a-empty v-else-if="hasLoaded && !loading && !records.length" description="暂无现场日报" />
-    <a-table
-      v-else
-      :loading="loading"
-      :columns="columns"
-      :data-source="records"
-      :pagination="false"
-      row-key="id"
-    >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'"
-          ><a-tag :color="record.status === 'DRAFT' ? 'default' : 'success'">{{
-            record.status === 'DRAFT' ? '草稿' : '已提交'
-          }}</a-tag></template
-        >
-        <template v-else-if="column.key === 'action'"
-          ><a-space
-            ><a-button type="link" @click="openRecord(record)">查看</a-button
-            ><a-button
-              v-if="canEdit && record.status === 'DRAFT'"
-              type="link"
-              @click="openRecord(record, true)"
-              >编辑</a-button
-            ><a-button
-              v-if="canEdit && record.status === 'DRAFT'"
-              type="link"
-              @click="submitRecord(record)"
-              >提交</a-button
-            ></a-space
-          ></template
-        >
-      </template>
-    </a-table>
-    <a-pagination
-      v-model:current="pageNo"
-      v-model:page-size="pageSize"
-      :total="total"
-      show-size-changer
-      @change="fetchData"
-    />
 
     <a-modal
       v-model:open="modalOpen"
@@ -501,20 +642,201 @@ onMounted(() => {
 
 <style scoped>
 .site-daily-page {
-  display: grid;
-  gap: 16px;
+  min-width: 0;
 }
-.lg-page-head {
+
+.site-daily-page-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.lg-page-head h1 {
-  margin: 0;
+
+.site-daily-query {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  box-sizing: border-box;
+  min-height: 60px;
+  padding: 10px 14px;
+  border: 0;
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    var(--shadow-soft);
 }
-.lg-page-head p {
-  margin: 6px 0 0;
+
+.site-daily-search-row,
+.site-daily-filter-panel,
+.site-daily-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.site-daily-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  width: 100%;
+}
+
+.site-daily-project-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.site-daily-project-select :deep(.ant-select-selector) {
+  height: 40px !important;
+  align-items: center;
+}
+
+.site-daily-filter-panel.is-open {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.site-daily-filter-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+}
+
+.site-daily-table-panel,
+.site-daily-table-wrap {
+  min-height: 0;
+}
+
+.site-daily-table-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.site-daily-table-wrap {
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.site-daily-table-wrap :deep(.site-daily-desktop-table),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-spin-nested-loading),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-spin-container),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table-container) {
+  height: 100%;
+  min-height: 0;
+}
+
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-spin-container),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table-container) {
+  display: flex;
+  flex-direction: column;
+}
+
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table-container),
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table-content) {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.site-daily-table-wrap :deep(.site-daily-desktop-table .ant-table-content) {
+  height: 100% !important;
+  overflow: auto;
+}
+
+.site-daily-pagination {
+  justify-content: flex-end;
+}
+
+.site-daily-analysis-panel header,
+.site-daily-analysis-panel section {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.site-daily-analysis-panel header {
+  display: grid;
+  gap: 2px;
+}
+
+.site-daily-analysis-panel header span,
+.site-daily-analysis-panel small,
+.site-daily-analysis-empty {
   color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.site-daily-analysis-panel h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+}
+
+.site-daily-analysis-row,
+.site-daily-recent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+}
+
+.site-daily-recent-row {
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.site-daily-recent-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-daily-mobile-list {
+  display: grid;
+}
+
+.site-daily-mobile-card {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  min-height: 92px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.site-daily-mobile-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.site-daily-mobile-date,
+.site-daily-mobile-content {
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.site-daily-card-hitarea {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: transparent;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
 }
 .site-daily-files {
   display: grid;
@@ -535,5 +857,46 @@ onMounted(() => {
   display: grid;
   gap: 8px;
   margin-top: 16px;
+}
+
+@media (width < 500px) {
+  .site-daily-query {
+    display: flex;
+    min-height: 40px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .site-daily-search-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+
+  .site-daily-project-select {
+    min-width: 0;
+  }
+
+  .site-daily-filter-panel.is-open {
+    display: grid !important;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .site-daily-toolbar {
+    min-height: 48px;
+    padding: 8px 12px;
+  }
+
+  .site-daily-mobile-card {
+    min-height: 88px;
+    padding: 10px 14px;
+  }
 }
 </style>

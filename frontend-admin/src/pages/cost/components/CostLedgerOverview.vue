@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
   DollarOutlined,
+  FilterOutlined,
   LockOutlined,
   ToolOutlined,
   ReloadOutlined,
   SearchOutlined,
   AlertOutlined,
-  SettingOutlined,
 } from '@ant-design/icons-vue'
+
+const mobileFiltersOpen = ref(false)
 
 interface KpiStats {
   total: number
@@ -105,7 +107,11 @@ const mobileKpiItems = computed(() => [
 </script>
 
 <template>
-  <section v-if="!isMobile" class="lg-kpi-strip cost-ledger-kpi-summary" aria-label="成本关键指标">
+  <section
+    v-if="!isMobile"
+    class="lg-kpi-strip cost-ledger-kpi-summary project-operation-kpi"
+    aria-label="成本关键指标"
+  >
     <div class="cost-ledger-kpi-item">
       <span class="cost-ledger-kpi-icon is-total"><DollarOutlined /></span>
       <span class="cost-ledger-kpi-label">成本总额</span>
@@ -160,8 +166,12 @@ const mobileKpiItems = computed(() => [
     </div>
   </div>
 
-  <div class="lg-search-bar cost-ledger-query-panel">
-    <div class="cost-ledger-query-primary">
+  <div class="lg-search-bar cost-ledger-query-panel project-operation-query-panel">
+    <div
+      id="cost-ledger-filter-panel"
+      class="cost-ledger-query-primary project-operation-filter-panel"
+      :class="{ 'is-open': mobileFiltersOpen }"
+    >
       <a-select
         v-if="filterVisibility.projectId"
         v-model:value="filter.projectId"
@@ -284,30 +294,26 @@ const mobileKpiItems = computed(() => [
         <template #prefix><SearchOutlined class="cost-ledger-search-prefix-icon" /></template>
       </a-input>
       <div class="cost-ledger-query-actions">
-        <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-        <a-button size="large" @click="handleReset">
+        <a-button
+          class="project-operation-desktop-query-action"
+          type="primary"
+          size="large"
+          @click="handleSearch"
+          >搜索</a-button
+        >
+        <a-button class="project-operation-desktop-query-action" size="large" @click="handleReset">
           <template #icon><ReloadOutlined /></template>
           重置
         </a-button>
-        <a-dropdown trigger="click">
-          <a-button size="large">
-            <template #icon><SettingOutlined /></template>
-            筛选栏设置
-          </a-button>
-          <template #overlay>
-            <a-menu>
-              <a-menu-item
-                v-for="item in filterSettingItems"
-                :key="item.key"
-                @click="toggleFilterVisibility(item.key)"
-              >
-                <a-checkbox :checked="filterVisibility[item.key]">
-                  {{ item.label }}
-                </a-checkbox>
-              </a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
+        <a-button
+          class="project-operation-filter-toggle"
+          size="large"
+          :aria-expanded="mobileFiltersOpen"
+          aria-controls="cost-ledger-filter-panel"
+          @click="mobileFiltersOpen = !mobileFiltersOpen"
+        >
+          <template #icon><FilterOutlined /></template>筛选
+        </a-button>
       </div>
     </div>
   </div>

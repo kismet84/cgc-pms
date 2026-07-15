@@ -27,21 +27,23 @@ defineProps<{
   warningRows: WarningRow[]
 }>()
 
-const emit = defineEmits<{
+defineEmits<{
   (e: 'allAlerts'): void
 }>()
 </script>
 
 <template>
-  <aside class="lg-analysis-rail cl-analysis-rail" aria-label="合同辅助分析">
+  <aside
+    class="lg-analysis-rail cl-analysis-rail project-operation-analysis-rail"
+    aria-label="合同辅助分析"
+  >
     <!-- class="cl-analysis-panel" -->
     <div class="lg-analysis-panel lg-fill-card cl-analysis-panel">
-      <header class="cl-analysis-head">
+      <header class="cl-analysis-head lg-analysis-header">
         <div>
-          <div class="cl-analysis-title">合同分析</div>
-          <div class="cl-analysis-subtitle">分布、状态与逾期风险</div>
+          <div class="cl-analysis-title lg-analysis-heading">辅助分析</div>
+          <div class="cl-analysis-subtitle lg-analysis-description">分布、状态与逾期风险</div>
         </div>
-        <a-button type="link" size="small" @click="emit('allAlerts')">查看预警</a-button>
       </header>
 
       <section class="cl-analysis-section">

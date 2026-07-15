@@ -4,10 +4,10 @@ import {
   ClockCircleOutlined,
   DollarOutlined,
   PayCircleOutlined,
-  ReloadOutlined,
   SearchOutlined,
   WalletOutlined,
 } from '@ant-design/icons-vue'
+import ListQueryPanel from '@/components/list-page/ListQueryPanel.vue'
 
 type FilterState = {
   projectId?: string
@@ -79,9 +79,9 @@ function handleProjectChange(value: string | undefined) {
     </a-breadcrumb>
   </div>
 
-  <div class="lg-grid payment-workspace">
-    <div class="lg-left payment-main-column">
-      <div class="lg-kpi-strip payment-kpi-summary" aria-label="付款关键指标">
+  <div class="lg-grid payment-workspace settlement-domain-workspace">
+    <div class="lg-left payment-main-column settlement-domain-main-column">
+      <div class="lg-kpi-strip payment-kpi-summary settlement-domain-kpi" aria-label="付款关键指标">
         <div class="payment-kpi-item">
           <span class="payment-kpi-icon is-total"><PayCircleOutlined /></span>
           <span class="payment-kpi-label">申请总数</span>
@@ -123,13 +123,12 @@ function handleProjectChange(value: string | undefined) {
         </div>
       </div>
 
-      <div class="lg-search-bar payment-search-bar">
-        <div class="payment-filter-grid">
+      <ListQueryPanel aria-label="付款查询条件" @search="props.onSearch" @reset="props.onReset">
+        <template #primary>
           <a-select
             v-model:value="props.filter.projectId"
             placeholder="全部项目"
             allow-clear
-            size="large"
             @change="handleProjectChange"
           >
             <template #suffixIcon><SearchOutlined /></template>
@@ -137,24 +136,22 @@ function handleProjectChange(value: string | undefined) {
               {{ p.projectName }}
             </a-select-option>
           </a-select>
+        </template>
+        <template #filters>
           <a-select
             v-model:value="props.filter.contractId"
             placeholder="全部合同"
             allow-clear
-            size="large"
             @change="props.onSearch"
           >
             <a-select-option v-for="c in props.contracts" :key="c.id" :value="c.id">
               {{ c.contractName }}
             </a-select-option>
           </a-select>
-        </div>
-        <div class="payment-filter-foot">
           <a-select
             v-model:value="props.filter.payType"
             placeholder="全部付款类型"
             allow-clear
-            size="large"
             @change="props.onSearch"
           >
             <a-select-option v-for="(label, key) in props.payTypeLabel" :key="key" :value="key">
@@ -165,34 +162,30 @@ function handleProjectChange(value: string | undefined) {
             v-model:value="props.filter.payStatus"
             placeholder="全部付款状态"
             allow-clear
-            size="large"
             @change="props.onSearch"
           >
             <a-select-option v-for="(_, key) in props.payStatusLabelMap" :key="key" :value="key">
               {{ props.payStatusLabel(String(key)) }}
             </a-select-option>
           </a-select>
-          <div class="payment-search-actions">
-            <a-button type="primary" size="large" @click="props.onSearch">搜索</a-button>
-            <a-button size="large" @click="props.onReset">
-              <template #icon><ReloadOutlined /></template>
-              重置
-            </a-button>
-          </div>
-        </div>
-      </div>
+        </template>
+      </ListQueryPanel>
 
       <slot />
     </div>
 
-    <aside class="lg-analysis-rail payment-analysis-rail" aria-label="付款辅助分析">
+    <aside
+      class="lg-analysis-rail payment-analysis-rail settlement-domain-analysis-rail"
+      aria-label="付款辅助分析"
+    >
       <div class="lg-analysis-panel payment-analysis-panel">
-        <header class="payment-analysis-head">
+        <header class="payment-analysis-head lg-analysis-header">
           <div>
-            <div class="payment-analysis-title">辅助分析</div>
-            <div class="payment-analysis-subtitle">支付状态、审批状态与待付款</div>
+            <div class="payment-analysis-title lg-analysis-heading">辅助分析</div>
+            <div class="payment-analysis-subtitle lg-analysis-description">
+              支付状态、审批状态与待付款
+            </div>
           </div>
-          <a-button type="link" size="small" @click="props.onRefresh">刷新</a-button>
         </header>
 
         <section class="payment-analysis-focus">

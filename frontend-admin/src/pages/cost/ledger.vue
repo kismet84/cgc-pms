@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -9,6 +9,8 @@ import {
   getCostLedgerSummary,
   getCostLedgerDetail,
   executeOverheadAllocation,
+  getOverheadAllocationRules,
+  type OverheadAllocationRuleVO,
 } from '@/api/modules/cost'
 import { getCostSubjectList } from '@/api/modules/costSubject'
 import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO } from '@/types/cost'
@@ -22,9 +24,9 @@ import CostLedgerOverview from './components/CostLedgerOverview.vue'
 import CostLedgerTablePanel from './components/CostLedgerTablePanel.vue'
 import CostLedgerAnalysisRail from './components/CostLedgerAnalysisRail.vue'
 import CostLedgerDetailDrawer from './components/CostLedgerDetailDrawer.vue'
+import { useMobileViewport } from '@/composables/useMobileViewport'
 
-const MOBILE_BP = 768
-const isMobile = ref(window.innerWidth < MOBILE_BP)
+const { isMobile } = useMobileViewport()
 const route = useRoute()
 const userStore = useUserStore()
 
@@ -36,6 +38,53 @@ const canExecuteAllocation = computed(
     isAllocationAdmin.value ||
     (userStore.hasPermission('cost:ledger:query') && userStore.hasPermission('overhead:execute')),
 )
+const canViewAllocationRules = computed(
+  () => isAllocationAdmin.value || userStore.hasPermission('overhead:query'),
+)
+const ruleModalOpen = ref(false)
+const ruleLoading = ref(false)
+const ruleRows = ref<OverheadAllocationRuleVO[]>([])
+const rulePageNo = ref(1)
+const rulePageSize = ref(10)
+const ruleTotal = ref(0)
+let ruleRequestId = 0
+
+const ruleColumns = [
+  { title: '成本科目 ID', dataIndex: 'costSubjectId' },
+  { title: '分摊依据', dataIndex: 'allocationBasis' },
+  { title: '分摊周期', dataIndex: 'allocationCycle' },
+  { title: '状态', dataIndex: 'status' },
+]
+
+async function fetchAllocationRules() {
+  const requestId = ++ruleRequestId
+  ruleLoading.value = true
+  ruleRows.value = []
+  ruleTotal.value = 0
+  try {
+    const result = await getOverheadAllocationRules(rulePageNo.value, rulePageSize.value)
+    if (requestId !== ruleRequestId) return
+    ruleRows.value = result.records
+    ruleTotal.value = result.total
+  } catch (error: unknown) {
+    console.error(error)
+    if (requestId === ruleRequestId) message.error('加载间接费规则失败')
+  } finally {
+    if (requestId === ruleRequestId) ruleLoading.value = false
+  }
+}
+
+function openRuleModal() {
+  rulePageNo.value = 1
+  ruleModalOpen.value = true
+  void fetchAllocationRules()
+}
+
+function handleRulePageChange(page: number, pageSize: number) {
+  rulePageNo.value = page
+  rulePageSize.value = pageSize
+  void fetchAllocationRules()
+}
 const allocationModalOpen = ref(false)
 const allocationSubmitting = ref(false)
 const allocationMonth = ref<string>()
@@ -77,10 +126,6 @@ async function confirmAllocation() {
   } finally {
     allocationSubmitting.value = false
   }
-}
-
-function onResize() {
-  isMobile.value = window.innerWidth < MOBILE_BP
 }
 
 const referenceStore = useReferenceStore()
@@ -404,7 +449,6 @@ const {
 } = useColumnSettings('cost_ledger_cols', gridColumns)
 
 onMounted(async () => {
-  window.addEventListener('resize', onResize)
   await fetchDictData(COST_TYPE_DICT)
   applyRouteQuery()
   referenceStore.fetchProjects()
@@ -414,12 +458,10 @@ onMounted(async () => {
   fetchData()
   fetchSummary()
 })
-
-onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page cost-ledger-page">
+  <div class="lg-list-page lg-page app-page cost-ledger-page project-operation-list-page">
     <div class="lg-page-head cost-ledger-page-head">
       <div class="cost-ledger-head-main">
         <a-breadcrumb class="cl-breadcrumb">
@@ -427,18 +469,27 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <a-breadcrumb-item>成本列表</a-breadcrumb-item>
         </a-breadcrumb>
       </div>
-      <a-button
-        v-if="canExecuteAllocation"
-        type="primary"
-        data-testid="execute-overhead-allocation"
-        @click="openAllocationModal"
-      >
-        执行间接费分摊
-      </a-button>
+      <a-space>
+        <a-button
+          v-if="canViewAllocationRules"
+          data-testid="view-overhead-allocation-rules"
+          @click="openRuleModal"
+        >
+          查看间接费规则
+        </a-button>
+        <a-button
+          v-if="canExecuteAllocation"
+          type="primary"
+          data-testid="execute-overhead-allocation"
+          @click="openAllocationModal"
+        >
+          执行间接费分摊
+        </a-button>
+      </a-space>
     </div>
 
-    <div class="lg-grid cost-ledger-grid">
-      <div class="lg-left cost-ledger-main">
+    <div class="lg-grid cost-ledger-grid project-operation-workspace">
+      <div class="lg-left cost-ledger-main project-operation-main-column">
         <CostLedgerOverview
           :is-mobile="isMobile"
           :kpi-stats="kpiStats"
@@ -493,6 +544,25 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       :cost-type-label="costTypeLabel"
       @close="closeDetail"
     />
+
+    <a-modal v-model:open="ruleModalOpen" title="间接费规则" :footer="null" width="760px">
+      <a-table
+        row-key="id"
+        :columns="ruleColumns"
+        :data-source="ruleRows"
+        :loading="ruleLoading"
+        :pagination="{
+          current: rulePageNo,
+          pageSize: rulePageSize,
+          total: ruleTotal,
+          showSizeChanger: true,
+        }"
+        @change="
+          (pagination: { current?: number; pageSize?: number }) =>
+            handleRulePageChange(pagination.current ?? 1, pagination.pageSize ?? 10)
+        "
+      />
+    </a-modal>
 
     <a-modal
       v-model:open="allocationModalOpen"

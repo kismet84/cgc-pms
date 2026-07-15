@@ -180,7 +180,7 @@ describe('purchase order page quality guardrails', () => {
     expect(source).toContain("import PurchaseOrderModal from './components/PurchaseOrderModal.vue'")
     expect(source).toMatch(/<PurchaseOrderSearchBar[\s\S]*?class=\"purchase-order-search-bar\"/)
     expect(source).toMatch(
-      /<PurchaseOrderAnalysisRail[\s\S]*?class=\"purchase-order-analysis-rail\"/,
+      /<PurchaseOrderAnalysisRail[\s\S]*?class=\"purchase-order-analysis-rail procurement-subcontract-analysis-rail\"/,
     )
     expect(source).toMatch(/<PurchaseOrderModal[\s\S]*?v-model:open=\"modalVisible\"/)
   })
@@ -196,7 +196,7 @@ describe('purchase order page quality guardrails', () => {
   })
 
   it('keeps search and analysis root DOM classes in local components', () => {
-    expect(searchBarSource).toContain('<div class="lg-search-bar">')
+    expect(searchBarSource).toContain('class="lg-search-bar procurement-subcontract-query-panel"')
     expect(analysisRailSource).toContain(
       '<aside class="lg-analysis-rail" aria-label="采购订单辅助分析">',
     )

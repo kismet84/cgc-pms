@@ -7,6 +7,7 @@ import {
   CheckCircleOutlined,
   ClockCircleOutlined,
   FileDoneOutlined,
+  FilterOutlined,
   MoreOutlined,
   PauseCircleOutlined,
   PlusOutlined,
@@ -36,6 +37,7 @@ import {
   SUBCONTRACT_TASK_STATUS_LABEL,
 } from './pageConfig'
 
+const filterPanelOpen = ref(false)
 const filter = reactive({
   projectId: undefined as string | undefined,
   contractId: undefined as string | undefined,
@@ -429,7 +431,9 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page subcontract-task-page">
+  <div
+    class="lg-list-page lg-page app-page subcontract-task-page procurement-subcontract-list-page"
+  >
     <div class="lg-page-head subcontract-task-page-head">
       <a-breadcrumb class="lg-breadcrumb">
         <a-breadcrumb-item>分包管理</a-breadcrumb-item>
@@ -482,8 +486,11 @@ onMounted(() => {
           </div>
         </div>
 
-        <div class="lg-search-bar subcontract-task-search-bar">
-          <div class="subcontract-task-filter-grid">
+        <div class="lg-search-bar subcontract-task-search-bar procurement-subcontract-query-panel">
+          <div
+            class="subcontract-task-filter-grid procurement-subcontract-filter-panel"
+            :class="{ 'is-open': filterPanelOpen }"
+          >
             <a-select
               v-model:value="filter.projectId"
               placeholder="全部项目"
@@ -510,7 +517,7 @@ onMounted(() => {
               <a-select-option value="SUSPENDED">已暂停</a-select-option>
             </a-select>
           </div>
-          <div class="subcontract-task-filter-foot">
+          <div class="subcontract-task-filter-foot procurement-subcontract-query-row">
             <a-input
               v-model:value="filter.keyword"
               placeholder="搜索任务编号、名称…"
@@ -522,17 +529,38 @@ onMounted(() => {
                 <SearchOutlined style="color: var(--text-secondary)" />
               </template>
             </a-input>
-            <div class="subcontract-task-filter-actions">
-              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-              <a-button size="large" @click="handleReset">
+            <div class="subcontract-task-filter-actions procurement-subcontract-query-actions">
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                type="primary"
+                size="large"
+                @click="handleSearch"
+                >搜索</a-button
+              >
+              <a-button
+                class="procurement-subcontract-desktop-action"
+                size="large"
+                @click="handleReset"
+              >
                 <template #icon><ReloadOutlined /></template>
                 重置
+              </a-button>
+              <a-button
+                class="procurement-subcontract-filter-toggle"
+                size="large"
+                :aria-expanded="filterPanelOpen"
+                @click="filterPanelOpen = !filterPanelOpen"
+              >
+                <template #icon><FilterOutlined /></template>
+                筛选
               </a-button>
             </div>
           </div>
         </div>
 
-        <main class="lg-list-table-panel subcontract-task-table-panel">
+        <main
+          class="lg-list-table-panel subcontract-task-table-panel procurement-subcontract-table-panel"
+        >
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
               <div class="subcontract-task-table-title">
@@ -578,6 +606,7 @@ onMounted(() => {
             </div>
             <vxe-grid
               v-else
+              class="procurement-subcontract-desktop-table"
               :data="tableData"
               :columns="visibleGridColumns"
               :loading="loading"
@@ -623,6 +652,31 @@ onMounted(() => {
                 </a-dropdown>
               </template>
             </vxe-grid>
+            <div v-if="!listError && !showEmptyState" class="procurement-subcontract-mobile-list">
+              <button
+                v-for="row in tableData"
+                :key="row.id"
+                class="procurement-subcontract-mobile-card"
+                type="button"
+                @click="handleView(row)"
+              >
+                <span class="procurement-subcontract-mobile-card-title">{{
+                  row.taskName || row.taskCode || '-'
+                }}</span>
+                <span class="procurement-subcontract-mobile-card-status">
+                  <a-tag :color="STATUS_COLOR[row.status]">{{
+                    STATUS_LABEL[row.status] ?? row.status
+                  }}</a-tag>
+                </span>
+                <span class="procurement-subcontract-mobile-card-subtitle"
+                  >{{ row.taskCode || '编号待维护' }} · {{ row.projectName || '未关联项目' }}</span
+                >
+                <span class="procurement-subcontract-mobile-card-meta"
+                  >进度 {{ row.progressPercent || '0' }}% ·
+                  {{ row.plannedEndDate || '计划日期待维护' }}</span
+                >
+              </button>
+            </div>
           </div>
 
           <section class="subcontract-task-wbs-panel" aria-label="项目内 WBS 树与只读甘特展示">
@@ -701,8 +755,17 @@ onMounted(() => {
         </main>
       </div>
 
-      <aside class="lg-analysis-rail subcontract-task-analysis-rail" aria-label="分包任务辅助分析">
+      <aside
+        class="lg-analysis-rail subcontract-task-analysis-rail procurement-subcontract-analysis-rail"
+        aria-label="分包任务辅助分析"
+      >
         <div class="lg-analysis-panel subcontract-task-analysis-panel">
+          <header class="lg-analysis-header">
+            <div>
+              <div class="lg-analysis-heading">辅助分析</div>
+              <div class="lg-analysis-description">任务状态、计量进度与近期任务</div>
+            </div>
+          </header>
           <section class="subcontract-task-analysis-section">
             <div class="subcontract-task-section-head">
               <strong>任务状态分布</strong>

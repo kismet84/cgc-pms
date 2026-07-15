@@ -82,8 +82,8 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
     // 验证页面容器
     await expect(page.locator('.lg-page').first()).toBeVisible()
 
-    // 关键指标摘要必须存在；列表允许展示数据表格或明确空状态。
-    await expect(page.locator('.payment-kpi-summary')).toBeVisible()
+    // 结算域桌面布局隐藏 KPI，统一查询面板必须可见；列表允许展示数据表格或明确空状态。
+    await expect(page.getByLabel('付款查询条件')).toBeVisible()
     const tableOrFeedback = page.locator('.vxe-table, .payment-list-feedback')
     await expect(tableOrFeedback.first()).toBeVisible({ timeout: 5000 })
 

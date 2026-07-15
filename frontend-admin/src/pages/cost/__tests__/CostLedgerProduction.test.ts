@@ -17,6 +17,25 @@ const overviewSource = readLocalComponent('CostLedgerOverview.vue')
 const tablePanelSource = readLocalComponent('CostLedgerTablePanel.vue')
 
 describe('CostLedger production guards', () => {
+  it('exposes a tenant-scoped read-only overhead rule list', () => {
+    expect(apiSource).toContain('export interface OverheadAllocationRuleVO')
+    expect(apiSource).toContain('export function getOverheadAllocationRules')
+    expect(apiSource).toMatch(
+      /getOverheadAllocationRules[\s\S]*url: '\/overhead-allocation\/rules'[\s\S]*method: 'get'[\s\S]*params: \{ pageNo, pageSize \}/,
+    )
+    expect(apiSource).not.toMatch(/getOverheadAllocationRules[\s\S]{0,300}tenantId/)
+    expect(source).toContain("userStore.hasPermission('overhead:query')")
+    expect(source).toContain('v-if="canViewAllocationRules"')
+    expect(source).toContain('data-testid="view-overhead-allocation-rules"')
+    expect(source).toContain('title="间接费规则"')
+    expect(source).toContain('const requestId = ++ruleRequestId')
+    expect(source).toContain('ruleRows.value = []')
+    expect(source).toContain('ruleTotal.value = 0')
+    expect(source).toContain('getOverheadAllocationRules(rulePageNo.value, rulePageSize.value)')
+    expect(source).toContain('handleRulePageChange')
+    expect(source).not.toMatch(/openRuleModal[\s\S]{0,500}(create|update|delete)Rule/)
+  })
+
   it('only exposes overhead execution to admins or users holding both required permissions', () => {
     expect(source).toContain("import { useUserStore } from '@/stores/user'")
     expect(source).toMatch(
@@ -154,9 +173,11 @@ describe('CostLedger production guards', () => {
     expect(existsSync(resolve(componentDir, 'CostLedgerAnalysisRail.vue'))).toBe(true)
     expect(existsSync(resolve(componentDir, 'CostLedgerDetailDrawer.vue'))).toBe(true)
 
-    expect(overview).toContain('class="lg-search-bar cost-ledger-query-panel"')
+    expect(overview).toContain(
+      'class="lg-search-bar cost-ledger-query-panel project-operation-query-panel"',
+    )
     expect(overview).toContain('.cost-ledger-query-panel')
-    expect(overview).toContain('class="lg-kpi-strip cost-ledger-kpi-summary"')
+    expect(overview).toContain('class="lg-kpi-strip cost-ledger-kpi-summary project-operation-kpi"')
     expect(overview).toContain('.cost-ledger-kpi-summary')
 
     expect(tablePanel).toContain('class="cost-ledger-mobile-card"')
@@ -164,7 +185,9 @@ describe('CostLedger production guards', () => {
     expect(tablePanel).toContain('.cost-ledger-mobile-card')
     expect(tablePanel).toContain('.cost-ledger-table-wrap')
 
-    expect(analysisRail).toContain('class="lg-analysis-rail cost-ledger-analysis-rail"')
+    expect(analysisRail).toContain(
+      'class="lg-analysis-rail cost-ledger-analysis-rail project-operation-analysis-rail"',
+    )
     expect(analysisRail).toContain('.cost-ledger-analysis-panel')
 
     expect(detailDrawer).toContain('class="cost-ledger-detail-drawer"')

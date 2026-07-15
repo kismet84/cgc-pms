@@ -313,7 +313,7 @@ describe('CostSummary production guards', () => {
   })
 
   it('移动端卡片真实渲染可读字段，且隐藏桌面列设置', async () => {
-    const wrapper = mountPage(500)
+    const wrapper = mountPage(499)
     await flushPromises()
 
     await wrapper.find('select.stub-select').setValue('p1')

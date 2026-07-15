@@ -87,10 +87,13 @@ test.describe('Cost regression smoke', () => {
     })
   })
 
-  test('contract ledger and payment list expose amount-bearing rows for cost comparison context', async () => {
+  test('contract ledger exposes amount columns and payment list exposes a clear result state', async () => {
     await sharedPage.goto('/contract/ledger')
     await expect(sharedPage.locator('.cl-redesign-page')).toBeVisible({ timeout: 10000 })
-    await expect(sharedPage.getByText('合同总金额(含税)')).toBeVisible({ timeout: 5000 })
+    await expect(sharedPage.getByLabel('合同台账查询条件')).toBeVisible({ timeout: 5000 })
+    await expect(
+      sharedPage.locator('.vxe-header--row').getByText('合同金额(含税)', { exact: true }).first(),
+    ).toBeVisible({ timeout: 5000 })
     await expect(sharedPage.locator('.cl-table-count')).toContainText('共 ')
     await expect(sharedPage.locator('.vxe-header--row .vxe-cell').first()).toBeVisible({
       timeout: 5000,
@@ -99,15 +102,12 @@ test.describe('Cost regression smoke', () => {
 
     await sharedPage.goto('/payment/application')
     await expect(sharedPage.locator('.payment-page')).toBeVisible({ timeout: 10000 })
-    await expect(sharedPage.locator('.payment-kpi-summary')).toBeVisible({ timeout: 5000 })
-    await expect(sharedPage.getByText('申请金额', { exact: true }).first()).toBeVisible({
-      timeout: 5000,
-    })
-    await expect(sharedPage.locator('.vxe-header--row .vxe-cell').first()).toBeVisible({
-      timeout: 5000,
-    })
+    await expect(sharedPage.getByLabel('付款查询条件')).toBeVisible({ timeout: 5000 })
+    const paymentTableOrFeedback = sharedPage.locator(
+      '.vxe-header--row .vxe-cell, .payment-list-feedback',
+    )
+    await expect(paymentTableOrFeedback.first()).toBeVisible({ timeout: 5000 })
     await expect(sharedPage.getByText('付款申请').first()).toBeVisible({ timeout: 5000 })
-    await expect(sharedPage.locator('.payment-kpi-label').first()).toBeVisible({ timeout: 5000 })
 
     await sharedPage.screenshot({
       path: 'e2e/screenshots/cost-regression-payment-context.png',

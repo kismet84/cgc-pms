@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { reactive } from 'vue'
-import { ReloadOutlined, SearchOutlined, SettingOutlined } from '@ant-design/icons-vue'
+import { ref } from 'vue'
+import { FilterOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
 
 defineProps<{
   projectId?: string
@@ -19,27 +19,17 @@ const emit = defineEmits<{
   reset: []
 }>()
 
-const filterVisibility = reactive({
-  projectId: true,
-  approvalStatus: true,
-  status: true,
-})
-const filterSettingItems = [
-  { key: 'projectId', label: '项目' },
-  { key: 'approvalStatus', label: '审批状态' },
-  { key: 'status', label: '业务状态' },
-] as const
-
-function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
-  filterVisibility[key] = !filterVisibility[key]
-}
+const filterPanelOpen = ref(false)
 </script>
 
 <template>
-  <div class="lg-search-bar purchase-request-search-bar">
-    <div class="purchase-request-search-fields">
+  <div class="lg-search-bar purchase-request-search-bar procurement-subcontract-query-panel">
+    <div
+      id="purchase-request-filter-panel"
+      class="purchase-request-search-fields procurement-subcontract-filter-panel"
+      :class="{ 'is-open': filterPanelOpen }"
+    >
       <a-select
-        v-if="filterVisibility.projectId"
         :value="projectId"
         class="purchase-request-search-select"
         placeholder="全部项目"
@@ -53,7 +43,6 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
         </a-select-option>
       </a-select>
       <a-select
-        v-if="filterVisibility.approvalStatus"
         :value="approvalStatus"
         class="purchase-request-search-select is-compact"
         placeholder="审批状态"
@@ -68,7 +57,6 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
         <a-select-option value="REJECTED">已驳回</a-select-option>
       </a-select>
       <a-select
-        v-if="filterVisibility.status"
         :value="status"
         class="purchase-request-search-select is-compact"
         placeholder="业务状态"
@@ -82,7 +70,7 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
         <a-select-option value="CONVERTED">已转PO</a-select-option>
       </a-select>
     </div>
-    <div class="purchase-request-search-keyword-row">
+    <div class="purchase-request-search-keyword-row procurement-subcontract-query-row">
       <a-input
         :value="keyword"
         class="purchase-request-search-input"
@@ -96,31 +84,32 @@ function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key'])
           <SearchOutlined class="purchase-request-search-prefix-icon" />
         </template>
       </a-input>
-      <div class="purchase-request-search-actions">
-        <a-button type="primary" size="large" @click="emit('search')">查询</a-button>
-        <a-button size="large" @click="emit('reset')">
+      <div class="purchase-request-search-actions procurement-subcontract-query-actions">
+        <a-button
+          class="procurement-subcontract-desktop-action"
+          type="primary"
+          size="large"
+          @click="emit('search')"
+          >搜索</a-button
+        >
+        <a-button
+          class="procurement-subcontract-desktop-action"
+          size="large"
+          @click="emit('reset')"
+        >
           <template #icon><ReloadOutlined /></template>
           重置
         </a-button>
-        <a-dropdown trigger="click">
-          <a-button size="large">
-            <template #icon><SettingOutlined /></template>
-            筛选栏设置
-          </a-button>
-          <template #overlay>
-            <a-menu>
-              <a-menu-item
-                v-for="item in filterSettingItems"
-                :key="item.key"
-                @click="toggleFilterVisibility(item.key)"
-              >
-                <a-checkbox :checked="filterVisibility[item.key]">
-                  {{ item.label }}
-                </a-checkbox>
-              </a-menu-item>
-            </a-menu>
-          </template>
-        </a-dropdown>
+        <a-button
+          class="procurement-subcontract-filter-toggle"
+          size="large"
+          :aria-expanded="filterPanelOpen"
+          aria-controls="purchase-request-filter-panel"
+          @click="filterPanelOpen = !filterPanelOpen"
+        >
+          <template #icon><FilterOutlined /></template>
+          筛选
+        </a-button>
       </div>
     </div>
   </div>

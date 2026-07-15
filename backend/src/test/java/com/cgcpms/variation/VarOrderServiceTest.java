@@ -21,6 +21,7 @@ import com.cgcpms.workflow.mapper.WfTemplateMapper;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,15 +75,41 @@ class VarOrderServiceTest {
     @Autowired
     private WfTemplateMapper wfTemplateMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     @BeforeEach
     void setupContext() {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        seedWorkflowApprover();
         seedReferenceData();
     }
 
     @AfterEach
     void clearContext() {
         TestUserContext.clear();
+    }
+
+    private void seedWorkflowApprover() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, TestUserContext.USER_ADMIN);
+        if (count != null && count == 0) {
+            jdbcTemplate.update("""
+                    INSERT INTO sys_user
+                        (id, tenant_id, username, password, real_name, status, is_admin,
+                         created_by, updated_by, deleted_flag, deleted_token, remark)
+                    VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, NULL, ?)
+                    """, TestUserContext.USER_ADMIN, TestUserContext.TENANT_0,
+                    "var_order_test_approver", "{noop}test", "变更审批测试人",
+                    TestUserContext.USER_ADMIN, TestUserContext.USER_ADMIN,
+                    "VarOrderServiceTest local approver");
+        } else {
+            jdbcTemplate.update("""
+                    UPDATE sys_user
+                    SET tenant_id = ?, status = 'ENABLE', deleted_flag = 0, deleted_token = NULL
+                    WHERE id = ?
+                    """, TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        }
     }
 
     private void seedReferenceData() {

@@ -25,6 +25,7 @@ const mockPush = vi.fn()
 // ── Mock vue-router ──
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
+  useRoute: () => ({ meta: { title: '测试页面' } }),
 }))
 
 // ── Mock pinia stores ──
