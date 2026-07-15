@@ -8,6 +8,62 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044` 与 `ISSUE-040-045` 已完成；`启动迭代-20` 当前完成 8/20。补货设置负向证据已收口，下一候选优先处理库存阈值与出入库真实并发专项。
 
+### ISSUE-040-046：库存阈值与出库真实并发防覆盖回归
+
+优先级：P2
+任务性质：回归证明
+类型：库存 / 安全阈值 / 出库 / 真实并发 / 乐观锁 / 测试隔离
+状态：Ready
+来源锚点：项目知识图谱当前问题 `OBS-STOCK-CONCURRENCY`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=0cf88baba5bcbc12d470ab3e5dc5137990990a96
+存量问题键：[stock:OBS-STOCK-CONCURRENCY]
+关联产品目标：以真实 local H2 并发证明安全库存阈值更新与出库同时写入同一库存行时，由 `@Version` 阻止旧快照覆盖，并在出库重试后保持余额、阈值和流水一致。
+候选对比：本项是现有唯一可直接执行的库存并发观察项；复用同一实体和事务服务即可形成最小闭环，变更面小于采购预测、工作日历、跨仓调拨或新产品能力，且紧接补货负向证据便于复用上下文。
+核验结论：现有并发测试分别覆盖两线程出库、两线程入库和首次入库唯一冲突，但未让安全阈值更新与出入库争用同一版本。CodeGraph 已命中阈值单次更新、出入库最多三次重试及现有并发夹具；被截断的测试尾部由当前分支局部读取补齐核验。
+阻塞证据：缺少确定性同版本争用证据，无法证明阈值写入不会覆盖并发余额，或出库重试不会把已成功阈值恢复为旧值。
+解除条件：两个真实线程在第一次 mapper 更新前用测试屏障对齐；至少一次 `@Version` 更新返回0，出库最终成功且仅生成一条 OUT 流水；最终余额为70，阈值按阈值操作成功/冲突分别为60/10，不允许其他组合。
+Migration：不需要
+依赖：复用 `MatStockService`、`MatStockMapper`、local H2、Spring `MockitoSpyBean`、测试专用仓库/物料和已存在的 `.codex-autopilot/ALLOW_TEST_DATA_RESET`。
+风险等级：中
+运行态要求：仅 local/test；使用专用仓库922和物料9922，开始前后只清理该夹具；不需要浏览器或 Docker 业务运行态，不得连接或发布生产。
+Reviewer要求：确认屏障只拦截两个线程各自第一次真实 `updateById`，后续出库重试不被阻塞；断言余额、阈值、版本与流水守恒；线程池有界退出，UserContext 在线程内设置并清理；不得修改生产逻辑。
+归档报告：`docs/quality/ISSUE-040-046-库存阈值与出库真实并发防覆盖回归验收报告.md`
+最小回滚：回退新增真实并发专项、治理回写和报告；生产代码与业务数据无需回滚。
+目标：
+- 新增独立 Spring 集成测试，让阈值更新和出库两个真实事务在同一版本的首次 mapper 更新前对齐。
+- 证明一次旧版本更新被拒绝，出库成功后余额固定为70且只有一条 OUT 流水。
+- 证明阈值更新若成功则最终为60，若返回并发冲突则保持10，任何情况下均不被旧快照覆盖。
+非目标：
+- 不修改生产乐观锁、重试次数、库存金额/数量规则、权限、租户或项目范围。
+- 不做压力/容量基准，不扩展入库首建、跨节点分布式锁、消息幂等或完整库存并发平台。
+- 不连接生产、不发布生产、不 push。
+允许修改：
+- `backend/src/test/java/com/cgcpms/inventory/MatStockRealConcurrencyTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-046-库存阈值与出库真实并发防覆盖回归验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/test/java/com/cgcpms/inventory/MatStockServiceTest.java`
+- `frontend-admin/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 屏障观测到至少两个首次 update 尝试，两个真实事务在30秒内有界结束，无线程泄漏。
+- 出库无异常且最终 availableQty=70.0000；OUT 流水恰好1条、quantity=30.0000、availableAfter=70.0000。
+- 阈值操作仅允许成功或 `STOCK_CONCURRENT_CONFLICT`；成功时 safetyStockQty=60.0000，冲突时保持10.0000；最终版本至少2且余额/阈值组合符合对应结果。
+- 专项连续运行两次通过并完成专用夹具清理；收口移除 `OBS-STOCK-CONCURRENCY`；新增后续项0、关闭1、净变化-1。
+- Ready lint、目标专项、`git diff --check` 和中风险复核 PASS。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-046`
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockRealConcurrencyTest" test`
+- `git diff --check`
+
 ### ISSUE-040-045：补货设置权限项目与乐观锁负向回归
 
 优先级：P1
