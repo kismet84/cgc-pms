@@ -78,6 +78,83 @@ Reviewer要求：按高风险金额只读与项目数据范围变更复核前端
 - `cd frontend-admin; pnpm exec eslint src/api/modules/cost.ts src/api/modules/__tests__/cost.test.ts src/types/cost.ts src/pages/cost/summary.vue src/pages/cost/__tests__/CostSummaryProduction.test.ts`
 - `git diff --check`
 
+### ISSUE-040-031：投标成本只读列表入口与租户边界
+
+优先级：P1
+任务性质：缺口修复
+类型：投标成本 / 用户入口 / 只读列表 / 权限 / 租户隔离 / 菜单迁移
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-BID-LIST`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；候选证据基于当前 HEAD `95767cb2e9203bdb4640a7df6ccb5556c72577b9`。
+存量问题键：[stock:A-01-BID-LIST]
+关联产品目标：让已实现的投标成本分页查询在管理端具备最小只读入口，使合格用户可以按状态和关键字检索投标项目，同时保持 `bid:query` 与当前租户边界。
+核验结论：问题仍存在——后端 `GET /bid-cost` 已提供分页、状态和关键字筛选，并由 `bid:query` 或 ADMIN/SUPER_ADMIN 保护，Service 按 `UserContext` 当前租户过滤；当前前端不存在 bid-cost API、类型、页面、路由或导航入口，Controller 测试也只覆盖未登录与管理员正向样本，缺少细粒度权限、无权限拒绝与跨租户列表证据。
+候选对比：同域 CREATE/UPDATE/DELETE/WON/LOST 均涉及业务写入、状态流转或项目关联，且当前没有既有投标页面可承载；`A-01-BID-LIST` 是其最小只读前置，接口、分页与租户过滤均已存在，用户价值、依赖和验收边界最完整，因此先处理该叶子问题。
+检索交叉核验：CodeGraph 命中 `BidCostController.getPage`、`BidCostService.getPage` 与实体关系但未命中前端同域文件；已按工具召回不足使用 `rg` 和直接文件读取补查，并用只读 `codebase-memory-mcp` 核验 Controller→Service→Mapper、前端路由/导航与测试边界，最终以当前分支源码、唯一台账与源报告为准。
+阻塞证据：合格用户无法从管理端访问既有投标成本列表，`bid:query` 仅停留在后端接口；缺少非管理员权限正负样本和跨租户列表样本，无法把新增入口作为安全闭环验收。
+解除条件：新增只读 `/bid-cost` 页面、类型化 GET API、静态路由、侧栏导航和 `bid:query` 菜单授权；页面只提供关键字、状态、分页和刷新，不出现写操作；后端未登录401、无权限403、持 `bid:query` 成功、跨租户记录不可见及菜单角色绑定证据齐全。
+Migration：需要
+依赖：新增 V150 菜单及角色绑定迁移但不改表结构和业务数据；复用既有 `GET /bid-cost`、`BidCostController`、`BidCostService`、`UserContext`、管理端 request、静态路由、项目运营侧栏与 `sys_menu` / `sys_role_menu`；不新增后端生产逻辑、表、写接口、状态机或金额口径。
+风险等级：高
+风险说明：本次虽然只开放查询，但会扩大租户业务数据的可达性并新增角色菜单授权，必须证明路由、接口权限、角色绑定和租户过滤同时 fail-close。
+运行态要求：自动化只在 local/dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，任一失败先归类为环境前置并执行 runtime refresh，稳定等待180秒后复验；从 dev-login 只读进入 `/bid-cost`，不得新增、编辑、删除、标记中标/未中标或重置业务数据，不连接或发布生产。
+Reviewer要求：按高风险权限与租户只读变更复核前端只发 GET 且不发送 tenantId、请求体或写方法；复核路由与导航均要求 `bid:query`、管理员旁路不扩大普通用户权限；复核后端401/403、持权限成功、跨租户隐藏、响应字段和 V150 角色绑定；对绑定 diff 给出 PASS/NEEDS_REPAIR。
+归档报告：`docs/quality/ISSUE-040-031-投标成本只读列表入口与租户边界验收报告.md`
+最小回滚：回退本 Issue 的前端类型、API、页面、路由、导航、V150 菜单迁移、专项测试与治理回写；不删除投标成本业务数据，不改变既有后端接口、Service 或表结构。
+目标：
+- 新增类型化投标成本分页 GET，只发送 pageNo、pageSize、可选 bidStatus 与 keyword，不发送 tenantId、body 或写请求。
+- 新增 `/bid-cost` 只读列表页与项目运营侧栏入口，展示投标项目、状态、关联项目和创建时间，覆盖搜索、重置、刷新、分页、加载、空态与失败态。
+- 补齐路由/导航权限、API 请求和页面行为测试，并在既有 Controller 集成测试中补齐细粒度权限、无权限拒绝、跨租户隐藏及 V150 菜单角色绑定证据。
+非目标：
+- 不开放新建、详情、编辑、删除、中标、未中标、成本项、金额汇总、导出或项目转化操作，不新增状态机和投标工作台。
+- 不修改 `BidCostController`、Service、Mapper、实体、表结构或既有权限表达式，不新增 tenantId 查询参数。
+- 不连接生产数据库、不发布生产、不自动 push，不新增、修改、删除或重置投标业务数据。
+允许修改：
+- `frontend-admin/src/types/bid.ts`
+- `frontend-admin/src/api/modules/bid.ts`
+- `frontend-admin/src/api/modules/__tests__/bid.test.ts`
+- `frontend-admin/src/pages/bid-cost/index.vue`
+- `frontend-admin/src/pages/bid-cost/__tests__/index.test.ts`
+- `frontend-admin/src/router/index.ts`
+- `frontend-admin/src/router/navigation.ts`
+- `frontend-admin/src/router/__tests__/router.test.ts`
+- `backend/src/main/resources/db/migration/V150__add_bid_cost_query_menu.sql`
+- `backend/src/test/java/com/cgcpms/bid/BidCostControllerTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-040-031-投标成本只读列表入口与租户边界验收报告.md`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `frontend-admin/src/api/request.ts`
+- `frontend-admin/src/stores/**`
+- `frontend-admin/src/pages/cost/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 测试精确断言 `GET /bid-cost` 仅携带分页、可选状态和关键字参数，无 body 与 tenantId；页面测试覆盖首载、搜索重置、状态筛选、分页、刷新、空态和失败态，且 DOM 中无新增、编辑、删除、中标或未中标操作。
+- 路由和导航都将 `/bid-cost` 绑定 `bid:query`；ADMIN/SUPER_ADMIN 可按既有规则旁路，普通用户无权限被导向403，持权限可进入；V150 仅新增一个只读菜单并绑定 SUPER_ADMIN、ADMIN、COST_MANAGER，不授予 `bid:add`、`bid:edit` 或 `bid:delete`。
+- 未登录列表请求返回401；已登录但无 `bid:query` 返回403；持 `bid:query` 返回200；同一请求只返回当前租户记录，跨租户投标记录不可见；响应不新增敏感字段或写能力。
+- 既有投标成本 CRUD、标记中标和成本域页面不回退；浏览器验收只读进入列表，筛选和分页可用，控制台无新增 error/warn。
+- 收口必须引用 `docs/backlog/current-issues.json` 及本项 `sourceRefs`；全部通过后移除 `A-01-BID-LIST`，未完全通过则用证据更新其唯一状态或分类。通过时同步更新 A-01 入口分类守恒并回写 Ready、current-focus、project-map；若差距或优先级判断变化，再更新 evolution-decision。
+- 归档报告统计新增后续项、关闭后续项和后续项净变化；所有发现项必须本轮修复、唯一载体承接或有依据关闭，存在悬空项不得通过。权限、租户、角色迁移或只读边界证据不足时判不通过。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint、SQL 安全检查与 `git diff --check` 全部通过；首次失败先按 tool_config、环境前置、真实质量/安全分类并复验。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-031`
+- `cd backend; .\mvnw.cmd "-Dtest=BidCostControllerTest,BidCostServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/__tests__/index.test.ts src/router/__tests__/router.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/types/bid.ts src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts src/router/index.ts src/router/navigation.ts src/router/__tests__/router.test.ts`
+- `pwsh -NoProfile -File scripts/check-sql-safety.ps1`
+- `git diff --check`
+
 ### ISSUE-040-029：共享列表中窄视口表格高度链修复
 
 优先级：P1
