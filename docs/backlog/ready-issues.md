@@ -6,7 +6,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045` 与 `ISSUE-040-046` 已完成；`启动迭代-20` 当前完成 9/20。库存真实并发证据已收口，当前 Ready 为 WBS 软删除事务故障注入回归。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046` 与 `ISSUE-040-047` 已完成；`启动迭代-20` 当前完成 10/20。WBS 软删除事务故障证据已收口，下一候选切换至其他独立存量问题域。
 
 ### ISSUE-040-047：WBS软删除墓碑事务故障注入回归
 
@@ -63,6 +63,12 @@ Reviewer要求：确认异常发生在真实 `updateById` 之后、`deleteById` 
 - `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-047`
 - `cd backend; .\mvnw.cmd "-Dtest=SubTaskDeleteTransactionTest" test`
 - `git diff --check`
+
+执行复验结果（2026-07-16，主线程完成中风险事务一致性复核）：
+- 新增 SubTaskDeleteTransactionTest，故障路径先由真实 Mapper 完成墓碑编号更新1行，再在 deleteById SQL 前抛出受控异常；服务事务退出后 task_code 恢复原编号且 deleted_flag 保持0。
+- 正常路径写入按任务 ID 唯一的 DELETED-947001、deleted_flag=1，并成功插入复用原业务编号的活动任务。
+- 目标专项连续运行两次均为2项通过、0失败、0错误；测试专用 ID 每次前后定向清理，Mockito spy 与 UserContext 均重置。
+- 生产源码、迁移、前端与控制面无差异。OBS-WBS-TOMBSTONE-FAULT 已关闭；新增后续项0、关闭后续项1、后续项净变化-1。
 
 ### ISSUE-040-046：库存阈值与出库真实并发防覆盖回归
 
