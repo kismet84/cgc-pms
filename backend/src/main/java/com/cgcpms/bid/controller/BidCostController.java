@@ -1,6 +1,7 @@
 package com.cgcpms.bid.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.cgcpms.bid.dto.BidCostCreateRequest;
 import com.cgcpms.bid.entity.BidCost;
 import com.cgcpms.bid.service.BidCostService;
 import com.cgcpms.common.result.ApiResponse;
@@ -36,8 +37,8 @@ public class BidCostController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('bid:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Long> create(@Valid @RequestBody BidCost bid) {
-        return ApiResponse.success(service.create(bid));
+    public ApiResponse<Long> create(@Valid @RequestBody BidCostCreateRequest request) {
+        return ApiResponse.success(service.create(request.toEntity()));
     }
 
     @PutMapping("/{id}")

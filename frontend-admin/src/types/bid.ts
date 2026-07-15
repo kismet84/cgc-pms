@@ -7,6 +7,11 @@ export interface BidCostQuery {
   keyword?: string
 }
 
+export interface BidCostCreatePayload {
+  bidProjectName: string
+  remark?: string
+}
+
 export interface BidCostVO {
   id: string
   projectId?: string | null

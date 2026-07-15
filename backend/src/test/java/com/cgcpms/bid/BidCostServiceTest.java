@@ -59,17 +59,24 @@ class BidCostServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("创建投标项目并验证状态为 BIDDING")
+    @DisplayName("创建投标项目时覆盖客户端身份、项目与状态字段")
     void testCreateBidCost() {
         BidCost bid = new BidCost();
+        bid.setId(99999999L);
+        bid.setTenantId(9001L);
+        bid.setProjectId(PROJECT_ID);
         bid.setBidProjectName("测试投标项目");
+        bid.setBidStatus("WON");
 
         Long id = bidCostService.create(bid);
         assertNotNull(id, "创建后应返回 ID");
+        assertNotEquals(99999999L, id);
 
         BidCost saved = bidCostService.getById(id);
         assertNotNull(saved, "应能查询到创建的投标项目");
         assertEquals("测试投标项目", saved.getBidProjectName());
+        assertEquals(TENANT_ID, saved.getTenantId());
+        assertNull(saved.getProjectId());
         assertEquals("BIDDING", saved.getBidStatus(), "新建投标状态应为 BIDDING");
     }
 

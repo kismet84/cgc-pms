@@ -1,15 +1,25 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import axios from 'axios'
 import { message } from 'ant-design-vue'
-import { ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
-import { getBidCosts } from '@/api/modules/bid'
+import { PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
+import { createBidCost, getBidCosts } from '@/api/modules/bid'
+import { useUserStore } from '@/stores/user'
 import type { BidCostQuery, BidCostVO, BidStatus } from '@/types/bid'
 
+const userStore = useUserStore()
 const loading = ref(false)
+const saving = ref(false)
+const createOpen = ref(false)
 const rows = ref<BidCostVO[]>([])
 const total = ref(0)
 const query = reactive<BidCostQuery>({ pageNo: 1, pageSize: 20 })
+const createForm = reactive({ bidProjectName: '', remark: '' })
+const canCreate = computed(
+  () =>
+    userStore.hasPermission('bid:add') ||
+    userStore.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'),
+)
 
 const statusMeta: Record<BidStatus, { label: string; color: string }> = {
   BIDDING: { label: '投标中', color: 'processing' },
@@ -24,11 +34,11 @@ const columns = [
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
 ]
 
-function errorMessage(error: unknown) {
+function errorMessage(error: unknown, fallback: string) {
   if (axios.isAxiosError(error)) {
     return (error.response?.data as { message?: string } | undefined)?.message || error.message
   }
-  return error instanceof Error ? error.message : '加载投标成本失败'
+  return error instanceof Error ? error.message : fallback
 }
 
 async function fetchRows() {
@@ -45,9 +55,40 @@ async function fetchRows() {
   } catch (error: unknown) {
     rows.value = []
     total.value = 0
-    message.error(errorMessage(error))
+    message.error(errorMessage(error, '加载投标成本失败'))
   } finally {
     loading.value = false
+  }
+}
+
+function openCreate() {
+  createForm.bidProjectName = ''
+  createForm.remark = ''
+  createOpen.value = true
+}
+
+async function submitCreate() {
+  const bidProjectName = createForm.bidProjectName.trim()
+  if (!bidProjectName) {
+    message.warning('请填写投标项目名称')
+    return
+  }
+  saving.value = true
+  try {
+    await createBidCost({
+      bidProjectName,
+      remark: createForm.remark.trim() || undefined,
+    })
+    message.success('投标项目创建成功')
+    createOpen.value = false
+    createForm.bidProjectName = ''
+    createForm.remark = ''
+    query.pageNo = 1
+    await fetchRows()
+  } catch (error: unknown) {
+    message.error(errorMessage(error, '新建投标项目失败'))
+  } finally {
+    saving.value = false
   }
 }
 
@@ -112,6 +153,10 @@ onMounted(fetchRows)
           <strong>投标项目</strong><span>共 {{ total }} 条</span>
         </div>
         <div class="lg-toolbar-right">
+          <a-button v-if="canCreate" type="primary" data-testid="create-button" @click="openCreate">
+            <template #icon><PlusOutlined /></template>
+            新建投标项目
+          </a-button>
           <a-button data-testid="refresh-button" @click="fetchRows">
             <template #icon><ReloadOutlined /></template>
             刷新
@@ -153,6 +198,37 @@ onMounted(fetchRows)
         />
       </div>
     </section>
+
+    <a-modal
+      v-model:open="createOpen"
+      title="新建投标项目"
+      :confirm-loading="saving"
+      ok-text="创建"
+      cancel-text="取消"
+      data-testid="create-modal"
+      @ok="submitCreate"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="投标项目名称" required>
+          <a-input
+            v-model:value="createForm.bidProjectName"
+            :maxlength="200"
+            placeholder="请输入投标项目名称"
+            data-testid="create-name-input"
+          />
+        </a-form-item>
+        <a-form-item label="备注">
+          <a-textarea
+            v-model:value="createForm.remark"
+            :maxlength="500"
+            :rows="4"
+            show-count
+            placeholder="可选，仅记录投标头备注"
+            data-testid="create-remark-input"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 

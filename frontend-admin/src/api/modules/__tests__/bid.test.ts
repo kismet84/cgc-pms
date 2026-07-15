@@ -4,7 +4,7 @@ const requestMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/api/request', () => ({ request: requestMock }))
 
-import { getBidCosts } from '../bid'
+import { createBidCost, getBidCosts } from '../bid'
 
 describe('bid cost API contract', () => {
   beforeEach(() => requestMock.mockReset().mockResolvedValue({}))
@@ -26,5 +26,21 @@ describe('bid cost API contract', () => {
     })
     expect(requestMock.mock.calls[0]?.[0]).not.toHaveProperty('data')
     expect(params).not.toHaveProperty('tenantId')
+  })
+
+  it('posts only the controlled create fields', async () => {
+    const data = { bidProjectName: '学校投标', remark: '资格预审阶段' }
+
+    await createBidCost(data)
+
+    expect(requestMock).toHaveBeenCalledWith({
+      url: '/bid-cost',
+      method: 'post',
+      data,
+    })
+    expect(data).not.toHaveProperty('tenantId')
+    expect(data).not.toHaveProperty('projectId')
+    expect(data).not.toHaveProperty('bidStatus')
+    expect(data).not.toHaveProperty('amount')
   })
 })

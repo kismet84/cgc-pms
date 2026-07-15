@@ -52,7 +52,9 @@ public class BidCostService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(BidCost bid) {
+        bid.setId(null);
         bid.setTenantId(UserContext.getCurrentTenantId());
+        bid.setProjectId(null);
         bid.setBidStatus("BIDDING");
         mapper.insert(bid);
         return bid.getId();
