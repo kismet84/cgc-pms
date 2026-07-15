@@ -35,6 +35,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -152,6 +153,49 @@ class OverheadAllocationControllerTest {
                 .createValidated(anyLong(), any(String.class), any(String.class));
     }
 
+    @Test
+    @DisplayName("规则修改要求 overhead:edit，路径 ID 与白名单字段为唯一更新输入")
+    void updateRulePermissionAndWhitelistContract() throws Exception {
+        String body = """
+                {"costSubjectId":54010401,"allocationBasis":"USAGE","allocationCycle":"PER_OCCURRENCE",
+                 "id":999,"tenantId":999999,"status":"DISABLE","updatedBy":888}
+                """;
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of(), List.of("overhead:query")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of(), List.of("overhead:edit")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of("ADMIN"), List.of()))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        verify(service, org.mockito.Mockito.times(2))
+                .updateValidated(940026001L, 54010401L, "USAGE", "PER_OCCURRENCE");
+    }
+
+    @Test
+    @DisplayName("规则修改拒绝缺失字段、非法依据和非法周期")
+    void updateRuleRejectsInvalidFields() throws Exception {
+        Cookie edit = cookie(List.of(), List.of("overhead:edit"));
+        for (String body : List.of(
+                "{\"allocationBasis\":\"DIRECT_LABOR\",\"allocationCycle\":\"MONTHLY\"}",
+                "{\"costSubjectId\":1,\"allocationCycle\":\"MONTHLY\"}",
+                "{\"costSubjectId\":1,\"allocationBasis\":\"EQUAL\",\"allocationCycle\":\"MONTHLY\"}",
+                "{\"costSubjectId\":1,\"allocationBasis\":\"USAGE\",\"allocationCycle\":\"YEARLY\"}")) {
+            mockMvc.perform(putApi("/overhead-allocation/rules/940026001").cookie(edit)
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().is4xxClientError());
+        }
+        verify(service, org.mockito.Mockito.never())
+                .updateValidated(anyLong(), anyLong(), any(String.class), any(String.class));
+    }
+
     @AfterEach
     void tearDown() {
         jdbcTemplate.update("DELETE FROM sys_operation_audit_log WHERE tenant_id=?", TENANT_ID);
@@ -254,6 +298,10 @@ class OverheadAllocationControllerTest {
 
     private MockHttpServletRequestBuilder getApi(String path) {
         return get("/api" + path).contextPath("/api");
+    }
+
+    private MockHttpServletRequestBuilder putApi(String path) {
+        return put("/api" + path).contextPath("/api");
     }
 
 }

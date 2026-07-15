@@ -76,6 +76,33 @@ public class OverheadAllocationService {
     @Transactional(rollbackFor = Exception.class)
     public Long createValidated(Long costSubjectId, String allocationBasis, String allocationCycle) {
         Long tenantId = UserContext.getCurrentTenantId();
+        requireValidOverheadSubject(costSubjectId, tenantId);
+        OverheadAllocationRule rule = new OverheadAllocationRule();
+        rule.setCostSubjectId(costSubjectId);
+        rule.setAllocationBasis(allocationBasis);
+        rule.setAllocationCycle(allocationCycle);
+        return create(rule);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void updateValidated(Long id, Long costSubjectId, String allocationBasis, String allocationCycle) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        OverheadAllocationRule existing = ruleMapper.selectById(id);
+        if (existing == null || !tenantId.equals(existing.getTenantId())) {
+            throw new BusinessException("RULE_NOT_FOUND", "分摊规则不存在");
+        }
+        requireValidOverheadSubject(costSubjectId, tenantId);
+        OverheadAllocationRule update = new OverheadAllocationRule();
+        update.setId(existing.getId());
+        update.setTenantId(existing.getTenantId());
+        update.setCostSubjectId(costSubjectId);
+        update.setAllocationBasis(allocationBasis);
+        update.setAllocationCycle(allocationCycle);
+        update.setStatus(existing.getStatus());
+        ruleMapper.updateById(update);
+    }
+
+    private CostSubject requireValidOverheadSubject(Long costSubjectId, Long tenantId) {
         CostSubject subject = costSubjectMapper.selectById(costSubjectId);
         if (subject == null || !tenantId.equals(subject.getTenantId())
                 || !"ENABLE".equals(subject.getStatus())
@@ -83,11 +110,7 @@ public class OverheadAllocationService {
                 || !"COST".equals(subject.getAccountCategory())) {
             throw new BusinessException("OVERHEAD_SUBJECT_INVALID", "间接费科目不存在或不可用");
         }
-        OverheadAllocationRule rule = new OverheadAllocationRule();
-        rule.setCostSubjectId(costSubjectId);
-        rule.setAllocationBasis(allocationBasis);
-        rule.setAllocationCycle(allocationCycle);
-        return create(rule);
+        return subject;
     }
 
     @Transactional(rollbackFor = Exception.class)

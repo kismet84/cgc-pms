@@ -123,6 +123,43 @@ class OverheadAllocationServiceTest {
     }
 
     @Test
+    @DisplayName("受控修改校验规则与科目租户并保留服务端状态")
+    void validatedUpdateRequiresTenantRuleAndEnabledOverheadCostSubject() {
+        seedSubject(SUBJECT_VALIDATED, TENANT_ID, "5401.04.31", "OVERHEAD", "COST", "ENABLE");
+        seedSubject(SUBJECT_OTHER_TENANT, OTHER_TENANT_ID, "5401.04.32", "OVERHEAD", "COST", "ENABLE");
+        seedSubject(SUBJECT_DISABLED, TENANT_ID, "5401.04.33", "OVERHEAD", "COST", "DISABLE");
+        seedSubject(SUBJECT_NOT_OVERHEAD, TENANT_ID, "5001.01.34", "MATERIAL", "COST", "ENABLE");
+        Long id = service.create(rule(SUBJECT_EQUAL, "EQUAL", "MONTHLY"));
+        Long otherId;
+        setUserContext(OTHER_TENANT_ID);
+        otherId = service.create(rule(SUBJECT_OTHER_TENANT, "USAGE", "MONTHLY"));
+        setUserContext(TENANT_ID);
+        jdbcTemplate.update("UPDATE overhead_allocation_rule SET status='DISABLE' WHERE id=?", id);
+        try {
+            service.updateValidated(id, SUBJECT_VALIDATED, "CONTRACT_AMOUNT", "PER_OCCURRENCE");
+            OverheadAllocationRule saved = ruleMapper.selectById(id);
+            assertEquals(TENANT_ID, saved.getTenantId());
+            assertEquals("DISABLE", saved.getStatus());
+            assertEquals(SUBJECT_VALIDATED, saved.getCostSubjectId());
+            assertEquals("CONTRACT_AMOUNT", saved.getAllocationBasis());
+            assertEquals("PER_OCCURRENCE", saved.getAllocationCycle());
+            assertThrows(BusinessException.class,
+                    () -> service.updateValidated(otherId, SUBJECT_VALIDATED, "USAGE", "MONTHLY"));
+            assertThrows(BusinessException.class,
+                    () -> service.updateValidated(999999999L, SUBJECT_VALIDATED, "USAGE", "MONTHLY"));
+            assertThrows(BusinessException.class,
+                    () -> service.updateValidated(id, SUBJECT_OTHER_TENANT, "USAGE", "MONTHLY"));
+            assertThrows(BusinessException.class,
+                    () -> service.updateValidated(id, SUBJECT_DISABLED, "USAGE", "MONTHLY"));
+            assertThrows(BusinessException.class,
+                    () -> service.updateValidated(id, SUBJECT_NOT_OVERHEAD, "USAGE", "MONTHLY"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM cost_subject WHERE id IN (?,?,?,?)",
+                    SUBJECT_VALIDATED, SUBJECT_OTHER_TENANT, SUBJECT_DISABLED, SUBJECT_NOT_OVERHEAD);
+        }
+    }
+
+    @Test
     @DisplayName("当前月不得提前占用幂等键，历史完整月仍可执行")
     void periodMustBeCompletedMonthEndWithoutEarlyIdempotencyClaim() {
         assertThrows(BusinessException.class,

@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-16 增量：间接费规则受控修改入口
+
+- 成本列表的间接费规则表格已增加受 `overhead:edit` 或管理员控制的修改入口，预填并只提交 costSubjectId、allocationBasis 和 allocationCycle。
+- 后端 PUT 已改用白名单 DTO；Service 隐藏跨租户规则、验证当前租户启用的 OVERHEAD/COST 科目，并保持服务端既有状态，客户端 id、tenantId、status 和审计字段不能改变身份或状态。
+- 自动化与连续180秒稳定运行态通过；dev 空规则数据下按禁止造数边界完成浏览器等价取消验收，PUT 计数保持0。`A-01-OVERHEAD-UPDATE` 已关闭，A-01 当前守恒为有用户入口247、前端调用无独立页面58、内部/集成/运维4、需补入口1、待废弃0、需要确认11，共321。
+
 ## 2026-07-16 增量：间接费规则受控新建入口
 
 - 成本列表的间接费规则弹窗已增加受 `overhead:add` 或管理员控制的新建表单，科目候选只显示启用的 OVERHEAD 科目，提交只包含 costSubjectId、allocationBasis 和 allocationCycle。

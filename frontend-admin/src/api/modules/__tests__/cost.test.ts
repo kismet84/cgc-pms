@@ -8,7 +8,11 @@ vi.mock('@/api/request', () => ({
   request: mockRequest,
 }))
 
-import { createOverheadAllocationRule, getCostSummaryHistory } from '../cost'
+import {
+  createOverheadAllocationRule,
+  getCostSummaryHistory,
+  updateOverheadAllocationRule,
+} from '../cost'
 
 describe('cost summary history api', () => {
   beforeEach(() => {
@@ -44,6 +48,26 @@ describe('cost summary history api', () => {
     expect(mockRequest).toHaveBeenCalledWith({
       url: '/overhead-allocation/rules',
       method: 'post',
+      data,
+    })
+    expect(data).not.toHaveProperty('id')
+    expect(data).not.toHaveProperty('tenantId')
+    expect(data).not.toHaveProperty('status')
+  })
+
+  it('修改间接费规则只使用路径 ID 和白名单字段', async () => {
+    mockRequest.mockResolvedValue(undefined)
+    const data = {
+      costSubjectId: 'subject-2',
+      allocationBasis: 'USAGE' as const,
+      allocationCycle: 'PER_OCCURRENCE' as const,
+    }
+
+    await updateOverheadAllocationRule('rule-1', data)
+
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/overhead-allocation/rules/rule-1',
+      method: 'put',
       data,
     })
     expect(data).not.toHaveProperty('id')

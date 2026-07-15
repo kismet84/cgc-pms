@@ -31,6 +31,8 @@ export interface OverheadAllocationRuleCreatePayload {
   allocationCycle: 'MONTHLY' | 'PER_OCCURRENCE'
 }
 
+export type OverheadAllocationRuleUpdatePayload = OverheadAllocationRuleCreatePayload
+
 export function getOverheadAllocationRules(pageNo: number, pageSize: number) {
   return request<PageResult<OverheadAllocationRuleVO>>({
     url: '/overhead-allocation/rules',
@@ -43,6 +45,17 @@ export function createOverheadAllocationRule(data: OverheadAllocationRuleCreateP
   return request<string>({
     url: '/overhead-allocation/rules',
     method: 'post',
+    data,
+  })
+}
+
+export function updateOverheadAllocationRule(
+  id: string,
+  data: OverheadAllocationRuleUpdatePayload,
+) {
+  return request<void>({
+    url: `/overhead-allocation/rules/${id}`,
+    method: 'put',
     data,
   })
 }
