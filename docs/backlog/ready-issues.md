@@ -8,6 +8,81 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047`、`ISSUE-040-048`、`ISSUE-040-049` 与 `ISSUE-040-050` 已完成；`启动迭代-20` 当前完成 13/20。日报领料联动真实浏览器证据已收口，下一候选按现行产品决策门选择。
 
+### ISSUE-040-051：供应商默认提前期与采购订单交货日期预填
+
+优先级：P1
+任务性质：能力新增
+类型：合作方 / 供应商 / 自然日提前期 / 采购订单 / 交货日期预填
+状态：Ready
+来源锚点：产品决策 `PI-2026-07-16-01`；项目知识图谱当前聚合问题 `A-02`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/product-intelligence/evolution-decision.md`,`docs/product-intelligence/competitor-analysis.md`,`docs/product-intelligence/project-map.md`; candidateEvidenceHead=73eada76ff4ef2fe9db48e89a698e4e60c6b00f5
+存量问题键：[stock:A-02-SUPPLIER-DEFAULT-LEAD-DAYS]
+关联产品目标：在既有供应商、采购合同与采购订单日期链上增加可空的供应商默认自然日提前期，减少采购员重复计算交货日期，同时保留订单级人工覆盖。
+候选对比：本项直接复用合作方维护、采购合同乙方和订单交货日期，单列 migration 即可闭环；优先于需要工作日历/节假日服务的工作日计算、需要供应商×物料关系表的精细提前期、需要需求历史的预测和需要新事实表的日报人员/设备。
+核验结论：当前库存项提前期只服务补货跳转，合作方没有默认提前期；采购订单通过采购合同乙方确定 supplier partnerId，订单已有 orderDate/deliveryDate 但完全依赖人工填写。Odoo 19 官方资料确认供应商提前期表示采购订单确认到收货的自然日，并用于预计到货日期。
+阻塞证据：相同供应商的常用提前期无法复用，采购员每张订单都需自行换算交货日期；现有库存项提前期属于仓库+物料补货设置，不能冒充供应商默认承诺。
+解除条件：SUPPLIER 合作方可维护0～3650整数自然日默认提前期；新建采购订单在合同乙方、订单日期和提前期齐备且用户尚未手工覆盖时预填交货日期；NULL 不预填，0 为订单日期，手工日期不被后续变化覆盖。
+Migration：需要
+Migration说明：MySQL/Flyway `V155` 只为 `md_partner` 增加可空整数列；现有行保持 NULL。
+依赖：既有合作方 CRUD、采购合同乙方、采购订单 orderDate/deliveryDate、当前 `partner:query/add/edit` 和采购订单权限。
+风险等级：中
+运行态要求：本地 H2/MySQL 与 Vite；可做只取消不写入浏览器验收，不连接或发布生产。
+Reviewer要求：确认提前期只对 SUPPLIER 展示/生效、按本地自然日计算且无时区漂移；NULL/0/正数、整数/边界、旧数据兼容和手工覆盖均有证据；不得把供应商默认值写回库存项或自动提交订单。
+归档报告：`docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md`
+最小回滚：回退前后端字段、V155 与预填逻辑；已写列为可空且不改变既有订单，回滚前先确认无新值依赖。
+目标：
+- 合作方维护页仅对供应商提供可空默认自然日提前期，并在详情中可读。
+- 新建采购订单根据合同乙方供应商与订单日期预填交货日期，用户仍可修改或清空。
+- 保持旧供应商 NULL、非供应商、已有订单编辑和订单审批/保存链兼容。
+非目标：
+- 不建设供应商×物料价目表、工作日历、节假日、采购确认缓冲、预测、自动选供应商或自动下单。
+- 不改库存项 replenishmentLeadDays，不反向修改历史订单或承诺供应商 SLA。
+- 不连接生产、不发布生产、不 push。
+允许修改：
+- `backend/src/main/java/com/cgcpms/partner/entity/MdPartner.java`
+- `backend/src/main/java/com/cgcpms/partner/vo/MdPartnerVO.java`
+- `backend/src/main/java/com/cgcpms/partner/service/MdPartnerService.java`
+- `backend/src/main/resources/db/migration/V155__add_partner_default_lead_days.sql`
+- `backend/src/test/java/com/cgcpms/partner/MdPartnerServiceTest.java`
+- `backend/src/test/java/com/cgcpms/partner/MdPartnerControllerTest.java`
+- `frontend-admin/src/types/partner.ts`
+- `frontend-admin/src/pages/partner/index.vue`
+- `frontend-admin/src/pages/partner/__tests__/index.test.ts`
+- `frontend-admin/src/pages/purchase/order.vue`
+- `frontend-admin/src/pages/purchase/supplierLeadTime.ts`
+- `frontend-admin/src/pages/purchase/__tests__/supplierLeadTime.test.ts`
+- `frontend-admin/src/pages/purchase/__tests__/order.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/ad-hoc-plan.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/competitor-analysis.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `frontend-admin/src/pages/inventory/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- V155 只新增 `md_partner.default_lead_days INT NULL`，现有行保持 NULL；实体/VO/前端类型一致，服务只向租户内合作方回显。
+- API 对默认提前期仅接受 NULL 或0～3650整数，小数、负数和3651拒绝；创建、更新、读取和旧客户端省略字段均有回归，非供应商值不得驱动订单预填。
+- 新建订单在 `orderDate + SUPPLIER.defaultLeadDays` 条件齐备时按本地自然日预填 deliveryDate；NULL 不预填、0 等于订单日期、跨月/闰日正确，用户手工覆盖后不再被自动值覆盖；编辑既有订单不自动改写。
+- 合作方与采购订单前端专项、后端目标测试、类型检查、目标 ESLint、Flyway/H2 启动、真实浏览器只取消不写入、Ready lint、允许路径和 `git diff --check` 全部 PASS。
+- 收口移除 `A-02-SUPPLIER-DEFAULT-LEAD-DAYS` 并更新 A-02 剩余边界；新增后续项0、关闭1、净变化-1。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-051`
+- `cd backend; .\mvnw.cmd "-Dtest=MdPartnerServiceTest,MdPartnerControllerTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/partner/__tests__/index.test.ts src/pages/purchase/__tests__/supplierLeadTime.test.ts src/pages/purchase/__tests__/order.test.ts`
+- `cd frontend-admin; pnpm exec vue-tsc --noEmit`
+- `cd frontend-admin; pnpm exec eslint src/types/partner.ts src/pages/partner/index.vue src/pages/partner/__tests__/index.test.ts src/pages/purchase/order.vue src/pages/purchase/supplierLeadTime.ts src/pages/purchase/__tests__/supplierLeadTime.test.ts src/pages/purchase/__tests__/order.test.ts`
+- `git diff --check`
+
 ### ISSUE-040-050：现场日报领料联动真实浏览器视觉回归
 
 优先级：P2
