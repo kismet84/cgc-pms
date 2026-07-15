@@ -223,7 +223,7 @@ Reviewer要求：确认公式前缀化不破坏普通文本和引号转义，Con
 优先级：P1
 任务性质：回归证明
 类型：站内通知 / 租户隔离 / 用户隔离 / 已读幂等 / SSE
-状态：Ready
+状态：Done
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/product-intelligence/project-map.md`; candidateEvidenceHead=f332d7462783d39ad9873480ce338570f6af2e88
 存量问题键：[stock:OBS-NOTIFICATION-INAPP-ISOLATION]
 关联产品目标：证明现有站内通知按租户+用户隔离且已读操作幂等，明确它不等于邮件、短信等外部真实渠道。
