@@ -6,6 +6,90 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
+当前控制面指纹金丝雀队列：`ISSUE-040-039` 已就绪；本轮先按单 Issue 门禁完成并登记金丝雀，通过后再继续 `启动迭代-20` 的剩余任务。
+
+### ISSUE-040-039：投标成本标记中标入口与状态项目边界
+
+优先级：P1
+任务性质：缺口修复
+类型：投标成本 / 中标状态 / 费用结转 / 权限 / 租户 / 项目数据范围
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-BID-WON`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=8dfa9ebfc8ba9dcd74ed0b8de2b066333d97c465
+存量问题键：[stock:A-01-BID-WON]
+关联产品目标：在既有投标成本页提供受控“标记中标”入口，复用既有中标端点和项目列表，将投标费用结转到用户有权访问的项目，并关闭 A-01 的最小叶子缺口。
+候选对比：同级叶子还有标记失标及间接费规则写入口；本任务复用已完成的投标列表、详情、创建、编辑、删除能力，且后端已有状态机和费用结转实现，范围小于间接费规则写入，适合作为当前控制面指纹单 Issue 金丝雀。失标保持独立 Ready，避免一次状态操作同时关闭两个存量问题。
+核验结论：问题仍存在——后端 `PUT /bid-cost/{id}/won` 已使用 `bid:status` 并限制 BIDDING、认证租户和同租户项目，但前端 API/页面明确没有中标调用；`bid:status` 尚未注册为菜单权限，Service 也未复用 `ProjectAccessChecker`，因此开放入口前必须同时补齐权限注册和项目数据范围门禁。知识图谱游标与候选取证提交一致。
+检索交叉核验：CodeGraph 未完整召回投标页面，按工具召回不足补充 codebase-memory 与当前分支精确 `rg`/文件读取；后端 Controller、Service、测试、前端无调用证据、V150～V153 权限迁移和 `ProjectAccessChecker` 语义均已交叉核验。
+阻塞证据：当前合格用户无法从投标成本页触发中标动作；仅持 `bid:edit` 已被后端明确拒绝，但数据库没有 `bid:status` 权限节点；同租户但超出用户项目数据范围的 projectId 目前只通过租户校验，可能造成越权关联与费用结转。
+解除条件：注册并绑定独立 `bid:status`；BIDDING 行在桌面和移动端提供二次确认的中标入口；项目候选来自既有只读项目列表且请求不含 tenantId；后端在任何状态或费用写入前校验项目数据范围；权限、租户、项目范围、状态、费用结转和失败不伪报成功的正负样本通过。
+Migration：需要
+Migration说明：新增 MySQL/H2 V154，仅在既有投标成本菜单下注册 `bid:status` BUTTON，并绑定既有 SUPER_ADMIN、ADMIN、COST_MANAGER；不修改已应用迁移。
+依赖：复用 `/bid-cost` 页面、`getProjectList`、`PUT /bid-cost/{id}/won`、`BidCostService.markAsWon`、`ProjectAccessChecker`、现有 bid API/页面测试与 BidCost Controller/Service 测试。
+风险等级：高
+运行态要求：仅 local/dev/test；浏览器验收前通过三项 health gate，页面只打开中标确认、加载项目并取消，不提交 PUT、不新增、修改、删除或重置业务数据。自动化测试数据必须事务回滚或精确清理；不得连接或发布生产。
+Reviewer要求：按高风险权限、租户、项目范围和金额事实复核；确认 `bid:status` 未被 `bid:edit`/`bid:query` 替代，401/403、管理员和显式权限样本齐全；确认跨租户/不存在投标统一隐藏，同租户无项目范围与跨租户项目均 fail-close，且失败发生在投标状态、费用来源类型、projectId 和成本汇总写入之前；确认重复操作拒绝、费用只从 BID_COST 结转一次并保持事务原子。
+归档报告：`docs/quality/ISSUE-040-039-投标成本标记中标入口与状态项目边界验收报告.md`
+最小回滚：回退 V154、前端中标 API/交互、Service 项目范围补强、测试及治理回写；不反向修改任何已中标业务数据，不回退既有列表、详情、创建、编辑和删除能力。
+目标：
+- 增加类型化 `markBidCostAsWon(id, projectId)`，精确调用 `PUT /bid-cost/{id}/won`，projectId 只作为请求参数。
+- 在既有投标成本桌面/移动 BIDDING 行提供 `bid:status` 或管理员可见的中标动作，确认文案包含投标项目和目标项目；取消不请求，成功刷新，失败保留当前状态和确认上下文。
+- 注册独立状态权限，并在后端结转前复用项目数据范围校验；补齐权限、状态、租户、项目范围和费用结转回归。
+非目标：
+- 不实现标记失标、撤销中标、重新打开、批量状态迁移、项目创建、成本项编辑或完整投标状态机重构。
+- 不修改既有 V150～V153，不新增路由、页面、表或状态值，不改变金额算法、成本汇总口径和项目列表授权。
+- 不连接生产、不发布生产、不 push；浏览器不确认中标。
+允许修改：
+- `backend/src/main/java/com/cgcpms/bid/service/BidCostService.java`
+- `backend/src/main/resources/db/migration/V154__add_bid_cost_status_permission.sql`
+- `backend/src/main/resources/db/migration-h2/V154__add_bid_cost_status_permission.sql`
+- `backend/src/test/java/com/cgcpms/bid/BidCostControllerTest.java`
+- `backend/src/test/java/com/cgcpms/bid/BidCostServiceTest.java`
+- `frontend-admin/src/api/modules/bid.ts`
+- `frontend-admin/src/api/modules/__tests__/bid.test.ts`
+- `frontend-admin/src/pages/bid-cost/index.vue`
+- `frontend-admin/src/pages/bid-cost/__tests__/index.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-039-投标成本标记中标入口与状态项目边界验收报告.md`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/bid/controller/**`
+- `backend/src/main/java/com/cgcpms/cost/**`
+- `backend/src/main/java/com/cgcpms/project/**`
+- `backend/src/main/resources/db/migration/V150__*`
+- `backend/src/main/resources/db/migration/V151__*`
+- `backend/src/main/resources/db/migration/V152__*`
+- `backend/src/main/resources/db/migration/V153__*`
+- `backend/src/main/resources/db/migration-h2/V150__*`
+- `backend/src/main/resources/db/migration-h2/V151__*`
+- `backend/src/main/resources/db/migration-h2/V152__*`
+- `backend/src/main/resources/db/migration-h2/V153__*`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `frontend-admin/src/types/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 精确调用 `PUT /bid-cost/{id}/won`；只发送 params=`{ projectId }`，无 body、tenantId 或其他业务字段。
+- 入口仅对 `bid:status` 或 ADMIN/SUPER_ADMIN 可见且仅 BIDDING 展示；目标项目从既有 GET 列表加载，确认文案包含投标名称与项目名称；取消不请求，成功刷新，失败不改行状态或伪报成功。
+- 未登录401、无 `bid:status` 403、仅 `bid:edit` 403、显式 `bid:status` 或管理员成功；不存在/跨租户投标统一 `BID_COST_NOT_FOUND`，非 BIDDING 返回 `BID_STATUS_INVALID`。
+- 同租户但超出项目数据范围返回 `PROJECT_ACCESS_DENIED`，跨租户/不存在项目统一 `PROJECT_NOT_FOUND`；全部拒绝发生在投标与费用写入前。合法中标关联项目、状态变 WON、BID_COST 费用转为 BID_COST_TRANSFERRED 并刷新汇总；重复操作不得二次结转。
+- V154 两方言等价且只绑定既有三类角色；列表、详情、新建、编辑、删除和失标后端能力不回退。
+- 收口移除 `A-01-BID-WON`，A-01 更新为有用户入口244、前端调用无独立页面58、内部/集成/运维4、需补入口4、待废弃0、需要确认11，共321；新增后续项0、关闭1、净变化-1。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint、SQL 静态、`git diff --check` 和只取消浏览器验收通过；独立风险复核结论为 PASS。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-039`
+- `cd backend; .\mvnw.cmd "-Dtest=BidCostControllerTest,BidCostServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
+- `git diff --check`
+
 ### ISSUE-040-038：投标成本受控删除入口与状态租户边界
 
 优先级：P1
