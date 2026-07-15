@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P0
 任务性质：运维治理
 类型：Flyway / MySQL / H2 / 迁移镜像 / 测试隔离 / 阻塞修复
-状态：Ready
+状态：Done
 来源锚点：`ISSUE-040-051` 首轮后端服务测试；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/ready-issues.md`; candidateEvidenceHead=7b09eea848563e7085b01a65790493ae6e015820
 存量问题键：[stock:AUTOPILOT-FLYWAY-V155-H2-MIRROR]
 关联产品目标：恢复供应商默认提前期任务在真实 H2 Flyway 测试上下文中的可验证性，保证同一 V155 在 MySQL 与 H2 两个既有迁移目录语义一致。
