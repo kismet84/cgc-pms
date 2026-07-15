@@ -30,3 +30,5 @@ Status: active
 - state 与 Issue checkpoint 的 `executionHost` 用于记录最后一次写入宿主；旧记录缺失时只读迁移为 `cli-legacy`，不得据此启动模型。
 - Reviewer 结果必须写为结构化 JSON，并与同一 Issue 和精确 diff hash 绑定后才能进入 closeout。
 - 控制面行为变化后，多 Issue 或无界执行仍需用户明确启动并通过一次 `启动迭代-1`；普通实现或测试命令不得冒充金丝雀。
+- 桌面原生单 Issue 金丝雀只有在实施与收口提交不同、Closeout Record v2 已登记、知识图谱 Git 游标等于当前 HEAD 后，才允许调用 `autopilot-register-canary.ps1` 原子登记并读回 `lastCanaryFingerprint` 与报告路径。
+- 新批次重置迭代计数时必须保留既有金丝雀证据；是否需要再次执行金丝雀只由当前控制面指纹与已登记指纹是否一致决定，不得按批次机械清空。

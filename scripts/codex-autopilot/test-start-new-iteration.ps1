@@ -50,6 +50,16 @@ try {
   if ($State.startedAt -eq "2026-07-09T13:29:13") { throw "Expected startedAt refreshed" }
   if (!(Test-Path (Join-Path $AutoDir "enabled.flag"))) { throw "Expected enabled.flag" }
 
+  $State.lastCanaryFingerprint = 'a' * 64
+  $State.lastCanaryReport = 'docs/quality/canary.md'
+  $State.controlPlaneFingerprint = 'a' * 64
+  $State.executionHost = 'desktop-native'
+  $State | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $AutoDir 'state.json') -Encoding UTF8
+  & pwsh -NoProfile -ExecutionPolicy Bypass -File $StartScript -Repo $Repo -MaxIterations 5 | Out-Null
+  $Restarted = Get-Content -Encoding UTF8 -Raw (Join-Path $AutoDir 'state.json') | ConvertFrom-Json
+  if ($Restarted.lastCanaryFingerprint -ne ('a' * 64) -or $Restarted.lastCanaryReport -ne 'docs/quality/canary.md') { throw 'new iteration batch discarded valid canary evidence' }
+  if ($Restarted.controlPlaneFingerprint -ne ('a' * 64) -or $Restarted.executionHost -ne 'desktop-native') { throw 'new iteration batch discarded control-plane identity' }
+
   Write-Host "autopilot new iteration start test passed"
 } finally {
   Remove-Item -LiteralPath $Repo -Recurse -Force -ErrorAction SilentlyContinue
