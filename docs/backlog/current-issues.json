@@ -1,12 +1,11 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-16T06:18:00+08:00",
+  "updatedAt": "2026-07-16T06:16:00+08:00",
   "issues": [
     { "issueKey": "A-01", "title": "后端接口用户入口治理", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P0", "blocking": false, "summary": "明确需补用户入口已清空，剩余11个子项均需要兼容性或业务规则确认。", "acceptanceCriteria": "11个子项均形成复用现有入口、内部接口、废弃或确认保留的唯一裁决，并通过权限、租户和状态边界验证。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md", "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"] },
     { "issueKey": "A-02", "title": "采购补货深化", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P1", "blocking": false, "summary": "供应商提前期、工作日历、预测和跨仓调拨仍缺。", "acceptanceCriteria": "通过产品决策门形成最小闭环，并验证采购角色、项目范围、数量和日期口径。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md"] },
     { "issueKey": "A-02-SUPPLIER-DEFAULT-LEAD-DAYS", "title": "供应商默认提前期与订单交货日期预填", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P1", "blocking": false, "parentIssueKey": "A-02", "summary": "合作方没有供应商默认自然日提前期，采购订单交货日期完全依赖人工换算。", "acceptanceCriteria": "供应商可维护可空0～3650整数自然日提前期；新建订单按订单日期预填且不覆盖人工日期，NULL/非供应商/旧订单保持兼容。", "sourceRefs": ["docs/product-intelligence/evolution-decision.md", "docs/backlog/ready-issues.md"] },
-    { "issueKey": "AUTOPILOT-FLYWAY-V155-H2-MIRROR", "title": "V155 双数据库迁移镜像缺失导致 H2 测试隔离失败", "status": "OPEN", "classification": "TO_FIX", "priority": "P0", "blocking": false, "summary": "ISSUE-040-051 首轮服务测试证明 MySQL V155 未同步到 migration-h2，H2 上下文缺少 default_lead_days 并在 SQL 层失败。", "acceptanceCriteria": "MySQL/H2 V155 同步新增同一可空整数列，迁移完整性与真实 H2 Flyway 上下文测试稳定通过。", "sourceRefs": ["docs/backlog/ready-issues.md"] },
     { "issueKey": "A-03", "title": "现场日报深化", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P1", "blocking": false, "summary": "人员班组、设备、自动天气、定位、离线、质量安全和统计仍缺。", "acceptanceCriteria": "按独立业务价值拆分最小Ready，不重复现有日报事实并验证项目数据范围。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md"] },
     { "issueKey": "A-04", "title": "WBS与进度平台深化", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P1", "blocking": false, "summary": "多前置、多类型、自动排程、基线和资源平衡仍缺。", "acceptanceCriteria": "先通过产品决策门和数据模型评审，再验证依赖一致性、环检测和项目隔离。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md"] },
     { "issueKey": "A-05", "title": "供应商综合履约", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P1", "blocking": false, "summary": "当前只有交付维度，质量、价格、退货、服务和黑名单仍缺。", "acceptanceCriteria": "核实真实数据质量后形成可解释、可追溯且不越权的最小履约闭环。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md"] },
