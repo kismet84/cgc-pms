@@ -8,6 +8,61 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047`、`ISSUE-040-048` 与 `ISSUE-040-049` 已完成；`启动迭代-20` 当前完成 12/20。WBS 前置门禁错误单次提示已收口，下一候选切换至日报领料联动真实浏览器验收。
 
+### ISSUE-040-050：现场日报领料联动真实浏览器视觉回归
+
+优先级：P2
+任务性质：回归证明
+类型：现场日报 / 已审批领料 / 只读详情 / 空态 / 长文本 / 响应式浏览器
+状态：Ready
+来源锚点：项目知识图谱当前问题 `OBS-DAILY-LOG-BROWSER`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=8adffabe709ea8e3662cd0d948d77de3863903be
+存量问题键：[stock:OBS-DAILY-LOG-BROWSER]
+关联产品目标：用真实浏览器补齐 `ISSUE-037-014` 当日已审批且已出库领料只读联动的可见性、空态、长文本和窄视口证据，不重复实现既有能力。
+候选对比：本项是唯一仍有明确浏览器验收缺口、可由当前本地 dev 运行态闭环的存量观察项；优先于首次冷缓存外网下载、受 ACL 保护残留清理和仍需产品决策的数据模型扩展。
+核验结论：当前日报详情已渲染“当日已审批领料”只读区、五个非敏感字段与专用空态，后端自动化已证明同租户/项目/日期、APPROVED、真实出库过滤；正式报告明确缺少真实浏览器视觉证据。
+阻塞证据：现有正式验收只能证明代码与自动化边界，不能证明当前真实页面中详情区可达、空态与长文本可读、窄视口下标题和只读内容不被裁切。
+解除条件：真实浏览器以当前 dev 角色进入日报页并打开详情，分别验证领料区可见或空态、长文本可读、桌面与小于500px窄视口关键内容可达；控制台无新增 error/warn；不产生未清理测试数据。
+Migration：不需要
+依赖：当前 8080/5173/dev-login 健康，本地 dev 数据或按三重门禁创建并精确清理的验收数据，既有日报组件测试。
+风险等级：中
+运行态要求：先通过三项 health gate；若需构造数据，只允许 dev、数据库 localhost/127.0.0.1 且存在 `.codex-autopilot/ALLOW_TEST_DATA_RESET`；不连接或发布生产。
+Reviewer要求：确认结论只覆盖现有当日领料只读联动，不把领料解释为已安装；浏览器不得出现价格、金额、合同等敏感字段；窄视口证据必须来自真实浏览器当前页面而非仅源码字符串。
+归档报告：`docs/quality/ISSUE-040-050-现场日报领料联动真实浏览器视觉回归验收报告.md`
+最小回滚：回退本轮治理回写与验收报告；本任务不修改业务代码或数据模型。
+目标：
+- 补齐日报详情领料区的真实浏览器可见性和专用空态证据。
+- 验证长施工文本与领料只读字段不会引入敏感字段或“已安装”语义。
+- 验证桌面视口和小于500px窄视口下关键详情内容仍可达、可读。
+非目标：
+- 不修改日报、领料、库存、权限或响应式业务代码，不新增 seed、migration 或永久演示数据。
+- 不扩展人员、设备、天气、定位、离线或统计能力，不声明生产发布通过。
+- 不连接生产、不发布生产、不 push。
+允许修改：
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-050-现场日报领料联动真实浏览器视觉回归验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- 8080 health、5173 与 dev-login 三项 health gate 通过，当前 Vite 指向本 Issue worktree 并完成稳定等待。
+- 真实浏览器桌面视口打开日报详情，“当日已审批领料”区域可见；无命中时展示专用空态，有命中时仅展示领料单号、物料、数量、单位、使用部位且不出现价格、金额、合同、供应商或“已安装”。
+- 浏览器中的长施工内容可完整滚动读取；小于500px真实窄视口下详情标题、施工内容、领料区及关闭操作仍可达，无水平裁切导致的不可操作。
+- 现有日报前端专项、类型检查、控制台 error/warn、当前问题 JSON、允许路径和 `git diff --check` 全部 PASS；若构造验收数据，收口复读零残留。
+- 收口移除 `OBS-DAILY-LOG-BROWSER`；新增后续项0、关闭1、净变化-1。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-050`
+- `cd frontend-admin; pnpm vitest run src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm exec vue-tsc --noEmit`
+- `git diff --check`
+
 ### ISSUE-040-049：WBS前置门禁错误单次提示与行为回归
 
 优先级：P2
