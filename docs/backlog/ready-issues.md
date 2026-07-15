@@ -4,14 +4,14 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-033` 已完成；本次 `启动迭代-5` 已通过控制面金丝雀放量门禁，当前执行 `ISSUE-040-034`。
+`ISSUE-040-034` 已完成；本次 `启动迭代-5` 已完成 1 条，继续按 checkpoint 选择下一条合格 Ready。
 
 ### ISSUE-040-034：工作流个人效率统计只读入口与数据范围
 
 优先级：P1
 任务性质：缺口修复
 类型：工作流 / 用户入口 / 个人效率 / 只读统计 / 身份与租户隔离
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `A-01-WORKFLOW-EFFICIENCY`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=4365b297325c0b20528375a0e7f82449bfdae918
 存量问题键：[stock:A-01-WORKFLOW-EFFICIENCY]
 归档报告：`docs/quality/ISSUE-040-034-工作流个人效率统计只读入口与数据范围验收报告.md`
@@ -63,6 +63,8 @@ Reviewer要求：复核请求只携带当前筛选和 overdueHours，不携带 u
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm exec eslint src/api/modules/workflow.ts src/pages/approval/todo.vue src/pages/approval/__tests__/ApprovalWorkList.test.ts`
 - `git diff --check`
+
+收口结论：个人效率统计 API、当前筛选同步、请求竞态门禁、五项分析栏展示、身份与租户统计口径均通过自动化和 180 秒稳定运行态验收；`A-01-WORKFLOW-EFFICIENCY` 已从唯一台账移除。新增后续项0、关闭后续项1、后续项净变化-1。
 
 ### ISSUE-040-033：投标成本详情只读入口与租户边界
 
