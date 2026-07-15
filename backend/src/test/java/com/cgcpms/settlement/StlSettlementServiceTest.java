@@ -55,6 +55,8 @@ class StlSettlementServiceTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private List<SubMeasureApprovalState> originalSubMeasureApprovalStates = List.of();
+
     @BeforeEach
     void setUp() {
         Claims claims = Jwts.claims()
@@ -71,7 +73,11 @@ class StlSettlementServiceTest {
         // Clear stl_settlement data left by other test classes
         // (e.g. Phase3IntegrationTest) to prevent pollution.
         jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ?", TENANT_ID);
-        jdbcTemplate.update("UPDATE sub_measure SET approval_status = 'APPROVED', status = 'CONFIRMED' " +
+        originalSubMeasureApprovalStates = jdbcTemplate.query(
+                "SELECT id, approval_status FROM sub_measure WHERE tenant_id = ? AND contract_id = ? ORDER BY id",
+                (rs, rowNum) -> new SubMeasureApprovalState(rs.getLong("id"), rs.getString("approval_status")),
+                TENANT_ID, CONTRACT_ID_30001);
+        jdbcTemplate.update("UPDATE sub_measure SET approval_status = 'APPROVED' " +
                 "WHERE tenant_id = ? AND contract_id = ?", TENANT_ID, CONTRACT_ID_30001);
 
         // Pre-load JSQLParser via a trivial MyBatis query.
@@ -86,8 +92,19 @@ class StlSettlementServiceTest {
 
     @AfterEach
     void tearDown() {
-        UserContext.clear();
+        try {
+            for (SubMeasureApprovalState state : originalSubMeasureApprovalStates) {
+                jdbcTemplate.update(
+                        "UPDATE sub_measure SET approval_status = ? WHERE tenant_id = ? AND id = ?",
+                        state.approvalStatus(), TENANT_ID, state.id());
+            }
+        } finally {
+            originalSubMeasureApprovalStates = List.of();
+            UserContext.clear();
+        }
     }
+
+    private record SubMeasureApprovalState(long id, String approvalStatus) {}
 
     private void seedWorkflowUsers() {
         jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
