@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P1
 任务性质：缺口修复
 类型：间接费规则 / 删除 / 权限 / 租户 / 引用状态 / 二次确认
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `A-01-OVERHEAD-DELETE`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=1688e2e5e1afda82bf26312d0b39ef693cd1e562
 存量问题键：[stock:A-01-OVERHEAD-DELETE]
 关联产品目标：在既有间接费规则弹窗提供最小受控删除入口，让 `overhead:delete` 用户删除尚未产生执行事实的规则，同时保护租户边界和历史分摊可追溯性。
