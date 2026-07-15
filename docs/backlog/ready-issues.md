@@ -4,7 +4,76 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036` 已完成；本次 `启动迭代-5` 已完成 3 条，下一条待 checkpoint 后选择。
+`ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036` 已完成；本次 `启动迭代-5` 已完成 3 条，当前执行 `ISSUE-040-037`。
+
+### ISSUE-040-037：投标成本受控修改入口与状态租户边界
+
+优先级：P1
+任务性质：缺口修复
+类型：投标成本 / 修改 / 白名单 DTO / 权限 / 租户 / 状态
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-BID-UPDATE`；唯一问题载体 `docs/backlog/current-issues.json`；candidateEvidenceHead=0a801fb178c4a380bfb237d5b23ba65d5edca081
+存量问题键：[stock:A-01-BID-UPDATE]
+归档报告：`docs/quality/ISSUE-040-037-投标成本受控修改入口与状态租户边界验收报告.md`
+Migration：需要
+Migration说明：MySQL/H2 V152 仅注册 `bid:edit` BUTTON 并绑定既有 SUPER_ADMIN、ADMIN、COST_MANAGER。
+依赖：复用 `/bid-cost` 页面、详情、新建 DTO 约束、`PUT /bid-cost/{id}`、BIDDING 状态与租户隐藏语义。
+风险等级：高
+运行态要求：仅 local/dev/test；浏览器仅打开并取消编辑，不提交 PUT 或写业务数据。
+Reviewer要求：确认更新 DTO/Service 仅写名称和备注，客户端字段不能覆盖 ID、tenantId、projectId、bidStatus、金额或审计事实；非 BIDDING 和跨租户 fail-close。
+最小回滚：回退 V152、更新 DTO/白名单、前端编辑/API/测试及治理回写；浏览器无数据回滚。
+目标：
+- 为 BIDDING 投标提供桌面和移动受控编辑入口，仅修改名称与备注。
+- 服务端把实体直写收敛为专用 DTO 和既有实体白名单更新。
+- 注册独立 `bid:edit` 权限并补齐权限、租户、状态和不可覆盖字段证据。
+非目标：
+- 不修改状态、关联项目、金额/成本项，不实现删除、中标、失标或批量编辑。
+- 不新增路由、页面或表，不改变成本结转/冲销逻辑。
+- 不连接/发布生产、不 push；浏览器不提交编辑。
+允许修改：
+- `backend/src/main/java/com/cgcpms/bid/controller/BidCostController.java`
+- `backend/src/main/java/com/cgcpms/bid/service/BidCostService.java`
+- `backend/src/main/java/com/cgcpms/bid/dto/BidCostUpdateRequest.java`
+- `backend/src/main/resources/db/migration/V152__add_bid_cost_edit_permission.sql`
+- `backend/src/main/resources/db/migration-h2/V152__add_bid_cost_edit_permission.sql`
+- `backend/src/test/java/com/cgcpms/bid/BidCostControllerTest.java`
+- `frontend-admin/src/types/bid.ts`
+- `frontend-admin/src/api/modules/bid.ts`
+- `frontend-admin/src/api/modules/__tests__/bid.test.ts`
+- `frontend-admin/src/pages/bid-cost/index.vue`
+- `frontend-admin/src/pages/bid-cost/__tests__/index.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-037-投标成本受控修改入口与状态租户边界验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/V150__*`
+- `backend/src/main/resources/db/migration/V151__*`
+- `backend/src/main/resources/db/migration-h2/V150__*`
+- `backend/src/main/resources/db/migration-h2/V151__*`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- PUT body 仅含 trim 后名称与可选备注；路径 ID 为唯一目标，tenantId/projectId/bidStatus/金额/审计字段不可覆盖。
+- 入口仅对 `bid:edit` 或管理员可见且仅 BIDDING 展示；取消不请求，成功刷新，失败保留表单。
+- 401/403、合法修改、跨租户/不存在统一隐藏、非 BIDDING 拒绝及白名单不变量通过。
+- V152 两方言等价且只绑定既有三类角色；列表、新建、详情和金额事实不回退。
+- 收口移除 `A-01-BID-UPDATE`，A-01 更新为有用户入口242、需补入口6；新增后续项0、关闭1、净变化-1。
+- Ready lint、后端专项、前端专项、类型、ESLint、SQL 静态、diff 与只取消浏览器验收通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-037`
+- `cd backend; .\mvnw.cmd "-Dtest=BidCostControllerTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/types/bid.ts src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-036：项目受控归档入口与项目数据范围
 

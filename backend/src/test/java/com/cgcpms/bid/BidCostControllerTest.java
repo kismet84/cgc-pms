@@ -86,7 +86,7 @@ class BidCostControllerTest {
         }
     }
 
-    @Test @Order(2) @DisplayName("V150/V151 register separate bid query and create permissions")
+    @Test @Order(2) @DisplayName("V150-V152 register separate bid query, create and edit permissions")
     void testBidMenuMigrationsApplied() {
         Set<String> permissions = Set.copyOf(jdbcTemplate.queryForList("""
                 SELECT DISTINCT m.perms
@@ -119,6 +119,23 @@ class BidCostControllerTest {
                 "SELECT COUNT(*) FROM sys_menu WHERE id = 963 AND perms IN ('bid:edit','bid:delete')",
                 Integer.class);
         assertEquals(0, unrelatedWritePermissionCount);
+
+        Set<String> editPermissions = Set.copyOf(jdbcTemplate.queryForList("""
+                SELECT DISTINCT m.perms
+                FROM sys_role r
+                JOIN sys_role_menu rm ON rm.role_id = r.id
+                JOIN sys_menu m ON m.id = rm.menu_id
+                WHERE r.role_code IN ('SUPER_ADMIN', 'ADMIN', 'COST_MANAGER')
+                  AND m.id = 964
+                  AND m.parent_id = 962
+                  AND m.menu_type = 'BUTTON'
+                  AND m.deleted_flag = 0
+                """, String.class));
+        assertEquals(Set.of("bid:edit"), editPermissions);
+        Integer unrelatedEditPermissionCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE id = 964 AND perms IN ('bid:add','bid:delete')",
+                Integer.class);
+        assertEquals(0, unrelatedEditPermissionCount);
     }
 
     @Test @Order(2) @DisplayName("POST /bid-cost enforces authentication and bid:add")
@@ -234,12 +251,89 @@ class BidCostControllerTest {
         }
     }
 
-    @Test @Order(6) @DisplayName("PUT /bid-cost/{id} -> 200 updates bid")
+    @Test @Order(6) @DisplayName("PUT /bid-cost/{id} updates only controlled fields")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(bidId);
-        String body = "{\"bidProjectName\":\"BID-UPD-" + System.nanoTime() + "\",\"bidStatus\":\"BIDDING\"}";
+        String name = "BID-UPD-" + System.nanoTime();
+        String body = "{\"bidProjectName\":\"  " + name + "  \",\"remark\":\" 修改备注 \","
+                + "\"tenantId\":9001,\"projectId\":10001,\"bidStatus\":\"WON\",\"amount\":999}";
         mockMvc.perform(putWith("/bid-cost/" + bidId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT tenant_id, project_id, bid_status, bid_project_name, remark FROM bid_cost WHERE id = ?", bidId);
+        assertEquals(TENANT_ID, ((Number) row.get("tenant_id")).longValue());
+        Assertions.assertNull(row.get("project_id"));
+        assertEquals("BIDDING", row.get("bid_status"));
+        assertEquals(name, row.get("bid_project_name"));
+        assertEquals("修改备注", row.get("remark"));
+    }
+
+    @Test @Order(6) @DisplayName("PUT /bid-cost/{id} enforces authentication and bid:edit")
+    void testUpdate_PermissionBoundary() throws Exception {
+        Assertions.assertNotNull(bidId);
+        String body = "{\"bidProjectName\":\"权限测试\"}";
+        mockMvc.perform(putWith("/bid-cost/" + bidId).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(putWith("/bid-cost/" + bidId).cookie(userCookie(TENANT_ID, List.of("bid:query")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(putWith("/bid-cost/" + bidId).cookie(userCookie(TENANT_ID, List.of("bid:edit")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(6) @DisplayName("bid:edit does not grant bid status transitions")
+    void testUpdate_EditPermissionDoesNotGrantStatusTransitions() throws Exception {
+        Assertions.assertNotNull(bidId);
+        Cookie editCookie = userCookie(TENANT_ID, List.of("bid:edit"));
+        mockMvc.perform(putWith("/bid-cost/" + bidId + "/won").cookie(editCookie).param("projectId", "10001"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(putWith("/bid-cost/" + bidId + "/lost").cookie(editCookie))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test @Order(6) @DisplayName("PUT /bid-cost/{id} validates controlled fields")
+    void testUpdate_ValidationBoundary() throws Exception {
+        Assertions.assertNotNull(bidId);
+        for (String body : List.of(
+                "{}",
+                "{\"bidProjectName\":\"   \"}",
+                "{\"bidProjectName\":\"" + "项".repeat(201) + "\"}",
+                "{\"bidProjectName\":\"合法项目\",\"remark\":\"" + "注".repeat(501) + "\"}")) {
+            mockMvc.perform(putWith("/bid-cost/" + bidId).cookie(adminCookie())
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().is4xxClientError());
+        }
+    }
+
+    @Test @Order(6) @DisplayName("PUT /bid-cost/{id} hides another tenant record as not found")
+    void testUpdate_TenantIsolation() throws Exception {
+        long id = 920000000000L + Math.abs(System.nanoTime() % 100000000L);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, id, 9001L, "CROSS-TENANT-BID-UPDATE-" + id);
+        try {
+            mockMvc.perform(putWith("/bid-cost/" + id)
+                            .cookie(userCookie(TENANT_ID, List.of("bid:edit")))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"bidProjectName\":\"不可见更新\"}"))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_COST_NOT_FOUND"))
+                    .andExpect(jsonPath("$.data").doesNotExist());
+        } finally {
+            jdbcTemplate.update("DELETE FROM bid_cost WHERE id = ?", id);
+        }
+    }
+
+    @Test @Order(10) @DisplayName("PUT /bid-cost/{id} rejects non-BIDDING state")
+    void testUpdate_NonBiddingRejected() throws Exception {
+        Assertions.assertNotNull(bidId);
+        mockMvc.perform(putWith("/bid-cost/" + bidId).cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"bidProjectName\":\"不可修改\"}"))
+                .andExpect(status().is4xxClientError())
+                .andExpect(jsonPath("$.code").value("BID_STATUS_NOT_EDITABLE"));
     }
 
     @Test @Order(7) @DisplayName("DELETE /bid-cost/{id} -> 200 deletes bid (before won)")

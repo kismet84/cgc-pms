@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import axios from 'axios'
 import { message } from 'ant-design-vue'
 import { FilterOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
-import { createBidCost, getBidCost, getBidCosts } from '@/api/modules/bid'
+import { createBidCost, getBidCost, getBidCosts, updateBidCost } from '@/api/modules/bid'
 import { useUserStore } from '@/stores/user'
 import type { BidCostQuery, BidCostVO, BidStatus } from '@/types/bid'
 import { useMobileViewport } from '@/composables/useMobileViewport'
@@ -14,6 +14,8 @@ const mobileFiltersOpen = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const createOpen = ref(false)
+const editOpen = ref(false)
+const editingId = ref('')
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detail = ref<BidCostVO | null>(null)
@@ -22,9 +24,15 @@ const rows = ref<BidCostVO[]>([])
 const total = ref(0)
 const query = reactive<BidCostQuery>({ pageNo: 1, pageSize: 20 })
 const createForm = reactive({ bidProjectName: '', remark: '' })
+const editForm = reactive({ bidProjectName: '', remark: '' })
 const canCreate = computed(
   () =>
     userStore.hasPermission('bid:add') ||
+    userStore.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'),
+)
+const canEdit = computed(
+  () =>
+    userStore.hasPermission('bid:edit') ||
     userStore.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'),
 )
 
@@ -104,6 +112,35 @@ async function submitCreate() {
     await fetchRows()
   } catch (error: unknown) {
     message.error(errorMessage(error, '新建投标项目失败'))
+  } finally {
+    saving.value = false
+  }
+}
+
+function openEdit(row: BidCostVO) {
+  editingId.value = row.id
+  editForm.bidProjectName = row.bidProjectName
+  editForm.remark = row.remark || ''
+  editOpen.value = true
+}
+
+async function submitEdit() {
+  const bidProjectName = editForm.bidProjectName.trim()
+  if (!bidProjectName) {
+    message.warning('请填写投标项目名称')
+    return
+  }
+  saving.value = true
+  try {
+    await updateBidCost(editingId.value, {
+      bidProjectName,
+      remark: editForm.remark.trim() || undefined,
+    })
+    message.success('投标项目更新成功')
+    editOpen.value = false
+    await fetchRows()
+  } catch (error: unknown) {
+    message.error(errorMessage(error, '更新投标项目失败'))
   } finally {
     saving.value = false
   }
@@ -267,6 +304,14 @@ onMounted(fetchRows)
                 <a-button type="link" data-testid="mobile-detail-button" @click="openDetail(row)">
                   查看详情
                 </a-button>
+                <a-button
+                  v-if="canEdit && row.bidStatus === 'BIDDING'"
+                  type="link"
+                  data-testid="mobile-edit-button"
+                  @click="openEdit(row)"
+                >
+                  编辑
+                </a-button>
               </article>
               <a-empty v-if="!loading && !rows.length" description="暂无投标项目" />
             </div>
@@ -291,6 +336,14 @@ onMounted(fetchRows)
                 <template v-else-if="column.key === 'action'">
                   <a-button type="link" data-testid="detail-button" @click="openDetail(record)">
                     查看
+                  </a-button>
+                  <a-button
+                    v-if="canEdit && record.bidStatus === 'BIDDING'"
+                    type="link"
+                    data-testid="edit-button"
+                    @click="openEdit(record)"
+                  >
+                    编辑
                   </a-button>
                 </template>
               </template>
@@ -375,6 +428,25 @@ onMounted(fetchRows)
             placeholder="可选，仅记录投标头备注"
             data-testid="create-remark-input"
           />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="editOpen"
+      title="编辑投标项目"
+      :confirm-loading="saving"
+      ok-text="保存"
+      cancel-text="取消"
+      data-testid="edit-modal"
+      @ok="submitEdit"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="投标项目名称" required>
+          <a-input v-model:value="editForm.bidProjectName" :maxlength="200" />
+        </a-form-item>
+        <a-form-item label="备注">
+          <a-textarea v-model:value="editForm.remark" :maxlength="500" :rows="4" show-count />
         </a-form-item>
       </a-form>
     </a-modal>
