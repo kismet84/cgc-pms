@@ -1,9 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import axios from 'axios'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import { FilterOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
-import { createBidCost, getBidCost, getBidCosts, updateBidCost } from '@/api/modules/bid'
+import {
+  createBidCost,
+  deleteBidCost,
+  getBidCost,
+  getBidCosts,
+  updateBidCost,
+} from '@/api/modules/bid'
 import { useUserStore } from '@/stores/user'
 import type { BidCostQuery, BidCostVO, BidStatus } from '@/types/bid'
 import { useMobileViewport } from '@/composables/useMobileViewport'
@@ -33,6 +39,11 @@ const canCreate = computed(
 const canEdit = computed(
   () =>
     userStore.hasPermission('bid:edit') ||
+    userStore.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'),
+)
+const canDelete = computed(
+  () =>
+    userStore.hasPermission('bid:delete') ||
     userStore.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'),
 )
 
@@ -144,6 +155,26 @@ async function submitEdit() {
   } finally {
     saving.value = false
   }
+}
+
+function confirmDelete(row: BidCostVO) {
+  Modal.confirm({
+    title: '删除投标项目',
+    content: `确认删除“${row.bidProjectName}”吗？仅投标中项目可删除。`,
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        await deleteBidCost(row.id)
+        message.success('投标项目删除成功')
+        await fetchRows()
+      } catch (error: unknown) {
+        message.error(errorMessage(error, '删除投标项目失败'))
+        throw error
+      }
+    },
+  })
 }
 
 async function openDetail(row: BidCostVO) {
@@ -312,6 +343,15 @@ onMounted(fetchRows)
                 >
                   编辑
                 </a-button>
+                <a-button
+                  v-if="canDelete && row.bidStatus === 'BIDDING'"
+                  type="link"
+                  danger
+                  data-testid="mobile-delete-button"
+                  @click="confirmDelete(row)"
+                >
+                  删除
+                </a-button>
               </article>
               <a-empty v-if="!loading && !rows.length" description="暂无投标项目" />
             </div>
@@ -344,6 +384,15 @@ onMounted(fetchRows)
                     @click="openEdit(record)"
                   >
                     编辑
+                  </a-button>
+                  <a-button
+                    v-if="canDelete && record.bidStatus === 'BIDDING'"
+                    type="link"
+                    danger
+                    data-testid="delete-button"
+                    @click="confirmDelete(record)"
+                  >
+                    删除
                   </a-button>
                 </template>
               </template>

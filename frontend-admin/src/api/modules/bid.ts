@@ -37,3 +37,10 @@ export function updateBidCost(id: string, data: BidCostUpdatePayload) {
     data,
   })
 }
+
+export function deleteBidCost(id: string) {
+  return request<void>({
+    url: `/bid-cost/${id}`,
+    method: 'delete',
+  })
+}

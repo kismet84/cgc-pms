@@ -4,7 +4,76 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037` 已完成；本次 `启动迭代-5` 已完成 4 条，准备选择第 5 条。
+`ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037` 已完成；本次 `启动迭代-5` 已完成 4 条，第 5 条已选择 `ISSUE-040-038`。
+
+### ISSUE-040-038：投标成本受控删除入口与状态租户边界
+
+优先级：P1
+任务性质：缺口修复
+类型：投标成本 / 删除 / 二次确认 / 权限 / 租户 / 状态
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-BID-DELETE`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=0d63f6739d0d2dcbc7610ec3c61e1bbc276ca7b0
+存量问题键：[stock:A-01-BID-DELETE]
+归档报告：`docs/quality/ISSUE-040-038-投标成本受控删除入口与状态租户边界验收报告.md`
+Migration：需要
+Migration说明：MySQL/H2 V153 仅注册 `bid:delete` BUTTON 并绑定既有 SUPER_ADMIN、ADMIN、COST_MANAGER。
+依赖：复用 `/bid-cost` 页面、既有 `DELETE /bid-cost/{id}`、`BidCostService.delete` 的认证租户隐藏与 BIDDING 状态门禁。
+风险等级：高
+运行态要求：仅 local/dev/test；浏览器只打开并取消删除确认，不提交 DELETE、不新增、修改、删除或重置业务数据。
+Reviewer要求：确认删除入口仅对 `bid:delete` 或管理员可见且只在 BIDDING 行展示；确认文案包含目标名称；取消不请求，失败不移除行或伪报成功；后端401/403、跨租户/不存在统一隐藏、非 BIDDING 拒绝。
+最小回滚：回退 V153、前端删除 API/确认入口/测试及治理回写；后端生产删除逻辑不变，浏览器无数据回滚。
+目标：
+- 为 BIDDING 投标提供桌面和移动受控删除入口，以目标项目名称二次确认。
+- 注册独立 `bid:delete` 权限；成功后刷新服务端列表，失败保留当前行并显示错误。
+- 补齐权限、租户、状态、请求契约和取消不写入证据。
+非目标：
+- 不实现批量删除、撤销/恢复、物理清理、中标、失标或关联项目/金额/成本项修改。
+- 不修改后端生产 Service、实体、Mapper、状态结转或冲销逻辑，不新增路由、页面或表。
+- 不连接/发布生产、不 push；浏览器不确认删除。
+允许修改：
+- `backend/src/main/resources/db/migration/V153__add_bid_cost_delete_permission.sql`
+- `backend/src/main/resources/db/migration-h2/V153__add_bid_cost_delete_permission.sql`
+- `backend/src/test/java/com/cgcpms/bid/BidCostControllerTest.java`
+- `frontend-admin/src/api/modules/bid.ts`
+- `frontend-admin/src/api/modules/__tests__/bid.test.ts`
+- `frontend-admin/src/pages/bid-cost/index.vue`
+- `frontend-admin/src/pages/bid-cost/__tests__/index.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-038-投标成本受控删除入口与状态租户边界验收报告.md`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration/V150__*`
+- `backend/src/main/resources/db/migration/V151__*`
+- `backend/src/main/resources/db/migration/V152__*`
+- `backend/src/main/resources/db/migration-h2/V150__*`
+- `backend/src/main/resources/db/migration-h2/V151__*`
+- `backend/src/main/resources/db/migration-h2/V152__*`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `frontend-admin/src/types/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 精确调用 `DELETE /bid-cost/{id}`，不发送 params、body、tenantId 或其他业务字段。
+- 入口仅对 `bid:delete` 或 ADMIN/SUPER_ADMIN 可见且仅 BIDDING 展示；确认文案包含项目名称；取消不请求，成功刷新，失败保留当前行。
+- 未登录401、无 `bid:delete` 403、显式权限或管理员成功；跨租户/不存在统一 `BID_COST_NOT_FOUND`，WON/LOST 返回 `BID_STATUS_NOT_DELETABLE`。
+- V153 两方言等价且只绑定既有三类角色；列表、新建、详情、编辑、状态动作和金额事实不回退。
+- 收口移除 `A-01-BID-DELETE`，A-01 更新为有用户入口243、需补入口5；新增后续项0、关闭1、净变化-1。
+- Ready lint、后端专项、前端专项、类型、ESLint、SQL 静态、diff 与只取消浏览器验收通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-038`
+- `cd backend; .\mvnw.cmd "-Dtest=BidCostControllerTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-037：投标成本受控修改入口与状态租户边界
 

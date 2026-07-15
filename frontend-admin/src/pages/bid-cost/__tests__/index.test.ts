@@ -17,15 +17,15 @@ describe('bid cost page contract', () => {
     expect(source).toContain('@change="changePage"')
   })
 
-  it('exposes only the permission-gated controlled create operation', () => {
+  it('exposes the permission-gated controlled create operation', () => {
     expect(source).toContain("userStore.hasPermission('bid:add')")
     expect(source).toContain('v-if="canCreate"')
     expect(source).toContain('createBidCost({')
     expect(source).toContain('bidProjectName,')
     expect(source).toContain('remark: createForm.remark.trim() || undefined')
     expect(source).toContain("message.error(errorMessage(error, '新建投标项目失败'))")
-    expect(source).not.toMatch(/删除|标记中标|标记未中标/)
-    expect(source).not.toMatch(/deleteBid|markAsWon|markAsLost/)
+    expect(source).not.toMatch(/标记中标|标记未中标/)
+    expect(source).not.toMatch(/markAsWon|markAsLost/)
     expect(source).not.toContain('tenantId')
     expect(source).not.toContain('projectId:')
     expect(source).not.toContain('amount')
@@ -47,7 +47,7 @@ describe('bid cost page contract', () => {
     expect(source).toContain('关联项目')
     expect(source).toContain('更新时间')
     expect(source).not.toContain('tenantId')
-    expect(source).not.toMatch(/deleteBid|markAsWon|markAsLost/)
+    expect(source).not.toMatch(/markAsWon|markAsLost/)
   })
 
   it('offers a permission and state guarded controlled edit for desktop and mobile', () => {
@@ -62,5 +62,19 @@ describe('bid cost page contract', () => {
     expect(source).toContain('remark: editForm.remark.trim() || undefined')
     expect(source).not.toContain('tenantId')
     expect(source).not.toContain('amount')
+  })
+
+  it('offers a permission and state guarded confirmed delete for desktop and mobile', () => {
+    expect(source).toContain("userStore.hasPermission('bid:delete')")
+    expect(source).toContain("canDelete && record.bidStatus === 'BIDDING'")
+    expect(source).toContain("canDelete && row.bidStatus === 'BIDDING'")
+    expect(source).toContain('data-testid="delete-button"')
+    expect(source).toContain('data-testid="mobile-delete-button"')
+    expect(source).toContain('content: `确认删除“${row.bidProjectName}”吗？仅投标中项目可删除。`')
+    expect(source).toContain('await deleteBidCost(row.id)')
+    expect(source).toContain("message.error(errorMessage(error, '删除投标项目失败'))")
+    expect(source).toContain('throw error')
+    expect(source).toContain('await fetchRows()')
+    expect(source).not.toContain('tenantId')
   })
 })
