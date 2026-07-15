@@ -4,7 +4,65 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-034` 已完成；本次 `启动迭代-5` 已完成 1 条，继续按 checkpoint 选择下一条合格 Ready。
+`ISSUE-040-034` 已完成；本次 `启动迭代-5` 已完成 1 条，当前执行 `ISSUE-040-035`。
+
+### ISSUE-040-035：间接费规则只读列表入口与租户边界
+
+优先级：P1
+任务性质：缺口修复
+类型：间接费 / 规则列表 / 用户入口 / 权限 / 租户隔离
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-OVERHEAD-LIST`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=5cec5beb458496888a7e62f6da76704a79b06cd1
+存量问题键：[stock:A-01-OVERHEAD-LIST]
+归档报告：`docs/quality/ISSUE-040-035-间接费规则只读列表入口与租户边界验收报告.md`
+Migration：不需要
+依赖：复用成本台账页面、成本 API、`GET /overhead-allocation/rules`、`overhead:query` 与既有 Controller/Service 测试。
+风险等级：高
+运行态要求：仅在 local/dev/test 以只读方式验收；先通过三项 health gate，不新增、修改、删除或重置规则及成本数据。
+Reviewer要求：复核列表入口仅对 `overhead:query` 或管理员可见，请求不含 tenantId，跨租户数据不可见；不得放宽执行权限或引入规则写操作。
+最小回滚：回退前端规则类型/API/弹窗入口、专项测试及治理回写，不涉及数据回滚。
+目标：
+- 在现有成本台账页为具备间接费查询权限的用户或管理员提供规则只读列表弹窗。
+- 展示成本科目 ID、分摊依据、周期和状态，支持服务端分页；失败保留弹窗且不显示旧数据。
+- 补齐前后端权限、租户、请求契约及页面交互测试。
+非目标：
+- 不实现规则新建、修改、删除、执行或详情，不新增路由、菜单、权限码或数据库迁移。
+- 不修改后端生产代码、成本科目模型、分摊算法或金额事实。
+- 不连接生产、不发布生产、不自动 push，不写业务数据。
+允许修改：
+- `frontend-admin/src/api/modules/cost.ts`
+- `frontend-admin/src/pages/cost/ledger.vue`
+- `frontend-admin/src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `backend/src/test/java/com/cgcpms/overhead/OverheadAllocationControllerTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-035-间接费规则只读列表入口与租户边界验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 精确调用 `GET /overhead-allocation/rules`，params 仅含 pageNo/pageSize，不含 tenantId、body 或写操作。
+- 入口仅对 `overhead:query` 或 ADMIN/SUPER_ADMIN 可见；打开加载第一页，分页加载，失败清空旧数据并保留弹窗。
+- 未登录返回401，无权限403，`overhead:query` 或管理员成功；Service 使用认证 tenantId，跨租户规则不返回。
+- 既有间接费执行权限、月份校验、幂等与成本台账能力不回退；收口移除 `A-01-OVERHEAD-LIST`，A-01 更新为有用户入口240、需补入口8。
+- 新增后续项0、关闭后续项1、净变化-1；Ready lint、前后端专项、类型检查、目标 ESLint、`git diff --check` 通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-035`
+- `cd backend; .\mvnw.cmd "-Dtest=OverheadAllocationControllerTest,TenantBoundaryTask2Test" test`
+- `cd frontend-admin; pnpm test:unit -- src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/cost.ts src/pages/cost/ledger.vue src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-034：工作流个人效率统计只读入口与数据范围
 

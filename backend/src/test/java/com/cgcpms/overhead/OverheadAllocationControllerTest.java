@@ -1,9 +1,11 @@
 package com.cgcpms.overhead;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.overhead.service.OverheadAllocationService;
+import com.cgcpms.overhead.entity.OverheadAllocationRule;
 import com.cgcpms.overhead.vo.OverheadAllocationExecutionResult;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.AfterEach;
@@ -31,6 +33,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -67,6 +70,41 @@ class OverheadAllocationControllerTest {
                     period.toString(), 0, 0, 0, 0, "0.00", false);
         });
         clearInvocations(service);
+        OverheadAllocationRule rule = new OverheadAllocationRule();
+        rule.setId(940026001L);
+        rule.setTenantId(TENANT_ID);
+        rule.setCostSubjectId(54010401L);
+        rule.setAllocationBasis("DIRECT_LABOR");
+        rule.setAllocationCycle("MONTHLY");
+        rule.setStatus("ENABLE");
+        Page<OverheadAllocationRule> page = new Page<>(1, 10, 1);
+        page.setRecords(List.of(rule));
+        when(service.getPage(1, 10)).thenReturn(page);
+    }
+
+    @Test
+    @DisplayName("规则列表要求登录和 overhead:query 权限")
+    void rulesRequireAuthenticationAndPermission() throws Exception {
+        mockMvc.perform(getApi("/overhead-allocation/rules"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(getApi("/overhead-allocation/rules")
+                        .cookie(cookie(List.of(), List.of("cost:ledger:query"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("规则查询权限或管理员可读取认证租户分页")
+    void rulesAllowQueryPermissionOrAdmin() throws Exception {
+        mockMvc.perform(getApi("/overhead-allocation/rules")
+                        .cookie(cookie(List.of(), List.of("overhead:query")))
+                        .param("pageNo", "1").param("pageSize", "10").param("tenantId", "999999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].id").value("940026001"));
+        mockMvc.perform(getApi("/overhead-allocation/rules")
+                        .cookie(cookie(List.of("ADMIN"), List.of()))
+                        .param("pageNo", "1").param("pageSize", "10"))
+                .andExpect(status().isOk());
+        verify(service, org.mockito.Mockito.times(2)).getPage(1, 10);
     }
 
     @AfterEach
@@ -167,6 +205,10 @@ class OverheadAllocationControllerTest {
 
     private MockHttpServletRequestBuilder postApi(String path) {
         return post("/api" + path).contextPath("/api");
+    }
+
+    private MockHttpServletRequestBuilder getApi(String path) {
+        return get("/api" + path).contextPath("/api");
     }
 
 }

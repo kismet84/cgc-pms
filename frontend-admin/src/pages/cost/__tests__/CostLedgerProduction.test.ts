@@ -17,6 +17,25 @@ const overviewSource = readLocalComponent('CostLedgerOverview.vue')
 const tablePanelSource = readLocalComponent('CostLedgerTablePanel.vue')
 
 describe('CostLedger production guards', () => {
+  it('exposes a tenant-scoped read-only overhead rule list', () => {
+    expect(apiSource).toContain('export interface OverheadAllocationRuleVO')
+    expect(apiSource).toContain('export function getOverheadAllocationRules')
+    expect(apiSource).toMatch(
+      /getOverheadAllocationRules[\s\S]*url: '\/overhead-allocation\/rules'[\s\S]*method: 'get'[\s\S]*params: \{ pageNo, pageSize \}/,
+    )
+    expect(apiSource).not.toMatch(/getOverheadAllocationRules[\s\S]{0,300}tenantId/)
+    expect(source).toContain("userStore.hasPermission('overhead:query')")
+    expect(source).toContain('v-if="canViewAllocationRules"')
+    expect(source).toContain('data-testid="view-overhead-allocation-rules"')
+    expect(source).toContain('title="间接费规则"')
+    expect(source).toContain('const requestId = ++ruleRequestId')
+    expect(source).toContain('ruleRows.value = []')
+    expect(source).toContain('ruleTotal.value = 0')
+    expect(source).toContain('getOverheadAllocationRules(rulePageNo.value, rulePageSize.value)')
+    expect(source).toContain('handleRulePageChange')
+    expect(source).not.toMatch(/openRuleModal[\s\S]{0,500}(create|update|delete)Rule/)
+  })
+
   it('only exposes overhead execution to admins or users holding both required permissions', () => {
     expect(source).toContain("import { useUserStore } from '@/stores/user'")
     expect(source).toMatch(
