@@ -36,3 +36,84 @@
 - 本轮关闭后续项：1
 - 关闭问题键：`OBS-POWERSHELL7-COMPAT`
 - 本轮后续项净变化：-1
+
+<!-- AUTOPILOT-FACTS:START -->
+## AutoPilot 自动事实
+
+- Issue：ISSUE-040-048
+- Ready 哈希：1e8b2f811c41a585f1b8e62114f656cfe2f6ac37daaf74ae0530c522fad9d083
+- 实施提交：60c12be200067dd8960d7252cc6d872e210dd24c
+- 验证差异哈希：99ee09d8b058a8116a8ff411c75b3c8dc81175fddcc9d6d41e3a3015bd544a2c
+- Evidence manifest：e2302a8d3f29163c3ccc7597f00937a5c67957979f61139c6904f9996757d006
+- Reviewer：required=True; decision=PASS
+- 后续项：added=0; closed=1; net=-1
+- 指标：{"closeoutDispatchCount":1,"contextBaseBuildCount":0,"contextDeltaBuildCount":0,"executorInvocationCount":0,"implementationDispatchCount":1,"inputTokens":null,"outputTokens":null,"phaseDurationsSeconds":{"IMPLEMENTED":0,"IMPLEMENTING":647,"REVIEWED":1,"REVIEWING":0,"VALIDATED":0,"VALIDATING":0},"phaseRestartCount":0,"plannerCandidateRefs":[],"plannerInvocationCount":0,"repairDispatchCount":0,"reportProjectionCount":1,"reviewDispatchCount":1,"reviewerInvocationCount":0,"runResumeCount":0,"tokenUsageStatus":"not_available","totalTokens":null,"validationDispatchCount":1,"validationExecutedCount":1,"validationReusedCount":0,"wallClockSeconds":649}
+- 控制面指纹：93a0a2677a888b909ef128a07c3bcff648115707190edb8b9555709baf6c5e74
+- PreCloseout Facts：cd52f325dc045da199fe76b011c79e7d9b1c18dc8e35d00c34dc59c28b99d9b0
+<!-- AUTOPILOT-FACTS:END -->
+
+<!-- AUTOPILOT-TASK-SCORE:BEGIN key=246020de1ed76b9e4ed2c2e0e5869b39f2b2456f4ab509a53402932f7e26cbc4 -->
+## AutoPilot 任务评分
+
+```json
+{
+  "schemaVersion": 2,
+  "key": "246020de1ed76b9e4ed2c2e0e5869b39f2b2456f4ab509a53402932f7e26cbc4",
+  "issueId": "ISSUE-040-048",
+  "implementationCommit": "60c12be200067dd8960d7252cc6d872e210dd24c",
+  "scoringVersion": "autopilot-task-score/v2",
+  "scoredAt": "2026-07-16T04:55:51.2668088+08:00",
+  "total": 100,
+  "dimensions": {
+    "deliveryCorrectness": {
+      "score": 35,
+      "max": 35,
+      "evidence": [
+        "docs/quality/ISSUE-040-048-PowerShell7控制面与UTF8兼容回归验收报告.md"
+      ]
+    },
+    "zeroDanglingIssues": {
+      "score": 25,
+      "max": 25,
+      "evidence": [
+        "docs/quality/ISSUE-040-048-PowerShell7控制面与UTF8兼容回归验收报告.md"
+      ]
+    },
+    "firstPassAcceptance": {
+      "score": 20,
+      "max": 20,
+      "evidence": [
+        "docs/quality/ISSUE-040-048-PowerShell7控制面与UTF8兼容回归验收报告.md"
+      ]
+    },
+    "taskExecutionEfficiency": {
+      "score": 10,
+      "max": 10,
+      "evidence": [
+        "docs/quality/ISSUE-040-048-PowerShell7控制面与UTF8兼容回归验收报告.md"
+      ]
+    },
+    "stockIssueReduction": {
+      "score": 10,
+      "max": 10,
+      "evidence": [
+        "docs/quality/ISSUE-040-048-PowerShell7控制面与UTF8兼容回归验收报告.md"
+      ]
+    }
+  },
+  "hardGatesPassed": true,
+  "followupNetChange": -1,
+  "executionTiming": {
+    "wallClockSeconds": 649,
+    "businessPhaseSeconds": 647,
+    "controlPlaneSeconds": 2,
+    "semanticProgressAt": "07/16/2026 04:55:48",
+    "livenessSignalsExcluded": true
+  },
+  "sourceRefs": [
+    "docs/quality/ISSUE-040-048-PowerShell7控制面与UTF8兼容回归验收报告.md"
+  ],
+  "shadow": false
+}
+```
+<!-- AUTOPILOT-TASK-SCORE:END -->

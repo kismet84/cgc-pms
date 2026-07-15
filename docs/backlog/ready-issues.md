@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P2
 任务性质：回归证明
 类型：AutoPilot / PowerShell 7 / 控制面 / 连续 runner / 状态机 / UTF-8
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `OBS-POWERSHELL7-COMPAT`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=359cc72d5278fa5b54f79a38ae8f0064b86955da
 存量问题键：[stock:OBS-POWERSHELL7-COMPAT]
 关联产品目标：解除 AutoPilot 使用 PowerShell 7 的历史兼容性观察项，以当前真实 `pwsh` 宿主证明控制面、连续 runner、状态迁移和 UTF-8 上下文原子读写回归通过。
