@@ -6,7 +6,64 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-当前控制面指纹金丝雀队列：`ISSUE-040-039` 已就绪；本轮先按单 Issue 门禁完成并登记金丝雀，通过后再继续 `启动迭代-20` 的剩余任务。
+`ISSUE-040-039` 已完成并登记控制面指纹金丝雀。执行中发现 closeout 目标区块误判阻塞，`ISSUE-047-001` 已作为单 Issue 修复队列就绪；通过后继续 `启动迭代-20` 剩余任务。
+
+### ISSUE-047-001：AutoPilot 收口区块边界与幂等误判修复
+
+优先级：P0
+任务性质：运维治理
+类型：AutoPilot / closeout / Ready 区块 / 幂等 / 双提交 / 控制面金丝雀
+状态：Ready
+来源锚点：`ISSUE-040-039` 收口实证；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-040-039-投标成本标记中标入口与状态项目边界验收报告.md`,`scripts/codex-autopilot/autopilot-closeout.ps1`
+存量问题键：[stock:AUTOPILOT-CLOSEOUT-BLOCK-BOUNDARY]
+关联产品目标：恢复本地连续迭代的确定性双提交与幂等收口，使后续产品和治理 Ready 不因其他历史 Done 区块被误判为已完成。
+核验结论：问题稳定复现——目标 Issue 的 worktree HEAD 等于 master HEAD 且目标仍为 Ready 时，现有跨区块正则可匹配后续任一 `状态：Done`，直接返回 idempotent/merged，未生成实现或收口提交。
+阻塞证据：`ISSUE-040-039` 首次调用 `Complete-AutopilotIssueCloseout` 返回空 `preCloseoutFacts` 且工作区仍保留14个未提交文件；剩余19个任务均使用同一 closeout 入口，继续执行会重复误判。
+解除条件：幂等检查严格绑定目标 Issue 区块；目标 Ready 后紧邻或隔着任意 Done 条目时仍进入真实 closeout；目标自身已 Done 且提交已合并时保持幂等。
+Migration：不需要
+依赖：复用 `Set-AutopilotReadyDone` 的区块边界语义、`Complete-AutopilotIssueCloseout` 与现有临时 Git 仓库自测。
+风险等级：高
+运行态要求：仅本地临时 Git 仓库与当前测试工作区；不访问业务服务、数据库或生产。
+Reviewer要求：确认修复只收紧目标区块识别，不放宽分支、基线、脏工作区、存量问题关闭、评分、双提交和 fast-forward 门禁；确认新回归在旧实现上失败、修复后通过，真正已完成目标仍幂等。
+归档报告：`docs/quality/ISSUE-047-001-AutoPilot收口区块边界与幂等误判验收报告.md`
+最小回滚：回退目标区块识别函数/条件及对应回归；不修改任何业务代码、业务数据、历史 closeout ledger 或既有提交。
+目标：
+- 为目标 Ready 提供单一、区块有界的状态读取，禁止读取后续 Issue 的 Done。
+- 增加“目标 Ready 后存在 Done 条目”的回归，并保留真正 Done 目标的幂等证据。
+非目标：
+- 不重构完整 closeout 状态机、评分、报告投影、登记账本或 Git 合并协议。
+- 不修改执行宿主、Ready writer、知识图谱、业务代码或生产配置。
+允许修改：
+- `scripts/codex-autopilot/autopilot-closeout.ps1`
+- `scripts/codex-autopilot/test-closeout.ps1`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-047-001-AutoPilot收口区块边界与幂等误判验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `scripts/codex-autopilot/autopilot-state.ps1`
+- `scripts/codex-autopilot/autopilot-transition.ps1`
+- `scripts/codex-autopilot/autopilot-issue-lifecycle.ps1`
+- `scripts/codex-autopilot/autopilot-task-score.ps1`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 当前目标为 Ready 且后续存在 Done 条目时，不得返回 idempotent；必须完成实现提交和独立 closeout 提交。
+- 目标自身 Done 且 closeout commit 已在 master 时，重试仍返回 idempotent 且不产生新提交。
+- 分支、基线、脏工作区、存量问题关闭、评分和 fast-forward 既有门禁不回退。
+- 收口移除 `AUTOPILOT-CLOSEOUT-BLOCK-BOUNDARY`；新增后续项0、关闭1、净变化-1。
+- Ready lint、closeout 自测、控制面回归、`git diff --check` 和独立风险复核通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-047-001`
+- `pwsh -NoProfile -File scripts/codex-autopilot/test-closeout.ps1`
+- `pwsh -NoProfile -File scripts/codex-autopilot/test-control-plane.ps1`
+- `git diff --check`
 
 ### ISSUE-040-039：投标成本标记中标入口与状态项目边界
 
