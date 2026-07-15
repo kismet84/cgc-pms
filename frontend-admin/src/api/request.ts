@@ -14,6 +14,28 @@ const SUCCESS_CODE = '0'
 const REFRESH_QUEUE_TIMEOUT = 15_000
 
 type RequestConfigWithPrompt = InternalAxiosRequestConfig & { errorMessage?: string }
+const REQUEST_ERROR_NOTIFIED = Symbol('request-error-notified')
+
+type RequestErrorWithNotification = object & { [REQUEST_ERROR_NOTIFIED]?: boolean }
+
+export function markRequestErrorNotified<T>(error: T): T {
+  if ((typeof error === 'object' && error !== null) || typeof error === 'function') {
+    Object.defineProperty(error, REQUEST_ERROR_NOTIFIED, {
+      value: true,
+      configurable: false,
+      enumerable: false,
+      writable: false,
+    })
+  }
+  return error
+}
+
+export function isRequestErrorNotified(error: unknown): boolean {
+  return (
+    ((typeof error === 'object' && error !== null) || typeof error === 'function') &&
+    (error as RequestErrorWithNotification)[REQUEST_ERROR_NOTIFIED] === true
+  )
+}
 
 const runtimeApiBaseUrl = (
   window as unknown as { __APP_RUNTIME_CONFIG__?: { apiBaseUrl?: string } }
@@ -115,7 +137,7 @@ service.interceptors.response.use(
     message.error(
       getConfiguredErrorMessage(response.config) || res.message || '操作失败，请稍后重试',
     )
-    return Promise.reject(new Error(res.message || '操作失败'))
+    return Promise.reject(markRequestErrorNotified(new Error(res.message || '操作失败')))
   },
   async (error) => {
     const status = error?.response?.status
@@ -138,7 +160,7 @@ service.interceptors.response.use(
 
       // Start a hard timeout so the queue always drains
       queueTimer = setTimeout(() => {
-        drainQueue(new Error('Token refresh timed out'))
+        drainQueue(markRequestErrorNotified(new Error('Token refresh timed out')))
         const userStore = useUserStore()
         userStore.logout()
         message.error('登录已过期，请重新登录')
@@ -157,12 +179,12 @@ service.interceptors.response.use(
         return service(originalRequest)
       } catch (e: unknown) {
         console.error('[refresh]', e)
-        drainQueue(new Error('Token refresh failed'))
+        drainQueue(markRequestErrorNotified(new Error('Token refresh failed')))
         const userStore = useUserStore()
         userStore.logout()
         message.error('登录已过期，请重新登录')
         if (window.location.pathname !== '/login') window.location.href = '/login'
-        return Promise.reject(error)
+        return Promise.reject(markRequestErrorNotified(error))
       }
     }
 
@@ -174,7 +196,7 @@ service.interceptors.response.use(
         '网络异常，请检查连接'
       message.error(msg)
     }
-    return Promise.reject(error)
+    return Promise.reject(markRequestErrorNotified(error))
   },
 )
 

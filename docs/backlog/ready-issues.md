@@ -6,7 +6,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047` 与 `ISSUE-040-048` 已完成；`启动迭代-20` 当前完成 11/20。PowerShell 7 兼容证据已收口，当前 Ready 为 WBS 前置门禁错误单次提示修复。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047`、`ISSUE-040-048` 与 `ISSUE-040-049` 已完成；`启动迭代-20` 当前完成 12/20。WBS 前置门禁错误单次提示已收口，下一候选切换至日报领料联动真实浏览器验收。
 
 ### ISSUE-040-049：WBS前置门禁错误单次提示与行为回归
 
@@ -67,6 +67,12 @@ Reviewer要求：确认标记不可枚举且只附着于对象错误，不改变
 - `cd frontend-admin; pnpm exec vue-tsc --noEmit`
 - `cd frontend-admin; pnpm exec eslint src/api/request.ts src/api/__tests__/request.test.ts src/pages/subcontract/task.vue src/pages/subcontract/__tests__/task.test.ts`
 - `git diff --check`
+
+执行复验结果（2026-07-16，主线程完成中风险前端复核）：
+- 请求层对业务码、非401响应错误及401刷新失败拒绝统一附加不可枚举的已提示标记；WBS 保存 catch 仅对未标记异常执行页面兜底。
+- request 与 WBS 组件目标测试共17项通过；行为用例证明请求层先提示再拒绝时总 message.error 调用恰好1次，未标记异常仍由页面兜底1次。类型检查和目标 ESLint 通过。
+- 本地后端首次 POST 暴露旧 JAR 的 Logback 类缺失，已分类为环境前置并执行干净打包、容器重启及184秒稳定采样；刷新后写接口恢复。浏览器创建前置/后置任务后，编辑页只出现1处前置门禁提示并禁用开工/完成选项，测试数据按 dev、localhost、重置标记三重门禁全部清理。
+- OBS-WBS-DUPLICATE-ERROR 已关闭；新增后续项0、关闭后续项1、后续项净变化-1。
 
 ### ISSUE-040-048：PowerShell 7控制面与UTF-8兼容回归
 

@@ -170,8 +170,8 @@ describe('api request error prompts', () => {
       dev: false,
     })
 
-    await expect(
-      requestModule.request({
+    const rejected = await requestModule
+      .request({
         url: '/files/f1/url',
         method: 'get',
         errorMessage: '文件下载失败，请确认权限或链接是否已过期',
@@ -186,9 +186,17 @@ describe('api request error prompts', () => {
             headers: {},
             config,
           }) as const,
-      }),
-    ).rejects.toThrow('无权访问该合同文件')
+      })
+      .catch((error: unknown) => error)
 
+    expect(rejected).toBeInstanceOf(Error)
+    expect((rejected as Error).message).toBe('无权访问该合同文件')
+    expect(requestModule.isRequestErrorNotified(rejected)).toBe(true)
+    const marker = Object.getOwnPropertySymbols(rejected as object).find(
+      (symbol) => (rejected as Record<symbol, unknown>)[symbol] === true,
+    )
+    expect(marker).toBeDefined()
+    expect(Object.getOwnPropertyDescriptor(rejected as object, marker!)?.enumerable).toBe(false)
     expect(mockMessageError).toHaveBeenCalledWith('文件下载失败，请确认权限或链接是否已过期')
   })
 })
