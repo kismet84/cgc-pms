@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P1
 任务性质：缺口修复
 类型：投标成本 / 未中标状态 / 费用核销 / 权限 / 租户 / 重复操作
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `A-01-BID-LOST`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=a5df9fe80a8e27f8e4d61d798a7002b69bc13b79
 存量问题键：[stock:A-01-BID-LOST]
 关联产品目标：在既有投标成本页提供受控“标记未中标”入口，复用已登记的 `bid:status` 权限和既有失标端点，将该投标的 BID_COST 费用一次性核销并关闭 A-01 的最后一个投标成本叶子。
