@@ -30,9 +30,7 @@ describe('CostLedger production guards', () => {
     expect(source).toContain(
       "dayjs(`${allocationMonth.value}-01`).endOf('month').format('YYYY-MM-DD')",
     )
-    expect(source).toContain(
-      "return !current.startOf('month').isBefore(dayjs().startOf('month'))",
-    )
+    expect(source).toContain("return !current.startOf('month').isBefore(dayjs().startOf('month'))")
     expect(source).toContain(':disabled-date="disableIncompleteMonth"')
     expect(source).toContain('仅可选择已完整结束的月份')
     expect(apiSource).toMatch(/params:\s*\{ period \}/)
