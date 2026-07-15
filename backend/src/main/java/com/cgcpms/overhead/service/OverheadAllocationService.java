@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.overhead.entity.OverheadAllocationRule;
 import com.cgcpms.overhead.entity.OverheadAllocationRun;
@@ -48,6 +50,7 @@ public class OverheadAllocationService {
     private final OverheadAllocationRuleMapper ruleMapper;
     private final OverheadAllocationRunMapper runMapper;
     private final CostItemMapper costItemMapper;
+    private final CostSubjectMapper costSubjectMapper;
     private final PmProjectMapper projectMapper;
     private final CostSummaryService costSummaryService;
     private final PlatformTransactionManager transactionManager;
@@ -68,6 +71,23 @@ public class OverheadAllocationService {
         rule.setStatus("ENABLE");
         ruleMapper.insert(rule);
         return rule.getId();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Long createValidated(Long costSubjectId, String allocationBasis, String allocationCycle) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        CostSubject subject = costSubjectMapper.selectById(costSubjectId);
+        if (subject == null || !tenantId.equals(subject.getTenantId())
+                || !"ENABLE".equals(subject.getStatus())
+                || !"OVERHEAD".equals(subject.getSubjectType())
+                || !"COST".equals(subject.getAccountCategory())) {
+            throw new BusinessException("OVERHEAD_SUBJECT_INVALID", "间接费科目不存在或不可用");
+        }
+        OverheadAllocationRule rule = new OverheadAllocationRule();
+        rule.setCostSubjectId(costSubjectId);
+        rule.setAllocationBasis(allocationBasis);
+        rule.setAllocationCycle(allocationCycle);
+        return create(rule);
     }
 
     @Transactional(rollbackFor = Exception.class)

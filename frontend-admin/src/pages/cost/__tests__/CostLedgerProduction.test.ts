@@ -36,6 +36,22 @@ describe('CostLedger production guards', () => {
     expect(source).not.toMatch(/openRuleModal[\s\S]{0,500}(create|update|delete)Rule/)
   })
 
+  it('offers a permission guarded controlled overhead rule create flow', () => {
+    expect(source).toContain("userStore.hasPermission('overhead:add')")
+    expect(source).toContain('v-if="canCreateAllocationRule"')
+    expect(source).toContain('data-testid="create-overhead-allocation-rule"')
+    expect(source).toContain('data-testid="create-overhead-allocation-rule-modal"')
+    expect(source).toContain("subject.status === 'ENABLE' && subject.subjectType === 'OVERHEAD'")
+    expect(source).toContain('await createOverheadAllocationRule({')
+    expect(source).toContain('costSubjectId: ruleCreateForm.costSubjectId')
+    expect(source).toContain('allocationBasis: ruleCreateForm.allocationBasis')
+    expect(source).toContain('allocationCycle: ruleCreateForm.allocationCycle')
+    expect(source).toContain('ruleCreateOpen.value = false')
+    expect(source).toContain('await fetchAllocationRules()')
+    expect(source).toContain("message.error('创建间接费规则失败')")
+    expect(source).not.toMatch(/createOverheadAllocationRule[\s\S]{0,500}(tenantId|status:)/)
+  })
+
   it('only exposes overhead execution to admins or users holding both required permissions', () => {
     expect(source).toContain("import { useUserStore } from '@/stores/user'")
     expect(source).toMatch(

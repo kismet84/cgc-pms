@@ -25,11 +25,25 @@ export interface OverheadAllocationRuleVO {
   status: string
 }
 
+export interface OverheadAllocationRuleCreatePayload {
+  costSubjectId: string
+  allocationBasis: 'DIRECT_LABOR' | 'CONTRACT_AMOUNT' | 'USAGE'
+  allocationCycle: 'MONTHLY' | 'PER_OCCURRENCE'
+}
+
 export function getOverheadAllocationRules(pageNo: number, pageSize: number) {
   return request<PageResult<OverheadAllocationRuleVO>>({
     url: '/overhead-allocation/rules',
     method: 'get',
     params: { pageNo, pageSize },
+  })
+}
+
+export function createOverheadAllocationRule(data: OverheadAllocationRuleCreatePayload) {
+  return request<string>({
+    url: '/overhead-allocation/rules',
+    method: 'post',
+    data,
   })
 }
 

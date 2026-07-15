@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { message } from 'ant-design-vue'
 import {
+  createOverheadAllocationRule,
   getCostLedger,
   getCostLedgerSummary,
   getCostLedgerDetail,
@@ -41,6 +42,9 @@ const canExecuteAllocation = computed(
 const canViewAllocationRules = computed(
   () => isAllocationAdmin.value || userStore.hasPermission('overhead:query'),
 )
+const canCreateAllocationRule = computed(
+  () => isAllocationAdmin.value || userStore.hasPermission('overhead:add'),
+)
 const ruleModalOpen = ref(false)
 const ruleLoading = ref(false)
 const ruleRows = ref<OverheadAllocationRuleVO[]>([])
@@ -48,6 +52,13 @@ const rulePageNo = ref(1)
 const rulePageSize = ref(10)
 const ruleTotal = ref(0)
 let ruleRequestId = 0
+const ruleCreateOpen = ref(false)
+const ruleCreateSubmitting = ref(false)
+const ruleCreateForm = reactive<{
+  costSubjectId?: string
+  allocationBasis: 'DIRECT_LABOR' | 'CONTRACT_AMOUNT' | 'USAGE'
+  allocationCycle: 'MONTHLY' | 'PER_OCCURRENCE'
+}>({ allocationBasis: 'DIRECT_LABOR', allocationCycle: 'MONTHLY' })
 
 const ruleColumns = [
   { title: '成本科目 ID', dataIndex: 'costSubjectId' },
@@ -84,6 +95,42 @@ function handleRulePageChange(page: number, pageSize: number) {
   rulePageNo.value = page
   rulePageSize.value = pageSize
   void fetchAllocationRules()
+}
+
+const overheadSubjectOptions = computed(() =>
+  costSubjectOptions.value.filter(
+    (subject) => subject.status === 'ENABLE' && subject.subjectType === 'OVERHEAD',
+  ),
+)
+
+function openRuleCreate() {
+  ruleCreateForm.costSubjectId = undefined
+  ruleCreateForm.allocationBasis = 'DIRECT_LABOR'
+  ruleCreateForm.allocationCycle = 'MONTHLY'
+  ruleCreateOpen.value = true
+}
+
+async function submitRuleCreate() {
+  if (!ruleCreateForm.costSubjectId) {
+    message.warning('请选择间接费科目')
+    return
+  }
+  ruleCreateSubmitting.value = true
+  try {
+    await createOverheadAllocationRule({
+      costSubjectId: ruleCreateForm.costSubjectId,
+      allocationBasis: ruleCreateForm.allocationBasis,
+      allocationCycle: ruleCreateForm.allocationCycle,
+    })
+    message.success('间接费规则创建成功')
+    ruleCreateOpen.value = false
+    await fetchAllocationRules()
+  } catch (error: unknown) {
+    console.error(error)
+    message.error('创建间接费规则失败')
+  } finally {
+    ruleCreateSubmitting.value = false
+  }
 }
 const allocationModalOpen = ref(false)
 const allocationSubmitting = ref(false)
@@ -136,7 +183,9 @@ const {
 } = storeToRefs(referenceStore)
 
 const contractOptions = ref(contractList.value ?? [])
-const costSubjectOptions = ref<{ id: string; subjectName: string }[]>([])
+const costSubjectOptions = ref<
+  { id: string; subjectName: string; subjectCode: string; subjectType: string; status: string }[]
+>([])
 const projectOptions = computed(() => projectList.value ?? [])
 
 async function loadCostSubjectOptions() {
@@ -546,6 +595,15 @@ onMounted(async () => {
     />
 
     <a-modal v-model:open="ruleModalOpen" title="间接费规则" :footer="null" width="760px">
+      <a-button
+        v-if="canCreateAllocationRule"
+        type="primary"
+        data-testid="create-overhead-allocation-rule"
+        style="margin-bottom: 16px"
+        @click="openRuleCreate"
+      >
+        新建规则
+      </a-button>
       <a-table
         row-key="id"
         :columns="ruleColumns"
@@ -562,6 +620,49 @@ onMounted(async () => {
             handleRulePageChange(pagination.current ?? 1, pagination.pageSize ?? 10)
         "
       />
+    </a-modal>
+
+    <a-modal
+      v-model:open="ruleCreateOpen"
+      title="新建间接费规则"
+      ok-text="确认新建"
+      cancel-text="取消"
+      :confirm-loading="ruleCreateSubmitting"
+      :mask-closable="!ruleCreateSubmitting"
+      data-testid="create-overhead-allocation-rule-modal"
+      @ok="submitRuleCreate"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="间接费科目" required>
+          <a-select
+            v-model:value="ruleCreateForm.costSubjectId"
+            placeholder="请选择启用的间接费科目"
+            data-testid="overhead-rule-subject"
+          >
+            <a-select-option
+              v-for="subject in overheadSubjectOptions"
+              :key="subject.id"
+              :value="subject.id"
+            >
+              {{ subject.subjectCode }} {{ subject.subjectName }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="分摊依据" required>
+          <a-select v-model:value="ruleCreateForm.allocationBasis">
+            <a-select-option value="DIRECT_LABOR">直接人工</a-select-option>
+            <a-select-option value="CONTRACT_AMOUNT">合同金额</a-select-option>
+            <a-select-option value="USAGE">均等分摊</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="分摊周期" required>
+          <a-select v-model:value="ruleCreateForm.allocationCycle">
+            <a-select-option value="MONTHLY">每月</a-select-option>
+            <a-select-option value="PER_OCCURRENCE">按次</a-select-option>
+          </a-select>
+        </a-form-item>
+      </a-form>
+      <a-alert type="warning" show-icon message="规则创建后默认启用；租户和状态由服务端确定。" />
     </a-modal>
 
     <a-modal
