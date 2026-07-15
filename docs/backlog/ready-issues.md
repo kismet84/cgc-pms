@@ -6,7 +6,77 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001` 与 `ISSUE-040-040` 已完成；`启动迭代-20` 当前完成 3/20。下一条 Ready 切换到间接费规则域，先完成受控新建入口。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040` 与 `ISSUE-040-041` 已完成；`启动迭代-20` 当前完成 4/20。下一条 Ready 继续关闭间接费规则修改入口，并收紧更新字段、科目和租户边界。
+
+### ISSUE-040-042：间接费规则受控修改入口与字段状态边界
+
+优先级：P1
+任务性质：缺口修复
+类型：间接费规则 / 修改 / 权限 / 科目 / 租户 / 状态 / 白名单 DTO
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-OVERHEAD-UPDATE`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=3b72fc0fa52364baeeaa9ef131f5b35e0319c298
+存量问题键：[stock:A-01-OVERHEAD-UPDATE]
+关联产品目标：在既有间接费规则弹窗提供最小受控修改入口，让 `overhead:edit` 用户调整科目、依据与周期，同时保持认证租户、既有状态和更新字段白名单边界。
+候选对比：间接费规则新建闭环已通过，修改复用同页、同一科目候选和同一校验服务，变更面小于删除的引用状态门禁；库存并发和补货负向测试属于回归证明，不先于已证实的用户入口缺口。
+核验结论：后端 PUT `/overhead-allocation/rules/{id}` 已存在，但直接接收实体，客户端可携带 tenantId、status 和审计字段；Service 仅修正 tenantId，未校验目标科目。前端规则列表无修改入口。CodeGraph 已命中 Controller 和 Service 更新链，前端预期局部召回不足，实施时以当前分支精确 `rg` 与文件读取补充核验。
+阻塞证据：合格用户无法从产品页面修改规则；直接开放现有实体入参会暴露身份、状态和审计字段注入面，且跨租户、禁用、非间接费科目可被写入规则。
+解除条件：新增更新白名单请求与目标规则/科目 fail-close；前端受控编辑表单成功后刷新、失败保留、取消不 PUT；权限、租户、字段注入、科目和枚举正负样本通过。
+Migration：不需要
+依赖：复用已验收的成本列表规则弹窗、新建表单科目候选、PUT `/overhead-allocation/rules/{id}`、现有 Controller/Service 专项和 V80 表结构。
+风险等级：高
+运行态要求：仅 local/dev/test；浏览器只打开编辑弹窗并取消，不提交 PUT、不修改或重置业务数据；不得连接或发布生产。
+Reviewer要求：确认仅 `overhead:edit` 或管理员可见；DTO 不接受 id、tenantId、status、审计字段；目标规则属于认证租户，科目是当前租户 ENABLE 的 OVERHEAD/COST 类别；更新保留服务端既有状态，失败不伪报成功。
+归档报告：`docs/quality/ISSUE-040-042-间接费规则受控修改入口与字段状态边界验收报告.md`
+最小回滚：回退更新 DTO、Controller/Service 校验、前端 API/表单、专项测试和治理回写；不修改任何既有规则数据或分摊事实。
+目标：
+- 用白名单 DTO 接收 costSubjectId、allocationBasis、allocationCycle，路径 id、认证租户和服务端既有状态为唯一身份/状态来源。
+- 校验目标规则与科目均属于认证租户，科目为启用的 OVERHEAD/COST 类别；非法目标、科目和枚举 fail-close。
+- 在规则列表提供 `overhead:edit`/管理员可见的编辑入口，成功刷新、失败保留、取消不请求。
+非目标：
+- 不实现规则删除、启停、复制、批量导入或立即执行分摊。
+- 不新增表、迁移、权限节点、路由或页面，不改变分摊算法、执行幂等和历史规则。
+- 不连接生产、不发布生产、不 push；浏览器不确认修改。
+允许修改：
+- `backend/src/main/java/com/cgcpms/overhead/dto/OverheadAllocationRuleUpdateRequest.java`
+- `backend/src/main/java/com/cgcpms/overhead/controller/OverheadAllocationController.java`
+- `backend/src/main/java/com/cgcpms/overhead/service/OverheadAllocationService.java`
+- `backend/src/test/java/com/cgcpms/overhead/OverheadAllocationControllerTest.java`
+- `backend/src/test/java/com/cgcpms/overhead/OverheadAllocationServiceTest.java`
+- `frontend-admin/src/api/modules/cost.ts`
+- `frontend-admin/src/api/modules/__tests__/cost.test.ts`
+- `frontend-admin/src/pages/cost/ledger.vue`
+- `frontend-admin/src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-042-间接费规则受控修改入口与字段状态边界验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/**`
+- `backend/src/main/java/com/cgcpms/overhead/entity/**`
+- `backend/src/main/java/com/cgcpms/overhead/mapper/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 只发送 costSubjectId、allocationBasis、allocationCycle；无 id、tenantId、status 或审计字段，路径 id 不可被请求体覆盖。
+- 入口仅 `overhead:edit` 或 ADMIN/SUPER_ADMIN 可见；表单预填当前规则，取消不请求，成功关闭并刷新，失败保留输入且不伪报成功。
+- 未登录401、无权限403、显式权限/管理员成功；目标规则和科目强制认证租户，跨租户/不存在规则及跨租户/不存在/禁用/非间接费科目 fail-close。
+- allocationBasis 仅 DIRECT_LABOR/CONTRACT_AMOUNT/USAGE，allocationCycle 仅 MONTHLY/PER_OCCURRENCE；非法输入不入库；更新保留既有状态。
+- 收口移除 `A-01-OVERHEAD-UPDATE`，A-01 更新为有用户入口247、前端调用无独立页面58、内部/集成/运维4、需补入口1、待废弃0、需要确认11，共321；新增后续项0、关闭1、净变化-1。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint、`git diff --check` 和只取消浏览器验收通过；高风险复核 PASS。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-042`
+- `cd backend; .\mvnw.cmd "-Dtest=OverheadAllocationControllerTest,OverheadAllocationServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/cost.test.ts src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/cost.ts src/api/modules/__tests__/cost.test.ts src/pages/cost/ledger.vue src/pages/cost/__tests__/CostLedgerProduction.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-041：间接费规则受控新建入口与科目租户边界
 
