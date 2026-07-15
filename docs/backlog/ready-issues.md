@@ -6,7 +6,67 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047` 与 `ISSUE-040-048` 已完成；`启动迭代-20` 当前完成 11/20。PowerShell 7 控制面与 UTF-8 兼容证据已收口，下一候选切换至其他存量问题域。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047` 与 `ISSUE-040-048` 已完成；`启动迭代-20` 当前完成 11/20。PowerShell 7 兼容证据已收口，当前 Ready 为 WBS 前置门禁错误单次提示修复。
+
+### ISSUE-040-049：WBS前置门禁错误单次提示与行为回归
+
+优先级：P2
+任务性质：缺口修复
+类型：WBS / 前置门禁 / Axios 拦截器 / 错误提示 / Vue 行为测试
+状态：Ready
+来源锚点：项目知识图谱当前问题 `OBS-WBS-DUPLICATE-ERROR`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=5b2ac921a683273afa0d4026ca5df3b96bd03bc4
+存量问题键：[stock:OBS-WBS-DUPLICATE-ERROR]
+关联产品目标：确保 WBS 前置任务未完成等后端门禁错误只向用户提示一次，同时保留页面对非请求错误的兜底提示。
+候选对比：本项已有明确前端调用链与可行为化复现，范围仅为请求错误元数据和 WBS 保存 catch；优先于需要业务数据构造的日报浏览器验收及尚未通过产品决策门的新能力。
+核验结论：`request.ts` 对业务码和非401网络错误调用 `message.error` 后拒绝 Promise；`task.vue` 的 `handleModalOk` catch 又按同一 Error 消息调用 `message.error`，确定存在双提示路径；当前 WBS 测试只检查 catch 源码字符串。
+阻塞证据：前置门禁拒绝会被全局拦截器与页面各提示一次，用户看到重复错误；源码字符串断言不能证明真实调用次数。
+解除条件：全局拦截器把已提示状态绑定到被拒绝错误；WBS catch 对已提示错误静默、对未提示错误仍兜底；组件行为测试模拟拦截器先提示后拒绝并严格断言总调用1次。
+Migration：不需要
+依赖：复用 Axios 响应拦截器、Ant Design Vue message、现有 WBS 组件测试和 Vitest。
+风险等级：中
+运行态要求：前端 Vitest/jsdom 与本地浏览器；不需要数据库重置、不连接或发布生产。
+Reviewer要求：确认标记不可枚举且只附着于对象错误，不改变错误 message/类型；业务码、非401与401刷新失败均标记；WBS 只抑制已提示错误，成功、校验 warning 与普通异常兜底保持原行为。
+归档报告：`docs/quality/ISSUE-040-049-WBS前置门禁错误单次提示与行为回归验收报告.md`
+最小回滚：回退请求错误标记、WBS catch 条件与行为测试；不涉及后端或数据迁移。
+目标：
+- 建立请求层“已向用户提示”错误标记与查询函数。
+- WBS 保存失败仅在错误未被请求层提示时显示页面兜底。
+- 用组件运行时行为测试替换关键源码字符串断言，证明门禁错误只提示一次。
+非目标：
+- 不重构全站错误策略，不批量修改其他页面 catch，不改变后端错误码或 WBS 状态机。
+- 不吞掉错误、不改变 Promise 拒绝、401 登录过期流程或本地表单校验。
+- 不连接生产、不发布生产、不 push。
+允许修改：
+- `frontend-admin/src/api/request.ts`
+- `frontend-admin/src/api/__tests__/request.test.ts`
+- `frontend-admin/src/pages/subcontract/task.vue`
+- `frontend-admin/src/pages/subcontract/__tests__/task.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-049-WBS前置门禁错误单次提示与行为回归验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/src/api/modules/subcontract.ts`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- 请求层业务码与非401错误在提示后均满足 `isRequestErrorNotified(error)=true`，标记不可枚举；401刷新失败拒绝也带标记。
+- WBS 组件行为测试模拟请求层先提示“前置任务未完成”再拒绝，最终 `message.error` 恰好调用1次；未标记普通错误仍由页面兜底1次。
+- 原 WBS 成功、校验 warning、列表、WBS/甘特与前置禁用回归保持通过；移除关键 catch 源码字符串断言。
+- 目标测试、前端类型检查、目标 ESLint、真实浏览器等价错误交互、`git diff --check` 和中风险复核 PASS。
+- 收口移除 `OBS-WBS-DUPLICATE-ERROR`；新增后续项0、关闭1、净变化-1。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-049`
+- `cd frontend-admin; pnpm vitest run src/api/__tests__/request.test.ts src/pages/subcontract/__tests__/task.test.ts`
+- `cd frontend-admin; pnpm exec vue-tsc --noEmit`
+- `cd frontend-admin; pnpm exec eslint src/api/request.ts src/api/__tests__/request.test.ts src/pages/subcontract/task.vue src/pages/subcontract/__tests__/task.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-048：PowerShell 7控制面与UTF-8兼容回归
 
