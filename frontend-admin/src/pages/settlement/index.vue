@@ -346,103 +346,30 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
 
 <template>
   <div class="lg-list-page lg-page app-page settlement-page">
-    <!-- 页面头部 -->
     <div class="lg-page-head settlement-page-head">
-      <div class="settlement-page-meta-row">
-        <div>
-          <a-breadcrumb class="settlement-breadcrumb">
-            <a-breadcrumb-item>结算管理</a-breadcrumb-item>
-            <a-breadcrumb-item>结算列表</a-breadcrumb-item>
-          </a-breadcrumb>
-          <div class="settlement-page-title-row">
-            <h1>结算审定台账</h1>
-            <span>送审、审定、差额与付款缺口集中核对</span>
-          </div>
-        </div>
-        <div class="settlement-head-digest">
-          <div>
-            <span>定案金额</span>
-            <strong>{{ fmtWan(kpi.totalFinalAmount) }}万</strong>
-          </div>
-          <div>
-            <span>变更差额</span>
-            <strong>{{ fmtWan(kpi.totalChangeAmount) }}万</strong>
-          </div>
-          <div>
-            <span>未付金额</span>
-            <strong>{{ fmtWan(kpi.totalUnpaidAmount) }}万</strong>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 搜索栏 -->
-    <div class="lg-search-bar settlement-search-bar">
-      <div class="settlement-search-title">
-        <strong>查询条件</strong>
-        <span>编号 / 项目 / 状态</span>
-      </div>
-      <div class="settlement-search-fields">
-        <a-input
-          v-model:value="filter.keyword"
-          class="settlement-search-input"
-          placeholder="搜索结算编号、项目、合同"
-          allow-clear
-          size="large"
-          @press-enter="handleSearch"
-        >
-          <template #prefix><SearchOutlined class="settlement-search-prefix-icon" /></template>
-        </a-input>
-        <a-select
-          v-model:value="filter.projectId"
-          class="settlement-search-select"
-          placeholder="全部项目"
-          allow-clear
-          size="large"
-          @change="onProjectChange"
-        >
-          <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
-            {{ p.projectName }}
-          </a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filter.settlementStatus"
-          class="settlement-search-select is-compact"
-          placeholder="状态"
-          allow-clear
-          size="large"
-        >
-          <a-select-option value="DRAFT">草稿</a-select-option>
-          <a-select-option value="FINALIZED">已定案</a-select-option>
-          <a-select-option value="CANCELLED">已作废</a-select-option>
-        </a-select>
-      </div>
-      <div class="settlement-search-actions">
-        <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
-        <a-button size="large" @click="handleReset">
-          <template #icon><ReloadOutlined /></template>
-          重置
-        </a-button>
-      </div>
+      <a-breadcrumb class="settlement-breadcrumb">
+        <a-breadcrumb-item>结算管理</a-breadcrumb-item>
+        <a-breadcrumb-item>结算列表</a-breadcrumb-item>
+      </a-breadcrumb>
     </div>
 
     <div class="lg-grid settlement-workspace">
-      <div class="lg-left">
+      <div class="lg-left settlement-main-column">
         <!-- KPI 横条 -->
         <div v-if="!isMobile" class="lg-kpi-strip settlement-kpi-summary" aria-label="结算关键指标">
-          <div class="lg-kpi-card settlement-kpi-item">
+          <div class="settlement-kpi-item">
             <span class="settlement-kpi-icon is-total"><FileDoneOutlined /></span>
             <span class="settlement-kpi-label">结算总数</span>
             <span class="settlement-kpi-value">{{ kpi.totalCount }} <small>单</small></span>
           </div>
-          <div class="lg-kpi-card settlement-kpi-item is-wide">
+          <div class="settlement-kpi-item is-wide">
             <span class="settlement-kpi-icon is-amount"><DollarOutlined /></span>
             <span class="settlement-kpi-label">合同金额</span>
             <span class="settlement-kpi-value"
               >{{ fmtWan(kpi.totalContractAmount) }} <small>万元</small></span
             >
           </div>
-          <div class="lg-kpi-card settlement-kpi-item is-progress">
+          <div class="settlement-kpi-item is-progress">
             <span class="settlement-kpi-icon is-final"><CheckCircleOutlined /></span>
             <span class="settlement-kpi-label">定案金额</span>
             <span class="settlement-kpi-value"
@@ -456,7 +383,7 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
               ></span
             ></span>
           </div>
-          <div class="lg-kpi-card settlement-kpi-item is-progress is-paid">
+          <div class="settlement-kpi-item is-progress is-paid">
             <span class="settlement-kpi-icon is-paid"><WalletOutlined /></span>
             <span class="settlement-kpi-label">已付金额</span>
             <span class="settlement-kpi-value"
@@ -470,12 +397,58 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
               ></span
             ></span>
           </div>
-          <div class="lg-kpi-card settlement-kpi-item is-unpaid">
+          <div class="settlement-kpi-item is-unpaid">
             <span class="settlement-kpi-icon is-unpaid"><WalletOutlined /></span>
             <span class="settlement-kpi-label">未付金额</span>
             <span class="settlement-kpi-value"
               >{{ fmtWan(kpi.totalUnpaidAmount) }} <small>万元</small></span
             >
+          </div>
+        </div>
+
+        <div class="lg-search-bar settlement-search-bar">
+          <div class="settlement-filter-grid">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              size="large"
+              @change="onProjectChange"
+            >
+              <a-select-option v-for="p in projects" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.settlementStatus"
+              placeholder="全部结算状态"
+              allow-clear
+              size="large"
+            >
+              <a-select-option value="DRAFT">草稿</a-select-option>
+              <a-select-option value="FINALIZED">已定案</a-select-option>
+              <a-select-option value="CANCELLED">已作废</a-select-option>
+            </a-select>
+          </div>
+          <div class="settlement-filter-foot">
+            <a-input
+              v-model:value="filter.keyword"
+              placeholder="搜索结算编号、项目、合同"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix>
+                <SearchOutlined class="settlement-search-prefix-icon" />
+              </template>
+            </a-input>
+            <div class="settlement-search-actions">
+              <a-button type="primary" size="large" @click="handleSearch">搜索</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </div>
           </div>
         </div>
 
@@ -485,24 +458,23 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
             <div class="lg-toolbar-left">
               <div class="settlement-table-heading">
                 <span class="settlement-table-title">结算记录明细</span>
-                <span class="settlement-table-count">共 {{ total }} 条，表格为主操作区</span>
+                <span class="settlement-table-count">共 {{ total }} 条</span>
               </div>
+            </div>
+            <div class="lg-toolbar-right">
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
                 @toggle="toggleCol"
               />
-              <a-button type="primary" @click="openCreateModal">
-                <template #icon><PlusOutlined /></template>
-                新建结算
-              </a-button>
               <a-button @click="fetchData">
                 <template #icon><ReloadOutlined /></template>
                 刷新
               </a-button>
-            </div>
-            <div class="lg-toolbar-right">
-              <span class="settlement-toolbar-hint">结算编号进入单据，行末查看更多操作</span>
+              <a-button type="primary" @click="openCreateModal">
+                <template #icon><PlusOutlined /></template>
+                新建结算
+              </a-button>
             </div>
           </div>
 
@@ -593,7 +565,7 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
 
       <!-- 右侧分析面板 -->
       <aside class="lg-analysis-rail settlement-analysis-rail" aria-label="结算辅助分析">
-        <div class="settlement-analysis-panel">
+        <div class="lg-analysis-panel settlement-analysis-panel">
           <header class="settlement-analysis-head">
             <div>
               <div class="settlement-analysis-title">辅助分析</div>
@@ -708,132 +680,42 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
 
 <style scoped>
 .settlement-page {
-  gap: 14px;
+  gap: 0;
 }
 
 .settlement-page-head {
-  align-items: center;
-  justify-content: space-between;
-  min-height: 0;
-  padding: 18px 20px;
-  background: #fff;
-  border: 1px solid var(--border-subtle);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-}
-
-.settlement-page-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  width: 100%;
-  min-width: 0;
+  margin-bottom: 14px;
 }
 
 .settlement-breadcrumb {
-  margin-bottom: 6px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
-}
-
-.settlement-page-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  min-width: 0;
-}
-
-.settlement-page-title-row h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 32px;
-}
-
-.settlement-page-title-row span,
-.settlement-head-digest span,
-.settlement-search-title span {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.settlement-head-digest {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
-  gap: 10px;
-  min-width: 360px;
-}
-
-.settlement-head-digest > div {
-  padding: 10px 12px;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.settlement-head-digest strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 800;
-  line-height: 22px;
 }
 
 .settlement-search-bar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  min-height: 108px;
+  margin-bottom: 0;
   padding: 16px;
-  border-left: 4px solid var(--primary-soft);
 }
 
-.settlement-search-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  grid-column: 1 / -1;
-}
-
-.settlement-search-title strong {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.settlement-search-fields {
-  display: flex;
-  flex: 1 1 auto;
+.settlement-filter-grid,
+.settlement-filter-foot {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  align-items: center;
-  min-width: 0;
+  width: 100%;
 }
 
-.settlement-search-input {
-  width: min(520px, 31vw);
-  min-width: 320px;
-  flex: 1 1 auto;
+.settlement-filter-foot {
+  grid-template-columns: minmax(0, 1fr) auto;
 }
 
 .settlement-search-prefix-icon {
   color: var(--text-secondary);
-}
-
-.settlement-search-select {
-  width: 180px;
-  flex: 0 0 180px;
-}
-
-.settlement-search-select.is-compact {
-  width: 150px;
-  flex-basis: 150px;
 }
 
 .settlement-search-actions {
@@ -853,7 +735,8 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
   grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
   gap: 0;
   overflow: hidden;
-  min-height: 84px;
+  min-height: 108px;
+  margin-bottom: 0;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -862,6 +745,10 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
 
 .settlement-page .lg-left > .settlement-kpi-summary {
   grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
+}
+
+.settlement-main-column {
+  gap: 12px;
 }
 
 .settlement-kpi-item {
@@ -957,7 +844,6 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
 
 .settlement-table-panel {
   min-height: 754px;
-  border-top: 3px solid var(--primary);
 }
 
 .settlement-toolbar {
@@ -985,28 +871,30 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
 }
 
 .settlement-analysis-rail {
-  width: 336px;
+  width: var(--lg-rail-width, 240px);
 }
 
 .settlement-analysis-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 0;
   height: 100%;
-  padding: 18px;
+  padding: 0;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
 .settlement-analysis-focus {
   display: grid;
   gap: 4px;
-  padding: 14px;
+  padding: 12px 16px;
   background: var(--error-soft);
-  border: 1px solid rgba(239, 68, 68, 0.18);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
 }
 
 .settlement-analysis-focus span,
@@ -1031,6 +919,11 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
   gap: 10px;
 }
 
+.settlement-analysis-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 .settlement-analysis-title {
   color: var(--text);
   font-size: 16px;
@@ -1049,7 +942,7 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding-top: 16px;
+  padding: 12px 16px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -1106,29 +999,9 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
 }
 
 @media (max-width: 768px) {
-  .settlement-page-meta-row,
-  .settlement-search-bar,
-  .settlement-search-fields {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .settlement-page-subtitle {
-    white-space: normal;
-  }
-
-  .settlement-head-digest {
-    width: 100%;
-    min-width: 0;
+  .settlement-filter-grid,
+  .settlement-filter-foot {
     grid-template-columns: 1fr;
-  }
-
-  .settlement-search-input,
-  .settlement-search-select,
-  .settlement-search-select.is-compact {
-    width: 100%;
-    min-width: 0;
-    flex-basis: auto;
   }
 }
 </style>

@@ -1,4 +1,13 @@
 $ErrorActionPreference = 'Stop'
+$powerShellHostLibrary = Join-Path $PSScriptRoot 'autopilot-powershell-host.ps1'
+if (!(Get-Command Resolve-AutopilotPowerShellHost -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath $powerShellHostLibrary)) { . $powerShellHostLibrary }
+
+function Get-AutopilotCodexRedirectedStdinArguments {
+  param([string[]]$Arguments)
+
+  $normalized = @($Arguments)
+  return @($normalized | Where-Object { $_ -ne '-' })
+}
 
 function Resolve-AutopilotCodexInvocation {
   param([string]$Command = 'codex')
@@ -13,13 +22,13 @@ function Resolve-AutopilotCodexInvocation {
       if ($resolved) { $resolved.Source } else { $null }
     }
     if ($shim) {
-      $hostCommand = Get-Command powershell.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1
+      $hostCommand = Resolve-AutopilotPowerShellHost
       return [pscustomobject]@{
-        fileName = $hostCommand.Source
+        fileName = $hostCommand.path
         argumentPrefix = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$shim)
       }
     }
-    throw 'Codex PowerShell shim is unavailable on Windows'
+    throw 'Codex pwsh shim is unavailable on Windows'
   }
 
   $native = Get-Command $Command -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1

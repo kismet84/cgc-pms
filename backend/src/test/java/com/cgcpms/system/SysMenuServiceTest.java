@@ -20,9 +20,17 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -42,6 +50,9 @@ class SysMenuServiceTest {
 
     @Autowired
     private SysRoleMenuMapper roleMenuMapper;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void setupContext() {
@@ -110,6 +121,7 @@ class SysMenuServiceTest {
     @DisplayName("创建菜单 — 自动设置tenantId")
     void testCreate_TenantIdAutoSet() {
         SysMenu menu = new SysMenu();
+        menu.setTenantId(999L);
         menu.setParentId(0L);
         menu.setMenuName("租户菜单");
         menu.setMenuType("MENU");
@@ -370,6 +382,197 @@ class SysMenuServiceTest {
         System.out.println("testUpdate_NotFound 通过");
     }
 
+    @Test
+    @Order(16)
+    @Transactional
+    @DisplayName("更新菜单 — 仅更新白名单业务字段且保留角色关系")
+    void testUpdate_AllBusinessFieldsAndPreservesRoleBinding() {
+        Long parentId = menuService.create(menu("更新目标父菜单", "DIR", 0L));
+        Long targetId = menuService.create(menu("更新目标", "MENU", 0L));
+        SysRoleMenu roleMenu = new SysRoleMenu();
+        roleMenu.setRoleId(1L);
+        roleMenu.setMenuId(targetId);
+        roleMenuMapper.insert(roleMenu);
+        long roleRefCount = roleMenuMapper.selectCount(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getMenuId, targetId));
+
+        SysMenu update = menu("更新后菜单", "DIR", parentId);
+        update.setId(targetId);
+        update.setTenantId(999L);
+        update.setPath("/updated-path");
+        update.setComponent("system/updated/index");
+        update.setPerms("system:menu:updated");
+        update.setIcon("updated-icon");
+        update.setOrderNum(8);
+        update.setStatus("DISABLE");
+        update.setVisible(0);
+        update.setCreatedBy(999L);
+        update.setUpdatedBy(999L);
+        update.setDeletedFlag(1);
+        update.setRemark("客户端不得覆盖");
+        update.setChildren(List.of(menu("伪造子节点", "MENU", targetId)));
+
+        menuService.update(update);
+
+        SysMenu saved = menuMapper.selectById(targetId);
+        assertEquals(TENANT_0, saved.getTenantId());
+        assertEquals(parentId, saved.getParentId());
+        assertEquals("更新后菜单", saved.getMenuName());
+        assertEquals("DIR", saved.getMenuType());
+        assertEquals("/updated-path", saved.getPath());
+        assertEquals("system/updated/index", saved.getComponent());
+        assertEquals("system:menu:updated", saved.getPerms());
+        assertEquals("updated-icon", saved.getIcon());
+        assertEquals(8, saved.getOrderNum());
+        assertEquals("DISABLE", saved.getStatus());
+        assertEquals(0, saved.getVisible());
+        assertNotEquals(999L, saved.getCreatedBy());
+        assertNotEquals(999L, saved.getUpdatedBy());
+        assertEquals(0, saved.getDeletedFlag());
+        assertNull(saved.getRemark());
+        assertEquals(roleRefCount, roleMenuMapper.selectCount(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getMenuId, targetId)));
+    }
+
+    @Test
+    @Order(17)
+    @Transactional
+    @DisplayName("更新菜单 — 根节点parentId为空时统一为0")
+    void testUpdate_NormalizesRootParent() {
+        Long targetId = menuService.create(menu("更新根节点", "DIR", 0L));
+        SysMenu update = menu("更新根节点", "DIR", null);
+        update.setId(targetId);
+
+        menuService.update(update);
+
+        assertEquals(0L, menuMapper.selectById(targetId).getParentId());
+    }
+
+    @Test
+    @Order(18)
+    @Transactional
+    @DisplayName("更新菜单 — 非法menuType拒绝且不产生部分更新")
+    void testUpdate_InvalidMenuTypeIsAtomic() {
+        Long targetId = menuService.create(menu("非法类型前", "MENU", 0L));
+
+        BusinessException ex = rejectUpdate(targetId, 0L, "UNKNOWN", "非法类型后");
+
+        assertEquals("MENU_TYPE_INVALID", ex.getCode());
+        assertMenuUnchanged(targetId, "非法类型前", "MENU", 0L);
+    }
+
+    @Test
+    @Order(19)
+    @Transactional
+    @DisplayName("更新菜单 — 不存在、跨租户和BUTTON父节点均拒绝且原记录不变")
+    void testUpdate_InvalidParentsAreAtomic() {
+        Long targetId = menuService.create(menu("父节点校验前", "MENU", 0L));
+        Long buttonId = menuService.create(menu("不可作为父节点的按钮", "BUTTON", 0L));
+        setTenant(998L);
+        Long foreignParentId = menuService.create(menu("其他租户父节点", "DIR", 0L));
+        setTenant(TENANT_0);
+
+        for (Long parentId : List.of(999999L, foreignParentId, buttonId)) {
+            BusinessException ex = rejectUpdate(targetId, parentId, "MENU", "父节点校验后");
+            assertEquals("MENU_PARENT_INVALID", ex.getCode());
+            assertMenuUnchanged(targetId, "父节点校验前", "MENU", 0L);
+        }
+    }
+
+    @Test
+    @Order(20)
+    @Transactional
+    @DisplayName("更新菜单 — 自身和任一后代均不能作为父节点")
+    void testUpdate_RejectsSelfAndDescendantCyclesAtomically() {
+        Long targetId = menuService.create(menu("环校验父菜单", "DIR", 0L));
+        Long childId = menuService.create(menu("环校验子菜单", "DIR", targetId));
+        Long grandchildId = menuService.create(menu("环校验孙菜单", "MENU", childId));
+
+        for (Long parentId : List.of(targetId, childId, grandchildId)) {
+            BusinessException ex = rejectUpdate(targetId, parentId, "DIR", "环校验修改后");
+            assertEquals("MENU_TREE_CYCLE", ex.getCode());
+            assertMenuUnchanged(targetId, "环校验父菜单", "DIR", 0L);
+        }
+    }
+
+    @Test
+    @Order(21)
+    @Transactional
+    @DisplayName("更新菜单 — 存在子节点时不能改为BUTTON")
+    void testUpdate_RejectsButtonTypeWithChildrenAtomically() {
+        Long targetId = menuService.create(menu("带子节点菜单", "DIR", 0L));
+        menuService.create(menu("现有子节点", "MENU", targetId));
+
+        BusinessException ex = rejectUpdate(targetId, 0L, "BUTTON", "不应变成按钮");
+
+        assertEquals("MENU_HAS_CHILDREN", ex.getCode());
+        assertMenuUnchanged(targetId, "带子节点菜单", "DIR", 0L);
+    }
+
+    @Test
+    @Order(22)
+    @Transactional
+    @DisplayName("更新菜单 — 合法重挂父节点后详情与树可确定性回读")
+    void testUpdate_ValidReparentAppearsInTree() {
+        Long oldParentId = menuService.create(menu("旧父菜单", "DIR", 0L));
+        Long newParentId = menuService.create(menu("新父菜单", "DIR", 0L));
+        Long targetId = menuService.create(menu("待重挂菜单", "MENU", oldParentId));
+        SysMenu update = menu("重挂后菜单", "MENU", newParentId);
+        update.setId(targetId);
+        update.setPerms("system:menu:reparented");
+
+        menuService.update(update);
+
+        SysMenu detail = menuService.getById(targetId);
+        assertEquals(newParentId, detail.getParentId());
+        assertEquals("重挂后菜单", detail.getMenuName());
+        assertEquals("system:menu:reparented", detail.getPerms());
+        MenuTreeVO newParent = menuService.getTree().stream()
+                .filter(node -> newParentId.equals(node.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(newParent.getChildren().stream().anyMatch(node -> targetId.equals(node.getId())));
+    }
+
+    @Test
+    @Order(23)
+    @DisplayName("更新菜单 — 并发互设父节点最多一个提交且不会形成环")
+    void testUpdate_ConcurrentMutualParentsCannotFormCycle() throws Exception {
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        Long[] ids = transaction.execute(status -> new Long[]{
+                menuService.create(menu("并发环节点A", "DIR", 0L)),
+                menuService.create(menu("并发环节点B", "DIR", 0L))
+        });
+        assertNotNull(ids);
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<String> first = executor.submit(() -> concurrentMove(transaction, start, ids[0], ids[1]));
+            Future<String> second = executor.submit(() -> concurrentMove(transaction, start, ids[1], ids[0]));
+            start.countDown();
+
+            List<String> outcomes = List.of(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS));
+            assertEquals(1, outcomes.stream().filter("UPDATED"::equals).count());
+            assertEquals(1, outcomes.stream().filter("MENU_TREE_CYCLE"::equals).count());
+
+            transaction.executeWithoutResult(status -> {
+                SysMenu firstSaved = menuMapper.selectById(ids[0]);
+                SysMenu secondSaved = menuMapper.selectById(ids[1]);
+                assertFalse(Objects.equals(firstSaved.getParentId(), ids[1])
+                                && Objects.equals(secondSaved.getParentId(), ids[0]),
+                        "并发提交后菜单树不得形成双节点环");
+            });
+        } finally {
+            executor.shutdownNow();
+            transaction.executeWithoutResult(status -> {
+                menuMapper.deleteById(ids[0]);
+                menuMapper.deleteById(ids[1]);
+            });
+            UserContext.clear();
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════
     // Delete tests
     // ═══════════════════════════════════════════════════════════
@@ -523,5 +726,136 @@ class SysMenuServiceTest {
         assertEquals("二级菜单", l1Node.getChildren().get(0).getMenuName());
 
         System.out.println("testGetTree_MultiLevelNesting 通过: l1 children=" + l1Node.getChildren().size());
+    }
+
+    @Test
+    @Order(22)
+    @Transactional
+    @DisplayName("创建根菜单 — parentId为空时统一为0")
+    void testCreate_NormalizesRootParent() {
+        SysMenu menu = menu("空父节点根菜单", "DIR", null);
+
+        Long id = menuService.create(menu);
+
+        assertEquals(0L, menuMapper.selectById(id).getParentId());
+    }
+
+    @Test
+    @Order(23)
+    @Transactional
+    @DisplayName("创建菜单 — 非法menuType被拒绝")
+    void testCreate_InvalidMenuType() {
+        SysMenu menu = menu("非法类型菜单", "UNKNOWN", 0L);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> menuService.create(menu));
+
+        assertEquals("MENU_TYPE_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Order(24)
+    @Transactional
+    @DisplayName("创建菜单 — 不存在的父节点被拒绝")
+    void testCreate_MissingParent() {
+        SysMenu menu = menu("孤立菜单", "MENU", 999999L);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> menuService.create(menu));
+
+        assertEquals("MENU_PARENT_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Order(25)
+    @Transactional
+    @DisplayName("创建菜单 — 其他租户父节点被拒绝")
+    void testCreate_CrossTenantParent() {
+        setTenant(998L);
+        Long foreignParentId = menuService.create(menu("其他租户父菜单", "DIR", 0L));
+        setTenant(TENANT_0);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> menuService.create(menu("跨租户子菜单", "MENU", foreignParentId)));
+
+        assertEquals("MENU_PARENT_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Order(26)
+    @Transactional
+    @DisplayName("创建菜单 — BUTTON不能作为父节点")
+    void testCreate_ButtonParent() {
+        Long buttonId = menuService.create(menu("父按钮", "BUTTON", 0L));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> menuService.create(menu("按钮子菜单", "MENU", buttonId)));
+
+        assertEquals("MENU_PARENT_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Order(27)
+    @Transactional
+    @DisplayName("创建菜单 — 合法同租户父节点写入正确树位置")
+    void testCreate_ValidParentAppearsInTree() {
+        Long parentId = menuService.create(menu("树约束父菜单", "DIR", 0L));
+        Long childId = menuService.create(menu("树约束子菜单", "MENU", parentId));
+
+        SysMenu saved = menuMapper.selectById(childId);
+        assertEquals(parentId, saved.getParentId());
+        assertEquals(TENANT_0, saved.getTenantId());
+
+        MenuTreeVO parent = menuService.getTree().stream()
+                .filter(node -> parentId.equals(node.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(parent.getChildren().stream().anyMatch(node -> childId.equals(node.getId())));
+    }
+
+    private SysMenu menu(String name, String type, Long parentId) {
+        SysMenu menu = new SysMenu();
+        menu.setParentId(parentId);
+        menu.setMenuName(name);
+        menu.setMenuType(type);
+        menu.setPath("/" + name);
+        return menu;
+    }
+
+    private BusinessException rejectUpdate(Long id, Long parentId, String type, String name) {
+        SysMenu update = menu(name, type, parentId);
+        update.setId(id);
+        return assertThrows(BusinessException.class, () -> menuService.update(update));
+    }
+
+    private String concurrentMove(TransactionTemplate transaction, CountDownLatch start,
+                                  Long menuId, Long parentId) throws InterruptedException {
+        start.await(5, TimeUnit.SECONDS);
+        setTenant(TENANT_0);
+        try {
+            transaction.executeWithoutResult(status -> {
+                SysMenu update = menu("并发更新-" + menuId, "DIR", parentId);
+                update.setId(menuId);
+                menuService.update(update);
+            });
+            return "UPDATED";
+        } catch (BusinessException error) {
+            return error.getCode();
+        } finally {
+            UserContext.clear();
+        }
+    }
+
+    private void assertMenuUnchanged(Long id, String name, String type, Long parentId) {
+        SysMenu saved = menuMapper.selectById(id);
+        assertEquals(name, saved.getMenuName());
+        assertEquals(type, saved.getMenuType());
+        assertEquals(parentId, saved.getParentId());
+    }
+
+    private void setTenant(Long tenantId) {
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", tenantId)
+                .build());
     }
 }

@@ -11,7 +11,13 @@ New-Item -ItemType Directory -Path (Split-Path -Parent $readyPath) -Force | Out-
 New-Item -ItemType Directory -Path (Join-Path $root 'docs\quality') -Force | Out-Null
 
 function New-ReadyText {
-  param([string]$Id = 'ISSUE-900-001', [string]$Nature = '缺口修复', [string]$Risk = '低', [string]$Allowed = '`docs/quality/**`')
+  param(
+    [string]$Id = 'ISSUE-900-001',
+    [string]$Nature = '缺口修复',
+    [string]$Risk = '低',
+    [string]$Allowed = '`docs/quality/**`',
+    [string]$Forbidden = '`deploy/**`'
+  )
   $tick = [char]96
   @"
 # Ready Issues
@@ -26,7 +32,7 @@ function New-ReadyText {
 允许修改：
 - $Allowed
 禁止修改：
-- ${tick}deploy/**${tick}
+- $Forbidden
 验收标准：
 - Contract is machine-readable.
 状态：Ready
@@ -72,6 +78,16 @@ try {
 
   New-ReadyText -Allowed '' | Set-Content -LiteralPath $readyPath -Encoding UTF8
   Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } '允许修改'
+
+  New-ReadyText -Allowed '`deploy/docker-compose.dev.yml`' -Forbidden '`deploy/**`' | Set-Content -LiteralPath $readyPath -Encoding UTF8
+  Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } 'READY_SCOPE_CONTRADICTION'
+
+  New-ReadyText -Allowed '`backend/src/**`' -Forbidden '`backend/**`' | Set-Content -LiteralPath $readyPath -Encoding UTF8
+  Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } 'READY_SCOPE_CONTRADICTION'
+
+  New-ReadyText -Allowed '`backend/**`' -Forbidden '`backend/src/main/resources/application-prod.yml`' | Set-Content -LiteralPath $readyPath -Encoding UTF8
+  $carveOut = @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root)
+  if ($carveOut.Count -ne 1) { throw 'safe broad-allow/narrow-forbid carve-out was rejected' }
 
   (New-ReadyText).Replace('`git diff --check`', '`cd missing-backend; .\mvnw.cmd test`') | Set-Content -LiteralPath $readyPath -Encoding UTF8
   Assert-Fails { Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root } '验证命令入口不存在'

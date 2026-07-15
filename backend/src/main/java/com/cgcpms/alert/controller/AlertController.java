@@ -141,7 +141,7 @@ public class AlertController {
 
     @PostMapping("/batch-evaluate")
     @AuditedOperation(type = "CREATE", businessType = "ALERT")
-    @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('alert:evaluate') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Object>> batchEvaluate() {
         Long tenantId = UserContext.getCurrentTenantId();
         int count = alertEvaluationService.batchEvaluate(tenantId);

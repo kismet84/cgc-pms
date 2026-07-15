@@ -76,7 +76,7 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -Subcategory 'powershell_parser_error' `
         -Confidence 'high' `
         -EvidencePatterns @('parsererror', 'unexpected argument', 'cannot process argument', 'parameterbinding') `
-        -Reason 'PowerShell invocation failed before the target command ran.' `
+        -Reason 'pwsh invocation failed before the target command ran.' `
         -SuggestedNextAction 'fix_command_syntax' `
         -RetryPolicy 'no_retry'
 } elseif ($normalizedText -match 'script.*not found|is not recognized|not loaded|entrypoint|command not found') {

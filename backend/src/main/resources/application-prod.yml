@@ -39,6 +39,13 @@ minio:
   secret-key: ${MINIO_SECRET_KEY}
   bucket: ${MINIO_BUCKET:cgc-pms}
 
+virus-scan:
+  enabled: ${VIRUS_SCAN_ENABLED:true}
+  host: ${VIRUS_SCAN_HOST}
+  port: ${VIRUS_SCAN_PORT:3310}
+  connect-timeout-millis: ${VIRUS_SCAN_CONNECT_TIMEOUT_MILLIS:2000}
+  read-timeout-millis: ${VIRUS_SCAN_READ_TIMEOUT_MILLIS:30000}
+
 # Cookie security — enable Secure flag for HTTPS-only environments
 cookie:
   secure: true

@@ -113,6 +113,16 @@ if (Test-Path $StatePath) {
   $Summary.allowTestDataReset = $State.allowTestDataReset
   $Summary.startedAt = $State.startedAt
   $Summary.lastHeartbeatAt = $State.lastHeartbeatAt
+  $Summary.reviewCycleId = $State.reviewCycleId
+  $Summary.reviewCycleStartedAt = $State.reviewCycleStartedAt
+  $Summary.reviewCycleCompletedCount = $State.reviewCycleCompletedCount
+  $Summary.retrospectiveDue = $State.retrospectiveDue
+  $Summary.retrospectiveStatus = $State.retrospectiveStatus
+  $Summary.retrospectivePhase = $State.retrospectivePhase
+  $Summary.retrospectiveRequiredAt = $State.retrospectiveRequiredAt
+  $Summary.lastRetrospectiveAt = $State.lastRetrospectiveAt
+  $Summary.lastRetrospectiveReport = $State.lastRetrospectiveReport
+  $Summary.activeScoringVersion = $State.activeScoringVersion
 } else {
   $Summary.stateExists = $false
   $Summary.status = "STOPPED"
@@ -167,7 +177,10 @@ if (Test-Path $RunsDir) {
   }
 }
 
-if ($Summary.status -eq 'LIMIT_REACHED') {
+if ($Summary.retrospectiveDue) {
+  $Summary.recoveryAction = 'COMPLETE_RETROSPECTIVE'
+  $Summary.recoveryReason = 'retrospective is required before a new iteration batch'
+} elseif ($Summary.status -eq 'LIMIT_REACHED') {
   $Summary.recoveryAction = 'NONE'
   $Summary.recoveryReason = 'iteration limit reached'
 } else {

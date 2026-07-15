@@ -61,7 +61,7 @@ public class AccountingEntryService {
 
     public Map<Long, String> getLineSubjectNames(List<AccountingEntryLine> lines) {
         Set<Long> ids = lines.stream().map(AccountingEntryLine::getCostSubjectId).collect(Collectors.toSet());
-        return subjectMapper.selectBatchIds(ids).stream()
+        return subjectMapper.selectByIds(ids).stream()
                 .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
     }
 

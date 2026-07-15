@@ -4,8 +4,13 @@ import type { SysFileVO, VirusScanStatus } from '../file'
 
 describe('file types', () => {
   it('exposes only reserved non-passing virus scan statuses', () => {
-    expect(FILE_VIRUS_SCAN_STATUSES).toEqual(['NOT_SCANNED', 'NOT_CONFIGURED', 'FAILED'])
-    expect(FILE_VIRUS_SCAN_STATUSES).not.toContain('PASSED')
+    expect(FILE_VIRUS_SCAN_STATUSES).toEqual([
+      'CLEAN',
+      'INFECTED',
+      'NOT_SCANNED',
+      'NOT_CONFIGURED',
+      'FAILED',
+    ])
   })
 
   it('keeps virus scan placeholder fields explicit and not safe-passed', () => {

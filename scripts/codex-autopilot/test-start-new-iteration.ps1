@@ -9,20 +9,36 @@ try {
   New-Item -ItemType Directory -Path $AutoDir -Force | Out-Null
   @'
 {
+  "schemaVersion": 2,
+  "runId": "legacy-start-test",
   "enabled": false,
   "startedAt": "2026-07-09T13:29:13",
+  "phaseStartedAt": "2026-07-09T13:29:13",
+  "lastHeartbeatAt": "2026-07-09T13:29:13",
+  "phase": "stopped",
+  "currentIssue": "",
+  "attempt": 0,
+  "stopRequested": true,
   "status": "STOPPED",
+  "mode": "continuous-runner",
   "iterationLimit": 10,
+  "completedImplementationIssues": 10,
+  "completedIssueIds": ["ISSUE-008-012", "ISSUE-008-013", "ISSUE-008-014", "ISSUE-008-015", "ISSUE-008-016", "ISSUE-008-017", "ISSUE-008-018", "ISSUE-008-019", "ISSUE-008-020", "ISSUE-008-021"],
+  "worktree": "",
+  "branch": "master",
+  "executorPid": null,
+  "lastCommit": null,
+  "failureFingerprint": null,
   "iterationCompleted": 10,
   "remainingIterations": 0,
   "iterationLastCountedIssue": "ISSUE-008-021"
 }
 '@ | Out-File -Encoding utf8 (Join-Path $AutoDir "state.json")
 
-  & powershell -NoProfile -ExecutionPolicy Bypass -File $StartScript -Repo $Repo -MaxIterations 10 | Out-Null
+  & pwsh -NoProfile -ExecutionPolicy Bypass -File $StartScript -Repo $Repo -MaxIterations 10 | Out-Null
   $State = Get-Content -Encoding UTF8 -Raw (Join-Path $AutoDir "state.json") | ConvertFrom-Json
 
-  if ($State.schemaVersion -ne 2) { throw "Expected schemaVersion=2" }
+  if ($State.schemaVersion -ne 3) { throw "Expected schemaVersion=3" }
   if ($State.status -ne "IDLE") { throw "Expected status=IDLE" }
   if ($State.phase -ne "idle") { throw "Expected phase=idle" }
   if ($State.completedImplementationIssues -ne 0) { throw "Expected completedImplementationIssues=0" }

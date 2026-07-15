@@ -7,6 +7,8 @@ import com.cgcpms.common.entity.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.LocalDateTime;
+
 /**
  * System file entity - generic file storage decoupled from specific business domains.
  */
@@ -44,4 +46,13 @@ public class SysFile extends BaseEntity {
 
     /** MinIO bucket name */
     private String bucketName;
+
+    /** Persisted result of the real malware scan. */
+    private String virusScanStatus;
+
+    /** Scanner detail, such as the detected signature name. */
+    private String virusScanDetail;
+
+    /** Time at which the scanner produced the persisted result. */
+    private LocalDateTime virusScannedAt;
 }

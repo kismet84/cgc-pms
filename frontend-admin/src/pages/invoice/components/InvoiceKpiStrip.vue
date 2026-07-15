@@ -38,7 +38,7 @@ function kpiPct(value: number, max: number): number {
 </script>
 
 <template>
-  <div class="invoice-kpi-summary" aria-label="发票关键指标">
+  <div class="lg-kpi-strip invoice-kpi-summary" aria-label="发票关键指标">
     <div class="invoice-kpi-item">
       <span class="invoice-kpi-icon is-total"><FileTextOutlined /></span>
       <span class="invoice-kpi-label">发票总数</span>
@@ -85,7 +85,8 @@ function kpiPct(value: number, max: number): number {
   grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
   gap: 0;
   overflow: hidden;
-  min-height: 84px;
+  min-height: 108px;
+  margin-bottom: 0;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -100,8 +101,12 @@ function kpiPct(value: number, max: number): number {
   column-gap: 10px;
   align-items: center;
   min-width: 0;
+  min-height: 108px;
   padding: 16px 18px;
+  border: 0;
   border-right: 1px solid var(--border-subtle);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .invoice-kpi-item:last-child {

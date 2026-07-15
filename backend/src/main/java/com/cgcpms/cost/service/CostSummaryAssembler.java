@@ -80,7 +80,7 @@ class CostSummaryAssembler {
                 .map(CostSummary::getProjectId).collect(Collectors.toSet());
         Map<Long, String> projectNameMap = Collections.emptyMap();
         if (!projectIds.isEmpty()) {
-            List<PmProject> projects = projectMapper.selectBatchIds(projectIds);
+            List<PmProject> projects = projectMapper.selectByIds(projectIds);
             projectNameMap = projects.stream()
                     .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         }
@@ -88,7 +88,7 @@ class CostSummaryAssembler {
                 .map(CostSummary::getCostSubjectId).filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> subjectNameMap = Collections.emptyMap();
         if (!subjectIds.isEmpty()) {
-            List<CostSubject> subjects = costSubjectMapper.selectBatchIds(subjectIds);
+            List<CostSubject> subjects = costSubjectMapper.selectByIds(subjectIds);
             subjectNameMap = subjects.stream()
                     .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
         }

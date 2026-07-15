@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cgc-pms.local/plugins/cgc-pms-autopilot/schemas/retrospective.schema.json",
+  "title": "CGC PMS AutoPilot Retrospective v1",
+  "type": "object",
+  "required": ["schemaVersion", "reviewCycleId", "scoringVersion", "scoringVersions", "generatedAt", "taskCount", "taskIssueIds", "total", "dimensions", "firstPassRate", "followupNetChange", "proposals"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "reviewCycleId": { "type": "string", "minLength": 1 },
+    "scoringVersion": { "type": "string", "minLength": 1 },
+    "scoringVersions": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "taskCount": { "type": "integer", "minimum": 1 },
+    "taskIssueIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string" } },
+    "total": { "type": "object" },
+    "dimensions": { "type": "object" },
+    "firstPassRate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "followupNetChange": { "type": "integer" },
+    "medianCycleSeconds": { "type": ["number", "null"], "minimum": 0 },
+    "openingIssueCount": { "type": ["integer", "null"], "minimum": 0 },
+    "closingIssueCount": { "type": ["integer", "null"], "minimum": 0 },
+    "proposals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["proposalKey", "reviewCycleId", "rule", "subject", "title", "summary", "priority", "approvalStatus", "blocking", "acceptanceCriteria", "sourceIssueIds"],
+        "properties": {
+          "proposalKey": { "type": "string", "pattern": "^AUTO-IMPROVEMENT-[A-F0-9]{16}$" },
+          "approvalStatus": { "const": "NEEDS_CONFIRMATION" },
+          "blocking": { "const": false }
+        }
+      }
+    }
+  }
+}

@@ -40,7 +40,7 @@ defineProps<{
       </header>
 
       <section class="project-analysis-section">
-        <div class="project-section-title">基本盘</div>
+        <div class="project-section-title">项目概览</div>
         <div class="project-overview-list">
           <div class="project-overview-row">
             <span>项目总数</span>
@@ -61,8 +61,16 @@ defineProps<{
             </strong>
           </div>
           <div class="project-overview-row">
-            <span>在建 / 已竣工</span>
-            <strong>{{ projectStats.ongoing || 0 }} / {{ projectStats.completed || 0 }}</strong>
+            <span>在建项目</span>
+            <strong>{{ projectStats.ongoing || 0 }} 个</strong>
+          </div>
+          <div class="project-overview-row">
+            <span>已竣工项目</span>
+            <strong>{{ projectStats.completed || 0 }} 个</strong>
+          </div>
+          <div class="project-overview-row">
+            <span>风险项目</span>
+            <strong>{{ projectStats.risk || 0 }} 个</strong>
           </div>
         </div>
       </section>
@@ -180,7 +188,7 @@ defineProps<{
 .project-overview-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .project-overview-row {

@@ -12,6 +12,13 @@
 - 任何代码、配置、文档、Git 或运行环境状态变更前，执行者必须核对 `git branch --show-current` 与 `git status --short`；怀疑 worktree 冲突时再查 `git worktree list`。
 - 实际派工才填写 `model`、`thinking`、`reason`；同时派出两个及以上子智能体时才要求模型分配表。超时或悬挂时先只读核验，再按风险收回直接执行、补上下文或重派。
 - 数据库、权限、安全、金额、租户、数据一致性与正式裁决必须有客观证据和必要复核；证据不足时明确写出“不通过”或“需要确认”，不得以派工或角色覆盖替代证据。
+- 任务收口实行“非阻塞问题零悬空”：当前目标、验收标准、当前 diff 根因或本轮直接引入的问题必须本轮修复并复验，否则不得判定通过；真正超出范围的问题必须去重后写入唯一正式载体并具备证据、价值、优先级、延期原因/前置与验收标准；无明确价值或验收方式的泛化建议直接关闭，不制造 backlog。
+- 收口时必须统计 `新增后续项`、`关闭后续项`、`后续项净变化`；没有正式承接载体的遗留项一律视为未收口。连续两个 Issue 净增后续项时，AutoPilot 暂停新的能力新增，优先消化缺口直至恢复到净增前基线。
+- AutoPilot 死进程恢复必须优先校验活动 Issue 的 durable phase checkpoint；Ready/base/worktree/branch/diff/evidence 一致时只从首个未完成的验证、Reviewer 或收口阶段继续，不得删除有效 worktree 后重新派发实现。Reviewer `tool_config` 重试耗尽只暂停 Reviewer；控制面指纹变化后 N>1/无界执行必须先通过用户启动的单任务金丝雀。
+- AutoPilot 控制面、子进程和测试入口统一使用 PowerShell 7 `pwsh`；缺失时归类为 `tool_config/AUTOPILOT_POWERSHELL7_REQUIRED` 并安全停止，不得回退到 Windows PowerShell 5.1。原生命令以退出码和命令契约裁决，stderr warning 仅作诊断证据。
+- AutoPilot 只有持有当前 `runInstanceId + leaseEpoch + controlPlaneFingerprint` fencing token 的 APPLY 实例可以派发、写状态或执行 Git 变更；CPU/心跳变化不算任务进度，进度只由工作区内容或 durable checkpoint/result/evidence 变化推进。
+- AutoPilot 各阶段统一返回可校验 `StageResult`，不得以自由文本路由；活动 Issue 的 checkpoint 阶段迁移只能经 `autopilot-transition.ps1`，并校验合法边、fencing、控制面指纹及 `transitionId + generation` 读回，state/checkpoint 底层模块不得自行决定业务阶段。
+- AutoPilot 生产默认宿主为 Codex 桌面主线程（`executionHost=desktop-native`）：主线程直接推进 checkpoint 与 A-F 职责，PowerShell 只做确定性原子动作；禁止 runner 启动嵌套 Planner、Executor、Reviewer `codex exec`。`cli-legacy` 仅可显式兼容或经授权紧急回退，不得静默降级。
 - `autoPush=false` / `no push` 禁止自动推送；提交或 push 只可在用户明确授权且其他适用门禁通过后执行。
 - 修改代码后必须运行相关验证：后端至少跑相关测试/构建，前端至少跑类型检查/测试/构建中的相关项。
 - 不要修改已经应用过的 Flyway 迁移脚本；数据库结构变化必须新增版本化 migration。
@@ -24,7 +31,8 @@
 
 ## 产品演进基本流程
 
-- 当用户要求判断产品方向、生成下一轮计划，或 Ready 为空且没有已通过决策门的候选时，先读取 `docs/product-intelligence/`，按“项目地图 → 竞品情报 → 迭代决策 → Ad-hoc Candidate → Ready → 实施 → 地图回写”推进。
+- 当用户要求判断产品方向、生成下一轮计划，或 Ready 为空且 `docs/backlog/current-issues.json` 中没有可自动拆分的存量问题、也没有已通过决策门的候选时，先读取 `docs/product-intelligence/`，按“项目地图 → 竞品情报 → 迭代决策 → Ad-hoc Candidate → Ready → 实施 → 地图回写”推进。
+- AutoPilot 补货优先级固定为：已有合格 Ready → `current-issues.json` 中安全可执行的存量问题 → 当前 focus 可解除阻塞 → 决策证据完整的 Ad-hoc Candidate → 产品情报刷新；长期增强计划不得直接拆 Ready。存量问题 Ready 必须保留 `[stock:<issueKey>]` 唯一标记，并在收口时同步回写原问题状态。
 - `docs/backlog/cgc-pms-production-enhancement-plan.md` 只作为研究和候选输入，不能直接生成 Ready；产品 Candidate 必须引用当前项目地图和迭代决策证据。
 - 工程治理 Candidate 默认不能替代产品方向；仅当当前证据证明它直接阻塞已选产品目标、安全边界或正式验收时，才可按 `缺口修复` 或 `运维治理` 进入 Ready，并明确关联目标、阻塞证据、解除条件、非目标和回滚方式。
 - Ready 以证据和字段完整为准，不为凑数量放宽门槛；1 条合格 Ready 即可实施，队列上限仍为 5 条。

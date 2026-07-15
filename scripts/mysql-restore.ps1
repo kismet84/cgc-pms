@@ -67,7 +67,7 @@ if ($TargetDatabase -ne 'cgc_pms_restore_test') {
 # Create target database if not exists
 # -------------------------------------------------------------------
 Write-Host "Ensuring target database '$TargetDatabase' exists..."
-$createDbSql = "CREATE DATABASE IF NOT EXISTS \`$TargetDatabase\` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
+$createDbSql = "CREATE DATABASE IF NOT EXISTS ``$TargetDatabase`` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;"
 $createArgs = @(
     'run', '--rm',
     '--network', 'host',
@@ -92,28 +92,52 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Restoring $BackupFile → ${TargetDatabase}@${MysqlHost}:${MysqlPort}..."
 
 $extension = [System.IO.Path]::GetExtension($BackupFile).ToLower()
+$restoreInputFile = (Resolve-Path $BackupFile).Path
+$decompressedTempFile = $null
+$restoreOutputFile = [System.IO.Path]::GetTempFileName()
+$restoreErrorFile = [System.IO.Path]::GetTempFileName()
 
-if ($extension -eq '.gz') {
-    # Decompress and pipe into mysql
-    $inStream = [System.IO.File]::OpenRead($BackupFile)
-    $gzipStream = New-Object System.IO.Compression.GZipStream($inStream, [System.IO.Compression.CompressionMode]::Decompress)
-    $reader = New-Object System.IO.StreamReader($gzipStream, [System.Text.Encoding]::UTF8)
-    $sql = $reader.ReadToEnd()
-    $reader.Close()
-    $gzipStream.Close()
-    $inStream.Close()
+try {
+    if ($extension -eq '.gz') {
+        $decompressedTempFile = [System.IO.Path]::GetTempFileName()
+        $inStream = [System.IO.File]::OpenRead($BackupFile)
+        $gzipStream = New-Object System.IO.Compression.GZipStream($inStream, [System.IO.Compression.CompressionMode]::Decompress)
+        $outStream = [System.IO.File]::Open($decompressedTempFile, [System.IO.FileMode]::Create)
+        $gzipStream.CopyTo($outStream)
+        $outStream.Close()
+        $gzipStream.Close()
+        $inStream.Close()
+        $restoreInputFile = $decompressedTempFile
+    }
 
-    # Pipe SQL via stdin to Docker mysql
-    $sql | & docker run --rm -i --network host -e "MYSQL_PWD=$MysqlPassword" mysql:8.0 mysql -h $MysqlHost -P $MysqlPort -u root $TargetDatabase 2>&1
+    $restoreArgs = @(
+        'run', '--rm', '-i', '--network', 'host',
+        '-e', "MYSQL_PWD=$MysqlPassword",
+        'mysql:8.0', 'mysql',
+        '-h', $MysqlHost,
+        '-P', $MysqlPort,
+        '-u', 'root',
+        $TargetDatabase
+    )
+    $restoreProcess = Start-Process -FilePath 'docker' -ArgumentList $restoreArgs `
+        -NoNewWindow -Wait -PassThru `
+        -RedirectStandardInput $restoreInputFile `
+        -RedirectStandardOutput $restoreOutputFile `
+        -RedirectStandardError $restoreErrorFile
+    if ($restoreProcess.ExitCode -ne 0) {
+        $restoreError = Get-Content -LiteralPath $restoreErrorFile -Raw -ErrorAction SilentlyContinue
+        throw "Restore failed (exit $($restoreProcess.ExitCode)): $restoreError"
+    }
 }
-else {
-    Get-Content $BackupFile -Raw |
-        & docker run --rm -i --network host -e "MYSQL_PWD=$MysqlPassword" mysql:8.0 mysql -h $MysqlHost -P $MysqlPort -u root $TargetDatabase 2>&1
-}
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Error 'Restore failed.'
+catch {
+    Write-Error $_
     exit 1
+}
+finally {
+    if ($decompressedTempFile) {
+        Remove-Item -LiteralPath $decompressedTempFile -Force -ErrorAction SilentlyContinue
+    }
+    Remove-Item -LiteralPath $restoreOutputFile, $restoreErrorFile -Force -ErrorAction SilentlyContinue
 }
 
 Write-Host 'Restore complete.'

@@ -20,6 +20,14 @@ export interface AlertListParams extends PageParams {
 
 export type AlertListResponse = PageResult<AlertLogVO> | AlertLogVO[]
 
+export interface AlertProcessingReport {
+  totalCount: number
+  unreadCount: number
+  readCount: number
+  severityCounts: Record<string, number>
+  processStatusCounts: Record<string, number>
+}
+
 export interface MarkReadResult {
   success: boolean
   alertId: string
@@ -80,6 +88,24 @@ export function getAlertList(params: AlertListParams) {
       triggeredEnd: params.triggeredEnd ?? params.triggeredAtEnd,
       pageNo: params.pageNo ?? params.pageNum,
       pageNum: params.pageNo ?? params.pageNum,
+    },
+  })
+}
+
+/** 当前筛选范围的预警处理汇总，供预警中心而非仅当前分页计算 KPI。 */
+export function getAlertProcessingReport(params: AlertListParams) {
+  return request<AlertProcessingReport>({
+    url: '/alerts/processing-report',
+    method: 'get',
+    params: {
+      projectId: params.projectId,
+      ruleType: params.ruleType,
+      alertDomain: params.alertDomain ?? params.category,
+      severity: params.severity,
+      isRead: params.isRead,
+      processStatus: params.processStatus,
+      triggeredStart: params.triggeredStart ?? params.triggeredAtStart,
+      triggeredEnd: params.triggeredEnd ?? params.triggeredAtEnd,
     },
   })
 }

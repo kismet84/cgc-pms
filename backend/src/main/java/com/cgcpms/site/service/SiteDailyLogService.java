@@ -88,7 +88,7 @@ public class SiteDailyLogService {
         query.orderByDesc(SiteDailyLog::getReportDate).orderByDesc(SiteDailyLog::getCreatedAt);
         Page<SiteDailyLog> page = mapper.selectPage(new Page<>(pageNo, pageSize), query);
         Set<Long> projectIds = page.getRecords().stream().map(SiteDailyLog::getProjectId).collect(Collectors.toSet());
-        Map<Long, String> names = projectIds.isEmpty() ? Map.of() : projectMapper.selectBatchIds(projectIds).stream()
+        Map<Long, String> names = projectIds.isEmpty() ? Map.of() : projectMapper.selectByIds(projectIds).stream()
                 .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         return page.convert(log -> toVO(log, names.get(log.getProjectId())));
     }

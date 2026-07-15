@@ -47,6 +47,13 @@ minio:
   secret-key: ${MINIO_SECRET_KEY:__SET_MINIO_SECRET_KEY_IN_ENV__}
   bucket: cgc-pms
 
+virus-scan:
+  enabled: ${VIRUS_SCAN_ENABLED:true}
+  host: ${VIRUS_SCAN_HOST:localhost}
+  port: ${VIRUS_SCAN_PORT:3310}
+  connect-timeout-millis: ${VIRUS_SCAN_CONNECT_TIMEOUT_MILLIS:2000}
+  read-timeout-millis: ${VIRUS_SCAN_READ_TIMEOUT_MILLIS:30000}
+
 # JWT
 jwt:
   secret: ${JWT_SECRET:__SET_JWT_SECRET_IN_ENV__}

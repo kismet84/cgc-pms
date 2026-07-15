@@ -37,6 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("ContractCompositeSave — composite atomic save behavior")
+@SuppressWarnings("deprecation") // verifies the still-supported legacy JSON flag is ignored
 class ContractCompositeSaveTest {
 
     private static final long PROJECT_ID = 10001L;

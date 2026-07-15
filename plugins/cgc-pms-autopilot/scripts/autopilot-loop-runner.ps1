@@ -1,4 +1,4 @@
-﻿param(
+param(
     [string]$IssueId = 'READY-DRY-RUN',
     [ValidateSet('dry-run', 'classify', 'closeout', 'full')]
     [string]$Scenario = 'dry-run',
@@ -13,6 +13,9 @@
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+if ($PSVersionTable.PSVersion.Major -lt 7) {
+    throw "AUTOPILOT_POWERSHELL7_REQUIRED: launch this plugin entry with pwsh, actual=$($PSVersionTable.PSVersion)."
+}
 
 if ($EnableLocalCommit) {
     throw 'autopilot-loop-runner.ps1 is preview-only. Use scripts/codex-autopilot/autopilot-run-continuous.ps1 for real execution.'
@@ -166,7 +169,7 @@ $repairRequest = $null
 $closeoutPreview = $null
 $verify = [ordered]@{
     requiredCommands = @(
-        'powershell -NoProfile -ExecutionPolicy Bypass -File plugins\cgc-pms-autopilot\scripts\validate-loop-artifacts.ps1',
+        'pwsh -NoProfile -ExecutionPolicy Bypass -File plugins\cgc-pms-autopilot\scripts\validate-loop-artifacts.ps1',
         'git diff --check'
     )
 }
@@ -229,7 +232,7 @@ if ($selectedIssue.ready) {
                 required_change = $classification.suggestedNextAction
                 allowed_files = 'plugins/cgc-pms-autopilot/**'
                 forbidden_files = 'backend/**, frontend-admin/**, deploy/**'
-                reverify_command = 'powershell -NoProfile -ExecutionPolicy Bypass -File plugins\cgc-pms-autopilot\scripts\autopilot-loop-runner.ps1 -DryRun -Scenario classify -AllowSyntheticIssue'
+                reverify_command = 'pwsh -NoProfile -ExecutionPolicy Bypass -File plugins\cgc-pms-autopilot\scripts\autopilot-loop-runner.ps1 -DryRun -Scenario classify -AllowSyntheticIssue'
                 stop_condition = 'Stop when the same classified failure repeats after the allowed retry policy is exhausted.'
             } | ConvertTo-Json -Depth 5 -Compress
 

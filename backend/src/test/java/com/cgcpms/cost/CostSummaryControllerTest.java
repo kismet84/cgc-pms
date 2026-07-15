@@ -61,6 +61,14 @@ class CostSummaryControllerTest {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
+    private Cookie authenticatedCookieWithoutPermissions(long userId) {
+        String token = jwtUtils.generateToken(
+                userId, "authenticated-user-" + userId, TENANT_ID,
+                List.of("COMMON_USER"),
+                List.of());
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // Unauthorized checks
     // ═══════════════════════════════════════════════════════════════
@@ -206,6 +214,39 @@ class CostSummaryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.projectId").value(String.valueOf(MANAGED_PROJECT_ID)));
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("GET /cost-summary/{projectId}/history authenticated user without permission -> 403")
+    void testGetHistory_WithoutPermissionForbidden() throws Exception {
+        mockMvc.perform(getWithApi("/cost-summary/" + PROJECT_ID + "/history")
+                        .cookie(authenticatedCookieWithoutPermissions(93063L)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+    }
+
+    @Test
+    @Order(13)
+    @DisplayName("GET /cost-summary/{projectId}/history cross-tenant user -> project hidden")
+    void testGetHistory_CrossTenantUserProjectHidden() throws Exception {
+        mockMvc.perform(getWithApi("/cost-summary/" + PROJECT_ID + "/history")
+                        .cookie(summaryViewerCookie(ADMIN_ID, 999L, List.of("ADMIN"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_NOT_FOUND"));
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("GET /cost-summary/{projectId}/history project manager with permission -> 200")
+    void testGetHistory_ProjectManagerAllowed() throws Exception {
+        seedManagedProjectIfAbsent();
+
+        mockMvc.perform(getWithApi("/cost-summary/" + MANAGED_PROJECT_ID + "/history")
+                        .cookie(summaryViewerCookie(PROJECT_MANAGER_ID, TENANT_ID, List.of("COMMON_USER"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").isArray());
     }
 
     // ── helpers ──

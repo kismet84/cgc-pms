@@ -376,9 +376,9 @@ public class ContractRevenueService {
         Set<Long> projectIds = records.stream().map(ContractRevenue::getProjectId).collect(Collectors.toSet());
         Set<Long> contractIds = records.stream().map(ContractRevenue::getContractId).collect(Collectors.toSet());
 
-        Map<Long, String> projectNames = projectMapper.selectBatchIds(projectIds).stream()
+        Map<Long, String> projectNames = projectMapper.selectByIds(projectIds).stream()
                 .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
-        Map<Long, String> contractNames = contractMapper.selectBatchIds(contractIds).stream()
+        Map<Long, String> contractNames = contractMapper.selectByIds(contractIds).stream()
                 .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
 
         Map<Long, String> all = new java.util.HashMap<>();

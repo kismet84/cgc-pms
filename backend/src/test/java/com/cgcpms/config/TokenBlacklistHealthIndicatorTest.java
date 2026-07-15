@@ -47,6 +47,7 @@ class TokenBlacklistHealthIndicatorTest {
     @DisplayName("available blacklist service -> UP")
     void shouldReportUpWhenBlacklistServiceCanCheckRedis() {
         TokenBlacklistService service = mock(TokenBlacklistService.class);
+        when(service.isEnabled()).thenReturn(true);
         when(service.isAvailable()).thenReturn(true);
         TokenBlacklistHealthIndicator indicator =
                 new TokenBlacklistHealthIndicator(provider(service), env("prod"));
@@ -61,6 +62,7 @@ class TokenBlacklistHealthIndicatorTest {
     @DisplayName("blacklist service Redis check fails -> DOWN")
     void shouldReportDownWhenBlacklistRedisCheckFails() {
         TokenBlacklistService service = mock(TokenBlacklistService.class);
+        when(service.isEnabled()).thenReturn(true);
         when(service.isAvailable()).thenReturn(false);
         TokenBlacklistHealthIndicator indicator =
                 new TokenBlacklistHealthIndicator(provider(service), env("prod"));

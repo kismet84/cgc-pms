@@ -2,9 +2,27 @@
 
 ## 场景1：Ready 空
 
-- 输入：`ready` 队列为空，`current-focus` 可继续拆题
-- 预期：A 进入拆题；不写业务代码；输出新的 Ready 或明确停止原因
+- 输入：`ready` 队列为空，知识图谱健康、Git 游标覆盖当前 HEAD，且存在合格 `OPEN` / `OBSERVATION` 叶子问题
+- 预期：A 从有界图谱查询发现存量候选，再按 `sourceRefs` 和当前分支事实核实；保留 `[stock:<issueKey>]`；不写业务代码；输出新的 Ready 或明确停止原因
 - 通过条件：只有 backlog/计划层动作，没有业务代码 diff
+
+## 场景1a：存量问题过滤与后备顺序
+
+- 输入：同时存在生产 `RELEASE_GATE`、`FROZEN`、`NEEDS_CONFIRMATION`、聚合父问题、合格存量叶子问题、当前 focus 阻塞和 Ad-hoc Candidate
+- 预期：只选择合格存量叶子问题；其余存量项不自动拆 Ready。合格存量问题耗尽后，才按当前 focus 可解除阻塞 → Ad-hoc Candidate → 产品情报刷新推进
+- 通过条件：长期增强计划不能直接生成 Ready；没有 Ready Planner 时正式补货 fail-close，不生成宽范围通用草稿
+
+## 场景1c：图谱异常或游标过期
+
+- 输入：Neo4j 不可用，或 Git 游标落后当前 HEAD 且单次 `autopilot-refill` 增量刷新后仍不一致
+- 预期：分别输出 `STOP_KG_REFILL_UNAVAILABLE` 或 `STOP_KG_REFILL_STALE`；不读取 `current-issues.json` 静默补货
+- 通过条件：不创建 Ready、不创建 issue worktree、不启动 executor；失败分类可区分 `environment_prereq`、`tool_config` 与数据一致性 `quality_security`
+
+## 场景1d：Ready 范围契约矛盾
+
+- 输入：精确允许文件被禁止目录覆盖，或允许子树被禁止父树完全覆盖
+- 预期：ready lint 返回 `READY_SCOPE_CONTRADICTION` / `ready_issue_config`
+- 通过条件：executor/worktree 均未创建；宽允许目录配合更窄禁止子目录仍通过前置检查，并继续受运行时 forbidden 优先门禁保护
 
 ## 场景1b：无 Ready 证据直接调用 runner
 
@@ -47,3 +65,33 @@
 - 输入：`-DryRun -EnableLocalCommit -Scenario closeout`
 - 预期：仍保持 dry-run，不触发真实 commit
 - 通过条件：输出 `dryRun=true`，且 closeout 分支最多只到 dry-run 预览
+
+## 场景8：候选评分版本未批准
+
+- 输入：`taskScoring.enabled=false`、`activeVersion=null`、`approvalStatus=NEEDS_CONFIRMATION`
+- 预期：允许确定性评分器单测和历史样本字段回放，不写正式评分、不增加回顾周期计数
+- 通过条件：runner 沿用既有单阶段行为；任何试图以未批准版本启用计数的配置均 fail-close
+
+## 场景9：评分两阶段收口与幂等重试
+
+- 输入：已批准 active `autopilot-task-score/v2`、硬门禁通过、同一 Issue 重复 closeout
+- 预期：产生不同的 `implementationCommit` 和 `closeoutCommit`；正式分包含 `taskExecutionEfficiency` 且只绑定前者，重复执行复用同一评分键和提交登记
+- 通过条件：正式报告只有一段 v2 评分、没有同任务 v1/shadow 双计数，ledger 只有一条有效登记、回顾周期只增加一次
+
+## 场景10：无界20任务回顾门禁
+
+- 输入：无界连续模式完成第20个有效评分任务
+- 预期：状态进入 `RETROSPECTIVE_REQUIRED`，下一 checkpoint 阻断第21个任务
+- 通过条件：周期计数为20且唯一 Issue/评分键各20个；回顾未完整收口前不能启动新批次
+
+## 场景11：有界18+3整批回顾
+
+- 输入：跨批次已有18个有效任务，执行 `启动迭代-3`
+- 预期：第20个任务只置待回顾，当前批次完成到21个后统一回顾
+- 通过条件：回顾覆盖21个任务，成功后全部清零且不结转；系统保持暂停，等待用户重新启动
+
+## 场景12：回顾阶段恢复
+
+- 输入：分别在报告提交、问题写回、图谱刷新或 Episode 写入后中断
+- 预期：保持累计与暂停，按 `REPORT_COMMITTED → ISSUES_WRITTEN → GRAPH_REFRESHED → EPISODE_RECORDED` 单向续跑
+- 通过条件：阶段乱序和提前清零被拒绝；改进提案始终为 `NEEDS_CONFIRMATION`，没有自动实施

@@ -93,7 +93,7 @@ public class CostLedgerService {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
         Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
-                : pmProjectMapper.selectBatchIds(projectIds).stream()
+                : pmProjectMapper.selectByIds(projectIds).stream()
                         .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         Map<String, BigDecimal> byProject = new LinkedHashMap<>();
         byProjectId.forEach((id, amount) -> {
@@ -254,28 +254,28 @@ public class CostLedgerService {
     private Map<Long, String> batchResolveProjectNames(List<CostItem> items) {
         Set<Long> ids = items.stream().map(CostItem::getProjectId).filter(Objects::nonNull).collect(Collectors.toSet());
         if (ids.isEmpty()) return Map.of();
-        return pmProjectMapper.selectBatchIds(ids).stream()
+        return pmProjectMapper.selectByIds(ids).stream()
                 .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
     }
 
     private Map<Long, String> batchResolveContractNames(List<CostItem> items) {
         Set<Long> ids = items.stream().map(CostItem::getContractId).filter(Objects::nonNull).collect(Collectors.toSet());
         if (ids.isEmpty()) return Map.of();
-        return ctContractMapper.selectBatchIds(ids).stream()
+        return ctContractMapper.selectByIds(ids).stream()
                 .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
     }
 
     private Map<Long, String> batchResolvePartnerNames(List<CostItem> items) {
         Set<Long> ids = items.stream().map(CostItem::getPartnerId).filter(Objects::nonNull).collect(Collectors.toSet());
         if (ids.isEmpty()) return Map.of();
-        return mdPartnerMapper.selectBatchIds(ids).stream()
+        return mdPartnerMapper.selectByIds(ids).stream()
                 .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
     }
 
     private Map<Long, String> batchResolveSubjectNames(List<CostItem> items) {
         Set<Long> ids = items.stream().map(CostItem::getCostSubjectId).filter(Objects::nonNull).collect(Collectors.toSet());
         if (ids.isEmpty()) return Map.of();
-        return costSubjectMapper.selectBatchIds(ids).stream()
+        return costSubjectMapper.selectByIds(ids).stream()
                 .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
     }
 

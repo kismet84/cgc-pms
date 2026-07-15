@@ -62,7 +62,7 @@ public class WfCcService {
         // Batch-fetch user names for all cc recipients and validate tenant membership
         Map<Long, SysUser> userMap = Collections.emptyMap();
         if (!ccUserIds.isEmpty()) {
-            List<SysUser> users = sysUserMapper.selectBatchIds(new HashSet<>(ccUserIds));
+            List<SysUser> users = sysUserMapper.selectByIds(new HashSet<>(ccUserIds));
             userMap = users.stream()
                     .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));
             // Validate every cc user belongs to the same tenant as the instance

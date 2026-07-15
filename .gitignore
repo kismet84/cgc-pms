@@ -79,6 +79,7 @@ admin-state.json
 .codex-autopilot/events.ndjson
 .codex-autopilot/closeouts.ndjson
 .codex-autopilot/runs/
+.codex-autopilot/checkpoints/
 !.codex-autopilot/ALLOW_TEST_DATA_RESET
 .omc/
 .omo/

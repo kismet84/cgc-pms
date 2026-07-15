@@ -1,10 +1,12 @@
 package com.cgcpms.config;
 
+import com.cgcpms.auth.context.UserContext;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -12,11 +14,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.aop.interceptor.AsyncUncaughtExceptionHandler;
 import org.springframework.aop.interceptor.SimpleAsyncUncaughtExceptionHandler;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.concurrent.ThreadPoolExecutor;
 
 @Configuration
@@ -50,6 +55,7 @@ public class AsyncConfig implements AsyncConfigurer {
         executor.setQueueCapacity(queueCapacity);
         executor.setThreadNamePrefix(threadNamePrefix);
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setTaskDecorator(this::decorateWithSubmittingContext);
         executor.initialize();
         meterRegistryProvider.ifAvailable(meterRegistry -> ExecutorServiceMetrics.monitor(
                 meterRegistry,
@@ -57,6 +63,41 @@ public class AsyncConfig implements AsyncConfigurer {
                 "cgc.pms.async",
                 Tags.of("executor", "taskExecutor")));
         return executor;
+    }
+
+    private Runnable decorateWithSubmittingContext(Runnable task) {
+        UserContext.Snapshot submittingUser = UserContext.capture();
+        Map<String, String> submittingMdc = MDC.getCopyOfContextMap();
+        SecurityContext submittingSecurity = copySecurityContext(SecurityContextHolder.getContext());
+        return () -> {
+            UserContext.Snapshot previousUser = UserContext.capture();
+            Map<String, String> previousMdc = MDC.getCopyOfContextMap();
+            SecurityContext previousSecurity = SecurityContextHolder.getContext();
+            try {
+                UserContext.restore(submittingUser);
+                if (submittingMdc == null) {
+                    MDC.clear();
+                } else {
+                    MDC.setContextMap(submittingMdc);
+                }
+                SecurityContextHolder.setContext(submittingSecurity);
+                task.run();
+            } finally {
+                UserContext.restore(previousUser);
+                if (previousMdc == null) {
+                    MDC.clear();
+                } else {
+                    MDC.setContextMap(previousMdc);
+                }
+                SecurityContextHolder.setContext(previousSecurity);
+            }
+        };
+    }
+
+    private SecurityContext copySecurityContext(SecurityContext source) {
+        SecurityContext copy = SecurityContextHolder.createEmptyContext();
+        copy.setAuthentication(source == null ? null : source.getAuthentication());
+        return copy;
     }
 
     @Override

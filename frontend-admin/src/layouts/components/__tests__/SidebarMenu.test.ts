@@ -166,6 +166,7 @@ describe('SidebarMenu', () => {
       '成本台账',
       '成本核对',
       '现场日报',
+      '投标成本',
     ])
 
     expect(wrapper.find('[data-menu-key="/cost-target/index"]').exists()).toBe(true)
@@ -179,6 +180,7 @@ describe('SidebarMenu', () => {
       '结算台账',
       '付款申请',
       '资金日记账',
+      '会计凭证',
       '发票管理',
     ])
 

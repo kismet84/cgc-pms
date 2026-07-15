@@ -160,7 +160,7 @@ public class WorkflowTaskService {
         // Batch-fetch user names for all signees and validate tenant membership
         Map<Long, SysUser> signUserMap = Collections.emptyMap();
         if (!additionalUserIds.isEmpty()) {
-            List<SysUser> signUsers = core.sysUserMapper.selectBatchIds(
+            List<SysUser> signUsers = core.sysUserMapper.selectByIds(
                     new HashSet<>(additionalUserIds));
             signUserMap = signUsers.stream()
                     .collect(Collectors.toMap(SysUser::getId, u -> u, (a, b) -> a));

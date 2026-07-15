@@ -204,7 +204,7 @@ public class MatReceiptAssembler {
 
     private Map<Long, String> resolveOrderCodes(Set<Long> orderIds) {
         if (orderIds.isEmpty()) return Map.of();
-        List<MatPurchaseOrder> orders = matPurchaseOrderMapper.selectBatchIds(orderIds);
+        List<MatPurchaseOrder> orders = matPurchaseOrderMapper.selectByIds(orderIds);
         Map<Long, String> map = new HashMap<>();
         for (MatPurchaseOrder o : orders) {
             map.put(o.getId(), o.getOrderCode());
@@ -217,7 +217,7 @@ public class MatReceiptAssembler {
                                                 Function<T, Long> idExtractor,
                                                 Function<T, String> nameExtractor) {
         if (ids.isEmpty()) return Map.of();
-        List<T> entities = mapper.selectBatchIds(ids);
+        List<T> entities = mapper.selectByIds(ids);
         Map<Long, String> map = new HashMap<>();
         for (T e : entities) {
             map.put(idExtractor.apply(e), nameExtractor.apply(e));
@@ -228,7 +228,7 @@ public class MatReceiptAssembler {
     @SuppressWarnings("unchecked")
     private <T> Map<Long, T> resolveEntities(Set<Long> ids, BaseMapper<T> mapper) {
         if (ids.isEmpty()) return Map.of();
-        List<T> entities = mapper.selectBatchIds(ids);
+        List<T> entities = mapper.selectByIds(ids);
         Map<Long, T> map = new HashMap<>();
         for (T e : entities) {
             try {

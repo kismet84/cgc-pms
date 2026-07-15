@@ -77,20 +77,28 @@ $mysqldumpArgs = @(
     $MysqlDatabase
 )
 
+ $tempSqlFile = Join-Path $BackupDir ".${MysqlDatabase}_${timestamp}.sql.tmp"
+ $tempErrorFile = Join-Path $BackupDir ".${MysqlDatabase}_${timestamp}.err.tmp"
+
 try {
-    $dumpOutput = & docker @mysqldumpArgs 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "mysqldump failed (exit $LASTEXITCODE): $dumpOutput"
-        exit 1
+    $dumpProcess = Start-Process -FilePath 'docker' -ArgumentList $mysqldumpArgs `
+        -NoNewWindow -Wait -PassThru `
+        -RedirectStandardOutput $tempSqlFile `
+        -RedirectStandardError $tempErrorFile
+    if ($dumpProcess.ExitCode -ne 0) {
+        $dumpError = Get-Content -LiteralPath $tempErrorFile -Raw -ErrorAction SilentlyContinue
+        throw "mysqldump failed (exit $($dumpProcess.ExitCode)): $dumpError"
     }
 
-    # Compress with gzip
-    $dumpBytes = [System.Text.Encoding]::UTF8.GetBytes(($dumpOutput -join "`n"))
+    # Keep the dump byte-for-byte intact. PowerShell text capture corrupts
+    # non-ASCII SQL before it is recompressed.
+    $inStream = [System.IO.File]::OpenRead($tempSqlFile)
     $outStream = [System.IO.File]::Open($backupFile, [System.IO.FileMode]::Create)
     $gzipStream = New-Object System.IO.Compression.GZipStream($outStream, [System.IO.Compression.CompressionMode]::Compress)
-    $gzipStream.Write($dumpBytes, 0, $dumpBytes.Length)
+    $inStream.CopyTo($gzipStream)
     $gzipStream.Close()
     $outStream.Close()
+    $inStream.Close()
 
     $fileSize = (Get-Item $backupFile).Length
     Write-Host "Backup complete: $backupFile ($([math]::Round($fileSize/1KB, 1)) KB)"
@@ -98,6 +106,9 @@ try {
 catch {
     Write-Error "Backup failed: $_"
     exit 1
+}
+finally {
+    Remove-Item -LiteralPath $tempSqlFile, $tempErrorFile -Force -ErrorAction SilentlyContinue
 }
 
 # -------------------------------------------------------------------

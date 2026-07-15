@@ -18,7 +18,11 @@ try {
   Invoke-Git @('init','-q')
   Invoke-Git @('config','user.email','autopilot@test.local')
   Invoke-Git @('config','user.name','AutoPilot Test')
+  Invoke-Git @('config','core.autocrlf','false')
+  Invoke-Git @('config','core.eol','lf')
   New-Item -ItemType Directory -Path (Join-Path $root 'docs\quality') -Force | Out-Null
+  New-Item -ItemType Directory -Path (Join-Path $root 'plugins\cgc-pms-autopilot\references') -Force | Out-Null
+  "# Policy`n`nPolicy-Version: 1`nStatus: active" | Set-Content -LiteralPath (Join-Path $root 'plugins\cgc-pms-autopilot\references\control-plane-policy.md') -Encoding UTF8
   ".worktrees/" | Set-Content -LiteralPath (Join-Path $root '.gitignore') -Encoding UTF8
   'base' | Set-Content -LiteralPath (Join-Path $root 'docs\quality\base.md') -Encoding UTF8
   Invoke-Git @('add','.')
@@ -31,6 +35,7 @@ try {
     readyContentHash = 'ready-hash-a'; taskNature = '缺口修复'; goal = @('isolate')
     nonGoals = @('no leak'); acceptanceCriteria = @('preserve business behavior'); allowedPaths = @('docs/quality/**'); forbiddenPaths = @('deploy/**')
     validationCommands = @('git diff --check'); riskLevel = '低'; migration = '不需要'
+    candidateEvidenceHead = ('a' * 40)
   }
   $worktree = New-AutopilotIssueWorktree -RepoRoot $root -IssueId $issue.issueId -BaseCommit $baseCommit
   if ((Get-Content -Encoding UTF8 -LiteralPath (Join-Path $worktree.path 'docs\quality\base.md') -Raw).Trim() -ne 'base') { throw 'main dirty content leaked into worktree' }
@@ -43,8 +48,13 @@ try {
 
   $contextPath = Join-Path $root 'context-a.json'
   $context = New-AutopilotContextPack -Issue $issue -Phase 'implement' -RepoRoot $root -Worktree $worktree.path -OutputPath $contextPath -RelevantSymbols @('docs/quality/base.md')
-  if ($context.issueId -ne $issue.issueId -or $context.baseCommit -ne $baseCommit) { throw 'context identity is wrong' }
+  if ($context.schemaVersion -ne 2 -or $context.issueId -ne $issue.issueId -or $context.baseCommit -ne $baseCommit -or $context.executionBaseCommit -ne $baseCommit -or $context.candidateEvidenceHead -ne ('a' * 40) -or $context.controlPlanePolicyHash -notmatch '^[a-f0-9]{64}$') { throw 'context identity is wrong' }
   if ($context.acceptanceCriteria -notcontains 'preserve business behavior') { throw 'acceptance criteria were omitted from isolated context' }
+  $candidateMismatch = $issue.PSObject.Copy()
+  $candidateMismatch.candidateEvidenceHead = ('b' * 40)
+  $candidateMismatchRejected = $false
+  try { Assert-AutopilotContextCurrent -Context $context -Issue $candidateMismatch -Worktree $worktree.path -ExpectedBaseCommit $baseCommit | Out-Null } catch { $candidateMismatchRejected = $true }
+  if (!$candidateMismatchRejected) { throw 'stale candidate evidence head was accepted' }
 
   $issueB = $issue.PSObject.Copy()
   $issueB.issueId = 'ISSUE-900-011'

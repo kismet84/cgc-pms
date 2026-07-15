@@ -8,7 +8,7 @@
   "properties": {
     "schemaVersion": { "type": "integer", "const": 1 },
     "issueId": { "type": "string", "pattern": "^ISSUE-[0-9-]+$" },
-    "decision": { "type": "string", "enum": ["pass", "needs_repair", "blocked"] },
+    "decision": { "type": "string", "enum": ["pass", "needs_repair", "blocked", "tool_blocked"] },
     "findings": {
       "type": "array",
       "items": {

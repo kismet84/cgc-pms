@@ -17,12 +17,15 @@ try {
   [pscustomobject]@{
     status = 'pass'; issueId = $issue.issueId; title = $issue.title
     readyContentHash = $issue.readyContentHash; taskNature = $issue.taskNature; riskLevel = $issue.riskLevel
+    failureCategory = 'none'; errorCode = ''
     errors = @(); warnings = @()
   } | ConvertTo-Json -Depth 6
 } catch {
   [pscustomobject]@{
     status = 'fail'; issueId = $targetId; title = $IssueTitle
     readyContentHash = ''; taskNature = ''; riskLevel = ''
+    failureCategory = 'ready_issue_config'
+    errorCode = if ($_.Exception.Message -match 'READY_SCOPE_CONTRADICTION') { 'READY_SCOPE_CONTRADICTION' } else { 'READY_CONTRACT_INVALID' }
     errors = @($_.Exception.Message); warnings = @()
   } | ConvertTo-Json -Depth 6
   exit 1

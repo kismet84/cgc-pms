@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cgc-pms.local/schemas/closeout-record.schema.json",
+  "title": "AutoPilot Closeout Record v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "key", "issueId", "readyContentHash", "outcome",
+    "implementationCommit", "closeoutCommit", "reportPath", "reportHash",
+    "resultHash", "preCloseoutFactsHash", "evidenceManifestHash",
+    "reviewRequired", "reviewDecision", "verifiedDiffHash", "followupsAdded",
+    "followupsClosed", "followupsNetChange", "metricsSummary", "metricsHash",
+    "controlPlaneFingerprint", "graphCursorRequired", "graphGitCursor", "registeredAt"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "key": { "$ref": "#/$defs/sha256" },
+    "issueId": { "type": "string", "minLength": 1 },
+    "readyContentHash": { "$ref": "#/$defs/sha256" },
+    "outcome": { "const": "PASSED" },
+    "implementationCommit": { "$ref": "#/$defs/gitCommit" },
+    "closeoutCommit": { "$ref": "#/$defs/gitCommit" },
+    "reportPath": { "type": "string", "minLength": 1 },
+    "reportHash": { "$ref": "#/$defs/sha256" },
+    "resultHash": { "$ref": "#/$defs/sha256" },
+    "preCloseoutFactsHash": { "$ref": "#/$defs/sha256" },
+    "evidenceManifestHash": { "$ref": "#/$defs/sha256" },
+    "reviewRequired": { "type": "boolean" },
+    "reviewDecision": { "type": "string" },
+    "verifiedDiffHash": { "$ref": "#/$defs/sha256" },
+    "followupsAdded": { "type": "integer", "minimum": 0 },
+    "followupsClosed": { "type": "integer", "minimum": 0 },
+    "followupsNetChange": { "type": "integer" },
+    "metricsSummary": { "type": "object" },
+    "metricsHash": { "$ref": "#/$defs/sha256" },
+    "controlPlaneFingerprint": { "$ref": "#/$defs/sha256" },
+    "graphCursorRequired": { "type": "boolean" },
+    "graphGitCursor": { "type": "string" },
+    "registeredAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gitCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+  }
+}

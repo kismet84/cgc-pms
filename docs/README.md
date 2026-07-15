@@ -27,6 +27,7 @@
 | 11 | [安全规范](standards/11-安全规范.md) |
 | 12 | [Codex Subagents 实施方案](standards/12-codex-subagents-implementation-plan.md) |
 | 13 | [驾驶舱摘要字段规范](standards/13-驾驶舱摘要字段生成与展示规范.md) |
+| 14 | [AutoPilot 任务评分与自动改进回顾规范](standards/14-AutoPilot任务评分与自动改进回顾规范.md) |
 
 ## 当前工作入口
 
@@ -41,6 +42,7 @@
 - [v1.5 迭代记录](iterations/README.md)
 - [未来开发计划](未来开发计划.md)
 - [历史开发记录](历史开发记录.md)
+- [项目知识图谱工具](../tools/knowledge-graph/README.md)
 
 ## 历史边界
 

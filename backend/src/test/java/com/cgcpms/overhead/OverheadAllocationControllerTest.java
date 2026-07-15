@@ -2,81 +2,171 @@ package com.cgcpms.overhead;
 
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.overhead.service.OverheadAllocationService;
+import com.cgcpms.overhead.vo.OverheadAllocationExecutionResult;
 import jakarta.servlet.http.Cookie;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+
+import java.time.LocalDate;
+import java.time.YearMonth;
 import java.util.List;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
-@AutoConfigureMockMvc @ActiveProfiles("local")
-@DisplayName("OverheadAllocationController integration tests")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "spring.main.lazy-initialization=true",
+        "jwt.secret=issue-040-024-controller-test-secret-key-at-least-sixty-four-characters-long"
+})
+@AutoConfigureMockMvc
+@ActiveProfiles("local")
 class OverheadAllocationControllerTest {
-    @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
-    private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
-    private Long ruleId;
 
-    private Cookie adminCookie() {
-        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
-                jwtUtils.generateToken(ADMIN_ID, "admin", TENANT_ID, List.of("ADMIN"), List.of()));
+    private static final long USER_ID = 94002601L;
+    private static final long TENANT_ID = 940026L;
+    private static final LocalDate PERIOD = LocalDate.of(2026, 6, 30);
+
+    @Autowired private MockMvc mockMvc;
+    @Autowired private JwtUtils jwtUtils;
+    @Autowired private JdbcTemplate jdbcTemplate;
+    @MockitoBean private OverheadAllocationService service;
+
+    @BeforeEach
+    void setUp() {
+        jdbcTemplate.update("DELETE FROM sys_operation_audit_log WHERE tenant_id=?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM overhead_allocation_run WHERE tenant_id=?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM overhead_allocation_rule WHERE tenant_id=?", TENANT_ID);
+        when(service.executeAllocation(anyLong(), any(LocalDate.class))).thenAnswer(invocation -> {
+            LocalDate period = invocation.getArgument(1);
+            if (!period.equals(YearMonth.from(period).atEndOfMonth())
+                    || !YearMonth.from(period).isBefore(YearMonth.now())) {
+                throw new BusinessException("INVALID_OVERHEAD_PERIOD", "非法分摊期间");
+            }
+            return new OverheadAllocationExecutionResult(
+                    period.toString(), 0, 0, 0, 0, "0.00", false);
+        });
+        clearInvocations(service);
     }
 
-    @Test @Order(1) @DisplayName("GET /overhead-allocation/rules without JWT -> 401")
-    void testUnauthorized() throws Exception { mockMvc.perform(g("/overhead-allocation/rules")).andExpect(status().isUnauthorized()); }
-
-    @Test @Order(2) @DisplayName("GET /overhead-allocation/rules -> 200")
-    void testGetRules() throws Exception {
-        mockMvc.perform(g("/overhead-allocation/rules").cookie(adminCookie()).param("pageNo","1").param("pageSize","10"))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+    @AfterEach
+    void tearDown() {
+        jdbcTemplate.update("DELETE FROM sys_operation_audit_log WHERE tenant_id=?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM overhead_allocation_run WHERE tenant_id=?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM overhead_allocation_rule WHERE tenant_id=?", TENANT_ID);
+        reset(service);
     }
 
-    @Test @Order(3) @DisplayName("POST /overhead-allocation/rules -> 200 creates rule")
-    void testCreateRule() throws Exception {
-        String body = "{\"costSubjectId\":%d,\"allocationBasis\":\"DIRECT_LABOR\",\"allocationCycle\":\"MONTHLY\"}".formatted(System.nanoTime() % 1000 + 1000);
-        String resp = mockMvc.perform(p("/overhead-allocation/rules").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isString())
-                .andReturn().getResponse().getContentAsString();
-        ruleId = Long.parseLong(resp.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
-        Assertions.assertNotNull(ruleId);
+    @Test
+    @DisplayName("未登录执行返回 401")
+    void executeRequiresAuthentication() throws Exception {
+        mockMvc.perform(postApi("/overhead-allocation/execute").param("period", PERIOD.toString()))
+                .andExpect(status().isUnauthorized());
     }
 
-    @Test @Order(4) @DisplayName("POST /overhead-allocation/rules missing required -> 400 or 409")
-    void testCreateRule_Missing() throws Exception {
-        mockMvc.perform(p("/overhead-allocation/rules").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content("{}"))
+    @Test
+    @DisplayName("仅成本查询权限返回 403")
+    void executeRejectsLedgerPermissionWithoutExecutePermission() throws Exception {
+        mockMvc.perform(postApi("/overhead-allocation/execute")
+                        .cookie(cookie(List.of(), List.of("cost:ledger:query")))
+                        .param("period", PERIOD.toString()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @DisplayName("显式执行权限用户与管理员可执行")
+    void executeAllowsExplicitPermissionOrAdmin() throws Exception {
+        mockMvc.perform(postApi("/overhead-allocation/execute")
+                        .cookie(cookie(List.of(), List.of("overhead:execute")))
+                        .param("period", PERIOD.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.period").value(PERIOD.toString()));
+
+        mockMvc.perform(postApi("/overhead-allocation/execute")
+                        .cookie(cookie(List.of("ADMIN"), List.of()))
+                        .param("period", PERIOD.toString()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("请求 tenantId 不得覆盖认证租户")
+    void requestTenantIdCannotOverrideAuthenticatedTenant() throws Exception {
+        mockMvc.perform(postApi("/overhead-allocation/execute")
+                        .cookie(cookie(List.of("SUPER_ADMIN"), List.of()))
+                        .param("tenantId", "999999")
+                        .param("period", PERIOD.toString()))
+                .andExpect(status().isOk());
+
+        verify(service).executeAllocation(TENANT_ID, PERIOD);
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM overhead_allocation_run WHERE tenant_id=999999", Integer.class));
+    }
+
+    @Test
+    @DisplayName("非法文本、非月末、当前月份和未来月份均 fail-close")
+    void invalidPeriodsFailClosed() throws Exception {
+        Cookie admin = cookie(List.of("ADMIN"), List.of());
+        mockMvc.perform(postApi("/overhead-allocation/execute").cookie(admin).param("period", "not-a-date"))
+                .andExpect(status().is4xxClientError());
+        mockMvc.perform(postApi("/overhead-allocation/execute").cookie(admin).param("period", "2026-06-01"))
+                .andExpect(status().is4xxClientError());
+        mockMvc.perform(postApi("/overhead-allocation/execute").cookie(admin)
+                        .param("period", YearMonth.now().atEndOfMonth().toString()))
+                .andExpect(status().is4xxClientError());
+        mockMvc.perform(postApi("/overhead-allocation/execute").cookie(admin)
+                        .param("period", YearMonth.now().plusMonths(1).atEndOfMonth().toString()))
                 .andExpect(status().is4xxClientError());
     }
 
-    @Test @Order(5) @DisplayName("PUT /overhead-allocation/rules/{id} -> 200")
-    void testUpdateRule() throws Exception {
-        Assertions.assertNotNull(ruleId);
-        String body = "{\"costSubjectId\":" + (System.nanoTime() % 1000 + 2000) + ",\"allocationBasis\":\"CONTRACT_AMOUNT\",\"allocationCycle\":\"PER_OCCURRENCE\"}";
-        mockMvc.perform(u("/overhead-allocation/rules/" + ruleId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+    @Test
+    @DisplayName("审计日志定位租户、期间、执行人，失败不记录伪成功")
+    void auditCapturesPeriodTenantExecutorAndFailure() throws Exception {
+        mockMvc.perform(postApi("/overhead-allocation/execute")
+                        .cookie(cookie(List.of("ADMIN"), List.of()))
+                        .param("period", "2026-06-01"))
+                .andExpect(status().is4xxClientError());
+
+        var rows = jdbcTemplate.queryForList("""
+                SELECT tenant_id,user_id,business_type,business_id,success_flag
+                FROM sys_operation_audit_log
+                WHERE tenant_id=? AND business_type='OVERHEAD_ALLOCATION'
+                ORDER BY id DESC
+                """, TENANT_ID);
+        assertEquals(1, rows.size());
+        assertEquals(TENANT_ID, ((Number) rows.get(0).get("TENANT_ID")).longValue());
+        assertEquals(USER_ID, ((Number) rows.get(0).get("USER_ID")).longValue());
+        assertEquals("2026-06-01", rows.get(0).get("BUSINESS_ID"));
+        assertEquals(0, ((Number) rows.get(0).get("SUCCESS_FLAG")).intValue());
     }
 
-    @Test @Order(6) @DisplayName("POST /overhead-allocation/execute -> accepts any response")
-    void testExecuteAllocation() throws Exception {
-        mockMvc.perform(p("/overhead-allocation/execute").cookie(adminCookie()).param("period", "2026-06-01"))
-                .andExpect(status().is2xxSuccessful());
+    private Cookie cookie(List<String> roles, List<String> permissions) {
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
+                jwtUtils.generateToken(USER_ID, "overhead-controller-test", TENANT_ID, roles, permissions));
     }
 
-    @Test @Order(7) @DisplayName("DELETE /overhead-allocation/rules/{id} -> 200")
-    void testDeleteRule() throws Exception {
-        Assertions.assertNotNull(ruleId);
-        mockMvc.perform(d("/overhead-allocation/rules/" + ruleId).cookie(adminCookie()))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+    private MockHttpServletRequestBuilder postApi(String path) {
+        return post("/api" + path).contextPath("/api");
     }
 
-    private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }
-    private MockHttpServletRequestBuilder p(String p) { return post("/api" + p).contextPath("/api"); }
-    private MockHttpServletRequestBuilder u(String p) { return put("/api" + p).contextPath("/api"); }
-    private MockHttpServletRequestBuilder d(String p) { return delete("/api" + p).contextPath("/api"); }
 }

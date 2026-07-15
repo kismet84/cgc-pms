@@ -6,6 +6,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.entity.SysMenu;
 import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysRoleMenu;
+import com.cgcpms.system.entity.SysUserRole;
 import com.cgcpms.system.mapper.SysMenuMapper;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
@@ -28,6 +29,11 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SysRoleService {
+
+    private static final Set<String> RESERVED_ROLE_CODES = Set.of("ADMIN", "SUPER_ADMIN");
+    private static final Set<String> ALLOWED_STATUSES = Set.of("ENABLE", "DISABLE");
+    private static final Set<String> ALLOWED_DATA_SCOPES =
+            Set.of("ALL", "DEPT", "DEPT_AND_CHILD", "SELF", "CUSTOM");
 
     private final SysRoleMapper sysRoleMapper;
     private final SysRoleMenuMapper sysRoleMenuMapper;
@@ -52,16 +58,48 @@ public class SysRoleService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(SysRole role) {
         Long tenantId = UserContext.getCurrentTenantId();
+        normalizeAndValidateCreate(role);
         if (sysRoleMapper.selectCount(new LambdaQueryWrapper<SysRole>()
                 .eq(SysRole::getRoleCode, role.getRoleCode())
                 .eq(SysRole::getTenantId, tenantId)) > 0) {
             throw new BusinessException("ROLE_CODE_EXISTS", "角色编码已存在");
         }
-        if (role.getStatus() == null) role.setStatus("ENABLE");
+        role.setId(null);
         role.setTenantId(tenantId);
+        role.setRoleType("CUSTOM");
+        role.setRoleLevel(2);
         sysRoleMapper.insert(role);
         log.info("Creating role: {}", role.getRoleCode());
         return role.getId();
+    }
+
+    private void normalizeAndValidateCreate(SysRole role) {
+        String roleCode = role.getRoleCode() == null ? "" : role.getRoleCode().trim();
+        String roleName = role.getRoleName() == null ? "" : role.getRoleName().trim();
+        if (roleCode.isEmpty() || roleName.isEmpty()) {
+            throw new BusinessException("ROLE_CREATE_INVALID_FIELD", "角色编码和角色名称不能为空");
+        }
+        if (roleCode.length() > 50 || roleName.length() > 100) {
+            throw new BusinessException("ROLE_CREATE_INVALID_FIELD", "角色编码或角色名称长度超限");
+        }
+        if (RESERVED_ROLE_CODES.contains(roleCode.toUpperCase())
+                || (role.getRoleType() != null && !"CUSTOM".equalsIgnoreCase(role.getRoleType().trim()))
+                || (role.getRoleLevel() != null && !Integer.valueOf(2).equals(role.getRoleLevel()))) {
+            throw new BusinessException("ROLE_CREATE_PRIVILEGE_ESCALATION", "不允许创建系统或高等级角色");
+        }
+
+        String status = role.getStatus() == null || role.getStatus().isBlank()
+                ? "ENABLE" : role.getStatus().trim().toUpperCase();
+        String dataScope = role.getDataScope() == null || role.getDataScope().isBlank()
+                ? "SELF" : role.getDataScope().trim().toUpperCase();
+        if (!ALLOWED_STATUSES.contains(status) || !ALLOWED_DATA_SCOPES.contains(dataScope)) {
+            throw new BusinessException("ROLE_CREATE_INVALID_FIELD", "角色状态或数据范围不合法");
+        }
+
+        role.setRoleCode(roleCode);
+        role.setRoleName(roleName);
+        role.setStatus(status);
+        role.setDataScope(dataScope);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -69,7 +107,37 @@ public class SysRoleService {
         SysRole existing = sysRoleMapper.selectById(role.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
-        sysRoleMapper.updateById(role);
+
+        String existingRoleCode = existing.getRoleCode() == null
+                ? "" : existing.getRoleCode().trim().toUpperCase();
+        if (RESERVED_ROLE_CODES.contains(existingRoleCode)
+                || "SYSTEM".equalsIgnoreCase(existing.getRoleType())
+                || (existing.getRoleLevel() != null && existing.getRoleLevel() < 2)) {
+            throw new BusinessException("ROLE_UPDATE_PROTECTED", "系统或高等级角色不允许修改");
+        }
+
+        String requestRoleCode = role.getRoleCode() == null ? "" : role.getRoleCode().trim();
+        if (!requestRoleCode.equals(existing.getRoleCode())) {
+            throw new BusinessException("ROLE_UPDATE_IMMUTABLE_FIELD", "角色编码不允许修改");
+        }
+
+        String roleName = role.getRoleName() == null ? "" : role.getRoleName().trim();
+        String status = role.getStatus() == null
+                ? existing.getStatus() : role.getStatus().trim().toUpperCase();
+        String dataScope = role.getDataScope() == null
+                ? existing.getDataScope() : role.getDataScope().trim().toUpperCase();
+        if (roleName.isEmpty() || roleName.length() > 100
+                || !ALLOWED_STATUSES.contains(status)
+                || !ALLOWED_DATA_SCOPES.contains(dataScope)) {
+            throw new BusinessException("ROLE_UPDATE_INVALID_FIELD", "角色名称、状态或数据范围不合法");
+        }
+
+        existing.setRoleName(roleName);
+        existing.setStatus(status);
+        existing.setDataScope(dataScope);
+        if (sysRoleMapper.updateById(existing) != 1) {
+            throw new BusinessException("ROLE_UPDATE_FAILED", "角色修改失败，请重试");
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -78,11 +146,24 @@ public class SysRoleService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
 
-        // Clean up role-menu and user-role associations to prevent orphan records
+        String roleCode = existing.getRoleCode() == null ? "" : existing.getRoleCode().trim().toUpperCase();
+        if (RESERVED_ROLE_CODES.contains(roleCode)
+                || "SYSTEM".equalsIgnoreCase(existing.getRoleType())
+                || (existing.getRoleLevel() != null && existing.getRoleLevel() < 2)) {
+            throw new BusinessException("ROLE_DELETE_PROTECTED", "系统或高等级角色不允许删除");
+        }
+
+        long userBindingCount = sysUserRoleMapper.selectCount(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, id));
+        if (userBindingCount > 0) {
+            throw new BusinessException("ROLE_IN_USE", "角色仍绑定用户，无法删除");
+        }
+
         sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenu>()
                 .eq(SysRoleMenu::getRoleId, id));
-        // Note: sys_user_role cleanup is handled by SysUserRoleMapper (if it exists)
-        sysRoleMapper.deleteById(id);
+        if (sysRoleMapper.deleteById(id) != 1) {
+            throw new BusinessException("ROLE_DELETE_FAILED", "角色删除失败，请重试");
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -156,7 +237,7 @@ public class SysRoleService {
 
     private Map<Long, SysMenu> loadMenus(List<Long> menuIds, Long tenantId) {
         if (menuIds.isEmpty()) return Map.of();
-        List<SysMenu> menus = sysMenuMapper.selectBatchIds(menuIds);
+        List<SysMenu> menus = sysMenuMapper.selectByIds(menuIds);
         Map<Long, SysMenu> menuMap = menus.stream()
                 .filter(menu -> tenantId.equals(menu.getTenantId()))
                 .collect(Collectors.toMap(SysMenu::getId, menu -> menu));

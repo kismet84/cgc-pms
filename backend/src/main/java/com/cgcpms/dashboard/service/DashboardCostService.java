@@ -186,7 +186,7 @@ public class DashboardCostService extends DashboardSharedSupport {
                 .collect(Collectors.toSet());
         Map<Long, CostSubject> subjectMap = Collections.emptyMap();
         if (!subjectIds.isEmpty()) {
-            List<CostSubject> subjects = costSubjectMapper.selectBatchIds(subjectIds);
+            List<CostSubject> subjects = costSubjectMapper.selectByIds(subjectIds);
             subjectMap = subjects.stream().collect(Collectors.toMap(CostSubject::getId, s -> s, (a, b) -> a));
         }
 
@@ -544,7 +544,7 @@ public class DashboardCostService extends DashboardSharedSupport {
         if (normalizedSubjectIds.isEmpty()) {
             return Collections.emptyMap();
         }
-        return costSubjectMapper.selectBatchIds(normalizedSubjectIds).stream()
+        return costSubjectMapper.selectByIds(normalizedSubjectIds).stream()
                 .collect(Collectors.toMap(CostSubject::getId, s -> s, (a, b) -> a));
     }
 
@@ -653,7 +653,7 @@ public class DashboardCostService extends DashboardSharedSupport {
         if (contractIds.isEmpty()) {
             return Collections.emptyMap();
         }
-        return ctContractMapper.selectBatchIds(contractIds).stream()
+        return ctContractMapper.selectByIds(contractIds).stream()
                 .collect(Collectors.toMap(CtContract::getId, c -> c, (a, b) -> a));
     }
 
@@ -713,7 +713,7 @@ public class DashboardCostService extends DashboardSharedSupport {
         if (contractIds.isEmpty()) {
             return Collections.emptyMap();
         }
-        Map<Long, CtContract> contracts = ctContractMapper.selectBatchIds(contractIds).stream()
+        Map<Long, CtContract> contracts = ctContractMapper.selectByIds(contractIds).stream()
                 .collect(Collectors.toMap(CtContract::getId, c -> c, (a, b) -> a));
 
         Map<Long, Set<Long>> contractIdsBySubject = items.stream()

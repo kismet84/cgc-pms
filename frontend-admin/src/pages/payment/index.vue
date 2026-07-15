@@ -719,24 +719,23 @@ onMounted(() => {
           <div class="lg-toolbar-left">
             <div class="payment-table-heading">
               <span class="payment-table-title">付款申请明细</span>
-              <span class="payment-table-count">共 {{ total }} 条，表格为主操作区</span>
+              <span class="payment-table-count">共 {{ total }} 条</span>
             </div>
+          </div>
+          <div class="lg-toolbar-right">
             <ColumnSettingsButton
               :columns="columnSettings"
               :visible="colVisible"
               @toggle="toggleCol"
             />
-            <a-button type="primary" @click="handleAdd">
-              <template #icon><PlusOutlined /></template>
-              新建申请
-            </a-button>
             <a-button @click="fetchData">
               <template #icon><ReloadOutlined /></template>
               刷新
             </a-button>
-          </div>
-          <div class="lg-toolbar-right">
-            <span class="payment-toolbar-hint">申请编号进入单据，行末查看更多操作</span>
+            <a-button type="primary" @click="handleAdd">
+              <template #icon><PlusOutlined /></template>
+              新建申请
+            </a-button>
           </div>
         </div>
 
@@ -901,7 +900,7 @@ onMounted(() => {
 
 <style scoped>
 .payment-page {
-  gap: 14px;
+  gap: 0;
 }
 
 .linked-cash-journal-banner {
@@ -926,7 +925,6 @@ onMounted(() => {
 
 .payment-table-panel {
   min-height: 754px;
-  border-top: 3px solid var(--primary);
 }
 
 .payment-list-feedback {
@@ -939,8 +937,7 @@ onMounted(() => {
 
 .payment-toolbar {
   align-items: center;
-  min-height: 58px;
-  background: linear-gradient(180deg, #fff, var(--surface-subtle));
+  min-height: 56px;
 }
 
 .payment-table-heading {

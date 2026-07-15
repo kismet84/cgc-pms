@@ -1,6 +1,21 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO } from '@/types/cost'
+import type {
+  CostLedgerVO,
+  CostLedgerQueryParams,
+  CostLedgerSummaryVO,
+  CostSummaryHistoryVO,
+} from '@/types/cost'
+
+export interface OverheadAllocationExecutionResult {
+  period: string
+  ruleCount: number
+  createdRunCount: number
+  duplicateRunCount: number
+  costItemCount: number
+  allocatedAmount: string
+  idempotent: boolean
+}
 
 /** 成本列表分页查询 */
 export function getCostLedger(params: CostLedgerQueryParams) {
@@ -28,6 +43,15 @@ export function getCostLedgerDetail(id: string) {
   })
 }
 
+/** 执行目标自然月的间接费分摊；租户只能由服务端认证上下文确定。 */
+export function executeOverheadAllocation(period: string) {
+  return request<OverheadAllocationExecutionResult>({
+    url: '/overhead-allocation/execute',
+    method: 'post',
+    params: { period },
+  })
+}
+
 // --- 动态成本汇总 ---
 import type { CostSummaryVO } from '@/types/cost'
 
@@ -35,6 +59,14 @@ import type { CostSummaryVO } from '@/types/cost'
 export function getCostSummary(projectId: string) {
   return request<CostSummaryVO>({
     url: `/cost-summary/${projectId}`,
+    method: 'get',
+  })
+}
+
+/** 获取项目成本汇总历史快照；租户与项目数据范围由服务端认证上下文确定。 */
+export function getCostSummaryHistory(projectId: string) {
+  return request<CostSummaryHistoryVO[]>({
+    url: `/cost-summary/${projectId}/history`,
     method: 'get',
   })
 }

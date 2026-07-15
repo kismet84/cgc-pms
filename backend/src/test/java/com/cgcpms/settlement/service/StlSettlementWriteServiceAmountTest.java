@@ -51,6 +51,7 @@ class StlSettlementWriteServiceAmountTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void createCapturesTheCompleteSettlementAmountSnapshot() {
         UserContext.set(Jwts.claims()
                 .add("userId", 1L)

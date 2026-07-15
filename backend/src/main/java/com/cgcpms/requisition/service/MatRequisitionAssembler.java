@@ -170,7 +170,7 @@ public class MatRequisitionAssembler {
                                                 Function<T, Long> idExtractor,
                                                 Function<T, String> nameExtractor) {
         if (ids.isEmpty()) return Map.of();
-        List<T> entities = mapper.selectBatchIds(ids);
+        List<T> entities = mapper.selectByIds(ids);
         Map<Long, String> map = new HashMap<>();
         for (T e : entities) {
             map.put(idExtractor.apply(e), nameExtractor.apply(e));
@@ -181,7 +181,7 @@ public class MatRequisitionAssembler {
     @SuppressWarnings("unchecked")
     private <T> Map<Long, T> resolveEntities(Set<Long> ids, BaseMapper<T> mapper) {
         if (ids.isEmpty()) return Map.of();
-        List<T> entities = mapper.selectBatchIds(ids);
+        List<T> entities = mapper.selectByIds(ids);
         Map<Long, T> map = new HashMap<>();
         for (T e : entities) {
             try {

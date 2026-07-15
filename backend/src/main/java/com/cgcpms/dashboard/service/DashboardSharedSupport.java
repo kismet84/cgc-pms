@@ -646,7 +646,7 @@ abstract class DashboardSharedSupport {
         Set<Long> instanceIds = tasks.stream()
                 .map(WfTask::getInstanceId)
                 .collect(Collectors.toSet());
-        List<WfInstance> instances = wfInstanceMapper.selectBatchIds(instanceIds);
+        List<WfInstance> instances = wfInstanceMapper.selectByIds(instanceIds);
         return instances.stream().collect(Collectors.toMap(WfInstance::getId, i -> i, (a, b) -> a));
     }
 

@@ -41,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @SpringBootTest
 @ActiveProfiles("local")
 @DisplayName("TenantIsolation — cross-tenant access is blocked")
+@SuppressWarnings("deprecation") // legacy request compatibility is intentionally covered here
 class TenantIsolationTest {
 
     private static final long TENANT_A = 0L; // default test tenant

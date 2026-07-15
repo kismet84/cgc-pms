@@ -547,69 +547,15 @@ onMounted(() => {
 <template>
   <div class="lg-list-page lg-page app-page subcontract-measure-page">
     <div class="lg-page-head subcontract-measure-page-head">
-      <div class="subcontract-measure-title-block">
-        <a-breadcrumb class="lg-breadcrumb">
-          <a-breadcrumb-item>分包管理</a-breadcrumb-item>
-          <a-breadcrumb-item>分包计量</a-breadcrumb-item>
-        </a-breadcrumb>
-        <div class="subcontract-measure-title-row">
-          <h1>分包计量</h1>
-          <span>核对分包计量申报、审核金额、净额与审批状态。</span>
-        </div>
-      </div>
+      <a-breadcrumb class="lg-breadcrumb">
+        <a-breadcrumb-item>分包管理</a-breadcrumb-item>
+        <a-breadcrumb-item>分包计量</a-breadcrumb-item>
+      </a-breadcrumb>
     </div>
 
-    <div class="lg-search-bar subcontract-measure-search-bar">
-      <a-input
-        v-model:value="filter.keyword"
-        placeholder="搜索计量编号…"
-        allow-clear
-        size="large"
-        @press-enter="handleSearch"
-      >
-        <template #prefix><SearchOutlined style="color: var(--text-secondary)" /></template>
-      </a-input>
-      <a-select
-        v-model:value="filter.projectId"
-        placeholder="全部项目"
-        allow-clear
-        size="large"
-        show-search
-        :filter-option="filterOptionByLabel"
-        @change="
-          (v: string | undefined) => {
-            filter.contractId = undefined
-            if (v) referenceStore.fetchContracts({ projectId: v })
-            handleSearch()
-          }
-        "
-      >
-        <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
-          {{ p.projectName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="filter.status"
-        placeholder="全部计量状态"
-        allow-clear
-        size="large"
-        @change="handleSearch"
-      >
-        <a-select-option value="DRAFT">草稿</a-select-option>
-        <a-select-option value="APPROVING">审批中</a-select-option>
-        <a-select-option value="CONFIRMED">已确认</a-select-option>
-        <a-select-option value="COMPLETED">已完成</a-select-option>
-      </a-select>
-      <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-      <a-button size="large" @click="handleReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
-    </div>
-
-    <div class="lg-grid">
-      <div class="subcontract-measure-main-column">
-        <div class="subcontract-measure-kpi-summary" aria-label="分包计量关键指标">
+    <div class="lg-grid subcontract-measure-workspace">
+      <div class="lg-left subcontract-measure-main-column">
+        <div class="lg-kpi-strip subcontract-measure-kpi-summary" aria-label="分包计量关键指标">
           <div class="subcontract-measure-kpi-item">
             <span class="subcontract-measure-kpi-icon is-blue"><FileDoneOutlined /></span>
             <div>
@@ -654,6 +600,62 @@ onMounted(() => {
           </div>
         </div>
 
+        <div class="lg-search-bar subcontract-measure-search-bar">
+          <div class="subcontract-measure-filter-grid">
+            <a-select
+              v-model:value="filter.projectId"
+              placeholder="全部项目"
+              allow-clear
+              size="large"
+              show-search
+              :filter-option="filterOptionByLabel"
+              @change="
+                (v: string | undefined) => {
+                  filter.contractId = undefined
+                  if (v) referenceStore.fetchContracts({ projectId: v })
+                  handleSearch()
+                }
+              "
+            >
+              <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
+                {{ p.projectName }}
+              </a-select-option>
+            </a-select>
+            <a-select
+              v-model:value="filter.status"
+              placeholder="全部计量状态"
+              allow-clear
+              size="large"
+              @change="handleSearch"
+            >
+              <a-select-option value="DRAFT">草稿</a-select-option>
+              <a-select-option value="APPROVING">审批中</a-select-option>
+              <a-select-option value="CONFIRMED">已确认</a-select-option>
+              <a-select-option value="COMPLETED">已完成</a-select-option>
+            </a-select>
+          </div>
+          <div class="subcontract-measure-filter-foot">
+            <a-input
+              v-model:value="filter.keyword"
+              placeholder="搜索计量编号…"
+              allow-clear
+              size="large"
+              @press-enter="handleSearch"
+            >
+              <template #prefix>
+                <SearchOutlined style="color: var(--text-secondary)" />
+              </template>
+            </a-input>
+            <div class="subcontract-measure-filter-actions">
+              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
+              <a-button size="large" @click="handleReset">
+                <template #icon><ReloadOutlined /></template>
+                重置
+              </a-button>
+            </div>
+          </div>
+        </div>
+
         <main class="lg-list-table-panel subcontract-measure-table-panel">
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
@@ -661,18 +663,20 @@ onMounted(() => {
                 <strong>计量明细</strong>
                 <span>共 {{ total }} 条</span>
               </div>
+            </div>
+            <div class="lg-toolbar-right">
               <ColumnSettingsButton
                 :columns="columnSettings"
                 :visible="colVisible"
                 @toggle="toggleCol"
               />
-              <a-button type="primary" @click="handleAdd">
-                <template #icon><PlusOutlined /></template>
-                新建计量
-              </a-button>
               <a-button @click="fetchData">
                 <template #icon><ReloadOutlined /></template>
                 刷新
+              </a-button>
+              <a-button type="primary" @click="handleAdd">
+                <template #icon><PlusOutlined /></template>
+                新建计量
               </a-button>
             </div>
           </div>
@@ -815,40 +819,39 @@ onMounted(() => {
 }
 
 .subcontract-measure-page-head {
-  margin-bottom: 7px;
+  margin-bottom: 14px;
 }
 
 .lg-breadcrumb {
-  margin-bottom: 5px;
-  font-size: 13px;
-}
-
-.subcontract-measure-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.subcontract-measure-title-row h1 {
-  margin: 0;
-  font-size: 22px;
-  line-height: 30px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.subcontract-measure-title-row span {
-  font-size: 13px;
-  color: #64748b;
+  font-size: 14px;
 }
 
 .subcontract-measure-search-bar {
-  min-height: 74px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  min-height: 108px;
+  margin-bottom: 0;
+  padding: 16px;
+}
+
+.subcontract-measure-filter-grid,
+.subcontract-measure-filter-foot {
   display: grid;
-  grid-template-columns: minmax(260px, 1.7fr) minmax(180px, 1fr) 160px auto auto;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  width: 100%;
+}
+
+.subcontract-measure-filter-foot {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.subcontract-measure-filter-actions {
+  display: flex;
   align-items: center;
-  margin-bottom: 16px;
+  gap: 8px;
 }
 
 .subcontract-measure-main-column {
@@ -861,8 +864,10 @@ onMounted(() => {
 .subcontract-measure-kpi-summary {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  height: 88px;
-  min-height: 88px;
+  gap: 0;
+  height: auto;
+  min-height: 108px;
+  margin-bottom: 0;
   background: #fff;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
@@ -874,7 +879,11 @@ onMounted(() => {
   gap: 12px;
   align-items: center;
   min-width: 0;
-  padding: 12px 18px;
+  min-height: 108px;
+  padding: 16px 18px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   border-right: 1px solid #edf1f5;
 }
 

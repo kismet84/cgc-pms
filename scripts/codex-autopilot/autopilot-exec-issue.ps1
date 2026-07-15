@@ -1,4 +1,4 @@
-﻿param(
+param(
   [string]$RepoRoot = "D:\projects-test\cgc-pms",
   [string]$ConfigPath = "",
   [string]$IssueId = "",
@@ -6,9 +6,14 @@
   [string]$ReadyPath = "",
   [string]$RunId = "",
   [string]$ContextPath = "",
+  [string]$ContextBasePath = "",
+  [string]$ContextDeltaPath = "",
   [string]$Model = "",
   [string]$Thinking = "",
   [string]$ExecutorRole = "",
+  [string]$RunInstanceId = "",
+  [string]$LeaseEpoch = "",
+  [string]$ControlPlaneFingerprint = "",
   [switch]$ReviewRequired,
   [switch]$DryRun,
   [switch]$Noop
@@ -17,6 +22,12 @@
 $ErrorActionPreference = "Stop"
 $commandLibrary = Join-Path $PSScriptRoot 'autopilot-command.ps1'
 if (Test-Path -LiteralPath $commandLibrary) { . $commandLibrary }
+$nativeCommandLibrary = Join-Path $PSScriptRoot 'autopilot-native-command.ps1'
+if (!(Get-Command Invoke-AutopilotGit -ErrorAction SilentlyContinue)) { . $nativeCommandLibrary }
+$metricsLibrary = Join-Path $PSScriptRoot 'autopilot-metrics.ps1'
+if (!(Get-Command New-AutopilotInvocationId -ErrorAction SilentlyContinue)) { . $metricsLibrary }
+$executionHostLibrary = Join-Path $PSScriptRoot 'autopilot-execution-host.ps1'
+if (!(Get-Command Assert-AutopilotLegacyModelProcessAllowed -ErrorAction SilentlyContinue)) { . $executionHostLibrary }
 
 function Read-JsonFile {
   param([string]$Path)
@@ -70,8 +81,8 @@ function Select-Issue {
 function Get-GitSummary {
   param([string]$Root)
 
-  $branch = (& git -C $Root branch --show-current 2>$null | Out-String).Trim()
-  $status = @(& git -C $Root status --short --untracked-files=all 2>$null)
+  $branch = (Invoke-AutopilotGit -RepoRoot $Root -Arguments @('branch','--show-current') -ThrowOnFailure).stdout.Trim()
+  $status = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $Root -Arguments @('status','--short','--untracked-files=all') -ThrowOnFailure).stdout)
   return [pscustomobject]@{
     branch = $branch
     isClean = ($status.Count -eq 0)
@@ -149,7 +160,8 @@ function Get-ChangedBusinessArtifacts {
     [string[]]$BeforeStatus,
     [string[]]$AfterStatus,
     [hashtable]$BeforeFingerprints,
-    [hashtable]$AfterFingerprints
+    [hashtable]$AfterFingerprints,
+    [string[]]$CommittedPaths = @()
   )
 
   $statusChanges = @($AfterStatus | Where-Object { $BeforeStatus -notcontains $_ })
@@ -159,11 +171,13 @@ function Get-ChangedBusinessArtifacts {
       $contentChanges += "content:$path"
     }
   }
+  $committedChanges = @($CommittedPaths | Where-Object { $_ -and -not (Test-ExcludedBusinessPath $_) } | ForEach-Object { "commit:$($_.Replace('\', '/'))" } | Select-Object -Unique)
 
   return [pscustomobject]@{
     statusChanges = $statusChanges
     contentChanges = $contentChanges
-    artifacts = @($statusChanges + $contentChanges)
+    committedChanges = $committedChanges
+    artifacts = @($statusChanges + $contentChanges + $committedChanges)
   }
 }
 
@@ -228,7 +242,12 @@ function New-IssuePromptFile {
   )
 
   $promptPath = Join-Path $RunDir "issue-prompt.md"
-  $contextInstruction = if ($ContextPath) { "只读取并遵守上下文包：$ContextPath" } else { "任务正文：`n$($Issue.body)" }
+  if (($ContextBasePath -and !$ContextDeltaPath) -or (!$ContextBasePath -and $ContextDeltaPath)) { throw 'context base and delta must be supplied together' }
+  $contextInstruction = if ($ContextBasePath) {
+    "只读取并遵守不可变基础上下文：$ContextBasePath`n只读取并遵守本阶段增量上下文：$ContextDeltaPath`n发生冲突时停止并报告，不得自行合并矛盾身份。"
+  } elseif ($ContextPath) {
+    "只读取并遵守兼容版 v2 上下文包：$ContextPath"
+  } else { "任务正文：`n$($Issue.body)" }
   @"
 你是被 AutoPilot 明确派工的执行智能体，不是主线程；在本 Ready Issue 范围内可以执行授权动作。
 
@@ -243,6 +262,7 @@ $contextInstruction
 - 只处理该 Ready Issue 声明的允许修改范围。
 - 不连接生产库，不发布生产，不自动 push。
 - 完成后留下可验收的文件改动和验证证据；无法完成时按 blocked/failed 收口。
+- 返回 done 前必须完成 Ready 验收要求中的 F 职责：正式归档报告、存量问题唯一载体更新、项目地图/焦点回写，以及新增后续项、关闭后续项、后续项净变化统计；缺任一项不得声称完成。
 "@ | Out-File -Encoding utf8 $promptPath
   return $promptPath
 }
@@ -254,7 +274,10 @@ function Invoke-ExecutorProcess {
     [string]$WorkingDirectory,
     [string]$StdinPath,
     [string]$LogPath,
-    [int]$TimeoutSeconds
+    [int]$TimeoutSeconds,
+    [Parameter(Mandatory)][string]$IssueId,
+    [Parameter(Mandatory)][string]$RunId,
+    [Parameter(Mandatory)][string]$RunDir
   )
 
   function Quote-ProcessArgument {
@@ -271,9 +294,14 @@ function Invoke-ExecutorProcess {
   } else {
     [pscustomobject]@{ fileName = Resolve-ExecutorCommand $Command; argumentPrefix = @() }
   }
+  $effectiveArguments = if ($Command -match '^codex(?:\.exe|\.cmd|\.ps1)?$') {
+    @(Get-AutopilotCodexRedirectedStdinArguments -Arguments $Arguments)
+  } else {
+    @($Arguments)
+  }
   $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
   $startInfo.FileName = $invocation.fileName
-  $startInfo.Arguments = (@($invocation.argumentPrefix) + @($Arguments) | ForEach-Object { Quote-ProcessArgument $_ }) -join " "
+  $startInfo.Arguments = (@($invocation.argumentPrefix) + @($effectiveArguments) | ForEach-Object { Quote-ProcessArgument $_ }) -join " "
   $startInfo.WorkingDirectory = $WorkingDirectory
   $startInfo.UseShellExecute = $false
   $startInfo.RedirectStandardOutput = $true
@@ -285,6 +313,9 @@ function Invoke-ExecutorProcess {
 
   $startedAt = Get-Date -Format o
   [void]$process.Start()
+  $invocationId = New-AutopilotInvocationId -Role EXECUTOR -Scope ISSUE -ScopeId $IssueId -ProcessId $process.Id -StartedAt $startedAt
+  $invocationEvent = New-AutopilotModelInvocationEvent -Role EXECUTOR -Scope ISSUE -ScopeId $IssueId -InvocationId $invocationId -IssueId $IssueId -RunId $RunId -ProcessId $process.Id -StartedAt $startedAt
+  Write-RunEvent -RunDir $RunDir -Event 'model.invocation' -Data $invocationEvent
   $stdoutTask = $process.StandardOutput.ReadToEndAsync()
   $stderrTask = $process.StandardError.ReadToEndAsync()
 
@@ -306,7 +337,7 @@ function Invoke-ExecutorProcess {
   $logLines = @(
     "executor.startedAt=$startedAt"
     "executor.command=$($startInfo.FileName)"
-    "executor.args=$($Arguments -join ' ')"
+    "executor.args=$($effectiveArguments -join ' ')"
     "executor.cwd=$WorkingDirectory"
     "executor.timeoutSeconds=$TimeoutSeconds"
     "executor.timedOut=$timedOut"
@@ -323,6 +354,7 @@ function Invoke-ExecutorProcess {
   return [pscustomobject]@{
     exitCode = if ($timedOut) { 124 } else { [int]$process.ExitCode }
     timedOut = $timedOut
+    invocationId = $invocationId
   }
 }
 
@@ -346,6 +378,8 @@ function Invoke-ConfiguredIssueExecutor {
     [object]$Config
   )
 
+  $executionHost = Get-AutopilotExecutionHost -Config $Config
+  Assert-AutopilotLegacyModelProcessAllowed -ExecutionHost $executionHost -Role 'EXECUTOR' | Out-Null
   $executor = $Config.issueExecutor
   if (!$executor -or !$executor.command) {
     return [pscustomobject]@{
@@ -372,6 +406,7 @@ function Invoke-ConfiguredIssueExecutor {
 
   $promptPath = New-IssuePromptFile $Issue $RunDir
   $logPath = Join-Path $RunDir "executor.log"
+  $beforeHead = (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
   $before = @(Get-BusinessGitStatus @((Get-GitSummary $RepoRoot).statusShort))
   $beforeFingerprints = Get-BusinessFileFingerprints -Root $RepoRoot -StatusLines $before
   $args = @()
@@ -393,7 +428,10 @@ function Invoke-ConfiguredIssueExecutor {
       -WorkingDirectory $RepoRoot `
       -StdinPath $stdinPath `
       -LogPath $logPath `
-      -TimeoutSeconds $timeoutSeconds
+      -TimeoutSeconds $timeoutSeconds `
+      -IssueId $Issue.issueId `
+      -RunId $RunId `
+      -RunDir $RunDir
     $exitCode = [int]$processResult.exitCode
   } catch {
     $_.Exception.Message | Out-File -Encoding utf8 $logPath
@@ -401,13 +439,19 @@ function Invoke-ConfiguredIssueExecutor {
   }
 
   $afterSummary = Get-GitSummary $RepoRoot
+  $afterHead = (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim()
+  $committedPaths = @()
+  if ($beforeHead -and $afterHead -and $beforeHead -ne $afterHead) {
+    $committedPaths = @(Get-AutopilotNativeOutputLines (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('diff','--name-only',$beforeHead,$afterHead,'--') -ThrowOnFailure).stdout)
+  }
   $after = @(Get-BusinessGitStatus @($afterSummary.statusShort))
   $afterFingerprints = Get-BusinessFileFingerprints -Root $RepoRoot -StatusLines $after
   $artifactChanges = Get-ChangedBusinessArtifacts `
     -BeforeStatus $before `
     -AfterStatus $after `
     -BeforeFingerprints $beforeFingerprints `
-    -AfterFingerprints $afterFingerprints
+    -AfterFingerprints $afterFingerprints `
+    -CommittedPaths $committedPaths
   $requireChangedFiles = if ($null -ne $executor.requireChangedFiles) { [bool]$executor.requireChangedFiles } else { $true }
   $logText = if (Test-Path $logPath) { Get-Content -Encoding UTF8 -Raw -LiteralPath $logPath } else { "" }
   $logTail = if (Test-Path $logPath) { @((Get-Content -Encoding UTF8 -Tail 40 -LiteralPath $logPath) -join "`n") } else { @() }
@@ -496,6 +540,7 @@ function Write-RunEvent {
 
   $eventPath = Join-Path $RunDir "events.jsonl"
   $payload = [ordered]@{
+    runId = $runId
     timestamp = Get-Date -Format o
     event = $Event
     mode = if ($DryRun) { "dry-run" } elseif ($Noop) { "noop" } else { "execute" }
@@ -525,6 +570,11 @@ if (!$ConfigPath) {
 $config = Read-JsonFile $ConfigPath
 if ($config.repoRoot -and !$PSBoundParameters.ContainsKey('RepoRoot')) {
   $RepoRoot = $config.repoRoot
+}
+if (Test-AutopilotDesktopNativeHost -Config $config) {
+  $handoff = New-AutopilotDesktopHandoff -RepoRoot $RepoRoot -ConfigPath $ConfigPath
+  Write-Output ($handoff | ConvertTo-Json -Depth 5)
+  return
 }
 if (!$ReadyPath) {
   $ReadyPath = Join-Path $RepoRoot "docs\backlog\ready-issues.md"
@@ -572,7 +622,25 @@ if (!$issue) {
 }
 
 $resultPath = Join-Path $runDir "result.json"
-$result | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 $resultPath
+if ($RunInstanceId -or $LeaseEpoch) {
+  try { $currentLock = Get-Content -LiteralPath (Join-Path $autoDir 'run.lock') -Raw -Encoding UTF8 | ConvertFrom-Json }
+  catch { throw 'AUTOPILOT_FENCE_REJECTED: executor cannot read current run.lock before writing result.' }
+  if ([string]$currentLock.runInstanceId -ne $RunInstanceId -or [string]$currentLock.leaseEpoch -ne $LeaseEpoch -or ($ControlPlaneFingerprint -and [string]$currentLock.controlPlaneFingerprint -ne $ControlPlaneFingerprint)) {
+    throw 'AUTOPILOT_FENCE_REJECTED: stale executor cannot write result.json.'
+  }
+}
+$result['runInstanceId'] = $RunInstanceId
+$result['leaseEpoch'] = $LeaseEpoch
+$result['controlPlaneFingerprint'] = $ControlPlaneFingerprint
+$result['transitionId'] = [guid]::NewGuid().ToString('N')
+$resultJson = $result | ConvertTo-Json -Depth 8
+$resultTemp = "$resultPath.$([guid]::NewGuid().ToString('N')).tmp"
+try {
+  [IO.File]::WriteAllText($resultTemp, $resultJson, [Text.UTF8Encoding]::new($false))
+  if (Test-Path -LiteralPath $resultPath) { [IO.File]::Move($resultTemp, $resultPath, $true) } else { [IO.File]::Move($resultTemp, $resultPath) }
+} finally {
+  Remove-Item -LiteralPath $resultTemp -Force -ErrorAction SilentlyContinue
+}
 Write-RunEvent $runDir "executor.result" ([pscustomobject]@{
   issueId = $result.issueId
   title = $result.title

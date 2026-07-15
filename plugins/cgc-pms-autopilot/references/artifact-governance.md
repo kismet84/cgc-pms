@@ -27,7 +27,7 @@
 - 独立项目业务任务的计划书：`docs/plans`
 - 独立项目业务任务的质量/收口报告：`docs/quality`
 - 独立项目业务任务的迭代摘要：`docs/iterations`
-- 项目真实 backlog / ready / done / blocked / focus：`docs/backlog`
+- 项目真实 backlog / ready / done / blocked / focus / current-issues：`docs/backlog`
 
 这些文档属于项目事实源，不因使用本插件而迁入 `plugins/cgc-pms-autopilot/artifacts/**`。
 

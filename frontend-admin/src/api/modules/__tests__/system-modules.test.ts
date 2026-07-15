@@ -8,7 +8,7 @@ vi.mock('@/api/request', () => ({
   request: mockRequest,
 }))
 
-import { getAlertList, markAlertRead, batchEvaluate } from '../alert'
+import { getAlertList, getAlertProcessingReport, markAlertRead, batchEvaluate } from '../alert'
 import {
   createDictData,
   createDictType,
@@ -23,7 +23,21 @@ import {
   updateDictType,
 } from '../dict'
 import { deleteFile, getFileUrl, listFiles, uploadFile } from '../file'
-import { getMenuTree, getRoles, getUserList, updateRoleMenus } from '../system'
+import {
+  createMenu,
+  createRole,
+  deleteMenu,
+  deleteRole,
+  getMenuDetail,
+  getMenuList,
+  getMenuTree,
+  getRoleDetail,
+  getRoles,
+  getUserList,
+  updateMenu,
+  updateRole,
+  updateRoleMenus,
+} from '../system'
 
 describe('system-related API modules', () => {
   beforeEach(() => {
@@ -31,23 +45,219 @@ describe('system-related API modules', () => {
   })
 
   it('builds system management requests', () => {
+    const createPayload = {
+      parentId: '10',
+      menuName: '采购看板',
+      menuType: 'MENU' as const,
+      path: '/purchase-board',
+      orderNum: 3,
+    }
     getMenuTree()
+    createMenu(createPayload)
     getRoles()
     updateRoleMenus(12, [1, 2])
     getUserList({ pageNum: 1, pageSize: 20 })
 
     expect(mockRequest).toHaveBeenNthCalledWith(1, { url: '/system/menus/tree', method: 'get' })
-    expect(mockRequest).toHaveBeenNthCalledWith(2, { url: '/system/roles', method: 'get' })
-    expect(mockRequest).toHaveBeenNthCalledWith(3, {
+    expect(mockRequest).toHaveBeenNthCalledWith(2, {
+      url: '/system/menus',
+      method: 'post',
+      data: createPayload,
+    })
+    expect(mockRequest).toHaveBeenNthCalledWith(3, { url: '/system/roles', method: 'get' })
+    expect(mockRequest).toHaveBeenNthCalledWith(4, {
       url: '/system/roles/12/menus',
       method: 'put',
       data: { menuIds: [1, 2] },
     })
-    expect(mockRequest).toHaveBeenNthCalledWith(4, {
+    expect(mockRequest).toHaveBeenNthCalledWith(5, {
       url: '/system/users',
       method: 'get',
       params: { pageNum: 1, pageSize: 20 },
     })
+    expect(createPayload).not.toHaveProperty('id')
+    expect(createPayload).not.toHaveProperty('tenantId')
+    expect(createPayload).not.toHaveProperty('children')
+    expect(createPayload).not.toHaveProperty('createdAt')
+  })
+
+  it('builds a bodyless menu deletion request', () => {
+    deleteMenu('13')
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/menus/13',
+      method: 'delete',
+    })
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+  })
+
+  it('builds an exact role creation request with ordinary business fields only', () => {
+    const payload = {
+      roleCode: 'COST_AUDITOR',
+      roleName: '成本审计员',
+      status: 'ENABLE' as const,
+      dataScope: 'SELF' as const,
+    }
+
+    createRole(payload)
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/roles',
+      method: 'post',
+      data: payload,
+    })
+    expect(Object.keys(mockRequest.mock.calls[0][0].data).sort()).toEqual(
+      ['roleCode', 'roleName', 'status', 'dataScope'].sort(),
+    )
+    for (const forbiddenField of [
+      'id',
+      'tenantId',
+      'roleType',
+      'roleLevel',
+      'menuIds',
+      'createdBy',
+      'createdAt',
+      'updatedBy',
+      'updatedAt',
+      'deletedFlag',
+    ]) {
+      expect(payload).not.toHaveProperty(forbiddenField)
+    }
+  })
+
+  it('builds a bodyless role detail request', () => {
+    getRoleDetail('12')
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/roles/12',
+      method: 'get',
+    })
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('params')
+  })
+
+  it('builds a bodyless role deletion request', () => {
+    deleteRole('12')
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/roles/12',
+      method: 'delete',
+    })
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('params')
+  })
+
+  it('builds an exact role update request with immutable role code and mutable fields only', () => {
+    const payload = {
+      roleCode: 'COST_AUDITOR',
+      roleName: '成本审计主管',
+      status: 'DISABLE' as const,
+      dataScope: 'DEPT' as const,
+    }
+
+    updateRole('12', payload)
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/roles/12',
+      method: 'put',
+      data: payload,
+    })
+    expect(Object.keys(mockRequest.mock.calls[0][0].data).sort()).toEqual(
+      ['roleCode', 'roleName', 'status', 'dataScope'].sort(),
+    )
+    for (const forbiddenField of [
+      'id',
+      'tenantId',
+      'roleType',
+      'roleLevel',
+      'menuIds',
+      'createdBy',
+      'createdAt',
+      'updatedBy',
+      'updatedAt',
+      'deletedFlag',
+    ]) {
+      expect(payload).not.toHaveProperty(forbiddenField)
+    }
+  })
+
+  it('builds an exact menu update request with business fields only', () => {
+    const payload = {
+      parentId: '10',
+      menuName: '菜单概览（修改）',
+      menuType: 'MENU' as const,
+      path: '/system/overview-v2',
+      component: 'system/overview/index',
+      perms: 'system:menu:edit',
+      icon: 'menu',
+      orderNum: 8,
+      status: 'ENABLE',
+      visible: 1,
+    }
+
+    updateMenu('13', payload)
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/menus/13',
+      method: 'put',
+      data: payload,
+    })
+    expect(Object.keys(mockRequest.mock.calls[0][0].data).sort()).toEqual(
+      [
+        'parentId',
+        'menuName',
+        'menuType',
+        'path',
+        'component',
+        'perms',
+        'icon',
+        'orderNum',
+        'status',
+        'visible',
+      ].sort(),
+    )
+    for (const forbiddenField of [
+      'id',
+      'tenantId',
+      'createdBy',
+      'createdAt',
+      'updatedBy',
+      'updatedAt',
+      'deletedFlag',
+      'children',
+    ]) {
+      expect(payload).not.toHaveProperty(forbiddenField)
+    }
+  })
+
+  it('builds a bodyless menu detail request', () => {
+    getMenuDetail('13')
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/menus/13',
+      method: 'get',
+    })
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('params')
+  })
+
+  it('builds a bodyless flat menu list request', () => {
+    getMenuList()
+
+    expect(mockRequest).toHaveBeenCalledOnce()
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/system/menus',
+      method: 'get',
+    })
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('data')
+    expect(mockRequest.mock.calls[0][0]).not.toHaveProperty('params')
   })
 
   it('builds alert requests', () => {
@@ -64,6 +274,32 @@ describe('system-related API modules', () => {
     expect(mockRequest).toHaveBeenNthCalledWith(3, {
       url: '/alerts/batch-evaluate',
       method: 'post',
+    })
+  })
+
+  it('builds the alert processing report request from the active filter', () => {
+    getAlertProcessingReport({
+      pageNum: 1,
+      pageSize: 20,
+      projectId: 'p1',
+      alertDomain: 'PURCHASE',
+      severity: 'HIGH',
+      processStatus: 'OPEN',
+    })
+
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/alerts/processing-report',
+      method: 'get',
+      params: {
+        projectId: 'p1',
+        ruleType: undefined,
+        alertDomain: 'PURCHASE',
+        severity: 'HIGH',
+        isRead: undefined,
+        processStatus: 'OPEN',
+        triggeredStart: undefined,
+        triggeredEnd: undefined,
+      },
     })
   })
 

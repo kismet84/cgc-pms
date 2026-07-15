@@ -19,6 +19,7 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("WorkflowNotificationAlertService 通知与预警联动")
+@SuppressWarnings("unchecked")
 class WorkflowNotificationAlertServiceTest {
 
     @Mock

@@ -9,13 +9,15 @@
 - 路由至少考虑风险、耦合、并行收益、上下文传递成本和独立证据需要，不按任务类别强制派工。
 - 任何代码、配置、文档、Git 或运行环境状态变更前，实际执行者都要核对 `git branch --show-current` 与 `git status --short`；怀疑冲突时再查 `git worktree list`。
 - A-F 是职责检查表，不是固定六线程；D 的裁决必需验证证据与 E 的适用风险审查证据不可省略，但不强制由独立线程提供。
-- 主线程不承载执行器长日志或推理历史；长期任务按 Issue/阶段生成最小 context pack，Reviewer 只接收 Ready、最终 diff 和绑定证据。
-- 一个 Issue 一个 worktree；不确定残留提交不得直接合并，先隔离并从当前 baseBranch 新鲜重跑。
+- 桌面原生模式下，主线程持有跨阶段与跨轮控制权，只保留决策所需摘要；长日志、原始推理历史不得写入长期 state。阶段输入按 Issue 生成最小 context base/delta，复核只消费 Ready、最终 diff 和绑定证据。
+- 主线程每个阶段前后读取 durable checkpoint，以结构化 StageResult 决定下一阶段；不得调用旧 runner 代替桌面编排，也不得在 `desktop-native` 下启动嵌套 `codex exec`。
+- 一个 Issue 一个 worktree；恢复先核验 durable phase checkpoint。证据一致时保留 worktree 并从首个未完成阶段继续；证据缺失或冲突时 quarantine，不得猜测合并、删除现场或从 B/C 新鲜重跑。
 
 ## 子智能体
 
 - 仅在主线程明确派工时使用；派工正文第一句必须声明：`你是被主线程明确派工的子智能体，不是主线程；在本派工范围内可以执行授权动作`
 - 只能在派工范围内执行修改、验证、归档、运维。
+- 仅承接短生命周期阶段任务；不得持有跨轮循环、下一 Issue 选择权、全局 state 或 run lock。
 - 发现范围外问题时，回报主线程，不自行扩 scope。
 - 实际派工时才填写 `model`、`thinking`、`reason`；同时派出两个及以上子智能体时才提供模型分配表。
 

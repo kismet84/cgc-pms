@@ -326,7 +326,7 @@ public class AlertEvaluationService {
             result.put("failures", List.of());
             return result;
         }
-        List<AlertLog> alerts = alertLogMapper.selectBatchIds(ids);
+        List<AlertLog> alerts = alertLogMapper.selectByIds(ids);
         Map<Long, AlertLog> alertMap = alerts.stream()
                 .collect(Collectors.toMap(AlertLog::getId, a -> a));
         List<Long> successIds = new ArrayList<>();

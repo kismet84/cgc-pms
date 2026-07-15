@@ -45,6 +45,7 @@ class PayApplicationCodeRetryTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void createRegeneratesApplyCodeAfterDuplicateKey() {
         UserContext.set(Jwts.claims()
                 .add("userId", 1L)

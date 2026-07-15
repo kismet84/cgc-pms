@@ -4,9 +4,10 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $runner = Join-Path $scriptDir 'autopilot-run-continuous.ps1'
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-unbounded-' + [guid]::NewGuid().ToString('N'))
-$backlog = Join-Path $root 'docs\backlog'; $autoDir = Join-Path $root '.codex-autopilot'; $fixtureScripts = Join-Path $root 'scripts\codex-autopilot'
-New-Item -ItemType Directory -Path $backlog,$autoDir,$fixtureScripts -Force | Out-Null
+$backlog = Join-Path $root 'docs\backlog'; $autoDir = Join-Path $root '.codex-autopilot'; $fixtureScripts = Join-Path $root 'scripts\codex-autopilot'; $policyDir = Join-Path $root 'plugins\cgc-pms-autopilot\references'
+New-Item -ItemType Directory -Path $backlog,$autoDir,$fixtureScripts,$policyDir -Force | Out-Null
 try {
+  "# Fixture Policy`n`nPolicy-Version: 1`nStatus: active" | Set-Content -LiteralPath (Join-Path $policyDir 'control-plane-policy.md') -Encoding UTF8
   '# Ready Issues' | Set-Content -LiteralPath (Join-Path $backlog 'ready-issues.md') -Encoding UTF8
   '# Current Focus' | Set-Content -LiteralPath (Join-Path $backlog 'current-focus.md') -Encoding UTF8
   '# Plan' | Set-Content -LiteralPath (Join-Path $backlog 'cgc-pms-production-enhancement-plan.md') -Encoding UTF8
@@ -17,7 +18,7 @@ try {
   [ordered]@{repoRoot=$root;autopilotDir=$autoDir;maxIssuesPerRun=1;maxParallelIssues=1;parallelSafetyMode='strict-independent-only';autoMerge=$true;autoPush=$false;maxRunMinutes=30;readyPlanner=[ordered]@{enabled=$false}} | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $configPath -Encoding UTF8
   & git -C $root init -q; & git -C $root config user.email 'autopilot@test.local'; & git -C $root config user.name 'AutoPilot Test'; & git -C $root add .; & git -C $root commit -qm 'base'
   $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-  $output = & powershell -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
+  $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $runner -RepoRoot $root -ConfigPath $configPath -MaxLoops 1 -ApplyBacklogSplit 2>&1 | Out-String
   $exitCode = $LASTEXITCODE
   $ErrorActionPreference = $old
   if ($exitCode -ne 0) { throw "unbounded runner failed: $output" }

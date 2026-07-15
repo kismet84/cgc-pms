@@ -15,20 +15,31 @@ $autoDir = Join-Path $Repo '.codex-autopilot'
 $statePath = Join-Path $autoDir 'state.json'
 $now = [datetimeoffset]::Now.ToString('o')
 New-Item -ItemType Directory -Path $autoDir -Force | Out-Null
+
+$existing = $null
+if (Test-Path -LiteralPath $statePath) {
+  try { $existing = Read-AutopilotState -Path $statePath } catch { throw "AutoPilot state cannot be resumed safely: $($_.Exception.Message)" }
+}
+if ($existing -and [bool]$existing.retrospectiveDue) {
+  throw 'RETROSPECTIVE_REQUIRED: complete the pending retrospective before starting a new iteration batch'
+}
 Remove-Item (Join-Path $autoDir 'stop.flag') -ErrorAction SilentlyContinue
 Remove-Item (Join-Path $autoDir 'pause.flag') -ErrorAction SilentlyContinue
 "started at $now" | Out-File -Encoding utf8 (Join-Path $autoDir 'start.flag')
 'enabled' | Out-File -Encoding utf8 (Join-Path $autoDir 'enabled.flag')
 
-$existing = $null
-if (Test-Path -LiteralPath $statePath) {
-  try { $existing = Get-Content -LiteralPath $statePath -Raw -Encoding UTF8 | ConvertFrom-Json } catch { $existing = $null }
-}
-
 function Get-ExistingStateValue {
   param([string]$Name, [object]$Default = $null)
   if ($null -ne $existing -and $existing.PSObject.Properties.Name -contains $Name) { return $existing.$Name }
   return $Default
+}
+
+function Get-ExistingTimestampString {
+  param([string]$Name, [string]$Default)
+  $value = Get-ExistingStateValue $Name $Default
+  if ($value -is [datetimeoffset]) { return $value.ToString('o') }
+  if ($value -is [datetime]) { return $value.ToString('yyyy-MM-ddTHH:mm:ssK') }
+  return [string]$value
 }
 
 $reset = $null -ne $MaxIterations
@@ -42,13 +53,13 @@ while ($completedIds.Count -lt $completed) { $completedIds += "legacy-completed-
 $remaining = if ($null -eq $limit) { $null } else { [Math]::Max(0, $limit - $completed) }
 
 $state = [ordered]@{
-  schemaVersion = 2
+  schemaVersion = 3
   runId = if (!$reset -and (Get-ExistingStateValue 'runId')) { [string](Get-ExistingStateValue 'runId') } else { 'run-' + [datetimeoffset]::Now.ToString('yyyyMMdd-HHmmss-fff') }
   status = 'IDLE'
   phase = 'idle'
   currentIssue = ''
   attempt = 0
-  startedAt = if (!$reset -and (Get-ExistingStateValue 'startedAt')) { [string](Get-ExistingStateValue 'startedAt') } else { $now }
+  startedAt = if (!$reset -and (Get-ExistingStateValue 'startedAt')) { Get-ExistingTimestampString 'startedAt' $now } else { $now }
   phaseStartedAt = $now
   lastHeartbeatAt = $now
   iterationLimit = $limit
@@ -59,6 +70,23 @@ $state = [ordered]@{
   executorPid = $null
   lastCommit = $null
   failureFingerprint = $null
+  reviewCycleId = [string](Get-ExistingStateValue 'reviewCycleId' '')
+  reviewCycleStartedAt = Get-ExistingStateValue 'reviewCycleStartedAt'
+  reviewCycleCompletedIssueIds = @(Get-ExistingStateValue 'reviewCycleCompletedIssueIds' @())
+  reviewCycleScoreKeys = @(Get-ExistingStateValue 'reviewCycleScoreKeys' @())
+  reviewCycleCompletedCount = [int](Get-ExistingStateValue 'reviewCycleCompletedCount' 0)
+  retrospectiveDue = [bool](Get-ExistingStateValue 'retrospectiveDue' $false)
+  retrospectiveStatus = [string](Get-ExistingStateValue 'retrospectiveStatus' 'IDLE')
+  retrospectivePhase = [string](Get-ExistingStateValue 'retrospectivePhase' 'NONE')
+  retrospectiveRequiredAt = Get-ExistingStateValue 'retrospectiveRequiredAt'
+  retrospectiveReportCommit = Get-ExistingStateValue 'retrospectiveReportCommit'
+  retrospectiveFactsCommit = Get-ExistingStateValue 'retrospectiveFactsCommit'
+  retrospectiveGraphGitCursor = Get-ExistingStateValue 'retrospectiveGraphGitCursor'
+  retrospectiveEpisodeId = Get-ExistingStateValue 'retrospectiveEpisodeId'
+  retrospectiveFailureCategory = Get-ExistingStateValue 'retrospectiveFailureCategory'
+  lastRetrospectiveAt = Get-ExistingStateValue 'lastRetrospectiveAt'
+  lastRetrospectiveReport = Get-ExistingStateValue 'lastRetrospectiveReport'
+  activeScoringVersion = Get-ExistingStateValue 'activeScoringVersion'
   enabled = $true
   mode = 'continuous-runner'
   iterationCompleted = $completed

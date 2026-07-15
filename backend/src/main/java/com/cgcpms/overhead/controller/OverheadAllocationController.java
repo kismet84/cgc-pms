@@ -3,10 +3,15 @@ package com.cgcpms.overhead.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.audit.annotation.AuditedOperation;
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.overhead.entity.OverheadAllocationRule;
 import com.cgcpms.overhead.service.OverheadAllocationService;
+import com.cgcpms.overhead.vo.OverheadAllocationExecutionResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -49,15 +54,15 @@ public class OverheadAllocationController {
 
     @PostMapping("/execute")
     @PreAuthorize("hasAuthority('overhead:execute') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> executeAllocation(
+    @AuditedOperation(type = "UPDATE", businessType = "OVERHEAD_ALLOCATION", businessIdExpression = "#period")
+    public ApiResponse<OverheadAllocationExecutionResult> executeAllocation(
             @RequestParam(required = false) Long tenantId,
-            @RequestParam String period) {
-        // SEC-01: Ignore client-supplied tenantId; use authenticated tenant from context
-        Long effectiveTenantId = com.cgcpms.auth.context.UserContext.getCurrentTenantId();
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) java.time.LocalDate period) {
+        // 客户端 tenantId 仅为兼容旧调用，永远不能覆盖认证租户。
+        Long effectiveTenantId = UserContext.getCurrentTenantId();
         if (effectiveTenantId == null) {
-            throw new com.cgcpms.common.exception.BusinessException("UNAUTHORIZED", "无法确定租户身份");
+            throw new BusinessException("UNAUTHORIZED", "无法确定租户身份");
         }
-        service.executeAllocation(effectiveTenantId, java.time.LocalDate.parse(period));
-        return ApiResponse.success();
+        return ApiResponse.success(service.executeAllocation(effectiveTenantId, period));
     }
 }

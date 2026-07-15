@@ -79,13 +79,13 @@ public class MatPurchaseOrderService {
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
 
         Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
-                : pmProjectMapper.selectBatchIds(projectIds).stream()
+                : pmProjectMapper.selectByIds(projectIds).stream()
                         .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         Map<Long, String> partnerNames = partnerIds.isEmpty() ? Map.of()
-                : mdPartnerMapper.selectBatchIds(partnerIds).stream()
+                : mdPartnerMapper.selectByIds(partnerIds).stream()
                         .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
         Map<Long, String> contractNames = contractIds.isEmpty() ? Map.of()
-                : ctContractMapper.selectBatchIds(contractIds).stream()
+                : ctContractMapper.selectByIds(contractIds).stream()
                         .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
 
         return page.convert(o -> toVO(o, projectNames, partnerNames, contractNames));
@@ -110,7 +110,7 @@ public class MatPurchaseOrderService {
         Set<Long> materialIds = items.stream().map(MatPurchaseOrderItem::getMaterialId)
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> materialNames = materialIds.isEmpty() ? Map.of()
-                : mdMaterialMapper.selectBatchIds(materialIds).stream()
+                : mdMaterialMapper.selectByIds(materialIds).stream()
                         .collect(Collectors.toMap(MdMaterial::getId, MdMaterial::getMaterialName, (a, b) -> a));
 
         vo.setItems(items.stream().map(i -> toItemVO(i, materialNames)).toList());
@@ -132,7 +132,7 @@ public class MatPurchaseOrderService {
         Set<Long> materialIds = items.stream().map(MatPurchaseOrderItem::getMaterialId)
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
         Map<Long, String> materialNames = materialIds.isEmpty() ? Map.of()
-                : mdMaterialMapper.selectBatchIds(materialIds).stream()
+                : mdMaterialMapper.selectByIds(materialIds).stream()
                         .collect(Collectors.toMap(MdMaterial::getId, MdMaterial::getMaterialName, (a, b) -> a));
 
         return items.stream().map(i -> toItemVO(i, materialNames)).toList();

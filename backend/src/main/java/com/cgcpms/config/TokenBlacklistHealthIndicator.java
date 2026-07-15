@@ -37,6 +37,12 @@ public class TokenBlacklistHealthIndicator implements HealthIndicator {
                     .withDetail("failClosed", prod)
                     .build();
         }
+        if (!service.isEnabled()) {
+            return Health.unknown()
+                    .withDetail("category", "TOKEN_BLACKLIST_DISABLED")
+                    .withDetail("failClosed", false)
+                    .build();
+        }
         if (service.isAvailable()) {
             return Health.up()
                     .withDetail("category", "TOKEN_BLACKLIST_AVAILABLE")

@@ -22,7 +22,7 @@ defineProps<{
 
 <template>
   <aside class="lg-analysis-rail subcontract-measure-analysis-rail" aria-label="分包计量辅助分析">
-    <div class="subcontract-measure-analysis-panel">
+    <div class="lg-analysis-panel subcontract-measure-analysis-panel">
       <section class="subcontract-measure-analysis-section">
         <div class="subcontract-measure-section-head">
           <strong>计量状态分布</strong>
@@ -81,12 +81,12 @@ defineProps<{
 
 <style scoped>
 .subcontract-measure-analysis-rail {
-  width: 336px;
+  width: var(--lg-rail-width, 240px);
 }
 
 .subcontract-measure-analysis-panel {
-  height: 856px;
-  min-height: 856px;
+  height: 100%;
+  min-height: 100%;
   box-sizing: border-box;
   background: #fff;
   border: 1px solid #e5e7eb;
@@ -96,7 +96,7 @@ defineProps<{
 }
 
 .subcontract-measure-analysis-section {
-  padding: 18px;
+  padding: 14px 16px;
   border-bottom: 1px solid #edf1f5;
 }
 

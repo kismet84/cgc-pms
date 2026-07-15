@@ -4,6 +4,13 @@ $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-metrics.ps1')
 
+function New-TestMetricEvent {
+  param([string]$Event, [string]$Timestamp, [object]$Data)
+  $payload = [ordered]@{ event=$Event; timestamp=$Timestamp }
+  foreach ($property in @($Data.PSObject.Properties)) { $payload[$property.Name] = $property.Value }
+  return [pscustomobject]$payload
+}
+
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-metrics-test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root -Force | Out-Null
 try {
@@ -27,6 +34,27 @@ try {
   ) | ForEach-Object { $_ | ConvertTo-Json -Compress } | Set-Content -LiteralPath $events -Encoding UTF8
   $invalid = Get-AutopilotRunMetrics -EventPath $events -RunId 'run-c'
   if ($invalid.valid) { throw 'negative event duration produced valid metrics' }
+
+  $executorInvocation = New-AutopilotModelInvocationEvent -Role EXECUTOR -Scope ISSUE -ScopeId 'ISSUE-3' -InvocationId (New-AutopilotInvocationId -Role EXECUTOR -Scope ISSUE -ScopeId 'ISSUE-3' -ProcessId 101 -StartedAt '2026-07-11T12:00:00+08:00') -IssueId 'ISSUE-3' -RunId 'run-c' -ProcessId 101 -StartedAt '2026-07-11T12:00:00+08:00'
+  $reviewerInvocation = New-AutopilotModelInvocationEvent -Role REVIEWER -Scope ISSUE -ScopeId 'ISSUE-3' -InvocationId (New-AutopilotInvocationId -Role REVIEWER -Scope ISSUE -ScopeId 'ISSUE-3' -ProcessId 102 -StartedAt '2026-07-11T12:01:00+08:00') -IssueId 'ISSUE-3' -RunId 'run-d' -ProcessId 102 -StartedAt '2026-07-11T12:01:00+08:00'
+  @(
+    (New-TestMetricEvent -Event 'model.invocation' -Timestamp '2026-07-11T12:00:00+08:00' -Data $executorInvocation),
+    (New-TestMetricEvent -Event 'model.invocation' -Timestamp '2026-07-11T12:00:00+08:00' -Data $executorInvocation),
+    (New-TestMetricEvent -Event 'model.invocation' -Timestamp '2026-07-11T12:01:00+08:00' -Data $reviewerInvocation),
+    [ordered]@{runId='run-c';issueId='ISSUE-3';event='validation.executed';timestamp='2026-07-11T12:02:00+08:00';operationId='validation-1'},
+    [ordered]@{runId='run-c';issueId='ISSUE-3';event='validation.executed';timestamp='2026-07-11T12:02:00+08:00';operationId='validation-1'}
+  ) | ForEach-Object { $_ | ConvertTo-Json -Compress } | Set-Content -LiteralPath $events -Encoding UTF8
+  $issueEfficiency = Get-AutopilotIssueEfficiencyMetrics -EventPaths @($events) -IssueId 'ISSUE-3'
+  if ($issueEfficiency.executorInvocationCount -ne 1 -or $issueEfficiency.reviewerInvocationCount -ne 1 -or $issueEfficiency.plannerInvocationCount -ne 0) { throw 'Issue invocation metrics did not deduplicate or preserve cross-run ownership' }
+  if ($issueEfficiency.validationExecutedCount -ne 1 -or $issueEfficiency.tokenUsageStatus -ne 'not_available' -or $null -ne $issueEfficiency.totalTokens) { throw 'Issue operation metrics or unavailable token semantics are invalid' }
+
+  $distribution = Get-AutopilotMetricPercentiles -Samples @(
+    [pscustomobject]@{executorInvocationCount=1;wallClockSeconds=10},
+    [pscustomobject]@{executorInvocationCount=2;wallClockSeconds=20},
+    [pscustomobject]@{executorInvocationCount=3;wallClockSeconds=30},
+    [pscustomobject]@{executorInvocationCount=4;wallClockSeconds=40}
+  ) -MetricNames @('executorInvocationCount','wallClockSeconds')
+  if ($distribution.metrics.executorInvocationCount.p50 -ne 2 -or $distribution.metrics.wallClockSeconds.p95 -ne 40) { throw 'explicit sample percentile calculation is invalid' }
 
   $runs = Join-Path $root 'runs'
   1..20 | ForEach-Object {

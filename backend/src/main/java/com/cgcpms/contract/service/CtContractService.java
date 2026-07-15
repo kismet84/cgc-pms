@@ -109,10 +109,10 @@ public class CtContractService {
         allPartyIds.addAll(partyBIds);
 
         Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
-                : pmProjectMapper.selectBatchIds(projectIds).stream()
+                : pmProjectMapper.selectByIds(projectIds).stream()
                         .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         Map<Long, String> partyNames = allPartyIds.isEmpty() ? Map.of()
-                : mdPartnerMapper.selectBatchIds(allPartyIds).stream()
+                : mdPartnerMapper.selectByIds(allPartyIds).stream()
                         .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
 
         return page.convert(c -> toVO(c, projectNames, partyNames));

@@ -73,115 +73,28 @@ function handleProjectChange(value: string | undefined) {
 
 <template>
   <div class="lg-page-head payment-page-head">
-    <div class="payment-page-meta-row">
-      <div>
-        <a-breadcrumb class="payment-breadcrumb">
-          <a-breadcrumb-item>付款管理</a-breadcrumb-item>
-          <a-breadcrumb-item>付款申请</a-breadcrumb-item>
-        </a-breadcrumb>
-        <div class="payment-page-title-row">
-          <h1>付款申请台账</h1>
-          <span>待付、已审未付、实际支付回写集中跟踪</span>
-        </div>
-      </div>
-      <div class="payment-head-digest">
-        <div>
-          <span>待付金额</span>
-          <strong>{{ props.fmtAmountText(props.kpiUnpaid) }}万</strong>
-        </div>
-        <div>
-          <span>已审未付</span>
-          <strong>{{ props.fmtAmountText(props.kpiApprovedUnpaid) }}万</strong>
-        </div>
-        <div>
-          <span>支付完成率</span>
-          <strong>{{ props.paidPct }}%</strong>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="lg-search-bar payment-search-bar">
-    <div class="payment-search-title">
-      <strong>查询条件</strong>
-      <span>项目 / 合同 / 类型 / 状态</span>
-    </div>
-    <div class="payment-search-fields">
-      <a-select
-        v-model:value="props.filter.projectId"
-        class="payment-search-select"
-        placeholder="全部项目"
-        allow-clear
-        size="large"
-        @change="handleProjectChange"
-      >
-        <template #suffixIcon><SearchOutlined /></template>
-        <a-select-option v-for="p in props.projects" :key="p.id" :value="p.id">
-          {{ p.projectName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="props.filter.contractId"
-        class="payment-search-select"
-        placeholder="全部合同"
-        allow-clear
-        size="large"
-        @change="props.onSearch"
-      >
-        <a-select-option v-for="c in props.contracts" :key="c.id" :value="c.id">
-          {{ c.contractName }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="props.filter.payType"
-        class="payment-search-select is-compact"
-        placeholder="类型"
-        allow-clear
-        size="large"
-        @change="props.onSearch"
-      >
-        <a-select-option v-for="(label, key) in props.payTypeLabel" :key="key" :value="key">
-          {{ label }}
-        </a-select-option>
-      </a-select>
-      <a-select
-        v-model:value="props.filter.payStatus"
-        class="payment-search-select is-compact"
-        placeholder="状态"
-        allow-clear
-        size="large"
-        @change="props.onSearch"
-      >
-        <a-select-option v-for="(_, key) in props.payStatusLabelMap" :key="key" :value="key">
-          {{ props.payStatusLabel(String(key)) }}
-        </a-select-option>
-      </a-select>
-    </div>
-    <div class="payment-search-actions">
-      <a-button type="primary" size="large" @click="props.onSearch">搜索</a-button>
-      <a-button size="large" @click="props.onReset">
-        <template #icon><ReloadOutlined /></template>
-        重置
-      </a-button>
-    </div>
+    <a-breadcrumb class="payment-breadcrumb">
+      <a-breadcrumb-item>付款管理</a-breadcrumb-item>
+      <a-breadcrumb-item>付款申请</a-breadcrumb-item>
+    </a-breadcrumb>
   </div>
 
   <div class="lg-grid payment-workspace">
-    <div class="lg-left">
+    <div class="lg-left payment-main-column">
       <div class="lg-kpi-strip payment-kpi-summary" aria-label="付款关键指标">
-        <div class="lg-kpi-card payment-kpi-item">
+        <div class="payment-kpi-item">
           <span class="payment-kpi-icon is-total"><PayCircleOutlined /></span>
           <span class="payment-kpi-label">申请总数</span>
           <span class="payment-kpi-value">{{ props.total }} <small>单</small></span>
         </div>
-        <div class="lg-kpi-card payment-kpi-item is-wide">
+        <div class="payment-kpi-item is-wide">
           <span class="payment-kpi-icon is-amount"><DollarOutlined /></span>
           <span class="payment-kpi-label">申请金额</span>
           <span class="payment-kpi-value"
             >{{ props.fmtAmountText(props.kpiTotalApply) }} <small>万元</small></span
           >
         </div>
-        <div class="lg-kpi-card payment-kpi-item is-progress">
+        <div class="payment-kpi-item is-progress">
           <span class="payment-kpi-icon is-paid"><CheckCircleOutlined /></span>
           <span class="payment-kpi-label">已付金额</span>
           <span class="payment-kpi-value"
@@ -191,7 +104,7 @@ function handleProjectChange(value: string | undefined) {
             ><span :style="{ width: props.paidPct + '%' }"></span
           ></span>
         </div>
-        <div class="lg-kpi-card payment-kpi-item is-progress is-unpaid">
+        <div class="payment-kpi-item is-progress is-unpaid">
           <span class="payment-kpi-icon is-unpaid"><WalletOutlined /></span>
           <span class="payment-kpi-label">待付款金额</span>
           <span class="payment-kpi-value"
@@ -201,7 +114,7 @@ function handleProjectChange(value: string | undefined) {
             <span :style="{ width: props.kpiUnpaidPct + '%' }"></span>
           </span>
         </div>
-        <div class="lg-kpi-card payment-kpi-item">
+        <div class="payment-kpi-item">
           <span class="payment-kpi-icon is-pending"><ClockCircleOutlined /></span>
           <span class="payment-kpi-label">已批未付</span>
           <span class="payment-kpi-value"
@@ -210,11 +123,70 @@ function handleProjectChange(value: string | undefined) {
         </div>
       </div>
 
+      <div class="lg-search-bar payment-search-bar">
+        <div class="payment-filter-grid">
+          <a-select
+            v-model:value="props.filter.projectId"
+            placeholder="全部项目"
+            allow-clear
+            size="large"
+            @change="handleProjectChange"
+          >
+            <template #suffixIcon><SearchOutlined /></template>
+            <a-select-option v-for="p in props.projects" :key="p.id" :value="p.id">
+              {{ p.projectName }}
+            </a-select-option>
+          </a-select>
+          <a-select
+            v-model:value="props.filter.contractId"
+            placeholder="全部合同"
+            allow-clear
+            size="large"
+            @change="props.onSearch"
+          >
+            <a-select-option v-for="c in props.contracts" :key="c.id" :value="c.id">
+              {{ c.contractName }}
+            </a-select-option>
+          </a-select>
+        </div>
+        <div class="payment-filter-foot">
+          <a-select
+            v-model:value="props.filter.payType"
+            placeholder="全部付款类型"
+            allow-clear
+            size="large"
+            @change="props.onSearch"
+          >
+            <a-select-option v-for="(label, key) in props.payTypeLabel" :key="key" :value="key">
+              {{ label }}
+            </a-select-option>
+          </a-select>
+          <a-select
+            v-model:value="props.filter.payStatus"
+            placeholder="全部付款状态"
+            allow-clear
+            size="large"
+            @change="props.onSearch"
+          >
+            <a-select-option v-for="(_, key) in props.payStatusLabelMap" :key="key" :value="key">
+              {{ props.payStatusLabel(String(key)) }}
+            </a-select-option>
+          </a-select>
+          <div class="payment-search-actions">
+            <a-button type="primary" size="large" @click="props.onSearch">搜索</a-button>
+            <a-button size="large" @click="props.onReset">
+              <template #icon><ReloadOutlined /></template>
+              重置
+            </a-button>
+          </div>
+        </div>
+      </div>
+
       <slot />
     </div>
 
     <aside class="lg-analysis-rail payment-analysis-rail" aria-label="付款辅助分析">
-      <div class="payment-analysis-panel">
+      <div class="lg-analysis-panel payment-analysis-panel">
         <header class="payment-analysis-head">
           <div>
             <div class="payment-analysis-title">辅助分析</div>
@@ -283,118 +255,34 @@ function handleProjectChange(value: string | undefined) {
 
 <style scoped>
 .payment-page-head {
-  align-items: center;
-  justify-content: space-between;
-  min-height: 0;
-  padding: 18px 20px;
-  background: #fff;
-  border: 1px solid var(--border-subtle);
-  border-left: 4px solid var(--primary);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-soft);
-}
-
-.payment-page-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-  width: 100%;
-  min-width: 0;
+  margin-bottom: 14px;
 }
 
 .payment-breadcrumb {
-  margin-bottom: 6px;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 20px;
-}
-
-.payment-page-title-row {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  min-width: 0;
-}
-
-.payment-page-title-row h1 {
-  margin: 0;
-  color: var(--text);
-  font-size: 24px;
-  font-weight: 800;
-  line-height: 32px;
-}
-
-.payment-page-title-row span,
-.payment-head-digest span,
-.payment-search-title span {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.payment-head-digest {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(96px, 1fr));
-  gap: 10px;
-  min-width: 360px;
-}
-
-.payment-head-digest > div {
-  padding: 10px 12px;
-  background: var(--surface-subtle);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-}
-
-.payment-head-digest strong {
-  display: block;
-  margin-top: 3px;
-  color: var(--text);
-  font-size: 17px;
-  font-weight: 800;
-  line-height: 22px;
 }
 
 .payment-search-bar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  min-height: 108px;
+  margin-bottom: 0;
   padding: 16px;
-  border-left: 4px solid var(--primary-soft);
 }
 
-.payment-search-title {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  grid-column: 1 / -1;
-}
-
-.payment-search-title strong {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 800;
-}
-
-.payment-search-fields {
-  display: flex;
-  flex: 1 1 auto;
+.payment-filter-grid,
+.payment-filter-foot {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  align-items: center;
-  min-width: 0;
+  width: 100%;
 }
 
-.payment-search-select {
-  width: 230px;
-  flex: 0 0 230px;
-}
-
-.payment-search-select.is-compact {
-  width: 150px;
-  flex-basis: 150px;
+.payment-filter-foot {
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
 }
 
 .payment-search-actions {
@@ -414,7 +302,8 @@ function handleProjectChange(value: string | undefined) {
   grid-template-columns: 1fr 1.25fr 1.15fr 1.15fr 1fr;
   gap: 0;
   overflow: hidden;
-  min-height: 84px;
+  min-height: 108px;
+  margin-bottom: 0;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
@@ -513,28 +402,30 @@ function handleProjectChange(value: string | undefined) {
 }
 
 .payment-analysis-rail {
-  width: 336px;
+  width: var(--lg-rail-width, 240px);
 }
 
 .payment-analysis-panel {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 0;
   height: 100%;
-  padding: 18px;
+  padding: 0;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-soft);
+  overflow: hidden;
 }
 
 .payment-analysis-focus {
   display: grid;
   gap: 4px;
-  padding: 14px;
+  padding: 12px 16px;
   background: var(--error-soft);
-  border: 1px solid rgba(239, 68, 68, 0.18);
-  border-radius: var(--radius-md);
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  border-radius: 0;
 }
 
 .payment-analysis-focus span,
@@ -559,6 +450,11 @@ function handleProjectChange(value: string | undefined) {
   gap: 10px;
 }
 
+.payment-analysis-head {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
 .payment-analysis-title {
   color: var(--text);
   font-size: 16px;
@@ -577,7 +473,7 @@ function handleProjectChange(value: string | undefined) {
   flex-direction: column;
   gap: 10px;
   min-width: 0;
-  padding-top: 16px;
+  padding: 12px 16px;
   border-top: 1px solid var(--border-subtle);
 }
 
@@ -622,23 +518,9 @@ function handleProjectChange(value: string | undefined) {
 }
 
 @media (max-width: 768px) {
-  .payment-page-meta-row,
-  .payment-search-bar,
-  .payment-search-fields {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .payment-head-digest {
-    width: 100%;
-    min-width: 0;
+  .payment-filter-grid,
+  .payment-filter-foot {
     grid-template-columns: 1fr;
-  }
-
-  .payment-search-select,
-  .payment-search-select.is-compact {
-    width: 100%;
-    flex-basis: auto;
   }
 }
 </style>

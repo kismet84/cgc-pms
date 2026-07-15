@@ -3,6 +3,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $scriptDir 'autopilot-state.ps1')
+. (Join-Path $scriptDir 'autopilot-transition.ps1')
 
 $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ('autopilot-state-test-' + [guid]::NewGuid().ToString('N'))
 $statePath = Join-Path $tempRoot 'state.json'
@@ -35,13 +36,24 @@ try {
   $state = New-TestState
   Write-AutopilotStateAtomic -Path $statePath -State $state | Out-Null
   $read = Read-AutopilotState -Path $statePath
-  if ($read.schemaVersion -ne 2 -or $read.status -ne 'IDLE') { throw 'state round-trip failed' }
+  if ($read.schemaVersion -ne 3 -or $read.status -ne 'IDLE') { throw 'state v2 to v3 round-trip migration failed' }
+  if ($read.reviewCycleCompletedCount -ne 0 -or @($read.reviewCycleCompletedIssueIds).Count -ne 0 -or $read.activeScoringVersion) { throw 'state migration fabricated historical scoring data' }
+  if ($read.issueCheckpointPath -ne '' -or $read.currentIssuePhase -ne '' -or $read.lastCanaryFingerprint -ne '') { throw 'state migration fabricated recovery or canary evidence' }
+  if ($read.runInstanceId -ne '' -or $read.leaseEpoch -ne '' -or [string]::IsNullOrWhiteSpace([string]$read.transitionId) -or $read.generation -lt 1 -or $read.controlPlaneFingerprint -ne '') { throw 'state migration or transition metadata is invalid' }
+
+  $bound = Resolve-AutopilotIssueStateBinding -Existing ([pscustomobject]@{issueCheckpointPath='old.json';currentIssuePhase='REGISTERED'})
+  if ($bound.checkpointPath -ne 'old.json' -or $bound.phase -ne 'REGISTERED') { throw 'active Issue state binding was not preserved' }
+  $cleared = Resolve-AutopilotIssueStateBinding -Existing ([pscustomobject]@{issueCheckpointPath='old.json';currentIssuePhase='REGISTERED'}) -Clear
+  if ($cleared.checkpointPath -ne '' -or $cleared.phase -ne '') { throw 'closed Issue state binding was restored from stale state' }
 
   $oldHeartbeat = [datetimeoffset]$read.lastHeartbeatAt
   Start-Sleep -Milliseconds 20
   $moved = Move-AutopilotState -Path $statePath -ToStatus 'CHECKPOINT' -Phase 'checkpoint' -Reason 'test'
   if ($moved.status -ne 'CHECKPOINT') { throw 'legal transition failed' }
   if ([datetimeoffset]$moved.lastHeartbeatAt -le $oldHeartbeat) { throw 'heartbeat was not refreshed' }
+  Move-AutopilotRunPhase -Path $statePath -Status REFILLING -Phase 'refill' -Reason 'test refill' | Out-Null
+  $runTransition = Move-AutopilotRunPhase -Path $statePath -Status CHECKPOINT -Phase 'refill-complete' -Reason 'same-run continuation'
+  if ($runTransition.status -ne 'CHECKPOINT' -or $runTransition.phase -ne 'refill-complete' -or !$runTransition.transitionId) { throw 'Run transition writer did not read back same-run continuation' }
 
   $illegalRejected = $false
   try { Move-AutopilotState -Path $statePath -ToStatus 'MERGING' -Phase 'merge' -Reason 'illegal' | Out-Null } catch { $illegalRejected = $true }
@@ -50,6 +62,7 @@ try {
   Add-AutopilotCompletedIssue -Path $statePath -IssueId 'ISSUE-TEST-001' | Out-Null
   $deduplicated = Add-AutopilotCompletedIssue -Path $statePath -IssueId 'ISSUE-TEST-001'
   if ($deduplicated.completedImplementationIssues -ne 1) { throw 'duplicate issue incremented completion count' }
+  if ($deduplicated.reviewCycleCompletedCount -ne 0) { throw 'legacy completion count leaked into the review cycle' }
 
   $beforeInvalidWrite = Get-Content -Encoding UTF8 -LiteralPath $statePath -Raw
   $invalid = New-TestState

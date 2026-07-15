@@ -1,6 +1,14 @@
 import { request } from '@/api/request'
 import type { PageParams, PageResult } from '@/types/api'
-import type { MenuTreeVO, SysRoleVO } from '@/types/system'
+import type {
+  CreateMenuPayload,
+  CreateRolePayload,
+  MenuTreeVO,
+  SysMenuVO,
+  SysRoleVO,
+  UpdateMenuPayload,
+  UpdateRolePayload,
+} from '@/types/system'
 
 /** 获取菜单树 */
 export function getMenuTree() {
@@ -10,11 +18,87 @@ export function getMenuTree() {
   })
 }
 
+/** 获取平铺菜单列表 */
+export function getMenuList() {
+  return request<SysMenuVO[]>({
+    url: '/system/menus',
+    method: 'get',
+  })
+}
+
+/** 获取菜单详情 */
+export function getMenuDetail(menuId: number | string) {
+  return request<SysMenuVO>({
+    url: `/system/menus/${menuId}`,
+    method: 'get',
+  })
+}
+
+/** 新建菜单 */
+export function createMenu(data: CreateMenuPayload) {
+  return request<number | string>({
+    url: '/system/menus',
+    method: 'post',
+    data,
+  })
+}
+
+/** 修改菜单 */
+export function updateMenu(menuId: number | string, data: UpdateMenuPayload) {
+  return request<void>({
+    url: `/system/menus/${menuId}`,
+    method: 'put',
+    data,
+  })
+}
+
+/** 删除菜单 */
+export function deleteMenu(menuId: number | string) {
+  return request<void>({
+    url: `/system/menus/${menuId}`,
+    method: 'delete',
+  })
+}
+
 /** 获取角色列表 */
 export function getRoles() {
   return request<SysRoleVO[]>({
     url: '/system/roles',
     method: 'get',
+  })
+}
+
+/** 获取角色详情 */
+export function getRoleDetail(roleId: number | string) {
+  return request<SysRoleVO>({
+    url: `/system/roles/${roleId}`,
+    method: 'get',
+  })
+}
+
+/** 新建普通自定义角色 */
+export function createRole(data: CreateRolePayload) {
+  return request<number | string>({
+    url: '/system/roles',
+    method: 'post',
+    data,
+  })
+}
+
+/** 修改普通自定义角色的业务字段 */
+export function updateRole(roleId: number | string, data: UpdateRolePayload) {
+  return request<void>({
+    url: `/system/roles/${roleId}`,
+    method: 'put',
+    data,
+  })
+}
+
+/** 删除未绑定用户的普通自定义角色 */
+export function deleteRole(roleId: number | string) {
+  return request<void>({
+    url: `/system/roles/${roleId}`,
+    method: 'delete',
   })
 }
 

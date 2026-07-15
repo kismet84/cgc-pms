@@ -94,6 +94,11 @@ class SysRoleServiceTest {
         assertEquals("TEST_ROLE_1", saved.getRoleCode());
         assertEquals("测试角色一", saved.getRoleName());
         assertEquals("CUSTOM", saved.getRoleType());
+        assertEquals(2, saved.getRoleLevel());
+        assertEquals("ENABLE", saved.getStatus());
+        assertEquals("SELF", saved.getDataScope());
+        assertEquals(0, roleMenuMapper.selectCount(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, id)));
 
         System.out.println("testCreate_Success 通过: roleCode=" + saved.getRoleCode());
     }
@@ -127,11 +132,13 @@ class SysRoleServiceTest {
         SysRole r2 = new SysRole();
         r2.setRoleCode("DUP_CODE");
         r2.setRoleName("重复编码角色2");
+        long before = roleMapper.selectCount(null);
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> roleService.create(r2),
                 "重复角色编码应抛出BusinessException");
         assertEquals("ROLE_CODE_EXISTS", ex.getCode());
+        assertEquals(before, roleMapper.selectCount(null), "重复编码不得产生部分写入");
 
         System.out.println("testCreate_DuplicateRoleCode 通过: code=" + ex.getCode());
     }
@@ -142,14 +149,51 @@ class SysRoleServiceTest {
     @DisplayName("创建角色 — 自动设置tenantId")
     void testCreate_TenantIdAutoSet() {
         SysRole role = new SysRole();
+        role.setId(999999L);
+        role.setTenantId(888L);
         role.setRoleCode("TENANT_ROLE");
         role.setRoleName("租户角色");
 
         Long id = roleService.create(role);
         SysRole saved = roleMapper.selectById(id);
         assertEquals(TENANT_0, saved.getTenantId(), "tenantId应自动从UserContext获取");
+        assertNotEquals(999999L, id, "客户端指定ID不得覆盖服务端生成ID");
 
         System.out.println("testCreate_TenantIdAutoSet 通过");
+    }
+
+    @Test
+    @Order(4)
+    @Transactional
+    @DisplayName("创建角色 — 拒绝保留编码、系统类型和高等级伪造")
+    void testCreate_RejectsPrivilegeEscalation() {
+        assertCreateRejected("ADMIN", null, null);
+        assertCreateRejected(" super_admin ", null, null);
+        assertCreateRejected("SYSTEM_TYPE_ROLE", "SYSTEM", null);
+        assertCreateRejected("LEVEL_ZERO_ROLE", null, 0);
+        assertCreateRejected("LEVEL_ONE_ROLE", null, 1);
+    }
+
+    @Test
+    @Order(4)
+    @Transactional
+    @DisplayName("创建角色 — 拒绝非法状态和数据范围")
+    void testCreate_RejectsInvalidStatusAndDataScope() {
+        SysRole invalidStatus = new SysRole();
+        invalidStatus.setRoleCode("INVALID_STATUS_ROLE");
+        invalidStatus.setRoleName("非法状态角色");
+        invalidStatus.setStatus("UNKNOWN");
+        BusinessException statusError = assertThrows(BusinessException.class,
+                () -> roleService.create(invalidStatus));
+        assertEquals("ROLE_CREATE_INVALID_FIELD", statusError.getCode());
+
+        SysRole invalidScope = new SysRole();
+        invalidScope.setRoleCode("INVALID_SCOPE_ROLE");
+        invalidScope.setRoleName("非法范围角色");
+        invalidScope.setDataScope("TENANT_ALL");
+        BusinessException scopeError = assertThrows(BusinessException.class,
+                () -> roleService.create(invalidScope));
+        assertEquals("ROLE_CREATE_INVALID_FIELD", scopeError.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -267,10 +311,28 @@ class SysRoleServiceTest {
         update.setId(id);
         update.setRoleCode("UPDATABLE");
         update.setRoleName("新名称");
+        update.setStatus("disable");
+        update.setDataScope("dept");
+        update.setTenantId(999L);
+        update.setRoleType("SYSTEM");
+        update.setRoleLevel(0);
+
+        SysRoleMenu roleMenu = new SysRoleMenu();
+        roleMenu.setRoleId(id);
+        roleMenu.setMenuId(1L);
+        roleMenuMapper.insert(roleMenu);
         roleService.update(update);
 
         SysRole saved = roleMapper.selectById(id);
         assertEquals("新名称", saved.getRoleName(), "roleName应已更新");
+        assertEquals("DISABLE", saved.getStatus());
+        assertEquals("DEPT", saved.getDataScope());
+        assertEquals("UPDATABLE", saved.getRoleCode());
+        assertEquals(TENANT_0, saved.getTenantId());
+        assertEquals("CUSTOM", saved.getRoleType());
+        assertEquals(2, saved.getRoleLevel());
+        assertEquals(1, roleMenuMapper.selectCount(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, id)));
 
         System.out.println("testUpdate_Success 通过: roleName=" + saved.getRoleName());
     }
@@ -317,6 +379,61 @@ class SysRoleServiceTest {
         assertEquals("ROLE_NOT_FOUND", ex.getCode());
 
         System.out.println("testUpdate_NotFound 通过");
+    }
+
+    @Test
+    @Order(12)
+    @Transactional
+    @DisplayName("更新角色 — 角色编码不可变")
+    void testUpdate_RejectsRoleCodeChange() {
+        SysRole existing = insertRawRole("IMMUTABLE_CODE", "CUSTOM", 2);
+        SysRole update = new SysRole();
+        update.setId(existing.getId());
+        update.setRoleCode("CHANGED_CODE");
+        update.setRoleName("恶意修改");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> roleService.update(update));
+        assertEquals("ROLE_UPDATE_IMMUTABLE_FIELD", ex.getCode());
+        assertEquals("IMMUTABLE_CODE", roleMapper.selectById(existing.getId()).getRoleCode());
+    }
+
+    @Test
+    @Order(12)
+    @Transactional
+    @DisplayName("更新角色 — 系统、保留或高等级角色不可修改")
+    void testUpdate_RejectsProtectedRoles() {
+        for (SysRole existing : List.of(
+                insertRawRole("ADMIN", "CUSTOM", 2),
+                insertRawRole("SYSTEM_UPDATE", "SYSTEM", 2),
+                insertRawRole("LEVEL_ONE_UPDATE", "CUSTOM", 1))) {
+            SysRole update = new SysRole();
+            update.setId(existing.getId());
+            update.setRoleCode(existing.getRoleCode());
+            update.setRoleName("不允许修改");
+            BusinessException ex = assertThrows(BusinessException.class, () -> roleService.update(update));
+            assertEquals("ROLE_UPDATE_PROTECTED", ex.getCode());
+            assertEquals("受保护角色", roleMapper.selectById(existing.getId()).getRoleName());
+        }
+    }
+
+    @Test
+    @Order(12)
+    @Transactional
+    @DisplayName("更新角色 — 非法业务字段不产生部分更新")
+    void testUpdate_RejectsInvalidBusinessFields() {
+        SysRole existing = insertRawRole("INVALID_UPDATE", "CUSTOM", 2);
+        for (SysRole update : List.of(
+                updatePayload(existing, " ", "ENABLE", "SELF"),
+                updatePayload(existing, "角".repeat(101), "ENABLE", "SELF"),
+                updatePayload(existing, "非法状态", "UNKNOWN", "SELF"),
+                updatePayload(existing, "非法范围", "ENABLE", "UNKNOWN"))) {
+            BusinessException ex = assertThrows(BusinessException.class, () -> roleService.update(update));
+            assertEquals("ROLE_UPDATE_INVALID_FIELD", ex.getCode());
+        }
+        SysRole saved = roleMapper.selectById(existing.getId());
+        assertEquals("受保护角色", saved.getRoleName());
+        assertEquals("ENABLE", saved.getStatus());
+        assertEquals("SELF", saved.getDataScope());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -410,6 +527,60 @@ class SysRoleServiceTest {
         System.out.println("testDelete_NotFound 通过");
     }
 
+    @Test
+    @Order(16)
+    @Transactional
+    @DisplayName("删除角色 — 系统、保留编码和高等级角色均受保护")
+    void testDelete_ProtectedRolesRejectedWithoutSideEffects() {
+        SysRole systemRole = insertRawRole("DELETE_SYSTEM", "SYSTEM", 2);
+        SysRole reservedRole = insertRawRole("ADMIN", "CUSTOM", 2);
+        SysRole elevatedRole = insertRawRole("DELETE_LEVEL_ONE", "CUSTOM", 1);
+
+        for (SysRole role : List.of(systemRole, reservedRole, elevatedRole)) {
+            SysRoleMenu menu = new SysRoleMenu();
+            menu.setRoleId(role.getId());
+            menu.setMenuId(201L);
+            roleMenuMapper.insert(menu);
+
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> roleService.delete(role.getId()));
+            assertEquals("ROLE_DELETE_PROTECTED", ex.getCode());
+            assertNotNull(roleMapper.selectById(role.getId()));
+            assertEquals(1, roleMenuMapper.selectCount(
+                    new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, role.getId())));
+        }
+    }
+
+    @Test
+    @Order(16)
+    @Transactional
+    @DisplayName("删除角色 — 存在用户绑定时拒绝且保留全部关系")
+    void testDelete_UserBindingRejectedWithoutSideEffects() {
+        SysRole role = new SysRole();
+        role.setRoleCode("DELETE_IN_USE");
+        role.setRoleName("被用户使用角色");
+        Long roleId = roleService.create(role);
+
+        SysRoleMenu menu = new SysRoleMenu();
+        menu.setRoleId(roleId);
+        menu.setMenuId(201L);
+        roleMenuMapper.insert(menu);
+
+        SysUserRole userRole = new SysUserRole();
+        userRole.setUserId(900001L);
+        userRole.setRoleId(roleId);
+        userRoleMapper.insert(userRole);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> roleService.delete(roleId));
+        assertEquals("ROLE_IN_USE", ex.getCode());
+        assertNotNull(roleMapper.selectById(roleId));
+        assertEquals(1, roleMenuMapper.selectCount(
+                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId)));
+        assertEquals(1, userRoleMapper.selectCount(
+                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, roleId)));
+    }
+
     // ═══════════════════════════════════════════════════════════
     // assignMenus tests
     // ═══════════════════════════════════════════════════════════
@@ -500,8 +671,13 @@ class SysRoleServiceTest {
         SysRole role = new SysRole();
         role.setRoleCode("ROLE_LEVEL_ZERO");
         role.setRoleName("冻结级别角色");
+        role.setTenantId(TENANT_0);
+        role.setRoleType("SYSTEM");
+        role.setStatus("ENABLE");
+        role.setDataScope("ALL");
         role.setRoleLevel(0);
-        Long roleId = roleService.create(role);
+        roleMapper.insert(role);
+        Long roleId = role.getId();
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> roleService.assignMenus(roleId, List.of(201L)));
@@ -625,5 +801,41 @@ class SysRoleServiceTest {
         menu.setStatus("ENABLE");
         menu.setVisible(0);
         menuMapper.insert(menu);
+    }
+
+    private void assertCreateRejected(String roleCode, String roleType, Integer roleLevel) {
+        long before = roleMapper.selectCount(null);
+        SysRole role = new SysRole();
+        role.setRoleCode(roleCode);
+        role.setRoleName("越权角色");
+        role.setRoleType(roleType);
+        role.setRoleLevel(roleLevel);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> roleService.create(role));
+        assertEquals("ROLE_CREATE_PRIVILEGE_ESCALATION", error.getCode());
+        assertEquals(before, roleMapper.selectCount(null), "拒绝越权载荷后不得插入角色");
+    }
+
+    private SysRole updatePayload(SysRole existing, String roleName, String status, String dataScope) {
+        SysRole update = new SysRole();
+        update.setId(existing.getId());
+        update.setRoleCode(existing.getRoleCode());
+        update.setRoleName(roleName);
+        update.setStatus(status);
+        update.setDataScope(dataScope);
+        return update;
+    }
+
+    private SysRole insertRawRole(String roleCode, String roleType, Integer roleLevel) {
+        SysRole role = new SysRole();
+        role.setTenantId(TENANT_0);
+        role.setRoleCode(roleCode);
+        role.setRoleName("受保护角色");
+        role.setRoleType(roleType);
+        role.setRoleLevel(roleLevel);
+        role.setStatus("ENABLE");
+        role.setDataScope("SELF");
+        roleMapper.insert(role);
+        return role;
     }
 }

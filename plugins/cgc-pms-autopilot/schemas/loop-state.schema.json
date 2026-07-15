@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cgc-pms.local/plugins/cgc-pms-autopilot/schemas/loop-state.schema.json",
-  "title": "CGC PMS AutoPilot State v2",
+  "title": "CGC PMS AutoPilot State v3",
   "description": "Durable single-writer state for the local unattended orchestrator.",
   "type": "object",
   "additionalProperties": false,
@@ -22,11 +22,37 @@
     "branch",
     "executorPid",
     "lastCommit",
-    "failureFingerprint"
+    "failureFingerprint",
+    "reviewCycleId",
+    "reviewCycleStartedAt",
+    "reviewCycleCompletedIssueIds",
+    "reviewCycleScoreKeys",
+    "reviewCycleCompletedCount",
+    "retrospectiveDue",
+    "retrospectiveStatus",
+    "retrospectivePhase",
+    "retrospectiveRequiredAt",
+    "retrospectiveReportCommit",
+    "retrospectiveFactsCommit",
+    "retrospectiveGraphGitCursor",
+    "retrospectiveEpisodeId",
+    "retrospectiveFailureCategory",
+    "lastRetrospectiveAt",
+    "lastRetrospectiveReport",
+    "activeScoringVersion",
+    "issueCheckpointPath",
+    "currentIssuePhase",
+    "lastCanaryFingerprint",
+    "lastCanaryReport",
+    "runInstanceId",
+    "leaseEpoch",
+    "transitionId",
+    "generation",
+    "controlPlaneFingerprint"
   ],
   "properties": {
     "schemaVersion": {
-      "const": 2
+      "const": 3
     },
     "runId": {
       "type": "string",
@@ -37,7 +63,7 @@
       "enum": [
         "DISABLED", "IDLE", "CHECKPOINT", "REFILLING", "SELECTING", "PLANNING",
         "EXECUTING", "VERIFYING", "REVIEWING", "REPAIRING", "CLOSING", "COMMITTING",
-        "MERGING", "PAUSED", "BLOCKED", "LIMIT_REACHED", "STOPPED", "FAILED"
+        "MERGING", "PAUSED", "BLOCKED", "RETROSPECTIVE_REQUIRED", "LIMIT_REACHED", "STOPPED", "FAILED"
       ]
     },
     "phase": { "type": "string", "minLength": 1 },
@@ -82,6 +108,41 @@
     },
     "lastCommit": { "type": ["string", "null"] },
     "failureFingerprint": { "type": ["string", "null"] },
+    "reviewCycleId": { "type": "string" },
+    "reviewCycleStartedAt": { "type": ["string", "null"], "format": "date-time" },
+    "reviewCycleCompletedIssueIds": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "reviewCycleScoreKeys": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+    },
+    "reviewCycleCompletedCount": { "type": "integer", "minimum": 0 },
+    "retrospectiveDue": { "type": "boolean" },
+    "retrospectiveStatus": { "enum": ["IDLE", "ACCUMULATING", "REQUIRED", "RUNNING", "COMPLETED", "FAILED"] },
+    "retrospectivePhase": { "enum": ["NONE", "REPORT_COMMITTED", "ISSUES_WRITTEN", "GRAPH_REFRESHED", "EPISODE_RECORDED", "RESET_COMMITTED"] },
+    "retrospectiveRequiredAt": { "type": ["string", "null"], "format": "date-time" },
+    "retrospectiveReportCommit": { "type": ["string", "null"] },
+    "retrospectiveFactsCommit": { "type": ["string", "null"] },
+    "retrospectiveGraphGitCursor": { "type": ["string", "null"] },
+    "retrospectiveEpisodeId": { "type": ["string", "null"] },
+    "retrospectiveFailureCategory": { "type": ["string", "null"] },
+    "lastRetrospectiveAt": { "type": ["string", "null"], "format": "date-time" },
+    "lastRetrospectiveReport": { "type": ["string", "null"] },
+    "activeScoringVersion": { "type": ["string", "null"] },
+    "issueCheckpointPath": { "type": "string" },
+    "currentIssuePhase": { "type": "string" },
+    "lastCanaryFingerprint": { "type": "string", "pattern": "^$|^[a-f0-9]{64}$" },
+    "lastCanaryReport": { "type": "string" },
+    "runInstanceId": { "type": "string" },
+    "leaseEpoch": { "type": "string" },
+    "transitionId": { "type": "string" },
+    "generation": { "type": "integer", "minimum": 0 },
+    "controlPlaneFingerprint": { "type": "string", "pattern": "^$|^[a-f0-9]{64}$" },
+    "executionHost": { "enum": ["desktop-native", "cli-legacy"] },
     "enabled": { "type": "boolean" },
     "mode": { "type": "string" },
     "iterationCompleted": { "type": "integer", "minimum": 0 },

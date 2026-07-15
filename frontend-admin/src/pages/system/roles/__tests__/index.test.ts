@@ -8,13 +8,32 @@ function flushPromises() {
 
 // ── Mock API module ──
 const mockGetRoles = vi.fn()
+const mockGetRoleDetail = vi.fn()
+const mockCreateRole = vi.fn()
+const mockDeleteRole = vi.fn()
+const mockUpdateRole = vi.fn()
 const mockGetMenuTree = vi.fn()
 const mockUpdateRoleMenus = vi.fn()
+const mockAccess = vi.hoisted(() => ({
+  roles: ['ADMIN'] as string[],
+  permissions: [] as string[],
+}))
 
 vi.mock('@/api/modules/system', () => ({
   getRoles: (...args: unknown[]) => mockGetRoles(...args),
+  getRoleDetail: (...args: unknown[]) => mockGetRoleDetail(...args),
+  createRole: (...args: unknown[]) => mockCreateRole(...args),
+  deleteRole: (...args: unknown[]) => mockDeleteRole(...args),
+  updateRole: (...args: unknown[]) => mockUpdateRole(...args),
   getMenuTree: (...args: unknown[]) => mockGetMenuTree(...args),
   updateRoleMenus: (...args: unknown[]) => mockUpdateRoleMenus(...args),
+}))
+
+vi.mock('@/stores/user', () => ({
+  useUserStore: () => ({
+    roles: mockAccess.roles,
+    hasPermission: (permission: string) => mockAccess.permissions.includes(permission),
+  }),
 }))
 
 // ── Mock ant-design-vue message ──
@@ -28,10 +47,13 @@ vi.mock('ant-design-vue', async () => {
       info: vi.fn(),
       warning: vi.fn(),
     },
+    Modal: {
+      confirm: vi.fn(),
+    },
   }
 })
 
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import RoleListPage from '@/pages/system/roles/index.vue'
 import PermissionModal from '@/pages/system/roles/PermissionModal.vue'
 
@@ -128,6 +150,33 @@ const ATagStub = defineComponent({
   },
 })
 
+const ASelectStub = defineComponent({
+  name: 'ASelectStub',
+  props: { value: String },
+  emits: ['update:value'],
+  setup(props, { emit, slots }) {
+    return () =>
+      h(
+        'select',
+        {
+          class: 'mock-select',
+          value: props.value,
+          onChange: (event: Event) =>
+            emit('update:value', (event.target as HTMLSelectElement).value),
+        },
+        slots.default?.(),
+      )
+  },
+})
+
+const ASelectOptionStub = defineComponent({
+  name: 'ASelectOptionStub',
+  props: { value: String },
+  setup(props, { slots }) {
+    return () => h('option', { value: props.value }, slots.default?.())
+  },
+})
+
 const APaginationStub = defineComponent({
   name: 'APaginationStub',
   props: {
@@ -171,7 +220,13 @@ const AModalStub = defineComponent({
             h('div', { class: 'mock-modal-footer' }, [
               h(
                 'button',
-                { class: 'mock-modal-cancel', onClick: () => emit('update:open', false) },
+                {
+                  class: 'mock-modal-cancel',
+                  onClick: () => {
+                    emit('cancel')
+                    emit('update:open', false)
+                  },
+                },
                 '取消',
               ),
               h(
@@ -213,15 +268,85 @@ const ATreeStub = defineComponent({
   },
 })
 
+const VxeGridStub = defineComponent({
+  name: 'VxeGridStub',
+  props: { data: Array, columns: Array, loading: Boolean },
+  setup(props, { slots }) {
+    return () =>
+      h(
+        'div',
+        { class: 'mock-vxe-grid' },
+        ((props.data as Record<string, unknown>[]) ?? []).map((row) =>
+          h(
+            'div',
+            { class: 'mock-vxe-row', key: String(row.id) },
+            ((props.columns as Record<string, unknown>[]) ?? []).map((column) => {
+              const slotName = (column.slots as { default?: string } | undefined)?.default
+              return h(
+                'div',
+                { class: 'mock-vxe-cell' },
+                slotName && slots[slotName]
+                  ? slots[slotName]?.({ row })
+                  : String(row[String(column.field ?? '')] ?? ''),
+              )
+            }),
+          ),
+        ),
+      )
+  },
+})
+
+const ADropdownStub = defineComponent({
+  name: 'ADropdownStub',
+  setup(_, { slots }) {
+    return () => h('div', { class: 'mock-dropdown' }, [slots.default?.(), slots.overlay?.()])
+  },
+})
+
+const AMenuStub = defineComponent({
+  name: 'AMenuStub',
+  setup(_, { slots }) {
+    return () => h('div', { class: 'mock-menu' }, slots.default?.())
+  },
+})
+
+const AMenuItemStub = defineComponent({
+  name: 'AMenuItemStub',
+  emits: ['click'],
+  setup(_, { emit, slots }) {
+    return () =>
+      h(
+        'button',
+        { class: 'mock-menu-item', type: 'button', onClick: () => emit('click') },
+        slots.default?.(),
+      )
+  },
+})
+
+const AEmptyStub = defineComponent({
+  name: 'AEmptyStub',
+  props: { description: String },
+  setup(props) {
+    return () => h('div', { class: 'mock-empty' }, props.description)
+  },
+})
+
 const stubs = {
   'a-table': ATableStub,
   'a-input': AInputStub,
   'a-button': AButtonStub,
   'a-tag': ATagStub,
+  'a-select': ASelectStub,
+  'a-select-option': ASelectOptionStub,
   'a-pagination': APaginationStub,
   'a-spin': ASpinStub,
   'a-modal': AModalStub,
   'a-tree': ATreeStub,
+  'a-empty': AEmptyStub,
+  'a-dropdown': ADropdownStub,
+  'a-menu': AMenuStub,
+  'a-menu-item': AMenuItemStub,
+  'vxe-grid': VxeGridStub,
   PermissionModal: true,
 }
 
@@ -265,6 +390,12 @@ const mockMenuTree = [
 describe('RoleListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockAccess.roles.splice(0, mockAccess.roles.length, 'ADMIN')
+    mockAccess.permissions.splice(0)
+    mockGetRoles.mockResolvedValue(mockRoles)
+    mockGetRoleDetail.mockResolvedValue({ ...mockRoles[0], dataScope: 'ALL' })
+    mockDeleteRole.mockResolvedValue(undefined)
+    mockUpdateRole.mockResolvedValue(undefined)
   })
 
   it('fetches roles on mount', async () => {
@@ -304,6 +435,299 @@ describe('RoleListPage', () => {
     await flushPromises()
 
     expect(vi.mocked(message.error)).toHaveBeenCalledWith('Network error')
+  })
+
+  it.each(['ADMIN', 'SUPER_ADMIN'])('shows create entry for %s', async (role) => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, role)
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="create-role-button"]').exists()).toBe(true)
+  })
+
+  it('hides create entry from ordinary users even with system:role:add', async () => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, 'USER')
+    mockAccess.permissions.push('system:role:add')
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="create-role-button"]').exists()).toBe(false)
+  })
+
+  it.each(['ADMIN', 'SUPER_ADMIN'])(
+    'shows delete only for unprotected roles to %s',
+    async (role) => {
+      mockAccess.roles.splice(0, mockAccess.roles.length, role)
+
+      const wrapper = mount(RoleListPage, { global: { stubs } })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="delete-role-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="delete-role-2"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="delete-role-3"]').exists()).toBe(false)
+    },
+  )
+
+  it('hides delete from ordinary users even with system:role:delete', async () => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, 'USER')
+    mockAccess.permissions.push('system:role:delete')
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="delete-role-2"]').exists()).toBe(false)
+    expect(mockDeleteRole).not.toHaveBeenCalled()
+  })
+
+  it.each(['ADMIN', 'SUPER_ADMIN'])(
+    'shows update only for unprotected roles to %s',
+    async (role) => {
+      mockAccess.roles.splice(0, mockAccess.roles.length, role)
+
+      const wrapper = mount(RoleListPage, { global: { stubs } })
+      await flushPromises()
+
+      expect(wrapper.find('[data-testid="update-role-1"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="update-role-2"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="update-role-3"]').exists()).toBe(false)
+    },
+  )
+
+  it('hides update from ordinary users even with system:role:edit', async () => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, 'USER')
+    mockAccess.permissions.push('system:role:edit')
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="update-role-2"]').exists()).toBe(false)
+    expect(mockUpdateRole).not.toHaveBeenCalled()
+  })
+
+  it('prefills immutable code and validates role name before updating', async () => {
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="update-role-2"]').trigger('click')
+
+    expect(
+      (wrapper.find('[data-testid="update-role-code"]').element as HTMLInputElement).value,
+    ).toBe('USER')
+    expect(
+      (wrapper.find('[data-testid="update-role-name"]').element as HTMLInputElement).value,
+    ).toBe('普通用户')
+
+    await wrapper.find('[data-testid="update-role-name"]').setValue('   ')
+    await wrapper.find('[data-testid="update-role-submit"]').trigger('click')
+    expect(vi.mocked(message.error)).toHaveBeenLastCalledWith('请填写角色名称')
+
+    await wrapper.find('[data-testid="update-role-name"]').setValue('角'.repeat(101))
+    await wrapper.find('[data-testid="update-role-submit"]').trigger('click')
+    expect(vi.mocked(message.error)).toHaveBeenLastCalledWith('角色名称不能超过100个字符')
+    expect(mockUpdateRole).not.toHaveBeenCalled()
+  })
+
+  it('keeps the update form open and reports the backend error', async () => {
+    mockUpdateRole.mockRejectedValueOnce(new Error('系统或高等级角色不允许修改'))
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="update-role-2"]').trigger('click')
+    await wrapper.find('[data-testid="update-role-name"]').setValue('修改失败仍保留')
+    await wrapper.find('[data-testid="update-role-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('系统或高等级角色不允许修改')
+    expect(wrapper.find('[data-testid="update-role-modal"]').exists()).toBe(true)
+    expect(
+      (wrapper.find('[data-testid="update-role-name"]').element as HTMLInputElement).value,
+    ).toBe('修改失败仍保留')
+    expect(mockGetRoles).toHaveBeenCalledTimes(1)
+  })
+
+  it('updates the selected role, closes the form, and refreshes without changing menus', async () => {
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="update-role-2"]').trigger('click')
+    await wrapper.find('[data-testid="update-role-name"]').setValue('项目成员')
+    await wrapper.find('[data-testid="update-role-status"]').setValue('DISABLE')
+    await wrapper.find('[data-testid="update-role-data-scope"]').setValue('DEPT')
+    await wrapper.find('[data-testid="update-role-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mockUpdateRole).toHaveBeenCalledWith(2, {
+      roleCode: 'USER',
+      roleName: '项目成员',
+      status: 'DISABLE',
+      dataScope: 'DEPT',
+    })
+    expect(vi.mocked(message.success)).toHaveBeenCalledWith('角色修改成功')
+    expect(wrapper.find('[data-testid="update-role-modal"]').exists()).toBe(false)
+    expect(mockGetRoles).toHaveBeenCalledTimes(2)
+    expect(mockUpdateRoleMenus).not.toHaveBeenCalled()
+  })
+
+  it('does not call delete until the destructive confirmation is accepted', async () => {
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-testid="delete-role-2"]').trigger('click')
+
+    expect(vi.mocked(Modal.confirm)).toHaveBeenCalledOnce()
+    expect(vi.mocked(Modal.confirm).mock.calls[0][0]).toMatchObject({
+      title: '确认删除角色',
+      okText: '删除',
+      cancelText: '取消',
+      okType: 'danger',
+    })
+    expect(mockDeleteRole).not.toHaveBeenCalled()
+  })
+
+  it('deletes the selected role and refreshes after confirmation', async () => {
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="delete-role-2"]').trigger('click')
+
+    const options = vi.mocked(Modal.confirm).mock.calls[0][0] as {
+      onOk: () => Promise<void>
+    }
+    await options.onOk()
+    await flushPromises()
+
+    expect(mockDeleteRole).toHaveBeenCalledWith(2)
+    expect(vi.mocked(message.success)).toHaveBeenCalledWith('角色删除成功')
+    expect(mockGetRoles).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps the list and reports the backend error when deletion fails', async () => {
+    mockDeleteRole.mockRejectedValueOnce(new Error('角色仍绑定用户，无法删除'))
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="delete-role-2"]').trigger('click')
+
+    const options = vi.mocked(Modal.confirm).mock.calls[0][0] as {
+      onOk: () => Promise<void>
+    }
+    await expect(options.onOk()).rejects.toThrow('角色仍绑定用户，无法删除')
+
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('角色仍绑定用户，无法删除')
+    expect(mockGetRoles).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(message.success)).not.toHaveBeenCalledWith('角色删除成功')
+  })
+
+  it.each(['ADMIN', 'SUPER_ADMIN'])('shows and loads role detail for %s', async (role) => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, role)
+    const detail = { ...mockRoles[0], dataScope: 'ALL' }
+    mockGetRoleDetail.mockResolvedValue(detail)
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="view-role-detail-1"]').trigger('click')
+    await flushPromises()
+
+    expect(mockGetRoleDetail).toHaveBeenCalledWith(1)
+    expect(wrapper.find('[data-testid="role-detail-content"]').text()).toContain('管理员')
+    expect(wrapper.find('[data-testid="role-detail-content"]').text()).toContain('ADMIN')
+    expect(wrapper.find('[data-testid="role-detail-content"]').text()).toContain('ALL')
+    expect(wrapper.find('[data-testid="role-detail-content"]').text()).toContain('1, 2')
+    expect(mockCreateRole).not.toHaveBeenCalled()
+    expect(mockUpdateRoleMenus).not.toHaveBeenCalled()
+  })
+
+  it('hides the detail entry from ordinary users even with system:role:query', async () => {
+    mockAccess.roles.splice(0, mockAccess.roles.length, 'USER')
+    mockAccess.permissions.push('system:role:query')
+
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="view-role-detail-1"]').exists()).toBe(false)
+    expect(mockGetRoleDetail).not.toHaveBeenCalled()
+  })
+
+  it('clears old detail, keeps the selected target on failure, and refetches after reopening', async () => {
+    mockGetRoleDetail.mockResolvedValueOnce({ ...mockRoles[0], dataScope: 'ALL' })
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+
+    await wrapper.find('[data-testid="view-role-detail-1"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="role-detail-content"]').text()).toContain('管理员')
+    await wrapper.find('[data-testid="role-detail-modal"] .mock-modal-cancel').trigger('click')
+
+    mockGetRoleDetail.mockRejectedValueOnce(new Error('角色不存在'))
+    await wrapper.find('[data-testid="view-role-detail-2"]').trigger('click')
+    await flushPromises()
+
+    expect(mockGetRoleDetail).toHaveBeenNthCalledWith(1, 1)
+    expect(mockGetRoleDetail).toHaveBeenNthCalledWith(2, 2)
+    expect(wrapper.find('[data-testid="role-detail-modal"] .mock-modal-title').text()).toContain(
+      '普通用户',
+    )
+    expect(wrapper.find('[data-testid="role-detail-content"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="role-detail-empty"]').exists()).toBe(true)
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('角色不存在')
+    expect(mockCreateRole).not.toHaveBeenCalled()
+    expect(mockUpdateRoleMenus).not.toHaveBeenCalled()
+  })
+
+  it('validates required fields and length limits before creating', async () => {
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="create-role-button"]').trigger('click')
+
+    await wrapper.find('[data-testid="create-role-submit"]').trigger('click')
+    expect(vi.mocked(message.error)).toHaveBeenLastCalledWith('请填写角色编码和角色名称')
+
+    await wrapper.find('[data-testid="create-role-code"]').setValue('R'.repeat(51))
+    await wrapper.find('[data-testid="create-role-name"]').setValue('普通角色')
+    await wrapper.find('[data-testid="create-role-submit"]').trigger('click')
+    expect(vi.mocked(message.error)).toHaveBeenLastCalledWith('角色编码不能超过50个字符')
+
+    await wrapper.find('[data-testid="create-role-code"]').setValue('NORMAL_ROLE')
+    await wrapper.find('[data-testid="create-role-name"]').setValue('角'.repeat(101))
+    await wrapper.find('[data-testid="create-role-submit"]').trigger('click')
+    expect(vi.mocked(message.error)).toHaveBeenLastCalledWith('角色名称不能超过100个字符')
+    expect(mockCreateRole).not.toHaveBeenCalled()
+  })
+
+  it('keeps the form open and shows the backend error when role code is duplicated', async () => {
+    mockCreateRole.mockRejectedValue(new Error('角色编码已存在'))
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="create-role-button"]').trigger('click')
+    await wrapper.find('[data-testid="create-role-code"]').setValue('DUPLICATE_ROLE')
+    await wrapper.find('[data-testid="create-role-name"]').setValue('重复角色')
+    await wrapper.find('[data-testid="create-role-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(vi.mocked(message.error)).toHaveBeenCalledWith('角色编码已存在')
+    expect(wrapper.find('.mock-modal').exists()).toBe(true)
+    expect(
+      (wrapper.find('[data-testid="create-role-code"]').element as HTMLInputElement).value,
+    ).toBe('DUPLICATE_ROLE')
+  })
+
+  it('closes the form and refreshes the list after successful creation', async () => {
+    mockCreateRole.mockResolvedValue('1001')
+    const wrapper = mount(RoleListPage, { global: { stubs } })
+    await flushPromises()
+    await wrapper.find('[data-testid="create-role-button"]').trigger('click')
+    await wrapper.find('[data-testid="create-role-code"]').setValue('NEW_ROLE')
+    await wrapper.find('[data-testid="create-role-name"]').setValue('新角色')
+    await wrapper.find('[data-testid="create-role-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(mockCreateRole).toHaveBeenCalledWith({
+      roleCode: 'NEW_ROLE',
+      roleName: '新角色',
+      status: 'ENABLE',
+      dataScope: 'SELF',
+    })
+    expect(vi.mocked(message.success)).toHaveBeenCalledWith('角色创建成功')
+    expect(wrapper.find('.mock-modal').exists()).toBe(false)
+    expect(mockGetRoles).toHaveBeenCalledTimes(2)
+    expect(mockUpdateRoleMenus).not.toHaveBeenCalled()
   })
 })
 

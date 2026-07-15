@@ -20,7 +20,6 @@ import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
 import { fetchDictData, getDictLabelSync } from '@/utils/dict'
 import ProjectAnalysisRail from './components/ProjectAnalysisRail.vue'
-import ProjectKpiSummary from './components/ProjectKpiSummary.vue'
 import ProjectQueryPanel from './components/ProjectQueryPanel.vue'
 import ProjectTablePanel from './components/ProjectTablePanel.vue'
 
@@ -686,11 +685,6 @@ const {
 
     <div class="lg-grid project-workspace">
       <div class="lg-left project-main-column">
-        <ProjectKpiSummary
-          :project-stats="projectStats"
-          :total-contract-amount="totalContractAmount"
-        />
-
         <ProjectQueryPanel
           :filter="filter"
           :filter-visibility="filterVisibility"
@@ -746,6 +740,8 @@ const {
 
 <style scoped>
 .project-list-page {
+  --lg-search-min-height: 95px;
+
   background: var(--surface-subtle);
 }
 

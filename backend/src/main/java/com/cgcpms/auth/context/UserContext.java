@@ -38,6 +38,37 @@ public final class UserContext {
         ROLES.remove();
     }
 
+    /**
+     * Capture an immutable copy for controlled propagation to an asynchronous worker.
+     */
+    public static Snapshot capture() {
+        return new Snapshot(USER_ID.get(), USERNAME.get(), TENANT_ID.get(), List.copyOf(getCurrentRoles()));
+    }
+
+    /**
+     * Replace the current thread context with a previously captured snapshot.
+     */
+    public static void restore(Snapshot snapshot) {
+        clear();
+        if (snapshot == null || snapshot.isEmpty()) {
+            return;
+        }
+        USER_ID.set(snapshot.userId());
+        USERNAME.set(snapshot.username());
+        TENANT_ID.set(snapshot.tenantId());
+        ROLES.set(snapshot.roles());
+    }
+
+    public record Snapshot(Long userId, String username, Long tenantId, List<String> roles) {
+        public Snapshot {
+            roles = roles == null ? List.of() : List.copyOf(roles);
+        }
+
+        public boolean isEmpty() {
+            return userId == null && username == null && tenantId == null && roles.isEmpty();
+        }
+    }
+
     public static Long getCurrentUserId() {
         return USER_ID.get();
     }

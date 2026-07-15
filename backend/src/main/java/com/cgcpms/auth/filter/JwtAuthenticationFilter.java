@@ -104,12 +104,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Check blacklist
         TokenBlacklistService blacklistService = tokenBlacklistServiceProvider.getIfAvailable();
         if (blacklistService == null) {
-            if (environment.acceptsProfiles(Profiles.of("prod"))) {
-                log.error("BLACKLIST_UNAVAILABLE: prod profile requires TokenBlacklistService，拒绝本次请求");
+            boolean blacklistEnabled = environment.getProperty("auth.token-blacklist.enabled", Boolean.class, true);
+            if (blacklistEnabled) {
+                log.error("BLACKLIST_UNAVAILABLE: 已启用令牌黑名单但 TokenBlacklistService 不可用，拒绝本次请求");
                 writeUnauthorized(response);
                 return;
             }
-            log.warn("BLACKLIST_UNAVAILABLE: TokenBlacklistService 不可用（Redis 未配置），黑名单保护缺失");
+            log.debug("令牌黑名单已显式禁用，跳过黑名单检查");
         } else if (blacklistService.isBlacklisted(token)) {
             log.warn("BLACKLISTED_TOKEN: 已黑名单令牌尝试访问");
             writeUnauthorized(response);
@@ -162,7 +163,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         List<GrantedAuthority> authorities = new ArrayList<>();
         
         // Extract role codes, prefix with ROLE_
-        List<String> roleCodes = claims.get(JwtUtils.CLAIM_ROLES, List.class);
+        List<String> roleCodes = stringListClaim(claims, JwtUtils.CLAIM_ROLES);
         if (roleCodes != null) {
             for (String roleCode : roleCodes) {
                 authorities.add(new SimpleGrantedAuthority("ROLE_" + roleCode));
@@ -170,7 +171,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         
         // Extract permissions (e.g., "system:user:add")
-        List<String> permissions = claims.get(JwtUtils.CLAIM_PERMISSIONS, List.class);
+        List<String> permissions = stringListClaim(claims, JwtUtils.CLAIM_PERMISSIONS);
         if (permissions != null) {
             for (String perm : permissions) {
                 authorities.add(new SimpleGrantedAuthority(perm));
@@ -178,6 +179,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         
         return authorities.isEmpty() ? Collections.emptyList() : authorities;
+    }
+
+    private List<String> stringListClaim(Claims claims, String claimName) {
+        Object value = claims.get(claimName);
+        if (!(value instanceof List<?> values)) {
+            return Collections.emptyList();
+        }
+        return values.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .toList();
     }
 
     private void writeUnauthorized(HttpServletResponse response) throws IOException {
