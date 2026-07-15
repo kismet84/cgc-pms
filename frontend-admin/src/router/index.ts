@@ -200,6 +200,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '现场日报', icon: 'FileTextOutlined' },
       },
       {
+        path: 'bid-cost',
+        name: 'BidCost',
+        component: () => import('@/pages/bid-cost/index.vue'),
+        meta: { title: '投标成本', icon: 'FundOutlined', permission: 'bid:query' },
+      },
+      {
         path: 'org',
         name: 'Org',
         component: () => import('@/pages/org/index.vue'),

@@ -8,12 +8,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -28,12 +32,18 @@ class BidCostControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtUtils jwtUtils;
+    @Autowired private JdbcTemplate jdbcTemplate;
     private static final long ADMIN_ID = 1L;
     private static final long TENANT_ID = 0L;
     private Long bidId;
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(ADMIN_ID, "admin", TENANT_ID, List.of("ADMIN"), List.of());
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    private Cookie userCookie(long tenantId, List<String> permissions) {
+        String token = jwtUtils.generateToken(99L, "bid-reader", tenantId, List.of("COMMON_USER"), permissions);
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
@@ -46,6 +56,52 @@ class BidCostControllerTest {
     void testList() throws Exception {
         mockMvc.perform(getWith("/bid-cost").cookie(adminCookie()).param("pageNo", "1").param("pageSize", "10"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data.records").isArray());
+    }
+
+    @Test @Order(2) @DisplayName("GET /bid-cost allows bid:query and rejects missing permission")
+    void testList_QueryPermissionBoundary() throws Exception {
+        mockMvc.perform(getWith("/bid-cost").cookie(userCookie(TENANT_ID, List.of("bid:query"))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+        mockMvc.perform(getWith("/bid-cost").cookie(userCookie(TENANT_ID, List.of())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test @Order(2) @DisplayName("GET /bid-cost hides another tenant record")
+    void testList_TenantIsolation() throws Exception {
+        long id = 900000000000L + Math.abs(System.nanoTime() % 100000000L);
+        String name = "CROSS-TENANT-BID-" + id;
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, id, 9001L, name);
+        try {
+            mockMvc.perform(getWith("/bid-cost")
+                            .cookie(userCookie(TENANT_ID, List.of("bid:query")))
+                            .param("keyword", name))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.total").value(0))
+                    .andExpect(jsonPath("$.data.records").isEmpty());
+        } finally {
+            jdbcTemplate.update("DELETE FROM bid_cost WHERE id = ?", id);
+        }
+    }
+
+    @Test @Order(2) @DisplayName("V150 grants only the bid query menu to configured roles")
+    void testBidQueryMenuMigrationApplied() {
+        Set<String> permissions = Set.copyOf(jdbcTemplate.queryForList("""
+                SELECT DISTINCT m.perms
+                FROM sys_role r
+                JOIN sys_role_menu rm ON rm.role_id = r.id
+                JOIN sys_menu m ON m.id = rm.menu_id
+                WHERE r.role_code IN ('SUPER_ADMIN', 'ADMIN', 'COST_MANAGER')
+                  AND m.id = 962
+                  AND m.deleted_flag = 0
+                """, String.class));
+        assertEquals(Set.of("bid:query"), permissions);
+        Integer writePermissionCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE id = 962 AND perms IN ('bid:add','bid:edit','bid:delete')",
+                Integer.class);
+        assertEquals(0, writePermissionCount);
     }
 
     @Test @Order(3) @DisplayName("POST /bid-cost -> 200 creates bid")
