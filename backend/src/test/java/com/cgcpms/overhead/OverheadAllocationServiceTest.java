@@ -96,6 +96,31 @@ class OverheadAllocationServiceTest {
     }
 
     @Test
+    @DisplayName("删除仅允许无执行事实的当前租户规则")
+    void deleteRejectsReferencedRuleAndKeepsTenantIsolation() {
+        Long removableId = service.create(rule(SUBJECT_EQUAL, "USAGE", "MONTHLY"));
+        service.delete(removableId);
+        assertEquals(null, ruleMapper.selectById(removableId));
+
+        Long protectedId = service.create(rule(SUBJECT_LABOR, "DIRECT_LABOR", "MONTHLY"));
+        jdbcTemplate.update("""
+                INSERT INTO overhead_allocation_run
+                (id,tenant_id,rule_id,period,trigger_type,run_status,allocated_amount,cost_item_count,deleted_flag)
+                VALUES (?,?,?,?,?,'SUCCESS',0,0,0)
+                """, 940024904L, TENANT_ID, protectedId, PERIOD, "MANUAL");
+
+        BusinessException referenced = assertThrows(BusinessException.class,
+                () -> service.delete(protectedId));
+        assertEquals("RULE_ALREADY_EXECUTED", referenced.getCode());
+        assertNotNull(ruleMapper.selectById(protectedId));
+
+        setUserContext(OTHER_TENANT_ID);
+        BusinessException hidden = assertThrows(BusinessException.class,
+                () -> service.delete(protectedId));
+        assertEquals("RULE_NOT_FOUND", hidden.getCode());
+    }
+
+    @Test
     @DisplayName("受控新建只接受当前租户启用的间接费成本科目")
     void validatedCreateRequiresTenantEnabledOverheadCostSubject() {
         seedSubject(SUBJECT_VALIDATED, TENANT_ID, "5401.04.31", "OVERHEAD", "COST", "ENABLE");

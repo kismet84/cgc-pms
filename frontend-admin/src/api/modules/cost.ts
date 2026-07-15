@@ -60,6 +60,13 @@ export function updateOverheadAllocationRule(
   })
 }
 
+export function deleteOverheadAllocationRule(id: string) {
+  return request<void>({
+    url: `/overhead-allocation/rules/${id}`,
+    method: 'delete',
+  })
+}
+
 /** 成本列表分页查询 */
 export function getCostLedger(params: CostLedgerQueryParams) {
   return request<PageResult<CostLedgerVO>>({

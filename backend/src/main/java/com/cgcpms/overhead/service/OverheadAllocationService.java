@@ -126,9 +126,16 @@ public class OverheadAllocationService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        Long tenantId = UserContext.getCurrentTenantId();
         OverheadAllocationRule existing = ruleMapper.selectById(id);
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+        if (existing == null || !existing.getTenantId().equals(tenantId)) {
             throw new BusinessException("RULE_NOT_FOUND", "分摊规则不存在");
+        }
+        long runCount = runMapper.selectCount(new LambdaQueryWrapper<OverheadAllocationRun>()
+                .eq(OverheadAllocationRun::getTenantId, tenantId)
+                .eq(OverheadAllocationRun::getRuleId, id));
+        if (runCount > 0) {
+            throw new BusinessException("RULE_ALREADY_EXECUTED", "规则已有执行事实，不允许删除");
         }
         ruleMapper.deleteById(id);
     }

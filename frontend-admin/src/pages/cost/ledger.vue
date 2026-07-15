@@ -3,9 +3,10 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import {
   createOverheadAllocationRule,
+  deleteOverheadAllocationRule,
   updateOverheadAllocationRule,
   getCostLedger,
   getCostLedgerSummary,
@@ -48,6 +49,9 @@ const canCreateAllocationRule = computed(
 )
 const canEditAllocationRule = computed(
   () => isAllocationAdmin.value || userStore.hasPermission('overhead:edit'),
+)
+const canDeleteAllocationRule = computed(
+  () => isAllocationAdmin.value || userStore.hasPermission('overhead:delete'),
 )
 const ruleModalOpen = ref(false)
 const ruleLoading = ref(false)
@@ -175,6 +179,27 @@ async function submitRuleEdit() {
   } finally {
     ruleEditSubmitting.value = false
   }
+}
+
+function confirmRuleDelete(rule: OverheadAllocationRuleVO) {
+  Modal.confirm({
+    title: '确认删除间接费规则',
+    content: `科目 ${rule.costSubjectId}，分摊依据 ${rule.allocationBasis}。已有执行事实的规则不可删除，历史分摊不会被清理。`,
+    okText: '确认删除',
+    cancelText: '取消',
+    okType: 'danger',
+    async onOk() {
+      try {
+        await deleteOverheadAllocationRule(rule.id)
+        message.success('间接费规则删除成功')
+        await fetchAllocationRules()
+      } catch (error: unknown) {
+        console.error(error)
+        message.error('删除间接费规则失败')
+        throw error
+      }
+    },
+  })
 }
 const allocationModalOpen = ref(false)
 const allocationSubmitting = ref(false)
@@ -674,6 +699,16 @@ onMounted(async () => {
               @click="openRuleEdit(record as OverheadAllocationRuleVO)"
             >
               修改
+            </a-button>
+            <a-button
+              v-if="canDeleteAllocationRule"
+              type="link"
+              danger
+              size="small"
+              data-testid="delete-overhead-allocation-rule"
+              @click="confirmRuleDelete(record as OverheadAllocationRuleVO)"
+            >
+              删除
             </a-button>
           </template>
         </template>

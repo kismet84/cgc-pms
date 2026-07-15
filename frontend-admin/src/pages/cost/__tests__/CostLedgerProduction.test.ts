@@ -67,6 +67,21 @@ describe('CostLedger production guards', () => {
     expect(source).not.toMatch(/updateOverheadAllocationRule[\s\S]{0,500}(tenantId|status:)/)
   })
 
+  it('guards overhead rule deletion and preserves execution facts', () => {
+    expect(source).toContain("userStore.hasPermission('overhead:delete')")
+    expect(source).toContain('v-if="canDeleteAllocationRule"')
+    expect(source).toContain('data-testid="delete-overhead-allocation-rule"')
+    expect(source).toContain("title: '确认删除间接费规则'")
+    expect(source).toContain('科目 ${rule.costSubjectId}，分摊依据 ${rule.allocationBasis}')
+    expect(source).toContain('已有执行事实的规则不可删除，历史分摊不会被清理')
+    expect(source).toContain('await deleteOverheadAllocationRule(rule.id)')
+    expect(source).toContain('await fetchAllocationRules()')
+    expect(source).toContain("message.error('删除间接费规则失败')")
+    expect(apiSource).toMatch(
+      /deleteOverheadAllocationRule[\s\S]*url: `\/overhead-allocation\/rules\/\$\{id\}`[\s\S]*method: 'delete'/,
+    )
+  })
+
   it('only exposes overhead execution to admins or users holding both required permissions', () => {
     expect(source).toContain("import { useUserStore } from '@/stores/user'")
     expect(source).toMatch(

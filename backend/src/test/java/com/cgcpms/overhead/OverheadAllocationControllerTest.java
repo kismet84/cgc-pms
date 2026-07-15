@@ -36,6 +36,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -196,6 +197,23 @@ class OverheadAllocationControllerTest {
                 .updateValidated(anyLong(), anyLong(), any(String.class), any(String.class));
     }
 
+    @Test
+    @DisplayName("规则删除要求 overhead:delete 或管理员权限")
+    void deleteRulePermissionContract() throws Exception {
+        mockMvc.perform(deleteApi("/overhead-allocation/rules/940026001"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(deleteApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of(), List.of("overhead:query"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(deleteApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of(), List.of("overhead:delete"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(deleteApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of("SUPER_ADMIN"), List.of())))
+                .andExpect(status().isOk());
+        verify(service, org.mockito.Mockito.times(2)).delete(940026001L);
+    }
+
     @AfterEach
     void tearDown() {
         jdbcTemplate.update("DELETE FROM sys_operation_audit_log WHERE tenant_id=?", TENANT_ID);
@@ -302,6 +320,10 @@ class OverheadAllocationControllerTest {
 
     private MockHttpServletRequestBuilder putApi(String path) {
         return put("/api" + path).contextPath("/api");
+    }
+
+    private MockHttpServletRequestBuilder deleteApi(String path) {
+        return delete("/api" + path).contextPath("/api");
     }
 
 }

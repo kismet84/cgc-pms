@@ -10,6 +10,7 @@ vi.mock('@/api/request', () => ({
 
 import {
   createOverheadAllocationRule,
+  deleteOverheadAllocationRule,
   getCostSummaryHistory,
   updateOverheadAllocationRule,
 } from '../cost'
@@ -73,5 +74,20 @@ describe('cost summary history api', () => {
     expect(data).not.toHaveProperty('id')
     expect(data).not.toHaveProperty('tenantId')
     expect(data).not.toHaveProperty('status')
+  })
+
+  it('删除间接费规则只发送路径 ID 且没有请求体', async () => {
+    mockRequest.mockResolvedValue(undefined)
+
+    await deleteOverheadAllocationRule('rule-1')
+
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/overhead-allocation/rules/rule-1',
+      method: 'delete',
+    })
+    const requestConfig = mockRequest.mock.calls[0][0]
+    expect(requestConfig).not.toHaveProperty('data')
+    expect(requestConfig).not.toHaveProperty('params')
+    expect(requestConfig).not.toHaveProperty('tenantId')
   })
 })
