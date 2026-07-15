@@ -6,7 +6,76 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039` 已完成并登记控制面指纹金丝雀。执行中发现 closeout 目标区块误判阻塞，`ISSUE-047-001` 已作为单 Issue 修复队列就绪；通过后继续 `启动迭代-20` 剩余任务。
+`ISSUE-040-039` 与阻塞修复 `ISSUE-047-001` 已完成；`启动迭代-20` 当前完成 2/20。下一条 Ready 为 `ISSUE-040-040`，完成投标成本最后一个明确入口叶子后切换到间接费规则域。
+
+### ISSUE-040-040：投标成本标记未中标入口与费用核销边界
+
+优先级：P1
+任务性质：缺口修复
+类型：投标成本 / 未中标状态 / 费用核销 / 权限 / 租户 / 重复操作
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-BID-LOST`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=a5df9fe80a8e27f8e4d61d798a7002b69bc13b79
+存量问题键：[stock:A-01-BID-LOST]
+关联产品目标：在既有投标成本页提供受控“标记未中标”入口，复用已登记的 `bid:status` 权限和既有失标端点，将该投标的 BID_COST 费用一次性核销并关闭 A-01 的最后一个投标成本叶子。
+候选对比：当前同级明确叶子还有间接费规则新建、修改和删除，另有库存并发、补货负向测试等观察项。投标域已连续超过五条 Ready，本条仍优先的唯一理由是它复用刚通过验收的同页、同一 `bid:status` 权限与同一 BIDDING 状态机，且是投标域最后一个明确叶子；完成后立即切换间接费域，不继续拆投标能力。相比同时启动间接费写入，本条无需新迁移或新数据模型，能够以最小变更关闭一个已证实用户缺口。
+核验结论：问题仍存在——后端 `PUT /bid-cost/{id}/lost`、认证租户隐藏、仅 BIDDING 可转换及 BID_COST 费用核销已有实现与部分测试，V154 已注册 `bid:status`；前端 API 与桌面/移动页面仍没有同方法入口，现有页面测试还明确断言不存在失标动作。
+检索交叉核验：先按 Java/TypeScript 规则查询源码图谱；投标页面召回不完整，归类为工具召回不足并使用当前分支精确 `rg` 与文件读取核验 Controller、Service、前端 API/页面及专项测试。现有后端测试已覆盖费用核销和非法状态，仍需以专项回归证明权限、租户和重复操作边界未回退。
+阻塞证据：具备 `bid:status` 的用户只能标记中标，无法从产品页面触发已实现的未中标状态；缺少二次确认、取消不请求、成功刷新与失败保留的交互证据。
+解除条件：BIDDING 行在桌面和移动端提供仅 `bid:status` 或管理员可见的未中标动作；确认文案包含投标名称与费用核销后果；取消不请求，成功刷新；失败不改变行状态或伪报成功；权限、租户、状态、核销和重复操作专项通过。
+Migration：不需要
+依赖：复用 `/bid-cost` 页面、V154 的 `bid:status`、`PUT /bid-cost/{id}/lost`、`BidCostService.markAsLost`、现有 bid API/页面测试与 BidCost Controller/Service 测试。
+风险等级：高
+运行态要求：仅 local/dev/test；浏览器验收前通过三项 health gate，只打开未中标确认并取消，不提交 PUT、不新增、修改、删除或重置业务数据；不得连接或发布生产。
+Reviewer要求：按权限、租户、状态和金额事实复核；确认仅 `bid:edit` 不获得状态权限，不存在/跨租户投标统一隐藏，非 BIDDING 与重复操作拒绝，合法失标只把当前投标的 BID_COST 费用核销一次；确认确认框取消不发请求、接口失败不伪报成功。
+归档报告：`docs/quality/ISSUE-040-040-投标成本标记未中标入口与费用核销边界验收报告.md`
+最小回滚：回退前端失标 API/交互、专项测试和治理回写；不反向修改任何已失标业务数据，不回退既有投标列表、详情、创建、编辑、删除和中标能力。
+目标：
+- 增加类型化 `markBidCostAsLost(id)`，精确调用 `PUT /bid-cost/{id}/lost`，不发送 body、params、tenantId 或其他业务字段。
+- 在既有投标成本桌面/移动 BIDDING 行提供 `bid:status` 或管理员可见的未中标动作，确认文案同时包含投标名称和费用核销后果；取消不请求，成功刷新，失败保留当前状态。
+- 复跑并按需补强权限、租户、状态、费用核销和重复操作后端回归，关闭唯一存量叶子。
+非目标：
+- 不实现撤销失标、重新打开、批量状态迁移、投标归档、成本项编辑或状态机重构。
+- 不新增权限、迁移、路由、页面、表或状态值，不修改中标项目范围、金额算法、核销口径或既有 V150～V154。
+- 不连接生产、不发布生产、不 push；浏览器不确认未中标。
+允许修改：
+- `backend/src/test/java/com/cgcpms/bid/BidCostControllerTest.java`
+- `backend/src/test/java/com/cgcpms/bid/BidCostServiceTest.java`
+- `frontend-admin/src/api/modules/bid.ts`
+- `frontend-admin/src/api/modules/__tests__/bid.test.ts`
+- `frontend-admin/src/pages/bid-cost/index.vue`
+- `frontend-admin/src/pages/bid-cost/__tests__/index.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-040-投标成本标记未中标入口与费用核销边界验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/main/resources/db/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `frontend-admin/src/types/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 精确调用 `PUT /bid-cost/{id}/lost`，无 body、params、tenantId 或其他业务字段。
+- 入口仅对 `bid:status` 或 ADMIN/SUPER_ADMIN 可见且仅 BIDDING 展示；确认文案包含投标名称和 BID_COST 费用将被核销的明确后果；取消不请求，成功刷新，失败不改行状态或伪报成功。
+- 未登录401、无 `bid:status` 403、仅 `bid:edit` 403、显式 `bid:status` 或管理员成功；不存在/跨租户投标统一 `BID_COST_NOT_FOUND`，非 BIDDING 与重复操作返回 `BID_STATUS_INVALID`。
+- 合法失标只将当前投标状态改为 LOST，并将其 BID_COST 费用改为 WRITE_OFF；其他投标和其他来源费用不受影响，失败路径无部分写入。
+- 列表、详情、新建、编辑、删除、中标及 V154 权限不回退；不产生迁移或生产代码变更。
+- 收口移除 `A-01-BID-LOST`，A-01 更新为有用户入口245、前端调用无独立页面58、内部/集成/运维4、需补入口3、待废弃0、需要确认11，共321；新增后续项0、关闭1、净变化-1。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint、`git diff --check` 和只取消浏览器验收通过；高风险复核结论为 PASS。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-040`
+- `cd backend; .\mvnw.cmd "-Dtest=BidCostControllerTest,BidCostServiceTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
+- `git diff --check`
 
 ### ISSUE-047-001：AutoPilot 收口区块边界与幂等误判修复
 
