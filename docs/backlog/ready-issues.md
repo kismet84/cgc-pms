@@ -6,7 +6,64 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041` 与 `ISSUE-040-042` 已完成；`启动迭代-20` 当前完成 5/20。下一条 Ready 关闭间接费规则最后一个明确叶子：受控删除与执行事实保护。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042` 与 `ISSUE-040-043` 已完成；`启动迭代-20` 当前完成 6/20。明确入口叶子已清空，下一条 Ready 修复驾驶舱性能测试阈值文案与真实断言不一致。
+
+### ISSUE-040-044：驾驶舱性能测试阈值文案对齐
+
+优先级：P2
+任务性质：缺口修复
+类型：驾驶舱 / 性能回归 / 测试契约 / 文案一致性
+状态：Ready
+来源锚点：项目知识图谱当前问题 `OBS-DASHBOARD-PERF-LABEL`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=6673afc8d292743e45cdc5e820017942ff9cc302
+存量问题键：[stock:OBS-DASHBOARD-PERF-LABEL]
+关联产品目标：让驾驶舱批量查询性能回归的显示名、说明、控制台输出与真实 `count <= 20` 断言采用同一门槛，避免 CI 和验收人员误读性能基线。
+候选对比：当前 P1 补货负向测试变更面更大；本项是已证实、单文件、低风险且可直接关闭的测试契约缺口，可先以最小改动恢复证据可信度，不改变生产行为。
+核验结论：`DashboardPerformanceTest` 两处真实断言均为 `count <= 20`，但类注释、测试显示名和成功输出仍写 `≤10`；CodeGraph 已精确命中全部不一致位置。
+阻塞证据：测试通过时输出可能声称满足 `≤10`，实际只保证 `≤20`，导致正式验收证据与执行门槛不一致。
+解除条件：所有描述门槛统一为 `≤20`，保留约42次 N+1 对照说明和真实断言；专项测试通过且不修改生产代码。
+Migration：不需要
+依赖：仅现有 `DashboardPerformanceTest` 和 local H2 测试上下文。
+风险等级：低
+运行态要求：仅 local/test；不需要浏览器、Docker 运行态或业务数据重置；不得连接或发布生产。
+Reviewer要求：确认只修改测试描述/输出，不放宽或收紧 `count <= 20` 断言，不改变生产查询实现。
+归档报告：`docs/quality/ISSUE-040-044-驾驶舱性能测试阈值文案对齐验收报告.md`
+最小回滚：回退测试文案、治理回写和报告；生产代码与数据无需回滚。
+目标：
+- 将类注释、`@DisplayName` 和成功输出中的 `≤10` 统一为 `≤20`。
+- 保留两处真实 `count <= 20` 断言和 N+1 约42次对照说明。
+- 用专项测试证明文案对齐未改变驾驶舱功能与性能门槛。
+非目标：
+- 不优化 DashboardService、不调整 SQL 数、不改变性能阈值、不修改生产代码。
+- 不新增基准测试框架、监控、页面或数据库迁移。
+- 不连接生产、不发布生产、不 push。
+允许修改：
+- `backend/src/test/java/com/cgcpms/DashboardPerformanceTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-044-驾驶舱性能测试阈值文案对齐验收报告.md`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/**`
+- `frontend-admin/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- `DashboardPerformanceTest` 不再包含 `≤10`，类注释、显示名、成功输出和两处真实断言均一致表达 `≤20`。
+- N+1 约42次对照说明保留；生产源码和断言数值不变。
+- 收口移除 `OBS-DASHBOARD-PERF-LABEL`；新增后续项0、关闭1、净变化-1。
+- Ready lint、`DashboardPerformanceTest`、目标文本核对、`git diff --check` 和低风险复核 PASS。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-044`
+- `cd backend; .\mvnw.cmd "-Dtest=DashboardPerformanceTest" test`
+- `rg -n "≤20" backend/src/test/java/com/cgcpms/DashboardPerformanceTest.java`
+- `rg -n "count <= 20" backend/src/test/java/com/cgcpms/DashboardPerformanceTest.java`
+- `git diff --check`
 
 ### ISSUE-040-043：间接费规则受控删除入口与执行事实保护
 
