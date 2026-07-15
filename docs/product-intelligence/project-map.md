@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-16 候选：跨域既有能力证据收口
+
+- A-03已存在人工天气摘要与在场总人数，A-05已存在供应商交付评分，A-06已有现金日记账同步CSV安全导出，A-07已有站内通知，A-04已有单前置FS门禁；这些能力均有自动化测试但缺少当前master独立正式报告。
+- 已登记 `OBS-SITE-DAILY-WEATHER-HEADCOUNT`、`OBS-SUPPLIER-SCORE-BOUNDARIES`、`OBS-CASHBOOK-CSV-SAFETY`、`OBS-NOTIFICATION-INAPP-ISOLATION`、`OBS-WBS-PREDECESSOR-EVIDENCE`，并拆为 `ISSUE-040-052`～`ISSUE-040-056` 回归证明。
+- 本批只锁定现有契约与未实现边界，不新增自动天气、综合供应商评分、异步报表、外部通知渠道、多前置或自动排程。
+
 ## 2026-07-16 增量：供应商默认提前期与订单交货日期预填
 
 - 合作方现已为 SUPPLIER 提供可空0～3650整数自然日默认提前期，API 与页面覆盖创建、更新、读取、清空、旧客户端省略字段和非供应商兼容边界。

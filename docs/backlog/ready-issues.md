@@ -6,7 +6,267 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047`、`ISSUE-040-048`、`ISSUE-040-049`、`ISSUE-040-050`、阻塞修复 `ISSUE-047-002` 与 `ISSUE-040-051` 已完成；`启动迭代-20` 当前完成 15/20。供应商默认提前期与订单交货日期预填已收口，下一候选按现行产品决策门选择。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`～`ISSUE-040-051`（含阻塞修复 `ISSUE-047-002`）已完成；`启动迭代-20` 当前完成 15/20。以下5条回归证明 Ready 用于完成本轮剩余任务，均不把既有能力表述为新增平台能力。
+
+### ISSUE-040-052：日报人工天气摘要与在场人数契约回归
+
+优先级：P1
+任务性质：回归证明
+类型：现场日报 / 人工天气 / 在场人数 / JSON整数 / 兼容边界
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/product-intelligence/project-map.md`; candidateEvidenceHead=f332d7462783d39ad9873480ce338570f6af2e88
+存量问题键：[stock:OBS-SITE-DAILY-WEATHER-HEADCOUNT]
+关联产品目标：把已存在的人工天气摘要和在场人数能力与仍缺的自动天气、人员班组、设备和考勤明确分界，形成可复验契约。
+候选对比：现有前后端与测试已具备，补齐正式证据小于新增天气服务、班组表或设备台账，并能立即消除能力地图歧义。
+核验结论：实体限制天气摘要最多200字，在场人数可空且经严格整数反序列化后限制0～100000；前端已有维护与详情展示，Controller测试覆盖创建、更新、读取和负向边界。
+阻塞证据：当前项目地图仍把A-03概括为天气与人员能力缺失，缺少独立报告时无法区分“人工摘要/总人数已具备”和“自动天气/班组明细仍缺”。
+解除条件：目标后端、前端测试与真实浏览器只读/取消证据通过，正式报告明确能力边界并移除唯一观察项。
+Migration：不需要
+依赖：既有 SiteDailyLog 实体、Controller、前端日报页与目标测试。
+风险等级：低
+运行态要求：本地 H2/MySQL 与 Vite；浏览器只打开/取消，不写入业务数据。
+Reviewer要求：确认NULL、0、100000、负数、小数、100001和200字边界；不得宣称自动天气、班组、考勤、定位或设备能力。
+归档报告：`docs/quality/ISSUE-040-052-日报人工天气摘要与在场人数契约回归验收报告.md`
+最小回滚：仅回退本项治理文档与报告，不改业务代码、schema或数据。
+目标：
+- 证明人工天气摘要和在场总人数的现有前后端契约仍在当前master生效。
+- 明确A-03已具备与仍缺能力的边界。
+非目标：
+- 不修改业务代码、数据库、测试实现或运行数据。
+- 不新增自动天气、人员班组、考勤、设备、定位、离线或统计能力。
+- 不连接生产、不发布生产、不push。
+允许修改：
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-052-日报人工天气摘要与在场人数契约回归验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- `SiteDailyLogControllerTest` 全部通过并覆盖天气200字、人数NULL/0/整数上下界与负数/小数/越界拒绝。
+- 日报前端专项与类型检查通过；真实浏览器显示人工天气摘要和在场人数入口/详情语义且不写入。
+- Ready lint、允许路径、`git diff --check`通过；观察项关闭且新增后续项0、关闭1、净变化-1。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-052`
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogControllerTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm exec vue-tsc --noEmit`
+- `git diff --check`
+
+### ISSUE-040-053：供应商交付评分项目与空值边界回归
+
+优先级：P1
+任务性质：回归证明
+类型：采购驾驶舱 / 供应商评分 / 项目隔离 / 逾期 / 稳定排序
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/product-intelligence/project-map.md`; candidateEvidenceHead=f332d7462783d39ad9873480ce338570f6af2e88
+存量问题键：[stock:OBS-SUPPLIER-SCORE-BOUNDARIES]
+关联产品目标：锁定现有供应商交付评分的可见项目、到货事实、迟交和空值边界，避免把交付评分误解为综合履约评分。
+候选对比：现有服务与采购驾驶舱测试已覆盖关键口径，独立收口成本低于新增质量、价格、退货或服务维度，且直接澄清A-05当前能力。
+核验结论：DashboardMaterialRoleService已有供应商评分聚合和稳定排序；现有测试包含跨项目、逾期、空供应商、完成迟交和前端钻取。
+阻塞证据：A-05仍只概括“当前只有交付维度”，缺少独立正式证据说明交付维度的可见范围和空值策略。
+解除条件：后端与前端目标测试通过，正式报告明确评分只覆盖交付维度并关闭唯一观察项。
+Migration：不需要
+依赖：既有采购订单、材料到货、供应商名称映射、采购驾驶舱组件与目标测试。
+风险等级：低
+运行态要求：本地 H2；不造业务数据，不连接外部系统。
+Reviewer要求：确认跨项目不可见、无供应商不合成评分、迟交口径与稳定排序；不得宣称质量、价格、退货、服务或黑名单综合评分。
+归档报告：`docs/quality/ISSUE-040-053-供应商交付评分项目与空值边界回归验收报告.md`
+最小回滚：仅回退本项治理文档与报告。
+目标：
+- 证明采购驾驶舱供应商交付评分在当前master保持项目、空值、迟交与排序边界。
+- 明确A-05仍需独立决策的综合履约维度。
+非目标：
+- 不修改业务代码、评分公式、数据库、测试实现或运行数据。
+- 不新增质量、价格、退货、服务、黑名单或供应商SLA。
+- 不连接生产、不发布生产、不push。
+允许修改：
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-053-供应商交付评分项目与空值边界回归验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- `DashboardMaterialRoleServiceTest` 全类通过并覆盖供应商评分现有边界。
+- `DashboardPurchaseView.test.ts` 全部通过，列表、空态和供应商钻取保持一致。
+- Ready lint、允许路径、`git diff --check`通过；观察项关闭且新增后续项0、关闭1、净变化-1。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-053`
+- `cd backend; .\mvnw.cmd "-Dtest=DashboardMaterialRoleServiceTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/dashboard/__tests__/DashboardPurchaseView.test.ts`
+- `git diff --check`
+
+### ISSUE-040-054：现金日记账CSV公式注入与导出契约回归
+
+优先级：P1
+任务性质：回归证明
+类型：现金日记账 / CSV导出 / 公式注入 / UTF-8 / 权限
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/product-intelligence/project-map.md`; candidateEvidenceHead=f332d7462783d39ad9873480ce338570f6af2e88
+存量问题键：[stock:OBS-CASHBOOK-CSV-SAFETY]
+关联产品目标：证明现有同步CSV导出对公式单元格和引号安全处理，并保持导出权限与UTF-8响应契约。
+候选对比：现有服务和Controller测试已具备，安全回归价值高于在缺少队列/存储前置时扩异步报表平台。
+核验结论：CashJournalService测试覆盖=、+、-、@、前导空白和双引号转义；Controller测试覆盖text/csv UTF-8响应与导出权限链。
+阻塞证据：A-06缺少对现有同步导出安全边界的正式说明，易将“报表平台未形成”误读为“现有导出不可安全使用”。
+解除条件：目标测试通过，正式报告锁定转义、权限、租户查询与同步导出边界并关闭观察项。
+Migration：不需要
+依赖：既有现金日记账查询、CSV导出服务、Controller权限与目标测试。
+风险等级：中
+运行态要求：本地 H2；不下载或保存真实财务数据。
+Reviewer要求：确认公式前缀化不破坏普通文本和引号转义，Controller仍要求导出权限并按认证租户查询；不得宣称异步导出或外部报表平台。
+归档报告：`docs/quality/ISSUE-040-054-现金日记账CSV公式注入与导出契约回归验收报告.md`
+最小回滚：仅回退本项治理文档与报告。
+目标：
+- 证明现金日记账CSV公式注入防护、UTF-8和权限契约在当前master生效。
+- 明确A-06现有同步导出与仍缺平台化能力的边界。
+非目标：
+- 不修改业务代码、财务数据、CSV格式、权限或测试实现。
+- 不新增异步导出、对象存储、任务队列或外部报表平台。
+- 不连接生产、不发布生产、不push。
+允许修改：
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-054-现金日记账CSV公式注入与导出契约回归验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- `CashJournalServiceTest` 与 `CashJournalControllerTest` 全部通过，公式字符、前导空白、双引号、UTF-8响应和权限入口有证据。
+- 安全审查确认没有扩大租户、金额或导出权限边界。
+- Ready lint、允许路径、`git diff --check`通过；观察项关闭且新增后续项0、关闭1、净变化-1。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-054`
+- `cd backend; .\mvnw.cmd "-Dtest=CashJournalServiceTest,CashJournalControllerTest" test`
+- `git diff --check`
+
+### ISSUE-040-055：站内通知租户用户隔离与已读幂等回归
+
+优先级：P1
+任务性质：回归证明
+类型：站内通知 / 租户隔离 / 用户隔离 / 已读幂等 / SSE
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/product-intelligence/project-map.md`; candidateEvidenceHead=f332d7462783d39ad9873480ce338570f6af2e88
+存量问题键：[stock:OBS-NOTIFICATION-INAPP-ISOLATION]
+关联产品目标：证明现有站内通知按租户+用户隔离且已读操作幂等，明确它不等于邮件、短信等外部真实渠道。
+候选对比：现有服务、SSE和通知铃测试覆盖完整，先锁定站内渠道边界小于接入外部凭据、失败重试队列和供应商服务。
+核验结论：NotificationService显式接收tenantId/userId，分页、计数和已读查询均双维过滤；现有测试覆盖跨租户、跨用户、重复已读、SSE和前端通知铃。
+阻塞证据：A-07只记录外部渠道未打通，缺少正式报告说明站内渠道已经具备的隔离与交互边界。
+解除条件：后端与前端目标测试通过，真实浏览器只读打开通知中心且无写入，正式报告关闭观察项。
+Migration：不需要
+依赖：既有 NotificationService、Controller、SSE、NotificationBell与目标测试。
+风险等级：中
+运行态要求：本地 H2/MySQL 与 Vite；浏览器只打开通知中心，不标记已读或写入。
+Reviewer要求：确认所有查询/写操作同时绑定租户和用户，越界统一不可见，重复已读幂等，SSE键含租户；不得宣称邮件、短信、企微、钉钉或重试队列完成。
+归档报告：`docs/quality/ISSUE-040-055-站内通知租户用户隔离与已读幂等回归验收报告.md`
+最小回滚：仅回退本项治理文档与报告。
+目标：
+- 证明站内通知隔离、未读计数、已读幂等和通知铃契约在当前master生效。
+- 明确A-07站内渠道与外部真实渠道的边界。
+非目标：
+- 不修改通知代码、数据、SSE超时、权限或测试实现。
+- 不接入邮件、短信、企业微信、钉钉、外部凭据或重试队列。
+- 不连接生产、不发布生产、不push。
+允许修改：
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-055-站内通知租户用户隔离与已读幂等回归验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- `NotificationServiceTest` 全部通过，覆盖租户/用户隔离、未读、单条/全部已读、重复已读与SSE。
+- `NotificationBell.test.ts` 全部通过；真实浏览器只打开通知中心，不触发已读写入，控制台无新增error/warn。
+- Ready lint、允许路径、`git diff --check`通过；观察项关闭且新增后续项0、关闭1、净变化-1。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-055`
+- `cd backend; .\mvnw.cmd "-Dtest=NotificationServiceTest" test`
+- `cd frontend-admin; pnpm vitest run src/components/__tests__/NotificationBell.test.ts`
+- `git diff --check`
+
+### ISSUE-040-056：WBS单前置FS门禁与风险提示回归
+
+优先级：P1
+任务性质：回归证明
+类型：WBS / 单前置FS / 状态门禁 / 环依赖 / 项目隔离 / 单次提示
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/product-intelligence/project-map.md`; candidateEvidenceHead=f332d7462783d39ad9873480ce338570f6af2e88
+存量问题键：[stock:OBS-WBS-PREDECESSOR-EVIDENCE]
+关联产品目标：证明现有单前置FS门禁与前端风险提示在当前master保持一致，明确它不等于多前置和自动排程平台。
+候选对比：现有Controller和前端任务测试已覆盖跨项目、环依赖、未完成门禁与迟交提示，独立收口成本低于扩关系表和排程引擎。
+核验结论：SubTaskControllerTest覆盖前置关联、环检测、跨项目和未完成状态门禁；前端task测试覆盖前置未完成/迟交展示与错误单次提示。
+阻塞证据：A-04概括多前置与平台能力仍缺，缺少当前master正式证据时容易低估既有单前置FS闭环或把它外推为完整排程。
+解除条件：后端与前端目标测试通过，真实浏览器只打开/取消任务弹窗，正式报告关闭观察项。
+Migration：不需要
+依赖：既有 SubTask 单前置字段、状态机、任务页与目标测试。
+风险等级：中
+运行态要求：本地 H2/MySQL 与 Vite；浏览器只打开/取消，不写入任务。
+Reviewer要求：确认跨项目、环依赖、未完成前置和单次提示边界；不得宣称多前置、lag、多类型、自动排程、基线或资源平衡。
+归档报告：`docs/quality/ISSUE-040-056-WBS单前置FS门禁与风险提示回归验收报告.md`
+最小回滚：仅回退本项治理文档与报告。
+目标：
+- 证明单前置FS状态门禁、项目边界、环检测和前端风险提示在当前master生效。
+- 明确A-04既有最小闭环与平台化缺口。
+非目标：
+- 不修改业务代码、数据库、测试实现或运行数据。
+- 不新增多前置、SS/FF/SF、lag、自动排程、基线、资源平衡或甘特拖拽。
+- 不连接生产、不发布生产、不push。
+允许修改：
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-056-WBS单前置FS门禁与风险提示回归验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- `SubTaskControllerTest` 全部通过，覆盖前置关联、未完成门禁、跨项目、环依赖和解除前置。
+- `task.test.ts` 全部通过，覆盖未完成/迟交风险和错误单次提示；真实浏览器只取消不写入。
+- Ready lint、允许路径、`git diff --check`通过；观察项关闭且新增后续项0、关闭1、净变化-1。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-056`
+- `cd backend; .\mvnw.cmd "-Dtest=SubTaskControllerTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/subcontract/__tests__/task.test.ts`
+- `git diff --check`
 
 ### ISSUE-047-002：V155双数据库迁移镜像与H2测试隔离修复
 
