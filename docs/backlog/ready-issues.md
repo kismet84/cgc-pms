@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P0
 任务性质：运维治理
 类型：AutoPilot / closeout / Ready 区块 / 幂等 / 双提交 / 控制面金丝雀
-状态：Ready
+状态：Done
 来源锚点：`ISSUE-040-039` 收口实证；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-040-039-投标成本标记中标入口与状态项目边界验收报告.md`,`scripts/codex-autopilot/autopilot-closeout.ps1`
 存量问题键：[stock:AUTOPILOT-CLOSEOUT-BLOCK-BOUNDARY]
 关联产品目标：恢复本地连续迭代的确定性双提交与幂等收口，使后续产品和治理 Ready 不因其他历史 Done 区块被误判为已完成。

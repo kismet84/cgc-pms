@@ -76,3 +76,8 @@ v1.0 已完成任务及其报告入口保留在 [backlog 快照](../archive/v1.0
 
 状态：Done
 归档报告：`docs/quality/ISSUE-040-039-投标成本标记中标入口与状态项目边界验收报告.md`
+
+### ISSUE-047-001：AutoPilot 收口区块边界与幂等误判修复
+
+状态：Done
+归档报告：`docs/quality/ISSUE-047-001-AutoPilot收口区块边界与幂等误判验收报告.md`
