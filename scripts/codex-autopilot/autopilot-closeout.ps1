@@ -40,6 +40,15 @@ function Set-AutopilotReadyDone {
   return $true
 }
 
+function Test-AutopilotReadyDone {
+  param([string]$ReadyPath, [string]$IssueTitle)
+  $text = Get-Content -LiteralPath $ReadyPath -Raw -Encoding UTF8
+  $pattern = '(?ms)^###\s+' + [regex]::Escape($IssueTitle) + '\s*\r?\n(?<body>.*?)(?=^###\s+ISSUE-|\z)'
+  $match = [regex]::Match($text, $pattern)
+  if (!$match.Success) { return $false }
+  return $match.Groups['body'].Value -match '(?m)^状态[：:]\s*Done\s*$'
+}
+
 function Assert-AutopilotStockIssueClosed {
   param([string]$Worktree, [string]$ReadyPath, [string]$IssueTitle)
   $readyText = Get-Content -LiteralPath $ReadyPath -Raw -Encoding UTF8
@@ -105,7 +114,7 @@ function Complete-AutopilotIssueCloseout {
   $scoringActive = $null -ne $TaskScoringConfig -and (Test-AutopilotTaskScoringActive $TaskScoringConfig)
   $activeScoringVersion = if ($scoringActive) { [string](Get-AutopilotScoreProperty $TaskScoringConfig 'activeVersion' '') } else { '' }
   $ancestorResult = Invoke-AutopilotCloseoutGit -RepoRoot $RepoRoot -Arguments @('merge-base','--is-ancestor',$worktreeHead,'HEAD') -AcceptedExitCodes @(0,1)
-  if ($ancestorResult.exitCode -eq 0 -and (Get-Content -LiteralPath (Join-Path $RepoRoot 'docs\backlog\ready-issues.md') -Raw -Encoding UTF8) -match ('(?ms)^###\s+' + [regex]::Escape($Issue.title) + '.*?^状态：Done\s*$')) {
+  if ($ancestorResult.exitCode -eq 0 -and (Test-AutopilotReadyDone -ReadyPath (Join-Path $RepoRoot 'docs\backlog\ready-issues.md') -IssueTitle $Issue.title)) {
     $score = if ($scoringActive) { Get-AutopilotTaskScoreFromReport -ReportPath $archivePath } else { $null }
     $implementationCommit = if ($score) { [string]$score.implementationCommit } else { Get-AutopilotCloseoutGitText (Invoke-AutopilotCloseoutGit -RepoRoot $Worktree -Arguments @('rev-parse',"$worktreeHead^")) }
     $scoreShadow = if ($scoringActive) { Get-AutopilotTaskScoreFromReport -ReportPath $archivePath -Shadow } else { $null }

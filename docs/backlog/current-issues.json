@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-16T02:34:55+08:00",
+  "updatedAt": "2026-07-16T02:39:00+08:00",
   "issues": [
     { "issueKey": "A-01", "title": "后端接口用户入口治理", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P0", "blocking": false, "summary": "当前有4个需补用户入口、11个需要确认的接口子项。", "acceptanceCriteria": "15个子项均形成补入口、复用现有入口、内部接口、废弃或确认保留的唯一裁决，并通过权限、租户和状态边界验证。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md", "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"] },
     { "issueKey": "A-02", "title": "采购补货深化", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P1", "blocking": false, "summary": "供应商提前期、工作日历、预测和跨仓调拨仍缺。", "acceptanceCriteria": "通过产品决策门形成最小闭环，并验证采购角色、项目范围、数量和日期口径。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md"] },
@@ -12,7 +12,6 @@
     { "issueKey": "A-07", "title": "通知平台真实渠道", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P2", "blocking": false, "summary": "邮件、短信、企业微信、钉钉及失败重试队列未打通。", "acceptanceCriteria": "至少一个真实渠道完成发送、失败、重试、权限和脱敏闭环。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md"] },
     { "issueKey": "A-09", "title": "总工程师技术域", "status": "FROZEN", "classification": "STILL_APPLICABLE", "priority": "P2", "blocking": false, "summary": "技术方案、设计协调、技术审核、RFI/Submittal和重大技术问题对象尚未建立。", "acceptanceCriteria": "获得业务对象、角色、状态和数据前置后重新通过产品决策门。", "deferReason": "业务对象与验收前置不足，继续Frozen。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md"] },
     { "issueKey": "A-10", "title": "移动端与外部系统", "status": "FROZEN", "classification": "STILL_APPLICABLE", "priority": "P2", "blocking": false, "summary": "PWA离线、真实财务系统、外部监控日志平台和BIM/IFC属于后续方向。", "acceptanceCriteria": "外部系统和安全前置明确后逐项形成独立Candidate。", "deferReason": "当前无已通过决策门的外部集成目标。", "sourceRefs": ["docs/backlog/v1.0-historical-issue-classification.md"] },
-    { "issueKey": "AUTOPILOT-CLOSEOUT-BLOCK-BOUNDARY", "title": "AutoPilot closeout 幂等检查跨 Ready 区块误判", "status": "OPEN", "classification": "OPERATIONAL_RISK", "priority": "P0", "blocking": true, "summary": "当前 Ready 位于已完成条目前时，Complete-AutopilotIssueCloseout 的未分段正则会读取后续条目的 Done 状态并错误返回已合并，跳过实现与收口提交。", "acceptanceCriteria": "幂等检查只读取目标 Issue 区块；当前 Ready 后存在任意 Done 条目时仍执行双提交，真正已完成目标保持幂等；closeout 自测与控制面回归通过。", "sourceRefs": ["docs/quality/ISSUE-040-039-投标成本标记中标入口与状态项目边界验收报告.md", "scripts/codex-autopilot/autopilot-closeout.ps1"] },
 
     { "issueKey": "A-01-BID-LOST", "title": "投标成本标记失标缺少用户入口", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P1", "blocking": false, "parentIssueKey": "A-01", "summary": "PUT /bid-cost/{id}/lost未检出前端同方法入口。", "acceptanceCriteria": "提供状态动作并验证bid:status、允许状态和重复操作。", "sourceRefs": ["docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"] },
     { "issueKey": "A-01-OVERHEAD-CREATE", "title": "间接费规则新建缺少用户入口", "status": "OPEN", "classification": "STILL_APPLICABLE", "priority": "P1", "blocking": false, "parentIssueKey": "A-01", "summary": "POST /overhead-allocation/rules未检出前端同方法入口。", "acceptanceCriteria": "提供新建入口并验证overhead:add、金额和租户边界。", "sourceRefs": ["docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"] },

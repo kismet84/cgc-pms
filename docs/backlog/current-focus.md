@@ -1,5 +1,11 @@
 # Current Focus
 
+## 2026-07-16 增量：AutoPilot 收口区块边界阻塞已解除
+
+- `ISSUE-047-001` 将 closeout 幂等判断收敛为目标 Issue 标题和下一 Issue 标题之间的有界区块；目标仍为 Ready 时，后续其他条目的 Done 不再被误读。
+- 临时 Git 仓库夹具新增“目标 Ready 后紧邻历史 Done”场景，旧实现会跳过存量关闭门禁，修复后继续执行双提交；原有真正 Done 目标重试幂等、分支、基线、评分和 fast-forward 回归保持通过。
+- closeout 自测与完整控制面自测通过，独立风险复核 `PASS`、findings=无；`AUTOPILOT-CLOSEOUT-BLOCK-BOUNDARY` 已从唯一台账移除。新增后续项0、关闭后续项1、净变化-1，剩余迭代可继续。
+
 ## 2026-07-16 增量：AutoPilot 收口区块边界阻塞已立项
 
 - `ISSUE-040-039` 双提交前暴露 `Complete-AutopilotIssueCloseout` 幂等检查未限制 Ready 区块：目标仍为 Ready，但后续任一条目为 Done 时会错误返回“已合并”，跳过实现/收口提交；主线程使用等价原子步骤完成当前 Issue，未造成交付丢失。

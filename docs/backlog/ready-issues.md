@@ -65,6 +65,8 @@ Reviewer要求：确认修复只收紧目标区块识别，不放宽分支、基
 - `pwsh -NoProfile -File scripts/codex-autopilot/test-control-plane.ps1`
 - `git diff --check`
 
+收口结论：closeout 幂等状态已按目标 Issue 区块有界读取；目标 Ready 后存在其他 Done 时继续触发存量关闭门禁并完成双提交，目标自身已 Done 的重试仍保持幂等。closeout 自测、完整控制面自测、Ready lint、范围与差异检查均通过，独立风险复核 `PASS`、findings=无。`AUTOPILOT-CLOSEOUT-BLOCK-BOUNDARY` 已移除；新增后续项0、关闭后续项1、净变化-1。
+
 ### ISSUE-040-039：投标成本标记中标入口与状态项目边界
 
 优先级：P1
