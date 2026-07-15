@@ -6,7 +6,64 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042` 与 `ISSUE-040-043` 已完成；`启动迭代-20` 当前完成 6/20。明确入口叶子已清空，下一条 Ready 修复驾驶舱性能测试阈值文案与真实断言不一致。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043` 与 `ISSUE-040-044` 已完成；`启动迭代-20` 当前完成 7/20。明确入口叶子已清空，下一条 Ready 补齐补货设置的三类 fail-close 负向回归。
+
+### ISSUE-040-045：补货设置权限项目与乐观锁负向回归
+
+优先级：P1
+任务性质：回归证明
+类型：库存补货 / 权限 / 项目范围 / 乐观锁 / 测试隔离
+状态：Ready
+来源锚点：项目知识图谱当前问题 `OBS-REPLENISHMENT-NEGATIVE-TESTS`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=0f36678d7cee48b5428f84a449c52dec5d7c8aac
+存量问题键：[stock:OBS-REPLENISHMENT-NEGATIVE-TESTS]
+关联产品目标：为已完成的采购低库存补货设置闭环补齐只读权限、跨项目和模拟乐观锁冲突的独立 fail-close 证据，防止越权或并发失败被误判为成功写入。
+候选对比：本项是当前唯一 P1、证据完整且无需产品决策门的观察项；三类负向样本均可复用现有权限、项目访问与 `@Version` 冲突路径，实施与回滚成本低于新增采购预测、工作日历或跨仓调拨能力。
+核验结论：补货设置已有正向、数值关系和提前期校验；安全阈值已有跨项目拒绝，但补货设置自身尚无只读权限、跨项目和确定性乐观锁冲突专项。CodeGraph 未召回补货符号，已按工具召回不足用当前分支 `rg` 和文件读取核验 Controller、Service 与测试承载点。
+阻塞证据：现有通过证据不能独立证明只读采购经理、无项目访问用户及 `updateById=0` 冲突均拒绝且不改变补货设置，正式回归存在权限和并发证据缺口。
+解除条件：三类负向测试分别稳定断言 403、PROJECT_ACCESS_DENIED、STOCK_CONCURRENT_CONFLICT，并在每个失败后证明持久化补货字段未变化；测试之间使用独立夹具或事务回滚。
+Migration：不需要
+依赖：复用 `MatStockController`、`MatStockService.loadAuthorizedStock`、`ProjectAccessChecker`、`MatStockMapper.updateById` 和 local H2 测试上下文。
+风险等级：中
+运行态要求：仅 local/test；不需要浏览器、Docker 运行态或测试数据重置；不得连接或发布生产。
+Reviewer要求：确认无权限请求在 Service 前被拒绝；跨项目拒绝发生在 update 前；模拟冲突固定返回 update=0，且断言数据库/持久化替身中的安全阈值、目标量和提前期均未变化；不得修改生产逻辑。
+归档报告：`docs/quality/ISSUE-040-045-补货设置权限项目与乐观锁负向回归验收报告.md`
+最小回滚：回退新增专项测试、治理回写和报告；生产代码与数据无需回滚。
+目标：
+- 为只具备库存读取权限、不具备库存编辑权限的采购经理补充补货设置 PUT 403 与字段不变断言。
+- 为无目标项目访问权用户补充 Service 层 PROJECT_ACCESS_DENIED 与字段不变断言。
+- 用独立 Mockito 单元测试稳定模拟 `MatStockMapper.updateById` 返回 0，断言 STOCK_CONCURRENT_CONFLICT 且持久化替身未变化。
+非目标：
+- 不修改补货设置生产逻辑、权限码、项目范围模型、乐观锁重试策略或库存出入库并发路径。
+- 不扩展采购预测、供应商提前期、工作日历、跨仓调拨、自动下单、页面或数据库迁移。
+- 不连接生产、不发布生产、不 push。
+允许修改：
+- `backend/src/test/java/com/cgcpms/inventory/MatStockControllerTest.java`
+- `backend/src/test/java/com/cgcpms/inventory/MatStockServiceTest.java`
+- `backend/src/test/java/com/cgcpms/inventory/MatStockReplenishmentConflictTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-045-补货设置权限项目与乐观锁负向回归验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `frontend-admin/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 只读权限 PUT 返回 403，调用前后安全阈值、补货目标量和提前期完全一致。
+- 无项目访问用户收到 PROJECT_ACCESS_DENIED，调用前后补货三字段完全一致。
+- `updateById=0` 确定性触发 STOCK_CONCURRENT_CONFLICT，持久化替身无字段变化，且没有 insert/delete 或其他写入。
+- 三类测试可独立运行且重复通过；收口移除 `OBS-REPLENISHMENT-NEGATIVE-TESTS`；新增后续项0、关闭1、净变化-1。
+- Ready lint、目标专项、`git diff --check` 和中风险复核 PASS。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-045`
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockControllerTest#testStockListOnlyCannotUpdateReplenishmentSettings,MatStockServiceTest#testReplenishmentSettingsRejectsInaccessibleProject,MatStockReplenishmentConflictTest" test`
+- `git diff --check`
 
 ### ISSUE-040-044：驾驶舱性能测试阈值文案对齐
 
