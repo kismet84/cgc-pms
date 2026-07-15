@@ -116,3 +116,8 @@ v1.0 已完成任务及其报告入口保留在 [backlog 快照](../archive/v1.0
 
 状态：Done
 归档报告：`docs/quality/ISSUE-040-046-库存阈值与出库真实并发防覆盖回归验收报告.md`
+
+### ISSUE-040-047：WBS软删除墓碑事务故障注入回归
+
+状态：Done
+归档报告：`docs/quality/ISSUE-040-047-WBS软删除墓碑事务故障注入回归验收报告.md`

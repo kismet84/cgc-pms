@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P2
 任务性质：回归证明
 类型：WBS / 分包任务 / 逻辑删除 / 事务回滚 / 故障注入 / 编号唯一性
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `OBS-WBS-TOMBSTONE-FAULT`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=1ad493ac3839a43349e9808be811f26e7ff3c576
 存量问题键：[stock:OBS-WBS-TOMBSTONE-FAULT]
 关联产品目标：为已完成的 WBS 分包任务软删除编号墓碑补齐事务故障证据，确保墓碑改名成功但逻辑删除失败时整笔回滚，不留下不可见记录占用 `DELETED-<id>` 或原业务编号。
