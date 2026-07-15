@@ -4,7 +4,79 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-032` 已完成；本次 `自动迭代-1` 达到一条上限，当前无待实施 Ready。
+`ISSUE-040-033` 已选定为本次 `启动迭代-1` 的唯一待实施 Ready；本轮完成或阻塞后不再派发下一项。
+
+### ISSUE-040-033：投标成本详情只读入口与租户边界
+
+优先级：P1
+任务性质：缺口修复
+类型：投标成本 / 用户入口 / 只读详情 / 权限 / 租户隔离 / 不存在记录 fail-close
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-BID-DETAIL`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；候选证据基于当前 HEAD `d28d71a83a6709560166e028d64bf5b72a365ccd`。
+存量问题键：[stock:A-01-BID-DETAIL]
+关联产品目标：在既有投标成本列表提供最小只读详情入口，让具备 `bid:query` 的用户查看当前租户投标头信息，同时保持跨租户与不存在记录统一隐藏。
+核验结论：问题仍存在——后端 `GET /bid-cost/{id}` 已由 `bid:query` 或 ADMIN/SUPER_ADMIN 保护，`BidCostService.requireExisting` 对不存在和跨租户记录统一抛出 `BID_COST_NOT_FOUND`；前端同域 API 与 `/bid-cost` 页面只实现列表和受控新建，没有详情请求或入口，现有 Controller 测试也未精确覆盖详情权限与跨租户拒绝路径。
+候选对比：当前 P1 Open 叶子中，DETAIL 复用刚完成的投标列表页面与既有只读接口，不新增状态、金额或业务写入；UPDATE/DELETE/WON/LOST 和间接费 CRUD 均涉及写状态、金额或删除，风险与回滚成本更高，因此本次单 Issue 金丝雀选择 DETAIL。
+检索交叉核验：CodeGraph 命中 `BidCostController.getById`、`BidCostService.getById/requireExisting` 与租户判断，但未完整召回前端同域精确文件，归类为工具召回不足；已用 `rg` 和直接文件读取确认前端缺口，并由只读 `codebase-memory-mcp` 交叉确认 Controller→Service 以及前后端 `/bid-cost` 关系。最终以当前分支源码、唯一台账与源报告为准。
+阻塞证据：具备查询权限的用户只能从列表看到有限列，无法访问后端已有详情；详情接口缺少未登录、无权限、跨租户和不存在记录的精确集成测试证据。
+解除条件：前端增加类型化详情 GET 并在桌面表格和移动卡片提供只读详情入口；详情弹窗覆盖加载、成功、失败保留和关闭重开；后端详情的 401、403、跨租户与不存在记录 fail-close、合法读取证据齐全，列表与新建能力不回退。
+Migration：不需要
+依赖：复用既有 `/bid-cost` 页面、`BidCostVO`、类型化 request、`GET /bid-cost/{id}`、`BidCostController`、`BidCostService.requireExisting`、V150 `bid:query` 菜单权限及现有前后端测试夹具；不新增路由、菜单、权限码、后端主代码、表或状态机。
+风险等级：高
+风险说明：详情会扩大单条租户业务数据的前端可达性，必须证明无 `bid:query`、跨租户和不存在记录均 fail-close，且前端不发送 tenantId、不引入写操作。
+运行态要求：自动化只在 local/dev/test 执行；浏览器验收前必须通过 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard` health gate，任一失败先归类为环境前置并执行 runtime refresh，稳定等待180秒后复验；浏览器只读打开现有投标详情，不创建、修改、删除或重置业务数据。
+Reviewer要求：按高风险只读权限与租户边界复核；确认前端只向所选记录 ID 发起 GET、无 tenantId/请求体/写操作，详情入口不另行放宽权限；复核后端 401、无权限403、跨租户与不存在记录统一隐藏、合法读取，页面失败不伪报空数据，列表、新建、筛选、分页与移动端布局不回退；对绑定 diff 给出 PASS/NEEDS_REPAIR。
+归档报告：`docs/quality/ISSUE-040-033-投标成本详情只读入口与租户边界验收报告.md`
+最小回滚：回退本 Issue 的前端详情 API、页面入口/弹窗、专项测试与治理回写，以及后端新增的详情安全测试；不删除或重置投标、项目或成本数据，不改变既有接口、列表、新建、状态和金额逻辑。
+目标：
+- 在投标 API 增加类型化详情请求，只调用既有 `GET /bid-cost/{id}`，不发送 tenantId、params、body 或写请求。
+- 在既有投标成本页为桌面表格与移动卡片增加只读详情入口，以弹窗展示项目名称、状态、关联项目、备注、创建和更新时间，覆盖加载、失败保留与关闭重开。
+- 补齐前端 API/页面契约测试，并在既有后端 Controller 集成测试中增加详情权限、租户及不存在记录的精确样本。
+非目标：
+- 不开放编辑、删除、中标、失标、项目转换、金额/成本项、批量、导入或导出，不新增详情路由或独立页面。
+- 不修改后端 Controller/Service/实体/Mapper、数据库迁移、菜单、权限码、状态机、成本汇总或项目访问规则，不在前端显示 tenantId 或审计主体字段。
+- 不连接生产数据库、不发布生产、不自动 push，不新增、修改、删除或重置本地业务数据。
+允许修改：
+- `backend/src/test/java/com/cgcpms/bid/BidCostControllerTest.java`
+- `frontend-admin/src/api/modules/bid.ts`
+- `frontend-admin/src/api/modules/__tests__/bid.test.ts`
+- `frontend-admin/src/pages/bid-cost/index.vue`
+- `frontend-admin/src/pages/bid-cost/__tests__/index.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-040-033-投标成本详情只读入口与租户边界验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/test/java/com/cgcpms/bid/BidCostServiceTest.java`
+- `frontend-admin/src/types/bid.ts`
+- `frontend-admin/src/api/request.ts`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 前端 API 测试精确断言详情请求为 `GET /bid-cost/{id}`，无 body、params 与 tenantId；复用 `BidCostVO`，不新增或展示租户字段。
+- 桌面表格与移动卡片均可打开详情；点击后显示加载态，成功展示项目名称、状态、关联项目、备注、创建和更新时间；失败显示错误并保持弹窗可见且不展示上一条记录，关闭后清空，再次打开按当前记录重新请求。
+- 未登录详情请求返回401；已登录但无 `bid:query` 返回403；持 `bid:query` 或 ADMIN/SUPER_ADMIN 可读取当前租户记录；跨租户 ID 与不存在 ID 均返回相同业务错误且不泄露记录内容。
+- 既有列表查询、筛选、分页、空态、受控新建及移动端列表测试不回退；浏览器验收只读打开现有记录详情，控制台无新增 error/warn。
+- 收口必须引用 `docs/backlog/current-issues.json` 及本项 `sourceRefs`；全部通过后移除 `A-01-BID-DETAIL`，同步更新 A-01 守恒为有用户入口238、前端调用但无独立页面58、内部/集成/运维4、需补入口10、待废弃0、需要确认11、总数321，并回写 Ready、current-focus、project-map；若差距或优先级判断变化，再更新 evolution-decision。
+- 归档报告统计新增后续项、关闭后续项和后续项净变化；所有发现项必须本轮修复、唯一载体承接或有依据关闭，存在悬空项不得通过。权限、租户或不存在记录 fail-close 证据不足时判不通过。
+- Ready lint、后端专项、前端专项、类型检查、目标 ESLint 与 `git diff --check` 全部通过；首次失败先按 tool_config、环境前置、真实质量/安全分类并复验。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-033`
+- `cd backend; .\mvnw.cmd "-Dtest=BidCostControllerTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-032：投标成本受控新建入口与租户状态边界
 

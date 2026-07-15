@@ -10,6 +10,13 @@ export function getBidCosts(params: BidCostQuery) {
   })
 }
 
+export function getBidCost(id: string) {
+  return request<BidCostVO>({
+    url: `/bid-cost/${id}`,
+    method: 'get',
+  })
+}
+
 export function createBidCost(data: BidCostCreatePayload) {
   return request<string>({
     url: '/bid-cost',

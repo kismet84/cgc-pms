@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import axios from 'axios'
 import { message } from 'ant-design-vue'
 import { FilterOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons-vue'
-import { createBidCost, getBidCosts } from '@/api/modules/bid'
+import { createBidCost, getBidCost, getBidCosts } from '@/api/modules/bid'
 import { useUserStore } from '@/stores/user'
 import type { BidCostQuery, BidCostVO, BidStatus } from '@/types/bid'
 import { useMobileViewport } from '@/composables/useMobileViewport'
@@ -14,6 +14,10 @@ const mobileFiltersOpen = ref(false)
 const loading = ref(false)
 const saving = ref(false)
 const createOpen = ref(false)
+const detailOpen = ref(false)
+const detailLoading = ref(false)
+const detail = ref<BidCostVO | null>(null)
+let detailRequestId = 0
 const rows = ref<BidCostVO[]>([])
 const total = ref(0)
 const query = reactive<BidCostQuery>({ pageNo: 1, pageSize: 20 })
@@ -44,6 +48,7 @@ const columns = [
   { title: '投标状态', dataIndex: 'bidStatus', key: 'bidStatus', width: 120 },
   { title: '关联项目ID', dataIndex: 'projectId', key: 'projectId', width: 180 },
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
+  { title: '操作', key: 'action', width: 80, fixed: 'right' as const },
 ]
 
 function errorMessage(error: unknown, fallback: string) {
@@ -102,6 +107,33 @@ async function submitCreate() {
   } finally {
     saving.value = false
   }
+}
+
+async function openDetail(row: BidCostVO) {
+  const requestId = ++detailRequestId
+  detail.value = null
+  detailOpen.value = true
+  detailLoading.value = true
+  try {
+    const result = await getBidCost(row.id)
+    if (requestId === detailRequestId) {
+      detail.value = result
+    }
+  } catch (error: unknown) {
+    if (requestId === detailRequestId) {
+      message.error(errorMessage(error, '加载投标详情失败'))
+    }
+  } finally {
+    if (requestId === detailRequestId) {
+      detailLoading.value = false
+    }
+  }
+}
+
+function clearDetail() {
+  detailRequestId += 1
+  detailLoading.value = false
+  detail.value = null
 }
 
 function search() {
@@ -232,6 +264,9 @@ onMounted(fetchRows)
                 </div>
                 <div>{{ row.projectId || '暂未关联项目' }}</div>
                 <small>{{ row.createdAt || '-' }}</small>
+                <a-button type="link" data-testid="mobile-detail-button" @click="openDetail(row)">
+                  查看详情
+                </a-button>
               </article>
               <a-empty v-if="!loading && !rows.length" description="暂无投标项目" />
             </div>
@@ -242,7 +277,7 @@ onMounted(fetchRows)
               :data-source="rows"
               :loading="loading"
               :pagination="false"
-              :scroll="{ x: 780 }"
+              :scroll="{ x: 860 }"
             >
               <template #bodyCell="{ column, record }">
                 <template v-if="column.key === 'bidStatus'">
@@ -252,6 +287,11 @@ onMounted(fetchRows)
                 </template>
                 <template v-else-if="column.key === 'projectId'">
                   {{ record.projectId || '—' }}
+                </template>
+                <template v-else-if="column.key === 'action'">
+                  <a-button type="link" data-testid="detail-button" @click="openDetail(record)">
+                    查看
+                  </a-button>
                 </template>
               </template>
               <template #emptyText>暂无投标项目</template>
@@ -337,6 +377,34 @@ onMounted(fetchRows)
           />
         </a-form-item>
       </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="detailOpen"
+      title="投标项目详情"
+      :footer="null"
+      data-testid="detail-modal"
+      @after-close="clearDetail"
+    >
+      <a-spin :spinning="detailLoading">
+        <a-descriptions v-if="detail" :column="1" bordered size="small">
+          <a-descriptions-item label="投标项目名称">
+            {{ detail.bidProjectName }}
+          </a-descriptions-item>
+          <a-descriptions-item label="投标状态">
+            <a-tag :color="statusMeta[detail.bidStatus].color">
+              {{ statusMeta[detail.bidStatus].label }}
+            </a-tag>
+          </a-descriptions-item>
+          <a-descriptions-item label="关联项目">
+            {{ detail.projectId || '暂未关联项目' }}
+          </a-descriptions-item>
+          <a-descriptions-item label="备注">{{ detail.remark || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="创建时间">{{ detail.createdAt || '—' }}</a-descriptions-item>
+          <a-descriptions-item label="更新时间">{{ detail.updatedAt || '—' }}</a-descriptions-item>
+        </a-descriptions>
+        <a-empty v-else-if="!detailLoading" description="详情加载失败，请关闭后重试" />
+      </a-spin>
     </a-modal>
   </div>
 </template>
@@ -471,6 +539,12 @@ onMounted(fetchRows)
   color: var(--text-secondary);
   font-size: 13px;
   border-bottom: 1px solid var(--border-subtle);
+}
+
+.bid-cost-mobile-card > :deep(.ant-btn-link) {
+  justify-self: end;
+  height: auto;
+  padding: 0;
 }
 
 .bid-cost-mobile-card-head {

@@ -198,7 +198,40 @@ class BidCostControllerTest {
 
     @Test @Order(6) @DisplayName("GET /bid-cost/{id} non-existent -> 4xx")
     void testGetById_NotFound() throws Exception {
-        mockMvc.perform(getWith("/bid-cost/999999").cookie(adminCookie())).andExpect(status().is4xxClientError());
+        mockMvc.perform(getWith("/bid-cost/999999").cookie(adminCookie()))
+                .andExpect(status().is4xxClientError())
+                .andExpect(jsonPath("$.code").value("BID_COST_NOT_FOUND"));
+    }
+
+    @Test @Order(6) @DisplayName("GET /bid-cost/{id} enforces authentication and bid:query")
+    void testGetById_QueryPermissionBoundary() throws Exception {
+        Assertions.assertNotNull(bidId);
+        mockMvc.perform(getWith("/bid-cost/" + bidId))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(getWith("/bid-cost/" + bidId).cookie(userCookie(TENANT_ID, List.of())))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(getWith("/bid-cost/" + bidId)
+                        .cookie(userCookie(TENANT_ID, List.of("bid:query"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.id").value(String.valueOf(bidId)));
+    }
+
+    @Test @Order(6) @DisplayName("GET /bid-cost/{id} hides another tenant record as not found")
+    void testGetById_TenantIsolation() throws Exception {
+        long id = 910000000000L + Math.abs(System.nanoTime() % 100000000L);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, id, 9001L, "CROSS-TENANT-BID-DETAIL-" + id);
+        try {
+            mockMvc.perform(getWith("/bid-cost/" + id)
+                            .cookie(userCookie(TENANT_ID, List.of("bid:query"))))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_COST_NOT_FOUND"))
+                    .andExpect(jsonPath("$.data").doesNotExist());
+        } finally {
+            jdbcTemplate.update("DELETE FROM bid_cost WHERE id = ?", id);
+        }
     }
 
     @Test @Order(6) @DisplayName("PUT /bid-cost/{id} -> 200 updates bid")
