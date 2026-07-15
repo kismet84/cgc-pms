@@ -36,3 +36,84 @@
 - 最小回滚：仅回退本项治理文档与报告。
 
 剩余风险：无；异步任务、对象存储、完整经营分析和外部报表平台继续保留在A-06聚合父项，不属于本项新增后续问题。
+
+<!-- AUTOPILOT-FACTS:START -->
+## AutoPilot 自动事实
+
+- Issue：ISSUE-040-054
+- Ready 哈希：1b0fb86e15f31ea7e1228dbf44c4f8909a3fb37fcc4916d0ac7e2c7fabb69a01
+- 实施提交：04557568aba54051bf1baad20b73ae3ca6973f13
+- 验证差异哈希：baf4fc655c8c60fae735fbca90da75687d1a3b00fa55a57e77f23960e04057b8
+- Evidence manifest：f8d17fe31885894579ff4d4d67e7ea3e9a0dea685a6512f4e09757658952ac67
+- Reviewer：required=True; decision=PASS
+- 后续项：added=0; closed=1; net=-1
+- 指标：{"closeoutDispatchCount":1,"contextBaseBuildCount":0,"contextDeltaBuildCount":0,"executorInvocationCount":0,"implementationDispatchCount":1,"inputTokens":null,"outputTokens":null,"phaseDurationsSeconds":{"IMPLEMENTED":0,"IMPLEMENTING":289,"REVIEWED":0,"REVIEWING":0,"VALIDATED":0,"VALIDATING":0},"phaseRestartCount":0,"plannerCandidateRefs":[],"plannerInvocationCount":0,"repairDispatchCount":0,"reportProjectionCount":1,"reviewDispatchCount":1,"reviewerInvocationCount":0,"runResumeCount":0,"tokenUsageStatus":"not_available","totalTokens":null,"validationDispatchCount":1,"validationExecutedCount":1,"validationReusedCount":0,"wallClockSeconds":289}
+- 控制面指纹：93a0a2677a888b909ef128a07c3bcff648115707190edb8b9555709baf6c5e74
+- PreCloseout Facts：caf12438f16478632b904f82575568989fac9b70cc869e85d1954c701481d9db
+<!-- AUTOPILOT-FACTS:END -->
+
+<!-- AUTOPILOT-TASK-SCORE:BEGIN key=ab2536765a3b26700cbd390665dc1e340c1a22f6bd6a1c022f6136ae8f346d50 -->
+## AutoPilot 任务评分
+
+```json
+{
+  "schemaVersion": 2,
+  "key": "ab2536765a3b26700cbd390665dc1e340c1a22f6bd6a1c022f6136ae8f346d50",
+  "issueId": "ISSUE-040-054",
+  "implementationCommit": "04557568aba54051bf1baad20b73ae3ca6973f13",
+  "scoringVersion": "autopilot-task-score/v2",
+  "scoredAt": "2026-07-16T07:21:48.0592635+08:00",
+  "total": 100,
+  "dimensions": {
+    "deliveryCorrectness": {
+      "score": 35,
+      "max": 35,
+      "evidence": [
+        "docs/quality/ISSUE-040-054-现金日记账CSV公式注入与导出契约回归验收报告.md"
+      ]
+    },
+    "zeroDanglingIssues": {
+      "score": 25,
+      "max": 25,
+      "evidence": [
+        "docs/quality/ISSUE-040-054-现金日记账CSV公式注入与导出契约回归验收报告.md"
+      ]
+    },
+    "firstPassAcceptance": {
+      "score": 20,
+      "max": 20,
+      "evidence": [
+        "docs/quality/ISSUE-040-054-现金日记账CSV公式注入与导出契约回归验收报告.md"
+      ]
+    },
+    "taskExecutionEfficiency": {
+      "score": 10,
+      "max": 10,
+      "evidence": [
+        "docs/quality/ISSUE-040-054-现金日记账CSV公式注入与导出契约回归验收报告.md"
+      ]
+    },
+    "stockIssueReduction": {
+      "score": 10,
+      "max": 10,
+      "evidence": [
+        "docs/quality/ISSUE-040-054-现金日记账CSV公式注入与导出契约回归验收报告.md"
+      ]
+    }
+  },
+  "hardGatesPassed": true,
+  "followupNetChange": -1,
+  "executionTiming": {
+    "wallClockSeconds": 289,
+    "businessPhaseSeconds": 289,
+    "controlPlaneSeconds": 0,
+    "semanticProgressAt": "07/16/2026 07:21:25",
+    "livenessSignalsExcluded": true
+  },
+  "sourceRefs": [
+    "docs/quality/ISSUE-040-054-现金日记账CSV公式注入与导出契约回归验收报告.md"
+  ],
+  "shadow": false
+}
+```
+<!-- AUTOPILOT-TASK-SCORE:END -->

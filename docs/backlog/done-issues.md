@@ -161,3 +161,8 @@ v1.0 已完成任务及其报告入口保留在 [backlog 快照](../archive/v1.0
 
 状态：Done
 归档报告：`docs/quality/ISSUE-040-053-供应商交付评分项目与空值边界回归验收报告.md`
+
+### ISSUE-040-054：现金日记账CSV公式注入与导出契约回归
+
+状态：Done
+归档报告：`docs/quality/ISSUE-040-054-现金日记账CSV公式注入与导出契约回归验收报告.md`

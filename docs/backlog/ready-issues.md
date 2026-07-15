@@ -172,7 +172,7 @@ Reviewer要求：确认跨项目不可见、无供应商不合成评分、迟交
 优先级：P1
 任务性质：回归证明
 类型：现金日记账 / CSV导出 / 公式注入 / UTF-8 / 权限
-状态：Ready
+状态：Done
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/product-intelligence/project-map.md`; candidateEvidenceHead=f332d7462783d39ad9873480ce338570f6af2e88
 存量问题键：[stock:OBS-CASHBOOK-CSV-SAFETY]
 关联产品目标：证明现有同步CSV导出对公式单元格和引号安全处理，并保持导出权限与UTF-8响应契约。
