@@ -142,4 +142,3 @@ test.describe('UI Refactor Smoke: Core Page Rendering', () => {
     })
   })
 })
-
