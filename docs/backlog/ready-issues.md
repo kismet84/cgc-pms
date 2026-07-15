@@ -61,8 +61,6 @@ Reviewer要求：确认只修改测试描述/输出，不放宽或收紧 `count 
 验证命令：
 - `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-044`
 - `cd backend; .\mvnw.cmd "-Dtest=DashboardPerformanceTest" test`
-- `rg -n "≤20" backend/src/test/java/com/cgcpms/DashboardPerformanceTest.java`
-- `rg -n "count <= 20" backend/src/test/java/com/cgcpms/DashboardPerformanceTest.java`
 - `git diff --check`
 
 ### ISSUE-040-043：间接费规则受控删除入口与执行事实保护
