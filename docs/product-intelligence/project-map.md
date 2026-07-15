@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-16 增量：PowerShell 7控制面运行证据
+
+- 本地 AutoPilot 已在 PowerShell 7.6.3 下通过控制面、连续 runner、状态机与 UTF-8 context delta 回归；pwsh 7+ 强制宿主、原子状态、fencing、恢复和收口语义均保持有效。
+- UTF-8 中文上下文往返及无 BOM 输出专项通过；本轮只补正式运行证据，没有改动 PowerShell、配置或插件。
+- `OBS-POWERSHELL7-COMPAT` 已关闭；结论限定为当前 Windows/pwsh 7.6.3 与仓库控制面，不外推到其他操作系统或预览版本。
+
 ## 2026-07-16 增量：WBS软删除墓碑事务原子性
 
 - 分包任务删除现已具备故障注入证据：墓碑编号更新成功后若逻辑删除步骤异常，Spring 事务会把 task_code 与 deleted_flag 一起回滚，不遗留半完成墓碑。

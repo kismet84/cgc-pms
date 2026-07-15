@@ -6,7 +6,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046` 与 `ISSUE-040-047` 已完成；`启动迭代-20` 当前完成 10/20。WBS 软删除事务故障证据已收口，当前 Ready 为 PowerShell 7 控制面与 UTF-8 兼容回归。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047` 与 `ISSUE-040-048` 已完成；`启动迭代-20` 当前完成 11/20。PowerShell 7 控制面与 UTF-8 兼容证据已收口，下一候选切换至其他存量问题域。
 
 ### ISSUE-040-048：PowerShell 7控制面与UTF-8兼容回归
 
@@ -65,6 +65,12 @@ Reviewer要求：确认四类专项均由 pwsh 7.6.3 执行，UTF-8 测试覆盖
 - `pwsh -NoProfile -File scripts/codex-autopilot/test-state-machine.ps1`
 - `pwsh -NoProfile -File scripts/codex-autopilot/tests/test-context-delta.ps1`
 - `git diff --check`
+
+执行复验结果（2026-07-16，主线程完成中风险控制面复核）：
+- 当前宿主为 PowerShell 7.6.3；控制面、状态机、UTF-8 context delta 三项快速专项均退出码0。
+- 连续 runner 专项在独立359.6秒窗口退出码0，覆盖执行模式、run lock fencing、恢复、stall、review/repair、closeout、报告投影和完成计数子套件。
+- 首次四命令并行包装在184秒总超时，分类为验证编排超时；拆分复跑后全部专项明确通过，不涉及源码修复或断言放宽。
+- diff 不含任何 ps1、配置、插件、hooks、skills 或规则文件。OBS-POWERSHELL7-COMPAT 已关闭；新增后续项0、关闭后续项1、后续项净变化-1。
 
 ### ISSUE-040-047：WBS软删除墓碑事务故障注入回归
 

@@ -1,5 +1,12 @@
 # Current Focus
 
+## 2026-07-16 增量：PowerShell 7控制面与UTF-8兼容回归完成
+
+- `ISSUE-040-048` 在真实 PowerShell 7.6.3 宿主下复跑控制面、连续 runner、状态机和 UTF-8 context delta；四类专项全部退出码0。
+- 连续 runner 用时359.6秒并覆盖执行模式、fencing、恢复、stall、review/repair、closeout、报告投影和完成计数；控制面、状态机与 UTF-8 专项分别明确通过，中文往返和无 BOM 输出保持有效。
+- 首次并行包装184秒超时已分类为验证编排窗口不足，拆分后无兼容失败；本任务没有修改任何 ps1、配置、插件、hooks、skills 或规则文件。
+- `OBS-POWERSHELL7-COMPAT` 已从唯一问题载体移除。新增后续项0、关闭后续项1、后续项净变化-1；`启动迭代-20` 当前完成11/20。
+
 ## 2026-07-16 增量：WBS软删除墓碑事务故障证据完成
 
 - `ISSUE-040-047` 在真实 Spring 事务内先执行分包任务墓碑编号 UPDATE，再于逻辑删除 SQL 前注入受控异常；事务退出后直接复读确认 task_code 恢复原编号、deleted_flag 保持0。
