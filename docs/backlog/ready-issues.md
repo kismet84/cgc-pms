@@ -8,6 +8,66 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046`、`ISSUE-040-047`、`ISSUE-040-048`、`ISSUE-040-049` 与 `ISSUE-040-050` 已完成；`启动迭代-20` 当前完成 13/20。日报领料联动真实浏览器证据已收口，下一候选按现行产品决策门选择。
 
+### ISSUE-047-002：V155双数据库迁移镜像与H2测试隔离修复
+
+优先级：P0
+任务性质：运维治理
+类型：Flyway / MySQL / H2 / 迁移镜像 / 测试隔离 / 阻塞修复
+状态：Ready
+来源锚点：`ISSUE-040-051` 首轮后端服务测试；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/ready-issues.md`; candidateEvidenceHead=7b09eea848563e7085b01a65790493ae6e015820
+存量问题键：[stock:AUTOPILOT-FLYWAY-V155-H2-MIRROR]
+关联产品目标：恢复供应商默认提前期任务在真实 H2 Flyway 测试上下文中的可验证性，保证同一 V155 在 MySQL 与 H2 两个既有迁移目录语义一致。
+候选对比：该问题稳定阻断当前产品 Ready 的后端测试，优先级高于继续新增产品切片；独立修复迁移镜像小于在测试类内临时建列或事后扩大已冻结 Ready 范围，并能覆盖后续所有 H2 测试上下文。
+核验结论：`backend/src/test/resources/application.yml` 启用 Flyway，测试运行态加载 `migration-h2`；现有迁移均按双方言目录镜像，当前实现只有 MySQL V155，`MdPartnerServiceTest` 因 H2 缺少 `default_lead_days` 在 SQL 查询阶段稳定失败。
+阻塞证据：`MdPartnerServiceTest,MdPartnerControllerTest` 首轮复验中 Controller 契约通过，但 Service 上下文对 `md_partner.default_lead_days` 的查询全部报列不存在；临时 `@Sql` 只能污染单类顺序，不能修复 CI 全套测试隔离。
+解除条件：MySQL/H2 均存在 V155 且只新增 `md_partner.default_lead_days INT NULL`；迁移完整性断言、版本唯一性和真实 H2 Flyway 上下文连续通过。
+Migration：需要
+Migration说明：新增 MySQL 与 H2 同版本 V155；两者只新增同名可空整数列，不改历史迁移、数据、索引、约束或权限。
+依赖：既有 `db/migration`、`db/migration-h2`、Flyway 测试 profile、`MigrationIntegrityTest` 与 `MigrationVersionUniquenessTest`。
+风险等级：中
+运行态要求：仅本地 H2 与静态迁移完整性测试；不连接业务服务、外部数据库或生产。
+Reviewer要求：确认双方言 V155 版本和列语义一致、没有 `IF NOT EXISTS` 等掩盖重复执行的宽松语义；确认测试通过来自真实 Flyway 目录而非测试类临时 DDL；不修改合作方、采购、库存或前端业务代码。
+归档报告：`docs/quality/ISSUE-047-002-V155双数据库迁移镜像与H2测试隔离验收报告.md`
+最小回滚：在供应商默认提前期产品代码合并前回退双方言 V155 与完整性断言；不改历史 schema history 或业务数据。
+目标：
+- 为 MySQL 与 H2 同步提供 V155，恢复当前及后续 H2 测试上下文的 schema 一致性。
+- 增加双方言文件存在性、版本与最小列语义断言，防止后续只改一侧。
+非目标：
+- 不实现合作方字段、采购订单预填、库存提前期、工作日历、预测或任何前端交互。
+- 不修改测试 profile、Flyway 路径、历史迁移、生产配置或 AutoPilot 控制面。
+- 不连接生产、不发布生产、不 push。
+允许修改：
+- `backend/src/main/resources/db/migration/V155__add_partner_default_lead_days.sql`
+- `backend/src/main/resources/db/migration-h2/V155__add_partner_default_lead_days.sql`
+- `backend/src/test/java/com/cgcpms/MigrationIntegrityTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-047-002-V155双数据库迁移镜像与H2测试隔离验收报告.md`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/partner/**`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `frontend-admin/**`
+- `backend/src/test/resources/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- MySQL 与 H2 V155 文件均存在，版本号和列定义一致，只新增 `md_partner.default_lead_days INT NULL`。
+- `MigrationIntegrityTest` 明确检查双方言 V155 的存在性与最小 SQL 语义；`MigrationVersionUniquenessTest` 证明各自目录没有重复版本。
+- 真实 `MdPartnerServiceTest` 启动 H2 Flyway 并通过，且测试类不新增临时 DDL、顺序依赖或 profile 覆盖。
+- 收口移除 `AUTOPILOT-FLYWAY-V155-H2-MIRROR`；新增后续项0、关闭1、净变化-1。
+- Ready lint、目标 Maven 测试连续两次、允许路径与 `git diff --check` 全部 PASS；Reviewer 结论 PASS。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-047-002`
+- `cd backend; .\mvnw.cmd "-Dtest=MigrationIntegrityTest,MigrationVersionUniquenessTest,MdPartnerServiceTest" test`
+- `git diff --check`
+
 ### ISSUE-040-051：供应商默认提前期与采购订单交货日期预填
 
 优先级：P1
