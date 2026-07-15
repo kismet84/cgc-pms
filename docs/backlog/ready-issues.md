@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P1
 任务性质：回归证明
 类型：库存补货 / 权限 / 项目范围 / 乐观锁 / 测试隔离
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `OBS-REPLENISHMENT-NEGATIVE-TESTS`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=0f36678d7cee48b5428f84a449c52dec5d7c8aac
 存量问题键：[stock:OBS-REPLENISHMENT-NEGATIVE-TESTS]
 关联产品目标：为已完成的采购低库存补货设置闭环补齐只读权限、跨项目和模拟乐观锁冲突的独立 fail-close 证据，防止越权或并发失败被误判为成功写入。
