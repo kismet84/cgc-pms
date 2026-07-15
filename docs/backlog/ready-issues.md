@@ -6,7 +6,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044` 与 `ISSUE-040-045` 已完成；`启动迭代-20` 当前完成 8/20。补货设置负向证据已收口，下一候选优先处理库存阈值与出入库真实并发专项。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045` 与 `ISSUE-040-046` 已完成；`启动迭代-20` 当前完成 9/20。库存真实并发证据已收口，下一候选切换至其他独立存量问题域。
 
 ### ISSUE-040-046：库存阈值与出库真实并发防覆盖回归
 
@@ -63,6 +63,12 @@ Reviewer要求：确认屏障只拦截两个线程各自第一次真实 `updateB
 - `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-046`
 - `cd backend; .\mvnw.cmd "-Dtest=MatStockRealConcurrencyTest" test`
 - `git diff --check`
+
+执行复验结果（2026-07-16，主线程完成中风险结构化复核）：
+- 新增 MatStockRealConcurrencyTest，两个真实事务在首次 updateById 前读取同版本快照；阈值事务先成功，出库旧版本更新恰好返回0一次，随后复读并重试成功。
+- 目标专项连续运行两次均为1项通过、0失败、0错误；两次最终值均为 availableQty=70.0000、safetyStockQty=60.0000、version=2，且只有一条 quantity=30.0000、availableAfter=70.0000 的 OUT 流水。
+- 初始测试替身尝试暴露 Mapper 接口无法调用真实方法、spy 无底层实例两项测试注入问题；均在测试边界内改为 SqlSessionTemplate 真实 Mapper 调用，未修改生产源码。
+- 专用仓库922、物料9922夹具在每次测试前后定向清理；线程池和 UserContext 均有界收口。OBS-STOCK-CONCURRENCY 已关闭；新增后续项0、关闭后续项1、后续项净变化-1。
 
 ### ISSUE-040-045：补货设置权限项目与乐观锁负向回归
 
