@@ -4,14 +4,14 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-033` 已选定为本次 `启动迭代-1` 的唯一待实施 Ready；本轮完成或阻塞后不再派发下一项。
+`ISSUE-040-033` 已完成；本次 `启动迭代-1` 达到一条上限，当前无待实施 Ready。
 
 ### ISSUE-040-033：投标成本详情只读入口与租户边界
 
 优先级：P1
 任务性质：缺口修复
 类型：投标成本 / 用户入口 / 只读详情 / 权限 / 租户隔离 / 不存在记录 fail-close
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `A-01-BID-DETAIL`；正式唯一问题载体为 `docs/backlog/current-issues.json`，其 `sourceRefs` 为 `docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；候选证据基于当前 HEAD `d28d71a83a6709560166e028d64bf5b72a365ccd`。
 存量问题键：[stock:A-01-BID-DETAIL]
 关联产品目标：在既有投标成本列表提供最小只读详情入口，让具备 `bid:query` 的用户查看当前租户投标头信息，同时保持跨租户与不存在记录统一隐藏。
@@ -77,6 +77,8 @@ Reviewer要求：按高风险只读权限与租户边界复核；确认前端只
 - `cd frontend-admin; pnpm type-check`
 - `cd frontend-admin; pnpm exec eslint src/api/modules/bid.ts src/api/modules/__tests__/bid.test.ts src/pages/bid-cost/index.vue src/pages/bid-cost/__tests__/index.test.ts`
 - `git diff --check`
+
+收口结论：投标详情 API、桌面/移动入口、只读弹窗、请求竞态防护，以及 `bid:query`、401/403、跨租户与不存在记录 fail-close 均已通过自动化和运行态核验；`A-01-BID-DETAIL` 已从唯一台账移除。新增后续项0、关闭后续项1、后续项净变化-1。
 
 ### ISSUE-040-032：投标成本受控新建入口与租户状态边界
 
