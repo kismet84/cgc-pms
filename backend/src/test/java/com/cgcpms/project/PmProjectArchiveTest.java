@@ -178,6 +178,25 @@ class PmProjectArchiveTest {
         assertEquals("ARCHIVED", archived.getStatus(), "空项目应可归档");
     }
 
+    @Test
+    @Order(10)
+    @Transactional
+    @DisplayName("TC8: 同租户但无项目数据范围的用户不能归档")
+    void testArchiveRequiresProjectDataScope() {
+        projectId = createProject("PRJ-ARCH-SCOPE-" + System.currentTimeMillis(), "项目范围归档测试", "DRAFT");
+        UserContext.set(Jwts.claims()
+                .add("userId", 999999L)
+                .add("username", "scoped-user")
+                .add("tenantId", TENANT_0)
+                .add("roleCodes", List.of())
+                .build());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> projectService.archive(projectId));
+        assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
+        assertEquals("DRAFT", projectMapper.selectById(projectId).getStatus());
+    }
+
     // ═══════════════════════════════════════════════════════════
     // TC2: Project with active contract blocks archiving
     // ═══════════════════════════════════════════════════════════

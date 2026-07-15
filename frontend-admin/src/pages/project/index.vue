@@ -7,6 +7,7 @@ import {
   getProjectDetail,
   createProject,
   updateProject,
+  archiveProject,
   deleteProject,
 } from '@/api/modules/project'
 import {
@@ -17,6 +18,7 @@ import {
 } from '@/composables/listTablePresets'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import { useMobileViewport } from '@/composables/useMobileViewport'
+import { useUserStore } from '@/stores/user'
 import type { ProjectVO } from '@/types/project'
 import type { PageResult } from '@/types/api'
 import { fetchDictData, getDictLabelSync } from '@/utils/dict'
@@ -39,7 +41,14 @@ const createVisible = ref(false)
 const createLoading = ref(false)
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const { isMobile } = useMobileViewport()
+const isProjectAdmin = computed(() =>
+  userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
+)
+const canArchiveProjects = computed(
+  () => isProjectAdmin.value || userStore.hasPermission('project:edit'),
+)
 const PROJECT_LIST_SCROLL_KEY = 'project-list-scroll-position'
 const createFormRef = ref()
 const createForm = reactive({
@@ -161,6 +170,28 @@ function handleDelete(record: ProjectVO) {
       } catch (e: unknown) {
         console.error(e)
         Modal.error({ title: '删除失败', content: '删除失败，请稍后重试' })
+      }
+    },
+  })
+}
+
+function handleArchive(record: ProjectVO) {
+  Modal.confirm({
+    title: '确认归档项目',
+    content: `确定要归档项目“${record.projectName}”吗？归档前请确认合同、付款、结算和审批均已完成。`,
+    okText: '确认归档',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await archiveProject(record.id)
+        message.success('项目归档成功')
+        await fetchData()
+      } catch (error: unknown) {
+        console.error(error)
+        Modal.error({
+          title: '项目归档失败',
+          content: error instanceof Error ? error.message : '项目归档失败，请稍后重试',
+        })
       }
     },
   })
@@ -306,6 +337,7 @@ const STATUS_LABEL: Record<string, string> = {
   COMPLETED: '已竣工',
   SUSPENDED: '已暂停',
   CLOSED: '已关闭',
+  ARCHIVED: '已归档',
 }
 const STATUS_COLOR: Record<string, string> = {
   DRAFT: 'processing',
@@ -314,6 +346,7 @@ const STATUS_COLOR: Record<string, string> = {
   COMPLETED: 'green',
   SUSPENDED: 'warning',
   CLOSED: 'error',
+  ARCHIVED: 'default',
 }
 
 const APPROVAL_STATUS_LABEL: Record<string, string> = {
@@ -364,7 +397,15 @@ const PROJECT_TYPE_LABEL: Record<string, string> = {
 }
 
 const PROJECT_TYPE_BASE_OPTIONS = Object.keys(PROJECT_TYPE_COLOR)
-const PROJECT_STATUS_OPTIONS = ['DRAFT', 'ACTIVE', 'ONGOING', 'COMPLETED', 'SUSPENDED', 'CLOSED']
+const PROJECT_STATUS_OPTIONS = [
+  'DRAFT',
+  'ACTIVE',
+  'ONGOING',
+  'COMPLETED',
+  'SUSPENDED',
+  'CLOSED',
+  'ARCHIVED',
+]
 
 function projectTypeLabel(value: string | undefined) {
   const label = getDictLabelSync(PROJECT_TYPE_DICT, value ?? '', PROJECT_TYPE_LABEL)
@@ -709,11 +750,13 @@ const {
           :project-type-label="projectTypeLabel"
           :project-type-color="projectTypeColor"
           :fmt-amount="formatWanAmountWithUnit"
+          :can-archive="canArchiveProjects"
           @toggle-col="toggleCol"
           @refresh="fetchData"
           @create="handleCreateModalOpen"
           @overview="openProjectOverview"
           @edit="handleEditModalOpen"
+          @archive="handleArchive"
           @delete="handleDelete"
           @page-change="handlePageChange"
           @page-size-change="handlePageSizeChange"

@@ -174,6 +174,37 @@ class PmProjectControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    @Test
+    @Order(8)
+    @DisplayName("PUT /projects/{id}/archive requires authentication and project:edit")
+    void testArchiveRequiresAuthenticationAndPermission() throws Exception {
+        mockMvc.perform(putWithApi("/projects/" + EXISTING_PROJECT_ID + "/archive"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(putWithApi("/projects/" + EXISTING_PROJECT_ID + "/archive")
+                        .cookie(cookie(93062L, TENANT_ID, List.of(), List.of("project:query"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("PUT /projects/{id}/archive rejects same-tenant editor without project access")
+    void testArchiveRequiresProjectDataScope() throws Exception {
+        mockMvc.perform(putWithApi("/projects/" + EXISTING_PROJECT_ID + "/archive")
+                        .cookie(cookie(93062L, TENANT_ID, List.of(), List.of("project:edit"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+    }
+
+    @Test
+    @Order(10)
+    @DisplayName("PUT /projects/{id}/archive hides cross-tenant project")
+    void testArchiveHidesCrossTenantProject() throws Exception {
+        mockMvc.perform(putWithApi("/projects/" + EXISTING_PROJECT_ID + "/archive")
+                        .cookie(cookie(93062L, 1L, List.of(), List.of("project:edit"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_NOT_FOUND"));
+    }
+
     // ── helpers ──
 
     private MockHttpServletRequestBuilder getWithApi(String pathWithinContext) {
@@ -182,5 +213,14 @@ class PmProjectControllerTest {
 
     private MockHttpServletRequestBuilder postWithApi(String pathWithinContext) {
         return post("/api" + pathWithinContext).contextPath("/api");
+    }
+
+    private MockHttpServletRequestBuilder putWithApi(String pathWithinContext) {
+        return put("/api" + pathWithinContext).contextPath("/api");
+    }
+
+    private Cookie cookie(long userId, long tenantId, List<String> roles, List<String> permissions) {
+        String token = jwtUtils.generateToken(userId, "archive-user", tenantId, roles, permissions);
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 }

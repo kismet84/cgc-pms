@@ -20,6 +20,7 @@ defineProps<{
   projectTypeLabel: (value?: string) => string
   projectTypeColor: (value?: string) => string
   fmtAmount: (val: string) => string
+  canArchive: boolean
 }>()
 
 const emit = defineEmits<{
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   create: []
   overview: [row: ProjectVO]
   edit: [row: ProjectVO]
+  archive: [row: ProjectVO]
   delete: [row: ProjectVO]
   pageChange: [page: number]
   pageSizeChange: [current: number, size: number]
@@ -155,6 +157,12 @@ const emit = defineEmits<{
               <a-menu>
                 <a-menu-item @click="emit('overview', row)">查看</a-menu-item>
                 <a-menu-item @click="emit('edit', row)">编辑</a-menu-item>
+                <a-menu-item
+                  v-if="canArchive && row.status !== 'ARCHIVED'"
+                  @click="emit('archive', row)"
+                >
+                  归档
+                </a-menu-item>
                 <a-menu-item danger @click="emit('delete', row)">删除</a-menu-item>
               </a-menu>
             </template>

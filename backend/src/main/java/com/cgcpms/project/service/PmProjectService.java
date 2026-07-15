@@ -209,6 +209,7 @@ public class PmProjectService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         }
+        projectAccessChecker.checkAccess(existing, "归档");
         if ("ARCHIVED".equals(existing.getStatus())) {
             throw new BusinessException("PROJECT_ALREADY_ARCHIVED", "项目已归档");
         }

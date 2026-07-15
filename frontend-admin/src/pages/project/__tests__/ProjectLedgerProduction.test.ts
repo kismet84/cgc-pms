@@ -30,6 +30,26 @@ describe('ProjectLedgerProduction source guards', () => {
     expect(source).toMatch(/function handleCreateSubmit\(/)
     expect(source).toMatch(/async function handleEditSubmit\(/)
     expect(source).toMatch(/function handleDelete\(/)
+    expect(source).toMatch(/function handleArchive\(/)
+  })
+
+  it('exposes project archive only through the existing guarded desktop action menu', () => {
+    const source = readProjectSource()
+    const tableSource = readProjectComponentSource('ProjectTablePanel')
+    const apiSource = readFileSync(resolve(currentDir, '../../../api/modules/project.ts'), 'utf-8')
+    expect(apiSource).toMatch(
+      /archiveProject[\s\S]*url: `\/projects\/\$\{id\}\/archive`[\s\S]*method: 'put'/,
+    )
+    expect(apiSource).not.toMatch(/archiveProject[\s\S]{0,240}(data|params|tenantId):/)
+    expect(source).toContain("userStore.hasPermission('project:edit')")
+    expect(source).toContain(':can-archive="canArchiveProjects"')
+    expect(source).toContain('@archive="handleArchive"')
+    expect(source).toContain("title: '确认归档项目'")
+    expect(source).toContain('await archiveProject(record.id)')
+    expect(source).toMatch(/await archiveProject\(record\.id\)[\s\S]*await fetchData\(\)/)
+    expect(tableSource).toContain('v-if="canArchive && row.status !== \'ARCHIVED\'"')
+    expect(tableSource).toContain("emit('archive', row)")
+    expect(tableSource).not.toContain('project-mobile-card-actions')
   })
 
   it('uses pageNo and carries projectType/status filters in fetchData', () => {

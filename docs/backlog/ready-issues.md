@@ -4,7 +4,69 @@
 
 v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-issues.md)。
 
-`ISSUE-040-034`、`ISSUE-040-035` 已完成；本次 `启动迭代-5` 已完成 2 条，下一条待 checkpoint 后选择。
+`ISSUE-040-034`、`ISSUE-040-035` 已完成；本次 `启动迭代-5` 已完成 2 条，当前执行 `ISSUE-040-036`。
+
+### ISSUE-040-036：项目受控归档入口与项目数据范围
+
+优先级：P1
+任务性质：缺口修复
+类型：项目 / 归档 / 写操作 / 权限 / 项目数据范围 / 依赖门禁
+状态：Ready
+来源锚点：项目知识图谱当前问题 `A-01-PROJECT-ARCHIVE`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md`；candidateEvidenceHead=688fc11553918cb2c25c46a9ae2dc83225a2a1af
+存量问题键：[stock:A-01-PROJECT-ARCHIVE]
+归档报告：`docs/quality/ISSUE-040-036-项目受控归档入口与项目数据范围验收报告.md`
+Migration：不需要
+依赖：复用现有项目列表、项目 API、`PUT /projects/{id}/archive`、`project:edit`、`ProjectAccessChecker` 和 `PmProjectArchiveTest`。
+风险等级：高
+运行态要求：仅在 local/dev/test 验收；先通过三项 health gate，浏览器只打开并取消归档确认，不确认归档、不新增、修改、删除或重置业务数据。
+Reviewer要求：复核入口仅对 `project:edit` 或管理员可见且已归档行隐藏；后端在依赖查询前执行项目数据范围校验；跨租户、无项目范围、重复归档及活动依赖均 fail-close。
+最小回滚：回退项目归档 API、列表动作、数据范围补强、专项测试及治理回写；浏览器不写数据，不需要数据回滚。
+目标：
+- 在桌面项目列表的既有操作菜单增加受控“归档”动作，明确展示项目名称并要求二次确认。
+- 精确调用既有项目归档接口；成功后刷新列表，失败保留当前列表并展示服务端门禁原因。
+- 补齐服务端项目数据范围检查及前后端权限、状态、依赖门禁测试。
+非目标：
+- 不开放移动端写操作，不实现批量归档、撤销归档、物理删除或自动关闭依赖。
+- 不改变项目归档状态值、合同/付款/结算/流程门禁规则，不新增路由、菜单、权限码或数据库迁移。
+- 不连接生产、不发布生产、不自动 push；浏览器验收不提交归档。
+允许修改：
+- `backend/src/main/java/com/cgcpms/project/service/PmProjectService.java`
+- `backend/src/test/java/com/cgcpms/project/PmProjectArchiveTest.java`
+- `backend/src/test/java/com/cgcpms/project/PmProjectControllerTest.java`
+- `frontend-admin/src/api/modules/project.ts`
+- `frontend-admin/src/pages/project/index.vue`
+- `frontend-admin/src/pages/project/components/ProjectTablePanel.vue`
+- `frontend-admin/src/pages/project/__tests__/ProjectLedgerProduction.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-036-项目受控归档入口与项目数据范围验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/resources/db/migration-h2/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- API 精确调用 `PUT /projects/{id}/archive`，不发送 params、body、tenantId 或其他项目字段。
+- 归档入口仅对 `project:edit` 或 ADMIN/SUPER_ADMIN 可见，仅未归档行展示；确认文案包含项目名称，取消不发请求，成功刷新，失败不删除或伪改列表。
+- 未登录401、无 `project:edit` 403；具备权限但无项目数据范围403；跨租户隐藏；管理员或可访问项目用户进入既有活动合同、付款、结算、流程、重复归档门禁。
+- 归档 Service 在依赖查询和状态更新前复用 `ProjectAccessChecker`；物理删除、项目编辑、列表、移动卡片及现有依赖判断不回退。
+- 收口移除 `A-01-PROJECT-ARCHIVE`，A-01 更新为有用户入口241、需补入口7；新增后续项0、关闭后续项1、净变化-1。
+- Ready lint、前后端专项、类型检查、目标 ESLint、`git diff --check` 和只取消不提交的浏览器验收通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-036`
+- `cd backend; .\mvnw.cmd "-Dtest=PmProjectArchiveTest,PmProjectControllerTest" test`
+- `cd frontend-admin; pnpm test:unit -- src/pages/project/__tests__/ProjectLedgerProduction.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm exec eslint src/api/modules/project.ts src/pages/project/index.vue src/pages/project/components/ProjectTablePanel.vue src/pages/project/__tests__/ProjectLedgerProduction.test.ts`
+- `git diff --check`
 
 ### ISSUE-040-035：间接费规则只读列表入口与租户边界
 

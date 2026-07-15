@@ -37,6 +37,14 @@ export function updateProject(id: string, data: Partial<ProjectVO>) {
   })
 }
 
+/** 归档项目 */
+export function archiveProject(id: string) {
+  return request<void>({
+    url: `/projects/${id}/archive`,
+    method: 'put',
+  })
+}
+
 /** 项目总览数据 */
 export function getProjectOverview(projectId: string) {
   return request<ProjectOverviewVO>({
