@@ -777,6 +777,35 @@ class MatStockServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("补货设置更新拒绝无项目访问权且保持三个设置字段不变")
+    void testReplenishmentSettingsRejectsInaccessibleProject() {
+        MatStock stock = createSettingsStock(new BigDecimal("80.0000"));
+        stockService.updateReplenishmentSettings(
+                stock.getId(), new BigDecimal("12.0000"), new BigDecimal("30.0000"), 5);
+        var before = jdbcTemplate.queryForMap("""
+                SELECT safety_stock_qty, replenishment_target_qty, replenishment_lead_days
+                FROM mat_stock WHERE id = ?
+                """, stock.getId());
+        UserContext.set(Jwts.claims()
+                .add("userId", 99999L)
+                .add("username", "no_project_access")
+                .add("tenantId", TENANT_ID)
+                .build());
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> stockService.updateReplenishmentSettings(
+                        stock.getId(), new BigDecimal("20.0000"), new BigDecimal("40.0000"), 9));
+
+        assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
+        var after = jdbcTemplate.queryForMap("""
+                SELECT safety_stock_qty, replenishment_target_qty, replenishment_lead_days
+                FROM mat_stock WHERE id = ?
+                """, stock.getId());
+        assertEquals(before, after, "项目越权拒绝不得改变补货设置持久化字段");
+    }
+
+    @Test
+    @Transactional
     @DisplayName("安全库存阈值更新拒绝禁用仓库")
     void testSafetyStockThresholdRejectsDisabledWarehouse() {
         MatStock stock = createSettingsStock(new BigDecimal("8.0000"));
