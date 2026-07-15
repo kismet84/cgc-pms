@@ -8,12 +8,66 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`～`ISSUE-040-051`（含阻塞修复 `ISSUE-047-002`）已完成；`启动迭代-20` 当前完成 15/20。以下5条回归证明 Ready 用于完成本轮剩余任务，均不把既有能力表述为新增平台能力。
 
+### ISSUE-047-003：日报Controller测试JWT密钥环境隔离修复
+
+优先级：P0
+任务性质：缺口修复
+类型：CI测试隔离 / JWT密钥 / Spring上下文 / 环境变量覆盖
+状态：Ready
+来源锚点：`ISSUE-040-052` 首轮后端目标测试；唯一问题载体 `docs/backlog/current-issues.json`；candidateEvidenceHead=84ce3942ba3b6741c7eaa67776aacc7b942b1f6f
+存量问题键：[stock:AUTOPILOT-SITE-DAILY-JWT-ISOLATION]
+关联产品目标：恢复日报天气摘要与在场人数契约在任意外部TEST_JWT_SECRET取值下的可验证性。
+候选对比：在测试类固定专用强密钥小于修改共享profile、清理用户环境变量或放宽JwtUtils安全校验，并与现有Controller测试隔离模式一致。
+核验结论：失败发生在Spring创建JwtUtils阶段，WeakKeyException报告144-bit密钥；`application-local.yml`引用外部TEST_JWT_SECRET，当前测试类没有`jwt.secret`覆盖，而其他隔离良好的Controller测试使用类级专用强密钥。
+阻塞证据：`SiteDailyLogControllerTest`尚未执行任何业务断言即上下文失败，稳定阻断 `ISSUE-040-052`；前端专项不受影响。
+解除条件：测试类显式固定至少256-bit专用密钥，目标测试连续两轮通过；共享test/local profile、生产配置与外部环境变量均不修改。
+Migration：不需要
+依赖：既有SiteDailyLogControllerTest、JwtUtils强密钥校验与SpringBootTest properties。
+风险等级：低
+运行态要求：仅本地H2/Spring测试；不启动业务服务，不连接外部数据库。
+Reviewer要求：确认密钥只存在测试源码、长度满足JWT HMAC要求且不削弱安全校验；不修改共享profile、生产配置或用户环境变量。
+归档报告：`docs/quality/ISSUE-047-003-日报Controller测试JWT密钥环境隔离修复验收报告.md`
+最小回滚：回退测试类properties与本项治理文档；不会影响业务代码、schema或数据。
+目标：
+- 消除外部TEST_JWT_SECRET对日报Controller测试上下文的污染。
+- 恢复 `ISSUE-040-052` 的后端验收前置。
+非目标：
+- 不修改JwtUtils安全校验、共享profile、环境变量或业务代码。
+- 不扩展日报能力或调整测试断言。
+- 不连接生产、不发布生产、不push。
+允许修改：
+- `backend/src/test/java/com/cgcpms/sitedaily/SiteDailyLogControllerTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-047-003-日报Controller测试JWT密钥环境隔离修复验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/test/resources/**`
+- `frontend-admin/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- 测试类通过`SpringBootTest.properties`固定至少256-bit的专用jwt.secret；不读取、覆盖或清除TEST_JWT_SECRET。
+- `SiteDailyLogControllerTest`连续两轮全部通过，证明业务断言实际执行。
+- 共享profile、生产代码、前端和脚本无修改；Ready lint、允许路径和`git diff --check`通过。
+- 收口移除阻塞叶子并恢复`ISSUE-040-052`为Ready；新增后续项0、关闭1、净变化-1。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-047-003`
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyLogControllerTest" test`
+- `git diff --check`
+
 ### ISSUE-040-052：日报人工天气摘要与在场人数契约回归
 
 优先级：P1
 任务性质：回归证明
 类型：现场日报 / 人工天气 / 在场人数 / JSON整数 / 兼容边界
-状态：Ready
+状态：Blocked
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/product-intelligence/project-map.md`; candidateEvidenceHead=f332d7462783d39ad9873480ce338570f6af2e88
 存量问题键：[stock:OBS-SITE-DAILY-WEATHER-HEADCOUNT]
 关联产品目标：把已存在的人工天气摘要和在场人数能力与仍缺的自动天气、人员班组、设备和考勤明确分界，形成可复验契约。
