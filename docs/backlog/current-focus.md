@@ -191,7 +191,8 @@
 
 - `docs/quality/code-audit-2026-07-12-full-develop-1.5.md` 的 7 项原阻塞已完成本地根因闭环；后端 1723 tests、前端 505 tests、MySQL 8 Flyway、SQL safety、构建后 JAR Trivy、UI smoke 与内置浏览器验收均通过。
 - `master` 分支保护已启用管理员强制与 required conversation resolution，11 个 required checks 和 strict 语义保持不变。
-- PR #334 的 11 个 required checks 已全绿，并于 2026-07-13 合并为 `master` 提交 `76ec42a0`；当前无 CI 合并门禁阻塞，尚未执行生产发布。
+- PR #334 的 11 个 required checks 曾全绿，并于 2026-07-13 合并为 `master` 提交 `76ec42a0`；该结论只代表当时目标提交，不再作为当前 `master` 绿灯证据。
+- 2026-07-16 复核显示当前 `master` 提交 `ed47aabb` 的 CI run #186 在 `backend-test` 失败，`supply-chain-security` 被跳过；`ISSUE-037-021` 已在 [blocked-issues.md](blocked-issues.md) 以同一根因键复发承接。失败已分类为 `quality_or_security`，根因为 `StlSettlementServiceTest` 污染共享 V105 数据并造成 Dashboard 顺序依赖。当前功能分支已完成原值恢复式隔离修复，目标类 13 项、显式失败顺序 26 项及后端全量 1814 项均通过；用户要求暂不提交、不推送，因此上线门禁仍只阻塞于修复提交的远端 11 项 required checks 与 `supply-chain-security` 证据。
 - 已完成依赖与格式治理：413 条纯 Prettier 告警已降为 0，ECharts 6.1.0 / vue-echarts 8.0.1 升级后 `pnpm audit --audit-level moderate` 为 0 漏洞；格式化后全量前端与 E2E 通过。
 - Trivy Java DB 已在 `supply-chain-security` 增加按 UTC 日期缓存与历史缓存回退；国内网络风险收敛为首次冷缓存下载时延，不采用未经项目验证的第三方镜像。
 - GitHub Actions Node.js 20 弃用注解已关闭：官方 actions 已升级到声明 Node 24 的主版本，`pnpm/action-setup@v6` 改为读取 `frontend-admin/package.json` 的精确 `packageManager`；全量 CI 后 Node 20 annotation 为 0。

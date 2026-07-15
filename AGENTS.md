@@ -25,14 +25,15 @@
 - 做外科手术式修改：只改必要文件，遵循现有命名、目录、异常处理和测试风格。
 - 解决错误或工具陷阱后，优先在当前会话中沉淀可复用结论；只有在当前运行环境允许且用户明确要求时，才写入 `memory/` 并更新 `memory/MEMORY.md`。
 - `AGENTS.md` 为仓库级协作规则入口；`CLAUDE.md` 若存在则属于本地 AI 协作配置，不影响系统运行。
+- 通用任务状态机、短指令、工具路由、失败分类、浏览器/验证/Git 模板、事件驱动沟通与恢复胶囊统一读取 `docs/standards/codex-task-execution-policy.md`；本文件只保留必须马上知道的边界和入口。
 - `codebase-memory-mcp` 只允许用于本地索引与只读查询；禁止由其创建、修改、删除或覆盖 `AGENTS.md`、`AGENTS.override.md`，禁止运行会自动改写智能体规则、Codex 配置、skills 或 hooks 的 `codebase-memory-mcp install` / `uninstall` 入口。需要升级时只能在用户明确授权后替换独立安装目录中的二进制，不得改写仓库规则文件。
-- 不要发送无信息量 commentary；需要进度同步时，只保留与当前任务直接相关的最小更新。
+- commentary 只在统一策略定义的状态变化事件中发送；不为每条命令、纯等待或相同状态重复播报。
 - 任务结束只做清理预览；仅清理本任务创建且确认无用的临时进程和产物，不影响用户已有运行环境，不得盲删。
 
 ## 产品演进基本流程
 
 - 当用户要求判断产品方向、生成下一轮计划，或 Ready 为空且 `docs/backlog/current-issues.json` 中没有可自动拆分的存量问题、也没有已通过决策门的候选时，先读取 `docs/product-intelligence/`，按“项目地图 → 竞品情报 → 迭代决策 → Ad-hoc Candidate → Ready → 实施 → 地图回写”推进。
-- AutoPilot 补货优先级固定为：已有合格 Ready → `current-issues.json` 中安全可执行的存量问题 → 当前 focus 可解除阻塞 → 决策证据完整的 Ad-hoc Candidate → 产品情报刷新；长期增强计划不得直接拆 Ready。存量问题 Ready 必须保留 `[stock:<issueKey>]` 唯一标记，并在收口时同步回写原问题状态。
+- AutoPilot 的 Ready 来源、知识图谱健康/HEAD 游标门禁、补货顺序、回写与停止条件统一读取 `plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md`；`current-issues.json` 是正式写回源，不是默认发现入口。图谱异常时 fail-close，不静默回退到文件扫描或长期计划凑任务。
 - `docs/backlog/cgc-pms-production-enhancement-plan.md` 只作为研究和候选输入，不能直接生成 Ready；产品 Candidate 必须引用当前项目地图和迭代决策证据。
 - 工程治理 Candidate 默认不能替代产品方向；仅当当前证据证明它直接阻塞已选产品目标、安全边界或正式验收时，才可按 `缺口修复` 或 `运维治理` 进入 Ready，并明确关联目标、阻塞证据、解除条件、非目标和回滚方式。
 - Ready 以证据和字段完整为准，不为凑数量放宽门槛；1 条合格 Ready 即可实施，队列上限仍为 5 条。
@@ -76,6 +77,7 @@
 - 数据库与迁移规范：`docs/standards/07-数据库与迁移规范.md`。
 - UI 基线：`docs/standards/00-UI-Design-Baselines-and-Code-Specifications.md`。
 - CI、页面异常、接口失败先分三类再定性：`工具配置/规则加载问题`、`环境前置问题`、`真实质量/安全问题`；不要把所有红灯都直接归因为业务代码缺陷。
+- Codex 通用执行协议：`docs/standards/codex-task-execution-policy.md`。
 
 ## 触发协议
 
@@ -106,3 +108,4 @@ docs/prompt/lark-confirmation-flow.md
 - API 契约：`docs/standards/06-API契约规范.md`
 - 权限与审批：`docs/standards/08-权限与审批流程.md`
 - 安全规范：`docs/standards/11-安全规范.md`
+- Codex 任务执行策略：`docs/standards/codex-task-execution-policy.md`

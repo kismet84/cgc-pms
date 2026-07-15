@@ -8,6 +8,11 @@ $realConfig = Get-Content -LiteralPath (Join-Path $scriptDir 'codex-autopilot.co
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/codex-autopilot/codex-autopilot.config.json') { throw 'control-plane fingerprint does not cover its behavior configuration' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/control-plane-policy.md') { throw 'control-plane fingerprint does not cover its behavior policy' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/desktop-execution-policy.md') { throw 'control-plane fingerprint does not cover the desktop execution policy' }
+if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'docs/standards/codex-task-execution-policy.md') { throw 'control-plane fingerprint does not cover the shared Codex execution policy' }
+if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md') { throw 'control-plane fingerprint does not cover the AutoPilot owner skill' }
+foreach ($skill in @('.agents/skills/cgc-pms-mainline-owner-flow/SKILL.md','.agents/skills/cgc-pms-ci-gate-triage/SKILL.md','.agents/skills/cgc-pms-runtime-refresh/SKILL.md')) {
+  if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains $skill) { throw "control-plane fingerprint does not cover project execution skill: $skill" }
+}
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/codex-autopilot/autopilot-execution-host.ps1') { throw 'control-plane fingerprint does not cover execution-host routing' }
 if ([int]$realConfig.readyPlanner.timeoutSeconds -lt 600) { throw 'ready Planner timeout budget is below the proven local planning floor' }
 $realPolicy = Get-AutopilotControlPlanePolicyDescriptor -RepoRoot (Resolve-Path (Join-Path $scriptDir '..\..')).Path -PolicyPath $realConfig.controlPlaneCanary.policyPath
