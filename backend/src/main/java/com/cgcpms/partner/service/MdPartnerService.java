@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -63,6 +64,7 @@ public class MdPartnerService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Long create(MdPartner partner) {
+        normalizeDefaultLeadDays(partner, partner.getPartnerType());
         // Auto-generate partner code: PTN-yyyyMMdd-NNN
         boolean autoGenerateCode = !StringUtils.hasText(partner.getPartnerCode());
         String prefix = null;
@@ -129,7 +131,28 @@ public class MdPartnerService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("PARTNER_NOT_FOUND", "合作方不存在");
         }
+        String effectivePartnerType = StringUtils.hasText(partner.getPartnerType())
+                ? partner.getPartnerType() : existing.getPartnerType();
+        if (!partner.isDefaultLeadDaysSpecified()) {
+            partner.preserveDefaultLeadDays(existing.getDefaultLeadDays());
+        }
+        normalizeDefaultLeadDays(partner, effectivePartnerType);
         mdPartnerMapper.updateById(partner);
+    }
+
+    private void normalizeDefaultLeadDays(MdPartner partner, String effectivePartnerType) {
+        if (!"SUPPLIER".equals(effectivePartnerType)) {
+            partner.preserveDefaultLeadDays(null);
+            return;
+        }
+        if (partner.getDefaultLeadDays() == null) return;
+        try {
+            int days = partner.getDefaultLeadDays().intValueExact();
+            if (days < 0 || days > 3650) throw new ArithmeticException("out of range");
+            partner.preserveDefaultLeadDays(BigDecimal.valueOf(days));
+        } catch (ArithmeticException error) {
+            throw new BusinessException("INVALID_PARTNER_DEFAULT_LEAD_DAYS", "供应商默认提前期必须为0到3650之间的整数");
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -164,6 +187,7 @@ public class MdPartnerService {
         vo.setBlacklistFlag(p.getBlacklistFlag());
         vo.setRiskLevel(p.getRiskLevel());
         vo.setStatus(p.getStatus());
+        vo.setDefaultLeadDays(p.getDefaultLeadDays() == null ? null : p.getDefaultLeadDays().intValueExact());
         if (p.getCreatedBy() != null) vo.setCreatedBy(String.valueOf(p.getCreatedBy()));
         if (p.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(p.getCreatedAt()));
         if (p.getUpdatedAt() != null) vo.setUpdatedAt(DateTimeUtils.DTF.format(p.getUpdatedAt()));

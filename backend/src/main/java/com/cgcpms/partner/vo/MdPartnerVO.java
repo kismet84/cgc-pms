@@ -19,6 +19,7 @@ public class MdPartnerVO {
     private Integer blacklistFlag;
     private String riskLevel;
     private String status;
+    private Integer defaultLeadDays;
     private String createdBy;
     private String createdAt;
     private String updatedAt;

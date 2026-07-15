@@ -67,6 +67,7 @@ const formData = reactive<Partial<PartnerVO>>({
   qualificationLevel: '',
   blacklistFlag: false,
   riskLevel: undefined as string | undefined,
+  defaultLeadDays: undefined,
   status: STATUS_ENABLE,
 })
 
@@ -253,6 +254,7 @@ function handleAdd() {
     qualificationLevel: '',
     blacklistFlag: false,
     riskLevel: undefined,
+    defaultLeadDays: undefined,
     status: STATUS_ENABLE,
   })
   modalVisible.value = true
@@ -288,6 +290,7 @@ function handleEdit(record: PartnerVO) {
     qualificationLevel: record.qualificationLevel || '',
     blacklistFlag: record.blacklistFlag,
     riskLevel: record.riskLevel || undefined,
+    defaultLeadDays: record.defaultLeadDays ?? undefined,
     status: record.status || STATUS_ENABLE,
   })
   modalVisible.value = true
@@ -326,6 +329,8 @@ async function handleModalOk() {
     const payload = {
       ...formData,
       blacklistFlag: formData.blacklistFlag ? 1 : 0,
+      defaultLeadDays:
+        formData.partnerType === 'SUPPLIER' ? (formData.defaultLeadDays ?? null) : null,
     }
     if (editingId.value) {
       await updatePartner(editingId.value, payload)
@@ -614,6 +619,16 @@ onMounted(() => {
         <a-form-item label="资质等级">
           <a-input v-model:value="formData.qualificationLevel" placeholder="请输入资质等级" />
         </a-form-item>
+        <a-form-item v-if="formData.partnerType === 'SUPPLIER'" label="默认提前期（自然日）">
+          <a-input-number
+            v-model:value="formData.defaultLeadDays"
+            :min="0"
+            :max="3650"
+            :precision="0"
+            placeholder="留空则不预填交货日期"
+            style="width: 100%"
+          />
+        </a-form-item>
         <a-form-item label="黑名单">
           <a-switch v-model:checked="formData.blacklistFlag" />
         </a-form-item>
@@ -684,6 +699,13 @@ onMounted(() => {
           </a-descriptions-item>
           <a-descriptions-item label="资质等级">
             {{ detailPartner.qualificationLevel || '-' }}
+          </a-descriptions-item>
+          <a-descriptions-item v-if="detailPartner.partnerType === 'SUPPLIER'" label="默认提前期">
+            {{
+              detailPartner.defaultLeadDays == null
+                ? '-'
+                : `${detailPartner.defaultLeadDays} 个自然日`
+            }}
           </a-descriptions-item>
           <a-descriptions-item label="风险等级">
             <a-tag v-if="detailPartner.riskLevel" :color="RISK_COLOR[detailPartner.riskLevel]">
