@@ -6,7 +6,65 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046` 与 `ISSUE-040-047` 已完成；`启动迭代-20` 当前完成 10/20。WBS 软删除事务故障证据已收口，下一候选切换至其他独立存量问题域。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045`、`ISSUE-040-046` 与 `ISSUE-040-047` 已完成；`启动迭代-20` 当前完成 10/20。WBS 软删除事务故障证据已收口，当前 Ready 为 PowerShell 7 控制面与 UTF-8 兼容回归。
+
+### ISSUE-040-048：PowerShell 7控制面与UTF-8兼容回归
+
+优先级：P2
+任务性质：回归证明
+类型：AutoPilot / PowerShell 7 / 控制面 / 连续 runner / 状态机 / UTF-8
+状态：Ready
+来源锚点：项目知识图谱当前问题 `OBS-POWERSHELL7-COMPAT`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=359cc72d5278fa5b54f79a38ae8f0064b86955da
+存量问题键：[stock:OBS-POWERSHELL7-COMPAT]
+关联产品目标：解除 AutoPilot 使用 PowerShell 7 的历史兼容性观察项，以当前真实 `pwsh` 宿主证明控制面、连续 runner、状态迁移和 UTF-8 上下文原子读写回归通过。
+候选对比：原 deferReason 为本机未安装 PowerShell 7，当前 `pwsh 7.6.3` 已解除前置；本项只运行现有确定性自测并归档，不需要修改控制面，风险与成本低于外部网络、浏览器数据构造或新产品域。
+核验结论：控制面已由 `Resolve-AutopilotPowerShellHost` 强制要求 pwsh 7+，当前连续迭代本身也已在 pwsh 下执行；仍需用现有专项复验控制面指纹、连续 runner、状态机与无 BOM UTF-8 上下文输出。
+阻塞证据：唯一问题载体仍声称本机未安装 PowerShell 7，且没有把当前宿主版本与关键自测结果绑定为正式证据，导致兼容性观察项无法关闭。
+解除条件：记录 pwsh 版本至少7；控制面、连续 runner、状态机、UTF-8 context delta 专项全部通过；确认本任务没有修改任何 ps1、配置、插件、hooks 或规则文件。
+Migration：不需要
+依赖：当前 PATH 中的 `pwsh 7.6.3` 与仓库既有 PowerShell 自测。
+风险等级：中
+运行态要求：本地控制面自测；不启动嵌套 Codex，不需要浏览器、Docker、数据库或外部网络，不连接或发布生产。
+Reviewer要求：确认四类专项均由 pwsh 7.6.3 执行，UTF-8 测试覆盖无 BOM 与中文文本，且 diff 仅含治理文档和正式报告；不得借回归证明修改控制面源码。
+归档报告：`docs/quality/ISSUE-040-048-PowerShell7控制面与UTF8兼容回归验收报告.md`
+最小回滚：回退治理回写与报告；控制面源码和运行配置无需回滚。
+目标：
+- 绑定真实 pwsh 版本与控制面、连续 runner、状态机及 UTF-8 上下文自测结果。
+- 证明当前桌面原生连续执行链可在 PowerShell 7 下保持原子状态、UTF-8 和确定性门禁语义。
+- 关闭已失效的“本机未安装 PowerShell 7”观察项。
+非目标：
+- 不修改任何 PowerShell 源码、AutoPilot 配置、插件、hooks、skills 或仓库规则。
+- 不宣称 Linux/macOS、PowerShell 8 预览版或所有第三方脚本兼容。
+- 不连接生产、不发布生产、不 push。
+允许修改：
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-048-PowerShell7控制面与UTF8兼容回归验收报告.md`
+禁止修改：
+- `scripts/**`
+- `plugins/**`
+- `backend/**`
+- `frontend-admin/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `skills-lock.json`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- `pwsh --version` 显示主版本至少7，并记录实际版本。
+- 控制面、连续 runner、状态机和 context delta 四项现有自测全部退出码0。
+- context delta 自测继续验证 UTF-8 中文往返和输出无 BOM；控制面指纹与 pwsh 强制宿主门禁保持通过。
+- 收口移除 `OBS-POWERSHELL7-COMPAT`；新增后续项0、关闭1、净变化-1。
+- Ready lint、当前问题 JSON、`git diff --check` 和中风险控制面复核 PASS，diff 不含任何 ps1 或配置。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-048`
+- `pwsh -NoProfile -File scripts/codex-autopilot/test-control-plane.ps1`
+- `pwsh -NoProfile -File scripts/codex-autopilot/test-continuous-runner.ps1`
+- `pwsh -NoProfile -File scripts/codex-autopilot/test-state-machine.ps1`
+- `pwsh -NoProfile -File scripts/codex-autopilot/tests/test-context-delta.ps1`
+- `git diff --check`
 
 ### ISSUE-040-047：WBS软删除墓碑事务故障注入回归
 
