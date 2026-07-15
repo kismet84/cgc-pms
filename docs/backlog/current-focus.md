@@ -1,5 +1,11 @@
 # Current Focus
 
+## 2026-07-16 增量：日报Controller测试JWT隔离修复完成
+
+- `ISSUE-047-003` 已在目标测试类固定专用强 `jwt.secret`，不再被外部144-bit `TEST_JWT_SECRET` 污染；没有修改JwtUtils、安全校验、共享local/test profile或用户环境变量。
+- `SiteDailyLogControllerTest` 连续两轮均3/3通过，业务创建、更新、提交、NULL/0/负数/小数/越界和天气长度断言实际执行。
+- `AUTOPILOT-SITE-DAILY-JWT-ISOLATION` 已移除，`ISSUE-040-052` 恢复Ready。新增后续项0、关闭后续项1、净变化-1；`启动迭代-20` 当前完成16/20。
+
 ## 2026-07-16 增量：日报Controller测试JWT隔离阻塞
 
 - `ISSUE-040-052` 首轮后端测试在任何业务断言执行前因 `WeakKeyException` 失败：外部 `TEST_JWT_SECRET` 为144-bit，覆盖了local profile默认值，测试类未像其他隔离良好的Controller测试一样固定专用强密钥。

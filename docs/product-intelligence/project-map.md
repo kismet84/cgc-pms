@@ -1,5 +1,10 @@
 # CGC-PMS 项目地图
 
+## 2026-07-16 增量：日报Controller测试JWT环境隔离修复完成
+
+- 日报Controller测试现在通过类级专用强密钥隔离外部 `TEST_JWT_SECRET`；JwtUtils强密钥校验、共享profile、生产配置和业务代码均未改变。
+- 同一3项测试连续两轮通过，`AUTOPILOT-SITE-DAILY-JWT-ISOLATION` 关闭，日报天气/人数回归恢复。
+
 ## 2026-07-16 增量：日报Controller测试JWT环境隔离阻塞
 
 - 日报天气/人数回归首轮尚未进入业务断言，Spring因外部144-bit `TEST_JWT_SECRET` 在JwtUtils构造阶段拒绝启动；这是测试环境隔离缺口，不改变日报能力事实。
