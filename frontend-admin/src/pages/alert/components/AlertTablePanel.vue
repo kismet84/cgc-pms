@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RightOutlined } from '@ant-design/icons-vue'
 import type { AlertLogVO } from '@/types/alert'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { ALERT_PROCESS_STATUS_COLOR, RULE_TYPE_LABELS, SEVERITY_COLOR } from '@/types/alert'
@@ -11,6 +12,7 @@ defineProps<{
   colVisible: Record<string, boolean>
   tableColumns: Array<Record<string, unknown>>
   loading: boolean
+  isMobile: boolean
   tableHeight: string
   allPageSelected: boolean
   pageSelectionIndeterminate: boolean
@@ -53,9 +55,13 @@ defineProps<{
 </script>
 
 <template>
-  <section class="alert-panel alert-table-panel">
+  <main class="lg-list-table-panel alert-table-panel">
     <div class="alert-toolbar">
-      <div class="alert-toolbar-left">
+      <div class="alert-toolbar-heading">
+        <strong>预警列表</strong>
+        <span>共 {{ total }} 条</span>
+      </div>
+      <div class="alert-toolbar-actions">
         <a-button
           v-if="canManageAlerts"
           type="primary"
@@ -79,8 +85,13 @@ defineProps<{
           >导出</a-button
         >
         <span v-if="canManageAlerts" class="alert-toolbar-meta">已选择 {{ selectedCount }} 条</span>
+        <ColumnSettingsButton
+          class="alert-column-settings"
+          :columns="columnSettings"
+          :visible="colVisible"
+          @toggle="toggleCol"
+        />
       </div>
-      <ColumnSettingsButton :columns="columnSettings" :visible="colVisible" @toggle="toggleCol" />
     </div>
 
     <div class="lg-table-wrap alert-grid-wrap">
@@ -95,6 +106,30 @@ defineProps<{
         <LgEmptyState description="暂无符合条件的预警记录">
           <a-button v-if="hasActiveFilters" @click="handleReset">清空筛选</a-button>
         </LgEmptyState>
+      </div>
+      <div v-else-if="isMobile" class="alert-mobile-list">
+        <article
+          v-for="record in alerts"
+          :key="String(record.id)"
+          class="alert-mobile-card"
+          @click="openDetail(record)"
+        >
+          <div class="alert-mobile-card-head">
+            <button type="button" class="alert-mobile-title" @click.stop="openDetail(record)">
+              {{ getAlertMessageText(record.message) }}
+            </button>
+            <a-tag :color="SEVERITY_COLOR[record.severity] ?? 'default'">
+              {{ formatSeverityText(record.severity) }}
+            </a-tag>
+          </div>
+          <div class="alert-mobile-project">{{ getProjectName(record.projectId) }}</div>
+          <div class="alert-mobile-meta">
+            <span
+              >{{ getProcessStatusLabel(record) }} · {{ formatDateTime(record.triggeredAt) }}</span
+            >
+            <RightOutlined />
+          </div>
+        </article>
       </div>
       <vxe-grid
         v-else
@@ -197,29 +232,22 @@ defineProps<{
     </div>
 
     <div class="lg-pagination alert-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
+      <span v-if="!isMobile" class="lg-total">共 {{ total }} 条</span>
       <a-pagination
         :current="pageNo"
         :page-size="pageSize"
         :total="total"
         :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
-        show-quick-jumper
+        :show-size-changer="!isMobile"
+        :simple="isMobile"
         @change="handlePageChange"
         @show-size-change="handlePageSizeChange"
       />
     </div>
-  </section>
+  </main>
 </template>
 
 <style scoped>
-.alert-panel {
-  background: #fff;
-  border: 1px solid #e8edf5;
-  border-radius: 12px;
-  box-shadow: 0 4px 14px rgba(31, 35, 41, 0.04);
-}
-
 .alert-table-panel {
   display: flex;
   flex: 1;
@@ -233,21 +261,35 @@ defineProps<{
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 18px;
+  padding: 10px 14px;
   border-bottom: 1px solid #eef2f7;
 }
 
-.alert-toolbar-left {
+.alert-toolbar-heading,
+.alert-toolbar-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
+.alert-toolbar-heading strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.alert-toolbar-heading span,
+.alert-toolbar-meta {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.alert-toolbar-actions {
+  justify-content: flex-end;
+}
+
 .alert-toolbar-meta {
   margin-left: 4px;
-  color: #8a94a6;
-  font-size: 13px;
 }
 
 .alert-grid-wrap {
@@ -261,11 +303,7 @@ defineProps<{
 }
 
 .alert-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 30px;
-  padding: 0 18px;
+  padding: 8px 18px;
 }
 
 .alert-link,
@@ -392,10 +430,88 @@ defineProps<{
   min-height: 0;
 }
 
-@media (max-width: 768px) {
+.alert-mobile-list {
+  display: grid;
+  gap: 6px;
+}
+
+.alert-mobile-card {
+  min-height: 88px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+}
+
+.alert-mobile-card-head,
+.alert-mobile-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.alert-mobile-title {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+}
+
+.alert-mobile-project,
+.alert-mobile-meta {
+  margin-top: 5px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (width < 500px) {
+  .alert-table-panel {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
   .alert-toolbar {
-    flex-direction: column;
-    align-items: stretch;
+    min-height: 40px;
+    padding: 8px 4px;
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .alert-toolbar-actions {
+    display: none;
+  }
+
+  .alert-grid-wrap {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .alert-pagination {
+    justify-content: center;
+    min-height: 40px;
+    padding: 2px 0;
+    border-top: 0;
   }
 }
 </style>

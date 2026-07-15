@@ -18,18 +18,22 @@ describe('ContractLedgerPage UI consistency', () => {
     const findings = scanContent(sourcePath, source)
 
     expect(findings).toEqual([])
-    expect(source).toContain('class="lg-list-page lg-page app-page cl-redesign-page"')
+    expect(source).toContain(
+      'class="lg-list-page lg-page app-page cl-redesign-page project-operation-list-page"',
+    )
     expect(source).toContain('class="lg-page-head cl-page-head"')
     expect(source).toContain('class="cl-page-meta-row"')
     expect(source).toContain('gap: 5em')
     expect(source).toContain('min-height: 0')
     expect(source).not.toContain('class="cl-page-title"')
     expect(source).not.toContain('<h1')
-    expect(source).toContain('class="lg-search-bar cl-query-panel"')
+    expect(source).toContain('class="lg-search-bar cl-query-panel project-operation-query-panel"')
     expect(source).toContain('class="cl-keyword-search"')
     expect(source).toContain('class="cl-search-prefix-icon"')
-    expect(source).toContain('class="lg-grid cl-workspace"')
-    expect(source).toContain('class="lg-list-table-panel cl-table-panel"')
+    expect(source).toContain('class="lg-grid cl-workspace project-operation-workspace"')
+    expect(source).toContain(
+      'class="lg-list-table-panel cl-table-panel project-operation-table-panel"',
+    )
     expect(source).toContain('class="lg-table-wrap cl-table-wrap"')
     expect(source).toContain('.cl-table-wrap :deep(.vxe-header--column .vxe-cell)')
     expect(source).toContain('text-align: center')

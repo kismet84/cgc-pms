@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import { ref } from 'vue'
 import {
   MoreOutlined,
+  FilterOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined,
-  SettingOutlined,
 } from '@ant-design/icons-vue'
 import ContractFormPage from './ContractFormPage.vue'
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
@@ -15,6 +15,7 @@ import ContractAnalysisPanel from './components/ContractAnalysisPanel.vue'
 import { useContractLedger, TYPE_LABEL, TYPE_COLOR } from './composables/useContractLedger'
 import type { ContractType, ContractStatus } from '@/types/contract'
 import { ColumnSettingsButton } from '@/components/list-page'
+import { useMobileViewport } from '@/composables/useMobileViewport'
 
 const {
   contractModalVisible,
@@ -53,33 +54,12 @@ const {
   visibleColumns,
 } = useContractLedger()
 
-// ---- Mobile detection ----
-const MOBILE_BP = 768
-const isMobile = ref(window.innerWidth < MOBILE_BP)
-const filterVisibility = reactive({
-  projectId: true,
-  contractType: true,
-  contractStatus: true,
-  dateRange: true,
-})
-const filterSettingItems = [
-  { key: 'projectId', label: '项目' },
-  { key: 'contractType', label: '合同类型' },
-  { key: 'contractStatus', label: '合同状态' },
-  { key: 'dateRange', label: '签订日期' },
-] as const
-function onResize() {
-  isMobile.value = window.innerWidth < MOBILE_BP
-}
-function toggleFilterVisibility(key: (typeof filterSettingItems)[number]['key']) {
-  filterVisibility[key] = !filterVisibility[key]
-}
-onMounted(() => window.addEventListener('resize', onResize))
-onUnmounted(() => window.removeEventListener('resize', onResize))
+const { isMobile } = useMobileViewport()
+const mobileFiltersOpen = ref(false)
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page cl-redesign-page">
+  <div class="lg-list-page lg-page app-page cl-redesign-page project-operation-list-page">
     <div class="lg-page-head cl-page-head">
       <div class="cl-page-meta-row">
         <a-breadcrumb class="cl-breadcrumb">
@@ -89,8 +69,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </div>
     </div>
 
-    <div class="lg-grid cl-workspace">
-      <div class="lg-left cl-main-column">
+    <div class="lg-grid cl-workspace project-operation-workspace">
+      <div class="lg-left cl-main-column project-operation-main-column">
         <ContractKpiStrip
           :kpi="kpi"
           :is-mobile="isMobile"
@@ -99,10 +79,16 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           :kpi-pct="kpiPct"
         />
 
-        <section class="lg-search-bar cl-query-panel" aria-label="合同台账查询条件">
-          <div class="cl-query-primary">
+        <section
+          class="lg-search-bar cl-query-panel project-operation-query-panel"
+          aria-label="合同台账查询条件"
+        >
+          <div
+            id="contract-filter-panel"
+            class="cl-query-primary project-operation-filter-panel"
+            :class="{ 'is-open': mobileFiltersOpen }"
+          >
             <a-select
-              v-if="filterVisibility.projectId"
               v-model:value="filter.projectId"
               placeholder="全部项目"
               allow-clear
@@ -115,7 +101,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               </a-select-option>
             </a-select>
             <a-select
-              v-if="filterVisibility.contractType"
               v-model:value="filter.contractType"
               placeholder="合同类型"
               allow-clear
@@ -128,7 +113,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               </a-select-option>
             </a-select>
             <a-select
-              v-if="filterVisibility.contractStatus"
               v-model:value="filter.contractStatus"
               placeholder="合同状态"
               allow-clear
@@ -142,7 +126,6 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               <a-select-option value="TERMINATED">已终止</a-select-option>
             </a-select>
             <a-range-picker
-              v-if="filterVisibility.dateRange"
               v-model:value="filter.dateRange"
               class="cl-date-filter"
               value-format="YYYY-MM-DD"
@@ -162,35 +145,35 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
               <template #prefix><SearchOutlined class="cl-search-prefix-icon" /></template>
             </a-input>
             <div class="cl-query-actions">
-              <a-button type="primary" size="large" @click="handleSearch">查询</a-button>
-              <a-button size="large" @click="handleReset">
+              <a-button
+                class="project-operation-desktop-query-action"
+                type="primary"
+                size="large"
+                @click="handleSearch"
+                >搜索</a-button
+              >
+              <a-button
+                class="project-operation-desktop-query-action"
+                size="large"
+                @click="handleReset"
+              >
                 <template #icon><ReloadOutlined /></template>
                 重置
               </a-button>
-              <a-dropdown trigger="click">
-                <a-button size="large">
-                  <template #icon><SettingOutlined /></template>
-                  筛选栏设置
-                </a-button>
-                <template #overlay>
-                  <a-menu>
-                    <a-menu-item
-                      v-for="item in filterSettingItems"
-                      :key="item.key"
-                      @click="toggleFilterVisibility(item.key)"
-                    >
-                      <a-checkbox :checked="filterVisibility[item.key]">
-                        {{ item.label }}
-                      </a-checkbox>
-                    </a-menu-item>
-                  </a-menu>
-                </template>
-              </a-dropdown>
+              <a-button
+                class="project-operation-filter-toggle"
+                size="large"
+                :aria-expanded="mobileFiltersOpen"
+                aria-controls="contract-filter-panel"
+                @click="mobileFiltersOpen = !mobileFiltersOpen"
+              >
+                <template #icon><FilterOutlined /></template>筛选
+              </a-button>
             </div>
           </div>
         </section>
 
-        <main class="lg-list-table-panel cl-table-panel">
+        <main class="lg-list-table-panel cl-table-panel project-operation-table-panel">
           <div class="lg-toolbar cl-table-toolbar">
             <div class="lg-toolbar-left">
               <div class="cl-table-heading">

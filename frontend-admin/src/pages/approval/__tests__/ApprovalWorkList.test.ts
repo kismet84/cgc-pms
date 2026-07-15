@@ -13,12 +13,14 @@ const workflowApiSource = readFileSync(
 const navigationSource = readFileSync(resolve(currentDir, '../../../router/navigation.ts'), 'utf-8')
 
 describe('approval work list route titles', () => {
-  it('renders breadcrumb and subtitle from the active approval tab', () => {
+  it('renders the active approval tab in the breadcrumb without a duplicate subtitle', () => {
     expect(source).toMatch(/<a-breadcrumb-item[^>]*>审批中心<\/a-breadcrumb-item>/)
     expect(source).toMatch(
       /<a-breadcrumb-item[^>]*>\{\{ pageHeaderTitle\(\) \}\}<\/a-breadcrumb-item>/,
     )
-    expect(source).toMatch(/<p[^>]*>\s*\{\{ pageHeaderSubtitle\(\) \}\}[\s\S]*?<\/p>/)
+    expect(source).not.toContain('pageHeaderSubtitle')
+    expect(source).not.toContain('approval-page-subtitle')
+    expect(source).not.toContain('处理需要您审批的业务单据')
   })
 
   it('maps payment application business type to Chinese display text', () => {
@@ -78,11 +80,7 @@ describe('approval work list route titles', () => {
     expect(source).not.toContain('count: mineData.value.length')
   })
 
-  it('uses tab-specific subtitles and empty-state text without changing detail entry', () => {
-    expect(source).toContain("return '处理需要您审批的业务单据'")
-    expect(source).toContain("return '查看您已处理的审批记录'")
-    expect(source).toContain("return '查看抄送给您的业务单据'")
-    expect(source).toContain("return '追踪您发起的审批实例'")
+  it('uses tab-specific empty-state text without changing detail entry', () => {
     expect(source).toContain("return '暂无待办任务'")
     expect(source).toContain("return '暂无已处理记录'")
     expect(source).toContain("return '暂无抄送记录'")
@@ -245,5 +243,18 @@ describe('approval work list route titles', () => {
     expect(source).toContain('无权访问该业务单据')
     expect(source).toContain(':disabled="!canOpenBusinessEntry(detail)"')
     expect(source).toContain('查看业务单据')
+  })
+
+  it('uses the project-list responsive layout contract without changing the approval workflow', () => {
+    expect(source).toContain("from '@/composables/useMobileViewport'")
+    expect(source).toContain('class="lg-search-bar approval-query-panel"')
+    expect(source).toContain('class="lg-grid approval-workspace"')
+    expect(source).toContain('class="lg-analysis-rail approval-analysis-rail"')
+    expect(source).toContain('grid-template-columns: minmax(0, 1fr) 20vw')
+    expect(source).toContain('class="approval-mobile-list"')
+    expect(source).toContain('@media (width < 500px)')
+    expect(source).toContain(':show-size-changer="!isMobile"')
+    expect(source).toContain(':simple="isMobile"')
+    expect(source).toContain('审批概览与近期动态')
   })
 })

@@ -17,7 +17,7 @@ defineProps<{
 </script>
 
 <template>
-  <aside class="lg-analysis-rail cost-reconcile-rail">
+  <aside class="lg-analysis-rail cost-reconcile-rail project-operation-analysis-rail">
     <div class="lg-analysis-panel lg-fill-card cost-reconcile-rail-body">
       <header class="cost-reconcile-rail-head">
         <div>

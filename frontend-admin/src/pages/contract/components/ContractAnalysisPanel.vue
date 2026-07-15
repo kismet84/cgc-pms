@@ -33,7 +33,10 @@ const emit = defineEmits<{
 </script>
 
 <template>
-  <aside class="lg-analysis-rail cl-analysis-rail" aria-label="合同辅助分析">
+  <aside
+    class="lg-analysis-rail cl-analysis-rail project-operation-analysis-rail"
+    aria-label="合同辅助分析"
+  >
     <!-- class="cl-analysis-panel" -->
     <div class="lg-analysis-panel lg-fill-card cl-analysis-panel">
       <header class="cl-analysis-head">

@@ -110,8 +110,12 @@ describe('VariationOrderPage save chain integrity', () => {
       expect(orderSource).toContain(
         "import VariationOrderModal from './components/VariationOrderModal.vue'",
       )
-      expect(workspaceSource).toContain('class="lg-left vo-main-column"')
-      expect(workspaceSource).toContain('class="lg-analysis-rail vo-analysis-rail"')
+      expect(workspaceSource).toContain(
+        'class="lg-left vo-main-column project-operation-main-column"',
+      )
+      expect(workspaceSource).toContain(
+        'class="lg-analysis-rail vo-analysis-rail project-operation-analysis-rail"',
+      )
       expect(modalSource).toContain('<a-modal')
       expect(modalSource).toContain('title="成本科目"')
     })

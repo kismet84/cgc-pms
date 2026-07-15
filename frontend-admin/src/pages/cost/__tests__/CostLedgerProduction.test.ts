@@ -154,9 +154,11 @@ describe('CostLedger production guards', () => {
     expect(existsSync(resolve(componentDir, 'CostLedgerAnalysisRail.vue'))).toBe(true)
     expect(existsSync(resolve(componentDir, 'CostLedgerDetailDrawer.vue'))).toBe(true)
 
-    expect(overview).toContain('class="lg-search-bar cost-ledger-query-panel"')
+    expect(overview).toContain(
+      'class="lg-search-bar cost-ledger-query-panel project-operation-query-panel"',
+    )
     expect(overview).toContain('.cost-ledger-query-panel')
-    expect(overview).toContain('class="lg-kpi-strip cost-ledger-kpi-summary"')
+    expect(overview).toContain('class="lg-kpi-strip cost-ledger-kpi-summary project-operation-kpi"')
     expect(overview).toContain('.cost-ledger-kpi-summary')
 
     expect(tablePanel).toContain('class="cost-ledger-mobile-card"')
@@ -164,7 +166,9 @@ describe('CostLedger production guards', () => {
     expect(tablePanel).toContain('.cost-ledger-mobile-card')
     expect(tablePanel).toContain('.cost-ledger-table-wrap')
 
-    expect(analysisRail).toContain('class="lg-analysis-rail cost-ledger-analysis-rail"')
+    expect(analysisRail).toContain(
+      'class="lg-analysis-rail cost-ledger-analysis-rail project-operation-analysis-rail"',
+    )
     expect(analysisRail).toContain('.cost-ledger-analysis-panel')
 
     expect(detailDrawer).toContain('class="cost-ledger-detail-drawer"')

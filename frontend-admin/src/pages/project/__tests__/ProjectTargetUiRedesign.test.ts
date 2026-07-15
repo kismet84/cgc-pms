@@ -44,14 +44,16 @@ describe('Project and target UI redesign source markers', () => {
 
   it('uses the approved high-density project list layout', () => {
     expect(sources.projectList).not.toContain('ProjectKpiSummary')
-    expect(sources.projectList).toContain('--lg-search-min-height: 95px')
+    expect(sources.projectList).toContain('--lg-search-min-height: 60px')
 
-    expect(sources.projectQueryPanel).toContain('grid-template-rows: 25px 40px')
-    expect(sources.projectQueryPanel).toContain('row-gap: 10px')
+    expect(sources.projectQueryPanel).toContain('display: flex')
+    expect(sources.projectQueryPanel).toContain('flex-direction: column')
+    expect(sources.projectQueryPanel).toContain('gap: 6px')
     expect(sources.projectQueryPanel).toContain('padding: 10px 14px')
-    expect(sources.projectQueryPanel).toContain('height: 95px')
+    expect(sources.projectQueryPanel).toContain('min-height: 60px')
     expect(sources.projectQueryPanel).toContain('height: 40px')
     expect(sources.projectQueryPanel).toContain('justify-content: center')
+    expect(sources.projectQueryPanel).not.toContain('筛选栏设置')
 
     for (const label of ['项目总数', '合同总金额', '在建项目', '已竣工项目', '风险项目']) {
       expect(sources.projectAnalysisRail).toContain(label)

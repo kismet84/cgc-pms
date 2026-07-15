@@ -14,7 +14,9 @@ describe('ContractAnalysisPanel UI consistency', () => {
     const findings = scanContent(sourcePath, source)
 
     expect(findings).toEqual([])
-    expect(source).toContain('class="lg-analysis-rail cl-analysis-rail"')
+    expect(source).toContain(
+      'class="lg-analysis-rail cl-analysis-rail project-operation-analysis-rail"',
+    )
     expect(source).toContain('aria-label="合同辅助分析"')
     expect(source).toContain('class="cl-analysis-panel"')
     expect(source).toContain('class="cl-analysis-section"')

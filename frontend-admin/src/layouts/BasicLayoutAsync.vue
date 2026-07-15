@@ -1,27 +1,28 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { MenuFoldOutlined, ProjectOutlined } from '@ant-design/icons-vue'
+import { MenuFoldOutlined, MenuOutlined, ProjectOutlined } from '@ant-design/icons-vue'
 import { getUserInfo } from '@/api/modules/auth'
+import { useMobileViewport } from '@/composables/useMobileViewport'
 import SidebarMenu from './components/SidebarMenu.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const { userInfo } = storeToRefs(userStore)
 const collapsed = ref(false)
-const isMobile = ref(false)
-let mobileQuery: MediaQueryList | undefined
+const { isMobile, isCompactDesktop } = useMobileViewport()
 const bellReady = ref(false)
+const mobilePageTitle = computed(() => String(route.meta.title || 'CGC-PMS'))
 
-function syncMobileState(event: MediaQueryList | MediaQueryListEvent) {
-  isMobile.value = event.matches
-  if (event.matches) {
+watch([isMobile, isCompactDesktop], ([mobile, compactDesktop]) => {
+  if (mobile || compactDesktop) {
     collapsed.value = true
   }
-}
+})
 
 function handleLogout() {
   userStore.logout()
@@ -47,17 +48,10 @@ async function refreshUserInfoIfNeeded() {
 }
 
 onMounted(() => {
-  mobileQuery = window.matchMedia('(max-width: 768px)')
-  syncMobileState(mobileQuery)
-  mobileQuery.addEventListener('change', syncMobileState)
   refreshUserInfoIfNeeded()
   setTimeout(() => {
     bellReady.value = true
   }, 500)
-})
-
-onBeforeUnmount(() => {
-  mobileQuery?.removeEventListener('change', syncMobileState)
 })
 </script>
 
@@ -69,7 +63,7 @@ onBeforeUnmount(() => {
     <a-layout-sider
       v-model:collapsed="collapsed"
       width="var(--shell-sidebar-width)"
-      :collapsed-width="72"
+      :collapsed-width="isMobile ? 0 : 72"
       class="sidebar"
       theme="light"
     >
@@ -133,6 +127,27 @@ onBeforeUnmount(() => {
     ></div>
 
     <a-layout>
+      <header v-if="isMobile" class="mobile-topbar">
+        <button
+          type="button"
+          class="mobile-topbar-button"
+          aria-label="打开导航菜单"
+          @click="collapsed = false"
+        >
+          <MenuOutlined aria-hidden="true" />
+        </button>
+        <div class="mobile-topbar-title">{{ mobilePageTitle }}</div>
+        <button
+          type="button"
+          class="mobile-profile-button"
+          aria-label="打开个人中心"
+          @click="router.push('/profile')"
+        >
+          <a-avatar :size="30" class="user-avatar">
+            {{ userInfo?.realName?.[0] || '●' }}
+          </a-avatar>
+        </button>
+      </header>
       <a-layout-content class="main-content">
         <router-view />
       </a-layout-content>
@@ -327,14 +342,17 @@ onBeforeUnmount(() => {
   display: none;
 }
 
-@media (max-width: 768px) {
+.mobile-topbar {
+  display: none;
+}
+
+@media (width < 500px) {
   .basic-layout {
     overflow-x: hidden;
   }
 
   .sidebar {
     z-index: 30;
-    transform: translateX(0);
     transition: width 0.22s ease;
   }
 
@@ -343,19 +361,58 @@ onBeforeUnmount(() => {
   }
 
   .main-content {
-    margin-left: var(--shell-sidebar-collapsed-width);
+    margin-left: 0;
   }
 
   :deep(.ant-layout-sider-collapsed) + .ant-layout .main-content {
-    margin-left: var(--shell-sidebar-collapsed-width);
+    margin-left: 0;
   }
 
   .main-content {
-    width: calc(100% - var(--shell-sidebar-collapsed-width));
-    max-width: calc(100vw - var(--shell-sidebar-collapsed-width));
-    min-height: 100vh;
-    padding: 12px;
+    width: 100%;
+    max-width: 100vw;
+    min-height: calc(100vh - 48px);
+    padding: 8px;
     overflow-x: hidden;
+  }
+
+  .mobile-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    display: grid;
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    align-items: center;
+    height: 48px;
+    padding: 0 8px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .mobile-topbar-button,
+  .mobile-profile-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    color: var(--text);
+    background: transparent;
+    border: 0;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  .mobile-topbar-title {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 16px;
+    font-weight: 700;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .user-text {

@@ -3,7 +3,13 @@ import dayjs from 'dayjs'
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { MoreOutlined } from '@ant-design/icons-vue'
+import {
+  FilterOutlined,
+  MoreOutlined,
+  ReloadOutlined,
+  RightOutlined,
+  SearchOutlined,
+} from '@ant-design/icons-vue'
 import type { Dayjs } from 'dayjs'
 import {
   approveTask,
@@ -24,6 +30,7 @@ import {
 import type { PageParams, PageResult } from '@/types/api'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { useMobileViewport } from '@/composables/useMobileViewport'
 import {
   readPositiveIntQuery,
   readStringQuery,
@@ -53,8 +60,10 @@ const WF_TASK_PENDING = 'PENDING'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { isMobile } = useMobileViewport()
 
 const activeTab = ref(String(route.meta.approvalTab ?? 'todo'))
+const advancedFiltersOpen = ref(false)
 
 const loading = ref(false)
 const hasLoaded = ref(false)
@@ -227,6 +236,7 @@ function handlePageChange(pno: number, psize: number) {
 }
 
 function handleFilterSearch() {
+  advancedFiltersOpen.value = false
   pageNo.value = 1
   fetchData()
 }
@@ -236,6 +246,7 @@ function handleFilterReset() {
   filterBusinessType.value = ''
   filterInstanceStatus.value = ''
   filterTimeRange.value = null
+  advancedFiltersOpen.value = false
   handleFilterSearch()
 }
 
@@ -508,13 +519,6 @@ function pageHeaderTitle(): string {
   return t?.label ?? '我的待办'
 }
 
-function pageHeaderSubtitle(): string {
-  if (activeTab.value === 'todo') return '处理需要您审批的业务单据'
-  if (activeTab.value === 'done') return '查看您已处理的审批记录'
-  if (activeTab.value === 'mine') return '追踪您发起的审批实例'
-  return '查看抄送给您的业务单据'
-}
-
 function tableEmptyText(): string {
   if (activeTab.value === 'todo') return '暂无待办任务'
   if (activeTab.value === 'done') return '暂无已处理记录'
@@ -549,54 +553,79 @@ watch(
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page">
+  <div class="lg-list-page lg-page app-page approval-worklist-page">
     <div class="lg-page-head">
-      <a-breadcrumb style="margin-bottom: 5px; font-size: 13px">
+      <a-breadcrumb class="lg-page-head-breadcrumb">
         <a-breadcrumb-item>审批中心</a-breadcrumb-item>
         <a-breadcrumb-item>{{ pageHeaderTitle() }}</a-breadcrumb-item>
       </a-breadcrumb>
-      <p class="app-page-subtitle" style="margin: 0; color: var(--text-secondary); font-size: 13px">
-        {{ pageHeaderSubtitle() }}
-      </p>
     </div>
 
-    <div class="lg-grid">
-      <main class="lg-list-table-panel">
-        <div class="lg-tabs-toolbar">
+    <section class="lg-search-bar approval-query-panel" aria-label="审批查询条件">
+      <div class="approval-search-row">
+        <a-input
+          v-model:value="filterKeyword"
+          allow-clear
+          placeholder="搜索审批标题或摘要"
+          class="approval-search-input"
+          @press-enter="handleFilterSearch"
+        >
+          <template #prefix><SearchOutlined class="approval-search-icon" /></template>
+        </a-input>
+        <a-button type="primary" class="approval-search-button" @click="handleFilterSearch">
+          搜索
+        </a-button>
+        <a-button class="approval-reset-button" @click="handleFilterReset">
+          <template #icon><ReloadOutlined /></template>
+          重置
+        </a-button>
+        <a-button
+          class="approval-filter-button"
+          :class="{ 'approval-filter-button--active': hasActiveFilters }"
+          :aria-expanded="advancedFiltersOpen"
+          aria-controls="approval-advanced-filters"
+          @click="advancedFiltersOpen = !advancedFiltersOpen"
+        >
+          <template #icon><FilterOutlined /></template>
+          筛选
+        </a-button>
+      </div>
+
+      <div
+        v-if="advancedFiltersOpen"
+        id="approval-advanced-filters"
+        class="approval-advanced-filters"
+      >
+        <a-select
+          v-model:value="filterBusinessType"
+          :options="businessTypeFilterOptions"
+          placeholder="全部业务"
+        />
+        <a-select
+          v-model:value="filterInstanceStatus"
+          :options="statusFilterOptions"
+          placeholder="全部状态"
+        />
+        <a-range-picker v-model:value="filterTimeRange" />
+        <div class="approval-advanced-actions">
+          <a-button @click="handleFilterReset">重置</a-button>
+          <a-button type="primary" @click="handleFilterSearch">应用筛选</a-button>
+        </div>
+      </div>
+    </section>
+
+    <div class="lg-grid approval-workspace">
+      <main class="lg-list-table-panel approval-table-panel">
+        <div class="lg-tabs-toolbar approval-table-toolbar">
           <a-tabs v-model:activeKey="activeTab" @change="handleTabChange">
             <a-tab-pane v-for="tab in tabs" :key="tab.key" :tab="tab.label" />
           </a-tabs>
-          <ColumnSettingsButton
-            :columns="columnSettings"
-            :visible="colVisible"
-            @toggle="toggleCol"
-          />
-        </div>
-
-        <div class="lg-search-bar approval-filter-bar">
-          <a-input
-            v-model:value="filterKeyword"
-            allow-clear
-            placeholder="搜索标题/摘要"
-            class="approval-filter-keyword"
-            @press-enter="handleFilterSearch"
-          />
-          <a-select
-            v-model:value="filterBusinessType"
-            :options="businessTypeFilterOptions"
-            placeholder="全部业务"
-            style="width: 150px"
-          />
-          <a-select
-            v-model:value="filterInstanceStatus"
-            :options="statusFilterOptions"
-            placeholder="全部状态"
-            style="width: 140px"
-          />
-          <a-range-picker v-model:value="filterTimeRange" />
-          <div class="lg-search-actions">
-            <a-button type="primary" @click="handleFilterSearch">查询</a-button>
-            <a-button @click="handleFilterReset">重置</a-button>
+          <div class="approval-column-settings">
+            <ColumnSettingsButton
+              :columns="columnSettings"
+              :visible="colVisible"
+              @toggle="toggleCol"
+            />
           </div>
         </div>
 
@@ -612,6 +641,27 @@ watch(
             <LgEmptyState :description="tableEmptyText()">
               <a-button v-if="hasActiveFilters" @click="handleFilterReset">清空筛选</a-button>
             </LgEmptyState>
+          </div>
+          <div v-else-if="isMobile" class="approval-mobile-list">
+            <button
+              v-for="item in tableData"
+              :key="String(item.instanceId ?? item.id ?? item.title)"
+              type="button"
+              class="approval-mobile-card"
+              @click="handleDetail({ instanceId: String(item.instanceId ?? item.id ?? '') })"
+            >
+              <span class="approval-mobile-card-main">
+                <strong>{{ displayText(item.title) }}</strong>
+                <span>{{ businessTypeLabel(item.businessType) }}</span>
+                <small>{{ displayText(getTimeCol(item)) }}</small>
+              </span>
+              <span class="approval-mobile-card-side">
+                <a-tag :color="getInstanceStatusMeta(item.instanceStatus).color">
+                  {{ getInstanceStatusMeta(item.instanceStatus).text }}
+                </a-tag>
+                <RightOutlined />
+              </span>
+            </button>
           </div>
           <vxe-grid
             v-else
@@ -665,44 +715,50 @@ watch(
           </vxe-grid>
         </div>
 
-        <div class="lg-pagination">
-          <span class="lg-total">共 {{ total }} 条</span>
+        <div class="lg-pagination approval-pagination">
+          <span v-if="!isMobile" class="lg-total">共 {{ total }} 条</span>
           <a-pagination
             v-model:current="pageNo"
             v-model:page-size="pageSize"
             :total="total"
             :page-size-options="['10', '20', '50', '100']"
-            show-size-changer
-            show-quick-jumper
+            :show-size-changer="!isMobile"
+            :simple="isMobile"
             @change="(p: number, ps: number) => handlePageChange(p, ps)"
           />
         </div>
       </main>
 
-      <aside class="lg-analysis-rail">
-        <div class="lg-panel">
-          <div class="lg-panel-title">审批分类</div>
-          <div class="lg-type-list">
-            <div v-for="item in approvalSummary" :key="item.label" class="lg-type-row">
-              <span class="lg-type-dot" :style="{ background: item.color }"></span>
-              <span class="lg-type-label">{{ item.label }}</span>
-              <strong>{{ item.count }}</strong>
-            </div>
+      <aside v-if="!isMobile" class="lg-analysis-rail approval-analysis-rail">
+        <div class="lg-analysis-panel lg-fill-card approval-analysis-card">
+          <div class="approval-analysis-head">
+            <strong>辅助分析</strong>
+            <span>审批概览与近期动态</span>
           </div>
-        </div>
-        <div class="lg-panel">
-          <div class="lg-panel-title">近期审批</div>
-          <div class="lg-rail-list">
-            <div
-              v-for="item in recentApprovals"
-              :key="String(item.instanceId ?? item.id ?? item.title)"
-              class="lg-rail-item"
-            >
-              <span class="lg-type-dot"></span>
-              <span>{{ item.title }}</span>
+          <section class="approval-analysis-section">
+            <div class="lg-panel-title">审批分类</div>
+            <div class="lg-type-list">
+              <div v-for="item in approvalSummary" :key="item.label" class="lg-type-row">
+                <span class="lg-type-dot" :style="{ background: item.color }"></span>
+                <span class="lg-type-label">{{ item.label }}</span>
+                <strong>{{ item.count }}</strong>
+              </div>
             </div>
-            <div v-if="!recentApprovals.length" class="lg-empty-text">暂无审批</div>
-          </div>
+          </section>
+          <section class="approval-analysis-section">
+            <div class="lg-panel-title">近期审批</div>
+            <div class="lg-rail-list">
+              <div
+                v-for="item in recentApprovals"
+                :key="String(item.instanceId ?? item.id ?? item.title)"
+                class="lg-rail-item"
+              >
+                <span class="lg-type-dot"></span>
+                <span>{{ item.title }}</span>
+              </div>
+              <div v-if="!recentApprovals.length" class="lg-empty-text">暂无审批</div>
+            </div>
+          </section>
         </div>
       </aside>
     </div>
@@ -909,17 +965,196 @@ watch(
   margin-top: 4px;
 }
 
-.approval-filter-bar {
-  padding: 12px 0;
+.approval-worklist-page {
+  gap: 12px;
+  min-height: 100%;
 }
 
-.approval-filter-keyword {
-  flex: 1;
-  min-width: 220px;
+.approval-query-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  min-height: 60px;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  margin: 0;
+  border: 0;
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    var(--shadow-soft);
+}
+
+.approval-search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.approval-search-input,
+.approval-search-button,
+.approval-reset-button,
+.approval-filter-button {
+  height: 40px;
+  min-height: 40px;
+  border-radius: var(--radius-md);
+}
+
+.approval-search-button,
+.approval-reset-button,
+.approval-filter-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  padding-inline: 10px;
+}
+
+.approval-filter-button {
+  min-width: 76px;
+}
+
+.approval-filter-button--active,
+.approval-search-icon {
+  color: var(--primary);
+}
+
+.approval-advanced-filters {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.8fr) minmax(140px, 0.7fr) minmax(240px, 1.2fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.approval-advanced-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.approval-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 20vw;
+  align-items: stretch;
+  width: 100%;
+  min-height: 0;
+}
+
+.approval-table-panel {
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.approval-table-toolbar {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.approval-analysis-rail {
+  width: 20vw;
+  min-width: 0;
+}
+
+.approval-analysis-card {
+  height: 100%;
+  overflow: auto;
+}
+
+.approval-analysis-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.approval-analysis-head strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.approval-analysis-head span {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.approval-analysis-section {
+  padding: 12px 14px;
+}
+
+.approval-analysis-section + .approval-analysis-section {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.approval-pagination {
+  padding: 8px 18px;
 }
 
 .approval-list-feedback {
   padding: 12px 0;
+}
+
+.approval-mobile-list {
+  display: grid;
+  gap: 6px;
+}
+
+.approval-mobile-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 84px;
+  padding: 10px 12px;
+  color: inherit;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+}
+
+.approval-mobile-card-main,
+.approval-mobile-card-side {
+  display: flex;
+  flex-direction: column;
+}
+
+.approval-mobile-card-main {
+  min-width: 0;
+  gap: 3px;
+}
+
+.approval-mobile-card-main strong,
+.approval-mobile-card-main span,
+.approval-mobile-card-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.approval-mobile-card-main strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.approval-mobile-card-main span,
+.approval-mobile-card-main small {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.approval-mobile-card-side {
+  align-items: flex-end;
+  gap: 10px;
+  color: var(--muted);
+  flex: 0 0 auto;
 }
 
 .approval-detail-section h3 {
@@ -946,5 +1181,77 @@ watch(
 :global(.approval-detail-modal .ant-modal-body) {
   max-height: calc(100vh - 220px);
   overflow-y: auto;
+}
+
+@media (width < 500px) {
+  .approval-worklist-page {
+    gap: 10px;
+  }
+
+  .approval-worklist-page > .lg-page-head {
+    display: none;
+  }
+
+  .approval-search-button,
+  .approval-reset-button,
+  .approval-column-settings {
+    display: none;
+  }
+
+  .approval-query-panel {
+    min-height: 40px;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .approval-search-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+
+  .approval-advanced-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .approval-advanced-actions {
+    justify-content: flex-end;
+  }
+
+  .approval-workspace {
+    display: block;
+  }
+
+  .approval-table-panel {
+    height: auto;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .approval-table-toolbar {
+    padding: 0 4px;
+    overflow-x: auto;
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .approval-table-panel .lg-table-wrap {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .approval-pagination {
+    justify-content: center;
+    min-height: 40px;
+    padding: 2px 0;
+    border-top: 0;
+  }
 }
 </style>

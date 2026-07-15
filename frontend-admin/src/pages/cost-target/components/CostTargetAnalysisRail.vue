@@ -25,7 +25,10 @@ function targetPercent(value: number): number {
 </script>
 
 <template>
-  <aside class="lg-analysis-rail ct-analysis-rail" aria-label="成本目标辅助分析">
+  <aside
+    class="lg-analysis-rail ct-analysis-rail project-operation-analysis-rail"
+    aria-label="成本目标辅助分析"
+  >
     <div class="lg-analysis-panel lg-fill-card ct-analysis-panel">
       <header class="ct-analysis-head">
         <div>

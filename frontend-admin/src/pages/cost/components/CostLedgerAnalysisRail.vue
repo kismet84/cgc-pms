@@ -26,7 +26,10 @@ const hasWarningItems = computed(() =>
 </script>
 
 <template>
-  <aside class="lg-analysis-rail cost-ledger-analysis-rail" aria-label="成本辅助分析">
+  <aside
+    class="lg-analysis-rail cost-ledger-analysis-rail project-operation-analysis-rail"
+    aria-label="成本辅助分析"
+  >
     <div class="lg-analysis-panel lg-fill-card cost-ledger-analysis-panel">
       <header class="cost-ledger-analysis-head">
         <div>

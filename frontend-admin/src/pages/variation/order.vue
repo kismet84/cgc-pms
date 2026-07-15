@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -21,6 +21,7 @@ import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/di
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import VariationOrderModal from './components/VariationOrderModal.vue'
 import VariationOrderWorkspace from './components/VariationOrderWorkspace.vue'
+import { useMobileViewport } from '@/composables/useMobileViewport'
 import {
   APPROVAL_STATUS_COLOR,
   APPROVAL_STATUS_LABEL,
@@ -59,8 +60,7 @@ const tableData = ref<VarOrderVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
-const MOBILE_BP = 768
-const isMobile = ref(false)
+const { isMobile } = useMobileViewport()
 
 const referenceStore = useReferenceStore()
 const { projects: projectList, contracts: contractList } = storeToRefs(referenceStore)
@@ -468,27 +468,17 @@ function fmtWan(val: string | undefined): string {
   return isNaN(n) ? '0.00' : (n / 10000).toFixed(2)
 }
 
-function onResize() {
-  isMobile.value = window.innerWidth < MOBILE_BP
-}
-
 onMounted(() => {
-  onResize()
-  window.addEventListener('resize', onResize)
   fetchDictData(APPROVAL_STATUS_DICT)
   referenceStore.fetchProjects()
   referenceStore.fetchContracts({})
   referenceStore.fetchPartners()
   fetchData()
 })
-
-onUnmounted(() => {
-  window.removeEventListener('resize', onResize)
-})
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page variation-page">
+  <div class="lg-list-page lg-page app-page variation-page project-operation-list-page">
     <div class="lg-page-head vo-page-head">
       <div class="vo-page-meta-row">
         <a-breadcrumb class="vo-breadcrumb">

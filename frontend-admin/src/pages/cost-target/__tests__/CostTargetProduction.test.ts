@@ -308,7 +308,7 @@ describe('CostTarget production guards', () => {
   })
 
   it('移动端与桌面端互斥，且移动端隐藏列设置按钮', async () => {
-    const mobileWrapper = mountPage(500)
+    const mobileWrapper = mountPage(499)
     await flushPromises()
 
     expect(mobileWrapper.find('.ct-mobile-list').exists()).toBe(true)
@@ -345,7 +345,7 @@ describe('CostTarget production guards', () => {
       /<CostTargetAnalysisRail[\s\S]*:total="total"[\s\S]*:target-status-summary="targetStatusSummary"[\s\S]*:target-version-summary="targetVersionSummary"[\s\S]*:recent-targets="recentTargets"[\s\S]*@refresh="fetchData"/,
     )
     expect(analysisRailSource).toMatch(
-      /<aside class="lg-analysis-rail ct-analysis-rail" aria-label="成本目标辅助分析">/,
+      /class="lg-analysis-rail ct-analysis-rail project-operation-analysis-rail"[\s\S]*aria-label="成本目标辅助分析"/,
     )
     expect(analysisRailSource).toMatch(
       /<a-button type="link" size="small" @click="emit\('refresh'\)">刷新<\/a-button>/,

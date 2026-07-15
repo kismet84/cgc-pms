@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { MoreOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons-vue'
+import { MoreOutlined, PlusOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons-vue'
 import { ColumnSettingsButton } from '@/components/list-page'
 import type { ProjectVO } from '@/types/project'
 
@@ -36,7 +36,7 @@ const emit = defineEmits<{
 
 <template>
   <main class="lg-list-table-panel project-table-panel">
-    <div class="lg-toolbar project-table-toolbar">
+    <div v-if="!isMobile" class="lg-toolbar project-table-toolbar">
       <div class="lg-toolbar-left">
         <div class="project-table-heading">
           <span class="project-table-title">项目列表</span>
@@ -68,7 +68,11 @@ const emit = defineEmits<{
               v-for="row in tableData"
               :key="row.id"
               class="project-mobile-card"
+              role="link"
+              tabindex="0"
               @click="emit('overview', row)"
+              @keydown.enter="emit('overview', row)"
+              @keydown.space.prevent="emit('overview', row)"
             >
               <div class="project-mobile-card-head">
                 <div class="project-mobile-card-title">{{ row.projectName }}</div>
@@ -78,38 +82,14 @@ const emit = defineEmits<{
               </div>
               <div class="project-mobile-card-meta">
                 <span class="project-mobile-card-code">{{ row.projectCode || '-' }}</span>
-                <a-tag :color="projectTypeColor(row.projectType)" size="small">
-                  {{ projectTypeLabel(row.projectType) }}
-                </a-tag>
+                <RightOutlined class="project-mobile-card-chevron" aria-hidden="true" />
               </div>
-              <div class="project-mobile-card-row">
-                <span>合同金额</span>
-                <span class="project-contract-amount">{{ fmtAmount(row.contractAmount) }}</span>
-              </div>
-              <div class="project-mobile-card-row">
-                <span>计划工期</span>
-                <span>
-                  {{
-                    row.plannedStartDate || row.plannedEndDate
-                      ? `${row.plannedStartDate || '-'} ~ ${row.plannedEndDate || '-'}`
-                      : '-'
-                  }}
-                </span>
-              </div>
-              <div class="project-mobile-card-row">
-                <span>审批状态</span>
-                <a-tag
-                  v-if="row.approvalStatus"
-                  :color="approvalStatusColor[row.approvalStatus]"
-                  size="small"
-                >
-                  {{ approvalStatusLabel[row.approvalStatus] ?? row.approvalStatus }}
-                </a-tag>
-                <span v-else class="project-empty-text">-</span>
-              </div>
-              <div class="project-mobile-card-actions">
-                <a-button size="small" @click.stop="emit('edit', row)">编辑</a-button>
-                <a-button size="small" danger @click.stop="emit('delete', row)">删除</a-button>
+              <div class="project-mobile-card-summary">
+                <span>{{ fmtAmount(row.contractAmount) }}</span>
+                <span aria-hidden="true">·</span>
+                <span>{{
+                  row.plannedEndDate ? `计划至 ${row.plannedEndDate}` : '工期待维护'
+                }}</span>
               </div>
             </article>
           </div>
@@ -184,13 +164,14 @@ const emit = defineEmits<{
     </div>
 
     <div class="lg-pagination project-pagination">
-      <span class="lg-total">共 {{ total }} 条</span>
+      <span v-if="!isMobile" class="lg-total">共 {{ total }} 条</span>
       <a-pagination
         :current="pageNo"
         :page-size="pageSize"
         :total="total"
         :page-size-options="['10', '20', '50', '100']"
-        show-size-changer
+        :show-size-changer="!isMobile"
+        :simple="isMobile"
         @change="(page) => emit('pageChange', page)"
         @show-size-change="(current, size) => emit('pageSizeChange', current, size)"
       />
@@ -214,6 +195,7 @@ const emit = defineEmits<{
 }
 
 .project-table-toolbar {
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -241,42 +223,59 @@ const emit = defineEmits<{
 }
 
 .project-mobile-list {
-  padding: 12px;
+  padding: 0;
 }
 
 .project-mobile-cards {
   display: grid;
-  gap: 12px;
+  gap: 6px;
 }
 
 .project-mobile-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
+  gap: 4px;
+  min-height: 82px;
+  padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease;
+}
+
+.project-mobile-card:hover,
+.project-mobile-card:focus-visible {
+  background: var(--surface-tint);
+  border-color: var(--primary);
+  outline: none;
 }
 
 .project-mobile-card-head,
-.project-mobile-card-meta,
-.project-mobile-card-row {
+.project-mobile-card-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.project-mobile-card-actions {
+.project-mobile-card-summary {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .project-mobile-card-title,
-.project-mobile-card-code,
-.project-mobile-card-row span:last-child {
+.project-mobile-card-code {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -284,13 +283,21 @@ const emit = defineEmits<{
 }
 
 .project-mobile-card-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
+  line-height: 20px;
 }
 
 .project-mobile-card-code {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.project-mobile-card-chevron {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .project-table-wrap :deep(.vxe-header--column .vxe-cell) {
@@ -322,7 +329,34 @@ const emit = defineEmits<{
 }
 
 .project-pagination {
+  padding: 8px 18px;
   border-top: 1px solid var(--border-subtle);
+}
+
+@media (width < 500px) {
+  .project-table-panel.lg-list-table-panel {
+    flex: 0 0 auto;
+    min-height: 0;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .project-table-panel .project-table-wrap {
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+  }
+
+  .project-pagination {
+    justify-content: center;
+    min-height: 40px;
+    padding: 2px 0;
+    border-top: 0;
+  }
 }
 
 @media (max-width: 1200px) {

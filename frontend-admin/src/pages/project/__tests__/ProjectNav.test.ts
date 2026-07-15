@@ -13,7 +13,11 @@ describe('ProjectNav — navigation handlers', () => {
       resolve(currentDir, '../components/ProjectTablePanel.vue'),
       'utf-8',
     )
-    expect(pageSource).toContain('@overview="router.push(`/project/${$event.id}/overview`)"')
+    expect(pageSource).toContain('@overview="openProjectOverview"')
+    expect(pageSource).toContain('router.push(`/project/${record.id}/overview`)')
+    expect(pageSource).toContain(
+      'sessionStorage.setItem(PROJECT_LIST_SCROLL_KEY, String(window.scrollY))',
+    )
     expect(tableSource).toContain('@click="emit(\'overview\', row)"')
   })
 

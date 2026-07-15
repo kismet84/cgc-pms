@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -22,9 +22,9 @@ import CostLedgerOverview from './components/CostLedgerOverview.vue'
 import CostLedgerTablePanel from './components/CostLedgerTablePanel.vue'
 import CostLedgerAnalysisRail from './components/CostLedgerAnalysisRail.vue'
 import CostLedgerDetailDrawer from './components/CostLedgerDetailDrawer.vue'
+import { useMobileViewport } from '@/composables/useMobileViewport'
 
-const MOBILE_BP = 768
-const isMobile = ref(window.innerWidth < MOBILE_BP)
+const { isMobile } = useMobileViewport()
 const route = useRoute()
 const userStore = useUserStore()
 
@@ -77,10 +77,6 @@ async function confirmAllocation() {
   } finally {
     allocationSubmitting.value = false
   }
-}
-
-function onResize() {
-  isMobile.value = window.innerWidth < MOBILE_BP
 }
 
 const referenceStore = useReferenceStore()
@@ -404,7 +400,6 @@ const {
 } = useColumnSettings('cost_ledger_cols', gridColumns)
 
 onMounted(async () => {
-  window.addEventListener('resize', onResize)
   await fetchDictData(COST_TYPE_DICT)
   applyRouteQuery()
   referenceStore.fetchProjects()
@@ -414,12 +409,10 @@ onMounted(async () => {
   fetchData()
   fetchSummary()
 })
-
-onUnmounted(() => window.removeEventListener('resize', onResize))
 </script>
 
 <template>
-  <div class="lg-list-page lg-page app-page cost-ledger-page">
+  <div class="lg-list-page lg-page app-page cost-ledger-page project-operation-list-page">
     <div class="lg-page-head cost-ledger-page-head">
       <div class="cost-ledger-head-main">
         <a-breadcrumb class="cl-breadcrumb">
@@ -437,8 +430,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
       </a-button>
     </div>
 
-    <div class="lg-grid cost-ledger-grid">
-      <div class="lg-left cost-ledger-main">
+    <div class="lg-grid cost-ledger-grid project-operation-workspace">
+      <div class="lg-left cost-ledger-main project-operation-main-column">
         <CostLedgerOverview
           :is-mobile="isMobile"
           :kpi-stats="kpiStats"
