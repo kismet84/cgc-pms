@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P2
 任务性质：回归证明
 类型：库存 / 安全阈值 / 出库 / 真实并发 / 乐观锁 / 测试隔离
-状态：Ready
+状态：Done
 来源锚点：项目知识图谱当前问题 `OBS-STOCK-CONCURRENCY`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=0cf88baba5bcbc12d470ab3e5dc5137990990a96
 存量问题键：[stock:OBS-STOCK-CONCURRENCY]
 关联产品目标：以真实 local H2 并发证明安全库存阈值更新与出库同时写入同一库存行时，由 `@Version` 阻止旧快照覆盖，并在出库重试后保持余额、阈值和流水一致。
