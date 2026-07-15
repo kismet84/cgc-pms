@@ -6,7 +6,63 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-034`、`ISSUE-040-035`、`ISSUE-040-036`、`ISSUE-040-037`、`ISSUE-040-038` 已完成；本次 `启动迭代-5` 已达到 5 条上限。
 
-`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045` 与 `ISSUE-040-046` 已完成；`启动迭代-20` 当前完成 9/20。库存真实并发证据已收口，下一候选切换至其他独立存量问题域。
+`ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`、`ISSUE-040-041`、`ISSUE-040-042`、`ISSUE-040-043`、`ISSUE-040-044`、`ISSUE-040-045` 与 `ISSUE-040-046` 已完成；`启动迭代-20` 当前完成 9/20。库存真实并发证据已收口，当前 Ready 为 WBS 软删除事务故障注入回归。
+
+### ISSUE-040-047：WBS软删除墓碑事务故障注入回归
+
+优先级：P2
+任务性质：回归证明
+类型：WBS / 分包任务 / 逻辑删除 / 事务回滚 / 故障注入 / 编号唯一性
+状态：Ready
+来源锚点：项目知识图谱当前问题 `OBS-WBS-TOMBSTONE-FAULT`；唯一问题载体 `docs/backlog/current-issues.json`；sourceRefs=`docs/backlog/current-focus.md`；candidateEvidenceHead=1ad493ac3839a43349e9808be811f26e7ff3c576
+存量问题键：[stock:OBS-WBS-TOMBSTONE-FAULT]
+关联产品目标：为已完成的 WBS 分包任务软删除编号墓碑补齐事务故障证据，确保墓碑改名成功但逻辑删除失败时整笔回滚，不留下不可见记录占用 `DELETED-<id>` 或原业务编号。
+候选对比：本项是现有明确、可本地复现的事务一致性叶子；复用现有 `@Transactional` 删除服务和 local H2 即可闭环，不依赖浏览器、外部网络或产品规则决策，范围小于多前置 WBS 平台化。
+核验结论：当前 `SubTaskService.delete` 在同一事务内依次把 taskCode 改为 `DELETED-<id>`、执行 `updateById`、再 `deleteById`；现有测试覆盖成功删除与编号复用，但未在第二步之后、逻辑删除之前注入异常并复读数据库状态。
+阻塞证据：缺少故障注入时，无法证明 `deleteById` 异常会回滚已经执行的墓碑编号更新，也无法排除原编号或 `DELETED-<id>` 命名空间被半完成事务占用。
+解除条件：真实 Spring 事务内让墓碑更新执行后、`deleteById` 抛出受控异常；事务结束后直接复读数据库，记录仍为 deleted_flag=0、task_code 为原值；清除故障后正常删除，墓碑为 `DELETED-<id>` 且原编号可复用。
+Migration：不需要
+依赖：复用 `SubTaskService`、`SubTaskMapper`、local H2、Spring `MockitoSpyBean`、项目10001、测试专用任务 ID/编号和已存在的 `.codex-autopilot/ALLOW_TEST_DATA_RESET`。
+风险等级：中
+运行态要求：仅 local/test；开始前后只清理测试专用任务记录，不需要浏览器或 Docker 业务运行态，不连接或发布生产。
+Reviewer要求：确认异常发生在真实 `updateById` 之后、`deleteById` SQL 之前；复读必须在服务事务结束后进行；同时断言 deleted_flag 和 task_code，且 spy、UserContext、测试数据均清理；不得修改生产逻辑。
+归档报告：`docs/quality/ISSUE-040-047-WBS软删除墓碑事务故障注入回归验收报告.md`
+最小回滚：回退新增故障注入集成测试、治理回写和报告；生产代码与业务数据无需回滚。
+目标：
+- 新增独立 Spring 集成测试，在真实墓碑更新完成后让逻辑删除步骤确定性失败。
+- 证明 `@Transactional(rollbackFor = Exception.class)` 同时回滚 task_code 变更与 deleted_flag 变更。
+- 证明故障清除后正常删除使用按任务 ID 唯一的墓碑，并释放原业务编号供新记录复用。
+非目标：
+- 不修改生产删除实现、事务传播、编号生成、WBS 状态机或前置依赖模型。
+- 不扩展项目/合同/伙伴权限、物理删除、批量删除或全局墓碑框架。
+- 不连接生产、不发布生产、不 push。
+允许修改：
+- `backend/src/test/java/com/cgcpms/subcontract/SubTaskDeleteTransactionTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-040-047-WBS软删除墓碑事务故障注入回归验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/test/java/com/cgcpms/TenantBoundaryTask2Test.java`
+- `frontend-admin/**`
+- `scripts/codex-autopilot/**`
+- `plugins/cgc-pms-autopilot/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `deploy/**`
+- `.github/**`
+验收标准：
+- 故障用例确认真实 `updateById` 返回1后，`deleteById` 抛出受控异常；服务返回后直接 SQL 复读为 deleted_flag=0、task_code=原编号。
+- 正常用例删除后直接 SQL 复读为 deleted_flag=1、task_code=`DELETED-<id>`，且可插入另一条使用原编号的活动任务。
+- 专项连续运行两次通过；每次前后定向清理测试任务，Mockito spy 与 UserContext 无跨用例污染。
+- 收口移除 `OBS-WBS-TOMBSTONE-FAULT`；新增后续项0、关闭1、净变化-1。
+- Ready lint、目标专项、`git diff --check` 和中风险事务一致性复核 PASS。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-040-047`
+- `cd backend; .\mvnw.cmd "-Dtest=SubTaskDeleteTransactionTest" test`
+- `git diff --check`
 
 ### ISSUE-040-046：库存阈值与出库真实并发防覆盖回归
 
