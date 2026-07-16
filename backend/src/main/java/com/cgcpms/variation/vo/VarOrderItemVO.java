@@ -12,6 +12,8 @@ public class VarOrderItemVO {
     private String quantity;
     private String unitPrice;
     private String amount;
+    private String claimUnitPrice;
+    private String claimAmount;
     private String costSubjectId;
     private String createdBy;
     private String createdAt;

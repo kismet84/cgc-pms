@@ -45,16 +45,17 @@ public class VarOrderWorkflowHandler implements WorkflowBusinessHandler {
             throw new IllegalStateException("签证变更不存在，varOrderId=" + varOrderId);
         }
 
-        // 先生成本，再更新状态 — 若 generateCost 失败抛异常，事务回滚，状态不会被错误更新
-        if ("COST".equals(order.getDirection())) {
+        // 内部成本测算大于0即生成成本；兼容历史 COST 方向数据。
+        if ((order.getEstimatedCostAmount() != null && order.getEstimatedCostAmount().signum() > 0)
+                || "COST".equals(order.getDirection())) {
             costGenerationService.generateCost("VAR_ORDER", varOrderId);
-        } else {
-            log.info("收入向签证暂不处理（第3阶段） varOrderId={}", varOrderId);
         }
 
         varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
                 .eq(VarOrder::getId, varOrderId)
-                .set(VarOrder::getApprovalStatus, "APPROVED"));
+                .set(VarOrder::getApprovalStatus, "APPROVED")
+                .set(VarOrder::getApprovedAmount, order.getReportedAmount())
+                .set(VarOrder::getOwnerStatus, "INTERNAL_APPROVED"));
     }
 
     @Override
@@ -64,7 +65,8 @@ public class VarOrderWorkflowHandler implements WorkflowBusinessHandler {
 
         varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
                 .eq(VarOrder::getId, varOrderId)
-                .set(VarOrder::getApprovalStatus, "REJECTED"));
+                .set(VarOrder::getApprovalStatus, "REJECTED")
+                .set(VarOrder::getOwnerStatus, "NOT_READY"));
     }
 
     @Override
@@ -74,7 +76,8 @@ public class VarOrderWorkflowHandler implements WorkflowBusinessHandler {
 
         varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
                 .eq(VarOrder::getId, varOrderId)
-                .set(VarOrder::getApprovalStatus, "DRAFT"));
+                .set(VarOrder::getApprovalStatus, "DRAFT")
+                .set(VarOrder::getOwnerStatus, "NOT_READY"));
     }
 
     private Long resolveVarOrderId(WfInstance instance) {

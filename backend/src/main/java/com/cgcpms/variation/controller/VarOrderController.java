@@ -3,6 +3,9 @@ package com.cgcpms.variation.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.audit.annotation.AuditedOperation;
+import com.cgcpms.variation.dto.VariationClaimModels.OwnerReviewRequest;
+import com.cgcpms.variation.dto.VariationClaimModels.OwnerSubmissionRequest;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.entity.VarOrderItem;
 import com.cgcpms.variation.service.VarOrderService;
@@ -15,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/var-orders")
@@ -46,12 +50,14 @@ public class VarOrderController {
     }
 
     @PostMapping
+    @AuditedOperation(type="CREATE", businessType="VAR_ORDER", businessIdExpression="#order.id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:add')")
     public ApiResponse<Long> create(@Valid @RequestBody VarOrder order) {
         return ApiResponse.success(varOrderService.create(order));
     }
 
     @PutMapping("/{id}")
+    @AuditedOperation(type="UPDATE", businessType="VAR_ORDER", businessIdExpression="#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody VarOrder order) {
         order.setId(id);
@@ -60,6 +66,7 @@ public class VarOrderController {
     }
 
     @DeleteMapping("/{id}")
+    @AuditedOperation(type="DELETE", businessType="VAR_ORDER", businessIdExpression="#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         varOrderService.delete(id);
@@ -67,6 +74,7 @@ public class VarOrderController {
     }
 
     @PostMapping("/{id}/submit")
+    @AuditedOperation(type="SUBMIT", businessType="VAR_ORDER", businessIdExpression="#id")
     @PreAuthorize("hasAuthority('variation:order:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         varOrderService.submitForApproval(id);
@@ -87,5 +95,28 @@ public class VarOrderController {
                                             @RequestBody List<VarOrderItem> items) {
         varOrderService.saveItems(id, items);
         return ApiResponse.success();
+    }
+
+    @PostMapping("/{id}/owner-submissions")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:owner:submit')")
+    @AuditedOperation(type="SUBMIT_OWNER", businessType="VARIATION_OWNER_SUBMISSION", businessIdExpression="#id")
+    public ApiResponse<Map<String, Object>> submitToOwner(@PathVariable Long id,
+                                                          @Valid @RequestBody OwnerSubmissionRequest request) {
+        return ApiResponse.success(varOrderService.submitToOwner(id, request));
+    }
+
+    @PostMapping("/{id}/owner-submissions/{submissionId}/review")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:owner:review')")
+    @AuditedOperation(type="OWNER_REVIEW", businessType="VARIATION_OWNER_SUBMISSION", businessIdExpression="#submissionId")
+    public ApiResponse<Map<String, Object>> reviewOwnerSubmission(@PathVariable Long id,
+                                                                  @PathVariable Long submissionId,
+                                                                  @Valid @RequestBody OwnerReviewRequest request) {
+        return ApiResponse.success(varOrderService.reviewOwnerSubmission(id, submissionId, request));
+    }
+
+    @GetMapping("/{id}/trace")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:trace')")
+    public ApiResponse<Map<String, Object>> trace(@PathVariable Long id) {
+        return ApiResponse.success(varOrderService.trace(id));
     }
 }

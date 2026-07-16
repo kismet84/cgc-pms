@@ -496,7 +496,7 @@ Docker Compose + Nginx + Actuator + Prometheus
 | --- | --- | --- | --- | --- | --- |
 | 项目与成员 | `pages/project/`、`api/modules/project.ts` | `project/` | `PmProjectControllerTest`、`ProjectOverviewServiceTest`、`ProjectLedgerProduction.test.ts` | Partial | v1.5 真实角色、项目数据范围和运行态待复验 |
 | 合同与付款条件 | `pages/contract/`、`api/modules/contract.ts` | `contract/` | `CtContractServiceTest`、`ContractApprovalIntegrationTest`、`ContractLedgerPage.test.ts` | Partial | 合同履约、金额口径和审批联动需当前复验 |
-| 变更与签证 | `pages/variation/`、`api/modules/variation.ts` | `variation/` | `VarOrderServiceTest`、`VarOrderControllerMockMvcTest`、`VariationOrderProduction.test.ts` | Partial | 变更收入/成本联动和审批边界待复验 |
+| 变更、签证与索赔 | `pages/variation/`、`api/modules/variation.ts` | `variation/`、`contract/change/` | `VarOrderServiceTest`、`VariationClaimClosedLoopIntegrationTest`、`VariationOrderProduction.test.ts` | P0 Closed | 已贯通事件证据、双口径、内部审批、业主版本/核定、正式合同变更及下游计量追溯；P1 待增强下游明细来源展示 |
 | 成本与目标成本 | `pages/cost/`、`pages/cost-target/` | `cost/`、`revenue/`、`overhead/`、`accounting/` | `CostSummaryServiceTest`、`CostLedgerServiceTest`、`CostSummaryProduction.test.ts` | Partial | 多来源成本、月份快照和下钻口径待复验 |
 | 采购与采购申请 | `pages/purchase/`、`pages/inventory/purchase-request.vue` | `purchase/` | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts` | Partial | 已完成安全阈值、人工补货目标量和自然日提前期预填；供应商级提前期、工作日历和预测仍缺失 |
 | 收货、仓库与库存 | `pages/receipt/`、`pages/inventory/` | `receipt/`、`inventory/` | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts` | Partial | 已维护安全阈值并联动 KPI/预警；目标量、全量建议、预测和跨仓调拨仍缺 |

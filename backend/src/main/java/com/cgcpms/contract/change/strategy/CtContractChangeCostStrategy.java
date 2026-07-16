@@ -65,6 +65,14 @@ public class CtContractChangeCostStrategy implements CostGenerationStrategy {
             return;
         }
 
+        // 由变更签证业主核定自动生成的合同变更，成本已经在签证内部审批时入账，禁止重复生成。
+        if (change.getSourceVarOrderId() != null) {
+            change.setCostGeneratedFlag(1);
+            changeMapper.updateById(change);
+            log.info("来源签证的合同变更跳过重复成本生成 changeId={}, varOrderId={}", changeId, change.getSourceVarOrderId());
+            return;
+        }
+
         // Look up the associated contract for partner/org info
         CtContract contract = contractMapper.selectById(change.getContractId());
 

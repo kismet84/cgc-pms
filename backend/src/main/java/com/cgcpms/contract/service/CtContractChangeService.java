@@ -13,6 +13,7 @@ import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.workflow.service.WorkflowEngine;
+import com.cgcpms.variation.entity.VarOrder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import com.cgcpms.common.util.DateTimeUtils;
 
 @Slf4j
@@ -72,20 +75,7 @@ public class CtContractChangeService {
                     "DRAFT 或 TERMINATED 状态的合同禁止创建变更");
 
         // 自动编号: CC-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        String prefix = "CC-" + today + "-";
-
-        String lastCode = ctContractChangeMapper.selectLastCodeByPrefix(prefix, UserContext.getCurrentTenantId());
-
-        int seq = 1;
-        if (lastCode != null && lastCode.startsWith(prefix)) {
-            try {
-                seq = Integer.parseInt(lastCode.substring(prefix.length())) + 1;
-            } catch (NumberFormatException e) {
-                log.warn("Failed to parse sequence number: {}", lastCode, e);
-            }
-        }
-        change.setChangeCode(prefix + String.format("%03d", seq));
+        change.setChangeCode(nextChangeCode());
 
         // 默认值
         if (change.getApprovalStatus() == null || change.getApprovalStatus().isBlank()) {
@@ -172,6 +162,71 @@ public class CtContractChangeService {
         ctContractChangeMapper.update(null, new LambdaUpdateWrapper<CtContractChange>()
                 .eq(CtContractChange::getId, id)
                 .set(CtContractChange::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Long createFromVariationAndSubmit(VarOrder order, BigDecimal confirmedAmount) {
+        if (order == null || order.getId() == null)
+            throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
+        BigDecimal amount = confirmedAmount == null ? BigDecimal.ZERO
+                : confirmedAmount.setScale(2, RoundingMode.HALF_UP);
+        if (amount.signum() <= 0)
+            throw new BusinessException("VARIATION_OWNER_CONFIRMED_AMOUNT_INVALID", "业主核定金额必须大于0");
+
+        CtContractChange existing = ctContractChangeMapper.selectOne(new LambdaQueryWrapper<CtContractChange>()
+                .eq(CtContractChange::getTenantId, UserContext.getCurrentTenantId())
+                .eq(CtContractChange::getSourceVarOrderId, order.getId()));
+        if (existing != null) return existing.getId();
+
+        CtContract contract = ctContractMapper.selectByIdForUpdate(order.getContractId(), UserContext.getCurrentTenantId());
+        if (contract == null || !java.util.Objects.equals(contract.getProjectId(), order.getProjectId()))
+            throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "合同不存在或不属于当前项目");
+        if (!"MAIN".equals(contract.getContractType())
+                || !ContractStatusConstants.APPROVAL_APPROVED.equals(contract.getApprovalStatus())
+                || !ContractStatusConstants.STATUS_PERFORMING.equals(contract.getContractStatus()))
+            throw new BusinessException("OWNER_CONTRACT_NOT_PERFORMING", "只有已审批且履约中的业主主合同可以生成正式变更");
+
+        BigDecimal before = contract.getCurrentAmount() == null ? contract.getContractAmount() : contract.getCurrentAmount();
+        CtContractChange change = new CtContractChange();
+        change.setTenantId(UserContext.getCurrentTenantId());
+        change.setProjectId(order.getProjectId());
+        change.setContractId(order.getContractId());
+        change.setSourceVarOrderId(order.getId());
+        change.setChangeCode(nextChangeCode());
+        change.setChangeName("业主核定-" + order.getVarCode() + "-" + order.getVarName());
+        change.setChangeType("AMOUNT");
+        change.setBeforeAmount(before);
+        change.setChangeAmount(amount);
+        change.setAfterAmount(before.add(amount));
+        change.setReason("由变更签证业主核定自动生成，来源=" + order.getVarCode());
+        change.setApprovalStatus(ContractStatusConstants.APPROVAL_DRAFT);
+        change.setEffectiveFlag(0);
+        change.setCostGeneratedFlag(0);
+        change.setRemark("系统自动生成，禁止脱离来源签证修改");
+        ctContractChangeMapper.insert(change);
+
+        workflowEngine.submit(UserContext.getCurrentUserId(), UserContext.getCurrentUsername(),
+                UserContext.getCurrentTenantId(), "CT_CHANGE", change.getId(), change.getChangeCode(), amount,
+                change.getProjectId(), change.getContractId(), null, null, null);
+        ctContractChangeMapper.update(null, new LambdaUpdateWrapper<CtContractChange>()
+                .eq(CtContractChange::getId, change.getId())
+                .eq(CtContractChange::getApprovalStatus, ContractStatusConstants.APPROVAL_DRAFT)
+                .set(CtContractChange::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING));
+        return change.getId();
+    }
+
+    private String nextChangeCode() {
+        String prefix = "CC-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
+        String lastCode = ctContractChangeMapper.selectLastCodeByPrefix(prefix, UserContext.getCurrentTenantId());
+        int seq = 1;
+        if (lastCode != null && lastCode.startsWith(prefix)) {
+            try {
+                seq = Integer.parseInt(lastCode.substring(prefix.length())) + 1;
+            } catch (NumberFormatException e) {
+                log.warn("Failed to parse sequence number: {}", lastCode, e);
+            }
+        }
+        return prefix + String.format("%03d", seq);
     }
 
     private void checkProjectAccess(Long projectId, String action) {

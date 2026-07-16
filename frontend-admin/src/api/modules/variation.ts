@@ -1,6 +1,11 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type { VarOrderVO, VarOrderItemVO } from '@/types/variation'
+import type {
+  VarOrderVO,
+  VarOrderItemVO,
+  VariationOwnerReviewLine,
+  VariationOwnerSubmission,
+} from '@/types/variation'
 
 /** 变更签证列表分页查询 */
 export function getVarOrderList(params: Record<string, unknown>) {
@@ -67,5 +72,41 @@ export function submitVarOrderForApproval(id: string) {
   return request<void>({
     url: `/var-orders/${id}/submit`,
     method: 'post',
+  })
+}
+
+export function submitVariationToOwner(
+  id: string,
+  data: { externalDocumentNo: string; submittedAt: string; remark?: string },
+) {
+  return request<VariationOwnerSubmission>({
+    url: `/var-orders/${id}/owner-submissions`,
+    method: 'post',
+    data,
+  })
+}
+
+export function reviewVariationOwnerSubmission(
+  id: string,
+  submissionId: string,
+  data: {
+    conclusion: 'CONFIRMED' | 'RETURNED'
+    responseDocumentNo: string
+    responseComment?: string
+    reviewedAt: string
+    items: VariationOwnerReviewLine[]
+  },
+) {
+  return request<VariationOwnerSubmission>({
+    url: `/var-orders/${id}/owner-submissions/${submissionId}/review`,
+    method: 'post',
+    data,
+  })
+}
+
+export function getVariationTrace(id: string) {
+  return request<Record<string, unknown>>({
+    url: `/var-orders/${id}/trace`,
+    method: 'get',
   })
 }

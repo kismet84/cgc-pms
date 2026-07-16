@@ -350,15 +350,6 @@ public class CostSummaryService {
         Map<Long, List<MatReceipt>> matReceiptsByProject = allMatReceipts.stream()
                 .collect(Collectors.groupingBy(MatReceipt::getProjectId));
 
-        List<VarOrder> allVarOrders = varOrderMapper.selectList(
-                new LambdaQueryWrapper<VarOrder>()
-                        .eq(VarOrder::getTenantId, tenantId)
-                        .in(VarOrder::getProjectId, validProjectIds)
-                        .eq(VarOrder::getDirection, "INCOME")
-                        .eq(VarOrder::getApprovalStatus, "APPROVED"));
-        Map<Long, List<VarOrder>> varOrdersByProject = allVarOrders.stream()
-                .collect(Collectors.groupingBy(VarOrder::getProjectId));
-
         // 4. Build result map
         Map<Long, CostProjectSummaryVO> result = new LinkedHashMap<>();
         for (Long projectId : validProjectIds) {
@@ -392,10 +383,8 @@ public class CostSummaryService {
             // Compute project-level values from batched data
             List<CtContract> projectContracts = contractsByProject.getOrDefault(projectId, Collections.emptyList());
             BigDecimal totalCurrentAmount = projectContracts.stream()
+                    .filter(c -> !"MAIN".equals(c.getContractType()))
                     .map(c -> c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal totalContractAmount = projectContracts.stream()
-                    .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             List<SubMeasure> projectSubMeasures = subMeasuresByProject.getOrDefault(projectId, Collections.emptyList());
@@ -408,14 +397,13 @@ public class CostSummaryService {
                     .map(r -> r.getTotalAmount() != null ? r.getTotalAmount() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            List<VarOrder> projectVarOrders = varOrdersByProject.getOrDefault(projectId, Collections.emptyList());
-            BigDecimal incomeVarAmount = projectVarOrders.stream()
-                    .map(v -> v.getApprovedAmount() != null ? v.getApprovedAmount() : BigDecimal.ZERO)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-
             BigDecimal estimatedRemainingCost = totalCurrentAmount
                     .subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount);
-            BigDecimal contractIncome = totalContractAmount.add(incomeVarAmount);
+            BigDecimal contractIncome = projectContracts.stream()
+                    .filter(c -> "MAIN".equals(c.getContractType()))
+                    .map(c -> c.getCurrentAmount() != null ? c.getCurrentAmount()
+                            : c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
             BigDecimal projectConfirmedRevenue = assembler.computeBatchProjectConfirmedRevenue(tenantId, projectId);
             BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
             BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);

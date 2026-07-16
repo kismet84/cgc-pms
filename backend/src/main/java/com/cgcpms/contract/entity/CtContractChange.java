@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotBlank;
@@ -54,6 +55,9 @@ public class CtContractChange implements Serializable {
 
     /** 合同变更与现场签证共用的业务事项唯一键，用于阻止同一事项跨域重复登记。 */
     private String businessMatterKey;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long sourceVarOrderId;
 
     @NotBlank
     private String changeType;

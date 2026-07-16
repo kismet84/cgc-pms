@@ -125,7 +125,8 @@ class CostSummaryAssembler {
         BigDecimal totalCurrentAmount = ctContractMapper.selectList(
                         new LambdaQueryWrapper<CtContract>()
                                 .eq(CtContract::getTenantId, tenantId)
-                                .eq(CtContract::getProjectId, projectId))
+                                .eq(CtContract::getProjectId, projectId)
+                                .ne(CtContract::getContractType, "MAIN"))
                 .stream()
                 .map(c -> c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -152,25 +153,15 @@ class CostSummaryAssembler {
     }
 
     BigDecimal computeProjectContractIncome(Long tenantId, Long projectId) {
-        BigDecimal totalContractAmount = ctContractMapper.selectList(
+        return ctContractMapper.selectList(
                         new LambdaQueryWrapper<CtContract>()
                                 .eq(CtContract::getTenantId, tenantId)
-                                .eq(CtContract::getProjectId, projectId))
+                                .eq(CtContract::getProjectId, projectId)
+                                .eq(CtContract::getContractType, "MAIN"))
                 .stream()
-                .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
+                .map(c -> c.getCurrentAmount() != null ? c.getCurrentAmount()
+                        : c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        BigDecimal incomeVarAmount = varOrderMapper.selectList(
-                        new LambdaQueryWrapper<VarOrder>()
-                                .eq(VarOrder::getTenantId, tenantId)
-                                .eq(VarOrder::getProjectId, projectId)
-                                .eq(VarOrder::getDirection, "INCOME")
-                                .eq(VarOrder::getApprovalStatus, "APPROVED"))
-                .stream()
-                .map(v -> v.getApprovedAmount() != null ? v.getApprovedAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return totalContractAmount.add(incomeVarAmount);
     }
 
     BigDecimal computeProjectPaidAmount(Long tenantId, Long projectId) {

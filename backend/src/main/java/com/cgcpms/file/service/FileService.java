@@ -119,6 +119,7 @@ public class FileService {
         // 业务对象上传权限校验
         authorizer.checkUploadAccess(businessType, businessId);
         String normalizedDocumentType = normalizeDocumentType(documentType, businessType);
+        authorizer.checkVariationDocumentStage(businessType, businessId, normalizedDocumentType);
         scanOrReject(content);
 
         try {
@@ -199,6 +200,7 @@ public class FileService {
         }
         // 业务对象删除权限校验
         authorizer.checkDeleteAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
+        authorizer.checkVariationDocumentStage(sysFile.getBusinessType(), sysFile.getBusinessId(), sysFile.getDocumentType());
 
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -445,11 +447,13 @@ public class FileService {
                 case "PAYMENT" -> "PAYMENT_PROOF";
                 case "CASH_JOURNAL" -> "BANK_RECEIPT";
                 case "CONTRACT" -> "CONTRACT_ATTACHMENT";
+                case "VARIATION" -> "SITE_EVIDENCE";
                 default -> "OTHER";
             };
         }
         if (!Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE", "BANK_RECEIPT",
-                "CONTRACT_ATTACHMENT", "PAYMENT_PROOF", "OTHER").contains(type)) {
+                "CONTRACT_ATTACHMENT", "PAYMENT_PROOF", "OTHER", "SITE_EVIDENCE",
+                "COST_ESTIMATE", "OWNER_SUBMISSION", "OWNER_CONFIRMATION").contains(type)) {
             throw new BusinessException("DOCUMENT_TYPE_INVALID", "不支持的业务文档类型");
         }
         if (Set.of("INVOICE", "SALES_INVOICE").contains(business) && !Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE").contains(type)) {

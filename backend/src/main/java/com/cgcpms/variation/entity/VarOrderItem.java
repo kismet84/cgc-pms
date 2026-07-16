@@ -36,5 +36,11 @@ public class VarOrderItem extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal amount;
 
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal claimUnitPrice;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal claimAmount;
+
     private Long costSubjectId;
 }
