@@ -170,6 +170,8 @@ export interface CostLedgerSummaryVO {
 
 /** Cost summary per subject view object */
 export interface CostSubjectSummaryVO {
+  costTargetId?: string
+  costForecastId?: string
   costSubjectId: string
   costSubjectName: string
   targetCost: string
@@ -178,6 +180,10 @@ export interface CostSubjectSummaryVO {
   paidAmount: string
   dynamicCost: string
   costDeviation: string
+  responsibilityCost?: string
+  forecastAtCompletionCost?: string
+  forecastProfit?: string
+  profitMargin?: string
 }
 
 /** Cost summary project-level view object */
@@ -193,6 +199,12 @@ export interface CostSummaryVO {
   contractIncome: string
   confirmedRevenue: string
   expectedProfit: string
+  costTargetId?: string
+  costForecastId?: string
+  responsibilityCost?: string
+  forecastAtCompletionCost?: string
+  forecastProfit?: string
+  profitMargin?: string
   subjects: CostSubjectSummaryVO[]
 }
 
@@ -204,6 +216,8 @@ export interface CostSummaryHistoryVO {
   summaryDate: string
   costSubjectId: string
   costSubjectName: string
+  costTargetId?: string
+  costForecastId?: string
   targetCost: string
   contractLockedCost: string
   actualCost: string
@@ -214,5 +228,9 @@ export interface CostSummaryHistoryVO {
   confirmedRevenue: string
   expectedProfit: string
   costDeviation: string
+  responsibilityCost?: string
+  forecastAtCompletionCost?: string
+  forecastProfit?: string
+  profitMargin?: string
   createdAt: string
 }

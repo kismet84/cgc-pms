@@ -47,6 +47,20 @@ public class CostTargetItem extends BaseEntity {
     @DecimalMin(value = "0.00", message = "目标金额不能为负数")
     private BigDecimal targetAmount;
 
+    /** 投标阶段该科目成本基准快照。 */
+    @DecimalMin(value = "0.00", message = "投标成本金额不能为负数")
+    private BigDecimal bidCostAmount;
+
+    /** 下达给责任主体的预算金额。 */
+    @DecimalMin(value = "0.00", message = "责任预算金额不能为负数")
+    private BigDecimal responsibilityAmount;
+
+    private Long responsibleUserId;
+
+    private String responsibilityUnit;
+
+    private Integer sortOrder;
+
     // ── V22 使用 created_time / updated_time ──
 
     @TableField("created_at")

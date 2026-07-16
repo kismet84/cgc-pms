@@ -33,6 +33,9 @@ public class CostSummary extends BaseEntity {
     /** 关联 cost_target.id，用于目标成本版本追溯 */
     private Long costTargetId;
 
+    /** 关联已确认完工预测版本。 */
+    private Long costForecastId;
+
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal targetCost;
 
@@ -62,4 +65,12 @@ public class CostSummary extends BaseEntity {
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal costDeviation;
+
+    private BigDecimal responsibilityCost;
+
+    private BigDecimal forecastAtCompletionCost;
+
+    private BigDecimal forecastProfit;
+
+    private BigDecimal profitMargin;
 }

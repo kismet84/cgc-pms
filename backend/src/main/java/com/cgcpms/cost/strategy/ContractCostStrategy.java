@@ -50,6 +50,10 @@ public class ContractCostStrategy implements CostGenerationStrategy {
             log.warn("生成锁定成本：合同不存在 contractId={}", contractId);
             return;
         }
+        if ("MAIN".equals(contract.getContractType())) {
+            log.info("主合同属于项目收入来源，不生成锁定成本 contractId={}", contractId);
+            return;
+        }
 
         List<CtContractItem> items = contractItemMapper.selectList(
                 new LambdaQueryWrapper<CtContractItem>()

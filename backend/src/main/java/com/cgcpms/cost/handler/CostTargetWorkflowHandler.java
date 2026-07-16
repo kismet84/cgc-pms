@@ -10,6 +10,9 @@ import com.cgcpms.cost.mapper.CostSummaryMapper;
 import com.cgcpms.cost.mapper.CostTargetItemMapper;
 import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.cost.service.CostTargetService;
+import com.cgcpms.cost.service.CostSummaryService;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -36,6 +39,8 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
     private final CostTargetItemMapper costTargetItemMapper;
     private final CostSummaryMapper costSummaryMapper;
     private final CostTargetService costTargetService;
+    private final CostSummaryService costSummaryService;
+    private final PmProjectMapper projectMapper;
 
     @Override
     public String supportBusinessType() {
@@ -57,21 +62,7 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
             throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在，targetId=" + targetId);
         }
 
-        // 校验：cost_target_item 不能为空
-        List<CostTargetItem> items = costTargetItemMapper.selectList(
-                new LambdaQueryWrapper<CostTargetItem>()
-                        .eq(CostTargetItem::getTargetId, targetId));
-        if (items == null || items.isEmpty()) {
-            throw new BusinessException("COST_TARGET_NO_ITEMS", "目标成本明细为空，请至少添加一条科目");
-        }
-
-        // 校验：cost_target_item 不能有 null/0 必填科目
-        for (CostTargetItem item : items) {
-            if (item.getCostSubjectId() == null || item.getCostSubjectId() == 0) {
-                throw new BusinessException("COST_TARGET_ITEM_INVALID",
-                        "目标成本明细存在未指定科目的记录，请完善所有科目");
-            }
-        }
+        costTargetService.validateForSubmit(target);
 
         // 将状态改为审批中
         target.setApprovalStatus("APPROVING");
@@ -91,6 +82,7 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
 
         // 1. 设置审批状态为 APPROVED
         target.setApprovalStatus("APPROVED");
+        target.setStatus("APPROVED");
         costTargetMapper.updateById(target);
 
         // 2. 版本切换：旧版本 is_active=0，新版本 is_active=1 + status=ACTIVE
@@ -99,7 +91,18 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
         // 3. 更新 cost_summary.cost_target_id 指向新激活的版本
         costSummaryMapper.update(null, new LambdaUpdateWrapper<CostSummary>()
                 .eq(CostSummary::getProjectId, target.getProjectId())
+                .eq(CostSummary::getTenantId, target.getTenantId())
                 .set(CostSummary::getCostTargetId, targetId));
+
+        PmProject project = projectMapper.selectById(target.getProjectId());
+        if (project == null || !target.getTenantId().equals(project.getTenantId())) {
+            throw new IllegalStateException("目标成本所属项目不存在或租户不一致，projectId=" + target.getProjectId());
+        }
+        if (target.getTotalTargetAmount() != null) {
+            project.setTargetCost(target.getTotalTargetAmount());
+            projectMapper.updateById(project);
+        }
+        costSummaryService.refreshSummary(target.getTenantId(), target.getProjectId());
     }
 
     @Override
@@ -109,7 +112,8 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
 
         costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
                 .eq(CostTarget::getId, targetId)
-                .set(CostTarget::getApprovalStatus, "REJECTED"));
+                .set(CostTarget::getApprovalStatus, "REJECTED")
+                .set(CostTarget::getStatus, "REJECTED"));
     }
 
     @Override
@@ -119,7 +123,8 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
 
         costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
                 .eq(CostTarget::getId, targetId)
-                .set(CostTarget::getApprovalStatus, "DRAFT"));
+                .set(CostTarget::getApprovalStatus, "DRAFT")
+                .set(CostTarget::getStatus, "DRAFT"));
     }
 
     private Long resolveTargetId(WfInstance instance) {

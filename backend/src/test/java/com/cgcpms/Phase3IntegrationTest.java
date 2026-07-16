@@ -484,8 +484,12 @@ class Phase3IntegrationTest {
         targetItem.setTenantId(0L);
         targetItem.setTargetId(targetId);
         targetItem.setProjectId(PROJECT_ID);
-        targetItem.setCostSubjectId(1L);  // 使用默认科目ID
+        targetItem.setCostSubjectId(1002L);  // 使用迁移种子中的材料成本科目
         targetItem.setTargetAmount(new BigDecimal("300000000.00"));
+        targetItem.setBidCostAmount(new BigDecimal("300000000.00"));
+        targetItem.setResponsibilityAmount(new BigDecimal("300000000.00"));
+        targetItem.setResponsibleUserId(USER_ADMIN);
+        targetItem.setResponsibilityUnit("项目成本组");
         targetItem.setCreatedBy(USER_ADMIN);
         targetItem.setCreatedTime(LocalDateTime.now());
         targetItem.setUpdatedBy(USER_ADMIN);
@@ -497,8 +501,12 @@ class Phase3IntegrationTest {
         targetItem2.setTenantId(0L);
         targetItem2.setTargetId(targetId);
         targetItem2.setProjectId(PROJECT_ID);
-        targetItem2.setCostSubjectId(2L);
+        targetItem2.setCostSubjectId(1003L); // 使用迁移种子中的分包成本科目
         targetItem2.setTargetAmount(new BigDecimal("220000000.00"));
+        targetItem2.setBidCostAmount(new BigDecimal("220000000.00"));
+        targetItem2.setResponsibilityAmount(new BigDecimal("220000000.00"));
+        targetItem2.setResponsibleUserId(USER_ADMIN);
+        targetItem2.setResponsibilityUnit("项目成本组");
         targetItem2.setCreatedBy(USER_ADMIN);
         targetItem2.setCreatedTime(LocalDateTime.now());
         targetItem2.setUpdatedBy(USER_ADMIN);

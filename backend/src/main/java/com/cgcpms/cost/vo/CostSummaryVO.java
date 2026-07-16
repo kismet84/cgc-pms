@@ -12,6 +12,8 @@ public class CostSummaryVO {
     private String summaryDate;
     private String costSubjectId;
     private String costSubjectName;
+    private String costTargetId;
+    private String costForecastId;
     private String targetCost;
     private String contractLockedCost;
     private String actualCost;
@@ -22,6 +24,10 @@ public class CostSummaryVO {
     private String confirmedRevenue;
     private String expectedProfit;
     private String costDeviation;
+    private String responsibilityCost;
+    private String forecastAtCompletionCost;
+    private String forecastProfit;
+    private String profitMargin;
     private String createdBy;
     private String createdAt;
     private String updatedAt;

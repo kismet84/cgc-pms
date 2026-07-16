@@ -28,6 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("local")
 @DisplayName("CostTargetController — items & submit endpoints")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CostTargetControllerTest {
 
     @Autowired
@@ -43,9 +44,32 @@ class CostTargetControllerTest {
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
     private static final long PROJECT_ID = 10001L;
+    private static final long[] SUBJECT_IDS = {101L, 102L, 103L, 201L, 202L, 301L, 302L};
+    private static final String TEST_VERSION = "V1.0-TEST-" + Long.toUnsignedString(System.nanoTime());
 
     /** ID of the cost target created for tests. */
     private static Long testTargetId;
+
+    @BeforeAll
+    void seedCostSubjects() {
+        for (long subjectId : SUBJECT_IDS) {
+            jdbcTemplate.update("INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,level,sort_order,status,created_at,updated_at,deleted_flag) " +
+                            "SELECT ?,0,0,?,?,'DIRECT',1,0,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 " +
+                            "WHERE NOT EXISTS (SELECT 1 FROM cost_subject WHERE id=?)",
+                    subjectId, "TEST-" + subjectId, "测试成本科目" + subjectId, subjectId);
+        }
+    }
+
+    @AfterAll
+    void cleanupCostTargetFixture() {
+        if (testTargetId != null) {
+            jdbcTemplate.update("DELETE FROM cost_target_item WHERE target_id=?", testTargetId);
+            jdbcTemplate.update("DELETE FROM cost_target WHERE id=?", testTargetId);
+        }
+        for (long subjectId : SUBJECT_IDS) {
+            jdbcTemplate.update("DELETE FROM cost_subject WHERE id=? AND subject_code=?", subjectId, "TEST-" + subjectId);
+        }
+    }
 
     /** Generate a valid JWT token for the admin user and wrap as HttpOnly cookie. */
     private Cookie adminCookie() {
@@ -105,14 +129,14 @@ class CostTargetControllerTest {
         String body = """
                 {
                     "projectId": %d,
-                    "versionNo": "V1.0-TEST",
+                    "versionNo": "%s",
                     "versionName": "测试版本",
                     "totalTargetAmount": 500000.00,
                     "isActive": 0,
                     "approvalStatus": "DRAFT",
                     "status": "DRAFT"
                 }
-                """.formatted(PROJECT_ID);
+                """.formatted(PROJECT_ID, TEST_VERSION);
 
         String response = mockMvc.perform(postWithApiContext("/cost-targets")
                         .cookie(adminCookie())
@@ -138,7 +162,7 @@ class CostTargetControllerTest {
         mockMvc.perform(getWithApiContext("/cost-targets")
                         .cookie(adminCookie())
                         .param("projectId", String.valueOf(PROJECT_ID))
-                        .param("versionNo", "V1.0-TEST")
+                        .param("versionNo", TEST_VERSION)
                         .param("pageNo", "1")
                         .param("pageSize", "1"))
                 .andExpect(status().isOk())
@@ -146,7 +170,7 @@ class CostTargetControllerTest {
                 .andExpect(jsonPath("$.data.records[0].id").isString())
                 .andExpect(jsonPath("$.data.records[0].id").value(String.valueOf(testTargetId)))
                 .andExpect(jsonPath("$.data.records[0].projectId").value(String.valueOf(PROJECT_ID)))
-                .andExpect(jsonPath("$.data.records[0].versionNo").value("V1.0-TEST"))
+                .andExpect(jsonPath("$.data.records[0].versionNo").value(TEST_VERSION))
                 .andExpect(jsonPath("$.data.records[0].tenantId").doesNotExist())
                 .andExpect(jsonPath("$.data.records[0].deletedFlag").doesNotExist());
     }
@@ -162,7 +186,7 @@ class CostTargetControllerTest {
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.id").value(String.valueOf(testTargetId)))
                 .andExpect(jsonPath("$.data.projectId").value(String.valueOf(PROJECT_ID)))
-                .andExpect(jsonPath("$.data.versionNo").value("V1.0-TEST"))
+                .andExpect(jsonPath("$.data.versionNo").value(TEST_VERSION))
                 .andExpect(jsonPath("$.data.versionName").value("测试版本"))
                 .andExpect(jsonPath("$.data.totalTargetAmount").value(500000.00))
                 .andExpect(jsonPath("$.data.isActive").value(0))

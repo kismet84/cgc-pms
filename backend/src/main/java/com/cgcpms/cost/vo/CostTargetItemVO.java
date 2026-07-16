@@ -23,5 +23,11 @@ public class CostTargetItemVO implements Serializable {
     private Long costSubjectId;
 
     private BigDecimal targetAmount;
+    private BigDecimal bidCostAmount;
+    private BigDecimal responsibilityAmount;
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long responsibleUserId;
+    private String responsibilityUnit;
+    private Integer sortOrder;
     private String remark;
 }

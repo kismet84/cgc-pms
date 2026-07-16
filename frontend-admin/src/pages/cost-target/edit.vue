@@ -7,6 +7,7 @@ import type { TreeSelectProps } from 'ant-design-vue'
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { getCostSubjectTree } from '@/api/modules/costSubject'
+import { getUserList, type SysUserBrief } from '@/api/modules/system'
 import {
   createCostTarget,
   updateCostTarget,
@@ -95,6 +96,7 @@ onBeforeUnmount(() => {
 const referenceStore = useReferenceStore()
 const projects = computed(() => referenceStore.projects ?? [])
 const subjectTree = ref<TreeSelectProps['treeData']>([])
+const userList = ref<SysUserBrief[]>([])
 
 // ---- Form data ----
 const formRef = ref<FormInstance>()
@@ -103,7 +105,9 @@ const formData = reactive({
   versionNo: '',
   versionName: '',
   effectiveDate: undefined as string | undefined,
+  totalBidCostAmount: undefined as number | undefined,
   totalTargetAmount: undefined as number | undefined,
+  totalResponsibilityAmount: undefined as number | undefined,
   remark: '',
 })
 
@@ -111,7 +115,9 @@ const formRules: Record<string, Rule[]> = {
   projectId: [{ required: true, message: '请选择所属项目', trigger: 'change' }],
   versionNo: [{ required: true, message: '请输入版本号', trigger: 'blur' }],
   versionName: [{ required: true, message: '请输入版本名称', trigger: 'blur' }],
+  totalBidCostAmount: [{ required: true, message: '请输入投标成本总额', trigger: 'blur' }],
   totalTargetAmount: [{ required: true, message: '请输入成本目标总额', trigger: 'blur' }],
+  totalResponsibilityAmount: [{ required: true, message: '请输入责任预算总额', trigger: 'blur' }],
 }
 
 // ---- Items table ----
@@ -120,7 +126,11 @@ interface EditableItem {
   costSubjectId: string | undefined
   costSubjectName: string
   costSubjectCode: string
+  bidCostAmount: number | undefined
   targetAmount: number | undefined
+  responsibilityAmount: number | undefined
+  responsibleUserId: string | undefined
+  responsibilityUnit: string
   sortOrder: number
 }
 
@@ -133,7 +143,9 @@ watch(
     formData.versionNo,
     formData.versionName,
     formData.effectiveDate,
+    formData.totalBidCostAmount,
     formData.totalTargetAmount,
+    formData.totalResponsibilityAmount,
     formData.remark,
   ],
   () => {
@@ -160,7 +172,11 @@ function addRow() {
     costSubjectId: undefined,
     costSubjectName: '',
     costSubjectCode: '',
+    bidCostAmount: undefined,
     targetAmount: undefined,
+    responsibilityAmount: undefined,
+    responsibleUserId: undefined,
+    responsibilityUnit: '',
     sortOrder: items.value.length + 1,
   })
 }
@@ -244,7 +260,9 @@ async function loadExisting() {
     formData.versionNo = target.versionNo
     formData.versionName = target.versionName
     formData.effectiveDate = target.effectiveDate
+    formData.totalBidCostAmount = Number(target.totalBidCostAmount) || undefined
     formData.totalTargetAmount = Number(target.totalTargetAmount) || undefined
+    formData.totalResponsibilityAmount = Number(target.totalResponsibilityAmount) || undefined
     formData.remark = target.remark || ''
 
     // Load items
@@ -256,7 +274,11 @@ async function loadExisting() {
         costSubjectId: String(it.costSubjectId),
         costSubjectName: it.costSubjectName || '',
         costSubjectCode: it.costSubjectCode || '',
+        bidCostAmount: Number(it.bidCostAmount) || undefined,
         targetAmount: Number(it.targetAmount) || undefined,
+        responsibilityAmount: Number(it.responsibilityAmount) || undefined,
+        responsibleUserId: it.responsibleUserId ? String(it.responsibleUserId) : undefined,
+        responsibilityUnit: it.responsibilityUnit || '',
         sortOrder: idx + 1,
       }))
     } catch (e: unknown) {
@@ -277,6 +299,12 @@ async function loadExisting() {
 const itemsTotal = computed(() =>
   items.value.reduce((s, r) => s + (Number(r.targetAmount) || 0), 0),
 )
+const bidItemsTotal = computed(() =>
+  items.value.reduce((sum, item) => sum + (Number(item.bidCostAmount) || 0), 0),
+)
+const responsibilityItemsTotal = computed(() =>
+  items.value.reduce((sum, item) => sum + (Number(item.responsibilityAmount) || 0), 0),
+)
 
 const totalMatch = computed(() => {
   const total = Number(formData.totalTargetAmount) || 0
@@ -284,6 +312,15 @@ const totalMatch = computed(() => {
   if (sum === 0) return true
   return Math.abs(total - sum) < 0.01
 })
+const bidTotalMatch = computed(
+  () => Math.abs((Number(formData.totalBidCostAmount) || 0) - bidItemsTotal.value) < 0.01,
+)
+const responsibilityTotalMatch = computed(
+  () =>
+    Math.abs((Number(formData.totalResponsibilityAmount) || 0) - responsibilityItemsTotal.value) <
+      0.01 &&
+    Math.abs((Number(formData.totalTargetAmount) || 0) - responsibilityItemsTotal.value) < 0.01,
+)
 const summaryCards = computed(() => [
   {
     label: '当前模式',
@@ -302,8 +339,14 @@ const summaryCards = computed(() => [
   },
   {
     label: '金额校验',
-    value: totalMatch.value ? '已对齐' : '待调整',
-    tone: totalMatch.value ? 'success' : 'warning',
+    value:
+      totalMatch.value && bidTotalMatch.value && responsibilityTotalMatch.value
+        ? '已对齐'
+        : '待调整',
+    tone:
+      totalMatch.value && bidTotalMatch.value && responsibilityTotalMatch.value
+        ? 'success'
+        : 'warning',
   },
 ])
 const analysisChecklist = computed(() => [
@@ -321,12 +364,26 @@ const analysisChecklist = computed(() => [
     label: '明细完整性',
     value:
       items.value.length > 0 &&
-      items.value.every((item) => item.costSubjectId && Number(item.targetAmount) > 0)
+      items.value.every(
+        (item) =>
+          item.costSubjectId &&
+          item.bidCostAmount !== undefined &&
+          Number(item.targetAmount) > 0 &&
+          Number(item.responsibilityAmount) > 0 &&
+          item.responsibleUserId,
+      )
         ? '可提交'
         : '待补齐',
     done:
       items.value.length > 0 &&
-      items.value.every((item) => item.costSubjectId && Number(item.targetAmount) > 0),
+      items.value.every(
+        (item) =>
+          Boolean(item.costSubjectId) &&
+          item.bidCostAmount !== undefined &&
+          Number(item.targetAmount) > 0 &&
+          Number(item.responsibilityAmount) > 0 &&
+          Boolean(item.responsibleUserId),
+      ),
   },
   {
     label: '离开提醒',
@@ -351,10 +408,17 @@ async function validateForm(): Promise<boolean> {
   }
 
   const emptyAmount = items.value.some(
-    (r) => !r.costSubjectId || !r.targetAmount || Number(r.targetAmount) <= 0,
+    (r) =>
+      !r.costSubjectId ||
+      r.bidCostAmount === undefined ||
+      !r.targetAmount ||
+      Number(r.targetAmount) <= 0 ||
+      !r.responsibilityAmount ||
+      Number(r.responsibilityAmount) <= 0 ||
+      !r.responsibleUserId,
   )
   if (emptyAmount) {
-    message.warning('存在未选择科目或未填写金额的明细项')
+    message.warning('每条明细必须填写投标成本、目标成本、责任预算和责任人')
     return false
   }
 
@@ -362,6 +426,14 @@ async function validateForm(): Promise<boolean> {
     message.warning(
       `科目金额合计（${itemsTotal.value.toFixed(2)}）与成本目标总额（${Number(formData.totalTargetAmount || 0).toFixed(2)}）不一致`,
     )
+    return false
+  }
+  if (!bidTotalMatch.value) {
+    message.warning('投标成本科目合计与投标成本总额不一致')
+    return false
+  }
+  if (!responsibilityTotalMatch.value) {
+    message.warning('责任预算必须完整分解且与目标成本总额一致')
     return false
   }
 
@@ -375,7 +447,9 @@ function buildTargetPayload(): Partial<CostTargetVO> {
     versionNo: formData.versionNo,
     versionName: formData.versionName,
     effectiveDate: formData.effectiveDate,
+    totalBidCostAmount: String(formData.totalBidCostAmount ?? 0),
     totalTargetAmount: String(formData.totalTargetAmount ?? 0),
+    totalResponsibilityAmount: String(formData.totalResponsibilityAmount ?? 0),
     remark: formData.remark,
   }
 }
@@ -383,7 +457,11 @@ function buildTargetPayload(): Partial<CostTargetVO> {
 function buildItemsPayload(): CostTargetItemVO[] {
   return items.value.map((r, idx) => ({
     costSubjectId: r.costSubjectId!,
+    bidCostAmount: String(r.bidCostAmount ?? '0'),
     targetAmount: String(r.targetAmount ?? '0'),
+    responsibilityAmount: String(r.responsibilityAmount ?? '0'),
+    responsibleUserId: r.responsibleUserId!,
+    responsibilityUnit: r.responsibilityUnit,
     sortOrder: idx + 1,
   }))
 }
@@ -470,7 +548,11 @@ function finishClose() {
 const itemColumns = computed(() => [
   { title: '序号', dataIndex: 'index', width: 46, align: 'center' as const },
   { title: '成本科目', dataIndex: 'costSubjectId', minWidth: 180 },
+  { title: '投标成本(元)', dataIndex: 'bidCostAmount', width: 130, align: 'right' as const },
   { title: '目标金额(元)', dataIndex: 'targetAmount', width: 128, align: 'right' as const },
+  { title: '责任预算(元)', dataIndex: 'responsibilityAmount', width: 130, align: 'right' as const },
+  { title: '责任人', dataIndex: 'responsibleUserId', width: 140 },
+  { title: '责任单位', dataIndex: 'responsibilityUnit', width: 150 },
   ...(isView.value
     ? []
     : [{ title: '操作', dataIndex: 'ops', width: 54, align: 'center' as const }]),
@@ -487,6 +569,9 @@ function fmtMoney(val: number | undefined): string {
 onMounted(() => {
   referenceStore.fetchProjects()
   fetchSubjectTree()
+  getUserList({ pageNo: 1, pageSize: 200 })
+    .then((result) => (userList.value = result.records.filter((user) => user.status !== 'DISABLE')))
+    .catch(() => (userList.value = []))
   if (hasExistingTarget.value && editId.value) loadExisting()
   else initialLoadDone = true
 })
@@ -611,6 +696,7 @@ onMounted(() => {
                   :data-source="items"
                   :columns="itemColumns"
                   :pagination="false"
+                  :scroll="{ x: 1150 }"
                   row-key="_key"
                   size="small"
                   bordered
@@ -632,14 +718,47 @@ onMounted(() => {
                         @change="(val: string | number | undefined) => onSubjectChange(val, record)"
                       />
                     </template>
-                    <template v-else-if="column.dataIndex === 'targetAmount'">
+                    <template
+                      v-else-if="
+                        ['bidCostAmount', 'targetAmount', 'responsibilityAmount'].includes(
+                          String(column.dataIndex),
+                        )
+                      "
+                    >
                       <a-input-number
-                        v-model:value="record.targetAmount"
+                        v-model:value="record[column.dataIndex]"
                         :min="0"
                         :precision="2"
                         size="small"
                         style="width: 100%"
                         placeholder="金额"
+                        :disabled="isView"
+                      />
+                    </template>
+                    <template v-else-if="column.dataIndex === 'responsibleUserId'">
+                      <a-select
+                        v-model:value="record.responsibleUserId"
+                        size="small"
+                        show-search
+                        option-filter-prop="label"
+                        placeholder="选择责任人"
+                        :disabled="isView"
+                      >
+                        <a-select-option
+                          v-for="user in userList"
+                          :key="user.id"
+                          :value="String(user.id)"
+                          :label="user.realName || user.username"
+                        >
+                          {{ user.realName || user.username }}
+                        </a-select-option>
+                      </a-select>
+                    </template>
+                    <template v-else-if="column.dataIndex === 'responsibilityUnit'">
+                      <a-input
+                        v-model:value="record.responsibilityUnit"
+                        size="small"
+                        placeholder="责任部门/班组"
                         :disabled="isView"
                       />
                     </template>
@@ -654,9 +773,10 @@ onMounted(() => {
 
                   <template #footer>
                     <div class="cte-footer">
-                      <span>合计：</span>
+                      <span>投标 / 目标 / 责任合计：</span>
                       <span class="cte-total" :class="{ 'cte-warn': !totalMatch }">
-                        {{ fmtMoney(itemsTotal) }} 元
+                        {{ fmtMoney(bidItemsTotal) }} / {{ fmtMoney(itemsTotal) }} /
+                        {{ fmtMoney(responsibilityItemsTotal) }} 元
                       </span>
                     </div>
                   </template>
@@ -673,6 +793,16 @@ onMounted(() => {
             <section class="pt-panel cte-section">
               <div class="pt-panel-header">金额明细</div>
               <div class="pt-panel-body pt-form-grid cte-amount-grid">
+                <a-form-item label="投标成本总额(元)" name="totalBidCostAmount">
+                  <a-input-number
+                    v-model:value="formData.totalBidCostAmount"
+                    :min="0"
+                    :precision="2"
+                    placeholder="投标成本基准"
+                    style="width: 100%"
+                    :disabled="isView"
+                  />
+                </a-form-item>
                 <a-form-item label="成本目标总额(元)" name="totalTargetAmount">
                   <a-input-number
                     v-model:value="formData.totalTargetAmount"
@@ -683,9 +813,26 @@ onMounted(() => {
                     :disabled="isView"
                   />
                 </a-form-item>
+                <a-form-item label="责任预算总额(元)" name="totalResponsibilityAmount">
+                  <a-input-number
+                    v-model:value="formData.totalResponsibilityAmount"
+                    :min="0"
+                    :precision="2"
+                    placeholder="须与目标成本一致"
+                    style="width: 100%"
+                    :disabled="isView"
+                  />
+                </a-form-item>
                 <div class="cte-amount-check">
-                  <span>科目金额合计</span>
-                  <b :class="{ 'cte-warn': !totalMatch }">{{ fmtMoney(itemsTotal) }} 元</b>
+                  <span>投标 / 目标 / 责任明细合计</span>
+                  <b
+                    :class="{
+                      'cte-warn': !totalMatch || !bidTotalMatch || !responsibilityTotalMatch,
+                    }"
+                  >
+                    {{ fmtMoney(bidItemsTotal) }} / {{ fmtMoney(itemsTotal) }} /
+                    {{ fmtMoney(responsibilityItemsTotal) }} 元
+                  </b>
                 </div>
               </div>
             </section>
@@ -728,7 +875,7 @@ onMounted(() => {
             <div class="cte-side-title">填写说明</div>
             <ul class="cte-note-list">
               <li>版本号与版本名称建议体现批次或周期，便于审批检索。</li>
-              <li>提交审批前，科目明细金额合计必须与成本目标总额一致。</li>
+              <li>投标、目标、责任预算均须按科目完整分解，责任预算总额必须等于目标成本。</li>
               <li>离开页面或关闭弹窗前，请先确认已保存，避免触发未保存拦截。</li>
             </ul>
           </section>

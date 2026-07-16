@@ -9,9 +9,13 @@ import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.entity.CostSummary;
+import com.cgcpms.cost.entity.CostTarget;
+import com.cgcpms.cost.entity.CostTargetItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.mapper.CostSummaryMapper;
+import com.cgcpms.cost.mapper.CostTargetMapper;
+import com.cgcpms.cost.mapper.CostTargetItemMapper;
 import com.cgcpms.cost.vo.CostProjectSummaryVO;
 import com.cgcpms.cost.vo.CostSummaryVO;
 import com.cgcpms.payment.entity.PayRecord;
@@ -30,6 +34,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.framework.AopContext;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -49,6 +54,8 @@ import java.util.stream.Collectors;
 public class CostSummaryService {
 
     private final CostSummaryMapper costSummaryMapper;
+    private final CostTargetMapper costTargetMapper;
+    private final CostTargetItemMapper costTargetItemMapper;
     private final CostItemMapper costItemMapper;
     private final PmProjectMapper projectMapper;
     private final CostSubjectMapper costSubjectMapper;
@@ -59,6 +66,7 @@ public class CostSummaryService {
     private final VarOrderMapper varOrderMapper;
     private final CostSummaryAssembler assembler;
     private final ProjectAccessChecker projectAccessChecker;
+    private final JdbcTemplate jdbc;
 
     /**
      * Prevents overlapping executions of the scheduled refresh task.
@@ -122,9 +130,22 @@ public class CostSummaryService {
         // 1. Remove today's snapshot rows for this project so re-inserts are idempotent
         costSummaryMapper.physicalDeleteByTenantProjectAndDate(tenantId, projectId, LocalDate.now());
 
-        // 2. Get project targetCost
-        BigDecimal targetCost = (project != null && project.getTargetCost() != null)
-                ? project.getTargetCost() : BigDecimal.ZERO;
+        CostTarget activeTarget = costTargetMapper.selectOne(new LambdaQueryWrapper<CostTarget>()
+                .eq(CostTarget::getTenantId, tenantId)
+                .eq(CostTarget::getProjectId, projectId)
+                .eq(CostTarget::getIsActive, 1)
+                .eq(CostTarget::getApprovalStatus, "APPROVED")
+                .eq(CostTarget::getStatus, "ACTIVE")
+                .last("LIMIT 1")); // SQL-SAFETY: fixed-sql-fragment
+        List<CostTargetItem> activeTargetItems = activeTarget == null ? Collections.emptyList()
+                : costTargetItemMapper.selectList(new LambdaQueryWrapper<CostTargetItem>()
+                    .eq(CostTargetItem::getTenantId, tenantId)
+                    .eq(CostTargetItem::getTargetId, activeTarget.getId()));
+        Map<Long, CostTargetItem> targetItemBySubject = activeTargetItems.stream()
+                .collect(Collectors.toMap(CostTargetItem::getCostSubjectId, item -> item, (a, b) -> a));
+        BigDecimal targetCost = activeTarget != null && activeTarget.getTotalTargetAmount() != null
+                ? activeTarget.getTotalTargetAmount()
+                : project.getTargetCost() != null ? project.getTargetCost() : BigDecimal.ZERO;
         log.debug("Project targetCost={}", targetCost);
 
         // 3. Query all cost items for this project, grouped by costSubjectId
@@ -132,11 +153,18 @@ public class CostSummaryService {
         itemWrapper.eq(CostItem::getTenantId, tenantId);
         itemWrapper.eq(CostItem::getProjectId, projectId);
         List<CostItem> allItems = costItemMapper.selectList(itemWrapper);
-
-        if (CollectionUtils.isEmpty(allItems)) {
-            log.info("No cost items found for projectId={}, summary cleared", projectId);
-            return getProjectSummary(tenantId, projectId);
-        }
+        Set<Long> mainContractIds = allItems.stream()
+                .map(CostItem::getContractId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.collectingAndThen(Collectors.toSet(), ids -> {
+                    if (ids.isEmpty()) {
+                        return Collections.emptySet();
+                    }
+                    return ctContractMapper.selectByIds(ids).stream()
+                            .filter(contract -> "MAIN".equals(contract.getContractType()))
+                            .map(CtContract::getId)
+                            .collect(Collectors.toSet());
+                }));
 
         // Group cost items by costSubjectId
         Map<Long, List<CostItem>> itemsBySubject = allItems.stream()
@@ -144,7 +172,8 @@ public class CostSummaryService {
                 .collect(Collectors.groupingBy(CostItem::getCostSubjectId));
 
         // 4. Build cost subject name map
-        Set<Long> subjectIds = itemsBySubject.keySet();
+        Set<Long> subjectIds = new HashSet<>(itemsBySubject.keySet());
+        subjectIds.addAll(targetItemBySubject.keySet());
         Map<Long, String> subjectNameMap = Collections.emptyMap();
         if (!subjectIds.isEmpty()) {
             List<CostSubject> subjects = costSubjectMapper.selectByIds(subjectIds);
@@ -157,17 +186,23 @@ public class CostSummaryService {
         BigDecimal projectContractIncome = assembler.computeProjectContractIncome(tenantId, projectId);
         BigDecimal projectConfirmedRevenue = assembler.computeProjectConfirmedRevenue(tenantId, projectId);
         BigDecimal projectPaidAmount = assembler.computeProjectPaidAmount(tenantId, projectId);
+        Map<String, Object> latestForecast = latestConfirmedForecast(tenantId, projectId);
 
         // 6. For each cost subject, calculate and insert summary
         LocalDate today = LocalDate.now();
         List<CostSummary> summaries = new ArrayList<>();
 
-        for (Map.Entry<Long, List<CostItem>> entry : itemsBySubject.entrySet()) {
-            Long costSubjectId = entry.getKey();
-            List<CostItem> subjectItems = entry.getValue();
+        for (Long costSubjectId : subjectIds) {
+            List<CostItem> subjectItems = itemsBySubject.getOrDefault(costSubjectId, Collections.emptyList());
+            CostTargetItem targetItem = targetItemBySubject.get(costSubjectId);
+            BigDecimal subjectTargetCost = activeTarget == null ? targetCost
+                    : targetItem == null || targetItem.getTargetAmount() == null ? BigDecimal.ZERO : targetItem.getTargetAmount();
+            BigDecimal subjectResponsibility = activeTarget == null ? targetCost
+                    : targetItem == null || targetItem.getResponsibilityAmount() == null ? BigDecimal.ZERO : targetItem.getResponsibilityAmount();
 
             BigDecimal contractLockedCost = subjectItems.stream()
                     .filter(item -> "CT_CONTRACT".equals(item.getSourceType()))
+                    .filter(item -> item.getContractId() == null || !mainContractIds.contains(item.getContractId()))
                     .map(CostItem::getAmount)
                     .filter(Objects::nonNull)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -182,7 +217,7 @@ public class CostSummaryService {
             BigDecimal paidAmount = projectPaidAmount;
             BigDecimal estimatedRemainingCost = projectEstimatedRemainingCost;
             BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
-            BigDecimal costDeviation = dynamicCost.subtract(targetCost);
+            BigDecimal costDeviation = dynamicCost.subtract(subjectTargetCost);
             BigDecimal confirmedRevenue = projectConfirmedRevenue;
             // Keep subject rows aligned with project/batch summaries and the V27 backfill contract.
             BigDecimal expectedProfit = projectContractIncome.subtract(dynamicCost);
@@ -192,7 +227,9 @@ public class CostSummaryService {
             summary.setProjectId(projectId);
             summary.setSummaryDate(today);
             summary.setCostSubjectId(costSubjectId);
-            summary.setTargetCost(targetCost);
+            summary.setCostTargetId(activeTarget == null ? null : activeTarget.getId());
+            summary.setCostForecastId(longNullable(latestForecast.get("id")));
+            summary.setTargetCost(subjectTargetCost);
             summary.setContractLockedCost(contractLockedCost);
             summary.setActualCost(actualCost);
             summary.setPaidAmount(paidAmount);
@@ -202,6 +239,10 @@ public class CostSummaryService {
             summary.setConfirmedRevenue(projectConfirmedRevenue);
             summary.setExpectedProfit(expectedProfit);
             summary.setCostDeviation(costDeviation);
+            summary.setResponsibilityCost(subjectResponsibility);
+            summary.setForecastAtCompletionCost(decimal(latestForecast.get("forecast_at_completion_amount")));
+            summary.setForecastProfit(decimal(latestForecast.get("forecast_profit_amount")));
+            summary.setProfitMargin(decimal(latestForecast.get("profit_margin")));
 
             summaries.add(summary);
         }
@@ -255,8 +296,12 @@ public class CostSummaryService {
         List<CostSummaryVO> subjects = getSummary(tenantId, projectId);
 
         String projectName = project.getProjectName();
-        BigDecimal targetCost = (project.getTargetCost() != null)
-                ? project.getTargetCost() : BigDecimal.ZERO;
+        CostTarget activeTarget = costTargetMapper.selectOne(new LambdaQueryWrapper<CostTarget>()
+                .eq(CostTarget::getTenantId, tenantId).eq(CostTarget::getProjectId, projectId)
+                .eq(CostTarget::getIsActive, 1).eq(CostTarget::getApprovalStatus, "APPROVED")
+                .eq(CostTarget::getStatus, "ACTIVE").last("LIMIT 1")); // SQL-SAFETY: fixed-sql-fragment
+        BigDecimal targetCost = activeTarget != null && activeTarget.getTotalTargetAmount() != null
+                ? activeTarget.getTotalTargetAmount() : project.getTargetCost() != null ? project.getTargetCost() : BigDecimal.ZERO;
 
         BigDecimal contractLockedCost = subjects.stream()
                 .map(s -> new BigDecimal(s.getContractLockedCost()))
@@ -289,6 +334,13 @@ public class CostSummaryService {
         vo.setConfirmedRevenue(projectConfirmedRevenue.toPlainString());
         vo.setExpectedProfit(expectedProfit.toPlainString());
         vo.setCostDeviation(costDeviation.toPlainString());
+        vo.setCostTargetId(activeTarget == null ? null : String.valueOf(activeTarget.getId()));
+        Map<String, Object> forecast = latestConfirmedForecast(tenantId, projectId);
+        vo.setCostForecastId(forecast.isEmpty() ? null : String.valueOf(forecast.get("id")));
+        vo.setResponsibilityCost(decimal(forecast.getOrDefault("responsibility_amount", targetCost)).toPlainString());
+        vo.setForecastAtCompletionCost(decimal(forecast.getOrDefault("forecast_at_completion_amount", dynamicCost)).toPlainString());
+        vo.setForecastProfit(decimal(forecast.getOrDefault("forecast_profit_amount", expectedProfit)).toPlainString());
+        vo.setProfitMargin(decimal(forecast.get("profit_margin")).toPlainString());
         vo.setSubjects(subjects);
         return vo;
     }
@@ -398,7 +450,7 @@ public class CostSummaryService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             BigDecimal estimatedRemainingCost = totalCurrentAmount
-                    .subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount);
+                    .subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount).max(BigDecimal.ZERO);
             BigDecimal contractIncome = projectContracts.stream()
                     .filter(c -> "MAIN".equals(c.getContractType()))
                     .map(c -> c.getCurrentAmount() != null ? c.getCurrentAmount()
@@ -422,6 +474,10 @@ public class CostSummaryService {
             vo.setConfirmedRevenue(projectConfirmedRevenue.toPlainString());
             vo.setExpectedProfit(expectedProfit.toPlainString());
             vo.setCostDeviation(costDeviation.toPlainString());
+            vo.setResponsibilityCost(targetCost.toPlainString());
+            vo.setForecastAtCompletionCost(dynamicCost.toPlainString());
+            vo.setForecastProfit(expectedProfit.toPlainString());
+            vo.setProfitMargin(contractIncome.compareTo(BigDecimal.ZERO) == 0 ? "0.000000" : expectedProfit.divide(contractIncome, 6, java.math.RoundingMode.HALF_UP).toPlainString());
             vo.setSubjects(Collections.emptyList());
 
             result.put(projectId, vo);
@@ -519,5 +575,20 @@ public class CostSummaryService {
                 .eq(CostSummary::getTenantId, tenantId)
                 .eq(CostSummary::getProjectId, projectId)
                 .set(CostSummary::getPaidAmount, totalPaid));
+    }
+
+    private Map<String, Object> latestConfirmedForecast(Long tenantId, Long projectId) {
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT * FROM cost_forecast WHERE tenant_id=? AND project_id=? AND status IN('ACTION_REQUIRED','CONTROLLED') AND deleted_flag=0 ORDER BY version_no DESC LIMIT 1", tenantId, projectId);
+        return rows.isEmpty() ? Collections.emptyMap() : rows.get(0);
+    }
+
+    private static BigDecimal decimal(Object value) {
+        if (value == null) return BigDecimal.ZERO;
+        return value instanceof BigDecimal amount ? amount : new BigDecimal(String.valueOf(value));
+    }
+
+    private static Long longNullable(Object value) {
+        if (value == null) return null;
+        return value instanceof Number number ? number.longValue() : Long.valueOf(String.valueOf(value));
     }
 }
