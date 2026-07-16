@@ -143,6 +143,16 @@ describe('router lazy loading', () => {
     expect(router.resolve('/site/daily-log').meta.permission).toBe('site:daily:query')
   })
 
+  it('registers the project schedule workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const scheduleRoute = rootRoute?.children?.find((c) => c.path === 'project-schedule')
+    expect(scheduleRoute?.name).toBe('ProjectSchedule')
+    expect(scheduleRoute?.meta?.title).toBe('项目计划')
+    expect(scheduleRoute?.meta?.permission).toBe('schedule:query')
+    expect(typeof scheduleRoute?.component).toBe('function')
+    expect(router.resolve('/project-schedule').meta.permission).toBe('schedule:query')
+  })
+
   it('registers the bid cost route with query permission', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const bidCostRoute = rootRoute?.children?.find((c) => c.path === 'bid-cost')

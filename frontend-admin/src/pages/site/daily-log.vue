@@ -13,6 +13,11 @@ import {
   updateSiteDailyLog,
 } from '@/api/modules/site-daily-log'
 import { deleteFile, getFileUrl, listFiles, uploadFile } from '@/api/modules/file'
+import {
+  getDailyProgress,
+  replaceDailyProgress,
+  type DailyProgressRequest,
+} from '@/api/modules/projectSchedule'
 import type { SiteDailyLogCommand, SiteDailyLogVO } from '@/types/site-daily-log'
 import type { SysFileVO } from '@/types/file'
 import { useMobileViewport } from '@/composables/useMobileViewport'
@@ -28,6 +33,17 @@ const canEdit = computed(
     userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role)) ||
     userStore.hasPermission('site:daily:edit'),
 )
+const canReportProgress = computed(
+  () =>
+    userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role)) ||
+    userStore.hasPermission('schedule:progress'),
+)
+
+interface DailyProgressFormRow extends DailyProgressRequest {
+  taskCode: string
+  taskName: string
+  included: boolean
+}
 
 const loading = ref(false)
 const hasLoaded = ref(false)
@@ -49,6 +65,8 @@ const activeRecord = ref<SiteDailyLogVO | null>(null)
 const saving = ref(false)
 const files = ref<SysFileVO[]>([])
 const filesLoading = ref(false)
+const progressSaving = ref(false)
+const progressRows = ref<DailyProgressFormRow[]>([])
 const form = reactive<SiteDailyLogCommand>({
   projectId: undefined,
   reportDate: undefined,
@@ -127,11 +145,62 @@ async function openRecord(record: SiteDailyLogVO, edit = false) {
   try {
     const detail = await getSiteDailyLog(record.id)
     activeRecord.value = detail
+    await loadProgress(detail)
     resetForm(detail)
     modalOpen.value = true
     await fetchFiles(record.id)
   } catch {
     message.error('现场日报详情加载失败')
+  }
+}
+
+async function loadProgress(detail: SiteDailyLogVO) {
+  if (!detail.scheduleManaged) {
+    progressRows.value = []
+    return
+  }
+  const existing = await getDailyProgress(detail.id)
+  const byTask = new Map(existing.map((row) => [String(row.wbsTaskId), row]))
+  progressRows.value = (detail.plannedTasks ?? []).map((task) => {
+    const row = byTask.get(task.id)
+    return {
+      wbsTaskId: task.id,
+      taskCode: task.taskCode,
+      taskName: task.taskName,
+      currentProgress: Number(row?.currentProgress ?? task.progressPercent ?? 0),
+      completedQuantity: Number(row?.completedQuantity ?? 0),
+      workDescription: String(row?.workDescription ?? ''),
+      included: Boolean(row),
+    }
+  })
+}
+
+async function saveProgress() {
+  if (!activeRecord.value?.scheduleManaged) return true
+  const items = progressRows.value.filter((row) => row.included)
+  if (!items.length) {
+    message.warning('至少选择一条当周WBS任务填报实际进度')
+    return false
+  }
+  if (items.some((row) => !row.workDescription.trim())) {
+    message.warning('已选任务必须填写完成情况')
+    return false
+  }
+  progressSaving.value = true
+  try {
+    await replaceDailyProgress(
+      activeRecord.value.id,
+      items.map(({ wbsTaskId, currentProgress, completedQuantity, workDescription }) => ({
+        wbsTaskId,
+        currentProgress,
+        completedQuantity,
+        workDescription,
+      })),
+    )
+    message.success('实际进度已保存')
+    return true
+  } finally {
+    progressSaving.value = false
   }
 }
 
@@ -160,6 +229,7 @@ function submitRecord(record: SiteDailyLogVO) {
     title: '提交现场日报',
     content: '提交后正文和附件不可修改，确认提交？',
     async onOk() {
+      if (record.scheduleManaged && !(await saveProgress())) return
       await submitSiteDailyLog(record.id)
       message.success('现场日报已提交')
       modalOpen.value = false
@@ -548,6 +618,75 @@ onMounted(() => {
           >
         </a-table>
         <a-empty v-else description="当日暂无已审批且已出库领料" />
+      </section>
+      <section v-if="activeRecord && modalMode === 'view'" class="site-daily-planned-tasks">
+        <strong>当日WBS实际进度</strong>
+        <a-alert
+          v-if="activeRecord.scheduleManaged"
+          type="info"
+          show-icon
+          message="项目已启用基线计划：提交日报时至少填报一条已审批周计划内任务，提交后自动更新WBS并生成偏差快照。"
+        />
+        <a-table
+          v-if="activeRecord.scheduleManaged && progressRows.length"
+          :data-source="progressRows"
+          :pagination="false"
+          row-key="wbsTaskId"
+          size="small"
+        >
+          <a-table-column key="included" title="填报" width="70">
+            <template #default="{ record: progress }">
+              <a-checkbox
+                v-model:checked="progress.included"
+                :disabled="activeRecord.status !== 'DRAFT' || !canReportProgress"
+              />
+            </template>
+          </a-table-column>
+          <a-table-column key="taskCode" title="任务编号" data-index="taskCode" />
+          <a-table-column key="taskName" title="任务" data-index="taskName" />
+          <a-table-column key="currentProgress" title="累计进度(%)" width="150">
+            <template #default="{ record: progress }">
+              <a-input-number
+                v-model:value="progress.currentProgress"
+                :min="0"
+                :max="100"
+                :disabled="
+                  !progress.included || activeRecord.status !== 'DRAFT' || !canReportProgress
+                "
+              />
+            </template>
+          </a-table-column>
+          <a-table-column key="completedQuantity" title="累计完成量" width="150">
+            <template #default="{ record: progress }">
+              <a-input-number
+                v-model:value="progress.completedQuantity"
+                :min="0"
+                :disabled="
+                  !progress.included || activeRecord.status !== 'DRAFT' || !canReportProgress
+                "
+              />
+            </template>
+          </a-table-column>
+          <a-table-column key="workDescription" title="完成情况">
+            <template #default="{ record: progress }">
+              <a-input
+                v-model:value="progress.workDescription"
+                :disabled="
+                  !progress.included || activeRecord.status !== 'DRAFT' || !canReportProgress
+                "
+              />
+            </template>
+          </a-table-column>
+        </a-table>
+        <a-button
+          v-if="
+            activeRecord.scheduleManaged && activeRecord.status === 'DRAFT' && canReportProgress
+          "
+          type="primary"
+          :loading="progressSaving"
+          @click="saveProgress"
+          >保存实际进度</a-button
+        >
       </section>
       <section v-if="activeRecord && modalMode === 'view'" class="site-daily-planned-tasks">
         <strong>当日计划任务</strong>

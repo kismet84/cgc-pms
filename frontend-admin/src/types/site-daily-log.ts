@@ -53,6 +53,7 @@ export interface SiteDailyLogVO {
   deliveries?: SiteDailyDeliveryVO[]
   requisitions?: SiteDailyRequisitionVO[]
   plannedTasks?: SiteDailyPlannedTaskVO[]
+  scheduleManaged?: boolean
   auditTrail?: SiteDailyAuditEntryVO[]
   status: SiteDailyLogStatus
   submittedBy?: string

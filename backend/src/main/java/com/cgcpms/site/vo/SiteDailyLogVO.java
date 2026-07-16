@@ -18,6 +18,7 @@ public class SiteDailyLogVO {
     private List<SiteDailyDeliveryVO> deliveries;
     private List<SiteDailyRequisitionVO> requisitions;
     private List<SiteDailyPlannedTaskVO> plannedTasks;
+    private Boolean scheduleManaged;
     private List<SiteDailyAuditEntryVO> auditTrail;
     private String status;
     private String submittedBy;
