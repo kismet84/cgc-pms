@@ -12,9 +12,12 @@ import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
 import com.cgcpms.workflow.handler.WorkflowContext;
+import com.cgcpms.variation.entity.VarOrder;
+import com.cgcpms.variation.mapper.VarOrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 
@@ -36,6 +39,8 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
     private final CtContractMapper contractMapper;
     private final CostGenerationService costGenerationService;
     private final CostSummaryService costSummaryService;
+    private final VarOrderMapper varOrderMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     @Override
     public String supportBusinessType() {
@@ -100,6 +105,18 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
         if (change.getProjectId() != null) {
             costSummaryService.refreshSummary(change.getTenantId(), change.getProjectId());
         }
+
+        if (change.getSourceVarOrderId() != null) {
+            varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
+                    .eq(VarOrder::getId, change.getSourceVarOrderId())
+                    .eq(VarOrder::getTenantId, change.getTenantId())
+                    .set(VarOrder::getOwnerConfirmFlag, 1)
+                    .set(VarOrder::getGeneratedContractChangeId, changeId)
+                    .set(VarOrder::getOwnerStatus, "CHANGE_EFFECTIVE"));
+            jdbcTemplate.update("UPDATE variation_owner_submission SET status='CHANGE_EFFECTIVE',updated_at=CURRENT_TIMESTAMP " +
+                            "WHERE tenant_id=? AND generated_contract_change_id=? AND deleted_flag=0",
+                    change.getTenantId(), changeId);
+        }
     }
 
     @Override
@@ -110,6 +127,7 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
         changeMapper.update(null, new LambdaUpdateWrapper<CtContractChange>()
                 .eq(CtContractChange::getId, changeId)
                 .set(CtContractChange::getApprovalStatus, "REJECTED"));
+        syncSourceStatus(changeId, "CHANGE_REJECTED");
     }
 
     @Override
@@ -120,6 +138,19 @@ public class CtContractChangeWorkflowHandler implements WorkflowBusinessHandler 
         changeMapper.update(null, new LambdaUpdateWrapper<CtContractChange>()
                 .eq(CtContractChange::getId, changeId)
                 .set(CtContractChange::getApprovalStatus, "DRAFT"));
+        syncSourceStatus(changeId, "CHANGE_PENDING");
+    }
+
+    private void syncSourceStatus(Long changeId, String ownerStatus) {
+        CtContractChange change = changeMapper.selectById(changeId);
+        if (change == null || change.getSourceVarOrderId() == null) return;
+        varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
+                .eq(VarOrder::getId, change.getSourceVarOrderId())
+                .eq(VarOrder::getTenantId, change.getTenantId())
+                .set(VarOrder::getOwnerStatus, ownerStatus));
+        jdbcTemplate.update("UPDATE variation_owner_submission SET status=?,updated_at=CURRENT_TIMESTAMP " +
+                        "WHERE tenant_id=? AND generated_contract_change_id=? AND deleted_flag=0",
+                ownerStatus, change.getTenantId(), changeId);
     }
 
     private Long resolveChangeId(WfInstance instance) {

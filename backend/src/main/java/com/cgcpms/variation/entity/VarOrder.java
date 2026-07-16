@@ -13,6 +13,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -38,6 +39,19 @@ public class VarOrder extends BaseEntity {
 
     private String varName;
 
+    @NotNull
+    private LocalDate eventDate;
+
+    private LocalDate claimDeadline;
+
+    @NotBlank
+    private String eventDescription;
+
+    @NotBlank
+    private String causeCategory;
+
+    private String responsibleParty;
+
     /** 合同变更与现场签证共用的业务事项唯一键。 */
     private String businessMatterKey;
 
@@ -49,13 +63,29 @@ public class VarOrder extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal reportedAmount;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal approvedAmount;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal confirmedAmount;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Integer ownerConfirmFlag;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal estimatedCostAmount;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String ownerStatus;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long internalApprovalInstanceId;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long generatedContractChangeId;
 
     private Integer impactDays;
 
@@ -64,4 +94,7 @@ public class VarOrder extends BaseEntity {
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Integer costGeneratedFlag;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Integer version;
 }

@@ -191,6 +191,10 @@ defineProps({
     type: Function as PropType<(row: VarOrderVO) => void>,
     required: true,
   },
+  handleOwnerAction: {
+    type: Function as PropType<(row: VarOrderVO) => void>,
+    required: true,
+  },
   handlePageChange: {
     type: Function as PropType<(page: number) => void>,
     required: true,
@@ -447,6 +451,29 @@ defineProps({
                       提交审批
                     </a-menu-item>
                     <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
+                    <a-menu-item
+                      v-if="
+                        row.direction === 'INCOME' &&
+                        row.approvalStatus === 'APPROVED' &&
+                        ['INTERNAL_APPROVED', 'OWNER_RETURNED', 'OWNER_SUBMITTED'].includes(
+                          row.ownerStatus ?? '',
+                        )
+                      "
+                      @click="handleOwnerAction(row)"
+                    >
+                      {{
+                        row.ownerStatus === 'OWNER_SUBMITTED'
+                          ? '登记业主回复'
+                          : ['INTERNAL_APPROVED', 'OWNER_RETURNED'].includes(row.ownerStatus ?? '')
+                            ? '提交业主申报'
+                            : '全链追溯'
+                      }}
+                    </a-menu-item>
+                    <a-menu-item
+                      v-if="row.generatedContractChangeId"
+                      @click="handleOwnerAction(row)"
+                      >全链追溯</a-menu-item
+                    >
                     <a-menu-item danger @click="handleDelete(row)">删除</a-menu-item>
                   </a-menu>
                 </template>

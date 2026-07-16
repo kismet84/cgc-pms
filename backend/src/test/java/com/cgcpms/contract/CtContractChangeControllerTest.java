@@ -10,6 +10,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import java.math.BigDecimal;
 import java.util.List;
@@ -22,9 +23,24 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class CtContractChangeControllerTest {
     @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
+    @Autowired private JdbcTemplate jdbcTemplate;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
     private static final long CONTRACT_ID = 30001L;
     private Long changeId;
+
+    @BeforeAll
+    void ensureWorkflowApprover() {
+        Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM sys_user WHERE id=?", Integer.class, ADMIN_ID);
+        if (count != null && count == 0) {
+            jdbcTemplate.update("""
+                    INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,deleted_flag)
+                    VALUES(?,?,'admin','{noop}test','管理员','ENABLE',1,0)
+                    """, ADMIN_ID, TENANT_ID);
+        } else {
+            jdbcTemplate.update("UPDATE sys_user SET tenant_id=?,status='ENABLE',deleted_flag=0 WHERE id=?",
+                    TENANT_ID, ADMIN_ID);
+        }
+    }
 
     private Cookie adminCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,

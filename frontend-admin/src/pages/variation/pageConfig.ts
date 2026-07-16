@@ -7,7 +7,7 @@ export const VAR_TYPE_OPTIONS = [
 
 export const DIRECTION_OPTIONS = [
   { label: '成本', value: 'COST' },
-  { label: '收入', value: 'REVENUE', disabled: true },
+  { label: '收入/索赔', value: 'INCOME' },
 ] as const
 
 export const VAR_TYPE_LABEL: Record<string, string> = {

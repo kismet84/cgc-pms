@@ -32,7 +32,6 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
     private static final String SOURCE_TYPE = "VAR_ORDER";
     private static final String COST_TYPE = "VARIATION";
     private static final String COST_STATUS_CONFIRMED = "CONFIRMED";
-    private static final String DIRECTION_COST = "COST";
 
     private final VarOrderMapper varOrderMapper;
     private final VarOrderItemMapper varOrderItemMapper;
@@ -51,12 +50,6 @@ public class VarOrderCostStrategy implements CostGenerationStrategy {
         VarOrder varOrder = varOrderMapper.selectById(varOrderId);
         if (varOrder == null) {
             log.warn("生成变更成本：变更单不存在 varOrderId={}", varOrderId);
-            return;
-        }
-
-        // Only generate cost when direction = 'COST' (per W0 decision 4)
-        if (!DIRECTION_COST.equals(varOrder.getDirection())) {
-            log.info("生成变更成本：变更方向非COST，跳过 varOrderId={}, direction={}", varOrderId, varOrder.getDirection());
             return;
         }
 

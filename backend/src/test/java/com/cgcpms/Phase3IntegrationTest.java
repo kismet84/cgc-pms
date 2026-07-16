@@ -654,6 +654,14 @@ class Phase3IntegrationTest {
         varItem.setCostSubjectId(900057L);
         varOrderService.saveItems(varOrderId, List.of(varItem));
 
+        jdbcTemplate.update("""
+                INSERT INTO sys_file(id,tenant_id,business_type,document_type,business_id,file_name,original_name,
+                    file_size,content_type,storage_path,bucket_name,created_at,updated_at,deleted_flag)
+                VALUES(?,0,'VARIATION','SITE_EVIDENCE',?,'phase3-evidence.pdf','phase3-evidence.pdf',
+                    128,'application/pdf',?,'cgc-pms',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """, com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(), varOrderId,
+                "VARIATION/" + varOrderId + "/phase3-evidence.pdf");
+
         // 提交签证审批
         varOrderService.submitForApproval(varOrderId);
         WfInstance varInst = findInstance(WorkflowBusinessTypes.VAR_ORDER, varOrderId);

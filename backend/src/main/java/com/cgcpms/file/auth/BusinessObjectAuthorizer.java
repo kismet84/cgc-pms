@@ -104,6 +104,24 @@ public class BusinessObjectAuthorizer {
                 "file:delete", "cashbook:journal:maintain");
     }
 
+    /** 变更签证附件按业务阶段不可逆约束，防止事后替换现场证据或伪造业主核定。 */
+    public void checkVariationDocumentStage(String businessType, Long businessId, String documentType) {
+        if (!"VARIATION".equalsIgnoreCase(businessType)) return;
+        VarOrder variation = variationMapper.selectById(businessId);
+        if (variation == null || !java.util.Objects.equals(variation.getTenantId(), UserContext.getCurrentTenantId()))
+            throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "变更单不存在: " + businessId);
+        String type = documentType == null ? "" : documentType.toUpperCase();
+        boolean allowed = switch (type) {
+            case "SITE_EVIDENCE", "COST_ESTIMATE" -> Set.of("DRAFT", "REJECTED").contains(variation.getApprovalStatus());
+            case "OWNER_SUBMISSION" -> "APPROVED".equals(variation.getApprovalStatus())
+                    && Set.of("INTERNAL_APPROVED", "OWNER_RETURNED").contains(variation.getOwnerStatus());
+            case "OWNER_CONFIRMATION" -> "OWNER_SUBMITTED".equals(variation.getOwnerStatus());
+            default -> false;
+        };
+        if (!allowed)
+            throw new BusinessException("VARIATION_DOCUMENT_STAGE_INVALID", "当前业务阶段不允许变更该类附件");
+    }
+
     private void checkAccess(String businessType, Long businessId, String action, boolean write,
                              String genericAuthority, String cashJournalAuthority) {
         if (businessType == null || !KNOWN_BUSINESS_TYPES.contains(businessType.toUpperCase())) {

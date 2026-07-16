@@ -518,7 +518,7 @@ class CostSummaryServiceTest {
         contract.setContractName("成本动态汇总报表合同");
         contract.setContractType("MAIN");
         contract.setContractAmount(new BigDecimal("5000000.00"));
-        contract.setCurrentAmount(BigDecimal.ZERO);
+        contract.setCurrentAmount(new BigDecimal("5000000.00"));
         contract.setContractStatus("PERFORMING");
         contractMapper.insert(contract);
 

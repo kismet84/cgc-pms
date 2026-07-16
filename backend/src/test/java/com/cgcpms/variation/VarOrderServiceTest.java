@@ -191,6 +191,7 @@ class VarOrderServiceTest {
         order.setApprovalStatus("DRAFT");
         Long id = varOrderService.create(order);
         assertNotNull(id, "创建VarOrder应返回ID");
+        prepareSubmission(id);
 
         // Submit must succeed now — template is present
         assertDoesNotThrow(() ->
@@ -217,6 +218,7 @@ class VarOrderServiceTest {
         order.setApprovalStatus("DRAFT");
         Long id = varOrderService.create(order);
         assertNotNull(id);
+        prepareSubmission(id);
 
         // First submit succeeds (template exists)
         varOrderService.submitForApproval(id);
@@ -280,6 +282,25 @@ class VarOrderServiceTest {
         assertNotNull(updated.getReportedAmount(), "金额应被聚合");
         assertEquals(0, new BigDecimal("5000.00").compareTo(updated.getReportedAmount()),
                 "聚合金额应为 2000+3000=5000");
+    }
+
+    private void prepareSubmission(Long id) {
+        VarOrderItem item = new VarOrderItem();
+        item.setItemName("审批测试明细");
+        item.setUnit("项");
+        item.setQuantity(BigDecimal.ONE);
+        item.setUnitPrice(new BigDecimal("100.00"));
+        item.setClaimUnitPrice(new BigDecimal("120.00"));
+        item.setCostSubjectId(90001L);
+        varOrderService.saveItems(id, java.util.List.of(item));
+        jdbcTemplate.update("""
+                INSERT INTO sys_file(id, tenant_id, business_type, document_type, business_id,
+                    file_name, original_name, file_size, content_type, storage_path, bucket_name,
+                    created_at, updated_at, deleted_flag)
+                VALUES(?, 0, 'VARIATION', 'SITE_EVIDENCE', ?, ?, 'evidence.pdf',
+                    128, 'application/pdf', ?, 'cgc-pms', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
+                """, com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(), id,
+                "evidence-" + id + ".pdf", "VARIATION/" + id + "/evidence.pdf");
     }
 
     @Test

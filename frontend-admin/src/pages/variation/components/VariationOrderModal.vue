@@ -66,6 +66,7 @@ defineProps({
     type: Number,
     required: true,
   },
+  itemsClaimTotalAmount: { type: Number, required: true },
   onFormProjectChange: {
     type: Function as PropType<(projectId: string) => void>,
     required: true,
@@ -88,6 +89,14 @@ defineProps({
   },
   handleItemPriceChange: {
     type: Function as PropType<(index: number) => void>,
+    required: true,
+  },
+  handleItemClaimPriceChange: {
+    type: Function as PropType<(index: number) => void>,
+    required: true,
+  },
+  onEvidenceFileChange: {
+    type: Function as PropType<(file?: File) => void>,
     required: true,
   },
   handleRemoveItem: {
@@ -183,12 +192,44 @@ defineEmits<{
               style="width: 100%" /></a-form-item
         ></a-col>
         <a-col :span="8"
-          ><a-form-item label="业主确认"
-            ><a-switch
-              :checked="formData.ownerConfirmFlag === 1"
-              @change="(v: boolean) => (formData.ownerConfirmFlag = v ? 1 : 0)" /></a-form-item
+          ><a-form-item label="事件日期（必填）"
+            ><a-input v-model:value="formData.eventDate" type="date" /></a-form-item
         ></a-col>
         <a-col :span="8"
+          ><a-form-item label="索赔申报截止日"
+            ><a-input v-model:value="formData.claimDeadline" type="date" /></a-form-item
+        ></a-col>
+      </a-row>
+      <a-row :gutter="16">
+        <a-col :span="8"
+          ><a-form-item label="原因分类（必填）"
+            ><a-input v-model:value="formData.causeCategory" /></a-form-item
+        ></a-col>
+        <a-col :span="8"
+          ><a-form-item label="责任方"
+            ><a-input v-model:value="formData.responsibleParty" /></a-form-item
+        ></a-col>
+        <a-col :span="8"
+          ><a-form-item label="业务事项键"
+            ><a-input
+              v-model:value="formData.businessMatterKey"
+              placeholder="用于防止重复立项" /></a-form-item
+        ></a-col>
+      </a-row>
+      <a-form-item label="事件及影响说明（必填）"
+        ><a-textarea v-model:value="formData.eventDescription" :rows="2"
+      /></a-form-item>
+      <a-row :gutter="16">
+        <a-col :span="12"
+          ><a-form-item label="现场证据（提交审批必需）"
+            ><input
+              type="file"
+              :disabled="modalReadonly"
+              @change="
+                onEvidenceFileChange(($event.target as HTMLInputElement).files?.[0])
+              " /></a-form-item
+        ></a-col>
+        <a-col :span="12"
           ><a-form-item label="备注"
             ><a-textarea v-model:value="formData.remark" :rows="2" /></a-form-item
         ></a-col>
@@ -214,7 +255,7 @@ defineEmits<{
         :pagination="false"
         row-key="key"
         size="small"
-        :scroll="{ x: 900, y: 250 }"
+        :scroll="{ x: 1180, y: 250 }"
       >
         <a-table-column title="清单项名称" width="160"
           ><template #default="{ record: item }"
@@ -255,7 +296,7 @@ defineEmits<{
               style="width: 100%"
               @change="handleItemQtyChange(index)" /></template
         ></a-table-column>
-        <a-table-column title="单价(元)" width="130"
+        <a-table-column title="内部成本单价" width="130"
           ><template #default="{ record: item, index }"
             ><a-input-number
               v-model:value="item.unitPrice"
@@ -265,10 +306,27 @@ defineEmits<{
               style="width: 100%"
               @change="handleItemPriceChange(index)" /></template
         ></a-table-column>
-        <a-table-column title="金额(元)" width="130"
+        <a-table-column title="内部成本金额" width="130"
           ><template #default="{ record: item }"
             ><span>{{
               Number(item.amount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+            }}</span></template
+          ></a-table-column
+        >
+        <a-table-column title="业主申报单价" width="130"
+          ><template #default="{ record: item, index }"
+            ><a-input-number
+              v-model:value="item.claimUnitPrice"
+              :min="0"
+              :precision="4"
+              :disabled="modalReadonly"
+              style="width: 100%"
+              @change="handleItemClaimPriceChange(index)" /></template
+        ></a-table-column>
+        <a-table-column title="业主申报金额" width="130"
+          ><template #default="{ record: item }"
+            ><span>{{
+              Number(item.claimAmount || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
             }}</span></template
           ></a-table-column
         >
@@ -286,9 +344,13 @@ defineEmits<{
         >
       </a-table>
       <div style="text-align: right; margin-top: 8px; font-size: 14px">
-        合计：<span style="font-weight: 600; color: #1677ff"
+        内部成本：<span style="font-weight: 600; color: #cf1322"
           >¥{{
             Number(itemsTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
+          }}</span
+        >　业主申报：<span style="font-weight: 600; color: #1677ff"
+          >¥{{
+            Number(itemsClaimTotalAmount).toLocaleString('zh-CN', { minimumFractionDigits: 2 })
           }}</span
         >
       </div>
