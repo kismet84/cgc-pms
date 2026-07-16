@@ -26,6 +26,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -347,6 +348,56 @@ class MdPartnerServiceTest {
         assertEquals("PARTNER_NOT_FOUND", ex.getCode());
 
         System.out.println("✅ testUpdate_NotFound 通过");
+    }
+
+    @Test
+    @Order(11)
+    @Transactional
+    @DisplayName("供应商默认提前期 — 创建、旧客户端省略、显式清空与非供应商归零")
+    void testSupplierDefaultLeadDaysLifecycle() {
+        MdPartner supplier = new MdPartner();
+        supplier.setPartnerName("提前期供应商");
+        supplier.setPartnerType("SUPPLIER");
+        supplier.setDefaultLeadDays(BigDecimal.valueOf(7));
+        Long id = partnerService.create(supplier);
+        assertEquals(7, partnerService.getById(id).getDefaultLeadDays());
+
+        MdPartner legacyUpdate = new MdPartner();
+        legacyUpdate.setId(id);
+        legacyUpdate.setPartnerName("提前期供应商-旧客户端更新");
+        legacyUpdate.setPartnerType("SUPPLIER");
+        partnerService.update(legacyUpdate);
+        assertEquals(7, partnerService.getById(id).getDefaultLeadDays(), "省略新字段必须保留旧值");
+
+        MdPartner clearUpdate = new MdPartner();
+        clearUpdate.setId(id);
+        clearUpdate.setPartnerName("提前期供应商-清空");
+        clearUpdate.setPartnerType("SUPPLIER");
+        clearUpdate.setDefaultLeadDays(null);
+        partnerService.update(clearUpdate);
+        assertNull(partnerService.getById(id).getDefaultLeadDays(), "显式 null 必须清空默认提前期");
+
+        MdPartner customer = new MdPartner();
+        customer.setPartnerName("非供应商");
+        customer.setPartnerType("CUSTOMER");
+        customer.setDefaultLeadDays(BigDecimal.TEN);
+        Long customerId = partnerService.create(customer);
+        assertNull(partnerService.getById(customerId).getDefaultLeadDays(), "非供应商不得保留默认提前期");
+    }
+
+    @Test
+    @Order(11)
+    @Transactional
+    @DisplayName("供应商默认提前期 — 服务层拒绝小数、负数与越界")
+    void testSupplierDefaultLeadDaysRejectsInvalidValues() {
+        for (BigDecimal invalid : List.of(new BigDecimal("1.5"), BigDecimal.valueOf(-1), BigDecimal.valueOf(3651))) {
+            MdPartner supplier = new MdPartner();
+            supplier.setPartnerName("非法提前期" + invalid);
+            supplier.setPartnerType("SUPPLIER");
+            supplier.setDefaultLeadDays(invalid);
+            BusinessException error = assertThrows(BusinessException.class, () -> partnerService.create(supplier));
+            assertEquals("INVALID_PARTNER_DEFAULT_LEAD_DAYS", error.getCode());
+        }
     }
 
     // ═══════════════════════════════════════════════════════════

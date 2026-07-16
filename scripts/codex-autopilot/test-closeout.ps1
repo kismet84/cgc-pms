@@ -22,6 +22,9 @@ try {
 ### ISSUE-900-040：Closeout
 状态：Ready
 存量问题键：[stock:STOCK-900-040]
+
+### ISSUE-900-039：Previously completed
+状态：Done
 '@ | Set-Content -LiteralPath (Join-Path $root 'docs\backlog\ready-issues.md') -Encoding UTF8
   '# Done Issues' | Set-Content -LiteralPath (Join-Path $root 'docs\backlog\done-issues.md') -Encoding UTF8
   @'

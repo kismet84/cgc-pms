@@ -168,6 +168,17 @@ class BidCostServiceTest {
         assertNotNull(item);
         assertEquals(PROJECT_ID, item.getProjectId());
         assertEquals("BID_COST_TRANSFERRED", item.getSourceType());
+
+        BusinessException repeat = assertThrows(
+                BusinessException.class,
+                () -> bidCostService.markAsWon(id, PROJECT_ID));
+        assertEquals("BID_STATUS_INVALID", repeat.getCode());
+        Long transferredCount = costItemMapper.selectCount(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostItem>()
+                        .eq(CostItem::getTenantId, TENANT_ID)
+                        .eq(CostItem::getSourceType, "BID_COST_TRANSFERRED")
+                        .eq(CostItem::getSourceId, id));
+        assertEquals(1L, transferredCount);
     }
 
     @Test
@@ -180,6 +191,9 @@ class BidCostServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class, () -> bidCostService.markAsWon(id, 99999999L));
         assertEquals("PROJECT_NOT_FOUND", ex.getCode());
+        BidCost unchanged = bidCostMapper.selectById(id);
+        assertEquals("BIDDING", unchanged.getBidStatus());
+        assertNull(unchanged.getProjectId());
     }
 
     @Test
@@ -202,6 +216,9 @@ class BidCostServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class, () -> bidCostService.markAsWon(id, OTHER_TENANT_PROJECT_ID));
         assertEquals("PROJECT_NOT_FOUND", ex.getCode());
+        BidCost unchanged = bidCostMapper.selectById(id);
+        assertEquals("BIDDING", unchanged.getBidStatus());
+        assertNull(unchanged.getProjectId());
     }
 
     @Test
@@ -222,12 +239,43 @@ class BidCostServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("markAsWon → 项目数据范围拒绝时不修改投标与费用")
+    void testMarkAsWon_ProjectDataScopeDeniedBeforeWrites() {
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("项目数据范围拒绝测试");
+        Long id = bidCostService.create(bid);
+        insertBidCostItem(id);
+        setCommonUserContext();
+
+        BusinessException ex = assertThrows(
+                BusinessException.class,
+                () -> bidCostService.markAsWon(id, PROJECT_ID));
+        assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
+
+        BidCost unchangedBid = bidCostMapper.selectById(id);
+        assertEquals("BIDDING", unchangedBid.getBidStatus());
+        assertNull(unchangedBid.getProjectId());
+        CostItem unchangedItem = costItemMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostItem>()
+                        .eq(CostItem::getTenantId, TENANT_ID)
+                        .eq(CostItem::getSourceId, id));
+        assertNotNull(unchangedItem);
+        assertEquals(PROJECT_ID, unchangedItem.getProjectId());
+        assertEquals("BID_COST", unchangedItem.getSourceType());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("markAsLost → 冲销费用并改为 LOST")
     void testMarkAsLost_Success() {
         BidCost bid = new BidCost();
         bid.setBidProjectName("未中标项目");
         Long id = bidCostService.create(bid);
         insertBidCostItem(id);
+        BidCost otherBid = new BidCost();
+        otherBid.setBidProjectName("其他投标项目");
+        Long otherId = bidCostService.create(otherBid);
+        insertBidCostItem(otherId);
 
         bidCostService.markAsLost(id);
 
@@ -240,6 +288,17 @@ class BidCostServiceTest {
                 .eq(CostItem::getSourceId, id));
         assertNotNull(item);
         assertEquals("WRITE_OFF", item.getCostStatus());
+
+        CostItem otherItem = costItemMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getTenantId, TENANT_ID)
+                .eq(CostItem::getSourceType, "BID_COST")
+                .eq(CostItem::getSourceId, otherId));
+        assertNotNull(otherItem);
+        assertEquals("CONFIRMED", otherItem.getCostStatus());
+
+        BusinessException repeat = assertThrows(BusinessException.class, () -> bidCostService.markAsLost(id));
+        assertEquals("BID_STATUS_INVALID", repeat.getCode());
+        assertEquals("WRITE_OFF", costItemMapper.selectById(item.getId()).getCostStatus());
     }
 
     @Test
@@ -283,6 +342,17 @@ class BidCostServiceTest {
                 .add("username", "admin")
                 .add("tenantId", TENANT_ID)
                 .add("roleCodes", List.of("ADMIN"))
+                .build();
+        UserContext.set(claims);
+    }
+
+    private void setCommonUserContext() {
+        var claims = Jwts.claims()
+                .subject("bid-reader")
+                .add("userId", 99L)
+                .add("username", "bid-reader")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of("COMMON_USER"))
                 .build();
         UserContext.set(claims);
     }

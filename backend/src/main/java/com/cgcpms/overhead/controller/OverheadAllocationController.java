@@ -6,6 +6,8 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.overhead.dto.OverheadAllocationRuleCreateRequest;
+import com.cgcpms.overhead.dto.OverheadAllocationRuleUpdateRequest;
 import com.cgcpms.overhead.entity.OverheadAllocationRule;
 import com.cgcpms.overhead.service.OverheadAllocationService;
 import com.cgcpms.overhead.vo.OverheadAllocationExecutionResult;
@@ -33,15 +35,17 @@ public class OverheadAllocationController {
 
     @PostMapping("/rules")
     @PreAuthorize("hasAuthority('overhead:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Long> createRule(@Valid @RequestBody OverheadAllocationRule rule) {
-        return ApiResponse.success(service.create(rule));
+    public ApiResponse<Long> createRule(@Valid @RequestBody OverheadAllocationRuleCreateRequest request) {
+        return ApiResponse.success(service.createValidated(
+                request.getCostSubjectId(), request.getAllocationBasis(), request.getAllocationCycle()));
     }
 
     @PutMapping("/rules/{id}")
     @PreAuthorize("hasAuthority('overhead:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> updateRule(@PathVariable Long id, @Valid @RequestBody OverheadAllocationRule rule) {
-        rule.setId(id);
-        service.update(rule);
+    public ApiResponse<Void> updateRule(@PathVariable Long id,
+                                        @Valid @RequestBody OverheadAllocationRuleUpdateRequest request) {
+        service.updateValidated(id, request.getCostSubjectId(),
+                request.getAllocationBasis(), request.getAllocationCycle());
         return ApiResponse.success();
     }
 

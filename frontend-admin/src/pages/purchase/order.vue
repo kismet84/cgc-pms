@@ -24,6 +24,7 @@ import {
   submitOrderForApproval,
 } from '@/api/modules/purchase'
 import type { MatPurchaseOrderVO, MatPurchaseOrderItemVO } from '@/types/purchase'
+import type { PartnerVO } from '@/types/partner'
 import {
   readPositiveIntQuery,
   readStringQuery,
@@ -35,6 +36,7 @@ import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/di
 import PurchaseOrderAnalysisRail from './components/PurchaseOrderAnalysisRail.vue'
 import PurchaseOrderModal from './components/PurchaseOrderModal.vue'
 import PurchaseOrderSearchBar from './components/PurchaseOrderSearchBar.vue'
+import { suggestSupplierDeliveryDate } from './supplierLeadTime'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -69,7 +71,7 @@ const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 const materialList = computed(() => referenceStore.materials ?? [])
-const supplierList = ref<{ id: string; partnerName?: string }[]>([])
+const supplierList = ref<PartnerVO[]>([])
 const hasActiveFilters = computed(() =>
   Boolean(
     filter.projectId ||
@@ -99,6 +101,24 @@ const formData = reactive<Partial<MatPurchaseOrderVO>>({
 const formPartnerName = computed(
   () => contractList.value?.find((c) => c.id === formData.contractId)?.partyBName ?? '',
 )
+const autoDeliveryDate = ref<string | undefined>()
+const selectedSupplier = computed(() =>
+  supplierList.value.find(
+    (partner) => partner.id === formData.partnerId && partner.partnerType === 'SUPPLIER',
+  ),
+)
+
+function applySupplierDefaultDeliveryDate() {
+  if (modalMode.value !== 'create') return
+  if (formData.deliveryDate && formData.deliveryDate !== autoDeliveryDate.value) return
+  const suggested = suggestSupplierDeliveryDate(
+    formData.orderDate,
+    selectedSupplier.value?.defaultLeadDays,
+  )
+  formData.deliveryDate = suggested
+  autoDeliveryDate.value = suggested
+}
+
 function onContractChange(contractId: string) {
   const c = contractList.value?.find((ct) => ct.id === contractId)
   formData.partnerId = c?.partyBId
@@ -109,6 +129,7 @@ watch(
     if (!val) formData.partnerId = undefined
   },
 )
+watch([() => formData.partnerId, () => formData.orderDate], applySupplierDefaultDeliveryDate)
 
 // Line items for the modal
 const itemList = ref<(Partial<MatPurchaseOrderItemVO> & { key: number })[]>([])
@@ -296,6 +317,7 @@ function handleAdd() {
   modalMode.value = 'create'
   modalTitle.value = '新建采购订单'
   editingId.value = null
+  autoDeliveryDate.value = undefined
   Object.assign(formData, {
     projectId: undefined,
     contractId: undefined,
@@ -314,6 +336,7 @@ async function handleEdit(record: MatPurchaseOrderVO) {
   modalMode.value = 'edit'
   modalTitle.value = '编辑采购订单'
   editingId.value = record.id
+  autoDeliveryDate.value = undefined
   Object.assign(formData, {
     projectId: record.projectId,
     contractId: record.contractId,

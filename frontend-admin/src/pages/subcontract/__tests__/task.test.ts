@@ -12,12 +12,14 @@ const originalTimezone = process.env.TZ
 
 const {
   mockGetSubTaskList,
+  mockCreateSubTask,
   mockRouterReplace,
   mockFetchProjects,
   mockFetchContracts,
   mockFetchPartners,
 } = vi.hoisted(() => ({
   mockGetSubTaskList: vi.fn(),
+  mockCreateSubTask: vi.fn(),
   mockRouterReplace: vi.fn(),
   mockFetchProjects: vi.fn(),
   mockFetchContracts: vi.fn(),
@@ -26,7 +28,7 @@ const {
 
 vi.mock('@/api/modules/subcontract', () => ({
   getSubTaskList: mockGetSubTaskList,
-  createSubTask: vi.fn(),
+  createSubTask: mockCreateSubTask,
   updateSubTask: vi.fn(),
   deleteSubTask: vi.fn(),
 }))
@@ -41,12 +43,16 @@ vi.mock('@/stores/reference', () => ({
   }),
 }))
 
-vi.mock('pinia', () => ({
-  storeToRefs: () => ({
-    projects: computed(() => []),
-    contracts: computed(() => []),
-  }),
-}))
+vi.mock('pinia', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('pinia')>()
+  return {
+    ...actual,
+    storeToRefs: () => ({
+      projects: computed(() => []),
+      contracts: computed(() => []),
+    }),
+  }
+})
 
 vi.mock('@/composables/useColumnSettings', () => ({
   useColumnSettings: () => ({
@@ -72,6 +78,8 @@ vi.mock('ant-design-vue', async () => {
 })
 
 import SubcontractTaskPage from '../task.vue'
+import { message } from 'ant-design-vue'
+import { markRequestErrorNotified } from '@/api/request'
 
 const BasicStub = defineComponent({
   name: 'BasicStub',
@@ -350,8 +358,54 @@ describe('subcontract task page quality guardrails', () => {
     expect(source).toContain('value="IN_PROGRESS" :disabled="predecessorStartBlocked"')
     expect(source).toContain('value="COMPLETED" :disabled="predecessorStartBlocked"')
     expect(source).toContain('前置任务未完成，当前任务不能开工或完成')
-    expect(source).toContain("e instanceof Error && e.message ? e.message : '操作失败，请稍后重试'")
     expect(source).not.toMatch(/draggable|dragstart|dhtmlx|frappe-gantt|criticalPath/i)
+  })
+
+  it('shows a predecessor gate rejection only once after the request layer already notified it', async () => {
+    mockGetSubTaskList.mockResolvedValue({ records: [], total: 0 })
+    mockCreateSubTask.mockImplementation(async () => {
+      const error = markRequestErrorNotified(new Error('前置任务未完成，当前任务不能开工或完成'))
+      message.error(error.message)
+      throw error
+    })
+
+    const wrapper = mount(SubcontractTaskPage, { global: { stubs: WbsStubs } })
+    await flushPromises()
+    type TaskSetupState = {
+      formData: { projectId?: string; taskName?: string }
+      handleModalOk: () => Promise<void>
+    }
+    const setupState = (wrapper.vm as unknown as { $: { setupState: TaskSetupState } }).$.setupState
+    setupState.formData.projectId = '10001'
+    setupState.formData.taskName = '等待前置的后续任务'
+
+    await setupState.handleModalOk()
+    await flushPromises()
+
+    expect(mockCreateSubTask).toHaveBeenCalledTimes(1)
+    expect(message.error).toHaveBeenCalledTimes(1)
+    expect(message.error).toHaveBeenCalledWith('前置任务未完成，当前任务不能开工或完成')
+  })
+
+  it('keeps one page fallback prompt for an unnotified local error', async () => {
+    mockGetSubTaskList.mockResolvedValue({ records: [], total: 0 })
+    mockCreateSubTask.mockRejectedValue(new Error('本地保存失败'))
+
+    const wrapper = mount(SubcontractTaskPage, { global: { stubs: WbsStubs } })
+    await flushPromises()
+    type TaskSetupState = {
+      formData: { projectId?: string; taskName?: string }
+      handleModalOk: () => Promise<void>
+    }
+    const setupState = (wrapper.vm as unknown as { $: { setupState: TaskSetupState } }).$.setupState
+    setupState.formData.projectId = '10001'
+    setupState.formData.taskName = '本地异常任务'
+
+    await setupState.handleModalOk()
+    await flushPromises()
+
+    expect(message.error).toHaveBeenCalledTimes(1)
+    expect(message.error).toHaveBeenCalledWith('本地保存失败')
   })
 
   it('extracts static status and grid config out of the giant component', () => {

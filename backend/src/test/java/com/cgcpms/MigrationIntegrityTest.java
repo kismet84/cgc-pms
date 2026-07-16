@@ -22,6 +22,18 @@ class MigrationIntegrityTest {
             "(?im)^\\s*ALTER\\s+TABLE\\s+cost_summary\\s*\\R\\s*ADD\\s+COLUMN\\s+cost_target_id");
 
     @Test
+    void partnerDefaultLeadDaysMigrationIsMirroredAcrossDialects() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V155__add_partner_default_lead_days.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V155__add_partner_default_lead_days.sql");
+        String expected = "alter table md_partner add column default_lead_days int null;";
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+        assertEquals(expected, normalizeSql(Files.readString(mysqlMigration)).trim());
+        assertEquals(expected, normalizeSql(Files.readString(h2Migration)).trim());
+    }
+
+    @Test
     void localTestProfileIncludesJavaMigrationsWhenPresent() throws Exception {
         Path localProfile = Path.of("src/test/resources/application-local.yml");
         if (!Files.exists(localProfile)) {

@@ -1,5 +1,12 @@
 # CGC-PMS 竞品情报与能力差距
 
+## 2026-07-16 增量复核：供应商提前期与采购交货日期
+
+- Odoo 19 官方 Lead Times 说明 Vendor Lead Time 是采购订单确认到收货的自然日，Expected Arrival 由订单日期/截止日加提前期得到；该自然日口径不自动跳过周末或节假日。
+- 当前 CGC-PMS 已有库存项补货提前期，但它属于仓库+物料设置；合作方没有供应商默认值，采购订单已有供应商、订单日期和交货日期，可用更小的默认预填闭环补齐重复换算。
+- 决策影响：先做可空供应商默认自然日与订单级可覆盖预填；供应商×物料价目表、工作日历、节假日与预测继续后置。
+- 官方来源：<https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory/warehouses_storage/replenishment/lead_times.html>，核验时间 2026-07-16。
+
 ## 分析基线
 
 | 项目 | 当前值 |

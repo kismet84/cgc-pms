@@ -116,7 +116,7 @@ describe('PurchaseOrderPage submit-approval button', () => {
   })
 
   it('keeps supplier filter when fetching partner options', () => {
-    expect(source).toContain('const supplierList = ref<{ id: string; partnerName?: string }[]>([])')
+    expect(source).toContain('const supplierList = ref<PartnerVO[]>([])')
     expect(source).toContain('async function loadSuppliers()')
     expect(source).toContain(
       "supplierList.value = await referenceStore.fetchPartners({ partnerType: 'SUPPLIER' })",
@@ -124,6 +124,18 @@ describe('PurchaseOrderPage submit-approval button', () => {
     expect(source).toMatch(/onMounted\([\s\S]*?loadSuppliers\(\)/)
     expect(searchBarSource).toMatch(/v-for="p in supplierList"/)
     expect(searchBarSource).not.toMatch(/v-for="p in partnerList"/)
+  })
+
+  it('prefills a new order delivery date from the selected supplier without overwriting manual input', () => {
+    expect(source).toContain("import { suggestSupplierDeliveryDate } from './supplierLeadTime'")
+    expect(source).toContain("partner.partnerType === 'SUPPLIER'")
+    expect(source).toContain("if (modalMode.value !== 'create') return")
+    expect(source).toContain(
+      'if (formData.deliveryDate && formData.deliveryDate !== autoDeliveryDate.value) return',
+    )
+    expect(source).toContain(
+      'watch([() => formData.partnerId, () => formData.orderDate], applySupplierDefaultDeliveryDate)',
+    )
   })
 
   it('exposes contractId and partnerId filters in the search bar', () => {

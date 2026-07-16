@@ -50,6 +50,10 @@ class OverheadAllocationServiceTest {
     private static final long SUBJECT_LABOR = 94002422L;
     private static final long SUBJECT_CONTRACT = 94002423L;
     private static final long SUBJECT_ZERO = 94002424L;
+    private static final long SUBJECT_VALIDATED = 94002431L;
+    private static final long SUBJECT_OTHER_TENANT = 94002432L;
+    private static final long SUBJECT_DISABLED = 94002433L;
+    private static final long SUBJECT_NOT_OVERHEAD = 94002434L;
     private static final LocalDate PERIOD = YearMonth.now().minusMonths(1).atEndOfMonth();
 
     @Autowired private OverheadAllocationService service;
@@ -89,6 +93,95 @@ class OverheadAllocationServiceTest {
         assertThrows(BusinessException.class,
                 () -> service.update(update(id, SUBJECT_EQUAL, "DIRECT_LABOR", "MONTHLY")));
         assertThrows(BusinessException.class, () -> service.delete(id));
+    }
+
+    @Test
+    @DisplayName("删除仅允许无执行事实的当前租户规则")
+    void deleteRejectsReferencedRuleAndKeepsTenantIsolation() {
+        Long removableId = service.create(rule(SUBJECT_EQUAL, "USAGE", "MONTHLY"));
+        service.delete(removableId);
+        assertEquals(null, ruleMapper.selectById(removableId));
+
+        Long protectedId = service.create(rule(SUBJECT_LABOR, "DIRECT_LABOR", "MONTHLY"));
+        jdbcTemplate.update("""
+                INSERT INTO overhead_allocation_run
+                (id,tenant_id,rule_id,period,trigger_type,run_status,allocated_amount,cost_item_count,deleted_flag)
+                VALUES (?,?,?,?,?,'SUCCESS',0,0,0)
+                """, 940024904L, TENANT_ID, protectedId, PERIOD, "MANUAL");
+
+        BusinessException referenced = assertThrows(BusinessException.class,
+                () -> service.delete(protectedId));
+        assertEquals("RULE_ALREADY_EXECUTED", referenced.getCode());
+        assertNotNull(ruleMapper.selectById(protectedId));
+
+        setUserContext(OTHER_TENANT_ID);
+        BusinessException hidden = assertThrows(BusinessException.class,
+                () -> service.delete(protectedId));
+        assertEquals("RULE_NOT_FOUND", hidden.getCode());
+    }
+
+    @Test
+    @DisplayName("受控新建只接受当前租户启用的间接费成本科目")
+    void validatedCreateRequiresTenantEnabledOverheadCostSubject() {
+        seedSubject(SUBJECT_VALIDATED, TENANT_ID, "5401.04.31", "OVERHEAD", "COST", "ENABLE");
+        seedSubject(SUBJECT_OTHER_TENANT, OTHER_TENANT_ID, "5401.04.32", "OVERHEAD", "COST", "ENABLE");
+        seedSubject(SUBJECT_DISABLED, TENANT_ID, "5401.04.33", "OVERHEAD", "COST", "DISABLE");
+        seedSubject(SUBJECT_NOT_OVERHEAD, TENANT_ID, "5001.01.34", "MATERIAL", "COST", "ENABLE");
+        try {
+            Long id = service.createValidated(SUBJECT_VALIDATED, "DIRECT_LABOR", "MONTHLY");
+            OverheadAllocationRule saved = ruleMapper.selectById(id);
+            assertEquals(TENANT_ID, saved.getTenantId());
+            assertEquals("ENABLE", saved.getStatus());
+            assertEquals(SUBJECT_VALIDATED, saved.getCostSubjectId());
+            assertThrows(BusinessException.class,
+                    () -> service.createValidated(SUBJECT_OTHER_TENANT, "USAGE", "MONTHLY"));
+            assertThrows(BusinessException.class,
+                    () -> service.createValidated(SUBJECT_DISABLED, "USAGE", "MONTHLY"));
+            assertThrows(BusinessException.class,
+                    () -> service.createValidated(SUBJECT_NOT_OVERHEAD, "USAGE", "PER_OCCURRENCE"));
+            assertThrows(BusinessException.class,
+                    () -> service.createValidated(999999999L, "USAGE", "MONTHLY"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM cost_subject WHERE id IN (?,?,?,?)",
+                    SUBJECT_VALIDATED, SUBJECT_OTHER_TENANT, SUBJECT_DISABLED, SUBJECT_NOT_OVERHEAD);
+        }
+    }
+
+    @Test
+    @DisplayName("受控修改校验规则与科目租户并保留服务端状态")
+    void validatedUpdateRequiresTenantRuleAndEnabledOverheadCostSubject() {
+        seedSubject(SUBJECT_VALIDATED, TENANT_ID, "5401.04.31", "OVERHEAD", "COST", "ENABLE");
+        seedSubject(SUBJECT_OTHER_TENANT, OTHER_TENANT_ID, "5401.04.32", "OVERHEAD", "COST", "ENABLE");
+        seedSubject(SUBJECT_DISABLED, TENANT_ID, "5401.04.33", "OVERHEAD", "COST", "DISABLE");
+        seedSubject(SUBJECT_NOT_OVERHEAD, TENANT_ID, "5001.01.34", "MATERIAL", "COST", "ENABLE");
+        Long id = service.create(rule(SUBJECT_EQUAL, "EQUAL", "MONTHLY"));
+        Long otherId;
+        setUserContext(OTHER_TENANT_ID);
+        otherId = service.create(rule(SUBJECT_OTHER_TENANT, "USAGE", "MONTHLY"));
+        setUserContext(TENANT_ID);
+        jdbcTemplate.update("UPDATE overhead_allocation_rule SET status='DISABLE' WHERE id=?", id);
+        try {
+            service.updateValidated(id, SUBJECT_VALIDATED, "CONTRACT_AMOUNT", "PER_OCCURRENCE");
+            OverheadAllocationRule saved = ruleMapper.selectById(id);
+            assertEquals(TENANT_ID, saved.getTenantId());
+            assertEquals("DISABLE", saved.getStatus());
+            assertEquals(SUBJECT_VALIDATED, saved.getCostSubjectId());
+            assertEquals("CONTRACT_AMOUNT", saved.getAllocationBasis());
+            assertEquals("PER_OCCURRENCE", saved.getAllocationCycle());
+            assertThrows(BusinessException.class,
+                    () -> service.updateValidated(otherId, SUBJECT_VALIDATED, "USAGE", "MONTHLY"));
+            assertThrows(BusinessException.class,
+                    () -> service.updateValidated(999999999L, SUBJECT_VALIDATED, "USAGE", "MONTHLY"));
+            assertThrows(BusinessException.class,
+                    () -> service.updateValidated(id, SUBJECT_OTHER_TENANT, "USAGE", "MONTHLY"));
+            assertThrows(BusinessException.class,
+                    () -> service.updateValidated(id, SUBJECT_DISABLED, "USAGE", "MONTHLY"));
+            assertThrows(BusinessException.class,
+                    () -> service.updateValidated(id, SUBJECT_NOT_OVERHEAD, "USAGE", "MONTHLY"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM cost_subject WHERE id IN (?,?,?,?)",
+                    SUBJECT_VALIDATED, SUBJECT_OTHER_TENANT, SUBJECT_DISABLED, SUBJECT_NOT_OVERHEAD);
+        }
     }
 
     @Test
@@ -339,6 +432,15 @@ class OverheadAllocationServiceTest {
                 (id,tenant_id,project_code,project_name,contract_amount,target_cost,status,deleted_flag)
                 VALUES (?,?,?,?,?,0,'ACTIVE',0)
                 """, id, tenantId, code, code, new BigDecimal(contractAmount));
+    }
+
+    private void seedSubject(long id, long tenantId, String code, String type,
+                             String category, String status) {
+        jdbcTemplate.update("""
+                INSERT INTO cost_subject
+                (id,tenant_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,deleted_flag)
+                VALUES (?,?,?,?,?,?,3,1,?,0)
+                """, id, tenantId, code, "测试间接费科目" + id, type, category, status);
     }
 
     private void insertRuleDirect(long tenantId, long subjectId, String basis) {

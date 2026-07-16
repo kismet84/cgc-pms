@@ -113,15 +113,10 @@ D:\projects-test\cgc-pms
   - 哪些统一分档尝试被判定为不合理
 - 对不确定内容标注“需要确认”，不要猜测。
 
-CI 与验收失败分类规则：
-- 工具配置类：本机缺少工具、CI job 配置错误、凭据/变量注入错误、脚本入口错误、规则文件未加载等，这类问题先修配置或补前置，不直接判为业务代码失败。
-- 环境前置类：Docker/WSL/数据库/端口未就绪、服务未达到稳定等待时间、前端 dev server 仍指向旧 backend、测试环境数据前置缺失等，这类问题先恢复环境再复验。
-- 真实质量/安全类：测试失败、构建失败、类型检查失败、接口契约不符、权限越权、安全扫描真实命中、数据一致性错误等，这类问题才进入实现整改或阻塞裁决。
-- 未先完成分类前，不得把 CI 红灯、页面异常或接口失败直接定性为“代码问题已确认”。
-
-内置浏览器测试规则：
-- 使用内置浏览器做前端页面测试时，优先访问 `http://localhost:5173/api/auth/dev-login?redirect=/dashboard`，用于跳过登录并直接进入首页。
-- 若浏览器回到 `/login`，且前端日志出现 `/api/*` 指向旧 `172.19.x.x:8080` 的 `ECONNREFUSED` 或同类代理错误，优先判定为前端 dev server 仍缓存旧 backend 地址；先重建前端运行态，再决定是否继续排查路由守卫或后端逻辑。
+统一执行策略索引：
+- 普通交互、主线、验收与发布收口的状态机、短指令语义、确定性工具路由、失败分类、浏览器模板、分层验证、Git 生命周期、事件驱动沟通和恢复胶囊，统一以 `docs/standards/codex-task-execution-policy.md` 为权威正文。
+- 该规范不得覆盖本文件的授权、安全、数据、生产、零悬空与 AutoPilot 硬门禁；专项步骤继续读取对应 Skill 和 AutoPilot 行为契约。
+- CI、页面和接口失败必须先按统一策略分类，未分类前不得判为业务代码失败。cgc-pms 浏览器验收与运行态恢复细节读取 `.agents/skills/cgc-pms-runtime-refresh/SKILL.md`，CI 门禁分诊读取 `.agents/skills/cgc-pms-ci-gate-triage/SKILL.md`。
 
 计划书归档规则：
 - 用户要求写计划书时，默认写入 `docs\plans`。
@@ -138,58 +133,22 @@ CI 与验收失败分类规则：
 - 同一根因、同一风险或同一建议再次出现时必须引用并更新已有唯一条目，不得重复新建；首次发现即完成处置，不得等待累计出现若干次后再承接。
 - 收口报告必须给出本轮 `新增后续项`、`关闭后续项`、`后续项净变化`。只要存在悬空项，结论必须为`不通过`；只有所有发现项均已修复、正式承接或有依据关闭后，才允许给出“通过但有已登记后续项”。
 
-输出风格：
-- 结论优先。
-- 明确区分：决策建议、执行任务、验收标准、风险点。
-- 涉及上线或验收时，必须给出：通过/不通过、阻塞/非阻塞、依据、剩余风险。
-- 等待子智能体执行期间，保持静默，不展示纯等待命令或计时过程；只在子智能体有结果、出现阻塞或需要用户决策时汇报。
-- Git/验收收口回报尽量使用最小模板：`正式交付物=...`、`验收证据=...`、`临时产物=...`、`git 状态=...`、`结论=通过/不通过`、`阻塞=...`、`剩余风险=...`。
-- 涉及方案时，优先选择最小可行方案，避免不必要抽象和大范围改造。
+输出与沟通边界：
+- 结论优先；涉及验收或上线必须给出通过/不通过、阻塞/非阻塞、依据与剩余风险。
+- commentary、最终收口模板和恢复胶囊统一读取 `docs/standards/codex-task-execution-policy.md`；等待与相同状态不重复播报，最终答复必须自包含。
+- 涉及方案时优先最小可行方案，避免不必要抽象和大范围改造。
 
-## 图谱工具与检索规则
+## 图谱工具与检索硬边界
 
-### 工具职责边界
-
-- CodeGraph 是非 PowerShell 源码的优先检索入口，适合 Java、TypeScript、Vue 等已被其有效解析的源码符号、引用和局部关系查询；CodeGraph 不是唯一事实源，当前分支源码、配置和正式载体仍是最终裁决依据。
-- `codebase-memory-mcp` 用于跨层影响、跨前后端或跨语言关系、复杂多跳调用链、架构边界、聚类，以及 CodeGraph 召回不足时的只读补充分析。
-- 项目知识图谱的职责是存量问题发现、筛选、排序、关联导航、Git 游标和 Episode 等治理状态查询，不作为源码符号、函数定义或调用关系的最终事实源。
-
-### 通用源码检索与交叉核验
-
-- 对非 PowerShell 源码，默认先使用 CodeGraph；涉及跨层、跨语言、复杂多跳调用链、架构边界或聚类时，必须补充调用只读的 `codebase-memory-mcp`，并记录查询目的、命中摘要和交叉核验结果。
-- 若 CodeGraph 未命中预期组件、跨语言引用、文件名、已知字段或明确符号，必须立即使用 `rg` 对明确符号和文件名做只读补查，并将结果归类为“工具召回不足”，不得解释为“代码不存在”。
-- 图谱命中的关键定义、调用边、文件位置和影响范围必须按风险使用 `rg`、直接文件读取或当前分支配置进行核验；不得仅凭图谱结果作出正式上线、安全、权限或数据一致性裁决。
-
-### PowerShell 专用检索规则
-
-- PowerShell 相关源码检索禁止使用 CodeGraph。适用范围包括 `.ps1`、`.psm1`、`.psd1` 文件，以及 PowerShell 函数、Cmdlet、模块、控制脚本、测试脚本和包含 PowerShell 节点的调用链。
-- PowerShell 定义、引用、调用关系和影响范围默认使用只读的 `codebase-memory-mcp`：
-  - 使用 `search_graph` 查询函数、模块和符号定义；
-  - 使用 `trace_path` 查询调用者、被调用者及多跳调用链；
-  - 使用 `search_code` 查询动态调用、dot-source、测试引用和文本关联。
-- `codebase-memory-mcp` 的关键命中必须使用 `rg` 对明确符号、文件路径和调用位置做只读交叉核验；当前分支源码仍是最终事实依据。
-- 涉及 PowerShell 与 Java、TypeScript、Vue 等语言的跨语言分析时，PowerShell 部分及跨语言边界统一由 `codebase-memory-mcp` 检索；CodeGraph 只能用于不包含 PowerShell 的独立源码片段。
-- 不得使用 CodeGraph 发起、补充或验证 PowerShell 查询，也不得将 CodeGraph 对 PowerShell 文件或符号的未命中解释为“代码不存在”。
-- 如果历史查询或其他流程已经产生 PowerShell 相关的 CodeGraph 结果，不得直接用于架构、影响范围或存在性裁决；必须改用 `codebase-memory-mcp` 和 `rg` 重新取证。
-
-### 存量问题与项目知识图谱
-
-- 普通“查询当前存量问题”默认先调用 `kg_status` 与有界的 `kg_list_issues`，不先扫描仓库台账、报告或源码。
-- 只有准备处理候选、深入分析、正式验收、图谱异常或索引游标过期时，才按 `sourceRefs` 交叉核验当前代码、配置、唯一台账和正式报告。
-- 项目知识图谱只负责发现、筛选、排序和关联导航；当前分支事实与正式治理载体仍是最终裁决依据。
-- AutoPilot 特有的知识图谱健康门禁、Git 游标、Ready 补货、Episode 和回顾规则继续保留在 AutoPilot 章节，不迁移到本通用章节。
-
-### 工具故障与授权边界
-
-- `codebase-memory-mcp` 未加载、未索引或查询失败时归类为 `tool_config`；PowerShell 查询此时退回 `rg` 和直接只读文件核验，不得回退使用 CodeGraph。
-- 不得伪造 `codebase-memory-mcp`、CodeGraph 或项目知识图谱的调用、命中和交叉核验证据。
-- `codebase-memory-mcp` 的授权边界固定为本地索引与只读查询；任何线程或工具都不得通过它创建、修改、删除或覆盖 `AGENTS.md`、`AGENTS.override.md`。
-- 禁止运行会自动改写智能体规则、Codex 配置、skills 或 hooks 的 `codebase-memory-mcp install` / `uninstall` 入口。
-- `codebase-memory-mcp` 升级必须获得用户明确授权，并且只能替换独立安装目录中的二进制，不得改写仓库规则文件。
+- 详细路由、调用预算、召回不足与交叉核验规则统一读取 `docs/standards/codex-task-execution-policy.md`。
+- PowerShell 源码、函数、Cmdlet、模块、测试和包含 PowerShell 节点的调用链禁止使用 CodeGraph；默认使用只读 `codebase-memory-mcp`，再用 `rg` 与当前文件核验。memory 图谱不可用时归类为 `tool_config` 并退回 `rg`/直接读取，不得改用 CodeGraph。
+- 非 PowerShell 未知源码符号优先 CodeGraph；跨层、跨语言、多跳调用链和架构边界使用 `codebase-memory-mcp` 并以当前源码核验。图谱未命中已知文件、字段或符号属于 `retrieval_gap`，不等于代码不存在。
+- 项目知识图谱只负责存量问题发现、筛选、排序、关联导航、Git 游标和 Episode；正式裁决必须核验 `sourceRefs`、当前分支和唯一正式载体。AutoPilot 特有健康门禁继续以专项章节和行为契约为准。
+- 不得伪造任何图谱调用或命中。`codebase-memory-mcp` 只允许本地只读查询；禁止通过其改写 AGENTS、Codex 配置、skills 或 hooks，禁止运行其 `install` / `uninstall`，升级必须另获明确授权。
 
 ## 产品情报与迭代决策规则
 
-- 当用户要求判断产品方向、生成下一轮计划，或 Ready 为空且 `docs/backlog/current-issues.json` 中没有可自动拆分的存量问题、也没有已通过决策门的候选时，先读取 `docs/product-intelligence/`，按“项目地图 → 竞品情报 → 迭代决策 → Ad-hoc Candidate → Ready → 实施 → 地图回写”推进。
+- 普通产品方向判断和已通过决策门的候选生成读取 `docs/product-intelligence/`，按“项目地图 → 竞品情报 → 迭代决策 → Ad-hoc Candidate → Ready → 实施 → 地图回写”推进；AutoPilot 的 Ready 发现与补货顺序只读取 owner Skill，不从本条推导直接文件扫描路径。
 - 项目事实以当前分支代码、配置、现行规范和当前验证为准；`docs/archive/v1.0/` 只作历史参考，不能替代当前证据，`archive/v1.0/private/` 继续禁止读取。
 - 竞品事实必须来自官方文档、官方产品资料或一手仓库，并记录来源和核验时间；竞品具备某项能力不等于 CGC-PMS 必须实现。
 - 产品 Candidate 必须引用当前 `project-map.md` 和 `evolution-decision.md`，明确用户价值、最小闭环、非目标、依赖、风险和待确认项；前置未核实或证据过期时保持 Candidate，不得强行拆成 Ready。
@@ -198,87 +157,28 @@ CI 与验收失败分类规则：
 - Ready 以证据和字段完整为准，不设置最低数量；1 条合格 Ready 即可实施，队列上限为 5 条。只有完全无关联且无代码、数据、权限和业务链耦合的任务才可并行。
 - 主线或 Ready Issue 完成后必须回写项目地图；若结果改变差距或优先级，同步刷新竞品分析、迭代决策、Current Focus 和候选状态。
 
-## Codex Local AutoPilot Rules
+## Codex Local AutoPilot 最高级边界与索引
 
-本仓库允许 Codex 在本地测试环境中按规则执行 AutoPilot，但边界必须先于效率。
+本节只保留不可绕过的项目边界与唯一事实入口。AutoPilot 的流程、阶段、评分、阈值、超时和运行态参数不得复制到本文件。
 
-### 基本禁止
+### 不可绕过边界
 
-- 不自动发布生产
-- 不连接生产数据库
-- 不删除仓库外文件
-- 不删除 `.git`
-- 不删除用户目录
-- AutoPilot 连续迭代无合格 Ready Issue 不实施对应业务或治理变更；普通交互任务不受此条限制
+- AutoPilot 连续迭代只处理合格 Ready Issue；普通交互任务和用户明确指定的其他治理流程仍按各自授权门与载体执行。
+- 禁止自动发布生产、连接生产数据库、删除仓库外文件、删除 `.git`、删除用户目录或读取项目已列明的禁止区。
+- Ready、授权、`stop.flag` / `pause.flag` / `enabled.flag` checkpoint、fencing、控制面指纹、验证、复核、收口、Git 与 no-push 门禁不可被兼容模式、恢复流程或人工续跑绕过。
+- 清库、删除或重置测试数据只允许 dev/test/demo 环境，数据库 host 必须为 `localhost` 或 `127.0.0.1`，且必须存在 `.codex-autopilot/ALLOW_TEST_DATA_RESET`；三项缺一即禁止。
+- 自动提交、合并、push 或生产操作仍需对应明确授权与专项门禁；`autoPush=false` 时不得自动 push。
+- 影响调度、恢复、验收、Reviewer、评分或收口的控制面语义变更，必须通过指纹契约与用户明确启动的单 Issue 金丝雀后，才允许进入更大连续执行范围。
 
-### Ready Issue 与 checkpoint
+### 唯一事实入口
 
-- 进入 AutoPilot 连续迭代的业务或治理变更前，必须先确认任务来自 `docs/backlog/ready-issues.md`；普通交互任务与用户明确指定的其他治理流程按各自授权和载体执行
-- AutoPilot 任务来源顺序为：a. `docs/backlog/ready-issues.md` 中已有合格 Ready；b. 从健康且 Git 游标覆盖当前 HEAD 的知识图谱中有界拉取可自动处理的存量问题，并按其 `sourceRefs` 与当前分支事实核实；c. 当前 focus 的可解除前置阻塞；d. `docs/backlog/ad-hoc-plan.md` 中已引用当前产品情报决策且前置完整的 `ReadyToSplit` / 高优先级 `Candidate`；e. 没有合格候选时刷新 `docs/product-intelligence/`。`docs/backlog/current-issues.json` 仍是正式写回源，不再是 AutoPilot 默认发现入口。存量问题筛选必须排除 `blocking=true`、`RELEASE_GATE`、`FROZEN`、`NEEDS_CONFIRMATION`、仍有子项的聚合父问题和证据/验收标准不完整项，按 `P0 → P1 → P2`、明确问题优先于观察项、叶子问题优先于宽泛根问题排序；Ready 必须保留唯一 `[stock:<issueKey>]` 标记，收口后同步更新或移除原存量问题。图谱不可用、采集失败或单次刷新后游标仍过期时必须安全停止，不得静默回退到台账或长期计划凑任务。
-- Ready 队列允许只有 1 条合格任务，最多 5 条；不得为凑数量放宽证据、前置或字段要求。补货轮只更新产品情报与 backlog，不直接修改业务代码；形成至少 1 条合格 Ready 后，若未命中 `stop.flag` / `pause.flag`，才能进入实施轮。
-- 连续执行模式下，若 `Ready` 队列为空，先从 `current-issues.json` 拆分合格存量问题；没有合格存量问题且 `blocked` 中存在当前 `focus/阶段` 的前置阻塞时，不得直接停止，必须先由主线程按自适应路由直接处理、单派或多派完成阻塞核实或解除，再决定是否继续拆 Ready。阻塞解除任务可属于运维、事实采集、测试数据前置或验收复核，但必须继续遵守测试数据重置边界，以及开始前、执行中、收口前的 `stop.flag` / `pause.flag` checkpoint
-- 若前置阻塞已解除，应先由 F 更新 `backlog/blocked/ready` 状态，再由 A 重新拆 Ready；只有阻塞被确认无法处理、已安全写入 `blocked`，或同时不存在可拆任务时，才允许进入连续模式停止判断
-- 每个关键 checkpoint 都要检查 `.codex-autopilot/stop.flag` 和 `.codex-autopilot/pause.flag`；若是在当前任务开始前发现，则不得启动下一个任务；若是在当前任务执行中发现，则只做安全收口，不强制中断
-- 至少在开始前、选任务后、改代码前、跑验证前、自动合并前、更新报告后检查一次 stop/pause
-- 运行前置或浏览器验收前必须先做 health gate：检查 `http://localhost:8080/api/actuator/health`、`http://localhost:5173/`、`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`；任一不通先归类为环境前置类并执行 runtime refresh，稳定等待 `180秒` 后再复验
-- Docker / backend / frontend 未启动、端口不通、dev-login 无法打通时，先归类为环境前置类；不得直接定性为业务代码失败
-- Ready Issue 中的验证命令必须先校验测试类、测试方法选择器或脚本入口是否真实存在；若不存在，先归类为 Ready Issue 配置问题，可做最小等价替换并把替换结果写入 iteration / quality / blocked / done 正式报告，不直接判测试失败
-- Ready Issue 的 `allowedPaths` / `forbiddenPaths` 必须在 executor 与 issue worktree 创建前完成确定性矛盾检查；完全相同、精确允许文件被禁止目录覆盖、允许子树被禁止父树完全覆盖均归类为 `ready_issue_config` / `READY_SCOPE_CONTRADICTION`。允许宽目录配合更窄禁止子目录的安全 carve-out，运行时 `forbidden` 优先门禁继续保留。
-- PowerShell 7 下包含逗号的 Maven 参数必须写成单参数字符串，例如 `.\mvnw.cmd "-Dtest=FileServiceTest,InvoiceServiceTest" test`；首次出现 `ParserError` 或参数拆分异常时，先归类为命令调用问题，不直接判测试失败。AutoPilot 控制面固定使用 `pwsh`，缺少 PowerShell 7 时归类为 `tool_config/AUTOPILOT_POWERSHELL7_REQUIRED` 并安全停止，不得静默回退到 Windows PowerShell 5.1
+- 通用执行、工具路由、失败分类、分层验证、Git 生命周期、沟通与恢复：`docs/standards/codex-task-execution-policy.md`。
+- AutoPilot 触发语义、Ready 来源、职责覆盖、checkpoint、失败处理和正式收口：`plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md`。
+- 调度、恢复、Reviewer、评分、回顾与金丝雀边界：`plugins/cgc-pms-autopilot/references/control-plane-policy.md`。
+- 桌面原生执行宿主边界：`plugins/cgc-pms-autopilot/references/desktop-execution-policy.md`。
+- `baseBranch`、`executionHost`、评分版本/权重、回顾阈值、超时和其他动态值：`scripts/codex-autopilot/codex-autopilot.config.json` 及其 schema；不得从本文件读取副本。
 
-### 测试数据重置边界
+### 项目级触发索引
 
-- 仅允许 dev/test/demo 环境
-- 数据库 host 必须同时满足 `localhost` 或 `127.0.0.1`
-- 清库、删测试数据、重置测试数据前必须存在 `.codex-autopilot/ALLOW_TEST_DATA_RESET`
-- 未同时满足环境、host、marker 三项时，禁止执行测试数据删除或重置
-
-### 自动合并前置
-
-- 必须先执行对应验证命令并通过 `git diff --check`
-- 必须更新 iteration report 与 backlog 状态
-- 必须再次确认没有 `stop.flag` / `pause.flag`
-- 当前任务已启动后若出现 `stop.flag`，允许自然收口并提交当前任务结果；收口后不得再派发下一任务
-- `pause.flag` 默认比 `stop.flag` 更严格：新任务不得启动，已启动任务只允许安全收口；除非 Ready Issue 明确要求更严格中断策略，否则不得强杀当前任务
-- 不满足前置条件时禁止自动合并
-
-### 连续执行效率与收口优化规则
-
-- 生产配置 `executionHost=desktop-native` 时，连续迭代由当前 Codex 桌面主线程直接推进；PowerShell 只用于 checkpoint、状态迁移、验证、失败分类、Ready/复核/收口结果校验和 Git 边界等确定性原子动作。禁止 runner 启动嵌套 Planner、Executor、Reviewer `codex exec`，也不得静默回退 `cli-legacy`。
-- `cli-legacy` 仅用于显式兼容测试或用户明确授权的紧急回退；无论宿主为何都不得绕过 Ready、stop/pause、fencing、控制面指纹、验证、复核、收口和 no-push 门禁。
-- 连续模式下每个 Ready Issue 默认按 `checkpoint -> A 拆解 -> C/B 最小实现 -> D 回归 -> E 审查 -> 必要时 C/B 补修 -> D 最终复验 -> F 归档 -> 本地 commit -> stop/pause/ready 检查` 覆盖职责；A–F 不自动映射为独立线程，可由主线程直接承担、单派或多派，但 D/E 的适用证据不可省略
-- A 拆 Ready 时必须给每条 Ready 明确标注 `任务性质`，至少属于以下之一：`能力新增`、`缺口修复`、`回归证明`、`运维治理`；若为 `回归证明`，目标、验收标准和收口结论都不得把“已证明现有能力生效”偷换成“新增能力已完成”或“整个平台化已完成”
-- 若同一能力域在同一连续执行轮次中已连续进入 `3` 条 Ready，A 下一次继续拆同域 Ready 前必须先在 `current-focus.md` 写出至少一组候选域对比与未切换原因；若已连续进入 `5` 条 Ready，继续拆同域 Ready 前必须额外写明“为何仍需继续当前域、为何其他候选域不应先做”的明确理由；缺少这些依据时不得继续同域续跑
-- F 归档通过后，若尚未检测到 `stop.flag` 或 `pause.flag`，必须先本地 commit 当前 Issue 成果，再判断是否进入下一轮；若已检测到 `stop.flag` 或 `pause.flag`，只做安全收口说明，不启动新任务
-- 达到 `启动迭代-N` 上限、收到停止指令、或因无 Ready/无法继续而退出当前连续轮次时，F 必须先做一次最小总验收：至少汇总本轮已完成 Issue、阻塞项、已正式承接的非阻塞后续项、本轮后续项净变化、当前 `focus` 是否允许继续；若因证据不足无法做总验收，必须明确写明未做原因与缺失前置
-- 命令首次失败时必须先做失败分类；对疑似瞬时波动、代理抖动、Maven `testCompile` 或其他前置状态问题，优先复跑一次或用最小等价验证确认稳定复现，再升级为阻塞，不得把一次性失败直接定性为业务代码失败
-- D 验收可以参考 C/B 已跑结果，但只复跑裁决必需项，不做无意义全量重复；至少覆盖目标测试、关键静态核对、`git diff --check`、以及权限/数据边界相关断言
-- E 提出的非阻塞建议若属于当前 diff、当前验收风险或低成本测试补强，必须本轮处理并复验；确实超出当前范围时，按“非阻塞问题零悬空规则”去重并正式承接；不满足立项证据与价值门槛时直接关闭，不得只归档为质量报告观察项
-- F 必须在每个 Issue 收口时统计 `新增后续项`、`关闭后续项` 与 `后续项净变化`，并更新对应唯一载体；若净变化大于 `0`，下一轮默认优先消化已登记后续项，除非 `current-focus.md` 已写明继续当前产品目标的证据与不先处理的风险依据
-- 若连续 `2` 个 Issue 的后续项净变化均大于 `0`，连续模式必须暂停选择新的`能力新增`任务，先进入缺口修复、运维治理或阻塞核实，直到后续项总量不高于这两个 Issue 开始前的基线；不得通过改名、拆分、重复迁移载体规避止涨门槛
-- F 每次写 AutoPilot state / backlog 收口状态时，必须同步刷新 `lastHeartbeatAt`；若未刷新，不得把该次 state 写入视为最新心跳
-- AutoPilot 每个活动 Issue 必须维护原子阶段 checkpoint，并至少绑定 Ready 内容哈希、baseCommit、worktree/branch、范围哈希、diff/evidence 和阶段派发计数。死进程恢复时先核验 checkpoint；证据有效只从 validation、review 或 closeout 的首个未完成阶段继续，禁止删除 worktree 后重新派发 B/C。证据不一致进入 `QUARANTINE` 并保留现场；没有 durable checkpoint 的残留提交也不得猜测合并或自动重做。
-- AutoPilot 阶段处理器必须返回并通过校验的 `StageResult`，不得用自由文本决定下一阶段；活动 Issue 的 checkpoint 阶段迁移只能通过 `autopilot-transition.ps1` 的 transition writer，底层 state/checkpoint 模块只负责模型、序列化与原子存储。transition writer 必须校验合法边、fencing token、控制面指纹，并对 `transitionId + generation` 写后读回；恢复模块只能请求迁移，不得建立第二套状态机。
-- Reviewer `tool_config` 与业务 `NEEDS_REPAIR` 必须隔离：同一 diff 的 Reviewer 工具故障只允许一次跨 run 重试，第二次仍失败进入 `PAUSED/REVIEW_TOOL_BLOCKED`；不得触发 implementation executor。只有绑定同一 Issue/diff 且 finding 完整的 `NEEDS_REPAIR` 才允许有界 repair。
-- AutoPilot 任务评分只对已通过全部硬门禁、完成正式归档并产生不同的 `implementationCommit` 与 `closeoutCommit` 的实施型 Ready Issue 生效；评分绑定实施提交，评分收口提交与 closeout ledger 登记成功后才可计入回顾周期。低分只用于周期观测，不得改变 DONE 裁决、触发自动补修或抵消既有质量/安全门禁。
-- 评分配置必须区分 candidate 与 active；只有用户明确批准 `scoringVersion`、五维权重和生效时间后，才允许设置 `approvalStatus=APPROVED`、激活版本并增加正式回顾计数。未批准候选只能用于 disabled 回放和测试，不得写入正式累计。
-- `autopilot-task-score/v2` 已获用户批准并作为 active 正式版本，五维权重为35/25/20/10/10，其中 `taskExecutionEfficiency=10`；自批准配置提交后的下一项新实施型 Ready Issue 生效。取证覆盖跨 run implementation 重派、阶段回退、人工恢复、工具/环境重试和证据完整性；绝对耗时只进入20任务趋势分析，不按固定分钟数直接扣分。v1 历史评分不得回算或覆盖，同一任务不得形成 v1/v2 双重正式计数。
-- 正式评分按独立于单次 `iterationLimit` 的回顾周期跨批次累计并以任务/评分幂等键去重。无界模式在第20个有效任务安全收口后禁止选择第21个任务；有界 `启动迭代-N` 可完成当前 N，随后对本周期全部任务统一回顾，超出20的部分不结转。
-- 达到回顾阈值后必须保持 `RETROSPECTIVE_REQUIRED` / 暂停状态。报告阶段按 `reviewCycleId` 将 `ready-issues.md` 中全部完整 Done 块迁入单独的 `docs/backlog/ready-history/ready-issues-<reviewCycleId>.md`，每次复盘一个文件；`ready-issues.md` 对历史项只保留 Issue 主题和归档链接，当前 Ready 继续保留完整契约。直到回顾报告与历史归档已提交、改进提案去重写入唯一问题事实源、知识图谱 Git 游标追平、稳定 Episode 可读回且最终 state 成功清零前都不得继续；任一阶段失败保留累计任务并按同一周期幂等续跑，既有同名归档内容冲突时 fail-close；清零后仍须用户重新启动，不自动恢复。
-- 自动回顾只能按可复现聚合规则生成 `NEEDS_CONFIRMATION` 改进提案，不得自动修改代码、规则、权重或环境。提案证据或验收标准不足时关闭，不得新建孤立改进清单或制造悬空 backlog。
-- 任何“剩余风险”都必须按“非阻塞问题零悬空规则”完成修复、唯一载体承接或有依据关闭；禁止只停留在 `docs/quality/**` 报告备注中
-- checkpoint 固定最小输出为 `branch`、`git status`、`stop.flag`、`pause.flag`、`enabled.flag`；如怀疑需清理工作区，只能先执行 `git clean -fdn` 预览，不得直接清理
-- 影响调度、恢复、验收、Reviewer、评分或收口的控制面指纹变化后，N>1 或无界连续执行必须先由用户明确启动并成功收口一次 `启动迭代-1`；指纹必须覆盖行为配置本身，且 closeout ledger、state 与知识图谱 Git cursor 全部读回后才能登记成功。同指纹金丝雀未登记时返回 `CONTROL_PLANE_CANARY_REQUIRED`，不得静默降级为1或开始首个任务。
-- 可后续沉淀为脚本或技能的候选资产仅记录为：`autopilot-checkpoint`、`ready-issue-writer`、`issue-closeout`、`test-failure-classifier`、`local-commit-closeout`；未明确立项前不要求实现
-
-### 项目级关键词协议
-
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动预演` 时，视为请求执行插件 dry-run 预演：`pwsh -NoProfile -File D:\projects-test\cgc-pms\plugins\cgc-pms-autopilot\scripts\autopilot-loop-runner.ps1 -DryRun -ReadyIssuePath D:\projects-test\cgc-pms\docs\backlog\ready-issues.md`；该语义只做受控预演，不启动下一任务、不提交、不 push。
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `启动迭代` 时，视为请求开启 `enabled.flag` 并进入连续迭代模式：生产默认由当前 Codex 桌面主线程读取 checkpoint 后直接连续执行，调用原子 checkpoint / classifier / transition / closeout 工具，但不调用旧 runner 启动嵌套模型。A–F 是职责检查表，由主线程按净收益直接承担、单派或多派，不机械创建六个线程；每轮最多允许 3 个完全无关联的 Ready 并行，不能证明无关联时按串行处理，涉及同一文件、模块、业务域、数据库、权限、安全、租户、金额或审批状态机的任务不得并行。若 Ready 为空，先经知识图谱健康/HEAD 游标门禁拉取合格存量问题并按来源核实，再处理当前 focus 的可解除阻塞，之后才检查有决策证据的 Ad-hoc Candidate；仍无合格候选时刷新产品情报，不得从长期计划凑 Ready。图谱异常时安全停止，不静默扫描台账补货。形成至少 1 条合格 Ready 且未命中 stop/pause 后才能实施；每轮结束后检查 stop/pause/enabled，并保持 `no push` 边界。
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语格式 `启动迭代-N` 时，视为带迭代上限的连续执行模式；`N` 必须为 1 到 50 的正整数，表示最多完成 N 个实施型 Ready Issue 后退出；N=0、非数字或超过 50 必须拒绝。dry-run、拆单、health gate、runtime refresh 不计入 N；无 `-N` 参数时保持上一条无上限连续语义。
-- 在 `D:\projects-test\cgc-pms` 项目会话中，用户输入精确短语 `停止迭代` 时，视为请求执行安全停止：设置停止标记并关闭 `enabled.flag`，用于阻断下一任务启动，不强杀当前任务。
-- 连续执行模式的停止条件包括：收到 `停止迭代` 后当前任务已自然收口、在任务边界检查到 `stop.flag` 或 `pause.flag`、当前 Ready 为空且无合格存量问题或 Candidate、产品情报无法形成可执行方向且不存在可解除的当前 focus 前置阻塞、当前 Issue 连续自修后仍失败并已写入 blocked、前置阻塞已确认无法解除并已安全写入 blocked、带 `-N` 参数时已触达完成上限、或触达系统/会话限制。
-- 连续执行模式仍保持以下边界：`autoPush=false`、不发布生产、不连接生产库、不删除仓库外文件；若涉及自动合并，仍必须先通过既有门禁与前置校验
-- 不得把单字 `启动` 或 `停止` 作为触发词，只有完整短语 `启动预演`、`启动迭代`、`启动迭代-N`、`停止迭代` 才能触发对应动作，避免误触发。
-- 触发前仍需通过授权门；项目总负责人主线程默认直接执行，只有运维卸载或独立证据等净收益明确时才派工
-- 执行完成后必须回报 AutoPilot 的 flag/state 检查结果，至少说明 `stop.flag`、`pause.flag`、`enabled.flag` 与相关运行状态，并明确是否停止了下一任务派发
+- 只有完整短语 `启动预演`、`启动迭代`、`启动迭代-N`、`停止迭代` 才路由到 AutoPilot owner Skill；单字 `启动` 或 `停止` 不触发。
+- 参数校验、状态迁移、停止条件和执行后 flag/state 回报以 owner Skill、控制面策略与当前动态配置为准；触发不等于绕过授权门。

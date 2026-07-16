@@ -2,7 +2,18 @@
 
 ## v1.5 当前阻塞任务
 
-当前无已确认的 CI 合并门禁阻塞。
+### ISSUE-037-021（2026-07-16 复发）：本地测试隔离已修复，master CI 待新提交复验
+
+- 优先级：P0
+- 失败分类：`quality_or_security`（真实质量/测试隔离）；远端失败已精确定位为测试共享数据污染导致的顺序依赖。整份日志下载异常仍单独归类为 `environment_prerequisite`，不再影响业务根因裁决。
+- 阻塞原因：本地根因与回归已关闭，但 `master` 当前仍是提交 `ed47aabb39198f343742009d52c68080530b79a9`；其 [CI run #186](https://github.com/kismet84/cgc-pms/actions/runs/29428204584) 为 failure，required job `backend-test` 失败，依赖它的 `supply-chain-security` 被跳过。用户明确要求暂不提交、不推送，因此当前没有包含修复的新提交可供 11 个 required checks 复验，仍不具备上线门禁通过证据。
+- 已完成证据：远端唯一失败已定位为 `DashboardMaterialRoleServiceTest.testDefaultDemoProject_DashboardRealisticDemoDistribution` 第 349 行，Maven 汇总 1814 项、失败 1、错误 0、跳过 3；修复前按 `StlSettlementServiceTest` 后接 Dashboard 的顺序可稳定复现。2026-07-16 已在当前功能分支完成测试隔离修复：`StlSettlementServiceTest` 不再改写共享 `sub_measure.status`，只临时设置结算前置校验实际需要的 `approval_status`，并在每个测试结束后按原值恢复。修复后目标类 13 项全绿；相同显式顺序回归 26 项全绿；`backend\\mvnw.cmd -C verify` 为 1814 项、失败 0、错误 0、跳过 1；`git diff --check` 通过。
+- 根因：`StlSettlementServiceTest#setUp` 原先在每个测试前把租户 0、合同 30001 的全部 `sub_measure` 同时改为 `approval_status='APPROVED'`、`status='CONFIRMED'`，且不恢复；V105 Dashboard 演示数据使用同一合同，原有 `APPROVING/CONFIRMED/DRAFT` 三态被压成单态。修复采用原值快照/逐项恢复，不使用无法覆盖并发子线程提交的类级测试事务。
+- 当前未完成原因：用户授权了本地修复与复验，但明确要求暂不提交、不推送；不得自行创建远端验证提交、触发等价 workflow 或改变 `master`。
+- 解除条件：获得提交与推送授权后，将已验证修复纳入等价新提交，并让 11 个 required checks 全部成功且 `supply-chain-security` 实际执行；若远端仍失败，必须基于新提交绑定日志重新分类，不复用旧 run 结果。
+- 未完成验收项：修复提交的远端 required checks 全绿、`supply-chain-security` 实际执行结果。
+- 安全恢复方式：根因日志已取得，不再重复下载整份日志或 artifact。若未来同类入口稳定超时，使用已登录 job 页面定位失败 step 临时日志入口，确认 Range 支持后先取末段 `256 KB`，摘要不足时只扩大一次；GitHub 仓库 SSH URL 只服务 Git 传输，切换 `origin` 不能修复 Actions 日志入口。临时签名 URL 不写入长期载体。
+- 恢复复核：2026-07-16 本地目标、显式失败顺序和全量验证均已通过；当前剩余阻塞是发布级远端证据缺失，不再是本地实现或测试隔离未完成。旧 run 只能证明旧提交失败，不能替代修复提交的 CI 裁决。
 
 第40条主线 M0 于 2026-07-13 复核并关闭 `ISSUE-037-021-A/B/C`：PR #334 目标提交 11 个 required checks 全部成功，PR 已合并到 `master`；分支保护当前为 `strict=true`、`enforce_admins=true`、`required_conversation_resolution=true`，并禁止 force push/delete。正式证据见 [M0 状态归一化验收报告](../quality/mainline-40-m0-historical-blocker-normalization-acceptance-2026-07-13.md)。
 

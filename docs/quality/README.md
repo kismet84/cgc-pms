@@ -19,3 +19,4 @@
 - [AutoPilot Codex stdin 启动参数修复验收报告](autopilot-codex-stdin-launcher-fix-2026-07-13.md)
 - [AutoPilot 已提交执行产物识别修复验收报告](autopilot-committed-executor-artifact-fix-2026-07-13.md)
 - [ISSUE-040-002～006：M1 五项历史风险复验与修复验收报告](ISSUE-040-002-006-M1五项历史风险复验与修复验收报告.md)
+- [第47条主线：Codex 执行效率与沟通降噪试运行报告](codex-execution-efficiency-trial-report-2026-07-15.md)

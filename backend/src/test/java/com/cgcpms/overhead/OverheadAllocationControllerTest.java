@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,6 +35,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -80,6 +83,7 @@ class OverheadAllocationControllerTest {
         Page<OverheadAllocationRule> page = new Page<>(1, 10, 1);
         page.setRecords(List.of(rule));
         when(service.getPage(1, 10)).thenReturn(page);
+        when(service.createValidated(anyLong(), any(String.class), any(String.class))).thenReturn(940026002L);
     }
 
     @Test
@@ -105,6 +109,109 @@ class OverheadAllocationControllerTest {
                         .param("pageNo", "1").param("pageSize", "10"))
                 .andExpect(status().isOk());
         verify(service, org.mockito.Mockito.times(2)).getPage(1, 10);
+    }
+
+    @Test
+    @DisplayName("规则新建要求 overhead:add，管理员与显式权限只传白名单字段")
+    void createRulePermissionAndWhitelistContract() throws Exception {
+        String body = """
+                {"costSubjectId":54010401,"allocationBasis":"DIRECT_LABOR","allocationCycle":"MONTHLY",
+                 "id":999,"tenantId":999999,"status":"DISABLE","createdBy":888}
+                """;
+        mockMvc.perform(postApi("/overhead-allocation/rules")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(postApi("/overhead-allocation/rules")
+                        .cookie(cookie(List.of(), List.of("overhead:query")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(postApi("/overhead-allocation/rules")
+                        .cookie(cookie(List.of(), List.of("overhead:add")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").value(940026002L));
+        mockMvc.perform(postApi("/overhead-allocation/rules")
+                        .cookie(cookie(List.of("ADMIN"), List.of()))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        verify(service, org.mockito.Mockito.times(2))
+                .createValidated(54010401L, "DIRECT_LABOR", "MONTHLY");
+    }
+
+    @Test
+    @DisplayName("规则新建拒绝缺失科目、非法依据和非法周期")
+    void createRuleRejectsInvalidFields() throws Exception {
+        Cookie add = cookie(List.of(), List.of("overhead:add"));
+        for (String body : List.of(
+                "{\"allocationBasis\":\"DIRECT_LABOR\",\"allocationCycle\":\"MONTHLY\"}",
+                "{\"costSubjectId\":1,\"allocationBasis\":\"EQUAL\",\"allocationCycle\":\"MONTHLY\"}",
+                "{\"costSubjectId\":1,\"allocationBasis\":\"USAGE\",\"allocationCycle\":\"YEARLY\"}")) {
+            mockMvc.perform(postApi("/overhead-allocation/rules").cookie(add)
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().is4xxClientError());
+        }
+        verify(service, org.mockito.Mockito.never())
+                .createValidated(anyLong(), any(String.class), any(String.class));
+    }
+
+    @Test
+    @DisplayName("规则修改要求 overhead:edit，路径 ID 与白名单字段为唯一更新输入")
+    void updateRulePermissionAndWhitelistContract() throws Exception {
+        String body = """
+                {"costSubjectId":54010401,"allocationBasis":"USAGE","allocationCycle":"PER_OCCURRENCE",
+                 "id":999,"tenantId":999999,"status":"DISABLE","updatedBy":888}
+                """;
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of(), List.of("overhead:query")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of(), List.of("overhead:edit")))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        mockMvc.perform(putApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of("ADMIN"), List.of()))
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+        verify(service, org.mockito.Mockito.times(2))
+                .updateValidated(940026001L, 54010401L, "USAGE", "PER_OCCURRENCE");
+    }
+
+    @Test
+    @DisplayName("规则修改拒绝缺失字段、非法依据和非法周期")
+    void updateRuleRejectsInvalidFields() throws Exception {
+        Cookie edit = cookie(List.of(), List.of("overhead:edit"));
+        for (String body : List.of(
+                "{\"allocationBasis\":\"DIRECT_LABOR\",\"allocationCycle\":\"MONTHLY\"}",
+                "{\"costSubjectId\":1,\"allocationCycle\":\"MONTHLY\"}",
+                "{\"costSubjectId\":1,\"allocationBasis\":\"EQUAL\",\"allocationCycle\":\"MONTHLY\"}",
+                "{\"costSubjectId\":1,\"allocationBasis\":\"USAGE\",\"allocationCycle\":\"YEARLY\"}")) {
+            mockMvc.perform(putApi("/overhead-allocation/rules/940026001").cookie(edit)
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().is4xxClientError());
+        }
+        verify(service, org.mockito.Mockito.never())
+                .updateValidated(anyLong(), anyLong(), any(String.class), any(String.class));
+    }
+
+    @Test
+    @DisplayName("规则删除要求 overhead:delete 或管理员权限")
+    void deleteRulePermissionContract() throws Exception {
+        mockMvc.perform(deleteApi("/overhead-allocation/rules/940026001"))
+                .andExpect(status().isUnauthorized());
+        mockMvc.perform(deleteApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of(), List.of("overhead:query"))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(deleteApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of(), List.of("overhead:delete"))))
+                .andExpect(status().isOk());
+        mockMvc.perform(deleteApi("/overhead-allocation/rules/940026001")
+                        .cookie(cookie(List.of("SUPER_ADMIN"), List.of())))
+                .andExpect(status().isOk());
+        verify(service, org.mockito.Mockito.times(2)).delete(940026001L);
     }
 
     @AfterEach
@@ -209,6 +316,14 @@ class OverheadAllocationControllerTest {
 
     private MockHttpServletRequestBuilder getApi(String path) {
         return get("/api" + path).contextPath("/api");
+    }
+
+    private MockHttpServletRequestBuilder putApi(String path) {
+        return put("/api" + path).contextPath("/api");
+    }
+
+    private MockHttpServletRequestBuilder deleteApi(String path) {
+        return delete("/api" + path).contextPath("/api");
     }
 
 }

@@ -86,7 +86,7 @@ class BidCostControllerTest {
         }
     }
 
-    @Test @Order(2) @DisplayName("V150-V153 register separate bid query, create, edit and delete permissions")
+    @Test @Order(2) @DisplayName("V150-V154 register separate bid query, create, edit, delete and status permissions")
     void testBidMenuMigrationsApplied() {
         Set<String> permissions = Set.copyOf(jdbcTemplate.queryForList("""
                 SELECT DISTINCT m.perms
@@ -153,6 +153,31 @@ class BidCostControllerTest {
                 "SELECT COUNT(*) FROM sys_menu WHERE id = 965 AND perms IN ('bid:add','bid:edit','bid:status')",
                 Integer.class);
         assertEquals(0, unrelatedDeletePermissionCount);
+
+        Set<String> statusPermissions = Set.copyOf(jdbcTemplate.queryForList("""
+                SELECT DISTINCT m.perms
+                FROM sys_role r
+                JOIN sys_role_menu rm ON rm.role_id = r.id
+                JOIN sys_menu m ON m.id = rm.menu_id
+                WHERE r.role_code IN ('SUPER_ADMIN', 'ADMIN', 'COST_MANAGER')
+                  AND m.id = 966
+                  AND m.parent_id = 962
+                  AND m.menu_type = 'BUTTON'
+                  AND m.deleted_flag = 0
+                """, String.class));
+        assertEquals(Set.of("bid:status"), statusPermissions);
+        Integer unrelatedStatusPermissionCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_menu WHERE id = 966 AND perms IN ('bid:add','bid:edit','bid:delete')",
+                Integer.class);
+        assertEquals(0, unrelatedStatusPermissionCount);
+        Integer unexpectedStatusRoleCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM sys_role_menu rm
+                JOIN sys_role r ON r.id = rm.role_id AND r.deleted_flag = 0
+                WHERE rm.menu_id = 966
+                  AND r.role_code NOT IN ('SUPER_ADMIN', 'ADMIN', 'COST_MANAGER')
+                """, Integer.class);
+        assertEquals(0, unexpectedStatusRoleCount);
     }
 
     @Test @Order(2) @DisplayName("POST /bid-cost enforces authentication and bid:add")
@@ -308,6 +333,143 @@ class BidCostControllerTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(putWith("/bid-cost/" + bidId + "/lost").cookie(editCookie))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test @Order(6) @DisplayName("PUT /bid-cost/{id}/won enforces status permission, tenant, state and project data scope")
+    void testMarkAsWon_PermissionAndBoundaryContract() throws Exception {
+        long base = 960000000000L + Math.abs(System.nanoTime() % 10000000L) * 10;
+        long allowedId = base + 1;
+        long crossTenantId = base + 2;
+        long invalidStateId = base + 3;
+        long ownedProjectId = base + 4;
+        jdbcTemplate.update("""
+                INSERT INTO pm_project (
+                    id, tenant_id, project_code, project_name, project_type,
+                    status, approval_status, created_by, deleted_flag
+                ) VALUES (?, ?, ?, ?, '房建工程', 'ACTIVE', 'APPROVED', ?, 0)
+                """, ownedProjectId, TENANT_ID, "BID-WON-PROJECT-" + ownedProjectId,
+                "投标中标权限测试项目", 99L);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, allowedId, TENANT_ID, "BID-WON-PERMISSION-" + allowedId);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, crossTenantId, 9001L, "BID-WON-CROSS-TENANT-" + crossTenantId);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'WON', 0)
+                """, invalidStateId, TENANT_ID, "BID-WON-INVALID-STATE-" + invalidStateId);
+        try {
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/won").param("projectId", "10001"))
+                    .andExpect(status().isUnauthorized());
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/won")
+                            .cookie(userCookie(TENANT_ID, List.of("bid:query")))
+                            .param("projectId", "10001"))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/won")
+                            .cookie(userCookie(TENANT_ID, List.of("bid:edit")))
+                            .param("projectId", "10001"))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/won")
+                            .cookie(userCookie(TENANT_ID, List.of("bid:status")))
+                            .param("projectId", "10001"))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+            assertEquals("BIDDING", jdbcTemplate.queryForObject(
+                    "SELECT bid_status FROM bid_cost WHERE id = ?", String.class, allowedId));
+
+            Cookie statusCookie = userCookie(TENANT_ID, List.of("bid:status"));
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/won")
+                            .cookie(statusCookie)
+                            .param("projectId", String.valueOf(ownedProjectId)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"));
+            assertEquals("WON", jdbcTemplate.queryForObject(
+                    "SELECT bid_status FROM bid_cost WHERE id = ?", String.class, allowedId));
+
+            mockMvc.perform(putWith("/bid-cost/999999999999/won")
+                            .cookie(statusCookie)
+                            .param("projectId", String.valueOf(ownedProjectId)))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_COST_NOT_FOUND"));
+            mockMvc.perform(putWith("/bid-cost/" + crossTenantId + "/won")
+                            .cookie(statusCookie)
+                            .param("projectId", String.valueOf(ownedProjectId)))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_COST_NOT_FOUND"));
+            mockMvc.perform(putWith("/bid-cost/" + invalidStateId + "/won")
+                            .cookie(statusCookie)
+                            .param("projectId", String.valueOf(ownedProjectId)))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_STATUS_INVALID"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM bid_cost WHERE id IN (?, ?, ?)", allowedId, crossTenantId, invalidStateId);
+            jdbcTemplate.update("DELETE FROM cost_summary WHERE project_id = ?", ownedProjectId);
+            jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", ownedProjectId);
+        }
+    }
+
+    @Test @Order(6) @DisplayName("PUT /bid-cost/{id}/lost enforces status permission, tenant and state")
+    void testMarkAsLost_PermissionAndBoundaryContract() throws Exception {
+        long base = 970000000000L + Math.abs(System.nanoTime() % 10000000L) * 10;
+        long allowedId = base + 1;
+        long adminId = base + 2;
+        long crossTenantId = base + 3;
+        long invalidStateId = base + 4;
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, allowedId, TENANT_ID, "BID-LOST-PERMISSION-" + allowedId);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, adminId, TENANT_ID, "BID-LOST-ADMIN-" + adminId);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'BIDDING', 0)
+                """, crossTenantId, 9001L, "BID-LOST-CROSS-TENANT-" + crossTenantId);
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, 'WON', 0)
+                """, invalidStateId, TENANT_ID, "BID-LOST-INVALID-STATE-" + invalidStateId);
+        try {
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost"))
+                    .andExpect(status().isUnauthorized());
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost")
+                            .cookie(userCookie(TENANT_ID, List.of("bid:query"))))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost")
+                            .cookie(userCookie(TENANT_ID, List.of("bid:edit"))))
+                    .andExpect(status().isForbidden());
+
+            Cookie statusCookie = userCookie(TENANT_ID, List.of("bid:status"));
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost").cookie(statusCookie))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"));
+            assertEquals("LOST", jdbcTemplate.queryForObject(
+                    "SELECT bid_status FROM bid_cost WHERE id = ?", String.class, allowedId));
+            mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost").cookie(statusCookie))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_STATUS_INVALID"));
+
+            mockMvc.perform(putWith("/bid-cost/" + adminId + "/lost").cookie(adminCookie()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"));
+            mockMvc.perform(putWith("/bid-cost/999999999999/lost").cookie(statusCookie))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_COST_NOT_FOUND"));
+            mockMvc.perform(putWith("/bid-cost/" + crossTenantId + "/lost").cookie(statusCookie))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_COST_NOT_FOUND"));
+            mockMvc.perform(putWith("/bid-cost/" + invalidStateId + "/lost").cookie(statusCookie))
+                    .andExpect(status().is4xxClientError())
+                    .andExpect(jsonPath("$.code").value("BID_STATUS_INVALID"));
+        } finally {
+            jdbcTemplate.update("DELETE FROM bid_cost WHERE id IN (?, ?, ?, ?)",
+                    allowedId, adminId, crossTenantId, invalidStateId);
+        }
     }
 
     @Test @Order(6) @DisplayName("PUT /bid-cost/{id} validates controlled fields")

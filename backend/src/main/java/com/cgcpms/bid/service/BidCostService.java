@@ -11,6 +11,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.service.CostSummaryService;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class BidCostService {
     private final BidCostMapper mapper;
     private final CostItemMapper costItemMapper;
     private final PmProjectMapper projectMapper;
+    private final ProjectAccessChecker projectAccessChecker;
     private final CostSummaryService costSummaryService;
 
     public IPage<BidCost> getPage(long pageNo, long pageSize, String bidStatus, String keyword) {
@@ -92,6 +94,7 @@ public class BidCostService {
         // 项目必须属于当前租户
         if (!Objects.equals(project.getTenantId(), UserContext.getCurrentTenantId()))
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        projectAccessChecker.checkAccess(project, "关联中标项目");
 
         bid.setProjectId(projectId);
         bid.setBidStatus("WON");

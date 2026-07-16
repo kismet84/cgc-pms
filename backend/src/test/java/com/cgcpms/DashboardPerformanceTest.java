@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Verifies that {@link DashboardService#getManagementView()} uses
  * {@link com.cgcpms.cost.service.CostSummaryService#getBatchProjectSummaries(Long, List)}
  * instead of looping per-project {@code getProjectSummary()} calls,
- * reducing SQL queries from ~42 (N+1) to ≤10 for 5 active projects.
+ * reducing SQL queries from ~42 (N+1) to ≤20 for 5 active projects.
  */
 @SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
 @ActiveProfiles("local")
@@ -118,7 +118,7 @@ class DashboardPerformanceTest {
 
     @Test
     @Transactional
-    @DisplayName("T6: 5 projects → SQL count ≤ 10 (down from ~42 with N+1)")
+    @DisplayName("T6: 5 projects → SQL count ≤ 20 (down from ~42 with N+1)")
     void testDashboardBatchQueryOptimization() {
         // ── 1. Create 5 test projects with cost_summary rows ──
         List<Long> testProjectIds = new ArrayList<>();
@@ -156,7 +156,7 @@ class DashboardPerformanceTest {
         // ── 3. Invoke the method under test ──
         ManagementDashboardVO result = dashboardService.getManagementView();
 
-        // ── 4. Verify SQL count: batch approach should issue ≤10 queries ──
+        // ── 4. Verify SQL count: batch approach should issue ≤20 queries ──
         int count = sqlCount.get();
         assertTrue(count <= 20,
                 String.format("SQL query count should be ≤20 (batch optimization) but was %d. "
@@ -183,7 +183,7 @@ class DashboardPerformanceTest {
         assertNotNull(result.getTotalExpectedProfit());
         assertNotNull(result.getTotalPaidAmount());
 
-        System.out.println("✅ T6 passed: SQL count = " + count + " (≤10) for 5 projects, "
+        System.out.println("✅ T6 passed: SQL count = " + count + " (≤20) for 5 projects, "
                 + result.getProjectRankings().size() + " project rankings returned");
     }
 

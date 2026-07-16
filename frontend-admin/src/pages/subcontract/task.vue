@@ -24,6 +24,7 @@ import {
 import { useReferenceStore } from '@/stores/reference'
 import type { SubTaskVO } from '@/types/subcontract'
 import type { SelectOption } from '@/types/ui'
+import { isRequestErrorNotified } from '@/api/request'
 import {
   readPositiveIntQuery,
   readStringQuery,
@@ -308,7 +309,9 @@ async function handleModalOk() {
     fetchData()
   } catch (e: unknown) {
     console.error(e)
-    message.error(e instanceof Error && e.message ? e.message : '操作失败，请稍后重试')
+    if (!isRequestErrorNotified(e)) {
+      message.error(e instanceof Error && e.message ? e.message : '操作失败，请稍后重试')
+    }
   }
 }
 

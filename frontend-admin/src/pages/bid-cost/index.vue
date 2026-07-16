@@ -8,10 +8,14 @@ import {
   deleteBidCost,
   getBidCost,
   getBidCosts,
+  markBidCostAsLost,
+  markBidCostAsWon,
   updateBidCost,
 } from '@/api/modules/bid'
+import { getProjectList } from '@/api/modules/project'
 import { useUserStore } from '@/stores/user'
 import type { BidCostQuery, BidCostVO, BidStatus } from '@/types/bid'
+import type { ProjectVO } from '@/types/project'
 import { useMobileViewport } from '@/composables/useMobileViewport'
 
 const userStore = useUserStore()
@@ -25,6 +29,12 @@ const editingId = ref('')
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detail = ref<BidCostVO | null>(null)
+const wonOpen = ref(false)
+const wonLoading = ref(false)
+const projectLoading = ref(false)
+const winningBid = ref<BidCostVO | null>(null)
+const selectedProjectId = ref<string>()
+const projectOptions = ref<ProjectVO[]>([])
 let detailRequestId = 0
 const rows = ref<BidCostVO[]>([])
 const total = ref(0)
@@ -45,6 +55,14 @@ const canDelete = computed(
   () =>
     userStore.hasPermission('bid:delete') ||
     userStore.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'),
+)
+const canChangeStatus = computed(
+  () =>
+    userStore.hasPermission('bid:status') ||
+    userStore.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'),
+)
+const selectedWonProject = computed(() =>
+  projectOptions.value.find((project) => project.id === selectedProjectId.value),
 )
 
 const statusMeta: Record<BidStatus, { label: string; color: string }> = {
@@ -67,7 +85,7 @@ const columns = [
   { title: '投标状态', dataIndex: 'bidStatus', key: 'bidStatus', width: 120 },
   { title: '关联项目ID', dataIndex: 'projectId', key: 'projectId', width: 180 },
   { title: '创建时间', dataIndex: 'createdAt', key: 'createdAt', width: 180 },
-  { title: '操作', key: 'action', width: 80, fixed: 'right' as const },
+  { title: '操作', key: 'action', width: 260, fixed: 'right' as const },
 ]
 
 function errorMessage(error: unknown, fallback: string) {
@@ -175,6 +193,66 @@ function confirmDelete(row: BidCostVO) {
       }
     },
   })
+}
+
+function confirmMarkLost(row: BidCostVO) {
+  Modal.confirm({
+    title: '标记未中标',
+    content: `确认将“${row.bidProjectName}”标记为未中标吗？该投标的 BID_COST 费用将被核销。`,
+    okText: '确认未中标',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      try {
+        await markBidCostAsLost(row.id)
+        message.success('投标项目已标记为未中标')
+        await fetchRows()
+      } catch (error: unknown) {
+        message.error(errorMessage(error, '标记未中标失败'))
+        throw error
+      }
+    },
+  })
+}
+
+async function openMarkWon(row: BidCostVO) {
+  winningBid.value = row
+  selectedProjectId.value = undefined
+  projectOptions.value = []
+  wonOpen.value = true
+  projectLoading.value = true
+  try {
+    const result = await getProjectList({ pageNo: 1, pageSize: 100 })
+    projectOptions.value = (result.records ?? []).filter((project) => project.status !== 'ARCHIVED')
+  } catch (error: unknown) {
+    message.error(errorMessage(error, '加载关联项目失败'))
+  } finally {
+    projectLoading.value = false
+  }
+}
+
+async function submitMarkWon() {
+  if (!winningBid.value || !selectedProjectId.value || !selectedWonProject.value) {
+    message.warning('请选择关联项目')
+    return
+  }
+  wonLoading.value = true
+  try {
+    await markBidCostAsWon(winningBid.value.id, selectedProjectId.value)
+    message.success('投标项目已标记为中标')
+    wonOpen.value = false
+    await fetchRows()
+  } catch (error: unknown) {
+    message.error(errorMessage(error, '标记中标失败'))
+  } finally {
+    wonLoading.value = false
+  }
+}
+
+function clearMarkWon() {
+  winningBid.value = null
+  selectedProjectId.value = undefined
+  projectOptions.value = []
 }
 
 async function openDetail(row: BidCostVO) {
@@ -344,6 +422,23 @@ onMounted(fetchRows)
                   编辑
                 </a-button>
                 <a-button
+                  v-if="canChangeStatus && row.bidStatus === 'BIDDING'"
+                  type="link"
+                  data-testid="mobile-mark-won-button"
+                  @click="openMarkWon(row)"
+                >
+                  标记中标
+                </a-button>
+                <a-button
+                  v-if="canChangeStatus && row.bidStatus === 'BIDDING'"
+                  type="link"
+                  danger
+                  data-testid="mobile-mark-lost-button"
+                  @click="confirmMarkLost(row)"
+                >
+                  标记未中标
+                </a-button>
+                <a-button
                   v-if="canDelete && row.bidStatus === 'BIDDING'"
                   type="link"
                   danger
@@ -384,6 +479,23 @@ onMounted(fetchRows)
                     @click="openEdit(record)"
                   >
                     编辑
+                  </a-button>
+                  <a-button
+                    v-if="canChangeStatus && record.bidStatus === 'BIDDING'"
+                    type="link"
+                    data-testid="mark-won-button"
+                    @click="openMarkWon(record)"
+                  >
+                    标记中标
+                  </a-button>
+                  <a-button
+                    v-if="canChangeStatus && record.bidStatus === 'BIDDING'"
+                    type="link"
+                    danger
+                    data-testid="mark-lost-button"
+                    @click="confirmMarkLost(record)"
+                  >
+                    标记未中标
                   </a-button>
                   <a-button
                     v-if="canDelete && record.bidStatus === 'BIDDING'"
@@ -478,6 +590,50 @@ onMounted(fetchRows)
             data-testid="create-remark-input"
           />
         </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="wonOpen"
+      title="标记投标项目中标"
+      :confirm-loading="wonLoading"
+      ok-text="确认中标"
+      cancel-text="取消"
+      data-testid="mark-won-modal"
+      @ok="submitMarkWon"
+      @after-close="clearMarkWon"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="关联项目" required>
+          <a-select
+            v-model:value="selectedProjectId"
+            show-search
+            :loading="projectLoading"
+            :filter-option="
+              (input: string, option: { label?: string }) =>
+                String(option.label || '')
+                  .toLowerCase()
+                  .includes(input.toLowerCase())
+            "
+            placeholder="请选择中标后关联的项目"
+            data-testid="won-project-select"
+          >
+            <a-select-option
+              v-for="project in projectOptions"
+              :key="project.id"
+              :value="project.id"
+              :label="project.projectName"
+            >
+              {{ project.projectName }}（{{ project.projectCode }}）
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-alert
+          v-if="winningBid && selectedWonProject"
+          type="warning"
+          show-icon
+          :message="`确认将“${winningBid.bidProjectName}”标记为中标并关联到“${selectedWonProject.projectName}”吗？`"
+        />
       </a-form>
     </a-modal>
 

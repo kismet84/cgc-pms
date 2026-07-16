@@ -13,5 +13,6 @@ export interface PartnerVO {
   blacklistFlag: boolean
   riskLevel: string
   status: string
+  defaultLeadDays?: number | null
   createdAt: string
 }

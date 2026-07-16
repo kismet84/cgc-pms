@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.overhead.entity.OverheadAllocationRule;
 import com.cgcpms.overhead.entity.OverheadAllocationRun;
@@ -48,6 +50,7 @@ public class OverheadAllocationService {
     private final OverheadAllocationRuleMapper ruleMapper;
     private final OverheadAllocationRunMapper runMapper;
     private final CostItemMapper costItemMapper;
+    private final CostSubjectMapper costSubjectMapper;
     private final PmProjectMapper projectMapper;
     private final CostSummaryService costSummaryService;
     private final PlatformTransactionManager transactionManager;
@@ -71,6 +74,46 @@ public class OverheadAllocationService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public Long createValidated(Long costSubjectId, String allocationBasis, String allocationCycle) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        requireValidOverheadSubject(costSubjectId, tenantId);
+        OverheadAllocationRule rule = new OverheadAllocationRule();
+        rule.setCostSubjectId(costSubjectId);
+        rule.setAllocationBasis(allocationBasis);
+        rule.setAllocationCycle(allocationCycle);
+        return create(rule);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void updateValidated(Long id, Long costSubjectId, String allocationBasis, String allocationCycle) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        OverheadAllocationRule existing = ruleMapper.selectById(id);
+        if (existing == null || !tenantId.equals(existing.getTenantId())) {
+            throw new BusinessException("RULE_NOT_FOUND", "分摊规则不存在");
+        }
+        requireValidOverheadSubject(costSubjectId, tenantId);
+        OverheadAllocationRule update = new OverheadAllocationRule();
+        update.setId(existing.getId());
+        update.setTenantId(existing.getTenantId());
+        update.setCostSubjectId(costSubjectId);
+        update.setAllocationBasis(allocationBasis);
+        update.setAllocationCycle(allocationCycle);
+        update.setStatus(existing.getStatus());
+        ruleMapper.updateById(update);
+    }
+
+    private CostSubject requireValidOverheadSubject(Long costSubjectId, Long tenantId) {
+        CostSubject subject = costSubjectMapper.selectById(costSubjectId);
+        if (subject == null || !tenantId.equals(subject.getTenantId())
+                || !"ENABLE".equals(subject.getStatus())
+                || !"OVERHEAD".equals(subject.getSubjectType())
+                || !"COST".equals(subject.getAccountCategory())) {
+            throw new BusinessException("OVERHEAD_SUBJECT_INVALID", "间接费科目不存在或不可用");
+        }
+        return subject;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
     public void update(OverheadAllocationRule rule) {
         Long tenantId = UserContext.getCurrentTenantId();
         OverheadAllocationRule existing = ruleMapper.selectById(rule.getId());
@@ -83,9 +126,16 @@ public class OverheadAllocationService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        Long tenantId = UserContext.getCurrentTenantId();
         OverheadAllocationRule existing = ruleMapper.selectById(id);
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+        if (existing == null || !existing.getTenantId().equals(tenantId)) {
             throw new BusinessException("RULE_NOT_FOUND", "分摊规则不存在");
+        }
+        long runCount = runMapper.selectCount(new LambdaQueryWrapper<OverheadAllocationRun>()
+                .eq(OverheadAllocationRun::getTenantId, tenantId)
+                .eq(OverheadAllocationRun::getRuleId, id));
+        if (runCount > 0) {
+            throw new BusinessException("RULE_ALREADY_EXECUTED", "规则已有执行事实，不允许删除");
         }
         ruleMapper.deleteById(id);
     }

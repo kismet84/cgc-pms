@@ -12,9 +12,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -28,7 +31,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * </ul>
  * ALL tests expect HTTP error (400/500) on current code — this is the RED phase.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "jwt.secret=mat-stock-controller-test-secret-key-at-least-sixty-four-characters-long"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("MatStockController — JSON body binding and ledger validation")
@@ -266,6 +272,42 @@ class MatStockControllerTest {
                             .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":null,\"replenishmentLeadDays\":" + value + "}"))
                     .andExpect(status().isBadRequest());
         }
+    }
+
+    @Test
+    @Order(11)
+    @Transactional
+    @DisplayName("仅库存读取权限不能维护补货设置且不会修改持久化字段")
+    void testStockListOnlyCannotUpdateReplenishmentSettings() throws Exception {
+        long warehouseId = 940L;
+        long stockId = 94001L;
+        jdbcTemplate.update("""
+                INSERT INTO mat_warehouse
+                    (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, 'ENABLE', 0)
+                """, warehouseId, TENANT_ID, 10001L, "WH-REPLENISHMENT-AUTH", "补货权限隔离测试仓");
+        jdbcTemplate.update("""
+                INSERT INTO mat_stock
+                    (id, tenant_id, warehouse_id, material_id, available_qty, safety_stock_qty,
+                     replenishment_target_qty, replenishment_lead_days, version, deleted_flag)
+                VALUES (?, ?, ?, ?, 80.0000, 10.0000, 25.0000, 7, 0, 0)
+                """, stockId, TENANT_ID, warehouseId, MATERIAL_ID);
+        Map<String, Object> before = jdbcTemplate.queryForMap("""
+                SELECT safety_stock_qty, replenishment_target_qty, replenishment_lead_days
+                FROM mat_stock WHERE id = ?
+                """, stockId);
+
+        mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
+                        .cookie(purchaseManagerCookie(List.of("inventory:stock:list")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"safetyStockQty\":\"1.0000\",\"replenishmentTargetQty\":\"2.0000\",\"replenishmentLeadDays\":99}"))
+                .andExpect(status().isForbidden());
+
+        Map<String, Object> after = jdbcTemplate.queryForMap("""
+                SELECT safety_stock_qty, replenishment_target_qty, replenishment_lead_days
+                FROM mat_stock WHERE id = ?
+                """, stockId);
+        assertEquals(before, after, "403 请求不得改变补货设置持久化字段");
     }
 
     // ---- helpers ----
