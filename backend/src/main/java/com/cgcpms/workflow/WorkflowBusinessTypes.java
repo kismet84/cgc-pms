@@ -29,4 +29,6 @@ public final class WorkflowBusinessTypes {
     public static final String EXPENSE = "EXPENSE";
     /** 项目收入闭环：业主结算审批 */
     public static final String OWNER_SETTLEMENT = "OWNER_SETTLEMENT";
+    /** 产值计量闭环：内部产值审批 */
+    public static final String PRODUCTION_MEASUREMENT = "PRODUCTION_MEASUREMENT";
 }

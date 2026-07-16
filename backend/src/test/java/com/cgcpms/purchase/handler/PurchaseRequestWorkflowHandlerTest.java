@@ -4,6 +4,9 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
 import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
+import com.cgcpms.purchase.entity.MatPurchaseOrder;
+import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
@@ -40,6 +43,9 @@ class PurchaseRequestWorkflowHandlerTest {
     private MatPurchaseOrderMapper orderMapper;
 
     @Autowired
+    private MatPurchaseOrderItemMapper orderItemMapper;
+
+    @Autowired
     private MatPurchaseRequestItemMapper requestItemMapper;
 
     @BeforeEach
@@ -71,7 +77,7 @@ class PurchaseRequestWorkflowHandlerTest {
 
     @Test
     @Transactional
-    @DisplayName("onApproved -> DRAFT→APPROVED, auto-converts to PurchaseOrder")
+    @DisplayName("onApproved -> 批准需求并转换为待补充商业条件的草稿采购订单")
     void testOnApproved_Success() {
         MatPurchaseRequest req = new MatPurchaseRequest();
         req.setProjectId(10001L);
@@ -102,8 +108,17 @@ class PurchaseRequestWorkflowHandlerTest {
         assertNotNull(updated, "采购申请应仍然存在");
         assertEquals("APPROVED", updated.getApprovalStatus(), "审批状态应变为 APPROVED");
         assertEquals("CONVERTED", updated.getStatus(), "业务状态应变为 CONVERTED");
-        assertEquals(1L, orderMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.cgcpms.purchase.entity.MatPurchaseOrder>()
-                .eq(com.cgcpms.purchase.entity.MatPurchaseOrder::getRequestId, req.getId())));
+        MatPurchaseOrder order = orderMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrder>()
+                        .eq(MatPurchaseOrder::getRequestId, req.getId()));
+        assertNotNull(order);
+        assertEquals("DRAFT", order.getApprovalStatus(), "采购申请审批不得替代订单审批");
+        assertEquals("DRAFT", order.getOrderStatus());
+        MatPurchaseOrderItem convertedItem = orderItemMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrderItem>()
+                        .eq(MatPurchaseOrderItem::getOrderId, order.getId()));
+        assertNotNull(convertedItem);
+        assertEquals(item.getId(), convertedItem.getRequestItemId());
     }
 
     @Test

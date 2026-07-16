@@ -25,11 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * 库存台账服务 — 数量型库存管理，@Version 乐观锁并发控制。
+ * 库存台账服务 — 数量与移动加权平均价值管理，@Version 乐观锁并发控制。
  * <p>
  * 核心规则：
  * <ul>
@@ -71,8 +72,37 @@ public class MatStockService {
     @Transactional(rollbackFor = Exception.class)
     public MatStock stockIn(Long warehouseId, Long materialId, BigDecimal quantity,
                             String sourceType, Long sourceId) {
+        return stockIn(warehouseId, materialId, quantity, sourceType, sourceId, null);
+    }
+
+    /**
+     * 入库（带来源单据和来源明细）。来源明细存在时，相同业务事件重复调用不会重复增加库存。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public MatStock stockIn(Long warehouseId, Long materialId, BigDecimal quantity,
+                            String sourceType, Long sourceId, Long sourceLineId) {
+        return stockInValued(warehouseId, materialId, quantity, BigDecimal.ZERO,
+                sourceType, sourceId, sourceLineId);
+    }
+
+    /** 入库并按移动加权平均法更新库存价值。 */
+    @Transactional(rollbackFor = Exception.class)
+    public MatStock stockInValued(Long warehouseId, Long materialId, BigDecimal quantity,
+                                  BigDecimal unitCost, String sourceType, Long sourceId,
+                                  Long sourceLineId) {
         validatePositiveQuantity(quantity);
+        if (unitCost == null || unitCost.signum() < 0) {
+            throw new BusinessException("STOCK_UNIT_COST_INVALID", "入库单位成本不能为负或为空");
+        }
         Long tenantId = UserContext.getCurrentTenantId();
+
+        if (findProcessedSourceLine(tenantId, "IN", sourceType, sourceId, sourceLineId) != null) {
+            MatStock existing = findStock(tenantId, warehouseId, materialId);
+            if (existing == null) {
+                throw new BusinessException("STOCK_IDEMPOTENCY_INCONSISTENT", "入库流水已存在但库存余额不存在");
+            }
+            return existing;
+        }
 
         MatStock stock = findStock(tenantId, warehouseId, materialId);
         if (stock == null) {
@@ -84,6 +114,10 @@ public class MatStockService {
                 stock.setWarehouseId(warehouseId);
                 stock.setMaterialId(materialId);
                 stock.setAvailableQty(quantity);
+                BigDecimal movementValue = quantity.multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
+                stock.setInventoryValue(movementValue);
+                stock.setAverageUnitCost(quantity.signum() == 0 ? BigDecimal.ZERO
+                        : movementValue.divide(quantity, 6, RoundingMode.HALF_UP));
                 stock.setSafetyStockQty(DEFAULT_SAFETY_STOCK_QTY);
                 stock.setVersion(0);
                 matStockMapper.insert(stock);
@@ -94,16 +128,17 @@ public class MatStockService {
                     throw new BusinessException("STOCK_CONCURRENT_CONFLICT",
                             "库存并发冲突，请稍后重试");
                 }
-                stock = doUpdateIncrement(tenantId, warehouseId, materialId, quantity, stock);
+                stock = doUpdateIncrement(tenantId, warehouseId, materialId, quantity, unitCost, stock);
             }
         } else {
             // 已有库存：乐观锁累加
-            stock = doUpdateIncrement(tenantId, warehouseId, materialId, quantity, stock);
+            stock = doUpdateIncrement(tenantId, warehouseId, materialId, quantity, unitCost, stock);
         }
 
         // 写入流水（带来源追溯）
+        BigDecimal movementValue = quantity.multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
         insertTxn(tenantId, warehouseId, materialId, "IN", quantity,
-                stock.getAvailableQty(), sourceType, sourceId);
+                stock.getAvailableQty(), unitCost, movementValue, sourceType, sourceId, sourceLineId);
 
         return stock;
     }
@@ -123,7 +158,7 @@ public class MatStockService {
      * @return 更新后的最新库存实体
      */
     private MatStock doUpdateIncrement(Long tenantId, Long warehouseId, Long materialId,
-                                       BigDecimal quantity, MatStock stock) {
+                                       BigDecimal quantity, BigDecimal unitCost, MatStock stock) {
         int retries = 0;
         while (true) {
             // 基于当前最新 stock 快照累加 availableQty
@@ -132,7 +167,13 @@ public class MatStockService {
                 throw new BusinessException("INSUFFICIENT_STOCK",
                         "库存不足：可用 " + stock.getAvailableQty() + "，请求变更 " + quantity);
             }
+            BigDecimal currentValue = nvl(stock.getInventoryValue());
+            BigDecimal movementValue = quantity.multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal nextValue = currentValue.add(movementValue);
             stock.setAvailableQty(nextAvailableQty);
+            stock.setInventoryValue(nextValue);
+            stock.setAverageUnitCost(nextAvailableQty.signum() == 0 ? BigDecimal.ZERO
+                    : nextValue.divide(nextAvailableQty, 6, RoundingMode.HALF_UP));
             // @Version 乐观锁：若版本冲突则 updateById 返回 0
             int updated = matStockMapper.updateById(stock);
             if (updated > 0) return stock;
@@ -167,8 +208,33 @@ public class MatStockService {
     @Transactional(rollbackFor = Exception.class)
     public MatStock stockOut(Long warehouseId, Long materialId, BigDecimal quantity,
                              String sourceType, Long sourceId) {
+        return stockOut(warehouseId, materialId, quantity, sourceType, sourceId, null);
+    }
+
+    /**
+     * 出库（带来源单据和来源明细）。来源明细存在时，相同业务事件重复调用不会重复扣减库存。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public MatStock stockOut(Long warehouseId, Long materialId, BigDecimal quantity,
+                             String sourceType, Long sourceId, Long sourceLineId) {
+        return stockOutValued(warehouseId, materialId, quantity, sourceType, sourceId, sourceLineId).stock();
+    }
+
+    /** 出库并返回按移动加权平均法计算的本次出库价值。 */
+    @Transactional(rollbackFor = Exception.class)
+    public StockMovementResult stockOutValued(Long warehouseId, Long materialId, BigDecimal quantity,
+                                               String sourceType, Long sourceId, Long sourceLineId) {
         validatePositiveQuantity(quantity);
         Long tenantId = UserContext.getCurrentTenantId();
+
+        MatStockTxn processed = findProcessedSourceLine(tenantId, "OUT", sourceType, sourceId, sourceLineId);
+        if (processed != null) {
+            MatStock existing = findStock(tenantId, warehouseId, materialId);
+            if (existing == null) {
+                throw new BusinessException("STOCK_IDEMPOTENCY_INCONSISTENT", "出库流水已存在但库存余额不存在");
+            }
+            return new StockMovementResult(existing, nvl(processed.getUnitCost()), nvl(processed.getAmount()));
+        }
 
         MatStock stock = findStock(tenantId, warehouseId, materialId);
         if (stock == null) {
@@ -177,13 +243,28 @@ public class MatStockService {
         }
 
         int retries = 0;
+        BigDecimal issuedUnitCost;
+        BigDecimal issuedAmount;
         while (true) {
             if (stock.getAvailableQty().compareTo(quantity) < 0) {
                 throw new BusinessException("INSUFFICIENT_STOCK",
                         "库存不足：可用 " + stock.getAvailableQty()
                                 + "，请求出库 " + quantity);
             }
-            stock.setAvailableQty(stock.getAvailableQty().subtract(quantity));
+            issuedUnitCost = nvl(stock.getAverageUnitCost());
+            issuedAmount = quantity.multiply(issuedUnitCost).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal nextQuantity = stock.getAvailableQty().subtract(quantity);
+            BigDecimal nextValue = nvl(stock.getInventoryValue()).subtract(issuedAmount);
+            if (nextQuantity.signum() == 0) {
+                nextValue = BigDecimal.ZERO;
+            }
+            if (nextValue.signum() < 0 && nextValue.abs().compareTo(new BigDecimal("0.01")) <= 0) {
+                nextValue = BigDecimal.ZERO;
+            }
+            stock.setAvailableQty(nextQuantity);
+            stock.setInventoryValue(nextValue);
+            stock.setAverageUnitCost(nextQuantity.signum() == 0 ? BigDecimal.ZERO
+                    : nextValue.divide(nextQuantity, 6, RoundingMode.HALF_UP));
             int updated = matStockMapper.updateById(stock);
             if (updated > 0) break;
             if (++retries >= MAX_RETRIES) {
@@ -200,9 +281,10 @@ public class MatStockService {
 
         // 写入流水（带来源追溯）
         insertTxn(tenantId, warehouseId, materialId, "OUT", quantity,
-                stock.getAvailableQty(), sourceType, sourceId);
+                stock.getAvailableQty(), issuedUnitCost, issuedAmount,
+                sourceType, sourceId, sourceLineId);
 
-        return stock;
+        return new StockMovementResult(stock, issuedUnitCost, issuedAmount);
     }
 
     private void validatePositiveQuantity(BigDecimal quantity) {
@@ -422,8 +504,8 @@ public class MatStockService {
      */
     private void insertTxn(Long tenantId, Long warehouseId, Long materialId,
                            String txnType, BigDecimal quantity,
-                           BigDecimal availableAfter,
-                           String sourceType, Long sourceId) {
+                           BigDecimal availableAfter, BigDecimal unitCost, BigDecimal amount,
+                           String sourceType, Long sourceId, Long sourceLineId) {
         MatStockTxn txn = new MatStockTxn();
         txn.setTenantId(tenantId);
         txn.setWarehouseId(warehouseId);
@@ -431,9 +513,25 @@ public class MatStockService {
         txn.setTxnType(txnType);
         txn.setQuantity(quantity);
         txn.setAvailableAfter(availableAfter);
+        txn.setUnitCost(unitCost);
+        txn.setAmount(amount);
         txn.setSourceType(sourceType);
         txn.setSourceId(sourceId);
+        txn.setSourceLineId(sourceLineId);
         matStockTxnMapper.insert(txn);
+    }
+
+    private MatStockTxn findProcessedSourceLine(Long tenantId, String txnType,
+                                                String sourceType, Long sourceId, Long sourceLineId) {
+        if (!StringUtils.hasText(sourceType) || sourceId == null || sourceLineId == null) {
+            return null;
+        }
+        return matStockTxnMapper.selectOne(new LambdaQueryWrapper<MatStockTxn>()
+                .eq(MatStockTxn::getTenantId, tenantId)
+                .eq(MatStockTxn::getTxnType, txnType)
+                .eq(MatStockTxn::getSourceType, sourceType)
+                .eq(MatStockTxn::getSourceId, sourceId)
+                .eq(MatStockTxn::getSourceLineId, sourceLineId));
     }
 
     /**
@@ -495,6 +593,8 @@ public class MatStockService {
         vo.setWarehouseId(entity.getWarehouseId());
         vo.setMaterialId(entity.getMaterialId());
         vo.setAvailableQty(entity.getAvailableQty());
+        vo.setInventoryValue(entity.getInventoryValue());
+        vo.setAverageUnitCost(entity.getAverageUnitCost());
         vo.setSafetyStockQty(entity.getSafetyStockQty());
         vo.setReplenishmentTargetQty(entity.getReplenishmentTargetQty());
         vo.setReplenishmentLeadDays(entity.getReplenishmentLeadDays());
@@ -550,8 +650,11 @@ public class MatStockService {
         vo.setTxnType(entity.getTxnType());
         vo.setQuantity(entity.getQuantity());
         vo.setAvailableAfter(entity.getAvailableAfter());
+        vo.setUnitCost(entity.getUnitCost());
+        vo.setAmount(entity.getAmount());
         vo.setSourceType(entity.getSourceType());
         vo.setSourceId(entity.getSourceId());
+        vo.setSourceLineId(entity.getSourceLineId());
         vo.setCreatedTime(entity.getCreatedTime() != null ? entity.getCreatedTime().toString() : null);
 
         vo.setWarehouseName(warehouseNameMap.get(entity.getWarehouseId()));
@@ -561,4 +664,10 @@ public class MatStockService {
         }
         return vo;
     }
+
+    private BigDecimal nvl(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    public record StockMovementResult(MatStock stock, BigDecimal unitCost, BigDecimal amount) {}
 }

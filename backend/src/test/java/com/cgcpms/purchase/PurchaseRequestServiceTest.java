@@ -624,8 +624,17 @@ class PurchaseRequestServiceTest {
                 .eq(MatPurchaseOrder::getTenantId, TENANT_ID));
         assertNotNull(order, "转换后应生成采购订单");
         assertEquals(PROJECT_ID, order.getProjectId());
-        assertEquals(1L, orderItemMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.cgcpms.purchase.entity.MatPurchaseOrderItem>()
-                .eq(com.cgcpms.purchase.entity.MatPurchaseOrderItem::getOrderId, order.getId())));
+        assertEquals("DRAFT", order.getApprovalStatus(), "需求审批不得替代采购订单审批");
+        assertEquals("DRAFT", order.getOrderStatus(), "转单后应等待采购人员补齐商业条件");
+        assertEquals(0, BigDecimal.ZERO.compareTo(order.getTotalAmount()), "未定价订单初始金额应为 0");
+
+        List<com.cgcpms.purchase.entity.MatPurchaseOrderItem> convertedItems = orderItemMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.cgcpms.purchase.entity.MatPurchaseOrderItem>()
+                        .eq(com.cgcpms.purchase.entity.MatPurchaseOrderItem::getOrderId, order.getId()));
+        assertEquals(1, convertedItems.size());
+        assertEquals(item.getId(), convertedItems.get(0).getRequestItemId(), "订单明细必须保留采购申请明细来源");
+        assertEquals(0, BigDecimal.ZERO.compareTo(convertedItems.get(0).getUnitPrice()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(convertedItems.get(0).getAmount()));
     }
 
     // ═══════════════════════════════════════════════════════════

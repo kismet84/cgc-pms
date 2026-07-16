@@ -26,6 +26,9 @@ public class MatPurchaseOrderItem extends BaseEntity {
     @NotNull
     private Long orderId;
 
+    /** 来源采购申请明细；手工创建订单时允许为空。 */
+    private Long requestItemId;
+
     private Long projectId;
 
     private Long materialId;

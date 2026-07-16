@@ -241,13 +241,24 @@ public class RevenueOperationsService {
         List<Map<String,Object>> receivables = receivableIds.isEmpty() ? List.of() : jdbc.queryForList("SELECT * FROM account_receivable WHERE tenant_id=? AND id IN(" + placeholders(receivableIds.size()) + ")", args(tenant(), receivableIds));
         List<Map<String,Object>> settlements = settlementIds.isEmpty() ? List.of() : jdbc.queryForList("SELECT * FROM owner_settlement WHERE tenant_id=? AND id IN(" + placeholders(settlementIds.size()) + ")", args(tenant(), settlementIds));
         Set<Long> revenueIds = new LinkedHashSet<>();
+        Set<Long> measurementIds = new LinkedHashSet<>();
+        Set<Long> ownerSubmissionIds = new LinkedHashSet<>();
         Set<Long> approvalInstanceIds = new LinkedHashSet<>();
         for (Map<String,Object> row : settlements) {
             if (longValue(row.get("revenue_id")) != null) revenueIds.add(longValue(row.get("revenue_id")));
+            if (longValue(row.get("production_measurement_id")) != null) measurementIds.add(longValue(row.get("production_measurement_id")));
+            if (longValue(row.get("owner_submission_id")) != null) ownerSubmissionIds.add(longValue(row.get("owner_submission_id")));
             if (longValue(row.get("approval_instance_id")) != null) approvalInstanceIds.add(longValue(row.get("approval_instance_id")));
         }
         List<Map<String,Object>> revenues = revenueIds.isEmpty() ? List.of() : jdbc.queryForList("SELECT * FROM contract_revenue WHERE tenant_id=? AND id IN(" + placeholders(revenueIds.size()) + ")", args(tenant(), revenueIds));
+        List<Map<String,Object>> measurements = measurementIds.isEmpty() ? List.of() : jdbc.queryForList("SELECT * FROM production_measurement WHERE tenant_id=? AND id IN(" + placeholders(measurementIds.size()) + ")", args(tenant(), measurementIds));
+        List<Map<String,Object>> measurementLines = measurementIds.isEmpty() ? List.of() : jdbc.queryForList("SELECT * FROM production_measurement_line WHERE tenant_id=? AND measurement_id IN(" + placeholders(measurementIds.size()) + ") ORDER BY measurement_id,sort_order,id", args(tenant(), measurementIds));
+        List<Map<String,Object>> ownerSubmissions = ownerSubmissionIds.isEmpty() ? List.of() : jdbc.queryForList("SELECT * FROM owner_measurement_submission WHERE tenant_id=? AND id IN(" + placeholders(ownerSubmissionIds.size()) + ")", args(tenant(), ownerSubmissionIds));
+        List<Map<String,Object>> ownerReviewLines = ownerSubmissionIds.isEmpty() ? List.of() : jdbc.queryForList("SELECT * FROM owner_measurement_review_line WHERE tenant_id=? AND submission_id IN(" + placeholders(ownerSubmissionIds.size()) + ") ORDER BY submission_id,id", args(tenant(), ownerSubmissionIds));
         for (Map<String,Object> row : revenues) {
+            if (longValue(row.get("approval_instance_id")) != null) approvalInstanceIds.add(longValue(row.get("approval_instance_id")));
+        }
+        for (Map<String,Object> row : measurements) {
             if (longValue(row.get("approval_instance_id")) != null) approvalInstanceIds.add(longValue(row.get("approval_instance_id")));
         }
         List<Map<String,Object>> approvalInstances = approvalInstanceIds.isEmpty() ? List.of() : jdbc.queryForList("SELECT * FROM wf_instance WHERE tenant_id=? AND id IN(" + placeholders(approvalInstanceIds.size()) + ")", args(tenant(), approvalInstanceIds));
@@ -260,6 +271,8 @@ public class RevenueOperationsService {
         Map<String,Object> trace = new LinkedHashMap<>();
         trace.put("journal", journal); trace.put("collection", collection); trace.put("allocations", allocations);
         trace.put("receivables", receivables); trace.put("settlements", settlements); trace.put("revenues", revenues);
+        trace.put("productionMeasurements", measurements); trace.put("productionMeasurementLines", measurementLines);
+        trace.put("ownerMeasurementSubmissions", ownerSubmissions); trace.put("ownerMeasurementReviewLines", ownerReviewLines);
         trace.put("approvalInstances", approvalInstances); trace.put("approvalTasks", approvalTasks); trace.put("approvalRecords", approvalRecords);
         trace.put("salesInvoices", invoices);
         trace.put("accountingEntries", entries); trace.put("contract", contract); trace.put("project", project);

@@ -50,6 +50,11 @@ public class MatRequisition extends BaseEntity {
 
     private Integer stockOutFlag;
 
+    private Long stockOutBy;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime stockOutAt;
+
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

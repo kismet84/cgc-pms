@@ -124,6 +124,17 @@ describe('router lazy loading', () => {
     expect(router.resolve('/revenue').meta.permission).toBe('revenue:operations:query')
   })
 
+  it('registers the production measurement workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const route = rootRoute?.children?.find((c) => c.path === 'production-measurement')
+
+    expect(route?.name).toBe('ProductionMeasurement')
+    expect(route?.meta?.title).toBe('产值计量')
+    expect(route?.meta?.permission).toBe('measurement:query')
+    expect(typeof route?.component).toBe('function')
+    expect(router.resolve('/production-measurement').meta.permission).toBe('measurement:query')
+  })
+
   it('registers the site daily log route with query permission', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const dailyRoute = rootRoute?.children?.find((c) => c.path === 'site/daily-log')

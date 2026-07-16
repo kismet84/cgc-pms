@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -42,6 +43,9 @@ class MatPurchaseOrderControllerTest {
     @Autowired
     private JwtUtils jwtUtils;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
@@ -52,6 +56,29 @@ class MatPurchaseOrderControllerTest {
     private static final Pattern ORDER_CODE_PATTERN = Pattern.compile("\"orderCode\":\"([^\"]+)\"");
 
     private Long orderId;
+
+    @BeforeAll
+    void ensureWorkflowApprover() {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, ADMIN_ID);
+        if (count != null && count > 0) {
+            return;
+        }
+        jdbcTemplate.update("""
+                INSERT INTO sys_user
+                    (id, tenant_id, username, password, real_name, status, is_admin,
+                     created_by, updated_by, deleted_flag, deleted_token, remark)
+                VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, NULL, ?)
+                """, ADMIN_ID, TENANT_ID, "test_purchase_controller_approver", "{noop}test",
+                "采购订单接口测试审批人", ADMIN_ID, ADMIN_ID,
+                "MatPurchaseOrderControllerTest local approver");
+    }
+
+    @AfterAll
+    void removeWorkflowApprover() {
+        jdbcTemplate.update("DELETE FROM sys_user WHERE id = ? AND username = ?",
+                ADMIN_ID, "test_purchase_controller_approver");
+    }
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
@@ -124,10 +151,11 @@ class MatPurchaseOrderControllerTest {
                     "orderCode": "PO-TEST-%d",
                     "orderType": "PURCHASE",
                     "orderDate": "%s",
+                    "deliveryDate": "%s",
                     "totalAmount": 100000.00
                 }
                 """.formatted(PROJECT_ID, CONTRACT_ID, PARTNER_ID,
-                System.nanoTime(), LocalDate.now().toString());
+                System.nanoTime(), LocalDate.now().toString(), LocalDate.now().plusDays(7).toString());
 
         String response = mockMvc.perform(postWithApi("/purchase-orders")
                         .cookie(adminCookie())
@@ -376,10 +404,11 @@ class MatPurchaseOrderControllerTest {
                     "orderCode": "PO-TEST-%d",
                     "orderType": "PURCHASE",
                     "orderDate": "%s",
+                    "deliveryDate": "%s",
                     "totalAmount": 100000.00
                 }
                 """.formatted(PROJECT_ID, CONTRACT_ID, PARTNER_ID,
-                System.nanoTime(), LocalDate.now().toString());
+                System.nanoTime(), LocalDate.now().toString(), LocalDate.now().plusDays(7).toString());
 
         String response = mockMvc.perform(postWithApi("/purchase-orders")
                         .cookie(adminCookie())
@@ -393,6 +422,25 @@ class MatPurchaseOrderControllerTest {
         orderId = Long.parseLong(
                 response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
         Assertions.assertNotNull(orderId);
+
+        String itemBody = """
+                [
+                    {
+                        "orderId": %d,
+                        "materialId": 1,
+                        "unit": "吨",
+                        "quantity": 10.00,
+                        "unitPrice": 10000.00,
+                        "amount": 100000.00
+                    }
+                ]
+                """.formatted(orderId);
+        mockMvc.perform(postWithApi("/purchase-orders/" + orderId + "/items/batch")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(itemBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
     }
 
     @Test

@@ -17,6 +17,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -163,10 +164,7 @@ class MatPurchaseOrderServiceTest {
 
     @Test @Transactional @DisplayName("submitForApproval → DRAFT→APPROVING")
     void testSubmitForApproval() {
-        MatPurchaseOrder order = new MatPurchaseOrder();
-        order.setProjectId(PROJECT_ID);
-        order.setOrderType("PURCHASE");
-        Long id = service.create(order);
+        Long id = createSubmittableOrder();
 
         service.submitForApproval(id);
         MatPurchaseOrderVO vo = service.getById(id);
@@ -175,13 +173,47 @@ class MatPurchaseOrderServiceTest {
 
     @Test @Transactional @DisplayName("submitForApproval → duplicate throws")
     void testSubmitForApproval_Duplicate() {
-        MatPurchaseOrder order = new MatPurchaseOrder();
-        order.setProjectId(PROJECT_ID); order.setOrderType("PURCHASE");
-        Long id = service.create(order);
+        Long id = createSubmittableOrder();
         service.submitForApproval(id);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> service.submitForApproval(id));
         assertEquals("PURCHASE_ORDER_ALREADY_SUBMITTED", ex.getCode());
+    }
+
+    @Test @Transactional @DisplayName("submitForApproval → 缺合同、供应商或商业明细时拒绝")
+    void testSubmitForApproval_IncompleteCommercialTerms() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setOrderType("PURCHASE");
+        order.setOrderDate(LocalDate.now());
+        order.setDeliveryDate(LocalDate.now().plusDays(1));
+        Long id = service.create(order);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.submitForApproval(id));
+        assertEquals("PURCHASE_ORDER_CONTRACT_REQUIRED", ex.getCode());
+    }
+
+    @Test @Transactional @DisplayName("update → 驳回订单修改后恢复草稿并可重新提交")
+    void testUpdate_RejectedOrderReturnsToDraft() {
+        Long id = createSubmittableOrder();
+        MatPurchaseOrder db = orderMapper.selectById(id);
+        db.setApprovalStatus("REJECTED");
+        orderMapper.updateById(db);
+
+        MatPurchaseOrder update = new MatPurchaseOrder();
+        update.setId(id);
+        update.setProjectId(PROJECT_ID);
+        update.setContractId(30001L);
+        update.setPartnerId(20002L);
+        update.setOrderType("PURCHASE");
+        update.setOrderDate(LocalDate.now());
+        update.setDeliveryDate(LocalDate.now().plusDays(7));
+        update.setTotalAmount(new BigDecimal("35000.00"));
+        service.update(update);
+
+        assertEquals("DRAFT", orderMapper.selectById(id).getApprovalStatus());
+        service.submitForApproval(id);
+        assertEquals("APPROVING", orderMapper.selectById(id).getApprovalStatus());
     }
 
     @Test @Transactional @DisplayName("saveItemsBatch → bulks saves items")
@@ -215,5 +247,24 @@ class MatPurchaseOrderServiceTest {
         List<MatPurchaseOrderItemVO> items = service.getItems(id);
         assertNotNull(items);
         assertTrue(items.isEmpty());
+    }
+
+    private Long createSubmittableOrder() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(30001L);
+        order.setPartnerId(20002L);
+        order.setOrderType("PURCHASE");
+        order.setOrderDate(LocalDate.now());
+        order.setDeliveryDate(LocalDate.now().plusDays(7));
+        Long id = service.create(order);
+
+        MatPurchaseOrderItem item = new MatPurchaseOrderItem();
+        item.setMaterialId(1L);
+        item.setQuantity(new BigDecimal("10.00"));
+        item.setUnitPrice(new BigDecimal("3500.00"));
+        item.setAmount(new BigDecimal("35000.00"));
+        service.saveItemsBatch(id, List.of(item));
+        return id;
     }
 }

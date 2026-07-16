@@ -137,10 +137,12 @@ class MatReceiptServiceTest {
     }
 
     @Test
-    @DisplayName("R-2c: 保存收货明细同步采购已收数量，替换明细后不重复累计")
-    void testSaveItemsBatchSyncsPurchaseReceivedQuantity() {
+    @DisplayName("R-2c: 草稿验收明细不提前占用采购已验收数量")
+    void testSaveItemsBatchDoesNotConfirmPurchaseReceivedQuantity() {
         MatPurchaseOrder order = new MatPurchaseOrder();
         order.setProjectId(PROJECT_ID);
+        order.setContractId(30001L);
+        order.setPartnerId(20002L);
         order.setOrderType("PURCHASE");
         Long orderId = orderService.create(order);
 
@@ -171,7 +173,7 @@ class MatReceiptServiceTest {
         first.setUnitPrice(new BigDecimal("2.0000"));
         first.setAmount(new BigDecimal("8.0000"));
         receiptService.saveItemsBatch(receiptId, List.of(first));
-        assertEquals(0, new BigDecimal("4.0000")
+        assertEquals(0, BigDecimal.ZERO
                 .compareTo(orderItemMapper.selectById(orderItemId).getReceivedQuantity()));
 
         MatReceiptItem replacement = new MatReceiptItem();
@@ -182,7 +184,7 @@ class MatReceiptServiceTest {
         replacement.setUnitPrice(new BigDecimal("2.0000"));
         replacement.setAmount(new BigDecimal("4.0000"));
         receiptService.saveItemsBatch(receiptId, List.of(replacement));
-        assertEquals(0, new BigDecimal("2.0000")
+        assertEquals(0, BigDecimal.ZERO
                 .compareTo(orderItemMapper.selectById(orderItemId).getReceivedQuantity()));
 
         receiptService.saveItemsBatch(receiptId, List.of());
@@ -195,6 +197,8 @@ class MatReceiptServiceTest {
     void testSaveItemsBatchRejectsInvalidOrderItemAndQuantities() {
         MatPurchaseOrder firstOrder = new MatPurchaseOrder();
         firstOrder.setProjectId(PROJECT_ID);
+        firstOrder.setContractId(30001L);
+        firstOrder.setPartnerId(20002L);
         firstOrder.setOrderType("PURCHASE");
         Long firstOrderId = orderService.create(firstOrder);
 
@@ -212,6 +216,8 @@ class MatReceiptServiceTest {
 
         MatPurchaseOrder secondOrder = new MatPurchaseOrder();
         secondOrder.setProjectId(PROJECT_ID);
+        secondOrder.setContractId(30001L);
+        secondOrder.setPartnerId(20002L);
         secondOrder.setOrderType("PURCHASE");
         Long secondOrderId = orderService.create(secondOrder);
         MatReceipt receipt = buildReceipt("QUALIFIED");
@@ -239,6 +245,17 @@ class MatReceiptServiceTest {
         BusinessException excessive = assertThrows(BusinessException.class,
                 () -> receiptService.saveItemsBatch(receiptId, List.of(excessiveQualified)));
         assertEquals("RECEIPT_QUANTITY_INVALID", excessive.getCode());
+
+        MatReceipt overReceipt = buildReceipt("PENDING");
+        overReceipt.setOrderId(firstOrderId);
+        Long overReceiptId = receiptService.create(overReceipt);
+        MatReceiptItem excessiveActual = new MatReceiptItem();
+        excessiveActual.setOrderItemId(firstOrderItemId);
+        excessiveActual.setActualQuantity(new BigDecimal("11"));
+        excessiveActual.setQualifiedQuantity(BigDecimal.TEN);
+        BusinessException over = assertThrows(BusinessException.class,
+                () -> receiptService.saveItemsBatch(overReceiptId, List.of(excessiveActual)));
+        assertEquals("RECEIPT_EXCEEDS_ORDER", over.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════════

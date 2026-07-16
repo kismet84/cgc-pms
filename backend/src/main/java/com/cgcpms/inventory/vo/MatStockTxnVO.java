@@ -17,8 +17,11 @@ public class MatStockTxnVO implements Serializable {
     private String txnType;
     private BigDecimal quantity;
     private BigDecimal availableAfter;
+    private BigDecimal unitCost;
+    private BigDecimal amount;
     private String sourceType;
     private Long sourceId;
+    private Long sourceLineId;
     private String createdTime;
 
     /** 仓库名称（JOIN 填充） */

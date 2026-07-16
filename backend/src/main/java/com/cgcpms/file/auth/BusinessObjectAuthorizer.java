@@ -76,7 +76,8 @@ public class BusinessObjectAuthorizer {
             "PROJECT", "CONTRACT", "INVOICE", "RECEIPT",
             "PAYMENT", "SUBCONTRACT", "SETTLEMENT", "VARIATION",
             "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL", "SITE_DAILY_LOG", "EXPENSE",
-            "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD"
+            "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD",
+            "PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION"
     );
 
     /**
@@ -185,7 +186,8 @@ public class BusinessObjectAuthorizer {
                 checkProjectAccess(expense.getProjectId(), action + "费用申请文件");
                 break;
             }
-            case "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD": {
+            case "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD",
+                    "PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION": {
                 RevenueFileObject object = findRevenueFileObject(upperType, businessId);
                 if (object == null) {
                     throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "收入回款业务对象不存在: " + businessId);
@@ -329,6 +331,8 @@ public class BusinessObjectAuthorizer {
             case "OWNER_SETTLEMENT" -> "owner_settlement";
             case "SALES_INVOICE" -> "sales_invoice";
             case "COLLECTION_RECORD" -> "collection_record";
+            case "PRODUCTION_MEASUREMENT" -> "production_measurement";
+            case "OWNER_MEASUREMENT_SUBMISSION" -> "owner_measurement_submission";
             default -> throw new IllegalArgumentException("Unsupported revenue file type");
         };
         String statusColumn = "CONTRACT_REVENUE".equals(businessType) ? "approval_status" : "status";
@@ -342,7 +346,8 @@ public class BusinessObjectAuthorizer {
 
     private boolean isRevenueFileImmutable(String businessType, String status) {
         return switch (businessType) {
-            case "CONTRACT_REVENUE", "OWNER_SETTLEMENT" -> !Set.of("DRAFT", "REJECTED").contains(status);
+            case "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "PRODUCTION_MEASUREMENT" -> !Set.of("DRAFT", "REJECTED").contains(status);
+            case "OWNER_MEASUREMENT_SUBMISSION" -> !"SUBMITTED".equals(status);
             case "SALES_INVOICE" -> "VOIDED".equals(status);
             case "COLLECTION_RECORD" -> "REVERSED".equals(status);
             default -> true;

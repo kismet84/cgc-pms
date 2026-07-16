@@ -7,6 +7,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.DateTimeUtils;
+import com.cgcpms.inventory.entity.MatWarehouse;
+import com.cgcpms.inventory.mapper.MatWarehouseMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
@@ -26,6 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -35,13 +39,13 @@ import java.util.*;
 public class MatReceiptService {
 
     private static final int CODE_GENERATION_MAX_RETRIES = 3;
-    private static final int ORDER_ITEM_UPDATE_MAX_RETRIES = 3;
-
     private final MatReceiptMapper matReceiptMapper;
     private final MatReceiptItemMapper matReceiptItemMapper;
     private final MatPurchaseOrderMapper matPurchaseOrderMapper;
     private final MatPurchaseOrderItemMapper matPurchaseOrderItemMapper;
+    private final MatWarehouseMapper matWarehouseMapper;
     private final WorkflowEngine workflowEngine;
+    private final ProjectAccessChecker projectAccessChecker;
 
     private final MatReceiptAssembler assembler;
 
@@ -70,6 +74,7 @@ public class MatReceiptService {
         MatReceipt receipt = matReceiptMapper.selectById(id);
         if (receipt == null || !receipt.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("RECEIPT_NOT_FOUND", "验收单不存在");
+        checkProjectAccess(receipt.getProjectId(), "查看材料验收单");
 
         MatReceiptVO vo = assembler.assemble(receipt);
 
@@ -87,6 +92,7 @@ public class MatReceiptService {
         MatReceipt receipt = matReceiptMapper.selectById(receiptId);
         if (receipt == null || !receipt.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("RECEIPT_NOT_FOUND", "验收单不存在");
+        checkProjectAccess(receipt.getProjectId(), "查看材料验收明细");
 
         LambdaQueryWrapper<MatReceiptItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MatReceiptItem::getReceiptId, receiptId)
@@ -103,6 +109,7 @@ public class MatReceiptService {
         MatPurchaseOrder order = matPurchaseOrderMapper.selectById(orderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("ORDER_NOT_FOUND", "采购订单不存在");
+        checkProjectAccess(order.getProjectId(), "选择采购订单验收明细");
 
         LambdaQueryWrapper<MatPurchaseOrderItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MatPurchaseOrderItem::getOrderId, orderId)
@@ -115,19 +122,28 @@ public class MatReceiptService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(MatReceipt receipt) {
+        checkProjectAccess(receipt.getProjectId(), "创建材料验收单");
         // Auto-generate receipt code: MR-yyyyMMdd-XXX
         String prefix = "MR-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         receipt.setApprovalStatus("DRAFT");
         receipt.setCostGeneratedFlag(0);
+        if (!StringUtils.hasText(receipt.getReceiptMode())) receipt.setReceiptMode("INVENTORY");
 
         // Validate order if present
         if (receipt.getOrderId() != null) {
             MatPurchaseOrder order = matPurchaseOrderMapper.selectById(receipt.getOrderId());
             if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
                 throw new BusinessException("ORDER_NOT_FOUND", "关联采购订单不存在");
+            validateReceiptOrderRelation(receipt, order);
             // Auto-fill contract and partner from order
             if (receipt.getContractId() == null) receipt.setContractId(order.getContractId());
             if (receipt.getPartnerId() == null) receipt.setPartnerId(order.getPartnerId());
+        }
+        if (isDirectConsumption(receipt) && receipt.getWarehouseId() != null) {
+            throw new BusinessException("DIRECT_RECEIPT_WAREHOUSE_FORBIDDEN", "直耗验收不得进入普通库存仓库");
+        }
+        if (!isDirectConsumption(receipt) && receipt.getWarehouseId() != null) {
+            validateWarehouse(receipt.getWarehouseId(), receipt.getProjectId());
         }
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
@@ -167,16 +183,39 @@ public class MatReceiptService {
         MatReceipt existing = matReceiptMapper.selectById(receipt.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("RECEIPT_NOT_FOUND", "验收单不存在");
+        checkProjectAccess(existing.getProjectId(), "编辑材料验收单");
 
-        if (!"DRAFT".equals(existing.getApprovalStatus()))
+        if (!"DRAFT".equals(existing.getApprovalStatus()) && !"REJECTED".equals(existing.getApprovalStatus()))
             throw new BusinessException("RECEIPT_IN_APPROVAL", "验收单审批中或已审批，不可编辑");
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
         // Prevent overwriting generated flags
-        receipt.setApprovalStatus(existing.getApprovalStatus());
+        receipt.setApprovalStatus("DRAFT");
         receipt.setCostGeneratedFlag(existing.getCostGeneratedFlag());
         receipt.setReceiptCode(existing.getReceiptCode());
+        if (!StringUtils.hasText(receipt.getReceiptMode())) receipt.setReceiptMode(existing.getReceiptMode());
+
+        Long effectiveProjectId = receipt.getProjectId() != null ? receipt.getProjectId() : existing.getProjectId();
+        Long effectiveOrderId = receipt.getOrderId() != null ? receipt.getOrderId() : existing.getOrderId();
+        if (effectiveOrderId != null) {
+            MatPurchaseOrder order = matPurchaseOrderMapper.selectById(effectiveOrderId);
+            if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                throw new BusinessException("ORDER_NOT_FOUND", "关联采购订单不存在");
+            }
+            MatReceipt relation = new MatReceipt();
+            relation.setProjectId(effectiveProjectId);
+            relation.setContractId(receipt.getContractId() != null ? receipt.getContractId() : existing.getContractId());
+            relation.setPartnerId(receipt.getPartnerId() != null ? receipt.getPartnerId() : existing.getPartnerId());
+            validateReceiptOrderRelation(relation, order);
+        }
+        Long effectiveWarehouseId = receipt.getWarehouseId() != null ? receipt.getWarehouseId() : existing.getWarehouseId();
+        if (isDirectConsumption(receipt) && effectiveWarehouseId != null) {
+            throw new BusinessException("DIRECT_RECEIPT_WAREHOUSE_FORBIDDEN", "直耗验收不得进入普通库存仓库");
+        }
+        if (!isDirectConsumption(receipt) && effectiveWarehouseId != null) {
+            validateWarehouse(effectiveWarehouseId, effectiveProjectId);
+        }
 
         matReceiptMapper.updateById(receipt);
     }
@@ -186,6 +225,7 @@ public class MatReceiptService {
         MatReceipt receipt = matReceiptMapper.selectById(id);
         if (receipt == null || !receipt.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("RECEIPT_NOT_FOUND", "验收单不存在");
+        checkProjectAccess(receipt.getProjectId(), "删除材料验收单");
 
         if (!"DRAFT".equals(receipt.getApprovalStatus()))
             throw new BusinessException("RECEIPT_IN_APPROVAL", "验收单审批中或已审批，不可删除");
@@ -211,6 +251,8 @@ public class MatReceiptService {
         if (!"DRAFT".equals(receipt.getApprovalStatus()))
             throw new BusinessException("RECEIPT_ALREADY_SUBMITTED", "验收单已提交审批，不可重复提交");
 
+        validateReceiptForSubmission(receipt);
+
         // 更新审批状态为审批中
         LambdaUpdateWrapper<MatReceipt> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(MatReceipt::getId, receiptId)
@@ -234,21 +276,26 @@ public class MatReceiptService {
     // ─────────────────── Item batch operations ───────────────────
 
     /**
-     * Batch save receipt items with quantity validation.
-     * W0 Decision 3: WARN but don't block when receipt qty > order remaining qty.
+     * Batch save receipt items with quantity and order-balance validation.
+     * Draft lines do not mutate the purchase order. Accepted quantity is confirmed only after approval.
      */
     @Transactional(rollbackFor = Exception.class)
     public void saveItemsBatch(Long receiptId, List<MatReceiptItem> items) {
         MatReceipt receipt = matReceiptMapper.selectById(receiptId);
         if (receipt == null || !receipt.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("RECEIPT_NOT_FOUND", "验收单不存在");
+        checkProjectAccess(receipt.getProjectId(), "编辑材料验收明细");
 
         if (!"DRAFT".equals(receipt.getApprovalStatus()))
             throw new BusinessException("RECEIPT_IN_APPROVAL", "验收单审批中或已审批，不可编辑");
         if (receipt.getCostGeneratedFlag() != null && receipt.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
+        if (receipt.getOrderId() == null) {
+            throw new BusinessException("RECEIPT_ORDER_REQUIRED", "验收单必须关联采购订单");
+        }
         Long tenantId = UserContext.getCurrentTenantId();
+        Map<Long, BigDecimal> draftActualByOrderItem = new HashMap<>();
 
         for (MatReceiptItem item : items) {
             BigDecimal actual = item.getActualQuantity();
@@ -258,25 +305,25 @@ public class MatReceiptService {
                     || qualified.compareTo(actual) > 0) {
                 throw new BusinessException("RECEIPT_QUANTITY_INVALID", "实收数量必须大于 0，合格数量必须在 0 到实收数量之间");
             }
-            if (item.getOrderItemId() != null) {
-                MatPurchaseOrderItem orderItem = matPurchaseOrderItemMapper.selectById(item.getOrderItemId());
-                if (orderItem == null || receipt.getOrderId() == null
-                        || !receipt.getOrderId().equals(orderItem.getOrderId())) {
-                    throw new BusinessException("ORDER_ITEM_MISMATCH", "采购订单明细不属于当前验收单");
-                }
+            if (item.getOrderItemId() == null) {
+                throw new BusinessException("ORDER_ITEM_REQUIRED", "验收明细必须关联采购订单明细");
             }
-        }
-
-        // Subtract old item quantities from order items before deletion
-        LambdaQueryWrapper<MatReceiptItem> oldItemWrapper = new LambdaQueryWrapper<>();
-        oldItemWrapper.eq(MatReceiptItem::getReceiptId, receiptId)
-                .eq(MatReceiptItem::getTenantId, tenantId);
-        List<MatReceiptItem> oldItems = matReceiptItemMapper.selectList(oldItemWrapper);
-        for (MatReceiptItem oldItem : oldItems) {
-            if (oldItem.getOrderItemId() != null) {
-                BigDecimal oldQty = oldItem.getActualQuantity() != null ? oldItem.getActualQuantity() : BigDecimal.ZERO;
-                adjustOrderItemReceivedQuantity(oldItem.getOrderItemId(), oldQty.negate(), true);
+            MatPurchaseOrderItem orderItem = matPurchaseOrderItemMapper.selectById(item.getOrderItemId());
+            if (orderItem == null || !tenantId.equals(orderItem.getTenantId())
+                    || !receipt.getOrderId().equals(orderItem.getOrderId())) {
+                throw new BusinessException("ORDER_ITEM_MISMATCH", "采购订单明细不属于当前验收单");
             }
+            BigDecimal received = nvl(orderItem.getReceivedQuantity());
+            BigDecimal remaining = nvl(orderItem.getQuantity()).subtract(received);
+            BigDecimal draftActual = draftActualByOrderItem.merge(
+                    item.getOrderItemId(), actual, BigDecimal::add);
+            if (draftActual.compareTo(remaining) > 0) {
+                throw new BusinessException("RECEIPT_EXCEEDS_ORDER",
+                        "验收数量超过采购订单剩余数量，订单明细ID=" + item.getOrderItemId());
+            }
+            item.setMaterialId(orderItem.getMaterialId());
+            item.setUnitPrice(nvl(orderItem.getUnitPrice()));
+            item.setAmount(qualified.multiply(item.getUnitPrice()).setScale(2, RoundingMode.HALF_UP));
         }
 
         // Delete old items
@@ -291,14 +338,7 @@ public class MatReceiptService {
             item.setTenantId(tenantId);
             if (item.getActualQuantity() == null) item.setActualQuantity(BigDecimal.ZERO);
             if (item.getQualifiedQuantity() == null) item.setQualifiedQuantity(BigDecimal.ZERO);
-            if (item.getUnitPrice() == null) item.setUnitPrice(BigDecimal.ZERO);
-            if (item.getAmount() == null) item.setAmount(BigDecimal.ZERO);
             matReceiptItemMapper.insert(item);
-
-            // Update order item received_quantity (W0 Decision 3: always update, warn if exceeds)
-            if (item.getOrderItemId() != null) {
-                adjustOrderItemReceivedQuantity(item.getOrderItemId(), item.getActualQuantity(), false);
-            }
         }
 
         // Recalculate total amount
@@ -309,31 +349,100 @@ public class MatReceiptService {
 
         LambdaUpdateWrapper<MatReceipt> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(MatReceipt::getId, receiptId)
-                .set(MatReceipt::getTotalAmount, totalAmount);
+                .set(MatReceipt::getTotalAmount, totalAmount)
+                .set(MatReceipt::getQualityStatus, deriveQualityStatus(items));
         matReceiptMapper.update(null, updateWrapper);
     }
 
-    private void adjustOrderItemReceivedQuantity(Long orderItemId, BigDecimal delta, boolean floorAtZero) {
-        int retries = 0;
-        while (true) {
-            MatPurchaseOrderItem orderItem = matPurchaseOrderItemMapper.selectById(orderItemId);
-            if (orderItem == null || !orderItem.getTenantId().equals(UserContext.getCurrentTenantId())) {
-                return;
+    private void validateReceiptForSubmission(MatReceipt receipt) {
+        checkProjectAccess(receipt.getProjectId(), "提交材料验收审批");
+        if (receipt.getOrderId() == null || receipt.getContractId() == null || receipt.getPartnerId() == null) {
+            throw new BusinessException("RECEIPT_RELATION_REQUIRED", "验收单必须关联采购订单、合同和供应商");
+        }
+        if (receipt.getReceiptDate() == null) {
+            throw new BusinessException("RECEIPT_INFO_INCOMPLETE", "验收日期不能为空");
+        }
+        if (!isDirectConsumption(receipt) && receipt.getWarehouseId() == null) {
+            throw new BusinessException("RECEIPT_INFO_INCOMPLETE", "库存验收必须指定入库仓库");
+        }
+        if (isDirectConsumption(receipt) && receipt.getWarehouseId() != null) {
+            throw new BusinessException("DIRECT_RECEIPT_WAREHOUSE_FORBIDDEN", "直耗验收不得进入普通库存仓库");
+        }
+        MatPurchaseOrder order = matPurchaseOrderMapper.selectById(receipt.getOrderId());
+        if (order == null || !UserContext.getCurrentTenantId().equals(order.getTenantId())) {
+            throw new BusinessException("ORDER_NOT_FOUND", "关联采购订单不存在");
+        }
+        validateReceiptOrderRelation(receipt, order);
+        if (!"APPROVED".equals(order.getApprovalStatus()) || !"APPROVED".equals(order.getOrderStatus())) {
+            throw new BusinessException("ORDER_NOT_APPROVED", "采购订单审批通过后才能提交验收");
+        }
+        if (!isDirectConsumption(receipt)) {
+            validateWarehouse(receipt.getWarehouseId(), receipt.getProjectId());
+        }
+        List<MatReceiptItem> items = matReceiptItemMapper.selectList(new LambdaQueryWrapper<MatReceiptItem>()
+                .eq(MatReceiptItem::getReceiptId, receipt.getId())
+                .eq(MatReceiptItem::getTenantId, UserContext.getCurrentTenantId()));
+        if (items.isEmpty()) {
+            throw new BusinessException("RECEIPT_ITEMS_REQUIRED", "验收单至少需要一条验收明细");
+        }
+        for (MatReceiptItem item : items) {
+            if (item.getOrderItemId() == null || item.getMaterialId() == null
+                    || item.getActualQuantity() == null || item.getActualQuantity().signum() <= 0
+                    || item.getQualifiedQuantity() == null || item.getQualifiedQuantity().signum() < 0
+                    || item.getQualifiedQuantity().compareTo(item.getActualQuantity()) > 0) {
+                throw new BusinessException("RECEIPT_ITEM_INCOMPLETE", "验收明细数据不完整或数量非法");
             }
-            BigDecimal currentReceived = orderItem.getReceivedQuantity() != null
-                    ? orderItem.getReceivedQuantity() : BigDecimal.ZERO;
-            BigDecimal nextReceived = currentReceived.add(delta != null ? delta : BigDecimal.ZERO);
-            if (floorAtZero && nextReceived.compareTo(BigDecimal.ZERO) < 0) {
-                nextReceived = BigDecimal.ZERO;
-            }
-            orderItem.setReceivedQuantity(nextReceived);
-            int updated = matPurchaseOrderItemMapper.updateById(orderItem);
-            if (updated > 0) {
-                return;
-            }
-            if (++retries >= ORDER_ITEM_UPDATE_MAX_RETRIES) {
-                throw new BusinessException("ORDER_ITEM_CONCURRENT_CONFLICT", "采购订单明细并发更新冲突，请稍后重试");
+            if (isDirectConsumption(receipt) && !StringUtils.hasText(item.getUseLocation())) {
+                throw new BusinessException("DIRECT_RECEIPT_USE_LOCATION_REQUIRED", "直耗材料必须填写使用部位");
             }
         }
+    }
+
+    private void validateReceiptOrderRelation(MatReceipt receipt, MatPurchaseOrder order) {
+        if (!Objects.equals(receipt.getProjectId(), order.getProjectId())) {
+            throw new BusinessException("RECEIPT_PROJECT_MISMATCH", "验收单项目与采购订单项目不一致");
+        }
+        if (receipt.getContractId() != null && !Objects.equals(receipt.getContractId(), order.getContractId())) {
+            throw new BusinessException("RECEIPT_CONTRACT_MISMATCH", "验收单合同与采购订单合同不一致");
+        }
+        if (receipt.getPartnerId() != null && !Objects.equals(receipt.getPartnerId(), order.getPartnerId())) {
+            throw new BusinessException("RECEIPT_PARTNER_MISMATCH", "验收单供应商与采购订单供应商不一致");
+        }
+    }
+
+    private void validateWarehouse(Long warehouseId, Long projectId) {
+        MatWarehouse warehouse = matWarehouseMapper.selectById(warehouseId);
+        if (warehouse == null || !UserContext.getCurrentTenantId().equals(warehouse.getTenantId())
+                || !"ENABLE".equals(warehouse.getStatus())) {
+            throw new BusinessException("WAREHOUSE_INVALID", "入库仓库不存在或已停用");
+        }
+        if (!Objects.equals(projectId, warehouse.getProjectId())) {
+            throw new BusinessException("WAREHOUSE_PROJECT_MISMATCH", "入库仓库不属于验收项目");
+        }
+    }
+
+    private String deriveQualityStatus(List<MatReceiptItem> items) {
+        if (items.isEmpty()) return "PENDING";
+        BigDecimal actual = items.stream().map(MatReceiptItem::getActualQuantity)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal qualified = items.stream().map(MatReceiptItem::getQualifiedQuantity)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (qualified.signum() == 0) return "REJECTED";
+        return qualified.compareTo(actual) == 0 ? "QUALIFIED" : "PARTIAL";
+    }
+
+    private BigDecimal nvl(BigDecimal value) {
+        return value != null ? value : BigDecimal.ZERO;
+    }
+
+    private boolean isDirectConsumption(MatReceipt receipt) {
+        return "DIRECT_CONSUMPTION".equals(receipt.getReceiptMode());
+    }
+
+    private void checkProjectAccess(Long projectId, String action) {
+        if (projectId == null) {
+            throw new BusinessException("PROJECT_REQUIRED", "验收单缺少项目关系");
+        }
+        projectAccessChecker.checkAccess(projectId, action);
     }
 }

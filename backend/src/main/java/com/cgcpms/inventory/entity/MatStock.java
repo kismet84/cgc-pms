@@ -35,6 +35,12 @@ public class MatStock extends BaseEntity {
     /** 可用数量，精度18,4 */
     private BigDecimal availableQty;
 
+    /** 当前库存价值，P0采用移动加权平均法。 */
+    private BigDecimal inventoryValue;
+
+    /** 当前移动加权平均单价。 */
+    private BigDecimal averageUnitCost;
+
     /** 安全库存阈值，按租户内仓库+物料库存项维护 */
     private BigDecimal safetyStockQty;
 

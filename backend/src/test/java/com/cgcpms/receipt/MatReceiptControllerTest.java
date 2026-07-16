@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -26,6 +27,7 @@ class MatReceiptControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtUtils jwtUtils;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private static final long ADMIN_ID = 1L;
     private static final long TENANT_ID = 0L;
@@ -33,8 +35,41 @@ class MatReceiptControllerTest {
     private static final long CONTRACT_ID = 30001L;
     private static final long PARTNER_ID = 20002L;
     private static final long WAREHOUSE_ID = 1L;
+    private static final long ORDER_ID = 9901001L;
+    private static final long ORDER_ITEM_ID = 9901002L;
 
     private Long receiptId;
+
+    @BeforeAll
+    void prepareApprovedOrderAndApprover() {
+        jdbcTemplate.update("""
+                INSERT INTO sys_user
+                    (id, tenant_id, username, password, real_name, status, is_admin,
+                     created_by, updated_by, deleted_flag, deleted_token, remark)
+                SELECT ?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, NULL, ?
+                WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = ?)
+                """, ADMIN_ID, TENANT_ID, "test_receipt_controller_approver", "{noop}test",
+                "验收接口测试审批人", ADMIN_ID, ADMIN_ID,
+                "MatReceiptControllerTest local approver", ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_order
+                    (id, tenant_id, project_id, contract_id, partner_id, order_code, order_type,
+                     order_date, delivery_date, total_amount, approval_status, order_status,
+                     created_by, updated_by, deleted_flag)
+                SELECT ?, ?, ?, ?, ?, ?, 'PURCHASE', ?, ?, 35000.00, 'APPROVED', 'APPROVED', ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM mat_purchase_order WHERE id = ?)
+                """, ORDER_ID, TENANT_ID, PROJECT_ID, CONTRACT_ID, PARTNER_ID,
+                "PO-RECEIPT-CTRL-" + System.nanoTime(), LocalDate.now(), LocalDate.now().plusDays(7),
+                ADMIN_ID, ADMIN_ID, ORDER_ID);
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_order_item
+                    (id, tenant_id, order_id, project_id, material_id, unit, quantity, unit_price,
+                     amount, received_quantity, version, created_by, updated_by, deleted_flag)
+                SELECT ?, ?, ?, ?, 1, '吨', 10.0000, 3500.0000, 35000.00, 0, 0, ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM mat_purchase_order_item WHERE id = ?)
+                """, ORDER_ITEM_ID, TENANT_ID, ORDER_ID, PROJECT_ID,
+                ADMIN_ID, ADMIN_ID, ORDER_ITEM_ID);
+    }
 
     private Cookie adminCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
@@ -55,8 +90,8 @@ class MatReceiptControllerTest {
     @Test @Order(3) @DisplayName("POST /receipts -> 200 creates receipt")
     void testCreate() throws Exception {
         String body = String.format("""
-                {"projectId":%d,"contractId":%d,"partnerId":%d,"warehouseId":%d,"receiptDate":"%s","qualityStatus":"PENDING","totalAmount":50000.00}
-                """, PROJECT_ID, CONTRACT_ID, PARTNER_ID, WAREHOUSE_ID, LocalDate.now());
+                {"projectId":%d,"orderId":%d,"contractId":%d,"partnerId":%d,"warehouseId":%d,"receiptDate":"%s","qualityStatus":"PENDING","totalAmount":50000.00}
+                """, PROJECT_ID, ORDER_ID, CONTRACT_ID, PARTNER_ID, WAREHOUSE_ID, LocalDate.now());
         String resp = mockMvc.perform(po("/receipts").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isString())
                 .andReturn().getResponse().getContentAsString();
@@ -103,8 +138,8 @@ class MatReceiptControllerTest {
     void testSaveItemsBatch() throws Exception {
         Assertions.assertNotNull(receiptId);
         String body = String.format("""
-                [{"receiptId":%d,"materialId":1,"actualQuantity":10.00,"unitPrice":3500.00,"amount":35000.00}]
-                """, receiptId);
+                [{"receiptId":%d,"orderItemId":%d,"materialId":1,"actualQuantity":10.00,"qualifiedQuantity":10.00,"unitPrice":1.00,"amount":1.00}]
+                """, receiptId, ORDER_ITEM_ID);
         mockMvc.perform(po("/receipts/"+receiptId+"/items/batch").cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().is2xxSuccessful());

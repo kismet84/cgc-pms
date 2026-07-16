@@ -20,6 +20,7 @@ public class MatReceiptVO {
     private String receiptDate;
     private String warehouseId;
     private String receiverId;
+    private String receiptMode;
     private String qualityStatus;
     private String totalAmount;
     private String approvalStatus;

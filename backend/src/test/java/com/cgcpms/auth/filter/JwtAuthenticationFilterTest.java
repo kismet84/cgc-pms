@@ -17,11 +17,13 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -125,6 +127,51 @@ class JwtAuthenticationFilterTest {
         verify(chain).doFilter(request, response);
         assertEquals(1L, request.getAttribute("accessLog.userId"));
         assertEquals(0L, request.getAttribute("accessLog.tenantId"));
+    }
+
+    @Test
+    @DisplayName("compact permission claim keeps every authority and legacy arrays remain compatible")
+    void compactPermissionClaimBuildsAuthorities() throws Exception {
+        JwtUtils jwtUtils = mock(JwtUtils.class);
+        JwtProperties jwtProperties = mock(JwtProperties.class);
+        CookieUtils cookieUtils = mock(CookieUtils.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<TokenBlacklistService> blacklistProvider = mock(ObjectProvider.class);
+        TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
+        FilterChain chain = mock(FilterChain.class);
+
+        when(jwtProperties.getHeader()).thenReturn("Authorization");
+        when(jwtProperties.getTokenPrefix()).thenReturn("Bearer ");
+        when(cookieUtils.getCookieValue(any(HttpServletRequest.class), eq(CookieUtils.ACCESS_TOKEN_COOKIE))).thenReturn(null);
+        when(jwtUtils.validateToken("compact-token")).thenReturn(true);
+        when(jwtUtils.isRefreshToken("compact-token")).thenReturn(false);
+        when(jwtUtils.parseToken("compact-token")).thenReturn(Jwts.claims()
+                .add(JwtUtils.CLAIM_USER_ID, 1L)
+                .add(JwtUtils.CLAIM_USERNAME, "admin")
+                .add(JwtUtils.CLAIM_TENANT_ID, 0L)
+                .add(JwtUtils.CLAIM_ROLES, List.of("SUPER_ADMIN"))
+                .add(JwtUtils.CLAIM_PERMISSIONS, "measurement:query,measurement:submit")
+                .build());
+        when(blacklistProvider.getIfAvailable()).thenReturn(blacklistService);
+        when(blacklistService.isBlacklisted("compact-token")).thenReturn(false);
+        doAnswer(invocation -> {
+            var authorities = SecurityContextHolder.getContext().getAuthentication().getAuthorities();
+            assertTrue(authorities.stream().anyMatch(value -> value.getAuthority().equals("ROLE_SUPER_ADMIN")));
+            assertTrue(authorities.stream().anyMatch(value -> value.getAuthority().equals("measurement:query")));
+            assertTrue(authorities.stream().anyMatch(value -> value.getAuthority().equals("measurement:submit")));
+            return null;
+        }).when(chain).doFilter(any(), any());
+
+        ExposedJwtAuthenticationFilter compactFilter = new ExposedJwtAuthenticationFilter(
+                jwtUtils, jwtProperties, cookieUtils, new ObjectMapper(), blacklistProvider, env("local"));
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/protected");
+        request.setServletPath("/protected");
+        request.addHeader("Authorization", "Bearer compact-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        compactFilter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
     }
 
     private static class ExposedJwtAuthenticationFilter extends JwtAuthenticationFilter {

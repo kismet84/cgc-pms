@@ -60,10 +60,12 @@ public class PurchaseRequestConversionService {
         order.setOrderCode(toPurchaseOrderCode(request.getRequestCode()));
         order.setOrderType("PURCHASE");
         order.setOrderDate(LocalDate.now());
-        order.setApprovalStatus("APPROVED");
-        order.setOrderStatus("APPROVED");
+        // 采购申请只批准内部需求，不代表供应商、价格和交付条件等商业承诺已批准。
+        // 转单后必须由采购人员补齐商业条件并重新提交采购订单审批。
+        order.setApprovalStatus("DRAFT");
+        order.setOrderStatus("DRAFT");
         order.setContractId(request.getContractId());
-        order.setTotalAmount(null);
+        order.setTotalAmount(BigDecimal.ZERO);
         orderMapper.insert(order);
 
         Long userId = UserContext.getCurrentUserId();
@@ -91,10 +93,13 @@ public class PurchaseRequestConversionService {
         orderItem.setId(IdWorker.getId());
         orderItem.setTenantId(tenantId);
         orderItem.setOrderId(orderId);
+        orderItem.setRequestItemId(requestItem.getId());
         orderItem.setProjectId(projectId);
         orderItem.setMaterialId(requestItem.getMaterialId());
         orderItem.setUnit(requestItem.getUnit());
         orderItem.setQuantity(requestItem.getQuantity());
+        orderItem.setUnitPrice(BigDecimal.ZERO);
+        orderItem.setAmount(BigDecimal.ZERO);
         orderItem.setReceivedQuantity(BigDecimal.ZERO);
         orderItem.setCreatedBy(userId);
         orderItem.setUpdatedBy(userId);

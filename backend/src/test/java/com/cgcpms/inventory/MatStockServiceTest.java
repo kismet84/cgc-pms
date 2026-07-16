@@ -579,6 +579,44 @@ class MatStockServiceTest {
         assertEquals(12345L, txn.getSourceId());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("同一来源明细重复入库只记一次库存与流水")
+    void testStockInWithSourceLineIsIdempotent() {
+        stockService.stockIn(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("5.0000"),
+                "MAT_RECEIPT", 22345L, 32345L);
+        MatStock repeated = stockService.stockIn(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("5.0000"),
+                "MAT_RECEIPT", 22345L, 32345L);
+
+        assertEquals(0, new BigDecimal("5.0000").compareTo(repeated.getAvailableQty()));
+        MatStockLedgerVO ledger = stockService.getLedger(
+                WAREHOUSE_ID, MATERIAL_ID, null, null, null, null, 1, 20);
+        assertEquals(1, ledger.getTxns().getTotal());
+        assertEquals(32345L, ledger.getTxns().getRecords().get(0).getSourceLineId());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("移动加权平均：两次不同单价入库后按平均价计算出库价值")
+    void testMovingWeightedAverageValuation() {
+        stockService.stockInValued(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("10.0000"),
+                new BigDecimal("10.000000"), "MAT_RECEIPT", 42345L, 52345L);
+        MatStock valued = stockService.stockInValued(
+                WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("10.0000"),
+                new BigDecimal("20.000000"), "MAT_RECEIPT", 42346L, 52346L);
+
+        assertEquals(0, new BigDecimal("20.0000").compareTo(valued.getAvailableQty()));
+        assertEquals(0, new BigDecimal("300.00").compareTo(valued.getInventoryValue()));
+        assertEquals(0, new BigDecimal("15.000000").compareTo(valued.getAverageUnitCost()));
+
+        MatStockService.StockMovementResult issued = stockService.stockOutValued(
+                WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("5.0000"),
+                "MAT_REQUISITION", 62345L, 72345L);
+        assertEquals(0, new BigDecimal("75.00").compareTo(issued.amount()));
+        assertEquals(0, new BigDecimal("225.00").compareTo(issued.stock().getInventoryValue()));
+        assertEquals(0, new BigDecimal("15.000000").compareTo(issued.stock().getAverageUnitCost()));
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // RED → GREEN: stockOut — 带 sourceType/sourceId 出库
     // ═══════════════════════════════════════════════════════════════

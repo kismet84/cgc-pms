@@ -290,6 +290,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '收入与回款', icon: 'RiseOutlined', permission: 'revenue:operations:query' },
       },
       {
+        path: 'production-measurement',
+        name: 'ProductionMeasurement',
+        component: () => import('@/pages/production-measurement/index.vue'),
+        meta: { title: '产值计量', icon: 'CalculatorOutlined', permission: 'measurement:query' },
+      },
+      {
         path: 'cash-journal',
         name: 'CashJournal',
         component: () => import('@/pages/cash-journal/index.vue'),
