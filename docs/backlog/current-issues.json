@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-16T08:06:25+08:00",
+  "updatedAt": "2026-07-16T10:59:42+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -392,13 +392,21 @@
     {
       "issueKey": "AUTO-IMPROVEMENT-7EFDFA50553C2152",
       "title": "AutoPilot 改进：cycleEfficiency",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
+      "status": "OBSERVATION",
+      "classification": "OPERATIONAL_RISK",
       "priority": "P1",
       "blocking": false,
       "summary": "周期平均分 5/10，低于 80%。",
       "acceptanceCriteria": "该维度连续一个完整回顾周期平均分达到满分的 80% 及以上，且不降低硬门禁。",
-      "deferReason": "AutoPilot 回顾提案等待用户批准；未批准前不得补货或自动实施。",
+      "deferReason": "用户已于 2026-07-16 批准转为工程治理 Candidate；先补齐下一完整回顾周期的有效样本并定位可复现根因，未满足 Ready 前不得修改控制面。",
+      "candidate": {
+        "userValue": "减少控制面重复等待和无效工具路径，提升单个任务周期的有效执行占比。",
+        "minimalLoop": "在不改调度、评分或环境配置的前提下采集下一完整回顾周期证据，并将低分归因收敛为一个可验证的最小修复方案。",
+        "nonGoals": "不调整评分权重、超时、并行度、控制面状态机或运行环境。",
+        "dependencies": "下一完整回顾周期的有效效率样本和可读回的失败分类。",
+        "risk": "当前仅有一个 cycleEfficiency 样本，直接调整规则会放大偶然波动。",
+        "readyPreconditions": "存在可复现根因、最小改动范围、量化验收标准和回滚方式。"
+      },
       "sourceRefs": [
         "docs/quality/AutoPilot-任务周期回顾-review-b8c59c337f3e49b8a81e770e3a3d85a4-2026-07-16.md"
       ]
@@ -406,27 +414,21 @@
     {
       "issueKey": "AUTO-IMPROVEMENT-45AD2EFE82162775",
       "title": "AutoPilot 改进：taskExecutionEfficiency",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
+      "status": "OBSERVATION",
+      "classification": "OPERATIONAL_RISK",
       "priority": "P1",
       "blocking": false,
       "summary": "周期平均分 6.11/10，低于 80%。",
       "acceptanceCriteria": "该维度连续一个完整回顾周期平均分达到满分的 80% 及以上，且不降低硬门禁。",
-      "deferReason": "AutoPilot 回顾提案等待用户批准；未批准前不得补货或自动实施。",
-      "sourceRefs": [
-        "docs/quality/AutoPilot-任务周期回顾-review-b8c59c337f3e49b8a81e770e3a3d85a4-2026-07-16.md"
-      ]
-    },
-    {
-      "issueKey": "AUTO-IMPROVEMENT-6C71794DEEA78DD9",
-      "title": "AutoPilot 改进：回顾周期评分证据完整性",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "30 条周期记录中有 2 条早期记录缺少正式评分块：ISSUE-040-031、ISSUE-040-032；本次不补造历史分数。",
-      "acceptanceCriteria": "完成历史计数入口审计；证明只有存在正式评分对象且 score key 可读回的完成记录才进入回顾周期，并用负向测试覆盖缺失评分拒绝计数。",
-      "deferReason": "AutoPilot 回顾提案等待用户批准；未批准前不得补货或自动实施。",
+      "deferReason": "用户已于 2026-07-16 批准转为工程治理 Candidate；先用后续批次证据识别重复路由、返工或验证成本的稳定根因，未满足 Ready 前不得修改控制面。",
+      "candidate": {
+        "userValue": "降低重复实施和无效验证成本，提升合格 Ready 从选取到收口的有效执行效率。",
+        "minimalLoop": "按现有失败分类和任务评分采集下一完整回顾周期数据，确认稳定低分来源后形成一个可独立验证的最小改动。",
+        "nonGoals": "不降低硬门禁，不跳过验证，不修改评分权重、状态机或环境配置。",
+        "dependencies": "下一完整回顾周期的任务评分、失败分类和返工证据。",
+        "risk": "平均值掩盖了中位数为满分的分布，未经归因直接优化可能误伤正常任务。",
+        "readyPreconditions": "存在可复现根因、最小改动范围、量化验收标准和回滚方式。"
+      },
       "sourceRefs": [
         "docs/quality/AutoPilot-任务周期回顾-review-b8c59c337f3e49b8a81e770e3a3d85a4-2026-07-16.md"
       ]
