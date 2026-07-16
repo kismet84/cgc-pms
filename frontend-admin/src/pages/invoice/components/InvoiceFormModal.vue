@@ -4,11 +4,17 @@ import { message, Modal, Upload } from 'ant-design-vue'
 import axios from 'axios'
 import { UploadOutlined } from '@ant-design/icons-vue'
 import type { UploadFile } from 'ant-design-vue'
-import { createInvoice, updateInvoice, recognizeInvoice } from '@/api/modules/invoice'
-import type { InvoiceVO, PayRecordBrief, InvoiceRecognizeResultVO } from '@/types/invoice'
+import {
+  createInvoice,
+  updateInvoice,
+  recognizeInvoice,
+  saveInvoiceAllocations,
+  getInvoiceAllocations,
+} from '@/api/modules/invoice'
+import type { InvoiceVO, PayRecordBrief, InvoiceRecognizeResultVO, InvoicePaymentAllocationVO } from '@/types/invoice'
 import { uploadFile } from '@/api/modules/file'
 
-const INVOICE_BUSINESS_TYPE = 'INVOICE_ATTACHMENT'
+const INVOICE_BUSINESS_TYPE = 'INVOICE'
 const MAX_UPLOAD_SIZE_MB = 20
 
 const props = defineProps<{
@@ -28,6 +34,7 @@ const editingId = ref<string | null>(null)
 
 const formData = reactive<Partial<InvoiceVO>>({
   payRecordId: undefined,
+  documentType: 'ELECTRONIC_INVOICE',
   invoiceNo: '',
   invoiceType: 'VAT_SPECIAL',
   invoiceAmount: undefined,
@@ -44,10 +51,13 @@ const formData = reactive<Partial<InvoiceVO>>({
 const uploadFileList = ref<UploadFile[]>([])
 const recognizing = ref(false)
 const recognizeResult = ref<InvoiceRecognizeResultVO | null>(null)
+const allocations = ref<(InvoicePaymentAllocationVO & { key: number })[]>([])
+let allocationKey = 0
 const abortController = ref<AbortController | null>(null)
 
 const emptyForm: Partial<InvoiceVO> = {
   payRecordId: undefined,
+  documentType: 'ELECTRONIC_INVOICE',
   invoiceNo: '',
   invoiceType: 'VAT_SPECIAL',
   invoiceAmount: undefined,
@@ -63,11 +73,13 @@ const emptyForm: Partial<InvoiceVO> = {
 
 function resetForm() {
   Object.assign(formData, { ...emptyForm })
+  allocations.value = [{ key: allocationKey++, payRecordId: '', allocatedAmount: '' }]
 }
 
 function applyRecord(record: InvoiceVO) {
   Object.assign(formData, {
     payRecordId: record.payRecordId,
+    documentType: record.documentType,
     invoiceNo: record.invoiceNo,
     invoiceType: record.invoiceType,
     invoiceAmount: record.invoiceAmount,
@@ -84,7 +96,7 @@ function applyRecord(record: InvoiceVO) {
 
 watch(
   () => [props.visible, props.mode, props.editRecord] as const,
-  ([vis, mode, record]) => {
+  async ([vis, mode, record]) => {
     if (!vis) return
     if (mode === 'create') {
       modalTitle.value = '新增发票'
@@ -94,6 +106,8 @@ watch(
       modalTitle.value = '编辑发票'
       editingId.value = record.id
       applyRecord(record)
+      const saved = await getInvoiceAllocations(record.id)
+      allocations.value = saved.map((item) => ({ ...item, key: allocationKey++ }))
     }
     if (abortController.value) {
       abortController.value.abort()
@@ -106,10 +120,6 @@ watch(
 )
 
 async function handleModalOk() {
-  if (!formData.payRecordId) {
-    message.warning('请选择关联的付款记录')
-    return
-  }
   if (!formData.invoiceNo || formData.invoiceNo.trim() === '') {
     message.warning('请输入发票号码')
     return
@@ -122,6 +132,31 @@ async function handleModalOk() {
     message.warning('请输入有效的发票金额')
     return
   }
+  if (!formData.invoiceDate) {
+    message.warning('请选择开票日期')
+    return
+  }
+  if (!editingId.value && uploadFileList.value.length === 0) {
+    message.warning('新建发票必须上传电子发票或扫描件')
+    return
+  }
+  const activeAllocations = allocations.value.filter(
+    (item) => item.payRecordId && Number(item.allocatedAmount) > 0,
+  )
+  if (!activeAllocations.length || activeAllocations.length !== allocations.value.length) {
+    message.warning('请完整填写每一条付款核销分配')
+    return
+  }
+  if (new Set(activeAllocations.map((item) => item.payRecordId)).size !== activeAllocations.length) {
+    message.warning('同一付款记录不能重复分配')
+    return
+  }
+  const allocatedTotal = activeAllocations.reduce((sum, item) => sum + Number(item.allocatedAmount), 0)
+  if (allocatedTotal > Number(formData.invoiceAmount) + 0.001) {
+    message.warning('核销分配合计不能超过发票金额')
+    return
+  }
+  formData.payRecordId = activeAllocations[0].payRecordId
 
   try {
     let invoiceId: string | null = null
@@ -133,19 +168,39 @@ async function handleModalOk() {
       invoiceId = await createInvoice(formData)
       message.success('创建成功')
     }
-    emit('close')
-    emit('saved')
+    if (invoiceId) {
+      await saveInvoiceAllocations(invoiceId, activeAllocations.map(({ payRecordId, allocatedAmount }) => ({
+        payRecordId,
+        allocatedAmount,
+      })))
+    }
+    if (invoiceId && recognizeResult.value) {
+      const { createInvoiceOcrReview } = await import('@/api/modules/financeOperations')
+      await createInvoiceOcrReview({
+        invoiceId,
+        confidence: Number(recognizeResult.value.confidence ?? 0),
+        rawResult: recognizeResult.value,
+        comparison: {
+          invoiceNo: formData.invoiceNo,
+          invoiceAmount: formData.invoiceAmount,
+          invoiceDate: formData.invoiceDate,
+          sellerTaxNo: formData.sellerTaxNo,
+        },
+      })
+    }
 
     // Upload attachment if a file was selected
     if (uploadFileList.value.length > 0 && invoiceId) {
       const file = uploadFileList.value[0].originFileObj as File
       try {
-        await uploadFile(file, INVOICE_BUSINESS_TYPE, invoiceId)
+        await uploadFile(file, INVOICE_BUSINESS_TYPE, invoiceId, formData.documentType)
       } catch (e: unknown) {
         console.error(e)
         message.warning('发票已创建，但文件上传失败。请稍后在发票详情中重新上传。')
       }
     }
+    emit('close')
+    emit('saved')
   } catch (e: unknown) {
     console.error(e)
     const msg = axios.isAxiosError(e)
@@ -183,6 +238,15 @@ function handleBeforeUpload(file: File) {
     return Upload.LIST_IGNORE
   }
   return false // prevent auto-upload; manual upload handled in handleRecognize()
+}
+
+function addAllocation() {
+  allocations.value.push({ key: allocationKey++, payRecordId: '', allocatedAmount: '' })
+}
+
+function removeAllocation(key: number) {
+  if (allocations.value.length === 1) return
+  allocations.value = allocations.value.filter((item) => item.key !== key)
 }
 
 /** Clear all invoice-related fields before re-recognizing */
@@ -281,6 +345,7 @@ defineExpose({
   formData,
   uploadFileList,
   recognizeResult,
+  allocations,
   applyRecognitionResult,
   handleBeforeUpload,
   handleAdd: () => {
@@ -328,11 +393,25 @@ defineExpose({
           识别发票
         </a-button>
       </a-form-item>
-      <a-form-item label="付款记录" required>
-        <a-select v-model:value="formData.payRecordId" placeholder="请选择关联的付款记录">
-          <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
-            {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}
-          </a-select-option>
+      <a-form-item label="付款核销分配" required>
+        <div class="allocation-list">
+          <div v-for="item in allocations" :key="item.key" class="allocation-row">
+            <a-select v-model:value="item.payRecordId" placeholder="付款记录">
+              <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
+                {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}（{{ pr.payAmount ?? '-' }}）
+              </a-select-option>
+            </a-select>
+            <a-input-number v-model:value="item.allocatedAmount" :min="0.01" :precision="2" placeholder="分配金额" />
+            <a-button danger :disabled="allocations.length === 1" @click="removeAllocation(item.key)">删除</a-button>
+          </div>
+          <a-button type="dashed" block @click="addAllocation">增加付款分配（一票多付）</a-button>
+          <div class="allocation-tip">支持一张发票分配多笔付款；多张发票也可分别核销同一付款，后台同时校验发票与付款两侧额度。</div>
+        </div>
+      </a-form-item>
+      <a-form-item label="文档类型" required>
+        <a-select v-model:value="formData.documentType">
+          <a-select-option value="ELECTRONIC_INVOICE">电子发票</a-select-option>
+          <a-select-option value="SCANNED_INVOICE">扫描件</a-select-option>
         </a-select>
       </a-form-item>
       <a-form-item label="发票号码" required>
@@ -373,7 +452,7 @@ defineExpose({
           placeholder="请输入税额"
         />
       </a-form-item>
-      <a-form-item label="开票日期">
+      <a-form-item label="开票日期" required>
         <a-date-picker
           v-model:value="formData.invoiceDate"
           value-format="YYYY-MM-DD"
@@ -399,4 +478,6 @@ defineExpose({
   </a-modal>
 </template>
 
-<style scoped></style>
+<style scoped>
+.allocation-list{display:grid;gap:8px}.allocation-row{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:8px}.allocation-tip{color:#667085;font-size:12px;line-height:20px}
+</style>

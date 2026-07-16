@@ -16,6 +16,8 @@ import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import com.baomidou.mybatisplus.annotation.Version;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -43,9 +45,13 @@ public class PayRecord extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal payAmount;
 
-    @NotNull
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate payDate;
+
+    private Long fundAccountId;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime paidAt;
 
     private String payMethod;
 
@@ -58,4 +64,20 @@ public class PayRecord extends BaseEntity {
      * 数据库层唯一约束已由 V76__fix_pay_record_external_txn_no_unique.sql 添加：
      * UNIQUE KEY uk_external_txn_no (tenant_id, external_txn_no, deleted_flag)。 */
     private String externalTxnNo;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String failureReason;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long reversedRecordId;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private LocalDateTime reversedAt;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String reversalType;
+
+    @Version
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Integer version;
 }

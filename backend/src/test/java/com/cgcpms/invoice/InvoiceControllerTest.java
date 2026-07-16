@@ -4,7 +4,11 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.PaymentTestFixtures;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.invoice.entity.InvoicePaymentAllocation;
+import com.cgcpms.invoice.service.InvoiceService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.Cookie;
@@ -13,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -43,6 +48,15 @@ class InvoiceControllerTest {
 
     @Autowired
     private PayRecordMapper payRecordMapper;
+
+    @Autowired
+    private PayApplicationMapper payApplicationMapper;
+
+    @Autowired
+    private InvoiceService invoiceService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
@@ -82,16 +96,18 @@ class InvoiceControllerTest {
     void initData() {
         setUserContext();
         try {
+            PaymentTestFixtures.insertApplication(payApplicationMapper, PROJECT_ID, TENANT_ID,
+                    PROJECT_ID, CONTRACT_ID, PARTNER_ID, new BigDecimal("3000.00"));
             PayRecord record = new PayRecord();
             record.setTenantId(TENANT_ID);
             record.setProjectId(PROJECT_ID);
             record.setPayApplicationId(PROJECT_ID);
             record.setContractId(CONTRACT_ID);
             record.setPartnerId(PARTNER_ID);
-            record.setPayAmount(new BigDecimal("3000.00"));
+            record.setPayAmount(new BigDecimal("10000.00"));
             record.setPayDate(LocalDate.now());
             record.setPayMethod("BANK_TRANSFER");
-            record.setPayStatus("PAID");
+            record.setPayStatus("SUCCESS");
             record.setExternalTxnNo("INV-TEST-TXN-" + System.nanoTime());
             payRecordMapper.insert(record);
             payRecordId = record.getId();
@@ -311,6 +327,23 @@ class InvoiceControllerTest {
     @DisplayName("PUT /invoices/{id}/verify -> 200 verifies invoice")
     void testVerify() throws Exception {
         Assertions.assertNotNull(invoiceId, "Prerequisite: invoiceId must be created");
+
+        setUserContext();
+        try {
+            InvoicePaymentAllocation allocation = new InvoicePaymentAllocation();
+            allocation.setPayRecordId(payRecordId);
+            allocation.setAllocatedAmount(new BigDecimal("6000.00"));
+            invoiceService.saveAllocations(invoiceId, List.of(allocation));
+            jdbcTemplate.update("""
+                    INSERT INTO sys_file(id, tenant_id, business_type, document_type, business_id,
+                        file_name, original_name, file_size, content_type, storage_path, bucket_name,
+                        created_at, updated_at, deleted_flag)
+                    VALUES(?, 0, 'INVOICE', 'ELECTRONIC_INVOICE', ?, 'invoice.pdf', 'invoice.pdf',
+                        128, 'application/pdf', ?, 'cgc-pms', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
+                    """, System.nanoTime(), invoiceId, "INVOICE/" + invoiceId + "/invoice.pdf");
+        } finally {
+            clearUserContext();
+        }
 
         mockMvc.perform(withCsrf(putWithApi("/invoices/" + invoiceId + "/verify"))
                         .cookie(adminCookie())

@@ -1,5 +1,6 @@
 package com.cgcpms.project;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
@@ -9,6 +10,8 @@ import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostSummary;
 import com.cgcpms.cost.mapper.CostSummaryMapper;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.PaymentTestFixtures;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
@@ -19,6 +22,7 @@ import com.cgcpms.project.vo.ProjectOverviewVO;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.SysUserMapper;
 
+import java.util.ArrayList;
 import java.util.List;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
@@ -66,6 +70,9 @@ class ProjectOverviewServiceTest {
 
     @Autowired
     private PayRecordMapper payRecordMapper;
+
+    @Autowired
+    private PayApplicationMapper payApplicationMapper;
 
     @Autowired
     private AlertLogMapper alertLogMapper;
@@ -129,6 +136,7 @@ class ProjectOverviewServiceTest {
         testProjectId = createTestProject();
 
         // Create 3 contracts
+        List<Long> contractIds = new ArrayList<>();
         for (int i = 0; i < 3; i++) {
             CtContract contract = new CtContract();
             contract.setTenantId(TENANT_0);
@@ -140,6 +148,7 @@ class ProjectOverviewServiceTest {
             contract.setCurrentAmount(new BigDecimal("1000000.00"));
             contract.setContractStatus("PERFORMING");
             ctContractMapper.insert(contract);
+            contractIds.add(contract.getId());
         }
 
         // Create cost_summary rows (2 subjects)
@@ -164,11 +173,14 @@ class ProjectOverviewServiceTest {
 
         // Create pay_records (2 successful, 1 failed)
         for (int i = 0; i < 3; i++) {
+            long applicationId = IdWorker.getId();
+            PaymentTestFixtures.insertApplication(payApplicationMapper, applicationId, TENANT_0,
+                    testProjectId, contractIds.get(i), null, new BigDecimal("200000.00"));
             PayRecord record = new PayRecord();
             record.setTenantId(TENANT_0);
             record.setProjectId(testProjectId);
-            record.setPayApplicationId(1000L + i);
-            record.setContractId(100L + i);
+            record.setPayApplicationId(applicationId);
+            record.setContractId(contractIds.get(i));
             record.setPayAmount(new BigDecimal("200000.00"));
             record.setPayDate(LocalDate.now());
             record.setPayStatus(i < 2 ? "SUCCESS" : "PENDING");

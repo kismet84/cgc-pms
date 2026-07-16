@@ -34,6 +34,11 @@ export interface InvoiceVO {
   tenantId?: string
   payRecordId?: string
   payApplicationId?: string
+  projectId?: string
+  contractId?: string
+  partnerId?: string
+  documentType?: 'ELECTRONIC_INVOICE' | 'SCANNED_INVOICE'
+  integrityVersion?: string
   invoiceNo: string
   invoiceType: InvoiceType
   invoiceAmount: string
@@ -49,6 +54,17 @@ export interface InvoiceVO {
   buyerName?: string
   buyerTaxNo?: string
   sellerTaxNo?: string
+  exceptionStatus?: 'NORMAL' | 'SUSPECT' | 'REJECTED' | 'PENDING_CREDIT'
+  exceptionReason?: string
+}
+
+export interface InvoicePaymentAllocationVO {
+  id?: string
+  invoiceId?: string
+  payRecordId: string
+  payApplicationId?: string
+  allocatedAmount: string
+  createdAt?: string
 }
 
 /** Invoice recognition result (from PDF extraction) */
@@ -64,6 +80,7 @@ export interface InvoiceRecognizeResultVO {
   buyerTaxNo?: string
   sellerTaxNo?: string
   remark?: string
+  confidence?: string
 }
 
 /** Pay record brief (for dropdown selector) */

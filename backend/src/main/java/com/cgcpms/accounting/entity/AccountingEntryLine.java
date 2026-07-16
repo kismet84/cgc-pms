@@ -31,6 +31,9 @@ public class AccountingEntryLine extends BaseEntity {
     /** 关联 cost_subject.id（非字符串，避免科目编码变更导致历史数据过期） */
     private Long costSubjectId;
 
+    private String accountCode;
+    private String accountName;
+
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal amount;
 

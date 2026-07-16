@@ -31,6 +31,7 @@ public class CtContractChangeService {
     private final CtContractMapper ctContractMapper;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
+    private final BusinessMatterRegistryService businessMatterRegistryService;
 
     public IPage<CtContractChange> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                            String changeType, String approvalStatus, String changeCode) {
@@ -98,7 +99,10 @@ public class CtContractChangeService {
         }
 
         change.setTenantId(UserContext.getCurrentTenantId());
+        change.setBusinessMatterKey(businessMatterRegistryService.normalize(change.getBusinessMatterKey()));
         ctContractChangeMapper.insert(change);
+        businessMatterRegistryService.register(BusinessMatterRegistryService.SOURCE_CONTRACT_CHANGE,
+                change.getId(), change.getProjectId(), change.getContractId(), change.getBusinessMatterKey());
         return change.getId();
     }
 
@@ -114,6 +118,12 @@ public class CtContractChangeService {
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
+        if (change.getBusinessMatterKey() != null) {
+            businessMatterRegistryService.replace(BusinessMatterRegistryService.SOURCE_CONTRACT_CHANGE,
+                    existing.getId(), existing.getProjectId(), existing.getContractId(),
+                    existing.getBusinessMatterKey(), change.getBusinessMatterKey());
+            change.setBusinessMatterKey(businessMatterRegistryService.normalize(change.getBusinessMatterKey()));
+        }
         ctContractChangeMapper.updateById(change);
     }
 
@@ -130,6 +140,8 @@ public class CtContractChangeService {
             throw new BusinessException("COST_GENERATED", "已生成成本，不可删除，请走冲销");
 
         ctContractChangeMapper.deleteById(id);
+        businessMatterRegistryService.release(BusinessMatterRegistryService.SOURCE_CONTRACT_CHANGE,
+                id, "合同变更草稿删除");
     }
 
     /**

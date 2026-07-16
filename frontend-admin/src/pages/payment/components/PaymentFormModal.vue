@@ -1,22 +1,10 @@
 <script setup lang="ts">
-import type { PayApplicationBasisVO, PayApplicationVO } from '@/types/payment'
+import type { BudgetLineVO } from '@/types/budget'
+import type { PayApplicationVO, PaymentApplicationSourceVO } from '@/types/payment'
 
-type ProjectOption = {
-  id: string
-  projectName?: string
-}
-
-type ContractOption = {
-  id: string
-  contractName?: string
-}
-
-type BasisOption = {
-  id: string
-  label: string
-}
-
-type BasisRow = Partial<PayApplicationBasisVO> & { key: number }
+type ProjectOption = { id: string; projectName?: string }
+type ContractOption = { id: string; contractName?: string }
+type SourceRow = Partial<PaymentApplicationSourceVO> & { key: number }
 
 const props = defineProps<{
   open: boolean
@@ -26,13 +14,15 @@ const props = defineProps<{
   contracts?: ContractOption[]
   formPartnerName: string
   payTypeLabel: Record<string, string>
-  basisList: BasisRow[]
-  getSourceOptions: (sourceType?: string) => BasisOption[]
+  budgetLines: BudgetLineVO[]
+  sourceList: SourceRow[]
+  proofFileName?: string
   onFormProjectChange: (value: string) => void
   onContractChange: (value: string) => void
-  onAddBasis: () => void
-  onSourceChange: (index: number) => void
-  onRemoveBasis: (index: number) => void
+  onBudgetLineChange: (value: string) => void
+  onAddSource: () => void
+  onRemoveSource: (index: number) => void
+  onProofFileChange: (event: Event) => void
 }>()
 
 const emit = defineEmits<{
@@ -45,47 +35,55 @@ const emit = defineEmits<{
   <a-modal
     :open="props.open"
     :title="props.title"
-    :width="800"
+    :width="900"
     @update:open="(value) => emit('update:open', value)"
     @ok="emit('submit')"
   >
+    <a-alert
+      type="info"
+      show-icon
+      style="margin-bottom: 16px"
+      message="付款申请提交前将校验项目、合同、预算、附件、费用分类、付款对象与来源金额。"
+    />
     <a-form layout="vertical" :model="props.formData">
       <a-row :gutter="16">
         <a-col :span="12"
-          ><a-form-item label="项目"
+          ><a-form-item label="项目" required
             ><a-select
               v-model:value="props.formData.projectId"
-              placeholder="请选择项目"
-              style="width: 100%"
               :options="(props.projects ?? []).map((p) => ({ value: p.id, label: p.projectName }))"
               @change="props.onFormProjectChange" /></a-form-item
         ></a-col>
         <a-col :span="12"
-          ><a-form-item label="合同"
+          ><a-form-item label="合同" required
             ><a-select
               v-model:value="props.formData.contractId"
-              placeholder="请选择合同"
-              style="width: 100%"
               :options="
                 (props.contracts ?? []).map((c) => ({ value: c.id, label: c.contractName }))
               "
               @change="props.onContractChange" /></a-form-item
         ></a-col>
-      </a-row>
-      <a-row :gutter="16">
         <a-col :span="12"
-          ><a-form-item label="合作方"
+          ><a-form-item label="付款对象" required
             ><a-input
               :value="props.formPartnerName"
               disabled
-              placeholder="选择合同后自动填充乙方" /></a-form-item
+              placeholder="选择合同后自动带出乙方" /></a-form-item
         ></a-col>
         <a-col :span="12"
-          ><a-form-item label="付款类型"
+          ><a-form-item label="预算/成本科目" required
             ><a-select
-              v-model:value="props.formData.payType"
-              placeholder="请选择付款类型"
-              style="width: 100%"
+              v-model:value="props.formData.budgetLineId"
+              @change="props.onBudgetLineChange"
+              ><a-select-option v-for="line in props.budgetLines" :key="line.id" :value="line.id"
+                >{{ line.costSubjectName }}（可用 {{ line.availableAmount }}）</a-select-option
+              ></a-select
+            ></a-form-item
+          ></a-col
+        >
+        <a-col :span="8"
+          ><a-form-item label="付款类型" required
+            ><a-select v-model:value="props.formData.payType"
               ><a-select-option
                 v-for="(label, key) in props.payTypeLabel"
                 :key="key"
@@ -95,33 +93,43 @@ const emit = defineEmits<{
             ></a-form-item
           ></a-col
         >
-      </a-row>
-      <a-row :gutter="16">
-        <a-col :span="12"
-          ><a-form-item label="申请编号" required
-            ><a-input
-              v-model:value="props.formData.applyCode"
-              placeholder="请输入申请编号" /></a-form-item
-        ></a-col>
-        <a-col :span="12"
-          ><a-form-item label="申请金额"
+        <a-col :span="8"
+          ><a-form-item label="费用分类" required
+            ><a-select v-model:value="props.formData.expenseCategory"
+              ><a-select-option value="LABOR">人工费</a-select-option
+              ><a-select-option value="MATERIAL">材料费</a-select-option
+              ><a-select-option value="SUBCONTRACT">分包费</a-select-option
+              ><a-select-option value="OTHER">其他</a-select-option></a-select
+            ></a-form-item
+          ></a-col
+        >
+        <a-col :span="8"
+          ><a-form-item label="申请金额" required
             ><a-input-number
               v-model:value="props.formData.applyAmount"
-              :min="0"
+              :min="0.01"
               :precision="2"
-              style="width: 100%"
-              placeholder="金额（元）" /></a-form-item
+              style="width: 100%" /></a-form-item
         ></a-col>
-        <a-col :span="12"
-          ><a-form-item label="申请原因"
-            ><a-textarea
-              v-model:value="props.formData.applyReason"
-              placeholder="申请原因"
-              :rows="2" /></a-form-item
+        <a-col :span="24"
+          ><a-form-item label="申请原因" required
+            ><a-textarea v-model:value="props.formData.applyReason" :rows="2" /></a-form-item
         ></a-col>
+        <a-col :span="24"
+          ><a-form-item label="付款附件" required
+            ><input
+              type="file"
+              accept=".pdf,.png,.jpg,.jpeg"
+              @change="props.onProofFileChange"
+            /><span v-if="props.proofFileName" style="margin-left: 8px">{{
+              props.proofFileName
+            }}</span></a-form-item
+          ></a-col
+        >
       </a-row>
     </a-form>
-    <div style="border-top: 1px solid #f0f0f0; padding-top: 12px; margin-top: 4px">
+
+    <div style="border-top: 1px solid #f0f0f0; padding-top: 12px">
       <div
         style="
           display: flex;
@@ -130,58 +138,40 @@ const emit = defineEmits<{
           margin-bottom: 10px;
         "
       >
-        <span style="font-weight: 600; font-size: 14px">付款依据</span
-        ><a-button size="small" @click="props.onAddBasis">添加依据行</a-button>
+        <strong>统一付款来源</strong
+        ><a-button size="small" @click="props.onAddSource">添加来源</a-button>
       </div>
-      <a-table
-        :data-source="props.basisList"
-        :pagination="false"
-        row-key="key"
-        size="small"
-        :scroll="{ y: 240 }"
-      >
-        <a-table-column title="来源类型" width="100"
-          ><template #default="{ record: item, index }"
-            ><a-select
-              v-model:value="item.basisType"
-              size="small"
-              style="width: 100%"
-              @change="props.onSourceChange(index)"
-              ><a-select-option value="MAT_RECEIPT">材料验收</a-select-option
-              ><a-select-option value="SUB_MEASURE">分包计量</a-select-option></a-select
+      <a-table :data-source="props.sourceList" :pagination="false" row-key="key" size="small">
+        <a-table-column title="来源类型" width="160"
+          ><template #default="{ record }"
+            ><a-select v-model:value="record.sourceType" style="width: 100%"
+              ><a-select-option value="EXPENSE">费用申请</a-select-option
+              ><a-select-option value="SETTLEMENT">结算申请</a-select-option
+              ><a-select-option value="DIRECT">直接付款</a-select-option></a-select
             ></template
           ></a-table-column
         >
-        <a-table-column title="来源单据" width="240"
-          ><template #default="{ record: item }"
-            ><a-select
-              v-model:value="item.basisId"
-              size="small"
-              placeholder="选择明细"
-              allow-clear
-              style="width: 100%"
-              ><a-select-option
-                v-for="opt in props.getSourceOptions(item.basisType)"
-                :key="opt.id"
-                :value="opt.id"
-                >{{ opt.label }}</a-select-option
-              ></a-select
-            ></template
-          ></a-table-column
-        >
-        <a-table-column title="金额" width="160"
-          ><template #default="{ record: item }"
-            ><a-input-number
-              v-model:value="item.basisAmount"
-              :min="0"
-              :precision="2"
-              size="small"
-              style="width: 100%"
-              placeholder="金额" /></template
+        <a-table-column title="来源单据 ID"
+          ><template #default="{ record }"
+            ><a-input
+              v-model:value="record.sourceRefId"
+              :placeholder="
+                record.sourceType === 'DIRECT'
+                  ? '保存后自动使用付款申请ID'
+                  : '请输入已审批来源单据ID'
+              " /></template
         ></a-table-column>
-        <a-table-column title="操作" width="76"
+        <a-table-column title="来源金额" width="200"
+          ><template #default="{ record }"
+            ><a-input-number
+              v-model:value="record.sourceAmount"
+              :min="0.01"
+              :precision="2"
+              style="width: 100%" /></template
+        ></a-table-column>
+        <a-table-column title="操作" width="80"
           ><template #default="{ index }"
-            ><a-button type="link" size="small" danger @click="props.onRemoveBasis(index)"
+            ><a-button type="link" danger @click="props.onRemoveSource(index)"
               >删除</a-button
             ></template
           ></a-table-column

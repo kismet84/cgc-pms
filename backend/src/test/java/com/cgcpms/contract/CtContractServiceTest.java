@@ -22,6 +22,8 @@ import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.PaymentTestFixtures;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -78,6 +80,9 @@ class CtContractServiceTest {
 
     @Autowired
     private PayRecordMapper payRecordMapper;
+
+    @Autowired
+    private PayApplicationMapper payApplicationMapper;
 
     @Autowired
     private CtContractItemMapper itemMapper;
@@ -844,6 +849,11 @@ class CtContractServiceTest {
         draftChange.setChangeAmount(new BigDecimal("300000.00"));
         draftChange.setApprovalStatus("DRAFT");
         contractChangeMapper.insert(draftChange);
+
+        PaymentTestFixtures.insertApplication(payApplicationMapper, 90001L, TENANT_ID,
+                PROJECT_ID, contract.getId(), PARTY_B_ID, new BigDecimal("300000.00"));
+        PaymentTestFixtures.insertApplication(payApplicationMapper, 90002L, TENANT_ID,
+                PROJECT_ID, contract.getId(), PARTY_B_ID, new BigDecimal("100000.00"));
 
         PayRecord paid = new PayRecord();
         paid.setTenantId(TENANT_ID);

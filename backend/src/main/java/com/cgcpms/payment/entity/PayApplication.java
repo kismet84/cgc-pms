@@ -3,6 +3,7 @@ package com.cgcpms.payment.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -33,7 +34,19 @@ public class PayApplication extends BaseEntity {
 
     private Long partnerId;
 
-    @NotBlank
+    private Long costSubjectId;
+
+    private Long budgetLineId;
+
+    private String expenseCategory;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long approvalInstanceId;
+
+    /** 完整性规则版本；历史记录保留 LEGACY_UNVERIFIED，新建记录执行 CLOSED_LOOP_V1。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String integrityVersion;
+
     private String applyCode;
 
     @NotNull
@@ -56,4 +69,8 @@ public class PayApplication extends BaseEntity {
     private String approvalStatus;
 
     private String applyReason;
+
+    @Version
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Integer version;
 }

@@ -96,7 +96,13 @@ class PmProjectArchiveTest {
         project.setStatus(status);
         project.setTargetCost(new BigDecimal("1000000.00"));
         project.setContractAmount(new BigDecimal("2000000.00"));
-        return projectService.create(project);
+        Long id = projectService.create(project);
+        PmProject stored = projectMapper.selectById(id);
+        if (!status.equals(stored.getStatus())) {
+            stored.setStatus(status);
+            projectMapper.updateById(stored);
+        }
+        return id;
     }
 
     private Long createContract(Long projectId, String code, String contractStatus) {
@@ -170,7 +176,7 @@ class PmProjectArchiveTest {
     @Transactional
     @DisplayName("TC1: 空项目可以归档")
     void testEmptyProjectCanBeArchived() {
-        projectId = createProject("PRJ-ARCH-EMPTY-" + System.currentTimeMillis(), "空项目归档测试", "DRAFT");
+        projectId = createProject("PRJ-ARCH-EMPTY-" + System.currentTimeMillis(), "空项目归档测试", "CLOSED");
 
         projectService.archive(projectId);
 
@@ -206,7 +212,7 @@ class PmProjectArchiveTest {
     @Transactional
     @DisplayName("TC2: 存在进行中合同时无法归档")
     void testActiveContractBlocksArchive() {
-        projectId = createProject("PRJ-ARCH-CT-" + System.currentTimeMillis(), "合同归档测试", "ACTIVE");
+        projectId = createProject("PRJ-ARCH-CT-" + System.currentTimeMillis(), "合同归档测试", "CLOSED");
         Long contractId = createContract(projectId, "CT-ARCH-TEST", "PERFORMING");
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -233,7 +239,7 @@ class PmProjectArchiveTest {
     @Transactional
     @DisplayName("TC3: 存在未付完的付款申请时无法归档")
     void testActivePaymentBlocksArchive() {
-        projectId = createProject("PRJ-ARCH-PAY-" + System.currentTimeMillis(), "付款归档测试", "ACTIVE");
+        projectId = createProject("PRJ-ARCH-PAY-" + System.currentTimeMillis(), "付款归档测试", "CLOSED");
         Long contractId = createContract(projectId, "CT-PAY-TEST", "SETTLED");
         createPayApplication(projectId, contractId, "PAY-ARCH-TEST", "APPROVED");
 
@@ -252,7 +258,7 @@ class PmProjectArchiveTest {
     @Transactional
     @DisplayName("TC4: 存在未完成的结算时无法归档")
     void testUnfinalizedSettlementBlocksArchive() {
-        projectId = createProject("PRJ-ARCH-STL-" + System.currentTimeMillis(), "结算归档测试", "ACTIVE");
+        projectId = createProject("PRJ-ARCH-STL-" + System.currentTimeMillis(), "结算归档测试", "CLOSED");
         Long contractId = createContract(projectId, "CT-STL-TEST", "SETTLED");
         createSettlement(projectId, contractId, "STL-ARCH-TEST", false);
 
@@ -271,7 +277,7 @@ class PmProjectArchiveTest {
     @Transactional
     @DisplayName("TC5: 存在运行中审批流程时无法归档")
     void testRunningWorkflowBlocksArchive() {
-        projectId = createProject("PRJ-ARCH-WF-" + System.currentTimeMillis(), "工作流归档测试", "ACTIVE");
+        projectId = createProject("PRJ-ARCH-WF-" + System.currentTimeMillis(), "工作流归档测试", "CLOSED");
         createWorkflowInstance(projectId, "CONTRACT_APPROVAL", projectId + 100, "RUNNING");
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -358,7 +364,7 @@ class PmProjectArchiveTest {
     @Transactional
     @DisplayName("TC9: 已归档项目无法再次归档")
     void testAlreadyArchivedProjectRejectsReArchive() {
-        projectId = createProject("PRJ-ARCH-DUP-" + System.currentTimeMillis(), "重复归档测试", "DRAFT");
+        projectId = createProject("PRJ-ARCH-DUP-" + System.currentTimeMillis(), "重复归档测试", "CLOSED");
 
         // First archive
         projectService.archive(projectId);

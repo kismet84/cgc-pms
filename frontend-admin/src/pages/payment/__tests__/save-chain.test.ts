@@ -11,32 +11,28 @@ const formModalSource = readFileSync(
 )
 
 describe('PaymentPage save chain integrity', () => {
-  describe('createApplication returns string (not {id}) — Bug FE-01 fix', () => {
-    it('handleSubmit uses returned string directly, not .id property', () => {
-      // createApplication returns Promise<string>, so res is a string.
-      // The fix: const id = await createApplication(formData) then saveBasis(id, cleaned payload)
-      expect(paymentSource).toMatch(/const\s+id\s+=\s+await\s+createApplication\(formData\)/)
-      expect(paymentSource).toMatch(/const\s+basisPayload\s+=\s+buildBasisPayload\(\)/)
-      expect(paymentSource).toMatch(/await\s+saveBasis\(id,\s*basisPayload\)/)
+  describe('createApplication returns string (not {id})', () => {
+    it('uses the returned id for sources and attachments', () => {
+      expect(paymentSource).toMatch(/id\s*=\s*await\s+createApplication\(formData\)/)
+      expect(paymentSource).toMatch(/await\s+saveApplicationSources\(id!,\s*sources\)/)
+      expect(paymentSource).toMatch(/uploadFile\(proofFile\.value,\s*'PAYMENT',\s*id!/)
     })
 
     it('does NOT reference res.id for createApplication result', () => {
       // The old buggy pattern was "const res = await createApplication(...); saveBasis(res.id, ...)"
       // This must not appear in the source
-      expect(paymentSource).not.toMatch(/saveBasis\(res\.id/)
+      expect(paymentSource).not.toMatch(/saveApplicationSources\(res\.id/)
     })
   })
 
-  describe('handleEdit basis load failure protection', () => {
+  describe('handleEdit source load failure protection', () => {
     it('loads application detail before filling edit form', () => {
       const handleEditFn = paymentSource.match(/async function handleEdit[\s\S]*?\n\}/)
       expect(handleEditFn?.[0]).toMatch(/await\s+getApplicationDetail\(record\.id\)/)
       expect(handleEditFn?.[0]).toMatch(/applyCode:\s*detail\.applyCode/)
       expect(handleEditFn?.[0]).toMatch(/applyAmount:\s*detail\.applyAmount/)
       expect(handleEditFn?.[0]).toMatch(/applyReason:\s*detail\.applyReason/)
-      expect(handleEditFn?.[0]).toMatch(
-        /detail\.basis\?\.length\s*\?\s*detail\.basis\s*:\s*\(await\s+getBasisList\(record\.id\)\)/,
-      )
+      expect(handleEditFn?.[0]).toMatch(/await\s+getApplicationSources\(record\.id\)/)
     })
 
     it('shows error message and returns early on getBasisList failure', () => {
@@ -50,23 +46,22 @@ describe('PaymentPage save chain integrity', () => {
       // After the fix, the function returns early with message.error instead
       const handleEditFn = paymentSource.match(/async function handleEdit[\s\S]*?\n\}/)
       if (handleEditFn) {
-        expect(handleEditFn[0]).not.toMatch(/catch[\s\S]*?basisList\.value\s*=\s*\[\]/)
+        expect(handleEditFn[0]).not.toMatch(/catch[\s\S]*?sourceList\.value\s*=\s*\[\]/)
       }
     })
   })
 
-  describe('payment basis backend contract', () => {
-    it('uses backend basis field names in the modal and submit payload', () => {
-      expect(formModalSource).toContain('v-model:value="item.basisType"')
-      expect(formModalSource).toContain('v-model:value="item.basisId"')
-      expect(formModalSource).toContain('v-model:value="item.basisAmount"')
-      expect(paymentSource).toMatch(/await\s+saveBasis\(id,\s*basisPayload\)/)
+  describe('unified payment source backend contract', () => {
+    it('uses source type, reference and amount fields', () => {
+      expect(formModalSource).toContain('v-model:value="record.sourceType"')
+      expect(formModalSource).toContain('v-model:value="record.sourceRefId"')
+      expect(formModalSource).toContain('v-model:value="record.sourceAmount"')
+      expect(paymentSource).toMatch(/await\s+saveApplicationSources\(id!,\s*sources\)/)
     })
 
     it('does not submit stale sourceType/sourceId/amount field names for basis rows', () => {
-      expect(formModalSource).not.toContain('v-model:value="item.sourceType"')
-      expect(formModalSource).not.toContain('v-model:value="item.sourceId"')
-      expect(formModalSource).not.toContain('v-model:value="item.amount"')
+      expect(formModalSource).not.toContain('v-model:value="record.sourceId"')
+      expect(formModalSource).not.toContain('v-model:value="record.amount"')
     })
   })
 })

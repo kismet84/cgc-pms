@@ -38,6 +38,7 @@ public class StlSettlementAssembler {
         vo.setDeductionAmount(m.getDeductionAmount() != null ? m.getDeductionAmount().toPlainString() : null);
         vo.setPaidAmount(m.getPaidAmount() != null ? m.getPaidAmount().toPlainString() : null);
         vo.setFinalAmount(m.getFinalAmount() != null ? m.getFinalAmount().toPlainString() : null);
+        vo.setAmountFormulaVersion(m.getAmountFormulaVersion());
         vo.setApprovalStatus(m.getApprovalStatus());
         vo.setStatus(m.getStatus());
         vo.setUnpaidAmount(m.getUnpaidAmount() != null ? m.getUnpaidAmount().toPlainString() : null);

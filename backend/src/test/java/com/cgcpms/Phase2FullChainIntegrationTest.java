@@ -474,10 +474,11 @@ class Phase2FullChainIntegrationTest {
     @Transactional
     @DisplayName("场景6c: 付款金额边界——累计付款精确等于合同金额")
     void test06c_balanceBoundaryExactMatch() {
-        // Set contract amount to 100000
+        // 在已有审批申请基线上再留出 100000，避免共享种子数据影响边界语义。
+        BigDecimal existingApproved = approvedApplicationAmount(CONTRACT_ID);
         CtContract contract = contractMapper.selectById(CONTRACT_ID);
-        contract.setContractAmount(new BigDecimal("100000"));
-        contract.setCurrentAmount(new BigDecimal("100000"));
+        contract.setContractAmount(existingApproved.add(new BigDecimal("100000")));
+        contract.setCurrentAmount(existingApproved.add(new BigDecimal("100000")));
         contractMapper.updateById(contract);
 
         // Create and approve first payment of 50000
@@ -519,9 +520,10 @@ class Phase2FullChainIntegrationTest {
     void test06d_balanceBoundaryExceedByOneCent() {
         // Contract amount = 100000, first payment = 50000 (approved)
         // Second payment = 50000.01 → should be REJECTED (exceeds by 1 cent)
+        BigDecimal existingApproved = approvedApplicationAmount(CONTRACT_ID);
         CtContract contract = contractMapper.selectById(CONTRACT_ID);
-        contract.setContractAmount(new BigDecimal("100000"));
-        contract.setCurrentAmount(new BigDecimal("100000"));
+        contract.setContractAmount(existingApproved.add(new BigDecimal("100000")));
+        contract.setCurrentAmount(existingApproved.add(new BigDecimal("100000")));
         contractMapper.updateById(contract);
 
         PayApplication app1 = new PayApplication();
@@ -552,6 +554,15 @@ class Phase2FullChainIntegrationTest {
                 "超出合同余额1分钱应抛出EXCEED_CONTRACT_BALANCE");
 
         System.out.println("✅ 场景6d 通过: 超出合同余额1分钱被拒止, code=" + ex.getCode());
+    }
+
+    private BigDecimal approvedApplicationAmount(Long contractId) {
+        return payApplicationMapper.selectList(new LambdaQueryWrapper<PayApplication>()
+                        .eq(PayApplication::getContractId, contractId)
+                        .eq(PayApplication::getApprovalStatus, "APPROVED"))
+                .stream()
+                .map(item -> item.getApplyAmount() == null ? BigDecimal.ZERO : item.getApplyAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -590,11 +601,17 @@ class Phase2FullChainIntegrationTest {
 
         app.setId(appId);
         app.setApprovalStatus("APPROVED");
+        // Phase2 场景保留为历史付款依据兼容测试，当前闭环路径另有独立集成测试。
+        app.setIntegrityVersion("LEGACY_UNVERIFIED");
         payApplicationMapper.updateById(app);
 
-        // 记录合同原有已付金额
-        CtContract contractBefore = contractMapper.selectById(CONTRACT_ID);
-        BigDecimal paidBefore = contractBefore.getPaidAmount() != null ? contractBefore.getPaidAmount() : BigDecimal.ZERO;
+        // 以成功付款事实为权威口径，避免历史合同汇总字段与明细暂时不一致影响用例。
+        BigDecimal paidBefore = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                        .eq(PayRecord::getContractId, CONTRACT_ID)
+                        .eq(PayRecord::getPayStatus, "SUCCESS"))
+                .stream()
+                .map(item -> item.getPayAmount() == null ? BigDecimal.ZERO : item.getPayAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // 3. 执行第一笔回写（部分付款：150000中的80000）
         PayRecord input1 = new PayRecord();

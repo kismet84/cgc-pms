@@ -28,6 +28,7 @@ import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.mapper.StlSettlementItemMapper;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
+import com.cgcpms.settlement.vo.SettlementAmountBaselineVO;
 import com.cgcpms.settlement.vo.SettlementAttachmentVO;
 import com.cgcpms.settlement.vo.SettlementCostItemVO;
 import com.cgcpms.settlement.vo.SettlementPaymentItemVO;
@@ -53,7 +54,6 @@ import org.springframework.util.StringUtils;
 import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMENT_DRAFT;
 import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMENT_FINALIZED;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -69,8 +69,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class StlSettlementQueryService {
-
-    private static final BigDecimal DEFAULT_WARRANTY_RATE = new BigDecimal("0.05");
 
     private final StlSettlementMapper stlSettlementMapper;
     private final StlSettlementItemMapper stlSettlementItemMapper;
@@ -192,31 +190,112 @@ public class StlSettlementQueryService {
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
         }
 
-        BigDecimal contractAmount = contract.getCurrentAmount() != null ? contract.getCurrentAmount() : BigDecimal.ZERO;
-
-        BigDecimal changeAmount = sumVarOrderConfirmed(tenantId, contractId);
-        BigDecimal measuredAmount = sumSubMeasureApproved(tenantId, contractId);
-        BigDecimal paidAmount = sumPaidAmount(tenantId, contractId);
-        BigDecimal deductionAmount = BigDecimal.ZERO;
-
-        BigDecimal finalAmount = contractAmount.add(changeAmount).add(measuredAmount).subtract(deductionAmount);
-
-        BigDecimal warrantyRate = DEFAULT_WARRANTY_RATE;
-        BigDecimal warrantyAmount = finalAmount.multiply(warrantyRate).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal unpaidAmount = finalAmount.subtract(paidAmount).subtract(warrantyAmount);
+        SettlementAmountSnapshot snapshot = SettlementAmountPolicy.calculate(
+                contract.getCurrentAmount(),
+                sumVarOrderConfirmed(tenantId, contractId),
+                sumSubMeasureApproved(tenantId, contractId),
+                BigDecimal.ZERO,
+                sumPaidAmount(tenantId, contractId));
 
         StlSettlementVO vo = new StlSettlementVO();
-        vo.setContractAmount(contractAmount.toPlainString());
-        vo.setChangeAmount(changeAmount.toPlainString());
-        vo.setMeasuredAmount(measuredAmount.toPlainString());
-        vo.setDeductionAmount(deductionAmount.toPlainString());
-        vo.setPaidAmount(paidAmount.toPlainString());
-        vo.setFinalAmount(finalAmount.toPlainString());
-        vo.setWarrantyAmount(warrantyAmount.toPlainString());
-        vo.setUnpaidAmount(unpaidAmount.toPlainString());
+        vo.setContractAmount(snapshot.effectiveContractAmount().toPlainString());
+        vo.setChangeAmount(snapshot.confirmedVariationAmount().toPlainString());
+        vo.setMeasuredAmount(snapshot.approvedMeasuredAmount().toPlainString());
+        vo.setDeductionAmount(snapshot.deductionAmount().toPlainString());
+        vo.setPaidAmount(snapshot.paidAmount().toPlainString());
+        vo.setFinalAmount(snapshot.finalAmount().toPlainString());
+        vo.setWarrantyAmount(snapshot.warrantyAmount().toPlainString());
+        vo.setUnpaidAmount(snapshot.unpaidAmount().toPlainString());
+        vo.setAmountFormulaVersion(snapshot.formulaVersion());
         vo.setContractName(contract.getContractName());
         vo.setProjectId(contract.getProjectId() != null ? contract.getProjectId().toString() : null);
         return vo;
+    }
+
+    /**
+     * 逐条预览历史结算快照与当前权威来源重算值的差异，不修改任何数据。
+     */
+    public IPage<SettlementAmountBaselineVO> previewAmountBaseline(long pageNo, long pageSize) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        long safePageNo = Math.max(1, pageNo);
+        long safePageSize = Math.min(100, Math.max(1, pageSize));
+        Page<StlSettlement> page = stlSettlementMapper.selectPage(
+                new Page<>(safePageNo, safePageSize),
+                new LambdaQueryWrapper<StlSettlement>()
+                        .eq(StlSettlement::getTenantId, tenantId)
+                        .orderByAsc(StlSettlement::getCreatedAt));
+        return page.convert(settlement -> toAmountBaseline(settlement, tenantId));
+    }
+
+    private SettlementAmountBaselineVO toAmountBaseline(StlSettlement settlement, Long tenantId) {
+        SettlementAmountBaselineVO vo = new SettlementAmountBaselineVO();
+        vo.setSettlementId(String.valueOf(settlement.getId()));
+        vo.setSettlementCode(settlement.getSettlementCode());
+        vo.setProjectId(settlement.getProjectId() != null ? settlement.getProjectId().toString() : null);
+        vo.setContractId(settlement.getContractId() != null ? settlement.getContractId().toString() : null);
+        vo.setStoredFormulaVersion(settlement.getAmountFormulaVersion());
+        vo.setTargetFormulaVersion(SettlementAmountPolicy.FORMULA_VERSION);
+
+        CtContract contract = settlement.getContractId() == null
+                ? null
+                : ctContractMapper.selectById(settlement.getContractId());
+        if (contract == null || !Objects.equals(contract.getTenantId(), tenantId)) {
+            vo.setAmountConsistent(false);
+            vo.setFormulaVersionCurrent(false);
+            vo.setRecommendedAction("MISSING_CONTRACT");
+            return vo;
+        }
+
+        SettlementAmountSnapshot recalculated = SettlementAmountPolicy.calculate(
+                contract.getCurrentAmount(),
+                sumVarOrderConfirmed(tenantId, contract.getId()),
+                sumSubMeasureApproved(tenantId, contract.getId()),
+                settlement.getDeductionAmount(),
+                sumPaidAmount(tenantId, contract.getId()));
+
+        vo.setStoredContractAmount(plain(settlement.getContractAmount()));
+        vo.setCurrentEffectiveContractAmount(recalculated.effectiveContractAmount().toPlainString());
+        vo.setStoredChangeAmount(plain(settlement.getChangeAmount()));
+        vo.setCurrentConfirmedVariationAmount(recalculated.confirmedVariationAmount().toPlainString());
+        vo.setStoredMeasuredAmount(plain(settlement.getMeasuredAmount()));
+        vo.setCurrentApprovedMeasuredAmount(recalculated.approvedMeasuredAmount().toPlainString());
+        vo.setDeductionAmount(recalculated.deductionAmount().toPlainString());
+        vo.setStoredPaidAmount(plain(settlement.getPaidAmount()));
+        vo.setCurrentPaidAmount(recalculated.paidAmount().toPlainString());
+        vo.setStoredFinalAmount(plain(settlement.getFinalAmount()));
+        vo.setRecalculatedFinalAmount(recalculated.finalAmount().toPlainString());
+        vo.setFinalAmountDelta(recalculated.finalAmount()
+                .subtract(SettlementAmountPolicy.money(settlement.getFinalAmount()))
+                .toPlainString());
+        vo.setStoredWarrantyAmount(plain(settlement.getWarrantyAmount()));
+        vo.setRecalculatedWarrantyAmount(recalculated.warrantyAmount().toPlainString());
+        vo.setStoredUnpaidAmount(plain(settlement.getUnpaidAmount()));
+        vo.setRecalculatedUnpaidAmount(recalculated.unpaidAmount().toPlainString());
+
+        boolean amountConsistent = same(settlement.getContractAmount(), recalculated.effectiveContractAmount())
+                && same(settlement.getChangeAmount(), recalculated.confirmedVariationAmount())
+                && same(settlement.getMeasuredAmount(), recalculated.approvedMeasuredAmount())
+                && same(settlement.getDeductionAmount(), recalculated.deductionAmount())
+                && same(settlement.getPaidAmount(), recalculated.paidAmount())
+                && same(settlement.getFinalAmount(), recalculated.finalAmount())
+                && same(settlement.getWarrantyAmount(), recalculated.warrantyAmount())
+                && same(settlement.getUnpaidAmount(), recalculated.unpaidAmount());
+        boolean formulaVersionCurrent = SettlementAmountPolicy.FORMULA_VERSION
+                .equals(settlement.getAmountFormulaVersion());
+        vo.setAmountConsistent(amountConsistent);
+        vo.setFormulaVersionCurrent(formulaVersionCurrent);
+        vo.setRecommendedAction(!amountConsistent
+                ? "REVIEW_AMOUNT_DRIFT"
+                : formulaVersionCurrent ? "NO_CHANGE" : "BACKFILL_FORMULA_VERSION");
+        return vo;
+    }
+
+    private static boolean same(BigDecimal stored, BigDecimal expected) {
+        return SettlementAmountPolicy.money(stored).compareTo(expected) == 0;
+    }
+
+    private static String plain(BigDecimal value) {
+        return SettlementAmountPolicy.money(value).toPlainString();
     }
 
     // ================================================================

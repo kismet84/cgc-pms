@@ -1,0 +1,28 @@
+ALTER TABLE ct_contract
+    ADD CONSTRAINT fk_contract_project FOREIGN KEY (project_id) REFERENCES pm_project(id) ON DELETE RESTRICT;
+
+ALTER TABLE pay_application
+    ADD CONSTRAINT fk_pay_app_project FOREIGN KEY (project_id) REFERENCES pm_project(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_pay_app_contract FOREIGN KEY (contract_id) REFERENCES ct_contract(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_pay_app_partner FOREIGN KEY (partner_id) REFERENCES md_partner(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_pay_app_subject FOREIGN KEY (cost_subject_id) REFERENCES cost_subject(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_pay_app_budget_line FOREIGN KEY (budget_line_id) REFERENCES project_budget_line(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_pay_app_approval FOREIGN KEY (approval_instance_id) REFERENCES wf_instance(id) ON DELETE RESTRICT;
+
+ALTER TABLE pay_record
+    ADD CONSTRAINT fk_pay_record_project FOREIGN KEY (project_id) REFERENCES pm_project(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_pay_record_application FOREIGN KEY (pay_application_id) REFERENCES pay_application(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_pay_record_contract FOREIGN KEY (contract_id) REFERENCES ct_contract(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_pay_record_partner FOREIGN KEY (partner_id) REFERENCES md_partner(id) ON DELETE RESTRICT;
+
+ALTER TABLE stl_settlement
+    ADD CONSTRAINT fk_settlement_project FOREIGN KEY (project_id) REFERENCES pm_project(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_settlement_contract FOREIGN KEY (contract_id) REFERENCES ct_contract(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_settlement_partner FOREIGN KEY (partner_id) REFERENCES md_partner(id) ON DELETE RESTRICT;
+
+ALTER TABLE cash_journal_entry
+    ADD CONSTRAINT fk_cash_journal_account FOREIGN KEY (account_id) REFERENCES fund_account(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_cash_journal_project FOREIGN KEY (project_id) REFERENCES pm_project(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_cash_journal_contract FOREIGN KEY (contract_id) REFERENCES ct_contract(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_cash_journal_reverse_of FOREIGN KEY (reverse_of_entry_id) REFERENCES cash_journal_entry(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_cash_journal_reversal FOREIGN KEY (reversal_entry_id) REFERENCES cash_journal_entry(id) ON DELETE RESTRICT;

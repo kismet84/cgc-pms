@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cashbook.service.CashJournalService;
+import com.cgcpms.cashbook.entity.FundAccount;
+import com.cgcpms.cashbook.mapper.FundAccountMapper;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.service.CostSummaryService;
@@ -14,6 +16,11 @@ import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.vo.PayRecordVO;
+import com.cgcpms.payment.constant.PaymentIntegrityConstants;
+import com.cgcpms.project.constant.ProjectStatusConstants;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.contract.constant.ContractStatusConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +31,10 @@ import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.time.LocalDateTime;
+import org.springframework.util.StringUtils;
+import com.cgcpms.accounting.service.EntryGenerator;
+import com.cgcpms.accounting.strategy.PayRecordEntryGenerationStrategy;
 
 @Slf4j
 @Service
@@ -36,6 +47,10 @@ public class PayRecordService {
     private final PayApplicationService payApplicationService;
     private final CostSummaryService costSummaryService;
     private final CashJournalService cashJournalService;
+    private final FundAccountMapper fundAccountMapper;
+    private final PmProjectMapper projectMapper;
+    private final PaymentApplicationSourceService sourceService;
+    private final EntryGenerator entryGenerator;
 
     // ---- Query ----
 
@@ -74,6 +89,8 @@ public class PayRecordService {
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
         if (!"APPROVED".equals(app.getApprovalStatus()))
             throw new BusinessException("PAY_APP_NOT_APPROVED", "仅审批通过的付款申请可付款");
+        boolean strictClosedLoop = PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(app.getIntegrityVersion());
+        normalizeAndValidateFact(input, strictClosedLoop);
 
         List<PayRecord> existing = payRecordMapper.selectList(
             new LambdaQueryWrapper<PayRecord>()
@@ -83,7 +100,8 @@ public class PayRecordService {
             PayRecord duplicate = existing.get(0);
             if (!Objects.equals(duplicate.getPayApplicationId(), payApplicationId)
                     || !sameAmount(duplicate.getPayAmount(), input.getPayAmount())
-                    || !Objects.equals(duplicate.getPayDate(), input.getPayDate())) {
+                    || !Objects.equals(duplicate.getPaidAt(), input.getPaidAt())
+                    || !Objects.equals(duplicate.getFundAccountId(), input.getFundAccountId())) {
                 throw new BusinessException("PAY_WRITEBACK_IDEMPOTENCY_CONFLICT",
                         "外部交易流水号已被不同付款数据使用");
             }
@@ -91,6 +109,8 @@ public class PayRecordService {
                 duplicate.getId());
             return toVO(duplicate);
         }
+
+        if (strictClosedLoop) validateSecondGate(app, input);
 
         // Check contract balance before payment — include pendingAmount to prevent concurrent overpay
         BigDecimal pendingAmount = input.getPayAmount() != null ? input.getPayAmount() : BigDecimal.ZERO;
@@ -118,17 +138,27 @@ public class PayRecordService {
         record.setPartnerId(app.getPartnerId());
         record.setProjectId(app.getProjectId());
         record.setPayAmount(input.getPayAmount() != null ? input.getPayAmount() : BigDecimal.ZERO);
-        record.setPayDate(input.getPayDate());
+        record.setPaidAt(input.getPaidAt());
+        record.setPayDate(input.getPaidAt().toLocalDate());
+        record.setFundAccountId(input.getFundAccountId());
         record.setPayMethod(input.getPayMethod());
         record.setVoucherNo(input.getVoucherNo());
         record.setExternalTxnNo(input.getExternalTxnNo());
         record.setPayStatus("SUCCESS");
+        record.setVersion(0);
 
         payRecordMapper.insert(record);
         log.info("Authoritative writeback: pay_record created, id={}, amount={}",
             record.getId(), record.getPayAmount());
 
-        cashJournalService.createPendingFromPayRecord(record);
+        if (strictClosedLoop) {
+            sourceService.consumeForPayment(app, record);
+            cashJournalService.createPendingFromPayRecord(record, app);
+            entryGenerator.generateEntry(PayRecordEntryGenerationStrategy.SOURCE_TYPE,
+                    record.getId(), PayRecordEntryGenerationStrategy.ENTRY_TYPE);
+        } else {
+            cashJournalService.createPendingFromPayRecord(record);
+        }
 
         // D4 linkage: cascade updates
         updateContractPaidAmount(app.getContractId());
@@ -181,11 +211,53 @@ public class PayRecordService {
         if (amount == null || amount.signum() <= 0 || amount.scale() > 2 || integerDigits > 16) {
             throw new BusinessException("PAY_AMOUNT_INVALID", "付款金额必须大于0且最多16位整数、2位小数");
         }
-        if (input.getPayDate() == null) {
-            throw new BusinessException("PAY_DATE_REQUIRED", "付款日期不能为空");
-        }
         if (input.getExternalTxnNo() == null || input.getExternalTxnNo().isBlank()) {
             throw new BusinessException("EXTERNAL_TXN_NO_REQUIRED", "外部交易流水号不能为空");
+        }
+        if (input.getPaidAt() == null && input.getPayDate() == null) {
+            throw new BusinessException("PAY_DATE_REQUIRED", "付款时间不能为空");
+        }
+    }
+
+    private void normalizeAndValidateFact(PayRecord input, boolean strictClosedLoop) {
+        if (input.getPaidAt() == null && input.getPayDate() != null && !strictClosedLoop) {
+            input.setPaidAt(input.getPayDate().atStartOfDay());
+        }
+        if (input.getPaidAt() == null) {
+            throw new BusinessException("PAID_AT_REQUIRED", "付款时间不能为空");
+        }
+        input.setPaidAt(input.getPaidAt().withNano(0));
+        if (input.getPaidAt().isAfter(LocalDateTime.now().plusMinutes(5))) {
+            throw new BusinessException("PAID_AT_INVALID", "付款时间不能晚于当前时间");
+        }
+        if (input.getPayDate() != null && !input.getPayDate().equals(input.getPaidAt().toLocalDate())) {
+            throw new BusinessException("PAY_DATE_CONFLICT", "付款日期必须与付款时间属于同一天");
+        }
+        if (strictClosedLoop && input.getFundAccountId() == null) {
+            throw new BusinessException("FUND_ACCOUNT_REQUIRED", "付款账户不能为空");
+        }
+        if (strictClosedLoop && !StringUtils.hasText(input.getPayMethod())) {
+            throw new BusinessException("PAY_METHOD_REQUIRED", "付款方式不能为空");
+        }
+    }
+
+    private void validateSecondGate(PayApplication app, PayRecord input) {
+        PmProject project = projectMapper.selectById(app.getProjectId());
+        if (project == null || !Objects.equals(project.getTenantId(), app.getTenantId())
+                || !ProjectStatusConstants.ACTIVE.equals(project.getStatus())) {
+            throw new BusinessException("PROJECT_NOT_ACTIVE", "项目已暂停、关闭或不存在，禁止付款");
+        }
+        CtContract contract = ctContractMapper.selectById(app.getContractId());
+        if (contract == null || !ContractStatusConstants.APPROVAL_APPROVED.equals(contract.getApprovalStatus())
+                || !ContractStatusConstants.STATUS_PERFORMING.equals(contract.getContractStatus())) {
+            throw new BusinessException("CONTRACT_STATUS_INVALID", "合同未审批通过或不在履约中，禁止付款");
+        }
+        FundAccount account = fundAccountMapper.selectByIdForUpdate(input.getFundAccountId(), app.getTenantId());
+        if (account == null || !Integer.valueOf(1).equals(account.getEnabledFlag())) {
+            throw new BusinessException("FUND_ACCOUNT_UNAVAILABLE", "付款账户不存在、跨租户或已停用");
+        }
+        if (account.getOpeningDate() != null && input.getPaidAt().toLocalDate().isBefore(account.getOpeningDate())) {
+            throw new BusinessException("FUND_ACCOUNT_NOT_OPEN", "付款时间早于资金账户启用日期");
         }
     }
 
@@ -200,9 +272,16 @@ public class PayRecordService {
         vo.setPartnerId(record.getPartnerId() != null ? record.getPartnerId().toString() : null);
         vo.setPayAmount(record.getPayAmount() != null ? record.getPayAmount().toPlainString() : null);
         vo.setPayDate(record.getPayDate() != null ? record.getPayDate().toString() : null);
+        vo.setPaidAt(record.getPaidAt() != null ? record.getPaidAt().format(DateTimeUtils.DTF) : null);
+        vo.setFundAccountId(record.getFundAccountId() != null ? record.getFundAccountId().toString() : null);
         vo.setPayMethod(record.getPayMethod());
         vo.setVoucherNo(record.getVoucherNo());
         vo.setPayStatus(record.getPayStatus());
+        vo.setExternalTxnNo(record.getExternalTxnNo());
+        vo.setFailureReason(record.getFailureReason());
+        vo.setReversedRecordId(record.getReversedRecordId() == null ? null : record.getReversedRecordId().toString());
+        vo.setReversedAt(record.getReversedAt() == null ? null : record.getReversedAt().format(DateTimeUtils.DTF));
+        vo.setReversalType(record.getReversalType());
         vo.setCreatedBy(record.getCreatedBy() != null ? record.getCreatedBy().toString() : null);
         vo.setCreatedAt(record.getCreatedAt() != null ? record.getCreatedAt().format(DateTimeUtils.DTF) : null);
         vo.setUpdatedAt(record.getUpdatedAt() != null ? record.getUpdatedAt().format(DateTimeUtils.DTF) : null);

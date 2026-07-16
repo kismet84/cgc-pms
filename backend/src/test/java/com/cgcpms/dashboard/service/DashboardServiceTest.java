@@ -20,7 +20,9 @@ import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -91,6 +93,7 @@ abstract class DashboardServiceTestSupport {
     @Autowired protected VarOrderMapper varOrderMapper;
     @Autowired protected SubMeasureMapper subMeasureMapper;
     @Autowired protected StlSettlementMapper stlSettlementMapper;
+    @Autowired protected PayApplicationMapper payApplicationMapper;
     @Autowired protected PayRecordMapper payRecordMapper;
     @Autowired protected AlertLogMapper alertLogMapper;
     @Autowired protected CostSummaryMapper costSummaryMapper;
@@ -341,10 +344,39 @@ abstract class DashboardServiceTestSupport {
         settlement.setSettlementStatus("FINALIZED");
         stlSettlementMapper.insert(settlement);
 
+        // Payment applications are the authoritative approval/payment state facts.
+        PayApplication paidApplication = new PayApplication();
+        paidApplication.setTenantId(TENANT_ID);
+        paidApplication.setProjectId(projectId);
+        paidApplication.setContractId(contractId);
+        paidApplication.setPartnerId(partnerId);
+        paidApplication.setApplyCode("PAY-PAID-" + suffix);
+        paidApplication.setPayType("PROGRESS");
+        paidApplication.setApplyAmount(new BigDecimal("100000.00"));
+        paidApplication.setApprovedAmount(new BigDecimal("100000.00"));
+        paidApplication.setActualPayAmount(new BigDecimal("100000.00"));
+        paidApplication.setApprovalStatus("APPROVED");
+        paidApplication.setPayStatus("PAID");
+        payApplicationMapper.insert(paidApplication);
+
+        PayApplication pendingApplication = new PayApplication();
+        pendingApplication.setTenantId(TENANT_ID);
+        pendingApplication.setProjectId(projectId);
+        pendingApplication.setContractId(contractId);
+        pendingApplication.setPartnerId(partnerId);
+        pendingApplication.setApplyCode("PAY-PENDING-" + suffix);
+        pendingApplication.setPayType("PROGRESS");
+        pendingApplication.setApplyAmount(new BigDecimal("230000.00"));
+        pendingApplication.setApprovedAmount(new BigDecimal("230000.00"));
+        pendingApplication.setActualPayAmount(BigDecimal.ZERO);
+        pendingApplication.setApprovalStatus("APPROVED");
+        pendingApplication.setPayStatus("UNPAID");
+        payApplicationMapper.insert(pendingApplication);
+
         // PayRecord
         PayRecord payRecord = new PayRecord();
         payRecord.setTenantId(TENANT_ID);
-        payRecord.setPayApplicationId(1L);
+        payRecord.setPayApplicationId(paidApplication.getId());
         payRecord.setContractId(contractId);
         payRecord.setProjectId(projectId);
         payRecord.setPayAmount(new BigDecimal("100000.00"));
@@ -354,7 +386,7 @@ abstract class DashboardServiceTestSupport {
 
         PayRecord pendingPayRecord = new PayRecord();
         pendingPayRecord.setTenantId(TENANT_ID);
-        pendingPayRecord.setPayApplicationId(2L);
+        pendingPayRecord.setPayApplicationId(pendingApplication.getId());
         pendingPayRecord.setContractId(contractId);
         pendingPayRecord.setProjectId(projectId);
         pendingPayRecord.setPayAmount(new BigDecimal("230000.00"));

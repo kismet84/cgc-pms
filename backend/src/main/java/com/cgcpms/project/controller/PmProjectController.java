@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.dto.ProjectStatusTransitionRequest;
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.project.service.PmProjectService;
 import com.cgcpms.project.service.ProjectOverviewService;
 import com.cgcpms.project.vo.PmProjectVO;
@@ -65,6 +67,15 @@ public class PmProjectController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:edit')")
     public ApiResponse<Void> archive(@PathVariable Long id) {
         pmProjectService.archive(id);
+        return ApiResponse.success();
+    }
+
+    @PutMapping("/{id}/status")
+    @AuditedOperation(type = "STATUS_CHANGE", businessType = "PROJECT", businessIdExpression = "#id")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:status')")
+    public ApiResponse<Void> transitionStatus(@PathVariable Long id,
+                                              @Valid @RequestBody ProjectStatusTransitionRequest request) {
+        pmProjectService.transitionStatus(id, request.getTargetStatus(), request.getReason());
         return ApiResponse.success();
     }
 

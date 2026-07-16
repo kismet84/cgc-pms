@@ -177,8 +177,12 @@ describe('SidebarMenu', () => {
     const wrapper = mountMenu()
 
     expect(findSubmenuLabels(wrapper, '/settlement-domain')).toEqual([
+      '项目预算',
       '结算台账',
+      '费用申请',
       '付款申请',
+      '资金运营',
+      '收入与回款',
       '资金日记账',
       '会计凭证',
       '发票管理',

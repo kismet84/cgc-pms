@@ -4,7 +4,9 @@ import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
+import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -50,6 +52,9 @@ class InvoiceValidationTest {
     private PayRecordMapper payRecordMapper;
 
     @Autowired
+    private PayApplicationMapper payApplicationMapper;
+
+    @Autowired
     private PmProjectMapper projectMapper;
 
     @Autowired
@@ -68,6 +73,7 @@ class InvoiceValidationTest {
 
     @BeforeEach
     void setUp() {
+        jdbcTemplate.update("DELETE FROM invoice_payment_allocation WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("""
                 DELETE FROM pay_invoice
@@ -76,6 +82,7 @@ class InvoiceValidationTest {
                    OR invoice_no LIKE 'INV-FILTER-%'
                 """);
         jdbcTemplate.update("DELETE FROM pay_record WHERE id = ?", SEED_PAY_RECORD_ID);
+        jdbcTemplate.update("DELETE FROM pay_application WHERE id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", SEED_PROJECT_ID);
 
         PmProject project = new PmProject();
@@ -90,6 +97,18 @@ class InvoiceValidationTest {
         project.setApprovalStatus("APPROVED");
         projectMapper.insert(project);
 
+        PayApplication application = new PayApplication();
+        application.setId(SEED_PAY_RECORD_ID);
+        application.setTenantId(0L);
+        application.setProjectId(SEED_PROJECT_ID);
+        application.setApplyCode("PAY-INVOICE-VAL-90001");
+        application.setPayType("PROGRESS");
+        application.setApplyAmount(new BigDecimal("100000.00"));
+        application.setApprovedAmount(new BigDecimal("100000.00"));
+        application.setApprovalStatus("APPROVED");
+        application.setPayStatus("PAID");
+        payApplicationMapper.insert(application);
+
         PayRecord seed = new PayRecord();
         seed.setId(SEED_PAY_RECORD_ID);
         seed.setTenantId(0L);
@@ -97,7 +116,7 @@ class InvoiceValidationTest {
         seed.setPayApplicationId(SEED_PAY_RECORD_ID);
         seed.setPayAmount(new BigDecimal("100000.00"));
         seed.setPayDate(java.time.LocalDate.of(2026, 6, 1));
-        seed.setPayStatus("PAID");
+        seed.setPayStatus("SUCCESS");
         payRecordMapper.insert(seed);
     }
 

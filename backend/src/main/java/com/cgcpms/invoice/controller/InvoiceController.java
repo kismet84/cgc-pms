@@ -10,6 +10,9 @@ import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
 import com.cgcpms.invoice.vo.InvoiceVO;
+import com.cgcpms.invoice.entity.InvoicePaymentAllocation;
+import jakarta.validation.constraints.Size;
+import java.util.List;
 import jakarta.validation.Valid;
 import org.springframework.web.multipart.MultipartFile;
 import lombok.RequiredArgsConstructor;
@@ -79,6 +82,23 @@ public class InvoiceController {
     @PreAuthorize("hasAuthority('invoice:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Long> register(@Valid @RequestBody PayInvoice invoice) {
         return ApiResponse.success(invoiceService.register(invoice));
+    }
+
+    @GetMapping("/{id}/allocations")
+    @PreAuthorize("hasAuthority('invoice:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<InvoicePaymentAllocation>> listAllocations(@PathVariable Long id) {
+        return ApiResponse.success(invoiceService.listAllocations(id));
+    }
+
+    @PostMapping("/{id}/allocations/batch")
+    @AuditedOperation(type = "ALLOCATE", businessType = "INVOICE", businessIdExpression = "#id")
+    @PreAuthorize("hasAuthority('invoice:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> saveAllocations(
+            @PathVariable Long id,
+            @Valid @Size(max = 200, message = "发票付款分配不能超过200条")
+            @RequestBody List<InvoicePaymentAllocation> allocations) {
+        invoiceService.saveAllocations(id, allocations);
+        return ApiResponse.success();
     }
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB

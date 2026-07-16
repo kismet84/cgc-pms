@@ -10,6 +10,8 @@ import com.cgcpms.contract.service.CtContractService;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.PaymentTestFixtures;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.service.PayRecordService;
 import com.cgcpms.project.entity.PmProject;
@@ -58,6 +60,7 @@ class TenantIsolationTest {
     @Autowired private MdPartnerMapper partnerMapper;
     @Autowired private PayRecordService payRecordService;
     @Autowired private PayRecordMapper payRecordMapper;
+    @Autowired private PayApplicationMapper payApplicationMapper;
 
     // ── seeded cross-tenant resource IDs ──
     private Long tenantBUserId;
@@ -168,10 +171,15 @@ class TenantIsolationTest {
         req.setSubmitForApproval(false);
         tenantBContractId = contractService.compositeSave(req);
 
-        // Pay record for tenant B (use mapper directly — writeback() requires valid pay application)
+        // Pay record for tenant B: keep the full application -> record relation valid.
+        long tenantBPayApplicationId = 51001L;
+        PaymentTestFixtures.insertApplication(payApplicationMapper, tenantBPayApplicationId, TENANT_B,
+                10002L, tenantBContractId, 20004L, new BigDecimal("10000.00"));
         PayRecord pr = new PayRecord();
-        pr.setPayApplicationId(-1L); // dummy
+        pr.setProjectId(10002L);
+        pr.setPayApplicationId(tenantBPayApplicationId);
         pr.setContractId(tenantBContractId);
+        pr.setPartnerId(20004L);
         pr.setPayAmount(new BigDecimal("10000.00"));
         pr.setPayDate(LocalDate.now());
         pr.setPayMethod("银行转账");

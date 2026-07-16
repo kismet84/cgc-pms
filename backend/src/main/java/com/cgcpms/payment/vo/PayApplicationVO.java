@@ -11,6 +11,11 @@ public class PayApplicationVO {
     private String projectId;
     private String contractId;
     private String partnerId;
+    private String costSubjectId;
+    private String budgetLineId;
+    private String expenseCategory;
+    private String approvalInstanceId;
+    private String integrityVersion;
     private String applyCode;
     private String applyAmount;
     private String approvedAmount;

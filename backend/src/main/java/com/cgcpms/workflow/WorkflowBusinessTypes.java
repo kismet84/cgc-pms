@@ -23,4 +23,10 @@ public final class WorkflowBusinessTypes {
     public static final String MATERIAL_REQUISITION = "MATERIAL_REQUISITION";
     /** 总工程师技术事项 */
     public static final String TECH_ITEM = "TECH_ITEM";
+    /** 项目资金闭环：项目预算版本审批 */
+    public static final String PROJECT_BUDGET = "PROJECT_BUDGET";
+    /** 项目资金闭环：费用申请审批 */
+    public static final String EXPENSE = "EXPENSE";
+    /** 项目收入闭环：业主结算审批 */
+    public static final String OWNER_SETTLEMENT = "OWNER_SETTLEMENT";
 }

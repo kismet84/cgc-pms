@@ -14,6 +14,7 @@ import com.cgcpms.inventory.service.MatWarehouseService;
 import com.cgcpms.inventory.vo.MatStockLedgerVO;
 import com.cgcpms.inventory.vo.MatWarehouseVO;
 import com.cgcpms.invoice.entity.PayInvoice;
+import com.cgcpms.invoice.entity.InvoicePaymentAllocation;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.material.entity.MdMaterial;
@@ -264,6 +265,18 @@ class Phase4IntegrationTest {
         assertEquals(payRecordId, saved.getPayRecordId(), "发票应关联正确的PayRecord");
         assertEquals(0, new BigDecimal("1000.00").compareTo(saved.getInvoiceAmount()),
                 "发票金额应为1000");
+
+        InvoicePaymentAllocation allocation = new InvoicePaymentAllocation();
+        allocation.setPayRecordId(payRecordId);
+        allocation.setAllocatedAmount(new BigDecimal("1000.00"));
+        invoiceService.saveAllocations(invoiceId, List.of(allocation));
+        jdbcTemplate.update("""
+                INSERT INTO sys_file(id, tenant_id, business_type, document_type, business_id,
+                    file_name, original_name, file_size, content_type, storage_path, bucket_name,
+                    created_at, updated_at, deleted_flag)
+                VALUES(?, 0, 'INVOICE', 'ELECTRONIC_INVOICE', ?, 'invoice.pdf', 'invoice.pdf',
+                    128, 'application/pdf', ?, 'cgc-pms', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
+                """, System.nanoTime(), invoiceId, "INVOICE/" + invoiceId + "/invoice.pdf");
 
         // 4. 核验通过 → VERIFIED
         assertDoesNotThrow(() -> invoiceService.verify(invoiceId, "VERIFIED"),

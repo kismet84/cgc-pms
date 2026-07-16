@@ -9,6 +9,7 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
+import com.cgcpms.expense.mapper.ExpenseApplicationMapper;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.material.entity.MdMaterial;
@@ -37,6 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Arrays;
 import java.util.List;
@@ -68,6 +70,8 @@ class BusinessObjectAuthorizerTest {
     @Mock MdMaterialMapper materialMapper;
     @Mock CashJournalEntryMapper cashJournalEntryMapper;
     @Mock SiteDailyLogMapper siteDailyLogMapper;
+    @Mock ExpenseApplicationMapper expenseApplicationMapper;
+    @Mock JdbcTemplate jdbcTemplate;
 
     private BusinessObjectAuthorizer authorizer;
 
@@ -78,7 +82,7 @@ class BusinessObjectAuthorizerTest {
         authorizer = new BusinessObjectAuthorizer(projectAccessChecker, contractMapper, invoiceMapper,
                 receiptMapper, paymentMapper, payRecordMapper, subcontractMapper, settlementMapper,
                 variationMapper, bidCostMapper, partnerMapper, materialMapper, cashJournalEntryMapper,
-                siteDailyLogMapper);
+                siteDailyLogMapper, expenseApplicationMapper, jdbcTemplate);
     }
 
     @AfterEach

@@ -13,6 +13,7 @@ public class VarOrderVO {
     private String partnerId;
     private String varCode;
     private String varName;
+    private String businessMatterKey;
     private String varType;
     private String direction;
     private String reportedAmount;

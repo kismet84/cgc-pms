@@ -18,6 +18,15 @@ public class FinanceDashboardVO {
     private String approvedUnpaidAmount;
     private String overRatioAmount;
     private String warrantyExpiringAmount;
+    private String totalContractAmount;
+    private String totalPaidAmount;
+    private String budgetAmount;
+    private String budgetConsumedAmount;
+    private String budgetExecutionRate;
+    private String cashOutflowAmount;
+    private String cashBalance;
+    private String projectProfit;
+    private String metricFormulaVersion;
     /** Detail lists */
     private List<DashboardPaymentItemVO> pendingPayments;
     private List<DashboardPaymentItemVO> overRatioPayments;

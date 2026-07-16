@@ -43,6 +43,9 @@ export interface PayApplicationVO {
   projectId: string
   contractId: string
   partnerId: string
+  costSubjectId?: string
+  budgetLineId?: string
+  expenseCategory?: string
   payType: PayType
   applyAmount: string
   approvedAmount?: string
@@ -57,7 +60,21 @@ export interface PayApplicationVO {
   createdAt?: string
   updatedAt?: string
   remark?: string
+  approvalInstanceId?: string
+  integrityVersion?: string
   basis?: PayApplicationBasisVO[]
+}
+
+export interface PaymentApplicationSourceVO {
+  id?: string
+  payApplicationId?: string
+  sourceType: 'EXPENSE' | 'SETTLEMENT' | 'DIRECT'
+  sourceRefId: string
+  expenseId?: string
+  settlementId?: string
+  sourceAmount: string
+  paidAmount?: string
+  remark?: string
 }
 
 /** Payment application basis view object */
@@ -83,19 +100,64 @@ export interface PayRecordVO {
   partnerId?: string
   payAmount: string
   payDate: string
+  paidAt?: string
+  fundAccountId?: string
   payMethod: string
   voucherNo?: string
   payStatus?: string
+  externalTxnNo?: string
+  failureReason?: string
+  reversedRecordId?: string
+  reversedAt?: string
+  reversalType?: 'REVERSAL' | 'REFUND'
   createdBy?: string
   createdAt?: string
+}
+
+export interface PaymentReversalDTO {
+  reversalType: 'REVERSAL' | 'REFUND'
+  externalTxnNo: string
+  reversedAt: string
+  reason: string
+}
+
+export interface PaymentFailureDTO {
+  payApplicationId: string
+  payAmount: number
+  externalTxnNo: string
+  attemptedAt: string
+  failureReason: string
+  fundAccountId?: string
+  payMethod?: string
 }
 
 /** Writeback request */
 export interface PayWritebackDTO {
   payApplicationId: string
   payAmount: number
-  payDate: string
+  payDate?: string
+  paidAt: string
+  fundAccountId: string
   payMethod: string
   voucherNo?: string
   externalTxnNo: string
+}
+
+export interface PaymentTraceVO {
+  project?: Record<string, unknown>
+  contract?: Record<string, unknown>
+  paymentApplication: PayApplicationVO
+  approvalInstance?: Record<string, unknown>
+  approvalRecords: Record<string, unknown>[]
+  applicationSources: PaymentApplicationSourceVO[]
+  expenses: Record<string, unknown>[]
+  settlements: Record<string, unknown>[]
+  paymentRecords: PayRecordVO[]
+  paymentSourceAllocations: Record<string, unknown>[]
+  cashJournals: Record<string, unknown>[]
+  invoices: Record<string, unknown>[]
+  invoiceAllocations: Record<string, unknown>[]
+  budgetLedgers: Record<string, unknown>[]
+  accountingEntries: Record<string, unknown>[]
+  accountingEntryLines: Record<string, unknown>[]
 }

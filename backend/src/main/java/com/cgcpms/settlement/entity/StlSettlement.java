@@ -56,6 +56,10 @@ public class StlSettlement extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal finalAmount;
 
+    /** 结算金额口径版本；历史数据需经差异预览后才能回填为当前版本。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String amountFormulaVersion;
+
     /** 结算生命周期状态: DRAFT(草稿) / SUBMITTED(已提交) / APPROVED(已审批) / REJECTED(已驳回) / CANCELLED(已作废) */
     private String status;
 

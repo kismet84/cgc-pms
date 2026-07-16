@@ -43,6 +43,9 @@ public class CashJournalEntry extends BaseEntity {
     private Long contractId;
     private String sourceType;
     private Long sourceId;
+    private Long payApplicationId;
+    private Long approvalInstanceId;
+    private Long payRecordId;
     private String status;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")

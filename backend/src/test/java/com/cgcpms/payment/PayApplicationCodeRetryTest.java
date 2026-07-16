@@ -12,6 +12,8 @@ import com.cgcpms.payment.mapper.PayApplicationBasisMapper;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.service.PayApplicationService;
+import com.cgcpms.payment.service.PaymentApplicationIntegrityService;
+import com.cgcpms.payment.service.PaymentApplicationSourceService;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
@@ -72,6 +74,8 @@ class PayApplicationCodeRetryTest {
                 mock(CtContractPaymentTermMapper.class),
                 mock(PayRecordMapper.class),
                 mock(ProjectAccessChecker.class),
+                mock(PaymentApplicationIntegrityService.class),
+                mock(PaymentApplicationSourceService.class),
                 mock(WorkflowEngine.class));
 
         String prefix = "PAY-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";

@@ -113,6 +113,17 @@ describe('router lazy loading', () => {
     expect(router.resolve('/accounting-entry').meta.permission).toBe('accounting:query')
   })
 
+  it('registers the revenue collection workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const revenueRoute = rootRoute?.children?.find((c) => c.path === 'revenue')
+
+    expect(revenueRoute?.name).toBe('RevenueOperations')
+    expect(revenueRoute?.meta?.title).toBe('收入与回款')
+    expect(revenueRoute?.meta?.permission).toBe('revenue:operations:query')
+    expect(typeof revenueRoute?.component).toBe('function')
+    expect(router.resolve('/revenue').meta.permission).toBe('revenue:operations:query')
+  })
+
   it('registers the site daily log route with query permission', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const dailyRoute = rootRoute?.children?.find((c) => c.path === 'site/daily-log')

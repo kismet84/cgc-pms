@@ -268,6 +268,15 @@ export interface FinanceDashboardVO {
   approvedUnpaidAmount: string
   overRatioAmount: string
   warrantyExpiringAmount: string
+  totalContractAmount: string
+  totalPaidAmount: string
+  budgetAmount: string
+  budgetConsumedAmount: string
+  budgetExecutionRate: string
+  cashOutflowAmount: string
+  cashBalance: string
+  projectProfit: string
+  metricFormulaVersion: string
   pendingPayments: DashboardPaymentItemVO[]
   overRatioPayments: DashboardPaymentItemVO[]
 }

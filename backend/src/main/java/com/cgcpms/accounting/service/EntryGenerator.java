@@ -81,8 +81,9 @@ public class EntryGenerator {
         entry.setTenantId(tenantId);
         entry.setSourceType(sourceType);
         entry.setSourceId(sourceId);
-        entry.setEntryDate(LocalDate.now());
+        if (entry.getEntryDate() == null) entry.setEntryDate(LocalDate.now());
         entry.setEntryStatus("DRAFT");
+        entry.setVersion(0);
 
         // 计算借贷平衡
         List<AccountingEntryLine> lines = entry.getLines();

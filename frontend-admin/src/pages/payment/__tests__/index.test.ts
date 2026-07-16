@@ -65,21 +65,33 @@ vi.mock('@/api/modules/payment', () => ({
     ],
     total: 1,
   }),
-  getBasisList: vi.fn(),
-  saveBasis: vi.fn(),
+  getApplicationSources: vi.fn().mockResolvedValue([]),
+  getPaymentTraceByApplication: vi.fn(),
+  saveApplicationSources: vi.fn(),
   submitForApproval: vi.fn(),
   updateApplication: vi.fn(),
 }))
 
-vi.mock('@/api/modules/cashbook', () => ({ getCashJournalList: mocks.getCashJournalList }))
-vi.mock('@/api/modules/receipt', () => ({
-  getReceiptItems: vi.fn().mockResolvedValue([]),
-  getReceiptList: vi.fn().mockResolvedValue({ records: [] }),
+vi.mock('@/api/modules/cashbook', () => ({
+  getCashJournalList: mocks.getCashJournalList,
+  getFundAccounts: vi.fn().mockResolvedValue([
+    {
+      id: 'account-1',
+      accountCode: 'BANK-001',
+      accountName: '基本户',
+      accountType: 'BANK',
+      openingDate: '2026-01-01',
+      openingBalance: '1000.00',
+      enabledFlag: 1,
+      version: 0,
+    },
+  ]),
 }))
-vi.mock('@/api/modules/subcontract', () => ({
-  getMeasureItems: vi.fn().mockResolvedValue([]),
-  getMeasureList: vi.fn().mockResolvedValue({ records: [] }),
+vi.mock('@/api/modules/budget', () => ({
+  getBudgetList: vi.fn().mockResolvedValue({ records: [] }),
+  getBudgetDetail: vi.fn(),
 }))
+vi.mock('@/api/modules/file', () => ({ uploadFile: vi.fn() }))
 vi.mock('@/utils/dict', () => ({
   fetchDictData: vi.fn(),
   getDictLabelSync: (_code: string, value: string) => value,
@@ -138,8 +150,13 @@ const stubs = {
     template:
       '<input data-testid="pay-date" :value="value" @input="$emit(\'update:value\', $event.target.value)" />',
   },
-  ASelect: { template: '<select><slot /></select>' },
-  ASelectOption: { template: '<option><slot /></option>' },
+  ASelect: {
+    props: ['value'],
+    emits: ['update:value'],
+    template:
+      '<select :value="value" @change="$emit(\'update:value\', $event.target.value)"><slot /></select>',
+  },
+  ASelectOption: { props: ['value'], template: '<option :value="value"><slot /></option>' },
   AInput: {
     props: ['value', 'placeholder'],
     emits: ['update:value'],
@@ -162,7 +179,8 @@ async function openAndFillWriteback(wrapper: Awaited<ReturnType<typeof mountPaym
   expect(writebackButton).toBeDefined()
   await writebackButton!.trigger('click')
   await wrapper.get('[data-testid="pay-amount"]').setValue('100')
-  await wrapper.get('[data-testid="pay-date"]').setValue('2026-07-11')
+  await wrapper.get('[data-testid="pay-date"]').setValue('2026-07-11T10:00:00')
+  await wrapper.findAll('select')[0].setValue('account-1')
   await wrapper.get('input[placeholder="银行或支付渠道唯一流水号"]').setValue('BANK-001')
 }
 
@@ -170,8 +188,7 @@ describe('payment page quality guardrails', () => {
   it('avoids silent catch blocks in critical payment actions', () => {
     expect(source).not.toContain('catch {')
     expect(source).not.toMatch(/catch\s*\(e\)\s*\{/)
-    expect(source).toContain("message.warning('验收单依据加载失败，可稍后重试')")
-    expect(source).toContain("message.warning('分包计量依据加载失败，可稍后重试')")
+    expect(source).toContain("message.warning('请完整填写统一付款来源')")
     expect(source).toContain("getErrorMessage(e, '删除失败，请稍后重试')")
     expect(source).toContain("getErrorMessage(e, '操作失败，请稍后重试')")
     expect(source).toContain("getErrorMessage(e, '提交审批失败，请稍后重试')")

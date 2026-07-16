@@ -43,6 +43,7 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -85,15 +86,21 @@ public class FileService {
     @Transactional(rollbackFor = Exception.class)
     @CircuitBreaker(name = "minio", fallbackMethod = "uploadFallback")
     public SysFileVO upload(MultipartFile file, String businessType, Long businessId) {
+        return upload(file, businessType, businessId, "OTHER");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @CircuitBreaker(name = "minio", fallbackMethod = "uploadFallback")
+    public SysFileVO upload(MultipartFile file, String businessType, Long businessId, String documentType) {
         try {
-            return doUpload(file, businessType, businessId);
+            return doUpload(file, businessType, businessId, documentType);
         } catch (BusinessException e) {
             recordUploadFailure(e.getCode());
             throw e;
         }
     }
 
-    private SysFileVO doUpload(MultipartFile file, String businessType, Long businessId) {
+    private SysFileVO doUpload(MultipartFile file, String businessType, Long businessId, String documentType) {
         if (file.isEmpty()) {
             throw new BusinessException("FILE_EMPTY", "上传文件不能为空");
         }
@@ -111,6 +118,7 @@ public class FileService {
         validateBusinessBindingParams(businessType, businessId);
         // 业务对象上传权限校验
         authorizer.checkUploadAccess(businessType, businessId);
+        String normalizedDocumentType = normalizeDocumentType(documentType, businessType);
         scanOrReject(content);
 
         try {
@@ -127,6 +135,7 @@ public class FileService {
             SysFile sysFile = new SysFile();
             sysFile.setTenantId(UserContext.getCurrentTenantId());
             sysFile.setBusinessType(businessType);
+            sysFile.setDocumentType(normalizedDocumentType);
             sysFile.setBusinessId(businessId);
             sysFile.setFileName(fileName);
             sysFile.setOriginalName(originalName);
@@ -257,6 +266,12 @@ public class FileService {
         log.error("MinIO circuit breaker fallback on upload: businessType={}, businessId={}", businessType, businessId, throwable);
         recordUploadFailure("FILE_STORAGE_UNAVAILABLE");
         throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件服务暂不可用，请稍后重试");
+    }
+
+    @SuppressWarnings("unused")
+    private SysFileVO uploadFallback(MultipartFile file, String businessType, Long businessId,
+                                     String documentType, Throwable throwable) {
+        return uploadFallback(file, businessType, businessId, throwable);
     }
 
     // ---- private helpers ----
@@ -404,6 +419,7 @@ public class FileService {
         SysFileVO vo = new SysFileVO();
         vo.setId(f.getId() == null ? null : String.valueOf(f.getId()));
         vo.setBusinessType(f.getBusinessType());
+        vo.setDocumentType(f.getDocumentType());
         vo.setBusinessId(f.getBusinessId() == null ? null : String.valueOf(f.getBusinessId()));
         vo.setFileName(f.getFileName());
         vo.setOriginalName(f.getOriginalName());
@@ -415,6 +431,31 @@ public class FileService {
         applyVirusScanStatus(f, vo);
         if (f.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(f.getCreatedAt()));
         return vo;
+    }
+
+    private String normalizeDocumentType(String documentType, String businessType) {
+        String type = documentType == null ? "OTHER" : documentType.trim().toUpperCase();
+        String business = businessType == null ? "" : businessType.trim().toUpperCase();
+        if ("OTHER".equals(type)) {
+            type = switch (business) {
+                case "INVOICE" -> "ELECTRONIC_INVOICE";
+                case "SALES_INVOICE" -> "ELECTRONIC_INVOICE";
+                case "COLLECTION_RECORD" -> "BANK_RECEIPT";
+                case "OWNER_SETTLEMENT", "CONTRACT_REVENUE" -> "CONTRACT_ATTACHMENT";
+                case "PAYMENT" -> "PAYMENT_PROOF";
+                case "CASH_JOURNAL" -> "BANK_RECEIPT";
+                case "CONTRACT" -> "CONTRACT_ATTACHMENT";
+                default -> "OTHER";
+            };
+        }
+        if (!Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE", "BANK_RECEIPT",
+                "CONTRACT_ATTACHMENT", "PAYMENT_PROOF", "OTHER").contains(type)) {
+            throw new BusinessException("DOCUMENT_TYPE_INVALID", "不支持的业务文档类型");
+        }
+        if (Set.of("INVOICE", "SALES_INVOICE").contains(business) && !Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE").contains(type)) {
+            throw new BusinessException("DOCUMENT_TYPE_MISMATCH", "发票只能上传电子发票或扫描件");
+        }
+        return type;
     }
 
     private void applyVirusScanStatus(SysFile file, SysFileVO vo) {

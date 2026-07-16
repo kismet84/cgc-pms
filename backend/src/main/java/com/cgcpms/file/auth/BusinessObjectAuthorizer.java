@@ -9,6 +9,8 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostTarget;
 import com.cgcpms.cost.mapper.CostTargetMapper;
+import com.cgcpms.expense.entity.ExpenseApplication;
+import com.cgcpms.expense.mapper.ExpenseApplicationMapper;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.material.entity.MdMaterial;
@@ -35,6 +37,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.dao.EmptyResultDataAccessException;
 
 import java.util.Set;
 
@@ -65,11 +69,14 @@ public class BusinessObjectAuthorizer {
     private final MdMaterialMapper materialMapper;
     private final CashJournalEntryMapper cashJournalEntryMapper;
     private final SiteDailyLogMapper siteDailyLogMapper;
+    private final ExpenseApplicationMapper expenseApplicationMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     private static final Set<String> KNOWN_BUSINESS_TYPES = Set.of(
             "PROJECT", "CONTRACT", "INVOICE", "RECEIPT",
             "PAYMENT", "SUBCONTRACT", "SETTLEMENT", "VARIATION",
-            "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL", "SITE_DAILY_LOG"
+            "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL", "SITE_DAILY_LOG", "EXPENSE",
+            "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD"
     );
 
     /**
@@ -165,6 +172,31 @@ public class BusinessObjectAuthorizer {
                             "无权访问该付款申请文件");
                 }
                 checkProjectAccess(payment.getProjectId(), action + "付款申请文件");
+                break;
+            }
+            case "EXPENSE": {
+                ExpenseApplication expense = expenseApplicationMapper.selectById(businessId);
+                if (expense == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "费用申请不存在: " + businessId);
+                }
+                if (!expense.getTenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该费用申请文件");
+                }
+                checkProjectAccess(expense.getProjectId(), action + "费用申请文件");
+                break;
+            }
+            case "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD": {
+                RevenueFileObject object = findRevenueFileObject(upperType, businessId);
+                if (object == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "收入回款业务对象不存在: " + businessId);
+                }
+                if (!object.tenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该收入回款业务文件");
+                }
+                if (write && isRevenueFileImmutable(upperType, object.status())) {
+                    throw new BusinessException("REVENUE_DOCUMENT_IMMUTABLE", "当前状态的收入回款业务附件不可变更");
+                }
+                checkProjectAccess(object.projectId(), action + "收入回款业务文件");
                 break;
             }
             case "SUBCONTRACT": {
@@ -290,6 +322,34 @@ public class BusinessObjectAuthorizer {
         }
         projectAccessChecker.checkAccess(projectId, action);
     }
+
+    private RevenueFileObject findRevenueFileObject(String businessType, Long businessId) {
+        String table = switch (businessType) {
+            case "CONTRACT_REVENUE" -> "contract_revenue";
+            case "OWNER_SETTLEMENT" -> "owner_settlement";
+            case "SALES_INVOICE" -> "sales_invoice";
+            case "COLLECTION_RECORD" -> "collection_record";
+            default -> throw new IllegalArgumentException("Unsupported revenue file type");
+        };
+        String statusColumn = "CONTRACT_REVENUE".equals(businessType) ? "approval_status" : "status";
+        try {
+            return jdbcTemplate.queryForObject("SELECT tenant_id,project_id," + statusColumn + " FROM " + table + " WHERE id=? AND deleted_flag=0",
+                    (rs, rowNum) -> new RevenueFileObject(rs.getLong("tenant_id"), rs.getLong("project_id"), rs.getString(statusColumn)), businessId);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    private boolean isRevenueFileImmutable(String businessType, String status) {
+        return switch (businessType) {
+            case "CONTRACT_REVENUE", "OWNER_SETTLEMENT" -> !Set.of("DRAFT", "REJECTED").contains(status);
+            case "SALES_INVOICE" -> "VOIDED".equals(status);
+            case "COLLECTION_RECORD" -> "REVERSED".equals(status);
+            default -> true;
+        };
+    }
+
+    private record RevenueFileObject(Long tenantId, Long projectId, String status) {}
 
     private void requireAuthority(String requiredAuthority) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

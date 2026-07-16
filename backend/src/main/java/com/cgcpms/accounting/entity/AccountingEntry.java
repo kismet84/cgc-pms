@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -15,6 +16,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -37,6 +39,12 @@ public class AccountingEntry extends BaseEntity {
 
     private Long sourceId;
 
+    private Long projectId;
+    private Long contractId;
+    private Long payApplicationId;
+    private Long payRecordId;
+    private Long collectionRecordId;
+
     /** DRAFT / POSTED / REVERSED */
     private String entryStatus;
 
@@ -45,6 +53,13 @@ public class AccountingEntry extends BaseEntity {
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal totalCredit;
+
+    private LocalDateTime postedAt;
+    private LocalDateTime reversedAt;
+    private Long reversedEntryId;
+
+    @Version
+    private Integer version;
 
     /** 分录行（仅内存传递，不映射数据库列） */
     @TableField(exist = false)

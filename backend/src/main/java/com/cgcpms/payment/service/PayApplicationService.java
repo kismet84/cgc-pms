@@ -25,6 +25,7 @@ import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.vo.PayApplicationBasisVO;
 import com.cgcpms.payment.vo.PayApplicationVO;
+import com.cgcpms.payment.constant.PaymentIntegrityConstants;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -33,6 +34,8 @@ import com.cgcpms.subcontract.entity.SubMeasureItem;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -72,6 +75,8 @@ public class PayApplicationService {
     private final PayRecordMapper payRecordMapper;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
+    private final PaymentApplicationIntegrityService integrityService;
+    private final PaymentApplicationSourceService sourceService;
 
     public PayApplicationService(
             PayApplicationMapper payApplicationMapper,
@@ -86,6 +91,8 @@ public class PayApplicationService {
             CtContractPaymentTermMapper contractPaymentTermMapper,
             PayRecordMapper payRecordMapper,
             ProjectAccessChecker projectAccessChecker,
+            PaymentApplicationIntegrityService integrityService,
+            PaymentApplicationSourceService sourceService,
             @org.springframework.context.annotation.Lazy WorkflowEngine workflowEngine) {
         this.payApplicationMapper = payApplicationMapper;
         this.payApplicationBasisMapper = payApplicationBasisMapper;
@@ -99,6 +106,8 @@ public class PayApplicationService {
         this.contractPaymentTermMapper = contractPaymentTermMapper;
         this.payRecordMapper = payRecordMapper;
         this.projectAccessChecker = projectAccessChecker;
+        this.integrityService = integrityService;
+        this.sourceService = sourceService;
         this.workflowEngine = workflowEngine;
     }
 
@@ -203,6 +212,9 @@ public class PayApplicationService {
         }
 
         app.setTenantId(UserContext.getCurrentTenantId());
+        app.setIntegrityVersion(PaymentIntegrityConstants.CLOSED_LOOP_V1);
+        app.setApprovalInstanceId(null);
+        app.setVersion(0);
         if (!autoGenerateCode) {
             payApplicationMapper.insert(app);
             return app.getId();
@@ -247,11 +259,18 @@ public class PayApplicationService {
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
         checkProjectAccess(existing.getProjectId(), "编辑付款申请");
 
-        if (!"DRAFT".equals(existing.getApprovalStatus()))
+        if (!"DRAFT".equals(existing.getApprovalStatus()) && !"REJECTED".equals(existing.getApprovalStatus()))
             throw new BusinessException("PAY_APP_IN_APPROVAL", "付款申请审批中或已审批，不可编辑");
 
-        app.setApprovalStatus(existing.getApprovalStatus());
+        app.setTenantId(existing.getTenantId());
+        app.setApplyCode(existing.getApplyCode());
+        app.setApprovalStatus("DRAFT");
         app.setPayStatus(existing.getPayStatus());
+        app.setApprovalInstanceId(existing.getApprovalInstanceId());
+        app.setIntegrityVersion(existing.getIntegrityVersion());
+        app.setActualPayAmount(existing.getActualPayAmount());
+        app.setApprovedAmount(existing.getApprovedAmount());
+        app.setVersion(existing.getVersion());
         validateProjectAndContract(
                 app.getProjectId() != null ? app.getProjectId() : existing.getProjectId(),
                 app.getContractId() != null ? app.getContractId() : existing.getContractId(),
@@ -272,6 +291,7 @@ public class PayApplicationService {
         // Delete basis records first
         payApplicationBasisMapper.delete(new LambdaQueryWrapper<PayApplicationBasis>()
                 .eq(PayApplicationBasis::getPayApplicationId, id));
+        sourceService.deleteDraftSources(existing);
 
         payApplicationMapper.deleteById(id);
     }
@@ -427,27 +447,34 @@ public class PayApplicationService {
 
         validatePaymentAmount(payApp);
 
+        boolean strictClosedLoop = PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(payApp.getIntegrityVersion());
+        if (strictClosedLoop) {
+            integrityService.validateAndAllocateForSubmit(payApp);
+        }
+
         // 合同余额双重校验（与 writeback 时 checkContractBalance 互补）
         if (payApp.getContractId() != null) {
             checkContractBalance(payApp, payApp.getApplyAmount() != null ? payApp.getApplyAmount() : BigDecimal.ZERO);
         }
 
         // Re-validate M1: header amount == sum of basis amounts
-        List<PayApplicationBasis> basisList = payApplicationBasisMapper.selectList(
-            new LambdaQueryWrapper<PayApplicationBasis>()
-                .eq(PayApplicationBasis::getPayApplicationId, payApp.getId()));
-        BigDecimal basisTotal = basisList.stream()
-            .map(b -> b.getBasisAmount() == null ? BigDecimal.ZERO : b.getBasisAmount())
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (payApp.getApplyAmount().compareTo(basisTotal) != 0) {
-            throw new BusinessException("PAY_AMOUNT_MISMATCH", "申请金额(" + payApp.getApplyAmount() + ")与依据金额合计(" + basisTotal + ")不一致");
+        if (!strictClosedLoop) {
+            List<PayApplicationBasis> basisList = payApplicationBasisMapper.selectList(
+                new LambdaQueryWrapper<PayApplicationBasis>()
+                    .eq(PayApplicationBasis::getPayApplicationId, payApp.getId()));
+            BigDecimal basisTotal = basisList.stream()
+                .map(b -> b.getBasisAmount() == null ? BigDecimal.ZERO : b.getBasisAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (payApp.getApplyAmount().compareTo(basisTotal) != 0) {
+                throw new BusinessException("PAY_AMOUNT_MISMATCH", "申请金额(" + payApp.getApplyAmount() + ")与依据金额合计(" + basisTotal + ")不一致");
+            }
         }
 
-        workflowEngine.submit(
+        WfInstance instance = workflowEngine.submit(
                 UserContext.getCurrentUserId(),
                 UserContext.getCurrentUsername(),
                 UserContext.getCurrentTenantId(),
-                "PAY_REQUEST",
+                WorkflowBusinessTypes.PAY_REQUEST,
                 payApp.getId(),
                 "付款申请 " + payApp.getApplyCode(),
                 payApp.getApplyAmount(),
@@ -457,6 +484,7 @@ public class PayApplicationService {
                 null, null);
 
         payApp.setApprovalStatus("APPROVING");
+        payApp.setApprovalInstanceId(instance.getId());
         payApplicationMapper.updateById(payApp);
     }
 
@@ -714,6 +742,11 @@ public class PayApplicationService {
         vo.setProjectId(app.getProjectId() != null ? app.getProjectId().toString() : null);
         vo.setContractId(app.getContractId() != null ? app.getContractId().toString() : null);
         vo.setPartnerId(app.getPartnerId() != null ? app.getPartnerId().toString() : null);
+        vo.setCostSubjectId(app.getCostSubjectId() != null ? app.getCostSubjectId().toString() : null);
+        vo.setBudgetLineId(app.getBudgetLineId() != null ? app.getBudgetLineId().toString() : null);
+        vo.setExpenseCategory(app.getExpenseCategory());
+        vo.setApprovalInstanceId(app.getApprovalInstanceId() != null ? app.getApprovalInstanceId().toString() : null);
+        vo.setIntegrityVersion(app.getIntegrityVersion());
         vo.setApplyCode(app.getApplyCode());
         vo.setApplyAmount(app.getApplyAmount() != null ? app.getApplyAmount().toPlainString() : null);
         vo.setApprovedAmount(app.getApprovedAmount() != null ? app.getApprovedAmount().toPlainString() : null);

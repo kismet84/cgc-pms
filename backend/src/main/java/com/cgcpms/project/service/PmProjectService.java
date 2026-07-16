@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.budget.constant.BudgetStatusConstants;
+import com.cgcpms.budget.entity.ProjectBudget;
+import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
@@ -27,6 +30,7 @@ import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.vo.PmProjectVO;
+import com.cgcpms.project.constant.ProjectStatusConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -37,6 +41,8 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.cgcpms.common.util.DateTimeUtils;
@@ -59,6 +65,7 @@ public class PmProjectService {
     private final WfInstanceMapper wfInstanceMapper;
     private final SysRoleMapper sysRoleMapper;
     private final SysUserMapper sysUserMapper;
+    private final ProjectBudgetMapper projectBudgetMapper;
     private final com.cgcpms.project.auth.ProjectAccessChecker projectAccessChecker;
 
     /**
@@ -146,7 +153,7 @@ public class PmProjectService {
             tenantId = 0L;
         }
 
-        project.setStatus("DRAFT");
+        project.setStatus(ProjectStatusConstants.DRAFT);
         project.setTenantId(tenantId);
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
@@ -195,6 +202,47 @@ public class PmProjectService {
         }
         // 数据范围校验（非管理员用户）
         projectAccessChecker.checkAccess(project.getId(), "编辑");
+        project.setStatus(existing.getStatus());
+        project.setApprovalStatus(existing.getApprovalStatus());
+        project.setTenantId(existing.getTenantId());
+        project.setProjectCode(existing.getProjectCode());
+        pmProjectMapper.updateById(project);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void transitionStatus(Long id, String targetStatus, String reason) {
+        PmProject project = pmProjectMapper.selectById(id);
+        if (project == null || !project.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        projectAccessChecker.checkAccess(project, "变更项目状态");
+        String current = project.getStatus();
+        String target = targetStatus == null ? null : targetStatus.trim().toUpperCase();
+        Map<String, Set<String>> transitions = Map.of(
+                ProjectStatusConstants.DRAFT, Set.of(ProjectStatusConstants.ACTIVE),
+                ProjectStatusConstants.ACTIVE, Set.of(ProjectStatusConstants.SUSPENDED, ProjectStatusConstants.CLOSED),
+                ProjectStatusConstants.SUSPENDED, Set.of(ProjectStatusConstants.ACTIVE, ProjectStatusConstants.CLOSED),
+                ProjectStatusConstants.CLOSED, Set.of(),
+                ProjectStatusConstants.ARCHIVED, Set.of());
+        if (!transitions.getOrDefault(current, Set.of()).contains(target)) {
+            throw new BusinessException("PROJECT_STATUS_TRANSITION_INVALID",
+                    "不允许从 " + current + " 变更为 " + target);
+        }
+        if (ProjectStatusConstants.ACTIVE.equals(target)) {
+            Long activeBudgetCount = projectBudgetMapper.selectCount(new LambdaQueryWrapper<ProjectBudget>()
+                    .eq(ProjectBudget::getTenantId, project.getTenantId())
+                    .eq(ProjectBudget::getProjectId, project.getId())
+                    .eq(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_APPROVED)
+                    .eq(ProjectBudget::getStatus, BudgetStatusConstants.STATUS_ACTIVE)
+                    .eq(ProjectBudget::getActiveFlag, 1));
+            if (activeBudgetCount != 1) {
+                throw new BusinessException("PROJECT_ACTIVE_BUDGET_REQUIRED", "项目启用前必须存在唯一已审批生效预算");
+            }
+        }
+        project.setStatus(target);
+        String oldRemark = project.getRemark();
+        project.setRemark((oldRemark == null || oldRemark.isBlank() ? "" : oldRemark + "\n")
+                + "状态变更 " + current + " -> " + target + "：" + reason.trim());
         pmProjectMapper.updateById(project);
     }
 
@@ -212,6 +260,9 @@ public class PmProjectService {
         projectAccessChecker.checkAccess(existing, "归档");
         if ("ARCHIVED".equals(existing.getStatus())) {
             throw new BusinessException("PROJECT_ALREADY_ARCHIVED", "项目已归档");
+        }
+        if (!ProjectStatusConstants.CLOSED.equals(existing.getStatus())) {
+            throw new BusinessException("PROJECT_MUST_BE_CLOSED", "项目必须先关闭才能归档");
         }
 
         Long tenantId = UserContext.getCurrentTenantId();

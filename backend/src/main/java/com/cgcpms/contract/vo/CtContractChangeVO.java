@@ -14,6 +14,7 @@ public class CtContractChangeVO {
     private String contractId;
     private String changeCode;
     private String changeName;
+    private String businessMatterKey;
     private String changeType;
     private BigDecimal beforeAmount;
     private BigDecimal changeAmount;
@@ -33,6 +34,7 @@ public class CtContractChangeVO {
         vo.setContractId(entity.getContractId() == null ? null : entity.getContractId().toString());
         vo.setChangeCode(entity.getChangeCode());
         vo.setChangeName(entity.getChangeName());
+        vo.setBusinessMatterKey(entity.getBusinessMatterKey());
         vo.setChangeType(entity.getChangeType());
         vo.setBeforeAmount(entity.getBeforeAmount());
         vo.setChangeAmount(entity.getChangeAmount());

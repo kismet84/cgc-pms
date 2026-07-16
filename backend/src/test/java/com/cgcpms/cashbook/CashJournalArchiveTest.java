@@ -7,7 +7,12 @@ import com.cgcpms.cashbook.dto.FundAccountCommand;
 import com.cgcpms.cashbook.dto.CashJournalUpdateRequest;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
 import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
+import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
+import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.cashbook.service.CashJournalService;
 import com.cgcpms.cashbook.service.FundAccountService;
 import com.cgcpms.common.TestUserContext;
@@ -39,6 +44,9 @@ class CashJournalArchiveTest {
     @Autowired FundAccountService accountService;
     @Autowired SysFileMapper fileMapper;
     @Autowired CashJournalEntryMapper entryMapper;
+    @Autowired PmProjectMapper projectMapper;
+    @Autowired PayApplicationMapper applicationMapper;
+    @Autowired PayRecordMapper payRecordMapper;
 
     @BeforeEach
     void setUp() {
@@ -84,11 +92,35 @@ class CashJournalArchiveTest {
     @Test
     void payRecordCannotBindOrArchiveBeforeAccountOpeningDate() {
         long accountId = createAccount("ARCHIVE-OPENING", "100.00");
+        PmProject project = new PmProject();
+        project.setId(93403021L);
+        project.setTenantId(TENANT_ID);
+        project.setProjectCode("CASH-JOURNAL-OPENING");
+        project.setProjectName("现金日记开户日测试");
+        project.setProjectType("CONSTRUCTION");
+        project.setStatus("ACTIVE");
+        project.setContractAmount(new BigDecimal("100.00"));
+        project.setTargetCost(new BigDecimal("80.00"));
+        projectMapper.insert(project);
+        PayApplication application = new PayApplication();
+        application.setId(93403022L);
+        application.setTenantId(TENANT_ID);
+        application.setProjectId(project.getId());
+        application.setApplyCode("PAY-CASH-JOURNAL-OPENING");
+        application.setPayType("OTHER");
+        application.setApplyAmount(new BigDecimal("10.00"));
+        application.setApprovalStatus("APPROVED");
+        application.setPayStatus("PAID");
+        applicationMapper.insert(application);
         PayRecord record = new PayRecord();
         record.setId(93403020L);
         record.setTenantId(TENANT_ID);
+        record.setProjectId(project.getId());
+        record.setPayApplicationId(application.getId());
         record.setPayAmount(new BigDecimal("10.00"));
         record.setPayDate(LocalDate.of(2026, 6, 30));
+        record.setPayStatus("SUCCESS");
+        payRecordMapper.insert(record);
         long entryId = Long.parseLong(journalService.createPendingFromPayRecord(record).getId());
         CashJournalUpdateRequest bind = new CashJournalUpdateRequest();
         bind.setAccountId(accountId);
