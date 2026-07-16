@@ -103,6 +103,8 @@ class CostSummaryAssembler {
             vo.setSummaryDate(s.getSummaryDate() != null ? s.getSummaryDate().toString() : null);
             vo.setCostSubjectId(s.getCostSubjectId() != null ? s.getCostSubjectId().toString() : null);
             vo.setCostSubjectName(s.getCostSubjectId() != null ? finalSubjectNameMap.getOrDefault(s.getCostSubjectId(), "") : "");
+            vo.setCostTargetId(s.getCostTargetId() != null ? s.getCostTargetId().toString() : null);
+            vo.setCostForecastId(s.getCostForecastId() != null ? s.getCostForecastId().toString() : null);
             vo.setTargetCost(s.getTargetCost() != null ? s.getTargetCost().toPlainString() : "0");
             vo.setContractLockedCost(s.getContractLockedCost() != null ? s.getContractLockedCost().toPlainString() : "0");
             vo.setActualCost(s.getActualCost() != null ? s.getActualCost().toPlainString() : "0");
@@ -113,6 +115,10 @@ class CostSummaryAssembler {
             vo.setConfirmedRevenue(s.getConfirmedRevenue() != null ? s.getConfirmedRevenue().toPlainString() : "0");
             vo.setExpectedProfit(s.getExpectedProfit() != null ? s.getExpectedProfit().toPlainString() : "0");
             vo.setCostDeviation(s.getCostDeviation() != null ? s.getCostDeviation().toPlainString() : "0");
+            vo.setResponsibilityCost(s.getResponsibilityCost() != null ? s.getResponsibilityCost().toPlainString() : "0");
+            vo.setForecastAtCompletionCost(s.getForecastAtCompletionCost() != null ? s.getForecastAtCompletionCost().toPlainString() : "0");
+            vo.setForecastProfit(s.getForecastProfit() != null ? s.getForecastProfit().toPlainString() : "0");
+            vo.setProfitMargin(s.getProfitMargin() != null ? s.getProfitMargin().toPlainString() : "0");
             vo.setCreatedBy(s.getCreatedBy() != null ? s.getCreatedBy().toString() : null);
             vo.setCreatedAt(s.getCreatedAt() != null ? DateTimeUtils.DTF.format(s.getCreatedAt()) : null);
             vo.setUpdatedAt(s.getUpdatedAt() != null ? DateTimeUtils.DTF.format(s.getUpdatedAt()) : null);
@@ -149,7 +155,7 @@ class CostSummaryAssembler {
                 .map(r -> r.getTotalAmount() != null ? r.getTotalAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return totalCurrentAmount.subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount);
+        return totalCurrentAmount.subtract(confirmedMeasureAmount).subtract(confirmedReceiptAmount).max(BigDecimal.ZERO);
     }
 
     BigDecimal computeProjectContractIncome(Long tenantId, Long projectId) {

@@ -88,6 +88,12 @@ export const routes: RouteRecordRaw[] = [
             meta: { title: '项目成本明细核对', icon: 'FundOutlined' },
           },
           {
+            path: 'control',
+            name: 'CostControl',
+            component: () => import('@/pages/cost/control.vue'),
+            meta: { title: '动态利润控制', icon: 'FundOutlined' },
+          },
+          {
             path: 'subject',
             name: 'CostSubject',
             component: () => import('@/pages/cost-subject/index.vue'),
@@ -505,6 +511,7 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
   Cost: 'cost:query',
   CostLedger: 'cost:ledger:query',
   CostSummary: 'cost:summary:view',
+  CostControl: 'cost:control:query',
   CostSubject: 'cost:query',
   CostTarget: 'cost:target:query',
   CostTargetList: 'cost:target:query',

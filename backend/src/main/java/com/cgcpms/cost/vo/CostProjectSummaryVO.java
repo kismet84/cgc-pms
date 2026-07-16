@@ -18,5 +18,11 @@ public class CostProjectSummaryVO {
     private String confirmedRevenue;
     private String expectedProfit;
     private String costDeviation;
+    private String costTargetId;
+    private String costForecastId;
+    private String responsibilityCost;
+    private String forecastAtCompletionCost;
+    private String forecastProfit;
+    private String profitMargin;
     private List<CostSummaryVO> subjects;
 }

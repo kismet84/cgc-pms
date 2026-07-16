@@ -4,10 +4,12 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
+import com.cgcpms.cost.entity.CostTarget;
 import com.cgcpms.cost.entity.CostTargetItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.mapper.CostTargetItemMapper;
+import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.cost.vo.CostSubjectTreeNodeVO;
 import com.cgcpms.cost.vo.CostSubjectVO;
 import io.jsonwebtoken.Jwts;
@@ -41,6 +43,9 @@ class CostSubjectServiceTest {
 
     @Autowired
     private CostTargetItemMapper costTargetItemMapper;
+
+    @Autowired
+    private CostTargetMapper costTargetMapper;
 
     @BeforeEach
     void setUp() {
@@ -681,9 +686,23 @@ class CostSubjectServiceTest {
         String code = "TSTDELCTI_" + System.nanoTime();
         CostSubject subject = createSubject(code, "被目标引用的科目", 0L, "COST", 1, 1);
 
+        CostTarget target = new CostTarget();
+        target.setTenantId(TENANT_ID);
+        target.setProjectId(10001L);
+        target.setVersionNo("TST-REF-" + System.nanoTime());
+        target.setVersionName("科目引用保护测试");
+        target.setTotalBidCostAmount(java.math.BigDecimal.ZERO);
+        target.setTotalTargetAmount(java.math.BigDecimal.ZERO);
+        target.setTotalResponsibilityAmount(java.math.BigDecimal.ZERO);
+        target.setIsActive(0);
+        target.setApprovalStatus("DRAFT");
+        target.setStatus("DRAFT");
+        target.setDeletedFlag(0);
+        costTargetMapper.insert(target);
+
         CostTargetItem targetItem = new CostTargetItem();
         targetItem.setTenantId(TENANT_ID);
-        targetItem.setTargetId(1L);
+        targetItem.setTargetId(target.getId());
         targetItem.setProjectId(10001L);
         targetItem.setCostSubjectId(subject.getId());
         targetItem.setDeletedFlag(0);

@@ -37,4 +37,6 @@ public final class WorkflowBusinessTypes {
     public static final String PROJECT_PERIOD_PLAN = "PROJECT_PERIOD_PLAN";
     /** 项目计划履约闭环：延期纠偏审批 */
     public static final String PROJECT_CORRECTIVE_ACTION = "PROJECT_CORRECTIVE_ACTION";
+    /** 目标成本与动态利润闭环：成本偏差纠偏审批 */
+    public static final String COST_CORRECTIVE_ACTION = "COST_CORRECTIVE_ACTION";
 }

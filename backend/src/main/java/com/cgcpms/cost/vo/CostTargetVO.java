@@ -22,6 +22,8 @@ public class CostTargetVO implements Serializable {
     private String versionNo;
     private String versionName;
     private BigDecimal totalTargetAmount;
+    private BigDecimal totalBidCostAmount;
+    private BigDecimal totalResponsibilityAmount;
     private Integer isActive;
     private String approvalStatus;
 
@@ -29,6 +31,9 @@ public class CostTargetVO implements Serializable {
     private LocalDate effectiveDate;
 
     private String status;
+    @JsonSerialize(using = ToStringSerializer.class)
+    private Long approvalInstanceId;
+    private Integer version;
     private String remark;
 
     @JsonSerialize(using = ToStringSerializer.class)

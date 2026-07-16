@@ -117,10 +117,14 @@ public class CostTargetController {
         vo.setVersionNo(target.getVersionNo());
         vo.setVersionName(target.getVersionName());
         vo.setTotalTargetAmount(target.getTotalTargetAmount());
+        vo.setTotalBidCostAmount(target.getTotalBidCostAmount());
+        vo.setTotalResponsibilityAmount(target.getTotalResponsibilityAmount());
         vo.setIsActive(target.getIsActive());
         vo.setApprovalStatus(target.getApprovalStatus());
         vo.setEffectiveDate(target.getEffectiveDate());
         vo.setStatus(target.getStatus());
+        vo.setApprovalInstanceId(target.getApprovalInstanceId());
+        vo.setVersion(target.getVersion());
         vo.setRemark(target.getRemark());
         vo.setCreatedBy(target.getCreatedBy());
         vo.setCreatedTime(target.getCreatedTime());
@@ -135,6 +139,11 @@ public class CostTargetController {
         vo.setProjectId(item.getProjectId());
         vo.setCostSubjectId(item.getCostSubjectId());
         vo.setTargetAmount(item.getTargetAmount());
+        vo.setBidCostAmount(item.getBidCostAmount());
+        vo.setResponsibilityAmount(item.getResponsibilityAmount());
+        vo.setResponsibleUserId(item.getResponsibleUserId());
+        vo.setResponsibilityUnit(item.getResponsibilityUnit());
+        vo.setSortOrder(item.getSortOrder());
         vo.setRemark(item.getRemark());
         return vo;
     }

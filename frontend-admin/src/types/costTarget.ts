@@ -6,6 +6,8 @@ export interface CostTargetVO {
   versionNo: string
   versionName: string
   totalTargetAmount: string
+  totalBidCostAmount: string
+  totalResponsibilityAmount: string
   /** 0=否, 1=是 — 同一项目仅允许一个生效版本 */
   isActive: number
   /** 审批状态：DRAFT / APPROVING / APPROVED / REJECTED */
@@ -17,6 +19,8 @@ export interface CostTargetVO {
   createdTime?: string
   updatedTime?: string
   createdBy?: string
+  approvalInstanceId?: string
+  version?: number
 }
 
 /** 成本目标明细项 */
@@ -28,6 +32,10 @@ export interface CostTargetItemVO {
   costSubjectName?: string
   costSubjectCode?: string
   targetAmount: string
+  bidCostAmount: string
+  responsibilityAmount: string
+  responsibleUserId: string
+  responsibilityUnit?: string
   sortOrder?: number
   remark?: string
 }

@@ -3,6 +3,7 @@ package com.cgcpms.cost.entity;
 import com.baomidou.mybatisplus.annotation.*;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.DecimalMin;
@@ -52,6 +53,14 @@ public class CostTarget extends BaseEntity {
     @DecimalMin(value = "0.00", message = "成本目标总额不能为负数")
     private BigDecimal totalTargetAmount;
 
+    /** 投标成本基准总额，由科目投标成本快照汇总。 */
+    @DecimalMin(value = "0.00", message = "投标成本总额不能为负数")
+    private BigDecimal totalBidCostAmount;
+
+    /** 责任预算总额，必须与目标成本总额一致并完整分解到责任人。 */
+    @DecimalMin(value = "0.00", message = "责任预算总额不能为负数")
+    private BigDecimal totalResponsibilityAmount;
+
     /** 是否生效版本：0否，1是。同一项目仅允许一个生效版本 */
     private Integer isActive;
 
@@ -63,6 +72,13 @@ public class CostTarget extends BaseEntity {
 
     /** 业务状态：DRAFT草稿，ACTIVE已生效，CANCELLED已作废 */
     private String status;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long approvalInstanceId;
+
+    @Version
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Integer version;
 
     // ── V22 列经 V44 统一为 created_at / updated_at ──
 
