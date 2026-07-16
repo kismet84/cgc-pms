@@ -33,6 +33,7 @@ export const navigationItems: NavigationItem[] = [
       '/cost-target',
       '/site/daily-log',
       '/project-schedule',
+      '/quality-safety',
       '/bid-cost',
     ],
     children: [
@@ -44,6 +45,7 @@ export const navigationItems: NavigationItem[] = [
       { key: '/cost/summary', label: '成本核对' },
       { key: '/site/daily-log', label: '现场日报', permission: 'site:daily:query' },
       { key: '/project-schedule', label: '项目计划', permission: 'schedule:query' },
+      { key: '/quality-safety', label: '质量安全整改', permission: 'quality:safety:query' },
       { key: '/bid-cost', label: '投标成本', permission: 'bid:query' },
     ],
   },

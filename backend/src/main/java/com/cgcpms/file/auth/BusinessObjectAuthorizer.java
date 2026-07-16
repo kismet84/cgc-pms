@@ -77,7 +77,8 @@ public class BusinessObjectAuthorizer {
             "PAYMENT", "SUBCONTRACT", "SETTLEMENT", "VARIATION",
             "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL", "SITE_DAILY_LOG", "EXPENSE",
             "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD",
-            "PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION"
+            "PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION",
+            "QS_INSPECTION", "QS_ISSUE", "QS_RECTIFICATION"
     );
 
     /**
@@ -106,6 +107,10 @@ public class BusinessObjectAuthorizer {
 
     /** 变更签证附件按业务阶段不可逆约束，防止事后替换现场证据或伪造业主核定。 */
     public void checkVariationDocumentStage(String businessType, Long businessId, String documentType) {
+        if (businessType != null && businessType.toUpperCase().startsWith("QS_")) {
+            checkQualityDocumentStage(businessType.toUpperCase(), businessId, documentType);
+            return;
+        }
         if (!"VARIATION".equalsIgnoreCase(businessType)) return;
         VarOrder variation = variationMapper.selectById(businessId);
         if (variation == null || !java.util.Objects.equals(variation.getTenantId(), UserContext.getCurrentTenantId()))
@@ -135,7 +140,8 @@ public class BusinessObjectAuthorizer {
             case "SITE_DAILY_LOG" -> write ? "site:daily:edit" : "site:daily:query";
             default -> genericAuthority;
         };
-        requireAuthority(requiredAuthority);
+        if (upperType.startsWith("QS_")) requireQualityAuthority(upperType, write);
+        else requireAuthority(requiredAuthority);
 
         switch (upperType) {
             case "PROJECT":
@@ -336,6 +342,17 @@ public class BusinessObjectAuthorizer {
                 projectAccessChecker.checkAccess(dailyLog.getProjectId(), action + "现场日报文件");
                 break;
             }
+            case "QS_INSPECTION", "QS_ISSUE", "QS_RECTIFICATION": {
+                QualityFileObject object = findQualityFileObject(upperType, businessId);
+                if (object == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "质量安全业务对象不存在: " + businessId);
+                }
+                if (!object.tenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该质量安全业务文件");
+                }
+                checkProjectAccess(object.projectId(), action + "质量安全业务文件");
+                break;
+            }
             default:
                 throw new BusinessException("FILE_BIZ_TYPE_UNKNOWN",
                         "不支持的业务类型: " + businessType);
@@ -383,6 +400,58 @@ public class BusinessObjectAuthorizer {
     }
 
     private record RevenueFileObject(Long tenantId, Long projectId, String status) {}
+
+    private void checkQualityDocumentStage(String businessType, Long businessId, String documentType) {
+        QualityFileObject object = findQualityFileObject(businessType, businessId);
+        if (object == null || !object.tenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "质量安全业务对象不存在: " + businessId);
+        String type = documentType == null ? "" : documentType.trim().toUpperCase();
+        boolean allowed = switch (businessType) {
+            case "QS_INSPECTION" -> "DRAFT".equals(object.status()) && "INSPECTION_EVIDENCE".equals(type);
+            case "QS_ISSUE" -> "DRAFT".equals(object.status()) && "ISSUE_EVIDENCE".equals(type);
+            case "QS_RECTIFICATION" -> ("DRAFT".equals(object.status()) && "RECTIFICATION_EVIDENCE".equals(type))
+                    || ("SUBMITTED".equals(object.status()) && "REINSPECTION_EVIDENCE".equals(type));
+            default -> false;
+        };
+        if (!allowed) throw new BusinessException("QS_DOCUMENT_STAGE_INVALID", "当前业务阶段不允许变更该类质量安全证据");
+    }
+
+    private QualityFileObject findQualityFileObject(String businessType, Long businessId) {
+        String sql = switch (businessType) {
+            case "QS_INSPECTION" -> "SELECT tenant_id,project_id,status FROM qs_inspection_record WHERE id=? AND deleted_flag=0";
+            case "QS_ISSUE" -> "SELECT i.tenant_id,i.project_id,r.status FROM qs_issue i JOIN qs_inspection_record r ON r.id=i.inspection_id WHERE i.id=? AND i.deleted_flag=0 AND r.deleted_flag=0";
+            case "QS_RECTIFICATION" -> "SELECT tenant_id,project_id,status FROM qs_rectification WHERE id=? AND deleted_flag=0";
+            default -> throw new IllegalArgumentException("Unsupported quality file type");
+        };
+        try {
+            return jdbcTemplate.queryForObject(sql,
+                    (rs, rowNum) -> new QualityFileObject(rs.getLong("tenant_id"), rs.getLong("project_id"), rs.getString("status")),
+                    businessId);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    private record QualityFileObject(Long tenantId, Long projectId, String status) {}
+
+    private void requireQualityAuthority(String businessType, boolean write) {
+        if (!write) {
+            requireAuthority("quality:safety:query");
+            return;
+        }
+        Set<String> allowed = switch (businessType) {
+            case "QS_INSPECTION", "QS_ISSUE" -> Set.of("quality:safety:inspection:maintain");
+            case "QS_RECTIFICATION" -> Set.of("quality:safety:rectify", "quality:safety:reinspect");
+            default -> Set.of();
+        };
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean permitted = authentication != null && authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> allowed.contains(authority)
+                        || "ROLE_ADMIN".equals(authority)
+                        || "ROLE_SUPER_ADMIN".equals(authority));
+        if (!permitted) throw new BusinessException("FILE_ACCESS_DENIED", "无权执行该质量安全文件操作");
+    }
 
     private void requireAuthority(String requiredAuthority) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
