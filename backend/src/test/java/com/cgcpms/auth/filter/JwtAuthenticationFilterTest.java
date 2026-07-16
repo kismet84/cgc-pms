@@ -20,6 +20,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -145,20 +146,23 @@ class JwtAuthenticationFilterTest {
         when(cookieUtils.getCookieValue(any(HttpServletRequest.class), eq(CookieUtils.ACCESS_TOKEN_COOKIE))).thenReturn(null);
         when(jwtUtils.validateToken("compact-token")).thenReturn(true);
         when(jwtUtils.isRefreshToken("compact-token")).thenReturn(false);
+        List<String> compressedPermissions = IntStream.range(0, 200)
+                .mapToObj(index -> "measurement:operation:" + index)
+                .toList();
         when(jwtUtils.parseToken("compact-token")).thenReturn(Jwts.claims()
                 .add(JwtUtils.CLAIM_USER_ID, 1L)
                 .add(JwtUtils.CLAIM_USERNAME, "admin")
                 .add(JwtUtils.CLAIM_TENANT_ID, 0L)
                 .add(JwtUtils.CLAIM_ROLES, List.of("SUPER_ADMIN"))
-                .add(JwtUtils.CLAIM_PERMISSIONS, "measurement:query,measurement:submit")
+                .add(JwtUtils.CLAIM_PERMISSIONS, JwtUtils.encodePermissionClaim(compressedPermissions))
                 .build());
         when(blacklistProvider.getIfAvailable()).thenReturn(blacklistService);
         when(blacklistService.isBlacklisted("compact-token")).thenReturn(false);
         doAnswer(invocation -> {
             var authorities = SecurityContextHolder.getContext().getAuthentication().getAuthorities();
             assertTrue(authorities.stream().anyMatch(value -> value.getAuthority().equals("ROLE_SUPER_ADMIN")));
-            assertTrue(authorities.stream().anyMatch(value -> value.getAuthority().equals("measurement:query")));
-            assertTrue(authorities.stream().anyMatch(value -> value.getAuthority().equals("measurement:submit")));
+            assertTrue(authorities.stream().anyMatch(value -> value.getAuthority().equals("measurement:operation:0")));
+            assertTrue(authorities.stream().anyMatch(value -> value.getAuthority().equals("measurement:operation:199")));
             return null;
         }).when(chain).doFilter(any(), any());
 
