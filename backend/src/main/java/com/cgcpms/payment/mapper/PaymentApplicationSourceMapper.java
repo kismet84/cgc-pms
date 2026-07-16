@@ -30,6 +30,21 @@ public interface PaymentApplicationSourceMapper extends BaseMapper<PaymentApplic
                                       @Param("settlementId") Long settlementId,
                                       @Param("excludeApplicationId") Long excludeApplicationId);
 
+    @Select("""
+            SELECT COALESCE(SUM(s.source_amount), 0)
+              FROM payment_application_source s
+              JOIN pay_application p ON p.id = s.pay_application_id
+             WHERE s.tenant_id = #{tenantId}
+               AND s.source_type = 'SUB_MEASURE'
+               AND s.sub_measure_id = #{subMeasureId}
+               AND s.deleted_flag = 0 AND p.deleted_flag = 0
+               AND p.approval_status IN ('APPROVING', 'APPROVED')
+               AND p.id <> #{excludeApplicationId}
+            """)
+    BigDecimal sumCommittedSubMeasure(@Param("tenantId") Long tenantId,
+                                      @Param("subMeasureId") Long subMeasureId,
+                                      @Param("excludeApplicationId") Long excludeApplicationId);
+
     @Update("""
             UPDATE payment_application_source
                SET paid_amount = paid_amount + #{amount}, version = version + 1

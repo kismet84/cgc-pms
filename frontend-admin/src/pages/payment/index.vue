@@ -924,6 +924,12 @@ onMounted(() => {
           <a-descriptions-item label="申请来源"
             >{{ traceData.applicationSources.length }} 条</a-descriptions-item
           >
+          <a-descriptions-item label="分包计量"
+            >{{ traceData.subMeasures.length }} 笔</a-descriptions-item
+          >
+          <a-descriptions-item label="分包任务"
+            >{{ traceData.subTasks.length }} 项</a-descriptions-item
+          >
           <a-descriptions-item label="付款记录"
             >{{ traceData.paymentRecords.length }} 条</a-descriptions-item
           >

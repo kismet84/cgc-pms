@@ -168,6 +168,7 @@ class BusinessObjectAuthorizerTest {
         StlSettlement settlement = new StlSettlement();
         settlement.setTenantId(TestUserContext.TENANT_0);
         settlement.setProjectId(10006L);
+        settlement.setApprovalStatus("DRAFT");
         when(settlementMapper.selectById(70001L)).thenReturn(settlement);
 
         authorizer.checkUploadAccess("SETTLEMENT", 70001L);

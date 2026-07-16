@@ -211,6 +211,9 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该分包计量文件");
                 }
+                if (write && !isEditableDocumentStatus(subcontract.getApprovalStatus())) {
+                    throw new BusinessException("SUB_MEASURE_DOCUMENT_IMMUTABLE", "审批中或已审批计量的附件不可变更");
+                }
                 checkProjectAccess(subcontract.getProjectId(), action + "分包计量文件");
                 break;
             }
@@ -223,6 +226,9 @@ public class BusinessObjectAuthorizer {
                 if (!settlement.getTenantId().equals(UserContext.getCurrentTenantId())) {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该结算单文件");
+                }
+                if (write && !isEditableDocumentStatus(settlement.getApprovalStatus())) {
+                    throw new BusinessException("SETTLEMENT_DOCUMENT_IMMUTABLE", "审批中或已定案结算的附件不可变更");
                 }
                 checkProjectAccess(settlement.getProjectId(), action + "结算单文件");
                 break;
@@ -316,6 +322,10 @@ public class BusinessObjectAuthorizer {
                 throw new BusinessException("FILE_BIZ_TYPE_UNKNOWN",
                         "不支持的业务类型: " + businessType);
         }
+    }
+
+    private boolean isEditableDocumentStatus(String approvalStatus) {
+        return "DRAFT".equals(approvalStatus) || "REJECTED".equals(approvalStatus);
     }
 
     private void checkProjectAccess(Long projectId, String action) {

@@ -91,6 +91,7 @@ watch(
   () => createForm.contractId,
   (val) => {
     if (!val) createForm.settlementType = undefined
+    if (val) createForm.settlementType = 'FINAL'
   },
 )
 
@@ -225,18 +226,17 @@ async function handleDelete(row: SettlementVO) {
 
 function openCreateModal() {
   createForm.contractId = undefined
-  createForm.settlementType = undefined
+  createForm.settlementType = 'FINAL'
   createForm.remark = ''
   createModalVisible.value = true
 }
 async function handleCreate() {
   createLoading.value = true
   try {
-    await createSettlement(createForm)
-    message.success('创建成功')
+    const settlementId = await createSettlement(createForm)
+    message.success('创建成功，请上传结算附件后提交审批')
     createModalVisible.value = false
-    fetchData()
-    fetchKpi()
+    await router.push(`/settlement/${settlementId}`)
   } catch (e: unknown) {
     console.error(e)
     message.error('创建结算单失败')
@@ -658,17 +658,8 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
       <a-form-item label="合作方">
         <a-input :value="createFormPartnerName" disabled placeholder="选择合同后自动填充乙方" />
       </a-form-item>
-      <a-form-item label="结算类型">
-        <a-select
-          v-model:value="createForm.settlementType"
-          placeholder="请选择"
-          allow-clear
-          style="width: 100%"
-        >
-          <a-select-option value="PROGRESS">进度结算</a-select-option>
-          <a-select-option value="FINAL">竣工结算</a-select-option>
-          <a-select-option value="INTERIM">期中结算</a-select-option>
-        </a-select>
+      <a-form-item label="结算类型" required>
+        <a-input value="终期结算（FINAL）" disabled />
       </a-form-item>
       <a-form-item label="备注">
         <a-textarea v-model:value="createForm.remark" placeholder="备注（选填）" :rows="3" />

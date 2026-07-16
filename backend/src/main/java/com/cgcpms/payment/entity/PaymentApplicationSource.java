@@ -35,6 +35,8 @@ public class PaymentApplicationSource extends BaseEntity {
     private Long expenseId;
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long settlementId;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long subMeasureId;
     @NotNull(message = "付款来源金额不能为空")
     @Positive(message = "付款来源金额必须大于0")
     @JsonSerialize(using = ToStringSerializer.class)

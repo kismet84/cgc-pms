@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { message, Modal } from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { useSettlementStore } from '@/stores/settlement'
 import { submitSettlement } from '@/api/modules/settlement'
+import { uploadFile } from '@/api/modules/file'
 import type { SettlementStatus } from '@/types/settlement'
 import { SETTLEMENT_STATUS_LABEL, SETTLEMENT_STATUS_COLOR } from '@/types/settlement'
 import { SOURCE_TYPE_LABEL, SOURCE_TYPE_COLOR } from '@/types/cost'
@@ -17,6 +18,7 @@ const store = useSettlementStore()
 const settlementId = route.params.id as string
 const activeTab = ref('basic')
 const submitting = ref(false)
+const attachmentUploading = ref(false)
 
 const APPROVAL_STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
@@ -214,30 +216,28 @@ function goBack() {
   router.back()
 }
 
-async function handleAction(action: string) {
-  if (action === 'APPROVE' || action === 'REJECT') {
-    Modal.confirm({
-      title: action === 'APPROVE' ? '确认通过？' : '确认驳回？',
-      onOk: async () => {
-        submitting.value = true
-        try {
-          await submitSettlement(settlementId, action)
-          message.success(action === 'APPROVE' ? '已通过' : '已驳回')
-          store.fetchDetail(settlementId)
-        } finally {
-          submitting.value = false
-        }
-      },
-    })
-  } else {
-    submitting.value = true
-    try {
-      await submitSettlement(settlementId, action)
-      message.success('操作成功')
-      store.fetchDetail(settlementId)
-    } finally {
-      submitting.value = false
-    }
+async function handleSubmit() {
+  submitting.value = true
+  try {
+    await submitSettlement(settlementId)
+    message.success('已提交审批，请到审批中心处理')
+    await store.fetchDetail(settlementId)
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function handleAttachmentUpload(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0]
+  if (!file) return
+  attachmentUploading.value = true
+  try {
+    await uploadFile(file, 'SETTLEMENT', settlementId, 'OTHER')
+    await store.fetchAttachments(settlementId)
+    message.success('结算附件上传成功')
+  } finally {
+    attachmentUploading.value = false
+    ;(event.target as HTMLInputElement).value = ''
   }
 }
 
@@ -256,25 +256,11 @@ onMounted(() => {
         <a-button @click="goBack"><ArrowLeftOutlined />返回</a-button>
         <template v-if="detail">
           <a-button
-            v-if="detail.settlementStatus === 'DRAFT'"
+            v-if="detail.approvalStatus === 'DRAFT' || detail.approvalStatus === 'REJECTED'"
             type="primary"
-            @click="handleAction('SUBMIT')"
+            @click="handleSubmit"
             :loading="submitting"
-            >提交审批</a-button
-          >
-          <a-button
-            v-if="detail.approvalStatus === 'APPROVING'"
-            type="primary"
-            @click="handleAction('APPROVE')"
-            :loading="submitting"
-            >同意</a-button
-          >
-          <a-button
-            v-if="detail.approvalStatus === 'APPROVING'"
-            danger
-            @click="handleAction('REJECT')"
-            :loading="submitting"
-            >驳回</a-button
+            >{{ detail.approvalStatus === 'REJECTED' ? '重新提交' : '提交审批' }}</a-button
           >
         </template>
       </div>
@@ -497,6 +483,18 @@ onMounted(() => {
 
           <a-tab-pane key="attachments" tab="附件">
             <a-spin :spinning="attachmentsLoading">
+              <div
+                v-if="detail.approvalStatus === 'DRAFT' || detail.approvalStatus === 'REJECTED'"
+                style="margin: 8px 0 12px"
+              >
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.xlsx,.docx"
+                  :disabled="attachmentUploading"
+                  @change="handleAttachmentUpload"
+                />
+                <span style="margin-left: 8px; color: #64748b">提交前至少上传一份结算附件</span>
+              </div>
               <a-table
                 v-if="attachments.length > 0"
                 :columns="attachmentColumns"

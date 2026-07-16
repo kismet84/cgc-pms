@@ -9,5 +9,6 @@ public final class PaymentIntegrityConstants {
 
     public static final String SOURCE_EXPENSE = "EXPENSE";
     public static final String SOURCE_SETTLEMENT = "SETTLEMENT";
+    public static final String SOURCE_SUB_MEASURE = "SUB_MEASURE";
     public static final String SOURCE_DIRECT = "DIRECT";
 }
