@@ -359,10 +359,14 @@ async function handleSubmit() {
       id = await createApplication(formData)
       editingId.value = id
     }
-    const sources = sourceList.value.map(({ key: _key, ...source }) => ({
-      ...source,
-      sourceRefId: source.sourceType === 'DIRECT' ? id! : source.sourceRefId!,
-    })) as PaymentApplicationSourceVO[]
+    const sources = sourceList.value.map((source) => {
+      const payload = { ...source }
+      delete payload.key
+      return {
+        ...payload,
+        sourceRefId: source.sourceType === 'DIRECT' ? id! : source.sourceRefId!,
+      } as PaymentApplicationSourceVO
+    })
     await saveApplicationSources(id!, sources)
     if (proofFile.value) await uploadFile(proofFile.value, 'PAYMENT', id!, 'PAYMENT_PROOF')
     message.success('付款申请草稿已保存')

@@ -80,11 +80,18 @@ export function saveInvoiceAllocations(id: string, items: InvoicePaymentAllocati
 }
 
 export function getInvoiceWriteOffProgress(id: string) {
-  return request<Record<string, unknown>>({ url: `/finance-operations/invoices/${id}/write-off`, method: 'get' })
+  return request<Record<string, unknown>>({
+    url: `/finance-operations/invoices/${id}/write-off`,
+    method: 'get',
+  })
 }
 
 export function markInvoiceException(id: string, status: string, reason: string) {
-  return request<void>({ url: `/finance-operations/invoices/${id}/exception`, method: 'post', data: { status, reason } })
+  return request<void>({
+    url: `/finance-operations/invoices/${id}/exception`,
+    method: 'post',
+    data: { status, reason },
+  })
 }
 
 /** 发票 OCR 识别（上传 PDF） */

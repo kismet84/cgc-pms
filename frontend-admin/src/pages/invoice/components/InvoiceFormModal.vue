@@ -11,7 +11,12 @@ import {
   saveInvoiceAllocations,
   getInvoiceAllocations,
 } from '@/api/modules/invoice'
-import type { InvoiceVO, PayRecordBrief, InvoiceRecognizeResultVO, InvoicePaymentAllocationVO } from '@/types/invoice'
+import type {
+  InvoiceVO,
+  PayRecordBrief,
+  InvoiceRecognizeResultVO,
+  InvoicePaymentAllocationVO,
+} from '@/types/invoice'
 import { uploadFile } from '@/api/modules/file'
 
 const INVOICE_BUSINESS_TYPE = 'INVOICE'
@@ -147,11 +152,16 @@ async function handleModalOk() {
     message.warning('请完整填写每一条付款核销分配')
     return
   }
-  if (new Set(activeAllocations.map((item) => item.payRecordId)).size !== activeAllocations.length) {
+  if (
+    new Set(activeAllocations.map((item) => item.payRecordId)).size !== activeAllocations.length
+  ) {
     message.warning('同一付款记录不能重复分配')
     return
   }
-  const allocatedTotal = activeAllocations.reduce((sum, item) => sum + Number(item.allocatedAmount), 0)
+  const allocatedTotal = activeAllocations.reduce(
+    (sum, item) => sum + Number(item.allocatedAmount),
+    0,
+  )
   if (allocatedTotal > Number(formData.invoiceAmount) + 0.001) {
     message.warning('核销分配合计不能超过发票金额')
     return
@@ -169,10 +179,13 @@ async function handleModalOk() {
       message.success('创建成功')
     }
     if (invoiceId) {
-      await saveInvoiceAllocations(invoiceId, activeAllocations.map(({ payRecordId, allocatedAmount }) => ({
-        payRecordId,
-        allocatedAmount,
-      })))
+      await saveInvoiceAllocations(
+        invoiceId,
+        activeAllocations.map(({ payRecordId, allocatedAmount }) => ({
+          payRecordId,
+          allocatedAmount,
+        })),
+      )
     }
     if (invoiceId && recognizeResult.value) {
       const { createInvoiceOcrReview } = await import('@/api/modules/financeOperations')
@@ -398,14 +411,28 @@ defineExpose({
           <div v-for="item in allocations" :key="item.key" class="allocation-row">
             <a-select v-model:value="item.payRecordId" placeholder="付款记录">
               <a-select-option v-for="pr in payRecordList" :key="pr.id" :value="pr.id">
-                {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}（{{ pr.payAmount ?? '-' }}）
+                {{ pr.voucherNo ? `#${pr.voucherNo}` : `付款记录#${pr.id}` }}（{{
+                  pr.payAmount ?? '-'
+                }}）
               </a-select-option>
             </a-select>
-            <a-input-number v-model:value="item.allocatedAmount" :min="0.01" :precision="2" placeholder="分配金额" />
-            <a-button danger :disabled="allocations.length === 1" @click="removeAllocation(item.key)">删除</a-button>
+            <a-input-number
+              v-model:value="item.allocatedAmount"
+              :min="0.01"
+              :precision="2"
+              placeholder="分配金额"
+            />
+            <a-button
+              danger
+              :disabled="allocations.length === 1"
+              @click="removeAllocation(item.key)"
+              >删除</a-button
+            >
           </div>
           <a-button type="dashed" block @click="addAllocation">增加付款分配（一票多付）</a-button>
-          <div class="allocation-tip">支持一张发票分配多笔付款；多张发票也可分别核销同一付款，后台同时校验发票与付款两侧额度。</div>
+          <div class="allocation-tip">
+            支持一张发票分配多笔付款；多张发票也可分别核销同一付款，后台同时校验发票与付款两侧额度。
+          </div>
         </div>
       </a-form-item>
       <a-form-item label="文档类型" required>
@@ -479,5 +506,18 @@ defineExpose({
 </template>
 
 <style scoped>
-.allocation-list{display:grid;gap:8px}.allocation-row{display:grid;grid-template-columns:minmax(0,1fr) 150px auto;gap:8px}.allocation-tip{color:#667085;font-size:12px;line-height:20px}
+.allocation-list {
+  display: grid;
+  gap: 8px;
+}
+.allocation-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px auto;
+  gap: 8px;
+}
+.allocation-tip {
+  color: #667085;
+  font-size: 12px;
+  line-height: 20px;
+}
 </style>

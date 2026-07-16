@@ -133,8 +133,8 @@ class Phase2FullChainIntegrationTest {
         assertEquals(PROJECT_ID, saved.getProjectId());
 
         // 3. 保存订单明细
-        MatPurchaseOrderItem item1 = buildOrderItem("C30商品砼", "C30", "m³", 100, 450);
-        MatPurchaseOrderItem item2 = buildOrderItem("HRB400螺纹钢", "HRB400 φ25", "t", 50, 3800);
+        MatPurchaseOrderItem item1 = buildOrderItem(1L, "C30商品砼", "C30", "m³", 100, 450);
+        MatPurchaseOrderItem item2 = buildOrderItem(2L, "HRB400螺纹钢", "HRB400 φ25", "t", 50, 3800);
         purchaseOrderService.saveItemsBatch(orderId, List.of(item1, item2));
 
         // 4. 验证明细已保存
@@ -237,6 +237,10 @@ class Phase2FullChainIntegrationTest {
     void test03_receiptApprovalAndCostGeneration() {
         // 1. 创建采购订单+明细，创建验收单+明细
         Long orderId = createOrderWithItems();
+        MatPurchaseOrder approvedOrder = purchaseOrderMapper.selectById(orderId);
+        approvedOrder.setApprovalStatus("APPROVED");
+        approvedOrder.setOrderStatus("APPROVED");
+        purchaseOrderMapper.updateById(approvedOrder);
         Long receiptId = createReceiptWithItems(orderId);
 
         // 2. 提交验收审批
@@ -715,8 +719,8 @@ class Phase2FullChainIntegrationTest {
 
         Long orderId = purchaseOrderService.create(order);
 
-        MatPurchaseOrderItem item1 = buildOrderItem("C30商品砼", "C30", "m³", 100, 450);
-        MatPurchaseOrderItem item2 = buildOrderItem("HRB400螺纹钢", "HRB400 φ25", "t", 50, 3800);
+        MatPurchaseOrderItem item1 = buildOrderItem(1L, "C30商品砼", "C30", "m³", 100, 450);
+        MatPurchaseOrderItem item2 = buildOrderItem(2L, "HRB400螺纹钢", "HRB400 φ25", "t", 50, 3800);
         purchaseOrderService.saveItemsBatch(orderId, List.of(item1, item2));
 
         return orderId;
@@ -728,6 +732,7 @@ class Phase2FullChainIntegrationTest {
         receipt.setProjectId(PROJECT_ID);
         receipt.setOrderId(orderId);
         receipt.setReceiptDate(LocalDate.now());
+        receipt.setReceiptMode("DIRECT_CONSUMPTION");
         receipt.setQualityStatus("PASSED");
         receipt.setRemark("Phase2辅助数据-验收单");
 
@@ -747,9 +752,10 @@ class Phase2FullChainIntegrationTest {
     }
 
     /** 构建采购订单明细 */
-    private MatPurchaseOrderItem buildOrderItem(String name, String spec, String unit,
+    private MatPurchaseOrderItem buildOrderItem(Long materialId, String name, String spec, String unit,
                                                   long quantity, long unitPrice) {
         MatPurchaseOrderItem item = new MatPurchaseOrderItem();
+        item.setMaterialId(materialId);
         item.setMaterialName(name);
         item.setSpecification(spec);
         item.setUnit(unit);
@@ -769,6 +775,7 @@ class Phase2FullChainIntegrationTest {
         item.setQualifiedQuantity(qualifiedQty);
         item.setUnitPrice(unitPrice);
         item.setAmount(amount);
+        item.setUseLocation("Phase2直耗测试部位");
         return item;
     }
 

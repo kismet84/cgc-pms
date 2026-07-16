@@ -7,7 +7,11 @@ export function getRevenueDashboard(projectId: string) {
 }
 
 export function getOwnerSettlements(projectId?: string, status?: string) {
-  return request<RevenueRow[]>({ url: '/revenue-operations/settlements', method: 'get', params: { projectId, status } })
+  return request<RevenueRow[]>({
+    url: '/revenue-operations/settlements',
+    method: 'get',
+    params: { projectId, status },
+  })
 }
 
 export function createOwnerSettlement(data: RevenueRow) {
@@ -15,15 +19,26 @@ export function createOwnerSettlement(data: RevenueRow) {
 }
 
 export function submitOwnerSettlement(id: string) {
-  return request<RevenueRow>({ url: `/revenue-operations/settlements/${id}/submit`, method: 'post' })
+  return request<RevenueRow>({
+    url: `/revenue-operations/settlements/${id}/submit`,
+    method: 'post',
+  })
 }
 
 export function getReceivables(projectId?: string, status?: string) {
-  return request<RevenueRow[]>({ url: '/revenue-operations/receivables', method: 'get', params: { projectId, status } })
+  return request<RevenueRow[]>({
+    url: '/revenue-operations/receivables',
+    method: 'get',
+    params: { projectId, status },
+  })
 }
 
 export function getSalesInvoices(projectId?: string) {
-  return request<RevenueRow[]>({ url: '/revenue-operations/sales-invoices', method: 'get', params: { projectId } })
+  return request<RevenueRow[]>({
+    url: '/revenue-operations/sales-invoices',
+    method: 'get',
+    params: { projectId },
+  })
 }
 
 export function createSalesInvoice(data: RevenueRow) {
@@ -31,7 +46,11 @@ export function createSalesInvoice(data: RevenueRow) {
 }
 
 export function getCollections(projectId?: string, status?: string) {
-  return request<RevenueRow[]>({ url: '/revenue-operations/collections', method: 'get', params: { projectId, status } })
+  return request<RevenueRow[]>({
+    url: '/revenue-operations/collections',
+    method: 'get',
+    params: { projectId, status },
+  })
 }
 
 export function createCollection(data: RevenueRow) {
@@ -39,17 +58,32 @@ export function createCollection(data: RevenueRow) {
 }
 
 export function reverseCollection(id: string, data: { reason: string; idempotencyKey: string }) {
-  return request<RevenueRow>({ url: `/revenue-operations/collections/${id}/reverse`, method: 'post', data })
+  return request<RevenueRow>({
+    url: `/revenue-operations/collections/${id}/reverse`,
+    method: 'post',
+    data,
+  })
 }
 
 export function getCollectionSchedules(status?: string) {
-  return request<RevenueRow[]>({ url: '/revenue-operations/schedules', method: 'get', params: { status } })
+  return request<RevenueRow[]>({
+    url: '/revenue-operations/schedules',
+    method: 'get',
+    params: { status },
+  })
 }
 
 export function runRevenueReconciliation(date?: string) {
-  return request<RevenueRow>({ url: '/revenue-operations/reconciliations/run', method: 'post', params: { date } })
+  return request<RevenueRow>({
+    url: '/revenue-operations/reconciliations/run',
+    method: 'post',
+    params: { date },
+  })
 }
 
 export function getRevenueTrace(journalId: string) {
-  return request<RevenueRow>({ url: `/revenue-operations/trace/cash-journals/${journalId}`, method: 'get' })
+  return request<RevenueRow>({
+    url: `/revenue-operations/trace/cash-journals/${journalId}`,
+    method: 'get',
+  })
 }

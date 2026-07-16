@@ -91,10 +91,15 @@ async function showWriteOff(record: InvoiceVO) {
 }
 
 function flagException(record: InvoiceVO) {
-  Modal.confirm({ title: '标记异常发票', content: '确认将该发票标记为疑似异常并进入人工处理？', async onOk() {
-    await markInvoiceException(record.id, 'SUSPECT', '财务人员在发票工作台人工标记')
-    message.success('已标记异常票'); fetchData()
-  } })
+  Modal.confirm({
+    title: '标记异常发票',
+    content: '确认将该发票标记为疑似异常并进入人工处理？',
+    async onOk() {
+      await markInvoiceException(record.id, 'SUSPECT', '财务人员在发票工作台人工标记')
+      message.success('已标记异常票')
+      fetchData()
+    },
+  })
 }
 
 onMounted(() => {
@@ -278,7 +283,12 @@ defineExpose({
                         核验
                       </a-menu-item>
                       <a-menu-item @click="showWriteOff(row)">核销进度</a-menu-item>
-                      <a-menu-item v-if="row.exceptionStatus !== 'SUSPECT'" danger @click="flagException(row)">标记异常票</a-menu-item>
+                      <a-menu-item
+                        v-if="row.exceptionStatus !== 'SUSPECT'"
+                        danger
+                        @click="flagException(row)"
+                        >标记异常票</a-menu-item
+                      >
                     </a-menu>
                   </template>
                 </a-dropdown>

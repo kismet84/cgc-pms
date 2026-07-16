@@ -124,7 +124,12 @@ async function save() {
     else editingId.value = await createBudget(payload)
     await saveBudgetLines(
       editingId.value!,
-      lines.value.map(({ key: _key, ...line }) => line),
+      lines.value.map(({ id, costSubjectId, budgetAmount, remark }) => ({
+        id,
+        costSubjectId,
+        budgetAmount,
+        remark,
+      })),
     )
     message.success('预算草稿已保存')
     modalOpen.value = false
