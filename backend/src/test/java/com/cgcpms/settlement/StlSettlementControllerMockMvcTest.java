@@ -15,6 +15,7 @@ import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.settlement.service.SettlementAmountPolicy;
 import com.cgcpms.settlement.service.StlSettlementWriteService;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
@@ -243,11 +244,31 @@ class StlSettlementControllerMockMvcTest {
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 5. POST /settlements/{id}/submit
+    // 5. GET /settlements/amount-baseline
     // ═══════════════════════════════════════════════════════════════
 
     @Test
     @Order(5)
+    @DisplayName("GET /settlements/amount-baseline -> 200 previews historical drift without mutation")
+    void testPreviewAmountBaseline() throws Exception {
+        mockMvc.perform(getWithApi("/settlements/amount-baseline")
+                        .cookie(adminCookie())
+                        .param("pageNo", "1")
+                        .param("pageSize", "100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.records").isArray())
+                .andExpect(jsonPath("$.data.records[?(@.settlementId == '" + settlementId + "')]").exists())
+                .andExpect(jsonPath("$.data.records[?(@.settlementId == '" + settlementId + "')].targetFormulaVersion")
+                        .value(org.hamcrest.Matchers.hasItem(SettlementAmountPolicy.FORMULA_VERSION)));
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 6. POST /settlements/{id}/submit
+    // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @Order(6)
     @DisplayName("POST /settlements/{id}/submit -> 200 submits for approval")
     void testSubmitForApproval() throws Exception {
         mockMvc.perform(postWithApi("/settlements/" + settlementId + "/submit")

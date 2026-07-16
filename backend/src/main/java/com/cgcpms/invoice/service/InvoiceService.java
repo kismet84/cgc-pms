@@ -7,11 +7,16 @@ import java.util.regex.Pattern;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.service.FileTypeValidator;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
+import com.cgcpms.invoice.mapper.InvoicePaymentAllocationMapper;
+import com.cgcpms.invoice.entity.InvoicePaymentAllocation;
+import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
 import com.cgcpms.invoice.vo.InvoiceVO;
 import com.cgcpms.payment.entity.PayRecord;
@@ -33,6 +38,12 @@ import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException;
 import org.apache.pdfbox.text.PDFTextStripper;
 
 import com.cgcpms.common.util.DateTimeUtils;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -46,6 +57,8 @@ public class InvoiceService {
     private final PayRecordMapper payRecordMapper;
     private final PayApplicationMapper payApplicationMapper;
     private final ProjectAccessChecker projectAccessChecker;
+    private final InvoicePaymentAllocationMapper allocationMapper;
+    private final SysFileMapper sysFileMapper;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     // ── Query ──
@@ -83,6 +96,10 @@ public class InvoiceService {
         if (invoice.getVerifyStatus() == null || invoice.getVerifyStatus().isBlank()) {
             invoice.setVerifyStatus("PENDING");
         }
+        if (!StringUtils.hasText(invoice.getDocumentType())) invoice.setDocumentType("ELECTRONIC_INVOICE");
+        if (!Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE").contains(invoice.getDocumentType())) {
+            throw new BusinessException("INVOICE_DOCUMENT_TYPE_INVALID", "发票文档类型仅支持电子发票或扫描件");
+        }
         // 强制关联付款记录 — 新创建的发票必须绑定有效付款记录
         if (invoice.getPayRecordId() == null) {
             throw new BusinessException("MISSING_PAY_RECORD_ID", "创建发票时必须关联付款记录");
@@ -93,7 +110,24 @@ public class InvoiceService {
             throw new BusinessException("PAY_RECORD_NOT_FOUND",
                     "关联的付款记录(" + invoice.getPayRecordId() + ")不存在或不属于当前租户");
         }
-        checkProjectAccess(resolveProjectId(payRecord, invoice.getPayApplicationId()), "创建发票");
+        if (!"SUCCESS".equals(payRecord.getPayStatus())) {
+            throw new BusinessException("PAY_RECORD_NOT_SUCCESS", "只有成功付款记录可以关联发票");
+        }
+        if (invoice.getPayApplicationId() != null
+                && !Objects.equals(invoice.getPayApplicationId(), payRecord.getPayApplicationId())) {
+            throw new BusinessException("INVOICE_PAYMENT_LINK_MISMATCH", "发票关联的付款申请与付款记录不一致");
+        }
+        PayApplication application = payApplicationMapper.selectById(payRecord.getPayApplicationId());
+        if (application == null || !Objects.equals(application.getTenantId(), invoice.getTenantId())) {
+            throw new BusinessException("PAY_APP_NOT_FOUND", "付款记录关联的付款申请不存在");
+        }
+        invoice.setPayApplicationId(application.getId());
+        invoice.setProjectId(payRecord.getProjectId());
+        invoice.setContractId(payRecord.getContractId());
+        invoice.setPartnerId(payRecord.getPartnerId());
+        invoice.setIntegrityVersion("CLOSED_LOOP_V1");
+        invoice.setVersion(0);
+        checkProjectAccess(invoice.getProjectId(), "创建发票");
         checkAndThrowDuplicate(invoice.getInvoiceNo(), () -> payInvoiceMapper.insert(invoice));
         log.debug("Invoice created successfully");
         return invoice.getId();
@@ -106,6 +140,21 @@ public class InvoiceService {
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
         checkInvoiceProjectAccess(existing, "编辑发票");
         ensurePending(existing);
+
+        if (invoice.getPayRecordId() != null
+                && !Objects.equals(invoice.getPayRecordId(), existing.getPayRecordId())) {
+            throw new BusinessException("INVOICE_PAYMENT_LINK_IMMUTABLE", "发票创建后不得变更关联付款记录");
+        }
+
+        invoice.setTenantId(existing.getTenantId());
+        invoice.setProjectId(existing.getProjectId());
+        invoice.setContractId(existing.getContractId());
+        invoice.setPartnerId(existing.getPartnerId());
+        invoice.setPayApplicationId(existing.getPayApplicationId());
+        invoice.setPayRecordId(existing.getPayRecordId());
+        invoice.setVerifyStatus(existing.getVerifyStatus());
+        invoice.setIntegrityVersion(existing.getIntegrityVersion());
+        invoice.setVersion(existing.getVersion());
 
         if (invoice.getPayRecordId() != null) {
             PayRecord payRecord = payRecordMapper.selectById(invoice.getPayRecordId());
@@ -134,6 +183,7 @@ public class InvoiceService {
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
         checkInvoiceProjectAccess(existing, "删除发票");
         ensurePending(existing);
+        allocationMapper.hardDeletePending(id, existing.getTenantId());
         payInvoiceMapper.deleteById(id);
     }
 
@@ -156,6 +206,22 @@ public class InvoiceService {
                     "当前核验状态为 " + invoice.getVerifyStatus() + "，仅 PENDING 状态的发票可核验");
         }
 
+        if ("VERIFIED".equals(targetStatus)
+                && "CLOSED_LOOP_V1".equals(invoice.getIntegrityVersion())) {
+            List<InvoicePaymentAllocation> allocations = listAllocations(id);
+            BigDecimal allocated = allocations.stream().map(InvoicePaymentAllocation::getAllocatedAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (money(invoice.getInvoiceAmount()).compareTo(money(allocated)) != 0) {
+                throw new BusinessException("INVOICE_ALLOCATION_INCOMPLETE", "发票分配金额合计必须等于发票金额");
+            }
+            if (sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
+                    .eq(SysFile::getTenantId, invoice.getTenantId())
+                    .eq(SysFile::getBusinessType, "INVOICE")
+                    .eq(SysFile::getBusinessId, invoice.getId())) == 0) {
+                throw new BusinessException("INVOICE_ATTACHMENT_REQUIRED", "发票核验前必须上传电子发票或扫描件");
+            }
+        }
+
         invoice.setVerifyStatus(targetStatus);
         payInvoiceMapper.updateById(invoice);
         log.info("Invoice verified: id={}, status={}→{}", id, "PENDING", targetStatus);
@@ -173,6 +239,70 @@ public class InvoiceService {
         return create(invoice);
     }
 
+    public List<InvoicePaymentAllocation> listAllocations(Long invoiceId) {
+        PayInvoice invoice = payInvoiceMapper.selectById(invoiceId);
+        if (invoice == null || !Objects.equals(invoice.getTenantId(), UserContext.getCurrentTenantId())) {
+            throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
+        }
+        checkInvoiceProjectAccess(invoice, "查看发票付款分配");
+        return allocationMapper.selectList(new LambdaQueryWrapper<InvoicePaymentAllocation>()
+                .eq(InvoicePaymentAllocation::getTenantId, invoice.getTenantId())
+                .eq(InvoicePaymentAllocation::getInvoiceId, invoiceId)
+                .orderByAsc(InvoicePaymentAllocation::getCreatedAt));
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void saveAllocations(Long invoiceId, List<InvoicePaymentAllocation> inputs) {
+        PayInvoice invoice = payInvoiceMapper.selectById(invoiceId);
+        if (invoice == null || !Objects.equals(invoice.getTenantId(), UserContext.getCurrentTenantId())) {
+            throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
+        }
+        checkInvoiceProjectAccess(invoice, "编辑发票付款分配");
+        ensurePending(invoice);
+        if (inputs == null || inputs.isEmpty()) {
+            throw new BusinessException("INVOICE_ALLOCATION_REQUIRED", "发票必须至少分配到一笔成功付款");
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        Set<Long> recordIds = new HashSet<>();
+        for (InvoicePaymentAllocation input : inputs) {
+            if (input.getPayRecordId() == null || !recordIds.add(input.getPayRecordId())
+                    || money(input.getAllocatedAmount()).compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessException("INVOICE_ALLOCATION_INVALID", "付款记录不可重复且分配金额必须大于0");
+            }
+            PayRecord record = payRecordMapper.selectByIdForUpdate(input.getPayRecordId(), invoice.getTenantId());
+            if (record == null || !"SUCCESS".equals(record.getPayStatus())) {
+                throw new BusinessException("INVOICE_PAY_RECORD_INVALID", "发票只能分配到当前租户的成功付款记录");
+            }
+            if (!Objects.equals(record.getPayApplicationId(), invoice.getPayApplicationId())
+                    || !Objects.equals(record.getProjectId(), invoice.getProjectId())
+                    || !Objects.equals(record.getContractId(), invoice.getContractId())
+                    || !Objects.equals(record.getPartnerId(), invoice.getPartnerId())) {
+                throw new BusinessException("INVOICE_PAYMENT_CONTEXT_MISMATCH", "发票与付款记录的申请、项目、合同或付款对象不一致");
+            }
+            BigDecimal amount = money(input.getAllocatedAmount());
+            BigDecimal otherAllocated = money(allocationMapper.sumAllocatedToRecord(
+                    invoice.getTenantId(), record.getId(), invoice.getId()));
+            if (otherAllocated.add(amount).compareTo(money(record.getPayAmount())) > 0) {
+                throw new BusinessException("PAY_RECORD_INVOICE_OVER_ALLOCATED", "付款记录的发票分配金额超过实付金额");
+            }
+            input.setAllocatedAmount(amount);
+            input.setPayApplicationId(record.getPayApplicationId());
+            total = total.add(amount);
+        }
+        if (total.compareTo(money(invoice.getInvoiceAmount())) != 0) {
+            throw new BusinessException("INVOICE_ALLOCATION_AMOUNT_MISMATCH", "发票分配金额合计必须等于发票金额");
+        }
+        allocationMapper.hardDeletePending(invoiceId, invoice.getTenantId());
+        for (InvoicePaymentAllocation input : inputs) {
+            input.setId(IdWorker.getId());
+            input.setTenantId(invoice.getTenantId());
+            input.setInvoiceId(invoiceId);
+            input.setCreatedBy(UserContext.getCurrentUserId());
+            input.setCreatedAt(java.time.LocalDateTime.now());
+            allocationMapper.insert(input);
+        }
+    }
+
     // ── VO conversion ──
 
     private InvoiceVO toVO(PayInvoice invoice) {
@@ -181,6 +311,11 @@ public class InvoiceService {
         vo.setTenantId(invoice.getTenantId() != null ? invoice.getTenantId().toString() : null);
         vo.setPayRecordId(invoice.getPayRecordId() != null ? invoice.getPayRecordId().toString() : null);
         vo.setPayApplicationId(invoice.getPayApplicationId() != null ? invoice.getPayApplicationId().toString() : null);
+        vo.setProjectId(invoice.getProjectId() == null ? null : invoice.getProjectId().toString());
+        vo.setContractId(invoice.getContractId() == null ? null : invoice.getContractId().toString());
+        vo.setPartnerId(invoice.getPartnerId() == null ? null : invoice.getPartnerId().toString());
+        vo.setDocumentType(invoice.getDocumentType());
+        vo.setIntegrityVersion(invoice.getIntegrityVersion());
         vo.setInvoiceNo(invoice.getInvoiceNo());
         vo.setInvoiceType(invoice.getInvoiceType());
         vo.setInvoiceAmount(invoice.getInvoiceAmount() != null ? invoice.getInvoiceAmount().toPlainString() : null);
@@ -196,6 +331,8 @@ public class InvoiceService {
         vo.setBuyerName(invoice.getBuyerName());
         vo.setBuyerTaxNo(invoice.getBuyerTaxNo());
         vo.setSellerTaxNo(invoice.getSellerTaxNo());
+        vo.setExceptionStatus(invoice.getExceptionStatus());
+        vo.setExceptionReason(invoice.getExceptionReason());
         return vo;
     }
 
@@ -265,6 +402,10 @@ public class InvoiceService {
         result.setBuyerTaxNo(extractBuyerTaxNo(text));
         result.setSellerTaxNo(extractSellerTaxNo(text));
         result.setRemark(null);
+        long recognized = java.util.stream.Stream.of(result.getInvoiceNo(), result.getInvoiceType(),
+                result.getInvoiceAmount(), result.getInvoiceDate(), result.getSellerName(), result.getBuyerName(),
+                result.getBuyerTaxNo(), result.getSellerTaxNo()).filter(value -> value != null && !value.isBlank()).count();
+        result.setConfidence(new BigDecimal(recognized).divide(new BigDecimal("8"), 4, java.math.RoundingMode.HALF_UP).toPlainString());
 
         log.debug("Invoice PDF recognition completed");
 
@@ -277,6 +418,7 @@ public class InvoiceService {
         result.setManualConfirmationRequired(true);
         result.setErrorCode(errorCode);
         result.setErrorMessage(errorMessage);
+        result.setConfidence("0.0000");
         return result;
     }
 
@@ -531,6 +673,10 @@ public class InvoiceService {
             if (count >= 2) return m.group(1).trim();
         }
         return null;
+    }
+
+    private static BigDecimal money(BigDecimal value) {
+        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
     }
 
     /**

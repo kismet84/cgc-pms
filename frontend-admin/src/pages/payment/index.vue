@@ -10,14 +10,15 @@ import {
   doWriteback,
   getApplicationDetail,
   getApplicationList,
-  getBasisList,
-  saveBasis,
+  getApplicationSources,
+  getPaymentTraceByApplication,
+  saveApplicationSources,
   submitForApproval,
   updateApplication,
 } from '@/api/modules/payment'
-import { getCashJournalList } from '@/api/modules/cashbook'
-import { getReceiptItems, getReceiptList } from '@/api/modules/receipt'
-import { getMeasureItems, getMeasureList } from '@/api/modules/subcontract'
+import { getCashJournalList, getFundAccounts } from '@/api/modules/cashbook'
+import { getBudgetDetail, getBudgetList } from '@/api/modules/budget'
+import { uploadFile } from '@/api/modules/file'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import {
   readPositiveIntQuery,
@@ -29,10 +30,9 @@ import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useReferenceStore } from '@/stores/reference'
 import { useUserStore } from '@/stores/user'
 import { PAY_STATUS_COLOR, PAY_STATUS_LABEL, PAY_TYPE_COLOR, PAY_TYPE_LABEL } from '@/types/payment'
-import type { PayApplicationBasisVO, PayApplicationVO } from '@/types/payment'
-import type { CashJournalEntryVO } from '@/types/cashbook'
-import type { MatReceiptVO } from '@/types/receipt'
-import type { SubMeasureVO } from '@/types/subcontract'
+import type { PayApplicationVO, PaymentApplicationSourceVO, PaymentTraceVO } from '@/types/payment'
+import type { CashJournalEntryVO, FundAccountVO } from '@/types/cashbook'
+import type { BudgetLineVO } from '@/types/budget'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 import { APPROVAL_STATUS_COLOR, APPROVAL_STATUS_LABEL, PAYMENT_GRID_COLUMNS } from './pageConfig'
 import PaymentFormModal from './components/PaymentFormModal.vue'
@@ -86,25 +86,24 @@ const hasActiveFilters = computed(() =>
   ),
 )
 
-type BasisType = 'MAT_RECEIPT' | 'SUB_MEASURE'
-type BasisSourceOption = { id: string; label: string; type: BasisType; amount?: string }
-
-const receiptList = ref<MatReceiptVO[]>([])
-const measureList = ref<SubMeasureVO[]>([])
-const receiptItemOptions = ref<BasisSourceOption[]>([])
-const measureItemOptions = ref<BasisSourceOption[]>([])
 const modalVisible = ref(false)
 const modalTitle = ref('新建付款申请')
 const editingId = ref<string | null>(null)
 const formData = reactive<Partial<PayApplicationVO>>({
-  applyCode: '',
   projectId: undefined,
   contractId: undefined,
   partnerId: undefined,
+  costSubjectId: undefined,
+  budgetLineId: undefined,
+  expenseCategory: 'OTHER',
   payType: undefined,
   applyAmount: undefined,
   applyReason: '',
 })
+const budgetLines = ref<BudgetLineVO[]>([])
+const sourceList = ref<(Partial<PaymentApplicationSourceVO> & { key: number })[]>([])
+const proofFile = ref<File>()
+let sourceKeyCounter = 0
 const formPartnerName = computed(
   () => contracts.value?.find((c) => c.id === formData.contractId)?.partyBName ?? '',
 )
@@ -114,10 +113,20 @@ function onContractChange(contractId: string) {
   formData.partnerId = c?.partyBId
 }
 
-function handleFormProjectChange(projectId: string) {
+async function handleFormProjectChange(projectId: string) {
   formData.contractId = undefined
   formData.partnerId = undefined
-  referenceStore.fetchContracts({ projectId })
+  formData.costSubjectId = undefined
+  formData.budgetLineId = undefined
+  budgetLines.value = []
+  await referenceStore.fetchContracts({ projectId })
+  const result = await getBudgetList({ pageNo: 1, pageSize: 10, projectId, status: 'ACTIVE' })
+  const active = (result.records ?? []).find((item) => item.active || item.status === 'ACTIVE')
+  if (active) budgetLines.value = (await getBudgetDetail(active.id)).lines ?? []
+}
+
+function handleBudgetLineChange(lineId: string) {
+  formData.costSubjectId = budgetLines.value.find((line) => line.id === lineId)?.costSubjectId
 }
 
 function handleFilterProjectChange(projectId: string | undefined) {
@@ -133,18 +142,21 @@ watch(
   },
 )
 
-const basisList = ref<(Partial<PayApplicationBasisVO> & { key: number })[]>([])
-let basisKeyCounter = 0
 const writebackVisible = ref(false)
 const writebackTargetId = ref('')
 const linkedCashJournal = ref<CashJournalEntryVO | null>(null)
 const writebackForm = reactive({
   payAmount: undefined as number | undefined,
-  payDate: undefined as string | undefined,
+  paidAt: undefined as string | undefined,
+  fundAccountId: undefined as string | undefined,
   payMethod: 'BANK_TRANSFER',
   voucherNo: '',
   externalTxnNo: '',
 })
+const fundAccounts = ref<FundAccountVO[]>([])
+const traceOpen = ref(false)
+const traceLoading = ref(false)
+const traceData = ref<PaymentTraceVO>()
 
 const PAY_STATUS_DICT = 'pay_status'
 const APPROVAL_STATUS_DICT = 'approval_status'
@@ -239,54 +251,6 @@ async function syncRouteQuery() {
   await router.replace({ path: route.path, query: nextQuery })
 }
 
-async function fetchReceipts() {
-  try {
-    const res = await getReceiptList({ pageNum: 1, pageSize: 50 })
-    receiptList.value = res.records
-    const items = await Promise.all(
-      receiptList.value.map(async (receipt) => {
-        const rows = await getReceiptItems(receipt.id)
-        return rows.map((item) => ({
-          id: item.id,
-          type: 'MAT_RECEIPT' as const,
-          amount: item.amount,
-          label: `${receipt.receiptCode ?? receipt.id} / ${item.materialName ?? item.id}`,
-        }))
-      }),
-    )
-    receiptItemOptions.value = items.flat()
-  } catch (e: unknown) {
-    console.error('付款依据装载失败: 验收单', e)
-    receiptList.value = []
-    receiptItemOptions.value = []
-    message.warning('验收单依据加载失败，可稍后重试')
-  }
-}
-
-async function fetchMeasures() {
-  try {
-    const res = await getMeasureList({ pageNum: 1, pageSize: 50 })
-    measureList.value = res.records
-    const items = await Promise.all(
-      measureList.value.map(async (measure) => {
-        const rows = await getMeasureItems(measure.id)
-        return rows.map((item) => ({
-          id: item.id,
-          type: 'SUB_MEASURE' as const,
-          amount: item.amount,
-          label: `${measure.measureCode ?? measure.id} / ${item.itemName ?? item.id}`,
-        }))
-      }),
-    )
-    measureItemOptions.value = items.flat()
-  } catch (e: unknown) {
-    console.error('付款依据装载失败: 分包计量', e)
-    measureList.value = []
-    measureItemOptions.value = []
-    message.warning('分包计量依据加载失败，可稍后重试')
-  }
-}
-
 function handleSearch() {
   pageNo.value = 1
   fetchData()
@@ -319,16 +283,21 @@ function handleAdd() {
   modalTitle.value = '新建付款申请'
   editingId.value = null
   Object.assign(formData, {
-    applyCode: '',
     projectId: undefined,
     contractId: undefined,
     partnerId: undefined,
+    costSubjectId: undefined,
+    budgetLineId: undefined,
+    expenseCategory: 'OTHER',
     payType: undefined,
     applyAmount: undefined,
     applyReason: '',
   })
-  basisList.value = []
-  basisKeyCounter = 0
+  sourceList.value = []
+  sourceKeyCounter = 0
+  proofFile.value = undefined
+  budgetLines.value = []
+  handleAddSource()
   modalVisible.value = true
 }
 
@@ -337,20 +306,23 @@ async function handleEdit(record: PayApplicationVO) {
   editingId.value = record.id
   try {
     const detail = await getApplicationDetail(record.id)
-    if (detail.projectId) await referenceStore.fetchContracts({ projectId: detail.projectId })
+    if (detail.projectId) await handleFormProjectChange(detail.projectId)
     Object.assign(formData, {
       applyCode: detail.applyCode,
       projectId: detail.projectId,
       contractId: detail.contractId,
       partnerId: detail.partnerId,
+      costSubjectId: detail.costSubjectId,
+      budgetLineId: detail.budgetLineId,
+      expenseCategory: detail.expenseCategory,
       payType: detail.payType,
       applyAmount: detail.applyAmount,
       applyReason: detail.applyReason ?? '',
     })
-    // detail.basis?.length ? detail.basis : (await getBasisList(record.id))
-    const data = detail.basis?.length ? detail.basis : await getBasisList(record.id)
-    basisList.value = data.map((it, idx) => ({ ...it, key: idx }))
-    basisKeyCounter = basisList.value.length
+    const sources = await getApplicationSources(record.id)
+    sourceList.value = sources.map((item, index) => ({ ...item, key: index }))
+    sourceKeyCounter = sourceList.value.length
+    proofFile.value = undefined
   } catch (e: unknown) {
     console.error(e)
     message.error(getErrorMessage(e, '加载付款依据失败，请稍后重试'))
@@ -378,19 +350,26 @@ async function handleDelete(record: PayApplicationVO) {
 }
 
 async function handleSubmit() {
-  const id = editingId.value
+  let id = editingId.value
   if (!validateForm()) return
-  const basisPayload = buildBasisPayload()
   try {
     if (id) {
       await updateApplication(id, formData)
-      await saveBasis(id, basisPayload)
-      message.success('更新成功')
     } else {
-      const id = await createApplication(formData)
-      await saveBasis(id, basisPayload)
-      message.success('创建成功')
+      id = await createApplication(formData)
+      editingId.value = id
     }
+    const sources = sourceList.value.map((source) => {
+      const payload = { ...source }
+      delete payload.key
+      return {
+        ...payload,
+        sourceRefId: source.sourceType === 'DIRECT' ? id! : source.sourceRefId!,
+      } as PaymentApplicationSourceVO
+    })
+    await saveApplicationSources(id!, sources)
+    if (proofFile.value) await uploadFile(proofFile.value, 'PAYMENT', id!, 'PAYMENT_PROOF')
+    message.success('付款申请草稿已保存')
     modalVisible.value = false
     fetchData()
   } catch (e: unknown) {
@@ -410,10 +389,24 @@ async function handleApproval(record: PayApplicationVO) {
   }
 }
 
+async function openTrace(record: PayApplicationVO) {
+  traceOpen.value = true
+  traceLoading.value = true
+  traceData.value = undefined
+  try {
+    traceData.value = await getPaymentTraceByApplication(record.id)
+  } catch (error) {
+    message.error(error instanceof Error ? error.message : '全链追溯加载失败')
+  } finally {
+    traceLoading.value = false
+  }
+}
+
 function openWriteback(record: PayApplicationVO) {
   writebackTargetId.value = record.id
   writebackForm.payAmount = undefined
-  writebackForm.payDate = undefined
+  writebackForm.paidAt = undefined
+  writebackForm.fundAccountId = undefined
   writebackForm.payMethod = 'BANK_TRANSFER'
   writebackForm.voucherNo = ''
   writebackForm.externalTxnNo = ''
@@ -421,8 +414,13 @@ function openWriteback(record: PayApplicationVO) {
 }
 
 async function handleWritebackOk() {
-  if (!writebackForm.payAmount || !writebackForm.payDate || !writebackForm.payMethod) {
-    message.warning('请完整填写支付金额、日期和方式')
+  if (
+    !writebackForm.payAmount ||
+    !writebackForm.paidAt ||
+    !writebackForm.fundAccountId ||
+    !writebackForm.payMethod
+  ) {
+    message.warning('请完整填写支付金额、精确时间、付款账户和方式')
     return
   }
   if (!writebackForm.externalTxnNo.trim()) {
@@ -434,7 +432,8 @@ async function handleWritebackOk() {
     payRecord = await doWriteback({
       payApplicationId: writebackTargetId.value,
       payAmount: writebackForm.payAmount,
-      payDate: writebackForm.payDate,
+      paidAt: writebackForm.paidAt,
+      fundAccountId: writebackForm.fundAccountId,
       payMethod: writebackForm.payMethod,
       voucherNo: writebackForm.voucherNo || undefined,
       externalTxnNo: writebackForm.externalTxnNo.trim(),
@@ -450,7 +449,8 @@ async function handleWritebackOk() {
   writebackVisible.value = false
   Object.assign(writebackForm, {
     payAmount: undefined,
-    payDate: undefined,
+    paidAt: undefined,
+    fundAccountId: undefined,
     payMethod: 'BANK_TRANSFER',
     voucherNo: '',
     externalTxnNo: '',
@@ -492,51 +492,38 @@ function handleWritebackCancel() {
   writebackVisible.value = false
 }
 
-function handleAddBasis() {
-  basisList.value.push({
-    key: basisKeyCounter++,
-    basisType: undefined,
-    basisId: undefined,
-    basisAmount: undefined,
+function handleAddSource() {
+  sourceList.value.push({
+    key: sourceKeyCounter++,
+    sourceType: 'DIRECT',
+    sourceAmount: undefined,
+    sourceRefId: '',
   })
 }
 
-function handleRemoveBasis(idx: number) {
-  basisList.value.splice(idx, 1)
+function handleRemoveSource(index: number) {
+  sourceList.value.splice(index, 1)
 }
 
-function getSourceOptions(sourceType?: string): BasisSourceOption[] {
-  if (sourceType === 'MAT_RECEIPT') return receiptItemOptions.value
-  if (sourceType === 'SUB_MEASURE') return measureItemOptions.value
-  return []
-}
-
-function handleSourceChange(idx: number) {
-  basisList.value[idx].basisId = undefined
+function handleProofFileChange(event: Event) {
+  proofFile.value = (event.target as HTMLInputElement).files?.[0]
 }
 
 function toCents(value: unknown): number {
   return Math.round((Number(value) || 0) * 100)
 }
 
-function buildBasisPayload(): PayApplicationBasisVO[] {
-  return basisList.value.map((item) => ({
-    id: item.id,
-    payApplicationId: item.payApplicationId,
-    basisType: item.basisType,
-    basisId: item.basisId,
-    basisAmount: item.basisAmount,
-    remark: item.remark,
-  }))
-}
-
 function validateForm(): boolean {
-  if (!formData.projectId || !formData.contractId || !formData.payType) {
-    message.warning('请选择项目、合同和付款类型')
-    return false
-  }
-  if (!formData.applyCode?.trim()) {
-    message.warning('请填写申请编号')
+  if (
+    !formData.projectId ||
+    !formData.contractId ||
+    !formData.payType ||
+    !formData.partnerId ||
+    !formData.costSubjectId ||
+    !formData.budgetLineId ||
+    !formData.expenseCategory
+  ) {
+    message.warning('请选择项目、合同、付款对象、预算科目、费用分类和付款类型')
     return false
   }
   if (toCents(formData.applyAmount) <= 0) {
@@ -547,17 +534,25 @@ function validateForm(): boolean {
     message.warning('请填写申请原因')
     return false
   }
-  if (
-    basisList.value.some(
-      (item) => !item.basisType || !item.basisId || toCents(item.basisAmount) <= 0,
-    )
-  ) {
-    message.warning('请完整填写付款依据行')
+  if (!editingId.value && !proofFile.value) {
+    message.warning('新建付款申请必须上传付款附件')
     return false
   }
-  const basisTotal = basisList.value.reduce((sum, item) => sum + toCents(item.basisAmount), 0)
-  if (basisTotal !== toCents(formData.applyAmount)) {
-    message.warning('申请金额与付款依据金额合计不一致')
+  if (
+    sourceList.value.length === 0 ||
+    sourceList.value.some(
+      (item) =>
+        !item.sourceType ||
+        (item.sourceType !== 'DIRECT' && !item.sourceRefId) ||
+        toCents(item.sourceAmount) <= 0,
+    )
+  ) {
+    message.warning('请完整填写统一付款来源')
+    return false
+  }
+  const sourceTotal = sourceList.value.reduce((sum, item) => sum + toCents(item.sourceAmount), 0)
+  if (sourceTotal !== toCents(formData.applyAmount)) {
+    message.warning('申请金额与付款来源金额合计不一致')
     return false
   }
   return true
@@ -666,9 +661,10 @@ onMounted(() => {
   referenceStore.fetchProjects()
   referenceStore.fetchContracts(filter.projectId ? { projectId: filter.projectId } : {})
   referenceStore.fetchPartners()
+  getFundAccounts()
+    .then((items) => (fundAccounts.value = items))
+    .catch((error) => console.warn('付款账户加载失败', error))
   fetchData()
-  fetchReceipts()
-  fetchMeasures()
   const payRecordId = readStringQuery(route.query.payRecordId)
   if (payRecordId && canViewCashJournal.value) {
     void tryLoadLinkedCashJournal(payRecordId, '关联日记账暂不可查看')
@@ -794,6 +790,7 @@ onMounted(() => {
                 </a-button>
                 <template #overlay>
                   <a-menu>
+                    <a-menu-item @click="openTrace(row)">全链追溯</a-menu-item>
                     <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
                     <a-menu-item
                       v-if="row.approvalStatus === APPROVAL_DRAFT"
@@ -842,13 +839,15 @@ onMounted(() => {
       :contracts="contracts ?? []"
       :form-partner-name="formPartnerName"
       :pay-type-label="PAY_TYPE_LABEL"
-      :basis-list="basisList"
-      :get-source-options="getSourceOptions"
+      :budget-lines="budgetLines"
+      :source-list="sourceList"
+      :proof-file-name="proofFile?.name"
       :on-form-project-change="handleFormProjectChange"
       :on-contract-change="onContractChange"
-      :on-add-basis="handleAddBasis"
-      :on-source-change="handleSourceChange"
-      :on-remove-basis="handleRemoveBasis"
+      :on-budget-line-change="handleBudgetLineChange"
+      :on-add-source="handleAddSource"
+      :on-remove-source="handleRemoveSource"
+      :on-proof-file-change="handleProofFileChange"
       @submit="handleSubmit"
     />
 
@@ -869,12 +868,23 @@ onMounted(() => {
             placeholder="请输入支付金额"
           />
         </a-form-item>
-        <a-form-item label="支付日期" required>
+        <a-form-item label="付款时间" required>
           <a-date-picker
-            v-model:value="writebackForm.payDate"
-            value-format="YYYY-MM-DD"
+            v-model:value="writebackForm.paidAt"
+            show-time
+            value-format="YYYY-MM-DDTHH:mm:ss"
             style="width: 100%"
           />
+        </a-form-item>
+        <a-form-item label="付款账户" required>
+          <a-select v-model:value="writebackForm.fundAccountId" placeholder="请选择启用的资金账户">
+            <a-select-option
+              v-for="account in fundAccounts.filter((item) => item.enabledFlag === 1)"
+              :key="account.id"
+              :value="account.id"
+              >{{ account.accountCode }} {{ account.accountName }}</a-select-option
+            >
+          </a-select>
         </a-form-item>
         <a-form-item label="支付方式" required>
           <a-select v-model:value="writebackForm.payMethod" placeholder="请选择">
@@ -895,6 +905,41 @@ onMounted(() => {
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-drawer v-model:open="traceOpen" title="项目资金全链追溯" :width="720">
+      <a-spin :spinning="traceLoading">
+        <a-descriptions v-if="traceData" bordered :column="2" size="small">
+          <a-descriptions-item label="项目">{{
+            String(traceData.project?.projectName ?? traceData.paymentApplication.projectId)
+          }}</a-descriptions-item>
+          <a-descriptions-item label="合同">{{
+            String(traceData.contract?.contractName ?? traceData.paymentApplication.contractId)
+          }}</a-descriptions-item>
+          <a-descriptions-item label="付款申请">{{
+            traceData.paymentApplication.applyCode
+          }}</a-descriptions-item>
+          <a-descriptions-item label="审批记录"
+            >{{ traceData.approvalRecords.length }} 条</a-descriptions-item
+          >
+          <a-descriptions-item label="申请来源"
+            >{{ traceData.applicationSources.length }} 条</a-descriptions-item
+          >
+          <a-descriptions-item label="付款记录"
+            >{{ traceData.paymentRecords.length }} 条</a-descriptions-item
+          >
+          <a-descriptions-item label="现金日记"
+            >{{ traceData.cashJournals.length }} 条</a-descriptions-item
+          >
+          <a-descriptions-item label="发票">{{ traceData.invoices.length }} 张</a-descriptions-item>
+          <a-descriptions-item label="预算台账"
+            >{{ traceData.budgetLedgers.length }} 条</a-descriptions-item
+          >
+          <a-descriptions-item label="会计凭证"
+            >{{ traceData.accountingEntries.length }} 张</a-descriptions-item
+          >
+        </a-descriptions>
+      </a-spin>
+    </a-drawer>
   </div>
 </template>
 

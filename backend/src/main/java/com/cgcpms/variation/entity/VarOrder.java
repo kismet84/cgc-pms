@@ -38,6 +38,9 @@ public class VarOrder extends BaseEntity {
 
     private String varName;
 
+    /** 合同变更与现场签证共用的业务事项唯一键。 */
+    private String businessMatterKey;
+
     @NotBlank
     private String varType;
 

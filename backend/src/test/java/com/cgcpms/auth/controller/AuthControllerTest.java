@@ -217,6 +217,24 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("GET /auth/dev-login 保留产值计量站内跳转")
+    void testDevLoginRedirectToProductionMeasurement() throws Exception {
+        var userInfo = new UserInfo();
+        userInfo.setUsername("demo_dev_super_admin");
+        var loginResponse = new LoginResponse("mock-token", "mock-refresh-token", userInfo);
+        when(authService.loginByUsernameEnsuringDevAccount(
+                eq("demo_dev_super_admin"),
+                eq("demo_dev_super_admin"))).thenReturn(loginResponse);
+
+        mockMvc.perform(get("/api/auth/dev-login")
+                        .servletPath("/auth/dev-login")
+                        .contextPath("/api")
+                        .param("redirect", "/production-measurement"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/production-measurement"));
+    }
+
+    @Test
     @DisplayName("GET /auth/dev-login 允许现场日报直达且拒绝不安全跳转")
     void testDevLoginRedirectToSiteDailyLogKeepsSecurityBoundary() throws Exception {
         when(authService.loginByUsernameEnsuringDevAccount(

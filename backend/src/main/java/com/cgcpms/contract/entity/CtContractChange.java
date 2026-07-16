@@ -52,6 +52,9 @@ public class CtContractChange implements Serializable {
     @NotBlank
     private String changeName;
 
+    /** 合同变更与现场签证共用的业务事项唯一键，用于阻止同一事项跨域重复登记。 */
+    private String businessMatterKey;
+
     @NotBlank
     private String changeType;
 

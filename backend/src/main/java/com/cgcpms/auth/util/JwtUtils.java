@@ -44,7 +44,9 @@ public class JwtUtils {
                 .claim(CLAIM_USERNAME, username)
                 .claim(CLAIM_TENANT_ID, tenantId)
                 .claim(CLAIM_ROLES, roleCodes)
-                .claim(CLAIM_PERMISSIONS, permissions)
+                // 权限码数量较多时，JSON 数组会让 HttpOnly Cookie 超过浏览器 4 KiB 上限。
+                // 使用逗号分隔字符串压缩载荷；鉴权过滤器继续兼容历史数组格式令牌。
+                .claim(CLAIM_PERMISSIONS, String.join(",", permissions == null ? List.of() : permissions))
                 .claim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_ACCESS)
                 .issuedAt(now)
                 .expiration(expiry)

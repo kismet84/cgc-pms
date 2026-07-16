@@ -27,6 +27,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.PaymentTestFixtures;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -62,6 +64,9 @@ class MigrationSoftDeleteBehaviorTest {
     private PayRecordMapper payRecordMapper;
 
     @Autowired
+    private PayApplicationMapper payApplicationMapper;
+
+    @Autowired
     private PmProjectMapper projectMapper;
 
     @BeforeEach
@@ -77,6 +82,7 @@ class MigrationSoftDeleteBehaviorTest {
 
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pay_record WHERE id = ?", SEED_PAY_RECORD_ID);
+        jdbcTemplate.update("DELETE FROM pay_application WHERE id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", SEED_PROJECT_ID);
 
         PmProject project = new PmProject();
@@ -91,6 +97,9 @@ class MigrationSoftDeleteBehaviorTest {
         project.setApprovalStatus("APPROVED");
         projectMapper.insert(project);
 
+        PaymentTestFixtures.insertApplication(payApplicationMapper, SEED_PAY_RECORD_ID, TENANT_ID,
+                SEED_PROJECT_ID, null, null, new BigDecimal("100000.00"));
+
         PayRecord seed = new PayRecord();
         seed.setId(SEED_PAY_RECORD_ID);
         seed.setTenantId(TENANT_ID);
@@ -98,7 +107,7 @@ class MigrationSoftDeleteBehaviorTest {
         seed.setPayApplicationId(SEED_PAY_RECORD_ID);
         seed.setPayAmount(new BigDecimal("100000.00"));
         seed.setPayDate(LocalDate.of(2026, 6, 1));
-        seed.setPayStatus("PAID");
+        seed.setPayStatus("SUCCESS");
         payRecordMapper.insert(seed);
     }
 
@@ -170,7 +179,8 @@ class MigrationSoftDeleteBehaviorTest {
         line.setEntryId(82000006L);
         line.setLineNo(1);
         line.setDirection("DEBIT");
-        line.setCostSubjectId(82000007L);
+        // V164 将非成本类分录的成本科目改为可空；本用例只验证审计列结构。
+        line.setCostSubjectId(null);
         line.setAmount(new BigDecimal("88.88"));
         line.setSummary("迁移列回归测试");
 

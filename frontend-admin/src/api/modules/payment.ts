@@ -3,8 +3,12 @@ import type { PageResult } from '@/types/api'
 import type {
   PayApplicationVO,
   PayApplicationBasisVO,
+  PaymentApplicationSourceVO,
+  PaymentTraceVO,
   PayRecordVO,
   PayWritebackDTO,
+  PaymentReversalDTO,
+  PaymentFailureDTO,
 } from '@/types/payment'
 
 /** 付款申请列表分页查询 */
@@ -14,6 +18,14 @@ export function getApplicationList(params: Record<string, unknown>) {
     method: 'get',
     params,
   })
+}
+
+export function reversePayment(id: string, data: PaymentReversalDTO) {
+  return request<PayRecordVO>({ url: `/pay-records/${id}/reverse`, method: 'post', data })
+}
+
+export function recordPaymentFailure(data: PaymentFailureDTO) {
+  return request<PayRecordVO>({ url: '/pay-records/failures', method: 'post', data })
 }
 
 /** 付款申请详情 */
@@ -75,11 +87,40 @@ export function submitForApproval(id: string) {
   })
 }
 
+export function getApplicationSources(id: string) {
+  return request<PaymentApplicationSourceVO[]>({
+    url: `/pay-applications/${id}/sources`,
+    method: 'get',
+  })
+}
+
+export function saveApplicationSources(id: string, items: PaymentApplicationSourceVO[]) {
+  return request<void>({
+    url: `/pay-applications/${id}/sources/batch`,
+    method: 'post',
+    data: items,
+  })
+}
+
 /** 付款回写 */
 export function doWriteback(data: PayWritebackDTO) {
   return request<PayRecordVO>({
     url: '/pay-records/writeback',
     method: 'post',
     data,
+  })
+}
+
+export function getPaymentTraceByApplication(id: string) {
+  return request<PaymentTraceVO>({
+    url: `/payment-traces/applications/${id}`,
+    method: 'get',
+  })
+}
+
+export function getPaymentTraceByCashJournal(id: string) {
+  return request<PaymentTraceVO>({
+    url: `/payment-traces/cash-journals/${id}`,
+    method: 'get',
   })
 }

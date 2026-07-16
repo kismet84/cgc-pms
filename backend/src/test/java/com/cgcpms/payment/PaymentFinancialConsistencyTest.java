@@ -113,7 +113,11 @@ class PaymentFinancialConsistencyTest {
         contract.setContractStatus("DRAFT");
         contract.setApprovalStatus("APPROVED");
         contract.setTenantId(TENANT_ID);
-        if (contractMapper.selectById(90001L) == null) contractMapper.insert(contract);
+        if (contractMapper.selectById(90001L) == null) {
+            contractMapper.insert(contract);
+        } else {
+            contractMapper.updateById(contract);
+        }
         testContractId = 90001L;
 
         // Seed pay application
@@ -130,7 +134,17 @@ class PaymentFinancialConsistencyTest {
         app.setPayStatus("APPROVED");
         app.setApprovalStatus("APPROVED");
         app.setTenantId(TENANT_ID);
-        if (payApplicationMapper.selectById(90001L) == null) payApplicationMapper.insert(app);
+        if (payApplicationMapper.selectById(90001L) == null) {
+            payApplicationMapper.insert(app);
+        } else {
+            PayApplication existing = payApplicationMapper.selectById(90001L);
+            existing.setApplyAmount(new BigDecimal("1000000.00"));
+            existing.setApprovedAmount(new BigDecimal("1000000.00"));
+            existing.setActualPayAmount(BigDecimal.ZERO);
+            existing.setPayStatus("APPROVED");
+            existing.setApprovalStatus("APPROVED");
+            payApplicationMapper.updateById(existing);
+        }
         testPayAppId = 90001L;
     }
 

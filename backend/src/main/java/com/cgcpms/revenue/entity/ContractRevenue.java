@@ -70,4 +70,11 @@ public class ContractRevenue extends BaseEntity {
 
     /** 审批通过后生成的 cost_item ID */
     private Long costItemId;
+
+    private Long approvalInstanceId;
+    private String formulaVersion;
+    private Integer attachmentCount;
+
+    @com.baomidou.mybatisplus.annotation.Version
+    private Integer version;
 }

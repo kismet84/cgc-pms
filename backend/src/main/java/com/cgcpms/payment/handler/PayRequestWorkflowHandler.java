@@ -5,6 +5,9 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.service.PayApplicationService;
+import com.cgcpms.payment.service.PaymentApplicationIntegrityService;
+import com.cgcpms.payment.service.PaymentApplicationSourceService;
+import com.cgcpms.payment.constant.PaymentIntegrityConstants;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -24,6 +27,8 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
 
     private final PayApplicationMapper payApplicationMapper;
     private final PayApplicationService payApplicationService;
+    private final PaymentApplicationIntegrityService integrityService;
+    private final PaymentApplicationSourceService sourceService;
 
     @Override
     public String supportBusinessType() {
@@ -46,6 +51,9 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
             throw new IllegalStateException("付款申请不存在 payAppId=" + payAppId);
         }
         payApplicationService.validatePaymentAmount(app);
+        if (PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(app.getIntegrityVersion())) {
+            integrityService.validateForApproval(app);
+        }
 
         int rows = payApplicationMapper.update(null, new LambdaUpdateWrapper<PayApplication>()
                 .eq(PayApplication::getId, payAppId)
@@ -63,6 +71,11 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
         Long payAppId = resolveBusinessId(context.getInstance());
         log.info("付款申请审批驳回 payAppId={}", payAppId);
 
+        PayApplication app = requireApplication(payAppId);
+        if (PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(app.getIntegrityVersion())) {
+            sourceService.releaseAllocations(app, "REJECT", round(context.getInstance()));
+        }
+
         payApplicationMapper.update(null, new LambdaUpdateWrapper<PayApplication>()
                 .eq(PayApplication::getId, payAppId)
                 .set(PayApplication::getApprovalStatus, "REJECTED"));
@@ -72,6 +85,11 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
     public void onWithdrawn(WorkflowContext context) {
         Long payAppId = resolveBusinessId(context.getInstance());
         log.info("付款申请审批撤回，恢复为草稿 payAppId={}", payAppId);
+
+        PayApplication app = requireApplication(payAppId);
+        if (PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(app.getIntegrityVersion())) {
+            sourceService.releaseAllocations(app, "WITHDRAW", round(context.getInstance()));
+        }
 
         payApplicationMapper.update(null, new LambdaUpdateWrapper<PayApplication>()
                 .eq(PayApplication::getId, payAppId)
@@ -85,5 +103,15 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
                     "审批实例缺少业务ID（付款申请ID），instanceId=" + instance.getId());
         }
         return businessId;
+    }
+
+    private PayApplication requireApplication(Long id) {
+        PayApplication app = payApplicationMapper.selectById(id);
+        if (app == null) throw new IllegalStateException("付款申请不存在 payAppId=" + id);
+        return app;
+    }
+
+    private static int round(WfInstance instance) {
+        return instance.getCurrentRound() == null ? 1 : instance.getCurrentRound();
     }
 }

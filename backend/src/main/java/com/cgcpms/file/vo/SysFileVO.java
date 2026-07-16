@@ -12,6 +12,7 @@ public class SysFileVO implements Serializable {
 
     private String id;
     private String businessType;
+    private String documentType;
     private String businessId;
     private String fileName;
     private String originalName;

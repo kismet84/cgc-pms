@@ -5,6 +5,9 @@ import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.dto.PaymentReversalRequest;
+import com.cgcpms.payment.dto.PaymentFailureRequest;
+import com.cgcpms.payment.service.PaymentReversalService;
 import com.cgcpms.payment.service.PayRecordService;
 import com.cgcpms.payment.vo.PayRecordVO;
 import jakarta.validation.Valid;
@@ -18,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 public class PayRecordController {
 
     private final PayRecordService payRecordService;
+    private final PaymentReversalService paymentReversalService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('payment:record:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
@@ -43,5 +47,20 @@ public class PayRecordController {
     @PreAuthorize("hasAuthority('payment:record:writeback') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PayRecordVO> writeback(@Valid @RequestBody PayRecord input) {
         return ApiResponse.success(payRecordService.writeback(input));
+    }
+
+    @PostMapping("/{id}/reverse")
+    @AuditedOperation(type = "REVERSE", businessType = "PAYMENT", businessIdExpression = "#id")
+    @PreAuthorize("hasAuthority('payment:record:reverse') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<PayRecordVO> reverse(@PathVariable Long id,
+                                             @Valid @RequestBody PaymentReversalRequest request) {
+        return ApiResponse.success(paymentReversalService.reverse(id, request));
+    }
+
+    @PostMapping("/failures")
+    @AuditedOperation(type = "CREATE", businessType = "PAYMENT_FAILURE", businessIdExpression = "#request.payApplicationId")
+    @PreAuthorize("hasAuthority('payment:record:writeback') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<PayRecordVO> recordFailure(@Valid @RequestBody PaymentFailureRequest request) {
+        return ApiResponse.success(paymentReversalService.recordFailure(request));
     }
 }

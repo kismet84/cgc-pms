@@ -76,7 +76,9 @@ class StlSettlementQueryServiceTest {
                 .add("username", "admin").add("tenantId", TENANT_ID)
                 .add("roleCodes", java.util.List.of("ADMIN")).build());
 
-        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ?", TENANT_ID);
+        cleanupPayments();
+        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND settlement_code = ?",
+                TENANT_ID, "STL-20260520-001");
 
         StlSettlement s = new StlSettlement();
         s.setTenantId(TENANT_ID); s.setProjectId(PROJECT_ID); s.setContractId(CONTRACT_ID);
@@ -106,11 +108,21 @@ class StlSettlementQueryServiceTest {
         jdbcTemplate.update("DELETE FROM sys_file WHERE business_type = 'SETTLEMENT' AND business_id = ?", settlementId);
         jdbcTemplate.update("DELETE FROM cost_item WHERE contract_id = ? AND source_type = 'SETTLEMENT_QUERY_TEST_COST'", CONTRACT_ID);
         jdbcTemplate.update("DELETE FROM var_order WHERE contract_id = ? AND var_name = 'settlement-query-test-variation'", CONTRACT_ID);
-        jdbcTemplate.update("DELETE FROM pay_record WHERE contract_id = ? AND tenant_id = ?", CONTRACT_ID, TENANT_ID);
-        jdbcTemplate.update("DELETE FROM pay_application WHERE contract_id = ? AND tenant_id = ?", CONTRACT_ID, TENANT_ID);
+        cleanupPayments();
         jdbcTemplate.update("DELETE FROM cost_subject WHERE id = ?", COST_SUBJECT_ID);
-        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND settlement_code = ?",
+                TENANT_ID, "STL-20260520-001");
         UserContext.clear();
+    }
+
+    private void cleanupPayments() {
+        String ownApplications = "SELECT id FROM pay_application WHERE tenant_id = ? "
+                + "AND apply_code LIKE 'PAY-SETTLEMENT-QUERY-%'";
+        jdbcTemplate.update("DELETE FROM invoice_payment_allocation WHERE pay_record_id IN "
+                + "(SELECT id FROM pay_record WHERE pay_application_id IN (" + ownApplications + "))", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM pay_record WHERE pay_application_id IN (" + ownApplications + ")", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM pay_application WHERE tenant_id = ? "
+                + "AND apply_code LIKE 'PAY-SETTLEMENT-QUERY-%'", TENANT_ID);
     }
 
     // ================================================================
@@ -280,9 +292,13 @@ class StlSettlementQueryServiceTest {
     @Test @DisplayName("getPayments — 返回结算页付款 VO 并归一化状态")
     void testGetPayments() throws Exception {
         List<SettlementPaymentItemVO> payments = queryService.getPayments(settlementId);
-        assertEquals(3, payments.size());
+        List<SettlementPaymentItemVO> ownPayments = payments.stream()
+                .filter(item -> item.getApplyCode() != null
+                        && item.getApplyCode().startsWith("PAY-SETTLEMENT-QUERY-"))
+                .toList();
+        assertEquals(3, ownPayments.size());
 
-        SettlementPaymentItemVO paid = payments.stream()
+        SettlementPaymentItemVO paid = ownPayments.stream()
                 .filter(item -> "PAY-SETTLEMENT-QUERY-PAID".equals(item.getApplyCode()))
                 .findFirst()
                 .orElseThrow();
@@ -294,13 +310,13 @@ class StlSettlementQueryServiceTest {
         assertEquals("VCH-SETTLEMENT-QUERY-001", paid.getVoucherNo());
         assertNotNull(paid.getCreatedAt());
 
-        SettlementPaymentItemVO partial = payments.stream()
+        SettlementPaymentItemVO partial = ownPayments.stream()
                 .filter(item -> "PAY-SETTLEMENT-QUERY-PARTIAL".equals(item.getApplyCode()))
                 .findFirst()
                 .orElseThrow();
         assertEquals("PARTIAL", partial.getPayStatus());
 
-        SettlementPaymentItemVO unpaid = payments.stream()
+        SettlementPaymentItemVO unpaid = ownPayments.stream()
                 .filter(item -> "PAY-SETTLEMENT-QUERY-UNPAID".equals(item.getApplyCode()))
                 .findFirst()
                 .orElseThrow();

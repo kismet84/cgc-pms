@@ -42,6 +42,8 @@ class StlSettlementServiceTest {
     private static final long CONTRACT_ID_30001 = 30001L;
     /** Demo contract CT-2026-002 (分包合同) — used for concurrent test (no existing settlement) */
     private static final long CONTRACT_ID_30002 = 30002L;
+    /** Demo contract CT-2026-003 (服务合同) — used for concurrent test */
+    private static final long CONTRACT_ID_30003 = 30003L;
 
     @Autowired
     private StlSettlementWriteService stlSettlementWriteService;
@@ -70,9 +72,9 @@ class StlSettlementServiceTest {
 
         seedWorkflowUsers();
 
-        // Clear stl_settlement data left by other test classes
-        // (e.g. Phase3IntegrationTest) to prevent pollution.
-        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ?", TENANT_ID);
+        // Clear only the contracts owned by this fixture so test order cannot leak state.
+        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND contract_id IN (?, ?, ?)",
+                TENANT_ID, CONTRACT_ID_30001, CONTRACT_ID_30002, CONTRACT_ID_30003);
         originalSubMeasureApprovalStates = jdbcTemplate.query(
                 "SELECT id, approval_status FROM sub_measure WHERE tenant_id = ? AND contract_id = ? ORDER BY id",
                 (rs, rowNum) -> new SubMeasureApprovalState(rs.getLong("id"), rs.getString("approval_status")),
@@ -98,6 +100,8 @@ class StlSettlementServiceTest {
                         "UPDATE sub_measure SET approval_status = ? WHERE tenant_id = ? AND id = ?",
                         state.approvalStatus(), TENANT_ID, state.id());
             }
+            jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND contract_id IN (?, ?, ?)",
+                    TENANT_ID, CONTRACT_ID_30001, CONTRACT_ID_30002, CONTRACT_ID_30003);
         } finally {
             originalSubMeasureApprovalStates = List.of();
             UserContext.clear();
@@ -180,7 +184,7 @@ class StlSettlementServiceTest {
     @DisplayName("CONCURRENT: two threads create settlement for same contract — exactly one succeeds")
     void shouldAllowOnlyOneConcurrentSettlement() throws Exception {
         // Use contract 30003 (service contract) to avoid collision with Test 2
-        final long contractId = 30003L;
+        final long contractId = CONTRACT_ID_30003;
 
         CountDownLatch startLatch = new CountDownLatch(1);
         CountDownLatch doneLatch = new CountDownLatch(2);

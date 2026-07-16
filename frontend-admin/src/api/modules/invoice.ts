@@ -1,6 +1,11 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type { InvoiceVO, PayRecordBrief, InvoiceRecognizeResultVO } from '@/types/invoice'
+import type {
+  InvoiceVO,
+  PayRecordBrief,
+  InvoiceRecognizeResultVO,
+  InvoicePaymentAllocationVO,
+} from '@/types/invoice'
 
 /** 发票列表分页查询 */
 export function getInvoiceList(params: Record<string, unknown>) {
@@ -60,6 +65,32 @@ export function verifyInvoice(id: string, verifyStatus: string) {
     url: `/invoices/${id}/verify`,
     method: 'put',
     data: { verifyStatus },
+  })
+}
+
+export function getInvoiceAllocations(id: string) {
+  return request<InvoicePaymentAllocationVO[]>({
+    url: `/invoices/${id}/allocations`,
+    method: 'get',
+  })
+}
+
+export function saveInvoiceAllocations(id: string, items: InvoicePaymentAllocationVO[]) {
+  return request<void>({ url: `/invoices/${id}/allocations/batch`, method: 'post', data: items })
+}
+
+export function getInvoiceWriteOffProgress(id: string) {
+  return request<Record<string, unknown>>({
+    url: `/finance-operations/invoices/${id}/write-off`,
+    method: 'get',
+  })
+}
+
+export function markInvoiceException(id: string, status: string, reason: string) {
+  return request<void>({
+    url: `/finance-operations/invoices/${id}/exception`,
+    method: 'post',
+    data: { status, reason },
   })
 }
 

@@ -30,6 +30,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
@@ -183,6 +184,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private List<String> stringListClaim(Claims claims, String claimName) {
         Object value = claims.get(claimName);
+        if (value instanceof String text) {
+            if (text.isBlank()) return Collections.emptyList();
+            return Arrays.stream(text.split(","))
+                    .map(String::trim)
+                    .filter(item -> !item.isEmpty())
+                    .toList();
+        }
         if (!(value instanceof List<?> values)) {
             return Collections.emptyList();
         }

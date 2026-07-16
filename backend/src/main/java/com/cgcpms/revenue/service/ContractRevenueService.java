@@ -130,8 +130,16 @@ public class ContractRevenueService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(ContractRevenue revenue) {
+        if (revenue.getProgressPercent() == null) revenue.setProgressPercent(BigDecimal.ZERO);
+        if (revenue.getRevenueTax() == null) revenue.setRevenueTax(BigDecimal.ZERO);
+        if (revenue.getBilledAmount() == null) revenue.setBilledAmount(BigDecimal.ZERO);
+        if (revenue.getBilledTax() == null) revenue.setBilledTax(BigDecimal.ZERO);
+        validateRevenueContext(revenue, null, false);
         revenue.setTenantId(UserContext.getCurrentTenantId());
         revenue.setApprovalStatus("DRAFT");
+        revenue.setFormulaVersion("REVENUE_PROGRESS_V1");
+        revenue.setAttachmentCount(revenue.getAttachmentCount() == null ? 0 : revenue.getAttachmentCount());
+        revenue.setVersion(0);
         boolean autoGenerateCode = !StringUtils.hasText(revenue.getRevenueCode());
         // 计算含税金额
         if (revenue.getRevenueAmount() != null && revenue.getRevenueTax() != null) {
@@ -168,6 +176,7 @@ public class ContractRevenueService {
         if (revenue.getRevenueTax() != null) existing.setRevenueTax(revenue.getRevenueTax());
         if (revenue.getBilledAmount() != null) existing.setBilledAmount(revenue.getBilledAmount());
         if (revenue.getBilledTax() != null) existing.setBilledTax(revenue.getBilledTax());
+        if (revenue.getAttachmentCount() != null) existing.setAttachmentCount(revenue.getAttachmentCount());
         // 计算含税金额
         if (existing.getRevenueAmount() != null && existing.getRevenueTax() != null) {
             existing.setRevenueAmountWithTax(existing.getRevenueAmount().add(existing.getRevenueTax()));
@@ -184,6 +193,7 @@ public class ContractRevenueService {
                 .set(ContractRevenue::getRevenueTax, existing.getRevenueTax())
                 .set(ContractRevenue::getBilledAmount, existing.getBilledAmount())
                 .set(ContractRevenue::getBilledTax, existing.getBilledTax())
+                .set(ContractRevenue::getAttachmentCount, existing.getAttachmentCount())
                 .set(ContractRevenue::getRevenueAmountWithTax, existing.getRevenueAmountWithTax()));
         if (rows != 1) {
             throw new BusinessException("REVENUE_STATUS_NOT_EDITABLE", "仅草稿状态可编辑");
@@ -208,6 +218,7 @@ public class ContractRevenueService {
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
             throw new BusinessException("REVENUE_SUBMIT_INVALID", "仅草稿状态可提交审批");
         }
+        validateRevenueContext(existing, id, true);
         // 原子状态更新：DRAFT → PENDING
         int rows = mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ContractRevenue>()
                 .eq(ContractRevenue::getId, id)
@@ -222,7 +233,7 @@ public class ContractRevenueService {
         // 创建工作流实例
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
-        workflowEngine.submit(userId, username, existing.getTenantId(),
+        var instance = workflowEngine.submit(userId, username, existing.getTenantId(),
                 com.cgcpms.workflow.WorkflowBusinessTypes.CONTRACT_REVENUE,
                 id,
                 existing.getRevenueCode(),
@@ -230,6 +241,10 @@ public class ContractRevenueService {
                 existing.getProjectId(),
                 existing.getContractId(),
                 null, null, null);
+        mapper.update(null, new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ContractRevenue>()
+                .eq(ContractRevenue::getId, id)
+                .eq(ContractRevenue::getTenantId, existing.getTenantId())
+                .set(ContractRevenue::getApprovalInstanceId, instance.getId()));
     }
 
     // ================================================================
@@ -310,6 +325,49 @@ public class ContractRevenueService {
         if (!revenue.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("REVENUE_NOT_FOUND", "收入确认单不存在");
         return revenue;
+    }
+
+    private void validateRevenueContext(ContractRevenue revenue, Long currentId, boolean submitting) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        PmProject project = projectMapper.selectById(revenue.getProjectId());
+        if (project == null || !Objects.equals(project.getTenantId(), tenantId)) {
+            throw new BusinessException("REVENUE_PROJECT_NOT_FOUND", "收入确认项目不存在");
+        }
+        if (submitting && !"ACTIVE".equals(project.getStatus())) {
+            throw new BusinessException("REVENUE_PROJECT_NOT_ACTIVE", "只有 ACTIVE 项目可以确认收入");
+        }
+        CtContract contract = contractMapper.selectById(revenue.getContractId());
+        if (contract == null || !Objects.equals(contract.getTenantId(), tenantId)
+                || !Objects.equals(contract.getProjectId(), revenue.getProjectId())) {
+            throw new BusinessException("REVENUE_CONTRACT_PROJECT_MISMATCH", "业主合同不存在或不属于所选项目");
+        }
+        if (submitting && (!"MAIN".equals(contract.getContractType()) || !"APPROVED".equals(contract.getApprovalStatus())
+                || !"PERFORMING".equals(contract.getContractStatus()))) {
+            throw new BusinessException("REVENUE_CONTRACT_NOT_PERFORMING", "收入确认必须关联已审批且履约中的 MAIN 合同");
+        }
+        if (revenue.getProgressPercent() == null || revenue.getProgressPercent().signum() < 0
+                || revenue.getProgressPercent().compareTo(new BigDecimal("100")) > 0) {
+            throw new BusinessException("REVENUE_PROGRESS_INVALID", "累计履约进度必须在 0 到 100 之间");
+        }
+        if (revenue.getRevenueAmount() == null || revenue.getRevenueAmount().signum() <= 0) {
+            throw new BusinessException("REVENUE_AMOUNT_INVALID", "本期确认收入必须大于零");
+        }
+        if (submitting && (revenue.getAttachmentCount() == null || revenue.getAttachmentCount() < 1)) {
+            throw new BusinessException("REVENUE_ATTACHMENT_REQUIRED", "收入确认提交审批前必须上传履约或产值依据");
+        }
+        LambdaQueryWrapper<ContractRevenue> amountQuery = new LambdaQueryWrapper<ContractRevenue>()
+                .eq(ContractRevenue::getTenantId, tenantId)
+                .eq(ContractRevenue::getContractId, revenue.getContractId())
+                .in(ContractRevenue::getApprovalStatus, "PENDING", "APPROVED")
+                .eq(ContractRevenue::getDeletedFlag, 0);
+        if (currentId != null) amountQuery.ne(ContractRevenue::getId, currentId);
+        BigDecimal accumulated = mapper.selectList(amountQuery).stream()
+                .map(ContractRevenue::getRevenueAmount).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal limit = contract.getCurrentAmount() == null ? contract.getContractAmount() : contract.getCurrentAmount();
+        if (submitting && accumulated.add(revenue.getRevenueAmount()).compareTo(limit) > 0) {
+            throw new BusinessException("REVENUE_CONTRACT_AMOUNT_EXCEEDED", "累计确认收入不能超过合同当前金额");
+        }
     }
 
     /**
@@ -406,6 +464,9 @@ public class ContractRevenueService {
         vo.setBilledTax(r.getBilledTax() != null ? r.getBilledTax().toPlainString() : "0");
         vo.setApprovalStatus(r.getApprovalStatus());
         vo.setCostItemId(r.getCostItemId() != null ? r.getCostItemId().toString() : null);
+        vo.setApprovalInstanceId(r.getApprovalInstanceId() != null ? r.getApprovalInstanceId().toString() : null);
+        vo.setFormulaVersion(r.getFormulaVersion());
+        vo.setAttachmentCount(r.getAttachmentCount());
         vo.setCreatedBy(r.getCreatedBy() != null ? r.getCreatedBy().toString() : null);
         vo.setCreatedAt(r.getCreatedAt() != null ? r.getCreatedAt().toString() : null);
         vo.setUpdatedAt(r.getUpdatedAt() != null ? r.getUpdatedAt().toString() : null);

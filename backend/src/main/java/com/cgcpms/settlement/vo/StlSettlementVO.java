@@ -19,6 +19,7 @@ public class StlSettlementVO {
     private String deductionAmount;
     private String paidAmount;
     private String finalAmount;
+    private String amountFormulaVersion;
     private String approvalStatus;
     private String status;
     // V24 enhanced fields

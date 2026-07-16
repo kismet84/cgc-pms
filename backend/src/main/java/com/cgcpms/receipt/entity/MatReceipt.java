@@ -45,6 +45,9 @@ public class MatReceipt extends BaseEntity {
 
     private Long receiverId;
 
+    /** INVENTORY=入库材料；DIRECT_CONSUMPTION=直耗材料 */
+    private String receiptMode;
+
     private String qualityStatus;
 
     @JsonSerialize(using = ToStringSerializer.class)

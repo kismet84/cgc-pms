@@ -26,6 +26,9 @@ public class SysFile extends BaseEntity {
     /** Business type (e.g., CONTRACT, PROJECT, PARTNER) */
     private String businessType;
 
+    /** ELECTRONIC_INVOICE/SCANNED_INVOICE/BANK_RECEIPT/CONTRACT_ATTACHMENT/PAYMENT_PROOF/OTHER */
+    private String documentType;
+
     /** Associated business record ID */
     private Long businessId;
 

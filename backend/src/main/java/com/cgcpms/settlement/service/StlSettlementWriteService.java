@@ -27,7 +27,6 @@ import static com.cgcpms.settlement.constant.SettlementStatusConstants.APPROVAL_
 import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMENT_DRAFT;
 import static com.cgcpms.settlement.constant.SettlementStatusConstants.STATUS_DRAFT;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
@@ -42,8 +41,6 @@ import java.util.Objects;
 public class StlSettlementWriteService {
 
     private static final int CODE_GENERATION_MAX_RETRIES = 3;
-
-    private static final BigDecimal DEFAULT_WARRANTY_RATE = new BigDecimal("0.05");
 
     private final StlSettlementMapper stlSettlementMapper;
     private final StlSettlementItemMapper stlSettlementItemMapper;
@@ -249,29 +246,21 @@ public class StlSettlementWriteService {
         Long tenantId = settlement.getTenantId() != null ? settlement.getTenantId() : UserContext.getCurrentTenantId();
         Long contractId = contract.getId();
 
-        BigDecimal contractAmount = contract.getCurrentAmount() != null ? contract.getCurrentAmount() : BigDecimal.ZERO;
-        settlement.setContractAmount(contractAmount);
+        SettlementAmountSnapshot snapshot = SettlementAmountPolicy.calculate(
+                contract.getCurrentAmount(),
+                queryService.sumVarOrderConfirmed(tenantId, contractId),
+                queryService.sumSubMeasureApproved(tenantId, contractId),
+                settlement.getDeductionAmount(),
+                queryService.sumPaidAmount(tenantId, contractId));
 
-        BigDecimal changeAmount = queryService.sumVarOrderConfirmed(tenantId, contractId);
-        settlement.setChangeAmount(changeAmount);
-
-        BigDecimal measuredAmount = queryService.sumSubMeasureApproved(tenantId, contractId);
-        settlement.setMeasuredAmount(measuredAmount);
-
-        BigDecimal paidAmount = queryService.sumPaidAmount(tenantId, contractId);
-        settlement.setPaidAmount(paidAmount);
-
-        BigDecimal deductionAmount = settlement.getDeductionAmount() != null ? settlement.getDeductionAmount() : BigDecimal.ZERO;
-        settlement.setDeductionAmount(deductionAmount);
-
-        BigDecimal finalAmount = contractAmount.add(changeAmount).add(measuredAmount).subtract(deductionAmount);
-        settlement.setFinalAmount(finalAmount);
-
-        BigDecimal warrantyRate = DEFAULT_WARRANTY_RATE;
-        BigDecimal warrantyAmount = finalAmount.multiply(warrantyRate).setScale(2, RoundingMode.HALF_UP);
-        settlement.setWarrantyAmount(warrantyAmount);
-
-        BigDecimal unpaidAmount = finalAmount.subtract(paidAmount).subtract(warrantyAmount);
-        settlement.setUnpaidAmount(unpaidAmount);
+        settlement.setContractAmount(snapshot.effectiveContractAmount());
+        settlement.setChangeAmount(snapshot.confirmedVariationAmount());
+        settlement.setMeasuredAmount(snapshot.approvedMeasuredAmount());
+        settlement.setDeductionAmount(snapshot.deductionAmount());
+        settlement.setPaidAmount(snapshot.paidAmount());
+        settlement.setFinalAmount(snapshot.finalAmount());
+        settlement.setWarrantyAmount(snapshot.warrantyAmount());
+        settlement.setUnpaidAmount(snapshot.unpaidAmount());
+        settlement.setAmountFormulaVersion(snapshot.formulaVersion());
     }
 }

@@ -33,8 +33,9 @@ public class FileController {
     public ApiResponse<SysFileVO> upload(
             @RequestParam MultipartFile file,
             @RequestParam String businessType,
-            @RequestParam Long businessId) {
-        return ApiResponse.success(fileService.upload(file, businessType, businessId));
+            @RequestParam Long businessId,
+            @RequestParam(defaultValue = "OTHER") String documentType) {
+        return ApiResponse.success(fileService.upload(file, businessType, businessId, documentType));
     }
 
     @GetMapping("/{id}/url")

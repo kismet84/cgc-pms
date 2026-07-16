@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -34,6 +35,17 @@ public class PayInvoice extends BaseEntity {
     private Long payRecordId;
 
     private Long payApplicationId;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long projectId;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long contractId;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long partnerId;
+
+    private String documentType;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String integrityVersion;
 
     @NotBlank
     private String invoiceNo;
@@ -101,4 +113,13 @@ public class PayInvoice extends BaseEntity {
     private String buyerName;
     private String buyerTaxNo;
     private String sellerTaxNo;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String exceptionStatus;
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String exceptionReason;
+
+    @Version
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Integer version;
 }

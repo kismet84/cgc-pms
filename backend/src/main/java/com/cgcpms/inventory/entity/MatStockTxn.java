@@ -37,11 +37,20 @@ public class MatStockTxn extends BaseEntity {
     /** 交易后可用量快照 */
     private BigDecimal availableAfter;
 
+    /** 本次移动采用的单位成本。 */
+    private BigDecimal unitCost;
+
+    /** 本次移动的库存价值。 */
+    private BigDecimal amount;
+
     /** 来源业务类型 */
     private String sourceType;
 
     /** 来源业务ID */
     private Long sourceId;
+
+    /** 来源业务明细ID，用于逐行追溯与幂等控制 */
+    private Long sourceLineId;
 
     // ── V35 使用 created_time / updated_time 列名 ──
 

@@ -153,6 +153,7 @@ public class MatReceiptAssembler {
         vo.setReceiptDate(r.getReceiptDate() != null ? DateTimeUtils.DATE_FMT.format(r.getReceiptDate()) : null);
         vo.setWarehouseId(r.getWarehouseId() != null ? r.getWarehouseId().toString() : null);
         vo.setReceiverId(r.getReceiverId() != null ? r.getReceiverId().toString() : null);
+        vo.setReceiptMode(r.getReceiptMode());
         vo.setQualityStatus(r.getQualityStatus());
         vo.setTotalAmount(r.getTotalAmount() != null ? r.getTotalAmount().toPlainString() : null);
         vo.setApprovalStatus(r.getApprovalStatus());

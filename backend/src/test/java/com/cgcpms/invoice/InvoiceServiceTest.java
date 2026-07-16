@@ -7,12 +7,17 @@ import ch.qos.logback.core.read.ListAppender;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.invoice.entity.InvoicePaymentAllocation;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.invoice.service.InvoiceService;
 import com.cgcpms.invoice.vo.InvoiceRecognizeResultVO;
 import com.cgcpms.invoice.vo.InvoiceVO;
+import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -58,6 +63,12 @@ class InvoiceServiceTest {
     private PayRecordMapper payRecordMapper;
 
     @Autowired
+    private PayApplicationMapper payApplicationMapper;
+
+    @Autowired
+    private SysFileMapper sysFileMapper;
+
+    @Autowired
     private PmProjectMapper projectMapper;
 
     @Autowired
@@ -75,9 +86,11 @@ class InvoiceServiceTest {
         UserContext.set(claims);
 
         // 物理清理本测试关心的数据，防止逻辑删除和并行测试类复用固定主键触发 PK 冲突。
+        jdbcTemplate.update("DELETE FROM invoice_payment_allocation WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM pay_record WHERE id = ?", SEED_PAY_RECORD_ID);
+        jdbcTemplate.update("DELETE FROM pay_application WHERE id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", SEED_PROJECT_ID);
 
         PmProject project = new PmProject();
@@ -92,6 +105,18 @@ class InvoiceServiceTest {
         project.setApprovalStatus("APPROVED");
         projectMapper.insert(project);
 
+        PayApplication application = new PayApplication();
+        application.setId(SEED_PAY_RECORD_ID);
+        application.setTenantId(TENANT_ID);
+        application.setProjectId(SEED_PROJECT_ID);
+        application.setApplyCode("PAY-INVOICE-91001");
+        application.setPayType("PROGRESS");
+        application.setApplyAmount(new BigDecimal("100000.00"));
+        application.setApprovedAmount(new BigDecimal("100000.00"));
+        application.setApprovalStatus("APPROVED");
+        application.setPayStatus("PAID");
+        payApplicationMapper.insert(application);
+
         // 插入种子付款记录，供发票创建时关联使用
         PayRecord seed = new PayRecord();
         seed.setId(SEED_PAY_RECORD_ID);
@@ -100,7 +125,7 @@ class InvoiceServiceTest {
         seed.setPayApplicationId(SEED_PAY_RECORD_ID);
         seed.setPayAmount(new BigDecimal("100000.00"));
         seed.setPayDate(LocalDate.of(2026, 6, 1));
-        seed.setPayStatus("PAID");
+        seed.setPayStatus("SUCCESS");
         payRecordMapper.insert(seed);
     }
 
@@ -264,6 +289,7 @@ class InvoiceServiceTest {
         invoice.setInvoiceAmount(new BigDecimal("8000.00"));
         invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id = invoiceService.create(invoice);
+        prepareVerification(id, "8000.00");
 
         invoiceService.verify(id, "VERIFIED");
 
@@ -302,6 +328,7 @@ class InvoiceServiceTest {
         invoice.setInvoiceAmount(new BigDecimal("7000.00"));
         invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id = invoiceService.create(invoice);
+        prepareVerification(id, "7000.00");
         invoiceService.verify(id, "VERIFIED");
 
         BusinessException ex = assertThrows(BusinessException.class, () -> {
@@ -413,6 +440,7 @@ class InvoiceServiceTest {
         invoice.setInvoiceAmount(new BigDecimal("1000.00"));
         invoice.setPayRecordId(SEED_PAY_RECORD_ID);
         Long id = invoiceService.create(invoice);
+        prepareVerification(id, "1000.00");
         invoiceService.verify(id, "VERIFIED");
 
         PayInvoice update = new PayInvoice();
@@ -445,12 +473,32 @@ class InvoiceServiceTest {
         update.setInvoiceDate(LocalDate.of(2026, 7, 18));
 
         BusinessException ex = assertThrows(BusinessException.class, () -> invoiceService.update(update));
-        assertEquals("PAY_RECORD_NOT_FOUND", ex.getCode());
+        assertEquals("INVOICE_PAYMENT_LINK_IMMUTABLE", ex.getCode());
 
         InvoiceVO vo = invoiceService.getById(id);
         assertEquals(String.valueOf(SEED_PAY_RECORD_ID), vo.getPayRecordId());
         assertEquals("2600.00", vo.getInvoiceAmount());
         assertEquals("2026-06-18", vo.getInvoiceDate());
+    }
+
+    private void prepareVerification(Long invoiceId, String amount) {
+        InvoicePaymentAllocation allocation = new InvoicePaymentAllocation();
+        allocation.setPayRecordId(SEED_PAY_RECORD_ID);
+        allocation.setAllocatedAmount(new BigDecimal(amount));
+        invoiceService.saveAllocations(invoiceId, List.of(allocation));
+
+        SysFile file = new SysFile();
+        file.setTenantId(TENANT_ID);
+        file.setBusinessType("INVOICE");
+        file.setBusinessId(invoiceId);
+        file.setDocumentType("ELECTRONIC_INVOICE");
+        file.setFileName("invoice-" + invoiceId + ".pdf");
+        file.setOriginalName("invoice.pdf");
+        file.setFileSize(100L);
+        file.setContentType("application/pdf");
+        file.setStoragePath("INVOICE/" + invoiceId + "/invoice.pdf");
+        file.setBucketName("test");
+        sysFileMapper.insert(file);
     }
 
     @Test

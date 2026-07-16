@@ -126,6 +126,8 @@ class PayRecordControllerTest {
             approvedApp.setApprovalStatus("APPROVED");
             approvedApp.setPayStatus("APPROVED");
             approvedApp.setApprovedAmount(approvedApp.getApplyAmount());
+            // 本测试验证历史控制器兼容路径；CLOSED_LOOP_V1 的强门禁由闭环集成测试覆盖。
+            approvedApp.setIntegrityVersion("LEGACY_UNVERIFIED");
             payApplicationMapper.updateById(approvedApp);
 
             // Create a pay record via writeback (prerequisite for getById)

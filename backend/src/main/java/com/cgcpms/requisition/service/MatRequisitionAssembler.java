@@ -115,6 +115,8 @@ public class MatRequisitionAssembler {
         vo.setApprovalStatus(r.getApprovalStatus());
         vo.setTotalAmount(r.getTotalAmount() != null ? r.getTotalAmount().toPlainString() : null);
         vo.setStockOutFlag(r.getStockOutFlag() != null ? r.getStockOutFlag().toString() : null);
+        vo.setStockOutBy(r.getStockOutBy() != null ? r.getStockOutBy().toString() : null);
+        vo.setStockOutAt(r.getStockOutAt() != null ? DateTimeUtils.DTF.format(r.getStockOutAt()) : null);
         vo.setCreatedBy(r.getCreatedBy() != null ? r.getCreatedBy().toString() : null);
         vo.setCreatedAt(r.getCreatedTime() != null ? DateTimeUtils.DTF.format(r.getCreatedTime()) : null);
         vo.setUpdatedAt(r.getUpdatedTime() != null ? DateTimeUtils.DTF.format(r.getUpdatedTime()) : null);

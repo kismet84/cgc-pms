@@ -1,0 +1,27 @@
+ALTER TABLE accounting_entry
+    ADD COLUMN project_id BIGINT NULL,
+    ADD COLUMN contract_id BIGINT NULL,
+    ADD COLUMN pay_application_id BIGINT NULL,
+    ADD COLUMN pay_record_id BIGINT NULL,
+    ADD COLUMN posted_at DATETIME NULL,
+    ADD COLUMN reversed_at DATETIME NULL,
+    ADD COLUMN reversed_entry_id BIGINT NULL,
+    ADD COLUMN version INT NOT NULL DEFAULT 0;
+
+ALTER TABLE accounting_entry
+    ADD CONSTRAINT fk_entry_project FOREIGN KEY (project_id) REFERENCES pm_project(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_entry_contract FOREIGN KEY (contract_id) REFERENCES ct_contract(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_entry_pay_application FOREIGN KEY (pay_application_id) REFERENCES pay_application(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_entry_pay_record FOREIGN KEY (pay_record_id) REFERENCES pay_record(id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_entry_reversed_entry FOREIGN KEY (reversed_entry_id) REFERENCES accounting_entry(id) ON DELETE RESTRICT;
+
+ALTER TABLE accounting_entry_line
+    MODIFY COLUMN cost_subject_id BIGINT NULL,
+    ADD COLUMN account_code VARCHAR(64) NULL,
+    ADD COLUMN account_name VARCHAR(128) NULL;
+
+ALTER TABLE accounting_entry_line
+    ADD CONSTRAINT fk_entry_line_subject FOREIGN KEY (cost_subject_id) REFERENCES cost_subject(id) ON DELETE RESTRICT;
+
+CREATE UNIQUE INDEX uk_entry_pay_record
+    ON accounting_entry(tenant_id, pay_record_id, entry_type, deleted_flag);

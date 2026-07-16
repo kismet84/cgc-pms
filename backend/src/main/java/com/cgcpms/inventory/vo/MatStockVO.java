@@ -15,6 +15,8 @@ public class MatStockVO implements Serializable {
     private Long warehouseId;
     private Long materialId;
     private BigDecimal availableQty;
+    private BigDecimal inventoryValue;
+    private BigDecimal averageUnitCost;
     private BigDecimal safetyStockQty;
     private BigDecimal replenishmentTargetQty;
     private Integer replenishmentLeadDays;

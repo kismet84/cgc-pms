@@ -7,6 +7,7 @@ public class MatPurchaseOrderItemVO {
     private String id;
     private String tenantId;
     private String orderId;
+    private String requestItemId;
     private String projectId;
     private String materialId;
     private String materialName;

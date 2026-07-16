@@ -61,13 +61,16 @@ public class MaterialReceiptCostStrategy implements CostGenerationStrategy {
             return;
         }
 
-        LocalDate today = LocalDate.now();
+        LocalDate costDate = receipt.getReceiptDate() != null ? receipt.getReceiptDate() : LocalDate.now();
 
         // Resolve default cost subject for MATERIAL type
         Long defaultSubjectId = costSubjectResolver.resolveDefaultSubjectId(receipt.getTenantId(), "材料");
 
         int generated = 0;
         for (MatReceiptItem item : items) {
+            if (nvl(item.getAmount()).signum() <= 0) {
+                continue;
+            }
             CostItem cost = new CostItem();
             cost.setTenantId(receipt.getTenantId());
             cost.setOrgId(null);
@@ -83,7 +86,7 @@ public class MaterialReceiptCostStrategy implements CostGenerationStrategy {
             cost.setSourceType(SOURCE_TYPE);
             cost.setSourceId(receiptId);
             cost.setSourceItemId(item.getId());
-            cost.setCostDate(today);
+            cost.setCostDate(costDate);
             cost.setCostStatus(COST_STATUS_CONFIRMED);
             cost.setGeneratedFlag(1);
 

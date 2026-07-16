@@ -1,5 +1,6 @@
 package com.cgcpms.requisition.controller;
 
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.requisition.entity.MatRequisition;
@@ -70,6 +71,14 @@ public class MatRequisitionController {
     @PreAuthorize("hasAuthority('requisition:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         requisitionService.submitForApproval(id);
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/{id}/stock-out")
+    @AuditedOperation(type = "STOCK_OUT", businessType = "REQUISITION", businessIdExpression = "#id")
+    @PreAuthorize("hasAuthority('requisition:stock-out') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> executeStockOut(@PathVariable Long id) {
+        requisitionService.executeStockOut(id);
         return ApiResponse.success();
     }
 

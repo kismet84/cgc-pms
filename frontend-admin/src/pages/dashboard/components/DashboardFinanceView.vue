@@ -67,6 +67,41 @@ const riskOpt = computed(() => financeRiskOption())
       </article>
     </section>
 
+    <section class="role-reference-panel role-reference-bottom-panel">
+      <div class="role-reference-panel-head">
+        <div>
+          <strong>项目资金闭环指标</strong
+          ><span>口径 {{ data.metricFormulaVersion || '-' }}，均可下钻到付款事实</span>
+        </div>
+      </div>
+      <div class="role-reference-summary-grid">
+        <div class="role-reference-summary-item">
+          <span>合同金额</span><b>{{ fmtWan(data.totalContractAmount) }} 万元</b>
+        </div>
+        <div class="role-reference-summary-item">
+          <span>累计付款</span><b>{{ fmtWan(data.totalPaidAmount) }} 万元</b>
+        </div>
+        <div class="role-reference-summary-item">
+          <span>预算总额</span><b>{{ fmtWan(data.budgetAmount) }} 万元</b>
+        </div>
+        <div class="role-reference-summary-item">
+          <span>预算已消耗</span><b>{{ fmtWan(data.budgetConsumedAmount) }} 万元</b>
+        </div>
+        <div class="role-reference-summary-item">
+          <span>预算执行率</span><b>{{ data.budgetExecutionRate || '0' }}%</b>
+        </div>
+        <div class="role-reference-summary-item">
+          <span>现金流出</span><b>{{ fmtWan(data.cashOutflowAmount) }} 万元</b>
+        </div>
+        <div class="role-reference-summary-item">
+          <span>资金余额</span><b>{{ fmtWan(data.cashBalance) }} 万元</b>
+        </div>
+        <div class="role-reference-summary-item">
+          <span>项目利润</span><b>{{ fmtWan(data.projectProfit) }} 万元</b>
+        </div>
+      </div>
+    </section>
+
     <section class="role-reference-main-grid">
       <div class="role-reference-panel role-reference-analysis">
         <div class="role-reference-panel-head">

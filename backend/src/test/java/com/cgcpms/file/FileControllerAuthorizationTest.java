@@ -11,7 +11,8 @@ class FileControllerAuthorizationTest {
 
     @Test
     void cashJournalAuthoritiesCanEnterGenericFileEndpoints() throws Exception {
-        assertAuthorizationContains("upload", new Class<?>[]{MultipartFile.class, String.class, Long.class},
+        assertAuthorizationContains("upload",
+                new Class<?>[]{MultipartFile.class, String.class, Long.class, String.class},
                 "cashbook:journal:maintain");
         assertAuthorizationContains("listByBusiness", new Class<?>[]{String.class, Long.class},
                 "cashbook:journal:query");

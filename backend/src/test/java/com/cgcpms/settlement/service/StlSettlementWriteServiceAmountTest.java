@@ -100,6 +100,7 @@ class StlSettlementWriteServiceAmountTest {
         assertEquals(new BigDecimal("1250.00"), settlement.getFinalAmount());
         assertEquals(new BigDecimal("62.50"), settlement.getWarrantyAmount());
         assertEquals(new BigDecimal("887.50"), settlement.getUnpaidAmount());
+        assertEquals(SettlementAmountPolicy.FORMULA_VERSION, settlement.getAmountFormulaVersion());
         verify(queryService).sumVarOrderConfirmed(TENANT_ID, CONTRACT_ID);
         verify(queryService).sumSubMeasureApproved(TENANT_ID, CONTRACT_ID);
         verify(queryService).sumPaidAmount(TENANT_ID, CONTRACT_ID);

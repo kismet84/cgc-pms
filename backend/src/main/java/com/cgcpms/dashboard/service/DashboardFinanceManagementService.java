@@ -28,6 +28,14 @@ import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.payment.entity.PayApplication;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
+import com.cgcpms.budget.entity.ProjectBudget;
+import com.cgcpms.budget.entity.ProjectBudgetLine;
+import com.cgcpms.budget.mapper.ProjectBudgetMapper;
+import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
+import com.cgcpms.cashbook.entity.FundAccount;
+import com.cgcpms.cashbook.mapper.FundAccountMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -85,6 +93,10 @@ import java.util.stream.Stream;
 public class DashboardFinanceManagementService extends DashboardSharedSupport {
 
     private final ProjectAccessChecker projectAccessChecker;
+    private final PayApplicationMapper payApplicationMapper;
+    private final ProjectBudgetMapper projectBudgetMapper;
+    private final ProjectBudgetLineMapper projectBudgetLineMapper;
+    private final FundAccountMapper fundAccountMapper;
 
     public DashboardFinanceManagementService(
             CostSummaryService costSummaryService,
@@ -113,9 +125,17 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             MdPartnerMapper partnerMapper,
             MdMaterialMapper materialMapper,
             SysUserMapper userMapper,
-            ProjectAccessChecker projectAccessChecker) {
+            ProjectAccessChecker projectAccessChecker,
+            PayApplicationMapper payApplicationMapper,
+            ProjectBudgetMapper projectBudgetMapper,
+            ProjectBudgetLineMapper projectBudgetLineMapper,
+            FundAccountMapper fundAccountMapper) {
         super(costSummaryService, costSummaryMapper, costSubjectMapper, costItemMapper, projectMapper, ctContractMapper, wfTaskMapper, wfInstanceMapper, payRecordMapper, stlSettlementMapper, varOrderMapper, subMeasureMapper, alertLogMapper, purchaseRequestMapper, purchaseRequestItemMapper, purchaseOrderMapper, purchaseOrderItemMapper, receiptMapper, receiptItemMapper, requisitionMapper, warehouseMapper, stockMapper, techItemMapper, partnerMapper, materialMapper, userMapper);
         this.projectAccessChecker = projectAccessChecker;
+        this.payApplicationMapper = payApplicationMapper;
+        this.projectBudgetMapper = projectBudgetMapper;
+        this.projectBudgetLineMapper = projectBudgetLineMapper;
+        this.fundAccountMapper = fundAccountMapper;
     }
 
     public FinanceDashboardVO getFinanceView(Long projectId) {
@@ -209,6 +229,8 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         }).collect(Collectors.toList()));
 
         vo.setOverRatioPayments(Collections.emptyList());
+
+        applyClosedLoopMetrics(vo, tenantId, List.of(projectId));
 
         return vo;
     }
@@ -383,6 +405,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             vo.setWarrantyExpiringAmount("0");
             vo.setPendingPayments(Collections.emptyList());
             vo.setOverRatioPayments(Collections.emptyList());
+            applyClosedLoopMetrics(vo, tenantId, List.of());
             return vo;
         }
 
@@ -464,6 +487,89 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         }).collect(Collectors.toList()));
         vo.setOverRatioPayments(Collections.emptyList());
 
+        applyClosedLoopMetrics(vo, tenantId, projectIds);
+
         return vo;
+    }
+
+    private void applyClosedLoopMetrics(FinanceDashboardVO vo, Long tenantId, List<Long> projectIds) {
+        if (projectIds.isEmpty()) {
+            vo.setPendingPaymentAmount("0.00");
+            vo.setPendingPaymentCount(0L);
+            vo.setApprovedUnpaidAmount("0.00");
+            vo.setTotalContractAmount("0.00");
+            vo.setTotalPaidAmount("0.00");
+            vo.setBudgetAmount("0.00");
+            vo.setBudgetConsumedAmount("0.00");
+            vo.setBudgetExecutionRate("0.00");
+            vo.setCashOutflowAmount("0.00");
+            vo.setCashBalance(companyCashBalance(tenantId).toPlainString());
+            vo.setProjectProfit("0.00");
+            vo.setMetricFormulaVersion("PAYMENT_CLOSED_LOOP_V1");
+            return;
+        }
+        List<PayApplication> applications = payApplicationMapper.selectList(
+                new LambdaQueryWrapper<PayApplication>().eq(PayApplication::getTenantId, tenantId)
+                        .in(PayApplication::getProjectId, projectIds));
+        List<PayApplication> approving = applications.stream()
+                .filter(a -> "APPROVING".equals(a.getApprovalStatus())).toList();
+        BigDecimal pending = approving.stream().map(PayApplication::getApplyAmount)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal approvedUnpaid = applications.stream()
+                .filter(a -> "APPROVED".equals(a.getApprovalStatus()))
+                .map(a -> nz(a.getApplyAmount()).subtract(nz(a.getActualPayAmount())))
+                .filter(v -> v.compareTo(BigDecimal.ZERO) > 0).reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setPendingPaymentAmount(pending.toPlainString());
+        vo.setPendingPaymentCount((long) approving.size());
+        vo.setApprovedUnpaidAmount(approvedUnpaid.toPlainString());
+
+        List<CtContract> contracts = ctContractMapper.selectList(new LambdaQueryWrapper<CtContract>()
+                .eq(CtContract::getTenantId, tenantId).in(CtContract::getProjectId, projectIds));
+        BigDecimal contractAmount = contracts.stream().map(CtContract::getCurrentAmount)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<PayRecord> paidRecords = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getTenantId, tenantId).in(PayRecord::getProjectId, projectIds)
+                .eq(PayRecord::getPayStatus, "SUCCESS"));
+        BigDecimal paid = paidRecords.stream().map(PayRecord::getPayAmount)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<ProjectBudget> activeBudgets = projectBudgetMapper.selectList(new LambdaQueryWrapper<ProjectBudget>()
+                .eq(ProjectBudget::getTenantId, tenantId).in(ProjectBudget::getProjectId, projectIds)
+                .eq(ProjectBudget::getStatus, "ACTIVE").eq(ProjectBudget::getActiveFlag, 1));
+        BigDecimal budgetAmount = activeBudgets.stream().map(ProjectBudget::getTotalAmount)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<Long> budgetIds = activeBudgets.stream().map(ProjectBudget::getId).toList();
+        BigDecimal consumed = budgetIds.isEmpty() ? BigDecimal.ZERO : projectBudgetLineMapper.selectList(
+                new LambdaQueryWrapper<ProjectBudgetLine>().eq(ProjectBudgetLine::getTenantId, tenantId)
+                        .in(ProjectBudgetLine::getBudgetId, budgetIds)).stream()
+                .map(ProjectBudgetLine::getConsumedAmount).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal executionRate = budgetAmount.compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ZERO
+                : consumed.multiply(new BigDecimal("100")).divide(budgetAmount, 2, RoundingMode.HALF_UP);
+
+        List<PmProject> projects = projectMapper.selectList(new LambdaQueryWrapper<PmProject>()
+                .eq(PmProject::getTenantId, tenantId).in(PmProject::getId, projectIds));
+        BigDecimal projectIncome = projects.stream().map(PmProject::getContractAmount)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        vo.setTotalContractAmount(contractAmount.toPlainString());
+        vo.setTotalPaidAmount(paid.toPlainString());
+        vo.setBudgetAmount(budgetAmount.toPlainString());
+        vo.setBudgetConsumedAmount(consumed.toPlainString());
+        vo.setBudgetExecutionRate(executionRate.toPlainString());
+        vo.setCashOutflowAmount(paid.toPlainString());
+        vo.setCashBalance(companyCashBalance(tenantId).toPlainString());
+        vo.setProjectProfit(projectIncome.subtract(consumed).toPlainString());
+        vo.setMetricFormulaVersion("PAYMENT_CLOSED_LOOP_V1");
+    }
+
+    private BigDecimal companyCashBalance(Long tenantId) {
+        return fundAccountMapper.selectList(new LambdaQueryWrapper<FundAccount>()
+                        .eq(FundAccount::getTenantId, tenantId).eq(FundAccount::getEnabledFlag, 1)).stream()
+                .map(account -> fundAccountMapper.selectCurrentBalance(account.getId(), tenantId))
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static BigDecimal nz(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 }

@@ -21,6 +21,8 @@ public class MatRequisitionVO {
     private String approvalStatus;
     private String totalAmount;
     private String stockOutFlag;
+    private String stockOutBy;
+    private String stockOutAt;
     private String createdBy;
     private String createdAt;
     private String updatedAt;

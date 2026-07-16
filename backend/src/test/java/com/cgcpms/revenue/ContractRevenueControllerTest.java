@@ -31,6 +31,7 @@ class ContractRevenueControllerTest {
     @Autowired private JwtUtils jwtUtils;
     private static final long ADMIN_ID = 1L;
     private static final long TENANT_ID = 0L;
+    private static final long PROJECT_ID = 10001L;
     private static final long CONTRACT_ID = 30001L;
     private Long revenueId;
 
@@ -57,9 +58,9 @@ class ContractRevenueControllerTest {
     @Test @Order(3) @DisplayName("POST /contract-revenue -> creates revenue (may conflict with parallel tests)")
     void testCreate() throws Exception {
         String body = String.format("""
-                {"contractId":%d,"revenueCode":"RV-TEST-%d","revenueName":"测试收入","amount":50000.00,
-                "revenueDate":"%s","recognitionMethod":"PERCENTAGE","completionPercent":50.00}
-                """, CONTRACT_ID, System.nanoTime(), LocalDate.now());
+                {"projectId":%d,"contractId":%d,"revenueCode":"RV-TEST-%d","revenueAmount":50000.00,
+                "revenueTax":0,"revenueDate":"%s","progressPercent":50.00,"attachmentCount":1}
+                """, PROJECT_ID, CONTRACT_ID, System.nanoTime(), LocalDate.now());
         var result = mockMvc.perform(postWith("/contract-revenue").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andReturn();
         // Accept 200 (success) or 409 (conflict from parallel tests)
@@ -101,9 +102,9 @@ class ContractRevenueControllerTest {
     void testUpdate() throws Exception {
         if (revenueId == null) { Assertions.assertTrue(true, "Skipped: no revenueId from create"); return; }
         String body = String.format("""
-                {"contractId":%d,"revenueCode":"RV-TEST-%d","revenueName":"更新收入","amount":60000.00,
-                "revenueDate":"%s","recognitionMethod":"PERCENTAGE","completionPercent":75.00}
-                """, CONTRACT_ID, System.nanoTime(), LocalDate.now());
+                {"projectId":%d,"contractId":%d,"revenueCode":"RV-TEST-%d","revenueAmount":60000.00,
+                "revenueTax":0,"revenueDate":"%s","progressPercent":75.00,"attachmentCount":1}
+                """, PROJECT_ID, CONTRACT_ID, System.nanoTime(), LocalDate.now());
         mockMvc.perform(putWith("/contract-revenue/" + revenueId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }
@@ -120,9 +121,9 @@ class ContractRevenueControllerTest {
     void testRecreate() throws Exception {
         if (revenueId == null) { Assertions.assertTrue(true, "Skipped: no revenueId from create"); return; }
         String body = String.format("""
-                {"contractId":%d,"revenueCode":"RV-TEST-%d","revenueName":"重创收入","amount":50000.00,
-                "revenueDate":"%s","recognitionMethod":"PERCENTAGE","completionPercent":50.00}
-                """, CONTRACT_ID, System.nanoTime(), LocalDate.now());
+                {"projectId":%d,"contractId":%d,"revenueCode":"RV-TEST-%d","revenueAmount":50000.00,
+                "revenueTax":0,"revenueDate":"%s","progressPercent":50.00,"attachmentCount":1}
+                """, PROJECT_ID, CONTRACT_ID, System.nanoTime(), LocalDate.now());
         String resp = mockMvc.perform(postWith("/contract-revenue").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isString())
                 .andReturn().getResponse().getContentAsString();

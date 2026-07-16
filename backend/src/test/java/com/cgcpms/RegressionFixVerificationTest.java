@@ -78,7 +78,7 @@ class RegressionFixVerificationTest {
     @Test
     @Order(1)
     @Transactional
-    @DisplayName("F10: saveItemsBatch不重复累加receivedQuantity")
+    @DisplayName("F10: 草稿saveItemsBatch不占用receivedQuantity")
     void testF10_receiptQuantityNoDoubleCount() {
         Long orderId = null;
         Long receiptId = null;
@@ -123,19 +123,19 @@ class RegressionFixVerificationTest {
             receiptService.saveItemsBatch(receiptId, List.of(ri1));
 
             MatPurchaseOrderItem oi = purchaseOrderItemMapper.selectById(orderItemId);
-            assertEquals(0, new BigDecimal("10").compareTo(oi.getReceivedQuantity()),
-                    "第一次保存后receivedQuantity应为10");
+            assertEquals(0, BigDecimal.ZERO.compareTo(oi.getReceivedQuantity()),
+                    "草稿第一次保存后receivedQuantity仍应为0");
 
             // 4. Second saveItemsBatch with same quantity → should NOT double-count
             MatReceiptItem ri2 = buildReceiptItem(orderItemId, 10, 10, 450, 10 * 450);
             receiptService.saveItemsBatch(receiptId, List.of(ri2));
 
             oi = purchaseOrderItemMapper.selectById(orderItemId);
-            assertEquals(0, new BigDecimal("10").compareTo(oi.getReceivedQuantity()),
-                    "第二次保存后receivedQuantity仍应为10，不应累加为20");
+            assertEquals(0, BigDecimal.ZERO.compareTo(oi.getReceivedQuantity()),
+                    "草稿第二次保存后receivedQuantity仍应为0");
 
             System.out.println("F10 PASS: receivedQuantity=" + oi.getReceivedQuantity()
-                    + " (expected 10, NOT 20)");
+                    + " (expected 0 until approval)");
 
         } finally {
             // Cleanup

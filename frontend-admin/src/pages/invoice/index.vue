@@ -16,6 +16,8 @@ import InvoiceVerifyPanel from './components/InvoiceVerifyPanel.vue'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import ListQueryPanel from '@/components/list-page/ListQueryPanel.vue'
+import { getInvoiceWriteOffProgress, markInvoiceException } from '@/api/modules/invoice'
+import { message, Modal } from 'ant-design-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,6 +80,26 @@ function onModalClose() {
 
 function onModalSaved() {
   fetchData()
+}
+
+async function showWriteOff(record: InvoiceVO) {
+  const data = await getInvoiceWriteOffProgress(record.id)
+  Modal.info({
+    title: `发票 ${record.invoiceNo} 核销进度`,
+    content: `已核销 ${data.allocatedAmount ?? '0.00'}，未核销 ${data.unallocatedAmount ?? '0.00'}，进度 ${(Number(data.writeOffRate ?? 0) * 100).toFixed(2)}%`,
+  })
+}
+
+function flagException(record: InvoiceVO) {
+  Modal.confirm({
+    title: '标记异常发票',
+    content: '确认将该发票标记为疑似异常并进入人工处理？',
+    async onOk() {
+      await markInvoiceException(record.id, 'SUSPECT', '财务人员在发票工作台人工标记')
+      message.success('已标记异常票')
+      fetchData()
+    },
+  })
 }
 
 onMounted(() => {
@@ -260,6 +282,13 @@ defineExpose({
                       <a-menu-item v-if="row.verifyStatus === 'PENDING'" @click="handleVerify(row)">
                         核验
                       </a-menu-item>
+                      <a-menu-item @click="showWriteOff(row)">核销进度</a-menu-item>
+                      <a-menu-item
+                        v-if="row.exceptionStatus !== 'SUSPECT'"
+                        danger
+                        @click="flagException(row)"
+                        >标记异常票</a-menu-item
+                      >
                     </a-menu>
                   </template>
                 </a-dropdown>

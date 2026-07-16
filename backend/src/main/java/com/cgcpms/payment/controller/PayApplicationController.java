@@ -7,6 +7,9 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayApplicationBasis;
 import com.cgcpms.payment.service.PayApplicationService;
+import com.cgcpms.payment.service.PaymentApplicationSourceService;
+import com.cgcpms.payment.entity.PaymentApplicationSource;
+import com.cgcpms.payment.vo.PaymentApplicationSourceVO;
 import com.cgcpms.payment.vo.PayApplicationBasisVO;
 import com.cgcpms.payment.vo.PayApplicationVO;
 import jakarta.validation.Valid;
@@ -23,6 +26,7 @@ import java.util.List;
 public class PayApplicationController {
 
     private final PayApplicationService payApplicationService;
+    private final PaymentApplicationSourceService sourceService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('payment:app:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
@@ -83,6 +87,23 @@ public class PayApplicationController {
                                             @Valid @Size(max = 200, message = "批量依据不能超过200条")
                                             @RequestBody List<PayApplicationBasis> basisList) {
         payApplicationService.saveBasis(id, basisList);
+        return ApiResponse.success();
+    }
+
+    @GetMapping("/{id}/sources")
+    @PreAuthorize("hasAuthority('payment:app:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<PaymentApplicationSourceVO>> listSources(@PathVariable Long id) {
+        return ApiResponse.success(sourceService.list(id));
+    }
+
+    @PostMapping("/{id}/sources/batch")
+    @AuditedOperation(type = "UPDATE_SOURCES", businessType = "PAYMENT", businessIdExpression = "#id")
+    @PreAuthorize("hasAuthority('payment:app:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> batchSaveSources(
+            @PathVariable Long id,
+            @Valid @Size(max = 200, message = "付款来源不能超过200条")
+            @RequestBody List<PaymentApplicationSource> sources) {
+        sourceService.save(id, sources);
         return ApiResponse.success();
     }
 

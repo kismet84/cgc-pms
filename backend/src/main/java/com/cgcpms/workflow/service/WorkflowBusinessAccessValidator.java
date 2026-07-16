@@ -7,6 +7,8 @@ import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostTarget;
 import com.cgcpms.cost.mapper.CostTargetMapper;
+import com.cgcpms.measurement.entity.ProductionMeasurement;
+import com.cgcpms.measurement.mapper.ProductionMeasurementMapper;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -28,8 +30,11 @@ import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 @Component
@@ -49,6 +54,8 @@ public class WorkflowBusinessAccessValidator {
     private final CostTargetMapper costTargetMapper;
     private final ContractRevenueMapper contractRevenueMapper;
     private final MatRequisitionMapper requisitionMapper;
+    private final ProductionMeasurementMapper productionMeasurementMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public ValidationResult validateSubmit(String businessType, Long businessId, Long tenantId,
                                            Long requestProjectId, Long requestContractId) {
@@ -133,6 +140,22 @@ public class WorkflowBusinessAccessValidator {
                         entity == null ? null : entity.getContractId(), requestContractId,
                         entity == null ? null : entity.getApprovalStatus(), "REVENUE_NOT_FOUND", "PENDING");
             }
+            case WorkflowBusinessTypes.PRODUCTION_MEASUREMENT -> {
+                ProductionMeasurement entity = productionMeasurementMapper.selectById(businessId);
+                return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
+                        entity == null ? null : entity.getProjectId(), requestProjectId,
+                        entity == null ? null : entity.getContractId(), requestContractId,
+                        entity == null ? null : entity.getApprovalStatus(), "PRODUCTION_MEASUREMENT_NOT_FOUND", "DRAFT", "REJECTED");
+            }
+            case WorkflowBusinessTypes.PROJECT_BUDGET -> {
+                return validateJdbc("project_budget", "approval_status", businessId, tenantId, requestProjectId, requestContractId, "PROJECT_BUDGET_NOT_FOUND");
+            }
+            case WorkflowBusinessTypes.EXPENSE -> {
+                return validateJdbc("expense_application", "approval_status", businessId, tenantId, requestProjectId, requestContractId, "EXPENSE_NOT_FOUND");
+            }
+            case WorkflowBusinessTypes.OWNER_SETTLEMENT -> {
+                return validateJdbc("owner_settlement", "status", businessId, tenantId, requestProjectId, requestContractId, "OWNER_SETTLEMENT_NOT_FOUND");
+            }
             case WorkflowBusinessTypes.MATERIAL_REQUISITION -> {
                 MatRequisition entity = requisitionMapper.selectById(businessId);
                 return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
@@ -142,6 +165,19 @@ public class WorkflowBusinessAccessValidator {
             }
             default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
         }
+    }
+
+    private ValidationResult validateJdbc(String table, String statusColumn, Long businessId, Long tenantId,
+                                            Long requestProjectId, Long requestContractId, String notFoundCode) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT tenant_id,project_id," + ("project_budget".equals(table) ? "NULL" : "contract_id")
+                        + " contract_id," + statusColumn + " approval_status FROM " + table + " WHERE id=? AND deleted_flag=0",
+                businessId);
+        Map<String, Object> row = rows.isEmpty() ? null : rows.get(0);
+        return validate(row != null, tenantId, row == null ? null : ((Number) row.get("tenant_id")).longValue(),
+                row == null ? null : ((Number) row.get("project_id")).longValue(), requestProjectId,
+                row == null || row.get("contract_id") == null ? null : ((Number) row.get("contract_id")).longValue(), requestContractId,
+                row == null ? null : Objects.toString(row.get("approval_status"), null), notFoundCode, "DRAFT", "REJECTED");
     }
 
     private ValidationResult validate(boolean exists, Long tenantId, Long realTenantId, Long realProjectId,

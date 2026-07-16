@@ -1,0 +1,2 @@
+ALTER TABLE stl_settlement
+    ADD COLUMN amount_formula_version VARCHAR(64) NOT NULL DEFAULT 'LEGACY_UNVERIFIED';

@@ -133,8 +133,8 @@ class Phase2FullChainIntegrationTest {
         assertEquals(PROJECT_ID, saved.getProjectId());
 
         // 3. 保存订单明细
-        MatPurchaseOrderItem item1 = buildOrderItem("C30商品砼", "C30", "m³", 100, 450);
-        MatPurchaseOrderItem item2 = buildOrderItem("HRB400螺纹钢", "HRB400 φ25", "t", 50, 3800);
+        MatPurchaseOrderItem item1 = buildOrderItem(1L, "C30商品砼", "C30", "m³", 100, 450);
+        MatPurchaseOrderItem item2 = buildOrderItem(2L, "HRB400螺纹钢", "HRB400 φ25", "t", 50, 3800);
         purchaseOrderService.saveItemsBatch(orderId, List.of(item1, item2));
 
         // 4. 验证明细已保存
@@ -237,6 +237,10 @@ class Phase2FullChainIntegrationTest {
     void test03_receiptApprovalAndCostGeneration() {
         // 1. 创建采购订单+明细，创建验收单+明细
         Long orderId = createOrderWithItems();
+        MatPurchaseOrder approvedOrder = purchaseOrderMapper.selectById(orderId);
+        approvedOrder.setApprovalStatus("APPROVED");
+        approvedOrder.setOrderStatus("APPROVED");
+        purchaseOrderMapper.updateById(approvedOrder);
         Long receiptId = createReceiptWithItems(orderId);
 
         // 2. 提交验收审批
@@ -474,10 +478,11 @@ class Phase2FullChainIntegrationTest {
     @Transactional
     @DisplayName("场景6c: 付款金额边界——累计付款精确等于合同金额")
     void test06c_balanceBoundaryExactMatch() {
-        // Set contract amount to 100000
+        // 在已有审批申请基线上再留出 100000，避免共享种子数据影响边界语义。
+        BigDecimal existingApproved = approvedApplicationAmount(CONTRACT_ID);
         CtContract contract = contractMapper.selectById(CONTRACT_ID);
-        contract.setContractAmount(new BigDecimal("100000"));
-        contract.setCurrentAmount(new BigDecimal("100000"));
+        contract.setContractAmount(existingApproved.add(new BigDecimal("100000")));
+        contract.setCurrentAmount(existingApproved.add(new BigDecimal("100000")));
         contractMapper.updateById(contract);
 
         // Create and approve first payment of 50000
@@ -519,9 +524,10 @@ class Phase2FullChainIntegrationTest {
     void test06d_balanceBoundaryExceedByOneCent() {
         // Contract amount = 100000, first payment = 50000 (approved)
         // Second payment = 50000.01 → should be REJECTED (exceeds by 1 cent)
+        BigDecimal existingApproved = approvedApplicationAmount(CONTRACT_ID);
         CtContract contract = contractMapper.selectById(CONTRACT_ID);
-        contract.setContractAmount(new BigDecimal("100000"));
-        contract.setCurrentAmount(new BigDecimal("100000"));
+        contract.setContractAmount(existingApproved.add(new BigDecimal("100000")));
+        contract.setCurrentAmount(existingApproved.add(new BigDecimal("100000")));
         contractMapper.updateById(contract);
 
         PayApplication app1 = new PayApplication();
@@ -552,6 +558,15 @@ class Phase2FullChainIntegrationTest {
                 "超出合同余额1分钱应抛出EXCEED_CONTRACT_BALANCE");
 
         System.out.println("✅ 场景6d 通过: 超出合同余额1分钱被拒止, code=" + ex.getCode());
+    }
+
+    private BigDecimal approvedApplicationAmount(Long contractId) {
+        return payApplicationMapper.selectList(new LambdaQueryWrapper<PayApplication>()
+                        .eq(PayApplication::getContractId, contractId)
+                        .eq(PayApplication::getApprovalStatus, "APPROVED"))
+                .stream()
+                .map(item -> item.getApplyAmount() == null ? BigDecimal.ZERO : item.getApplyAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -590,11 +605,17 @@ class Phase2FullChainIntegrationTest {
 
         app.setId(appId);
         app.setApprovalStatus("APPROVED");
+        // Phase2 场景保留为历史付款依据兼容测试，当前闭环路径另有独立集成测试。
+        app.setIntegrityVersion("LEGACY_UNVERIFIED");
         payApplicationMapper.updateById(app);
 
-        // 记录合同原有已付金额
-        CtContract contractBefore = contractMapper.selectById(CONTRACT_ID);
-        BigDecimal paidBefore = contractBefore.getPaidAmount() != null ? contractBefore.getPaidAmount() : BigDecimal.ZERO;
+        // 以成功付款事实为权威口径，避免历史合同汇总字段与明细暂时不一致影响用例。
+        BigDecimal paidBefore = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                        .eq(PayRecord::getContractId, CONTRACT_ID)
+                        .eq(PayRecord::getPayStatus, "SUCCESS"))
+                .stream()
+                .map(item -> item.getPayAmount() == null ? BigDecimal.ZERO : item.getPayAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // 3. 执行第一笔回写（部分付款：150000中的80000）
         PayRecord input1 = new PayRecord();
@@ -698,8 +719,8 @@ class Phase2FullChainIntegrationTest {
 
         Long orderId = purchaseOrderService.create(order);
 
-        MatPurchaseOrderItem item1 = buildOrderItem("C30商品砼", "C30", "m³", 100, 450);
-        MatPurchaseOrderItem item2 = buildOrderItem("HRB400螺纹钢", "HRB400 φ25", "t", 50, 3800);
+        MatPurchaseOrderItem item1 = buildOrderItem(1L, "C30商品砼", "C30", "m³", 100, 450);
+        MatPurchaseOrderItem item2 = buildOrderItem(2L, "HRB400螺纹钢", "HRB400 φ25", "t", 50, 3800);
         purchaseOrderService.saveItemsBatch(orderId, List.of(item1, item2));
 
         return orderId;
@@ -711,6 +732,7 @@ class Phase2FullChainIntegrationTest {
         receipt.setProjectId(PROJECT_ID);
         receipt.setOrderId(orderId);
         receipt.setReceiptDate(LocalDate.now());
+        receipt.setReceiptMode("DIRECT_CONSUMPTION");
         receipt.setQualityStatus("PASSED");
         receipt.setRemark("Phase2辅助数据-验收单");
 
@@ -730,9 +752,10 @@ class Phase2FullChainIntegrationTest {
     }
 
     /** 构建采购订单明细 */
-    private MatPurchaseOrderItem buildOrderItem(String name, String spec, String unit,
+    private MatPurchaseOrderItem buildOrderItem(Long materialId, String name, String spec, String unit,
                                                   long quantity, long unitPrice) {
         MatPurchaseOrderItem item = new MatPurchaseOrderItem();
+        item.setMaterialId(materialId);
         item.setMaterialName(name);
         item.setSpecification(spec);
         item.setUnit(unit);
@@ -752,6 +775,7 @@ class Phase2FullChainIntegrationTest {
         item.setQualifiedQuantity(qualifiedQty);
         item.setUnitPrice(unitPrice);
         item.setAmount(amount);
+        item.setUseLocation("Phase2直耗测试部位");
         return item;
     }
 

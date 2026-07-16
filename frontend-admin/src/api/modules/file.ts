@@ -4,14 +4,19 @@ import type { SysFileVO } from '@/types/file'
 const FILE_DOWNLOAD_ERROR_MESSAGE = '文件下载失败，请确认权限或链接是否已过期'
 
 /** Upload a file (FormData multipart, extended timeout for large files) */
-export function uploadFile(file: File, businessType: string, businessId: string) {
+export function uploadFile(
+  file: File,
+  businessType: string,
+  businessId: string,
+  documentType?: string,
+) {
   const formData = new FormData()
   formData.append('file', file)
   return request<SysFileVO>({
     url: '/files/upload',
     method: 'post',
     data: formData,
-    params: { businessType, businessId },
+    params: { businessType, businessId, documentType },
     timeout: 120000,
   })
 }

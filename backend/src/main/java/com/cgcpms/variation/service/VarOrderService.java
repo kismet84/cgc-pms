@@ -9,6 +9,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.contract.service.BusinessMatterRegistryService;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -48,6 +49,7 @@ public class VarOrderService {
     private final MdPartnerMapper mdPartnerMapper;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
+    private final BusinessMatterRegistryService businessMatterRegistryService;
 
     public IPage<VarOrderVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                       Long partnerId, String varType, String direction, String varCode) {
@@ -160,7 +162,10 @@ public class VarOrderService {
         }
 
         order.setTenantId(UserContext.getCurrentTenantId());
+        order.setBusinessMatterKey(businessMatterRegistryService.normalize(order.getBusinessMatterKey()));
         varOrderMapper.insert(order);
+        businessMatterRegistryService.register(BusinessMatterRegistryService.SOURCE_VARIATION_ORDER,
+                order.getId(), order.getProjectId(), order.getContractId(), order.getBusinessMatterKey());
         return order.getId();
     }
 
@@ -182,6 +187,12 @@ public class VarOrderService {
                 order.getContractId() != null ? order.getContractId() : existing.getContractId(),
                 "编辑变更签证");
 
+        if (order.getBusinessMatterKey() != null) {
+            businessMatterRegistryService.replace(BusinessMatterRegistryService.SOURCE_VARIATION_ORDER,
+                    existing.getId(), existing.getProjectId(), existing.getContractId(),
+                    existing.getBusinessMatterKey(), order.getBusinessMatterKey());
+            order.setBusinessMatterKey(businessMatterRegistryService.normalize(order.getBusinessMatterKey()));
+        }
         varOrderMapper.updateById(order);
     }
 
@@ -232,6 +243,8 @@ public class VarOrderService {
             throw new BusinessException("COST_GENERATED", "已生成成本，不可删除，请走冲销");
 
         varOrderMapper.deleteById(id);
+        businessMatterRegistryService.release(BusinessMatterRegistryService.SOURCE_VARIATION_ORDER,
+                id, "现场签证草稿删除");
     }
 
     /**
@@ -393,6 +406,7 @@ public class VarOrderService {
         vo.setPartnerId(m.getPartnerId() != null ? m.getPartnerId().toString() : null);
         vo.setVarCode(m.getVarCode());
         vo.setVarName(m.getVarName());
+        vo.setBusinessMatterKey(m.getBusinessMatterKey());
         vo.setVarType(m.getVarType());
         vo.setDirection(m.getDirection());
         vo.setReportedAmount(m.getReportedAmount() != null ? m.getReportedAmount().toPlainString() : null);

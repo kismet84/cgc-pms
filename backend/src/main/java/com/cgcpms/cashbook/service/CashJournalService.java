@@ -21,6 +21,7 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.vo.SysFileVO;
@@ -82,9 +83,23 @@ public class CashJournalService {
     }
 
     @Transactional(rollbackFor = Exception.class)
+    public CashJournalEntryVO createPendingFromPayRecord(PayRecord record, PayApplication application) {
+        return createPendingFromPayRecord(record, application, true);
+    }
+
+    /** 仅用于历史兼容和旧数据修复；正式付款必须传入付款申请以建立显式链路。 */
+    @Deprecated
+    @Transactional(rollbackFor = Exception.class)
     public CashJournalEntryVO createPendingFromPayRecord(PayRecord record) {
+        return createPendingFromPayRecord(record, null, false);
+    }
+
+    private CashJournalEntryVO createPendingFromPayRecord(PayRecord record, PayApplication application,
+                                                           boolean strictTrace) {
         if (record == null || record.getId() == null || record.getPayAmount() == null
-                || record.getPayDate() == null || !Objects.equals(record.getTenantId(), tenantId())) {
+                || record.getPayDate() == null || !Objects.equals(record.getTenantId(), tenantId())
+                || (strictTrace && (record.getFundAccountId() == null || application == null
+                || !Objects.equals(application.getId(), record.getPayApplicationId())))) {
             throw new BusinessException("PAY_RECORD_CASH_JOURNAL_INVALID", "付款记录无法生成资金流水");
         }
         validateAmount(record.getPayAmount(), false, "PAY_RECORD_CASH_JOURNAL_INVALID", "付款金额不合法");
@@ -96,6 +111,7 @@ public class CashJournalService {
 
         CashJournalEntry entry = new CashJournalEntry();
         entry.setTenantId(tenantId());
+        entry.setAccountId(record.getFundAccountId());
         entry.setDirection(CashbookConstants.Direction.OUT);
         entry.setAmount(record.getPayAmount().setScale(2));
         entry.setBusinessDate(record.getPayDate());
@@ -105,6 +121,9 @@ public class CashJournalService {
         entry.setContractId(record.getContractId());
         entry.setSourceType(CashbookConstants.SourceType.PAY_RECORD);
         entry.setSourceId(record.getId());
+        entry.setPayApplicationId(application == null ? null : application.getId());
+        entry.setApprovalInstanceId(application == null ? null : application.getApprovalInstanceId());
+        entry.setPayRecordId(record.getId());
         entry.setStatus(CashbookConstants.Status.PENDING_ARCHIVE);
         entry.setClosureDueAt(LocalDateTime.now().plusHours(24));
         entry.setVersion(0);
@@ -201,6 +220,18 @@ public class CashJournalService {
 
     @Transactional(rollbackFor = Exception.class)
     public CashJournalEntryVO reverse(Long id, String reason) {
+        return reverseInternal(id, reason, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public CashJournalEntryVO reverseForPayment(Long id, String reason, Long reversalPayRecordId) {
+        if (reversalPayRecordId == null) {
+            throw new BusinessException("REVERSAL_PAY_RECORD_REQUIRED", "付款红冲必须关联冲销付款记录");
+        }
+        return reverseInternal(id, reason, reversalPayRecordId);
+    }
+
+    private CashJournalEntryVO reverseInternal(Long id, String reason, Long reversalPayRecordId) {
         if (!StringUtils.hasText(reason)) {
             throw new BusinessException("CASH_JOURNAL_REVERSE_REASON_REQUIRED", "红冲原因不能为空");
         }
@@ -237,6 +268,9 @@ public class CashJournalService {
         reversal.setSummary("红冲 " + original.getEntryNo() + "：" + reason.trim());
         reversal.setProjectId(original.getProjectId());
         reversal.setContractId(original.getContractId());
+        reversal.setPayApplicationId(original.getPayApplicationId());
+        reversal.setApprovalInstanceId(original.getApprovalInstanceId());
+        reversal.setPayRecordId(reversalPayRecordId);
         reversal.setSourceType(CashbookConstants.SourceType.REVERSAL);
         reversal.setSourceId(original.getId());
         reversal.setStatus(CashbookConstants.Status.ARCHIVED);

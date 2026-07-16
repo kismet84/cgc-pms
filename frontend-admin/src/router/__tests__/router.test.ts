@@ -113,6 +113,28 @@ describe('router lazy loading', () => {
     expect(router.resolve('/accounting-entry').meta.permission).toBe('accounting:query')
   })
 
+  it('registers the revenue collection workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const revenueRoute = rootRoute?.children?.find((c) => c.path === 'revenue')
+
+    expect(revenueRoute?.name).toBe('RevenueOperations')
+    expect(revenueRoute?.meta?.title).toBe('收入与回款')
+    expect(revenueRoute?.meta?.permission).toBe('revenue:operations:query')
+    expect(typeof revenueRoute?.component).toBe('function')
+    expect(router.resolve('/revenue').meta.permission).toBe('revenue:operations:query')
+  })
+
+  it('registers the production measurement workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const route = rootRoute?.children?.find((c) => c.path === 'production-measurement')
+
+    expect(route?.name).toBe('ProductionMeasurement')
+    expect(route?.meta?.title).toBe('产值计量')
+    expect(route?.meta?.permission).toBe('measurement:query')
+    expect(typeof route?.component).toBe('function')
+    expect(router.resolve('/production-measurement').meta.permission).toBe('measurement:query')
+  })
+
   it('registers the site daily log route with query permission', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const dailyRoute = rootRoute?.children?.find((c) => c.path === 'site/daily-log')

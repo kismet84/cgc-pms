@@ -11,9 +11,16 @@ public class PayRecordVO {
     private String partnerId;
     private String payAmount;
     private String payDate;
+    private String paidAt;
+    private String fundAccountId;
     private String payMethod;
     private String voucherNo;
     private String payStatus;
+    private String externalTxnNo;
+    private String failureReason;
+    private String reversedRecordId;
+    private String reversedAt;
+    private String reversalType;
     private String createdBy;
     private String createdAt;
     private String updatedAt;

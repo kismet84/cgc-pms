@@ -9,6 +9,7 @@ import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.service.StlSettlementQueryService;
 import com.cgcpms.settlement.service.StlSettlementWriteService;
 import com.cgcpms.settlement.vo.SettlementApprovalRecordVO;
+import com.cgcpms.settlement.vo.SettlementAmountBaselineVO;
 import com.cgcpms.settlement.vo.SettlementAttachmentVO;
 import com.cgcpms.settlement.vo.SettlementCostItemVO;
 import com.cgcpms.settlement.vo.SettlementPaymentItemVO;
@@ -115,6 +116,14 @@ public class StlSettlementController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
     public ApiResponse<StlSettlementVO> computeSettlementAmount(@PathVariable Long contractId) {
         return ApiResponse.success(queryService.computeSettlementAmount(contractId));
+    }
+
+    @GetMapping("/amount-baseline")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('settlement:query')")
+    public ApiResponse<PageResult<SettlementAmountBaselineVO>> previewAmountBaseline(
+            @RequestParam(defaultValue = "1") long pageNo,
+            @RequestParam(defaultValue = "50") long pageSize) {
+        return ApiResponse.success(PageResult.of(queryService.previewAmountBaseline(pageNo, pageSize)));
     }
 
     @GetMapping("/{id}/sources")

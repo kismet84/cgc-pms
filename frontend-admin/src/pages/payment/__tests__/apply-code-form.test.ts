@@ -10,19 +10,15 @@ const formModalSource = readFileSync(
   'utf-8',
 )
 
-describe('PaymentPage applyCode form chain', () => {
-  it('keeps applyCode in form state for create and edit flows', () => {
-    expect(paymentSource).toMatch(
-      /const\s+formData\s*=\s*reactive<Partial<PayApplicationVO>>\(\{[\s\S]*?applyCode:\s*''/,
-    )
-    expect(paymentSource).toMatch(/Object\.assign\(formData,\s*\{[\s\S]*?applyCode:\s*''/)
-    expect(paymentSource).toMatch(
-      /Object\.assign\(formData,\s*\{[\s\S]*?applyCode:\s*detail\.applyCode/,
-    )
+describe('PaymentPage server-generated application code', () => {
+  it('does not require users to maintain an application code', () => {
+    expect(paymentSource).not.toMatch(/applyCode:s*''/)
+    expect(formModalSource).not.toContain('v-model:value="props.formData.applyCode"')
+    expect(formModalSource).not.toContain('label="申请编号"')
   })
 
-  it('renders applyCode input in create\/edit modal', () => {
-    expect(formModalSource).toContain('label="申请编号"')
-    expect(formModalSource).toContain('v-model:value="props.formData.applyCode"')
+  it('still displays the server-generated code in list and edit data', () => {
+    expect(paymentSource).toContain('record.applyCode')
+    expect(paymentSource).toContain('applyCode: detail.applyCode')
   })
 })

@@ -25,6 +25,9 @@ public class ContractRevenueVO {
     private String billedTax;
     private String approvalStatus;
     private String costItemId;
+    private String approvalInstanceId;
+    private String formulaVersion;
+    private Integer attachmentCount;
     private String createdBy;
     private String createdAt;
     private String updatedAt;

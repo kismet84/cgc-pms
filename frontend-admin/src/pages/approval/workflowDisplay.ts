@@ -49,6 +49,14 @@ export const workflowBusinessEntryRegistry: WorkflowBusinessEntryRegistryItem[] 
     openMode: 'route',
     forbiddenPolicy: 'disabled-with-tooltip',
   },
+  {
+    businessType: 'PRODUCTION_MEASUREMENT',
+    displayName: '产值计量',
+    permissionCode: 'measurement:query',
+    targetRoute: (businessId: string) => `/production-measurement?businessId=${businessId}`,
+    openMode: 'route',
+    forbiddenPolicy: 'disabled-with-tooltip',
+  },
 ]
 
 const workflowBusinessEntryMap = new Map(
@@ -70,6 +78,7 @@ export const workflowBusinessTypeLabels: Record<string, string> = {
   SETTLEMENT: '结算审批',
   COST_TARGET: '成本目标',
   CONTRACT_REVENUE: '合同收入',
+  OWNER_SETTLEMENT: '业主结算',
   TECH_ITEM: '技术事项',
 }
 

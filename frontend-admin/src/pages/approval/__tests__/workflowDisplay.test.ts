@@ -24,13 +24,14 @@ import {
 } from '../workflowDisplay'
 
 describe('workflowDisplay registry', () => {
-  it('只注册首批冻结的三类审批入口', () => {
-    expect(workflowBusinessEntryRegistry).toHaveLength(4)
+  it('注册冻结入口及产值计量闭环入口', () => {
+    expect(workflowBusinessEntryRegistry).toHaveLength(5)
     expect(workflowBusinessEntryRegistry.map((entry) => entry.businessType)).toEqual([
       'CONTRACT',
       'CONTRACT_APPROVAL',
       'PURCHASE_REQUEST',
       'SUB_MEASURE',
+      'PRODUCTION_MEASUREMENT',
     ])
   })
 
@@ -38,6 +39,7 @@ describe('workflowDisplay registry', () => {
     expect(getWorkflowBusinessTypeLabel('CONTRACT_APPROVAL')).toBe('合同审批')
     expect(getWorkflowBusinessTypeLabel('PURCHASE_REQUEST')).toBe('采购申请')
     expect(getWorkflowBusinessTypeLabel('SUB_MEASURE')).toBe('分包计量')
+    expect(getWorkflowBusinessTypeLabel('PRODUCTION_MEASUREMENT')).toBe('产值计量')
 
     expect(getWorkflowBusinessEntry({ businessType: 'CONTRACT_APPROVAL' })).toMatchObject({
       displayName: '合同审批',
@@ -63,6 +65,9 @@ describe('workflowDisplay registry', () => {
         businessId: '303',
       }),
     ).toBe('/subcontract/measure?businessId=303')
+    expect(
+      getWorkflowBusinessEntryPath({ businessType: 'PRODUCTION_MEASUREMENT', businessId: '404' }),
+    ).toBe('/production-measurement?businessId=404')
   })
 
   it('付款申请当前只有标签，没有 registry 入口', () => {
@@ -87,6 +92,7 @@ describe('workflowDisplay registry', () => {
       { label: '合同审批', value: 'CONTRACT_APPROVAL' },
       { label: '采购申请', value: 'PURCHASE_REQUEST' },
       { label: '分包计量', value: 'SUB_MEASURE' },
+      { label: '产值计量', value: 'PRODUCTION_MEASUREMENT' },
     ])
   })
 
