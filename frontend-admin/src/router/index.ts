@@ -212,6 +212,16 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '项目计划', icon: 'CalendarOutlined', permission: 'schedule:query' },
       },
       {
+        path: 'quality-safety',
+        name: 'QualitySafety',
+        component: () => import('@/pages/quality-safety/index.vue'),
+        meta: {
+          title: '质量安全整改',
+          icon: 'SafetyCertificateOutlined',
+          permission: 'quality:safety:query',
+        },
+      },
+      {
         path: 'bid-cost',
         name: 'BidCost',
         component: () => import('@/pages/bid-cost/index.vue'),

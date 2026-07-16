@@ -448,12 +448,17 @@ public class FileService {
                 case "CASH_JOURNAL" -> "BANK_RECEIPT";
                 case "CONTRACT" -> "CONTRACT_ATTACHMENT";
                 case "VARIATION" -> "SITE_EVIDENCE";
+                case "QS_INSPECTION" -> "INSPECTION_EVIDENCE";
+                case "QS_ISSUE" -> "ISSUE_EVIDENCE";
+                case "QS_RECTIFICATION" -> "RECTIFICATION_EVIDENCE";
                 default -> "OTHER";
             };
         }
         if (!Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE", "BANK_RECEIPT",
                 "CONTRACT_ATTACHMENT", "PAYMENT_PROOF", "OTHER", "SITE_EVIDENCE",
-                "COST_ESTIMATE", "OWNER_SUBMISSION", "OWNER_CONFIRMATION").contains(type)) {
+                "COST_ESTIMATE", "OWNER_SUBMISSION", "OWNER_CONFIRMATION",
+                "INSPECTION_EVIDENCE", "ISSUE_EVIDENCE", "RECTIFICATION_EVIDENCE",
+                "REINSPECTION_EVIDENCE").contains(type)) {
             throw new BusinessException("DOCUMENT_TYPE_INVALID", "不支持的业务文档类型");
         }
         if (Set.of("INVOICE", "SALES_INVOICE").contains(business) && !Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE").contains(type)) {

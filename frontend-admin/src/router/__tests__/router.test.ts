@@ -153,6 +153,16 @@ describe('router lazy loading', () => {
     expect(router.resolve('/project-schedule').meta.permission).toBe('schedule:query')
   })
 
+  it('registers the quality safety rectification workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const route = rootRoute?.children?.find((c) => c.path === 'quality-safety')
+    expect(route?.name).toBe('QualitySafety')
+    expect(route?.meta?.title).toBe('质量安全整改')
+    expect(route?.meta?.permission).toBe('quality:safety:query')
+    expect(typeof route?.component).toBe('function')
+    expect(router.resolve('/quality-safety').meta.permission).toBe('quality:safety:query')
+  })
+
   it('registers the bid cost route with query permission', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const bidCostRoute = rootRoute?.children?.find((c) => c.path === 'bid-cost')
