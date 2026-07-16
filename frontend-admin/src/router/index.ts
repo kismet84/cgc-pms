@@ -200,6 +200,12 @@ export const routes: RouteRecordRaw[] = [
         meta: { title: '现场日报', icon: 'FileTextOutlined' },
       },
       {
+        path: 'project-schedule',
+        name: 'ProjectSchedule',
+        component: () => import('@/pages/project-schedule/index.vue'),
+        meta: { title: '项目计划', icon: 'CalendarOutlined', permission: 'schedule:query' },
+      },
+      {
         path: 'bid-cost',
         name: 'BidCost',
         component: () => import('@/pages/bid-cost/index.vue'),
@@ -515,6 +521,7 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
   ProjectMembers: 'project:member:list',
   ProjectEdit: 'project:edit',
   SiteDailyLog: 'site:daily:query',
+  ProjectSchedule: 'schedule:query',
   Partner: 'partner:query',
   Org: 'org:query',
   Subcontract: 'subcontract:task:query',

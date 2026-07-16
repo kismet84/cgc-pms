@@ -36,6 +36,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 @Component
 @RequiredArgsConstructor
@@ -163,6 +164,15 @@ public class WorkflowBusinessAccessValidator {
                         entity == null ? null : entity.getContractId(), requestContractId,
                         entity == null ? null : entity.getApprovalStatus(), "REQUISITION_NOT_FOUND");
             }
+            case WorkflowBusinessTypes.PROJECT_SCHEDULE -> {
+                return validateJdbc("project_schedule_plan", "status", businessId, tenantId, requestProjectId, requestContractId, "PROJECT_SCHEDULE_NOT_FOUND");
+            }
+            case WorkflowBusinessTypes.PROJECT_PERIOD_PLAN -> {
+                return validateJdbc("project_period_plan", "status", businessId, tenantId, requestProjectId, requestContractId, "PROJECT_PERIOD_NOT_FOUND");
+            }
+            case WorkflowBusinessTypes.PROJECT_CORRECTIVE_ACTION -> {
+                return validateJdbc("project_corrective_action", "status", businessId, tenantId, requestProjectId, requestContractId, "PROJECT_CORRECTIVE_NOT_FOUND");
+            }
             default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
         }
     }
@@ -170,7 +180,7 @@ public class WorkflowBusinessAccessValidator {
     private ValidationResult validateJdbc(String table, String statusColumn, Long businessId, Long tenantId,
                                             Long requestProjectId, Long requestContractId, String notFoundCode) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT tenant_id,project_id," + ("project_budget".equals(table) ? "NULL" : "contract_id")
+                "SELECT tenant_id,project_id," + (hasNoContractColumn(table) ? "NULL" : "contract_id")
                         + " contract_id," + statusColumn + " approval_status FROM " + table + " WHERE id=? AND deleted_flag=0",
                 businessId);
         Map<String, Object> row = rows.isEmpty() ? null : rows.get(0);
@@ -178,6 +188,10 @@ public class WorkflowBusinessAccessValidator {
                 row == null ? null : ((Number) row.get("project_id")).longValue(), requestProjectId,
                 row == null || row.get("contract_id") == null ? null : ((Number) row.get("contract_id")).longValue(), requestContractId,
                 row == null ? null : Objects.toString(row.get("approval_status"), null), notFoundCode, "DRAFT", "REJECTED");
+    }
+
+    private boolean hasNoContractColumn(String table) {
+        return Set.of("project_budget", "project_schedule_plan", "project_period_plan", "project_corrective_action").contains(table);
     }
 
     private ValidationResult validate(boolean exists, Long tenantId, Long realTenantId, Long realProjectId,

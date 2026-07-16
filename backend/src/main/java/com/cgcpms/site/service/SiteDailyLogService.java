@@ -22,6 +22,7 @@ import com.cgcpms.requisition.entity.MatRequisition;
 import com.cgcpms.requisition.entity.MatRequisitionItem;
 import com.cgcpms.requisition.mapper.MatRequisitionItemMapper;
 import com.cgcpms.requisition.mapper.MatRequisitionMapper;
+import com.cgcpms.schedule.service.ProjectScheduleService;
 import com.cgcpms.site.entity.SiteDailyLog;
 import com.cgcpms.site.mapper.SiteDailyLogMapper;
 import com.cgcpms.site.vo.SiteDailyLogVO;
@@ -64,6 +65,7 @@ public class SiteDailyLogService {
     private final MatRequisitionItemMapper requisitionItemMapper;
     private final SubTaskMapper subTaskMapper;
     private final OperationAuditLogMapper auditLogMapper;
+    private final ProjectScheduleService projectScheduleService;
 
     public IPage<SiteDailyLogVO> getPage(long pageNo, long pageSize, Long projectId,
                                          LocalDate startDate, LocalDate endDate, String status) {
@@ -100,7 +102,11 @@ public class SiteDailyLogService {
         SiteDailyLogVO detail = toVO(log, project == null ? null : project.getProjectName());
         detail.setDeliveries(loadDeliveries(log));
         detail.setRequisitions(loadRequisitions(log));
-        detail.setPlannedTasks(loadPlannedTasks(log));
+        boolean scheduleManaged = projectScheduleService.hasActiveSchedule(log.getProjectId());
+        detail.setScheduleManaged(scheduleManaged);
+        detail.setPlannedTasks(scheduleManaged
+                ? projectScheduleService.approvedTasksForDailyLog(log.getProjectId(), log.getReportDate())
+                : loadPlannedTasks(log));
         detail.setAuditTrail(loadAuditTrail(log.getId()));
         return detail;
     }
@@ -150,6 +156,7 @@ public class SiteDailyLogService {
     public void submit(Long id) {
         SiteDailyLog log = requireLog(id);
         projectAccessChecker.checkAccess(log.getProjectId(), "提交现场日报");
+        projectScheduleService.onDailyLogSubmitted(log);
         int updated = mapper.update(null, new LambdaUpdateWrapper<SiteDailyLog>()
                 .eq(SiteDailyLog::getId, id)
                 .eq(SiteDailyLog::getTenantId, log.getTenantId())

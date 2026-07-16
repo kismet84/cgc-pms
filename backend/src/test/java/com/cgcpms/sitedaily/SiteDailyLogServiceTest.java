@@ -25,6 +25,7 @@ import com.cgcpms.site.entity.SiteDailyLog;
 import com.cgcpms.site.mapper.SiteDailyLogMapper;
 import com.cgcpms.site.service.SiteDailyLogService;
 import com.cgcpms.site.vo.SiteDailyRequisitionVO;
+import com.cgcpms.schedule.service.ProjectScheduleService;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -123,7 +124,7 @@ class SiteDailyLogServiceTest {
         SiteDailyLogService service = new SiteDailyLogService(
                 mapper, projectMapper, checker, receiptMapper, itemMapper, materialMapper, partnerMapper,
                 mock(MatRequisitionMapper.class), mock(MatRequisitionItemMapper.class),
-                mock(SubTaskMapper.class), mock(OperationAuditLogMapper.class));
+                mock(SubTaskMapper.class), mock(OperationAuditLogMapper.class), mock(ProjectScheduleService.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -181,7 +182,8 @@ class SiteDailyLogServiceTest {
         SiteDailyLogService service = new SiteDailyLogService(
                 mapper, mock(PmProjectMapper.class), checker, mock(MatReceiptMapper.class),
                 mock(MatReceiptItemMapper.class), materialMapper, mock(MdPartnerMapper.class),
-                requisitionMapper, itemMapper, mock(SubTaskMapper.class), mock(OperationAuditLogMapper.class));
+                requisitionMapper, itemMapper, mock(SubTaskMapper.class), mock(OperationAuditLogMapper.class),
+                mock(ProjectScheduleService.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -244,7 +246,7 @@ class SiteDailyLogServiceTest {
                 mapper, projectMapper, checker, mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
                 mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(MatRequisitionMapper.class),
                 mock(MatRequisitionItemMapper.class), taskMapper,
-                mock(OperationAuditLogMapper.class));
+                mock(OperationAuditLogMapper.class), mock(ProjectScheduleService.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -294,7 +296,8 @@ class SiteDailyLogServiceTest {
         SiteDailyLogService service = new SiteDailyLogService(
                 mapper, projectMapper, checker, mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
                 mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(MatRequisitionMapper.class),
-                mock(MatRequisitionItemMapper.class), mock(SubTaskMapper.class), auditMapper);
+                mock(MatRequisitionItemMapper.class), mock(SubTaskMapper.class), auditMapper,
+                mock(ProjectScheduleService.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -345,6 +348,6 @@ class SiteDailyLogServiceTest {
                 mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
                 mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(MatRequisitionMapper.class),
                 mock(MatRequisitionItemMapper.class), mock(SubTaskMapper.class),
-                mock(OperationAuditLogMapper.class));
+                mock(OperationAuditLogMapper.class), mock(ProjectScheduleService.class));
     }
 }

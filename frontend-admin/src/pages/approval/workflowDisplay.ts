@@ -57,6 +57,33 @@ export const workflowBusinessEntryRegistry: WorkflowBusinessEntryRegistryItem[] 
     openMode: 'route',
     forbiddenPolicy: 'disabled-with-tooltip',
   },
+  {
+    businessType: 'PROJECT_SCHEDULE',
+    displayName: '项目基线/修订计划',
+    permissionCode: 'schedule:query',
+    targetRoute: (businessId: string) =>
+      `/project-schedule?businessType=PROJECT_SCHEDULE&businessId=${businessId}`,
+    openMode: 'route',
+    forbiddenPolicy: 'disabled-with-tooltip',
+  },
+  {
+    businessType: 'PROJECT_PERIOD_PLAN',
+    displayName: '项目月周计划',
+    permissionCode: 'schedule:query',
+    targetRoute: (businessId: string) =>
+      `/project-schedule?businessType=PROJECT_PERIOD_PLAN&businessId=${businessId}`,
+    openMode: 'route',
+    forbiddenPolicy: 'disabled-with-tooltip',
+  },
+  {
+    businessType: 'PROJECT_CORRECTIVE_ACTION',
+    displayName: '项目进度纠偏',
+    permissionCode: 'schedule:query',
+    targetRoute: (businessId: string) =>
+      `/project-schedule?businessType=PROJECT_CORRECTIVE_ACTION&businessId=${businessId}`,
+    openMode: 'route',
+    forbiddenPolicy: 'disabled-with-tooltip',
+  },
 ]
 
 const workflowBusinessEntryMap = new Map(
