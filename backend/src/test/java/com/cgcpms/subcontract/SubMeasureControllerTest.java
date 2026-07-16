@@ -2,7 +2,10 @@ package com.cgcpms.subcontract;
 
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.contract.constant.ContractStatusConstants;
+import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
@@ -45,6 +48,7 @@ class SubMeasureControllerTest {
     @Autowired private SubMeasureMapper subMeasureMapper;
     @Autowired private SubMeasureItemMapper subMeasureItemMapper;
     @Autowired private SubTaskMapper subTaskMapper;
+    @Autowired private CtContractMapper contractMapper;
     @Autowired private CtContractItemMapper contractItemMapper;
     @Autowired private SysFileMapper fileMapper;
 
@@ -52,10 +56,34 @@ class SubMeasureControllerTest {
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
     private static final long PROJECT_ID = 10001L;
-    private static final long CONTRACT_ID = 30001L;
+    private static final long CONTRACT_ID = 93415001L;
     private static final long PARTNER_ID = 20002L;
 
     private Long measureId;
+
+    @BeforeAll
+    void createIsolatedContractFixture() {
+        if (contractMapper.selectById(CONTRACT_ID) != null) {
+            return;
+        }
+        CtContract contract = new CtContract();
+        contract.setId(CONTRACT_ID);
+        contract.setTenantId(TENANT_ID);
+        contract.setProjectId(PROJECT_ID);
+        contract.setContractCode("SM-CONTROLLER-CONTRACT");
+        contract.setContractName("分包计量控制器测试专属合同");
+        contract.setContractType("SUB");
+        contract.setPartyAId(20001L);
+        contract.setPartyBId(PARTNER_ID);
+        contract.setContractAmount(new BigDecimal("50000.00"));
+        contract.setCurrentAmount(new BigDecimal("50000.00"));
+        contract.setPaidAmount(BigDecimal.ZERO);
+        contract.setContractStatus(ContractStatusConstants.STATUS_PERFORMING);
+        contract.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVED);
+        contract.setCostGeneratedFlag(0);
+        contract.setVersion(0);
+        contractMapper.insert(contract);
+    }
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(ADMIN_ID, ADMIN_USERNAME, TENANT_ID, List.of("ADMIN"), List.of());
