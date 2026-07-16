@@ -11,6 +11,10 @@ import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.subcontract.service.SubMeasureService;
 import com.cgcpms.subcontract.vo.SubMeasureItemVO;
 import com.cgcpms.subcontract.vo.SubMeasureVO;
+import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
@@ -46,6 +50,8 @@ class SubMeasureServiceTest {
     @Autowired private SubTaskMapper subTaskMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
     @Autowired private WfInstanceMapper wfInstanceMapper;
+    @Autowired private CtContractItemMapper contractItemMapper;
+    @Autowired private SysFileMapper fileMapper;
 
     @BeforeEach void setupContext() {
         UserContext.set(Jwts.claims().add("userId", USER_ADMIN).add("username", "admin")
@@ -139,19 +145,11 @@ class SubMeasureServiceTest {
         assertNull(vo.getSubTaskName());
     }
 
-    @Test @Transactional @DisplayName("submitForApproval → with null subTaskId succeeds")
+    @Test @Transactional @DisplayName("submitForApproval → without subTaskId is blocked")
     void testSubmitForApproval_NoSubTaskId() {
         Long id = service.create(buildMeasure());
-        service.submitForApproval(id);
-        SubMeasureVO vo = service.getById(id);
-        assertEquals("APPROVING", vo.getApprovalStatus());
-        assertEquals("APPROVING", vo.getStatus());
-        assertTrue(service.getPage(1, 20, PROJECT_ID, null, null, "APPROVING", null)
-                .getRecords().stream()
-                .anyMatch(record -> id.toString().equals(record.getId())
-                        && "APPROVING".equals(record.getApprovalStatus())
-                        && "APPROVING".equals(record.getStatus())), "列表应回读提交后的 APPROVING 状态");
-        assertPendingWorkflowTask(id);
+        BusinessException exception = assertThrows(BusinessException.class, () -> service.submitForApproval(id));
+        assertEquals("SUB_MEASURE_CONTEXT_REQUIRED", exception.getCode());
     }
 
     @Test @Transactional @DisplayName("submitForApproval → PROJECT_ROLE缺成员时回退超管仍可提交")
@@ -173,7 +171,7 @@ class SubMeasureServiceTest {
                 VALUES (?, ?, (SELECT id FROM sys_role WHERE tenant_id = ? AND role_code = 'SUPER_ADMIN' AND deleted_flag = 0 LIMIT 1))
                 """,
                 990002L, 990001L, TENANT_ID);
-        Long id = service.create(buildMeasure());
+        Long id = createReadyMeasure();
 
         service.submitForApproval(id);
 
@@ -221,9 +219,9 @@ class SubMeasureServiceTest {
     void testSaveItemsBatch() {
         Long id = service.create(buildMeasure());
         SubMeasureItem item = new SubMeasureItem();
-        item.setContractItemId(1L); item.setItemName("测试项");
+        item.setContractItemId(createContractItem()); item.setItemName("测试项");
         item.setUnit("m³"); item.setContractQuantity(new BigDecimal("100.00"));
-        item.setCurrentQuantity(new BigDecimal("10.00"));
+        item.setCurrentQuantity(new BigDecimal("100.00"));
         item.setUnitPrice(new BigDecimal("500.00")); item.setAmount(new BigDecimal("5000.00"));
         service.saveItems(id, List.of(item));
         assertNotNull(service.getById(id).getItems());
@@ -231,14 +229,14 @@ class SubMeasureServiceTest {
 
     @Test @Transactional @DisplayName("saveItemsBatch → empty list ok")
     void testSaveItemsBatch_Empty() {
-        Long id = service.create(buildMeasure());
+        Long id = createReadyMeasure();
         service.saveItems(id, List.of());
         assertTrue(service.getById(id).getItems() == null || service.getById(id).getItems().isEmpty());
     }
 
     @Test @Transactional @DisplayName("submitForApproval → DRAFT→APPROVING")
     void testSubmitForApproval() {
-        Long id = service.create(buildMeasure());
+        Long id = createReadyMeasure();
         service.submitForApproval(id);
         SubMeasureVO vo = service.getById(id);
         assertEquals("APPROVING", vo.getApprovalStatus());
@@ -248,14 +246,14 @@ class SubMeasureServiceTest {
 
     @Test @Transactional @DisplayName("submitForApproval → duplicate throws")
     void testSubmitForApproval_Duplicate() {
-        Long id = service.create(buildMeasure());
+        Long id = createReadyMeasure();
         service.submitForApproval(id);
         assertThrows(BusinessException.class, () -> service.submitForApproval(id));
     }
 
     @Test @Transactional @DisplayName("submitForApproval → withdrawn draft resubmits existing workflow")
     void testSubmitForApproval_WithdrawnDraftResubmits() {
-        Long id = service.create(buildMeasure());
+        Long id = createReadyMeasure();
         WfInstance withdrawn = new WfInstance();
         withdrawn.setTenantId(TENANT_ID);
         withdrawn.setTemplateId(50004L);
@@ -295,5 +293,57 @@ class SubMeasureServiceTest {
                   AND task_status = 'PENDING'
                 """, Integer.class, measureId);
         assertTrue(count != null && count > 0, "提交后审批中心应存在待办任务");
+    }
+
+    private Long createReadyMeasure() {
+        SubTask task = new SubTask();
+        task.setTenantId(TENANT_ID);
+        task.setProjectId(PROJECT_ID);
+        task.setContractId(CONTRACT_ID);
+        task.setPartnerId(PARTNER_ID);
+        task.setTaskCode("READY-" + System.nanoTime());
+        task.setTaskName("可计量分包任务");
+        task.setStatus("IN_PROGRESS");
+        subTaskMapper.insert(task);
+
+        SubMeasure measure = buildMeasure();
+        measure.setSubTaskId(task.getId());
+        Long id = service.create(measure);
+        SubMeasureItem item = new SubMeasureItem();
+        item.setContractItemId(createContractItem());
+        item.setCurrentQuantity(new BigDecimal("100.0000"));
+        service.saveItems(id, List.of(item));
+        attach(id);
+        return id;
+    }
+
+    private Long createContractItem() {
+        CtContractItem item = new CtContractItem();
+        item.setTenantId(TENANT_ID);
+        item.setContractId(CONTRACT_ID);
+        item.setItemCode("CI-" + System.nanoTime());
+        item.setItemName("分包清单测试项");
+        item.setUnit("m2");
+        item.setQuantity(new BigDecimal("100.0000"));
+        item.setUnitPrice(new BigDecimal("500.0000"));
+        item.setAmount(new BigDecimal("50000.00"));
+        contractItemMapper.insert(item);
+        return item.getId();
+    }
+
+    private void attach(Long measureId) {
+        SysFile file = new SysFile();
+        file.setTenantId(TENANT_ID);
+        file.setBusinessType("SUBCONTRACT");
+        file.setBusinessId(measureId);
+        file.setDocumentType("OTHER");
+        file.setFileName("measure-" + measureId + ".pdf");
+        file.setOriginalName("计量确认单.pdf");
+        file.setFileSize(100L);
+        file.setContentType("application/pdf");
+        file.setStoragePath("SUBCONTRACT/" + measureId + "/proof.pdf");
+        file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
+        fileMapper.insert(file);
     }
 }

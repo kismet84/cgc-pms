@@ -4,6 +4,11 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.subcontract.entity.SubMeasureItem;
+import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
+import com.cgcpms.cost.entity.CostItem;
+import com.cgcpms.cost.mapper.CostItemMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowContext;
 import io.jsonwebtoken.Jwts;
@@ -14,6 +19,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,6 +37,9 @@ class SubMeasureWorkflowHandlerTest {
 
     @Autowired
     private SubMeasureMapper subMeasureMapper;
+
+    @Autowired private SubMeasureItemMapper subMeasureItemMapper;
+    @Autowired private CostItemMapper costItemMapper;
 
     @BeforeEach
     void setupContext() {
@@ -83,6 +93,54 @@ class SubMeasureWorkflowHandlerTest {
         SubMeasure updated = subMeasureMapper.selectById(measure.getId());
         assertNotNull(updated, "分包计量应仍然存在");
         assertEquals("APPROVED", updated.getApprovalStatus(), "审批状态应变为 APPROVED");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("onApproved -> 成本明细按净计量额分摊且金额守恒")
+    void testOnApproved_AllocatesNetMeasureCost() {
+        SubMeasure measure = new SubMeasure();
+        measure.setProjectId(10001L);
+        measure.setContractId(30001L);
+        measure.setPartnerId(20002L);
+        measure.setMeasureCode("SM-HDLR-COST-" + System.nanoTime());
+        measure.setMeasureDate(LocalDate.now());
+        measure.setReportedAmount(new BigDecimal("100.00"));
+        measure.setApprovedAmount(new BigDecimal("95.00"));
+        measure.setDeductionAmount(new BigDecimal("5.00"));
+        measure.setNetAmount(new BigDecimal("90.00"));
+        measure.setApprovalStatus("APPROVING");
+        measure.setStatus("APPROVING");
+        measure.setTenantId(TENANT_0);
+        subMeasureMapper.insert(measure);
+
+        insertMeasureItem(measure.getId(), new BigDecimal("60.00"));
+        insertMeasureItem(measure.getId(), new BigDecimal("40.00"));
+
+        WfInstance instance = new WfInstance();
+        instance.setBusinessId(measure.getId());
+        WorkflowContext context = new WorkflowContext();
+        context.setInstance(instance);
+        handler.onApproved(context);
+
+        List<CostItem> costs = costItemMapper.selectList(new LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getTenantId, TENANT_0)
+                .eq(CostItem::getSourceType, "SUB_MEASURE")
+                .eq(CostItem::getSourceId, measure.getId()));
+        assertEquals(2, costs.size());
+        BigDecimal total = costs.stream().map(CostItem::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        assertEquals(0, new BigDecimal("90.00").compareTo(total));
+        assertTrue(costs.stream().anyMatch(cost -> new BigDecimal("54.00").compareTo(cost.getAmount()) == 0));
+        assertTrue(costs.stream().anyMatch(cost -> new BigDecimal("36.00").compareTo(cost.getAmount()) == 0));
+    }
+
+    private void insertMeasureItem(Long measureId, BigDecimal amount) {
+        SubMeasureItem item = new SubMeasureItem();
+        item.setTenantId(TENANT_0);
+        item.setMeasureId(measureId);
+        item.setItemName("成本分摊项");
+        item.setAmount(amount);
+        subMeasureItemMapper.insert(item);
     }
 
     @Test

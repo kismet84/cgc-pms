@@ -10,6 +10,7 @@ public class PaymentApplicationSourceVO {
     private String sourceRefId;
     private String expenseId;
     private String settlementId;
+    private String subMeasureId;
     private String sourceAmount;
     private String paidAmount;
     private String remark;

@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import static com.cgcpms.common.util.BigDecimalUtils.nvl;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -61,13 +62,27 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
             return;
         }
 
-        LocalDate today = LocalDate.now();
+        BigDecimal netAmount = money(measure.getNetAmount());
+        BigDecimal grossAmount = items.stream().map(SubMeasureItem::getAmount).map(SubMeasureCostStrategy::money)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (netAmount.compareTo(BigDecimal.ZERO) <= 0 || grossAmount.compareTo(BigDecimal.ZERO) <= 0
+                || netAmount.compareTo(grossAmount) > 0) {
+            throw new IllegalStateException("分包计量净额与明细金额不守恒，禁止生成成本 measureId=" + measureId);
+        }
+
+        LocalDate costDate = measure.getMeasureDate() == null ? LocalDate.now() : measure.getMeasureDate();
 
         // Resolve default cost subject for SUBCONTRACT type
         Long defaultSubjectId = costSubjectResolver.resolveDefaultSubjectId(measure.getTenantId(), "分包");
 
         int generated = 0;
-        for (SubMeasureItem item : items) {
+        BigDecimal allocatedTotal = BigDecimal.ZERO;
+        for (int index = 0; index < items.size(); index++) {
+            SubMeasureItem item = items.get(index);
+            BigDecimal allocatedAmount = index == items.size() - 1
+                    ? netAmount.subtract(allocatedTotal)
+                    : netAmount.multiply(money(item.getAmount())).divide(grossAmount, 2, RoundingMode.HALF_UP);
+            allocatedTotal = allocatedTotal.add(allocatedAmount);
             CostItem cost = new CostItem();
             cost.setTenantId(measure.getTenantId());
             cost.setOrgId(null);
@@ -76,14 +91,14 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
             cost.setPartnerId(measure.getPartnerId());
             cost.setCostType(COST_TYPE);
             cost.setCostSubjectId(defaultSubjectId);
-            cost.setAmount(nvl(item.getAmount()));
+            cost.setAmount(allocatedAmount);
             // Source item does not provide tax breakdown; assume full amount without tax
             cost.setTaxAmount(BigDecimal.ZERO);
-            cost.setAmountWithoutTax(nvl(item.getAmount()));
+            cost.setAmountWithoutTax(allocatedAmount);
             cost.setSourceType(SOURCE_TYPE);
             cost.setSourceId(measureId);
             cost.setSourceItemId(item.getId());
-            cost.setCostDate(today);
+            cost.setCostDate(costDate);
             cost.setCostStatus(COST_STATUS_CONFIRMED);
             cost.setGeneratedFlag(1);
 
@@ -100,6 +115,10 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
         subMeasureMapper.updateById(measure);
 
         log.info("生成分包成本完成 measureId={}, 明细数={}, 新增={}", measureId, items.size(), generated);
+    }
+
+    private static BigDecimal money(BigDecimal value) {
+        return nvl(value).setScale(2, RoundingMode.HALF_UP);
     }
 
 }

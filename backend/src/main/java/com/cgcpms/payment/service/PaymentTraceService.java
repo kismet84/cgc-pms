@@ -32,7 +32,13 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
+import com.cgcpms.settlement.entity.SettlementSubMeasure;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.settlement.mapper.SettlementSubMeasureMapper;
+import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.entity.SubTask;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfRecord;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
@@ -55,6 +61,9 @@ public class PaymentTraceService {
     private final PaymentRecordSourceAllocationMapper sourceAllocationMapper;
     private final ExpenseApplicationMapper expenseMapper;
     private final StlSettlementMapper settlementMapper;
+    private final SettlementSubMeasureMapper settlementSubMeasureMapper;
+    private final SubMeasureMapper subMeasureMapper;
+    private final SubTaskMapper subTaskMapper;
     private final PmProjectMapper projectMapper;
     private final CtContractMapper contractMapper;
     private final WfInstanceMapper instanceMapper;
@@ -116,8 +125,23 @@ public class PaymentTraceService {
         trace.setApplicationSources(sources);
         List<Long> expenseIds = sources.stream().map(PaymentApplicationSource::getExpenseId).filter(Objects::nonNull).distinct().toList();
         List<Long> settlementIds = sources.stream().map(PaymentApplicationSource::getSettlementId).filter(Objects::nonNull).distinct().toList();
+        List<Long> directMeasureIds = sources.stream().map(PaymentApplicationSource::getSubMeasureId)
+                .filter(Objects::nonNull).distinct().toList();
         trace.setExpenses(expenseIds.isEmpty() ? List.of() : expenseMapper.selectByIds(expenseIds));
         trace.setSettlements(settlementIds.isEmpty() ? List.of() : settlementMapper.selectByIds(settlementIds));
+        List<SettlementSubMeasure> settlementMeasureLinks = settlementIds.isEmpty() ? List.of()
+                : settlementSubMeasureMapper.selectList(new LambdaQueryWrapper<SettlementSubMeasure>()
+                    .eq(SettlementSubMeasure::getTenantId, tenantId)
+                    .in(SettlementSubMeasure::getSettlementId, settlementIds));
+        trace.setSettlementSubMeasures(settlementMeasureLinks);
+        Set<Long> measureIds = new HashSet<>(directMeasureIds);
+        settlementMeasureLinks.stream().map(SettlementSubMeasure::getSubMeasureId).forEach(measureIds::add);
+        List<SubMeasure> measures = measureIds.isEmpty() ? List.of() : subMeasureMapper.selectByIds(measureIds).stream()
+                .filter(measure -> Objects.equals(measure.getTenantId(), tenantId)).toList();
+        trace.setSubMeasures(measures);
+        List<Long> taskIds = measures.stream().map(SubMeasure::getSubTaskId).filter(Objects::nonNull).distinct().toList();
+        trace.setSubTasks(taskIds.isEmpty() ? List.of() : subTaskMapper.selectByIds(taskIds).stream()
+                .filter(task -> Objects.equals(task.getTenantId(), tenantId)).toList());
 
         List<PayRecord> records = recordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
                 .eq(PayRecord::getTenantId, tenantId).eq(PayRecord::getPayApplicationId, applicationId)

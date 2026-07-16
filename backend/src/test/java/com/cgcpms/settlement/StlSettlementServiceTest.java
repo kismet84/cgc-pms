@@ -7,6 +7,8 @@ import com.cgcpms.settlement.entity.StlSettlementItem;
 import com.cgcpms.settlement.mapper.StlSettlementItemMapper;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.service.StlSettlementWriteService;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
@@ -57,6 +59,8 @@ class StlSettlementServiceTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired private SysFileMapper fileMapper;
+
     private List<SubMeasureApprovalState> originalSubMeasureApprovalStates = List.of();
 
     @BeforeEach
@@ -73,8 +77,7 @@ class StlSettlementServiceTest {
         seedWorkflowUsers();
 
         // Clear only the contracts owned by this fixture so test order cannot leak state.
-        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND contract_id IN (?, ?, ?)",
-                TENANT_ID, CONTRACT_ID_30001, CONTRACT_ID_30002, CONTRACT_ID_30003);
+        deleteSettlementFixtures();
         originalSubMeasureApprovalStates = jdbcTemplate.query(
                 "SELECT id, approval_status FROM sub_measure WHERE tenant_id = ? AND contract_id = ? ORDER BY id",
                 (rs, rowNum) -> new SubMeasureApprovalState(rs.getLong("id"), rs.getString("approval_status")),
@@ -100,8 +103,7 @@ class StlSettlementServiceTest {
                         "UPDATE sub_measure SET approval_status = ? WHERE tenant_id = ? AND id = ?",
                         state.approvalStatus(), TENANT_ID, state.id());
             }
-            jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND contract_id IN (?, ?, ?)",
-                    TENANT_ID, CONTRACT_ID_30001, CONTRACT_ID_30002, CONTRACT_ID_30003);
+            deleteSettlementFixtures();
         } finally {
             originalSubMeasureApprovalStates = List.of();
             UserContext.clear();
@@ -426,11 +428,15 @@ class StlSettlementServiceTest {
         settlement.setContractId(CONTRACT_ID_30001);
         settlement.setSettlementType("FINAL");
         Long id = stlSettlementWriteService.create(settlement);
+        attachSettlement(id);
 
         stlSettlementWriteService.submitForApproval(id);
 
         StlSettlement saved = stlSettlementMapper.selectById(id);
         assertEquals("APPROVING", saved.getApprovalStatus());
+        assertTrue(jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM settlement_sub_measure WHERE settlement_id = ?",
+                Long.class, id) > 0, "提交终期结算时应冻结已审批计量快照");
     }
 
     @Test
@@ -442,10 +448,38 @@ class StlSettlementServiceTest {
         settlement.setContractId(CONTRACT_ID_30001);
         settlement.setSettlementType("FINAL");
         Long id = stlSettlementWriteService.create(settlement);
+        attachSettlement(id);
 
         stlSettlementWriteService.submitForApproval(id);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> stlSettlementWriteService.submitForApproval(id));
         assertEquals("STL_ALREADY_SUBMITTED", ex.getCode());
+    }
+
+    private void attachSettlement(Long settlementId) {
+        SysFile file = new SysFile();
+        file.setTenantId(TENANT_ID);
+        file.setBusinessType("SETTLEMENT");
+        file.setBusinessId(settlementId);
+        file.setDocumentType("OTHER");
+        file.setFileName("settlement-" + settlementId + ".pdf");
+        file.setOriginalName("终期结算确认书.pdf");
+        file.setFileSize(100L);
+        file.setContentType("application/pdf");
+        file.setStoragePath("SETTLEMENT/" + settlementId + "/proof.pdf");
+        file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
+        fileMapper.insert(file);
+    }
+
+    private void deleteSettlementFixtures() {
+        jdbcTemplate.update("DELETE FROM settlement_sub_measure WHERE settlement_id IN (" +
+                        "SELECT id FROM stl_settlement WHERE tenant_id = ? AND contract_id IN (?, ?, ?))",
+                TENANT_ID, CONTRACT_ID_30001, CONTRACT_ID_30002, CONTRACT_ID_30003);
+        jdbcTemplate.update("DELETE FROM sys_file WHERE tenant_id = ? AND business_type = 'SETTLEMENT' AND business_id IN (" +
+                        "SELECT id FROM stl_settlement WHERE tenant_id = ? AND contract_id IN (?, ?, ?))",
+                TENANT_ID, TENANT_ID, CONTRACT_ID_30001, CONTRACT_ID_30002, CONTRACT_ID_30003);
+        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND contract_id IN (?, ?, ?)",
+                TENANT_ID, CONTRACT_ID_30001, CONTRACT_ID_30002, CONTRACT_ID_30003);
     }
 }

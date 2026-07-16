@@ -43,6 +43,10 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.entity.SubTask;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowContext;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -107,6 +111,8 @@ class PaymentApplicationClosedLoopIntegrationTest {
     @Autowired private AccountingEntryMapper accountingEntryMapper;
     @Autowired private AccountingEntryLineMapper accountingLineMapper;
     @Autowired private StlSettlementMapper settlementMapper;
+    @Autowired private SubMeasureMapper subMeasureMapper;
+    @Autowired private SubTaskMapper subTaskMapper;
     @Autowired private InvoiceService invoiceService;
     @Autowired private PaymentTraceService traceService;
     @Autowired private PaymentReversalService reversalService;
@@ -306,7 +312,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
         settlement.setContractId(CONTRACT_ID);
         settlement.setPartnerId(PARTNER_ID);
         settlement.setSettlementCode("PAYMENT-SOURCE-SETTLEMENT-001");
-        settlement.setSettlementType("PROGRESS");
+        settlement.setSettlementType("FINAL");
         settlement.setFinalAmount(new BigDecimal("250.00"));
         settlement.setPaidAmount(BigDecimal.ZERO);
         settlement.setApprovalStatus("APPROVED");
@@ -314,7 +320,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
         settlement.setFinalizedAt(LocalDateTime.now());
         settlementMapper.insert(settlement);
 
-        Long applicationId = createPayment(new BigDecimal("250.00"));
+        Long applicationId = createFinalPayment(new BigDecimal("250.00"));
         PaymentApplicationSource source = new PaymentApplicationSource();
         source.setSourceType(PaymentIntegrityConstants.SOURCE_SETTLEMENT);
         source.setSourceRefId(settlement.getId());
@@ -327,6 +333,72 @@ class PaymentApplicationClosedLoopIntegrationTest {
         assertMoney("250.00", lineMapper.selectById(BUDGET_LINE_ID).getReservedAmount());
         assertEquals(settlement.getId(), sourceService.list(applicationId).get(0).getSettlementId() == null
                 ? null : Long.valueOf(sourceService.list(applicationId).get(0).getSettlementId()));
+    }
+
+    @Test
+    @DisplayName("已审批分包计量可作为进度款来源且付款后可反查任务和计量")
+    void approvedSubMeasureCanBePaidAndTracedWithoutDuplicatePayment() {
+        SubTask task = new SubTask();
+        task.setTenantId(TENANT_ID);
+        task.setProjectId(PROJECT_ID);
+        task.setContractId(CONTRACT_ID);
+        task.setPartnerId(PARTNER_ID);
+        task.setTaskCode("PAYMENT-SUB-TASK-001");
+        task.setTaskName("付款闭环分包任务");
+        task.setStatus("IN_PROGRESS");
+        subTaskMapper.insert(task);
+
+        SubMeasure measure = new SubMeasure();
+        measure.setTenantId(TENANT_ID);
+        measure.setProjectId(PROJECT_ID);
+        measure.setContractId(CONTRACT_ID);
+        measure.setPartnerId(PARTNER_ID);
+        measure.setSubTaskId(task.getId());
+        measure.setMeasureCode("PAYMENT-SUB-MEASURE-001");
+        measure.setMeasurePeriod("2026-07");
+        measure.setMeasureDate(LocalDate.now());
+        measure.setReportedAmount(new BigDecimal("300.00"));
+        measure.setApprovedAmount(new BigDecimal("280.00"));
+        measure.setDeductionAmount(new BigDecimal("30.00"));
+        measure.setNetAmount(new BigDecimal("250.00"));
+        measure.setApprovalStatus("APPROVED");
+        measure.setStatus("CONFIRMED");
+        subMeasureMapper.insert(measure);
+
+        Long applicationId = createSubcontractProgressPayment(new BigDecimal("250.00"));
+        PaymentApplicationSource source = new PaymentApplicationSource();
+        source.setSourceType(PaymentIntegrityConstants.SOURCE_SUB_MEASURE);
+        source.setSourceRefId(measure.getId());
+        source.setSourceAmount(new BigDecimal("250.00"));
+        sourceService.save(applicationId, List.of(source));
+        attach("PAYMENT", applicationId);
+        applicationService.submitForApproval(applicationId);
+        paymentHandler.onApproved(context(instance(applicationId)));
+
+        PayRecord payment = new PayRecord();
+        payment.setPayApplicationId(applicationId);
+        payment.setPayAmount(new BigDecimal("250.00"));
+        payment.setFundAccountId(FUND_ACCOUNT_ID);
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setPayMethod("BANK_TRANSFER");
+        payment.setExternalTxnNo("PAYMENT-SUB-MEASURE-TXN-001");
+        var paid = payRecordService.writeback(payment);
+
+        var trace = traceService.byPayRecord(Long.valueOf(paid.getId()));
+        assertEquals(1, trace.getSubMeasures().size());
+        assertEquals(measure.getId(), trace.getSubMeasures().getFirst().getId());
+        assertEquals(1, trace.getSubTasks().size());
+        assertEquals(task.getId(), trace.getSubTasks().getFirst().getId());
+        assertMoney("250.00", new BigDecimal(sourceService.list(applicationId).getFirst().getPaidAmount()));
+
+        Long duplicateApplicationId = createSubcontractProgressPayment(new BigDecimal("1.00"));
+        PaymentApplicationSource duplicate = new PaymentApplicationSource();
+        duplicate.setSourceType(PaymentIntegrityConstants.SOURCE_SUB_MEASURE);
+        duplicate.setSourceRefId(measure.getId());
+        duplicate.setSourceAmount(new BigDecimal("1.00"));
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> sourceService.save(duplicateApplicationId, List.of(duplicate)));
+        assertEquals("SUB_MEASURE_AVAILABLE_AMOUNT_INSUFFICIENT", exception.getCode());
     }
 
     @Test
@@ -406,6 +478,34 @@ class PaymentApplicationClosedLoopIntegrationTest {
         app.setApplyAmount(amount);
         app.setPayType("BANK_TRANSFER");
         app.setApplyReason("付款闭环集成测试");
+        return applicationService.create(app);
+    }
+
+    private Long createSubcontractProgressPayment(BigDecimal amount) {
+        PayApplication app = new PayApplication();
+        app.setProjectId(PROJECT_ID);
+        app.setContractId(CONTRACT_ID);
+        app.setPartnerId(PARTNER_ID);
+        app.setCostSubjectId(SUBJECT_ID);
+        app.setBudgetLineId(BUDGET_LINE_ID);
+        app.setExpenseCategory("SUBCONTRACT");
+        app.setApplyAmount(amount);
+        app.setPayType("PROGRESS");
+        app.setApplyReason("分包计量进度款");
+        return applicationService.create(app);
+    }
+
+    private Long createFinalPayment(BigDecimal amount) {
+        PayApplication app = new PayApplication();
+        app.setProjectId(PROJECT_ID);
+        app.setContractId(CONTRACT_ID);
+        app.setPartnerId(PARTNER_ID);
+        app.setCostSubjectId(SUBJECT_ID);
+        app.setBudgetLineId(BUDGET_LINE_ID);
+        app.setExpenseCategory("SUBCONTRACT");
+        app.setApplyAmount(amount);
+        app.setPayType("FINAL");
+        app.setApplyReason("分包终期结算款");
         return applicationService.create(app);
     }
 
@@ -568,7 +668,11 @@ class PaymentApplicationClosedLoopIntegrationTest {
         jdbcTemplate.update("DELETE FROM pay_application WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM wf_instance WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM expense_application WHERE project_id = ?", PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM settlement_sub_measure WHERE settlement_id IN (SELECT id FROM stl_settlement WHERE project_id = ?)", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM stl_settlement WHERE project_id = ?", PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM sub_measure_item WHERE measure_id IN (SELECT id FROM sub_measure WHERE project_id = ?)", PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM sub_measure WHERE project_id = ?", PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM sub_task WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM contract_budget_allocation WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM project_budget_line WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM project_budget WHERE project_id = ?", PROJECT_ID);

@@ -27,6 +27,7 @@ import {
   getSubTaskList,
 } from '@/api/modules/subcontract'
 import { getContractItems } from '@/api/modules/contract'
+import { listFiles, uploadFile } from '@/api/modules/file'
 import { useReferenceStore } from '@/stores/reference'
 import type { SubMeasureVO, SubMeasureItemVO, SubTaskVO } from '@/types/subcontract'
 
@@ -82,6 +83,8 @@ const formData = reactive<Partial<SubMeasureVO>>({
   remark: '',
 })
 const subTaskOptions = ref<SubTaskVO[]>([])
+const attachmentFile = ref<File>()
+const existingAttachmentCount = ref(0)
 const formPartnerName = computed(
   () => contractList.value?.find((c) => c.id === formData.contractId)?.partyBName ?? '',
 )
@@ -206,7 +209,9 @@ async function loadSubTaskOptions() {
     if (formData.contractId) params.contractId = formData.contractId
     if (formData.partnerId) params.partnerId = formData.partnerId
     const res = await getSubTaskList(params)
-    subTaskOptions.value = res.records || []
+    subTaskOptions.value = (res.records || []).filter((task) =>
+      ['IN_PROGRESS', 'COMPLETED'].includes(task.status),
+    )
   } catch (e: unknown) {
     console.error(e)
     subTaskOptions.value = []
@@ -262,11 +267,14 @@ function handleAdd() {
     measurePeriod: '',
     measureDate: undefined,
     remark: '',
+    deductionAmount: '0',
   })
   itemList.value = []
   contractItemList.value = []
   subTaskOptions.value = []
   itemKeyCounter = 0
+  attachmentFile.value = undefined
+  existingAttachmentCount.value = 0
   modalVisible.value = true
 }
 
@@ -281,6 +289,7 @@ async function handleEdit(record: SubMeasureVO) {
     measurePeriod: record.measurePeriod,
     measureDate: record.measureDate,
     remark: record.remark,
+    deductionAmount: record.deductionAmount ?? '0',
   })
   itemList.value = []
   itemKeyCounter = 0
@@ -302,6 +311,13 @@ async function handleEdit(record: SubMeasureVO) {
     message.error('加载明细失败')
     itemList.value = []
   }
+  try {
+    existingAttachmentCount.value = (await listFiles('SUBCONTRACT', record.id)).length
+  } catch (e: unknown) {
+    console.error(e)
+    existingAttachmentCount.value = 0
+  }
+  attachmentFile.value = undefined
   modalVisible.value = true
 }
 
@@ -448,8 +464,23 @@ function handleModalProjectChange(projectId: string) {
 }
 
 async function handleModalOk() {
-  if (!formData.projectId) {
-    message.warning('请选择项目')
+  if (
+    !formData.projectId ||
+    !formData.contractId ||
+    !formData.partnerId ||
+    !formData.subTaskId ||
+    !formData.measurePeriod?.trim() ||
+    !formData.measureDate
+  ) {
+    message.warning('请完整填写项目、分包合同、分包商、关联任务、计量期次和计量日期')
+    return
+  }
+  if (itemList.value.length === 0) {
+    message.warning('请至少添加一条合同清单计量明细')
+    return
+  }
+  if (!editingId.value && !attachmentFile.value) {
+    message.warning('新建分包计量必须上传计量附件')
     return
   }
 
@@ -466,12 +497,13 @@ async function handleModalOk() {
     }
 
     // Save line items
-    if (itemList.value.length > 0) {
-      const items = itemList.value.map((item) => ({
-        ...item,
-        measureId: measureId,
-      }))
-      await saveMeasureItems(measureId, items)
+    const items = itemList.value.map((item) => ({
+      ...item,
+      measureId: measureId,
+    }))
+    await saveMeasureItems(measureId, items)
+    if (attachmentFile.value) {
+      await uploadFile(attachmentFile.value, 'SUBCONTRACT', measureId, 'OTHER')
     }
 
     modalVisible.value = false
@@ -480,6 +512,10 @@ async function handleModalOk() {
     console.error(e)
     message.error('操作失败，请稍后重试')
   }
+}
+
+function handleAttachmentFileChange(event: Event) {
+  attachmentFile.value = (event.target as HTMLInputElement).files?.[0]
 }
 
 function handleModalCancel() {
@@ -860,6 +896,8 @@ onMounted(() => {
       :item-list="itemList"
       :contract-item-list="contractItemList"
       :items-total-amount="itemsTotalAmount"
+      :attachment-file-name="attachmentFile?.name"
+      :existing-attachment-count="existingAttachmentCount"
       :on-ok="handleModalOk"
       :on-cancel="handleModalCancel"
       :on-project-change="handleModalProjectChange"
@@ -869,6 +907,7 @@ onMounted(() => {
       :on-contract-item-change="handleContractItemChange"
       :on-item-qty-change="handleItemQtyChange"
       :on-item-price-change="handleItemPriceChange"
+      :on-attachment-file-change="handleAttachmentFileChange"
     />
   </div>
 </template>

@@ -7,7 +7,9 @@ import com.cgcpms.alert.service.AlertEvaluationService;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractChange;
+import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractChangeMapper;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.service.CtContractChangeService;
 import com.cgcpms.cost.entity.CostItem;
@@ -20,6 +22,8 @@ import com.cgcpms.cost.mapper.CostTargetItemMapper;
 import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.cost.service.CostTargetService;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.notification.entity.SysNotification;
 import com.cgcpms.notification.mapper.SysNotificationMapper;
 import com.cgcpms.project.entity.PmProjectMember;
@@ -29,8 +33,10 @@ import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.service.StlSettlementWriteService;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
+import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.subcontract.service.SubMeasureService;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.entity.VarOrderItem;
@@ -100,6 +106,9 @@ class Phase3IntegrationTest {
     @Autowired private SubMeasureService subMeasureService;
     @Autowired private SubMeasureMapper subMeasureMapper;
     @Autowired private SubMeasureItemMapper subMeasureItemMapper;
+    @Autowired private SubTaskMapper subTaskMapper;
+    @Autowired private CtContractItemMapper contractItemMapper;
+    @Autowired private SysFileMapper fileMapper;
 
     // ── COST_TARGET ──
     @Autowired private CostTargetService costTargetService;
@@ -257,14 +266,25 @@ class Phase3IntegrationTest {
     @Transactional
     @DisplayName("场景2: 结算全链路 → 创建分包计量并审批→创建结算→提交审批→锁定→验证无成本生成")
     void test02_settlementFullChain() {
-        final long settlementContractId = 30003L;
+        final long settlementContractId = 30002L;
         final long settlementPartnerId = 20002L;
 
         // 1. 创建分包计量并提交审批
+        SubTask task = new SubTask();
+        task.setTenantId(0L);
+        task.setProjectId(PROJECT_ID);
+        task.setContractId(settlementContractId);
+        task.setPartnerId(settlementPartnerId);
+        task.setTaskCode("PHASE3-SUB-TASK-" + System.nanoTime());
+        task.setTaskName("Phase3分包计量任务");
+        task.setStatus("IN_PROGRESS");
+        subTaskMapper.insert(task);
+
         SubMeasure measure = new SubMeasure();
         measure.setProjectId(PROJECT_ID);
         measure.setContractId(settlementContractId);
         measure.setPartnerId(settlementPartnerId);
+        measure.setSubTaskId(task.getId());
         measure.setMeasurePeriod("2026-Q2");
         measure.setMeasureDate(LocalDate.now());
         measure.setReportedAmount(new BigDecimal("100000.00"));
@@ -275,16 +295,29 @@ class Phase3IntegrationTest {
         assertNotNull(measureId, "计量ID不应为空");
 
         // 保存计量明细
+        CtContractItem contractItem = new CtContractItem();
+        contractItem.setTenantId(0L);
+        contractItem.setContractId(settlementContractId);
+        contractItem.setItemCode("PHASE3-ITEM-" + System.nanoTime());
+        contractItem.setItemName("混凝土浇筑-测试");
+        contractItem.setUnit("m³");
+        contractItem.setQuantity(new BigDecimal("200.00"));
+        contractItem.setUnitPrice(new BigDecimal("500.00"));
+        contractItem.setAmount(new BigDecimal("100000.00"));
+        contractItemMapper.insert(contractItem);
+
         SubMeasureItem item = new SubMeasureItem();
         item.setMeasureId(measureId);
+        item.setContractItemId(contractItem.getId());
         item.setItemName("混凝土浇筑-测试");
         item.setUnit("m³");
         item.setContractQuantity(new BigDecimal("200.00"));
-        item.setCurrentQuantity(new BigDecimal("180.00"));
-        item.setCumulativeQuantity(new BigDecimal("180.00"));
+        item.setCurrentQuantity(new BigDecimal("200.00"));
+        item.setCumulativeQuantity(new BigDecimal("200.00"));
         item.setUnitPrice(new BigDecimal("500.00"));
-        item.setAmount(new BigDecimal("90000.00"));
+        item.setAmount(new BigDecimal("100000.00"));
         subMeasureService.saveItems(measureId, List.of(item));
+        attachCleanFile("SUBCONTRACT", measureId, "phase3-measure-proof.pdf");
 
         // 提交计量审批
         assertDoesNotThrow(() -> subMeasureService.submitForApproval(measureId),
@@ -316,20 +349,15 @@ class Phase3IntegrationTest {
 
         Long settlementId = settlementWriteService.create(settlement);
         assertNotNull(settlementId, "结算单ID不应为空");
+        attachCleanFile("SETTLEMENT", settlementId, "phase3-settlement-proof.pdf");
 
         StlSettlement saved = settlementMapper.selectById(settlementId);
         assertNotNull(saved.getSettlementCode(), "结算编号应自动生成");
         assertTrue(saved.getSettlementCode().startsWith("STL-"), "结算编号应以STL-开头");
         assertEquals("DRAFT", saved.getApprovalStatus(), "初始审批状态应为DRAFT");
 
-        // 3. 提交结算审批（使用 WorkflowEngine 直接提交）
-        assertDoesNotThrow(() -> workflowEngine.submit(
-                USER_ADMIN, "admin", 0L,
-                WorkflowBusinessTypes.SETTLEMENT, settlementId,
-                "结算审批-" + saved.getSettlementCode(),
-                settlement.getFinalAmount(),
-                PROJECT_ID, settlementContractId,
-                "Phase3集成测试-结算审批", null, null),
+        // 3. 经结算写服务提交，执行完整性校验并冻结已审批计量快照
+        assertDoesNotThrow(() -> settlementWriteService.submitForApproval(settlementId),
                 "提交结算审批不应抛异常");
 
         // 4. 查找审批实例并全部通过
@@ -362,6 +390,22 @@ class Phase3IntegrationTest {
         System.out.println("✅ 场景2 通过: settlementCode=" + saved.getSettlementCode()
                 + ", settlementStatus=" + afterApproval.getSettlementStatus()
                 + ", settlementCostCount=" + settlementCostCount + " (应为0)");
+    }
+
+    private void attachCleanFile(String businessType, Long businessId, String originalName) {
+        SysFile file = new SysFile();
+        file.setTenantId(0L);
+        file.setBusinessType(businessType);
+        file.setBusinessId(businessId);
+        file.setDocumentType("OTHER");
+        file.setFileName(originalName);
+        file.setOriginalName(originalName);
+        file.setFileSize(100L);
+        file.setContentType("application/pdf");
+        file.setStoragePath(businessType + "/" + businessId + "/" + originalName);
+        file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
+        fileMapper.insert(file);
     }
 
     // ═══════════════════════════════════════════════════════════

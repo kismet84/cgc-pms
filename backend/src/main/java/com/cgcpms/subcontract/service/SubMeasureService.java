@@ -7,7 +7,9 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
@@ -37,6 +39,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -51,9 +54,11 @@ public class SubMeasureService {
     private final SubTaskMapper subTaskMapper;
     private final PmProjectMapper pmProjectMapper;
     private final CtContractMapper ctContractMapper;
+    private final CtContractItemMapper ctContractItemMapper;
     private final MdPartnerMapper mdPartnerMapper;
     private final WorkflowEngine workflowEngine;
     private final WfInstanceMapper wfInstanceMapper;
+    private final SubMeasureIntegrityService integrityService;
 
     public IPage<SubMeasureVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                         Long partnerId, String status, String measureCode) {
@@ -174,7 +179,7 @@ public class SubMeasureService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
 
-        if (!"DRAFT".equals(existing.getApprovalStatus()))
+        if (!Set.of("DRAFT", "REJECTED").contains(existing.getApprovalStatus()))
             throw new BusinessException("MEASURE_IN_APPROVAL", "计量单审批中或已审批，不可编辑");
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
@@ -215,33 +220,99 @@ public class SubMeasureService {
     @Transactional(rollbackFor = Exception.class)
     public void saveItems(Long measureId, List<SubMeasureItem> items) {
         // Verify measure exists and belongs to tenant
-        SubMeasure measure = subMeasureMapper.selectById(measureId);
-        if (measure == null || !measure.getTenantId().equals(UserContext.getCurrentTenantId()))
+        Long tenantId = UserContext.getCurrentTenantId();
+        SubMeasure measure = subMeasureMapper.selectByIdForUpdate(measureId, tenantId);
+        if (measure == null)
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
 
-        if (!"DRAFT".equals(measure.getApprovalStatus()))
+        if (!Set.of("DRAFT", "REJECTED").contains(measure.getApprovalStatus()))
             throw new BusinessException("MEASURE_IN_APPROVAL", "计量单审批中或已审批，不可编辑");
         if (measure.getCostGeneratedFlag() != null && measure.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
-        // Delete old items
+        List<SubMeasureItem> normalizedItems = items == null ? List.of() : items;
+        if (normalizedItems.size() > 200) {
+            throw new BusinessException("SUB_MEASURE_ITEMS_LIMIT", "分包计量明细不能超过200条");
+        }
+        Set<Long> contractItemIds = new HashSet<>();
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        for (SubMeasureItem item : normalizedItems) {
+            if (item.getContractItemId() == null || !contractItemIds.add(item.getContractItemId())) {
+                throw new BusinessException("SUB_MEASURE_ITEM_DUPLICATE", "合同清单项不能为空且同一计量单内不可重复");
+            }
+            CtContractItem contractItem = ctContractItemMapper.selectById(item.getContractItemId());
+            if (contractItem == null || !tenantId.equals(contractItem.getTenantId())
+                    || !java.util.Objects.equals(measure.getContractId(), contractItem.getContractId())) {
+                throw new BusinessException("SUB_MEASURE_CONTRACT_ITEM_INVALID", "合同清单项不存在、跨租户或不属于当前分包合同");
+            }
+            BigDecimal currentQuantity = item.getCurrentQuantity() == null
+                    ? BigDecimal.ZERO : item.getCurrentQuantity();
+            if (currentQuantity.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessException("SUB_MEASURE_QUANTITY_INVALID", "本期计量数量必须大于0");
+            }
+            BigDecimal previousQuantity = subMeasureMapper.sumApprovedQuantity(
+                    tenantId, contractItem.getId(), measureId);
+            BigDecimal cumulativeQuantity = (previousQuantity == null ? BigDecimal.ZERO : previousQuantity)
+                    .add(currentQuantity);
+            BigDecimal contractQuantity = contractItem.getQuantity() == null
+                    ? BigDecimal.ZERO : contractItem.getQuantity();
+            if (cumulativeQuantity.compareTo(contractQuantity) > 0) {
+                throw new BusinessException("SUB_MEASURE_QUANTITY_EXCEEDED", "累计计量数量不得超过合同清单数量");
+            }
+            BigDecimal unitPrice = contractItem.getUnitPrice() == null
+                    ? BigDecimal.ZERO : contractItem.getUnitPrice();
+            BigDecimal amount = currentQuantity.multiply(unitPrice)
+                    .setScale(2, java.math.RoundingMode.HALF_UP);
+            item.setItemName(contractItem.getItemName());
+            item.setUnit(contractItem.getUnit());
+            item.setContractQuantity(contractQuantity);
+            item.setCumulativeQuantity(cumulativeQuantity);
+            item.setUnitPrice(unitPrice);
+            item.setAmount(amount);
+            totalAmount = totalAmount.add(amount);
+        }
+
+        // Replace draft items after every input row has passed authoritative contract checks.
         subMeasureItemMapper.delete(new LambdaQueryWrapper<SubMeasureItem>()
                 .eq(SubMeasureItem::getMeasureId, measureId));
 
-        // Batch insert new items and calculate total amount
-        BigDecimal totalAmount = BigDecimal.ZERO;
-        if (items != null) {
-            for (SubMeasureItem item : items) {
+        if (!normalizedItems.isEmpty()) {
+            for (SubMeasureItem item : normalizedItems) {
                 item.setMeasureId(measureId);
-                item.setTenantId(UserContext.getCurrentTenantId());
+                item.setTenantId(tenantId);
                 item.setId(null);
                 subMeasureItemMapper.insert(item);
-                totalAmount = totalAmount.add(item.getAmount() == null ? BigDecimal.ZERO : item.getAmount());
             }
         }
 
-        // Update header reported amount
-        measure.setReportedAmount(totalAmount);
+        // Header amounts are derived from authoritative line items. If no separate reviewed
+        // amount exists yet, the submitted amount is the initial reviewed baseline.
+        BigDecimal oldReported = measure.getReportedAmount();
+        BigDecimal approved = measure.getApprovedAmount();
+        if (normalizedItems.isEmpty()) {
+            measure.setReportedAmount(BigDecimal.ZERO.setScale(2));
+            measure.setApprovedAmount(BigDecimal.ZERO.setScale(2));
+            measure.setDeductionAmount(BigDecimal.ZERO.setScale(2));
+            measure.setNetAmount(BigDecimal.ZERO.setScale(2));
+            subMeasureMapper.updateById(measure);
+            return;
+        }
+        if (approved == null || approved.compareTo(BigDecimal.ZERO) <= 0
+                || oldReported == null || approved.compareTo(oldReported) == 0) {
+            approved = totalAmount;
+        }
+        if (approved.compareTo(totalAmount) > 0) {
+            throw new BusinessException("SUB_MEASURE_APPROVED_EXCEEDED", "审定金额不得超过合同明细申报金额");
+        }
+        BigDecimal deduction = measure.getDeductionAmount() == null
+                ? BigDecimal.ZERO : measure.getDeductionAmount();
+        if (deduction.compareTo(BigDecimal.ZERO) < 0 || deduction.compareTo(approved) >= 0) {
+            throw new BusinessException("SUB_MEASURE_DEDUCTION_INVALID", "扣款金额必须大于等于0且小于审定金额");
+        }
+        measure.setReportedAmount(totalAmount.setScale(2, java.math.RoundingMode.HALF_UP));
+        measure.setApprovedAmount(approved.setScale(2, java.math.RoundingMode.HALF_UP));
+        measure.setDeductionAmount(deduction.setScale(2, java.math.RoundingMode.HALF_UP));
+        measure.setNetAmount(approved.subtract(deduction).setScale(2, java.math.RoundingMode.HALF_UP));
         subMeasureMapper.updateById(measure);
     }
 
@@ -251,7 +322,7 @@ public class SubMeasureService {
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
 
-        if (!"DRAFT".equals(existing.getApprovalStatus()))
+        if (!Set.of("DRAFT", "REJECTED").contains(existing.getApprovalStatus()))
             throw new BusinessException("MEASURE_IN_APPROVAL", "计量单审批中或已审批，不可删除");
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可删除，请走冲销");
@@ -261,15 +332,17 @@ public class SubMeasureService {
 
     @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long measureId) {
-        SubMeasure measure = subMeasureMapper.selectById(measureId);
-        if (measure == null || !measure.getTenantId().equals(UserContext.getCurrentTenantId()))
+        SubMeasure measure = subMeasureMapper.selectByIdForUpdate(measureId, UserContext.getCurrentTenantId());
+        if (measure == null)
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
 
-        if (!"DRAFT".equals(measure.getApprovalStatus()))
+        if (!Set.of("DRAFT", "REJECTED").contains(measure.getApprovalStatus()))
             throw new BusinessException("SUB_MEASURE_ALREADY_SUBMITTED", "计量单已提交审批，不可重复提交");
 
         if (measure.getMeasureCode() == null || measure.getMeasureCode().isBlank())
             throw new BusinessException("SUB_MEASURE_NO_CODE", "计量单编号不能为空，无法提交审批");
+
+        integrityService.validateForSubmit(measure);
 
         // Update submission state before starting workflow; transaction rolls back if workflow creation fails.
         subMeasureMapper.update(null, new LambdaUpdateWrapper<SubMeasure>()

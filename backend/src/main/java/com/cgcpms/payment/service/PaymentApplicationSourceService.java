@@ -21,7 +21,11 @@ import com.cgcpms.payment.vo.PaymentApplicationSourceVO;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.settlement.constant.SettlementStatusConstants;
 import com.cgcpms.settlement.entity.StlSettlement;
+import com.cgcpms.settlement.entity.SettlementSubMeasure;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.settlement.mapper.SettlementSubMeasureMapper;
+import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +45,8 @@ public class PaymentApplicationSourceService {
     private final PayApplicationMapper applicationMapper;
     private final ExpenseApplicationMapper expenseMapper;
     private final StlSettlementMapper settlementMapper;
+    private final SubMeasureMapper subMeasureMapper;
+    private final SettlementSubMeasureMapper settlementSubMeasureMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final BudgetLedgerService ledgerService;
     private final PaymentRecordSourceAllocationMapper allocationMapper;
@@ -203,7 +209,7 @@ public class PaymentApplicationSourceService {
 
     private void normalizeAndValidateShape(PayApplication app, List<PaymentApplicationSource> sources) {
         if (sources.isEmpty()) {
-            throw new BusinessException("PAYMENT_SOURCE_REQUIRED", "付款申请必须至少关联一个费用、结算或直接付款来源");
+            throw new BusinessException("PAYMENT_SOURCE_REQUIRED", "付款申请必须至少关联一个费用、分包计量、结算或直接付款来源");
         }
         Set<String> keys = new HashSet<>();
         BigDecimal total = BigDecimal.ZERO;
@@ -218,10 +224,17 @@ public class PaymentApplicationSourceService {
                 case PaymentIntegrityConstants.SOURCE_EXPENSE -> {
                     source.setExpenseId(source.getSourceRefId());
                     source.setSettlementId(null);
+                    source.setSubMeasureId(null);
                 }
                 case PaymentIntegrityConstants.SOURCE_SETTLEMENT -> {
                     source.setSettlementId(source.getSourceRefId());
                     source.setExpenseId(null);
+                    source.setSubMeasureId(null);
+                }
+                case PaymentIntegrityConstants.SOURCE_SUB_MEASURE -> {
+                    source.setSubMeasureId(source.getSourceRefId());
+                    source.setExpenseId(null);
+                    source.setSettlementId(null);
                 }
                 case PaymentIntegrityConstants.SOURCE_DIRECT -> {
                     if (!Objects.equals(source.getSourceRefId(), app.getId())) {
@@ -229,8 +242,9 @@ public class PaymentApplicationSourceService {
                     }
                     source.setExpenseId(null);
                     source.setSettlementId(null);
+                    source.setSubMeasureId(null);
                 }
-                default -> throw new BusinessException("PAYMENT_SOURCE_TYPE_INVALID", "付款来源类型仅支持 EXPENSE、SETTLEMENT、DIRECT");
+                default -> throw new BusinessException("PAYMENT_SOURCE_TYPE_INVALID", "付款来源类型仅支持 EXPENSE、SUB_MEASURE、SETTLEMENT、DIRECT");
             }
             String key = source.getSourceType() + ":" + source.getSourceRefId();
             if (!keys.add(key)) throw new BusinessException("PAYMENT_SOURCE_DUPLICATE", "付款来源重复: " + key);
@@ -266,20 +280,56 @@ public class PaymentApplicationSourceService {
                     throw new BusinessException("EXPENSE_AVAILABLE_AMOUNT_INSUFFICIENT", "费用来源可转付款金额不足");
                 }
             } else if (PaymentIntegrityConstants.SOURCE_SETTLEMENT.equals(source.getSourceType())) {
+                if (!"FINAL".equals(app.getPayType())) {
+                    throw new BusinessException("SETTLEMENT_SOURCE_PAY_TYPE_INVALID", "终期结算来源仅允许发起结算款付款申请");
+                }
                 StlSettlement settlement = settlementMapper.selectByIdForUpdate(source.getSettlementId(), app.getTenantId());
                 if (settlement == null || !SettlementStatusConstants.APPROVAL_APPROVED.equals(settlement.getApprovalStatus())
                         || !SettlementStatusConstants.SETTLEMENT_FINALIZED.equals(settlement.getSettlementStatus())) {
                     throw new BusinessException("SETTLEMENT_SOURCE_NOT_FINALIZED", "结算来源不存在、跨租户、未审批或未定案");
                 }
                 if (!Objects.equals(settlement.getProjectId(), app.getProjectId())
-                        || !Objects.equals(settlement.getContractId(), app.getContractId())) {
-                    throw new BusinessException("SETTLEMENT_SOURCE_CONTEXT_MISMATCH", "结算来源与付款申请的项目或合同不一致");
+                        || !Objects.equals(settlement.getContractId(), app.getContractId())
+                        || !Objects.equals(settlement.getPartnerId(), app.getPartnerId())) {
+                    throw new BusinessException("SETTLEMENT_SOURCE_CONTEXT_MISMATCH", "结算来源与付款申请的项目、合同或付款对象不一致");
                 }
                 BigDecimal committed = sourceMapper.sumCommittedSettlement(app.getTenantId(), settlement.getId(), app.getId());
                 BigDecimal available = money(settlement.getFinalAmount()).subtract(money(settlement.getPaidAmount()))
                         .subtract(money(committed));
                 if (source.getSourceAmount().compareTo(available) > 0) {
                     throw new BusinessException("SETTLEMENT_AVAILABLE_AMOUNT_INSUFFICIENT", "结算来源可申请付款金额不足");
+                }
+            } else if (PaymentIntegrityConstants.SOURCE_SUB_MEASURE.equals(source.getSourceType())) {
+                if (!"PROGRESS".equals(app.getPayType()) || !"SUBCONTRACT".equals(app.getExpenseCategory())) {
+                    throw new BusinessException("SUB_MEASURE_SOURCE_PAY_TYPE_INVALID", "分包计量来源仅允许发起分包费进度款");
+                }
+                SubMeasure measure = subMeasureMapper.selectByIdForUpdate(source.getSubMeasureId(), app.getTenantId());
+                if (measure == null || !"APPROVED".equals(measure.getApprovalStatus())
+                        || !"CONFIRMED".equals(measure.getStatus())) {
+                    throw new BusinessException("SUB_MEASURE_SOURCE_NOT_APPROVED", "分包计量来源不存在、跨租户或未审批确认");
+                }
+                if (!Objects.equals(measure.getProjectId(), app.getProjectId())
+                        || !Objects.equals(measure.getContractId(), app.getContractId())
+                        || !Objects.equals(measure.getPartnerId(), app.getPartnerId())) {
+                    throw new BusinessException("SUB_MEASURE_SOURCE_CONTEXT_MISMATCH", "分包计量与付款申请的项目、合同或付款对象不一致");
+                }
+                List<SettlementSubMeasure> finalSettlementLinks = settlementSubMeasureMapper.selectList(
+                        new LambdaQueryWrapper<SettlementSubMeasure>()
+                                .eq(SettlementSubMeasure::getTenantId, app.getTenantId())
+                                .eq(SettlementSubMeasure::getSubMeasureId, measure.getId()));
+                for (SettlementSubMeasure link : finalSettlementLinks) {
+                    StlSettlement finalSettlement = settlementMapper.selectById(link.getSettlementId());
+                    if (finalSettlement != null && Set.of("APPROVING", "APPROVED")
+                            .contains(finalSettlement.getApprovalStatus())) {
+                        throw new BusinessException("SUB_MEASURE_ALREADY_IN_FINAL_SETTLEMENT",
+                                "该计量已进入终期结算，禁止再发起进度付款");
+                    }
+                }
+                BigDecimal committed = sourceMapper.sumCommittedSubMeasure(
+                        app.getTenantId(), measure.getId(), app.getId());
+                BigDecimal available = money(measure.getNetAmount()).subtract(money(committed));
+                if (source.getSourceAmount().compareTo(available) > 0) {
+                    throw new BusinessException("SUB_MEASURE_AVAILABLE_AMOUNT_INSUFFICIENT", "分包计量可申请付款金额不足");
                 }
             }
         }
@@ -309,6 +359,7 @@ public class PaymentApplicationSourceService {
         vo.setSourceRefId(String.valueOf(source.getSourceRefId()));
         vo.setExpenseId(source.getExpenseId() == null ? null : String.valueOf(source.getExpenseId()));
         vo.setSettlementId(source.getSettlementId() == null ? null : String.valueOf(source.getSettlementId()));
+        vo.setSubMeasureId(source.getSubMeasureId() == null ? null : String.valueOf(source.getSubMeasureId()));
         vo.setSourceAmount(money(source.getSourceAmount()).toPlainString());
         vo.setPaidAmount(money(source.getPaidAmount()).toPlainString());
         vo.setRemark(source.getRemark());

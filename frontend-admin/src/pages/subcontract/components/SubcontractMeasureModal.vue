@@ -14,6 +14,8 @@ defineProps<{
   itemList: Array<Partial<SubMeasureItemVO> & { key: number }>
   contractItemList: ContractItem[]
   itemsTotalAmount: string
+  attachmentFileName?: string
+  existingAttachmentCount: number
   onOk: () => void
   onCancel: () => void
   onProjectChange: (projectId: string) => void
@@ -23,6 +25,7 @@ defineProps<{
   onContractItemChange: (index: number, itemId: string | undefined) => void
   onItemQtyChange: (index: number) => void
   onItemPriceChange: (index: number) => void
+  onAttachmentFileChange: (event: Event) => void
 }>()
 
 function filterOptionByLabel(input: string, option?: { label?: string | number }) {
@@ -61,7 +64,7 @@ function filterOptionByLabel(input: string, option?: { label?: string | number }
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="分包合同">
+        <a-form-item label="分包合同" required>
           <a-select
             v-model:value="formData.contractId"
             placeholder="请选择合同"
@@ -75,10 +78,10 @@ function filterOptionByLabel(input: string, option?: { label?: string | number }
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="分包商">
+        <a-form-item label="分包商" required>
           <a-input :value="formPartnerName" disabled placeholder="选择合同后自动填充乙方" />
         </a-form-item>
-        <a-form-item label="关联任务">
+        <a-form-item label="关联任务" required>
           <a-select
             v-model:value="formData.subTaskId"
             placeholder="请选择关联分包任务"
@@ -91,18 +94,37 @@ function filterOptionByLabel(input: string, option?: { label?: string | number }
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="计量期次">
+        <a-form-item label="计量期次" required>
           <a-input
             v-model:value="formData.measurePeriod"
             placeholder="请输入计量期次（如：第1期）"
           />
         </a-form-item>
-        <a-form-item label="计量日期">
+        <a-form-item label="计量日期" required>
           <a-date-picker
             v-model:value="formData.measureDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
+        </a-form-item>
+        <a-form-item label="扣款金额">
+          <a-input-number
+            v-model:value="formData.deductionAmount"
+            :min="0"
+            :precision="2"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="计量附件" required>
+          <input
+            type="file"
+            accept=".pdf,.png,.jpg,.jpeg,.xlsx,.docx"
+            @change="onAttachmentFileChange"
+          />
+          <span v-if="attachmentFileName" style="margin-left: 8px">{{ attachmentFileName }}</span>
+          <span v-else-if="existingAttachmentCount" style="margin-left: 8px">
+            已上传 {{ existingAttachmentCount }} 份
+          </span>
         </a-form-item>
         <a-form-item label="备注">
           <a-textarea v-model:value="formData.remark" :rows="1" placeholder="请输入备注" />

@@ -7,6 +7,12 @@ import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementItemMapper;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
+import com.cgcpms.settlement.mapper.SettlementSubMeasureMapper;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
@@ -44,6 +50,13 @@ class StlSettlementWriteServiceAmountTest {
 
     @Mock
     private StlSettlementQueryService queryService;
+
+    @Mock private SettlementSubMeasureMapper settlementSubMeasureMapper;
+    @Mock private SubMeasureMapper subMeasureMapper;
+    @Mock private SysFileMapper fileMapper;
+    @Mock private PmProjectMapper projectMapper;
+    @Mock private ProjectAccessChecker projectAccessChecker;
+    @Mock private WfInstanceMapper wfInstanceMapper;
 
     @AfterEach
     void clearContext() {
@@ -89,7 +102,13 @@ class StlSettlementWriteServiceAmountTest {
                 settlementItemMapper,
                 contractMapper,
                 workflowEngine,
-                queryService);
+                queryService,
+                settlementSubMeasureMapper,
+                subMeasureMapper,
+                fileMapper,
+                projectMapper,
+                projectAccessChecker,
+                wfInstanceMapper);
 
         assertEquals(42L, service.create(settlement));
         assertEquals(new BigDecimal("1000.00"), settlement.getContractAmount());
@@ -97,9 +116,9 @@ class StlSettlementWriteServiceAmountTest {
         assertEquals(new BigDecimal("200.00"), settlement.getMeasuredAmount());
         assertEquals(new BigDecimal("300.00"), settlement.getPaidAmount());
         assertEquals(new BigDecimal("50.00"), settlement.getDeductionAmount());
-        assertEquals(new BigDecimal("1250.00"), settlement.getFinalAmount());
-        assertEquals(new BigDecimal("62.50"), settlement.getWarrantyAmount());
-        assertEquals(new BigDecimal("887.50"), settlement.getUnpaidAmount());
+        assertEquals(new BigDecimal("250.00"), settlement.getFinalAmount());
+        assertEquals(new BigDecimal("12.50"), settlement.getWarrantyAmount());
+        assertEquals(new BigDecimal("-62.50"), settlement.getUnpaidAmount());
         assertEquals(SettlementAmountPolicy.FORMULA_VERSION, settlement.getAmountFormulaVersion());
         verify(queryService).sumVarOrderConfirmed(TENANT_ID, CONTRACT_ID);
         verify(queryService).sumSubMeasureApproved(TENANT_ID, CONTRACT_ID);

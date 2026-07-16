@@ -17,6 +17,8 @@ import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.service.SettlementAmountPolicy;
 import com.cgcpms.settlement.service.StlSettlementWriteService;
+import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import io.jsonwebtoken.Claims;
@@ -42,7 +44,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * VUL-019 settlement desensitization tests plus submit workflow baseline.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "jwt.secret=settlement-controller-test-secret-key-at-least-sixty-four-characters-long"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("StlSettlementController — VUL-019 desensitization")
@@ -74,15 +79,19 @@ class StlSettlementControllerMockMvcTest {
     private PayApplicationMapper payApplicationMapper;
     @Autowired
     private PayRecordMapper payRecordMapper;
+    @Autowired
+    private SubMeasureMapper subMeasureMapper;
 
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
     private static final long PROJECT_ID = 10001L;
-    private static final long CONTRACT_ID = 30003L;
+    private static final long CONTRACT_ID = 30002L;
+    private static final long PARTNER_ID = 20002L;
     private static final long COST_SUBJECT_ID = 910002L;
 
     private Long settlementId;
+    private Long measureId;
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
@@ -117,6 +126,7 @@ class StlSettlementControllerMockMvcTest {
             settlement.setContractId(CONTRACT_ID);
             settlement.setSettlementType("FINAL");
             settlementId = stlSettlementWriteService.create(settlement);
+            seedApprovedMeasure();
             seedVariation();
             seedCost();
             seedAttachment();
@@ -130,6 +140,7 @@ class StlSettlementControllerMockMvcTest {
     void cleanupSettlement() {
         setUserContext();
         try {
+            jdbcTemplate.update("DELETE FROM settlement_sub_measure WHERE settlement_id = ?", settlementId);
             sysFileMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysFile>()
                     .eq(SysFile::getBusinessType, "SETTLEMENT")
                     .eq(SysFile::getBusinessId, settlementId)
@@ -148,6 +159,7 @@ class StlSettlementControllerMockMvcTest {
                     .eq(PayApplication::getTenantId, TENANT_ID));
             costSubjectMapper.deleteById(COST_SUBJECT_ID);
             settlementMapper.deleteById(settlementId);
+            subMeasureMapper.deleteById(measureId);
         } finally {
             clearUserContext();
         }
@@ -295,12 +307,33 @@ class StlSettlementControllerMockMvcTest {
                 "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
     }
 
+    private void seedApprovedMeasure() {
+        StlSettlement settlement = settlementMapper.selectById(settlementId);
+        SubMeasure measure = new SubMeasure();
+        measure.setTenantId(TENANT_ID);
+        measure.setProjectId(PROJECT_ID);
+        measure.setContractId(CONTRACT_ID);
+        measure.setPartnerId(settlement.getPartnerId());
+        measure.setMeasureCode("SM-SETTLEMENT-CONTROLLER-" + System.nanoTime());
+        measure.setMeasurePeriod("2026-06");
+        measure.setMeasureDate(LocalDate.now());
+        measure.setReportedAmount(new BigDecimal("5000.00"));
+        measure.setApprovedAmount(new BigDecimal("4800.00"));
+        measure.setDeductionAmount(new BigDecimal("200.00"));
+        measure.setNetAmount(new BigDecimal("4600.00"));
+        measure.setApprovalStatus("APPROVED");
+        measure.setStatus("CONFIRMED");
+        measure.setCostGeneratedFlag(1);
+        subMeasureMapper.insert(measure);
+        measureId = measure.getId();
+    }
+
     private void seedVariation() {
         VarOrder order = new VarOrder();
         order.setTenantId(TENANT_ID);
         order.setProjectId(PROJECT_ID);
         order.setContractId(CONTRACT_ID);
-        order.setPartnerId(20001L);
+        order.setPartnerId(PARTNER_ID);
         order.setVarCode("VO-SETTLEMENT-CONTROLLER-001");
         order.setVarName("settlement-controller-test-variation");
         order.setVarType("DESIGN_CHANGE");
@@ -336,7 +369,7 @@ class StlSettlementControllerMockMvcTest {
         item.setTenantId(TENANT_ID);
         item.setProjectId(PROJECT_ID);
         item.setContractId(CONTRACT_ID);
-        item.setPartnerId(20001L);
+        item.setPartnerId(PARTNER_ID);
         item.setCostSubjectId(COST_SUBJECT_ID);
         item.setCostType("LABOR");
         item.setAmount(new BigDecimal("888.00"));
@@ -363,6 +396,7 @@ class StlSettlementControllerMockMvcTest {
         file.setContentType("application/pdf");
         file.setStoragePath("SETTLEMENT/" + settlementId + "/settlement-controller-test.pdf");
         file.setBucketName("test-bucket");
+        file.setVirusScanStatus("CLEAN");
         file.setCreatedBy(ADMIN_ID);
         sysFileMapper.insert(file);
     }
@@ -372,7 +406,7 @@ class StlSettlementControllerMockMvcTest {
         application.setTenantId(TENANT_ID);
         application.setProjectId(PROJECT_ID);
         application.setContractId(CONTRACT_ID);
-        application.setPartnerId(20001L);
+        application.setPartnerId(PARTNER_ID);
         application.setApplyCode("PAY-SETTLEMENT-CONTROLLER-001");
         application.setApplyAmount(new BigDecimal("1500.00"));
         application.setApprovedAmount(new BigDecimal("1400.00"));
@@ -388,7 +422,7 @@ class StlSettlementControllerMockMvcTest {
         record.setProjectId(PROJECT_ID);
         record.setPayApplicationId(application.getId());
         record.setContractId(CONTRACT_ID);
-        record.setPartnerId(20001L);
+        record.setPartnerId(PARTNER_ID);
         record.setPayAmount(new BigDecimal("1000.00"));
         record.setPayDate(LocalDate.of(2026, 7, 2));
         record.setPayMethod("BANK_TRANSFER");

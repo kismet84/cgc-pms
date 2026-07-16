@@ -68,10 +68,11 @@ export interface PayApplicationVO {
 export interface PaymentApplicationSourceVO {
   id?: string
   payApplicationId?: string
-  sourceType: 'EXPENSE' | 'SETTLEMENT' | 'DIRECT'
+  sourceType: 'EXPENSE' | 'SUB_MEASURE' | 'SETTLEMENT' | 'DIRECT'
   sourceRefId: string
   expenseId?: string
   settlementId?: string
+  subMeasureId?: string
   sourceAmount: string
   paidAmount?: string
   remark?: string
@@ -152,6 +153,9 @@ export interface PaymentTraceVO {
   applicationSources: PaymentApplicationSourceVO[]
   expenses: Record<string, unknown>[]
   settlements: Record<string, unknown>[]
+  settlementSubMeasures: Record<string, unknown>[]
+  subMeasures: Record<string, unknown>[]
+  subTasks: Record<string, unknown>[]
   paymentRecords: PayRecordVO[]
   paymentSourceAllocations: Record<string, unknown>[]
   cashJournals: Record<string, unknown>[]

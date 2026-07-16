@@ -2,6 +2,19 @@ package com.cgcpms.subcontract;
 
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.contract.constant.ContractStatusConstants;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.entity.SubMeasureItem;
+import com.cgcpms.subcontract.entity.SubTask;
+import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +32,10 @@ import java.util.List;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "jwt.secret=sub-measure-controller-test-secret-key-at-least-sixty-four-characters-long"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("SubMeasureController integration tests")
@@ -29,15 +45,45 @@ class SubMeasureControllerTest {
 
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtUtils jwtUtils;
+    @Autowired private SubMeasureMapper subMeasureMapper;
+    @Autowired private SubMeasureItemMapper subMeasureItemMapper;
+    @Autowired private SubTaskMapper subTaskMapper;
+    @Autowired private CtContractMapper contractMapper;
+    @Autowired private CtContractItemMapper contractItemMapper;
+    @Autowired private SysFileMapper fileMapper;
 
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
     private static final long PROJECT_ID = 10001L;
-    private static final long CONTRACT_ID = 30001L;
+    private static final long CONTRACT_ID = 93415001L;
     private static final long PARTNER_ID = 20002L;
 
     private Long measureId;
+
+    @BeforeAll
+    void createIsolatedContractFixture() {
+        if (contractMapper.selectById(CONTRACT_ID) != null) {
+            return;
+        }
+        CtContract contract = new CtContract();
+        contract.setId(CONTRACT_ID);
+        contract.setTenantId(TENANT_ID);
+        contract.setProjectId(PROJECT_ID);
+        contract.setContractCode("SM-CONTROLLER-CONTRACT");
+        contract.setContractName("分包计量控制器测试专属合同");
+        contract.setContractType("SUB");
+        contract.setPartyAId(20001L);
+        contract.setPartyBId(PARTNER_ID);
+        contract.setContractAmount(new BigDecimal("50000.00"));
+        contract.setCurrentAmount(new BigDecimal("50000.00"));
+        contract.setPaidAmount(BigDecimal.ZERO);
+        contract.setContractStatus(ContractStatusConstants.STATUS_PERFORMING);
+        contract.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVED);
+        contract.setCostGeneratedFlag(0);
+        contract.setVersion(0);
+        contractMapper.insert(contract);
+    }
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(ADMIN_ID, ADMIN_USERNAME, TENANT_ID, List.of("ADMIN"), List.of());
@@ -132,6 +178,7 @@ class SubMeasureControllerTest {
     @Test @Order(10) @DisplayName("POST /sub-measures/{id}/submit -> 2xx submits for approval")
     void testSubmit() throws Exception {
         Assertions.assertNotNull(measureId);
+        prepareMeasureForSubmission();
         mockMvc.perform(postWithApi("/sub-measures/" + measureId + "/submit").cookie(adminCookie()))
                 .andExpect(status().is2xxSuccessful())
                 .andExpect(jsonPath("$.code").value("0"));
@@ -146,6 +193,60 @@ class SubMeasureControllerTest {
         Assertions.assertNotNull(measureId);
         mockMvc.perform(getWithApi("/sub-measures/" + measureId + "/items").cookie(adminCookie()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isArray());
+    }
+
+    private void prepareMeasureForSubmission() {
+        SubTask task = new SubTask();
+        task.setTenantId(TENANT_ID);
+        task.setProjectId(PROJECT_ID);
+        task.setContractId(CONTRACT_ID);
+        task.setPartnerId(PARTNER_ID);
+        task.setTaskCode("SM-CONTROLLER-TASK-" + System.nanoTime());
+        task.setTaskName("计量控制器测试任务");
+        task.setStatus("IN_PROGRESS");
+        subTaskMapper.insert(task);
+
+        CtContractItem contractItem = new CtContractItem();
+        contractItem.setTenantId(TENANT_ID);
+        contractItem.setContractId(CONTRACT_ID);
+        contractItem.setItemCode("SM-CONTROLLER-ITEM-" + System.nanoTime());
+        contractItem.setItemName("计量控制器测试清单项");
+        contractItem.setUnit("m2");
+        contractItem.setQuantity(new BigDecimal("100.0000"));
+        contractItem.setUnitPrice(new BigDecimal("500.0000"));
+        contractItem.setAmount(new BigDecimal("50000.00"));
+        contractItemMapper.insert(contractItem);
+
+        SubMeasure measure = subMeasureMapper.selectById(measureId);
+        measure.setSubTaskId(task.getId());
+        subMeasureMapper.updateById(measure);
+
+        SubMeasureItem item = new SubMeasureItem();
+        item.setTenantId(TENANT_ID);
+        item.setMeasureId(measureId);
+        item.setContractItemId(contractItem.getId());
+        item.setItemName(contractItem.getItemName());
+        item.setUnit(contractItem.getUnit());
+        item.setContractQuantity(contractItem.getQuantity());
+        item.setCurrentQuantity(new BigDecimal("100.0000"));
+        item.setCumulativeQuantity(new BigDecimal("100.0000"));
+        item.setUnitPrice(contractItem.getUnitPrice());
+        item.setAmount(contractItem.getAmount());
+        subMeasureItemMapper.insert(item);
+
+        SysFile file = new SysFile();
+        file.setTenantId(TENANT_ID);
+        file.setBusinessType("SUBCONTRACT");
+        file.setBusinessId(measureId);
+        file.setDocumentType("OTHER");
+        file.setFileName("measure-controller-test.pdf");
+        file.setOriginalName("计量控制器测试确认单.pdf");
+        file.setFileSize(100L);
+        file.setContentType("application/pdf");
+        file.setStoragePath("SUBCONTRACT/" + measureId + "/measure-controller-test.pdf");
+        file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
+        fileMapper.insert(file);
     }
 
     private MockHttpServletRequestBuilder getWithApi(String p) { return get("/api" + p).contextPath("/api"); }

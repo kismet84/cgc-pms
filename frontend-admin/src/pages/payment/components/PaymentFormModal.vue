@@ -146,6 +146,7 @@ const emit = defineEmits<{
           ><template #default="{ record }"
             ><a-select v-model:value="record.sourceType" style="width: 100%"
               ><a-select-option value="EXPENSE">费用申请</a-select-option
+              ><a-select-option value="SUB_MEASURE">已审批分包计量（进度款）</a-select-option
               ><a-select-option value="SETTLEMENT">结算申请</a-select-option
               ><a-select-option value="DIRECT">直接付款</a-select-option></a-select
             ></template
@@ -158,7 +159,9 @@ const emit = defineEmits<{
               :placeholder="
                 record.sourceType === 'DIRECT'
                   ? '保存后自动使用付款申请ID'
-                  : '请输入已审批来源单据ID'
+                  : record.sourceType === 'SUB_MEASURE'
+                    ? '请输入已审批分包计量ID'
+                    : '请输入已审批来源单据ID'
               " /></template
         ></a-table-column>
         <a-table-column title="来源金额" width="200"
