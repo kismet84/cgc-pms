@@ -70,9 +70,9 @@ class StlSettlementServiceTest {
 
         seedWorkflowUsers();
 
-        // Clear stl_settlement data left by other test classes
-        // (e.g. Phase3IntegrationTest) to prevent pollution.
-        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ?", TENANT_ID);
+        // Clear only the contracts owned by this fixture so test order cannot leak state.
+        jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND contract_id IN (?, ?)",
+                TENANT_ID, CONTRACT_ID_30001, CONTRACT_ID_30002);
         originalSubMeasureApprovalStates = jdbcTemplate.query(
                 "SELECT id, approval_status FROM sub_measure WHERE tenant_id = ? AND contract_id = ? ORDER BY id",
                 (rs, rowNum) -> new SubMeasureApprovalState(rs.getLong("id"), rs.getString("approval_status")),
@@ -98,6 +98,8 @@ class StlSettlementServiceTest {
                         "UPDATE sub_measure SET approval_status = ? WHERE tenant_id = ? AND id = ?",
                         state.approvalStatus(), TENANT_ID, state.id());
             }
+            jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND contract_id IN (?, ?)",
+                    TENANT_ID, CONTRACT_ID_30001, CONTRACT_ID_30002);
         } finally {
             originalSubMeasureApprovalStates = List.of();
             UserContext.clear();

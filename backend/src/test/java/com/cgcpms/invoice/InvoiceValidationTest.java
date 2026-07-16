@@ -60,8 +60,8 @@ class InvoiceValidationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private static final long SEED_PAY_RECORD_ID = 90001L;
-    private static final long SEED_PROJECT_ID = 90001L;
+    private static final long SEED_PAY_RECORD_ID = 99176001L;
+    private static final long SEED_PROJECT_ID = 99176001L;
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
@@ -88,7 +88,7 @@ class InvoiceValidationTest {
         PmProject project = new PmProject();
         project.setId(SEED_PROJECT_ID);
         project.setTenantId(0L);
-        project.setProjectCode("PRJ-INVOICE-VAL-90001");
+        project.setProjectCode("PRJ-INVOICE-VAL-99176001");
         project.setProjectName("发票校验测试项目");
         project.setProjectType("CONSTRUCTION");
         project.setContractAmount(new BigDecimal("1000000.00"));
@@ -101,7 +101,7 @@ class InvoiceValidationTest {
         application.setId(SEED_PAY_RECORD_ID);
         application.setTenantId(0L);
         application.setProjectId(SEED_PROJECT_ID);
-        application.setApplyCode("PAY-INVOICE-VAL-90001");
+        application.setApplyCode("PAY-INVOICE-VAL-99176001");
         application.setPayType("PROGRESS");
         application.setApplyAmount(new BigDecimal("100000.00"));
         application.setApprovedAmount(new BigDecimal("100000.00"));
