@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P1
 任务性质：能力新增
 类型：库存 / 跨仓调拨 / 原子过账 / 价值守恒 / 幂等并发
-状态：Ready
+状态：Done
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-07`；candidateEvidenceHead=5da5808847bd7385efc215cc6dff6fda4979c960
 存量问题键：[stock:A-02-STOCK-TRANSFER-POSTING]
 关联产品目标：把同项目跨仓可调拨余量从只读提示闭合为安全、可追溯且保持数量/价值守恒的真实库存动作。
