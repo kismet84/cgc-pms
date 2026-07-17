@@ -48,6 +48,16 @@ public class AccountingEntry extends BaseEntity {
     /** DRAFT / POSTED / REVERSED */
     private String entryStatus;
 
+    /** PENDING / APPROVED / REJECTED */
+    private String reviewStatus;
+    private Long reviewedBy;
+    private LocalDateTime reviewedAt;
+    private String reviewComment;
+    private Long postedBy;
+    private Long periodId;
+    private Integer adjustmentFlag;
+    private Long originalEntryId;
+
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal totalDebit;
 

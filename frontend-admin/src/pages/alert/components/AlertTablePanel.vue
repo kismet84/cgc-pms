@@ -39,11 +39,7 @@ defineProps<{
   formatDateTime: (value: unknown) => string
   getAlertMessageText: (value: unknown) => string
   handleMarkRead: (record: AlertLogVO) => void
-  handleChangeStatus: (
-    record: AlertLogVO,
-    processStatus: AlertProcessStatus,
-    statusRemark?: string,
-  ) => void
+  handleAcknowledge: (record: AlertLogVO) => void
   handleBatchStatus: (processStatus: AlertProcessStatus) => void
   handleBatchMarkRead: () => void
   handlePageChange: (page: number) => void
@@ -210,18 +206,34 @@ defineProps<{
               >标记已读</a-button
             >
             <a-button
-              v-if="canManageAlerts && String(row.processStatus ?? 'OPEN') !== 'PROCESSED'"
+              v-if="
+                canManageAlerts &&
+                String(row.processStatus ?? 'OPEN') === 'OPEN' &&
+                !row.acknowledgedBy
+              "
               type="link"
               size="small"
-              @click="handleChangeStatus(row, 'PROCESSED')"
+              @click="handleAcknowledge(row)"
+            >
+              接单
+            </a-button>
+            <a-button
+              v-if="
+                canManageAlerts &&
+                String(row.processStatus ?? 'OPEN') === 'OPEN' &&
+                row.acknowledgedBy
+              "
+              type="link"
+              size="small"
+              @click="openDetail(row)"
             >
               处理
             </a-button>
             <a-button
-              v-if="canManageAlerts && String(row.processStatus ?? 'OPEN') !== 'ARCHIVED'"
+              v-if="canManageAlerts && String(row.processStatus ?? 'OPEN') === 'PROCESSED'"
               type="link"
               size="small"
-              @click="handleChangeStatus(row, 'ARCHIVED')"
+              @click="openDetail(row)"
             >
               归档
             </a-button>

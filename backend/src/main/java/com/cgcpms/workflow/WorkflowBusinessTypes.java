@@ -39,4 +39,8 @@ public final class WorkflowBusinessTypes {
     public static final String PROJECT_CORRECTIVE_ACTION = "PROJECT_CORRECTIVE_ACTION";
     /** 目标成本与动态利润闭环：成本偏差纠偏审批 */
     public static final String COST_CORRECTIVE_ACTION = "COST_CORRECTIVE_ACTION";
+    /** 图纸、RFI与技术方案闭环：技术方案审批 */
+    public static final String TECHNICAL_SCHEME = "TECHNICAL_SCHEME";
+    /** 项目竣工与收尾闭环：竣工验收审批 */
+    public static final String PROJECT_FINAL_ACCEPTANCE = "PROJECT_FINAL_ACCEPTANCE";
 }

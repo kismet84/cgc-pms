@@ -72,14 +72,15 @@ class AlertNotificationDispatcherTest {
         AlertNotificationDispatcher dispatcher =
                 new AlertNotificationDispatcher(recordMapper, List.of(inAppSender));
         AlertLog alert = alert();
+        alert.setProcessStatus("ARCHIVED");
         when(inAppSender.channel()).thenReturn(AlertNotificationChannel.IN_APP);
-        when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("STATUS_CHANGED"),
+        when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("STATUS_CHANGED_ARCHIVED"),
                 eq("ALERT_STATUS"), eq("预警已归档"), eq("采购订单逾期\n处理说明：done")))
                 .thenReturn(AlertNotificationSendResult.sent(7002L));
 
         dispatcher.dispatchStatusChanged(10L, 21L, alert, "预警已归档", " done ", Set.of(" in_app "));
 
-        verify(inAppSender).send(eq(10L), eq(21L), eq(alert), eq("STATUS_CHANGED"),
+        verify(inAppSender).send(eq(10L), eq(21L), eq(alert), eq("STATUS_CHANGED_ARCHIVED"),
                 eq("ALERT_STATUS"), eq("预警已归档"), eq("采购订单逾期\n处理说明：done"));
         ArgumentCaptor<AlertNotificationSendRecord> recordCaptor =
                 ArgumentCaptor.forClass(AlertNotificationSendRecord.class);
@@ -87,11 +88,35 @@ class AlertNotificationDispatcherTest {
         AlertNotificationSendRecord record = recordCaptor.getValue();
         assertEquals(10L, record.getTenantId());
         assertEquals(9001L, record.getAlertId());
-        assertEquals("STATUS_CHANGED", record.getEventType());
+        assertEquals("STATUS_CHANGED_ARCHIVED", record.getEventType());
         assertEquals("IN_APP", record.getChannel());
         assertEquals(21L, record.getTargetUserId());
         assertEquals(7002L, record.getBizNotificationId());
         assertEquals("SENT", record.getSendStatus());
+    }
+
+    @Test
+    @DisplayName("升级通知使用独立业务类型和级别幂等键")
+    void dispatchesEscalationWithIndependentTraceIdentity() {
+        AlertNotificationDispatcher dispatcher =
+                new AlertNotificationDispatcher(recordMapper, List.of(inAppSender));
+        AlertLog alert = alert();
+        when(inAppSender.channel()).thenReturn(AlertNotificationChannel.IN_APP);
+        when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("ESCALATED_L2"),
+                eq("ALERT_ESCALATION"), eq("预警处置超时升级"),
+                eq("采购订单逾期\n升级原因：超过处置时限")))
+                .thenReturn(AlertNotificationSendResult.sent(7003L));
+
+        dispatcher.dispatchEscalated(10L, 21L, alert, 2, "超过处置时限");
+
+        verify(inAppSender).send(eq(10L), eq(21L), eq(alert), eq("ESCALATED_L2"),
+                eq("ALERT_ESCALATION"), eq("预警处置超时升级"),
+                eq("采购订单逾期\n升级原因：超过处置时限"));
+        ArgumentCaptor<AlertNotificationSendRecord> recordCaptor =
+                ArgumentCaptor.forClass(AlertNotificationSendRecord.class);
+        verify(recordMapper).insert(recordCaptor.capture());
+        assertEquals("ESCALATED_L2", recordCaptor.getValue().getEventType());
+        assertEquals("SENT", recordCaptor.getValue().getSendStatus());
     }
 
     @Test
@@ -259,13 +284,14 @@ class AlertNotificationDispatcherTest {
         AlertNotificationDispatcher dispatcher =
                 new AlertNotificationDispatcher(recordMapper, List.of(inAppSender));
         AlertLog alert = alert();
+        alert.setProcessStatus("ARCHIVED");
         AlertLog anotherAlert = alert();
         anotherAlert.setId(9002L);
         when(inAppSender.channel()).thenReturn(AlertNotificationChannel.IN_APP);
         when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("ALERT_CREATED"),
                 eq("ALERT"), eq("采购逾期"), eq("采购订单逾期")))
                 .thenReturn(AlertNotificationSendResult.sent(7001L));
-        when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("STATUS_CHANGED"),
+        when(inAppSender.send(eq(10L), eq(21L), eq(alert), eq("STATUS_CHANGED_ARCHIVED"),
                 eq("ALERT_STATUS"), eq("预警已归档"), eq("采购订单逾期")))
                 .thenReturn(AlertNotificationSendResult.sent(7002L));
         when(inAppSender.send(eq(10L), eq(21L), eq(anotherAlert), eq("ALERT_CREATED"),
@@ -288,7 +314,7 @@ class AlertNotificationDispatcherTest {
         assertEquals("ALERT_CREATED", records.get(0).getEventType());
         assertEquals(9001L, records.get(0).getAlertId());
         assertEquals("SENT", records.get(1).getSendStatus());
-        assertEquals("STATUS_CHANGED", records.get(1).getEventType());
+        assertEquals("STATUS_CHANGED_ARCHIVED", records.get(1).getEventType());
         assertEquals(9001L, records.get(1).getAlertId());
         assertEquals("SENT", records.get(2).getSendStatus());
         assertEquals("ALERT_CREATED", records.get(2).getEventType());

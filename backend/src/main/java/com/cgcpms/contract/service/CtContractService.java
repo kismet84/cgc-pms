@@ -306,6 +306,8 @@ public class CtContractService {
         if (contract.getContractCode() == null || contract.getContractCode().isBlank())
             throw new BusinessException("CONTRACT_NO_CODE", "合同编号不能为空，无法提交审批");
 
+        validatePurchaseSupplierAdmission(contract);
+
         // 更新审批状态为审批中（携带版本号乐观锁）
         LambdaUpdateWrapper<CtContract> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(CtContract::getId, contractId)
@@ -463,6 +465,19 @@ public class CtContractService {
         if (contract == null || contract.getPartyAId() == null || contract.getPartyBId() == null) {
             throw new BusinessException("CONTRACT_PARTY_REQUIRED", "合同甲方和乙方不能为空");
         }
+    }
+
+    private void validatePurchaseSupplierAdmission(CtContract contract) {
+        if (!"PURCHASE".equals(contract.getContractType())) return;
+        MdPartner supplier = mdPartnerMapper.selectById(contract.getPartyBId());
+        if (supplier == null || !java.util.Objects.equals(supplier.getTenantId(), UserContext.getCurrentTenantId()))
+            throw new BusinessException("PURCHASE_SUPPLIER_NOT_FOUND", "采购合同乙方供应商不存在");
+        if (!"SUPPLIER".equals(supplier.getPartnerType()))
+            throw new BusinessException("PURCHASE_SUPPLIER_TYPE_INVALID", "采购合同乙方必须是供应商");
+        if (!"ENABLE".equals(supplier.getStatus()))
+            throw new BusinessException("PURCHASE_SUPPLIER_DISABLED", "供应商已停用，禁止提交采购合同审批");
+        if (java.util.Objects.equals(supplier.getBlacklistFlag(), 1))
+            throw new BusinessException("PURCHASE_SUPPLIER_BLACKLISTED", "黑名单供应商禁止提交采购合同审批");
     }
 
     private CtContractVO toVO(CtContract c) {

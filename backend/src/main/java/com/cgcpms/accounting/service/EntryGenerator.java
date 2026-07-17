@@ -34,6 +34,7 @@ public class EntryGenerator {
     private final List<EntryGenerationStrategy> strategies;
     private final AccountingEntryMapper entryMapper;
     private final AccountingEntryLineMapper lineMapper;
+    private final AccountingPeriodGuard periodGuard;
     private Map<String, EntryGenerationStrategy> strategyMap;
 
     @PostConstruct
@@ -82,7 +83,11 @@ public class EntryGenerator {
         entry.setSourceType(sourceType);
         entry.setSourceId(sourceId);
         if (entry.getEntryDate() == null) entry.setEntryDate(LocalDate.now());
+        periodGuard.assertWritable(entry.getEntryDate());
         entry.setEntryStatus("DRAFT");
+        entry.setReviewStatus("PENDING");
+        entry.setPeriodId(periodGuard.findPeriodId(entry.getEntryDate()));
+        entry.setAdjustmentFlag(0);
         entry.setVersion(0);
 
         // 计算借贷平衡

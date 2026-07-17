@@ -57,16 +57,31 @@ public class AccountingEntryController {
     }
 
     @PutMapping("/{id}/post")
-    @PreAuthorize("hasAuthority('accounting:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('accounting:post') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> post(@PathVariable Long id) {
         entryService.post(id);
         return ApiResponse.success();
     }
 
-    @PutMapping("/{id}/reverse")
-    @PreAuthorize("hasAuthority('accounting:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> reverse(@PathVariable Long id) {
-        entryService.reverse(id);
+    @PutMapping("/{id}/review")
+    @PreAuthorize("hasAuthority('accounting:review') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> review(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        boolean approved = Boolean.TRUE.equals(body.get("approved"));
+        entryService.review(id, approved, body.get("comment") == null ? null : body.get("comment").toString());
         return ApiResponse.success();
+    }
+
+    @PutMapping("/{id}/resubmit")
+    @PreAuthorize("hasAuthority('accounting:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> resubmit(@PathVariable Long id) {
+        entryService.submitReview(id);
+        return ApiResponse.success();
+    }
+
+    @PutMapping("/{id}/reverse")
+    @PreAuthorize("hasAuthority('accounting:adjustment:add') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Long> reverse(@PathVariable Long id, @RequestBody(required = false) Map<String, Object> body) {
+        String reason = body == null || body.get("reason") == null ? "会计冲销" : body.get("reason").toString();
+        return ApiResponse.success(entryService.createReversal(id, reason).getId());
     }
 }

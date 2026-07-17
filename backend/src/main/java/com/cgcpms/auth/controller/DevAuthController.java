@@ -79,7 +79,8 @@ public class DevAuthController {
             "/system", "/approval", "/inventory", "/subcontract", "/variation",
             "/receipt", "/invoice", "/revenue", "/overhead", "/accounting",
             "/bid", "/notification", "/alert", "/profile", "/purchase",
-            "/org", "/ledger", "/cash-journal", "/site", "/production-measurement"
+            "/org", "/ledger", "/cash-journal", "/site", "/production-measurement",
+            "/financial-close", "/cash-forecast"
     );
 
     private String normalizeRedirect(String redirect) {

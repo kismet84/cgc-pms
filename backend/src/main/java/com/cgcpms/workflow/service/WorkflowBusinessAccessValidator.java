@@ -176,6 +176,12 @@ public class WorkflowBusinessAccessValidator {
             case WorkflowBusinessTypes.COST_CORRECTIVE_ACTION -> {
                 return validateJdbc("cost_corrective_action", "status", businessId, tenantId, requestProjectId, requestContractId, "COST_CORRECTIVE_NOT_FOUND");
             }
+            case WorkflowBusinessTypes.TECHNICAL_SCHEME -> {
+                return validateJdbc("technical_scheme", "status", businessId, tenantId, requestProjectId, requestContractId, "TECH_SCHEME_NOT_FOUND");
+            }
+            case WorkflowBusinessTypes.PROJECT_FINAL_ACCEPTANCE -> {
+                return validateJdbc("closeout_final_acceptance", "status", businessId, tenantId, requestProjectId, requestContractId, "CLOSEOUT_FINAL_ACCEPTANCE_NOT_FOUND");
+            }
             default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
         }
     }
@@ -194,7 +200,8 @@ public class WorkflowBusinessAccessValidator {
     }
 
     private boolean hasNoContractColumn(String table) {
-        return Set.of("project_budget", "project_schedule_plan", "project_period_plan", "project_corrective_action", "cost_corrective_action").contains(table);
+        return Set.of("project_budget", "project_schedule_plan", "project_period_plan", "project_corrective_action",
+                "cost_corrective_action", "technical_scheme", "closeout_final_acceptance").contains(table);
     }
 
     private ValidationResult validate(boolean exists, Long tenantId, Long realTenantId, Long realProjectId,

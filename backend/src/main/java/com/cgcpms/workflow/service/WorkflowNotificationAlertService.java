@@ -3,6 +3,7 @@ package com.cgcpms.workflow.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
+import com.cgcpms.alert.service.AlertLifecycleService;
 import com.cgcpms.notification.entity.SysNotification;
 import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -22,6 +23,7 @@ public class WorkflowNotificationAlertService {
 
     private final NotificationService notificationService;
     private final AlertLogMapper alertLogMapper;
+    private final AlertLifecycleService lifecycleService;
 
     public SysNotification createWorkflowNotification(WfInstance instance, Long recipientUserId,
                                                       String title, String content, String eventType) {
@@ -65,7 +67,9 @@ public class WorkflowNotificationAlertService {
             alert.setIsRead(0);
             alert.setProcessStatus("OPEN");
             alert.setDeletedFlag(0);
+            lifecycleService.initialize(alert);
             alertLogMapper.insert(alert);
+            lifecycleService.recordCreated(alert);
         } catch (Exception alertError) {
             log.warn("Failed to record workflow notification alert: instanceId={}, recipientUserId={}, eventType={}",
                     instance.getId(), recipientUserId, normalizedEventType, alertError);

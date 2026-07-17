@@ -8,7 +8,16 @@ vi.mock('@/api/request', () => ({
   request: mockRequest,
 }))
 
-import { getAlertList, getAlertProcessingReport, markAlertRead, batchEvaluate } from '../alert'
+import {
+  acknowledgeAlert,
+  batchEvaluate,
+  getAlertList,
+  getAlertProcessingReport,
+  getAlertRuleEffectReport,
+  getAlertTrace,
+  markAlertRead,
+  updateAlertStatus,
+} from '../alert'
 import {
   createDictData,
   createDictType,
@@ -300,6 +309,51 @@ describe('system-related API modules', () => {
         triggeredStart: undefined,
         triggeredEnd: undefined,
       },
+    })
+  })
+
+  it('builds the rule effect review request from project, domain and time range', () => {
+    getAlertRuleEffectReport({
+      pageNum: 1,
+      pageSize: 20,
+      projectId: 'p1',
+      ruleType: 'CONTRACT_EXPIRING',
+      alertDomain: 'CONTRACT',
+      triggeredStart: '2026-07-01T00:00:00',
+      triggeredEnd: '2026-07-31T23:59:59',
+    })
+
+    expect(mockRequest).toHaveBeenCalledWith({
+      url: '/alerts/rule-effect-report',
+      method: 'get',
+      params: {
+        projectId: 'p1',
+        ruleType: 'CONTRACT_EXPIRING',
+        alertDomain: 'CONTRACT',
+        triggeredStart: '2026-07-01T00:00:00',
+        triggeredEnd: '2026-07-31T23:59:59',
+      },
+    })
+  })
+
+  it('builds alert acknowledgement, controlled transition and trace requests', () => {
+    acknowledgeAlert('a1', { remark: '接单' })
+    updateAlertStatus('a1', { processStatus: 'PROCESSED', statusRemark: '处置完成' })
+    getAlertTrace('a1')
+
+    expect(mockRequest).toHaveBeenNthCalledWith(1, {
+      url: '/alerts/a1/acknowledge',
+      method: 'put',
+      data: { remark: '接单' },
+    })
+    expect(mockRequest).toHaveBeenNthCalledWith(2, {
+      url: '/alerts/a1/status',
+      method: 'put',
+      data: { processStatus: 'PROCESSED', statusRemark: '处置完成' },
+    })
+    expect(mockRequest).toHaveBeenNthCalledWith(3, {
+      url: '/alerts/a1/trace',
+      method: 'get',
     })
   })
 
