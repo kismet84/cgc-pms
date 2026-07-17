@@ -98,9 +98,6 @@ public class StlSettlementWriteService {
         if (settlement.getApprovalStatus() == null || settlement.getApprovalStatus().isBlank()) {
             settlement.setApprovalStatus(APPROVAL_DRAFT);
         }
-        if (settlement.getStatus() == null || settlement.getStatus().isBlank()) {
-            settlement.setStatus(STATUS_DRAFT);
-        }
         if (settlement.getSettlementStatus() == null || settlement.getSettlementStatus().isBlank()) {
             settlement.setSettlementStatus(SETTLEMENT_DRAFT);
         }
@@ -241,8 +238,7 @@ public class StlSettlementWriteService {
 
         stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
-                .set(StlSettlement::getApprovalStatus, APPROVAL_APPROVING)
-                .set(StlSettlement::getStatus, APPROVAL_APPROVING));
+                .set(StlSettlement::getApprovalStatus, APPROVAL_APPROVING));
 
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();

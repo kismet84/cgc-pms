@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue'
+import { onMounted, computed, reactive, ref } from 'vue'
+import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   MoreOutlined,
@@ -22,6 +23,16 @@ import ReceiptKpiStrip from './components/ReceiptKpiStrip.vue'
 import ReceiptFormModal from './components/ReceiptFormModal.vue'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { getReceiptItems } from '@/api/modules/receipt'
+import {
+  confirmSupplierReturn,
+  createSupplierReturn,
+  getProcurementTrace,
+  type ProcurementTrace,
+} from '@/api/modules/procurement'
+import { uploadFile } from '@/api/modules/file'
+import type { MatReceiptItemVO, MatReceiptVO } from '@/types/receipt'
+import ProcurementTraceDrawer from '@/components/ProcurementTraceDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -70,6 +81,7 @@ const {
 const {
   modalVisible,
   modalTitle,
+  proofFile,
   formData,
   itemList,
   itemsTotalAmount,
@@ -89,6 +101,102 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
 async function handleView(row: Parameters<typeof handleEdit>[0]) {
   await handleEdit(row)
   modalTitle.value = '查看材料验收'
+}
+
+const traceOpen = ref(false)
+const traceLoading = ref(false)
+const traceData = ref<ProcurementTrace>()
+
+async function openTrace(row: MatReceiptVO) {
+  traceOpen.value = true
+  traceLoading.value = true
+  traceData.value = undefined
+  try {
+    traceData.value = await getProcurementTrace('receipts', row.id)
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('加载采购闭环追溯失败')
+  } finally {
+    traceLoading.value = false
+  }
+}
+
+const supplierReturnVisible = ref(false)
+const supplierReturnLoading = ref(false)
+const supplierReturnItems = ref<MatReceiptItemVO[]>([])
+const supplierReturnFile = ref<File | null>(null)
+const supplierReturnForm = reactive({
+  receiptItemId: '',
+  returnKind: 'UNQUALIFIED' as 'UNQUALIFIED' | 'ACCEPTED',
+  quantity: '',
+  returnDate: '',
+  reason: '',
+})
+
+function handleSupplierReturnFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  supplierReturnFile.value = input.files?.[0] ?? null
+}
+
+async function openSupplierReturn(row: MatReceiptVO) {
+  try {
+    const items = await getReceiptItems(row.id)
+    supplierReturnItems.value = items.filter(
+      (item) =>
+        Number(item.qualifiedQuantity || 0) > 0 || Number(item.unqualifiedQuantity || 0) > 0,
+    )
+    if (!supplierReturnItems.value.length) {
+      message.warning('该验收单没有可退供数量')
+      return
+    }
+    const firstUnqualified = supplierReturnItems.value.find(
+      (item) => Number(item.unqualifiedQuantity || 0) > 0,
+    )
+    Object.assign(supplierReturnForm, {
+      receiptItemId: (firstUnqualified ?? supplierReturnItems.value[0]).id,
+      returnKind: firstUnqualified ? 'UNQUALIFIED' : 'ACCEPTED',
+      quantity: '',
+      returnDate: new Date().toISOString().slice(0, 10),
+      reason: '',
+    })
+    supplierReturnFile.value = null
+    supplierReturnVisible.value = true
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('加载验收明细失败')
+  }
+}
+
+async function submitSupplierReturn() {
+  if (!supplierReturnForm.receiptItemId || Number(supplierReturnForm.quantity) <= 0) {
+    message.warning('请选择验收明细并填写大于 0 的退供数量')
+    return
+  }
+  if (!supplierReturnForm.returnDate || !supplierReturnForm.reason.trim()) {
+    message.warning('请填写退供日期和原因')
+    return
+  }
+  if (!supplierReturnFile.value) {
+    message.warning('请上传退供单或供应商签收凭证')
+    return
+  }
+  supplierReturnLoading.value = true
+  try {
+    const id = await createSupplierReturn({
+      ...supplierReturnForm,
+      idempotencyKey: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    })
+    await uploadFile(supplierReturnFile.value, 'SUPPLIER_RETURN', id, 'RETURN_PROOF')
+    await confirmSupplierReturn(id)
+    message.success('退供已确认，库存、成本和预算已同步冲销')
+    supplierReturnVisible.value = false
+    await fetchData()
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('退供确认失败，请核对可退数量、处置方式和附件状态')
+  } finally {
+    supplierReturnLoading.value = false
+  }
 }
 
 const receiptStatusSummary = computed(() => [
@@ -340,6 +448,13 @@ onMounted(() => {
                       >
                         提交审批
                       </a-menu-item>
+                      <a-menu-item @click="openTrace(row)">全链追溯</a-menu-item>
+                      <a-menu-item
+                        v-if="row.approvalStatus === 'APPROVED'"
+                        @click="openSupplierReturn(row)"
+                      >
+                        发起退供
+                      </a-menu-item>
                     </a-menu>
                   </template>
                 </a-dropdown>
@@ -467,13 +582,66 @@ onMounted(() => {
       :item-list="itemList"
       :has-warning="hasWarning"
       :items-total-amount="itemsTotalAmount"
+      :proof-file-name="proofFile?.name"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
       @order-change="handleOrderChange"
       @item-qty-change="handleItemQtyChange"
       @item-price-change="handleItemPriceChange"
       @item-qualified-qty-change="handleItemQualifiedQtyChange"
+      @proof-file-change="proofFile = $event"
     />
+    <ProcurementTraceDrawer
+      :open="traceOpen"
+      :loading="traceLoading"
+      :trace="traceData"
+      @close="traceOpen = false"
+    />
+    <a-modal
+      :open="supplierReturnVisible"
+      title="验收退供确认"
+      :confirm-loading="supplierReturnLoading"
+      @ok="submitSupplierReturn"
+      @cancel="supplierReturnVisible = false"
+    >
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 17 }">
+        <a-form-item label="验收明细" required>
+          <a-select v-model:value="supplierReturnForm.receiptItemId">
+            <a-select-option v-for="item in supplierReturnItems" :key="item.id" :value="item.id">
+              {{ item.materialName }}（合格 {{ item.qualifiedQuantity || 0 }} / 不合格
+              {{ item.unqualifiedQuantity || 0 }}）
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="退供类型" required>
+          <a-radio-group v-model:value="supplierReturnForm.returnKind">
+            <a-radio value="UNQUALIFIED">不合格退供</a-radio>
+            <a-radio value="ACCEPTED">已接收材料退供</a-radio>
+          </a-radio-group>
+        </a-form-item>
+        <a-form-item label="退供数量" required>
+          <a-input-number
+            v-model:value="supplierReturnForm.quantity"
+            :min="0"
+            :precision="2"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="退供日期" required>
+          <a-date-picker
+            v-model:value="supplierReturnForm.returnDate"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="退供原因" required>
+          <a-textarea v-model:value="supplierReturnForm.reason" :rows="3" />
+        </a-form-item>
+        <a-form-item label="退供凭证" required>
+          <input type="file" @change="handleSupplierReturnFile" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 

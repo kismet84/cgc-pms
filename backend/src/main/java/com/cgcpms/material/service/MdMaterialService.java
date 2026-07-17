@@ -7,7 +7,9 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.material.entity.MdMaterialCategory;
 import com.cgcpms.material.mapper.MdMaterialMapper;
+import com.cgcpms.material.mapper.MdMaterialCategoryMapper;
 import com.cgcpms.material.vo.MdMaterialVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 public class MdMaterialService {
 
     private final MdMaterialMapper mdMaterialMapper;
+    private final MdMaterialCategoryMapper categoryMapper;
 
     public PageResult<MdMaterialVO> getPage(long pageNo, long pageSize, String materialCode, String materialName, Long categoryId, String status) {
         LambdaQueryWrapper<MdMaterial> wrapper = new LambdaQueryWrapper<>();
@@ -48,6 +51,8 @@ public class MdMaterialService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(MdMaterial material) {
         material.setTenantId(UserContext.getCurrentTenantId());
+        material.setCategoryId(resolveCategory(material.getCategoryId(), material.getTenantId()));
+        if (material.getStatus() == null || material.getStatus().isBlank()) material.setStatus("ENABLE");
         mdMaterialMapper.insert(material);
         return material.getId();
     }
@@ -60,7 +65,29 @@ public class MdMaterialService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("MATERIAL_NOT_FOUND", "材料不存在");
         }
+        material.setTenantId(existing.getTenantId());
+        material.setCategoryId(resolveCategory(
+                material.getCategoryId() == null ? existing.getCategoryId() : material.getCategoryId(),
+                existing.getTenantId()));
         mdMaterialMapper.updateById(material);
+    }
+
+    private Long resolveCategory(Long categoryId, Long tenantId) {
+        if (categoryId == null) {
+            MdMaterialCategory fallback = categoryMapper.selectOne(new LambdaQueryWrapper<MdMaterialCategory>()
+                    .eq(MdMaterialCategory::getTenantId, tenantId)
+                    .eq(MdMaterialCategory::getCategoryCode, "UNCATEGORIZED")
+                    .eq(MdMaterialCategory::getStatus, "ENABLE"));
+            if (fallback == null) {
+                throw new BusinessException("MATERIAL_CATEGORY_DEFAULT_MISSING", "租户默认材料分类不存在");
+            }
+            return fallback.getId();
+        }
+        MdMaterialCategory category = categoryMapper.selectById(categoryId);
+        if (category == null || !tenantId.equals(category.getTenantId()) || !"ENABLE".equals(category.getStatus())) {
+            throw new BusinessException("MATERIAL_CATEGORY_INVALID", "材料分类不存在、已停用或不属于当前租户");
+        }
+        return categoryId;
     }
 
     @Transactional(rollbackFor = Exception.class)

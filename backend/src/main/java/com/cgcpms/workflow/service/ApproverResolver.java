@@ -17,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Collections;
 import java.util.List;
@@ -44,6 +45,7 @@ public class ApproverResolver {
     private final OrgPositionMapper orgPositionMapper;
     private final PmProjectMemberMapper pmProjectMemberMapper;
     private final ObjectMapper objectMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     /**
      * Resolve approver user IDs from the approverConfig JSON.
@@ -117,24 +119,19 @@ public class ApproverResolver {
         long positionId = config.get("positionId").asLong();
 
         OrgPosition position = orgPositionMapper.selectById(positionId);
-        if (position == null) {
+        if (position == null || !Objects.equals(position.getTenantId(), tenantId)
+                || !"ENABLE".equals(position.getStatus())) {
             return Collections.emptyList();
         }
-
-        LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getStatus, "ENABLE");
-        if (tenantId != null) {
-            wrapper.eq(SysUser::getTenantId, tenantId);
-        }
-        // Match users in the same org unit as the position
-        if (position.getDepartmentId() != null) {
-            wrapper.eq(SysUser::getOrgId, position.getDepartmentId());
-        } else if (position.getCompanyId() != null) {
-            wrapper.eq(SysUser::getOrgId, position.getCompanyId());
-        }
-
-        List<SysUser> users = sysUserMapper.selectList(wrapper);
-        return users.stream().map(SysUser::getId).toList();
+        return jdbcTemplate.queryForList("""
+                SELECT u.id FROM org_user_position up
+                JOIN sys_user u ON u.id=up.user_id AND u.tenant_id=up.tenant_id
+                WHERE up.tenant_id=? AND up.position_id=? AND up.status='ACTIVE'
+                  AND u.status='ENABLE' AND u.deleted_flag=0
+                  AND (up.effective_from IS NULL OR up.effective_from<=CURRENT_DATE)
+                  AND (up.effective_to IS NULL OR up.effective_to>=CURRENT_DATE)
+                ORDER BY up.primary_flag DESC,u.id
+                """, Long.class, tenantId, positionId);
     }
 
     private List<Long> resolveProjectRole(JsonNode config, Long tenantId, Long projectId) {
@@ -179,6 +176,7 @@ public class ApproverResolver {
     private List<Long> resolveRoleById(Long roleId, Long tenantId) {
         List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
                 new LambdaQueryWrapper<SysUserRole>()
+                        .eq(tenantId != null, SysUserRole::getTenantId, tenantId)
                         .eq(SysUserRole::getRoleId, roleId));
         if (userRoles.isEmpty()) {
             return Collections.emptyList();

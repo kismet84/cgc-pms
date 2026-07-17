@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.common.util.DateTimeUtils;
@@ -14,6 +15,7 @@ import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.procurement.service.ProcurementIntegrityService;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
 import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
@@ -26,11 +28,14 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -50,6 +55,9 @@ public class MatPurchaseRequestService {
     private final WorkflowEngine workflowEngine;
     private final PurchaseRequestConversionService conversionService;
     private final ProjectAccessChecker projectAccessChecker;
+    private final JdbcTemplate jdbcTemplate;
+    private final ProcurementIntegrityService integrityService;
+    private final BudgetLedgerService budgetLedgerService;
 
     // ================================================================
     // 分页查询
@@ -189,13 +197,29 @@ public class MatPurchaseRequestService {
         if (request.getRequestCode() == null || request.getRequestCode().isBlank())
             throw new BusinessException("PURCHASE_REQUEST_NO_CODE", "申请编号不能为空，无法提交审批");
 
-        // Check items exist
-        Long itemCount = requestItemMapper.selectCount(
+        projectAccessChecker.checkAccess(request.getProjectId(), "提交采购申请审批");
+        integrityService.requireActiveProject(request.getProjectId(), "提交采购申请");
+        if (request.getContractId() == null) {
+            throw new BusinessException("PURCHASE_REQUEST_CONTRACT_REQUIRED", "采购申请必须绑定采购合同");
+        }
+        validateContractProject(request.getContractId(), request.getProjectId());
+        if (!StringUtils.hasText(request.getPurpose())) {
+            throw new BusinessException("PURCHASE_REQUEST_PURPOSE_REQUIRED", "采购申请必须填写采购用途或施工部位");
+        }
+        integrityService.requireCleanAttachment("PURCHASE_REQUEST", requestId);
+
+        List<MatPurchaseRequestItem> items = requestItemMapper.selectList(
                 new LambdaQueryWrapper<MatPurchaseRequestItem>()
                         .eq(MatPurchaseRequestItem::getRequestId, requestId)
                         .eq(MatPurchaseRequestItem::getTenantId, UserContext.getCurrentTenantId()));
-        if (itemCount == 0)
+        if (items.isEmpty())
             throw new BusinessException("PURCHASE_REQUEST_NO_ITEMS", "采购申请没有明细，无法提交审批");
+
+        for (MatPurchaseRequestItem item : items) {
+            validateRequestItemForSubmission(request, item);
+            budgetLedgerService.reserve(item.getBudgetLineId(), "PURCHASE_REQUEST", requestId,
+                    item.getEstimatedAmount(), "PURCHASE_REQUEST:" + requestId + ":ITEM:" + item.getId() + ":RESERVE");
+        }
 
         // 更新审批状态为审批中
         LambdaUpdateWrapper<MatPurchaseRequest> updateWrapper = new LambdaUpdateWrapper<>();
@@ -270,11 +294,39 @@ public class MatPurchaseRequestService {
             item.setTenantId(tenantId);
             // Auto-create material if name provided but no existing materialId
             resolveMaterial(item, tenantId);
+            validatePlanningReferences(item, request.getProjectId(), tenantId);
+            if (item.getEstimatedUnitPrice() != null) {
+                if (item.getEstimatedUnitPrice().signum() <= 0) {
+                    throw new BusinessException("PURCHASE_ESTIMATED_PRICE_INVALID", "采购申请估算单价必须大于0");
+                }
+                item.setEstimatedAmount(item.getQuantity().multiply(item.getEstimatedUnitPrice())
+                        .setScale(2, RoundingMode.HALF_UP));
+            }
             item.setCreatedBy(UserContext.getCurrentUserId());
             item.setUpdatedBy(UserContext.getCurrentUserId());
         }
         if (!items.isEmpty()) {
             requestItemMapper.insertBatch(items);
+        }
+    }
+
+    private void validateRequestItemForSubmission(MatPurchaseRequest request, MatPurchaseRequestItem item) {
+        if (item.getMaterialId() == null || item.getQuantity() == null || item.getQuantity().signum() <= 0) {
+            throw new BusinessException("PURCHASE_REQUEST_ITEM_INCOMPLETE", "采购申请明细必须填写物料和有效数量");
+        }
+        if (item.getPlannedDate() == null) {
+            throw new BusinessException("PURCHASE_REQUEST_PLANNED_DATE_REQUIRED", "采购申请明细必须填写计划到货日期");
+        }
+        integrityService.requireActiveBudgetLine(request.getProjectId(), item.getBudgetLineId());
+        integrityService.validateSubTask(request.getProjectId(), item.getSubTaskId());
+        if (item.getEstimatedUnitPrice() == null || item.getEstimatedUnitPrice().signum() <= 0) {
+            throw new BusinessException("PURCHASE_ESTIMATED_PRICE_REQUIRED", "采购申请明细必须填写大于0的估算单价");
+        }
+        BigDecimal expected = item.getQuantity().multiply(item.getEstimatedUnitPrice())
+                .setScale(2, RoundingMode.HALF_UP);
+        if (item.getEstimatedAmount() == null
+                || expected.compareTo(item.getEstimatedAmount().setScale(2, RoundingMode.HALF_UP)) != 0) {
+            throw new BusinessException("PURCHASE_ESTIMATED_AMOUNT_MISMATCH", "采购申请估算金额必须等于数量乘以估算单价");
         }
     }
 
@@ -311,6 +363,29 @@ public class MatPurchaseRequestService {
         material.setStatus("ENABLE");
         mdMaterialMapper.insert(material);
         item.setMaterialId(material.getId());
+    }
+
+    private void validatePlanningReferences(MatPurchaseRequestItem item, Long projectId, Long tenantId) {
+        if (item.getWbsTaskId() != null) {
+            Integer count = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM project_wbs_task
+                    WHERE id=? AND tenant_id=? AND project_id=? AND deleted_flag=0
+                    """, Integer.class, item.getWbsTaskId(), tenantId, projectId);
+            if (count == null || count != 1) {
+                throw new BusinessException("PURCHASE_WBS_MISMATCH", "WBS任务不存在或不属于当前项目");
+            }
+        }
+        if (item.getBudgetLineId() != null) {
+            Integer count = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM project_budget_line l
+                    JOIN project_budget b ON b.id=l.budget_id AND b.tenant_id=l.tenant_id
+                    WHERE l.id=? AND l.tenant_id=? AND l.project_id=? AND l.deleted_flag=0
+                      AND b.deleted_flag=0 AND b.status='ACTIVE'
+                    """, Integer.class, item.getBudgetLineId(), tenantId, projectId);
+            if (count == null || count != 1) {
+                throw new BusinessException("PURCHASE_BUDGET_MISMATCH", "预算行不存在、未生效或不属于当前项目");
+            }
+        }
     }
 
     // ================================================================
@@ -404,6 +479,7 @@ public class MatPurchaseRequestService {
         vo.setTenantId(String.valueOf(r.getTenantId()));
         vo.setProjectId(r.getProjectId() != null ? String.valueOf(r.getProjectId()) : null);
         vo.setContractId(r.getContractId() != null ? String.valueOf(r.getContractId()) : null);
+        vo.setPurpose(r.getPurpose());
         vo.setRequestCode(r.getRequestCode());
         vo.setApprovalStatus(r.getApprovalStatus());
         vo.setStatus(r.getStatus());
@@ -420,8 +496,14 @@ public class MatPurchaseRequestService {
         vo.setTenantId(String.valueOf(item.getTenantId()));
         vo.setRequestId(String.valueOf(item.getRequestId()));
         vo.setMaterialId(item.getMaterialId() != null ? String.valueOf(item.getMaterialId()) : null);
+        vo.setWbsTaskId(item.getWbsTaskId() != null ? String.valueOf(item.getWbsTaskId()) : null);
+        vo.setBudgetLineId(item.getBudgetLineId() != null ? String.valueOf(item.getBudgetLineId()) : null);
         vo.setMaterialName(item.getMaterialId() != null ? materialNames.get(item.getMaterialId()) : item.getMaterialName());
+        vo.setBudgetLineId(item.getBudgetLineId() != null ? String.valueOf(item.getBudgetLineId()) : null);
+        vo.setSubTaskId(item.getSubTaskId() != null ? String.valueOf(item.getSubTaskId()) : null);
         vo.setQuantity(String.valueOf(item.getQuantity()));
+        vo.setEstimatedUnitPrice(item.getEstimatedUnitPrice() != null ? item.getEstimatedUnitPrice().toPlainString() : null);
+        vo.setEstimatedAmount(item.getEstimatedAmount() != null ? item.getEstimatedAmount().toPlainString() : null);
         vo.setUnit(item.getUnit());
         vo.setPlannedDate(item.getPlannedDate() != null ? item.getPlannedDate().toString() : null);
         vo.setCreatedBy(item.getCreatedBy() != null ? String.valueOf(item.getCreatedBy()) : null);

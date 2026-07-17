@@ -22,7 +22,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * TDD RED phase — reproduce inventory controller binding failures.
+ * 库存控制器契约测试。采购闭环启用后，手工出入库接口必须 fail-close，
+ * 实物移动只能由验收、领料、退供、退料或已审批调整单驱动。
  * <p>
  * Known bugs:
  * <ul>
@@ -55,6 +56,32 @@ class MatStockControllerTest {
     private static final long TENANT_ID = 0L;
     private static final long WAREHOUSE_ID = 1L;
     private static final long MATERIAL_ID = 1001L;
+    private static final long SETTINGS_WAREHOUSE_ID = 9402L;
+    private static final long SETTINGS_STOCK_ID = 940201L;
+
+    @BeforeEach
+    void seedReplenishmentStock() {
+        jdbcTemplate.update("DELETE FROM mat_stock WHERE id = ?", SETTINGS_STOCK_ID);
+        jdbcTemplate.update("DELETE FROM mat_warehouse WHERE id = ?", SETTINGS_WAREHOUSE_ID);
+        jdbcTemplate.update("""
+                INSERT INTO mat_warehouse
+                    (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, 'ENABLE', 0)
+                """, SETTINGS_WAREHOUSE_ID, TENANT_ID, 10001L,
+                "WH-STOCK-CONTROLLER", "库存控制器隔离测试仓");
+        jdbcTemplate.update("""
+                INSERT INTO mat_stock
+                    (id, tenant_id, warehouse_id, material_id, available_qty, safety_stock_qty,
+                     replenishment_target_qty, replenishment_lead_days, version, deleted_flag)
+                VALUES (?, ?, ?, ?, 80.0000, 10.0000, 250.0000, 7, 0, 0)
+                """, SETTINGS_STOCK_ID, TENANT_ID, SETTINGS_WAREHOUSE_ID, MATERIAL_ID);
+    }
+
+    @AfterEach
+    void cleanReplenishmentStock() {
+        jdbcTemplate.update("DELETE FROM mat_stock WHERE id = ?", SETTINGS_STOCK_ID);
+        jdbcTemplate.update("DELETE FROM mat_warehouse WHERE id = ?", SETTINGS_WAREHOUSE_ID);
+    }
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
@@ -80,23 +107,15 @@ class MatStockControllerTest {
 
     @Test
     @Order(1)
-    @DisplayName("POST /inventory/stock/in with JSON body → 200 and hides internal fields")
-    void testStockInWithJsonBodySucceedsAndHidesInternalFields() throws Exception {
+    @DisplayName("POST /inventory/stock/in → 禁止绕过验收单手工入库")
+    void testManualStockInIsDisabled() throws Exception {
         mockMvc.perform(postWithApi("/inventory/stock/in")
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"warehouseId":1,"materialId":1001,"quantity":"100.0000"}"""))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.id").exists())
-                .andExpect(jsonPath("$.data.warehouseId").value(WAREHOUSE_ID))
-                .andExpect(jsonPath("$.data.materialId").value(MATERIAL_ID))
-                .andExpect(jsonPath("$.data.availableQty").exists())
-                .andExpect(jsonPath("$.data.safetyStockQty").value(10.0000))
-                .andExpect(jsonPath("$.data.tenantId").doesNotExist())
-                .andExpect(jsonPath("$.data.version").doesNotExist())
-                .andExpect(jsonPath("$.data.deletedFlag").doesNotExist());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MANUAL_STOCK_MOVEMENT_DISABLED"));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -107,22 +126,15 @@ class MatStockControllerTest {
 
     @Test
     @Order(2)
-    @DisplayName("POST /inventory/stock/out with JSON body → 200 and hides internal fields")
-    void testStockOutWithJsonBodySucceedsAndHidesInternalFields() throws Exception {
+    @DisplayName("POST /inventory/stock/out → 禁止绕过领料单手工出库")
+    void testManualStockOutIsDisabled() throws Exception {
         mockMvc.perform(postWithApi("/inventory/stock/out")
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"warehouseId":1,"materialId":1001,"quantity":"50.0000"}"""))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.id").exists())
-                .andExpect(jsonPath("$.data.warehouseId").value(WAREHOUSE_ID))
-                .andExpect(jsonPath("$.data.materialId").value(MATERIAL_ID))
-                .andExpect(jsonPath("$.data.availableQty").exists())
-                .andExpect(jsonPath("$.data.tenantId").doesNotExist())
-                .andExpect(jsonPath("$.data.version").doesNotExist())
-                .andExpect(jsonPath("$.data.deletedFlag").doesNotExist());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MANUAL_STOCK_MOVEMENT_DISABLED"));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -181,9 +193,7 @@ class MatStockControllerTest {
     @Order(6)
     @DisplayName("采购经理可维护安全库存阈值")
     void testPurchaseManagerCanUpdateSafetyThreshold() throws Exception {
-        Long stockId = jdbcTemplate.queryForObject(
-                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
-                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+        Long stockId = SETTINGS_STOCK_ID;
 
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/safety-threshold")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
@@ -198,9 +208,7 @@ class MatStockControllerTest {
     @Order(7)
     @DisplayName("仅库存读取权限不能维护安全库存阈值")
     void testStockListOnlyCannotUpdateSafetyThreshold() throws Exception {
-        Long stockId = jdbcTemplate.queryForObject(
-                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
-                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+        Long stockId = SETTINGS_STOCK_ID;
 
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/safety-threshold")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list")))
@@ -213,9 +221,7 @@ class MatStockControllerTest {
     @Order(8)
     @DisplayName("采购经理可原子维护安全库存与补货目标量")
     void testPurchaseManagerCanUpdateReplenishmentSettings() throws Exception {
-        Long stockId = jdbcTemplate.queryForObject(
-                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
-                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+        Long stockId = SETTINGS_STOCK_ID;
 
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
@@ -246,9 +252,7 @@ class MatStockControllerTest {
     @Order(9)
     @DisplayName("补货目标量低于安全库存时拒绝保存")
     void testRejectsTargetBelowSafetyThreshold() throws Exception {
-        Long stockId = jdbcTemplate.queryForObject(
-                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
-                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+        Long stockId = SETTINGS_STOCK_ID;
 
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
@@ -261,9 +265,7 @@ class MatStockControllerTest {
     @Order(10)
     @DisplayName("补货提前期拒绝小数和越界值")
     void testRejectsInvalidReplenishmentLeadDays() throws Exception {
-        Long stockId = jdbcTemplate.queryForObject(
-                "SELECT id FROM mat_stock WHERE tenant_id = ? AND warehouse_id = ? AND material_id = ? LIMIT 1",
-                Long.class, TENANT_ID, WAREHOUSE_ID, MATERIAL_ID);
+        Long stockId = SETTINGS_STOCK_ID;
 
         for (String value : List.of("-1", "3651", "1.5")) {
             mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")

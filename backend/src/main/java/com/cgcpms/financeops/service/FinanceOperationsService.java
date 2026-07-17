@@ -176,6 +176,8 @@ public class FinanceOperationsService {
         if (!Set.of("RESOLVED", "IGNORED").contains(status)) throw error("FINANCE_ALERT_STATUS_INVALID", "预警只能处理为 RESOLVED 或 IGNORED");
         if (jdbc.update("UPDATE finance_alert SET status=?,handled_by=?,handled_at=CURRENT_TIMESTAMP,handle_note=? WHERE id=? AND tenant_id=? AND status='OPEN'",
                 status, user(), request.note().trim(), id, tenant()) != 1) throw error("FINANCE_ALERT_NOT_OPEN", "预警不存在或已处理");
+        jdbc.update("UPDATE alert_log SET process_status=?,processed_at=CURRENT_TIMESTAMP,status_remark=?,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=(SELECT alert_log_id FROM finance_alert WHERE id=? AND tenant_id=?) AND tenant_id=?",
+                "RESOLVED".equals(status) ? "PROCESSED" : "INVALID", request.note().trim(), user(), id, tenant(), tenant());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -284,36 +286,43 @@ public class FinanceOperationsService {
 
     private int generateAlertsForTenant(Long tenantId, LocalDateTime now) {
         int created = 0;
-        List<Map<String,Object>> schedules = jdbc.queryForList("SELECT * FROM payment_schedule WHERE tenant_id=? AND status IN ('PLANNED','PARTIALLY_PAID') AND planned_date<=?",
+        List<Map<String,Object>> schedules = jdbc.queryForList("SELECT id,project_id,planned_date,reminder_days,schedule_name FROM payment_schedule WHERE tenant_id=? AND status IN ('PLANNED','PARTIALLY_PAID') AND planned_date<=?",
                 tenantId, now.toLocalDate().plusDays(30));
         for (Map<String,Object> row : schedules) {
             LocalDate due = row.get("planned_date") instanceof LocalDate value
                     ? value : LocalDate.parse(String.valueOf(row.get("planned_date")));
             int reminder = ((Number)row.get("reminder_days")).intValue();
-            if (!due.minusDays(reminder).isAfter(now.toLocalDate())) created += alert(tenantId, "PAYMENT_DUE", "PAYMENT_SCHEDULE",
+            if (!due.minusDays(reminder).isAfter(now.toLocalDate())) created += alert(tenantId, longValue(row.get("project_id")), "PAYMENT_DUE", "PAYMENT_SCHEDULE",
                     longValue(row.get("id")), due.isBefore(now.toLocalDate()) ? "HIGH" : "MEDIUM",
                     due.atStartOfDay(), "付款计划已到提醒窗口：" + row.get("schedule_name"), "PAYMENT_DUE:" + row.get("id") + ":" + due);
         }
-        for (Map<String,Object> row : jdbc.queryForList("SELECT id,closure_due_at,entry_no FROM cash_journal_entry WHERE tenant_id=? AND status='PENDING_ARCHIVE' AND closure_due_at<?", tenantId, now)) {
-            created += alert(tenantId, "JOURNAL_ARCHIVE_OVERDUE", "CASH_JOURNAL", longValue(row.get("id")), "HIGH",
+        for (Map<String,Object> row : jdbc.queryForList("SELECT id,project_id,closure_due_at,entry_no FROM cash_journal_entry WHERE tenant_id=? AND status='PENDING_ARCHIVE' AND closure_due_at<?", tenantId, now)) {
+            created += alert(tenantId, longValue(row.get("project_id")), "JOURNAL_ARCHIVE_OVERDUE", "CASH_JOURNAL", longValue(row.get("id")), "HIGH",
                     (LocalDateTime)row.get("closure_due_at"), "现金日记待归档超时：" + row.get("entry_no"), "JOURNAL_OVERDUE:" + row.get("id"));
         }
         for (Map<String,Object> row : jdbc.queryForList("""
-                SELECT r.id,r.paid_at FROM pay_record r LEFT JOIN invoice_payment_allocation a ON a.pay_record_id=r.id
-                 WHERE r.tenant_id=? AND r.pay_status='SUCCESS' AND r.paid_at<? GROUP BY r.id,r.paid_at HAVING COALESCE(SUM(a.allocated_amount),0)<MAX(r.pay_amount)
+                SELECT r.id,r.project_id,r.paid_at FROM pay_record r LEFT JOIN invoice_payment_allocation a ON a.pay_record_id=r.id
+                 WHERE r.tenant_id=? AND r.pay_status='SUCCESS' AND r.paid_at<? GROUP BY r.id,r.project_id,r.paid_at HAVING COALESCE(SUM(a.allocated_amount),0)<MAX(r.pay_amount)
                 """, tenantId, now.minusDays(30))) {
-            created += alert(tenantId, "INVOICE_MISSING", "PAYMENT", longValue(row.get("id")), "MEDIUM",
+            created += alert(tenantId, longValue(row.get("project_id")), "INVOICE_MISSING", "PAYMENT", longValue(row.get("id")), "MEDIUM",
                     now, "付款超过30天仍未足额取得发票", "INVOICE_MISSING:" + row.get("id"));
         }
         return created;
     }
 
-    private int alert(Long tenantId, String type, String businessType, Long businessId, String severity,
+    private int alert(Long tenantId, Long projectId, String type, String businessType, Long businessId, String severity,
                       LocalDateTime dueAt, String message, String key) {
+        if (count("SELECT COUNT(*) FROM finance_alert WHERE tenant_id=? AND alert_key=?", tenantId, key) > 0) return 0;
+        Long id = IdWorker.getId();
         try {
-            return jdbc.update("INSERT INTO finance_alert(id,tenant_id,alert_type,business_type,business_id,severity,due_at,status,message,alert_key,created_at) VALUES(?,?,?,?,?,?,?,'OPEN',?,?,CURRENT_TIMESTAMP)",
-                    IdWorker.getId(), tenantId, type, businessType, businessId, severity, dueAt, message, key);
-        } catch (DuplicateKeyException ignored) { return 0; }
+            jdbc.update("INSERT INTO alert_log(id,tenant_id,project_id,rule_type,severity,message,triggered_at,is_read,alert_domain,alert_category,source_type,source_id,dedup_key,process_status,created_at,updated_at) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,0,'FINANCE_OPERATIONS',?,?,?,?,'OPEN',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",
+                    id, tenantId, projectId, type, severity, message, type, businessType, businessId, "FINANCE:" + key);
+            return jdbc.update("INSERT INTO finance_alert(id,tenant_id,alert_type,business_type,business_id,severity,due_at,status,message,alert_key,alert_log_id,created_at) VALUES(?,?,?,?,?,?,?,'OPEN',?,?,?,CURRENT_TIMESTAMP)",
+                    id, tenantId, type, businessType, businessId, severity, dueAt, message, key, id);
+        } catch (DuplicateKeyException ignored) {
+            jdbc.update("DELETE FROM alert_log WHERE id=? AND tenant_id=?", id, tenantId);
+            return 0;
+        }
     }
 
     private int insertIssues(Long runId, Long tenantId, String sql) {

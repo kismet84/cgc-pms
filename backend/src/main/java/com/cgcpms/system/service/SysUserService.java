@@ -140,7 +140,9 @@ public class SysUserService {
         // 检查是否是 ADMIN 用户，如果是则检查是否还有其他 ADMIN（不能删除最后一个管理员）
         Long currentTenantId = UserContext.getCurrentTenantId();
         List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, id));
+                new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getTenantId, currentTenantId)
+                        .eq(SysUserRole::getUserId, id));
         boolean isAdmin = userRoles.stream().anyMatch(ur -> {
             SysRole role = sysRoleMapper.selectById(ur.getRoleId());
             return role != null && "ADMIN".equals(role.getRoleCode());
@@ -148,11 +150,12 @@ public class SysUserService {
         if (isAdmin) {
             // 统计当前租户下还有多少 ADMIN 用户
             List<SysUserRole> allUserRoles = sysUserRoleMapper.selectList(
-                    new LambdaQueryWrapper<SysUserRole>().in(SysUserRole::getUserId,
+                new LambdaQueryWrapper<SysUserRole>().in(SysUserRole::getUserId,
                             sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
                                     .eq(SysUser::getTenantId, currentTenantId)
                                     .ne(SysUser::getId, id))
-                                    .stream().map(SysUser::getId).toList()));
+                                    .stream().map(SysUser::getId).toList())
+                        .eq(SysUserRole::getTenantId, currentTenantId));
             long adminCount = allUserRoles.stream().filter(ur -> {
                 SysRole role = sysRoleMapper.selectById(ur.getRoleId());
                 return role != null && "ADMIN".equals(role.getRoleCode());
@@ -163,6 +166,7 @@ public class SysUserService {
         }
 
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getTenantId, currentTenantId)
                 .eq(SysUserRole::getUserId, id));
         sysUserMapper.deleteById(id);
     }
@@ -202,10 +206,12 @@ public class SysUserService {
         }
 
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getTenantId, user.getTenantId())
                 .eq(SysUserRole::getUserId, userId));
         if (roleIds != null) {
             for (Long roleId : roleIds) {
                 SysUserRole ur = new SysUserRole();
+                ur.setTenantId(user.getTenantId());
                 ur.setUserId(userId);
                 ur.setRoleId(roleId);
                 sysUserRoleMapper.insert(ur);
@@ -242,7 +248,9 @@ public class SysUserService {
     private Map<Long, List<String>> bulkLoadRoleNames(List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) return Collections.emptyMap();
         var userRoles = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>().in(SysUserRole::getUserId, userIds));
+                new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getTenantId, UserContext.getCurrentTenantId())
+                        .in(SysUserRole::getUserId, userIds));
         if (userRoles.isEmpty()) return Collections.emptyMap();
         List<Long> roleIds = userRoles.stream().map(SysUserRole::getRoleId).distinct().toList();
         var roleMap = sysRoleMapper.selectByIds(roleIds).stream()
@@ -255,7 +263,9 @@ public class SysUserService {
     private Map<Long, List<Long>> bulkLoadRoleIds(List<Long> userIds) {
         if (userIds == null || userIds.isEmpty()) return Collections.emptyMap();
         var userRoles = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>().in(SysUserRole::getUserId, userIds));
+                new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getTenantId, UserContext.getCurrentTenantId())
+                        .in(SysUserRole::getUserId, userIds));
         if (userRoles.isEmpty()) return Collections.emptyMap();
         return userRoles.stream().collect(Collectors.groupingBy(
                 SysUserRole::getUserId,
@@ -264,7 +274,9 @@ public class SysUserService {
 
     private List<String> getRoleNames(Long userId) {
         List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId));
+                new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getTenantId, UserContext.getCurrentTenantId())
+                        .eq(SysUserRole::getUserId, userId));
         if (userRoles.isEmpty()) return Collections.emptyList();
         List<Long> roleIds = userRoles.stream().map(SysUserRole::getRoleId).toList();
         return sysRoleMapper.selectByIds(roleIds).stream()
@@ -274,7 +286,9 @@ public class SysUserService {
 
     private List<Long> getRoleIds(Long userId) {
         List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId));
+                new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getTenantId, UserContext.getCurrentTenantId())
+                        .eq(SysUserRole::getUserId, userId));
         if (userRoles.isEmpty()) return Collections.emptyList();
         return userRoles.stream().map(SysUserRole::getRoleId).collect(Collectors.toList());
     }

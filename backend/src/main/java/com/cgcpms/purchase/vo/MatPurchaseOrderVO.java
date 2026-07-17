@@ -19,6 +19,9 @@ public class MatPurchaseOrderVO {
     private String orderType;
     private String orderDate;
     private String deliveryDate;
+    private String deliveryTerms;
+    private Integer exceptionPurchaseFlag;
+    private String exceptionReason;
     private String totalAmount;
     private String approvalStatus;
     private String orderStatus;

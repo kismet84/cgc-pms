@@ -45,4 +45,10 @@ public class ProcurementTraceController {
     public ApiResponse<ProcurementTraceVO> byMaterialReturn(@PathVariable Long id) {
         return ApiResponse.success(traceService.byMaterialReturn(id));
     }
+
+    @GetMapping("/supplier-returns/{id}")
+    @PreAuthorize("hasAuthority('procurement:trace:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<ProcurementTraceVO> bySupplierReturn(@PathVariable Long id) {
+        return ApiResponse.success(traceService.bySupplierReturn(id));
+    }
 }

@@ -45,8 +45,8 @@ class MatReceiptControllerTest {
         jdbcTemplate.update("""
                 INSERT INTO sys_user
                     (id, tenant_id, username, password, real_name, status, is_admin,
-                     created_by, updated_by, deleted_flag, deleted_token, remark)
-                SELECT ?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, NULL, ?
+                     created_by, updated_by, deleted_flag, remark)
+                SELECT ?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, ?
                 WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = ?)
                 """, ADMIN_ID, TENANT_ID, "test_receipt_controller_approver", "{noop}test",
                 "验收接口测试审批人", ADMIN_ID, ADMIN_ID,
@@ -143,6 +143,13 @@ class MatReceiptControllerTest {
         mockMvc.perform(po("/receipts/"+receiptId+"/items/batch").cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().is2xxSuccessful());
+        jdbcTemplate.update("""
+                INSERT INTO sys_file (
+                    id, tenant_id, business_type, business_id, file_name, original_name,
+                    file_size, storage_path, bucket_name, virus_scan_status, created_by, deleted_flag
+                ) VALUES (?, ?, 'MATERIAL_RECEIPT', ?, 'receipt.pdf', 'receipt.pdf', 10,
+                    '/test/receipt.pdf', 'test', 'CLEAN', ?, 0)
+                """, Math.abs(System.nanoTime()), TENANT_ID, receiptId, ADMIN_ID);
     }
 
     @Test @Order(10) @DisplayName("POST /receipts/{id}/submit -> 2xx")

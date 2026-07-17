@@ -2,6 +2,7 @@ package com.cgcpms.purchase.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -17,6 +18,7 @@ import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,6 +28,8 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class PurchaseRequestConversionService {
+
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final MatPurchaseRequestMapper requestMapper;
     private final MatPurchaseRequestItemMapper requestItemMapper;
@@ -57,7 +61,6 @@ public class PurchaseRequestConversionService {
         order.setTenantId(tenantId);
         order.setProjectId(request.getProjectId());
         order.setRequestId(requestId);
-        order.setOrderCode(toPurchaseOrderCode(request.getRequestCode()));
         order.setOrderType("PURCHASE");
         order.setOrderDate(LocalDate.now());
         // 采购申请只批准内部需求，不代表供应商、价格和交付条件等商业承诺已批准。
@@ -65,8 +68,23 @@ public class PurchaseRequestConversionService {
         order.setApprovalStatus("DRAFT");
         order.setOrderStatus("DRAFT");
         order.setContractId(request.getContractId());
+        order.setExceptionPurchaseFlag(0);
         order.setTotalAmount(BigDecimal.ZERO);
-        orderMapper.insert(order);
+        String prefix = "PO-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
+        boolean inserted = false;
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            order.setOrderCode(nextOrderCode(prefix, tenantId, attempt));
+            try {
+                orderMapper.insert(order);
+                inserted = true;
+                break;
+            } catch (DuplicateKeyException exception) {
+                log.warn("采购申请转单编号冲突，重试生成 orderCode={}", order.getOrderCode());
+            }
+        }
+        if (!inserted) {
+            throw new BusinessException("PURCHASE_ORDER_CODE_CONFLICT", "采购订单编号生成冲突，请重试");
+        }
 
         Long userId = UserContext.getCurrentUserId();
         List<MatPurchaseOrderItem> orderItems = requestItems.stream()
@@ -79,12 +97,22 @@ public class PurchaseRequestConversionService {
         return order.getId();
     }
 
-    private String toPurchaseOrderCode(String requestCode) {
-        if (requestCode != null && requestCode.startsWith("PR-")) {
-            return "PO-" + requestCode.substring(3);
+    private String nextOrderCode(String prefix, Long tenantId, int offset) {
+        Page<MatPurchaseOrder> page = orderMapper.selectPage(new Page<>(1, 1),
+                new LambdaQueryWrapper<MatPurchaseOrder>()
+                        .eq(MatPurchaseOrder::getTenantId, tenantId)
+                        .likeRight(MatPurchaseOrder::getOrderCode, prefix)
+                        .orderByDesc(MatPurchaseOrder::getOrderCode));
+        MatPurchaseOrder last = page.getRecords().isEmpty() ? null : page.getRecords().getFirst();
+        int sequence = 1 + offset;
+        if (last != null && last.getOrderCode() != null && last.getOrderCode().startsWith(prefix)) {
+            try {
+                sequence = Integer.parseInt(last.getOrderCode().substring(prefix.length())) + 1 + offset;
+            } catch (NumberFormatException exception) {
+                log.warn("采购订单编号后缀无法解析，改用候选序号：{}", last.getOrderCode());
+            }
         }
-        String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
-        return "PO-" + today + "-001";
+        return prefix + String.format("%03d", sequence);
     }
 
     private MatPurchaseOrderItem toOrderItem(MatPurchaseRequestItem requestItem, Long orderId,
@@ -94,12 +122,17 @@ public class PurchaseRequestConversionService {
         orderItem.setTenantId(tenantId);
         orderItem.setOrderId(orderId);
         orderItem.setRequestItemId(requestItem.getId());
+        orderItem.setWbsTaskId(requestItem.getWbsTaskId());
+        orderItem.setBudgetLineId(requestItem.getBudgetLineId());
         orderItem.setProjectId(projectId);
         orderItem.setMaterialId(requestItem.getMaterialId());
         orderItem.setUnit(requestItem.getUnit());
         orderItem.setQuantity(requestItem.getQuantity());
-        orderItem.setUnitPrice(BigDecimal.ZERO);
-        orderItem.setAmount(BigDecimal.ZERO);
+        orderItem.setUnitPrice(requestItem.getEstimatedUnitPrice() == null ? BigDecimal.ZERO : requestItem.getEstimatedUnitPrice());
+        orderItem.setAmount(requestItem.getEstimatedAmount() == null ? BigDecimal.ZERO : requestItem.getEstimatedAmount());
+        orderItem.setTaxRate(BigDecimal.ZERO);
+        orderItem.setTaxAmount(BigDecimal.ZERO);
+        orderItem.setAmountWithoutTax(requestItem.getEstimatedAmount() == null ? BigDecimal.ZERO : requestItem.getEstimatedAmount());
         orderItem.setReceivedQuantity(BigDecimal.ZERO);
         orderItem.setCreatedBy(userId);
         orderItem.setUpdatedBy(userId);

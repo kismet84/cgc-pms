@@ -16,6 +16,7 @@ defineProps<{
   itemList: (Partial<MatReceiptItemVO> & { key: number; warning?: boolean })[]
   hasWarning: boolean
   itemsTotalAmount: string
+  proofFileName?: string
 }>()
 
 const emit = defineEmits<{
@@ -26,14 +27,20 @@ const emit = defineEmits<{
   itemQtyChange: [index: number]
   itemPriceChange: [index: number]
   itemQualifiedQtyChange: [index: number]
+  proofFileChange: [file: File | null]
 }>()
+
+function handleProofFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  emit('proofFileChange', input.files?.[0] ?? null)
+}
 </script>
 
 <template>
   <a-modal
     :open="visible"
     :title="title"
-    :width="800"
+    :width="1180"
     wrap-class-name="compact-receipt-modal"
     @ok="emit('ok')"
     @cancel="emit('cancel')"
@@ -52,7 +59,7 @@ const emit = defineEmits<{
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="采购订单">
+        <a-form-item label="采购订单" required>
           <a-select
             v-model:value="formData.orderId"
             placeholder="请选择采购订单"
@@ -78,20 +85,26 @@ const emit = defineEmits<{
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="验收日期">
+        <a-form-item label="验收日期" required>
           <a-date-picker
             v-model:value="formData.receiptDate"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </a-form-item>
-        <a-form-item label="质量状态">
+        <a-form-item label="质量状态" required>
           <a-select v-model:value="formData.qualityStatus" placeholder="请选择质量状态" allow-clear>
             <a-select-option value="QUALIFIED">合格</a-select-option>
             <a-select-option value="PARTIAL">部分合格</a-select-option>
             <a-select-option value="UNQUALIFIED">不合格</a-select-option>
             <a-select-option value="PENDING">待检验</a-select-option>
           </a-select>
+        </a-form-item>
+        <a-form-item label="验收附件" required>
+          <div class="proof-file-input">
+            <input type="file" @change="handleProofFile" />
+            <span>{{ proofFileName || '上传验收记录、质检报告或到货凭证' }}</span>
+          </div>
         </a-form-item>
         <a-form-item label="备注">
           <a-textarea v-model:value="formData.remark" :rows="1" placeholder="请输入备注" />
@@ -118,7 +131,7 @@ const emit = defineEmits<{
           :pagination="false"
           row-key="key"
           size="small"
-          :scroll="{ x: 1210, y: 220 }"
+          :scroll="{ x: 1580, y: 220 }"
         >
           <a-table-column title="材料" width="150">
             <template #default="{ record: item }">
@@ -176,6 +189,41 @@ const emit = defineEmits<{
                 :precision="2"
                 style="width: 100%"
                 @change="emit('itemQualifiedQtyChange', index)"
+              />
+            </template>
+          </a-table-column>
+          <a-table-column title="不合格" width="85">
+            <template #default="{ record: item }">
+              <span
+                :style="{
+                  color: Number(item.unqualifiedQuantity || 0) > 0 ? '#ff4d4f' : undefined,
+                }"
+              >
+                {{ item.unqualifiedQuantity || '0' }}
+              </span>
+            </template>
+          </a-table-column>
+          <a-table-column title="处置方式" width="125">
+            <template #default="{ record: item }">
+              <a-select
+                v-model:value="item.dispositionType"
+                :disabled="Number(item.unqualifiedQuantity || 0) <= 0"
+                allow-clear
+                placeholder="选择处置"
+                style="width: 100%"
+              >
+                <a-select-option value="RETURN">退供</a-select-option>
+                <a-select-option value="REPLACE">换货</a-select-option>
+                <a-select-option value="CONCESSION">让步接收</a-select-option>
+              </a-select>
+            </template>
+          </a-table-column>
+          <a-table-column title="处置原因" width="150">
+            <template #default="{ record: item }">
+              <a-input
+                v-model:value="item.dispositionReason"
+                :disabled="Number(item.unqualifiedQuantity || 0) <= 0"
+                placeholder="必填"
               />
             </template>
           </a-table-column>
@@ -269,6 +317,14 @@ const emit = defineEmits<{
 .receipt-items-total span {
   font-weight: 600;
   color: #1677ff;
+}
+
+.proof-file-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 :global(.compact-receipt-modal .ant-modal-body) {

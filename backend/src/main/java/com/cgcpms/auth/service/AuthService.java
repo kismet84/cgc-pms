@@ -147,7 +147,9 @@ public class AuthService {
      * 供 {@link com.cgcpms.system.service.ProfileService} 等内部调用。
      */
     public List<String> getRoleCodes(Long userId) {
+        Long tenantId = requireUserTenant(userId);
         var userRoles = sysUserRoleMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysUserRole>()
+                .eq(com.cgcpms.system.entity.SysUserRole::getTenantId, tenantId)
                 .eq(com.cgcpms.system.entity.SysUserRole::getUserId, userId));
         if (userRoles.isEmpty()) {
             return Collections.emptyList();
@@ -155,7 +157,9 @@ public class AuthService {
         List<Long> roleIds = userRoles.stream()
                 .map(com.cgcpms.system.entity.SysUserRole::getRoleId)
                 .toList();
-        return sysRoleMapper.selectByIds(roleIds).stream()
+        return sysRoleMapper.selectList(new LambdaQueryWrapper<SysRole>()
+                        .eq(SysRole::getTenantId, tenantId)
+                        .in(SysRole::getId, roleIds)).stream()
                 .map(SysRole::getRoleCode)
                 .collect(Collectors.toList());
     }
@@ -165,7 +169,9 @@ public class AuthService {
      * 供 {@link com.cgcpms.system.service.ProfileService} 等内部调用。
      */
     public List<String> getPermissionCodes(Long userId) {
+        Long tenantId = requireUserTenant(userId);
         var userRoles = sysUserRoleMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysUserRole>()
+                .eq(com.cgcpms.system.entity.SysUserRole::getTenantId, tenantId)
                 .eq(com.cgcpms.system.entity.SysUserRole::getUserId, userId));
         if (userRoles.isEmpty()) {
             return Collections.emptyList();
@@ -173,11 +179,14 @@ public class AuthService {
         List<Long> roleIds = userRoles.stream()
                 .map(com.cgcpms.system.entity.SysUserRole::getRoleId)
                 .toList();
-        List<String> roleCodes = sysRoleMapper.selectByIds(roleIds).stream()
+        List<String> roleCodes = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRole>()
+                        .eq(SysRole::getTenantId, tenantId)
+                        .in(SysRole::getId, roleIds)).stream()
                 .map(SysRole::getRoleCode)
                 .toList();
         if (roleCodes.contains("SUPER_ADMIN") || roleCodes.contains("ADMIN")) {
             return sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenu>()
+                            .eq(SysMenu::getTenantId, tenantId)
                             .isNotNull(SysMenu::getPerms)
                             .ne(SysMenu::getPerms, ""))
                     .stream()
@@ -187,6 +196,7 @@ public class AuthService {
         }
 
         var roleMenus = sysRoleMenuMapper.selectList(new LambdaQueryWrapper<com.cgcpms.system.entity.SysRoleMenu>()
+                .eq(com.cgcpms.system.entity.SysRoleMenu::getTenantId, tenantId)
                 .in(com.cgcpms.system.entity.SysRoleMenu::getRoleId, roleIds));
         if (roleMenus.isEmpty()) {
             return Collections.emptyList();
@@ -196,7 +206,9 @@ public class AuthService {
                 .distinct()
                 .toList();
 
-        return sysMenuMapper.selectByIds(menuIds).stream()
+        return sysMenuMapper.selectList(new LambdaQueryWrapper<SysMenu>()
+                        .eq(SysMenu::getTenantId, tenantId)
+                        .in(SysMenu::getId, menuIds)).stream()
                 .map(SysMenu::getPerms)
                 .filter(p -> p != null && !p.isBlank())
                 .collect(Collectors.toList());
@@ -323,15 +335,30 @@ public class AuthService {
     }
 
     private void ensureUserRole(Long userId, Long roleId) {
+        SysUser user = sysUserMapper.selectById(userId);
+        SysRole role = sysRoleMapper.selectById(roleId);
+        if (user == null || role == null || !user.getTenantId().equals(role.getTenantId())) {
+            throw new BusinessException("AUTH_ROLE_TENANT_MISMATCH", "用户与角色不属于同一租户");
+        }
         Long count = sysUserRoleMapper.selectCount(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getTenantId, user.getTenantId())
                 .eq(SysUserRole::getUserId, userId)
                 .eq(SysUserRole::getRoleId, roleId));
         if (count != null && count > 0) {
             return;
         }
         SysUserRole userRole = new SysUserRole();
+        userRole.setTenantId(user.getTenantId());
         userRole.setUserId(userId);
         userRole.setRoleId(roleId);
         sysUserRoleMapper.insert(userRole);
+    }
+
+    private Long requireUserTenant(Long userId) {
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null) {
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+        }
+        return user.getTenantId();
     }
 }

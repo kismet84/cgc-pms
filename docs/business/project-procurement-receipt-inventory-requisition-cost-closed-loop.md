@@ -1,10 +1,10 @@
 # CGC-PMS 采购—验收—库存—领料—成本闭环业务标准
 
-状态：P0 一期实施中 / 尚未达到上线门禁  
-版本：v1.1  
-基线日期：2026-07-16  
-适用范围：建筑工程总承包项目的材料需求、采购、到货验收、库存、领退料与材料成本管理  
-事实基线：当前 `master` 分支源码、数据库迁移、自动化测试与本地页面核验
+状态：P0 核心代码闭环已完成 / 上线数据与 E2E 门禁待验
+版本：v1.2
+基线日期：2026-07-16
+适用范围：建筑工程总承包项目的材料需求、采购、到货验收、库存、领退料与材料成本管理
+事实基线：`codex/procurement-closed-loop-p0` 分支源码、数据库迁移与自动化测试
 
 > 本文是本闭环后续产品设计、数据库设计、接口开发、审批配置、测试和验收的唯一业务标准。本文中的“目标要求”不代表当前源码已经实现；第 2 章和第 12 章记录当前事实。
 
@@ -78,11 +78,11 @@
 
 | 评估维度       | 当前判断                                                                |
 | -------------- | ----------------------------------------------------------------------- |
-| 模块和页面覆盖 | 约 75%；本轮主要补齐后端，实发、退料及 Trace 尚缺配套页面               |
-| 单模块业务能力 | 约 75%                                                                  |
-| 全链路闭环能力 | 约 65%；库存材料主链及退料冲销已有后端链路，供应商退货仍未闭环          |
+| 模块和页面覆盖 | 约 95%；采购预算/附件、不合格处置、实发、退供、退料和 Trace 均有操作入口 |
+| 单模块业务能力 | 约 95%                                                                  |
+| 全链路闭环能力 | 约 90%；核心正向链路和退供/退料反向链路已实现，历史数据与专项报表待验    |
 | 生产可用性     | 不通过                                                                  |
-| 主要阻塞       | 附件与预算/WBS门禁、供应商退货、不合格处置、物理外键、历史数据迁移和E2E |
+| 主要阻塞       | 历史数据治理、真实 MySQL 迁移、角色/租户 E2E、并发压测和驾驶舱口径复验 |
 
 以上百分比用于优先级判断，不作为代码行或接口数量统计。
 
@@ -90,15 +90,15 @@
 
 | 节点                 | 页面       | 数据表       | 接口/服务                          | 审批               | 自动化测试 | 当前结论                                             |
 | -------------------- | ---------- | ------------ | ---------------------------------- | ------------------ | ---------- | ---------------------------------------------------- |
-| 项目、合同、目标成本 | 已有       | 已有         | 已有                               | 部分已有           | 已有       | 可作为上游，但采购申请仍未强制目标成本/WBS           |
-| 采购申请             | 已有       | 已有         | CRUD、提交、草稿转单及逐行来源已有 | 已有               | 较多       | 转单规则已修复；仍缺预算/WBS、附件及用途硬门禁       |
-| 采购订单             | 已有       | 已有         | CRUD、完整性校验、提交已有         | 已有               | 较多       | 不再自动批准；仍缺税价、交付附件及例外采购完整规则   |
-| 材料验收             | 已有       | 已有         | 库存/直耗模式、硬校验、提交已有    | 已有               | 较多       | 草稿不占量、超收阻断；仍缺附件和不合格处置闭环       |
+| 项目、合同、目标成本 | 已有       | 已有         | 已有                               | 部分已有           | 已有       | 采购申请/订单明细强制绑定当前生效预算科目，WBS可选校验 |
+| 采购申请             | 已补齐     | 已扩展       | 预算、用途、附件、计划日期硬门禁   | 已有               | 已补       | 审批占用预算，驳回/撤回释放，转单保留逐行来源         |
+| 采购订单             | 已补齐     | 已扩展       | 税价、交付、附件、来源/例外校验    | 已有               | 已补       | 例外订单提交占用预算，审批确认执行预算                |
+| 材料验收             | 已补齐     | 已扩展       | 附件、不合格数量及处置方式硬门禁   | 已有               | 较多       | 合格入库/直耗成本与不合格退供分流                     |
 | 入库与库存           | 已有       | 已扩展       | 数量、移动平均价值、来源幂等已有   | 无调整审批         | 较多       | 核心价值账已实现；批次追溯、盘点调整尚未完成         |
-| 领料申请与实发       | 领料页已有 | 已扩展       | 审批与实际出库已拆分               | 已有               | 较多       | 后端已形成待发料→实际出库；尚缺仓库实发专用页面      |
-| 退货/退料            | 缺失       | 退料表已新增 | 退料确认、库存恢复、成本冲销已有   | 尚无退料审批       | 已有       | 领料退回最小闭环已实现；供应商退货未实现             |
+| 领料申请与实发       | 已补齐     | 已扩展       | 审批与实际出库已拆分               | 已有               | 较多       | 领料列表提供仓管实际出库入口，重复出库 fail-close     |
+| 退货/退料            | 已补齐     | 已新增       | 退供/退料、库存及成本/预算反向冲销 | 受权限与确认控制   | 已补       | 必须引用原验收/出库流水并限制累计退回数量             |
 | 材料成本             | 已有       | 已有         | 库存实发/直耗验收分口径生成        | 成本本身无独立确认 | 较多       | 普通库存验收不再重复确认成本，退料生成负成本         |
-| 全链路追溯           | 缺失       | 逻辑关联已补 | 已有统一 Procurement Trace API     | 不适用             | 已有       | 后端可从库存流水、验收、领料、成本和退料反查，UI待补 |
+| 全链路追溯           | 已补齐     | 关系已补     | 统一 Procurement Trace API         | 不适用             | 已补       | 验收、领料、退供、退料均可进入追溯抽屉               |
 | 驾驶舱               | 有局部指标 | 有汇总       | 有聚合                             | 不适用             | 有局部测试 | 尚未按新库存价值、实发成本和冲销口径完成专项复验     |
 
 ### 2.3 已实现能力（截至 2026-07-16 本轮实施）
@@ -111,20 +111,25 @@
 - 领料审批仅形成仓库待发料授权，实际出库接口执行后才扣减库存并按服务端成本价确认材料成本。
 - 普通库存材料仅在实际出库确认成本；直耗材料仅在验收通过确认成本，避免双重确认。
 - 已实现领料退回最小闭环：引用原出库流水、限制累计退料量、恢复库存价值并生成负成本冲销。
+- 采购申请和采购订单明细已强制绑定当前项目生效预算科目，申请提交占用预算，审批驳回/撤回释放，订单审批承接并执行预算。
+- 采购申请、采购订单和材料验收在进入审批前均要求存在病毒扫描状态为 `CLEAN` 的附件。
+- 采购订单已增加交付条件、税率/税额/不含税金额及无申请来源时的例外采购原因。
+- 验收明细已记录不合格数量、退供/换货/让步接收决定、处置状态和原因；不合格材料不得进入可用库存。
+- 已实现供应商退供：引用原验收明细，已接收材料反向扣减库存或直耗成本，不合格退供关闭处置，并同步冲销预算。
+- 验收和领料页面已提供全链追溯；领料页面提供审批后实际出库和出库后退料入口。
+- 通用手工出入库接口和页面操作已 fail-close，业务库存只能由具备来源单据的服务事件生成。
+- 核心申请/订单/验收/领料关系已增加物理外键和 `ON DELETE RESTRICT` 删除限制，并补充退供、退料、实发和追溯权限。
 - 已提供采购 Trace API，可从库存流水、验收、领料、成本和退料反查上游单据、审批及成本证据。
 - 已增加申请转单、订单校验、验收入库/直耗、库存估值、领料实发、重复调用和退料冲销自动化测试。
 
 ### 2.4 剩余 P0 阻塞缺口
 
-1. 采购申请尚未强制绑定目标成本/WBS及预算余额，采购申请、订单和验收的附件硬门禁未完成。
-2. 采购订单税价、交付条件、例外采购和供应商准入规则仍不完整。
-3. 不合格材料的隔离、退货、换货、让步接收流程未实现；供应商退货及库存/应付冲销未实现。
-4. 仓库实际发料、退料和 Trace 仅有后端能力，尚无对应前端作业及反查页面。
-5. 核心业务关系仍以逻辑外键为主，物理外键、限制删除及历史数据兼容策略未完成。
-6. 历史草稿验收占量、验收/领料双计成本及无价值库存尚未迁移和核对。
-7. 项目权限与租户隔离已有服务层校验，但仍缺真实角色矩阵、越权回归和审计查询验收。
-8. 尚未完成浏览器 E2E、MySQL 真实迁移、并发验收/出库压测及驾驶舱新口径复验。
-9. 既有通用手工入库/出库接口仍可绕开业务单据且手工入库没有价值依据；在库存调整审批闭环完成前不得用于生产业务过账。
+1. 历史草稿验收占量、验收/领料双计成本、无价值库存及缺失来源明细尚未完成生产数据盘点和迁移决策。
+2. 新增外键已通过 H2/迁移一致性校验，但仍需在生产数据副本执行 MySQL 真实迁移预演；脏数据存在时必须阻断，不得自动猜测关联。
+3. 供应商准入目前依赖有效采购合同及合同乙方，尚未完成黑名单/冻结状态的专项回归。
+4. 新增退供、退料、实发和 Trace 权限已配置，仍缺真实角色账号的 401/403、跨租户和跨项目 E2E 验收。
+5. 尚未完成并发验收/出库/退供压测以及驾驶舱库存价值、实发成本和冲销口径专项复验。
+6. 库存调整审批闭环属于 P1；在其完成前，通用手工出入库保持禁用。
 
 ## 3. 目标业务流程
 
@@ -229,6 +234,9 @@ erDiagram
     STOCK_TRANSACTION ||--o| COST_ITEM : creates_cost
     REQUISITION_ITEM ||--o{ MATERIAL_RETURN_ITEM : returned_by
     MATERIAL_RETURN_ITEM ||--o{ STOCK_TRANSACTION : creates_return
+    RECEIPT_ITEM ||--o{ SUPPLIER_RETURN_ITEM : returned_to_supplier
+    SUPPLIER_RETURN_ITEM ||--o{ STOCK_TRANSACTION : reverses_stock
+    SUPPLIER_RETURN_ITEM ||--o{ COST_REVERSAL : reverses_direct_cost
     COST_ITEM ||--o{ COST_REVERSAL : reversed_by
     PROJECT ||--o{ ATTACHMENT_LINK : owns
 ```
@@ -697,18 +705,18 @@ GET  /inventory/transactions/{id}/trace
 
 ### 10.1 P0：必须完成
 
-1. 修复采购申请转单：只生成草稿订单，增加申请明细到订单明细的逐行关系。
-2. 建立采购订单商业完整性校验：合同/例外审批、供应商、税价、交付条件、附件和额度。
-3. 重构验收提交与审批校验：订单状态、项目一致性、仓库、附件、超收和不合格处置。
-4. 草稿验收不再更新订单累计验收量；审批通过时原子更新。
-5. 为库存流水增加来源明细、业务事件幂等键、金额和库存价值字段。
-6. 引入移动加权平均价和库存价值。
-7. 将领料审批与仓库实际发料拆分；成本在实际出库后生成。
-8. 统一材料成本确认口径，消除验收与领料双重成本。
-9. 增加退料、退货及成本冲销最小闭环。
-10. 修复驳回后恢复草稿、修改和重新提交的状态路径。
-11. 补齐项目数据权限、审计日志、物理外键和删除限制。
-12. 建立申请到成本及反向 Trace 的全链路自动化测试。
+1. ✅ 修复采购申请转单：只生成草稿订单，增加申请明细到订单明细的逐行关系。
+2. ✅ 建立采购订单商业完整性校验：合同/例外采购、供应商、税价、交付条件、附件和额度。
+3. ✅ 重构验收提交与审批校验：订单状态、项目一致性、仓库、附件、超收和不合格处置。
+4. ✅ 草稿验收不再更新订单累计验收量；审批通过时原子更新。
+5. ✅ 为库存流水增加来源明细、业务事件幂等键、金额和库存价值字段。
+6. ✅ 引入移动加权平均价和库存价值。
+7. ✅ 将领料审批与仓库实际发料拆分；成本在实际出库后生成。
+8. ✅ 统一材料成本确认口径，消除验收与领料双重成本。
+9. ✅ 增加退料、退供及成本/预算冲销最小闭环。
+10. ✅ 修复驳回后恢复草稿、修改和重新提交的状态路径。
+11. ⏳ 已补项目数据权限、审计日志、物理外键和删除限制；真实角色/跨租户 E2E 待验。
+12. ⏳ 已补核心服务与前端契约自动化测试；生产数据副本迁移、浏览器全链 E2E 和并发压测待验。
 
 ### 10.2 P1：建议完成
 
@@ -753,16 +761,37 @@ GET  /inventory/transactions/{id}/trace
 | 已实施事实                            | 源码或迁移位置                                                                                                                                               |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 采购申请只转换为草稿订单并逐行关联    | `purchase/service/PurchaseRequestConversionService.java`、`V176__link_purchase_order_item_to_request_item.sql`                                               |
-| 采购订单提交完整性及驳回重提          | `purchase/service/MatPurchaseOrderService.java`                                                                                                              |
-| 库存/直耗验收、超收阻断、审批确认占量 | `receipt/service/MatReceiptService.java`、`receipt/handler/MaterialReceiptWorkflowHandler.java`                                                              |
+| 采购申请预算、WBS、用途与附件门禁      | `purchase/service/MatPurchaseRequestService.java`、`procurement/service/ProcurementIntegrityService.java`、`V181__procurement_integrity_and_commercial_terms.sql` |
+| 采购订单税价、交付、例外采购及预算门禁 | `purchase/service/MatPurchaseOrderService.java`、`purchase/handler/PurchaseOrderWorkflowHandler.java`                                                        |
+| 库存/直耗验收、超收阻断、不合格处置   | `receipt/service/MatReceiptService.java`、`receipt/handler/MaterialReceiptWorkflowHandler.java`、`V181__procurement_integrity_and_commercial_terms.sql`       |
 | 库存流水来源幂等和移动平均价值        | `inventory/service/MatStockService.java`、`V177__add_stock_transaction_source_line.sql`、`V179__add_inventory_valuation_and_receipt_mode.sql`                |
 | 领料审批与仓库实际出库拆分            | `requisition/handler/MaterialRequisitionWorkflowHandler.java`、`requisition/service/MatRequisitionService.java`                                              |
 | 实际出库成本与直耗验收成本分口径      | `cost/strategy/MaterialRequisitionCostStrategy.java`、`cost/strategy/MaterialReceiptCostStrategy.java`                                                       |
 | 退料恢复库存并生成负成本冲销          | `materialreturn/service/MaterialReturnService.java`、`V180__create_material_return_tables.sql`                                                               |
-| 采购全链路反查接口                    | `procurement/service/ProcurementTraceService.java`、`procurement/controller/ProcurementTraceController.java`                                                 |
-| 关键主链自动化验证                    | `PurchaseRequestServiceTest`、`MatPurchaseOrderServiceTest`、`MaterialReceiptWorkflowHandlerTest`、`MatRequisitionWorkflowSubmitTest`、`MatStockServiceTest` |
+| 供应商退供及库存/成本/预算反向冲销    | `supplierreturn/service/MatSupplierReturnService.java`、`V200__close_procurement_quality_return_loop.sql`；复用唯一头表 `sp_supplier_return`                   |
+| 手工库存接口 fail-close               | `inventory/controller/MatStockController.java`、`inventory/transaction.vue`                                                                                  |
+| 采购全链路反查接口及页面               | `procurement/service/ProcurementTraceService.java`、`ProcurementTraceDrawer.vue`、`receipt/index.vue`、`requisition/index.vue`                               |
+| 权限、外键和删除限制                  | `V181__procurement_integrity_and_commercial_terms.sql`、`V183__seed_procurement_return_permissions.sql`                                                       |
+| 关键主链自动化验证                    | `PurchaseRequestServiceTest`、`MatPurchaseOrderServiceTest`、`MaterialReceiptWorkflowHandlerTest`、`ProcurementIntegrityServiceTest`、前端采购/验收/领料闭环测试 |
 
 本索引只证明本轮已实现范围，不代表第 13 章全部上线门禁已经通过。
+
+### 12.1 2026-07-16 自动化验收结果
+
+| 验证层级 | 命令或范围 | 结果 |
+| -------- | ---------- | ---- |
+| 后端全量 | 设置不少于 256 bit 的 `TEST_JWT_SECRET` 后执行 `backend/mvnw.cmd -q test` | 201 个测试类，1875 项测试，0 failure，0 error，1 skipped |
+| 后端采购定向 | 采购申请/订单/验收/领料/退供、迁移完整性、Flyway MySQL smoke 等采购闭环套件 | 通过 |
+| 后端控制器与全链路 | `Phase2FullChainIntegrationTest`、`MatStockControllerTest`、采购订单与验收 Controller | 通过 |
+| 前端全量 | `type-check`、`lint:check`、Vitest 全量 | 106 个测试文件，647 项测试全部通过 |
+| 数据库迁移 | MySQL/H2 V181～V183、迁移版本唯一性和迁移完整性 | 通过；生产数据副本预演仍为上线门禁 |
+
+### 12.2 本轮发现项处置
+
+1. **本轮修复并复验**：旧 `Phase2FullChainIntegrationTest`、采购订单 Controller 和验收 Controller 未准备附件、预算、税价或例外采购前置，已补齐并通过后端全量测试。
+2. **本轮修复并复验**：`MatStockControllerTest` 依赖其他测试遗留库存数据，已改为独立仓库与库存夹具，11 项测试可独立通过。
+3. **证据充分后关闭**：未设置合规 `TEST_JWT_SECRET` 导致的 `WeakKeyException` 属测试环境前置，不是采购业务失败；设置合规测试密钥后全量测试通过。CI 和本地门禁必须继续显式注入测试专用强密钥，不得降低生产密钥校验。
+4. **超出当前代码实施范围并由本文正式承接**：第 2.4 节六项生产数据、真实 MySQL、供应商冻结、真实角色/租户 E2E、并发/驾驶舱和库存调整事项，分别按第 10、11、13 章门禁验收；在完成前生产上线结论保持“不通过”。
 
 ## 13. 上线与数据迁移门禁
 

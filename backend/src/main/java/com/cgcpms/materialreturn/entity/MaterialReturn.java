@@ -33,4 +33,9 @@ public class MaterialReturn extends BaseEntity {
     private Long confirmedBy;
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime confirmedAt;
+    private Long reversedBy;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime reversedAt;
+    private String reversalReason;
+    private Integer version;
 }

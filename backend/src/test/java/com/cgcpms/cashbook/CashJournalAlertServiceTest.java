@@ -17,6 +17,12 @@ import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.entity.SysUserRole;
+import com.cgcpms.system.entity.SysRole;
+import com.cgcpms.system.entity.SysMenu;
+import com.cgcpms.system.entity.SysRoleMenu;
+import com.cgcpms.system.mapper.SysRoleMapper;
+import com.cgcpms.system.mapper.SysMenuMapper;
+import com.cgcpms.system.mapper.SysRoleMenuMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -45,6 +51,8 @@ class CashJournalAlertServiceTest {
 
     private static final long TENANT_ID = 934041L;
     private static final long RECIPIENT_ID = 93404101L;
+    private static final long FINANCE_ROLE_ID = 93404191L;
+    private static final long FINANCE_MENU_ID = 93404192L;
 
     @Autowired CashJournalAlertService alertService;
     @Autowired CashJournalService journalService;
@@ -54,6 +62,9 @@ class CashJournalAlertServiceTest {
     @Autowired SysFileMapper fileMapper;
     @Autowired SysUserMapper userMapper;
     @Autowired SysUserRoleMapper userRoleMapper;
+    @Autowired SysRoleMapper roleMapper;
+    @Autowired SysMenuMapper menuMapper;
+    @Autowired SysRoleMenuMapper roleMenuMapper;
 
     @MockitoBean AlertNotificationDispatcher notificationDispatcher;
 
@@ -137,6 +148,36 @@ class CashJournalAlertServiceTest {
     }
 
     private void seedRecipient() {
+        SysRole role = new SysRole();
+        role.setId(FINANCE_ROLE_ID);
+        role.setTenantId(TENANT_ID);
+        role.setRoleCode("CASH_ALERT_TEST_FINANCE");
+        role.setRoleName("现金日记测试财务角色");
+        role.setRoleType("CUSTOM");
+        role.setStatus("ENABLE");
+        role.setDataScope("ALL");
+        role.setRoleLevel(2);
+        roleMapper.insert(role);
+
+        SysMenu menu = new SysMenu();
+        menu.setId(FINANCE_MENU_ID);
+        menu.setTenantId(TENANT_ID);
+        menu.setParentId(0L);
+        menu.setMenuName("现金日记维护测试权限");
+        menu.setMenuType("BUTTON");
+        menu.setPerms("cashbook:journal:maintain");
+        menu.setOrderNum(0);
+        menu.setStatus("ENABLE");
+        menu.setVisible(1);
+        menuMapper.insert(menu);
+
+        SysRoleMenu roleMenu = new SysRoleMenu();
+        roleMenu.setId(FINANCE_MENU_ID + 100L);
+        roleMenu.setTenantId(TENANT_ID);
+        roleMenu.setRoleId(FINANCE_ROLE_ID);
+        roleMenu.setMenuId(FINANCE_MENU_ID);
+        roleMenuMapper.insert(roleMenu);
+
         SysUser user = new SysUser();
         user.setId(RECIPIENT_ID);
         user.setTenantId(TENANT_ID);
@@ -147,8 +188,9 @@ class CashJournalAlertServiceTest {
         userMapper.insert(user);
         SysUserRole relation = new SysUserRole();
         relation.setId(RECIPIENT_ID + 100L);
+        relation.setTenantId(TENANT_ID);
         relation.setUserId(RECIPIENT_ID);
-        relation.setRoleId(6L);
+        relation.setRoleId(FINANCE_ROLE_ID);
         userRoleMapper.insert(relation);
     }
 }

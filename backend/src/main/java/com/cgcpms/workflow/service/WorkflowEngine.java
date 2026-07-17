@@ -73,6 +73,7 @@ public class WorkflowEngine {
     public String getRequiredPermission(String businessType) {
         return switch (businessType) {
             case WorkflowBusinessTypes.CONTRACT_APPROVAL -> "contract:submit";
+            case WorkflowBusinessTypes.PROJECT_APPROVAL -> "project:submit";
             case WorkflowBusinessTypes.CONTRACT_REVENUE -> "revenue:submit";
             case WorkflowBusinessTypes.PURCHASE_ORDER -> "purchase:order:submit";
             case WorkflowBusinessTypes.PURCHASE_REQUEST -> "purchase:request:submit";

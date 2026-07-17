@@ -9,6 +9,7 @@ import {
 } from '@/api/modules/receipt'
 import type { MatReceiptVO, MatReceiptItemVO } from '@/types/receipt'
 import type { MatPurchaseOrderVO } from '@/types/purchase'
+import { uploadFile } from '@/api/modules/file'
 
 export function useReceiptForm(
   fetchData: () => Promise<void>,
@@ -17,6 +18,7 @@ export function useReceiptForm(
   const modalVisible = ref(false)
   const modalTitle = ref('新建材料验收')
   const editingId = ref<string | null>(null)
+  const proofFile = ref<File | null>(null)
   const formData = reactive<Partial<MatReceiptVO>>({
     projectId: undefined,
     orderId: undefined,
@@ -49,6 +51,7 @@ export function useReceiptForm(
     })
     itemList.value = []
     itemKeyCounter = 0
+    proofFile.value = null
     modalVisible.value = true
   }
 
@@ -68,6 +71,7 @@ export function useReceiptForm(
     })
     itemList.value = []
     itemKeyCounter = 0
+    proofFile.value = null
     // Load existing items
     try {
       const items = await getReceiptItems(record.id)
@@ -143,6 +147,11 @@ export function useReceiptForm(
       message.warning('合格数量不能超过实际到货数量')
       item.qualifiedQuantity = item.actualQuantity
     }
+    item.unqualifiedQuantity = Math.max(0, actual - Number(item.qualifiedQuantity || 0)).toFixed(2)
+    if (Number(item.unqualifiedQuantity) === 0) {
+      item.dispositionType = undefined
+      item.dispositionReason = undefined
+    }
   }
 
   const itemsTotalAmount = computed(() => {
@@ -162,6 +171,34 @@ export function useReceiptForm(
     if (!formData.projectId) {
       message.warning('请选择项目')
       return
+    }
+    if (!formData.orderId || !formData.contractId || !formData.partnerId) {
+      message.warning('请选择有效采购订单，系统将自动关联合同和供应商')
+      return
+    }
+    if (!formData.receiptDate || !formData.qualityStatus) {
+      message.warning('请填写验收日期和质量状态')
+      return
+    }
+    if (!editingId.value && !proofFile.value) {
+      message.warning('请上传验收记录或质量证明附件')
+      return
+    }
+    if (!itemList.value.some((item) => Number(item.actualQuantity) > 0)) {
+      message.warning('至少一条明细的本次到货数量必须大于 0')
+      return
+    }
+    for (const item of itemList.value) {
+      const actual = Number(item.actualQuantity || 0)
+      const qualified = Number(item.qualifiedQuantity || 0)
+      item.unqualifiedQuantity = Math.max(0, actual - qualified).toFixed(2)
+      if (
+        Number(item.unqualifiedQuantity) > 0 &&
+        (!item.dispositionType || !item.dispositionReason?.trim())
+      ) {
+        message.warning('不合格数量必须选择处置方式并填写原因')
+        return
+      }
     }
 
     // Show warning but don't block (W0 Decision 3)
@@ -190,6 +227,9 @@ export function useReceiptForm(
         }))
         await saveReceiptItems(receiptId, items)
       }
+      if (proofFile.value) {
+        await uploadFile(proofFile.value, 'MATERIAL_RECEIPT', receiptId, 'RECEIPT_PROOF')
+      }
 
       modalVisible.value = false
       fetchData()
@@ -207,6 +247,7 @@ export function useReceiptForm(
     modalVisible,
     modalTitle,
     editingId,
+    proofFile,
     formData,
     itemList,
     handleAdd,

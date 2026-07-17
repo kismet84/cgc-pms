@@ -57,8 +57,6 @@ public class ExpenseApplication extends BaseEntity {
     @NotBlank(message = "费用说明不能为空")
     private String description;
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
-    private String status;
-    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String approvalStatus;
     @Version
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)

@@ -131,7 +131,7 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    @DisplayName("compact permission claim keeps every authority and legacy arrays remain compatible")
+    @DisplayName("decoded compact permissions keep every authority")
     void compactPermissionClaimBuildsAuthorities() throws Exception {
         JwtUtils jwtUtils = mock(JwtUtils.class);
         JwtProperties jwtProperties = mock(JwtProperties.class);

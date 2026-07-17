@@ -173,14 +173,14 @@ onMounted(() => {
             <span class="transaction-kpi-icon is-green"><LoginOutlined /></span>
             <span class="transaction-kpi-copy">
               <span class="lg-kpi-card-label">入库操作</span>
-              <span class="lg-kpi-card-value" style="color: #22c55e">登记</span>
+              <span class="lg-kpi-card-value" style="color: #22c55e">验收驱动</span>
             </span>
           </div>
           <div class="lg-kpi-card is-warn transaction-kpi-card">
             <span class="transaction-kpi-icon is-red"><LogoutOutlined /></span>
             <span class="transaction-kpi-copy">
               <span class="lg-kpi-card-label">出库操作</span>
-              <span class="lg-kpi-card-value" style="color: #ef4444">登记</span>
+              <span class="lg-kpi-card-value" style="color: #ef4444">领料驱动</span>
             </span>
           </div>
           <div class="lg-kpi-card transaction-kpi-card">
@@ -295,7 +295,7 @@ onMounted(() => {
         >
           <div class="lg-toolbar">
             <div class="lg-toolbar-left">
-              <span class="transaction-section-title">库存变动登记</span>
+              <span class="transaction-section-title">库存变动业务入口</span>
             </div>
             <div class="lg-toolbar-right">
               <a-tabs v-model:activeKey="activeTab" class="transaction-tabs">
@@ -307,6 +307,7 @@ onMounted(() => {
                 v-show="activeTab === 'in'"
                 type="primary"
                 :loading="inSubmitting"
+                disabled
                 @click="handleStockIn"
               >
                 确认入库
@@ -317,6 +318,7 @@ onMounted(() => {
                 type="primary"
                 danger
                 :loading="outSubmitting"
+                disabled
                 @click="handleStockOut"
               >
                 确认出库
@@ -325,6 +327,13 @@ onMounted(() => {
           </div>
 
           <div class="transaction-form-body">
+            <a-alert
+              message="手工出入库已关闭"
+              description="采购入库必须由审批通过的材料验收自动生成；材料出库必须由审批通过的领料单经仓管确认后生成。退供和退料使用对应业务单据冲销，禁止绕过来源单据直接改库存。"
+              type="info"
+              show-icon
+              style="margin-bottom: 16px"
+            />
             <!-- Stock In Form -->
             <div v-if="activeTab === 'in'">
               <a-form layout="vertical" class="transaction-form">
@@ -340,6 +349,7 @@ onMounted(() => {
                     v-model:value="inForm.quantity"
                     :min="0.0001"
                     :precision="4"
+                    disabled
                     class="transaction-quantity"
                     placeholder="请输入数量"
                     addon-after=""
@@ -380,6 +390,7 @@ onMounted(() => {
                     v-model:value="outForm.quantity"
                     :min="0.0001"
                     :precision="4"
+                    disabled
                     class="transaction-quantity"
                     placeholder="请输入数量"
                   >
@@ -420,8 +431,8 @@ onMounted(() => {
           <section class="transaction-analysis-section">
             <div class="transaction-rail-title">操作提示</div>
             <ul class="transaction-rail-list">
-              <li><span>入库</span><b>增加可用库存</b></li>
-              <li><span>出库</span><b>扣减可用库存</b></li>
+              <li><span>入库</span><b>材料验收审批驱动</b></li>
+              <li><span>出库</span><b>领料审批后仓管确认</b></li>
               <li>
                 <span>权限</span><b>{{ canSubmitTransaction ? '可提交' : '仅查看' }}</b>
               </li>

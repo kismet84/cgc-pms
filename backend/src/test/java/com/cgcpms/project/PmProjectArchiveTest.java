@@ -143,7 +143,7 @@ class PmProjectArchiveTest {
         stl.setSettlementType("FINAL");
         stl.setContractAmount(new BigDecimal("500000.00"));
         stl.setMeasuredAmount(new BigDecimal("480000.00"));
-        stl.setStatus("DRAFT");
+        stl.setApprovalStatus("DRAFT");
         if (finalized) {
             stl.setFinalizedAt(LocalDateTime.now());
         }

@@ -10,6 +10,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.inventory.entity.MatWarehouse;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.procurement.service.ProcurementIntegrityService;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
@@ -46,6 +47,7 @@ public class MatReceiptService {
     private final MatWarehouseMapper matWarehouseMapper;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ProcurementIntegrityService integrityService;
 
     private final MatReceiptAssembler assembler;
 
@@ -322,6 +324,17 @@ public class MatReceiptService {
                         "验收数量超过采购订单剩余数量，订单明细ID=" + item.getOrderItemId());
             }
             item.setMaterialId(orderItem.getMaterialId());
+            item.setWbsTaskId(orderItem.getWbsTaskId());
+            item.setBudgetLineId(orderItem.getBudgetLineId());
+            BigDecimal unqualified = actual.subtract(qualified);
+            item.setUnqualifiedQuantity(unqualified);
+            if (unqualified.signum() == 0) {
+                item.setDispositionType(null);
+                item.setDispositionStatus(null);
+                item.setDispositionReason(null);
+            } else if (item.getDispositionStatus() == null) {
+                item.setDispositionStatus("PENDING");
+            }
             item.setUnitPrice(nvl(orderItem.getUnitPrice()));
             item.setAmount(qualified.multiply(item.getUnitPrice()).setScale(2, RoundingMode.HALF_UP));
         }
@@ -356,6 +369,8 @@ public class MatReceiptService {
 
     private void validateReceiptForSubmission(MatReceipt receipt) {
         checkProjectAccess(receipt.getProjectId(), "提交材料验收审批");
+        integrityService.requireActiveProject(receipt.getProjectId(), "提交材料验收");
+        integrityService.requireCleanAttachment("MATERIAL_RECEIPT", receipt.getId());
         if (receipt.getOrderId() == null || receipt.getContractId() == null || receipt.getPartnerId() == null) {
             throw new BusinessException("RECEIPT_RELATION_REQUIRED", "验收单必须关联采购订单、合同和供应商");
         }
@@ -394,6 +409,19 @@ public class MatReceiptService {
             }
             if (isDirectConsumption(receipt) && !StringUtils.hasText(item.getUseLocation())) {
                 throw new BusinessException("DIRECT_RECEIPT_USE_LOCATION_REQUIRED", "直耗材料必须填写使用部位");
+            }
+            BigDecimal unqualified = item.getActualQuantity().subtract(item.getQualifiedQuantity());
+            if (item.getUnqualifiedQuantity() == null || item.getUnqualifiedQuantity().compareTo(unqualified) != 0) {
+                throw new BusinessException("RECEIPT_UNQUALIFIED_QUANTITY_MISMATCH", "不合格数量必须等于实收数量减合格数量");
+            }
+            if (unqualified.signum() > 0) {
+                if (!List.of("RETURN", "REPLACE", "CONCESSION").contains(item.getDispositionType())
+                        || !StringUtils.hasText(item.getDispositionReason())) {
+                    throw new BusinessException("RECEIPT_DISPOSITION_REQUIRED", "存在不合格材料时必须填写退货、换货或让步接收处置及原因");
+                }
+                if (!"PENDING".equals(item.getDispositionStatus())) {
+                    throw new BusinessException("RECEIPT_DISPOSITION_STATUS_INVALID", "不合格材料提交审批时必须处于待处置状态");
+                }
             }
         }
     }

@@ -37,6 +37,9 @@ import PurchaseOrderAnalysisRail from './components/PurchaseOrderAnalysisRail.vu
 import PurchaseOrderModal from './components/PurchaseOrderModal.vue'
 import PurchaseOrderSearchBar from './components/PurchaseOrderSearchBar.vue'
 import { suggestSupplierDeliveryDate } from './supplierLeadTime'
+import { getBudgetDetail, getBudgetList } from '@/api/modules/budget'
+import { uploadFile } from '@/api/modules/file'
+import type { BudgetLineVO } from '@/types/budget'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -72,6 +75,8 @@ const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = computed(() => referenceStore.contracts ?? [])
 const materialList = computed(() => referenceStore.materials ?? [])
 const supplierList = ref<PartnerVO[]>([])
+const budgetLineOptions = ref<Array<BudgetLineVO & { label: string }>>([])
+const proofFile = ref<File | null>(null)
 const hasActiveFilters = computed(() =>
   Boolean(
     filter.projectId ||
@@ -96,6 +101,9 @@ const formData = reactive<Partial<MatPurchaseOrderVO>>({
   orderType: undefined,
   orderDate: undefined,
   deliveryDate: undefined,
+  deliveryTerms: '',
+  exceptionPurchaseFlag: 1,
+  exceptionReason: '',
   remark: '',
 })
 const formPartnerName = computed(
@@ -325,9 +333,14 @@ function handleAdd() {
     orderType: undefined,
     orderDate: undefined,
     deliveryDate: undefined,
+    deliveryTerms: '',
+    exceptionPurchaseFlag: 1,
+    exceptionReason: '',
     remark: '',
   })
   itemList.value = []
+  budgetLineOptions.value = []
+  proofFile.value = null
   itemKeyCounter = 0
   modalVisible.value = true
 }
@@ -344,10 +357,16 @@ async function handleEdit(record: MatPurchaseOrderVO) {
     orderType: record.orderType,
     orderDate: record.orderDate,
     deliveryDate: record.deliveryDate,
+    deliveryTerms: record.deliveryTerms,
+    exceptionPurchaseFlag: record.exceptionPurchaseFlag,
+    exceptionReason: record.exceptionReason,
+    requestId: record.requestId,
     remark: record.remark,
   })
   itemList.value = []
   itemKeyCounter = 0
+  proofFile.value = null
+  await loadBudgetLines(record.projectId)
   // Load existing items
   try {
     const items = await getOrderItems(record.id)
@@ -438,6 +457,8 @@ function handleAddItem() {
     quantity: '0',
     unitPrice: '0',
     amount: '0',
+    budgetLineId: undefined,
+    taxRate: '13',
   })
 }
 
@@ -493,9 +514,47 @@ async function handleModalOk() {
     message.warning('请选择项目')
     return
   }
+  if (!formData.contractId) {
+    message.warning('请选择采购合同')
+    return
+  }
+  if (!formData.orderDate || !formData.deliveryDate) {
+    message.warning('请填写订单日期和交货日期')
+    return
+  }
+  if (!formData.deliveryTerms?.trim()) {
+    message.warning('请填写交付条款')
+    return
+  }
+  if (!formData.requestId && !formData.exceptionReason?.trim()) {
+    message.warning('无采购申请来源时必须填写例外采购原因')
+    return
+  }
+  if (!editingId.value && !proofFile.value) {
+    message.warning('请上传采购订单附件')
+    return
+  }
+  if (!itemList.value.length) {
+    message.warning('请至少添加一个订单明细')
+    return
+  }
+  for (const item of itemList.value) {
+    if (!item.materialId || Number(item.quantity) <= 0 || Number(item.unitPrice) <= 0) {
+      message.warning('所有明细必须选择材料，且数量、单价均大于 0')
+      return
+    }
+    if (!item.budgetLineId) {
+      message.warning('请为所有明细选择预算科目')
+      return
+    }
+    if (item.taxRate == null || Number(item.taxRate) < 0 || Number(item.taxRate) > 100) {
+      message.warning('税率必须在 0 至 100 之间')
+      return
+    }
+  }
 
+  let orderId = ''
   try {
-    let orderId: string
     if (editingId.value) {
       await updateOrder(editingId.value, formData)
       orderId = editingId.value
@@ -514,11 +573,21 @@ async function handleModalOk() {
       }))
       await saveOrderItems(orderId, items)
     }
+    if (proofFile.value) {
+      await uploadFile(proofFile.value, 'PURCHASE_ORDER', orderId, 'ORDER_BASIS')
+    }
 
     modalVisible.value = false
     fetchData()
   } catch (e: unknown) {
     console.error(e)
+    if (!editingId.value && orderId) {
+      try {
+        await deleteOrder(orderId)
+      } catch (cleanupError: unknown) {
+        console.error('采购订单创建回滚失败', cleanupError)
+      }
+    }
     message.error('操作失败，请稍后重试')
   }
 }
@@ -632,15 +701,38 @@ function onFilterProjectChange(v: string | undefined) {
   handleSearch()
 }
 
-function handleModalProjectChange(v: string) {
+async function loadBudgetLines(projectId?: string) {
+  budgetLineOptions.value = []
+  if (!projectId) return
+  try {
+    const page = await getBudgetList({ projectId, pageNo: 1, pageSize: 20, status: 'ACTIVE' })
+    const activeBudget = page.records.find((budget) => budget.active || budget.status === 'ACTIVE')
+    if (!activeBudget) return
+    const detail = activeBudget.lines?.length
+      ? activeBudget
+      : await getBudgetDetail(activeBudget.id)
+    budgetLineOptions.value = (detail.lines ?? []).map((line) => ({
+      ...line,
+      label: `${line.costSubjectName || line.costSubjectId}（可用 ¥${Number(line.availableAmount ?? line.budgetAmount).toLocaleString('zh-CN')}）`,
+    }))
+  } catch (e: unknown) {
+    console.error(e)
+    message.warning('未能加载当前有效预算，请确认项目预算已生效')
+  }
+}
+
+async function handleModalProjectChange(v: string) {
   formData.contractId = undefined
   formData.partnerId = undefined
-  referenceStore.fetchContracts({
-    projectId: v,
-    contractType: 'PURCHASE',
-    contractStatus: 'PERFORMING',
-    approvalStatus: 'APPROVED',
-  })
+  await Promise.all([
+    referenceStore.fetchContracts({
+      projectId: v,
+      contractType: 'PURCHASE',
+      contractStatus: 'PERFORMING',
+      approvalStatus: 'APPROVED',
+    }),
+    loadBudgetLines(v),
+  ])
 }
 
 async function loadSuppliers() {
@@ -917,6 +1009,8 @@ onMounted(() => {
       :contract-list="contractList"
       :material-list="materialList"
       :item-list="itemList"
+      :budget-line-options="budgetLineOptions"
+      :proof-file-name="proofFile?.name"
       :items-total-amount="itemsTotalAmount"
       :on-project-change="handleModalProjectChange"
       :on-contract-change="onContractChange"
@@ -927,6 +1021,7 @@ onMounted(() => {
       :on-item-price-change="handleItemPriceChange"
       @ok="handleModalOk"
       @cancel="handleModalCancel"
+      @proof-file-change="proofFile = $event"
     />
   </div>
 </template>

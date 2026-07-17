@@ -387,4 +387,3 @@ CREATE TABLE IF NOT EXISTS sys_file (
     remark VARCHAR(500),
     PRIMARY KEY (id)
 );
-

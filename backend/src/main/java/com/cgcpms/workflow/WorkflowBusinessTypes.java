@@ -4,6 +4,8 @@ public final class WorkflowBusinessTypes {
     private WorkflowBusinessTypes() {}
 
     public static final String CONTRACT_APPROVAL = "CONTRACT_APPROVAL";
+    /** 项目主数据审批 */
+    public static final String PROJECT_APPROVAL = "PROJECT_APPROVAL";
     public static final String PURCHASE_ORDER = "PURCHASE_ORDER";
     public static final String MATERIAL_RECEIPT = "MATERIAL_RECEIPT";
     public static final String SUB_MEASURE = "SUB_MEASURE";

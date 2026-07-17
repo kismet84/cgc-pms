@@ -23,6 +23,10 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
+      - name: Verify backend test order independence
+        run: cd backend && ./mvnw -C -Ptest-order-independence test
+        env:
+          TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
       - name: Run backend tests with coverage
         run: cd backend && ./mvnw -C verify
         env:

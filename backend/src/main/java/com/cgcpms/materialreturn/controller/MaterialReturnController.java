@@ -3,6 +3,7 @@ package com.cgcpms.materialreturn.controller;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.materialreturn.dto.MaterialReturnRequest;
+import com.cgcpms.materialreturn.dto.MaterialReturnReversalRequest;
 import com.cgcpms.materialreturn.entity.MaterialReturn;
 import com.cgcpms.materialreturn.entity.MaterialReturnItem;
 import com.cgcpms.materialreturn.service.MaterialReturnService;
@@ -24,6 +25,14 @@ public class MaterialReturnController {
     @PreAuthorize("hasAuthority('requisition:return') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Long> confirm(@Valid @RequestBody MaterialReturnRequest request) {
         return ApiResponse.success(returnService.confirm(request));
+    }
+
+    @PostMapping("/{id}/reverse")
+    @AuditedOperation(type = "REVERSE", businessType = "MATERIAL_RETURN")
+    @PreAuthorize("hasAuthority('requisition:return') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Long> reverse(@PathVariable Long id,
+                                     @Valid @RequestBody MaterialReturnReversalRequest request) {
+        return ApiResponse.success(returnService.reverse(id, request.reason()));
     }
 
     @GetMapping("/{id}")

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
@@ -16,6 +17,9 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.procurement.service.ProcurementIntegrityService;
+import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
@@ -55,6 +59,9 @@ public class MatPurchaseOrderService {
     private final MdMaterialMapper mdMaterialMapper;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ProcurementIntegrityService integrityService;
+    private final BudgetLedgerService budgetLedgerService;
+    private final MatPurchaseRequestItemMapper purchaseRequestItemMapper;
 
     public IPage<MatPurchaseOrderVO> getPage(long pageNum, long pageSize, Long projectId, Long contractId,
                                               Long partnerId, String orderStatus, String orderType, String orderCode) {
@@ -240,6 +247,14 @@ public class MatPurchaseOrderService {
 
         validateOrderForSubmission(order);
 
+        // 无采购申请来源的例外采购，在提交时按订单明细占用预算。
+        if (order.getRequestId() == null) {
+            for (MatPurchaseOrderItem item : getOrderEntities(order)) {
+                budgetLedgerService.reserve(item.getBudgetLineId(), "PURCHASE_ORDER", orderId,
+                        item.getAmount(), "PURCHASE_ORDER:" + orderId + ":ITEM:" + item.getId() + ":RESERVE");
+            }
+        }
+
         // 调用审批引擎
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -261,6 +276,7 @@ public class MatPurchaseOrderService {
     }
 
     private void validateOrderForSubmission(MatPurchaseOrder order) {
+        integrityService.requireActiveProject(order.getProjectId(), "提交采购订单");
         if (order.getContractId() == null) {
             throw new BusinessException("PURCHASE_ORDER_CONTRACT_REQUIRED", "采购订单必须关联执行中的采购合同");
         }
@@ -273,6 +289,17 @@ public class MatPurchaseOrderService {
         if (order.getDeliveryDate().isBefore(order.getOrderDate())) {
             throw new BusinessException("PURCHASE_ORDER_DATE_INVALID", "交货日期不得早于订单日期");
         }
+        if (!StringUtils.hasText(order.getDeliveryTerms())) {
+            throw new BusinessException("PURCHASE_ORDER_DELIVERY_TERMS_REQUIRED", "采购订单必须填写交付条件");
+        }
+        boolean exceptionPurchase = Integer.valueOf(1).equals(order.getExceptionPurchaseFlag());
+        if (order.getRequestId() == null && (!exceptionPurchase || !StringUtils.hasText(order.getExceptionReason()))) {
+            throw new BusinessException("PURCHASE_ORDER_SOURCE_REQUIRED", "无采购申请来源时必须标记例外采购并填写原因");
+        }
+        if (order.getRequestId() != null && exceptionPurchase) {
+            throw new BusinessException("PURCHASE_ORDER_SOURCE_CONFLICT", "有采购申请来源的订单不得标记为例外采购");
+        }
+        integrityService.requireCleanAttachment("PURCHASE_ORDER", order.getId());
 
         CtContract contract = ctContractMapper.selectById(order.getContractId());
         if (contract == null || !java.util.Objects.equals(contract.getTenantId(), order.getTenantId())) {
@@ -319,6 +346,24 @@ public class MatPurchaseOrderService {
             }
             if (item.getUnitPrice() == null || item.getUnitPrice().signum() <= 0) {
                 throw new BusinessException("PURCHASE_ORDER_ITEM_PRICE_INVALID", "采购订单明细单价必须大于 0");
+            }
+            integrityService.requireActiveBudgetLine(order.getProjectId(), item.getBudgetLineId());
+            if (item.getRequestItemId() != null) {
+                MatPurchaseRequestItem requestItem = purchaseRequestItemMapper.selectById(item.getRequestItemId());
+                if (requestItem == null || !java.util.Objects.equals(requestItem.getTenantId(), order.getTenantId())
+                        || !java.util.Objects.equals(requestItem.getBudgetLineId(), item.getBudgetLineId())) {
+                    throw new BusinessException("PURCHASE_ORDER_REQUEST_ITEM_MISMATCH", "订单明细与采购申请预算来源不一致");
+                }
+                if (item.getAmount() != null && requestItem.getEstimatedAmount() != null
+                        && item.getAmount().compareTo(requestItem.getEstimatedAmount()) > 0) {
+                    throw new BusinessException("PURCHASE_ORDER_EXCEEDS_REQUEST_BUDGET", "订单明细金额超过采购申请已占用预算");
+                }
+            } else if (!exceptionPurchase) {
+                throw new BusinessException("PURCHASE_ORDER_REQUEST_ITEM_REQUIRED", "非例外采购订单明细必须关联采购申请明细");
+            }
+            if (item.getTaxRate() == null || item.getTaxRate().signum() < 0
+                    || item.getTaxRate().compareTo(new BigDecimal("100")) > 0) {
+                throw new BusinessException("PURCHASE_ORDER_TAX_RATE_INVALID", "订单税率必须在0到100之间");
             }
             BigDecimal expectedAmount = item.getQuantity().multiply(item.getUnitPrice())
                     .setScale(2, RoundingMode.HALF_UP);
@@ -370,6 +415,24 @@ public class MatPurchaseOrderService {
         // Insert new items
         Long tenantId = UserContext.getCurrentTenantId();
         for (MatPurchaseOrderItem item : items) {
+            if (item.getQuantity() == null || item.getQuantity().signum() <= 0
+                    || item.getUnitPrice() == null || item.getUnitPrice().signum() <= 0) {
+                throw new BusinessException("PURCHASE_ORDER_ITEM_INVALID", "订单明细数量和单价必须大于0");
+            }
+            if (item.getBudgetLineId() != null) {
+                integrityService.requireActiveBudgetLine(order.getProjectId(), item.getBudgetLineId());
+            }
+            BigDecimal taxRate = item.getTaxRate() == null ? BigDecimal.ZERO : item.getTaxRate();
+            if (taxRate.signum() < 0 || taxRate.compareTo(new BigDecimal("100")) > 0) {
+                throw new BusinessException("PURCHASE_ORDER_TAX_RATE_INVALID", "订单税率必须在0到100之间");
+            }
+            BigDecimal amount = item.getQuantity().multiply(item.getUnitPrice()).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal withoutTax = taxRate.signum() == 0 ? amount
+                    : amount.multiply(new BigDecimal("100")).divide(new BigDecimal("100").add(taxRate), 2, RoundingMode.HALF_UP);
+            item.setTaxRate(taxRate);
+            item.setAmount(amount);
+            item.setAmountWithoutTax(withoutTax);
+            item.setTaxAmount(amount.subtract(withoutTax));
             item.setOrderId(orderId);
             item.setTenantId(tenantId);
             item.setProjectId(order.getProjectId());
@@ -387,6 +450,12 @@ public class MatPurchaseOrderService {
         updateWrapper.eq(MatPurchaseOrder::getId, orderId)
                 .set(MatPurchaseOrder::getTotalAmount, totalAmount);
         matPurchaseOrderMapper.update(null, updateWrapper);
+    }
+
+    private List<MatPurchaseOrderItem> getOrderEntities(MatPurchaseOrder order) {
+        return matPurchaseOrderItemMapper.selectList(new LambdaQueryWrapper<MatPurchaseOrderItem>()
+                .eq(MatPurchaseOrderItem::getOrderId, order.getId())
+                .eq(MatPurchaseOrderItem::getTenantId, order.getTenantId()));
     }
 
     private MatPurchaseOrderVO toVO(MatPurchaseOrder o) {
@@ -434,6 +503,9 @@ public class MatPurchaseOrderService {
         vo.setOrderType(o.getOrderType());
         vo.setOrderDate(o.getOrderDate() != null ? DateTimeUtils.DATE_FMT.format(o.getOrderDate()) : null);
         vo.setDeliveryDate(o.getDeliveryDate() != null ? DateTimeUtils.DATE_FMT.format(o.getDeliveryDate()) : null);
+        vo.setDeliveryTerms(o.getDeliveryTerms());
+        vo.setExceptionPurchaseFlag(o.getExceptionPurchaseFlag());
+        vo.setExceptionReason(o.getExceptionReason());
         vo.setTotalAmount(o.getTotalAmount() != null ? o.getTotalAmount().toPlainString() : null);
         vo.setApprovalStatus(o.getApprovalStatus());
         vo.setOrderStatus(o.getOrderStatus());
@@ -450,6 +522,8 @@ public class MatPurchaseOrderService {
         vo.setTenantId(i.getTenantId() != null ? i.getTenantId().toString() : null);
         vo.setOrderId(i.getOrderId() != null ? i.getOrderId().toString() : null);
         vo.setRequestItemId(i.getRequestItemId() != null ? i.getRequestItemId().toString() : null);
+        vo.setWbsTaskId(i.getWbsTaskId() != null ? i.getWbsTaskId().toString() : null);
+        vo.setBudgetLineId(i.getBudgetLineId() != null ? i.getBudgetLineId().toString() : null);
         vo.setProjectId(i.getProjectId() != null ? i.getProjectId().toString() : null);
         vo.setMaterialId(i.getMaterialId() != null ? i.getMaterialId().toString() : null);
         vo.setMaterialName(i.getMaterialId() != null ? materialNames.get(i.getMaterialId()) : i.getMaterialName());
@@ -457,7 +531,10 @@ public class MatPurchaseOrderService {
         vo.setUnit(i.getUnit());
         vo.setQuantity(i.getQuantity() != null ? i.getQuantity().toPlainString() : null);
         vo.setUnitPrice(i.getUnitPrice() != null ? i.getUnitPrice().toPlainString() : null);
+        vo.setTaxRate(i.getTaxRate() != null ? i.getTaxRate().toPlainString() : "0");
         vo.setAmount(i.getAmount() != null ? i.getAmount().toPlainString() : null);
+        vo.setTaxAmount(i.getTaxAmount() != null ? i.getTaxAmount().toPlainString() : "0");
+        vo.setAmountWithoutTax(i.getAmountWithoutTax() != null ? i.getAmountWithoutTax().toPlainString() : "0");
         vo.setReceivedQuantity(i.getReceivedQuantity() != null ? i.getReceivedQuantity().toPlainString() : "0");
         vo.setCreatedBy(i.getCreatedBy() != null ? i.getCreatedBy().toString() : null);
         vo.setCreatedAt(i.getCreatedAt() != null ? DateTimeUtils.DTF.format(i.getCreatedAt()) : null);

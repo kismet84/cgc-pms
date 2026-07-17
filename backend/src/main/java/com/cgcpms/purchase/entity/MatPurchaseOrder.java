@@ -47,6 +47,13 @@ public class MatPurchaseOrder extends BaseEntity {
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate deliveryDate;
 
+    private String deliveryTerms;
+
+    /** 无采购申请来源时必须显式标记例外采购。 */
+    private Integer exceptionPurchaseFlag;
+
+    private String exceptionReason;
+
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal totalAmount;
 

@@ -75,8 +75,8 @@ public class WorkflowTemplateService {
     public void updateTemplate(Long templateId, WorkflowTemplateUpdateRequest request) {
         WfTemplate template = getTemplateOrThrow(templateId);
         validateAmountRange(request.getAmountMin(), request.getAmountMax());
-        validateJsonOrBlank(request.getConditionRule(), "conditionRule");
-        validateJsonOrBlank(request.getFormSchema(), "formSchema");
+        rejectUnsupportedConfig(request.getConditionRule(), "conditionRule");
+        rejectUnsupportedConfig(request.getFormSchema(), "formSchema");
         template.setTemplateName(request.getTemplateName());
         template.setEnabled(request.getEnabled() == null ? template.getEnabled() : request.getEnabled());
         template.setAmountMin(request.getAmountMin());
@@ -217,11 +217,11 @@ public class WorkflowTemplateService {
                 && !WorkflowConstants.MODE_COUNTERSIGN.equals(mode)
                 && !WorkflowConstants.MODE_OR_SIGN.equals(mode))
             throw new BusinessException("TEMPLATE_NODE_MODE_INVALID", "审批模式不支持");
-        validateJsonOrBlank(request.getApproverConfig(), "approverConfig");
-        validateJsonOrBlank(request.getPassRuleJson(), "passRuleJson");
-        validateJsonOrBlank(request.getRejectRuleJson(), "rejectRuleJson");
-        validateJsonOrBlank(request.getConditionRule(), "conditionRule");
-        validateJsonOrBlank(request.getNodeConfig(), "nodeConfig");
+        validateApproverConfig(request.getApproverConfig());
+        rejectUnsupportedConfig(request.getPassRuleJson(), "passRuleJson");
+        rejectUnsupportedConfig(request.getRejectRuleJson(), "rejectRuleJson");
+        rejectUnsupportedConfig(request.getConditionRule(), "conditionRule");
+        rejectUnsupportedConfig(request.getNodeConfig(), "nodeConfig");
     }
 
     private void validateAmountRange(BigDecimal min, BigDecimal max) {
@@ -233,6 +233,40 @@ public class WorkflowTemplateService {
         if (json == null || json.isBlank()) return;
         try { objectMapper.readTree(json); }
         catch (Exception e) { throw new BusinessException("TEMPLATE_JSON_INVALID", fieldName + " 不是合法 JSON"); }
+    }
+
+    private void rejectUnsupportedConfig(String json, String fieldName) {
+        if (json == null || json.isBlank()) return;
+        validateJsonOrBlank(json, fieldName);
+        throw new BusinessException("TEMPLATE_CONFIG_UNSUPPORTED",
+                fieldName + " 尚未接入审批执行引擎，禁止保存为生效配置");
+    }
+
+    private void validateApproverConfig(String json) {
+        if (json == null || json.isBlank()) return;
+        final com.fasterxml.jackson.databind.JsonNode node;
+        try { node = objectMapper.readTree(json); }
+        catch (Exception e) { throw new BusinessException("TEMPLATE_JSON_INVALID", "approverConfig 不是合法 JSON"); }
+        if (!node.isObject() || !node.hasNonNull("type")) {
+            throw new BusinessException("INVALID_APPROVER_CONFIG", "审批人配置必须是包含 type 的 JSON 对象");
+        }
+        String type = node.get("type").asText().toUpperCase();
+        String required = switch (type) {
+            case "USER" -> "userId";
+            case "ROLE" -> "roleId";
+            case "POSITION" -> "positionId";
+            case "PROJECT_ROLE" -> "roleCode";
+            default -> throw new BusinessException("UNSUPPORTED_APPROVER_TYPE", "不支持的审批人类型: " + type);
+        };
+        if (!node.hasNonNull(required) || node.get(required).asText().isBlank()) {
+            throw new BusinessException("INVALID_APPROVER_CONFIG", type + " 类型配置缺少 " + required);
+        }
+        Set<String> allowed = Set.of("type", required);
+        node.fieldNames().forEachRemaining(field -> {
+            if (!allowed.contains(field)) {
+                throw new BusinessException("INVALID_APPROVER_CONFIG", "审批人配置包含未执行字段: " + field);
+            }
+        });
     }
 
     // ═══════════════════════════════════════════════════════════

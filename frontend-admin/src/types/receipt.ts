@@ -9,10 +9,14 @@ export interface MatReceiptItemVO {
   unit?: string
   actualQuantity?: string
   qualifiedQuantity?: string
+  unqualifiedQuantity?: string
   unitPrice?: string
   amount?: string
   useLocation?: string
   batchNo?: string
+  dispositionType?: 'RETURN' | 'REPLACE' | 'CONCESSION'
+  dispositionStatus?: 'PENDING' | 'COMPLETED'
+  dispositionReason?: string
   orderedQuantity?: string
   receivedQuantity?: string
   remainingQuantity?: string

@@ -9,6 +9,7 @@ import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.workflow.WorkflowConstants;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandlerRegistry;
@@ -17,6 +18,7 @@ import com.cgcpms.workflow.mapper.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -45,6 +47,7 @@ class WorkflowCoreService {
     final WorkflowBusinessHandlerRegistry handlerRegistry;
     final NotificationService notificationService;
     final ApproverResolver approverResolver;
+    final JdbcTemplate jdbcTemplate;
 
     void requireCurrentTenant(Long targetTenantId) {
         if (!Objects.equals(targetTenantId, UserContext.getCurrentTenantId())) {
@@ -53,8 +56,13 @@ class WorkflowCoreService {
     }
 
     // ── Template lookup ──
-    WfTemplate findTemplate(String businessType, Long tenantId, java.math.BigDecimal amount) {
-        WfTemplate template = queryTemplate(businessType, tenantId, amount);
+    WfTemplate findTemplate(String businessType, Long tenantId, java.math.BigDecimal amount,
+                            Long businessId, Long contractId) {
+        WfTemplate template = queryRoutedTemplate(businessType, tenantId, amount, businessId, contractId);
+        if (template == null && tenantId != null && tenantId != 0L)
+            template = queryRoutedTemplate(businessType, 0L, amount, businessId, contractId);
+        if (template != null) return template;
+        template = queryTemplate(businessType, tenantId, amount);
         if (template == null && tenantId != null && tenantId != 0L)
             template = queryTemplate(businessType, 0L, amount);
         if (template == null)
@@ -72,12 +80,65 @@ class WorkflowCoreService {
         }
         List<WfTemplate> templates = wfTemplateMapper.selectList(wrapper);
         if (templates.isEmpty()) return null;
-        templates.sort(Comparator
-                .comparing(WfTemplate::getAmountMin, Comparator.nullsFirst(java.math.BigDecimal::compareTo))
-                .thenComparing(WfTemplate::getAmountMax,
-                        Comparator.nullsLast(java.math.BigDecimal::compareTo).reversed())
-                .thenComparing(WfTemplate::getCreatedAt, Comparator.nullsLast(LocalDateTime::compareTo)));
+        templates.sort((a,b)->{
+            int min=compareMinDesc(a.getAmountMin(),b.getAmountMin());
+            if(min!=0)return min;
+            int max=compareMaxAsc(a.getAmountMax(),b.getAmountMax());
+            if(max!=0)return max;
+            return Comparator.nullsLast(LocalDateTime::compareTo).compare(a.getCreatedAt(),b.getCreatedAt());
+        });
+        if(templates.size()>1&&Objects.equals(templates.get(0).getAmountMin(),templates.get(1).getAmountMin())
+                &&Objects.equals(templates.get(0).getAmountMax(),templates.get(1).getAmountMax())){
+            throw new BusinessException("TEMPLATE_AMBIGUOUS", "存在相同业务类型和金额范围的多个审批模板");
+        }
         return templates.get(0);
+    }
+
+    private WfTemplate queryRoutedTemplate(String businessType,Long ruleTenantId,
+                                           java.math.BigDecimal amount,Long businessId,Long contractId){
+        String contractType=null,expenseCategory=null;
+        if(contractId!=null){
+            List<String> values=jdbcTemplate.query("SELECT contract_type FROM ct_contract WHERE id=? AND tenant_id=? AND deleted_flag=0",
+                    (rs,row)->rs.getString(1),contractId,UserContext.getCurrentTenantId());
+            if(!values.isEmpty())contractType=values.getFirst();
+        }
+        if(businessId!=null&&WorkflowBusinessTypes.EXPENSE.equals(businessType)){
+            List<String> values=jdbcTemplate.query("SELECT expense_category FROM expense_application WHERE id=? AND tenant_id=? AND deleted_flag=0",
+                    (rs,row)->rs.getString(1),businessId,UserContext.getCurrentTenantId());
+            if(!values.isEmpty())expenseCategory=values.getFirst();
+        }else if(businessId!=null&&WorkflowBusinessTypes.PAY_REQUEST.equals(businessType)){
+            List<String> values=jdbcTemplate.query("SELECT expense_category FROM pay_application WHERE id=? AND tenant_id=? AND deleted_flag=0",
+                    (rs,row)->rs.getString(1),businessId,UserContext.getCurrentTenantId());
+            if(!values.isEmpty())expenseCategory=values.getFirst();
+        }
+        List<java.util.Map<String,Object>> rules=jdbcTemplate.queryForList("""
+                SELECT id,workflow_template_id,priority FROM approval_routing_rule
+                WHERE tenant_id=? AND business_type=? AND enabled_flag=1
+                  AND (min_amount IS NULL OR min_amount<=?) AND (max_amount IS NULL OR max_amount>=?)
+                  AND (contract_type IS NULL OR contract_type=?)
+                  AND (expense_category IS NULL OR expense_category=?)
+                ORDER BY priority,id
+                """,ruleTenantId,businessType,amount,amount,contractType,expenseCategory);
+        if(rules.isEmpty())return null;
+        int priority=((Number)rules.getFirst().get("priority")).intValue();
+        List<java.util.Map<String,Object>> best=rules.stream()
+                .filter(r->((Number)r.get("priority")).intValue()==priority).toList();
+        List<Long> templateIds=best.stream().map(r->((Number)r.get("workflow_template_id")).longValue()).distinct().toList();
+        if(templateIds.size()>1)throw new BusinessException("APPROVAL_ROUTING_AMBIGUOUS","存在同优先级且指向不同模板的审批路由");
+        WfTemplate template=wfTemplateMapper.selectOne(new LambdaQueryWrapper<WfTemplate>()
+                .eq(WfTemplate::getId,templateIds.getFirst())
+                .eq(WfTemplate::getTenantId,ruleTenantId)
+                .eq(WfTemplate::getEnabled,1));
+        if(template==null||!businessType.equals(template.getBusinessType()))
+            throw new BusinessException("APPROVAL_ROUTING_TEMPLATE_INVALID","审批路由指向了不可用或业务类型不一致的模板");
+        return template;
+    }
+
+    private int compareMinDesc(java.math.BigDecimal a,java.math.BigDecimal b){
+        if(a==null&&b==null)return 0;if(a==null)return 1;if(b==null)return -1;return b.compareTo(a);
+    }
+    private int compareMaxAsc(java.math.BigDecimal a,java.math.BigDecimal b){
+        if(a==null&&b==null)return 0;if(a==null)return 1;if(b==null)return -1;return a.compareTo(b);
     }
 
     List<WfTemplateNode> findTemplateNodes(Long templateId) {

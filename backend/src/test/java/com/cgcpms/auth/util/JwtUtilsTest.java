@@ -8,15 +8,14 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DisplayName("JWT compact claims")
 class JwtUtilsTest {
 
     @Test
-    @DisplayName("permissions are encoded as a compact string without changing their values")
-    void permissionsUseCompactStringClaim() {
+    @DisplayName("permissions are compressed without changing their values")
+    void permissionsUseCompressedClaim() {
         JwtProperties properties = new JwtProperties();
         properties.setSecret("0123456789abcdef0123456789abcdef0123456789abcdef");
         properties.setExpiration(900_000L);
@@ -26,10 +25,12 @@ class JwtUtilsTest {
         String token = jwtUtils.generateToken(1L, "admin", 0L,
                 List.of("SUPER_ADMIN"),
                 List.of("measurement:query", "measurement:submit", "measurement:owner:review"));
-        Object claim = jwtUtils.parseToken(token).get(JwtUtils.CLAIM_PERMISSIONS);
+        var claims = jwtUtils.parseToken(token);
 
-        assertInstanceOf(String.class, claim);
-        assertEquals("measurement:query,measurement:submit,measurement:owner:review", claim);
+        Object claim = claims.get(JwtUtils.CLAIM_PERMISSIONS);
+        assertTrue(claim instanceof String);
+        assertEquals(List.of("measurement:query", "measurement:submit", "measurement:owner:review"),
+                JwtUtils.decodePermissionClaim(claim));
         assertTrue(jwtUtils.validateToken(token));
     }
 

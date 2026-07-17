@@ -7,15 +7,20 @@ defineProps<{
   formData: {
     projectId?: string
     contractId?: string
+    purpose?: string
     remark?: string
   }
   projectList: { id: string; projectName: string }[]
   contractList: { id: string; contractName?: string }[]
+  budgetLineOptions: Array<{ id?: string; label: string }>
+  proofFileName?: string
   itemList: Array<{
     key: number
     materialId?: string
     materialName?: string
     quantity?: string
+    budgetLineId?: string
+    estimatedUnitPrice?: string
     unit?: string
     plannedDate?: string
     remark?: string
@@ -36,14 +41,21 @@ const emit = defineEmits<{
   removeItem: [key: number]
   materialChange: [key: number, materialId: string | undefined]
   materialClear: [key: number]
+  proofFileChange: [file: File | null]
 }>()
+
+function handleProofFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  emit('proofFileChange', input.files?.[0] ?? null)
+  emit('markDirty')
+}
 </script>
 
 <template>
   <a-modal
     :open="open"
     :title="title"
-    :width="800"
+    :width="1120"
     :confirm-loading="isViewMode ? false : submitting"
     :ok-button-props="isViewMode ? { style: { display: 'none' } } : undefined"
     :cancel-text="isViewMode ? '关闭' : '取消'"
@@ -64,7 +76,7 @@ const emit = defineEmits<{
           </a-select-option>
         </a-select>
       </a-form-item>
-      <a-form-item label="关联合同">
+      <a-form-item label="关联合同" required>
         <a-select
           v-model:value="formData.contractId"
           :disabled="isViewMode"
@@ -78,6 +90,22 @@ const emit = defineEmits<{
             {{ c.contractName }}
           </a-select-option>
         </a-select>
+      </a-form-item>
+      <a-form-item label="采购用途" required>
+        <a-textarea
+          v-model:value="formData.purpose"
+          :disabled="isViewMode"
+          :rows="2"
+          placeholder="说明本次采购用途、施工部位或需求来源"
+          @change="emit('markDirty')"
+        />
+      </a-form-item>
+      <a-form-item label="采购依据" :required="!isViewMode">
+        <div v-if="isViewMode">附件已由系统在提交审批时校验</div>
+        <div v-else class="proof-file-input">
+          <input type="file" @change="handleProofFile" />
+          <span>{{ proofFileName || '新建申请必须上传采购依据' }}</span>
+        </div>
       </a-form-item>
       <a-form-item label="备注">
         <a-textarea
@@ -159,6 +187,29 @@ const emit = defineEmits<{
               @change="emit('markDirty')"
             />
           </template>
+          <template v-else-if="column.key === 'budgetLineId'">
+            <a-select
+              v-model:value="item.budgetLineId"
+              :disabled="isViewMode"
+              placeholder="预算科目"
+              style="width: 100%"
+              @change="emit('markDirty')"
+            >
+              <a-select-option v-for="line in budgetLineOptions" :key="line.id" :value="line.id">
+                {{ line.label }}
+              </a-select-option>
+            </a-select>
+          </template>
+          <template v-else-if="column.key === 'estimatedUnitPrice'">
+            <a-input-number
+              v-model:value="item.estimatedUnitPrice"
+              :disabled="isViewMode"
+              :min="0"
+              :precision="2"
+              style="width: 100%"
+              @change="emit('markDirty')"
+            />
+          </template>
           <template v-else-if="column.key === 'plannedDate'">
             <a-date-picker
               v-model:value="item.plannedDate"
@@ -201,6 +252,14 @@ const emit = defineEmits<{
   border-top: 1px solid #f0f0f0;
   padding-top: 12px;
   margin-top: 4px;
+}
+
+.proof-file-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .pr-items-header {

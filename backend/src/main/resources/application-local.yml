@@ -34,7 +34,7 @@ spring:
     baseline-version: 0
     table: flyway_schema_history
     encoding: UTF-8
-    validate-on-migrate: false
+    validate-on-migrate: true
     # clean-disabled=false is safe for H2 in-memory — DB is recreated each run.
     clean-disabled: false
 

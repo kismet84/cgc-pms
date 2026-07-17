@@ -262,3 +262,15 @@ describe('PurchaseOrderPage route filters', () => {
     })
   })
 })
+
+describe('PurchaseOrderPage commercial and budget integrity', () => {
+  it('captures delivery, exception source, budget, tax and attachment evidence', () => {
+    expect(source).toContain('formData.deliveryTerms')
+    expect(source).toContain('formData.exceptionReason')
+    expect(source).toContain('item.budgetLineId')
+    expect(source).toContain('item.taxRate')
+    expect(source).toContain("uploadFile(proofFile.value, 'PURCHASE_ORDER'")
+    expect(modalSource).toContain('例外采购原因')
+    expect(modalSource).toContain('订单附件')
+  })
+})

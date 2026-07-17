@@ -153,8 +153,7 @@ public class SettlementWorkflowHandler implements WorkflowBusinessHandler {
 
         stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
-                .set(StlSettlement::getApprovalStatus, APPROVAL_REJECTED)
-                .set(StlSettlement::getStatus, APPROVAL_REJECTED));
+                .set(StlSettlement::getApprovalStatus, APPROVAL_REJECTED));
     }
 
     // ================================================================
@@ -169,7 +168,6 @@ public class SettlementWorkflowHandler implements WorkflowBusinessHandler {
         stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
                 .set(StlSettlement::getApprovalStatus, APPROVAL_DRAFT)
-                .set(StlSettlement::getStatus, APPROVAL_DRAFT)
                 .set(StlSettlement::getSettlementStatus, SETTLEMENT_DRAFT));
     }
 

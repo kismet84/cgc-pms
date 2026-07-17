@@ -10,14 +10,20 @@ public class MatReceiptItemVO {
     private String orderItemId;
     private String materialId;
     private String materialName;
+    private String wbsTaskId;
+    private String budgetLineId;
     private String specification;
     private String unit;
     private String actualQuantity;
     private String qualifiedQuantity;
+    private String unqualifiedQuantity;
     private String unitPrice;
     private String amount;
     private String useLocation;
     private String batchNo;
+    private String dispositionType;
+    private String dispositionStatus;
+    private String dispositionReason;
     /** Order item quantity for receipt line selection context */
     private String orderedQuantity;
     /** Already received quantity from order items */

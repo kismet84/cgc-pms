@@ -52,6 +52,8 @@ class MatPurchaseOrderControllerTest {
     private static final long PROJECT_ID = 10001L;
     private static final long CONTRACT_ID = 30001L;
     private static final long PARTNER_ID = 20002L;
+    private static final long BUDGET_ID = 9901101L;
+    private static final long BUDGET_LINE_ID = 9901102L;
     private static final Pattern DATA_ID_PATTERN = Pattern.compile("\"data\":\"(\\d+)\"");
     private static final Pattern ORDER_CODE_PATTERN = Pattern.compile("\"orderCode\":\"([^\"]+)\"");
 
@@ -62,6 +64,7 @@ class MatPurchaseOrderControllerTest {
         // 控制器提交用例使用真实采购语义，避免复用 V90 的分包合同夹具。
         jdbcTemplate.update("UPDATE md_partner SET partner_type='SUPPLIER',blacklist_flag=0,status='ENABLE' WHERE id=?", PARTNER_ID);
         jdbcTemplate.update("UPDATE ct_contract SET contract_type='PURCHASE' WHERE id=?", CONTRACT_ID);
+        ensureActiveBudget();
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, ADMIN_ID);
         if (count != null && count > 0) {
@@ -70,11 +73,30 @@ class MatPurchaseOrderControllerTest {
         jdbcTemplate.update("""
                 INSERT INTO sys_user
                     (id, tenant_id, username, password, real_name, status, is_admin,
-                     created_by, updated_by, deleted_flag, deleted_token, remark)
-                VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, NULL, ?)
+                     created_by, updated_by, deleted_flag, remark)
+                VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, ?)
                 """, ADMIN_ID, TENANT_ID, "test_purchase_controller_approver", "{noop}test",
                 "采购订单接口测试审批人", ADMIN_ID, ADMIN_ID,
                 "MatPurchaseOrderControllerTest local approver");
+    }
+
+    private void ensureActiveBudget() {
+        jdbcTemplate.update("""
+                INSERT INTO project_budget (
+                    id, tenant_id, project_id, version_no, budget_name, total_amount,
+                    approval_status, status, active_flag, active_token, created_by, deleted_flag
+                ) SELECT ?, ?, ?, 'PO-CONTROLLER-V1', '采购订单接口测试预算', 5000000,
+                    'APPROVED', 'ACTIVE', 1, ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM project_budget WHERE id = ?)
+                """, BUDGET_ID, TENANT_ID, PROJECT_ID, BUDGET_ID, ADMIN_ID, BUDGET_ID);
+        jdbcTemplate.update("""
+                INSERT INTO project_budget_line (
+                    id, tenant_id, budget_id, project_id, cost_subject_id, budget_amount,
+                    reserved_amount, consumed_amount, version, created_by, deleted_flag
+                ) SELECT ?, ?, ?, ?, 1002, 5000000, 0, 0, 0, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM project_budget_line WHERE id = ?)
+                """, BUDGET_LINE_ID, TENANT_ID, BUDGET_ID, PROJECT_ID,
+                ADMIN_ID, BUDGET_LINE_ID);
     }
 
     @AfterAll
@@ -157,6 +179,9 @@ class MatPurchaseOrderControllerTest {
                     "orderType": "PURCHASE",
                     "orderDate": "%s",
                     "deliveryDate": "%s",
+                    "deliveryTerms": "送达项目现场并验收",
+                    "exceptionPurchaseFlag": 1,
+                    "exceptionReason": "采购订单接口闭环测试",
                     "totalAmount": 100000.00
                 }
                 """.formatted(PROJECT_ID, CONTRACT_ID, PARTNER_ID,
@@ -410,6 +435,9 @@ class MatPurchaseOrderControllerTest {
                     "orderType": "PURCHASE",
                     "orderDate": "%s",
                     "deliveryDate": "%s",
+                    "deliveryTerms": "送达项目现场并验收",
+                    "exceptionPurchaseFlag": 1,
+                    "exceptionReason": "采购订单接口闭环测试",
                     "totalAmount": 100000.00
                 }
                 """.formatted(PROJECT_ID, CONTRACT_ID, PARTNER_ID,
@@ -436,16 +464,26 @@ class MatPurchaseOrderControllerTest {
                         "unit": "吨",
                         "quantity": 10.00,
                         "unitPrice": 10000.00,
+                        "budgetLineId": %d,
+                        "taxRate": 13.00,
                         "amount": 100000.00
                     }
                 ]
-                """.formatted(orderId);
+                """.formatted(orderId, BUDGET_LINE_ID);
         mockMvc.perform(postWithApi("/purchase-orders/" + orderId + "/items/batch")
                         .cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(itemBody))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
+
+        jdbcTemplate.update("""
+                INSERT INTO sys_file (
+                    id, tenant_id, business_type, business_id, file_name, original_name,
+                    file_size, storage_path, bucket_name, virus_scan_status, created_by, deleted_flag
+                ) VALUES (?, ?, 'PURCHASE_ORDER', ?, 'order.pdf', 'order.pdf', 10,
+                    '/test/order.pdf', 'test', 'CLEAN', ?, 0)
+                """, Math.abs(System.nanoTime()), TENANT_ID, orderId, ADMIN_ID);
     }
 
     @Test

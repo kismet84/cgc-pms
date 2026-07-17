@@ -218,6 +218,26 @@ class WorkflowCoreServiceTest {
         assertEquals("RUNNING", instanceMax.getInstanceStatus());
     }
 
+    @Test
+    @DisplayName("审批路由规则在唯一模板入口按合同类型生效")
+    void routingRuleOverridesFallbackAmountRange() {
+        long businessId = 88888005L;
+        seedContract(businessId);
+        jdbcTemplate.update("""
+                INSERT INTO approval_routing_rule(
+                 id,tenant_id,rule_name,business_type,min_amount,max_amount,contract_type,
+                 workflow_template_id,priority,enabled_flag,rule_signature,active_rule_token,version,created_at,updated_at)
+                VALUES(230000000000000201,0,'合同类型路由测试',?,0,50000,'SUB',?,1,1,
+                 'CONTRACT_APPROVAL|0.00|50000.00|SUB|*',0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)
+                """, BUSINESS_TYPE, TEMPLATE_1_ID);
+
+        WfInstance instance = workflowEngine.submit(USER_ADMIN, "admin", TENANT_0,
+                BUSINESS_TYPE, businessId, "路由覆盖金额范围", new BigDecimal("20000.00"),
+                null, null, "{}", "{}", null);
+
+        assertEquals(TEMPLATE_1_ID, instance.getTemplateId());
+    }
+
     // ── Approver config resolution ──
 
     @Test
@@ -427,7 +447,7 @@ class WorkflowCoreServiceTest {
 
     private void cleanup() {
         // Clean up workflow data in correct FK order
-        for (long bizId : new long[]{88888001L, 88888002L, 88888003L, 88888004L}) {
+        for (long bizId : new long[]{88888001L, 88888002L, 88888003L, 88888004L, 88888005L}) {
             jdbcTemplate.update("DELETE FROM wf_record WHERE business_id = ?", bizId);
             jdbcTemplate.update("DELETE FROM wf_task WHERE business_id = ?", bizId);
             jdbcTemplate.update(
@@ -436,6 +456,7 @@ class WorkflowCoreServiceTest {
             jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id = ?", bizId);
             jdbcTemplate.update("DELETE FROM ct_contract WHERE id = ?", bizId);
         }
+        jdbcTemplate.update("DELETE FROM approval_routing_rule WHERE id = 230000000000000201");
         // Clean template nodes first (FK to template)
         jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id IN (?, ?)",
                 TEMPLATE_1_ID, TEMPLATE_2_ID);

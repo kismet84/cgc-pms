@@ -135,7 +135,7 @@ class StlSettlementServiceTest {
         settlement.setProjectId(PROJECT_ID);
         settlement.setContractId(CONTRACT_ID_30001);
         settlement.setSettlementType("FINAL");
-        settlement.setStatus("DRAFT");
+        settlement.setApprovalStatus("DRAFT");
 
         Long id = stlSettlementWriteService.create(settlement);
         assertNotNull(id);
@@ -289,7 +289,6 @@ class StlSettlementServiceTest {
         update.setId(id);
         update.setContractId(CONTRACT_ID_30001);
         update.setDeductionAmount(new BigDecimal("500.00"));
-        update.setStatus("DRAFT");
         stlSettlementWriteService.update(update);
 
         StlSettlement saved = stlSettlementMapper.selectById(id);

@@ -277,5 +277,24 @@ class MatRequisitionWorkflowSubmitTest {
                         item.getId(), txn.getId(), new BigDecimal("6.0000"),
                         LocalDate.of(2026, 7, 8), "超量退料", "RETURN-TEST-002")));
         assertEquals("RETURN_EXCEEDS_ISSUED", excessiveReturn.getCode());
+
+        assertEquals(returnId, materialReturnService.reverse(returnId, "退料录入错误"));
+        assertEquals(returnId, materialReturnService.reverse(returnId, "重复冲销保持幂等"));
+        assertEquals("REVERSED", materialReturnService.getById(returnId).getStatus());
+        MatStock afterReversal = matStockMapper.selectById(stock.getId());
+        assertEquals(0, new BigDecimal("12.0000").compareTo(afterReversal.getAvailableQty()));
+        assertEquals(0, new BigDecimal("150.00").compareTo(afterReversal.getInventoryValue()));
+        CostItem reversalUndo = costItemMapper.selectOne(new LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getSourceType, "MATERIAL_RETURN_REVERSAL")
+                .eq(CostItem::getSourceId, returnId));
+        assertNotNull(reversalUndo);
+        assertEquals(0, new BigDecimal("37.50").compareTo(reversalUndo.getAmount()));
+
+        Long fullReturnId = materialReturnService.confirm(new MaterialReturnRequest(
+                item.getId(), txn.getId(), new BigDecimal("8.0000"),
+                LocalDate.of(2026, 7, 9), "冲销后重新全量退料", "RETURN-TEST-003"));
+        assertNotNull(fullReturnId, "已冲销退料不应继续占用累计可退数量");
+        assertEquals(0, new BigDecimal("20.0000")
+                .compareTo(matStockMapper.selectById(stock.getId()).getAvailableQty()));
     }
 }

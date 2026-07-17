@@ -26,6 +26,8 @@ import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.WorkflowBusinessTypes;
+import com.cgcpms.workflow.service.WorkflowEngine;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -63,6 +65,7 @@ public class PmProjectService {
     private final PayRecordMapper payRecordMapper;
     private final StlSettlementMapper stlSettlementMapper;
     private final WfInstanceMapper wfInstanceMapper;
+    private final WorkflowEngine workflowEngine;
     private final SysRoleMapper sysRoleMapper;
     private final SysUserMapper sysUserMapper;
     private final ProjectBudgetMapper projectBudgetMapper;
@@ -166,6 +169,26 @@ public class PmProjectService {
             }
         }
         throw new BusinessException("PROJECT_CODE_CONFLICT", "项目编号生成冲突，请重试");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Long submitApproval(Long id) {
+        PmProject project = pmProjectMapper.selectById(id);
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (project == null || !project.getTenantId().equals(tenantId)) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        projectAccessChecker.checkAccess(project, "提交项目审批");
+        if (!Set.of("DRAFT", "REJECTED").contains(project.getApprovalStatus())) {
+            throw new BusinessException("PROJECT_NOT_SUBMITTABLE", "只有草稿或驳回状态的项目可以提交审批");
+        }
+        WfInstance instance = workflowEngine.submit(
+                UserContext.getCurrentUserId(), UserContext.getCurrentUsername(), tenantId,
+                WorkflowBusinessTypes.PROJECT_APPROVAL, project.getId(), project.getProjectName(),
+                project.getContractAmount(), project.getId(), null, null, null, null);
+        project.setApprovalStatus("APPROVING");
+        pmProjectMapper.updateById(project);
+        return instance.getId();
     }
 
     private String nextProjectCode(Long tenantId, String prefix, int offset) {

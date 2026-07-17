@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
@@ -38,6 +39,8 @@ class ApproverResolverTest {
     private OrgPositionMapper orgPositionMapper;
     @Mock
     private PmProjectMemberMapper pmProjectMemberMapper;
+    @Mock
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     @DisplayName("PROJECT_ROLE审批人查询显式包含tenant条件")
@@ -52,7 +55,8 @@ class ApproverResolverTest {
                 sysRoleMapper,
                 orgPositionMapper,
                 pmProjectMemberMapper,
-                new ObjectMapper());
+                new ObjectMapper(),
+                jdbcTemplate);
         when(pmProjectMemberMapper.selectList(any())).thenReturn(List.of());
 
         try {

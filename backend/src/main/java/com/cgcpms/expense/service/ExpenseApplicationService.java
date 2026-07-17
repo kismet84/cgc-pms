@@ -88,7 +88,6 @@ public class ExpenseApplicationService {
         expense.setAmount(money(expense.getAmount()));
         expense.setConvertedAmount(BigDecimal.ZERO.setScale(2));
         expense.setPaidAmount(BigDecimal.ZERO.setScale(2));
-        expense.setStatus("DRAFT");
         expense.setApprovalStatus("DRAFT");
         expense.setVersion(0);
         String prefix = "EXP-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
@@ -115,7 +114,6 @@ public class ExpenseApplicationService {
         input.setAmount(money(input.getAmount()));
         input.setConvertedAmount(existing.getConvertedAmount());
         input.setPaidAmount(existing.getPaidAmount());
-        input.setStatus("DRAFT");
         input.setApprovalStatus("DRAFT");
         input.setVersion(existing.getVersion());
         validateBusinessContext(input);
@@ -161,8 +159,7 @@ public class ExpenseApplicationService {
         expenseMapper.update(null, new LambdaUpdateWrapper<ExpenseApplication>()
                 .eq(ExpenseApplication::getId, id)
                 .eq(ExpenseApplication::getApprovalStatus, "DRAFT")
-                .set(ExpenseApplication::getApprovalStatus, "APPROVING")
-                .set(ExpenseApplication::getStatus, "APPROVING"));
+                .set(ExpenseApplication::getApprovalStatus, "APPROVING"));
     }
 
     private void validateBusinessContext(ExpenseApplication expense) {
@@ -250,7 +247,8 @@ public class ExpenseApplicationService {
         vo.setPaidAmount(money(expense.getPaidAmount()).toPlainString());
         vo.setAvailableToConvert(money(expense.getAmount()).subtract(money(expense.getConvertedAmount())).toPlainString());
         vo.setDescription(expense.getDescription());
-        vo.setStatus(expense.getStatus());
+        // Compatibility response field: approval_status is the sole persisted authority.
+        vo.setStatus(expense.getApprovalStatus());
         vo.setApprovalStatus(expense.getApprovalStatus());
         vo.setVersion(expense.getVersion());
         vo.setCreatedAt(expense.getCreatedAt() == null ? null : expense.getCreatedAt().format(DateTimeUtils.DTF));

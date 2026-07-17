@@ -12,6 +12,8 @@ import com.cgcpms.measurement.mapper.ProductionMeasurementMapper;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
@@ -43,6 +45,7 @@ import java.util.Set;
 public class WorkflowBusinessAccessValidator {
 
     private final ProjectAccessChecker projectAccessChecker;
+    private final PmProjectMapper projectMapper;
     private final CtContractMapper contractMapper;
     private final MatPurchaseOrderMapper purchaseOrderMapper;
     private final MatPurchaseRequestMapper purchaseRequestMapper;
@@ -64,6 +67,13 @@ public class WorkflowBusinessAccessValidator {
             throw new BusinessException("WORKFLOW_BUSINESS_INVALID", "审批业务对象不能为空");
         }
         switch (businessType) {
+            case WorkflowBusinessTypes.PROJECT_APPROVAL -> {
+                PmProject entity = projectMapper.selectById(businessId);
+                return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
+                        entity == null ? null : entity.getId(), requestProjectId,
+                        null, requestContractId,
+                        entity == null ? null : entity.getApprovalStatus(), "PROJECT_NOT_FOUND", "DRAFT", "REJECTED");
+            }
             case WorkflowBusinessTypes.CONTRACT_APPROVAL -> {
                 CtContract entity = contractMapper.selectById(businessId);
                 return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),

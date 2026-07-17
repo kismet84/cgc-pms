@@ -97,8 +97,8 @@ class VarOrderServiceTest {
             jdbcTemplate.update("""
                     INSERT INTO sys_user
                         (id, tenant_id, username, password, real_name, status, is_admin,
-                         created_by, updated_by, deleted_flag, deleted_token, remark)
-                    VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, NULL, ?)
+                         created_by, updated_by, deleted_flag, remark)
+                    VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, ?)
                     """, TestUserContext.USER_ADMIN, TestUserContext.TENANT_0,
                     "var_order_test_approver", "{noop}test", "变更审批测试人",
                     TestUserContext.USER_ADMIN, TestUserContext.USER_ADMIN,
@@ -106,7 +106,7 @@ class VarOrderServiceTest {
         } else {
             jdbcTemplate.update("""
                     UPDATE sys_user
-                    SET tenant_id = ?, status = 'ENABLE', deleted_flag = 0, deleted_token = NULL
+                    SET tenant_id = ?, status = 'ENABLE', deleted_flag = 0
                     WHERE id = ?
                     """, TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         }

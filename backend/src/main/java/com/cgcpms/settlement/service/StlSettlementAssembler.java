@@ -40,7 +40,8 @@ public class StlSettlementAssembler {
         vo.setFinalAmount(m.getFinalAmount() != null ? m.getFinalAmount().toPlainString() : null);
         vo.setAmountFormulaVersion(m.getAmountFormulaVersion());
         vo.setApprovalStatus(m.getApprovalStatus());
-        vo.setStatus(m.getStatus());
+        // Compatibility response field: approval_status is the sole workflow state authority.
+        vo.setStatus(m.getApprovalStatus());
         vo.setUnpaidAmount(m.getUnpaidAmount() != null ? m.getUnpaidAmount().toPlainString() : null);
         vo.setWarrantyAmount(m.getWarrantyAmount() != null ? m.getWarrantyAmount().toPlainString() : null);
         vo.setSettlementStatus(m.getSettlementStatus());

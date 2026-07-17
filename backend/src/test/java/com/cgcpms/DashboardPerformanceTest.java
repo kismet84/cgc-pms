@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class DashboardPerformanceTest {
 
     private static final long USER_ADMIN = 1L;
-    private static final long TENANT_ID = 0L;
+    private static final long TENANT_ID = 982200L;
 
     @Autowired
     private DashboardService dashboardService;

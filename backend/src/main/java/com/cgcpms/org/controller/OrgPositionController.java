@@ -6,10 +6,13 @@ import com.cgcpms.common.result.PageResult;
 import com.cgcpms.org.entity.OrgPosition;
 import com.cgcpms.org.service.OrgPositionService;
 import com.cgcpms.org.vo.OrgPositionVO;
+import com.cgcpms.org.dto.OrgPositionUserAssignmentRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/org/positions")
@@ -56,6 +59,20 @@ public class OrgPositionController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         orgPositionService.delete(id);
+        return ApiResponse.success();
+    }
+
+    @GetMapping("/{id}/users")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:query')")
+    public ApiResponse<List<Long>> users(@PathVariable Long id) {
+        return ApiResponse.success(orgPositionService.positionUsers(id));
+    }
+
+    @PutMapping("/{id}/users")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('org:edit')")
+    public ApiResponse<Void> replaceUsers(@PathVariable Long id,
+                                          @Valid @RequestBody OrgPositionUserAssignmentRequest request) {
+        orgPositionService.replacePositionUsers(id, request.userIds());
         return ApiResponse.success();
     }
 }

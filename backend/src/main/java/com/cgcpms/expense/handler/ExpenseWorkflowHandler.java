@@ -38,8 +38,7 @@ public class ExpenseWorkflowHandler implements WorkflowBusinessHandler {
         int rows = expenseMapper.update(null, new LambdaUpdateWrapper<ExpenseApplication>()
                 .eq(ExpenseApplication::getId, expenseId)
                 .eq(ExpenseApplication::getApprovalStatus, "APPROVING")
-                .set(ExpenseApplication::getApprovalStatus, "APPROVED")
-                .set(ExpenseApplication::getStatus, "APPROVED"));
+                .set(ExpenseApplication::getApprovalStatus, "APPROVED"));
         if (rows != 1) throw new IllegalStateException("费用申请审批状态冲突，expenseId=" + expenseId);
     }
 
@@ -48,8 +47,7 @@ public class ExpenseWorkflowHandler implements WorkflowBusinessHandler {
         releaseOutstandingReservation(context.getInstance(), "REJECT");
         expenseMapper.update(null, new LambdaUpdateWrapper<ExpenseApplication>()
                 .eq(ExpenseApplication::getId, resolveId(context.getInstance()))
-                .set(ExpenseApplication::getApprovalStatus, "REJECTED")
-                .set(ExpenseApplication::getStatus, "REJECTED"));
+                .set(ExpenseApplication::getApprovalStatus, "REJECTED"));
     }
 
     @Override
@@ -57,8 +55,7 @@ public class ExpenseWorkflowHandler implements WorkflowBusinessHandler {
         releaseOutstandingReservation(context.getInstance(), "WITHDRAW");
         expenseMapper.update(null, new LambdaUpdateWrapper<ExpenseApplication>()
                 .eq(ExpenseApplication::getId, resolveId(context.getInstance()))
-                .set(ExpenseApplication::getApprovalStatus, "DRAFT")
-                .set(ExpenseApplication::getStatus, "DRAFT"));
+                .set(ExpenseApplication::getApprovalStatus, "DRAFT"));
     }
 
     private void releaseOutstandingReservation(WfInstance instance, String action) {

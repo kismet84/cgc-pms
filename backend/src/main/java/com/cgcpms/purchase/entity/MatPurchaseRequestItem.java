@@ -35,12 +35,27 @@ public class MatPurchaseRequestItem extends BaseEntity {
 
     private Long materialId;
 
+    /** 对应项目进度计划中的 WBS 任务。 */
+    private Long wbsTaskId;
+
+    /** 对应已批准项目预算的预算行。 */
+    private Long budgetLineId;
+
+    /** 可选分包任务，用于采购与分包履约追溯。 */
+    private Long subTaskId;
+
     /** 自定义物料名称（非表字段，仅用于接收前端输入，后端据此创建 MdMaterial） */
     @TableField(exist = false)
     private String materialName;
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal quantity;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal estimatedUnitPrice;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal estimatedAmount;
 
     private String unit;
 

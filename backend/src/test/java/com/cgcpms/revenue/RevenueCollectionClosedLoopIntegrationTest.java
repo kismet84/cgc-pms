@@ -178,7 +178,8 @@ class RevenueCollectionClosedLoopIntegrationTest {
         jdbc.update("UPDATE finance_integration_endpoint SET endpoint_type='BANK' WHERE id=?", ENDPOINT);
 
         var receipt = financeIntegration.ingestBankReceipt(new BankReceiptRequest(ENDPOINT,"BANK-REV-IN-MATCH",null,
-                LocalDateTime.now(),"IN",new BigDecimal("200"),"测试业主","工程回款",Map.of("source","test")));
+                LocalDateTime.now(),"IN",new BigDecimal("200"),"测试业主","工程回款",
+                null,null,null,null,List.of(),Map.of("source","test")));
         assertEquals("MATCHED", receipt.get("match_status"));
         assertEquals(collectionId, ((Number)receipt.get("collection_record_id")).longValue());
         assertNull(receipt.get("pay_record_id"));

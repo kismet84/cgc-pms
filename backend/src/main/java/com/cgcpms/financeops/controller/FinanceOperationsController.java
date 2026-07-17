@@ -94,6 +94,8 @@ public class FinanceOperationsController {
     public ApiResponse<Map<String,Object>> receipt(@Valid@RequestBody BankReceiptRequest r){return ApiResponse.success(integrations.ingestBankReceipt(r));}
     @GetMapping("/bank-receipts") @PreAuthorize("hasAuthority('finance:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<Map<String,Object>>> receipts(@RequestParam(required=false)String status){return ApiResponse.success(integrations.bankReceipts(status));}
+    @GetMapping("/bank-receipts/{id}/trace") @PreAuthorize("hasAuthority('finance:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Map<String,Object>> receiptTrace(@PathVariable Long id){return ApiResponse.success(integrations.traceBankReceipt(id));}
     @PostMapping("/cash-forecasts") @PreAuthorize("hasAuthority('finance:integration:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String,Object>> forecast(@Valid@RequestBody CashForecastRequest r){return ApiResponse.success(integrations.createForecast(r));}
     @GetMapping("/cash-forecasts/summary") @PreAuthorize("hasAuthority('finance:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
