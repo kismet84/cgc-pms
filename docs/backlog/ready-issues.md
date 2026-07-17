@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P0
 任务性质：缺口修复
 类型：系统用户 / 详情端点 / 编辑一致性 / 权限租户 / 陈旧响应
-状态：Ready
+状态：Done
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-09`；candidateEvidenceHead=c06f49f1637bc21d7ad7941afea51e59bbf1c1af
 存量问题键：[stock:A-01-SYSTEM-USER-DETAIL]
 关联产品目标：让管理员编辑用户时以当前服务端详情和角色映射为准，避免分页行快照过期后覆盖其他管理员刚完成的用户或角色变更，同时关闭既有P0兼容性待确认项。
