@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P1
 任务性质：回归证明
 类型：供应商履约 / 质量与商业评分 / 退货 / 黑名单 / 聚合问题裁决
-状态：Ready
+状态：Done
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-04`；candidateEvidenceHead=5a7602083388fb206e1a1b03965c6234352e810d
 存量问题键：[supplier:A-05-CLOSED-LOOP-RECONCILIATION]
 关联产品目标：纠正 A-05 “当前只有交付维度”的过时判断，以当前实现和运行证据确认供应商综合履约闭环是否已成立，避免重复建设。
