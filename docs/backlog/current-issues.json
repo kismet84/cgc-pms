@@ -58,21 +58,6 @@
       ]
     },
     {
-      "issueKey": "OBS-WBS-PREDECESSOR-EVIDENCE",
-      "title": "WBS单前置FS门禁与风险提示证据收口",
-      "status": "OBSERVATION",
-      "classification": "NON_BLOCKING_OBSERVATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-04",
-      "summary": "单前置FS门禁、跨项目拒绝、环检测和前端风险提示已有实现与测试，但缺少面向当前master的独立正式回归结论。",
-      "acceptanceCriteria": "后端证明未完成前置不能开工或完成、跨项目和环依赖拒绝；前端证明只提示一次并区分未完成与迟交，明确不扩多前置或自动排程。",
-      "sourceRefs": [
-        "docs/backlog/ready-issues.md",
-        "docs/product-intelligence/project-map.md"
-      ]
-    },
-    {
       "issueKey": "A-05",
       "title": "供应商综合履约",
       "status": "OPEN",
