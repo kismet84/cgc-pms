@@ -17,6 +17,7 @@ import com.cgcpms.inventory.vo.MatStockLedgerVO;
 import com.cgcpms.inventory.vo.MatStockTxnVO;
 import com.cgcpms.inventory.vo.MatStockVO;
 import com.cgcpms.inventory.vo.StockKpiVO;
+import com.cgcpms.inventory.vo.StockConsumptionBaselineVO;
 import com.cgcpms.inventory.vo.StockIncomingSupplyVO;
 import com.cgcpms.inventory.vo.StockTransferCandidateVO;
 import com.cgcpms.inventory.vo.StockTransferVO;
@@ -485,6 +486,39 @@ public class MatStockService {
     }
 
     /**
+     * 汇总当前库存项含今日的 30/90 个本地自然日净领料事实。
+     * 只计已过账领料与材料退料；结果用于历史分析，不代表需求预测。
+     */
+    public StockConsumptionBaselineVO getConsumptionBaseline(Long stockId) {
+        MatStock currentStock = loadAuthorizedStock(stockId, "查询库存历史净领料基线");
+        Long tenantId = UserContext.getCurrentTenantId();
+        LocalDateTime cutoffAt = LocalDateTime.now();
+        LocalDateTime window30Start = cutoffAt.toLocalDate().minusDays(29).atStartOfDay();
+        LocalDateTime window90Start = cutoffAt.toLocalDate().minusDays(89).atStartOfDay();
+
+        StockConsumptionBaselineVO baseline = matStockTxnMapper.selectConsumptionBaseline(
+                tenantId, currentStock.getWarehouseId(), currentStock.getMaterialId(),
+                window30Start, window90Start, cutoffAt);
+        if (baseline == null) {
+            baseline = new StockConsumptionBaselineVO();
+        }
+        BigDecimal issued30 = scaleQuantity(baseline.getGrossIssued30());
+        BigDecimal returned30 = scaleQuantity(baseline.getReturned30());
+        BigDecimal issued90 = scaleQuantity(baseline.getGrossIssued90());
+        BigDecimal returned90 = scaleQuantity(baseline.getReturned90());
+        baseline.setWindow30Start(window30Start.toLocalDate());
+        baseline.setWindow90Start(window90Start.toLocalDate());
+        baseline.setCutoffAt(cutoffAt);
+        baseline.setGrossIssued30(issued30);
+        baseline.setReturned30(returned30);
+        baseline.setNetIssued30(issued30.subtract(returned30));
+        baseline.setGrossIssued90(issued90);
+        baseline.setReturned90(returned90);
+        baseline.setNetIssued90(issued90.subtract(returned90));
+        return baseline;
+    }
+
+    /**
      * 将同项目同物料从来源库存原子调拨到目标库存。
      * 两端库存按 ID 稳定加锁，避免反向并发调拨死锁；调拨事实、成对流水与余额在同一事务提交。
      */
@@ -718,6 +752,10 @@ public class MatStockService {
         candidate.setSafetyStockQty(safety.setScale(4, RoundingMode.HALF_UP));
         candidate.setTransferableQty(transferable);
         return candidate;
+    }
+
+    private BigDecimal scaleQuantity(BigDecimal value) {
+        return nvl(value).setScale(4, RoundingMode.HALF_UP);
     }
 
     private MatWarehouse loadTransferWarehouse(Long warehouseId, Long tenantId) {

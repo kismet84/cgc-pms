@@ -2,6 +2,7 @@
 import type { StockKpiVO } from '@/types/inventory'
 import type { StockTransferCandidateVO } from '@/types/inventory'
 import type { StockIncomingSupplyVO } from '@/types/inventory'
+import type { StockConsumptionBaselineVO } from '@/types/inventory'
 
 defineProps<{
   lowStockWarn: { name: string; qty: number; threshold: number }[]
@@ -11,6 +12,9 @@ defineProps<{
   transferCandidatesLoading: boolean
   incomingSupplies: StockIncomingSupplyVO[]
   incomingSuppliesLoading: boolean
+  consumptionBaseline: StockConsumptionBaselineVO | null
+  consumptionBaselineLoading: boolean
+  consumptionBaselineError: boolean
   canTransfer: boolean
 }>()
 
@@ -55,6 +59,37 @@ defineEmits<{
             <span class="lg-type-label" style="grid-column: 2 / span 4">库存正常</span>
           </div>
         </div>
+      </section>
+      <section class="stock-analysis-section">
+        <div class="stock-section-title">历史净领料</div>
+        <div v-if="consumptionBaselineLoading" class="stock-transfer-hint">正在汇总历史流水…</div>
+        <div v-else-if="consumptionBaselineError" class="stock-transfer-hint">历史基线暂不可用</div>
+        <template v-else-if="consumptionBaseline">
+          <div class="stock-supply-row">
+            <span class="stock-transfer-name">近 30 日</span>
+            <strong>{{ consumptionBaseline.netIssued30 }}</strong>
+          </div>
+          <div class="stock-transfer-hint">
+            领 {{ consumptionBaseline.grossIssued30 }} / 退 {{ consumptionBaseline.returned30 }}
+          </div>
+          <div class="stock-transfer-hint">
+            {{ consumptionBaseline.window30Start }} 至
+            {{ consumptionBaseline.cutoffAt.slice(0, 10) }}
+          </div>
+          <div class="stock-supply-row">
+            <span class="stock-transfer-name">近 90 日</span>
+            <strong>{{ consumptionBaseline.netIssued90 }}</strong>
+          </div>
+          <div class="stock-transfer-hint">
+            领 {{ consumptionBaseline.grossIssued90 }} / 退 {{ consumptionBaseline.returned90 }}
+          </div>
+          <div class="stock-transfer-hint">
+            {{ consumptionBaseline.window90Start }} 至
+            {{ consumptionBaseline.cutoffAt.slice(0, 10) }}
+          </div>
+          <div class="stock-transfer-hint">历史事实，非需求预测</div>
+        </template>
+        <div v-else class="stock-transfer-hint">暂无历史净领料数据</div>
       </section>
       <section class="stock-analysis-section">
         <div class="stock-section-title">已审批采购在途</div>

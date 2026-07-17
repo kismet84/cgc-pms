@@ -15,6 +15,7 @@ import type {
   StockTransferParams,
   StockTransferVO,
   StockIncomingSupplyVO,
+  StockConsumptionBaselineVO,
 } from '@/types/inventory'
 
 // ── 仓库 CRUD ──
@@ -132,6 +133,14 @@ export function createStockTransfer(data: StockTransferParams) {
 export function getStockIncomingSupplies(id: string) {
   return request<StockIncomingSupplyVO[]>({
     url: `/inventory/stock/${id}/incoming-supplies`,
+    method: 'get',
+  })
+}
+
+/** 查询当前库存项近 30/90 个日历日的历史净领料事实 */
+export function getStockConsumptionBaseline(id: string) {
+  return request<StockConsumptionBaselineVO>({
+    url: `/inventory/stock/${id}/consumption-baseline`,
     method: 'get',
   })
 }

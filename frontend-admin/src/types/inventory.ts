@@ -74,6 +74,19 @@ export interface StockIncomingSupplyVO {
   remainingQty: string
 }
 
+/** 当前库存项的历史净领料事实，不代表需求预测。 */
+export interface StockConsumptionBaselineVO {
+  window30Start: string
+  window90Start: string
+  cutoffAt: string
+  grossIssued30: string
+  returned30: string
+  netIssued30: string
+  grossIssued90: string
+  returned90: string
+  netIssued90: string
+}
+
 /** 库存流水 */
 export interface MatStockTxnVO {
   id: string

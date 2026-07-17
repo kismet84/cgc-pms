@@ -35,6 +35,9 @@ const {
   transferCandidatesLoading,
   incomingSupplies,
   incomingSuppliesLoading,
+  consumptionBaseline,
+  consumptionBaselineLoading,
+  consumptionBaselineError,
   safetyThresholdDraft,
   replenishmentTargetDraft,
   replenishmentLeadDaysDraft,
@@ -418,6 +421,9 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         :transfer-candidates-loading="transferCandidatesLoading"
         :incoming-supplies="incomingSupplies"
         :incoming-supplies-loading="incomingSuppliesLoading"
+        :consumption-baseline="consumptionBaseline"
+        :consumption-baseline-loading="consumptionBaselineLoading"
+        :consumption-baseline-error="consumptionBaselineError"
         :can-transfer="canTransferStock"
         @replenish="handleReplenish"
         @transfer="openTransfer"

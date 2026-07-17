@@ -11,6 +11,7 @@ import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.inventory.vo.MatStockLedgerVO;
 import com.cgcpms.inventory.vo.MatStockVO;
 import com.cgcpms.inventory.vo.StockKpiVO;
+import com.cgcpms.inventory.vo.StockConsumptionBaselineVO;
 import com.cgcpms.inventory.vo.StockIncomingSupplyVO;
 import com.cgcpms.inventory.vo.StockTransferCandidateVO;
 import com.cgcpms.inventory.vo.StockTransferVO;
@@ -65,6 +66,12 @@ public class MatStockController {
     public ApiResponse<java.util.List<StockTransferCandidateVO>> getTransferCandidates(
             @PathVariable Long id) {
         return ApiResponse.success(matStockService.getTransferCandidates(id));
+    }
+
+    @GetMapping("/{id}/consumption-baseline")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:stock:list')")
+    public ApiResponse<StockConsumptionBaselineVO> getConsumptionBaseline(@PathVariable Long id) {
+        return ApiResponse.success(matStockService.getConsumptionBaseline(id));
     }
 
     @PostMapping("/transfers")

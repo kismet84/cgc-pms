@@ -6,6 +6,7 @@ import {
   getStockKpi,
   getStockTransferCandidates,
   getStockIncomingSupplies,
+  getStockConsumptionBaseline,
   getWarehouseList,
   updateStockReplenishmentSettings,
 } from '@/api/modules/inventory'
@@ -22,6 +23,7 @@ import type {
   MatStockVO,
   StockTransferCandidateVO,
   StockIncomingSupplyVO,
+  StockConsumptionBaselineVO,
 } from '@/types/inventory'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
@@ -110,6 +112,9 @@ export function useStockLedger({
   const transferCandidatesLoading = ref(false)
   const incomingSupplies = ref<StockIncomingSupplyVO[]>([])
   const incomingSuppliesLoading = ref(false)
+  const consumptionBaseline = ref<StockConsumptionBaselineVO | null>(null)
+  const consumptionBaselineLoading = ref(false)
+  const consumptionBaselineError = ref(false)
   const safetyThresholdDraft = ref<number | null>(null)
   const replenishmentTargetDraft = ref<number | null>(null)
   const replenishmentLeadDaysDraft = ref<number | null>(null)
@@ -164,6 +169,7 @@ export function useStockLedger({
   let fetchSeq = 0
   let transferCandidateSeq = 0
   let incomingSupplySeq = 0
+  let consumptionBaselineSeq = 0
 
   function resetTxnState() {
     transferCandidateSeq += 1
@@ -173,6 +179,10 @@ export function useStockLedger({
     incomingSupplySeq += 1
     incomingSupplies.value = []
     incomingSuppliesLoading.value = false
+    consumptionBaselineSeq += 1
+    consumptionBaseline.value = null
+    consumptionBaselineLoading.value = false
+    consumptionBaselineError.value = false
     safetyThresholdDraft.value = null
     replenishmentTargetDraft.value = null
     replenishmentLeadDaysDraft.value = null
@@ -208,6 +218,7 @@ export function useStockLedger({
       stock.value = res.stock
       void fetchTransferCandidates(res.stock)
       void fetchIncomingSupplies(res.stock)
+      void fetchConsumptionBaseline(res.stock)
       safetyThresholdDraft.value = res.stock ? Number(res.stock.safetyStockQty) : null
       replenishmentTargetDraft.value =
         res.stock?.replenishmentTargetQty == null ? null : Number(res.stock.replenishmentTargetQty)
@@ -277,6 +288,33 @@ export function useStockLedger({
     } finally {
       if (mySeq === incomingSupplySeq) {
         incomingSuppliesLoading.value = false
+      }
+    }
+  }
+
+  async function fetchConsumptionBaseline(currentStock: MatStockVO | null) {
+    if (!currentStock) {
+      consumptionBaseline.value = null
+      consumptionBaselineError.value = false
+      return
+    }
+    const mySeq = ++consumptionBaselineSeq
+    consumptionBaselineLoading.value = true
+    consumptionBaselineError.value = false
+    try {
+      const baseline = await getStockConsumptionBaseline(currentStock.id)
+      if (mySeq === consumptionBaselineSeq && stock.value?.id === currentStock.id) {
+        consumptionBaseline.value = baseline
+      }
+    } catch (e: unknown) {
+      console.error(e)
+      if (mySeq === consumptionBaselineSeq) {
+        consumptionBaseline.value = null
+        consumptionBaselineError.value = true
+      }
+    } finally {
+      if (mySeq === consumptionBaselineSeq) {
+        consumptionBaselineLoading.value = false
       }
     }
   }
@@ -551,6 +589,9 @@ export function useStockLedger({
     transferCandidatesLoading,
     incomingSupplies,
     incomingSuppliesLoading,
+    consumptionBaseline,
+    consumptionBaselineLoading,
+    consumptionBaselineError,
     safetyThresholdDraft,
     replenishmentTargetDraft,
     replenishmentLeadDaysDraft,
