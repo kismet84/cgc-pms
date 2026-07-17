@@ -30,7 +30,6 @@ public class MatPurchaseOrderItem extends BaseEntity {
     private Long requestItemId;
 
     private Long wbsTaskId;
-
     private Long budgetLineId;
 
     private Long projectId;
@@ -51,7 +50,16 @@ public class MatPurchaseOrderItem extends BaseEntity {
     private BigDecimal unitPrice;
 
     @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal taxRate;
+
+    @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal amount;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal taxAmount;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal amountWithoutTax;
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal receivedQuantity;

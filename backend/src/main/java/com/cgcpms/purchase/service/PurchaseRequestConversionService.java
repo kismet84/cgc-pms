@@ -68,6 +68,7 @@ public class PurchaseRequestConversionService {
         order.setApprovalStatus("DRAFT");
         order.setOrderStatus("DRAFT");
         order.setContractId(request.getContractId());
+        order.setExceptionPurchaseFlag(0);
         order.setTotalAmount(BigDecimal.ZERO);
         String prefix = "PO-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         boolean inserted = false;
@@ -127,8 +128,11 @@ public class PurchaseRequestConversionService {
         orderItem.setMaterialId(requestItem.getMaterialId());
         orderItem.setUnit(requestItem.getUnit());
         orderItem.setQuantity(requestItem.getQuantity());
-        orderItem.setUnitPrice(BigDecimal.ZERO);
-        orderItem.setAmount(BigDecimal.ZERO);
+        orderItem.setUnitPrice(requestItem.getEstimatedUnitPrice() == null ? BigDecimal.ZERO : requestItem.getEstimatedUnitPrice());
+        orderItem.setAmount(requestItem.getEstimatedAmount() == null ? BigDecimal.ZERO : requestItem.getEstimatedAmount());
+        orderItem.setTaxRate(BigDecimal.ZERO);
+        orderItem.setTaxAmount(BigDecimal.ZERO);
+        orderItem.setAmountWithoutTax(requestItem.getEstimatedAmount() == null ? BigDecimal.ZERO : requestItem.getEstimatedAmount());
         orderItem.setReceivedQuantity(BigDecimal.ZERO);
         orderItem.setCreatedBy(userId);
         orderItem.setUpdatedBy(userId);

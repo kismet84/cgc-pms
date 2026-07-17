@@ -11,7 +11,7 @@ import java.math.BigDecimal;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-@TableName("mat_supplier_return_item")
+@TableName("sp_supplier_return_item")
 public class MatSupplierReturnItem extends BaseEntity {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;

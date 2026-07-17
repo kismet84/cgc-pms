@@ -20,16 +20,32 @@ import java.util.List;
 public class MatSupplierReturnController {
     private final MatSupplierReturnService returnService;
 
+    @PostMapping
+    @AuditedOperation(type = "CONFIRM", businessType = "SUPPLIER_RETURN")
+    @PreAuthorize("hasAnyAuthority('receipt:return','receipt:update') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Long> create(@Valid @RequestBody SupplierReturnRequest request) {
+        return ApiResponse.success(returnService.confirm(request));
+    }
+
     @PostMapping("/confirm")
     @AuditedOperation(type = "CONFIRM", businessType = "SUPPLIER_RETURN")
-    @PreAuthorize("hasAuthority('receipt:update') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('receipt:return','receipt:update') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Long> confirm(@Valid @RequestBody SupplierReturnRequest request) {
         return ApiResponse.success(returnService.confirm(request));
     }
 
+    @PostMapping("/{id}/confirm")
+    @AuditedOperation(type = "CONFIRM", businessType = "SUPPLIER_RETURN")
+    @PreAuthorize("hasAnyAuthority('receipt:return','receipt:update') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> confirmExisting(@PathVariable Long id) {
+        // 兼容原有前端的“创建后确认”调用；统一模型在创建时已原子确认。
+        returnService.getById(id);
+        return ApiResponse.success();
+    }
+
     @PostMapping("/{id}/reverse")
     @AuditedOperation(type = "REVERSE", businessType = "SUPPLIER_RETURN")
-    @PreAuthorize("hasAuthority('receipt:update') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('receipt:return','receipt:update') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Long> reverse(@PathVariable Long id,
                                      @Valid @RequestBody SupplierReturnReversalRequest request) {
         return ApiResponse.success(returnService.reverse(id, request.reason()));

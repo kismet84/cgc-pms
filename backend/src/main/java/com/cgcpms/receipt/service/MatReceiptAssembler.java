@@ -114,6 +114,7 @@ public class MatReceiptAssembler {
             vo.setRemainingQuantity(remainingQty.toPlainString());
             vo.setActualQuantity("0");
             vo.setQualifiedQuantity("0");
+            vo.setUnqualifiedQuantity("0");
             vo.setUnitPrice(i.getUnitPrice() != null ? i.getUnitPrice().toPlainString() : "0");
             vo.setAmount("0");
             return vo;
@@ -183,10 +184,14 @@ public class MatReceiptAssembler {
         vo.setBudgetLineId(i.getBudgetLineId() != null ? i.getBudgetLineId().toString() : null);
         vo.setActualQuantity(i.getActualQuantity() != null ? i.getActualQuantity().toPlainString() : null);
         vo.setQualifiedQuantity(i.getQualifiedQuantity() != null ? i.getQualifiedQuantity().toPlainString() : null);
+        vo.setUnqualifiedQuantity(i.getUnqualifiedQuantity() != null ? i.getUnqualifiedQuantity().toPlainString() : "0");
         vo.setUnitPrice(i.getUnitPrice() != null ? i.getUnitPrice().toPlainString() : null);
         vo.setAmount(i.getAmount() != null ? i.getAmount().toPlainString() : null);
         vo.setUseLocation(i.getUseLocation());
         vo.setBatchNo(i.getBatchNo());
+        vo.setDispositionType(i.getDispositionType());
+        vo.setDispositionStatus(i.getDispositionStatus());
+        vo.setDispositionReason(i.getDispositionReason());
         vo.setCreatedBy(i.getCreatedBy() != null ? i.getCreatedBy().toString() : null);
         vo.setCreatedAt(i.getCreatedAt() != null ? DateTimeUtils.DTF.format(i.getCreatedAt()) : null);
         vo.setUpdatedAt(i.getUpdatedAt() != null ? DateTimeUtils.DTF.format(i.getUpdatedAt()) : null);

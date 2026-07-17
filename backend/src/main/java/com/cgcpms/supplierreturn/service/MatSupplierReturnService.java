@@ -72,19 +72,26 @@ public class MatSupplierReturnService {
             throw new BusinessException("SUPPLIER_RETURN_RECEIPT_INVALID", "原验收单不存在或未审批通过");
         }
         projectAccessChecker.checkAccess(receipt.getProjectId(), "确认供应商退货");
-        if (receipt.getPartnerId() == null || receiptItem.getOrderItemId() == null
+        if (receipt.getPartnerId() == null || receipt.getContractId() == null || receipt.getOrderId() == null
+                || receiptItem.getOrderItemId() == null
                 || receiptItem.getMaterialId() == null) {
             throw new BusinessException("SUPPLIER_RETURN_SOURCE_INCOMPLETE", "原验收供应商、订单明细或材料关系不完整");
         }
 
-        String source = request.qualityDispositionId() == null ? QUALIFIED : REJECTED;
+        boolean rejected = request.qualityDispositionId() != null || "UNQUALIFIED".equals(request.returnKind());
+        if (request.qualityDispositionId() != null && "ACCEPTED".equals(request.returnKind())) {
+            throw new BusinessException("SUPPLIER_RETURN_SOURCE_CONFLICT", "合格品退货不能关联不合格处置");
+        }
+        String source = rejected ? REJECTED : QUALIFIED;
         MatQualityDisposition disposition = null;
         MatStockTxn originalTxn = null;
         CostItem originalCost = null;
         BigDecimal limit;
         BigDecimal unitCost;
         if (REJECTED.equals(source)) {
-            disposition = dispositionMapper.selectForUpdate(request.qualityDispositionId(), tenantId);
+            disposition = request.qualityDispositionId() == null
+                    ? dispositionMapper.selectReturnForUpdate(receiptItem.getId(), tenantId)
+                    : dispositionMapper.selectForUpdate(request.qualityDispositionId(), tenantId);
             if (disposition == null || !Objects.equals(disposition.getReceiptItemId(), receiptItem.getId())
                     || !"RETURN_TO_SUPPLIER".equals(disposition.getDispositionAction())
                     || "CANCELLED".equals(disposition.getStatus())) {
@@ -125,11 +132,13 @@ public class MatSupplierReturnService {
         supplierReturn.setProjectId(receipt.getProjectId());
         supplierReturn.setContractId(receipt.getContractId());
         supplierReturn.setPartnerId(receipt.getPartnerId());
+        supplierReturn.setPurchaseOrderId(receipt.getOrderId());
         supplierReturn.setReceiptId(receipt.getId());
         supplierReturn.setWarehouseId(originalTxn == null ? null : originalTxn.getWarehouseId());
         supplierReturn.setReturnCode("SRT-" + request.returnDate().format(DateTimeFormatter.BASIC_ISO_DATE)
                 + "-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         supplierReturn.setReturnDate(request.returnDate());
+        supplierReturn.setReturnQuantity(request.quantity());
         supplierReturn.setStatus("CONFIRMED");
         supplierReturn.setIdempotencyKey(request.idempotencyKey());
         supplierReturn.setTotalAmount(amount);

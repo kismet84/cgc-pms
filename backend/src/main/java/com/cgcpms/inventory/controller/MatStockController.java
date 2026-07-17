@@ -2,6 +2,7 @@ package com.cgcpms.inventory.controller;
 
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.inventory.dto.StockTransactionDTO;
 import com.cgcpms.inventory.dto.SafetyStockThresholdDTO;
 import com.cgcpms.inventory.dto.ReplenishmentSettingsDTO;
@@ -24,17 +25,13 @@ public class MatStockController {
     @PostMapping("/in")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:transaction:add')")
     public ApiResponse<MatStockVO> stockIn(@Valid @RequestBody StockTransactionDTO dto) {
-        return ApiResponse.success(matStockService.toStockVO(matStockService.stockIn(
-                dto.getWarehouseId(), dto.getMaterialId(), dto.getQuantity(),
-                dto.getSourceType(), dto.getSourceId())));
+        throw new BusinessException("MANUAL_STOCK_MOVEMENT_DISABLED", "手工入库已停用，请从验收或库存调整审批单过账");
     }
 
     @PostMapping("/out")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:transaction:add')")
     public ApiResponse<MatStockVO> stockOut(@Valid @RequestBody StockTransactionDTO dto) {
-        return ApiResponse.success(matStockService.toStockVO(matStockService.stockOut(
-                dto.getWarehouseId(), dto.getMaterialId(), dto.getQuantity(),
-                dto.getSourceType(), dto.getSourceId())));
+        throw new BusinessException("MANUAL_STOCK_MOVEMENT_DISABLED", "手工出库已停用，请从领料实发或库存调整审批单过账");
     }
 
     @GetMapping("/ledger")

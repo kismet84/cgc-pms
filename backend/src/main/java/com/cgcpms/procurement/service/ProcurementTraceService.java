@@ -34,6 +34,10 @@ import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfRecord;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfRecordMapper;
+import com.cgcpms.supplierreturn.entity.MatSupplierReturn;
+import com.cgcpms.supplierreturn.entity.MatSupplierReturnItem;
+import com.cgcpms.supplierreturn.mapper.MatSupplierReturnMapper;
+import com.cgcpms.supplierreturn.mapper.MatSupplierReturnItemMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -48,6 +52,8 @@ public class ProcurementTraceService {
     private final MatStockTxnMapper stockTxnMapper;
     private final MaterialReturnMapper materialReturnMapper;
     private final MaterialReturnItemMapper materialReturnItemMapper;
+    private final MatSupplierReturnMapper supplierReturnMapper;
+    private final MatSupplierReturnItemMapper supplierReturnItemMapper;
     private final CostItemMapper costItemMapper;
     private final MatReceiptMapper receiptMapper;
     private final MatReceiptItemMapper receiptItemMapper;
@@ -73,6 +79,8 @@ public class ProcurementTraceService {
             trace = byRequisition(txn.getSourceId());
         } else if ("MATERIAL_RETURN".equals(txn.getSourceType())) {
             trace = byMaterialReturn(txn.getSourceId());
+        } else if ("SUPPLIER_RETURN".equals(txn.getSourceType())) {
+            trace = bySupplierReturn(txn.getSourceId());
         } else {
             throw new BusinessException("PROCUREMENT_TRACE_UNSUPPORTED", "库存流水缺少受支持的采购业务来源");
         }
@@ -90,6 +98,8 @@ public class ProcurementTraceService {
             trace = byRequisition(cost.getSourceId());
         } else if ("MATERIAL_RETURN".equals(cost.getSourceType())) {
             trace = byMaterialReturn(cost.getSourceId());
+        } else if ("SUPPLIER_RETURN".equals(cost.getSourceType())) {
+            trace = bySupplierReturn(cost.getSourceId());
         } else {
             throw new BusinessException("PROCUREMENT_TRACE_UNSUPPORTED", "成本记录不属于采购材料闭环");
         }
@@ -168,6 +178,30 @@ public class ProcurementTraceService {
         List<Long> originalCostIds = items.stream().map(MaterialReturnItem::getOriginalCostItemId)
                 .filter(Objects::nonNull).distinct().toList();
         if (!originalCostIds.isEmpty()) costs.addAll(costItemMapper.selectByIds(originalCostIds));
+        trace.setCosts(costs);
+        return trace;
+    }
+
+    public ProcurementTraceVO bySupplierReturn(Long returnId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        MatSupplierReturn supplierReturn = supplierReturnMapper.selectById(returnId);
+        requireTenant(supplierReturn == null ? null : supplierReturn.getTenantId(),
+                "SUPPLIER_RETURN_NOT_FOUND", "供应商退货单不存在");
+        ProcurementTraceVO trace = byReceipt(supplierReturn.getReceiptId());
+        trace.setSupplierReturn(supplierReturn);
+        List<MatSupplierReturnItem> items = supplierReturnItemMapper.selectList(
+                new LambdaQueryWrapper<MatSupplierReturnItem>()
+                        .eq(MatSupplierReturnItem::getTenantId, tenantId)
+                        .eq(MatSupplierReturnItem::getReturnId, returnId));
+        trace.setSupplierReturnItems(items);
+        List<MatStockTxn> txns = new ArrayList<>(trace.getStockTransactions());
+        txns.addAll(stockTxnMapper.selectList(new LambdaQueryWrapper<MatStockTxn>()
+                .eq(MatStockTxn::getTenantId, tenantId)
+                .eq(MatStockTxn::getSourceType, "SUPPLIER_RETURN")
+                .eq(MatStockTxn::getSourceId, returnId)));
+        trace.setStockTransactions(txns);
+        List<CostItem> costs = new ArrayList<>(trace.getCosts());
+        costs.addAll(loadCosts("SUPPLIER_RETURN", returnId));
         trace.setCosts(costs);
         return trace;
     }

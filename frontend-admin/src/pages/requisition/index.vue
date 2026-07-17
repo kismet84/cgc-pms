@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { onMounted, computed, ref } from 'vue'
+import { onMounted, computed, reactive, ref } from 'vue'
+import { message, Modal } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   MoreOutlined,
@@ -20,6 +21,14 @@ import RequisitionKpiStrip from './components/RequisitionKpiStrip.vue'
 import RequisitionFormModal from './components/RequisitionFormModal.vue'
 import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useColumnSettings } from '@/composables/useColumnSettings'
+import { executeRequisitionStockOut, getRequisitionItems } from '@/api/modules/requisition'
+import {
+  confirmMaterialReturn,
+  getProcurementTrace,
+  type ProcurementTrace,
+} from '@/api/modules/procurement'
+import type { MatRequisitionItemVO, MatRequisitionVO } from '@/types/requisition'
+import ProcurementTraceDrawer from '@/components/ProcurementTraceDrawer.vue'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
@@ -101,6 +110,122 @@ const {
 async function handleView(row: Parameters<typeof handleEdit>[0]) {
   await handleEdit(row)
   modalTitle.value = '查看领料申请'
+}
+
+function handleStockOut(row: MatRequisitionVO) {
+  Modal.confirm({
+    title: '确认实际出库',
+    content: `将按领料单“${row.requisitionCode}”扣减实时库存并生成项目材料成本。该操作不可重复。`,
+    okText: '确认出库',
+    cancelText: '取消',
+    onOk: async () => {
+      try {
+        await executeRequisitionStockOut(row.id!)
+        message.success('实际出库完成，库存流水和项目成本已自动生成')
+        await fetchData()
+      } catch (e: unknown) {
+        console.error(e)
+        message.error('实际出库失败，请核对审批状态和可用库存')
+      }
+    },
+  })
+}
+
+const traceOpen = ref(false)
+const traceLoading = ref(false)
+const traceData = ref<ProcurementTrace>()
+
+async function openTrace(row: MatRequisitionVO) {
+  traceOpen.value = true
+  traceLoading.value = true
+  traceData.value = undefined
+  try {
+    traceData.value = await getProcurementTrace('requisitions', row.id!)
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('加载采购闭环追溯失败')
+  } finally {
+    traceLoading.value = false
+  }
+}
+
+const materialReturnVisible = ref(false)
+const materialReturnLoading = ref(false)
+const materialReturnItems = ref<MatRequisitionItemVO[]>([])
+const stockTxnByItem = ref<Record<string, string>>({})
+const materialReturnForm = reactive({
+  requisitionItemId: '',
+  quantity: '',
+  returnDate: '',
+  reason: '',
+})
+
+async function openMaterialReturn(row: MatRequisitionVO) {
+  try {
+    const [items, trace] = await Promise.all([
+      getRequisitionItems(row.id!),
+      getProcurementTrace('requisitions', row.id!),
+    ])
+    const txnMap: Record<string, string> = {}
+    for (const txn of trace.stockTransactions ?? []) {
+      if (
+        txn.txnType === 'OUT' &&
+        txn.sourceType === 'MAT_REQUISITION' &&
+        txn.sourceLineId &&
+        txn.id
+      ) {
+        txnMap[String(txn.sourceLineId)] = String(txn.id)
+      }
+    }
+    materialReturnItems.value = items.filter((item) => item.id && txnMap[String(item.id)])
+    stockTxnByItem.value = txnMap
+    if (!materialReturnItems.value.length) {
+      message.warning('未找到可退料的原始出库流水')
+      return
+    }
+    Object.assign(materialReturnForm, {
+      requisitionItemId: String(materialReturnItems.value[0].id),
+      quantity: '',
+      returnDate: new Date().toISOString().slice(0, 10),
+      reason: '',
+    })
+    materialReturnVisible.value = true
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('加载可退料明细失败')
+  }
+}
+
+async function submitMaterialReturn() {
+  if (!materialReturnForm.requisitionItemId || Number(materialReturnForm.quantity) <= 0) {
+    message.warning('请选择领料明细并填写大于 0 的退料数量')
+    return
+  }
+  if (!materialReturnForm.returnDate || !materialReturnForm.reason.trim()) {
+    message.warning('请填写退料日期和原因')
+    return
+  }
+  const originalStockTxnId = stockTxnByItem.value[materialReturnForm.requisitionItemId]
+  if (!originalStockTxnId) {
+    message.error('原始出库流水不存在，禁止退料')
+    return
+  }
+  materialReturnLoading.value = true
+  try {
+    await confirmMaterialReturn({
+      ...materialReturnForm,
+      originalStockTxnId,
+      idempotencyKey: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    })
+    message.success('退料已确认，库存已恢复并生成负向成本')
+    materialReturnVisible.value = false
+    await fetchData()
+  } catch (e: unknown) {
+    console.error(e)
+    message.error('退料失败，请核对累计退料数量和原出库成本')
+  } finally {
+    materialReturnLoading.value = false
+  }
 }
 
 function approvalStatusLabel(status: string) {
@@ -387,6 +512,16 @@ onMounted(() => {
                       >
                         提交审批
                       </a-menu-item>
+                      <a-menu-item
+                        v-if="row.approvalStatus === APPROVAL_APPROVED && row.stockOutFlag !== 1"
+                        @click="handleStockOut(row)"
+                      >
+                        仓库确认出库
+                      </a-menu-item>
+                      <a-menu-item @click="openTrace(row)">全链追溯</a-menu-item>
+                      <a-menu-item v-if="row.stockOutFlag === 1" @click="openMaterialReturn(row)">
+                        发起退料
+                      </a-menu-item>
                     </a-menu>
                   </template>
                 </a-dropdown>
@@ -528,6 +663,51 @@ onMounted(() => {
       @add-item="handleAddItem"
       @remove-item="handleRemoveItem"
     />
+    <ProcurementTraceDrawer
+      :open="traceOpen"
+      :loading="traceLoading"
+      :trace="traceData"
+      @close="traceOpen = false"
+    />
+    <a-modal
+      :open="materialReturnVisible"
+      title="施工退料确认"
+      :confirm-loading="materialReturnLoading"
+      @ok="submitMaterialReturn"
+      @cancel="materialReturnVisible = false"
+    >
+      <a-form :label-col="{ span: 6 }" :wrapper-col="{ span: 17 }">
+        <a-form-item label="原领料明细" required>
+          <a-select v-model:value="materialReturnForm.requisitionItemId">
+            <a-select-option
+              v-for="item in materialReturnItems"
+              :key="item.id"
+              :value="String(item.id)"
+            >
+              {{ item.materialName }}（原领料 {{ item.quantity || 0 }} {{ item.unit || '' }}）
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="退料数量" required>
+          <a-input-number
+            v-model:value="materialReturnForm.quantity"
+            :min="0"
+            :precision="2"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="退料日期" required>
+          <a-date-picker
+            v-model:value="materialReturnForm.returnDate"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="退料原因" required>
+          <a-textarea v-model:value="materialReturnForm.reason" :rows="3" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 

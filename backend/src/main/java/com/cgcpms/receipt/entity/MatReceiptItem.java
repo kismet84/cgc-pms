@@ -40,6 +40,9 @@ public class MatReceiptItem extends BaseEntity {
     private BigDecimal qualifiedQuantity;
 
     @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal unqualifiedQuantity;
+
+    @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal unitPrice;
 
     @JsonSerialize(using = ToStringSerializer.class)
@@ -48,4 +51,12 @@ public class MatReceiptItem extends BaseEntity {
     private String useLocation;
 
     private String batchNo;
+
+    /** RETURN=退货，REPLACE=换货，CONCESSION=让步接收。 */
+    private String dispositionType;
+
+    /** PENDING=待处置，COMPLETED=处置完成。 */
+    private String dispositionStatus;
+
+    private String dispositionReason;
 }

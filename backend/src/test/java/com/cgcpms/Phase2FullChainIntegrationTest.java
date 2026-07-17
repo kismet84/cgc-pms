@@ -11,6 +11,8 @@ import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.service.CostGenerationService;
 import com.cgcpms.cost.service.CostLedgerService;
 import com.cgcpms.cost.service.CostSummaryService;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayApplicationBasis;
 import com.cgcpms.payment.entity.PayRecord;
@@ -86,6 +88,7 @@ class Phase2FullChainIntegrationTest {
     @Autowired private PayApplicationBasisMapper payApplicationBasisMapper;
     @Autowired private PayRecordMapper payRecordMapper;
     @Autowired private CostItemMapper costItemMapper;
+    @Autowired private SysFileMapper sysFileMapper;
     @Autowired private CtContractMapper contractMapper;
     @Autowired private SysUserMapper sysUserMapper;
     @Autowired private WfInstanceMapper wfInstanceMapper;
@@ -747,8 +750,24 @@ class Phase2FullChainIntegrationTest {
         MatReceiptItem ri2 = buildReceiptItem(orderItems.get(1).getId(),
                 new BigDecimal("30"), new BigDecimal("30"), new BigDecimal("3800"), new BigDecimal("114000.00"));
         receiptService.saveItemsBatch(receiptId, List.of(ri1, ri2));
+        attachReceiptProof(receiptId);
 
         return receiptId;
+    }
+
+    private void attachReceiptProof(Long receiptId) {
+        SysFile file = new SysFile();
+        file.setTenantId(TestUserContext.TENANT_0);
+        file.setBusinessType("MATERIAL_RECEIPT");
+        file.setBusinessId(receiptId);
+        file.setFileName("receipt-" + receiptId + ".pdf");
+        file.setOriginalName("Phase2验收凭证.pdf");
+        file.setFileSize(100L);
+        file.setContentType("application/pdf");
+        file.setStoragePath("MATERIAL_RECEIPT/" + receiptId + "/proof.pdf");
+        file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
+        sysFileMapper.insert(file);
     }
 
     /** 构建采购订单明细 */

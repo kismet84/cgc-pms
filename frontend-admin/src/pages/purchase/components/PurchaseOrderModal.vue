@@ -12,6 +12,8 @@ const props = defineProps<{
   contractList: Array<{ id: string; contractName?: string }>
   materialList: Array<{ id: string; materialName?: string; specification?: string; unit?: string }>
   itemList: Array<Partial<MatPurchaseOrderItemVO> & { key: number }>
+  budgetLineOptions: Array<{ id?: string; label: string }>
+  proofFileName?: string
   itemsTotalAmount: string
   onProjectChange: (value: string) => void
   onContractChange: (value: string) => void
@@ -26,7 +28,13 @@ const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
   (e: 'ok'): void
   (e: 'cancel'): void
+  (e: 'proofFileChange', value: File | null): void
 }>()
+
+function handleProofFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  emit('proofFileChange', input.files?.[0] ?? null)
+}
 
 function handleCancel() {
   emit('update:open', false)
@@ -38,7 +46,7 @@ function handleCancel() {
   <a-modal
     :open="open"
     :title="title"
-    :width="800"
+    :width="1180"
     :ok-button-props="isViewMode ? { style: { display: 'none' } } : undefined"
     :cancel-text="isViewMode ? '关闭' : '取消'"
     @update:open="emit('update:open', $event)"
@@ -63,7 +71,7 @@ function handleCancel() {
           </a-select-option>
         </a-select>
       </a-form-item>
-      <a-form-item label="采购合同">
+      <a-form-item label="采购合同" required>
         <a-select
           v-model:value="props.formData.contractId"
           :disabled="isViewMode"
@@ -114,6 +122,29 @@ function handleCancel() {
           style="width: 100%"
         />
       </a-form-item>
+      <a-form-item label="交付条款" required>
+        <a-textarea
+          v-model:value="props.formData.deliveryTerms"
+          :disabled="isViewMode"
+          :rows="2"
+          placeholder="交货地点、运输责任、验收标准等"
+        />
+      </a-form-item>
+      <a-form-item v-if="!props.formData.requestId" label="例外采购原因" required>
+        <a-textarea
+          v-model:value="props.formData.exceptionReason"
+          :disabled="isViewMode"
+          :rows="2"
+          placeholder="未由采购申请转单，必须说明例外原因"
+        />
+      </a-form-item>
+      <a-form-item label="订单附件" :required="!isViewMode">
+        <div v-if="isViewMode">附件已由系统在提交审批时校验</div>
+        <div v-else class="proof-file-input">
+          <input type="file" @change="handleProofFile" />
+          <span>{{ proofFileName || '新建订单必须上传合同、报价或订单依据' }}</span>
+        </div>
+      </a-form-item>
       <a-form-item label="备注">
         <a-textarea
           v-model:value="props.formData.remark"
@@ -144,7 +175,7 @@ function handleCancel() {
         :pagination="false"
         row-key="key"
         size="small"
-        :scroll="{ y: 250 }"
+        :scroll="{ x: 1320, y: 250 }"
       >
         <a-table-column title="材料" width="200">
           <template #default="{ record: item, index }">
@@ -189,6 +220,20 @@ function handleCancel() {
             />
           </template>
         </a-table-column>
+        <a-table-column title="预算科目" width="200">
+          <template #default="{ record: item }">
+            <a-select
+              v-model:value="item.budgetLineId"
+              :disabled="isViewMode"
+              placeholder="选择预算科目"
+              style="width: 100%"
+            >
+              <a-select-option v-for="line in budgetLineOptions" :key="line.id" :value="line.id">
+                {{ line.label }}
+              </a-select-option>
+            </a-select>
+          </template>
+        </a-table-column>
         <a-table-column title="单价(元)" width="130">
           <template #default="{ record: item, index }">
             <a-input-number
@@ -198,6 +243,18 @@ function handleCancel() {
               :precision="2"
               style="width: 100%"
               @change="onItemPriceChange(index)"
+            />
+          </template>
+        </a-table-column>
+        <a-table-column title="税率(%)" width="105">
+          <template #default="{ record: item }">
+            <a-input-number
+              v-model:value="item.taxRate"
+              :disabled="isViewMode"
+              :min="0"
+              :max="100"
+              :precision="2"
+              style="width: 100%"
             />
           </template>
         </a-table-column>
@@ -232,3 +289,13 @@ function handleCancel() {
     </div>
   </a-modal>
 </template>
+
+<style scoped>
+.proof-file-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+</style>

@@ -64,6 +64,7 @@ export interface PurchaseRequestVO {
   projectName?: string
   contractId?: string
   contractName?: string
+  purpose?: string
   requestCode: string
   approvalStatus: string
   status: string
@@ -81,7 +82,11 @@ export interface PurchaseRequestItemVO {
   requestId: string
   materialId: string
   materialName?: string
+  budgetLineId?: string
+  subTaskId?: string
   quantity: string
+  estimatedUnitPrice?: string
+  estimatedAmount?: string
   unit?: string
   plannedDate?: string
   createdBy?: string

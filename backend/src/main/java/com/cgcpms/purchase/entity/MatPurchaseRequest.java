@@ -32,6 +32,9 @@ public class MatPurchaseRequest extends BaseEntity {
     /** 关联采购合同 */
     private Long contractId;
 
+    /** 采购用途/施工部位说明。 */
+    private String purpose;
+
     /** 申请编号，PR-yyyyMMdd-XXX */
     private String requestCode;
 

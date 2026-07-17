@@ -11,7 +11,10 @@ public class MatPurchaseRequestItemVO {
     private String materialName;
     private String wbsTaskId;
     private String budgetLineId;
+    private String subTaskId;
     private String quantity;
+    private String estimatedUnitPrice;
+    private String estimatedAmount;
     private String unit;
     private String plannedDate;
     private String createdBy;

@@ -39,6 +39,9 @@ class PurchaseRequestServiceTest {
     private static final long USER_ADMIN = 1L;
     private static final long TENANT_ID = 0L;
     private static final long PROJECT_ID = 100L;
+    private static final long CONTRACT_ID = 39991L;
+    private static final long BUDGET_ID = 39992L;
+    private static final long BUDGET_LINE_ID = 39993L;
 
     @Autowired
     private MatPurchaseRequestService requestService;
@@ -72,6 +75,7 @@ class PurchaseRequestServiceTest {
                 .build());
         seedProject(PROJECT_ID);
         seedProject(200L);
+        seedProcurementSupportData();
     }
 
     @AfterEach
@@ -109,6 +113,66 @@ class PurchaseRequestServiceTest {
                 """,
                 projectId, TENANT_ID, "PR-TDD-PRJ-" + projectId, "采购申请测试项目-" + projectId,
                 USER_ADMIN, USER_ADMIN, projectId);
+    }
+
+    private void seedProcurementSupportData() {
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract (
+                    id, tenant_id, project_id, party_a_id, party_b_id, contract_code, contract_name,
+                    contract_type, contract_amount, current_amount, contract_status, approval_status,
+                    start_date, end_date, cost_generated_flag, created_by, deleted_flag
+                ) SELECT ?, ?, ?, 20001, 20002, 'PR-TDD-PURCHASE', '采购申请测试合同',
+                    'PURCHASE', 1000000, 1000000, 'PERFORMING', 'APPROVED',
+                    CURRENT_DATE, DATEADD('DAY', 365, CURRENT_DATE), 0, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id = ?)
+                """, CONTRACT_ID, TENANT_ID, PROJECT_ID, USER_ADMIN, CONTRACT_ID);
+        Long costSubjectId = jdbcTemplate.queryForObject(
+                "SELECT id FROM cost_subject ORDER BY id LIMIT 1", Long.class);
+        jdbcTemplate.update("""
+                INSERT INTO project_budget (
+                    id, tenant_id, project_id, version_no, budget_name, total_amount,
+                    approval_status, status, active_flag, active_token, created_by, deleted_flag
+                ) SELECT ?, ?, ?, 'PR-TDD-V1', '采购申请测试预算', 1000000,
+                    'APPROVED', 'ACTIVE', 1, ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM project_budget WHERE id = ?)
+                """, BUDGET_ID, TENANT_ID, PROJECT_ID, BUDGET_ID, USER_ADMIN, BUDGET_ID);
+        jdbcTemplate.update("""
+                INSERT INTO project_budget_line (
+                    id, tenant_id, budget_id, project_id, cost_subject_id, budget_amount,
+                    reserved_amount, consumed_amount, version, created_by, deleted_flag
+                ) SELECT ?, ?, ?, ?, ?, 1000000, 0, 0, 0, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM project_budget_line WHERE id = ?)
+                """, BUDGET_LINE_ID, TENANT_ID, BUDGET_ID, PROJECT_ID, costSubjectId,
+                USER_ADMIN, BUDGET_LINE_ID);
+    }
+
+    private void attachCleanFile(String businessType, Long businessId) {
+        jdbcTemplate.update("""
+                INSERT INTO sys_file (
+                    id, tenant_id, business_type, business_id, file_name, original_name,
+                    file_size, storage_path, bucket_name, virus_scan_status, created_by, deleted_flag
+                ) VALUES (?, ?, ?, ?, 'test.pdf', 'test.pdf', 10, '/test/test.pdf', 'test', 'CLEAN', ?, 0)
+                """, Math.abs(System.nanoTime()), TENANT_ID, businessType, businessId, USER_ADMIN);
+    }
+
+    private MatPurchaseRequest completeRequestHeader() {
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setProjectId(PROJECT_ID);
+        request.setContractId(CONTRACT_ID);
+        request.setPurpose("主体结构材料采购");
+        return request;
+    }
+
+    private MatPurchaseRequestItem completeRequestItem() {
+        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
+        item.setMaterialId(1L);
+        item.setBudgetLineId(BUDGET_LINE_ID);
+        item.setQuantity(new BigDecimal("100.00"));
+        item.setEstimatedUnitPrice(new BigDecimal("10.00"));
+        item.setEstimatedAmount(new BigDecimal("1000.00"));
+        item.setPlannedDate(LocalDate.now().plusDays(7));
+        item.setUnit("m³");
+        return item;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -483,15 +547,12 @@ class PurchaseRequestServiceTest {
     @Transactional
     @DisplayName("RED→GREEN: 提交审批（需有明细和模板）")
     void testSubmitForApproval() {
-        MatPurchaseRequest request = new MatPurchaseRequest();
-        request.setProjectId(PROJECT_ID);
+        MatPurchaseRequest request = completeRequestHeader();
         Long requestId = requestService.create(request);
+        attachCleanFile("PURCHASE_REQUEST", requestId);
 
         // Add items (required for submit)
-        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
-        item.setMaterialId(1L);
-        item.setQuantity(new BigDecimal("100.00"));
-        item.setUnit("m³");
+        MatPurchaseRequestItem item = completeRequestItem();
         requestService.saveItemsBatch(requestId, List.of(item));
 
         // Submit
@@ -509,9 +570,9 @@ class PurchaseRequestServiceTest {
     @Transactional
     @DisplayName("RED→GREEN: 无明细时提交审批应抛异常")
     void testSubmitWithoutItems() {
-        MatPurchaseRequest request = new MatPurchaseRequest();
-        request.setProjectId(PROJECT_ID);
+        MatPurchaseRequest request = completeRequestHeader();
         Long requestId = requestService.create(request);
+        attachCleanFile("PURCHASE_REQUEST", requestId);
 
         BusinessException ex = assertThrows(BusinessException.class, () -> {
             requestService.submitForApproval(requestId);
@@ -526,13 +587,11 @@ class PurchaseRequestServiceTest {
     @Transactional
     @DisplayName("RED→GREEN: 重复提交应抛异常")
     void testCannotSubmitTwice() {
-        MatPurchaseRequest request = new MatPurchaseRequest();
-        request.setProjectId(PROJECT_ID);
+        MatPurchaseRequest request = completeRequestHeader();
         Long requestId = requestService.create(request);
+        attachCleanFile("PURCHASE_REQUEST", requestId);
 
-        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
-        item.setMaterialId(1L);
-        item.setQuantity(new BigDecimal("100.00"));
+        MatPurchaseRequestItem item = completeRequestItem();
         requestService.saveItemsBatch(requestId, List.of(item));
 
         requestService.submitForApproval(requestId);

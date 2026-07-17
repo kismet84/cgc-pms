@@ -16,6 +16,8 @@ import com.cgcpms.requisition.entity.MatRequisition;
 import com.cgcpms.requisition.entity.MatRequisitionItem;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfRecord;
+import com.cgcpms.supplierreturn.entity.MatSupplierReturn;
+import com.cgcpms.supplierreturn.entity.MatSupplierReturnItem;
 import lombok.Data;
 
 import java.util.List;
@@ -36,6 +38,8 @@ public class ProcurementTraceVO {
     private List<CostItem> costs = List.of();
     private MaterialReturn materialReturn;
     private List<MaterialReturnItem> materialReturnItems = List.of();
+    private MatSupplierReturn supplierReturn;
+    private List<MatSupplierReturnItem> supplierReturnItems = List.of();
     private List<WfInstance> approvalInstances = List.of();
     private List<WfRecord> approvalRecords = List.of();
 }

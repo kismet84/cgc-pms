@@ -276,5 +276,4 @@ public class FinanceIntegrationService {
     private static Long optionalLong(Object value){return value==null?null:Long.valueOf(value.toString());}
     private static BigDecimal requiredMoney(Map<String,Object> payload,String key){try{BigDecimal v=money(new BigDecimal(requiredText(payload,key)));if(v.signum()<=0)throw new NumberFormatException();return v;}catch(NumberFormatException e){throw error("INTEGRATION_PAYLOAD_FIELD_INVALID","集成报文金额字段错误: "+key);}}
     private static LocalDateTime requiredDateTime(Map<String,Object> payload,String key){try{return LocalDateTime.parse(requiredText(payload,key).replace(' ','T'));}catch(Exception e){throw error("INTEGRATION_PAYLOAD_FIELD_INVALID","集成报文时间字段错误: "+key);}}
-    private static LocalDateTime dateTime(Object value){if(value instanceof LocalDateTime v)return v;if(value instanceof java.sql.Timestamp v)return v.toLocalDateTime();return LocalDateTime.parse(String.valueOf(value).replace(' ','T'));}
 }

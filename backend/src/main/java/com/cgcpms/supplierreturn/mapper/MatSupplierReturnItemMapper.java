@@ -12,8 +12,8 @@ import java.math.BigDecimal;
 public interface MatSupplierReturnItemMapper extends BaseMapper<MatSupplierReturnItem> {
     @Select("""
             SELECT COALESCE(SUM(i.quantity),0)
-            FROM mat_supplier_return_item i
-            JOIN mat_supplier_return r ON r.id=i.return_id AND r.tenant_id=i.tenant_id
+            FROM sp_supplier_return_item i
+            JOIN sp_supplier_return r ON r.id=i.return_id AND r.tenant_id=i.tenant_id
             WHERE i.tenant_id=#{tenantId} AND i.receipt_item_id=#{receiptItemId}
               AND i.return_source=#{returnSource} AND r.status='CONFIRMED'
             """)
