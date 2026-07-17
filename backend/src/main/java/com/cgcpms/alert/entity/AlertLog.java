@@ -61,17 +61,47 @@ public class AlertLog implements Serializable {
     /** 0 = unread, 1 = read. */
     private Integer isRead;
 
+    private Long readBy;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime readAt;
+
+    /** 首位接单责任人；接单后不得被其他操作覆盖。 */
+    private Long acknowledgedBy;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime acknowledgedAt;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime responseDueAt;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime resolutionDueAt;
+
+    /** 0 = 未升级，1 = 响应超时，2 = 处置超时。 */
+    private Integer escalationLevel;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime lastEscalatedAt;
+
     /** OPEN / PROCESSED / ARCHIVED / INVALID. */
     private String processStatus;
 
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime processedAt;
 
+    private Long processedBy;
+
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime archivedAt;
 
+    private Long archivedBy;
+
     /** 状态备注：处理说明、归档原因、失效原因等。 */
     private String statusRemark;
+
+    @Version
+    private Integer version = 0;
 
     @TableField(fill = FieldFill.INSERT)
     private Long createdBy;
@@ -122,7 +152,10 @@ public class AlertLog implements Serializable {
 
     @JsonProperty("handledBy")
     public Long getHandledBy() {
-        return updatedBy;
+        if ("ARCHIVED".equals(processStatus) || "INVALID".equals(processStatus)) {
+            return archivedBy != null ? archivedBy : processedBy;
+        }
+        return processedBy != null ? processedBy : acknowledgedBy;
     }
 
     @JsonProperty("handledAt")

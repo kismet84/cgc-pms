@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { AlertLogVO } from '@/types/alert'
+import type { AlertLogVO, AlertTraceVO } from '@/types/alert'
 import { ALERT_PROCESS_STATUS_COLOR, SEVERITY_COLOR } from '@/types/alert'
 
 type AlertProcessStatus = 'OPEN' | 'PROCESSED' | 'ARCHIVED' | 'INVALID'
@@ -8,6 +8,8 @@ type AlertProcessStatus = 'OPEN' | 'PROCESSED' | 'ARCHIVED' | 'INVALID'
 const props = withDefaults(
   defineProps<{
     activeRecord: AlertLogVO | null
+    activeTrace: AlertTraceVO | null
+    traceLoading: boolean
     statusRemarkDraft: string
     currentOperator: string
     subscriptionRows: Array<{
@@ -25,6 +27,7 @@ const props = withDefaults(
     getProcessStatusLabel: (record: AlertLogVO) => string
     openSubscriptionModal: () => void
     handleMarkRead: (record: AlertLogVO) => void
+    handleAcknowledge: (record: AlertLogVO) => void
     handleChangeStatus: (
       record: AlertLogVO,
       processStatus: AlertProcessStatus,
@@ -91,6 +94,20 @@ const statusRemarkModel = computed({
             <span>触发时间</span>
             <strong>{{ formatDateTime(activeRecord.triggeredAt) }}</strong>
           </div>
+          <div class="alert-detail-item">
+            <span>响应期限</span>
+            <strong>{{ formatDateTime(activeRecord.responseDueAt) }}</strong>
+          </div>
+          <div class="alert-detail-item">
+            <span>处置期限</span>
+            <strong>{{ formatDateTime(activeRecord.resolutionDueAt) }}</strong>
+          </div>
+          <div class="alert-detail-item">
+            <span>升级级别</span>
+            <a-tag :color="(activeRecord.escalationLevel ?? 0) >= 2 ? 'red' : 'orange'">
+              {{ activeRecord.escalationLevel ? `L${activeRecord.escalationLevel}` : '未升级' }}
+            </a-tag>
+          </div>
         </div>
       </section>
 
@@ -129,8 +146,16 @@ const statusRemarkModel = computed({
         <div class="alert-section-title">处理信息</div>
         <div class="alert-content-list">
           <div class="alert-content-row">
+            <span>接单责任人</span>
+            <strong>{{ activeRecord.acknowledgedBy ?? '-' }}</strong>
+          </div>
+          <div class="alert-content-row">
+            <span>接单时间</span>
+            <strong>{{ formatDateTime(activeRecord.acknowledgedAt) }}</strong>
+          </div>
+          <div class="alert-content-row">
             <span>处理人</span>
-            <strong>{{ currentOperator }}</strong>
+            <strong>{{ activeRecord.processedBy ?? currentOperator }}</strong>
           </div>
           <div class="alert-content-row">
             <span>处理时间</span>
@@ -140,7 +165,34 @@ const statusRemarkModel = computed({
             <span>归档时间</span>
             <strong>{{ formatDateTime(activeRecord.archivedAt) }}</strong>
           </div>
+          <div class="alert-content-row">
+            <span>最近升级时间</span>
+            <strong>{{ formatDateTime(activeRecord.lastEscalatedAt) }}</strong>
+          </div>
         </div>
+      </section>
+
+      <section class="alert-detail-section">
+        <div class="alert-section-title">全链路追溯</div>
+        <a-spin :spinning="traceLoading">
+          <div v-if="activeTrace?.lifecycleEvents.length" class="alert-trace-list">
+            <div
+              v-for="event in activeTrace.lifecycleEvents"
+              :key="String(event.id)"
+              class="alert-trace-line"
+            >
+              <strong>{{ event.eventType }}</strong>
+              <span>{{ event.fromStatus || '-' }} → {{ event.toStatus || '-' }}</span>
+              <span>{{ formatDateTime(event.occurredAt) }}</span>
+              <small>{{ event.remark || '-' }} · {{ event.payloadHash }}</small>
+            </div>
+          </div>
+          <div v-else class="alert-detail-tip">暂无生命周期事件</div>
+          <div class="alert-notification-trace">
+            通知发送 {{ activeTrace?.notificationSendRecords.length ?? 0 }} 条，站内信
+            {{ activeTrace?.notifications.length ?? 0 }} 条
+          </div>
+        </a-spin>
       </section>
 
       <section class="alert-detail-section">
@@ -168,10 +220,17 @@ const statusRemarkModel = computed({
           >标记已读</a-button
         >
         <a-button
-          v-if="String(activeRecord.processStatus ?? 'OPEN') !== 'ARCHIVED'"
-          @click="
-            handleChangeStatus(activeRecord, 'ARCHIVED', statusRemarkDraft.trim() || undefined)
+          v-if="
+            String(activeRecord.processStatus ?? 'OPEN') === 'OPEN' && !activeRecord.acknowledgedBy
           "
+          type="primary"
+          @click="handleAcknowledge(activeRecord)"
+        >
+          接单处理
+        </a-button>
+        <a-button
+          v-if="String(activeRecord.processStatus ?? 'OPEN') === 'PROCESSED'"
+          @click="handleChangeStatus(activeRecord, 'ARCHIVED', statusRemarkDraft.trim())"
         >
           归档
         </a-button>
@@ -181,7 +240,14 @@ const statusRemarkModel = computed({
         >
           查看业务单据
         </a-button>
-        <a-button type="primary" @click="handleSaveActiveResult">保存处理结果</a-button>
+        <a-button
+          v-if="
+            String(activeRecord.processStatus ?? 'OPEN') === 'OPEN' && activeRecord.acknowledgedBy
+          "
+          type="primary"
+          @click="handleSaveActiveResult"
+          >保存处理结果</a-button
+        >
       </div>
     </template>
 
@@ -326,6 +392,36 @@ const statusRemarkModel = computed({
   padding: 12px 16px;
   margin-top: 10px;
   border-top: 1px solid #eef2f7;
+}
+
+.alert-trace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alert-trace-line {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  padding: 8px;
+  font-size: 12px;
+  background: #fafbfd;
+  border-radius: 8px;
+}
+
+.alert-trace-line small {
+  grid-column: 1 / -1;
+  overflow: hidden;
+  color: #8a94a6;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.alert-notification-trace {
+  margin-top: 8px;
+  color: #5f6b7a;
+  font-size: 12px;
 }
 
 .alert-detail-empty {

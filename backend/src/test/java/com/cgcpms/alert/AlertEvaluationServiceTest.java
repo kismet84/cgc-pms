@@ -41,6 +41,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -182,7 +183,7 @@ class AlertEvaluationServiceTest {
                 .likeRight(MatReceipt::getReceiptCode, "ALERT-RC-"));
         notificationMapper.delete(new LambdaQueryWrapper<SysNotification>()
                 .eq(SysNotification::getTenantId, TENANT_ID)
-                .in(SysNotification::getBizType, List.of("ALERT", "ALERT_STATUS")));
+                .in(SysNotification::getBizType, List.of("ALERT", "ALERT_STATUS", "ALERT_ESCALATION")));
         jdbcTemplate.update("""
                 delete from sys_user_preference
                 where tenant_id = ? and user_id in (?, ?, ?, ?, ?, ?)
@@ -799,6 +800,7 @@ class AlertEvaluationServiceTest {
         alert.setDeletedFlag(0);
         alertLogMapper.insert(alert);
 
+        assertTrue(alertService.acknowledge(TENANT_ID, alert.getId(), "接单"));
         assertTrue(alertService.updateStatus(TENANT_ID, alert.getId(), "PROCESSED", "已处理"));
         AlertLog processed = alertLogMapper.selectById(alert.getId());
         assertEquals("PROCESSED", processed.getProcessStatus());
@@ -808,6 +810,64 @@ class AlertEvaluationServiceTest {
         AlertLog archived = alertLogMapper.selectById(alert.getId());
         assertEquals("ARCHIVED", archived.getProcessStatus());
         assertNotNull(archived.getArchivedAt());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11b-1: 接单、责任人、状态机和不可变追溯链形成闭环")
+    void testAcknowledgementStateMachineAndTrace() {
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(TENANT_ID);
+        alert.setProjectId(testProjectId);
+        alert.setRuleType("TEST_ACK_TRACE");
+        alert.setAlertDomain("CONTRACT");
+        alert.setSeverity("HIGH");
+        alert.setMessage("接单追溯测试");
+        alert.setTriggeredAt(LocalDateTime.now());
+        alert.setIsRead(0);
+        alert.setProcessStatus("OPEN");
+        alert.setDeletedFlag(0);
+        alertLogMapper.insert(alert);
+
+        assertThrows(BusinessException.class,
+                () -> alertService.updateStatus(TENANT_ID, alert.getId(), "PROCESSED", "越过接单"));
+        assertTrue(alertService.acknowledge(TENANT_ID, alert.getId(), "管理员接单"));
+
+        AlertLog acknowledged = alertLogMapper.selectById(alert.getId());
+        assertEquals(USER_ADMIN, acknowledged.getAcknowledgedBy());
+        assertNotNull(acknowledged.getAcknowledgedAt());
+        assertEquals(1, acknowledged.getIsRead());
+
+        seedMember(testProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
+        TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
+        assertThrows(BusinessException.class,
+                () -> alertService.acknowledge(TENANT_ID, alert.getId(), "抢单"));
+
+        TestUserContext.setAdmin(TENANT_ID, USER_ADMIN);
+        assertThrows(BusinessException.class,
+                () -> alertService.updateStatus(TENANT_ID, alert.getId(), "ARCHIVED", "越级归档"));
+        assertTrue(alertService.updateStatus(TENANT_ID, alert.getId(), "PROCESSED", "完成处置"));
+        assertTrue(alertService.updateStatus(TENANT_ID, alert.getId(), "ARCHIVED", "复核归档"));
+        assertThrows(BusinessException.class,
+                () -> alertService.updateStatus(TENANT_ID, alert.getId(), "INVALID", "修改终态"));
+
+        Map<String, Object> trace = alertService.trace(TENANT_ID, alert.getId());
+        @SuppressWarnings("unchecked")
+        List<com.cgcpms.alert.entity.AlertLifecycleEvent> events =
+                (List<com.cgcpms.alert.entity.AlertLifecycleEvent>) trace.get("lifecycleEvents");
+        assertEquals(List.of("ACKNOWLEDGED", "STATUS_CHANGED", "STATUS_CHANGED"),
+                events.stream().map(com.cgcpms.alert.entity.AlertLifecycleEvent::getEventType).toList());
+        assertTrue(events.stream().allMatch(event -> event.getPayloadHash() != null
+                && event.getPayloadHash().length() == 64));
+        @SuppressWarnings("unchecked")
+        List<SysNotification> tracedNotifications =
+                (List<SysNotification>) trace.get("notifications");
+        assertFalse(tracedNotifications.isEmpty());
+        assertTrue(tracedNotifications.stream()
+                .allMatch(notification -> "ALERT_STATUS".equals(notification.getBizType())));
+        assertEquals(Set.of("预警已处理", "预警已归档"), tracedNotifications.stream()
+                .map(SysNotification::getTitle)
+                .collect(java.util.stream.Collectors.toSet()));
     }
 
     @Test
@@ -832,6 +892,7 @@ class AlertEvaluationServiceTest {
         alertLogMapper.insert(alert);
 
         TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
+        assertTrue(alertService.acknowledge(TENANT_ID, alert.getId(), "接单"));
         assertTrue(alertService.updateStatus(TENANT_ID, alert.getId(), "PROCESSED", "已处理"));
 
         AlertLog processed = alertLogMapper.selectById(alert.getId());
@@ -865,7 +926,10 @@ class AlertEvaluationServiceTest {
         AlertLog archivedAlert = insertStatusAlert("TEST_STATUS_NOTIFY_ARCHIVED");
         AlertLog invalidAlert = insertStatusAlert("TEST_STATUS_NOTIFY_INVALID");
 
+        assertTrue(alertService.acknowledge(TENANT_ID, processedAlert.getId(), "接单"));
         assertTrue(alertService.updateStatus(TENANT_ID, processedAlert.getId(), "PROCESSED", "已处理"));
+        assertTrue(alertService.acknowledge(TENANT_ID, archivedAlert.getId(), "接单"));
+        assertTrue(alertService.updateStatus(TENANT_ID, archivedAlert.getId(), "PROCESSED", "已处理"));
         assertTrue(alertService.updateStatus(TENANT_ID, archivedAlert.getId(), "ARCHIVED", "已归档"));
         assertTrue(alertService.updateStatus(TENANT_ID, invalidAlert.getId(), "INVALID", "已失效"));
 
@@ -885,9 +949,63 @@ class AlertEvaluationServiceTest {
         Integer sent = jdbcTemplate.queryForObject("""
                 select count(*) from alert_notification_send_record
                 where tenant_id = ? and alert_id in (?, ?, ?) and channel = 'IN_APP'
-                  and event_type = 'STATUS_CHANGED' and send_status = 'SENT'
+                  and event_type like 'STATUS_CHANGED_%' and send_status = 'SENT'
                 """, Integer.class, TENANT_ID, processedAlert.getId(), archivedAlert.getId(), invalidAlert.getId());
-        assertEquals(3, sent);
+        assertEquals(4, sent, "归档预警应完整记录处理与归档两次状态通知");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA11c-2: 超时预警按响应/处置时限两级升级并保持扫描幂等")
+    void testEscalateOverdueAlerts_TwoLevelsIdempotentAndReviewable() {
+        AlertLog responseOverdue = insertEscalationAlert("OPEN", null,
+                LocalDateTime.now().minusMinutes(1), LocalDateTime.now().plusHours(1));
+        AlertLog resolutionOverdue = insertEscalationAlert("OPEN", USER_ADMIN,
+                LocalDateTime.now().minusHours(3), LocalDateTime.now().minusMinutes(1));
+        AlertLog alreadyProcessed = insertEscalationAlert("PROCESSED", USER_ADMIN,
+                LocalDateTime.now().minusHours(3), LocalDateTime.now().minusMinutes(1));
+
+        assertTrue(alertLogMapper.selectPendingEscalationTenantIds().contains(TENANT_ID),
+                "即使项目不再活跃，存在超时开放预警的租户仍必须进入定时升级扫描");
+        assertEquals(2, alertService.escalateOverdueAlerts(TENANT_ID));
+        assertEquals(0, alertService.escalateOverdueAlerts(TENANT_ID), "重复扫描不得重复升级或重复通知");
+
+        assertEquals(1, alertLogMapper.selectById(responseOverdue.getId()).getEscalationLevel());
+        assertEquals(2, alertLogMapper.selectById(resolutionOverdue.getId()).getEscalationLevel());
+        assertEquals(0, alertLogMapper.selectById(alreadyProcessed.getId()).getEscalationLevel());
+
+        Integer lifecycleCount = jdbcTemplate.queryForObject("""
+                select count(*) from alert_lifecycle_event
+                where tenant_id = ? and alert_id in (?, ?)
+                  and event_type in ('ESCALATED_L1', 'ESCALATED_L2')
+                """, Integer.class, TENANT_ID, responseOverdue.getId(), resolutionOverdue.getId());
+        assertEquals(2, lifecycleCount);
+
+        List<SysNotification> escalationNotifications = notificationMapper.selectList(
+                new LambdaQueryWrapper<SysNotification>()
+                        .eq(SysNotification::getTenantId, TENANT_ID)
+                        .eq(SysNotification::getBizType, "ALERT_ESCALATION")
+                        .in(SysNotification::getBizId, List.of(responseOverdue.getId(), resolutionOverdue.getId())));
+        assertFalse(escalationNotifications.isEmpty());
+        assertEquals(Set.of("预警响应超时升级", "预警处置超时升级"), escalationNotifications.stream()
+                .map(SysNotification::getTitle)
+                .collect(java.util.stream.Collectors.toSet()));
+
+        AlertProcessingReportVO report = alertService.processingReport(TENANT_ID, testProjectId,
+                "TEST_ESCALATION", null, null, null, null, null, null);
+        assertEquals(2, report.getEscalatedCount());
+
+        assertTrue(alertLogMapper.selectPendingEscalationTenantIds().isEmpty(),
+                "已完成升级的租户不得继续进入定时升级扫描");
+
+        var effect = alertService.ruleEffectReport(TENANT_ID, testProjectId,
+                        "TEST_ESCALATION", null, null, null).stream()
+                .filter(item -> "TEST_ESCALATION".equals(item.getRuleType()))
+                .findFirst().orElseThrow();
+        assertEquals(3, effect.getGeneratedCount());
+        assertEquals(2, effect.getEscalatedCount());
+        assertEquals(1, effect.getProcessedCount());
+        assertEquals(2, effect.getAcknowledgedCount());
     }
 
     private AlertLog reportAlert(String severity, int isRead, String processStatus) {
@@ -1517,6 +1635,29 @@ class AlertEvaluationServiceTest {
         alert.setIsRead(0);
         alert.setProcessStatus("OPEN");
         alert.setCreatedBy(USER_CREATOR);
+        alert.setDeletedFlag(0);
+        alertLogMapper.insert(alert);
+        return alert;
+    }
+
+    private AlertLog insertEscalationAlert(String processStatus, Long acknowledgedBy,
+                                           LocalDateTime responseDueAt, LocalDateTime resolutionDueAt) {
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(TENANT_ID);
+        alert.setProjectId(testProjectId);
+        alert.setRuleType("TEST_ESCALATION");
+        alert.setAlertDomain("CONTRACT");
+        alert.setAlertCategory("CONTRACT_TERM");
+        alert.setSeverity("HIGH");
+        alert.setMessage("升级闭环测试");
+        alert.setTriggeredAt(LocalDateTime.now().minusDays(4));
+        alert.setIsRead(acknowledgedBy == null ? 0 : 1);
+        alert.setAcknowledgedBy(acknowledgedBy);
+        alert.setAcknowledgedAt(acknowledgedBy == null ? null : LocalDateTime.now().minusDays(2));
+        alert.setResponseDueAt(responseDueAt);
+        alert.setResolutionDueAt(resolutionDueAt);
+        alert.setEscalationLevel(0);
+        alert.setProcessStatus(processStatus);
         alert.setDeletedFlag(0);
         alertLogMapper.insert(alert);
         return alert;

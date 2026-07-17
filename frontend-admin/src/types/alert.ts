@@ -15,6 +15,17 @@ export interface AlertLogVO {
   triggeredAt: string
   /** 0=未读, 1=已读 */
   isRead: number
+  readBy?: string | number
+  readAt?: string
+  acknowledgedBy?: string | number
+  acknowledgedAt?: string
+  responseDueAt?: string
+  resolutionDueAt?: string
+  escalationLevel?: number
+  lastEscalatedAt?: string
+  processedBy?: string | number
+  archivedBy?: string | number
+  version?: number
   createdAt: string
   updatedAt: string
   remark?: string
@@ -40,6 +51,49 @@ export interface AlertLogVO {
   defaultScope?: boolean | number | string
   isDefaultScope?: boolean | number | string
   inDefaultScope?: boolean | number | string
+}
+
+export interface AlertLifecycleEventVO {
+  id: string | number
+  eventType:
+    | 'CREATED'
+    | 'READ'
+    | 'ACKNOWLEDGED'
+    | 'ESCALATED_L1'
+    | 'ESCALATED_L2'
+    | 'STATUS_CHANGED'
+    | 'AUTO_ARCHIVED'
+  fromStatus?: string
+  toStatus?: string
+  operatorId?: string | number
+  remark?: string
+  occurredAt: string
+  payloadHash: string
+}
+
+export interface AlertNotificationSendRecordVO {
+  id: string | number
+  eventType: string
+  channel: string
+  targetUserId?: string | number
+  bizNotificationId?: string | number
+  sendStatus: string
+  failReason?: string
+  requestedAt: string
+  completedAt?: string
+}
+
+export interface AlertTraceVO {
+  alert: AlertLogVO
+  source: {
+    projectId?: string | number
+    contractId?: string | number
+    sourceType?: string
+    sourceId?: string | number
+  }
+  lifecycleEvents: AlertLifecycleEventVO[]
+  notificationSendRecords: AlertNotificationSendRecordVO[]
+  notifications: Array<Record<string, unknown>>
 }
 
 export interface AlertSubscriptionConfig {

@@ -45,4 +45,9 @@ public class TechItem extends BaseEntity {
     private LocalDateTime closedAt;
 
     private Long responsibleUserId;
+
+    /** 真实来源：TECHNICAL_SCHEME / TECH_RFI。 */
+    private String sourceType;
+
+    private Long sourceId;
 }

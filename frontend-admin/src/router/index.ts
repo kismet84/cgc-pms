@@ -222,6 +222,36 @@ export const routes: RouteRecordRaw[] = [
         },
       },
       {
+        path: 'technical-management',
+        name: 'TechnicalManagement',
+        component: () => import('@/pages/technical-management/index.vue'),
+        meta: {
+          title: '图纸RFI技术闭环',
+          icon: 'FileSearchOutlined',
+          permission: 'technical:query',
+        },
+      },
+      {
+        path: 'project-closeout',
+        name: 'ProjectCloseout',
+        component: () => import('@/pages/project-closeout/index.vue'),
+        meta: {
+          title: '项目竣工收尾',
+          icon: 'CheckCircleOutlined',
+          permission: 'closeout:query',
+        },
+      },
+      {
+        path: 'supplier-sourcing',
+        name: 'SupplierSourcing',
+        component: () => import('@/pages/supplier-sourcing/index.vue'),
+        meta: {
+          title: '供应商招采履约',
+          icon: 'TeamOutlined',
+          permission: 'supplier:sourcing:query',
+        },
+      },
+      {
         path: 'bid-cost',
         name: 'BidCost',
         component: () => import('@/pages/bid-cost/index.vue'),
@@ -328,6 +358,26 @@ export const routes: RouteRecordRaw[] = [
         name: 'AccountingEntry',
         component: () => import('@/pages/accounting-entry/index.vue'),
         meta: { title: '会计凭证', icon: 'AccountBookOutlined', permission: 'accounting:query' },
+      },
+      {
+        path: 'cash-forecast',
+        name: 'CashForecast',
+        component: () => import('@/pages/cash-forecast/index.vue'),
+        meta: {
+          title: '项目资金预测',
+          icon: 'FundOutlined',
+          permission: 'finance:forecast:query',
+        },
+      },
+      {
+        path: 'financial-close',
+        name: 'FinancialClose',
+        component: () => import('@/pages/financial-close/index.vue'),
+        meta: {
+          title: '财务核算与月结',
+          icon: 'AccountBookOutlined',
+          permission: 'finance:close:query',
+        },
       },
       {
         path: 'inventory',

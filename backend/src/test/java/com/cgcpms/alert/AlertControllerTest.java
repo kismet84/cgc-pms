@@ -36,7 +36,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "jwt.secret=alert-controller-test-secret-key-at-least-sixty-four-characters-long"
+})
 @AutoConfigureMockMvc @ActiveProfiles("local")
 @DisplayName("AlertController integration tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -101,6 +104,12 @@ class AlertControllerTest {
                     .andExpect(jsonPath("$.data.severityCounts.MEDIUM").value(1))
                     .andExpect(jsonPath("$.data.processStatusCounts.OPEN").value(1))
                     .andExpect(jsonPath("$.data.processStatusCounts.PROCESSED").value(1));
+
+            mockMvc.perform(g("/alerts/rule-effect-report?projectId=10001&ruleType=TEST_REPORT_CTRL")
+                            .cookie(adminCookie()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"))
+                    .andExpect(jsonPath("$.data[?(@.ruleType == 'TEST_REPORT_CTRL')].generatedCount").exists());
         } finally {
             deleteReportControllerAlerts();
         }
@@ -223,6 +232,31 @@ class AlertControllerTest {
                 .andExpect(jsonPath("$.code").value("0"));
     }
 
+    @Test @Order(4) @DisplayName("POST /alerts/escalate-overdue uses dedicated evaluate permission and persists escalation")
+    void testEscalateOverdue() throws Exception {
+        deleteAlertsByRuleType("TEST_ESCALATE_CTRL");
+        AlertLog alert = newAlert("TEST_ESCALATE_CTRL", 10001L);
+        alert.setResponseDueAt(LocalDateTime.now().minusMinutes(1));
+        alert.setResolutionDueAt(LocalDateTime.now().plusHours(1));
+        alert.setEscalationLevel(0);
+        alertLogMapper.insert(alert);
+        try {
+            mockMvc.perform(p("/alerts/escalate-overdue")
+                            .cookie(memberCookie(NO_ACCESS_MEMBER_ID, "alert:edit")))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(p("/alerts/escalate-overdue").cookie(adminCookie()))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"))
+                    .andExpect(jsonPath("$.data.alertsEscalated").value(1));
+            assertEquals(1, alertLogMapper.selectById(alert.getId()).getEscalationLevel());
+        } finally {
+            jdbcTemplate.update("delete from alert_notification_send_record where alert_id = ?", alert.getId());
+            jdbcTemplate.update("delete from sys_notification where biz_id = ? and biz_type = 'ALERT_ESCALATION'", alert.getId());
+            jdbcTemplate.update("delete from alert_lifecycle_event where alert_id = ?", alert.getId());
+            deleteAlertsByRuleType("TEST_ESCALATE_CTRL");
+        }
+    }
+
     @Test @Order(4) @DisplayName("V146 keeps ordinary edit and batch evaluate permissions separate")
     void testAlertPermissionMigrationApplied() {
         assertEquals("alert:edit", jdbcTemplate.queryForObject(
@@ -247,12 +281,25 @@ class AlertControllerTest {
         alert.setDeletedFlag(0);
         alertLogMapper.insert(alert);
 
+        mockMvc.perform(u("/alerts/" + alert.getId() + "/acknowledge").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"remark\":\"take\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+
         mockMvc.perform(u("/alerts/" + alert.getId() + "/status").cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"processStatus\":\"PROCESSED\",\"statusRemark\":\"done\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.processStatus").value("PROCESSED"));
+
+        mockMvc.perform(g("/alerts/" + alert.getId() + "/trace").cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.alert.id").value(alert.getId().toString()))
+                .andExpect(jsonPath("$.data.lifecycleEvents.length()").value(2))
+                .andExpect(jsonPath("$.data.lifecycleEvents[0].payloadHash").isString());
     }
 
     @Test @Order(6) @DisplayName("PUT /alerts/{id}/status same-tenant different-project member -> denied")

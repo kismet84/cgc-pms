@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   getList: vi.fn(),
   getDetail: vi.fn(),
   post: vi.fn(),
+  review: vi.fn(),
+  resubmit: vi.fn(),
   reverse: vi.fn(),
   confirm: vi.fn(),
   success: vi.fn(),
@@ -30,6 +32,8 @@ vi.mock('@/api/modules/accounting', () => ({
   getAccountingEntries: mocks.getList,
   getAccountingEntryDetail: mocks.getDetail,
   postAccountingEntry: mocks.post,
+  reviewAccountingEntry: mocks.review,
+  resubmitAccountingEntry: mocks.resubmit,
   reverseAccountingEntry: mocks.reverse,
 }))
 
@@ -54,6 +58,7 @@ function entry(overrides: Partial<AccountingEntryVO> = {}): AccountingEntryVO {
     sourceType: 'CONTRACT',
     sourceId: '88',
     entryStatus: 'DRAFT',
+    reviewStatus: 'PENDING',
     totalDebit: '100.00',
     totalCredit: '100.00',
     ...overrides,
@@ -124,13 +129,19 @@ describe('accounting entry page', () => {
     mocks.roles = ['FINANCE']
     mocks.permissions = ['accounting:query']
     mocks.getList.mockReset().mockResolvedValue({
-      records: [entry(), entry({ id: '102', entryCode: 'ACC-002', entryStatus: 'POSTED' })],
+      records: [
+        entry(),
+        entry({ id: '102', entryCode: 'ACC-002', entryStatus: 'POSTED', reviewStatus: 'APPROVED' }),
+        entry({ id: '103', entryCode: 'ACC-003', reviewStatus: 'APPROVED' }),
+      ],
       total: 2,
       pageNo: 1,
       pageSize: 20,
     })
     mocks.getDetail.mockReset().mockImplementation(async (id: string) => detail(entry({ id })))
     mocks.post.mockReset().mockResolvedValue(undefined)
+    mocks.review.mockReset().mockResolvedValue(undefined)
+    mocks.resubmit.mockReset().mockResolvedValue(undefined)
     mocks.reverse.mockReset().mockResolvedValue(undefined)
     mocks.confirm.mockReset()
     mocks.success.mockReset()
@@ -155,19 +166,25 @@ describe('accounting entry page', () => {
     expect(wrapper.find('[data-testid="reverse-102"]').exists()).toBe(false)
   })
 
-  it('shows state-valid actions with accounting:edit and executes confirmed post', async () => {
-    mocks.permissions = ['accounting:query', 'accounting:edit']
+  it('shows state-valid actions with separated permissions and executes confirmed post', async () => {
+    mocks.permissions = [
+      'accounting:query',
+      'accounting:review',
+      'accounting:post',
+      'accounting:adjustment:add',
+    ]
     const wrapper = mountPage()
     await flushPromises()
 
-    expect(wrapper.find('[data-testid="post-101"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="review-101"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="post-103"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="reverse-102"]').exists()).toBe(true)
 
-    await wrapper.get('[data-testid="post-101"]').trigger('click')
+    await wrapper.get('[data-testid="post-103"]').trigger('click')
     const options = mocks.confirm.mock.calls[0][0] as { onOk: () => Promise<void> }
     await options.onOk()
 
-    expect(mocks.post).toHaveBeenCalledWith('101')
+    expect(mocks.post).toHaveBeenCalledWith('103')
     expect(mocks.success).toHaveBeenCalledWith('凭证过账成功')
     expect(mocks.getList).toHaveBeenCalledTimes(2)
   })

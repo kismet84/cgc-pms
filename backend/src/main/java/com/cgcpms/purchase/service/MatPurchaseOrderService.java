@@ -284,8 +284,21 @@ public class MatPurchaseOrderService {
         if (!ContractStatusConstants.STATUS_PERFORMING.equals(contract.getContractStatus())) {
             throw new BusinessException("CONTRACT_NOT_PERFORMING", "关联合同非执行中状态，无法提交采购订单");
         }
+        if (!"PURCHASE".equals(contract.getContractType())) {
+            throw new BusinessException("PURCHASE_ORDER_CONTRACT_TYPE_INVALID", "采购订单必须关联采购合同");
+        }
         if (!java.util.Objects.equals(contract.getPartyBId(), order.getPartnerId())) {
             throw new BusinessException("PURCHASE_ORDER_PARTNER_MISMATCH", "采购订单供应商必须与合同乙方一致");
+        }
+        MdPartner supplier = mdPartnerMapper.selectById(order.getPartnerId());
+        if (supplier == null || !java.util.Objects.equals(supplier.getTenantId(), order.getTenantId())) {
+            throw new BusinessException("PURCHASE_ORDER_PARTNER_NOT_FOUND", "采购订单供应商不存在");
+        }
+        if (!"SUPPLIER".equals(supplier.getPartnerType()) || !"ENABLE".equals(supplier.getStatus())) {
+            throw new BusinessException("PURCHASE_ORDER_PARTNER_DISABLED", "采购订单供应商类型不正确或已停用");
+        }
+        if (java.util.Objects.equals(supplier.getBlacklistFlag(), 1)) {
+            throw new BusinessException("PURCHASE_ORDER_PARTNER_BLACKLISTED", "黑名单供应商禁止提交采购订单审批");
         }
 
         List<MatPurchaseOrderItem> items = matPurchaseOrderItemMapper.selectList(

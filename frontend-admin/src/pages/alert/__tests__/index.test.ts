@@ -21,6 +21,8 @@ const {
   mockExportAlertAudit,
   mockGetAlertList,
   mockGetAlertProcessingReport,
+  mockGetAlertRuleEffectReport,
+  mockGetAlertTrace,
   mockGetAlertSubscription,
   mockUpdateAlertSubscription,
   mockDownloadBlobFile,
@@ -32,6 +34,8 @@ const {
   mockExportAlertAudit: vi.fn(),
   mockGetAlertList: vi.fn(),
   mockGetAlertProcessingReport: vi.fn(),
+  mockGetAlertRuleEffectReport: vi.fn(),
+  mockGetAlertTrace: vi.fn(),
   mockGetAlertSubscription: vi.fn(),
   mockUpdateAlertSubscription: vi.fn(),
   mockDownloadBlobFile: vi.fn(),
@@ -125,6 +129,7 @@ const mockAlertStore = {
   batchChangeStatus: vi.fn().mockResolvedValue({ successIds: [] }),
   markRead: vi.fn().mockResolvedValue(undefined),
   changeStatus: vi.fn().mockResolvedValue(undefined),
+  acknowledge: vi.fn().mockResolvedValue({ success: true }),
   evaluating: false,
   loading: false,
   markingRead: new Set<string>(),
@@ -157,6 +162,8 @@ vi.mock('@/api/modules/alert', () => ({
   exportAlertAudit: mockExportAlertAudit,
   getAlertList: mockGetAlertList,
   getAlertProcessingReport: mockGetAlertProcessingReport,
+  getAlertRuleEffectReport: mockGetAlertRuleEffectReport,
+  getAlertTrace: mockGetAlertTrace,
   getAlertSubscription: mockGetAlertSubscription,
   updateAlertSubscription: mockUpdateAlertSubscription,
 }))
@@ -466,9 +473,27 @@ beforeEach(() => {
     totalCount: 0,
     unreadCount: 0,
     readCount: 0,
+    unacknowledgedCount: 0,
+    overdueOpenCount: 0,
+    escalatedCount: 0,
+    failedNotificationCount: 0,
     severityCounts: {},
     processStatusCounts: {},
   })
+  mockGetAlertRuleEffectReport.mockResolvedValue([])
+  mockGetAlertTrace.mockImplementation(async (id: string) => ({
+    alert:
+      mockAlertStore.alerts.find((item) => String(item.id) === String(id)) ?? createAlertRecord(),
+    source: {
+      projectId: 'P-01',
+      contractId: 'CT-1',
+      sourceType: 'PURCHASE_ORDER',
+      sourceId: 'PO-9',
+    },
+    lifecycleEvents: [],
+    notificationSendRecords: [],
+    notifications: [],
+  }))
   mockExportAlertAudit.mockResolvedValue(undefined)
   mockGetAlertSubscription.mockResolvedValue(buildSubscriptionResponse())
   mockUpdateAlertSubscription.mockResolvedValue(
@@ -486,6 +511,42 @@ beforeEach(() => {
 })
 
 describe('alert/index.vue', () => {
+  it('展示规则效果复盘和升级统计', async () => {
+    mockGetAlertProcessingReport.mockResolvedValue({
+      totalCount: 2,
+      unreadCount: 1,
+      readCount: 1,
+      unacknowledgedCount: 1,
+      overdueOpenCount: 1,
+      escalatedCount: 1,
+      failedNotificationCount: 0,
+      severityCounts: { HIGH: 2 },
+      processStatusCounts: { OPEN: 1, ARCHIVED: 1 },
+    })
+    mockGetAlertRuleEffectReport.mockResolvedValue([
+      {
+        ruleType: 'CONTRACT_OVERDUE',
+        generatedCount: 2,
+        acknowledgedCount: 1,
+        withinResponseSlaCount: 1,
+        escalatedCount: 1,
+        processedCount: 1,
+        archivedCount: 1,
+        invalidCount: 0,
+        failedNotificationCount: 0,
+        averageResponseMinutes: 30,
+      },
+    ])
+
+    const wrapper = mountAlertPage()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('规则效果复盘')
+    expect(wrapper.text()).toContain('合同超期')
+    expect(wrapper.text()).toContain('平均响应 30 分钟')
+    expect(wrapper.text()).toContain('已升级 1')
+  })
+
   it('页面正常渲染并以默认查询参数拉取列表与订阅', async () => {
     mockAlertStore.alerts = [createAlertRecord()]
     mockAlertStore.total = 1
@@ -498,7 +559,7 @@ describe('alert/index.vue', () => {
     expect(wrapper.text()).toContain('仅看默认范围')
     expect(wrapper.text()).toContain('接收通知')
     expect(wrapper.text()).toContain('标记已读')
-    expect(wrapper.text()).toContain('保存处理结果')
+    expect(wrapper.text()).toContain('接单处理')
     expect(mockAlertStore.fetchAlerts).toHaveBeenCalledWith(
       expect.objectContaining({
         alertDomain: 'PURCHASE',
@@ -532,7 +593,7 @@ describe('alert/index.vue', () => {
 
     expect(filterActions).toEqual(['搜索', '重置', '筛选'])
     expect(toolbarButtons).toEqual(['批量处理', '标记已读', '归档', '导出', '列设置'])
-    expect(detailButtons).toEqual(['标记已读', '归档', '查看业务单据', '保存处理结果'])
+    expect(detailButtons).toEqual(['标记已读', '接单处理', '查看业务单据'])
     expect(wrapper.find('.alert-filter-scope').text()).toContain('仅看默认范围')
     expect(wrapper.find('.alert-message-button').text()).toContain('采购订单逾期')
     expect(wrapper.find('.alert-subscription-header').text()).toContain('通知渠道')
@@ -582,7 +643,9 @@ describe('alert/index.vue', () => {
   })
 
   it('表格详情、备注保存、订阅保存和业务单据跳转链路仍可达', async () => {
-    mockAlertStore.alerts = [createAlertRecord()]
+    mockAlertStore.alerts = [
+      createAlertRecord({ acknowledgedBy: 'U-1', acknowledgedAt: '2026-07-07 10:10:00' }),
+    ]
     mockAlertStore.total = 1
 
     const wrapper = mountAlertPage({
@@ -1081,7 +1144,8 @@ describe('alert/index.vue', () => {
     expect(filterPanelSource).toContain('.alert-filter-scope')
 
     expect(tablePanelSource).toContain('标记已读')
-    expect(tablePanelSource).toContain("handleChangeStatus(row, 'PROCESSED')")
+    expect(tablePanelSource).toContain('@click="handleAcknowledge(row)"')
+    expect(tablePanelSource).toContain("String(row.processStatus ?? 'OPEN') === 'PROCESSED'")
     expect(tablePanelSource).toContain('<template #triggeredAt="{ row }">')
     expect(tablePanelSource).toContain('class="alert-message-button"')
     expect(tablePanelSource).toContain(
@@ -1184,7 +1248,7 @@ describe('alert 子组件 DOM/结构证据', () => {
         formatDateTime: vi.fn(() => '2026-07-07 10:00:00'),
         getAlertMessageText: vi.fn(() => '采购订单逾期'),
         handleMarkRead: vi.fn(),
-        handleChangeStatus: vi.fn(),
+        handleAcknowledge: vi.fn(),
         handleBatchStatus: vi.fn(),
         handleBatchMarkRead: vi.fn(),
         handlePageChange: vi.fn(),
@@ -1211,7 +1275,7 @@ describe('alert 子组件 DOM/结构证据', () => {
     expect(wrapper.find('.alert-pagination').exists()).toBe(true)
     expect(wrapper.find('.alert-grid-wrap').exists()).toBe(true)
     expect(toolbarButtons).toEqual(['批量处理', '标记已读', '归档', '导出', '列设置'])
-    expect(actionButtons).toEqual(['标记已读', '处理', '归档', '详情'])
+    expect(actionButtons).toEqual(['标记已读', '接单', '详情'])
   })
 
   it('无编辑/导出权限时隐藏预警批量、导出和行级写操作入口', () => {
@@ -1247,7 +1311,7 @@ describe('alert 子组件 DOM/结构证据', () => {
         formatDateTime: vi.fn(() => '2026-07-07 10:00:00'),
         getAlertMessageText: vi.fn(() => '采购订单逾期'),
         handleMarkRead: vi.fn(),
-        handleChangeStatus: vi.fn(),
+        handleAcknowledge: vi.fn(),
         handleBatchStatus: vi.fn(),
         handleBatchMarkRead: vi.fn(),
         handlePageChange: vi.fn(),
@@ -1296,7 +1360,18 @@ describe('alert 子组件 DOM/结构证据', () => {
 
     const wrapper = mount(AlertDetailPanel, {
       props: {
-        activeRecord: createAlertRecord(),
+        activeRecord: createAlertRecord({
+          acknowledgedBy: 'U-1',
+          acknowledgedAt: '2026-07-07 10:10:00',
+        }),
+        activeTrace: {
+          alert: createAlertRecord(),
+          source: {},
+          lifecycleEvents: [],
+          notificationSendRecords: [],
+          notifications: [],
+        },
+        traceLoading: false,
         statusRemarkDraft: '',
         currentOperator: '测试用户',
         subscriptionRows: [{ channel: 'IN_APP', label: '站内', enabled: true, minSeverity: 'LOW' }],
@@ -1309,6 +1384,7 @@ describe('alert 子组件 DOM/结构证据', () => {
         getProcessStatusLabel: () => '待处理',
         openSubscriptionModal,
         handleMarkRead,
+        handleAcknowledge: vi.fn(),
         handleChangeStatus,
         canOpenBusinessEntry: () => true,
         openBusinessEntry,
@@ -1323,19 +1399,30 @@ describe('alert 子组件 DOM/结构证据', () => {
     const actionButtons = wrapper.findAll('.alert-detail-actions button').map((item) => item.text())
 
     expect(wrapper.find('.alert-detail-panel').exists()).toBe(true)
-    expect(sectionTitles).toEqual(['基本信息', '告警内容', '状态备注', '处理信息', '通知订阅'])
+    expect(sectionTitles).toEqual([
+      '基本信息',
+      '告警内容',
+      '状态备注',
+      '处理信息',
+      '全链路追溯',
+      '通知订阅',
+    ])
     expect(wrapper.find('.alert-subscription-header').exists()).toBe(true)
     expect(wrapper.findAll('.alert-subscription-header span').map((item) => item.text())).toEqual([
       '通知渠道',
       '是否启用',
       '最低严重度',
     ])
-    expect(actionButtons).toEqual(['标记已读', '归档', '查看业务单据', '保存处理结果'])
+    expect(actionButtons).toEqual(['标记已读', '查看业务单据', '保存处理结果'])
 
     await wrapper.get('textarea').setValue('新的备注')
     expect(wrapper.emitted('update:statusRemarkDraft')).toEqual([['新的备注']])
 
-    await wrapper.get('.alert-detail-actions button:nth-child(3)').trigger('click')
+    const businessButton = wrapper
+      .findAll('.alert-detail-actions button')
+      .find((item) => item.text() === '查看业务单据')
+    expect(businessButton).toBeTruthy()
+    await businessButton!.trigger('click')
     expect(openBusinessEntry).toHaveBeenCalledTimes(1)
   })
 
@@ -1349,6 +1436,8 @@ describe('alert 子组件 DOM/结构证据', () => {
           businessId: '',
           contractId: '',
         }),
+        activeTrace: null,
+        traceLoading: false,
         statusRemarkDraft: '',
         currentOperator: '测试用户',
         subscriptionRows: [],
@@ -1360,6 +1449,7 @@ describe('alert 子组件 DOM/结构证据', () => {
         getProcessStatusLabel: () => '待处理',
         openSubscriptionModal: vi.fn(),
         handleMarkRead: vi.fn(),
+        handleAcknowledge: vi.fn(),
         handleChangeStatus: vi.fn(),
         canOpenBusinessEntry: () => false,
         openBusinessEntry: vi.fn(),

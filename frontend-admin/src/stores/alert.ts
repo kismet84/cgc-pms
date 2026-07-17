@@ -9,6 +9,7 @@ import {
   batchMarkAlertRead,
   batchUpdateAlertStatus,
   batchEvaluate,
+  acknowledgeAlert,
   type AlertListResponse,
   type AlertListParams,
   type AlertProcessStatus,
@@ -235,6 +236,25 @@ export const useAlertStore = defineStore('alert', () => {
     }
   }
 
+  async function acknowledge(id: string, remark?: string) {
+    const normalizedId = normalizeId(id)
+    markingRead.value.add(normalizedId)
+    try {
+      const result = await acknowledgeAlert(normalizedId, { remark })
+      if (result.success) {
+        const now = new Date().toISOString()
+        alerts.value.forEach((alert) => {
+          if (normalizeId(alert.id) !== normalizedId) return
+          alert.isRead = 1
+          alert.acknowledgedAt = now
+        })
+      }
+      return result
+    } finally {
+      markingRead.value.delete(normalizedId)
+    }
+  }
+
   async function batchMarkRead(ids: Array<string | number>) {
     const uniqueIds = normalizeIds(ids)
     if (!uniqueIds.length) {
@@ -257,7 +277,7 @@ export const useAlertStore = defineStore('alert', () => {
   async function changeStatus(
     id: string | number,
     processStatus: AlertProcessStatus,
-    statusRemark?: string,
+    statusRemark: string,
   ) {
     const normalizedId = normalizeId(id)
     markingRead.value.add(normalizedId)
@@ -274,7 +294,7 @@ export const useAlertStore = defineStore('alert', () => {
   async function batchChangeStatus(
     ids: Array<string | number>,
     processStatus: AlertProcessStatus,
-    statusRemark?: string,
+    statusRemark: string,
   ) {
     const uniqueIds = normalizeIds(ids)
     if (!uniqueIds.length) {
@@ -328,6 +348,7 @@ export const useAlertStore = defineStore('alert', () => {
     markingRead,
     fetchAlerts,
     markRead,
+    acknowledge,
     batchMarkRead,
     changeStatus,
     batchChangeStatus,

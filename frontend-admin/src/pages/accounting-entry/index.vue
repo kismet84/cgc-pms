@@ -15,6 +15,8 @@ import {
   getAccountingEntries,
   getAccountingEntryDetail,
   postAccountingEntry,
+  resubmitAccountingEntry,
+  reviewAccountingEntry,
   reverseAccountingEntry,
 } from '@/api/modules/accounting'
 import { useUserStore } from '@/stores/user'
@@ -30,7 +32,16 @@ const userStore = useUserStore()
 const isAdmin = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role.toUpperCase())),
 )
-const canEdit = computed(() => isAdmin.value || userStore.hasPermission('accounting:edit'))
+const canReview = computed(() => isAdmin.value || userStore.hasPermission('accounting:review'))
+const canPost = computed(
+  () =>
+    isAdmin.value ||
+    userStore.hasPermission('accounting:post') ||
+    userStore.hasPermission('accounting:edit'),
+)
+const canAdjust = computed(
+  () => isAdmin.value || userStore.hasPermission('accounting:adjustment:add'),
+)
 
 const loading = ref(false)
 const rows = ref<AccountingEntryVO[]>([])
@@ -54,7 +65,8 @@ const columns = [
   { title: '借方合计', dataIndex: 'totalDebit', key: 'totalDebit', width: 130, align: 'right' },
   { title: '贷方合计', dataIndex: 'totalCredit', key: 'totalCredit', width: 130, align: 'right' },
   { title: '状态', dataIndex: 'entryStatus', key: 'entryStatus', width: 100 },
-  { title: '操作', key: 'actions', fixed: 'right', width: 210 },
+  { title: '复核状态', dataIndex: 'reviewStatus', key: 'reviewStatus', width: 110 },
+  { title: '操作', key: 'actions', fixed: 'right', width: 330 },
 ]
 
 const lineColumns = [
@@ -176,6 +188,42 @@ function confirmPost(entry: AccountingEntryVO) {
   })
 }
 
+function confirmReview(entry: AccountingEntryVO, approved: boolean) {
+  Modal.confirm({
+    title: approved ? '确认复核通过' : '确认驳回复核',
+    content: approved
+      ? `确认凭证 ${entry.entryCode} 的科目、金额与来源单据一致？`
+      : `凭证 ${entry.entryCode} 将退回制单人修改。`,
+    okText: approved ? '复核通过' : '驳回',
+    okType: approved ? 'primary' : 'danger',
+    async onOk() {
+      actionEntryId.value = entry.id
+      try {
+        await reviewAccountingEntry(
+          entry.id,
+          approved,
+          approved ? '复核通过' : '科目、金额或来源资料需修正',
+        )
+        message.success(approved ? '凭证复核通过' : '凭证已驳回')
+        await fetchEntries()
+      } finally {
+        actionEntryId.value = null
+      }
+    },
+  })
+}
+
+async function resubmit(entry: AccountingEntryVO) {
+  actionEntryId.value = entry.id
+  try {
+    await resubmitAccountingEntry(entry.id)
+    message.success('凭证已重新提交复核')
+    await fetchEntries()
+  } finally {
+    actionEntryId.value = null
+  }
+}
+
 function confirmReverse(entry: AccountingEntryVO) {
   Modal.confirm({
     title: '确认冲销',
@@ -186,8 +234,8 @@ function confirmReverse(entry: AccountingEntryVO) {
     async onOk() {
       actionEntryId.value = entry.id
       try {
-        await reverseAccountingEntry(entry.id)
-        message.success('凭证冲销成功')
+        await reverseAccountingEntry(entry.id, `冲销凭证 ${entry.entryCode}`)
+        message.success('冲销凭证已生成，复核过账后生效')
         await fetchEntries()
       } catch (error: unknown) {
         console.error(error)
@@ -305,6 +353,25 @@ onMounted(fetchEntries)
                     {{ statusMeta[record.entryStatus as AccountingEntryStatus].label }}
                   </a-tag>
                 </template>
+                <template v-else-if="column.key === 'reviewStatus'">
+                  <a-tag
+                    :color="
+                      record.reviewStatus === 'APPROVED'
+                        ? 'success'
+                        : record.reviewStatus === 'REJECTED'
+                          ? 'error'
+                          : 'processing'
+                    "
+                  >
+                    {{
+                      record.reviewStatus === 'APPROVED'
+                        ? '复核通过'
+                        : record.reviewStatus === 'REJECTED'
+                          ? '已驳回'
+                          : '待复核'
+                    }}
+                  </a-tag>
+                </template>
                 <template v-else-if="column.key === 'totalDebit' || column.key === 'totalCredit'">
                   ¥ {{ record[column.dataIndex] }}
                 </template>
@@ -320,7 +387,33 @@ onMounted(fetchEntries)
                       详情
                     </a-button>
                     <a-button
-                      v-if="canEdit && record.entryStatus === 'DRAFT'"
+                      v-if="
+                        canReview &&
+                        record.entryStatus === 'DRAFT' &&
+                        record.reviewStatus === 'PENDING'
+                      "
+                      type="link"
+                      size="small"
+                      :data-testid="`review-${record.id}`"
+                      @click="confirmReview(record, true)"
+                    >
+                      复核
+                    </a-button>
+                    <a-button
+                      v-if="record.entryStatus === 'DRAFT' && record.reviewStatus === 'REJECTED'"
+                      type="link"
+                      size="small"
+                      :data-testid="`resubmit-${record.id}`"
+                      @click="resubmit(record)"
+                    >
+                      重提
+                    </a-button>
+                    <a-button
+                      v-if="
+                        canPost &&
+                        record.entryStatus === 'DRAFT' &&
+                        record.reviewStatus === 'APPROVED'
+                      "
                       type="link"
                       size="small"
                       :loading="actionEntryId === record.id"
@@ -330,7 +423,7 @@ onMounted(fetchEntries)
                       过账
                     </a-button>
                     <a-button
-                      v-if="canEdit && record.entryStatus === 'POSTED'"
+                      v-if="canAdjust && record.entryStatus === 'POSTED'"
                       type="link"
                       danger
                       size="small"

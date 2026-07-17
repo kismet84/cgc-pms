@@ -235,6 +235,42 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("GET /auth/dev-login 保留财务核算与月结站内跳转")
+    void testDevLoginRedirectToFinancialClose() throws Exception {
+        var userInfo = new UserInfo();
+        userInfo.setUsername("demo_dev_super_admin");
+        var loginResponse = new LoginResponse("mock-token", "mock-refresh-token", userInfo);
+        when(authService.loginByUsernameEnsuringDevAccount(
+                eq("demo_dev_super_admin"),
+                eq("demo_dev_super_admin"))).thenReturn(loginResponse);
+
+        mockMvc.perform(get("/api/auth/dev-login")
+                        .servletPath("/auth/dev-login")
+                        .contextPath("/api")
+                        .param("redirect", "/financial-close"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/financial-close"));
+    }
+
+    @Test
+    @DisplayName("GET /auth/dev-login 保留项目资金预测站内跳转")
+    void testDevLoginRedirectToCashForecast() throws Exception {
+        var userInfo = new UserInfo();
+        userInfo.setUsername("demo_dev_super_admin");
+        var loginResponse = new LoginResponse("mock-token", "mock-refresh-token", userInfo);
+        when(authService.loginByUsernameEnsuringDevAccount(
+                eq("demo_dev_super_admin"),
+                eq("demo_dev_super_admin"))).thenReturn(loginResponse);
+
+        mockMvc.perform(get("/api/auth/dev-login")
+                        .servletPath("/auth/dev-login")
+                        .contextPath("/api")
+                        .param("redirect", "/cash-forecast"))
+                .andExpect(status().isFound())
+                .andExpect(header().string("Location", "/cash-forecast"));
+    }
+
+    @Test
     @DisplayName("GET /auth/dev-login 允许现场日报直达且拒绝不安全跳转")
     void testDevLoginRedirectToSiteDailyLogKeepsSecurityBoundary() throws Exception {
         when(authService.loginByUsernameEnsuringDevAccount(

@@ -1,4 +1,5 @@
 export type AccountingEntryStatus = 'DRAFT' | 'POSTED' | 'REVERSED'
+export type AccountingReviewStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 
 export interface AccountingEntryQuery {
   pageNo: number
@@ -18,6 +19,15 @@ export interface AccountingEntryVO {
   sourceType: string
   sourceId: string
   entryStatus: AccountingEntryStatus
+  reviewStatus: AccountingReviewStatus
+  reviewedBy?: string
+  reviewedAt?: string
+  reviewComment?: string
+  postedBy?: string
+  periodId?: string
+  adjustmentFlag?: number
+  originalEntryId?: string
+  reversedEntryId?: string
   totalDebit: string
   totalCredit: string
   createdAt?: string

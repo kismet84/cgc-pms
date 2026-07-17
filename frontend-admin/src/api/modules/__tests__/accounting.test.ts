@@ -8,6 +8,8 @@ import {
   getAccountingEntries,
   getAccountingEntryDetail,
   postAccountingEntry,
+  resubmitAccountingEntry,
+  reviewAccountingEntry,
   reverseAccountingEntry,
 } from '../accounting'
 
@@ -30,17 +32,29 @@ describe('accounting entry API contracts', () => {
     })
   })
 
-  it('uses PUT for controlled post and reverse transitions', async () => {
+  it('uses PUT for review, resubmit, post and reverse transitions', async () => {
+    await reviewAccountingEntry('100', true, '复核通过')
+    await resubmitAccountingEntry('100')
     await postAccountingEntry('101')
-    await reverseAccountingEntry('102')
+    await reverseAccountingEntry('102', '会计冲销')
 
     expect(requestMock).toHaveBeenNthCalledWith(1, {
+      url: '/accounting-entry/100/review',
+      method: 'put',
+      data: { approved: true, comment: '复核通过' },
+    })
+    expect(requestMock).toHaveBeenNthCalledWith(2, {
+      url: '/accounting-entry/100/resubmit',
+      method: 'put',
+    })
+    expect(requestMock).toHaveBeenNthCalledWith(3, {
       url: '/accounting-entry/101/post',
       method: 'put',
     })
-    expect(requestMock).toHaveBeenNthCalledWith(2, {
+    expect(requestMock).toHaveBeenNthCalledWith(4, {
       url: '/accounting-entry/102/reverse',
       method: 'put',
+      data: { reason: '会计冲销' },
     })
   })
 })

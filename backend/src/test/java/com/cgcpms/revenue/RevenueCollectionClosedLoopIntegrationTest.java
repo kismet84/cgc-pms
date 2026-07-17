@@ -5,6 +5,8 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.*;
 import com.cgcpms.revenue.service.RevenueOperationsService;
 import com.cgcpms.revenue.service.RevenueAdvancedService;
+import com.cgcpms.financeops.dto.FinanceOperationsModels.BankReceiptRequest;
+import com.cgcpms.financeops.service.FinanceIntegrationService;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -16,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,6 +35,7 @@ class RevenueCollectionClosedLoopIntegrationTest {
 
     @Autowired RevenueOperationsService service;
     @Autowired RevenueAdvancedService advanced;
+    @Autowired FinanceIntegrationService financeIntegration;
     @Autowired JdbcTemplate jdbc;
 
     @BeforeEach
@@ -164,6 +168,23 @@ class RevenueCollectionClosedLoopIntegrationTest {
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM accounting_entry WHERE collection_record_id IN(SELECT id FROM collection_record WHERE external_txn_no='BANK-REV-CONCURRENT')", Integer.class));
     }
 
+    @Test
+    void inboundBankReceiptMatchesCollectionAmountDirectionAndCashJournal() {
+        long ar = createReceivable("2026-11", new BigDecimal("300"));
+        var collection = service.createCollection(new CollectionRequest(PROJECT,CONTRACT,CUSTOMER,ACCOUNT,"BANK-REV-IN-MATCH",
+                LocalDateTime.now(),new BigDecimal("200"),"测试业主",1,
+                List.of(new AmountAllocation(ar,new BigDecimal("200"))),"银行收入对账"));
+        long collectionId = ((Number) collection.get("id")).longValue();
+        jdbc.update("UPDATE finance_integration_endpoint SET endpoint_type='BANK' WHERE id=?", ENDPOINT);
+
+        var receipt = financeIntegration.ingestBankReceipt(new BankReceiptRequest(ENDPOINT,"BANK-REV-IN-MATCH",null,
+                LocalDateTime.now(),"IN",new BigDecimal("200"),"测试业主","工程回款",Map.of("source","test")));
+        assertEquals("MATCHED", receipt.get("match_status"));
+        assertEquals(collectionId, ((Number)receipt.get("collection_record_id")).longValue());
+        assertNull(receipt.get("pay_record_id"));
+        assertNotNull(receipt.get("cash_journal_id"));
+    }
+
     private long createReceivable(String period,BigDecimal amount){
         var settlement=service.createSettlement(new OwnerSettlementRequest(PROJECT,CONTRACT,REVENUE,period,LocalDate.now(),amount,BigDecimal.ZERO,BigDecimal.ZERO,LocalDate.now().plusDays(15),CUSTOMER,1,null));
         long id=((Number)settlement.get("id")).longValue();jdbc.update("UPDATE owner_settlement SET status='PENDING' WHERE id=?",id);service.onSettlementApproved(id);
@@ -171,6 +192,8 @@ class RevenueCollectionClosedLoopIntegrationTest {
     }
 
     private void cleanup() {
+        jdbc.update("DELETE FROM finance_bank_reconciliation WHERE bank_receipt_id IN(SELECT id FROM bank_receipt WHERE endpoint_id=?)",ENDPOINT);
+        jdbc.update("DELETE FROM bank_receipt WHERE endpoint_id=?",ENDPOINT);
         jdbc.update("DELETE FROM revenue_external_sync WHERE business_id IN(SELECT id FROM account_receivable WHERE project_id=?)",PROJECT);
         jdbc.update("DELETE FROM finance_integration_message WHERE endpoint_id=?",ENDPOINT);
         jdbc.update("DELETE FROM finance_integration_endpoint WHERE id=?",ENDPOINT);

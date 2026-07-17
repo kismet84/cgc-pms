@@ -28,9 +28,25 @@ export function postAccountingEntry(id: string) {
   })
 }
 
-export function reverseAccountingEntry(id: string) {
+export function reviewAccountingEntry(id: string, approved: boolean, comment?: string) {
   return request<void>({
+    url: `/accounting-entry/${id}/review`,
+    method: 'put',
+    data: { approved, comment },
+  })
+}
+
+export function resubmitAccountingEntry(id: string) {
+  return request<void>({
+    url: `/accounting-entry/${id}/resubmit`,
+    method: 'put',
+  })
+}
+
+export function reverseAccountingEntry(id: string, reason: string) {
+  return request<string>({
     url: `/accounting-entry/${id}/reverse`,
     method: 'put',
+    data: { reason },
   })
 }
