@@ -84,6 +84,18 @@ class MatStockConsumptionBaselineServiceTest {
         assertEquals("STOCK_NOT_FOUND", error.getCode());
     }
 
+    @Test
+    void returnsFourDecimalZerosWhenNoEligibleHistoryExists() {
+        var result = service.getConsumptionBaseline(STOCK);
+
+        assertDecimal("0.0000", result.getGrossIssued30());
+        assertDecimal("0.0000", result.getReturned30());
+        assertDecimal("0.0000", result.getNetIssued30());
+        assertDecimal("0.0000", result.getGrossIssued90());
+        assertDecimal("0.0000", result.getReturned90());
+        assertDecimal("0.0000", result.getNetIssued90());
+    }
+
     private void insertTxn(long id, long tenantId, long warehouseId, long materialId,
                            String txnType, String quantity, String sourceType, LocalDateTime createdAt) {
         jdbc.update("""
