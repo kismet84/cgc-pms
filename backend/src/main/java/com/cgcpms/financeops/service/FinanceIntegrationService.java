@@ -8,6 +8,9 @@ import com.cgcpms.payment.dto.PaymentFailureRequest;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.service.PayRecordService;
 import com.cgcpms.payment.service.PaymentReversalService;
+import com.cgcpms.revenue.dto.RevenueOperationsModels.AmountAllocation;
+import com.cgcpms.revenue.dto.RevenueOperationsModels.CollectionRequest;
+import com.cgcpms.revenue.service.RevenueOperationsService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -31,6 +34,7 @@ public class FinanceIntegrationService {
     private final ObjectMapper objectMapper;
     private final PayRecordService payRecordService;
     private final PaymentReversalService paymentReversalService;
+    private final RevenueOperationsService revenueOperationsService;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createEndpoint(IntegrationEndpointRequest request) {
@@ -111,12 +115,21 @@ public class FinanceIntegrationService {
     public Map<String,Object> ingestBankReceipt(BankReceiptRequest request) {
         Map<String,Object> endpoint=requireEndpoint(request.endpointId());
         if(!"BANK".equals(endpoint.get("endpoint_type")))throw error("BANK_ENDPOINT_REQUIRED","银行回单必须来自 BANK 类型端点");
+        String direction=request.direction().trim().toUpperCase();
+        if(!Set.of("IN","OUT").contains(direction))throw error("BANK_RECEIPT_DIRECTION_INVALID","银行回单方向仅支持 IN 或 OUT");
+        validateIncomingContext(request,direction);
         Map<String,Object> old=one("SELECT * FROM bank_receipt WHERE tenant_id=? AND endpoint_id=? AND bank_txn_no=?",tenant(),request.endpointId(),request.bankTxnNo());
-        if(old!=null)return old;
+        if(old!=null){
+            if("IN".equals(direction)&&request.projectId()!=null){
+                jdbc.update("UPDATE bank_receipt SET project_id=COALESCE(project_id,?),contract_id=COALESCE(contract_id,?),customer_id=COALESCE(customer_id,?),fund_account_id=COALESCE(fund_account_id,?),allocation_json=COALESCE(allocation_json,?) WHERE id=? AND tenant_id=? AND match_status='UNMATCHED'",
+                        request.projectId(),request.contractId(),request.customerId(),request.fundAccountId(),json(request.allocations()),old.get("id"),tenant());
+            }
+            autoMatchReceipt(longValue(old.get("id")));return one("SELECT * FROM bank_receipt WHERE id=? AND tenant_id=?",old.get("id"),tenant());
+        }
         Long id=IdWorker.getId();
-        jdbc.update("INSERT INTO bank_receipt(id,tenant_id,endpoint_id,bank_txn_no,account_no_masked,transaction_time,direction,amount,counterparty_name,purpose_text,match_status,raw_payload_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,'UNMATCHED',?,CURRENT_TIMESTAMP)",id,tenant(),request.endpointId(),request.bankTxnNo().trim(),blank(request.accountNoMasked()),request.transactionTime(),request.direction().trim().toUpperCase(),money(request.amount()),blank(request.counterpartyName()),blank(request.purposeText()),json(request.rawPayload()));
+        jdbc.update("INSERT INTO bank_receipt(id,tenant_id,endpoint_id,bank_txn_no,account_no_masked,transaction_time,direction,amount,counterparty_name,purpose_text,project_id,contract_id,customer_id,fund_account_id,allocation_json,match_status,raw_payload_json,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'UNMATCHED',?,CURRENT_TIMESTAMP)",id,tenant(),request.endpointId(),request.bankTxnNo().trim(),blank(request.accountNoMasked()),request.transactionTime(),direction,money(request.amount()),blank(request.counterpartyName()),blank(request.purposeText()),request.projectId(),request.contractId(),request.customerId(),request.fundAccountId(),json(request.allocations()),json(request.rawPayload()));
         autoMatchReceipt(id);
-        return one("SELECT * FROM bank_receipt WHERE id=?",id);
+        return one("SELECT * FROM bank_receipt WHERE id=? AND tenant_id=?",id,tenant());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -124,10 +137,25 @@ public class FinanceIntegrationService {
         Map<String,Object> receipt=one("SELECT * FROM bank_receipt WHERE id=? AND tenant_id=? FOR UPDATE",receiptId,tenant());
         if(receipt==null)throw error("BANK_RECEIPT_NOT_FOUND","银行回单不存在");
         if(!"UNMATCHED".equals(receipt.get("match_status")))return receipt;
+        if("IN".equals(receipt.get("direction"))){
+            if(receipt.get("project_id")==null)return receipt;
+            List<AmountAllocation> allocations=loadReceiptAllocations(receipt);
+            Map<String,Object> collection=revenueOperationsService.createCollection(new CollectionRequest(
+                    longValue(receipt.get("project_id")),longValue(receipt.get("contract_id")),
+                    longValue(receipt.get("customer_id")),longValue(receipt.get("fund_account_id")),
+                    String.valueOf(receipt.get("bank_txn_no")),dateTime(receipt.get("transaction_time")),
+                    decimal(receipt.get("amount")),requiredReceiptPayer(receipt),1,allocations,
+                    "银行回单自动入账："+Objects.toString(receipt.get("purpose_text"),"")));
+            Map<String,Object> journal=one("SELECT id FROM cash_journal_entry WHERE tenant_id=? AND collection_record_id=? AND deleted_flag=0",tenant(),collection.get("id"));
+            jdbc.update("UPDATE bank_receipt SET match_status='MATCHED',collection_record_id=?,cash_journal_id=?,confidence=1.0000,matched_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                    collection.get("id"),journal==null?null:journal.get("id"),receiptId,tenant());
+            return one("SELECT * FROM bank_receipt WHERE id=? AND tenant_id=?",receiptId,tenant());
+        }
         Map<String,Object> pay=one("SELECT id FROM pay_record WHERE tenant_id=? AND external_txn_no=? AND pay_status='SUCCESS' AND deleted_flag=0",tenant(),receipt.get("bank_txn_no"));
         BigDecimal confidence=new BigDecimal("1.0000");
         if(pay==null){
-            List<Map<String,Object>> candidates=jdbc.queryForList("SELECT id FROM pay_record WHERE tenant_id=? AND pay_status='SUCCESS' AND pay_amount=? AND paid_at BETWEEN ? AND ? AND deleted_flag=0",tenant(),receipt.get("amount"),((LocalDateTime)receipt.get("transaction_time")).minusDays(1),((LocalDateTime)receipt.get("transaction_time")).plusDays(1));
+            LocalDateTime transactionTime=dateTime(receipt.get("transaction_time"));
+            List<Map<String,Object>> candidates=jdbc.queryForList("SELECT id FROM pay_record WHERE tenant_id=? AND pay_status='SUCCESS' AND pay_amount=? AND paid_at BETWEEN ? AND ? AND deleted_flag=0",tenant(),receipt.get("amount"),transactionTime.minusDays(1),transactionTime.plusDays(1));
             if(candidates.size()==1){pay=candidates.getFirst();confidence=new BigDecimal("0.8000");}
         }
         if(pay!=null){Map<String,Object>journal=one("SELECT id FROM cash_journal_entry WHERE tenant_id=? AND pay_record_id=?",tenant(),pay.get("id"));jdbc.update("UPDATE bank_receipt SET match_status='MATCHED',pay_record_id=?,cash_journal_id=?,confidence=?,matched_at=CURRENT_TIMESTAMP WHERE id=?",pay.get("id"),journal==null?null:journal.get("id"),confidence,receiptId);}
@@ -135,6 +163,23 @@ public class FinanceIntegrationService {
     }
 
     public List<Map<String,Object>> bankReceipts(String status){return jdbc.queryForList("SELECT * FROM bank_receipt WHERE tenant_id=? AND (? IS NULL OR match_status=?) ORDER BY transaction_time DESC",tenant(),status,status);}
+
+    public Map<String,Object> traceBankReceipt(Long receiptId){
+        Map<String,Object> receipt=one("SELECT * FROM bank_receipt WHERE id=? AND tenant_id=?",receiptId,tenant());
+        if(receipt==null)throw error("BANK_RECEIPT_NOT_FOUND","银行回单不存在");
+        Map<String,Object> result=new LinkedHashMap<>();result.put("bankReceipt",receipt);
+        if(receipt.get("collection_record_id")!=null){
+            Long collectionId=longValue(receipt.get("collection_record_id"));
+            result.put("collection",one("SELECT * FROM collection_record WHERE id=? AND tenant_id=? AND deleted_flag=0",collectionId,tenant()));
+            result.put("cashJournal",one("SELECT * FROM cash_journal_entry WHERE collection_record_id=? AND tenant_id=? AND deleted_flag=0",collectionId,tenant()));
+            result.put("accountingEntries",jdbc.queryForList("SELECT * FROM accounting_entry WHERE collection_record_id=? AND tenant_id=? AND deleted_flag=0 ORDER BY id",collectionId,tenant()));
+            result.put("reversal",one("SELECT * FROM collection_reversal WHERE collection_id=? AND tenant_id=?",collectionId,tenant()));
+        }else if(receipt.get("pay_record_id")!=null){
+            result.put("payRecord",one("SELECT * FROM pay_record WHERE id=? AND tenant_id=? AND deleted_flag=0",receipt.get("pay_record_id"),tenant()));
+            result.put("cashJournal",receipt.get("cash_journal_id")==null?null:one("SELECT * FROM cash_journal_entry WHERE id=? AND tenant_id=? AND deleted_flag=0",receipt.get("cash_journal_id"),tenant()));
+        }
+        return result;
+    }
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createForecast(CashForecastRequest request){
@@ -179,6 +224,32 @@ public class FinanceIntegrationService {
         if("E_INVOICE".equals(endpointType)&&request.businessId()!=null){String result=String.valueOf(request.payload().getOrDefault("verifyStatus","PENDING")).toUpperCase();if(!Set.of("VERIFIED","REJECTED","PENDING").contains(result))throw error("E_INVOICE_RESULT_INVALID","电子发票验真结果不合法");jdbc.update("UPDATE pay_invoice SET verify_status=?,exception_status=?,exception_reason=?,version=version+1 WHERE id=? AND tenant_id=? AND deleted_flag=0",result,"REJECTED".equals(result)?"SUSPECT":"NORMAL",request.payload().get("reason"),request.businessId(),tenant());}
         if(Set.of("ERP","GENERAL_LEDGER","TAX").contains(endpointType)&&request.businessId()!=null&&"ACCOUNTING_ENTRY".equalsIgnoreCase(request.businessType())){jdbc.update("UPDATE accounting_entry SET external_sync_status=?,external_sync_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND deleted_flag=0",String.valueOf(request.payload().getOrDefault("status","ACKNOWLEDGED")),request.businessId(),tenant());}
     }
+    private void validateIncomingContext(BankReceiptRequest request,String direction){
+        boolean any=request.projectId()!=null||request.contractId()!=null||request.customerId()!=null||request.fundAccountId()!=null;
+        boolean all=request.projectId()!=null&&request.contractId()!=null&&request.customerId()!=null&&request.fundAccountId()!=null;
+        if("OUT".equals(direction)&&(any||(request.allocations()!=null&&!request.allocations().isEmpty())))
+            throw error("BANK_RECEIPT_CONTEXT_DIRECTION_INVALID","出账回单不能携带收款业务上下文");
+        if("IN".equals(direction)&&any&&!all)
+            throw error("BANK_RECEIPT_CONTEXT_INCOMPLETE","自动入账必须同时提供项目、合同、客户和收款账户");
+        if("IN".equals(direction)&&all&&!org.springframework.util.StringUtils.hasText(request.counterpartyName()))
+            throw error("BANK_RECEIPT_PAYER_REQUIRED","自动入账必须提供付款方名称");
+        if("IN".equals(direction)&&!all&&request.allocations()!=null&&!request.allocations().isEmpty())
+            throw error("BANK_RECEIPT_ALLOCATION_CONTEXT_REQUIRED","应收分配必须同时提供完整收款业务上下文");
+    }
+    private List<AmountAllocation> loadReceiptAllocations(Map<String,Object> receipt){
+        String jsonValue=jdbc.queryForObject("SELECT allocation_json FROM bank_receipt WHERE id=? AND tenant_id=?",String.class,receipt.get("id"),tenant());
+        if(jsonValue==null||jsonValue.isBlank())return List.of();
+        try{
+            BankReceiptAllocation[] values=objectMapper.readValue(jsonValue,BankReceiptAllocation[].class);
+            if(values==null)return List.of();
+            return Arrays.stream(values).map(v->new AmountAllocation(v.receivableId(),v.amount())).toList();
+        }catch(Exception e){throw error("BANK_RECEIPT_ALLOCATION_INVALID","银行回单应收分配数据无法解析");}
+    }
+    private String requiredReceiptPayer(Map<String,Object> receipt){
+        String payer=blank(Objects.toString(receipt.get("counterparty_name"),null));
+        if(payer==null)throw error("BANK_RECEIPT_PAYER_REQUIRED","自动入账必须提供付款方名称");
+        return payer;
+    }
     private Map<String,Object>requireEndpoint(Long id){Map<String,Object>v=one("SELECT * FROM finance_integration_endpoint WHERE id=? AND tenant_id=? AND enabled_flag=1",id,tenant());if(v==null)throw error("INTEGRATION_ENDPOINT_NOT_FOUND","集成端点不存在或已停用");return v;}
     private Map<String,Object>endpoint(Long id){return one("SELECT id,endpoint_type,endpoint_code,endpoint_name,base_url,credential_ref,enabled_flag,config_json,version,created_at,updated_at FROM finance_integration_endpoint WHERE id=? AND tenant_id=?",id,tenant());}
     private Map<String,Object>message(Long id){return one("SELECT * FROM finance_integration_message WHERE id=? AND tenant_id=?",id,tenant());}
@@ -194,4 +265,5 @@ public class FinanceIntegrationService {
     private static Long optionalLong(Object value){return value==null?null:Long.valueOf(value.toString());}
     private static BigDecimal requiredMoney(Map<String,Object> payload,String key){try{BigDecimal v=money(new BigDecimal(requiredText(payload,key)));if(v.signum()<=0)throw new NumberFormatException();return v;}catch(NumberFormatException e){throw error("INTEGRATION_PAYLOAD_FIELD_INVALID","集成报文金额字段错误: "+key);}}
     private static LocalDateTime requiredDateTime(Map<String,Object> payload,String key){try{return LocalDateTime.parse(requiredText(payload,key).replace(' ','T'));}catch(Exception e){throw error("INTEGRATION_PAYLOAD_FIELD_INVALID","集成报文时间字段错误: "+key);}}
+    private static LocalDateTime dateTime(Object value){if(value instanceof LocalDateTime v)return v;if(value instanceof java.sql.Timestamp v)return v.toLocalDateTime();return LocalDateTime.parse(String.valueOf(value).replace(' ','T'));}
 }

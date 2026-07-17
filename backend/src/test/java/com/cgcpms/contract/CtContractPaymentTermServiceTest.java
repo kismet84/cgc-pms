@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -31,6 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 @SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
 @ActiveProfiles("local")
+@Transactional
 @DisplayName("CtContractPaymentTermService — 合同付款条款 CRUD 测试")
 class CtContractPaymentTermServiceTest {
 

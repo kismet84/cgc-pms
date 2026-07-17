@@ -26,6 +26,7 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -50,6 +51,7 @@ public class MatPurchaseRequestService {
     private final WorkflowEngine workflowEngine;
     private final PurchaseRequestConversionService conversionService;
     private final ProjectAccessChecker projectAccessChecker;
+    private final JdbcTemplate jdbcTemplate;
 
     // ================================================================
     // 分页查询
@@ -270,6 +272,7 @@ public class MatPurchaseRequestService {
             item.setTenantId(tenantId);
             // Auto-create material if name provided but no existing materialId
             resolveMaterial(item, tenantId);
+            validatePlanningReferences(item, request.getProjectId(), tenantId);
             item.setCreatedBy(UserContext.getCurrentUserId());
             item.setUpdatedBy(UserContext.getCurrentUserId());
         }
@@ -311,6 +314,29 @@ public class MatPurchaseRequestService {
         material.setStatus("ENABLE");
         mdMaterialMapper.insert(material);
         item.setMaterialId(material.getId());
+    }
+
+    private void validatePlanningReferences(MatPurchaseRequestItem item, Long projectId, Long tenantId) {
+        if (item.getWbsTaskId() != null) {
+            Integer count = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM project_wbs_task
+                    WHERE id=? AND tenant_id=? AND project_id=? AND deleted_flag=0
+                    """, Integer.class, item.getWbsTaskId(), tenantId, projectId);
+            if (count == null || count != 1) {
+                throw new BusinessException("PURCHASE_WBS_MISMATCH", "WBS任务不存在或不属于当前项目");
+            }
+        }
+        if (item.getBudgetLineId() != null) {
+            Integer count = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*) FROM project_budget_line l
+                    JOIN project_budget b ON b.id=l.budget_id AND b.tenant_id=l.tenant_id
+                    WHERE l.id=? AND l.tenant_id=? AND l.project_id=? AND l.deleted_flag=0
+                      AND b.deleted_flag=0 AND b.status='ACTIVE'
+                    """, Integer.class, item.getBudgetLineId(), tenantId, projectId);
+            if (count == null || count != 1) {
+                throw new BusinessException("PURCHASE_BUDGET_MISMATCH", "预算行不存在、未生效或不属于当前项目");
+            }
+        }
     }
 
     // ================================================================
@@ -420,6 +446,8 @@ public class MatPurchaseRequestService {
         vo.setTenantId(String.valueOf(item.getTenantId()));
         vo.setRequestId(String.valueOf(item.getRequestId()));
         vo.setMaterialId(item.getMaterialId() != null ? String.valueOf(item.getMaterialId()) : null);
+        vo.setWbsTaskId(item.getWbsTaskId() != null ? String.valueOf(item.getWbsTaskId()) : null);
+        vo.setBudgetLineId(item.getBudgetLineId() != null ? String.valueOf(item.getBudgetLineId()) : null);
         vo.setMaterialName(item.getMaterialId() != null ? materialNames.get(item.getMaterialId()) : item.getMaterialName());
         vo.setQuantity(String.valueOf(item.getQuantity()));
         vo.setUnit(item.getUnit());

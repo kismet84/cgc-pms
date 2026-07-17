@@ -8,11 +8,13 @@ import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysRoleMenuAuditSnapshot;
 import com.cgcpms.system.entity.SysRoleMenu;
 import com.cgcpms.system.entity.SysUserRole;
+import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.SysMenuMapper;
 import com.cgcpms.system.mapper.SysRoleMenuAuditSnapshotMapper;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysRoleMenuMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
+import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.system.service.SysRoleService;
 import com.cgcpms.system.vo.SysRoleVO;
 import io.jsonwebtoken.Jwts;
@@ -56,6 +58,9 @@ class SysRoleServiceTest {
     private SysUserRoleMapper userRoleMapper;
 
     @Autowired
+    private SysUserMapper userMapper;
+
+    @Autowired
     private SysRoleMenuAuditSnapshotMapper auditSnapshotMapper;
 
     @BeforeEach
@@ -65,6 +70,7 @@ class SysRoleServiceTest {
                 .add("username", "admin")
                 .add("tenantId", TENANT_0)
                 .build());
+        ensureUser(USER_ADMIN, "rbac-admin-fixture");
     }
 
     @AfterEach
@@ -567,6 +573,8 @@ class SysRoleServiceTest {
         roleMenuMapper.insert(menu);
 
         SysUserRole userRole = new SysUserRole();
+        ensureUser(900001L, "rbac-bound-user-fixture");
+        userRole.setTenantId(TENANT_0);
         userRole.setUserId(900001L);
         userRole.setRoleId(roleId);
         userRoleMapper.insert(userRole);
@@ -695,6 +703,7 @@ class SysRoleServiceTest {
         Long roleId = roleService.create(role);
 
         SysUserRole userRole = new SysUserRole();
+        userRole.setTenantId(TENANT_0);
         userRole.setUserId(USER_ADMIN);
         userRole.setRoleId(roleId);
         userRoleMapper.insert(userRole);
@@ -801,6 +810,18 @@ class SysRoleServiceTest {
         menu.setStatus("ENABLE");
         menu.setVisible(0);
         menuMapper.insert(menu);
+    }
+
+    private void ensureUser(Long id, String username) {
+        if (userMapper.selectById(id) != null) return;
+        SysUser user = new SysUser();
+        user.setId(id);
+        user.setTenantId(TENANT_0);
+        user.setUsername(username);
+        user.setPassword("{noop}test-only");
+        user.setStatus("ENABLE");
+        user.setIsAdmin(0);
+        userMapper.insert(user);
     }
 
     private void assertCreateRejected(String roleCode, String roleType, Integer roleLevel) {

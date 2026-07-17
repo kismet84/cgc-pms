@@ -92,7 +92,7 @@ class StlSettlementQueryServiceTest {
         s.setUnpaidAmount(new BigDecimal("86400.00"));
         s.setWarrantyAmount(new BigDecimal("5600.00"));
         s.setApprovalStatus("DRAFT");
-        s.setStatus("DRAFT");
+        s.setApprovalStatus("DRAFT");
         s.setSettlementStatus(SettlementStatusConstants.SETTLEMENT_DRAFT);
         settlementMapper.insert(s);
         settlementId = s.getId();

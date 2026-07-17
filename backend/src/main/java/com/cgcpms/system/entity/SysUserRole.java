@@ -14,6 +14,8 @@ public class SysUserRole implements Serializable {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
+    private Long tenantId;
+
     private Long userId;
 
     private Long roleId;

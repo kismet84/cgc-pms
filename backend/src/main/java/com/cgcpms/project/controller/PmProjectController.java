@@ -63,6 +63,13 @@ public class PmProjectController {
         return ApiResponse.success();
     }
 
+    @PostMapping("/{id}/submit")
+    @AuditedOperation(type = "SUBMIT", businessType = "PROJECT", businessIdExpression = "#id")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:submit')")
+    public ApiResponse<Long> submitApproval(@PathVariable Long id) {
+        return ApiResponse.success(pmProjectService.submitApproval(id));
+    }
+
     @PutMapping("/{id}/archive")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('project:edit')")
     public ApiResponse<Void> archive(@PathVariable Long id) {

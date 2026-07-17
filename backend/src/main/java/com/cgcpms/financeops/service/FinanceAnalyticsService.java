@@ -153,11 +153,19 @@ public class FinanceAnalyticsService {
             throw error("WORKFLOW_TEMPLATE_NOT_AVAILABLE", "审批模板不存在或未启用");
         }
         Long id = IdWorker.getId();
-        jdbc.update("INSERT INTO approval_routing_rule(id,tenant_id,rule_name,business_type,min_amount,max_amount,contract_type,expense_category,workflow_template_id,priority,enabled_flag,version,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP)",
-                id, tenant(), request.ruleName().trim(), request.businessType().trim().toUpperCase(), min,
-                max == null ? null : money(max), blank(request.contractType()), blank(request.expenseCategory()),
-                request.workflowTemplateId(), request.priority() == null ? 100 : request.priority(),
-                Boolean.FALSE.equals(request.enabled()) ? 0 : 1, user(), user());
+        String businessType=request.businessType().trim().toUpperCase();
+        BigDecimal normalizedMax=max==null?null:money(max);
+        String contractType=blank(request.contractType()),expenseCategory=blank(request.expenseCategory());
+        int priority=request.priority()==null?100:request.priority();
+        int enabled=Boolean.FALSE.equals(request.enabled())?0:1;
+        String signature=routingSignature(businessType,min,normalizedMax,contractType,expenseCategory);
+        try {
+            jdbc.update("INSERT INTO approval_routing_rule(id,tenant_id,rule_name,business_type,min_amount,max_amount,contract_type,expense_category,workflow_template_id,priority,enabled_flag,rule_signature,active_rule_token,version,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP)",
+                    id, tenant(), request.ruleName().trim(), businessType, min, normalizedMax, contractType, expenseCategory,
+                    request.workflowTemplateId(), priority, enabled, signature, enabled==1?0L:id, user(), user());
+        } catch (DuplicateKeyException e) {
+            throw error("APPROVAL_ROUTING_DUPLICATE", "相同优先级下已存在完全相同的启用审批路由");
+        }
         return one("SELECT * FROM approval_routing_rule WHERE id=?", id);
     }
 
@@ -170,7 +178,12 @@ public class FinanceAnalyticsService {
                 """, tenant(), request.businessType().trim().toUpperCase(), money(request.amount()), money(request.amount()),
                 blank(request.contractType()), blank(request.expenseCategory()));
         if (rules.isEmpty()) throw error("APPROVAL_ROUTING_NOT_FOUND", "没有匹配的审批模板路由");
-        return rules.getFirst();
+        int bestPriority=((Number)rules.getFirst().get("priority")).intValue();
+        List<Map<String,Object>> best=rules.stream()
+                .filter(r->((Number)r.get("priority")).intValue()==bestPriority).toList();
+        long templates=best.stream().map(r->longValue(r.get("workflow_template_id"))).distinct().count();
+        if(templates>1)throw error("APPROVAL_ROUTING_AMBIGUOUS","存在同优先级且指向不同模板的审批路由，请先消除冲突");
+        return best.getFirst();
     }
 
     public List<Map<String,Object>> auditSearch(String businessType, Long businessId, LocalDateTime from, LocalDateTime to, String bucket) {
@@ -245,5 +258,9 @@ public class FinanceAnalyticsService {
     private static BigDecimal decimal(Object v){return moneyValue(v);}
     private static Long longValue(Object v){return v==null?null:Long.valueOf(v.toString());}
     private static String blank(String v){return v==null||v.isBlank()?null:v.trim().toUpperCase();}
+    private static String routingSignature(String businessType,BigDecimal min,BigDecimal max,String contractType,String expenseCategory){
+        return businessType+"|"+(min==null?"*":min.toPlainString())+"|"+(max==null?"*":max.toPlainString())+"|"+
+                (contractType==null?"*":contractType)+"|"+(expenseCategory==null?"*":expenseCategory);
+    }
     private static BusinessException error(String c,String m){return new BusinessException(c,m);}
 }

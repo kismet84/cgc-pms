@@ -19,6 +19,10 @@ import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.supplierreturn.dto.SupplierReturnRequest;
+import com.cgcpms.supplierreturn.entity.MatQualityDisposition;
+import com.cgcpms.supplierreturn.mapper.MatQualityDispositionMapper;
+import com.cgcpms.supplierreturn.service.MatSupplierReturnService;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowContext;
 import io.jsonwebtoken.Jwts;
@@ -56,6 +60,8 @@ class MaterialReceiptWorkflowHandlerTest {
     @Autowired private MatStockTxnMapper stockTxnMapper;
     @Autowired private ProcurementTraceService traceService;
     @Autowired private CostItemMapper costItemMapper;
+    @Autowired private MatQualityDispositionMapper qualityDispositionMapper;
+    @Autowired private MatSupplierReturnService supplierReturnService;
 
     @BeforeEach void setupContext() {
         UserContext.set(Jwts.claims().add("userId", USER_ADMIN).add("username", "admin")
@@ -134,7 +140,7 @@ class MaterialReceiptWorkflowHandlerTest {
         receiptItem.setReceiptId(receipt.getId());
         receiptItem.setOrderItemId(orderItem.getId());
         receiptItem.setMaterialId(1L);
-        receiptItem.setActualQuantity(new BigDecimal("2.0000"));
+        receiptItem.setActualQuantity(new BigDecimal("3.0000"));
         receiptItem.setQualifiedQuantity(new BigDecimal("2.0000"));
         receiptItem.setUnitPrice(new BigDecimal("10.0000"));
         receiptItem.setAmount(new BigDecimal("20.00"));
@@ -164,6 +170,42 @@ class MaterialReceiptWorkflowHandlerTest {
         assertEquals(order.getId(), trace.getPurchaseOrder().getId());
         assertEquals(receipt.getId(), trace.getReceipt().getId());
         assertTrue(trace.getCosts().isEmpty(), "库存材料验收入库只形成库存价值，不提前确认项目成本");
+
+        MatQualityDisposition disposition = qualityDispositionMapper.selectOne(
+                new LambdaQueryWrapper<MatQualityDisposition>()
+                        .eq(MatQualityDisposition::getReceiptItemId, receiptItem.getId()));
+        assertNotNull(disposition);
+        assertEquals("OPEN", disposition.getStatus());
+        assertEquals(0, new BigDecimal("1.0000").compareTo(disposition.getRejectedQuantity()));
+
+        Long qualifiedReturnId = supplierReturnService.confirm(new SupplierReturnRequest(
+                receiptItem.getId(), null, new BigDecimal("1.0000"), LocalDate.now(),
+                "合格品供应商退货", "SRT-Q-" + receiptItem.getId()));
+        assertEquals(0, new BigDecimal("1.0000")
+                .compareTo(orderItemMapper.selectById(orderItem.getId()).getReceivedQuantity()));
+        assertEquals(1L, stockTxnMapper.selectCount(new LambdaQueryWrapper<MatStockTxn>()
+                .eq(MatStockTxn::getSourceType, "SUPPLIER_RETURN")
+                .eq(MatStockTxn::getSourceId, qualifiedReturnId)));
+        assertEquals(qualifiedReturnId, supplierReturnService.confirm(new SupplierReturnRequest(
+                receiptItem.getId(), null, new BigDecimal("1.0000"), LocalDate.now(),
+                "重复回调", "SRT-Q-" + receiptItem.getId())));
+        supplierReturnService.reverse(qualifiedReturnId, "撤销测试退货");
+        assertEquals(0, new BigDecimal("2.0000")
+                .compareTo(orderItemMapper.selectById(orderItem.getId()).getReceivedQuantity()));
+        assertEquals(1L, stockTxnMapper.selectCount(new LambdaQueryWrapper<MatStockTxn>()
+                .eq(MatStockTxn::getSourceType, "SUPPLIER_RETURN_REVERSAL")
+                .eq(MatStockTxn::getSourceId, qualifiedReturnId)));
+
+        Long rejectedReturnId = supplierReturnService.confirm(new SupplierReturnRequest(
+                receiptItem.getId(), disposition.getId(), new BigDecimal("1.0000"), LocalDate.now(),
+                "不合格品退回供应商", "SRT-R-" + receiptItem.getId()));
+        MatQualityDisposition resolved = qualityDispositionMapper.selectById(disposition.getId());
+        assertEquals("RESOLVED", resolved.getStatus());
+        assertEquals(0L, stockTxnMapper.selectCount(new LambdaQueryWrapper<MatStockTxn>()
+                .eq(MatStockTxn::getSourceId, rejectedReturnId)
+                .in(MatStockTxn::getSourceType, "SUPPLIER_RETURN", "SUPPLIER_RETURN_REVERSAL")));
+        supplierReturnService.reverse(rejectedReturnId, "撤销不合格品退货");
+        assertEquals("OPEN", qualityDispositionMapper.selectById(disposition.getId()).getStatus());
 
         handler.onApproved(ctx);
         assertEquals(0, new BigDecimal("2.0000")
@@ -249,6 +291,26 @@ class MaterialReceiptWorkflowHandlerTest {
                 .eq(CostItem::getSourceId, receipt.getId()));
         assertNotNull(cost);
         assertEquals(0, new BigDecimal("50.00").compareTo(cost.getAmount()));
+
+        Long returnId = supplierReturnService.confirm(new SupplierReturnRequest(
+                item.getId(), null, new BigDecimal("2.0000"), LocalDate.now(),
+                "直耗材料供应商退货", "SRT-D-" + item.getId()));
+        assertEquals(0, new BigDecimal("3.0000")
+                .compareTo(orderItemMapper.selectById(orderItem.getId()).getReceivedQuantity()));
+        CostItem returnCost = costItemMapper.selectOne(new LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getSourceType, "SUPPLIER_RETURN")
+                .eq(CostItem::getSourceId, returnId));
+        assertNotNull(returnCost);
+        assertEquals(0, new BigDecimal("-20.00").compareTo(returnCost.getAmount()));
+
+        supplierReturnService.reverse(returnId, "撤销直耗退货");
+        assertEquals(0, new BigDecimal("5.0000")
+                .compareTo(orderItemMapper.selectById(orderItem.getId()).getReceivedQuantity()));
+        CostItem undoCost = costItemMapper.selectOne(new LambdaQueryWrapper<CostItem>()
+                .eq(CostItem::getSourceType, "SUPPLIER_RETURN_REVERSAL")
+                .eq(CostItem::getSourceId, returnId));
+        assertNotNull(undoCost);
+        assertEquals(0, new BigDecimal("20.00").compareTo(undoCost.getAmount()));
     }
 
     @Test @Transactional @DisplayName("onRejected -> status = REJECTED")

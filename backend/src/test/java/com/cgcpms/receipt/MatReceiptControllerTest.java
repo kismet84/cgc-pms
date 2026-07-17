@@ -45,8 +45,8 @@ class MatReceiptControllerTest {
         jdbcTemplate.update("""
                 INSERT INTO sys_user
                     (id, tenant_id, username, password, real_name, status, is_admin,
-                     created_by, updated_by, deleted_flag, deleted_token, remark)
-                SELECT ?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, NULL, ?
+                     created_by, updated_by, deleted_flag, remark)
+                SELECT ?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, ?
                 WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = ?)
                 """, ADMIN_ID, TENANT_ID, "test_receipt_controller_approver", "{noop}test",
                 "验收接口测试审批人", ADMIN_ID, ADMIN_ID,

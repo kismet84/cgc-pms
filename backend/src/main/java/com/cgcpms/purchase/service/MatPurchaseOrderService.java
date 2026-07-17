@@ -437,6 +437,8 @@ public class MatPurchaseOrderService {
         vo.setTenantId(i.getTenantId() != null ? i.getTenantId().toString() : null);
         vo.setOrderId(i.getOrderId() != null ? i.getOrderId().toString() : null);
         vo.setRequestItemId(i.getRequestItemId() != null ? i.getRequestItemId().toString() : null);
+        vo.setWbsTaskId(i.getWbsTaskId() != null ? i.getWbsTaskId().toString() : null);
+        vo.setBudgetLineId(i.getBudgetLineId() != null ? i.getBudgetLineId().toString() : null);
         vo.setProjectId(i.getProjectId() != null ? i.getProjectId().toString() : null);
         vo.setMaterialId(i.getMaterialId() != null ? i.getMaterialId().toString() : null);
         vo.setMaterialName(i.getMaterialId() != null ? materialNames.get(i.getMaterialId()) : i.getMaterialName());

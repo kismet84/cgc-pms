@@ -148,6 +148,24 @@ class MigrationSoftDeleteBehaviorTest {
     }
 
     @Test
+    @DisplayName("V210 退役全部 deleted_token 且保留活动唯一键")
+    void obsoleteDeletedTokensAreAbsentAfterV210() {
+        Integer obsoleteColumns = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE UPPER(TABLE_SCHEMA) = 'PUBLIC' AND UPPER(COLUMN_NAME) = 'DELETED_TOKEN'
+                """, Integer.class);
+        Integer activeTokens = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE UPPER(TABLE_SCHEMA) = 'PUBLIC' AND UPPER(COLUMN_NAME) = 'ACTIVE_UNIQUE_TOKEN'
+                """, Integer.class);
+
+        assertEquals(0, obsoleteColumns);
+        assertEquals(15, activeTokens);
+    }
+
+    @Test
     @DisplayName("pay_invoice 删除走逻辑删除并允许同一发票号重建")
     void payInvoiceDeleteIsLogicalAndAllowsRecreate() {
         String invoiceNo = "INV-SOFT-DEL-082";

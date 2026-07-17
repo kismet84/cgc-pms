@@ -210,7 +210,6 @@ class PayApplicationControllerTest {
                   "projectId": %d,
                   "contractId": %d,
                   "partnerId": %d,
-                  "applyCode": "CLIENT-PLACEHOLDER",
                   "applyAmount": 1000.00,
                   "payType": "MATERIAL",
                   "applyReason": "%s"

@@ -10,6 +10,8 @@ public class MatReceiptItemVO {
     private String orderItemId;
     private String materialId;
     private String materialName;
+    private String wbsTaskId;
+    private String budgetLineId;
     private String specification;
     private String unit;
     private String actualQuantity;

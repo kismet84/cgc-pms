@@ -176,6 +176,7 @@ public class SysMenuService {
         // Check for role references
         long roleRefCount = sysRoleMenuMapper.selectCount(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysRoleMenu>()
+                        .eq(SysRoleMenu::getTenantId, tenantId)
                         .eq(SysRoleMenu::getMenuId, id));
         if (roleRefCount > 0) {
             throw new BusinessException("MENU_REFERENCED_BY_ROLES", "菜单被角色引用，请先解除角色授权");

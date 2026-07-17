@@ -154,12 +154,15 @@ public class SysRoleService {
         }
 
         long userBindingCount = sysUserRoleMapper.selectCount(
-                new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getRoleId, id));
+                new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getTenantId, existing.getTenantId())
+                        .eq(SysUserRole::getRoleId, id));
         if (userBindingCount > 0) {
             throw new BusinessException("ROLE_IN_USE", "角色仍绑定用户，无法删除");
         }
 
         sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenu>()
+                .eq(SysRoleMenu::getTenantId, existing.getTenantId())
                 .eq(SysRoleMenu::getRoleId, id));
         if (sysRoleMapper.deleteById(id) != 1) {
             throw new BusinessException("ROLE_DELETE_FAILED", "角色删除失败，请重试");
@@ -193,9 +196,11 @@ public class SysRoleService {
         rejectHighRiskDiff(beforeMenuIds, afterMenuIds, afterMenus);
 
         sysRoleMenuMapper.delete(new LambdaQueryWrapper<SysRoleMenu>()
+                .eq(SysRoleMenu::getTenantId, tenantId)
                 .eq(SysRoleMenu::getRoleId, roleId));
         for (Long menuId : afterMenuIds) {
             SysRoleMenu rm = new SysRoleMenu();
+            rm.setTenantId(tenantId);
             rm.setRoleId(roleId);
             rm.setMenuId(menuId);
             sysRoleMenuMapper.insert(rm);
@@ -214,7 +219,9 @@ public class SysRoleService {
 
     private List<Long> currentMenuIds(Long roleId) {
         return sysRoleMenuMapper.selectList(
-                        new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, roleId))
+                        new LambdaQueryWrapper<SysRoleMenu>()
+                                .eq(SysRoleMenu::getTenantId, UserContext.getCurrentTenantId())
+                                .eq(SysRoleMenu::getRoleId, roleId))
                 .stream()
                 .map(SysRoleMenu::getMenuId)
                 .distinct()
@@ -229,6 +236,7 @@ public class SysRoleService {
         long selfRoleCount = sysUserRoleMapper.selectCount(
                 new LambdaQueryWrapper<com.cgcpms.system.entity.SysUserRole>()
                         .eq(com.cgcpms.system.entity.SysUserRole::getUserId, operatorId)
+                        .eq(com.cgcpms.system.entity.SysUserRole::getTenantId, role.getTenantId())
                         .eq(com.cgcpms.system.entity.SysUserRole::getRoleId, role.getId()));
         if (selfRoleCount > 0) {
             throw new BusinessException("ROLE_MENU_SELF_EDIT_FORBIDDEN", "不允许编辑当前用户持有的角色授权");
@@ -293,7 +301,9 @@ public class SysRoleService {
         vo.setStatus(role.getStatus());
         vo.setDataScope(role.getDataScope());
         List<SysRoleMenu> roleMenus = sysRoleMenuMapper.selectList(
-                new LambdaQueryWrapper<SysRoleMenu>().eq(SysRoleMenu::getRoleId, role.getId()));
+                new LambdaQueryWrapper<SysRoleMenu>()
+                        .eq(SysRoleMenu::getTenantId, role.getTenantId())
+                        .eq(SysRoleMenu::getRoleId, role.getId()));
         vo.setMenuIds(roleMenus.stream().map(SysRoleMenu::getMenuId).collect(Collectors.toList()));
         if (role.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(role.getCreatedAt()));
         return vo;

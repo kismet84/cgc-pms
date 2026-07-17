@@ -14,7 +14,9 @@ import java.time.LocalDateTime;
 public interface WfTaskMapper extends BaseMapper<WfTask> {
 
     @InterceptorIgnore(tenantLine = "true")
-    @Select("SELECT * FROM wf_task WHERE id = #{id} AND deleted_flag = 0")
+    @Select("SELECT id,tenant_id,instance_id,node_instance_id,business_type,business_id,approver_id,approver_name," +
+            "task_status,round_no,task_version,received_at,handled_at,action_type,comment,created_by,created_at," +
+            "updated_by,updated_at,deleted_flag,remark FROM wf_task WHERE id = #{id} AND deleted_flag = 0")
     WfTask selectByIdIgnoringTenant(@Param("id") Long id);
 
     /**

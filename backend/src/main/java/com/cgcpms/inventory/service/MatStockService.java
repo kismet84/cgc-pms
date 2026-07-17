@@ -224,6 +224,26 @@ public class MatStockService {
     @Transactional(rollbackFor = Exception.class)
     public StockMovementResult stockOutValued(Long warehouseId, Long materialId, BigDecimal quantity,
                                                String sourceType, Long sourceId, Long sourceLineId) {
+        return stockOutValuedInternal(warehouseId, materialId, quantity, null,
+                sourceType, sourceId, sourceLineId);
+    }
+
+    /** 出库并按指定历史单位成本冲减库存价值，用于原事实的精确冲销。 */
+    @Transactional(rollbackFor = Exception.class)
+    public StockMovementResult stockOutAtUnitCost(Long warehouseId, Long materialId, BigDecimal quantity,
+                                                   BigDecimal unitCost, String sourceType,
+                                                   Long sourceId, Long sourceLineId) {
+        if (unitCost == null || unitCost.signum() < 0) {
+            throw new BusinessException("STOCK_UNIT_COST_INVALID", "冲销单位成本不能为负或为空");
+        }
+        return stockOutValuedInternal(warehouseId, materialId, quantity, unitCost,
+                sourceType, sourceId, sourceLineId);
+    }
+
+    private StockMovementResult stockOutValuedInternal(Long warehouseId, Long materialId,
+                                                        BigDecimal quantity, BigDecimal fixedUnitCost,
+                                                        String sourceType, Long sourceId,
+                                                        Long sourceLineId) {
         validatePositiveQuantity(quantity);
         Long tenantId = UserContext.getCurrentTenantId();
 
@@ -251,11 +271,17 @@ public class MatStockService {
                         "库存不足：可用 " + stock.getAvailableQty()
                                 + "，请求出库 " + quantity);
             }
-            issuedUnitCost = nvl(stock.getAverageUnitCost());
+            issuedUnitCost = fixedUnitCost == null ? nvl(stock.getAverageUnitCost()) : fixedUnitCost;
             issuedAmount = quantity.multiply(issuedUnitCost).setScale(2, RoundingMode.HALF_UP);
             BigDecimal nextQuantity = stock.getAvailableQty().subtract(quantity);
             BigDecimal nextValue = nvl(stock.getInventoryValue()).subtract(issuedAmount);
+            if (nextValue.signum() < 0 && nextValue.abs().compareTo(new BigDecimal("0.01")) > 0) {
+                throw new BusinessException("STOCK_VALUE_INSUFFICIENT", "库存价值不足，无法按历史成本冲销");
+            }
             if (nextQuantity.signum() == 0) {
+                if (fixedUnitCost != null && nextValue.abs().compareTo(new BigDecimal("0.01")) > 0) {
+                    throw new BusinessException("STOCK_VALUE_MISMATCH", "清空库存后仍有价值余额，禁止冲销");
+                }
                 nextValue = BigDecimal.ZERO;
             }
             if (nextValue.signum() < 0 && nextValue.abs().compareTo(new BigDecimal("0.01")) <= 0) {

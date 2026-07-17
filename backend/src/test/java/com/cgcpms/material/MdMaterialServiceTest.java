@@ -3,6 +3,8 @@ package com.cgcpms.material;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.material.entity.MdMaterialCategory;
+import com.cgcpms.material.mapper.MdMaterialCategoryMapper;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.material.service.MdMaterialService;
 import com.cgcpms.material.vo.MdMaterialVO;
@@ -33,10 +35,16 @@ class MdMaterialServiceTest {
 
     @Autowired
     private MdMaterialMapper mdMaterialMapper;
+    @Autowired
+    private MdMaterialCategoryMapper categoryMapper;
 
     @BeforeEach
     void setUp() {
         setAdminContext();
+        category(100L, "TEST-DEFAULT");
+        category(101L, "TEST-101");
+        category(102L, "TEST-102");
+        category(200L, "TEST-200");
     }
 
     @AfterEach
@@ -52,6 +60,7 @@ class MdMaterialServiceTest {
         material.setMaterialCode("TEST-MAT-001");
         material.setMaterialName("测试材料");
         material.setUnit("个");
+        material.setCategoryId(100L);
         material.setStatus("ENABLE");
 
         Long id = mdMaterialService.create(material);
@@ -71,6 +80,7 @@ class MdMaterialServiceTest {
         material.setMaterialCode("PAGE-TEST");
         material.setMaterialName("分页测试材料");
         material.setUnit("个");
+        material.setCategoryId(100L);
         material.setStatus("ENABLE");
         mdMaterialService.create(material);
 
@@ -138,6 +148,7 @@ class MdMaterialServiceTest {
         material.setMaterialCode("UPD-MAT-001");
         material.setMaterialName("待更新材料");
         material.setUnit("个");
+        material.setCategoryId(100L);
         material.setStatus("ENABLE");
         Long id = mdMaterialService.create(material);
 
@@ -199,6 +210,7 @@ class MdMaterialServiceTest {
         material.setMaterialCode("STATUS-MAT-001");
         material.setMaterialName("状态测试材料");
         material.setUnit("个");
+        material.setCategoryId(100L);
         material.setStatus("ENABLE");
         Long id = mdMaterialService.create(material);
 
@@ -241,5 +253,12 @@ class MdMaterialServiceTest {
                 .add("roleCodes", List.of("ADMIN"))
                 .build();
         UserContext.set(claims);
+    }
+
+    private void category(Long id, String code) {
+        MdMaterialCategory category = new MdMaterialCategory();
+        category.setId(id); category.setTenantId(TENANT_ID); category.setCategoryCode(code);
+        category.setCategoryName(code); category.setLevelNo(1); category.setOrderNum(0); category.setStatus("ENABLE");
+        categoryMapper.insert(category);
     }
 }

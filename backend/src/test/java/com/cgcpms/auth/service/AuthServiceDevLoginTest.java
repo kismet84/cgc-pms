@@ -70,6 +70,8 @@ class AuthServiceDevLoginTest {
         SysRole superAdminRole = role(1L, 0L);
         SysUser defaultUser = user(910001L, 0L, username);
         SysUserRole userRole = new SysUserRole();
+        userRole.setTenantId(0L);
+        userRole.setUserId(defaultUser.getId());
         userRole.setRoleId(superAdminRole.getId());
 
         when(sysRoleMapper.selectList(any())).thenReturn(List.of(superAdminRole));
@@ -82,8 +84,8 @@ class AuthServiceDevLoginTest {
         });
         when(sysUserRoleMapper.selectCount(any())).thenReturn(1L);
         when(sysUserMapper.selectById(defaultUser.getId())).thenReturn(defaultUser);
+        when(sysRoleMapper.selectById(superAdminRole.getId())).thenReturn(superAdminRole);
         when(sysUserRoleMapper.selectList(any())).thenReturn(List.of(userRole));
-        when(sysRoleMapper.selectByIds(any())).thenReturn(List.of(superAdminRole));
         when(sysMenuMapper.selectList(any())).thenReturn(List.of(
                 menu("inventory:transaction:add"),
                 menu("requisition:add"),

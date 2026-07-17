@@ -31,6 +31,10 @@
         <resilience4j.version>2.2.0</resilience4j.version>
         <bouncycastle.version>1.84</bouncycastle.version>
         <okhttp.version>5.1.0</okhttp.version>
+        <!-- Keep test class scheduling deterministic across Windows and Linux. -->
+        <surefire.runOrder>alphabetical</surefire.runOrder>
+        <surefire.parallel>classes</surefire.parallel>
+        <surefire.threadCount>2</surefire.threadCount>
     </properties>
 
     <dependencyManagement>
@@ -245,8 +249,9 @@
                     <forkedProcessExitTimeoutInSeconds>300</forkedProcessExitTimeoutInSeconds>
                     <reuseForks>true</reuseForks>
                     <forkCount>1</forkCount>
-                    <parallel>classes</parallel>
-                    <threadCount>2</threadCount>
+                    <runOrder>${surefire.runOrder}</runOrder>
+                    <parallel>${surefire.parallel}</parallel>
+                    <threadCount>${surefire.threadCount}</threadCount>
                     <systemPropertyVariables>
                         <spring.devtools.restart.enabled>false</spring.devtools.restart.enabled>
                     </systemPropertyVariables>
@@ -352,5 +357,17 @@
             <snapshots><enabled>false</enabled></snapshots>
         </pluginRepository>
     </pluginRepositories>
+
+    <profiles>
+        <profile>
+            <id>test-order-independence</id>
+            <properties>
+                <!-- Re-run the historically state-sensitive tests in the opposite order and sequentially. -->
+                <test>AlertEvaluationServiceTest,AuthServiceTest,DashboardPerformanceTest,InvoiceValidationTest,PaymentFinancialConsistencyTest,Phase3IntegrationTest,ProductionMeasurementClosedLoopIntegrationTest,ProfileControllerTest,StlSettlementQueryServiceTest,StlSettlementServiceTest,SysUserServiceTest,WorkflowTemplateManagementTest</test>
+                <surefire.runOrder>reversealphabetical</surefire.runOrder>
+                <surefire.threadCount>1</surefire.threadCount>
+            </properties>
+        </profile>
+    </profiles>
 
 </project>

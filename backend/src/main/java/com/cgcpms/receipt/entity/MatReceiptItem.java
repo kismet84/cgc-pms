@@ -29,6 +29,10 @@ public class MatReceiptItem extends BaseEntity {
 
     private Long materialId;
 
+    private Long wbsTaskId;
+
+    private Long budgetLineId;
+
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal actualQuantity;
 

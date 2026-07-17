@@ -15,6 +15,8 @@ import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.supplierreturn.entity.MatQualityDisposition;
+import com.cgcpms.supplierreturn.mapper.MatQualityDispositionMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -45,6 +47,7 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
     private final MatWarehouseMapper warehouseMapper;
     private final CostGenerationService costGenerationService;
     private final MatStockService matStockService;
+    private final MatQualityDispositionMapper qualityDispositionMapper;
 
     @Override
     public String supportBusinessType() {
@@ -100,6 +103,7 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
         for (MatReceiptItem item : items) {
             MatPurchaseOrderItem orderItem = validateOrderItem(receipt, item);
             BigDecimal qualified = nvl(item.getQualifiedQuantity());
+            createQualityDisposition(receipt, item);
             if (qualified.signum() <= 0) {
                 continue;
             }
@@ -116,6 +120,32 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
         if (isDirectConsumption(receipt)) {
             costGenerationService.generateCost("MAT_RECEIPT", receiptId);
         }
+    }
+
+    private void createQualityDisposition(MatReceipt receipt, MatReceiptItem item) {
+        BigDecimal rejected = nvl(item.getActualQuantity()).subtract(nvl(item.getQualifiedQuantity()));
+        if (rejected.signum() <= 0) {
+            return;
+        }
+        Long existing = qualityDispositionMapper.selectCount(
+                new LambdaQueryWrapper<MatQualityDisposition>()
+                        .eq(MatQualityDisposition::getTenantId, receipt.getTenantId())
+                        .eq(MatQualityDisposition::getReceiptItemId, item.getId()));
+        if (existing != null && existing > 0) {
+            return;
+        }
+        MatQualityDisposition disposition = new MatQualityDisposition();
+        disposition.setTenantId(receipt.getTenantId());
+        disposition.setProjectId(receipt.getProjectId());
+        disposition.setReceiptId(receipt.getId());
+        disposition.setReceiptItemId(item.getId());
+        disposition.setRejectedQuantity(rejected);
+        disposition.setDispositionAction("RETURN_TO_SUPPLIER");
+        disposition.setStatus("OPEN");
+        disposition.setResolvedQuantity(BigDecimal.ZERO);
+        disposition.setVersion(0);
+        disposition.setRemark("验收审批自动生成不合格处置任务");
+        qualityDispositionMapper.insert(disposition);
     }
 
     @Override

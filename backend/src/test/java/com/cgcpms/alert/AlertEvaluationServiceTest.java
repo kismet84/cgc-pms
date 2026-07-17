@@ -35,6 +35,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.transaction.AfterTransaction;
+import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -50,14 +52,26 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("AlertEvaluationService — 告警评估引擎测试")
 class AlertEvaluationServiceTest {
 
-    private static final long TENANT_ID = 0L;
-    private static final long USER_ADMIN = 1L;
-    private static final long USER_CREATOR = 2L;
-    private static final long USER_PROJECT_MANAGER = 91001L;
-    private static final long USER_PURCHASE_MANAGER = 91002L;
-    private static final long USER_COMMERCIAL_MANAGER = 91003L;
-    private static final long USER_PRODUCTION_MANAGER = 91004L;
-    private static final long USER_CHIEF_ENGINEER = 91005L;
+    private static final long TENANT_ID = 982100L;
+    private static final long USER_ADMIN = 98210001L;
+    private static final long USER_CREATOR = 98210002L;
+    private static final long USER_PROJECT_MANAGER = 98210003L;
+    private static final long USER_PURCHASE_MANAGER = 98210004L;
+    private static final long USER_COMMERCIAL_MANAGER = 98210005L;
+    private static final long USER_PRODUCTION_MANAGER = 98210006L;
+    private static final long USER_CHIEF_ENGINEER = 98210007L;
+    private static final long PROJECT_ID = 98210101L;
+    private static final long OTHER_PROJECT_SCOPE_ID = 98210102L;
+    private static final long OTHER_PROJECT_CREATED_ID = 98210103L;
+    private static final long BATCH_OWN_PROJECT_ID = 98210104L;
+    private static final long BATCH_OTHER_PROJECT_ID = 98210105L;
+    private static final long DEDUP_OTHER_PROJECT_ID = 98210106L;
+    private static final long PARTY_A_ID = 98210201L;
+    private static final long PARTY_B_ID = 98210202L;
+    private static final long CONTRACT_ID = 98210301L;
+    private static final long BATCH_OWN_CONTRACT_ID = 98210304L;
+    private static final long BATCH_OTHER_CONTRACT_ID = 98210305L;
+    private static final long DEDUP_OTHER_CONTRACT_ID = 98210306L;
 
     @Autowired
     private AlertEvaluationService alertService;
@@ -93,13 +107,25 @@ class AlertEvaluationServiceTest {
     private Long testProjectId;
     private Long testContractId;
 
+    @BeforeTransaction
+    void cleanupCommittedAlertDataBeforeTransaction() {
+        cleanupCommittedAlertData();
+    }
+
+    @AfterTransaction
+    void cleanupCommittedAlertDataAfterTransaction() {
+        cleanupCommittedAlertData();
+    }
+
     @BeforeEach
     void setup() {
         TestUserContext.setAdmin(TENANT_ID, USER_ADMIN);
+        seedUsers();
+        seedDefaultRuleConfigs();
 
         // 种子项目
         PmProject project = new PmProject();
-        project.setId(81001L);
+        project.setId(PROJECT_ID);
         project.setProjectCode("ALERT-TEST-001");
         project.setProjectName("告警测试项目");
         project.setProjectType("CONSTRUCTION");
@@ -108,8 +134,8 @@ class AlertEvaluationServiceTest {
         project.setStatus("ACTIVE");
         project.setApprovalStatus("APPROVED");
         project.setTenantId(TENANT_ID);
-        if (projectMapper.selectById(81001L) == null) projectMapper.insert(project);
-        testProjectId = 81001L;
+        if (projectMapper.selectById(PROJECT_ID) == null) projectMapper.insert(project);
+        testProjectId = PROJECT_ID;
 
         // 种子项目成员（通知目标）
         if (projectMemberMapper.selectCount(
@@ -126,28 +152,28 @@ class AlertEvaluationServiceTest {
         }
 
         // 种子合作方
-        if (partnerMapper.selectById(81001L) == null) {
+        if (partnerMapper.selectById(PARTY_A_ID) == null) {
             MdPartner pa = new MdPartner();
-            pa.setId(81001L); pa.setPartnerCode("A-PA"); pa.setPartnerName("测试甲方");
+            pa.setId(PARTY_A_ID); pa.setPartnerCode("A-PA"); pa.setPartnerName("测试甲方");
             pa.setPartnerType("PARTY_A"); pa.setStatus("ENABLE"); pa.setTenantId(TENANT_ID);
             partnerMapper.insert(pa);
         }
-        if (partnerMapper.selectById(81002L) == null) {
+        if (partnerMapper.selectById(PARTY_B_ID) == null) {
             MdPartner pb = new MdPartner();
-            pb.setId(81002L); pb.setPartnerCode("A-PB"); pb.setPartnerName("测试乙方");
+            pb.setId(PARTY_B_ID); pb.setPartnerCode("A-PB"); pb.setPartnerName("测试乙方");
             pb.setPartnerType("PARTY_B"); pb.setStatus("ENABLE"); pb.setTenantId(TENANT_ID);
             partnerMapper.insert(pb);
         }
 
         // 种子合同（PERFORMING + 未超期）
         CtContract contract = new CtContract();
-        contract.setId(81001L);
+        contract.setId(CONTRACT_ID);
         contract.setProjectId(testProjectId);
         contract.setContractCode("A-CT-001");
         contract.setContractName("告警测试合同");
         contract.setContractType("SUB");
-        contract.setPartyAId(81001L);
-        contract.setPartyBId(81002L);
+        contract.setPartyAId(PARTY_A_ID);
+        contract.setPartyBId(PARTY_B_ID);
         contract.setContractAmount(new BigDecimal("1000000.00"));
         contract.setCurrentAmount(new BigDecimal("1000000.00"));
         contract.setPaidAmount(BigDecimal.ZERO);
@@ -157,8 +183,8 @@ class AlertEvaluationServiceTest {
         contract.setStartDate(LocalDate.of(2024, 1, 1));
         contract.setEndDate(LocalDate.now().plusDays(365));
         contract.setTenantId(TENANT_ID);
-        if (contractMapper.selectById(81001L) == null) contractMapper.insert(contract);
-        testContractId = 81001L;
+        if (contractMapper.selectById(CONTRACT_ID) == null) contractMapper.insert(contract);
+        testContractId = CONTRACT_ID;
     }
 
     @AfterEach
@@ -166,10 +192,10 @@ class AlertEvaluationServiceTest {
         // 清理告警日志
         alertLogMapper.delete(new LambdaQueryWrapper<AlertLog>()
                 .eq(AlertLog::getTenantId, TENANT_ID)
-                .in(AlertLog::getProjectId, List.of(testProjectId, 82001L, 82002L, 83001L, 83002L)));
+                .in(AlertLog::getProjectId, testProjectIds()));
         purchaseOrderMapper.delete(new LambdaQueryWrapper<MatPurchaseOrder>()
                 .eq(MatPurchaseOrder::getTenantId, TENANT_ID)
-                .in(MatPurchaseOrder::getProjectId, List.of(testProjectId, 82001L, 82002L, 83001L, 83002L))
+                .in(MatPurchaseOrder::getProjectId, testProjectIds())
                 .likeRight(MatPurchaseOrder::getOrderCode, "ALERT-PO-"));
         stockTxnMapper.delete(new LambdaQueryWrapper<MatStockTxn>()
                 .eq(MatStockTxn::getTenantId, TENANT_ID)
@@ -178,17 +204,59 @@ class AlertEvaluationServiceTest {
                 .eq(MatStockTxn::getMaterialId, 91001L));
         receiptMapper.delete(new LambdaQueryWrapper<MatReceipt>()
                 .eq(MatReceipt::getTenantId, TENANT_ID)
-                .in(MatReceipt::getProjectId, List.of(testProjectId, 82001L, 82002L, 83001L, 83002L))
+                .in(MatReceipt::getProjectId, testProjectIds())
                 .likeRight(MatReceipt::getReceiptCode, "ALERT-RC-"));
         notificationMapper.delete(new LambdaQueryWrapper<SysNotification>()
                 .eq(SysNotification::getTenantId, TENANT_ID)
                 .in(SysNotification::getBizType, List.of("ALERT", "ALERT_STATUS")));
         jdbcTemplate.update("""
                 delete from sys_user_preference
-                where tenant_id = ? and user_id in (?, ?, ?, ?, ?, ?)
+                where tenant_id = ? and user_id in (?, ?, ?, ?, ?, ?, ?)
                 """, TENANT_ID, USER_ADMIN, USER_CREATOR, USER_PROJECT_MANAGER, USER_PURCHASE_MANAGER,
-                USER_COMMERCIAL_MANAGER, USER_CHIEF_ENGINEER);
+                USER_COMMERCIAL_MANAGER, USER_PRODUCTION_MANAGER, USER_CHIEF_ENGINEER);
         TestUserContext.clear();
+    }
+
+    private void seedUsers() {
+        seedUser(USER_ADMIN, "alert-isolation-admin", "告警隔离管理员", 1);
+        seedUser(USER_CREATOR, "alert-isolation-creator", "告警隔离创建人", 0);
+        seedUser(USER_PROJECT_MANAGER, "alert-isolation-pm", "告警隔离项目经理", 0);
+        seedUser(USER_PURCHASE_MANAGER, "alert-isolation-purchase", "告警隔离采购经理", 0);
+        seedUser(USER_COMMERCIAL_MANAGER, "alert-isolation-commercial", "告警隔离商务经理", 0);
+        seedUser(USER_PRODUCTION_MANAGER, "alert-isolation-production", "告警隔离生产经理", 0);
+        seedUser(USER_CHIEF_ENGINEER, "alert-isolation-chief", "告警隔离总工", 0);
+    }
+
+    private void cleanupCommittedAlertData() {
+        jdbcTemplate.update("DELETE FROM alert_notification_send_record WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM sys_notification WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM alert_log WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM alert_rule_config WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM sys_user_preference WHERE tenant_id = ?", TENANT_ID);
+    }
+
+    private List<Long> testProjectIds() {
+        return List.of(PROJECT_ID, OTHER_PROJECT_SCOPE_ID, OTHER_PROJECT_CREATED_ID,
+                BATCH_OWN_PROJECT_ID, BATCH_OTHER_PROJECT_ID, DEDUP_OTHER_PROJECT_ID);
+    }
+
+    private void seedUser(long userId, String username, String realName, int isAdmin) {
+        jdbcTemplate.update("""
+                insert into sys_user (
+                    id, tenant_id, username, password, real_name, status, is_admin,
+                    created_by, updated_by, deleted_flag, remark
+                )
+                select ?, ?, ?, '{noop}test', ?, 'ENABLE', ?, ?, ?, 0, 'alert-isolation-test'
+                where not exists (select 1 from sys_user where id = ?)
+                """, userId, TENANT_ID, username, realName, isAdmin,
+                USER_ADMIN, USER_ADMIN, userId);
+    }
+
+    private void seedDefaultRuleConfigs() {
+        insertRuleConfig("DYNAMIC_COST_EXCEEDS_TARGET", BigDecimal.ONE, null, null, 24);
+        insertRuleConfig("CONTRACT_OVERDUE", null, null, null, 24);
+        insertRuleConfig("CONTRACT_EXPIRING", null, 30, null, 24);
+        insertRuleConfig("PURCHASE_DELIVERY_OVERDUE", null, null, null, 24);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1136,7 +1204,7 @@ class AlertEvaluationServiceTest {
     @Transactional
     @DisplayName("TA11f: PROJECT_MANAGER — 可见本人项目全域，但不能看无权限项目")
     void testAccess_ProjectManagerOwnProjectsOnly() {
-        Long otherProjectId = 82001L;
+        Long otherProjectId = OTHER_PROJECT_SCOPE_ID;
         seedProject(otherProjectId, "ALERT-OTHER-001", USER_CREATOR);
         seedMember(testProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
         insertAlert(testProjectId, "COST", "DYNAMIC_COST_EXCEEDS_TARGET");
@@ -1157,7 +1225,7 @@ class AlertEvaluationServiceTest {
     @Transactional
     @DisplayName("TA11f2: PROJECT_MANAGER — 无权限 projectId 与越权域并存时仍优先拒绝项目")
     void testAccess_ProjectManagerUnauthorizedProjectBeatsUnauthorizedDomain() {
-        Long otherProjectId = 82002L;
+        Long otherProjectId = OTHER_PROJECT_CREATED_ID;
         seedProject(otherProjectId, "ALERT-OTHER-002", USER_CREATOR);
         seedMember(testProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
         TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
@@ -1235,13 +1303,13 @@ class AlertEvaluationServiceTest {
     @Transactional
     @DisplayName("TA12b: batchEvaluate — 非管理员只评估可访问项目集合")
     void testBatchEvaluate_NonAdminOnlyAccessibleProjects() {
-        Long ownProjectId = 83001L;
-        Long otherProjectId = 83002L;
+        Long ownProjectId = BATCH_OWN_PROJECT_ID;
+        Long otherProjectId = BATCH_OTHER_PROJECT_ID;
         seedProject(ownProjectId, "ALERT-BATCH-OWN", USER_CREATOR);
         seedProject(otherProjectId, "ALERT-BATCH-OTHER", USER_CREATOR);
         seedMember(ownProjectId, USER_PROJECT_MANAGER, "PROJECT_MANAGER");
-        seedOverdueContract(83001L, ownProjectId, "A-CT-BATCH-OWN");
-        seedOverdueContract(83002L, otherProjectId, "A-CT-BATCH-OTHER");
+        seedOverdueContract(BATCH_OWN_CONTRACT_ID, ownProjectId, "A-CT-BATCH-OWN");
+        seedOverdueContract(BATCH_OTHER_CONTRACT_ID, otherProjectId, "A-CT-BATCH-OTHER");
         TestUserContext.setUser(TENANT_ID, USER_PROJECT_MANAGER, "pm", List.of("PROJECT_MANAGER"));
 
         alertService.batchEvaluate(TENANT_ID);
@@ -1394,9 +1462,9 @@ class AlertEvaluationServiceTest {
                 .eq(AlertLog::getSourceId, secondOrder.getId()));
         assertEquals(1L, secondOrderAlerts, "同规则不同采购订单 sourceId 不能被错误串并");
 
-        Long otherProjectId = 84001L;
+        Long otherProjectId = DEDUP_OTHER_PROJECT_ID;
         seedProject(otherProjectId, "ALERT-DEDUP-OTHER", USER_CREATOR);
-        seedOverdueContract(84001L, otherProjectId, "A-CT-DEDUP-OTHER");
+        seedOverdueContract(DEDUP_OTHER_CONTRACT_ID, otherProjectId, "A-CT-DEDUP-OTHER");
         alertService.evaluateProject(TENANT_ID, otherProjectId);
         Long otherProjectAlerts = alertLogMapper.selectCount(new LambdaQueryWrapper<AlertLog>()
                 .eq(AlertLog::getTenantId, TENANT_ID)
@@ -1529,8 +1597,8 @@ class AlertEvaluationServiceTest {
         contract.setContractCode(contractCode);
         contract.setContractName(contractCode);
         contract.setContractType("SUB");
-        contract.setPartyAId(81001L);
-        contract.setPartyBId(81002L);
+        contract.setPartyAId(PARTY_A_ID);
+        contract.setPartyBId(PARTY_B_ID);
         contract.setContractAmount(new BigDecimal("1000000.00"));
         contract.setCurrentAmount(new BigDecimal("1000000.00"));
         contract.setPaidAmount(BigDecimal.ZERO);

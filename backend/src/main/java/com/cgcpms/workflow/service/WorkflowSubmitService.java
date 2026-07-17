@@ -39,7 +39,8 @@ public class WorkflowSubmitService {
         WorkflowBusinessAccessValidator.ValidationResult businessAccess =
                 businessAccessValidator.validateSubmit(businessType, businessId, tenantId, projectId, contractId);
 
-        WfTemplate template = core.findTemplate(businessType, tenantId, amount);
+        WfTemplate template = core.findTemplate(businessType, tenantId, amount, businessId,
+                businessAccess.getContractId());
         List<WfTemplateNode> templateNodes = core.findTemplateNodes(template.getId());
 
         // Create instance

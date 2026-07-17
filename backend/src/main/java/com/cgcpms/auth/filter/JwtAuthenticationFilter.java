@@ -172,7 +172,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         
         // Extract permissions (e.g., "system:user:add")
-        List<String> permissions = stringListClaim(claims, JwtUtils.CLAIM_PERMISSIONS);
+        List<String> permissions = jwtUtils.getPermissionCodes(claims);
         if (permissions != null) {
             for (String perm : permissions) {
                 authorities.add(new SimpleGrantedAuthority(perm));

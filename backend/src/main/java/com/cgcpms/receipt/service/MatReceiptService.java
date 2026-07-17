@@ -322,6 +322,8 @@ public class MatReceiptService {
                         "验收数量超过采购订单剩余数量，订单明细ID=" + item.getOrderItemId());
             }
             item.setMaterialId(orderItem.getMaterialId());
+            item.setWbsTaskId(orderItem.getWbsTaskId());
+            item.setBudgetLineId(orderItem.getBudgetLineId());
             item.setUnitPrice(nvl(orderItem.getUnitPrice()));
             item.setAmount(qualified.multiply(item.getUnitPrice()).setScale(2, RoundingMode.HALF_UP));
         }

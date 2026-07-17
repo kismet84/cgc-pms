@@ -67,8 +67,8 @@ class MatPurchaseOrderControllerTest {
         jdbcTemplate.update("""
                 INSERT INTO sys_user
                     (id, tenant_id, username, password, real_name, status, is_admin,
-                     created_by, updated_by, deleted_flag, deleted_token, remark)
-                VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, NULL, ?)
+                     created_by, updated_by, deleted_flag, remark)
+                VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, ?)
                 """, ADMIN_ID, TENANT_ID, "test_purchase_controller_approver", "{noop}test",
                 "采购订单接口测试审批人", ADMIN_ID, ADMIN_ID,
                 "MatPurchaseOrderControllerTest local approver");

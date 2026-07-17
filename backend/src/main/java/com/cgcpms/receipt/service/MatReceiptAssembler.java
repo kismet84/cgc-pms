@@ -96,6 +96,8 @@ public class MatReceiptAssembler {
             MatReceiptItemVO vo = new MatReceiptItemVO();
             vo.setOrderItemId(i.getId() != null ? i.getId().toString() : null);
             vo.setMaterialId(i.getMaterialId() != null ? i.getMaterialId().toString() : null);
+            vo.setWbsTaskId(i.getWbsTaskId() != null ? i.getWbsTaskId().toString() : null);
+            vo.setBudgetLineId(i.getBudgetLineId() != null ? i.getBudgetLineId().toString() : null);
             vo.setMaterialName(i.getMaterialId() != null ? materialNames.get(i.getMaterialId()) : null);
             if (i.getMaterialId() != null) {
                 MdMaterial mat = materialMap.get(i.getMaterialId());
@@ -177,6 +179,8 @@ public class MatReceiptAssembler {
         vo.setOrderItemId(i.getOrderItemId() != null ? i.getOrderItemId().toString() : null);
         vo.setMaterialId(i.getMaterialId() != null ? i.getMaterialId().toString() : null);
         vo.setMaterialName(i.getMaterialId() != null ? materialNames.get(i.getMaterialId()) : null);
+        vo.setWbsTaskId(i.getWbsTaskId() != null ? i.getWbsTaskId().toString() : null);
+        vo.setBudgetLineId(i.getBudgetLineId() != null ? i.getBudgetLineId().toString() : null);
         vo.setActualQuantity(i.getActualQuantity() != null ? i.getActualQuantity().toPlainString() : null);
         vo.setQualifiedQuantity(i.getQualifiedQuantity() != null ? i.getQualifiedQuantity().toPlainString() : null);
         vo.setUnitPrice(i.getUnitPrice() != null ? i.getUnitPrice().toPlainString() : null);

@@ -15,7 +15,10 @@ import java.util.List;
 public interface WfInstanceMapper extends BaseMapper<WfInstance> {
 
     @InterceptorIgnore(tenantLine = "true")
-    @Select("SELECT * FROM wf_instance WHERE id = #{id} AND deleted_flag = 0")
+    @Select("SELECT id,tenant_id,template_id,business_type,business_id,project_id,contract_id,title,amount," +
+            "instance_status,current_round,resubmit_count,business_revision,initiator_id,business_summary,variables," +
+            "started_at,ended_at,created_by,created_at,updated_by,updated_at,deleted_flag,remark " +
+            "FROM wf_instance WHERE id = #{id} AND deleted_flag = 0")
     WfInstance selectByIdIgnoringTenant(@Param("id") Long id);
 
     /**
@@ -23,7 +26,10 @@ public interface WfInstanceMapper extends BaseMapper<WfInstance> {
      * Uses raw SQL to bypass MyBatis-Plus {@code @TableLogic} filtering.
      * SUPER_ADMIN only — for admin data inspection/cleanup.
      */
-    @Select("SELECT * FROM wf_instance WHERE business_type = #{businessType} AND business_id = #{businessId}")
+    @Select("SELECT id,tenant_id,template_id,business_type,business_id,project_id,contract_id,title,amount," +
+            "instance_status,current_round,resubmit_count,business_revision,initiator_id,business_summary,variables," +
+            "started_at,ended_at,created_by,created_at,updated_by,updated_at,deleted_flag,remark " +
+            "FROM wf_instance WHERE business_type = #{businessType} AND business_id = #{businessId}")
     List<WfInstance> selectAllIncludingDeleted(@Param("businessType") String businessType,
                                                 @Param("businessId") Long businessId);
 

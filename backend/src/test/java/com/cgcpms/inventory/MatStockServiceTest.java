@@ -435,7 +435,7 @@ class MatStockServiceTest {
 
         jdbcTemplate.update("""
                 UPDATE mat_stock
-                SET deleted_flag = 1, deleted_token = id
+                SET deleted_flag = 1
                 WHERE id = ?
                 """, 919001L);
 

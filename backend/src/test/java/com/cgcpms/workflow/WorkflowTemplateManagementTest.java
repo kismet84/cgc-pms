@@ -41,8 +41,11 @@ class WorkflowTemplateManagementTest {
     private static final long TEMPLATE_ID = 230000000000000001L;
     private static final long NODE_1_ID = 230000000000000101L;
     private static final long NODE_2_ID = 230000000000000102L;
-    private static final long TENANT_ID = 0L;
-    private static final long USER_ADMIN = 1L;
+    private static final long TENANT_ID = 982300L;
+    private static final long USER_ADMIN = 98230001L;
+    private static final long PROJECT_ID = 98230002L;
+    private static final long PARTY_A_ID = 98230003L;
+    private static final long PARTY_B_ID = 98230004L;
     private static final long BUSINESS_ID = 230000000000000901L;
     private static final String BUSINESS_TYPE = WorkflowBusinessTypes.CONTRACT_APPROVAL;
     private static final BigDecimal TEMPLATE_TEST_AMOUNT = new BigDecimal("1000000000.00");
@@ -64,6 +67,8 @@ class WorkflowTemplateManagementTest {
                 .add("roleCodes", java.util.List.of("ADMIN"))
                 .build());
         cleanup();
+        seedUser();
+        seedPartners();
         seedTemplate();
     }
 
@@ -118,7 +123,7 @@ class WorkflowTemplateManagementTest {
         createRequest.setNodeName("法务审批");
         createRequest.setNodeType("APPROVAL");
         createRequest.setApproveMode("OR_SIGN");
-        createRequest.setApproverConfig("{\"type\":\"USER\",\"userId\":1}");
+        createRequest.setApproverConfig(userApproverConfig());
         createRequest.setAllowTransfer(1);
         createRequest.setAllowAddSign(0);
         createRequest.setTimeoutHours(24);
@@ -135,7 +140,7 @@ class WorkflowTemplateManagementTest {
         updateRequest.setNodeOrder(2);
         updateRequest.setNodeType("APPROVAL");
         updateRequest.setApproveMode("COUNTERSIGN");
-        updateRequest.setApproverConfig("{\"type\":\"USER\",\"userId\":1}");
+        updateRequest.setApproverConfig(userApproverConfig());
         updateRequest.setAllowTransfer(0);
         updateRequest.setAllowAddSign(1);
         updateRequest.setTimeoutHours(48);
@@ -189,7 +194,7 @@ class WorkflowTemplateManagementTest {
         createRequest.setNodeName("新增节点");
         createRequest.setNodeType("APPROVAL");
         createRequest.setApproveMode("SEQUENTIAL");
-        createRequest.setApproverConfig("{\"type\":\"USER\",\"userId\":1}");
+        createRequest.setApproverConfig(userApproverConfig());
         createRequest.setAllowTransfer(1);
         createRequest.setAllowAddSign(1);
         workflowTemplateService.createNode(TEMPLATE_ID, createRequest);
@@ -238,7 +243,7 @@ class WorkflowTemplateManagementTest {
         first.setNodeOrder(1);
         first.setNodeType("APPROVAL");
         first.setApproveMode("SEQUENTIAL");
-        first.setApproverConfig("{\"type\":\"USER\",\"userId\":1}");
+        first.setApproverConfig(userApproverConfig());
         first.setAllowTransfer(1);
         first.setAllowAddSign(1);
         nodeMapper.insert(first);
@@ -252,7 +257,7 @@ class WorkflowTemplateManagementTest {
         second.setNodeOrder(2);
         second.setNodeType("APPROVAL");
         second.setApproveMode("SEQUENTIAL");
-        second.setApproverConfig("{\"type\":\"USER\",\"userId\":1}");
+        second.setApproverConfig(userApproverConfig());
         second.setAllowTransfer(1);
         second.setAllowAddSign(1);
         nodeMapper.insert(second);
@@ -276,8 +281,11 @@ class WorkflowTemplateManagementTest {
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id IN (?, ?))", BUSINESS_ID, BUSINESS_ID + 1);
         jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id IN (?, ?)", BUSINESS_ID, BUSINESS_ID + 1);
         jdbcTemplate.update("DELETE FROM ct_contract WHERE id IN (?, ?)", BUSINESS_ID, BUSINESS_ID + 1);
+        jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM md_partner WHERE id IN (?, ?)", PARTY_A_ID, PARTY_B_ID);
         jdbcTemplate.update("DELETE FROM wf_template_node WHERE template_id = ?", TEMPLATE_ID);
         jdbcTemplate.update("DELETE FROM wf_template WHERE id = ?", TEMPLATE_ID);
+        jdbcTemplate.update("DELETE FROM sys_user WHERE id = ?", USER_ADMIN);
     }
 
     private void seedContract(long businessId) {
@@ -291,8 +299,8 @@ class WorkflowTemplateManagementTest {
                 SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
                 WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id = ?)
                 """,
-                businessId, TENANT_ID, 100L, "WF-TPL-" + businessId, "workflow模板测试合同-" + businessId, "SUB",
-                20001L, 20002L, new BigDecimal("10000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
+                businessId, TENANT_ID, PROJECT_ID, "WF-TPL-" + businessId, "workflow模板测试合同-" + businessId, "SUB",
+                PARTY_A_ID, PARTY_B_ID, new BigDecimal("10000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
                 "DRAFT", "DRAFT", USER_ADMIN, USER_ADMIN,
                 businessId);
     }
@@ -307,7 +315,36 @@ class WorkflowTemplateManagementTest {
                 SELECT ?, ?, ?, ?, '房建工程', 10000, 8000, 'ACTIVE', 'APPROVED', ?, ?, 0
                 WHERE NOT EXISTS (SELECT 1 FROM pm_project WHERE id = ?)
                 """,
-                100L, TENANT_ID, "WF-TPL-PRJ-100", "workflow模板测试项目",
-                USER_ADMIN, USER_ADMIN, 100L);
+                PROJECT_ID, TENANT_ID, "WF-TPL-PRJ-98230002", "workflow模板测试项目",
+                USER_ADMIN, USER_ADMIN, PROJECT_ID);
+    }
+
+    private void seedUser() {
+        jdbcTemplate.update("""
+                INSERT INTO sys_user (
+                    id, tenant_id, username, password, real_name, status, is_admin,
+                    created_by, updated_by, deleted_flag, remark
+                ) VALUES (?, ?, 'workflow-template-admin', '{noop}test', '流程模板测试管理员',
+                          'ENABLE', 1, ?, ?, 0, 'workflow-template-isolation-test')
+                """, USER_ADMIN, TENANT_ID, USER_ADMIN, USER_ADMIN);
+    }
+
+    private void seedPartners() {
+        jdbcTemplate.update("""
+                INSERT INTO md_partner (
+                    id, tenant_id, partner_code, partner_name, partner_type, status,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, 'WF-TPL-PA', '流程模板测试甲方', 'CUSTOMER', 'ENABLE', ?, ?, 0)
+                """, PARTY_A_ID, TENANT_ID, USER_ADMIN, USER_ADMIN);
+        jdbcTemplate.update("""
+                INSERT INTO md_partner (
+                    id, tenant_id, partner_code, partner_name, partner_type, status,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, 'WF-TPL-PB', '流程模板测试乙方', 'SUPPLIER', 'ENABLE', ?, ?, 0)
+                """, PARTY_B_ID, TENANT_ID, USER_ADMIN, USER_ADMIN);
+    }
+
+    private String userApproverConfig() {
+        return "{\"type\":\"USER\",\"userId\":" + USER_ADMIN + "}";
     }
 }

@@ -53,11 +53,15 @@ public final class FinanceOperationsModels {
     public record IntegrationCallbackRequest(@NotBlank String idempotencyKey,
                                              @NotBlank String messageType, String businessType,
                                              Long businessId, @NotNull Map<String,Object> payload) {}
+    public record BankReceiptAllocation(@NotNull Long receivableId,
+                                        @NotNull @Positive @Digits(integer=16, fraction=2) BigDecimal amount) {}
     public record BankReceiptRequest(@NotNull Long endpointId, @NotBlank String bankTxnNo,
                                      String accountNoMasked, @NotNull LocalDateTime transactionTime,
                                      @NotBlank String direction,
                                      @NotNull @Positive @Digits(integer=16, fraction=2) BigDecimal amount,
                                      String counterpartyName, String purposeText,
+                                     Long projectId, Long contractId, Long customerId, Long fundAccountId,
+                                     List<@Valid BankReceiptAllocation> allocations,
                                      @NotNull Map<String,Object> rawPayload) {}
     public record CashForecastRequest(Long projectId, @NotNull LocalDate forecastDate,
                                       @NotBlank String scenario,

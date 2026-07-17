@@ -110,6 +110,66 @@ public abstract class H2SoftDeleteUniqueMigration extends BaseJavaMigration {
         }
     }
 
+    /**
+     * 删除一个已知名称的 H2 唯一约束或唯一索引，不影响同表的其他唯一约束。
+     */
+    protected static void dropNamedUniqueConstraint(java.sql.Connection conn,
+                                                    String tableName,
+                                                    String constraintName) throws SQLException {
+        validateIdentifier(tableName);
+        validateIdentifier(constraintName);
+        String actualConstraint = null;
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT CONSTRAINT_NAME
+                FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+                WHERE UPPER(CONSTRAINT_SCHEMA) = 'PUBLIC'
+                  AND UPPER(TABLE_NAME) = ?
+                  AND UPPER(CONSTRAINT_NAME) = ?
+                  AND CONSTRAINT_TYPE = 'UNIQUE'
+                """)) { // SQL-SAFETY: migration-ddl
+            ps.setString(1, tableName.toUpperCase(Locale.ROOT));
+            ps.setString(2, constraintName.toUpperCase(Locale.ROOT));
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    actualConstraint = rs.getString(1);
+                }
+            }
+        }
+        if (actualConstraint != null) {
+            validateIdentifier(actualConstraint);
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "ALTER TABLE " + quoteIdentifier(tableName) +
+                            " DROP CONSTRAINT " + quoteIdentifier(actualConstraint))) { // SQL-SAFETY: migration-ddl
+                ps.execute();
+                return;
+            }
+        }
+
+        String actualIndex = null;
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT INDEX_NAME
+                FROM INFORMATION_SCHEMA.INDEXES
+                WHERE UPPER(TABLE_SCHEMA) = 'PUBLIC'
+                  AND UPPER(TABLE_NAME) = ?
+                  AND UPPER(INDEX_NAME) = ?
+                """)) { // SQL-SAFETY: migration-ddl
+            ps.setString(1, tableName.toUpperCase(Locale.ROOT));
+            ps.setString(2, constraintName.toUpperCase(Locale.ROOT));
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    actualIndex = rs.getString(1);
+                }
+            }
+        }
+        if (actualIndex != null) {
+            validateIdentifier(actualIndex);
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "DROP INDEX " + quoteIdentifier(actualIndex))) { // SQL-SAFETY: migration-ddl
+                ps.execute();
+            }
+        }
+    }
+
     private static String quoteIdentifier(String identifier) {
         return "\"" + identifier.replace("\"", "\"\"") + "\"";
     }

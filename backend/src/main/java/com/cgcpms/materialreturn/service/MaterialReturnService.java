@@ -62,7 +62,8 @@ public class MaterialReturnService {
         }
         projectAccessChecker.checkAccess(requisition.getProjectId(), "确认材料退料");
 
-        MatStockTxn originalTxn = stockTxnMapper.selectById(request.originalStockTxnId());
+        // Serialize every partial return of the same original issue before calculating the cumulative quantity.
+        MatStockTxn originalTxn = stockTxnMapper.selectForUpdate(request.originalStockTxnId(), tenantId);
         if (originalTxn == null || !tenantId.equals(originalTxn.getTenantId())
                 || !"OUT".equals(originalTxn.getTxnType())
                 || !"MAT_REQUISITION".equals(originalTxn.getSourceType())
@@ -73,12 +74,7 @@ public class MaterialReturnService {
             throw new BusinessException("RETURN_SOURCE_MISMATCH", "原出库流水与领料明细不匹配");
         }
 
-        BigDecimal alreadyReturned = returnItemMapper.selectList(
-                new LambdaQueryWrapper<MaterialReturnItem>()
-                        .eq(MaterialReturnItem::getTenantId, tenantId)
-                        .eq(MaterialReturnItem::getOriginalStockTxnId, originalTxn.getId()))
-                .stream().map(MaterialReturnItem::getQuantity)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal alreadyReturned = returnItemMapper.sumConfirmedQuantity(tenantId, originalTxn.getId());
         if (alreadyReturned.add(request.quantity()).compareTo(originalTxn.getQuantity()) > 0) {
             throw new BusinessException("RETURN_EXCEEDS_ISSUED", "累计退料数量超过原实际出库数量");
         }
@@ -144,6 +140,68 @@ public class MaterialReturnService {
         reversal.setGeneratedFlag(1);
         reversal.setRemark("冲销原领料成本 " + originalCost.getId() + "：" + request.reason().trim());
         costItemMapper.insert(reversal);
+        return materialReturn.getId();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Long reverse(Long returnId, String reason) {
+        if (reason == null || reason.isBlank() || reason.trim().length() > 500) {
+            throw new BusinessException("MATERIAL_RETURN_REVERSAL_REASON_INVALID", "冲销原因不能为空且最多500字");
+        }
+        Long tenantId = UserContext.getCurrentTenantId();
+        MaterialReturn materialReturn = returnMapper.selectForUpdate(returnId, tenantId);
+        if (materialReturn == null) {
+            throw new BusinessException("MATERIAL_RETURN_NOT_FOUND", "退料单不存在");
+        }
+        projectAccessChecker.checkAccess(materialReturn.getProjectId(), "冲销材料退料");
+        if ("REVERSED".equals(materialReturn.getStatus())) {
+            return materialReturn.getId();
+        }
+        if (!"CONFIRMED".equals(materialReturn.getStatus())) {
+            throw new BusinessException("MATERIAL_RETURN_NOT_REVERSIBLE", "当前退料状态不允许冲销");
+        }
+
+        List<MaterialReturnItem> items = returnItemMapper.selectList(
+                new LambdaQueryWrapper<MaterialReturnItem>()
+                        .eq(MaterialReturnItem::getTenantId, tenantId)
+                        .eq(MaterialReturnItem::getReturnId, returnId));
+        if (items.isEmpty()) {
+            throw new BusinessException("MATERIAL_RETURN_ITEM_MISSING", "退料明细不存在，禁止冲销");
+        }
+        for (MaterialReturnItem item : items) {
+            stockService.stockOutAtUnitCost(materialReturn.getWarehouseId(), item.getMaterialId(),
+                    item.getQuantity(), item.getUnitCost(), "MATERIAL_RETURN_REVERSAL", returnId, item.getId());
+
+            CostItem originalCost = costItemMapper.selectById(item.getOriginalCostItemId());
+            if (originalCost == null || !tenantId.equals(originalCost.getTenantId())) {
+                throw new BusinessException("RETURN_ORIGINAL_COST_NOT_FOUND", "原出库成本不存在，禁止冲销退料");
+            }
+            CostItem undo = new CostItem();
+            undo.setTenantId(tenantId);
+            undo.setProjectId(materialReturn.getProjectId());
+            undo.setContractId(materialReturn.getContractId());
+            undo.setPartnerId(originalCost.getPartnerId());
+            undo.setCostType("MATERIAL");
+            undo.setCostSubjectId(originalCost.getCostSubjectId());
+            undo.setAmount(item.getAmount());
+            undo.setTaxAmount(BigDecimal.ZERO);
+            undo.setAmountWithoutTax(item.getAmount());
+            undo.setSourceType("MATERIAL_RETURN_REVERSAL");
+            undo.setSourceId(returnId);
+            undo.setSourceItemId(item.getId());
+            undo.setCostDate(java.time.LocalDate.now());
+            undo.setCostStatus("CONFIRMED");
+            undo.setGeneratedFlag(1);
+            undo.setRemark("冲销退料 " + returnId + "：" + reason.trim());
+            costItemMapper.insert(undo);
+        }
+
+        materialReturn.setStatus("REVERSED");
+        materialReturn.setReversedBy(UserContext.getCurrentUserId());
+        materialReturn.setReversedAt(LocalDateTime.now());
+        materialReturn.setReversalReason(reason.trim());
+        materialReturn.setVersion(materialReturn.getVersion() == null ? 1 : materialReturn.getVersion() + 1);
+        returnMapper.updateById(materialReturn);
         return materialReturn.getId();
     }
 
