@@ -139,10 +139,10 @@ class ProjectBudgetIntegrationTest {
         projectService.transitionStatus(PROJECT_ID, "ACTIVE", "预算已批准");
         projectService.transitionStatus(PROJECT_ID, "SUSPENDED", "现场暂停");
         projectService.transitionStatus(PROJECT_ID, "ACTIVE", "恢复施工");
-        projectService.transitionStatus(PROJECT_ID, "CLOSED", "项目完成");
-        assertEquals("CLOSED", projectMapper.selectById(PROJECT_ID).getStatus());
-        assertThrows(BusinessException.class,
-                () -> projectService.transitionStatus(PROJECT_ID, "ACTIVE", "非法重开"));
+        BusinessException closeDirectly = assertThrows(BusinessException.class,
+                () -> projectService.transitionStatus(PROJECT_ID, "CLOSED", "项目完成"));
+        assertEquals("PROJECT_CLOSEOUT_ACTION_REQUIRED", closeDirectly.getCode());
+        assertEquals("ACTIVE", projectMapper.selectById(PROJECT_ID).getStatus());
     }
 
     @Test

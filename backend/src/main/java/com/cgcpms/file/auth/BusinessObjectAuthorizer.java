@@ -77,7 +77,13 @@ public class BusinessObjectAuthorizer {
             "PAYMENT", "SUBCONTRACT", "SETTLEMENT", "VARIATION",
             "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL", "SITE_DAILY_LOG", "EXPENSE",
             "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD",
-            "PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION"
+            "PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION",
+            "QS_INSPECTION", "QS_ISSUE", "QS_RECTIFICATION",
+            "SUPPLIER_SOURCING", "SUPPLIER_QUOTE",
+            "TECH_SCHEME", "TECH_DRAWING_VERSION", "TECH_DRAWING_REVIEW", "TECH_RFI",
+            "TECH_RFI_RESPONSE", "TECH_DISCLOSURE", "TECH_ARCHIVE",
+            "CLOSEOUT_SECTION_ACCEPTANCE", "CLOSEOUT_FINAL_ACCEPTANCE", "CLOSEOUT_DEFECT",
+            "CLOSEOUT_WARRANTY", "CLOSEOUT_ARCHIVE_TRANSFER"
     );
 
     /**
@@ -106,6 +112,22 @@ public class BusinessObjectAuthorizer {
 
     /** 变更签证附件按业务阶段不可逆约束，防止事后替换现场证据或伪造业主核定。 */
     public void checkVariationDocumentStage(String businessType, Long businessId, String documentType) {
+        if (businessType != null && businessType.toUpperCase().startsWith("QS_")) {
+            checkQualityDocumentStage(businessType.toUpperCase(), businessId, documentType);
+            return;
+        }
+        if (businessType != null && businessType.toUpperCase().startsWith("SUPPLIER_")) {
+            checkSupplierDocumentStage(businessType.toUpperCase(), businessId, documentType);
+            return;
+        }
+        if (businessType != null && businessType.toUpperCase().startsWith("TECH_")) {
+            checkTechnicalDocumentStage(businessType.toUpperCase(), businessId, documentType);
+            return;
+        }
+        if (businessType != null && businessType.toUpperCase().startsWith("CLOSEOUT_")) {
+            checkCloseoutDocumentStage(businessType.toUpperCase(), businessId, documentType);
+            return;
+        }
         if (!"VARIATION".equalsIgnoreCase(businessType)) return;
         VarOrder variation = variationMapper.selectById(businessId);
         if (variation == null || !java.util.Objects.equals(variation.getTenantId(), UserContext.getCurrentTenantId()))
@@ -135,7 +157,11 @@ public class BusinessObjectAuthorizer {
             case "SITE_DAILY_LOG" -> write ? "site:daily:edit" : "site:daily:query";
             default -> genericAuthority;
         };
-        requireAuthority(requiredAuthority);
+        if (upperType.startsWith("QS_")) requireQualityAuthority(upperType, write);
+        else if (upperType.startsWith("SUPPLIER_")) requireSupplierAuthority(upperType, write);
+        else if (upperType.startsWith("TECH_")) requireTechnicalAuthority(upperType, write);
+        else if (upperType.startsWith("CLOSEOUT_")) requireCloseoutAuthority(upperType, write);
+        else requireAuthority(requiredAuthority);
 
         switch (upperType) {
             case "PROJECT":
@@ -336,6 +362,52 @@ public class BusinessObjectAuthorizer {
                 projectAccessChecker.checkAccess(dailyLog.getProjectId(), action + "现场日报文件");
                 break;
             }
+            case "QS_INSPECTION", "QS_ISSUE", "QS_RECTIFICATION": {
+                QualityFileObject object = findQualityFileObject(upperType, businessId);
+                if (object == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "质量安全业务对象不存在: " + businessId);
+                }
+                if (!object.tenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该质量安全业务文件");
+                }
+                checkProjectAccess(object.projectId(), action + "质量安全业务文件");
+                break;
+            }
+            case "SUPPLIER_SOURCING", "SUPPLIER_QUOTE": {
+                SupplierFileObject object = findSupplierFileObject(upperType, businessId);
+                if (object == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "供应商招采业务对象不存在: " + businessId);
+                }
+                if (!object.tenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该供应商招采文件");
+                }
+                checkProjectAccess(object.projectId(), action + "供应商招采文件");
+                break;
+            }
+            case "TECH_SCHEME", "TECH_DRAWING_VERSION", "TECH_DRAWING_REVIEW", "TECH_RFI",
+                    "TECH_RFI_RESPONSE", "TECH_DISCLOSURE", "TECH_ARCHIVE": {
+                TechnicalFileObject object = findTechnicalFileObject(upperType, businessId);
+                if (object == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "技术管理业务对象不存在: " + businessId);
+                }
+                if (!object.tenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该技术管理文件");
+                }
+                checkProjectAccess(object.projectId(), action + "技术管理文件");
+                break;
+            }
+            case "CLOSEOUT_SECTION_ACCEPTANCE", "CLOSEOUT_FINAL_ACCEPTANCE", "CLOSEOUT_DEFECT",
+                    "CLOSEOUT_WARRANTY", "CLOSEOUT_ARCHIVE_TRANSFER": {
+                CloseoutFileObject object = findCloseoutFileObject(upperType, businessId);
+                if (object == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "项目收尾业务对象不存在: " + businessId);
+                }
+                if (!object.tenantId().equals(UserContext.getCurrentTenantId())) {
+                    throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该项目收尾文件");
+                }
+                checkProjectAccess(object.projectId(), action + "项目收尾文件");
+                break;
+            }
             default:
                 throw new BusinessException("FILE_BIZ_TYPE_UNKNOWN",
                         "不支持的业务类型: " + businessType);
@@ -383,6 +455,215 @@ public class BusinessObjectAuthorizer {
     }
 
     private record RevenueFileObject(Long tenantId, Long projectId, String status) {}
+
+    private void checkQualityDocumentStage(String businessType, Long businessId, String documentType) {
+        QualityFileObject object = findQualityFileObject(businessType, businessId);
+        if (object == null || !object.tenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "质量安全业务对象不存在: " + businessId);
+        String type = documentType == null ? "" : documentType.trim().toUpperCase();
+        boolean allowed = switch (businessType) {
+            case "QS_INSPECTION" -> "DRAFT".equals(object.status()) && "INSPECTION_EVIDENCE".equals(type);
+            case "QS_ISSUE" -> "DRAFT".equals(object.status()) && "ISSUE_EVIDENCE".equals(type);
+            case "QS_RECTIFICATION" -> ("DRAFT".equals(object.status()) && "RECTIFICATION_EVIDENCE".equals(type))
+                    || ("SUBMITTED".equals(object.status()) && "REINSPECTION_EVIDENCE".equals(type));
+            default -> false;
+        };
+        if (!allowed) throw new BusinessException("QS_DOCUMENT_STAGE_INVALID", "当前业务阶段不允许变更该类质量安全证据");
+    }
+
+    private QualityFileObject findQualityFileObject(String businessType, Long businessId) {
+        String sql = switch (businessType) {
+            case "QS_INSPECTION" -> "SELECT tenant_id,project_id,status FROM qs_inspection_record WHERE id=? AND deleted_flag=0";
+            case "QS_ISSUE" -> "SELECT i.tenant_id,i.project_id,r.status FROM qs_issue i JOIN qs_inspection_record r ON r.id=i.inspection_id WHERE i.id=? AND i.deleted_flag=0 AND r.deleted_flag=0";
+            case "QS_RECTIFICATION" -> "SELECT tenant_id,project_id,status FROM qs_rectification WHERE id=? AND deleted_flag=0";
+            default -> throw new IllegalArgumentException("Unsupported quality file type");
+        };
+        try {
+            return jdbcTemplate.queryForObject(sql,
+                    (rs, rowNum) -> new QualityFileObject(rs.getLong("tenant_id"), rs.getLong("project_id"), rs.getString("status")),
+                    businessId);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    private record QualityFileObject(Long tenantId, Long projectId, String status) {}
+
+    private void checkSupplierDocumentStage(String businessType, Long businessId, String documentType) {
+        SupplierFileObject object = findSupplierFileObject(businessType, businessId);
+        if (object == null || !object.tenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "供应商招采业务对象不存在: " + businessId);
+        String type = documentType == null ? "" : documentType.trim().toUpperCase();
+        boolean allowed = switch (businessType) {
+            case "SUPPLIER_SOURCING" -> "DRAFT".equals(object.status()) && "SOURCING_REQUIREMENT".equals(type);
+            case "SUPPLIER_QUOTE" -> "DRAFT".equals(object.status()) && "QUOTE_ATTACHMENT".equals(type);
+            default -> false;
+        };
+        if (!allowed) throw new BusinessException("SP_DOCUMENT_STAGE_INVALID", "当前业务阶段不允许变更该类招采附件");
+    }
+
+    private SupplierFileObject findSupplierFileObject(String businessType, Long businessId) {
+        String sql = switch (businessType) {
+            case "SUPPLIER_SOURCING" -> "SELECT tenant_id,project_id,status FROM sp_sourcing_event WHERE id=? AND deleted_flag=0";
+            case "SUPPLIER_QUOTE" -> "SELECT q.tenant_id,e.project_id,q.status FROM sp_supplier_quote q JOIN sp_sourcing_event e ON e.id=q.sourcing_event_id WHERE q.id=? AND q.deleted_flag=0 AND e.deleted_flag=0";
+            default -> throw new IllegalArgumentException("Unsupported supplier file type");
+        };
+        try {
+            return jdbcTemplate.queryForObject(sql,
+                    (rs, rowNum) -> new SupplierFileObject(rs.getLong("tenant_id"), rs.getLong("project_id"), rs.getString("status")),
+                    businessId);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    private record SupplierFileObject(Long tenantId, Long projectId, String status) {}
+
+    private void checkTechnicalDocumentStage(String businessType, Long businessId, String documentType) {
+        TechnicalFileObject object = findTechnicalFileObject(businessType, businessId);
+        if (object == null || !object.tenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "技术管理业务对象不存在: " + businessId);
+        String type = documentType == null ? "" : documentType.trim().toUpperCase();
+        boolean allowed = switch (businessType) {
+            case "TECH_SCHEME" -> Set.of("DRAFT", "REJECTED").contains(object.status()) && "SCHEME_FILE".equals(type);
+            case "TECH_DRAWING_VERSION" -> "RECEIVED".equals(object.status()) && "DRAWING_FILE".equals(type);
+            case "TECH_DRAWING_REVIEW" -> "DRAFT".equals(object.status()) && "REVIEW_MINUTES".equals(type);
+            case "TECH_RFI" -> "DRAFT".equals(object.status()) && "RFI_EVIDENCE".equals(type);
+            case "TECH_RFI_RESPONSE" -> "SUBMITTED".equals(object.status()) && "DESIGN_RESPONSE".equals(type);
+            case "TECH_DISCLOSURE" -> "DRAFT".equals(object.status()) && "DISCLOSURE_RECORD".equals(type);
+            case "TECH_ARCHIVE" -> "DRAFT".equals(object.status()) && "ACCEPTANCE_ARCHIVE".equals(type);
+            default -> false;
+        };
+        if (!allowed) throw new BusinessException("TECH_DOCUMENT_STAGE_INVALID", "当前业务阶段不允许变更该类技术文件");
+    }
+
+    private TechnicalFileObject findTechnicalFileObject(String businessType, Long businessId) {
+        String sql = switch (businessType) {
+            case "TECH_SCHEME" -> "SELECT tenant_id,project_id,status FROM technical_scheme WHERE id=? AND deleted_flag=0";
+            case "TECH_DRAWING_VERSION" -> "SELECT tenant_id,project_id,status FROM tech_drawing_version WHERE id=? AND deleted_flag=0";
+            case "TECH_DRAWING_REVIEW" -> "SELECT tenant_id,project_id,status FROM tech_drawing_review WHERE id=? AND deleted_flag=0";
+            case "TECH_RFI" -> "SELECT tenant_id,project_id,status FROM tech_rfi WHERE id=? AND deleted_flag=0";
+            case "TECH_RFI_RESPONSE" -> "SELECT p.tenant_id,r.project_id,p.status FROM tech_rfi_response p JOIN tech_rfi r ON r.id=p.rfi_id WHERE p.id=? AND r.deleted_flag=0";
+            case "TECH_DISCLOSURE" -> "SELECT tenant_id,project_id,status FROM tech_disclosure WHERE id=? AND deleted_flag=0";
+            case "TECH_ARCHIVE" -> "SELECT tenant_id,project_id,status FROM tech_acceptance_archive WHERE id=? AND deleted_flag=0";
+            default -> throw new IllegalArgumentException("Unsupported technical file type");
+        };
+        try {
+            return jdbcTemplate.queryForObject(sql,
+                    (rs, rowNum) -> new TechnicalFileObject(rs.getLong("tenant_id"), rs.getLong("project_id"), rs.getString("status")),
+                    businessId);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    private record TechnicalFileObject(Long tenantId, Long projectId, String status) {}
+
+    private void checkCloseoutDocumentStage(String businessType, Long businessId, String documentType) {
+        CloseoutFileObject object = findCloseoutFileObject(businessType, businessId);
+        if (object == null || !object.tenantId().equals(UserContext.getCurrentTenantId()))
+            throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "项目收尾业务对象不存在: " + businessId);
+        String type = documentType == null ? "" : documentType.trim().toUpperCase();
+        boolean allowed = switch (businessType) {
+            case "CLOSEOUT_SECTION_ACCEPTANCE" -> "DRAFT".equals(object.status()) && "SECTION_ACCEPTANCE_RECORD".equals(type);
+            case "CLOSEOUT_FINAL_ACCEPTANCE" -> Set.of("DRAFT", "REJECTED").contains(object.status()) && "FINAL_ACCEPTANCE_CERTIFICATE".equals(type);
+            case "CLOSEOUT_DEFECT" -> "OPEN".equals(object.status()) && "DEFECT_RECTIFICATION_EVIDENCE".equals(type);
+            case "CLOSEOUT_WARRANTY" -> Set.of("ACTIVE", "DEFECT_LIABILITY").contains(object.status()) && "WARRANTY_RELEASE_VOUCHER".equals(type);
+            case "CLOSEOUT_ARCHIVE_TRANSFER" -> "DRAFT".equals(object.status()) && "ARCHIVE_TRANSFER_LIST".equals(type);
+            default -> false;
+        };
+        if (!allowed) throw new BusinessException("CLOSEOUT_DOCUMENT_STAGE_INVALID", "当前收尾阶段不允许变更该类证据");
+    }
+
+    private CloseoutFileObject findCloseoutFileObject(String businessType, Long businessId) {
+        String table = switch (businessType) {
+            case "CLOSEOUT_SECTION_ACCEPTANCE" -> "closeout_section_acceptance";
+            case "CLOSEOUT_FINAL_ACCEPTANCE" -> "closeout_final_acceptance";
+            case "CLOSEOUT_DEFECT" -> "closeout_defect";
+            case "CLOSEOUT_WARRANTY" -> "closeout_warranty";
+            case "CLOSEOUT_ARCHIVE_TRANSFER" -> "closeout_archive_transfer";
+            default -> throw new IllegalArgumentException("Unsupported closeout file type");
+        };
+        try {
+            return jdbcTemplate.queryForObject("SELECT tenant_id,project_id,status FROM " + table + " WHERE id=? AND deleted_flag=0",
+                    (rs, rowNum) -> new CloseoutFileObject(rs.getLong("tenant_id"), rs.getLong("project_id"), rs.getString("status")),
+                    businessId);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    private record CloseoutFileObject(Long tenantId, Long projectId, String status) {}
+
+    private void requireQualityAuthority(String businessType, boolean write) {
+        if (!write) {
+            requireAuthority("quality:safety:query");
+            return;
+        }
+        Set<String> allowed = switch (businessType) {
+            case "QS_INSPECTION", "QS_ISSUE" -> Set.of("quality:safety:inspection:maintain");
+            case "QS_RECTIFICATION" -> Set.of("quality:safety:rectify", "quality:safety:reinspect");
+            default -> Set.of();
+        };
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean permitted = authentication != null && authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> allowed.contains(authority)
+                        || "ROLE_ADMIN".equals(authority)
+                        || "ROLE_SUPER_ADMIN".equals(authority));
+        if (!permitted) throw new BusinessException("FILE_ACCESS_DENIED", "无权执行该质量安全文件操作");
+    }
+
+    private void requireSupplierAuthority(String businessType, boolean write) {
+        Set<String> allowed = !write ? Set.of("supplier:sourcing:query")
+                : "SUPPLIER_QUOTE".equals(businessType)
+                ? Set.of("supplier:sourcing:quote") : Set.of("supplier:sourcing:maintain");
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean permitted = authentication != null && authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> allowed.contains(authority)
+                        || "ROLE_ADMIN".equals(authority)
+                        || "ROLE_SUPER_ADMIN".equals(authority));
+        if (!permitted) throw new BusinessException("FILE_ACCESS_DENIED", "无权执行该供应商招采文件操作");
+    }
+
+    private void requireTechnicalAuthority(String businessType, boolean write) {
+        Set<String> allowed = !write ? Set.of("technical:query") : switch (businessType) {
+            case "TECH_SCHEME" -> Set.of("technical:scheme:maintain", "technical:scheme:submit");
+            case "TECH_DRAWING_VERSION" -> Set.of("technical:drawing:receive");
+            case "TECH_DRAWING_REVIEW" -> Set.of("technical:drawing:review");
+            case "TECH_RFI" -> Set.of("technical:rfi:raise");
+            case "TECH_RFI_RESPONSE" -> Set.of("technical:rfi:respond", "technical:rfi:accept");
+            case "TECH_DISCLOSURE" -> Set.of("technical:disclosure:maintain");
+            case "TECH_ARCHIVE" -> Set.of("technical:archive:confirm");
+            default -> Set.of();
+        };
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean permitted = authentication != null && authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> allowed.contains(authority)
+                        || "ROLE_ADMIN".equals(authority)
+                        || "ROLE_SUPER_ADMIN".equals(authority));
+        if (!permitted) throw new BusinessException("FILE_ACCESS_DENIED", "无权执行该技术管理文件操作");
+    }
+
+    private void requireCloseoutAuthority(String businessType, boolean write) {
+        Set<String> allowed = !write ? Set.of("closeout:query") : switch (businessType) {
+            case "CLOSEOUT_SECTION_ACCEPTANCE" -> Set.of("closeout:section:maintain");
+            case "CLOSEOUT_FINAL_ACCEPTANCE" -> Set.of("closeout:acceptance:submit");
+            case "CLOSEOUT_DEFECT" -> Set.of("closeout:defect:maintain", "closeout:defect:verify");
+            case "CLOSEOUT_WARRANTY" -> Set.of("closeout:warranty:maintain");
+            case "CLOSEOUT_ARCHIVE_TRANSFER" -> Set.of("closeout:archive:maintain");
+            default -> Set.of();
+        };
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean permitted = authentication != null && authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> allowed.contains(authority)
+                        || "ROLE_ADMIN".equals(authority)
+                        || "ROLE_SUPER_ADMIN".equals(authority));
+        if (!permitted) throw new BusinessException("FILE_ACCESS_DENIED", "无权执行该项目收尾文件操作");
+    }
 
     private void requireAuthority(String requiredAuthority) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();

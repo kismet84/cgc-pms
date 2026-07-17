@@ -59,6 +59,9 @@ class MatPurchaseOrderControllerTest {
 
     @BeforeAll
     void ensureWorkflowApprover() {
+        // 控制器提交用例使用真实采购语义，避免复用 V90 的分包合同夹具。
+        jdbcTemplate.update("UPDATE md_partner SET partner_type='SUPPLIER',blacklist_flag=0,status='ENABLE' WHERE id=?", PARTNER_ID);
+        jdbcTemplate.update("UPDATE ct_contract SET contract_type='PURCHASE' WHERE id=?", CONTRACT_ID);
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, ADMIN_ID);
         if (count != null && count > 0) {
@@ -78,6 +81,8 @@ class MatPurchaseOrderControllerTest {
     void removeWorkflowApprover() {
         jdbcTemplate.update("DELETE FROM sys_user WHERE id = ? AND username = ?",
                 ADMIN_ID, "test_purchase_controller_approver");
+        jdbcTemplate.update("UPDATE ct_contract SET contract_type='SUB' WHERE id=?", CONTRACT_ID);
+        jdbcTemplate.update("UPDATE md_partner SET partner_type='PARTY_B',blacklist_flag=0 WHERE id=?", PARTNER_ID);
     }
 
     private Cookie adminCookie() {

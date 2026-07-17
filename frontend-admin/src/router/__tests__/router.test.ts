@@ -113,6 +113,28 @@ describe('router lazy loading', () => {
     expect(router.resolve('/accounting-entry').meta.permission).toBe('accounting:query')
   })
 
+  it('registers the financial close workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const route = rootRoute?.children?.find((c) => c.path === 'financial-close')
+
+    expect(route?.name).toBe('FinancialClose')
+    expect(route?.meta?.title).toBe('财务核算与月结')
+    expect(route?.meta?.permission).toBe('finance:close:query')
+    expect(typeof route?.component).toBe('function')
+    expect(router.resolve('/financial-close').meta.permission).toBe('finance:close:query')
+  })
+
+  it('registers the project cash forecast workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const route = rootRoute?.children?.find((c) => c.path === 'cash-forecast')
+
+    expect(route?.name).toBe('CashForecast')
+    expect(route?.meta?.title).toBe('项目资金预测')
+    expect(route?.meta?.permission).toBe('finance:forecast:query')
+    expect(typeof route?.component).toBe('function')
+    expect(router.resolve('/cash-forecast').meta.permission).toBe('finance:forecast:query')
+  })
+
   it('registers the revenue collection workbench with query permission', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const revenueRoute = rootRoute?.children?.find((c) => c.path === 'revenue')
@@ -151,6 +173,46 @@ describe('router lazy loading', () => {
     expect(scheduleRoute?.meta?.permission).toBe('schedule:query')
     expect(typeof scheduleRoute?.component).toBe('function')
     expect(router.resolve('/project-schedule').meta.permission).toBe('schedule:query')
+  })
+
+  it('registers the quality safety rectification workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const route = rootRoute?.children?.find((c) => c.path === 'quality-safety')
+    expect(route?.name).toBe('QualitySafety')
+    expect(route?.meta?.title).toBe('质量安全整改')
+    expect(route?.meta?.permission).toBe('quality:safety:query')
+    expect(typeof route?.component).toBe('function')
+    expect(router.resolve('/quality-safety').meta.permission).toBe('quality:safety:query')
+  })
+
+  it('registers the supplier sourcing performance workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const route = rootRoute?.children?.find((c) => c.path === 'supplier-sourcing')
+    expect(route?.name).toBe('SupplierSourcing')
+    expect(route?.meta?.title).toBe('供应商招采履约')
+    expect(route?.meta?.permission).toBe('supplier:sourcing:query')
+    expect(typeof route?.component).toBe('function')
+    expect(router.resolve('/supplier-sourcing').meta.permission).toBe('supplier:sourcing:query')
+  })
+
+  it('registers the drawing RFI technical workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const route = rootRoute?.children?.find((c) => c.path === 'technical-management')
+    expect(route?.name).toBe('TechnicalManagement')
+    expect(route?.meta?.title).toBe('图纸RFI技术闭环')
+    expect(route?.meta?.permission).toBe('technical:query')
+    expect(typeof route?.component).toBe('function')
+    expect(router.resolve('/technical-management').meta.permission).toBe('technical:query')
+  })
+
+  it('registers the project completion closeout workbench with query permission', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const route = rootRoute?.children?.find((c) => c.path === 'project-closeout')
+    expect(route?.name).toBe('ProjectCloseout')
+    expect(route?.meta?.title).toBe('项目竣工收尾')
+    expect(route?.meta?.permission).toBe('closeout:query')
+    expect(typeof route?.component).toBe('function')
+    expect(router.resolve('/project-closeout').meta.permission).toBe('closeout:query')
   })
 
   it('registers the bid cost route with query permission', () => {

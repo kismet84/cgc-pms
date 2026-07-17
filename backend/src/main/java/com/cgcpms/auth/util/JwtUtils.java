@@ -29,10 +29,11 @@ public class JwtUtils {
     public static final String CLAIM_TENANT_ID = "tenantId";
     public static final String CLAIM_ROLES = "roleCodes";
     public static final String CLAIM_PERMISSIONS = "permissions";
-    public static final String CLAIM_PERMISSIONS_GZIP = "pc";
     public static final String CLAIM_TOKEN_TYPE = "tokenType";
     public static final String TOKEN_TYPE_ACCESS = "access";
     public static final String TOKEN_TYPE_REFRESH = "refresh";
+    private static final String GZIP_PERMISSION_PREFIX = "gz:";
+    private static final int MAX_PERMISSION_PAYLOAD_BYTES = 64 * 1024;
 
     private final JwtProperties jwtProperties;
     private final SecretKey key;
@@ -52,15 +53,85 @@ public class JwtUtils {
                 .claim(CLAIM_USERNAME, username)
                 .claim(CLAIM_TENANT_ID, tenantId)
                 .claim(CLAIM_ROLES, roleCodes)
-                // 权限码数量较多时，即使改成逗号分隔字符串，访问令牌仍可能超过
-                // 浏览器单 Cookie 约 4 KiB 的上限。使用 GZIP + Base64URL 紧凑声明，
-                // 解析端继续兼容历史 permissions 数组/字符串格式。
-                .claim(CLAIM_PERMISSIONS_GZIP, compressPermissions(permissions))
+                .claim(CLAIM_PERMISSIONS, encodePermissionClaim(permissions))
                 .claim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_ACCESS)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
                 .compact();
+    }
+
+    /**
+     * Encode permission authorities compactly enough for an HttpOnly cookie.
+     * Small claims retain the legacy comma-separated representation; larger
+     * claims use signed gzip content with an explicit prefix.
+     */
+    public static String encodePermissionClaim(List<String> permissions) {
+        List<String> normalized = permissions == null
+                ? List.of()
+                : permissions.stream()
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .toList();
+        String legacy = String.join(",", normalized);
+        if (legacy.isEmpty()) {
+            return legacy;
+        }
+
+        String compressed = GZIP_PERMISSION_PREFIX + gzip(String.join("\n", normalized));
+        return compressed.length() < legacy.length() ? compressed : legacy;
+    }
+
+    /** Decode current compressed claims and both historical claim formats. */
+    public static List<String> decodePermissionClaim(Object value) {
+        if (value instanceof List<?> values) {
+            return values.stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .filter(item -> !item.isBlank())
+                    .toList();
+        }
+        if (!(value instanceof String text) || text.isBlank()) {
+            return Collections.emptyList();
+        }
+        if (text.startsWith(GZIP_PERMISSION_PREFIX)) {
+            return splitPermissions(gunzip(text.substring(GZIP_PERMISSION_PREFIX.length())), "\n");
+        }
+        return splitPermissions(text, ",");
+    }
+
+    private static List<String> splitPermissions(String value, String delimiter) {
+        return List.of(value.split(delimiter)).stream()
+                .map(String::trim)
+                .filter(item -> !item.isEmpty())
+                .toList();
+    }
+
+    private static String gzip(String value) {
+        try {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzip = new GZIPOutputStream(output)) {
+                gzip.write(value.getBytes(StandardCharsets.UTF_8));
+            }
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(output.toByteArray());
+        } catch (IOException ex) {
+            throw new IllegalStateException("Unable to encode permission claim", ex);
+        }
+    }
+
+    private static String gunzip(String value) {
+        try {
+            byte[] encoded = Base64.getUrlDecoder().decode(value);
+            try (GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(encoded))) {
+                byte[] decoded = gzip.readNBytes(MAX_PERMISSION_PAYLOAD_BYTES + 1);
+                if (decoded.length > MAX_PERMISSION_PAYLOAD_BYTES) {
+                    throw new IllegalArgumentException("Permission claim exceeds decoded size limit");
+                }
+                return new String(decoded, StandardCharsets.UTF_8);
+            }
+        } catch (IOException | IllegalArgumentException ex) {
+            throw new IllegalArgumentException("Invalid compressed permission claim", ex);
+        }
     }
 
     public String generateRefreshToken(Long userId) {
@@ -102,38 +173,6 @@ public class JwtUtils {
         }
     }
 
-    /**
-     * Read permission codes from the compact claim, while remaining compatible
-     * with access tokens issued before the compact claim was introduced.
-     */
-    public List<String> getPermissionCodes(Claims claims) {
-        Object legacy = claims.get(CLAIM_PERMISSIONS);
-        if (legacy instanceof String text) {
-            return splitPermissions(text);
-        }
-        if (legacy instanceof List<?> values) {
-            return values.stream()
-                    .filter(String.class::isInstance)
-                    .map(String.class::cast)
-                    .toList();
-        }
-
-        Object compact = claims.get(CLAIM_PERMISSIONS_GZIP);
-        if (!(compact instanceof String encoded) || encoded.isBlank()) {
-            return Collections.emptyList();
-        }
-        try {
-            byte[] compressed = Base64.getUrlDecoder().decode(encoded);
-            try (GZIPInputStream gzip = new GZIPInputStream(new ByteArrayInputStream(compressed))) {
-                byte[] bytes = gzip.readAllBytes();
-                return splitPermissions(new String(bytes, StandardCharsets.UTF_8));
-            }
-        } catch (IllegalArgumentException | IOException ex) {
-            // Fail closed: a malformed permission claim grants no authorities.
-            return Collections.emptyList();
-        }
-    }
-
     /** Returns remaining TTL in millis for a valid token, or 0 if expired/invalid. */
     public long getRemainingTtlMillis(String token) {
         try {
@@ -145,29 +184,4 @@ public class JwtUtils {
         }
     }
 
-    private String compressPermissions(List<String> permissions) {
-        String joined = String.join(",", permissions == null ? List.of() : permissions);
-        if (joined.isEmpty()) {
-            return "";
-        }
-        try {
-            ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-            try (GZIPOutputStream gzip = new GZIPOutputStream(buffer)) {
-                gzip.write(joined.getBytes(StandardCharsets.UTF_8));
-            }
-            return Base64.getUrlEncoder().withoutPadding().encodeToString(buffer.toByteArray());
-        } catch (IOException ex) {
-            throw new IllegalStateException("无法压缩 JWT 权限声明", ex);
-        }
-    }
-
-    private List<String> splitPermissions(String text) {
-        if (text == null || text.isBlank()) {
-            return Collections.emptyList();
-        }
-        return java.util.Arrays.stream(text.split(","))
-                .map(String::trim)
-                .filter(item -> !item.isEmpty())
-                .toList();
-    }
 }

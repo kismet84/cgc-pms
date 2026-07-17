@@ -2,6 +2,7 @@ package com.cgcpms.cashbook;
 
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.alert.notification.AlertNotificationDispatcher;
+import com.cgcpms.alert.service.AlertLifecycleService;
 import com.cgcpms.cashbook.constant.CashbookConstants;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
 import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
@@ -50,6 +51,7 @@ class CashJournalAlertConcurrencyTest {
     @Autowired CashJournalEntryMapper entryMapper;
     @Autowired SysFileMapper fileMapper;
     @Autowired AlertLogMapper alertLogMapper;
+    @Autowired AlertLifecycleService alertLifecycleService;
     @Autowired PlatformTransactionManager transactionManager;
     @Autowired JdbcTemplate jdbcTemplate;
 
@@ -139,7 +141,8 @@ class CashJournalAlertConcurrencyTest {
     private CashJournalAlertService service(CashJournalEntryMapper entries, AlertLogMapper alerts,
                                             CashJournalAlertRecipientResolver recipients,
                                             AlertNotificationDispatcher notifications) {
-        return new CashJournalAlertService(entries, fileMapper, alerts, recipients, notifications);
+        return new CashJournalAlertService(entries, fileMapper, alerts, recipients, notifications,
+                alertLifecycleService);
     }
 
     @SuppressWarnings("unchecked")

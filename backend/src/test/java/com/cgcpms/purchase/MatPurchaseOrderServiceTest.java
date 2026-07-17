@@ -193,6 +193,15 @@ class MatPurchaseOrderServiceTest {
         assertEquals("PURCHASE_ORDER_CONTRACT_REQUIRED", ex.getCode());
     }
 
+    @Test @Transactional @DisplayName("submitForApproval → 黑名单供应商拒绝")
+    void testSubmitForApproval_BlacklistedSupplier() {
+        Long id = createSubmittableOrder();
+        jdbcTemplate.update("UPDATE md_partner SET blacklist_flag=1 WHERE id=20002");
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.submitForApproval(id));
+        assertEquals("PURCHASE_ORDER_PARTNER_BLACKLISTED", ex.getCode());
+    }
+
     @Test @Transactional @DisplayName("update → 驳回订单修改后恢复草稿并可重新提交")
     void testUpdate_RejectedOrderReturnsToDraft() {
         Long id = createSubmittableOrder();
@@ -250,6 +259,9 @@ class MatPurchaseOrderServiceTest {
     }
 
     private Long createSubmittableOrder() {
+        // 本测试必须使用真实采购语义，不能复用 V90 的“分包合同 + 普通乙方”夹具。
+        jdbcTemplate.update("UPDATE md_partner SET partner_type='SUPPLIER',blacklist_flag=0,status='ENABLE' WHERE id=20002");
+        jdbcTemplate.update("UPDATE ct_contract SET contract_type='PURCHASE' WHERE id=30001");
         MatPurchaseOrder order = new MatPurchaseOrder();
         order.setProjectId(PROJECT_ID);
         order.setContractId(30001L);

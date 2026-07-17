@@ -243,10 +243,13 @@ public class PmProjectService {
         String target = targetStatus == null ? null : targetStatus.trim().toUpperCase();
         Map<String, Set<String>> transitions = Map.of(
                 ProjectStatusConstants.DRAFT, Set.of(ProjectStatusConstants.ACTIVE),
-                ProjectStatusConstants.ACTIVE, Set.of(ProjectStatusConstants.SUSPENDED, ProjectStatusConstants.CLOSED),
-                ProjectStatusConstants.SUSPENDED, Set.of(ProjectStatusConstants.ACTIVE, ProjectStatusConstants.CLOSED),
+                ProjectStatusConstants.ACTIVE, Set.of(ProjectStatusConstants.SUSPENDED),
+                ProjectStatusConstants.SUSPENDED, Set.of(ProjectStatusConstants.ACTIVE),
                 ProjectStatusConstants.CLOSED, Set.of(),
                 ProjectStatusConstants.ARCHIVED, Set.of());
+        if (ProjectStatusConstants.CLOSED.equals(target)) {
+            throw new BusinessException("PROJECT_CLOSEOUT_ACTION_REQUIRED", "项目只能通过竣工收尾闭环关闭");
+        }
         if (!transitions.getOrDefault(current, Set.of()).contains(target)) {
             throw new BusinessException("PROJECT_STATUS_TRANSITION_INVALID",
                     "不允许从 " + current + " 变更为 " + target);

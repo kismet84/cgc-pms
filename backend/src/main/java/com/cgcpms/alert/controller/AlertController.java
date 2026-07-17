@@ -3,9 +3,11 @@ package com.cgcpms.alert.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.alert.dto.AlertBatchReadRequest;
 import com.cgcpms.alert.dto.AlertBatchStatusUpdateRequest;
+import com.cgcpms.alert.dto.AlertAcknowledgeRequest;
 import com.cgcpms.alert.dto.AlertExportAuditRequest;
 import com.cgcpms.alert.dto.AlertOperationResponse;
 import com.cgcpms.alert.dto.AlertProcessingReportVO;
+import com.cgcpms.alert.dto.AlertRuleEffectVO;
 import com.cgcpms.alert.dto.AlertStatusUpdateRequest;
 import com.cgcpms.alert.dto.AlertSubscriptionUpdateRequest;
 import com.cgcpms.alert.entity.AlertLog;
@@ -22,6 +24,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -71,6 +74,20 @@ public class AlertController {
                 ruleType, alertDomain, severity, isRead, triggeredStart, triggeredEnd, processStatus));
     }
 
+    @GetMapping("/rule-effect-report")
+    @PreAuthorize("hasAuthority('alert:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<AlertRuleEffectVO>> ruleEffectReport(
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String ruleType,
+            @RequestParam(required = false) String alertDomain,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime triggeredStart,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime triggeredEnd) {
+        return ApiResponse.success(alertEvaluationService.ruleEffectReport(
+                UserContext.getCurrentTenantId(), projectId, ruleType, alertDomain, triggeredStart, triggeredEnd));
+    }
+
     @PostMapping("/export-audit")
     @AuditedOperation(type = "DOWNLOAD", businessType = "ALERT_EXPORT", businessIdExpression = "#request.filterSignature")
     @PreAuthorize("hasAuthority('alert:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
@@ -85,6 +102,23 @@ public class AlertController {
         Long tenantId = UserContext.getCurrentTenantId();
         boolean ok = alertEvaluationService.markRead(tenantId, id);
         return ApiResponse.success(new AlertOperationResponse(ok, id));
+    }
+
+    @PutMapping("/{id}/acknowledge")
+    @AuditedOperation(type = "UPDATE", businessType = "ALERT")
+    @PreAuthorize("hasAuthority('alert:edit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<AlertOperationResponse> acknowledge(
+            @PathVariable Long id,
+            @Valid @RequestBody AlertAcknowledgeRequest request) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        boolean ok = alertEvaluationService.acknowledge(tenantId, id, request.getRemark());
+        return ApiResponse.success(new AlertOperationResponse(ok, id, "OPEN"));
+    }
+
+    @GetMapping("/{id}/trace")
+    @PreAuthorize("hasAuthority('alert:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Map<String, Object>> trace(@PathVariable Long id) {
+        return ApiResponse.success(alertEvaluationService.trace(UserContext.getCurrentTenantId(), id));
     }
 
     @PutMapping("/batch/read")
@@ -146,5 +180,14 @@ public class AlertController {
         Long tenantId = UserContext.getCurrentTenantId();
         int count = alertEvaluationService.batchEvaluate(tenantId);
         return ApiResponse.success(Map.of("alertsGenerated", count, "tenantId", tenantId));
+    }
+
+    @PostMapping("/escalate-overdue")
+    @AuditedOperation(type = "UPDATE", businessType = "ALERT_ESCALATION")
+    @PreAuthorize("hasAuthority('alert:evaluate') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Map<String, Object>> escalateOverdue() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        int count = alertEvaluationService.escalateOverdueAlerts(tenantId);
+        return ApiResponse.success(Map.of("alertsEscalated", count, "tenantId", tenantId));
     }
 }

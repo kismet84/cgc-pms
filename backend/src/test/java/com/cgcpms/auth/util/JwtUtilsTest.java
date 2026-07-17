@@ -5,9 +5,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DisplayName("JWT compact claims")
@@ -27,29 +27,31 @@ class JwtUtilsTest {
                 List.of("measurement:query", "measurement:submit", "measurement:owner:review"));
         var claims = jwtUtils.parseToken(token);
 
-        assertNull(claims.get(JwtUtils.CLAIM_PERMISSIONS));
-        assertTrue(claims.get(JwtUtils.CLAIM_PERMISSIONS_GZIP, String.class).length() > 0);
+        Object claim = claims.get(JwtUtils.CLAIM_PERMISSIONS);
+        assertTrue(claim instanceof String);
         assertEquals(List.of("measurement:query", "measurement:submit", "measurement:owner:review"),
-                jwtUtils.getPermissionCodes(claims));
+                JwtUtils.decodePermissionClaim(claim));
         assertTrue(jwtUtils.validateToken(token));
     }
 
     @Test
-    @DisplayName("large permission sets stay safely below the browser cookie limit")
-    void largePermissionSetFitsCookieLimit() {
+    @DisplayName("large permission sets are compressed and stay inside the browser cookie budget")
+    void largePermissionSetStaysInsideCookieBudget() {
         JwtProperties properties = new JwtProperties();
         properties.setSecret("0123456789abcdef0123456789abcdef0123456789abcdef");
         properties.setExpiration(900_000L);
         properties.setRefreshExpiration(604_800_000L);
         JwtUtils jwtUtils = new JwtUtils(properties);
-        List<String> permissions = java.util.stream.IntStream.range(0, 400)
-                .mapToObj(i -> "module:" + i + ":query")
+        List<String> permissions = IntStream.range(0, 600)
+                .mapToObj(index -> "project:domain" + (index % 40) + ":operation" + index)
                 .toList();
 
-        String token = jwtUtils.generateToken(1L, "admin", 0L,
+        String token = jwtUtils.generateToken(1L, "demo_dev_super_admin", 0L,
                 List.of("SUPER_ADMIN"), permissions);
+        Object claim = jwtUtils.parseToken(token).get(JwtUtils.CLAIM_PERMISSIONS);
 
-        assertTrue(token.length() < 3800, "access token must leave room for cookie attributes");
-        assertEquals(permissions, jwtUtils.getPermissionCodes(jwtUtils.parseToken(token)));
+        assertTrue(claim instanceof String text && text.startsWith("gz:"));
+        assertEquals(permissions, JwtUtils.decodePermissionClaim(claim));
+        assertTrue(token.length() < 3_800, "access token must leave room for cookie attributes");
     }
 }

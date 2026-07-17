@@ -17,10 +17,13 @@ import {
   exportAlertAudit,
   getAlertList,
   getAlertProcessingReport,
+  getAlertRuleEffectReport,
+  getAlertTrace,
   getAlertSubscription,
   updateAlertSubscription,
   type AlertListParams,
   type AlertProcessingReport,
+  type AlertRuleEffect,
   type AlertProcessStatus,
   type BatchAlertOperationResult,
 } from '@/api/modules/alert'
@@ -32,6 +35,7 @@ import {
   RULE_TYPE_LABELS,
   getAlertRuleCategory,
   type AlertLogVO,
+  type AlertTraceVO,
   type AlertSubscriptionConfig,
   type AlertSubscriptionResponse,
 } from '@/types/alert'
@@ -61,6 +65,7 @@ const subscriptionLoading = ref(false)
 const subscriptionSaving = ref(false)
 const exportLoading = ref(false)
 const processingReport = ref<AlertProcessingReport | null>(null)
+const ruleEffects = ref<AlertRuleEffect[]>([])
 const EXPORT_MAX_RECORDS = 1000
 const EXPORT_LIMIT_REACHED = Symbol('alert-export-limit-reached')
 const subscriptionState = ref<AlertSubscriptionResponse | null>(null)
@@ -92,6 +97,8 @@ const pageNo = ref(1)
 const pageSize = ref(20)
 const selectedRowKeys = ref<Array<string | number>>([])
 const activeRecord = ref<AlertLogVO | null>(null)
+const activeTrace = ref<AlertTraceVO | null>(null)
+const traceLoading = ref(false)
 const statusRemarkDraft = ref('')
 const roleDefaultApplied = ref(false)
 
@@ -431,11 +438,13 @@ async function fetchData() {
   await syncRouteQuery()
   try {
     const params = buildAlertListParams()
-    const [, report] = await Promise.all([
+    const [, report, effects] = await Promise.all([
       store.fetchAlerts(params),
       getAlertProcessingReport(params),
+      getAlertRuleEffectReport(params),
     ])
     processingReport.value = report
+    ruleEffects.value = effects
     syncActiveRecordFromList()
   } catch (error) {
     console.error(error)
@@ -515,8 +524,25 @@ function getSelectedRows(): AlertLogVO[] {
   return alerts.value.filter((item) => selected.has(String(item.id)))
 }
 
+async function refreshActiveTrace(id: string | number) {
+  traceLoading.value = true
+  try {
+    const trace = await getAlertTrace(String(id))
+    activeTrace.value = trace
+    activeRecord.value = { ...trace.alert }
+  } catch (error) {
+    console.error(error)
+    activeTrace.value = null
+    message.error('加载预警追溯链失败')
+  } finally {
+    traceLoading.value = false
+  }
+}
+
 function openDetail(record: AlertLogVO) {
   activeRecord.value = { ...record }
+  activeTrace.value = null
+  void refreshActiveTrace(record.id)
   if (isMobile.value) mobileDetailVisible.value = true
 }
 
@@ -527,10 +553,23 @@ async function handleMarkRead(record: AlertLogVO) {
     syncActiveRecord(record.id, (item) => {
       item.isRead = 1
     })
+    await refreshActiveTrace(record.id)
     message.success('已标记为已读')
   } catch (error) {
     console.error(error)
     message.error('操作失败')
+  }
+}
+
+async function handleAcknowledge(record: AlertLogVO) {
+  if (!canManageAlerts.value) return
+  try {
+    await store.acknowledge(String(record.id), statusRemarkDraft.value.trim() || undefined)
+    await refreshActiveTrace(record.id)
+    message.success('接单成功，您已成为该预警责任人')
+  } catch (error) {
+    console.error(error)
+    message.error('接单失败，请刷新后重试')
   }
 }
 
@@ -569,8 +608,13 @@ async function handleBatchStatus(processStatus: AlertProcessStatus) {
       const result = await store.batchChangeStatus(
         rows.map((item) => item.id),
         processStatus,
+        `批量${ALERT_PROCESS_STATUS_LABELS[processStatus]}`,
       )
-      syncBatchStatusResult(result.successIds, processStatus)
+      syncBatchStatusResult(
+        result.successIds,
+        processStatus,
+        `批量${ALERT_PROCESS_STATUS_LABELS[processStatus]}`,
+      )
       showBatchResult(`批量${ALERT_PROCESS_STATUS_LABELS[processStatus]}`, result)
       clearSelection()
     },
@@ -583,14 +627,19 @@ async function handleChangeStatus(
   statusRemark?: string,
 ) {
   if (!canManageAlerts.value) return
+  const normalizedRemark = String(statusRemark ?? '').trim()
+  if (!normalizedRemark) {
+    message.warning('请先填写处理说明')
+    return
+  }
   try {
-    await store.changeStatus(record.id, processStatus, statusRemark)
+    await store.changeStatus(record.id, processStatus, normalizedRemark)
     const now = new Date().toISOString()
     syncActiveRecord(record.id, (item) => {
       item.processStatus = processStatus
       item.handledStatus = processStatus
       item.handledBy = currentOperator.value
-      item.statusRemark = statusRemark
+      item.statusRemark = normalizedRemark
       if (processStatus === 'PROCESSED') {
         item.processedAt = now
         item.handledAt = now
@@ -600,6 +649,7 @@ async function handleChangeStatus(
         item.handledAt = now
       }
     })
+    await refreshActiveTrace(record.id)
     message.success(
       processStatus === 'PROCESSED'
         ? '已标记为已处理'
@@ -615,13 +665,17 @@ async function handleChangeStatus(
 
 async function handleSaveActiveResult() {
   if (!activeRecord.value) return
-  const nextStatus: AlertProcessStatus =
-    String(activeRecord.value.processStatus ?? 'OPEN') === 'ARCHIVED' ? 'ARCHIVED' : 'PROCESSED'
-  await handleChangeStatus(
-    activeRecord.value,
-    nextStatus,
-    statusRemarkDraft.value.trim() || undefined,
-  )
+  const currentStatus = String(activeRecord.value.processStatus ?? 'OPEN')
+  if (currentStatus !== 'OPEN') {
+    message.info(currentStatus === 'PROCESSED' ? '请使用归档操作完成闭环' : '终态预警不可修改')
+    return
+  }
+  if (!activeRecord.value.acknowledgedBy) {
+    message.warning('请先接单，再提交处理结果')
+    return
+  }
+  const nextStatus: AlertProcessStatus = 'PROCESSED'
+  await handleChangeStatus(activeRecord.value, nextStatus, statusRemarkDraft.value.trim())
 }
 
 const kpi = computed(() => ({
@@ -655,7 +709,7 @@ const kpiCards = computed(() => [
     titleCn: '高危',
     titleEn: '',
     value: kpi.value.high,
-    hint: '完整筛选结果',
+    hint: `已升级 ${processingReport.value?.escalatedCount ?? 0}`,
     icon: ThunderboltOutlined,
     tone: 'primary',
   },
@@ -1041,7 +1095,7 @@ onMounted(async () => {
         :format-date-time="formatDateTime"
         :get-alert-message-text="getAlertMessageText"
         :handle-mark-read="handleMarkRead"
-        :handle-change-status="handleChangeStatus"
+        :handle-acknowledge="handleAcknowledge"
         :handle-batch-status="handleBatchStatus"
         :handle-batch-mark-read="handleBatchMarkRead"
         :handle-page-change="handlePageChange"
@@ -1085,8 +1139,31 @@ onMounted(async () => {
             </article>
           </section>
 
+          <section class="alert-rule-effect" aria-label="规则效果复盘">
+            <div class="alert-rule-effect-head">
+              <strong>规则效果复盘</strong>
+              <span>命中 / SLA内响应 / 升级 / 归档</span>
+            </div>
+            <div v-if="ruleEffects.length" class="alert-rule-effect-list">
+              <div v-for="item in ruleEffects" :key="item.ruleType" class="alert-rule-effect-row">
+                <strong>{{ RULE_TYPE_LABELS[item.ruleType] ?? item.ruleType }}</strong>
+                <span>
+                  {{ item.generatedCount }} / {{ item.withinResponseSlaCount }} /
+                  {{ item.escalatedCount }} / {{ item.archivedCount }}
+                </span>
+                <small>
+                  平均响应 {{ item.averageResponseMinutes ?? '-' }} 分钟 · 通知失败
+                  {{ item.failedNotificationCount }}
+                </small>
+              </div>
+            </div>
+            <div v-else class="alert-detail-tip">当前筛选范围暂无规则命中</div>
+          </section>
+
           <AlertDetailPanel
             :active-record="activeRecord"
+            :active-trace="activeTrace"
+            :trace-loading="traceLoading"
             :status-remark-draft="statusRemarkDraft"
             :current-operator="activeOperator"
             :subscription-rows="subscriptionRows"
@@ -1099,6 +1176,7 @@ onMounted(async () => {
             :get-process-status-label="getProcessStatusLabel"
             :open-subscription-modal="openSubscriptionModal"
             :handle-mark-read="handleMarkRead"
+            :handle-acknowledge="handleAcknowledge"
             :handle-change-status="handleChangeStatus"
             :can-open-business-entry="canOpenBusinessEntry"
             :open-business-entry="openBusinessEntry"
@@ -1150,6 +1228,41 @@ onMounted(async () => {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+}
+
+.alert-rule-effect {
+  margin: 0 12px 12px;
+  padding: 12px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+}
+
+.alert-rule-effect-head,
+.alert-rule-effect-row {
+  display: grid;
+  gap: 4px;
+}
+
+.alert-rule-effect-head {
+  margin-bottom: 8px;
+}
+
+.alert-rule-effect-head span,
+.alert-rule-effect-row small {
+  color: var(--text-color-secondary, #6b7280);
+  font-size: 12px;
+}
+
+.alert-rule-effect-list {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.alert-rule-effect-row {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, #e5e7eb);
 }
 
 .alert-analysis-head,

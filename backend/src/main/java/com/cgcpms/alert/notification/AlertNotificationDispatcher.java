@@ -34,6 +34,13 @@ public class AlertNotificationDispatcher {
         dispatchStatusChanged(tenantId, userId, alert, title, statusRemark, Set.of(AlertNotificationChannel.IN_APP.name()));
     }
 
+    public void dispatchEscalated(Long tenantId, Long userId, AlertLog alert, int level, String reason) {
+        String title = level >= 2 ? "预警处置超时升级" : "预警响应超时升级";
+        String content = alert.getMessage() + "\n升级原因：" + reason;
+        dispatch(tenantId, userId, alert, "ESCALATED_L" + level,
+                "ALERT_ESCALATION", title, content, Set.of(AlertNotificationChannel.IN_APP.name()));
+    }
+
     public void dispatchAlertCreated(Long tenantId, Long userId, AlertLog alert, String title, Set<String> channels) {
         dispatch(tenantId, userId, alert, "ALERT_CREATED", "ALERT", title, alert.getMessage(), channels);
     }
@@ -44,7 +51,10 @@ public class AlertNotificationDispatcher {
         if (StringUtils.hasText(statusRemark)) {
             content = content + "\n处理说明：" + statusRemark.trim();
         }
-        dispatch(tenantId, userId, alert, "STATUS_CHANGED", "ALERT_STATUS", title, content, channels);
+        String status = StringUtils.hasText(alert.getProcessStatus())
+                ? alert.getProcessStatus().trim().toUpperCase(Locale.ROOT) : "UNKNOWN";
+        dispatch(tenantId, userId, alert, "STATUS_CHANGED_" + status,
+                "ALERT_STATUS", title, content, channels);
     }
 
     private void dispatch(Long tenantId, Long userId, AlertLog alert, String eventType,

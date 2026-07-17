@@ -123,7 +123,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             request.setAttribute(TraceIdFilter.ACCESS_LOG_USER_ID_ATTRIBUTE, UserContext.getCurrentUserId());
             request.setAttribute(TraceIdFilter.ACCESS_LOG_TENANT_ID_ATTRIBUTE, UserContext.getCurrentTenantId());
             
-            List<GrantedAuthority> authorities = buildAuthorities(claims);
+            List<GrantedAuthority> authorities;
+            try {
+                authorities = buildAuthorities(claims);
+            } catch (IllegalArgumentException ex) {
+                log.warn("INVALID_PERMISSION_CLAIM: 无法解码权限声明");
+                writeUnauthorized(response);
+                return;
+            }
             
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(
@@ -172,7 +179,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         
         // Extract permissions (e.g., "system:user:add")
-        List<String> permissions = jwtUtils.getPermissionCodes(claims);
+        List<String> permissions = JwtUtils.decodePermissionClaim(claims.get(JwtUtils.CLAIM_PERMISSIONS));
         if (permissions != null) {
             for (String perm : permissions) {
                 authorities.add(new SimpleGrantedAuthority(perm));

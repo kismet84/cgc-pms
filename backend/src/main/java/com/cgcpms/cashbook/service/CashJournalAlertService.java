@@ -3,6 +3,7 @@ package com.cgcpms.cashbook.service;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.alert.notification.AlertNotificationDispatcher;
+import com.cgcpms.alert.service.AlertLifecycleService;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
 import com.cgcpms.cashbook.constant.CashbookConstants;
@@ -33,6 +34,7 @@ public class CashJournalAlertService {
     private final AlertLogMapper alertLogMapper;
     private final CashJournalAlertRecipientResolver recipientResolver;
     private final AlertNotificationDispatcher notificationDispatcher;
+    private final AlertLifecycleService lifecycleService;
 
     public Set<Long> pendingTenantIds() {
         return new LinkedHashSet<>(entryMapper.selectPendingArchiveTenantIds());
@@ -70,7 +72,9 @@ public class CashJournalAlertService {
             alert.setIsRead(0);
             alert.setProcessStatus("OPEN");
             alert.setDeletedFlag(0);
+            lifecycleService.initialize(alert);
             alertLogMapper.insert(alert);
+            lifecycleService.recordCreated(alert);
             for (Long userId : recipientResolver.resolve(tenantId)) {
                 notificationDispatcher.dispatchAlertCreated(tenantId, userId, alert, TITLE);
             }
@@ -90,7 +94,10 @@ public class CashJournalAlertService {
             if (updated == 0) continue;
             alert.setProcessStatus("ARCHIVED");
             alert.setArchivedAt(now);
+            alert.setArchivedBy(UserContext.getCurrentUserId());
             alert.setStatusRemark("资金流水归档完成");
+            lifecycleService.record(alert, "AUTO_ARCHIVED", "OPEN", "ARCHIVED",
+                    UserContext.getCurrentUserId(), "资金流水归档完成");
             for (Long userId : recipientResolver.resolve(entry.getTenantId())) {
                 notificationDispatcher.dispatchStatusChanged(
                         entry.getTenantId(), userId, alert, "资金流水已归档", "资金流水归档完成");

@@ -669,6 +669,27 @@ class CtContractServiceTest {
         assertEquals("CONTRACT_ALREADY_SUBMITTED", ex.getCode());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("提交审批 — 采购合同黑名单供应商拒绝")
+    void testSubmitPurchaseContractBlacklistedSupplierRejected() {
+        MdPartner supplier = partnerMapper.selectById(PARTY_B_ID);
+        supplier.setPartnerType("SUPPLIER");
+        supplier.setStatus("ENABLE");
+        supplier.setBlacklistFlag(1);
+        partnerMapper.updateById(supplier);
+
+        CtContract contract = buildDraftContract("黑名单供应商采购合同");
+        contract.setContractType("PURCHASE");
+        contract.setContractCode("CT-TEST-BL-" + System.nanoTime());
+        contract.setTenantId(TENANT_ID);
+        contractMapper.insert(contract);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> contractService.submitForApproval(contract.getId()));
+        assertEquals("PURCHASE_SUPPLIER_BLACKLISTED", ex.getCode());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // 复合原子保存
     // ═══════════════════════════════════════════════════════════════

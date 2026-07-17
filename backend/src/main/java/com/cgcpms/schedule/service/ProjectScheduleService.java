@@ -1,6 +1,9 @@
 package com.cgcpms.schedule.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.cgcpms.alert.entity.AlertLog;
+import com.cgcpms.alert.mapper.AlertLogMapper;
+import com.cgcpms.alert.service.AlertLifecycleService;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -21,6 +24,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Date;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 
@@ -33,6 +37,8 @@ public class ProjectScheduleService {
     private final JdbcTemplate jdbc;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
+    private final AlertLogMapper alertLogMapper;
+    private final AlertLifecycleService alertLifecycleService;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createSchedule(ScheduleRequest request) {
@@ -373,7 +379,14 @@ public class ProjectScheduleService {
         if (!"PENDING".equals(string(action.get("status")))) throw error("PROJECT_CORRECTIVE_APPROVAL_STATE_INVALID", "纠偏审批状态不正确");
         Long revisionId = createRevision(action);
         jdbc.update("UPDATE project_corrective_action SET status='APPROVED',generated_revision_plan_id=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='PENDING'", revisionId, id, tenant());
-        if (action.get("alert_id") != null) jdbc.update("UPDATE alert_log SET process_status='PROCESSED',processed_at=CURRENT_TIMESTAMP,status_remark='纠偏审批通过，已生成计划修订草稿',updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", user(), action.get("alert_id"), tenant());
+        if (action.get("alert_id") != null) {
+            int updated = jdbc.update("UPDATE alert_log SET is_read=1,read_by=COALESCE(read_by,?),read_at=COALESCE(read_at,CURRENT_TIMESTAMP),acknowledged_by=COALESCE(acknowledged_by,?),acknowledged_at=COALESCE(acknowledged_at,CURRENT_TIMESTAMP),process_status='PROCESSED',processed_at=CURRENT_TIMESTAMP,processed_by=?,status_remark='纠偏审批通过，已生成计划修订草稿',updated_by=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND tenant_id=? AND process_status='OPEN'", user(), user(), user(), user(), action.get("alert_id"), tenant());
+            if (updated == 1) {
+                AlertLog alert = alertLogMapper.selectById(longValue(action.get("alert_id")));
+                alertLifecycleService.record(alert, "STATUS_CHANGED", "OPEN", "PROCESSED", user(),
+                        "纠偏审批通过，已生成计划修订草稿");
+            }
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -454,14 +467,27 @@ public class ProjectScheduleService {
         String dedupKey = "S:PROJECT_PROGRESS_SNAPSHOT:" + snapshotId + ":R:PROJECT_PROGRESS_DELAY";
         Integer exists = jdbc.queryForObject("SELECT COUNT(*) FROM alert_log WHERE tenant_id=? AND dedup_key=? AND process_status IN('OPEN','PROCESSED') AND deleted_flag=0", Integer.class, tenant(), dedupKey);
         if (exists != null && exists > 0) return;
-        jdbc.update("""
-                INSERT INTO alert_log(id,tenant_id,project_id,contract_id,alert_domain,alert_category,source_type,source_id,dedup_key,
-                 rule_type,severity,message,triggered_at,is_read,process_status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                VALUES(?,?,?,NULL,'SCHEDULE','PROGRESS_DELAY','PROJECT_PROGRESS_SNAPSHOT',?,?,'PROJECT_PROGRESS_DELAY',?, ?,CURRENT_TIMESTAMP,0,'OPEN',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                """, IdWorker.getId(), tenant(), schedule.get("project_id"), snapshotId, dedupKey,
-                text(config.get("severity_override")) == null ? "HIGH" : config.get("severity_override"),
-                "项目计划进度延期：" + date + " 计划" + planned + "%、实际" + actual + "%、偏差" + deviation + "个百分点",
-                user(), user(), "计划版本=" + schedule.get("version_no"));
+        AlertLog alert = new AlertLog();
+        alert.setTenantId(tenant());
+        alert.setProjectId(longValue(schedule.get("project_id")));
+        alert.setAlertDomain("SCHEDULE");
+        alert.setAlertCategory("PROGRESS_DELAY");
+        alert.setSourceType("PROJECT_PROGRESS_SNAPSHOT");
+        alert.setSourceId(snapshotId);
+        alert.setDedupKey(dedupKey);
+        alert.setRuleType("PROJECT_PROGRESS_DELAY");
+        alert.setSeverity(text(config.get("severity_override")) == null ? "HIGH" : text(config.get("severity_override")));
+        alert.setMessage("项目计划进度延期：" + date + " 计划" + planned + "%、实际" + actual + "%、偏差" + deviation + "个百分点");
+        alert.setTriggeredAt(LocalDateTime.now());
+        alert.setIsRead(0);
+        alert.setProcessStatus("OPEN");
+        alert.setCreatedBy(user());
+        alert.setUpdatedBy(user());
+        alert.setDeletedFlag(0);
+        alert.setRemark("计划版本=" + schedule.get("version_no"));
+        alertLifecycleService.initialize(alert);
+        alertLogMapper.insert(alert);
+        alertLifecycleService.recordCreated(alert);
     }
 
     private Long createRevision(Map<String, Object> action) {

@@ -448,12 +448,36 @@ public class FileService {
                 case "CASH_JOURNAL" -> "BANK_RECEIPT";
                 case "CONTRACT" -> "CONTRACT_ATTACHMENT";
                 case "VARIATION" -> "SITE_EVIDENCE";
+                case "QS_INSPECTION" -> "INSPECTION_EVIDENCE";
+                case "QS_ISSUE" -> "ISSUE_EVIDENCE";
+                case "QS_RECTIFICATION" -> "RECTIFICATION_EVIDENCE";
+                case "SUPPLIER_SOURCING" -> "SOURCING_REQUIREMENT";
+                case "SUPPLIER_QUOTE" -> "QUOTE_ATTACHMENT";
+                case "TECH_SCHEME" -> "SCHEME_FILE";
+                case "TECH_DRAWING_VERSION" -> "DRAWING_FILE";
+                case "TECH_DRAWING_REVIEW" -> "REVIEW_MINUTES";
+                case "TECH_RFI" -> "RFI_EVIDENCE";
+                case "TECH_RFI_RESPONSE" -> "DESIGN_RESPONSE";
+                case "TECH_DISCLOSURE" -> "DISCLOSURE_RECORD";
+                case "TECH_ARCHIVE" -> "ACCEPTANCE_ARCHIVE";
+                case "CLOSEOUT_SECTION_ACCEPTANCE" -> "SECTION_ACCEPTANCE_RECORD";
+                case "CLOSEOUT_FINAL_ACCEPTANCE" -> "FINAL_ACCEPTANCE_CERTIFICATE";
+                case "CLOSEOUT_DEFECT" -> "DEFECT_RECTIFICATION_EVIDENCE";
+                case "CLOSEOUT_WARRANTY" -> "WARRANTY_RELEASE_VOUCHER";
+                case "CLOSEOUT_ARCHIVE_TRANSFER" -> "ARCHIVE_TRANSFER_LIST";
                 default -> "OTHER";
             };
         }
         if (!Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE", "BANK_RECEIPT",
                 "CONTRACT_ATTACHMENT", "PAYMENT_PROOF", "OTHER", "SITE_EVIDENCE",
-                "COST_ESTIMATE", "OWNER_SUBMISSION", "OWNER_CONFIRMATION").contains(type)) {
+                "COST_ESTIMATE", "OWNER_SUBMISSION", "OWNER_CONFIRMATION",
+                "INSPECTION_EVIDENCE", "ISSUE_EVIDENCE", "RECTIFICATION_EVIDENCE",
+                "REINSPECTION_EVIDENCE", "SOURCING_REQUIREMENT", "QUOTE_ATTACHMENT",
+                "SCHEME_FILE", "DRAWING_FILE", "REVIEW_MINUTES", "RFI_EVIDENCE",
+                "DESIGN_RESPONSE", "DISCLOSURE_RECORD", "ACCEPTANCE_ARCHIVE",
+                "SECTION_ACCEPTANCE_RECORD", "FINAL_ACCEPTANCE_CERTIFICATE",
+                "DEFECT_RECTIFICATION_EVIDENCE", "WARRANTY_RELEASE_VOUCHER",
+                "ARCHIVE_TRANSFER_LIST").contains(type)) {
             throw new BusinessException("DOCUMENT_TYPE_INVALID", "不支持的业务文档类型");
         }
         if (Set.of("INVOICE", "SALES_INVOICE").contains(business) && !Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE").contains(type)) {

@@ -92,6 +92,8 @@ public class WorkflowEngine {
             case WorkflowBusinessTypes.PROJECT_SCHEDULE -> "schedule:submit";
             case WorkflowBusinessTypes.PROJECT_PERIOD_PLAN -> "schedule:submit";
             case WorkflowBusinessTypes.PROJECT_CORRECTIVE_ACTION -> "schedule:correct";
+            case WorkflowBusinessTypes.TECHNICAL_SCHEME -> "technical:scheme:submit";
+            case WorkflowBusinessTypes.PROJECT_FINAL_ACCEPTANCE -> "closeout:acceptance:submit";
             default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
         };
     }

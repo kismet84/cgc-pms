@@ -5,9 +5,14 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.alert.auth.AlertAccessScopeResolver;
 import com.cgcpms.alert.dto.AlertProcessingReportVO;
+import com.cgcpms.alert.dto.AlertRuleEffectVO;
 import com.cgcpms.alert.entity.AlertLog;
+import com.cgcpms.alert.entity.AlertLifecycleEvent;
+import com.cgcpms.alert.entity.AlertNotificationSendRecord;
 import com.cgcpms.alert.entity.AlertRuleConfig;
+import com.cgcpms.alert.mapper.AlertLifecycleEventMapper;
 import com.cgcpms.alert.mapper.AlertLogMapper;
+import com.cgcpms.alert.mapper.AlertNotificationSendRecordMapper;
 import com.cgcpms.alert.notification.AlertNotificationDispatcher;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -15,6 +20,8 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.mapper.PmProjectMemberMapper;
+import com.cgcpms.notification.entity.SysNotification;
+import com.cgcpms.notification.mapper.SysNotificationMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.aop.framework.AopContext;
@@ -23,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Predicate;
@@ -46,7 +54,12 @@ public class AlertEvaluationService {
     private final AlertNotificationDispatcher notificationDispatcher;
     private final AlertAccessScopeResolver accessScopeResolver;
     private final AlertSubscriptionService alertSubscriptionService;
+    private final AlertEscalationRecipientResolver escalationRecipientResolver;
     private final AlertRuleEvaluator ruleEvaluator;
+    private final AlertLifecycleService lifecycleService;
+    private final AlertLifecycleEventMapper lifecycleEventMapper;
+    private final AlertNotificationSendRecordMapper notificationSendRecordMapper;
+    private final SysNotificationMapper notificationMapper;
     private final com.cgcpms.cashbook.service.CashJournalAlertService cashJournalAlertService;
 
     private final AtomicBoolean scheduledEvaluateRunning = new AtomicBoolean(false);
@@ -78,11 +91,13 @@ public class AlertEvaluationService {
                 }
             }
             cashJournalTenants.addAll(cashJournalAlertService.pendingTenantIds());
+            cashJournalTenants.addAll(alertLogMapper.selectPendingEscalationTenantIds());
             for (Long tenantId : cashJournalTenants) {
                 try {
                     cashJournalAlertService.evaluateOverdue(tenantId);
+                    ((AlertEvaluationService) AopContext.currentProxy()).escalateOverdueAlerts(tenantId);
                 } catch (Exception e) {
-                    log.error("Failed to evaluate cash journal alerts for tenant {}", tenantId, e);
+                    log.error("Failed to evaluate or escalate alerts for tenant {}", tenantId, e);
                 }
             }
         } catch (Exception e) {
@@ -117,6 +132,8 @@ public class AlertEvaluationService {
         for (PmProject project : activeProjects) {
             totalAlerts += evaluateProject(tenantId, project.getId());
         }
+        int escalated = escalateOverdueAlerts(tenantId);
+        log.info("Manual alert escalation done: {} alert(s) escalated for tenantId={}", escalated, tenantId);
         log.info("Manual alert evaluation done: {} alerts generated for tenantId={}", totalAlerts, tenantId);
         return totalAlerts;
     }
@@ -141,8 +158,10 @@ public class AlertEvaluationService {
         alerts.addAll(ruleEvaluator.evaluatePurchaseDeliveryOverdue(tenantId, projectId, ruleConfigs));
 
         if (!alerts.isEmpty()) {
+            alerts.forEach(lifecycleService::initialize);
             com.baomidou.mybatisplus.extension.toolkit.Db.saveBatch(alerts, 50);
             for (AlertLog alert : alerts) {
+                lifecycleService.recordCreated(alert);
                 try {
                     createAlertNotification(tenantId, projectId, alert);
                 } catch (Exception e) {
@@ -153,6 +172,47 @@ public class AlertEvaluationService {
             log.info("Project {}: {} alert(s) generated", projectId, alerts.size());
         }
         return alerts.size();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public int escalateOverdueAlerts(Long tenantId) {
+        LocalDateTime now = LocalDateTime.now();
+        List<AlertLog> alerts = alertLogMapper.selectList(new LambdaQueryWrapper<AlertLog>()
+                .eq(AlertLog::getTenantId, tenantId)
+                .eq(AlertLog::getProcessStatus, "OPEN")
+                .and(wrapper -> wrapper
+                        .and(response -> response.isNull(AlertLog::getAcknowledgedAt)
+                                .le(AlertLog::getResponseDueAt, now)
+                                .lt(AlertLog::getEscalationLevel, 1))
+                        .or(resolution -> resolution.le(AlertLog::getResolutionDueAt, now)
+                                .lt(AlertLog::getEscalationLevel, 2)))
+                .orderByAsc(AlertLog::getResolutionDueAt)
+                .orderByAsc(AlertLog::getResponseDueAt));
+        int escalated = 0;
+        for (AlertLog alert : alerts) {
+            int currentLevel = Optional.ofNullable(alert.getEscalationLevel()).orElse(0);
+            int targetLevel = alert.getResolutionDueAt() != null && !alert.getResolutionDueAt().isAfter(now)
+                    ? 2 : 1;
+            if (targetLevel <= currentLevel) continue;
+            String reason = targetLevel >= 2
+                    ? "预警超过处置时限仍未完成处理"
+                    : "预警超过响应时限仍未接单";
+            Set<Long> recipients = escalationRecipientResolver.resolve(alert, targetLevel);
+            alert.setEscalationLevel(targetLevel);
+            alert.setLastEscalatedAt(now);
+            alert.setUpdatedBy(0L);
+            if (alertLogMapper.updateById(alert) == 0) {
+                log.info("Alert escalation skipped after concurrent update: alertId={}", alert.getId());
+                continue;
+            }
+            lifecycleService.record(alert, "ESCALATED_L" + targetLevel, "OPEN", "OPEN", 0L,
+                    reason + "；通知对象=" + recipients);
+            for (Long userId : recipients) {
+                notificationDispatcher.dispatchEscalated(tenantId, userId, alert, targetLevel, reason);
+            }
+            escalated++;
+        }
+        return escalated;
     }
 
     // ──────────────────────────────────────────────
@@ -190,9 +250,73 @@ public class AlertEvaluationService {
         report.setTotalCount(alerts.size());
         report.setUnreadCount(alerts.stream().filter(a -> Objects.equals(a.getIsRead(), 0)).count());
         report.setReadCount(alerts.stream().filter(a -> Objects.equals(a.getIsRead(), 1)).count());
+        LocalDateTime now = LocalDateTime.now();
+        report.setUnacknowledgedCount(alerts.stream()
+                .filter(a -> "OPEN".equals(a.getProcessStatus()) && a.getAcknowledgedAt() == null).count());
+        report.setOverdueOpenCount(alerts.stream()
+                .filter(a -> "OPEN".equals(a.getProcessStatus()) && a.getResponseDueAt() != null
+                        && a.getResponseDueAt().isBefore(now)).count());
+        report.setEscalatedCount(alerts.stream()
+                .filter(a -> a.getEscalationLevel() != null && a.getEscalationLevel() > 0).count());
+        if (!alerts.isEmpty()) {
+            report.setFailedNotificationCount(notificationSendRecordMapper.selectCount(
+                    new LambdaQueryWrapper<AlertNotificationSendRecord>()
+                            .eq(AlertNotificationSendRecord::getTenantId, tenantId)
+                            .in(AlertNotificationSendRecord::getAlertId,
+                                    alerts.stream().map(AlertLog::getId).toList())
+                            .eq(AlertNotificationSendRecord::getSendStatus, "FAILED")));
+        }
         report.setSeverityCounts(groupBy(alerts, AlertLog::getSeverity));
         report.setProcessStatusCounts(groupBy(alerts, AlertLog::getProcessStatus));
         return report;
+    }
+
+    public List<AlertRuleEffectVO> ruleEffectReport(Long tenantId, Long projectId,
+                                                    String ruleType, String alertDomain,
+                                                    LocalDateTime triggeredStart,
+                                                    LocalDateTime triggeredEnd) {
+        LambdaQueryWrapper<AlertLog> wrapper = buildAlertQuery(tenantId, projectId, ruleType, alertDomain,
+                null, null, triggeredStart, triggeredEnd, null);
+        if (wrapper == null) return List.of();
+        List<AlertLog> alerts = alertLogMapper.selectList(wrapper);
+        Map<Long, Long> failedByAlert = alerts.isEmpty() ? Map.of()
+                : notificationSendRecordMapper.selectList(new LambdaQueryWrapper<AlertNotificationSendRecord>()
+                        .eq(AlertNotificationSendRecord::getTenantId, tenantId)
+                        .in(AlertNotificationSendRecord::getAlertId, alerts.stream().map(AlertLog::getId).toList())
+                        .eq(AlertNotificationSendRecord::getSendStatus, "FAILED"))
+                .stream().collect(Collectors.groupingBy(AlertNotificationSendRecord::getAlertId, Collectors.counting()));
+
+        return alerts.stream()
+                .collect(Collectors.groupingBy(alert -> StringUtils.hasText(alert.getRuleType())
+                        ? alert.getRuleType() : "UNKNOWN", TreeMap::new, Collectors.toList()))
+                .entrySet().stream()
+                .map(entry -> buildRuleEffect(entry.getKey(), entry.getValue(), failedByAlert))
+                .toList();
+    }
+
+    private AlertRuleEffectVO buildRuleEffect(String ruleType, List<AlertLog> alerts,
+                                              Map<Long, Long> failedByAlert) {
+        AlertRuleEffectVO effect = new AlertRuleEffectVO();
+        effect.setRuleType(ruleType);
+        effect.setGeneratedCount(alerts.size());
+        effect.setAcknowledgedCount(alerts.stream().filter(a -> a.getAcknowledgedAt() != null).count());
+        effect.setWithinResponseSlaCount(alerts.stream()
+                .filter(a -> a.getAcknowledgedAt() != null && a.getResponseDueAt() != null
+                        && !a.getAcknowledgedAt().isAfter(a.getResponseDueAt())).count());
+        effect.setEscalatedCount(alerts.stream()
+                .filter(a -> a.getEscalationLevel() != null && a.getEscalationLevel() > 0).count());
+        effect.setProcessedCount(alerts.stream()
+                .filter(a -> List.of("PROCESSED", "ARCHIVED").contains(a.getProcessStatus())).count());
+        effect.setArchivedCount(alerts.stream().filter(a -> "ARCHIVED".equals(a.getProcessStatus())).count());
+        effect.setInvalidCount(alerts.stream().filter(a -> "INVALID".equals(a.getProcessStatus())).count());
+        effect.setFailedNotificationCount(alerts.stream()
+                .mapToLong(a -> failedByAlert.getOrDefault(a.getId(), 0L)).sum());
+        OptionalDouble averageMinutes = alerts.stream()
+                .filter(a -> a.getTriggeredAt() != null && a.getAcknowledgedAt() != null)
+                .mapToLong(a -> Math.max(0, Duration.between(a.getTriggeredAt(), a.getAcknowledgedAt()).toMinutes()))
+                .average();
+        effect.setAverageResponseMinutes(averageMinutes.isPresent() ? Math.round(averageMinutes.getAsDouble()) : null);
+        return effect;
     }
 
     private LambdaQueryWrapper<AlertLog> buildAlertQuery(Long tenantId, Long projectId,
@@ -304,14 +428,53 @@ public class AlertEvaluationService {
     // CRUD operations
     // ──────────────────────────────────────────────
 
+    @Transactional(rollbackFor = Exception.class)
     public boolean markRead(Long tenantId, Long alertId) {
         AlertLog alert = alertLogMapper.selectById(alertId);
         if (alert == null || !Objects.equals(alert.getTenantId(), tenantId)) {
             return false;
         }
         accessScopeResolver.assertAlertAccess(tenantId, alert);
+        if (Objects.equals(alert.getIsRead(), 1)) return true;
+        Long userId = UserContext.getCurrentUserId();
         alert.setIsRead(1);
-        return alertLogMapper.updateById(alert) > 0;
+        alert.setReadBy(userId);
+        alert.setReadAt(LocalDateTime.now());
+        if (alertLogMapper.updateById(alert) == 0) {
+            throw new BusinessException("ALERT_CONCURRENT_UPDATE", "预警已被其他用户更新，请刷新后重试");
+        }
+        lifecycleService.record(alert, "READ", alert.getProcessStatus(), alert.getProcessStatus(), userId, "已阅读");
+        return true;
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public boolean acknowledge(Long tenantId, Long alertId, String remark) {
+        AlertLog alert = alertLogMapper.selectById(alertId);
+        if (alert == null || !Objects.equals(alert.getTenantId(), tenantId)) return false;
+        accessScopeResolver.assertAlertAccess(tenantId, alert);
+        if (!"OPEN".equals(alert.getProcessStatus())) {
+            throw new BusinessException("ALERT_ACK_STATE_INVALID", "只有待处理预警可以接单");
+        }
+        Long userId = UserContext.getCurrentUserId();
+        if (alert.getAcknowledgedBy() != null) {
+            if (Objects.equals(alert.getAcknowledgedBy(), userId)) return true;
+            throw new BusinessException("ALERT_ALREADY_ACKNOWLEDGED", "该预警已由其他责任人接单");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        alert.setAcknowledgedBy(userId);
+        alert.setAcknowledgedAt(now);
+        if (!Objects.equals(alert.getIsRead(), 1)) {
+            alert.setIsRead(1);
+            alert.setReadBy(userId);
+            alert.setReadAt(now);
+        }
+        alert.setUpdatedBy(userId);
+        if (alertLogMapper.updateById(alert) == 0) {
+            throw new BusinessException("ALERT_CONCURRENT_UPDATE", "预警已被其他用户接单，请刷新后重试");
+        }
+        lifecycleService.record(alert, "ACKNOWLEDGED", "OPEN", "OPEN", userId,
+                StringUtils.hasText(remark) ? remark.trim() : "接单处理");
+        return true;
     }
 
     public Map<String, Object> batchMarkRead(Long tenantId, List<Long> alertIds) {
@@ -338,9 +501,7 @@ public class AlertEvaluationService {
                 continue;
             }
             try {
-                accessScopeResolver.assertAlertAccess(tenantId, alert);
-                alert.setIsRead(1);
-                alertLogMapper.updateById(alert);
+                markRead(tenantId, id);
                 successIds.add(id);
             } catch (BusinessException e) {
                 failures.add(batchFailure(id, e.getMessage()));
@@ -356,25 +517,54 @@ public class AlertEvaluationService {
         return result;
     }
 
+    @Transactional(rollbackFor = Exception.class)
     public boolean updateStatus(Long tenantId, Long alertId, String processStatus, String statusRemark) {
         if (!List.of("PROCESSED", "ARCHIVED", "INVALID").contains(processStatus)) {
             throw new BusinessException("ALERT_STATUS_INVALID", "预警状态不合法");
+        }
+        if (!StringUtils.hasText(statusRemark)) {
+            throw new BusinessException("ALERT_STATUS_REMARK_REQUIRED", "状态变更必须填写处理说明");
         }
         AlertLog alert = alertLogMapper.selectById(alertId);
         if (alert == null || !Objects.equals(alert.getTenantId(), tenantId)) {
             return false;
         }
         accessScopeResolver.assertAlertAccess(tenantId, alert);
-        alert.setProcessStatus(processStatus);
-        alert.setStatusRemark(StringUtils.hasText(statusRemark) ? statusRemark.trim() : null);
-        alert.setUpdatedBy(UserContext.getCurrentUserId());
+        String current = StringUtils.hasText(alert.getProcessStatus()) ? alert.getProcessStatus() : "OPEN";
+        if (current.equals(processStatus)) return true;
+        if (List.of("ARCHIVED", "INVALID").contains(current)) {
+            throw new BusinessException("ALERT_TERMINAL_IMMUTABLE", "已归档或已失效预警不允许再次修改");
+        }
+        Long userId = UserContext.getCurrentUserId();
         if ("PROCESSED".equals(processStatus)) {
-            alert.setProcessedAt(LocalDateTime.now());
+            if (!"OPEN".equals(current)) {
+                throw new BusinessException("ALERT_STATUS_TRANSITION_INVALID", "当前状态不能标记为已处理");
+            }
+            if (alert.getAcknowledgedBy() == null || !Objects.equals(alert.getAcknowledgedBy(), userId)) {
+                throw new BusinessException("ALERT_HANDLER_REQUIRED", "必须由当前接单责任人完成处理");
+            }
+        } else if ("ARCHIVED".equals(processStatus) && !"PROCESSED".equals(current)) {
+            throw new BusinessException("ALERT_STATUS_TRANSITION_INVALID", "只有已处理预警可以归档");
+        } else if ("INVALID".equals(processStatus) && !"OPEN".equals(current)) {
+            throw new BusinessException("ALERT_STATUS_TRANSITION_INVALID", "只有待处理预警可以标记失效");
+        }
+        alert.setProcessStatus(processStatus);
+        alert.setStatusRemark(statusRemark.trim());
+        alert.setUpdatedBy(userId);
+        LocalDateTime now = LocalDateTime.now();
+        if ("PROCESSED".equals(processStatus)) {
+            alert.setProcessedAt(now);
+            alert.setProcessedBy(userId);
         }
         if ("ARCHIVED".equals(processStatus) || "INVALID".equals(processStatus)) {
-            alert.setArchivedAt(LocalDateTime.now());
+            alert.setArchivedAt(now);
+            alert.setArchivedBy(userId);
         }
         boolean updated = alertLogMapper.updateById(alert) > 0;
+        if (!updated) {
+            throw new BusinessException("ALERT_CONCURRENT_UPDATE", "预警已被其他用户更新，请刷新后重试");
+        }
+        lifecycleService.record(alert, "STATUS_CHANGED", current, processStatus, userId, statusRemark.trim());
         if (updated) {
             try {
                 dispatchStatusNotification(tenantId, alert, processStatus, statusRemark);
@@ -384,6 +574,43 @@ public class AlertEvaluationService {
             }
         }
         return updated;
+    }
+
+    public Map<String, Object> trace(Long tenantId, Long alertId) {
+        AlertLog alert = alertLogMapper.selectById(alertId);
+        if (alert == null || !Objects.equals(alert.getTenantId(), tenantId)) {
+            throw new BusinessException("ALERT_NOT_FOUND", "预警不存在或不属于当前租户");
+        }
+        accessScopeResolver.assertAlertAccess(tenantId, alert);
+        List<AlertLifecycleEvent> events = lifecycleEventMapper.selectList(
+                new LambdaQueryWrapper<AlertLifecycleEvent>()
+                        .eq(AlertLifecycleEvent::getTenantId, tenantId)
+                        .eq(AlertLifecycleEvent::getAlertId, alertId)
+                        .orderByAsc(AlertLifecycleEvent::getOccurredAt)
+                        .orderByAsc(AlertLifecycleEvent::getId));
+        List<AlertNotificationSendRecord> sends = notificationSendRecordMapper.selectList(
+                new LambdaQueryWrapper<AlertNotificationSendRecord>()
+                        .eq(AlertNotificationSendRecord::getTenantId, tenantId)
+                        .eq(AlertNotificationSendRecord::getAlertId, alertId)
+                        .orderByAsc(AlertNotificationSendRecord::getRequestedAt));
+        List<SysNotification> notifications = notificationMapper.selectList(
+                new LambdaQueryWrapper<SysNotification>()
+                        .eq(SysNotification::getTenantId, tenantId)
+                        .in(SysNotification::getBizType, List.of("ALERT", "ALERT_STATUS", "ALERT_ESCALATION"))
+                        .eq(SysNotification::getBizId, alertId)
+                        .orderByAsc(SysNotification::getCreatedTime));
+        Map<String, Object> source = new LinkedHashMap<>();
+        source.put("projectId", alert.getProjectId());
+        source.put("contractId", alert.getContractId());
+        source.put("sourceType", alert.getSourceType());
+        source.put("sourceId", alert.getSourceId());
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("alert", alert);
+        result.put("source", source);
+        result.put("lifecycleEvents", events);
+        result.put("notificationSendRecords", sends);
+        result.put("notifications", notifications);
+        return result;
     }
 
     public Map<String, Object> batchUpdateStatus(Long tenantId, List<Long> alertIds,

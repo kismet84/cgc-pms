@@ -654,6 +654,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
         jdbcTemplate.update("DELETE FROM payment_record_source_allocation WHERE pay_record_id IN (SELECT id FROM pay_record WHERE project_id = ?)", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM accounting_entry_line WHERE entry_id IN (SELECT id FROM accounting_entry WHERE project_id = ?)", PROJECT_ID);
         jdbcTemplate.update("UPDATE accounting_entry SET reversed_entry_id = NULL WHERE project_id = ?", PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM accounting_entry WHERE project_id = ? AND original_entry_id IS NOT NULL", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM accounting_entry WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM sys_file WHERE business_id IN (SELECT id FROM pay_invoice WHERE project_id = ?) AND business_type = 'INVOICE'", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM invoice_payment_allocation WHERE invoice_id IN (SELECT id FROM pay_invoice WHERE project_id = ?)", PROJECT_ID);

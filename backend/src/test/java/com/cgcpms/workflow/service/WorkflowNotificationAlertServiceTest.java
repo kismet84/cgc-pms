@@ -3,6 +3,7 @@ package com.cgcpms.workflow.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
+import com.cgcpms.alert.service.AlertLifecycleService;
 import com.cgcpms.notification.entity.SysNotification;
 import com.cgcpms.notification.service.NotificationService;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -28,11 +29,14 @@ class WorkflowNotificationAlertServiceTest {
     @Mock
     private AlertLogMapper alertLogMapper;
 
+    @Mock
+    private AlertLifecycleService lifecycleService;
+
     @Test
     @DisplayName("审批提交通知成功时只创建站内通知，不生成预警")
     void createsWorkflowNotificationWithoutAlertOnSuccess() {
         WorkflowNotificationAlertService service =
-                new WorkflowNotificationAlertService(notificationService, alertLogMapper);
+                new WorkflowNotificationAlertService(notificationService, alertLogMapper, lifecycleService);
         WfInstance instance = workflowInstance();
         SysNotification notification = new SysNotification();
         notification.setId(7001L);
@@ -51,7 +55,7 @@ class WorkflowNotificationAlertServiceTest {
     @DisplayName("审批完成通知失败时生成一条可追踪预警且不泄露敏感内容")
     void recordsAlertWhenCompletionNotificationFails() {
         WorkflowNotificationAlertService service =
-                new WorkflowNotificationAlertService(notificationService, alertLogMapper);
+                new WorkflowNotificationAlertService(notificationService, alertLogMapper, lifecycleService);
         WfInstance instance = workflowInstance();
         when(notificationService.create(anyLong(), anyLong(), anyString(), anyString(), anyString(), anyLong()))
                 .thenThrow(new IllegalStateException(
@@ -82,13 +86,15 @@ class WorkflowNotificationAlertServiceTest {
         assertFalse(alert.getMessage().contains("sid=1"));
         assertFalse(alert.getMessage().contains("password=secret"));
         assertFalse(alert.getMessage().contains("token=raw"));
+        verify(lifecycleService).initialize(alert);
+        verify(lifecycleService).recordCreated(alert);
     }
 
     @Test
     @DisplayName("同一审批异常事件已有活跃预警时不重复插入")
     void doesNotDuplicateExistingExceptionAlert() {
         WorkflowNotificationAlertService service =
-                new WorkflowNotificationAlertService(notificationService, alertLogMapper);
+                new WorkflowNotificationAlertService(notificationService, alertLogMapper, lifecycleService);
         WfInstance instance = workflowInstance();
         when(notificationService.create(anyLong(), anyLong(), anyString(), anyString(), anyString(), anyLong()))
                 .thenThrow(new IllegalStateException("notification down"));

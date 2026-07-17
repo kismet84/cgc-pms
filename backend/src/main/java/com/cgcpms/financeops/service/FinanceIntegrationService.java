@@ -137,8 +137,11 @@ public class FinanceIntegrationService {
         Map<String,Object> receipt=one("SELECT * FROM bank_receipt WHERE id=? AND tenant_id=? FOR UPDATE",receiptId,tenant());
         if(receipt==null)throw error("BANK_RECEIPT_NOT_FOUND","银行回单不存在");
         if(!"UNMATCHED".equals(receipt.get("match_status")))return receipt;
-        if("IN".equals(receipt.get("direction"))){
-            if(receipt.get("project_id")==null)return receipt;
+        String direction=String.valueOf(receipt.get("direction"));
+        BigDecimal receiptAmount=decimal(receipt.get("amount"));
+        BigDecimal confidence=new BigDecimal("1.0000");
+        LocalDateTime txnTime=dateTime(receipt.get("transaction_time"));
+        if("IN".equals(direction) && receipt.get("project_id")!=null){
             List<AmountAllocation> allocations=loadReceiptAllocations(receipt);
             Map<String,Object> collection=revenueOperationsService.createCollection(new CollectionRequest(
                     longValue(receipt.get("project_id")),longValue(receipt.get("contract_id")),
@@ -151,15 +154,22 @@ public class FinanceIntegrationService {
                     collection.get("id"),journal==null?null:journal.get("id"),receiptId,tenant());
             return one("SELECT * FROM bank_receipt WHERE id=? AND tenant_id=?",receiptId,tenant());
         }
-        Map<String,Object> pay=one("SELECT id FROM pay_record WHERE tenant_id=? AND external_txn_no=? AND pay_status='SUCCESS' AND deleted_flag=0",tenant(),receipt.get("bank_txn_no"));
-        BigDecimal confidence=new BigDecimal("1.0000");
-        if(pay==null){
-            LocalDateTime transactionTime=dateTime(receipt.get("transaction_time"));
-            List<Map<String,Object>> candidates=jdbc.queryForList("SELECT id FROM pay_record WHERE tenant_id=? AND pay_status='SUCCESS' AND pay_amount=? AND paid_at BETWEEN ? AND ? AND deleted_flag=0",tenant(),receipt.get("amount"),transactionTime.minusDays(1),transactionTime.plusDays(1));
-            if(candidates.size()==1){pay=candidates.getFirst();confidence=new BigDecimal("0.8000");}
+        if("OUT".equals(direction)){
+            Map<String,Object> pay=one("SELECT id,pay_amount FROM pay_record WHERE tenant_id=? AND external_txn_no=? AND pay_status='SUCCESS' AND pay_amount=? AND deleted_flag=0",tenant(),receipt.get("bank_txn_no"),receiptAmount);
+            if(pay==null){
+                List<Map<String,Object>> candidates=jdbc.queryForList("SELECT id,pay_amount FROM pay_record WHERE tenant_id=? AND pay_status='SUCCESS' AND pay_amount=? AND paid_at BETWEEN ? AND ? AND deleted_flag=0",tenant(),receiptAmount,txnTime.minusDays(1),txnTime.plusDays(1));
+                if(candidates.size()==1){pay=candidates.getFirst();confidence=new BigDecimal("0.8000");}
+            }
+            if(pay!=null){Map<String,Object>journal=one("SELECT id FROM cash_journal_entry WHERE tenant_id=? AND pay_record_id=? AND deleted_flag=0",tenant(),pay.get("id"));jdbc.update("UPDATE bank_receipt SET match_status='MATCHED',pay_record_id=?,collection_record_id=NULL,cash_journal_id=?,confidence=?,matched_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",pay.get("id"),journal==null?null:journal.get("id"),confidence,receiptId,tenant());}
+        }else if("IN".equals(direction)){
+            Map<String,Object> collection=one("SELECT id,amount FROM collection_record WHERE tenant_id=? AND external_txn_no=? AND status='SUCCESS' AND amount=? AND deleted_flag=0",tenant(),receipt.get("bank_txn_no"),receiptAmount);
+            if(collection==null){
+                List<Map<String,Object>> candidates=jdbc.queryForList("SELECT id,amount FROM collection_record WHERE tenant_id=? AND status='SUCCESS' AND amount=? AND collected_at BETWEEN ? AND ? AND deleted_flag=0",tenant(),receiptAmount,txnTime.minusDays(1),txnTime.plusDays(1));
+                if(candidates.size()==1){collection=candidates.getFirst();confidence=new BigDecimal("0.8000");}
+            }
+            if(collection!=null){Map<String,Object>journal=one("SELECT id FROM cash_journal_entry WHERE tenant_id=? AND collection_record_id=? AND deleted_flag=0",tenant(),collection.get("id"));jdbc.update("UPDATE bank_receipt SET match_status='MATCHED',collection_record_id=?,pay_record_id=NULL,cash_journal_id=?,confidence=?,matched_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",collection.get("id"),journal==null?null:journal.get("id"),confidence,receiptId,tenant());}
         }
-        if(pay!=null){Map<String,Object>journal=one("SELECT id FROM cash_journal_entry WHERE tenant_id=? AND pay_record_id=?",tenant(),pay.get("id"));jdbc.update("UPDATE bank_receipt SET match_status='MATCHED',pay_record_id=?,cash_journal_id=?,confidence=?,matched_at=CURRENT_TIMESTAMP WHERE id=?",pay.get("id"),journal==null?null:journal.get("id"),confidence,receiptId);}
-        return one("SELECT * FROM bank_receipt WHERE id=?",receiptId);
+        return one("SELECT * FROM bank_receipt WHERE id=? AND tenant_id=?",receiptId,tenant());
     }
 
     public List<Map<String,Object>> bankReceipts(String status){return jdbc.queryForList("SELECT * FROM bank_receipt WHERE tenant_id=? AND (? IS NULL OR match_status=?) ORDER BY transaction_time DESC",tenant(),status,status);}
@@ -260,6 +270,7 @@ public class FinanceIntegrationService {
     private static boolean constantTimeEquals(String a,String b){return MessageDigest.isEqual(a.getBytes(StandardCharsets.UTF_8),b.getBytes(StandardCharsets.UTF_8));}
     private static BigDecimal money(BigDecimal v){return(v==null?BigDecimal.ZERO:v).setScale(2,RoundingMode.HALF_UP);}private static BigDecimal decimal(Object v){return money(v==null?BigDecimal.ZERO:new BigDecimal(v.toString()));}private static Long longValue(Object v){return v==null?null:Long.valueOf(v.toString());}
     private static String blank(String v){return v==null||v.isBlank()?null:v.trim();}private static String blankUpper(String v){String x=blank(v);return x==null?null:x.toUpperCase();}private static BusinessException error(String c,String m){return new BusinessException(c,m);}
+    private static LocalDateTime dateTime(Object value){if(value instanceof LocalDateTime v)return v;if(value instanceof java.sql.Timestamp v)return v.toLocalDateTime();return LocalDateTime.parse(String.valueOf(value).replace(' ','T'));}
     private static String requiredText(Map<String,Object> payload,String key){Object v=payload.get(key);if(v==null||v.toString().isBlank())throw error("INTEGRATION_PAYLOAD_FIELD_REQUIRED","集成报文缺少字段: "+key);return v.toString().trim();}
     private static Long requiredLong(Map<String,Object> payload,String key){try{return Long.valueOf(requiredText(payload,key));}catch(NumberFormatException e){throw error("INTEGRATION_PAYLOAD_FIELD_INVALID","集成报文字段类型错误: "+key);}}
     private static Long optionalLong(Object value){return value==null?null:Long.valueOf(value.toString());}

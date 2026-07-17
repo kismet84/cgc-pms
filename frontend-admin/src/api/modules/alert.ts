@@ -1,6 +1,11 @@
 import { request } from '@/api/request'
 import type { PageParams, PageResult } from '@/types/api'
-import type { AlertLogVO, AlertSubscriptionConfig, AlertSubscriptionResponse } from '@/types/alert'
+import type {
+  AlertLogVO,
+  AlertSubscriptionConfig,
+  AlertSubscriptionResponse,
+  AlertTraceVO,
+} from '@/types/alert'
 
 export interface AlertListParams extends PageParams {
   keyword?: string
@@ -24,8 +29,25 @@ export interface AlertProcessingReport {
   totalCount: number
   unreadCount: number
   readCount: number
+  unacknowledgedCount: number
+  overdueOpenCount: number
+  escalatedCount: number
+  failedNotificationCount: number
   severityCounts: Record<string, number>
   processStatusCounts: Record<string, number>
+}
+
+export interface AlertRuleEffect {
+  ruleType: string
+  generatedCount: number
+  acknowledgedCount: number
+  withinResponseSlaCount: number
+  escalatedCount: number
+  processedCount: number
+  archivedCount: number
+  invalidCount: number
+  failedNotificationCount: number
+  averageResponseMinutes?: number
 }
 
 export interface MarkReadResult {
@@ -47,7 +69,7 @@ export interface BatchAlertOperatePayload {
 
 export interface BatchUpdateAlertStatusPayload extends BatchAlertOperatePayload {
   processStatus: AlertProcessStatus
-  statusRemark?: string
+  statusRemark: string
 }
 
 export interface BatchAlertOperationFailure {
@@ -110,6 +132,21 @@ export function getAlertProcessingReport(params: AlertListParams) {
   })
 }
 
+/** 按规则复盘命中、响应 SLA、升级、处置和通知效果。 */
+export function getAlertRuleEffectReport(params: AlertListParams) {
+  return request<AlertRuleEffect[]>({
+    url: '/alerts/rule-effect-report',
+    method: 'get',
+    params: {
+      projectId: params.projectId,
+      ruleType: params.ruleType,
+      alertDomain: params.alertDomain ?? params.category,
+      triggeredStart: params.triggeredStart ?? params.triggeredAtStart,
+      triggeredEnd: params.triggeredEnd ?? params.triggeredAtEnd,
+    },
+  })
+}
+
 /** 标记单条预警为已读 */
 export function markAlertRead(id: string) {
   return request<MarkReadResult>({
@@ -118,9 +155,24 @@ export function markAlertRead(id: string) {
   })
 }
 
+export function acknowledgeAlert(id: string, data: { remark?: string } = {}) {
+  return request<UpdateAlertStatusResult>({
+    url: `/alerts/${id}/acknowledge`,
+    method: 'put',
+    data,
+  })
+}
+
+export function getAlertTrace(id: string) {
+  return request<AlertTraceVO>({
+    url: `/alerts/${id}/trace`,
+    method: 'get',
+  })
+}
+
 export function updateAlertStatus(
   id: string,
-  data: { processStatus: AlertProcessStatus; statusRemark?: string },
+  data: { processStatus: AlertProcessStatus; statusRemark: string },
 ) {
   return request<UpdateAlertStatusResult>({
     url: `/alerts/${id}/status`,
