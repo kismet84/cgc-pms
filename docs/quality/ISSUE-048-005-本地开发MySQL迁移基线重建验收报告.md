@@ -41,3 +41,84 @@
 - 最小回滚：使用已验真的完整备份恢复原本地库；Git 文档回退不能替代数据库回滚。
 
 剩余风险：回滚备份包含本地开发测试数据，应按本机敏感数据管理且不得提交；生产发布、生产数据库和 push 均未执行。
+
+<!-- AUTOPILOT-FACTS:START -->
+## AutoPilot 自动事实
+
+- Issue：ISSUE-048-005
+- Ready 哈希：13943d58820e5068a18edfb08fc2c5f2b90eddb18c00114a78bf4edb39369cad
+- 实施提交：c2485d124b2e85d48cab922ec9e8286f6dec4e7b
+- 验证差异哈希：a9d5661a970b461353a3fca9751d848854fe90566c4f3a46c1243612bffd98de
+- Evidence manifest：50913ff9b040cf596d5b024eda12f0c5b1535dfb665c47a99352ad974c4c15c9
+- Reviewer：required=True; decision=PASS
+- 后续项：added=0; closed=1; net=-1
+- 指标：{"closeoutDispatchCount":1,"contextBaseBuildCount":0,"contextDeltaBuildCount":0,"executorInvocationCount":0,"implementationDispatchCount":1,"inputTokens":null,"outputTokens":null,"phaseDurationsSeconds":{"CLOSING":38,"IMPLEMENTED":0,"IMPLEMENTING":479,"REVIEWED":0,"REVIEWING":0,"VALIDATED":0,"VALIDATING":0},"phaseRestartCount":0,"plannerCandidateRefs":[],"plannerInvocationCount":0,"repairDispatchCount":0,"reportProjectionCount":1,"reviewDispatchCount":1,"reviewerInvocationCount":0,"runResumeCount":0,"tokenUsageStatus":"not_available","totalTokens":null,"validationDispatchCount":1,"validationExecutedCount":1,"validationReusedCount":0,"wallClockSeconds":517}
+- 控制面指纹：93a0a2677a888b909ef128a07c3bcff648115707190edb8b9555709baf6c5e74
+- PreCloseout Facts：2ed493e407bb8740f4ba5ed7790336da16bb052605a28777dcbe8bb7bfa4270c
+<!-- AUTOPILOT-FACTS:END -->
+
+<!-- AUTOPILOT-TASK-SCORE:BEGIN key=317d84326f3e9481979d4d56c5f3f086bb153a7d33c1a1c8d8fdb1769103d195 -->
+## AutoPilot 任务评分
+
+```json
+{
+  "schemaVersion": 2,
+  "key": "317d84326f3e9481979d4d56c5f3f086bb153a7d33c1a1c8d8fdb1769103d195",
+  "issueId": "ISSUE-048-005",
+  "implementationCommit": "c2485d124b2e85d48cab922ec9e8286f6dec4e7b",
+  "scoringVersion": "autopilot-task-score/v2",
+  "scoredAt": "2026-07-17T16:43:00.8080484+08:00",
+  "total": 100,
+  "dimensions": {
+    "deliveryCorrectness": {
+      "score": 35,
+      "max": 35,
+      "evidence": [
+        "docs/quality/ISSUE-048-005-本地开发MySQL迁移基线重建验收报告.md"
+      ]
+    },
+    "zeroDanglingIssues": {
+      "score": 25,
+      "max": 25,
+      "evidence": [
+        "docs/quality/ISSUE-048-005-本地开发MySQL迁移基线重建验收报告.md"
+      ]
+    },
+    "firstPassAcceptance": {
+      "score": 20,
+      "max": 20,
+      "evidence": [
+        "docs/quality/ISSUE-048-005-本地开发MySQL迁移基线重建验收报告.md"
+      ]
+    },
+    "taskExecutionEfficiency": {
+      "score": 10,
+      "max": 10,
+      "evidence": [
+        "docs/quality/ISSUE-048-005-本地开发MySQL迁移基线重建验收报告.md"
+      ]
+    },
+    "stockIssueReduction": {
+      "score": 10,
+      "max": 10,
+      "evidence": [
+        "docs/quality/ISSUE-048-005-本地开发MySQL迁移基线重建验收报告.md"
+      ]
+    }
+  },
+  "hardGatesPassed": true,
+  "followupNetChange": -1,
+  "executionTiming": {
+    "wallClockSeconds": 517,
+    "businessPhaseSeconds": 517,
+    "controlPlaneSeconds": 0,
+    "semanticProgressAt": "07/17/2026 16:43:00",
+    "livenessSignalsExcluded": true
+  },
+  "sourceRefs": [
+    "docs/quality/ISSUE-048-005-本地开发MySQL迁移基线重建验收报告.md"
+  ],
+  "shadow": false
+}
+```
+<!-- AUTOPILOT-TASK-SCORE:END -->
