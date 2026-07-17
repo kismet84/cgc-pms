@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P1
 任务性质：能力新增
 类型：现场日报 / 质量安全 / 同日检查 / 权限交集 / 只读聚合
-状态：Ready
+状态：Done
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-06`；candidateEvidenceHead=3013344e44d97808b624b00fdbe8ff62000be3f0
 存量问题键：[stock:A-03-QUALITY-SAFETY-DAILY-FACTS]
 关联产品目标：在不复制质量安全事实的前提下，让具备双域权限的现场管理人员从日报看到当天已提交检查及问题概况。

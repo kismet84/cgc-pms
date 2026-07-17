@@ -201,3 +201,8 @@ v1.0 已完成任务及其报告入口保留在 [backlog 快照](../archive/v1.0
 
 状态：Done
 归档报告：`docs/quality/ISSUE-048-005-本地开发MySQL迁移基线重建验收报告.md`
+
+### ISSUE-048-006：现场日报当日质量安全检查只读联动
+
+状态：Done
+归档报告：`docs/quality/ISSUE-048-006-现场日报当日质量安全检查只读联动验收报告.md`
