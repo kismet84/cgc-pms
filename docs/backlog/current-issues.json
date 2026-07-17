@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-17T15:59:24+08:00",
+  "updatedAt": "2026-07-17T16:09:05+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -69,6 +69,22 @@
       "acceptanceCriteria": "核实真实数据质量后形成可解释、可追溯且不越权的最小履约闭环。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
+      ]
+    },
+    {
+      "issueKey": "A-05-CLOSED-LOOP-RECONCILIATION",
+      "parentIssueKey": "A-05",
+      "title": "供应商综合履约现状复核与聚合问题裁决",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
+      "priority": "P1",
+      "blocking": false,
+      "summary": "A-05仍称只有交付维度，但当前供应商招采模块已实现质量、商业、服务、退货、结算、黑名单审批和全链路追溯，需要以当前证据裁决聚合问题是否已失效。",
+      "acceptanceCriteria": "复验综合评分事实来源、租户/项目权限、状态不可变、黑名单职责分离和真实页面可达性；证据完整则关闭A-05，否则只登记可复现的唯一剩余缺口。",
+      "sourceRefs": [
+        "backend/src/main/java/com/cgcpms/supplier/service/SupplierSourcingService.java",
+        "frontend-admin/src/pages/supplier-sourcing/index.vue",
+        "docs/product-intelligence/evolution-decision.md"
       ]
     },
     {

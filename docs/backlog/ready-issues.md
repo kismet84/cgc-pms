@@ -8,6 +8,65 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`～`ISSUE-040-055`、阻塞修复 `ISSUE-047-002` 与 `ISSUE-047-003` 已完成；`启动迭代-20` 已完成 20/20。站内通知的租户/用户隔离、已读幂等、SSE与通知铃契约已完成回归证明。
 
+### ISSUE-048-004：供应商综合履约现状复核与聚合问题裁决
+
+优先级：P1
+任务性质：回归证明
+类型：供应商履约 / 质量与商业评分 / 退货 / 黑名单 / 聚合问题裁决
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-04`；candidateEvidenceHead=5a7602083388fb206e1a1b03965c6234352e810d
+存量问题键：[supplier:A-05-CLOSED-LOOP-RECONCILIATION]
+关联产品目标：纠正 A-05 “当前只有交付维度”的过时判断，以当前实现和运行证据确认供应商综合履约闭环是否已成立，避免重复建设。
+核验结论：现有 `SupplierSourcingService` 已将交付、验收质量、质量安全事实、人工服务分、确认退货和结算扣款汇总为30/35/15/20权重的履约评价，并具备确认锁定、黑名单申请/异人审核和招采准入阻断；前端已有可达工作台。
+阻塞证据：唯一问题载体仍把质量、价格、退货、服务和黑名单全部列为缺失，与当前代码事实冲突，导致产品地图和后续选题可能重复。
+解除条件：后端闭环、权限/租户/项目/状态负向、前端契约、真实 MySQL 只读请求和真实页面只查看全部通过后关闭 A-05；任一关键事实不成立则保留 A-05 并登记唯一可复现缺口。
+Migration：不需要
+依赖：既有供应商招采服务、采购订单、验收、供应商退货、结算、质量安全评价、合作方黑名单、权限与项目数据范围。
+风险等级：高
+运行态要求：本地 H2/MySQL 与 Vite；浏览器只选择项目、查看履约/退货/黑名单和追溯入口，不创建、确认、提交或审核任何业务数据。
+Reviewer要求：确认评分事实和权重与代码一致；确认评价必须交付完成、存在已审批验收及已定案结算；确认黑名单只能基于已确认低分评价、禁止自审且审批后阻断供应商准入；确认不能把招采报价分或人工服务分包装成客观价格质量事实。
+归档报告：`docs/quality/ISSUE-048-004-供应商综合履约现状复核与聚合问题裁决验收报告.md`
+最小回滚：仅回退本次现状裁决、报告和问题载体回写；不修改业务代码、数据库或业务数据。
+目标：
+- 以当前代码、自动化和真实只读运行态证明供应商综合履约的事实来源、权限、状态与用户入口。
+- 对 A-05 作唯一裁决：证据完整则关闭，证据不完整则保留并精确登记剩余缺口。
+- 同步项目地图与迭代决策，消除“只有交付维度”的过时描述。
+非目标：
+- 不修改评分公式、权重、供应商、订单、验收、退货、结算、质量安全、黑名单、权限或数据库。
+- 不创建验收夹具，不连接生产，不发布，不 push，不扩展供应商门户、自动评分或外部征信。
+允许修改：
+- `backend/src/test/java/com/cgcpms/supplier/**`
+- `frontend-admin/src/pages/supplier-sourcing/__tests__/**`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-048-004-供应商综合履约现状复核与聚合问题裁决验收报告.md`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/src/pages/supplier-sourcing/index.vue`
+- `frontend-admin/src/api/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- 后端证明交付、验收质量、质量安全、人工服务、确认退货、已定案结算及扣款进入既有评分，权重为30/35/15/20；未完成交付、无已审批验收或无已定案结算不得生成评价。
+- 评价只允许同租户且有项目访问权的用户读取/生成，确认后不可重复确认；黑名单只允许已确认且触发建议的评价发起，提交人与审核人分离，审批通过后合作方进入黑名单并被招采准入拒绝。
+- 前端工作台明确展示交付、质量、服务、商业、总分、等级、退货和黑名单状态，并按招采、履约评价、黑名单审核权限分离动作。
+- 真实 MySQL 仅执行 GET/页面读取；浏览器无新增错误，不产生 POST/PUT/PATCH/DELETE 请求或业务数据变化。
+- 目标测试、类型检查、Ready lint、允许/禁止路径和 `git diff --check` 通过；所有发现项完成本轮修复、正式承接或有依据关闭。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-048-004`
+- `cd backend; .\mvnw.cmd "-Dtest=SupplierSourcingClosedLoopIntegrationTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/supplier-sourcing/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
 ### ISSUE-040-056：WBS单前置FS门禁与风险提示回归
 
 优先级：P1
