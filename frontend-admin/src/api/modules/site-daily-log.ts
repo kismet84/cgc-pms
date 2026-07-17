@@ -1,6 +1,10 @@
 import { request } from '@/api/request'
 import type { PageResult } from '@/types/api'
-import type { SiteDailyLogCommand, SiteDailyLogVO } from '@/types/site-daily-log'
+import type {
+  SiteDailyLogCommand,
+  SiteDailyLogVO,
+  SiteDailyQualitySafetyVO,
+} from '@/types/site-daily-log'
 
 export interface SiteDailyLogQuery {
   pageNo?: number
@@ -17,6 +21,13 @@ export function getSiteDailyLogs(params: SiteDailyLogQuery) {
 
 export function getSiteDailyLog(id: string) {
   return request<SiteDailyLogVO>({ url: `/site-daily-logs/${id}`, method: 'get' })
+}
+
+export function getSiteDailyQualitySafetyFacts(id: string) {
+  return request<SiteDailyQualitySafetyVO[]>({
+    url: `/site-daily-logs/${id}/quality-safety`,
+    method: 'get',
+  })
 }
 
 export function createSiteDailyLog(data: SiteDailyLogCommand) {
