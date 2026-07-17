@@ -4,12 +4,21 @@ import type {
   PayApplicationVO,
   PayApplicationBasisVO,
   PaymentApplicationSourceVO,
+  PaymentSourceOptionVO,
   PaymentTraceVO,
   PayRecordVO,
   PayWritebackDTO,
   PaymentReversalDTO,
   PaymentFailureDTO,
 } from '@/types/payment'
+
+export interface PaymentSourceOptionParams {
+  projectId: string
+  contractId: string
+  partnerId: string
+  payType: string
+  expenseCategory?: string
+}
 
 /** 付款申请列表分页查询 */
 export function getApplicationList(params: Record<string, unknown>) {
@@ -91,6 +100,14 @@ export function getApplicationSources(id: string) {
   return request<PaymentApplicationSourceVO[]>({
     url: `/pay-applications/${id}/sources`,
     method: 'get',
+  })
+}
+
+export function getPaymentSourceOptions(params: PaymentSourceOptionParams) {
+  return request<PaymentSourceOptionVO[]>({
+    url: '/pay-applications/source-options',
+    method: 'get',
+    params,
   })
 }
 

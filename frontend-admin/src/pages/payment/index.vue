@@ -11,6 +11,7 @@ import {
   getApplicationDetail,
   getApplicationList,
   getApplicationSources,
+  getPaymentSourceOptions,
   getPaymentTraceByApplication,
   saveApplicationSources,
   submitForApproval,
@@ -30,7 +31,12 @@ import { ColumnSettingsButton, LgEmptyState } from '@/components/list-page'
 import { useReferenceStore } from '@/stores/reference'
 import { useUserStore } from '@/stores/user'
 import { PAY_STATUS_COLOR, PAY_STATUS_LABEL, PAY_TYPE_COLOR, PAY_TYPE_LABEL } from '@/types/payment'
-import type { PayApplicationVO, PaymentApplicationSourceVO, PaymentTraceVO } from '@/types/payment'
+import type {
+  PayApplicationVO,
+  PaymentApplicationSourceVO,
+  PaymentSourceOptionVO,
+  PaymentTraceVO,
+} from '@/types/payment'
 import type { CashJournalEntryVO, FundAccountVO } from '@/types/cashbook'
 import type { BudgetLineVO } from '@/types/budget'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
@@ -102,6 +108,9 @@ const formData = reactive<Partial<PayApplicationVO>>({
 })
 const budgetLines = ref<BudgetLineVO[]>([])
 const sourceList = ref<(Partial<PaymentApplicationSourceVO> & { key: number })[]>([])
+const sourceOptions = ref<PaymentSourceOptionVO[]>([])
+const sourceOptionsLoading = ref(false)
+let sourceOptionsRequest = 0
 const proofFile = ref<File>()
 let sourceKeyCounter = 0
 const formPartnerName = computed(
@@ -111,6 +120,49 @@ const formPartnerName = computed(
 function onContractChange(contractId: string) {
   const c = contracts.value?.find((ct) => ct.id === contractId)
   formData.partnerId = c?.partyBId
+}
+
+function canLoadSourceOptions(): boolean {
+  return Boolean(
+    formData.projectId &&
+    formData.contractId &&
+    formData.partnerId &&
+    ((formData.payType === 'PROGRESS' && formData.expenseCategory === 'SUBCONTRACT') ||
+      formData.payType === 'FINAL'),
+  )
+}
+
+async function loadSourceOptions() {
+  const requestId = ++sourceOptionsRequest
+  sourceOptions.value = []
+  if (!canLoadSourceOptions()) {
+    sourceOptionsLoading.value = false
+    return
+  }
+  sourceOptionsLoading.value = true
+  try {
+    const options = await getPaymentSourceOptions({
+      projectId: formData.projectId!,
+      contractId: formData.contractId!,
+      partnerId: formData.partnerId!,
+      payType: formData.payType!,
+      expenseCategory: formData.expenseCategory,
+    })
+    if (requestId === sourceOptionsRequest) sourceOptions.value = options
+  } catch (error: unknown) {
+    if (requestId === sourceOptionsRequest) {
+      console.error(error)
+      sourceOptions.value = []
+      message.warning('可付款业务单据加载失败，请重试')
+    }
+  } finally {
+    if (requestId === sourceOptionsRequest) sourceOptionsLoading.value = false
+  }
+}
+
+function handleSourceTypeChange(record: Partial<PaymentApplicationSourceVO> & { key: number }) {
+  record.sourceRefId = ''
+  void loadSourceOptions()
 }
 
 async function handleFormProjectChange(projectId: string) {
@@ -139,6 +191,24 @@ watch(
   () => formData.contractId,
   (val) => {
     if (!val) formData.partnerId = undefined
+  },
+)
+
+watch(
+  [
+    () => formData.projectId,
+    () => formData.contractId,
+    () => formData.partnerId,
+    () => formData.payType,
+    () => formData.expenseCategory,
+  ],
+  () => {
+    sourceList.value.forEach((source) => {
+      if (source.sourceType === 'SUB_MEASURE' || source.sourceType === 'SETTLEMENT') {
+        source.sourceRefId = ''
+      }
+    })
+    void loadSourceOptions()
   },
 )
 
@@ -294,6 +364,7 @@ function handleAdd() {
     applyReason: '',
   })
   sourceList.value = []
+  sourceOptions.value = []
   sourceKeyCounter = 0
   proofFile.value = undefined
   budgetLines.value = []
@@ -322,6 +393,7 @@ async function handleEdit(record: PayApplicationVO) {
     const sources = await getApplicationSources(record.id)
     sourceList.value = sources.map((item, index) => ({ ...item, key: index }))
     sourceKeyCounter = sourceList.value.length
+    await loadSourceOptions()
     proofFile.value = undefined
   } catch (e: unknown) {
     console.error(e)
@@ -841,12 +913,15 @@ onMounted(() => {
       :pay-type-label="PAY_TYPE_LABEL"
       :budget-lines="budgetLines"
       :source-list="sourceList"
+      :source-options="sourceOptions"
+      :source-options-loading="sourceOptionsLoading"
       :proof-file-name="proofFile?.name"
       :on-form-project-change="handleFormProjectChange"
       :on-contract-change="onContractChange"
       :on-budget-line-change="handleBudgetLineChange"
       :on-add-source="handleAddSource"
       :on-remove-source="handleRemoveSource"
+      :on-source-type-change="handleSourceTypeChange"
       :on-proof-file-change="handleProofFileChange"
       @submit="handleSubmit"
     />

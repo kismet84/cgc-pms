@@ -78,6 +78,15 @@ export interface PaymentApplicationSourceVO {
   remark?: string
 }
 
+export interface PaymentSourceOptionVO {
+  sourceType: 'SUB_MEASURE' | 'SETTLEMENT'
+  sourceRefId: string
+  documentCode: string
+  sourceTotalAmount: string
+  committedAmount: string
+  availableAmount: string
+}
+
 /** Payment application basis view object */
 export interface PayApplicationBasisVO {
   id?: string

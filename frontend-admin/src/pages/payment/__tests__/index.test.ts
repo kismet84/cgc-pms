@@ -66,6 +66,7 @@ vi.mock('@/api/modules/payment', () => ({
     total: 1,
   }),
   getApplicationSources: vi.fn().mockResolvedValue([]),
+  getPaymentSourceOptions: vi.fn().mockResolvedValue([]),
   getPaymentTraceByApplication: vi.fn(),
   saveApplicationSources: vi.fn(),
   submitForApproval: vi.fn(),

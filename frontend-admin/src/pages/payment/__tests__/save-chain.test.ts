@@ -59,6 +59,16 @@ describe('PaymentPage save chain integrity', () => {
       expect(paymentSource).toMatch(/await\s+saveApplicationSources\(id!,\s*sources\)/)
     })
 
+    it('selects subcontract payment documents and shows server-computed available balance', () => {
+      expect(paymentSource).toContain('getPaymentSourceOptions')
+      expect(paymentSource).not.toContain('excludeApplicationId')
+      expect(formModalSource).toContain("record.sourceType === 'SUB_MEASURE'")
+      expect(formModalSource).toContain("record.sourceType === 'SETTLEMENT'")
+      expect(formModalSource).toContain('请选择当前上下文内的可付业务单据')
+      expect(formModalSource).toContain('可申请 ${option.availableAmount}')
+      expect(formModalSource).toContain(':disabled="record.sourceType === \'DIRECT\'"')
+    })
+
     it('does not submit stale sourceType/sourceId/amount field names for basis rows', () => {
       expect(formModalSource).not.toContain('v-model:value="record.sourceId"')
       expect(formModalSource).not.toContain('v-model:value="record.amount"')

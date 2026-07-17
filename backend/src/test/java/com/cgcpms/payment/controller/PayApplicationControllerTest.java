@@ -35,7 +35,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "jwt.secret=pay-application-controller-test-secret-key-at-least-sixty-four-characters-long"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("PayApplicationController — 基础 CRUD 端点测试")
@@ -180,6 +183,22 @@ class PayApplicationControllerTest {
         assertEquals(0, log.getSuccessFlag());
         assertFalse(log.getErrorCode() == null || log.getErrorCode().isBlank());
         assertEquals(path, log.getRequestPath());
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("GET /pay-applications/source-options 返回当前分包付款上下文候选")
+    void testListSourceOptions() throws Exception {
+        mockMvc.perform(getWithApi("/pay-applications/source-options")
+                        .cookie(adminCookie())
+                        .param("projectId", String.valueOf(PROJECT_ID))
+                        .param("contractId", String.valueOf(CONTRACT_ID))
+                        .param("partnerId", String.valueOf(PARTNER_ID))
+                        .param("payType", "PROGRESS")
+                        .param("expenseCategory", "SUBCONTRACT"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").isArray());
     }
 
     private void assertAudit(String methodName, Class<?>[] parameterTypes,

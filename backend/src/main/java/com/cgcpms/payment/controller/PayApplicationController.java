@@ -10,6 +10,7 @@ import com.cgcpms.payment.service.PayApplicationService;
 import com.cgcpms.payment.service.PaymentApplicationSourceService;
 import com.cgcpms.payment.entity.PaymentApplicationSource;
 import com.cgcpms.payment.vo.PaymentApplicationSourceVO;
+import com.cgcpms.payment.vo.PaymentSourceOptionVO;
 import com.cgcpms.payment.vo.PayApplicationBasisVO;
 import com.cgcpms.payment.vo.PayApplicationVO;
 import jakarta.validation.Valid;
@@ -42,6 +43,18 @@ public class PayApplicationController {
         IPage<PayApplicationVO> page = payApplicationService.getPage(pageNo, pageSize, projectId, contractId,
                 partnerId, payStatus, approvalStatus, applyCode);
         return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/source-options")
+    @PreAuthorize("hasAuthority('payment:app:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<PaymentSourceOptionVO>> listSourceOptions(
+            @RequestParam Long projectId,
+            @RequestParam Long contractId,
+            @RequestParam Long partnerId,
+            @RequestParam String payType,
+            @RequestParam(required = false) String expenseCategory) {
+        return ApiResponse.success(sourceService.listOptions(projectId, contractId, partnerId,
+                payType, expenseCategory));
     }
 
     @GetMapping("/{id}")
