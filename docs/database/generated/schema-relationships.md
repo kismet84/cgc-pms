@@ -371,4 +371,3 @@ flowchart LR
     variation_owner_submission_item["variation_owner_submission_item"] -->|"var_order_item_id → id / fk_variation_owner_item_source"| var_order_item["var_order_item"]
     variation_owner_submission_item["variation_owner_submission_item"] -->|"submission_id → id / fk_variation_owner_item_submission"| variation_owner_submission["variation_owner_submission"]
 ```
-

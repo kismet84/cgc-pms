@@ -82,7 +82,7 @@ ORDER BY table_name, constraint_name, ordinal_position;
             [void]$dictionary.AppendLine("|$($c[1])|``$($c[2])``|``$($c[3])``|$($c[4])|``$($c[5])``|$($c[6])|$($c[7])|$comment|")
         }
     }
-    Set-Content -LiteralPath (Join-Path $output 'schema-dictionary.md') -Value $dictionary.ToString() -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $output 'schema-dictionary.md') -Value $dictionary.ToString().TrimEnd() -Encoding utf8 -NoNewline
 
     $relationships = [System.Text.StringBuilder]::new()
     [void]$relationships.AppendLine('# CGC-PMS 数据库 ER 关系（自动生成）')
@@ -100,7 +100,7 @@ ORDER BY table_name, constraint_name, ordinal_position;
         [void]$relationships.AppendLine($edge)
     }
     [void]$relationships.AppendLine('```')
-    Set-Content -LiteralPath (Join-Path $output 'schema-relationships.md') -Value $relationships.ToString() -Encoding utf8
+    Set-Content -LiteralPath (Join-Path $output 'schema-relationships.md') -Value $relationships.ToString().TrimEnd() -Encoding utf8 -NoNewline
 } finally {
     $env:MYSQL_PWD = $previousPassword
 }

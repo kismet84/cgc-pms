@@ -3715,7 +3715,6 @@
 |20|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
 |21|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
 |22|`remark`|`varchar(500)`|YES|`∅`|||备注|
-
 ## sub_measure_item
 
 - 表注释：分包计量明细表
