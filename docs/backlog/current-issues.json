@@ -46,24 +46,6 @@
       ]
     },
     {
-      "issueKey": "A-03-QUALITY-SAFETY-DAILY-FACTS",
-      "parentIssueKey": "A-03",
-      "title": "现场日报当日质量安全检查只读联动",
-      "status": "CLOSED",
-      "classification": "RESOLVED",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "已新增双域权限保护的独立只读端点，日报按服务端租户、项目和日期展示当天已提交检查及问题概况。",
-      "acceptanceCriteria": "以日报服务端范围聚合同日已提交检查；双域权限、租户/项目/日期/状态、最小字段、空态、失败态和真实只读页面全部通过。",
-      "sourceRefs": [
-        "backend/src/main/java/com/cgcpms/site/service/SiteDailyLogService.java",
-        "backend/src/main/java/com/cgcpms/quality/entity/QualityInspectionRecord.java",
-        "frontend-admin/src/pages/site/daily-log.vue",
-        "docs/product-intelligence/evolution-decision.md",
-        "docs/quality/ISSUE-048-006-现场日报当日质量安全检查只读联动验收报告.md"
-      ]
-    },
-    {
       "issueKey": "A-04",
       "title": "WBS与进度平台深化",
       "status": "OPEN",
