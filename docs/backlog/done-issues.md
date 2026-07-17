@@ -171,3 +171,8 @@ v1.0 已完成任务及其报告入口保留在 [backlog 快照](../archive/v1.0
 
 状态：Done
 归档报告：`docs/quality/ISSUE-040-055-站内通知租户用户隔离与已读幂等回归验收报告.md`
+
+### ISSUE-040-056：WBS单前置FS门禁与风险提示回归
+
+状态：Done
+归档报告：`docs/quality/ISSUE-040-056-WBS单前置FS门禁与风险提示回归验收报告.md`
