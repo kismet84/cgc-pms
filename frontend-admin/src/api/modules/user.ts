@@ -11,6 +11,14 @@ export function getUserList(params: Record<string, unknown>) {
   })
 }
 
+/** 用户详情 */
+export function getUserDetail(id: string) {
+  return request<SysUserVO>({
+    url: `/system/users/${id}`,
+    method: 'get',
+  })
+}
+
 /** 创建用户 */
 export function createUser(data: Record<string, unknown>) {
   return request<string>({
