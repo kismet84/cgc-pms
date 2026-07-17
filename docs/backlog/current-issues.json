@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-17T16:09:05+08:00",
+  "updatedAt": "2026-07-17T16:20:31+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -56,35 +56,6 @@
       "acceptanceCriteria": "先通过产品决策门和数据模型评审，再验证依赖一致性、环检测和项目隔离。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
-      ]
-    },
-    {
-      "issueKey": "A-05",
-      "title": "供应商综合履约",
-      "status": "OPEN",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "当前只有交付维度，质量、价格、退货、服务和黑名单仍缺。",
-      "acceptanceCriteria": "核实真实数据质量后形成可解释、可追溯且不越权的最小履约闭环。",
-      "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md"
-      ]
-    },
-    {
-      "issueKey": "A-05-CLOSED-LOOP-RECONCILIATION",
-      "parentIssueKey": "A-05",
-      "title": "供应商综合履约现状复核与聚合问题裁决",
-      "status": "OPEN",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "A-05仍称只有交付维度，但当前供应商招采模块已实现质量、商业、服务、退货、结算、黑名单审批和全链路追溯，需要以当前证据裁决聚合问题是否已失效。",
-      "acceptanceCriteria": "复验综合评分事实来源、租户/项目权限、状态不可变、黑名单职责分离和真实页面可达性；证据完整则关闭A-05，否则只登记可复现的唯一剩余缺口。",
-      "sourceRefs": [
-        "backend/src/main/java/com/cgcpms/supplier/service/SupplierSourcingService.java",
-        "frontend-admin/src/pages/supplier-sourcing/index.vue",
-        "docs/product-intelligence/evolution-decision.md"
       ]
     },
     {
@@ -343,6 +314,21 @@
       "summary": "隔离目录仍有受原ACL保护的残留文件，但不进入版本管理或构建。",
       "acceptanceCriteria": "在不影响用户环境的前提下取得权限并清理，或确认长期隔离且构建不引用。",
       "sourceRefs": [
+        "docs/backlog/current-focus.md"
+      ]
+    },
+    {
+      "issueKey": "OPS-DEV-MYSQL-FLYWAY-DRIFT",
+      "title": "本地开发 MySQL 迁移历史漂移",
+      "status": "OBSERVATION",
+      "classification": "OPERATIONAL_RISK",
+      "priority": "P1",
+      "blocking": false,
+      "summary": "现有开发库的 Flyway 历史与当前 master 不一致，供应商 V210 表缺失；当前迁移在一次性 MySQL 8.4 空库可完整执行到 V210。",
+      "acceptanceCriteria": "备份开发库后，在不修改历史迁移文件的前提下完成迁移历史对账；当前 master 以 Flyway 启用方式启动，V210 成功且 sp_performance_evaluation、sp_supplier_return、sp_blacklist_record 存在，健康检查和供应商只读接口通过。",
+      "deferReason": "需要独立数据库备份、历史对账和回滚窗口；本轮仅获供应商闭环只读验收授权，不应改写共享开发库。",
+      "sourceRefs": [
+        "docs/quality/ISSUE-048-004-供应商综合履约现状复核与聚合问题裁决验收报告.md",
         "docs/backlog/current-focus.md"
       ]
     },
