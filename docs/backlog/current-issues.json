@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-17T16:31:34+08:00",
+  "updatedAt": "2026-07-17T16:41:15+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -314,21 +314,6 @@
       "summary": "隔离目录仍有受原ACL保护的残留文件，但不进入版本管理或构建。",
       "acceptanceCriteria": "在不影响用户环境的前提下取得权限并清理，或确认长期隔离且构建不引用。",
       "sourceRefs": [
-        "docs/backlog/current-focus.md"
-      ]
-    },
-    {
-      "issueKey": "OPS-DEV-MYSQL-FLYWAY-DRIFT",
-      "title": "本地开发 MySQL 迁移历史漂移",
-      "status": "OBSERVATION",
-      "classification": "OPERATIONAL_RISK",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "现有开发库的旧 V188～V203 内容与当前重新编号后的迁移错位，V181/V183 及当前供应商等迁移未应用；直接 repair 会形成校验通过但结构缺失的假基线。",
-      "acceptanceCriteria": "完整备份并独立恢复读回后，只重建 localhost:3307 的 cgc_pms；当前 master 从 V1 迁移到 V210且 validate 通过，供应商三表、健康检查、开发登录和三个供应商只读接口通过。",
-      "deferReason": "已由 ISSUE-048-005 正式承接；执行前必须满足本地 host、容器名和 ALLOW_TEST_DATA_RESET 三重门禁，且备份恢复验真先于重建。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-048-004-供应商综合履约现状复核与聚合问题裁决验收报告.md",
         "docs/backlog/current-focus.md"
       ]
     },

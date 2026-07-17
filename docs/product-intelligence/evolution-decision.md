@@ -8,6 +8,7 @@
 - 裁决：准入 `ISSUE-048-005`。三重门禁为 `127.0.0.1:3307`、`cgc-pms-mysql-dev` 和 `ALLOW_TEST_DATA_RESET`；备份验真先于重建，只操作 `cgc_pms`，不改迁移、业务代码、编排或生产/远程数据库。
 - 验收：当前 Flyway V1→V210 与 validate、V210/关键表读回、backend health、开发登录、供应商三个 GET 均通过；一次性恢复容器删除，原库完整备份保留。
 - 回滚：停止 backend，重建空 `cgc_pms` 后导入已验真备份并重启。Git 回退不能替代数据库回滚。
+- 实施回写：`ISSUE-048-005` 已完成。旧库备份在一次性 MySQL 中恢复后表数、历史数和旧末版本一致；本地 `cgc_pms` 随后由当前 master 执行207条迁移到 V210，失败0，validate、MySQL smoke、backend健康、开发登录和供应商3个GET通过。`OPS-DEV-MYSQL-FLYWAY-DRIFT` 已关闭，回滚备份保留且一次性容器已删除。
 
 ## PI-2026-07-17-04：供应商综合履约现状复核与聚合问题裁决
 

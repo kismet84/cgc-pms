@@ -1,5 +1,11 @@
 # Current Focus
 
+## 2026-07-17 增量：本地开发 MySQL 迁移基线重建完成
+
+- `ISSUE-048-005` 已在 `127.0.0.1` 的3307端口、指定开发容器和 reset sentinel 三重门禁下完成。原库完整逻辑备份524,349字节、SHA-256为 `3cd81335b6900d06e5b14eea701aee9f03ac4d8b3e3b8be3ce3c7fb496399ddf`，独立恢复读回149张表、198条历史和旧V203一致。
+- 本地 `cgc_pms` 已由当前 master 从 V1 重新执行207条迁移到 V210，失败0，当前184个表/视图；Flyway validate、MySQL smoke、backend健康、开发登录和供应商3个GET均通过。
+- `OPS-DEV-MYSQL-FLYWAY-DRIFT` 已关闭；备份保留在本地忽略目录用于回滚，一次性恢复容器已删除。新增后续项0、关闭1、净变化-1；本次 `启动迭代-20` 当前完成5/20。
+
 ## 2026-07-17 增量：本地开发 MySQL 迁移基线重建进入 Ready
 
 - `ISSUE-048-005` 处理已正式承接的 `OPS-DEV-MYSQL-FLYWAY-DRIFT`：开发库历史将旧 V188～V203 内容记录在与当前迁移不同的版本号上，且缺 V181、V183 和当前 V188～V194/V204～V210，不能用 `flyway repair` 掩盖。
