@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-17T16:41:15+08:00",
+  "updatedAt": "2026-07-17T16:46:54+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -43,6 +43,23 @@
       "acceptanceCriteria": "按独立业务价值拆分最小Ready，不重复现有日报事实并验证项目数据范围。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
+      ]
+    },
+    {
+      "issueKey": "A-03-QUALITY-SAFETY-DAILY-FACTS",
+      "parentIssueKey": "A-03",
+      "title": "现场日报当日质量安全检查只读联动",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
+      "priority": "P1",
+      "blocking": false,
+      "summary": "日报已联动材料、领料、WBS和审计，但具备质量安全权限的现场人员仍无法在日报查看当天已提交检查及问题概况。",
+      "acceptanceCriteria": "以日报服务端范围聚合同日已提交检查；双域权限、租户/项目/日期/状态、最小字段、空态、失败态和真实只读页面全部通过。",
+      "sourceRefs": [
+        "backend/src/main/java/com/cgcpms/site/service/SiteDailyLogService.java",
+        "backend/src/main/java/com/cgcpms/quality/entity/QualityInspectionRecord.java",
+        "frontend-admin/src/pages/site/daily-log.vue",
+        "docs/product-intelligence/evolution-decision.md"
       ]
     },
     {

@@ -8,6 +8,68 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`～`ISSUE-040-055`、阻塞修复 `ISSUE-047-002` 与 `ISSUE-047-003` 已完成；`启动迭代-20` 已完成 20/20。站内通知的租户/用户隔离、已读幂等、SSE与通知铃契约已完成回归证明。
 
+### ISSUE-048-006：现场日报当日质量安全检查只读联动
+
+优先级：P1
+任务性质：能力新增
+类型：现场日报 / 质量安全 / 同日检查 / 权限交集 / 只读聚合
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-06`；candidateEvidenceHead=3013344e44d97808b624b00fdbe8ff62000be3f0
+存量问题键：[stock:A-03-QUALITY-SAFETY-DAILY-FACTS]
+关联产品目标：在不复制质量安全事实的前提下，让具备双域权限的现场管理人员从日报看到当天已提交检查及问题概况。
+阻塞证据：日报已联动到货、领料、WBS和审计，但尚未展示现有 `qs_inspection_record`/`qs_issue`；A-03仍明确缺少质量安全子域联动。
+解除条件：新增独立只读端点，权限必须同时满足日报查询和质量安全查询；只返回同租户、同项目、日报日期、已提交检查的最小聚合字段，并在日报详情提供受权限控制的空态/失败态。
+Migration：不需要
+依赖：现场日报、质量安全检查/问题、项目数据范围、现有用户权限、当前 V210 开发基线。
+风险等级：高
+运行态要求：当前本地 MySQL/Vite/backend；浏览器只打开日报详情，不创建、提交、整改或复验任何数据。
+Reviewer要求：确认双域权限不能被任一单权限绕过；确认租户/项目/日期/已提交状态和稳定排序；确认只返回计数与检查摘要，不泄露问题描述、责任人、合作方、金额或整改内容。
+归档报告：`docs/quality/ISSUE-048-006-现场日报当日质量安全检查只读联动验收报告.md`
+最小回滚：回退独立只读端点、VO、前端调用和展示；不涉及 schema、质量安全写侧或历史数据。
+目标：
+- 以日报 ID 服务端反查租户、项目和日期，聚合当天已提交质量安全检查及问题计数。
+- 前端仅在管理员或拥有 `quality:safety:query` 时调用和展示，失败不阻断日报正文。
+- 关闭唯一叶子，A-03继续承接人员班组、设备、自动天气、定位、离线和统计。
+非目标：
+- 不从日报创建/修改检查、问题、整改、复验或后果；不新增表、字段、权限或迁移。
+- 不展示问题描述、责任人、合作方、附件、金额、整改动作；不把草稿检查或日报日期外事实计入。
+允许修改：
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/api/modules/site-daily-log.ts`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `frontend-admin/src/pages/site/daily-log.vue`
+- `frontend-admin/src/pages/site/__tests__/daily-log.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-048-006-现场日报当日质量安全检查只读联动验收报告.md`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/quality/**`
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/src/pages/quality-safety/**`
+- `frontend-admin/src/api/modules/qualitySafety.ts`
+- `deploy/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- 新端点先按租户隐藏不存在/跨租户日报，再校验项目访问；Controller同时要求日报查询与质量安全查询，管理员可访问，任一单权限均为403。
+- 只查询同租户、同项目、日报日期且状态为 `SUBMITTED` 的检查；问题必须同时限定租户、项目和检查ID，按检查编号/ID稳定排序，无检查返回空列表且无N+1。
+- 每条仅返回检查ID、编号、地点、结论、问题总数、高风险数、未关闭数；不返回问题正文、责任主体、附件、金额或整改详情。
+- 前端无质量权限不请求；有权限时展示加载、空、失败和数据状态，失败不关闭日报详情，不提供质量安全写操作。
+- 后端专项、前端专项、类型、ESLint、Ready lint、允许/禁止路径和 `git diff --check` 通过；真实页面只读且无新增控制台错误。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-048-006`
+- `cd backend; .\mvnw.cmd "-Dtest=SiteDailyQualitySafetyServiceTest,SiteDailyLogControllerTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/site/__tests__/daily-log.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
 ### ISSUE-048-005：本地开发 MySQL 迁移基线重建
 
 优先级：P1
