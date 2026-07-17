@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-17T16:20:31+08:00",
+  "updatedAt": "2026-07-17T16:31:34+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -324,9 +324,9 @@
       "classification": "OPERATIONAL_RISK",
       "priority": "P1",
       "blocking": false,
-      "summary": "现有开发库的 Flyway 历史与当前 master 不一致，供应商 V210 表缺失；当前迁移在一次性 MySQL 8.4 空库可完整执行到 V210。",
-      "acceptanceCriteria": "备份开发库后，在不修改历史迁移文件的前提下完成迁移历史对账；当前 master 以 Flyway 启用方式启动，V210 成功且 sp_performance_evaluation、sp_supplier_return、sp_blacklist_record 存在，健康检查和供应商只读接口通过。",
-      "deferReason": "需要独立数据库备份、历史对账和回滚窗口；本轮仅获供应商闭环只读验收授权，不应改写共享开发库。",
+      "summary": "现有开发库的旧 V188～V203 内容与当前重新编号后的迁移错位，V181/V183 及当前供应商等迁移未应用；直接 repair 会形成校验通过但结构缺失的假基线。",
+      "acceptanceCriteria": "完整备份并独立恢复读回后，只重建 localhost:3307 的 cgc_pms；当前 master 从 V1 迁移到 V210且 validate 通过，供应商三表、健康检查、开发登录和三个供应商只读接口通过。",
+      "deferReason": "已由 ISSUE-048-005 正式承接；执行前必须满足本地 host、容器名和 ALLOW_TEST_DATA_RESET 三重门禁，且备份恢复验真先于重建。",
       "sourceRefs": [
         "docs/quality/ISSUE-048-004-供应商综合履约现状复核与聚合问题裁决验收报告.md",
         "docs/backlog/current-focus.md"

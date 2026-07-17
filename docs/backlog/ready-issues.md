@@ -8,6 +8,59 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`～`ISSUE-040-055`、阻塞修复 `ISSUE-047-002` 与 `ISSUE-047-003` 已完成；`启动迭代-20` 已完成 20/20。站内通知的租户/用户隔离、已读幂等、SSE与通知铃契约已完成回归证明。
 
+### ISSUE-048-005：本地开发 MySQL 迁移基线重建
+
+优先级：P1
+任务性质：运维治理
+类型：MySQL / Flyway / 本地开发基线 / 备份恢复 / 运行态
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-05`；candidateEvidenceHead=9bd7c16f2cf61b7ad1a6e2db7fc708ba36d23c71
+存量问题键：[stock:OPS-DEV-MYSQL-FLYWAY-DRIFT]
+关联产品目标：恢复当前 master 的本地开发 MySQL 权威基线，使供应商及后续跨域功能可以在 Flyway 启用的真实运行态验收。
+阻塞证据：`flyway:validate` 显示 V188～V203 校验和与当前文件错位、V181/V183 未应用，数据库停在旧 V203 且缺少当前 V204～V210；供应商三张 V189 表缺失，当前后端查询返回500。
+解除条件：完整逻辑备份通过独立恢复读回后，只重建 localhost:3307 的 `cgc_pms`；当前迁移 V1→V210 与 validate 通过，当前 backend 健康、开发登录和供应商只读接口通过。
+Migration：不需要
+依赖：`cgc-pms-mysql-dev`、`cgc-pms-backend-dev`、`.codex-autopilot/ALLOW_TEST_DATA_RESET`、当前 master 后端 JAR、受控本地备份目录。
+风险等级：高
+运行态要求：数据库 host 必须是 `127.0.0.1:3307`/Docker 本地网络且 sentinel 存在；先备份并在一次性 MySQL 恢复验真，再重建；不得连接生产或远程数据库。
+Reviewer要求：确认备份先于重建且可恢复；确认只操作 `cgc_pms`，不改迁移历史文件或其他 schema；确认 V1→V210、validate、表清单、健康、开发登录和供应商 GET 均有读回证据。
+归档报告：`docs/quality/ISSUE-048-005-本地开发MySQL迁移基线重建验收报告.md`
+最小回滚：停止 backend，删除重建后的本地 `cgc_pms`，从已验真的完整逻辑备份恢复原库并重启；不依赖 Git 回退。
+目标：
+- 为当前本地开发库生成完整逻辑备份，记录 SHA-256、大小、表数和 Flyway 末版本，并在一次性 MySQL 中恢复读回。
+- 在三重门禁成立后重建本地 `cgc_pms`，由当前 master Flyway 从 V1 完整执行到 V210，消除错位历史。
+- 复验当前 backend、开发登录和供应商只读链路，关闭唯一运维风险。
+非目标：
+- 不修改迁移 SQL、业务代码、Docker 编排、密钥、生产或远程数据库；不尝试用 `flyway repair` 掩盖错位历史。
+- 不把旧开发测试数据合并进新基线；原数据只保留在已验真的回滚备份中。
+允许修改：
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-048-005-本地开发MySQL迁移基线重建验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `backend/src/test/**`
+- `frontend-admin/src/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- 操作前确认 `127.0.0.1` 的3307端口、容器名和 sentinel 三项全部成立；备份非空、SHA-256固定，并在一次性 MySQL 恢复后读回原表数、原 Flyway 末版本和关键表。
+- 只删除并重建本地 `cgc_pms`；当前迁移从 V1 完整执行到 V210，`flyway_schema_history` 全部成功且 `flyway:validate` 返回0。
+- 重建库含当前供应商三表及 V210，当前 backend 以 Flyway 启用方式健康；开发登录成功，供应商 events/performance/returns GET 均不再因缺表失败。
+- Git 仅含允许治理文档；Ready lint、允许/禁止路径和 `git diff --check` 通过；所有一次性验证容器均精确删除，备份保留用于回滚。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-048-005`
+- `cd backend; .\mvnw.cmd "-Dtest=FlywayMySqlSmokeTest" test`
+- `git diff --check`
+
 ### ISSUE-048-004：供应商综合履约现状复核与聚合问题裁决
 
 优先级：P1
