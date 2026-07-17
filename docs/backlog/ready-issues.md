@@ -193,3 +193,65 @@ Reviewer要求：确认候选查询受付款查询权限、租户和项目数据
 - `cd frontend-admin; pnpm vitest run src/pages/payment/__tests__/index.test.ts src/pages/payment/__tests__/save-chain.test.ts`
 - `cd frontend-admin; pnpm type-check`
 - `git diff --check`
+
+### ISSUE-048-002：采购补货前同项目跨仓可调拨余量提示
+
+优先级：P1
+任务性质：能力新增
+类型：库存补货 / 跨仓余量 / 项目隔离 / 只读决策辅助
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-02`；candidateEvidenceHead=4e1766a83758685a9233185dbeb31a6e0af69194
+存量问题键：[stock:A-02-CROSS-WAREHOUSE-SURPLUS]
+关联产品目标：在低库存直接发起采购前，优先让采购人员看到同项目其他仓库可保留安全库存后调出的余量，减少无效采购判断。
+候选对比：工作日历需要新增日期规则，需求预测缺少审定算法，真实调拨过账需要完整单据、在途和成本模型；本项只读复用现有仓库、项目、库存和安全库存，边界最小。
+核验结论：`mat_stock` 已按租户、仓库和物料维护可用量与安全库存，`mat_warehouse` 已有项目归属和状态；库存页现有低库存动作只预填采购申请，手工出入库接口已停用。
+阻塞证据：当前用户无法在采购前识别同项目其他仓库的可用余量，可能在已有内部余量时仍直接创建采购申请。
+解除条件：服务端从当前库存项反查项目并返回其他启用仓库正余量，页面只读展示且保留现有人工发起采购路径；租户、项目、权限、数量与空结果边界通过验证。
+Migration：不需要
+依赖：既有 `MatStockService`、`MatWarehouse` 项目归属、库存查询权限、项目数据范围和库存台账页面。
+风险等级：高
+运行态要求：本地 H2/MySQL 与 Vite；浏览器只查询和查看提示，不发起采购、不修改补货设置或库存。
+Reviewer要求：确认范围由当前仓库服务端反查并限制同租户同项目；确认只返回其他启用仓库且余量为 `availableQty-safetyStockQty` 的正数；确认提示不预占、不自动调拨、不绕过库存写侧。
+归档报告：`docs/quality/ISSUE-048-002-采购补货前同项目跨仓可调拨余量提示验收报告.md`
+最小回滚：回退只读候选接口、VO、前端类型与展示，不改数据库、库存流水或采购事实。
+目标：
+- 为当前库存项返回同项目其他启用仓库同物料的可调拨余量候选。
+- 在库存辅助分析中展示来源仓名称与可调拨余量，并明确其为非预占的查询快照。
+- 保持现有采购申请由用户明确发起，库存写入继续只走受控业务单据。
+非目标：
+- 不实现调拨单、双边出入库流水、在途、预占、成本结转、跨项目调拨或自动采购。
+- 不实现工作日历、需求预测，不新增迁移、历史数据回填、生产连接、发布或 push。
+允许修改：
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `frontend-admin/src/api/modules/inventory.ts`
+- `frontend-admin/src/types/inventory.ts`
+- `frontend-admin/src/pages/inventory/**`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-048-002-采购补货前同项目跨仓可调拨余量提示验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/procurement/**`
+- `backend/src/main/java/com/cgcpms/requisition/**`
+- `frontend-admin/src/router/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- 当前库存项不存在、跨租户、仓库禁用或无项目访问权时统一不可获取候选；客户端不能通过传入项目扩大范围。
+- 仅返回同租户、同项目、其他启用仓库、同一物料且 `availableQty-safetyStockQty>0` 的候选；余量精确到4位，按余量倒序、仓库 ID 升序稳定排序。
+- 页面只在已加载库存项时请求并展示来源仓、可调拨余量与“未预占”提示；空结果和请求失败不阻断现有台账与采购补货入口。
+- 后端和前端目标测试、类型检查、Ready lint、允许路径与 `git diff --check` 通过；真实 MySQL 只读请求和真实页面只查看验收通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-048-002`
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockServiceTest,MatStockControllerTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/inventory/__tests__/stock-production.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`

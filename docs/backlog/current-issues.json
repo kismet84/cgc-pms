@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-16T10:59:42+08:00",
+  "updatedAt": "2026-07-17T15:25:00+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -24,11 +24,26 @@
       "classification": "STILL_APPLICABLE",
       "priority": "P1",
       "blocking": false,
-      "summary": "供应商默认自然日提前期已交付，剩余工作日历、需求预测和跨仓调拨仍缺。",
+      "summary": "供应商默认自然日提前期已交付；跨仓调拨先拆出同项目其他仓库可调拨余量提示，工作日历、需求预测和调拨过账仍缺。",
       "acceptanceCriteria": "通过产品决策门形成最小闭环，并验证采购角色、项目范围、数量和日期口径。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md",
         "docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md"
+      ]
+    },
+    {
+      "issueKey": "A-02-CROSS-WAREHOUSE-SURPLUS",
+      "title": "采购补货前同项目跨仓可调拨余量提示",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
+      "priority": "P1",
+      "blocking": false,
+      "parentIssueKey": "A-02",
+      "summary": "低库存发起采购补货前，当前页面无法识别同项目其他启用仓库同物料在保留安全库存后的可调拨余量。",
+      "acceptanceCriteria": "只读返回当前租户和同项目其他启用仓库的正可调拨余量，前端在采购补货前展示；不跨项目、不修改库存、不创建调拨事实。",
+      "sourceRefs": [
+        "docs/product-intelligence/evolution-decision.md",
+        "docs/product-intelligence/project-map.md"
       ]
     },
     {
