@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { StockKpiVO } from '@/types/inventory'
+import type { StockTransferCandidateVO } from '@/types/inventory'
 
 defineProps<{
   lowStockWarn: { name: string; qty: number; threshold: number }[]
   kpi: StockKpiVO
   inOutStats: { inPct: number; outPct: number }
+  transferCandidates: StockTransferCandidateVO[]
+  transferCandidatesLoading: boolean
 }>()
 
 defineEmits<{ replenish: [] }>()
@@ -45,6 +48,22 @@ defineEmits<{ replenish: [] }>()
             <span class="lg-type-label" style="grid-column: 2 / span 4">库存正常</span>
           </div>
         </div>
+      </section>
+      <section class="stock-analysis-section">
+        <div class="stock-section-title">同项目可调拨余量</div>
+        <div v-if="transferCandidatesLoading" class="stock-transfer-hint">正在查询其他仓库…</div>
+        <template v-else-if="transferCandidates.length">
+          <div
+            v-for="candidate in transferCandidates"
+            :key="candidate.warehouseId"
+            class="stock-transfer-row"
+          >
+            <span class="stock-transfer-name">{{ candidate.warehouseName }}</span>
+            <strong>{{ candidate.transferableQty }}</strong>
+          </div>
+          <div class="stock-transfer-hint">查询快照，未预占库存</div>
+        </template>
+        <div v-else class="stock-transfer-hint">暂无可调拨余量</div>
       </section>
       <section class="stock-analysis-section">
         <div class="stock-section-title">出入库统计</div>
@@ -144,6 +163,26 @@ defineEmits<{ replenish: [] }>()
   font-size: 14px;
   font-weight: 700;
   line-height: 20px;
+}
+
+.stock-transfer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.stock-transfer-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-transfer-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .stock-analysis-section :deep(.lg-type-row),

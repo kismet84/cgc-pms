@@ -10,6 +10,7 @@ import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.inventory.vo.MatStockLedgerVO;
 import com.cgcpms.inventory.vo.MatStockVO;
 import com.cgcpms.inventory.vo.StockKpiVO;
+import com.cgcpms.inventory.vo.StockTransferCandidateVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -54,6 +55,13 @@ public class MatStockController {
     public ApiResponse<StockKpiVO> getKpi(@RequestParam(required = false) Long warehouseId,
                                            @RequestParam(required = false) Long projectId) {
         return ApiResponse.success(matStockService.getKpi(warehouseId, projectId));
+    }
+
+    @GetMapping("/{id}/transfer-candidates")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:stock:list')")
+    public ApiResponse<java.util.List<StockTransferCandidateVO>> getTransferCandidates(
+            @PathVariable Long id) {
+        return ApiResponse.success(matStockService.getTransferCandidates(id));
     }
 
     @PutMapping("/{id}/safety-threshold")

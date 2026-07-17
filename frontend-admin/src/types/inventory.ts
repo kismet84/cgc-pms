@@ -34,6 +34,15 @@ export interface MatStockVO {
   unit?: string
 }
 
+/** 同项目其他仓库可调拨余量（查询快照，不预占） */
+export interface StockTransferCandidateVO {
+  warehouseId: string
+  warehouseName: string
+  availableQty: string
+  safetyStockQty: string
+  transferableQty: string
+}
+
 /** 库存流水 */
 export interface MatStockTxnVO {
   id: string

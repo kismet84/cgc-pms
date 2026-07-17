@@ -4,6 +4,7 @@ import { message } from 'ant-design-vue'
 import {
   getStockLedger,
   getStockKpi,
+  getStockTransferCandidates,
   getWarehouseList,
   updateStockReplenishmentSettings,
 } from '@/api/modules/inventory'
@@ -13,7 +14,13 @@ import {
   readStringQuery,
   replaceListQuery,
 } from '@/composables/listPageQuery'
-import type { WarehouseVO, MatStockTxnVO, StockKpiVO, MatStockVO } from '@/types/inventory'
+import type {
+  WarehouseVO,
+  MatStockTxnVO,
+  StockKpiVO,
+  MatStockVO,
+  StockTransferCandidateVO,
+} from '@/types/inventory'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
 // ---- 交易类型 ----
@@ -97,6 +104,8 @@ export function useStockLedger({
   const hasLoaded = ref(false)
   const listError = ref<string | null>(null)
   const stock = ref<MatStockVO | null>(null)
+  const transferCandidates = ref<StockTransferCandidateVO[]>([])
+  const transferCandidatesLoading = ref(false)
   const safetyThresholdDraft = ref<number | null>(null)
   const replenishmentTargetDraft = ref<number | null>(null)
   const replenishmentLeadDaysDraft = ref<number | null>(null)
@@ -149,9 +158,13 @@ export function useStockLedger({
 
   // ---- 防陈旧响应 ----
   let fetchSeq = 0
+  let transferCandidateSeq = 0
 
   function resetTxnState() {
+    transferCandidateSeq += 1
     stock.value = null
+    transferCandidates.value = []
+    transferCandidatesLoading.value = false
     safetyThresholdDraft.value = null
     replenishmentTargetDraft.value = null
     replenishmentLeadDaysDraft.value = null
@@ -185,6 +198,7 @@ export function useStockLedger({
       })
       if (mySeq !== fetchSeq) return
       stock.value = res.stock
+      void fetchTransferCandidates(res.stock)
       safetyThresholdDraft.value = res.stock ? Number(res.stock.safetyStockQty) : null
       replenishmentTargetDraft.value =
         res.stock?.replenishmentTargetQty == null ? null : Number(res.stock.replenishmentTargetQty)
@@ -206,6 +220,30 @@ export function useStockLedger({
       if (mySeq === fetchSeq) {
         hasLoaded.value = true
         loading.value = false
+      }
+    }
+  }
+
+  async function fetchTransferCandidates(currentStock: MatStockVO | null) {
+    if (!currentStock) {
+      transferCandidates.value = []
+      return
+    }
+    const mySeq = ++transferCandidateSeq
+    transferCandidatesLoading.value = true
+    try {
+      const candidates = (await getStockTransferCandidates(currentStock.id)) ?? []
+      if (mySeq === transferCandidateSeq && stock.value?.id === currentStock.id) {
+        transferCandidates.value = candidates
+      }
+    } catch (e: unknown) {
+      console.error(e)
+      if (mySeq === transferCandidateSeq) {
+        transferCandidates.value = []
+      }
+    } finally {
+      if (mySeq === transferCandidateSeq) {
+        transferCandidatesLoading.value = false
       }
     }
   }
@@ -476,6 +514,8 @@ export function useStockLedger({
     hasRequiredFilters,
     showEmptyState,
     stock,
+    transferCandidates,
+    transferCandidatesLoading,
     safetyThresholdDraft,
     replenishmentTargetDraft,
     replenishmentLeadDaysDraft,

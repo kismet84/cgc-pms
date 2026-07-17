@@ -11,6 +11,7 @@ import type {
   PurchaseRequestQuery,
   StockKpiVO,
   MatStockVO,
+  StockTransferCandidateVO,
 } from '@/types/inventory'
 
 // ── 仓库 CRUD ──
@@ -104,6 +105,14 @@ export function getStockKpi(params?: { warehouseId?: string; projectId?: string 
     url: '/inventory/stock/kpi',
     method: 'get',
     params,
+  })
+}
+
+/** 查询当前库存项在同项目其他启用仓库的可调拨余量快照 */
+export function getStockTransferCandidates(id: string) {
+  return request<StockTransferCandidateVO[]>({
+    url: `/inventory/stock/${id}/transfer-candidates`,
+    method: 'get',
   })
 }
 

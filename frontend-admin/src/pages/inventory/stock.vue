@@ -28,6 +28,8 @@ const {
   loading,
   listError,
   stock,
+  transferCandidates,
+  transferCandidatesLoading,
   safetyThresholdDraft,
   replenishmentTargetDraft,
   replenishmentLeadDaysDraft,
@@ -345,6 +347,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         :low-stock-warn="lowStockWarn"
         :kpi="kpi"
         :in-out-stats="inOutStats"
+        :transfer-candidates="transferCandidates"
+        :transfer-candidates-loading="transferCandidatesLoading"
         @replenish="handleReplenish"
       />
     </div>

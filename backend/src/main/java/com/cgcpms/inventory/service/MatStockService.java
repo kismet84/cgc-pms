@@ -15,6 +15,7 @@ import com.cgcpms.inventory.vo.MatStockLedgerVO;
 import com.cgcpms.inventory.vo.MatStockTxnVO;
 import com.cgcpms.inventory.vo.MatStockVO;
 import com.cgcpms.inventory.vo.StockKpiVO;
+import com.cgcpms.inventory.vo.StockTransferCandidateVO;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -437,6 +438,39 @@ public class MatStockService {
         return kpi;
     }
 
+    /**
+     * 查询当前库存项在同项目其他启用仓库的可调拨余量。
+     * 结果只是查询快照，不预占库存；项目范围由当前库存项所属仓库反查。
+     */
+    public List<StockTransferCandidateVO> getTransferCandidates(Long stockId) {
+        MatStock currentStock = loadAuthorizedStock(stockId, "查询跨仓可调拨余量");
+        Long tenantId = UserContext.getCurrentTenantId();
+        MatWarehouse currentWarehouse = matWarehouseMapper.selectById(currentStock.getWarehouseId());
+
+        List<MatWarehouse> warehouses = matWarehouseMapper.selectList(new LambdaQueryWrapper<MatWarehouse>()
+                .eq(MatWarehouse::getTenantId, tenantId)
+                .eq(MatWarehouse::getProjectId, currentWarehouse.getProjectId())
+                .eq(MatWarehouse::getStatus, "ENABLE")
+                .ne(MatWarehouse::getId, currentWarehouse.getId()));
+        if (warehouses.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, MatWarehouse> warehouseMap = warehouses.stream()
+                .collect(Collectors.toMap(MatWarehouse::getId, warehouse -> warehouse));
+        List<MatStock> stocks = matStockMapper.selectList(new LambdaQueryWrapper<MatStock>()
+                .eq(MatStock::getTenantId, tenantId)
+                .eq(MatStock::getMaterialId, currentStock.getMaterialId())
+                .in(MatStock::getWarehouseId, warehouseMap.keySet()));
+
+        return stocks.stream()
+                .map(stock -> toTransferCandidate(stock, warehouseMap.get(stock.getWarehouseId())))
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(StockTransferCandidateVO::getTransferableQty).reversed()
+                        .thenComparing(StockTransferCandidateVO::getWarehouseId))
+                .collect(Collectors.toList());
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public MatStock updateSafetyStockThreshold(Long stockId, BigDecimal safetyStockQty) {
         validateQuantity(safetyStockQty, "INVALID_SAFETY_STOCK_THRESHOLD", "安全库存阈值");
@@ -507,6 +541,22 @@ public class MatStockService {
         wrapper.last("LIMIT 1"); // SQL-SAFETY: fixed-sql-fragment
         List<MatStock> results = matStockMapper.selectList(wrapper);
         return results.isEmpty() ? null : results.get(0);
+    }
+
+    private StockTransferCandidateVO toTransferCandidate(MatStock stock, MatWarehouse warehouse) {
+        BigDecimal available = stock.getAvailableQty() == null ? BigDecimal.ZERO : stock.getAvailableQty();
+        BigDecimal safety = stock.getSafetyStockQty() == null ? BigDecimal.ZERO : stock.getSafetyStockQty();
+        BigDecimal transferable = available.subtract(safety).setScale(4, RoundingMode.HALF_UP);
+        if (warehouse == null || transferable.signum() <= 0) {
+            return null;
+        }
+        StockTransferCandidateVO candidate = new StockTransferCandidateVO();
+        candidate.setWarehouseId(warehouse.getId());
+        candidate.setWarehouseName(warehouse.getWarehouseName());
+        candidate.setAvailableQty(available.setScale(4, RoundingMode.HALF_UP));
+        candidate.setSafetyStockQty(safety.setScale(4, RoundingMode.HALF_UP));
+        candidate.setTransferableQty(transferable);
+        return candidate;
     }
 
     private List<Long> findEnabledWarehouseIds(Long tenantId, Long warehouseId, Long projectId) {
