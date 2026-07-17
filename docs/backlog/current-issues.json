@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-17T17:03:45+08:00",
+  "updatedAt": "2026-07-17T17:11:44+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -30,6 +30,23 @@
         "docs/backlog/v1.0-historical-issue-classification.md",
         "docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md",
         "docs/quality/ISSUE-048-003-采购前已审批在途余量提示验收报告.md"
+      ]
+    },
+    {
+      "issueKey": "A-02-STOCK-TRANSFER-POSTING",
+      "parentIssueKey": "A-02",
+      "title": "同项目跨仓库存调拨过账",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
+      "priority": "P1",
+      "blocking": false,
+      "summary": "库存页已有同项目其他启用仓库的可调拨余量提示，但只能查看，无法形成原子、幂等、可追溯的跨仓数量与价值转移。",
+      "acceptanceCriteria": "同租户同项目同物料跨仓调拨在单事务内完成，守住来源仓安全库存、目标仓价值、幂等、并发和权限边界，并可从库存流水追溯。",
+      "sourceRefs": [
+        "backend/src/main/java/com/cgcpms/inventory/service/MatStockService.java",
+        "backend/src/main/java/com/cgcpms/inventory/controller/MatStockController.java",
+        "frontend-admin/src/pages/inventory/components/StockAnalysisPanel.vue",
+        "docs/product-intelligence/evolution-decision.md"
       ]
     },
     {

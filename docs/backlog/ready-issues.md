@@ -8,6 +8,73 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`～`ISSUE-040-055`、阻塞修复 `ISSUE-047-002` 与 `ISSUE-047-003` 已完成；`启动迭代-20` 已完成 20/20。站内通知的租户/用户隔离、已读幂等、SSE与通知铃契约已完成回归证明。
 
+### ISSUE-048-007：同项目跨仓库存调拨过账
+
+优先级：P1
+任务性质：能力新增
+类型：库存 / 跨仓调拨 / 原子过账 / 价值守恒 / 幂等并发
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-07`；candidateEvidenceHead=5da5808847bd7385efc215cc6dff6fda4979c960
+存量问题键：[stock:A-02-STOCK-TRANSFER-POSTING]
+关联产品目标：把同项目跨仓可调拨余量从只读提示闭合为安全、可追溯且保持数量/价值守恒的真实库存动作。
+阻塞证据：`getTransferCandidates` 已展示来源仓、可用量、安全库存和可调拨量，但当前没有调拨事实、写端点或前端动作，采购人员仍只能看到余量而不能利用余量替代补购。
+解除条件：新增同项目即时调拨事实和双权限写端点，在单事务中完成来源扣减、目标增加、成对流水和幂等记录；前端只能从服务端候选发起并刷新库存。
+Migration：需要
+依赖：现有库存、仓库、物料、跨仓候选、库存价值、库存流水、项目数据范围、库存编辑与事务权限、当前 V210 基线。
+风险等级：高
+运行态要求：dev/test 本地 MySQL；先以自动化覆盖写链，真实页面只查看候选和调拨入口，不在共享开发库提交调拨；如需写验收仅使用满足重置门禁的一次性数据库。
+Reviewer要求：确认不同租户/项目/物料/同仓拒绝，来源安全库存不能被突破，成对流水与调拨事实完全一致，数量和价值守恒，重复键/并发不会双扣，任一单权限不能过账。
+归档报告：`docs/quality/ISSUE-048-007-同项目跨仓库存调拨过账验收报告.md`
+最小回滚：代码可回退；V211表保留不删，未投产时可停用入口，已完成事实只能通过后续反向调拨冲正，禁止直接删流水或改库存。
+目标：
+- 新增调拨事实、DTO/VO、服务与独立端点，复用库存价值原语完成同项目同物料跨仓即时过账。
+- 以同租户幂等键唯一、提交时重算安全余量、稳定并发控制和单事务成对流水保证不重扣、不超调、不留半边事实。
+- 在库存分析区从服务端候选发起调拨；成功后刷新库存、候选和流水，权限不足不展示动作。
+非目标：
+- 不恢复通用手工入/出库，不做跨项目/跨租户、审批流、在途运输、批次/序列号、费用或跨币种计价。
+- 不修改采购在途、补货建议、安全库存计算、领料/验收入出库或历史流水；不在共享开发库写验收数据。
+允许修改：
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `backend/src/main/resources/db/migration/V211__add_stock_transfer_posting.sql`
+- `frontend-admin/src/api/modules/inventory.ts`
+- `frontend-admin/src/types/inventory.ts`
+- `frontend-admin/src/pages/inventory/stock.vue`
+- `frontend-admin/src/pages/inventory/components/StockAnalysisPanel.vue`
+- `frontend-admin/src/pages/inventory/__tests__/**`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-048-007-同项目跨仓库存调拨过账验收报告.md`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `backend/src/main/java/com/cgcpms/requisition/**`
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- `backend/src/main/resources/db/migration/V1__init.sql`～`V210__drop_obsolete_deleted_tokens.sql`
+- `frontend-admin/src/pages/purchase/**`
+- `deploy/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- 调拨端点仅管理员或同时拥有 `inventory:stock:edit` 与 `inventory:transaction:add` 的用户可访问，任一单权限403；服务端校验租户、项目数据范围、两端启用仓库、同项目、不同仓、同物料。
+- 数量必须大于0且不超过提交时来源 `available_qty - safety_stock_qty`；并发调拨总量不能突破安全库存，失败不得留下调拨事实、单边库存或单边流水。
+- 首次成功只产生一条 `COMPLETED` 调拨事实和两条共用调拨ID的 `STOCK_TRANSFER` 流水；来源 `OUT`、目标 `IN` 数量相等，单位成本取来源历史成本，项目总数量与总价值前后相等。
+- 同租户同幂等键相同载荷返回原结果，不重复扣增；相同键不同载荷冲突。不同租户可复用同一键且数据互不可见。
+- 前端仅从当前库存的服务端候选发起，限制最大可调拨量并提交原因/幂等键；权限不足不展示，成功刷新列表/候选/流水，失败保留当前页面并给出错误。
+- MySQL V1→V211、后端专项/并发测试、前端专项、类型、ESLint、Ready lint、允许/禁止路径和 `git diff --check` 全部通过；真实页面不产生新增控制台错误。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-048-007`
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockTransferServiceTest,MatStockTransferControllerTest,MatStockTransferConcurrencyTest,FlywayMySqlSmokeTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/inventory/__tests__/stock-transfer.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm eslint src/pages/inventory/stock.vue src/pages/inventory/components/StockAnalysisPanel.vue src/api/modules/inventory.ts src/types/inventory.ts src/pages/inventory/__tests__/stock-transfer.test.ts`
+- `git diff --check`
+
 ### ISSUE-048-006：现场日报当日质量安全检查只读联动
 
 优先级：P1
