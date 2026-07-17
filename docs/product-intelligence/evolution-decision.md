@@ -10,6 +10,7 @@
 - 非目标：不计算日均、周转、缺货日期、预测、建议采购量、季节性、置信度或自动下单；不改领料、退料、调拨、验收和采购写侧。
 - 回滚：回退只读聚合端点、VO和库存分析区卡片；无迁移、无数据回填、无业务事实逆变更。
 - 官方来源：<https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory/warehouses_storage/reporting/moves_history.html>、<https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory/warehouses_storage/reporting/forecast.html>。
+- 实施结果：`ISSUE-048-008` 已按裁决完成；后端聚合、权限和租户边界，前端窗口解释、失败隔离和陈旧响应防护均通过验收，A-02后续只保留工作日历与真正的预测算法决策。
 
 ## PI-2026-07-17-07：同项目跨仓库存调拨过账
 
