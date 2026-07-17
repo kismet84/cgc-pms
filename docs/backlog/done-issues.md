@@ -211,3 +211,8 @@ v1.0 已完成任务及其报告入口保留在 [backlog 快照](../archive/v1.0
 
 状态：Done
 归档报告：`docs/quality/ISSUE-048-007-同项目跨仓库存调拨过账验收报告.md`
+
+### ISSUE-048-008：库存历史净领料基线
+
+状态：Done
+归档报告：`docs/quality/ISSUE-048-008-库存历史净领料基线验收报告.md`

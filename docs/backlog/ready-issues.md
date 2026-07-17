@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P1
 任务性质：能力新增
 类型：库存 / 历史领料 / 退料冲减 / 30与90日窗口 / 只读基线
-状态：Ready
+状态：Done
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-08`；candidateEvidenceHead=0d71054a4934552a112b213de6681969ef7f4552
 存量问题键：[stock:A-02-MATERIAL-CONSUMPTION-BASELINE]
 关联产品目标：在引入需求预测算法前，让采购和库存人员先看到当前库存项可审计的历史净领料事实，避免把缺少口径的数据直接包装成预测或自动采购建议。
