@@ -6,9 +6,11 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.inventory.entity.MatStock;
+import com.cgcpms.inventory.entity.MatStockTransfer;
 import com.cgcpms.inventory.entity.MatStockTxn;
 import com.cgcpms.inventory.entity.MatWarehouse;
 import com.cgcpms.inventory.mapper.MatStockMapper;
+import com.cgcpms.inventory.mapper.MatStockTransferMapper;
 import com.cgcpms.inventory.mapper.MatStockTxnMapper;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.vo.MatStockLedgerVO;
@@ -17,6 +19,8 @@ import com.cgcpms.inventory.vo.MatStockVO;
 import com.cgcpms.inventory.vo.StockKpiVO;
 import com.cgcpms.inventory.vo.StockIncomingSupplyVO;
 import com.cgcpms.inventory.vo.StockTransferCandidateVO;
+import com.cgcpms.inventory.vo.StockTransferVO;
+import com.cgcpms.inventory.dto.StockTransferDTO;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -32,6 +36,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -54,6 +59,7 @@ public class MatStockService {
     private static final BigDecimal DEFAULT_SAFETY_STOCK_QTY = new BigDecimal("10.0000");
 
     private final MatStockMapper matStockMapper;
+    private final MatStockTransferMapper matStockTransferMapper;
     private final MatStockTxnMapper matStockTxnMapper;
     private final MatWarehouseMapper matWarehouseMapper;
     private final MdMaterialMapper mdMaterialMapper;
@@ -479,6 +485,110 @@ public class MatStockService {
     }
 
     /**
+     * 将同项目同物料从来源库存原子调拨到目标库存。
+     * 两端库存按 ID 稳定加锁，避免反向并发调拨死锁；调拨事实、成对流水与余额在同一事务提交。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public StockTransferVO transfer(StockTransferDTO dto) {
+        if (dto == null || dto.getQuantity() == null || dto.getQuantity().signum() <= 0
+                || dto.getQuantity().scale() > 4) {
+            throw new BusinessException("STOCK_TRANSFER_QUANTITY_INVALID", "调拨数量必须大于0且最多4位小数");
+        }
+        if (dto.getSourceStockId() == null || dto.getTargetStockId() == null) {
+            throw new BusinessException("STOCK_TRANSFER_ROUTE_INVALID", "调拨两端库存不能为空");
+        }
+        if (!StringUtils.hasText(dto.getIdempotencyKey()) || dto.getIdempotencyKey().trim().length() > 100) {
+            throw new BusinessException("STOCK_TRANSFER_IDEMPOTENCY_KEY_INVALID", "幂等键不能为空且不能超过100个字符");
+        }
+        if (!StringUtils.hasText(dto.getReason()) || dto.getReason().trim().length() > 500) {
+            throw new BusinessException("STOCK_TRANSFER_REASON_INVALID", "调拨原因不能为空且不能超过500个字符");
+        }
+        Long tenantId = UserContext.getCurrentTenantId();
+        BigDecimal quantity = dto.getQuantity().setScale(4, RoundingMode.UNNECESSARY);
+        String idempotencyKey = dto.getIdempotencyKey().trim();
+        String reason = dto.getReason().trim();
+
+        MatStockTransfer existing = findTransfer(tenantId, idempotencyKey);
+        if (existing != null) {
+            return resolveExistingTransfer(existing, dto, quantity, reason);
+        }
+
+        MatStockTransfer transfer = new MatStockTransfer();
+        transfer.setTenantId(tenantId);
+        transfer.setSourceStockId(dto.getSourceStockId());
+        transfer.setTargetStockId(dto.getTargetStockId());
+        transfer.setQuantity(quantity);
+        transfer.setUnitCost(BigDecimal.ZERO.setScale(6));
+        transfer.setAmount(BigDecimal.ZERO.setScale(2));
+        transfer.setIdempotencyKey(idempotencyKey);
+        transfer.setStatus("PENDING");
+        transfer.setRemark(reason);
+
+        if (Objects.equals(dto.getSourceStockId(), dto.getTargetStockId())) {
+            throw new BusinessException("STOCK_TRANSFER_ROUTE_INVALID", "来源库存与目标库存不能相同");
+        }
+        long firstId = Math.min(dto.getSourceStockId(), dto.getTargetStockId());
+        long secondId = Math.max(dto.getSourceStockId(), dto.getTargetStockId());
+        MatStock first = matStockMapper.selectByIdForUpdate(firstId, tenantId);
+        MatStock second = matStockMapper.selectByIdForUpdate(secondId, tenantId);
+        if (first == null || second == null) {
+            throw new BusinessException("STOCK_TRANSFER_ROUTE_INVALID", "调拨库存不存在");
+        }
+        // 并发同键请求可能在等待库存锁期间由先行事务完成；必须先重查幂等事实，
+        // 否则会基于已扣减库存误报安全库存不足，而不是返回先行事务结果。
+        existing = matStockTransferMapper.selectByTenantAndKeyForUpdate(tenantId, idempotencyKey);
+        if (existing != null) {
+            return resolveExistingTransfer(existing, dto, quantity, reason);
+        }
+        MatStock source = Objects.equals(first.getId(), dto.getSourceStockId()) ? first : second;
+        MatStock target = Objects.equals(first.getId(), dto.getTargetStockId()) ? first : second;
+
+        MatWarehouse sourceWarehouse = loadTransferWarehouse(source.getWarehouseId(), tenantId);
+        MatWarehouse targetWarehouse = loadTransferWarehouse(target.getWarehouseId(), tenantId);
+        if (Objects.equals(sourceWarehouse.getId(), targetWarehouse.getId())
+                || !Objects.equals(sourceWarehouse.getProjectId(), targetWarehouse.getProjectId())
+                || !Objects.equals(source.getMaterialId(), target.getMaterialId())) {
+            throw new BusinessException("STOCK_TRANSFER_ROUTE_INVALID", "调拨仅支持同项目、同物料的不同启用仓库");
+        }
+        projectAccessChecker.checkAccess(sourceWarehouse.getProjectId(), "执行库存调拨");
+
+        BigDecimal safety = nvl(source.getSafetyStockQty());
+        BigDecimal transferable = nvl(source.getAvailableQty()).subtract(safety);
+        if (transferable.compareTo(quantity) < 0) {
+            throw new BusinessException("STOCK_TRANSFER_SAFETY_LIMIT",
+                    "可调拨数量不足：当前最多可调拨 " + transferable.max(BigDecimal.ZERO));
+        }
+
+        transfer.setProjectId(sourceWarehouse.getProjectId());
+        transfer.setSourceWarehouseId(sourceWarehouse.getId());
+        transfer.setTargetWarehouseId(targetWarehouse.getId());
+        transfer.setMaterialId(source.getMaterialId());
+        try {
+            matStockTransferMapper.insert(transfer);
+        } catch (DuplicateKeyException duplicate) {
+            MatStockTransfer winner = findTransfer(tenantId, idempotencyKey);
+            if (winner == null) {
+                throw new BusinessException("STOCK_TRANSFER_CONCURRENT_CONFLICT", "调拨请求并发冲突，请稍后重试");
+            }
+            return resolveExistingTransfer(winner, dto, quantity, reason);
+        }
+
+        StockMovementResult movement = stockOutValued(sourceWarehouse.getId(), source.getMaterialId(), quantity,
+                "STOCK_TRANSFER", transfer.getId(), source.getId());
+        stockInValued(targetWarehouse.getId(), target.getMaterialId(), quantity, movement.unitCost(),
+                "STOCK_TRANSFER", transfer.getId(), target.getId());
+
+        transfer.setUnitCost(movement.unitCost());
+        transfer.setAmount(movement.amount());
+        transfer.setStatus("COMPLETED");
+        transfer.setCompletedAt(LocalDateTime.now());
+        if (matStockTransferMapper.updateById(transfer) != 1) {
+            throw new BusinessException("STOCK_TRANSFER_CONCURRENT_CONFLICT", "调拨事实更新失败，请稍后重试");
+        }
+        return toTransferVO(transfer);
+    }
+
+    /**
      * 查询当前库存项对应的已审批采购订单未收货余量。
      * 结果按订单汇总，只是未入库查询快照，不改变采购、验收或库存事实。
      */
@@ -601,12 +711,62 @@ public class MatStockService {
             return null;
         }
         StockTransferCandidateVO candidate = new StockTransferCandidateVO();
+        candidate.setStockId(stock.getId());
         candidate.setWarehouseId(warehouse.getId());
         candidate.setWarehouseName(warehouse.getWarehouseName());
         candidate.setAvailableQty(available.setScale(4, RoundingMode.HALF_UP));
         candidate.setSafetyStockQty(safety.setScale(4, RoundingMode.HALF_UP));
         candidate.setTransferableQty(transferable);
         return candidate;
+    }
+
+    private MatWarehouse loadTransferWarehouse(Long warehouseId, Long tenantId) {
+        MatWarehouse warehouse = matWarehouseMapper.selectById(warehouseId);
+        if (warehouse == null || !tenantId.equals(warehouse.getTenantId())
+                || !"ENABLE".equals(warehouse.getStatus())) {
+            throw new BusinessException("STOCK_TRANSFER_ROUTE_INVALID", "调拨仓库不存在或未启用");
+        }
+        return warehouse;
+    }
+
+    private MatStockTransfer findTransfer(Long tenantId, String idempotencyKey) {
+        return matStockTransferMapper.selectOne(new LambdaQueryWrapper<MatStockTransfer>()
+                .eq(MatStockTransfer::getTenantId, tenantId)
+                .eq(MatStockTransfer::getIdempotencyKey, idempotencyKey));
+    }
+
+    private StockTransferVO resolveExistingTransfer(MatStockTransfer existing, StockTransferDTO dto,
+                                                     BigDecimal quantity, String reason) {
+        boolean samePayload = Objects.equals(existing.getSourceStockId(), dto.getSourceStockId())
+                && Objects.equals(existing.getTargetStockId(), dto.getTargetStockId())
+                && existing.getQuantity() != null && existing.getQuantity().compareTo(quantity) == 0
+                && Objects.equals(existing.getRemark(), reason);
+        if (!samePayload) {
+            throw new BusinessException("STOCK_TRANSFER_IDEMPOTENCY_CONFLICT", "幂等键已被其他调拨载荷使用");
+        }
+        if (!"COMPLETED".equals(existing.getStatus())) {
+            throw new BusinessException("STOCK_TRANSFER_IN_PROGRESS", "调拨正在处理中，请稍后查询");
+        }
+        return toTransferVO(existing);
+    }
+
+    private StockTransferVO toTransferVO(MatStockTransfer transfer) {
+        StockTransferVO vo = new StockTransferVO();
+        vo.setId(transfer.getId());
+        vo.setProjectId(transfer.getProjectId());
+        vo.setSourceStockId(transfer.getSourceStockId());
+        vo.setTargetStockId(transfer.getTargetStockId());
+        vo.setSourceWarehouseId(transfer.getSourceWarehouseId());
+        vo.setTargetWarehouseId(transfer.getTargetWarehouseId());
+        vo.setMaterialId(transfer.getMaterialId());
+        vo.setQuantity(transfer.getQuantity());
+        vo.setUnitCost(transfer.getUnitCost());
+        vo.setAmount(transfer.getAmount());
+        vo.setIdempotencyKey(transfer.getIdempotencyKey());
+        vo.setStatus(transfer.getStatus());
+        vo.setReason(transfer.getRemark());
+        vo.setCompletedAt(transfer.getCompletedAt());
+        return vo;
     }
 
     private StockIncomingSupplyVO toIncomingSupply(MatPurchaseOrder order, BigDecimal remainingQty) {

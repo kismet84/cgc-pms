@@ -4,6 +4,7 @@ import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.inventory.dto.StockTransactionDTO;
+import com.cgcpms.inventory.dto.StockTransferDTO;
 import com.cgcpms.inventory.dto.SafetyStockThresholdDTO;
 import com.cgcpms.inventory.dto.ReplenishmentSettingsDTO;
 import com.cgcpms.inventory.service.MatStockService;
@@ -12,6 +13,7 @@ import com.cgcpms.inventory.vo.MatStockVO;
 import com.cgcpms.inventory.vo.StockKpiVO;
 import com.cgcpms.inventory.vo.StockIncomingSupplyVO;
 import com.cgcpms.inventory.vo.StockTransferCandidateVO;
+import com.cgcpms.inventory.vo.StockTransferVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -63,6 +65,14 @@ public class MatStockController {
     public ApiResponse<java.util.List<StockTransferCandidateVO>> getTransferCandidates(
             @PathVariable Long id) {
         return ApiResponse.success(matStockService.getTransferCandidates(id));
+    }
+
+    @PostMapping("/transfers")
+    @AuditedOperation(type = "CREATE", businessType = "STOCK_TRANSFER", businessIdExpression = "#dto.idempotencyKey")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or "
+            + "(hasAuthority('inventory:stock:edit') and hasAuthority('inventory:transaction:add'))")
+    public ApiResponse<StockTransferVO> transfer(@Valid @RequestBody StockTransferDTO dto) {
+        return ApiResponse.success(matStockService.transfer(dto));
     }
 
     @GetMapping("/{id}/incoming-supplies")

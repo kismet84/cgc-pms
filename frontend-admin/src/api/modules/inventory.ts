@@ -12,6 +12,8 @@ import type {
   StockKpiVO,
   MatStockVO,
   StockTransferCandidateVO,
+  StockTransferParams,
+  StockTransferVO,
   StockIncomingSupplyVO,
 } from '@/types/inventory'
 
@@ -114,6 +116,15 @@ export function getStockTransferCandidates(id: string) {
   return request<StockTransferCandidateVO[]>({
     url: `/inventory/stock/${id}/transfer-candidates`,
     method: 'get',
+  })
+}
+
+/** 原子提交同项目同物料跨仓调拨 */
+export function createStockTransfer(data: StockTransferParams) {
+  return request<StockTransferVO>({
+    url: '/inventory/stock/transfers',
+    method: 'post',
+    data,
   })
 }
 

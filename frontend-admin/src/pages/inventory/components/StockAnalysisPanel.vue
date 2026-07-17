@@ -11,9 +11,13 @@ defineProps<{
   transferCandidatesLoading: boolean
   incomingSupplies: StockIncomingSupplyVO[]
   incomingSuppliesLoading: boolean
+  canTransfer: boolean
 }>()
 
-defineEmits<{ replenish: [] }>()
+defineEmits<{
+  replenish: []
+  transfer: [candidate: StockTransferCandidateVO]
+}>()
 </script>
 
 <template>
@@ -77,7 +81,17 @@ defineEmits<{ replenish: [] }>()
             class="stock-transfer-row"
           >
             <span class="stock-transfer-name">{{ candidate.warehouseName }}</span>
-            <strong>{{ candidate.transferableQty }}</strong>
+            <span class="stock-transfer-action">
+              <strong>{{ candidate.transferableQty }}</strong>
+              <a-button
+                v-if="canTransfer"
+                type="link"
+                size="small"
+                @click="$emit('transfer', candidate)"
+              >
+                调拨
+              </a-button>
+            </span>
           </div>
           <div class="stock-transfer-hint">查询快照，未预占库存</div>
         </template>
@@ -216,6 +230,13 @@ defineEmits<{ replenish: [] }>()
 .stock-transfer-name {
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-transfer-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   white-space: nowrap;
 }
 

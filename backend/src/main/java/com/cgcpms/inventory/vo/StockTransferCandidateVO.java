@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 @Data
 public class StockTransferCandidateVO implements Serializable {
 
+    private Long stockId;
     private Long warehouseId;
     private String warehouseName;
     private BigDecimal availableQty;
