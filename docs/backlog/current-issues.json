@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-17T15:35:00+08:00",
+  "updatedAt": "2026-07-17T15:52:00+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -29,6 +29,21 @@
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md",
         "docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md"
+      ]
+    },
+    {
+      "issueKey": "A-02-APPROVED-INCOMING-SUPPLY",
+      "parentIssueKey": "A-02",
+      "title": "采购前已审批在途余量提示",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
+      "priority": "P1",
+      "blocking": false,
+      "summary": "库存补货页看不到已审批采购订单的未收货数量，可能在已有到货计划时重复补货。",
+      "acceptanceCriteria": "只读展示同租户同项目同物料、已审批且未完成收货的订单余量与预计交付日期，并验证项目数据范围、状态、数量和空结果边界。",
+      "sourceRefs": [
+        "docs/product-intelligence/evolution-decision.md",
+        "docs/product-intelligence/project-map.md"
       ]
     },
     {

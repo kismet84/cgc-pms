@@ -60,6 +60,70 @@ Reviewer要求：确认跨项目、环依赖、未完成前置和单次提示边
 - `cd frontend-admin; pnpm vitest run src/pages/subcontract/__tests__/task.test.ts`
 - `git diff --check`
 
+### ISSUE-048-003：采购前已审批在途余量提示
+
+优先级：P1
+任务性质：能力新增
+类型：库存补货 / 已审批采购在途 / 项目隔离 / 只读决策辅助
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-03`；candidateEvidenceHead=00e9a632a214de52c55146ddafd58d77e99759b7
+存量问题键：[stock:A-02-APPROVED-INCOMING-SUPPLY]
+关联产品目标：在低库存发起采购前展示已有已审批采购订单的未收货数量和预计交付日期，减少重复补货判断。
+候选对比：工作日历需要新增日期规则，历史消耗预测缺少审定算法，真实调拨需要完整写侧模型；本项只读复用采购订单、明细和已收货数量，边界最小。
+核验结论：采购订单已有项目、交付日期、审批和业务状态；明细已有物料、采购数量与已收货数量，库存服务已具备当前库存项的租户和项目范围校验。
+阻塞证据：库存补货页当前只显示库存、台账和跨仓余量，看不到已审批订单剩余到货量，用户可能在已有采购在途时再次发起采购申请。
+解除条件：服务端从当前库存项反查项目和物料，仅返回已审批、未完成、交付日期明确且剩余量为正的同项目订单；页面只读展示且状态、租户、项目、数量和空结果边界通过验证。
+Migration：不需要
+依赖：既有 `MatStockService`、`MatPurchaseOrder`、`MatPurchaseOrderItem`、项目数据范围、库存查询权限和库存台账页面。
+风险等级：高
+运行态要求：本地 H2/MySQL 与 Vite；浏览器只查询和查看提示，不创建采购申请、不修改订单、验收或库存。
+Reviewer要求：确认项目和物料仅由当前库存项服务端反查；确认只计订单与审批状态均为 `APPROVED`、交付日期非空的订单；确认剩余量按订单汇总 `max(quantity-receivedQuantity,0)` 且提示不等于已入库。
+归档报告：`docs/quality/ISSUE-048-003-采购前已审批在途余量提示验收报告.md`
+最小回滚：回退只读接口、VO、前端类型与展示，不改采购订单、验收、库存流水或数据库。
+目标：
+- 为当前库存项返回同项目同物料的已审批采购订单未收货余量。
+- 在库存辅助分析中展示订单号、预计交付日期和剩余数量，并明确其为未入库查询快照。
+- 保持采购、验收与库存写入继续走既有受控业务单据。
+非目标：
+- 不计草稿、审批中、驳回、已完成或无交付日期订单，不修改订单或收货事实。
+- 不实现工作日历、统计需求预测、调拨、预占、自动采购、迁移、历史回填、生产连接、发布或 push。
+允许修改：
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `frontend-admin/src/api/modules/inventory.ts`
+- `frontend-admin/src/types/inventory.ts`
+- `frontend-admin/src/pages/inventory/**`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-048-003-采购前已审批在途余量提示验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `backend/src/main/java/com/cgcpms/receipt/**`
+- `backend/src/main/java/com/cgcpms/procurement/**`
+- `frontend-admin/src/router/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+- `deploy/**`
+验收标准：
+- 当前库存项不存在、跨租户、仓库停用或无项目访问权时不可获取；客户端不能通过传入项目、物料或订单扩大范围。
+- 仅计同租户、同项目、同物料、`approvalStatus=APPROVED`、`orderStatus=APPROVED`、交付日期非空的订单明细；单订单剩余量为各明细 `max(quantity-receivedQuantity,0)` 之和，只返回正数。
+- 结果按预计交付日期、订单 ID 升序稳定排序；数量精确到4位，超收明细按0处理，不得产生负数。
+- 页面只在已加载库存项时请求并展示订单号、预计交付日期、剩余数量和“未入库快照”提示；空结果和请求失败不阻断现有台账、跨仓提示与采购补货入口。
+- 后端和前端目标测试、类型检查、Ready lint、允许路径与 `git diff --check` 通过；真实 MySQL 只读请求和真实页面只查看验收通过。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-048-003`
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockServiceTest,MatStockControllerTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/inventory/__tests__/stock-production.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+
 ## v1.5 准入要求
 
 每条 Ready Issue 必须包含：编号、任务性质、目标、范围、非目标、验收标准、真实存在的验证命令、风险与回滚方式、归档报告路径。
