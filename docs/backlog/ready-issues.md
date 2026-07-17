@@ -199,7 +199,7 @@ Reviewer要求：确认候选查询受付款查询权限、租户和项目数据
 优先级：P1
 任务性质：能力新增
 类型：库存补货 / 跨仓余量 / 项目隔离 / 只读决策辅助
-状态：Ready
+状态：Done
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-02`；candidateEvidenceHead=4e1766a83758685a9233185dbeb31a6e0af69194
 存量问题键：[stock:A-02-CROSS-WAREHOUSE-SURPLUS]
 关联产品目标：在低库存直接发起采购前，优先让采购人员看到同项目其他仓库可保留安全库存后调出的余量，减少无效采购判断。
