@@ -9,6 +9,9 @@ export interface MatPurchaseOrderVO {
   orderType?: string
   orderDate?: string
   deliveryDate?: string
+  deliveryTerms?: string
+  exceptionPurchaseFlag?: number
+  exceptionReason?: string
   totalAmount?: string
   approvalStatus?: string
   orderStatus?: string
@@ -24,13 +27,18 @@ export interface MatPurchaseOrderVO {
 export interface MatPurchaseOrderItemVO {
   id: string
   orderId: string
+  requestItemId?: string
+  budgetLineId?: string
   materialId?: string
   materialName?: string
   specification?: string
   unit?: string
   quantity?: string
   unitPrice?: string
+  taxRate?: string
   amount?: string
+  taxAmount?: string
+  amountWithoutTax?: string
   receivedQuantity?: string
 }
 

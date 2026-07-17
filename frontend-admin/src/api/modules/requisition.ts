@@ -53,6 +53,11 @@ export function submitRequisitionForApproval(id: string) {
   })
 }
 
+/** 仓管员按审批通过的领料单执行实际出库。 */
+export function executeRequisitionStockOut(id: string) {
+  return request<void>({ url: `/requisitions/${id}/stock-out`, method: 'post' })
+}
+
 /** 领料申请明细列表 */
 export function getRequisitionItems(id: string) {
   return request<MatRequisitionItemVO[]>({

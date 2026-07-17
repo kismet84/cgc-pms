@@ -3,9 +3,14 @@ package com.cgcpms.purchase.handler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
+import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
+import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -30,6 +35,9 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
 
     private final MatPurchaseOrderMapper orderMapper;
     private final CtContractMapper contractMapper;
+    private final MatPurchaseOrderItemMapper orderItemMapper;
+    private final MatPurchaseRequestItemMapper requestItemMapper;
+    private final BudgetLedgerService budgetLedgerService;
 
     @Override
     public String supportBusinessType() {
@@ -50,6 +58,9 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
         MatPurchaseOrder order = orderMapper.selectById(orderId);
         if (order == null) {
             throw new BusinessException("ORDER_NOT_FOUND", "采购订单不存在");
+        }
+        if ("APPROVED".equals(order.getApprovalStatus())) {
+            return;
         }
 
         // Validate contract balance before approval
@@ -77,6 +88,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
             }
         }
 
+        consumeBudget(order);
         orderMapper.update(null, new LambdaUpdateWrapper<MatPurchaseOrder>()
                 .eq(MatPurchaseOrder::getId, orderId)
                 .set(MatPurchaseOrder::getApprovalStatus, "APPROVED")
@@ -91,6 +103,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
         orderMapper.update(null, new LambdaUpdateWrapper<MatPurchaseOrder>()
                 .eq(MatPurchaseOrder::getId, orderId)
                 .set(MatPurchaseOrder::getApprovalStatus, "REJECTED"));
+        releaseExceptionBudget(orderId, "REJECT");
     }
 
     @Override
@@ -101,6 +114,37 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
         orderMapper.update(null, new LambdaUpdateWrapper<MatPurchaseOrder>()
                 .eq(MatPurchaseOrder::getId, orderId)
                 .set(MatPurchaseOrder::getApprovalStatus, "DRAFT"));
+        releaseExceptionBudget(orderId, "WITHDRAW");
+    }
+
+    private void consumeBudget(MatPurchaseOrder order) {
+        List<MatPurchaseOrderItem> items = orderItemMapper.selectList(
+                new LambdaQueryWrapper<MatPurchaseOrderItem>()
+                        .eq(MatPurchaseOrderItem::getTenantId, order.getTenantId())
+                        .eq(MatPurchaseOrderItem::getOrderId, order.getId()));
+        for (MatPurchaseOrderItem item : items) {
+            budgetLedgerService.consume(item.getBudgetLineId(), "PURCHASE_ORDER", order.getId(), item.getAmount(),
+                    "PURCHASE_ORDER:" + order.getId() + ":ITEM:" + item.getId() + ":CONSUME");
+            if (item.getRequestItemId() != null) {
+                MatPurchaseRequestItem requestItem = requestItemMapper.selectById(item.getRequestItemId());
+                BigDecimal remaining = requestItem.getEstimatedAmount().subtract(item.getAmount());
+                if (remaining.signum() > 0) {
+                    budgetLedgerService.release(item.getBudgetLineId(), "PURCHASE_REQUEST", order.getRequestId(), remaining,
+                            "PURCHASE_ORDER:" + order.getId() + ":ITEM:" + item.getId() + ":RELEASE_VARIANCE");
+                }
+            }
+        }
+    }
+
+    private void releaseExceptionBudget(Long orderId, String action) {
+        MatPurchaseOrder order = orderMapper.selectById(orderId);
+        if (order == null || order.getRequestId() != null) return;
+        orderItemMapper.selectList(new LambdaQueryWrapper<MatPurchaseOrderItem>()
+                        .eq(MatPurchaseOrderItem::getTenantId, order.getTenantId())
+                        .eq(MatPurchaseOrderItem::getOrderId, orderId))
+                .forEach(item -> budgetLedgerService.release(item.getBudgetLineId(), "PURCHASE_ORDER", orderId,
+                        item.getAmount(), "PURCHASE_ORDER:" + orderId + ":ITEM:" + item.getId()
+                                + ":" + action + ":RELEASE"));
     }
 
     private Long resolveOrderId(WfInstance instance) {

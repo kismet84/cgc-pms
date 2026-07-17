@@ -30,6 +30,8 @@ class MatPurchaseOrderServiceTest {
     private static final long USER_ADMIN = 1L;
     private static final long TENANT_ID = 0L;
     private static final long PROJECT_ID = 10001L;
+    private static final long BUDGET_ID = 49991L;
+    private static final long BUDGET_LINE_ID = 49992L;
 
     @Autowired private MatPurchaseOrderService service;
     @Autowired private MatPurchaseOrderMapper orderMapper;
@@ -39,6 +41,7 @@ class MatPurchaseOrderServiceTest {
     @BeforeEach void setupContext() {
         TestUserContext.setAdmin(TENANT_ID, USER_ADMIN);
         ensureWorkflowApprover();
+        ensureActiveBudget();
     }
     @AfterEach void clearContext() {
         jdbcTemplate.update("DELETE FROM sys_user WHERE id = ? AND username = ?", USER_ADMIN, "test_purchase_approver");
@@ -57,6 +60,37 @@ class MatPurchaseOrderServiceTest {
                 VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, NULL, ?)
                 """, USER_ADMIN, TENANT_ID, "test_purchase_approver", "{noop}test",
                 "采购审批测试人", USER_ADMIN, USER_ADMIN, "MatPurchaseOrderServiceTest local approver");
+    }
+
+    private void ensureActiveBudget() {
+        Long costSubjectId = jdbcTemplate.queryForObject(
+                "SELECT id FROM cost_subject ORDER BY id LIMIT 1", Long.class);
+        jdbcTemplate.update("""
+                INSERT INTO project_budget (
+                    id, tenant_id, project_id, version_no, budget_name, total_amount,
+                    approval_status, status, active_flag, active_token, created_by, deleted_flag
+                ) SELECT ?, ?, ?, 'PO-TDD-V1', '采购订单测试预算', 5000000,
+                    'APPROVED', 'ACTIVE', 1, ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM project_budget WHERE id = ?)
+                """, BUDGET_ID, TENANT_ID, PROJECT_ID, BUDGET_ID, USER_ADMIN, BUDGET_ID);
+        jdbcTemplate.update("""
+                INSERT INTO project_budget_line (
+                    id, tenant_id, budget_id, project_id, cost_subject_id, budget_amount,
+                    reserved_amount, consumed_amount, version, created_by, deleted_flag
+                ) SELECT ?, ?, ?, ?, ?, 5000000, 0, 0, 0, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM project_budget_line WHERE id = ?)
+                """, BUDGET_LINE_ID, TENANT_ID, BUDGET_ID, PROJECT_ID, costSubjectId,
+                USER_ADMIN, BUDGET_LINE_ID);
+    }
+
+    private void attachCleanFile(Long orderId) {
+        jdbcTemplate.update("""
+                INSERT INTO sys_file (
+                    id, tenant_id, business_type, business_id, file_name, original_name,
+                    file_size, storage_path, bucket_name, virus_scan_status, created_by, deleted_flag
+                ) VALUES (?, ?, 'PURCHASE_ORDER', ?, 'order.pdf', 'order.pdf', 10,
+                    '/test/order.pdf', 'test', 'CLEAN', ?, 0)
+                """, Math.abs(System.nanoTime()), TENANT_ID, orderId, USER_ADMIN);
     }
 
     @Test @Transactional @DisplayName("create → auto-generates PO code, returns ID")
@@ -208,6 +242,9 @@ class MatPurchaseOrderServiceTest {
         update.setOrderType("PURCHASE");
         update.setOrderDate(LocalDate.now());
         update.setDeliveryDate(LocalDate.now().plusDays(7));
+        update.setDeliveryTerms("送达项目仓库并验收");
+        update.setExceptionPurchaseFlag(1);
+        update.setExceptionReason("现场紧急采购测试");
         update.setTotalAmount(new BigDecimal("35000.00"));
         service.update(update);
 
@@ -257,13 +294,20 @@ class MatPurchaseOrderServiceTest {
         order.setOrderType("PURCHASE");
         order.setOrderDate(LocalDate.now());
         order.setDeliveryDate(LocalDate.now().plusDays(7));
+        order.setDeliveryTerms("送达项目仓库并验收");
+        order.setExceptionPurchaseFlag(1);
+        order.setExceptionReason("现场紧急采购测试");
+        order.setTotalAmount(new BigDecimal("35000.00"));
         Long id = service.create(order);
+        attachCleanFile(id);
 
         MatPurchaseOrderItem item = new MatPurchaseOrderItem();
         item.setMaterialId(1L);
         item.setQuantity(new BigDecimal("10.00"));
         item.setUnitPrice(new BigDecimal("3500.00"));
         item.setAmount(new BigDecimal("35000.00"));
+        item.setBudgetLineId(BUDGET_LINE_ID);
+        item.setTaxRate(new BigDecimal("13.00"));
         service.saveItemsBatch(id, List.of(item));
         return id;
     }

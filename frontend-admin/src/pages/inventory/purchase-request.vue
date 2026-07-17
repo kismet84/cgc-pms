@@ -25,7 +25,10 @@ import {
 import { useReferenceStore } from '@/stores/reference'
 import type { PurchaseRequestVO, PurchaseRequestItemVO } from '@/types/inventory'
 import { getContractLedger } from '@/api/modules/contract'
+import { getBudgetDetail, getBudgetList } from '@/api/modules/budget'
+import { uploadFile } from '@/api/modules/file'
 import type { ContractVO } from '@/types/contract'
+import type { BudgetLineVO } from '@/types/budget'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
 import PurchaseRequestAnalysisPanel from './components/PurchaseRequestAnalysisPanel.vue'
 import PurchaseRequestModal from './components/PurchaseRequestModal.vue'
@@ -61,7 +64,9 @@ const pageSize = ref(20)
 const referenceStore = useReferenceStore()
 const projectList = computed(() => referenceStore.projects ?? [])
 const contractList = ref<ContractVO[]>([])
+const budgetLineOptions = ref<Array<BudgetLineVO & { label: string }>>([])
 const materialList = computed(() => referenceStore.materials ?? [])
+const proofFile = ref<File | null>(null)
 
 const modalVisible = ref(false)
 const modalTitle = ref('新建采购申请')
@@ -74,6 +79,7 @@ const isViewMode = computed(() => modalMode.value === 'view')
 const formData = reactive<Partial<PurchaseRequestVO>>({
   projectId: undefined,
   contractId: undefined,
+  purpose: '',
   remark: '',
 })
 
@@ -119,7 +125,9 @@ const itemColumns = [
   },
   { title: '单位', dataIndex: 'unit', key: 'unit', width: 120 },
   { title: '数量', dataIndex: 'quantity', key: 'quantity', width: 120 },
-  { title: '计划日期', dataIndex: 'plannedDate', key: 'plannedDate', width: 160 },
+  { title: '预算科目', dataIndex: 'budgetLineId', key: 'budgetLineId', width: 180 },
+  { title: '预计单价', dataIndex: 'estimatedUnitPrice', key: 'estimatedUnitPrice', width: 120 },
+  { title: '计划日期', dataIndex: 'plannedDate', key: 'plannedDate', width: 150 },
   { title: '备注', dataIndex: 'remark', key: 'remark', width: 160 },
   { title: '操作', key: 'action', width: 76 },
 ]
@@ -204,11 +212,14 @@ function handleAdd() {
   Object.assign(formData, {
     projectId: undefined,
     contractId: undefined,
+    purpose: '',
     remark: '',
   })
   itemList.value = []
   keySeq.value = 0
   contractList.value = []
+  budgetLineOptions.value = []
+  proofFile.value = null
   modalDirty.value = false
   modalVisible.value = true
 }
@@ -220,11 +231,14 @@ async function handleEdit(record: PurchaseRequestVO) {
   Object.assign(formData, {
     projectId: record.projectId,
     contractId: record.contractId,
+    purpose: record.purpose,
     remark: record.remark,
   })
   itemList.value = []
   keySeq.value = 0
   await loadContractsByProject(record.projectId)
+  await loadBudgetLines(record.projectId)
+  proofFile.value = null
   // Load existing items
   try {
     const items = await getPurchaseRequestItems(record.id)
@@ -347,12 +361,32 @@ async function loadContractsByProject(projectId?: string) {
   }
 }
 
+async function loadBudgetLines(projectId?: string) {
+  budgetLineOptions.value = []
+  if (!projectId) return
+  try {
+    const page = await getBudgetList({ projectId, pageNo: 1, pageSize: 20, status: 'ACTIVE' })
+    const activeBudget = page.records.find((budget) => budget.active || budget.status === 'ACTIVE')
+    if (!activeBudget) return
+    const detail = activeBudget.lines?.length
+      ? activeBudget
+      : await getBudgetDetail(activeBudget.id)
+    budgetLineOptions.value = (detail.lines ?? []).map((line) => ({
+      ...line,
+      label: `${line.costSubjectName || line.costSubjectId}（可用 ¥${Number(line.availableAmount ?? line.budgetAmount).toLocaleString('zh-CN')}）`,
+    }))
+  } catch (e: unknown) {
+    console.error(e)
+    message.warning('未能加载当前有效预算，请确认项目预算已生效')
+  }
+}
+
 async function handleProjectChange(projectId?: string) {
   if (isViewMode.value) return
   formData.projectId = projectId
   formData.contractId = undefined
   modalDirty.value = true
-  await loadContractsByProject(projectId)
+  await Promise.all([loadContractsByProject(projectId), loadBudgetLines(projectId)])
 }
 
 function handleDelete(record: PurchaseRequestVO) {
@@ -402,6 +436,9 @@ function handleAddItem() {
     materialId: '',
     materialName: '',
     quantity: '0',
+    budgetLineId: undefined,
+    estimatedUnitPrice: undefined,
+    estimatedAmount: undefined,
     unit: '',
     plannedDate: undefined,
     remark: '',
@@ -456,6 +493,18 @@ async function handleModalOk() {
     message.warning('请选择项目')
     return
   }
+  if (!formData.contractId) {
+    message.warning('请选择采购合同')
+    return
+  }
+  if (!formData.purpose?.trim()) {
+    message.warning('请填写采购用途')
+    return
+  }
+  if (!editingId.value && !proofFile.value) {
+    message.warning('请上传采购依据附件')
+    return
+  }
   if (itemList.value.length < 1) {
     message.warning('请至少添加一个物料明细')
     return
@@ -467,6 +516,18 @@ async function handleModalOk() {
     }
     if (!item.quantity || Number(item.quantity) <= 0) {
       message.warning('物料数量必须大于 0')
+      return
+    }
+    if (!item.budgetLineId) {
+      message.warning('请为所有明细选择预算科目')
+      return
+    }
+    if (!item.plannedDate) {
+      message.warning('请填写所有明细的计划日期')
+      return
+    }
+    if (!item.estimatedUnitPrice || Number(item.estimatedUnitPrice) <= 0) {
+      message.warning('预计单价必须大于 0')
       return
     }
   }
@@ -486,8 +547,12 @@ async function handleModalOk() {
       const items = itemList.value.map((item) => ({
         ...item,
         requestId: requestId,
+        estimatedAmount: (Number(item.quantity) * Number(item.estimatedUnitPrice)).toFixed(2),
       }))
       await savePurchaseRequestItems(requestId, items)
+    }
+    if (proofFile.value) {
+      await uploadFile(proofFile.value, 'PURCHASE_REQUEST', requestId, 'PURCHASE_BASIS')
     }
 
     message.success(editingId.value ? '更新成功' : '创建成功')
@@ -812,6 +877,8 @@ onMounted(async () => {
       :form-data="formData"
       :project-list="projectList"
       :contract-list="contractList"
+      :budget-line-options="budgetLineOptions"
+      :proof-file-name="proofFile?.name"
       :item-list="itemList"
       :items-count="itemsCount"
       :item-columns="itemColumns"
@@ -826,6 +893,7 @@ onMounted(async () => {
       @remove-item="handleRemoveItem"
       @material-change="handleMaterialChange"
       @material-clear="handleMaterialClear"
+      @proof-file-change="proofFile = $event"
     />
   </div>
 </template>

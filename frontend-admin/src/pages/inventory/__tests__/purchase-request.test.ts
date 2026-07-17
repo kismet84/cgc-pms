@@ -134,4 +134,16 @@ describe('purchase request modal filters', () => {
     expect(source).toContain("APPROVED: '已通过'")
     expect(searchBarSource).toContain('<a-select-option value="APPROVED">已通过</a-select-option>')
   })
+
+  it('requires budget, estimate, purpose and attachment before creating a submittable request', () => {
+    expect(source).toContain(
+      "import { getBudgetDetail, getBudgetList } from '@/api/modules/budget'",
+    )
+    expect(source).toContain("uploadFile(proofFile.value, 'PURCHASE_REQUEST'")
+    expect(source).toContain('item.budgetLineId')
+    expect(source).toContain('item.estimatedUnitPrice')
+    expect(source).toContain('formData.purpose')
+    expect(modalSource).toContain('预算科目')
+    expect(modalSource).toContain('采购依据')
+  })
 })

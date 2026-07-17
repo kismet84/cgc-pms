@@ -29,6 +29,8 @@ public class MatPurchaseOrderItem extends BaseEntity {
     /** 来源采购申请明细；手工创建订单时允许为空。 */
     private Long requestItemId;
 
+    private Long budgetLineId;
+
     private Long projectId;
 
     private Long materialId;
@@ -47,7 +49,16 @@ public class MatPurchaseOrderItem extends BaseEntity {
     private BigDecimal unitPrice;
 
     @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal taxRate;
+
+    @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal amount;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal taxAmount;
+
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal amountWithoutTax;
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal receivedQuantity;

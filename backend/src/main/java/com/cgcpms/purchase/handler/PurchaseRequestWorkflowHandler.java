@@ -1,8 +1,12 @@
 package com.cgcpms.purchase.handler;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
+import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import com.cgcpms.purchase.service.PurchaseRequestConversionService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
@@ -26,6 +30,8 @@ public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
 
     private final MatPurchaseRequestMapper requestMapper;
     private final PurchaseRequestConversionService conversionService;
+    private final MatPurchaseRequestItemMapper requestItemMapper;
+    private final BudgetLedgerService budgetLedgerService;
 
     @Override
     public String supportBusinessType() {
@@ -66,6 +72,7 @@ public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
         requestMapper.update(null, new LambdaUpdateWrapper<MatPurchaseRequest>()
                 .eq(MatPurchaseRequest::getId, requestId)
                 .set(MatPurchaseRequest::getApprovalStatus, "REJECTED"));
+        releaseReservations(requestId, "REJECT");
     }
 
     @Override
@@ -76,6 +83,18 @@ public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
         requestMapper.update(null, new LambdaUpdateWrapper<MatPurchaseRequest>()
                 .eq(MatPurchaseRequest::getId, requestId)
                 .set(MatPurchaseRequest::getApprovalStatus, "DRAFT"));
+        releaseReservations(requestId, "WITHDRAW");
+    }
+
+    private void releaseReservations(Long requestId, String action) {
+        MatPurchaseRequest request = requestMapper.selectById(requestId);
+        if (request == null) return;
+        requestItemMapper.selectList(new LambdaQueryWrapper<MatPurchaseRequestItem>()
+                        .eq(MatPurchaseRequestItem::getTenantId, request.getTenantId())
+                        .eq(MatPurchaseRequestItem::getRequestId, requestId))
+                .forEach(item -> budgetLedgerService.release(item.getBudgetLineId(), "PURCHASE_REQUEST", requestId,
+                        item.getEstimatedAmount(), "PURCHASE_REQUEST:" + requestId + ":ITEM:" + item.getId()
+                                + ":" + action + ":RELEASE"));
     }
 
     private Long resolveRequestId(WfInstance instance) {
