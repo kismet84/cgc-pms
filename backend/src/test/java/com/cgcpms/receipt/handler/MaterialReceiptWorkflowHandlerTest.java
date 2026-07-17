@@ -179,7 +179,7 @@ class MaterialReceiptWorkflowHandlerTest {
         assertEquals(0, new BigDecimal("1.0000").compareTo(disposition.getRejectedQuantity()));
 
         Long qualifiedReturnId = supplierReturnService.confirm(new SupplierReturnRequest(
-                receiptItem.getId(), null, new BigDecimal("1.0000"), LocalDate.now(),
+                receiptItem.getId(), (Long) null, new BigDecimal("1.0000"), LocalDate.now(),
                 "合格品供应商退货", "SRT-Q-" + receiptItem.getId()));
         assertEquals(0, new BigDecimal("1.0000")
                 .compareTo(orderItemMapper.selectById(orderItem.getId()).getReceivedQuantity()));
@@ -187,7 +187,7 @@ class MaterialReceiptWorkflowHandlerTest {
                 .eq(MatStockTxn::getSourceType, "SUPPLIER_RETURN")
                 .eq(MatStockTxn::getSourceId, qualifiedReturnId)));
         assertEquals(qualifiedReturnId, supplierReturnService.confirm(new SupplierReturnRequest(
-                receiptItem.getId(), null, new BigDecimal("1.0000"), LocalDate.now(),
+                receiptItem.getId(), (Long) null, new BigDecimal("1.0000"), LocalDate.now(),
                 "重复回调", "SRT-Q-" + receiptItem.getId())));
         supplierReturnService.reverse(qualifiedReturnId, "撤销测试退货");
         assertEquals(0, new BigDecimal("2.0000")
@@ -293,7 +293,7 @@ class MaterialReceiptWorkflowHandlerTest {
         assertEquals(0, new BigDecimal("50.00").compareTo(cost.getAmount()));
 
         Long returnId = supplierReturnService.confirm(new SupplierReturnRequest(
-                item.getId(), null, new BigDecimal("2.0000"), LocalDate.now(),
+                item.getId(), (Long) null, new BigDecimal("2.0000"), LocalDate.now(),
                 "直耗材料供应商退货", "SRT-D-" + item.getId()));
         assertEquals(0, new BigDecimal("3.0000")
                 .compareTo(orderItemMapper.selectById(orderItem.getId()).getReceivedQuantity()));

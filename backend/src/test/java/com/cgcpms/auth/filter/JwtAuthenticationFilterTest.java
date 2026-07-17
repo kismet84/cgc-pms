@@ -156,8 +156,6 @@ class JwtAuthenticationFilterTest {
                 .add(JwtUtils.CLAIM_ROLES, List.of("SUPER_ADMIN"))
                 .add(JwtUtils.CLAIM_PERMISSIONS, JwtUtils.encodePermissionClaim(compressedPermissions))
                 .build());
-        when(jwtUtils.getPermissionCodes(any())).thenReturn(
-                List.of("measurement:query", "measurement:submit"));
         when(blacklistProvider.getIfAvailable()).thenReturn(blacklistService);
         when(blacklistService.isBlacklisted("compact-token")).thenReturn(false);
         doAnswer(invocation -> {

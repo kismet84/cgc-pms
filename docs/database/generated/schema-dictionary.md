@@ -1,10 +1,10 @@
 # CGC-PMS 数据库结构字典（自动生成）
 
-> 生成时间：2026-07-17 11:38:53 +08:00；来源：MySQL information_schema / 数据库 `cgc_pms`。请勿手工修改。
+> 生成时间：2026-07-17 12:51:59 +08:00；来源：MySQL information_schema / 数据库 `cgc_pms_merge_v210`。请勿手工修改。
 
-- 业务表数量：146
-- 字段数量：2468
-- 外键列数量：261
+- 业务表数量：181
+- 字段数量：3193
+- 外键列数量：366
 
 ## account_receivable
 
@@ -69,6 +69,14 @@
 |25|`external_sync_status`|`varchar(32)`|YES|`∅`|||未定义（需要人工确认）|
 |26|`external_sync_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
 |27|`collection_record_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|28|`review_status`|`varchar(32)`|NO|`PENDING`|||PENDING/APPROVED/REJECTED|
+|29|`reviewed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|30|`reviewed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|31|`review_comment`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|32|`posted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|33|`period_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|34|`adjustment_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|35|`original_entry_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
 
 ## accounting_entry_line
 
@@ -94,6 +102,25 @@
 |15|`account_code`|`varchar(64)`|YES|`∅`|||未定义（需要人工确认）|
 |16|`account_name`|`varchar(128)`|YES|`∅`|||未定义（需要人工确认）|
 
+## alert_lifecycle_event
+
+- 表注释：预警不可变生命周期事件
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||生命周期事件ID|
+|2|`tenant_id`|`bigint`|NO|`∅`|MUL||租户ID|
+|3|`alert_id`|`bigint`|NO|`∅`|MUL||预警ID|
+|4|`event_type`|`varchar(50)`|NO|`∅`|||CREATED/READ/ACKNOWLEDGED/ESCALATED_L1/ESCALATED_L2/STATUS_CHANGED/AUTO_ARCHIVED|
+|5|`from_status`|`varchar(20)`|YES|`∅`|||原状态|
+|6|`to_status`|`varchar(20)`|YES|`∅`|||目标状态|
+|7|`operator_id`|`bigint`|YES|`∅`|||操作人|
+|8|`remark`|`varchar(500)`|YES|`∅`|||操作说明|
+|9|`occurred_at`|`datetime`|NO|`∅`|||发生时间|
+|10|`payload_json`|`text`|NO|`∅`|||事件快照JSON|
+|11|`payload_hash`|`char(64)`|NO|`∅`|||事件快照SHA-256|
+
 ## alert_log
 
 - 表注释：预警记录表
@@ -115,16 +142,27 @@
 |12|`message`|`text`|YES|`∅`|||预警消息内容|
 |13|`triggered_at`|`datetime`|NO|`CURRENT_TIMESTAMP`|MUL|DEFAULT_GENERATED|触发时间|
 |14|`is_read`|`tinyint`|NO|`0`|MUL||是否已读：0未读，1已读|
-|15|`process_status`|`varchar(20)`|NO|`OPEN`|MUL||处理状态：OPEN/PROCESSED/ARCHIVED/INVALID|
-|16|`processed_at`|`datetime`|YES|`∅`|||处理时间|
-|17|`archived_at`|`datetime`|YES|`∅`|||归档时间|
-|18|`status_remark`|`varchar(500)`|YES|`∅`|||状态备注|
-|19|`created_by`|`bigint`|YES|`∅`|||创建人|
-|20|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|21|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|22|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|23|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|24|`remark`|`varchar(500)`|YES|`∅`|||备注|
+|15|`read_by`|`bigint`|YES|`∅`|||首次阅读人|
+|16|`read_at`|`datetime`|YES|`∅`|||首次阅读时间|
+|17|`acknowledged_by`|`bigint`|YES|`∅`|||接单责任人|
+|18|`acknowledged_at`|`datetime`|YES|`∅`|||接单时间|
+|19|`response_due_at`|`datetime`|YES|`∅`|||响应期限|
+|20|`resolution_due_at`|`datetime`|YES|`∅`|||处置期限|
+|21|`escalation_level`|`int`|NO|`0`|||升级级别：0未升级/1响应超时/2处置超时|
+|22|`last_escalated_at`|`datetime`|YES|`∅`|||最近升级时间|
+|23|`process_status`|`varchar(20)`|NO|`OPEN`|MUL||处理状态：OPEN/PROCESSED/ARCHIVED/INVALID|
+|24|`processed_at`|`datetime`|YES|`∅`|||处理时间|
+|25|`processed_by`|`bigint`|YES|`∅`|||处理人|
+|26|`archived_at`|`datetime`|YES|`∅`|||归档时间|
+|27|`archived_by`|`bigint`|YES|`∅`|||归档/失效操作人|
+|28|`status_remark`|`varchar(500)`|YES|`∅`|||状态备注|
+|29|`version`|`int`|NO|`0`|||乐观锁版本|
+|30|`created_by`|`bigint`|YES|`∅`|||创建人|
+|31|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
+|32|`updated_by`|`bigint`|YES|`∅`|||更新人|
+|33|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
+|34|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
+|35|`remark`|`varchar(500)`|YES|`∅`|||备注|
 
 ## alert_notification_send_record
 
@@ -148,7 +186,7 @@
 ## alert_rule_config
 
 - 表注释：预警规则配置表
-- information_schema 估算行数：9
+- information_schema 估算行数：10
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -362,6 +400,92 @@
 |14|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
 |15|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
 
+## cash_forecast_cycle
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`cycle_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|5|`forecast_name`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`as_of_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|7|`horizon_start`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|8|`horizon_end`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|9|`scenario`|`varchar(32)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`opening_balance`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`status`|`varchar(32)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|12|`version_no`|`int`|NO|`∅`|||未定义（需要人工确认）|
+|13|`previous_cycle_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|14|`source_cutoff_at`|`datetime`|NO|`∅`|||未定义（需要人工确认）|
+|15|`submitted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`submitted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|17|`approved_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`approved_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|19|`approval_comment`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|20|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|21|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|22|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|23|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|24|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+
+## cash_forecast_line
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`cycle_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`forecast_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|5|`planned_inflow`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|6|`planned_outflow`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|7|`financing_amount`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|8|`projected_balance`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`gap_amount`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|10|`actual_inflow`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|11|`actual_outflow`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|12|`inflow_variance`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|13|`outflow_variance`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|14|`source_summary_json`|`json`|YES|`∅`|||未定义（需要人工确认）|
+|15|`actual_refreshed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+
+## cash_funding_action
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`cycle_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`line_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`action_type`|`varchar(32)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`planned_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|8|`amount`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`reason`|`varchar(500)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`status`|`varchar(32)`|NO|`PROPOSED`|||未定义（需要人工确认）|
+|11|`source_type`|`varchar(32)`|YES|`∅`|||未定义（需要人工确认）|
+|12|`source_id`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|13|`requested_by`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|14|`submitted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|15|`approved_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`approved_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|17|`completed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`completed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|19|`actual_amount`|`decimal(18,2)`|YES|`∅`|||未定义（需要人工确认）|
+|20|`completion_reference`|`varchar(128)`|YES|`∅`|||未定义（需要人工确认）|
+|21|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|22|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|23|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+
 ## cash_journal_change_log
 
 - 表注释：资金日记账不可变变更日志
@@ -416,6 +540,152 @@
 |28|`approval_instance_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
 |29|`pay_record_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
 |30|`collection_record_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+
+## closeout_archive_transfer
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`closeout_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`transfer_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`transfer_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|7|`recipient_organization`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`recipient_name`|`varchar(100)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`archive_location`|`varchar(300)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`transfer_scope`|`varchar(2000)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`status`|`varchar(32)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|12|`accepted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|13|`accepted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|14|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|15|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|17|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|19|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|20|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## closeout_defect
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`closeout_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`warranty_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`defect_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`defect_title`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`defect_description`|`varchar(2000)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`responsible_user_id`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|10|`rectification_deadline`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|11|`status`|`varchar(32)`|NO|`OPEN`|||未定义（需要人工确认）|
+|12|`rectification_content`|`varchar(2000)`|YES|`∅`|||未定义（需要人工确认）|
+|13|`rectified_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|14|`rectified_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|15|`verified_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`verified_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|17|`verification_comment`|`varchar(1000)`|YES|`∅`|||未定义（需要人工确认）|
+|18|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|19|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|20|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|21|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|22|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|23|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|24|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## closeout_final_acceptance
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`closeout_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`acceptance_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`acceptance_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|7|`organizer`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`participant_summary`|`varchar(1000)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`conclusion`|`varchar(32)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`acceptance_summary`|`varchar(2000)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`status`|`varchar(32)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|12|`approval_instance_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|13|`approved_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|14|`approved_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|15|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|16|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|18|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|19|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|20|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|21|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## closeout_section_acceptance
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`closeout_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`wbs_task_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`quality_inspection_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|7|`acceptance_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`acceptance_name`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`acceptance_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|10|`conclusion`|`varchar(32)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`status`|`varchar(32)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|12|`confirmed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|13|`confirmed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|14|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|15|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|17|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|19|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|20|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## closeout_warranty
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`closeout_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`contract_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`receivable_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|7|`warranty_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`warranty_amount`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`warranty_start_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|10|`warranty_end_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|11|`responsible_user_id`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|12|`status`|`varchar(32)`|NO|`ACTIVE`|||未定义（需要人工确认）|
+|13|`released_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|14|`released_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|15|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|16|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|18|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|19|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|20|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|21|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 
 ## collection_allocation
 
@@ -738,7 +1008,7 @@
 ## cost_summary
 
 - 表注释：动态成本汇总表
-- information_schema 估算行数：4
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1020,6 +1290,25 @@
 |21|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
 |22|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 
+## finance_account_reconciliation
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`period_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`account_type`|`varchar(16)`|NO|`∅`|||未定义（需要人工确认）|
+|5|`expected_amount`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`ledger_amount`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`difference_amount`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`status`|`varchar(16)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`detail_json`|`longtext`|YES|`∅`|||未定义（需要人工确认）|
+|10|`reconciled_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|11|`reconciled_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+
 ## finance_alert
 
 - 表注释：未定义（需要人工确认）
@@ -1061,6 +1350,31 @@
 |9|`archive_bucket`|`varchar(32)`|NO|`HOT`|||未定义（需要人工确认）|
 |10|`payload_json`|`longtext`|NO|`∅`|||未定义（需要人工确认）|
 |11|`payload_hash`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+
+## finance_bank_reconciliation
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`period_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`bank_receipt_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`direction`|`varchar(8)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`business_type`|`varchar(32)`|YES|`∅`|||未定义（需要人工确认）|
+|7|`business_id`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|8|`cash_journal_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|9|`bank_amount`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`business_amount`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|11|`difference_amount`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|12|`status`|`varchar(16)`|NO|`∅`|||未定义（需要人工确认）|
+|13|`match_method`|`varchar(16)`|NO|`AUTO`|||未定义（需要人工确认）|
+|14|`resolved_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|15|`resolved_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|16|`resolution_note`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|17|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
 
 ## finance_import_batch
 
@@ -1145,6 +1459,52 @@
 |14|`processed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
 |15|`error_message`|`varchar(1000)`|YES|`∅`|||未定义（需要人工确认）|
 |16|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+
+## finance_period
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`period_code`|`varchar(16)`|NO|`∅`|||未定义（需要人工确认）|
+|4|`fiscal_year`|`int`|NO|`∅`|||未定义（需要人工确认）|
+|5|`fiscal_month`|`int`|NO|`∅`|||未定义（需要人工确认）|
+|6|`start_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|7|`end_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|8|`status`|`varchar(32)`|NO|`OPEN`|||未定义（需要人工确认）|
+|9|`last_check_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|10|`issue_count`|`int`|NO|`0`|||未定义（需要人工确认）|
+|11|`closed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|12|`closed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|13|`close_comment`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|14|`reopened_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|15|`reopened_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|16|`reopen_reason`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|17|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|18|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|19|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|20|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|21|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+
+## finance_period_check
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`period_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`check_type`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|5|`check_status`|`varchar(16)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`issue_count`|`int`|NO|`0`|||未定义（需要人工确认）|
+|7|`detail_json`|`longtext`|YES|`∅`|||未定义（需要人工确认）|
+|8|`checked_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|9|`checked_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
 
 ## finance_reconciliation_issue
 
@@ -1372,16 +1732,19 @@
 |8|`order_type`|`varchar(50)`|YES|`∅`|||订单类型|
 |9|`order_date`|`date`|YES|`∅`|||订单日期|
 |10|`delivery_date`|`date`|YES|`∅`|||预计交付日期|
-|11|`total_amount`|`decimal(18,2)`|YES|`∅`|||订单总金额|
-|12|`approval_status`|`varchar(50)`|NO|`DRAFT`|||审批状态|
-|13|`order_status`|`varchar(50)`|NO|`DRAFT`|||订单状态|
-|14|`created_by`|`bigint`|YES|`∅`|||创建人|
-|15|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|16|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|17|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|18|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|19|`remark`|`varchar(500)`|YES|`∅`|||备注|
-|20|`active_unique_token`|`bigint`|YES|`∅`||STORED GENERATED|活动行唯一键辅助列：活动行=0，删除行=id|
+|11|`delivery_terms`|`varchar(500)`|YES|`∅`|||交付条件|
+|12|`exception_purchase_flag`|`tinyint`|NO|`0`|||无申请来源的例外采购标识|
+|13|`exception_reason`|`varchar(500)`|YES|`∅`|||例外采购原因|
+|14|`total_amount`|`decimal(18,2)`|YES|`∅`|||订单总金额|
+|15|`approval_status`|`varchar(50)`|NO|`DRAFT`|||审批状态|
+|16|`order_status`|`varchar(50)`|NO|`DRAFT`|||订单状态|
+|17|`created_by`|`bigint`|YES|`∅`|||创建人|
+|18|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
+|19|`updated_by`|`bigint`|YES|`∅`|||更新人|
+|20|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
+|21|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
+|22|`remark`|`varchar(500)`|YES|`∅`|||备注|
+|23|`active_unique_token`|`bigint`|YES|`∅`||STORED GENERATED|活动行唯一键辅助列：活动行=0，删除行=id|
 
 ## mat_purchase_order_item
 
@@ -1393,25 +1756,28 @@
 |1|`id`|`bigint`|NO|`∅`|PRI||订单明细ID，雪花ID|
 |2|`tenant_id`|`bigint`|NO|`0`|MUL||租户ID|
 |3|`order_id`|`bigint`|NO|`∅`|MUL||采购订单ID|
-|4|`request_item_id`|`bigint`|YES|`∅`|||来源采购申请明细ID；手工订单允许为空|
-|5|`project_id`|`bigint`|YES|`∅`|||项目ID|
-|6|`material_id`|`bigint`|YES|`∅`|MUL||材料ID|
-|7|`material_name`|`varchar(200)`|YES|`∅`|||材料名称|
-|8|`specification`|`varchar(200)`|YES|`∅`|||规格型号|
-|9|`unit`|`varchar(20)`|YES|`∅`|||计量单位|
-|10|`quantity`|`decimal(18,4)`|YES|`∅`|||采购数量|
-|11|`unit_price`|`decimal(18,4)`|YES|`∅`|||单价|
-|12|`amount`|`decimal(18,2)`|YES|`∅`|||金额|
-|13|`received_quantity`|`decimal(18,4)`|NO|`0.0000`|||已收货数量|
-|14|`version`|`int`|NO|`0`|||乐观锁版本号|
-|15|`created_by`|`bigint`|YES|`∅`|||创建人|
-|16|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|17|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|18|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|19|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|20|`remark`|`varchar(500)`|YES|`∅`|||备注|
-|21|`wbs_task_id`|`bigint`|YES|`∅`|||来源WBS任务ID|
-|22|`budget_line_id`|`bigint`|YES|`∅`|||来源项目预算行ID|
+|4|`request_item_id`|`bigint`|YES|`∅`|MUL||来源采购申请明细ID；手工订单允许为空|
+|5|`budget_line_id`|`bigint`|YES|`∅`|||项目预算科目ID|
+|6|`project_id`|`bigint`|YES|`∅`|||项目ID|
+|7|`material_id`|`bigint`|YES|`∅`|MUL||材料ID|
+|8|`material_name`|`varchar(200)`|YES|`∅`|||材料名称|
+|9|`specification`|`varchar(200)`|YES|`∅`|||规格型号|
+|10|`unit`|`varchar(20)`|YES|`∅`|||计量单位|
+|11|`quantity`|`decimal(18,4)`|YES|`∅`|||采购数量|
+|12|`unit_price`|`decimal(18,4)`|YES|`∅`|||单价|
+|13|`tax_rate`|`decimal(8,4)`|NO|`0.0000`|||税率百分比|
+|14|`amount`|`decimal(18,2)`|YES|`∅`|||金额|
+|15|`tax_amount`|`decimal(18,2)`|NO|`0.00`|||税额|
+|16|`amount_without_tax`|`decimal(18,2)`|NO|`0.00`|||不含税金额|
+|17|`received_quantity`|`decimal(18,4)`|NO|`0.0000`|||已收货数量|
+|18|`version`|`int`|NO|`0`|||乐观锁版本号|
+|19|`created_by`|`bigint`|YES|`∅`|||创建人|
+|20|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
+|21|`updated_by`|`bigint`|YES|`∅`|||更新人|
+|22|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
+|23|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
+|24|`remark`|`varchar(500)`|YES|`∅`|||备注|
+|25|`wbs_task_id`|`bigint`|YES|`∅`|||来源WBS任务ID|
 
 ## mat_purchase_request
 
@@ -1424,15 +1790,16 @@
 |2|`tenant_id`|`bigint`|NO|`0`|MUL||租户ID|
 |3|`project_id`|`bigint`|NO|`∅`|MUL||项目ID|
 |4|`contract_id`|`bigint`|YES|`∅`|||关联采购合同|
-|5|`request_code`|`varchar(50)`|NO|`∅`|||申请编号，PR-yyyyMMdd-XXX|
-|6|`approval_status`|`varchar(50)`|NO|`DRAFT`|||审批状态：DRAFT草稿，APPROVING审批中，APPROVED已通过，REJECTED已驳回，WITHDRAWN已撤回|
-|7|`status`|`varchar(50)`|NO|`DRAFT`|||业务状态：DRAFT草稿，APPROVED已通过，CONVERTED已转采购订单|
-|8|`created_by`|`bigint`|YES|`∅`|||创建人|
-|9|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|10|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|11|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|12|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|13|`remark`|`text`|YES|`∅`|||备注|
+|5|`purpose`|`varchar(500)`|YES|`∅`|||采购用途/施工部位说明|
+|6|`request_code`|`varchar(50)`|NO|`∅`|||申请编号，PR-yyyyMMdd-XXX|
+|7|`approval_status`|`varchar(50)`|NO|`DRAFT`|||审批状态：DRAFT草稿，APPROVING审批中，APPROVED已通过，REJECTED已驳回，WITHDRAWN已撤回|
+|8|`status`|`varchar(50)`|NO|`DRAFT`|||业务状态：DRAFT草稿，APPROVED已通过，CONVERTED已转采购订单|
+|9|`created_by`|`bigint`|YES|`∅`|||创建人|
+|10|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
+|11|`updated_by`|`bigint`|YES|`∅`|||更新人|
+|12|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
+|13|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
+|14|`remark`|`text`|YES|`∅`|||备注|
 
 ## mat_purchase_request_item
 
@@ -1445,17 +1812,20 @@
 |2|`tenant_id`|`bigint`|NO|`0`|MUL||租户ID|
 |3|`request_id`|`bigint`|NO|`∅`|MUL||采购申请ID|
 |4|`material_id`|`bigint`|NO|`∅`|MUL||物料ID|
-|5|`quantity`|`decimal(18,4)`|NO|`∅`|||申请数量|
-|6|`unit`|`varchar(20)`|YES|`∅`|||单位|
-|7|`planned_date`|`date`|YES|`∅`|||期望到货日期|
-|8|`created_by`|`bigint`|YES|`∅`|||创建人|
-|9|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|10|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|11|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|12|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|13|`remark`|`text`|YES|`∅`|||备注|
-|14|`wbs_task_id`|`bigint`|YES|`∅`|||WBS任务ID|
-|15|`budget_line_id`|`bigint`|YES|`∅`|||项目预算行ID|
+|5|`budget_line_id`|`bigint`|YES|`∅`|||项目预算科目ID|
+|6|`sub_task_id`|`bigint`|YES|`∅`|MUL||分包任务ID|
+|7|`quantity`|`decimal(18,4)`|NO|`∅`|||申请数量|
+|8|`estimated_unit_price`|`decimal(18,4)`|YES|`∅`|||申请估算单价|
+|9|`estimated_amount`|`decimal(18,2)`|YES|`∅`|||申请估算金额|
+|10|`unit`|`varchar(20)`|YES|`∅`|||单位|
+|11|`planned_date`|`date`|YES|`∅`|||期望到货日期|
+|12|`created_by`|`bigint`|YES|`∅`|||创建人|
+|13|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
+|14|`updated_by`|`bigint`|YES|`∅`|||更新人|
+|15|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
+|16|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
+|17|`remark`|`text`|YES|`∅`|||备注|
+|18|`wbs_task_id`|`bigint`|YES|`∅`|||WBS任务ID|
 
 ## mat_quality_disposition
 
@@ -1522,27 +1892,31 @@
 |1|`id`|`bigint`|NO|`∅`|PRI||验收明细ID，雪花ID|
 |2|`tenant_id`|`bigint`|NO|`0`|MUL||租户ID|
 |3|`receipt_id`|`bigint`|NO|`∅`|MUL||验收单ID|
-|4|`order_item_id`|`bigint`|YES|`∅`|||订单明细ID|
+|4|`order_item_id`|`bigint`|YES|`∅`|MUL||订单明细ID|
 |5|`material_id`|`bigint`|YES|`∅`|MUL||材料ID|
 |6|`actual_quantity`|`decimal(18,4)`|YES|`∅`|||实际到货数量|
 |7|`qualified_quantity`|`decimal(18,4)`|YES|`∅`|||合格数量|
-|8|`unit_price`|`decimal(18,4)`|YES|`∅`|||单价|
-|9|`amount`|`decimal(18,2)`|YES|`∅`|||金额|
-|10|`use_location`|`varchar(200)`|YES|`∅`|||使用部位|
-|11|`batch_no`|`varchar(100)`|YES|`∅`|||批号|
-|12|`created_by`|`bigint`|YES|`∅`|||创建人|
-|13|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|14|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|15|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|16|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|17|`remark`|`varchar(500)`|YES|`∅`|||备注|
-|18|`wbs_task_id`|`bigint`|YES|`∅`|||来源WBS任务ID|
-|19|`budget_line_id`|`bigint`|YES|`∅`|||来源项目预算行ID|
+|8|`unqualified_quantity`|`decimal(18,4)`|NO|`0.0000`|||不合格数量|
+|9|`unit_price`|`decimal(18,4)`|YES|`∅`|||单价|
+|10|`amount`|`decimal(18,2)`|YES|`∅`|||金额|
+|11|`use_location`|`varchar(200)`|YES|`∅`|||使用部位|
+|12|`batch_no`|`varchar(100)`|YES|`∅`|||批号|
+|13|`disposition_type`|`varchar(30)`|YES|`∅`|||RETURN/REPLACE/CONCESSION|
+|14|`disposition_status`|`varchar(30)`|YES|`∅`|||PENDING/COMPLETED|
+|15|`disposition_reason`|`varchar(500)`|YES|`∅`|||不合格处置原因|
+|16|`created_by`|`bigint`|YES|`∅`|||创建人|
+|17|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
+|18|`updated_by`|`bigint`|YES|`∅`|||更新人|
+|19|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
+|20|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
+|21|`remark`|`varchar(500)`|YES|`∅`|||备注|
+|22|`wbs_task_id`|`bigint`|YES|`∅`|||来源WBS任务ID|
+|23|`budget_line_id`|`bigint`|YES|`∅`|||来源项目预算行ID|
 
 ## mat_requisition
 
 - 表注释：领料申请主表
-- information_schema 估算行数：0
+- information_schema 估算行数：1
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1570,7 +1944,7 @@
 ## mat_requisition_item
 
 - 表注释：领料申请明细表
-- information_schema 估算行数：0
+- information_schema 估算行数：1
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1641,66 +2015,6 @@
 |16|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
 |17|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
 |18|`remark`|`text`|YES|`∅`|||备注|
-
-## mat_supplier_return
-
-- 表注释：供应商退货单
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||供应商退货ID|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||租户ID|
-|3|`project_id`|`bigint`|NO|`∅`|||项目ID|
-|4|`contract_id`|`bigint`|YES|`∅`|||采购合同ID|
-|5|`partner_id`|`bigint`|NO|`∅`|||供应商ID|
-|6|`receipt_id`|`bigint`|NO|`∅`|||原验收单ID|
-|7|`warehouse_id`|`bigint`|YES|`∅`|||退货出库仓库ID|
-|8|`return_code`|`varchar(64)`|NO|`∅`|||退货单号|
-|9|`return_date`|`date`|NO|`∅`|||退货日期|
-|10|`status`|`varchar(32)`|NO|`CONFIRMED`|||CONFIRMED/REVERSED|
-|11|`idempotency_key`|`varchar(128)`|NO|`∅`|||外部幂等键|
-|12|`total_amount`|`decimal(18,2)`|NO|`0.00`|||退货总金额|
-|13|`reason`|`varchar(500)`|NO|`∅`|||退货原因|
-|14|`confirmed_by`|`bigint`|YES|`∅`|||确认人|
-|15|`confirmed_at`|`datetime`|YES|`∅`|||确认时间|
-|16|`reversed_by`|`bigint`|YES|`∅`|||冲销人|
-|17|`reversed_at`|`datetime`|YES|`∅`|||冲销时间|
-|18|`reversal_reason`|`varchar(500)`|YES|`∅`|||冲销原因|
-|19|`version`|`int`|NO|`0`|||乐观锁版本|
-|20|`created_by`|`bigint`|YES|`∅`|||创建人|
-|21|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|22|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|23|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|24|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|25|`remark`|`varchar(500)`|YES|`∅`|||备注|
-
-## mat_supplier_return_item
-
-- 表注释：供应商退货明细
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||供应商退货明细ID|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||租户ID|
-|3|`return_id`|`bigint`|NO|`∅`|||供应商退货ID|
-|4|`receipt_item_id`|`bigint`|NO|`∅`|||原验收明细ID|
-|5|`order_item_id`|`bigint`|NO|`∅`|||采购订单明细ID|
-|6|`quality_disposition_id`|`bigint`|YES|`∅`|MUL||不合格处置ID；为空表示已入库合格品退货|
-|7|`original_stock_txn_id`|`bigint`|YES|`∅`|MUL||原验收入库流水ID|
-|8|`original_cost_item_id`|`bigint`|YES|`∅`|MUL||原直耗成本ID|
-|9|`material_id`|`bigint`|NO|`∅`|MUL||材料ID|
-|10|`return_source`|`varchar(20)`|NO|`∅`|||QUALIFIED/REJECTED|
-|11|`quantity`|`decimal(18,4)`|NO|`∅`|||退货数量|
-|12|`unit_cost`|`decimal(18,4)`|NO|`∅`|||单位成本|
-|13|`amount`|`decimal(18,2)`|NO|`∅`|||退货金额|
-|14|`created_by`|`bigint`|YES|`∅`|||创建人|
-|15|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|16|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|17|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|18|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|19|`remark`|`varchar(500)`|YES|`∅`|||备注|
 
 ## mat_warehouse
 
@@ -2065,6 +2379,7 @@
 |27|`owner_submission_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
 |28|`reported_amount`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
 |29|`deducted_amount`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|30|`settlement_type`|`varchar(32)`|NO|`PROGRESS`|||PROGRESS/FINAL|
 
 ## pay_application
 
@@ -2259,7 +2574,7 @@
 ## pm_project
 
 - 表注释：项目表
-- information_schema 估算行数：0
+- information_schema 估算行数：1
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2419,6 +2734,32 @@
 |13|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
 |14|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
 |15|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## project_closeout
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`closeout_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|5|`planned_completion_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|6|`actual_completion_date`|`date`|YES|`∅`|||未定义（需要人工确认）|
+|7|`status`|`varchar(40)`|NO|`INITIATED`|||未定义（需要人工确认）|
+|8|`final_owner_settlement_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|9|`tail_collection_verified_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|10|`closed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|11|`closed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|12|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|13|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|14|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|15|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|17|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|18|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 
 ## project_corrective_action
 
@@ -2581,6 +2922,182 @@
 |26|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
 |27|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
 |28|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## qs_consequence
+
+- 表注释：问题处罚与成本后果
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`issue_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`partner_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`contract_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|7|`consequence_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`decision_type`|`varchar(20)`|NO|`∅`|||NONE/FINE/REWORK_COST/BOTH|
+|9|`fine_amount`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|10|`rework_cost_amount`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
+|11|`evaluation_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|12|`evaluation_comment`|`varchar(1000)`|NO|`∅`|||未定义（需要人工确认）|
+|13|`status`|`varchar(16)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|14|`cost_item_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|15|`evaluation_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|16|`posted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`posted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|18|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|19|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|20|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|21|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|22|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|23|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|24|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## qs_inspection_plan
+
+- 表注释：质量安全检查计划
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`plan_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|5|`plan_name`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`inspection_type`|`varchar(16)`|NO|`∅`|||QUALITY/SAFETY|
+|7|`frequency_type`|`varchar(16)`|NO|`∅`|||SINGLE/WEEKLY/MONTHLY|
+|8|`start_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|9|`end_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|10|`owner_user_id`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|11|`status`|`varchar(16)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|12|`activated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|13|`activated_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|14|`completed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|15|`completed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|16|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|17|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|19|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|20|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|21|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|22|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## qs_inspection_record
+
+- 表注释：质量安全检查记录
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`plan_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`inspection_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`inspection_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|7|`location`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`inspector_user_id`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|9|`conclusion`|`varchar(16)`|NO|`PENDING`|||未定义（需要人工确认）|
+|10|`summary`|`varchar(1000)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`status`|`varchar(16)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|12|`submitted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|13|`submitted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|14|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|15|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|17|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|19|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|20|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## qs_issue
+
+- 表注释：质量安全问题单
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`plan_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`inspection_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`issue_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`issue_type`|`varchar(16)`|NO|`∅`|||QUALITY/SAFETY|
+|8|`category`|`varchar(100)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`severity`|`varchar(16)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`title`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`description`|`varchar(2000)`|NO|`∅`|||未定义（需要人工确认）|
+|12|`responsible_kind`|`varchar(16)`|NO|`∅`|||INTERNAL/PARTNER|
+|13|`responsible_partner_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|14|`responsible_user_id`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|15|`due_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|16|`status`|`varchar(32)`|NO|`OPEN`|||未定义（需要人工确认）|
+|17|`closed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`closed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|19|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|20|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|21|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|22|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|23|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|24|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|25|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## qs_partner_evaluation
+
+- 表注释：供应商或分包商质量安全评价事实
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`consequence_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`issue_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`partner_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|7|`evaluation_type`|`varchar(16)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`evaluation_comment`|`varchar(1000)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`evaluated_by`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|11|`evaluated_at`|`datetime`|NO|`∅`|||未定义（需要人工确认）|
+|12|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|13|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|14|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|15|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## qs_rectification
+
+- 表注释：问题整改与复验轮次
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`issue_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`round_no`|`int`|NO|`∅`|||未定义（需要人工确认）|
+|6|`action_description`|`varchar(2000)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`responsible_user_id`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|8|`planned_complete_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|9|`actual_completed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|10|`status`|`varchar(16)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|11|`submitted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|12|`submitted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|13|`reinspection_comment`|`varchar(1000)`|YES|`∅`|||未定义（需要人工确认）|
+|14|`reinspected_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|15|`reinspected_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|16|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|17|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|19|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|20|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|21|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|22|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 
 ## receivable_adjustment
 
@@ -2820,7 +3337,7 @@
 ## site_daily_log
 
 - 表注释：项目现场日报
-- information_schema 估算行数：1
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2865,6 +3382,251 @@
 |13|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
 |14|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
 |15|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+
+## sp_bid_evaluation
+
+- 表注释：供应商比价评审
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`sourcing_event_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`quote_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`partner_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`commercial_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`technical_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`delivery_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`quality_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`total_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`evaluation_comment`|`varchar(1000)`|NO|`∅`|||未定义（需要人工确认）|
+|12|`evaluated_by`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|13|`evaluated_at`|`datetime`|NO|`∅`|||未定义（需要人工确认）|
+|14|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|15|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|16|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|18|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|19|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## sp_blacklist_record
+
+- 表注释：供应商黑名单审批记录
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`performance_evaluation_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`partner_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`action_type`|`varchar(12)`|NO|`ADD`|||未定义（需要人工确认）|
+|7|`reason`|`varchar(1000)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`status`|`varchar(16)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|9|`submitted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|10|`submitted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|11|`reviewed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|12|`reviewed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|13|`review_comment`|`varchar(1000)`|YES|`∅`|||未定义（需要人工确认）|
+|14|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|15|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|17|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|19|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|20|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## sp_performance_evaluation
+
+- 表注释：供应商履约综合评价
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`partner_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`contract_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`purchase_order_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|7|`evaluation_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`period_start`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|9|`period_end`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|10|`delivery_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`quality_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|12|`service_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|13|`commercial_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|14|`total_score`|`decimal(5,2)`|NO|`∅`|||未定义（需要人工确认）|
+|15|`grade`|`varchar(8)`|NO|`∅`|||未定义（需要人工确认）|
+|16|`on_time_flag`|`tinyint`|NO|`∅`|||未定义（需要人工确认）|
+|17|`approved_receipt_count`|`int`|NO|`0`|||未定义（需要人工确认）|
+|18|`unqualified_receipt_count`|`int`|NO|`0`|||未定义（需要人工确认）|
+|19|`return_count`|`int`|NO|`0`|||未定义（需要人工确认）|
+|20|`finalized_settlement_count`|`int`|NO|`0`|||未定义（需要人工确认）|
+|21|`quality_safety_fact_count`|`int`|NO|`0`|||未定义（需要人工确认）|
+|22|`quality_safety_average`|`decimal(5,2)`|YES|`∅`|||未定义（需要人工确认）|
+|23|`evaluation_comment`|`varchar(1000)`|NO|`∅`|||未定义（需要人工确认）|
+|24|`recommend_blacklist`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|25|`status`|`varchar(16)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|26|`confirmed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|27|`confirmed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|28|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|29|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|30|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|31|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|32|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|33|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|34|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## sp_sourcing_event
+
+- 表注释：供应商询价招标事件
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`purchase_request_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`sourcing_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`sourcing_title`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`sourcing_type`|`varchar(16)`|NO|`∅`|||INQUIRY/TENDER|
+|8|`deadline`|`datetime`|NO|`∅`|||未定义（需要人工确认）|
+|9|`currency_code`|`varchar(8)`|NO|`CNY`|||未定义（需要人工确认）|
+|10|`status`|`varchar(20)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|11|`awarded_quote_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|12|`awarded_partner_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|13|`contract_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|14|`award_reason`|`varchar(1000)`|YES|`∅`|||未定义（需要人工确认）|
+|15|`published_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`published_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|17|`awarded_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`awarded_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|19|`contracted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|20|`contracted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|21|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|22|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|23|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|24|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|25|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|26|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|27|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## sp_sourcing_supplier
+
+- 表注释：招采受邀供应商
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`sourcing_event_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`partner_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`invitation_status`|`varchar(20)`|NO|`PENDING`|||未定义（需要人工确认）|
+|6|`invited_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|7|`responded_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|8|`disqualification_reason`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|9|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|10|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|11|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|12|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|13|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|14|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## sp_supplier_quote
+
+- 表注释：供应商报价
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`sourcing_event_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`sourcing_supplier_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`partner_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`quote_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`total_amount`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`tax_rate`|`decimal(8,4)`|NO|`0.0000`|||未定义（需要人工确认）|
+|9|`delivery_days`|`int`|NO|`∅`|||未定义（需要人工确认）|
+|10|`validity_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|11|`commercial_terms`|`varchar(2000)`|NO|`∅`|||未定义（需要人工确认）|
+|12|`status`|`varchar(16)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|13|`submitted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|14|`submitted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|15|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|16|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|18|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|19|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|20|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|21|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## sp_supplier_return
+
+- 表注释：供应商退货事实
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`partner_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`contract_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`purchase_order_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|7|`receipt_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|8|`warehouse_id`|`bigint`|YES|`∅`|||退货出库仓库ID|
+|9|`return_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`return_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|11|`return_quantity`|`decimal(18,4)`|NO|`∅`|||未定义（需要人工确认）|
+|12|`return_amount`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|13|`reason`|`varchar(1000)`|NO|`∅`|||未定义（需要人工确认）|
+|14|`status`|`varchar(16)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|15|`idempotency_key`|`varchar(128)`|YES|`∅`|||外部幂等键|
+|16|`confirmed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`confirmed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|18|`reversed_by`|`bigint`|YES|`∅`|||冲销人|
+|19|`reversed_at`|`datetime`|YES|`∅`|||冲销时间|
+|20|`reversal_reason`|`varchar(500)`|YES|`∅`|||冲销原因|
+|21|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|22|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|23|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|24|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|25|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|26|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|27|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## sp_supplier_return_item
+
+- 表注释：供应商退货明细
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||供应商退货明细ID|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||租户ID|
+|3|`return_id`|`bigint`|NO|`∅`|||供应商退货ID|
+|4|`receipt_item_id`|`bigint`|NO|`∅`|||原验收明细ID|
+|5|`order_item_id`|`bigint`|NO|`∅`|||采购订单明细ID|
+|6|`quality_disposition_id`|`bigint`|YES|`∅`|MUL||不合格处置ID；为空表示已入库合格品退货|
+|7|`original_stock_txn_id`|`bigint`|YES|`∅`|MUL||原验收入库流水ID|
+|8|`original_cost_item_id`|`bigint`|YES|`∅`|MUL||原直耗成本ID|
+|9|`material_id`|`bigint`|NO|`∅`|MUL||材料ID|
+|10|`return_source`|`varchar(20)`|NO|`∅`|||QUALIFIED/REJECTED|
+|11|`quantity`|`decimal(18,4)`|NO|`∅`|||退货数量|
+|12|`unit_cost`|`decimal(18,4)`|NO|`∅`|||单位成本|
+|13|`amount`|`decimal(18,2)`|NO|`∅`|||退货金额|
+|14|`created_by`|`bigint`|YES|`∅`|||创建人|
+|15|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
+|16|`updated_by`|`bigint`|YES|`∅`|||更新人|
+|17|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
+|18|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
+|19|`remark`|`varchar(500)`|YES|`∅`|||备注|
 
 ## stl_settlement
 
@@ -2982,7 +3744,7 @@
 ## sub_task
 
 - 表注释：分包任务表
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3045,7 +3807,7 @@
 ## sys_file
 
 - 表注释：系统文件表
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3073,7 +3835,7 @@
 ## sys_menu
 
 - 表注释：系统菜单权限表
-- information_schema 估算行数：168
+- information_schema 估算行数：235
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3118,7 +3880,7 @@
 ## sys_operation_audit_log
 
 - 表注释：操作审计日志
-- information_schema 估算行数：561
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3139,7 +3901,7 @@
 ## sys_role
 
 - 表注释：系统角色表
-- information_schema 估算行数：13
+- information_schema 估算行数：12
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3162,7 +3924,7 @@
 ## sys_role_menu
 
 - 表注释：角色菜单关联表
-- information_schema 估算行数：299
+- information_schema 估算行数：472
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3191,7 +3953,7 @@
 ## sys_type_registry
 
 - 表注释：多态业务类型契约注册表
-- information_schema 估算行数：34
+- information_schema 估算行数：36
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3208,7 +3970,7 @@
 ## sys_user
 
 - 表注释：系统用户表
-- information_schema 估算行数：9
+- information_schema 估算行数：8
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3252,7 +4014,7 @@
 ## sys_user_role
 
 - 表注释：用户角色关联表
-- information_schema 估算行数：11
+- information_schema 估算行数：10
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3260,6 +4022,166 @@
 |2|`tenant_id`|`bigint`|NO|`0`|MUL||租户ID|
 |3|`user_id`|`bigint`|NO|`∅`|||用户ID|
 |4|`role_id`|`bigint`|NO|`∅`|||角色ID|
+
+## tech_acceptance_archive
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`drawing_version_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`construction_reference_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`quality_inspection_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|7|`archive_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`acceptance_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|9|`acceptance_conclusion`|`varchar(20)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`archive_location`|`varchar(300)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`status`|`varchar(20)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|12|`archived_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|13|`archived_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|14|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|15|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|16|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|18|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|19|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## tech_construction_reference
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`drawing_version_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`disclosure_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`daily_log_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|7|`wbs_task_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|8|`reference_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|9|`work_area`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`reference_description`|`varchar(1000)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`status`|`varchar(20)`|NO|`RECORDED`|||未定义（需要人工确认）|
+|12|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|13|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|14|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|15|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|16|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|17|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## tech_disclosure
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`drawing_version_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`scheme_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|6|`disclosure_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`disclosure_title`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`disclosure_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|9|`presenter_user_id`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|10|`recipient_summary`|`varchar(500)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`disclosure_content`|`varchar(2000)`|NO|`∅`|||未定义（需要人工确认）|
+|12|`status`|`varchar(20)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|13|`confirmed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|14|`confirmed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|15|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|16|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|18|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|19|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|20|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|21|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## tech_drawing
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`drawing_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|5|`drawing_name`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`specialty`|`varchar(50)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`source_organization`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`current_version_id`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|9|`status`|`varchar(20)`|NO|`ACTIVE`|||未定义（需要人工确认）|
+|10|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|11|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|12|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|13|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|14|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|15|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## tech_drawing_review
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`drawing_version_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`review_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`review_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|7|`chair_user_id`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|8|`participant_summary`|`varchar(500)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`conclusion`|`varchar(20)`|NO|`∅`|||未定义（需要人工确认）|
+|10|`review_summary`|`varchar(1000)`|NO|`∅`|||未定义（需要人工确认）|
+|11|`requires_rfi`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|12|`status`|`varchar(20)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|13|`confirmed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|14|`confirmed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|15|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|16|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|18|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|19|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|20|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|21|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## tech_drawing_version
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`drawing_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`version_no`|`varchar(30)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`previous_version_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|7|`source_rfi_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|8|`received_at`|`datetime`|NO|`∅`|||未定义（需要人工确认）|
+|9|`received_by`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|10|`change_summary`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|11|`status`|`varchar(30)`|NO|`RECEIVED`|||未定义（需要人工确认）|
+|12|`approved_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|13|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|14|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|15|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|16|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|18|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|19|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 
 ## tech_item
 
@@ -3286,6 +4208,89 @@
 |16|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
 |17|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除|
 |18|`remark`|`varchar(500)`|YES|`∅`|||备注|
+|19|`source_type`|`varchar(40)`|YES|`∅`|||真实技术业务来源类型|
+|20|`source_id`|`bigint`|YES|`∅`|||真实技术业务来源ID|
+
+## tech_rfi
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`drawing_version_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|5|`review_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|6|`rfi_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`subject`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`question`|`varchar(2000)`|NO|`∅`|||未定义（需要人工确认）|
+|9|`priority`|`varchar(20)`|NO|`NORMAL`|||未定义（需要人工确认）|
+|10|`raised_by`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|11|`raised_at`|`datetime`|NO|`∅`|||未定义（需要人工确认）|
+|12|`response_due_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|13|`status`|`varchar(20)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|14|`closed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|15|`closed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|16|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|17|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|18|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|19|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|20|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|21|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|22|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+
+## tech_rfi_response
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`rfi_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`response_no`|`int`|NO|`∅`|||未定义（需要人工确认）|
+|5|`response_content`|`varchar(2000)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`change_required`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|7|`responder_name`|`varchar(100)`|NO|`∅`|||未定义（需要人工确认）|
+|8|`responded_by`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|9|`responded_at`|`datetime`|NO|`∅`|||未定义（需要人工确认）|
+|10|`status`|`varchar(20)`|NO|`SUBMITTED`|||未定义（需要人工确认）|
+|11|`reviewed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|12|`reviewed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|13|`review_comment`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|14|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|15|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|16|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|17|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+
+## technical_scheme
+
+- 表注释：未定义（需要人工确认）
+- information_schema 估算行数：0
+
+|序号|字段|类型|可空|默认值|键|附加属性|注释|
+|---:|---|---|---|---|---|---|---|
+|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
+|4|`scheme_code`|`varchar(64)`|NO|`∅`|||未定义（需要人工确认）|
+|5|`scheme_name`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`scheme_type`|`varchar(30)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`responsible_user_id`|`bigint`|NO|`∅`|||未定义（需要人工确认）|
+|8|`planned_effective_date`|`date`|NO|`∅`|||未定义（需要人工确认）|
+|9|`status`|`varchar(20)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|10|`approval_instance_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|11|`approved_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|12|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|13|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|14|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|15|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|17|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|18|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 
 ## var_order
 
@@ -3567,7 +4572,7 @@
 ## wf_template
 
 - 表注释：审批模板表
-- information_schema 估算行数：13
+- information_schema 估算行数：23
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3591,7 +4596,7 @@
 ## wf_template_node
 
 - 表注释：审批模板节点表
-- information_schema 估算行数：48
+- information_schema 估算行数：65
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3617,3 +4622,4 @@
 |20|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
 |21|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
 |22|`remark`|`varchar(500)`|YES|`∅`|||备注|
+

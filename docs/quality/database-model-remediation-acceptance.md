@@ -69,15 +69,12 @@
 
 |验证层|结果|
 |---|---|
-|后端全量|`mvnw.cmd -q clean verify`：206 套件、1888 项、失败 0、错误 0、跳过 1|
+|后端全量|`mvnw.cmd -q clean verify`：213 套件、1921 项、失败 0、错误 0、跳过 1|
 |H2|V1—V210 空库迁移、迁移完整性、14 列退役契约、核心功能/约束/并发测试随全量门禁通过|
-|MySQL 空库|临时 MySQL 8 schema 从 V1 迁移至 V210；146 表、2444 个基础表字段、24 个视图字段、34 条类型注册；postflight 全 0；临时 schema 已删除|
-|MySQL 升级|本地 `cgc_pms` 从 V180 升至 V210；V210 前 14 个 `deleted_token` 非空值、索引和运行时依赖均为 0；升级后 `deleted_token` 0 列、`active_unique_token` 15 列，postflight 全 0|
+|MySQL 空库|临时 MySQL 8 schema 从 V1 顺序迁移至 V210；181 张业务表、3193 个基础表字段、24 个视图字段、36 条类型注册；postflight 的 7 个 BLOCK 与 3 个 REVIEW 全为 0；临时 schema 已删除|
+|MySQL 升级边界|V1—V210 顺序迁移已覆盖 V194→V210 DDL 路径；未连接或改动生产数据库，带真实存量数据的生产升级仍须按 preflight 和发布手册独立审批|
 |Flyway|最大版本 210；失败记录 0|
-|运行稳定性|后端重启后观察 188 秒；36 秒进入 healthy，窗口结束健康接口 200|
-|端到端登录|经 Vite 5173 dev-login 302，最终 `/dashboard` 200；访问令牌 Cookie 长度 1842|
-|受保护 API|`/api/material-categories` 200/code 0；`/api/projects` 200/code 0|
-|前端|`http://localhost:5173/` 200，标题存在|
+|前端|ESLint 通过；120 个测试文件、689 个用例全部通过；`vue-tsc --noEmit` 与生产构建通过|
 |后置检查|7 个 BLOCK 与 3 个 REVIEW 全部为 0|
 
 ## 5. 风险与发布边界

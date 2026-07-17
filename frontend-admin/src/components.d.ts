@@ -89,6 +89,7 @@ declare module 'vue' {
     ListQueryPanel: typeof import('./components/list-page/ListQueryPanel.vue')['default']
     NotificationBell: typeof import('./components/NotificationBell.vue')['default']
     PaymentTermEditor: typeof import('./components/PaymentTermEditor.vue')['default']
+    ProcurementTraceDrawer: typeof import('./components/ProcurementTraceDrawer.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     StatusTag: typeof import('./components/StatusTag.vue')['default']
