@@ -932,6 +932,61 @@ class MatStockServiceTest {
         assertEquals("PROJECT_ACCESS_DENIED", denied.getCode());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("采购在途只汇总同项目同物料已审批未完成订单并稳定排序")
+    void testIncomingSuppliesRespectStatusScopeAndRemainingQuantity() {
+        long warehouseId = 9520L;
+        insertWarehouse(warehouseId, 10001L, "WH-INCOMING-CURRENT");
+        MatStock current = stockService.stockIn(warehouseId, MATERIAL_ID, new BigDecimal("2.0000"));
+
+        insertPurchaseOrder(9701L, 10001L, "PO-INCOMING-LATER", "2026-08-02", "APPROVED", "APPROVED");
+        insertPurchaseOrder(9702L, 10001L, "PO-INCOMING-EARLY", "2026-08-01", "APPROVED", "APPROVED");
+        insertPurchaseOrder(9703L, 10002L, "PO-INCOMING-OTHER-PROJECT", "2026-07-30", "APPROVED", "APPROVED");
+        insertPurchaseOrder(9704L, 10001L, "PO-INCOMING-DRAFT", "2026-07-29", "DRAFT", "DRAFT");
+        insertPurchaseOrder(9705L, 10001L, "PO-INCOMING-COMPLETED", "2026-07-28", "APPROVED", "COMPLETED");
+        insertPurchaseOrder(9706L, 10001L, "PO-INCOMING-NO-DATE", null, "APPROVED", "APPROVED");
+
+        insertPurchaseOrderItem(9711L, 9701L, 10001L, MATERIAL_ID, "10.0000", "4.0000");
+        insertPurchaseOrderItem(9712L, 9701L, null, MATERIAL_ID, "5.0000", "1.0000");
+        insertPurchaseOrderItem(9713L, 9701L, 10001L, 1002L, "99.0000", "0.0000");
+        insertPurchaseOrderItem(9721L, 9702L, 10001L, MATERIAL_ID, "8.0000", "10.0000");
+        insertPurchaseOrderItem(9722L, 9702L, 10001L, MATERIAL_ID, "3.0000", "0.0000");
+        insertPurchaseOrderItem(9731L, 9703L, 10002L, MATERIAL_ID, "20.0000", "0.0000");
+        insertPurchaseOrderItem(9741L, 9704L, 10001L, MATERIAL_ID, "20.0000", "0.0000");
+        insertPurchaseOrderItem(9751L, 9705L, 10001L, MATERIAL_ID, "20.0000", "0.0000");
+        insertPurchaseOrderItem(9761L, 9706L, 10001L, MATERIAL_ID, "20.0000", "0.0000");
+
+        var supplies = stockService.getIncomingSupplies(current.getId());
+
+        assertEquals(2, supplies.size());
+        assertEquals(9702L, supplies.get(0).getOrderId(), "先按预计交付日期升序");
+        assertEquals(0, new BigDecimal("3.0000").compareTo(supplies.get(0).getRemainingQty()),
+                "超收明细按0处理，不得抵消同订单其他正余量");
+        assertEquals(9701L, supplies.get(1).getOrderId());
+        assertEquals(0, new BigDecimal("10.0000").compareTo(supplies.get(1).getRemainingQty()),
+                "订单已限定项目，兼容历史明细project_id为空的数据");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("采购在途对伪造库存与无项目访问权 fail-close")
+    void testIncomingSuppliesFailClosed() {
+        BusinessException missing = assertThrows(BusinessException.class,
+                () -> stockService.getIncomingSupplies(Long.MAX_VALUE));
+        assertEquals("STOCK_NOT_FOUND", missing.getCode());
+
+        MatStock stock = createSettingsStock(new BigDecimal("8.0000"));
+        UserContext.set(Jwts.claims()
+                .add("userId", 99999L)
+                .add("username", "no_project_access")
+                .add("tenantId", TENANT_ID)
+                .build());
+        BusinessException denied = assertThrows(BusinessException.class,
+                () -> stockService.getIncomingSupplies(stock.getId()));
+        assertEquals("PROJECT_ACCESS_DENIED", denied.getCode());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // RED → GREEN: getKpi — 有数据时统计正确
     // ═══════════════════════════════════════════════════════════════
@@ -1262,6 +1317,29 @@ class MatStockServiceTest {
                     (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
                 VALUES (?, ?, ?, ?, ?, ?, 0)
                 """, warehouseId, TENANT_ID, projectId, code, code, status);
+    }
+
+    private void insertPurchaseOrder(long id, long projectId, String code, String deliveryDate,
+                                     String approvalStatus, String orderStatus) {
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_order
+                    (id, tenant_id, project_id, order_code, delivery_date,
+                     approval_status, order_status, exception_purchase_flag, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0)
+                """, id, TENANT_ID, projectId, code,
+                deliveryDate == null ? null : java.sql.Date.valueOf(deliveryDate),
+                approvalStatus, orderStatus);
+    }
+
+    private void insertPurchaseOrderItem(long id, long orderId, Long projectId, long materialId,
+                                         String quantity, String receivedQuantity) {
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_order_item
+                    (id, tenant_id, order_id, project_id, material_id, quantity, received_quantity,
+                     tax_rate, tax_amount, amount_without_tax, version, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, 0)
+                """, id, TENANT_ID, orderId, projectId, materialId,
+                new BigDecimal(quantity), new BigDecimal(receivedQuantity));
     }
 
     // ═══════════════════════════════════════════════════════════════

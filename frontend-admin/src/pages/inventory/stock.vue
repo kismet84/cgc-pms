@@ -30,6 +30,8 @@ const {
   stock,
   transferCandidates,
   transferCandidatesLoading,
+  incomingSupplies,
+  incomingSuppliesLoading,
   safetyThresholdDraft,
   replenishmentTargetDraft,
   replenishmentLeadDaysDraft,
@@ -349,6 +351,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         :in-out-stats="inOutStats"
         :transfer-candidates="transferCandidates"
         :transfer-candidates-loading="transferCandidatesLoading"
+        :incoming-supplies="incomingSupplies"
+        :incoming-supplies-loading="incomingSuppliesLoading"
         @replenish="handleReplenish"
       />
     </div>

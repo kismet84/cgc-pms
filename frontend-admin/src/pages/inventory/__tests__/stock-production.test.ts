@@ -51,16 +51,21 @@ describe('stock ledger production hardening', () => {
 
   it('shows same-project transfer surplus as a non-reserved read-only hint', () => {
     expect(composableSource).toContain('getStockTransferCandidates(currentStock.id)')
+    expect(composableSource).toContain('getStockIncomingSupplies(currentStock.id)')
     expect(composableSource).toContain('mySeq === transferCandidateSeq')
     expect(composableSource).toContain('stock.value?.id === currentStock.id')
     expect(composableSource).toContain('transferCandidates.value = []')
     expect(pageSource).toContain(':transfer-candidates="transferCandidates"')
     expect(pageSource).toContain(':transfer-candidates-loading="transferCandidatesLoading"')
+    expect(pageSource).toContain(':incoming-supplies="incomingSupplies"')
+    expect(pageSource).toContain(':incoming-supplies-loading="incomingSuppliesLoading"')
     const panelSource = readFileSync(
       resolve(currentDir, '../components/StockAnalysisPanel.vue'),
       'utf-8',
     )
     expect(panelSource).toContain('同项目可调拨余量')
+    expect(panelSource).toContain('已审批采购在途')
+    expect(panelSource).toContain('已审批未收货快照，尚未入库')
     expect(panelSource).toContain('查询快照，未预占库存')
     expect(panelSource).toContain('candidate.transferableQty')
   })

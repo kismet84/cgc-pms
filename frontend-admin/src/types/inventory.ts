@@ -43,6 +43,14 @@ export interface StockTransferCandidateVO {
   transferableQty: string
 }
 
+/** 已审批采购订单尚未收货的数量（查询快照，尚未入库） */
+export interface StockIncomingSupplyVO {
+  orderId: string
+  orderCode: string
+  deliveryDate: string
+  remainingQty: string
+}
+
 /** 库存流水 */
 export interface MatStockTxnVO {
   id: string

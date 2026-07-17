@@ -5,6 +5,7 @@ import {
   getStockLedger,
   getStockKpi,
   getStockTransferCandidates,
+  getStockIncomingSupplies,
   getWarehouseList,
   updateStockReplenishmentSettings,
 } from '@/api/modules/inventory'
@@ -20,6 +21,7 @@ import type {
   StockKpiVO,
   MatStockVO,
   StockTransferCandidateVO,
+  StockIncomingSupplyVO,
 } from '@/types/inventory'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
@@ -106,6 +108,8 @@ export function useStockLedger({
   const stock = ref<MatStockVO | null>(null)
   const transferCandidates = ref<StockTransferCandidateVO[]>([])
   const transferCandidatesLoading = ref(false)
+  const incomingSupplies = ref<StockIncomingSupplyVO[]>([])
+  const incomingSuppliesLoading = ref(false)
   const safetyThresholdDraft = ref<number | null>(null)
   const replenishmentTargetDraft = ref<number | null>(null)
   const replenishmentLeadDaysDraft = ref<number | null>(null)
@@ -159,12 +163,16 @@ export function useStockLedger({
   // ---- 防陈旧响应 ----
   let fetchSeq = 0
   let transferCandidateSeq = 0
+  let incomingSupplySeq = 0
 
   function resetTxnState() {
     transferCandidateSeq += 1
     stock.value = null
     transferCandidates.value = []
     transferCandidatesLoading.value = false
+    incomingSupplySeq += 1
+    incomingSupplies.value = []
+    incomingSuppliesLoading.value = false
     safetyThresholdDraft.value = null
     replenishmentTargetDraft.value = null
     replenishmentLeadDaysDraft.value = null
@@ -199,6 +207,7 @@ export function useStockLedger({
       if (mySeq !== fetchSeq) return
       stock.value = res.stock
       void fetchTransferCandidates(res.stock)
+      void fetchIncomingSupplies(res.stock)
       safetyThresholdDraft.value = res.stock ? Number(res.stock.safetyStockQty) : null
       replenishmentTargetDraft.value =
         res.stock?.replenishmentTargetQty == null ? null : Number(res.stock.replenishmentTargetQty)
@@ -244,6 +253,30 @@ export function useStockLedger({
     } finally {
       if (mySeq === transferCandidateSeq) {
         transferCandidatesLoading.value = false
+      }
+    }
+  }
+
+  async function fetchIncomingSupplies(currentStock: MatStockVO | null) {
+    if (!currentStock) {
+      incomingSupplies.value = []
+      return
+    }
+    const mySeq = ++incomingSupplySeq
+    incomingSuppliesLoading.value = true
+    try {
+      const supplies = (await getStockIncomingSupplies(currentStock.id)) ?? []
+      if (mySeq === incomingSupplySeq && stock.value?.id === currentStock.id) {
+        incomingSupplies.value = supplies
+      }
+    } catch (e: unknown) {
+      console.error(e)
+      if (mySeq === incomingSupplySeq) {
+        incomingSupplies.value = []
+      }
+    } finally {
+      if (mySeq === incomingSupplySeq) {
+        incomingSuppliesLoading.value = false
       }
     }
   }
@@ -516,6 +549,8 @@ export function useStockLedger({
     stock,
     transferCandidates,
     transferCandidatesLoading,
+    incomingSupplies,
+    incomingSuppliesLoading,
     safetyThresholdDraft,
     replenishmentTargetDraft,
     replenishmentLeadDaysDraft,

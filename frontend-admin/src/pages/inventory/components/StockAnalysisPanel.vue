@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { StockKpiVO } from '@/types/inventory'
 import type { StockTransferCandidateVO } from '@/types/inventory'
+import type { StockIncomingSupplyVO } from '@/types/inventory'
 
 defineProps<{
   lowStockWarn: { name: string; qty: number; threshold: number }[]
@@ -8,6 +9,8 @@ defineProps<{
   inOutStats: { inPct: number; outPct: number }
   transferCandidates: StockTransferCandidateVO[]
   transferCandidatesLoading: boolean
+  incomingSupplies: StockIncomingSupplyVO[]
+  incomingSuppliesLoading: boolean
 }>()
 
 defineEmits<{ replenish: [] }>()
@@ -48,6 +51,21 @@ defineEmits<{ replenish: [] }>()
             <span class="lg-type-label" style="grid-column: 2 / span 4">库存正常</span>
           </div>
         </div>
+      </section>
+      <section class="stock-analysis-section">
+        <div class="stock-section-title">已审批采购在途</div>
+        <div v-if="incomingSuppliesLoading" class="stock-transfer-hint">正在查询采购订单…</div>
+        <template v-else-if="incomingSupplies.length">
+          <div v-for="supply in incomingSupplies" :key="supply.orderId" class="stock-supply-row">
+            <span class="stock-supply-main">
+              <span class="stock-transfer-name">{{ supply.orderCode }}</span>
+              <small>{{ supply.deliveryDate }}</small>
+            </span>
+            <strong>{{ supply.remainingQty }}</strong>
+          </div>
+          <div class="stock-transfer-hint">已审批未收货快照，尚未入库</div>
+        </template>
+        <div v-else class="stock-transfer-hint">暂无已审批采购在途</div>
       </section>
       <section class="stock-analysis-section">
         <div class="stock-section-title">同项目可调拨余量</div>
@@ -172,6 +190,27 @@ defineEmits<{ replenish: [] }>()
   gap: 12px;
   color: var(--text);
   font-size: 13px;
+}
+
+.stock-supply-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.stock-supply-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stock-supply-main small {
+  color: var(--text-secondary);
+  font-size: 11px;
 }
 
 .stock-transfer-name {

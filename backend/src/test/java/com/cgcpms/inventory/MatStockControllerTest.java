@@ -353,6 +353,28 @@ class MatStockControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    @Order(14)
+    @DisplayName("库存读取接口可查询已审批采购在途且不接受客户端范围参数")
+    void testGetIncomingSupplies() throws Exception {
+        mockMvc.perform(getWithApi("/inventory/stock/" + SETTINGS_STOCK_ID + "/incoming-supplies")
+                        .cookie(adminCookie())
+                        .param("projectId", "999999")
+                        .param("materialId", "999999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
+    @Order(15)
+    @DisplayName("无库存读取权限不能查询已审批采购在途")
+    void testGetIncomingSuppliesRequiresStockListPermission() throws Exception {
+        mockMvc.perform(getWithApi("/inventory/stock/" + SETTINGS_STOCK_ID + "/incoming-supplies")
+                        .cookie(purchaseManagerCookie(List.of())))
+                .andExpect(status().isForbidden());
+    }
+
     // ---- helpers ----
 
     private MockHttpServletRequestBuilder getWithApi(String pathWithinContext) {

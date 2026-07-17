@@ -15,10 +15,15 @@ import com.cgcpms.inventory.vo.MatStockLedgerVO;
 import com.cgcpms.inventory.vo.MatStockTxnVO;
 import com.cgcpms.inventory.vo.MatStockVO;
 import com.cgcpms.inventory.vo.StockKpiVO;
+import com.cgcpms.inventory.vo.StockIncomingSupplyVO;
 import com.cgcpms.inventory.vo.StockTransferCandidateVO;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.purchase.entity.MatPurchaseOrder;
+import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -53,6 +58,8 @@ public class MatStockService {
     private final MatWarehouseMapper matWarehouseMapper;
     private final MdMaterialMapper mdMaterialMapper;
     private final ProjectAccessChecker projectAccessChecker;
+    private final MatPurchaseOrderMapper matPurchaseOrderMapper;
+    private final MatPurchaseOrderItemMapper matPurchaseOrderItemMapper;
 
     /**
      * 入库：增加指定仓库+物料的可用库存。
@@ -471,6 +478,49 @@ public class MatStockService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 查询当前库存项对应的已审批采购订单未收货余量。
+     * 结果按订单汇总，只是未入库查询快照，不改变采购、验收或库存事实。
+     */
+    public List<StockIncomingSupplyVO> getIncomingSupplies(Long stockId) {
+        MatStock currentStock = loadAuthorizedStock(stockId, "查询采购在途余量");
+        Long tenantId = UserContext.getCurrentTenantId();
+        MatWarehouse currentWarehouse = matWarehouseMapper.selectById(currentStock.getWarehouseId());
+
+        List<MatPurchaseOrder> orders = matPurchaseOrderMapper.selectList(
+                new LambdaQueryWrapper<MatPurchaseOrder>()
+                        .eq(MatPurchaseOrder::getTenantId, tenantId)
+                        .eq(MatPurchaseOrder::getProjectId, currentWarehouse.getProjectId())
+                        .eq(MatPurchaseOrder::getApprovalStatus, "APPROVED")
+                        .eq(MatPurchaseOrder::getOrderStatus, "APPROVED")
+                        .isNotNull(MatPurchaseOrder::getDeliveryDate)
+                        .orderByAsc(MatPurchaseOrder::getDeliveryDate)
+                        .orderByAsc(MatPurchaseOrder::getId));
+        if (orders.isEmpty()) {
+            return List.of();
+        }
+
+        Set<Long> orderIds = orders.stream().map(MatPurchaseOrder::getId).collect(Collectors.toSet());
+        List<MatPurchaseOrderItem> items = matPurchaseOrderItemMapper.selectList(
+                new LambdaQueryWrapper<MatPurchaseOrderItem>()
+                        .eq(MatPurchaseOrderItem::getTenantId, tenantId)
+                        .eq(MatPurchaseOrderItem::getMaterialId, currentStock.getMaterialId())
+                        .in(MatPurchaseOrderItem::getOrderId, orderIds));
+
+        Map<Long, BigDecimal> remainingByOrder = new HashMap<>();
+        for (MatPurchaseOrderItem item : items) {
+            BigDecimal ordered = nvl(item.getQuantity());
+            BigDecimal received = nvl(item.getReceivedQuantity());
+            BigDecimal remaining = ordered.subtract(received).max(BigDecimal.ZERO);
+            remainingByOrder.merge(item.getOrderId(), remaining, BigDecimal::add);
+        }
+
+        return orders.stream()
+                .map(order -> toIncomingSupply(order, remainingByOrder.get(order.getId())))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public MatStock updateSafetyStockThreshold(Long stockId, BigDecimal safetyStockQty) {
         validateQuantity(safetyStockQty, "INVALID_SAFETY_STOCK_THRESHOLD", "安全库存阈值");
@@ -557,6 +607,18 @@ public class MatStockService {
         candidate.setSafetyStockQty(safety.setScale(4, RoundingMode.HALF_UP));
         candidate.setTransferableQty(transferable);
         return candidate;
+    }
+
+    private StockIncomingSupplyVO toIncomingSupply(MatPurchaseOrder order, BigDecimal remainingQty) {
+        if (remainingQty == null || remainingQty.signum() <= 0) {
+            return null;
+        }
+        StockIncomingSupplyVO supply = new StockIncomingSupplyVO();
+        supply.setOrderId(order.getId());
+        supply.setOrderCode(order.getOrderCode());
+        supply.setDeliveryDate(order.getDeliveryDate());
+        supply.setRemainingQty(remainingQty.setScale(4, RoundingMode.HALF_UP));
+        return supply;
     }
 
     private List<Long> findEnabledWarehouseIds(Long tenantId, Long warehouseId, Long projectId) {
