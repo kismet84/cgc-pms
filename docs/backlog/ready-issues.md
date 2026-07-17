@@ -199,7 +199,7 @@ Reviewer要求：确认候选查询受付款查询权限、租户和项目数据
 优先级：P1
 任务性质：能力新增
 类型：库存补货 / 已审批采购在途 / 项目隔离 / 只读决策辅助
-状态：Ready
+状态：Done
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-03`；candidateEvidenceHead=00e9a632a214de52c55146ddafd58d77e99759b7
 存量问题键：[stock:A-02-APPROVED-INCOMING-SUPPLY]
 关联产品目标：在低库存发起采购前展示已有已审批采购订单的未收货数量和预计交付日期，减少重复补货判断。
