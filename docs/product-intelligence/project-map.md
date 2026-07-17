@@ -1,5 +1,11 @@
 # CGC-PMS 项目地图
 
+## 2026-07-17 增量：会计凭证生成策略现状复核完成
+
+- 成功付款通过 `PayRecordEntryGenerationStrategy` 自动生成 `PAY_RECORD/PAYMENT` 凭证，借记应付账款、贷记对应资金账户；成功回款通过 `CollectionRecordEntryGenerationStrategy` 自动生成 `COLLECTION_RECORD/COLLECTION` 凭证，按分配额/未分配额贷记应收/预收并借记资金账户。
+- 两类凭证均以租户、来源、类型和草稿/已过账状态做幂等，处于 `DRAFT/PENDING` 后进入既有复核、过账、期间写保护和反向冲销闭环；重复银行回调不重复生成会计事实。
+- 原P0“没有生产策略”已纠正关闭；手工生成入口和 `accounting:add` 没有开放。页面仍有一条“规则待确认”的陈旧说明，已唯一承接为下一最小修正，不影响当前会计事实结论。
+
 ## 2026-07-17 增量：系统用户编辑详情权威加载完成
 
 - 用户编辑现先调用既有 `GET /system/users/{id}`，仅在当前请求成功后以详情的用户、联系方式和角色ID打开表单；密码始终留空。

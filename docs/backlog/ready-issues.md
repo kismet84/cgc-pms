@@ -13,7 +13,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P0
 任务性质：回归证明
 类型：会计凭证 / 付款回款 / 自动生成 / 幂等租户 / 历史问题纠偏
-状态：Ready
+状态：Done
 来源锚点：唯一问题载体 `docs/backlog/current-issues.json` 的 `A-01-ACCOUNTING-GENERATE`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-10`；`docs/business/financial-accounting-month-end-closed-loop.md`；candidateEvidenceHead=ba8d8c92da9744f07ed2c6e547e976e7e6dde21b
 存量问题键：[stock:A-01-ACCOUNTING-GENERATE]
 关联产品目标：纠正“生产环境没有会计凭证生成策略”的过时P0结论，并用当前付款、回款、月结闭环证据确认自动凭证的来源、科目、借贷、幂等、租户、期间和冲销边界。
