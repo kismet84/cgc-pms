@@ -1,5 +1,15 @@
 # CGC-PMS v1.5 首轮迭代方向决策
 
+## PI-2026-07-17-09：系统用户编辑详情权威加载
+
+- 项目事实：`SysUserController.getById` 与 `SysUserService.getById` 已按租户返回 `SysUserVO` 和角色映射；`frontend-admin/src/pages/system/users/index.vue` 的编辑动作却直接使用分页行，且用户API模块没有详情GET。
+- 外部事实：Keycloak最新Admin REST API将用户集合查询与 `/users/{user-id}` 单用户资源分开，并允许集合使用简要表示；这支持“列表用于浏览、按ID详情用于当前编辑上下文”的边界。来源核验时间：2026-07-17。
+- 方案比较：删除详情端点会破坏未知兼容调用且没有收益；新增独立详情页超出当前价值；让既有编辑弹窗消费详情端点，可最小化旧分页快照覆盖并关闭P0待确认项。
+- 裁决：准入 `ISSUE-048-009`。成功取得详情后才打开编辑弹窗；失败不回退分页行，快速切换防陈旧响应，密码保持空且详情VO不得扩展敏感字段。
+- 非目标：不改用户表、角色表、权限码、密码策略、更新事务、登录审计或项目成员关系。
+- 回滚：回退前端详情方法和编辑前加载，后端与数据无变化。
+- 官方来源：<https://www.keycloak.org/docs-api/latest/rest-api/index.html>。
+
 ## PI-2026-07-17-08：库存历史净领料基线
 
 - 项目事实：`mat_stock_txn` 已以来源类型区分领料 `MAT_REQUISITION/OUT`、退料 `MATERIAL_RETURN/IN`、调拨和验收入库；当前库存台账能查看明细，但没有按稳定窗口汇总的领料事实，A-02需求预测缺少可见输入基线。

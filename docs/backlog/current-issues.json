@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-17T18:31:00+08:00",
+  "updatedAt": "2026-07-17T18:48:00+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -10,7 +10,7 @@
       "classification": "STILL_APPLICABLE",
       "priority": "P0",
       "blocking": false,
-      "summary": "明确需补用户入口已清空，剩余11个子项均需要兼容性或业务规则确认。",
+      "summary": "明确需补用户入口已清空；系统用户详情已核实并转入Ready，剩余10个子项仍需兼容性或业务规则确认。",
       "acceptanceCriteria": "11个子项均形成复用现有入口、内部接口、废弃或确认保留的唯一裁决，并通过权限、租户和状态边界验证。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md",
@@ -266,17 +266,19 @@
     },
     {
       "issueKey": "A-01-SYSTEM-USER-DETAIL",
-      "title": "系统用户详情兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
+      "title": "系统用户编辑详情权威加载",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
       "priority": "P0",
       "blocking": false,
       "parentIssueKey": "A-01",
-      "summary": "GET /system/users/{id}未检出前端同方法入口。",
-      "acceptanceCriteria": "核实管理员入口、调用方和敏感字段边界后形成唯一裁决。",
-      "deferReason": "调用与入口证据不足。",
+      "summary": "用户编辑当前直接复用分页行快照，GET /system/users/{id} 已返回租户内用户和完整角色映射但没有前端调用，分页刷新与编辑之间的变更可能被旧快照覆盖。",
+      "acceptanceCriteria": "管理员从用户管理编辑入口按ID加载服务端详情后再打开表单；失败不回退分页快照，切换编辑目标不被陈旧响应覆盖，并验证查询权限、租户隔离和敏感字段边界。",
       "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
+        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md",
+        "frontend-admin/src/pages/system/users/index.vue",
+        "backend/src/main/java/com/cgcpms/system/service/SysUserService.java",
+        "docs/product-intelligence/evolution-decision.md"
       ]
     },
     {

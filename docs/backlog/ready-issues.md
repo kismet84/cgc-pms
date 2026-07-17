@@ -8,6 +8,70 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`～`ISSUE-040-055`、阻塞修复 `ISSUE-047-002` 与 `ISSUE-047-003` 已完成；`启动迭代-20` 已完成 20/20。站内通知的租户/用户隔离、已读幂等、SSE与通知铃契约已完成回归证明。
 
+### ISSUE-048-009：系统用户编辑详情权威加载
+
+优先级：P0
+任务性质：缺口修复
+类型：系统用户 / 详情端点 / 编辑一致性 / 权限租户 / 陈旧响应
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-09`；candidateEvidenceHead=c06f49f1637bc21d7ad7941afea51e59bbf1c1af
+存量问题键：[stock:A-01-SYSTEM-USER-DETAIL]
+关联产品目标：让管理员编辑用户时以当前服务端详情和角色映射为准，避免分页行快照过期后覆盖其他管理员刚完成的用户或角色变更，同时关闭既有P0兼容性待确认项。
+阻塞证据：`GET /system/users/{id}` 已按租户返回 `SysUserVO` 与角色ID/名称，用户管理页编辑入口却直接复制分页行；现有前端API模块没有详情方法，详情端点无法形成用户入口。
+解除条件：用户编辑先按ID加载详情，成功后才填表并打开弹窗；加载失败不回退旧行数据，快速切换目标时只接受最后一次响应；权限、租户与无密码字段边界保持现状。
+Migration：不需要
+依赖：现有用户列表、用户详情端点、用户编辑弹窗、角色映射、`system:user:query`、管理员角色和租户拦截。
+风险等级：中
+运行态要求：当前本地 backend/Vite/MySQL；浏览器只读打开详情弹窗，不保存、不分配角色、不改变用户状态。
+Reviewer要求：确认详情响应不含密码/密码哈希；管理员和 `system:user:query` 可读、无关权限403、跨租户 `USER_NOT_FOUND`；详情失败不得用分页行继续编辑；响应顺序不能让旧用户覆盖新用户。
+归档报告：`docs/quality/ISSUE-048-009-系统用户编辑详情权威加载验收报告.md`
+最小回滚：回退前端详情API与编辑前加载逻辑，恢复分页行填表；后端端点和数据不变。
+目标：
+- 为前端API补齐现有用户详情GET，并由用户管理编辑入口消费。
+- 以详情返回的用户名、姓名、手机、邮箱和角色ID填表，密码始终留空；加载失败不打开弹窗。
+- 为快速重复点击提供最小陈旧响应防护，新增用户动作同时使在途编辑详情失效。
+非目标：
+- 不新增用户详情独立页面，不修改用户表、角色表、权限码、密码策略或更新事务。
+- 不展示密码、密码哈希、令牌、登录历史、审计日志、项目成员关系或跨租户用户。
+允许修改：
+- `frontend-admin/src/api/modules/user.ts`
+- `frontend-admin/src/pages/system/users/index.vue`
+- `frontend-admin/src/pages/system/users/__tests__/**`
+- `backend/src/test/java/com/cgcpms/system/**`
+- `backend/src/test/java/com/cgcpms/contract/TenantIsolationTest.java`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/ad-hoc-plan.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/competitor-analysis.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-048-009-系统用户编辑详情权威加载验收报告.md`
+禁止修改：
+- `backend/src/main/java/**`
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/src/pages/system/roles/**`
+- `frontend-admin/src/pages/system/permissions/**`
+- `deploy/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- `getUserDetail(id)` 固定调用 `GET /system/users/{id}`；编辑入口必须等待详情成功后再打开弹窗，不以列表行作为失败兜底。
+- 详情表单只映射 `SysUserVO` 允许字段，密码为空；角色使用详情 `roleIds`，不把 `tenantId`、密码或其他服务端字段送回更新载荷。
+- 快速点击不同用户时，先返回的旧请求不能覆盖最后目标；点击新增时使既有详情请求失效。
+- 详情GET仅管理员或 `system:user:query` 通过，无关权限403；跨租户保持 `USER_NOT_FOUND`，响应VO无密码字段。
+- 后端权限/租户专项、前端专项、类型、ESLint、Ready lint、允许/禁止路径和 `git diff --check` 全部通过；真实页面只读打开详情弹窗并观察到GET，无新增控制台错误。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-048-009`
+- `cd backend; .\mvnw.cmd "-Dtest=SysUserDetailControllerTest,TenantIsolationTest#testCrossTenantUserRead" test`
+- `cd frontend-admin; pnpm vitest run src/pages/system/users/__tests__/user-detail.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm eslint src/api/modules/user.ts src/pages/system/users/index.vue src/pages/system/users/__tests__/user-detail.test.ts`
+- `git diff --check`
+
 ### ISSUE-048-008：库存历史净领料基线
 
 优先级：P1
