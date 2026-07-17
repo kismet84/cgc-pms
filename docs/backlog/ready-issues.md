@@ -8,6 +8,75 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`～`ISSUE-040-055`、阻塞修复 `ISSUE-047-002` 与 `ISSUE-047-003` 已完成；`启动迭代-20` 已完成 20/20。站内通知的租户/用户隔离、已读幂等、SSE与通知铃契约已完成回归证明。
 
+### ISSUE-048-008：库存历史净领料基线
+
+优先级：P1
+任务性质：能力新增
+类型：库存 / 历史领料 / 退料冲减 / 30与90日窗口 / 只读基线
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-08`；candidateEvidenceHead=0d71054a4934552a112b213de6681969ef7f4552
+存量问题键：[stock:A-02-MATERIAL-CONSUMPTION-BASELINE]
+关联产品目标：在引入需求预测算法前，让采购和库存人员先看到当前库存项可审计的历史净领料事实，避免把缺少口径的数据直接包装成预测或自动采购建议。
+阻塞证据：`mat_stock_txn` 已记录领料 `MAT_REQUISITION/OUT` 和退料 `MATERIAL_RETURN/IN`，但库存页只能看明细流水，不能按稳定窗口判断30/90日领用与退回规模；A-02的需求预测因此缺少可见、可验真的输入基线。
+解除条件：从当前库存项服务端反查租户、项目、仓库和物料，以同一次查询返回含今日的30/90个本地自然日内领料、退料和净领料数量；页面明确标注历史事实而非预测，失败不阻断库存台账。
+Migration：不需要
+依赖：现有库存、仓库、库存流水、领料出库、材料退料、项目数据范围、库存查询权限和当前 V211 基线。
+风险等级：中
+运行态要求：当前本地 MySQL/Vite/backend；端点和页面均只读，不创建领料、退料、库存流水或采购申请。
+Reviewer要求：确认租户/项目/仓库/物料隔离，30/90日边界含今日且不重叠误算；只计 `MAT_REQUISITION/OUT` 与 `MATERIAL_RETURN/IN`，排除调拨、验收、供应商退货和其他流水；净值允许因窗口外领料、本窗口退料而为负，不得钳零或宣称预测。
+归档报告：`docs/quality/ISSUE-048-008-库存历史净领料基线验收报告.md`
+最小回滚：回退只读端点、VO、聚合查询和前端基线卡片；不涉及迁移、历史流水或采购事实。
+目标：
+- 为当前库存项提供30/90日历史领料、退料和净领料数量，范围完全由服务端库存与仓库关系确定。
+- 用一次条件聚合查询完成两个窗口，不加载全量流水，不增加预测表或缓存副本。
+- 在库存分析区展示只读基线、窗口起止和明确的“非预测”说明；加载失败只显示局部状态。
+非目标：
+- 不计算日均、周转天数、缺货日期、建议采购量、工作日历、季节性、趋势外推、置信区间或自动下单。
+- 不把跨仓调拨、材料验收、供应商退货、库存调整或通用手工流水计入领料需求，不修改领料/退料写侧。
+允许修改：
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `frontend-admin/src/api/modules/inventory.ts`
+- `frontend-admin/src/types/inventory.ts`
+- `frontend-admin/src/pages/inventory/stock.vue`
+- `frontend-admin/src/pages/inventory/composables/useStockLedger.ts`
+- `frontend-admin/src/pages/inventory/components/StockAnalysisPanel.vue`
+- `frontend-admin/src/pages/inventory/__tests__/**`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/ad-hoc-plan.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/competitor-analysis.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-048-008-库存历史净领料基线验收报告.md`
+禁止修改：
+- `backend/src/main/java/com/cgcpms/requisition/**`
+- `backend/src/main/java/com/cgcpms/materialreturn/**`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `backend/src/main/resources/db/migration/**`
+- `frontend-admin/src/pages/purchase/**`
+- `deploy/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- 访问控制继续复用现有库存查询权限，管理员等价通过；权限码为 `inventory:stock:list`。库存不存在、跨租户或无项目访问权均按现有库存查询边界拒绝，不接受客户端项目、仓库或物料参数扩大范围。
+- 30日窗口从当前本地日期减29日的零时整开始，90日窗口从减89日的零时整开始，截止同一服务端时刻；边界流水只计一次，返回窗口起止供页面解释。
+- 领料只计 `txn_type=OUT AND source_type=MAT_REQUISITION`，退料只计 `txn_type=IN AND source_type=MATERIAL_RETURN`；净领料等于领料减退料并保留四位小数，允许负值。
+- 一次聚合查询同时得到30/90日结果；其他租户、仓库、物料、调拨、验收、供应商退货及窗口外流水不进入统计，空结果全部为0。
+- 前端在当前库存项分析区展示30/90日领料、退料、净领料和“历史事实、非需求预测”说明；切换库存不显示旧响应，局部失败不关闭台账或污染其他数据。
+- 后端专项、前端专项、类型、ESLint、Ready lint、允许/禁止路径和 `git diff --check` 全部通过；真实页面只读且无新增控制台错误。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-048-008`
+- `cd backend; .\mvnw.cmd "-Dtest=MatStockConsumptionBaselineServiceTest,MatStockConsumptionBaselineControllerTest" test`
+- `cd frontend-admin; pnpm vitest run src/pages/inventory/__tests__/stock-consumption-baseline.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin; pnpm eslint src/pages/inventory/stock.vue src/pages/inventory/composables/useStockLedger.ts src/pages/inventory/components/StockAnalysisPanel.vue src/api/modules/inventory.ts src/types/inventory.ts src/pages/inventory/__tests__/stock-consumption-baseline.test.ts`
+- `git diff --check`
+
 ### ISSUE-048-007：同项目跨仓库存调拨过账
 
 优先级：P1

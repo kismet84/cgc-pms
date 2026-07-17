@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-17T18:02:00+08:00",
+  "updatedAt": "2026-07-17T18:12:00+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -31,6 +31,23 @@
         "docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md",
         "docs/quality/ISSUE-048-003-采购前已审批在途余量提示验收报告.md",
         "docs/quality/ISSUE-048-007-同项目跨仓库存调拨过账验收报告.md"
+      ]
+    },
+    {
+      "issueKey": "A-02-MATERIAL-CONSUMPTION-BASELINE",
+      "parentIssueKey": "A-02",
+      "title": "库存历史净领料基线",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
+      "priority": "P1",
+      "blocking": false,
+      "summary": "库存流水已有领料出库和材料退料来源，但当前库存页没有30/90日聚合，需求预测缺少可见、可审计的历史输入基线。",
+      "acceptanceCriteria": "按当前库存项服务端范围一次聚合含今日的30/90日领料、退料和净领料，排除其他流水并明确结果不是需求预测。",
+      "sourceRefs": [
+        "backend/src/main/java/com/cgcpms/inventory/entity/MatStockTxn.java",
+        "backend/src/main/java/com/cgcpms/requisition/service/MatRequisitionService.java",
+        "backend/src/main/java/com/cgcpms/materialreturn/service/MaterialReturnService.java",
+        "docs/product-intelligence/evolution-decision.md"
       ]
     },
     {

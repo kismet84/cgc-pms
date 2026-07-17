@@ -1,5 +1,16 @@
 # CGC-PMS v1.5 首轮迭代方向决策
 
+## PI-2026-07-17-08：库存历史净领料基线
+
+- 项目事实：`mat_stock_txn` 已以来源类型区分领料 `MAT_REQUISITION/OUT`、退料 `MATERIAL_RETURN/IN`、调拨和验收入库；当前库存台账能查看明细，但没有按稳定窗口汇总的领料事实，A-02需求预测缺少可见输入基线。
+- 外部事实：Odoo 19 的 Moves History 支持任意时段、最近30日/最近3个月以及按产品和日期查看历史移动；其 Forecasted report 则基于已确认或已计划的未来入库/出库，二者语义分开。来源核验时间：2026-07-17。
+- 方案比较：直接给历史均值、缺货日或建议采购量会在工作日历、需求对象和算法均未审定时制造伪预测；先展示30/90日领料、退料和净领料，能复用现有权威流水并暴露数据质量，且不改变补货或采购动作。
+- 口径裁决：当前库存项服务端反查租户、项目、仓库和物料；窗口按含今日的30/90个本地自然日计算，只计真实领料出库和材料退料入库，净值为两者差且允许负数。
+- 裁决：准入 `ISSUE-048-008`。一次条件聚合查询返回两个窗口，前端明确标识“历史事实、非需求预测”；A-02的工作日历和需求预测继续保留。
+- 非目标：不计算日均、周转、缺货日期、预测、建议采购量、季节性、置信度或自动下单；不改领料、退料、调拨、验收和采购写侧。
+- 回滚：回退只读聚合端点、VO和库存分析区卡片；无迁移、无数据回填、无业务事实逆变更。
+- 官方来源：<https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory/warehouses_storage/reporting/moves_history.html>、<https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory/warehouses_storage/reporting/forecast.html>。
+
 ## PI-2026-07-17-07：同项目跨仓库存调拨过账
 
 - 项目事实：`MatStockService.getTransferCandidates` 已按租户、项目、启用仓库、同物料和安全库存计算跨仓可调拨余量；库存服务已有带来源追溯、幂等和价值的入出库原语，但手工入出库控制器已明确停用。

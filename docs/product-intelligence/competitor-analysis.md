@@ -1,5 +1,12 @@
 # CGC-PMS 竞品情报与能力差距
 
+## 2026-07-17 增量复核：历史库存移动不等于需求预测
+
+- Odoo 19 官方 Moves History 将历史库存移动作为可按任意时段、最近30日、最近3个月、产品和日期查看的分析事实，并保留移动原因。
+- Odoo 19 官方 Forecasted report 基于已确认或已计划的未来入库与出库投影库存；采购询价未确认时不进入预测。历史移动分析和未来确定性供需投影不是同一口径。
+- 当前 CGC-PMS 已有来源可追溯的领料与退料流水，但尚无稳定窗口汇总，也没有已审定的统计预测算法。决策影响：先交付30/90日历史净领料基线并明确“非预测”，不从历史均值直接生成采购量。
+- 官方来源：<https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory/warehouses_storage/reporting/moves_history.html>、<https://www.odoo.com/documentation/19.0/applications/inventory_and_mrp/inventory/warehouses_storage/reporting/forecast.html>，核验时间 2026-07-17。
+
 ## 2026-07-16 增量复核：供应商提前期与采购交货日期
 
 - Odoo 19 官方 Lead Times 说明 Vendor Lead Time 是采购订单确认到收货的自然日，Expected Arrival 由订单日期/截止日加提前期得到；该自然日口径不自动跳过周末或节假日。
