@@ -8,6 +8,63 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`～`ISSUE-040-055`、阻塞修复 `ISSUE-047-002` 与 `ISSUE-047-003` 已完成；`启动迭代-20` 已完成 20/20。站内通知的租户/用户隔离、已读幂等、SSE与通知铃契约已完成回归证明。
 
+### ISSUE-048-010：会计凭证生成策略现状复核与P0问题关闭
+
+优先级：P0
+任务性质：回归证明
+类型：会计凭证 / 付款回款 / 自动生成 / 幂等租户 / 历史问题纠偏
+状态：Ready
+来源锚点：唯一问题载体 `docs/backlog/current-issues.json` 的 `A-01-ACCOUNTING-GENERATE`；`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-17-10`；`docs/business/financial-accounting-month-end-closed-loop.md`；candidateEvidenceHead=ba8d8c92da9744f07ed2c6e547e976e7e6dde21b
+存量问题键：[stock:A-01-ACCOUNTING-GENERATE]
+关联产品目标：纠正“生产环境没有会计凭证生成策略”的过时P0结论，并用当前付款、回款、月结闭环证据确认自动凭证的来源、科目、借贷、幂等、租户、期间和冲销边界。
+阻塞证据：当前问题仍称 `POST /accounting-entry/generate` 没有生产 `EntryGenerationStrategy`；当前源码却已有 `PayRecordEntryGenerationStrategy` 与 `CollectionRecordEntryGenerationStrategy`，付款和回款写侧会自动调用 `EntryGenerator`，项目地图也已将财务核算与月结标记为 P0 完成。正式台账与当前实现冲突。
+解除条件：证明成功付款与成功回款各自生成唯一、借贷平衡、来源可追溯的草稿待复核凭证；重复回调不重复记账，非法来源、错误类型、跨租户或非成功事实被拒绝，会计期间与冲销继续受现有闭环约束；成立后移除过时P0叶子。
+Migration：不需要
+依赖：现有付款闭环、收入回款闭环、`EntryGenerator`、两种生产策略、会计期间、复核/过账/冲销状态机及财务核算业务标准。
+风险等级：高
+运行态要求：当前本地 H2/MySQL；浏览器只读查看会计凭证列表/详情，不生成、复核、过账或冲销凭证。
+Reviewer要求：确认不是仅存在类名而无真实调用；确认两类来源的租户、成功状态、来源关系、借贷金额、幂等与并发证据；确认 `accounting:add` 未因本轮扩大授权，手工生成端点仍只允许显式权限或管理员且不替代业务写侧自动生成。
+归档报告：`docs/quality/ISSUE-048-010-会计凭证生成策略现状复核与P0问题关闭验收报告.md`
+最小回滚：回退治理台账、项目地图、迭代决策与验收报告；不修改会计、付款、回款代码、迁移或业务数据。
+目标：
+- 以当前源码、业务标准和自动化证明付款、回款两类生产凭证策略真实可达，而非只做静态存在性判断。
+- 验证自动生成的来源唯一、借贷平衡、租户隔离、成功状态、期间写保护和冲销链边界。
+- 若全部成立，关闭唯一P0叶子并更新A-01剩余数量；若任一关键事实不成立，保留原问题并登记一个可复现的唯一剩余缺口。
+非目标：
+- 不新增来源类型、科目映射、手工凭证入口、角色授权、迁移、报表、多账簿、多币种、税务或外部财务系统。
+- 不创建、复核、过账、冲销真实业务凭证，不修改历史会计、付款、回款、银行或现金日记事实。
+允许修改：
+- `backend/src/test/java/com/cgcpms/accounting/**`
+- `backend/src/test/java/com/cgcpms/payment/**`
+- `backend/src/test/java/com/cgcpms/revenue/**`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/ad-hoc-plan.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-048-010-会计凭证生成策略现状复核与P0问题关闭验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `frontend-admin/src/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- 当前生产 Spring 上下文注册且业务写侧真实调用 `PAY_RECORD`、`COLLECTION_RECORD` 两种策略；成功付款生成 `PAYMENT`，成功回款生成 `COLLECTION`，均为 `DRAFT/PENDING`。
+- 付款凭证借记应付、贷记对应资金账户；回款按已分配/未分配金额贷记应收/预收并借记资金账户；总借方等于总贷方，来源ID、项目、合同和资金账户可追溯。
+- 同租户同来源同凭证类型重复生成或并发重复银行回调只保留一份会计事实；跨租户、非成功事实、错误凭证类型及未知来源明确拒绝，不返回伪成功空结果。
+- 会计期间、复核、过账和冲销继续受既有业务标准与专项测试保护；本轮不授予 `accounting:add`，不新增前端手工生成入口。
+- 后端付款/回款/月结专项、控制器权限专项、Ready lint、允许/禁止路径和 `git diff --check` 全部通过；真实页面只读且无新增控制台错误。
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-048-010`
+- `cd backend; .\mvnw.cmd "-Dtest=AccountingEntryControllerTest,PaymentApplicationClosedLoopIntegrationTest,RevenueCollectionClosedLoopIntegrationTest,FinancialAccountingMonthEndClosedLoopIntegrationTest" test`
+- `git diff --check`
+
 ### ISSUE-048-009：系统用户编辑详情权威加载
 
 优先级：P0

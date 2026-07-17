@@ -1,5 +1,15 @@
 # CGC-PMS v1.5 首轮迭代方向决策
 
+## PI-2026-07-17-10：会计凭证生成策略现状复核与P0问题关闭
+
+- 历史结论：`PI-2026-07-13-01` 当时确认生产代码没有 `EntryGenerationStrategy`，因此未授权 `accounting:add`，并把生成端点重分类为需要确认。
+- 当前事实：后续付款/回款闭环已新增 `PayRecordEntryGenerationStrategy` 与 `CollectionRecordEntryGenerationStrategy`；成功付款和成功回款的权威写侧分别调用 `EntryGenerator`，财务核算业务标准也已审定自动凭证、复核、过账、冲销和月结边界。
+- 方案比较：开放手工生成入口会重复业务写侧且扩大财务权限；继续保留“无生产实现”会制造假P0；用当前闭环测试和只读页面复核后关闭过时叶子，范围最小且不改变会计事实。
+- 裁决：准入 `ISSUE-048-010`。复核付款与回款的成功状态、租户、科目、借贷、来源、幂等/并发、期间与冲销证据；全部成立才关闭 `A-01-ACCOUNTING-GENERATE`。
+- 权限边界：不授予 `accounting:add`，不新增前端手工生成动作；`POST /accounting-entry/generate` 继续只允许显式权限或管理员，正常业务凭证由付款/回款权威写侧自动生成。
+- 非目标：不新增策略、科目、迁移、手工凭证、报表、多账簿、多币种、税务或外部财务系统。
+- 回滚：仅回退治理与报告；生产代码、迁移和数据不变。
+
 ## PI-2026-07-17-09：系统用户编辑详情权威加载
 
 - 项目事实：`SysUserController.getById` 与 `SysUserService.getById` 已按租户返回 `SysUserVO` 和角色映射；`frontend-admin/src/pages/system/users/index.vue` 的编辑动作却直接使用分页行，且用户API模块没有详情GET。
