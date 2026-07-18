@@ -162,7 +162,7 @@ class MigrationSoftDeleteBehaviorTest {
                 """, Integer.class);
 
         assertEquals(0, obsoleteColumns);
-        assertEquals(15, activeTokens);
+        assertEquals(16, activeTokens);
     }
 
     @Test
