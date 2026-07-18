@@ -7,6 +7,15 @@ import { isBlocked } from "./policy.js";
 
 export const ISSUE_REGISTER_PATH = "docs/backlog/current-issues.json";
 
+const candidateSchema = z.object({
+  userValue: z.string().min(1).max(4000),
+  minimalLoop: z.string().min(1).max(4000),
+  nonGoals: z.string().min(1).max(4000),
+  dependencies: z.string().min(1).max(4000),
+  risk: z.string().min(1).max(4000),
+  readyPreconditions: z.string().min(1).max(4000),
+}).strict();
+
 const issueSchema = z.object({
   issueKey: z.string().min(1).max(200),
   title: z.string().min(1).max(500),
@@ -24,6 +33,7 @@ const issueSchema = z.object({
   summary: z.string().min(1).max(4000),
   acceptanceCriteria: z.string().min(1).max(4000),
   deferReason: z.string().max(2000).nullable().optional(),
+  candidate: candidateSchema.optional(),
   sourceRefs: z.array(z.string().min(1).max(1000)).min(1).max(20),
 }).strict();
 

@@ -34,6 +34,59 @@ export interface MatStockVO {
   unit?: string
 }
 
+/** 同项目其他仓库可调拨余量（查询快照，不预占） */
+export interface StockTransferCandidateVO {
+  stockId: string
+  warehouseId: string
+  warehouseName: string
+  availableQty: string
+  safetyStockQty: string
+  transferableQty: string
+}
+
+/** 同项目跨仓库存调拨请求。 */
+export interface StockTransferParams {
+  sourceStockId: string
+  targetStockId: string
+  quantity: string
+  idempotencyKey: string
+  reason: string
+}
+
+/** 已完成库存调拨结果。 */
+export interface StockTransferVO extends StockTransferParams {
+  id: string
+  projectId: string
+  sourceWarehouseId: string
+  targetWarehouseId: string
+  materialId: string
+  unitCost: string
+  amount: string
+  status: 'COMPLETED'
+  completedAt: string
+}
+
+/** 已审批采购订单尚未收货的数量（查询快照，尚未入库） */
+export interface StockIncomingSupplyVO {
+  orderId: string
+  orderCode: string
+  deliveryDate: string
+  remainingQty: string
+}
+
+/** 当前库存项的历史净领料事实，不代表需求预测。 */
+export interface StockConsumptionBaselineVO {
+  window30Start: string
+  window90Start: string
+  cutoffAt: string
+  grossIssued30: string
+  returned30: string
+  netIssued30: string
+  grossIssued90: string
+  returned90: string
+  netIssued90: string
+}
+
 /** 库存流水 */
 export interface MatStockTxnVO {
   id: string

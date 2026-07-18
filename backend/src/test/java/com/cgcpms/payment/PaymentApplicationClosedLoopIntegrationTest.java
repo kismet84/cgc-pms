@@ -9,6 +9,8 @@ import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.document.provider.DocumentDataSnapshot;
+import com.cgcpms.document.provider.PaymentDocumentDataProvider;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.expense.entity.ExpenseApplication;
@@ -115,6 +117,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
     @Autowired private SubTaskMapper subTaskMapper;
     @Autowired private InvoiceService invoiceService;
     @Autowired private PaymentTraceService traceService;
+    @Autowired private PaymentDocumentDataProvider paymentDocumentDataProvider;
     @Autowired private PaymentReversalService reversalService;
     @Autowired private JdbcTemplate jdbcTemplate;
     @MockBean private WorkflowEngine workflowEngine;
@@ -294,6 +297,18 @@ class PaymentApplicationClosedLoopIntegrationTest {
         attach("INVOICE", invoiceId);
         invoiceService.verify(invoiceId, "VERIFIED");
 
+        DocumentDataSnapshot document = paymentDocumentDataProvider.load(applicationId);
+        @SuppressWarnings("unchecked")
+        var paymentDocument = (java.util.Map<String, Object>) document.values().get("payment");
+        @SuppressWarnings("unchecked")
+        var payeeDocument = (java.util.Map<String, Object>) document.values().get("payee");
+        assertEquals("500.00", paymentDocument.get("applyAmount"));
+        assertEquals("****5678", payeeDocument.get("bankAccount"));
+        assertEquals("138****5678", payeeDocument.get("contactPhone"));
+        assertEquals(1, ((java.util.List<?>) document.values().get("sources")).size());
+        assertEquals(1, ((java.util.List<?>) document.values().get("invoices")).size());
+        assertEquals(1, ((java.util.List<?>) document.values().get("attachments")).size());
+
         var trace = traceService.byCashJournal(journal.getId());
         assertEquals(applicationId, trace.getPaymentApplication().getId());
         assertEquals(1, trace.getPaymentRecords().size());
@@ -301,6 +316,55 @@ class PaymentApplicationClosedLoopIntegrationTest {
         assertEquals(1, trace.getInvoices().size());
         assertEquals(1, trace.getAccountingEntries().size());
         assertEquals(2, trace.getAccountingEntryLines().size());
+    }
+
+    @Test
+    @DisplayName("付款单据Provider从真实业务链读取多来源、多发票且金额不重算")
+    void paymentDocumentProviderReadsMultipleSourcesAndInvoicesFromAuthoritativeChain() {
+        Long firstExpenseId = createApprovedExpense(new BigDecimal("200.00"));
+        Long secondExpenseId = createApprovedExpense(new BigDecimal("300.00"));
+        Long applicationId = createPayment(new BigDecimal("500.00"));
+
+        PaymentApplicationSource firstSource = new PaymentApplicationSource();
+        firstSource.setSourceType(PaymentIntegrityConstants.SOURCE_EXPENSE);
+        firstSource.setSourceRefId(firstExpenseId);
+        firstSource.setSourceAmount(new BigDecimal("200.00"));
+        PaymentApplicationSource secondSource = new PaymentApplicationSource();
+        secondSource.setSourceType(PaymentIntegrityConstants.SOURCE_EXPENSE);
+        secondSource.setSourceRefId(secondExpenseId);
+        secondSource.setSourceAmount(new BigDecimal("300.00"));
+        sourceService.save(applicationId, List.of(firstSource, secondSource));
+        attach("PAYMENT", applicationId);
+        applicationService.submitForApproval(applicationId);
+        paymentHandler.onApproved(context(instance(applicationId)));
+
+        PayRecord payment = new PayRecord();
+        payment.setPayApplicationId(applicationId);
+        payment.setPayAmount(new BigDecimal("500.00"));
+        payment.setFundAccountId(FUND_ACCOUNT_ID);
+        payment.setPaidAt(LocalDateTime.now());
+        payment.setPayMethod("BANK_TRANSFER");
+        payment.setExternalTxnNo("PAYMENT-DOCUMENT-MULTI-TXN-001");
+        var paid = payRecordService.writeback(payment);
+
+        createAllocatedInvoice(Long.valueOf(paid.getId()), "PAYMENT-DOCUMENT-INVOICE-001", "200.00");
+        createAllocatedInvoice(Long.valueOf(paid.getId()), "PAYMENT-DOCUMENT-INVOICE-002", "300.00");
+
+        DocumentDataSnapshot document = paymentDocumentDataProvider.load(applicationId);
+        @SuppressWarnings("unchecked")
+        var paymentValues = (java.util.Map<String, Object>) document.values().get("payment");
+        @SuppressWarnings("unchecked")
+        var sources = (List<java.util.Map<String, Object>>) document.values().get("sources");
+        @SuppressWarnings("unchecked")
+        var invoices = (List<java.util.Map<String, Object>>) document.values().get("invoices");
+
+        assertEquals("500.00", paymentValues.get("applyAmount"));
+        assertEquals("500.00", paymentValues.get("approvedAmount"));
+        assertEquals("500.00", paymentValues.get("actualPayAmount"));
+        assertEquals(List.of("200.00", "300.00"),
+                sources.stream().map(row -> row.get("amount")).sorted().toList());
+        assertEquals(List.of("200.00", "300.00"),
+                invoices.stream().map(row -> row.get("amount")).sorted().toList());
     }
 
     @Test
@@ -545,6 +609,9 @@ class PaymentApplicationClosedLoopIntegrationTest {
         partner.setPartnerCode("PAYMENT-CLOSED-LOOP-PARTNER");
         partner.setPartnerName("付款闭环收款对象");
         partner.setPartnerType("SUBCONTRACTOR");
+        partner.setBankName("付款闭环银行");
+        partner.setBankAccount("6222000012345678");
+        partner.setContactPhone("13812345678");
         partner.setStatus("ENABLE");
         partnerMapper.insert(partner);
 
@@ -622,6 +689,23 @@ class PaymentApplicationClosedLoopIntegrationTest {
             default -> "OTHER";
         });
         fileMapper.insert(file);
+    }
+
+    private void createAllocatedInvoice(Long payRecordId, String invoiceNo, String amount) {
+        PayInvoice invoice = new PayInvoice();
+        invoice.setPayRecordId(payRecordId);
+        invoice.setInvoiceNo(invoiceNo);
+        invoice.setInvoiceType("VAT_SPECIAL");
+        invoice.setDocumentType("ELECTRONIC_INVOICE");
+        invoice.setInvoiceAmount(new BigDecimal(amount));
+        invoice.setInvoiceDate(LocalDate.now());
+        Long invoiceId = invoiceService.create(invoice);
+        InvoicePaymentAllocation allocation = new InvoicePaymentAllocation();
+        allocation.setPayRecordId(payRecordId);
+        allocation.setAllocatedAmount(new BigDecimal(amount));
+        invoiceService.saveAllocations(invoiceId, List.of(allocation));
+        attach("INVOICE", invoiceId);
+        invoiceService.verify(invoiceId, "VERIFIED");
     }
 
     private WorkflowContext context(WfInstance instance) {

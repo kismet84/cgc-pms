@@ -6,7 +6,9 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.site.entity.SiteDailyLog;
 import com.cgcpms.site.service.SiteDailyLogService;
+import com.cgcpms.site.service.SiteDailyQualitySafetyService;
 import com.cgcpms.site.vo.SiteDailyLogVO;
+import com.cgcpms.site.vo.SiteDailyQualitySafetyVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -14,12 +16,14 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @RestController
 @RequestMapping("/site-daily-logs")
 @RequiredArgsConstructor
 public class SiteDailyLogController {
     private final SiteDailyLogService service;
+    private final SiteDailyQualitySafetyService qualitySafetyService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:query')")
@@ -38,6 +42,12 @@ public class SiteDailyLogController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('site:daily:query')")
     public ApiResponse<SiteDailyLogVO> detail(@PathVariable Long id) {
         return ApiResponse.success(service.getById(id));
+    }
+
+    @GetMapping("/{id}/quality-safety")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or (hasAuthority('site:daily:query') and hasAuthority('quality:safety:query'))")
+    public ApiResponse<List<SiteDailyQualitySafetyVO>> qualitySafety(@PathVariable Long id) {
+        return ApiResponse.success(qualitySafetyService.listForDailyLog(id));
     }
 
     @PostMapping

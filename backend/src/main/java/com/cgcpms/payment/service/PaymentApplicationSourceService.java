@@ -18,6 +18,7 @@ import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PaymentApplicationSourceMapper;
 import com.cgcpms.payment.mapper.PaymentRecordSourceAllocationMapper;
 import com.cgcpms.payment.vo.PaymentApplicationSourceVO;
+import com.cgcpms.payment.vo.PaymentSourceOptionVO;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.settlement.constant.SettlementStatusConstants;
 import com.cgcpms.settlement.entity.StlSettlement;
@@ -54,6 +55,21 @@ public class PaymentApplicationSourceService {
     public List<PaymentApplicationSourceVO> list(Long applicationId) {
         PayApplication app = requireApplication(applicationId, "查看付款申请来源");
         return loadSources(app).stream().map(this::toVO).toList();
+    }
+
+    public List<PaymentSourceOptionVO> listOptions(Long projectId, Long contractId, Long partnerId,
+                                                    String payType, String expenseCategory) {
+        projectAccessChecker.checkAccess(projectId, "选择付款申请来源");
+        Long tenantId = UserContext.getCurrentTenantId();
+        String normalizedPayType = payType == null ? "" : payType.trim().toUpperCase();
+        String normalizedCategory = expenseCategory == null ? "" : expenseCategory.trim().toUpperCase();
+        if ("PROGRESS".equals(normalizedPayType) && "SUBCONTRACT".equals(normalizedCategory)) {
+            return sourceMapper.selectSubMeasureOptions(tenantId, projectId, contractId, partnerId);
+        }
+        if ("FINAL".equals(normalizedPayType)) {
+            return sourceMapper.selectSettlementOptions(tenantId, projectId, contractId, partnerId);
+        }
+        return List.of();
     }
 
     public void deleteDraftSources(PayApplication app) {

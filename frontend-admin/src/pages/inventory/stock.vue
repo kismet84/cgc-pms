@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ReloadOutlined } from '@ant-design/icons-vue'
+import { message } from 'ant-design-vue'
 import { useReferenceStore } from '@/stores/reference'
 import { useUserStore } from '@/stores/user'
 import {
@@ -17,6 +18,8 @@ import StockKpiStrip from './components/StockKpiStrip.vue'
 import StockTxnTable from './components/StockTxnTable.vue'
 import StockTxnDetailDrawer from './components/StockTxnDetailDrawer.vue'
 import StockAnalysisPanel from './components/StockAnalysisPanel.vue'
+import { createStockTransfer } from '@/api/modules/inventory'
+import type { StockTransferCandidateVO } from '@/types/inventory'
 
 const referenceStore = useReferenceStore()
 const userStore = useUserStore()
@@ -28,6 +31,13 @@ const {
   loading,
   listError,
   stock,
+  transferCandidates,
+  transferCandidatesLoading,
+  incomingSupplies,
+  incomingSuppliesLoading,
+  consumptionBaseline,
+  consumptionBaselineLoading,
+  consumptionBaselineError,
   safetyThresholdDraft,
   replenishmentTargetDraft,
   replenishmentLeadDaysDraft,
@@ -73,6 +83,68 @@ const canEditStock = computed(
     userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role)) ||
     userStore.hasPermission('inventory:stock:edit'),
 )
+
+const canTransferStock = computed(
+  () =>
+    userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role)) ||
+    (userStore.hasPermission('inventory:stock:edit') &&
+      userStore.hasPermission('inventory:transaction:add')),
+)
+const transferOpen = ref(false)
+const transferCandidate = ref<StockTransferCandidateVO | null>(null)
+const transferQuantity = ref<number | null>(null)
+const transferReason = ref('')
+const transferKey = ref('')
+const transferSubmitting = ref(false)
+
+function newTransferKey() {
+  return globalThis.crypto?.randomUUID?.() ?? `transfer-${Date.now()}-${Math.random()}`
+}
+
+function openTransfer(candidate: StockTransferCandidateVO) {
+  if (!canTransferStock.value || !stock.value) return
+  transferCandidate.value = candidate
+  transferQuantity.value = null
+  transferReason.value = ''
+  transferKey.value = newTransferKey()
+  transferOpen.value = true
+}
+
+async function submitTransfer() {
+  const candidate = transferCandidate.value
+  const target = stock.value
+  const quantity = transferQuantity.value
+  if (!candidate || !target || quantity == null || quantity <= 0) {
+    message.warning('请输入有效的调拨数量')
+    return
+  }
+  if (quantity > Number(candidate.transferableQty)) {
+    message.warning('调拨数量不能超过当前可调拨余量')
+    return
+  }
+  if (!transferReason.value.trim()) {
+    message.warning('请填写调拨原因')
+    return
+  }
+  transferSubmitting.value = true
+  try {
+    await createStockTransfer({
+      sourceStockId: candidate.stockId,
+      targetStockId: target.id,
+      quantity: quantity.toFixed(4),
+      idempotencyKey: transferKey.value,
+      reason: transferReason.value.trim(),
+    })
+    message.success('库存调拨已完成')
+    transferOpen.value = false
+    handleSearch()
+  } catch (error: unknown) {
+    console.error(error)
+    message.error('库存调拨失败，请核对最新余量后重试')
+  } finally {
+    transferSubmitting.value = false
+  }
+}
 
 // ---- 移动端检测 ----
 const MOBILE_BP = 500
@@ -345,9 +417,48 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
         :low-stock-warn="lowStockWarn"
         :kpi="kpi"
         :in-out-stats="inOutStats"
+        :transfer-candidates="transferCandidates"
+        :transfer-candidates-loading="transferCandidatesLoading"
+        :incoming-supplies="incomingSupplies"
+        :incoming-supplies-loading="incomingSuppliesLoading"
+        :consumption-baseline="consumptionBaseline"
+        :consumption-baseline-loading="consumptionBaselineLoading"
+        :consumption-baseline-error="consumptionBaselineError"
+        :can-transfer="canTransferStock"
         @replenish="handleReplenish"
+        @transfer="openTransfer"
       />
     </div>
+
+    <a-modal
+      v-model:open="transferOpen"
+      title="同项目跨仓调拨"
+      :confirm-loading="transferSubmitting"
+      ok-text="确认调拨"
+      cancel-text="取消"
+      @ok="submitTransfer"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="来源仓库">
+          <a-input :value="transferCandidate?.warehouseName" disabled />
+        </a-form-item>
+        <a-form-item label="可调拨量">
+          <a-input :value="transferCandidate?.transferableQty" disabled />
+        </a-form-item>
+        <a-form-item label="调拨数量" required>
+          <a-input-number
+            v-model:value="transferQuantity"
+            :min="0.0001"
+            :max="Number(transferCandidate?.transferableQty ?? 0)"
+            :precision="4"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="调拨原因" required>
+          <a-textarea v-model:value="transferReason" :maxlength="500" show-count :rows="3" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 

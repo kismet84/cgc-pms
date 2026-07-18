@@ -5,6 +5,7 @@ import { MoreOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant
 import axios from 'axios'
 import {
   getUserList,
+  getUserDetail,
   createUser,
   updateUser,
   updateUserStatus,
@@ -48,6 +49,7 @@ const filter = reactive({
 const modalVisible = ref(false)
 const modalTitle = ref('新增用户')
 const editingId = ref<string | null>(null)
+let editRequestSequence = 0
 const saving = ref(false)
 const allRoles = ref<SysRoleVO[]>([])
 const formData = reactive({
@@ -132,6 +134,7 @@ function handleReset() {
 }
 
 function handleAdd() {
+  editRequestSequence += 1
   modalTitle.value = '新增用户'
   editingId.value = null
   Object.assign(formData, {
@@ -145,18 +148,28 @@ function handleAdd() {
   modalVisible.value = true
 }
 
-function handleEdit(record: SysUserVO) {
-  modalTitle.value = '编辑用户'
-  editingId.value = record.id
-  Object.assign(formData, {
-    username: record.username,
-    password: '',
-    realName: record.realName,
-    phone: record.phone ?? '',
-    email: record.email ?? '',
-    roleIds: record.roleIds ? [...record.roleIds] : [],
-  })
-  modalVisible.value = true
+async function handleEdit(record: SysUserVO) {
+  const requestSequence = ++editRequestSequence
+  try {
+    const detail = await getUserDetail(record.id)
+    if (requestSequence !== editRequestSequence) return
+
+    modalTitle.value = '编辑用户'
+    editingId.value = detail.id
+    Object.assign(formData, {
+      username: detail.username,
+      password: '',
+      realName: detail.realName,
+      phone: detail.phone ?? '',
+      email: detail.email ?? '',
+      roleIds: detail.roleIds ? [...detail.roleIds] : [],
+    })
+    modalVisible.value = true
+  } catch (e: unknown) {
+    if (requestSequence !== editRequestSequence) return
+    console.error(e)
+    message.error('加载用户详情失败，请重试')
+  }
 }
 
 async function handleModalOk() {

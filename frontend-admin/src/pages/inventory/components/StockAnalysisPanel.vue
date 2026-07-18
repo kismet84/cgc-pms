@@ -1,13 +1,27 @@
 <script setup lang="ts">
 import type { StockKpiVO } from '@/types/inventory'
+import type { StockTransferCandidateVO } from '@/types/inventory'
+import type { StockIncomingSupplyVO } from '@/types/inventory'
+import type { StockConsumptionBaselineVO } from '@/types/inventory'
 
 defineProps<{
   lowStockWarn: { name: string; qty: number; threshold: number }[]
   kpi: StockKpiVO
   inOutStats: { inPct: number; outPct: number }
+  transferCandidates: StockTransferCandidateVO[]
+  transferCandidatesLoading: boolean
+  incomingSupplies: StockIncomingSupplyVO[]
+  incomingSuppliesLoading: boolean
+  consumptionBaseline: StockConsumptionBaselineVO | null
+  consumptionBaselineLoading: boolean
+  consumptionBaselineError: boolean
+  canTransfer: boolean
 }>()
 
-defineEmits<{ replenish: [] }>()
+defineEmits<{
+  replenish: []
+  transfer: [candidate: StockTransferCandidateVO]
+}>()
 </script>
 
 <template>
@@ -45,6 +59,78 @@ defineEmits<{ replenish: [] }>()
             <span class="lg-type-label" style="grid-column: 2 / span 4">库存正常</span>
           </div>
         </div>
+      </section>
+      <section class="stock-analysis-section">
+        <div class="stock-section-title">历史净领料</div>
+        <div v-if="consumptionBaselineLoading" class="stock-transfer-hint">正在汇总历史流水…</div>
+        <div v-else-if="consumptionBaselineError" class="stock-transfer-hint">历史基线暂不可用</div>
+        <template v-else-if="consumptionBaseline">
+          <div class="stock-supply-row">
+            <span class="stock-transfer-name">近 30 日</span>
+            <strong>{{ consumptionBaseline.netIssued30 }}</strong>
+          </div>
+          <div class="stock-transfer-hint">
+            领 {{ consumptionBaseline.grossIssued30 }} / 退 {{ consumptionBaseline.returned30 }}
+          </div>
+          <div class="stock-transfer-hint">
+            {{ consumptionBaseline.window30Start }} 至
+            {{ consumptionBaseline.cutoffAt.slice(0, 10) }}
+          </div>
+          <div class="stock-supply-row">
+            <span class="stock-transfer-name">近 90 日</span>
+            <strong>{{ consumptionBaseline.netIssued90 }}</strong>
+          </div>
+          <div class="stock-transfer-hint">
+            领 {{ consumptionBaseline.grossIssued90 }} / 退 {{ consumptionBaseline.returned90 }}
+          </div>
+          <div class="stock-transfer-hint">
+            {{ consumptionBaseline.window90Start }} 至
+            {{ consumptionBaseline.cutoffAt.slice(0, 10) }}
+          </div>
+          <div class="stock-transfer-hint">历史事实，非需求预测</div>
+        </template>
+        <div v-else class="stock-transfer-hint">暂无历史净领料数据</div>
+      </section>
+      <section class="stock-analysis-section">
+        <div class="stock-section-title">已审批采购在途</div>
+        <div v-if="incomingSuppliesLoading" class="stock-transfer-hint">正在查询采购订单…</div>
+        <template v-else-if="incomingSupplies.length">
+          <div v-for="supply in incomingSupplies" :key="supply.orderId" class="stock-supply-row">
+            <span class="stock-supply-main">
+              <span class="stock-transfer-name">{{ supply.orderCode }}</span>
+              <small>{{ supply.deliveryDate }}</small>
+            </span>
+            <strong>{{ supply.remainingQty }}</strong>
+          </div>
+          <div class="stock-transfer-hint">已审批未收货快照，尚未入库</div>
+        </template>
+        <div v-else class="stock-transfer-hint">暂无已审批采购在途</div>
+      </section>
+      <section class="stock-analysis-section">
+        <div class="stock-section-title">同项目可调拨余量</div>
+        <div v-if="transferCandidatesLoading" class="stock-transfer-hint">正在查询其他仓库…</div>
+        <template v-else-if="transferCandidates.length">
+          <div
+            v-for="candidate in transferCandidates"
+            :key="candidate.warehouseId"
+            class="stock-transfer-row"
+          >
+            <span class="stock-transfer-name">{{ candidate.warehouseName }}</span>
+            <span class="stock-transfer-action">
+              <strong>{{ candidate.transferableQty }}</strong>
+              <a-button
+                v-if="canTransfer"
+                type="link"
+                size="small"
+                @click="$emit('transfer', candidate)"
+              >
+                调拨
+              </a-button>
+            </span>
+          </div>
+          <div class="stock-transfer-hint">查询快照，未预占库存</div>
+        </template>
+        <div v-else class="stock-transfer-hint">暂无可调拨余量</div>
       </section>
       <section class="stock-analysis-section">
         <div class="stock-section-title">出入库统计</div>
@@ -144,6 +230,54 @@ defineEmits<{ replenish: [] }>()
   font-size: 14px;
   font-weight: 700;
   line-height: 20px;
+}
+
+.stock-transfer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.stock-supply-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.stock-supply-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.stock-supply-main small {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.stock-transfer-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-transfer-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.stock-transfer-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .stock-analysis-section :deep(.lg-type-row),

@@ -9,6 +9,7 @@ import {
   createSiteDailyLog,
   getSiteDailyLog,
   getSiteDailyLogs,
+  getSiteDailyQualitySafetyFacts,
   submitSiteDailyLog,
   updateSiteDailyLog,
 } from '@/api/modules/site-daily-log'
@@ -18,7 +19,11 @@ import {
   replaceDailyProgress,
   type DailyProgressRequest,
 } from '@/api/modules/projectSchedule'
-import type { SiteDailyLogCommand, SiteDailyLogVO } from '@/types/site-daily-log'
+import type {
+  SiteDailyLogCommand,
+  SiteDailyLogVO,
+  SiteDailyQualitySafetyVO,
+} from '@/types/site-daily-log'
 import type { SysFileVO } from '@/types/file'
 import { useMobileViewport } from '@/composables/useMobileViewport'
 
@@ -37,6 +42,11 @@ const canReportProgress = computed(
   () =>
     userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role)) ||
     userStore.hasPermission('schedule:progress'),
+)
+const canViewQualitySafety = computed(
+  () =>
+    userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role)) ||
+    userStore.hasPermission('quality:safety:query'),
 )
 
 interface DailyProgressFormRow extends DailyProgressRequest {
@@ -67,6 +77,10 @@ const files = ref<SysFileVO[]>([])
 const filesLoading = ref(false)
 const progressSaving = ref(false)
 const progressRows = ref<DailyProgressFormRow[]>([])
+const qualitySafetyFacts = ref<SiteDailyQualitySafetyVO[]>([])
+const qualitySafetyLoading = ref(false)
+const qualitySafetyError = ref('')
+let qualitySafetyRequestId = 0
 const form = reactive<SiteDailyLogCommand>({
   projectId: undefined,
   reportDate: undefined,
@@ -133,6 +147,9 @@ function resetForm(record?: SiteDailyLogVO) {
 }
 
 function openCreate() {
+  qualitySafetyRequestId += 1
+  qualitySafetyFacts.value = []
+  qualitySafetyError.value = ''
   modalMode.value = 'create'
   activeRecord.value = null
   files.value = []
@@ -149,8 +166,30 @@ async function openRecord(record: SiteDailyLogVO, edit = false) {
     resetForm(detail)
     modalOpen.value = true
     await fetchFiles(record.id)
+    await loadQualitySafetyFacts(record.id)
   } catch {
     message.error('现场日报详情加载失败')
+  }
+}
+
+async function loadQualitySafetyFacts(dailyLogId: string) {
+  const requestId = ++qualitySafetyRequestId
+  qualitySafetyFacts.value = []
+  qualitySafetyError.value = ''
+  if (!canViewQualitySafety.value) {
+    qualitySafetyLoading.value = false
+    return
+  }
+  qualitySafetyLoading.value = true
+  try {
+    const facts = await getSiteDailyQualitySafetyFacts(dailyLogId)
+    if (requestId === qualitySafetyRequestId && activeRecord.value?.id === dailyLogId)
+      qualitySafetyFacts.value = facts
+  } catch {
+    if (requestId === qualitySafetyRequestId && activeRecord.value?.id === dailyLogId)
+      qualitySafetyError.value = '当日质量安全检查加载失败，不影响日报正文查看。'
+  } finally {
+    if (requestId === qualitySafetyRequestId) qualitySafetyLoading.value = false
   }
 }
 
@@ -687,6 +726,39 @@ onMounted(() => {
           @click="saveProgress"
           >保存实际进度</a-button
         >
+      </section>
+      <section
+        v-if="activeRecord && modalMode === 'view' && canViewQualitySafety"
+        class="site-daily-planned-tasks"
+      >
+        <strong>当日质量安全检查</strong>
+        <a-spin :spinning="qualitySafetyLoading">
+          <a-alert
+            v-if="qualitySafetyError"
+            type="warning"
+            show-icon
+            :message="qualitySafetyError"
+          />
+          <a-table
+            v-else-if="qualitySafetyFacts.length"
+            :data-source="qualitySafetyFacts"
+            :pagination="false"
+            row-key="inspectionId"
+            size="small"
+          >
+            <a-table-column key="inspectionCode" title="检查编号" data-index="inspectionCode" />
+            <a-table-column key="location" title="检查地点" data-index="location" />
+            <a-table-column key="conclusion" title="结论" data-index="conclusion" />
+            <a-table-column key="issueCount" title="问题总数" data-index="issueCount" />
+            <a-table-column
+              key="highSeverityIssueCount"
+              title="高风险"
+              data-index="highSeverityIssueCount"
+            />
+            <a-table-column key="openIssueCount" title="未关闭" data-index="openIssueCount" />
+          </a-table>
+          <a-empty v-else description="当日暂无已提交质量安全检查" />
+        </a-spin>
       </section>
       <section v-if="activeRecord && modalMode === 'view'" class="site-daily-planned-tasks">
         <strong>当日计划任务</strong>

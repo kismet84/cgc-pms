@@ -529,6 +529,12 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/pages/system/audit/index.vue'),
             meta: { title: '操作审计', adminOnly: false },
           },
+          {
+            path: 'document-templates',
+            name: 'DocumentTemplateManagement',
+            component: () => import('@/pages/system/document-templates/index.vue'),
+            meta: { title: '业务单据模板', adminOnly: true },
+          },
         ],
       },
       {
@@ -625,6 +631,7 @@ const ROUTE_PERMISSION_MAP: Record<string, string> = {
   RoleManagement: 'system:role:query',
   SystemPermissions: 'system:permission:query',
   SystemAudit: 'audit:query',
+  DocumentTemplateManagement: 'document:template:query',
   Profile: 'profile:query',
   Settings: 'settings:query',
   Help: 'help:query',

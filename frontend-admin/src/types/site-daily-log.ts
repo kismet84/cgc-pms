@@ -40,6 +40,16 @@ export interface SiteDailyAuditEntryVO {
   createdAt?: string
 }
 
+export interface SiteDailyQualitySafetyVO {
+  inspectionId: string
+  inspectionCode: string
+  location?: string
+  conclusion?: string
+  issueCount: number
+  highSeverityIssueCount: number
+  openIssueCount: number
+}
+
 export interface SiteDailyLogVO {
   id: string
   projectId: string

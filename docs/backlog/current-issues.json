@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-16T10:59:42+08:00",
+  "updatedAt": "2026-07-17T19:20:00+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -10,8 +10,8 @@
       "classification": "STILL_APPLICABLE",
       "priority": "P0",
       "blocking": false,
-      "summary": "明确需补用户入口已清空，剩余11个子项均需要兼容性或业务规则确认。",
-      "acceptanceCriteria": "11个子项均形成复用现有入口、内部接口、废弃或确认保留的唯一裁决，并通过权限、租户和状态边界验证。",
+      "summary": "明确需补用户入口已清空；系统用户详情和会计凭证生产策略已闭环，剩余9个接口子项需兼容性确认，另有1个会计页面陈旧说明待修正。",
+      "acceptanceCriteria": "剩余10个子项均形成复用现有入口、内部接口、废弃、修正文案或确认保留的唯一裁决，并通过权限、租户和状态边界验证。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md",
         "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
@@ -24,11 +24,14 @@
       "classification": "STILL_APPLICABLE",
       "priority": "P1",
       "blocking": false,
-      "summary": "供应商默认自然日提前期已交付，剩余工作日历、需求预测和跨仓调拨仍缺。",
+      "summary": "供应商默认自然日提前期、采购前同项目跨仓余量、已审批采购在途、真实调拨过账和30/90日历史净领料基线已交付；工作日历和需求预测仍缺。",
       "acceptanceCriteria": "通过产品决策门形成最小闭环，并验证采购角色、项目范围、数量和日期口径。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md",
-        "docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md"
+        "docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md",
+        "docs/quality/ISSUE-048-003-采购前已审批在途余量提示验收报告.md",
+        "docs/quality/ISSUE-048-007-同项目跨仓库存调拨过账验收报告.md",
+        "docs/quality/ISSUE-048-008-库存历史净领料基线验收报告.md"
       ]
     },
     {
@@ -38,7 +41,7 @@
       "classification": "STILL_APPLICABLE",
       "priority": "P1",
       "blocking": false,
-      "summary": "人员班组、设备、自动天气、定位、离线、质量安全和统计仍缺。",
+      "summary": "当日已提交质量安全检查只读联动已交付；人员班组、设备、自动天气、定位、离线和统计仍缺。",
       "acceptanceCriteria": "按独立业务价值拆分最小Ready，不重复现有日报事实并验证项目数据范围。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
@@ -53,34 +56,6 @@
       "blocking": false,
       "summary": "多前置、多类型、自动排程、基线和资源平衡仍缺。",
       "acceptanceCriteria": "先通过产品决策门和数据模型评审，再验证依赖一致性、环检测和项目隔离。",
-      "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md"
-      ]
-    },
-    {
-      "issueKey": "OBS-WBS-PREDECESSOR-EVIDENCE",
-      "title": "WBS单前置FS门禁与风险提示证据收口",
-      "status": "OBSERVATION",
-      "classification": "NON_BLOCKING_OBSERVATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-04",
-      "summary": "单前置FS门禁、跨项目拒绝、环检测和前端风险提示已有实现与测试，但缺少面向当前master的独立正式回归结论。",
-      "acceptanceCriteria": "后端证明未完成前置不能开工或完成、跨项目和环依赖拒绝；前端证明只提示一次并区分未完成与迟交，明确不扩多前置或自动排程。",
-      "sourceRefs": [
-        "docs/backlog/ready-issues.md",
-        "docs/product-intelligence/project-map.md"
-      ]
-    },
-    {
-      "issueKey": "A-05",
-      "title": "供应商综合履约",
-      "status": "OPEN",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "当前只有交付维度，质量、价格、退货、服务和黑名单仍缺。",
-      "acceptanceCriteria": "核实真实数据质量后形成可解释、可追溯且不越权的最小履约闭环。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
       ]
@@ -140,18 +115,17 @@
       ]
     },
     {
-      "issueKey": "A-01-ACCOUNTING-GENERATE",
-      "title": "会计凭证生成策略需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P0",
+      "issueKey": "A-01-ACCOUNTING-GENERATION-COPY",
+      "title": "会计凭证页面生成规则说明已过时",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
+      "priority": "P1",
       "blocking": false,
       "parentIssueKey": "A-01",
-      "summary": "POST /accounting-entry/generate没有生产EntryGenerationStrategy实现。",
-      "acceptanceCriteria": "财务评审明确来源、科目、幂等和冲销规则后形成独立Ready，或确认废弃接口。",
-      "deferReason": "缺少会计规则，禁止伪造实现。",
+      "summary": "会计凭证页面仍显示“来源单据到借贷科目的生成规则待会计确认”，但付款和回款策略、业务标准及闭环测试已经成立。",
+      "acceptanceCriteria": "只修正页面辅助说明，准确表达付款/回款由权威业务写侧自动生成、手工生成入口未开放；不新增生成按钮或扩大accounting:add权限，并通过页面测试与只读浏览器复验。",
       "sourceRefs": [
-        "docs/quality/ISSUE-040-012-016-A-01财务核算五项入口治理验收报告.md"
+        "docs/quality/ISSUE-048-010-会计凭证生成策略现状复核与P0问题关闭验收报告.md"
       ]
     },
     {
@@ -284,21 +258,6 @@
       "parentIssueKey": "A-01",
       "summary": "GET /settlements/{id}/sources未检出前端同方法入口。",
       "acceptanceCriteria": "核实结算页面调用、替代接口和金额租户边界后形成唯一裁决。",
-      "deferReason": "调用与入口证据不足。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-SYSTEM-USER-DETAIL",
-      "title": "系统用户详情兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P0",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "GET /system/users/{id}未检出前端同方法入口。",
-      "acceptanceCriteria": "核实管理员入口、调用方和敏感字段边界后形成唯一裁决。",
       "deferReason": "调用与入口证据不足。",
       "sourceRefs": [
         "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"

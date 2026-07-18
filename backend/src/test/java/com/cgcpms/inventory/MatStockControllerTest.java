@@ -58,9 +58,13 @@ class MatStockControllerTest {
     private static final long MATERIAL_ID = 1001L;
     private static final long SETTINGS_WAREHOUSE_ID = 9402L;
     private static final long SETTINGS_STOCK_ID = 940201L;
+    private static final long TRANSFER_WAREHOUSE_ID = 9403L;
+    private static final long TRANSFER_STOCK_ID = 940301L;
 
     @BeforeEach
     void seedReplenishmentStock() {
+        jdbcTemplate.update("DELETE FROM mat_stock WHERE id = ?", TRANSFER_STOCK_ID);
+        jdbcTemplate.update("DELETE FROM mat_warehouse WHERE id = ?", TRANSFER_WAREHOUSE_ID);
         jdbcTemplate.update("DELETE FROM mat_stock WHERE id = ?", SETTINGS_STOCK_ID);
         jdbcTemplate.update("DELETE FROM mat_warehouse WHERE id = ?", SETTINGS_WAREHOUSE_ID);
         jdbcTemplate.update("""
@@ -70,16 +74,30 @@ class MatStockControllerTest {
                 """, SETTINGS_WAREHOUSE_ID, TENANT_ID, 10001L,
                 "WH-STOCK-CONTROLLER", "库存控制器隔离测试仓");
         jdbcTemplate.update("""
+                INSERT INTO mat_warehouse
+                    (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, 'ENABLE', 0)
+                """, TRANSFER_WAREHOUSE_ID, TENANT_ID, 10001L,
+                "WH-TRANSFER-CONTROLLER", "可调拨候选仓");
+        jdbcTemplate.update("""
                 INSERT INTO mat_stock
                     (id, tenant_id, warehouse_id, material_id, available_qty, safety_stock_qty,
                      replenishment_target_qty, replenishment_lead_days, version, deleted_flag)
                 VALUES (?, ?, ?, ?, 80.0000, 10.0000, 250.0000, 7, 0, 0)
                 """, SETTINGS_STOCK_ID, TENANT_ID, SETTINGS_WAREHOUSE_ID, MATERIAL_ID);
+        jdbcTemplate.update("""
+                INSERT INTO mat_stock
+                    (id, tenant_id, warehouse_id, material_id, available_qty, safety_stock_qty,
+                     version, deleted_flag)
+                VALUES (?, ?, ?, ?, 80.0000, 10.0000, 0, 0)
+                """, TRANSFER_STOCK_ID, TENANT_ID, TRANSFER_WAREHOUSE_ID, MATERIAL_ID);
     }
 
     @AfterEach
     void cleanReplenishmentStock() {
+        jdbcTemplate.update("DELETE FROM mat_stock WHERE id = ?", TRANSFER_STOCK_ID);
         jdbcTemplate.update("DELETE FROM mat_stock WHERE id = ?", SETTINGS_STOCK_ID);
+        jdbcTemplate.update("DELETE FROM mat_warehouse WHERE id = ?", TRANSFER_WAREHOUSE_ID);
         jdbcTemplate.update("DELETE FROM mat_warehouse WHERE id = ?", SETTINGS_WAREHOUSE_ID);
     }
 
@@ -310,6 +328,51 @@ class MatStockControllerTest {
                 FROM mat_stock WHERE id = ?
                 """, stockId);
         assertEquals(before, after, "403 请求不得改变补货设置持久化字段");
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("库存读取接口返回同项目可调拨余量且不接受客户端项目参数")
+    void testGetTransferCandidates() throws Exception {
+        mockMvc.perform(getWithApi("/inventory/stock/" + SETTINGS_STOCK_ID + "/transfer-candidates")
+                        .cookie(adminCookie())
+                        .param("projectId", "999999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].warehouseId").value(TRANSFER_WAREHOUSE_ID))
+                .andExpect(jsonPath("$.data[0].transferableQty").value(70.0000));
+    }
+
+    @Test
+    @Order(13)
+    @DisplayName("无库存读取权限不能查询跨仓余量")
+    void testGetTransferCandidatesRequiresStockListPermission() throws Exception {
+        mockMvc.perform(getWithApi("/inventory/stock/" + SETTINGS_STOCK_ID + "/transfer-candidates")
+                        .cookie(purchaseManagerCookie(List.of())))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("库存读取接口可查询已审批采购在途且不接受客户端范围参数")
+    void testGetIncomingSupplies() throws Exception {
+        mockMvc.perform(getWithApi("/inventory/stock/" + SETTINGS_STOCK_ID + "/incoming-supplies")
+                        .cookie(adminCookie())
+                        .param("projectId", "999999")
+                        .param("materialId", "999999"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data").isArray());
+    }
+
+    @Test
+    @Order(15)
+    @DisplayName("无库存读取权限不能查询已审批采购在途")
+    void testGetIncomingSuppliesRequiresStockListPermission() throws Exception {
+        mockMvc.perform(getWithApi("/inventory/stock/" + SETTINGS_STOCK_ID + "/incoming-supplies")
+                        .cookie(purchaseManagerCookie(List.of())))
+                .andExpect(status().isForbidden());
     }
 
     // ---- helpers ----

@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type { BudgetLineVO } from '@/types/budget'
-import type { PayApplicationVO, PaymentApplicationSourceVO } from '@/types/payment'
+import type {
+  PayApplicationVO,
+  PaymentApplicationSourceVO,
+  PaymentSourceOptionVO,
+} from '@/types/payment'
 
 type ProjectOption = { id: string; projectName?: string }
 type ContractOption = { id: string; contractName?: string }
@@ -16,12 +20,15 @@ const props = defineProps<{
   payTypeLabel: Record<string, string>
   budgetLines: BudgetLineVO[]
   sourceList: SourceRow[]
+  sourceOptions: PaymentSourceOptionVO[]
+  sourceOptionsLoading: boolean
   proofFileName?: string
   onFormProjectChange: (value: string) => void
   onContractChange: (value: string) => void
   onBudgetLineChange: (value: string) => void
   onAddSource: () => void
   onRemoveSource: (index: number) => void
+  onSourceTypeChange: (record: SourceRow) => void
   onProofFileChange: (event: Event) => void
 }>()
 
@@ -144,7 +151,10 @@ const emit = defineEmits<{
       <a-table :data-source="props.sourceList" :pagination="false" row-key="key" size="small">
         <a-table-column title="来源类型" width="160"
           ><template #default="{ record }"
-            ><a-select v-model:value="record.sourceType" style="width: 100%"
+            ><a-select
+              v-model:value="record.sourceType"
+              style="width: 100%"
+              @change="props.onSourceTypeChange(record)"
               ><a-select-option value="EXPENSE">费用申请</a-select-option
               ><a-select-option value="SUB_MEASURE">已审批分包计量（进度款）</a-select-option
               ><a-select-option value="SETTLEMENT">结算申请</a-select-option
@@ -152,16 +162,31 @@ const emit = defineEmits<{
             ></template
           ></a-table-column
         >
-        <a-table-column title="来源单据 ID"
+        <a-table-column title="来源业务单据"
           ><template #default="{ record }"
-            ><a-input
+            ><a-select
+              v-if="record.sourceType === 'SUB_MEASURE' || record.sourceType === 'SETTLEMENT'"
               v-model:value="record.sourceRefId"
+              :loading="props.sourceOptionsLoading"
+              :options="
+                props.sourceOptions
+                  .filter((option) => option.sourceType === record.sourceType)
+                  .map((option) => ({
+                    value: option.sourceRefId,
+                    label: `${option.documentCode}（可申请 ${option.availableAmount}）`,
+                  }))
+              "
+              show-search
+              option-filter-prop="label"
+              placeholder="请选择当前上下文内的可付业务单据"
+              style="width: 100%" /><a-input
+              v-else
+              v-model:value="record.sourceRefId"
+              :disabled="record.sourceType === 'DIRECT'"
               :placeholder="
                 record.sourceType === 'DIRECT'
                   ? '保存后自动使用付款申请ID'
-                  : record.sourceType === 'SUB_MEASURE'
-                    ? '请输入已审批分包计量ID'
-                    : '请输入已审批来源单据ID'
+                  : '请输入已审批费用来源单据ID'
               " /></template
         ></a-table-column>
         <a-table-column title="来源金额" width="200"

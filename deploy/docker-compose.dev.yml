@@ -141,7 +141,14 @@ services:
       SPRING_DATA_REDIS_HOST: redis
       SPRING_DATA_REDIS_PORT: "6379"
       SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD}
+      # Document generation canary switches. Defaults remain fail-closed.
+      DOCUMENT_GENERATION_ENABLED: "${DOCUMENT_GENERATION_ENABLED:-false}"
+      DOCUMENT_PAYMENT_GENERATION_ENABLED: "${DOCUMENT_PAYMENT_GENERATION_ENABLED:-false}"
+      DOCUMENT_SETTLEMENT_GENERATION_ENABLED: "${DOCUMENT_SETTLEMENT_GENERATION_ENABLED:-false}"
       MINIO_ENDPOINT: "http://minio:9000"
+      # Presigned URLs are consumed by host browsers, not Docker service DNS.
+      MINIO_PUBLIC_ENDPOINT: "http://localhost:9000"
+      MINIO_REGION: "${MINIO_REGION:-us-east-1}"
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       VIRUS_SCAN_ENABLED: "true"

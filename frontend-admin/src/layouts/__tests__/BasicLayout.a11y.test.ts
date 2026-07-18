@@ -23,13 +23,15 @@ beforeAll(() => {
 // ── Mock vue-router ──
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
-  useRoute: () => ({ meta: { title: '测试页面' } }),
+  useRoute: () => ({ path: '/dashboard', query: {}, hash: '', meta: { title: '测试页面' } }),
 }))
 
 // ── Mock pinia stores ──
 vi.mock('@/stores/user', () => ({
   useUserStore: () => ({
     logout: vi.fn(),
+    roles: ['PROJECT_MANAGER'],
+    hasPermission: vi.fn(() => true),
     userInfo: ref({ userId: '1', realName: '张三', roleName: '项目经理' }),
   }),
 }))
@@ -43,6 +45,7 @@ vi.mock('pinia', () => ({
 // ── Mock icons (inheritAttrs: true so aria-label and class are applied to root) ──
 vi.mock('@ant-design/icons-vue', () => ({
   MenuFoldOutlined: { template: '<span class="icon-stub"><slot /></span>' },
+  MenuOutlined: { template: '<span class="icon-stub"><slot /></span>' },
   ProjectOutlined: { template: '<span class="icon-stub"><slot /></span>' },
 }))
 
@@ -52,6 +55,12 @@ vi.mock('@/components/NotificationBell.vue', () => ({
 }))
 vi.mock('@/layouts/components/SidebarMenu.vue', () => ({
   default: { name: 'SidebarMenu', template: '<div class="sidebar-stub">Menu</div>' },
+}))
+vi.mock('@/layouts/components/WorkspaceTabs.vue', () => ({
+  default: { name: 'WorkspaceTabs', template: '<div class="workspace-tabs-stub" />' },
+}))
+vi.mock('@/layouts/components/ObjectContextNavigation.vue', () => ({
+  default: { name: 'ObjectContextNavigation', template: '<div class="object-context-stub" />' },
 }))
 
 // ── Mock Ant Design Vue components we don't need to fully render ──
@@ -124,15 +133,15 @@ describe('BasicLayout accessibility', () => {
     })
 
     // bellReady starts false; NotificationBell is conditionally rendered via v-if
-    expect(wrapper.find('span[aria-label="通知"]').exists()).toBe(false)
+    expect(wrapper.find('span[aria-label="通知中心"]').exists()).toBe(false)
 
     // Advance past the 500ms setTimeout in onMounted
     vi.advanceTimersByTime(500)
     await wrapper.vm.$nextTick()
 
-    const bellWrapper = wrapper.find('span[aria-label="通知"]')
+    const bellWrapper = wrapper.find('span[aria-label="通知中心"]')
     expect(bellWrapper.exists()).toBe(true)
-    expect(wrapper.find('.sidebar-bell-label').text()).toBe('通知中心')
+    expect(wrapper.find('.global-notification').exists()).toBe(true)
 
     vi.useRealTimers()
   })

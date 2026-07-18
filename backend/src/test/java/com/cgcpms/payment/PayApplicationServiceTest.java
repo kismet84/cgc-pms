@@ -335,6 +335,19 @@ class PayApplicationServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("M2: getPage -- 无项目范围时列表不泄露付款申请")
+    void testGetPage_NoProjectAccessReturnsEmptyPage() {
+        TestUserContext.setUser(TENANT_ID, 999L, "no-project", List.of());
+
+        IPage<PayApplicationVO> page = payApplicationService.getPage(1, 10,
+                null, null, null, null, null, null);
+
+        assertEquals(0, page.getTotal());
+        assertTrue(page.getRecords().isEmpty());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("getPage -- 按 contractId 过滤")
     void testGetPage_FilterByContractId() {
         IPage<PayApplicationVO> page = payApplicationService.getPage(1, 10,

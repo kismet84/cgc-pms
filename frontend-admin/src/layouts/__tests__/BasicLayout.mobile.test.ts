@@ -18,9 +18,9 @@ describe('BasicLayout mobile shell CSS', () => {
       'const { isMobile, isCompactDesktop } = useMobileViewport()',
     )
     expect(basicLayoutSource).toContain('if (mobile || compactDesktop)')
-    expect(basicLayoutSource).toMatch(/\.main-content\s*\{[^}]*margin-left:\s*0/s)
+    expect(basicLayoutSource).toMatch(/\.workspace-layout\s*,[^}]*margin-left:\s*0/s)
     expect(basicLayoutSource).toMatch(
-      /:deep\(\.ant-layout-sider-collapsed\)\s*\+\s*\.ant-layout\s*\.main-content\s*\{[^}]*margin-left:\s*0/s,
+      /:deep\(\.ant-layout-sider-collapsed\)\s*\+\s*\.workspace-layout\s*\{[^}]*margin-left:\s*0/s,
     )
   })
 })

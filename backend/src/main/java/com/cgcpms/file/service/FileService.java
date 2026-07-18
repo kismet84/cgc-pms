@@ -53,6 +53,7 @@ import java.util.concurrent.TimeUnit;
 public class FileService {
 
     private static final int PRESIGNED_URL_EXPIRE_MINUTES = 5;
+    private static final int MAX_GENERATED_PDF_BYTES = 20 * 1024 * 1024;
 
     private final SysFileMapper sysFileMapper;
     private final MinioClient minioClient;
@@ -186,6 +187,93 @@ public class FileService {
         }
     }
 
+    /** Download contract for immutable generated documents. */
+    public String getGeneratedDocumentPresignedUrl(Long fileId) {
+        SysFile sysFile = requireGeneratedDocument(fileId);
+        authorizer.checkGeneratedDocumentAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
+        ensureDownloadAllowed(sysFile);
+        return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath(), sysFile);
+    }
+
+    /** Audit-only contract; caller must enforce audit role and authority before bypassing current business visibility. */
+    public String getGeneratedDocumentAuditPresignedUrl(Long fileId) {
+        SysFile sysFile = requireGeneratedDocument(fileId);
+        ensureDownloadAllowed(sysFile);
+        return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath(), sysFile);
+    }
+
+    private SysFile requireGeneratedDocument(Long fileId) {
+        SysFile sysFile = sysFileMapper.selectById(fileId);
+        if (sysFile == null || !java.util.Objects.equals(sysFile.getTenantId(), UserContext.getCurrentTenantId())
+                || !"GENERATED_DOCUMENT".equals(sysFile.getDocumentType())) {
+            throw new BusinessException("FILE_NOT_FOUND", "生成文档不存在");
+        }
+        return sysFile;
+    }
+
+    /**
+     * Archive a server-generated PDF without routing it through the untrusted multipart upload contract.
+     * The caller must already have checked business read/generation authority.
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public GeneratedFileArchive archiveGeneratedPdf(byte[] content, String businessType, Long businessId,
+                                                     String generationNo, String expectedSha256) {
+        validateBusinessBindingParams(businessType, businessId);
+        if (content == null || content.length < 5
+                || !"%PDF-".equals(new String(content, 0, 5, java.nio.charset.StandardCharsets.US_ASCII))) {
+            throw new BusinessException("DOCUMENT_OUTPUT_INVALID", "归档内容不是有效PDF");
+        }
+        if (content.length > MAX_GENERATED_PDF_BYTES) {
+            throw new BusinessException("DOCUMENT_OUTPUT_TOO_LARGE", "归档PDF超过大小限制");
+        }
+        String actualSha256 = sha256Hex(content);
+        if (expectedSha256 == null || !actualSha256.equalsIgnoreCase(expectedSha256)) {
+            throw new BusinessException("DOCUMENT_OUTPUT_HASH_MISMATCH", "PDF归档哈希校验失败");
+        }
+        if (generationNo == null || !generationNo.matches("[A-Za-z0-9_-]{1,50}")) {
+            throw new BusinessException("DOCUMENT_GENERATION_NO_INVALID", "文档生成编号格式非法");
+        }
+
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new BusinessException("AUTH_CONTEXT_MISSING", "缺少租户上下文");
+        }
+        String bucketName = minioConfig.getBucket();
+        String fileName = generationNo + "-" + actualSha256.substring(0, 16) + ".pdf";
+        String storagePath = businessType.toUpperCase() + "/" + businessId + "/generated/" + fileName;
+        try {
+            requireArchiveTransaction();
+            putObjectWithRetry(bucketName, storagePath, "application/pdf", content);
+            registerRollbackObjectCleanup(bucketName, storagePath);
+
+            SysFile sysFile = new SysFile();
+            sysFile.setTenantId(tenantId);
+            sysFile.setBusinessType(businessType.toUpperCase());
+            sysFile.setDocumentType("GENERATED_DOCUMENT");
+            sysFile.setBusinessId(businessId);
+            sysFile.setFileName(fileName);
+            sysFile.setOriginalName(generationNo + ".pdf");
+            sysFile.setFileSize((long) content.length);
+            sysFile.setContentType("application/pdf");
+            sysFile.setStoragePath(storagePath);
+            sysFile.setBucketName(bucketName);
+            sysFile.setVirusScanStatus(FileVirusScanStatus.CLEAN.name());
+            sysFile.setVirusScanDetail("SERVER_GENERATED");
+            sysFile.setVirusScannedAt(LocalDateTime.now());
+            sysFileMapper.insert(sysFile);
+            return new GeneratedFileArchive(sysFile.getId(), actualSha256, content.length);
+        } catch (BusinessException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            log.error("Generated PDF archive failed: businessType={}, businessId={}, generationNo={}",
+                    businessType, businessId, generationNo, exception);
+            if (isStorageUnavailable(exception)) {
+                throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件服务暂不可用，请稍后重试");
+            }
+            throw new BusinessException("DOCUMENT_ARCHIVE_FAILED", "生成文档归档失败，请稍后重试", exception);
+        }
+    }
+
     /**
      * Delete a file (logical delete in DB + remove from MinIO).
      */
@@ -197,6 +285,9 @@ public class FileService {
         }
         if (!sysFile.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
+        }
+        if ("GENERATED_DOCUMENT".equals(sysFile.getDocumentType())) {
+            throw new BusinessException("FILE_IMMUTABLE", "已归档生成文档不可删除");
         }
         // 业务对象删除权限校验
         authorizer.checkDeleteAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
@@ -325,6 +416,29 @@ public class FileService {
         });
     }
 
+    private void registerRollbackObjectCleanup(String bucketName, String storagePath) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status == TransactionSynchronization.STATUS_COMMITTED) return;
+                try {
+                    minioClient.removeObject(RemoveObjectArgs.builder()
+                            .bucket(bucketName).object(storagePath).build());
+                } catch (Exception cleanupFailure) {
+                    log.error("Rollback cleanup failed for generated PDF: storagePath={}, errorType={}",
+                            storagePath, cleanupFailure.getClass().getSimpleName());
+                }
+            }
+        });
+    }
+
+    private void requireArchiveTransaction() {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()
+                || !TransactionSynchronizationManager.isSynchronizationActive()) {
+            throw new BusinessException("DOCUMENT_ARCHIVE_TRANSACTION_REQUIRED", "生成文档归档需要事务上下文");
+        }
+    }
+
     private void rejectDuplicateFile(String businessType, Long businessId, String fileName) {
         Long duplicates = sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
                 .eq(SysFile::getTenantId, UserContext.getCurrentTenantId())
@@ -384,10 +498,11 @@ public class FileService {
                 extraQueryParams.put("response-content-type", "text/plain; charset=utf-8");
                 extraQueryParams.put("response-content-disposition", "attachment; filename=\"" + file.getFileName() + "\"");
             }
-            String url = minioClient.getPresignedObjectUrl(
+            String url = presignClient().getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .bucket(bucket)
                             .object(object)
+                            .region(minioConfig.getRegion())
                             .extraQueryParams(extraQueryParams)
                             .expiry(PRESIGNED_URL_EXPIRE_MINUTES, TimeUnit.MINUTES)
                             .method(Method.GET)
@@ -402,6 +517,10 @@ public class FileService {
             log.error("Failed to generate presigned URL: bucket={}, object={}", bucket, object, e);
             throw new BusinessException("FILE_URL_ERROR", "生成下载链接失败: " + e.getMessage());
         }
+    }
+
+    private MinioClient presignClient() {
+        return minioConfig.hasPublicEndpoint() ? minioConfig.presignClient() : minioClient;
     }
 
     private boolean isPresignedUrl(String url) {
@@ -500,5 +619,8 @@ public class FileService {
                 ? status.message()
                 : status.message() + "（" + detail + "）");
         vo.setVirusScanPassed(status.passed());
+    }
+
+    public record GeneratedFileArchive(Long fileId, String sha256, int sizeBytes) {
     }
 }

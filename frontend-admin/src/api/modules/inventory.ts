@@ -11,6 +11,11 @@ import type {
   PurchaseRequestQuery,
   StockKpiVO,
   MatStockVO,
+  StockTransferCandidateVO,
+  StockTransferParams,
+  StockTransferVO,
+  StockIncomingSupplyVO,
+  StockConsumptionBaselineVO,
 } from '@/types/inventory'
 
 // ── 仓库 CRUD ──
@@ -104,6 +109,39 @@ export function getStockKpi(params?: { warehouseId?: string; projectId?: string 
     url: '/inventory/stock/kpi',
     method: 'get',
     params,
+  })
+}
+
+/** 查询当前库存项在同项目其他启用仓库的可调拨余量快照 */
+export function getStockTransferCandidates(id: string) {
+  return request<StockTransferCandidateVO[]>({
+    url: `/inventory/stock/${id}/transfer-candidates`,
+    method: 'get',
+  })
+}
+
+/** 原子提交同项目同物料跨仓调拨 */
+export function createStockTransfer(data: StockTransferParams) {
+  return request<StockTransferVO>({
+    url: '/inventory/stock/transfers',
+    method: 'post',
+    data,
+  })
+}
+
+/** 查询当前库存项的已审批采购订单未收货余量快照 */
+export function getStockIncomingSupplies(id: string) {
+  return request<StockIncomingSupplyVO[]>({
+    url: `/inventory/stock/${id}/incoming-supplies`,
+    method: 'get',
+  })
+}
+
+/** 查询当前库存项近 30/90 个日历日的历史净领料事实 */
+export function getStockConsumptionBaseline(id: string) {
+  return request<StockConsumptionBaselineVO>({
+    url: `/inventory/stock/${id}/consumption-baseline`,
+    method: 'get',
   })
 }
 

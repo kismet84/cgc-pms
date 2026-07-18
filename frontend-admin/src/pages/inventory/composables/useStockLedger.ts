@@ -4,6 +4,9 @@ import { message } from 'ant-design-vue'
 import {
   getStockLedger,
   getStockKpi,
+  getStockTransferCandidates,
+  getStockIncomingSupplies,
+  getStockConsumptionBaseline,
   getWarehouseList,
   updateStockReplenishmentSettings,
 } from '@/api/modules/inventory'
@@ -13,7 +16,15 @@ import {
   readStringQuery,
   replaceListQuery,
 } from '@/composables/listPageQuery'
-import type { WarehouseVO, MatStockTxnVO, StockKpiVO, MatStockVO } from '@/types/inventory'
+import type {
+  WarehouseVO,
+  MatStockTxnVO,
+  StockKpiVO,
+  MatStockVO,
+  StockTransferCandidateVO,
+  StockIncomingSupplyVO,
+  StockConsumptionBaselineVO,
+} from '@/types/inventory'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
 // ---- 交易类型 ----
@@ -97,6 +108,13 @@ export function useStockLedger({
   const hasLoaded = ref(false)
   const listError = ref<string | null>(null)
   const stock = ref<MatStockVO | null>(null)
+  const transferCandidates = ref<StockTransferCandidateVO[]>([])
+  const transferCandidatesLoading = ref(false)
+  const incomingSupplies = ref<StockIncomingSupplyVO[]>([])
+  const incomingSuppliesLoading = ref(false)
+  const consumptionBaseline = ref<StockConsumptionBaselineVO | null>(null)
+  const consumptionBaselineLoading = ref(false)
+  const consumptionBaselineError = ref(false)
   const safetyThresholdDraft = ref<number | null>(null)
   const replenishmentTargetDraft = ref<number | null>(null)
   const replenishmentLeadDaysDraft = ref<number | null>(null)
@@ -149,9 +167,22 @@ export function useStockLedger({
 
   // ---- 防陈旧响应 ----
   let fetchSeq = 0
+  let transferCandidateSeq = 0
+  let incomingSupplySeq = 0
+  let consumptionBaselineSeq = 0
 
   function resetTxnState() {
+    transferCandidateSeq += 1
     stock.value = null
+    transferCandidates.value = []
+    transferCandidatesLoading.value = false
+    incomingSupplySeq += 1
+    incomingSupplies.value = []
+    incomingSuppliesLoading.value = false
+    consumptionBaselineSeq += 1
+    consumptionBaseline.value = null
+    consumptionBaselineLoading.value = false
+    consumptionBaselineError.value = false
     safetyThresholdDraft.value = null
     replenishmentTargetDraft.value = null
     replenishmentLeadDaysDraft.value = null
@@ -185,6 +216,9 @@ export function useStockLedger({
       })
       if (mySeq !== fetchSeq) return
       stock.value = res.stock
+      void fetchTransferCandidates(res.stock)
+      void fetchIncomingSupplies(res.stock)
+      void fetchConsumptionBaseline(res.stock)
       safetyThresholdDraft.value = res.stock ? Number(res.stock.safetyStockQty) : null
       replenishmentTargetDraft.value =
         res.stock?.replenishmentTargetQty == null ? null : Number(res.stock.replenishmentTargetQty)
@@ -206,6 +240,81 @@ export function useStockLedger({
       if (mySeq === fetchSeq) {
         hasLoaded.value = true
         loading.value = false
+      }
+    }
+  }
+
+  async function fetchTransferCandidates(currentStock: MatStockVO | null) {
+    if (!currentStock) {
+      transferCandidates.value = []
+      return
+    }
+    const mySeq = ++transferCandidateSeq
+    transferCandidatesLoading.value = true
+    try {
+      const candidates = (await getStockTransferCandidates(currentStock.id)) ?? []
+      if (mySeq === transferCandidateSeq && stock.value?.id === currentStock.id) {
+        transferCandidates.value = candidates
+      }
+    } catch (e: unknown) {
+      console.error(e)
+      if (mySeq === transferCandidateSeq) {
+        transferCandidates.value = []
+      }
+    } finally {
+      if (mySeq === transferCandidateSeq) {
+        transferCandidatesLoading.value = false
+      }
+    }
+  }
+
+  async function fetchIncomingSupplies(currentStock: MatStockVO | null) {
+    if (!currentStock) {
+      incomingSupplies.value = []
+      return
+    }
+    const mySeq = ++incomingSupplySeq
+    incomingSuppliesLoading.value = true
+    try {
+      const supplies = (await getStockIncomingSupplies(currentStock.id)) ?? []
+      if (mySeq === incomingSupplySeq && stock.value?.id === currentStock.id) {
+        incomingSupplies.value = supplies
+      }
+    } catch (e: unknown) {
+      console.error(e)
+      if (mySeq === incomingSupplySeq) {
+        incomingSupplies.value = []
+      }
+    } finally {
+      if (mySeq === incomingSupplySeq) {
+        incomingSuppliesLoading.value = false
+      }
+    }
+  }
+
+  async function fetchConsumptionBaseline(currentStock: MatStockVO | null) {
+    if (!currentStock) {
+      consumptionBaseline.value = null
+      consumptionBaselineError.value = false
+      return
+    }
+    const mySeq = ++consumptionBaselineSeq
+    consumptionBaselineLoading.value = true
+    consumptionBaselineError.value = false
+    try {
+      const baseline = await getStockConsumptionBaseline(currentStock.id)
+      if (mySeq === consumptionBaselineSeq && stock.value?.id === currentStock.id) {
+        consumptionBaseline.value = baseline
+      }
+    } catch (e: unknown) {
+      console.error(e)
+      if (mySeq === consumptionBaselineSeq) {
+        consumptionBaseline.value = null
+        consumptionBaselineError.value = true
+      }
+    } finally {
+      if (mySeq === consumptionBaselineSeq) {
+        consumptionBaselineLoading.value = false
       }
     }
   }
@@ -476,6 +585,13 @@ export function useStockLedger({
     hasRequiredFilters,
     showEmptyState,
     stock,
+    transferCandidates,
+    transferCandidatesLoading,
+    incomingSupplies,
+    incomingSuppliesLoading,
+    consumptionBaseline,
+    consumptionBaselineLoading,
+    consumptionBaselineError,
     safetyThresholdDraft,
     replenishmentTargetDraft,
     replenishmentLeadDaysDraft,

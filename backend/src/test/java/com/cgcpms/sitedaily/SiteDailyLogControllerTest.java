@@ -32,6 +32,25 @@ class SiteDailyLogControllerTest {
                 jwtUtils.generateToken(1L, "admin", 0L, List.of("ADMIN"), List.of()));
     }
 
+    private Cookie permissionCookie(String... permissions) {
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
+                jwtUtils.generateToken(2L, "site-reader", 0L, List.of(), List.of(permissions)));
+    }
+
+    @Test
+    void qualitySafetyFactsRequireSiteAndQualityPermissionsTogether() throws Exception {
+        String path = "/api/site-daily-logs/999999999/quality-safety";
+        mockMvc.perform(get(path).contextPath("/api").cookie(permissionCookie("site:daily:query")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get(path).contextPath("/api").cookie(permissionCookie("quality:safety:query")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get(path).contextPath("/api").cookie(
+                        permissionCookie("site:daily:query", "quality:safety:query")))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get(path).contextPath("/api").cookie(adminCookie()))
+                .andExpect(status().isBadRequest());
+    }
+
     @Test
     void draftCanBeEditedAndSubmittedOnlyOnce() throws Exception {
         String body = "{\"projectId\":10001,\"reportDate\":\"2099-01-01\","

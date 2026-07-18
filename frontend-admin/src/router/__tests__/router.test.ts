@@ -285,6 +285,17 @@ describe('router lazy loading', () => {
     expect(router.resolve('/system/audit').meta.adminOnly).toBe(false)
   })
 
+  it('registers the document template management route with query permission and admin boundary', () => {
+    const rootRoute = routes.find((r) => r.path === '/')
+    const systemRoute = rootRoute?.children?.find((c) => c.name === 'System')
+    const route = systemRoute?.children?.find((c) => c.name === 'DocumentTemplateManagement')
+
+    expect(route?.meta?.title).toBe('业务单据模板')
+    expect(route?.meta?.adminOnly).toBe(true)
+    expect(typeof route?.component).toBe('function')
+    expect(router.resolve('/system/document-templates').meta.permission).toBe('document:template:query')
+  })
+
   it('registers dedicated approval done, cc and mine routes', () => {
     const rootRoute = routes.find((r) => r.path === '/')
     const approvalRoute = rootRoute?.children?.find((c) => c.path === 'approval')

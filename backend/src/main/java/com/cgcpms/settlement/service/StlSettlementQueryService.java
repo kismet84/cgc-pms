@@ -420,7 +420,9 @@ public class StlSettlementQueryService {
         return sysFileMapper.selectList(new LambdaQueryWrapper<SysFile>()
                 .eq(SysFile::getTenantId, tenantId)
                 .eq(SysFile::getBusinessType, "SETTLEMENT")
-                .eq(SysFile::getBusinessId, settlementId))
+                .eq(SysFile::getBusinessId, settlementId)
+                .and(wrapper -> wrapper.ne(SysFile::getDocumentType, "GENERATED_DOCUMENT")
+                        .or().isNull(SysFile::getDocumentType)))
                 .stream()
                 .map(this::toSettlementAttachmentVO)
                 .toList();

@@ -7,6 +7,8 @@ import { MenuFoldOutlined, MenuOutlined, ProjectOutlined } from '@ant-design/ico
 import { getUserInfo } from '@/api/modules/auth'
 import { useMobileViewport } from '@/composables/useMobileViewport'
 import SidebarMenu from './components/SidebarMenu.vue'
+import ObjectContextNavigation from './components/ObjectContextNavigation.vue'
+import WorkspaceTabs from './components/WorkspaceTabs.vue'
 import NotificationBell from '@/components/NotificationBell.vue'
 
 const router = useRouter()
@@ -17,6 +19,7 @@ const collapsed = ref(false)
 const { isMobile, isCompactDesktop } = useMobileViewport()
 const bellReady = ref(false)
 const mobilePageTitle = computed(() => String(route.meta.title || 'CGC-PMS'))
+const pageTitle = computed(() => String(route.meta.title || '工作台'))
 
 watch([isMobile, isCompactDesktop], ([mobile, compactDesktop]) => {
   if (mobile || compactDesktop) {
@@ -84,38 +87,6 @@ onMounted(() => {
             <MenuFoldOutlined class="sidebar-tool-icon" aria-hidden="true" />
             <span v-if="!collapsed">折叠菜单</span>
           </button>
-          <span
-            class="sidebar-tool-button sidebar-bell"
-            :aria-label="bellReady ? '通知' : undefined"
-          >
-            <NotificationBell
-              v-if="bellReady"
-              :label="collapsed ? '' : '通知中心'"
-              placement="topLeft"
-            />
-            <span v-if="bellReady && !collapsed" class="sidebar-bell-label sidebar-bell-label--sr"
-              >通知中心</span
-            >
-          </span>
-          <a-dropdown :trigger="['click']">
-            <div class="sidebar-user" :class="{ 'sidebar-user--collapsed': collapsed }">
-              <a-avatar :size="32" class="user-avatar">
-                {{ userInfo?.realName?.[0] || '●' }}
-              </a-avatar>
-              <div v-if="!collapsed" class="user-text">
-                <div class="username">{{ userInfo?.realName || '张三' }}</div>
-                <div class="role">{{ userInfo?.roleName || '项目经理' }}</div>
-              </div>
-            </div>
-            <template #overlay>
-              <a-menu>
-                <a-menu-item key="profile" @click="router.push('/profile')">个人中心</a-menu-item>
-                <a-menu-item key="settings" @click="router.push('/settings')">设置</a-menu-item>
-                <a-menu-divider />
-                <a-menu-item key="logout" @click="handleLogout">退出登录</a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
         </div>
       </div>
     </a-layout-sider>
@@ -126,7 +97,38 @@ onMounted(() => {
       @click="collapsed = true"
     ></div>
 
-    <a-layout>
+    <a-layout class="workspace-layout">
+      <header v-if="!isMobile" class="global-topbar">
+        <h1 class="global-topbar__title">{{ pageTitle }}</h1>
+        <div class="global-topbar__tools" aria-label="全局工具栏">
+          <button type="button" class="global-tool-button" @click="router.push('/approval/todo')">
+            我的待办
+          </button>
+          <span v-if="bellReady" class="global-notification" aria-label="通知中心">
+            <NotificationBell label="通知中心" placement="bottomRight" />
+          </span>
+          <a-dropdown :trigger="['click']">
+            <div class="global-user" aria-label="打开个人账户菜单">
+              <a-avatar :size="32" class="user-avatar">
+                {{ userInfo?.realName?.[0] || '●' }}
+              </a-avatar>
+              <div class="user-text">
+                <div class="username">{{ userInfo?.realName || '张三' }}</div>
+                <div class="role">{{ userInfo?.roleName || '项目经理' }}</div>
+              </div>
+            </div>
+            <template #overlay>
+              <a-menu>
+                <a-menu-item key="profile" @click="router.push('/profile')">个人资料</a-menu-item>
+                <a-menu-item key="settings" @click="router.push('/settings')">偏好设置</a-menu-item>
+                <a-menu-item key="help" @click="router.push('/help')">帮助与支持</a-menu-item>
+                <a-menu-divider />
+                <a-menu-item key="logout" @click="handleLogout">退出登录</a-menu-item>
+              </a-menu>
+            </template>
+          </a-dropdown>
+        </div>
+      </header>
       <header v-if="isMobile" class="mobile-topbar">
         <button
           type="button"
@@ -148,6 +150,8 @@ onMounted(() => {
           </a-avatar>
         </button>
       </header>
+      <WorkspaceTabs />
+      <ObjectContextNavigation />
       <a-layout-content class="main-content">
         <router-view />
       </a-layout-content>
@@ -230,8 +234,7 @@ onMounted(() => {
   padding: 12px 8px;
 }
 
-.sidebar-tool-button,
-.sidebar-user {
+.sidebar-tool-button {
   display: flex;
   align-items: center;
   width: 100%;
@@ -254,8 +257,7 @@ onMounted(() => {
     color 0.16s ease;
 }
 
-.sidebar-tool-button:hover,
-.sidebar-user:hover {
+.sidebar-tool-button:hover {
   color: var(--primary);
   background: var(--surface-tint);
   border-color: var(--border);
@@ -268,42 +270,9 @@ onMounted(() => {
   font-size: 18px;
 }
 
-.sidebar-footer--collapsed .sidebar-tool-button,
-.sidebar-footer--collapsed .sidebar-user {
+.sidebar-footer--collapsed .sidebar-tool-button {
   justify-content: center;
   padding: 0;
-}
-
-.sidebar-bell {
-  justify-content: flex-start;
-  padding: 0 10px;
-}
-
-.sidebar-footer--collapsed .sidebar-bell {
-  justify-content: center;
-  padding: 0;
-}
-
-.sidebar-bell-label--sr {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-}
-
-.sidebar-user {
-  gap: 11px;
-  padding: 4px 8px 4px 4px;
-  cursor: pointer;
-  transition:
-    background 0.16s ease,
-    border-color 0.16s ease;
-}
-
-.sidebar-user--collapsed {
-  padding: 4px;
 }
 
 .user-avatar {
@@ -326,15 +295,80 @@ onMounted(() => {
   color: var(--muted);
 }
 
+.global-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 13;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--shell-header-height);
+  padding: 0 24px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+}
+
+.global-topbar__title {
+  margin: 0;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.global-topbar__tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.global-tool-button,
+.global-user {
+  min-height: 38px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+}
+
+.global-tool-button {
+  padding: 0 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.global-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 8px 3px 4px;
+  cursor: pointer;
+}
+
+.global-tool-button:hover,
+.global-user:hover {
+  color: var(--primary);
+  background: var(--surface-tint);
+  border-color: var(--border);
+}
+
+.global-notification {
+  display: inline-flex;
+  align-items: center;
+}
+
 .main-content {
   padding: 0;
-  margin-left: var(--shell-sidebar-width);
   min-height: 100vh;
   background: transparent;
 }
 
-/* 折叠时调整 */
-:deep(.ant-layout-sider-collapsed) + .ant-layout .main-content {
+.workspace-layout {
+  min-width: 0;
+  margin-left: var(--shell-sidebar-width);
+}
+
+:deep(.ant-layout-sider-collapsed) + .workspace-layout {
   margin-left: var(--shell-sidebar-collapsed-width);
 }
 
@@ -360,11 +394,12 @@ onMounted(() => {
     transform: translateX(0);
   }
 
-  .main-content {
-    margin-left: 0;
+  .global-topbar {
+    display: none;
   }
 
-  :deep(.ant-layout-sider-collapsed) + .ant-layout .main-content {
+  .workspace-layout,
+  :deep(.ant-layout-sider-collapsed) + .workspace-layout {
     margin-left: 0;
   }
 
