@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,34 +17,47 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MigrationVersionUniquenessTest {
 
-    private static final Pattern VERSION_PATTERN = Pattern.compile("^V(\\d+)__.+\\.sql$");
+    private static final Pattern SQL_VERSION = Pattern.compile("^([BV])(\\d+)__.+\\.sql$");
+    private static final Pattern JAVA_VERSION = Pattern.compile("^V(\\d+)__.+\\.java$");
 
     @Test
-    void migrationVersionsAreUniquePerDialect() throws IOException {
-        assertUniqueVersions(Path.of("src/main/resources/db/migration"));
-        assertUniqueVersions(Path.of("src/main/resources/db/migration-h2"));
+    void migrationVersionsAreUniqueAcrossActiveLegacyAndJavaLocations() throws IOException {
+        assertUniqueVersions("mysql", List.of(
+                Path.of("src/main/resources/db/migration"),
+                Path.of("src/main/resources/db/migration-legacy")), false);
+        assertUniqueVersions("h2", List.of(
+                Path.of("src/main/resources/db/migration-h2"),
+                Path.of("src/main/resources/db/migration-h2-legacy"),
+                Path.of("src/main/java/com/cgcpms/common/migration")), true);
     }
 
-    private static void assertUniqueVersions(Path dir) throws IOException {
-        Map<String, List<String>> filesByVersion = new HashMap<>();
-        try (Stream<Path> paths = Files.list(dir)) {
-            paths.filter(path -> Files.isRegularFile(path))
-                    .map(path -> path.getFileName().toString())
-                    .forEach(fileName -> {
-                        Matcher matcher = VERSION_PATTERN.matcher(fileName);
-                        if (matcher.matches()) {
-                            filesByVersion.merge(matcher.group(1), List.of(fileName), (left, right) -> Stream
-                                    .concat(left.stream(), right.stream())
-                                    .toList());
-                        }
-                    });
+    private static void assertUniqueVersions(String dialect, List<Path> directories, boolean includeJava)
+            throws IOException {
+        Map<String, List<String>> filesByTypeAndVersion = new HashMap<>();
+        for (Path directory : directories) {
+            try (Stream<Path> paths = Files.list(directory)) {
+                for (Path path : paths.filter(Files::isRegularFile).toList()) {
+                    String name = path.getFileName().toString();
+                    Matcher sql = SQL_VERSION.matcher(name);
+                    Matcher java = JAVA_VERSION.matcher(name);
+                    String key = null;
+                    if (sql.matches()) {
+                        key = sql.group(1) + sql.group(2);
+                    } else if (includeJava && java.matches()) {
+                        key = "V" + java.group(1);
+                    }
+                    if (key != null) {
+                        filesByTypeAndVersion.computeIfAbsent(key, ignored -> new ArrayList<>())
+                                .add(path.toString());
+                    }
+                }
+            }
         }
 
-        List<String> duplicates = filesByVersion.entrySet().stream()
+        List<String> duplicates = filesByTypeAndVersion.entrySet().stream()
                 .filter(entry -> entry.getValue().size() > 1)
-                .map(entry -> dir + " V" + entry.getKey() + " -> " + entry.getValue())
+                .map(entry -> dialect + " " + entry.getKey() + " -> " + entry.getValue())
                 .toList();
-
         assertTrue(duplicates.isEmpty(), "Flyway migration versions must be unique: " + duplicates);
     }
 }

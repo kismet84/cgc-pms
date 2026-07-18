@@ -15,8 +15,8 @@ class AlertPermissionMigrationTest {
 
     @Test
     void migrationSplitsOnlyBatchEvaluatePermissionForMysqlAndH2() throws IOException {
-        assertMigration(Path.of("src/main/resources/db/migration", FILE_NAME));
-        assertMigration(Path.of("src/main/resources/db/migration-h2", FILE_NAME));
+        assertMigration(Path.of("src/main/resources/db/migration-legacy", FILE_NAME));
+        assertMigration(Path.of("src/main/resources/db/migration-h2-legacy", FILE_NAME));
     }
 
     private void assertMigration(Path migration) throws IOException {

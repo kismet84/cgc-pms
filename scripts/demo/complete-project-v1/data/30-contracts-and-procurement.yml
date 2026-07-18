@@ -1,0 +1,3 @@
+stage: procurement
+source: sql/20-procurement.sql
+assertions: [three-contracts, request-order-receipt-one-to-one, purchase-amount-delta-zero]

@@ -291,6 +291,9 @@
                     <threadCount>${surefire.threadCount}</threadCount>
                     <systemPropertyVariables>
                         <spring.devtools.restart.enabled>false</spring.devtools.restart.enabled>
+                        <!-- Full regression suite keeps its frozen H2 fixture chain.
+                             Dedicated baseline tests instantiate Flyway directly. -->
+                        <spring.flyway.locations>classpath:db/migration-h2-legacy,classpath:com/cgcpms/common/migration,classpath:com/cgcpms/common/migration/**/*.class</spring.flyway.locations>
                     </systemPropertyVariables>
                 </configuration>
             </plugin>

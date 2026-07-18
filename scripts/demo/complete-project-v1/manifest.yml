@@ -1,0 +1,21 @@
+package-id: CGC-COMPLETE-PROJECT
+version: 1
+tenant-id: 0
+project-id: 520000000000000001
+project-code: CGC-DEMO-M52-001
+ownership-prefix: M52-
+stages:
+  - id: core
+    source: sql/10-core.sql
+    scope: [partner, project, bid, target-cost, contracts, budget, schedule]
+  - id: procurement
+    source: sql/20-procurement.sql
+    scope: [request, order, receipt, stock, requisition, material-cost]
+  - id: commercial
+    source: sql/30-commercial.sql
+    scope: [sub-measure, settlement, payment, expense, revenue, collection]
+  - id: governance
+    source: sql/40-governance.sql
+    scope: [quality-safety, progress, workflow, alert, closeout]
+checkpoint-prefix: DEMO_CGC_V1_
+cleanup-policy: rebuild-local-demo-database

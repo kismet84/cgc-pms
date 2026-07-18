@@ -20,3 +20,4 @@
 - [AutoPilot 已提交执行产物识别修复验收报告](autopilot-committed-executor-artifact-fix-2026-07-13.md)
 - [ISSUE-040-002～006：M1 五项历史风险复验与修复验收报告](ISSUE-040-002-006-M1五项历史风险复验与修复验收报告.md)
 - [第47条主线：Codex 执行效率与沟通降噪试运行报告](codex-execution-efficiency-trial-report-2026-07-15.md)
+- [第52条主线：数据库基线平台初始化与演示项目重建验收报告](第52条主线-数据库基线平台初始化与演示项目重建验收报告.md)

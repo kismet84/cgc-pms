@@ -9,6 +9,7 @@
 set -euo pipefail
 
 MIGRATION_DIR="backend/src/main/resources/db/migration"
+LEGACY_DIR="backend/src/main/resources/db/migration-legacy"
 WARNING="WARNING: Modifying already-applied Flyway migrations. Use new V90+ migrations instead."
 
 # Only check if the migration directory exists
@@ -19,7 +20,8 @@ fi
 # Find V*.sql files that are both:
 #   a) staged (git diff --cached) AND
 #   b) already exist in HEAD (not new files)
-MODIFIED_MIGRATIONS=$(git diff --cached --name-only --diff-filter=M -- "$MIGRATION_DIR"/V*.sql 2>/dev/null || true)
+MODIFIED_MIGRATIONS=$(git diff --cached --name-only --diff-filter=M -- \
+  "$MIGRATION_DIR"/V*.sql "$LEGACY_DIR"/V*.sql 2>/dev/null || true)
 
 if [ -n "$MODIFIED_MIGRATIONS" ]; then
   echo ""

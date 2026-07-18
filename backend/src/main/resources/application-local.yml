@@ -29,7 +29,7 @@ spring:
   # Flyway using H2-compatible migrations
   flyway:
     enabled: true
-    locations: classpath:db/migration-h2,classpath:com/cgcpms/common/migration,classpath:com/cgcpms/common/migration/**/*.class
+    locations: classpath:db/migration-h2,classpath:db/migration-h2-legacy,classpath:com/cgcpms/common/migration,classpath:com/cgcpms/common/migration/**/*.class
     baseline-on-migrate: true
     baseline-version: 0
     table: flyway_schema_history
@@ -73,7 +73,7 @@ auth:
     enabled: false
   dev-login:
     enabled: true
-    default-username: demo_dev_super_admin
+    default-username: ${CGCPMS_DEV_LOGIN_USERNAME:${CGCPMS_BOOTSTRAP_ADMIN_USERNAME:admin}}
 
 management:
   endpoints:

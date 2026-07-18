@@ -33,7 +33,7 @@ spring:
   # Flyway database migration
   flyway:
     enabled: true
-    locations: classpath:db/migration
+    locations: classpath:db/migration,classpath:db/migration-legacy
     baseline-on-migrate: true
     baseline-version: 0
     table: flyway_schema_history
@@ -81,4 +81,4 @@ cors:
 auth:
   dev-login:
     enabled: true
-    default-username: demo_dev_super_admin
+    default-username: ${CGCPMS_DEV_LOGIN_USERNAME:${CGCPMS_BOOTSTRAP_ADMIN_USERNAME:admin}}

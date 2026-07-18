@@ -1,0 +1,16 @@
+cgc-pms:
+  bootstrap:
+    enabled: ${CGCPMS_BOOTSTRAP_ENABLED:false}
+    version: 1
+    tenant-id: ${CGCPMS_BOOTSTRAP_TENANT_ID:0}
+    organization:
+      company-code: ${CGCPMS_BOOTSTRAP_COMPANY_CODE:ROOT}
+      company-name: ${CGCPMS_BOOTSTRAP_COMPANY_NAME:总公司}
+      department-code: ${CGCPMS_BOOTSTRAP_DEPARTMENT_CODE:ROOT_DEPT}
+      department-name: ${CGCPMS_BOOTSTRAP_DEPARTMENT_NAME:总部}
+    administrator:
+      username: ${CGCPMS_BOOTSTRAP_ADMIN_USERNAME:admin}
+      real-name: ${CGCPMS_BOOTSTRAP_ADMIN_REAL_NAME:平台管理员}
+      email: ${CGCPMS_BOOTSTRAP_ADMIN_EMAIL:}
+      password: ${CGCPMS_BOOTSTRAP_ADMIN_PASSWORD:}
+      role-code: SUPER_ADMIN

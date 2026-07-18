@@ -16,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MigrationIntegrityTest {
 
-    private static final Path MIGRATION_DIR = Path.of("src/main/resources/db/migration");
-    private static final Path H2_MIGRATION_DIR = Path.of("src/main/resources/db/migration-h2");
+    private static final Path MIGRATION_DIR = Path.of("src/main/resources/db/migration-legacy");
+    private static final Path H2_MIGRATION_DIR = Path.of("src/main/resources/db/migration-h2-legacy");
     private static final Pattern DIRECT_ADD_COST_TARGET_ID = Pattern.compile(
             "(?im)^\\s*ALTER\\s+TABLE\\s+cost_summary\\s*\\R\\s*ADD\\s+COLUMN\\s+cost_target_id");
 

@@ -1,0 +1,3 @@
+stage: core
+source: sql/10-core.sql
+assertions: [three-partners, one-material, stable-project-id, stable-warehouse-code]
