@@ -8,7 +8,7 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
-import com.cgcpms.cost.strategy.CostSubjectResolver;
+import com.cgcpms.cost.service.CostSubjectV2Service;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.partner.entity.MdPartner;
@@ -54,7 +54,7 @@ public class QualitySafetyService {
     private final CtContractMapper contractMapper;
     private final SysFileMapper fileMapper;
     private final CostItemMapper costItemMapper;
-    private final CostSubjectResolver costSubjectResolver;
+    private final CostSubjectV2Service costSubjectV2Service;
 
     public List<QualityInspectionPlan> listPlans(Long projectId) {
         projectAccessChecker.checkAccess(projectId, "查询质量安全检查计划");
@@ -413,6 +413,7 @@ public class QualitySafetyService {
         if (!"CLOSED".equals(issue.getStatus()) || !"DRAFT".equals(consequence.getStatus()))
             throw immutable("只有已关闭问题的草稿处罚成本记录可以确认");
         Long costItemId = createCostIfRequired(consequence);
+        Long costSubjectId = costItemId == null ? null : costItemMapper.selectById(costItemId).getCostSubjectId();
         QualityPartnerEvaluation evaluation = new QualityPartnerEvaluation();
         evaluation.setTenantId(tenantId());
         evaluation.setConsequenceId(consequence.getId());
@@ -432,6 +433,7 @@ public class QualitySafetyService {
                 .eq(QualityConsequence::getId, id).eq(QualityConsequence::getTenantId, tenantId())
                 .eq(QualityConsequence::getStatus, "DRAFT")
                 .set(QualityConsequence::getStatus, "POSTED")
+                .set(QualityConsequence::getCostSubjectId, costSubjectId)
                 .set(QualityConsequence::getCostItemId, costItemId)
                 .set(QualityConsequence::getEvaluationId, evaluation.getId())
                 .set(QualityConsequence::getPostedBy, userId())
@@ -506,7 +508,8 @@ public class QualitySafetyService {
         cost.setProjectId(consequence.getProjectId());
         cost.setContractId(consequence.getContractId());
         cost.setPartnerId(consequence.getPartnerId());
-        cost.setCostSubjectId(costSubjectResolver.resolveDefaultSubjectId(tenantId(), "质量安全"));
+        QualitySafetyIssue issue = requireIssue(consequence.getIssueId());
+        cost.setCostSubjectId(costSubjectV2Service.resolveRule(SOURCE_TYPE, issue.getIssueType(), consequence.getProjectId()));
         cost.setCostType(COST_TYPE);
         cost.setAmount(consequence.getReworkCostAmount());
         cost.setTaxAmount(BigDecimal.ZERO);

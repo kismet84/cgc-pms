@@ -3,7 +3,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
-import { MenuFoldOutlined, MenuOutlined, ProjectOutlined } from '@ant-design/icons-vue'
+import {
+  CalendarOutlined,
+  DownOutlined,
+  MenuFoldOutlined,
+  MenuOutlined,
+  ProjectOutlined,
+  SearchOutlined,
+} from '@ant-design/icons-vue'
 import { getUserInfo } from '@/api/modules/auth'
 import { useMobileViewport } from '@/composables/useMobileViewport'
 import SidebarMenu from './components/SidebarMenu.vue'
@@ -16,10 +23,16 @@ const route = useRoute()
 const userStore = useUserStore()
 const { userInfo } = storeToRefs(userStore)
 const collapsed = ref(false)
+const globalSearchKeyword = ref('')
 const { isMobile, isCompactDesktop } = useMobileViewport()
 const bellReady = ref(false)
 const mobilePageTitle = computed(() => String(route.meta.title || 'CGC-PMS'))
-const pageTitle = computed(() => String(route.meta.title || '工作台'))
+const isDashboard = computed(() => route.path === '/dashboard')
+const currentProjectName = computed(() => String(route.meta.title || '项目工作台'))
+const reportPeriod = computed(() => {
+  const now = new Date()
+  return `${now.getFullYear()}年${now.getMonth() + 1}月`
+})
 
 watch([isMobile, isCompactDesktop], ([mobile, compactDesktop]) => {
   if (mobile || compactDesktop) {
@@ -30,6 +43,15 @@ watch([isMobile, isCompactDesktop], ([mobile, compactDesktop]) => {
 function handleLogout() {
   userStore.logout()
   router.push('/login')
+}
+
+function openProjectList() {
+  router.push('/project/list')
+}
+
+function handleGlobalSearch() {
+  const keyword = globalSearchKeyword.value.trim()
+  router.push({ path: '/dashboard/reports', query: keyword ? { keyword } : undefined })
 }
 
 async function refreshUserInfoIfNeeded() {
@@ -73,7 +95,10 @@ onMounted(() => {
       <div class="sidebar-shell">
         <div class="brand" :class="{ 'brand--collapsed': collapsed }">
           <ProjectOutlined class="logo" aria-hidden="true" />
-          <span v-if="!collapsed" class="brand-text">建筑工程总包项目</span>
+          <span v-if="!collapsed" class="brand-text">
+            <strong>CGC-PMS</strong>
+            <small>建造 · 陪伴 · 成就</small>
+          </span>
         </div>
         <SidebarMenu :collapsed="collapsed" />
 
@@ -99,7 +124,29 @@ onMounted(() => {
 
     <a-layout class="workspace-layout">
       <header v-if="!isMobile" class="global-topbar">
-        <h1 class="global-topbar__title">{{ pageTitle }}</h1>
+        <button
+          type="button"
+          class="topbar-context topbar-context--project"
+          @click="openProjectList"
+        >
+          <span>当前项目</span>
+          <strong>{{ currentProjectName }}</strong>
+          <DownOutlined aria-hidden="true" />
+        </button>
+        <div class="topbar-context topbar-context--period">
+          <span>报告期</span>
+          <strong>{{ reportPeriod }}</strong>
+          <CalendarOutlined aria-hidden="true" />
+        </div>
+        <form class="global-search" role="search" @submit.prevent="handleGlobalSearch">
+          <a-input
+            v-model:value="globalSearchKeyword"
+            aria-label="全局搜索"
+            placeholder="全局搜索（合同/项目/单据/功能）"
+          >
+            <template #suffix><SearchOutlined aria-hidden="true" /></template>
+          </a-input>
+        </form>
         <div class="global-topbar__tools" aria-label="全局工具栏">
           <button type="button" class="global-tool-button" @click="router.push('/approval/todo')">
             我的待办
@@ -150,8 +197,8 @@ onMounted(() => {
           </a-avatar>
         </button>
       </header>
-      <WorkspaceTabs />
-      <ObjectContextNavigation />
+      <WorkspaceTabs v-if="!isDashboard" />
+      <ObjectContextNavigation v-if="!isDashboard" />
       <a-layout-content class="main-content">
         <router-view />
       </a-layout-content>
@@ -212,12 +259,24 @@ onMounted(() => {
 
 .brand-text {
   min-width: 0;
+  display: grid;
+  gap: 1px;
   overflow: hidden;
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0;
   text-overflow: ellipsis;
+}
+
+.brand-text strong {
+  color: var(--primary);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 22px;
+}
+
+.brand-text small {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 14px;
 }
 
 .sidebar-footer {
@@ -301,25 +360,84 @@ onMounted(() => {
   z-index: 13;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   min-height: var(--shell-header-height);
-  padding: 0 24px;
+  padding: 0;
   background: color-mix(in srgb, var(--surface) 94%, transparent);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
 }
 
-.global-topbar__title {
-  margin: 0;
+.topbar-context {
+  position: relative;
+  align-self: stretch;
+  min-width: 0;
+  padding: 12px 44px 10px 18px;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--border);
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+button.topbar-context {
+  cursor: pointer;
+}
+
+button.topbar-context:hover {
+  background: var(--surface-tint);
+}
+
+.topbar-context--project {
+  width: 292px;
+}
+
+.topbar-context--period {
+  width: 264px;
+}
+
+.topbar-context span {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.topbar-context strong {
+  display: block;
+  overflow: hidden;
   color: var(--text);
-  font-size: 17px;
-  font-weight: 800;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-context > :last-child {
+  position: absolute;
+  right: 18px;
+  bottom: 19px;
+  color: var(--text-secondary);
+}
+
+.global-search {
+  width: min(280px, 26vw);
+  margin: 0 auto;
+}
+
+.global-search :deep(.ant-input-affix-wrapper) {
+  height: 38px;
+  border-color: var(--border);
+  border-radius: 7px;
+  box-shadow: none;
 }
 
 .global-topbar__tools {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  padding-right: 16px;
 }
 
 .global-tool-button,
@@ -332,9 +450,23 @@ onMounted(() => {
 }
 
 .global-tool-button {
-  padding: 0 12px;
+  padding: 0 8px;
   font-size: 13px;
   cursor: pointer;
+}
+
+@media (width < 1240px) {
+  .topbar-context--project {
+    width: 240px;
+  }
+
+  .topbar-context--period {
+    width: 210px;
+  }
+
+  .global-search {
+    width: min(220px, 22vw);
+  }
 }
 
 .global-user {

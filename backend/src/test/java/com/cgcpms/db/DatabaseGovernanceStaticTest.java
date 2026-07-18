@@ -17,7 +17,8 @@ class DatabaseGovernanceStaticTest {
     @Test
     void newMysqlTablesHaveTableAndColumnComments() throws IOException {
         Path migrations = ROOT.resolve("main/resources/db/migration");
-        Pattern table = Pattern.compile("CREATE\\s+TABLE\\s+[a-zA-Z0-9_]+\\s*\\((.*?)\\)\\s*ENGINE=.*?;",
+        String followUpComments = Files.readString(migrations.resolve("V215__document_cost_subject_v2_schema.sql"));
+        Pattern table = Pattern.compile("CREATE\\s+TABLE\\s+([a-zA-Z0-9_]+)\\s*\\((.*?)\\)\\s*ENGINE=.*?;",
                 Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
         for (Path file : Files.list(migrations).filter(p -> version(p) >= 195).toList()) {
             String sql = Files.readString(file);
@@ -25,13 +26,25 @@ class DatabaseGovernanceStaticTest {
             while (matcher.find()) {
                 String statement = matcher.group();
                 assertTrue(statement.matches("(?is).*COMMENT\\s*=.*"), file + " 新表缺少表注释");
-                for (String line : matcher.group(1).split("\\R")) {
+                String tableName = matcher.group(1);
+                for (String line : matcher.group(2).split("\\R")) {
                     String value = line.trim();
                     if (!value.matches("(?is)^[a-z_][a-z0-9_]*\\s+(BIGINT|INT|TINYINT|VARCHAR|DECIMAL|DATETIME|DATE|TIMESTAMP|LONGTEXT|TEXT|JSON)\\b.*")) continue;
-                    assertTrue(value.matches("(?is).*\\bCOMMENT\\b.*"), file + " 新字段缺少注释: " + value);
+                    String columnName = value.substring(0, value.indexOf(' '));
+                    assertTrue(value.matches("(?is).*\\bCOMMENT\\b.*")
+                                    || followUpDocumentsColumn(followUpComments, tableName, columnName),
+                            file + " 新字段缺少注释: " + value);
                 }
             }
         }
+    }
+
+    private static boolean followUpDocumentsColumn(String sql, String tableName, String columnName) {
+        Matcher alter = Pattern.compile("(?is)ALTER\\s+TABLE\\s+" + Pattern.quote(tableName) + "\\s+(.*?);")
+                .matcher(sql);
+        if (!alter.find()) return false;
+        return Pattern.compile("(?is)MODIFY\\s+COLUMN\\s+" + Pattern.quote(columnName) + "\\b.*?COMMENT\\b")
+                .matcher(alter.group(1)).find();
     }
 
     @Test

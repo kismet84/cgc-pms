@@ -243,6 +243,7 @@ public class CostTargetService {
             int sort = 1;
             for (CostTargetItem item : items) {
                 if (!subjects.add(item.getCostSubjectId())) throw new BusinessException("COST_TARGET_SUBJECT_DUPLICATE", "同一目标成本版本内成本科目不能重复");
+                requireLeafCostSubject(item.getCostSubjectId(), target.getProjectId());
                 requireEnabledUser(item.getResponsibleUserId());
                 item.setTargetId(targetId);
                 item.setTenantId(UserContext.getCurrentTenantId());
@@ -321,8 +322,24 @@ public class CostTargetService {
         Set<Long> subjects = new HashSet<>();
         for (CostTargetItem item : items) {
             if (item.getCostSubjectId() == null || !subjects.add(item.getCostSubjectId())) throw new BusinessException("COST_TARGET_ITEM_INVALID", "目标成本科目不能为空且不能重复");
+            requireLeafCostSubject(item.getCostSubjectId(), target.getProjectId());
             if (item.getResponsibleUserId() == null) throw new BusinessException("COST_TARGET_RESPONSIBLE_REQUIRED", "责任预算必须落实到责任人");
             requireEnabledUser(item.getResponsibleUserId());
+        }
+    }
+
+    private void requireLeafCostSubject(Long subjectId, Long projectId) {
+        Integer valid = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM cost_subject s
+                WHERE s.tenant_id=? AND s.id=? AND s.deleted_flag=0 AND s.status='ENABLE' AND s.account_category='COST'
+                  AND NOT EXISTS (SELECT 1 FROM cost_subject c WHERE c.tenant_id=s.tenant_id AND c.parent_id=s.id AND c.deleted_flag=0)
+                  AND (NOT EXISTS (SELECT 1 FROM project_cost_subject_scope p WHERE p.tenant_id=s.tenant_id AND p.project_id=?)
+                       OR EXISTS (SELECT 1 FROM project_cost_subject_scope p WHERE p.tenant_id=s.tenant_id AND p.project_id=?
+                         AND p.cost_subject_id=s.id AND p.enabled=1 AND p.effective_from<=CURRENT_DATE
+                         AND (p.effective_to IS NULL OR p.effective_to>=CURRENT_DATE)))
+                """, Integer.class, UserContext.getCurrentTenantId(), subjectId, projectId, projectId);
+        if (valid == null || valid != 1) {
+            throw new BusinessException("COST_TARGET_SUBJECT_INVALID", "目标成本必须使用项目适用范围内的启用末级成本科目");
         }
     }
 

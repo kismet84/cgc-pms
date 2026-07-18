@@ -44,9 +44,12 @@ vi.mock('pinia', () => ({
 
 // ── Mock icons (inheritAttrs: true so aria-label and class are applied to root) ──
 vi.mock('@ant-design/icons-vue', () => ({
+  CalendarOutlined: { template: '<span class="icon-stub"><slot /></span>' },
+  DownOutlined: { template: '<span class="icon-stub"><slot /></span>' },
   MenuFoldOutlined: { template: '<span class="icon-stub"><slot /></span>' },
   MenuOutlined: { template: '<span class="icon-stub"><slot /></span>' },
   ProjectOutlined: { template: '<span class="icon-stub"><slot /></span>' },
+  SearchOutlined: { template: '<span class="icon-stub"><slot /></span>' },
 }))
 
 // ── Mock sub-components ──
@@ -75,6 +78,7 @@ const antdStubs = [
   'a-menu-item',
   'a-menu-divider',
   'a-badge',
+  'a-input',
   'router-view',
 ]
 

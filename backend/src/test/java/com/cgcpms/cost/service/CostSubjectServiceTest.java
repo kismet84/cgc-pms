@@ -676,7 +676,7 @@ class CostSubjectServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> costSubjectService.delete(subject.getId()));
         assertEquals("COST_SUBJECT_REFERENCED", ex.getCode());
-        assertTrue(ex.getMessage().contains("成本明细引用"));
+        assertTrue(ex.getMessage().contains("成本明细1条"));
     }
 
     @Test
@@ -711,7 +711,7 @@ class CostSubjectServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> costSubjectService.delete(subject.getId()));
         assertEquals("COST_SUBJECT_REFERENCED", ex.getCode());
-        assertTrue(ex.getMessage().contains("目标成本明细引用"));
+        assertTrue(ex.getMessage().contains("目标成本明细1条"));
     }
 
     // ═══════════════════════════════════════════════════════════════
