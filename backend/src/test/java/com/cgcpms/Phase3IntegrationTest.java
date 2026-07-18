@@ -89,6 +89,10 @@ class Phase3IntegrationTest {
     /** Demo data: supplier partner */
     private static final long PARTNER_ID = 20001L;
 
+    private long materialSubjectId;
+    private long subcontractSubjectId;
+    private long earthworkSubjectId;
+
     // ── CT_CHANGE ──
     @Autowired private CtContractChangeService changeService;
     @Autowired private CtContractChangeMapper changeMapper;
@@ -145,7 +149,7 @@ class Phase3IntegrationTest {
      * Re-seed users 1-5 in tenant 0 so the workflow approve/transfer/withdraw flows work.
      */
     @BeforeAll
-    void seedTestUsers() {
+    void seedTestPrerequisites() {
         jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
                 "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
@@ -161,6 +165,28 @@ class Phase3IntegrationTest {
         jdbcTemplate.update("INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
                 "SELECT 5, 0, 'cost', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '成本人员', '13800000004', 'cost@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 5)");
+
+        materialSubjectId = ensureCostSubject("5401.03.02", "材料费", "MATERIAL", 3);
+        subcontractSubjectId = ensureCostSubject("5401.03.05", "专业分包费", "SUBCONTRACT", 3);
+        earthworkSubjectId = ensureCostSubject("5401.03.05.01", "土方分包", "SUBCONTRACT", 4);
+    }
+
+    private long ensureCostSubject(String code, String name, String type, int level) {
+        List<Long> existingIds = jdbcTemplate.queryForList(
+                "SELECT id FROM cost_subject WHERE tenant_id = 0 AND subject_code = ? AND deleted_flag = 0",
+                Long.class,
+                code);
+        if (!existingIds.isEmpty()) {
+            return existingIds.getFirst();
+        }
+
+        long id = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbcTemplate.update("""
+                INSERT INTO cost_subject(id,tenant_id,subject_code,subject_name,subject_type,account_category,
+                    level,sort_order,status,created_at,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,'COST',?,1,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """, id, code, name, type, level);
+        return id;
     }
 
     @BeforeEach
@@ -484,7 +510,7 @@ class Phase3IntegrationTest {
         targetItem.setTenantId(0L);
         targetItem.setTargetId(targetId);
         targetItem.setProjectId(PROJECT_ID);
-        targetItem.setCostSubjectId(1002L);  // 使用迁移种子中的材料成本科目
+        targetItem.setCostSubjectId(materialSubjectId); // V2 标准科目：5401.03.02 材料费
         targetItem.setTargetAmount(new BigDecimal("300000000.00"));
         targetItem.setBidCostAmount(new BigDecimal("300000000.00"));
         targetItem.setResponsibilityAmount(new BigDecimal("300000000.00"));
@@ -501,7 +527,7 @@ class Phase3IntegrationTest {
         targetItem2.setTenantId(0L);
         targetItem2.setTargetId(targetId);
         targetItem2.setProjectId(PROJECT_ID);
-        targetItem2.setCostSubjectId(1003L); // 使用迁移种子中的分包成本科目
+        targetItem2.setCostSubjectId(subcontractSubjectId); // V2 标准科目：5401.03.05 专业分包费
         targetItem2.setTargetAmount(new BigDecimal("220000000.00"));
         targetItem2.setBidCostAmount(new BigDecimal("220000000.00"));
         targetItem2.setResponsibilityAmount(new BigDecimal("220000000.00"));
@@ -659,7 +685,7 @@ class Phase3IntegrationTest {
         varItem.setQuantity(new BigDecimal("1000.00"));
         varItem.setUnitPrice(new BigDecimal("200.00"));
         varItem.setAmount(new BigDecimal("200000.00"));
-        varItem.setCostSubjectId(900057L);
+        varItem.setCostSubjectId(earthworkSubjectId);
         varOrderService.saveItems(varOrderId, List.of(varItem));
 
         jdbcTemplate.update("""

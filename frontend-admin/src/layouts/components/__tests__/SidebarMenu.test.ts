@@ -156,7 +156,7 @@ describe('SidebarMenu', () => {
       '合作方管理',
       '组织架构',
       '物资主数据',
-      '财务主数据',
+      '成本科目中心',
     ])
 
     expect(findSubmenuLabels(wrapper, '/commercial')).toEqual([
