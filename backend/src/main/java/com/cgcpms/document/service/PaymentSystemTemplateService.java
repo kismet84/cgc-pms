@@ -108,7 +108,7 @@ public class PaymentSystemTemplateService {
                 .eq(DocumentTemplateVersion::getTemplateId, existing.getId())
                 .eq(DocumentTemplateVersion::getStatus, "PUBLISHED")
                 .orderByDesc(DocumentTemplateVersion::getVersionNo)
-                .last("LIMIT 1"));
+                .last("LIMIT 1")); // SQL-SAFETY: fixed-sql-fragment — fixed row limit, no user input
         if (published == null) {
             throw new BusinessException("DOCUMENT_SYSTEM_TEMPLATE_STATE_INVALID", "系统付款模板存在但没有已发布版本");
         }

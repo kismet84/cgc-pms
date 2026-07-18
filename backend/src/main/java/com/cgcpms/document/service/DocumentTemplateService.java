@@ -113,7 +113,7 @@ public class DocumentTemplateService {
                 .eq(DocumentTemplateVersion::getTenantId, requireTenant())
                 .eq(DocumentTemplateVersion::getTemplateId, templateId)
                 .orderByDesc(DocumentTemplateVersion::getVersionNo)
-                .last("LIMIT 1"));
+                .last("LIMIT 1")); // SQL-SAFETY: fixed-sql-fragment — fixed row limit, no user input
         int next = latest == null ? 1 : latest.getVersionNo() + 1;
         try {
             return insertDraft(templateId, next, draft);

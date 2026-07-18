@@ -123,7 +123,7 @@ public class PayApplicationService {
         } else {
             List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
             if (accessibleProjectIds.isEmpty()) {
-                wrapper.apply("1 = 0");
+                wrapper.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment — deny-all when no project is accessible
             } else {
                 wrapper.in(PayApplication::getProjectId, accessibleProjectIds);
             }
