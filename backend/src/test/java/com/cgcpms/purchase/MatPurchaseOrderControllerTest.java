@@ -81,6 +81,7 @@ class MatPurchaseOrderControllerTest {
     }
 
     private void ensureActiveBudget() {
+        long costSubjectId = ensureCostSubject();
         jdbcTemplate.update("""
                 INSERT INTO project_budget (
                     id, tenant_id, project_id, version_no, budget_name, total_amount,
@@ -93,10 +94,28 @@ class MatPurchaseOrderControllerTest {
                 INSERT INTO project_budget_line (
                     id, tenant_id, budget_id, project_id, cost_subject_id, budget_amount,
                     reserved_amount, consumed_amount, version, created_by, deleted_flag
-                ) SELECT ?, ?, ?, ?, 1002, 5000000, 0, 0, 0, ?, 0
+                ) SELECT ?, ?, ?, ?, ?, 5000000, 0, 0, 0, ?, 0
                 WHERE NOT EXISTS (SELECT 1 FROM project_budget_line WHERE id = ?)
                 """, BUDGET_LINE_ID, TENANT_ID, BUDGET_ID, PROJECT_ID,
-                ADMIN_ID, BUDGET_LINE_ID);
+                costSubjectId, ADMIN_ID, BUDGET_LINE_ID);
+    }
+
+    private long ensureCostSubject() {
+        List<Long> existingIds = jdbcTemplate.queryForList(
+                "SELECT id FROM cost_subject WHERE tenant_id = 0 AND subject_code = '5401.03.02' AND deleted_flag = 0",
+                Long.class);
+        if (!existingIds.isEmpty()) {
+            return existingIds.getFirst();
+        }
+
+        long id = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbcTemplate.update("""
+                INSERT INTO cost_subject(id,tenant_id,subject_code,subject_name,subject_type,account_category,
+                    level,sort_order,status,created_at,updated_at,deleted_flag)
+                VALUES(?,0,'5401.03.02','材料费','MATERIAL','COST',3,2,'ENABLE',
+                    CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)
+                """, id);
+        return id;
     }
 
     @AfterAll

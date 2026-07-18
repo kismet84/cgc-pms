@@ -46,7 +46,7 @@ class CostSubjectControllerTest {
 
     @Test @Order(4) @DisplayName("POST /cost-subjects -> 200 creates subject")
     void testCreate() throws Exception {
-        String body = "{\"subjectCode\":\"CS-TEST-" + System.nanoTime() + "\",\"subjectName\":\"测试科目\",\"level\":2,\"parentId\":1001}";
+        String body = "{\"subjectCode\":\"CS-TEST-" + System.nanoTime() + "\",\"subjectName\":\"测试科目\",\"level\":1,\"parentId\":0}";
         String resp = mockMvc.perform(p("/cost-subjects").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isString())
                 .andReturn().getResponse().getContentAsString();
@@ -70,7 +70,7 @@ class CostSubjectControllerTest {
     @Test @Order(7) @DisplayName("PUT /cost-subjects/{id} -> 200")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(subjectId);
-        String body = "{\"subjectCode\":\"CS-UPD-" + System.nanoTime() + "\",\"subjectName\":\"更新科目\",\"level\":2,\"parentId\":1001}";
+        String body = "{\"subjectCode\":\"CS-UPD-" + System.nanoTime() + "\",\"subjectName\":\"更新科目\",\"level\":1,\"parentId\":0}";
         mockMvc.perform(u("/cost-subjects/" + subjectId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }
