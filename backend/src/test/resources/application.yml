@@ -12,6 +12,11 @@ spring:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
   flyway:
     enabled: true
+    # General regression tests intentionally retain the frozen legacy fixture chain.
+    # Fresh B215/H2 and B215/MySQL behavior is covered by dedicated baseline tests;
+    # including B215 here would suppress the historical demo fixtures many existing
+    # service/controller tests explicitly exercise.
+    locations: classpath:db/migration-h2-legacy,classpath:com/cgcpms/common/migration,classpath:com/cgcpms/common/migration/**/*.class
   sql:
     init:
       mode: never

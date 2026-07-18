@@ -106,9 +106,10 @@ jobs:
           distribution: 'temurin'
           cache: maven
       - name: Run MySQL Flyway smoke test
-        run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest test -Dspring.profiles.active=test
+        run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest test -Dspring.profiles.active=test
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
+          CGCPMS_M52_MYSQL_BASELINE: 'true'
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }}
           SPRING_DATASOURCE_USERNAME: ${{ env.CI_MYSQL_USER }}
           SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}
@@ -373,9 +374,14 @@ jobs:
           exit 1
       - name: Start backend
         run: |
+          bootstrap_password="Aa9!$(openssl rand -hex 16)"
+          echo "::add-mask::$bootstrap_password"
+          export CGCPMS_BOOTSTRAP_ENABLED=true
+          export CGCPMS_BOOTSTRAP_ADMIN_USERNAME=admin
+          export CGCPMS_BOOTSTRAP_ADMIN_PASSWORD="$bootstrap_password"
           cd backend
           nohup ./mvnw -C spring-boot:run -Dspring-boot.run.profiles=test,dev \
-            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }} --spring.datasource.username=${{ env.CI_MYSQL_USER }} --spring.datasource.password=${{ env.CI_MYSQL_PASSWORD }} --spring.redis.host=localhost --spring.redis.port=6379 --jwt.secret=${TEST_JWT_SECRET} --cors.allowed-origins=http://127.0.0.1:4173,http://localhost:4173 --minio.endpoint=http://localhost:9000 --minio.access-key=cgcpmsci --minio.secret-key=cgcpmsci123456 --minio.bucket=cgc-pms-e2e --auth.dev-login.enabled=true --auth.dev-login.default-username=demo_dev_super_admin" \
+            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }} --spring.datasource.username=${{ env.CI_MYSQL_USER }} --spring.datasource.password=${{ env.CI_MYSQL_PASSWORD }} --spring.redis.host=localhost --spring.redis.port=6379 --jwt.secret=${TEST_JWT_SECRET} --cors.allowed-origins=http://127.0.0.1:4173,http://localhost:4173 --minio.endpoint=http://localhost:9000 --minio.access-key=cgcpmsci --minio.secret-key=cgcpmsci123456 --minio.bucket=cgc-pms-e2e --auth.dev-login.enabled=true --auth.dev-login.default-username=admin" \
             > ../backend.log 2>&1 &
           backend_pid=$!
           cd ..

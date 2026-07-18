@@ -354,13 +354,16 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("dev-login 默认用户名配置已切换到稳定演示超管账号")
+    @DisplayName("dev-login 默认用户名跟随 bootstrap 管理员并允许环境覆盖")
     void testDevLoginDefaultUsernameConfigSwitched() throws Exception {
         String devConfig = Files.readString(Path.of("src/main/resources/application-dev.yml"));
         String localConfig = Files.readString(Path.of("src/main/resources/application-local.yml"));
 
-        org.junit.jupiter.api.Assertions.assertTrue(devConfig.contains("default-username: demo_dev_super_admin"));
-        org.junit.jupiter.api.Assertions.assertTrue(localConfig.contains("default-username: demo_dev_super_admin"));
+        String expected = "default-username: ${CGCPMS_DEV_LOGIN_USERNAME:${CGCPMS_BOOTSTRAP_ADMIN_USERNAME:admin}}";
+        org.junit.jupiter.api.Assertions.assertTrue(devConfig.contains(expected));
+        org.junit.jupiter.api.Assertions.assertTrue(localConfig.contains(expected));
+        org.junit.jupiter.api.Assertions.assertFalse(devConfig.contains("default-username: demo_dev_super_admin"));
+        org.junit.jupiter.api.Assertions.assertFalse(localConfig.contains("default-username: demo_dev_super_admin"));
         org.junit.jupiter.api.Assertions.assertFalse(devConfig.contains("demo_alert_commercial"));
         org.junit.jupiter.api.Assertions.assertFalse(localConfig.contains("demo_alert_commercial"));
     }

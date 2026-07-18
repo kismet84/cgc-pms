@@ -9,6 +9,7 @@ REM   scripts\check-flyway-immutability.bat
 setlocal enabledelayedexpansion
 
 set "MIGRATION_DIR=backend\src\main\resources\db\migration"
+set "LEGACY_DIR=backend\src\main\resources\db\migration-legacy"
 set "WARNING=WARNING: Modifying already-applied Flyway migrations. Use new V90+ migrations instead."
 
 if not exist "%MIGRATION_DIR%" (
@@ -17,7 +18,7 @@ if not exist "%MIGRATION_DIR%" (
 
 REM Find staged, modified (not new) V*.sql files
 set "FOUND="
-for /f "tokens=*" %%f in ('git diff --cached --name-only --diff-filter=M -- "%MIGRATION_DIR%\V*.sql" 2^>nul') do (
+for /f "tokens=*" %%f in ('git diff --cached --name-only --diff-filter=M -- "%MIGRATION_DIR%\V*.sql" "%LEGACY_DIR%\V*.sql" 2^>nul') do (
     if not defined FOUND (
         echo.
         echo ============================================================

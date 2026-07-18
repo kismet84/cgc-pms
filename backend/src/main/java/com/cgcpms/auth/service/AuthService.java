@@ -9,14 +9,11 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.entity.SysMenu;
 import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysUser;
-import com.cgcpms.system.entity.SysUserRole;
 import com.cgcpms.system.mapper.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.Collections;
@@ -29,11 +26,6 @@ import java.util.stream.Collectors;
 public class AuthService {
 
     private static final String ENABLED_STATUS = "ENABLE";
-    private static final String SUPER_ADMIN_ROLE_CODE = "SUPER_ADMIN";
-    private static final String DEV_LOGIN_DEMO_PASSWORD = "DevOnly#Demo123";
-    private static final String DEV_LOGIN_DEMO_REAL_NAME = "开发演示超级管理员";
-    private static final String DEV_LOGIN_DEMO_PHONE = "13800019999";
-    private static final String DEV_LOGIN_DEMO_REMARK = "仅供 dev/local 免密登录自动补齐的演示超级管理员账号";
 
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
@@ -110,12 +102,9 @@ public class AuthService {
         return loginById(user.getId());
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public LoginResponse loginByUsernameEnsuringDevAccount(String username, String defaultUsername) {
         String effectiveUsername = normalizeUsername(username);
-        SysUser user = isDefaultDevLoginUsername(effectiveUsername, defaultUsername)
-                ? ensureDevSuperAdminAccount(effectiveUsername)
-                : findUserByUsername(effectiveUsername);
+        SysUser user = findUserByUsername(effectiveUsername);
         if (user == null) {
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         }
@@ -238,120 +227,6 @@ public class AuthService {
             return null;
         }
         return username.trim();
-    }
-
-    private boolean isDefaultDevLoginUsername(String username, String defaultUsername) {
-        String normalizedDefaultUsername = normalizeUsername(defaultUsername);
-        return StringUtils.hasText(username) && username.equals(normalizedDefaultUsername);
-    }
-
-    private SysUser ensureDevSuperAdminAccount(String username) {
-        SysRole superAdminRole = getDefaultSuperAdminRole();
-        SysUser user = findUserByTenantIdAndUsername(superAdminRole.getTenantId(), username);
-        if (user == null) {
-            user = insertDevSuperAdminUser(username, superAdminRole.getTenantId());
-        } else if (patchDevSuperAdminUser(user, superAdminRole.getTenantId(), username)) {
-            sysUserMapper.updateById(user);
-        }
-        ensureUserRole(user.getId(), superAdminRole.getId());
-        return user;
-    }
-
-    private SysRole getDefaultSuperAdminRole() {
-        List<SysRole> roles = sysRoleMapper.selectList(new LambdaQueryWrapper<SysRole>()
-                .eq(SysRole::getRoleCode, SUPER_ADMIN_ROLE_CODE)
-                .eq(SysRole::getStatus, ENABLED_STATUS)
-                .orderByAsc(SysRole::getTenantId)
-                .orderByAsc(SysRole::getId));
-        if (roles.isEmpty()) {
-            throw new BusinessException("DEV_LOGIN_ROLE_NOT_FOUND", "dev login 默认超级管理员角色不存在");
-        }
-        return roles.get(0);
-    }
-
-    private SysUser insertDevSuperAdminUser(String username, Long tenantId) {
-        SysUser user = buildDevSuperAdminUser(username, tenantId);
-        try {
-            sysUserMapper.insert(user);
-            return user;
-        } catch (DuplicateKeyException ex) {
-            SysUser existing = findUserByTenantIdAndUsername(tenantId, username);
-            if (existing != null) {
-                return existing;
-            }
-            throw ex;
-        }
-    }
-
-    private SysUser buildDevSuperAdminUser(String username, Long tenantId) {
-        SysUser user = new SysUser();
-        user.setTenantId(tenantId);
-        user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(DEV_LOGIN_DEMO_PASSWORD));
-        user.setRealName(DEV_LOGIN_DEMO_REAL_NAME);
-        user.setPhone(DEV_LOGIN_DEMO_PHONE);
-        user.setEmail(username + "@cgc-pms.dev.local");
-        user.setStatus(ENABLED_STATUS);
-        user.setIsAdmin(1);
-        user.setRemark(DEV_LOGIN_DEMO_REMARK);
-        return user;
-    }
-
-    private boolean patchDevSuperAdminUser(SysUser user, Long tenantId, String username) {
-        boolean changed = false;
-        if (!tenantId.equals(user.getTenantId())) {
-            user.setTenantId(tenantId);
-            changed = true;
-        }
-        if (!ENABLED_STATUS.equals(user.getStatus())) {
-            user.setStatus(ENABLED_STATUS);
-            changed = true;
-        }
-        if (!Integer.valueOf(1).equals(user.getIsAdmin())) {
-            user.setIsAdmin(1);
-            changed = true;
-        }
-        if (!StringUtils.hasText(user.getPassword())) {
-            user.setPassword(passwordEncoder.encode(DEV_LOGIN_DEMO_PASSWORD));
-            changed = true;
-        }
-        if (!StringUtils.hasText(user.getRealName())) {
-            user.setRealName(DEV_LOGIN_DEMO_REAL_NAME);
-            changed = true;
-        }
-        if (!StringUtils.hasText(user.getPhone())) {
-            user.setPhone(DEV_LOGIN_DEMO_PHONE);
-            changed = true;
-        }
-        if (!StringUtils.hasText(user.getEmail())) {
-            user.setEmail(username + "@cgc-pms.dev.local");
-            changed = true;
-        }
-        if (!StringUtils.hasText(user.getRemark())) {
-            user.setRemark(DEV_LOGIN_DEMO_REMARK);
-            changed = true;
-        }
-        return changed;
-    }
-
-    private void ensureUserRole(Long userId, Long roleId) {
-        SysUser user = sysUserMapper.selectById(userId);
-        SysRole role = sysRoleMapper.selectById(roleId);
-        if (user == null || role == null || !user.getTenantId().equals(role.getTenantId())) {
-            throw new BusinessException("AUTH_ROLE_TENANT_MISMATCH", "用户与角色不属于同一租户");
-        }
-        Long count = sysUserRoleMapper.selectCount(new LambdaQueryWrapper<SysUserRole>()
-                .eq(SysUserRole::getTenantId, user.getTenantId())
-                .eq(SysUserRole::getUserId, userId)
-                .eq(SysUserRole::getRoleId, roleId));
-        if (count != null && count > 0) {
-            return;
-        }
-        SysUserRole userRole = new SysUserRole();
-        userRole.setTenantId(user.getTenantId());
-        userRole.setUserId(userId);
-        userRole.setRoleId(roleId);
-        sysUserRoleMapper.insert(userRole);
     }
 
     private Long requireUserTenant(Long userId) {

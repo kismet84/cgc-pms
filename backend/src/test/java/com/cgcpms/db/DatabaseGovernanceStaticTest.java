@@ -16,7 +16,7 @@ class DatabaseGovernanceStaticTest {
 
     @Test
     void newMysqlTablesHaveTableAndColumnComments() throws IOException {
-        Path migrations = ROOT.resolve("main/resources/db/migration");
+        Path migrations = ROOT.resolve("main/resources/db/migration-legacy");
         String followUpComments = Files.readString(migrations.resolve("V215__document_cost_subject_v2_schema.sql"));
         Pattern table = Pattern.compile("CREATE\\s+TABLE\\s+([a-zA-Z0-9_]+)\\s*\\((.*?)\\)\\s*ENGINE=.*?;",
                 Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
@@ -49,7 +49,7 @@ class DatabaseGovernanceStaticTest {
 
     @Test
     void jsonPayloadsAreConstrainedAndProfilesValidateMigrations() throws IOException {
-        String mysql = Files.readString(ROOT.resolve("main/resources/db/migration/V206__validate_json_payloads.sql"));
+        String mysql = Files.readString(ROOT.resolve("main/resources/db/migration-legacy/V206__validate_json_payloads.sql"));
         assertEquals(18, occurrences(mysql, "ADD CONSTRAINT"));
         assertTrue(mysql.contains("JSON_VALID"));
         assertTrue(mysql.contains("1048576"));
@@ -73,8 +73,8 @@ class DatabaseGovernanceStaticTest {
                 "org_company", "org_position", "pay_application", "md_material",
                 "mat_purchase_order", "mat_receipt", "mat_stock", "pm_project", "cost_subject");
         for (Path migration : List.of(
-                ROOT.resolve("main/resources/db/migration/V210__drop_obsolete_deleted_tokens.sql"),
-                ROOT.resolve("main/resources/db/migration-h2/V210__drop_obsolete_deleted_tokens.sql"))) {
+                ROOT.resolve("main/resources/db/migration-legacy/V210__drop_obsolete_deleted_tokens.sql"),
+                ROOT.resolve("main/resources/db/migration-h2-legacy/V210__drop_obsolete_deleted_tokens.sql"))) {
             String sql = Files.readString(migration).toLowerCase();
             assertEquals(14, occurrences(sql, "drop column deleted_token"), migration + " 必须精确退役 14 个字段");
             for (String table : tables) {
