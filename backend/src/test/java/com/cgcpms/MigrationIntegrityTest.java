@@ -78,6 +78,67 @@ class MigrationIntegrityTest {
     }
 
     @Test
+    void costSubjectV2ClosedLoopMigrationIsMirroredAcrossDialects() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V213__cost_subject_v2_closed_loop.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V213__cost_subject_v2_closed_loop.sql");
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            String normalized = normalizeSql(sql);
+            assertTrue(normalized.contains("create table cost_subject_mapping_version"));
+            assertTrue(normalized.contains("create table cost_subject_assignment_rule"));
+            assertTrue(normalized.contains("create table project_cost_subject_scope"));
+            assertTrue(normalized.contains("create table bid_cost_target_transfer"));
+            assertTrue(normalized.contains("create table finance_cost_allocation_batch"));
+            assertTrue(normalized.contains("cost:subject:finance-allocate"));
+            assertTrue(normalized.contains("approval_instance_id"));
+            assertTrue(normalized.contains("idempotency_key"));
+            assertTrue(normalized.contains("reversal_of_id"));
+            assertTrue(normalized.contains("bid_cost_target_transfer_reversal"));
+            assertTrue(normalized.contains("finance_cost_allocation_reversal"));
+        }
+    }
+
+    @Test
+    void legacyCostSubjectCleanupIsMirroredAndCoversEveryReferenceColumn() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V214__remove_legacy_cost_subjects.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V214__remove_legacy_cost_subjects.sql");
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        List<String> referenceColumns = List.of(
+                "cost_item set cost_subject_id",
+                "cost_target_item set cost_subject_id",
+                "cost_forecast_item set cost_subject_id",
+                "project_budget_line set cost_subject_id",
+                "pay_application set cost_subject_id",
+                "expense_application set cost_subject_id",
+                "stl_settlement_item set cost_subject_id",
+                "accounting_entry_line set cost_subject_id",
+                "cost_subject_assignment_rule set cost_subject_id",
+                "project_cost_subject_scope set cost_subject_id",
+                "qs_consequence set cost_subject_id",
+                "finance_cost_allocation_batch set cost_subject_id",
+                "bid_cost_target_transfer_line set source_subject_id",
+                "bid_cost_target_transfer_line set target_subject_id",
+                "cost_summary set cost_subject_id",
+                "overhead_allocation_rule set cost_subject_id",
+                "overhead_allocation_record set cost_subject_id",
+                "var_order_item set cost_subject_id");
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            String normalized = normalizeSql(sql);
+            assertTrue(normalized.contains("create table cost_subject_legacy_cleanup_audit"));
+            assertTrue(normalized.contains("'5001.01','分包成本-劳务',900043,'5401.03.01.02','劳务分包费'"));
+            assertTrue(normalized.contains("delete from cost_subject_mapping_item where source_subject_id"));
+            for (String referenceColumn : referenceColumns) {
+                assertTrue(normalized.contains("update " + referenceColumn), referenceColumn);
+            }
+            assertTrue(normalized.contains("delete from cost_subject where id in"));
+        }
+    }
+
+    @Test
     void localTestProfileIncludesJavaMigrationsWhenPresent() throws Exception {
         Path localProfile = Path.of("src/test/resources/application-local.yml");
         if (!Files.exists(localProfile)) {

@@ -1,5 +1,14 @@
 # CGC-PMS 项目地图
 
+## 2026-07-18 主线：成本科目 V2 重整本地实施完成
+
+- 成本科目已从单一树选择器扩展为“映射版本 + 显式归集规则 + 项目适用范围 + 追踪对账”；用户明确授权后，V214 已迁移全部已知旧引用、保留替代审计并删除 10 个旧节点，历史业务金额不变。
+- 投标成本中标后不再原地改写来源事实，而是经映射版本、目标成本草稿、审批、幂等和净额防重生成转入事实；冲销保留负数事实。
+- 质量安全后果的返工成本已强制命中显式末级科目规则；项目财务费用以独立批次支持直接归属、受益额、占用天数和合同额例外四种受控分摊依据，不复用间接费分摊事实。
+- 基础资料下“成本科目中心”已收敛为科目体系、归集规则、项目适用与目标成本、影响与转入追踪 4 个独立 URL/Tab；旧路由兼容、不硬编码角色菜单。
+- 本地回归覆盖 V213/V214 双方言、旧引用归零与金额守恒、规则决策、引用保护、投标正反向转入、财务正反向分摊、质量安全归集和四工作区深链接。生产切换仍受目标环境扫描、完整映射签认、财务口径签认、备份和脱敏演练阻塞。
+- 权威载体：[第51条主线计划书](../plans/第51条主线-成本科目V2重整任务计划书.md)。
+
 ## 2026-07-18 主线：业务单据模板与可审计PDF生成M4通过，M5保持候选门
 
 - 当前付款、结算、审批、文件和审计域已具备复用基础，但项目地图仍将付款、结算、发票、工作流和文件能力标为 `Partial`；高风险边界包括租户、金额、权限和不可变历史。
@@ -565,15 +574,15 @@
 
 ## 地图基线
 
-| 项目 | 当前值 |
-| --- | --- |
-| 产品版本 | `1.5.0-dev.0` |
-| 分支 | `develop/1.5` |
-| Commit | 当前 `develop/1.5` 工作区 |
-| 生成时间 | 2026-07-12 |
-| 证据类型 | 当前代码、配置、现行规范、测试入口静态核对 |
-| 验证新鲜度 | 业务测试和真实角色运行态待本轮后续复验 |
-| 下次刷新 | 下一条产品 Candidate 完成后，或当前事实变化时 |
+| 项目       | 当前值                                        |
+| ---------- | --------------------------------------------- |
+| 产品版本   | `1.5.0-dev.0`                                 |
+| 分支       | `develop/1.5`                                 |
+| Commit     | 当前 `develop/1.5` 工作区                     |
+| 生成时间   | 2026-07-12                                    |
+| 证据类型   | 当前代码、配置、现行规范、测试入口静态核对    |
+| 验证新鲜度 | 业务测试和真实角色运行态待本轮后续复验        |
+| 下次刷新   | 下一条产品 Candidate 完成后，或当前事实变化时 |
 
 > 本地图中的 `Partial` 不等于功能不存在，表示真实代码链路已经存在，但尚未取得 v1.5 当前周期的完整运行或业务验收证据。v1.0 历史测试结论不用于升级状态。
 
@@ -611,90 +620,90 @@ MySQL/H2 + Redis + MinIO
 Docker Compose + Nginx + Actuator + Prometheus
 ```
 
-| 层级 | 现行入口 |
-| --- | --- |
-| 前端入口 | `frontend-admin/src/main.ts`、`frontend-admin/src/App.vue` |
-| 前端路由 | `frontend-admin/src/router/` |
-| 页面 | `frontend-admin/src/pages/` |
-| API 封装 | `frontend-admin/src/api/modules/` |
-| 后端入口 | `backend/src/main/java/com/cgcpms/CgcPmsApplication.java` |
-| 后端业务域 | `backend/src/main/java/com/cgcpms/` |
-| MySQL migration | `backend/src/main/resources/db/migration/` |
-| H2 migration | `backend/src/main/resources/db/migration-h2/` |
-| 部署 | `deploy/`、`docker-compose*.yml` |
+| 层级            | 现行入口                                                   |
+| --------------- | ---------------------------------------------------------- |
+| 前端入口        | `frontend-admin/src/main.ts`、`frontend-admin/src/App.vue` |
+| 前端路由        | `frontend-admin/src/router/`                               |
+| 页面            | `frontend-admin/src/pages/`                                |
+| API 封装        | `frontend-admin/src/api/modules/`                          |
+| 后端入口        | `backend/src/main/java/com/cgcpms/CgcPmsApplication.java`  |
+| 后端业务域      | `backend/src/main/java/com/cgcpms/`                        |
+| MySQL migration | `backend/src/main/resources/db/migration/`                 |
+| H2 migration    | `backend/src/main/resources/db/migration-h2/`              |
+| 部署            | `deploy/`、`docker-compose*.yml`                           |
 
 ## 当前规模快照
 
 以下是路径级粗计数，不代表完成度：
 
-| 指标 | 数量 |
-| --- | ---: |
-| 后端一级业务/技术域 | 32 |
-| Controller 文件 | 53 |
-| 前端 Vue 文件 | 129 |
-| MySQL Flyway migration | 189 |
+| 指标                   | 数量 |
+| ---------------------- | ---: |
+| 后端一级业务/技术域    |   32 |
+| Controller 文件        |   53 |
+| 前端 Vue 文件          |  129 |
+| MySQL Flyway migration |  189 |
 
 ## 业务能力地图
 
-| 业务域 | 前端证据 | 后端证据 | 测试入口示例 | 状态 | 当前缺口 |
-| --- | --- | --- | --- | --- | --- |
-| 项目与成员 | `pages/project/`、`api/modules/project.ts` | `project/` | `PmProjectControllerTest`、`ProjectOverviewServiceTest`、`ProjectLedgerProduction.test.ts` | Partial | v1.5 真实角色、项目数据范围和运行态待复验 |
-| 项目计划与施工履约 | `pages/project-schedule/`、`pages/site-daily/` | `schedule/`、`site/` | `ProjectScheduleClosedLoopIntegrationTest` | Complete(P0) | 版本化基线/月周计划、日报实绩、偏差预警、纠偏修订和 Trace 已闭环；关键路径、工作日历、多前置类型和外部计划软件属 P1+ |
-| 合同与付款条件 | `pages/contract/`、`api/modules/contract.ts` | `contract/` | `CtContractServiceTest`、`ContractApprovalIntegrationTest`、`ContractLedgerPage.test.ts` | Partial | 合同履约、金额口径和审批联动需当前复验 |
-| 变更、签证与索赔 | `pages/variation/`、`api/modules/variation.ts` | `variation/`、`contract/change/` | `VarOrderServiceTest`、`VariationClaimClosedLoopIntegrationTest`、`VariationOrderProduction.test.ts` | P0 Closed | 已贯通事件证据、双口径、内部审批、业主版本/核定、正式合同变更及下游计量追溯；P1 待增强下游明细来源展示 |
-| 成本与目标成本 | `pages/cost/`、`pages/cost-target/` | `cost/`、`revenue/`、`overhead/`、`accounting/` | `TargetCostDynamicProfitClosedLoopIntegrationTest`、`CostSummaryServiceTest`、`CostLedgerServiceTest` | Complete(P0) | 三算矩阵、责任预算、EAC、动态利润、纠偏措施和 Trace 已闭环；概率模拟、BIM量算和集团成本库属 P1+ |
-| 质量安全整改 | `pages/quality-safety/` | `quality/` | `QualitySafetyClosedLoopIntegrationTest`、`quality-safety/index.test.ts` | Complete(P0) | 计划、检查、问题、整改、复验、处罚成本与合作方评价已闭环；移动巡检、AI识别、IoT/BIM 和结算核销属 P1+ |
-| 采购与采购申请 | `pages/purchase/`、`pages/inventory/purchase-request.vue` | `purchase/` | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts` | Partial | 已完成安全阈值、人工补货目标量和自然日提前期预填；供应商级提前期、工作日历和预测仍缺失 |
-| 供应商招采与履约评价 | `pages/supplier-sourcing/`、`api/modules/supplierSourcing.ts` | `supplier/` | `SupplierSourcingClosedLoopIntegrationTest`、`supplierSourcing.test.ts` | Complete(P0) | 邀请、报价、评审、定标、合同、到货、退货、结算、履约评价和黑名单阻断已闭环；供应商门户、申诉解除和集团共享属 P1+ |
-| 收货、仓库与库存 | `pages/receipt/`、`pages/inventory/` | `receipt/`、`inventory/` | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts` | Partial | 已维护安全阈值并联动 KPI/预警；目标量、全量建议、预测和跨仓调拨仍缺 |
-| 领料 | `pages/requisition/` | `requisition/` | `MatRequisitionServiceTest`、`useRequisitionForm.test.ts` | Partial | 与计划需用量、施工部位和损耗分析尚未闭环 |
-| 分包与计量 | `pages/subcontract/` | `subcontract/` | `SubMeasureServiceTest`、`SubTaskControllerTest`、`subcontract/measure.test.ts` | Partial | 已完成单前置 FS、状态门禁、延期风险和软删除编号冲突修复；仍无多前置、多类型、自动排程和完整履约档案 |
-| 结算 | `pages/settlement/` | `settlement/` | `StlSettlementServiceTest`、`StlSettlementControllerMockMvcTest`、`settlement/index.test.ts` | Partial | 合同、变更、计量、付款汇总需当前一致性复验 |
-| 付款与资金日记账 | `pages/payment/`、`pages/cash-journal/` | `payment/`、`accounting/` | `PaymentFinancialConsistencyTest`、`PayRecordCashJournalIntegrationTest`、`payment/save-chain.test.ts` | Partial | 金额、财务回写、附件和权限需当前复验 |
-| 发票与识别 | `pages/invoice/` | `invoice/` | `InvoiceServiceTest`、`InvoiceRecognitionTest`、`invoice-pdf.test.ts` | Partial | 识别可靠性、付款关联和文件安全需当前复验 |
-| 图纸、RFI 与技术方案 | `pages/technical-management/`、`api/modules/technicalManagement.ts` | `tech/` | `TechnicalManagementClosedLoopIntegrationTest`、`technical-management/index.test.ts` | Complete(P0) | 方案、图纸版本、会审、RFI、设计回复、交底、施工引用、验收归档和 Trace 已闭环；BIM/IFC、在线批注、设计门户和 AI 审图属 P1+ |
-| 项目竣工与收尾 | `pages/project-closeout/`、`api/modules/projectCloseout.ts` | `closeout/` | `ProjectCloseoutClosedLoopIntegrationTest`、`project-closeout/index.test.ts` | Complete(P0) | 分项/竣工验收、最终结算、尾款质保金、缺陷、档案移交及项目关闭门禁已闭环；电子签章、档案馆接口和项目后评价属 P1+ |
-| 财务核算与月结 | `pages/accounting-entry/`、`pages/financial-close/` | `accounting/`、`financeclose/` | `FinancialAccountingMonthEndClosedLoopIntegrationTest`、`financial-close/index.test.ts` | Complete(P0) | 凭证复核、过账、冲销、银行/子账对账、月结检查、关账/反结账和 Trace 已闭环；多账簿、多币种、合并和税务属 P1+ |
-| 项目资金计划与现金预测 | `pages/cash-forecast/`、`api/modules/cashForecast.ts` | `cashforecast/` | `ProjectCashForecastClosedLoopIntegrationTest`、`cash-forecast/index.test.ts` | Complete(P0) | 预测版本、计划收付、缺口措施、审批、实际回写、滚动预测和 Trace 已闭环；集团资金、多币种、授信计息和概率预测属 P1+ |
-| 审批、抄送与通知 | `pages/approval/` | `workflow/`、`notification/` | `WorkflowCoreServiceTest`、`ApproverResolverTenantIntegrationTest`、`ApprovalWorkList.test.ts` | Partial | 真实角色矩阵、跨业务状态一致性待复验 |
-| 预警 | `pages/alert/` | `alert/` | `AlertEvaluationServiceTest`、`AlertControllerTest`、`AlertNotificationDispatcherTest`、`alert/index.test.ts` | Complete(P0) | 阅读、唯一接单、响应/处置双 SLA、固定两级升级、规则效果复盘、通知证据和 Trace 已闭环；失败重试、可配置升级矩阵与第三方回执属 P1+ |
-| 驾驶舱与报表 | `pages/dashboard/`、`pages/report/` | `dashboard/` | `DashboardServiceTest`、`DashboardControllerTest`、`DashboardDataLoading.test.ts` | Partial | 指标来源、下钻和不同角色数据边界待复验 |
-| 用户、角色、菜单与审计 | `pages/system/`、`api/modules/system.ts` | `auth/`、`system/`、`audit/` | `WorkflowControllerAuthTest`、`system/permissions/index.test.ts` | Partial | 不能用超级管理员替代真实角色验收 |
-| 文件 | `api/modules/file.ts` | `file/` | 现有文件安全与业务绑定测试 | Partial | 上传、病毒扫描占位和业务绑定边界需当前复验 |
+| 业务域                 | 前端证据                                                            | 后端证据                                        | 测试入口示例                                                                                                  | 状态         | 当前缺口                                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| 项目与成员             | `pages/project/`、`api/modules/project.ts`                          | `project/`                                      | `PmProjectControllerTest`、`ProjectOverviewServiceTest`、`ProjectLedgerProduction.test.ts`                    | Partial      | v1.5 真实角色、项目数据范围和运行态待复验                                                                                        |
+| 项目计划与施工履约     | `pages/project-schedule/`、`pages/site-daily/`                      | `schedule/`、`site/`                            | `ProjectScheduleClosedLoopIntegrationTest`                                                                    | Complete(P0) | 版本化基线/月周计划、日报实绩、偏差预警、纠偏修订和 Trace 已闭环；关键路径、工作日历、多前置类型和外部计划软件属 P1+             |
+| 合同与付款条件         | `pages/contract/`、`api/modules/contract.ts`                        | `contract/`                                     | `CtContractServiceTest`、`ContractApprovalIntegrationTest`、`ContractLedgerPage.test.ts`                      | Partial      | 合同履约、金额口径和审批联动需当前复验                                                                                           |
+| 变更、签证与索赔       | `pages/variation/`、`api/modules/variation.ts`                      | `variation/`、`contract/change/`                | `VarOrderServiceTest`、`VariationClaimClosedLoopIntegrationTest`、`VariationOrderProduction.test.ts`          | P0 Closed    | 已贯通事件证据、双口径、内部审批、业主版本/核定、正式合同变更及下游计量追溯；P1 待增强下游明细来源展示                           |
+| 成本与目标成本         | `pages/cost/`、`pages/cost-target/`                                 | `cost/`、`revenue/`、`overhead/`、`accounting/` | `TargetCostDynamicProfitClosedLoopIntegrationTest`、`CostSummaryServiceTest`、`CostLedgerServiceTest`         | Complete(P0) | 三算矩阵、责任预算、EAC、动态利润、纠偏措施和 Trace 已闭环；概率模拟、BIM量算和集团成本库属 P1+                                  |
+| 质量安全整改           | `pages/quality-safety/`                                             | `quality/`                                      | `QualitySafetyClosedLoopIntegrationTest`、`quality-safety/index.test.ts`                                      | Complete(P0) | 计划、检查、问题、整改、复验、处罚成本与合作方评价已闭环；移动巡检、AI识别、IoT/BIM 和结算核销属 P1+                             |
+| 采购与采购申请         | `pages/purchase/`、`pages/inventory/purchase-request.vue`           | `purchase/`                                     | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts`                         | Partial      | 已完成安全阈值、人工补货目标量和自然日提前期预填；供应商级提前期、工作日历和预测仍缺失                                           |
+| 供应商招采与履约评价   | `pages/supplier-sourcing/`、`api/modules/supplierSourcing.ts`       | `supplier/`                                     | `SupplierSourcingClosedLoopIntegrationTest`、`supplierSourcing.test.ts`                                       | Complete(P0) | 邀请、报价、评审、定标、合同、到货、退货、结算、履约评价和黑名单阻断已闭环；供应商门户、申诉解除和集团共享属 P1+                 |
+| 收货、仓库与库存       | `pages/receipt/`、`pages/inventory/`                                | `receipt/`、`inventory/`                        | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts`                                    | Partial      | 已维护安全阈值并联动 KPI/预警；目标量、全量建议、预测和跨仓调拨仍缺                                                              |
+| 领料                   | `pages/requisition/`                                                | `requisition/`                                  | `MatRequisitionServiceTest`、`useRequisitionForm.test.ts`                                                     | Partial      | 与计划需用量、施工部位和损耗分析尚未闭环                                                                                         |
+| 分包与计量             | `pages/subcontract/`                                                | `subcontract/`                                  | `SubMeasureServiceTest`、`SubTaskControllerTest`、`subcontract/measure.test.ts`                               | Partial      | 已完成单前置 FS、状态门禁、延期风险和软删除编号冲突修复；仍无多前置、多类型、自动排程和完整履约档案                              |
+| 结算                   | `pages/settlement/`                                                 | `settlement/`                                   | `StlSettlementServiceTest`、`StlSettlementControllerMockMvcTest`、`settlement/index.test.ts`                  | Partial      | 合同、变更、计量、付款汇总需当前一致性复验                                                                                       |
+| 付款与资金日记账       | `pages/payment/`、`pages/cash-journal/`                             | `payment/`、`accounting/`                       | `PaymentFinancialConsistencyTest`、`PayRecordCashJournalIntegrationTest`、`payment/save-chain.test.ts`        | Partial      | 金额、财务回写、附件和权限需当前复验                                                                                             |
+| 发票与识别             | `pages/invoice/`                                                    | `invoice/`                                      | `InvoiceServiceTest`、`InvoiceRecognitionTest`、`invoice-pdf.test.ts`                                         | Partial      | 识别可靠性、付款关联和文件安全需当前复验                                                                                         |
+| 图纸、RFI 与技术方案   | `pages/technical-management/`、`api/modules/technicalManagement.ts` | `tech/`                                         | `TechnicalManagementClosedLoopIntegrationTest`、`technical-management/index.test.ts`                          | Complete(P0) | 方案、图纸版本、会审、RFI、设计回复、交底、施工引用、验收归档和 Trace 已闭环；BIM/IFC、在线批注、设计门户和 AI 审图属 P1+        |
+| 项目竣工与收尾         | `pages/project-closeout/`、`api/modules/projectCloseout.ts`         | `closeout/`                                     | `ProjectCloseoutClosedLoopIntegrationTest`、`project-closeout/index.test.ts`                                  | Complete(P0) | 分项/竣工验收、最终结算、尾款质保金、缺陷、档案移交及项目关闭门禁已闭环；电子签章、档案馆接口和项目后评价属 P1+                  |
+| 财务核算与月结         | `pages/accounting-entry/`、`pages/financial-close/`                 | `accounting/`、`financeclose/`                  | `FinancialAccountingMonthEndClosedLoopIntegrationTest`、`financial-close/index.test.ts`                       | Complete(P0) | 凭证复核、过账、冲销、银行/子账对账、月结检查、关账/反结账和 Trace 已闭环；多账簿、多币种、合并和税务属 P1+                      |
+| 项目资金计划与现金预测 | `pages/cash-forecast/`、`api/modules/cashForecast.ts`               | `cashforecast/`                                 | `ProjectCashForecastClosedLoopIntegrationTest`、`cash-forecast/index.test.ts`                                 | Complete(P0) | 预测版本、计划收付、缺口措施、审批、实际回写、滚动预测和 Trace 已闭环；集团资金、多币种、授信计息和概率预测属 P1+                |
+| 审批、抄送与通知       | `pages/approval/`                                                   | `workflow/`、`notification/`                    | `WorkflowCoreServiceTest`、`ApproverResolverTenantIntegrationTest`、`ApprovalWorkList.test.ts`                | Partial      | 真实角色矩阵、跨业务状态一致性待复验                                                                                             |
+| 预警                   | `pages/alert/`                                                      | `alert/`                                        | `AlertEvaluationServiceTest`、`AlertControllerTest`、`AlertNotificationDispatcherTest`、`alert/index.test.ts` | Complete(P0) | 阅读、唯一接单、响应/处置双 SLA、固定两级升级、规则效果复盘、通知证据和 Trace 已闭环；失败重试、可配置升级矩阵与第三方回执属 P1+ |
+| 驾驶舱与报表           | `pages/dashboard/`、`pages/report/`                                 | `dashboard/`                                    | `DashboardServiceTest`、`DashboardControllerTest`、`DashboardDataLoading.test.ts`                             | Partial      | 指标来源、下钻和不同角色数据边界待复验                                                                                           |
+| 用户、角色、菜单与审计 | `pages/system/`、`api/modules/system.ts`                            | `auth/`、`system/`、`audit/`                    | `WorkflowControllerAuthTest`、`system/permissions/index.test.ts`                                              | Partial      | 不能用超级管理员替代真实角色验收                                                                                                 |
+| 文件                   | `api/modules/file.ts`                                               | `file/`                                         | 现有文件安全与业务绑定测试                                                                                    | Partial      | 上传、病毒扫描占位和业务绑定边界需当前复验                                                                                       |
 
 ## 角色驾驶舱地图
 
-| 角色 | 当前业务基础 | 状态 | 边界 |
-| --- | --- | --- | --- |
-| 项目经理 | 项目总览、待办、预警、审批、合同履约 | Partial | 不用经营财务图表冒充执行协同 |
-| 商务经理 | 合同、变更、成本、结算、付款、预警 | Partial | 现有成本经理语义统一为商务经理 |
-| 采购经理 | 采购、验收、库存、领料 | Partial | 不复用商务经理利润/结算主视图 |
-| 生产经理 | 验收、领料、库存、分包计量近似数据 | Partial | 不是完整进度、劳务、机械和产值驾驶舱 |
+| 角色     | 当前业务基础                                            | 状态         | 边界                                                  |
+| -------- | ------------------------------------------------------- | ------------ | ----------------------------------------------------- |
+| 项目经理 | 项目总览、待办、预警、审批、合同履约                    | Partial      | 不用经营财务图表冒充执行协同                          |
+| 商务经理 | 合同、变更、成本、结算、付款、预警                      | Partial      | 现有成本经理语义统一为商务经理                        |
+| 采购经理 | 采购、验收、库存、领料                                  | Partial      | 不复用商务经理利润/结算主视图                         |
+| 生产经理 | 验收、领料、库存、分包计量近似数据                      | Partial      | 不是完整进度、劳务、机械和产值驾驶舱                  |
 | 总工程师 | 技术方案、图纸版本、会审、RFI、设计回复、交底和验收归档 | Complete(P0) | BIM/IFC、在线批注、外部设计门户和 AI 审图仍属后续能力 |
 
 ## 数据与安全边界
 
-| 边界 | 当前规则 | 地图结论 |
-| --- | --- | --- |
-| 租户 | 后端强制隔离，Service 必须校验 | ISSUE-040-003 的第二租户与跨租户专项通过；V-04 三类真实角色浏览器正负样本通过 |
-| 项目 | 大多数业务对象的主线维度 | ISSUE-040-003 的跨项目、成员与附件项目校验通过；V-04 浏览器体验通过 |
-| 权限 | `@PreAuthorize` 是安全边界，前端隐藏仅为体验 | V-01 三类真实角色正负 API、前端 42 项与 V-04 浏览器交互通过 |
-| 审批 | 合同、变更、付款、结算等必须校验状态 | 跨业务状态一致性是高风险验收项 |
-| 金额 | 成本、合同、采购、库存、分包、付款、结算共同影响 | 任何改动必须给出来源、月份和回滚证据 |
-| 数据库 | 只新增 migration，不修改已应用脚本 | v1.5 业务候选默认优先无 migration 的最小闭环 |
+| 边界   | 当前规则                                         | 地图结论                                                                      |
+| ------ | ------------------------------------------------ | ----------------------------------------------------------------------------- |
+| 租户   | 后端强制隔离，Service 必须校验                   | ISSUE-040-003 的第二租户与跨租户专项通过；V-04 三类真实角色浏览器正负样本通过 |
+| 项目   | 大多数业务对象的主线维度                         | ISSUE-040-003 的跨项目、成员与附件项目校验通过；V-04 浏览器体验通过           |
+| 权限   | `@PreAuthorize` 是安全边界，前端隐藏仅为体验     | V-01 三类真实角色正负 API、前端 42 项与 V-04 浏览器交互通过                   |
+| 审批   | 合同、变更、付款、结算等必须校验状态             | 跨业务状态一致性是高风险验收项                                                |
+| 金额   | 成本、合同、采购、库存、分包、付款、结算共同影响 | 任何改动必须给出来源、月份和回滚证据                                          |
+| 数据库 | 只新增 migration，不修改已应用脚本               | v1.5 业务候选默认优先无 migration 的最小闭环                                  |
 
 ## 工程与实施地图
 
-| 能力 | 当前入口 | 状态 | 说明 |
-| --- | --- | --- | --- |
-| CI 门禁 | `.github/workflows/` | Partial | 本地整改与 11 项门禁映射已通过，`enforce_admins=true`、`required_conversation_resolution=true`；等待本轮整改 commit/push 后同一待合并 SHA 的远端 required checks 全绿证据 |
-| 本地运行 | `scripts/rebuild.py`、Docker Compose | Partial | ISSUE-037-001 已完成 8080、5173、dev-login health gate 与真实角色浏览器验收 |
-| 现场日报验收直达 | `DevAuthController`、`/site/daily-log` | Implemented | `ISSUE-037-008` 已补 `/site`，直达与站外/遍历安全回落均有测试和运行态证据 |
-| Ready 准入 | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1`、插件 loop runner | Implemented | 当前 Ready 可被严格解析器和插件预演识别；插件标题多行匹配已有回归保护 |
-| 候选补货 | `autopilot-refill.ps1`、知识图谱 `issues` CLI | Implemented | 先过图谱健康与 HEAD 游标门禁，再有界拉取并核实存量候选；图谱异常 fail-close，不回退文件或长期计划凑任务 |
-| 连续执行 | `autopilot-run-continuous.ps1` | Implemented | 已具备隔离执行、本地提交、上限停止、300/600 秒停滞处置、一次有限重派、第二次 blocked 和有界长命令声明 |
-| 质量归档 | `docs/quality/` | Implemented | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-021 正式验收报告 |
-| Windows MySQL 备份恢复与本机凭据轮换 | `scripts/mysql-backup.ps1`、`scripts/mysql-restore.ps1`、`deploy/.env`（忽略） | Implemented（本地） | ISSUE-040-006 已修复二进制安全问题，隔离恢复与轮换后均保留 74 表；MySQL/Redis/MinIO/JWT/Jasypt 注入、旧 JWT 失效和新登录通过。未来生产轮换由上线门禁重新验收 |
+| 能力                                 | 当前入口                                                                       | 状态                | 说明                                                                                                                                                                      |
+| ------------------------------------ | ------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CI 门禁                              | `.github/workflows/`                                                           | Partial             | 本地整改与 11 项门禁映射已通过，`enforce_admins=true`、`required_conversation_resolution=true`；等待本轮整改 commit/push 后同一待合并 SHA 的远端 required checks 全绿证据 |
+| 本地运行                             | `scripts/rebuild.py`、Docker Compose                                           | Partial             | ISSUE-037-001 已完成 8080、5173、dev-login health gate 与真实角色浏览器验收                                                                                               |
+| 现场日报验收直达                     | `DevAuthController`、`/site/daily-log`                                         | Implemented         | `ISSUE-037-008` 已补 `/site`，直达与站外/遍历安全回落均有测试和运行态证据                                                                                                 |
+| Ready 准入                           | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1`、插件 loop runner        | Implemented         | 当前 Ready 可被严格解析器和插件预演识别；插件标题多行匹配已有回归保护                                                                                                     |
+| 候选补货                             | `autopilot-refill.ps1`、知识图谱 `issues` CLI                                  | Implemented         | 先过图谱健康与 HEAD 游标门禁，再有界拉取并核实存量候选；图谱异常 fail-close，不回退文件或长期计划凑任务                                                                   |
+| 连续执行                             | `autopilot-run-continuous.ps1`                                                 | Implemented         | 已具备隔离执行、本地提交、上限停止、300/600 秒停滞处置、一次有限重派、第二次 blocked 和有界长命令声明                                                                     |
+| 质量归档                             | `docs/quality/`                                                                | Implemented         | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-021 正式验收报告                                                                                                            |
+| Windows MySQL 备份恢复与本机凭据轮换 | `scripts/mysql-backup.ps1`、`scripts/mysql-restore.ps1`、`deploy/.env`（忽略） | Implemented（本地） | ISSUE-040-006 已修复二进制安全问题，隔离恢复与轮换后均保留 74 表；MySQL/Redis/MinIO/JWT/Jasypt 注入、旧 JWT 失效和新登录通过。未来生产轮换由上线门禁重新验收              |
 
 ## 当前明确缺口
 
@@ -720,11 +729,13 @@ Docker Compose + Nginx + Actuator + Prometheus
 - 当前本地 Docker、后端和前端 health gate 及三类低权限浏览器正负样本已于 ISSUE-040-005 验证通过。
 - 五类驾驶舱角色的真实账号与数据可见范围。
 - 现有长期计划中所有“已完成”项在 v1.5 的复验状态。
+
 # 2026-07-15 增量：工作流个人效率统计入口
 
 - `ISSUE-040-034` 在既有审批工作台分析栏复用已实现的个人效率接口，按当前认证 userId、tenantId 与页面筛选展示待办、逾期待办、已办、已处理任务和平均处理分钟数；前端不提交身份或租户参数。
 - 后端 32 项、前端 13 项、类型检查、目标 ESLint、差异检查、180 秒稳定运行态与真实浏览器筛选交互通过；快速筛选的旧响应覆盖风险和窄栏标签截断均已在本轮修复复验。
 - `A-01-WORKFLOW-EFFICIENCY` 已关闭；A-01 当前守恒为有用户入口239、前端调用但无独立页面58、内部/集成/运维4、需补入口9、待废弃0、需要确认11，共321。产品候选排序不变。
+
 ## 2026-07-17 增量：财务核算与月结 P0 闭环
 
 - 会计凭证新增待复核、通过、驳回状态以及制单/复核职责分离；凭证只有复核通过且会计期间可写时才能过账，冲销改为生成可复核、可过账、与原凭证互链的反向调整凭证。

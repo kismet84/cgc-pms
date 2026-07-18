@@ -20,7 +20,7 @@ describe('CGC-PMS V2 navigation architecture', () => {
     const workspaces = navigationItems.flatMap((item) => item.children)
 
     expect(workspaces).toHaveLength(30)
-    expect(workspaces.flatMap((workspace) => workspace.tabs)).toHaveLength(54)
+    expect(workspaces.flatMap((workspace) => workspace.tabs)).toHaveLength(57)
     for (const workspace of workspaces) {
       expect(workspace.tabs.length, workspace.label).toBeGreaterThan(0)
       expect(workspace.tabs.length, workspace.label).toBeLessThanOrEqual(5)
@@ -41,6 +41,7 @@ describe('CGC-PMS V2 navigation architecture', () => {
     expect(findWorkspaceByPath('/inventory/purchase-request')?.workspace.label).toBe('采购执行')
     expect(findWorkspaceByPath('/purchase/receipt')?.workspace.label).toBe('采购执行')
     expect(findWorkspaceByPath('/cost/control')?.workspace.label).toBe('成本核算与控制')
+    expect(findWorkspaceByPath('/cost/subject/rules')?.workspace.label).toBe('成本科目中心')
     expect(findWorkspaceByPath('/approval/12345')?.workspace.label).toBe('我的工作')
     expect(findWorkspaceByPath('/approval/process')?.workspace.label).toBe('流程配置')
     expect(findWorkspaceByPath('/project/42/members')?.workspace.label).toBe('项目管理')
@@ -62,7 +63,7 @@ describe('CGC-PMS V2 navigation architecture', () => {
       .getRoutes()
       .filter((route) => route.path !== '/' && Boolean(route.components?.default))
 
-    expect(pageRoutes).toHaveLength(70)
+    expect(pageRoutes).toHaveLength(73)
     for (const route of pageRoutes) {
       expect(
         globalPaths.has(route.path) || Boolean(findWorkspaceByPath(route.path)),

@@ -10,7 +10,6 @@ import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
-import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -36,7 +35,6 @@ public class BidCostService {
     private final CostItemMapper costItemMapper;
     private final PmProjectMapper projectMapper;
     private final ProjectAccessChecker projectAccessChecker;
-    private final CostSummaryService costSummaryService;
 
     public IPage<BidCost> getPage(long pageNo, long pageSize, String bidStatus, String keyword) {
         Long tenantId = UserContext.getCurrentTenantId();
@@ -100,15 +98,8 @@ public class BidCostService {
         bid.setBidStatus("WON");
         mapper.updateById(bid);
 
-        // 费用结转：BID_COST → BID_COST_TRANSFERRED，关联项目
-        costItemMapper.update(null, new LambdaUpdateWrapper<CostItem>()
-                .eq(CostItem::getSourceType, "BID_COST")
-                .eq(CostItem::getSourceId, bidCostId)
-                .set(CostItem::getProjectId, projectId)
-                .set(CostItem::getSourceType, "BID_COST_TRANSFERRED"));
-
-        costSummaryService.refreshSummary(bid.getTenantId(), projectId);
-        log.info("投标项目中标 bidCostId={} projectId={}", bidCostId, projectId);
+        // 原投标成本事实保持不变；V2 由独立、审批通过的目标成本转入事实承担项目归集。
+        log.info("投标项目中标，等待目标成本转入 bidCostId={} projectId={}", bidCostId, projectId);
     }
 
     /**

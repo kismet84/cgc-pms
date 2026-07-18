@@ -3,22 +3,20 @@ package com.cgcpms.cost.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
-import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
-import com.cgcpms.cost.entity.CostTargetItem;
-import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
-import com.cgcpms.cost.mapper.CostTargetItemMapper;
 import com.cgcpms.cost.vo.CostSubjectTreeNodeVO;
 import com.cgcpms.cost.vo.CostSubjectVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -31,8 +29,7 @@ import java.util.stream.Collectors;
 public class CostSubjectService {
 
     private final CostSubjectMapper costSubjectMapper;
-    private final CostItemMapper costItemMapper;
-    private final CostTargetItemMapper costTargetItemMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public List<CostSubjectTreeNodeVO> getTree(String accountCategory) {
         LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
@@ -181,8 +178,10 @@ public class CostSubjectService {
             throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
         }
 
-        // Toggle between ENABLE and DISABLE
         String newStatus = "ENABLE".equals(existing.getStatus()) ? "DISABLE" : "ENABLE";
+        if ("DISABLE".equals(newStatus)) {
+            assertNoActiveReferences(id, existing.getTenantId(), "停用");
+        }
         existing.setStatus(newStatus);
         costSubjectMapper.updateById(existing);
     }
@@ -206,25 +205,7 @@ public class CostSubjectService {
             throw new BusinessException("HAS_CHILDREN", "该科目下存在子科目，无法删除");
         }
 
-        // Check no cost item references exist (exclude soft-deleted items)
-        long costItemCount = costItemMapper.selectCount(
-                new LambdaQueryWrapper<CostItem>()
-                        .eq(CostItem::getCostSubjectId, id)
-                        .eq(CostItem::getDeletedFlag, 0));
-        if (costItemCount > 0) {
-            throw new BusinessException("COST_SUBJECT_REFERENCED",
-                    "该成本科目被 " + costItemCount + " 条成本明细引用，无法删除");
-        }
-
-        // Check no cost target item references exist (exclude soft-deleted items)
-        long targetItemCount = costTargetItemMapper.selectCount(
-                new LambdaQueryWrapper<CostTargetItem>()
-                        .eq(CostTargetItem::getCostSubjectId, id)
-                        .eq(CostTargetItem::getDeletedFlag, 0));
-        if (targetItemCount > 0) {
-            throw new BusinessException("COST_SUBJECT_REFERENCED",
-                    "该成本科目被 " + targetItemCount + " 条目标成本明细引用，无法删除");
-        }
+        assertNoActiveReferences(id, existing.getTenantId(), "删除");
 
         // 检查是否已存在相同编码的已删除记录，避免唯一键冲突
         long existingDeletedCount = costSubjectMapper.selectCount(
@@ -238,6 +219,54 @@ public class CostSubjectService {
             costSubjectMapper.updateById(existing);
         }
         costSubjectMapper.deleteById(id);
+    }
+
+    private void assertNoActiveReferences(Long subjectId, Long tenantId, String action) {
+        Map<String, Long> referenceCounts = new LinkedHashMap<>();
+        referenceCounts.put("成本明细", countReference(
+                "SELECT COUNT(*) FROM cost_item WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
+        referenceCounts.put("目标成本明细", countReference(
+                "SELECT COUNT(*) FROM cost_target_item WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
+        referenceCounts.put("完工成本预测", countReference(
+                "SELECT COUNT(*) FROM cost_forecast_item WHERE tenant_id=? AND cost_subject_id=?", tenantId, subjectId));
+        referenceCounts.put("项目预算明细", countReference(
+                "SELECT COUNT(*) FROM project_budget_line WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
+        referenceCounts.put("付款申请", countReference(
+                "SELECT COUNT(*) FROM pay_application WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
+        referenceCounts.put("费用申请", countReference(
+                "SELECT COUNT(*) FROM expense_application WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
+        referenceCounts.put("结算明细", countReference(
+                "SELECT COUNT(*) FROM stl_settlement_item WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
+        referenceCounts.put("会计凭证明细", countReference(
+                "SELECT COUNT(*) FROM accounting_entry_line WHERE tenant_id=? AND cost_subject_id=?", tenantId, subjectId));
+        referenceCounts.put("V2历史映射", countReference(
+                "SELECT COUNT(*) FROM cost_subject_mapping_item WHERE tenant_id=? AND (source_subject_id=? OR target_subject_id=?)", tenantId, subjectId));
+        referenceCounts.put("V2归集规则", countReference(
+                "SELECT COUNT(*) FROM cost_subject_assignment_rule WHERE tenant_id=? AND cost_subject_id=?", tenantId, subjectId));
+        referenceCounts.put("项目适用范围", countReference(
+                "SELECT COUNT(*) FROM project_cost_subject_scope WHERE tenant_id=? AND cost_subject_id=?", tenantId, subjectId));
+        referenceCounts.put("质量安全后果", countReference(
+                "SELECT COUNT(*) FROM qs_consequence WHERE tenant_id=? AND cost_subject_id=? AND deleted_flag=0", tenantId, subjectId));
+        referenceCounts.put("财务费用分摊", countReference(
+                "SELECT COUNT(*) FROM finance_cost_allocation_batch WHERE tenant_id=? AND cost_subject_id=?", tenantId, subjectId));
+
+        List<String> references = referenceCounts.entrySet().stream()
+                .filter(entry -> entry.getValue() > 0)
+                .map(entry -> entry.getKey() + entry.getValue() + "条")
+                .toList();
+        if (!references.isEmpty()) {
+            throw new BusinessException("COST_SUBJECT_REFERENCED",
+                    "该成本科目被" + String.join("、", references) + "引用，无法" + action);
+        }
+    }
+
+    private long countReference(String sql, Long tenantId, Long subjectId) {
+        int placeholders = sql.length() - sql.replace("?", "").length();
+        Object[] args = placeholders == 3
+                ? new Object[]{tenantId, subjectId, subjectId}
+                : new Object[]{tenantId, subjectId};
+        Long count = jdbcTemplate.queryForObject(sql, Long.class, args);
+        return count == null ? 0L : count;
     }
 
     private void validateParentForSave(CostSubject subject, Long currentId) {

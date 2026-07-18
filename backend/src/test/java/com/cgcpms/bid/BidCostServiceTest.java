@@ -149,7 +149,7 @@ class BidCostServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("markAsWon → 关联项目、结转费用并刷新状态")
+    @DisplayName("markAsWon → 仅关联项目，原投标成本事实保持不变")
     void testMarkAsWon_Success() {
         BidCost bid = new BidCost();
         bid.setBidProjectName("中标项目");
@@ -167,7 +167,7 @@ class BidCostServiceTest {
                 .eq(CostItem::getSourceId, id));
         assertNotNull(item);
         assertEquals(PROJECT_ID, item.getProjectId());
-        assertEquals("BID_COST_TRANSFERRED", item.getSourceType());
+        assertEquals("BID_COST", item.getSourceType());
 
         BusinessException repeat = assertThrows(
                 BusinessException.class,
@@ -178,7 +178,7 @@ class BidCostServiceTest {
                         .eq(CostItem::getTenantId, TENANT_ID)
                         .eq(CostItem::getSourceType, "BID_COST_TRANSFERRED")
                         .eq(CostItem::getSourceId, id));
-        assertEquals(1L, transferredCount);
+        assertEquals(0L, transferredCount);
     }
 
     @Test

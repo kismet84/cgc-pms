@@ -30,6 +30,7 @@ public class QualityConsequence extends BaseEntity {
     private BigDecimal evaluationScore;
     private String evaluationComment;
     private String status;
+    @JsonSerialize(using = ToStringSerializer.class) private Long costSubjectId;
     @JsonSerialize(using = ToStringSerializer.class) private Long costItemId;
     @JsonSerialize(using = ToStringSerializer.class) private Long evaluationId;
     @JsonSerialize(using = ToStringSerializer.class) private Long postedBy;

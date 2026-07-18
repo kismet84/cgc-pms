@@ -32,6 +32,8 @@ class QualitySafetyClosedLoopIntegrationTest {
     private static final long PARTNER = 99188002L;
     private static final long CONTRACT = 99188003L;
     private static final long SUBJECT = 99188004L;
+    private static final long MAPPING_VERSION = 99188005L;
+    private static final long ASSIGNMENT_RULE = 99188006L;
     private static final AtomicLong FILE_ID = new AtomicLong(99188100L);
 
     @Autowired QualitySafetyService service;
@@ -47,6 +49,8 @@ class QualitySafetyClosedLoopIntegrationTest {
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'QS-SUP','测试供应商','SUPPLIER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", PARTNER);
         jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'QS-PO','测试采购合同','PURCHASE',?,?,10000,10000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACT, PROJECT, PARTNER, PARTNER);
         jdbc.update("INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,created_at,updated_at,deleted_flag) VALUES(?,0,0,'QS-COST','质量安全返工','质量安全','COST',1,1,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", SUBJECT);
+        jdbc.update("INSERT INTO cost_subject_mapping_version(id,tenant_id,version_code,version_name,status,effective_date,created_by) VALUES(?,0,'QS-TEST-V2','质量安全测试映射','ACTIVE',CURRENT_DATE,1)", MAPPING_VERSION);
+        jdbc.update("INSERT INTO cost_subject_assignment_rule(id,tenant_id,mapping_version_id,rule_code,source_type,business_category,project_id,cost_subject_id,priority,status,effective_from,created_by) VALUES(?,0,?,'QS-REWORK','QUALITY_SAFETY_CONSEQUENCE','SAFETY',NULL,?,1,'ACTIVE',CURRENT_DATE,1)", ASSIGNMENT_RULE, MAPPING_VERSION, SUBJECT);
     }
 
     @AfterEach
@@ -89,6 +93,7 @@ class QualitySafetyClosedLoopIntegrationTest {
         consequence = service.postConsequence(consequence.getId());
         assertEquals("POSTED", consequence.getStatus());
         assertNotNull(consequence.getCostItemId());
+        assertEquals(SUBJECT, consequence.getCostSubjectId());
         assertNotNull(consequence.getEvaluationId());
         assertEquals(0, new BigDecimal("500.00").compareTo(jdbc.queryForObject(
                 "SELECT amount FROM cost_item WHERE id=?", BigDecimal.class, consequence.getCostItemId())));
@@ -207,6 +212,8 @@ class QualitySafetyClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM qs_inspection_plan WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM ct_contract WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM md_partner WHERE id=?", PARTNER);
+        jdbc.update("DELETE FROM cost_subject_assignment_rule WHERE id=?", ASSIGNMENT_RULE);
+        jdbc.update("DELETE FROM cost_subject_mapping_version WHERE id=?", MAPPING_VERSION);
         jdbc.update("DELETE FROM cost_subject WHERE id=?", SUBJECT);
         jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT);
     }

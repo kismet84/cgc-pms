@@ -1,7 +1,6 @@
 package com.cgcpms.cost.strategy;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -12,20 +11,8 @@ import org.springframework.stereotype.Component;
  * Shared utility for resolving default cost subject IDs.
  * Extracted from 4 CostStrategy implementations to eliminate duplication.
  *
- * <p>Resolution strategy (3-tier fallback):
- * <ol>
- *   <li>Match by subject_type (e.g. "合同", "分包", "材料")</li>
- *   <li>Fallback: any root-level subject (parent_id = 0)</li>
- *   <li>Last resort: any enabled subject</li>
- * </ol>
- *
- * <p>CT_CHANGE variant (4-tier fallback):
- * <ol>
- *   <li>Match "变更" subject_type</li>
- *   <li>Fallback: "合同" subject_type</li>
- *   <li>Fallback: root-level subject</li>
- *   <li>Last resort: any enabled subject</li>
- * </ol>
+ * <p>Only an exact, enabled leaf {@code subject_type} match is returned. Missing mappings remain
+ * unclassified instead of being silently assigned to a parent, root or unrelated enabled subject.
  */
 @Slf4j
 @Component
@@ -36,109 +23,29 @@ public class CostSubjectResolver {
 
     /**
      * Resolve a default cost_subject_id for the given tenant by subject_type.
-     * 3-tier fallback: subject_type match → root-level → any enabled → null.
+     * Exact leaf subject_type match only. Missing mappings return null for upstream handling.
      *
      * @param tenantId    the tenant ID
      * @param subjectType the subject type to match (e.g. "合同", "分包", "材料")
      * @return the resolved subject ID, or null if no subject exists
      */
     public Long resolveDefaultSubjectId(Long tenantId, String subjectType) {
-        LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getSubjectType, subjectType);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getLevel);
-        Page<CostSubject> page1 = new Page<>(0, 1);
-        Page<CostSubject> result1 = costSubjectMapper.selectPage(page1, wrapper);
-        CostSubject subject = result1.getRecords().isEmpty() ? null : result1.getRecords().get(0);
-        if (subject != null) {
-            return subject.getId();
+        Long subjectId = findSubjectByType(tenantId, subjectType);
+        if (subjectId == null) {
+            log.warn("未配置 subject_type={} 的启用成本科目，保留待归类状态", subjectType);
         }
-
-        // Fallback: root-level subject
-        wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getParentId, 0L);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getSortOrder);
-        Page<CostSubject> page2 = new Page<>(0, 1);
-        Page<CostSubject> result2 = costSubjectMapper.selectPage(page2, wrapper);
-        subject = result2.getRecords().isEmpty() ? null : result2.getRecords().get(0);
-        if (subject != null) {
-            log.warn("未找到 subject_type={} 对应的科目，使用根科目 subjectId={}", subjectType, subject.getId());
-            return subject.getId();
-        }
-
-        // Last resort: any enabled subject
-        wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getLevel, CostSubject::getSortOrder);
-        Page<CostSubject> page3 = new Page<>(0, 1);
-        Page<CostSubject> result3 = costSubjectMapper.selectPage(page3, wrapper);
-        subject = result3.getRecords().isEmpty() ? null : result3.getRecords().get(0);
-        if (subject != null) {
-            log.warn("未找到 subject_type={} 对应的科目且无根科目，使用第一个可用科目 subjectId={}", subjectType, subject.getId());
-            return subject.getId();
-        }
-
-        log.error("租户 {} 下无任何启用科目，costSubjectId 将为 null，cost_type={}", tenantId, subjectType);
-        return null;
+        return subjectId;
     }
 
     /**
      * Resolve a cost_subject_id for CT_CHANGE source type.
-     * 4-tier fallback: "变更" → "合同" → root-level → any enabled → null.
+     * Exact "变更" subject_type match only.
      *
      * @param tenantId the tenant ID
      * @return the resolved subject ID, or null if no subject exists
      */
     public Long resolveForChange(Long tenantId) {
-        // 1. Try "变更" subject type
-        Long id = findSubjectByType(tenantId, "变更");
-        if (id != null) return id;
-
-        // 2. Fallback: "合同" subject type (contract default)
-        id = findSubjectByType(tenantId, "合同");
-        if (id != null) {
-            log.warn("未找到 subject_type=变更 对应的科目，使用合同科目 subjectId={}", id);
-            return id;
-        }
-
-        // 3. Fallback: root-level subject
-        LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getParentId, 0L);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getSortOrder);
-        Page<CostSubject> page4 = new Page<>(0, 1);
-        Page<CostSubject> result4 = costSubjectMapper.selectPage(page4, wrapper);
-        CostSubject subject = result4.getRecords().isEmpty() ? null : result4.getRecords().get(0);
-        if (subject != null) {
-            log.warn("未找到 subject_type=变更/合同 对应的科目，使用根科目 subjectId={}", subject.getId());
-            return subject.getId();
-        }
-
-        // 4. Last resort: any enabled subject
-        wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(CostSubject::getTenantId, tenantId);
-        wrapper.eq(CostSubject::getStatus, "ENABLE");
-        wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getLevel, CostSubject::getSortOrder);
-        Page<CostSubject> page5 = new Page<>(0, 1);
-        Page<CostSubject> result5 = costSubjectMapper.selectPage(page5, wrapper);
-        subject = result5.getRecords().isEmpty() ? null : result5.getRecords().get(0);
-        if (subject != null) {
-            log.warn("未找到 subject_type=变更/合同 对应的科目且无根科目，使用第一个可用科目 subjectId={}", subject.getId());
-            return subject.getId();
-        }
-
-        log.error("租户 {} 下无任何启用科目，costSubjectId 将为 null，source_type=CT_CHANGE", tenantId);
-        return null;
+        return resolveDefaultSubjectId(tenantId, "变更");
     }
 
     /**
@@ -150,10 +57,14 @@ public class CostSubjectResolver {
         wrapper.eq(CostSubject::getSubjectType, subjectType);
         wrapper.eq(CostSubject::getStatus, "ENABLE");
         wrapper.eq(CostSubject::getDeletedFlag, 0);
-        wrapper.orderByAsc(CostSubject::getLevel);
-        Page<CostSubject> page6 = new Page<>(0, 1);
-        Page<CostSubject> result6 = costSubjectMapper.selectPage(page6, wrapper);
-        CostSubject subject = result6.getRecords().isEmpty() ? null : result6.getRecords().get(0);
-        return subject != null ? subject.getId() : null;
+        wrapper.orderByDesc(CostSubject::getLevel, CostSubject::getSortOrder, CostSubject::getId);
+        return costSubjectMapper.selectList(wrapper).stream()
+                .filter(subject -> costSubjectMapper.selectCount(new LambdaQueryWrapper<CostSubject>()
+                        .eq(CostSubject::getTenantId, tenantId)
+                        .eq(CostSubject::getParentId, subject.getId())
+                        .eq(CostSubject::getDeletedFlag, 0)) == 0)
+                .map(CostSubject::getId)
+                .findFirst()
+                .orElse(null);
     }
 }

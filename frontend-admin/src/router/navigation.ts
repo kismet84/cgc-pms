@@ -314,9 +314,23 @@ export const navigationItems: NavigationItem[] = [
       },
       {
         key: '/master-data/finance',
-        label: '财务主数据',
-        defaultPath: '/cost/subject',
-        tabs: [{ key: '/cost/subject', label: '成本科目', permission: 'cost:query' }],
+        label: '成本科目中心',
+        defaultPath: '/cost/subject/taxonomy',
+        matchPrefixes: ['/cost/subject'],
+        tabs: [
+          { key: '/cost/subject/taxonomy', label: '科目体系', permission: 'cost:query' },
+          { key: '/cost/subject/rules', label: '归集规则', permission: 'cost:subject:rule:query' },
+          {
+            key: '/cost/subject/scope',
+            label: '项目适用与目标成本',
+            permission: 'cost:subject:scope:query',
+          },
+          {
+            key: '/cost/subject/trace',
+            label: '影响与转入追踪',
+            permission: 'cost:subject:audit:query',
+          },
+        ],
       },
     ],
   },
