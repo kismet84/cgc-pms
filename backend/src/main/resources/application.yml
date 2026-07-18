@@ -50,6 +50,22 @@ rate-limit:
     max-requests: 120
     window-seconds: 60
 
+# Business document generation stays off until tenant-scoped dev/test canary approval.
+document:
+  generation:
+    enabled: ${DOCUMENT_GENERATION_ENABLED:false}
+    payment-enabled: ${DOCUMENT_PAYMENT_GENERATION_ENABLED:false}
+    settlement-enabled: ${DOCUMENT_SETTLEMENT_GENERATION_ENABLED:false}
+    max-template-bytes: ${DOCUMENT_MAX_TEMPLATE_BYTES:524288}
+    max-collection-items: ${DOCUMENT_MAX_COLLECTION_ITEMS:200}
+    max-image-bytes: ${DOCUMENT_MAX_IMAGE_BYTES:1048576}
+    max-total-image-bytes: ${DOCUMENT_MAX_TOTAL_IMAGE_BYTES:3145728}
+    max-pdf-bytes: ${DOCUMENT_MAX_PDF_BYTES:20971520}
+    max-pages: ${DOCUMENT_MAX_PAGES:100}
+    timeout-seconds: ${DOCUMENT_RENDER_TIMEOUT_SECONDS:15}
+    concurrency: ${DOCUMENT_RENDER_CONCURRENCY:2}
+    queue-capacity: ${DOCUMENT_RENDER_QUEUE_CAPACITY:2}
+
 resilience4j:
   circuitbreaker:
     instances:

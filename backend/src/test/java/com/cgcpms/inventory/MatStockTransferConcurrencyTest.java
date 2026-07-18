@@ -38,7 +38,6 @@ class MatStockTransferConcurrencyTest {
 
     @BeforeEach
     void seed() {
-        createTransferTable();
         cleanup();
         jdbc.update("INSERT INTO mat_warehouse (id,tenant_id,project_id,warehouse_code,warehouse_name,status,deleted_flag) VALUES (?,?,10001,?,?, 'ENABLE',0)", SOURCE_WAREHOUSE, 0L, "WH-CONC-S", "并发来源仓");
         jdbc.update("INSERT INTO mat_warehouse (id,tenant_id,project_id,warehouse_code,warehouse_name,status,deleted_flag) VALUES (?,?,10001,?,?, 'ENABLE',0)", TARGET_WAREHOUSE, 0L, "WH-CONC-T", "并发目标仓");
@@ -133,17 +132,4 @@ class MatStockTransferConcurrencyTest {
         return dto;
     }
 
-    private void createTransferTable() {
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS mat_stock_transfer (
-                    id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL, project_id BIGINT NOT NULL,
-                    source_stock_id BIGINT NOT NULL, target_stock_id BIGINT NOT NULL,
-                    source_warehouse_id BIGINT NOT NULL, target_warehouse_id BIGINT NOT NULL, material_id BIGINT NOT NULL,
-                    quantity DECIMAL(18,4) NOT NULL, unit_cost DECIMAL(18,6) NOT NULL,
-                    amount DECIMAL(18,2) NOT NULL, idempotency_key VARCHAR(100) NOT NULL,
-                    status VARCHAR(20) NOT NULL, completed_at TIMESTAMP, created_by BIGINT, created_at TIMESTAMP,
-                    updated_by BIGINT, updated_at TIMESTAMP, deleted_flag TINYINT DEFAULT 0,
-                    remark VARCHAR(500), UNIQUE (tenant_id, idempotency_key))
-                """);
-    }
 }

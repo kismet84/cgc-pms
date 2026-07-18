@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, h, ref, watch, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { navigationItems, type NavigationItem } from '@/router/navigation'
-import { useUserStore } from '@/stores/user'
+import {
+  findWorkspaceByPath,
+  navigationItems,
+  type NavigationItem,
+  type NavigationWorkspace,
+} from '@/router/navigation'
+import { useNavigationAccess } from '@/composables/useNavigationAccess'
 import {
   AccountBookOutlined,
   AuditOutlined,
@@ -18,6 +23,7 @@ import {
 interface MenuItem {
   key: string
   label: string
+  targetPath: string
   icon?: () => ReturnType<typeof h>
   children?: MenuItem[]
 }
@@ -36,45 +42,37 @@ const iconMap: Record<string, Component> = {
 
 const route = useRoute()
 const router = useRouter()
-const userStore = useUserStore()
+const { getVisibleTabs } = useNavigationAccess()
 
 const props = defineProps<{
   collapsed?: boolean
 }>()
 
-const isAdmin = computed(() => {
-  return userStore.roles.includes('ADMIN') || userStore.roles.includes('SUPER_ADMIN')
-})
-
-function isMenuVisible(item: Pick<NavigationItem, 'adminOnly' | 'permission'>) {
-  if (item.adminOnly && userStore.roles.length > 0 && !isAdmin.value) return false
-  if (
-    item.permission &&
-    userStore.roles.length > 0 &&
-    !isAdmin.value &&
-    !userStore.hasPermission(item.permission)
-  )
-    return false
-  return true
+function buildWorkspaceMenuItem(workspace: NavigationWorkspace): MenuItem | undefined {
+  const visibleTabs = getVisibleTabs(workspace)
+  if (!visibleTabs.length) return undefined
+  return {
+    key: workspace.key,
+    label: workspace.label,
+    targetPath:
+      visibleTabs.find((tab) => tab.key === workspace.defaultPath)?.key || visibleTabs[0].key,
+  }
 }
 
 function buildMenuItem(navigation: NavigationItem): MenuItem | undefined {
-  if (!isMenuVisible(navigation)) return undefined
+  const children = navigation.children
+    .map((workspace) => buildWorkspaceMenuItem(workspace))
+    .filter(Boolean) as MenuItem[]
+  if (!children.length) return undefined
 
   const iconName = navigation.icon
-  const item: MenuItem = {
+  return {
     key: navigation.key,
     label: navigation.label,
+    targetPath: children[0].targetPath,
     icon: iconName && iconMap[iconName] ? () => h(iconMap[iconName]) : undefined,
+    children,
   }
-
-  if (navigation.children?.length) {
-    item.children = navigation.children
-      .map((child) => buildMenuItem(child))
-      .filter(Boolean) as MenuItem[]
-  }
-
-  return item.children?.length || !navigation.children?.length ? item : undefined
 }
 
 const menuItems = computed(() => {
@@ -82,28 +80,14 @@ const menuItems = computed(() => {
 })
 
 const selectedKeys = computed(() => {
-  const child = navigationItems
-    .flatMap((item) => item.children || [])
-    .filter((item) => isMenuVisible(item))
-    .find((item) => route.path === item.key || route.path.startsWith(`${item.key}/`))
-
-  if (child) return [child.key]
-
-  const parent = navigationItems.find((item) =>
-    item.matchPrefixes?.some(
-      (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
-    ),
-  )
-  return parent ? [parent.key] : [route.path]
+  const match = findWorkspaceByPath(route.path)
+  if (match && getVisibleTabs(match.workspace).length) return [match.workspace.key]
+  return [route.path]
 })
 
 function computeOpenKeys(): string[] {
-  const parent = navigationItems.find((item) =>
-    item.matchPrefixes?.some(
-      (prefix) => route.path === prefix || route.path.startsWith(`${prefix}/`),
-    ),
-  )
-  return parent ? [parent.key] : []
+  const match = findWorkspaceByPath(route.path)
+  return match && getVisibleTabs(match.workspace).length ? [match.domain.key] : []
 }
 
 const openKeys = ref<string[]>(computeOpenKeys())
@@ -119,14 +103,17 @@ watch(
 function handleMenuClick({ key }: { key: string }) {
   const target = String(key)
   const rootItem = menuItems.value.find((item) => item.key === target)
-  const nextTarget = rootItem?.children?.[0]?.key || target
+  const workspaceItem = menuItems.value
+    .flatMap((item) => item.children || [])
+    .find((item) => item.key === target)
+  const nextTarget = workspaceItem?.targetPath || rootItem?.targetPath || target
   if (nextTarget.startsWith('/')) {
     router.push(nextTarget)
   }
 }
 
 function handleSectionClick(item: MenuItem) {
-  const target = item.children?.[0]?.key || item.key
+  const target = item.targetPath
   if (target.startsWith('/')) {
     router.push(target)
   }

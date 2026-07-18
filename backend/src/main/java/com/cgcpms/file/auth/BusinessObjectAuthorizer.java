@@ -94,6 +94,18 @@ public class BusinessObjectAuthorizer {
                 "file:query", "cashbook:journal:query");
     }
 
+    /** Business-query half of the generated-document permission intersection. */
+    public void checkGeneratedDocumentAccess(String businessType, Long businessId) {
+        String upper = businessType == null ? "" : businessType.toUpperCase();
+        String authority = switch (upper) {
+            case "PAYMENT" -> "payment:app:query";
+            case "SETTLEMENT" -> "settlement:query";
+            default -> throw new BusinessException("DOCUMENT_BUSINESS_TYPE_INVALID",
+                    "仅支持付款申请或结算单文档");
+        };
+        checkAccess(upper, businessId, "读取生成文档", false, authority, authority);
+    }
+
     /**
      * 验证当前用户对指定业务对象拥有附件上传权限。
      */

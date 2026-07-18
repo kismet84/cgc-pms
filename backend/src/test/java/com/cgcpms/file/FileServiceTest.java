@@ -27,6 +27,8 @@ import org.springframework.test.util.AopTestUtils;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.net.ConnectException;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -598,6 +600,40 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("delete rejects immutable generated documents before authorization and storage side effects")
+    void testDeleteRejectsGeneratedDocument() {
+        SysFile file = insertFile("PAYMENT", 30012L, TestUserContext.TENANT_0,
+                "generated.pdf", "application/pdf");
+        file.setDocumentType("GENERATED_DOCUMENT");
+        sysFileMapper.updateById(file);
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> fileService.delete(file.getId()));
+
+        assertEquals("FILE_IMMUTABLE", ex.getCode());
+        assertNotNull(sysFileMapper.selectById(file.getId()));
+        verify(authorizer, never()).checkDeleteAccess(any(), any());
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
+    @DisplayName("archive stores a server-generated PDF with immutable document type and verified hash")
+    void testArchiveGeneratedPdf() throws Exception {
+        byte[] pdf = "%PDF-1.7\nminimal-generated-pdf".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+        String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(pdf));
+
+        FileService.GeneratedFileArchive archive = fileService.archiveGeneratedPdf(
+                pdf, "PAYMENT", 30013L, "DOC-TEST-30013", hash);
+
+        SysFile stored = sysFileMapper.selectById(archive.fileId());
+        assertNotNull(stored);
+        assertEquals("GENERATED_DOCUMENT", stored.getDocumentType());
+        assertEquals("application/pdf", stored.getContentType());
+        assertEquals(FileVirusScanStatus.CLEAN.name(), stored.getVirusScanStatus());
+        assertEquals(hash, archive.sha256());
+        verify(minioClient).putObject(any(PutObjectArgs.class));
+    }
+
+    @Test
     @DisplayName("delete keeps physical object and metadata when logical delete affects no row")
     void testDeleteKeepsObjectWhenLogicalDeleteFails() throws Exception {
         SysFile file = insertFile("CONTRACT", 30009L, TestUserContext.TENANT_0,
@@ -657,6 +693,7 @@ class FileServiceTest {
         var args = org.mockito.ArgumentCaptor.forClass(GetPresignedObjectUrlArgs.class);
         verify(minioClient).getPresignedObjectUrl(args.capture());
         assertEquals(Method.GET, args.getValue().method());
+        assertEquals("us-east-1", args.getValue().region());
         assertEquals(5 * 60, args.getValue().expiry());
         assertTrue(args.getValue().extraQueryParams()
                 .get("response-content-type")

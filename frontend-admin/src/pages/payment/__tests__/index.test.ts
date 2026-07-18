@@ -10,6 +10,11 @@ const mocks = vi.hoisted(() => ({
   warning: vi.fn(),
   writeback: vi.fn(),
   getCashJournalList: vi.fn(),
+  getFundAccounts: vi.fn().mockResolvedValue([]),
+  fetchProjects: vi.fn().mockResolvedValue([]),
+  fetchContracts: vi.fn().mockResolvedValue([]),
+  fetchPartners: vi.fn().mockResolvedValue([]),
+  fetchDictData: vi.fn(),
   routeQuery: {} as Record<string, string>,
   roles: ['USER'] as string[],
   permissions: new Set<string>(),
@@ -39,9 +44,9 @@ vi.mock('@/stores/user', () => ({
 
 vi.mock('@/stores/reference', () => ({
   useReferenceStore: () => ({
-    fetchProjects: vi.fn().mockResolvedValue([]),
-    fetchContracts: vi.fn().mockResolvedValue([]),
-    fetchPartners: vi.fn().mockResolvedValue([]),
+    fetchProjects: mocks.fetchProjects,
+    fetchContracts: mocks.fetchContracts,
+    fetchPartners: mocks.fetchPartners,
   }),
 }))
 
@@ -75,18 +80,7 @@ vi.mock('@/api/modules/payment', () => ({
 
 vi.mock('@/api/modules/cashbook', () => ({
   getCashJournalList: mocks.getCashJournalList,
-  getFundAccounts: vi.fn().mockResolvedValue([
-    {
-      id: 'account-1',
-      accountCode: 'BANK-001',
-      accountName: '基本户',
-      accountType: 'BANK',
-      openingDate: '2026-01-01',
-      openingBalance: '1000.00',
-      enabledFlag: 1,
-      version: 0,
-    },
-  ]),
+  getFundAccounts: mocks.getFundAccounts,
 }))
 vi.mock('@/api/modules/budget', () => ({
   getBudgetList: vi.fn().mockResolvedValue({ records: [] }),
@@ -94,7 +88,7 @@ vi.mock('@/api/modules/budget', () => ({
 }))
 vi.mock('@/api/modules/file', () => ({ uploadFile: vi.fn() }))
 vi.mock('@/utils/dict', () => ({
-  fetchDictData: vi.fn(),
+  fetchDictData: mocks.fetchDictData,
   getDictLabelSync: (_code: string, value: string) => value,
   getDictTagColorSync: () => 'default',
 }))
@@ -209,6 +203,24 @@ describe('payment page quality guardrails', () => {
     expect(source).toContain('<PaymentOverviewPanel')
     expect(source).toContain('<PaymentFormModal')
   })
+
+  it('does not request protected reference data without matching permissions', async () => {
+    mocks.roles = ['FINANCE']
+    mocks.permissions = new Set(['payment:app:query', 'document:generate'])
+    mocks.fetchProjects.mockClear()
+    mocks.fetchContracts.mockClear()
+    mocks.fetchPartners.mockClear()
+    mocks.fetchDictData.mockClear()
+    mocks.getFundAccounts.mockClear()
+
+    await mountPaymentPage()
+
+    expect(mocks.fetchProjects).not.toHaveBeenCalled()
+    expect(mocks.fetchContracts).not.toHaveBeenCalled()
+    expect(mocks.fetchPartners).not.toHaveBeenCalled()
+    expect(mocks.fetchDictData).not.toHaveBeenCalled()
+    expect(mocks.getFundAccounts).not.toHaveBeenCalled()
+  })
 })
 
 describe('payment writeback result boundaries', () => {
@@ -218,6 +230,19 @@ describe('payment writeback result boundaries', () => {
     mocks.warning.mockReset()
     mocks.writeback.mockReset()
     mocks.getCashJournalList.mockReset()
+    mocks.getFundAccounts.mockReset()
+    mocks.getFundAccounts.mockResolvedValue([
+      {
+        id: 'account-1',
+        accountCode: 'BANK-001',
+        accountName: '基本户',
+        accountType: 'BANK',
+        openingDate: '2026-01-01',
+        openingBalance: '1000.00',
+        enabledFlag: 1,
+        version: 0,
+      },
+    ])
     mocks.routeQuery = {}
     mocks.roles = ['USER']
     mocks.permissions = new Set(['cashbook:journal:query'])

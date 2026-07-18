@@ -20,6 +20,12 @@ import {
 import { getCashJournalList, getFundAccounts } from '@/api/modules/cashbook'
 import { getBudgetDetail, getBudgetList } from '@/api/modules/budget'
 import { uploadFile } from '@/api/modules/file'
+import {
+  generateBusinessDocument,
+  getBusinessDocumentDownloadUrl,
+  getBusinessDocumentHistory,
+  previewBusinessDocument,
+} from '@/api/modules/document'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 import {
   readPositiveIntQuery,
@@ -39,6 +45,7 @@ import type {
 } from '@/types/payment'
 import type { CashJournalEntryVO, FundAccountVO } from '@/types/cashbook'
 import type { BudgetLineVO } from '@/types/budget'
+import type { DocumentGeneration } from '@/types/document'
 import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 import { APPROVAL_STATUS_COLOR, APPROVAL_STATUS_LABEL, PAYMENT_GRID_COLUMNS } from './pageConfig'
 import PaymentFormModal from './components/PaymentFormModal.vue'
@@ -46,6 +53,7 @@ import PaymentOverviewPanel from './components/PaymentOverviewPanel.vue'
 
 // 字典常量 - 审批状态
 const APPROVAL_DRAFT = 'DRAFT'
+const APPROVAL_APPROVING = 'APPROVING'
 const APPROVAL_APPROVED = 'APPROVED'
 
 // 字典常量 - 付款状态
@@ -75,12 +83,38 @@ const queryReady = ref(false)
 const referenceStore = useReferenceStore()
 const userStore = useUserStore()
 const { projects, contracts } = storeToRefs(referenceStore)
-const canViewCashJournal = computed(
-  () =>
-    userStore.roles.includes('ADMIN') ||
-    userStore.roles.includes('SUPER_ADMIN') ||
-    userStore.hasPermission('cashbook:journal:query'),
+const isPrivileged = computed(
+  () => userStore.roles.includes('ADMIN') || userStore.roles.includes('SUPER_ADMIN'),
 )
+const canQueryProjects = computed(
+  () => isPrivileged.value || userStore.hasPermission('project:query'),
+)
+const canQueryContracts = computed(
+  () => isPrivileged.value || userStore.hasPermission('contract:query'),
+)
+const canQueryPartners = computed(
+  () => isPrivileged.value || userStore.hasPermission('partner:query'),
+)
+const canQueryDicts = computed(
+  () => isPrivileged.value || userStore.hasPermission('system:dict:list'),
+)
+const canViewCashJournal = computed(
+  () => isPrivileged.value || userStore.hasPermission('cashbook:journal:query'),
+)
+const canWritebackPayment = computed(
+  () => isPrivileged.value || userStore.hasPermission('payment:record:writeback'),
+)
+const canGenerateDocument = computed(
+  () => isPrivileged.value || userStore.hasPermission('document:generate'),
+)
+const canViewDocumentHistory = computed(
+  () => isPrivileged.value || userStore.hasPermission('document:history:query'),
+)
+const documentBusyId = ref<string>()
+const documentHistoryOpen = ref(false)
+const documentHistoryLoading = ref(false)
+const documentHistory = ref<DocumentGeneration[]>([])
+const documentHistoryTarget = ref<PayApplicationVO>()
 const hasActiveFilters = computed(() =>
   Boolean(
     filter.projectId ||
@@ -474,6 +508,75 @@ async function openTrace(record: PayApplicationVO) {
   }
 }
 
+function openDocumentUrl(url: string) {
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.target = '_blank'
+  anchor.rel = 'noopener noreferrer'
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+}
+
+async function handleDocumentPreview(record: PayApplicationVO) {
+  documentBusyId.value = record.id
+  try {
+    const blob = await previewBusinessDocument('PAYMENT', record.id)
+    const url = URL.createObjectURL(blob)
+    openDocumentUrl(url)
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (error) {
+    console.error(error)
+    message.error('付款申请单预览失败')
+  } finally {
+    documentBusyId.value = undefined
+  }
+}
+
+async function handleDocumentGenerate(record: PayApplicationVO) {
+  documentBusyId.value = record.id
+  try {
+    const key = `payment:${record.id}:approved:${record.approvalInstanceId ?? 'v1'}`
+    const generated = await generateBusinessDocument('PAYMENT', record.id, key)
+    if (generated.status !== 'SUCCEEDED') {
+      message.warning(`单据生成状态：${generated.status}`)
+      return
+    }
+    message.success('付款申请单已生成并归档')
+    openDocumentUrl(await getBusinessDocumentDownloadUrl(generated.id))
+  } catch (error) {
+    console.error(error)
+    message.error('付款申请单生成失败')
+  } finally {
+    documentBusyId.value = undefined
+  }
+}
+
+async function openDocumentHistory(record: PayApplicationVO) {
+  documentHistoryTarget.value = record
+  documentHistoryOpen.value = true
+  documentHistoryLoading.value = true
+  documentHistory.value = []
+  try {
+    const page = await getBusinessDocumentHistory('PAYMENT', record.id)
+    documentHistory.value = page.records
+  } catch (error) {
+    console.error(error)
+    message.error('付款申请单历史加载失败')
+  } finally {
+    documentHistoryLoading.value = false
+  }
+}
+
+async function downloadGeneratedDocument(item: DocumentGeneration) {
+  try {
+    openDocumentUrl(await getBusinessDocumentDownloadUrl(item.id))
+  } catch (error) {
+    console.error(error)
+    message.error('付款申请单下载失败')
+  }
+}
+
 function openWriteback(record: PayApplicationVO) {
   writebackTargetId.value = record.id
   writebackForm.payAmount = undefined
@@ -728,14 +831,20 @@ const showEmptyState = computed(() => hasLoaded.value && !loading.value && !tabl
 
 onMounted(() => {
   hydrateFromRouteQuery()
-  fetchDictData(PAY_STATUS_DICT)
-  fetchDictData(APPROVAL_STATUS_DICT)
-  referenceStore.fetchProjects()
-  referenceStore.fetchContracts(filter.projectId ? { projectId: filter.projectId } : {})
-  referenceStore.fetchPartners()
-  getFundAccounts()
-    .then((items) => (fundAccounts.value = items))
-    .catch((error) => console.warn('付款账户加载失败', error))
+  if (canQueryDicts.value) {
+    fetchDictData(PAY_STATUS_DICT)
+    fetchDictData(APPROVAL_STATUS_DICT)
+  }
+  if (canQueryProjects.value) referenceStore.fetchProjects()
+  if (canQueryContracts.value) {
+    referenceStore.fetchContracts(filter.projectId ? { projectId: filter.projectId } : {})
+  }
+  if (canQueryPartners.value) referenceStore.fetchPartners()
+  if (canViewCashJournal.value || canWritebackPayment.value) {
+    getFundAccounts()
+      .then((items) => (fundAccounts.value = items))
+      .catch((error) => console.warn('付款账户加载失败', error))
+  }
   fetchData()
   const payRecordId = readStringQuery(route.query.payRecordId)
   if (payRecordId && canViewCashJournal.value) {
@@ -863,6 +972,26 @@ onMounted(() => {
                 <template #overlay>
                   <a-menu>
                     <a-menu-item @click="openTrace(row)">全链追溯</a-menu-item>
+                    <a-menu-item
+                      v-if="
+                        canGenerateDocument &&
+                        [APPROVAL_APPROVING, APPROVAL_APPROVED].includes(row.approvalStatus)
+                      "
+                      :disabled="documentBusyId === row.id"
+                      @click="handleDocumentPreview(row)"
+                    >
+                      预览付款申请单
+                    </a-menu-item>
+                    <a-menu-item
+                      v-if="canGenerateDocument && row.approvalStatus === APPROVAL_APPROVED"
+                      :disabled="documentBusyId === row.id"
+                      @click="handleDocumentGenerate(row)"
+                    >
+                      生成并归档PDF
+                    </a-menu-item>
+                    <a-menu-item v-if="canViewDocumentHistory" @click="openDocumentHistory(row)">
+                      单据生成历史
+                    </a-menu-item>
                     <a-menu-item @click="handleEdit(row)">编辑</a-menu-item>
                     <a-menu-item
                       v-if="row.approvalStatus === APPROVAL_DRAFT"
@@ -925,6 +1054,38 @@ onMounted(() => {
       :on-proof-file-change="handleProofFileChange"
       @submit="handleSubmit"
     />
+
+    <a-modal
+      v-model:open="documentHistoryOpen"
+      :title="`单据生成历史 · ${documentHistoryTarget?.applyCode ?? ''}`"
+      :footer="null"
+      :width="900"
+    >
+      <a-table
+        :data-source="documentHistory"
+        :loading="documentHistoryLoading"
+        :pagination="false"
+        row-key="id"
+        size="small"
+      >
+        <a-table-column title="生成编号" data-index="generationNo" />
+        <a-table-column title="状态" data-index="status" width="110" />
+        <a-table-column title="生成时间" data-index="requestedAt" width="190" />
+        <a-table-column title="失败码" data-index="failureCode" />
+        <a-table-column title="操作" width="90">
+          <template #default="{ record }">
+            <a-button
+              v-if="record.status === 'SUCCEEDED'"
+              type="link"
+              size="small"
+              @click="downloadGeneratedDocument(record)"
+            >
+              下载
+            </a-button>
+          </template>
+        </a-table-column>
+      </a-table>
+    </a-modal>
 
     <a-modal
       v-model:open="writebackVisible"

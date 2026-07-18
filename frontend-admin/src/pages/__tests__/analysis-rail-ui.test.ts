@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const readPage = (path: string) => readFileSync(resolve(currentDir, path), 'utf-8')
 
-const analysisSurfaces = [
+const analysisSurfacePaths = [
   '../accounting-entry/index.vue',
   '../alert/index.vue',
   '../approval/todo.vue',
@@ -34,7 +34,11 @@ const analysisSurfaces = [
   '../system/roles/index.vue',
   '../system/users/index.vue',
   '../variation/components/VariationOrderWorkspace.vue',
-].map(readPage)
+]
+const analysisSurfaces = analysisSurfacePaths.map(readPage)
+const informationalAnalysisSurfaces = analysisSurfacePaths
+  .filter((path) => path !== '../inventory/components/StockAnalysisPanel.vue')
+  .map(readPage)
 
 function analysisRailTemplate(source: string) {
   const classIndex = source.indexOf('lg-analysis-rail')
@@ -56,11 +60,17 @@ describe('global analysis rail UI contract', () => {
   })
 
   it('keeps every analysis rail informational with no buttons', () => {
-    analysisSurfaces.forEach((source) => {
+    informationalAnalysisSurfaces.forEach((source) => {
       const rail = analysisRailTemplate(source)
       expect(rail).not.toContain('<a-button')
       expect(rail).not.toContain('<button')
     })
+
+    const stockRail = analysisRailTemplate(
+      readPage('../inventory/components/StockAnalysisPanel.vue'),
+    )
+    expect(stockRail).toContain('v-if="canTransfer"')
+    expect(stockRail).toContain('@click="$emit(\'transfer\', candidate)"')
   })
 
   it('uses flat shared rows instead of page-specific cards and chips', () => {

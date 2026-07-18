@@ -34,6 +34,50 @@ class MigrationIntegrityTest {
     }
 
     @Test
+    void stockTransferPostingMigrationIsMirroredAcrossDialects() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V211__add_stock_transfer_posting.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V211__add_stock_transfer_posting.sql");
+
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            String normalized = normalizeSql(sql);
+            assertTrue(normalized.contains("create table mat_stock_transfer"));
+            assertTrue(normalized.contains("uk_stock_transfer_tenant_key"));
+            assertTrue(normalized.contains("(tenant_id,idempotency_key)"));
+            assertTrue(normalized.contains("foreign key (source_stock_id) references mat_stock (id) on delete restrict"));
+            assertTrue(normalized.contains("foreign key (target_stock_id) references mat_stock (id) on delete restrict"));
+            assertTrue(normalized.contains("check (source_stock_id <> target_stock_id and source_warehouse_id <> target_warehouse_id)"));
+            assertTrue(normalized.contains("check (quantity > 0 and unit_cost >= 0 and amount >= 0)"));
+            assertTrue(normalized.contains("check (status in ('pending','completed'))"));
+            assertTrue(normalized.contains("idx_stock_transfer_project_created"));
+            assertTrue(normalized.contains("idx_stock_transfer_source_stock"));
+            assertTrue(normalized.contains("idx_stock_transfer_target_stock"));
+        }
+    }
+
+    @Test
+    void documentGenerationCoreMigrationIsMirroredAcrossDialects() throws IOException {
+        Path mysqlMigration = MIGRATION_DIR.resolve("V212__create_document_generation_core.sql");
+        Path h2Migration = H2_MIGRATION_DIR.resolve("V212__create_document_generation_core.sql");
+        assertTrue(Files.exists(mysqlMigration));
+        assertTrue(Files.exists(h2Migration));
+        for (String sql : List.of(readString(mysqlMigration), readString(h2Migration))) {
+            String normalized = normalizeSql(sql);
+            assertTrue(normalized.contains("create table biz_document_template"));
+            assertTrue(normalized.contains("create table biz_document_template_version"));
+            assertTrue(normalized.contains("create table biz_document_default_binding"));
+            assertTrue(normalized.contains("create table biz_document_generation"));
+            assertTrue(normalized.contains("active_unique_token"));
+            assertFalse(normalized.contains("deleted_token"));
+            assertTrue(normalized.contains("document:audit:download"));
+            assertTrue(normalized.contains("role_code = 'super_admin'")
+                    || normalized.contains("role_code in ('super_admin'"));
+        }
+    }
+
+    @Test
     void localTestProfileIncludesJavaMigrationsWhenPresent() throws Exception {
         Path localProfile = Path.of("src/test/resources/application-local.yml");
         if (!Files.exists(localProfile)) {

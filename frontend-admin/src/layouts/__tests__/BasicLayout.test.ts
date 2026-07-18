@@ -25,7 +25,7 @@ const mockPush = vi.fn()
 // ── Mock vue-router ──
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: mockPush }),
-  useRoute: () => ({ meta: { title: '测试页面' } }),
+  useRoute: () => ({ path: '/dashboard', query: {}, hash: '', meta: { title: '测试页面' } }),
 }))
 
 // ── Mock pinia stores ──
@@ -45,6 +45,7 @@ vi.mock('pinia', () => ({
 // ── Mock icons ──
 vi.mock('@ant-design/icons-vue', () => ({
   MenuFoldOutlined: { template: '<span class="icon-stub hamburger-icon"><slot /></span>' },
+  MenuOutlined: { template: '<span class="icon-stub menu-icon"><slot /></span>' },
   ProjectOutlined: { template: '<span class="icon-stub project-icon"><slot /></span>' },
 }))
 
@@ -54,6 +55,12 @@ vi.mock('@/components/NotificationBell.vue', () => ({
 }))
 vi.mock('@/layouts/components/SidebarMenu.vue', () => ({
   default: { name: 'SidebarMenu', template: '<div class="sidebar-stub">Menu</div>' },
+}))
+vi.mock('@/layouts/components/WorkspaceTabs.vue', () => ({
+  default: { name: 'WorkspaceTabs', template: '<div class="workspace-tabs-stub" />' },
+}))
+vi.mock('@/layouts/components/ObjectContextNavigation.vue', () => ({
+  default: { name: 'ObjectContextNavigation', template: '<div class="object-context-stub" />' },
 }))
 
 // ── Import after mocks ──
@@ -143,10 +150,10 @@ describe('BasicLayout click handlers', () => {
     mockPush.mockClear()
   })
 
-  it('navigates to /profile when "个人中心" menu item is clicked', async () => {
+  it('navigates to /profile when "个人资料" menu item is clicked', async () => {
     const wrapper = createWrapper()
 
-    const profileItem = findMenuItemByText(wrapper, '个人中心')
+    const profileItem = findMenuItemByText(wrapper, '个人资料')
     expect(profileItem).toBeDefined()
 
     profileItem!.trigger('click')
@@ -155,16 +162,27 @@ describe('BasicLayout click handlers', () => {
     expect(mockPush).toHaveBeenCalledWith('/profile')
   })
 
-  it('navigates to /settings when "设置" menu item is clicked', async () => {
+  it('navigates to /settings when "偏好设置" menu item is clicked', async () => {
     const wrapper = createWrapper()
 
-    const settingsItem = findMenuItemByText(wrapper, '设置')
+    const settingsItem = findMenuItemByText(wrapper, '偏好设置')
     expect(settingsItem).toBeDefined()
 
     settingsItem!.trigger('click')
 
     expect(mockPush).toHaveBeenCalledTimes(1)
     expect(mockPush).toHaveBeenCalledWith('/settings')
+  })
+
+  it('exposes help in the global account menu', async () => {
+    const wrapper = createWrapper()
+
+    const helpItem = findMenuItemByText(wrapper, '帮助与支持')
+    expect(helpItem).toBeDefined()
+
+    await helpItem!.trigger('click')
+
+    expect(mockPush).toHaveBeenCalledWith('/help')
   })
 
   it('navigates to /login when "退出登录" is clicked (existing handler still works)', async () => {
@@ -178,7 +196,7 @@ describe('BasicLayout click handlers', () => {
     expect(mockPush).toHaveBeenCalledWith('/login')
   })
 
-  it('uses click trigger for the sidebar user dropdown', () => {
+  it('uses click trigger for the global account dropdown', () => {
     const wrapper = createWrapper()
 
     expect(wrapper.find('.stub-dropdown').attributes('data-trigger')).toBe('click')

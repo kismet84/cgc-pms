@@ -60,7 +60,8 @@ describe('approval work list route titles', () => {
     expect(source).toContain('getMyDone(params)')
     expect(source).toContain('getMyCc(params)')
     expect(navigationSource).toContain("'/approval/mine'")
-    expect(navigationSource).toContain("key: '/workflow-system'")
+    expect(navigationSource).toContain("key: '/workbench/my-work'")
+    expect(navigationSource).toContain("label: '我的工作'")
   })
 
   it('uses API total as the visible count source for each approval tab', () => {

@@ -734,9 +734,9 @@ describe('permission governance menu management', () => {
 
     expect(routerSource).toContain("path: 'permissions'")
     expect(routerSource).toContain("name: 'SystemPermissions'")
-    expect(navigationSource).toContain(
-      "{ key: '/system/permissions', label: '权限清单', adminOnly: true }",
-    )
+    expect(navigationSource).toContain("key: '/system-management/access-control'")
+    expect(navigationSource).toContain("key: '/system/permissions'")
+    expect(navigationSource).toContain("label: '权限清单'")
     expect(source).toContain('updateMenu')
     expect(source).toContain('deleteMenu')
     expect(source).toContain('getMenuDetail')

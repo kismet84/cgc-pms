@@ -35,7 +35,6 @@ class MatStockTransferServiceTest {
 
     @BeforeEach
     void setUp() {
-        createTransferTable();
         UserContext.set(Jwts.claims()
                 .add("userId", 1L).add("username", "admin").add("tenantId", TENANT)
                 .add("roles", List.of("ADMIN")).build());
@@ -128,20 +127,6 @@ class MatStockTransferServiceTest {
         dto.setIdempotencyKey(key);
         dto.setReason(reason);
         return dto;
-    }
-
-    private void createTransferTable() {
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS mat_stock_transfer (
-                    id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL, project_id BIGINT NOT NULL,
-                    source_stock_id BIGINT NOT NULL, target_stock_id BIGINT NOT NULL,
-                    source_warehouse_id BIGINT NOT NULL, target_warehouse_id BIGINT NOT NULL, material_id BIGINT NOT NULL,
-                    quantity DECIMAL(18,4) NOT NULL, unit_cost DECIMAL(18,6) NOT NULL,
-                    amount DECIMAL(18,2) NOT NULL, idempotency_key VARCHAR(100) NOT NULL,
-                    status VARCHAR(20) NOT NULL, completed_at TIMESTAMP, created_by BIGINT, created_at TIMESTAMP,
-                    updated_by BIGINT, updated_at TIMESTAMP, deleted_flag TINYINT DEFAULT 0,
-                    remark VARCHAR(500), UNIQUE (tenant_id, idempotency_key))
-                """);
     }
 
     private void cleanupFixtures() {

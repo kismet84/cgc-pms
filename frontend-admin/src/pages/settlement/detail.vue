@@ -4,21 +4,43 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { ArrowLeftOutlined } from '@ant-design/icons-vue'
 import { useSettlementStore } from '@/stores/settlement'
+import { useUserStore } from '@/stores/user'
 import { submitSettlement } from '@/api/modules/settlement'
 import { uploadFile } from '@/api/modules/file'
+import {
+  generateBusinessDocument,
+  getBusinessDocumentDownloadUrl,
+  getBusinessDocumentHistory,
+  previewBusinessDocument,
+} from '@/api/modules/document'
 import type { SettlementStatus } from '@/types/settlement'
 import { SETTLEMENT_STATUS_LABEL, SETTLEMENT_STATUS_COLOR } from '@/types/settlement'
 import { SOURCE_TYPE_LABEL, SOURCE_TYPE_COLOR } from '@/types/cost'
 import type { SourceType } from '@/types/cost'
+import type { DocumentGeneration } from '@/types/document'
 
 const route = useRoute()
 const router = useRouter()
 const store = useSettlementStore()
+const userStore = useUserStore()
 
 const settlementId = route.params.id as string
 const activeTab = ref('basic')
 const submitting = ref(false)
 const attachmentUploading = ref(false)
+const documentBusy = ref(false)
+const documentHistoryOpen = ref(false)
+const documentHistoryLoading = ref(false)
+const documentHistory = ref<DocumentGeneration[]>([])
+const isPrivileged = computed(
+  () => userStore.roles.includes('ADMIN') || userStore.roles.includes('SUPER_ADMIN'),
+)
+const canGenerateDocument = computed(
+  () => isPrivileged.value || userStore.hasPermission('document:generate'),
+)
+const canViewDocumentHistory = computed(
+  () => isPrivileged.value || userStore.hasPermission('document:history:query'),
+)
 
 const APPROVAL_STATUS_LABEL: Record<string, string> = {
   DRAFT: '草稿',
@@ -216,6 +238,79 @@ function goBack() {
   router.back()
 }
 
+function openDocumentUrl(url: string) {
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.target = '_blank'
+  anchor.rel = 'noopener noreferrer'
+  document.body.appendChild(anchor)
+  anchor.click()
+  anchor.remove()
+}
+
+async function handleDocumentPreview() {
+  documentBusy.value = true
+  try {
+    const blob = await previewBusinessDocument('SETTLEMENT', settlementId)
+    const url = URL.createObjectURL(blob)
+    openDocumentUrl(url)
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  } catch (error) {
+    console.error(error)
+    message.error('结算单预览失败')
+  } finally {
+    documentBusy.value = false
+  }
+}
+
+async function handleDocumentGenerate() {
+  documentBusy.value = true
+  try {
+    const marker = `${detail.value?.amountFormulaVersion ?? 'v1'}:${detail.value?.finalizedAt ?? 'finalized'}`
+      .replace(/[^A-Za-z0-9._:-]/g, '-')
+    const generated = await generateBusinessDocument(
+      'SETTLEMENT',
+      settlementId,
+      `settlement:${settlementId}:finalized:${marker}`,
+    )
+    if (generated.status !== 'SUCCEEDED') {
+      message.warning(`单据生成状态：${generated.status}`)
+      return
+    }
+    message.success('结算单已生成并归档')
+    openDocumentUrl(await getBusinessDocumentDownloadUrl(generated.id))
+  } catch (error) {
+    console.error(error)
+    message.error('结算单生成失败')
+  } finally {
+    documentBusy.value = false
+  }
+}
+
+async function openDocumentHistory() {
+  documentHistoryOpen.value = true
+  documentHistoryLoading.value = true
+  documentHistory.value = []
+  try {
+    const page = await getBusinessDocumentHistory('SETTLEMENT', settlementId)
+    documentHistory.value = page.records
+  } catch (error) {
+    console.error(error)
+    message.error('结算单历史加载失败')
+  } finally {
+    documentHistoryLoading.value = false
+  }
+}
+
+async function downloadGeneratedDocument(item: DocumentGeneration) {
+  try {
+    openDocumentUrl(await getBusinessDocumentDownloadUrl(item.id))
+  } catch (error) {
+    console.error(error)
+    message.error('结算单下载失败')
+  }
+}
+
 async function handleSubmit() {
   submitting.value = true
   try {
@@ -255,6 +350,31 @@ onMounted(() => {
       <div class="pt-head-actions">
         <a-button @click="goBack"><ArrowLeftOutlined />返回</a-button>
         <template v-if="detail">
+          <a-button
+            v-if="
+              canGenerateDocument &&
+              ['APPROVING', 'APPROVED'].includes(detail.approvalStatus)
+            "
+            :loading="documentBusy"
+            @click="handleDocumentPreview"
+          >
+            预览结算单
+          </a-button>
+          <a-button
+            v-if="
+              canGenerateDocument &&
+              detail.approvalStatus === 'APPROVED' &&
+              detail.settlementStatus === 'FINALIZED'
+            "
+            type="primary"
+            :loading="documentBusy"
+            @click="handleDocumentGenerate"
+          >
+            生成并归档PDF
+          </a-button>
+          <a-button v-if="canViewDocumentHistory" :loading="documentHistoryLoading" @click="openDocumentHistory">
+            单据生成历史
+          </a-button>
           <a-button
             v-if="detail.approvalStatus === 'DRAFT' || detail.approvalStatus === 'REJECTED'"
             type="primary"
@@ -551,6 +671,38 @@ onMounted(() => {
       </template>
       <a-empty v-else-if="!loading" description="结算单不存在" style="padding: 80px 0" />
     </a-spin>
+
+    <a-modal
+      v-model:open="documentHistoryOpen"
+      :title="`单据生成历史 · ${detail?.settlementCode ?? ''}`"
+      :footer="null"
+      :width="900"
+    >
+      <a-table
+        :data-source="documentHistory"
+        :loading="documentHistoryLoading"
+        :pagination="false"
+        row-key="id"
+        size="small"
+      >
+        <a-table-column title="生成编号" data-index="generationNo" />
+        <a-table-column title="状态" data-index="status" width="110" />
+        <a-table-column title="生成时间" data-index="requestedAt" width="190" />
+        <a-table-column title="失败码" data-index="failureCode" />
+        <a-table-column title="操作" width="90">
+          <template #default="{ record }">
+            <a-button
+              v-if="record.status === 'SUCCEEDED'"
+              type="link"
+              size="small"
+              @click="downloadGeneratedDocument(record)"
+            >
+              下载
+            </a-button>
+          </template>
+        </a-table-column>
+      </a-table>
+    </a-modal>
   </div>
 </template>
 

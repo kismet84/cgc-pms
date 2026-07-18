@@ -77,6 +77,19 @@ public class ProjectAccessChecker {
                 .toList();
     }
 
+    /**
+     * 返回当前用户在当前租户内可访问的项目 ID，供跨项目列表查询复用。
+     */
+    public List<Long> accessibleProjectIds() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (tenantId == null) return List.of();
+        List<PmProject> tenantProjects = projectMapper.selectList(
+                new LambdaQueryWrapper<PmProject>().eq(PmProject::getTenantId, tenantId));
+        return filterAccessible(tenantProjects).stream()
+                .map(PmProject::getId)
+                .toList();
+    }
+
     private boolean isAccessible(PmProject project, List<String> roles, Long userId, String dataScope) {
         if (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN")) return true;
         if (userId != null && userId.equals(project.getProjectManagerId())) return true;

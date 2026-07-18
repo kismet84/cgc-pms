@@ -43,6 +43,8 @@ spring:
 # MinIO object storage
 minio:
   endpoint: http://localhost:9000
+  public-endpoint: ${MINIO_PUBLIC_ENDPOINT:}
+  region: ${MINIO_REGION:us-east-1}
   access-key: ${MINIO_ACCESS_KEY:__SET_MINIO_ACCESS_KEY_IN_ENV__}
   secret-key: ${MINIO_SECRET_KEY:__SET_MINIO_SECRET_KEY_IN_ENV__}
   bucket: cgc-pms

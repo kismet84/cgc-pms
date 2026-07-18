@@ -346,6 +346,20 @@ class StlSettlementQueryServiceTest {
 
     @Test @DisplayName("getAttachments — 返回脱敏后的附件")
     void testGetAttachments() {
+        SysFile generated = new SysFile();
+        generated.setTenantId(TENANT_ID);
+        generated.setBusinessType("SETTLEMENT");
+        generated.setBusinessId(settlementId);
+        generated.setFileName("generated-settlement.pdf");
+        generated.setOriginalName("generated-settlement.pdf");
+        generated.setFileSize(1024L);
+        generated.setContentType("application/pdf");
+        generated.setDocumentType("GENERATED_DOCUMENT");
+        generated.setStoragePath("SETTLEMENT/" + settlementId + "/generated-settlement.pdf");
+        generated.setBucketName("test-bucket");
+        generated.setCreatedBy(USER_ID);
+        sysFileMapper.insert(generated);
+
         var attachments = queryService.getAttachments(settlementId);
         assertEquals(1, attachments.size());
         SettlementAttachmentVO attachment = attachments.get(0);

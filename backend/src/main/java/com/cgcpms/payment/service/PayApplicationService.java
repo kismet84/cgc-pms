@@ -117,7 +117,17 @@ public class PayApplicationService {
                                            Long partnerId, String payStatus, String approvalStatus, String applyCode) {
         LambdaQueryWrapper<PayApplication> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PayApplication::getTenantId, UserContext.getCurrentTenantId());
-        if (projectId != null) wrapper.eq(PayApplication::getProjectId, projectId);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看付款申请");
+            wrapper.eq(PayApplication::getProjectId, projectId);
+        } else {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            if (accessibleProjectIds.isEmpty()) {
+                wrapper.apply("1 = 0");
+            } else {
+                wrapper.in(PayApplication::getProjectId, accessibleProjectIds);
+            }
+        }
         if (contractId != null) wrapper.eq(PayApplication::getContractId, contractId);
         if (partnerId != null) wrapper.eq(PayApplication::getPartnerId, partnerId);
         if (StringUtils.hasText(payStatus)) wrapper.eq(PayApplication::getPayStatus, payStatus);
