@@ -44,9 +44,12 @@ vi.mock('pinia', () => ({
 
 // ── Mock icons ──
 vi.mock('@ant-design/icons-vue', () => ({
+  CalendarOutlined: { template: '<span class="icon-stub calendar-icon"><slot /></span>' },
+  DownOutlined: { template: '<span class="icon-stub down-icon"><slot /></span>' },
   MenuFoldOutlined: { template: '<span class="icon-stub hamburger-icon"><slot /></span>' },
   MenuOutlined: { template: '<span class="icon-stub menu-icon"><slot /></span>' },
   ProjectOutlined: { template: '<span class="icon-stub project-icon"><slot /></span>' },
+  SearchOutlined: { template: '<span class="icon-stub search-icon"><slot /></span>' },
 }))
 
 // ── Mock sub-components ──
@@ -123,6 +126,7 @@ const simpleStubs = {
   'a-layout-content': { template: '<div class="stub-a-layout-content"><slot /></div>' },
   'a-avatar': { template: '<div class="stub-a-avatar"><slot /></div>' },
   'a-badge': { template: '<div class="stub-a-badge"><slot /></div>' },
+  'a-input': { template: '<div class="stub-a-input"><slot name="suffix" /></div>' },
   'router-view': { template: '<div class="stub-router-view" />' },
 }
 

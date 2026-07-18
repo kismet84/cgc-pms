@@ -18,7 +18,7 @@ import { drillCols } from './utils/tableColumns'
 import type { DashboardRole } from '@/types/dashboard'
 import DashboardPmView from './components/DashboardPmView.vue'
 import DashboardBmView from './components/DashboardBmView.vue'
-import DashboardCostView from './components/DashboardCostView.vue'
+import DashboardCommandView from './components/DashboardCommandView.vue'
 import DashboardPurchaseView from './components/DashboardPurchaseView.vue'
 import DashboardProductionView from './components/DashboardProductionView.vue'
 import DashboardChiefEngineerView from './components/DashboardChiefEngineerView.vue'
@@ -40,17 +40,27 @@ const {
   chiefEngineerData,
   financeData,
   mgmtData,
-  costBreakdown,
   loading,
   drillSubject,
   drillVisible,
   drillChildren,
   needsProject,
-  handleBarClick,
   closeDrill,
   fetchViewData,
 } = useDashboardData()
 const router = useRouter()
+const lastUpdated = computed(() =>
+  new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+    .format(new Date())
+    .replaceAll('/', '-'),
+)
 
 const roleTabOrder: DashboardRole[] = ['cost', 'pm', 'purchase', 'production', 'chiefEngineer']
 const roleDisplayLabel: Record<DashboardRole, string> = {
@@ -100,11 +110,21 @@ function openReportCatalog() {
     <div class="dashboard-header">
       <div class="dashboard-title-block">
         <div class="dashboard-title-row">
-          <h1>驾驶舱</h1>
+          <h1>经营指挥台</h1>
+          <span class="dashboard-update-time">数据更新：{{ lastUpdated }}</span>
+          <a-button
+            type="text"
+            shape="circle"
+            :loading="loading"
+            aria-label="刷新驾驶舱"
+            @click="fetchViewData"
+          >
+            <template #icon><ReloadOutlined /></template>
+          </a-button>
         </div>
       </div>
       <div class="dashboard-actions">
-        <div v-if="activeRole !== 'mgmt'" class="project-field">
+        <div v-if="activeRole !== 'mgmt'" class="project-field dashboard-project-select">
           <a-select v-model:value="selectedProjectId" placeholder="请选择项目" style="width: 300px">
             <a-select-option :value="ALL_PROJECT_ID">全部</a-select-option>
             <a-select-option v-for="p in projectList" :key="p.id" :value="p.id">
@@ -112,7 +132,7 @@ function openReportCatalog() {
             </a-select-option>
           </a-select>
         </div>
-        <a-select v-model:value="selectedMonth" style="width: 112px">
+        <a-select v-model:value="selectedMonth" class="dashboard-month-select" style="width: 112px">
           <a-select-option
             v-for="monthOption in monthOptions"
             :key="monthOption.value || 'all'"
@@ -121,22 +141,22 @@ function openReportCatalog() {
             {{ monthOption.label }}
           </a-select-option>
         </a-select>
-        <a-button type="text" :loading="loading" @click="fetchViewData">
-          <template #icon><ReloadOutlined /></template>
-          刷新
-        </a-button>
-        <a-button type="text" @click="openReportCatalog">
+        <a-button type="primary" @click="openReportCatalog">
           <template #icon><AppstoreOutlined /></template>
-          报表目录
+          进入经营分析
         </a-button>
-        <a-button type="text" @click="toggleFullscreen">
+        <a-button
+          type="text"
+          class="dashboard-fullscreen"
+          aria-label="全屏"
+          @click="toggleFullscreen"
+        >
           <template #icon><FullscreenOutlined /></template>
-          全屏
         </a-button>
       </div>
     </div>
 
-    <div class="role-tabs-card">
+    <div v-if="activeRole !== 'cost'" class="role-tabs-card">
       <a-tabs v-model:activeKey="activeRole" class="role-tabs" size="small">
         <a-tab-pane v-for="role in orderedRoles" :key="role">
           <template #tab>
@@ -158,12 +178,7 @@ function openReportCatalog() {
     </template>
 
     <template v-if="activeRole === 'cost' && costData">
-      <DashboardCostView
-        :data="costData"
-        :breakdown="costBreakdown"
-        :loading="loading"
-        @bar-click="handleBarClick"
-      />
+      <DashboardCommandView :data="costData" :loading="loading" />
     </template>
 
     <template v-if="activeRole === 'purchase' && purchaseData">
@@ -233,6 +248,7 @@ function openReportCatalog() {
 <style>
 .dashboard {
   min-height: 100%;
+  padding: 14px 16px 18px;
   color: var(--text);
   background: #f5f7fb;
 }
@@ -266,10 +282,20 @@ function openReportCatalog() {
 .dashboard-title-row h1 {
   margin: 0;
   color: #111827;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 34px;
   letter-spacing: 0;
+}
+
+.dashboard-update-time {
+  color: #738096;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.dashboard-title-row :deep(.ant-btn) {
+  color: #64748b;
 }
 
 .dashboard-title-row span:last-child {
@@ -287,6 +313,32 @@ function openReportCatalog() {
   justify-content: flex-end;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.dashboard-actions :deep(.ant-btn-primary) {
+  height: 34px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgb(37 99 235 / 18%);
+  font-weight: 600;
+}
+
+.dashboard-project-select :deep(.ant-select-selector) {
+  height: 34px !important;
+  border-color: #7aa7f8 !important;
+  border-radius: 4px !important;
+}
+
+.dashboard-project-select :deep(.ant-select-selection-item),
+.dashboard-project-select :deep(.ant-select-selection-placeholder) {
+  line-height: 32px !important;
+}
+
+.dashboard-month-select {
+  display: none;
+}
+
+.dashboard-fullscreen {
+  width: 34px;
 }
 
 .dashboard-header.lg-page-head {
