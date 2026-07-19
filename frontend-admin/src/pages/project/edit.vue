@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { getProjectDetail, updateProject } from '@/api/modules/project'
 import { getDictDataByCode } from '@/api/modules/dict'
-import type { ProjectVO } from '@/types/project'
 import { normalizeArray } from '@/utils/normalizeArray'
 
 const route = useRoute()
