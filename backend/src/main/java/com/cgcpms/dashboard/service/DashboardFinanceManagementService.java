@@ -506,6 +506,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             vo.setCashBalance(companyCashBalance(tenantId).toPlainString());
             vo.setProjectProfit("0.00");
             vo.setMetricFormulaVersion("PAYMENT_CLOSED_LOOP_V1");
+            vo.setTrendPoints(Collections.emptyList());
             return;
         }
         List<PayApplication> applications = payApplicationMapper.selectList(
@@ -527,9 +528,10 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                 .eq(CtContract::getTenantId, tenantId).in(CtContract::getProjectId, projectIds));
         BigDecimal contractAmount = contracts.stream().map(CtContract::getCurrentAmount)
                 .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
-        List<PayRecord> paidRecords = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
-                .eq(PayRecord::getTenantId, tenantId).in(PayRecord::getProjectId, projectIds)
-                .eq(PayRecord::getPayStatus, "SUCCESS"));
+        List<PayRecord> allPayRecords = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getTenantId, tenantId).in(PayRecord::getProjectId, projectIds));
+        List<PayRecord> paidRecords = allPayRecords.stream()
+                .filter(record -> "SUCCESS".equals(record.getPayStatus())).toList();
         BigDecimal paid = paidRecords.stream().map(PayRecord::getPayAmount)
                 .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -560,6 +562,44 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         vo.setCashBalance(companyCashBalance(tenantId).toPlainString());
         vo.setProjectProfit(projectIncome.subtract(consumed).toPlainString());
         vo.setMetricFormulaVersion("PAYMENT_CLOSED_LOOP_V1");
+        vo.setTrendPoints(buildFinanceTrendPoints(allPayRecords));
+    }
+
+    private List<FinanceDashboardVO.TrendPoint> buildFinanceTrendPoints(List<PayRecord> records) {
+        List<PayRecord> datedRecords = records.stream().filter(record -> record.getPayDate() != null).toList();
+        if (datedRecords.isEmpty()) return Collections.emptyList();
+
+        YearMonth latest = datedRecords.stream().map(record -> YearMonth.from(record.getPayDate()))
+                .max(Comparator.naturalOrder()).orElseThrow();
+        YearMonth earliest = datedRecords.stream().map(record -> YearMonth.from(record.getPayDate()))
+                .min(Comparator.naturalOrder()).orElse(latest);
+        YearMonth first = earliest.isBefore(latest.minusMonths(11)) ? latest.minusMonths(11) : earliest;
+        Map<YearMonth, BigDecimal> paidByMonth = new HashMap<>();
+        Map<YearMonth, BigDecimal> pendingByMonth = new HashMap<>();
+        BigDecimal cumulative = BigDecimal.ZERO;
+        for (PayRecord record : datedRecords) {
+            BigDecimal amount = nz(record.getPayAmount());
+            YearMonth month = YearMonth.from(record.getPayDate());
+            if ("SUCCESS".equals(record.getPayStatus())) {
+                if (month.isBefore(first)) cumulative = cumulative.add(amount);
+                else paidByMonth.merge(month, amount, BigDecimal::add);
+            } else if (!month.isBefore(first)) {
+                pendingByMonth.merge(month, amount, BigDecimal::add);
+            }
+        }
+
+        List<FinanceDashboardVO.TrendPoint> points = new ArrayList<>();
+        for (YearMonth month = first; !month.isAfter(latest); month = month.plusMonths(1)) {
+            BigDecimal monthlyPaid = paidByMonth.getOrDefault(month, BigDecimal.ZERO);
+            cumulative = cumulative.add(monthlyPaid);
+            FinanceDashboardVO.TrendPoint point = new FinanceDashboardVO.TrendPoint();
+            point.setMonth(month.toString());
+            point.setCashOutflowAmount(monthlyPaid.toPlainString());
+            point.setCumulativePaidAmount(cumulative.toPlainString());
+            point.setPendingPaymentAmount(pendingByMonth.getOrDefault(month, BigDecimal.ZERO).toPlainString());
+            points.add(point);
+        }
+        return points;
     }
 
     private BigDecimal companyCashBalance(Long tenantId) {

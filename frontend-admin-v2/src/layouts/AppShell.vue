@@ -15,6 +15,8 @@ const workspaceStore = useWorkspaceStore()
 const mobileNavigationOpen = ref(false)
 const sidebarCollapsed = ref(false)
 const notificationOpen = ref(false)
+const roleTesterOpen = ref(false)
+const switchingTestUser = ref<string | null>(null)
 const isMobile = ref(false)
 const menuToggle = ref<HTMLButtonElement | null>(null)
 const navigationPanel = ref<HTMLElement | null>(null)
@@ -33,11 +35,28 @@ const visibleActiveWorkspace = computed(() => {
     ?.workspaces.find((workspace) => workspace.id === match.workspace.id)
 })
 
-const projectOptions = computed(() => workspaceStore.projects)
-const reportPeriodOptions = computed(() => workspaceStore.reportPeriods)
+const projectOptions = computed(() => [
+  { value: '', label: '全部项目' },
+  ...workspaceStore.projects,
+])
+const reportPeriodOptions = computed(() => [
+  { value: '', label: '全部报告期' },
+  ...workspaceStore.reportPeriods,
+])
 const accountName = computed(
   () => session.userInfo?.realName || session.userInfo?.username || '当前用户',
 )
+const showRoleTester = computed(() => import.meta.env.DEV && route.path === '/dashboard')
+const roleTestAccounts = [
+  { role: 'pm', username: 'demo.manager', label: '项目经理' },
+  { role: 'bm', username: 'demo.business', label: '商务经理' },
+  { role: 'cost', username: 'demo.cost', label: '成本经理' },
+  { role: 'purchase', username: 'demo.purchase', label: '采购经理' },
+  { role: 'production', username: 'demo.production', label: '生产经理' },
+  { role: 'chiefEngineer', username: 'demo.chief', label: '总工程师' },
+  { role: 'finance', username: 'demo.finance', label: '财务经理' },
+  { role: 'mgmt', username: 'admin', label: '管理层' },
+] as const
 
 watch(
   () => route.fullPath,
@@ -62,6 +81,7 @@ watch(mobileNavigationOpen, async (open) => {
 })
 
 onMounted(() => {
+  void workspaceStore.initialize(session.roles, session.permissions).catch(() => undefined)
   mobileMedia = window.matchMedia('(max-width: 48rem)')
   syncMobileMode(mobileMedia)
   mobileMedia.addEventListener('change', syncMobileMode)
@@ -139,6 +159,28 @@ async function signOut(): Promise<void> {
     await session.logout()
   } finally {
     await router.replace('/login')
+  }
+}
+
+async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Promise<void> {
+  if (!import.meta.env.DEV || switchingTestUser.value) return
+  switchingTestUser.value = account.username
+  session.setRequestNotice(null)
+  try {
+    const response = await fetch(
+      `/api/auth/dev-login?username=${encodeURIComponent(account.username)}`,
+      { credentials: 'same-origin' },
+    )
+    const payload = (await response.json()) as { code?: string }
+    if (!response.ok || payload.code !== '0') throw new Error('DEV_ROLE_SWITCH_FAILED')
+    const target = router.resolve({
+      path: '/dashboard',
+      query: { ...route.query, role: account.role },
+    }).href
+    window.location.assign(target)
+  } catch {
+    switchingTestUser.value = null
+    session.setRequestNotice({ code: 'DEV_ROLE_SWITCH_FAILED', message: '角色账号切换失败' })
   }
 }
 </script>
@@ -266,8 +308,9 @@ async function signOut(): Promise<void> {
             :model-value="workspaceStore.selectedProjectId || ''"
             :options="projectOptions"
             label="当前项目"
-            :placeholder="projectOptions.length ? '选择项目' : '暂无可用项目'"
-            :disabled="!projectOptions.length"
+            placeholder="暂无可用项目"
+            :disabled="!workspaceStore.projects.length"
+            allow-empty
             @update:model-value="selectProject"
           />
           <V2Select
@@ -275,8 +318,9 @@ async function signOut(): Promise<void> {
             :model-value="workspaceStore.selectedReportPeriod || ''"
             :options="reportPeriodOptions"
             label="报告期"
-            :placeholder="reportPeriodOptions.length ? '选择报告期' : '暂无可用报告期'"
-            :disabled="!reportPeriodOptions.length"
+            placeholder="暂无可用报告期"
+            :disabled="!workspaceStore.reportPeriods.length"
+            allow-empty
             @update:model-value="selectReportPeriod"
           />
         </div>
@@ -357,6 +401,41 @@ async function signOut(): Promise<void> {
         description="业务通知能力尚未迁移；此处不显示模拟数量或业务消息。"
       />
     </V2Dialog>
+
+    <div v-if="showRoleTester" class="app-shell__role-tester" @keydown.esc="roleTesterOpen = false">
+      <section
+        v-if="roleTesterOpen"
+        id="role-tester-panel"
+        class="app-shell__role-tester-panel"
+        aria-label="角色测试账号"
+      >
+        <header>
+          <strong>角色测试</strong>
+          <small>仅本地开发环境</small>
+        </header>
+        <button
+          v-for="account in roleTestAccounts"
+          :key="account.username"
+          type="button"
+          :class="{ 'is-active': session.userInfo?.username === account.username }"
+          :disabled="Boolean(switchingTestUser)"
+          @click="switchTestAccount(account)"
+        >
+          <span>{{ account.label }}</span>
+          <small>{{ account.username }}</small>
+        </button>
+      </section>
+      <button
+        type="button"
+        class="app-shell__role-tester-trigger"
+        aria-label="切换角色测试账号"
+        aria-controls="role-tester-panel"
+        :aria-expanded="roleTesterOpen"
+        @click="roleTesterOpen = !roleTesterOpen"
+      >
+        角
+      </button>
+    </div>
   </div>
 </template>
 
@@ -761,6 +840,84 @@ async function signOut(): Promise<void> {
   padding-inline: var(--v2-page-gutter);
 }
 
+.app-shell__role-tester {
+  position: fixed;
+  z-index: 50;
+  inset-inline-end: var(--v2-space-6);
+  inset-block-end: var(--v2-space-6);
+  display: grid;
+  justify-items: end;
+  gap: var(--v2-space-3);
+}
+
+.app-shell__role-tester-trigger {
+  width: 3.25rem;
+  height: 3.25rem;
+  color: #fff;
+  background: var(--v2-color-primary);
+  border: 0;
+  border-radius: 50%;
+  box-shadow: 0 0.75rem 2rem rgb(37 99 235 / 28%);
+  font: inherit;
+  font-weight: var(--v2-font-weight-bold);
+  cursor: pointer;
+}
+
+.app-shell__role-tester-trigger:focus-visible,
+.app-shell__role-tester-panel button:focus-visible {
+  outline: 3px solid var(--v2-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.app-shell__role-tester-panel {
+  width: 15rem;
+  max-height: min(32rem, calc(100vh - 7rem));
+  overflow-y: auto;
+  padding: var(--v2-space-3);
+  background: var(--v2-color-surface);
+  border: 1px solid var(--v2-color-border);
+  border-radius: var(--v2-radius-lg);
+  box-shadow: var(--v2-shadow-panel);
+}
+
+.app-shell__role-tester-panel header {
+  display: grid;
+  gap: var(--v2-space-1);
+  padding: var(--v2-space-2);
+}
+
+.app-shell__role-tester-panel header small,
+.app-shell__role-tester-panel button small {
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
+}
+
+.app-shell__role-tester-panel button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: var(--v2-space-2) var(--v2-space-3);
+  color: var(--v2-color-text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--v2-radius-sm);
+  font: inherit;
+  cursor: pointer;
+}
+
+.app-shell__role-tester-panel button:hover,
+.app-shell__role-tester-panel button.is-active {
+  color: var(--v2-color-primary);
+  background: var(--v2-color-primary-soft);
+}
+
+.app-shell__role-tester-panel button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .app-shell__scrim {
   display: none;
 }
@@ -966,6 +1123,11 @@ async function signOut(): Promise<void> {
 
   .app-shell__notice-region {
     padding-inline: var(--v2-space-4);
+  }
+
+  .app-shell__role-tester {
+    inset-inline-end: var(--v2-space-4);
+    inset-block-end: var(--v2-space-4);
   }
 
   :global(body.v2-mobile-nav-open) {

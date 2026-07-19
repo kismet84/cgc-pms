@@ -27,7 +27,17 @@ public class FinanceDashboardVO {
     private String cashBalance;
     private String projectProfit;
     private String metricFormulaVersion;
+    /** Monthly payment trend points, sorted by month ASC, max 12. */
+    private List<TrendPoint> trendPoints;
     /** Detail lists */
     private List<DashboardPaymentItemVO> pendingPayments;
     private List<DashboardPaymentItemVO> overRatioPayments;
+
+    @Data
+    public static class TrendPoint {
+        private String month;
+        private String cashOutflowAmount;
+        private String cumulativePaidAmount;
+        private String pendingPaymentAmount;
+    }
 }

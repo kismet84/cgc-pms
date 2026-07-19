@@ -156,4 +156,19 @@ describe('V2 same-origin request core', () => {
       traceId: 'trace-test',
     })
   })
+
+  it('does not turn intentional cancellation into a network notice', async () => {
+    const onError = vi.fn()
+    configureRequestLifecycle({ onError })
+    const controller = new AbortController()
+    fetchMock.mockImplementation(async () => {
+      controller.abort()
+      throw new DOMException('aborted', 'AbortError')
+    })
+
+    await expect(apiRequest('/slow', { signal: controller.signal })).rejects.toMatchObject({
+      name: 'AbortError',
+    })
+    expect(onError).not.toHaveBeenCalled()
+  })
 })

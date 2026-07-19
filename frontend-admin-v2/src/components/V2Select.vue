@@ -13,6 +13,7 @@ const props = withDefaults(
     error?: string
     disabled?: boolean
     required?: boolean
+    allowEmpty?: boolean
   }>(),
   {
     modelValue: '',
@@ -23,6 +24,7 @@ const props = withDefaults(
     error: undefined,
     disabled: false,
     required: false,
+    allowEmpty: false,
   },
 )
 
@@ -61,7 +63,7 @@ function onChange(event: Event) {
       :aria-describedby="describedBy"
       @change="onChange"
     >
-      <option value="" disabled>{{ placeholder }}</option>
+      <option v-if="!allowEmpty" value="" disabled>{{ placeholder }}</option>
       <option
         v-for="option in options"
         :key="option.value"

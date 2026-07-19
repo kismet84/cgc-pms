@@ -74,7 +74,8 @@ $stages = @(
     [pscustomobject]@{ Id = 'INVENTORY_EXCEPTIONS'; Files = @('scripts/demo/complete-project-v2/sql/110-inventory-exceptions.sql') },
     [pscustomobject]@{ Id = 'DOCUMENT_SYSTEM'; Files = @('scripts/demo/complete-project-v2/sql/120-document-system.sql') },
     [pscustomobject]@{ Id = 'FORM_FIELD_COMPLETION'; Files = @('scripts/demo/complete-project-v2/sql/130-form-field-completion.sql') },
-    [pscustomobject]@{ Id = 'DATA_QUALITY_NORMALIZATION'; Files = @('scripts/demo/complete-project-v2/sql/140-data-quality-normalization.sql') }
+    [pscustomobject]@{ Id = 'DATA_QUALITY_NORMALIZATION'; Files = @('scripts/demo/complete-project-v2/sql/140-data-quality-normalization.sql') },
+    [pscustomobject]@{ Id = 'ROLE_TEST_ACCOUNTS'; Files = @('scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql') }
 )
 
 foreach ($stage in $stages) {

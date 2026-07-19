@@ -1,3 +1,74 @@
+# 第53条主线 M2 驾驶舱工作区 Design QA
+
+- source visual truth path: `C:\Users\SUMMAD~1\AppData\Local\Temp\codex-clipboard-bf7110e7-c69e-4e8d-9a4c-eee7b8d0f7a7.png`
+- implementation screenshot path: `C:\Users\summade87114\AppData\Local\Temp\cgc-pms-dashboard-trend-final.png`
+- full-view comparison evidence: `C:\Users\summade87114\AppData\Local\Temp\cgc-pms-dashboard-comparison-final.png`
+- focused comparison evidence: `C:\Users\summade87114\AppData\Local\Temp\cgc-pms-dashboard-comparison-top.png`、`C:\Users\summade87114\AppData\Local\Temp\cgc-pms-dashboard-comparison-middle.png`
+- annotation comparison evidence: `C:\Users\summade87114\AppData\Local\Temp\cgc-pms-dashboard-compact-comparison.png`
+- viewport: 参考图 `1232 × 933`；实现内容区 `1240 × 1004`，对比时归一化为 `1232 × 933`
+- state: 本地 `cgc_pms_demo_v2`，`demo.cost` 成本经理，全部项目、全部报告期，真实接口数据
+
+## Findings
+
+- 无剩余 P0/P1/P2。
+- 参考图健康度为 76 分红色关注态；当前真实数据为 100 分稳健态，因此圆环使用蓝色成功语义。结构、尺寸和数字层级一致，差异来自数据状态。
+- 参考图与当前接口均可出现空趋势、零预警；实现保留完整卡片、筛选、表头和真实空状态，不注入模拟数据。
+- 成本科目分解是 M2 已验收能力，保留在参考工作区下方；它位于参考图首屏之后，不改变参考布局主层级。
+- 快捷入口沿用参考图的七列结构，但仅链接当前页已验收区块，未开放尚未迁移的旧版业务路由。
+- 标注复验：最高风险入口已移至健康卡 Header 的刷新按钮右侧；健康内容区实测 `168px`，趋势/预警双栏实测 `330px`，页面宽度 `1440px` 时无横向溢出。
+
+## Required Fidelity Surfaces
+
+- Fonts and typography: 使用 V2 中文系统字体栈；标题、说明、指标、单位、表头层级与参考图一致。金额压缩为万元后无折行、裁切或溢出。
+- Spacing and layout rhythm: 健康度横向总览、趋势/预警双栏、快捷入口/最近打开三层结构一致；卡片间距 12px，主区域比例和参考图一致。
+- Colors and visual tokens: 主色蓝、成本目标蓝、动态成本青、正向绿、负向红均映射 V2 语义令牌；健康圆环根据真实健康状态变化。
+- Image quality and asset fidelity: 参考工作区无业务位图。圆环为真实数据驱动的原生 Canvas 图表；快捷入口复用项目现有 `currentColor` 导航图标，无 Emoji 或占位图。
+- Copy and content: 保留项目经营健康度、经营趋势、经营预警与待办、快捷入口、最近打开等参考文案；项目、角色、金额和风险内容来自真实接口。
+
+## Full-view Comparison Evidence
+
+- 参考图和最终实现已置于同一 `2464 × 933` 对比输入中检查。
+- 主要区域顺序、左右栏比例、卡片高度、指标分栏和底部工具区无可执行 P0/P1/P2 差异。
+
+## Focused Region Comparison Evidence
+
+- 顶部 `290px` 对比确认健康圆环、最高风险、四项指标、边框和基线对齐。
+- 中部 `480px` 对比确认趋势/预警双栏比例、工具栏、表头、空状态和底部指标区对齐。
+
+## Primary Interactions Tested
+
+- 成本经理真实账号加载、全部项目/全部报告期默认值、具体项目切换和恢复全部。
+- 趋势时间范围切换、预警筛选、页内快捷入口、刷新、管理员八角色切换。
+- 1440 × 900、1024 × 768、390 × 844 三个视口无页面级横向溢出。
+- 浏览器控制台无 warning/error；Axe serious/critical 违规为 0。
+
+## Comparison History
+
+1. 首次实现 P1：隐藏标题和表格说明外露，金额以元显示造成折行。修复隐藏工具类，并统一金额为万元。
+2. 首次构建门禁：通用图表依赖使 vendor 包达到 644KB。移除依赖，改用原生 Canvas 健康圆环，最终最大 vendor 包 111.33KB。
+3. 首次浏览器复验 P1：负利润错误使用成功色。修复成本偏差和利润的正负语义映射。
+4. 首次 Axe 复验 P1：空状态辅助文字对比度不足。由 disabled 色调整为 muted 色，复验 serious/critical 为 0。
+5. 最终同视口全图和重点区域对比无剩余 P0/P1/P2。
+6. 浏览器标注复验：风险入口从正文移至 Header；健康总览由 `222px` 压缩至 `168px`，趋势空态由 `292px` 压缩至 `180px`。实际双栏总高度 `330px`，控制台无 warning/error。
+7. 分数标注复验：移除圆环内 `/100` 比例文字；浏览器实测仅保留分数和健康状态，无横向溢出及控制台 warning/error。
+8. 趋势联动复验：补入项目级 7 个月真实演示快照并使用原生 Canvas 绘图；全部项目/在建项目均为 7 点，近 6 个月为 6 点，近 3 个月为 3 点。删除趋势卡片底部重复 KPI，保留健康总览唯一展示。
+
+## Implementation Checklist
+
+- [x] 参考图三层信息架构
+- [x] 真实数据健康度、指标、风险和成本趋势
+- [x] 桌面、平板、移动端响应式
+- [x] 颜色语义、键盘语义和对比度
+- [x] 单测、Lint、类型、构建、包体积、Clean-room、真实浏览器验收
+
+## Follow-up Polish
+
+- 无需新增后续项。
+
+final result: passed
+
+---
+
 # CGC-PMS 经营指挥台 Design QA
 
 - source visual truth path: `C:\Users\SUMMAD~1\AppData\Local\Temp\codex-clipboard-4041f8cd-86ec-4841-a6fe-6b00d89798a1.png`

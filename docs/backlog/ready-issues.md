@@ -65,6 +65,250 @@ Migration：不需要
 Reviewer要求：核对文案与现行付款/回款实现及业务标准一致；确认无按钮、权限、API、状态机或数据变更。
 最小回滚：回退页面文案、对应单测和治理回写；不涉及迁移与业务数据恢复。
 
+### ISSUE-053-005：M2 共享契约、项目上下文与数据请求基线
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 共享契约 / 项目范围 / 可取消请求
+目标：
+- 补齐八类驾驶舱稳定 DTO、权限码、端点映射和项目查询契约。
+- 复用 V2 请求核心，建立合法报告期转换、按权限选择端点和陈旧请求隔离。
+非目标：
+- 不渲染真实驾驶舱，不修改后端、数据库、Legacy 或正式入口。
+- 不新增全局 Store、请求库、缓存层或业务 mock。
+允许修改：
+- `packages/frontend-contracts/src/**`
+- `frontend-admin-v2/src/services/**`
+- `frontend-admin-v2/src/stores/workspace/**`
+- `frontend-admin-v2/src/layouts/AppShell.vue`
+- `frontend-admin-v2/tests/unit/**`
+- `docs/backlog/**`
+- `docs/plans/第53条主线-M2-工作台与新版驾驶舱任务计划书-2026-07-19.md`
+- `docs/product-intelligence/**`
+- `docs/quality/ISSUE-053-005-M2共享契约与请求基线验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `frontend-admin-v2/src/pages/dashboard/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 八角色端点、权限码和 DTO 与当前后端契约一致；项目列表不扩大当前用户数据范围。
+- 非法项目或报告期不发畸形请求；仅请求当前有权角色端点，陈旧响应不能覆盖最新状态。
+- 契约类型、V2 单测、类型、Lint、Clean-room 边界、构建和 `git diff --check` 通过。
+状态：Done
+来源锚点：`docs/plans/第53条主线-M2-工作台与新版驾驶舱任务计划书-2026-07-19.md` 的 ISSUE-053-005；`docs/product-intelligence/project-map.md` 驾驶舱与报表 Partial
+存量问题键：[mainline:053-M2-005-CONTRACT-REQUEST-BASELINE]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-005`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-005-M2共享契约与请求基线验收报告.md`
+Migration：不需要
+依赖：M1 与公共壳定稿已完成；本 Issue 是 M2 唯一本地实施金丝雀，完成后方可实施 ISSUE-053-006。
+风险等级：高
+运行态要求：本地 V2 与后端；只读项目和驾驶舱接口，不执行业务写入。
+Reviewer要求：交叉核对 Controller、共享契约和请求选择；确认无权端点请求为 0、无项目不回退租户全量、陈旧响应不回写。
+最小回滚：回退 M2 契约、薄服务、workspace 小范围接线和测试；M1 壳保持可用。
+
+### ISSUE-053-006：八角色新版经营驾驶舱
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 驾驶舱 / 八角色 / 数据范围
+目标：
+- 用真实 API 落地八角色经营驾驶舱、趋势、风险、快捷入口和成本两级下钻。
+非目标：
+- 不复制 Legacy UI，不新增图表库、后端口径、写操作或正式入口切换。
+允许修改：
+- `frontend-admin-v2/src/pages/dashboard/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/tests/**`
+- `docs/backlog/**`
+- `docs/product-intelligence/**`
+- `docs/quality/ISSUE-053-006-M2八角色新版经营驾驶舱验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 八角色仅消费真实 API；无权角色不展示、不请求，项目级用户无项目时保持空态。
+- 金额字符串、健康辅助标签、趋势等价文本、成本两级下钻和部分失败隔离通过。
+- 1440、1024、390 视觉、无障碍、单测、类型、Lint、构建、包体和边界通过。
+状态：Ready
+来源锚点：M2计划 ISSUE-053-006；用户选定经营驾驶舱视觉源；项目地图驾驶舱 Partial
+存量问题键：[mainline:053-M2-006-EIGHT-ROLE-DASHBOARD]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-006`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm check:bundle-size`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-006-M2八角色新版经营驾驶舱验收报告.md`
+Migration：不需要
+依赖：ISSUE-053-005 通过。
+风险等级：高
+运行态要求：本地真实后端与受控身份；浏览器只读驾驶舱。
+Reviewer要求：确认真实数据、权限/项目范围、金额口径、部分失败、视觉源与三视口证据。
+最小回滚：恢复 Dashboard 路由占位并回退 V2 驾驶舱页面与测试。
+
+### ISSUE-053-007：审批工作台与实例深链
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 审批 / 深链 / 幂等
+目标：
+- 迁移四类审批列表、详情深链及后端允许的审批动作。
+非目标：
+- 不迁移流程模板管理，不新增动作、状态机、后端或数据库能力。
+允许修改：
+- `packages/frontend-contracts/src/workflow.ts`
+- `frontend-admin-v2/src/services/workflow.ts`
+- `frontend-admin-v2/src/pages/workbench/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/tests/**`
+- `docs/backlog/**`
+- `docs/product-intelligence/**`
+- `docs/quality/ISSUE-053-007-M2审批工作台验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 列表和详情身份范围 fail-close；动作同时受 `availableActions` 与权限控制。
+- CSRF、幂等键、重复点击、冲突和业务拒绝不产生重复事实；`/approval/process` 保持未迁移。
+- 单测、类型、Lint、构建、权限负向、深链和三视口通过。
+状态：Ready
+来源锚点：M2计划 ISSUE-053-007；项目地图审批、抄送与通知 Partial
+存量问题键：[mainline:053-M2-007-APPROVAL-WORKBENCH]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-007`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-007-M2审批工作台验收报告.md`
+Migration：不需要
+依赖：ISSUE-053-006 通过。
+风险等级：高
+运行态要求：本地受控审批样本；禁止生产和无授权业务写入。
+Reviewer要求：确认身份范围、跨租户/未知实例、动作双重控制、CSRF、幂等和事实回读。
+最小回滚：恢复审批路由占位并回退 V2 workflow 契约、服务、页面和测试。
+
+### ISSUE-053-008：预警中心、通知摘要与报表目录
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 预警 / 通知 / 报表
+目标：
+- 迁移预警查询处置闭环、受控通知摘要和报表目录。
+非目标：
+- 不接入 SSE，不伪造未读数，不新增预警规则、报表或后端能力。
+允许修改：
+- `packages/frontend-contracts/src/alert.ts`
+- `packages/frontend-contracts/src/report.ts`
+- `frontend-admin-v2/src/services/**`
+- `frontend-admin-v2/src/pages/workbench/**`
+- `frontend-admin-v2/src/layouts/AppShell.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/tests/**`
+- `docs/backlog/**`
+- `docs/product-intelligence/**`
+- `docs/quality/ISSUE-053-008-M2预警与报表目录验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 预警查看、编辑和评估权限正负矩阵通过；批量部分成功逐项显示。
+- 无预警权限不请求通知摘要；报表按服务端权限过滤，未知目标和 `api_only` 不伪装页面。
+- 单测、类型、Lint、构建、权限、深链和三视口通过。
+状态：Ready
+来源锚点：M2计划 ISSUE-053-008；项目地图预警 Complete(P0) 与驾驶舱报表 Partial
+存量问题键：[mainline:053-M2-008-ALERT-REPORT-WORKBENCH]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-008`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-008-M2预警与报表目录验收报告.md`
+Migration：不需要
+依赖：ISSUE-053-007 通过。
+风险等级：高
+运行态要求：本地受控身份和数据；只执行验收所需受控预警动作。
+Reviewer要求：确认权限矩阵、部分成功、通知零伪造、报表目标过滤和真实回读。
+最小回滚：恢复预警/报表路由占位并回退相关契约、服务、页面、壳接线和测试。
+
+### ISSUE-053-009：M2全量退出门与治理收口
+
+优先级：P0
+任务性质：回归证明
+类型：Clean-room V2 / M2验收 / 路由台账 / 治理收口
+目标：
+- 完成九个M2路由、八角色、四类身份、三视口和治理载体的一致性验收。
+非目标：
+- 不新增业务能力，不切换正式入口，不发布生产或退役 Legacy。
+允许修改：
+- `frontend-admin-v2/tests/**`
+- `frontend-admin-v2/e2e/**`
+- `frontend-admin-v2/route-migration-ledger.json`
+- `docs/ui-v2/**`
+- `docs/backlog/**`
+- `docs/product-intelligence/**`
+- `docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md`
+禁止修改：
+- `backend/src/main/**`
+- `frontend-admin/src/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 九个目标路由均为 `V2_ACCEPTED`，台账达到78/9/0；无占位、mock或Legacy边。
+- 权限、项目范围、金额、审批幂等、预警部分成功、报表过滤、性能、包体、axe和控制台门禁通过。
+- 所有发现完成修复、正式承接或关闭；正式报告与项目地图、迭代决策、Current Focus一致。
+状态：Ready
+来源锚点：M2计划 ISSUE-053-009 与 M2完成定义
+存量问题键：[mainline:053-M2-009-EXIT-GATE]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-009`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm check:bundle-size`
+- `git diff --check`
+归档报告：`docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md`
+Migration：不需要
+依赖：ISSUE-053-008 通过。
+风险等级：高
+运行态要求：本地V2、Legacy、后端和数据库健康；真实受控身份和1440/1024/390浏览器验收。
+Reviewer要求：独立核对路由计数、权限负向、数据范围、金额、写侧事实、Clean-room、三视口和零悬空。
+最小回滚：将九个M2路由恢复占位并回退M2页面、服务、契约、测试与台账；M1保留。
+
 ### ISSUE-053-001：建立 Clean-room V2 设计令牌与最小组件基线
 
 优先级：P0
@@ -1013,7 +1257,6 @@ Reviewer要求：确认项目和物料仅由当前库存项服务端反查；确
 - `cd frontend-admin; pnpm vitest run src/pages/inventory/__tests__/stock-production.test.ts`
 - `cd frontend-admin; pnpm type-check`
 - `git diff --check`
-
 ### ISSUE-048-002：采购补货前同项目跨仓可调拨余量提示
 
 优先级：P1

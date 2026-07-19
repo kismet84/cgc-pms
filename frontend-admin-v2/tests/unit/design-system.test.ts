@@ -78,6 +78,23 @@ describe('Clean-room V2 design system', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([['2026-07']])
   })
 
+  it('supports a selectable empty option without duplicating the placeholder', async () => {
+    const wrapper = mount(V2Select, {
+      props: {
+        label: '当前项目',
+        modelValue: '',
+        allowEmpty: true,
+        options: [
+          { value: '', label: '全部项目' },
+          { value: '1', label: '项目一' },
+        ],
+      },
+    })
+
+    expect(wrapper.findAll('option')).toHaveLength(2)
+    expect(wrapper.get('select').element.selectedOptions[0]?.textContent).toBe('全部项目')
+  })
+
   it('covers card, badge, alert and skeleton status primitives', async () => {
     const card = mount(V2Card, {
       props: { title: '经营健康度', subtitle: '当前报告期', interactive: true },
