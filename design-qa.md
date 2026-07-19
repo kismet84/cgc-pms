@@ -52,3 +52,153 @@
 - 无需建立后续项。参考图中的非空趋势与预警数据应由业务数据产生，不在前端写入模拟数据。
 
 final result: passed
+
+---
+
+# 公共壳定稿 Design QA
+
+- source visual truth: `public-shell-audit/07-annotation-baseline.png`、标签参考图与用户提供的八域 SVG 定义
+- desktop implementation: `public-shell-audit/45-public-shell-final-desktop.png`
+- mobile implementation: `public-shell-audit/49-public-shell-final-mobile-single-row.png`
+- mobile before/after comparison: `public-shell-audit/50-public-shell-mobile-final-comparison.png`
+- viewports: 1490 x 1114、1024 x 768、390 x 844
+- states: `/v2/dashboard`、`/v2/system/users`、`/v2/project-schedule`、`/v2/site/daily-log`
+- focused region evidence: 移动端 Header 与 Tab 在 before/after 对比中可直接判读；桌面侧栏、Header、工作区栏和图标在全视图中清晰可读。
+
+## Findings
+
+- 无剩余 P0/P1/P2。
+- 字体与排版：公共壳沿用 V2 中文系统字体栈；桌面标签 12px，移动端上下文值和标签文案均完整可读。
+- 间距与布局：桌面品牌区/Header 65px、工作区栏 50px、侧栏 200px/折叠 80px；移动端 Header 内容自适应且页面无横向溢出。
+- 颜色与视觉令牌：导航默认/选中态使用 text-secondary/primary；Tab 使用冷灰默认底、浅红选中底与 danger 红线。
+- 图像与资产：八域导航完整复用用户提供的 24px `currentColor` SVG；无单字占位、Emoji 或临时图形。
+- 文案与内容：项目、报告期、域、工作区、Tab 和空状态文案均保持真实路由语义。
+- 响应式：移动端 Header 保持单行；390px 下两个上下文控件各约 109px，430px 下各约 129px；Tab 按文字宽度自适应，项目计划/现场日报各约 114px；原生滚动条隐藏但保留触摸滚动。
+- 可访问性：导航、折叠、移动端抽屉、上下文控件和标签均保留语义名称、键盘焦点与状态属性。
+
+## Primary Interactions Tested
+
+- 侧栏展开 200px、折叠 80px并可恢复。
+- 项目计划切换到现场日报，选中底边遮挡红线，未选中标签继续显示红线。
+- 移动端导航打开、焦点进入、关闭后恢复；抽屉内当前域工作区可见。
+- 8 个域图标全部渲染，系统管理选中态跟随主色。
+- 桌面、窄屏、移动端均无页面级横向溢出；浏览器控制台无 warning/error。
+
+## Comparison History
+
+1. 侧栏宽度、品牌/Header 高度、工作区栏高度、折叠入口和导航间距按用户标注逐项校正。
+2. Tab 轮廓、尺寸、字号、右上圆角、状态底色和选中遮线按参考图与用户标注逐项校正。
+3. 八域单字占位替换为用户提供的 `currentColor` SVG。
+4. 最终 P2：移动端上下文控件继承桌面双列字段模板，被压缩到约 46px；先修复字段宽度，再按用户要求把菜单、项目、报告期、通知和头像收敛到单行 Header。
+5. 最终优化：移动端 Tab 改为文字宽度自适应，并隐藏可见滚动条；复验无溢出。
+
+## Implementation Checklist
+
+- [x] 桌面、窄屏、移动端尺寸与溢出复验
+- [x] 侧栏折叠/恢复与移动抽屉复验
+- [x] 标签切换、动态宽度和选中遮线复验
+- [x] 八域图标与状态色复验
+- [x] Lint、单测、类型、构建、边界、路由账本和包体积门禁
+
+final result: passed
+
+---
+
+# 八域主导航图标设计 QA
+
+- source asset definition: `C:/Users/summade87114/.codex/attachments/90a51f01-88d7-4731-8df3-3ffb4cfe105a/pasted-text.txt`
+- implementation screenshot: `C:/Users/summade87114/.codex/visualizations/2026/07/19/019f79fb-2bf9-7b52-b36a-99f900490804/public-shell-audit/43-eight-domain-icons.png`
+- full-view comparison evidence: `C:/Users/summade87114/.codex/visualizations/2026/07/19/019f79fb-2bf9-7b52-b36a-99f900490804/public-shell-audit/44-eight-domain-icons-comparison.png`
+- viewport: 1280 x 720
+- state: `/v2/system/users`，系统管理选中
+- focused region evidence: 左侧完整八域导航在全视图中清晰可读，无需额外裁切。
+
+## Findings
+
+- 无剩余 P0/P1/P2。
+- 字体与排版：导航文案、字号、行高均未改变。
+- 间距与布局：8 个图标均为 24 x 24px，沿用原 28px 图标槽位；侧栏间距未改变。
+- 颜色与视觉令牌：SVG 使用 `currentColor`；默认态为次级文字色，选中态随域链接变为主色蓝。
+- 图像与资产：完整复用用户提供的 8 套 SVG 几何，不使用单字占位或替代图形。
+- 文案：8 个导航项及可访问名称保持不变。
+
+## Comparison History
+
+1. 初始 P2：八域主导航使用“台、项、商、供、分、财、基、系”单字占位。
+2. 修复：替换为附件提供的 8 个 `currentColor` SVG 图标，未改变导航结构、权限与路由。
+3. 复验：8 个图标均渲染为 24 x 24px；默认态和选中态颜色正确；页面无横向溢出。
+
+final result: passed
+
+---
+
+# 公共壳侧栏标注设计 QA
+
+- source visual truth: `C:/Users/summade87114/.codex/visualizations/2026/07/19/019f79fb-2bf9-7b52-b36a-99f900490804/public-shell-audit/07-annotation-baseline.png`
+- implementation screenshot: `C:/Users/summade87114/.codex/visualizations/2026/07/19/019f79fb-2bf9-7b52-b36a-99f900490804/public-shell-audit/41-shell-heights-65-65-50.png`
+- full-view comparison evidence: `C:/Users/summade87114/.codex/visualizations/2026/07/19/019f79fb-2bf9-7b52-b36a-99f900490804/public-shell-audit/42-shell-heights-comparison.png`
+- viewport: 1440 x 900
+- state: `/v2/project-schedule`，侧栏展开，平台管理员
+- focused region evidence: 全视图中品牌区、header、完整侧栏及底部按钮均清晰可读，无需额外裁切。
+
+## Findings
+
+- 无剩余 P0/P1/P2。
+- 字体与排版：沿用现有 V2 字体、字重与字号，无漂移。
+- 间距与布局：品牌区和 header 均为 65px，工作区栏为 50px；侧栏展开 200px、折叠 80px；无横向溢出。
+- 颜色与视觉令牌：仅复用现有 surface、border、primary 令牌。
+- 图像与资产：未新增或替换资产；现有品牌标识与导航图形保持不变。
+- 文案：新增“收起侧栏 / 展开侧栏”可访问名称，状态语义明确。
+
+## Comparison History
+
+1. 初始 P2：品牌区与右侧 header 高度观感未对齐。最终按标注统一为 65px，浏览器计算值均为 `65px`。
+2. 初始 P2：侧栏宽于目标且缺少折叠入口。修复：展开宽度改为 `200px`，底部增加可逆折叠按钮，折叠宽度 `80px`。
+3. 复验：展开/折叠交互通过，页面无横向溢出，浏览器 warn/error 为 0。
+4. 标注校正：工作区栏固定为 50px；移动端继续使用内容自适应高度。
+
+## Implementation Checklist
+
+- [x] 品牌区与 header 等高
+- [x] 侧栏展开宽度 200px
+- [x] 底部折叠按钮
+- [x] 折叠与恢复交互
+- [x] 无横向溢出
+
+final result: passed
+
+---
+
+# 公共壳梯形 Tab 设计 QA
+
+- source visual truth: `C:/Users/SUMMAD~1/AppData/Local/Temp/codex-clipboard-f3601fa7-7b94-4ace-bc28-7a2d87404118.png`
+- implementation screenshot: `C:/Users/summade87114/.codex/visualizations/2026/07/19/019f79fb-2bf9-7b52-b36a-99f900490804/public-shell-audit/39-tabs-180x40.png`
+- full-view comparison evidence: `C:/Users/summade87114/.codex/visualizations/2026/07/19/019f79fb-2bf9-7b52-b36a-99f900490804/public-shell-audit/40-tabs-180x40-comparison.png`
+- viewport: 1440 x 900
+- state: `/v2/project-schedule`，项目计划选中
+- focused region evidence: 对比图中的标签条可清晰识别默认态与选中态，无需额外裁切。
+
+## Findings
+
+- 无剩余 P0/P1/P2。
+- 字体与排版：沿用 V2 字体栈；标签字重与参考图一致。
+- 间距与布局：所有标签统一为 `180 x 40px` 非对称梯形；左边严格垂直，右侧斜切并在右上角使用贝塞尔圆角过渡，标签重叠 14px；横向溢出由原生滚动承接。
+- 字号：标签文字统一为 `12px`。
+- 颜色与视觉令牌：冷灰默认态、浅灰悬停态、极浅红底红字选中态，状态均复用 V2 语义令牌；红色底线保持贯穿。
+- 图像与资产：参考组件无图片资产；实现未新增图标或替代资产。
+- 文案：保留真实工作区标签，无参考图示例文案渗入。
+
+## Comparison History
+
+1. 初版 P2：标签过窄，且误实现为对称梯形。
+2. 二次 P2：后续标签误做成平行四边形，左右两侧都发生倾斜。
+3. 用户校正：所有标签采用同一轮廓，左边直边、右边斜切。
+4. 修复：统一右侧顶部内收 25px、重叠 14px；左侧顶部内收归零。
+5. 用户校正：标签尺寸统一调整为 180 x 50px，文字调整为 12px。
+6. 用户校正：右上角增加圆角。修复为固定尺寸路径中的贝塞尔圆滑过渡，未改变左侧直边。
+7. 用户校正：提高默认态与选中态底色辨识度。修复为冷灰默认底、极浅红选中底，悬停态使用现有 surface-hover 令牌。
+8. 用户校正：选中标签必须遮挡底部红线。修复为各未选中标签自行绘制底线，标签组尾部伪元素补齐剩余底线；选中标签用同色底边自然断开红线。
+9. 用户校正：标签尺寸调整为 180 x 40px；宽度、12px 字号与其余交互样式不变。
+10. 复验：标签切换、选中态、390px 响应式和页面无横向溢出均通过；浏览器 warn/error 为 0。
+
+final result: passed

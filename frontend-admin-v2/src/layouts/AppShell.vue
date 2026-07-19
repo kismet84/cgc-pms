@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { V2Alert, V2Button, V2Dialog, V2PageState, V2Select } from '@/components'
+import DomainNavigationIcon from '@/components/DomainNavigationIcon.vue'
 import { findWorkspace, visibleNavigation } from '@/navigation/catalog'
 import ShellLoadingPage from '@/pages/shell/ShellLoadingPage.vue'
 import { useSessionStore } from '@/stores/session'
@@ -12,6 +13,7 @@ const router = useRouter()
 const session = useSessionStore()
 const workspaceStore = useWorkspaceStore()
 const mobileNavigationOpen = ref(false)
+const sidebarCollapsed = ref(false)
 const notificationOpen = ref(false)
 const isMobile = ref(false)
 const menuToggle = ref<HTMLButtonElement | null>(null)
@@ -142,7 +144,13 @@ async function signOut(): Promise<void> {
 </script>
 
 <template>
-  <div class="app-shell" :class="{ 'app-shell--nav-open': mobileNavigationOpen }">
+  <div
+    class="app-shell"
+    :class="{
+      'app-shell--nav-open': mobileNavigationOpen,
+      'app-shell--collapsed': sidebarCollapsed && !isMobile,
+    }"
+  >
     <a class="app-shell__skip-link" href="#shell-main-content">跳到主要内容</a>
     <button
       v-if="mobileNavigationOpen"
@@ -193,7 +201,9 @@ async function signOut(): Promise<void> {
             :to="domain.workspaces[0]!.tabs[0]!.path"
             :aria-label="domain.label"
           >
-            <span class="app-shell__domain-badge" aria-hidden="true">{{ domain.badge }}</span>
+            <span class="app-shell__domain-badge" aria-hidden="true">
+              <DomainNavigationIcon :domain-id="domain.id" />
+            </span>
             <span>{{ domain.label }}</span>
           </RouterLink>
           <div class="app-shell__workspaces">
@@ -213,6 +223,16 @@ async function signOut(): Promise<void> {
       <div v-if="!navigation.length" class="app-shell__empty-navigation">
         当前账号无可访问业务域
       </div>
+
+      <button
+        type="button"
+        class="app-shell__collapse-toggle"
+        :aria-label="sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+        :aria-expanded="!sidebarCollapsed"
+        @click="sidebarCollapsed = !sidebarCollapsed"
+      >
+        {{ sidebarCollapsed ? '展开' : '收起侧栏' }}
+      </button>
 
       <div class="app-shell__mobile-account">
         <span class="app-shell__avatar" aria-hidden="true">{{ accountName.slice(0, 1) }}</span>
@@ -285,25 +305,24 @@ async function signOut(): Promise<void> {
       </header>
 
       <div class="app-shell__workspace-bar">
-        <div>
+        <div class="app-shell__breadcrumb" aria-label="当前位置">
           <span>{{ activeMatch?.domain.label || '应用壳' }}</span>
           <strong>{{ activeMatch?.workspace.label || '权限导航' }}</strong>
         </div>
         <span v-if="workspaceStore.objectContext" class="app-shell__object-context">
           对象 {{ workspaceStore.objectContext.kind }} / {{ workspaceStore.objectContext.id }}
         </span>
+        <nav v-if="visibleActiveWorkspace" class="app-shell__tabs" aria-label="工作区标签页">
+          <RouterLink
+            v-for="tab in visibleActiveWorkspace.tabs"
+            :key="tab.path"
+            :to="{ path: tab.path, query: route.query }"
+            class="app-shell__tab"
+          >
+            <span>{{ tab.label }}</span>
+          </RouterLink>
+        </nav>
       </div>
-
-      <nav v-if="visibleActiveWorkspace" class="app-shell__tabs" aria-label="工作区标签页">
-        <RouterLink
-          v-for="tab in visibleActiveWorkspace.tabs"
-          :key="tab.path"
-          :to="{ path: tab.path, query: route.query }"
-          class="app-shell__tab"
-        >
-          {{ tab.label }}
-        </RouterLink>
-      </nav>
 
       <div v-if="session.requestNotice" class="app-shell__notice-region">
         <V2Alert
@@ -345,7 +364,7 @@ async function signOut(): Promise<void> {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: 17rem minmax(0, 1fr);
+  grid-template-columns: 12.5rem minmax(0, 1fr);
   background: var(--v2-color-canvas);
 }
 
@@ -371,13 +390,17 @@ async function signOut(): Promise<void> {
   z-index: var(--v2-z-sticky);
   inset-block-start: 0;
   height: 100vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--v2-color-surface);
   border-inline-end: var(--v2-border-width) solid var(--v2-color-border);
 }
 
 .app-shell__brand {
-  min-height: 4.75rem;
+  box-sizing: border-box;
+  height: 4.0625rem;
+  min-height: 4.0625rem;
   display: flex;
   align-items: center;
   gap: var(--v2-space-3);
@@ -425,9 +448,10 @@ async function signOut(): Promise<void> {
 }
 
 .app-shell__navigation {
+  overflow-y: auto;
   display: grid;
   gap: var(--v2-space-1);
-  padding: var(--v2-space-3);
+  padding: var(--v2-space-2);
 }
 
 .app-shell__domain {
@@ -435,7 +459,7 @@ async function signOut(): Promise<void> {
 }
 
 .app-shell__domain-link {
-  min-height: var(--v2-control-height-touch);
+  min-height: 2.5rem;
   display: flex;
   align-items: center;
   gap: var(--v2-space-3);
@@ -459,14 +483,16 @@ async function signOut(): Promise<void> {
   display: grid;
   place-items: center;
   color: currentColor;
-  border: var(--v2-border-width) solid currentColor;
-  border-radius: var(--v2-radius-sm);
-  font-size: var(--v2-font-size-11);
+}
+
+.app-shell__domain-badge svg {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .app-shell__workspaces {
   display: none;
-  padding: var(--v2-space-1) var(--v2-space-2) var(--v2-space-2) 3.5rem;
+  padding: 0 var(--v2-space-2) var(--v2-space-1) 3.25rem;
 }
 
 .app-shell__domain--active .app-shell__workspaces {
@@ -474,7 +500,7 @@ async function signOut(): Promise<void> {
 }
 
 .app-shell__workspace-link {
-  padding: var(--v2-space-2);
+  padding: var(--v2-space-1) var(--v2-space-2);
   color: var(--v2-color-text-muted);
   border-inline-start: 2px solid var(--v2-color-border);
   font-size: var(--v2-font-size-12);
@@ -496,12 +522,32 @@ async function signOut(): Promise<void> {
   font-size: var(--v2-font-size-12);
 }
 
+.app-shell__collapse-toggle {
+  min-height: 3rem;
+  flex: 0 0 auto;
+  margin-block-start: auto;
+  color: var(--v2-color-text-secondary);
+  background: var(--v2-color-surface);
+  border: 0;
+  border-block-start: var(--v2-border-width) solid var(--v2-color-border);
+  font: var(--v2-font-weight-semibold) var(--v2-font-size-12) / var(--v2-line-height-ui)
+    var(--v2-font-sans);
+  cursor: pointer;
+}
+
+.app-shell__collapse-toggle:hover {
+  color: var(--v2-color-primary);
+  background: var(--v2-color-primary-soft);
+}
+
 .app-shell__main {
   min-width: 0;
 }
 
 .app-shell__header {
-  min-height: 4.75rem;
+  box-sizing: border-box;
+  height: 4.0625rem;
+  min-height: 4.0625rem;
   display: grid;
   grid-template-columns: minmax(24rem, 1fr) auto auto;
   align-items: center;
@@ -551,8 +597,18 @@ async function signOut(): Promise<void> {
 
 .app-shell__context-controls {
   display: grid;
-  grid-template-columns: repeat(2, minmax(12rem, 18rem));
-  gap: var(--v2-space-4);
+  grid-template-columns: repeat(2, minmax(15rem, 20rem));
+  gap: var(--v2-space-3);
+}
+
+.app-shell__context-controls :deep(.v2-field) {
+  grid-template-columns: auto minmax(10rem, 1fr);
+  align-items: center;
+  gap: var(--v2-space-2);
+}
+
+.app-shell__context-controls :deep(.v2-field__label) {
+  white-space: nowrap;
 }
 
 .app-shell__account {
@@ -577,19 +633,22 @@ async function signOut(): Promise<void> {
 }
 
 .app-shell__workspace-bar {
-  min-height: 3.5rem;
+  box-sizing: border-box;
+  height: 3.125rem;
+  min-height: 3.125rem;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--v2-space-4);
-  padding: var(--v2-space-3) var(--v2-page-gutter);
+  gap: var(--v2-space-5);
+  padding: 0 var(--v2-page-gutter);
   background: var(--v2-color-surface);
   border-block-end: var(--v2-border-width) solid var(--v2-color-border-subtle);
 }
 
-.app-shell__workspace-bar > div {
-  display: grid;
-  gap: var(--v2-space-1);
+.app-shell__breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: var(--v2-space-2);
+  white-space: nowrap;
 }
 
 .app-shell__workspace-bar span {
@@ -597,9 +656,11 @@ async function signOut(): Promise<void> {
   font-size: var(--v2-font-size-11);
 }
 
-.app-shell__workspace-bar strong {
+.app-shell__breadcrumb strong {
+  padding-inline-start: var(--v2-space-2);
   color: var(--v2-color-text-strong);
-  font-size: var(--v2-font-size-17);
+  border-inline-start: var(--v2-border-width) solid var(--v2-color-border);
+  font-size: var(--v2-font-size-12);
 }
 
 .app-shell__object-context {
@@ -609,32 +670,78 @@ async function signOut(): Promise<void> {
 }
 
 .app-shell__tabs {
-  min-height: var(--v2-control-height-touch);
+  min-width: 0;
+  min-height: 2.5rem;
   display: flex;
-  gap: var(--v2-space-1);
+  flex: 1;
+  align-items: flex-end;
+  gap: 0;
   overflow-x: auto;
-  padding: 0 var(--v2-page-gutter);
-  background: var(--v2-color-surface);
-  border-block-end: var(--v2-border-width) solid var(--v2-color-border);
+  overflow-y: hidden;
+  padding: 0;
+  scrollbar-width: none;
+}
+
+.app-shell__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.app-shell__tabs::after {
+  min-width: 4rem;
+  flex: 1 0 4rem;
+  align-self: flex-end;
+  border-block-end: 2px solid var(--v2-color-workspace-tab-accent);
+  content: '';
 }
 
 .app-shell__tab {
-  min-height: var(--v2-control-height-touch);
+  position: relative;
+  box-sizing: border-box;
+  width: 11.25rem;
+  min-width: 11.25rem;
+  height: 2.5rem;
+  min-height: 2.5rem;
   display: inline-flex;
   align-items: center;
-  padding: 0 var(--v2-space-3);
+  justify-content: center;
+  margin-block-end: 0;
+  margin-inline-end: -0.875rem;
+  padding: 0 var(--v2-space-6);
   color: var(--v2-color-text-secondary);
-  border-block-end: 2px solid transparent;
+  background: var(--v2-color-canvas);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-block-end: 2px solid var(--v2-color-workspace-tab-accent);
+  border-radius: var(--v2-radius-md) var(--v2-radius-md) 0 0;
+  clip-path: path('M 0 0 H 154 C 159 0 161 2 163 7 L 180 40 H 0 Z');
+  filter: drop-shadow(-1px 0 0 var(--v2-color-border)) drop-shadow(1px 0 0 var(--v2-color-border));
   font-size: var(--v2-font-size-12);
   font-weight: var(--v2-font-weight-semibold);
   text-decoration: none;
   white-space: nowrap;
 }
 
-.app-shell__tab:hover,
+.app-shell__tab > span {
+  color: inherit;
+  font-size: inherit;
+}
+
+.app-shell__tab:hover {
+  color: var(--v2-color-workspace-tab-accent);
+  background: var(--v2-color-surface-hover);
+  border-block-start: 3px solid var(--v2-color-workspace-tab-accent);
+}
+
 .app-shell__tab.router-link-active {
-  color: var(--v2-color-primary);
-  border-block-end-color: var(--v2-color-primary);
+  z-index: 1;
+  color: var(--v2-color-workspace-tab-accent);
+  background: var(--v2-color-workspace-tab-accent-soft);
+  border-block-end-color: var(--v2-color-workspace-tab-accent-soft);
+  border-block-start: 3px solid var(--v2-color-workspace-tab-accent);
+}
+
+.app-shell__tab:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 0 0 3px var(--v2-color-focus-ring);
 }
 
 .app-shell__content {
@@ -662,34 +769,42 @@ async function signOut(): Promise<void> {
   display: none;
 }
 
+.app-shell--collapsed {
+  grid-template-columns: 5rem minmax(0, 1fr);
+}
+
+.app-shell--collapsed .app-shell__brand {
+  justify-content: center;
+  padding-inline: var(--v2-space-2);
+}
+
+.app-shell--collapsed .app-shell__brand-copy,
+.app-shell--collapsed .app-shell__domain-link > span:last-child,
+.app-shell--collapsed .app-shell__workspaces,
+.app-shell--collapsed .app-shell__domain--active .app-shell__workspaces {
+  display: none;
+}
+
+.app-shell--collapsed .app-shell__domain-link {
+  justify-content: center;
+  padding-inline: var(--v2-space-2);
+}
+
 @media (max-width: 70rem) and (min-width: 48.01rem) {
-  .app-shell {
-    grid-template-columns: 5rem minmax(0, 1fr);
-  }
-
-  .app-shell__brand {
-    justify-content: center;
-    padding-inline: var(--v2-space-2);
-  }
-
-  .app-shell__brand-copy,
-  .app-shell__domain-link > span:last-child,
-  .app-shell__workspaces,
-  .app-shell__domain--active .app-shell__workspaces {
-    display: none;
-    height: 0;
-    overflow: hidden;
-    padding: 0;
-    visibility: hidden;
-  }
-
-  .app-shell__domain-link {
-    justify-content: center;
-    padding-inline: var(--v2-space-2);
-  }
-
   .app-shell__header {
     grid-template-columns: minmax(20rem, 1fr) auto auto;
+  }
+
+  .app-shell__context-controls {
+    grid-template-columns: repeat(2, minmax(10rem, 1fr));
+  }
+
+  .app-shell__context-controls :deep(.v2-field) {
+    grid-template-columns: 1fr;
+  }
+
+  .app-shell__context-controls :deep(.v2-field__label) {
+    display: none;
   }
 }
 
@@ -707,6 +822,10 @@ async function signOut(): Promise<void> {
     transition: transform var(--v2-motion-base) var(--v2-ease-standard);
   }
 
+  .app-shell__collapse-toggle {
+    display: none;
+  }
+
   .app-shell--nav-open .app-shell__sidebar {
     transform: translateX(0);
   }
@@ -721,6 +840,7 @@ async function signOut(): Promise<void> {
   }
 
   .app-shell__header {
+    height: auto;
     min-height: auto;
     grid-template-columns: auto minmax(0, 1fr) auto auto;
     gap: var(--v2-space-2);
@@ -741,11 +861,22 @@ async function signOut(): Promise<void> {
   }
 
   .app-shell__context-controls {
-    grid-column: 1 / -1;
-    grid-row: 2;
+    grid-column: 2;
+    grid-row: 1;
     min-width: 0;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--v2-space-2);
+    gap: var(--v2-space-1);
+  }
+
+  .app-shell__context-controls :deep(.v2-field) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell__context-controls :deep(.v2-field__control) {
+    min-width: 0;
+    min-height: var(--v2-control-height-md);
+    padding-inline: var(--v2-space-2) var(--v2-space-6);
+    font-size: var(--v2-font-size-11);
   }
 
   .app-shell__context-controls :deep(.v2-field__label),
@@ -791,8 +922,12 @@ async function signOut(): Promise<void> {
   }
 
   .app-shell__workspace-bar {
-    align-items: flex-start;
-    padding-inline: var(--v2-space-4);
+    height: auto;
+    min-height: auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0 var(--v2-space-3);
+    padding: var(--v2-space-2) var(--v2-space-4) 0;
   }
 
   .app-shell__object-context {
@@ -803,7 +938,26 @@ async function signOut(): Promise<void> {
   }
 
   .app-shell__tabs {
-    padding-inline: var(--v2-space-3);
+    flex-basis: 100%;
+    order: 3;
+  }
+
+  .app-shell__tab {
+    width: max-content;
+    min-width: max-content;
+    padding-inline: var(--v2-space-8);
+    clip-path: polygon(
+      0 0,
+      calc(100% - 1.625rem) 0,
+      calc(100% - 1.375rem) 0.125rem,
+      calc(100% - 1.1875rem) 0.4375rem,
+      100% 100%,
+      0 100%
+    );
+  }
+
+  .app-shell__breadcrumb {
+    min-height: 2rem;
   }
 
   .app-shell__content {

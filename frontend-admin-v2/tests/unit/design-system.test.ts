@@ -154,6 +154,7 @@ describe('Clean-room V2 design system', () => {
     for (const token of [
       '--v2-color-primary',
       '--v2-color-danger',
+      '--v2-color-workspace-tab-accent',
       '--v2-chart-1',
       '--v2-font-sans',
       '--v2-space-4',
@@ -167,5 +168,17 @@ describe('Clean-room V2 design system', () => {
 
     expect(componentCss).not.toMatch(/#[0-9a-f]{3,8}\b/i)
     expect(componentFiles).not.toMatch(/#[0-9a-f]{3,8}\b/i)
+  })
+
+  it('keeps navigation accents separate from risk colors', () => {
+    const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
+    const placeholder = readFileSync(
+      resolve(sourceRoot, 'pages/shell/ShellPlaceholderPage.vue'),
+      'utf-8',
+    )
+
+    expect(appShell).toContain('var(--v2-color-workspace-tab-accent)')
+    expect(placeholder).toContain('title="业务页面建设中" tone="info"')
+    expect(placeholder).not.toContain('tone="warning"')
   })
 })

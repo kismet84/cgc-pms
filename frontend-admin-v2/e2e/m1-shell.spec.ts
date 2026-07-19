@@ -119,6 +119,9 @@ test('keeps login and authenticated shell accessible at 1440, 1024 and 390', asy
     await page.goto('/v2/dashboard')
     await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
     await expect(page.getByRole('main')).toBeVisible()
+    await expect(page.getByLabel('当前位置')).toContainText('工作台经营驾驶舱')
+    await expect(page.getByRole('navigation', { name: '工作区标签页' })).toHaveCount(1)
+    await expect(page.locator('.shell-placeholder h1')).toHaveCount(1)
     await expectNoHorizontalOverflow(page)
     await expectNoSeriousAxeViolations(page)
 
@@ -136,12 +139,32 @@ test('keeps login and authenticated shell accessible at 1440, 1024 and 390', asy
       })
       await page.keyboard.press('Tab')
       await expect(page.getByRole('link', { name: '跳到主要内容' })).toBeFocused()
+      await page.getByRole('button', { name: '收起侧栏' }).click()
+      await expect(page.locator('.app-shell')).toHaveClass(/app-shell--collapsed/)
+      await page.getByRole('button', { name: '展开侧栏' }).click()
     }
     if (viewport.name === 'compact') {
-      await expect(page.locator('.app-shell__workspaces').first()).toBeHidden()
+      await expect(page.locator('.app-shell__sidebar')).toHaveCSS('width', '200px')
+      await expect(page.locator('.app-shell__domain--active .app-shell__workspaces')).toBeVisible()
       await expect(page.getByRole('link', { name: '供应链与物资' })).toBeVisible()
     }
     if (viewport.name === 'mobile') {
+      const menuTop = await page
+        .getByRole('button', { name: '打开导航' })
+        .evaluate((button) => button.getBoundingClientRect().top)
+      for (const label of ['当前项目', '报告期']) {
+        const controlBox = await page.getByLabel(label).evaluate((control) => {
+          const rect = control.getBoundingClientRect()
+          return { top: rect.top, width: rect.width }
+        })
+        expect(controlBox.width).toBeGreaterThan(80)
+        expect(Math.abs(controlBox.top - menuTop)).toBeLessThan(4)
+      }
+      const mobileTabWidths = await page
+        .getByRole('navigation', { name: '工作区标签页' })
+        .getByRole('link')
+        .evaluateAll((tabs) => tabs.map((tab) => tab.getBoundingClientRect().width))
+      expect(mobileTabWidths.every((width) => width > 70 && width < 180)).toBe(true)
       const menu = page.getByRole('button', { name: '打开导航' })
       await menu.click()
       await expect(page.getByRole('button', { name: '关闭导航' }).last()).toBeFocused()
