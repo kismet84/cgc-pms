@@ -34,6 +34,16 @@ class QualitySafetyClosedLoopIntegrationTest {
     private static final long SUBJECT = 99188004L;
     private static final long MAPPING_VERSION = 99188005L;
     private static final long ASSIGNMENT_RULE = 99188006L;
+    private static final long CONTRACT_COUNTERPARTY = 99188007L;
+    private static final long OTHER_PROJECT = 99188008L;
+    private static final long OTHER_PARTNER_A = 99188009L;
+    private static final long OTHER_PARTNER_B = 99188010L;
+    private static final long OTHER_PROJECT_CONTRACT = 99188011L;
+    private static final long UNRELATED_CONTRACT = 99188012L;
+    private static final long CROSS_TENANT_PROJECT = 99188013L;
+    private static final long CROSS_TENANT_PARTNER_A = 99188014L;
+    private static final long CROSS_TENANT_PARTNER_B = 99188015L;
+    private static final long CROSS_TENANT_CONTRACT = 99188016L;
     private static final AtomicLong FILE_ID = new AtomicLong(99188100L);
 
     @Autowired QualitySafetyService service;
@@ -47,7 +57,8 @@ class QualitySafetyClosedLoopIntegrationTest {
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 1,0,'admin','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','系统管理员','ENABLE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=1)");
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,contract_amount,target_cost,project_manager_id,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'QS-IT','质量安全闭环测试项目',100000,80000,1,'ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'QS-SUP','测试供应商','SUPPLIER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", PARTNER);
-        jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'QS-PO','测试采购合同','PURCHASE',?,?,10000,10000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACT, PROJECT, PARTNER, PARTNER);
+        jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'QS-OWNER','测试合同相对方','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACT_COUNTERPARTY);
+        jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'QS-PO','测试采购合同','PURCHASE',?,?,10000,10000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACT, PROJECT, CONTRACT_COUNTERPARTY, PARTNER);
         jdbc.update("INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,created_at,updated_at,deleted_flag) VALUES(?,0,0,'QS-COST','质量安全返工','质量安全','COST',1,1,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", SUBJECT);
         jdbc.update("INSERT INTO cost_subject_mapping_version(id,tenant_id,version_code,version_name,status,effective_date,created_by) VALUES(?,0,'QS-TEST-V2','质量安全测试映射','ACTIVE',CURRENT_DATE,1)", MAPPING_VERSION);
         jdbc.update("INSERT INTO cost_subject_assignment_rule(id,tenant_id,mapping_version_id,rule_code,source_type,business_category,project_id,cost_subject_id,priority,status,effective_from,created_by) VALUES(?,0,?,'QS-REWORK','QUALITY_SAFETY_CONSEQUENCE','SAFETY',NULL,?,1,'ACTIVE',CURRENT_DATE,1)", ASSIGNMENT_RULE, MAPPING_VERSION, SUBJECT);
@@ -85,6 +96,26 @@ class QualitySafetyClosedLoopIntegrationTest {
         assertEquals("PASSED", service.reinspect(rectification.getId(),
                 new ReinspectionCommand("PASS", "复测间距符合方案，现场清理完成")).getStatus());
         assertEquals("CLOSED", service.listIssues(PROJECT, null).get(0).getStatus());
+
+        BusinessException missingContract = assertThrows(BusinessException.class,
+                () -> service.createConsequence(consequenceCommand(issue.getId(), null, "QS-C-MISSING")));
+        assertEquals("QS_CONTRACT_REQUIRED", missingContract.getCode());
+
+        insertContractValidationFixtures();
+        BusinessException wrongProject = assertThrows(BusinessException.class,
+                () -> service.createConsequence(consequenceCommand(
+                        issue.getId(), OTHER_PROJECT_CONTRACT, "QS-C-WRONG-PROJECT")));
+        assertEquals("QS_CONTRACT_PROJECT_MISMATCH", wrongProject.getCode());
+
+        BusinessException wrongPartner = assertThrows(BusinessException.class,
+                () -> service.createConsequence(consequenceCommand(
+                        issue.getId(), UNRELATED_CONTRACT, "QS-C-WRONG-PARTNER")));
+        assertEquals("QS_CONTRACT_PARTNER_MISMATCH", wrongPartner.getCode());
+
+        BusinessException crossTenant = assertThrows(BusinessException.class,
+                () -> service.createConsequence(consequenceCommand(
+                        issue.getId(), CROSS_TENANT_CONTRACT, "QS-C-CROSS-TENANT")));
+        assertEquals("QS_CONTRACT_NOT_FOUND", crossTenant.getCode());
 
         QualityConsequence consequence = service.createConsequence(new ConsequenceCommand(
                 issue.getId(), PARTNER, CONTRACT, "QS-C-001", "BOTH",
@@ -184,6 +215,25 @@ class QualitySafetyClosedLoopIntegrationTest {
                 LocalDate.now(), LocalDate.now().plusDays(30), 1L, null);
     }
 
+    private ConsequenceCommand consequenceCommand(Long issueId, Long contractId, String code) {
+        return new ConsequenceCommand(issueId, PARTNER, contractId, code, "NONE",
+                BigDecimal.ZERO, BigDecimal.ZERO, new BigDecimal("80.00"),
+                "合同引用边界测试", null);
+    }
+
+    private void insertContractValidationFixtures() {
+        jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,contract_amount,target_cost,project_manager_id,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'QS-OTHER','其他项目',100000,80000,1,'ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", OTHER_PROJECT);
+        jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'QS-OTHER-A','无关甲方','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OTHER_PARTNER_A);
+        jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'QS-OTHER-B','无关乙方','SUPPLIER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OTHER_PARTNER_B);
+        jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'QS-OTHER-PROJECT-CT','其他项目合同','PURCHASE',?,?,10000,10000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OTHER_PROJECT_CONTRACT, OTHER_PROJECT, CONTRACT_COUNTERPARTY, PARTNER);
+        jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'QS-UNRELATED-CT','无关合作方合同','PURCHASE',?,?,10000,10000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", UNRELATED_CONTRACT, PROJECT, OTHER_PARTNER_A, OTHER_PARTNER_B);
+
+        jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,contract_amount,target_cost,project_manager_id,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,1,'QS-CROSS-TENANT','跨租户项目',100000,80000,1,'ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", CROSS_TENANT_PROJECT);
+        jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,1,'QS-CROSS-A','跨租户甲方','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CROSS_TENANT_PARTNER_A);
+        jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,1,'QS-CROSS-B','跨租户乙方','SUPPLIER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CROSS_TENANT_PARTNER_B);
+        jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,1,?,'QS-CROSS-TENANT-CT','跨租户合同','PURCHASE',?,?,10000,10000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CROSS_TENANT_CONTRACT, CROSS_TENANT_PROJECT, CROSS_TENANT_PARTNER_A, CROSS_TENANT_PARTNER_B);
+    }
+
     private void evidence(String businessType, Long businessId, String documentType) {
         long id = FILE_ID.incrementAndGet();
         jdbc.update("INSERT INTO sys_file(id,tenant_id,business_type,document_type,business_id,file_name,original_name,file_size,content_type,storage_path,bucket_name,virus_scan_status,virus_scanned_at,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(0+?,0,?,?,?,'evidence.pdf','evidence.pdf',100,'application/pdf',?,'test','CLEAN',CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)",
@@ -210,11 +260,11 @@ class QualitySafetyClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM qs_issue WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM qs_inspection_record WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM qs_inspection_plan WHERE project_id=?", PROJECT);
-        jdbc.update("DELETE FROM ct_contract WHERE project_id=?", PROJECT);
-        jdbc.update("DELETE FROM md_partner WHERE id=?", PARTNER);
+        jdbc.update("DELETE FROM ct_contract WHERE id IN (?,?,?,?)", CONTRACT, OTHER_PROJECT_CONTRACT, UNRELATED_CONTRACT, CROSS_TENANT_CONTRACT);
+        jdbc.update("DELETE FROM md_partner WHERE id IN (?,?,?,?,?,?)", PARTNER, CONTRACT_COUNTERPARTY, OTHER_PARTNER_A, OTHER_PARTNER_B, CROSS_TENANT_PARTNER_A, CROSS_TENANT_PARTNER_B);
         jdbc.update("DELETE FROM cost_subject_assignment_rule WHERE id=?", ASSIGNMENT_RULE);
         jdbc.update("DELETE FROM cost_subject_mapping_version WHERE id=?", MAPPING_VERSION);
         jdbc.update("DELETE FROM cost_subject WHERE id=?", SUBJECT);
-        jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT);
+        jdbc.update("DELETE FROM pm_project WHERE id IN (?,?,?)", PROJECT, OTHER_PROJECT, CROSS_TENANT_PROJECT);
     }
 }

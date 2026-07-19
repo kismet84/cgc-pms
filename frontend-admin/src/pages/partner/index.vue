@@ -71,25 +71,22 @@ const formData = reactive<Partial<PartnerVO>>({
   status: STATUS_ENABLE,
 })
 
-const partnerTypeOptions = ref<{ dictLabel: string; dictValue: string }[]>([
-  { dictLabel: '甲方', dictValue: 'PARTY_A' },
-  { dictLabel: '乙方', dictValue: 'PARTY_B' },
-  { dictLabel: '其他', dictValue: 'OTHER' },
-])
-const fallbackPartnerTypeOptions = [
-  { dictLabel: '甲方', dictValue: 'PARTY_A' },
-  { dictLabel: '乙方', dictValue: 'PARTY_B' },
-  { dictLabel: '其他', dictValue: 'OTHER' },
-]
+const partnerTypeOptions = ref<{ dictLabel: string; dictValue: string }[]>([])
+const partnerTypeLoading = ref(false)
 const partnerTypeLabel = (val: string) => {
   const options = Array.isArray(partnerTypeOptions.value) ? partnerTypeOptions.value : []
   const fromDict = options.find((o) => o.dictValue === val)
   if (fromDict) return fromDict.dictLabel
-  const fallback: Record<string, string> = { PARTY_A: '甲方', PARTY_B: '乙方', OTHER: '其他' }
-  return fallback[val] ?? val
+  return val
 }
 const partnerTypeColor = (val: string): string => {
-  const map: Record<string, string> = { PARTY_A: 'blue', PARTY_B: 'green', OTHER: 'default' }
+  const map: Record<string, string> = {
+    CUSTOMER: 'cyan',
+    SUPPLIER: 'blue',
+    SUBCONTRACTOR: 'green',
+    LESSOR: 'purple',
+    SERVICE_PROVIDER: 'orange',
+  }
   return map[val] ?? 'default'
 }
 const statusLabel = (val: string | undefined) =>
@@ -98,14 +95,21 @@ const statusColor = (val: string | undefined) =>
   getDictTagColorSync(COMMON_STATUS_DICT, val ?? '', STATUS_COLOR)
 
 async function fetchPartnerTypes() {
+  partnerTypeLoading.value = true
   try {
     const options = normalizeArray<{ dictLabel: string; dictValue: string }>(
       await getDictDataByCode('partner_type'),
     )
-    partnerTypeOptions.value = options.length ? options : fallbackPartnerTypeOptions
+    partnerTypeOptions.value = options
+    if (!options.length) {
+      message.error('合作方类型字典为空，暂不能编辑')
+    }
   } catch (e: unknown) {
     console.error(e)
-    partnerTypeOptions.value = fallbackPartnerTypeOptions
+    partnerTypeOptions.value = []
+    message.error('合作方类型字典加载失败，暂不能编辑')
+  } finally {
+    partnerTypeLoading.value = false
   }
 }
 
@@ -153,18 +157,18 @@ const {
 
 const partnerStats = computed(() => ({
   total: total.value,
-  partyA: tableData.value.filter((item) => item.partnerType === 'PARTY_A').length,
-  partyB: tableData.value.filter((item) => item.partnerType === 'PARTY_B').length,
+  customer: tableData.value.filter((item) => item.partnerType === 'CUSTOMER').length,
+  supplier: tableData.value.filter((item) => item.partnerType === 'SUPPLIER').length,
   enabled: tableData.value.filter((item) => item.status === STATUS_ENABLE).length,
   risk: tableData.value.filter((item) => item.riskLevel === 'HIGH' || item.blacklistFlag).length,
 }))
 
 const partnerTypeSummary = computed(() =>
-  ['PARTY_A', 'PARTY_B', 'OTHER'].map((type) => ({
-    key: type,
-    label: partnerTypeLabel(type),
-    count: tableData.value.filter((item) => item.partnerType === type).length,
-    color: type === 'PARTY_A' ? '#1890ff' : type === 'PARTY_B' ? '#52c41a' : '#8c8c8c',
+  partnerTypeOptions.value.map((type) => ({
+    key: type.dictValue,
+    label: type.dictLabel,
+    count: tableData.value.filter((item) => item.partnerType === type.dictValue).length,
+    color: partnerTypeColor(type.dictValue),
   })),
 )
 
@@ -202,8 +206,13 @@ async function fetchData() {
       status: filter.status,
     })
     tableData.value = normalizeArray<PartnerVO>(res.records)
-    tableData.value.sort((a, b) =>
-      a.partnerType === 'PARTY_A' ? -1 : b.partnerType === 'PARTY_A' ? 1 : 0,
+    const typeOrder = new Map(
+      partnerTypeOptions.value.map((item, index) => [item.dictValue, index]),
+    )
+    tableData.value.sort(
+      (a, b) =>
+        (typeOrder.get(a.partnerType) ?? Number.MAX_SAFE_INTEGER) -
+        (typeOrder.get(b.partnerType) ?? Number.MAX_SAFE_INTEGER),
     )
     total.value = Number(res.total ?? 0)
   } catch (e: unknown) {
@@ -324,6 +333,10 @@ async function handleModalOk() {
     message.warning('请选择合作方类型')
     return
   }
+  if (!partnerTypeOptions.value.some((item) => item.dictValue === formData.partnerType)) {
+    message.error('请选择有效合作方类型')
+    return
+  }
   formLoading.value = true
   try {
     const payload = {
@@ -401,13 +414,13 @@ onMounted(() => {
           </div>
           <div class="partner-kpi-item">
             <span class="partner-kpi-icon is-cyan"><BankOutlined /></span>
-            <span class="partner-kpi-label">甲方单位</span>
-            <strong>{{ partnerStats.partyA }} <small>个</small></strong>
+            <span class="partner-kpi-label">建设单位/客户</span>
+            <strong>{{ partnerStats.customer }} <small>个</small></strong>
           </div>
           <div class="partner-kpi-item">
             <span class="partner-kpi-icon is-green"><SafetyCertificateOutlined /></span>
-            <span class="partner-kpi-label">乙方单位</span>
-            <strong>{{ partnerStats.partyB }} <small>个</small></strong>
+            <span class="partner-kpi-label">供应商</span>
+            <strong>{{ partnerStats.supplier }} <small>个</small></strong>
           </div>
           <div class="partner-kpi-item">
             <span class="partner-kpi-icon is-purple"><CheckCircleOutlined /></span>
@@ -588,7 +601,12 @@ onMounted(() => {
           <a-input v-model:value="formData.partnerName" placeholder="请输入合作方名称" />
         </a-form-item>
         <a-form-item label="合作方类型" required>
-          <a-select v-model:value="formData.partnerType" placeholder="请选择合作方类型">
+          <a-select
+            v-model:value="formData.partnerType"
+            placeholder="请选择合作方类型"
+            :loading="partnerTypeLoading"
+            :disabled="!partnerTypeOptions.length"
+          >
             <a-select-option
               v-for="opt in partnerTypeOptions"
               :key="opt.dictValue"

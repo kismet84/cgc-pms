@@ -497,8 +497,8 @@ onMounted(fetchEntries)
           </section>
 
           <section class="accounting-entry-rule-note">
-            <strong>凭证生成入口暂未开放</strong>
-            <span>当前仅开放查询、详情、过账和冲销；来源单据到借贷科目的生成规则待会计确认。</span>
+            <strong>手工生成入口未开放</strong>
+            <span>付款、回款凭证由权威业务写侧自动生成；当前仅开放查询、详情、过账和冲销。</span>
           </section>
         </div>
       </aside>

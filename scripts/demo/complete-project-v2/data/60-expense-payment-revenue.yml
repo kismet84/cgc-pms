@@ -1,0 +1,3 @@
+stage: commercial
+source: sql/30-commercial.sql
+assertions: [expense-paid, revenue-approved, receivable-balanced, collection-balanced]

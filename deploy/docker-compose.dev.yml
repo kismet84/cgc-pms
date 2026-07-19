@@ -134,7 +134,7 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: dev
       # Override dev profile's localhost → Docker service names
-      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-cgc_pms}?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&allowPublicKeyRetrieval=true"
       SPRING_DATASOURCE_HIKARI_CONNECTION-INIT-SQL: SET NAMES utf8mb4
       DB_USERNAME: ${MYSQL_USER:-cgc}
       DB_PASSWORD: ${MYSQL_PASSWORD}
@@ -204,6 +204,39 @@ services:
       VITE_API_TARGET: "http://backend:8080"
     command: >
       sh /app/scripts/docker-dev-entrypoint.sh
+    networks:
+      - cgc-pms-dev-net
+
+  # ===========================================================================
+  # Frontend V2 — Clean-room Vite dev server; shares backend only
+  # ===========================================================================
+  frontend-v2:
+    image: node:22-alpine
+    container_name: cgc-pms-frontend-v2-dev
+    restart: unless-stopped
+    working_dir: /app
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "5174:5174"
+    volumes:
+      - ../frontend-admin-v2:/app
+      - ../packages/frontend-contracts:/packages/frontend-contracts:ro
+      - /app/node_modules
+      - pnpm-store:/root/.local/share/pnpm/store
+      - corepack-cache:/root/.cache/node/corepack
+    environment:
+      VITE_API_TARGET: "http://backend:8080"
+      VITE_BASE_PATH: "/v2/"
+    command: >
+      sh /app/scripts/docker-dev-entrypoint.sh
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5174/v2/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
     networks:
       - cgc-pms-dev-net
 

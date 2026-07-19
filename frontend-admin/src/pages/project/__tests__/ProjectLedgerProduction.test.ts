@@ -90,7 +90,7 @@ describe('ProjectLedgerProduction source guards', () => {
     expect(source).toMatch(/function syncQueryToRoute\(\)/)
     expect(source).toMatch(/router\.replace\(\{ query \}\)/)
     expect(source).toMatch(
-      /restoreFilterFromRoute\(\)[\s\S]*await fetchDictData\(PROJECT_TYPE_DICT\)/,
+      /restoreFilterFromRoute\(\)[\s\S]*fetchDictData\(PROJECT_TYPE_DICT\)[\s\S]*fetchDictData\(PROJECT_STATUS_DICT\)/,
     )
     expect(source).toMatch(/syncQueryToRoute\(\)[\s\S]*getProjectList/)
   })
@@ -172,23 +172,25 @@ describe('ProjectLedgerProduction source guards', () => {
     )
   })
 
-  it('uses projectTypeLabel fallback instead of directly rendering raw projectType', () => {
+  it('renders project type and status through dictionary data', () => {
     const source = readProjectSource()
     const queryPanelSource = readProjectComponentSource('ProjectQueryPanel')
     const tablePanelSource = readProjectComponentSource('ProjectTablePanel')
     expect(source).toContain("const PROJECT_TYPE_DICT = 'project_type'")
-    expect(source).toContain('const PROJECT_TYPE_LABEL: Record<string, string>')
-    expect(source).toContain("BUILDING: '施工总承包'")
+    expect(source).toContain("const PROJECT_STATUS_DICT = 'project_status'")
+    expect(source).toContain('projectTypeDictData.value.map((item) => item.dictValue)')
+    expect(source).toContain('projectStatusDictData.value.map((item) => item.dictValue)')
+    expect(source).not.toContain("BUILDING: '施工总承包'")
     expect(source).toContain('function projectTypeLabel(value: string | undefined)')
     expect(queryPanelSource).toContain('{{ projectTypeLabel(item) }}')
     expect(tablePanelSource).toContain('{{ projectTypeLabel(row.projectType) }}')
     expect(tablePanelSource).not.toContain("{{ row.projectType || '未分类' }}")
   })
 
-  it('preloads project type dict before the first fetch to avoid raw code flashes', () => {
+  it('preloads project type and status dictionaries before the first fetch', () => {
     const source = readProjectSource()
     expect(source).toMatch(
-      /onMounted\(async \(\) => \{[\s\S]*await fetchDictData\(PROJECT_TYPE_DICT\)\s*await fetchData\(\)/,
+      /onMounted\(async \(\) => \{[\s\S]*fetchDictData\(PROJECT_TYPE_DICT\)[\s\S]*fetchDictData\(PROJECT_STATUS_DICT\)[\s\S]*await fetchData\(\)/,
     )
     expect(source).not.toContain('onMounted(fetchData)')
   })

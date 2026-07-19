@@ -1,0 +1,11 @@
+*
+!frontend-admin-v2/
+!frontend-admin-v2/**
+frontend-admin-v2/node_modules/
+frontend-admin-v2/dist/
+frontend-admin-v2/coverage/
+frontend-admin-v2/playwright-report/
+frontend-admin-v2/test-results/
+!packages/
+!packages/frontend-contracts/
+!packages/frontend-contracts/**

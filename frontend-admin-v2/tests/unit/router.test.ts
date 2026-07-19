@@ -1,0 +1,98 @@
+import { createPinia, setActivePinia } from 'pinia'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { UserInfo } from '@cgc-pms/frontend-contracts'
+import { installSessionGuard, routes } from '@/router'
+import { normalizeRedirect } from '@/services/navigation'
+import { getCurrentUser } from '@/services/auth'
+
+vi.mock('@/services/auth', () => ({
+  getCurrentUser: vi.fn(),
+  login: vi.fn(),
+  logout: vi.fn(),
+}))
+
+function user(permissions: string[]): UserInfo {
+  return {
+    userId: '1',
+    username: 'tester',
+    roles: ['USER'],
+    permissions,
+  }
+}
+
+function guardedRouter() {
+  const target = createRouter({ history: createMemoryHistory(), routes })
+  installSessionGuard(target)
+  return target
+}
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  vi.mocked(getCurrentUser).mockReset()
+})
+
+describe('V2 application-shell routes', () => {
+  it('keeps technical routes and exposes permission-bearing shell routes', () => {
+    expect(routes.find((route) => route.name === 'V2Health')).toMatchObject({ path: '/health' })
+    expect(routes.find((route) => route.name === 'V2Login')).toMatchObject({ path: '/login' })
+    const shell = routes.find((route) => route.path === '/shell')
+    const dashboard = shell?.children?.find((route) => route.path === '/dashboard')
+    const project = shell?.children?.find((route) => route.path === '/project/list')
+
+    expect(dashboard?.meta?.permission).toBe('dashboard:view')
+    expect(project?.meta?.permission).toBe('project:query')
+  })
+
+  it('restores a permitted deep link and blocks a missing permission', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user(['project:query']))
+    const router = guardedRouter()
+
+    await router.push('/project/list?projectId=23')
+    await router.isReady()
+    expect(router.currentRoute.value.fullPath).toBe('/project/list?projectId=23')
+
+    await router.push('/contract/ledger')
+    expect(router.currentRoute.value.path).toBe('/forbidden')
+    expect(router.currentRoute.value.query.from).toBe('/contract/ledger')
+  })
+
+  it('uses wildcard permission for the administrator sample without role-name checks', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user(['*']))
+    const router = guardedRouter()
+
+    await router.push('/session')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/dashboard')
+  })
+
+  it('redirects an anonymous deep link to login', async () => {
+    vi.mocked(getCurrentUser).mockRejectedValue(new Error('anonymous'))
+    const router = guardedRouter()
+
+    await router.push('/project/42/overview')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query.redirect).toBe('/project/42/overview')
+  })
+
+  it('distinguishes an authenticated unknown route from forbidden access', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user(['*']))
+    const router = guardedRouter()
+
+    await router.push('/definitely-not-a-v2-route')
+    await router.isReady()
+
+    expect(router.currentRoute.value.name).toBe('V2NotFound')
+    expect(router.currentRoute.value.path).toBe('/definitely-not-a-v2-route')
+  })
+
+  it('accepts only internal non-login redirects', () => {
+    expect(normalizeRedirect('/session?from=login')).toBe('/session?from=login')
+    expect(normalizeRedirect('https://evil.example')).toBe('/session')
+    expect(normalizeRedirect('//evil.example')).toBe('/session')
+    expect(normalizeRedirect('/login?redirect=/session')).toBe('/session')
+  })
+})

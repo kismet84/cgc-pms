@@ -22,4 +22,15 @@ describe('partner default supplier lead days', () => {
     )
     expect(source).toContain('defaultLeadDays: record.defaultLeadDays ?? undefined')
   })
+
+  it('only accepts partner type codes returned by dictionary API', () => {
+    expect(source).toContain("getDictDataByCode('partner_type')")
+    expect(source).toContain(
+      'partnerTypeOptions.value.some((item) => item.dictValue === formData.partnerType)',
+    )
+    expect(source).not.toContain("dictValue: 'PARTY_A'")
+    expect(source).not.toContain("dictValue: 'PARTY_B'")
+    expect(source).not.toContain("dictValue: 'OTHER'")
+    expect(source).not.toContain("partnerType === 'PARTY_A'")
+  })
 })

@@ -1,6 +1,6 @@
 # 前端 Docker 与 UI 测试规则
 
-适用范围：`frontend-admin` 页面重构、UI 对齐、交互修复、Codex 内置浏览器验收和 Playwright 回归。
+适用范围：`frontend-admin`、`frontend-admin-v2` 页面重构、UI 对齐、交互修复、Codex 内置浏览器验收和 Playwright 回归。
 
 ## 基准环境
 
@@ -49,6 +49,20 @@ Local: http://localhost:5173/
 - 推荐使用：
   - `waitUntil: 'domcontentloaded'`
   - 再等待关键元素可见，例如页面标题、按钮、表格、弹窗、抽屉、面板等。
+
+## Windows Playwright 浏览器通道
+
+- 本机 Windows 执行 Playwright E2E 时，默认直接使用已安装的 Microsoft Edge：`PLAYWRIGHT_CHANNEL=msedge`。
+- 禁止先尝试 Playwright 自带 Chromium；不得因其未安装而制造一次可避免的 `browserType.launch` 失败。
+- PowerShell 示例：
+
+```powershell
+$env:PLAYWRIGHT_CHANNEL='msedge'
+pnpm exec playwright test <目标测试文件> --project=chromium
+```
+
+- `--project=chromium` 是项目名称，不代表启动 Playwright 自带 Chromium；实际浏览器由 `PLAYWRIGHT_CHANNEL=msedge` 固定为本机 Edge。
+- 若 Edge 通道不可用，先分类为 `tool_config` 并报告实际错误；不得自动回退尝试 Chromium 或下载浏览器。
 
 ## 推荐验收流程
 

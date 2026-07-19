@@ -561,4 +561,18 @@ class MdPartnerServiceTest {
 
         System.out.println("✅ testGetById_NotFound 通过");
     }
+
+    @Test
+    @Order(19)
+    @Transactional
+    @DisplayName("字典约束 — 创建时拒绝未启用合作方类型")
+    void testCreateRejectsInvalidPartnerType() {
+        MdPartner partner = new MdPartner();
+        partner.setPartnerName("非法类型合作方");
+        partner.setPartnerType("ARBITRARY_TYPE");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> partnerService.create(partner));
+        assertEquals("PARTNER_TYPE_INVALID", error.getCode());
+    }
 }

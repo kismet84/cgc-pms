@@ -57,7 +57,7 @@ public final class QualitySafetyModels {
     public record ConsequenceCommand(
             @NotNull Long issueId,
             @NotNull Long partnerId,
-            Long contractId,
+            @NotNull(message = "关联合同不能为空") Long contractId,
             @NotBlank @Size(max = 64) String consequenceCode,
             @NotBlank String decisionType,
             @NotNull @DecimalMin("0.00") BigDecimal fineAmount,

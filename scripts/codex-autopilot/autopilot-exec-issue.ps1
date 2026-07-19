@@ -249,7 +249,7 @@ function New-IssuePromptFile {
     "只读取并遵守兼容版 v2 上下文包：$ContextPath"
   } else { "任务正文：`n$($Issue.body)" }
   @"
-你是被 AutoPilot 明确派工的执行智能体，不是主线程；在本 Ready Issue 范围内可以执行授权动作。
+仅处理当前 Ready Issue，并在其范围内执行已授权动作。
 
 仓库：$RepoRoot
 Issue：$($Issue.title)

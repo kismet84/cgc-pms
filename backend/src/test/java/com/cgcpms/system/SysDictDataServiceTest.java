@@ -91,7 +91,7 @@ class SysDictDataServiceTest {
         SysDictData saved = dictDataMapper.selectById(id);
         assertNotNull(saved, "应能查到刚创建的字典数据");
         assertEquals("测试标签1", saved.getDictLabel());
-        assertEquals("test_value_1", saved.getDictValue());
+        assertEquals("TEST_VALUE_1", saved.getDictValue());
         assertEquals(dictTypeId, saved.getDictTypeId());
 
         System.out.println("testCreate_Success 通过: dictValue=" + saved.getDictValue());
@@ -195,7 +195,7 @@ class SysDictDataServiceTest {
         SysDictDataVO vo = dictDataService.getById(id);
         assertNotNull(vo, "应能查到刚创建的字典数据");
         assertEquals("详情标签", vo.getDictLabel());
-        assertEquals("detail_value", vo.getDictValue());
+        assertEquals("DETAIL_VALUE", vo.getDictValue());
         assertNotNull(vo.getCreatedAt(), "createdAt应已格式化");
 
         System.out.println("testGetById_Success 通过: dictValue=" + vo.getDictValue());
@@ -385,7 +385,7 @@ class SysDictDataServiceTest {
     @Test
     @Order(14)
     @Transactional
-    @DisplayName("更新字典数据 — 修改dictLabel和dictValue")
+    @DisplayName("更新字典数据 — 修改标签且保持不可变键值")
     void testUpdate_Success() {
         SysDictData entity = new SysDictData();
         entity.setDictTypeId(dictTypeId);
@@ -397,12 +397,12 @@ class SysDictDataServiceTest {
         update.setId(id);
         update.setDictTypeId(dictTypeId);
         update.setDictLabel("新标签");
-        update.setDictValue("new_value");
+        update.setDictValue("OLD_VALUE");
         dictDataService.update(update);
 
         SysDictData saved = dictDataMapper.selectById(id);
         assertEquals("新标签", saved.getDictLabel(), "dictLabel应已更新");
-        assertEquals("new_value", saved.getDictValue(), "dictValue应已更新");
+        assertEquals("OLD_VALUE", saved.getDictValue(), "dictValue应保持创建后的规范编码");
 
         System.out.println("testUpdate_Success 通过: dictLabel=" + saved.getDictLabel()
                 + ", dictValue=" + saved.getDictValue());
@@ -571,7 +571,7 @@ class SysDictDataServiceTest {
         UserContext.clear();
 
         List<SysDictDataVO> list = dictDataService.getByDictCode(dictCode);
-        assertTrue(list.stream().anyMatch(item -> "system_tenant_value".equals(item.getDictValue())),
+        assertTrue(list.stream().anyMatch(item -> "SYSTEM_TENANT_VALUE".equals(item.getDictValue())),
                 "无UserContext时应按系统租户查询字典，避免公共字典接口被空租户阻塞");
     }
 
@@ -590,8 +590,8 @@ class SysDictDataServiceTest {
     @Test
     @Order(23)
     @Transactional
-    @DisplayName("通过dictCode获取数据 — 租户隔离")
-    void testGetByDictCode_CrossTenantEmpty() {
+    @DisplayName("通过dictCode获取数据 — 租户无同名类型时回退系统字典")
+    void testGetByDictCode_CrossTenantFallsBackToSystem() {
         SysDictType savedType = dictTypeMapper.selectById(dictTypeId);
         String dictCode = savedType.getDictCode();
 
@@ -610,9 +610,10 @@ class SysDictDataServiceTest {
                 .build());
 
         List<SysDictDataVO> list = dictDataService.getByDictCode(dictCode);
-        assertTrue(list.isEmpty(), "其他租户不应看到租户0的字典数据");
+        assertTrue(list.stream().anyMatch(item -> "TENANT_DATA".equals(item.getDictValue())),
+                "租户无同名类型时应读取系统租户字典，保证普通业务角色可用");
 
-        System.out.println("testGetByDictCode_CrossTenantEmpty 通过: size=" + list.size());
+        System.out.println("testGetByDictCode_CrossTenantFallsBackToSystem 通过: size=" + list.size());
     }
 
     @Test

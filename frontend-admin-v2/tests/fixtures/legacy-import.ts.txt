@@ -1,0 +1,3 @@
+import LegacyPage from '../../frontend-admin/src/pages/dashboard/index.vue'
+
+export default LegacyPage

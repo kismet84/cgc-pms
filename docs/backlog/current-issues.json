@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-17T19:20:00+08:00",
+  "updatedAt": "2026-07-19T12:27:57+08:00",
   "issues": [
     {
       "issueKey": "A-01",
@@ -10,8 +10,8 @@
       "classification": "STILL_APPLICABLE",
       "priority": "P0",
       "blocking": false,
-      "summary": "明确需补用户入口已清空；系统用户详情和会计凭证生产策略已闭环，剩余9个接口子项需兼容性确认，另有1个会计页面陈旧说明待修正。",
-      "acceptanceCriteria": "剩余10个子项均形成复用现有入口、内部接口、废弃、修正文案或确认保留的唯一裁决，并通过权限、租户和状态边界验证。",
+      "summary": "明确需补用户入口已清空；系统用户详情、会计凭证生产策略和页面说明已闭环，剩余9个接口子项需兼容性确认。",
+      "acceptanceCriteria": "剩余9个子项均形成复用现有入口、内部接口、废弃或确认保留的唯一裁决，并通过权限、租户和状态边界验证。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md",
         "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
@@ -112,20 +112,6 @@
       "deferReason": "当前无已通过决策门的外部集成目标。",
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-ACCOUNTING-GENERATION-COPY",
-      "title": "会计凭证页面生成规则说明已过时",
-      "status": "OPEN",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "会计凭证页面仍显示“来源单据到借贷科目的生成规则待会计确认”，但付款和回款策略、业务标准及闭环测试已经成立。",
-      "acceptanceCriteria": "只修正页面辅助说明，准确表达付款/回款由权威业务写侧自动生成、手工生成入口未开放；不新增生成按钮或扩大accounting:add权限，并通过页面测试与只读浏览器复验。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-048-010-会计凭证生成策略现状复核与P0问题关闭验收报告.md"
       ]
     },
     {

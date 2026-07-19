@@ -12,8 +12,8 @@ import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import ContractKpiStrip from './components/ContractKpiStrip.vue'
 import ContractMobileCardList from './components/ContractMobileCardList.vue'
 import ContractAnalysisPanel from './components/ContractAnalysisPanel.vue'
-import { useContractLedger, TYPE_LABEL, TYPE_COLOR } from './composables/useContractLedger'
-import type { ContractType, ContractStatus } from '@/types/contract'
+import { useContractLedger } from './composables/useContractLedger'
+import type { ContractStatus } from '@/types/contract'
 import { ColumnSettingsButton } from '@/components/list-page'
 import { useMobileViewport } from '@/composables/useMobileViewport'
 
@@ -30,6 +30,10 @@ const {
   handleContractClose,
   filter,
   projects,
+  contractTypeOptions,
+  contractStatusOptions,
+  typeLabelMap,
+  typeColorMap,
   loading,
   tableData,
   total,
@@ -108,8 +112,12 @@ const mobileFiltersOpen = ref(false)
               size="large"
               @change="handleSearch"
             >
-              <a-select-option v-for="(label, value) in TYPE_LABEL" :key="value" :value="value">
-                {{ label }}
+              <a-select-option
+                v-for="item in contractTypeOptions"
+                :key="item.dictValue"
+                :value="item.dictValue"
+              >
+                {{ item.dictLabel }}
               </a-select-option>
             </a-select>
             <a-select
@@ -120,10 +128,13 @@ const mobileFiltersOpen = ref(false)
               size="large"
               @change="handleSearch"
             >
-              <a-select-option value="DRAFT">草稿</a-select-option>
-              <a-select-option value="PERFORMING">履约中</a-select-option>
-              <a-select-option value="SETTLED">已完成</a-select-option>
-              <a-select-option value="TERMINATED">已终止</a-select-option>
+              <a-select-option
+                v-for="item in contractStatusOptions"
+                :key="item.dictValue"
+                :value="item.dictValue"
+              >
+                {{ item.dictLabel }}
+              </a-select-option>
             </a-select>
             <a-range-picker
               v-model:value="filter.dateRange"
@@ -217,8 +228,8 @@ const mobileFiltersOpen = ref(false)
                 </a-button>
               </template>
               <template #contractType="{ row }">
-                <a-tag :color="TYPE_COLOR[row.contractType as ContractType]">
-                  {{ TYPE_LABEL[row.contractType as ContractType] }}
+                <a-tag :color="typeColorMap[row.contractType] || 'default'">
+                  {{ typeLabelMap[row.contractType] || row.contractType }}
                 </a-tag>
               </template>
               <template #amount="{ row }">
@@ -258,8 +269,8 @@ const mobileFiltersOpen = ref(false)
             :data="tableData"
             :loading="loading"
             :col-visible="colVisible"
-            :type-color="TYPE_COLOR"
-            :type-label="TYPE_LABEL"
+            :type-color="typeColorMap"
+            :type-label="typeLabelMap"
             @view="handleView"
             @edit="handleEdit"
             @delete="handleDelete"

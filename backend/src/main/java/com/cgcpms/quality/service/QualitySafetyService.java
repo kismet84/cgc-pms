@@ -534,7 +534,8 @@ public class QualitySafetyService {
     }
 
     private void validateContract(Long contractId, Long projectId, Long partnerId) {
-        if (contractId == null) return;
+        if (contractId == null)
+            throw new BusinessException("QS_CONTRACT_REQUIRED", "关联合同不能为空");
         CtContract contract = contractMapper.selectById(contractId);
         if (contract == null || !Objects.equals(contract.getTenantId(), tenantId()))
             throw new BusinessException("QS_CONTRACT_NOT_FOUND", "关联合同不存在");

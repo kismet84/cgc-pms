@@ -1,0 +1,3 @@
+stage: governance
+source: sql/40-governance.sql
+assertions: [progress-completed, quality-issue-closed, rectification-passed, alert-resolved, project-closed]

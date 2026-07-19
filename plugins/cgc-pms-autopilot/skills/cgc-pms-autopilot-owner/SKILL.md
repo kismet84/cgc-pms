@@ -14,7 +14,7 @@ description: Owns cgc-pms AutoPilot planning, role routing, failure classificati
 
 ## Do first
 
-1. 先确认仓库级规则、授权边界和当前执行路由；普通交互任务获明确授权后不强制进入 Ready，只有 AutoPilot 连续迭代严格要求合格 Ready Issue。
+1. 先确认仓库级规则、授权边界和当前执行方案；普通交互任务获明确授权后不强制进入 Ready，只有 AutoPilot 连续迭代严格要求合格 Ready Issue。
 2. 只把本插件当成规则、模板、脚本工具箱与插件自有归档目录，不当成项目真实 backlog 或业务 quality 仓库；项目业务任务正式文档仍留在项目 `docs/**`。
 3. 任何状态变更前先核对 `git branch --show-current` 与 `git status --short`；进入 AutoPilot 实施前再跑 `scripts/autopilot-checkpoint.ps1`，至少看 `branch`、`gitStatus`、`stopFlag`、`pauseFlag`、`enabledFlag`。
 4. 需要 loop 协议时，优先参考 `../../schemas/loop-state.schema.json`、`../../schemas/loop-event.schema.json`、`../../schemas/classification-result.schema.json`、`../../scripts/autopilot-loop-runner.ps1` 和 `../../scripts/validate-loop-artifacts.ps1`。
@@ -51,7 +51,7 @@ Legacy 兼容短语继续有效：
 
 1. 读项目 `ready` / `blocked` / `focus` 正式状态，只选择合格 Ready Issue 实施；Ready 为空时，先通过 `kg_status` 与有界 `kg_list_issues` 从健康且 Git 游标覆盖当前 HEAD 的知识图谱发现存量候选，再按 `sourceRefs`、当前分支代码/配置与唯一台账核实，之后才处理当前 focus 可解除阻塞、决策证据完整的 Ad-hoc Candidate和产品情报刷新。图谱异常时安全停止，不静默回退到文件扫描。
 2. 判定当前阶段属于实现、验收、运维还是审计。
-3. 按 A-F 检查实际职责，再由主线程根据风险、耦合、并行收益、上下文成本和独立证据需要选择直接执行、单派或多派；只有实际派工才给出 `model`、`thinking`、`reason`。A 定位 Java、TypeScript、Vue 未知符号时先用 CodeGraph；涉及跨层影响、跨前后端/跨语言关系、复杂多跳调用链、架构边界/聚类，或 CodeGraph 召回不足时，必须补充调用只读的 `codebase-memory-mcp`，并保留查询目的、命中摘要和交叉核验。memory 工具不可用时归类为 `tool_config`：非 PowerShell 源码才允许回退 CodeGraph 与 `rg`，PowerShell 检索必须改用 `rg` 与直接读取，禁止使用 CodeGraph。
+3. 按 A-F 检查实际职责，再由主线程根据风险、耦合、上下文成本和独立证据需要制定执行方案。A 定位 Java、TypeScript、Vue 未知符号时先用 CodeGraph；涉及跨层影响、跨前后端/跨语言关系、复杂多跳调用链、架构边界/聚类，或 CodeGraph 召回不足时，必须补充调用只读的 `codebase-memory-mcp`，并保留查询目的、命中摘要和交叉核验。memory 工具不可用时归类为 `tool_config`：非 PowerShell 源码才允许回退 CodeGraph 与 `rg`，PowerShell 检索必须改用 `rg` 与直接读取，禁止使用 CodeGraph。
 4. 实施前执行 checkpoint；需要运行态或浏览器验收时先过 health gate。
    - 一个 Issue 一个隔离 worktree；implement、repair、review 使用独立 context pack。
    - Implementer 超时、停滞检查与终止阈值只从项目 `scripts/codex-autopilot/codex-autopilot.config.json` 的 `issueExecutor` 读取；停滞只允许一次新鲜缩小上下文重试。
@@ -60,16 +60,15 @@ Legacy 兼容短语继续有效：
 7. F 收口后先做 `local-commit-closeout.ps1 -DryRun`，确认 `git diff --check` 和文件范围，再决定是否本地 commit。
 8. D/E 不通过时，优先用 `../../templates/repair-request.md` 生成结构化补修请求；沉淀稳定经验时用 `../../templates/reflection-entry.md`。
 9. 仅当项目配置存在用户批准的 active 评分版本时，才启用两阶段评分收口：`implementationCommit` 冻结正式证据，评分绑定该提交，`closeoutCommit` 写入评分与收口事实；后者合入并登记后才增加跨批次回顾计数。版本、权重和生效点从配置及批准来源读取，candidate/disabled 版本不得计数。
-10. 死进程或新 run 接管活动 Issue 时先校验 durable phase checkpoint；Ready、base、worktree/branch、scope、diff 和 evidence 一致时，只恢复 validation、review 或 closeout。不得删除有效 worktree 后重派 implementation；Reviewer `tool_config` 跨 run 重试一次仍失败则暂停，不得转 business repair。
+10. 死进程或新 run 接管活动 Issue 时先校验 durable phase checkpoint；Ready、base、worktree/branch、scope、diff 和 evidence 一致时，只恢复 validation、review 或 closeout。不得删除有效 worktree 后重新执行 implementation；Reviewer `tool_config` 跨 run 重试一次仍失败则暂停，不得转 business repair。
 11. 控制面指纹变化后，多任务或无界执行必须先通过用户明确启动的单 Issue 金丝雀；具体行为契约读取 `../../references/control-plane-policy.md`。
 12. 回顾周期独立于单次 `iterationLimit`；阈值从配置读取。回顾只生成 `NEEDS_CONFIRMATION` 提案，不自动改代码、规则、权重或环境；报告、唯一问题事实源、图谱 Git 游标与稳定 Episode 未全部确认前不得清零或启动新批次。
 
 ## Role boundaries
 
-- 授权门通过后主线程是默认执行者，并对实施、验证和收口负责。
-- 只有派工净收益明确时才使用子智能体；不存在按任务类别强制派工或固定六线程的规则。
-- 子智能体只在明确授权范围内执行修改、验证、归档或运维动作，第一句必须声明身份边界。
-- 实际派工单最少包含：`任务名称`、`角色边界`、`目标`、`范围`、`禁止事项`、`model`、`thinking`、`reason`、`验收输出`。
+- 授权门通过后主线程直接执行，并对实施、验证和收口负责。
+- 主线程覆盖规划、实施、验证、复核和归档职责；A-F 是职责检查表，不映射为独立线程。
+- 客观证据和必要复核不可省略。
 
 细则见：
 

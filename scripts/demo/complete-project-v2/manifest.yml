@@ -1,0 +1,51 @@
+package-id: CGC-COMPLETE-PROJECT
+version: 2
+tenant-id: 0
+project-id: 520000000000000001
+project-code: CGC-DEMO-M52-001
+ownership-prefix: M52-
+stages:
+  - id: core
+    source: sql/10-core.sql
+    scope: [partner, project, bid, target-cost, contracts, budget, schedule]
+  - id: procurement
+    source: sql/20-procurement.sql
+    scope: [request, order, receipt, stock, requisition, material-cost]
+  - id: commercial
+    source: sql/30-commercial.sql
+    scope: [sub-measure, settlement, payment, expense, revenue, collection]
+  - id: governance
+    source: sql/40-governance.sql
+    scope: [quality-safety, progress, workflow, alert, closeout]
+  - id: finance
+    source: sql/50-finance.sql
+    scope: [cash-forecast, invoice, sales-invoice, finance-period, accounting-entry]
+  - id: production-site
+    source: sql/60-production-site.sql
+    scope: [contract-item, period-plan, production-measurement, owner-submission, site-daily-log]
+  - id: sourcing-technical
+    source: sql/70-sourcing-technical.sql
+    scope: [sourcing, quote, evaluation, performance, supplier-return, scheme, drawing, rfi, disclosure, archive]
+  - id: variation-closeout-system
+    source: sql/80-variation-closeout-system.sql
+    scope: [variation, owner-submission, contract-change, closeout-detail, position, project-member, preference]
+  - id: control-closures
+    source: sql/90-control-closures.sql
+    scope: [approval-routing, budget-ledger, cost-forecast, corrective-action, payment-source, collection-adjustment, quality-consequence]
+  - id: finance-operations
+    source: sql/100-finance-operations.sql
+    scope: [invoice-ocr, reconciliation, import-preview, bank-receipt, cash-journal, audit-log]
+  - id: inventory-exceptions
+    source: sql/110-inventory-exceptions.sql
+    scope: [quality-disposition, stock-transfer, material-return-reversal]
+  - id: document-system
+    source: sql/120-document-system.sql
+    scope: [document-template, version, default-binding, generation, system-user]
+  - id: form-field-completion
+    source: sql/130-form-field-completion.sql
+    scope: [workflow-json, contract-terms, cost-result, finance-link, project-profile, exception-purchase, task-dependency]
+  - id: data-quality-normalization
+    source: sql/140-data-quality-normalization.sql
+    scope: [partner-completeness, project-dictionary-coverage, contract-dictionary-coverage, workflow-state-coverage, quality-contract-trace]
+checkpoint-prefix: DEMO_CGC_V2_
+cleanup-policy: rebuild-local-demo-database

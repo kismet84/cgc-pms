@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BaselineFlywayCompatibilityTest {
 
     private static final String ACTIVE = "classpath:db/migration-h2";
-    private static final String LEGACY = "classpath:db/migration-h2-legacy";
+    private static final String LEGACY = "filesystem:src/main/resources/db/migration-h2-legacy";
     private static final String JAVA = "classpath:com/cgcpms/common/migration";
 
     @Test
@@ -21,7 +21,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("215", flyway.info().current().getVersion().getVersion());
+        assertEquals("217", flyway.info().current().getVersion().getVersion());
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
         assertEquals(9, count(flyway, "sys_role"));
@@ -49,7 +49,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("215", current.info().current().getVersion().getVersion());
+        assertEquals("217", current.info().current().getVersion().getVersion());
         assertFalse(Arrays.stream(current.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
     }

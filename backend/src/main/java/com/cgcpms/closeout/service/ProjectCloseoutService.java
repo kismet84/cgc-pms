@@ -74,8 +74,9 @@ public class ProjectCloseoutService {
                 FROM closeout_warranty WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY created_at DESC
                 """, tenant(), projectId));
         result.put("defects", jdbc.queryForList("""
-                SELECT id,warranty_id warrantyId,defect_code defectCode,defect_title defectTitle,
-                 responsible_user_id responsibleUserId,rectification_deadline rectificationDeadline,status,
+            SELECT id,warranty_id warrantyId,defect_code defectCode,defect_title defectTitle,
+                 defect_description defectDescription,responsible_user_id responsibleUserId,
+                 rectification_deadline rectificationDeadline,status,
                  rectified_by rectifiedBy,rectified_at rectifiedAt,verified_by verifiedBy,verified_at verifiedAt,
                  verification_comment verificationComment,remark
                 FROM closeout_defect WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY created_at DESC

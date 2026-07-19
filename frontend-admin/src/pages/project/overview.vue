@@ -13,6 +13,7 @@ import {
 import { getProjectDetail, getProjectOverview } from '@/api/modules/project'
 import { useMobileViewport } from '@/composables/useMobileViewport'
 import type { ProjectOverviewVO, ProjectVO } from '@/types/project'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 /* ── Route param ── */
 const route = useRoute()
@@ -80,39 +81,19 @@ const projectManagerName = computed(
   () => members.value.find((member) => member.roleCode === 'PM')?.userName || '待维护',
 )
 
-const projectStatusLabel: Record<string, string> = {
-  DRAFT: '前期',
-  ACTIVE: '在建',
-  ONGOING: '在建',
-  COMPLETED: '已竣工',
-  SUSPENDED: '已暂停',
-  CLOSED: '已关闭',
+const PROJECT_STATUS_DICT = 'project_status'
+const PROJECT_TYPE_DICT = 'project_type'
+
+function projectStatusLabel(value: string) {
+  return getDictLabelSync(PROJECT_STATUS_DICT, value)
 }
-const projectStatusColor: Record<string, string> = {
-  DRAFT: 'processing',
-  ACTIVE: 'success',
-  ONGOING: 'success',
-  COMPLETED: 'green',
-  SUSPENDED: 'warning',
-  CLOSED: 'default',
+
+function projectStatusColor(value: string) {
+  return getDictTagColorSync(PROJECT_STATUS_DICT, value)
 }
-const projectTypeLabel: Record<string, string> = {
-  CONSTRUCTION: '施工总承包',
-  BUILDING: '施工总承包',
-  MAIN: '施工总承包',
-  MUNICIPAL: '市政工程',
-  DECORATION: '装饰装修',
-  INFRASTRUCTURE: '基础设施',
-  SUB: '专业分包',
-  PROFESSIONAL_SUB: '专业分包',
-  PROFESSIONAL_SUBCONTRACT: '专业分包',
-  LABOR: '劳务分包',
-  LABOR_SUB: '劳务分包',
-  LABOR_SUBCONTRACT: '劳务分包',
-  PURCHASE: '材料采购',
-  MATERIAL: '材料采购',
-  MATERIAL_PURCHASE: '材料采购',
-  OTHER: '其他',
+
+function projectTypeLabel(value: string) {
+  return getDictLabelSync(PROJECT_TYPE_DICT, value)
 }
 
 function formatPlan(projectData: ProjectVO): string {
@@ -191,8 +172,9 @@ const pieOption = computed(() => {
   }
 })
 
-onMounted(() => {
-  fetchOverview()
+onMounted(async () => {
+  await Promise.all([fetchDictData(PROJECT_STATUS_DICT), fetchDictData(PROJECT_TYPE_DICT)])
+  await fetchOverview()
 })
 </script>
 
@@ -241,8 +223,8 @@ onMounted(() => {
                 <h1>{{ project.projectName }}</h1>
                 <div class="project-mobile-code">{{ project.projectCode }}</div>
               </div>
-              <a-tag :color="projectStatusColor[project.status]">
-                {{ projectStatusLabel[project.status] ?? project.status }}
+              <a-tag :color="projectStatusColor(project.status)">
+                {{ projectStatusLabel(project.status) }}
               </a-tag>
             </div>
           </section>
@@ -272,7 +254,7 @@ onMounted(() => {
               <dl>
                 <div>
                   <dt>项目类型</dt>
-                  <dd>{{ projectTypeLabel[project.projectType] ?? project.projectType }}</dd>
+                  <dd>{{ projectTypeLabel(project.projectType) }}</dd>
                 </div>
                 <div>
                   <dt>建设单位</dt>
@@ -352,7 +334,7 @@ onMounted(() => {
           <div class="overview-summary pt-panel">
             <div class="summary-cell">
               <span>项目状态</span>
-              <b>{{ projectStatusLabel[project.status] ?? project.status }}</b>
+              <b>{{ projectStatusLabel(project.status) }}</b>
             </div>
             <div class="summary-cell">
               <span>项目经理</span>

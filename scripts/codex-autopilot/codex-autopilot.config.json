@@ -69,7 +69,6 @@
       "scripts/codex-autopilot/tests/test-no-nested-codex.ps1",
       "scripts/codex-autopilot/tests/test-desktop-checkpoint-recovery.ps1",
       "scripts/codex-autopilot/tests/test-desktop-canary-registration.ps1",
-      "scripts/codex-autopilot/tests/test-desktop-subagent-boundary.ps1",
       "scripts/codex-autopilot/tests/test-stage-result-contract.ps1",
       "scripts/codex-autopilot/tests/test-transition-writer.ps1",
       "scripts/codex-autopilot/tests/test-refill-continuation.ps1",

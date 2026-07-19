@@ -2,6 +2,7 @@ package com.cgcpms.system.dict.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.system.dict.entity.SysDictData;
 import com.cgcpms.system.dict.service.SysDictDataService;
@@ -38,12 +39,14 @@ public class SysDictDataController {
     }
 
     @PostMapping
+    @AuditedOperation(type = "CREATE", businessType = "DICT_DATA")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:add')")
     public ApiResponse<Long> create(@Valid @RequestBody SysDictData entity) {
         return ApiResponse.success(sysDictDataService.create(entity));
     }
 
     @PutMapping("/{id}")
+    @AuditedOperation(type = "UPDATE", businessType = "DICT_DATA", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SysDictData entity) {
         entity.setId(id);
@@ -52,13 +55,14 @@ public class SysDictDataController {
     }
 
     @DeleteMapping("/{id}")
+    @AuditedOperation(type = "DELETE", businessType = "DICT_DATA", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:delete')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         sysDictDataService.delete(id);
         return ApiResponse.success();
     }
     @GetMapping("/by-code/{dictCode}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:list')")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<List<SysDictDataVO>> getByDictCode(@PathVariable String dictCode) {
         return ApiResponse.success(sysDictDataService.getByDictCode(dictCode));
     }

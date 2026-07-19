@@ -17,7 +17,14 @@ import {
 } from '@/api/modules/cost'
 import { getCostSubjectList } from '@/api/modules/costSubject'
 import type { CostLedgerVO, CostLedgerQueryParams, CostLedgerSummaryVO } from '@/types/cost'
-import { COST_TYPE_DICT, getCostTypeLabel, getSourceTypeLabel } from '@/types/cost'
+import {
+  COST_SOURCE_TYPE_DICT,
+  COST_STATUS_DICT,
+  COST_TYPE_DICT,
+  getCostTypeLabel,
+  getSourceTypeLabel,
+} from '@/types/cost'
+import type { DictDataVO } from '@/types/dict'
 import type { PageResult } from '@/types/api'
 import { useReferenceStore } from '@/stores/reference'
 import { useUserStore } from '@/stores/user'
@@ -255,6 +262,9 @@ const contractOptions = ref(contractList.value ?? [])
 const costSubjectOptions = ref<
   { id: string; subjectName: string; subjectCode: string; subjectType: string; status: string }[]
 >([])
+const costTypeOptions = ref<DictDataVO[]>([])
+const sourceTypeOptions = ref<DictDataVO[]>([])
+const costStatusOptions = ref<DictDataVO[]>([])
 const projectOptions = computed(() => projectList.value ?? [])
 
 async function loadCostSubjectOptions() {
@@ -509,7 +519,7 @@ interface RailItem {
   amount: string
 }
 
-const subjectBreakdown = computed<RailItem[]>(() => {
+const costTypeBreakdown = computed<RailItem[]>(() => {
   const entries = Object.entries(summary.value.byCostType).map(([key, val]) => ({
     label: getCostTypeLabel(key),
     amount: val,
@@ -531,7 +541,7 @@ const sourceBreakdown = computed<RailItem[]>(() => {
 
 const maxAmount = computed(() =>
   Math.max(
-    ...subjectBreakdown.value.map((item) => parseFloat(item.amount) || 0),
+    ...costTypeBreakdown.value.map((item) => parseFloat(item.amount) || 0),
     ...sourceBreakdown.value.map((item) => parseFloat(item.amount) || 0),
     1,
   ),
@@ -567,7 +577,11 @@ const {
 } = useColumnSettings('cost_ledger_cols', gridColumns)
 
 onMounted(async () => {
-  await fetchDictData(COST_TYPE_DICT)
+  ;[costTypeOptions.value, sourceTypeOptions.value, costStatusOptions.value] = await Promise.all([
+    fetchDictData(COST_TYPE_DICT),
+    fetchDictData(COST_SOURCE_TYPE_DICT),
+    fetchDictData(COST_STATUS_DICT),
+  ])
   applyRouteQuery()
   referenceStore.fetchProjects()
   referenceStore.fetchPartners()
@@ -618,6 +632,9 @@ onMounted(async () => {
           :contract-options="contractOptions"
           :partner-list="partnerList ?? []"
           :cost-subject-options="costSubjectOptions"
+          :cost-type-options="costTypeOptions"
+          :source-type-options="sourceTypeOptions"
+          :cost-status-options="costStatusOptions"
           :fmt-wan="fmtWan"
           :bar-percent="barPercent"
           :handle-search="handleSearch"
@@ -647,7 +664,7 @@ onMounted(async () => {
       </div>
 
       <CostLedgerAnalysisRail
-        :subject-breakdown="subjectBreakdown"
+        :cost-type-breakdown="costTypeBreakdown"
         :source-breakdown="sourceBreakdown"
         :fmt-wan="fmtWan"
         :bar-percent="barPercent"

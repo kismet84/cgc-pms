@@ -1,0 +1,3 @@
+stage: platform-bootstrap-prerequisite
+owner: platform-bootstrap
+assertions: [one-root-company, one-root-department, one-super-admin]

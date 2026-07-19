@@ -1,0 +1,37 @@
+package-id: CGC-COMPLETE-PROJECT
+version: 2
+counts:
+  project: 1
+  partner: 5
+  contract: 4
+  material: 1
+  completed-stage: 13
+inventory:
+  requested-qty: 100
+  ordered-qty: 100
+  received-qty: 100
+  issued-qty: 20
+  stock-qty: 80
+  balance-delta: 0
+commercial:
+  bid-transfer-delta: 0
+  material-cost-delta: 0
+  subcontract-delta: 0
+  receivable-delta: 0
+  collection-delta: 0
+  quality-safety-cost: 5000
+  actual-cost-total: 85000
+closed-loops:
+  procurement: 1
+  subcontract-payment: 1
+  revenue-collection: 1
+  quality-rectification: 1
+  workflow: 1
+  alert: 1
+  closeout: 1
+  cost-forecast: 1
+  finance-reconciliation: 1
+  inventory-exception: 1
+  document-generation: 1
+coverage:
+  mapped-target-tables-with-zero-rows: 0

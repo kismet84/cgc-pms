@@ -80,12 +80,14 @@ public class TechnicalManagementService {
                 """, tenant(), projectId));
         result.put("disclosures", jdbc.queryForList("""
                 SELECT id,drawing_version_id drawingVersionId,scheme_id schemeId,disclosure_code disclosureCode,
-                 disclosure_title disclosureTitle,disclosure_date disclosureDate,presenter_user_id presenterUserId,status
+                 disclosure_title disclosureTitle,disclosure_date disclosureDate,presenter_user_id presenterUserId,
+                 recipient_summary recipientSummary,disclosure_content disclosureContent,status
                 FROM tech_disclosure WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY disclosure_date DESC,id DESC
                 """, tenant(), projectId));
         result.put("constructionReferences", jdbc.queryForList("""
                 SELECT id,drawing_version_id drawingVersionId,disclosure_id disclosureId,daily_log_id dailyLogId,
-                 wbs_task_id wbsTaskId,reference_date referenceDate,work_area workArea,status
+                 wbs_task_id wbsTaskId,reference_date referenceDate,work_area workArea,
+                 reference_description referenceDescription,status
                 FROM tech_construction_reference WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY reference_date DESC,id DESC
                 """, tenant(), projectId));
         result.put("archives", jdbc.queryForList("""

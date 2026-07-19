@@ -1,0 +1,110 @@
+:root {
+  color-scheme: light;
+
+  --v2-color-canvas: #f4f7fb;
+  --v2-color-surface: #ffffff;
+  --v2-color-surface-subtle: #fafbfd;
+  --v2-color-surface-hover: #f7faff;
+  --v2-color-text: #172033;
+  --v2-color-text-strong: #121b2e;
+  --v2-color-text-secondary: #53627a;
+  --v2-color-text-muted: #64748b;
+  --v2-color-text-disabled: #94a3b8;
+  --v2-color-border: #e1e8f2;
+  --v2-color-border-subtle: #edf1f6;
+  --v2-color-primary: #2563eb;
+  --v2-color-primary-hover: #1d4ed8;
+  --v2-color-primary-active: #1e40af;
+  --v2-color-primary-soft: #eff6ff;
+  --v2-color-focus-ring: rgb(37 99 235 / 28%);
+  --v2-color-info: #0f9fa8;
+  --v2-color-info-text: #0e6f78;
+  --v2-color-info-soft: #ecfeff;
+  --v2-color-success: #0f9f6e;
+  --v2-color-success-text: #06724f;
+  --v2-color-success-soft: #ecfdf5;
+  --v2-color-warning: #f97316;
+  --v2-color-warning-text: #a8470b;
+  --v2-color-warning-soft: #fff7ed;
+  --v2-color-danger: #d71920;
+  --v2-color-danger-text: #b4232a;
+  --v2-color-danger-hover: #b91c1c;
+  --v2-color-danger-soft: #fff1f0;
+  --v2-color-overlay: rgb(18 27 46 / 46%);
+
+  --v2-chart-1: #2563eb;
+  --v2-chart-2: #0f9fa8;
+  --v2-chart-3: #f97316;
+  --v2-chart-4: #0f9f6e;
+  --v2-chart-5: #7c3aed;
+  --v2-chart-6: #db2777;
+
+  --v2-font-sans:
+    Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
+  --v2-font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  --v2-font-size-11: 0.6875rem;
+  --v2-font-size-12: 0.75rem;
+  --v2-font-size-13: 0.8125rem;
+  --v2-font-size-14: 0.875rem;
+  --v2-font-size-15: 0.9375rem;
+  --v2-font-size-17: 1.0625rem;
+  --v2-font-size-21: 1.3125rem;
+  --v2-font-size-28: 1.75rem;
+  --v2-font-weight-regular: 400;
+  --v2-font-weight-medium: 500;
+  --v2-font-weight-semibold: 600;
+  --v2-font-weight-bold: 700;
+  --v2-font-weight-heavy: 800;
+  --v2-line-height-tight: 1.2;
+  --v2-line-height-ui: 1.4;
+  --v2-line-height-body: 1.65;
+
+  --v2-space-0: 0;
+  --v2-space-1: 0.25rem;
+  --v2-space-2: 0.5rem;
+  --v2-space-3: 0.75rem;
+  --v2-space-4: 1rem;
+  --v2-space-5: 1.25rem;
+  --v2-space-6: 1.5rem;
+  --v2-space-7: 1.75rem;
+  --v2-space-8: 2rem;
+  --v2-space-10: 2.5rem;
+  --v2-space-12: 3rem;
+
+  --v2-radius-xs: 0.1875rem;
+  --v2-radius-sm: 0.375rem;
+  --v2-radius-md: 0.5rem;
+  --v2-radius-lg: 0.75rem;
+  --v2-radius-round: 999rem;
+  --v2-border-width: 1px;
+  --v2-shadow-panel: 0 2px 8px rgb(31 52 80 / 4%);
+  --v2-shadow-float: 0 16px 42px rgb(31 52 80 / 16%);
+
+  --v2-control-height-sm: 2rem;
+  --v2-control-height-md: 2.5rem;
+  --v2-control-height-touch: 2.75rem;
+  --v2-page-gutter: clamp(1rem, 2vw, 2rem);
+  --v2-page-max-width: 90rem;
+  --v2-grid-gap: var(--v2-space-3);
+
+  --v2-z-base: 0;
+  --v2-z-sticky: 100;
+  --v2-z-dropdown: 300;
+  --v2-z-dialog: 600;
+  --v2-z-toast: 800;
+
+  --v2-motion-fast: 120ms;
+  --v2-motion-base: 180ms;
+  --v2-motion-slow: 260ms;
+  --v2-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --v2-ease-emphasized: cubic-bezier(0.2, 0, 0, 1.2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --v2-motion-fast: 1ms;
+    --v2-motion-base: 1ms;
+    --v2-motion-slow: 1ms;
+  }
+}

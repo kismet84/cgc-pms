@@ -36,6 +36,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -101,6 +102,9 @@ class CtContractServiceTest {
 
     @Autowired
     private SysUserMapper sysUserMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setupContext() {
@@ -933,6 +937,72 @@ class CtContractServiceTest {
         Long id = createDraftContract("租户隔离测试合同");
         CtContract saved = contractMapper.selectById(id);
         assertEquals(TENANT_ID, saved.getTenantId(), "tenantId 应为当前租户");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("字典约束 — 创建时拒绝未启用合同类型")
+    void testCreateRejectsInvalidContractType() {
+        CtContract contract = buildDraftContract("非法类型合同");
+        contract.setContractType("ARBITRARY_TYPE");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.create(contract));
+        assertEquals("CONTRACT_TYPE_INVALID", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("引用约束 — 创建时拒绝甲乙方相同")
+    void testCreateRejectsSameParties() {
+        CtContract contract = buildDraftContract("甲乙方相同合同");
+        contract.setPartyBId(contract.getPartyAId());
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.create(contract));
+        assertEquals("CONTRACT_PARTIES_SAME", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("引用约束 — 创建时拒绝跨租户项目")
+    void testCreateRejectsCrossTenantProject() {
+        long crossTenantProjectId = 990001L;
+        jdbcTemplate.update("""
+                INSERT INTO pm_project
+                    (id, tenant_id, project_code, project_name, project_type, status, approval_status)
+                VALUES (?, 999, 'CROSS-TENANT-PROJECT', '跨租户项目', 'CONSTRUCTION', 'DRAFT', 'DRAFT')
+                """, crossTenantProjectId);
+        CtContract contract = buildDraftContract("跨租户项目合同");
+        contract.setProjectId(crossTenantProjectId);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.create(contract));
+        assertEquals("CONTRACT_PROJECT_NOT_FOUND", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("引用约束 — 创建时分别拒绝跨租户甲方和乙方")
+    void testCreateRejectsCrossTenantParties() {
+        long crossTenantPartnerId = 990002L;
+        jdbcTemplate.update("""
+                INSERT INTO md_partner
+                    (id, tenant_id, partner_code, partner_name, partner_type, status)
+                VALUES (?, 999, 'CROSS-TENANT-PARTNER', '跨租户合作方', 'SUPPLIER', 'ENABLE')
+                """, crossTenantPartnerId);
+
+        CtContract partyAContract = buildDraftContract("跨租户甲方合同");
+        partyAContract.setPartyAId(crossTenantPartnerId);
+        BusinessException partyAError = assertThrows(BusinessException.class,
+                () -> contractService.create(partyAContract));
+        assertEquals("CONTRACT_PARTY_A_NOT_FOUND", partyAError.getCode());
+
+        CtContract partyBContract = buildDraftContract("跨租户乙方合同");
+        partyBContract.setPartyBId(crossTenantPartnerId);
+        BusinessException partyBError = assertThrows(BusinessException.class,
+                () -> contractService.create(partyBContract));
+        assertEquals("CONTRACT_PARTY_B_NOT_FOUND", partyBError.getCode());
     }
 
     @Test
