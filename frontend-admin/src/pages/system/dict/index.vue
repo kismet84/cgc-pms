@@ -13,7 +13,8 @@ import {
   deleteDictData,
 } from '@/api/modules/dict'
 import type { DictTypeVO, DictDataVO } from '@/types/dict'
-import { DICT_DATA_GRID_COLUMNS, DICT_STATUS_LABEL } from './dictPageConfig'
+import { clearDictCache } from '@/utils/dict'
+import { DICT_DATA_GRID_COLUMNS, DICT_STATUS_LABEL, DICT_TAG_STYLE_OPTIONS } from './dictPageConfig'
 
 /* ========== 字典类型列表（左侧） ========== */
 
@@ -25,6 +26,10 @@ const selectedTypeName = computed(() => {
   const t = typeList.value.find((x) => x.id === selectedTypeId.value)
   return t?.dictName ?? ''
 })
+const selectedTypeCode = computed(() => {
+  const type = typeList.value.find((item) => item.id === selectedTypeId.value)
+  return type?.dictCode ?? ''
+})
 
 const typeModalVisible = ref(false)
 const typeModalTitle = ref('新增字典类型')
@@ -34,7 +39,7 @@ const typeForm = reactive({
   id: '' as string,
   dictCode: '',
   dictName: '',
-  status: 'ENABLED',
+  status: 'ENABLE',
 })
 
 async function fetchTypeList() {
@@ -80,7 +85,7 @@ function handleAddType() {
   typeForm.id = ''
   typeForm.dictCode = ''
   typeForm.dictName = ''
-  typeForm.status = 'ENABLED'
+  typeForm.status = 'ENABLE'
   typeModalVisible.value = true
 }
 
@@ -97,13 +102,14 @@ function handleEditType(record: DictTypeVO) {
 async function handleDeleteType(record: DictTypeVO) {
   Modal.confirm({
     title: '确认删除',
-    content: `确定要删除字典类型"${record.dictName}"吗？删除后该类型下的字典数据也将不可用。`,
+    content: `确定要删除字典类型“${record.dictName}”吗？仅空字典允许删除。`,
     okText: '确定',
     cancelText: '取消',
     okType: 'danger',
     onOk: async () => {
       try {
         await deleteDictType(record.id)
+        clearDictCache(record.dictCode)
         message.success('删除成功')
         if (selectedTypeId.value === record.id) {
           selectedTypeId.value = ''
@@ -139,6 +145,7 @@ async function handleTypeSubmit() {
       })
       message.success('新增成功')
     }
+    clearDictCache(typeForm.dictCode)
     typeModalVisible.value = false
     fetchTypeList()
   } catch (e: unknown) {
@@ -178,7 +185,7 @@ const dataForm = reactive({
   cssClass: '',
   listClass: '',
   orderNum: 0,
-  status: 'ENABLED',
+  status: 'ENABLE',
 })
 
 const dataGridColumns = computed(() => [...DICT_DATA_GRID_COLUMNS])
@@ -226,6 +233,12 @@ function handleDataReset() {
   fetchDataList()
 }
 
+function dictTagColor(value: string | undefined) {
+  if (value === 'primary') return 'processing'
+  if (value === 'danger') return 'error'
+  return value || 'default'
+}
+
 function handleDataPageChange(page: number) {
   dataPageNo.value = page
   fetchDataList()
@@ -253,7 +266,7 @@ function handleAddData() {
   dataForm.cssClass = ''
   dataForm.listClass = ''
   dataForm.orderNum = 0
-  dataForm.status = 'ENABLED'
+  dataForm.status = 'ENABLE'
   dataModalVisible.value = true
 }
 
@@ -281,6 +294,7 @@ async function handleDeleteData(record: DictDataVO) {
     onOk: async () => {
       try {
         await deleteDictData(record.id)
+        clearDictCache(selectedTypeCode.value)
         message.success('删除成功')
         fetchDataList()
       } catch (e: unknown) {
@@ -318,6 +332,7 @@ async function handleDataSubmit() {
       await createDictData(payload)
       message.success('新增成功')
     }
+    clearDictCache(selectedTypeCode.value)
     dataModalVisible.value = false
     fetchDataList()
   } catch (e: unknown) {
@@ -416,8 +431,8 @@ onMounted(() => {
                 allow-clear
                 class="dict-filter-status"
               >
-                <a-select-option value="ENABLED">启用</a-select-option>
-                <a-select-option value="DISABLED">禁用</a-select-option>
+                <a-select-option value="ENABLE">启用</a-select-option>
+                <a-select-option value="DISABLE">禁用</a-select-option>
               </a-select>
             </div>
             <div class="lg-toolbar-right">
@@ -437,9 +452,12 @@ onMounted(() => {
               border="inner"
               size="small"
             >
+              <template #dictLabel="{ row }">
+                <a-tag :color="dictTagColor(row.listClass)">{{ row.dictLabel }}</a-tag>
+              </template>
               <template #status="{ row }">
-                <a-tag :color="row.status === 'ENABLED' ? 'success' : 'default'">
-                  {{ STATUS_LABEL[row.status] ?? row.status }}
+                <a-tag :color="row.status === 'ENABLE' ? 'success' : 'default'">
+                  {{ DICT_STATUS_LABEL[row.status] ?? row.status }}
                 </a-tag>
               </template>
               <template #ops="{ row }">
@@ -504,17 +522,18 @@ onMounted(() => {
         <a-form-item label="字典编码" required>
           <a-input
             v-model:value="typeForm.dictCode"
-            placeholder="请输入字典编码"
+            placeholder="小写蛇形命名，如 project_type"
             :disabled="typeIsEdit"
           />
+          <div class="dict-field-help">创建后不可修改，业务代码以此作为稳定契约。</div>
         </a-form-item>
         <a-form-item label="字典名称" required>
           <a-input v-model:value="typeForm.dictName" placeholder="请输入字典名称" />
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="typeForm.status" class="dict-status-select">
-            <a-select-option value="ENABLED">启用</a-select-option>
-            <a-select-option value="DISABLED">禁用</a-select-option>
+            <a-select-option value="ENABLE">启用</a-select-option>
+            <a-select-option value="DISABLE">禁用</a-select-option>
           </a-select>
         </a-form-item>
       </a-form>
@@ -537,7 +556,12 @@ onMounted(() => {
           <a-input v-model:value="dataForm.dictLabel" placeholder="请输入字典标签" />
         </a-form-item>
         <a-form-item label="字典键值" required>
-          <a-input v-model:value="dataForm.dictValue" placeholder="请输入字典键值" />
+          <a-input
+            v-model:value="dataForm.dictValue"
+            placeholder="大写稳定编码，如 ACTIVE"
+            :disabled="dataIsEdit"
+          />
+          <div class="dict-field-help">创建后不可修改；显示名称、颜色、排序可继续维护。</div>
         </a-form-item>
         <a-form-item label="排序号">
           <a-input-number v-model:value="dataForm.orderNum" :min="0" class="lg-full-control" />
@@ -545,13 +569,26 @@ onMounted(() => {
         <a-form-item label="CSS类名">
           <a-input v-model:value="dataForm.cssClass" placeholder="如：text-danger bg-warning" />
         </a-form-item>
-        <a-form-item label="列表样式">
-          <a-input v-model:value="dataForm.listClass" placeholder="如：default primary success" />
+        <a-form-item label="标签颜色">
+          <a-select
+            v-model:value="dataForm.listClass"
+            placeholder="选择标签颜色"
+            allow-clear
+            show-search
+          >
+            <a-select-option
+              v-for="item in DICT_TAG_STYLE_OPTIONS"
+              :key="item.value"
+              :value="item.value"
+            >
+              {{ item.label }}
+            </a-select-option>
+          </a-select>
         </a-form-item>
         <a-form-item label="状态">
           <a-select v-model:value="dataForm.status" class="dict-status-select">
-            <a-select-option value="ENABLED">启用</a-select-option>
-            <a-select-option value="DISABLED">禁用</a-select-option>
+            <a-select-option value="ENABLE">启用</a-select-option>
+            <a-select-option value="DISABLE">禁用</a-select-option>
           </a-select>
         </a-form-item>
       </a-form>
@@ -752,6 +789,13 @@ onMounted(() => {
 .dict-filter-status,
 .dict-status-select {
   width: 120px;
+}
+
+.dict-field-help {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .dc-right .lg-toolbar {

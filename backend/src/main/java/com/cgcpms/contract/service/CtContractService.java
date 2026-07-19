@@ -24,6 +24,7 @@ import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfRecord;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
@@ -64,6 +65,7 @@ public class CtContractService {
     private final WfRecordMapper wfRecordMapper;
     private final CodeGenerationService codeGenerationService;
     private final ProjectAccessChecker projectAccessChecker;
+    private final SysDictDataService sysDictDataService;
 
     public IPage<CtContractVO> getPage(long pageNo, long pageSize, String keyword,
                                        String contractCode, String contractName,
@@ -220,7 +222,8 @@ public class CtContractService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(CtContract contract) {
-        validateContractParties(contract);
+        normalizeContractType(contract);
+        validateContractReferences(contract);
         contract.setContractStatus("DRAFT");
         contract.setApprovalStatus("DRAFT");
         contract.setTenantId(UserContext.getCurrentTenantId());
@@ -247,7 +250,8 @@ public class CtContractService {
         if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
             throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
 
-        validateContractParties(contract);
+        normalizeContractType(contract);
+        validateContractReferences(contract);
 
         // 校验合同状态：仅允许在有效状态集合内修改
         if (contract.getContractStatus() != null
@@ -357,10 +361,14 @@ public class CtContractService {
     @Transactional(rollbackFor = Exception.class)
     public Long compositeSave(ContractSaveRequest request) {
         CtContract contract = request.getContract();
-        validateContractParties(contract);
+        if (contract == null) {
+            throw new BusinessException("CONTRACT_REQUIRED", "合同不能为空");
+        }
 
         if (contract.getId() == null) {
             // ── 新建 ──
+            normalizeContractType(contract);
+            validateContractReferences(contract);
             contract.setContractStatus("DRAFT");
             contract.setApprovalStatus("DRAFT");
             contract.setTenantId(UserContext.getCurrentTenantId());
@@ -386,6 +394,9 @@ public class CtContractService {
             // 编辑守卫：只允许 DRAFT 状态编辑
             if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
                 throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
+
+            normalizeContractType(contract);
+            validateContractReferences(contract);
 
             // 禁止通过更新接口覆盖受保护字段
             contract.setApprovalStatus(existing.getApprovalStatus());
@@ -461,10 +472,39 @@ public class CtContractService {
         }).toList();
     }
 
-    private void validateContractParties(CtContract contract) {
+    private void validateContractReferences(CtContract contract) {
         if (contract == null || contract.getPartyAId() == null || contract.getPartyBId() == null) {
             throw new BusinessException("CONTRACT_PARTY_REQUIRED", "合同甲方和乙方不能为空");
         }
+        if (java.util.Objects.equals(contract.getPartyAId(), contract.getPartyBId())) {
+            throw new BusinessException("CONTRACT_PARTIES_SAME", "合同甲方和乙方不能相同");
+        }
+        if (contract.getProjectId() == null) {
+            throw new BusinessException("CONTRACT_PROJECT_REQUIRED", "关联合同项目不能为空");
+        }
+
+        Long tenantId = UserContext.getCurrentTenantId();
+        PmProject project = pmProjectMapper.selectById(contract.getProjectId());
+        if (project == null || !java.util.Objects.equals(project.getTenantId(), tenantId)) {
+            throw new BusinessException("CONTRACT_PROJECT_NOT_FOUND", "关联合同项目不存在");
+        }
+        MdPartner partyA = mdPartnerMapper.selectById(contract.getPartyAId());
+        if (partyA == null || !java.util.Objects.equals(partyA.getTenantId(), tenantId)) {
+            throw new BusinessException("CONTRACT_PARTY_A_NOT_FOUND", "合同甲方不存在");
+        }
+        MdPartner partyB = mdPartnerMapper.selectById(contract.getPartyBId());
+        if (partyB == null || !java.util.Objects.equals(partyB.getTenantId(), tenantId)) {
+            throw new BusinessException("CONTRACT_PARTY_B_NOT_FOUND", "合同乙方不存在");
+        }
+    }
+
+    private void normalizeContractType(CtContract contract) {
+        if (contract == null) {
+            throw new BusinessException("CONTRACT_REQUIRED", "合同不能为空");
+        }
+        contract.setContractType(sysDictDataService.requireEnabledValue(
+                "contract_type", contract.getContractType(),
+                "CONTRACT_TYPE_INVALID", "合同类型不合法"));
     }
 
     private void validatePurchaseSupplierAdmission(CtContract contract) {

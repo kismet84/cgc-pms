@@ -1,0 +1,3 @@
+stage: procurement
+source: sql/20-procurement.sql
+assertions: [received-100, issued-20, stock-80, inventory-delta-zero, material-cost-delta-zero]

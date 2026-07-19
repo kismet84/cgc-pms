@@ -102,7 +102,7 @@ class ProjectOverviewServiceTest {
         project.setTenantId(TENANT_0);
         project.setProjectCode("TST-OV-" + System.currentTimeMillis());
         project.setProjectName("概览测试项目");
-        project.setProjectType("BUILDING");
+        project.setProjectType("CONSTRUCTION");
         project.setStatus("ACTIVE");
         project.setTargetCost(new BigDecimal("5000000.00"));
         project.setContractAmount(new BigDecimal("8000000.00"));

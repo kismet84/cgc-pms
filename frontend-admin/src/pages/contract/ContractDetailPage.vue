@@ -7,7 +7,7 @@ import { submitForApproval } from '@/api/modules/contract'
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
 import ContractChangeList from '@/components/ContractChangeList.vue'
-import type { ContractType } from '@/types/contract'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 const route = useRoute()
 const router = useRouter()
@@ -17,21 +17,7 @@ const contractId = route.params.id as string
 const activeTab = ref('items')
 const submitting = ref(false)
 
-const TYPE_LABEL: Record<ContractType, string> = {
-  MAIN: '总包合同',
-  SUB: '分包合同',
-  PURCHASE: '采购合同',
-  LEASE: '租赁合同',
-  SERVICE: '服务合同',
-}
-
-const TYPE_COLOR: Record<ContractType, string> = {
-  MAIN: 'blue',
-  SUB: 'green',
-  PURCHASE: 'orange',
-  LEASE: 'purple',
-  SERVICE: 'cyan',
-}
+const CONTRACT_TYPE_DICT = 'contract_type'
 
 const itemColumns = [
   { title: '清单编码', dataIndex: 'itemCode', key: 'itemCode', width: 118, ellipsis: true },
@@ -133,6 +119,7 @@ function handleSubmitApproval() {
 }
 
 onMounted(() => {
+  void fetchDictData(CONTRACT_TYPE_DICT)
   loadData()
 })
 
@@ -189,8 +176,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             }}</a-descriptions-item>
             <a-descriptions-item label="合同编号">{{ contract.contractCode }}</a-descriptions-item>
             <a-descriptions-item label="合同类型">
-              <a-tag :color="TYPE_COLOR[contract.contractType]">
-                {{ TYPE_LABEL[contract.contractType] }}
+              <a-tag :color="getDictTagColorSync(CONTRACT_TYPE_DICT, contract.contractType)">
+                {{ getDictLabelSync(CONTRACT_TYPE_DICT, contract.contractType) }}
               </a-tag>
             </a-descriptions-item>
             <a-descriptions-item label="项目名称">{{ contract.projectName }}</a-descriptions-item>
@@ -246,8 +233,8 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
           <div class="cd-info-row">
             <span class="cd-info-label">合同类型</span>
             <span class="cd-info-value">
-              <a-tag :color="TYPE_COLOR[contract.contractType as ContractType]">
-                {{ TYPE_LABEL[contract.contractType as ContractType] }}
+              <a-tag :color="getDictTagColorSync(CONTRACT_TYPE_DICT, contract.contractType)">
+                {{ getDictLabelSync(CONTRACT_TYPE_DICT, contract.contractType) }}
               </a-tag>
             </span>
           </div>

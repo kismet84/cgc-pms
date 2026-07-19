@@ -14,6 +14,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,6 +33,9 @@ class DictServiceTest {
 
     @Autowired
     private SysDictDataService dictDataService;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     // Tracks IDs created during tests for cleanup assertions
     private static Long createdTypeId;
@@ -117,6 +121,7 @@ class DictServiceTest {
         // 使用种子数据 contract_type id=1002
         SysDictType entity = new SysDictType();
         entity.setId(1002L);
+        entity.setDictCode("contract_type");
         entity.setDictName("合同类型（已修改）");
         entity.setStatus("DISABLE");
 
@@ -188,7 +193,7 @@ class DictServiceTest {
         // 项目状态 dict_type_id=1001，种子数据应有5条
         IPage<SysDictDataVO> page = dictDataService.getPage(1, 20, 1001L, null, null);
         assertEquals(5, page.getTotal(), "project_status 应有5条种子数据");
-        // 验证按 orderNum 排序（第一条应为草稿）
+        // local profile uses baseline fixtures; V216 normalization is covered by Flyway smoke tests.
         assertEquals("草稿", page.getRecords().get(0).getDictLabel());
     }
 
@@ -196,7 +201,7 @@ class DictServiceTest {
     @Order(9)
     @DisplayName("T9: 按ID获取字典数据")
     void test09_getDictDataById() {
-        // 种子数据 草稿 id=100101
+        // local profile seed data id=100101
         SysDictDataVO vo = dictDataService.getById(100101L);
         assertNotNull(vo);
         assertEquals("草稿", vo.getDictLabel());
@@ -241,16 +246,27 @@ class DictServiceTest {
     @DisplayName("T12: 更新字典数据")
     @Transactional
     void test12_updateDictData() {
-        // 种子数据 已关闭 id=100105
+        SysDictType type = new SysDictType();
+        type.setDictCode("test_update_status");
+        type.setDictName("测试更新状态");
+        Long typeId = dictTypeService.create(type);
+
+        SysDictData initial = new SysDictData();
+        initial.setDictTypeId(typeId);
+        initial.setDictLabel("原标签");
+        initial.setDictValue("CLOSED");
+        Long dataId = dictDataService.create(initial);
+
         SysDictData entity = new SysDictData();
-        entity.setId(100105L);
+        entity.setId(dataId);
+        entity.setDictTypeId(typeId);
         entity.setDictLabel("已关闭（已修改）");
         entity.setDictValue("CLOSED");
         entity.setStatus("DISABLE");
 
         dictDataService.update(entity);
 
-        SysDictDataVO updated = dictDataService.getById(100105L);
+        SysDictDataVO updated = dictDataService.getById(dataId);
         assertEquals("已关闭（已修改）", updated.getDictLabel());
         assertEquals("DISABLE", updated.getStatus());
     }
@@ -260,8 +276,13 @@ class DictServiceTest {
     @DisplayName("T13: 删除字典数据")
     @Transactional
     void test13_deleteDictData() {
+        SysDictType type = new SysDictType();
+        type.setDictCode("test_delete_status");
+        type.setDictName("测试删除状态");
+        Long typeId = dictTypeService.create(type);
+
         SysDictData entity = new SysDictData();
-        entity.setDictTypeId(1001L);
+        entity.setDictTypeId(typeId);
         entity.setDictLabel("待删除项");
         entity.setDictValue("TO_DELETE");
         Long id = dictDataService.create(entity);
@@ -272,10 +293,10 @@ class DictServiceTest {
 
     @Test
     @Order(14)
-    @DisplayName("T14: 租户隔离—其他租户字典数据不可见")
+    @DisplayName("T14: 租户隔离—禁止跨租户挂载字典数据")
     @Transactional
     void test14_tenantIsolation_data() {
-        // 在 other tenant 下创建数据
+        // other tenant 不能把数据挂到 system tenant 的类型下
         UserContext.clear();
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ADMIN)
@@ -287,22 +308,9 @@ class DictServiceTest {
         entity.setDictTypeId(1001L);
         entity.setDictLabel("其他租户数据");
         entity.setDictValue("OTHER_TENANT");
-        Long otherDataId = dictDataService.create(entity);
-
-        // 切回 system tenant
-        UserContext.clear();
-        UserContext.set(Jwts.claims()
-                .add("userId", USER_ADMIN)
-                .add("username", "admin")
-                .add("tenantId", TENANT_SYSTEM)
-                .build());
-
-        // system tenant 不应看到 other tenant 的数据
-        assertThrows(BusinessException.class, () -> dictDataService.getById(otherDataId));
-
-        // 列表中也不应出现
-        IPage<SysDictDataVO> page = dictDataService.getPage(1, 100, 1001L, "其他租户数据", null);
-        assertEquals(0, page.getTotal());
+        assertThrows(BusinessException.class, () -> dictDataService.create(entity));
+        assertFalse(dictDataService.getByDictCode("project_status").isEmpty(),
+                "租户未覆盖字典时应只读回退到系统字典");
     }
 
     @Test
@@ -319,5 +327,124 @@ class DictServiceTest {
     void test16_filterDictTypeByStatus() {
         IPage<SysDictTypeVO> page = dictTypeService.getPage(1, 20, null, null, "ENABLE");
         assertTrue(page.getTotal() >= 7, "ENABLE 状态应至少有7条");
+    }
+
+    @Test
+    @Order(17)
+    @DisplayName("T17: 字典编码和值创建后不可修改")
+    @Transactional
+    void test17_immutableKeys() {
+        SysDictType type = new SysDictType();
+        type.setDictCode("immutable_type");
+        type.setDictName("不可变类型");
+        Long typeId = dictTypeService.create(type);
+
+        SysDictType changedType = new SysDictType();
+        changedType.setId(typeId);
+        changedType.setDictCode("changed_type");
+        changedType.setDictName("已修改");
+        assertThrows(BusinessException.class, () -> dictTypeService.update(changedType));
+
+        SysDictData data = new SysDictData();
+        data.setDictTypeId(typeId);
+        data.setDictLabel("固定值");
+        data.setDictValue("FIXED");
+        Long dataId = dictDataService.create(data);
+
+        SysDictData changedData = new SysDictData();
+        changedData.setId(dataId);
+        changedData.setDictTypeId(typeId);
+        changedData.setDictLabel("修改标签允许");
+        changedData.setDictValue("CHANGED");
+        assertThrows(BusinessException.class, () -> dictDataService.update(changedData));
+        assertThrows(BusinessException.class, () -> dictTypeService.delete(typeId));
+    }
+
+    @Test
+    @Order(18)
+    @DisplayName("T18: 系统字典变更后清除所有租户的只读回退缓存")
+    @Transactional
+    void test18_systemDictionaryCacheInvalidation() {
+        SysDictType type = new SysDictType();
+        type.setDictCode("cache_invalidation_status");
+        type.setDictName("缓存失效状态");
+        Long typeId = dictTypeService.create(type);
+
+        SysDictData data = new SysDictData();
+        data.setDictTypeId(typeId);
+        data.setDictLabel("旧标签");
+        data.setDictValue("FIXED");
+        Long dataId = dictDataService.create(data);
+
+        setTenant(TENANT_OTHER);
+        assertEquals("旧标签", dictDataService.getByDictCodeCached(type.getDictCode()).getFirst().getDictLabel());
+
+        setTenant(TENANT_SYSTEM);
+        SysDictData updated = new SysDictData();
+        updated.setId(dataId);
+        updated.setDictTypeId(typeId);
+        updated.setDictLabel("新标签");
+        updated.setDictValue("FIXED");
+        dictDataService.update(updated);
+
+        setTenant(TENANT_OTHER);
+        assertEquals("新标签", dictDataService.getByDictCodeCached(type.getDictCode()).getFirst().getDictLabel());
+
+        setTenant(TENANT_SYSTEM);
+        SysDictType disabled = new SysDictType();
+        disabled.setId(typeId);
+        disabled.setDictCode(type.getDictCode());
+        disabled.setDictName(type.getDictName());
+        disabled.setStatus("DISABLE");
+        dictTypeService.update(disabled);
+
+        setTenant(TENANT_OTHER);
+        assertTrue(dictDataService.getByDictCodeCached(type.getDictCode()).isEmpty());
+    }
+
+    @Test
+    @Order(19)
+    @DisplayName("T19: 核心字典忽略租户同名影子且禁止新建覆盖")
+    @Transactional
+    void test19_coreDictionaryUsesSystemAuthority() {
+        jdbc.update("INSERT INTO sys_dict_type(id,tenant_id,dict_code,dict_name,status) VALUES(990101,?,'project_type','租户伪项目类型','ENABLE')", TENANT_OTHER);
+        jdbc.update("INSERT INTO sys_dict_data(id,tenant_id,dict_type_id,dict_label,dict_value,order_num,status) VALUES(990102,?,990101,'租户伪值','TENANT_FAKE',1,'ENABLE')", TENANT_OTHER);
+
+        setTenant(TENANT_OTHER);
+        var values = dictDataService.getByDictCodeCached("project_type");
+        assertTrue(values.stream().anyMatch(row -> "CONSTRUCTION".equals(row.getDictValue())));
+        assertTrue(values.stream().noneMatch(row -> "TENANT_FAKE".equals(row.getDictValue())));
+
+        SysDictType duplicate = new SysDictType();
+        duplicate.setDictCode("contract_type");
+        duplicate.setDictName("租户合同类型");
+        BusinessException error = assertThrows(BusinessException.class, () -> dictTypeService.create(duplicate));
+        assertEquals("DICT_CORE_TYPE_TENANT_OVERRIDE_FORBIDDEN", error.getCode());
+    }
+
+    @Test
+    @Order(20)
+    @DisplayName("T20: 核心字典值禁止停用和删除")
+    @Transactional
+    void test20_coreDictionaryValueProtected() {
+        SysDictData disabled = new SysDictData();
+        disabled.setId(132001L);
+        disabled.setDictTypeId(132000L);
+        disabled.setDictLabel("施工总承包");
+        disabled.setDictValue("CONSTRUCTION");
+        disabled.setStatus("DISABLE");
+        assertEquals("DICT_CORE_VALUE_DISABLE_FORBIDDEN",
+                assertThrows(BusinessException.class, () -> dictDataService.update(disabled)).getCode());
+        assertEquals("DICT_CORE_VALUE_DELETE_FORBIDDEN",
+                assertThrows(BusinessException.class, () -> dictDataService.delete(132001L)).getCode());
+    }
+
+    private void setTenant(long tenantId) {
+        UserContext.clear();
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", tenantId)
+                .build());
     }
 }

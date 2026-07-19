@@ -4,7 +4,6 @@
 
 ## 默认预算
 
-- `max_subagents=3`
 - `max_retries_per_command=1`
 - `max_reverify_commands=3`
 - `max_wall_time_minutes=45`
@@ -22,4 +21,4 @@
 ## 使用提示
 
 - 在 loop state 中记录预算是否已触边，不需要新增数据库。
-- 若用户明确提高验收标准，先更新预算判断，再决定是否重派或升档。
+- 若用户明确提高验收标准，先更新预算判断，再调整执行方案或证据强度。

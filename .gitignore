@@ -22,6 +22,11 @@ frontend-admin/playwright-report/
 frontend-admin/test-results/
 frontend-admin/.pnpm-store/
 frontend-admin/.playwright-cli/
+frontend-admin-v2/dist/
+frontend-admin-v2/coverage/
+frontend-admin-v2/playwright-report/
+frontend-admin-v2/test-results/
+frontend-admin-v2/.pnpm-store/
 mobile/node_modules/
 mobile/dist/
 

@@ -23,6 +23,7 @@ class SysDictTypeControllerTest {
     @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
     private Long dictTypeId;
+    private String dictCode;
 
     private Cookie adminCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
@@ -40,7 +41,8 @@ class SysDictTypeControllerTest {
 
     @Test @Order(3) @DisplayName("POST /system/dict/types -> 200 creates type")
     void testCreate() throws Exception {
-        String body = "{\"dictCode\":\"test_type_" + System.nanoTime() + "\",\"dictName\":\"测试字典类型\"}";
+        dictCode = "test_type_" + System.nanoTime();
+        String body = "{\"dictCode\":\"" + dictCode + "\",\"dictName\":\"测试字典类型\"}";
         String resp = mockMvc.perform(p("/system/dict/types").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isString())
                 .andReturn().getResponse().getContentAsString();
@@ -64,7 +66,7 @@ class SysDictTypeControllerTest {
     @Test @Order(6) @DisplayName("PUT /system/dict/types/{id} -> 200")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(dictTypeId);
-        String body = "{\"dictCode\":\"test_type_" + System.nanoTime() + "\",\"dictName\":\"更新字典类型\"}";
+        String body = "{\"dictCode\":\"" + dictCode + "\",\"dictName\":\"更新字典类型\"}";
         mockMvc.perform(u("/system/dict/types/" + dictTypeId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }

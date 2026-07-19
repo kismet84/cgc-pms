@@ -9,6 +9,7 @@ import {
   SearchOutlined,
   AlertOutlined,
 } from '@ant-design/icons-vue'
+import type { DictDataVO } from '@/types/dict'
 
 const mobileFiltersOpen = ref(false)
 
@@ -66,6 +67,9 @@ const props = defineProps<{
   contractOptions: OptionItem[]
   partnerList: OptionItem[]
   costSubjectOptions: OptionItem[]
+  costTypeOptions: DictDataVO[]
+  sourceTypeOptions: DictDataVO[]
+  costStatusOptions: DictDataVO[]
   fmtWan: (val: string | undefined) => string
   barPercent: (amount: string) => string
   handleSearch: () => void
@@ -241,11 +245,13 @@ const mobileKpiItems = computed(() => [
         size="large"
         @change="handleSearch"
       >
-        <a-select-option value="MATERIAL">材料费</a-select-option>
-        <a-select-option value="LABOR">人工费</a-select-option>
-        <a-select-option value="MACHINERY">机械费</a-select-option>
-        <a-select-option value="SUBCONTRACT">分包费</a-select-option>
-        <a-select-option value="OTHER">其他</a-select-option>
+        <a-select-option
+          v-for="item in costTypeOptions"
+          :key="item.dictValue"
+          :value="item.dictValue"
+        >
+          {{ item.dictLabel }}
+        </a-select-option>
       </a-select>
       <a-select
         v-if="filterVisibility.sourceType"
@@ -256,10 +262,13 @@ const mobileKpiItems = computed(() => [
         size="large"
         @change="handleSearch"
       >
-        <a-select-option value="PURCHASE_ORDER">采购单</a-select-option>
-        <a-select-option value="SUB_MEASURE">分包计量</a-select-option>
-        <a-select-option value="SETTLEMENT">结算单</a-select-option>
-        <a-select-option value="MANUAL">手工录入</a-select-option>
+        <a-select-option
+          v-for="item in sourceTypeOptions"
+          :key="item.dictValue"
+          :value="item.dictValue"
+        >
+          {{ item.dictLabel }}
+        </a-select-option>
       </a-select>
       <a-select
         v-if="filterVisibility.costStatus"
@@ -270,8 +279,13 @@ const mobileKpiItems = computed(() => [
         size="large"
         @change="handleSearch"
       >
-        <a-select-option value="CONFIRMED">已确认</a-select-option>
-        <a-select-option value="PENDING">待确认</a-select-option>
+        <a-select-option
+          v-for="item in costStatusOptions"
+          :key="item.dictValue"
+          :value="item.dictValue"
+        >
+          {{ item.dictLabel }}
+        </a-select-option>
       </a-select>
       <a-range-picker
         v-if="filterVisibility.dateRange"

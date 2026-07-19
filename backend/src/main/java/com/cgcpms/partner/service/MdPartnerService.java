@@ -7,6 +7,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.partner.vo.MdPartnerVO;
@@ -32,6 +33,7 @@ public class MdPartnerService {
 
     private final MdPartnerMapper mdPartnerMapper;
     private final CtContractMapper ctContractMapper;
+    private final SysDictDataService sysDictDataService;
 
     public IPage<MdPartnerVO> getPage(long pageNo, long pageSize, String partnerCode, String partnerName, String partnerType, String status) {
         LambdaQueryWrapper<MdPartner> wrapper = new LambdaQueryWrapper<>();
@@ -64,6 +66,9 @@ public class MdPartnerService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Long create(MdPartner partner) {
+        partner.setPartnerType(sysDictDataService.requireEnabledValue(
+                "partner_type", partner.getPartnerType(),
+                "PARTNER_TYPE_INVALID", "合作方类型不合法"));
         normalizeDefaultLeadDays(partner, partner.getPartnerType());
         // Auto-generate partner code: PTN-yyyyMMdd-NNN
         boolean autoGenerateCode = !StringUtils.hasText(partner.getPartnerCode());
@@ -133,6 +138,12 @@ public class MdPartnerService {
         }
         String effectivePartnerType = StringUtils.hasText(partner.getPartnerType())
                 ? partner.getPartnerType() : existing.getPartnerType();
+        effectivePartnerType = sysDictDataService.requireEnabledValue(
+                "partner_type", effectivePartnerType,
+                "PARTNER_TYPE_INVALID", "合作方类型不合法");
+        if (StringUtils.hasText(partner.getPartnerType())) {
+            partner.setPartnerType(effectivePartnerType);
+        }
         if (!partner.isDefaultLeadDaysSpecified()) {
             partner.preserveDefaultLeadDays(existing.getDefaultLeadDays());
         }

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
-import type { ContractVO, ContractType, ContractStatus } from '@/types/contract'
+import type { ContractVO, ContractStatus } from '@/types/contract'
 
 defineProps<{
   data: ContractVO[]
   loading: boolean
   colVisible: Record<string, boolean>
-  typeColor: Record<ContractType, string>
-  typeLabel: Record<ContractType, string>
+  typeColor: Record<string, string>
+  typeLabel: Record<string, string>
 }>()
 
 const emit = defineEmits<{
@@ -31,11 +31,8 @@ const emit = defineEmits<{
           <a class="lg-link" @click="emit('view', row)">{{ row.contractCode }}</a>
         </span>
         <span class="lg-card-head-right">
-          <a-tag
-            v-if="colVisible.contractType"
-            :color="typeColor[row.contractType as ContractType]"
-          >
-            {{ typeLabel[row.contractType as ContractType] }}
+          <a-tag v-if="colVisible.contractType" :color="typeColor[row.contractType] || 'default'">
+            {{ typeLabel[row.contractType] || row.contractType }}
           </a-tag>
           <ContractStatusTag
             v-if="colVisible.contractStatus"

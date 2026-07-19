@@ -115,7 +115,7 @@ function Invoke-IssueExecutor {
       if ($retryAllowed) {
         Write-State $autoDir 'REPAIRING' $false 'EXECUTOR_STALL_REPAIR' $Issue.title 'executor timed out without semantic progress' ''
         Write-RunEvent 'executor.stall.retry-request' ([pscustomobject]@{ issueId = $Issue.lint.issueId; task = 'repair'; status = 'RETRY_REQUESTED'; executorPid = $childResult.executorPid; startedAt = $script:ExecutorStartedAt; lastProgressAt = $script:LastProgressAt; retryCount = 1; timeoutReason = 'no new evidence; retry scope limited to unfinished acceptance items with missing context supplied'; retiredAt = $script:RetiredAt; retiredStatus = $script:RetiredStatus })
-        return Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt 1 -Phase 'repair' -PreviousSummary '首次 executor 因 600 秒无新证据已退役；仅处理未完成验收项，补充缺失上下文，不得扩大范围或再次重派。'
+        return Invoke-IssueExecutor -RepoRoot $RepoRoot -ConfigPath $ConfigPath -Issue $Issue -Route $Route -Attempt 1 -Phase 'repair' -PreviousSummary '首次 executor 因 600 秒无新证据已退役；仅处理未完成验收项，补充缺失上下文，不得扩大范围或再次自动重试。'
       }
       Write-RunEvent 'executor.stall.retry-suppressed' ([pscustomobject]@{ issueId=$Issue.lint.issueId; task=$Phase; status='PAUSED'; retryCount=1; timeoutReason='same failureFingerprint + phase + diffHash already consumed its automatic recovery budget' })
     }

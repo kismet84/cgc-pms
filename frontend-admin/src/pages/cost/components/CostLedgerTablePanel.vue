@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { MoreOutlined, ReloadOutlined } from '@ant-design/icons-vue'
 import { ColumnSettingsButton } from '@/components/list-page'
-import { getSourceTypeColor, getSourceTypeLabel } from '@/types/cost'
+import {
+  getCostStatusColor,
+  getCostStatusLabel,
+  getSourceTypeColor,
+  getSourceTypeLabel,
+} from '@/types/cost'
 import type { CostLedgerVO } from '@/types/cost'
 
 defineProps<{
@@ -69,15 +74,7 @@ defineProps<{
           <div class="cost-ledger-mobile-meta">项目：{{ row.projectName || '-' }}</div>
           <div class="cost-ledger-mobile-meta">合同：{{ row.contractName || '-' }}</div>
           <div class="cost-ledger-mobile-meta">来源：{{ getSourceTypeLabel(row.sourceType) }}</div>
-          <div class="cost-ledger-mobile-meta">
-            状态：{{
-              row.costStatus === 'CONFIRMED'
-                ? '已确认'
-                : row.costStatus === 'PENDING'
-                  ? '待确认'
-                  : row.costStatus || '-'
-            }}
-          </div>
+          <div class="cost-ledger-mobile-meta">状态：{{ getCostStatusLabel(row.costStatus) }}</div>
         </button>
       </template>
     </div>
@@ -100,23 +97,8 @@ defineProps<{
           <span class="lg-money">{{ fmtWan(row.amount) }}</span>
         </template>
         <template #costStatus="{ row }">
-          <a-tag
-            :color="
-              row.costStatus === 'CONFIRMED'
-                ? 'success'
-                : row.costStatus === 'PENDING'
-                  ? 'processing'
-                  : 'default'
-            "
-            size="small"
-          >
-            {{
-              row.costStatus === 'CONFIRMED'
-                ? '已确认'
-                : row.costStatus === 'PENDING'
-                  ? '待确认'
-                  : row.costStatus
-            }}
+          <a-tag :color="getCostStatusColor(row.costStatus)" size="small">
+            {{ getCostStatusLabel(row.costStatus) }}
           </a-tag>
         </template>
         <template #ops="{ row }">

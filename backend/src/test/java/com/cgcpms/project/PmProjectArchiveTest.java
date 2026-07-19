@@ -92,7 +92,7 @@ class PmProjectArchiveTest {
         project.setTenantId(TENANT_0);
         project.setProjectCode(code);
         project.setProjectName(name);
-        project.setProjectType("BUILDING");
+        project.setProjectType("CONSTRUCTION");
         project.setStatus(status);
         project.setTargetCost(new BigDecimal("1000000.00"));
         project.setContractAmount(new BigDecimal("2000000.00"));

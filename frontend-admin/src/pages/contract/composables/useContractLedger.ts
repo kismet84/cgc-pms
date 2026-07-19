@@ -11,6 +11,8 @@ import type {
   ContractStatus,
 } from '@/types/contract'
 import type { PageResult } from '@/types/api'
+import type { DictDataVO } from '@/types/dict'
+import { fetchDictData, getDictTagColorSync } from '@/utils/dict'
 import {
   buildActionColumn,
   buildAmountColumn,
@@ -20,41 +22,17 @@ import {
 } from '@/composables/listTablePresets'
 import { useColumnSettings } from '@/composables/useColumnSettings'
 
-// ---- Constants ----
-export const TYPE_LABEL: Record<ContractType, string> = {
-  MAIN: '总包合同',
-  SUB: '分包合同',
-  PURCHASE: '采购合同',
-  LEASE: '租赁合同',
-  SERVICE: '服务合同',
-}
-export const TYPE_COLOR: Record<ContractType, string> = {
-  MAIN: 'blue',
-  SUB: 'green',
-  PURCHASE: 'orange',
-  LEASE: 'purple',
-  SERVICE: 'cyan',
-}
-
-export const TYPE_CHART_COLOR: Record<ContractType, string> = {
-  MAIN: 'var(--primary)',
-  SUB: 'var(--success)',
-  PURCHASE: 'var(--warning)',
-  LEASE: 'var(--info)',
-  SERVICE: 'var(--text-secondary)',
-}
-
-export const STATUS_LABEL: Record<ContractStatus, string> = {
-  DRAFT: '草稿',
-  PERFORMING: '履约中',
-  SETTLED: '已完成',
-  TERMINATED: '已终止',
-}
-export const STATUS_COLOR: Record<ContractStatus, string> = {
-  DRAFT: 'var(--text-secondary)',
-  PERFORMING: 'var(--primary)',
-  SETTLED: 'var(--success)',
-  TERMINATED: 'var(--error)',
+const CONTRACT_TYPE_DICT = 'contract_type'
+const CONTRACT_STATUS_DICT = 'contract_status'
+const CHART_COLOR: Record<string, string> = {
+  blue: 'var(--primary)',
+  processing: 'var(--primary)',
+  green: 'var(--success)',
+  success: 'var(--success)',
+  orange: 'var(--warning)',
+  warning: 'var(--warning)',
+  red: 'var(--error)',
+  error: 'var(--error)',
 }
 
 export function useContractLedger() {
@@ -62,6 +40,19 @@ export function useContractLedger() {
   const router = useRouter()
   const referenceStore = useReferenceStore()
   const projects = computed(() => referenceStore.projects ?? [])
+  const contractTypeOptions = ref<DictDataVO[]>([])
+  const contractStatusOptions = ref<DictDataVO[]>([])
+  const typeLabelMap = computed<Record<string, string>>(() =>
+    Object.fromEntries(contractTypeOptions.value.map((item) => [item.dictValue, item.dictLabel])),
+  )
+  const typeColorMap = computed<Record<string, string>>(() =>
+    Object.fromEntries(
+      contractTypeOptions.value.map((item) => [
+        item.dictValue,
+        getDictTagColorSync(CONTRACT_TYPE_DICT, item.dictValue),
+      ]),
+    ),
+  )
 
   // ---- Modal state ----
   const contractModalVisible = ref(false)
@@ -239,7 +230,13 @@ export function useContractLedger() {
 
   onMounted(async () => {
     restoreFilterFromRoute()
-    await referenceStore.fetchProjects()
+    const [types, statuses] = await Promise.all([
+      fetchDictData(CONTRACT_TYPE_DICT),
+      fetchDictData(CONTRACT_STATUS_DICT),
+      referenceStore.fetchProjects(),
+    ])
+    contractTypeOptions.value = types
+    contractStatusOptions.value = statuses
     fetchData()
     fetchKpi()
   })
@@ -287,19 +284,17 @@ export function useContractLedger() {
   // ---- Computed analysis ----
   const typeDistribution = computed(() => {
     if (!tableData.value.length) return []
-    const counts = tableData.value.reduce<Record<ContractType, number>>(
-      (acc, item) => {
-        acc[item.contractType] += 1
-        return acc
-      },
-      { MAIN: 0, SUB: 0, PURCHASE: 0, LEASE: 0, SERVICE: 0 },
-    )
-    return (Object.keys(TYPE_LABEL) as ContractType[])
-      .map((key) => ({
-        key,
-        label: TYPE_LABEL[key],
-        value: counts[key],
-        color: TYPE_CHART_COLOR[key],
+    const counts = tableData.value.reduce<Record<string, number>>((acc, item) => {
+      acc[item.contractType] = (acc[item.contractType] || 0) + 1
+      return acc
+    }, {})
+    return contractTypeOptions.value
+      .map((item) => ({
+        key: item.dictValue,
+        label: item.dictLabel,
+        value: counts[item.dictValue] || 0,
+        color:
+          CHART_COLOR[getDictTagColorSync(CONTRACT_TYPE_DICT, item.dictValue)] || 'var(--info)',
       }))
       .filter((item) => item.value > 0)
   })
@@ -322,22 +317,20 @@ export function useContractLedger() {
 
   const statusBars = computed(() => {
     if (!tableData.value.length) return []
-    const counts = tableData.value.reduce<Record<ContractStatus, number>>(
-      (acc, item) => {
-        acc[item.contractStatus] += 1
-        return acc
-      },
-      { DRAFT: 0, PERFORMING: 0, SETTLED: 0, TERMINATED: 0 },
-    )
+    const counts = tableData.value.reduce<Record<string, number>>((acc, item) => {
+      acc[item.contractStatus] = (acc[item.contractStatus] || 0) + 1
+      return acc
+    }, {})
     const total = Object.values(counts).reduce((s, v) => s + v, 0) || 1
-    return (Object.keys(STATUS_LABEL) as ContractStatus[])
-      .filter((key) => counts[key] > 0)
-      .map((key) => ({
-        key,
-        label: STATUS_LABEL[key],
-        value: counts[key],
-        color: STATUS_COLOR[key],
-        percent: Math.round((counts[key] / total) * 100),
+    return contractStatusOptions.value
+      .filter((item) => (counts[item.dictValue] || 0) > 0)
+      .map((item) => ({
+        key: item.dictValue,
+        label: item.dictLabel,
+        value: counts[item.dictValue] || 0,
+        color:
+          CHART_COLOR[getDictTagColorSync(CONTRACT_STATUS_DICT, item.dictValue)] || 'var(--info)',
+        percent: Math.round(((counts[item.dictValue] || 0) / total) * 100),
       }))
   })
 
@@ -413,6 +406,10 @@ export function useContractLedger() {
     // Filter
     filter,
     projects,
+    contractTypeOptions,
+    contractStatusOptions,
+    typeLabelMap,
+    typeColorMap,
     // Table
     loading,
     tableData,

@@ -25,6 +25,7 @@ import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -70,6 +71,7 @@ public class PmProjectService {
     private final SysUserMapper sysUserMapper;
     private final ProjectBudgetMapper projectBudgetMapper;
     private final com.cgcpms.project.auth.ProjectAccessChecker projectAccessChecker;
+    private final SysDictDataService sysDictDataService;
 
     /**
      * Resolve the tightest data scope for the current user.
@@ -146,6 +148,9 @@ public class PmProjectService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(PmProject project) {
         log.info("Creating project: {}", project.getProjectName());
+        project.setProjectType(sysDictDataService.requireEnabledValue(
+                "project_type", project.getProjectType(),
+                "PROJECT_TYPE_INVALID", "项目类型不合法"));
 
         // Auto-generate project code: XM-yyyyMMdd-XXX
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
@@ -225,6 +230,9 @@ public class PmProjectService {
         }
         // 数据范围校验（非管理员用户）
         projectAccessChecker.checkAccess(project.getId(), "编辑");
+        project.setProjectType(sysDictDataService.requireEnabledValue(
+                "project_type", project.getProjectType(),
+                "PROJECT_TYPE_INVALID", "项目类型不合法"));
         project.setStatus(existing.getStatus());
         project.setApprovalStatus(existing.getApprovalStatus());
         project.setTenantId(existing.getTenantId());

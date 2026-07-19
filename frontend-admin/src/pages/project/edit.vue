@@ -3,7 +3,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { getProjectDetail, updateProject } from '@/api/modules/project'
-import type { ProjectVO } from '@/types/project'
+import { getDictDataByCode } from '@/api/modules/dict'
+import { normalizeArray } from '@/utils/normalizeArray'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,17 +26,35 @@ const formData = reactive({
   plannedEndDate: undefined as string | undefined,
 })
 
-const projectTypeOptions = [
-  { value: '施工总承包', label: '施工总承包' },
-  { value: '专业分包', label: '专业分包' },
-  { value: '劳务分包', label: '劳务分包' },
-  { value: '材料采购', label: '材料采购' },
-]
+const projectTypeOptions = ref<{ value: string; label: string }[]>([])
+const projectTypeLoading = ref(false)
+
+async function fetchProjectTypes() {
+  projectTypeLoading.value = true
+  try {
+    const options = normalizeArray<{ dictLabel: string; dictValue: string }>(
+      await getDictDataByCode('project_type'),
+    )
+    projectTypeOptions.value = options.map((item) => ({
+      value: item.dictValue,
+      label: item.dictLabel,
+    }))
+    if (!projectTypeOptions.value.length) {
+      message.error('项目类型字典为空，暂不能保存')
+    }
+  } catch (e: unknown) {
+    console.error(e)
+    projectTypeOptions.value = []
+    message.error('项目类型字典加载失败，暂不能保存')
+  } finally {
+    projectTypeLoading.value = false
+  }
+}
 
 onMounted(async () => {
   loading.value = true
   try {
-    const project: ProjectVO = await getProjectDetail(projectId)
+    const [, project] = await Promise.all([fetchProjectTypes(), getProjectDetail(projectId)])
     formData.projectName = project.projectName
     formData.projectType = project.projectType
     formData.projectAddress = project.projectAddress || ''
@@ -56,6 +75,10 @@ onMounted(async () => {
 })
 
 async function handleSave() {
+  if (!projectTypeOptions.value.some((item) => item.value === formData.projectType)) {
+    message.error('请选择有效项目类型')
+    return
+  }
   saving.value = true
   try {
     await updateProject(projectId, {
@@ -126,6 +149,8 @@ function handleCancel() {
                   v-model:value="formData.projectType"
                   placeholder="请选择项目类型"
                   :options="projectTypeOptions"
+                  :loading="projectTypeLoading"
+                  :disabled="!projectTypeOptions.length"
                 />
               </a-form-item>
               <a-form-item label="项目地址">

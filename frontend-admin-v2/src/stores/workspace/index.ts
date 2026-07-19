@@ -1,0 +1,104 @@
+import { computed, ref } from 'vue'
+import { defineStore } from 'pinia'
+import type { LocationQuery, RouteParamsGeneric } from 'vue-router'
+import { registerSessionCacheClearer } from '@/stores/session'
+
+export interface ContextOption {
+  value: string
+  label: string
+}
+
+export interface ObjectContext {
+  kind: 'project' | 'contract' | 'settlement'
+  id: string
+}
+
+function queryValue(value: LocationQuery[string]): string | null {
+  return typeof value === 'string' && value.trim() ? value : null
+}
+
+function paramValue(value: RouteParamsGeneric[string]): string | null {
+  if (typeof value === 'string' && value.trim()) return value
+  if (Array.isArray(value)) return value.find((item) => item.trim()) ?? null
+  return null
+}
+
+export const useWorkspaceStore = defineStore('v2-workspace', () => {
+  const projects = ref<ContextOption[]>([])
+  const reportPeriods = ref<ContextOption[]>([])
+  const requestedProjectId = ref<string | null>(null)
+  const requestedReportPeriod = ref<string | null>(null)
+  const objectContext = ref<ObjectContext | null>(null)
+
+  const selectedProjectId = computed(() =>
+    projects.value.some((item) => item.value === requestedProjectId.value)
+      ? requestedProjectId.value
+      : null,
+  )
+  const selectedReportPeriod = computed(() =>
+    reportPeriods.value.some((item) => item.value === requestedReportPeriod.value)
+      ? requestedReportPeriod.value
+      : null,
+  )
+
+  function setProjects(options: ContextOption[]): void {
+    projects.value = [...options]
+    if (!selectedProjectId.value) requestedProjectId.value = options[0]?.value ?? null
+  }
+
+  function setReportPeriods(options: ContextOption[]): void {
+    reportPeriods.value = [...options]
+    if (!selectedReportPeriod.value) requestedReportPeriod.value = options[0]?.value ?? null
+  }
+
+  function selectProject(value: string): void {
+    requestedProjectId.value = projects.value.some((item) => item.value === value) ? value : null
+  }
+
+  function selectReportPeriod(value: string): void {
+    requestedReportPeriod.value = reportPeriods.value.some((item) => item.value === value)
+      ? value
+      : null
+  }
+
+  function syncRoute(path: string, query: LocationQuery, params: RouteParamsGeneric): void {
+    requestedProjectId.value = queryValue(query.projectId)
+    requestedReportPeriod.value = queryValue(query.period)
+
+    const projectId = paramValue(params.projectId)
+    const contractId = paramValue(params.id)
+    if (projectId && path.startsWith('/project/')) {
+      objectContext.value = { kind: 'project', id: projectId }
+    } else if (contractId && path.startsWith('/contract/')) {
+      objectContext.value = { kind: 'contract', id: contractId }
+    } else if (contractId && path.startsWith('/settlement/')) {
+      objectContext.value = { kind: 'settlement', id: contractId }
+    } else {
+      objectContext.value = null
+    }
+  }
+
+  function clear(): void {
+    projects.value = []
+    reportPeriods.value = []
+    requestedProjectId.value = null
+    requestedReportPeriod.value = null
+    objectContext.value = null
+  }
+
+  registerSessionCacheClearer(clear)
+
+  return {
+    projects,
+    reportPeriods,
+    selectedProjectId,
+    selectedReportPeriod,
+    objectContext,
+    setProjects,
+    setReportPeriods,
+    selectProject,
+    selectReportPeriod,
+    syncRoute,
+    clear,
+  }
+})

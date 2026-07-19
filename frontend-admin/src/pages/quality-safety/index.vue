@@ -73,7 +73,11 @@ const externalPartners = computed(() =>
   partners.value.filter((item) => ['SUPPLIER', 'SUB', 'SUBCONTRACTOR'].includes(item.partnerType)),
 )
 const projectContracts = computed(() =>
-  contracts.value.filter((item) => item.projectId === projectId.value),
+  contracts.value.filter((item) => {
+    if (item.projectId !== projectId.value) return false
+    const partnerId = currentIssue.value?.responsiblePartnerId
+    return !partnerId || item.partyAId === partnerId || item.partyBId === partnerId
+  }),
 )
 const kpi = computed(() => ({
   open: issues.value.filter((item) => item.status === 'RECTIFYING').length,
@@ -413,6 +417,7 @@ async function saveConsequence() {
   const issue = currentIssue.value
   if (!issue || !consequenceForm.partnerId || !consequenceForm.evaluationComment)
     return message.warning('请完整填写处罚成本与评价')
+  if (!consequenceForm.contractId) return message.warning('请选择关联合同')
   const created = await createQualityConsequence({ issueId: issue.id, ...consequenceForm })
   await postQualityConsequence(created.id)
   consequenceOpen.value = false
@@ -802,8 +807,8 @@ onMounted(async () => {
               >{{ partner.partnerName }}</a-select-option
             ></a-select
           ></a-form-item
-        ><a-form-item label="关联合同（可选）"
-          ><a-select v-model:value="consequenceForm.contractId" allow-clear
+        ><a-form-item label="关联合同" required
+          ><a-select v-model:value="consequenceForm.contractId"
             ><a-select-option
               v-for="contract in projectContracts"
               :key="contract.id"

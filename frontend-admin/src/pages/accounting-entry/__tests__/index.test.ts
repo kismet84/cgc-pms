@@ -189,11 +189,13 @@ describe('accounting entry page', () => {
     expect(mocks.getList).toHaveBeenCalledTimes(2)
   })
 
-  it('does not expose the unsupported generation endpoint as a user action', () => {
+  it('states automatic source generation without exposing manual generation', () => {
     const source = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
     expect(source).not.toContain('generateAccounting')
     expect(source).not.toContain('/generate')
-    expect(source).toContain('凭证生成入口暂未开放')
+    expect(source).not.toContain('来源单据到借贷科目的生成规则待会计确认')
+    expect(source).toContain('手工生成入口未开放')
+    expect(source).toContain('付款、回款凭证由权威业务写侧自动生成')
   })
 
   it('uses the ledger layout with KPI context and an analysis rail', () => {

@@ -15,7 +15,10 @@ import java.util.List;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "jwt.secret=dict-controller-test-secret-key-at-least-sixty-four-characters-long"
+})
 @AutoConfigureMockMvc @ActiveProfiles("local")
 @DisplayName("SysDictDataController integration tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
@@ -29,6 +32,12 @@ class SysDictDataControllerTest {
                 jwtUtils.generateToken(ADMIN_ID, "admin", TENANT_ID, List.of("ADMIN"), List.of()));
     }
 
+    private Cookie projectManagerCookie() {
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
+                jwtUtils.generateToken(ADMIN_ID, "project-manager", TENANT_ID,
+                        List.of("PROJECT_MANAGER"), List.of()));
+    }
+
     @Test @Order(1) @DisplayName("GET /system/dict/data without JWT -> 401")
     void testUnauthorized() throws Exception { mockMvc.perform(g("/system/dict/data")).andExpect(status().isUnauthorized()); }
 
@@ -40,13 +49,19 @@ class SysDictDataControllerTest {
 
     @Test @Order(3) @DisplayName("GET /system/dict/data/by-code/{dictCode} -> 200")
     void testGetByDictCode() throws Exception {
-        mockMvc.perform(g("/system/dict/data/by-code/contract_type").cookie(adminCookie()))
+        mockMvc.perform(g("/system/dict/data/by-code/contract_type").cookie(projectManagerCookie()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isArray());
     }
 
-    @Test @Order(4) @DisplayName("POST /system/dict/data -> 200 creates dict data")
+    @Test @Order(4) @DisplayName("ordinary business role cannot access dict management list")
+    void testBusinessRoleCannotListManagedData() throws Exception {
+        mockMvc.perform(g("/system/dict/data").cookie(projectManagerCookie()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test @Order(5) @DisplayName("POST /system/dict/data -> 200 creates dict data")
     void testCreate() throws Exception {
-        String body = "{\"dictTypeId\":1001,\"dictLabel\":\"TEST-" + System.nanoTime() + "\",\"dictValue\":\"TEST_VAL\",\"sortOrder\":999}";
+        String body = "{\"dictTypeId\":1008,\"dictLabel\":\"TEST-" + System.nanoTime() + "\",\"dictValue\":\"TEST_VAL\",\"sortOrder\":999}";
         String resp = mockMvc.perform(p("/system/dict/data").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isString())
                 .andReturn().getResponse().getContentAsString();
@@ -54,28 +69,28 @@ class SysDictDataControllerTest {
         Assertions.assertNotNull(dictDataId);
     }
 
-    @Test @Order(5) @DisplayName("POST /system/dict/data missing required -> 400")
+    @Test @Order(6) @DisplayName("POST /system/dict/data missing required -> 400")
     void testCreate_Missing() throws Exception {
         mockMvc.perform(p("/system/dict/data").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content("{}"))
                 .andExpect(status().isBadRequest());
     }
 
-    @Test @Order(6) @DisplayName("GET /system/dict/data/{id} -> 200")
+    @Test @Order(7) @DisplayName("GET /system/dict/data/{id} -> 200")
     void testGetById() throws Exception {
         Assertions.assertNotNull(dictDataId);
         mockMvc.perform(g("/system/dict/data/" + dictDataId).cookie(adminCookie()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data.id").exists());
     }
 
-    @Test @Order(7) @DisplayName("PUT /system/dict/data/{id} -> 200")
+    @Test @Order(8) @DisplayName("PUT /system/dict/data/{id} -> 200")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(dictDataId);
-        String body = "{\"dictTypeId\":1001,\"dictLabel\":\"TEST-UPD-" + System.nanoTime() + "\",\"dictValue\":\"TEST_VAL_UPD\"}";
+        String body = "{\"dictTypeId\":1008,\"dictLabel\":\"TEST-UPD-" + System.nanoTime() + "\",\"dictValue\":\"TEST_VAL\"}";
         mockMvc.perform(u("/system/dict/data/" + dictDataId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }
 
-    @Test @Order(8) @DisplayName("DELETE /system/dict/data/{id} -> 200")
+    @Test @Order(9) @DisplayName("DELETE /system/dict/data/{id} -> 200")
     void testDelete() throws Exception {
         Assertions.assertNotNull(dictDataId);
         mockMvc.perform(d("/system/dict/data/" + dictDataId).cookie(adminCookie()))

@@ -7,7 +7,7 @@ interface RailItem {
 }
 
 const props = defineProps<{
-  subjectBreakdown: RailItem[]
+  costTypeBreakdown: RailItem[]
   sourceBreakdown: RailItem[]
   fmtWan: (val: string | undefined) => string
   barPercent: (amount: string) => string
@@ -34,13 +34,13 @@ const hasWarningItems = computed(() =>
       <header class="cost-ledger-analysis-head lg-analysis-header">
         <div>
           <div class="cost-ledger-analysis-title lg-analysis-heading">辅助分析</div>
-          <div class="lg-analysis-description">科目、来源与预算预警</div>
+          <div class="lg-analysis-description">成本类型、来源与预算预警</div>
         </div>
       </header>
 
       <section class="cost-ledger-analysis-section">
-        <div class="cost-ledger-section-title">成本科目占比</div>
-        <div v-for="item in subjectBreakdown" :key="item.label" class="lg-type-row">
+        <div class="cost-ledger-section-title">成本类型占比</div>
+        <div v-for="item in costTypeBreakdown" :key="item.label" class="lg-type-row">
           <span class="lg-type-dot" :style="{ background: 'var(--kpi-paid)' }"></span>
           <span class="lg-type-label">{{ item.label }}</span>
           <span class="lg-type-bar-wrap">

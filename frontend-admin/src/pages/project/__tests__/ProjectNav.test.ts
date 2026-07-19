@@ -21,10 +21,12 @@ describe('ProjectNav — navigation handlers', () => {
     expect(tableSource).toContain('@click="emit(\'overview\', row)"')
   })
 
-  it('maps ACTIVE project status to Chinese display text', () => {
+  it('maps project status through the authoritative dictionary', () => {
     const source = readFileSync(resolve(currentDir, '../index.vue'), 'utf-8')
-    expect(source).toMatch(/ACTIVE:\s*'在建'/)
-    expect(source).toMatch(/\['ACTIVE',\s*'ONGOING'\]\.includes\(item\.status\)/)
+    expect(source).toContain("const PROJECT_STATUS_DICT = 'project_status'")
+    expect(source).toContain('fetchDictData(PROJECT_STATUS_DICT)')
+    expect(source).toContain('label: statusLabelMap.value[key] ?? key')
+    expect(source).not.toMatch(/ACTIVE:\s*'在建'/)
   })
 
   // ── TEST 2: Partner name is NOT a clickable link (no partner detail route) ──

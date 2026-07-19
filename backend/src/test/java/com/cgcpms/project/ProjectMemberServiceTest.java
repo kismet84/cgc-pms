@@ -65,7 +65,7 @@ class ProjectMemberServiceTest {
         project.setTenantId(TENANT_0);
         project.setProjectCode("TST-MEMBER-" + System.currentTimeMillis());
         project.setProjectName("成员测试项目");
-        project.setProjectType("BUILDING");
+        project.setProjectType("CONSTRUCTION");
         project.setStatus("DRAFT");
         project.setContractAmount(new BigDecimal("1000000.00"));
         return projectService.create(project);
@@ -285,7 +285,7 @@ class ProjectMemberServiceTest {
         project2.setTenantId(TENANT_0);
         project2.setProjectCode("TST-MEMBER-B-" + System.currentTimeMillis());
         project2.setProjectName("测试项目B");
-        project2.setProjectType("BUILDING");
+        project2.setProjectType("CONSTRUCTION");
         project2.setStatus("DRAFT");
         project2.setContractAmount(new BigDecimal("1000000.00"));
         Long projectBId = projectService.create(project2);

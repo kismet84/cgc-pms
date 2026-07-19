@@ -1,4 +1,4 @@
-import { getDictLabelSync } from '@/utils/dict'
+import { getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 
 /** Source type display mapping */
 export type SourceType =
@@ -23,6 +23,8 @@ export type SourceType =
   | 'OVERHEAD_ALLOCATION'
 
 export const COST_TYPE_DICT = 'cost_type'
+export const COST_SOURCE_TYPE_DICT = 'cost_source_type'
+export const COST_STATUS_DICT = 'cost_status'
 export const COST_TYPE_LABEL: Record<string, string> = {
   CONTRACT_LOCKED: '合同锁定成本',
   ACTUAL_COST: '实际成本',
@@ -106,13 +108,25 @@ export function getCostTypeLabel(value: string | undefined) {
 export function getSourceTypeLabel(value: string | undefined) {
   const key = value?.trim()
   if (!key) return '-'
-  return SOURCE_TYPE_LABEL[key as SourceType] ?? key
+  return getDictLabelSync(COST_SOURCE_TYPE_DICT, key, SOURCE_TYPE_LABEL) || key
 }
 
 export function getSourceTypeColor(value: string | undefined) {
   const key = value?.trim()
   if (!key) return 'default'
-  return SOURCE_TYPE_COLOR[key as SourceType] ?? 'default'
+  return getDictTagColorSync(COST_SOURCE_TYPE_DICT, key, SOURCE_TYPE_COLOR)
+}
+
+export function getCostStatusLabel(value: string | undefined) {
+  const key = value?.trim()
+  if (!key) return '-'
+  return getDictLabelSync(COST_STATUS_DICT, key) || key
+}
+
+export function getCostStatusColor(value: string | undefined) {
+  const key = value?.trim()
+  if (!key) return 'default'
+  return getDictTagColorSync(COST_STATUS_DICT, key)
 }
 
 /** Cost ledger item view object */

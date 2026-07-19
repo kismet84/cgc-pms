@@ -1,0 +1,124 @@
+@import './tokens.css';
+@import './components.css';
+
+:root {
+  color: var(--v2-color-text);
+  background: var(--v2-color-canvas);
+  font-family: var(--v2-font-sans);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--v2-color-text);
+  background: var(--v2-color-canvas);
+}
+
+#app,
+.v2-error-boundary__content,
+.global-error-page {
+  min-height: 100vh;
+}
+
+.global-error-page {
+  display: grid;
+  place-items: center;
+  padding: var(--v2-page-gutter);
+}
+
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--v2-color-primary);
+  outline-offset: 2px;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.health-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: var(--v2-space-6);
+}
+
+.health-card {
+  width: min(620px, 100%);
+  padding: clamp(var(--v2-space-7), 5vw, var(--v2-space-12));
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-lg);
+  background: var(--v2-color-surface);
+  box-shadow: var(--v2-shadow-panel);
+}
+
+.eyebrow {
+  margin: 0 0 var(--v2-space-3);
+  color: var(--v2-color-primary);
+  font-size: var(--v2-font-size-12);
+  font-weight: var(--v2-font-weight-bold);
+  letter-spacing: 0.12em;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 42px);
+  line-height: var(--v2-line-height-tight);
+}
+
+.description {
+  margin: var(--v2-space-5) 0 var(--v2-space-7);
+  color: var(--v2-color-text-secondary);
+  line-height: var(--v2-line-height-body);
+}
+
+.status-list {
+  display: grid;
+  gap: var(--v2-space-3);
+  margin: 0;
+}
+
+.status-list div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--v2-space-6);
+  padding: var(--v2-space-4) 0;
+  border-top: var(--v2-border-width) solid var(--v2-color-border-subtle);
+}
+
+.status-list dt,
+.status-list dd {
+  margin: 0;
+}
+
+.status-up {
+  color: var(--v2-color-success-text);
+  font-weight: var(--v2-font-weight-bold);
+}
+
+.status-muted {
+  color: var(--v2-color-warning-text);
+  font-weight: var(--v2-font-weight-bold);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

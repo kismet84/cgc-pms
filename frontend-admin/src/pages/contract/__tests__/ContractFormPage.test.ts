@@ -32,4 +32,11 @@ describe('ContractFormPage modal-aware editing', () => {
     expect(source).toMatch(/<ContractItemEditor/)
     expect(source).toMatch(/<PaymentTermEditor/)
   })
+
+  it('treats party A and party B as contract roles instead of obsolete partner types', () => {
+    expect(source).toContain('partner.id !== formData.partyBId')
+    expect(source).toContain('partner.id !== formData.partyAId')
+    expect(source).not.toContain("partnerType === 'PARTY_A'")
+    expect(source).not.toContain("partnerType === 'PARTY_B'")
+  })
 })

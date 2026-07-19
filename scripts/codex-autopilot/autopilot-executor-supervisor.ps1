@@ -27,7 +27,7 @@ function Write-ExecutorStallBlockedIssue {
 $($rows -join "`r`n")
 - 解除条件：补齐缺失上下文或拆小剩余范围后，由人工确认重新进入 Ready。
 - 未完成验收项：该 Issue 的实现、验证、独立复核与归档尚未完成。
-- 安全恢复方式：保持两个 executorPid 永久退役，从干净 checkpoint 创建全新执行单元；不得复用旧 PID 或启动第三次自动重派。
+- 安全恢复方式：保持两个 executorPid 永久退役，从干净 checkpoint 创建全新执行单元；不得复用旧 PID 或启动第三次自动执行。
 "@
   [IO.File]::WriteAllText($path, ($existing.TrimEnd() + "`r`n" + $block.TrimStart()), [Text.UTF8Encoding]::new($false))
   return $path

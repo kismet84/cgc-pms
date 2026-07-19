@@ -20,8 +20,9 @@ import { useColumnSettings } from '@/composables/useColumnSettings'
 import { useMobileViewport } from '@/composables/useMobileViewport'
 import { useUserStore } from '@/stores/user'
 import type { ProjectVO } from '@/types/project'
+import type { DictDataVO } from '@/types/dict'
 import type { PageResult } from '@/types/api'
-import { fetchDictData, getDictLabelSync } from '@/utils/dict'
+import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/dict'
 import ProjectAnalysisRail from './components/ProjectAnalysisRail.vue'
 import ProjectQueryPanel from './components/ProjectQueryPanel.vue'
 import ProjectTablePanel from './components/ProjectTablePanel.vue'
@@ -304,7 +305,12 @@ function syncQueryToRoute() {
 
 onMounted(async () => {
   restoreFilterFromRoute()
-  await fetchDictData(PROJECT_TYPE_DICT)
+  ;[projectTypeDictData.value, projectStatusDictData.value, approvalStatusDictData.value] =
+    await Promise.all([
+      fetchDictData(PROJECT_TYPE_DICT),
+      fetchDictData(PROJECT_STATUS_DICT),
+      fetchDictData(APPROVAL_STATUS_DICT),
+    ])
   await fetchData()
   await nextTick()
   const savedScroll = Number(sessionStorage.getItem(PROJECT_LIST_SCROLL_KEY))
@@ -330,102 +336,49 @@ function amountWanToYuan(val?: number): string | undefined {
   return String(val * 10000)
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: '前期',
-  ACTIVE: '在建',
-  ONGOING: '在建',
-  COMPLETED: '已竣工',
-  SUSPENDED: '已暂停',
-  CLOSED: '已关闭',
-  ARCHIVED: '已归档',
-}
-const STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'processing',
-  ACTIVE: 'success',
-  ONGOING: 'success',
-  COMPLETED: 'green',
-  SUSPENDED: 'warning',
-  CLOSED: 'error',
-  ARCHIVED: 'default',
-}
-
-const APPROVAL_STATUS_LABEL: Record<string, string> = {
-  DRAFT: '草稿',
-  PENDING: '审批中',
-  APPROVED: '已通过',
-  REJECTED: '已驳回',
-  已批准: '已通过',
-  审批中: '审批中',
-  已拒绝: '已驳回',
-}
-const APPROVAL_STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'processing',
-  PENDING: 'warning',
-  APPROVED: 'success',
-  REJECTED: 'error',
-  已批准: 'success',
-  审批中: 'warning',
-  已拒绝: 'error',
-}
-
-const PROJECT_TYPE_COLOR: Record<string, string> = {
-  施工总承包: 'blue',
-  专业分包: 'green',
-  劳务分包: 'orange',
-  材料采购: 'purple',
-}
-
 const PROJECT_TYPE_DICT = 'project_type'
-const PROJECT_TYPE_LABEL: Record<string, string> = {
-  施工总承包: '施工总承包',
-  专业分包: '专业分包',
-  劳务分包: '劳务分包',
-  材料采购: '材料采购',
-  BUILDING: '施工总承包',
-  MAIN: '施工总承包',
-  SUB: '专业分包',
-  PURCHASE: '材料采购',
-  MATERIAL: '材料采购',
-  MATERIAL_PURCHASE: '材料采购',
-  LABOR: '劳务分包',
-  LABOR_SUB: '劳务分包',
-  LABOR_SUBCONTRACT: '劳务分包',
-  PROFESSIONAL_SUB: '专业分包',
-  PROFESSIONAL_SUBCONTRACT: '专业分包',
-  GENERAL: '施工总承包',
-  GENERAL_CONTRACT: '施工总承包',
-}
+const PROJECT_STATUS_DICT = 'project_status'
+const APPROVAL_STATUS_DICT = 'approval_status'
+const projectTypeDictData = ref<DictDataVO[]>([])
+const projectStatusDictData = ref<DictDataVO[]>([])
+const approvalStatusDictData = ref<DictDataVO[]>([])
 
-const PROJECT_TYPE_BASE_OPTIONS = Object.keys(PROJECT_TYPE_COLOR)
-const PROJECT_STATUS_OPTIONS = [
-  'DRAFT',
-  'ACTIVE',
-  'ONGOING',
-  'COMPLETED',
-  'SUSPENDED',
-  'CLOSED',
-  'ARCHIVED',
-]
+const statusLabelMap = computed<Record<string, string>>(() =>
+  Object.fromEntries(projectStatusDictData.value.map((item) => [item.dictValue, item.dictLabel])),
+)
+const statusColorMap = computed<Record<string, string>>(() =>
+  Object.fromEntries(
+    projectStatusDictData.value.map((item) => [
+      item.dictValue,
+      getDictTagColorSync(PROJECT_STATUS_DICT, item.dictValue),
+    ]),
+  ),
+)
+const approvalStatusLabelMap = computed<Record<string, string>>(() =>
+  Object.fromEntries(approvalStatusDictData.value.map((item) => [item.dictValue, item.dictLabel])),
+)
+const approvalStatusColorMap = computed<Record<string, string>>(() =>
+  Object.fromEntries(
+    approvalStatusDictData.value.map((item) => [
+      item.dictValue,
+      getDictTagColorSync(APPROVAL_STATUS_DICT, item.dictValue),
+    ]),
+  ),
+)
+const PROJECT_STATUS_OPTIONS = computed(() =>
+  projectStatusDictData.value.map((item) => item.dictValue),
+)
 
 function projectTypeLabel(value: string | undefined) {
-  const label = getDictLabelSync(PROJECT_TYPE_DICT, value ?? '', PROJECT_TYPE_LABEL)
+  const label = getDictLabelSync(PROJECT_TYPE_DICT, value ?? '')
   return label || value || '未分类'
 }
 
 function projectTypeColor(value: string | undefined) {
-  return PROJECT_TYPE_COLOR[projectTypeLabel(value)] ?? 'default'
+  return getDictTagColorSync(PROJECT_TYPE_DICT, value ?? '')
 }
 
-const projectTypeOptions = computed(() => {
-  const options = new Set<string>(PROJECT_TYPE_BASE_OPTIONS)
-  tableData.value.forEach((item) => {
-    if (item.projectType) options.add(item.projectType)
-  })
-  if (filter.projectType) options.add(filter.projectType)
-  if (createForm.projectType) options.add(createForm.projectType)
-  if (editForm.projectType) options.add(editForm.projectType)
-  return Array.from(options)
-})
+const projectTypeOptions = computed(() => projectTypeDictData.value.map((item) => item.dictValue))
 
 function calcCodeColumnWidth(values: Array<string | undefined>, title = '项目编号') {
   const longest = Math.max(title.length, ...values.map((value) => String(value ?? '').length))
@@ -436,10 +389,10 @@ const projectStats = computed(() => {
   const rows = tableData.value
   return {
     total: total.value || rows.length,
-    ongoing: rows.filter((item) => ['ACTIVE', 'ONGOING'].includes(item.status)).length,
-    completed: rows.filter((item) => item.status === 'COMPLETED').length,
+    ongoing: rows.filter((item) => item.status === 'ACTIVE').length,
+    completed: rows.filter((item) => item.status === 'CLOSED').length,
     draft: rows.filter((item) => item.status === 'DRAFT').length,
-    risk: rows.filter((item) => ['SUSPENDED', 'CLOSED'].includes(item.status)).length,
+    risk: rows.filter((item) => item.status === 'SUSPENDED').length,
   }
 })
 
@@ -455,7 +408,7 @@ const statusDistribution = computed(() => {
   }, {})
   return Object.entries(counts).map(([key, value]) => ({
     key,
-    label: STATUS_LABEL[key] ?? key,
+    label: statusLabelMap.value[key] ?? key,
     value,
     percent: rows.length ? Math.round((value / rows.length) * 100) : 0,
   }))
@@ -477,11 +430,11 @@ const typeDistribution = computed(() => {
 
 const riskProjects = computed(() => {
   const rows = tableData.value
-    .filter((item) => ['SUSPENDED', 'CLOSED'].includes(item.status))
+    .filter((item) => item.status === 'SUSPENDED')
     .slice(0, 3)
     .map((item) => ({
       name: item.projectName,
-      status: STATUS_LABEL[item.status] ?? item.status,
+      status: statusLabelMap.value[item.status] ?? item.status,
     }))
   return rows.length
     ? rows
@@ -495,7 +448,7 @@ const recentProjects = computed(() =>
   (tableData.value.length ? tableData.value.slice(0, 4) : [])
     .map((item) => ({
       name: item.projectName,
-      status: STATUS_LABEL[item.status] ?? item.status,
+      status: statusLabelMap.value[item.status] ?? item.status,
     }))
     .concat(tableData.value.length ? [] : [{ name: '等待项目数据加载', status: '空状态' }]),
 )
@@ -728,7 +681,7 @@ const {
           :project-type-options="projectTypeOptions"
           :project-type-label="projectTypeLabel"
           :project-status-options="PROJECT_STATUS_OPTIONS"
-          :status-label="STATUS_LABEL"
+          :status-label="statusLabelMap"
           @search="handleSearch"
           @reset="handleReset"
         />
@@ -743,10 +696,10 @@ const {
           :visible-grid-columns="visibleGridColumns"
           :column-settings="columnSettings"
           :col-visible="colVisible"
-          :status-label="STATUS_LABEL"
-          :status-color="STATUS_COLOR"
-          :approval-status-label="APPROVAL_STATUS_LABEL"
-          :approval-status-color="APPROVAL_STATUS_COLOR"
+          :status-label="statusLabelMap"
+          :status-color="statusColorMap"
+          :approval-status-label="approvalStatusLabelMap"
+          :approval-status-color="approvalStatusColorMap"
           :project-type-label="projectTypeLabel"
           :project-type-color="projectTypeColor"
           :fmt-amount="formatWanAmountWithUnit"

@@ -87,14 +87,7 @@ const current = ref(0)
 const submitting = ref(false)
 
 // ---- Data dictionaries ----
-const fallbackContractTypeOptions: { value: ContractType; label: string }[] = [
-  { value: 'MAIN', label: '总包合同' },
-  { value: 'SUB', label: '分包合同' },
-  { value: 'PURCHASE', label: '采购合同' },
-  { value: 'LEASE', label: '租赁合同' },
-  { value: 'SERVICE', label: '服务合同' },
-]
-const contractTypeOptions = ref([...fallbackContractTypeOptions])
+const contractTypeOptions = ref<{ value: ContractType; label: string }[]>([])
 const paymentMethodOptions = [
   { value: '银行转账', label: '银行转账' },
   { value: '银行承兑汇票', label: '银行承兑汇票' },
@@ -136,9 +129,13 @@ const referenceStore = useReferenceStore()
 const projects = computed(() => referenceStore.projects ?? [])
 const partners = computed(() => referenceStore.partners ?? [])
 
-// Filtered partner lists
-const partyAPartners = computed(() => partners.value.filter((p) => p.partnerType === 'PARTY_A'))
-const partyBPartners = computed(() => partners.value.filter((p) => p.partnerType === 'PARTY_B'))
+// 甲方/乙方是合同角色，不是合作方类型。候选来自当前租户合作方，双方必须不同。
+const partyAPartners = computed(() =>
+  partners.value.filter((partner) => partner.id !== formData.partyBId),
+)
+const partyBPartners = computed(() =>
+  partners.value.filter((partner) => partner.id !== formData.partyAId),
+)
 
 const projectName = computed(
   () => projects.value.find((p) => p.id === formData.projectId)?.projectName ?? '-',
@@ -386,9 +383,12 @@ async function loadContractTypes() {
     const enabled = rows
       .filter((row) => row.status === 'ENABLE')
       .map((row) => ({ value: row.dictValue as ContractType, label: row.dictLabel }))
-    if (enabled.length) contractTypeOptions.value = enabled
+    contractTypeOptions.value = enabled
+    if (!enabled.length) message.error('合同类型字典为空，请先维护字典标签')
   } catch (e: unknown) {
     console.error(e)
+    contractTypeOptions.value = []
+    message.error('合同类型字典加载失败')
   }
 }
 
@@ -551,7 +551,7 @@ function genTermKey(): string {
                 <a-form-item label="甲方" name="partyAId">
                   <a-select
                     v-model:value="formData.partyAId"
-                    placeholder="请选择甲方（合作方-甲方类型）"
+                    placeholder="请选择甲方"
                     show-search
                     option-filter-prop="label"
                     allow-clear
@@ -572,7 +572,7 @@ function genTermKey(): string {
                 <a-form-item label="乙方" name="partyBId">
                   <a-select
                     v-model:value="formData.partyBId"
-                    placeholder="请选择乙方（合作方-乙方类型）"
+                    placeholder="请选择乙方"
                     show-search
                     option-filter-prop="label"
                     allow-clear

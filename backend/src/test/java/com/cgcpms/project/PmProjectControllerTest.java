@@ -20,7 +20,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * PmProjectController integration tests covering all endpoints.
  */
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "jwt.secret=project-controller-test-secret-key-at-least-sixty-four-characters-long"
+})
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
 @DisplayName("PmProjectController integration tests")
@@ -149,7 +152,7 @@ class PmProjectControllerTest {
                 {
                     "projectName": "集成测试项目",
                     "projectCode": "IT-TEST-%d",
-                    "projectType": "房建工程",
+                    "projectType": "CONSTRUCTION",
                     "status": "DRAFT"
                 }
                 """.formatted(System.nanoTime());
@@ -165,6 +168,25 @@ class PmProjectControllerTest {
 
     @Test
     @Order(7)
+    @DisplayName("POST /projects rejects project type outside enabled dictionary")
+    void testCreate_InvalidProjectType() throws Exception {
+        String body = """
+                {
+                    "projectName": "非法类型项目",
+                    "projectType": "ARBITRARY_TYPE"
+                }
+                """;
+
+        mockMvc.perform(postWithApi("/projects")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_TYPE_INVALID"));
+    }
+
+    @Test
+    @Order(8)
     @DisplayName("POST /projects with missing required field -> 400")
     void testCreate_MissingRequired() throws Exception {
         mockMvc.perform(postWithApi("/projects")
@@ -175,7 +197,7 @@ class PmProjectControllerTest {
     }
 
     @Test
-    @Order(8)
+    @Order(9)
     @DisplayName("PUT /projects/{id}/archive requires authentication and project:edit")
     void testArchiveRequiresAuthenticationAndPermission() throws Exception {
         mockMvc.perform(putWithApi("/projects/" + EXISTING_PROJECT_ID + "/archive"))
@@ -186,7 +208,7 @@ class PmProjectControllerTest {
     }
 
     @Test
-    @Order(9)
+    @Order(10)
     @DisplayName("PUT /projects/{id}/archive rejects same-tenant editor without project access")
     void testArchiveRequiresProjectDataScope() throws Exception {
         mockMvc.perform(putWithApi("/projects/" + EXISTING_PROJECT_ID + "/archive")
@@ -196,7 +218,7 @@ class PmProjectControllerTest {
     }
 
     @Test
-    @Order(10)
+    @Order(11)
     @DisplayName("PUT /projects/{id}/archive hides cross-tenant project")
     void testArchiveHidesCrossTenantProject() throws Exception {
         mockMvc.perform(putWithApi("/projects/" + EXISTING_PROJECT_ID + "/archive")

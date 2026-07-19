@@ -225,6 +225,27 @@ jobs:
       - name: Audit frontend dependencies with official registry
         run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm audit --audit-level high --registry=https://registry.npmjs.org
 
+  frontend-v2-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: frontend-admin-v2/package.json
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+          cache-dependency-path: frontend-admin-v2/pnpm-lock.yaml
+      - name: Install V2 dependencies
+        run: cd frontend-admin-v2 && pnpm install --frozen-lockfile
+      - name: Enforce Clean-room boundary and route ledger
+        run: cd frontend-admin-v2 && pnpm check:boundary && pnpm check:route-ledger
+      - name: Lint, test, type-check and build V2
+        run: cd frontend-admin-v2 && pnpm lint:check && pnpm test:unit && pnpm type-check:contracts && pnpm type-check && pnpm build && pnpm check:bundle-size
+      - name: Audit V2 dependencies with official registry
+        run: cd frontend-admin-v2 && pnpm audit --audit-level high --registry=https://registry.npmjs.org
+
   supply-chain-security:
     runs-on: ubuntu-latest
     needs: [backend-test, backend-dependency-scan, frontend-build]
@@ -439,6 +460,7 @@ jobs:
       - frontend-build
       - frontend-test
       - frontend-dependency-audit
+      - frontend-v2-gate
       - supply-chain-security
       - e2e
       - sql-safety-scan
@@ -450,7 +472,7 @@ jobs:
             echo ""
             echo "- Run number: ${{ github.run_number }}"
             echo "- Commit SHA: ${{ github.sha }}"
-            echo "- Core gate jobs: frontend-lint, backend-dependency-scan, backend-test, backend-test-mysql, type-check, frontend-build, frontend-test, frontend-dependency-audit, e2e, sql-safety-scan, supply-chain-security"
+            echo "- Core gate jobs: frontend-lint, backend-dependency-scan, backend-test, backend-test-mysql, type-check, frontend-build, frontend-test, frontend-dependency-audit, frontend-v2-gate, e2e, sql-safety-scan, supply-chain-security"
             echo "- Artifacts: ${{ env.BACKEND_JAR_ARTIFACT }}, ${{ env.BACKEND_COVERAGE_ARTIFACT }}, ${{ env.FRONTEND_DIST_ARTIFACT }}, ${{ env.FRONTEND_COVERAGE_ARTIFACT }}, ${{ env.SBOM_ARTIFACT }}"
             echo ""
             echo "### Job Results"
@@ -462,6 +484,7 @@ jobs:
             echo "- frontend-build: ${{ needs.frontend-build.result }}"
             echo "- frontend-test: ${{ needs.frontend-test.result }}"
             echo "- frontend-dependency-audit: ${{ needs.frontend-dependency-audit.result }}"
+            echo "- frontend-v2-gate: ${{ needs.frontend-v2-gate.result }}"
             echo "- supply-chain-security: ${{ needs.supply-chain-security.result }}"
             echo "- e2e: ${{ needs.e2e.result }}"
             echo "- sql-safety-scan: ${{ needs.sql-safety-scan.result }}"

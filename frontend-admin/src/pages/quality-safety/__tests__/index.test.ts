@@ -29,4 +29,13 @@ describe('quality safety rectification workbench', () => {
     expect(source).toContain('全链路')
     expect(source).toContain('成本台账')
   })
+
+  it('requires a related contract before creating a consequence', () => {
+    expect(source).toContain(
+      "if (!consequenceForm.contractId) return message.warning('请选择关联合同')",
+    )
+    expect(source).toContain('<a-form-item label="关联合同" required')
+    expect(source).not.toContain('关联合同（可选）')
+    expect(source).toContain('item.partyAId === partnerId || item.partyBId === partnerId')
+  })
 })

@@ -8,6 +8,331 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 `ISSUE-040-039`、阻塞修复 `ISSUE-047-001`、`ISSUE-040-040`～`ISSUE-040-055`、阻塞修复 `ISSUE-047-002` 与 `ISSUE-047-003` 已完成；`启动迭代-20` 已完成 20/20。站内通知的租户/用户隔离、已读幂等、SSE与通知铃契约已完成回归证明。
 
+2026-07-19 手工补货 5 条已全部完成：`ISSUE-048-011`、`ISSUE-053-001`、`ISSUE-053-002`、`ISSUE-053-003`、`ISSUE-053-004`；Clean-room V2 M1 完整退出门通过，M2 须经产品决策与 Ready 补货后再实施。
+
+### ISSUE-048-011：修正会计凭证页面陈旧生成规则说明
+
+优先级：P1
+任务性质：缺口修复
+类型：会计凭证 / 页面文案 / 自动生成边界 / 权限不扩张
+目标：
+- 将会计凭证页陈旧辅助说明修正为当前事实，即付款、回款凭证由权威业务写侧自动生成，手工生成入口未开放。
+- 用页面单测和只读浏览器复验保证财务用户不再被“生成规则待确认”误导。
+非目标：
+- 不新增生成按钮、生成 API、科目映射、凭证策略、权限、迁移或业务数据。
+- 不改变复核、过账、冲销及会计期间状态机。
+允许修改：
+- `frontend-admin/src/pages/accounting-entry/index.vue`
+- `frontend-admin/src/pages/accounting-entry/__tests__/index.test.ts`
+- `docs/backlog/current-issues.json`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/ad-hoc-plan.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-048-011-修正会计凭证页面陈旧生成规则说明验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/src/api/**`
+- `frontend-admin/src/router/**`
+- `frontend-admin/src/stores/**`
+- `frontend-admin-v2/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `scripts/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- 页面不再出现“来源单据到借贷科目的生成规则待会计确认”或其他暗示规则尚未落地的文案。
+- 新文案明确付款、回款由权威业务写侧自动生成，手工生成入口未开放；页面不新增生成按钮或可触发生成的交互。
+- 既有会计新增权限契约保持不变，权限码 `accounting:add`、后端、数据库与历史会计事实零修改。
+- 会计凭证页专项单测、Legacy 前端类型检查、只读浏览器复验与 `git diff --check` 通过。
+状态：Done
+来源锚点：`docs/backlog/current-issues.json` 的 `A-01-ACCOUNTING-GENERATION-COPY`；`docs/backlog/ad-hoc-plan.md` 的同名 `ReadyToSplit` 候选；`docs/quality/ISSUE-048-010-会计凭证生成策略现状复核与P0问题关闭验收报告.md`
+存量问题键：[stock:A-01-ACCOUNTING-GENERATION-COPY]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-048-011`
+- `cd frontend-admin; pnpm test:unit -- src/pages/accounting-entry/__tests__/index.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-048-011-修正会计凭证页面陈旧生成规则说明验收报告.md`
+Migration：不需要
+依赖：`ISSUE-048-010` 已确认付款、回款生产策略与业务写侧自动生成事实；不依赖 M1。
+风险等级：低
+运行态要求：当前本地 Legacy 前端与后端；只读查看会计凭证列表，不生成、复核、过账或冲销凭证。
+Reviewer要求：核对文案与现行付款/回款实现及业务标准一致；确认无按钮、权限、API、状态机或数据变更。
+最小回滚：回退页面文案、对应单测和治理回写；不涉及迁移与业务数据恢复。
+
+### ISSUE-053-001：建立 Clean-room V2 设计令牌与最小组件基线
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 设计系统 / Token / 基础组件
+目标：
+- 从已选新版经营驾驶舱视觉基线提取颜色、排版、间距、圆角、阴影、层级和动效令牌，形成桌面与移动应用壳可复用的 V2 设计基线。
+- 实现登录、应用壳和驾驶舱所需的最小无业务组件集，并保持 Clean-room 边界。
+非目标：
+- 不实现登录会话、权限守卫、八域导航、真实驾驶舱或业务页面迁移。
+- 不复制 Legacy Vue、Pinia、CSS、DOM 状态或消息组件，不修改 Legacy 前端、后端和数据库。
+允许修改：
+- `frontend-admin-v2/src/styles/**`
+- `frontend-admin-v2/src/components/**`
+- `frontend-admin-v2/tests/unit/**`
+- `frontend-admin-v2/package.json`
+- `frontend-admin-v2/pnpm-lock.yaml`
+- `docs/ui-v2/**`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-001-Clean-room-V2设计令牌与最小组件基线验收报告.md`
+禁止修改：
+- `frontend-admin-v2/src/services/**`
+- `frontend-admin-v2/src/stores/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/pages/**`
+- `frontend-admin/**`
+- `backend/**`
+- `packages/frontend-contracts/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `scripts/codex-autopilot/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- 令牌覆盖颜色、排版、间距、圆角、阴影、层级和动效，组件禁止散落与令牌重复的硬编码核心视觉值。
+- 最小组件集覆盖按钮、输入、选择、卡片、徽标、反馈、骨架、对话与基础布局；键盘焦点、禁用、加载和错误状态可测试。
+- 桌面与移动壳视觉稿/规范可追溯到已选驾驶舱基线；不引入真实业务数据或 Legacy 源码。
+- V2 单测、类型、Lint、构建、Clean-room 边界和 `git diff --check` 通过。
+状态：Done
+来源锚点：`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-18-02`；`docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md` 的 M1；`docs/product-intelligence/project-map.md` 的 M0 完成事实
+存量问题键：[candidate:PI-2026-07-18-02-M1-DESIGN-SYSTEM]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-001`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-001-Clean-room-V2设计令牌与最小组件基线验收报告.md`
+Migration：不需要
+依赖：第53条主线 M0 已通过；用户已选新版经营驾驶舱为唯一视觉基线。完成后方可实施 `ISSUE-053-002`。
+风险等级：中
+运行态要求：本地 V2 5174 与现有后端；需在 1440、1024、390 视口检查组件基线，不切换正式入口。
+Reviewer要求：确认设计令牌来自选定视觉基线、组件范围最小且可复用、无 Legacy import、无业务功能偷跑和无正式入口变更。
+最小回滚：回退 V2 令牌、组件、测试与文档；M0 健康页、Legacy、后端和数据保持不变。
+
+### ISSUE-053-002：实现 Clean-room V2 安全会话与请求核心
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 登录 / 同源会话 / CSRF / 401恢复
+目标：
+- 实现登录、当前用户恢复、登出、CSRF、401 单次恢复和重复错误去重，保持与 Legacy 后端契约一致。
+- 建立仅共享 DTO、权限码和 API 相对路径的认证契约与 V2 请求核心。
+非目标：
+- 不实现八域导航、对象上下文、真实驾驶舱或其他业务页面。
+- 不新增认证 API、不改变 JWT/Session 后端策略、不把 token 写入 localStorage、sessionStorage 或 URL。
+允许修改：
+- `packages/frontend-contracts/src/auth.ts`
+- `packages/frontend-contracts/src/api.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/**`
+- `frontend-admin-v2/src/stores/**`
+- `frontend-admin-v2/src/pages/auth/**`
+- `frontend-admin-v2/src/main.ts`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/vite.config.ts`
+- `frontend-admin-v2/tests/unit/**`
+- `frontend-admin-v2/e2e/**`
+- `frontend-admin-v2/package.json`
+- `frontend-admin-v2/pnpm-lock.yaml`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-002-Clean-room-V2安全会话与请求核心验收报告.md`
+禁止修改：
+- `frontend-admin/**`
+- `backend/**`
+- `frontend-admin-v2/src/pages/dashboard/**`
+- `frontend-admin-v2/src/pages/workspace/**`
+- `frontend-admin-v2/src/features/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `scripts/codex-autopilot/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- 未登录用户只能访问公开健康页和登录页；有效同源会话可恢复当前用户，登出后受保护状态与缓存清空。
+- CSRF 只附加到需要保护的写请求；并发 401 只触发一次恢复流程，恢复失败统一退出且不形成重试风暴。
+- token 不进入 localStorage、sessionStorage、IndexedDB、URL、日志或错误提示；重复错误在同一恢复窗口只通知一次。
+- ADMIN、普通有权、无权和未登录用户的认证结果与 Legacy 契约一致；V2/契约单测、类型、Lint、构建、边界和浏览器认证专项通过。
+状态：Done
+来源锚点：`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-18-02`；第53条主线计划书 M1 认证任务；M0 冻结的登录、用户、角色、权限和 API 最小契约
+存量问题键：[candidate:PI-2026-07-18-02-M1-AUTH-SESSION]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-002`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-002-Clean-room-V2安全会话与请求核心验收报告.md`
+Migration：不需要
+依赖：`ISSUE-053-001` 完成；复用 M0 已冻结认证契约与现有后端同源会话，不新增后端前置。完成后方可实施 `ISSUE-053-003`。
+风险等级：高
+运行态要求：本地 V2 5174、Legacy 5173 与同一后端；使用测试/演示账号做登录、恢复、登出及 401 正负样本，不连接生产。
+Reviewer要求：安全复核 token 零持久化、CSRF 条件、401 并发单飞、错误去重、退出清理、权限信息来源和跨租户缓存隔离。
+最小回滚：回退 V2 请求、会话、登录页、契约和测试；不回退 M0/`ISSUE-053-001`，Legacy 入口继续可用。
+
+### ISSUE-053-003：实现 Clean-room V2 八域应用壳与权限导航
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 应用壳 / 八域导航 / 工作区上下文
+目标：
+- 实现八域导航、工作区 Tab、对象上下文、全局项目和报告期选择，并由当前用户权限驱动可见性与深链守卫。
+- 建立响应式应用壳的路由与状态骨架，为 M2 及后续垂直迁移提供唯一承载层。
+非目标：
+- 不迁移驾驶舱、项目、合同、供应链、成本、财务或系统管理真实业务页面。
+- 不按角色名称硬编码导航，不新增权限码、后端 API、数据库字段或正式入口切换。
+允许修改：
+- `frontend-admin-v2/src/layouts/**`
+- `frontend-admin-v2/src/navigation/**`
+- `frontend-admin-v2/src/stores/workspace/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/pages/shell/**`
+- `frontend-admin-v2/src/App.vue`
+- `frontend-admin-v2/tests/unit/**`
+- `frontend-admin-v2/e2e/**`
+- `frontend-admin-v2/package.json`
+- `frontend-admin-v2/pnpm-lock.yaml`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-003-Clean-room-V2八域应用壳与权限导航验收报告.md`
+禁止修改：
+- `frontend-admin/**`
+- `backend/**`
+- `packages/frontend-contracts/src/auth.ts`
+- `packages/frontend-contracts/src/api.ts`
+- `frontend-admin-v2/src/pages/dashboard/**`
+- `frontend-admin-v2/src/features/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `scripts/codex-autopilot/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- 八域入口、工作区 Tab、对象上下文、全局项目和报告期具有确定状态来源；刷新、深链、退出和无可用项目时不产生陈旧上下文。
+- ADMIN、普通有权和无权用户只看到可访问导航；直接访问无权限路由被守卫阻断，结果与 Legacy 权限码契约一致。
+- 壳层不加载真实业务 API、不伪造业务数字、不以空壳宣称业务页面迁移完成；路由迁移台账准确反映状态。
+- V2 单测、类型、Lint、构建、边界、路由台账检查、浏览器权限正负样本和 `git diff --check` 通过。
+状态：Done
+来源锚点：`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-18-02`；第53条主线计划书 M1 八域应用壳任务；`docs/ui-v2/route-migration-ledger.md`
+存量问题键：[candidate:PI-2026-07-18-02-M1-APP-SHELL]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-003`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-003-Clean-room-V2八域应用壳与权限导航验收报告.md`
+Migration：不需要
+依赖：`ISSUE-053-001`、`ISSUE-053-002` 完成；与二者串行，完成后方可实施 `ISSUE-053-004`。
+风险等级：高
+运行态要求：本地 V2 5174、Legacy 5173 与同一后端；至少使用 ADMIN、普通有权、无权和未登录四类身份做导航与深链正负样本。
+Reviewer要求：复核权限码而非角色名驱动、项目/报告期/对象上下文隔离、深链与刷新一致性、路由台账准确性及无真实业务页偷跑。
+最小回滚：回退 V2 壳、导航、工作区状态、路由和测试；保留已验收设计系统与安全会话，Legacy 正式入口不变。
+
+### ISSUE-053-004：完成 Clean-room V2 响应式、无障碍与错误状态基线
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 响应式 / 无障碍 / 错误边界
+目标：
+- 为应用壳完成桌面、紧凑桌面、移动端和减少动效模式。
+- 实现 403、404、全局错误边界、加载壳和通知入口，形成 M1 完整退出门。
+非目标：
+- 不迁移真实驾驶舱或其他业务页面，不接入真实通知业务列表、SSE 或写操作。
+- 不改变认证、权限码、后端异常结构、数据库、Legacy 前端或正式入口。
+允许修改：
+- `frontend-admin-v2/src/styles/**`
+- `frontend-admin-v2/src/components/**`
+- `frontend-admin-v2/src/layouts/**`
+- `frontend-admin-v2/src/navigation/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/pages/errors/**`
+- `frontend-admin-v2/src/pages/shell/**`
+- `frontend-admin-v2/src/App.vue`
+- `frontend-admin-v2/tests/unit/**`
+- `frontend-admin-v2/e2e/**`
+- `frontend-admin-v2/playwright.config.ts`
+- `frontend-admin-v2/package.json`
+- `frontend-admin-v2/pnpm-lock.yaml`
+- `docs/ui-v2/**`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-004-Clean-room-V2响应式无障碍与错误状态基线验收报告.md`
+禁止修改：
+- `frontend-admin/**`
+- `backend/**`
+- `packages/frontend-contracts/**`
+- `frontend-admin-v2/src/pages/dashboard/**`
+- `frontend-admin-v2/src/features/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `scripts/codex-autopilot/**`
+- `plugins/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+- `.github/**`
+验收标准：
+- 1440、1024、390 视口的登录页和应用壳无横向溢出、遮挡、不可达主操作或焦点丢失；紧凑桌面与移动导航可键盘和触控操作。
+- `prefers-reduced-motion` 下非必要动效关闭；焦点顺序、焦点可见性、语义地标、可访问名称和对比度满足核心流程要求。
+- 403、404、全局异常、加载、空壳和重复错误均有明确状态；通知入口只提供壳级占位与权限边界，不伪造业务通知。
+- ADMIN、普通有权、无权和未登录四类结果与 Legacy 契约一致；axe 核心扫描无 serious/critical 违规，浏览器控制台无新增 warning/error。
+- V2 单测、类型、Lint、构建、边界、路由台账、1440/1024/390 Playwright 与 `git diff --check` 全部通过，M1 才可判定完成。
+状态：Done
+来源锚点：`docs/product-intelligence/evolution-decision.md` 的 `PI-2026-07-18-02`；第53条主线计划书 M1 响应式、403/404、错误边界和 axe 退出标准
+存量问题键：[candidate:PI-2026-07-18-02-M1-RESPONSIVE-A11Y]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-004`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m1-shell.spec.ts`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-004-Clean-room-V2响应式无障碍与错误状态基线验收报告.md`
+Migration：不需要
+依赖：`ISSUE-053-001`、`ISSUE-053-002`、`ISSUE-053-003` 全部完成；作为 M1 最终串行收口，不得与前三项并行。
+风险等级：中
+运行态要求：本地 V2 5174、Legacy 5173 与同一后端；Edge/Chromium 在 1440、1024、390 视口实测四类身份，不连接生产。
+Reviewer要求：独立复核三视口、键盘路径、减少动效、axe、403/404/全局错误状态、控制台、通知入口非业务化及 M1 退出标准完整性。
+最小回滚：回退响应式、无障碍、错误状态、测试和文档；保留前三个已验收 M1 切片，Legacy 正式入口不变。
+
 ### ISSUE-048-010：会计凭证生成策略现状复核与P0问题关闭
 
 优先级：P0

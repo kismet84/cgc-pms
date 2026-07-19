@@ -36,7 +36,7 @@
 2. `启动迭代`
    - 进入连续迭代模式
    - 优先走插件 runner / checkpoint / classifier
-   - A-F 作为职责检查表动态覆盖，由主线程按净收益选择直接执行、单派或多派；仍遵守 Ready 队列、stop/pause/enabled、no push
+   - A-F 作为职责检查表由主线程动态覆盖；仍遵守 Ready 队列、stop/pause/enabled、no push
 3. `启动迭代-N`
    - `N` 为 1 到 50
    - 最多完成 N 个实施型 Ready Issue 后退出
@@ -58,7 +58,7 @@
 ## 连续迭代硬边界
 
 - 普通交互任务获用户明确授权后不强制进入 Ready；AutoPilot 只实施合格 Ready Issue。
-- A-F 不对应固定六线程；D 的裁决必需验证证据与 E 的适用风险审查证据不可省略，但不强制独立线程。
+- A-F 是主线程职责检查表；D 的裁决必需验证证据与 E 的适用风险审查证据不可省略。
 - 状态变更前核对 branch/status；AutoPilot 按开始、选题、改代码、验证、自动合并、报告收口等 checkpoint 检查 stop/pause/enabled。
 - 运行态或浏览器验收先过 health gate；失败先分类，环境未就绪先刷新并等待 180 秒复验。
 - 每轮最多并行 3 个完全无关联且无代码关联的 Ready Issue，不能证明无关联时串行。

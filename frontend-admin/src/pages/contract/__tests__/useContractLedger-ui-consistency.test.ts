@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { scanContent } from '../../../../scripts/check-ui-style-consistency.mjs'
-import { STATUS_COLOR, TYPE_CHART_COLOR } from '../composables/useContractLedger'
 
 const sourcePath = resolve(__dirname, '../composables/useContractLedger.ts')
 
@@ -14,20 +13,15 @@ describe('useContractLedger UI consistency', () => {
     expect(findings).toEqual([])
   })
 
-  it('exposes chart colors as semantic CSS variables', () => {
-    expect(Object.values(TYPE_CHART_COLOR)).toEqual([
-      'var(--primary)',
-      'var(--success)',
-      'var(--warning)',
-      'var(--info)',
-      'var(--text-secondary)',
-    ])
-    expect(Object.values(STATUS_COLOR)).toEqual([
-      'var(--text-secondary)',
-      'var(--primary)',
-      'var(--success)',
-      'var(--error)',
-    ])
+  it('derives contract type and status labels from dictionaries', () => {
+    const source = readFileSync(sourcePath, 'utf8')
+
+    expect(source).toContain("const CONTRACT_TYPE_DICT = 'contract_type'")
+    expect(source).toContain("const CONTRACT_STATUS_DICT = 'contract_status'")
+    expect(source).toContain('fetchDictData(CONTRACT_TYPE_DICT)')
+    expect(source).toContain('fetchDictData(CONTRACT_STATUS_DICT)')
+    expect(source).not.toContain('export const TYPE_LABEL')
+    expect(source).not.toContain('export const STATUS_LABEL')
   })
 
   it('defaults low-priority ledger columns to hidden while keeping them configurable', () => {
