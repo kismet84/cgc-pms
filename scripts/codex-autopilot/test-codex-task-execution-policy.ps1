@@ -29,6 +29,7 @@ $policySuite = Read-RepoText 'scripts\codex-autopilot\test-codex-task-policy-sui
 $prePrGate = Read-RepoText 'scripts\codex-autopilot\verify-pre-pr-ci.ps1'
 $prePrGateTest = Read-RepoText 'scripts\codex-autopilot\test-pre-pr-ci-gate.ps1'
 $ciWorkflow = Read-RepoText '.github\workflows\ci.yml'
+$mysqlGrantScript = Read-RepoText 'scripts\ci\verify-mysql-grants.sh'
 $prTemplate = Read-RepoText '.github\pull_request_template.md'
 $config = Read-RepoText 'scripts\codex-autopilot\codex-autopilot.config.json' | ConvertFrom-Json
 
@@ -86,7 +87,8 @@ Assert-TextContains $efficiencyCalculatorTest @('persistentWrites = 0','missing 
 Assert-TextContains $policySuite @('test-codex-task-efficiency.ps1','test-codex-task-git-lifecycle.ps1','test-pre-pr-ci-gate.ps1','test-tool-routing.ps1','test-control-plane-fingerprint.ps1','test-mainline-owner-flow.ps1','Parameter(Mandatory)') 'Codex task policy suite'
 Assert-TextContains $prePrGate @('headBranch','TRACKED_WORKTREE_DIRTY','INVALID_FEATURE_BRANCH','event','push','PRE_PR_CI_EVIDENCE_MISSING','PRE_PR_CI_JOB_EVIDENCE_MISSING','build-summary','frontend-v2-gate','supply-chain-security','e2e') 'pre-PR CI evidence gate'
 Assert-TextContains $prePrGateTest @('valid pre-PR CI evidence','PRE_PR_CI_NOT_GREEN','PRE_PR_CI_JOB_NOT_GREEN') 'pre-PR CI evidence gate test'
-Assert-TextContains $ciWorkflow @("branches: ['**']",'Verify MySQL migration user scope','normalized_grants','Run MySQL least-privilege Flyway migration smoke test','Verify backend test order independence','frontend-v2-gate','supply-chain-security','e2e') 'CI workflow pre-PR equivalence'
+Assert-TextContains $ciWorkflow @("branches: ['**']",'Verify MySQL migration user scope','bash ./scripts/ci/verify-mysql-grants.sh','Run MySQL least-privilege Flyway migration smoke test','Verify backend test order independence','frontend-v2-gate','supply-chain-security','e2e') 'CI workflow pre-PR equivalence'
+Assert-TextContains $mysqlGrantScript @('normalized_grants','CI_MYSQL_DATABASE','MySQL migration user has global privileges') 'MySQL least-privilege script'
 Assert-TextContains $prTemplate @('首次非 Draft PR HEAD SHA','verify-pre-pr-ci.ps1','只能保持 Draft','V2 门禁','E2E') 'pull request evidence template'
 
 if ([string]$config.baseBranch -ne 'master') { throw 'AutoPilot baseBranch is not aligned with the actual repository base branch' }

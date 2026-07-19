@@ -18,11 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v5
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
+      - uses: ./.github/actions/setup-backend
       - name: Verify backend test order independence
         run: cd backend && ./mvnw -C -Ptest-order-independence test
         env:
@@ -61,16 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Scan backend high and critical library vulnerabilities
-        run: |
-          docker run --rm -v "$PWD:/workspace" aquasec/trivy:0.65.0 \
-            fs \
-            --scanners vuln \
-            --vuln-type library \
-            --severity HIGH,CRITICAL \
-            --exit-code 1 \
-            --format table \
-            --timeout 10m \
-            /workspace/backend
+        run: bash ./scripts/ci/scan-backend-dependencies.sh
 
   backend-test-mysql:
     runs-on: ubuntu-latest
@@ -100,27 +87,10 @@ jobs:
           - 6379:6379
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v5
-        with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
+      - uses: ./.github/actions/setup-backend
       - name: Verify MySQL migration user scope
         shell: bash
-        run: |
-          set -euo pipefail
-          grants="$(docker exec -e "MYSQL_PWD=${CI_MYSQL_PASSWORD}" "${{ job.services.mysql.id }}" \
-            mysql -u"${CI_MYSQL_USER}" -Nse 'SHOW GRANTS FOR CURRENT_USER')"
-          printf '%s\n' "$grants"
-          normalized_grants="$(printf '%s\n' "$grants" | tr -d '\\')"
-          if ! printf '%s\n' "$normalized_grants" | grep -Fq "ON \`${CI_MYSQL_DATABASE}\`.*"; then
-            echo "MySQL migration user is not scoped to ${CI_MYSQL_DATABASE}.*" >&2
-            exit 1
-          fi
-          if printf '%s\n' "$normalized_grants" | grep -Ev '^GRANT USAGE ON \*\.\*' | grep -Eq ' ON \*\.\* '; then
-            echo 'MySQL migration user has global privileges' >&2
-            exit 1
-          fi
+        run: bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"
       - name: Run MySQL least-privilege Flyway migration smoke test
         run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest test -Dspring.profiles.active=test
         env:
@@ -141,22 +111,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: ./.github/actions/setup-frontend
         with:
-          package_json_file: frontend-admin/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+          working-directory: frontend-admin
       - name: Lint frontend
         shell: bash
-        run: |
-          cd frontend-admin
-          mkdir -p .ci-artifacts
-          pnpm install --frozen-lockfile
-          set -o pipefail
-          pnpm lint:check 2>&1 | tee .ci-artifacts/lint-check.txt
+        run: bash ./scripts/ci/run-frontend-lint.sh
       - name: Upload frontend lint evidence
         if: failure()
         uses: actions/upload-artifact@v7
@@ -169,31 +129,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: ./.github/actions/setup-frontend
         with:
-          package_json_file: frontend-admin/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+          working-directory: frontend-admin
       - name: TypeScript type check
-        run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm type-check
+        run: cd frontend-admin && pnpm type-check
 
   frontend-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: ./.github/actions/setup-frontend
         with:
-          package_json_file: frontend-admin/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+          working-directory: frontend-admin
       - name: Install & Build
-        run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm build
+        run: cd frontend-admin && pnpm build
       - name: Check frontend bundle size
         run: cd frontend-admin && pnpm check:bundle-size
       - name: Upload build artifacts
@@ -207,16 +157,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: ./.github/actions/setup-frontend
         with:
-          package_json_file: frontend-admin/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+          working-directory: frontend-admin
       - name: Install & Test with coverage
-        run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm test:coverage
+        run: cd frontend-admin && pnpm test:coverage
         env:
           COVERAGE_DIR: coverage-ci
       - name: Upload frontend coverage
@@ -230,31 +175,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: ./.github/actions/setup-frontend
         with:
-          package_json_file: frontend-admin/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+          working-directory: frontend-admin
       - name: Audit frontend dependencies with official registry
-        run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm audit --audit-level high --registry=https://registry.npmjs.org
+        run: cd frontend-admin && pnpm audit --audit-level high --registry=https://registry.npmjs.org
 
   frontend-v2-gate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: ./.github/actions/setup-frontend
         with:
-          package_json_file: frontend-admin-v2/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: frontend-admin-v2/pnpm-lock.yaml
-      - name: Install V2 dependencies
-        run: cd frontend-admin-v2 && pnpm install --frozen-lockfile
+          working-directory: frontend-admin-v2
       - name: Enforce Clean-room boundary and route ledger
         run: cd frontend-admin-v2 && pnpm check:boundary && pnpm check:route-ledger
       - name: Lint, test, type-check and build V2
@@ -376,68 +309,23 @@ jobs:
           - 6379:6379
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-java@v5
+      - uses: ./.github/actions/setup-backend
+      - uses: ./.github/actions/setup-frontend
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: maven
-      - uses: pnpm/action-setup@v6
-        with:
-          package_json_file: frontend-admin/package.json
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'pnpm'
-          cache-dependency-path: frontend-admin/pnpm-lock.yaml
+          working-directory: frontend-admin
       - name: Download frontend build
         uses: actions/download-artifact@v8
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
           path: frontend-admin/dist
       - name: Start MinIO
-        run: |
-          docker run -d --name cgc-pms-e2e-minio \
-            -p 9000:9000 \
-            -e MINIO_ROOT_USER=cgcpmsci \
-            -e MINIO_ROOT_PASSWORD=cgcpmsci123456 \
-            minio/minio:latest server /data --console-address ":9001"
-          for attempt in {1..30}; do
-            if curl -fsS http://127.0.0.1:9000/minio/health/live; then
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs cgc-pms-e2e-minio
-          exit 1
+        run: bash ./scripts/ci/start-e2e-minio.sh
       - name: Start backend
-        run: |
-          bootstrap_password="Aa9!$(openssl rand -hex 16)"
-          echo "::add-mask::$bootstrap_password"
-          export CGCPMS_BOOTSTRAP_ENABLED=true
-          export CGCPMS_BOOTSTRAP_ADMIN_USERNAME=admin
-          export CGCPMS_BOOTSTRAP_ADMIN_PASSWORD="$bootstrap_password"
-          cd backend
-          nohup ./mvnw -C spring-boot:run -Dspring-boot.run.profiles=test,dev \
-            -Dspring-boot.run.arguments="--spring.datasource.url=jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }} --spring.datasource.username=${{ env.CI_MYSQL_USER }} --spring.datasource.password=${{ env.CI_MYSQL_PASSWORD }} --spring.redis.host=localhost --spring.redis.port=6379 --jwt.secret=${TEST_JWT_SECRET} --cors.allowed-origins=http://127.0.0.1:4173,http://localhost:4173 --minio.endpoint=http://localhost:9000 --minio.access-key=cgcpmsci --minio.secret-key=cgcpmsci123456 --minio.bucket=cgc-pms-e2e --auth.dev-login.enabled=true --auth.dev-login.default-username=admin" \
-            > ../backend.log 2>&1 &
-          backend_pid=$!
-          cd ..
-          for attempt in {1..90}; do
-            if curl -fsS http://127.0.0.1:8080/api/actuator/health | grep -q '"status":"UP"'; then
-              exit 0
-            fi
-            if ! kill -0 "$backend_pid" 2>/dev/null; then
-              cat backend.log
-              exit 1
-            fi
-            sleep 2
-          done
-          cat backend.log
-          exit 1
+        run: bash ./scripts/ci/start-e2e-backend.sh
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
       - name: Install Playwright dependencies
-        run: cd frontend-admin && pnpm install --frozen-lockfile && pnpm exec playwright install chromium
+        run: cd frontend-admin && pnpm exec playwright install chromium
       - name: Run E2E tests
         run: cd frontend-admin && pnpm test:e2e:ui
         env:
@@ -460,6 +348,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Verify CI workflow contract
+        shell: pwsh
+        run: ./scripts/ci/test-workflow-contract.ps1
       - name: Run SQL injection safety scan
         shell: pwsh
         run: ./scripts/check-sql-safety.ps1
