@@ -147,6 +147,12 @@ GitHub Actions 失败分类采用更严格边界：只有 GitHub 服务、网络
 4. `build-summary` 及上述全部 job 均成功后，运行 `scripts/codex-autopilot/verify-pre-pr-ci.ps1` 核对当前功能分支、远端 run、事件、HEAD SHA、tracked 工作区和 job 结论。缺少任一证据时禁止创建/转为非 Draft PR，也禁止输出“可提 PR”“已具备提 PR 条件”等等价结论。
 5. CI 命令、环境或工作流与 PR CI 不等价时不采信。允许使用功能分支 push CI 作为前置证据，但 PR 创建后的首次 CI 仍须独立运行并计入首次通过率。
 
+### 合并后 CI 去重
+
+1. 完整 CI 由非默认功能分支 `push`、面向 `master/main` 的 `pull_request` 或人工 `workflow_dispatch` 触发；受保护默认分支合并后的 `push` 不重复执行完整门禁。
+2. 默认分支 `push` 只运行轻量 post-merge 验证：当前 SHA 必须对应已合并 PR，且该 PR 源 HEAD 的 13 个 pre-PR job 必须全部成功；同时复验 CI workflow 与任务执行策略静态契约。
+3. 无法证明来自合格已合并 PR 的默认分支提交必须 fail-close；按违规直推处理，并通过 `workflow_dispatch` 补跑完整 CI，不得把缺少证据解释为通过。
+
 ## 10. 事件驱动沟通
 
 只在以下事件发送 commentary：

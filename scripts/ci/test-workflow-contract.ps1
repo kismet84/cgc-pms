@@ -32,6 +32,7 @@ function Get-JobBlock([string]$Workflow,[string]$JobName) {
 }
 
 $workflow = Read-RepoText '.github\workflows\ci.yml'
+$postMergeWorkflow = Read-RepoText '.github\workflows\post-merge.yml'
 $jobsMatch = [regex]::Match($workflow,'(?m)^jobs:\r?$')
 if (!$jobsMatch.Success) { throw 'workflow jobs mapping is missing' }
 $jobsText = $workflow.Substring($jobsMatch.Index + $jobsMatch.Length)
@@ -56,7 +57,21 @@ $supplyChain = Get-JobBlock $workflow 'supply-chain-security'
 $e2e = Get-JobBlock $workflow 'e2e'
 $sqlSafety = Get-JobBlock $workflow 'sql-safety-scan'
 
-Assert-Contains $workflow @("branches: ['**']",'pull_request:','branches: [master, main]') 'workflow triggers'
+Assert-Contains $workflow @('branches-ignore: [master, main]','pull_request:','branches: [master, main]','workflow_dispatch:') 'workflow triggers'
+if ($workflow.Contains("branches: ['**']")) { throw 'full CI must not rerun after protected default-branch merges' }
+Assert-Contains $postMergeWorkflow @(
+  'name: Post-merge verification','branches: [master, main]','contents: read','checks: read','pull-requests: read',
+  'post-merge-verification:','./scripts/ci/verify-post-merge-ci.ps1',
+  './scripts/ci/test-workflow-contract.ps1','./scripts/codex-autopilot/test-codex-task-execution-policy.ps1'
+) 'post-merge workflow'
+$postMergeJobsMatch = [regex]::Match($postMergeWorkflow,'(?m)^jobs:\r?$')
+if (!$postMergeJobsMatch.Success) { throw 'post-merge workflow jobs mapping is missing' }
+$postMergeJobsText = $postMergeWorkflow.Substring($postMergeJobsMatch.Index + $postMergeJobsMatch.Length)
+$postMergeJobs = @([regex]::Matches($postMergeJobsText,'(?m)^  ([a-z0-9][a-z0-9-]*):\r?$') | ForEach-Object { $_.Groups[1].Value })
+Assert-SetEqual $postMergeJobs @('post-merge-verification') 'post-merge lightweight jobs'
+$postMergeStepCount = [regex]::Matches($postMergeWorkflow,'(?m)^      - (?:name|uses):').Count
+if ($postMergeStepCount -ne 4) { throw "post-merge workflow must remain lightweight: steps=$postMergeStepCount" }
+if ([regex]::IsMatch($postMergeWorkflow,'(?m)^\s+[a-z-]+: write\s*$')) { throw 'post-merge workflow permissions must remain read-only' }
 if ([regex]::IsMatch($workflow.Substring(0,$jobsMatch.Index),'(?m)^permissions:')) { throw 'workflow added global permissions' }
 if ([regex]::Matches($workflow,'(?m)^    permissions:\r?$').Count -ne 2) { throw 'job-level permissions declaration count changed' }
 if ([regex]::IsMatch($workflow,'(?m)^    name:')) { throw 'job display names must remain implicit job ids for check-context compatibility' }
@@ -132,4 +147,6 @@ foreach ($name in @('check:boundary','check:route-ledger','lint:check','test:uni
   artifactUploads = 9
   artifactDownloads = 3
   permissionBlocks = 2
+  postMergeJobs = $postMergeJobs.Count
+  postMergeSteps = $postMergeStepCount
 } | ConvertTo-Json -Depth 4
