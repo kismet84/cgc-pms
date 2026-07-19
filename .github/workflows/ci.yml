@@ -112,11 +112,12 @@ jobs:
           grants="$(docker exec -e "MYSQL_PWD=${CI_MYSQL_PASSWORD}" "${{ job.services.mysql.id }}" \
             mysql -u"${CI_MYSQL_USER}" -Nse 'SHOW GRANTS FOR CURRENT_USER')"
           printf '%s\n' "$grants"
-          if ! printf '%s\n' "$grants" | grep -Fq "ON \`${CI_MYSQL_DATABASE}\`.*"; then
+          normalized_grants="$(printf '%s\n' "$grants" | tr -d '\\')"
+          if ! printf '%s\n' "$normalized_grants" | grep -Fq "ON \`${CI_MYSQL_DATABASE}\`.*"; then
             echo "MySQL migration user is not scoped to ${CI_MYSQL_DATABASE}.*" >&2
             exit 1
           fi
-          if printf '%s\n' "$grants" | grep -Ev '^GRANT USAGE ON \*\.\*' | grep -Eq ' ON \*\.\* '; then
+          if printf '%s\n' "$normalized_grants" | grep -Ev '^GRANT USAGE ON \*\.\*' | grep -Eq ' ON \*\.\* '; then
             echo 'MySQL migration user has global privileges' >&2
             exit 1
           fi
