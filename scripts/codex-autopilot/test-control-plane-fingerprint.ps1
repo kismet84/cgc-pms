@@ -9,6 +9,8 @@ if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/cod
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/control-plane-policy.md') { throw 'control-plane fingerprint does not cover its behavior policy' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/desktop-execution-policy.md') { throw 'control-plane fingerprint does not cover the desktop execution policy' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'docs/standards/codex-task-execution-policy.md') { throw 'control-plane fingerprint does not cover the shared Codex execution policy' }
+if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains '.github/workflows/ci.yml') { throw 'control-plane fingerprint does not cover the pre-PR equivalent CI workflow' }
+if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/codex-autopilot/verify-pre-pr-ci.ps1') { throw 'control-plane fingerprint does not cover the pre-PR evidence gate' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md') { throw 'control-plane fingerprint does not cover the AutoPilot owner skill' }
 foreach ($skill in @('.agents/skills/cgc-pms-mainline-owner-flow/SKILL.md','.agents/skills/cgc-pms-ci-gate-triage/SKILL.md','.agents/skills/cgc-pms-runtime-refresh/SKILL.md')) {
   if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains $skill) { throw "control-plane fingerprint does not cover project execution skill: $skill" }

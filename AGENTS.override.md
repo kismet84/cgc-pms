@@ -32,6 +32,7 @@ D:\projects-test\cgc-pms
 - 主线程可根据任务独立性、并行收益、冲突风险和上下文传递成本，自主决定是否调用 subagent，无需用户逐次确认；主线程始终负责范围控制、冲突协调、客观复核与最终裁决。
 - 任何代码、配置、文档、Git 或运行环境状态变更前，实际执行者都必须核对 `git branch --show-current` 与 `git status --short`；怀疑并行隔离、分支归属或工作区冲突时再补 `git worktree list`。
 - `autoPush=false` 与 `no push` 禁止自动推送，不代表永久禁止提交或 push；只有用户明确授权且其他适用门禁通过后，才可执行提交或 push。
+- 首次创建非 Draft PR 或把 Draft 转为 Ready 前，必须在同一 HEAD SHA 的功能分支 `push` 事件上完成等价 CI：后端全量测试、测试顺序复验、MySQL 最小权限迁移、前端 lint/test/type-check/build、安全扫描、V2 门禁和 E2E。缺少任一绑定证据时禁止声明“可提 PR”。代码、测试、迁移或基线不同步导致的 CI 失败统一判定为交付门禁遗漏；只有 GitHub 服务、网络或 Runner 基础设施故障可归类为 CI 环境问题。核心指标是 PR 首次 CI 通过率，后续修绿不得追溯改写首次结果。
 - 其他智能体私有目录 `.omc/`、`.omo/`、`.opencode/`、`.claude/`、`.mimocode/`、`graphify-out/`、`.sisyphus/`、`.archive/` 及本地私有封存 `archive/v1.0/private/` 默认禁止读取、递归扫描、审计、清理或总结；即使用户要求查看所有配置文件也默认排除；只有用户明确点名并明确解除禁止后才能读取。
 - `docs/quality/` 仅用于正式质量报告、代码审计报告、验收报告、上线裁决/收口报告；不得存放临时日志、截图、缓存、过程草稿或自动化中间产物。写入 `docs/quality/` 与 `docs/plans/` 同样按授权门和自适应路由执行，主线程始终负责最终结论和验收。
 - 临时产物治理规则：
