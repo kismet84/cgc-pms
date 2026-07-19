@@ -1,0 +1,27 @@
+name: Post-merge verification
+
+on:
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+
+jobs:
+  post-merge-verification:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Verify merged PR CI evidence
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: ./scripts/ci/verify-post-merge-ci.ps1
+      - name: Verify CI workflow contract
+        shell: pwsh
+        run: ./scripts/ci/test-workflow-contract.ps1
+      - name: Verify task execution policy contract
+        shell: pwsh
+        run: ./scripts/codex-autopilot/test-codex-task-execution-policy.ps1
