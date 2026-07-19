@@ -11,6 +11,7 @@ import { useSessionStore } from './stores/session'
 const ForbiddenPage = () => import('./pages/errors/ForbiddenPage.vue')
 const NotFoundPage = () => import('./pages/errors/NotFoundPage.vue')
 const ShellPlaceholderPage = () => import('./pages/shell/ShellPlaceholderPage.vue')
+const DashboardPage = () => import('./pages/dashboard/DashboardPage.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -40,7 +41,7 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
         {
           path: tab.path,
           name: routeName(tab.path),
-          component: ShellPlaceholderPage,
+          component: tab.path === '/dashboard' ? DashboardPage : ShellPlaceholderPage,
           meta: { shell: true, permission: tab.permission },
         },
       ]

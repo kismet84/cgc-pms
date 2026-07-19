@@ -15,7 +15,7 @@
 | 维度 | V2 基线 |
 | --- | --- |
 | 背景 | 冷灰蓝画布 `#f4f7fb`，面板使用真白 `#ffffff` |
-| 文字 | 主文字 `#172033`，强标题 `#121b2e`，次级 `#53627a`，弱说明 `#7a879a` |
+| 文字 | 主文字 `#172033`，强标题 `#121b2e`，次级 `#53627a`，弱说明 `#64748b` |
 | 品牌 | 主蓝 `#2563eb`；focus ring 使用同色透明环 |
 | 语义 | 风险红 `#d71920`、预警橙 `#f97316`、成功绿 `#0f9f6e`、信息青 `#0f9fa8` |
 | 图表序列 | 蓝、青、橙、绿、紫、洋红六色序列；M1 只冻结 token，不实现业务图表 |
@@ -27,6 +27,34 @@
 | 层级 | base、sticky、dropdown、dialog、toast 五级语义层 |
 
 实现入口：`frontend-admin-v2/src/styles/tokens.css`、`components.css`。业务组件只能消费 token，不散落重复核心颜色、阴影或圆角。
+
+### 2.1 颜色语义标准
+
+| 角色 | Token | 使用边界 |
+| --- | --- | --- |
+| 页面与容器 | `canvas`、`surface`、`surface-subtle`、`surface-hover` | 页面背景、卡片、弱分区和悬停；不表达业务状态 |
+| 文字 | `text-strong`、`text`、`text-secondary`、`text-muted`、`text-disabled` | 按信息层级使用；禁用态不得只靠降低透明度 |
+| 品牌与交互 | `primary`、`primary-hover`、`primary-active`、`primary-soft` | 主操作、链接、焦点和常规导航激活态 |
+| 信息 | `info`、`info-text`、`info-soft` | 普通说明、建设/迁移状态，不表示风险 |
+| 成功 | `success`、`success-text`、`success-soft` | 已完成、已通过、运行正常 |
+| 预警 | `warning`、`warning-text`、`warning-soft` | 需要关注但尚未失败的业务风险 |
+| 危险 | `danger`、`danger-text`、`danger-hover`、`danger-soft` | 错误、失败、高风险和破坏性操作 |
+| 工作区标签例外 | `workspace-tab-accent`、`workspace-tab-accent-soft` | 仅用于用户确认的斜切标签激活线与激活态；不得代替危险色，也不得扩散到其他导航 |
+
+同一信息只使用一种状态语义；颜色必须配合文字、图标或状态标签，不能作为唯一识别手段。业务组件禁止直接引用十六进制颜色，也不得借用 `danger` 表示普通选中态。
+
+### 2.2 文字层级标准
+
+| 层级 | 字号 / 字重 / 行高 | 典型用途 |
+| --- | --- | --- |
+| 页面标题 | `21–28` / `bold` / `tight` | 页面唯一 `h1` |
+| 区块标题 | `17` / `semibold` / `tight` | 卡片组、主要区块标题 |
+| 卡片标题 | `15` / `semibold` / `ui` | 卡片、对话框次级标题 |
+| 正文 | `13–14` / `regular` / `body` | 说明、数据正文、长文本 |
+| 控件与标签 | `12–13` / `medium` 或 `semibold` / `ui` | 按钮、Tab、表单标签、状态值 |
+| 辅助文字 | `11–12` / `regular` / `ui` | Eyebrow、时间、提示、元数据 |
+
+页面最多同时呈现三级标题；同一层级不得靠临时颜色或任意加粗制造新层级。正文默认使用 `text` 或 `text-secondary`，辅助文字使用 `text-muted`，禁用内容使用 `text-disabled`。业务数字仅在需要等宽对齐时启用 tabular nums。
 
 ## 3. 本切片组件
 

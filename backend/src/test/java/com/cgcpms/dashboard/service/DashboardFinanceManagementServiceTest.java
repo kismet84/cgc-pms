@@ -93,6 +93,7 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertNotNull(vo.getApprovedUnpaidAmount());
         assertNotNull(vo.getOverRatioAmount());
         assertNotNull(vo.getWarrantyExpiringAmount());
+        assertNotNull(vo.getTrendPoints());
         assertNotNull(vo.getPendingPayments());
     }
 
@@ -107,6 +108,7 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertNull(vo.getProjectId());
         assertEquals("全部项目", vo.getProjectName());
         assertNotNull(vo.getPendingPaymentAmount());
+        assertNotNull(vo.getTrendPoints());
     }
 
     // ========================================================================

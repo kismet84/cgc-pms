@@ -1,11 +1,14 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
+import { buildDashboardReportPeriods } from '@cgc-pms/frontend-contracts'
 import type { LocationQuery, RouteParamsGeneric } from 'vue-router'
+import { loadVisibleProjects } from '@/services/projects'
 import { registerSessionCacheClearer } from '@/stores/session'
 
 export interface ContextOption {
   value: string
   label: string
+  status?: string
 }
 
 export interface ObjectContext {
@@ -29,6 +32,8 @@ export const useWorkspaceStore = defineStore('v2-workspace', () => {
   const requestedProjectId = ref<string | null>(null)
   const requestedReportPeriod = ref<string | null>(null)
   const objectContext = ref<ObjectContext | null>(null)
+  let contextLoadGeneration = 0
+  let contextLoadController: AbortController | null = null
 
   const selectedProjectId = computed(() =>
     projects.value.some((item) => item.value === requestedProjectId.value)
@@ -43,12 +48,22 @@ export const useWorkspaceStore = defineStore('v2-workspace', () => {
 
   function setProjects(options: ContextOption[]): void {
     projects.value = [...options]
-    if (!selectedProjectId.value) requestedProjectId.value = options[0]?.value ?? null
+    if (
+      requestedProjectId.value &&
+      !projects.value.some((item) => item.value === requestedProjectId.value)
+    ) {
+      requestedProjectId.value = null
+    }
   }
 
   function setReportPeriods(options: ContextOption[]): void {
     reportPeriods.value = [...options]
-    if (!selectedReportPeriod.value) requestedReportPeriod.value = options[0]?.value ?? null
+    if (
+      requestedReportPeriod.value &&
+      !reportPeriods.value.some((item) => item.value === requestedReportPeriod.value)
+    ) {
+      requestedReportPeriod.value = null
+    }
   }
 
   function selectProject(value: string): void {
@@ -78,7 +93,41 @@ export const useWorkspaceStore = defineStore('v2-workspace', () => {
     }
   }
 
+  async function initialize(roles: string[], permissions: string[]): Promise<void> {
+    const generation = ++contextLoadGeneration
+    contextLoadController?.abort()
+    setReportPeriods(buildDashboardReportPeriods())
+
+    const canQueryProjects =
+      roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN') ||
+      permissions.includes('*') ||
+      permissions.includes('project:query')
+    if (!canQueryProjects) {
+      setProjects([])
+      return
+    }
+
+    const controller = new AbortController()
+    contextLoadController = controller
+    try {
+      const visibleProjects = await loadVisibleProjects(controller.signal)
+      if (generation !== contextLoadGeneration) return
+      setProjects(
+        visibleProjects.map((project) => ({
+          value: project.id,
+          label: project.projectName,
+          status: project.status,
+        })),
+      )
+    } finally {
+      if (contextLoadController === controller) contextLoadController = null
+    }
+  }
+
   function clear(): void {
+    contextLoadGeneration += 1
+    contextLoadController?.abort()
+    contextLoadController = null
     projects.value = []
     reportPeriods.value = []
     requestedProjectId.value = null
@@ -99,6 +148,7 @@ export const useWorkspaceStore = defineStore('v2-workspace', () => {
     selectProject,
     selectReportPeriod,
     syncRoute,
+    initialize,
     clear,
   }
 })

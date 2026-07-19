@@ -2,6 +2,7 @@
 -- Depends on V216 dictionary normalization. Keeps the package forward-compatible and idempotent.
 SET @demo_user := (SELECT id FROM sys_user WHERE tenant_id=0 AND username='admin' AND deleted_flag=0 LIMIT 1);
 SET @demo_org := (SELECT id FROM org_company WHERE tenant_id=0 AND deleted_flag=0 ORDER BY id LIMIT 1);
+SET @demo_subject := (SELECT id FROM cost_subject WHERE tenant_id=0 AND status='ENABLE' AND deleted_flag=0 ORDER BY sort_order,id LIMIT 1);
 
 INSERT INTO sys_type_registry
   (id,type_domain,type_code,owner_module,contract_version,status,description,created_at,updated_at)
@@ -124,6 +125,24 @@ ON DUPLICATE KEY UPDATE
   actual_start_date=VALUES(actual_start_date),actual_end_date=VALUES(actual_end_date),project_manager_id=VALUES(project_manager_id),
   status=VALUES(status),approval_status=VALUES(approval_status),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),remark=VALUES(remark);
 
+-- M2 dashboard: project-level monthly snapshots drive project and range-sensitive trend charts.
+INSERT INTO cost_summary
+  (id,tenant_id,project_id,summary_date,cost_subject_id,target_cost,contract_locked_cost,actual_cost,paid_amount,estimated_remaining_cost,
+   dynamic_cost,contract_income,confirmed_revenue,expected_profit,cost_deviation,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000009401,0,520000000000009002,'2026-01-31',NULL,3900000,0,0,0,300000,300000,0,0,-300000,-3600000,@demo_user,NOW(),@demo_user,NOW(),0,'M2驾驶舱月度趋势：2026-01'),
+  (520000000000009402,0,520000000000009002,'2026-02-28',NULL,3900000,0,0,0,420000,420000,0,0,-420000,-3480000,@demo_user,NOW(),@demo_user,NOW(),0,'M2驾驶舱月度趋势：2026-02'),
+  (520000000000009403,0,520000000000009002,'2026-03-31',NULL,3900000,0,0,0,510000,510000,0,0,-510000,-3390000,@demo_user,NOW(),@demo_user,NOW(),0,'M2驾驶舱月度趋势：2026-03'),
+  (520000000000009404,0,520000000000009002,'2026-04-30',NULL,3900000,0,0,0,610000,610000,0,0,-610000,-3290000,@demo_user,NOW(),@demo_user,NOW(),0,'M2驾驶舱月度趋势：2026-04'),
+  (520000000000009405,0,520000000000009002,'2026-05-31',NULL,3900000,0,0,0,680000,680000,0,0,-680000,-3220000,@demo_user,NOW(),@demo_user,NOW(),0,'M2驾驶舱月度趋势：2026-05'),
+  (520000000000009406,0,520000000000009002,'2026-06-30',NULL,3900000,0,0,0,740000,740000,0,0,-740000,-3160000,@demo_user,NOW(),@demo_user,NOW(),0,'M2驾驶舱月度趋势：2026-06'),
+  (520000000000009407,0,520000000000009002,'2026-07-18',NULL,3900000,0,0,0,800000,800000,0,0,-800000,-3100000,@demo_user,NOW(),@demo_user,NOW(),0,'M2驾驶舱月度趋势：2026-07')
+ON DUPLICATE KEY UPDATE
+  summary_date=VALUES(summary_date),target_cost=VALUES(target_cost),contract_locked_cost=VALUES(contract_locked_cost),actual_cost=VALUES(actual_cost),paid_amount=VALUES(paid_amount),
+  estimated_remaining_cost=VALUES(estimated_remaining_cost),dynamic_cost=VALUES(dynamic_cost),contract_income=VALUES(contract_income),
+  confirmed_revenue=VALUES(confirmed_revenue),expected_profit=VALUES(expected_profit),cost_deviation=VALUES(cost_deviation),
+  updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=VALUES(deleted_flag),remark=VALUES(remark);
+
 -- DQ-006: all contracts use canonical dictionary codes and valid party relationships.
 UPDATE ct_contract SET contract_type='MAIN',contract_status='SETTLED',party_a_id=520000000000000101,party_b_id=520000000000009101,
   updated_by=@demo_user,updated_at=NOW() WHERE tenant_id=0 AND id=520000000000000701 AND deleted_flag=0;
@@ -149,6 +168,74 @@ ON DUPLICATE KEY UPDATE
   signed_date=VALUES(signed_date),start_date=VALUES(start_date),end_date=VALUES(end_date),contract_status=VALUES(contract_status),
   approval_status=VALUES(approval_status),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),remark=VALUES(remark),
   settlement_amount=VALUES(settlement_amount),version=VALUES(version);
+
+-- DQ-008/M2: active finance demo includes budget, paid flow, approved-unpaid and processing payment facts.
+INSERT INTO project_budget
+  (id,tenant_id,project_id,version_no,budget_name,total_amount,approval_status,status,active_flag,active_token,effective_at,version,
+   created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000009410,0,520000000000009002,'V1','劳务分包在建演示项目预算 V1',3900000,'APPROVED','ACTIVE',1,520000000000009002,
+   '2026-01-01 00:00:00',0,@demo_user,NOW(),@demo_user,NOW(),0,'M2财务驾驶舱预算闭环样本')
+ON DUPLICATE KEY UPDATE
+  budget_name=VALUES(budget_name),total_amount=VALUES(total_amount),approval_status=VALUES(approval_status),status=VALUES(status),
+  active_flag=VALUES(active_flag),active_token=VALUES(active_token),effective_at=VALUES(effective_at),updated_by=VALUES(updated_by),
+  updated_at=VALUES(updated_at),deleted_flag=VALUES(deleted_flag),remark=VALUES(remark);
+
+INSERT INTO project_budget_line
+  (id,tenant_id,budget_id,project_id,cost_subject_id,budget_amount,reserved_amount,consumed_amount,version,
+   created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000009411,0,520000000000009410,520000000000009002,@demo_subject,3900000,120000,800000,0,
+   @demo_user,NOW(),@demo_user,NOW(),0,'M2财务驾驶舱预算消耗样本')
+ON DUPLICATE KEY UPDATE
+  budget_amount=VALUES(budget_amount),reserved_amount=VALUES(reserved_amount),consumed_amount=VALUES(consumed_amount),
+  updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=VALUES(deleted_flag),remark=VALUES(remark);
+
+INSERT INTO pay_application
+  (id,tenant_id,project_id,contract_id,partner_id,apply_code,apply_amount,approved_amount,actual_pay_amount,pay_type,pay_status,
+   approval_status,apply_reason,cost_subject_id,budget_line_id,expense_category,version,integrity_version,
+   created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000009412,0,520000000000009002,520000000000009202,520000000000009101,'M52-ACTIVE-PAY-001',120000,120000,120000,
+   'PROGRESS','PAID','APPROVED','一月项目管理服务付款',@demo_subject,520000000000009411,'SITE_MANAGEMENT',0,'PAYMENT_INTEGRITY_V1',
+   @demo_user,'2026-01-20 09:00:00',@demo_user,NOW(),0,'M2财务驾驶舱已付款样本'),
+  (520000000000009413,0,520000000000009002,520000000000009202,520000000000009101,'M52-ACTIVE-PAY-002',180000,180000,180000,
+   'PROGRESS','PAID','APPROVED','四月项目管理服务付款',@demo_subject,520000000000009411,'SITE_MANAGEMENT',0,'PAYMENT_INTEGRITY_V1',
+   @demo_user,'2026-04-18 09:00:00',@demo_user,NOW(),0,'M2财务驾驶舱已付款样本'),
+  (520000000000009414,0,520000000000009002,520000000000009202,520000000000009101,'M52-ACTIVE-PAY-003',160000,160000,40000,
+   'PROGRESS','PARTIAL','APPROVED','七月项目管理服务分期付款',@demo_subject,520000000000009411,'SITE_MANAGEMENT',0,'PAYMENT_INTEGRITY_V1',
+   @demo_user,'2026-07-10 09:00:00',@demo_user,NOW(),0,'M2财务驾驶舱已批未付样本'),
+  (520000000000009415,0,520000000000009002,520000000000009202,520000000000009101,'M52-ACTIVE-PAY-004',90000,0,0,
+   'PROGRESS','PENDING','APPROVING','七月项目管理服务付款申请',@demo_subject,520000000000009411,'SITE_MANAGEMENT',0,'PAYMENT_INTEGRITY_V1',
+   @demo_user,'2026-07-16 09:00:00',@demo_user,NOW(),0,'M2财务驾驶舱审批中付款样本')
+ON DUPLICATE KEY UPDATE
+  project_id=VALUES(project_id),contract_id=VALUES(contract_id),partner_id=VALUES(partner_id),apply_amount=VALUES(apply_amount),
+  approved_amount=VALUES(approved_amount),actual_pay_amount=VALUES(actual_pay_amount),pay_type=VALUES(pay_type),pay_status=VALUES(pay_status),
+  approval_status=VALUES(approval_status),apply_reason=VALUES(apply_reason),cost_subject_id=VALUES(cost_subject_id),budget_line_id=VALUES(budget_line_id),
+  expense_category=VALUES(expense_category),integrity_version=VALUES(integrity_version),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),
+  deleted_flag=VALUES(deleted_flag),remark=VALUES(remark);
+
+INSERT INTO pay_record
+  (id,tenant_id,project_id,pay_application_id,contract_id,partner_id,pay_amount,pay_date,pay_method,voucher_no,pay_status,
+   external_txn_no,fund_account_id,paid_at,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000009421,0,520000000000009002,520000000000009412,520000000000009202,520000000000009101,120000,
+   '2026-01-22','BANK','M52-ACTIVE-VOUCHER-001','SUCCESS','M52-ACTIVE-TXN-001',520000000000002301,'2026-01-22 10:00:00',0,
+   @demo_user,'2026-01-22 10:00:00',@demo_user,NOW(),0,'M2财务驾驶舱一月付款流水'),
+  (520000000000009422,0,520000000000009002,520000000000009413,520000000000009202,520000000000009101,180000,
+   '2026-04-20','BANK','M52-ACTIVE-VOUCHER-002','SUCCESS','M52-ACTIVE-TXN-002',520000000000002301,'2026-04-20 10:00:00',0,
+   @demo_user,'2026-04-20 10:00:00',@demo_user,NOW(),0,'M2财务驾驶舱四月付款流水'),
+  (520000000000009423,0,520000000000009002,520000000000009414,520000000000009202,520000000000009101,40000,
+   '2026-07-12','BANK','M52-ACTIVE-VOUCHER-003','SUCCESS','M52-ACTIVE-TXN-003',520000000000002301,'2026-07-12 10:00:00',0,
+   @demo_user,'2026-07-12 10:00:00',@demo_user,NOW(),0,'M2财务驾驶舱七月已付款流水'),
+  (520000000000009424,0,520000000000009002,520000000000009414,520000000000009202,520000000000009101,120000,
+   '2026-07-18','BANK',NULL,'PROCESSING','M52-ACTIVE-TXN-004',520000000000002301,NULL,0,
+   @demo_user,'2026-07-18 10:00:00',@demo_user,NOW(),0,'M2财务驾驶舱处理中付款流水')
+ON DUPLICATE KEY UPDATE
+  project_id=VALUES(project_id),pay_application_id=VALUES(pay_application_id),contract_id=VALUES(contract_id),partner_id=VALUES(partner_id),
+  pay_amount=VALUES(pay_amount),pay_date=VALUES(pay_date),pay_method=VALUES(pay_method),voucher_no=VALUES(voucher_no),pay_status=VALUES(pay_status),
+  fund_account_id=VALUES(fund_account_id),paid_at=VALUES(paid_at),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),
+  deleted_flag=VALUES(deleted_flag),remark=VALUES(remark);
 
 -- DQ-009: normalize existing workflow values to current WorkflowConstants.
 UPDATE wf_instance SET instance_status='APPROVED',updated_by=@demo_user,updated_at=NOW()

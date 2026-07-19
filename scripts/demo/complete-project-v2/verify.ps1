@@ -89,6 +89,27 @@ UNION ALL SELECT 'material_return_reversal',COUNT(*) FROM mat_material_return WH
 UNION ALL SELECT 'document_template',COUNT(*) FROM biz_document_template WHERE tenant_id=0 AND template_code='M52-PAYMENT-PDF' AND enabled=1 AND deleted_flag=0
 UNION ALL SELECT 'document_generation',COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND generation_no LIKE 'M52-DOC-%' AND deleted_flag=0
 UNION ALL SELECT 'demo_user',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username='demo.manager' AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'role_test_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'dashboard_trend_month',COUNT(DISTINCT DATE_FORMAT(summary_date,'%Y-%m')) FROM cost_summary WHERE tenant_id=0 AND project_id=520000000000009002 AND cost_subject_id IS NULL AND deleted_flag=0
+UNION ALL SELECT 'finance_demo_budget',COUNT(*) FROM project_budget WHERE tenant_id=0 AND project_id=520000000000009002 AND status='ACTIVE' AND active_flag=1 AND deleted_flag=0
+UNION ALL SELECT 'finance_demo_pay_application',COUNT(*) FROM pay_application WHERE tenant_id=0 AND id BETWEEN 520000000000009412 AND 520000000000009415 AND deleted_flag=0
+UNION ALL SELECT 'finance_demo_pay_record',COUNT(*) FROM pay_record WHERE tenant_id=0 AND id BETWEEN 520000000000009421 AND 520000000000009424 AND deleted_flag=0
+UNION ALL SELECT 'finance_demo_paid',COALESCE(SUM(pay_amount),0) FROM pay_record WHERE tenant_id=0 AND id BETWEEN 520000000000009421 AND 520000000000009424 AND pay_status='SUCCESS' AND deleted_flag=0
+UNION ALL SELECT 'finance_demo_processing',COALESCE(SUM(pay_amount),0) FROM pay_record WHERE tenant_id=0 AND id BETWEEN 520000000000009421 AND 520000000000009424 AND pay_status='PROCESSING' AND deleted_flag=0
+UNION ALL SELECT 'role_test_scope',COUNT(DISTINCT u.username) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id
+  JOIN sys_role_menu rm ON rm.tenant_id=r.tenant_id AND rm.role_id=r.id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.deleted_flag=0 AND (
+    (u.username='admin' AND r.role_code='SUPER_ADMIN' AND m.perms='dashboard:management:view') OR
+    (u.username='demo.manager' AND m.perms='dashboard:project-manager:view') OR
+    (u.username='demo.business' AND m.perms='dashboard:business-manager:view') OR
+    (u.username='demo.cost' AND m.perms='dashboard:cost-manager:view') OR
+    (u.username='demo.purchase' AND m.perms='dashboard:purchase-manager:view') OR
+    (u.username='demo.production' AND m.perms='dashboard:production-manager:view') OR
+    (u.username='demo.chief' AND m.perms='dashboard:chief-engineer:view') OR
+    (u.username='demo.finance' AND m.perms='dashboard:finance:view'))
 UNION ALL SELECT 'requested_qty',COALESCE(SUM(quantity),0) FROM mat_purchase_request_item WHERE request_id=520000000000001101 AND deleted_flag=0
 UNION ALL SELECT 'ordered_qty',COALESCE(SUM(quantity),0) FROM mat_purchase_order_item WHERE order_id=520000000000001201 AND deleted_flag=0
 UNION ALL SELECT 'received_qty',COALESCE(SUM(qualified_quantity),0) FROM mat_receipt_item WHERE receipt_id=520000000000001301 AND deleted_flag=0
@@ -262,8 +283,11 @@ $oneKeys = @('project','material','bid_transfer','target','purchase_request','pu
     'cost_forecast','cost_corrective_action','finance_reconciliation_run','finance_import_batch','inventory_exception',
     'material_return_reversal','document_template','demo_user')
 $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $invalidCreditPartners.Count -eq 0 `
-    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 14 `
-    -and $metrics.document_generation -eq 2
+    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 15 `
+    -and $metrics.role_test_account -eq 8 -and $metrics.dashboard_trend_month -eq 7 -and $metrics.role_test_scope -eq 8 `
+    -and $metrics.document_generation -eq 2 -and $metrics.finance_demo_budget -eq 1 `
+    -and $metrics.finance_demo_pay_application -eq 4 -and $metrics.finance_demo_pay_record -eq 4 `
+    -and $metrics.finance_demo_paid -eq 340000 -and $metrics.finance_demo_processing -eq 120000
 foreach ($key in $oneKeys) { $passed = $passed -and $metrics[$key] -eq 1 }
 $passed = $passed -and $metrics.requested_qty -eq 100 -and $metrics.ordered_qty -eq 100 `
     -and $metrics.received_qty -eq 100 -and $metrics.issued_qty -eq 20 -and $metrics.stock_qty -eq 80 `

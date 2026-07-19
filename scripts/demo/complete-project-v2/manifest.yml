@@ -47,5 +47,8 @@ stages:
   - id: data-quality-normalization
     source: sql/140-data-quality-normalization.sql
     scope: [partner-completeness, project-dictionary-coverage, contract-dictionary-coverage, workflow-state-coverage, quality-contract-trace]
+  - id: role-test-accounts
+    source: sql/150-role-test-accounts.sql
+    scope: [dev-login-users, dashboard-role-permissions]
 checkpoint-prefix: DEMO_CGC_V2_
 cleanup-policy: rebuild-local-demo-database

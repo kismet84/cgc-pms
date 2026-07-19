@@ -1,9 +1,15 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { loadVisibleProjects } from '@/services/projects'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 
+vi.mock('@/services/projects', () => ({ loadVisibleProjects: vi.fn() }))
+
+const loadVisibleProjectsMock = vi.mocked(loadVisibleProjects)
+
 beforeEach(() => {
+  vi.resetAllMocks()
   setActivePinia(createPinia())
 })
 
@@ -47,5 +53,44 @@ describe('V2 workspace context store', () => {
     expect(workspace.projects).toEqual([])
     expect(workspace.reportPeriods).toEqual([])
     expect(workspace.objectContext).toBeNull()
+  })
+
+  it('loads only permitted projects and ignores a stale context response', async () => {
+    let resolveFirst: ((value: Awaited<ReturnType<typeof loadVisibleProjects>>) => void) | undefined
+    loadVisibleProjectsMock
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve
+          }),
+      )
+      .mockResolvedValueOnce([
+        { id: 'P-1', projectCode: 'P1', projectName: '项目一', status: 'DRAFT' },
+        { id: 'P-2', projectCode: 'P2', projectName: '项目二', status: 'ACTIVE' },
+      ])
+    const workspace = useWorkspaceStore()
+
+    const stale = workspace.initialize(['ADMIN'], [])
+    await workspace.initialize(['ADMIN'], [])
+    resolveFirst?.([{ id: 'P-1', projectCode: 'P1', projectName: '项目一', status: 'ACTIVE' }])
+    await stale
+
+    expect(workspace.projects).toEqual([
+      { value: 'P-1', label: '项目一', status: 'DRAFT' },
+      { value: 'P-2', label: '项目二', status: 'ACTIVE' },
+    ])
+    expect(workspace.selectedProjectId).toBeNull()
+    expect(workspace.selectedReportPeriod).toBeNull()
+    expect(workspace.reportPeriods).toHaveLength(12)
+  })
+
+  it('does not request projects without project query access', async () => {
+    const workspace = useWorkspaceStore()
+
+    await workspace.initialize(['USER'], ['dashboard:finance:view'])
+
+    expect(loadVisibleProjectsMock).not.toHaveBeenCalled()
+    expect(workspace.projects).toEqual([])
+    expect(workspace.reportPeriods).toHaveLength(12)
   })
 })

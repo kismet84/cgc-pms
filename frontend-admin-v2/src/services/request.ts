@@ -91,6 +91,7 @@ export async function apiRequest<T, TBody = unknown>(
   try {
     return await sendRequest<T, TBody>(path, options, false)
   } catch (error) {
+    if (options.signal?.aborted) throw error
     const normalized = normalizeError(error)
     if (options.notifyError !== false && !(normalized instanceof SessionExpiredError)) {
       notifyErrorOnce(normalized)

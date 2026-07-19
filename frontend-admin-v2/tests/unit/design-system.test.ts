@@ -78,6 +78,23 @@ describe('Clean-room V2 design system', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([['2026-07']])
   })
 
+  it('supports a selectable empty option without duplicating the placeholder', async () => {
+    const wrapper = mount(V2Select, {
+      props: {
+        label: '当前项目',
+        modelValue: '',
+        allowEmpty: true,
+        options: [
+          { value: '', label: '全部项目' },
+          { value: '1', label: '项目一' },
+        ],
+      },
+    })
+
+    expect(wrapper.findAll('option')).toHaveLength(2)
+    expect(wrapper.get('select').element.selectedOptions[0]?.textContent).toBe('全部项目')
+  })
+
   it('covers card, badge, alert and skeleton status primitives', async () => {
     const card = mount(V2Card, {
       props: { title: '经营健康度', subtitle: '当前报告期', interactive: true },
@@ -154,6 +171,7 @@ describe('Clean-room V2 design system', () => {
     for (const token of [
       '--v2-color-primary',
       '--v2-color-danger',
+      '--v2-color-workspace-tab-accent',
       '--v2-chart-1',
       '--v2-font-sans',
       '--v2-space-4',
@@ -167,5 +185,17 @@ describe('Clean-room V2 design system', () => {
 
     expect(componentCss).not.toMatch(/#[0-9a-f]{3,8}\b/i)
     expect(componentFiles).not.toMatch(/#[0-9a-f]{3,8}\b/i)
+  })
+
+  it('keeps navigation accents separate from risk colors', () => {
+    const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
+    const placeholder = readFileSync(
+      resolve(sourceRoot, 'pages/shell/ShellPlaceholderPage.vue'),
+      'utf-8',
+    )
+
+    expect(appShell).toContain('var(--v2-color-workspace-tab-accent)')
+    expect(placeholder).toContain('title="业务页面建设中" tone="info"')
+    expect(placeholder).not.toContain('tone="warning"')
   })
 })

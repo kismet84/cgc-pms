@@ -5,7 +5,9 @@ const runLiveShell = process.env.V2_LIVE_SHELL === '1'
 test.describe('V2 live application shell', () => {
   test.skip(!runLiveShell, 'Set V2_LIVE_SHELL=1 only against the local test/demo runtime')
 
-  test('keeps the admin shell responsive without loading business data', async ({ page }) => {
+  test('keeps the admin dashboard responsive with selected-role business data', async ({
+    page,
+  }) => {
     const visualOutput = process.env.V2_VISUAL_OUTPUT
     const runtimeErrors: string[] = []
     const businessRequests: string[] = []
@@ -32,9 +34,9 @@ test.describe('V2 live application shell', () => {
       { name: 'mobile', width: 390, height: 844 },
     ]) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
-      await page.goto('/v2/dashboard')
-      await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
-      await expect(page.getByText('业务页面尚未迁移')).toBeVisible()
+      await page.goto('/v2/dashboard?role=mgmt')
+      await expect(page.getByRole('heading', { level: 1, name: '经营全景' })).toBeVisible()
+      await expect(page.getByText('经营健康为辅助判断')).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)
@@ -46,19 +48,27 @@ test.describe('V2 live application shell', () => {
           'matrix(1, 0, 0, 1, 0, 0)',
         )
         await expect(page.locator('[data-domain="workbench"]')).toBeVisible()
+        await page.getByRole('button', { name: '关闭导航' }).last().click()
+        await expect(page.locator('.app-shell__sidebar')).toHaveCSS(
+          'transform',
+          'matrix(1, 0, 0, 1, -304, 0)',
+        )
       } else if (viewport.name === 'compact') {
-        await expect(page.locator('.app-shell__workspaces').first()).toBeHidden()
+        await expect(
+          page.locator('.app-shell__domain--active .app-shell__workspaces'),
+        ).toBeVisible()
       }
 
       if (visualOutput) {
         await page.screenshot({
           path: `${visualOutput}/shell-${viewport.name}.png`,
-          fullPage: true,
+          fullPage: viewport.name !== 'mobile',
         })
       }
     }
 
-    expect(businessRequests).toEqual([])
+    expect(businessRequests).toContain('/api/projects')
+    expect(businessRequests).toContain('/api/dashboard/management')
     expect(
       runtimeErrors.filter(
         (message) =>
