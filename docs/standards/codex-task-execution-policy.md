@@ -14,6 +14,7 @@
 4. 验证按风险分层，允许复用仍绑定当前代码、环境和命令的证据，不以降噪替代验证。
 5. commentary 只在有信息增益的事件发生时播报，最终答复必须自包含。
 6. 中断恢复以任务胶囊、Git 事实和绑定证据为准，不凭会话记忆重做已完成工作。
+7. 交付质量以前置门禁和 PR 首次 CI 通过率衡量，不以创建 PR 后反复修绿替代交付前验证。
 
 ## 2. 状态机与粘性模式
 
@@ -87,6 +88,8 @@
 
 面向用户按“分类 + 影响 + 已采取动作 + 结果”汇总；重复的同类错误细节不逐条转播。
 
+GitHub Actions 失败分类采用更严格边界：只有 GitHub 服务、网络或 Runner 基础设施故障可归为 CI `environment_prerequisite`。代码、测试、迁移或基线不同步导致的失败必须归为 `quality_or_security`，同时标记 `DELIVERY_GATE_OMISSION`；workflow、参数、凭据或工具版本问题仍分别归入 `tool_config` / `tool_invocation`，不得改称环境问题。workflow 内的 Docker、service container、数据库、端口或测试数据配置失败也不得自动视为外部环境故障。
+
 ## 6. 浏览器执行模板
 
 1. 每个线程首次使用浏览器时只做一次能力与页面状态初始化，不猜测 API 名称或参数。
@@ -104,29 +107,46 @@
 | L1 目标验证 | 每次具体修改后 | 目标测试或静态核对、变更文件空白检查 |
 | L2 模块回归 | 跨文件或关键边界修改后 | 相关模块测试、类型检查或构建 |
 | L3 批次验收 | 一组紧密相关修改完成后 | 复用有效 L1/L2，仅补裁决必需项 |
-| L4 发布验证 | 提交后推送、PR 或合并前 | 适用 CI、权限/数据边界和发布门禁 |
+| L4 发布验证 | 提交后推送、首次非 Draft PR 或合并前 | 同 HEAD SHA 等价 CI、权限/数据边界和发布门禁 |
 
 证据只有在代码/diff、命令、测试选择器、环境、配置和适用的上下文身份均未发生影响结果的变化时才可复用。AutoPilot 使用既有 Context Base/Delta 与 Evidence v2 绑定，不为普通任务另建缓存或第二套状态系统；静态廉价检查及专项策略要求重跑的集成/浏览器证据不得错误复用。
 
 ## 8. CI 轮询与重试
 
-1. 首次红灯先分类，疑似瞬时或环境前置问题只允许一次最小等价复验。
+1. 首次红灯先分类；只有 GitHub 服务、网络或 Runner 基础设施故障允许按 CI 环境问题做一次最小等价复验。
 2. 轮询使用退避节奏；状态未变化时不重复 commentary。
 3. 只在状态变化、超过预期、出现确定失败或需要用户决策时更新。
 4. 本地与远端结果不一致时，以当前提交绑定的真实 checks、workflow 和分支保护为裁决依据。
 5. 未完成分类前，不得把 CI 红灯定性为业务代码失败。
+6. 代码、测试、迁移或基线不同步造成的 CI 红灯是交付门禁遗漏；创建 PR 后修绿不改变该次首次 CI 失败记录。
 
 ## 9. Git 生命周期
 
 ```text
 授权功能分支 -> 实施/验证 -> 本地提交 -> 推送功能分支
-             -> PR/CI/审查 -> 授权合并 -> 预览并清理已合并分支
+             -> 同 HEAD SHA 等价 CI -> 首次非 Draft PR/CI/审查
+             -> 授权合并 -> 预览并清理已合并分支
 ```
 
 - 任何文件或 Git 状态变化前核对当前分支与 `git status --short`；怀疑隔离冲突时再查 worktree。
 - 禁止直接向 `master` 推送。创建/切换分支、提交、推送、PR、合并和清理分别按授权与门禁执行。
 - 未获得提交授权时停在已验证 diff；未获得推送/合并授权时停在对应前一状态。
 - 清理前必须预览并确认已合并、无未推送提交、无活动 worktree 占用；禁止盲删。
+
+### 首次非 Draft PR 前置门禁
+
+1. “首次非 Draft PR”同时包括直接创建非 Draft PR，以及把既有 Draft 转为 Ready for review；Draft 可提前用于协作，但不得据此声明“可提 PR”。
+2. 功能分支最终提交必须先 push，并在 `event=push`、`headSha=git rev-parse HEAD` 的同一 HEAD SHA 上取得完整成功的 CI。任何后续提交立即使旧证据失效。
+3. 必跑且必须逐项有成功证据：
+   - 后端全量测试：`backend-test` 的 `./mvnw -C verify`。
+   - 测试顺序复验：`backend-test` 的 `./mvnw -C -Ptest-order-independence test`。
+   - MySQL 最小权限迁移：`backend-test-mysql` 使用非 root、仅目标库授权用户完成 Flyway 与 baseline smoke。
+   - 前端：`frontend-lint`、`frontend-test`、`type-check`、`frontend-build`。
+   - 安全扫描：`backend-dependency-scan`、`frontend-dependency-audit`、`sql-safety-scan`、`supply-chain-security`。
+   - V2 门禁：`frontend-v2-gate`。
+   - 端到端：`e2e`。
+4. `build-summary` 及上述全部 job 均成功后，运行 `scripts/codex-autopilot/verify-pre-pr-ci.ps1` 核对当前功能分支、远端 run、事件、HEAD SHA、tracked 工作区和 job 结论。缺少任一证据时禁止创建/转为非 Draft PR，也禁止输出“可提 PR”“已具备提 PR 条件”等等价结论。
+5. CI 命令、环境或工作流与 PR CI 不等价时不采信。允许使用功能分支 push CI 作为前置证据，但 PR 创建后的首次 CI 仍须独立运行并计入首次通过率。
 
 ## 10. 事件驱动沟通
 
@@ -162,7 +182,9 @@
 
 ## 12. 收口与度量
 
-最终回报至少包含：正式交付物、验收证据、临时产物、Git 状态、结论、阻塞、剩余风险、新增后续项、关闭后续项和后续项净变化。
+最终回报至少包含：正式交付物、验收证据、临时产物、Git 状态、结论、阻塞、剩余风险、新增后续项、关闭后续项和后续项净变化。涉及 PR 时另列首次非 Draft PR 的 HEAD SHA、前置证据完整性、首次 PR CI 结论及失败分类。
+
+`PR 首次 CI 通过率 = 首次非 Draft PR 创建后、首次 PR CI 即全部必需 job 通过的 PR 数 / 首次非 Draft PR 总数`。同一 PR 后续重跑或补修转绿只影响最终合并门禁，不追溯改写首次 CI 指标。指标按 PR 计数，不按 job 或重跑次数计数。
 
 效率度量只保留正式汇总：工具调用分类、原样重试、浏览器调用错误、过程播报数、中断返工、控制面耗时、证据复用和后续项净变化。原始会话日志、run id、截图名和临时路径不得写入长期规则或正式报告。
 

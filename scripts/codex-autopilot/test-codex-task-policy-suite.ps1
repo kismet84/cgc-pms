@@ -9,6 +9,7 @@ $tests = @(
   'test-codex-task-efficiency.ps1',
   'test-codex-task-execution-policy.ps1',
   'test-codex-task-git-lifecycle.ps1',
+  'test-pre-pr-ci-gate.ps1',
   'test-tool-routing.ps1',
   'test-control-plane-fingerprint.ps1'
 )

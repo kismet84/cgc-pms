@@ -6,11 +6,21 @@
 
 ## 验证
 
-- [ ] 已执行与 CI 一致的后端 `mvnw -C verify`（涉及后端时）
-- [ ] 已执行 `mvnw -C -Ptest-order-independence test`（涉及数据库集成测试时）
+- 首次非 Draft PR HEAD SHA：
+- 同 SHA、`push` 事件、成功 CI URL：
+
+- [ ] 已运行 `scripts/codex-autopilot/verify-pre-pr-ci.ps1`，输出 `status=PASS`
+- [ ] 后端全量测试 `mvnw -C verify` 通过
+- [ ] 后端测试顺序复验 `mvnw -C -Ptest-order-independence test` 通过
+- [ ] MySQL 非 root、库级最小权限迁移与基线 smoke 通过
+- [ ] 前端 lint、test、type-check、build 通过
+- [ ] 后端依赖、前端依赖、SQL 与制品供应链安全扫描通过
+- [ ] V2 门禁通过
+- [ ] E2E 通过
 - [ ] 新增测试使用独立 ID/编码/单号，未修改共享演示数据或 `sys_user.id = 1`
 - [ ] 测试在前后置阶段按外键反向顺序物理清理本类数据
-- [ ] 已执行前端 lint、类型检查、单元测试和构建（涉及前端时）
+
+缺少任一同 SHA 证据时，只能保持 Draft，不得声明“可提 PR”或转为 Ready for review。
 
 ## 业务闭环影响
 

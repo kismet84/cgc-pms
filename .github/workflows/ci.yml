@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master, main]
+    branches: ['**']
   pull_request:
     branches: [master, main]
 
@@ -105,7 +105,22 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
-      - name: Run MySQL Flyway smoke test
+      - name: Verify MySQL migration user scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          grants="$(docker exec -e "MYSQL_PWD=${CI_MYSQL_PASSWORD}" "${{ job.services.mysql.id }}" \
+            mysql -u"${CI_MYSQL_USER}" -Nse 'SHOW GRANTS FOR CURRENT_USER')"
+          printf '%s\n' "$grants"
+          if ! printf '%s\n' "$grants" | grep -Fq "ON \`${CI_MYSQL_DATABASE}\`.*"; then
+            echo "MySQL migration user is not scoped to ${CI_MYSQL_DATABASE}.*" >&2
+            exit 1
+          fi
+          if printf '%s\n' "$grants" | grep -Ev '^GRANT USAGE ON \*\.\*' | grep -Eq ' ON \*\.\* '; then
+            echo 'MySQL migration user has global privileges' >&2
+            exit 1
+          fi
+      - name: Run MySQL least-privilege Flyway migration smoke test
         run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest test -Dspring.profiles.active=test
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
