@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.cashbook.service.CashJournalService;
 import com.cgcpms.cashbook.entity.FundAccount;
 import com.cgcpms.cashbook.mapper.FundAccountMapper;
@@ -51,6 +52,7 @@ public class PayRecordService {
     private final PmProjectMapper projectMapper;
     private final PaymentApplicationSourceService sourceService;
     private final EntryGenerator entryGenerator;
+    private final CodeGenerationService codeGenerationService;
 
     // ---- Query ----
 
@@ -137,6 +139,9 @@ public class PayRecordService {
         record.setContractId(app.getContractId());
         record.setPartnerId(app.getPartnerId());
         record.setProjectId(app.getProjectId());
+        record.setRecordCode(codeGenerationService.nextCode(
+                payRecordMapper, PayRecord::getRecordCode, "PMT-",
+                UserContext.getCurrentTenantId(), true));
         record.setPayAmount(input.getPayAmount() != null ? input.getPayAmount() : BigDecimal.ZERO);
         record.setPaidAt(input.getPaidAt());
         record.setPayDate(input.getPaidAt().toLocalDate());
@@ -270,6 +275,7 @@ public class PayRecordService {
         vo.setPayApplicationId(record.getPayApplicationId() != null ? record.getPayApplicationId().toString() : null);
         vo.setContractId(record.getContractId() != null ? record.getContractId().toString() : null);
         vo.setPartnerId(record.getPartnerId() != null ? record.getPartnerId().toString() : null);
+        vo.setRecordCode(record.getRecordCode());
         vo.setPayAmount(record.getPayAmount() != null ? record.getPayAmount().toPlainString() : null);
         vo.setPayDate(record.getPayDate() != null ? record.getPayDate().toString() : null);
         vo.setPaidAt(record.getPaidAt() != null ? record.getPaidAt().format(DateTimeUtils.DTF) : null);

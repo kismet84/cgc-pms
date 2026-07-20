@@ -18,7 +18,7 @@ class BaselineMySqlUpgradeTest {
     private static final String ACTIVE = "classpath:db/migration";
 
     @Test
-    void existingV180MySqlIgnoresBaselineAndUpgradesToV215() {
+    void existingV180MySqlIgnoresBaselineAndUpgradesToLatestVersion() {
         String url = required("SPRING_DATASOURCE_URL");
         String username = required("SPRING_DATASOURCE_USERNAME");
         String password = required("SPRING_DATASOURCE_PASSWORD");
@@ -37,7 +37,7 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("215", current.info().current().getVersion().getVersion());
+        assertEquals("218", current.info().current().getVersion().getVersion());
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
         assertFalse(Arrays.stream(current.info().applied())

@@ -8,16 +8,19 @@ import type {
   SubjectBreakdown,
 } from '@cgc-pms/frontend-contracts'
 import { resolveDashboardRoles } from '@cgc-pms/frontend-contracts'
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { V2Alert, V2Badge, V2Button, V2Card, V2PageState } from '@/components'
+import { V2Alert, V2Button, V2Card, V2PageState } from '@/components'
 import DomainNavigationIcon from '@/components/DomainNavigationIcon.vue'
 import { loadCostBreakdown, loadDashboard } from '@/services/dashboard'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import {
   DASHBOARD_ROLE_LABELS,
+  DASHBOARD_RISK_LABELS,
+  type DashboardRiskLevel,
   compactDashboardValue,
+  dashboardActivityItems,
   dashboardHealth,
   dashboardMetrics,
   formatAmount,
@@ -45,8 +48,13 @@ const breakdown = ref<CostBreakdownVO | null>(null)
 const breakdownLoading = ref(false)
 const breakdownError = ref(false)
 const expandedSubjects = ref(new Set<string>())
+const expandedFinanceContracts = ref(new Set<string>())
 const trendRange = ref<'year' | 'half' | 'quarter'>('year')
-const riskFilter = ref<'all' | 'attention' | 'risk'>('all')
+const riskFilter = ref<'all' | DashboardRiskLevel>('all')
+const riskFilterMenu = ref<HTMLDetailsElement>()
+const riskFilterLabel = computed(
+  () => ({ all: '全部预警', ...DASHBOARD_RISK_LABELS })[riskFilter.value],
+)
 const refreshToken = ref(0)
 let generation = 0
 let controller: AbortController | null = null
@@ -69,6 +77,9 @@ const displayMetrics = computed(() =>
 const health = computed(() => (data.value ? dashboardHealth(selectedRole.value, data.value) : null))
 const risks = computed(() =>
   data.value ? primaryRiskItems(selectedRole.value, data.value).slice(0, 6) : [],
+)
+const activityItems = computed(() =>
+  data.value ? dashboardActivityItems(selectedRole.value, data.value).slice(0, 6) : [],
 )
 const costData = computed(() =>
   selectedRole.value === 'cost' && data.value ? (data.value as CostManagerDashboardVO) : null,
@@ -143,10 +154,12 @@ const financeSummary = computed(() => {
     { label: '项目利润', value: formatAmount(item.projectProfit) },
   ]
 })
-const highestRisk = computed(() => risks.value[0])
+const highestRisk = computed(
+  () => risks.value.find((item) => item.riskLevel === 'high') ?? risks.value[0],
+)
 const filteredRisks = computed(() => {
   if (riskFilter.value === 'all') return risks.value
-  return risks.value.filter((_, index) => (riskFilter.value === 'risk' ? index === 0 : index > 0))
+  return risks.value.filter((item) => item.riskLevel === riskFilter.value)
 })
 const quickEntries = [
   { label: '风险待办', href: '#risk-list', domain: 'workbench' },
@@ -202,6 +215,17 @@ watch(
 
 onBeforeUnmount(() => controller?.abort())
 
+async function showHighestRisks(): Promise<void> {
+  riskFilter.value = 'high'
+  await nextTick()
+  document.getElementById('risk-list')?.scrollIntoView?.({ block: 'start' })
+}
+
+function selectRiskFilter(value: 'all' | DashboardRiskLevel): void {
+  riskFilter.value = value
+  riskFilterMenu.value?.removeAttribute('open')
+}
+
 async function refresh(): Promise<void> {
   const currentGeneration = ++generation
   controller?.abort()
@@ -211,6 +235,7 @@ async function refresh(): Promise<void> {
   error.value = false
   breakdownError.value = false
   expandedSubjects.value = new Set()
+  expandedFinanceContracts.value = new Set()
 
   if (!allowedRoles.value.includes(selectedRole.value)) return
   if (projectUnsupported.value) return
@@ -270,6 +295,13 @@ function hasChildren(subject: SubjectBreakdown): boolean {
       (item) => item.level === 2 && item.parentSubjectId === subject.costSubjectId,
     ),
   )
+}
+
+function toggleFinanceContract(contractId: string): void {
+  const next = new Set(expandedFinanceContracts.value)
+  if (next.has(contractId)) next.delete(contractId)
+  else next.add(contractId)
+  expandedFinanceContracts.value = next
 }
 
 function isAbort(errorValue: unknown): boolean {
@@ -332,7 +364,9 @@ function isAbort(errorValue: unknown): boolean {
           <V2Button size="small" variant="ghost" :loading="loading" @click="refreshToken += 1">
             刷新
           </V2Button>
-          <a class="dashboard-page__outline-link" href="#risk-list">查看并处理最高风险</a>
+          <button type="button" class="dashboard-page__outline-link" @click="showHighestRisks">
+            查看最高风险
+          </button>
         </header>
         <div class="health-content">
           <div v-if="health" class="health-score">
@@ -376,10 +410,13 @@ function isAbort(errorValue: unknown): boolean {
         <section id="cost-trend" class="command-panel trend-panel">
           <header class="panel-toolbar">
             <div>
-              <strong>{{ trendDefinition.title }}</strong
-              ><span>（万元）</span>
+              <strong>{{
+                trendDefinition.series.length ? trendDefinition.title : '经营动态'
+              }}</strong>
+              <span v-if="trendDefinition.series.length">（万元）</span>
+              <span v-else>（{{ activityItems.length }}）</span>
             </div>
-            <div class="trend-range" aria-label="趋势时间范围">
+            <div v-if="trendDefinition.series.length" class="trend-range" aria-label="趋势时间范围">
               <button
                 v-for="range in [
                   { value: 'year', label: '当年累计' },
@@ -397,28 +434,81 @@ function isAbort(errorValue: unknown): boolean {
             </div>
           </header>
           <DashboardTrendChart
-            v-if="visibleTrendPoints.length"
+            v-if="trendDefinition.series.length && visibleTrendPoints.length"
             :points="visibleTrendPoints"
             :series="trendDefinition.series"
             :aria-label="trendDefinition.ariaLabel"
             :caption="trendDefinition.caption"
           />
-          <p v-else class="trend-empty">当前角色暂无趋势数据</p>
+          <p v-else-if="trendDefinition.series.length" class="trend-empty">
+            当前筛选条件下暂无趋势数据
+          </p>
+          <ul v-else-if="activityItems.length" class="dashboard-activity-list">
+            <li v-for="item in activityItems" :key="item.id">
+              <div>
+                <strong>{{ item.title }}</strong>
+                <span>{{ item.meta }}</span>
+              </div>
+              <div>
+                <strong>{{ item.value || '—' }}</strong>
+                <span>{{ item.status }}</span>
+              </div>
+            </li>
+          </ul>
+          <p v-else class="trend-empty">当前筛选条件下暂无经营动态</p>
         </section>
 
         <section id="risk-list" class="command-panel risk-panel">
           <header class="panel-toolbar">
             <strong>经营预警与待办（{{ risks.length }}）</strong>
-            <label class="risk-filter">
+            <details ref="riskFilterMenu" class="risk-filter">
               <span class="v2-visually-hidden">筛选预警</span>
-              <select v-model="riskFilter">
-                <option value="all">全部预警</option>
-                <option value="risk">最高风险</option>
-                <option value="attention">其他关注</option>
-              </select>
-            </label>
+              <summary aria-label="筛选预警">{{ riskFilterLabel }}</summary>
+              <div class="risk-filter__menu" role="listbox" aria-label="筛选预警选项">
+                <button
+                  type="button"
+                  role="option"
+                  :aria-selected="riskFilter === 'all'"
+                  @click="selectRiskFilter('all')"
+                >
+                  全部预警
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  :aria-selected="riskFilter === 'high'"
+                  @click="selectRiskFilter('high')"
+                >
+                  高
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  :aria-selected="riskFilter === 'medium'"
+                  @click="selectRiskFilter('medium')"
+                >
+                  中
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  :aria-selected="riskFilter === 'low'"
+                  @click="selectRiskFilter('low')"
+                >
+                  低
+                </button>
+                <button
+                  type="button"
+                  role="option"
+                  :aria-selected="riskFilter === 'other'"
+                  @click="selectRiskFilter('other')"
+                >
+                  其他
+                </button>
+              </div>
+            </details>
           </header>
-          <div class="risk-table-wrap">
+          <div class="risk-table-wrap" tabindex="0">
             <table class="risk-table">
               <caption class="v2-visually-hidden">
                 经营预警与待办
@@ -434,10 +524,10 @@ function isAbort(errorValue: unknown): boolean {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(item, index) in filteredRisks" :key="item.id">
+                <tr v-for="item in filteredRisks" :key="item.id">
                   <td>
-                    <span class="risk-level" :class="index === 0 ? 'is-high' : 'is-medium'">{{
-                      index === 0 ? '高' : '中'
+                    <span class="risk-level" :class="`is-${item.riskLevel}`">{{
+                      item.riskLevel ? DASHBOARD_RISK_LABELS[item.riskLevel] : '其他'
                     }}</span>
                   </td>
                   <td>
@@ -497,10 +587,8 @@ function isAbort(errorValue: unknown): boolean {
       <V2Card v-if="selectedRole === 'cost'" id="cost-breakdown" class="dashboard-page__panel">
         <header>
           <div>
-            <p class="dashboard-page__eyebrow">两级只读下钻</p>
             <h2>成本科目分解</h2>
           </div>
-          <V2Badge tone="info">独立请求</V2Badge>
         </header>
         <V2PageState
           v-if="breakdownLoading"
@@ -549,6 +637,75 @@ function isAbort(errorValue: unknown): boolean {
           </table>
         </div>
         <p v-else class="dashboard-page__empty">当前项目暂无成本科目分解。</p>
+      </V2Card>
+
+      <V2Card
+        v-if="selectedRole === 'finance'"
+        id="finance-contract-breakdown"
+        class="dashboard-page__panel"
+      >
+        <header><h2>合同资金分解</h2></header>
+        <div v-if="financeData?.contractFundBreakdowns.length" class="dashboard-page__table-wrap">
+          <table>
+            <caption class="v2-visually-hidden">
+              合同与付款记录资金分解
+            </caption>
+            <thead>
+              <tr>
+                <th>合同 / 付款记录</th>
+                <th>合同金额</th>
+                <th>累计支付 / 付款金额</th>
+                <th>审批中</th>
+                <th>已批未付</th>
+                <th>剩余额度</th>
+                <th>支付比例 / 状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template
+                v-for="contract in financeData.contractFundBreakdowns"
+                :key="contract.contractId"
+              >
+                <tr>
+                  <td>
+                    <button
+                      v-if="contract.paymentRecords.length"
+                      type="button"
+                      :aria-expanded="expandedFinanceContracts.has(contract.contractId)"
+                      @click="toggleFinanceContract(contract.contractId)"
+                    >
+                      {{ expandedFinanceContracts.has(contract.contractId) ? '收起' : '展开' }}
+                    </button>
+                    {{ contract.contractName }}（{{ contract.contractCode }}）
+                  </td>
+                  <td>{{ formatAmount(contract.contractAmount) }}</td>
+                  <td>{{ formatAmount(contract.paidAmount) }}</td>
+                  <td>{{ formatAmount(contract.approvingAmount) }}</td>
+                  <td>{{ formatAmount(contract.approvedUnpaidAmount) }}</td>
+                  <td>{{ formatAmount(contract.remainingAmount) }}</td>
+                  <td>{{ contract.paymentRatio }}%</td>
+                </tr>
+                <tr
+                  v-for="payment in expandedFinanceContracts.has(contract.contractId)
+                    ? contract.paymentRecords
+                    : []"
+                  :key="payment.payRecordId"
+                >
+                  <td class="is-child">
+                    {{ payment.recordCode || '付款记录' }} · {{ payment.payDate || '日期未定' }}
+                  </td>
+                  <td>—</td>
+                  <td>{{ formatAmount(payment.payAmount) }}</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>{{ payment.payStatus }}</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="dashboard-page__empty">当前范围暂无合同资金明细。</p>
       </V2Card>
     </template>
   </section>
@@ -941,11 +1098,14 @@ function isAbort(errorValue: unknown): boolean {
   min-height: 36px;
   align-items: center;
   padding: 0 16px;
+  background: transparent;
   color: var(--v2-color-primary);
   border: 1px solid var(--v2-color-primary);
   border-radius: var(--v2-radius-sm);
   font-size: var(--v2-font-size-12);
+  font-family: inherit;
   text-decoration: none;
+  cursor: pointer;
 }
 .command-panel__title .dashboard-page__outline-link {
   min-height: 32px;
@@ -1039,6 +1199,45 @@ function isAbort(errorValue: unknown): boolean {
   width: 100%;
   height: 180px;
 }
+.dashboard-activity-list {
+  height: 180px;
+  padding: 0;
+  margin: 0;
+  overflow: auto;
+  list-style: none;
+}
+.dashboard-activity-list li {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 45px;
+  padding: 8px 14px;
+  border-bottom: 1px solid var(--v2-color-border-subtle);
+}
+.dashboard-activity-list li > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.dashboard-activity-list li > div:last-child {
+  flex: 0 0 auto;
+  text-align: right;
+}
+.dashboard-activity-list strong,
+.dashboard-activity-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dashboard-activity-list strong {
+  color: var(--v2-color-text-strong);
+  font-size: var(--v2-font-size-12);
+}
+.dashboard-activity-list span {
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
+}
 .trend-empty {
   display: grid;
   place-items: center;
@@ -1046,16 +1245,58 @@ function isAbort(errorValue: unknown): boolean {
   color: var(--v2-color-text-muted);
   font-size: var(--v2-font-size-12);
 }
-.risk-filter select {
+.risk-filter {
+  position: relative;
+  font-size: var(--v2-font-size-11);
+  font-weight: var(--v2-font-weight-regular);
+}
+.risk-filter summary {
   width: 94px;
   min-height: 32px;
+  display: flex;
+  align-items: center;
   padding: 0 8px;
   color: var(--v2-color-text-secondary);
   background: var(--v2-color-surface);
   border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-sm);
-  font: inherit;
-  font-size: var(--v2-font-size-11);
+  list-style: none;
+  cursor: pointer;
+}
+.risk-filter summary::after {
+  margin-inline-start: auto;
+  content: '⌄';
+}
+.risk-filter summary::-webkit-details-marker {
+  display: none;
+}
+.risk-filter__menu {
+  position: absolute;
+  z-index: var(--v2-z-dropdown);
+  inset-block-start: calc(100% + 4px);
+  inset-inline-end: 0;
+  width: 112px;
+  padding: 4px;
+  background: var(--v2-color-surface);
+  border: 1px solid var(--v2-color-border);
+  border-radius: var(--v2-radius-sm);
+  box-shadow: var(--v2-shadow-panel);
+}
+.risk-filter__menu button {
+  width: 100%;
+  min-height: 32px;
+  padding: 0 8px;
+  color: var(--v2-color-text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--v2-radius-sm);
+  text-align: start;
+  cursor: pointer;
+}
+.risk-filter__menu button:hover,
+.risk-filter__menu button[aria-selected='true'] {
+  color: var(--v2-color-primary);
+  background: var(--v2-color-primary-soft);
 }
 .finance-summary-grid {
   display: grid;
@@ -1135,6 +1376,16 @@ function isAbort(errorValue: unknown): boolean {
   color: var(--v2-color-warning-text);
   background: var(--v2-color-warning-soft);
   border-color: #ffd698;
+}
+.risk-level.is-low {
+  color: var(--v2-color-success-text);
+  background: var(--v2-color-success-soft);
+  border-color: #9ce3c5;
+}
+.risk-level.is-other {
+  color: var(--v2-color-text-secondary);
+  background: var(--v2-color-surface-subtle);
+  border-color: var(--v2-color-border);
 }
 .dashboard-page .empty-row td {
   height: 180px;

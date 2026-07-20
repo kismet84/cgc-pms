@@ -50,5 +50,17 @@ stages:
   - id: role-test-accounts
     source: sql/150-role-test-accounts.sql
     scope: [dev-login-users, dashboard-role-permissions]
+  - id: role-dashboard-data
+    source: sql/160-role-dashboard-data.sql
+    scope: [project-manager, business-manager, purchase-manager, production-manager, chief-engineer]
+  - id: dashboard-risk-levels
+    source: sql/170-dashboard-risk-levels.sql
+    scope: [high-risk, medium-risk, low-risk, other-risk, eight-role-dashboard]
+  - id: cost-breakdown-data
+    source: sql/180-cost-breakdown-data.sql
+    scope: [cost-manager, cost-subject, two-level-drilldown, amount-reconciliation]
+  - id: standardize-business-codes
+    source: sql/190-standardize-business-codes.sql
+    scope: [internal-business-code, historical-normalization, payment-record-code]
 checkpoint-prefix: DEMO_CGC_V2_
 cleanup-policy: rebuild-local-demo-database

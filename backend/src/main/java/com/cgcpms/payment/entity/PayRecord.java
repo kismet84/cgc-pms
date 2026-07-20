@@ -39,6 +39,9 @@ public class PayRecord extends BaseEntity {
 
     private Long partnerId;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String recordCode;
+
     @NotNull
     @Positive
     @Digits(integer = 16, fraction = 2)

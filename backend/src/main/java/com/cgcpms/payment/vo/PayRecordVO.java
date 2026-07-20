@@ -9,6 +9,7 @@ public class PayRecordVO {
     private String payApplicationId;
     private String contractId;
     private String partnerId;
+    private String recordCode;
     private String payAmount;
     private String payDate;
     private String paidAt;

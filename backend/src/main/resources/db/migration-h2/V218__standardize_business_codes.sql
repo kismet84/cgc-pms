@@ -1,0 +1,44 @@
+-- H2 counterpart of V218__standardize_business_codes.sql.
+
+ALTER TABLE pay_record ADD COLUMN record_code VARCHAR(32) NULL;
+CREATE UNIQUE INDEX uk_pay_record_code ON pay_record (tenant_id, record_code);
+
+UPDATE pm_project SET project_code=CONCAT('TMP-',id);
+UPDATE pm_project t SET project_code=CONCAT('XM-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM pm_project s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE md_partner SET partner_code=CONCAT('TMP-',id);
+UPDATE md_partner t SET partner_code=CONCAT('PTN-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM md_partner s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE ct_contract SET contract_code=CONCAT('TMP-',id);
+UPDATE ct_contract t SET contract_code=CONCAT('CT-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM ct_contract s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE ct_contract_change SET change_code=CONCAT('TMP-',id);
+UPDATE ct_contract_change t SET change_code=CONCAT('CC-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM ct_contract_change s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE var_order SET var_code=CONCAT('TMP-',id);
+UPDATE var_order t SET var_code=CONCAT('VO-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM var_order s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE mat_purchase_request SET request_code=CONCAT('TMP-',id);
+UPDATE mat_purchase_request t SET request_code=CONCAT('PR-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM mat_purchase_request s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE mat_purchase_order SET order_code=CONCAT('TMP-',id);
+UPDATE mat_purchase_order t SET order_code=CONCAT('PO-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM mat_purchase_order s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE mat_receipt SET receipt_code=CONCAT('TMP-',id);
+UPDATE mat_receipt t SET receipt_code=CONCAT('MR-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM mat_receipt s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE mat_requisition SET requisition_code=CONCAT('TMP-',id);
+UPDATE mat_requisition t SET requisition_code=CONCAT('REQ-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM mat_requisition s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE mat_material_return SET return_code=CONCAT('TMP-',id);
+UPDATE mat_material_return t SET return_code=CONCAT('MRT-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM mat_material_return s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE sp_supplier_return SET return_code=CONCAT('TMP-',id);
+UPDATE sp_supplier_return t SET return_code=CONCAT('SRT-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM sp_supplier_return s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE sub_task SET task_code=CONCAT('TMP-',id);
+UPDATE sub_task t SET task_code=CONCAT('SUB-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM sub_task s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE sub_measure SET measure_code=CONCAT('TMP-',id);
+UPDATE sub_measure t SET measure_code=CONCAT('SM-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM sub_measure s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE pay_application SET apply_code=CONCAT('TMP-',id);
+UPDATE pay_application t SET apply_code=CONCAT('PAY-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM pay_application s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE pay_record t SET record_code=CONCAT('PMT-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM pay_record s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE stl_settlement SET settlement_code=CONCAT('TMP-',id);
+UPDATE stl_settlement t SET settlement_code=CONCAT('STL-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM stl_settlement s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE expense_application SET expense_code=CONCAT('TMP-',id);
+UPDATE expense_application t SET expense_code=CONCAT('EXP-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM expense_application s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE contract_revenue SET revenue_code=CONCAT('TMP-',id);
+UPDATE contract_revenue t SET revenue_code=CONCAT('RV-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM contract_revenue s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE cash_journal_entry SET entry_no=CONCAT('TMP-',id);
+UPDATE cash_journal_entry t SET entry_no=CONCAT('CJ-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM cash_journal_entry s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));
+UPDATE biz_document_generation SET generation_no=CONCAT('TMP-',id);
+UPDATE biz_document_generation t SET generation_no=CONCAT('DOC-',FORMATDATETIME(created_at,'yyyyMMdd'),'-',LPAD(CAST((SELECT COUNT(*)+1 FROM biz_document_generation s WHERE s.tenant_id=t.tenant_id AND CAST(s.created_at AS DATE)=CAST(t.created_at AS DATE) AND s.id<t.id) AS VARCHAR),3,'0'));

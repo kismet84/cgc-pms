@@ -75,7 +75,11 @@ $stages = @(
     [pscustomobject]@{ Id = 'DOCUMENT_SYSTEM'; Files = @('scripts/demo/complete-project-v2/sql/120-document-system.sql') },
     [pscustomobject]@{ Id = 'FORM_FIELD_COMPLETION'; Files = @('scripts/demo/complete-project-v2/sql/130-form-field-completion.sql') },
     [pscustomobject]@{ Id = 'DATA_QUALITY_NORMALIZATION'; Files = @('scripts/demo/complete-project-v2/sql/140-data-quality-normalization.sql') },
-    [pscustomobject]@{ Id = 'ROLE_TEST_ACCOUNTS'; Files = @('scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql') }
+    [pscustomobject]@{ Id = 'ROLE_TEST_ACCOUNTS'; Files = @('scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql') },
+    [pscustomobject]@{ Id = 'ROLE_DASHBOARD_DATA'; Files = @('scripts/demo/complete-project-v2/sql/160-role-dashboard-data.sql') },
+    [pscustomobject]@{ Id = 'DASHBOARD_RISK_LEVELS'; Files = @('scripts/demo/complete-project-v2/sql/170-dashboard-risk-levels.sql') },
+    [pscustomobject]@{ Id = 'COST_BREAKDOWN_DATA'; Files = @('scripts/demo/complete-project-v2/sql/180-cost-breakdown-data.sql') },
+    [pscustomobject]@{ Id = 'STANDARDIZE_BUSINESS_CODES'; Files = @('scripts/demo/complete-project-v2/sql/190-standardize-business-codes.sql') }
 )
 
 foreach ($stage in $stages) {

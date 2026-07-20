@@ -8,6 +8,7 @@ import lombok.Data;
 @Data
 public class DashboardPaymentItemVO {
     private String payRecordId;
+    private String recordCode;
     private String contractId;
     private String contractName;
     private String partnerName;

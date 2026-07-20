@@ -17,23 +17,23 @@ if ($LASTEXITCODE -ne 0 -or -not (($portBinding -join "`n") -match '127\.0\.0\.1
 }
 
 $sql = @'
-SELECT 'project',COUNT(*) FROM pm_project WHERE tenant_id=0 AND id=520000000000000001 AND project_code='CGC-DEMO-M52-001' AND deleted_flag=0
-UNION ALL SELECT 'partner',COUNT(*) FROM md_partner WHERE tenant_id=0 AND partner_code LIKE 'M52-%' AND deleted_flag=0
+SELECT 'project',COUNT(*) FROM pm_project WHERE tenant_id=0 AND id=520000000000000001 AND deleted_flag=0
+UNION ALL SELECT 'partner',COUNT(*) FROM md_partner WHERE tenant_id=0 AND id IN (520000000000000101,520000000000000102,520000000000000103,520000000000006001,520000000000006002,520000000000009101,520000000000009102) AND deleted_flag=0
 UNION ALL SELECT 'material',COUNT(*) FROM md_material WHERE tenant_id=0 AND material_code='M52-MAT-STEEL' AND deleted_flag=0
-UNION ALL SELECT 'contract',COUNT(*) FROM ct_contract WHERE tenant_id=0 AND project_id=520000000000000001 AND contract_code LIKE 'M52-%' AND deleted_flag=0
+UNION ALL SELECT 'contract',COUNT(*) FROM ct_contract WHERE tenant_id=0 AND project_id=520000000000000001 AND deleted_flag=0
 UNION ALL SELECT 'bid_transfer',COUNT(*) FROM bid_cost_target_transfer WHERE tenant_id=0 AND project_id=520000000000000001 AND status='POSTED'
 UNION ALL SELECT 'target',COUNT(*) FROM cost_target WHERE tenant_id=0 AND project_id=520000000000000001 AND is_active=1 AND deleted_flag=0
-UNION ALL SELECT 'purchase_request',COUNT(*) FROM mat_purchase_request WHERE tenant_id=0 AND request_code='M52-PR-001' AND deleted_flag=0
-UNION ALL SELECT 'purchase_order',COUNT(*) FROM mat_purchase_order WHERE tenant_id=0 AND order_code='M52-PO-001' AND deleted_flag=0
-UNION ALL SELECT 'receipt',COUNT(*) FROM mat_receipt WHERE tenant_id=0 AND receipt_code='M52-RC-001' AND deleted_flag=0
-UNION ALL SELECT 'requisition',COUNT(*) FROM mat_requisition WHERE tenant_id=0 AND requisition_code='M52-REQ-001' AND deleted_flag=0
+UNION ALL SELECT 'purchase_request',COUNT(*) FROM mat_purchase_request WHERE tenant_id=0 AND id=520000000000001101 AND deleted_flag=0
+UNION ALL SELECT 'purchase_order',COUNT(*) FROM mat_purchase_order WHERE tenant_id=0 AND id=520000000000001201 AND deleted_flag=0
+UNION ALL SELECT 'receipt',COUNT(*) FROM mat_receipt WHERE tenant_id=0 AND id=520000000000001301 AND deleted_flag=0
+UNION ALL SELECT 'requisition',COUNT(*) FROM mat_requisition WHERE tenant_id=0 AND id=520000000000001501 AND deleted_flag=0
 UNION ALL SELECT 'stock',COUNT(*) FROM mat_stock WHERE tenant_id=0 AND warehouse_id=520000000000000301 AND material_id=520000000000000201 AND deleted_flag=0
-UNION ALL SELECT 'sub_measure',COUNT(*) FROM sub_measure WHERE tenant_id=0 AND measure_code='M52-SM-001' AND deleted_flag=0
-UNION ALL SELECT 'settlement',COUNT(*) FROM stl_settlement WHERE tenant_id=0 AND settlement_code='M52-STL-001' AND deleted_flag=0
-UNION ALL SELECT 'pay_application',COUNT(*) FROM pay_application WHERE tenant_id=0 AND apply_code='M52-PAY-APP-001' AND deleted_flag=0
+UNION ALL SELECT 'sub_measure',COUNT(*) FROM sub_measure WHERE tenant_id=0 AND id=520000000000002101 AND deleted_flag=0
+UNION ALL SELECT 'settlement',COUNT(*) FROM stl_settlement WHERE tenant_id=0 AND id=520000000000002201 AND deleted_flag=0
+UNION ALL SELECT 'pay_application',COUNT(*) FROM pay_application WHERE tenant_id=0 AND id=520000000000002401 AND deleted_flag=0
 UNION ALL SELECT 'pay_record',COUNT(*) FROM pay_record WHERE tenant_id=0 AND external_txn_no='M52-PAY-TXN-001' AND deleted_flag=0
-UNION ALL SELECT 'expense',COUNT(*) FROM expense_application WHERE tenant_id=0 AND expense_code='M52-EXP-001' AND deleted_flag=0
-UNION ALL SELECT 'revenue',COUNT(*) FROM contract_revenue WHERE tenant_id=0 AND revenue_code='M52-REV-001' AND deleted_flag=0
+UNION ALL SELECT 'expense',COUNT(*) FROM expense_application WHERE tenant_id=0 AND id=520000000000002501 AND deleted_flag=0
+UNION ALL SELECT 'revenue',COUNT(*) FROM contract_revenue WHERE tenant_id=0 AND id=520000000000002601 AND deleted_flag=0
 UNION ALL SELECT 'receivable',COUNT(*) FROM account_receivable WHERE tenant_id=0 AND receivable_code='M52-AR-001' AND deleted_flag=0
 UNION ALL SELECT 'collection',COUNT(*) FROM collection_record WHERE tenant_id=0 AND collection_code='M52-COLLECTION-001' AND deleted_flag=0
 UNION ALL SELECT 'quality_issue',COUNT(*) FROM qs_issue WHERE tenant_id=0 AND issue_code='M52-QS-ISSUE-001' AND status='CLOSED' AND deleted_flag=0
@@ -68,9 +68,9 @@ UNION ALL SELECT 'technical_scheme',COUNT(*) FROM technical_scheme WHERE tenant_
 UNION ALL SELECT 'technical_drawing',COUNT(*) FROM tech_drawing WHERE tenant_id=0 AND drawing_code LIKE 'M52-DRAW-%' AND deleted_flag=0
 UNION ALL SELECT 'technical_rfi',COUNT(*) FROM tech_rfi WHERE tenant_id=0 AND rfi_code LIKE 'M52-RFI-%' AND deleted_flag=0
 UNION ALL SELECT 'technical_archive',COUNT(*) FROM tech_acceptance_archive WHERE tenant_id=0 AND archive_code LIKE 'M52-TECH-ARCHIVE-%' AND deleted_flag=0
-UNION ALL SELECT 'variation_order',COUNT(*) FROM var_order WHERE tenant_id=0 AND var_code LIKE 'M52-VAR-%' AND deleted_flag=0
+UNION ALL SELECT 'variation_order',COUNT(*) FROM var_order WHERE tenant_id=0 AND id BETWEEN 520000000000007101 AND 520000000000007103 AND deleted_flag=0
 UNION ALL SELECT 'variation_submission',COUNT(*) FROM variation_owner_submission WHERE tenant_id=0 AND submission_code LIKE 'M52-VAR-SUB-%' AND deleted_flag=0
-UNION ALL SELECT 'contract_change',COUNT(*) FROM ct_contract_change WHERE tenant_id=0 AND change_code='M52-CONTRACT-CHANGE-001' AND deleted_flag=0
+UNION ALL SELECT 'contract_change',COUNT(*) FROM ct_contract_change WHERE tenant_id=0 AND id=520000000000007201 AND deleted_flag=0
 UNION ALL SELECT 'closeout_detail',(
   (SELECT COUNT(*) FROM closeout_section_acceptance WHERE closeout_id=520000000000003501 AND deleted_flag=0)+
   (SELECT COUNT(*) FROM closeout_final_acceptance WHERE closeout_id=520000000000003501 AND deleted_flag=0)+
@@ -87,7 +87,7 @@ UNION ALL SELECT 'finance_import_batch',COUNT(*) FROM finance_import_batch WHERE
 UNION ALL SELECT 'inventory_exception',COUNT(*) FROM mat_quality_disposition WHERE tenant_id=0 AND id=520000000000008403 AND status='OPEN' AND deleted_flag=0
 UNION ALL SELECT 'material_return_reversal',COUNT(*) FROM mat_material_return WHERE tenant_id=0 AND id=520000000000008421 AND status='REVERSED' AND deleted_flag=0
 UNION ALL SELECT 'document_template',COUNT(*) FROM biz_document_template WHERE tenant_id=0 AND template_code='M52-PAYMENT-PDF' AND enabled=1 AND deleted_flag=0
-UNION ALL SELECT 'document_generation',COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND generation_no LIKE 'M52-DOC-%' AND deleted_flag=0
+UNION ALL SELECT 'document_generation',COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND id BETWEEN 520000000000008511 AND 520000000000008512 AND deleted_flag=0
 UNION ALL SELECT 'demo_user',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username='demo.manager' AND status='ENABLE' AND deleted_flag=0
 UNION ALL SELECT 'role_test_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance') AND status='ENABLE' AND deleted_flag=0
 UNION ALL SELECT 'dashboard_trend_month',COUNT(DISTINCT DATE_FORMAT(summary_date,'%Y-%m')) FROM cost_summary WHERE tenant_id=0 AND project_id=520000000000009002 AND cost_subject_id IS NULL AND deleted_flag=0
@@ -96,6 +96,67 @@ UNION ALL SELECT 'finance_demo_pay_application',COUNT(*) FROM pay_application WH
 UNION ALL SELECT 'finance_demo_pay_record',COUNT(*) FROM pay_record WHERE tenant_id=0 AND id BETWEEN 520000000000009421 AND 520000000000009424 AND deleted_flag=0
 UNION ALL SELECT 'finance_demo_paid',COALESCE(SUM(pay_amount),0) FROM pay_record WHERE tenant_id=0 AND id BETWEEN 520000000000009421 AND 520000000000009424 AND pay_status='SUCCESS' AND deleted_flag=0
 UNION ALL SELECT 'finance_demo_processing',COALESCE(SUM(pay_amount),0) FROM pay_record WHERE tenant_id=0 AND id BETWEEN 520000000000009421 AND 520000000000009424 AND pay_status='PROCESSING' AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_contract',COUNT(*) FROM ct_contract WHERE tenant_id=0 AND id=520000000000009501 AND project_id=520000000000009002 AND contract_status='PERFORMING' AND end_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(),INTERVAL 30 DAY) AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_variation',COUNT(*) FROM var_order WHERE tenant_id=0 AND id=520000000000009502 AND project_id=520000000000009002 AND approval_status='APPROVED' AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_measure',COUNT(*) FROM sub_measure WHERE tenant_id=0 AND id=520000000000009503 AND project_id=520000000000009002 AND approval_status='APPROVED' AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_settlement',COUNT(*) FROM stl_settlement WHERE tenant_id=0 AND id=520000000000009504 AND project_id=520000000000009002 AND settlement_status='FINALIZED' AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_purchase',COUNT(*) FROM mat_purchase_order WHERE tenant_id=0 AND id=520000000000009513 AND project_id=520000000000009002 AND order_status='IN_PROGRESS' AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_receipt',COUNT(*) FROM mat_receipt WHERE tenant_id=0 AND id=520000000000009517 AND project_id=520000000000009002 AND approval_status='PENDING' AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_requisition',COUNT(*) FROM mat_requisition WHERE tenant_id=0 AND id=520000000000009519 AND project_id=520000000000009002 AND stock_out_flag=0 AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_low_stock',COUNT(*) FROM mat_stock WHERE tenant_id=0 AND id=520000000000009516 AND available_qty=0 AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_tech',COUNT(*) FROM tech_item WHERE tenant_id=0 AND id BETWEEN 520000000000009531 AND 520000000000009533 AND project_id=520000000000009002 AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_task',COUNT(*) FROM wf_task t JOIN wf_instance i ON i.id=t.instance_id AND i.tenant_id=t.tenant_id WHERE t.tenant_id=0 AND t.id=520000000000009543 AND t.task_status='PENDING' AND i.project_id=520000000000009002 AND t.deleted_flag=0 AND i.deleted_flag=0
+UNION ALL SELECT 'role_dashboard_lagging',COUNT(*) FROM pm_project WHERE tenant_id=0 AND id=520000000000009002 AND status='ACTIVE' AND planned_end_date<CURDATE() AND deleted_flag=0
+UNION ALL SELECT 'risk_level_contracts',COUNT(*) FROM ct_contract WHERE tenant_id=0 AND id BETWEEN 520000000000009601 AND 520000000000009602 AND project_id=520000000000009002 AND deleted_flag=0
+UNION ALL SELECT 'risk_level_project_task',COUNT(*) FROM wf_task WHERE tenant_id=0 AND id=520000000000009603 AND task_status='PENDING' AND deleted_flag=0
+UNION ALL SELECT 'risk_level_purchase_order',COUNT(*) FROM mat_purchase_order WHERE tenant_id=0 AND id=520000000000009604 AND order_status='IN_PROGRESS' AND delivery_date<CURDATE() AND deleted_flag=0
+UNION ALL SELECT 'risk_level_measures',COUNT(DISTINCT status) FROM sub_measure WHERE tenant_id=0 AND id IN (520000000000009503,520000000000009605,520000000000009606,520000000000009607) AND deleted_flag=0
+UNION ALL SELECT 'risk_level_tech_items',COUNT(*) FROM tech_item WHERE tenant_id=0 AND id BETWEEN 520000000000009608 AND 520000000000009609 AND deleted_flag=0
+UNION ALL SELECT 'risk_level_finance_records',COUNT(*) FROM pay_record WHERE tenant_id=0 AND id IN (520000000000009611,520000000000009612,520000000000009613,520000000000009618) AND deleted_flag=0
+UNION ALL SELECT 'risk_level_alert_severities',COUNT(DISTINCT severity) FROM alert_log WHERE tenant_id=0 AND id BETWEEN 520000000000009621 AND 520000000000009624 AND is_read=0 AND deleted_flag=0
+UNION ALL SELECT 'cost_breakdown_rows',COUNT(*) FROM cost_summary WHERE tenant_id=0 AND id BETWEEN 520000000000009471 AND 520000000000009475 AND project_id=520000000000009002 AND deleted_flag=0
+UNION ALL SELECT 'cost_breakdown_roots',COUNT(*) FROM cost_summary s JOIN cost_subject c ON c.id=s.cost_subject_id AND c.tenant_id=s.tenant_id WHERE s.tenant_id=0 AND s.id BETWEEN 520000000000009471 AND 520000000000009475 AND c.level=1 AND c.status='ENABLE' AND c.deleted_flag=0 AND s.deleted_flag=0
+UNION ALL SELECT 'cost_breakdown_children',COUNT(*) FROM cost_summary s JOIN cost_subject c ON c.id=s.cost_subject_id AND c.tenant_id=s.tenant_id WHERE s.tenant_id=0 AND s.id BETWEEN 520000000000009471 AND 520000000000009475 AND c.level=2 AND c.parent_id=900001 AND c.status='ENABLE' AND c.deleted_flag=0 AND s.deleted_flag=0
+UNION ALL SELECT 'cost_breakdown_target_delta',ABS(
+  COALESCE((SELECT target_cost FROM cost_summary WHERE id=520000000000009471 AND deleted_flag=0),0)
+  -COALESCE((SELECT SUM(target_cost) FROM cost_summary WHERE id BETWEEN 520000000000009472 AND 520000000000009475 AND deleted_flag=0),0))
+UNION ALL SELECT 'cost_breakdown_actual_delta',ABS(
+  COALESCE((SELECT actual_cost FROM cost_summary WHERE id=520000000000009471 AND deleted_flag=0),0)
+  -COALESCE((SELECT SUM(actual_cost) FROM cost_summary WHERE id BETWEEN 520000000000009472 AND 520000000000009475 AND deleted_flag=0),0))
+UNION ALL SELECT 'cost_breakdown_dynamic_delta',ABS(
+  COALESCE((SELECT dynamic_cost FROM cost_summary WHERE id=520000000000009471 AND deleted_flag=0),0)
+  -COALESCE((SELECT SUM(dynamic_cost) FROM cost_summary WHERE id BETWEEN 520000000000009472 AND 520000000000009475 AND deleted_flag=0),0))
+UNION ALL SELECT 'cost_breakdown_deviation_delta',ABS(
+  COALESCE((SELECT cost_deviation FROM cost_summary WHERE id=520000000000009471 AND deleted_flag=0),0)
+  -COALESCE((SELECT SUM(cost_deviation) FROM cost_summary WHERE id BETWEEN 520000000000009472 AND 520000000000009475 AND deleted_flag=0),0))
+UNION ALL SELECT 'cost_breakdown_permission',COUNT(DISTINCT u.id) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.cost' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms='dashboard:cost-breakdown:view' AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'invalid_business_code',SUM(invalid_count) FROM (
+  SELECT COUNT(*) invalid_count FROM pm_project WHERE project_code NOT REGEXP '^XM-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM md_partner WHERE partner_code NOT REGEXP '^PTN-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM ct_contract WHERE contract_code NOT REGEXP '^CT-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM ct_contract_change WHERE change_code NOT REGEXP '^CC-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM var_order WHERE var_code NOT REGEXP '^VO-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_purchase_request WHERE request_code NOT REGEXP '^PR-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_purchase_order WHERE order_code NOT REGEXP '^PO-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_receipt WHERE receipt_code NOT REGEXP '^MR-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_requisition WHERE requisition_code NOT REGEXP '^REQ-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_material_return WHERE return_code NOT REGEXP '^MRT-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM sp_supplier_return WHERE return_code NOT REGEXP '^SRT-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM sub_task WHERE task_code NOT REGEXP '^SUB-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM sub_measure WHERE measure_code NOT REGEXP '^SM-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM pay_application WHERE apply_code NOT REGEXP '^PAY-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM pay_record WHERE record_code IS NULL OR record_code NOT REGEXP '^PMT-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM stl_settlement WHERE settlement_code NOT REGEXP '^STL-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM expense_application WHERE expense_code NOT REGEXP '^EXP-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM contract_revenue WHERE revenue_code NOT REGEXP '^RV-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM cash_journal_entry WHERE entry_no NOT REGEXP '^CJ-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM biz_document_generation WHERE generation_no NOT REGEXP '^DOC-[0-9]{8}-[0-9]{3}$'
+) standardized_codes
 UNION ALL SELECT 'role_test_scope',COUNT(DISTINCT u.username) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id
@@ -136,29 +197,29 @@ UNION ALL SELECT 'collection_delta',ABS(
   COALESCE((SELECT amount-allocated_amount-unallocated_amount FROM collection_record WHERE id=520000000000002901),0))
 UNION ALL SELECT 'quality_safety_cost',COALESCE(SUM(amount),0) FROM cost_item WHERE project_id=520000000000000001 AND cost_type='QUALITY_SAFETY' AND deleted_flag=0
 UNION ALL SELECT 'actual_cost_total',COALESCE(SUM(amount),0) FROM cost_item WHERE project_id=520000000000000001 AND deleted_flag=0
-UNION ALL SELECT 'project_total',COUNT(*) FROM pm_project WHERE tenant_id=0 AND project_code LIKE 'CGC-DEMO-M52-%' AND deleted_flag=0
+UNION ALL SELECT 'project_total',COUNT(*) FROM pm_project WHERE tenant_id=0 AND id IN (520000000000000001,520000000000009001,520000000000009002,520000000000009003,520000000000009004,520000000000009005,520000000000009006,520000000000009007) AND deleted_flag=0
 UNION ALL SELECT 'partner_incomplete',COUNT(*) FROM md_partner
-  WHERE tenant_id=0 AND partner_code LIKE 'M52-%' AND deleted_flag=0
+  WHERE tenant_id=0 AND id IN (520000000000000101,520000000000000102,520000000000000103,520000000000006001,520000000000006002,520000000000009101,520000000000009102) AND deleted_flag=0
     AND (NULLIF(TRIM(credit_code),'') IS NULL OR NULLIF(TRIM(legal_person),'') IS NULL OR NULLIF(TRIM(contact_name),'') IS NULL
       OR NULLIF(TRIM(contact_phone),'') IS NULL OR NULLIF(TRIM(bank_name),'') IS NULL OR NULLIF(TRIM(bank_account),'') IS NULL
       OR NULLIF(TRIM(qualification_level),'') IS NULL OR NULLIF(TRIM(risk_level),'') IS NULL)
 UNION ALL SELECT 'partner_invalid_credit',COUNT(*) FROM md_partner
-  WHERE tenant_id=0 AND partner_code LIKE 'M52-%' AND deleted_flag=0 AND credit_code NOT REGEXP '^[0-9A-HJ-NPQRTUWXY]{18}$'
+  WHERE tenant_id=0 AND id IN (520000000000000101,520000000000000102,520000000000000103,520000000000006001,520000000000006002,520000000000009101,520000000000009102) AND deleted_flag=0 AND credit_code NOT REGEXP '^[0-9A-HJ-NPQRTUWXY]{18}$'
 UNION ALL SELECT CONCAT('partner_credit:',partner_code),credit_code FROM md_partner
-  WHERE tenant_id=0 AND partner_code LIKE 'M52-%' AND deleted_flag=0
+  WHERE tenant_id=0 AND id IN (520000000000000101,520000000000000102,520000000000000103,520000000000006001,520000000000006002,520000000000009101,520000000000009102) AND deleted_flag=0
 UNION ALL SELECT 'partner_invalid_type',COUNT(*) FROM md_partner p
   LEFT JOIN sys_dict_type dt ON dt.tenant_id=p.tenant_id AND dt.dict_code='partner_type' AND dt.status='ENABLE'
   LEFT JOIN sys_dict_data dd ON dd.tenant_id=p.tenant_id AND dd.dict_type_id=dt.id AND dd.dict_value=p.partner_type AND dd.status='ENABLE'
-  WHERE p.tenant_id=0 AND p.partner_code LIKE 'M52-%' AND p.deleted_flag=0 AND dd.id IS NULL
+  WHERE p.tenant_id=0 AND p.id IN (520000000000000101,520000000000000102,520000000000000103,520000000000006001,520000000000006002,520000000000009101,520000000000009102) AND p.deleted_flag=0 AND dd.id IS NULL
 UNION ALL SELECT 'project_type_missing',COUNT(*) FROM sys_dict_data dd JOIN sys_dict_type dt ON dt.id=dd.dict_type_id
   WHERE dt.tenant_id=0 AND dt.dict_code='project_type' AND dt.status='ENABLE' AND dd.status='ENABLE'
-    AND NOT EXISTS (SELECT 1 FROM pm_project p WHERE p.tenant_id=0 AND p.project_code LIKE 'CGC-DEMO-M52-%' AND p.deleted_flag=0 AND p.project_type=dd.dict_value)
+    AND NOT EXISTS (SELECT 1 FROM pm_project p WHERE p.tenant_id=0 AND p.id IN (520000000000000001,520000000000009001,520000000000009002,520000000000009003,520000000000009004,520000000000009005,520000000000009006,520000000000009007) AND p.deleted_flag=0 AND p.project_type=dd.dict_value)
 UNION ALL SELECT 'project_status_missing',COUNT(*) FROM sys_dict_data dd JOIN sys_dict_type dt ON dt.id=dd.dict_type_id
   WHERE dt.tenant_id=0 AND dt.dict_code='project_status' AND dt.status='ENABLE' AND dd.status='ENABLE'
-    AND NOT EXISTS (SELECT 1 FROM pm_project p WHERE p.tenant_id=0 AND p.project_code LIKE 'CGC-DEMO-M52-%' AND p.deleted_flag=0 AND p.status=dd.dict_value)
+    AND NOT EXISTS (SELECT 1 FROM pm_project p WHERE p.tenant_id=0 AND p.id IN (520000000000000001,520000000000009001,520000000000009002,520000000000009003,520000000000009004,520000000000009005,520000000000009006,520000000000009007) AND p.deleted_flag=0 AND p.status=dd.dict_value)
 UNION ALL SELECT 'project_approval_missing',COUNT(*) FROM sys_dict_data dd JOIN sys_dict_type dt ON dt.id=dd.dict_type_id
   WHERE dt.tenant_id=0 AND dt.dict_code='approval_status' AND dt.status='ENABLE' AND dd.status='ENABLE'
-    AND NOT EXISTS (SELECT 1 FROM pm_project p WHERE p.tenant_id=0 AND p.project_code LIKE 'CGC-DEMO-M52-%' AND p.deleted_flag=0 AND p.approval_status=dd.dict_value)
+    AND NOT EXISTS (SELECT 1 FROM pm_project p WHERE p.tenant_id=0 AND p.id IN (520000000000000001,520000000000009001,520000000000009002,520000000000009003,520000000000009004,520000000000009005,520000000000009006,520000000000009007) AND p.deleted_flag=0 AND p.approval_status=dd.dict_value)
 UNION ALL SELECT 'project_invalid_authority',COUNT(*) FROM pm_project p
   LEFT JOIN sys_dict_type ptdt ON ptdt.tenant_id=p.tenant_id AND ptdt.dict_code='project_type' AND ptdt.status='ENABLE'
   LEFT JOIN sys_dict_data ptdd ON ptdd.tenant_id=p.tenant_id AND ptdd.dict_type_id=ptdt.id AND ptdd.dict_value=p.project_type AND ptdd.status='ENABLE'
@@ -166,16 +227,16 @@ UNION ALL SELECT 'project_invalid_authority',COUNT(*) FROM pm_project p
   LEFT JOIN sys_dict_data psdd ON psdd.tenant_id=p.tenant_id AND psdd.dict_type_id=psdt.id AND psdd.dict_value=p.status AND psdd.status='ENABLE'
   LEFT JOIN sys_dict_type padt ON padt.tenant_id=p.tenant_id AND padt.dict_code='approval_status' AND padt.status='ENABLE'
   LEFT JOIN sys_dict_data padd ON padd.tenant_id=p.tenant_id AND padd.dict_type_id=padt.id AND padd.dict_value=p.approval_status AND padd.status='ENABLE'
-  WHERE p.tenant_id=0 AND p.project_code LIKE 'CGC-DEMO-M52-%' AND p.deleted_flag=0 AND (ptdd.id IS NULL OR psdd.id IS NULL OR padd.id IS NULL)
+  WHERE p.tenant_id=0 AND p.id IN (520000000000000001,520000000000009001,520000000000009002,520000000000009003,520000000000009004,520000000000009005,520000000000009006,520000000000009007) AND p.deleted_flag=0 AND (ptdd.id IS NULL OR psdd.id IS NULL OR padd.id IS NULL)
 UNION ALL SELECT 'project_invalid_dates',COUNT(*) FROM pm_project
-  WHERE tenant_id=0 AND project_code LIKE 'CGC-DEMO-M52-%' AND deleted_flag=0
+  WHERE tenant_id=0 AND id IN (520000000000000001,520000000000009001,520000000000009002,520000000000009003,520000000000009004,520000000000009005,520000000000009006,520000000000009007) AND deleted_flag=0
     AND (planned_start_date>planned_end_date OR (actual_start_date IS NOT NULL AND actual_end_date IS NOT NULL AND actual_start_date>actual_end_date))
 UNION ALL SELECT 'contract_type_missing',COUNT(*) FROM sys_dict_data dd JOIN sys_dict_type dt ON dt.id=dd.dict_type_id
   WHERE dt.tenant_id=0 AND dt.dict_code='contract_type' AND dt.status='ENABLE' AND dd.status='ENABLE'
-    AND NOT EXISTS (SELECT 1 FROM ct_contract c WHERE c.tenant_id=0 AND c.contract_code LIKE 'M52-%' AND c.deleted_flag=0 AND c.contract_type=dd.dict_value)
+    AND NOT EXISTS (SELECT 1 FROM ct_contract c WHERE c.tenant_id=0 AND c.id BETWEEN 520000000000000000 AND 520000000000009999 AND c.deleted_flag=0 AND c.contract_type=dd.dict_value)
 UNION ALL SELECT 'contract_status_missing',COUNT(*) FROM sys_dict_data dd JOIN sys_dict_type dt ON dt.id=dd.dict_type_id
   WHERE dt.tenant_id=0 AND dt.dict_code='contract_status' AND dt.status='ENABLE' AND dd.status='ENABLE'
-    AND NOT EXISTS (SELECT 1 FROM ct_contract c WHERE c.tenant_id=0 AND c.contract_code LIKE 'M52-%' AND c.deleted_flag=0 AND c.contract_status=dd.dict_value)
+    AND NOT EXISTS (SELECT 1 FROM ct_contract c WHERE c.tenant_id=0 AND c.id BETWEEN 520000000000000000 AND 520000000000009999 AND c.deleted_flag=0 AND c.contract_status=dd.dict_value)
 UNION ALL SELECT 'contract_invalid_authority',COUNT(*) FROM ct_contract c
   LEFT JOIN sys_dict_type ctdt ON ctdt.tenant_id=c.tenant_id AND ctdt.dict_code='contract_type' AND ctdt.status='ENABLE'
   LEFT JOIN sys_dict_data ctdd ON ctdd.tenant_id=c.tenant_id AND ctdd.dict_type_id=ctdt.id AND ctdd.dict_value=c.contract_type AND ctdd.status='ENABLE'
@@ -183,11 +244,11 @@ UNION ALL SELECT 'contract_invalid_authority',COUNT(*) FROM ct_contract c
   LEFT JOIN sys_dict_data csdd ON csdd.tenant_id=c.tenant_id AND csdd.dict_type_id=csdt.id AND csdd.dict_value=c.contract_status AND csdd.status='ENABLE'
   LEFT JOIN sys_dict_type cadt ON cadt.tenant_id=c.tenant_id AND cadt.dict_code='approval_status' AND cadt.status='ENABLE'
   LEFT JOIN sys_dict_data cadd ON cadd.tenant_id=c.tenant_id AND cadd.dict_type_id=cadt.id AND cadd.dict_value=c.approval_status AND cadd.status='ENABLE'
-  WHERE c.tenant_id=0 AND c.contract_code LIKE 'M52-%' AND c.deleted_flag=0 AND (ctdd.id IS NULL OR csdd.id IS NULL OR cadd.id IS NULL)
+  WHERE c.tenant_id=0 AND c.id BETWEEN 520000000000000000 AND 520000000000009999 AND c.deleted_flag=0 AND (ctdd.id IS NULL OR csdd.id IS NULL OR cadd.id IS NULL)
 UNION ALL SELECT 'contract_invalid_parties',COUNT(*) FROM ct_contract c
   LEFT JOIN md_partner pa ON pa.id=c.party_a_id AND pa.tenant_id=c.tenant_id AND pa.deleted_flag=0
   LEFT JOIN md_partner pb ON pb.id=c.party_b_id AND pb.tenant_id=c.tenant_id AND pb.deleted_flag=0
-  WHERE c.tenant_id=0 AND c.contract_code LIKE 'M52-%' AND c.deleted_flag=0 AND (c.party_a_id=c.party_b_id OR pa.id IS NULL OR pb.id IS NULL)
+  WHERE c.tenant_id=0 AND c.id BETWEEN 520000000000000000 AND 520000000000009999 AND c.deleted_flag=0 AND (c.party_a_id=c.party_b_id OR pa.id IS NULL OR pb.id IS NULL)
 UNION ALL SELECT 'workflow_instance_status_missing',COUNT(*) FROM sys_dict_data dd JOIN sys_dict_type dt ON dt.id=dd.dict_type_id
   WHERE dt.tenant_id=0 AND dt.dict_code='wf_instance_status' AND dt.status='ENABLE' AND dd.status='ENABLE'
     AND NOT EXISTS (SELECT 1 FROM wf_instance w WHERE w.tenant_id=0 AND w.id BETWEEN 520000000000000000 AND 520000000000009999 AND w.deleted_flag=0 AND w.instance_status=dd.dict_value)
@@ -283,11 +344,26 @@ $oneKeys = @('project','material','bid_transfer','target','purchase_request','pu
     'cost_forecast','cost_corrective_action','finance_reconciliation_run','finance_import_batch','inventory_exception',
     'material_return_reversal','document_template','demo_user')
 $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $invalidCreditPartners.Count -eq 0 `
-    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 15 `
+    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 19 `
     -and $metrics.role_test_account -eq 8 -and $metrics.dashboard_trend_month -eq 7 -and $metrics.role_test_scope -eq 8 `
     -and $metrics.document_generation -eq 2 -and $metrics.finance_demo_budget -eq 1 `
     -and $metrics.finance_demo_pay_application -eq 4 -and $metrics.finance_demo_pay_record -eq 4 `
-    -and $metrics.finance_demo_paid -eq 340000 -and $metrics.finance_demo_processing -eq 120000
+    -and $metrics.finance_demo_paid -eq 340000 -and $metrics.finance_demo_processing -eq 120000 `
+    -and $metrics.role_dashboard_contract -eq 1 -and $metrics.role_dashboard_variation -eq 1 `
+    -and $metrics.role_dashboard_measure -eq 1 -and $metrics.role_dashboard_settlement -eq 1 `
+    -and $metrics.role_dashboard_purchase -eq 1 -and $metrics.role_dashboard_receipt -eq 1 `
+    -and $metrics.role_dashboard_requisition -eq 1 -and $metrics.role_dashboard_low_stock -eq 1 `
+    -and $metrics.role_dashboard_tech -eq 3 -and $metrics.role_dashboard_task -eq 1 `
+    -and $metrics.role_dashboard_lagging -eq 1 `
+    -and $metrics.risk_level_contracts -eq 2 -and $metrics.risk_level_project_task -eq 1 `
+    -and $metrics.risk_level_purchase_order -eq 1 -and $metrics.risk_level_measures -eq 4 `
+    -and $metrics.risk_level_tech_items -eq 2 -and $metrics.risk_level_finance_records -eq 4 `
+    -and $metrics.risk_level_alert_severities -eq 4 `
+    -and $metrics.cost_breakdown_rows -eq 5 -and $metrics.cost_breakdown_roots -eq 1 `
+    -and $metrics.cost_breakdown_children -eq 4 -and $metrics.cost_breakdown_permission -eq 1 `
+    -and $metrics.cost_breakdown_target_delta -eq 0 -and $metrics.cost_breakdown_actual_delta -eq 0 `
+    -and $metrics.cost_breakdown_dynamic_delta -eq 0 -and $metrics.cost_breakdown_deviation_delta -eq 0 `
+    -and $metrics.invalid_business_code -eq 0
 foreach ($key in $oneKeys) { $passed = $passed -and $metrics[$key] -eq 1 }
 $passed = $passed -and $metrics.requested_qty -eq 100 -and $metrics.ordered_qty -eq 100 `
     -and $metrics.received_qty -eq 100 -and $metrics.issued_qty -eq 20 -and $metrics.stock_qty -eq 80 `

@@ -153,6 +153,7 @@ class PaymentWritebackTest {
         PayRecord input1 = buildPayRecord(new BigDecimal("100000.00"), "TXN-WB-UNIQUE");
         PayRecordVO vo1 = payRecordService.writeback(input1);
         assertNotNull(vo1.getId(), "首次写回应返回 ID");
+        assertTrue(vo1.getRecordCode().matches("PMT-\\d{8}-\\d{3}"), "付款记录编号应符合统一规则");
 
         // 同流水号再次写回
         PayRecord input2 = buildPayRecord(new BigDecimal("100000.00"), "TXN-WB-UNIQUE");
