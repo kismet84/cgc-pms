@@ -158,6 +158,7 @@ export interface DashboardContractItemVO {
 
 export interface DashboardPaymentItemVO {
   payRecordId: string;
+  recordCode?: string;
   contractId: string;
   contractName: string;
   partnerName: string;
@@ -354,6 +355,22 @@ export interface FinanceDashboardVO {
   trendPoints: FinanceDashboardTrendPoint[];
   pendingPayments: DashboardPaymentItemVO[];
   overRatioPayments: DashboardPaymentItemVO[];
+  contractFundBreakdowns: FinanceContractFundBreakdown[];
+}
+
+export interface FinanceContractFundBreakdown {
+  contractId: string;
+  projectId: string;
+  projectName: string;
+  contractCode: string;
+  contractName: string;
+  contractAmount: string;
+  paidAmount: string;
+  approvingAmount: string;
+  approvedUnpaidAmount: string;
+  remainingAmount: string;
+  paymentRatio: string;
+  paymentRecords: DashboardPaymentItemVO[];
 }
 
 export interface FinanceDashboardTrendPoint {

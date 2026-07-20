@@ -1,4 +1,5 @@
 import type {
+  CostBreakdownVO,
   CostManagerDashboardVO,
   FinanceDashboardVO,
   ProjectManagerDashboardVO,
@@ -59,6 +60,38 @@ const costData: CostManagerDashboardVO = {
   ledgerTotal: 0,
 }
 
+const costBreakdownData: CostBreakdownVO = {
+  projectId: '1',
+  projectName: '项目一',
+  targetCost: '3900000.00',
+  dynamicCost: '3970000.00',
+  expectedProfit: '1030000.00',
+  subjectBreakdowns: [
+    {
+      costSubjectId: '900001',
+      costSubjectName: '合同履约成本',
+      level: 1,
+      parentSubjectId: '0',
+      targetCost: '3900000.00',
+      contractLockedCost: '3100000.00',
+      actualCost: '2400000.00',
+      dynamicCost: '3970000.00',
+      costDeviation: '70000.00',
+    },
+    {
+      costSubjectId: '900010',
+      costSubjectName: '招投标及前期费用',
+      level: 2,
+      parentSubjectId: '900001',
+      targetCost: '200000.00',
+      contractLockedCost: '160000.00',
+      actualCost: '150000.00',
+      dynamicCost: '180000.00',
+      costDeviation: '-20000.00',
+    },
+  ],
+}
+
 const financeData: FinanceDashboardVO = {
   projectId: '1',
   projectName: '项目一',
@@ -104,6 +137,35 @@ const financeData: FinanceDashboardVO = {
     },
   ],
   overRatioPayments: [],
+  contractFundBreakdowns: [
+    {
+      contractId: '88',
+      projectId: '1',
+      projectName: '项目一',
+      contractCode: 'M52-SERVICE-C',
+      contractName: '项目管理服务合同',
+      contractAmount: '800000.00',
+      paidAmount: '340000.00',
+      approvingAmount: '90000.00',
+      approvedUnpaidAmount: '120000.00',
+      remainingAmount: '460000.00',
+      paymentRatio: '42.50',
+      paymentRecords: [
+        {
+          payRecordId: '99',
+          recordCode: 'PMT-20260718-001',
+          contractId: '88',
+          contractName: '项目管理服务合同',
+          partnerName: '演示合作方',
+          payAmount: '120000.00',
+          payDate: '2026-07-18',
+          payStatus: 'SUCCESS',
+          projectId: '1',
+          projectName: '项目一',
+        },
+      ],
+    },
+  ],
 }
 
 function deferred<T>() {
@@ -165,12 +227,70 @@ describe('M2 dashboard page', () => {
     expect(wrapper.text()).toContain('待处理任务')
     expect(wrapper.text()).toContain('2')
     expect(wrapper.text()).toContain('项目经营健康度')
-    expect(wrapper.text()).toContain('经营趋势')
+    expect(wrapper.text()).toContain('经营动态')
+    expect(wrapper.text()).not.toContain('当前角色暂无趋势数据')
     expect(wrapper.text()).toContain('经营预警与待办')
     expect(wrapper.get('.command-panel__title .dashboard-page__outline-link').text()).toBe(
-      '查看并处理最高风险',
+      '查看最高风险',
     )
     expect(wrapper.find('.highest-risk .dashboard-page__outline-link').exists()).toBe(false)
+  })
+
+  it('filters by semantic risk level and the header action selects highest risks', async () => {
+    vi.mocked(loadDashboard).mockResolvedValue({
+      ...costData,
+      overBudgetAlerts: [
+        {
+          alertType: 'COST_OVER_BUDGET',
+          severity: 'MEDIUM',
+          message: '一般关注事项',
+          projectId: '1',
+          projectName: '项目一',
+          triggeredAt: '2026-07-20 10:00:00',
+        },
+        {
+          alertType: 'COST_OVER_BUDGET',
+          severity: 'HIGH',
+          message: '最高风险事项',
+          projectId: '1',
+          projectName: '项目一',
+          triggeredAt: '2026-07-20 11:00:00',
+        },
+        {
+          alertType: 'COST_OVER_BUDGET',
+          severity: 'LOW',
+          message: '低风险事项',
+          projectId: '1',
+          projectName: '项目一',
+          triggeredAt: '2026-07-20 12:00:00',
+        },
+        {
+          alertType: 'COST_OVER_BUDGET',
+          severity: 'INFO',
+          message: '其他事项',
+          projectId: '1',
+          projectName: '项目一',
+          triggeredAt: '2026-07-20 13:00:00',
+        },
+      ],
+    })
+    const { wrapper } = await mountDashboard(['dashboard:cost-manager:view'])
+    const filter = wrapper.get('.risk-filter')
+    const riskList = wrapper.get('#risk-list')
+
+    await filter
+      .findAll('button')
+      .find((button) => button.text() === '中')!
+      .trigger('click')
+    expect(riskList.text()).toContain('一般关注事项')
+    expect(riskList.text()).not.toContain('最高风险事项')
+    expect(wrapper.get('.risk-level').text()).toBe('中')
+
+    await wrapper.get('.command-panel__title .dashboard-page__outline-link').trigger('click')
+    expect(filter.get('summary').text()).toBe('高')
+    expect(riskList.text()).toContain('最高风险事项')
+    expect(riskList.text()).not.toContain('一般关注事项')
+    expect(wrapper.get('.risk-level').text()).toBe('高')
   })
 
   it('requests an aggregate role view when all projects and periods are selected', async () => {
@@ -256,6 +376,29 @@ describe('M2 dashboard page', () => {
     expect(wrapper.get('.test-trend-chart').text()).toContain('· 2')
   })
 
+  it('renders canonical cost subjects and toggles the second level', async () => {
+    vi.mocked(loadDashboard).mockResolvedValue(costData)
+    vi.mocked(loadCostBreakdown).mockResolvedValue(costBreakdownData)
+    const { wrapper } = await mountDashboard([
+      'dashboard:cost-manager:view',
+      'dashboard:cost-breakdown:view',
+    ])
+    const breakdownPanel = wrapper.get('#cost-breakdown')
+
+    expect(loadCostBreakdown).toHaveBeenCalledWith('1', expect.any(Object), expect.any(AbortSignal))
+    expect(breakdownPanel.findAll('tbody tr')).toHaveLength(1)
+    expect(breakdownPanel.text()).toContain('合同履约成本')
+    expect(breakdownPanel.text()).not.toContain('招投标及前期费用')
+
+    await breakdownPanel.get('button[aria-expanded="false"]').trigger('click')
+    expect(breakdownPanel.findAll('tbody tr')).toHaveLength(2)
+    expect(breakdownPanel.text()).toContain('招投标及前期费用')
+    expect(breakdownPanel.text()).toContain('¥−20,000.00')
+
+    await breakdownPanel.get('button[aria-expanded="true"]').trigger('click')
+    expect(breakdownPanel.findAll('tbody tr')).toHaveLength(1)
+  })
+
   it('renders finance payment trend, closed-loop indicators and pending work', async () => {
     vi.mocked(loadDashboard).mockResolvedValue(financeData)
     const { wrapper } = await mountDashboard(['dashboard:finance:view'])
@@ -271,5 +414,12 @@ describe('M2 dashboard page', () => {
     expect(wrapper.text()).toContain('累计支付')
     expect(wrapper.text()).toContain('项目管理服务合同')
     expect(wrapper.text()).toContain('PROCESSING')
+    const breakdown = wrapper.get('#finance-contract-breakdown')
+    expect(breakdown.text()).toContain('合同资金分解')
+    expect(breakdown.findAll('tbody tr')).toHaveLength(1)
+    await breakdown.get('button[aria-expanded="false"]').trigger('click')
+    expect(breakdown.findAll('tbody tr')).toHaveLength(2)
+    expect(breakdown.text()).toContain('PMT-20260718-001 · 2026-07-18')
+    expect(breakdown.text()).toContain('SUCCESS')
   })
 })

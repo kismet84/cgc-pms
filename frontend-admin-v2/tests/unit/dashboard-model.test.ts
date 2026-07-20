@@ -1,10 +1,13 @@
+import type { DashboardDataByRole } from '@cgc-pms/frontend-contracts'
 import { describe, expect, it } from 'vitest'
 import {
   compactDashboardValue,
+  dashboardActivityItems,
   deriveDashboardHealth,
   formatAmount,
   formatRatio,
   normalizeGaugeValue,
+  primaryRiskItems,
 } from '@/pages/dashboard/model'
 
 describe('dashboard display model', () => {
@@ -43,5 +46,131 @@ describe('dashboard display model', () => {
     expect(deriveDashboardHealth(1, 1, 2)).toEqual({ score: 83, label: '关注', tone: 'warning' })
     expect(deriveDashboardHealth(4, 3, 4)).toEqual({ score: 45, label: '风险', tone: 'danger' })
     expect(deriveDashboardHealth(99, 99, 99).score).toBe(0)
+  })
+
+  it('reuses role business records as activity instead of fabricating trend data', () => {
+    const purchase = {
+      purchaseOrders: [
+        {
+          sourceType: 'PURCHASE_ORDER',
+          sourceId: '1',
+          title: '钢筋采购订单',
+          projectName: '在建项目',
+          amount: '320000.00',
+          status: 'IN_PROGRESS',
+        },
+      ],
+      recentRequests: [],
+      pendingReceipts: [],
+    } as DashboardDataByRole['purchase']
+
+    expect(dashboardActivityItems('purchase', purchase)).toEqual([
+      {
+        id: 'PURCHASE_ORDER-1',
+        title: '钢筋采购订单',
+        meta: '在建项目',
+        value: '¥320,000.00',
+        status: 'IN_PROGRESS',
+      },
+    ])
+  })
+
+  it('classifies risk filters from business severity instead of list position', () => {
+    const cost = {
+      overBudgetAlerts: [
+        {
+          alertType: 'COST_OVER_BUDGET',
+          severity: 'MEDIUM',
+          message: '一般关注',
+          projectId: '1',
+          projectName: '项目一',
+          triggeredAt: '2026-07-20 10:00:00',
+        },
+        {
+          alertType: 'COST_OVER_BUDGET',
+          severity: 'HIGH',
+          message: '高风险',
+          projectId: '2',
+          projectName: '项目二',
+          triggeredAt: '2026-07-20 11:00:00',
+        },
+        {
+          alertType: 'COST_OVER_BUDGET',
+          severity: 'LOW',
+          message: '低风险',
+          projectId: '3',
+          projectName: '项目三',
+          triggeredAt: '2026-07-20 12:00:00',
+        },
+        {
+          alertType: 'COST_OVER_BUDGET',
+          severity: 'INFO',
+          message: '其他提醒',
+          projectId: '4',
+          projectName: '项目四',
+          triggeredAt: '2026-07-20 13:00:00',
+        },
+      ],
+    } as DashboardDataByRole['cost']
+
+    expect(primaryRiskItems('cost', cost).map((item) => item.riskLevel)).toEqual([
+      'medium',
+      'high',
+      'low',
+      'other',
+    ])
+  })
+
+  it('classifies business contracts into the unified four levels', () => {
+    const dateAfter = (days: number) => {
+      const date = new Date()
+      date.setDate(date.getDate() + days)
+      return date.toISOString().slice(0, 10)
+    }
+    const business = {
+      recentChanges: [
+        {
+          contractId: '1',
+          contractCode: 'C-001',
+          contractName: '长期合同',
+          currentAmount: '800000',
+          contractStatus: 'PERFORMING',
+          endDate: dateAfter(365),
+        },
+        {
+          contractId: '2',
+          contractCode: 'C-002',
+          contractName: '高风险合同',
+          currentAmount: '720000',
+          contractStatus: 'PERFORMING',
+          endDate: dateAfter(20),
+        },
+        {
+          contractId: '3',
+          contractCode: 'C-003',
+          contractName: '中风险合同',
+          currentAmount: '710000',
+          contractStatus: 'PERFORMING',
+          endDate: dateAfter(60),
+        },
+        {
+          contractId: '4',
+          contractCode: 'C-004',
+          contractName: '低风险合同',
+          currentAmount: '700000',
+          contractStatus: 'PERFORMING',
+          endDate: dateAfter(120),
+        },
+      ],
+    } as DashboardDataByRole['bm']
+
+    expect(primaryRiskItems('bm', business).map((item) => item.riskLevel)).toEqual([
+      'other',
+      'high',
+      'medium',
+      'low',
+    ])
+    expect(primaryRiskItems('bm', business)[0]?.meta).toBe('C-001')
+    expect(dashboardActivityItems('bm', business)[0]?.meta).toBe('C-001')
   })
 })

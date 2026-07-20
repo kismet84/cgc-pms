@@ -12,6 +12,16 @@ export interface DashboardListItem {
   meta: string
   value?: string
   status?: string
+  riskLevel?: DashboardRiskLevel
+}
+
+export type DashboardRiskLevel = 'high' | 'medium' | 'low' | 'other'
+
+export const DASHBOARD_RISK_LABELS: Record<DashboardRiskLevel, string> = {
+  high: '高',
+  medium: '中',
+  low: '低',
+  other: '其他',
 }
 
 export interface DashboardHealth {
@@ -238,21 +248,43 @@ export function primaryRiskItems(
   data: DashboardDataByRole[DashboardRole],
 ): DashboardListItem[] {
   switch (role) {
-    case 'pm':
-      return (data as DashboardDataByRole['pm']).laggingProjects.map((item) => ({
-        id: item.projectId,
-        title: item.projectName,
-        meta: `项目 ${item.projectCode}`,
-        value: formatAmount(item.costDeviation),
-        status: `${item.riskCount} 项风险`,
-      }))
+    case 'pm': {
+      const item = data as DashboardDataByRole['pm']
+      const personalTaskIds = new Set(item.pendingTasks.map((task) => task.taskId))
+      return [
+        ...item.laggingProjects.map((project) => ({
+          id: `lagging-${project.projectId}`,
+          title: project.projectName,
+          meta: `项目 ${project.projectCode}`,
+          value: formatAmount(project.costDeviation),
+          status: `${project.riskCount} 项风险`,
+          riskLevel: 'high' as const,
+        })),
+        ...item.expiringContracts.map((contract) => ({
+          id: `contract-${contract.contractId}`,
+          title: contract.contractName,
+          meta: contract.contractCode,
+          value: formatAmount(contract.currentAmount),
+          status: '合同临期',
+          riskLevel: 'medium' as const,
+        })),
+        ...item.pendingApprovals
+          .filter((task) => !personalTaskIds.has(task.taskId))
+          .map((task) => ({ ...taskItem(task), riskLevel: 'low' as const })),
+        ...item.pendingTasks.map((task) => ({
+          ...taskItem(task),
+          riskLevel: 'other' as const,
+        })),
+      ]
+    }
     case 'bm':
       return (data as DashboardDataByRole['bm']).recentChanges.map((item) => ({
         id: item.contractId,
         title: item.contractName,
-        meta: `${item.projectName} · ${item.contractCode}`,
+        meta: [item.projectName, item.contractCode].filter(Boolean).join(' · '),
         value: formatAmount(item.currentAmount),
         status: item.contractStatus,
+        riskLevel: contractRiskLevel(item.endDate),
       }))
     case 'cost':
       return (data as DashboardDataByRole['cost']).overBudgetAlerts.map((item, index) => ({
@@ -260,16 +292,54 @@ export function primaryRiskItems(
         title: item.message,
         meta: item.projectName,
         status: `${item.severity} · ${item.alertType}`,
+        riskLevel: alertRiskLevel(item.severity),
       }))
-    case 'purchase':
-      return (data as DashboardDataByRole['purchase']).overdueOrders.map(businessItem)
+    case 'purchase': {
+      const item = data as DashboardDataByRole['purchase']
+      return [
+        ...item.overdueOrders.map((order) => ({
+          ...businessItem(order),
+          riskLevel: overdueRiskLevel(order.overdueDays),
+        })),
+        ...item.pendingReceipts.map((receipt) => ({
+          ...businessItem(receipt),
+          riskLevel: 'low' as const,
+        })),
+        ...item.recentRequests.map((request) => ({
+          ...businessItem(request),
+          riskLevel: 'other' as const,
+        })),
+      ]
+    }
     case 'production':
-      return (data as DashboardDataByRole['production']).recentSubMeasures.map(businessItem)
-    case 'chiefEngineer':
-      return (data as DashboardDataByRole['chiefEngineer']).overdueItems.map(businessItem)
+      return (data as DashboardDataByRole['production']).recentSubMeasures.map((item) => ({
+        ...businessItem(item),
+        riskLevel: statusRiskLevel(item.status),
+      }))
+    case 'chiefEngineer': {
+      const item = data as DashboardDataByRole['chiefEngineer']
+      const overdueIds = new Set(item.overdueItems.map((entry) => entry.sourceId))
+      return [
+        ...item.overdueItems.map((entry) => ({
+          ...businessItem(entry),
+          riskLevel: overdueRiskLevel(entry.overdueDays),
+        })),
+        ...item.openIssues
+          .filter((entry) => !overdueIds.has(entry.sourceId))
+          .map((entry) => ({ ...businessItem(entry), riskLevel: 'low' as const })),
+        ...[...item.pendingReviews, ...item.pendingCoordinations]
+          .filter((entry) => !overdueIds.has(entry.sourceId))
+          .map((entry) => ({ ...businessItem(entry), riskLevel: 'other' as const })),
+      ]
+    }
     case 'finance': {
       const finance = data as DashboardDataByRole['finance']
-      const payments = [...finance.overRatioPayments, ...finance.pendingPayments].filter(
+      const overRatioPayments = finance.overRatioPayments.filter(
+        (item, index, all) =>
+          all.findIndex((candidate) => candidate.contractId === item.contractId) === index,
+      )
+      const overRatioIds = new Set(overRatioPayments.map((item) => item.payRecordId))
+      const payments = [...overRatioPayments, ...finance.pendingPayments].filter(
         (item, index, all) =>
           all.findIndex((candidate) => candidate.payRecordId === item.payRecordId) === index,
       )
@@ -279,6 +349,9 @@ export function primaryRiskItems(
         meta: [item.projectName, item.partnerName].filter(Boolean).join(' · '),
         value: formatAmount(item.payAmount),
         status: item.payStatus,
+        riskLevel: overRatioIds.has(item.payRecordId)
+          ? 'high'
+          : financePaymentRiskLevel(item.payStatus),
       }))
     }
     case 'mgmt':
@@ -287,7 +360,114 @@ export function primaryRiskItems(
         title: item.message,
         meta: item.projectName,
         status: `${item.severity} · ${item.alertType}`,
+        riskLevel: alertRiskLevel(item.severity),
       }))
+  }
+}
+
+function alertRiskLevel(severity: string): DashboardRiskLevel {
+  const normalized = severity.toUpperCase()
+  if (['CRITICAL', 'HIGH'].includes(normalized)) return 'high'
+  if (normalized === 'MEDIUM') return 'medium'
+  if (normalized === 'LOW') return 'low'
+  return 'other'
+}
+
+function overdueRiskLevel(overdueDays?: number): DashboardRiskLevel {
+  if ((overdueDays ?? 0) >= 7) return 'high'
+  if ((overdueDays ?? 0) > 0) return 'medium'
+  return 'low'
+}
+
+function contractRiskLevel(endDate?: string): DashboardRiskLevel {
+  const timestamp = Date.parse(endDate ?? '')
+  if (Number.isNaN(timestamp)) return 'other'
+  const remainingDays = (timestamp - Date.now()) / (24 * 60 * 60 * 1000)
+  if (remainingDays <= 30) return 'high'
+  if (remainingDays <= 90) return 'medium'
+  if (remainingDays <= 180) return 'low'
+  return 'other'
+}
+
+function statusRiskLevel(status?: string): DashboardRiskLevel {
+  const normalized = status?.toUpperCase() ?? ''
+  if (['REJECTED', 'FAILED', 'OVERDUE', 'BLOCKED'].includes(normalized)) return 'high'
+  if (['PENDING', 'PROCESSING', 'RUNNING'].includes(normalized)) return 'medium'
+  if (['APPROVED', 'CONFIRMED', 'SUCCESS'].includes(normalized)) return 'low'
+  return 'other'
+}
+
+function financePaymentRiskLevel(status?: string): DashboardRiskLevel {
+  const normalized = status?.toUpperCase() ?? ''
+  if (['FAILED', 'REJECTED', 'OVERDUE', 'BLOCKED'].includes(normalized)) return 'high'
+  if (normalized === 'PROCESSING') return 'medium'
+  if (normalized === 'PENDING') return 'low'
+  return 'other'
+}
+
+export function dashboardActivityItems(
+  role: DashboardRole,
+  data: DashboardDataByRole[DashboardRole],
+): DashboardListItem[] {
+  switch (role) {
+    case 'pm': {
+      const item = data as DashboardDataByRole['pm']
+      return [
+        ...item.pendingTasks.map((task) => ({
+          id: task.taskId,
+          title: task.title,
+          meta: task.projectName,
+          value: task.amount ? formatAmount(task.amount) : undefined,
+          status: task.taskStatus,
+        })),
+        ...item.expiringContracts.map((contract) => ({
+          id: contract.contractId,
+          title: contract.contractName,
+          meta: `${contract.contractCode} · ${contract.endDate}`,
+          value: formatAmount(contract.currentAmount),
+          status: '即将到期',
+        })),
+      ]
+    }
+    case 'bm': {
+      const item = data as DashboardDataByRole['bm']
+      return item.recentChanges.map((contract) => ({
+        id: contract.contractId,
+        title: contract.contractName,
+        meta: [contract.projectName, contract.contractCode].filter(Boolean).join(' · '),
+        value: formatAmount(contract.currentAmount),
+        status: contract.contractStatus,
+      }))
+    }
+    case 'purchase': {
+      const item = data as DashboardDataByRole['purchase']
+      return [...item.purchaseOrders, ...item.recentRequests, ...item.pendingReceipts].map(
+        businessItem,
+      )
+    }
+    case 'production': {
+      const item = data as DashboardDataByRole['production']
+      return [...item.recentReceipts, ...item.recentRequisitions, ...item.recentSubMeasures].map(
+        businessItem,
+      )
+    }
+    case 'chiefEngineer': {
+      const item = data as DashboardDataByRole['chiefEngineer']
+      return [...item.pendingReviews, ...item.pendingCoordinations, ...item.openIssues].map(
+        businessItem,
+      )
+    }
+    case 'mgmt':
+      return (data as DashboardDataByRole['mgmt']).projectRankings.map((project) => ({
+        id: project.projectId,
+        title: project.projectName,
+        meta: project.projectCode,
+        value: formatAmount(project.expectedProfit),
+        status: project.status,
+      }))
+    case 'cost':
+    case 'finance':
+      return []
   }
 }
 
@@ -305,5 +485,15 @@ function businessItem(item: {
     meta: item.projectName,
     value: formatAmount(item.amount),
     status: item.status,
+  }
+}
+
+function taskItem(item: DashboardDataByRole['pm']['pendingTasks'][number]): DashboardListItem {
+  return {
+    id: `task-${item.taskId}`,
+    title: item.title,
+    meta: item.projectName,
+    value: item.amount ? formatAmount(item.amount) : undefined,
+    status: item.taskStatus,
   }
 }

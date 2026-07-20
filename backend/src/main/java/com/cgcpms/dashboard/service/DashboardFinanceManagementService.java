@@ -172,6 +172,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
 
         // Over-ratio payments: SUM of excess where SUCCESS paid > contract_amount
         BigDecimal overRatioTotal = BigDecimal.ZERO;
+        Set<Long> overRatioContractIds = new HashSet<>();
         List<PayRecord> successRecords = payRecords.stream()
                 .filter(p -> "SUCCESS".equals(p.getPayStatus()) && p.getContractId() != null)
                 .collect(Collectors.toList());
@@ -195,6 +196,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                 if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
                 if (entry.getValue().compareTo(contractAmount) > 0) {
                     overRatioTotal = overRatioTotal.add(entry.getValue().subtract(contractAmount));
+                    overRatioContractIds.add(entry.getKey());
                 }
             }
         }
@@ -219,6 +221,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         vo.setPendingPayments(pendingPayments.stream().limit(20).map(p -> {
             DashboardPaymentItemVO item = new DashboardPaymentItemVO();
             item.setPayRecordId(String.valueOf(p.getId()));
+            item.setRecordCode(p.getRecordCode());
             item.setContractId(p.getContractId() != null ? String.valueOf(p.getContractId()) : null);
             item.setPayAmount(p.getPayAmount() != null ? p.getPayAmount().toPlainString() : "0");
             item.setPayDate(p.getPayDate() != null ? p.getPayDate().toString() : null);
@@ -228,7 +231,11 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             return item;
         }).collect(Collectors.toList()));
 
-        vo.setOverRatioPayments(Collections.emptyList());
+        vo.setOverRatioPayments(successRecords.stream()
+                .filter(p -> overRatioContractIds.contains(p.getContractId()))
+                .limit(20)
+                .map(p -> toPaymentItem(p, project.getProjectName()))
+                .collect(Collectors.toList()));
 
         applyClosedLoopMetrics(vo, tenantId, List.of(projectId));
 
@@ -357,16 +364,15 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                 }).collect(Collectors.toList());
         vo.setOverdueItems(overdueItems);
 
-        // Risks from alert_log: HIGH severity unread alerts tenant-wide
-        List<AlertLog> highAlerts = alertLogMapper.selectList(
+        // Risks from alert_log: unread alerts tenant-wide, preserving severity for UI filtering.
+        List<AlertLog> unreadAlerts = alertLogMapper.selectList(
                 new LambdaQueryWrapper<AlertLog>()
                         .eq(AlertLog::getTenantId, tenantId)
                         .in(AlertLog::getProjectId, visibleProjectIds)
                         .eq(AlertLog::getIsRead, 0)
-                        .eq(AlertLog::getSeverity, "HIGH")
                         .orderByDesc(AlertLog::getTriggeredAt));
-        vo.setTotalRiskCount((long) highAlerts.size());
-        vo.setMajorRisks(highAlerts.stream().limit(10).map(this::toAlertItem).collect(Collectors.toList()));
+        vo.setTotalRiskCount((long) unreadAlerts.size());
+        vo.setMajorRisks(unreadAlerts.stream().limit(10).map(this::toAlertItem).collect(Collectors.toList()));
 
         return vo;
     }
@@ -387,10 +393,10 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
     }
 
     private FinanceDashboardVO getFinanceViewAllProjects(Long tenantId) {
-        List<PmProject> activeProjects = projectMapper.selectList(
+        List<PmProject> activeProjects = projectAccessChecker.filterAccessible(projectMapper.selectList(
                 new LambdaQueryWrapper<PmProject>()
                         .eq(PmProject::getTenantId, tenantId)
-                        .eq(PmProject::getStatus, "ACTIVE"));
+                        .eq(PmProject::getStatus, "ACTIVE")));
         List<Long> projectIds = activeProjects.stream().map(PmProject::getId).collect(Collectors.toList());
 
         FinanceDashboardVO vo = new FinanceDashboardVO();
@@ -428,6 +434,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
 
         // Over-ratio payments
         BigDecimal overRatioTotal = BigDecimal.ZERO;
+        Set<Long> overRatioContractIds = new HashSet<>();
         List<PayRecord> successRecords = allPayRecords.stream()
                 .filter(p -> "SUCCESS".equals(p.getPayStatus()) && p.getContractId() != null)
                 .collect(Collectors.toList());
@@ -451,6 +458,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                 if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
                 if (entry.getValue().compareTo(contractAmount) > 0) {
                     overRatioTotal = overRatioTotal.add(entry.getValue().subtract(contractAmount));
+                    overRatioContractIds.add(entry.getKey());
                 }
             }
         }
@@ -477,6 +485,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         vo.setPendingPayments(pendingPayments.stream().limit(20).map(p -> {
             DashboardPaymentItemVO item = new DashboardPaymentItemVO();
             item.setPayRecordId(String.valueOf(p.getId()));
+            item.setRecordCode(p.getRecordCode());
             item.setContractId(p.getContractId() != null ? String.valueOf(p.getContractId()) : null);
             item.setPayAmount(p.getPayAmount() != null ? p.getPayAmount().toPlainString() : "0");
             item.setPayDate(p.getPayDate() != null ? p.getPayDate().toString() : null);
@@ -485,11 +494,28 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             item.setProjectName(projectNameMap.getOrDefault(p.getProjectId(), ""));
             return item;
         }).collect(Collectors.toList()));
-        vo.setOverRatioPayments(Collections.emptyList());
+        vo.setOverRatioPayments(successRecords.stream()
+                .filter(p -> overRatioContractIds.contains(p.getContractId()))
+                .limit(20)
+                .map(p -> toPaymentItem(p, projectNameMap.getOrDefault(p.getProjectId(), "")))
+                .collect(Collectors.toList()));
 
         applyClosedLoopMetrics(vo, tenantId, projectIds);
 
         return vo;
+    }
+
+    private DashboardPaymentItemVO toPaymentItem(PayRecord payment, String projectName) {
+        DashboardPaymentItemVO item = new DashboardPaymentItemVO();
+        item.setPayRecordId(String.valueOf(payment.getId()));
+        item.setRecordCode(payment.getRecordCode());
+        item.setContractId(payment.getContractId() != null ? String.valueOf(payment.getContractId()) : null);
+        item.setPayAmount(payment.getPayAmount() != null ? payment.getPayAmount().toPlainString() : "0");
+        item.setPayDate(payment.getPayDate() != null ? payment.getPayDate().toString() : null);
+        item.setPayStatus(payment.getPayStatus());
+        item.setProjectId(String.valueOf(payment.getProjectId()));
+        item.setProjectName(projectName);
+        return item;
     }
 
     private void applyClosedLoopMetrics(FinanceDashboardVO vo, Long tenantId, List<Long> projectIds) {
@@ -507,6 +533,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             vo.setProjectProfit("0.00");
             vo.setMetricFormulaVersion("PAYMENT_CLOSED_LOOP_V1");
             vo.setTrendPoints(Collections.emptyList());
+            vo.setContractFundBreakdowns(Collections.emptyList());
             return;
         }
         List<PayApplication> applications = payApplicationMapper.selectList(
@@ -551,6 +578,8 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
 
         List<PmProject> projects = projectMapper.selectList(new LambdaQueryWrapper<PmProject>()
                 .eq(PmProject::getTenantId, tenantId).in(PmProject::getId, projectIds));
+        Map<Long, String> projectNames = projects.stream().collect(Collectors.toMap(
+                PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         BigDecimal projectIncome = projects.stream().map(PmProject::getContractAmount)
                 .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
         vo.setTotalContractAmount(contractAmount.toPlainString());
@@ -563,6 +592,77 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         vo.setProjectProfit(projectIncome.subtract(consumed).toPlainString());
         vo.setMetricFormulaVersion("PAYMENT_CLOSED_LOOP_V1");
         vo.setTrendPoints(buildFinanceTrendPoints(allPayRecords));
+        vo.setContractFundBreakdowns(buildContractFundBreakdowns(
+                contracts, applications, allPayRecords, projectNames));
+    }
+
+    private List<FinanceDashboardVO.ContractFundBreakdown> buildContractFundBreakdowns(
+            List<CtContract> contracts,
+            List<PayApplication> applications,
+            List<PayRecord> records,
+            Map<Long, String> projectNames) {
+        Map<Long, List<PayApplication>> applicationsByContract = applications.stream()
+                .filter(item -> item.getContractId() != null)
+                .collect(Collectors.groupingBy(PayApplication::getContractId));
+        Map<Long, List<PayRecord>> recordsByContract = records.stream()
+                .filter(item -> item.getContractId() != null)
+                .collect(Collectors.groupingBy(PayRecord::getContractId));
+
+        return contracts.stream()
+                .sorted(Comparator.comparing(CtContract::getContractCode,
+                                Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(CtContract::getId))
+                .map(contract -> {
+                    List<PayApplication> contractApplications = applicationsByContract
+                            .getOrDefault(contract.getId(), Collections.emptyList());
+                    List<PayRecord> contractRecords = recordsByContract
+                            .getOrDefault(contract.getId(), Collections.emptyList());
+                    BigDecimal contractAmount = contract.getCurrentAmount() != null
+                            ? contract.getCurrentAmount() : nz(contract.getContractAmount());
+                    BigDecimal paidAmount = contractRecords.stream()
+                            .filter(record -> "SUCCESS".equals(record.getPayStatus()))
+                            .map(PayRecord::getPayAmount).filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal approvingAmount = contractApplications.stream()
+                            .filter(application -> "APPROVING".equals(application.getApprovalStatus()))
+                            .map(PayApplication::getApplyAmount).filter(Objects::nonNull)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal approvedUnpaidAmount = contractApplications.stream()
+                            .filter(application -> "APPROVED".equals(application.getApprovalStatus()))
+                            .map(application -> nz(application.getApplyAmount())
+                                    .subtract(nz(application.getActualPayAmount())))
+                            .filter(amount -> amount.compareTo(BigDecimal.ZERO) > 0)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal remainingAmount = contractAmount.subtract(paidAmount).max(BigDecimal.ZERO);
+                    BigDecimal paymentRatio = contractAmount.compareTo(BigDecimal.ZERO) == 0
+                            ? BigDecimal.ZERO
+                            : paidAmount.multiply(new BigDecimal("100"))
+                                    .divide(contractAmount, 2, RoundingMode.HALF_UP);
+
+                    FinanceDashboardVO.ContractFundBreakdown item = new FinanceDashboardVO.ContractFundBreakdown();
+                    item.setContractId(String.valueOf(contract.getId()));
+                    item.setProjectId(String.valueOf(contract.getProjectId()));
+                    item.setProjectName(projectNames.getOrDefault(contract.getProjectId(), ""));
+                    item.setContractCode(contract.getContractCode());
+                    item.setContractName(contract.getContractName());
+                    item.setContractAmount(contractAmount.toPlainString());
+                    item.setPaidAmount(paidAmount.toPlainString());
+                    item.setApprovingAmount(approvingAmount.toPlainString());
+                    item.setApprovedUnpaidAmount(approvedUnpaidAmount.toPlainString());
+                    item.setRemainingAmount(remainingAmount.toPlainString());
+                    item.setPaymentRatio(paymentRatio.toPlainString());
+                    item.setPaymentRecords(contractRecords.stream()
+                            .sorted(Comparator.comparing(PayRecord::getPayDate,
+                                            Comparator.nullsLast(Comparator.reverseOrder()))
+                                    .thenComparing(PayRecord::getId, Comparator.reverseOrder()))
+                            .map(record -> {
+                                DashboardPaymentItemVO payment = toPaymentItem(
+                                        record, projectNames.getOrDefault(record.getProjectId(), ""));
+                                payment.setContractName(contract.getContractName());
+                                return payment;
+                            }).collect(Collectors.toList()));
+                    return item;
+                }).collect(Collectors.toList());
     }
 
     private List<FinanceDashboardVO.TrendPoint> buildFinanceTrendPoints(List<PayRecord> records) {

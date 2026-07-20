@@ -32,6 +32,7 @@ public class FinanceDashboardVO {
     /** Detail lists */
     private List<DashboardPaymentItemVO> pendingPayments;
     private List<DashboardPaymentItemVO> overRatioPayments;
+    private List<ContractFundBreakdown> contractFundBreakdowns;
 
     @Data
     public static class TrendPoint {
@@ -39,5 +40,21 @@ public class FinanceDashboardVO {
         private String cashOutflowAmount;
         private String cumulativePaidAmount;
         private String pendingPaymentAmount;
+    }
+
+    @Data
+    public static class ContractFundBreakdown {
+        private String contractId;
+        private String projectId;
+        private String projectName;
+        private String contractCode;
+        private String contractName;
+        private String contractAmount;
+        private String paidAmount;
+        private String approvingAmount;
+        private String approvedUnpaidAmount;
+        private String remainingAmount;
+        private String paymentRatio;
+        private List<DashboardPaymentItemVO> paymentRecords;
     }
 }

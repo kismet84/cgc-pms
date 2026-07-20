@@ -50,6 +50,43 @@ test.describe('M2 live eight-role dashboard', () => {
     await expect(page.locator('.trend-summary')).toHaveCount(0)
   })
 
+  test('cost manager expands the canonical two-level cost breakdown', async ({ page }) => {
+    const projectId = '520000000000009002'
+    expect((await page.goto('/api/auth/dev-login?username=demo.cost'))?.ok()).toBe(true)
+    const breakdownResponse = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return url.pathname === `/api/dashboard/project/${projectId}/cost-breakdown`
+    })
+
+    await page.goto(`/v2/dashboard?role=cost&projectId=${projectId}`)
+    const response = await breakdownResponse
+    expect(response.ok()).toBe(true)
+    const envelope = (await response.json()) as {
+      data: { subjectBreakdowns: Array<{ level: number; parentSubjectId: string }> }
+    }
+    expect(envelope.data.subjectBreakdowns.filter((item) => item.level === 1)).toHaveLength(1)
+    expect(
+      envelope.data.subjectBreakdowns.filter(
+        (item) => item.level === 2 && item.parentSubjectId === '900001',
+      ),
+    ).toHaveLength(4)
+
+    const panel = page.locator('#cost-breakdown')
+    const rows = panel.locator('tbody tr')
+    await expect(panel.getByText('成本科目分解', { exact: true })).toBeVisible()
+    await expect(rows).toHaveCount(1)
+    await expect(rows.first()).toContainText('合同履约成本')
+    await panel.getByRole('button', { name: '展开', exact: true }).click()
+    await expect(rows).toHaveCount(5)
+    await expect(panel.getByText('招投标及前期费用', { exact: true })).toBeVisible()
+    await expect(panel.getByText('采购阶段成本', { exact: true })).toBeVisible()
+    await expect(panel.getByText('施工阶段成本', { exact: true })).toBeVisible()
+    await expect(panel.getByText('项目间接费用', { exact: true })).toBeVisible()
+    await expect(rows.nth(2)).toContainText('¥980,000.00')
+    await panel.getByRole('button', { name: '收起', exact: true }).click()
+    await expect(rows).toHaveCount(1)
+  })
+
   test('finance view exposes project payment trend and closed-loop indicators', async ({
     page,
   }) => {
@@ -78,19 +115,55 @@ test.describe('M2 live eight-role dashboard', () => {
         budgetAmount: string
         totalPaidAmount: string
         trendPoints: unknown[]
+        contractFundBreakdowns: Array<{
+          contractCode: string
+          contractName: string
+          contractAmount: string
+          paidAmount: string
+          approvingAmount: string
+          approvedUnpaidAmount: string
+          remainingAmount: string
+          paymentRatio: string
+          paymentRecords: unknown[]
+        }>
       }
     }
     expect(envelope.data.pendingPaymentAmount).toBe('90000.00')
-    expect(envelope.data.approvedUnpaidAmount).toBe('120000.00')
+    expect(envelope.data.approvedUnpaidAmount).toBe('150000.00')
     expect(envelope.data.budgetAmount).toBe('3900000.00')
-    expect(envelope.data.totalPaidAmount).toBe('340000.00')
+    expect(envelope.data.totalPaidAmount).toBe('990000.00')
     expect(envelope.data.trendPoints).toHaveLength(7)
+    expect(envelope.data.contractFundBreakdowns).toHaveLength(4)
+    expect(
+      envelope.data.contractFundBreakdowns.find(
+        (contract) => contract.contractName === '演示项目管理服务合同',
+      ),
+    ).toMatchObject({
+      contractAmount: '800000.00',
+      paidAmount: '940000.00',
+      approvingAmount: '90000.00',
+      approvedUnpaidAmount: '120000.00',
+      remainingAmount: '0',
+      paymentRatio: '117.50',
+    })
 
     await expect(page.getByText('资金支付趋势', { exact: true })).toBeVisible()
     await expect(page.locator('.trend-chart canvas')).toBeVisible()
     await expect(page.locator('.trend-chart tbody tr')).toHaveCount(7)
     await expect(page.getByText('资金闭环指标')).toBeVisible()
     await expect(page.getByText('PROCESSING')).toBeVisible()
+    const breakdown = page.locator('#finance-contract-breakdown')
+    const rows = breakdown.locator('tbody tr')
+    await expect(breakdown.getByText('合同资金分解', { exact: true })).toBeVisible()
+    await expect(rows).toHaveCount(4)
+    const serviceContract = rows.filter({ hasText: '演示项目管理服务合同' })
+    await serviceContract.getByRole('button', { name: '展开', exact: true }).click()
+    await expect(rows).toHaveCount(9)
+    await expect(
+      breakdown.getByText('PMT-20260720-001 · 2026-07-20', { exact: true }),
+    ).toBeVisible()
+    await serviceContract.getByRole('button', { name: '收起', exact: true }).click()
+    await expect(rows).toHaveCount(4)
   })
 
   test('business manager defaults to all and can switch between aggregate and specific context', async ({
@@ -114,6 +187,18 @@ test.describe('M2 live eight-role dashboard', () => {
     await expect(projectSelect.locator('option:checked')).toHaveText('全部项目')
     await expect(periodSelect).toHaveValue('')
     await expect(periodSelect.locator('option:checked')).toHaveText('全部报告期')
+
+    const riskFilter = page.locator('.risk-filter')
+    const riskList = page.locator('#risk-list')
+    await riskFilter.locator('summary').click()
+    await expect(riskFilter).toHaveAttribute('open', '')
+    await riskFilter.getByRole('option', { name: '高', exact: true }).click()
+    await expect(riskList.getByText('在建项目临期材料采购合同', { exact: true })).toBeVisible()
+    await expect(riskList.getByText('演示项目管理服务合同', { exact: true })).toHaveCount(0)
+    await riskFilter.locator('summary').click()
+    await riskFilter.getByRole('option', { name: '其他', exact: true }).click()
+    await expect(riskList.getByText('演示项目管理服务合同', { exact: true })).toBeVisible()
+    await expect(riskList.getByText('在建项目临期材料采购合同', { exact: true })).toHaveCount(0)
 
     const projectId = await projectSelect.locator('option').nth(1).getAttribute('value')
     expect(projectId).toBeTruthy()
@@ -143,6 +228,121 @@ test.describe('M2 live eight-role dashboard', () => {
     await periodSelect.selectOption('')
     expect((await restoredAggregateResponse).ok()).toBe(true)
     await expect(page).not.toHaveURL(/projectId=|period=/)
+  })
+
+  test('active project supplies real data for the remaining role dashboards', async ({ page }) => {
+    const projectId = '520000000000009002'
+    const cases = [
+      {
+        username: 'demo.manager',
+        path: 'project-manager',
+        assert: (data: Record<string, unknown>) => {
+          expect(Number(data.pendingTaskCount)).toBe(1)
+          expect(Number(data.expiringContractCount)).toBe(1)
+          expect(Number(data.laggingProjectCount)).toBe(1)
+        },
+      },
+      {
+        username: 'demo.business',
+        path: 'business-manager',
+        assert: (data: Record<string, unknown>) => {
+          expect(data.contractChangeAmount).toBe('90000.00')
+          expect(data.varOrderAmount).toBe('70000.00')
+          expect(data.settlementProgress).toBe('1/1')
+        },
+      },
+      {
+        username: 'demo.purchase',
+        path: 'purchase-manager',
+        assert: (data: Record<string, unknown>) => {
+          expect(Number(data.pendingRequestCount)).toBe(1)
+          expect(Number(data.activeOrderCount)).toBe(2)
+          expect(Number(data.overdueDeliveryCount)).toBe(2)
+          expect(Number(data.pendingReceiptCount)).toBe(1)
+          expect(Number(data.lowStockItemCount)).toBe(1)
+        },
+      },
+      {
+        username: 'demo.production',
+        path: 'production-manager',
+        assert: (data: Record<string, unknown>) => {
+          expect(Number(data.receiptCount)).toBe(1)
+          expect(Number(data.requisitionCount)).toBe(1)
+          expect(Number(data.pendingStockOutCount)).toBe(1)
+          expect(data.confirmedMeasureAmount).toBe('460000.00')
+        },
+      },
+      {
+        username: 'demo.chief',
+        path: 'chief-engineer',
+        assert: (data: Record<string, unknown>) => {
+          expect(Number(data.pendingReviewCount)).toBe(1)
+          expect(Number(data.pendingCoordinationCount)).toBe(1)
+          expect(Number(data.openIssueCount)).toBe(3)
+          expect(Number(data.overdueCount)).toBe(2)
+        },
+      },
+    ]
+
+    for (const role of cases) {
+      expect((await page.goto(`/api/auth/dev-login?username=${role.username}`))?.ok()).toBe(true)
+      const response = await page.request.get(`/api/dashboard/${role.path}?projectId=${projectId}`)
+      expect(response.ok()).toBe(true)
+      const body = (await response.json()) as { data: Record<string, unknown> }
+      role.assert(body.data)
+    }
+
+    await page.goto('/v2/dashboard?role=chiefEngineer')
+    await page.locator('#global-project').selectOption(projectId)
+    await expect(page.getByText('经营动态', { exact: true })).toBeVisible()
+    await expect(page.locator('#cost-trend').getByText('楼梯节点做法逾期未闭环')).toBeVisible()
+    await expect(page.getByText('当前角色暂无趋势数据')).toHaveCount(0)
+
+    expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
+    await page.goto('/v2/dashboard?role=pm')
+    await page.getByRole('button', { name: '查看最高风险', exact: true }).click()
+    await expect(page.locator('.risk-filter summary')).toHaveText('高')
+    await expect(
+      page.locator('#risk-list').getByText('劳务分包在建演示项目', { exact: true }),
+    ).toBeVisible()
+  })
+
+  test('every role exposes high, medium, low and other risk data', async ({ page }) => {
+    const projectId = '520000000000009002'
+    const roleCases = [
+      { role: 'pm', username: 'demo.manager' },
+      { role: 'bm', username: 'demo.business' },
+      { role: 'cost', username: 'demo.cost' },
+      { role: 'purchase', username: 'demo.purchase' },
+      { role: 'production', username: 'demo.production' },
+      { role: 'chiefEngineer', username: 'demo.chief' },
+      { role: 'finance', username: 'demo.finance' },
+      { role: 'mgmt', username: 'admin' },
+    ] as const
+    const levels = ['高', '中', '低', '其他'] as const
+
+    for (const roleCase of roleCases) {
+      expect((await page.goto(`/api/auth/dev-login?username=${roleCase.username}`))?.ok()).toBe(
+        true,
+      )
+      await page.goto(`/v2/dashboard?role=${roleCase.role}&projectId=${projectId}`)
+      const riskFilter = page.locator('.risk-filter')
+      const riskBadges = page.locator('#risk-list .risk-level')
+
+      for (const level of levels) {
+        await riskFilter.locator('summary').click()
+        await riskFilter.getByRole('option', { name: level, exact: true }).click()
+        await expect(riskFilter.locator('summary')).toHaveText(level)
+        await expect
+          .poll(async () => riskBadges.count(), {
+            message: `${roleCase.role} should expose ${level} risk data`,
+          })
+          .toBeGreaterThan(0)
+        expect(await riskBadges.allTextContents()).toEqual(
+          Array(await riskBadges.count()).fill(level),
+        )
+      }
+    }
   })
 
   test('defaults to aggregate context and loads the real management view in three viewports', async ({

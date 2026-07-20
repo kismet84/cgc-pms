@@ -58,6 +58,7 @@ import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfTask;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.mapper.WfTaskMapper;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,6 +70,8 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -84,6 +87,11 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
     @DisplayName("4.1 Finance view: single project payment analysis")
     void testFinanceView_SingleProject() {
         SeedResult sr = seed("FIN1");
+        PayRecord paid = payRecordMapper.selectOne(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getProjectId, sr.projectId)
+                .eq(PayRecord::getPayStatus, "SUCCESS"));
+        paid.setPayAmount(new BigDecimal("6000000.00"));
+        payRecordMapper.updateById(paid);
         FinanceDashboardVO vo = dashboardService.getFinanceView(sr.projectId);
 
         assertNotNull(vo);
@@ -95,6 +103,16 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertNotNull(vo.getWarrantyExpiringAmount());
         assertNotNull(vo.getTrendPoints());
         assertNotNull(vo.getPendingPayments());
+        assertEquals("1000000.00", vo.getOverRatioAmount());
+        assertEquals(1, vo.getOverRatioPayments().size());
+        assertEquals(paid.getId().toString(), vo.getOverRatioPayments().get(0).getPayRecordId());
+        assertEquals(1, vo.getContractFundBreakdowns().size());
+        FinanceDashboardVO.ContractFundBreakdown breakdown = vo.getContractFundBreakdowns().get(0);
+        assertEquals("5500000.00", breakdown.getContractAmount());
+        assertEquals("6000000.00", breakdown.getPaidAmount());
+        assertEquals("0", breakdown.getRemainingAmount());
+        assertEquals("109.09", breakdown.getPaymentRatio());
+        assertEquals(2, breakdown.getPaymentRecords().size());
     }
 
     @Test
@@ -109,6 +127,23 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertEquals("全部项目", vo.getProjectName());
         assertNotNull(vo.getPendingPaymentAmount());
         assertNotNull(vo.getTrendPoints());
+        assertFalse(vo.getContractFundBreakdowns().isEmpty());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("4.3 Finance view: contract breakdown respects SELF project scope")
+    void testFinanceView_ContractBreakdownRespectsProjectScope() {
+        SeedResult visible = seed("FIN_SELF_VISIBLE");
+        SeedResult hidden = seed("FIN_SELF_HIDDEN");
+        long scopedUserId = 88_101L;
+        applySelfScope(visible.projectId, hidden.projectId, scopedUserId);
+
+        FinanceDashboardVO vo = dashboardService.getFinanceView(null);
+
+        assertEquals(Set.of(visible.projectId.toString()), vo.getContractFundBreakdowns().stream()
+                .map(FinanceDashboardVO.ContractFundBreakdown::getProjectId)
+                .collect(Collectors.toSet()));
     }
 
     // ========================================================================
@@ -120,6 +155,17 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
     @DisplayName("5.1 Management view: returns project rankings and aggregates")
     void testManagementView() {
         SeedResult sr = seed("MGMT1");
+        for (String severity : List.of("MEDIUM", "LOW", "INFO")) {
+            AlertLog alert = new AlertLog();
+            alert.setTenantId(TENANT_ID);
+            alert.setProjectId(sr.projectId);
+            alert.setRuleType("DYNAMIC_COST_EXCEEDS_TARGET");
+            alert.setSeverity(severity);
+            alert.setMessage(severity + " management risk");
+            alert.setIsRead(0);
+            alert.setTriggeredAt(LocalDateTime.now());
+            alertLogMapper.insert(alert);
+        }
         ManagementDashboardVO vo = dashboardService.getManagementView();
 
         assertNotNull(vo);
@@ -153,6 +199,10 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertNotNull(vo.getOverdueItems());
         assertNotNull(vo.getMajorRisks());
         assertTrue(vo.getMajorRisks().size() >= 1);
+        Set<String> severities = vo.getMajorRisks().stream()
+                .map(DashboardAlertItemVO::getSeverity)
+                .collect(Collectors.toSet());
+        assertEquals(Set.of("HIGH", "MEDIUM", "LOW", "INFO"), severities);
         assertTrue(vo.getTotalPendingTaskCount() >= 1);
     }
 
