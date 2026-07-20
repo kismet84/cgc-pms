@@ -4,9 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.project.auth.ProjectAccessChecker;
-import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
@@ -19,6 +19,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -35,21 +36,7 @@ public class WorkflowQueryService {
     private final WorkflowVOAssembler voAssembler;
     private final ProjectAccessChecker projectAccessChecker;
 
-    private static final Set<String> SUPPORTED_BUSINESS_TYPES = Set.of(
-            WorkflowBusinessTypes.CONTRACT_APPROVAL,
-            WorkflowBusinessTypes.PURCHASE_ORDER,
-            WorkflowBusinessTypes.MATERIAL_RECEIPT,
-            WorkflowBusinessTypes.SUB_MEASURE,
-            WorkflowBusinessTypes.PAY_REQUEST,
-            WorkflowBusinessTypes.VAR_ORDER,
-            WorkflowBusinessTypes.PURCHASE_REQUEST,
-            WorkflowBusinessTypes.CT_CHANGE,
-            WorkflowBusinessTypes.SETTLEMENT,
-            WorkflowBusinessTypes.COST_TARGET,
-            WorkflowBusinessTypes.CONTRACT_REVENUE,
-            WorkflowBusinessTypes.MATERIAL_REQUISITION,
-            WorkflowBusinessTypes.TECH_ITEM
-    );
+    private static final Pattern BUSINESS_TYPE_PATTERN = Pattern.compile("[A-Z][A-Z0-9_]{0,63}");
 
     private static final Set<String> SUPPORTED_INSTANCE_STATUSES = Set.of(
             WorkflowConstants.INSTANCE_RUNNING,
@@ -60,6 +47,68 @@ public class WorkflowQueryService {
     );
 
     // ── 我的待办 ──
+
+    public List<String> getVisibleBusinessTypes(Long tenantId, Long userId, String tab) {
+        return switch (tab) {
+            case "todo" -> visibleTodoBusinessTypes(tenantId, userId);
+            case "done" -> visibleBusinessTypes(wfRecordMapper.selectList(
+                    new LambdaQueryWrapper<WfRecord>()
+                            .select(WfRecord::getBusinessType)
+                            .eq(WfRecord::getTenantId, tenantId)
+                            .eq(WfRecord::getOperatorId, userId)
+                            .in(WfRecord::getActionType,
+                                    WorkflowConstants.ACTION_APPROVE,
+                                    WorkflowConstants.ACTION_REJECT,
+                                    WorkflowConstants.ACTION_TRANSFER,
+                                    WorkflowConstants.ACTION_ADD_SIGN)), WfRecord::getBusinessType);
+            case "cc" -> visibleBusinessTypes(wfCcMapper.selectList(
+                    new LambdaQueryWrapper<WfCc>()
+                            .select(WfCc::getBusinessType)
+                            .eq(WfCc::getTenantId, tenantId)
+                            .eq(WfCc::getCcUserId, userId)), WfCc::getBusinessType);
+            case "mine" -> visibleBusinessTypes(wfInstanceMapper.selectList(
+                    new LambdaQueryWrapper<WfInstance>()
+                            .select(WfInstance::getBusinessType)
+                            .eq(WfInstance::getTenantId, tenantId)
+                            .eq(WfInstance::getInitiatorId, userId)), WfInstance::getBusinessType);
+            default -> throw new BusinessException("WORKFLOW_TAB_INVALID", "审批列表类型无效");
+        };
+    }
+
+    private List<String> visibleTodoBusinessTypes(Long tenantId, Long userId) {
+        List<WfTask> pendingTasks = wfTaskMapper.selectList(
+                new LambdaQueryWrapper<WfTask>()
+                        .select(WfTask::getInstanceId, WfTask::getBusinessType)
+                        .eq(WfTask::getTenantId, tenantId)
+                        .eq(WfTask::getApproverId, userId)
+                        .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
+        if (pendingTasks.isEmpty()) return List.of();
+        Set<Long> pendingInstanceIds = pendingTasks.stream()
+                .map(WfTask::getInstanceId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (pendingInstanceIds.isEmpty()) return List.of();
+        Set<Long> runningInstanceIds = wfInstanceMapper.selectList(
+                new LambdaQueryWrapper<WfInstance>()
+                        .select(WfInstance::getId)
+                        .eq(WfInstance::getTenantId, tenantId)
+                        .eq(WfInstance::getInstanceStatus, WorkflowConstants.INSTANCE_RUNNING)
+                        .in(WfInstance::getId, pendingInstanceIds))
+                .stream().map(WfInstance::getId).collect(Collectors.toSet());
+        return visibleBusinessTypes(pendingTasks.stream()
+                .filter(task -> runningInstanceIds.contains(task.getInstanceId()))
+                .toList(), WfTask::getBusinessType);
+    }
+
+    private <T> List<String> visibleBusinessTypes(List<T> rows, Function<T, String> getter) {
+        return rows.stream()
+                .map(getter)
+                .filter(Objects::nonNull)
+                .filter(BUSINESS_TYPE_PATTERN.asMatchPredicate())
+                .distinct()
+                .sorted()
+                .toList();
+    }
 
     public IPage<WfTaskVO> getMyTodos(Long tenantId, Long userId, long pageNo, long pageSize) {
         return getMyTodos(tenantId, userId, null, null, null, null, null, pageNo, pageSize);
@@ -435,7 +484,7 @@ public class WorkflowQueryService {
 
     private boolean isUnsupportedBusinessType(String businessType) {
         String normalized = trimToNull(businessType);
-        return normalized != null && !SUPPORTED_BUSINESS_TYPES.contains(normalized);
+        return normalized != null && !BUSINESS_TYPE_PATTERN.matcher(normalized).matches();
     }
 
     private boolean isUnsupportedInstanceStatus(String instanceStatus) {

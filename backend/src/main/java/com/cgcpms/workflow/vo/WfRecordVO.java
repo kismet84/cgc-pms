@@ -20,6 +20,7 @@ public class WfRecordVO {
     private String recordStatus;
     private String createdAt;
     private String businessType;
+    private String businessId;
     private String title;
     private String instanceStatus;
 }

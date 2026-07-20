@@ -8,11 +8,13 @@ const props = withDefaults(
     description?: string
     closeLabel?: string
     closeOnBackdrop?: boolean
+    panelClass?: string
   }>(),
   {
     description: undefined,
     closeLabel: '关闭对话框',
     closeOnBackdrop: true,
+    panelClass: undefined,
   },
 )
 
@@ -35,6 +37,10 @@ function onBackdrop() {
   if (props.closeOnBackdrop) close()
 }
 
+function focusPanel() {
+  panel.value?.focus()
+}
+
 function focusableElements() {
   if (!panel.value) return []
   return Array.from(
@@ -45,11 +51,6 @@ function focusableElements() {
 }
 
 function onKeydown(event: KeyboardEvent) {
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    close()
-    return
-  }
   if (event.key !== 'Tab') return
 
   const focusables = focusableElements()
@@ -70,31 +71,42 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+function onDocumentKeydown(event: KeyboardEvent) {
+  if (!props.open || event.defaultPrevented || event.key !== 'Escape') return
+  event.preventDefault()
+  close()
+}
+
 watch(
   () => props.open,
   async (open) => {
     if (open) {
       previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+      document.addEventListener('keydown', onDocumentKeydown)
       await nextTick()
-      panel.value?.focus()
+      focusPanel()
       return
     }
+    document.removeEventListener('keydown', onDocumentKeydown)
     previousFocus?.focus()
     previousFocus = null
   },
   { immediate: true },
 )
 
-onBeforeUnmount(() => previousFocus?.focus())
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onDocumentKeydown)
+  previousFocus?.focus()
+})
 </script>
 
 <template>
   <Teleport to="body">
-    <Transition name="v2-dialog">
+    <Transition name="v2-dialog" @after-enter="focusPanel">
       <div v-if="open" class="v2-dialog__backdrop" @click.self="onBackdrop">
         <section
           ref="panel"
-          class="v2-dialog__panel"
+          :class="['v2-dialog__panel', panelClass]"
           role="dialog"
           aria-modal="true"
           :aria-labelledby="titleId"

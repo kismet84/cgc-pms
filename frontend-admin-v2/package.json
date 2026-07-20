@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit",
     "type-check:contracts": "tsc -p ../packages/frontend-contracts/tsconfig.json --noEmit",
-    "lint:check": "eslint . --ext .vue,.js,.mjs,.ts,.jsx,.tsx",
+    "lint:check": "eslint src tests e2e scripts eslint.config.js playwright.config.ts vite.config.ts vitest.config.ts --ext .vue,.js,.mjs,.ts,.jsx,.tsx",
     "test:unit": "vitest run tests/unit",
     "test:e2e:health": "playwright test e2e/health.spec.ts",
     "check:boundary": "node scripts/check-clean-room-boundary.mjs",

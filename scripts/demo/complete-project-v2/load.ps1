@@ -79,7 +79,8 @@ $stages = @(
     [pscustomobject]@{ Id = 'ROLE_DASHBOARD_DATA'; Files = @('scripts/demo/complete-project-v2/sql/160-role-dashboard-data.sql') },
     [pscustomobject]@{ Id = 'DASHBOARD_RISK_LEVELS'; Files = @('scripts/demo/complete-project-v2/sql/170-dashboard-risk-levels.sql') },
     [pscustomobject]@{ Id = 'COST_BREAKDOWN_DATA'; Files = @('scripts/demo/complete-project-v2/sql/180-cost-breakdown-data.sql') },
-    [pscustomobject]@{ Id = 'STANDARDIZE_BUSINESS_CODES'; Files = @('scripts/demo/complete-project-v2/sql/190-standardize-business-codes.sql') }
+    [pscustomobject]@{ Id = 'STANDARDIZE_BUSINESS_CODES'; Files = @('scripts/demo/complete-project-v2/sql/190-standardize-business-codes.sql') },
+    [pscustomobject]@{ Id = 'ROLE_WORKFLOW_STATUS_DATA'; Files = @('scripts/demo/complete-project-v2/sql/200-role-workflow-status-data.sql') }
 )
 
 foreach ($stage in $stages) {

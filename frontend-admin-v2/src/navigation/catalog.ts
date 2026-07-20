@@ -40,10 +40,10 @@ export const navigationDomains: NavigationDomain[] = [
         defaultPath: '/approval/todo',
         matchPrefixes: ['/approval'],
         tabs: [
-          { path: '/approval/todo', label: '待我处理', permission: 'workflow:task:query' },
-          { path: '/approval/done', label: '我已处理', permission: 'workflow:task:query' },
-          { path: '/approval/cc', label: '抄送我的', permission: 'workflow:cc:query' },
-          { path: '/approval/mine', label: '我发起', permission: 'workflow:instance:query' },
+          { path: '/approval/todo', label: '待我处理' },
+          { path: '/approval/done', label: '我已处理' },
+          { path: '/approval/cc', label: '抄送我的' },
+          { path: '/approval/mine', label: '我发起' },
         ],
       },
       {

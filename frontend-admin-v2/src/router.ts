@@ -7,11 +7,13 @@ import SessionPage from './pages/auth/SessionPage.vue'
 import HealthPage from './pages/HealthPage.vue'
 import { normalizeRedirect } from './services/navigation'
 import { useSessionStore } from './stores/session'
+import type { WorkflowTab } from '@cgc-pms/frontend-contracts'
 
 const ForbiddenPage = () => import('./pages/errors/ForbiddenPage.vue')
 const NotFoundPage = () => import('./pages/errors/NotFoundPage.vue')
 const ShellPlaceholderPage = () => import('./pages/shell/ShellPlaceholderPage.vue')
 const DashboardPage = () => import('./pages/dashboard/DashboardPage.vue')
+const WorkflowWorkbenchPage = () => import('./pages/workbench/WorkflowWorkbenchPage.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -20,6 +22,7 @@ declare module 'vue-router' {
     technical?: boolean
     shell?: boolean
     permission?: string
+    workflowTab?: WorkflowTab
   }
 }
 
@@ -31,18 +34,29 @@ function routeName(path: string): string {
     .replace(/^./, (value) => value.toUpperCase())}`
 }
 
+function workflowTab(path: string): WorkflowTab | undefined {
+  const value = path.match(/^\/approval\/(todo|done|cc|mine)$/)?.[1]
+  return value as WorkflowTab | undefined
+}
+
 const registeredPaths = new Set<string>()
 const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
   domain.workspaces.flatMap((workspace) =>
     workspace.tabs.flatMap((tab) => {
       if (registeredPaths.has(tab.path)) return []
       registeredPaths.add(tab.path)
+      const approvalTab = workflowTab(tab.path)
       return [
         {
           path: tab.path,
           name: routeName(tab.path),
-          component: tab.path === '/dashboard' ? DashboardPage : ShellPlaceholderPage,
-          meta: { shell: true, permission: tab.permission },
+          component:
+            tab.path === '/dashboard'
+              ? DashboardPage
+              : approvalTab
+                ? WorkflowWorkbenchPage
+                : ShellPlaceholderPage,
+          meta: { shell: true, permission: tab.permission, workflowTab: approvalTab },
         },
       ]
     }),
@@ -50,6 +64,12 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
 )
 
 const contextRoutes: RouteRecordRaw[] = [
+  {
+    path: '/approval/instances/:instanceId',
+    name: 'V2WorkflowInstanceDetail',
+    component: WorkflowWorkbenchPage,
+    meta: { shell: true, workflowTab: 'todo' },
+  },
   {
     path: '/project/:projectId/overview',
     name: 'V2ShellProjectOverview',

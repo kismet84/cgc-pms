@@ -56,6 +56,7 @@ public class WorkflowVOAssembler {
         vo.setRecordStatus(record.getRecordStatus());
         if (record.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(record.getCreatedAt()));
         vo.setBusinessType(record.getBusinessType());
+        if (record.getBusinessId() != null) vo.setBusinessId(String.valueOf(record.getBusinessId()));
         return vo;
     }
 

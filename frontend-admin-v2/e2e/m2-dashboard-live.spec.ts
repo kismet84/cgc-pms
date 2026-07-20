@@ -1,7 +1,13 @@
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test } from '@playwright/test'
+import { expect, test, type Locator } from '@playwright/test'
 
 const runLiveDashboard = process.env.V2_LIVE_DASHBOARD === '1'
+
+function selectOption(control: Locator, value: string) {
+  return control
+    .click()
+    .then(() => control.locator('..').locator(`[role="option"][data-value="${value}"]`).click())
+}
 
 const roles = [
   { label: '项目经理', path: '/api/dashboard/project-manager' },
@@ -33,8 +39,10 @@ test.describe('M2 live eight-role dashboard', () => {
     await expect(trendRows).toHaveCount(3)
 
     const projectSelect = page.locator('#global-project')
-    const activeProject = projectSelect.locator('option', { hasText: '劳务分包在建演示项目' })
-    const projectId = await activeProject.getAttribute('value')
+    const activeProject = projectSelect
+      .locator('..')
+      .locator('[role="option"]', { hasText: '劳务分包在建演示项目' })
+    const projectId = await activeProject.getAttribute('data-value')
     expect(projectId).toBeTruthy()
     const projectResponse = page.waitForResponse((response) => {
       const url = new URL(response.url())
@@ -43,7 +51,7 @@ test.describe('M2 live eight-role dashboard', () => {
         url.searchParams.get('projectId') === projectId
       )
     })
-    await projectSelect.selectOption(projectId!)
+    await selectOption(projectSelect, projectId!)
     expect((await projectResponse).ok()).toBe(true)
     await page.getByRole('button', { name: '当年累计' }).click()
     await expect(trendRows).toHaveCount(7)
@@ -96,16 +104,16 @@ test.describe('M2 live eight-role dashboard', () => {
 
     const projectSelect = page.locator('#global-project')
     const projectId = '520000000000009002'
-    await expect(projectSelect.locator(`option[value="${projectId}"]`)).toHaveText(
-      '劳务分包在建演示项目',
-    )
+    await expect(
+      projectSelect.locator('..').locator(`[role="option"][data-value="${projectId}"]`),
+    ).toHaveText('劳务分包在建演示项目')
     const projectResponse = page.waitForResponse((response) => {
       const url = new URL(response.url())
       return (
         url.pathname === '/api/dashboard/finance' && url.searchParams.get('projectId') === projectId
       )
     })
-    await projectSelect.selectOption(projectId)
+    await selectOption(projectSelect, projectId)
     const response = await projectResponse
     expect(response.ok()).toBe(true)
     const envelope = (await response.json()) as {
@@ -183,10 +191,14 @@ test.describe('M2 live eight-role dashboard', () => {
 
     const projectSelect = page.locator('#global-project')
     const periodSelect = page.locator('#global-report-period')
-    await expect(projectSelect).toHaveValue('')
-    await expect(projectSelect.locator('option:checked')).toHaveText('全部项目')
-    await expect(periodSelect).toHaveValue('')
-    await expect(periodSelect.locator('option:checked')).toHaveText('全部报告期')
+    await expect(projectSelect).toContainText('全部项目')
+    await expect(
+      projectSelect.locator('..').locator('[role="option"][data-value=""]'),
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(periodSelect).toContainText('全部报告期')
+    await expect(
+      periodSelect.locator('..').locator('[role="option"][data-value=""]'),
+    ).toHaveAttribute('aria-selected', 'true')
 
     const riskFilter = page.locator('.risk-filter')
     const riskList = page.locator('#risk-list')
@@ -200,7 +212,11 @@ test.describe('M2 live eight-role dashboard', () => {
     await expect(riskList.getByText('演示项目管理服务合同', { exact: true })).toBeVisible()
     await expect(riskList.getByText('在建项目临期材料采购合同', { exact: true })).toHaveCount(0)
 
-    const projectId = await projectSelect.locator('option').nth(1).getAttribute('value')
+    const projectId = await projectSelect
+      .locator('..')
+      .locator('[role="option"]')
+      .nth(1)
+      .getAttribute('data-value')
     expect(projectId).toBeTruthy()
     const projectResponse = page.waitForResponse((response) => {
       const url = new URL(response.url())
@@ -209,13 +225,17 @@ test.describe('M2 live eight-role dashboard', () => {
         url.searchParams.get('projectId') === projectId
       )
     })
-    await projectSelect.selectOption(projectId!)
+    await selectOption(projectSelect, projectId!)
     expect((await projectResponse).ok()).toBe(true)
     await expect(page).toHaveURL(new RegExp(`projectId=${projectId}`))
 
-    const period = await periodSelect.locator('option').nth(1).getAttribute('value')
+    const period = await periodSelect
+      .locator('..')
+      .locator('[role="option"]')
+      .nth(1)
+      .getAttribute('data-value')
     expect(period).toBeTruthy()
-    await periodSelect.selectOption(period!)
+    await selectOption(periodSelect, period!)
     await expect(page).toHaveURL(new RegExp(`period=${period}`))
 
     const restoredAggregateResponse = page.waitForResponse((response) => {
@@ -224,8 +244,8 @@ test.describe('M2 live eight-role dashboard', () => {
         url.pathname === '/api/dashboard/business-manager' && !url.searchParams.has('projectId')
       )
     })
-    await projectSelect.selectOption('')
-    await periodSelect.selectOption('')
+    await selectOption(projectSelect, '')
+    await selectOption(periodSelect, '')
     expect((await restoredAggregateResponse).ok()).toBe(true)
     await expect(page).not.toHaveURL(/projectId=|period=/)
   })
@@ -237,7 +257,7 @@ test.describe('M2 live eight-role dashboard', () => {
         username: 'demo.manager',
         path: 'project-manager',
         assert: (data: Record<string, unknown>) => {
-          expect(Number(data.pendingTaskCount)).toBe(1)
+          expect(Number(data.pendingTaskCount)).toBe(2)
           expect(Number(data.expiringContractCount)).toBe(1)
           expect(Number(data.laggingProjectCount)).toBe(1)
         },
@@ -293,10 +313,14 @@ test.describe('M2 live eight-role dashboard', () => {
     }
 
     await page.goto('/v2/dashboard?role=chiefEngineer')
-    await page.locator('#global-project').selectOption(projectId)
+    await selectOption(page.locator('#global-project'), projectId)
     await expect(page.getByText('经营动态', { exact: true })).toBeVisible()
     await expect(page.locator('#cost-trend').getByText('楼梯节点做法逾期未闭环')).toBeVisible()
     await expect(page.getByText('当前角色暂无趋势数据')).toHaveCount(0)
+    const activityList = page.locator('#cost-trend .dashboard-activity-list')
+    expect(
+      await activityList.evaluate((element) => element.scrollHeight <= element.clientHeight),
+    ).toBe(true)
 
     expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
     await page.goto('/v2/dashboard?role=pm')
@@ -305,6 +329,8 @@ test.describe('M2 live eight-role dashboard', () => {
     await expect(
       page.locator('#risk-list').getByText('劳务分包在建演示项目', { exact: true }),
     ).toBeVisible()
+    await page.getByRole('button', { name: '查看最高风险', exact: true }).click()
+    await expect(page.locator('.risk-filter summary')).toHaveText('全部预警')
   })
 
   test('every role exposes high, medium, low and other risk data', async ({ page }) => {
@@ -371,10 +397,14 @@ test.describe('M2 live eight-role dashboard', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/v2/dashboard?role=pm')
     await expect(page.getByText('项目经营健康度')).toBeVisible()
-    await expect(page.locator('#global-project')).toHaveValue('')
-    await expect(page.locator('#global-project option:checked')).toHaveText('全部项目')
-    await expect(page.locator('#global-report-period')).toHaveValue('')
-    await expect(page.locator('#global-report-period option:checked')).toHaveText('全部报告期')
+    await expect(page.locator('#global-project')).toContainText('全部项目')
+    await expect(
+      page.locator('#global-project').locator('..').locator('[role="option"][data-value=""]'),
+    ).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('#global-report-period')).toContainText('全部报告期')
+    await expect(
+      page.locator('#global-report-period').locator('..').locator('[role="option"][data-value=""]'),
+    ).toHaveAttribute('aria-selected', 'true')
     expect(
       dashboardRequestUrls.some((url) => {
         const requestUrl = new URL(url)

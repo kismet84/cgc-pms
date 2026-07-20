@@ -108,6 +108,40 @@ class WorkflowQueryServiceTest {
         seedTemplateAndSubmit();
     }
 
+    @Test
+    @DisplayName("可见业务类型按当前用户和审批列表范围返回")
+    void visibleBusinessTypesFollowCurrentUserAndTabScope() {
+        LocalDateTime now = LocalDateTime.of(2099, 7, 2, 10, 0, 0);
+        Long purchase = insertStartedInstance(33333020L, WorkflowBusinessTypes.PURCHASE_REQUEST,
+                USER_ADMIN, WorkflowConstants.INSTANCE_APPROVED, "采购审批", null,
+                now.minusDays(2), now.minusDays(1));
+        Long subMeasure = insertStartedInstance(33333021L, WorkflowBusinessTypes.SUB_MEASURE,
+                USER_OTHER, WorkflowConstants.INSTANCE_RUNNING, "分包计量审批", null,
+                now.minusDays(1), now);
+        insertStartedInstance(33333022L, WorkflowBusinessTypes.TECHNICAL_SCHEME,
+                USER_OTHER, WorkflowConstants.INSTANCE_RUNNING, "他人技术方案", null,
+                now.minusDays(1), now);
+        insertRecord(purchase, 33333020L, WorkflowBusinessTypes.PURCHASE_REQUEST,
+                WorkflowConstants.ACTION_APPROVE, USER_ADMIN, now);
+        insertCc(subMeasure, 33333021L, WorkflowBusinessTypes.SUB_MEASURE,
+                USER_ADMIN, "分包计量抄送", now);
+
+        assertTrue(queryService.getVisibleBusinessTypes(TENANT_0, USER_ADMIN, "todo")
+                .contains(WorkflowBusinessTypes.CONTRACT_APPROVAL));
+        assertTrue(queryService.getVisibleBusinessTypes(TENANT_0, USER_ADMIN, "done")
+                .contains(WorkflowBusinessTypes.PURCHASE_REQUEST));
+        assertTrue(queryService.getVisibleBusinessTypes(TENANT_0, USER_ADMIN, "cc")
+                .contains(WorkflowBusinessTypes.SUB_MEASURE));
+        List<String> mine = queryService.getVisibleBusinessTypes(TENANT_0, USER_ADMIN, "mine");
+        assertTrue(mine.contains(WorkflowBusinessTypes.CONTRACT_APPROVAL));
+        assertTrue(mine.contains(WorkflowBusinessTypes.PURCHASE_REQUEST));
+        assertFalse(mine.contains(WorkflowBusinessTypes.TECHNICAL_SCHEME));
+        assertTrue(queryService.getVisibleBusinessTypes(TENANT_0, USER_OTHER, "mine")
+                .contains(WorkflowBusinessTypes.TECHNICAL_SCHEME));
+        assertThrows(BusinessException.class,
+                () -> queryService.getVisibleBusinessTypes(TENANT_0, USER_ADMIN, "invalid"));
+    }
+
     @AfterEach
     void tearDown() {
         cleanup();
@@ -313,6 +347,7 @@ class WorkflowQueryServiceTest {
                 .orElseThrow();
         assertEquals("admin", done.getOperatorName());
         assertEquals(String.valueOf(submittedInstanceId), done.getInstanceId());
+        assertEquals("33333001", done.getBusinessId());
         assertEquals(WorkflowConstants.ACTION_APPROVE, done.getActionType());
         assertNotNull(done.getTitle());
     }

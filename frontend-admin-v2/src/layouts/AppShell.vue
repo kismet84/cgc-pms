@@ -46,7 +46,7 @@ const reportPeriodOptions = computed(() => [
 const accountName = computed(
   () => session.userInfo?.realName || session.userInfo?.username || '当前用户',
 )
-const showRoleTester = computed(() => import.meta.env.DEV && route.path === '/dashboard')
+const showRoleTester = import.meta.env.DEV
 const roleTestAccounts = [
   { role: 'pm', username: 'demo.manager', label: '项目经理' },
   { role: 'bm', username: 'demo.business', label: '商务经理' },
@@ -173,10 +173,10 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
     )
     const payload = (await response.json()) as { code?: string }
     if (!response.ok || payload.code !== '0') throw new Error('DEV_ROLE_SWITCH_FAILED')
-    const target = router.resolve({
-      path: '/dashboard',
-      query: { ...route.query, role: account.role },
-    }).href
+    const query = { ...route.query }
+    if (route.path === '/dashboard') query.role = account.role
+    else delete query.role
+    const target = router.resolve({ path: route.path, query }).href
     window.location.assign(target)
   } catch {
     switchingTestUser.value = null
@@ -264,6 +264,45 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 
       <div v-if="!navigation.length" class="app-shell__empty-navigation">
         当前账号无可访问业务域
+      </div>
+
+      <div
+        v-if="showRoleTester"
+        class="app-shell__role-tester"
+        @keydown.esc="roleTesterOpen = false"
+      >
+        <section
+          v-if="roleTesterOpen"
+          id="role-tester-panel"
+          class="app-shell__role-tester-panel"
+          aria-label="角色测试账号"
+        >
+          <header>
+            <strong>角色测试</strong>
+            <small>仅本地开发环境</small>
+          </header>
+          <button
+            v-for="account in roleTestAccounts"
+            :key="account.username"
+            type="button"
+            :class="{ 'is-active': session.userInfo?.username === account.username }"
+            :disabled="Boolean(switchingTestUser)"
+            @click="switchTestAccount(account)"
+          >
+            <span>{{ account.label }}</span>
+            <small>{{ account.username }}</small>
+          </button>
+        </section>
+        <button
+          type="button"
+          class="app-shell__role-tester-trigger"
+          aria-label="切换角色测试账号"
+          aria-controls="role-tester-panel"
+          :aria-expanded="roleTesterOpen"
+          @click="roleTesterOpen = !roleTesterOpen"
+        >
+          角
+        </button>
       </div>
 
       <button
@@ -379,7 +418,12 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
         </V2Alert>
       </div>
 
-      <main id="shell-main-content" class="app-shell__content" tabindex="-1">
+      <main
+        id="shell-main-content"
+        class="app-shell__content"
+        :class="{ 'app-shell__content--full': route.meta.workflowTab }"
+        tabindex="-1"
+      >
         <RouterView v-slot="{ Component }">
           <Suspense>
             <component :is="Component" />
@@ -401,41 +445,6 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
         description="业务通知能力尚未迁移；此处不显示模拟数量或业务消息。"
       />
     </V2Dialog>
-
-    <div v-if="showRoleTester" class="app-shell__role-tester" @keydown.esc="roleTesterOpen = false">
-      <section
-        v-if="roleTesterOpen"
-        id="role-tester-panel"
-        class="app-shell__role-tester-panel"
-        aria-label="角色测试账号"
-      >
-        <header>
-          <strong>角色测试</strong>
-          <small>仅本地开发环境</small>
-        </header>
-        <button
-          v-for="account in roleTestAccounts"
-          :key="account.username"
-          type="button"
-          :class="{ 'is-active': session.userInfo?.username === account.username }"
-          :disabled="Boolean(switchingTestUser)"
-          @click="switchTestAccount(account)"
-        >
-          <span>{{ account.label }}</span>
-          <small>{{ account.username }}</small>
-        </button>
-      </section>
-      <button
-        type="button"
-        class="app-shell__role-tester-trigger"
-        aria-label="切换角色测试账号"
-        aria-controls="role-tester-panel"
-        :aria-expanded="roleTesterOpen"
-        @click="roleTesterOpen = !roleTesterOpen"
-      >
-        角
-      </button>
-    </div>
   </div>
 </template>
 
@@ -621,6 +630,9 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 
 .app-shell__main {
   min-width: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-shell__header {
@@ -829,6 +841,14 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
   padding: var(--v2-page-gutter);
 }
 
+.app-shell__content.app-shell__content--full {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  margin: 0;
+  padding: 0;
+}
+
 .app-shell__content:focus {
   outline: 3px solid var(--v2-color-primary);
   outline-offset: -3px;
@@ -841,13 +861,15 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 }
 
 .app-shell__role-tester {
-  position: fixed;
-  z-index: 50;
-  inset-inline-end: var(--v2-space-6);
-  inset-block-end: var(--v2-space-6);
+  flex: 0 0 auto;
   display: grid;
-  justify-items: end;
-  gap: var(--v2-space-3);
+  place-items: center;
+  margin-block-start: auto;
+  padding: var(--v2-space-2);
+}
+
+.app-shell__role-tester + .app-shell__collapse-toggle {
+  margin-block-start: 0;
 }
 
 .app-shell__role-tester-trigger {
@@ -870,6 +892,10 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 }
 
 .app-shell__role-tester-panel {
+  position: fixed;
+  z-index: 50;
+  inset-inline-start: calc(12.5rem + var(--v2-space-2));
+  inset-block-end: 3.5rem;
   width: 15rem;
   max-height: min(32rem, calc(100vh - 7rem));
   overflow-y: auto;
@@ -928,6 +954,10 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 
 .app-shell--collapsed {
   grid-template-columns: 5rem minmax(0, 1fr);
+}
+
+.app-shell--collapsed .app-shell__role-tester-panel {
+  inset-inline-start: calc(5rem + var(--v2-space-2));
 }
 
 .app-shell--collapsed .app-shell__brand {
@@ -1126,8 +1156,13 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
   }
 
   .app-shell__role-tester {
-    inset-inline-end: var(--v2-space-4);
-    inset-block-end: var(--v2-space-4);
+    padding: var(--v2-space-2) var(--v2-space-4);
+  }
+
+  .app-shell__role-tester-panel {
+    inset-inline-start: var(--v2-space-4);
+    inset-block-end: 4rem;
+    width: min(15rem, calc(100vw - 2rem));
   }
 
   :global(body.v2-mobile-nav-open) {

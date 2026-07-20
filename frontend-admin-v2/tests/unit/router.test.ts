@@ -42,6 +42,15 @@ describe('V2 application-shell routes', () => {
 
     expect(dashboard?.meta?.permission).toBe('dashboard:view')
     expect(project?.meta?.permission).toBe('project:query')
+    const approval = shell?.children?.find((route) => route.path === '/approval/todo')
+    const approvalDetail = shell?.children?.find(
+      (route) => route.path === '/approval/instances/:instanceId',
+    )
+    expect(approval?.meta).toMatchObject({
+      workflowTab: 'todo',
+    })
+    expect(approval?.meta?.permission).toBeUndefined()
+    expect(approvalDetail?.meta?.permission).toBeUndefined()
   })
 
   it('restores a permitted deep link and blocks a missing permission', async () => {
