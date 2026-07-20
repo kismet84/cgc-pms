@@ -482,7 +482,7 @@
 }
 
 .workflow-detail-dialog .v2-dialog__title {
-  font-size: var(--v2-font-size-20);
+  font-size: var(--v2-font-size-17);
 }
 
 .workflow-detail-dialog .v2-dialog__body {
@@ -710,7 +710,7 @@
   }
 
   .workflow-detail-dialog .v2-dialog__title {
-    font-size: var(--v2-font-size-16);
+    font-size: var(--v2-font-size-15);
     line-height: 1.35;
   }
 

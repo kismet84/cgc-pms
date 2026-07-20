@@ -1371,21 +1371,26 @@ class AlertEvaluationServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("TA11g: PRODUCTION_MANAGER / CHIEF_ENGINEER — 预警中心 fail-close")
-    void testAccess_FailCloseRoles() {
+    @DisplayName("TA11g: PRODUCTION_MANAGER / CHIEF_ENGINEER — 仅返回授权业务域")
+    void testAccess_ProductionAndChiefEngineerDomains() {
         seedMember(testProjectId, USER_PRODUCTION_MANAGER, "PRODUCTION_MANAGER");
         seedMember(testProjectId, USER_CHIEF_ENGINEER, "CHIEF_ENGINEER");
         insertAlert(testProjectId, "COST", "DYNAMIC_COST_EXCEEDS_TARGET");
+        insertAlert(testProjectId, "PURCHASE", "PURCHASE_DELIVERY_OVERDUE");
+        insertAlert(testProjectId, "QUALITY_SAFETY", "QUALITY_SAFETY_ISSUE");
 
         TestUserContext.setUser(TENANT_ID, USER_PRODUCTION_MANAGER, "production", List.of("PRODUCTION_MANAGER"));
         var productionPage = alertService.page(TENANT_ID, 1, 10, null,
                 null, null, null, null, null, null, null);
-        assertEquals(0, productionPage.getTotal());
+        assertEquals(2, productionPage.getTotal());
+        assertEquals(Set.of("PURCHASE", "QUALITY_SAFETY"), productionPage.getRecords().stream()
+                .map(AlertLog::getAlertDomain).collect(java.util.stream.Collectors.toSet()));
 
         TestUserContext.setUser(TENANT_ID, USER_CHIEF_ENGINEER, "chief", List.of("CHIEF_ENGINEER"));
         var chiefPage = alertService.page(TENANT_ID, 1, 10, null,
                 null, null, null, null, null, null, null);
-        assertEquals(0, chiefPage.getTotal());
+        assertEquals(1, chiefPage.getTotal());
+        assertEquals("QUALITY_SAFETY", chiefPage.getRecords().getFirst().getAlertDomain());
     }
 
     @Test

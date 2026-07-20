@@ -40,6 +40,9 @@ describe('V2 eight-domain navigation contract', () => {
   it('uses exact permission codes for routes and keeps object paths in their workspace', () => {
     expect(permissionForPath('/system/users')).toBe('system:user:query')
     expect(firstAccessiblePath(['audit:query'])).toBe('/approval/todo')
+    expect(
+      visibleNavigation(['*'])[0]?.workspaces.find((workspace) => workspace.id === 'cockpit')?.tabs,
+    ).toMatchObject([{ path: '/dashboard', label: '驾驶舱' }])
     expect(findWorkspace('/project/42/overview')?.workspace.label).toBe('项目管理')
     expect(findWorkspace('/contract/C-100/edit')?.workspace.label).toBe('合同与变更')
   })

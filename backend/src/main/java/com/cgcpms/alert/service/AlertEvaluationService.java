@@ -405,6 +405,10 @@ public class AlertEvaluationService {
 
     private void applyDomainScope(LambdaQueryWrapper<AlertLog> wrapper, Set<String> allowedDomains) {
         Set<String> domainRuleTypes = ruleTypesForDomains(allowedDomains);
+        if (domainRuleTypes.isEmpty()) {
+            wrapper.in(AlertLog::getAlertDomain, allowedDomains);
+            return;
+        }
         wrapper.and(w -> w.in(AlertLog::getAlertDomain, allowedDomains)
                 .or(legacy -> legacy.in(AlertLog::getRuleType, domainRuleTypes)
                         .and(blank -> blank.isNull(AlertLog::getAlertDomain)

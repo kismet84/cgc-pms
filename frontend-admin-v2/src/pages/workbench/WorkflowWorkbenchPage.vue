@@ -585,6 +585,9 @@ onBeforeUnmount(() => {
   flex: 1;
   gap: 10px;
   padding: 10px;
+  color: var(--v2-color-text);
+  font-size: var(--v2-font-size-13);
+  line-height: var(--v2-line-height-body);
 }
 .workflow-page__header {
   display: flex;
@@ -688,6 +691,7 @@ onBeforeUnmount(() => {
 .workflow-table small {
   margin-top: var(--v2-space-1);
   color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
 }
 .workflow-pagination {
   display: flex;
@@ -746,6 +750,7 @@ onBeforeUnmount(() => {
 .workflow-summary dd {
   margin: var(--v2-space-1) 0 0;
   color: var(--v2-color-text);
+  font-size: var(--v2-font-size-13);
   font-weight: var(--v2-font-weight-semibold);
   overflow-wrap: anywhere;
 }
@@ -772,6 +777,10 @@ onBeforeUnmount(() => {
 .workflow-timeline small {
   display: block;
 }
+.workflow-timeline strong {
+  color: var(--v2-color-text);
+  font-size: var(--v2-font-size-13);
+}
 .workflow-timeline__empty {
   justify-content: center;
   min-height: 4rem;
@@ -781,6 +790,7 @@ onBeforeUnmount(() => {
 .workflow-timeline small {
   margin-top: var(--v2-space-1);
   color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
 }
 .workflow-action-form {
   display: grid;

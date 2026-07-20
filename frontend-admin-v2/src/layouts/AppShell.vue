@@ -1,10 +1,20 @@
 <script setup lang="ts">
+import {
+  canRequestAlertNotifications,
+  hasPermission,
+  type NotificationRecord,
+} from '@cgc-pms/frontend-contracts'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { V2Alert, V2Button, V2Dialog, V2PageState, V2Select } from '@/components'
 import DomainNavigationIcon from '@/components/DomainNavigationIcon.vue'
 import { findWorkspace, visibleNavigation } from '@/navigation/catalog'
 import ShellLoadingPage from '@/pages/shell/ShellLoadingPage.vue'
+import {
+  loadNotificationSummary,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from '@/services/alerts'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -15,6 +25,10 @@ const workspaceStore = useWorkspaceStore()
 const mobileNavigationOpen = ref(false)
 const sidebarCollapsed = ref(false)
 const notificationOpen = ref(false)
+const notificationItems = ref<NotificationRecord[]>([])
+const notificationUnreadCount = ref<number | null>(null)
+const notificationLoading = ref(false)
+const notificationError = ref('')
 const roleTesterOpen = ref(false)
 const switchingTestUser = ref<string | null>(null)
 const isMobile = ref(false)
@@ -24,8 +38,11 @@ const navigationClose = ref<HTMLButtonElement | null>(null)
 let mobileMedia: MediaQueryList | null = null
 let removeAfterEach: (() => void) | null = null
 let restoreMenuFocus = false
+let notificationController: AbortController | null = null
 
 const navigation = computed(() => visibleNavigation(session.permissions))
+const canRequestNotifications = computed(() => canRequestAlertNotifications(session.permissions))
+const canEditNotifications = computed(() => hasPermission(session.permissions, 'notification:edit'))
 const activeMatch = computed(() => findWorkspace(route.path))
 const visibleActiveWorkspace = computed(() => {
   const match = activeMatch.value
@@ -68,6 +85,15 @@ watch(
   { immediate: true },
 )
 
+watch(
+  canRequestNotifications,
+  (allowed) => {
+    if (allowed) void refreshNotifications()
+    else clearNotifications()
+  },
+  { immediate: true },
+)
+
 watch(mobileNavigationOpen, async (open) => {
   document.body.classList.toggle('v2-mobile-nav-open', isMobile.value && open)
   if (open) {
@@ -95,10 +121,64 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  notificationController?.abort()
   mobileMedia?.removeEventListener('change', syncMobileMode)
   removeAfterEach?.()
   document.body.classList.remove('v2-mobile-nav-open')
 })
+
+function clearNotifications(): void {
+  notificationController?.abort()
+  notificationItems.value = []
+  notificationUnreadCount.value = null
+  notificationError.value = ''
+}
+
+async function refreshNotifications(): Promise<void> {
+  if (!canRequestNotifications.value) return
+  notificationController?.abort()
+  notificationController = new AbortController()
+  notificationLoading.value = true
+  notificationError.value = ''
+  try {
+    const [page, unread] = await loadNotificationSummary(notificationController.signal)
+    notificationItems.value = page.records
+    notificationUnreadCount.value = unread.count
+  } catch {
+    if (!notificationController.signal.aborted) {
+      notificationItems.value = []
+      notificationUnreadCount.value = null
+      notificationError.value = '通知摘要加载失败'
+    }
+  } finally {
+    if (!notificationController.signal.aborted) notificationLoading.value = false
+  }
+}
+
+function openNotifications(): void {
+  notificationOpen.value = true
+  if (canRequestNotifications.value) void refreshNotifications()
+}
+
+async function readNotification(id: string): Promise<void> {
+  if (!canEditNotifications.value) return
+  try {
+    await markNotificationRead(id)
+    await refreshNotifications()
+  } catch {
+    notificationError.value = '通知已读操作失败'
+  }
+}
+
+async function readAllNotifications(): Promise<void> {
+  if (!canEditNotifications.value) return
+  try {
+    await markAllNotificationsRead()
+    await refreshNotifications()
+  } catch {
+    notificationError.value = '全部已读操作失败'
+  }
+}
 
 function syncMobileMode(event: MediaQueryList | MediaQueryListEvent): void {
   isMobile.value = event.matches
@@ -367,14 +447,21 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
         <button
           type="button"
           class="app-shell__notification"
-          aria-label="打开通知中心占位"
+          :aria-label="
+            notificationUnreadCount === null
+              ? '打开通知中心'
+              : `打开通知中心，${notificationUnreadCount} 条未读`
+          "
           :aria-expanded="notificationOpen"
           aria-haspopup="dialog"
-          @click="notificationOpen = true"
+          @click="openNotifications"
         >
           <svg aria-hidden="true" viewBox="0 0 24 24">
             <path d="M18 8a6 6 0 00-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
           </svg>
+          <span v-if="notificationUnreadCount" class="app-shell__notification-count">{{
+            notificationUnreadCount > 99 ? '99+' : notificationUnreadCount
+          }}</span>
         </button>
 
         <div class="app-shell__account">
@@ -436,14 +523,62 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
     <V2Dialog
       v-model:open="notificationOpen"
       title="通知中心"
-      description="M1 仅提供壳级入口，不连接业务通知、SSE 或写操作。"
+      description="按当前账号读取站内通知摘要；不建立实时连接。"
     >
+      <V2Alert v-if="notificationError" tone="danger" title="请求未完成">{{
+        notificationError
+      }}</V2Alert>
       <V2PageState
+        v-if="!canRequestNotifications"
+        kind="forbidden"
+        :heading-level="3"
+        title="当前账号无通知摘要权限"
+        description="未发起通知列表或未读数请求。"
+      />
+      <V2PageState
+        v-else-if="notificationLoading"
+        kind="loading"
+        :heading-level="3"
+        title="正在加载通知"
+        description="读取当前账号最近通知。"
+      />
+      <V2PageState
+        v-else-if="!notificationItems.length"
         kind="empty"
         :heading-level="3"
-        title="暂无壳级通知"
-        description="业务通知能力尚未迁移；此处不显示模拟数量或业务消息。"
+        title="暂无站内通知"
+        description="当前账号没有可见通知。"
       />
+      <div v-else class="app-shell__notification-summary">
+        <div class="app-shell__notification-toolbar">
+          <span>未读 {{ notificationUnreadCount ?? 0 }} 条</span>
+          <V2Button
+            v-if="canEditNotifications && notificationUnreadCount"
+            variant="ghost"
+            size="small"
+            @click="readAllNotifications"
+            >全部已读</V2Button
+          >
+        </div>
+        <article
+          v-for="item in notificationItems"
+          :key="item.id"
+          :class="['app-shell__notification-item', { 'is-unread': item.isRead !== 1 }]"
+        >
+          <div>
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.content }}</p>
+            <small>{{ item.createdTime }}</small>
+          </div>
+          <V2Button
+            v-if="canEditNotifications && item.isRead !== 1"
+            variant="ghost"
+            size="small"
+            @click="readNotification(item.id)"
+            >已读</V2Button
+          >
+        </article>
+      </div>
     </V2Dialog>
   </div>
 </template>
@@ -666,6 +801,22 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 
 .app-shell__notification {
   display: grid;
+  position: relative;
+}
+
+.app-shell__notification-count {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 0;
+  min-width: 1rem;
+  height: 1rem;
+  padding-inline: 0.2rem;
+  color: var(--v2-color-surface);
+  background: var(--v2-color-danger);
+  border-radius: 999px;
+  font-size: 0.625rem;
+  line-height: 1rem;
+  text-align: center;
 }
 
 .app-shell__notification:hover,
@@ -684,6 +835,52 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 1.8;
+}
+
+.app-shell__notification-summary {
+  display: grid;
+  gap: var(--v2-space-2);
+}
+
+.app-shell__notification-toolbar,
+.app-shell__notification-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-3);
+}
+
+.app-shell__notification-toolbar {
+  color: var(--v2-color-text-secondary);
+  font-size: var(--v2-font-size-12);
+}
+
+.app-shell__notification-toolbar > span {
+  color: var(--v2-color-danger-text);
+  font-size: var(--v2-font-size-12);
+  font-weight: var(--v2-font-weight-bold);
+}
+
+.app-shell__notification-item {
+  padding: var(--v2-space-3);
+  border: 1px solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+}
+
+.app-shell__notification-item strong {
+  font-size: var(--v2-font-size-12);
+}
+
+.app-shell__notification-item.is-unread {
+  border-inline-start: 0.2rem solid var(--v2-color-primary);
+  background: var(--v2-color-primary-soft);
+}
+
+.app-shell__notification-item p,
+.app-shell__notification-item small {
+  margin: var(--v2-space-1) 0 0;
+  color: var(--v2-color-text-secondary);
+  font-size: var(--v2-font-size-11);
 }
 
 .app-shell__context-controls {
@@ -838,7 +1035,7 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 .app-shell__content {
   width: min(100%, var(--v2-page-max-width));
   margin-inline: auto;
-  padding: var(--v2-page-gutter);
+  padding: 10px;
 }
 
 .app-shell__content.app-shell__content--full {
@@ -1148,7 +1345,7 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
   }
 
   .app-shell__content {
-    padding: var(--v2-space-4);
+    padding: 10px;
   }
 
   .app-shell__notice-region {

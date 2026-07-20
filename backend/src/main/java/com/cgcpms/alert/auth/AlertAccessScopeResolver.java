@@ -20,13 +20,18 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AlertAccessScopeResolver {
 
-    public static final Set<String> ALL_ALERT_DOMAINS = Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "FINANCE");
+    public static final Set<String> ALL_ALERT_DOMAINS = Set.of(
+            "COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE",
+            "FINANCE", "FINANCE_OPERATIONS", "QUALITY_SAFETY");
 
     private static final Map<String, Set<String>> ROLE_DOMAINS = Map.of(
-            "PROJECT_MANAGER", Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE"),
+            "PROJECT_MANAGER", Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "QUALITY_SAFETY"),
             "COMMERCIAL_MANAGER", Set.of("CONTRACT", "PAYMENT", "VARIATION"),
+            "COST_MANAGER", Set.of("COST"),
             "PURCHASE_MANAGER", Set.of("PURCHASE"),
-            "FINANCE", Set.of("PAYMENT")
+            "PRODUCTION_MANAGER", Set.of("PURCHASE", "QUALITY_SAFETY"),
+            "CHIEF_ENGINEER", Set.of("QUALITY_SAFETY"),
+            "FINANCE", Set.of("PAYMENT", "FINANCE_OPERATIONS")
     );
 
     private final PmProjectMapper projectMapper;

@@ -47,12 +47,6 @@ export const navigationDomains: NavigationDomain[] = [
         ],
       },
       {
-        id: 'alerts',
-        label: '预警中心',
-        defaultPath: '/alert',
-        tabs: [{ path: '/alert', label: '预警中心', permission: 'alert:view' }],
-      },
-      {
         id: 'reports',
         label: '报表中心',
         defaultPath: '/dashboard/reports',
