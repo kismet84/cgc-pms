@@ -2,7 +2,7 @@
 
 ## 1. 验收结论
 
-**通过。** 两项AutoPilot效率观察没有取得“下一完整回顾周期”的新证据，继续保持`OBSERVATION`，不修改评分、调度、状态机或环境。用户后续专项授权远端治理，`master`保护已按书面最小策略更新并复读通过。
+**通过。** 两项AutoPilot效率观察没有取得“下一完整回顾周期”的新证据，继续保持`OBSERVATION`，不修改评分、调度、状态机或环境。用户后续专项授权远端治理；1名批准者方案经真实PR验证在单协作者仓库无合格审批人，已立即回滚。最终保护策略与当前协作结构一致。
 
 ## 2. AutoPilot裁决
 
@@ -20,9 +20,9 @@
 - `required_pull_request_reviews=null`。
 - `restrictions=null`。
 
-实施结果：至少1名批准者；新提交后撤销陈旧批准；不强制Code Owner或最后推送者之外批准。API复读确认11项app绑定required checks、strict、管理员强制和对话解决保持不变。push allowlist继续为空，因为稳定团队、CI机器人和紧急恢复主体清单未知，猜测账号可能锁死维护路径。
+实施结果：先按书面候选启用1名批准者与陈旧批准失效；创建PR后复读仓库协作者，只有PR作者`kismet84`一人，GitHub显示`REVIEW_REQUIRED/BLOCKED`且不存在合格审批人。该配置不具可执行性，已使用更新前快照回滚required reviews为NULL。最终API复读确认11项app绑定required checks、strict、管理员强制和对话解决保持不变。push allowlist继续为空。
 
-首次向尚未存在的required-review子资源发送更新返回404，分类为`tool_invocation/API资源不存在`，远端未变化；随后使用完整保护配置一次更新并复读成功。旧配置已在更新前完整读取，可按原快照回滚。
+首次向尚未存在的required-review子资源发送更新返回404，分类为`tool_invocation/API资源不存在`，远端未变化；随后使用完整保护配置更新并验证真实PR。协作者证据推翻1人审批方案后，按原快照完成回滚并复读。最终策略：新增第二位具push权限的独立协作者前，required reviews与push restrictions保持NULL；新增后再独立立项启用，不为单人仓库制造永久死锁。
 
 ## 4. 收口统计
 
@@ -32,4 +32,4 @@
 - 正式保留：AutoPilot观察2项。
 - 悬空项：0。
 
-M4治理及远端保护变更完成；未启用push allowlist是有依据的安全裁决，不再保留悬空问题。
+M4治理完成；最终未启用required review或push allowlist均有当前协作者证据，不再保留悬空问题。

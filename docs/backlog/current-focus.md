@@ -5,7 +5,7 @@
 - 原25项关闭A-01父项/9叶子、ACL观察及分支保护共12项；M0新增3项审计Candidate，当前台账16项且唯一，主线后续项净变化-9。
 - 唯一生产代码变更为合同清单项、付款条件单条新增补齐草稿合同门禁；专项90项、后端全量2046项、HighRisk策略7项和差异检查通过。
 - M0至M5本地治理通过；3项`RELEASE_GATE`仍要求目标环境凭据轮换、生产文件逐对象复扫及同SHA CI/Flyway/真实角色证据。
-- 用户已授权Git与远端治理生命周期；`master`现要求1名批准者并撤销陈旧批准，11项checks、strict、管理员强制和对话解决保持不变。功能分支按提交→push CI→pre-PR核验推进；目标环境仍未识别，不可上线。正式证据见`docs/quality/第54条主线-M0至M5本地治理收口验收报告.md`。
+- 用户已授权Git与远端治理生命周期；1名批准者方案因仓库唯一协作者即PR作者、无合格审批人而按快照回滚。`master`最终保留11项checks、strict、管理员强制与对话解决，required reviews/restrictions为NULL。功能分支push与PR首次CI均全绿；目标环境仍未识别，不可上线。正式证据见`docs/quality/第54条主线-M0至M5本地治理收口验收报告.md`。
 - M6追加只读识别：GitHub仓库无Environment，仓库级Secret/Variable名列表为空；本机生产Compose缺必需`BACKEND_TAG`并在插值阶段fail-close。禁止猜测目标环境、凭据或制品标签。
 
 ## 2026-07-20 第54条主线M5：P2候选与运维观察收口
@@ -20,7 +20,7 @@
 
 - 两项AutoPilot效率Candidate仍缺下一完整回顾周期：`cycleEfficiency`只有1个样本，`taskExecutionEfficiency`原周期中位数为满分；无稳定根因，继续`OBSERVATION`，未改控制面。
 - GitHub API复读确认`master`强制11项required checks并对管理员生效，但required reviews与push restrictions为空。
-- 用户后续授权后已配置至少1名批准者、新提交后撤销陈旧批准；11项checks、strict、管理员强制和对话解决复读保持不变。未知团队/机器人/恢复主体清单前不启用push allowlist。
+- 用户后续授权后试配1名批准者；真实PR证明仓库只有作者一名协作者、没有合格审批人，已按快照回滚required reviews为NULL。11项checks、strict、管理员强制和对话解决保持不变；新增第二位协作者前不启用review或push allowlist。
 - 本阶段新增后续项0、关闭后续项1、后续项净变化-1；无悬空项。正式证据见`docs/quality/第54条主线-M4-AutoPilot观察与分支保护治理验收报告.md`。
 
 ## 2026-07-20 第54条主线M3：A-02至A-04产品决策门收口
@@ -642,7 +642,7 @@
 - 本次 `启动迭代-10` 当前完成 5/10；Ready 清空后继续补货。静态盘点不代表真实角色、动态菜单或运行态可见性通过。
 - `ISSUE-037-020` 已完成：长期计划补货只接纳第 7–9 章开发计划，2–6 章现状/对标/差距/目标标题不再误入 Candidate；本次当前完成 5/10，继续补货。
 - `ISSUE-037-021` 的红灯与 `enforce_admins=false` 仅保留为首次复验历史快照；第40条 M0 已以 PR #334 合并、11 checks 全绿和当前分支保护 API 将 A/B/C 三条阻塞统一裁决为 `VerifiedResolved`。
-- 历史复验时API未返回required pull-request review和push restrictions；第54条主线获授权后已启用1名批准者及陈旧批准失效，push restrictions因主体清单未知保持为空。
+- 历史复验时API未返回required pull-request review和push restrictions；第54条主线试配1名批准者后因唯一协作者即PR作者而回滚，最终两项继续为空，既有checks与管理员门禁保持。
 - CI 工具链观察：GitHub annotation 提示 Node 20 action 被强制运行于 Node 24；当前不是三个红灯的退出根因，升级 Actions 需另行授权。
 - `停止迭代` 已生效：本次 `启动迭代-10` 最终完成 4/10 条实施型 Ready；`ISSUE-037-021` 仅作为不通过的回归证明归档，不计入实施数，当前不再派发下一任务。
 - 新一轮 `启动迭代-1` 在控制面选单前稳定复现 Windows PowerShell 5.1 ParserError；已按 `tool_config` 分类并建立 `ISSUE-037-022`，仅恢复 AutoPilot 脚本 UTF-8 解析兼容与回归保护，不改变业务或生产边界。
