@@ -34,6 +34,16 @@ public class AlertAccessScopeResolver {
             "FINANCE", Set.of("PAYMENT", "FINANCE_OPERATIONS")
     );
 
+    private static final Set<String> ALL_SUBSCRIPTION_DOMAINS = Set.of(
+            "COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "FINANCE");
+
+    private static final Map<String, Set<String>> SUBSCRIPTION_ROLE_DOMAINS = Map.of(
+            "PROJECT_MANAGER", Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE"),
+            "COMMERCIAL_MANAGER", Set.of("CONTRACT", "PAYMENT", "VARIATION"),
+            "PURCHASE_MANAGER", Set.of("PURCHASE"),
+            "FINANCE", Set.of("PAYMENT")
+    );
+
     private final PmProjectMapper projectMapper;
     private final PmProjectMemberMapper projectMemberMapper;
     private final CashJournalAlertRecipientResolver cashJournalRecipientResolver;
@@ -62,6 +72,17 @@ public class AlertAccessScopeResolver {
         Set<String> domains = new LinkedHashSet<>();
         for (String role : roles != null ? roles : Collections.<String>emptyList()) {
             domains.addAll(ROLE_DOMAINS.getOrDefault(normalizeRoleCode(role), Collections.emptySet()));
+        }
+        return domains;
+    }
+
+    public Set<String> allowedSubscriptionDomainsForRoles(Collection<String> roles) {
+        if (hasAdminRole(roles)) {
+            return ALL_SUBSCRIPTION_DOMAINS;
+        }
+        Set<String> domains = new LinkedHashSet<>();
+        for (String role : roles != null ? roles : Collections.<String>emptyList()) {
+            domains.addAll(SUBSCRIPTION_ROLE_DOMAINS.getOrDefault(normalizeRoleCode(role), Collections.emptySet()));
         }
         return domains;
     }
