@@ -58,7 +58,7 @@ public class AlertSubscriptionService {
     }
 
     private Subscription buildDefaults(Collection<String> roleCodes) {
-        Set<String> domains = accessScopeResolver.allowedDomainsForRoles(roleCodes);
+        Set<String> domains = accessScopeResolver.allowedSubscriptionDomainsForRoles(roleCodes);
         List<String> channels = availableChannels();
         boolean enabled = !domains.isEmpty() && !channels.isEmpty();
         return new Subscription(

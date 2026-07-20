@@ -1,4 +1,5 @@
 import type {
+  AlertRecord,
   CostBreakdownVO,
   CostManagerDashboardVO,
   FinanceDashboardVO,
@@ -9,6 +10,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DashboardPage from '@/pages/dashboard/DashboardPage.vue'
+import { loadAlerts, updateAlertStatus } from '@/services/alerts'
 import { loadCostBreakdown, loadDashboard } from '@/services/dashboard'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -16,6 +18,13 @@ import { useWorkspaceStore } from '@/stores/workspace'
 vi.mock('@/services/dashboard', () => ({
   loadDashboard: vi.fn(),
   loadCostBreakdown: vi.fn(),
+}))
+vi.mock('@/services/alerts', () => ({
+  loadAlerts: vi.fn(),
+  markAlertRead: vi.fn(),
+  acknowledgeAlert: vi.fn(),
+  updateAlertStatus: vi.fn(),
+  evaluateAlerts: vi.fn(),
 }))
 vi.mock('@/pages/dashboard/DashboardGauge.vue', () => ({
   default: { template: '<div class="test-gauge" />' },
@@ -201,7 +210,9 @@ async function mountDashboard(permissions: string[]) {
   })
   await router.push('/dashboard')
   await router.isReady()
-  const wrapper = mount(DashboardPage, { global: { plugins: [pinia, router] } })
+  const wrapper = mount(DashboardPage, {
+    global: { plugins: [pinia, router], stubs: { teleport: true } },
+  })
   await flushPromises()
   return { wrapper, workspace }
 }
@@ -209,6 +220,13 @@ async function mountDashboard(permissions: string[]) {
 beforeEach(() => {
   vi.mocked(loadDashboard).mockReset()
   vi.mocked(loadCostBreakdown).mockReset()
+  vi.mocked(loadAlerts).mockReset().mockResolvedValue({
+    records: [],
+    total: 0,
+    pageNo: 1,
+    pageSize: 50,
+  })
+  vi.mocked(updateAlertStatus).mockReset()
 })
 
 describe('M2 dashboard page', () => {
@@ -229,7 +247,7 @@ describe('M2 dashboard page', () => {
     expect(wrapper.text()).toContain('项目经营健康度')
     expect(wrapper.text()).toContain('经营动态')
     expect(wrapper.text()).not.toContain('当前角色暂无趋势数据')
-    expect(wrapper.text()).toContain('经营预警与待办')
+    expect(wrapper.text()).toContain('预警列表')
     expect(wrapper.get('.command-panel__title .dashboard-page__outline-link').text()).toBe(
       '查看最高风险',
     )
@@ -296,6 +314,78 @@ describe('M2 dashboard page', () => {
     expect(filter.get('summary').text()).toBe('全部预警')
     expect(riskList.text()).toContain('最高风险事项')
     expect(riskList.text()).toContain('一般关注事项')
+  })
+
+  it('opens and disposes an authoritative alert from the dashboard list', async () => {
+    const alert: AlertRecord = {
+      id: '101',
+      projectId: '1',
+      ruleType: 'DYNAMIC_COST_EXCEEDS_TARGET',
+      severity: 'HIGH',
+      message: '动态成本超过目标成本',
+      triggeredAt: '2026-07-20 11:00:00',
+      isRead: 0,
+      processStatus: 'OPEN',
+    }
+    vi.mocked(loadDashboard).mockResolvedValue(costData)
+    vi.mocked(loadAlerts).mockResolvedValue({
+      records: [alert],
+      total: 1,
+      pageNo: 1,
+      pageSize: 50,
+    })
+    vi.mocked(updateAlertStatus).mockResolvedValue({})
+
+    const { wrapper } = await mountDashboard([
+      'dashboard:cost-manager:view',
+      'alert:view',
+      'alert:edit',
+    ])
+
+    expect(loadAlerts).toHaveBeenCalledWith(
+      {
+        pageNum: 1,
+        pageSize: 50,
+        projectId: '1',
+        triggeredStart: '2026-07-01T00:00:00',
+        triggeredEnd: '2026-07-31T23:59:59',
+      },
+      expect.any(AbortSignal),
+    )
+    await wrapper.get('.risk-table tr.is-actionable').trigger('click')
+    expect(wrapper.get('.dashboard-alert-dialog').classes()).toContain('workflow-detail-dialog')
+    expect(wrapper.text()).toContain('查看权威预警记录并执行当前账号允许的操作。')
+    await wrapper.get('.dashboard-alert-actions input').setValue('已完成复核')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === '确认处置')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(updateAlertStatus).toHaveBeenCalledWith('101', 'PROCESSED', '已完成复核')
+  })
+
+  it('reloads authoritative alerts when the report period changes', async () => {
+    vi.mocked(loadDashboard).mockResolvedValue(pmData)
+    const { workspace } = await mountDashboard(['dashboard:project-manager:view', 'alert:view'])
+    vi.mocked(loadAlerts).mockClear()
+    workspace.setReportPeriods([
+      { value: '2026-06', label: '2026年6月' },
+      { value: '2026-07', label: '2026年7月' },
+    ])
+    workspace.selectReportPeriod('2026-06')
+    await flushPromises()
+
+    expect(loadAlerts).toHaveBeenCalledWith(
+      {
+        pageNum: 1,
+        pageSize: 50,
+        projectId: '1',
+        triggeredStart: '2026-06-01T00:00:00',
+        triggeredEnd: '2026-06-30T23:59:59',
+      },
+      expect.any(AbortSignal),
+    )
   })
 
   it('requests an aggregate role view when all projects and periods are selected', async () => {

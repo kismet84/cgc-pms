@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -86,6 +87,22 @@ class AlertAccessScopeResolverTest {
 
         assertFalse(resolver.allowedDomains().contains("FINANCE"));
         assertThrows(BusinessException.class, () -> resolver.assertAlertAccess(20L, financeAlert(20L)));
+    }
+
+    @Test
+    void dashboardRolesResolveTheirBusinessAlertDomains() {
+        AlertAccessScopeResolver resolver = new AlertAccessScopeResolver(
+                projectMapper, projectMemberMapper, recipientResolver);
+
+        assertEquals(Set.of("COST"), resolver.allowedDomainsForRoles(List.of("COST_MANAGER")));
+        assertEquals(Set.of("PURCHASE", "QUALITY_SAFETY"),
+                resolver.allowedDomainsForRoles(List.of("PRODUCTION_MANAGER")));
+        assertEquals(Set.of("QUALITY_SAFETY"),
+                resolver.allowedDomainsForRoles(List.of("CHIEF_ENGINEER")));
+        assertEquals(Set.of("PAYMENT", "FINANCE_OPERATIONS"),
+                resolver.allowedDomainsForRoles(List.of("FINANCE")));
+        assertTrue(resolver.allowedDomainsForRoles(List.of("SUPER_ADMIN"))
+                .containsAll(Set.of("FINANCE_OPERATIONS", "QUALITY_SAFETY")));
     }
 
     private AlertLog financeAlert(Long tenantId) {

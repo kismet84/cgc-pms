@@ -69,6 +69,57 @@ final result: passed
 
 ---
 
+# 驾驶舱预警处置弹窗对齐审批详情弹窗 Design QA
+
+- source visual truth path: `test-results/design-qa/approval-detail-dialog.png`
+- implementation screenshot path: `test-results/design-qa/dashboard-alert-dialog.png`
+- viewport: 默认桌面视口 `1264 × 720`；响应式复验 `390 × 844`
+- state: 平台管理员；审批待办详情与管理层驾驶舱高风险预警处置弹窗
+
+## Findings
+
+- 无剩余 P0/P1/P2。
+- 字体与排版：预警弹窗直接复用审批弹窗标题、说明和正文令牌；详情值保持 12px，信息层级清晰。
+- 间距与布局：复用审批弹窗宽度、Header、Body 间距、圆角、阴影和移动端顶对齐规则；详情与操作区使用同款半透明卡片。
+- 颜色与视觉令牌：背景、边框、玻璃模糊和状态色均复用现有 V2 令牌，没有新增颜色体系。
+- 图像与资产：两类弹窗均无图片资产；未新增图标、占位图或替代图形。
+- 文案与内容：审批弹窗保留审批语义，预警弹窗保留规则、状态、项目、触发时间和处置操作，不复制无关审批字段。
+
+## Full-view Comparison Evidence
+
+- 审批详情弹窗与预警处置弹窗已在同一浏览器比较输入中检查；容器、Header、玻璃材质、信息卡和操作卡视觉一致。
+
+## Focused Region Comparison Evidence
+
+- 无需额外裁切：默认视口截图可清晰判读 Header、详情卡、操作卡、圆角和阴影。
+
+## Primary Interactions Tested
+
+- 预警列表点击打开处置弹窗；处置控件完整显示。
+- `390 × 844` 下弹窗顶对齐，宽度不超出视口，操作区单列排列。
+- 页面控制台 warning/error 为 0；V2 全量单测 18 文件、83 项通过。
+
+## Comparison History
+
+1. 初始 P2：预警弹窗独立定义 760px 宽度和玻璃样式，与审批详情弹窗容器和移动端规则分叉。
+2. 修复：直接复用 `workflow-detail-dialog`，删除重复容器样式，并将详情/操作区调整为审批弹窗同款半透明卡片。
+3. 桌面与移动端复验无剩余 P0/P1/P2。
+
+## Implementation Checklist
+
+- [x] 复用审批弹窗容器和响应式规则
+- [x] 详情卡与操作卡视觉统一
+- [x] 桌面、移动端及控制台复验
+- [x] 目标单测与差异检查
+
+## Follow-up Polish
+
+- 无需新增后续项。
+
+final result: passed
+
+---
+
 # 审批工作台移动端筛选与详情弹窗设计 QA
 
 - source visual truth: 2026-07-20 浏览器标注截图（430 x 932，`/v2/approval/done` 与审批详情）

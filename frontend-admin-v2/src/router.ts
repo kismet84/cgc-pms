@@ -14,6 +14,7 @@ const NotFoundPage = () => import('./pages/errors/NotFoundPage.vue')
 const ShellPlaceholderPage = () => import('./pages/shell/ShellPlaceholderPage.vue')
 const DashboardPage = () => import('./pages/dashboard/DashboardPage.vue')
 const WorkflowWorkbenchPage = () => import('./pages/workbench/WorkflowWorkbenchPage.vue')
+const ReportCatalogPage = () => import('./pages/workbench/ReportCatalogPage.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -53,9 +54,11 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
           component:
             tab.path === '/dashboard'
               ? DashboardPage
-              : approvalTab
-                ? WorkflowWorkbenchPage
-                : ShellPlaceholderPage,
+              : tab.path === '/dashboard/reports'
+                ? ReportCatalogPage
+                : approvalTab
+                  ? WorkflowWorkbenchPage
+                  : ShellPlaceholderPage,
           meta: { shell: true, permission: tab.permission, workflowTab: approvalTab },
         },
       ]
@@ -64,6 +67,12 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
 )
 
 const contextRoutes: RouteRecordRaw[] = [
+  {
+    path: '/alert',
+    name: 'V2LegacyAlertRedirect',
+    redirect: (to) => ({ path: '/dashboard', query: to.query, hash: '#risk-list' }),
+    meta: { shell: true, permission: 'alert:view' },
+  },
   {
     path: '/approval/instances/:instanceId',
     name: 'V2WorkflowInstanceDetail',

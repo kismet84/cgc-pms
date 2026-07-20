@@ -1,6 +1,7 @@
 import type { DashboardDataByRole } from '@cgc-pms/frontend-contracts'
 import { describe, expect, it } from 'vitest'
 import {
+  alertRiskLevel,
   compactDashboardValue,
   dashboardActivityItems,
   deriveDashboardHealth,
@@ -11,6 +12,10 @@ import {
 } from '@/pages/dashboard/model'
 
 describe('dashboard display model', () => {
+  it('maps INFO alerts to the styled other risk level', () => {
+    expect(alertRiskLevel('INFO')).toBe('other')
+  })
+
   it.each([
     ['12345678901234567890.12', '¥12,345,678,901,234,567,890.12'],
     ['-12.3456', '¥−12.3456'],

@@ -365,7 +365,7 @@ export function primaryRiskItems(
   }
 }
 
-function alertRiskLevel(severity: string): DashboardRiskLevel {
+export function alertRiskLevel(severity: string): DashboardRiskLevel {
   const normalized = severity.toUpperCase()
   if (['CRITICAL', 'HIGH'].includes(normalized)) return 'high'
   if (normalized === 'MEDIUM') return 'medium'

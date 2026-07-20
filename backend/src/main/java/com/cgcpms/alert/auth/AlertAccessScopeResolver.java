@@ -20,9 +20,24 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class AlertAccessScopeResolver {
 
-    public static final Set<String> ALL_ALERT_DOMAINS = Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "FINANCE");
+    public static final Set<String> ALL_ALERT_DOMAINS = Set.of(
+            "COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE",
+            "FINANCE", "FINANCE_OPERATIONS", "QUALITY_SAFETY");
 
     private static final Map<String, Set<String>> ROLE_DOMAINS = Map.of(
+            "PROJECT_MANAGER", Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "QUALITY_SAFETY"),
+            "COMMERCIAL_MANAGER", Set.of("CONTRACT", "PAYMENT", "VARIATION"),
+            "COST_MANAGER", Set.of("COST"),
+            "PURCHASE_MANAGER", Set.of("PURCHASE"),
+            "PRODUCTION_MANAGER", Set.of("PURCHASE", "QUALITY_SAFETY"),
+            "CHIEF_ENGINEER", Set.of("QUALITY_SAFETY"),
+            "FINANCE", Set.of("PAYMENT", "FINANCE_OPERATIONS")
+    );
+
+    private static final Set<String> ALL_SUBSCRIPTION_DOMAINS = Set.of(
+            "COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE", "FINANCE");
+
+    private static final Map<String, Set<String>> SUBSCRIPTION_ROLE_DOMAINS = Map.of(
             "PROJECT_MANAGER", Set.of("COST", "CONTRACT", "PAYMENT", "VARIATION", "PURCHASE"),
             "COMMERCIAL_MANAGER", Set.of("CONTRACT", "PAYMENT", "VARIATION"),
             "PURCHASE_MANAGER", Set.of("PURCHASE"),
@@ -57,6 +72,17 @@ public class AlertAccessScopeResolver {
         Set<String> domains = new LinkedHashSet<>();
         for (String role : roles != null ? roles : Collections.<String>emptyList()) {
             domains.addAll(ROLE_DOMAINS.getOrDefault(normalizeRoleCode(role), Collections.emptySet()));
+        }
+        return domains;
+    }
+
+    public Set<String> allowedSubscriptionDomainsForRoles(Collection<String> roles) {
+        if (hasAdminRole(roles)) {
+            return ALL_SUBSCRIPTION_DOMAINS;
+        }
+        Set<String> domains = new LinkedHashSet<>();
+        for (String role : roles != null ? roles : Collections.<String>emptyList()) {
+            domains.addAll(SUBSCRIPTION_ROLE_DOMAINS.getOrDefault(normalizeRoleCode(role), Collections.emptySet()));
         }
         return domains;
     }

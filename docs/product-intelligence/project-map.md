@@ -1,5 +1,14 @@
 # CGC-PMS 项目地图
 
+## 2026-07-20 主线：Clean-room V2 M2 驾驶舱预警处置、通知摘要与报表目录闭环
+
+- `ISSUE-053-008` 已把权威预警查看、接单、单项处置和规则评估收敛进驾驶舱预警列表；八个演示角色具备查看与单项处置权限，规则评估仍仅限财务与管理员，点击预警行在悬浮窗内完成当前账号允许的操作。
+- 独立预警中心页面与工作区标签已取消；历史 `/alert` 深链重定向至驾驶舱预警列表，无预警权限角色继续使用派生风险只读视图。
+- 公共壳通知摘要只在同时具备预警查看和通知查看权限时读取真实有限列表与未读数；无权角色零请求，不接入 SSE，不伪造数量。
+- 报表目录以服务端返回集合为当前用户权威可见范围；只有可用的已注册页面目标提供入口，`api_only`、未知及不可用目标不伪装成页面。
+- 预警继续为 `Complete(P0)`；驾驶舱与报表的 M2 P0 页面范围更新为 `Complete(P0)`。流程模板管理、实时消息、可配置升级矩阵、第三方回执和深化分析仍不在本切片范围。
+- 本地运行态通过八个角色真实会话、业务域/活动项目范围隔离、权威预警列表、历史深链、桌面与390视口悬浮窗验收；后端仅补齐既有角色域解析和空旧规则映射查询，数据仅更新本地 demo 幂等脚本，未新增迁移、未修改 Legacy 或生产。
+
 ## 2026-07-20 主线：Clean-room V2 M2 审批工作台闭环
 
 - `ISSUE-053-007` 已迁移四类个人审批列表与实例详情深链，继续复用现有工作流查询和动作端点；读取由后端按当前用户、租户和参与关系裁决，未知实例失败关闭。
@@ -738,9 +747,9 @@ Docker Compose + Nginx + Actuator + Prometheus
 | 项目竣工与收尾         | `pages/project-closeout/`、`api/modules/projectCloseout.ts`         | `closeout/`                                     | `ProjectCloseoutClosedLoopIntegrationTest`、`project-closeout/index.test.ts`                                  | Complete(P0) | 分项/竣工验收、最终结算、尾款质保金、缺陷、档案移交及项目关闭门禁已闭环；电子签章、档案馆接口和项目后评价属 P1+                  |
 | 财务核算与月结         | `pages/accounting-entry/`、`pages/financial-close/`                 | `accounting/`、`financeclose/`                  | `FinancialAccountingMonthEndClosedLoopIntegrationTest`、`financial-close/index.test.ts`                       | Complete(P0) | 凭证复核、过账、冲销、银行/子账对账、月结检查、关账/反结账和 Trace 已闭环；多账簿、多币种、合并和税务属 P1+                      |
 | 项目资金计划与现金预测 | `pages/cash-forecast/`、`api/modules/cashForecast.ts`               | `cashforecast/`                                 | `ProjectCashForecastClosedLoopIntegrationTest`、`cash-forecast/index.test.ts`                                 | Complete(P0) | 预测版本、计划收付、缺口措施、审批、实际回写、滚动预测和 Trace 已闭环；集团资金、多币种、授信计息和概率预测属 P1+                |
-| 审批、抄送与通知       | `pages/approval/`                                                   | `workflow/`、`notification/`                    | `WorkflowCoreServiceTest`、`ApproverResolverTenantIntegrationTest`、`ApprovalWorkList.test.ts`                | Partial      | 真实角色矩阵、跨业务状态一致性待复验                                                                                             |
+| 审批、抄送与通知       | `pages/approval/`                                                   | `workflow/`、`notification/`                    | `WorkflowCoreServiceTest`、`ApproverResolverTenantIntegrationTest`、`ApprovalWorkList.test.ts`                | Partial      | 个人四类列表、实例深链、动作双门禁和有限通知摘要已闭环；流程模板管理仍待迁移                                                      |
 | 预警                   | `pages/alert/`                                                      | `alert/`                                        | `AlertEvaluationServiceTest`、`AlertControllerTest`、`AlertNotificationDispatcherTest`、`alert/index.test.ts` | Complete(P0) | 阅读、唯一接单、响应/处置双 SLA、固定两级升级、规则效果复盘、通知证据和 Trace 已闭环；失败重试、可配置升级矩阵与第三方回执属 P1+ |
-| 驾驶舱与报表           | `pages/dashboard/`、`pages/report/`                                 | `dashboard/`                                    | `DashboardServiceTest`、`DashboardControllerTest`、`DashboardDataLoading.test.ts`                             | Partial      | 指标来源、下钻和不同角色数据边界待复验                                                                                           |
+| 驾驶舱与报表           | `pages/dashboard/`、`pages/report/`                                 | `dashboard/`                                    | `DashboardServiceTest`、`DashboardControllerTest`、`DashboardDataLoading.test.ts`                             | Complete(P0) | 八角色驾驶舱、成本/资金分解和权限过滤报表目录已完成；深化分析与新增报表属 P1+                                                     |
 | 用户、角色、菜单与审计 | `pages/system/`、`api/modules/system.ts`                            | `auth/`、`system/`、`audit/`                    | `WorkflowControllerAuthTest`、`system/permissions/index.test.ts`                                              | Partial      | 不能用超级管理员替代真实角色验收                                                                                                 |
 | 文件                   | `api/modules/file.ts`                                               | `file/`                                         | 现有文件安全与业务绑定测试                                                                                    | Partial      | 上传、病毒扫描占位和业务绑定边界需当前复验                                                                                       |
 

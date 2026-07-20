@@ -46,11 +46,16 @@ describe('V2 application-shell routes', () => {
     const approvalDetail = shell?.children?.find(
       (route) => route.path === '/approval/instances/:instanceId',
     )
+    const alert = shell?.children?.find((route) => route.path === '/alert')
+    const reports = shell?.children?.find((route) => route.path === '/dashboard/reports')
     expect(approval?.meta).toMatchObject({
       workflowTab: 'todo',
     })
     expect(approval?.meta?.permission).toBeUndefined()
     expect(approvalDetail?.meta?.permission).toBeUndefined()
+    expect(alert?.meta?.permission).toBe('alert:view')
+    expect(alert?.redirect).toBeTypeOf('function')
+    expect(String(reports?.component)).not.toContain('ShellPlaceholderPage')
   })
 
   it('restores a permitted deep link and blocks a missing permission', async () => {

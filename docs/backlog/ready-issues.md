@@ -234,55 +234,69 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
   Reviewer要求：确认身份范围、跨租户/未知实例、动作双重控制、CSRF、幂等和事实回读。
   最小回滚：恢复审批路由占位并回退 V2 workflow 契约、服务、页面和测试。
 
-### ISSUE-053-008：预警中心、通知摘要与报表目录
+### ISSUE-053-008：驾驶舱内预警处置、通知摘要与报表目录
 
 优先级：P0
 任务性质：能力新增
 类型：Clean-room V2 / 预警 / 通知 / 报表
 目标：
 
-- 迁移预警查询处置闭环、受控通知摘要和报表目录。
-  非目标：
-- 不接入 SSE，不伪造未读数，不新增预警规则、报表或后端能力。
-  允许修改：
+- 将权威预警查询与单项处置闭环收敛进驾驶舱，并迁移受控通知摘要和报表目录。
+非目标：
+- 不接入 SSE，不伪造未读数，不新增预警规则或报表；后续授权只允许修复既有八角色预警访问域和本地 demo 范围数据。
+允许修改：
+- `backend/src/main/java/com/cgcpms/alert/auth/AlertAccessScopeResolver.java`
+- `backend/src/main/java/com/cgcpms/alert/service/AlertEvaluationService.java`
+- `backend/src/test/java/com/cgcpms/alert/AlertAccessScopeResolverTest.java`
+- `backend/src/test/java/com/cgcpms/alert/AlertEvaluationServiceTest.java`
 - `packages/frontend-contracts/src/alert.ts`
 - `packages/frontend-contracts/src/report.ts`
+- `packages/frontend-contracts/src/index.ts`
 - `frontend-admin-v2/src/services/**`
+- `frontend-admin-v2/src/pages/dashboard/**`
 - `frontend-admin-v2/src/pages/workbench/**`
 - `frontend-admin-v2/src/layouts/AppShell.vue`
+- `frontend-admin-v2/src/navigation/**`
 - `frontend-admin-v2/src/router.ts`
 - `frontend-admin-v2/tests/**`
+- `scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql`
+- `scripts/demo/complete-project-v2/sql/170-dashboard-risk-levels.sql`
+- `scripts/demo/complete-project-v2/verify.ps1`
 - `docs/backlog/**`
 - `docs/product-intelligence/**`
 - `docs/quality/ISSUE-053-008-M2预警与报表目录验收报告.md`
-  禁止修改：
-- `backend/**`
+禁止修改：
+- `backend/**`（上述明确允许文件除外）
 - `frontend-admin/**`
 - `backend/src/main/resources/db/migration/**`
 - `deploy/**`
 - `.github/**`
 - `AGENTS.md`
 - `AGENTS.override.md`
-  验收标准：
-- 预警查看、编辑和评估权限正负矩阵通过；批量部分成功逐项显示。
+验收标准：
+- 预警查看、编辑和评估权限正负矩阵通过；权威预警行可在驾驶舱内打开悬浮窗并按权限处置。
+- 不保留独立预警中心页面或工作区标签；历史 `/alert` 深链安全重定向到驾驶舱预警列表。
 - 无预警权限不请求通知摘要；报表按服务端权限过滤，未知目标和 `api_only` 不伪装页面。
 - 单测、类型、Lint、构建、权限、深链和三视口通过。
-  状态：Ready
-  来源锚点：M2计划 ISSUE-053-008；项目地图预警 Complete(P0) 与驾驶舱报表 Partial
-  存量问题键：[mainline:053-M2-008-ALERT-REPORT-WORKBENCH]
-  验证命令：
+- 八个演示角色均通过真实登录会话读取至少一条与其业务域、活动项目范围一致的权威预警；八角色均具备单项处置权限，规则评估仍仅限财务与管理员，项目范围与角色业务域不得扩大。
+状态：Completed（2026-07-20，驾驶舱内预警处置、有限通知摘要、权限过滤报表目录与运行态验收已通过）
+来源锚点：M2计划 ISSUE-053-008；项目地图预警 Complete(P0) 与驾驶舱报表 Partial
+存量问题键：[mainline:053-M2-008-ALERT-REPORT-WORKBENCH]
+验证命令：
 - `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-008`
 - `cd frontend-admin-v2; pnpm test:unit`
 - `cd frontend-admin-v2; pnpm lint:check`
 - `cd frontend-admin-v2; pnpm build`
+- `cd backend; .\mvnw.cmd "-Dtest=AlertAccessScopeResolverTest,AlertEvaluationServiceTest#testAccess_ProductionAndChiefEngineerDomains" test`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1 -Environment demo -Database cgc_pms_demo_v2`
 - `git diff --check`
-  归档报告：`docs/quality/ISSUE-053-008-M2预警与报表目录验收报告.md`
-  Migration：不需要
-  依赖：ISSUE-053-007 通过。
-  风险等级：高
-  运行态要求：本地受控身份和数据；只执行验收所需受控预警动作。
-  Reviewer要求：确认权限矩阵、部分成功、通知零伪造、报表目标过滤和真实回读。
-  最小回滚：恢复预警/报表路由占位并回退相关契约、服务、页面、壳接线和测试。
+归档报告：`docs/quality/ISSUE-053-008-M2预警与报表目录验收报告.md`
+Migration：不需要；仅更新幂等本地 demo 数据脚本。
+依赖：ISSUE-053-007 通过。
+风险等级：高
+运行态要求：本地受控身份和数据；只执行验收所需受控预警动作。
+Reviewer要求：确认权限矩阵、驾驶舱权威预警来源、通知零伪造、报表目标过滤和真实回读。
+最小回滚：恢复驾驶舱派生风险只读列表和预警/报表路由占位，回退相关契约、服务、页面、壳接线、角色业务域解析及测试；本地 demo 数据按固定 ID 删除新增成员、授权与质量安全预警。
 
 ### ISSUE-053-009：M2全量退出门与治理收口
 

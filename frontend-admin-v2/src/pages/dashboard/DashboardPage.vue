@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type {
+  AlertProcessStatus,
+  AlertRecord,
   CostBreakdownVO,
   CostManagerDashboardVO,
   DashboardDataByRole,
@@ -7,18 +9,36 @@ import type {
   FinanceDashboardVO,
   SubjectBreakdown,
 } from '@cgc-pms/frontend-contracts'
-import { resolveDashboardRoles } from '@cgc-pms/frontend-contracts'
+import { hasPermission, resolveDashboardRoles } from '@cgc-pms/frontend-contracts'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { V2Alert, V2Button, V2Card, V2PageState } from '@/components'
+import {
+  V2Alert,
+  V2Badge,
+  V2Button,
+  V2Card,
+  V2Dialog,
+  V2Input,
+  V2PageState,
+  V2Select,
+} from '@/components'
 import DomainNavigationIcon from '@/components/DomainNavigationIcon.vue'
 import { loadCostBreakdown, loadDashboard } from '@/services/dashboard'
+import {
+  acknowledgeAlert,
+  evaluateAlerts,
+  loadAlerts,
+  markAlertRead,
+  updateAlertStatus,
+} from '@/services/alerts'
+import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import {
   DASHBOARD_ROLE_LABELS,
   DASHBOARD_RISK_LABELS,
   type DashboardRiskLevel,
+  alertRiskLevel,
   compactDashboardValue,
   dashboardActivityItems,
   dashboardHealth,
@@ -26,6 +46,7 @@ import {
   formatAmount,
   primaryRiskItems,
 } from './model'
+import { alertRuleLabel, alertStatusLabel, severityTone } from '../workbench/alert-report-model'
 import DashboardGauge from './DashboardGauge.vue'
 import DashboardTrendChart from './DashboardTrendChart.vue'
 
@@ -42,6 +63,14 @@ const selectedRole = ref<DashboardRole>(
     : (allowedRoles.value[0] ?? 'pm'),
 )
 const data = ref<DashboardDataByRole[DashboardRole] | null>(null)
+const alertRows = ref<AlertRecord[]>([])
+const alertLoading = ref(false)
+const alertError = ref('')
+const alertActionLoading = ref(false)
+const alertActionMessage = ref('')
+const selectedAlert = ref<AlertRecord | null>(null)
+const targetAlertStatus = ref<AlertProcessStatus>('PROCESSED')
+const alertRemark = ref('')
 const loading = ref(false)
 const error = ref(false)
 const breakdown = ref<CostBreakdownVO | null>(null)
@@ -58,8 +87,12 @@ const riskFilterLabel = computed(
 const refreshToken = ref(0)
 let generation = 0
 let controller: AbortController | null = null
+let alertController: AbortController | null = null
 
 const access = computed(() => ({ roles: session.roles, permissions: session.permissions }))
+const canViewAlerts = computed(() => hasPermission(session.permissions, 'alert:view'))
+const canEditAlerts = computed(() => hasPermission(session.permissions, 'alert:edit'))
+const canEvaluateAlerts = computed(() => hasPermission(session.permissions, 'alert:evaluate'))
 const currentProject = computed(() =>
   workspace.projects.find((item) => item.value === workspace.selectedProjectId),
 )
@@ -75,7 +108,20 @@ const displayMetrics = computed(() =>
   metrics.value.map((metric) => ({ ...metric, ...compactDashboardValue(metric.value) })),
 )
 const health = computed(() => (data.value ? dashboardHealth(selectedRole.value, data.value) : null))
-const risks = computed(() => (data.value ? primaryRiskItems(selectedRole.value, data.value) : []))
+const derivedRisks = computed(() =>
+  data.value ? primaryRiskItems(selectedRole.value, data.value) : [],
+)
+const alertRisks = computed(() =>
+  alertRows.value.map((alert) => ({
+    id: alert.id,
+    title: alert.message,
+    meta: `${alertRuleLabel(alert.ruleType)} · ${alert.triggeredAt}`,
+    status: alertStatusLabel(alert.processStatus),
+    riskLevel: alertRiskLevel(alert.severity),
+    alert,
+  })),
+)
+const risks = computed(() => (canViewAlerts.value ? alertRisks.value : derivedRisks.value))
 const activityItems = computed(() =>
   data.value ? dashboardActivityItems(selectedRole.value, data.value).slice(0, 6) : [],
 )
@@ -160,8 +206,13 @@ const filteredRisks = computed(() => {
     riskFilter.value === 'all'
       ? risks.value
       : risks.value.filter((item) => item.riskLevel === riskFilter.value)
-  return items.slice(0, 6)
+  return items
 })
+const targetAlertStatusOptions = [
+  { value: 'PROCESSED', label: '已处理' },
+  { value: 'ARCHIVED', label: '已归档' },
+  { value: 'INVALID', label: '已失效' },
+]
 const quickEntries = [
   { label: '风险待办', href: '#risk-list', domain: 'workbench' },
   { label: '经营趋势', href: '#cost-trend', domain: 'delivery' },
@@ -214,7 +265,21 @@ watch(
   { immediate: true },
 )
 
-onBeforeUnmount(() => controller?.abort())
+watch(
+  [
+    canViewAlerts,
+    () => workspace.selectedProjectId,
+    () => workspace.selectedReportPeriod,
+    refreshToken,
+  ],
+  () => void refreshAlerts(),
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  controller?.abort()
+  alertController?.abort()
+})
 
 async function showHighestRisks(): Promise<void> {
   riskFilter.value = riskFilter.value === 'high' ? 'all' : 'high'
@@ -225,6 +290,122 @@ async function showHighestRisks(): Promise<void> {
 function selectRiskFilter(value: 'all' | DashboardRiskLevel): void {
   riskFilter.value = value
   riskFilterMenu.value?.removeAttribute('open')
+}
+
+async function refreshAlerts(): Promise<void> {
+  alertController?.abort()
+  alertRows.value = []
+  alertError.value = ''
+  if (!canViewAlerts.value) return
+
+  alertController = new AbortController()
+  const currentController = alertController
+  alertLoading.value = true
+  try {
+    const periodBounds = dashboardPeriodBounds(workspace.selectedReportPeriod)
+    const result = await loadAlerts(
+      {
+        pageNum: 1,
+        pageSize: 50,
+        projectId: workspace.selectedProjectId || undefined,
+        ...periodBounds,
+      },
+      currentController.signal,
+    )
+    if (currentController.signal.aborted) return
+    alertRows.value = result.records.map((row) => ({
+      ...row,
+      id: String(row.id),
+      projectId: String(row.projectId),
+    }))
+  } catch (caught) {
+    if (!currentController.signal.aborted) {
+      alertError.value = isApiClientError(caught) ? caught.message : '预警列表加载失败'
+    }
+  } finally {
+    if (!currentController.signal.aborted) alertLoading.value = false
+  }
+}
+
+function dashboardPeriodBounds(period: string | null): {
+  triggeredStart?: string
+  triggeredEnd?: string
+} {
+  const match = /^(\d{4})-(\d{2})$/.exec(period ?? '')
+  if (!match) return {}
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (month < 1 || month > 12) return {}
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  return {
+    triggeredStart: `${period}-01T00:00:00`,
+    triggeredEnd: `${period}-${String(lastDay).padStart(2, '0')}T23:59:59`,
+  }
+}
+
+function openAlertDisposition(item: (typeof risks.value)[number]): void {
+  if (!('alert' in item) || !item.alert) return
+  selectedAlert.value = item.alert
+  targetAlertStatus.value = 'PROCESSED'
+  alertRemark.value = ''
+  alertActionMessage.value = ''
+  alertError.value = ''
+}
+
+async function runAlertAction(action: () => Promise<unknown>, message: string): Promise<void> {
+  const alertId = selectedAlert.value?.id
+  if (!alertId) return
+  alertActionLoading.value = true
+  alertError.value = ''
+  try {
+    await action()
+    alertActionMessage.value = message
+    await refreshAlerts()
+    selectedAlert.value = alertRows.value.find((row) => row.id === alertId) ?? null
+  } catch (caught) {
+    alertError.value = isApiClientError(caught) ? caught.message : '预警处置失败'
+  } finally {
+    alertActionLoading.value = false
+  }
+}
+
+function markSelectedAlertRead(): void {
+  if (!selectedAlert.value) return
+  void runAlertAction(() => markAlertRead(selectedAlert.value!.id), '已标记为已读')
+}
+
+function acknowledgeSelectedAlert(): void {
+  if (!selectedAlert.value) return
+  void runAlertAction(() => acknowledgeAlert(selectedAlert.value!.id, '在驾驶舱接单'), '预警已接单')
+}
+
+function disposeSelectedAlert(): void {
+  if (!selectedAlert.value) return
+  if (!alertRemark.value.trim()) {
+    alertError.value = '处置预警必须填写处理说明'
+    return
+  }
+  void runAlertAction(
+    () =>
+      updateAlertStatus(selectedAlert.value!.id, targetAlertStatus.value, alertRemark.value.trim()),
+    '预警状态已更新',
+  )
+}
+
+function evaluateCurrentAlerts(): void {
+  alertActionLoading.value = true
+  alertError.value = ''
+  void evaluateAlerts()
+    .then(async (result) => {
+      alertActionMessage.value = `评估完成，生成 ${result.alertsGenerated} 项预警`
+      await refreshAlerts()
+    })
+    .catch((caught: unknown) => {
+      alertError.value = isApiClientError(caught) ? caught.message : '预警评估失败'
+    })
+    .finally(() => {
+      alertActionLoading.value = false
+    })
 }
 
 async function refresh(): Promise<void> {
@@ -461,58 +642,75 @@ function isAbort(errorValue: unknown): boolean {
 
         <section id="risk-list" class="command-panel risk-panel">
           <header class="panel-toolbar">
-            <strong>经营预警与待办（{{ risks.length }}）</strong>
-            <details ref="riskFilterMenu" class="risk-filter">
-              <span class="v2-visually-hidden">筛选预警</span>
-              <summary aria-label="筛选预警">{{ riskFilterLabel }}</summary>
-              <div class="risk-filter__menu" role="listbox" aria-label="筛选预警选项">
-                <button
-                  type="button"
-                  role="option"
-                  :aria-selected="riskFilter === 'all'"
-                  @click="selectRiskFilter('all')"
-                >
-                  全部预警
-                </button>
-                <button
-                  type="button"
-                  role="option"
-                  :aria-selected="riskFilter === 'high'"
-                  @click="selectRiskFilter('high')"
-                >
-                  高
-                </button>
-                <button
-                  type="button"
-                  role="option"
-                  :aria-selected="riskFilter === 'medium'"
-                  @click="selectRiskFilter('medium')"
-                >
-                  中
-                </button>
-                <button
-                  type="button"
-                  role="option"
-                  :aria-selected="riskFilter === 'low'"
-                  @click="selectRiskFilter('low')"
-                >
-                  低
-                </button>
-                <button
-                  type="button"
-                  role="option"
-                  :aria-selected="riskFilter === 'other'"
-                  @click="selectRiskFilter('other')"
-                >
-                  其他
-                </button>
-              </div>
-            </details>
+            <strong>预警列表（{{ risks.length }}）</strong>
+            <div class="risk-panel__actions">
+              <details ref="riskFilterMenu" class="risk-filter">
+                <span class="v2-visually-hidden">筛选预警</span>
+                <summary aria-label="筛选预警">{{ riskFilterLabel }}</summary>
+                <div class="risk-filter__menu" role="listbox" aria-label="筛选预警选项">
+                  <button
+                    type="button"
+                    role="option"
+                    :aria-selected="riskFilter === 'all'"
+                    @click="selectRiskFilter('all')"
+                  >
+                    全部预警
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    :aria-selected="riskFilter === 'high'"
+                    @click="selectRiskFilter('high')"
+                  >
+                    高
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    :aria-selected="riskFilter === 'medium'"
+                    @click="selectRiskFilter('medium')"
+                  >
+                    中
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    :aria-selected="riskFilter === 'low'"
+                    @click="selectRiskFilter('low')"
+                  >
+                    低
+                  </button>
+                  <button
+                    type="button"
+                    role="option"
+                    :aria-selected="riskFilter === 'other'"
+                    @click="selectRiskFilter('other')"
+                  >
+                    其他
+                  </button>
+                </div>
+              </details>
+              <V2Button
+                v-if="canEvaluateAlerts"
+                size="small"
+                variant="ghost"
+                :loading="alertActionLoading"
+                @click="evaluateCurrentAlerts"
+              >
+                评估预警
+              </V2Button>
+            </div>
           </header>
+          <V2Alert v-if="alertError && !selectedAlert" tone="danger" title="预警请求未完成">
+            {{ alertError }}
+          </V2Alert>
+          <V2Alert v-if="alertActionMessage && !selectedAlert" tone="info" title="操作结果">
+            {{ alertActionMessage }}
+          </V2Alert>
           <div class="risk-table-wrap" tabindex="0">
             <table class="risk-table">
               <caption class="v2-visually-hidden">
-                经营预警与待办
+                预警列表
               </caption>
               <thead>
                 <tr>
@@ -525,7 +723,14 @@ function isAbort(errorValue: unknown): boolean {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in filteredRisks" :key="item.id">
+                <tr
+                  v-for="item in filteredRisks"
+                  :key="item.id"
+                  :class="{ 'is-actionable': 'alert' in item && item.alert }"
+                  :tabindex="'alert' in item && item.alert ? 0 : undefined"
+                  @click="openAlertDisposition(item)"
+                  @keydown.enter="openAlertDisposition(item)"
+                >
                   <td>
                     <span class="risk-level" :class="`is-${item.riskLevel}`">{{
                       item.riskLevel ? DASHBOARD_RISK_LABELS[item.riskLevel] : '其他'
@@ -539,8 +744,11 @@ function isAbort(errorValue: unknown): boolean {
                   <td>{{ currentProjectLabel }}</td>
                   <td>{{ item.meta }}</td>
                 </tr>
-                <tr v-if="!filteredRisks.length" class="empty-row">
-                  <td colspan="6">当前筛选条件下暂无预警与待办</td>
+                <tr v-if="alertLoading" class="empty-row">
+                  <td colspan="6">正在加载预警</td>
+                </tr>
+                <tr v-else-if="!filteredRisks.length" class="empty-row">
+                  <td colspan="6">当前筛选条件下暂无预警</td>
                 </tr>
               </tbody>
             </table>
@@ -709,6 +917,78 @@ function isAbort(errorValue: unknown): boolean {
         <p v-else class="dashboard-page__empty">当前范围暂无合同资金明细。</p>
       </V2Card>
     </template>
+
+    <V2Dialog
+      :open="Boolean(selectedAlert)"
+      :title="selectedAlert?.message ?? '预警处置'"
+      description="查看权威预警记录并执行当前账号允许的操作。"
+      close-label="关闭预警处置"
+      panel-class="workflow-detail-dialog dashboard-alert-dialog"
+      :close-on-backdrop="!alertActionLoading"
+      @close="selectedAlert = null"
+    >
+      <template v-if="selectedAlert">
+        <V2Alert v-if="alertError" tone="danger" title="处置未完成">{{ alertError }}</V2Alert>
+        <V2Alert v-if="alertActionMessage" tone="info" title="操作结果">
+          {{ alertActionMessage }}
+        </V2Alert>
+        <div class="dashboard-alert-detail">
+          <V2Badge :tone="severityTone(selectedAlert.severity)">{{
+            DASHBOARD_RISK_LABELS[alertRiskLevel(selectedAlert.severity)]
+          }}</V2Badge>
+          <dl>
+            <div>
+              <dt>规则</dt>
+              <dd>{{ alertRuleLabel(selectedAlert.ruleType) }}</dd>
+            </div>
+            <div>
+              <dt>状态</dt>
+              <dd>{{ alertStatusLabel(selectedAlert.processStatus) }}</dd>
+            </div>
+            <div>
+              <dt>项目</dt>
+              <dd>{{ selectedAlert.projectId }}</dd>
+            </div>
+            <div>
+              <dt>触发时间</dt>
+              <dd>{{ selectedAlert.triggeredAt }}</dd>
+            </div>
+          </dl>
+        </div>
+        <div v-if="canEditAlerts" class="dashboard-alert-actions">
+          <V2Button
+            v-if="selectedAlert.isRead !== 1"
+            size="small"
+            variant="secondary"
+            :loading="alertActionLoading"
+            @click="markSelectedAlertRead"
+          >
+            标记已读
+          </V2Button>
+          <V2Button
+            v-if="
+              (selectedAlert.processStatus || 'OPEN') === 'OPEN' && !selectedAlert.acknowledgedBy
+            "
+            size="small"
+            variant="secondary"
+            :loading="alertActionLoading"
+            @click="acknowledgeSelectedAlert"
+          >
+            接单
+          </V2Button>
+          <V2Select
+            v-model="targetAlertStatus"
+            label="目标状态"
+            :options="targetAlertStatusOptions"
+          />
+          <V2Input v-model="alertRemark" label="处理说明" placeholder="必填，最多500字" />
+          <V2Button size="small" :loading="alertActionLoading" @click="disposeSelectedAlert">
+            确认处置
+          </V2Button>
+        </div>
+        <p v-else class="dashboard-alert-readonly">当前账号仅可查看预警。</p>
+      </template>
+    </V2Dialog>
   </section>
 </template>
 
@@ -1017,6 +1297,9 @@ function isAbort(errorValue: unknown): boolean {
   font-size: var(--v2-font-size-11);
   font-weight: var(--v2-font-weight-regular);
 }
+.health-panel > .command-panel__title {
+  min-height: 55px;
+}
 .health-content {
   min-height: 168px;
   display: grid;
@@ -1249,6 +1532,11 @@ function isAbort(errorValue: unknown): boolean {
   font-size: var(--v2-font-size-11);
   font-weight: var(--v2-font-weight-regular);
 }
+.risk-panel__actions {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+}
 .risk-filter summary {
   width: 94px;
   min-height: 32px;
@@ -1356,6 +1644,14 @@ function isAbort(errorValue: unknown): boolean {
   color: var(--v2-color-text-strong);
   text-overflow: ellipsis;
 }
+.dashboard-page .risk-table tr.is-actionable {
+  cursor: pointer;
+}
+.dashboard-page .risk-table tr.is-actionable:hover,
+.dashboard-page .risk-table tr.is-actionable:focus-visible {
+  background: var(--v2-color-primary-soft);
+  outline: 0;
+}
 .risk-level {
   display: inline-flex;
   width: 25px;
@@ -1390,6 +1686,49 @@ function isAbort(errorValue: unknown): boolean {
   height: 180px;
   color: var(--v2-color-text-muted);
   text-align: center;
+}
+.dashboard-alert-detail {
+  display: grid;
+  gap: 12px;
+  padding: var(--v2-space-4);
+  border: 1px solid color-mix(in srgb, var(--v2-color-border) 70%, transparent);
+  border-radius: var(--v2-radius-md);
+  background: color-mix(in srgb, var(--v2-color-surface) 68%, transparent);
+}
+.dashboard-alert-detail dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.dashboard-alert-detail dl div {
+  padding-inline-start: 10px;
+  border-inline-start: 2px solid var(--v2-color-border-subtle);
+}
+.dashboard-alert-detail dt {
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
+}
+.dashboard-alert-detail dd {
+  margin: 3px 0 0;
+  color: var(--v2-color-text-strong);
+  font-size: var(--v2-font-size-12);
+  font-weight: var(--v2-font-weight-semibold);
+}
+.dashboard-alert-actions {
+  display: grid;
+  grid-template-columns: auto auto minmax(120px, 0.7fr) minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  padding: var(--v2-space-3) var(--v2-space-4);
+  border: 1px solid color-mix(in srgb, var(--v2-color-border) 64%, transparent);
+  border-radius: var(--v2-radius-md);
+  background: color-mix(in srgb, var(--v2-color-surface) 58%, transparent);
+}
+.dashboard-alert-readonly {
+  margin: 14px 0 0;
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-12);
 }
 .utility-panel {
   min-height: 104px;
@@ -1514,6 +1853,10 @@ function isAbort(errorValue: unknown): boolean {
     align-items: flex-start;
     flex-direction: column;
     padding-block: 10px;
+  }
+  .dashboard-alert-detail dl,
+  .dashboard-alert-actions {
+    grid-template-columns: 1fr;
   }
   .utility-panel {
     grid-template-columns: 1fr;

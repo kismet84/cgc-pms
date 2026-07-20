@@ -90,6 +90,22 @@ UNION ALL SELECT 'document_template',COUNT(*) FROM biz_document_template WHERE t
 UNION ALL SELECT 'document_generation',COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND id BETWEEN 520000000000008511 AND 520000000000008512 AND deleted_flag=0
 UNION ALL SELECT 'demo_user',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username='demo.manager' AND status='ENABLE' AND deleted_flag=0
 UNION ALL SELECT 'role_test_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'role_alert_permission',COUNT(DISTINCT u.username) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance')
+    AND u.status='ENABLE' AND u.deleted_flag=0 AND m.perms='alert:view' AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'role_alert_edit_permission',COUNT(DISTINCT u.username) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance')
+    AND u.status='ENABLE' AND u.deleted_flag=0 AND m.perms='alert:edit' AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'role_alert_project_members',COUNT(DISTINCT u.username) FROM sys_user u
+  JOIN pm_project_member pm ON pm.tenant_id=u.tenant_id AND pm.user_id=u.id
+  WHERE u.tenant_id=0 AND u.username IN ('demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance')
+    AND pm.project_id=520000000000009002 AND pm.status='ACTIVE' AND pm.deleted_flag=0
 UNION ALL SELECT 'role_workflow_status_instances',COUNT(*) FROM wf_instance WHERE tenant_id=0 AND id BETWEEN 520000000000009700 AND 520000000000009739 AND deleted_flag=0 AND remark='M2八角色审批状态矩阵'
 UNION ALL SELECT 'role_workflow_status_pairs',COUNT(DISTINCT CONCAT(initiator_id,':',instance_status)) FROM wf_instance WHERE tenant_id=0 AND id BETWEEN 520000000000009700 AND 520000000000009739 AND deleted_flag=0
 UNION ALL SELECT 'role_workflow_status_todos',COUNT(*) FROM wf_task t JOIN wf_instance i ON i.id=t.instance_id AND i.tenant_id=t.tenant_id WHERE t.tenant_id=0 AND t.id BETWEEN 520000000000009780 AND 520000000000009819 AND t.task_status='PENDING' AND i.instance_status='RUNNING' AND t.deleted_flag=0 AND i.deleted_flag=0
@@ -133,6 +149,7 @@ UNION ALL SELECT 'risk_level_measures',COUNT(DISTINCT status) FROM sub_measure W
 UNION ALL SELECT 'risk_level_tech_items',COUNT(*) FROM tech_item WHERE tenant_id=0 AND id BETWEEN 520000000000009608 AND 520000000000009609 AND deleted_flag=0
 UNION ALL SELECT 'risk_level_finance_records',COUNT(*) FROM pay_record WHERE tenant_id=0 AND id IN (520000000000009611,520000000000009612,520000000000009613,520000000000009618) AND deleted_flag=0
 UNION ALL SELECT 'risk_level_alert_severities',COUNT(DISTINCT severity) FROM alert_log WHERE tenant_id=0 AND id BETWEEN 520000000000009621 AND 520000000000009624 AND is_read=0 AND deleted_flag=0
+UNION ALL SELECT 'role_quality_safety_alert',COUNT(*) FROM alert_log WHERE tenant_id=0 AND id=520000000000009625 AND alert_domain='QUALITY_SAFETY' AND process_status='OPEN' AND deleted_flag=0
 UNION ALL SELECT 'cost_breakdown_rows',COUNT(*) FROM cost_summary WHERE tenant_id=0 AND id BETWEEN 520000000000009471 AND 520000000000009475 AND project_id=520000000000009002 AND deleted_flag=0
 UNION ALL SELECT 'cost_breakdown_roots',COUNT(*) FROM cost_summary s JOIN cost_subject c ON c.id=s.cost_subject_id AND c.tenant_id=s.tenant_id WHERE s.tenant_id=0 AND s.id BETWEEN 520000000000009471 AND 520000000000009475 AND c.level=1 AND c.status='ENABLE' AND c.deleted_flag=0 AND s.deleted_flag=0
 UNION ALL SELECT 'cost_breakdown_children',COUNT(*) FROM cost_summary s JOIN cost_subject c ON c.id=s.cost_subject_id AND c.tenant_id=s.tenant_id WHERE s.tenant_id=0 AND s.id BETWEEN 520000000000009471 AND 520000000000009475 AND c.level=2 AND c.parent_id=900001 AND c.status='ENABLE' AND c.deleted_flag=0 AND s.deleted_flag=0
@@ -364,7 +381,9 @@ $oneKeys = @('project','material','bid_transfer','target','purchase_request','pu
     'material_return_reversal','document_template','demo_user')
 $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $invalidCreditPartners.Count -eq 0 `
     -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 20 `
-    -and $metrics.role_test_account -eq 8 -and $metrics.dashboard_trend_month -eq 7 -and $metrics.role_test_scope -eq 8 `
+    -and $metrics.role_test_account -eq 8 -and $metrics.role_alert_permission -eq 8 -and $metrics.role_alert_edit_permission -eq 8 `
+    -and $metrics.role_alert_project_members -eq 7 `
+    -and $metrics.dashboard_trend_month -eq 7 -and $metrics.role_test_scope -eq 8 `
     -and $metrics.document_generation -eq 2 -and $metrics.finance_demo_budget -eq 1 `
     -and $metrics.finance_demo_pay_application -eq 4 -and $metrics.finance_demo_pay_record -eq 4 `
     -and $metrics.finance_demo_paid -eq 340000 -and $metrics.finance_demo_processing -eq 120000 `
@@ -377,7 +396,7 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.risk_level_contracts -eq 2 -and $metrics.risk_level_project_task -eq 1 `
     -and $metrics.risk_level_purchase_order -eq 1 -and $metrics.risk_level_measures -eq 4 `
     -and $metrics.risk_level_tech_items -eq 2 -and $metrics.risk_level_finance_records -eq 4 `
-    -and $metrics.risk_level_alert_severities -eq 4 `
+    -and $metrics.risk_level_alert_severities -eq 4 -and $metrics.role_quality_safety_alert -eq 1 `
     -and $metrics.cost_breakdown_rows -eq 5 -and $metrics.cost_breakdown_roots -eq 1 `
     -and $metrics.cost_breakdown_children -eq 4 -and $metrics.cost_breakdown_permission -eq 1 `
     -and $metrics.cost_breakdown_target_delta -eq 0 -and $metrics.cost_breakdown_actual_delta -eq 0 `

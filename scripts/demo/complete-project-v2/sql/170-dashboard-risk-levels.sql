@@ -123,7 +123,10 @@ VALUES
    @demo_admin,NOW(),@demo_admin,NOW(),0,'M2风险等级：低'),
   (520000000000009624,0,@demo_project,@demo_contract,'COST','COST_CONTROL','COST_SUMMARY',520000000000009411,'M52-RISK:OTHER:COST',
    'DYNAMIC_COST_EXCEEDS_TARGET','INFO','其他：成本数据例行复核提醒',DATE_SUB(NOW(),INTERVAL 4 MINUTE),0,NULL,NULL,'OPEN',NULL,NULL,0,0,
-   @demo_admin,NOW(),@demo_admin,NOW(),0,'M2风险等级：其他')
+   @demo_admin,NOW(),@demo_admin,NOW(),0,'M2风险等级：其他'),
+  (520000000000009625,0,@demo_project,NULL,'QUALITY_SAFETY','QUALITY','QS_ISSUE',520000000000009411,'M53-M2:QUALITY-SAFETY:ACTIVE',
+   'QUALITY_SAFETY_ISSUE','MEDIUM','中风险：施工质量安全问题待复核',DATE_SUB(NOW(),INTERVAL 5 MINUTE),0,NULL,NULL,'OPEN',NULL,NULL,1,0,
+   @demo_admin,NOW(),@demo_admin,NOW(),0,'M53-M2 总工程师与生产经理驾驶舱预警')
 ON DUPLICATE KEY UPDATE
   severity=VALUES(severity),message=VALUES(message),triggered_at=VALUES(triggered_at),is_read=0,acknowledged_by=NULL,acknowledged_at=NULL,
   process_status='OPEN',processed_at=NULL,processed_by=NULL,escalation_level=VALUES(escalation_level),updated_by=VALUES(updated_by),
