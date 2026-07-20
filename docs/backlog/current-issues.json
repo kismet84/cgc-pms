@@ -1,31 +1,26 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-19T12:27:57+08:00",
+  "updatedAt": "2026-07-20T00:00:00+08:00",
   "issues": [
-    {
-      "issueKey": "A-01",
-      "title": "后端接口用户入口治理",
-      "status": "OPEN",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P0",
-      "blocking": false,
-      "summary": "明确需补用户入口已清空；系统用户详情、会计凭证生产策略和页面说明已闭环，剩余9个接口子项需兼容性确认。",
-      "acceptanceCriteria": "剩余9个子项均形成复用现有入口、内部接口、废弃或确认保留的唯一裁决，并通过权限、租户和状态边界验证。",
-      "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md",
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
     {
       "issueKey": "A-02",
       "title": "采购补货深化",
-      "status": "OPEN",
+      "status": "NEEDS_CONFIRMATION",
       "classification": "STILL_APPLICABLE",
       "priority": "P1",
       "blocking": false,
       "summary": "供应商默认自然日提前期、采购前同项目跨仓余量、已审批采购在途、真实调拨过账和30/90日历史净领料基线已交付；工作日历和需求预测仍缺。",
-      "acceptanceCriteria": "通过产品决策门形成最小闭环，并验证采购角色、项目范围、数量和日期口径。",
+      "acceptanceCriteria": "先确定工作日历权威归属、需求对象、预测算法和量化收益，再形成单一最小Ready并验证采购角色、项目范围、数量和日期口径。",
+      "deferReason": "现有30/90日净领料仅是历史事实；工作日历权威来源、预测需求对象、算法与业务收益均未形成可验收前置，本轮不制造伪预测。",
+      "candidate": {
+        "userValue": "在可解释口径下提高补货日期与数量决策质量，减少缺料和无依据囤货。",
+        "minimalLoop": "先选定一个权威工作日历及一种明确需求对象；仅在历史数据质量、算法误差基线和人工覆盖规则通过评审后，输出可解释的只读建议。",
+        "nonGoals": "不自动下单，不把历史均值伪装成预测，不同时建设供应商物料价目表、季节模型或通用计划平台。",
+        "dependencies": "工作日历归属与维护责任、需求对象、至少一个完整业务周期数据、预测误差与人工覆盖验收口径。",
+        "risk": "前置不足时生成建议会放大脏数据并误导采购数量与交期。",
+        "readyPreconditions": "明确权威日历、需求对象、可回放样本、量化收益、误差阈值、权限和回滚方式。"
+      },
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md",
         "docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md",
@@ -37,12 +32,21 @@
     {
       "issueKey": "A-03",
       "title": "现场日报深化",
-      "status": "OPEN",
+      "status": "FROZEN",
       "classification": "STILL_APPLICABLE",
       "priority": "P1",
       "blocking": false,
       "summary": "当日已提交质量安全检查只读联动已交付；人员班组、设备、自动天气、定位、离线和统计仍缺。",
-      "acceptanceCriteria": "按独立业务价值拆分最小Ready，不重复现有日报事实并验证项目数据范围。",
+      "acceptanceCriteria": "获得明确一线角色、使用频次和可复用权威事实后，只选一个独立价值链拆分最小Ready并验证项目数据范围。",
+      "deferReason": "剩余人员班组、设备、自动天气、定位、离线和统计分属不同业务与客户端基础设施，当前无量化需求和统一最小闭环。",
+      "candidate": {
+        "userValue": "减少现场重复录入，并让日报引用可追溯的人员或设备实绩。",
+        "minimalLoop": "只选择一个已有权威事实源的只读联动或最小录入链，不把六类能力并成日报平台重构。",
+        "nonGoals": "不同时建设考勤、设备台账、天气供应商、GIS、离线同步和统计平台。",
+        "dependencies": "明确一线角色、最高频痛点、权威人员或设备事实源、移动网络约束和数据保留规则。",
+        "risk": "直接扩字段会复制考勤或设备事实，并引入离线冲突和定位隐私风险。",
+        "readyPreconditions": "单一用户价值、权威数据源、权限与隐私边界、真实使用样本、最小验收和回滚方式明确。"
+      },
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
       ]
@@ -50,12 +54,21 @@
     {
       "issueKey": "A-04",
       "title": "WBS与进度平台深化",
-      "status": "OPEN",
+      "status": "FROZEN",
       "classification": "STILL_APPLICABLE",
       "priority": "P1",
       "blocking": false,
       "summary": "多前置、多类型、自动排程、基线和资源平衡仍缺。",
-      "acceptanceCriteria": "先通过产品决策门和数据模型评审，再验证依赖一致性、环检测和项目隔离。",
+      "acceptanceCriteria": "先取得多前置或自动排程的真实业务样本并通过关系模型、算法和外部互操作评审，再验证依赖一致性、环检测和项目隔离。",
+      "deferReason": "现有P0版本计划与单前置FS门禁已闭环；多前置、多类型、自动排程、资源平衡和关键路径属于新计划模型，当前无量化使用需求。",
+      "candidate": {
+        "userValue": "在复杂项目中表达真实依赖并降低人工改期成本。",
+        "minimalLoop": "先用真实项目样本验证多前置FS的必要性；只有单前置模型无法表达且收益可量化时，新增最小关系模型与环检测。",
+        "nonGoals": "不一次建设关键路径、资源平衡、甘特拖拽、跨项目依赖或独立计划软件。",
+        "dependencies": "真实复杂依赖样本、计划责任角色、基线与改期规则、外部导入导出需求及迁移策略。",
+        "risk": "未经样本驱动扩展关系模型会放大迁移、排程一致性和交互复杂度。",
+        "readyPreconditions": "至少一个无法由现有模型表达的项目样本、最小数据模型、环检测、迁移、性能和回滚方案明确。"
+      },
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
       ]
@@ -63,12 +76,21 @@
     {
       "issueKey": "A-06",
       "title": "报表中心平台化",
-      "status": "OPEN",
+      "status": "FROZEN",
       "classification": "STILL_APPLICABLE",
       "priority": "P2",
       "blocking": false,
       "summary": "异步导出、完整经营分析和外部报表平台仍未形成。",
-      "acceptanceCriteria": "明确报表口径、权限、性能和运维前置后再拆Ready。",
+      "acceptanceCriteria": "获得一个明确报表对象、异步必要性与量化性能证据后，按口径、权限、任务状态、对象存储和审计形成最小Ready。",
+      "deferReason": "现有同步CSV与各域驾驶舱能满足已证实需求；异步导出、完整经营分析和外部平台没有明确报表对象、数据规模或SLA。",
+      "candidate": {
+        "userValue": "在大数据量下可靠生成受权限控制、可审计的经营报表。",
+        "minimalLoop": "只选一个已证明同步导出超时或超限的报表，复用现有权限和对象存储，形成提交、执行、下载、过期与审计闭环。",
+        "nonGoals": "不一次建设通用BI、数据仓库、全域经营指标或外部报表平台。",
+        "dependencies": "明确报表口径、数据规模、SLA、下载权限、对象存储保留期和失败重试责任。",
+        "risk": "平台先行会复制业务口径并扩大敏感数据导出面。",
+        "readyPreconditions": "提供同步路径失败或超时证据、单一报表样本、口径签认、权限矩阵、性能门槛和回滚方式。"
+      },
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
       ]
@@ -76,12 +98,21 @@
     {
       "issueKey": "A-07",
       "title": "通知平台真实渠道",
-      "status": "OPEN",
+      "status": "FROZEN",
       "classification": "STILL_APPLICABLE",
       "priority": "P2",
       "blocking": false,
       "summary": "邮件、短信、企业微信、钉钉及失败重试队列未打通。",
-      "acceptanceCriteria": "至少一个真实渠道完成发送、失败、重试、权限和脱敏闭环。",
+      "acceptanceCriteria": "业务选定一个真实渠道并提供供应商、Secret、收件人同意和送达SLA后，完成发送、失败、重试、权限、脱敏和停用闭环。",
+      "deferReason": "站内通知已闭环；邮件、短信、企业微信和钉钉没有被选定的首个渠道、供应商账号、Secret载体或合规边界。",
+      "candidate": {
+        "userValue": "让必须离开系统触达的高价值事件可靠送达责任人。",
+        "minimalLoop": "只选择一个渠道和一种高价值事件，复用站内通知事实，提供显式订阅、脱敏模板、有限重试、失败可见和一键停用。",
+        "nonGoals": "不同时接入四种渠道，不建设营销群发、通用消息总线或无限重试队列。",
+        "dependencies": "首个渠道与事件、供应商合同、Secret注入、收件人同意、模板审核、送达SLA和费用上限。",
+        "risk": "未明确合规与停用边界会泄露业务信息、产生骚扰或不可控费用。",
+        "readyPreconditions": "渠道/事件被业务选定，测试账号和Secret就绪，脱敏模板、重试上限、审计与回滚方式明确。"
+      },
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
       ]
@@ -96,6 +127,14 @@
       "summary": "技术方案、设计协调、技术审核、RFI/Submittal和重大技术问题对象尚未建立。",
       "acceptanceCriteria": "获得业务对象、角色、状态和数据前置后重新通过产品决策门。",
       "deferReason": "业务对象与验收前置不足，继续Frozen。",
+      "candidate": {
+        "userValue": "让重大技术决策、设计协调和RFI形成可追溯责任闭环。",
+        "minimalLoop": "业务先选择一个对象和一条审批/回复链，优先复用现有技术管理对象与权限，不建立重复技术平台。",
+        "nonGoals": "不同时建设技术方案、RFI、Submittal、设计门户、BIM和AI审图。",
+        "dependencies": "总工程师角色、首个权威对象、状态、责任人、时限、附件和现有技术管理域去重结论。",
+        "risk": "未先去重会与现有技术管理P0闭环产生重复事实和权限冲突。",
+        "readyPreconditions": "提供真实业务样本，完成与现有技术管理域的对象映射、状态与权限评审。"
+      },
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
       ]
@@ -110,157 +149,16 @@
       "summary": "PWA离线、真实财务系统、外部监控日志平台和BIM/IFC属于后续方向。",
       "acceptanceCriteria": "外部系统和安全前置明确后逐项形成独立Candidate。",
       "deferReason": "当前无已通过决策门的外部集成目标。",
+      "candidate": {
+        "userValue": "在明确场景下支持离线作业或与一个权威外部系统交换数据。",
+        "minimalLoop": "每次只选择一个外部系统或一个离线工作流，以单向最小数据集、幂等、审计和停用开关闭环。",
+        "nonGoals": "不把PWA、财务、监控、BIM/IFC并成统一集成平台，不默认双向同步。",
+        "dependencies": "已选系统、协议/供应商、一致性责任、Secret、数据分类、沙箱、限流和故障恢复方案。",
+        "risk": "边界不明会造成双写冲突、敏感数据泄露和不可逆外部副作用。",
+        "readyPreconditions": "单一目标获业务批准，沙箱与接口契约可用，数据所有权、权限、安全、对账和回滚明确。"
+      },
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-CONTRACT-ITEM-CREATE",
-      "title": "合同清单项新增兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "POST /contracts/{id}/items未检出前端同方法入口。",
-      "acceptanceCriteria": "核实调用方、替代接口和兼容性后决定补入口、保留内部调用或废弃。",
-      "deferReason": "仅凭前端未调用不足以裁决。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-CONTRACT-ITEM-UPDATE",
-      "title": "合同清单项修改兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "PUT /contracts/{id}/items/{itemId}未检出前端同方法入口。",
-      "acceptanceCriteria": "核实调用方、替代接口和兼容性后决定补入口、保留内部调用或废弃。",
-      "deferReason": "仅凭前端未调用不足以裁决。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-CONTRACT-ITEM-DELETE",
-      "title": "合同清单项删除兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "DELETE /contracts/{id}/items/{itemId}未检出前端同方法入口。",
-      "acceptanceCriteria": "核实调用方、替代接口和兼容性后决定补入口、保留内部调用或废弃。",
-      "deferReason": "仅凭前端未调用不足以裁决。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-CONTRACT-TERM-CREATE",
-      "title": "合同付款条件新增兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "POST /contracts/{id}/payment-terms未检出前端同方法入口。",
-      "acceptanceCriteria": "核实调用方、替代接口和兼容性后决定补入口、保留内部调用或废弃。",
-      "deferReason": "仅凭前端未调用不足以裁决。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-CONTRACT-TERM-UPDATE",
-      "title": "合同付款条件修改兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "PUT /contracts/{id}/payment-terms/{termId}未检出前端同方法入口。",
-      "acceptanceCriteria": "核实调用方、替代接口和兼容性后决定补入口、保留内部调用或废弃。",
-      "deferReason": "仅凭前端未调用不足以裁决。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-CONTRACT-TERM-DELETE",
-      "title": "合同付款条件删除兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "DELETE /contracts/{id}/payment-terms/{termId}未检出前端同方法入口。",
-      "acceptanceCriteria": "核实调用方、替代接口和兼容性后决定补入口、保留内部调用或废弃。",
-      "deferReason": "仅凭前端未调用不足以裁决。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-PAY-RECORD-DETAIL",
-      "title": "付款记录详情兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "GET /pay-records/{id}未检出前端同方法入口。",
-      "acceptanceCriteria": "核实调用方、替代入口和金额权限后形成唯一裁决。",
-      "deferReason": "调用与入口证据不足。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-PROJECT-MEMBER-DETAIL",
-      "title": "项目成员详情兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "GET /projects/{id}/members/{memberId}未检出前端同方法入口。",
-      "acceptanceCriteria": "核实调用方和列表替代能力，并验证项目与租户数据范围。",
-      "deferReason": "调用与入口证据不足。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "A-01-SETTLEMENT-SOURCES",
-      "title": "结算来源查询兼容性需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "parentIssueKey": "A-01",
-      "summary": "GET /settlements/{id}/sources未检出前端同方法入口。",
-      "acceptanceCriteria": "核实结算页面调用、替代接口和金额租户边界后形成唯一裁决。",
-      "deferReason": "调用与入口证据不足。",
-      "sourceRefs": [
-        "docs/quality/ISSUE-037-019-后端接口无前端入口只读盘点与治理裁决验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "GOV-BRANCH-PROTECTION",
-      "title": "分支保护附加审批与推送白名单需要确认",
-      "status": "NEEDS_CONFIRMATION",
-      "classification": "NEEDS_CONFIRMATION",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "当前API未返回required review和push restrictions，是否增加需要仓库治理决策。",
-      "acceptanceCriteria": "明确审批人数和推送主体策略，获得授权后配置并复读远端保护状态。",
-      "deferReason": "未获远端治理授权。",
-      "sourceRefs": [
-        "docs/backlog/blocked-issues.md"
       ]
     },
     {
@@ -271,22 +169,19 @@
       "priority": "P2",
       "blocking": false,
       "summary": "国内网络下首次冷缓存下载仍可能延迟，已有UTC日期缓存和历史缓存回退。",
-      "acceptanceCriteria": "CI冷缓存场景在允许时限内成功或可靠命中受控回退。",
+      "acceptanceCriteria": "一次受控CI冷缓存运行在job时限内完成Java DB下载与HIGH/CRITICAL扫描，或在下载不可用时可靠命中历史缓存且扫描不被跳过。",
+      "deferReason": "当前只有按UTC日期缓存与历史缓存回退配置和既往热缓存成功证据，没有本主线同SHA冷缓存运行；不得为缩短时延跳过或降级扫描。",
+      "candidate": {
+        "userValue": "避免首次或缓存失效时供应链扫描因大体积Java DB下载而超时。",
+        "minimalLoop": "保留官方数据库与当前扫描阈值，只采集一次受控冷缓存job的下载、回退和扫描完成证据。",
+        "nonGoals": "不使用未经验证的第三方镜像，不跳过Java DB，不降低HIGH/CRITICAL门禁。",
+        "dependencies": "可清空该job缓存的CI授权、明确job时限和一次受控同SHA运行。",
+        "risk": "主动清缓存会增加CI时长和外部下载失败概率，但不应影响业务代码。",
+        "readyPreconditions": "取得CI缓存治理授权，准备运行标识、超时分类和失败后恢复缓存方案。"
+      },
       "sourceRefs": [
-        "docs/backlog/current-focus.md"
-      ]
-    },
-    {
-      "issueKey": "OPS-NODE-MODULES-ACL",
-      "title": "旧node_modules损坏ACL残留",
-      "status": "OBSERVATION",
-      "classification": "OPERATIONAL_RISK",
-      "priority": "P2",
-      "blocking": false,
-      "summary": "隔离目录仍有受原ACL保护的残留文件，但不进入版本管理或构建。",
-      "acceptanceCriteria": "在不影响用户环境的前提下取得权限并清理，或确认长期隔离且构建不引用。",
-      "sourceRefs": [
-        "docs/backlog/current-focus.md"
+        "docs/backlog/current-focus.md",
+        "docs/quality/第54条主线-M5-P2候选与运维观察收口验收报告.md"
       ]
     },
     {
@@ -376,6 +271,75 @@
       },
       "sourceRefs": [
         "docs/quality/AutoPilot-任务周期回顾-review-b8c59c337f3e49b8a81e770e3a3d85a4-2026-07-16.md"
+      ]
+    },
+    {
+      "issueKey": "AUDIT-FINANCE-RECONCILIATION-ATOMICITY",
+      "title": "定时财务对账按租户事务与失败可观测性",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
+      "priority": "P1",
+      "blocking": false,
+      "summary": "定时入口直接调用同类私有方法，未进入Spring事务代理；多步写入失败可能保留RUNNING或部分问题明细，且RuntimeException被静默吞掉。",
+      "acceptanceCriteria": "每个租户的定时对账在独立事务中原子提交或回滚；失败可观测且不阻断其他租户；补充失败注入与多租户隔离测试。",
+      "candidate": {
+        "userValue": "避免夜间财务对账留下部分状态或静默失效。",
+        "minimalLoop": "复用Spring现有事务能力，为每租户对账建立真实代理事务边界并记录脱敏失败信息。",
+        "nonGoals": "不新增调度器、消息队列或第二套对账模型。",
+        "dependencies": "确认现有对账运行表允许的失败状态与告警记录口径。",
+        "risk": "事务边界不当可能扩大锁范围或影响其他租户批次。",
+        "readyPreconditions": "明确失败状态、最小文件范围、故障注入测试和回滚方式。"
+      },
+      "sourceRefs": [
+        "backend/src/main/java/com/cgcpms/financeops/service/FinanceOperationsService.java",
+        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md"
+      ]
+    },
+    {
+      "issueKey": "AUDIT-PROMETHEUS-SCRAPE-AUTH",
+      "title": "Prometheus抓取认证方案缺失",
+      "status": "NEEDS_CONFIRMATION",
+      "classification": "OPERATIONAL_RISK",
+      "priority": "P1",
+      "blocking": false,
+      "summary": "Prometheus抓取配置未携带认证信息，而后端回归明确要求未登录访问指标端点被拒绝；直接启用监控Compose无法证明抓取成功。",
+      "acceptanceCriteria": "选定不暴露指标的机器认证或受控网络方案，以Secret注入凭据并完成未认证拒绝、认证抓取成功、凭据不落库验证。",
+      "deferReason": "缺少目标环境网络边界、Secret载体和机器身份认证决策；不得通过公开指标端点绕过。",
+      "candidate": {
+        "userValue": "避免生产监控盲区，同时保持指标端点不匿名暴露。",
+        "minimalLoop": "复用既有安全链和部署Secret能力，只补一个可轮换的机器抓取身份。",
+        "nonGoals": "不公开Actuator，不在仓库写静态密码，不新增监控平台。",
+        "dependencies": "目标环境网络拓扑、Secret注入方式和机器认证机制。",
+        "risk": "错误放行会泄露运行指标；短期JWT会造成周期性抓取中断。",
+        "readyPreconditions": "认证机制、凭据轮换责任人、目标环境验证和回滚方案明确。"
+      },
+      "sourceRefs": [
+        "deploy/monitoring/prometheus.yml",
+        "backend/src/test/java/com/cgcpms/config/ActuatorMetricsTest.java",
+        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md"
+      ]
+    },
+    {
+      "issueKey": "AUDIT-CASH-FORECAST-VERSION-CONCURRENCY",
+      "title": "现金预测版本号并发创建冲突",
+      "status": "OPEN",
+      "classification": "STILL_APPLICABLE",
+      "priority": "P1",
+      "blocking": false,
+      "summary": "现金预测创建在事务中使用MAX(version_no)+1，但未锁定项目或版本命名空间；并发请求可取得相同版本并由唯一键随机拒绝其中一个。",
+      "acceptanceCriteria": "同租户、项目、场景并发创建得到互不冲突的连续版本；跨租户和跨项目不互相阻塞；补充真实并发测试。",
+      "candidate": {
+        "userValue": "避免财务人员并发创建预测时出现非业务性唯一键失败。",
+        "minimalLoop": "复用现有项目行和事务，在读取下一版本前锁定最小项目级命名空间。",
+        "nonGoals": "不新增序列服务、分布式锁或重构预测状态机。",
+        "dependencies": "确认项目行锁对预测创建吞吐的影响可接受。",
+        "risk": "锁顺序不一致可能引入死锁，必须保持单一固定锁顺序。",
+        "readyPreconditions": "锁点、异常契约、并发测试和回滚方式明确。"
+      },
+      "sourceRefs": [
+        "backend/src/main/java/com/cgcpms/cashforecast/service/ProjectCashForecastService.java",
+        "backend/src/main/resources/db/migration-legacy/V193__project_cash_forecast_closed_loop.sql",
+        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md"
       ]
     }
   ]

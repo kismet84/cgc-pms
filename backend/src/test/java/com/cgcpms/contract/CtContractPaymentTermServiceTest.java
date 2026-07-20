@@ -187,6 +187,17 @@ class CtContractPaymentTermServiceTest {
     }
 
     @Test
+    @DisplayName("创建 — 非草稿合同拒绝新增")
+    void testCreateRejectedForNonDraftContract() {
+        CtContractPaymentTerm term = buildDraftTerm("非草稿合同条款");
+        term.setContractId(CONTRACT_ID);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> termService.create(term));
+        assertEquals("CONTRACT_NOT_EDITABLE", ex.getCode());
+    }
+
+    @Test
     @DisplayName("创建 — 所有字段正确持久化")
     void testCreateAllFieldsPersisted() {
         CtContractPaymentTerm term = new CtContractPaymentTerm();

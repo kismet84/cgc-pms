@@ -1,5 +1,59 @@
 # Current Focus
 
+## 2026-07-20 第54条主线M0至M5：本地治理收口通过、M6执行中
+
+- 原25项关闭A-01父项/9叶子、ACL观察及分支保护共12项；M0新增3项审计Candidate，当前台账16项且唯一，主线后续项净变化-9。
+- 唯一生产代码变更为合同清单项、付款条件单条新增补齐草稿合同门禁；专项90项、后端全量2046项、HighRisk策略7项和差异检查通过。
+- M0至M5本地治理通过；3项`RELEASE_GATE`仍要求目标环境凭据轮换、生产文件逐对象复扫及同SHA CI/Flyway/真实角色证据。
+- 用户已授权Git与远端治理生命周期；`master`现要求1名批准者并撤销陈旧批准，11项checks、strict、管理员强制和对话解决保持不变。功能分支按提交→push CI→pre-PR核验推进；目标环境仍未识别，不可上线。正式证据见`docs/quality/第54条主线-M0至M5本地治理收口验收报告.md`。
+- M6追加只读识别：GitHub仓库无Environment，仓库级Secret/Variable名列表为空；本机生产Compose缺必需`BACKEND_TAG`并在插值阶段fail-close。禁止猜测目标环境、凭据或制品标签。
+
+## 2026-07-20 第54条主线M5：P2候选与运维观察收口
+
+- A-06、A-07转`FROZEN`：分别等待单一报表的量化异步必要性，以及单一真实通知渠道/事件、供应商Secret与合规前置；不平台先行。
+- A-09、A-10维持`FROZEN`并补齐Candidate：必须先与现有技术管理P0去重，或选定一个外部系统/离线工作流及沙箱契约。
+- 旧ACL残留位于被忽略隔离目录，当前依赖已重建，构建不引用；按既定验收分支关闭，不提权、不删除用户环境文件。
+- Trivy冷缓存仍缺本主线同SHA冷缓存job，继续`OBSERVATION`；禁止跳过Java DB、使用未验证镜像或降低HIGH/CRITICAL门禁。
+- 本阶段新增后续项0、关闭后续项1、后续项净变化-1；无悬空项。正式证据见`docs/quality/第54条主线-M5-P2候选与运维观察收口验收报告.md`。
+
+## 2026-07-20 第54条主线M4：AutoPilot观察与分支保护治理收口
+
+- 两项AutoPilot效率Candidate仍缺下一完整回顾周期：`cycleEfficiency`只有1个样本，`taskExecutionEfficiency`原周期中位数为满分；无稳定根因，继续`OBSERVATION`，未改控制面。
+- GitHub API复读确认`master`强制11项required checks并对管理员生效，但required reviews与push restrictions为空。
+- 用户后续授权后已配置至少1名批准者、新提交后撤销陈旧批准；11项checks、strict、管理员强制和对话解决复读保持不变。未知团队/机器人/恢复主体清单前不启用push allowlist。
+- 本阶段新增后续项0、关闭后续项1、后续项净变化-1；无悬空项。正式证据见`docs/quality/第54条主线-M4-AutoPilot观察与分支保护治理验收报告.md`。
+
+## 2026-07-20 第54条主线M3：A-02至A-04产品决策门收口
+
+- A-02保持`NEEDS_CONFIRMATION`：历史净领料不得冒充预测；须先明确工作日历权威来源、需求对象、预测误差与量化收益。
+- A-03、A-04转`FROZEN`：现场日报剩余六类能力没有单一高频价值链；WBS高级能力缺少无法由现有单前置模型表达的真实项目样本。
+- 三项均补齐Candidate用户价值、最小闭环、非目标、依赖、风险与Ready前置；本轮不新增Ready、不改代码/数据库/运行态。
+- 本阶段新增后续项0、关闭后续项0、后续项净变化0；无悬空项。正式证据见`docs/quality/第54条主线-M3-A-02至A-04产品决策门验收报告.md`。
+
+## 2026-07-20 第54条主线M1A：三项发布门禁准备完成
+
+- 凭据轮换对象冻结为MySQL root/应用账号、Redis、MinIO、JWT、Jasypt及目标环境实际启用的TLS材料；只记录Secret键、版本和责任角色，不记录值。
+- 文件复扫对象冻结为`sys_file`与MinIO对象双向清单；逐对象读取真实内容并复用`VirusScanner`，感染、缺对象、读取失败和扫描器不可用均fail-close，禁止SQL批量标记`CLEAN`。
+- 同SHA复验冻结13个pre-PR job及`verify-pre-pr-ci.ps1`核验入口；任何后续提交使旧证据失效。
+- M1A只完成准备，不连接目标环境。3项`RELEASE_GATE`继续阻塞上线，必须在M6分别取得专项授权后执行。
+- 本阶段新增后续项0、关闭后续项0、后续项净变化0。正式证据见`docs/quality/第54条主线-M1A-三项发布门禁准备验收报告.md`。
+
+## 2026-07-20 第54条主线M2：A-01九项接口兼容性治理完成
+
+- 合同清单项、付款条件的单条新增/修改/删除接口继续作为粒度化集成兼容API保留；Legacy页面仍复用批量全量保存，不新增重复UI。
+- 单条新增原先只校验合同租户，现已与批量、修改、删除统一为仅草稿合同可写；非草稿合同均返回`CONTRACT_NOT_EDITABLE`。
+- `GET /pay-records/{id}`被付款冲销与失败处理服务复用；`GET /projects/{projectId}/members/{id}`具备项目访问、租户及项目归属校验；`GET /settlements/{id}/sources`被兼容服务调用并只返回同租户合同的已确认来源，三者均保留。
+- 目标验证共90项通过：合同清单/付款条件35项，付款、租户、项目成员、结算来源55项。A-01父项与9个叶子项全部关闭并从当前问题台账移除。
+- 本阶段新增后续项0、关闭后续项10、后续项净变化-10；无悬空项。正式证据见`docs/quality/第54条主线-M2-A-01九项接口兼容性治理验收报告.md`。
+
+## 2026-07-20 第54条主线M0：25项事实冻结与4项审计发现收口
+
+- 知识图谱与`docs/backlog/current-issues.json`交叉核验：基线25项守恒，P0 4、P1 15、P2 6；16个根项与A-01的9个子项无重复，3项发布门禁继续阻塞上线。
+- `AUDIT-FINANCE-RECONCILIATION-ATOMICITY`与`AUDIT-CASH-FORECAST-VERSION-CONCURRENCY`已按P1工程治理Candidate唯一承接；先完成根因、最小锁/事务边界和故障注入设计，再进入Ready，不直接扩建框架。
+- `AUDIT-PROMETHEUS-SCRAPE-AUTH`保持P1 `NEEDS_CONFIRMATION`：目标环境网络、Secret与机器认证前置不足；禁止以匿名开放指标端点规避。
+- “现金预测约1830次数据库操作”按证据不足关闭：当前区间硬上限366天，1830为静态估算，未提供运行时SLA、查询计数或超时复现；获得量化证据后再立项，不制造性能Backlog。
+- M0新增正式后续项3、关闭发现1、后续项净变化+3；均已进入唯一载体，无悬空项。正式证据见`docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md`。
+
 ## 2026-07-20 ISSUE-053-006：八角色新版经营驾驶舱实施完成，真实数据验收受阻
 
 - 已实现八角色按权 Tab、真实 Dashboard 薄服务接线、项目级 fail-close、报告期/角色切换取消、金额字符串格式化、辅助健康分、风险待办、原生 SVG 趋势等价表格、V2_ACCEPTED 快捷入口边界和成本两级独立下钻。
@@ -588,7 +642,7 @@
 - 本次 `启动迭代-10` 当前完成 5/10；Ready 清空后继续补货。静态盘点不代表真实角色、动态菜单或运行态可见性通过。
 - `ISSUE-037-020` 已完成：长期计划补货只接纳第 7–9 章开发计划，2–6 章现状/对标/差距/目标标题不再误入 Candidate；本次当前完成 5/10，继续补货。
 - `ISSUE-037-021` 的红灯与 `enforce_admins=false` 仅保留为首次复验历史快照；第40条 M0 已以 PR #334 合并、11 checks 全绿和当前分支保护 API 将 A/B/C 三条阻塞统一裁决为 `VerifiedResolved`。
-- 当前 API 未返回 required pull-request review 和 push restrictions；原管理员绕过已关闭，但是否额外要求审批人数或推送主体白名单保持“需要确认”，未获授权前不修改远端。
+- 历史复验时API未返回required pull-request review和push restrictions；第54条主线获授权后已启用1名批准者及陈旧批准失效，push restrictions因主体清单未知保持为空。
 - CI 工具链观察：GitHub annotation 提示 Node 20 action 被强制运行于 Node 24；当前不是三个红灯的退出根因，升级 Actions 需另行授权。
 - `停止迭代` 已生效：本次 `启动迭代-10` 最终完成 4/10 条实施型 Ready；`ISSUE-037-021` 仅作为不通过的回归证明归档，不计入实施数，当前不再派发下一任务。
 - 新一轮 `启动迭代-1` 在控制面选单前稳定复现 Windows PowerShell 5.1 ParserError；已按 `tool_config` 分类并建立 `ISSUE-037-022`，仅恢复 AutoPilot 脚本 UTF-8 解析兼容与回归保护，不改变业务或生产边界。
