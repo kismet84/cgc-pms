@@ -90,6 +90,25 @@ UNION ALL SELECT 'document_template',COUNT(*) FROM biz_document_template WHERE t
 UNION ALL SELECT 'document_generation',COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND id BETWEEN 520000000000008511 AND 520000000000008512 AND deleted_flag=0
 UNION ALL SELECT 'demo_user',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username='demo.manager' AND status='ENABLE' AND deleted_flag=0
 UNION ALL SELECT 'role_test_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'role_workflow_status_instances',COUNT(*) FROM wf_instance WHERE tenant_id=0 AND id BETWEEN 520000000000009700 AND 520000000000009739 AND deleted_flag=0 AND remark='M2八角色审批状态矩阵'
+UNION ALL SELECT 'role_workflow_status_pairs',COUNT(DISTINCT CONCAT(initiator_id,':',instance_status)) FROM wf_instance WHERE tenant_id=0 AND id BETWEEN 520000000000009700 AND 520000000000009739 AND deleted_flag=0
+UNION ALL SELECT 'role_workflow_status_todos',COUNT(*) FROM wf_task t JOIN wf_instance i ON i.id=t.instance_id AND i.tenant_id=t.tenant_id WHERE t.tenant_id=0 AND t.id BETWEEN 520000000000009780 AND 520000000000009819 AND t.task_status='PENDING' AND i.instance_status='RUNNING' AND t.deleted_flag=0 AND i.deleted_flag=0
+UNION ALL SELECT 'role_workflow_status_done',COUNT(*) FROM wf_record WHERE tenant_id=0 AND id BETWEEN 520000000000009820 AND 520000000000009859 AND action_type IN ('APPROVE','REJECT','TRANSFER','ADD_SIGN') AND record_status='EFFECTIVE' AND deleted_flag=0
+UNION ALL SELECT 'role_workflow_status_cc',COUNT(*) FROM wf_cc WHERE tenant_id=0 AND id BETWEEN 520000000000009860 AND 520000000000009899
+UNION ALL SELECT 'role_workflow_business_types',COUNT(DISTINCT business_type) FROM wf_instance WHERE tenant_id=0 AND id BETWEEN 520000000000009700 AND 520000000000009739 AND deleted_flag=0
+UNION ALL SELECT 'role_workflow_action_permissions',COUNT(DISTINCT CONCAT(u.username,':',m.perms)) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance')
+    AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms IN ('workflow:approve','workflow:reject','workflow:transfer','workflow:add-sign','workflow:withdraw','workflow:resubmit')
+    AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'role_workflow_orphans',(
+  (SELECT COUNT(*) FROM wf_node_instance n LEFT JOIN wf_instance i ON i.id=n.instance_id AND i.tenant_id=n.tenant_id WHERE n.tenant_id=0 AND n.id BETWEEN 520000000000009740 AND 520000000000009779 AND (i.id IS NULL OR i.deleted_flag<>0))+
+  (SELECT COUNT(*) FROM wf_task t LEFT JOIN wf_instance i ON i.id=t.instance_id AND i.tenant_id=t.tenant_id LEFT JOIN wf_node_instance n ON n.id=t.node_instance_id AND n.tenant_id=t.tenant_id WHERE t.tenant_id=0 AND t.id BETWEEN 520000000000009780 AND 520000000000009819 AND (i.id IS NULL OR n.id IS NULL))+
+  (SELECT COUNT(*) FROM wf_record r LEFT JOIN wf_instance i ON i.id=r.instance_id AND i.tenant_id=r.tenant_id WHERE r.tenant_id=0 AND r.id BETWEEN 520000000000009820 AND 520000000000009859 AND i.id IS NULL)+
+  (SELECT COUNT(*) FROM wf_cc c LEFT JOIN wf_instance i ON i.id=c.instance_id AND i.tenant_id=c.tenant_id WHERE c.tenant_id=0 AND c.id BETWEEN 520000000000009860 AND 520000000000009899 AND i.id IS NULL))
 UNION ALL SELECT 'dashboard_trend_month',COUNT(DISTINCT DATE_FORMAT(summary_date,'%Y-%m')) FROM cost_summary WHERE tenant_id=0 AND project_id=520000000000009002 AND cost_subject_id IS NULL AND deleted_flag=0
 UNION ALL SELECT 'finance_demo_budget',COUNT(*) FROM project_budget WHERE tenant_id=0 AND project_id=520000000000009002 AND status='ACTIVE' AND active_flag=1 AND deleted_flag=0
 UNION ALL SELECT 'finance_demo_pay_application',COUNT(*) FROM pay_application WHERE tenant_id=0 AND id BETWEEN 520000000000009412 AND 520000000000009415 AND deleted_flag=0
@@ -344,7 +363,7 @@ $oneKeys = @('project','material','bid_transfer','target','purchase_request','pu
     'cost_forecast','cost_corrective_action','finance_reconciliation_run','finance_import_batch','inventory_exception',
     'material_return_reversal','document_template','demo_user')
 $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $invalidCreditPartners.Count -eq 0 `
-    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 19 `
+    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 20 `
     -and $metrics.role_test_account -eq 8 -and $metrics.dashboard_trend_month -eq 7 -and $metrics.role_test_scope -eq 8 `
     -and $metrics.document_generation -eq 2 -and $metrics.finance_demo_budget -eq 1 `
     -and $metrics.finance_demo_pay_application -eq 4 -and $metrics.finance_demo_pay_record -eq 4 `
@@ -363,6 +382,11 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.cost_breakdown_children -eq 4 -and $metrics.cost_breakdown_permission -eq 1 `
     -and $metrics.cost_breakdown_target_delta -eq 0 -and $metrics.cost_breakdown_actual_delta -eq 0 `
     -and $metrics.cost_breakdown_dynamic_delta -eq 0 -and $metrics.cost_breakdown_deviation_delta -eq 0 `
+    -and $metrics.role_workflow_status_instances -eq 40 -and $metrics.role_workflow_status_pairs -eq 40 `
+    -and $metrics.role_workflow_status_todos -eq 8 -and $metrics.role_workflow_status_done -eq 40 `
+    -and $metrics.role_workflow_status_cc -eq 40 -and $metrics.role_workflow_business_types -eq 25 `
+    -and $metrics.role_workflow_action_permissions -eq 48 `
+    -and $metrics.role_workflow_orphans -eq 0 `
     -and $metrics.invalid_business_code -eq 0
 foreach ($key in $oneKeys) { $passed = $passed -and $metrics[$key] -eq 1 }
 $passed = $passed -and $metrics.requested_qty -eq 100 -and $metrics.ordered_qty -eq 100 `

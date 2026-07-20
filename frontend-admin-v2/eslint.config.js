@@ -17,7 +17,13 @@ export default [
   },
   {
     name: 'v2/files-to-ignore',
-    ignores: ['**/dist/**', '**/node_modules/**', '**/*.d.ts', 'tests/fixtures/**'],
+    ignores: [
+      '**/dist/**',
+      '**/node_modules/**',
+      '**/.pnpm-store/**',
+      '**/*.d.ts',
+      'tests/fixtures/**',
+    ],
   },
   ...pluginVue.configs['flat/essential'],
   ...vueTsEslintConfig(),

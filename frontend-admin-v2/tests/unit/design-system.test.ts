@@ -60,7 +60,7 @@ describe('Clean-room V2 design system', () => {
     )
   })
 
-  it('renders a native select with placeholder and disabled options', async () => {
+  it('renders an anchored select with placeholder and disabled options', async () => {
     const wrapper = mount(V2Select, {
       props: {
         label: '报告期',
@@ -72,9 +72,9 @@ describe('Clean-room V2 design system', () => {
       },
     })
 
-    expect(wrapper.findAll('option')).toHaveLength(3)
-    expect(wrapper.findAll('option')[2]?.attributes()).toHaveProperty('disabled')
-    await wrapper.get('select').setValue('2026-07')
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(3)
+    expect(wrapper.findAll('[role="option"]')[2]?.attributes()).toHaveProperty('disabled')
+    await wrapper.findAll('[role="option"]')[1]?.trigger('click')
     expect(wrapper.emitted('update:modelValue')).toEqual([['2026-07']])
   })
 
@@ -91,8 +91,8 @@ describe('Clean-room V2 design system', () => {
       },
     })
 
-    expect(wrapper.findAll('option')).toHaveLength(2)
-    expect(wrapper.get('select').element.selectedOptions[0]?.textContent).toBe('全部项目')
+    expect(wrapper.findAll('[role="option"]')).toHaveLength(2)
+    expect(wrapper.get('[role="button"]').text()).toBe('全部项目')
   })
 
   it('covers card, badge, alert and skeleton status primitives', async () => {

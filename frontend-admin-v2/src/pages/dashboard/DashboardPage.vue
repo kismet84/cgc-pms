@@ -75,9 +75,7 @@ const displayMetrics = computed(() =>
   metrics.value.map((metric) => ({ ...metric, ...compactDashboardValue(metric.value) })),
 )
 const health = computed(() => (data.value ? dashboardHealth(selectedRole.value, data.value) : null))
-const risks = computed(() =>
-  data.value ? primaryRiskItems(selectedRole.value, data.value).slice(0, 6) : [],
-)
+const risks = computed(() => (data.value ? primaryRiskItems(selectedRole.value, data.value) : []))
 const activityItems = computed(() =>
   data.value ? dashboardActivityItems(selectedRole.value, data.value).slice(0, 6) : [],
 )
@@ -158,8 +156,11 @@ const highestRisk = computed(
   () => risks.value.find((item) => item.riskLevel === 'high') ?? risks.value[0],
 )
 const filteredRisks = computed(() => {
-  if (riskFilter.value === 'all') return risks.value
-  return risks.value.filter((item) => item.riskLevel === riskFilter.value)
+  const items =
+    riskFilter.value === 'all'
+      ? risks.value
+      : risks.value.filter((item) => item.riskLevel === riskFilter.value)
+  return items.slice(0, 6)
 })
 const quickEntries = [
   { label: '风险待办', href: '#risk-list', domain: 'workbench' },
@@ -216,7 +217,7 @@ watch(
 onBeforeUnmount(() => controller?.abort())
 
 async function showHighestRisks(): Promise<void> {
-  riskFilter.value = 'high'
+  riskFilter.value = riskFilter.value === 'high' ? 'all' : 'high'
   await nextTick()
   document.getElementById('risk-list')?.scrollIntoView?.({ block: 'start' })
 }
@@ -1200,10 +1201,8 @@ function isAbort(errorValue: unknown): boolean {
   height: 180px;
 }
 .dashboard-activity-list {
-  height: 180px;
   padding: 0;
   margin: 0;
-  overflow: auto;
   list-style: none;
 }
 .dashboard-activity-list li {

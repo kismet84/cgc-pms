@@ -291,6 +291,11 @@ describe('M2 dashboard page', () => {
     expect(riskList.text()).toContain('最高风险事项')
     expect(riskList.text()).not.toContain('一般关注事项')
     expect(wrapper.get('.risk-level').text()).toBe('高')
+
+    await wrapper.get('.command-panel__title .dashboard-page__outline-link').trigger('click')
+    expect(filter.get('summary').text()).toBe('全部预警')
+    expect(riskList.text()).toContain('最高风险事项')
+    expect(riskList.text()).toContain('一般关注事项')
   })
 
   it('requests an aggregate role view when all projects and periods are selected', async () => {

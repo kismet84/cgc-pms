@@ -26,6 +26,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -136,6 +137,13 @@ public class WorkflowController {
         IPage<WfTaskVO> page = workflowQueryService.getMyTodos(tenantId, userId,
                 keyword, businessType, instanceStatus, startTime, endTime, pageNo, pageSize);
         return ApiResponse.success(PageResult.of(page));
+    }
+
+    @GetMapping("/business-types")
+    @PreAuthorize("isAuthenticated()")
+    public ApiResponse<List<String>> visibleBusinessTypes(@RequestParam String tab) {
+        return ApiResponse.success(workflowQueryService.getVisibleBusinessTypes(
+                UserContext.getCurrentTenantId(), UserContext.getCurrentUserId(), tab));
     }
 
     @GetMapping("/instances/mine")
