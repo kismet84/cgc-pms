@@ -52,7 +52,7 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(CtContractItem item) {
-        requireParentContract(item.getContractId());
+        requireDraftParentContract(item.getContractId());
         item.setTenantId(UserContext.getCurrentTenantId());
         mapper.insert(item);
         return item.getId();

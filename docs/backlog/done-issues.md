@@ -2,6 +2,9 @@
 
 ## v1.5 已完成任务
 
+- `MAINLINE-054-M4-GOV-BRANCH-PROTECTION`（2026-07-20）：经用户专项授权试配1名批准者后，复读发现仓库唯一协作者即PR作者，规则无合格审批人并锁死合并；已按更新前快照回滚required reviews为NULL，保留11项app绑定checks、strict、管理员强制与对话解决，push restrictions继续为空。最终策略为新增第二位合格协作者前不启用required review/allowlist；报告`docs/quality/第54条主线-M4-AutoPilot观察与分支保护治理验收报告.md`。
+- `MAINLINE-054-M5-OPS-NODE-MODULES-ACL`（2026-07-20）：旧损坏ACL依赖只残留于被忽略隔离目录`.codex-autopilot/runs/frontend-node_modules-acl-broken-20260713`，当前`frontend-admin/node_modules`已重建，构建脚本不引用隔离路径；按验收标准“确认长期隔离且构建不引用”关闭，不提权、不删除用户环境文件；报告`docs/quality/第54条主线-M5-P2候选与运维观察收口验收报告.md`。
+- `MAINLINE-054-M2-A-01`（2026-07-20）：A-01剩余9项接口兼容性完成唯一裁决；合同清单项与付款条件单条新增补齐草稿状态门禁，其余接口按已有内部调用、集成兼容或安全查询用途保留；报告`docs/quality/第54条主线-M2-A-01九项接口兼容性治理验收报告.md`；A-01父项及9个叶子项从当前问题台账移除。
 - `ISSUE-037-001`（2026-07-11）：采购低库存补货建议最小闭环；提交 `2fc8d22bf`；报告 `docs/quality/ISSUE-037-001-采购低库存补货建议最小闭环验收报告.md`；验证通过；扩展补货策略仍为后续候选。
 - `ISSUE-037-002`（2026-07-12）：供应商交付档案最小闭环；提交 `d7b9a872e`；报告 `docs/quality/ISSUE-037-002-供应商交付档案最小闭环验收报告.md`；验证通过；不代表综合供应商评级。
 - `ISSUE-037-003`（2026-07-12）：驾驶舱项目数据范围统一收口；提交 `f1b7e0670`；报告 `docs/quality/ISSUE-037-003-驾驶舱项目数据范围统一收口验收报告.md`；验证通过；性能测试门槛文案为非阻塞观察。

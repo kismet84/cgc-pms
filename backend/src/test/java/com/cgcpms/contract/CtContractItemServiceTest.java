@@ -174,6 +174,17 @@ class CtContractItemServiceTest {
     }
 
     @Test
+    @DisplayName("创建 — 非草稿合同拒绝新增")
+    void testCreateRejectedForNonDraftContract() {
+        CtContractItem item = buildDraftItem("CI-NON-DRAFT-001", "非草稿合同清单项");
+        item.setContractId(CONTRACT_ID);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> itemService.create(item));
+        assertEquals("CONTRACT_NOT_EDITABLE", ex.getCode());
+    }
+
+    @Test
     @DisplayName("创建 — 所有金额字段正确持久化")
     void testCreateAllFieldsPersisted() {
         CtContractItem item = new CtContractItem();

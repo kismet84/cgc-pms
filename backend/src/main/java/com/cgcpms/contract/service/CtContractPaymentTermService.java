@@ -53,7 +53,7 @@ public class CtContractPaymentTermService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(CtContractPaymentTerm term) {
-        requireParentContract(term.getContractId());
+        requireDraftParentContract(term.getContractId());
         term.setTenantId(UserContext.getCurrentTenantId());
         ctContractPaymentTermMapper.insert(term);
         return term.getId();

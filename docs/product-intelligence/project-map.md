@@ -1,5 +1,12 @@
 # CGC-PMS 项目地图
 
+## 2026-07-20 第54条主线：A-02～A-04产品决策门收口
+
+- A-02已完成自然日提前期、跨仓余量、审批在途、真实调拨与30/90日历史净领料；工作日历和需求预测因权威日历、需求对象、算法误差及量化收益未定，保持`NEEDS_CONFIRMATION`，历史事实不得称为预测。
+- A-03剩余人员班组、设备、自动天气、定位、离线和统计跨越多个事实源与客户端基础设施；无单一高频价值链，转`FROZEN`。
+- A-04现有P0版本计划与单前置FS门禁继续有效；多前置、多类型、自动排程、资源平衡和关键路径缺少真实复杂项目样本，转`FROZEN`。
+- 本轮不新增Ready、不新增代码或数据模型。三个原问题作为唯一Candidate载体，后续只有满足各自Ready前置才重新准入。
+
 ## 2026-07-20 主线：Clean-room V2 M2 请求金丝雀通过
 
 - `ISSUE-053-005` 已补齐八角色驾驶舱共享 DTO、权限码、端点映射、项目分页查询、报告期转换、按权请求和 Abort/generation 陈旧响应隔离。
@@ -705,9 +712,9 @@ Docker Compose + Nginx + Actuator + Prometheus
 | 变更、签证与索赔       | `pages/variation/`、`api/modules/variation.ts`                      | `variation/`、`contract/change/`                | `VarOrderServiceTest`、`VariationClaimClosedLoopIntegrationTest`、`VariationOrderProduction.test.ts`          | P0 Closed    | 已贯通事件证据、双口径、内部审批、业主版本/核定、正式合同变更及下游计量追溯；P1 待增强下游明细来源展示                           |
 | 成本与目标成本         | `pages/cost/`、`pages/cost-target/`                                 | `cost/`、`revenue/`、`overhead/`、`accounting/` | `TargetCostDynamicProfitClosedLoopIntegrationTest`、`CostSummaryServiceTest`、`CostLedgerServiceTest`         | Complete(P0) | 三算矩阵、责任预算、EAC、动态利润、纠偏措施和 Trace 已闭环；概率模拟、BIM量算和集团成本库属 P1+                                  |
 | 质量安全整改           | `pages/quality-safety/`                                             | `quality/`                                      | `QualitySafetyClosedLoopIntegrationTest`、`quality-safety/index.test.ts`                                      | Complete(P0) | 计划、检查、问题、整改、复验、处罚成本与合作方评价已闭环；移动巡检、AI识别、IoT/BIM 和结算核销属 P1+                             |
-| 采购与采购申请         | `pages/purchase/`、`pages/inventory/purchase-request.vue`           | `purchase/`                                     | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts`                         | Partial      | 已完成安全阈值、人工补货目标量和自然日提前期预填；供应商级提前期、工作日历和预测仍缺失                                           |
+| 采购与采购申请         | `pages/purchase/`、`pages/inventory/purchase-request.vue`           | `purchase/`                                     | `MatPurchaseOrderServiceTest`、`PurchaseRequestServiceTest`、`purchase/order.test.ts`                         | Partial      | 已完成安全阈值、人工补货目标量、供应商默认自然日提前期、跨仓余量/调拨、审批在途和历史净领料；工作日历与真实预测待决策             |
 | 供应商招采与履约评价   | `pages/supplier-sourcing/`、`api/modules/supplierSourcing.ts`       | `supplier/`                                     | `SupplierSourcingClosedLoopIntegrationTest`、`supplierSourcing.test.ts`                                       | Complete(P0) | 邀请、报价、评审、定标、合同、到货、退货、结算、履约评价和黑名单阻断已闭环；供应商门户、申诉解除和集团共享属 P1+                 |
-| 收货、仓库与库存       | `pages/receipt/`、`pages/inventory/`                                | `receipt/`、`inventory/`                        | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts`                                    | Partial      | 已维护安全阈值并联动 KPI/预警；目标量、全量建议、预测和跨仓调拨仍缺                                                              |
+| 收货、仓库与库存       | `pages/receipt/`、`pages/inventory/`                                | `receipt/`、`inventory/`                        | `MatReceiptServiceTest`、`MatStockServiceTest`、`stock-production.test.ts`                                    | Partial      | 已完成安全阈值、人工目标量、跨仓余量/真实调拨、审批在途与历史净领料；工作日历、预测和全量建议仍待产品决策                         |
 | 领料                   | `pages/requisition/`                                                | `requisition/`                                  | `MatRequisitionServiceTest`、`useRequisitionForm.test.ts`                                                     | Partial      | 与计划需用量、施工部位和损耗分析尚未闭环                                                                                         |
 | 分包与计量             | `pages/subcontract/`                                                | `subcontract/`                                  | `SubMeasureServiceTest`、`SubTaskControllerTest`、`subcontract/measure.test.ts`                               | Partial      | 已完成单前置 FS、状态门禁、延期风险和软删除编号冲突修复；仍无多前置、多类型、自动排程和完整履约档案                              |
 | 结算                   | `pages/settlement/`                                                 | `settlement/`                                   | `StlSettlementServiceTest`、`StlSettlementControllerMockMvcTest`、`settlement/index.test.ts`                  | Partial      | 合同、变更、计量、付款汇总需当前一致性复验                                                                                       |
@@ -761,9 +768,9 @@ Docker Compose + Nginx + Actuator + Prometheus
 
 ### 产品候选
 
-- 采购补货建议：已完成数量预填、安全阈值、可空人工目标量和可空自然日提前期计划日期预填；供应商级提前期、工作日历、预测与全量建议治理仍后置。
-- 现场日报 / 施工日志：`ISSUE-037-005` 已建立日报对象、状态、项目范围与附件链，`ISSUE-037-007` 已增加人工天气摘要和可空在场人数；人员明细、设备材料、移动离线和质量安全继续后置。
-- WBS 任务依赖与延期预警：`ISSUE-037-004` 已在分包任务上完成单前置 FS、项目数据范围和前置延期风险；仍不支持多前置、多类型、依赖连线、拖拽、自动改期或独立计划模型。
+- 采购补货建议：已完成数量预填、安全阈值、人工目标量、库存与供应商自然日提前期、跨仓余量/真实调拨、审批在途和历史净领料；工作日历、预测与全量建议保持`NEEDS_CONFIRMATION`。
+- 现场日报 / 施工日志：既有日报对象、状态、项目范围、附件、人工天气/人数及材料、领料、计划、质量安全等只读联动继续有效；人员班组、设备、自动天气、定位、离线和统计转`FROZEN`。
+- WBS 任务依赖与延期预警：P0版本计划与单前置FS、项目范围、状态门禁和延期风险继续有效；多前置、多类型、自动排程、资源平衡和独立计划模型转`FROZEN`。
 - 供应商交付档案：`ISSUE-037-002` 已用订单明细与已审批验收累计数量还原交付完成日，并区分按期完成、迟交完成和逾期未完成；质量、价格和退货仍不具备稳定口径，页面明确不是综合评级。
 - 后端接口无前端入口治理：`ISSUE-037-019` 静态基线纳入 53 个 Controller、321 个唯一 HTTP 方法；经增量治理后，当前已验收分类为有用户入口 244、前端调用但无独立页面 58、内部/集成/运维 4、需补用户入口 4、待废弃 0、需要确认 11。当前剩余明确叶子为投标失标与间接费规则新建、修改、删除；其余11项保持需要确认，均需按域验收，不是新业务域。
 - 驾驶舱项目数据范围：`ISSUE-037-003` 已统一项目经理与管理驾驶舱的指定项目、全项目任务/审批/合同/风险聚合，空关联与不可见项目 fail-close。
