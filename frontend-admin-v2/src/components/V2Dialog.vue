@@ -122,7 +122,7 @@ onBeforeUnmount(() => {
               </p>
             </div>
             <button type="button" class="v2-dialog__close" :aria-label="closeLabel" @click="close">
-              关闭
+              <span aria-hidden="true">×</span>
             </button>
           </header>
           <div class="v2-dialog__body"><slot /></div>

@@ -43,8 +43,12 @@ describe('V2 application-shell routes', () => {
     expect(dashboard?.meta?.permission).toBe('dashboard:view')
     expect(project?.meta?.permission).toBe('project:query')
     const approval = shell?.children?.find((route) => route.path === '/approval/todo')
+    const approvalRoot = shell?.children?.find((route) => route.path === '/approval')
     const approvalDetail = shell?.children?.find(
       (route) => route.path === '/approval/instances/:instanceId',
+    )
+    const legacyApprovalDetail = shell?.children?.find(
+      (route) => route.path === '/approval/:instanceId',
     )
     const alert = shell?.children?.find((route) => route.path === '/alert')
     const reports = shell?.children?.find((route) => route.path === '/dashboard/reports')
@@ -52,10 +56,24 @@ describe('V2 application-shell routes', () => {
       workflowTab: 'todo',
     })
     expect(approval?.meta?.permission).toBeUndefined()
+    expect(approvalRoot?.redirect).toBeTypeOf('function')
     expect(approvalDetail?.meta?.permission).toBeUndefined()
+    expect(legacyApprovalDetail?.redirect).toBeTypeOf('function')
     expect(alert?.meta?.permission).toBe('alert:view')
     expect(alert?.redirect).toBeTypeOf('function')
     expect(String(reports?.component)).not.toContain('ShellPlaceholderPage')
+  })
+
+  it('keeps legacy approval entry and detail deep links compatible', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user(['*']))
+    const router = guardedRouter()
+
+    await router.push('/approval?projectId=23')
+    await router.isReady()
+    expect(router.currentRoute.value.fullPath).toBe('/approval/todo?projectId=23')
+
+    await router.push('/approval/81?returnTab=done')
+    expect(router.currentRoute.value.fullPath).toBe('/approval/instances/81?returnTab=done')
   })
 
   it('restores a permitted deep link and blocks a missing permission', async () => {

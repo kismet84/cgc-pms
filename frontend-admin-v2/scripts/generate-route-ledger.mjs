@@ -9,6 +9,20 @@ const routerPath = resolve(repositoryRoot, 'frontend-admin/src/router/index.ts')
 const jsonPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.json')
 const markdownPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.md')
 
+const m2AcceptedRoutes = {
+  Dashboard: '@/pages/dashboard/DashboardPage.vue',
+  ReportCatalog: '@/pages/workbench/ReportCatalogPage.vue',
+  Alert: '@/router.ts#V2LegacyAlertRedirect',
+  Approval: '@/router.ts#V2LegacyApprovalRedirect',
+  ApprovalTodo: '@/pages/workbench/WorkflowWorkbenchPage.vue',
+  ApprovalDone: '@/pages/workbench/WorkflowWorkbenchPage.vue',
+  ApprovalCc: '@/pages/workbench/WorkflowWorkbenchPage.vue',
+  ApprovalMine: '@/pages/workbench/WorkflowWorkbenchPage.vue',
+  ApprovalDetail: '@/router.ts#V2LegacyApprovalDetailRedirect',
+}
+
+const m2AcceptanceEvidence = 'docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md'
+
 function findVariable(sourceFile, name) {
   for (const statement of sourceFile.statements) {
     if (!ts.isVariableStatement(statement)) continue
@@ -99,20 +113,21 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
     const redirect = literal(objectValue(element, 'redirect')) || null
 
     if (typeof name === 'string') {
+      const v2View = m2AcceptedRoutes[name] || null
       result.push({
         name,
         path: fullPath,
         legacyView: component,
-        v2View: null,
+        v2View,
         permission: permissions[name] || null,
         adminOnly: effectiveAdmin,
         public: meta ? literal(objectValue(meta, 'public')) === true : false,
         redirect,
         domain: domainFor(fullPath),
-        status: name === 'Dashboard' ? 'V2_SOURCE_AVAILABLE' : 'LEGACY_ONLY',
-        stitchDesign: name === 'Dashboard' ? '用户已选新版经营驾驶舱视觉概念；M2 落地' : null,
-        testEvidence: null,
-        acceptanceEvidence: null,
+        status: v2View ? 'V2_ACCEPTED' : 'LEGACY_ONLY',
+        stitchDesign: name === 'Dashboard' ? '用户已选新版经营驾驶舱视觉概念；M2 已验收' : null,
+        testEvidence: v2View ? 'frontend-admin-v2/tests/unit；frontend-admin-v2/e2e' : null,
+        acceptanceEvidence: v2View ? m2AcceptanceEvidence : null,
       })
     }
 
@@ -139,6 +154,7 @@ function renderMarkdown(ledger) {
     `- Legacy 独立页面模块：${ledger.summary.uniqueLegacyViews}`,
     `- ` + '`LEGACY_ONLY`' + `：${ledger.summary.legacyOnly}`,
     `- ` + '`V2_SOURCE_AVAILABLE`' + `：${ledger.summary.v2SourceAvailable}`,
+    `- ` + '`V2_ACCEPTED`' + `：${ledger.summary.v2Accepted}`,
     '',
     '| 域 | route name | URL | Legacy 视图 | V2 视图 | permission | adminOnly | 状态 | Stitch / 测试 / 验收 |',
     '|---|---|---|---|---|---|---:|---|---|',
@@ -182,6 +198,7 @@ async function buildLedger() {
       ).size,
       legacyOnly: routes.filter((route) => route.status === 'LEGACY_ONLY').length,
       v2SourceAvailable: routes.filter((route) => route.status === 'V2_SOURCE_AVAILABLE').length,
+      v2Accepted: routes.filter((route) => route.status === 'V2_ACCEPTED').length,
     },
     routes,
   }

@@ -306,17 +306,23 @@ Reviewer要求：确认权限矩阵、驾驶舱权威预警来源、通知零伪
 目标：
 
 - 完成九个M2路由、八角色、四类身份、三视口和治理载体的一致性验收。
-  非目标：
+非目标：
 - 不新增业务能力，不切换正式入口，不发布生产或退役 Legacy。
-  允许修改：
+允许修改：
 - `frontend-admin-v2/tests/**`
 - `frontend-admin-v2/e2e/**`
-- `frontend-admin-v2/route-migration-ledger.json`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/components/V2Dialog.vue`
+- `frontend-admin-v2/src/pages/dashboard/DashboardPage.vue`
+- `frontend-admin-v2/src/styles/components.css`
+- `frontend-admin-v2/src/styles/tokens.css`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
 - `docs/ui-v2/**`
 - `docs/backlog/**`
+- `docs/plans/第53条主线-M2-工作台与新版驾驶舱任务计划书-2026-07-19.md`
 - `docs/product-intelligence/**`
 - `docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md`
-  禁止修改：
+禁止修改：
 - `backend/src/main/**`
 - `frontend-admin/src/**`
 - `backend/src/main/resources/db/migration/**`
@@ -324,14 +330,14 @@ Reviewer要求：确认权限矩阵、驾驶舱权威预警来源、通知零伪
 - `.github/**`
 - `AGENTS.md`
 - `AGENTS.override.md`
-  验收标准：
+验收标准：
 - 九个目标路由均为 `V2_ACCEPTED`，台账达到78/9/0；无占位、mock或Legacy边。
 - 权限、项目范围、金额、审批幂等、预警部分成功、报表过滤、性能、包体、axe和控制台门禁通过。
 - 所有发现完成修复、正式承接或关闭；正式报告与项目地图、迭代决策、Current Focus一致。
-  状态：Ready
-  来源锚点：M2计划 ISSUE-053-009 与 M2完成定义
-  存量问题键：[mainline:053-M2-009-EXIT-GATE]
-  验证命令：
+状态：Completed（2026-07-21，九路由、八角色、四类身份、三视口与治理载体全量退出门通过）
+来源锚点：M2计划 ISSUE-053-009 与 M2完成定义
+存量问题键：[mainline:053-M2-009-EXIT-GATE]
+验证命令：
 - `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-009`
 - `cd frontend-admin-v2; pnpm test:unit`
 - `cd frontend-admin-v2; pnpm lint:check`
@@ -340,13 +346,21 @@ Reviewer要求：确认权限矩阵、驾驶舱权威预警来源、通知零伪
 - `cd frontend-admin-v2; pnpm build`
 - `cd frontend-admin-v2; pnpm check:bundle-size`
 - `git diff --check`
-  归档报告：`docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md`
-  Migration：不需要
-  依赖：ISSUE-053-008 通过。
-  风险等级：高
-  运行态要求：本地V2、Legacy、后端和数据库健康；真实受控身份和1440/1024/390浏览器验收。
-  Reviewer要求：独立核对路由计数、权限负向、数据范围、金额、写侧事实、Clean-room、三视口和零悬空。
-  最小回滚：将九个M2路由恢复占位并回退M2页面、服务、契约、测试与台账；M1保留。
+归档报告：`docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md`
+Migration：不需要
+依赖：ISSUE-053-008 通过。
+风险等级：高
+运行态要求：本地V2、Legacy、后端和数据库健康；真实受控身份和1440/1024/390浏览器验收。
+Reviewer要求：独立核对路由计数、权限负向、数据范围、金额、写侧事实、Clean-room、三视口和零悬空。
+最小回滚：将九个M2路由恢复占位并回退M2页面、服务、契约、测试与台账；M1保留。
+
+完成结果：
+- 九个 M2 route name 全部为 `V2_ACCEPTED`，台账达到 `78/9/0`；`/approval` 与 `/approval/:instanceId` 兼容深链已补齐，`/approval/process` 保持 `LEGACY_ONLY`。
+- V2 单测18文件84项、Lint、类型/构建、Clean-room边界、路由台账、8个JS包体门禁和驾驶舱性能2项通过；5项目SQL计数13，低于20门槛。
+- 本地真实运行态后端、Legacy、V2与demo验真通过；最终同一diff下驾驶舱8项、审批12项、M1壳2项及live壳1项共23项通过，覆盖八角色、四身份、三视口、axe、403/404、深链、权限负向和控制台。
+- 公共`V2Dialog`已统一桌面端卡片、文字和布局；通知、审批详情与预警处置弹窗复用同一视觉语言，内容按业务差异保留；弹窗内下拉菜单固定向下展开且不再被面板裁切。
+- 退出门发现的Ready格式、台账生成器硬编码、审批兼容路由、陈旧E2E断言、移动端详情标题、健康分数口径提示、桌面端嵌套白卡与下拉裁切均本轮修复并复验。
+- 新增后续项0、关闭后续项1、后续项净变化-1；无悬空项。未切正式入口，未发布生产，未退役Legacy。
 
 ### ISSUE-053-001：建立 Clean-room V2 设计令牌与最小组件基线
 

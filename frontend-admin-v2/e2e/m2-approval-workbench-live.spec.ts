@@ -41,6 +41,41 @@ test.describe('M2 live approval workbench', () => {
     expect((await page.goto('/api/auth/dev-login?username=admin'))?.ok()).toBe(true)
   })
 
+  test('legacy approval entry and detail deep links reach the V2 workbench', async ({ page }) => {
+    await page.goto('/v2/approval?projectId=520000000000009001')
+    await expect(page).toHaveURL(/\/v2\/approval\/todo\?projectId=520000000000009001$/)
+
+    await page.goto(`/v2/approval/${controlledInstanceId}?returnTab=todo`)
+    await expect(page).toHaveURL(
+      new RegExp(`/v2/approval/instances/${controlledInstanceId}\\?returnTab=todo$`),
+    )
+    await expect(page.locator('.workflow-detail-dialog')).toBeVisible()
+  })
+
+  test('all nine M2 ledger routes resolve to accepted V2 pages or redirects', async ({ page }) => {
+    const routes = [
+      '/v2/dashboard',
+      '/v2/dashboard/reports',
+      '/v2/alert',
+      '/v2/approval',
+      '/v2/approval/todo',
+      '/v2/approval/done',
+      '/v2/approval/cc',
+      '/v2/approval/mine',
+      `/v2/approval/${controlledInstanceId}`,
+    ]
+
+    for (const path of routes) {
+      expect((await page.goto(path))?.ok()).toBe(true)
+      await expect(page.locator('.shell-placeholder')).toHaveCount(0)
+      await expect(page.getByRole('main')).toBeVisible()
+    }
+
+    await expect(page).toHaveURL(
+      new RegExp(`/v2/approval/instances/${controlledInstanceId}(?:\\?.*)?$`),
+    )
+  })
+
   for (const viewport of [
     { name: 'desktop', width: 1440, height: 900 },
     { name: 'tablet', width: 1024, height: 768 },
