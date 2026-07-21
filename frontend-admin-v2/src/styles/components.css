@@ -408,6 +408,17 @@
   background: var(--v2-color-surface-hover);
 }
 
+.v2-dialog__close {
+  display: grid;
+  flex: 0 0 auto;
+  padding: 0;
+  place-items: center;
+  border-radius: var(--v2-radius-round);
+  font-size: var(--v2-font-size-21);
+  font-weight: var(--v2-font-weight-regular);
+  line-height: 1;
+}
+
 .v2-skeleton {
   position: relative;
   overflow: hidden;
@@ -446,49 +457,56 @@
   display: grid;
   place-items: center;
   padding: var(--v2-page-gutter);
-  background: var(--v2-color-overlay);
-}
-
-.v2-dialog__panel {
-  width: min(32rem, 100%);
-  max-height: min(42rem, calc(100vh - 2 * var(--v2-page-gutter)));
-  overflow: auto;
-  color: var(--v2-color-text);
-  background: var(--v2-color-surface);
-  border: var(--v2-border-width) solid var(--v2-color-border);
-  border-radius: var(--v2-radius-lg);
-  box-shadow: var(--v2-shadow-float);
-  font-family: var(--v2-font-sans);
-}
-
-.workflow-detail-dialog {
-  width: min(68rem, 100%);
-  max-height: min(46rem, calc(100vh - 2 * var(--v2-page-gutter)));
-  background: color-mix(in srgb, var(--v2-color-surface) 76%, transparent);
-  border-color: color-mix(in srgb, white 58%, var(--v2-color-border));
-  box-shadow: 0 1.75rem 5rem rgb(15 23 42 / 28%);
-  backdrop-filter: blur(1.5rem) saturate(150%);
-  -webkit-backdrop-filter: blur(1.5rem) saturate(150%);
-}
-
-.v2-dialog__backdrop:has(.workflow-detail-dialog) {
+  background: color-mix(in srgb, var(--v2-color-overlay) 82%, transparent);
   backdrop-filter: blur(0.25rem);
   -webkit-backdrop-filter: blur(0.25rem);
 }
 
-.workflow-detail-dialog .v2-dialog__header {
-  padding: var(--v2-space-5) var(--v2-space-6) var(--v2-space-4);
-  background: color-mix(in srgb, var(--v2-color-surface) 42%, transparent);
+.v2-dialog__panel {
+  position: relative;
+  isolation: isolate;
+  width: min(32rem, 100%);
+  max-height: min(42rem, calc(100vh - 2 * var(--v2-page-gutter)));
+  overflow: auto;
+  color: var(--v2-color-text);
+  background: var(--v2-dialog-surface);
+  border: 0;
+  border-radius: var(--v2-dialog-radius);
+  box-shadow: var(--v2-dialog-shadow);
+  font-family: var(--v2-font-sans);
+  backdrop-filter: blur(1.5rem) saturate(118%);
+  -webkit-backdrop-filter: blur(1.5rem) saturate(118%);
 }
 
-.workflow-detail-dialog .v2-dialog__title {
-  font-size: var(--v2-font-size-17);
+.v2-dialog__panel::before {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.95' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.18'/%3E%3C/svg%3E");
+  content: '';
+  opacity: 0.12;
+  pointer-events: none;
+  mix-blend-mode: soft-light;
+}
+
+.v2-dialog__panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.v2-dialog__panel:has(.v2-select[open]) {
+  overflow: visible;
+}
+
+.workflow-detail-dialog {
+  width: min(54rem, 100%);
+  max-height: min(42rem, calc(100vh - 2 * var(--v2-page-gutter)));
 }
 
 .workflow-detail-dialog .v2-dialog__body {
   display: grid;
   gap: var(--v2-space-3);
-  padding: var(--v2-space-4) var(--v2-space-6) var(--v2-space-5);
+  padding: var(--v2-space-5) var(--v2-space-6) var(--v2-space-6);
 }
 
 .workflow-detail-dialog .v2-card {
@@ -498,10 +516,35 @@
 }
 
 .workflow-detail-dialog .v2-dialog__close {
-  min-height: 2rem;
-  padding-inline: var(--v2-space-3);
-  border-radius: var(--v2-radius-round);
-  background: color-mix(in srgb, var(--v2-color-surface) 62%, transparent);
+  min-width: var(--v2-control-height-touch);
+}
+
+@media (min-width: 48.01rem) {
+  .workflow-detail-dialog .v2-dialog__body > .workflow-detail-overview,
+  .workflow-detail-dialog .v2-dialog__body > .workflow-detail-actions,
+  .workflow-detail-dialog .v2-dialog__body > .dashboard-alert-detail,
+  .workflow-detail-dialog .v2-dialog__body > .dashboard-alert-actions {
+    padding: 0 0 var(--v2-space-4);
+    background: transparent;
+    border: 0;
+    border-bottom: var(--v2-border-width) solid var(--v2-dialog-divider);
+    border-radius: 0;
+  }
+
+  .workflow-detail-dialog .workflow-detail-grid {
+    gap: 0;
+  }
+
+  .workflow-detail-dialog .workflow-detail-grid > .v2-card {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .workflow-detail-dialog .workflow-detail-grid > .v2-card + .v2-card {
+    padding-left: var(--v2-space-5);
+    border-left: var(--v2-border-width) solid var(--v2-dialog-divider);
+  }
 }
 
 .v2-dialog__header {
@@ -509,35 +552,37 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--v2-space-4);
-  padding: var(--v2-space-5) var(--v2-space-5) var(--v2-space-4);
-  border-bottom: var(--v2-border-width) solid var(--v2-color-border-subtle);
+  padding: var(--v2-space-6) var(--v2-space-6) var(--v2-space-4);
+  border-bottom: var(--v2-border-width) solid var(--v2-dialog-divider);
 }
 
 .v2-dialog__title {
   margin: 0;
   color: var(--v2-color-text-strong);
-  font-size: var(--v2-font-size-17);
-  line-height: var(--v2-line-height-tight);
+  font-size: var(--v2-font-size-21);
+  font-weight: var(--v2-font-weight-bold);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
 }
 
 .v2-dialog__description {
   margin: var(--v2-space-2) 0 0;
   color: var(--v2-color-text-muted);
-  font-size: var(--v2-font-size-12);
+  font-size: var(--v2-font-size-13);
   line-height: var(--v2-line-height-body);
 }
 
-.v2-dialog__body,
-.v2-dialog__footer {
-  padding: var(--v2-space-5);
+.v2-dialog__body {
+  padding: var(--v2-space-5) var(--v2-space-6) var(--v2-space-6);
+  line-height: var(--v2-line-height-body);
 }
 
 .v2-dialog__footer {
   display: flex;
   justify-content: flex-end;
   gap: var(--v2-space-2);
-  padding-top: var(--v2-space-4);
-  border-top: var(--v2-border-width) solid var(--v2-color-border-subtle);
+  padding: var(--v2-space-4) var(--v2-space-6) var(--v2-space-5);
+  border-top: var(--v2-border-width) solid var(--v2-dialog-divider);
 }
 
 .v2-dialog-enter-active,
@@ -710,7 +755,7 @@
   }
 
   .workflow-detail-dialog .v2-dialog__title {
-    font-size: var(--v2-font-size-15);
+    font-size: 1rem;
     line-height: 1.35;
   }
 

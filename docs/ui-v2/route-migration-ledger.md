@@ -5,15 +5,16 @@
 - 命名路由：87
 - Legacy 路由视图引用：73
 - Legacy 独立页面模块：65
-- `LEGACY_ONLY`：86
-- `V2_SOURCE_AVAILABLE`：1
+- `LEGACY_ONLY`：78
+- `V2_SOURCE_AVAILABLE`：0
+- `V2_ACCEPTED`：9
 
 | 域 | route name | URL | Legacy 视图 | V2 视图 | permission | adminOnly | 状态 | Stitch / 测试 / 验收 |
 |---|---|---|---|---|---|---:|---|---|
 | 系统与全局 | Login | /login | @/pages/login/index.vue | — | — | 否 | LEGACY_ONLY | — |
-| 工作台 | Dashboard | /dashboard | @/pages/dashboard/index.vue | — | dashboard:view | 否 | V2_SOURCE_AVAILABLE | 用户已选新版经营驾驶舱视觉概念；M2 落地 |
+| 工作台 | Dashboard | /dashboard | @/pages/dashboard/index.vue | @/pages/dashboard/DashboardPage.vue | dashboard:view | 否 | V2_ACCEPTED | 用户已选新版经营驾驶舱视觉概念；M2 已验收；frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
 | 系统与全局 | Forbidden | /403 | @/pages/error/403.vue | — | — | 否 | LEGACY_ONLY | — |
-| 工作台 | ReportCatalog | /dashboard/reports | @/pages/report/catalog.vue | — | — | 否 | LEGACY_ONLY | — |
+| 工作台 | ReportCatalog | /dashboard/reports | @/pages/report/catalog.vue | @/pages/workbench/ReportCatalogPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
 | 商务合约 | Contract | /contract | — | — | contract:query | 否 | LEGACY_ONLY | — |
 | 商务合约 | ContractLedger | /contract/ledger | @/pages/contract/ContractLedgerPage.vue | — | contract:query | 否 | LEGACY_ONLY | — |
 | 商务合约 | ContractCreate | /contract/create | @/pages/contract/ContractFormPage.vue | — | contract:add | 否 | LEGACY_ONLY | — |
@@ -77,14 +78,14 @@
 | 资金财务 | Invoice | /invoice | @/pages/invoice/index.vue | — | invoice:query | 否 | LEGACY_ONLY | — |
 | 基础资料 | Material | /material | — | — | material:query | 否 | LEGACY_ONLY | — |
 | 基础资料 | MaterialDictionary | /material/dictionary | @/pages/material/dictionary.vue | — | material:query | 否 | LEGACY_ONLY | — |
-| 工作台 | Alert | /alert | @/pages/alert/index.vue | — | alert:view | 否 | LEGACY_ONLY | — |
-| 工作台 | Approval | /approval | — | — | workflow:task:query | 否 | LEGACY_ONLY | — |
-| 工作台 | ApprovalTodo | /approval/todo | @/pages/approval/todo.vue | — | workflow:task:query | 否 | LEGACY_ONLY | — |
-| 工作台 | ApprovalDone | /approval/done | @/pages/approval/todo.vue | — | workflow:task:query | 否 | LEGACY_ONLY | — |
-| 工作台 | ApprovalCc | /approval/cc | @/pages/approval/todo.vue | — | workflow:cc:query | 否 | LEGACY_ONLY | — |
-| 工作台 | ApprovalMine | /approval/mine | @/pages/approval/todo.vue | — | workflow:instance:query | 否 | LEGACY_ONLY | — |
+| 工作台 | Alert | /alert | @/pages/alert/index.vue | @/router.ts#V2LegacyAlertRedirect | alert:view | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
+| 工作台 | Approval | /approval | — | @/router.ts#V2LegacyApprovalRedirect | workflow:task:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
+| 工作台 | ApprovalTodo | /approval/todo | @/pages/approval/todo.vue | @/pages/workbench/WorkflowWorkbenchPage.vue | workflow:task:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
+| 工作台 | ApprovalDone | /approval/done | @/pages/approval/todo.vue | @/pages/workbench/WorkflowWorkbenchPage.vue | workflow:task:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
+| 工作台 | ApprovalCc | /approval/cc | @/pages/approval/todo.vue | @/pages/workbench/WorkflowWorkbenchPage.vue | workflow:cc:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
+| 工作台 | ApprovalMine | /approval/mine | @/pages/approval/todo.vue | @/pages/workbench/WorkflowWorkbenchPage.vue | workflow:instance:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
 | 工作台 | ApprovalProcess | /approval/process | @/pages/approval/process.vue | — | workflow:process:query | 是 | LEGACY_ONLY | — |
-| 工作台 | ApprovalDetail | /approval/:instanceId | @/pages/approval/detail.vue | — | workflow:instance:query | 否 | LEGACY_ONLY | — |
+| 工作台 | ApprovalDetail | /approval/:instanceId | @/pages/approval/detail.vue | @/router.ts#V2LegacyApprovalDetailRedirect | workflow:instance:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
 | 系统与全局 | System | /system | — | — | system:dict:query | 是 | LEGACY_ONLY | — |
 | 系统与全局 | SystemDict | /system/dict | @/pages/system/dict/index.vue | — | system:dict:query | 是 | LEGACY_ONLY | — |
 | 系统与全局 | SystemUsers | /system/users | @/pages/system/users/index.vue | — | system:user:query | 是 | LEGACY_ONLY | — |

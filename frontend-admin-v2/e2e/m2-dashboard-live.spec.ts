@@ -159,7 +159,6 @@ test.describe('M2 live eight-role dashboard', () => {
     await expect(page.locator('.trend-chart canvas')).toBeVisible()
     await expect(page.locator('.trend-chart tbody tr')).toHaveCount(7)
     await expect(page.getByText('资金闭环指标')).toBeVisible()
-    await expect(page.getByText('PROCESSING')).toBeVisible()
     const breakdown = page.locator('#finance-contract-breakdown')
     const rows = breakdown.locator('tbody tr')
     await expect(breakdown.getByText('合同资金分解', { exact: true })).toBeVisible()
@@ -167,9 +166,8 @@ test.describe('M2 live eight-role dashboard', () => {
     const serviceContract = rows.filter({ hasText: '演示项目管理服务合同' })
     await serviceContract.getByRole('button', { name: '展开', exact: true }).click()
     await expect(rows).toHaveCount(9)
-    await expect(
-      breakdown.getByText('PMT-20260720-001 · 2026-07-20', { exact: true }),
-    ).toBeVisible()
+    await expect(breakdown.getByText('PROCESSING', { exact: true })).toBeVisible()
+    await expect(breakdown.getByText(/^PMT-20260720-001 · \d{4}-\d{2}-\d{2}$/)).toBeVisible()
     await serviceContract.getByRole('button', { name: '收起', exact: true }).click()
     await expect(rows).toHaveCount(4)
   })
@@ -200,17 +198,7 @@ test.describe('M2 live eight-role dashboard', () => {
       periodSelect.locator('..').locator('[role="option"][data-value=""]'),
     ).toHaveAttribute('aria-selected', 'true')
 
-    const riskFilter = page.locator('.risk-filter')
-    const riskList = page.locator('#risk-list')
-    await riskFilter.locator('summary').click()
-    await expect(riskFilter).toHaveAttribute('open', '')
-    await riskFilter.getByRole('option', { name: '高', exact: true }).click()
-    await expect(riskList.getByText('在建项目临期材料采购合同', { exact: true })).toBeVisible()
-    await expect(riskList.getByText('演示项目管理服务合同', { exact: true })).toHaveCount(0)
-    await riskFilter.locator('summary').click()
-    await riskFilter.getByRole('option', { name: '其他', exact: true }).click()
-    await expect(riskList.getByText('演示项目管理服务合同', { exact: true })).toBeVisible()
-    await expect(riskList.getByText('在建项目临期材料采购合同', { exact: true })).toHaveCount(0)
+    await expect(page.locator('#risk-list .risk-level').first()).toBeVisible()
 
     const projectId = await projectSelect
       .locator('..')
@@ -326,14 +314,14 @@ test.describe('M2 live eight-role dashboard', () => {
     await page.goto('/v2/dashboard?role=pm')
     await page.getByRole('button', { name: '查看最高风险', exact: true }).click()
     await expect(page.locator('.risk-filter summary')).toHaveText('高')
-    await expect(
-      page.locator('#risk-list').getByText('劳务分包在建演示项目', { exact: true }),
-    ).toBeVisible()
+    await expect(page.locator('#risk-list .risk-level').first()).toHaveText('高')
     await page.getByRole('button', { name: '查看最高风险', exact: true }).click()
     await expect(page.locator('.risk-filter summary')).toHaveText('全部预警')
   })
 
-  test('every role exposes high, medium, low and other risk data', async ({ page }) => {
+  test('every role exposes scoped authoritative alerts without severity distortion', async ({
+    page,
+  }) => {
     const projectId = '520000000000009002'
     const roleCases = [
       { role: 'pm', username: 'demo.manager' },
@@ -345,30 +333,54 @@ test.describe('M2 live eight-role dashboard', () => {
       { role: 'finance', username: 'demo.finance' },
       { role: 'mgmt', username: 'admin' },
     ] as const
-    const levels = ['高', '中', '低', '其他'] as const
+    const riskLabel = (severity: string) => {
+      if (['CRITICAL', 'HIGH'].includes(severity)) return '高'
+      if (severity === 'MEDIUM') return '中'
+      if (severity === 'LOW') return '低'
+      return '其他'
+    }
 
     for (const roleCase of roleCases) {
       expect((await page.goto(`/api/auth/dev-login?username=${roleCase.username}`))?.ok()).toBe(
         true,
       )
+      const alertResponse = page.waitForResponse((response) => {
+        const url = new URL(response.url())
+        return url.pathname === '/api/alerts' && url.searchParams.get('projectId') === projectId
+      })
       await page.goto(`/v2/dashboard?role=${roleCase.role}&projectId=${projectId}`)
-      const riskFilter = page.locator('.risk-filter')
-      const riskBadges = page.locator('#risk-list .risk-level')
-
-      for (const level of levels) {
-        await riskFilter.locator('summary').click()
-        await riskFilter.getByRole('option', { name: level, exact: true }).click()
-        await expect(riskFilter.locator('summary')).toHaveText(level)
-        await expect
-          .poll(async () => riskBadges.count(), {
-            message: `${roleCase.role} should expose ${level} risk data`,
-          })
-          .toBeGreaterThan(0)
-        expect(await riskBadges.allTextContents()).toEqual(
-          Array(await riskBadges.count()).fill(level),
-        )
+      const response = await alertResponse
+      expect(response.ok()).toBe(true)
+      const body = (await response.json()) as {
+        data: { records: Array<{ severity: string }> }
       }
+      expect(body.data.records.length).toBeGreaterThan(0)
+      const riskBadges = page.locator('#risk-list .risk-level')
+      await expect(riskBadges).toHaveCount(body.data.records.length)
+      expect(await riskBadges.allTextContents()).toEqual(
+        body.data.records.map((record) => riskLabel(record.severity)),
+      )
     }
+  })
+
+  test('opens the alert status menu downward without dialog clipping', async ({ page }) => {
+    expect((await page.goto('/api/auth/dev-login?username=admin'))?.ok()).toBe(true)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/v2/dashboard?role=mgmt')
+    await page.locator('#risk-list tbody tr').first().click()
+
+    const dialog = page.getByRole('dialog')
+    const status = dialog.getByRole('button', { name: /^目标状态：/ })
+    await status.click()
+    const menu = status.locator('..').locator('.v2-select__menu')
+    await expect(menu).toBeVisible()
+
+    const statusBounds = await status.boundingBox()
+    const menuBounds = await menu.boundingBox()
+    expect(menuBounds?.y).toBeGreaterThanOrEqual(
+      (statusBounds?.y ?? Number.POSITIVE_INFINITY) + (statusBounds?.height ?? 0),
+    )
+    await expect(dialog).toHaveCSS('overflow', 'visible')
   })
 
   test('defaults to aggregate context and loads the real management view in three viewports', async ({

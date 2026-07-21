@@ -562,7 +562,7 @@ function isAbort(errorValue: unknown): boolean {
                 <span :class="`is-${health.tone}`">{{ health.label }}</span>
               </div>
             </div>
-            <p>综合成本、资金、履约与待办风险</p>
+            <p>综合成本、资金、履约与待办风险；经营健康为辅助判断，非财务/结算口径</p>
           </div>
 
           <div class="highest-risk">

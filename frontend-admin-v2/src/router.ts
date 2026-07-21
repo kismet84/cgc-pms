@@ -74,10 +74,25 @@ const contextRoutes: RouteRecordRaw[] = [
     meta: { shell: true, permission: 'alert:view' },
   },
   {
+    path: '/approval',
+    name: 'V2LegacyApprovalRedirect',
+    redirect: (to) => ({ path: '/approval/todo', query: to.query }),
+    meta: { shell: true },
+  },
+  {
     path: '/approval/instances/:instanceId',
     name: 'V2WorkflowInstanceDetail',
     component: WorkflowWorkbenchPage,
     meta: { shell: true, workflowTab: 'todo' },
+  },
+  {
+    path: '/approval/:instanceId',
+    name: 'V2LegacyApprovalDetailRedirect',
+    redirect: (to) => ({
+      path: `/approval/instances/${String(to.params.instanceId)}`,
+      query: to.query,
+    }),
+    meta: { shell: true },
   },
   {
     path: '/project/:projectId/overview',

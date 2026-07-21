@@ -78,7 +78,7 @@ async function installIdentity(page: Page, readIdentity: () => Identity): Promis
       }),
     }),
   )
-  await page.route('**/api/dashboard/project-manager?**', (route) =>
+  await page.route(/\/api\/dashboard\/project-manager(?:\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -98,6 +98,35 @@ async function installIdentity(page: Page, readIdentity: () => Identity): Promis
           expiringContracts: [],
         },
       }),
+    }),
+  )
+  await page.route(/\/api\/alerts(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '0',
+        message: 'success',
+        data: { records: [], total: 0, pageNo: 1, pageSize: 50 },
+      }),
+    }),
+  )
+  await page.route(/\/api\/notifications(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '0',
+        message: 'success',
+        data: { records: [], total: 0, pageNo: 1, pageSize: 8 },
+      }),
+    }),
+  )
+  await page.route('**/api/notifications/unread-count', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: '0', message: 'success', data: { count: 0 } }),
     }),
   )
 }
@@ -155,7 +184,7 @@ test('keeps login and authenticated shell accessible at 1440, 1024 and 390', asy
 
     identity = 'admin'
     await page.goto('/v2/dashboard')
-    await expect(page.getByRole('heading', { level: 1, name: '经营全景' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
     await expect(page.getByRole('main')).toBeVisible()
     await expect(page.getByLabel('当前位置')).toContainText('工作台经营驾驶舱')
     await expect(page.getByRole('navigation', { name: '工作区标签页' })).toHaveCount(1)
@@ -163,10 +192,10 @@ test('keeps login and authenticated shell accessible at 1440, 1024 and 390', asy
     await expectNoHorizontalOverflow(page)
     await expectNoSeriousAxeViolations(page)
 
-    await page.getByRole('button', { name: '打开通知中心占位' }).click()
+    await page.getByRole('button', { name: '打开通知中心' }).click()
     await expect(page.getByRole('dialog', { name: '通知中心' })).toBeVisible()
-    await expect(page.getByRole('heading', { name: '暂无壳级通知' })).toBeVisible()
-    await expect(page.getByText('此处不显示模拟数量或业务消息')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '暂无站内通知' })).toBeVisible()
+    await expect(page.getByText('当前账号没有可见通知')).toBeVisible()
     await page.getByRole('button', { name: '关闭对话框' }).click()
 
     if (viewport.name === 'desktop') {
@@ -190,8 +219,8 @@ test('keeps login and authenticated shell accessible at 1440, 1024 and 390', asy
       const menuTop = await page
         .getByRole('button', { name: '打开导航' })
         .evaluate((button) => button.getBoundingClientRect().top)
-      for (const label of ['当前项目', '报告期']) {
-        const controlBox = await page.getByLabel(label).evaluate((control) => {
+      for (const controlId of ['#global-project', '#global-report-period']) {
+        const controlBox = await page.locator(controlId).evaluate((control) => {
           const rect = control.getBoundingClientRect()
           return { top: rect.top, width: rect.width }
         })
