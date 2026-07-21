@@ -1,5 +1,42 @@
 # Current Focus
 
+## 2026-07-21 ISSUE-053-012：计划与现场日报通过
+
+- `/project-schedule`与`/site/daily-log`已迁移为真实Clean-room V2页面，台账达到`71/16/0`；计划、WBS、月周计划、快照、纠偏、日报正文、质量安全摘要和附件闭环完成。
+- 快照写权限改为`schedule:progress`；WBS/期间项使用父记录version，日报使用expectedUpdatedAt；计划/期间/纠偏/日报提交及纠偏审批回调加锁、重验状态，双线程审批仅生成一份修订计划。
+- 后端组合34项、V2单测98项、契约/类型/Lint/Clean-room/台账/构建/包体、Legacy兼容及live E2E通过；真实权限403、陈旧令牌、DRAFT附件和SUBMITTED不可变已在本地dev/demo闭环。
+- 受控身份与业务数据已精确回滚，计数为0；新增后续项0、关闭后续项0、净变化0。013未启动，须另行补为Ready。
+
+## 2026-07-21 053-M3-PROJECT-MEMBER-REJOIN：P1后续闭环
+
+- 项目成员创建现优先恢复同租户、同项目、同用户的逻辑删除原记录；活动成员仍返回`MEMBER_ALREADY_EXISTS`，原`uk_ppm_project_user(project_id,user_id)`唯一键保持不变。
+- 恢复SQL以`id/tenant_id/project_id/user_id/deleted_flag=1`原子限定，更新当前成员字段及`updated_by/updated_at`，保留原ID、`created_by/created_at`；无数据库迁移。
+- 单元、Controller校验与H2集成目标验证17项、项目模块回归39项通过；并发用例证明双恢复仅一项成功且最终单行。本地MySQL真实API删除→重加保持同ID并更新角色，受控测试成员已逻辑删除；独立测试复核无阻塞finding。
+- 原唯一P1候选`[mainline:053-M3-PROJECT-MEMBER-REJOIN]`已关闭并从`docs/未来开发计划.md`移除。新增后续项0、关闭后续项1、后续项净变化-1；012随后已完成。
+
+## 2026-07-21 ISSUE-053-011：项目对象工作区五路由通过
+
+- 五个项目对象路由、项目与成员写侧、权限分流、字典、金额字符串、旧响应隔离和失败恢复已实现；后端37项、V2单测93项、静态门禁及live E2E 9项通过。
+- 当前台账为`73/14/0`：五路由均登记`V2_ACCEPTED`。
+- 已创建可回滚的本地`demo.member-readonly`/`PROJECT_MEMBER_VIEWER`，只含`project:query`和`project:member:list`；真实读200、写403通过。
+- 用户授权后已移除成员实体对服务端派生`tenantId/projectId`的错误请求前置校验；`userId/roleCode`校验保留，Service继续覆盖租户/项目，专项14项、主项目37项及真实首次新增/删除通过。
+- 正式报告：`docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md`。011收口时新增后续项1、关闭后续项0、后续项净变化+1；该成员重新加入P1已于后续修复闭环，012也已解除阻塞并完成。
+
+## 2026-07-21 第53条主线M3：后续详细规划完成
+
+- M3固定为`ISSUE-053-011～016`六个串行切片：项目对象、计划日报、质量安全、技术管理、竣工收尾、全量退出门；不并行。
+- `ISSUE-053-011～012`已完成；当前无M3 Ready，013～016保持Planned。
+- 每切片均绑定路由计数、权限/项目范围、金额/状态机、附件、故障注入、三视口、自动化、live证据和最小回滚；M3最终目标台账`68/19/0`。
+- 本轮新增后续项0、关闭后续项0、后续项净变化0；六个切片是M3既定实施任务，不属于审计发现或悬空后续。
+
+## 2026-07-21 ISSUE-053-010：M3项目契约与只读请求金丝雀通过
+
+- 用户已授权开始M3；功能分支为`codex/mainline-53-ui-v2-m3`，10个项目履约路由继续保持`LEGACY_ONLY`。
+- 项目、总览、成员稳定契约与只读请求基线已通过；查询安全编码、空筛选省略、AbortSignal和金额字符串边界有目标测试。
+- 19个V2单测文件88项、契约/V2类型、Lint、Clean-room 83/8、构建和差异检查通过；正式报告为`docs/quality/ISSUE-053-010-M3项目契约与只读请求基线验收报告.md`。
+- 非目标：不修改后端、数据库、Legacy、正式入口或生产；用户未跟踪`docs/quality/full-audit/`保持隔离。
+- 新增后续项0、关闭后续项0、后续项净变化0；M3阶段计划与Ready是已授权实施载体，不属于审计后续项。
+
 ## 2026-07-21 ISSUE-053-009：Clean-room V2 M2全量退出门通过
 
 - 九个M2路由均已接入真实V2页面或受控重定向，路由台账达到`LEGACY_ONLY=78 / V2_ACCEPTED=9 / V2_SOURCE_AVAILABLE=0`；审批流程模板`/approval/process`继续属于M7并保持`LEGACY_ONLY`。

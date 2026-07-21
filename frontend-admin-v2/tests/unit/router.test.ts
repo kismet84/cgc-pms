@@ -42,6 +42,8 @@ describe('V2 application-shell routes', () => {
 
     expect(dashboard?.meta?.permission).toBe('dashboard:view')
     expect(project?.meta?.permission).toBe('project:query')
+    expect(dashboard?.meta?.workspaceContext).toEqual({ project: true, period: true })
+    expect(project?.meta?.workspaceContext).toEqual({ project: true, period: false })
     const approval = shell?.children?.find((route) => route.path === '/approval/todo')
     const approvalRoot = shell?.children?.find((route) => route.path === '/approval')
     const approvalDetail = shell?.children?.find(
@@ -54,6 +56,7 @@ describe('V2 application-shell routes', () => {
     const reports = shell?.children?.find((route) => route.path === '/dashboard/reports')
     expect(approval?.meta).toMatchObject({
       workflowTab: 'todo',
+      workspaceContext: { project: false, period: true },
     })
     expect(approval?.meta?.permission).toBeUndefined()
     expect(approvalRoot?.redirect).toBeTypeOf('function')
@@ -62,6 +65,13 @@ describe('V2 application-shell routes', () => {
     expect(alert?.meta?.permission).toBe('alert:view')
     expect(alert?.redirect).toBeTypeOf('function')
     expect(String(reports?.component)).not.toContain('ShellPlaceholderPage')
+    expect(reports?.meta?.workspaceContext).toBeUndefined()
+    expect(approvalDetail?.meta?.workspaceContext).toBeUndefined()
+
+    const projectOverview = shell?.children?.find(
+      (route) => route.path === '/project/:projectId/overview',
+    )
+    expect(projectOverview?.meta?.workspaceContext).toBeUndefined()
   })
 
   it('keeps legacy approval entry and detail deep links compatible', async () => {

@@ -3,6 +3,7 @@ package com.cgcpms.site.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -37,6 +38,10 @@ public class SiteDailyLog extends BaseEntity {
     @Max(value = 100000, message = "在场人数不能超过 100000")
     @JsonDeserialize(using = StrictIntegerDeserializer.class)
     private Integer onSiteHeadcount;
+    @TableField(exist = false)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    private LocalDateTime expectedUpdatedAt;
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String status;
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)

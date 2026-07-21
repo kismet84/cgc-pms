@@ -77,8 +77,8 @@ export const useWorkspaceStore = defineStore('v2-workspace', () => {
   }
 
   function syncRoute(path: string, query: LocationQuery, params: RouteParamsGeneric): void {
-    requestedProjectId.value = queryValue(query.projectId)
-    requestedReportPeriod.value = queryValue(query.period)
+    if (Object.hasOwn(query, 'projectId')) requestedProjectId.value = queryValue(query.projectId)
+    if (Object.hasOwn(query, 'period')) requestedReportPeriod.value = queryValue(query.period)
 
     const projectId = paramValue(params.projectId)
     const contractId = paramValue(params.id)

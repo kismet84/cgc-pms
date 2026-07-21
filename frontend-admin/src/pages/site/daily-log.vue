@@ -251,7 +251,10 @@ async function save() {
   saving.value = true
   try {
     if (modalMode.value === 'edit' && activeRecord.value)
-      await updateSiteDailyLog(activeRecord.value.id, form)
+      await updateSiteDailyLog(activeRecord.value.id, {
+        ...form,
+        expectedUpdatedAt: activeRecord.value.updatedAt,
+      })
     else await createSiteDailyLog(form)
     message.success('日报草稿已保存')
     modalOpen.value = false

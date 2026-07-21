@@ -113,6 +113,52 @@ class SiteDailyLogServiceTest {
     }
 
     @Test
+    void updateRequiresCurrentTimestampAndRejectsStaleDraft() {
+        SiteDailyLogMapper mapper = mock(SiteDailyLogMapper.class);
+        ProjectAccessChecker checker = mock(ProjectAccessChecker.class);
+        SiteDailyLogService service = service(mapper, mock(PmProjectMapper.class), checker);
+        UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
+        LocalDateTime current = LocalDateTime.of(2099, 1, 2, 8, 0);
+        SiteDailyLog existing = new SiteDailyLog();
+        existing.setId(33L); existing.setTenantId(11L); existing.setProjectId(21L);
+        existing.setReportDate(LocalDate.of(2099, 1, 2)); existing.setConstructionContent("旧内容");
+        existing.setStatus("DRAFT"); existing.setUpdatedAt(current);
+        when(mapper.selectByIdForUpdate(33L, 11L)).thenReturn(existing);
+
+        SiteDailyLog command = new SiteDailyLog();
+        command.setId(33L); command.setProjectId(21L); command.setReportDate(LocalDate.of(2099, 1, 2));
+        command.setConstructionContent("陈旧内容");
+        BusinessException missing = assertThrows(BusinessException.class, () -> service.update(command));
+        assertEquals("SITE_DAILY_LOG_PRECONDITION_REQUIRED", missing.getCode());
+
+        command.setExpectedUpdatedAt(current.minusSeconds(1));
+        BusinessException stale = assertThrows(BusinessException.class, () -> service.update(command));
+        assertEquals("SITE_DAILY_LOG_VERSION_CONFLICT", stale.getCode());
+        verify(mapper, never()).update(any(), any());
+    }
+
+    @Test
+    void duplicateSubmitStopsBeforeScheduleSideEffects() {
+        SiteDailyLogMapper mapper = mock(SiteDailyLogMapper.class);
+        ProjectAccessChecker checker = mock(ProjectAccessChecker.class);
+        ProjectScheduleService scheduleService = mock(ProjectScheduleService.class);
+        SiteDailyLogService service = new SiteDailyLogService(
+                mapper, mock(PmProjectMapper.class), checker, mock(MatReceiptMapper.class),
+                mock(MatReceiptItemMapper.class), mock(MdMaterialMapper.class), mock(MdPartnerMapper.class),
+                mock(MatRequisitionMapper.class), mock(MatRequisitionItemMapper.class), mock(SubTaskMapper.class),
+                mock(OperationAuditLogMapper.class), scheduleService);
+        UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
+        SiteDailyLog submitted = new SiteDailyLog();
+        submitted.setId(34L); submitted.setTenantId(11L); submitted.setProjectId(21L); submitted.setStatus("SUBMITTED");
+        when(mapper.selectByIdForUpdate(34L, 11L)).thenReturn(submitted);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.submit(34L));
+
+        assertEquals("SITE_DAILY_LOG_SUBMITTED_IMMUTABLE", error.getCode());
+        verifyNoInteractions(scheduleService);
+    }
+
+    @Test
     void detailIncludesOnlyApprovedDeliveriesForSameTenantProjectAndDate() {
         SiteDailyLogMapper mapper = mock(SiteDailyLogMapper.class);
         PmProjectMapper projectMapper = mock(PmProjectMapper.class);

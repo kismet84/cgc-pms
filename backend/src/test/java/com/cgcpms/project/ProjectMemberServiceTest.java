@@ -23,6 +23,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -230,6 +234,90 @@ class ProjectMemberServiceTest {
         assertEquals("MEMBER_NOT_FOUND", ex.getCode());
 
         System.out.println("✅ TC5 通过: 逻辑删除成功, 后续查询抛出MEMBER_NOT_FOUND");
+    }
+
+    @Test
+    @Order(11)
+    @Transactional
+    @DisplayName("TC11: 删除后重新加入 → 恢复原记录并更新成员信息")
+    void test11_rejoinMember() {
+        testProjectId = createTestProject();
+
+        PmProjectMember original = new PmProjectMember();
+        original.setUserId(1009L);
+        original.setRoleCode("FIN");
+        original.setPositionName("原岗位");
+        Long originalId = memberService.create(testProjectId, original);
+        String createdAt = memberService.getById(testProjectId, originalId).getCreatedAt();
+        memberService.delete(testProjectId, originalId);
+
+        PmProjectMember rejoined = new PmProjectMember();
+        rejoined.setUserId(1009L);
+        rejoined.setRoleCode("PM");
+        rejoined.setPositionName("重新加入岗位");
+        Long restoredId = memberService.create(testProjectId, rejoined);
+
+        assertEquals(originalId, restoredId, "应恢复原成员记录而非新建冲突记录");
+        PmProjectMemberVO restored = memberService.getById(testProjectId, restoredId);
+        assertEquals("PM", restored.getRoleCode());
+        assertEquals("重新加入岗位", restored.getPositionName());
+        assertEquals("ACTIVE", restored.getStatus());
+        assertEquals(createdAt, restored.getCreatedAt(), "恢复时应保留原始创建审计时间");
+        assertEquals(1, memberService.getPage(testProjectId, 1, 20, null, null).getTotal());
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("TC12: 并发重新加入 → 仅一个请求恢复成功且保持单行唯一")
+    void test12_concurrentRejoinMember() throws Exception {
+        testProjectId = createTestProject();
+        PmProjectMember original = new PmProjectMember();
+        original.setUserId(1010L);
+        original.setRoleCode("FIN");
+        Long originalId = memberService.create(testProjectId, original);
+        memberService.delete(testProjectId, originalId);
+
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> rejoinAfter(start, testProjectId, 1010L));
+            var second = executor.submit(() -> rejoinAfter(start, testProjectId, 1010L));
+            start.countDown();
+            List<String> outcomes = List.of(
+                    first.get(10, TimeUnit.SECONDS),
+                    second.get(10, TimeUnit.SECONDS));
+
+            assertEquals(1, outcomes.stream().filter(value -> value.equals("SUCCESS:" + originalId)).count());
+            assertEquals(1, outcomes.stream().filter("MEMBER_ALREADY_EXISTS"::equals).count());
+            assertEquals(1, memberService.getPage(testProjectId, 1, 20, null, null).getTotal());
+        } finally {
+            memberService.delete(testProjectId, originalId);
+            UserContext.set(Jwts.claims()
+                    .add("userId", USER_ADMIN)
+                    .add("username", "superadmin")
+                    .add("tenantId", TENANT_0)
+                    .add("roleCodes", List.of("SUPER_ADMIN"))
+                    .build());
+            projectService.delete(testProjectId);
+        }
+    }
+
+    private String rejoinAfter(CountDownLatch start, Long projectId, Long userId) throws InterruptedException {
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", TENANT_0)
+                .build());
+        try {
+            start.await();
+            PmProjectMember member = new PmProjectMember();
+            member.setUserId(userId);
+            member.setRoleCode("PM");
+            return "SUCCESS:" + memberService.create(projectId, member);
+        } catch (BusinessException ex) {
+            return ex.getCode();
+        } finally {
+            UserContext.clear();
+        }
     }
 
     // ═══════════════════════════════════════════════════════════

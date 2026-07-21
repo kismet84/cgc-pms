@@ -96,7 +96,7 @@ public class ProjectScheduleController {
 
     @PostMapping("/{id}/snapshots")
     @AuditedOperation(type="CALCULATE_DEVIATION", businessType="PROJECT_SCHEDULE", businessIdExpression="#id")
-    @PreAuthorize("hasAuthority('schedule:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('schedule:progress') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String,Object>> snapshot(@PathVariable Long id,
             @RequestParam @DateTimeFormat(pattern="yyyy-MM-dd") LocalDate date) {
         return ApiResponse.success(service.calculateSnapshot(id, date));

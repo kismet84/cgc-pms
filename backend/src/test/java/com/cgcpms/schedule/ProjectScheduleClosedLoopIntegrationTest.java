@@ -23,6 +23,9 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -107,11 +110,11 @@ class ProjectScheduleClosedLoopIntegrationTest {
     void rejectsInvalidWeightsWeeklyWithoutApprovedMonthAndProgressRollback() {
         long schedule = id(service.createSchedule(new ScheduleRequest(PROJECT, "BASE-INVALID", "错误权重基线",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
-        service.replaceTasks(schedule, new WbsTaskBatch(List.of(task("T1", new BigDecimal("90")))));
+        service.replaceTasks(schedule, new WbsTaskBatch(0, List.of(task("T1", new BigDecimal("90")))));
         BusinessException weightError = assertThrows(BusinessException.class, () -> service.submitSchedule(schedule));
         assertEquals("PROJECT_WBS_WEIGHT_INVALID", weightError.getCode());
 
-        service.replaceTasks(schedule, new WbsTaskBatch(List.of(task("T1", new BigDecimal("100")))));
+        service.replaceTasks(schedule, new WbsTaskBatch(1, List.of(task("T1", new BigDecimal("100")))));
         service.submitSchedule(schedule);
         approveAll("PROJECT_SCHEDULE", schedule);
         long taskId = jdbc.queryForObject("SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
@@ -142,13 +145,138 @@ class ProjectScheduleClosedLoopIntegrationTest {
         assertEquals("PROJECT_NOT_ACTIVE", suspended.getCode());
     }
 
+    @Test
+    void rejectsStaleScheduleAndPeriodReplacements() {
+        long schedule = id(service.createSchedule(new ScheduleRequest(PROJECT, "BASE-STALE", "并发保护基线",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
+        service.replaceTasks(schedule, new WbsTaskBatch(0, List.of(task("T1", new BigDecimal("100")))));
+
+        BusinessException scheduleConflict = assertThrows(BusinessException.class,
+                () -> service.replaceTasks(schedule, new WbsTaskBatch(0, List.of(task("T2", new BigDecimal("100"))))));
+        assertEquals("PROJECT_SCHEDULE_VERSION_CONFLICT", scheduleConflict.getCode());
+        assertEquals("T1", jdbc.queryForObject("SELECT task_code FROM project_wbs_task WHERE schedule_plan_id=?", String.class, schedule));
+
+        service.submitSchedule(schedule);
+        approveAll("PROJECT_SCHEDULE", schedule);
+        long taskId = jdbc.queryForObject("SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
+        Map<String, Object> period = service.createPeriodPlan(new PeriodPlanRequest(schedule, "MONTHLY", null,
+                "M-STALE", "并发保护月计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null));
+        long periodId = id(period);
+        service.replacePeriodItems(periodId, new PeriodItemBatch(0,
+                List.of(new PeriodItemRequest(taskId, new BigDecimal("50"), null))));
+
+        BusinessException periodConflict = assertThrows(BusinessException.class,
+                () -> service.replacePeriodItems(periodId, new PeriodItemBatch(0,
+                        List.of(new PeriodItemRequest(taskId, new BigDecimal("60"), null)))));
+        assertEquals("PROJECT_PERIOD_VERSION_CONFLICT", periodConflict.getCode());
+        assertEquals(new BigDecimal("50.0000"), jdbc.queryForObject(
+                "SELECT target_progress FROM project_period_plan_item WHERE period_plan_id=?", BigDecimal.class, periodId));
+    }
+
+    @Test
+    void concurrentPeriodSubmitCreatesOneWorkflowInstance() throws Exception {
+        long schedule = createAndActivateBaseline();
+        long taskId = jdbc.queryForObject("SELECT id FROM project_wbs_task WHERE schedule_plan_id=?", Long.class, schedule);
+        long periodId = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, "MONTHLY", null,
+                "M-CONCURRENT", "并发提交月计划", LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
+        service.replacePeriodItems(periodId, new PeriodItemBatch(0,
+                List.of(new PeriodItemRequest(taskId, new BigDecimal("50"), null))));
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            List<Future<String>> results = List.of(
+                    executor.submit(() -> submitPeriodAfterBarrier(periodId, ready, start)),
+                    executor.submit(() -> submitPeriodAfterBarrier(periodId, ready, start)));
+            ready.await();
+            start.countDown();
+            List<String> outcomes = results.stream().map(result -> {
+                try { return result.get(); }
+                catch (Exception e) { throw new RuntimeException(e); }
+            }).toList();
+            assertEquals(1, outcomes.stream().filter("SUCCESS"::equals).count());
+            assertEquals(1, outcomes.stream().filter("PROJECT_PERIOD_SUBMIT_STATE_INVALID"::equals).count());
+        }
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM wf_instance WHERE business_type='PROJECT_PERIOD_PLAN' AND business_id=? AND deleted_flag=0",
+                Integer.class, periodId));
+    }
+
+    @Test
+    void concurrentCorrectiveApprovalCreatesOneRevision() throws Exception {
+        long schedule = createAndActivateBaseline();
+        Map<String, Object> snapshot = service.calculateSnapshot(schedule, LocalDate.of(2099, 7, 20));
+        long correctiveId = id(service.createCorrectiveAction(schedule, new CorrectiveActionRequest(
+                id(snapshot), "COR-CONCURRENT", "并发审批测试", "仅生成一份修订计划", 1L,
+                LocalDate.of(2099, 7, 31), null)));
+        service.submitCorrectiveAction(correctiveId);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            List<Future<String>> results = List.of(
+                    executor.submit(() -> approveCorrectiveAfterBarrier(correctiveId, ready, start)),
+                    executor.submit(() -> approveCorrectiveAfterBarrier(correctiveId, ready, start)));
+            ready.await();
+            start.countDown();
+            assertEquals(List.of("SUCCESS", "SUCCESS"), results.stream().map(result -> {
+                try { return result.get(); }
+                catch (Exception e) { throw new RuntimeException(e); }
+            }).sorted().toList());
+        }
+
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM project_schedule_plan WHERE tenant_id=0 AND parent_plan_id=? AND corrective_action_id=? AND deleted_flag=0",
+                Integer.class, schedule, correctiveId));
+        assertNotNull(jdbc.queryForObject(
+                "SELECT generated_revision_plan_id FROM project_corrective_action WHERE id=?", Long.class, correctiveId));
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM alert_log WHERE source_type='PROJECT_PROGRESS_SNAPSHOT' AND source_id=? AND process_status='PROCESSED'",
+                Integer.class, snapshot.get("id")));
+    }
+
     private long createAndActivateBaseline() {
         long id = id(service.createSchedule(new ScheduleRequest(PROJECT, "BASE-2099-01", "项目基线计划",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), "首版基线")));
-        service.replaceTasks(id, new WbsTaskBatch(List.of(task("WBS-001", new BigDecimal("100")))));
+        service.replaceTasks(id, new WbsTaskBatch(0, List.of(task("WBS-001", new BigDecimal("100")))));
         service.submitSchedule(id);
         approveAll("PROJECT_SCHEDULE", id);
         return id;
+    }
+
+    private String submitPeriodAfterBarrier(long periodId, CountDownLatch ready, CountDownLatch start) {
+        UserContext.set(Jwts.claims().subject("admin").add("userId", 1L).add("username", "admin")
+                .add("tenantId", 0L).add("roleCodes", List.of("ADMIN")).build());
+        try {
+            ready.countDown();
+            start.await();
+            service.submitPeriodPlan(periodId);
+            return "SUCCESS";
+        } catch (BusinessException e) {
+            return e.getCode();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } finally {
+            UserContext.clear();
+        }
+    }
+
+    private String approveCorrectiveAfterBarrier(long correctiveId, CountDownLatch ready, CountDownLatch start) {
+        UserContext.set(Jwts.claims().subject("admin").add("userId", 1L).add("username", "admin")
+                .add("tenantId", 0L).add("roleCodes", List.of("ADMIN")).build());
+        try {
+            ready.countDown();
+            start.await();
+            service.onCorrectiveApproved(correctiveId);
+            return "SUCCESS";
+        } catch (BusinessException e) {
+            return e.getCode();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException(e);
+        } finally {
+            UserContext.clear();
+        }
     }
 
     private WbsTaskRequest task(String code, BigDecimal weight) {
@@ -160,7 +288,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
     private long createAndApprovePeriod(long schedule, Long parent, String type, String code,
                                         LocalDate start, LocalDate end, long task, BigDecimal target) {
         long id = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, type, parent, code, code, start, end, null)));
-        service.replacePeriodItems(id, new PeriodItemBatch(List.of(new PeriodItemRequest(task, target, target))));
+        service.replacePeriodItems(id, new PeriodItemBatch(0, List.of(new PeriodItemRequest(task, target, target))));
         service.submitPeriodPlan(id);
         approveAll("PROJECT_PERIOD_PLAN", id);
         return id;

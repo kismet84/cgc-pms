@@ -10,6 +10,227 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 2026-07-19 手工补货 5 条已全部完成：`ISSUE-048-011`、`ISSUE-053-001`、`ISSUE-053-002`、`ISSUE-053-003`、`ISSUE-053-004`；Clean-room V2 M1 完整退出门通过，M2 须经产品决策与 Ready 补货后再实施。
 
+2026-07-21 第53条主线M3已获授权；`ISSUE-053-010～012`已完成。当前无M3 Ready；013～016保持Planned，须逐项按当前证据补货。
+
+### ISSUE-053-010：M3项目契约与只读请求基线
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 项目履约 / 共享契约 / 只读请求金丝雀
+目标：
+
+- 冻结项目、项目总览和项目成员的稳定DTO及只读API路径。
+- 复用V2请求核心，建立安全编码、空筛选省略和可取消请求基线。
+非目标：
+- 不渲染或接入M3页面，不修改路由台账状态。
+- 不修改后端、数据库、Legacy、正式入口或业务数据；不新增依赖、缓存、Store或请求层。
+允许修改：
+- `packages/frontend-contracts/src/project.ts`
+- `frontend-admin-v2/src/services/projects.ts`
+- `frontend-admin-v2/tests/unit/m3-project-request-baseline.test.ts`
+- `docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-010-M3项目契约与只读请求基线验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/pages/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- DTO与`PmProjectVO`、`ProjectOverviewVO`、`PmProjectMemberVO`当前返回字段一致，金额保持字符串。
+- 项目分页、详情、总览和成员分页只访问既有端点；query安全编码，空筛选不发送，AbortSignal完整传递。
+- 不实现权限兜底、租户全量回退、业务mock、缓存或页面状态。
+- Ready lint、契约类型、目标单测、V2类型、Lint、Clean-room边界、构建和`git diff --check`通过。
+状态：Done
+来源锚点：`docs/product-intelligence/evolution-decision.md`的`PI-2026-07-18-02`；`docs/product-intelligence/project-map.md`的M2退出事实；`docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`
+存量问题键：[mainline:053-M3-010-PROJECT-CONTRACT-REQUEST]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-010`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m3-project-request-baseline.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-010-M3项目契约与只读请求基线验收报告.md`
+Migration：不需要
+依赖：M2全量退出门已通过；本Issue是M3唯一实施金丝雀，通过后方可补充首个页面迁移Ready。
+风险等级：高
+运行态要求：无；仅执行契约、请求构造和静态/单元验证，不连接生产。
+Reviewer要求：交叉核对后端Controller/VO、Legacy类型和V2契约；确认项目范围不扩大、金额不转浮点、signal不丢失、无Legacy UI依赖。
+最小回滚：回退项目契约、薄服务、目标测试及M3治理回写；M0～M2保持不变。
+
+完成结果：项目、总览、成员契约与只读请求基线通过；19个V2单测文件88项、契约/V2类型、Lint、Clean-room、构建和差异检查全绿。未接页面、未改路由台账。
+
+### ISSUE-053-011：M3项目对象工作区五路由迁移
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 项目履约 / 项目对象 / 权限与金额
+目标：
+
+- 迁移项目根重定向、列表、总览、成员和编辑五个路由，形成项目对象上下文和受控写侧闭环。
+- 保持项目范围、权限、字典、金额字符串、状态机、query和深链与后端事实一致。
+非目标：
+- 不迁移计划、日报、质量、技术或收尾页面，不修改后端、数据库、Legacy或正式入口。
+- 不新增依赖、全局Store、请求层、缓存或前端权威金额/状态推导。
+允许修改：
+- `packages/frontend-contracts/src/project.ts`
+- `frontend-admin-v2/src/services/projects.ts`
+- `frontend-admin-v2/src/pages/projects/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/**`
+- `frontend-admin-v2/e2e/m3-projects.spec.ts`
+- `backend/src/main/java/com/cgcpms/project/entity/PmProjectMember.java`（仅用户专项授权的服务端派生字段校验修复）
+- `backend/src/test/java/com/cgcpms/project/PmProjectMemberControllerValidationTest.java`
+- `backend/src/test/java/com/cgcpms/project/PmProjectMemberServiceTest.java`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md`
+- `docs/未来开发计划.md`
+禁止修改：
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 五路由均为真实V2页面或受控重定向，台账达到`73/14/0`；无Shell占位、Legacy UI依赖或本地业务mock。
+- 项目列表/详情/总览只返回当前身份可见项目；未知、跨项目和无权ID失败关闭，快速切换不回写陈旧项目。
+- 创建、编辑/归档、提交、状态转换、删除分别遵守`project:add/edit/submit/status`与`SUPER_ADMIN`；成员读/增/改/删权限严格分离，按钮隐藏不替代后端403。
+- 合同金额、目标成本和总览金额保持十进制字符串；写侧成功、409或业务拒绝后回读权威事实，不乐观改金额/状态。
+- ADMIN、普通查询、成员只读、无权、未登录身份；1440/1024/390、axe、控制台、query/hash、刷新、深链和失败恢复通过。
+- Ready lint、项目后端专项、V2单测/类型/Lint/Clean-room/台账/构建/包体、live E2E与`git diff --check`通过。
+状态：Done
+来源锚点：`docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`的ISSUE-053-011；`docs/product-intelligence/evolution-decision.md`的`PI-2026-07-18-02`；`ISSUE-053-010`金丝雀通过事实
+存量问题键：[mainline:053-M3-011-PROJECT-WORKSPACE]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-011`
+- `cd backend; .\mvnw.cmd "-Dtest=PmProjectControllerTest,PmProjectArchiveTest,ProjectOverviewServiceTest,ProjectMemberServiceTest" test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm check:bundle-size`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md`
+Migration：不需要
+依赖：`ISSUE-053-010`已通过；实施前必须核实本地demo存在项目查询、成员只读、项目写侧和无权身份，缺失时保持Ready并判`需要确认`。
+风险等级：高
+运行态要求：本地V2、Legacy、后端和`cgc_pms_demo_v2`健康；只在dev/demo受控项目执行最小写侧，不连接生产。
+Reviewer要求：独立核对五路由计数、Controller权限、跨项目拒绝、成员分权、金额字符串、状态回读、三视口、axe、控制台和零悬空。
+最小回滚：五路由恢复M2后的占位/Legacy状态，回退项目页面、写侧服务、契约增量、测试和台账；保留`ISSUE-053-010`只读基线，无数据库回滚。
+
+完成结果：五路由达到`V2_ACCEPTED`，台账`73/14/0`；项目与成员受控写侧、真实ADMIN/query-only/member-readonly/无权/匿名、三视口、axe、旧响应隔离、故障恢复和金额字符串通过。服务端派生成员字段的错误前置校验已最小修复，Service继续强制覆盖租户/项目。收口时登记的成员删除后重新加入P1已于2026-07-21通过恢复逻辑删除原记录闭环。
+
+### ISSUE-053-012：M3项目计划与现场日报双路由迁移
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 项目履约 / 计划日报 / 并发与附件
+目标：
+
+- 迁移`/project-schedule`与`/site/daily-log`，闭合基线计划、WBS、月周计划、日报实绩、偏差快照、纠偏、日报正文与附件。
+- 保持权限、项目范围、状态机、并发令牌、写后权威回读及部分权限零请求与后端事实一致。
+非目标：
+- 不迁移质量安全、技术管理或竣工收尾；不切换正式入口，不发布生产。
+- 不新增数据库迁移、依赖、全局Store、前端业务推导或Legacy UI复用。
+允许修改：
+- `backend/src/main/java/com/cgcpms/schedule/**`
+- `backend/src/main/java/com/cgcpms/site/**`
+- `backend/src/test/java/com/cgcpms/schedule/**`
+- `backend/src/test/java/com/cgcpms/sitedaily/**`
+- `frontend-admin/src/api/modules/projectSchedule.ts`
+- `frontend-admin/src/api/modules/site-daily-log.ts`
+- `frontend-admin/src/api/modules/__tests__/projectSchedule.test.ts`
+- `frontend-admin/src/pages/project-schedule/index.vue`
+- `frontend-admin/src/pages/site/daily-log.vue`
+- `frontend-admin/src/types/site-daily-log.ts`
+- `packages/frontend-contracts/src/delivery.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/request.ts`
+- `frontend-admin-v2/src/services/delivery.ts`
+- `frontend-admin-v2/src/pages/delivery/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/**`
+- `frontend-admin-v2/e2e/m3-delivery.spec.ts`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 两路由均为真实V2页面，台账达到`71/16/0`；无Shell占位、Legacy UI依赖或本地业务mock。
+- 计划读、维护、提交、进度、纠偏及日报读写权限严格分离；无权限按钮隐藏且零请求，后端403仍为最终边界。
+- WBS仅支持单前置FS；DRAFT/REJECTED可编辑，提交后只读；月周计划、快照、纠偏及日报单向状态机与后端一致。
+- WBS/期间项携带expectedVersion，日报编辑携带expectedUpdatedAt；陈旧写、重复提交、跨项目及部分成功均fail-close并回读权威事实。
+- `SITE_DAILY_LOG`附件仅DRAFT上传/删除，SUBMITTED不可变；FormData不设置JSON Content-Type，上传中断可恢复。
+- 质量安全权限缺失时零请求且不阻断日报详情；进度权限缺失时零请求且正文只读事实仍可用。
+- ADMIN、计划query-only、计划维护、日报读写、无权、未登录身份；1440/1024/390、键盘、axe、控制台、刷新、深链和失败恢复通过。
+- Ready lint、后端专项、Legacy兼容、契约/V2单测/类型/Lint/Clean-room/台账/构建/包体、live E2E与`git diff --check`通过。
+状态：Done
+来源锚点：`docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`的ISSUE-053-012；`docs/product-intelligence/evolution-decision.md`的`PI-2026-07-18-02`；`ISSUE-053-011`通过事实
+存量问题键：[mainline:053-M3-012-SCHEDULE-DAILY]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-012`
+- `cd backend; .\mvnw.cmd "-Dtest=ProjectScheduleClosedLoopIntegrationTest,ProjectScheduleControllerPermissionTest,SiteDailyLogServiceTest,SiteDailyLogControllerTest,BusinessObjectAuthorizerTest" test`
+- `cd frontend-admin; pnpm exec vitest run src/api/modules/__tests__/projectSchedule.test.ts`
+- `cd frontend-admin; pnpm type-check`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm check:bundle-size`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md`
+Migration：不需要
+依赖：`ISSUE-053-011`已通过；补货前置阻塞已通过复用现有version、updated_at、行锁及唯一键完成修复与目标回归；live写侧仅使用本地`cgc_pms_demo_v2`受控身份与可识别数据。
+风险等级：高
+运行态要求：本地V2、Legacy、后端、MySQL、Redis和MinIO健康；身份及验收数据只在dev/demo创建并可精确回滚，不连接生产。
+Reviewer要求：独立安全复核已确认权限、并发和令牌修复路线；完成后独立测试复核两路由、陈旧写、重复提交、附件不可变、权限零请求、三视口、axe和台账。
+最小回滚：两路由恢复`LEGACY_ONLY`，回退V2页面/服务/契约、FormData增量及兼容性后端/Legacy改动；删除精确标记的本地验收身份与数据；无数据库结构回滚。
+
+完成结果：两路由达到`V2_ACCEPTED`，台账`71/16/0`；后端组合34项、V2单测98项、Legacy兼容、静态/构建门禁和本地live验收通过。独立复核发现的纠偏审批并发重复修订风险已通过行锁、条件更新和双线程测试闭环；trace契约保留后端真实数组。受控身份与数据已精确回滚。
+
 ### ISSUE-048-011：修正会计凭证页面陈旧生成规则说明
 
 优先级：P1

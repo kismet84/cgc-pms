@@ -5,6 +5,10 @@ export interface NavigationAccess {
 export interface WorkspaceTab extends NavigationAccess {
   path: string
   label: string
+  workspaceContext?: {
+    project: boolean
+    period: boolean
+  }
 }
 
 export interface NavigationWorkspace {
@@ -32,7 +36,14 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'cockpit',
         label: '经营驾驶舱',
         defaultPath: '/dashboard',
-        tabs: [{ path: '/dashboard', label: '驾驶舱', permission: 'dashboard:view' }],
+        tabs: [
+          {
+            path: '/dashboard',
+            label: '驾驶舱',
+            permission: 'dashboard:view',
+            workspaceContext: { project: true, period: true },
+          },
+        ],
       },
       {
         id: 'my-work',
@@ -40,10 +51,26 @@ export const navigationDomains: NavigationDomain[] = [
         defaultPath: '/approval/todo',
         matchPrefixes: ['/approval'],
         tabs: [
-          { path: '/approval/todo', label: '待我处理' },
-          { path: '/approval/done', label: '我已处理' },
-          { path: '/approval/cc', label: '抄送我的' },
-          { path: '/approval/mine', label: '我发起' },
+          {
+            path: '/approval/todo',
+            label: '待我处理',
+            workspaceContext: { project: false, period: true },
+          },
+          {
+            path: '/approval/done',
+            label: '我已处理',
+            workspaceContext: { project: false, period: true },
+          },
+          {
+            path: '/approval/cc',
+            label: '抄送我的',
+            workspaceContext: { project: false, period: true },
+          },
+          {
+            path: '/approval/mine',
+            label: '我发起',
+            workspaceContext: { project: false, period: true },
+          },
         ],
       },
       {
@@ -64,15 +91,32 @@ export const navigationDomains: NavigationDomain[] = [
         label: '项目管理',
         defaultPath: '/project/list',
         matchPrefixes: ['/project'],
-        tabs: [{ path: '/project/list', label: '项目列表', permission: 'project:query' }],
+        tabs: [
+          {
+            path: '/project/list',
+            label: '项目列表',
+            permission: 'project:query',
+            workspaceContext: { project: true, period: false },
+          },
+        ],
       },
       {
         id: 'execution',
         label: '计划与现场',
         defaultPath: '/project-schedule',
         tabs: [
-          { path: '/project-schedule', label: '项目计划', permission: 'schedule:query' },
-          { path: '/site/daily-log', label: '现场日报', permission: 'site:daily:query' },
+          {
+            path: '/project-schedule',
+            label: '项目计划',
+            permission: 'schedule:query',
+            workspaceContext: { project: true, period: false },
+          },
+          {
+            path: '/site/daily-log',
+            label: '现场日报',
+            permission: 'site:daily:query',
+            workspaceContext: { project: true, period: true },
+          },
         ],
       },
       {

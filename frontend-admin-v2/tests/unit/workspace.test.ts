@@ -41,6 +41,18 @@ describe('V2 workspace context store', () => {
     expect(workspace.objectContext).toEqual({ kind: 'project', id: 'P-1' })
   })
 
+  it('keeps global context when a navigation target omits context query keys', () => {
+    const workspace = useWorkspaceStore()
+    workspace.setProjects([{ value: 'P-1', label: '项目一' }])
+    workspace.setReportPeriods([{ value: '2026-07', label: '2026年7月' }])
+    workspace.syncRoute('/project/list', { projectId: 'P-1', period: '2026-07' }, {})
+
+    workspace.syncRoute('/dashboard', { role: 'pm' }, {})
+
+    expect(workspace.selectedProjectId).toBe('P-1')
+    expect(workspace.selectedReportPeriod).toBe('2026-07')
+  })
+
   it('clears every context when the session is cleared', async () => {
     const workspace = useWorkspaceStore()
     const session = useSessionStore()
