@@ -36,6 +36,12 @@ test.describe('M3 live delivery workspace', () => {
     await expect(page.getByRole('main')).toContainText('现场日报')
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
     await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('.daily-log-page__filters')).toHaveCount(0)
+    await expect(
+      page.locator('.daily-log-page__toolbar').getByRole('button', {
+        name: '日报状态：全部状态',
+      }),
+    ).toBeVisible()
   })
 
   test('daily-log report period reaches the server as calendar-month bounds', async ({ page }) => {
@@ -62,6 +68,50 @@ test.describe('M3 live delivery workspace', () => {
     })
     await option.click()
     expect((await filtered).ok()).toBe(true)
+
+    const statusControl = page.getByRole('button', { name: '日报状态：全部状态' })
+    await statusControl.click()
+    const statusFiltered = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return (
+        url.pathname === '/api/site-daily-logs' &&
+        url.searchParams.get('projectId') === projectId &&
+        url.searchParams.get('startDate') === `${period}-01` &&
+        url.searchParams.get('endDate') === `${period}-${String(lastDay).padStart(2, '0')}` &&
+        url.searchParams.get('status') === 'DRAFT'
+      )
+    })
+    await page.getByRole('option', { name: '草稿', exact: true }).click()
+    expect((await statusFiltered).ok()).toBe(true)
+    await expect(page).toHaveURL(/projectId=.*period=\d{4}-\d{2}.*status=DRAFT/)
+    expect(new URL(page.url()).searchParams.has('startDate')).toBe(false)
+    expect(new URL(page.url()).searchParams.has('endDate')).toBe(false)
+
+    const clearStatus = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return url.pathname === '/api/site-daily-logs' && !url.searchParams.has('status')
+    })
+    await page.getByRole('button', { name: '日报状态：草稿' }).click()
+    await page.getByRole('option', { name: '全部状态', exact: true }).click()
+    expect((await clearStatus).ok()).toBe(true)
+    expect(new URL(page.url()).searchParams.has('status')).toBe(false)
+  })
+
+  test('daily-log removes legacy hidden date filters in favor of shell period', async ({
+    page,
+  }) => {
+    await login(page, 'admin')
+    const unfiltered = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return (
+        url.pathname === '/api/site-daily-logs' &&
+        !url.searchParams.has('startDate') &&
+        !url.searchParams.has('endDate')
+      )
+    })
+    await page.goto('/v2/site/daily-log?startDate=2025-05-01&endDate=2025-05-31')
+    expect((await unfiltered).ok()).toBe(true)
+    await expect(page).toHaveURL('/v2/site/daily-log')
   })
 
   test('delivery routes keep layout stable in three viewports with no serious accessibility issue', async ({
@@ -78,7 +128,7 @@ test.describe('M3 live delivery workspace', () => {
       await page.setViewportSize(viewport)
       await page.goto(`/v2/project-schedule?projectId=${projectId}`)
       await expect(
-        page.getByRole('heading', { level: 2, name: '项目计划与施工履约' }),
+        page.getByRole('heading', { level: 1, name: '项目计划与施工履约' }),
       ).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -91,7 +141,7 @@ test.describe('M3 live delivery workspace', () => {
       ).toEqual([])
 
       await page.goto(`/v2/site/daily-log?projectId=${projectId}`)
-      await expect(page.getByRole('heading', { level: 2, name: '现场日报' })).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: '现场日报' })).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)
@@ -115,14 +165,14 @@ test.describe('M3 live delivery workspace', () => {
 
     await login(page, splitRoleUser)
     await page.goto(`/v2/project-schedule?projectId=${controlledProjectId}`)
-    await expect(page.getByRole('heading', { level: 2, name: '项目计划与施工履约' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: '项目计划与施工履约' })).toBeVisible()
     await expect(page.getByRole('button', { name: '新建基线计划' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '维护 WBS' })).toHaveCount(0)
     expect(mutatingRequests).toEqual([])
 
     await login(page, 'demo.production')
     await page.goto(`/v2/site/daily-log?projectId=${controlledProjectId}`)
-    await expect(page.getByRole('heading', { level: 2, name: '现场日报' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: '现场日报' })).toBeVisible()
     await expect(page.getByRole('button', { name: '新建日报' })).toBeVisible()
   })
 })

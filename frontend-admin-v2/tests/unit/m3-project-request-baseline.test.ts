@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   loadProject,
   loadProjectMembers,
@@ -24,6 +26,28 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('M3 project request baseline', () => {
+  it('applies both project selects through the route before loading', () => {
+    const source = readFileSync(resolve('src/pages/projects/ProjectPage.vue'), 'utf-8')
+    expect(source).toContain(`@update:model-value="applySelectFilter('projectType', $event)"`)
+    expect(source).toContain(`@update:model-value="applySelectFilter('status', $event)"`)
+    expect(source).toMatch(
+      /async function setQuery[\s\S]*router\.resolve[\s\S]*await router\.replace/,
+    )
+    expect(source).toMatch(
+      /async function search[\s\S]*if \(!\(await setQuery\(\)\)\) await load\(\)/,
+    )
+  })
+
+  it('snapshots the selected schedule directly and keeps daily actions behind confirmation', () => {
+    const schedule = readFileSync(resolve('src/pages/delivery/SchedulePage.vue'), 'utf-8')
+    const dailyLog = readFileSync(resolve('src/pages/delivery/DailyLogPage.vue'), 'utf-8')
+
+    expect(schedule).toContain('@click="requestScheduleSubmit(item)"')
+    expect(schedule).not.toContain('openDetail(item.id).then(() => requestScheduleSubmit())')
+    expect(dailyLog).toContain(':on-click="requestDailySubmit"')
+    expect(dailyLog).toContain('@click="requestFileRemoval(file.id, file.originalName)"')
+  })
+
   it('encodes non-empty project filters and passes the abort signal', async () => {
     const controller = new AbortController()
     await loadProjectPage(

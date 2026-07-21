@@ -49,7 +49,7 @@ test.describe('M2 live approval workbench', () => {
     await expect(page).toHaveURL(
       new RegExp(`/v2/approval/instances/${controlledInstanceId}\\?returnTab=todo$`),
     )
-    await expect(page.locator('.workflow-detail-dialog')).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveClass(/v2-dialog-standard/)
   })
 
   test('all nine M2 ledger routes resolve to accepted V2 pages or redirects', async ({ page }) => {
@@ -88,7 +88,7 @@ test.describe('M2 live approval workbench', () => {
       )
       await page.goto('/v2/approval/todo')
       expect((await response).ok()).toBe(true)
-      await expect(page.getByRole('heading', { name: '审批工作台', exact: true })).toHaveCount(0)
+      await expect(page.getByRole('heading', { level: 1, name: '审批工作台' })).toBeAttached()
       await expect(page.getByRole('navigation', { name: '审批列表' })).toHaveCount(0)
       await expect(page.getByRole('heading', { name: '筛选条件', exact: true })).toHaveCount(0)
       const layout = await page.locator('.workflow-page').evaluate((element) => {

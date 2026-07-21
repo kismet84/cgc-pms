@@ -10,7 +10,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import DashboardPage from '@/pages/dashboard/DashboardPage.vue'
-import { loadAlerts, updateAlertStatus } from '@/services/alerts'
+import { evaluateAlerts, loadAlerts, updateAlertStatus } from '@/services/alerts'
 import { loadCostBreakdown, loadDashboard } from '@/services/dashboard'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -227,6 +227,7 @@ beforeEach(() => {
     pageSize: 50,
   })
   vi.mocked(updateAlertStatus).mockReset()
+  vi.mocked(evaluateAlerts).mockReset()
 })
 
 describe('M2 dashboard page', () => {
@@ -316,6 +317,35 @@ describe('M2 dashboard page', () => {
     expect(riskList.text()).toContain('一般关注事项')
   })
 
+  it('shows the alert evaluation result in a bubble anchored above its button', async () => {
+    vi.useFakeTimers()
+    vi.mocked(loadDashboard).mockResolvedValue(pmData)
+    vi.mocked(evaluateAlerts).mockResolvedValue({ alertsGenerated: 0, tenantId: '1' })
+    const { wrapper } = await mountDashboard([
+      'dashboard:project-manager:view',
+      'alert:view',
+      'alert:evaluate',
+    ])
+
+    try {
+      await wrapper.get('.risk-evaluate-action button').trigger('click')
+      await flushPromises()
+
+      expect(evaluateAlerts).toHaveBeenCalledTimes(1)
+      const feedback = wrapper.get('.risk-evaluate-feedback[role="status"]')
+      expect(feedback.text()).toContain('评估完成，生成 0 项预警')
+      expect(feedback.element.parentElement).toBe(wrapper.get('.risk-evaluate-action').element)
+      expect(wrapper.find('#risk-list > .v2-alert--info').exists()).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(2999)
+      expect(wrapper.find('.risk-evaluate-feedback').exists()).toBe(true)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(wrapper.find('.risk-evaluate-feedback').exists()).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('opens and disposes an authoritative alert from the dashboard list', async () => {
     const alert: AlertRecord = {
       id: '101',
@@ -353,9 +383,13 @@ describe('M2 dashboard page', () => {
       expect.any(AbortSignal),
     )
     await wrapper.get('.risk-table tr.is-actionable').trigger('click')
-    expect(wrapper.get('.dashboard-alert-dialog').classes()).toContain('workflow-detail-dialog')
+    expect(wrapper.get('.v2-detail-dialog').classes()).toContain('v2-dialog-standard')
+    expect(wrapper.get('.v2-dialog__title').text()).toBe('预警详情')
+    expect(wrapper.get('.v2-detail-dialog__message').text()).toBe(alert.message)
+    expect(wrapper.get('.v2-detail-dialog__quick-actions').findAll('button')).toHaveLength(2)
+    expect(wrapper.get('.v2-detail-dialog__form-row').findAll('.v2-field')).toHaveLength(2)
     expect(wrapper.text()).toContain('查看权威预警记录并执行当前账号允许的操作。')
-    await wrapper.get('.dashboard-alert-actions input').setValue('已完成复核')
+    await wrapper.get('.v2-detail-dialog__actions input').setValue('已完成复核')
     await wrapper
       .findAll('button')
       .find((button) => button.text() === '确认处置')!

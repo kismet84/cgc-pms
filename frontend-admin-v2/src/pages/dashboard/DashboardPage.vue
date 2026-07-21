@@ -18,6 +18,7 @@ import {
   V2Button,
   V2Card,
   V2Dialog,
+  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -68,6 +69,8 @@ const alertLoading = ref(false)
 const alertError = ref('')
 const alertActionLoading = ref(false)
 const alertActionMessage = ref('')
+const alertEvaluationMessage = ref('')
+let alertEvaluationTimer: ReturnType<typeof setTimeout> | undefined
 const selectedAlert = ref<AlertRecord | null>(null)
 const targetAlertStatus = ref<AlertProcessStatus>('PROCESSED')
 const alertRemark = ref('')
@@ -140,9 +143,9 @@ const trendDefinition = computed(() => {
       ariaLabel: '目标成本、动态成本和成本偏差月度趋势图',
       caption: '经营趋势精确数据',
       series: [
-        { key: 'targetCost', label: '目标成本', color: '#2563eb' },
-        { key: 'dynamicCost', label: '动态成本', color: '#0891b2' },
-        { key: 'costDeviation', label: '成本偏差', color: '#f97316' },
+        { key: 'targetCost', label: '目标成本', color: '--v2-chart-1' },
+        { key: 'dynamicCost', label: '动态成本', color: '--v2-chart-2' },
+        { key: 'costDeviation', label: '成本偏差', color: '--v2-chart-3' },
       ],
       points: costData.value.trendPoints.map((point) => ({
         month: point.month,
@@ -160,9 +163,9 @@ const trendDefinition = computed(() => {
       ariaLabel: '本月支付、累计支付和处理中付款月度趋势图',
       caption: '资金支付趋势精确数据',
       series: [
-        { key: 'cashOutflowAmount', label: '本月支付', color: '#2563eb' },
-        { key: 'cumulativePaidAmount', label: '累计支付', color: '#0891b2' },
-        { key: 'pendingPaymentAmount', label: '处理中付款', color: '#f97316' },
+        { key: 'cashOutflowAmount', label: '本月支付', color: '--v2-chart-1' },
+        { key: 'cumulativePaidAmount', label: '累计支付', color: '--v2-chart-2' },
+        { key: 'pendingPaymentAmount', label: '处理中付款', color: '--v2-chart-3' },
       ],
       points: (financeData.value.trendPoints ?? []).map((point) => ({
         month: point.month,
@@ -282,6 +285,7 @@ watch(
 onBeforeUnmount(() => {
   controller?.abort()
   alertController?.abort()
+  if (alertEvaluationTimer) clearTimeout(alertEvaluationTimer)
 })
 
 async function showHighestRisks(): Promise<void> {
@@ -402,9 +406,15 @@ function disposeSelectedAlert(): void {
 function evaluateCurrentAlerts(): void {
   alertActionLoading.value = true
   alertError.value = ''
+  if (alertEvaluationTimer) clearTimeout(alertEvaluationTimer)
+  alertEvaluationMessage.value = ''
   void evaluateAlerts()
     .then(async (result) => {
-      alertActionMessage.value = `评估完成，生成 ${result.alertsGenerated} 项预警`
+      alertEvaluationMessage.value = `评估完成，生成 ${result.alertsGenerated} 项预警`
+      alertEvaluationTimer = setTimeout(() => {
+        alertEvaluationMessage.value = ''
+        alertEvaluationTimer = undefined
+      }, 3000)
       await refreshAlerts()
     })
     .catch((caught: unknown) => {
@@ -521,24 +531,28 @@ function isAbort(errorValue: unknown): boolean {
       kind="error"
       title="暂无驾驶舱权限"
       description="当前账号没有任何角色驾驶舱查看权限。"
+      :heading-level="2"
     />
     <V2PageState
       v-else-if="projectUnsupported"
       kind="empty"
       title="当前项目暂不支持此视图"
       description="项目经理驾驶舱仅支持进行中项目，请在顶部切换项目。"
+      :heading-level="2"
     />
     <V2PageState
       v-else-if="loading"
       kind="loading"
       title="正在加载经营数据"
       description="仅请求当前选中的角色视图。"
+      :heading-level="2"
     />
     <V2PageState
       v-else-if="error"
       kind="error"
       title="经营数据加载失败"
       description="已保留当前项目与报告期，可重试本角色视图。"
+      :heading-level="2"
     >
       <template #actions>
         <V2Button @click="refreshToken += 1">重新加载</V2Button>
@@ -562,7 +576,7 @@ function isAbort(errorValue: unknown): boolean {
             <div class="health-score__chart">
               <DashboardGauge
                 :value="health.score"
-                :color="health.tone === 'danger' ? '#d71920' : '#2563eb'"
+                :color-token="health.tone === 'danger' ? '--v2-color-danger' : '--v2-color-primary'"
               />
               <div class="health-score__value">
                 <strong>{{ health.score }}</strong>
@@ -697,22 +711,28 @@ function isAbort(errorValue: unknown): boolean {
                   </button>
                 </div>
               </details>
-              <V2Button
-                v-if="canEvaluateAlerts"
-                size="small"
-                variant="ghost"
-                :loading="alertActionLoading"
-                @click="evaluateCurrentAlerts"
-              >
-                评估预警
-              </V2Button>
+              <div v-if="canEvaluateAlerts" class="risk-evaluate-action">
+                <V2Alert
+                  v-if="alertEvaluationMessage"
+                  class="risk-evaluate-feedback"
+                  tone="info"
+                  title="操作结果"
+                >
+                  {{ alertEvaluationMessage }}
+                </V2Alert>
+                <V2Button
+                  size="small"
+                  variant="ghost"
+                  :loading="alertActionLoading"
+                  @click="evaluateCurrentAlerts"
+                >
+                  评估预警
+                </V2Button>
+              </div>
             </div>
           </header>
           <V2Alert v-if="alertError && !selectedAlert" tone="danger" title="预警请求未完成">
             {{ alertError }}
-          </V2Alert>
-          <V2Alert v-if="alertActionMessage && !selectedAlert" tone="info" title="操作结果">
-            {{ alertActionMessage }}
           </V2Alert>
           <div class="risk-table-wrap" tabindex="0">
             <table class="risk-table">
@@ -927,10 +947,10 @@ function isAbort(errorValue: unknown): boolean {
 
     <V2Dialog
       :open="Boolean(selectedAlert)"
-      :title="selectedAlert?.message ?? '预警处置'"
+      title="预警详情"
       description="查看权威预警记录并执行当前账号允许的操作。"
-      close-label="关闭预警处置"
-      panel-class="workflow-detail-dialog dashboard-alert-dialog"
+      close-label="关闭预警详情"
+      panel-class="v2-dialog-standard v2-detail-dialog"
       :close-on-backdrop="!alertActionLoading"
       @close="selectedAlert = null"
     >
@@ -939,11 +959,12 @@ function isAbort(errorValue: unknown): boolean {
         <V2Alert v-if="alertActionMessage" tone="info" title="操作结果">
           {{ alertActionMessage }}
         </V2Alert>
-        <div class="dashboard-alert-detail">
+        <div class="v2-detail-dialog__section">
           <V2Badge :tone="severityTone(selectedAlert.severity)">{{
             DASHBOARD_RISK_LABELS[alertRiskLevel(selectedAlert.severity)]
           }}</V2Badge>
-          <dl>
+          <p class="v2-detail-dialog__message">{{ selectedAlert.message }}</p>
+          <dl class="v2-detail-dialog__facts">
             <div>
               <dt>规则</dt>
               <dd>{{ alertRuleLabel(selectedAlert.ruleType) }}</dd>
@@ -962,38 +983,38 @@ function isAbort(errorValue: unknown): boolean {
             </div>
           </dl>
         </div>
-        <div v-if="canEditAlerts" class="dashboard-alert-actions">
-          <V2Button
-            v-if="selectedAlert.isRead !== 1"
-            size="small"
-            variant="secondary"
-            :loading="alertActionLoading"
-            @click="markSelectedAlertRead"
-          >
-            标记已读
-          </V2Button>
-          <V2Button
-            v-if="
-              (selectedAlert.processStatus || 'OPEN') === 'OPEN' && !selectedAlert.acknowledgedBy
-            "
-            size="small"
-            variant="secondary"
-            :loading="alertActionLoading"
-            @click="acknowledgeSelectedAlert"
-          >
-            接单
-          </V2Button>
-          <V2Select
-            v-model="targetAlertStatus"
-            label="目标状态"
-            :options="targetAlertStatusOptions"
-          />
-          <V2Input v-model="alertRemark" label="处理说明" placeholder="必填，最多500字" />
-          <V2Button size="small" :loading="alertActionLoading" @click="disposeSelectedAlert">
-            确认处置
-          </V2Button>
+        <div v-if="canEditAlerts" class="v2-detail-dialog__actions">
+          <div class="v2-detail-dialog__quick-actions">
+            <V2GlassButton
+              v-if="selectedAlert.isRead !== 1"
+              text="标记已读"
+              :loading="alertActionLoading"
+              @click="markSelectedAlertRead"
+            />
+            <V2GlassButton
+              v-if="
+                (selectedAlert.processStatus || 'OPEN') === 'OPEN' && !selectedAlert.acknowledgedBy
+              "
+              text="接单"
+              :loading="alertActionLoading"
+              @click="acknowledgeSelectedAlert"
+            />
+          </div>
+          <div class="v2-detail-dialog__form-row">
+            <V2Select
+              v-model="targetAlertStatus"
+              label="目标状态"
+              :options="targetAlertStatusOptions"
+            />
+            <V2Input v-model="alertRemark" label="处理说明" placeholder="必填，最多500字" />
+            <V2GlassButton
+              text="确认处置"
+              :loading="alertActionLoading"
+              @click="disposeSelectedAlert"
+            />
+          </div>
         </div>
-        <p v-else class="dashboard-alert-readonly">当前账号仅可查看预警。</p>
+        <p v-else class="v2-detail-dialog__readonly">当前账号仅可查看预警。</p>
       </template>
     </V2Dialog>
   </section>
@@ -1005,41 +1026,11 @@ function isAbort(errorValue: unknown): boolean {
   gap: var(--v2-space-4);
   min-width: 0;
 }
-.dashboard-page__hero,
 .dashboard-page__panel header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--v2-space-4);
-}
-.dashboard-page__hero {
-  padding: var(--v2-space-5) var(--v2-space-6);
-  background: linear-gradient(130deg, #10284d, #1d4f91 70%, #2563eb);
-  border-radius: var(--v2-radius-lg);
-  color: #fff;
-  box-shadow: var(--v2-shadow-panel);
-}
-.dashboard-page__hero h1 {
-  margin: 0;
-  font-size: clamp(var(--v2-font-size-21), 3vw, var(--v2-font-size-28));
-}
-.dashboard-page__hero p {
-  margin: var(--v2-space-2) 0 0;
-  color: rgb(255 255 255 / 76%);
-  font-size: var(--v2-font-size-12);
-}
-.dashboard-page__eyebrow {
-  margin: 0 0 var(--v2-space-1);
-  color: var(--v2-color-primary);
-  font-size: var(--v2-font-size-11);
-  font-weight: var(--v2-font-weight-bold);
-  letter-spacing: 0.1em;
-}
-.dashboard-page__hero .dashboard-page__eyebrow {
-  color: #a8d1ff;
-}
-.dashboard-page__hero :deep(.v2-button--secondary) {
-  color: var(--v2-color-primary-active);
 }
 .dashboard-page__roles {
   display: flex;
@@ -1060,53 +1051,10 @@ function isAbort(errorValue: unknown): boolean {
   cursor: pointer;
 }
 .dashboard-page__roles button.is-active {
-  color: #fff;
+  color: var(--v2-color-surface);
   background: var(--v2-color-primary);
   border-color: var(--v2-color-primary);
-  box-shadow: 0 6px 18px rgb(37 99 235 / 18%);
-}
-.dashboard-page__summary {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: var(--v2-space-3);
-}
-.dashboard-page__summary :deep(.v2-card) {
-  min-width: 0;
-  padding: var(--v2-space-4);
-}
-.dashboard-page__health {
-  background: var(--v2-color-primary-soft);
-}
-.dashboard-page__health p,
-.dashboard-page__metric p {
-  margin: 0;
-  color: var(--v2-color-text-muted);
-  font-size: var(--v2-font-size-12);
-}
-.dashboard-page__health p {
-  color: var(--v2-color-text-secondary);
-}
-.dashboard-page__health strong,
-.dashboard-page__metric strong {
-  display: block;
-  margin: var(--v2-space-2) 0;
-  color: var(--v2-color-text-strong);
-  font-size: clamp(var(--v2-font-size-17), 2vw, var(--v2-font-size-21));
-  overflow-wrap: anywhere;
-}
-.dashboard-page__metric--positive strong {
-  color: var(--v2-color-success-text);
-}
-.dashboard-page__metric--warning strong {
-  color: var(--v2-color-warning-text);
-}
-.dashboard-page__metric--danger strong {
-  color: var(--v2-color-danger-text);
-}
-.dashboard-page__grid {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
-  gap: var(--v2-space-3);
+  box-shadow: var(--v2-shadow-primary);
 }
 .dashboard-page__panel {
   min-width: 0;
@@ -1119,68 +1067,9 @@ function isAbort(errorValue: unknown): boolean {
   margin: 0;
   font-size: var(--v2-font-size-17);
 }
-.dashboard-page__list {
-  display: grid;
-  gap: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.dashboard-page__list li {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--v2-space-3);
-  padding: var(--v2-space-3) 0;
-  border-block-start: 1px solid var(--v2-color-border-subtle);
-}
-.dashboard-page__list li > div {
-  display: grid;
-  gap: var(--v2-space-1);
-  min-width: 0;
-}
-.dashboard-page__list strong {
-  color: var(--v2-color-text-strong);
-  font-size: var(--v2-font-size-13);
-}
-.dashboard-page__list span,
-.dashboard-page__empty,
-.dashboard-page__quick p {
+.dashboard-page__empty {
   color: var(--v2-color-text-muted);
   font-size: var(--v2-font-size-12);
-}
-.dashboard-page__list-value {
-  text-align: end;
-}
-.dashboard-page__quick a {
-  display: block;
-  min-height: 2.75rem;
-  padding: var(--v2-space-3);
-  color: var(--v2-color-primary);
-  background: var(--v2-color-primary-soft);
-  border-radius: var(--v2-radius-sm);
-  text-decoration: none;
-}
-.dashboard-page__trend {
-  display: grid;
-  grid-template-columns: minmax(18rem, 1fr) minmax(24rem, 2fr);
-  gap: var(--v2-space-4);
-  align-items: center;
-}
-.dashboard-page__trend svg {
-  width: 100%;
-  min-height: 12rem;
-  background: linear-gradient(to bottom, var(--v2-color-surface-subtle), transparent);
-  border-radius: var(--v2-radius-md);
-}
-.dashboard-page__trend line {
-  stroke: var(--v2-color-border);
-  stroke-width: 1;
-}
-.dashboard-page__trend polyline {
-  fill: none;
-  stroke: var(--v2-chart-1);
-  stroke-width: 3;
-  vector-effect: non-scaling-stroke;
 }
 .dashboard-page__table-wrap {
   max-width: 100%;
@@ -1216,55 +1105,15 @@ function isAbort(errorValue: unknown): boolean {
   border: 0;
   cursor: pointer;
 }
-@media (max-width: 64rem) {
-  .dashboard-page__summary {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .dashboard-page__trend {
-    grid-template-columns: 1fr;
-  }
-}
 @media (max-width: 48rem) {
-  .dashboard-page__hero {
-    padding: var(--v2-space-4);
-  }
-  .dashboard-page__hero,
   .dashboard-page__panel header {
     align-items: stretch;
     flex-direction: column;
-  }
-  .dashboard-page__summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .dashboard-page__grid {
-    grid-template-columns: 1fr;
-  }
-  .dashboard-page__list li {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .dashboard-page__list-value {
-    text-align: start;
-  }
-}
-@media (max-width: 25rem) {
-  .dashboard-page__summary {
-    grid-template-columns: 1fr;
   }
 }
 
 .dashboard-page {
   gap: 12px;
-}
-.v2-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
 }
 .dashboard-page__roles {
   min-height: 34px;
@@ -1336,8 +1185,8 @@ function isAbort(errorValue: unknown): boolean {
 }
 .health-score__value strong {
   color: var(--v2-color-danger);
-  font-size: 36px;
-  line-height: 40px;
+  font-size: var(--v2-font-size-36);
+  line-height: var(--v2-line-height-tight);
 }
 .health-score__value span {
   grid-column: 1 / -1;
@@ -1430,7 +1279,7 @@ function isAbort(errorValue: unknown): boolean {
 }
 .health-metric strong small {
   color: var(--v2-color-text-muted);
-  font-size: var(--v2-font-size-10, 0.625rem);
+  font-size: var(--v2-font-size-11);
   font-weight: var(--v2-font-weight-medium);
 }
 .health-metric p {
@@ -1483,7 +1332,7 @@ function isAbort(errorValue: unknown): boolean {
 .trend-range button.is-active {
   color: var(--v2-color-text-strong);
   background: var(--v2-color-surface);
-  box-shadow: 0 1px 3px rgb(31 52 80 / 8%);
+  box-shadow: var(--v2-shadow-control);
 }
 .trend-chart,
 .trend-empty {
@@ -1543,6 +1392,38 @@ function isAbort(errorValue: unknown): boolean {
   display: flex;
   align-items: end;
   gap: 8px;
+}
+.risk-panel {
+  overflow: visible;
+}
+.risk-evaluate-action {
+  position: relative;
+  flex: 0 0 auto;
+}
+.risk-evaluate-feedback {
+  position: absolute;
+  z-index: var(--v2-z-toast);
+  inset-block-end: calc(100% + 8px);
+  inset-inline-end: 0;
+  width: max-content;
+  max-width: min(22rem, 75vw);
+  display: block;
+  padding: 8px 10px;
+  border-radius: var(--v2-radius-md);
+  box-shadow: var(--v2-shadow-panel);
+  white-space: normal;
+}
+.risk-evaluate-feedback::after {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-end: 18px;
+  width: 8px;
+  height: 8px;
+  background: var(--v2-color-primary-soft);
+  border-inline-end: var(--v2-border-width) solid var(--v2-color-primary);
+  border-block-end: var(--v2-border-width) solid var(--v2-color-primary);
+  content: '';
+  transform: translateY(-50%) rotate(45deg);
 }
 .risk-filter summary {
   width: 94px;
@@ -1672,17 +1553,17 @@ function isAbort(errorValue: unknown): boolean {
 .risk-level.is-high {
   color: var(--v2-color-danger-text);
   background: var(--v2-color-danger-soft);
-  border-color: #ffb8b5;
+  border-color: var(--v2-color-danger);
 }
 .risk-level.is-medium {
   color: var(--v2-color-warning-text);
   background: var(--v2-color-warning-soft);
-  border-color: #ffd698;
+  border-color: var(--v2-color-warning);
 }
 .risk-level.is-low {
   color: var(--v2-color-success-text);
   background: var(--v2-color-success-soft);
-  border-color: #9ce3c5;
+  border-color: var(--v2-color-success);
 }
 .risk-level.is-other {
   color: var(--v2-color-text-secondary);
@@ -1693,49 +1574,6 @@ function isAbort(errorValue: unknown): boolean {
   height: 180px;
   color: var(--v2-color-text-muted);
   text-align: center;
-}
-.dashboard-alert-detail {
-  display: grid;
-  gap: 12px;
-  padding: var(--v2-space-4);
-  border: 1px solid color-mix(in srgb, var(--v2-color-border) 70%, transparent);
-  border-radius: var(--v2-radius-md);
-  background: color-mix(in srgb, var(--v2-color-surface) 68%, transparent);
-}
-.dashboard-alert-detail dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
-}
-.dashboard-alert-detail dl div {
-  padding-inline-start: 10px;
-  border-inline-start: 2px solid var(--v2-color-border-subtle);
-}
-.dashboard-alert-detail dt {
-  color: var(--v2-color-text-muted);
-  font-size: var(--v2-font-size-11);
-}
-.dashboard-alert-detail dd {
-  margin: 3px 0 0;
-  color: var(--v2-color-text-strong);
-  font-size: var(--v2-font-size-12);
-  font-weight: var(--v2-font-weight-semibold);
-}
-.dashboard-alert-actions {
-  display: grid;
-  grid-template-columns: auto auto minmax(120px, 0.7fr) minmax(180px, 1fr) auto;
-  gap: 10px;
-  align-items: end;
-  padding: var(--v2-space-3) var(--v2-space-4);
-  border: 1px solid color-mix(in srgb, var(--v2-color-border) 64%, transparent);
-  border-radius: var(--v2-radius-md);
-  background: color-mix(in srgb, var(--v2-color-surface) 58%, transparent);
-}
-.dashboard-alert-readonly {
-  margin: 14px 0 0;
-  color: var(--v2-color-text-muted);
-  font-size: var(--v2-font-size-12);
 }
 .utility-panel {
   min-height: 104px;
@@ -1804,7 +1642,7 @@ function isAbort(errorValue: unknown): boolean {
 .recent-entry small {
   margin-top: 5px;
   color: var(--v2-color-text-muted);
-  font-size: 10px;
+  font-size: var(--v2-font-size-11);
 }
 
 @media (max-width: 78.75rem) {
@@ -1860,10 +1698,6 @@ function isAbort(errorValue: unknown): boolean {
     align-items: flex-start;
     flex-direction: column;
     padding-block: 10px;
-  }
-  .dashboard-alert-detail dl,
-  .dashboard-alert-actions {
-    grid-template-columns: 1fr;
   }
   .utility-panel {
     grid-template-columns: 1fr;

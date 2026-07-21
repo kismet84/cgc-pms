@@ -14,6 +14,7 @@ import {
   V2Badge,
   V2Button,
   V2Card,
+  V2ConfirmDialog,
   V2Dialog,
   V2Input,
   V2PageState,
@@ -78,6 +79,17 @@ const memberForm = reactive<ProjectMemberCommand>({
   remark: '',
 })
 const statusForm = reactive({ targetStatus: '', reason: '' })
+type ProjectAction = 'archive' | 'submit' | 'status' | 'delete'
+type PendingConfirmation =
+  | {
+      kind: 'project'
+      action: ProjectAction
+      target: ProjectRecord
+      targetStatus?: string
+      reason?: string
+    }
+  | { kind: 'member'; member: ProjectMember }
+const pendingConfirmation = ref<PendingConfirmation | null>(null)
 let requestId = 0
 let controller: AbortController | null = null
 
@@ -112,6 +124,44 @@ const roleLabel = (value: string) =>
   PROJECT_ROLE_OPTIONS.find((item) => item.value === value)?.label ?? value
 const dictLabel = (items: DictionaryItem[], value: string) =>
   items.find((item) => item.dictValue === value)?.dictLabel ?? value
+const confirmationCopy = computed(() => {
+  const pending = pendingConfirmation.value
+  if (!pending) return { title: '', description: '', confirmText: '确认', danger: false }
+  if (pending.kind === 'member')
+    return {
+      title: '移除项目成员',
+      description: `确认移除成员 ${pending.member.userId}？该成员将失去当前项目角色。`,
+      confirmText: '确认移除',
+      danger: true,
+    }
+  if (pending.action === 'delete')
+    return {
+      title: '删除项目',
+      description: `“${pending.target.projectName}”将被永久删除，此操作无法撤销。`,
+      confirmText: '永久删除',
+      danger: true,
+    }
+  if (pending.action === 'archive')
+    return {
+      title: '归档项目',
+      description: `确认归档“${pending.target.projectName}”？归档前请确认项目已完成收口。`,
+      confirmText: '确认归档',
+      danger: false,
+    }
+  if (pending.action === 'status')
+    return {
+      title: '变更项目状态',
+      description: `“${pending.target.projectName}”将变更为“${dictLabel(projectStatuses.value, pending.targetStatus ?? '')}”。原因：${pending.reason}`,
+      confirmText: '确认变更',
+      danger: false,
+    }
+  return {
+    title: '提交项目审批',
+    description: `确认将“${pending.target.projectName}”提交审批？`,
+    confirmText: '确认提交',
+    danger: false,
+  }
+})
 
 function message(error: unknown, fallback: string) {
   return isApiClientError(error) ? error.message : fallback
@@ -120,8 +170,8 @@ function resetNotices() {
   errorMessage.value = ''
   successMessage.value = ''
 }
-function setQuery() {
-  void router.replace({
+async function setQuery(): Promise<boolean> {
+  const location = {
     query: {
       ...(typeof route.query.projectId === 'string' ? { projectId: route.query.projectId } : {}),
       ...(typeof route.query.period === 'string' ? { period: route.query.period } : {}),
@@ -131,7 +181,10 @@ function setQuery() {
       ...(filter.pageNo > 1 ? { pageNo: String(filter.pageNo) } : {}),
     },
     hash: route.hash,
-  })
+  }
+  if (router.resolve(location).fullPath === route.fullPath) return false
+  await router.replace(location)
+  return true
 }
 function hydrateQuery() {
   filter.keyword = typeof route.query.keyword === 'string' ? route.query.keyword : ''
@@ -244,29 +297,31 @@ async function saveProject(create: boolean) {
     saving.value = false
   }
 }
-async function act(action: 'archive' | 'submit' | 'status' | 'delete', target: ProjectRecord) {
-  const prompts = {
-    archive: `确认归档“${target.projectName}”？`,
-    submit: `确认提交“${target.projectName}”审批？`,
-    status: `确认变更“${target.projectName}”状态？`,
-    delete: `确认永久删除“${target.projectName}”？`,
-  }
-  if (!window.confirm(prompts[action])) return
+function requestProjectAction(action: ProjectAction, target: ProjectRecord) {
   if (action === 'status' && (!statusForm.targetStatus || !statusForm.reason.trim())) {
     errorMessage.value = '状态和变更原因不能为空'
     return
   }
+  pendingConfirmation.value = {
+    kind: 'project',
+    action,
+    target,
+    targetStatus: action === 'status' ? statusForm.targetStatus : undefined,
+    reason: action === 'status' ? statusForm.reason.trim() : undefined,
+  }
+}
+async function act(pending: Extract<PendingConfirmation, { kind: 'project' }>) {
   saving.value = true
   resetNotices()
   try {
-    if (action === 'archive') await archiveProject(target.id)
-    if (action === 'submit') await submitProject(target.id)
-    if (action === 'status')
-      await changeProjectStatus(target.id, {
-        targetStatus: statusForm.targetStatus,
-        reason: statusForm.reason.trim(),
+    if (pending.action === 'archive') await archiveProject(pending.target.id)
+    if (pending.action === 'submit') await submitProject(pending.target.id)
+    if (pending.action === 'status')
+      await changeProjectStatus(pending.target.id, {
+        targetStatus: pending.targetStatus ?? '',
+        reason: pending.reason ?? '',
       })
-    if (action === 'delete') await deleteProject(target.id)
+    if (pending.action === 'delete') await deleteProject(pending.target.id)
     successMessage.value = '操作成功；页面已按服务端权威状态重读。'
     await load(true)
   } catch (error) {
@@ -313,7 +368,6 @@ async function saveMember() {
   }
 }
 async function removeMember(member: ProjectMember) {
-  if (!window.confirm(`确认移除成员 ${member.userId}？`)) return
   saving.value = true
   resetNotices()
   try {
@@ -327,10 +381,26 @@ async function removeMember(member: ProjectMember) {
     saving.value = false
   }
 }
-function search() {
+function requestMemberRemoval(member: ProjectMember) {
+  pendingConfirmation.value = { kind: 'member', member }
+}
+function closeConfirmation() {
+  if (!saving.value) pendingConfirmation.value = null
+}
+async function confirmPendingAction() {
+  const pending = pendingConfirmation.value
+  if (!pending || saving.value) return
+  if (pending.kind === 'project') await act(pending)
+  else await removeMember(pending.member)
+  pendingConfirmation.value = null
+}
+async function search() {
   filter.pageNo = 1
-  setQuery()
-  void load()
+  if (!(await setQuery())) await load()
+}
+function applySelectFilter(key: 'projectType' | 'status', value: string) {
+  filter[key] = value
+  void search()
 }
 function go(path: string) {
   void router.push({ path, query: route.query, hash: route.hash })
@@ -353,13 +423,15 @@ onBeforeUnmount(() => controller?.abort())
       kind="loading"
       title="正在加载项目数据"
       description="按当前账号和项目范围读取。"
+      title-id="project-title"
+      :heading-level="1"
     />
 
     <template v-else-if="mode === 'list'">
       <V2Card class="project-page__toolbar-card">
         <template #actions>
           <form class="project-page__filters" @submit.prevent="search">
-            <h1 id="project-title" class="sr-only">项目台账</h1>
+            <h1 id="project-title" class="v2-visually-hidden">项目台账</h1>
             <V2Input
               v-model="filter.keyword"
               type="search"
@@ -367,18 +439,20 @@ onBeforeUnmount(() => controller?.abort())
               placeholder="项目编号或名称"
             />
             <V2Select
-              v-model="filter.projectType"
+              :model-value="filter.projectType"
               label="项目类型"
               :options="typeOptions"
               allow-empty
               placeholder="全部类型"
+              @update:model-value="applySelectFilter('projectType', $event)"
             />
             <V2Select
-              v-model="filter.status"
+              :model-value="filter.status"
               label="项目状态"
               :options="statusOptions"
               allow-empty
               placeholder="全部状态"
+              @update:model-value="applySelectFilter('status', $event)"
             />
             <V2Button type="submit">查询</V2Button>
             <V2Button type="button" size="small" variant="ghost" @click="load()">刷新</V2Button>
@@ -393,6 +467,7 @@ onBeforeUnmount(() => controller?.abort())
         kind="empty"
         title="没有可见项目"
         description="调整查询条件，或联系管理员核对项目范围。"
+        :heading-level="2"
       />
       <div v-else class="project-page__grid">
         <V2Card
@@ -430,7 +505,7 @@ onBeforeUnmount(() => controller?.abort())
                 size="small"
                 variant="ghost"
                 :loading="saving"
-                @click="act('submit', item)"
+                @click="requestProjectAction('submit', item)"
                 >提交</V2Button
               >
               <V2Button
@@ -438,7 +513,7 @@ onBeforeUnmount(() => controller?.abort())
                 size="small"
                 variant="ghost"
                 :loading="saving"
-                @click="act('archive', item)"
+                @click="requestProjectAction('archive', item)"
                 >归档</V2Button
               >
               <V2Button
@@ -446,7 +521,7 @@ onBeforeUnmount(() => controller?.abort())
                 size="small"
                 variant="danger"
                 :loading="saving"
-                @click="act('delete', item)"
+                @click="requestProjectAction('delete', item)"
                 >删除</V2Button
               >
             </div></template
@@ -458,6 +533,8 @@ onBeforeUnmount(() => controller?.abort())
     <template v-else-if="project">
       <V2Card
         :title="project.projectName"
+        title-id="project-title"
+        :heading-level="1"
         :subtitle="`${project.projectCode} · ${dictLabel(projectStatuses, project.status)}`"
       >
         <template #actions
@@ -483,7 +560,6 @@ onBeforeUnmount(() => controller?.abort())
             >
           </div></template
         >
-        <h1 id="project-title" class="sr-only">{{ project.projectName }}</h1>
       </V2Card>
 
       <div v-if="mode === 'overview' && overview" class="project-page__grid">
@@ -522,7 +598,7 @@ onBeforeUnmount(() => controller?.abort())
               :options="statusOptions"
             /><V2Input v-model="statusForm.reason" label="变更原因" /><V2Button
               :loading="saving"
-              @click="act('status', project)"
+              @click="requestProjectAction('status', project)"
               >确认变更</V2Button
             >
           </div></V2Card
@@ -568,7 +644,8 @@ onBeforeUnmount(() => controller?.abort())
                   v-if="can('project:member:delete')"
                   size="small"
                   variant="danger"
-                  @click="removeMember(member)"
+                  :loading="saving"
+                  @click="requestMemberRemoval(member)"
                   >移除</V2Button
                 >
               </div>
@@ -579,6 +656,7 @@ onBeforeUnmount(() => controller?.abort())
             kind="empty"
             title="暂无项目成员"
             description="具备添加权限的账号可维护成员。"
+            :heading-level="3"
           />
         </V2Card>
       </template>
@@ -588,10 +666,23 @@ onBeforeUnmount(() => controller?.abort())
       kind="error"
       title="项目不可访问"
       description="项目不存在、超出当前账号范围，或请求被拒绝。"
+      title-id="project-title"
+      :heading-level="1"
       ><template #actions
         ><V2Button variant="secondary" @click="load()">重试</V2Button></template
       ></V2PageState
     >
+
+    <V2ConfirmDialog
+      :open="Boolean(pendingConfirmation)"
+      :title="confirmationCopy.title"
+      :description="confirmationCopy.description"
+      :confirm-text="confirmationCopy.confirmText"
+      :danger="confirmationCopy.danger"
+      :loading="saving"
+      @close="closeConfirmation"
+      @confirm="confirmPendingAction"
+    />
 
     <V2Dialog v-model:open="createOpen" title="新建项目" description="项目编号由服务端生成。"
       ><ProjectForm
@@ -719,13 +810,6 @@ dd {
   background: var(--v2-color-surface);
   border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
 }
 @media (max-width: 64rem) {
   .project-page__filters,

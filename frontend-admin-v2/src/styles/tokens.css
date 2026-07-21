@@ -53,6 +53,8 @@
   --v2-font-size-17: 1.0625rem;
   --v2-font-size-21: 1.3125rem;
   --v2-font-size-28: 1.75rem;
+  --v2-font-size-36: 2.25rem;
+  --v2-font-size-42: 2.625rem;
   --v2-font-weight-regular: 400;
   --v2-font-weight-medium: 500;
   --v2-font-weight-semibold: 600;
@@ -82,6 +84,8 @@
   --v2-border-width: 1px;
   --v2-shadow-panel: 0 2px 8px rgb(31 52 80 / 4%);
   --v2-shadow-float: 0 16px 42px rgb(31 52 80 / 16%);
+  --v2-shadow-primary: 0 6px 18px rgb(37 99 235 / 18%);
+  --v2-shadow-control: 0 1px 3px rgb(31 52 80 / 8%);
   --v2-dialog-surface: rgb(245 248 252 / 88%);
   --v2-dialog-divider: rgb(94 118 150 / 14%);
   --v2-dialog-radius: 1.5625rem;

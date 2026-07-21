@@ -1,5 +1,9 @@
 UI风格的设计基准和代码参考规范文档
 
+> **适用范围：Legacy UI。** `frontend-admin-v2` 的唯一视觉基线为
+> `docs/ui-v2/m1-design-system-baseline.md` 与 `frontend-admin-v2/src/styles/tokens.css`；
+> 本文字号、颜色及组件尺寸不得用于 V2 新迁移页面。
+
 > 适用版本：v1.5。历史结论和旧路径仅作回溯，当前实现以本分支代码、配置和实时验证为准。
 
 ---

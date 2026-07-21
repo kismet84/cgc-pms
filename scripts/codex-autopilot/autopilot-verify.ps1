@@ -313,7 +313,7 @@ function Invoke-AutopilotRuntimePreflight {
   $process = Start-Process -FilePath pwsh -ArgumentList '-NoProfile','-EncodedCommand',$encoded -WorkingDirectory $RepoRoot -PassThru -WindowStyle Hidden
   if (!$process.WaitForExit($timeoutSeconds * 1000)) { & taskkill.exe /PID $process.Id /T /F 2>$null | Out-Null; return [pscustomobject]@{ status='fail'; refreshed=$true; before=$before; after=$null; reason='runtime refresh timed out' } }
   if ($process.ExitCode -ne 0) { return [pscustomobject]@{ status='fail'; refreshed=$true; before=$before; after=$null; reason="runtime refresh exitCode=$($process.ExitCode)" } }
-  $waitSeconds = if ($RuntimeRefresh.waitSeconds) { [int]$RuntimeRefresh.waitSeconds } else { 180 }
+  $waitSeconds = if ($RuntimeRefresh.waitSeconds) { [int]$RuntimeRefresh.waitSeconds } else { 25 }
   Start-Sleep -Seconds $waitSeconds
   $after = Test-AutopilotHealthGate
   return [pscustomobject]@{ status=$after.status; refreshed=$true; before=$before; after=$after; reason=if($after.status -eq 'pass'){'runtime recovered'}else{'runtime remains unhealthy after refresh'} }

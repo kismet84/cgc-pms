@@ -63,7 +63,7 @@
 - 系统分层、模块域、数据与部署架构：`docs/standards/02-系统架构.md`
 - Docker、生产部署、回滚、备份、监控：`docs/standards/10-部署运维手册.md`
 - 前端本地验收默认入口：`http://localhost:5173`
-- 前后端重启后的统一稳定等待时间按 `180秒` 执行；后端至少等待 `180秒` 后再做 health / Flyway / 接口验收，前端至少等待 `180秒` 并确认 Vite ready 后，再做 Playwright UI 验收。
+- 前后端重启后的统一稳定等待时间读取 `scripts/codex-autopilot/codex-autopilot.config.json` 的 `runtimeRefresh.waitSeconds`；等待完成后，后端再做 health / Flyway / 接口验收，前端确认 Vite ready 后再做 Playwright UI 验收。
 - 若 Docker 连续多次不可用（如 `dockerDesktopLinuxEngine` 管道不存在、`docker ps` 无法连接、`5173/8080` 均拒绝连接），在需要运行态验收且用户允许运维动作时，先尝试重启 WSL2 与 Docker Desktop，再等待 `180秒` 后复查 `docker ps`、后端 health、前端入口；不得把 Docker 不可用伪装成业务失败或验收通过。
 - 若 `http://localhost:5173` 回退到 `/login`，且前端日志出现 `/api/*` 代理到旧 `172.19.x.x:8080` 的错误，优先判定为前端 dev server 持有旧 backend 容器 IP；先执行 `python scripts/rebuild.py frontend` 再复验，不要先误判为路由守卫或后端业务回退。
 

@@ -8,18 +8,21 @@ const props = withDefaults(
     description?: string
     closeLabel?: string
     closeOnBackdrop?: boolean
+    closeDisabled?: boolean
     panelClass?: string
   }>(),
   {
     description: undefined,
     closeLabel: '关闭对话框',
     closeOnBackdrop: true,
+    closeDisabled: false,
     panelClass: undefined,
   },
 )
 
 const emit = defineEmits<{
   close: []
+  'backdrop-click': []
   'update:open': [value: boolean]
 }>()
 
@@ -29,12 +32,17 @@ const descriptionId = `${titleId}-description`
 let previousFocus: HTMLElement | null = null
 
 function close() {
+  if (props.closeDisabled) return
   emit('update:open', false)
   emit('close')
 }
 
 function onBackdrop() {
-  if (props.closeOnBackdrop) close()
+  if (props.closeOnBackdrop) {
+    close()
+    return
+  }
+  emit('backdrop-click')
 }
 
 function focusPanel() {
@@ -73,6 +81,7 @@ function onKeydown(event: KeyboardEvent) {
 
 function onDocumentKeydown(event: KeyboardEvent) {
   if (!props.open || event.defaultPrevented || event.key !== 'Escape') return
+  if (!panel.value?.contains(document.activeElement)) return
   event.preventDefault()
   close()
 }
@@ -121,7 +130,13 @@ onBeforeUnmount(() => {
                 {{ description }}
               </p>
             </div>
-            <button type="button" class="v2-dialog__close" :aria-label="closeLabel" @click="close">
+            <button
+              type="button"
+              class="v2-dialog__close"
+              :aria-label="closeLabel"
+              :disabled="closeDisabled"
+              @click="close"
+            >
               <span aria-hidden="true">×</span>
             </button>
           </header>

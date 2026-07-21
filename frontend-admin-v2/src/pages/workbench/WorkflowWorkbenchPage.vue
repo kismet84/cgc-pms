@@ -11,7 +11,16 @@ import {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { V2Alert, V2Badge, V2Button, V2Card, V2Dialog, V2PageState, V2Select } from '@/components'
+import {
+  V2Alert,
+  V2Badge,
+  V2Button,
+  V2Card,
+  V2Dialog,
+  V2GlassButton,
+  V2PageState,
+  V2Select,
+} from '@/components'
 import {
   addSignWorkflowTask,
   approveWorkflowTask,
@@ -320,7 +329,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="workflow-page" aria-label="审批工作台">
+  <section class="workflow-page" aria-labelledby="workflow-title">
+    <h1 id="workflow-title" class="v2-visually-hidden">审批工作台</h1>
     <V2Alert
       v-if="errorMessage"
       tone="danger"
@@ -368,11 +378,13 @@ onBeforeUnmount(() => {
         kind="loading"
         title="正在加载审批列表"
         description="请稍候。"
+        :heading-level="2"
       />
       <V2PageState
         v-else-if="rows.length === 0"
         title="暂无审批记录"
         description="当前筛选范围内没有可显示记录。"
+        :heading-level="2"
       />
       <V2Card
         v-else
@@ -417,11 +429,11 @@ onBeforeUnmount(() => {
         </div>
         <template #footer>
           <div class="workflow-pagination">
-            <span>第 {{ pageNo }} / {{ pageCount }} 页</span>
             <div>
               <V2Button size="small" variant="ghost" :disabled="pageNo <= 1" @click="changePage(-1)"
                 >上一页</V2Button
               >
+              <span>第 {{ pageNo }} 页</span>
               <V2Button
                 size="small"
                 variant="ghost"
@@ -437,14 +449,14 @@ onBeforeUnmount(() => {
 
     <V2Dialog
       :open="isDetailRoute"
-      :title="detail?.title ?? (detailLoading ? '正在加载审批详情' : '审批详情')"
+      title="审批详情"
       :description="
         detail
           ? `${workflowBusinessTypeLabel(detail.businessType)} · ${detail.templateName}`
           : '查看权威流程记录并执行当前允许动作。'
       "
       close-label="关闭审批详情"
-      panel-class="workflow-detail-dialog"
+      panel-class="v2-dialog-standard v2-detail-dialog"
       @close="closeDetail"
     >
       <V2PageState
@@ -452,21 +464,26 @@ onBeforeUnmount(() => {
         kind="loading"
         title="正在加载审批详情"
         description="正在校验当前账号可见范围。"
+        :heading-level="3"
       />
       <V2PageState
         v-else-if="!detail"
         kind="empty"
         title="无法显示审批详情"
         description="实例不存在或当前账号无权访问。"
+        :heading-level="3"
       />
       <template v-else>
-        <div class="workflow-detail-overview">
-          <div class="workflow-detail-status">
-            <V2Badge :tone="statusTone(detail.instanceStatus)" dot>{{
-              workflowStatusLabel(detail.instanceStatus)
-            }}</V2Badge>
-          </div>
-          <dl class="workflow-summary">
+        <div class="v2-detail-dialog__section">
+          <V2Badge :tone="statusTone(detail.instanceStatus)" dot>{{
+            workflowStatusLabel(detail.instanceStatus)
+          }}</V2Badge>
+          <p class="v2-detail-dialog__message">{{ detail.businessSummary ?? '-' }}</p>
+          <dl class="v2-detail-dialog__facts">
+            <div>
+              <dt>审批事项</dt>
+              <dd>{{ detail.title }}</dd>
+            </div>
             <div>
               <dt>发起人</dt>
               <dd>{{ detail.initiatorName }}</dd>
@@ -483,34 +500,23 @@ onBeforeUnmount(() => {
               <dt>金额</dt>
               <dd>{{ detail.amount ?? '-' }}</dd>
             </div>
-            <div class="workflow-summary__wide">
-              <dt>摘要</dt>
-              <dd>{{ detail.businessSummary ?? '-' }}</dd>
-            </div>
           </dl>
         </div>
-        <div v-if="availableActions.length" class="workflow-detail-actions" aria-label="审批动作">
-          <span>可用操作</span>
-          <div class="workflow-actions">
-            <V2Button
+        <div v-if="availableActions.length" class="v2-detail-dialog__actions" aria-label="审批动作">
+          <p class="v2-detail-dialog__message">可用操作</p>
+          <div class="v2-detail-dialog__quick-actions">
+            <V2GlassButton
               v-for="candidate in availableActions"
               :key="candidate"
-              :variant="
-                candidate === 'reject'
-                  ? 'danger'
-                  : candidate === 'approve'
-                    ? 'primary'
-                    : 'secondary'
-              "
+              :text="WORKFLOW_ACTION_LABELS[candidate]"
               :disabled="actionLoading"
               @click="openAction(candidate)"
-              >{{ WORKFLOW_ACTION_LABELS[candidate] }}</V2Button
-            >
+            />
           </div>
         </div>
 
         <div class="workflow-detail-grid">
-          <V2Card title="审批节点">
+          <V2Card title="审批节点" :heading-level="3">
             <ol class="workflow-timeline">
               <li v-for="node in detail.nodes" :key="node.id">
                 <V2Badge :tone="statusTone(node.nodeStatus)">{{
@@ -526,7 +532,7 @@ onBeforeUnmount(() => {
               </li>
             </ol>
           </V2Card>
-          <V2Card title="操作记录">
+          <V2Card title="操作记录" :heading-level="3">
             <ol class="workflow-timeline">
               <li v-if="detail.records.length === 0" class="workflow-timeline__empty">
                 暂无操作记录
@@ -594,26 +600,6 @@ onBeforeUnmount(() => {
   color: var(--v2-color-text);
   font-size: var(--v2-font-size-13);
   line-height: var(--v2-line-height-body);
-}
-.workflow-page__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--v2-space-4);
-}
-.workflow-page__header h1 {
-  margin: 0;
-  color: var(--v2-color-text-strong);
-  font-size: var(--v2-font-size-28);
-}
-.workflow-page__header p {
-  margin: var(--v2-space-1) 0 0;
-  color: var(--v2-color-text-secondary);
-}
-.workflow-page__eyebrow {
-  color: var(--v2-color-primary) !important;
-  font-size: var(--v2-font-size-12);
-  font-weight: var(--v2-font-weight-semibold);
 }
 .workflow-filter__form {
   display: grid;
@@ -701,64 +687,15 @@ onBeforeUnmount(() => {
 }
 .workflow-pagination {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
+  gap: var(--v2-space-2);
   color: var(--v2-color-text-secondary);
   font-size: var(--v2-font-size-12);
 }
 .workflow-pagination div {
   display: flex;
   gap: var(--v2-space-2);
-}
-.workflow-summary {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--v2-space-4);
-  margin: 0;
-}
-.workflow-detail-overview {
-  padding: var(--v2-space-4);
-  border: 1px solid color-mix(in srgb, var(--v2-color-border) 70%, transparent);
-  border-radius: var(--v2-radius-md);
-  background: color-mix(in srgb, var(--v2-color-surface) 68%, transparent);
-}
-.workflow-detail-status {
-  display: flex;
-  justify-content: flex-end;
-  margin-bottom: var(--v2-space-3);
-}
-.workflow-detail-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--v2-space-4);
-  padding: var(--v2-space-3) var(--v2-space-4);
-  border: 1px solid color-mix(in srgb, var(--v2-color-border) 64%, transparent);
-  border-radius: var(--v2-radius-md);
-  background: color-mix(in srgb, var(--v2-color-surface) 58%, transparent);
-}
-.workflow-detail-actions > span {
-  color: var(--v2-color-text-secondary);
-  font-size: var(--v2-font-size-12);
-  font-weight: var(--v2-font-weight-semibold);
-}
-.workflow-summary div {
-  border-left: 2px solid var(--v2-color-border);
-  padding-left: var(--v2-space-3);
-}
-.workflow-summary__wide {
-  grid-column: 1 / -1;
-}
-.workflow-summary dt {
-  color: var(--v2-color-text-muted);
-  font-size: var(--v2-font-size-12);
-}
-.workflow-summary dd {
-  margin: var(--v2-space-1) 0 0;
-  color: var(--v2-color-text);
-  font-size: var(--v2-font-size-13);
-  font-weight: var(--v2-font-weight-semibold);
-  overflow-wrap: anywhere;
 }
 .workflow-detail-grid {
   display: grid;
@@ -806,16 +743,9 @@ onBeforeUnmount(() => {
   .workflow-filter__form {
     grid-template-columns: 1fr 1fr;
   }
-  .workflow-summary {
-    grid-template-columns: 1fr 1fr;
-  }
 }
 @media (max-width: 40rem) {
-  .workflow-page__header {
-    align-items: flex-start;
-  }
-  .workflow-detail-grid,
-  .workflow-summary {
+  .workflow-detail-grid {
     grid-template-columns: 1fr;
   }
   .workflow-filter__form {
@@ -830,16 +760,9 @@ onBeforeUnmount(() => {
   .workflow-filter__status {
     min-width: 0;
   }
-  .workflow-summary__wide {
-    grid-column: auto;
-  }
   .workflow-filter__actions {
     grid-column: auto;
     flex-wrap: nowrap;
-  }
-  .workflow-detail-actions {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }
 </style>

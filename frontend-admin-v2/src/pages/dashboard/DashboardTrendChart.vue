@@ -21,6 +21,12 @@ const props = defineProps<{
 const canvas = ref<HTMLCanvasElement | null>(null)
 let observer: ResizeObserver | null = null
 
+function cssValue(token: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(token).trim()
+  if (!value) throw new Error(`Missing design token: ${token}`)
+  return value
+}
+
 function draw(): void {
   const element = canvas.value
   const context = element?.getContext('2d')
@@ -45,24 +51,24 @@ function draw(): void {
     area.left + ((area.right - area.left) * index) / Math.max(1, props.points.length - 1)
   const y = (value: number) => area.bottom - ((value - minimum) / span) * (area.bottom - area.top)
 
-  context.font = '11px sans-serif'
+  context.font = `${cssValue('--v2-font-size-11')} ${cssValue('--v2-font-sans')}`
   context.textBaseline = 'middle'
   let legendX = area.left
   for (const item of props.series) {
-    context.strokeStyle = item.color
+    context.strokeStyle = cssValue(item.color)
     context.lineWidth = 2
     context.beginPath()
     context.moveTo(legendX, 16)
     context.lineTo(legendX + 16, 16)
     context.stroke()
-    context.fillStyle = '#52627a'
+    context.fillStyle = cssValue('--v2-color-text-secondary')
     context.fillText(item.label, legendX + 21, 16)
     legendX += 86
   }
 
-  context.strokeStyle = '#e7edf5'
+  context.strokeStyle = cssValue('--v2-color-border')
   context.lineWidth = 1
-  context.fillStyle = '#8a98ad'
+  context.fillStyle = cssValue('--v2-color-text-disabled')
   context.textAlign = 'right'
   for (let index = 0; index <= 4; index += 1) {
     const value = minimum + (span * index) / 4
@@ -83,8 +89,8 @@ function draw(): void {
   })
 
   for (const item of props.series) {
-    context.strokeStyle = item.color
-    context.fillStyle = item.color
+    context.strokeStyle = cssValue(item.color)
+    context.fillStyle = cssValue(item.color)
     context.lineWidth = 2
     context.beginPath()
     props.points.forEach((point, index) => {
@@ -144,15 +150,5 @@ canvas {
 }
 canvas {
   display: block;
-}
-.v2-visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
 }
 </style>
