@@ -19,7 +19,7 @@
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
     "ant-design-vue": "^4.2.6",
-    "axios": "^1.7.9",
+    "axios": "^1.18.1",
     "dayjs": "^1.11.21",
     "echarts": "^6.1.0",
     "pinia": "^2.3.0",
