@@ -2,6 +2,8 @@
 import {
   canRequestAlertNotifications,
   hasPermission,
+  resolveDashboardRoles,
+  type DashboardRole,
   type NotificationRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -60,6 +62,27 @@ const reportPeriodOptions = computed(() => [
   { value: '', label: '全部报告期' },
   ...workspaceStore.reportPeriods,
 ])
+const dashboardRole = computed<DashboardRole | null>(() => {
+  if (route.path !== '/dashboard') return null
+  const allowed = resolveDashboardRoles(session.roles, session.permissions)
+  const requested = typeof route.query.role === 'string' ? route.query.role : ''
+  return allowed.includes(requested as DashboardRole)
+    ? (requested as DashboardRole)
+    : (allowed[0] ?? null)
+})
+const projectFilterUnsupported = computed(
+  () => route.meta.workspaceContext?.project !== true || dashboardRole.value === 'mgmt',
+)
+const periodFilterUnsupported = computed(
+  () =>
+    route.meta.workspaceContext?.period !== true ||
+    (dashboardRole.value ? ['bm', 'finance', 'mgmt'].includes(dashboardRole.value) : false),
+)
+const projectFilterLabel = computed(() => {
+  if (!projectFilterUnsupported.value) return '当前项目'
+  return dashboardRole.value === 'mgmt' ? '当前项目（管理层为租户汇总）' : '当前项目'
+})
+const periodFilterLabel = '报告期'
 const accountName = computed(
   () => session.userInfo?.realName || session.userInfo?.username || '当前用户',
 )
@@ -234,6 +257,18 @@ function updateContextQuery(key: 'projectId' | 'period', value: string | null): 
   void router.replace({ path: route.path, query, hash: route.hash })
 }
 
+function contextRoute(path: string) {
+  return {
+    path,
+    query: {
+      ...(workspaceStore.selectedProjectId ? { projectId: workspaceStore.selectedProjectId } : {}),
+      ...(workspaceStore.selectedReportPeriod
+        ? { period: workspaceStore.selectedReportPeriod }
+        : {}),
+    },
+  }
+}
+
 async function signOut(): Promise<void> {
   try {
     await session.logout()
@@ -320,7 +355,7 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
         >
           <RouterLink
             class="app-shell__domain-link"
-            :to="domain.workspaces[0]!.tabs[0]!.path"
+            :to="contextRoute(domain.workspaces[0]!.tabs[0]!.path)"
             :aria-label="domain.label"
           >
             <span class="app-shell__domain-badge" aria-hidden="true">
@@ -334,7 +369,7 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
               :key="workspace.id"
               class="app-shell__workspace-link"
               :class="{ 'router-link-active': activeMatch?.workspace.id === workspace.id }"
-              :to="workspace.tabs[0]!.path"
+              :to="contextRoute(workspace.tabs[0]!.path)"
             >
               {{ workspace.label }}
             </RouterLink>
@@ -426,9 +461,9 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
             id="global-project"
             :model-value="workspaceStore.selectedProjectId || ''"
             :options="projectOptions"
-            label="当前项目"
+            :label="projectFilterLabel"
             placeholder="暂无可用项目"
-            :disabled="!workspaceStore.projects.length"
+            :disabled="!workspaceStore.projects.length || projectFilterUnsupported"
             allow-empty
             @update:model-value="selectProject"
           />
@@ -436,9 +471,9 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
             id="global-report-period"
             :model-value="workspaceStore.selectedReportPeriod || ''"
             :options="reportPeriodOptions"
-            label="报告期"
+            :label="periodFilterLabel"
             placeholder="暂无可用报告期"
-            :disabled="!workspaceStore.reportPeriods.length"
+            :disabled="!workspaceStore.reportPeriods.length || periodFilterUnsupported"
             allow-empty
             @update:model-value="selectReportPeriod"
           />
@@ -479,9 +514,6 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
           <span>{{ activeMatch?.domain.label || '应用壳' }}</span>
           <strong>{{ activeMatch?.workspace.label || '权限导航' }}</strong>
         </div>
-        <span v-if="workspaceStore.objectContext" class="app-shell__object-context">
-          对象 {{ workspaceStore.objectContext.kind }} / {{ workspaceStore.objectContext.id }}
-        </span>
         <nav v-if="visibleActiveWorkspace" class="app-shell__tabs" aria-label="工作区标签页">
           <RouterLink
             v-for="tab in visibleActiveWorkspace.tabs"
@@ -951,12 +983,6 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
   font-size: var(--v2-font-size-12);
 }
 
-.app-shell__object-context {
-  padding: var(--v2-space-2) var(--v2-space-3);
-  background: var(--v2-color-primary-soft);
-  border-radius: var(--v2-radius-round);
-}
-
 .app-shell__tabs {
   min-width: 0;
   min-height: 2.5rem;
@@ -1312,13 +1338,6 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
     align-items: center;
     gap: 0 var(--v2-space-3);
     padding: var(--v2-space-2) var(--v2-space-4) 0;
-  }
-
-  .app-shell__object-context {
-    max-width: 50%;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   .app-shell__tabs {

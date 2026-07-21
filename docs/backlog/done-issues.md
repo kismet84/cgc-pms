@@ -2,6 +2,9 @@
 
 ## v1.5 已完成任务
 
+- `ISSUE-053-012`（2026-07-21）：M3项目计划与现场日报双路由达到`V2_ACCEPTED`，台账`71/16/0`；并发令牌、提交/审批行锁、真实trace数组、分权、附件不可变、三视口与live验收通过。报告`docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md`。无迁移，受控本地身份与数据已精确回滚，未切正式入口或发布生产。
+- `ISSUE-053-011`（2026-07-21）：M3项目对象工作区五路由通过并达到`V2_ACCEPTED`，台账`73/14/0`；项目/成员写侧、权限分流、金额字符串、快速请求隔离、三视口、axe、真实成员只读身份及live E2E通过；后端移除服务端派生成员字段的错误请求前置校验并保留Service强制覆盖。报告`docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md`。未启动012、未切正式入口或发布生产。
+- `ISSUE-053-010`（2026-07-21）：M3项目契约与只读请求金丝雀通过；项目、总览、成员DTO及分页/详情/总览/成员薄服务完成，ID/query编码、AbortSignal与金额字符串边界验证通过；报告`docs/quality/ISSUE-053-010-M3项目契约与只读请求基线验收报告.md`。10个M3路由仍为`LEGACY_ONLY`，未接页面、未改后端/数据库/Legacy或正式入口。
 - `ISSUE-053-009`（2026-07-21）：Clean-room V2 M2全量退出门与治理收口通过；九路由达到`V2_ACCEPTED`，台账为78/9/0；八角色、四身份、三视口、权限/数据范围、SQL≤20、包体、axe、403/404和真实深链验收通过；桌面端通知、审批详情与预警处置统一复用公共弹窗视觉，下拉菜单向下展开且无裁切；报告`docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md`。未切正式入口、未发布生产或退役Legacy。
 - `MAINLINE-054-M4-GOV-BRANCH-PROTECTION`（2026-07-20）：经用户专项授权试配1名批准者后，复读发现仓库唯一协作者即PR作者，规则无合格审批人并锁死合并；已按更新前快照回滚required reviews为NULL，保留11项app绑定checks、strict、管理员强制与对话解决，push restrictions继续为空。最终策略为新增第二位合格协作者前不启用required review/allowlist；报告`docs/quality/第54条主线-M4-AutoPilot观察与分支保护治理验收报告.md`。
 - `MAINLINE-054-M5-OPS-NODE-MODULES-ACL`（2026-07-20）：旧损坏ACL依赖只残留于被忽略隔离目录`.codex-autopilot/runs/frontend-node_modules-acl-broken-20260713`，当前`frontend-admin/node_modules`已重建，构建脚本不引用隔离路径；按验收标准“确认长期隔离且构建不引用”关闭，不提权、不删除用户环境文件；报告`docs/quality/第54条主线-M5-P2候选与运维观察收口验收报告.md`。

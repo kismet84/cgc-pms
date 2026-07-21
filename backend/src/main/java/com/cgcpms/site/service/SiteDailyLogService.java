@@ -129,11 +129,17 @@ public class SiteDailyLogService {
 
     @Transactional(rollbackFor = Exception.class)
     public void update(SiteDailyLog command) {
-        SiteDailyLog existing = requireLog(command.getId());
+        SiteDailyLog existing = requireLogForUpdate(command.getId());
         projectAccessChecker.checkAccess(existing.getProjectId(), "修改现场日报");
         projectAccessChecker.checkAccess(command.getProjectId(), "修改现场日报");
         requireDraft(existing);
+        if (command.getExpectedUpdatedAt() == null)
+            throw new BusinessException("SITE_DAILY_LOG_PRECONDITION_REQUIRED", "修改现场日报必须携带最新更新时间");
+        if (!command.getExpectedUpdatedAt().withNano(0).equals(existing.getUpdatedAt().withNano(0)))
+            throw new BusinessException("SITE_DAILY_LOG_VERSION_CONFLICT", "现场日报已被其他用户修改，请刷新后重试");
         requireUniqueDate(command.getProjectId(), command.getReportDate(), existing.getId());
+        LocalDateTime now = LocalDateTime.now().withNano(0);
+        LocalDateTime nextUpdatedAt = now.isAfter(existing.getUpdatedAt()) ? now : existing.getUpdatedAt().plusSeconds(1);
         try {
             int updated = mapper.update(null, new LambdaUpdateWrapper<SiteDailyLog>()
                     .eq(SiteDailyLog::getId, existing.getId())
@@ -145,7 +151,9 @@ public class SiteDailyLogService {
                     .set(SiteDailyLog::getIssuesDelays, command.getIssuesDelays())
                     .set(SiteDailyLog::getNextDayPlan, command.getNextDayPlan())
                     .set(SiteDailyLog::getWeatherSummary, command.getWeatherSummary())
-                    .set(SiteDailyLog::getOnSiteHeadcount, command.getOnSiteHeadcount()));
+                    .set(SiteDailyLog::getOnSiteHeadcount, command.getOnSiteHeadcount())
+                    .set(SiteDailyLog::getUpdatedBy, UserContext.getCurrentUserId())
+                    .set(SiteDailyLog::getUpdatedAt, nextUpdatedAt));
             if (updated != 1) throw submittedImmutable();
         } catch (DuplicateKeyException e) {
             throw duplicateDate();
@@ -154,8 +162,9 @@ public class SiteDailyLogService {
 
     @Transactional(rollbackFor = Exception.class)
     public void submit(Long id) {
-        SiteDailyLog log = requireLog(id);
+        SiteDailyLog log = requireLogForUpdate(id);
         projectAccessChecker.checkAccess(log.getProjectId(), "提交现场日报");
+        requireDraft(log);
         projectScheduleService.onDailyLogSubmitted(log);
         int updated = mapper.update(null, new LambdaUpdateWrapper<SiteDailyLog>()
                 .eq(SiteDailyLog::getId, id)
@@ -171,6 +180,12 @@ public class SiteDailyLogService {
         SiteDailyLog log = mapper.selectById(id);
         if (log == null || !UserContext.getCurrentTenantId().equals(log.getTenantId()))
             throw new BusinessException("SITE_DAILY_LOG_NOT_FOUND", "现场日报不存在");
+        return log;
+    }
+
+    private SiteDailyLog requireLogForUpdate(Long id) {
+        SiteDailyLog log = mapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
+        if (log == null) throw new BusinessException("SITE_DAILY_LOG_NOT_FOUND", "现场日报不存在");
         return log;
     }
 

@@ -2,6 +2,7 @@ package com.cgcpms.sitedaily;
 
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,7 @@ import static org.hamcrest.Matchers.nullValue;
 class SiteDailyLogControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired JwtUtils jwtUtils;
+    @Autowired ObjectMapper objectMapper;
 
     private Cookie adminCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
@@ -65,9 +67,12 @@ class SiteDailyLogControllerTest {
         mockMvc.perform(post("/api/site-daily-logs").contextPath("/api")
                         .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isBadRequest());
+        String detailResponse = mockMvc.perform(get("/api/site-daily-logs/" + id).contextPath("/api").cookie(adminCookie()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        String expectedUpdatedAt = objectMapper.readTree(detailResponse).path("data").path("updatedAt").asText();
         mockMvc.perform(put("/api/site-daily-logs/" + id).contextPath("/api")
                         .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"projectId\":10001,\"reportDate\":\"2099-01-01\",\"constructionContent\":\"已更新施工内容\",\"weatherSummary\":\"晴转多云\",\"onSiteHeadcount\":0}"))
+                        .content("{\"projectId\":10001,\"reportDate\":\"2099-01-01\",\"constructionContent\":\"已更新施工内容\",\"weatherSummary\":\"晴转多云\",\"onSiteHeadcount\":0,\"expectedUpdatedAt\":\"" + expectedUpdatedAt + "\"}"))
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/site-daily-logs/" + id).contextPath("/api").cookie(adminCookie()))
                 .andExpect(status().isOk())

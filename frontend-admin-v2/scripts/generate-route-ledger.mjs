@@ -9,7 +9,7 @@ const routerPath = resolve(repositoryRoot, 'frontend-admin/src/router/index.ts')
 const jsonPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.json')
 const markdownPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.md')
 
-const m2AcceptedRoutes = {
+const acceptedRoutes = {
   Dashboard: '@/pages/dashboard/DashboardPage.vue',
   ReportCatalog: '@/pages/workbench/ReportCatalogPage.vue',
   Alert: '@/router.ts#V2LegacyAlertRedirect',
@@ -19,9 +19,20 @@ const m2AcceptedRoutes = {
   ApprovalCc: '@/pages/workbench/WorkflowWorkbenchPage.vue',
   ApprovalMine: '@/pages/workbench/WorkflowWorkbenchPage.vue',
   ApprovalDetail: '@/router.ts#V2LegacyApprovalDetailRedirect',
+  Project: '@/router.ts#V2ProjectRedirect',
+  ProjectList: '@/pages/projects/ProjectPage.vue',
+  ProjectOverview: '@/pages/projects/ProjectPage.vue',
+  ProjectMembers: '@/pages/projects/ProjectPage.vue',
+  ProjectEdit: '@/pages/projects/ProjectPage.vue',
+  ProjectSchedule: '@/pages/delivery/SchedulePage.vue',
+  SiteDailyLog: '@/pages/delivery/DailyLogPage.vue',
 }
 
+const sourceAvailableRoutes = {}
+
 const m2AcceptanceEvidence = 'docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md'
+const m3ProjectAcceptanceEvidence = 'docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md'
+const m3DeliveryAcceptanceEvidence = 'docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md'
 
 function findVariable(sourceFile, name) {
   for (const statement of sourceFile.statements) {
@@ -113,7 +124,11 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
     const redirect = literal(objectValue(element, 'redirect')) || null
 
     if (typeof name === 'string') {
-      const v2View = m2AcceptedRoutes[name] || null
+      const acceptedView = acceptedRoutes[name] || null
+      const sourceView = sourceAvailableRoutes[name] || null
+      const v2View = acceptedView || sourceView
+      const isM3Project = name === 'Project' || name.startsWith('Project')
+      const isM3Delivery = name === 'ProjectSchedule' || name === 'SiteDailyLog'
       result.push({
         name,
         path: fullPath,
@@ -124,10 +139,16 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
         public: meta ? literal(objectValue(meta, 'public')) === true : false,
         redirect,
         domain: domainFor(fullPath),
-        status: v2View ? 'V2_ACCEPTED' : 'LEGACY_ONLY',
+        status: acceptedView ? 'V2_ACCEPTED' : sourceView ? 'V2_SOURCE_AVAILABLE' : 'LEGACY_ONLY',
         stitchDesign: name === 'Dashboard' ? '用户已选新版经营驾驶舱视觉概念；M2 已验收' : null,
         testEvidence: v2View ? 'frontend-admin-v2/tests/unit；frontend-admin-v2/e2e' : null,
-        acceptanceEvidence: v2View ? m2AcceptanceEvidence : null,
+        acceptanceEvidence: acceptedView
+          ? isM3Delivery
+            ? m3DeliveryAcceptanceEvidence
+            : isM3Project
+              ? m3ProjectAcceptanceEvidence
+              : m2AcceptanceEvidence
+          : null,
       })
     }
 

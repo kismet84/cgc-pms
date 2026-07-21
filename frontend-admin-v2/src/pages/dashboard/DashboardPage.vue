@@ -102,7 +102,9 @@ const projectUnsupported = computed(
     currentProject.value?.status !== undefined &&
     currentProject.value.status !== 'ACTIVE',
 )
-const currentProjectLabel = computed(() => currentProject.value?.label ?? '全部项目')
+const currentProjectLabel = computed(() =>
+  selectedRole.value === 'mgmt' ? '租户汇总' : (currentProject.value?.label ?? '全部项目'),
+)
 const metrics = computed(() => (data.value ? dashboardMetrics(selectedRole.value, data.value) : []))
 const displayMetrics = computed(() =>
   metrics.value.map((metric) => ({ ...metric, ...compactDashboardValue(metric.value) })),
@@ -267,6 +269,7 @@ watch(
 
 watch(
   [
+    selectedRole,
     canViewAlerts,
     () => workspace.selectedProjectId,
     () => workspace.selectedReportPeriod,
@@ -302,12 +305,16 @@ async function refreshAlerts(): Promise<void> {
   const currentController = alertController
   alertLoading.value = true
   try {
-    const periodBounds = dashboardPeriodBounds(workspace.selectedReportPeriod)
+    const supportsProject = selectedRole.value !== 'mgmt'
+    const supportsPeriod = !['bm', 'finance', 'mgmt'].includes(selectedRole.value)
+    const periodBounds = dashboardPeriodBounds(
+      supportsPeriod ? workspace.selectedReportPeriod : null,
+    )
     const result = await loadAlerts(
       {
         pageNum: 1,
         pageSize: 50,
-        projectId: workspace.selectedProjectId || undefined,
+        projectId: supportsProject ? workspace.selectedProjectId || undefined : undefined,
         ...periodBounds,
       },
       currentController.signal,

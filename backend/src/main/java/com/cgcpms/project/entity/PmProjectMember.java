@@ -32,11 +32,9 @@ public class PmProjectMember extends BaseEntity {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
-    @NotNull
     @TableField("tenant_id")
     private Long tenantId;
 
-    @NotNull
     @TableField("project_id")
     private Long projectId;
 

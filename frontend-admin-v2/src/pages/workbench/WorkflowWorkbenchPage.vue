@@ -24,7 +24,9 @@ import {
   withdrawWorkflowInstance,
 } from '@/services/workflow'
 import { isApiClientError } from '@/services/request'
+import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
+import { useWorkspaceStore } from '@/stores/workspace'
 import {
   WORKFLOW_ACTION_LABELS,
   WORKFLOW_TABS,
@@ -48,6 +50,7 @@ const workflowInstanceStatusOptions = [
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
+const workspace = useWorkspaceStore()
 
 const activeTab = computed<WorkflowTab>(() => {
   const returnTab = String(route.query.returnTab ?? '')
@@ -115,12 +118,15 @@ function errorText(error: unknown, fallback: string): string {
 }
 
 function listQuery() {
+  const periodBounds = reportPeriodBounds(workspace.selectedReportPeriod)
   return {
     pageNo: pageNo.value,
     pageSize,
     keyword: keyword.value.trim() || undefined,
     businessType: businessType.value.trim() || undefined,
     instanceStatus: instanceStatus.value || undefined,
+    startTime: periodBounds ? `${periodBounds.startDate}T00:00:00` : undefined,
+    endTime: periodBounds ? `${periodBounds.endDate}T23:59:59` : undefined,
   }
 }
 
@@ -294,7 +300,7 @@ async function submitAction() {
 }
 
 watch(
-  () => [activeTab.value, instanceId.value],
+  () => [activeTab.value, instanceId.value, workspace.selectedReportPeriod],
   async () => {
     if (isDetailRoute.value) void loadDetail()
     else {

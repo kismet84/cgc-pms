@@ -81,4 +81,5 @@ export interface SiteDailyLogCommand {
   nextDayPlan?: string
   weatherSummary?: string
   onSiteHeadcount?: number | null
+  expectedUpdatedAt?: string
 }

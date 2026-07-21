@@ -87,6 +87,7 @@ public class ProjectScheduleService {
     public Map<String, Object> replaceTasks(Long scheduleId, WbsTaskBatch batch) {
         Map<String, Object> schedule = requireEditableSchedule(scheduleId);
         projectAccessChecker.checkAccess(longValue(schedule.get("project_id")), "维护WBS");
+        requireVersion(schedule, batch.expectedVersion(), "PROJECT_SCHEDULE_VERSION_CONFLICT", "项目计划已被其他用户修改，请刷新后重试");
         Integer periods = jdbc.queryForObject("SELECT COUNT(*) FROM project_period_plan WHERE tenant_id=? AND schedule_plan_id=? AND deleted_flag=0", Integer.class, tenant(), scheduleId);
         if (periods != null && periods > 0) throw error("PROJECT_WBS_PERIOD_EXISTS", "已生成月周计划后不能替换WBS");
         validateTaskBatch(batch.tasks(), localDate(schedule.get("planned_start_date")), localDate(schedule.get("planned_end_date")));
@@ -109,6 +110,8 @@ public class ProjectScheduleService {
                     item.plannedStartDate(), item.plannedEndDate(), scale(item.weightPercent()), item.plannedQuantity(), text(item.unit()),
                     sort++, user(), user(), item.remark());
         }
+        jdbc.update("UPDATE project_schedule_plan SET version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                user(), scheduleId, tenant());
         return schedule(scheduleId);
     }
 
@@ -122,8 +125,9 @@ public class ProjectScheduleService {
         if (total.compareTo(HUNDRED) != 0) throw error("PROJECT_WBS_WEIGHT_INVALID", "WBS任务权重合计必须等于100%");
         WfInstance instance = workflowInstance(row, WorkflowBusinessTypes.PROJECT_SCHEDULE, id,
                 string(row.get("plan_code")), "项目基线/修订计划", longValue(row.get("project_id")));
-        jdbc.update("UPDATE project_schedule_plan SET status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+        int changed = jdbc.update("UPDATE project_schedule_plan SET status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status IN ('DRAFT','REJECTED')",
                 instance.getId(), user(), id, tenant());
+        if (changed != 1) throw error("PROJECT_SCHEDULE_SUBMIT_STATE_INVALID", "项目计划当前状态不能提交");
         return schedule(id);
     }
 
@@ -191,8 +195,9 @@ public class ProjectScheduleService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> replacePeriodItems(Long periodId, PeriodItemBatch batch) {
-        Map<String, Object> period = requirePeriod(periodId);
+        Map<String, Object> period = requirePeriod(periodId, true);
         projectAccessChecker.checkAccess(longValue(period.get("project_id")), "维护月周计划");
+        requireVersion(period, batch.expectedVersion(), "PROJECT_PERIOD_VERSION_CONFLICT", "月周计划已被其他用户修改，请刷新后重试");
         if (!Set.of("DRAFT", "REJECTED").contains(string(period.get("status")))) throw error("PROJECT_PERIOD_IMMUTABLE", "非草稿或驳回状态的月周计划不能修改");
         Set<Long> unique = new HashSet<>();
         for (PeriodItemRequest item : batch.items()) {
@@ -208,19 +213,22 @@ public class ProjectScheduleService {
             jdbc.update("INSERT INTO project_period_plan_item(id,tenant_id,period_plan_id,wbs_task_id,target_progress,planned_quantity,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP)",
                     IdWorker.getId(), tenant(), periodId, item.wbsTaskId(), scale(item.targetProgress()), item.plannedQuantity(), user(), user());
         }
+        jdbc.update("UPDATE project_period_plan SET version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                user(), periodId, tenant());
         return periodPlan(periodId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> submitPeriodPlan(Long id) {
-        Map<String, Object> row = requirePeriod(id);
+        Map<String, Object> row = requirePeriod(id, true);
         projectAccessChecker.checkAccess(longValue(row.get("project_id")), "提交月周计划");
         if (!Set.of("DRAFT", "REJECTED").contains(string(row.get("status")))) throw error("PROJECT_PERIOD_SUBMIT_STATE_INVALID", "月周计划当前状态不能提交");
         Integer items = jdbc.queryForObject("SELECT COUNT(*) FROM project_period_plan_item WHERE tenant_id=? AND period_plan_id=?", Integer.class, tenant(), id);
         if (items == null || items == 0) throw error("PROJECT_PERIOD_ITEM_REQUIRED", "月周计划至少包含一条WBS任务");
         WfInstance instance = workflowInstance(row, WorkflowBusinessTypes.PROJECT_PERIOD_PLAN, id,
                 string(row.get("period_code")), "项目月周计划", longValue(row.get("project_id")));
-        jdbc.update("UPDATE project_period_plan SET status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", instance.getId(), user(), id, tenant());
+        int changed = jdbc.update("UPDATE project_period_plan SET status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status IN ('DRAFT','REJECTED')", instance.getId(), user(), id, tenant());
+        if (changed != 1) throw error("PROJECT_PERIOD_SUBMIT_STATE_INVALID", "月周计划当前状态不能提交");
         return periodPlan(id);
     }
 
@@ -363,22 +371,24 @@ public class ProjectScheduleService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> submitCorrectiveAction(Long id) {
-        Map<String, Object> row = requireCorrective(id);
+        Map<String, Object> row = requireCorrective(id, true);
         projectAccessChecker.checkAccess(longValue(row.get("project_id")), "提交进度纠偏");
         if (!Set.of("DRAFT", "REJECTED").contains(string(row.get("status")))) throw error("PROJECT_CORRECTIVE_SUBMIT_STATE_INVALID", "纠偏单当前状态不能提交");
         WfInstance instance = workflowInstance(row, WorkflowBusinessTypes.PROJECT_CORRECTIVE_ACTION, id,
                 string(row.get("action_code")), "项目进度纠偏", longValue(row.get("project_id")));
-        jdbc.update("UPDATE project_corrective_action SET status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", instance.getId(), user(), id, tenant());
+        int changed = jdbc.update("UPDATE project_corrective_action SET status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status IN ('DRAFT','REJECTED')", instance.getId(), user(), id, tenant());
+        if (changed != 1) throw error("PROJECT_CORRECTIVE_SUBMIT_STATE_INVALID", "纠偏单当前状态不能提交");
         return correctiveAction(id);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void onCorrectiveApproved(Long id) {
-        Map<String, Object> action = requireCorrective(id);
+        Map<String, Object> action = requireCorrective(id, true);
         if ("APPROVED".equals(string(action.get("status")))) return;
         if (!"PENDING".equals(string(action.get("status")))) throw error("PROJECT_CORRECTIVE_APPROVAL_STATE_INVALID", "纠偏审批状态不正确");
         Long revisionId = createRevision(action);
-        jdbc.update("UPDATE project_corrective_action SET status='APPROVED',generated_revision_plan_id=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='PENDING'", revisionId, id, tenant());
+        int changed = jdbc.update("UPDATE project_corrective_action SET status='APPROVED',generated_revision_plan_id=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='PENDING'", revisionId, id, tenant());
+        if (changed != 1) throw error("PROJECT_CORRECTIVE_APPROVAL_STATE_INVALID", "纠偏审批状态不正确");
         if (action.get("alert_id") != null) {
             int updated = jdbc.update("UPDATE alert_log SET is_read=1,read_by=COALESCE(read_by,?),read_at=COALESCE(read_at,CURRENT_TIMESTAMP),acknowledged_by=COALESCE(acknowledged_by,?),acknowledged_at=COALESCE(acknowledged_at,CURRENT_TIMESTAMP),process_status='PROCESSED',processed_at=CURRENT_TIMESTAMP,processed_by=?,status_remark='纠偏审批通过，已生成计划修订草稿',updated_by=?,updated_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=? AND tenant_id=? AND process_status='OPEN'", user(), user(), user(), user(), action.get("alert_id"), tenant());
             if (updated == 1) {
@@ -589,7 +599,11 @@ public class ProjectScheduleService {
     }
 
     private Map<String, Object> requirePeriod(Long id) {
-        return queryOne("SELECT * FROM project_period_plan WHERE id=? AND tenant_id=? AND deleted_flag=0", "PROJECT_PERIOD_NOT_FOUND", "月周计划不存在", id, tenant());
+        return requirePeriod(id, false);
+    }
+
+    private Map<String, Object> requirePeriod(Long id, boolean lock) {
+        return queryOne("SELECT * FROM project_period_plan WHERE id=? AND tenant_id=? AND deleted_flag=0" + (lock ? " FOR UPDATE" : ""), "PROJECT_PERIOD_NOT_FOUND", "月周计划不存在", id, tenant());
     }
 
     private Map<String, Object> requireTask(Long id) {
@@ -605,7 +619,15 @@ public class ProjectScheduleService {
     }
 
     private Map<String, Object> requireCorrective(Long id) {
-        return queryOne("SELECT * FROM project_corrective_action WHERE id=? AND tenant_id=? AND deleted_flag=0", "PROJECT_CORRECTIVE_NOT_FOUND", "进度纠偏单不存在", id, tenant());
+        return requireCorrective(id, false);
+    }
+
+    private Map<String, Object> requireCorrective(Long id, boolean lock) {
+        return queryOne("SELECT * FROM project_corrective_action WHERE id=? AND tenant_id=? AND deleted_flag=0" + (lock ? " FOR UPDATE" : ""), "PROJECT_CORRECTIVE_NOT_FOUND", "进度纠偏单不存在", id, tenant());
+    }
+
+    private void requireVersion(Map<String, Object> row, Integer expectedVersion, String code, String message) {
+        if (!Objects.equals(((Number) row.get("version")).intValue(), expectedVersion)) throw error(code, message);
     }
 
     private Map<String, Object> queryOne(String sql, String code, String message, Object... args) {

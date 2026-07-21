@@ -36,6 +36,7 @@
 
 | Issue | 原失败分类 | 解除证据 | 当前状态 |
 | --- | --- | --- | --- |
+| ISSUE-053-012 | `quality_or_security`：计划快照权限、陈旧写保护、并发提交 | 用户已授权最小后端/Legacy兼容修复及本地dev/demo准备；快照改为`schedule:progress`，WBS/期间项/日报接通必填并发令牌，计划/期间/纠偏/日报提交加锁并重验状态；后端目标13项、Legacy API目标2项及类型检查通过 | `VerifiedResolved`，已补为Ready继续实施 |
 | ISSUE-040-006 / V-06 | 外部前置：生产轮换证据缺失 | 用户明确将执行范围收敛到本机；local-dev 完成 MySQL/Redis/MinIO/JWT/Jasypt 真实轮换，74 表保留、依赖健康、旧 JWT 401、新登录 200、注入一致。当前无可识别生产环境，未来目标环境轮换改由上线门禁约束 | `VerifiedResolved`（本地 M1） |
 | ISSUE-040-005 / V-04 | `tool_config`：浏览器控制入口未加载 | 2026-07-13 三角色均进入对应驾驶舱；系统管理/流程设计入口隐藏；直达 `/approval/process` 均转 `/403` 并显示无权访问；API 403 与前端 42 项同时通过 | `VerifiedResolved` |
 | ISSUE-037-021-A | 真实质量类：`frontend-lint`、`frontend-test` 红灯 | PR #334 head `b1960ec7` 的两项 check 均为 `SUCCESS`，11 个 required checks 全绿 | `VerifiedResolved` |

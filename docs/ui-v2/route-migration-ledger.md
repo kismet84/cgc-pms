@@ -5,9 +5,9 @@
 - 命名路由：87
 - Legacy 路由视图引用：73
 - Legacy 独立页面模块：65
-- `LEGACY_ONLY`：78
+- `LEGACY_ONLY`：71
 - `V2_SOURCE_AVAILABLE`：0
-- `V2_ACCEPTED`：9
+- `V2_ACCEPTED`：16
 
 | 域 | route name | URL | Legacy 视图 | V2 视图 | permission | adminOnly | 状态 | Stitch / 测试 / 验收 |
 |---|---|---|---|---|---|---:|---|---|
@@ -38,14 +38,14 @@
 | 分包与结算 | Settlement | /settlement | — | — | settlement:query | 否 | LEGACY_ONLY | — |
 | 分包与结算 | SettlementList | /settlement/list | @/pages/settlement/index.vue | — | settlement:query | 否 | LEGACY_ONLY | — |
 | 分包与结算 | SettlementDetail | /settlement/:id | @/pages/settlement/detail.vue | — | settlement:query | 否 | LEGACY_ONLY | — |
-| 项目履约 | Project | /project | — | — | project:query | 否 | LEGACY_ONLY | — |
-| 项目履约 | ProjectList | /project/list | @/pages/project/index.vue | — | project:query | 否 | LEGACY_ONLY | — |
-| 项目履约 | ProjectOverview | /project/:projectId/overview | @/pages/project/overview.vue | — | project:query | 否 | LEGACY_ONLY | — |
-| 项目履约 | ProjectMembers | /project/:projectId/members | @/pages/project/members.vue | — | project:member:list | 否 | LEGACY_ONLY | — |
-| 项目履约 | ProjectEdit | /project/:projectId/edit | @/pages/project/edit.vue | — | project:edit | 否 | LEGACY_ONLY | — |
+| 项目履约 | Project | /project | — | @/router.ts#V2ProjectRedirect | project:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md |
+| 项目履约 | ProjectList | /project/list | @/pages/project/index.vue | @/pages/projects/ProjectPage.vue | project:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md |
+| 项目履约 | ProjectOverview | /project/:projectId/overview | @/pages/project/overview.vue | @/pages/projects/ProjectPage.vue | project:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md |
+| 项目履约 | ProjectMembers | /project/:projectId/members | @/pages/project/members.vue | @/pages/projects/ProjectPage.vue | project:member:list | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md |
+| 项目履约 | ProjectEdit | /project/:projectId/edit | @/pages/project/edit.vue | @/pages/projects/ProjectPage.vue | project:edit | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md |
 | 基础资料 | Partner | /partner | @/pages/partner/index.vue | — | partner:query | 否 | LEGACY_ONLY | — |
-| 项目履约 | SiteDailyLog | /site/daily-log | @/pages/site/daily-log.vue | — | site:daily:query | 否 | LEGACY_ONLY | — |
-| 项目履约 | ProjectSchedule | /project-schedule | @/pages/project-schedule/index.vue | — | schedule:query | 否 | LEGACY_ONLY | — |
+| 项目履约 | SiteDailyLog | /site/daily-log | @/pages/site/daily-log.vue | @/pages/delivery/DailyLogPage.vue | site:daily:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md |
+| 项目履约 | ProjectSchedule | /project-schedule | @/pages/project-schedule/index.vue | @/pages/delivery/SchedulePage.vue | schedule:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md |
 | 项目履约 | QualitySafety | /quality-safety | @/pages/quality-safety/index.vue | — | — | 否 | LEGACY_ONLY | — |
 | 项目履约 | TechnicalManagement | /technical-management | @/pages/technical-management/index.vue | — | — | 否 | LEGACY_ONLY | — |
 | 项目履约 | ProjectCloseout | /project-closeout | @/pages/project-closeout/index.vue | — | — | 否 | LEGACY_ONLY | — |

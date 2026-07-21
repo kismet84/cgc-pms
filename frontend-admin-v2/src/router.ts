@@ -15,6 +15,9 @@ const ShellPlaceholderPage = () => import('./pages/shell/ShellPlaceholderPage.vu
 const DashboardPage = () => import('./pages/dashboard/DashboardPage.vue')
 const WorkflowWorkbenchPage = () => import('./pages/workbench/WorkflowWorkbenchPage.vue')
 const ReportCatalogPage = () => import('./pages/workbench/ReportCatalogPage.vue')
+const ProjectPage = () => import('./pages/projects/ProjectPage.vue')
+const SchedulePage = () => import('./pages/delivery/SchedulePage.vue')
+const DailyLogPage = () => import('./pages/delivery/DailyLogPage.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -24,6 +27,10 @@ declare module 'vue-router' {
     shell?: boolean
     permission?: string
     workflowTab?: WorkflowTab
+    workspaceContext?: {
+      project: boolean
+      period: boolean
+    }
   }
 }
 
@@ -58,8 +65,19 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
                 ? ReportCatalogPage
                 : approvalTab
                   ? WorkflowWorkbenchPage
-                  : ShellPlaceholderPage,
-          meta: { shell: true, permission: tab.permission, workflowTab: approvalTab },
+                  : tab.path === '/project/list'
+                    ? ProjectPage
+                    : tab.path === '/project-schedule'
+                      ? SchedulePage
+                      : tab.path === '/site/daily-log'
+                        ? DailyLogPage
+                        : ShellPlaceholderPage,
+          meta: {
+            shell: true,
+            permission: tab.permission,
+            workflowTab: approvalTab,
+            workspaceContext: tab.workspaceContext,
+          },
         },
       ]
     }),
@@ -67,6 +85,12 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
 )
 
 const contextRoutes: RouteRecordRaw[] = [
+  {
+    path: '/project',
+    name: 'V2ProjectRedirect',
+    redirect: (to) => ({ path: '/project/list', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'project:query' },
+  },
   {
     path: '/alert',
     name: 'V2LegacyAlertRedirect',
@@ -97,19 +121,19 @@ const contextRoutes: RouteRecordRaw[] = [
   {
     path: '/project/:projectId/overview',
     name: 'V2ShellProjectOverview',
-    component: ShellPlaceholderPage,
+    component: ProjectPage,
     meta: { shell: true, permission: 'project:query' },
   },
   {
     path: '/project/:projectId/members',
     name: 'V2ShellProjectMembers',
-    component: ShellPlaceholderPage,
+    component: ProjectPage,
     meta: { shell: true, permission: 'project:member:list' },
   },
   {
     path: '/project/:projectId/edit',
     name: 'V2ShellProjectEdit',
-    component: ShellPlaceholderPage,
+    component: ProjectPage,
     meta: { shell: true, permission: 'project:edit' },
   },
   {

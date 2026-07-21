@@ -8,6 +8,7 @@ import {
   createPeriodPlan,
   getProjectScheduleTrace,
   replaceDailyProgress,
+  replacePeriodPlanItems,
   replaceWbsTasks,
   submitCorrectiveAction,
   submitProjectSchedule,
@@ -17,7 +18,7 @@ describe('project schedule closed-loop API contracts', () => {
   beforeEach(() => requestMock.mockReset().mockResolvedValue({}))
 
   it('keeps baseline, WBS, period plan and daily progress endpoints traceable', async () => {
-    await replaceWbsTasks('11', [])
+    await replaceWbsTasks('11', 3, [])
     await submitProjectSchedule('11')
     await createPeriodPlan('11', {
       schedulePlanId: '11',
@@ -27,6 +28,7 @@ describe('project schedule closed-loop API contracts', () => {
       startDate: '2099-01-01',
       endDate: '2099-01-31',
     })
+    await replacePeriodPlanItems('44', 2, [])
     await replaceDailyProgress('22', [
       {
         wbsTaskId: '33',
@@ -39,7 +41,7 @@ describe('project schedule closed-loop API contracts', () => {
     expect(requestMock).toHaveBeenNthCalledWith(1, {
       url: '/project-schedules/11/tasks',
       method: 'put',
-      data: { tasks: [] },
+      data: { expectedVersion: 3, tasks: [] },
     })
     expect(requestMock).toHaveBeenNthCalledWith(2, {
       url: '/project-schedules/11/submit',
@@ -51,6 +53,11 @@ describe('project schedule closed-loop API contracts', () => {
       data: expect.objectContaining({ periodType: 'MONTHLY' }),
     })
     expect(requestMock).toHaveBeenNthCalledWith(4, {
+      url: '/project-schedules/period-plans/44/items',
+      method: 'put',
+      data: { expectedVersion: 2, items: [] },
+    })
+    expect(requestMock).toHaveBeenNthCalledWith(5, {
       url: '/project-schedules/daily-logs/22/progress',
       method: 'put',
       data: { items: [expect.objectContaining({ wbsTaskId: '33' })] },

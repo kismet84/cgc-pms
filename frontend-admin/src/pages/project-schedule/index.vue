@@ -200,7 +200,11 @@ async function saveWbs() {
     0.0001
   )
     return message.warning('WBS权重合计必须等于100%')
-  selected.value = await replaceWbsTasks(id(selected.value), wbsRows.value)
+  selected.value = await replaceWbsTasks(
+    id(selected.value),
+    Number(value(selected.value, 'version') ?? 0),
+    wbsRows.value,
+  )
   wbsOpen.value = false
   await load()
 }
@@ -246,6 +250,7 @@ async function savePeriod() {
   const periodId = id(row)
   await replacePeriodPlanItems(
     periodId,
+    Number(value(row, 'version') ?? 0),
     periodForm.taskIds.map((wbsTaskId) => ({
       wbsTaskId,
       targetProgress: periodForm.targetProgress,

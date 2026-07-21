@@ -23,6 +23,77 @@ const roles = [
 test.describe('M2 live eight-role dashboard', () => {
   test.skip(!runLiveDashboard, 'Set V2_LIVE_DASHBOARD=1 only against the local test/demo runtime')
 
+  test('shell context survives cross-workspace navigation and reaches dashboard requests', async ({
+    page,
+  }) => {
+    const projectId = '520000000000009002'
+    const period = '2026-07'
+    expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
+    await page.goto('/v2/project/list')
+    await selectOption(page.locator('#global-project'), projectId)
+    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'true')
+
+    await page.getByRole('link', { name: '工作台', exact: true }).click()
+    await selectOption(page.locator('#global-report-period'), period)
+
+    const dashboardResponse = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return (
+        url.pathname === '/api/dashboard/project-manager' &&
+        url.searchParams.get('projectId') === projectId &&
+        url.searchParams.get('month') === period
+      )
+    })
+    await page.getByRole('button', { name: '刷新', exact: true }).click()
+
+    expect((await dashboardResponse).ok()).toBe(true)
+    await expect(page).toHaveURL(new RegExp(`projectId=${projectId}.*period=${period}`))
+  })
+
+  test('shell disables filters unsupported by the selected dashboard role', async ({ page }) => {
+    const projectId = '520000000000009002'
+    const period = '2026-07'
+    const alertUrls: URL[] = []
+    page.on('request', (request) => {
+      const url = new URL(request.url())
+      if (url.pathname === '/api/alerts') alertUrls.push(url)
+    })
+    expect((await page.goto('/api/auth/dev-login?username=admin'))?.ok()).toBe(true)
+    await page.goto(`/v2/dashboard?role=mgmt&projectId=${projectId}&period=${period}`, {
+      waitUntil: 'networkidle',
+    })
+    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.getByText('当前项目（管理层为租户汇总）')).toBeVisible()
+    await expect(page.locator('.health-panel .command-panel__title > span')).toHaveText(
+      '租户汇总 · 管理层',
+    )
+    await expect(page.locator('.recent-entry b')).toHaveText('租户汇总')
+    expect(alertUrls.length).toBeGreaterThan(0)
+    expect(
+      alertUrls.every(
+        (url) =>
+          !url.searchParams.has('projectId') &&
+          !url.searchParams.has('triggeredStart') &&
+          !url.searchParams.has('triggeredEnd'),
+      ),
+    ).toBe(true)
+
+    alertUrls.length = 0
+    await page.goto(`/v2/dashboard?role=bm&projectId=${projectId}&period=${period}`, {
+      waitUntil: 'networkidle',
+    })
+    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.getByText('报告期（当前页面不适用）')).toHaveCount(0)
+    expect(alertUrls.some((url) => url.searchParams.get('projectId') === projectId)).toBe(true)
+    expect(
+      alertUrls.every(
+        (url) => !url.searchParams.has('triggeredStart') && !url.searchParams.has('triggeredEnd'),
+      ),
+    ).toBe(true)
+  })
+
   test('cost trend follows project and card range selections without duplicate KPI summary', async ({
     page,
   }) => {

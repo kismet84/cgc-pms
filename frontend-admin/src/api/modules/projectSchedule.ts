@@ -69,11 +69,11 @@ export function getProjectSchedule(id: string) {
 export function createProjectSchedule(data: ScheduleRequest) {
   return request<ScheduleRow>({ url: '/project-schedules', method: 'post', data })
 }
-export function replaceWbsTasks(id: string, tasks: WbsTaskRequest[]) {
+export function replaceWbsTasks(id: string, expectedVersion: number, tasks: WbsTaskRequest[]) {
   return request<ScheduleRow>({
     url: `/project-schedules/${id}/tasks`,
     method: 'put',
-    data: { tasks },
+    data: { expectedVersion, tasks },
   })
 }
 export function submitProjectSchedule(id: string) {
@@ -89,11 +89,11 @@ export function createPeriodPlan(scheduleId: string, data: PeriodPlanRequest) {
 export function getPeriodPlan(id: string) {
   return request<ScheduleRow>({ url: `/project-schedules/period-plans/${id}`, method: 'get' })
 }
-export function replacePeriodPlanItems(id: string, items: PeriodItemRequest[]) {
+export function replacePeriodPlanItems(id: string, expectedVersion: number, items: PeriodItemRequest[]) {
   return request<ScheduleRow>({
     url: `/project-schedules/period-plans/${id}/items`,
     method: 'put',
-    data: { items },
+    data: { expectedVersion, items },
   })
 }
 export function submitPeriodPlan(id: string) {

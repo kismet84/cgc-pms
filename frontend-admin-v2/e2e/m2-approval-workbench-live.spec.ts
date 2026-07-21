@@ -186,18 +186,31 @@ test.describe('M2 live approval workbench', () => {
     await expect(detailDialog).toHaveCount(0)
     await expect(page.getByRole('cell', { name: '合同审批', exact: true })).toBeVisible()
 
-    for (const [selector, label] of [
-      ['#global-project', '当前项目'],
-      ['#global-report-period', '报告期'],
-    ] as const) {
-      const control = page.locator(selector)
-      await control.click()
-      const menu = page.getByRole('listbox', { name: label })
-      const controlBox = await control.boundingBox()
-      const menuBox = await menu.boundingBox()
-      expect(menuBox?.x).toBeCloseTo(controlBox?.x ?? 0, 0)
-      await control.press('Escape')
-    }
+    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'true')
+    const periodControl = page.locator('#global-report-period')
+    await periodControl.click()
+    const periodMenu = page.getByRole('listbox', { name: '报告期' })
+    const periodControlBox = await periodControl.boundingBox()
+    const periodMenuBox = await periodMenu.boundingBox()
+    expect(periodMenuBox?.x).toBeCloseTo(periodControlBox?.x ?? 0, 0)
+    const period = await periodMenu
+      .locator('[role="option"][data-value]:not([data-value=""])')
+      .first()
+    const periodValue = await period.getAttribute('data-value')
+    expect(periodValue).toMatch(/^\d{4}-\d{2}$/)
+    const [, year, month] = /^(\d{4})-(\d{2})$/.exec(periodValue!)!
+    const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
+    const filteredByPeriod = page.waitForResponse((item) => {
+      const url = new URL(item.url())
+      return (
+        url.pathname === '/api/workflow/tasks/todo' &&
+        url.searchParams.get('startTime') === `${periodValue}-01T00:00:00` &&
+        url.searchParams.get('endTime') ===
+          `${periodValue}-${String(lastDay).padStart(2, '0')}T23:59:59`
+      )
+    })
+    await period.click()
+    expect((await filteredByPeriod).ok()).toBe(true)
 
     const businessType = page.getByRole('button', { name: /^业务类型：/ })
     await businessType.click()

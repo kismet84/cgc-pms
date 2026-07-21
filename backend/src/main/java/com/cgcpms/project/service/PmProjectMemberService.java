@@ -85,13 +85,16 @@ public class PmProjectMemberService {
             member.setStatus("ACTIVE");
         }
 
-        // Check duplicate: same project + same user
-        Long exists = memberMapper.selectCount(new LambdaQueryWrapper<PmProjectMember>()
-                .eq(PmProjectMember::getTenantId, UserContext.getCurrentTenantId())
-                .eq(PmProjectMember::getProjectId, projectId)
-                .eq(PmProjectMember::getUserId, member.getUserId()));
-        if (exists != null && exists > 0) {
-            throw new BusinessException("MEMBER_ALREADY_EXISTS", "该用户已是本项目成员");
+        Long existingId = memberMapper.selectIdIncludingDeleted(
+                UserContext.getCurrentTenantId(), projectId, member.getUserId());
+        if (existingId != null) {
+            int restored = memberMapper.restoreDeleted(existingId, UserContext.getCurrentTenantId(), projectId,
+                    member, UserContext.getCurrentUserId());
+            if (restored == 0) {
+                throw new BusinessException("MEMBER_ALREADY_EXISTS", "该用户已是本项目成员");
+            }
+            log.info("Restoring project member: userId={}, projectId={}", member.getUserId(), projectId);
+            return existingId;
         }
 
         memberMapper.insert(member);

@@ -106,11 +106,12 @@ async function sendRequest<T, TBody>(
   retried: boolean,
 ): Promise<T> {
   const method = options.method ?? 'GET'
+  const body = resolveBody(options.body)
   const response = await fetch(`${API_PREFIX}${path}`, {
     method,
     credentials: 'same-origin',
     headers: buildHeaders(method, options.headers, options.body),
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+    body,
     signal: options.signal,
   })
 
@@ -201,7 +202,7 @@ function buildHeaders(
   body?: unknown,
 ): Headers {
   const headers = new Headers({ Accept: 'application/json', ...customHeaders })
-  if (body !== undefined && !headers.has('Content-Type')) {
+  if (body !== undefined && !isFormData(body) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
   }
 
@@ -210,6 +211,16 @@ function buildHeaders(
     if (token) headers.set(CSRF_CONTRACT.headerName, token)
   }
   return headers
+}
+
+function resolveBody(body: unknown): BodyInit | undefined {
+  if (body === undefined) return undefined
+  if (isFormData(body)) return body
+  return JSON.stringify(body)
+}
+
+function isFormData(body: unknown): body is FormData {
+  return typeof FormData !== 'undefined' && body instanceof FormData
 }
 
 function getCookie(name: string): string | null {

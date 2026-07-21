@@ -32,7 +32,9 @@ public final class ProjectScheduleModels {
             @Size(max = 30) String unit,
             @Size(max = 500) String remark) {}
 
-    public record WbsTaskBatch(@NotEmpty List<@Valid WbsTaskRequest> tasks) {}
+    public record WbsTaskBatch(
+            @NotNull @Min(0) Integer expectedVersion,
+            @NotEmpty List<@Valid WbsTaskRequest> tasks) {}
 
     public record PeriodPlanRequest(
             @NotNull Long schedulePlanId,
@@ -49,7 +51,9 @@ public final class ProjectScheduleModels {
             @NotNull @DecimalMin("0") @DecimalMax("100") BigDecimal targetProgress,
             @DecimalMin("0") BigDecimal plannedQuantity) {}
 
-    public record PeriodItemBatch(@NotEmpty List<@Valid PeriodItemRequest> items) {}
+    public record PeriodItemBatch(
+            @NotNull @Min(0) Integer expectedVersion,
+            @NotEmpty List<@Valid PeriodItemRequest> items) {}
 
     public record DailyProgressRequest(
             @NotNull Long wbsTaskId,
