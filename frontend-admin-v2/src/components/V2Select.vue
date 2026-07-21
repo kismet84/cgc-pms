@@ -38,11 +38,13 @@ const describedBy = computed(() =>
 )
 const dropdown = ref<HTMLDetailsElement | null>(null)
 const open = ref(false)
-const renderedOptions = computed(() =>
-  props.allowEmpty
+const renderedOptions = computed(() => {
+  if (!props.allowEmpty)
+    return [{ value: '', label: props.placeholder, disabled: true }, ...props.options]
+  return props.options.some((option) => option.value === '')
     ? props.options
-    : [{ value: '', label: props.placeholder, disabled: true }, ...props.options],
-)
+    : [{ value: '', label: props.placeholder }, ...props.options]
+})
 const selectedLabel = computed(
   () =>
     renderedOptions.value.find((option) => option.value === props.modelValue)?.label ??

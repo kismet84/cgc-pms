@@ -211,7 +211,7 @@
     "enabled": true,
     "command": "python scripts/rebuild.py",
     "timeoutSeconds": 900,
-    "waitSeconds": 180
+    "waitSeconds": 25
   },
   "allowedEpics": [
     "EPIC-000",

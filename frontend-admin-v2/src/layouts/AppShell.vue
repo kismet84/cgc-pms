@@ -846,7 +846,7 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
   color: var(--v2-color-surface);
   background: var(--v2-color-danger);
   border-radius: 999px;
-  font-size: 0.625rem;
+  font-size: var(--v2-font-size-11);
   line-height: 1rem;
   text-align: center;
 }
@@ -1098,11 +1098,11 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 .app-shell__role-tester-trigger {
   width: 3.25rem;
   height: 3.25rem;
-  color: #fff;
+  color: var(--v2-color-surface);
   background: var(--v2-color-primary);
   border: 0;
   border-radius: 50%;
-  box-shadow: 0 0.75rem 2rem rgb(37 99 235 / 28%);
+  box-shadow: 0 0.75rem 2rem var(--v2-color-focus-ring);
   font: inherit;
   font-weight: var(--v2-font-weight-bold);
   cursor: pointer;

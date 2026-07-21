@@ -10,6 +10,7 @@ const props = withDefaults(
     kind?: 'error' | 'loading' | 'empty'
     live?: 'off' | 'polite' | 'assertive'
     headingLevel?: 1 | 2 | 3
+    titleId?: string
   }>(),
   {
     code: undefined,
@@ -20,7 +21,8 @@ const props = withDefaults(
 )
 
 const role = computed(() => (props.kind === 'error' ? 'alert' : 'status'))
-const titleId = `v2-page-state-title-${useId()}`
+const generatedTitleId = `v2-page-state-title-${useId()}`
+const resolvedTitleId = computed(() => props.titleId || generatedTitleId)
 </script>
 
 <template>
@@ -30,14 +32,14 @@ const titleId = `v2-page-state-title-${useId()}`
     :role="role"
     :aria-live="live"
     aria-atomic="true"
-    :aria-labelledby="titleId"
+    :aria-labelledby="resolvedTitleId"
   >
     <div class="v2-page-state__mark" aria-hidden="true">
       {{ kind === 'loading' ? '···' : code || '—' }}
     </div>
     <div class="v2-page-state__copy">
       <p v-if="code" class="v2-page-state__code">状态 {{ code }}</p>
-      <component :is="`h${headingLevel}`" :id="titleId">{{ title }}</component>
+      <component :is="`h${headingLevel}`" :id="resolvedTitleId">{{ title }}</component>
       <p>{{ description }}</p>
     </div>
     <div v-if="kind === 'loading'" class="v2-page-state__skeletons" aria-hidden="true">

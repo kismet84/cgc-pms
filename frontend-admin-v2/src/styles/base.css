@@ -13,6 +13,17 @@
   box-sizing: border-box;
 }
 
+.v2-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 body {
   min-width: 320px;
   min-height: 100vh;
@@ -73,7 +84,7 @@ textarea {
 
 h1 {
   margin: 0;
-  font-size: clamp(28px, 5vw, 42px);
+  font-size: clamp(var(--v2-font-size-28), 5vw, var(--v2-font-size-42));
   line-height: var(--v2-line-height-tight);
 }
 

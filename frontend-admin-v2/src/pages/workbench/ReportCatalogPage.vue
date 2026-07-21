@@ -63,13 +63,17 @@ onBeforeUnmount(() => controller?.abort())
 
 <template>
   <section class="report-catalog-page" aria-labelledby="report-catalog-title">
-    <V2Card title="报表目录" subtitle="仅展示服务端按当前账号权限返回的报表。">
+    <V2Card
+      title="报表目录"
+      title-id="report-catalog-title"
+      :heading-level="1"
+      subtitle="仅展示服务端按当前账号权限返回的报表。"
+    >
       <template #actions
         ><V2Button variant="ghost" size="small" :loading="loading" @click="refresh"
           >刷新</V2Button
         ></template
       >
-      <h1 id="report-catalog-title" class="sr-only">报表目录</h1>
       <p class="report-catalog-page__summary">
         可见 {{ items.length }} 项；API-only 仅展示接口能力，不伪装成页面入口。
       </p>
@@ -80,12 +84,14 @@ onBeforeUnmount(() => controller?.abort())
       kind="loading"
       title="正在加载报表目录"
       description="读取服务端权限过滤后的目录。"
+      :heading-level="2"
     />
     <V2PageState
       v-else-if="!groups.length"
       kind="empty"
       title="当前账号暂无可见报表"
       description="请联系管理员核对报表权限。"
+      :heading-level="2"
     />
     <section v-else class="report-catalog-page__groups">
       <V2Card v-for="group in groups" :key="group.key" :title="catalogLabels[group.key] || '其他'">
@@ -169,13 +175,6 @@ onBeforeUnmount(() => controller?.abort())
 .report-catalog-page__no-entry {
   color: var(--v2-color-text-secondary);
   font-size: var(--v2-font-size-12);
-}
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
 }
 @media (max-width: 64rem) {
   .report-catalog-page__groups {

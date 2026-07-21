@@ -25,7 +25,7 @@ defineEmits<{
     :role="props.tone === 'danger' ? 'alert' : 'status'"
   >
     <div>
-      <h2 class="v2-alert__title">{{ title }}</h2>
+      <strong class="v2-alert__title">{{ title }}</strong>
       <p v-if="$slots.default" class="v2-alert__message"><slot /></p>
     </div>
     <button

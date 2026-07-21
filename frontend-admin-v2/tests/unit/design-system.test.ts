@@ -9,9 +9,12 @@ import {
   V2Button,
   V2Card,
   V2Cluster,
+  V2ConfirmDialog,
   V2Dialog,
+  V2GlassButton,
   V2Grid,
   V2Input,
+  V2PageState,
   V2Select,
   V2Skeleton,
   V2Stack,
@@ -39,6 +42,30 @@ describe('Clean-room V2 design system', () => {
     expect(wrapper.find('.v2-spinner').exists()).toBe(true)
 
     await wrapper.setProps({ loading: false, disabled: true })
+    expect(button.attributes()).toHaveProperty('disabled')
+  })
+
+  it('exposes a reusable glass button with text, state and click props', async () => {
+    let clicks = 0
+    const wrapper = mount(V2GlassButton, {
+      props: {
+        text: '确认处置',
+        className: 'dialog-action',
+        onClick: () => {
+          clicks += 1
+        },
+      },
+    })
+
+    const button = wrapper.get('button')
+    expect(button.classes()).toContain('v2-glass-button')
+    expect(button.classes()).toContain('dialog-action')
+    expect(button.text()).toContain('确认处置')
+    await button.trigger('click')
+    expect(clicks).toBe(1)
+
+    await wrapper.setProps({ loading: true })
+    expect(button.attributes('aria-busy')).toBe('true')
     expect(button.attributes()).toHaveProperty('disabled')
   })
 
@@ -78,7 +105,7 @@ describe('Clean-room V2 design system', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([['2026-07']])
   })
 
-  it('supports a selectable empty option without duplicating the placeholder', async () => {
+  it('supports an explicit or inferred empty option without duplicating the placeholder', async () => {
     const wrapper = mount(V2Select, {
       props: {
         label: '当前项目',
@@ -93,6 +120,19 @@ describe('Clean-room V2 design system', () => {
 
     expect(wrapper.findAll('[role="option"]')).toHaveLength(2)
     expect(wrapper.get('[role="button"]').text()).toBe('全部项目')
+
+    const inferred = mount(V2Select, {
+      props: {
+        label: '项目类型',
+        modelValue: 'BUILDING',
+        allowEmpty: true,
+        placeholder: '全部类型',
+        options: [{ value: 'BUILDING', label: '施工总承包' }],
+      },
+    })
+    expect(inferred.findAll('[role="option"]')).toHaveLength(2)
+    await inferred.get('[role="option"][data-value=""]').trigger('click')
+    expect(inferred.emitted('update:modelValue')).toEqual([['']])
   })
 
   it('covers card, badge, alert and skeleton status primitives', async () => {
@@ -101,7 +141,17 @@ describe('Clean-room V2 design system', () => {
       slots: { default: '面板内容', footer: '底部动作' },
     })
     expect(card.get('.v2-card__title').text()).toBe('经营健康度')
+    expect(card.get('h2').exists()).toBe(true)
     expect(card.classes()).toContain('v2-card--interactive')
+
+    const pageCard = mount(V2Card, {
+      props: { title: '现场日报', headingLevel: 1, titleId: 'daily-log-title' },
+    })
+    expect(pageCard.get('h1').attributes('id')).toBe('daily-log-title')
+    expect(pageCard.get('h1').classes()).toContain('v2-card__title--page')
+
+    const nestedCard = mount(V2Card, { props: { title: '附件', headingLevel: 3 } })
+    expect(nestedCard.get('h3').text()).toBe('附件')
 
     const badge = mount(V2Badge, {
       props: { tone: 'danger', dot: true },
@@ -115,12 +165,24 @@ describe('Clean-room V2 design system', () => {
       slots: { default: '请检查输入内容' },
     })
     expect(alert.attributes('role')).toBe('alert')
+    expect(alert.find('h1, h2, h3').exists()).toBe(false)
     await alert.get('button').trigger('click')
     expect(alert.emitted('dismiss')).toHaveLength(1)
 
     const skeleton = mount(V2Skeleton, { props: { variant: 'circle' } })
     expect(skeleton.attributes('aria-busy')).toBe('true')
     expect(skeleton.classes()).toContain('v2-skeleton--circle')
+
+    const state = mount(V2PageState, {
+      props: {
+        title: '正在加载',
+        description: '请稍候。',
+        headingLevel: 2,
+        titleId: 'stable-state-title',
+      },
+    })
+    expect(state.get('h2').attributes('id')).toBe('stable-state-title')
+    expect(state.attributes('aria-labelledby')).toBe('stable-state-title')
   })
 
   it('closes dialog with Escape and restores focus', async () => {
@@ -147,6 +209,84 @@ describe('Clean-room V2 design system', () => {
     await wrapper.setProps({ open: false })
     await flushPromises()
     expect(document.activeElement).toBe(trigger)
+    wrapper.unmount()
+  })
+
+  it('keeps a dialog open and emits a signal when backdrop closing is disabled', async () => {
+    const wrapper = mount(V2Dialog, {
+      attachTo: document.body,
+      props: { open: true, title: '编辑日报', closeOnBackdrop: false },
+    })
+    await flushPromises()
+
+    document
+      .querySelector<HTMLElement>('.v2-dialog__backdrop')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+    expect(wrapper.emitted('backdrop-click')).toHaveLength(1)
+    expect(wrapper.emitted('update:open')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('renders branded confirmation actions and blocks closing while saving', async () => {
+    const wrapper = mount(V2ConfirmDialog, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        title: '删除项目',
+        description: '此操作无法撤销。',
+        confirmText: '永久删除',
+        danger: true,
+      },
+    })
+    await flushPromises()
+
+    const buttons = Array.from(
+      document.querySelectorAll<HTMLButtonElement>('.v2-dialog__footer .v2-button'),
+    )
+    expect(document.querySelector('.v2-confirm-dialog')?.classList).toContain('v2-dialog-standard')
+    expect(buttons[1]?.classList).toContain('v2-button--danger')
+    buttons[0]?.click()
+    await flushPromises()
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    buttons[1]?.click()
+    await flushPromises()
+    expect(wrapper.emitted('confirm')).toHaveLength(1)
+
+    await wrapper.setProps({ loading: true })
+    document.querySelector<HTMLButtonElement>('.v2-dialog__close')?.click()
+    await flushPromises()
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    expect(document.querySelector<HTMLButtonElement>('.v2-button--danger')?.disabled).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('closes only the focused top dialog with Escape', async () => {
+    const wrapper = mount(
+      {
+        components: { V2Dialog },
+        data: () => ({ outerOpen: true, innerOpen: true }),
+        template: `
+          <V2Dialog v-model:open="outerOpen" title="日报详情">
+            <button>详情操作</button>
+          </V2Dialog>
+          <V2Dialog v-model:open="innerOpen" title="确认提交">
+            <button>确认操作</button>
+          </V2Dialog>
+        `,
+      },
+      { attachTo: document.body },
+    )
+    await flushPromises()
+
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(2)
+    document.activeElement?.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+    )
+    await flushPromises()
+
+    expect(document.querySelectorAll('[role="dialog"]')).toHaveLength(1)
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('日报详情')
     wrapper.unmount()
   })
 
@@ -187,6 +327,189 @@ describe('Clean-room V2 design system', () => {
     expect(componentFiles).not.toMatch(/#[0-9a-f]{3,8}\b/i)
   })
 
+  it('keeps migrated pages on declared typography and color tokens', () => {
+    const sourceFiles = readdirSync(sourceRoot, { recursive: true })
+      .map(String)
+      .filter((name) => /\.(?:css|ts|vue)$/.test(name))
+    const allSources = sourceFiles
+      .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
+      .join('\n')
+    const implementationSources = sourceFiles
+      .filter((name) => name !== 'styles\\tokens.css' && name !== 'styles/tokens.css')
+      .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
+      .join('\n')
+    const pageAndLayoutSources = sourceFiles
+      .filter((name) => /^(?:pages|layouts)[\\/]/.test(name))
+      .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
+      .join('\n')
+    const declaredTokens = new Set(
+      readFileSync(resolve(sourceRoot, 'styles/tokens.css'), 'utf-8').match(
+        /--v2-[\w-]+(?=\s*:)/g,
+      ) ?? [],
+    )
+    const runtimeLayoutTokens = new Set([
+      '--v2-cluster-align',
+      '--v2-cluster-gap',
+      '--v2-cluster-justify',
+      '--v2-grid-align',
+      '--v2-grid-min',
+      '--v2-stack-align',
+      '--v2-stack-gap',
+      '--v2-stack-justify',
+    ])
+    const referencedTokens = [
+      ...[...allSources.matchAll(/var\((--v2-[\w-]+)/g)].map(([, token]) => token),
+      ...[...allSources.matchAll(/['"](--v2-[\w-]+)['"]/g)].map(([, token]) => token),
+    ]
+    const unknownTokens = [
+      ...new Set(
+        referencedTokens.filter(
+          (token) =>
+            !token.endsWith('-') && !runtimeLayoutTokens.has(token) && !declaredTokens.has(token),
+        ),
+      ),
+    ]
+
+    expect(unknownTokens).toEqual([])
+    expect(implementationSources).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i)
+    expect(implementationSources).not.toMatch(/font-size:\s*[0-9.]+(?:px|rem)\b/i)
+    expect(pageAndLayoutSources).not.toMatch(/\.(?:sr-only|v2-visually-hidden)\s*\{/)
+  })
+
+  it('keeps migrated page title ids stable and page states below the page heading', () => {
+    const sources = Object.fromEntries(
+      [
+        'pages/dashboard/DashboardPage.vue',
+        'pages/delivery/DailyLogPage.vue',
+        'pages/delivery/SchedulePage.vue',
+        'pages/projects/ProjectPage.vue',
+        'pages/workbench/ReportCatalogPage.vue',
+        'pages/workbench/WorkflowWorkbenchPage.vue',
+      ].map((name) => [name, readFileSync(resolve(sourceRoot, name), 'utf-8')]),
+    )
+
+    const cardTitles = {
+      'pages/delivery/DailyLogPage.vue': 'daily-log-title',
+      'pages/delivery/SchedulePage.vue': 'schedule-title',
+      'pages/projects/ProjectPage.vue': 'project-title',
+      'pages/workbench/ReportCatalogPage.vue': 'report-catalog-title',
+    }
+    for (const [name, titleId] of Object.entries(cardTitles)) {
+      const source = sources[name]
+      expect(source).toContain(`aria-labelledby="${titleId}"`)
+      const titleCards = [...source.matchAll(/<V2Card\b[^>]*>/g)].map(([tag]) => tag)
+      expect(
+        titleCards.some(
+          (tag) => tag.includes(`title-id="${titleId}"`) && tag.includes(':heading-level="1"'),
+        ),
+      ).toBe(true)
+    }
+
+    const nativeTitles = {
+      'pages/dashboard/DashboardPage.vue': 'dashboard-title',
+      'pages/workbench/WorkflowWorkbenchPage.vue': 'workflow-title',
+    }
+    for (const [name, titleId] of Object.entries(nativeTitles)) {
+      const source = sources[name]
+      expect(source).toContain(`aria-labelledby="${titleId}"`)
+      expect(source).toMatch(new RegExp(`<h1[^>]*id="${titleId}"`))
+    }
+
+    for (const source of Object.values(sources)) {
+      const stateTags = [...source.matchAll(/<V2PageState\b[^>]*>/g)].map(([tag]) => tag)
+      for (const tag of stateTags) expect(tag).toMatch(/:heading-level="[123]"/)
+    }
+  })
+
+  it('keeps native browser confirmation dialogs out of V2 pages', () => {
+    const pageSources = readdirSync(resolve(sourceRoot, 'pages'), { recursive: true })
+      .filter((name) => name.endsWith('.vue'))
+      .map((name) => readFileSync(resolve(sourceRoot, 'pages', name), 'utf-8'))
+      .join('\n')
+
+    expect(pageSources).not.toContain('window.confirm(')
+  })
+
+  it('uses the standard dialog shell for confirmation and detail dialogs', () => {
+    const dailyLog = readFileSync(resolve(sourceRoot, 'pages/delivery/DailyLogPage.vue'), 'utf-8')
+    const workflow = readFileSync(
+      resolve(sourceRoot, 'pages/workbench/WorkflowWorkbenchPage.vue'),
+      'utf-8',
+    )
+    const dashboard = readFileSync(
+      resolve(sourceRoot, 'pages/dashboard/DashboardPage.vue'),
+      'utf-8',
+    )
+    const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+
+    expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog'")
+    expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog daily-log-page__dialog'")
+    expect(dailyLog).toContain('class="v2-detail-dialog__section"')
+    expect(dailyLog).toContain('class="v2-detail-dialog__facts"')
+    expect(
+      dailyLog.match(/dialogMode !== 'view' && canEdit && activeRecord\.status === 'DRAFT'/g),
+    ).toHaveLength(2)
+    expect(dailyLog).toContain('<template v-if="dialogMode !== \'view\'" #footer>')
+    expect(dailyLog).toContain(':close-on-backdrop="dialogMode === \'view\'"')
+    expect(dailyLog).toContain('@backdrop-click="warnUnsavedDialog"')
+    expect(dailyLog).toContain('class="daily-log-page__dialog-actions"')
+    expect(dailyLog).toContain('text="选择文件"')
+    expect(dailyLog).toContain('text="保存实际进度"')
+    expect(dailyLog).toContain('text="保存草稿"')
+    expect(dailyLog).toContain('text="提交定稿"')
+    expect(dailyLog).toContain('class="daily-log-page__stack daily-log-page__linked-facts"')
+    expect(workflow).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
+    expect(workflow).toContain('title="审批详情"')
+    expect(workflow).toContain('<dt>审批事项</dt>')
+    expect(workflow).toContain('<V2GlassButton')
+    expect(workflow).toContain('class="v2-detail-dialog__section"')
+    expect(workflow).toContain('class="v2-detail-dialog__facts"')
+    expect(workflow).toContain('class="v2-detail-dialog__actions"')
+    expect(workflow).toContain('<span>第 {{ pageNo }} 页</span>')
+    expect(workflow).toMatch(
+      /\.workflow-pagination \{[\s\S]*?justify-content: flex-end;[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+    )
+    expect(workflow).not.toContain('workflow-detail-overview')
+    expect(workflow).not.toContain('workflow-summary')
+    expect(dashboard).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
+    expect(dashboard).toContain('class="v2-detail-dialog__section"')
+    expect(dashboard).not.toContain('dashboard-alert-detail')
+    expect(components).toContain('.v2-detail-dialog .v2-card {')
+    expect(components).toMatch(/\.v2-dialog-standard \{[\s\S]*?width: min\(32rem, 100%\);/)
+    expect(components).toMatch(/@media \(min-width: 64rem\) \{[\s\S]*?width: min\(46rem, 100%\);/)
+    expect(components).toContain('scrollbar-width: none;')
+    expect(components).toContain('.v2-dialog__panel::-webkit-scrollbar')
+    expect(components).toContain('.v2-select__menu::-webkit-scrollbar')
+    expect(components).not.toContain('.v2-dialog__panel:has(.v2-select[open])')
+    expect(dailyLog).toMatch(
+      /\.daily-log-page__table th,[\s\S]*?\.daily-log-page__table td \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+    )
+    expect(dailyLog).toMatch(
+      /\.daily-log-page__panel \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+    )
+    expect(dailyLog).toMatch(
+      /\.daily-log-page__facts,[\s\S]*?\.daily-log-page__summary \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+    )
+    expect(dailyLog).toMatch(
+      /\.daily-log-page__form \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+    )
+    expect(dailyLog).toMatch(
+      /\.daily-log-page__form input,[\s\S]*?\.daily-log-page__form textarea \{[\s\S]*?background: transparent;[\s\S]*?border: 1px solid color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
+    )
+    expect(dailyLog).toMatch(
+      /\.daily-log-page__form :deep\(\.v2-field__control\) \{[\s\S]*?background: transparent;[\s\S]*?border-color: color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
+    )
+    expect(dailyLog).toMatch(
+      /\.daily-log-page__pagination \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+    )
+    expect(dailyLog).toMatch(
+      /\.daily-log-page__linked-facts \{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/,
+    )
+    expect(components).toMatch(/\.v2-detail-dialog \.v2-card \{[\s\S]*?border: 0;/)
+    expect(components).toMatch(/\.v2-detail-dialog \.v2-card \{[\s\S]*?background: transparent;/)
+    expect(components).toMatch(/\.v2-detail-dialog__quick-actions \{[\s\S]*?display: flex;/)
+  })
+
   it('keeps navigation accents separate from risk colors', () => {
     const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
     const placeholder = readFileSync(
@@ -197,5 +520,50 @@ describe('Clean-room V2 design system', () => {
     expect(appShell).toContain('var(--v2-color-workspace-tab-accent)')
     expect(placeholder).toContain('title="业务页面建设中" tone="info"')
     expect(placeholder).not.toContain('tone="warning"')
+  })
+
+  it('locks the current V2 standard style contract', () => {
+    const baseline = readFileSync(
+      resolve(sourceRoot, '../../docs/ui-v2/m1-design-system-baseline.md'),
+      'utf-8',
+    )
+    const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+    const glassButton = readFileSync(resolve(sourceRoot, 'components/V2GlassButton.vue'), 'utf-8')
+    const dailyLog = readFileSync(resolve(sourceRoot, 'pages/delivery/DailyLogPage.vue'), 'utf-8')
+    const workflow = readFileSync(
+      resolve(sourceRoot, 'pages/workbench/WorkflowWorkbenchPage.vue'),
+      'utf-8',
+    )
+
+    for (const marker of [
+      '现行 V2 标准样式合同',
+      'v2-dialog-standard',
+      'v2-detail-dialog',
+      'V2ConfirmDialog',
+      'V2GlassButton',
+      '上一页 — 第 N 页 — 下一页',
+    ]) {
+      expect(baseline).toContain(marker)
+    }
+
+    expect(components).toMatch(
+      /\.v2-detail-dialog__section \{[\s\S]*?margin-block-end: 10px;[\s\S]*?padding-block-end: 10px;[\s\S]*?color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
+    )
+    expect(glassButton).toContain('color-mix(in srgb, var(--v2-color-surface) 50%, transparent)')
+    expect(glassButton).toContain('backdrop-filter: blur(16px) saturate(160%);')
+    expect(glassButton).toContain('-webkit-backdrop-filter: blur(16px) saturate(160%);')
+    expect(glassButton).toContain('.v2-glass-button.v2-button:hover:not(:disabled)')
+    expect(glassButton).toContain('.v2-glass-button.v2-button:active:not(:disabled)')
+    expect(glassButton).toContain('.v2-glass-button.v2-button:focus-visible')
+    expect(glassButton).toContain('@media (prefers-reduced-motion: reduce)')
+
+    for (const source of [dailyLog, workflow]) {
+      const previous = source.indexOf('上一页')
+      const current = source.indexOf('第 {{ pageNo }} 页')
+      const next = source.indexOf('下一页')
+      expect(previous).toBeGreaterThan(-1)
+      expect(previous).toBeLessThan(current)
+      expect(current).toBeLessThan(next)
+    }
   })
 })
