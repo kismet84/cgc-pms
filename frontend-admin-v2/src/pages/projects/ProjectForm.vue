@@ -76,6 +76,9 @@ function set(key: keyof ProjectUpsertCommand, value: string) {
   gap: var(--v2-space-3);
   align-items: end;
 }
+.project-form--dialog {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 .project-form label {
   display: grid;
   gap: var(--v2-space-1);
@@ -88,6 +91,15 @@ function set(key: keyof ProjectUpsertCommand, value: string) {
   background: var(--v2-color-surface);
   border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
+}
+.project-form--dialog input {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
+  border-radius: var(--v2-radius-sm);
+}
+.project-form--dialog :deep(.v2-field__control) {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
 }
 @media (max-width: 64rem) {
   .project-form {

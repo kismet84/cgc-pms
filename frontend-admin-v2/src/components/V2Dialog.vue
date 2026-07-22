@@ -115,7 +115,7 @@ onBeforeUnmount(() => {
       <div v-if="open" class="v2-dialog__backdrop" @click.self="onBackdrop">
         <section
           ref="panel"
-          :class="['v2-dialog__panel', panelClass]"
+          :class="['v2-dialog__panel', 'v2-dialog-standard', panelClass]"
           role="dialog"
           aria-modal="true"
           :aria-labelledby="titleId"

@@ -49,13 +49,22 @@ describe('V2 application-shell routes', () => {
     expect(dashboard?.meta?.permission).toBe('dashboard:view')
     expect(project?.meta?.permission).toBe('project:query')
     expect(quality?.meta?.permission).toBe('quality:safety:query')
-    expect(quality?.meta?.workspaceContext).toEqual({ project: true, period: false })
+    expect(quality?.meta?.workspaceContext).toEqual({
+      project: true,
+      period: false,
+    })
     expect(String(quality?.component)).not.toContain('ShellPlaceholderPage')
     expect(technical?.meta?.permission).toBe('technical:query')
-    expect(technical?.meta?.workspaceContext).toEqual({ project: true, period: false })
+    expect(technical?.meta?.workspaceContext).toEqual({
+      project: true,
+      period: false,
+    })
     expect(String(technical?.component)).not.toContain('ShellPlaceholderPage')
     expect(closeout?.meta?.permission).toBe('closeout:query')
-    expect(closeout?.meta?.workspaceContext).toEqual({ project: true, period: false })
+    expect(closeout?.meta?.workspaceContext).toEqual({
+      project: true,
+      period: false,
+    })
     expect(String(closeout?.component)).not.toContain('ShellPlaceholderPage')
     expect(scheduleDetail?.meta).toMatchObject({
       permission: 'schedule:query',

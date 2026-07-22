@@ -105,12 +105,7 @@ const correctiveForm = reactive<CorrectiveActionCommand>({
 })
 const snapshotDate = ref(new Date().toISOString().slice(0, 10))
 
-const routeProjectId = computed(() =>
-  typeof route.query.projectId === 'string' && route.query.projectId.trim()
-    ? route.query.projectId.trim()
-    : '',
-)
-const projectId = computed(() => routeProjectId.value || workspace.selectedProjectId || '')
+const projectId = computed(() => workspace.selectedProjectId || '')
 const scheduleId = computed(() =>
   typeof route.params.scheduleId === 'string' ? route.params.scheduleId.trim() : '',
 )
@@ -595,12 +590,8 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
           <V2Button v-if="canMaintain" size="small" @click="openCreate">新建基线计划</V2Button>
         </div>
       </template>
-      <p class="schedule-page__hint">
-        {{
-          isDetailRoute
-            ? '查看计划任务、月周计划、进度偏差与纠偏记录。'
-            : '集中管理基线计划、WBS、月周计划、进度偏差与纠偏。'
-        }}
+      <p v-if="isDetailRoute" class="schedule-page__hint">
+        查看计划任务、月周计划、进度偏差与纠偏记录。
       </p>
     </V2Card>
 
@@ -896,6 +887,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
         <V2Select
           v-if="projectOptions.length"
           v-model="scheduleForm.projectId"
+          class="schedule-page__span-2"
           label="项目"
           :options="projectOptions"
           required
@@ -903,11 +895,12 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
         <V2Input
           v-else
           v-model="scheduleForm.projectId"
+          class="schedule-page__span-2"
           label="项目 ID"
           required
           hint="没有项目列表时，使用已确认的项目 ID。"
         />
-        <V2Input v-model="scheduleForm.planCode" label="计划编码" required />
+        <V2Input v-model="scheduleForm.planCode" label="计划编号" required />
         <V2Input v-model="scheduleForm.planName" label="计划名称" required />
         <label>
           计划开始

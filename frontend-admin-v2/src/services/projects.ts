@@ -2,7 +2,7 @@ import {
   PROJECT_API,
   type DictionaryItem,
   type PageResult,
-  type ProjectListItem,
+  type ProjectContextOption,
   type ProjectMember,
   type ProjectMemberQuery,
   type ProjectOverview,
@@ -14,8 +14,6 @@ import {
   type ProjectUserOption,
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
-
-const PROJECT_PAGE_SIZE = 200
 
 export function loadProjectPage(
   query: ProjectQuery = {},
@@ -46,20 +44,8 @@ export function loadProjectMembers(
   )
 }
 
-export async function loadVisibleProjects(signal?: AbortSignal): Promise<ProjectListItem[]> {
-  const projects: ProjectListItem[] = []
-  let pageNo = 1
-  let total = 0
-
-  do {
-    const page = await loadProjectPage({ pageNo, pageSize: PROJECT_PAGE_SIZE }, signal)
-    projects.push(...page.records)
-    total = page.total
-    if (!page.records.length) break
-    pageNo += 1
-  } while (projects.length < total)
-
-  return projects
+export function loadVisibleProjects(signal?: AbortSignal): Promise<ProjectContextOption[]> {
+  return apiRequest<ProjectContextOption[]>(PROJECT_API.contextOptions, { signal })
 }
 
 export function createProject(command: ProjectUpsertCommand): Promise<string> {

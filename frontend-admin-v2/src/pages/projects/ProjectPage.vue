@@ -285,9 +285,7 @@ async function saveProject(create: boolean) {
   try {
     if (create) await createProject(command)
     else await updateProject(projectId.value, command)
-    successMessage.value = create
-      ? '项目已创建；列表已按服务端状态重读。'
-      : '项目已更新；详情已按服务端状态重读。'
+    successMessage.value = create ? '项目已创建。' : '项目已更新。'
     createOpen.value = false
     await load(true)
   } catch (error) {
@@ -322,7 +320,7 @@ async function act(pending: Extract<PendingConfirmation, { kind: 'project' }>) {
         reason: pending.reason ?? '',
       })
     if (pending.action === 'delete') await deleteProject(pending.target.id)
-    successMessage.value = '操作成功；页面已按服务端权威状态重读。'
+    successMessage.value = '操作成功。'
     await load(true)
   } catch (error) {
     errorMessage.value = message(error, '项目操作失败')
@@ -358,7 +356,7 @@ async function saveMember() {
       await updateProjectMember(projectId.value, editingMemberId.value, command)
     else await addProjectMember(projectId.value, command)
     memberOpen.value = false
-    successMessage.value = '成员已保存；成员列表已按服务端状态重读。'
+    successMessage.value = '成员已保存。'
     await load(true)
   } catch (error) {
     errorMessage.value = message(error, '成员保存失败')
@@ -372,7 +370,7 @@ async function removeMember(member: ProjectMember) {
   resetNotices()
   try {
     await deleteProjectMember(projectId.value, member.id)
-    successMessage.value = '成员已移除；列表已重读。'
+    successMessage.value = '成员已移除。'
     await load(true)
   } catch (error) {
     errorMessage.value = message(error, '成员移除失败')
@@ -590,7 +588,7 @@ onBeforeUnmount(() => controller?.abort())
         <V2Card
           v-if="can('project:status')"
           title="状态变更"
-          subtitle="原因必填；提交后重读服务端状态。"
+          subtitle="原因必填；提交后刷新项目状态。"
           ><div class="project-page__filters">
             <V2Select
               v-model="statusForm.targetStatus"
@@ -612,7 +610,7 @@ onBeforeUnmount(() => controller?.abort())
             :type-options="typeOptions"
             @update:model-value="Object.assign(form, $event)"
           /><template #footer
-            ><V2Button :loading="saving" @click="saveProject(false)">保存并重读</V2Button></template
+            ><V2Button :loading="saving" @click="saveProject(false)">保存</V2Button></template
           ></V2Card
         >
       </template>
@@ -684,18 +682,31 @@ onBeforeUnmount(() => controller?.abort())
       @confirm="confirmPendingAction"
     />
 
-    <V2Dialog v-model:open="createOpen" title="新建项目" description="项目编号由服务端生成。"
-      ><ProjectForm
+    <V2Dialog
+      v-model:open="createOpen"
+      title="新建项目"
+      description="项目编号由服务端生成。"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
+    >
+      <ProjectForm
+        class="project-form--dialog"
         :model-value="form"
         :type-options="typeOptions"
         @update:model-value="Object.assign(form, $event)"
-      /><template #footer
-        ><V2Button variant="secondary" @click="createOpen = false">取消</V2Button
-        ><V2Button :loading="saving" @click="saveProject(true)">创建并重读</V2Button></template
-      ></V2Dialog
+      />
+      <template #footer>
+        <V2Button variant="secondary" @click="createOpen = false">取消</V2Button>
+        <V2Button :loading="saving" @click="saveProject(true)">创建</V2Button>
+      </template>
+    </V2Dialog>
+    <V2Dialog
+      v-model:open="memberOpen"
+      :title="editingMemberId ? '编辑成员' : '添加成员'"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
     >
-    <V2Dialog v-model:open="memberOpen" :title="editingMemberId ? '编辑成员' : '添加成员'">
-      <form class="project-page__form" @submit.prevent="saveMember">
+      <form class="project-page__form project-page__form--dialog" @submit.prevent="saveMember">
         <V2Select
           v-if="userOptions.length && !editingMemberId"
           v-model="memberForm.userId"
@@ -720,7 +731,7 @@ onBeforeUnmount(() => controller?.abort())
       </form>
       <template #footer
         ><V2Button variant="secondary" @click="memberOpen = false">取消</V2Button
-        ><V2Button :loading="saving" @click="saveMember">保存并重读</V2Button></template
+        ><V2Button :loading="saving" @click="saveMember">保存</V2Button></template
       >
     </V2Dialog>
   </section>
@@ -739,6 +750,9 @@ onBeforeUnmount(() => controller?.abort())
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--v2-space-3);
   align-items: end;
+}
+.project-page__form--dialog {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .project-page__toolbar-card :deep(.v2-card__header) {
   display: block;

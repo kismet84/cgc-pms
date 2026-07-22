@@ -23,6 +23,14 @@ import {
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const sourceRoot = resolve(currentDir, '../../src')
 
+function migratedPageSources() {
+  const pagesRoot = resolve(sourceRoot, 'pages')
+  return readdirSync(pagesRoot, { recursive: true })
+    .map(String)
+    .filter((name) => name.endsWith('.vue'))
+    .map((name) => ({ name, source: readFileSync(resolve(pagesRoot, name), 'utf-8') }))
+}
+
 afterEach(() => {
   document.body.innerHTML = ''
 })
@@ -164,12 +172,14 @@ describe('Clean-room V2 design system', () => {
     expect(card.get('.v2-card__title').text()).toBe('经营健康度')
     expect(card.get('h2').exists()).toBe(true)
     expect(card.classes()).toContain('v2-card--interactive')
+    expect(card.get('.v2-card__body').text()).toBe('面板内容')
 
     const pageCard = mount(V2Card, {
       props: { title: '现场日报', headingLevel: 1, titleId: 'daily-log-title' },
     })
     expect(pageCard.get('h1').attributes('id')).toBe('daily-log-title')
     expect(pageCard.get('h1').classes()).toContain('v2-card__title--page')
+    expect(pageCard.find('.v2-card__body').exists()).toBe(false)
 
     const nestedCard = mount(V2Card, { props: { title: '附件', headingLevel: 3 } })
     expect(nestedCard.get('h3').text()).toBe('附件')
@@ -222,6 +232,7 @@ describe('Clean-room V2 design system', () => {
 
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
     expect(dialog).not.toBeNull()
+    expect(dialog?.classList).toContain('v2-dialog-standard')
     expect(document.activeElement).toBe(dialog)
     dialog?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     await flushPromises()
@@ -346,6 +357,8 @@ describe('Clean-room V2 design system', () => {
 
     expect(componentCss).not.toMatch(/#[0-9a-f]{3,8}\b/i)
     expect(componentFiles).not.toMatch(/#[0-9a-f]{3,8}\b/i)
+    expect(componentCss).toContain('.v2-card__body:empty')
+    expect(componentCss).toContain('.v2-card__header + .v2-card__body:not(:empty)')
   })
 
   it('keeps migrated pages on declared typography and color tokens', () => {
@@ -443,12 +456,54 @@ describe('Clean-room V2 design system', () => {
   })
 
   it('keeps native browser confirmation dialogs out of V2 pages', () => {
-    const pageSources = readdirSync(resolve(sourceRoot, 'pages'), { recursive: true })
-      .filter((name) => name.endsWith('.vue'))
-      .map((name) => readFileSync(resolve(sourceRoot, 'pages', name), 'utf-8'))
+    const pageSources = migratedPageSources()
+      .map(({ source }) => source)
       .join('\n')
 
     expect(pageSources).not.toContain('window.confirm(')
+  })
+
+  it('keeps implementation wording out of every migrated page', () => {
+    const pageSources = migratedPageSources()
+      .map(({ source }) => source)
+      .join('\n')
+
+    expect(pageSources).not.toMatch(/权威|回读|重读|后端状态|后端阶段/)
+  })
+
+  it('keeps text and select fields on shared V2 components across every migrated page', () => {
+    const nativeInputPattern = /<input\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g
+    const allowedNativeTypes = new Set(['checkbox', 'date', 'file', 'hidden', 'number', 'radio'])
+
+    for (const { name, source } of migratedPageSources()) {
+      expect(source, `${name} native select`).not.toMatch(/<select\b/)
+      for (const [tag] of source.matchAll(nativeInputPattern)) {
+        const type = tag.match(/\btype=["']([^"']+)["']/)?.[1]
+        expect(allowedNativeTypes.has(type ?? ''), `${name} ${tag}`).toBe(true)
+      }
+    }
+  })
+
+  it('enforces the standard dialog contract across every migrated page', () => {
+    const dialogPattern = /(<V2Dialog\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>)([\s\S]*?)<\/V2Dialog\s*>/g
+
+    for (const { name, source } of migratedPageSources()) {
+      const dialogs = [...source.matchAll(dialogPattern)]
+      expect(dialogs, `${name} V2Dialog parser coverage`).toHaveLength(
+        [...source.matchAll(/<V2Dialog\b/g)].length,
+      )
+      for (const [index, [, openingTag, body]] of dialogs.entries()) {
+        const evidence = `${name} V2Dialog #${index + 1}`
+        expect(openingTag, evidence).toMatch(/\b:?close-on-backdrop=/)
+
+        const hasEditableControl = /<(?:form|input|textarea|select)\b|<V2(?:Input|Select)\b/.test(
+          body,
+        )
+        if (hasEditableControl) {
+          expect(openingTag, evidence).toMatch(/:close-on-backdrop="false"|@backdrop-click=/)
+        }
+      }
+    }
   })
 
   it('uses the standard dialog shell for confirmation and detail dialogs', () => {
@@ -468,6 +523,8 @@ describe('Clean-room V2 design system', () => {
       'pages/delivery/TechnicalManagementPage.vue',
       'pages/delivery/ProjectCloseoutPage.vue',
     ].map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
+    const projectPage = readFileSync(resolve(sourceRoot, 'pages/projects/ProjectPage.vue'), 'utf-8')
+    const projectForm = readFileSync(resolve(sourceRoot, 'pages/projects/ProjectForm.vue'), 'utf-8')
 
     expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog'")
     expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog daily-log-page__dialog'")
@@ -502,10 +559,7 @@ describe('Clean-room V2 design system', () => {
     expect(dashboard).toContain('class="v2-detail-dialog__section"')
     expect(dashboard).not.toContain('dashboard-alert-detail')
     for (const page of deliveryPages) {
-      expect(page).toContain('panel-class="v2-dialog-standard')
-      expect(page).toContain(':close-on-backdrop="false"')
       expect(page).toContain('<template #footer>')
-      expect(page).not.toMatch(/权威|回读|重读|后端状态|后端阶段/)
       expect(page).not.toMatch(/\{\{\s*(?:\w+\.)+(?:status|severity|conclusion)\s*\}\}/)
     }
     for (const page of deliveryPages.slice(1)) {
@@ -522,6 +576,16 @@ describe('Clean-room V2 design system', () => {
       expect(deliveryPages[0]).toContain(`id="${formId}"`)
       expect(deliveryPages[0]).toContain(`type="submit" form="${formId}"`)
     }
+    expect(deliveryPages[0]).toMatch(/class="schedule-page__span-2"[\s\S]*?label="项目"/)
+    expect(deliveryPages[0]).toContain('label="计划编号"')
+    expect(projectPage).toContain('class="project-form--dialog"')
+    expect(projectForm).toMatch(
+      /\.project-form--dialog \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+    )
+    expect(projectForm).toContain('.project-form--dialog :deep(.v2-field__control) {')
+    expect(components).toContain('.v2-dialog-standard label:not(.v2-field) {')
+    expect(components).toContain('var(--v2-font-size-12) / var(--v2-line-height-ui)')
+    expect(components).toContain('var(--v2-font-size-13) / var(--v2-line-height-ui)')
     expect(components).toContain('.v2-detail-dialog .v2-card {')
     expect(components).toMatch(/\.v2-dialog-standard \{[\s\S]*?width: min\(32rem, 100%\);/)
     expect(components).toMatch(/@media \(min-width: 64rem\) \{[\s\S]*?width: min\(46rem, 100%\);/)

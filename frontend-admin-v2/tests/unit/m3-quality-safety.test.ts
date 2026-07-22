@@ -137,7 +137,7 @@ describe('M3 quality safety closed loop', () => {
       "'REINSPECTION_EVIDENCE'",
     ])
       expect(pageSource).toContain(stage)
-    expect(pageSource).toContain('aria-labelledby="quality-title"')
+    expect(pageSource).toContain('aria-label="质量安全整改闭环"')
     expect(pageSource).toContain('aria-live="polite"')
     expect(pageSource).toContain('@media (max-width: 64rem)')
     expect(pageSource).toContain('@media (max-width: 40rem)')

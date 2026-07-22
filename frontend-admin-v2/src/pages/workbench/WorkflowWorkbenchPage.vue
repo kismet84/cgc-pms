@@ -18,6 +18,7 @@ import {
   V2Card,
   V2Dialog,
   V2GlassButton,
+  V2Input,
   V2PageState,
   V2Select,
 } from '@/components'
@@ -344,9 +345,13 @@ onBeforeUnmount(() => {
     <template v-if="true">
       <V2Card class="workflow-filter">
         <form class="workflow-filter__form" @submit.prevent="search">
-          <label class="workflow-filter__keyword"
-            >关键词<input v-model="keyword" type="search" placeholder="标题或业务编号"
-          /></label>
+          <V2Input
+            v-model="keyword"
+            class="workflow-filter__keyword"
+            type="search"
+            label="关键词"
+            placeholder="标题或业务编号"
+          />
           <V2Select
             id="workflow-business-type"
             class="workflow-filter__business-type"
@@ -453,10 +458,11 @@ onBeforeUnmount(() => {
       :description="
         detail
           ? `${workflowBusinessTypeLabel(detail.businessType)} · ${detail.templateName}`
-          : '查看权威流程记录并执行当前允许动作。'
+          : '查看流程记录并执行当前允许动作。'
       "
       close-label="关闭审批详情"
       panel-class="v2-dialog-standard v2-detail-dialog"
+      :close-on-backdrop="true"
       @close="closeDetail"
     >
       <V2PageState
@@ -555,19 +561,18 @@ onBeforeUnmount(() => {
     <V2Dialog
       v-model:open="actionOpen"
       :title="action ? WORKFLOW_ACTION_LABELS[action] : '审批动作'"
-      description="提交后将重新读取服务端权威状态。"
-      :close-on-backdrop="!actionLoading"
+      description="提交后将刷新最新状态。"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
     >
       <div class="workflow-action-form">
-        <label v-if="action === 'transfer'"
-          >目标用户 ID<input v-model="targetUserId" type="text"
-        /></label>
-        <label v-if="action === 'addSign'"
-          >加签用户 ID<input
-            v-model="additionalUserIds"
-            type="text"
-            placeholder="多个 ID 用逗号分隔"
-        /></label>
+        <V2Input v-if="action === 'transfer'" v-model="targetUserId" label="目标用户 ID" />
+        <V2Input
+          v-if="action === 'addSign'"
+          v-model="additionalUserIds"
+          label="加签用户 ID"
+          placeholder="多个 ID 用逗号分隔"
+        />
         <label
           >处理意见<textarea v-model="comment" rows="4" :required="action === 'reject'"></textarea>
         </label>

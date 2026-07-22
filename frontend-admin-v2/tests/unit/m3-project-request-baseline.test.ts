@@ -44,8 +44,40 @@ describe('M3 project request baseline', () => {
 
     expect(schedule).toContain('@click="requestScheduleSubmit(item)"')
     expect(schedule).not.toContain('openDetail(item.id).then(() => requestScheduleSubmit())')
+    expect(schedule).not.toContain('集中管理基线计划、WBS、月周计划、进度偏差与纠偏。')
     expect(dailyLog).toContain(':on-click="requestDailySubmit"')
     expect(dailyLog).toContain('@click="requestFileRemoval(file.id, file.originalName)"')
+  })
+
+  it('uses the validated public-shell project context and keeps aggregate routes on all projects', () => {
+    const shell = readFileSync(resolve('src/layouts/AppShell.vue'), 'utf-8')
+    const catalog = readFileSync(resolve('src/navigation/catalog.ts'), 'utf-8')
+
+    expect(shell).toContain("{ value: '', label: '全部项目' }")
+    expect(shell).toContain('allow-empty')
+    for (const page of [
+      'SchedulePage.vue',
+      'DailyLogPage.vue',
+      'QualitySafetyPage.vue',
+      'TechnicalManagementPage.vue',
+      'ProjectCloseoutPage.vue',
+    ]) {
+      const source = readFileSync(resolve(`src/pages/delivery/${page}`), 'utf-8')
+      expect(source).not.toMatch(/route\.query\.projectId/)
+      expect(source).toContain('workspace.selectedProjectId')
+    }
+    expect(catalog).not.toContain('projectAllowAll: false')
+    for (const page of [
+      'QualitySafetyPage.vue',
+      'TechnicalManagementPage.vue',
+      'ProjectCloseoutPage.vue',
+    ]) {
+      const source = readFileSync(resolve(`src/pages/delivery/${page}`), 'utf-8')
+      expect(source).toContain('scopeProjectIds')
+    }
+    expect(readFileSync(resolve('src/pages/delivery/QualitySafetyPage.vue'), 'utf-8')).toMatch(
+      /async function runWrite[\s\S]*if \(!projectId\.value\)/,
+    )
   })
 
   it('encodes non-empty project filters and passes the abort signal', async () => {

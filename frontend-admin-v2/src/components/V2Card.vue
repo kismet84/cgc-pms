@@ -34,7 +34,7 @@ const props = withDefaults(
       </div>
       <slot name="actions"></slot>
     </header>
-    <div class="v2-card__body"><slot /></div>
+    <div v-if="$slots.default" class="v2-card__body"><slot /></div>
     <footer v-if="$slots.footer" class="v2-card__footer"><slot name="footer" /></footer>
   </section>
 </template>

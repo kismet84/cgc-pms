@@ -100,12 +100,7 @@ const projectOptions = computed(() =>
 const canEdit = computed(() => hasPermission('site:daily:edit'))
 const canReportProgress = computed(() => hasPermission('schedule:progress'))
 const canViewQuality = computed(() => hasPermission('quality:safety:query'))
-const routeProjectId = computed(() =>
-  typeof route.query.projectId === 'string' && route.query.projectId.trim()
-    ? route.query.projectId.trim()
-    : '',
-)
-const selectedProjectId = computed(() => routeProjectId.value || workspace.selectedProjectId || '')
+const selectedProjectId = computed(() => workspace.selectedProjectId || '')
 const selectedReportPeriod = computed(() =>
   typeof route.query.period === 'string'
     ? route.query.period
@@ -336,10 +331,10 @@ async function saveRecord(): Promise<void> {
         ...command,
         expectedUpdatedAt: activeRecord.value.updatedAt ?? undefined,
       })
-      successMessage.value = '日报草稿已更新；列表已按服务端权威状态重读。'
+      successMessage.value = '日报草稿已更新。'
     } else {
       await createSiteDailyLog(command)
-      successMessage.value = '日报草稿已创建；列表已按服务端权威状态重读。'
+      successMessage.value = '日报草稿已创建。'
     }
     dialogOpen.value = false
     await loadList(true)
@@ -394,7 +389,7 @@ async function submitCurrent(record: SiteDailyLogRecord): Promise<void> {
   try {
     await submitSiteDailyLog(record.id)
     dialogOpen.value = false
-    successMessage.value = '现场日报已提交；列表已按服务端权威状态重读。'
+    successMessage.value = '现场日报已提交。'
     await loadList(true)
   } catch (error) {
     errorMessage.value = message(error, '现场日报提交失败')
@@ -411,7 +406,7 @@ async function onFileChange(event: Event): Promise<void> {
   resetNotices()
   try {
     await uploadSiteFile(file, SITE_DAILY_LOG, activeRecord.value.id)
-    successMessage.value = '附件已上传；列表已按服务端权威状态重读。'
+    successMessage.value = '附件已上传。'
     await loadFiles(activeRecord.value.id, detailRequestId.value)
   } catch (error) {
     errorMessage.value = message(error, '附件上传失败')
@@ -446,7 +441,7 @@ async function removeFile(pending: Extract<PendingDailyAction, { kind: 'file' }>
   resetNotices()
   try {
     await deleteSiteFile(pending.fileId)
-    successMessage.value = '附件已删除；列表已按服务端权威状态重读。'
+    successMessage.value = '附件已删除。'
     await loadFiles(pending.recordId, pending.requestId)
   } catch (error) {
     errorMessage.value = message(error, '附件删除失败')
@@ -788,7 +783,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
           title="WBS 实际进度"
           :subtitle="
             canReportProgress
-              ? '仅周计划内任务可填报；提交后统一走权威回读。'
+              ? '仅周计划内任务可填报；提交后统一刷新进度。'
               : '当前账号无进度填报权限，正文详情继续可读且不会发起进度请求。'
           "
         >
@@ -846,10 +841,9 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
                   </td>
                   <td>
                     <span v-if="dialogMode === 'view'">{{ row.workDescription || '—' }}</span>
-                    <input
+                    <V2Input
                       v-else
                       v-model="row.workDescription"
-                      type="text"
                       :disabled="
                         !canReportProgress || !row.included || activeRecord.status !== 'DRAFT'
                       "

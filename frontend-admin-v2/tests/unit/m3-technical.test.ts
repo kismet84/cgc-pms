@@ -129,7 +129,7 @@ describe('M3 technical management closed loop', () => {
     expect(pageSource).not.toContain('state="loading"')
     expect(pageSource).not.toContain('state="empty"')
     expect(pageSource).toContain('description="正在加载方案、图纸、RFI、交底和归档状态。"')
-    expect(pageSource).toContain('aria-labelledby="technical-title"')
+    expect(pageSource).toContain('aria-label="图纸 RFI 技术闭环"')
     expect(pageSource).toContain('aria-live="polite"')
     expect(pageSource).toContain('@media (max-width: 64rem)')
     expect(pageSource).toContain('@media (max-width: 40rem)')

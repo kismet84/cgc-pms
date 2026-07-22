@@ -12,7 +12,7 @@ async function login(page: Page, username: string) {
 
 async function openCloseout(page: Page, projectId = closedProjectId) {
   await page.goto(`/v2/project-closeout?projectId=${projectId}`)
-  await expect(page.getByRole('heading', { level: 1, name: '竣工收尾闭环' })).toBeVisible()
+  await expect(page.getByRole('region', { name: '竣工收尾闭环' })).toBeVisible()
   await expect(page.locator('.shell-placeholder')).toHaveCount(0)
   await expect(page.locator('.v2-page-state--loading')).toHaveCount(0)
   await expect(page.getByRole('alert', { name: '页面暂时无法显示' })).toHaveCount(0)

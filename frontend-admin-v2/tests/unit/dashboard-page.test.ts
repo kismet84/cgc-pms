@@ -388,7 +388,7 @@ describe('M2 dashboard page', () => {
     expect(wrapper.get('.v2-detail-dialog__message').text()).toBe(alert.message)
     expect(wrapper.get('.v2-detail-dialog__quick-actions').findAll('button')).toHaveLength(2)
     expect(wrapper.get('.v2-detail-dialog__form-row').findAll('.v2-field')).toHaveLength(2)
-    expect(wrapper.text()).toContain('查看权威预警记录并执行当前账号允许的操作。')
+    expect(wrapper.text()).toContain('查看预警记录并执行当前账号允许的操作。')
     await wrapper.get('.v2-detail-dialog__actions input').setValue('已完成复核')
     await wrapper
       .findAll('button')

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import type {
   ArchiveTransferCommand,
   CloseProjectCommand,
@@ -81,7 +80,12 @@ interface EvidenceGroup {
   files: SiteFileRecord[]
 }
 
-const route = useRoute()
+interface ScopedCloseoutOverview {
+  projectId: string
+  projectName: string
+  overview: CloseoutOverview
+}
+
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
 const loading = ref(false)
@@ -90,6 +94,7 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const dialog = ref<DialogKind>(null)
 const overview = ref<CloseoutOverview | null>(null)
+const scopedOverviews = ref<ScopedCloseoutOverview[]>([])
 const trace = ref<CloseoutTrace | null>(null)
 const traceFiles = ref<EvidenceGroup[]>([])
 const pendingEvidence = ref<PendingEvidence | null>(null)
@@ -101,22 +106,23 @@ let traceController: AbortController | null = null
 let generation = 0
 
 const today = () => new Date().toISOString().slice(0, 10)
-const projectId = computed(() => {
-  const query = typeof route.query.projectId === 'string' ? route.query.projectId.trim() : ''
-  return query || workspace.selectedProjectId || ''
-})
+const projectId = computed(() => workspace.selectedProjectId || '')
+const scopeProjectIds = computed(() =>
+  projectId.value ? [projectId.value] : workspace.projects.map((project) => project.value),
+)
 const closeout = computed(() => overview.value?.closeout ?? null)
-const canInitiate = computed(() => can('closeout:initiate'))
+const canWrite = computed(() => Boolean(projectId.value))
+const canInitiate = computed(() => canWrite.value && can('closeout:initiate'))
 const canQuery = computed(() => can('closeout:query'))
-const canSection = computed(() => can('closeout:section:maintain'))
-const canAcceptance = computed(() => can('closeout:acceptance:submit'))
-const canSettlement = computed(() => can('closeout:settlement:bind'))
-const canCollection = computed(() => can('closeout:collection:verify'))
-const canWarranty = computed(() => can('closeout:warranty:maintain'))
-const canDefect = computed(() => can('closeout:defect:maintain'))
-const canDefectVerify = computed(() => can('closeout:defect:verify'))
-const canArchive = computed(() => can('closeout:archive:maintain'))
-const canClose = computed(() => can('closeout:close'))
+const canSection = computed(() => canWrite.value && can('closeout:section:maintain'))
+const canAcceptance = computed(() => canWrite.value && can('closeout:acceptance:submit'))
+const canSettlement = computed(() => canWrite.value && can('closeout:settlement:bind'))
+const canCollection = computed(() => canWrite.value && can('closeout:collection:verify'))
+const canWarranty = computed(() => canWrite.value && can('closeout:warranty:maintain'))
+const canDefect = computed(() => canWrite.value && can('closeout:defect:maintain'))
+const canDefectVerify = computed(() => canWrite.value && can('closeout:defect:verify'))
+const canArchive = computed(() => canWrite.value && can('closeout:archive:maintain'))
+const canClose = computed(() => canWrite.value && can('closeout:close'))
 const sectionQualityOptions = computed(() =>
   (overview.value?.qualityInspections ?? []).map((item) => ({
     value: item.id,
@@ -333,21 +339,71 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
   }
 }
 
+function hasCloseoutData(item: CloseoutOverview): boolean {
+  return Boolean(
+    item.closeout ||
+    item.sectionAcceptances.length ||
+    item.finalAcceptances.length ||
+    item.settlements.length ||
+    item.receivables.length ||
+    item.warranties.length ||
+    item.defects.length ||
+    item.archiveTransfers.length,
+  )
+}
+
 async function loadProject(preserveNotice = false): Promise<void> {
   projectController?.abort()
   traceController?.abort()
   const requestGeneration = ++generation
   overview.value = null
+  scopedOverviews.value = []
   trace.value = null
   traceFiles.value = []
-  if (!projectId.value) return
+  if (!scopeProjectIds.value.length) return
   const controller = new AbortController()
   projectController = controller
   loading.value = true
   if (!preserveNotice) clearNotice()
   try {
-    const loaded = await loadCloseoutOverview(projectId.value, controller.signal)
-    if (requestGeneration === generation) overview.value = loaded
+    // ponytail: fan-out stays simple; add a server aggregate endpoint only if project counts make it slow.
+    const loaded = await Promise.all(
+      scopeProjectIds.value.map(async (id) => ({
+        projectId: id,
+        projectName: workspace.projects.find((project) => project.value === id)?.label ?? id,
+        overview: await loadCloseoutOverview(id, controller.signal),
+      })),
+    )
+    if (requestGeneration === generation) {
+      const visible = projectId.value
+        ? loaded
+        : loaded.filter((item) => hasCloseoutData(item.overview))
+      scopedOverviews.value = visible
+      overview.value = projectId.value
+        ? (visible[0]?.overview ?? null)
+        : {
+            closeout: null,
+            sectionAcceptances: visible.flatMap((item) => item.overview.sectionAcceptances),
+            finalAcceptances: visible.flatMap((item) => item.overview.finalAcceptances),
+            settlements: visible.flatMap((item) => item.overview.settlements),
+            receivables: visible.flatMap((item) => item.overview.receivables),
+            warranties: visible.flatMap((item) => item.overview.warranties),
+            defects: visible.flatMap((item) => item.overview.defects),
+            archiveTransfers: visible.flatMap((item) => item.overview.archiveTransfers),
+            wbsReadiness: {
+              totalTasks: visible.reduce(
+                (sum, item) => sum + item.overview.wbsReadiness.totalTasks,
+                0,
+              ),
+              incompleteTasks: visible.reduce(
+                (sum, item) => sum + item.overview.wbsReadiness.incompleteTasks,
+                0,
+              ),
+            },
+            wbsTasks: visible.flatMap((item) => item.overview.wbsTasks),
+            qualityInspections: visible.flatMap((item) => item.overview.qualityInspections),
+          }
+    }
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '竣工收尾事实加载失败')
   } finally {
@@ -539,7 +595,7 @@ const saveDialog = () =>
     }
   }, '竣工收尾步骤已提交')
 
-watch(projectId, () => void loadProject(), { immediate: true })
+watch(scopeProjectIds, () => void loadProject(), { immediate: true })
 
 onBeforeUnmount(() => {
   generation += 1
@@ -549,13 +605,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="closeout-page" aria-labelledby="closeout-title">
-    <header>
-      <p class="closeout-page__eyebrow">项目履约 · 竣工收尾</p>
-      <h1 id="closeout-title">竣工收尾闭环</h1>
-      <p>发起 → 分项验收 → 竣工验收 → 最终结算 → 尾款回收 → 质保缺陷 → 档案移交 → 项目关闭。</p>
-    </header>
-
+  <section class="closeout-page" aria-label="竣工收尾闭环">
     <div class="closeout-page__notice" aria-live="polite">
       <V2Alert v-if="errorMessage" tone="danger" title="操作未完成">{{ errorMessage }}</V2Alert>
       <V2Alert v-else-if="successMessage" tone="success" title="操作完成">{{
@@ -574,10 +624,10 @@ onBeforeUnmount(() => {
       description="正在加载收尾主线、验收、结算、回款、质保与档案。"
     />
     <V2PageState
-      v-else-if="!projectId"
+      v-else-if="!scopeProjectIds.length"
       kind="empty"
-      title="尚未选择项目"
-      description="请选择项目后查看收尾闭环。"
+      title="暂无可访问项目"
+      description="当前账号没有可查看的项目。"
     />
     <V2PageState
       v-else-if="!canQuery"
@@ -586,6 +636,32 @@ onBeforeUnmount(() => {
       description="当前身份没有收尾查询权限。"
     />
     <template v-else>
+      <V2Card
+        v-for="item in projectId ? [] : scopedOverviews"
+        :key="item.projectId"
+        :title="item.projectName"
+        :subtitle="
+          item.overview.closeout
+            ? `${item.overview.closeout.closeoutCode} · ${deliveryLabel(item.overview.closeout.status)}`
+            : '尚未发起收尾'
+        "
+      >
+        <div class="closeout-page__facts">
+          <V2Badge v-if="item.overview.closeout" :tone="badgeTone(item.overview.closeout.status)">
+            {{ deliveryLabel(item.overview.closeout.status) }}
+          </V2Badge>
+          <span>分项验收 {{ item.overview.sectionAcceptances.length }}</span>
+          <span>竣工验收 {{ item.overview.finalAcceptances.length }}</span>
+          <span>质保 {{ item.overview.warranties.length }}</span>
+          <span>缺陷 {{ item.overview.defects.length }}</span>
+        </div>
+        <template v-if="item.overview.closeout" #footer>
+          <V2Button size="small" variant="secondary" @click="openTrace(item.overview.closeout.id)"
+            >追溯</V2Button
+          >
+        </template>
+      </V2Card>
+
       <V2Card
         v-if="closeout"
         title="收尾主线"
