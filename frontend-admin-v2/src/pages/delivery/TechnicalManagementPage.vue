@@ -513,6 +513,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="technical-page" aria-label="图纸 RFI 技术闭环">
+    <h1 class="v2-visually-hidden">图纸 RFI 技术闭环</h1>
     <div class="technical-page__toolbar">
       <div class="technical-page__actions">
         <V2Button v-if="canSchemeMaintain" size="small" @click="show('scheme')">新建方案</V2Button>
@@ -721,34 +722,45 @@ onBeforeUnmount(() => {
           </article>
         </div>
       </V2Card>
-      <V2Card
-        v-if="trace"
-        title="图纸闭环追溯"
-        :subtitle="`${trace.drawing.drawingCode} · 版本、会审、RFI、交底与归档记录`"
-        ><ol class="technical-page__timeline">
-          <li v-for="item in trace.versions" :key="`v-${item.id}`">
-            <strong>版本 {{ item.versionNo }}</strong
-            ><span>{{ deliveryLabel(item.status) }}</span>
-          </li>
-          <li v-for="item in trace.reviews" :key="`review-${item.id}`">
-            <strong>会审 {{ item.reviewCode }}</strong
-            ><span>{{ deliveryLabel(item.status) }}</span>
-          </li>
-          <li v-for="item in trace.rfis" :key="`rfi-${item.id}`">
-            <strong>RFI {{ item.rfiCode }}</strong
-            ><span>{{ deliveryLabel(item.status) }}</span>
-          </li>
-          <li v-for="item in trace.disclosures" :key="`d-${item.id}`">
-            <strong>交底 {{ item.disclosureCode }}</strong
-            ><span>{{ deliveryLabel(item.status) }}</span>
-          </li>
-          <li v-for="item in trace.archives" :key="`a-${item.id}`">
-            <strong>档案 {{ item.archiveCode }}</strong
-            ><span>{{ deliveryLabel(item.status) }}</span>
-          </li>
-        </ol></V2Card
-      >
     </template>
+
+    <V2Dialog
+      :open="Boolean(trace)"
+      title="图纸闭环追溯"
+      :description="
+        trace ? `${trace.drawing.drawingCode} · 版本、会审、RFI、交底与归档记录` : undefined
+      "
+      :close-on-backdrop="true"
+      panel-class="v2-detail-dialog"
+      @update:open="
+        (open) => {
+          if (!open) trace = null
+        }
+      "
+    >
+      <ol v-if="trace" class="technical-page__timeline">
+        <li v-for="item in trace.versions" :key="`v-${item.id}`">
+          <strong>版本 {{ item.versionNo }}</strong
+          ><span>{{ deliveryLabel(item.status) }}</span>
+        </li>
+        <li v-for="item in trace.reviews" :key="`review-${item.id}`">
+          <strong>会审 {{ item.reviewCode }}</strong
+          ><span>{{ deliveryLabel(item.status) }}</span>
+        </li>
+        <li v-for="item in trace.rfis" :key="`rfi-${item.id}`">
+          <strong>RFI {{ item.rfiCode }}</strong
+          ><span>{{ deliveryLabel(item.status) }}</span>
+        </li>
+        <li v-for="item in trace.disclosures" :key="`d-${item.id}`">
+          <strong>交底 {{ item.disclosureCode }}</strong
+          ><span>{{ deliveryLabel(item.status) }}</span>
+        </li>
+        <li v-for="item in trace.archives" :key="`a-${item.id}`">
+          <strong>档案 {{ item.archiveCode }}</strong
+          ><span>{{ deliveryLabel(item.status) }}</span>
+        </li>
+      </ol>
+    </V2Dialog>
 
     <V2Dialog
       :open="Boolean(dialog)"
@@ -923,6 +935,7 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--v2-space-3);
   color: var(--v2-color-text);
+  font-size: var(--v2-font-size-12);
 }
 .technical-page h1,
 .technical-page p {
@@ -962,13 +975,18 @@ onBeforeUnmount(() => {
   border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
 }
+.technical-page__item > strong {
+  font-size: var(--v2-font-size-14);
+  font-weight: var(--v2-font-weight-semibold);
+}
 .technical-page__title {
   padding: 0;
   color: var(--v2-color-primary-hover);
   background: none;
   border: 0;
   font: inherit;
-  font-weight: 700;
+  font-size: var(--v2-font-size-14);
+  font-weight: var(--v2-font-weight-semibold);
   text-align: left;
   cursor: pointer;
 }

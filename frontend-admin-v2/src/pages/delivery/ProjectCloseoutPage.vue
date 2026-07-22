@@ -606,6 +606,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="closeout-page" aria-label="竣工收尾闭环">
+    <h1 class="v2-visually-hidden">竣工收尾闭环</h1>
     <div class="closeout-page__notice" aria-live="polite">
       <V2Alert v-if="errorMessage" tone="danger" title="操作未完成">{{ errorMessage }}</V2Alert>
       <V2Alert v-else-if="successMessage" tone="success" title="操作完成">{{
@@ -946,12 +947,24 @@ onBeforeUnmount(() => {
           <p v-if="!overview?.archiveTransfers.length">暂无档案移交事实。</p>
         </div>
       </V2Card>
+    </template>
 
-      <V2Card
-        v-if="trace"
-        title="收尾追溯"
-        :subtitle="`${trace.closeout.closeoutCode} · 验收、质保与归档记录`"
-      >
+    <V2Dialog
+      :open="Boolean(trace)"
+      title="收尾追溯"
+      :description="trace ? `${trace.closeout.closeoutCode} · 验收、质保与归档记录` : undefined"
+      :close-on-backdrop="true"
+      panel-class="v2-detail-dialog"
+      @update:open="
+        (open) => {
+          if (!open) {
+            trace = null
+            traceFiles = []
+          }
+        }
+      "
+    >
+      <template v-if="trace">
         <ol class="closeout-page__timeline">
           <li>
             <strong>收尾主线</strong><span>{{ deliveryLabel(trace.closeout.status) }}</span>
@@ -990,8 +1003,8 @@ onBeforeUnmount(() => {
             </ul>
           </section>
         </div>
-      </V2Card>
-    </template>
+      </template>
+    </V2Dialog>
 
     <V2Dialog
       :open="Boolean(dialog)"
@@ -1182,6 +1195,7 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--v2-space-3);
   color: var(--v2-color-text);
+  font-size: var(--v2-font-size-12);
 }
 .closeout-page h1,
 .closeout-page h3,
@@ -1218,6 +1232,10 @@ onBeforeUnmount(() => {
   padding: var(--v2-space-3);
   border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
+}
+.closeout-page__item > strong {
+  font-size: var(--v2-font-size-14);
+  font-weight: var(--v2-font-weight-semibold);
 }
 .closeout-page__timeline {
   display: grid;

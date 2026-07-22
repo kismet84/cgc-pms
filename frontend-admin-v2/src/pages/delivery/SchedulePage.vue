@@ -1062,6 +1062,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
   display: grid;
   gap: var(--v2-space-3);
   color: var(--v2-color-text);
+  font-size: var(--v2-font-size-12);
 }
 .schedule-page__grid,
 .schedule-page__detail-grid {

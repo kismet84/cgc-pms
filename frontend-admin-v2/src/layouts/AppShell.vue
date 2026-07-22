@@ -1284,7 +1284,7 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 
   .app-shell__context-controls :deep(.v2-field__control) {
     min-width: 0;
-    min-height: var(--v2-control-height-md);
+    min-height: var(--v2-control-height-touch);
     padding-inline: var(--v2-space-2) var(--v2-space-6);
     font-size: var(--v2-font-size-11);
   }
