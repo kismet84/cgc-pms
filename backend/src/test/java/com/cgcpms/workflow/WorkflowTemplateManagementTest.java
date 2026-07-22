@@ -301,7 +301,7 @@ class WorkflowTemplateManagementTest {
                 """,
                 businessId, TENANT_ID, PROJECT_ID, "WF-TPL-" + businessId, "workflow模板测试合同-" + businessId, "SUB",
                 PARTY_A_ID, PARTY_B_ID, new BigDecimal("10000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
-                "DRAFT", "DRAFT", USER_ADMIN, USER_ADMIN,
+                "DRAFT", "APPROVING", USER_ADMIN, USER_ADMIN,
                 businessId);
     }
 

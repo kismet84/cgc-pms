@@ -540,14 +540,8 @@ class Phase3IntegrationTest {
         targetItem2.setDeletedFlag(0);
         costTargetItemMapper.insert(targetItem2);
 
-        // 3. 提交目标成本审批（使用 WorkflowEngine 直接提交）
-        assertDoesNotThrow(() -> workflowEngine.submit(
-                USER_ADMIN, "admin", 0L,
-                WorkflowBusinessTypes.COST_TARGET, targetId,
-                "目标成本审批-" + saved.getVersionNo(),
-                saved.getTotalTargetAmount(),
-                PROJECT_ID, null,
-                "Phase3集成测试-目标成本审批", null, null),
+        // 3. 提交目标成本审批（目标成本必须通过专用服务入口）
+        assertDoesNotThrow(() -> costTargetService.submitForApproval(targetId, saved.getVersion()),
                 "提交目标成本审批不应抛异常");
 
         // 4. 查找审批实例并全部通过
