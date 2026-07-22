@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiRequest } from '@/services/request'
 import {
   loadSchedule,
+  loadSchedules,
   loadScheduleTrace,
   replaceWbsTasks,
   updateSiteDailyLog,
   uploadSiteFile,
 } from '@/services/delivery'
+import { deliveryLabel } from '@/pages/delivery/labels'
 
 const fetchMock = vi.fn<typeof fetch>()
 
@@ -29,6 +31,38 @@ afterEach(() => {
 })
 
 describe('M3 delivery request and service contracts', () => {
+  it('omits projectId when loading schedules for all accessible projects', async () => {
+    fetchMock.mockResolvedValueOnce(apiResponse([]))
+
+    await loadSchedules()
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/project-schedules')
+  })
+
+  it('shows delivery statuses and choices as business labels', () => {
+    expect(
+      [
+        'ACCEPTED',
+        'REJECTED',
+        'NORMAL',
+        'HIGH',
+        'URGENT',
+        'CONSTRUCTION_ORGANIZATION',
+        'CONDITIONAL_PASS',
+        'RFI_PENDING',
+      ].map(deliveryLabel),
+    ).toEqual([
+      '已接受',
+      '已驳回',
+      '普通',
+      '高',
+      '紧急',
+      '施工组织设计',
+      '有条件通过',
+      '待发起 RFI',
+    ])
+  })
+
   it('keeps FormData uploads raw and does not force JSON content type', async () => {
     fetchMock.mockResolvedValueOnce(apiResponse({ id: '1', originalName: '日报.png' }))
 

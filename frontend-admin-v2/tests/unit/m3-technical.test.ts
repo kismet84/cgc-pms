@@ -128,7 +128,7 @@ describe('M3 technical management closed loop', () => {
     expect(pageSource).toContain('kind="empty"')
     expect(pageSource).not.toContain('state="loading"')
     expect(pageSource).not.toContain('state="empty"')
-    expect(pageSource).toContain('description="正在回读方案、图纸、RFI、交底和归档状态。"')
+    expect(pageSource).toContain('description="正在加载方案、图纸、RFI、交底和归档状态。"')
     expect(pageSource).toContain('aria-labelledby="technical-title"')
     expect(pageSource).toContain('aria-live="polite"')
     expect(pageSource).toContain('@media (max-width: 64rem)')
@@ -143,7 +143,7 @@ describe('M3 technical management closed loop', () => {
       'pendingEvidence.value = { kind, documentType, businessType, businessId }',
     )
     expect(pageSource).toContain('pendingEvidence.value = null')
-    expect(pageSource).toContain("pendingEvidence ? '仅重试附件上传' : '提交并权威回读'")
+    expect(pageSource).toContain("pendingEvidence ? '重试附件上传' : '确认提交'")
 
     const recordPending = pageSource.indexOf(
       'pendingEvidence.value = { kind, documentType, businessType, businessId }',

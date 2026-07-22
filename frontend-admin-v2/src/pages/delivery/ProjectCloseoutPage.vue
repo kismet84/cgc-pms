@@ -51,6 +51,7 @@ import {
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { deliveryLabel } from './labels'
 
 type DialogKind =
   | 'initiate'
@@ -104,9 +105,6 @@ const projectId = computed(() => {
   const query = typeof route.query.projectId === 'string' ? route.query.projectId.trim() : ''
   return query || workspace.selectedProjectId || ''
 })
-const projectOptions = computed(() =>
-  workspace.projects.map((item) => ({ value: item.value, label: item.label })),
-)
 const closeout = computed(() => overview.value?.closeout ?? null)
 const canInitiate = computed(() => can('closeout:initiate'))
 const canQuery = computed(() => can('closeout:query'))
@@ -443,7 +441,7 @@ async function run(
   } catch (error) {
     errorMessage.value = pendingEvidence.value
       ? `业务对象已创建，仅附件上传失败；请直接重试附件上传。${errorText(error, '')}`
-      : errorText(error, '操作失败，已保留后端权威状态')
+      : errorText(error, '操作失败，当前数据未变更')
   } finally {
     await loadProject(true)
     if (reloadTrace && closeout.value?.id)
@@ -539,7 +537,7 @@ const saveDialog = () =>
     if (dialog.value === 'closeProject') {
       await closeProjectCloseout(closeout.value.id, closeForm)
     }
-  }, '竣工收尾步骤已提交并回读')
+  }, '竣工收尾步骤已提交')
 
 watch(projectId, () => void loadProject(), { immediate: true })
 
@@ -565,30 +563,15 @@ onBeforeUnmount(() => {
       }}</V2Alert>
     </div>
 
-    <V2Card title="项目范围" subtitle="查询身份只发起 GET 请求，不推导前端权威状态。">
-      <div class="closeout-page__toolbar">
-        <V2Select
-          v-if="projectOptions.length"
-          :model-value="projectId"
-          label="项目"
-          :options="projectOptions"
-          @update:model-value="workspace.selectProject"
-        />
-        <span v-else>{{ projectId ? `项目 ${projectId}` : '请选择项目' }}</span>
-        <V2Button
-          v-if="canInitiate && !closeout && projectId"
-          size="small"
-          @click="show('initiate')"
-          >发起收尾</V2Button
-        >
-      </div>
-    </V2Card>
+    <div v-if="canInitiate && !closeout && projectId" class="closeout-page__actions">
+      <V2Button size="small" @click="show('initiate')">发起收尾</V2Button>
+    </div>
 
     <V2PageState
       v-if="loading"
       kind="loading"
       title="正在加载竣工收尾事实"
-      description="正在回读收尾主线、验收、结算、回款、质保与档案。"
+      description="正在加载收尾主线、验收、结算、回款、质保与档案。"
     />
     <V2PageState
       v-else-if="!projectId"
@@ -606,10 +589,10 @@ onBeforeUnmount(() => {
       <V2Card
         v-if="closeout"
         title="收尾主线"
-        :subtitle="`${closeout.closeoutCode} · 后端状态 ${closeout.status}`"
+        :subtitle="`${closeout.closeoutCode} · ${deliveryLabel(closeout.status)}`"
       >
         <div class="closeout-page__facts">
-          <V2Badge :tone="badgeTone(closeout.status)">{{ closeout.status }}</V2Badge>
+          <V2Badge :tone="badgeTone(closeout.status)">{{ deliveryLabel(closeout.status) }}</V2Badge>
           <span>计划完成 {{ closeout.plannedCompletionDate }}</span>
           <span v-if="closeout.finalOwnerSettlementId"
             >结算 {{ closeout.finalOwnerSettlementId }}</span
@@ -692,7 +675,9 @@ onBeforeUnmount(() => {
             >
               <strong>{{ section.acceptanceCode }} · {{ section.acceptanceName }}</strong>
               <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(section.status)">{{ section.status }}</V2Badge>
+                <V2Badge :tone="badgeTone(section.status)">{{
+                  deliveryLabel(section.status)
+                }}</V2Badge>
                 <span>{{ section.taskCode }} / {{ section.acceptanceDate }}</span>
               </div>
               <V2Button
@@ -715,8 +700,8 @@ onBeforeUnmount(() => {
             >
               <strong>{{ item.acceptanceCode }} · {{ item.organizer }}</strong>
               <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ item.status }}</V2Badge>
-                <span>{{ item.conclusion }} / {{ item.acceptanceDate }}</span>
+                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
+                <span>{{ deliveryLabel(item.conclusion) }} / {{ item.acceptanceDate }}</span>
               </div>
               <V2Button
                 v-if="canAcceptance && ['DRAFT', 'REJECTED'].includes(item.status)"
@@ -734,10 +719,7 @@ onBeforeUnmount(() => {
           </div>
         </V2Card>
 
-        <V2Card
-          title="结算与回款"
-          subtitle="不加载候选结算列表；手工输入结算 ID，避免扩大 revenue 权限。"
-        >
+        <V2Card title="结算与回款" subtitle="关联最终结算时，请输入已确认的结算 ID。">
           <div class="closeout-page__stack">
             <article
               v-for="item in overview?.settlements ?? []"
@@ -746,8 +728,8 @@ onBeforeUnmount(() => {
             >
               <strong>{{ item.settlementCode }}</strong>
               <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ item.status }}</V2Badge>
-                <span>结算类型 {{ item.settlementType || '-' }}</span>
+                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
+                <span>结算类型 {{ deliveryLabel(item.settlementType) }}</span>
                 <span>净应收 {{ formatAmount(item.netReceivableAmount) }}</span>
               </div>
             </article>
@@ -756,9 +738,9 @@ onBeforeUnmount(() => {
               :key="item.id"
               class="closeout-page__item"
             >
-              <strong>{{ item.receivableCode }} · {{ item.receivableType }}</strong>
+              <strong>{{ item.receivableCode }} · {{ deliveryLabel(item.receivableType) }}</strong>
               <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ item.status }}</V2Badge>
+                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
                 <span>原值 {{ formatAmount(item.originalAmount) }}</span>
                 <span>未收 {{ formatAmount(item.outstandingAmount) }}</span>
               </div>
@@ -783,7 +765,7 @@ onBeforeUnmount(() => {
             >
               <strong>{{ item.warrantyCode }}</strong>
               <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ item.status }}</V2Badge>
+                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
                 <span>金额 {{ formatAmount(item.warrantyAmount) }}</span>
                 <span>{{ item.warrantyStartDate }} 至 {{ item.warrantyEndDate }}</span>
               </div>
@@ -810,7 +792,7 @@ onBeforeUnmount(() => {
             >
               <strong>{{ item.defectCode }} · {{ item.defectTitle }}</strong>
               <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ item.status }}</V2Badge>
+                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
                 <span>期限 {{ item.rectificationDeadline }}</span>
               </div>
               <div class="closeout-page__actions">
@@ -844,7 +826,7 @@ onBeforeUnmount(() => {
             >
               <strong>{{ item.taskCode }} · {{ item.taskName }}</strong>
               <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ item.status }}</V2Badge>
+                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
                 <span>进度 {{ item.actualProgress }}</span>
               </div>
             </article>
@@ -855,8 +837,8 @@ onBeforeUnmount(() => {
             >
               <strong>{{ item.inspectionCode }}</strong>
               <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ item.status }}</V2Badge>
-                <span>{{ item.conclusion }} / {{ item.inspectionDate }}</span>
+                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
+                <span>{{ deliveryLabel(item.conclusion) }} / {{ item.inspectionDate }}</span>
               </div>
             </article>
           </div>
@@ -872,7 +854,7 @@ onBeforeUnmount(() => {
           >
             <strong>{{ item.transferCode }} · {{ item.recipientOrganization }}</strong>
             <div class="closeout-page__facts">
-              <V2Badge :tone="badgeTone(item.status)">{{ item.status }}</V2Badge>
+              <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
               <span>{{ item.archiveLocation }}</span>
             </div>
             <V2Button
@@ -892,19 +874,19 @@ onBeforeUnmount(() => {
       <V2Card
         v-if="trace"
         title="收尾追溯"
-        :subtitle="`${trace.closeout.closeoutCode} · 后端权威链`"
+        :subtitle="`${trace.closeout.closeoutCode} · 验收、质保与归档记录`"
       >
         <ol class="closeout-page__timeline">
           <li>
-            <strong>收尾主线</strong><span>{{ trace.closeout.status }}</span>
+            <strong>收尾主线</strong><span>{{ deliveryLabel(trace.closeout.status) }}</span>
           </li>
           <li v-for="item in trace.sectionAcceptances" :key="String(item.id)">
             <strong>分项验收 {{ item.acceptance_code || item.acceptanceCode }}</strong>
-            <span>{{ item.status }}</span>
+            <span>{{ deliveryLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.finalAcceptances" :key="String(item.id)">
             <strong>竣工验收 {{ item.acceptance_code || item.acceptanceCode }}</strong>
-            <span>{{ item.status }}</span>
+            <span>{{ deliveryLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.collectionAllocations" :key="item.id">
             <strong>回款分配 {{ item.collectionCode || item.id }}</strong>
@@ -912,15 +894,15 @@ onBeforeUnmount(() => {
           </li>
           <li v-for="item in trace.warranties" :key="String(item.id)">
             <strong>质保 {{ item.warranty_code || item.warrantyCode }}</strong>
-            <span>{{ item.status }}</span>
+            <span>{{ deliveryLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.defects" :key="String(item.id)">
             <strong>缺陷 {{ item.defect_code || item.defectCode }}</strong>
-            <span>{{ item.status }}</span>
+            <span>{{ deliveryLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.archiveTransfers" :key="String(item.id)">
             <strong>档案 {{ item.transfer_code || item.transferCode }}</strong>
-            <span>{{ item.status }}</span>
+            <span>{{ deliveryLabel(item.status) }}</span>
           </li>
         </ol>
         <div class="closeout-page__evidence" aria-label="阶段证据附件">
@@ -953,13 +935,15 @@ onBeforeUnmount(() => {
         }[dialog ?? 'initiate']
       "
       :close-disabled="saving || Boolean(pendingEvidence)"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
       @update:open="
         (open) => {
           if (!open) dialog = null
         }
       "
     >
-      <form class="closeout-page__form" @submit.prevent="saveDialog">
+      <form id="closeout-dialog-form" class="closeout-page__form" @submit.prevent="saveDialog">
         <template v-if="dialog === 'initiate'">
           <V2Input v-model="initiateForm.closeoutCode" label="收尾编号" required />
           <label
@@ -981,8 +965,8 @@ onBeforeUnmount(() => {
             v-model="sectionForm.conclusion"
             label="结论"
             :options="[
-              { value: 'PASS', label: 'PASS' },
-              { value: 'CONDITIONAL_PASS', label: 'CONDITIONAL_PASS' },
+              { value: 'PASS', label: '通过' },
+              { value: 'CONDITIONAL_PASS', label: '有条件通过' },
             ]"
           />
           <label class="closeout-page__wide"
@@ -999,8 +983,8 @@ onBeforeUnmount(() => {
             v-model="finalAcceptanceForm.conclusion"
             label="结论"
             :options="[
-              { value: 'PASS', label: 'PASS' },
-              { value: 'CONDITIONAL_PASS', label: 'CONDITIONAL_PASS' },
+              { value: 'PASS', label: '通过' },
+              { value: 'CONDITIONAL_PASS', label: '有条件通过' },
             ]"
           />
           <label class="closeout-page__wide"
@@ -1071,8 +1055,8 @@ onBeforeUnmount(() => {
             v-model="verificationForm.decision"
             label="复验结论"
             :options="[
-              { value: 'ACCEPTED', label: 'ACCEPTED' },
-              { value: 'REJECTED', label: 'REJECTED' },
+              { value: 'ACCEPTED', label: '接受' },
+              { value: 'REJECTED', label: '驳回' },
             ]"
           />
           <label class="closeout-page__wide"
@@ -1106,10 +1090,13 @@ onBeforeUnmount(() => {
             >关闭原因<textarea v-model="closeForm.reason" required />
           </label>
         </template>
-        <V2Button type="submit" :loading="saving">{{
-          pendingEvidence ? '仅重试附件上传' : '提交并回读'
-        }}</V2Button>
       </form>
+      <template #footer>
+        <V2Button variant="secondary" :disabled="saving" @click="dialog = null">取消</V2Button>
+        <V2Button type="submit" form="closeout-dialog-form" :loading="saving">{{
+          pendingEvidence ? '重试附件上传' : '确认提交'
+        }}</V2Button>
+      </template>
     </V2Dialog>
   </section>
 </template>
@@ -1133,16 +1120,12 @@ onBeforeUnmount(() => {
 .closeout-page__notice:empty {
   display: none;
 }
-.closeout-page__toolbar,
 .closeout-page__facts,
 .closeout-page__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--v2-space-2);
   align-items: center;
-}
-.closeout-page__toolbar {
-  justify-content: space-between;
 }
 .closeout-page__columns,
 .closeout-page__evidence {
@@ -1185,10 +1168,14 @@ onBeforeUnmount(() => {
   min-height: 2.5rem;
   padding: var(--v2-space-2);
   color: var(--v2-color-text);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
   border-radius: var(--v2-radius-md);
   font: inherit;
+}
+.closeout-page__form :deep(.v2-field__control) {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
 }
 .closeout-page__form textarea {
   min-height: 6rem;

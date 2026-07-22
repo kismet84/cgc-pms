@@ -5,6 +5,7 @@ import { captureRuntimeErrors } from './runtime-errors'
 const runLiveDelivery = process.env.V2_LIVE_DELIVERY === '1'
 const splitRoleUser = process.env.V2_SCHEDULE_READONLY_USER || 'demo.schedule.query'
 const controlledProjectId = process.env.V2_DELIVERY_PROJECT_ID || '520000000000009011'
+const scheduleProjectId = process.env.V2_SCHEDULE_PROJECT_ID || '520000000000000001'
 const runtimeErrors = new WeakMap<Page, string[]>()
 
 async function login(page: Page, username: string) {
@@ -46,6 +47,60 @@ test.describe('M3 live delivery workspace', () => {
         name: '日报状态：全部状态',
       }),
     ).toBeVisible()
+  })
+
+  test('schedule detail uses a deep link and returns to the list', async ({ page }) => {
+    await login(page, 'admin')
+    await page.goto(`/v2/project-schedule?projectId=${scheduleProjectId}`)
+
+    await page.getByRole('button', { name: '履约详情' }).first().click()
+    await expect(page).toHaveURL(
+      new RegExp(`/v2/project-schedule/[^?]+\\?projectId=${scheduleProjectId}`),
+    )
+    await expect(page.getByRole('button', { name: '返回计划列表' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '履约详情' })).toHaveCount(0)
+
+    await page.reload()
+    await expect(page.getByRole('heading', { level: 1, name: '施工履约详情' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '返回计划列表' })).toBeVisible()
+
+    await page.getByRole('button', { name: '返回计划列表' }).click()
+    await expect(page).toHaveURL(`/v2/project-schedule?projectId=${scheduleProjectId}`)
+  })
+
+  test('schedule loads all accessible projects when the shell selects all projects', async ({
+    page,
+  }) => {
+    await login(page, 'admin')
+    await page.goto(`/v2/project-schedule?projectId=${scheduleProjectId}`)
+
+    const projectControl = page.locator('#global-project')
+    await projectControl.click()
+    const allProjectsResponse = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return url.pathname === '/api/project-schedules' && !url.searchParams.has('projectId')
+    })
+    await projectControl.locator('..').locator('[role="option"][data-value=""]').click()
+
+    expect((await allProjectsResponse).ok()).toBe(true)
+    await expect(page).toHaveURL('/v2/project-schedule')
+    await expect(page.getByText('当前范围：全部项目')).toBeVisible()
+    await expect(page.getByRole('button', { name: '履约详情' }).first()).toBeVisible()
+  })
+
+  test('unavailable schedule detail keeps a return path', async ({ page }) => {
+    await login(page, 'admin')
+    await page.goto(`/v2/project-schedule/not-found?projectId=${scheduleProjectId}`)
+
+    await expect(page.getByRole('heading', { name: '计划详情不可用' })).toBeVisible()
+    runtimeErrors.set(
+      page,
+      (runtimeErrors.get(page) ?? []).filter(
+        (error) => !error.includes('/api/project-schedules/not-found'),
+      ),
+    )
+    await page.getByRole('button', { name: '返回计划列表' }).click()
+    await expect(page).toHaveURL(`/v2/project-schedule?projectId=${scheduleProjectId}`)
   })
 
   test('daily-log report period reaches the server as calendar-month bounds', async ({ page }) => {

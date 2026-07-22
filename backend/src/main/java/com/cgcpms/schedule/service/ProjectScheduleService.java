@@ -61,7 +61,22 @@ public class ProjectScheduleService {
     }
 
     public List<Map<String, Object>> schedules(Long projectId) {
-        if (projectId == null) return List.of();
+        if (projectId == null) {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            if (accessibleProjectIds.isEmpty()) return List.of();
+            String placeholders = String.join(",", Collections.nCopies(accessibleProjectIds.size(), "?"));
+            List<Object> arguments = new ArrayList<>();
+            arguments.add(tenant());
+            arguments.addAll(accessibleProjectIds);
+            return jdbc.queryForList("""
+                    SELECT s.id,s.project_id projectId,s.plan_code planCode,s.plan_name planName,s.plan_type planType,
+                     s.version_no versionNo,s.parent_plan_id parentPlanId,s.corrective_action_id correctiveActionId,
+                     s.planned_start_date plannedStartDate,s.planned_end_date plannedEndDate,s.status,
+                     s.approval_instance_id approvalInstanceId,s.activated_at activatedAt,s.remark
+                    FROM project_schedule_plan s WHERE s.tenant_id=? AND s.project_id IN (%s) AND s.deleted_flag=0
+                    ORDER BY s.project_id,s.version_no DESC
+                    """.formatted(placeholders), arguments.toArray());
+        }
         projectAccessChecker.checkAccess(projectId, "查看项目计划");
         return jdbc.queryForList("""
                 SELECT s.id,s.project_id projectId,s.plan_code planCode,s.plan_name planName,s.plan_type planType,

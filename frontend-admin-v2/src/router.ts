@@ -128,6 +128,16 @@ const contextRoutes: RouteRecordRaw[] = [
     meta: { shell: true },
   },
   {
+    path: '/project-schedule/:scheduleId',
+    name: 'V2ShellProjectScheduleDetail',
+    component: SchedulePage,
+    meta: {
+      shell: true,
+      permission: 'schedule:query',
+      workspaceContext: { project: true, period: false },
+    },
+  },
+  {
     path: '/project/:projectId/overview',
     name: 'V2ShellProjectOverview',
     component: ProjectPage,

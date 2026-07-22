@@ -42,16 +42,26 @@ describe('V2 application-shell routes', () => {
     const quality = shell?.children?.find((route) => route.path === '/quality-safety')
     const technical = shell?.children?.find((route) => route.path === '/technical-management')
     const closeout = shell?.children?.find((route) => route.path === '/project-closeout')
+    const scheduleDetail = shell?.children?.find(
+      (route) => route.path === '/project-schedule/:scheduleId',
+    )
 
     expect(dashboard?.meta?.permission).toBe('dashboard:view')
     expect(project?.meta?.permission).toBe('project:query')
     expect(quality?.meta?.permission).toBe('quality:safety:query')
+    expect(quality?.meta?.workspaceContext).toEqual({ project: true, period: false })
     expect(String(quality?.component)).not.toContain('ShellPlaceholderPage')
     expect(technical?.meta?.permission).toBe('technical:query')
+    expect(technical?.meta?.workspaceContext).toEqual({ project: true, period: false })
     expect(String(technical?.component)).not.toContain('ShellPlaceholderPage')
     expect(closeout?.meta?.permission).toBe('closeout:query')
     expect(closeout?.meta?.workspaceContext).toEqual({ project: true, period: false })
     expect(String(closeout?.component)).not.toContain('ShellPlaceholderPage')
+    expect(scheduleDetail?.meta).toMatchObject({
+      permission: 'schedule:query',
+      workspaceContext: { project: true, period: false },
+    })
+    expect(String(scheduleDetail?.component)).not.toContain('ShellPlaceholderPage')
     expect(dashboard?.meta?.workspaceContext).toEqual({ project: true, period: true })
     expect(project?.meta?.workspaceContext).toEqual({ project: true, period: false })
     const approval = shell?.children?.find((route) => route.path === '/approval/todo')
@@ -107,6 +117,16 @@ describe('V2 application-shell routes', () => {
     await router.push('/contract/ledger')
     expect(router.currentRoute.value.path).toBe('/forbidden')
     expect(router.currentRoute.value.query.from).toBe('/contract/ledger')
+  })
+
+  it('restores a permitted project schedule detail deep link', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user(['schedule:query']))
+    const router = guardedRouter()
+
+    await router.push('/project-schedule/11?projectId=23')
+    await router.isReady()
+
+    expect(router.currentRoute.value.fullPath).toBe('/project-schedule/11?projectId=23')
   })
 
   it('uses wildcard permission for the administrator sample without role-name checks', async () => {

@@ -44,6 +44,12 @@ describe('V2 eight-domain navigation contract', () => {
       visibleNavigation(['*'])[0]?.workspaces.find((workspace) => workspace.id === 'cockpit')?.tabs,
     ).toMatchObject([{ path: '/dashboard', label: '驾驶舱' }])
     expect(findWorkspace('/project/42/overview')?.workspace.label).toBe('项目管理')
+    expect(findWorkspace('/project-schedule/11')?.workspace.label).toBe('计划与现场')
+    for (const path of ['/quality-safety', '/technical-management', '/project-closeout']) {
+      expect(
+        findWorkspace(path)?.workspace.tabs.find((tab) => tab.path === path)?.workspaceContext,
+      ).toEqual({ project: true, period: false })
+    }
     expect(
       findWorkspace('/project-closeout')?.workspace.tabs.find(
         (tab) => tab.path === '/project-closeout',
