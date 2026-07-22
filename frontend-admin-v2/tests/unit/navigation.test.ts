@@ -44,6 +44,11 @@ describe('V2 eight-domain navigation contract', () => {
       visibleNavigation(['*'])[0]?.workspaces.find((workspace) => workspace.id === 'cockpit')?.tabs,
     ).toMatchObject([{ path: '/dashboard', label: '驾驶舱' }])
     expect(findWorkspace('/project/42/overview')?.workspace.label).toBe('项目管理')
+    expect(
+      findWorkspace('/project-closeout')?.workspace.tabs.find(
+        (tab) => tab.path === '/project-closeout',
+      )?.workspaceContext,
+    ).toEqual({ project: true, period: false })
     expect(findWorkspace('/contract/C-100/edit')?.workspace.label).toBe('合同与变更')
   })
 })

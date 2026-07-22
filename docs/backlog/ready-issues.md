@@ -10,7 +10,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 2026-07-19 手工补货 5 条已全部完成：`ISSUE-048-011`、`ISSUE-053-001`、`ISSUE-053-002`、`ISSUE-053-003`、`ISSUE-053-004`；Clean-room V2 M1 完整退出门通过，M2 须经产品决策与 Ready 补货后再实施。
 
-2026-07-21 第53条主线M3已获授权；`ISSUE-053-010～012`已完成。当前无M3 Ready；013～016保持Planned，须逐项按当前证据补货。
+2026-07-22 第53条主线M3已完成；`ISSUE-053-010～016`全部通过并完成治理收口。当前无M3 Ready。
 
 ### ISSUE-053-010：M3项目契约与只读请求基线
 
@@ -230,6 +230,324 @@ Reviewer要求：独立安全复核已确认权限、并发和令牌修复路线
 最小回滚：两路由恢复`LEGACY_ONLY`，回退V2页面/服务/契约、FormData增量及兼容性后端/Legacy改动；删除精确标记的本地验收身份与数据；无数据库结构回滚。
 
 完成结果：两路由达到`V2_ACCEPTED`，台账`71/16/0`；后端组合34项、V2单测98项、Legacy兼容、静态/构建门禁和本地live验收通过。独立复核发现的纠偏审批并发重复修订风险已通过行锁、条件更新和双线程测试闭环；trace契约保留后端真实数组。受控身份与数据已精确回滚。
+
+### ISSUE-053-013：M3质量安全整改闭环迁移
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 项目履约 / 质量安全 / 权限与附件
+目标：
+
+- 迁移`/quality-safety`，闭合质量计划、检查、问题、整改、复检、后果与反向追溯。
+- 保持项目范围、合同关联、状态机、阶段证据附件、权限分离和写后权威回读与后端事实一致。
+非目标：
+- 不迁移技术管理或竣工收尾；不切换正式入口，不发布生产。
+- 不新增数据库迁移、依赖、全局Store、前端业务状态推导或Legacy UI复用。
+允许修改：
+- `backend/src/main/java/com/cgcpms/file/auth/BusinessObjectAuthorizer.java`
+- `backend/src/test/java/com/cgcpms/quality/QualitySafetyClosedLoopIntegrationTest.java`
+- `backend/src/test/java/com/cgcpms/tech/TechnicalManagementClosedLoopIntegrationTest.java`
+- `backend/src/test/java/com/cgcpms/m3/M3ControllerPermissionIntegrationTest.java`
+- `packages/frontend-contracts/src/quality.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/quality.ts`
+- `frontend-admin-v2/src/pages/delivery/QualitySafetyPage.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m3-quality-safety.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/e2e/m3-quality-safety.spec.ts`
+- `scripts/demo/complete-project-v2/sql/210-m3-domain-permission-data.sql`
+- `scripts/demo/complete-project-v2/load.ps1`
+- `scripts/demo/complete-project-v2/verify.ps1`
+- `scripts/demo/complete-project-v2/manifest.yml`
+- `scripts/demo/complete-project-v2/README.md`
+- `scripts/demo/complete-project-v2/expected/acceptance-metrics.yml`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/blocked-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-013-M3质量安全整改闭环验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 路由为真实V2页面，台账达到`70/17/0`；无Shell占位、Legacy UI依赖或本地业务mock。
+- 查询、计划、检查、整改、复检、后果权限严格分离；无权限动作隐藏且零请求，后端403仍为最终边界。
+- 合同、责任合作方、项目范围、阶段动作、附件业务类型和不可变历史只消费后端权威事实。
+- 缺合同、跨项目、重复提交、无权动作、整改提交后编辑、复检拒绝及附件失败均fail-close并可权威回读。
+- ADMIN、质量查询、计划维护、检查维护、整改、复检、后果、无权和未登录身份具备可复验dev/demo数据。
+- 后端`QualitySafetyClosedLoopIntegrationTest`、V2专项/全量单测、类型、Lint、Clean-room、台账、构建、包体、1440/1024/390 live E2E、axe、控制台和`git diff --check`通过。
+状态：Done
+来源锚点：`docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`的ISSUE-053-013；`docs/product-intelligence/evolution-decision.md`的`PI-2026-07-18-02`；`ISSUE-053-012`通过事实
+存量问题键：[mainline:053-M3-013-QUALITY-SAFETY]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-013`
+- `cd backend; .\mvnw.cmd "-Dtest=QualitySafetyClosedLoopIntegrationTest" test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm check:bundle-size`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-013-M3质量安全整改闭环验收报告.md`
+Migration：不需要
+依赖：`ISSUE-053-012`已通过；本地`complete-project-v2`已有完整质量事实，实施时补齐分权身份/权限并纳入幂等验真。
+风险等级：高
+运行态要求：本地V2、Legacy、后端、MySQL、Redis和MinIO健康；身份及验收数据只在dev/demo创建并可精确回滚，不连接生产。
+Reviewer要求：完成后独立安全与测试复核项目范围、合同关联、权限零请求、阶段附件、状态机、三视口、axe和台账。
+最小回滚：单路由恢复`LEGACY_ONLY`，回退V2页面/服务/契约、专项测试及精确标记的本地验收权限数据；不删除既有质量事实或附件。
+
+完成结果：`/quality-safety`达到`V2_ACCEPTED`，台账`70/17/0`；计划、检查、问题、整改、复检、后果、trace及四类CLEAN阶段证据已接入真实V2页面。六个持久化demo分权账号与六条阶段状态数据纳入幂等装载/验真，查询账号无写按钮且零写请求。后端附件授权按整改证据/复检证据精确分权；专项后端5项、V2全量24文件119项、类型/Lint/Clean-room/台账/构建/包体及live E2E 7项通过。新增后续项0、关闭后续项0、后续项净变化0。
+
+### ISSUE-053-014：M3技术管理、图纸与RFI闭环迁移
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 项目履约 / 技术管理 / 图纸与RFI
+目标：
+
+- 迁移`/technical-management`，闭合技术方案、图纸版本/会审、RFI回复/接受、施工交底和档案确认。
+- 保持项目范围、阶段状态、十类权限、附件事实和写后权威回读与现有后端一致。
+非目标：
+- 不迁移项目收尾，不改变技术域后端状态机、数据库结构或Legacy入口，不发布生产。
+- 不新增依赖、全局Store、第二套请求层、前端业务状态推导或本地业务mock。
+允许修改：
+- `packages/frontend-contracts/src/technical.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/technical.ts`
+- `frontend-admin-v2/src/pages/delivery/TechnicalManagementPage.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m3-technical.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/e2e/m3-technical.spec.ts`
+- `scripts/demo/complete-project-v2/sql/210-m3-domain-permission-data.sql`
+- `scripts/demo/complete-project-v2/load.ps1`
+- `scripts/demo/complete-project-v2/verify.ps1`
+- `scripts/demo/complete-project-v2/manifest.yml`
+- `scripts/demo/complete-project-v2/README.md`
+- `scripts/demo/complete-project-v2/expected/acceptance-metrics.yml`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 路由为真实V2页面，台账达到`69/18/0`；方案、图纸/版本、会审、RFI、交底、档案及trace均来自后端真实API。
+- `technical:query`及九类动作权限严格分离；查询账号无写按钮且零写请求，后端403为最终边界，无动作权限越授。
+- 图纸版本、会审、RFI回复/接受、交底、归档的阶段允许动作由后端状态决定；附件成功不替代业务提交成功。
+- 跨项目、错误版本、无会审发RFI、重复回复、无权接受、附件成功但业务失败和陈旧trace均fail-close且可恢复。
+- ADMIN、查询、方案维护/提交、图纸接收/会审、RFI发起/回复/接受、交底、归档及无权身份具备可复验dev/demo数据。
+- 后端`TechnicalManagementClosedLoopIntegrationTest`、V2专项/全量单测、类型、Lint、Clean-room、台账、构建、包体、1440/1024/390 live E2E、axe、控制台和`git diff --check`通过。
+状态：Done
+来源锚点：`docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`的ISSUE-053-014；`docs/product-intelligence/evolution-decision.md`的`PI-2026-07-18-02`；`ISSUE-053-013`通过事实
+存量问题键：[mainline:053-M3-014-TECHNICAL]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-014`
+- `cd backend; .\mvnw.cmd "-Dtest=TechnicalManagementClosedLoopIntegrationTest" test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm check:bundle-size`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md`
+Migration：不需要
+依赖：`ISSUE-053-013`已通过；当前后端技术域、Controller权限与complete-project-v2技术事实已核实，实施时补齐分权身份、可写阶段和附件验真。
+风险等级：高
+运行态要求：本地V2、Legacy、后端、MySQL、Redis和MinIO健康；身份及阶段数据只在dev/demo持久化，不连接生产。
+Reviewer要求：完成后独立安全与测试复核项目范围、十权限分离、版本/状态机、附件与业务动作分离、三视口、axe和台账。
+最小回滚：单路由恢复`LEGACY_ONLY`，回退V2技术契约/服务/页面、专项测试及M3 demo技术数据；不改写或删除既有方案、图纸、RFI、交底、归档或附件事实。
+
+完成结果：`/technical-management`达到`V2_ACCEPTED`，台账`69/18/0`；方案、图纸/版本、会审、RFI、交底、施工依据、归档与trace接入真实V2。10个demo分权账号、9个单一动作权限、7个阶段样本和6类CLEAN附件纳入幂等验真；附件上传失败保留业务ID，重试仅上传附件。后端专项2项、V2全量25文件124项、静态/构建门及live E2E 11项通过。新增后续项0、关闭后续项0、后续项净变化0。
+
+### ISSUE-053-015：M3竣工收尾闭环迁移
+
+优先级：P0
+任务性质：缺口修复
+类型：Clean-room V2 / 项目履约 / 竣工收尾 / 权限与项目范围
+目标：
+
+- 迁移`/project-closeout`，闭合发起、分部验收、竣工验收、最终结算、尾款核验、质保、缺陷、档案移交与项目关闭。
+- 保持项目范围、十一类权限、金额字符串、附件事实、状态机和写后权威回读与当前后端一致，并补齐负责人必须属于同租户有效项目成员的服务端约束。
+非目标：
+- 不改变收尾业务状态机、数据库结构、Legacy入口、收入域规则或生产环境，不自动提交、push或发布。
+- 不新增依赖、全局Store、第二套请求层、前端业务状态推导或本地业务mock。
+允许修改：
+- `backend/src/main/java/com/cgcpms/closeout/service/ProjectCloseoutService.java`
+- `backend/src/test/java/com/cgcpms/closeout/ProjectCloseoutClosedLoopIntegrationTest.java`
+- `packages/frontend-contracts/src/closeout.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/closeout.ts`
+- `frontend-admin-v2/src/pages/delivery/ProjectCloseoutPage.vue`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m3-closeout.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/tests/unit/navigation.test.ts`
+- `frontend-admin-v2/e2e/m3-closeout.spec.ts`
+- `scripts/demo/complete-project-v2/sql/210-m3-domain-permission-data.sql`
+- `scripts/demo/complete-project-v2/load.ps1`
+- `scripts/demo/complete-project-v2/verify.ps1`
+- `scripts/demo/complete-project-v2/manifest.yml`
+- `scripts/demo/complete-project-v2/README.md`
+- `scripts/demo/complete-project-v2/expected/acceptance-metrics.yml`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- 路由为真实V2页面，台账达到`68/19/0`；完整收尾链路与trace均来自后端真实API，金额字段保持字符串。
+- `closeout:query`及十类动作权限严格分离；查询账号无写按钮且零写请求，后端403为最终边界，无动作权限越授。
+- 每个阶段允许动作只由后端状态决定；结算候选按需读取，不扩大`revenue:operations:query`；附件成功不替代业务提交成功，失败重试不得重复创建业务事实。
+- 质保和缺陷负责人必须是同租户、有效且属于目标项目的成员；跨租户、跨项目、缺前置、尾款未核验、质保未释放、缺陷未关闭、档案未接受及重复关闭均fail-close。
+- ADMIN、查询、发起、分部验收、竣工验收、结算绑定、回款核验、质保、缺陷维护/验证、档案、关闭及无权身份具备可复验dev/demo数据；既有语义非法CLOSED样本被替换为合法链路事实。
+- 后端`ProjectCloseoutClosedLoopIntegrationTest`、V2专项/全量单测、类型、Lint、Clean-room、台账、构建、包体、1440/1024/390 live E2E、axe、控制台和`git diff --check`通过。
+状态：Done
+来源锚点：`docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`的ISSUE-053-015；`docs/product-intelligence/evolution-decision.md`的`PI-2026-07-18-02`；`ISSUE-053-014`通过事实
+存量问题键：[mainline:053-M3-015-CLOSEOUT]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-015`
+- `cd backend; .\mvnw.cmd "-Dtest=ProjectCloseoutClosedLoopIntegrationTest" test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm check:bundle-size`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md`
+Migration：不需要
+依赖：`ISSUE-053-014`已通过；当前后端收尾状态机、Controller权限与既有demo偏差已核实，实施时补齐合法阶段事实、分权身份、项目成员约束和附件验真。
+风险等级：高
+运行态要求：本地V2、Legacy、后端、MySQL、Redis和MinIO健康；身份及阶段数据只在dev/demo持久化，不连接生产。
+Reviewer要求：完成后独立安全与测试复核项目范围、十一权限分离、金额、状态机、负责人项目成员约束、附件与业务动作分离、三视口、axe和台账。
+最小回滚：单路由恢复`LEGACY_ONLY`，回退V2收尾契约/服务/页面、专项测试、服务端负责人约束及M3 demo收尾数据；不得删除既有验收、结算、回款、质保、缺陷、档案或关闭事实。
+
+完成结果：`/project-closeout`达到`V2_ACCEPTED`，台账`68/19/0`；完整收尾链、金额字符串、trace、附件失败恢复和责任人项目成员边界成立。11个demo账号、10个单一动作权限、10个阶段样本、1条合法关闭链及5类CLEAN附件纳入幂等验真；后端专项2项、V2全量26文件128项、静态/构建门及live E2E 9项通过。新增后续项0、关闭后续项0、后续项净变化0。
+
+### ISSUE-053-016：M3全量退出门与治理收口
+
+优先级：P0
+任务性质：缺口修复
+类型：Clean-room V2 / M3退出门 / 全量验收 / 治理收口
+目标：
+
+- 对M3十条项目履约路由执行统一退出验收，证明真实API、权限、项目范围、金额、状态机、附件恢复、查询零写和写后权威回读边界完整成立。
+- 固化`68/19/0`台账、完整dev/demo复验、独立安全与测试复核及唯一治理结论，使M3形成可审计闭环。
+非目标：
+- 不启动M4，不切换正式根路由，不退役Legacy，不改变数据库结构、生产环境或发布配置，不自动提交、push或发布。
+- 不新增依赖、业务能力、全局Store、第二套请求层、前端业务状态推导或本地业务mock。
+允许修改：
+- `backend/src/main/java/com/cgcpms/closeout/service/ProjectCloseoutService.java`
+- `backend/src/main/java/com/cgcpms/file/auth/BusinessObjectAuthorizer.java`
+- `backend/src/main/java/com/cgcpms/quality/service/QualitySafetyService.java`
+- `backend/src/main/java/com/cgcpms/tech/service/TechnicalManagementService.java`
+- `backend/src/test/java/com/cgcpms/closeout/ProjectCloseoutClosedLoopIntegrationTest.java`
+- `backend/src/test/java/com/cgcpms/quality/QualitySafetyClosedLoopIntegrationTest.java`
+- `backend/src/test/java/com/cgcpms/tech/TechnicalManagementClosedLoopIntegrationTest.java`
+- `backend/src/test/java/com/cgcpms/m3/**`
+- `packages/frontend-contracts/src/**`
+- `frontend-admin-v2/src/pages/projects/**`
+- `frontend-admin-v2/src/pages/delivery/**`
+- `frontend-admin-v2/src/services/**`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/**`
+- `frontend-admin-v2/e2e/m3-*.spec.ts`
+- `frontend-admin-v2/e2e/runtime-errors.ts`
+- `scripts/demo/complete-project-v2/**`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/第53条主线-M3-项目履约全量退出门验收报告.md`
+禁止修改：
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- M3十条目标路由均为真实V2页面，台账固定为`68/19/0`，无`ShellPlaceholderPage`、手写台账或本地业务mock。
+- 项目范围、最小权限、跨项目/跨租户拒绝、金额字符串、后端状态机、附件与业务动作分离、失败恢复、查询账号零写请求和写后权威回读全部可复验。
+- complete-project-v2补齐全部M3角色、权限、阶段、合法闭环和CLEAN附件数据；连续重载保持幂等，验证脚本通过。
+- M3后端专项集、V2全量单测、契约类型、应用类型、Lint、Clean-room边界、台账生成、构建、包体、`git diff --check`全部通过。
+- 五组M3 live E2E在1440/1024/390视口验证真实后端、axe、控制台、查询零写及阶段动作；独立安全与测试复核无阻塞发现。
+- 计划、Ready、Current Focus、Done、项目地图、迭代决策及正式质量报告一致回写；所有发现项完成本轮修复、正式承接或有依据关闭。
+状态：Done
+来源锚点：`docs/plans/第53条主线-M3-项目履约任务计划书-2026-07-21.md`的ISSUE-053-016；`docs/product-intelligence/evolution-decision.md`的`PI-2026-07-18-02`；`ISSUE-053-015`通过事实
+存量问题键：[mainline:053-M3-016-EXIT-GATE]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-016`
+- `cd backend; .\mvnw.cmd "-Dtest=QualitySafetyClosedLoopIntegrationTest,TechnicalManagementClosedLoopIntegrationTest,ProjectCloseoutClosedLoopIntegrationTest,M3ControllerPermissionIntegrationTest" test`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm check:bundle-size`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/load.ps1 -Environment demo -Database cgc_pms_demo_v2`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1 -Environment demo -Database cgc_pms_demo_v2`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify-m3-live.ps1`
+- `git diff --check`
+归档报告：`docs/quality/第53条主线-M3-项目履约全量退出门验收报告.md`
+Migration：不需要
+依赖：`ISSUE-053-010～015`均已通过；本Issue仅执行M3全量复验、独立复核和治理收口。
+风险等级：高
+运行态要求：本地V2、Legacy、后端、MySQL、Redis和MinIO健康；仅使用dev/demo数据，不连接生产。
+Reviewer要求：独立安全Reviewer复核权限、租户/项目范围、金额、状态机与附件边界；独立测试Reviewer复核测试覆盖、演示数据、三视口、axe、查询零写和证据完整性。
+最小回滚：回退本Issue治理与报告回写；若复验发现具体缺陷，仅回退对应M3路由或数据增量，不改写既有业务事实，不影响M0～M2。
 
 ### ISSUE-048-011：修正会计凭证页面陈旧生成规则说明
 

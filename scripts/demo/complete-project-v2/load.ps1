@@ -80,25 +80,27 @@ $stages = @(
     [pscustomobject]@{ Id = 'DASHBOARD_RISK_LEVELS'; Files = @('scripts/demo/complete-project-v2/sql/170-dashboard-risk-levels.sql') },
     [pscustomobject]@{ Id = 'COST_BREAKDOWN_DATA'; Files = @('scripts/demo/complete-project-v2/sql/180-cost-breakdown-data.sql') },
     [pscustomobject]@{ Id = 'STANDARDIZE_BUSINESS_CODES'; Files = @('scripts/demo/complete-project-v2/sql/190-standardize-business-codes.sql') },
-    [pscustomobject]@{ Id = 'ROLE_WORKFLOW_STATUS_DATA'; Files = @('scripts/demo/complete-project-v2/sql/200-role-workflow-status-data.sql') }
+    [pscustomobject]@{ Id = 'ROLE_WORKFLOW_STATUS_DATA'; Files = @('scripts/demo/complete-project-v2/sql/200-role-workflow-status-data.sql') },
+    [pscustomobject]@{ Id = 'M3_DOMAIN_PERMISSION_DATA'; Version = 10; Files = @('scripts/demo/complete-project-v2/sql/210-m3-domain-permission-data.sql') }
 )
 
 foreach ($stage in $stages) {
     $key = "DEMO_CGC_V2_$($stage.Id)"
-    $status = Invoke-MySql -Sql "SELECT COALESCE(MAX(status),'') FROM sys_bootstrap_state WHERE bootstrap_key='$key';" -Capture
+    $stageVersion = if ($null -ne $stage.Version) { [int]$stage.Version } else { 2 }
+    $status = Invoke-MySql -Sql "SELECT COALESCE(MAX(status),'') FROM sys_bootstrap_state WHERE bootstrap_key='$key' AND bootstrap_version=$stageVersion;" -Capture
     if (($status | Select-Object -First 1) -eq 'COMPLETED') {
         continue
     }
 
     $body = [System.Text.StringBuilder]::new()
     [void]$body.AppendLine('START TRANSACTION;')
-    [void]$body.AppendLine("INSERT INTO sys_bootstrap_state (bootstrap_key,bootstrap_version,status,completed_at) VALUES ('$key',2,'PENDING',NULL) ON DUPLICATE KEY UPDATE bootstrap_version=VALUES(bootstrap_version);")
+    [void]$body.AppendLine("INSERT INTO sys_bootstrap_state (bootstrap_key,bootstrap_version,status,completed_at) VALUES ('$key',$stageVersion,'PENDING',NULL) ON DUPLICATE KEY UPDATE bootstrap_version=VALUES(bootstrap_version),status='PENDING',completed_at=NULL;")
     foreach ($relativePath in $stage.Files) {
         $source = Join-Path $repoRoot $relativePath
         if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw "DEMO_LOAD_SOURCE_MISSING:$relativePath" }
         [void]$body.AppendLine([System.IO.File]::ReadAllText($source))
     }
-    [void]$body.AppendLine("UPDATE sys_bootstrap_state SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE bootstrap_key='$key' AND bootstrap_version=2;")
+    [void]$body.AppendLine("UPDATE sys_bootstrap_state SET status='COMPLETED',completed_at=CURRENT_TIMESTAMP WHERE bootstrap_key='$key' AND bootstrap_version=$stageVersion;")
     [void]$body.AppendLine('COMMIT;')
     Invoke-MySql -Sql $body.ToString()
 }

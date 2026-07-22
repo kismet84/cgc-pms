@@ -47,6 +47,9 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     private static final long REGULAR_RECEIVABLE = 99191009L;
     private static final long RETENTION_RECEIVABLE = 99191010L;
     private static final long FUND_ACCOUNT = 99191011L;
+    private static final long RESPONSIBLE_USER = 99191012L;
+    private static final long OUTSIDE_USER = 99191013L;
+    private static final long PROJECT_MEMBER = 99191014L;
     private static final AtomicLong IDS = new AtomicLong(99191100L);
 
     @Autowired ProjectCloseoutService service;
@@ -62,7 +65,10 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         asUser(1L);
         cleanup();
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 1,0,'admin','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','系统管理员','ENABLE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=1)");
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'closeout-responsible','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','收尾责任人','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", RESPONSIBLE_USER);
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'closeout-outsider','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','非项目成员','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OUTSIDE_USER);
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'CLOSEOUT-IT','竣工收尾闭环测试项目','ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(?,0,?,?,'PROJECT_MANAGER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", PROJECT_MEMBER, PROJECT, RESPONSIBLE_USER);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'OWNER-CLOSEOUT','收尾测试业主','OWNER','ENABLE',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PARTNER);
         jdbc.update("""
                 INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,
@@ -157,11 +163,19 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         collect(REGULAR_RECEIVABLE, new BigDecimal("900.00"), "REGULAR");
         service.verifyTailCollection(closeoutId);
 
+        assertEquals("CLOSEOUT_RESPONSIBLE_PROJECT_MEMBER_INVALID", assertThrows(BusinessException.class,
+                () -> service.registerWarranty(closeoutId, new WarrantyCommand(
+                        CONTRACT, RETENTION_RECEIVABLE, "W-OUTSIDE", new BigDecimal("100.00"),
+                        LocalDate.now().minusMonths(12), LocalDate.now(), OUTSIDE_USER, null))).getCode());
         long warrantyId = id(service.registerWarranty(closeoutId, new WarrantyCommand(
                 CONTRACT, RETENTION_RECEIVABLE, "W-001", new BigDecimal("100.00"),
-                LocalDate.now().minusMonths(12), LocalDate.now(), 1L, null)));
+                LocalDate.now().minusMonths(12), LocalDate.now(), RESPONSIBLE_USER, null)));
+        assertEquals("CLOSEOUT_RESPONSIBLE_PROJECT_MEMBER_INVALID", assertThrows(BusinessException.class,
+                () -> service.createDefect(warrantyId, new DefectCommand(
+                        "DF-OUTSIDE", "非成员缺陷", "责任人不属于项目", OUTSIDE_USER,
+                        LocalDate.now().plusDays(7), null))).getCode());
         long defectId = id(service.createDefect(warrantyId, new DefectCommand(
-                "DF-001", "屋面局部渗水", "雨后屋面局部出现渗水", 1L, LocalDate.now().plusDays(7), null)));
+                "DF-001", "屋面局部渗水", "雨后屋面局部出现渗水", RESPONSIBLE_USER, LocalDate.now().plusDays(7), null)));
         evidence("CLOSEOUT_DEFECT", defectId, "DEFECT_RECTIFICATION_EVIDENCE");
         service.rectifyDefect(defectId, new RectificationCommand("完成防水层修补并通过淋水试验"));
         assertEquals("CLOSEOUT_DEFECT_REVIEWER_CONFLICT", assertThrows(BusinessException.class,
@@ -299,6 +313,8 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM project_schedule_plan WHERE id=?", SCHEDULE);
         jdbc.update("DELETE FROM ct_contract WHERE id=?", CONTRACT);
         jdbc.update("DELETE FROM md_partner WHERE id=?", PARTNER);
+        jdbc.update("DELETE FROM pm_project_member WHERE id=?", PROJECT_MEMBER);
         jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT);
+        jdbc.update("DELETE FROM sys_user WHERE id IN(?,?)", RESPONSIBLE_USER, OUTSIDE_USER);
     }
 }

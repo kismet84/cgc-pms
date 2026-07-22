@@ -330,6 +330,7 @@ public class ProjectCloseoutService {
             throw error("CLOSEOUT_PROJECT_MISMATCH", "质保金应收、合同与项目关系不一致");
         if (decimal(receivable.get("original_amount")).compareTo(command.warrantyAmount()) != 0)
             throw error("CLOSEOUT_WARRANTY_AMOUNT_MISMATCH", "质保金额必须等于结算形成的质保金应收原值");
+        requireActiveProjectMember(projectId, command.responsibleUserId());
         Long id = IdWorker.getId();
         try {
             jdbc.update("""
@@ -351,9 +352,11 @@ public class ProjectCloseoutService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createDefect(Long warrantyId, DefectCommand command) {
         Map<String, Object> warranty = requireWarranty(warrantyId, true);
-        projectAccessChecker.checkAccess(longValue(warranty.get("project_id")), "登记缺陷责任");
+        Long projectId = longValue(warranty.get("project_id"));
+        projectAccessChecker.checkAccess(projectId, "登记缺陷责任");
         if (!Set.of("ACTIVE", "DEFECT_LIABILITY").contains(string(warranty.get("status"))))
             throw error("CLOSEOUT_WARRANTY_STATE_INVALID", "当前质保责任状态不允许新增缺陷");
+        requireActiveProjectMember(projectId, command.responsibleUserId());
         Long id = IdWorker.getId();
         try {
             jdbc.update("""
@@ -581,6 +584,17 @@ public class ProjectCloseoutService {
                  AND document_type=? AND virus_scan_status='CLEAN' AND deleted_flag=0
                 """, Integer.class, tenant(), businessType, businessId, documentType);
         if (count == null || count == 0) throw error("CLOSEOUT_ATTACHMENT_REQUIRED", message);
+    }
+
+    private void requireActiveProjectMember(Long projectId, Long userId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM sys_user u
+                JOIN pm_project_member m ON m.tenant_id=u.tenant_id AND m.user_id=u.id
+                WHERE u.id=? AND u.tenant_id=? AND u.status='ENABLE' AND u.deleted_flag=0
+                 AND m.project_id=? AND m.status='ACTIVE' AND m.deleted_flag=0
+                """, Integer.class, userId, tenant(), projectId);
+        if (count == null || count == 0)
+            throw error("CLOSEOUT_RESPONSIBLE_PROJECT_MEMBER_INVALID", "责任人不存在、跨租户、已停用或不是目标项目有效成员");
     }
 
     private Map<String, Object> requireProject(Long id, boolean lock) {

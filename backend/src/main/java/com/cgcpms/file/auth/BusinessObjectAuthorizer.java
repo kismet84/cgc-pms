@@ -473,6 +473,7 @@ public class BusinessObjectAuthorizer {
         if (object == null || !object.tenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "质量安全业务对象不存在: " + businessId);
         String type = documentType == null ? "" : documentType.trim().toUpperCase();
+        requireQualityDocumentAuthority(businessType, type);
         boolean allowed = switch (businessType) {
             case "QS_INSPECTION" -> "DRAFT".equals(object.status()) && "INSPECTION_EVIDENCE".equals(type);
             case "QS_ISSUE" -> "DRAFT".equals(object.status()) && "ISSUE_EVIDENCE".equals(type);
@@ -481,6 +482,19 @@ public class BusinessObjectAuthorizer {
             default -> false;
         };
         if (!allowed) throw new BusinessException("QS_DOCUMENT_STAGE_INVALID", "当前业务阶段不允许变更该类质量安全证据");
+    }
+
+    private void requireQualityDocumentAuthority(String businessType, String documentType) {
+        String authority = switch (businessType) {
+            case "QS_INSPECTION", "QS_ISSUE" -> "quality:safety:inspection:maintain";
+            case "QS_RECTIFICATION" -> switch (documentType) {
+                case "RECTIFICATION_EVIDENCE" -> "quality:safety:rectify";
+                case "REINSPECTION_EVIDENCE" -> "quality:safety:reinspect";
+                default -> null;
+            };
+            default -> null;
+        };
+        if (authority != null) requireAuthority(authority);
     }
 
     private QualityFileObject findQualityFileObject(String businessType, Long businessId) {

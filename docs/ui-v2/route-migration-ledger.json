@@ -5,9 +5,9 @@
     "namedRoutes": 87,
     "legacyRouteViewEntries": 73,
     "uniqueLegacyViews": 65,
-    "legacyOnly": 71,
+    "legacyOnly": 68,
     "v2SourceAvailable": 0,
-    "v2Accepted": 16
+    "v2Accepted": 19
   },
   "routes": [
     {
@@ -539,46 +539,46 @@
       "name": "QualitySafety",
       "path": "/quality-safety",
       "legacyView": "@/pages/quality-safety/index.vue",
-      "v2View": null,
+      "v2View": "@/pages/delivery/QualitySafetyPage.vue",
       "permission": null,
       "adminOnly": false,
       "public": false,
       "redirect": null,
       "domain": "项目履约",
-      "status": "LEGACY_ONLY",
+      "status": "V2_ACCEPTED",
       "stitchDesign": null,
-      "testEvidence": null,
-      "acceptanceEvidence": null
+      "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
+      "acceptanceEvidence": "docs/quality/ISSUE-053-013-M3质量安全整改闭环验收报告.md"
     },
     {
       "name": "TechnicalManagement",
       "path": "/technical-management",
       "legacyView": "@/pages/technical-management/index.vue",
-      "v2View": null,
+      "v2View": "@/pages/delivery/TechnicalManagementPage.vue",
       "permission": null,
       "adminOnly": false,
       "public": false,
       "redirect": null,
       "domain": "项目履约",
-      "status": "LEGACY_ONLY",
+      "status": "V2_ACCEPTED",
       "stitchDesign": null,
-      "testEvidence": null,
-      "acceptanceEvidence": null
+      "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
+      "acceptanceEvidence": "docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md"
     },
     {
       "name": "ProjectCloseout",
       "path": "/project-closeout",
       "legacyView": "@/pages/project-closeout/index.vue",
-      "v2View": null,
+      "v2View": "@/pages/delivery/ProjectCloseoutPage.vue",
       "permission": null,
       "adminOnly": false,
       "public": false,
       "redirect": null,
       "domain": "项目履约",
-      "status": "LEGACY_ONLY",
+      "status": "V2_ACCEPTED",
       "stitchDesign": null,
-      "testEvidence": null,
-      "acceptanceEvidence": null
+      "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
+      "acceptanceEvidence": "docs/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md"
     },
     {
       "name": "SupplierSourcing",

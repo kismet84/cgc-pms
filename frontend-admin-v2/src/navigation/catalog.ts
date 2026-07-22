@@ -136,7 +136,14 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'closeout',
         label: '项目收尾',
         defaultPath: '/project-closeout',
-        tabs: [{ path: '/project-closeout', label: '竣工收尾', permission: 'closeout:query' }],
+        tabs: [
+          {
+            path: '/project-closeout',
+            label: '竣工收尾',
+            permission: 'closeout:query',
+            workspaceContext: { project: true, period: false },
+          },
+        ],
       },
     ],
   },

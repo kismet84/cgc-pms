@@ -4,5 +4,8 @@ export * from "./auth";
 export * from "./dashboard";
 export * from "./delivery";
 export * from "./project";
+export * from "./quality";
+export * from "./technical";
+export * from "./closeout";
 export * from "./report";
 export * from "./workflow";

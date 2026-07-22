@@ -2,10 +2,10 @@ package-id: CGC-COMPLETE-PROJECT
 version: 2
 counts:
   project: 1
-  partner: 5
+  partner: 7
   contract: 4
   material: 1
-  completed-stage: 13
+  completed-stage: 21
 inventory:
   requested-qty: 100
   ordered-qty: 100
@@ -35,3 +35,27 @@ closed-loops:
   document-generation: 1
 coverage:
   mapped-target-tables-with-zero-rows: 0
+m3-delivery:
+  split-permission-accounts: 1
+  query-permissions: 2
+  action-overgrant: 0
+  project-members: 1
+m3-quality:
+  split-permission-accounts: 6
+  action-permissions: 5
+  stage-rows: 6
+  clean-document-types: 4
+  invalid-responsible-members: 0
+m3-technical:
+  split-permission-accounts: 10
+  action-permissions: 9
+  stage-rows: 7
+  clean-document-types: 6
+  invalid-responsible-members: 0
+m3-closeout:
+  split-permission-accounts: 11
+  action-permissions: 10
+  stage-rows: 10
+  clean-document-types: 5
+  legal-closed-chains: 1
+  invalid-responsible-members: 0
