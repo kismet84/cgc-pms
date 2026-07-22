@@ -10,6 +10,7 @@ import com.cgcpms.variation.entity.VarOrderItem;
 import com.cgcpms.variation.mapper.VarOrderItemMapper;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.handler.WorkflowContext;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
@@ -42,6 +43,9 @@ class VarOrderWorkflowHandlerTest {
 
     @Autowired
     private CostItemMapper costItemMapper;
+
+    @Autowired
+    private WfInstanceMapper wfInstanceMapper;
 
     @BeforeEach
     void setupContext() {
@@ -81,15 +85,11 @@ class VarOrderWorkflowHandlerTest {
         order.setVarCode("VO-HDLR-TEST-" + System.nanoTime());
         order.setVarName("测试签证变更-" + System.nanoTime());
         order.setDirection("REVENUE");
-        order.setApprovalStatus("DRAFT");
+        order.setApprovalStatus("APPROVING");
         order.setTenantId(0L);
         varOrderMapper.insert(order);
 
-        WfInstance instance = new WfInstance();
-        instance.setBusinessId(order.getId());
-        instance.setId(2400001L);
-        WorkflowContext ctx = new WorkflowContext();
-        ctx.setInstance(instance);
+        WorkflowContext ctx = contextFor(order.getId(), 2400001L);
 
         handler.onApproved(ctx);
 
@@ -111,7 +111,7 @@ class VarOrderWorkflowHandlerTest {
         order.setVarType("DESIGN_CHANGE");
         order.setDirection("COST");
         order.setReportedAmount(new BigDecimal("12000.00"));
-        order.setApprovalStatus("DRAFT");
+        order.setApprovalStatus("APPROVING");
         order.setCostGeneratedFlag(0);
         order.setTenantId(TENANT_0);
         varOrderMapper.insert(order);
@@ -173,10 +173,7 @@ class VarOrderWorkflowHandlerTest {
         order.setTenantId(0L);
         varOrderMapper.insert(order);
 
-        WfInstance instance = new WfInstance();
-        instance.setBusinessId(order.getId());
-        WorkflowContext ctx = new WorkflowContext();
-        ctx.setInstance(instance);
+        WorkflowContext ctx = contextFor(order.getId(), 2400004L);
 
         handler.onRejected(ctx);
 
@@ -199,10 +196,7 @@ class VarOrderWorkflowHandlerTest {
         order.setTenantId(0L);
         varOrderMapper.insert(order);
 
-        WfInstance instance = new WfInstance();
-        instance.setBusinessId(order.getId());
-        WorkflowContext ctx = new WorkflowContext();
-        ctx.setInstance(instance);
+        WorkflowContext ctx = contextFor(order.getId(), 2400005L);
 
         handler.onWithdrawn(ctx);
 
@@ -227,6 +221,18 @@ class VarOrderWorkflowHandlerTest {
         WfInstance instance = new WfInstance();
         instance.setBusinessId(businessId);
         instance.setId(instanceId);
+        instance.setTenantId(TENANT_0);
+        instance.setTemplateId(1L);
+        instance.setBusinessType("VAR_ORDER");
+        instance.setProjectId(10001L);
+        instance.setTitle("签证审批测试");
+        instance.setInstanceStatus("RUNNING");
+        instance.setInitiatorId(USER_ADMIN);
+        wfInstanceMapper.insert(instance);
+        VarOrder patch = new VarOrder();
+        patch.setId(businessId);
+        patch.setInternalApprovalInstanceId(instanceId);
+        varOrderMapper.updateById(patch);
         WorkflowContext ctx = new WorkflowContext();
         ctx.setInstance(instance);
         return ctx;

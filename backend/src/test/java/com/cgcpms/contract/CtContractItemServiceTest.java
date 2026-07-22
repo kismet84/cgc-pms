@@ -1,6 +1,7 @@
 package com.cgcpms.contract;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
@@ -9,6 +10,9 @@ import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.service.CtContractItemService;
+import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.mapper.PmProjectMapper;
+import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -47,6 +51,9 @@ class CtContractItemServiceTest {
 
     @Autowired
     private CtContractMapper contractMapper;
+
+    @Autowired
+    private PmProjectMapper projectMapper;
 
     @BeforeEach
     void setupContext() {
@@ -116,6 +123,25 @@ class CtContractItemServiceTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> itemService.getByContractId(draftContractId));
         assertEquals("CONTRACT_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    @DisplayName("按合同查询 — 无项目权限时拒绝访问")
+    void testGetByContractIdProjectAccessDenied() {
+        PmProject project = projectMapper.selectById(10001L);
+        project.setCreatedBy(2L);
+        project.setProjectManagerId(null);
+        projectMapper.updateById(project);
+
+        UserContext.set(Jwts.claims()
+                .add("userId", 3L)
+                .add("username", "no-project-access")
+                .add("tenantId", TestUserContext.TENANT_0)
+                .add("roleCodes", List.of())
+                .build());
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> itemService.getByContractId(draftContractId));
+        assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
     }
 
     @Test

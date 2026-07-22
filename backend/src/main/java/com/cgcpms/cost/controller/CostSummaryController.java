@@ -1,5 +1,6 @@
 package com.cgcpms.cost.controller;
 
+import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.cost.vo.CostProjectSummaryVO;
@@ -24,7 +25,8 @@ public class CostSummaryController {
     }
 
     @PostMapping("/{projectId}/refresh")
-    @PreAuthorize("hasAuthority('cost:summary:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('cost:summary:refresh') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @AuditedOperation(type = "REFRESH", businessType = "COST_SUMMARY", businessIdExpression = "#projectId")
     public ApiResponse<CostProjectSummaryVO> refresh(@PathVariable Long projectId) {
         return ApiResponse.success(costSummaryService.refreshSummary(projectId));
     }

@@ -54,7 +54,10 @@ class BidCostControllerTest {
 
     @Test @Order(2) @DisplayName("GET /bid-cost -> 200 with paginated data")
     void testList() throws Exception {
-        mockMvc.perform(getWith("/bid-cost").cookie(adminCookie()).param("pageNo", "1").param("pageSize", "10"))
+        mockMvc.perform(getWith("/bid-cost").cookie(adminCookie())
+                        .param("pageNo", "1").param("pageSize", "10")
+                        .param("projectId", "10001")
+                        .param("startDate", "2026-07-01").param("endDate", "2026-07-31"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data.records").isArray());
     }
 

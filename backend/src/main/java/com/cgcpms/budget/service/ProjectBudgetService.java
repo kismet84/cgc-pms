@@ -20,6 +20,8 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
@@ -28,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -46,18 +49,37 @@ public class ProjectBudgetService {
     private final CostSubjectMapper costSubjectMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final WorkflowEngine workflowEngine;
+    private final WfInstanceMapper wfInstanceMapper;
 
-    public IPage<ProjectBudgetVO> getPage(long pageNo, long pageSize, Long projectId, String status) {
+    public IPage<ProjectBudgetVO> getPage(long pageNo, long pageSize, Long projectId, String status,
+                                          LocalDate startDate, LocalDate endDate) {
+        validateDateWindow(startDate, endDate);
         LambdaQueryWrapper<ProjectBudget> wrapper = new LambdaQueryWrapper<ProjectBudget>()
                 .eq(ProjectBudget::getTenantId, UserContext.getCurrentTenantId());
         if (projectId != null) {
             projectAccessChecker.checkAccess(projectId, "查看项目预算");
             wrapper.eq(ProjectBudget::getProjectId, projectId);
+        } else {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            if (accessibleProjectIds.isEmpty()) {
+                wrapper.eq(ProjectBudget::getProjectId, -1L);
+            } else {
+                wrapper.in(ProjectBudget::getProjectId, accessibleProjectIds);
+            }
         }
         if (status != null && !status.isBlank()) wrapper.eq(ProjectBudget::getStatus, status);
+        // Budget has no business occurrence date; immutable server audit creation time is the report date.
+        if (startDate != null) wrapper.ge(ProjectBudget::getCreatedAt, startDate.atStartOfDay());
+        if (endDate != null) wrapper.lt(ProjectBudget::getCreatedAt, endDate.plusDays(1).atStartOfDay());
         wrapper.orderByDesc(ProjectBudget::getCreatedAt);
         return budgetMapper.selectPage(new Page<>(Math.max(1, pageNo), Math.min(100, Math.max(1, pageSize))), wrapper)
                 .convert(budget -> toVO(budget, false));
+    }
+
+    private static void validateDateWindow(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw new BusinessException("BUDGET_REPORT_DATE_INVALID", "预算报表开始日期不能晚于结束日期");
+        }
     }
 
     public ProjectBudgetVO getById(Long id) {
@@ -87,16 +109,14 @@ public class ProjectBudgetService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void update(ProjectBudget input) {
+    public void update(ProjectBudget input, Integer expectedVersion) {
         ProjectBudget existing = requireEditableBudget(input.getId());
+        requireVersion(expectedVersion, existing);
         requireWritableProject(existing.getProjectId(), "编辑项目预算");
         existing.setVersionNo(input.getVersionNo());
         existing.setBudgetName(input.getBudgetName());
         existing.setTotalAmount(money(input.getTotalAmount()));
         existing.setRemark(input.getRemark());
-        if (BudgetStatusConstants.APPROVAL_REJECTED.equals(existing.getApprovalStatus())) {
-            existing.setApprovalStatus(BudgetStatusConstants.APPROVAL_DRAFT);
-        }
         try {
             if (budgetMapper.updateById(existing) != 1) {
                 throw new BusinessException("BUDGET_CONCURRENT_UPDATE", "预算已被其他用户修改，请刷新后重试");
@@ -107,8 +127,9 @@ public class ProjectBudgetService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void saveLines(Long budgetId, List<ProjectBudgetLine> lines) {
+    public void saveLines(Long budgetId, Integer expectedVersion, List<ProjectBudgetLine> lines) {
         ProjectBudget budget = requireEditableBudget(budgetId);
+        requireVersion(expectedVersion, budget);
         requireWritableProject(budget.getProjectId(), "编辑项目预算科目");
         if (lines == null || lines.isEmpty()) {
             throw new BusinessException("BUDGET_LINES_REQUIRED", "项目预算至少需要一条科目明细");
@@ -143,6 +164,8 @@ public class ProjectBudgetService {
             throw new BusinessException("BUDGET_SUBJECT_INVALID", "预算包含不存在、跨租户或已停用的成本科目");
         }
 
+        // Reserve parent version before replacing children; loser fails before any unique-key side effect.
+        bumpVersion(budgetId, expectedVersion);
         lineMapper.hardDeleteDraftLines(budgetId, tenantId);
         for (ProjectBudgetLine line : lines) {
             line.setId(null);
@@ -156,19 +179,35 @@ public class ProjectBudgetService {
         }
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    public void delete(Long id) {
-        ProjectBudget budget = requireEditableBudget(id);
-        projectAccessChecker.checkAccess(budget.getProjectId(), "删除项目预算");
-        lineMapper.hardDeleteDraftLines(id, UserContext.getCurrentTenantId());
-        budgetMapper.deleteById(id);
+    /** Internal compatibility path; HTTP writes always provide an explicit version. */
+    public void saveLines(Long budgetId, List<ProjectBudgetLine> lines) {
+        saveLines(budgetId, requireBudget(budgetId).getVersion(), lines);
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void submit(Long id) {
+    public void delete(Long id, Integer expectedVersion) {
         ProjectBudget budget = requireEditableBudget(id);
+        requireVersion(expectedVersion, budget);
+        projectAccessChecker.checkAccess(budget.getProjectId(), "删除项目预算");
+        bumpVersion(id, expectedVersion);
+        lineMapper.hardDeleteDraftLines(id, UserContext.getCurrentTenantId());
+        int deleted = budgetMapper.delete(new LambdaQueryWrapper<ProjectBudget>()
+                .eq(ProjectBudget::getId, id)
+                .eq(ProjectBudget::getTenantId, UserContext.getCurrentTenantId())
+                .eq(ProjectBudget::getVersion, expectedVersion + 1));
+        if (deleted != 1) throw concurrentUpdate();
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void submit(Long id, Integer expectedVersion) {
+        ProjectBudget budget = requireEditableBudget(id);
+        requireVersion(expectedVersion, budget);
         validateForSubmit(budget);
-        workflowEngine.submit(
+        // Claim this business revision before creating workflow children.
+        bumpVersion(id, expectedVersion);
+        WfInstance instance = BudgetStatusConstants.APPROVAL_REJECTED.equals(budget.getApprovalStatus())
+                ? workflowEngine.resubmitProjectBudget(findWorkflowInstance(id), UserContext.getCurrentUserId(), UserContext.getCurrentUsername())
+                : workflowEngine.submitProjectBudget(
                 UserContext.getCurrentUserId(),
                 UserContext.getCurrentUsername(),
                 UserContext.getCurrentTenantId(),
@@ -179,10 +218,13 @@ public class ProjectBudgetService {
                 budget.getProjectId(),
                 null,
                 null, null, null);
-        budgetMapper.update(null, new LambdaUpdateWrapper<ProjectBudget>()
+        int submitted = budgetMapper.update(null, new LambdaUpdateWrapper<ProjectBudget>()
                 .eq(ProjectBudget::getId, id)
+                .eq(ProjectBudget::getTenantId, UserContext.getCurrentTenantId())
                 .eq(ProjectBudget::getApprovalStatus, budget.getApprovalStatus())
+                .eq(ProjectBudget::getVersion, expectedVersion + 1)
                 .set(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_APPROVING));
+        if (submitted != 1) throw concurrentUpdate();
     }
 
     public void validateForSubmit(ProjectBudget budget) {
@@ -220,6 +262,34 @@ public class ProjectBudgetService {
             throw new BusinessException("BUDGET_ACTIVE_LOCKED", "已生效预算不可编辑");
         }
         return budget;
+    }
+
+    private void requireVersion(Integer expectedVersion, ProjectBudget budget) {
+        if (expectedVersion == null || expectedVersion < 0) {
+            throw new BusinessException("BUDGET_VERSION_REQUIRED", "客户端版本不能为空且必须大于等于0");
+        }
+        if (!Objects.equals(expectedVersion, budget.getVersion())) throw concurrentUpdate();
+    }
+
+    private void bumpVersion(Long id, Integer expectedVersion) {
+        int updated = budgetMapper.update(null, new LambdaUpdateWrapper<ProjectBudget>()
+                .eq(ProjectBudget::getId, id)
+                .eq(ProjectBudget::getTenantId, UserContext.getCurrentTenantId())
+                .eq(ProjectBudget::getVersion, expectedVersion)
+                .set(ProjectBudget::getVersion, expectedVersion + 1));
+        if (updated != 1) throw concurrentUpdate();
+    }
+
+    private Long findWorkflowInstance(Long budgetId) {
+        WfInstance instance = wfInstanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getBusinessType, WorkflowBusinessTypes.PROJECT_BUDGET)
+                .eq(WfInstance::getBusinessId, budgetId));
+        if (instance == null) throw new BusinessException("BUDGET_WORKFLOW_INSTANCE_NOT_FOUND", "驳回预算缺少原审批实例");
+        return instance.getId();
+    }
+
+    private static BusinessException concurrentUpdate() {
+        return new BusinessException("BUDGET_CONCURRENT_UPDATE", "预算已被其他用户修改，请刷新后重试");
     }
 
     private ProjectBudget requireBudget(Long id) {

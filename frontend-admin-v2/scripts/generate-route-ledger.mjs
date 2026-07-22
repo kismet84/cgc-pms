@@ -6,6 +6,8 @@ import ts from 'typescript'
 const scriptRoot = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const repositoryRoot = resolve(scriptRoot, '../..')
 const routerPath = resolve(repositoryRoot, 'frontend-admin/src/router/index.ts')
+const v2RouterPath = resolve(repositoryRoot, 'frontend-admin-v2/src/router.ts')
+const navigationCatalogPath = resolve(repositoryRoot, 'frontend-admin-v2/src/navigation/catalog.ts')
 const jsonPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.json')
 const markdownPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.md')
 
@@ -29,6 +31,24 @@ const acceptedRoutes = {
   QualitySafety: '@/pages/delivery/QualitySafetyPage.vue',
   TechnicalManagement: '@/pages/delivery/TechnicalManagementPage.vue',
   ProjectCloseout: '@/pages/delivery/ProjectCloseoutPage.vue',
+  Contract: '@/router.ts#V2ContractRootRedirect',
+  ContractLedger: '@/pages/commercial/ContractPage.vue',
+  ContractCreate: '@/pages/commercial/ContractPage.vue',
+  ContractDetail: '@/pages/commercial/ContractPage.vue',
+  ContractEdit: '@/pages/commercial/ContractPage.vue',
+  Variation: '@/router.ts#V2VariationRootRedirect',
+  VariationOrder: '@/pages/commercial/VariationPage.vue',
+  BidCost: '@/pages/commercial/BidCostPage.vue',
+  CostTarget: '@/router.ts#V2CostTargetRootRedirect',
+  CostTargetList: '@/pages/commercial/CostTargetPage.vue',
+  CostTargetCreate: '@/pages/commercial/CostTargetPage.vue',
+  CostTargetEdit: '@/pages/commercial/CostTargetPage.vue',
+  Cost: '@/router.ts#V2CostRootRedirect',
+  CostLedger: '@/pages/commercial/CostLedgerPage.vue',
+  CostSummary: '@/pages/commercial/CostSummaryPage.vue',
+  CostControl: '@/pages/commercial/CostControlPage.vue',
+  ProjectBudget: '@/pages/commercial/BudgetPage.vue',
+  ProductionMeasurement: '@/pages/commercial/ProductionMeasurementPage.vue',
 }
 
 const sourceAvailableRoutes = {}
@@ -40,6 +60,14 @@ const m3QualityAcceptanceEvidence = 'docs/quality/ISSUE-053-013-M3质量安全�
 const m3TechnicalAcceptanceEvidence =
   'docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md'
 const m3CloseoutAcceptanceEvidence = 'docs/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md'
+const m4ContractAcceptanceEvidence =
+  'docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md'
+const m4VariationBidAcceptanceEvidence =
+  'docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md'
+const m4CostTargetAcceptanceEvidence = 'docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md'
+const m4CostsAcceptanceEvidence = 'docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md'
+const m4BudgetMeasurementAcceptanceEvidence =
+  'docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md'
 
 function findVariable(sourceFile, name) {
   for (const statement of sourceFile.statements) {
@@ -140,6 +168,12 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
       const isM3Quality = name === 'QualitySafety'
       const isM3Technical = name === 'TechnicalManagement'
       const isM3Closeout = name === 'ProjectCloseout'
+      const isM4Contract = name === 'Contract' || name.startsWith('Contract')
+      const isM4VariationBid =
+        name === 'Variation' || name === 'VariationOrder' || name === 'BidCost'
+      const isM4CostTarget = name === 'CostTarget' || name.startsWith('CostTarget')
+      const isM4Costs = ['Cost', 'CostLedger', 'CostSummary', 'CostControl'].includes(name)
+      const isM4BudgetMeasurement = ['ProjectBudget', 'ProductionMeasurement'].includes(name)
       result.push({
         name,
         path: fullPath,
@@ -154,17 +188,27 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
         stitchDesign: name === 'Dashboard' ? '用户已选新版经营驾驶舱视觉概念；M2 已验收' : null,
         testEvidence: v2View ? 'frontend-admin-v2/tests/unit；frontend-admin-v2/e2e' : null,
         acceptanceEvidence: acceptedView
-          ? isM3Delivery
-            ? m3DeliveryAcceptanceEvidence
-            : isM3Quality
-              ? m3QualityAcceptanceEvidence
-              : isM3Technical
-                ? m3TechnicalAcceptanceEvidence
-                : isM3Closeout
-                  ? m3CloseoutAcceptanceEvidence
-                  : isM3Project
-                    ? m3ProjectAcceptanceEvidence
-                    : m2AcceptanceEvidence
+          ? isM4BudgetMeasurement
+            ? m4BudgetMeasurementAcceptanceEvidence
+            : isM4Costs
+              ? m4CostsAcceptanceEvidence
+              : isM4CostTarget
+                ? m4CostTargetAcceptanceEvidence
+                : isM4Contract
+                  ? m4ContractAcceptanceEvidence
+                  : isM4VariationBid
+                    ? m4VariationBidAcceptanceEvidence
+                    : isM3Delivery
+                      ? m3DeliveryAcceptanceEvidence
+                      : isM3Quality
+                        ? m3QualityAcceptanceEvidence
+                        : isM3Technical
+                          ? m3TechnicalAcceptanceEvidence
+                          : isM3Closeout
+                            ? m3CloseoutAcceptanceEvidence
+                            : isM3Project
+                              ? m3ProjectAcceptanceEvidence
+                              : m2AcceptanceEvidence
           : null,
       })
     }
@@ -210,8 +254,73 @@ function renderMarkdown(ledger) {
   return lines.join('\n')
 }
 
+function assertCostTargetV2Acceptance(routerSource, catalogSource) {
+  const routerChecks = [
+    /const CostTargetPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/commercial\/CostTargetPage\.vue['"]\)/,
+    /tab\.path\s*===\s*['"]\/cost-target\/index['"]\s*\?\s*CostTargetPage/,
+    /path:\s*['"]\/cost-target['"][\s\S]{0,240}name:\s*['"]V2CostTargetRootRedirect['"][\s\S]{0,240}\/cost-target\/index/,
+    /path:\s*['"]\/cost-target\/create['"][\s\S]{0,240}name:\s*['"]V2ShellCostTargetCreate['"][\s\S]{0,240}component:\s*CostTargetPage/,
+    /path:\s*['"]\/cost-target\/:id\/edit['"][\s\S]{0,240}name:\s*['"]V2ShellCostTargetEdit['"][\s\S]{0,240}component:\s*CostTargetPage/,
+  ]
+  const catalogCheck =
+    /path:\s*['"]\/cost-target\/index['"][\s\S]{0,180}permission:\s*['"]cost:target:query['"][\s\S]{0,180}workspaceContext:\s*\{\s*project:\s*true,\s*period:\s*false\s*\}/
+  if (
+    routerChecks.some((check) => !check.test(routerSource)) ||
+    !catalogCheck.test(catalogSource)
+  ) {
+    throw new Error('CostTarget V2 acceptance mapping is missing or stale')
+  }
+}
+
+function assertCostsV2Acceptance(routerSource, catalogSource) {
+  const routerChecks = [
+    /const CostLedgerPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/commercial\/CostLedgerPage\.vue['"]\)/,
+    /const CostSummaryPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/commercial\/CostSummaryPage\.vue['"]\)/,
+    /const CostControlPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/commercial\/CostControlPage\.vue['"]\)/,
+    /path:\s*['"]\/cost['"][\s\S]{0,240}name:\s*['"]V2CostRootRedirect['"][\s\S]{0,240}\/cost\/ledger/,
+  ]
+  const catalogChecks = [
+    [/\/cost\/ledger/, /cost:ledger:query/],
+    [/\/cost\/summary/, /cost:summary:view/],
+    [/\/cost\/control/, /cost:control:query/],
+  ]
+  if (
+    routerChecks.some((check) => !check.test(routerSource)) ||
+    catalogChecks.some(
+      ([path, permission]) => !path.test(catalogSource) || !permission.test(catalogSource),
+    )
+  ) {
+    throw new Error('M4 costs V2 acceptance mapping is missing or stale')
+  }
+}
+
+function assertBudgetMeasurementV2Acceptance(routerSource, catalogSource) {
+  const routerChecks = [
+    /const BudgetPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/commercial\/BudgetPage\.vue['"]\)/,
+    /const ProductionMeasurementPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/commercial\/ProductionMeasurementPage\.vue['"]\)/,
+    /tab\.path\s*===\s*['"]\/budget['"]\s*\?\s*BudgetPage/,
+    /tab\.path\s*===\s*['"]\/production-measurement['"]\s*\?\s*ProductionMeasurementPage/,
+  ]
+  const catalogChecks = [
+    /path:\s*['"]\/budget['"][\s\S]{0,240}permission:\s*['"]budget:query['"][\s\S]{0,240}workspaceContext:\s*\{\s*project:\s*true,\s*period:\s*true\s*\}/,
+    /path:\s*['"]\/production-measurement['"][\s\S]{0,240}permission:\s*['"]measurement:query['"][\s\S]{0,240}workspaceContext:\s*\{\s*project:\s*true,\s*period:\s*true\s*\}/,
+  ]
+  if (
+    routerChecks.some((check) => !check.test(routerSource)) ||
+    catalogChecks.some((check) => !check.test(catalogSource))
+  )
+    throw new Error('M4 budget/measurement V2 acceptance mapping is missing or stale')
+}
+
 async function buildLedger() {
-  const source = await readFile(routerPath, 'utf8')
+  const [source, v2RouterSource, navigationCatalogSource] = await Promise.all([
+    readFile(routerPath, 'utf8'),
+    readFile(v2RouterPath, 'utf8'),
+    readFile(navigationCatalogPath, 'utf8'),
+  ])
+  assertCostTargetV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertCostsV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertBudgetMeasurementV2Acceptance(v2RouterSource, navigationCatalogSource)
   const sourceFile = ts.createSourceFile(
     routerPath,
     source,

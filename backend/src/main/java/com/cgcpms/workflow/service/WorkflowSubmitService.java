@@ -35,6 +35,73 @@ public class WorkflowSubmitService {
                              Long projectId, Long contractId,
                              String businessSummary, String variables,
                              List<Long> ccUserIds) {
+        return submit(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds, null);
+    }
+
+    public WfInstance submitCostTarget(Long userId, String username, Long tenantId,
+                                       String businessType, Long businessId,
+                                       String title, java.math.BigDecimal amount,
+                                       Long projectId, Long contractId,
+                                       String businessSummary, String variables,
+                                       List<Long> ccUserIds) {
+        if (!com.cgcpms.workflow.WorkflowBusinessTypes.COST_TARGET.equals(businessType)) {
+            throw new BusinessException("WORKFLOW_BUSINESS_INVALID", "目标成本专用提交仅支持 COST_TARGET");
+        }
+        return submit(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.COST_TARGET);
+    }
+
+    public WfInstance submitCostCorrectiveAction(Long userId, String username, Long tenantId,
+                                                 String businessType, Long businessId,
+                                                 String title, java.math.BigDecimal amount,
+                                                 Long projectId, Long contractId,
+                                                 String businessSummary, String variables,
+                                                 List<Long> ccUserIds) {
+        if (!com.cgcpms.workflow.WorkflowBusinessTypes.COST_CORRECTIVE_ACTION.equals(businessType)) {
+            throw new BusinessException("WORKFLOW_BUSINESS_INVALID", "成本纠偏专用提交仅支持 COST_CORRECTIVE_ACTION");
+        }
+        return submit(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.COST_CORRECTIVE_ACTION);
+    }
+
+    public WfInstance submitProjectBudget(Long userId, String username, Long tenantId,
+                                          String businessType, Long businessId,
+                                          String title, java.math.BigDecimal amount,
+                                          Long projectId, Long contractId,
+                                          String businessSummary, String variables,
+                                          List<Long> ccUserIds) {
+        if (!com.cgcpms.workflow.WorkflowBusinessTypes.PROJECT_BUDGET.equals(businessType)) {
+            throw new BusinessException("WORKFLOW_BUSINESS_INVALID", "项目预算专用提交仅支持 PROJECT_BUDGET");
+        }
+        return submit(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.PROJECT_BUDGET);
+    }
+
+    public WfInstance submitProductionMeasurement(Long userId, String username, Long tenantId,
+                                                  String businessType, Long businessId,
+                                                  String title, java.math.BigDecimal amount,
+                                                  Long projectId, Long contractId,
+                                                  String businessSummary, String variables,
+                                                  List<Long> ccUserIds) {
+        if (!com.cgcpms.workflow.WorkflowBusinessTypes.PRODUCTION_MEASUREMENT.equals(businessType)) {
+            throw new BusinessException("WORKFLOW_BUSINESS_INVALID", "产值计量专用提交仅支持 PRODUCTION_MEASUREMENT");
+        }
+        return submit(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.PRODUCTION_MEASUREMENT);
+    }
+
+    private WfInstance submit(Long userId, String username, Long tenantId,
+                              String businessType, Long businessId,
+                              String title, java.math.BigDecimal amount,
+                              Long projectId, Long contractId,
+                              String businessSummary, String variables,
+                              List<Long> ccUserIds, String dedicatedBusinessType) {
+        rejectGenericProtectedRoute(businessType, dedicatedBusinessType);
 
         WorkflowBusinessAccessValidator.ValidationResult businessAccess =
                 businessAccessValidator.validateSubmit(businessType, businessId, tenantId, projectId, contractId);
@@ -106,6 +173,30 @@ public class WorkflowSubmitService {
 
     @Transactional(rollbackFor = Exception.class)
     public WfInstance resubmit(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username, null);
+    }
+
+    public WfInstance resubmitCostTarget(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username, com.cgcpms.workflow.WorkflowBusinessTypes.COST_TARGET);
+    }
+
+    public WfInstance resubmitCostCorrectiveAction(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username,
+                com.cgcpms.workflow.WorkflowBusinessTypes.COST_CORRECTIVE_ACTION);
+    }
+
+    public WfInstance resubmitProjectBudget(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username,
+                com.cgcpms.workflow.WorkflowBusinessTypes.PROJECT_BUDGET);
+    }
+
+    public WfInstance resubmitProductionMeasurement(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username,
+                com.cgcpms.workflow.WorkflowBusinessTypes.PRODUCTION_MEASUREMENT);
+    }
+
+    private WfInstance resubmit(Long instanceId, Long userId, String username,
+                                String dedicatedBusinessType) {
 
         WfInstance tenantProbe = wfInstanceMapper.selectByIdIgnoringTenant(instanceId);
         if (tenantProbe == null) {
@@ -116,6 +207,7 @@ public class WorkflowSubmitService {
         if (instance == null) {
             throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
         }
+        rejectGenericProtectedRoute(instance.getBusinessType(), dedicatedBusinessType);
         if (!WorkflowConstants.INSTANCE_REJECTED.equals(instance.getInstanceStatus())
                 && !WorkflowConstants.INSTANCE_WITHDRAWN.equals(instance.getInstanceStatus())) {
             throw new BusinessException("INSTANCE_NOT_RESUBMITTABLE", "只能重新提交已驳回或已撤回的审批");
@@ -125,6 +217,8 @@ public class WorkflowSubmitService {
         }
 
         int newRound = instance.getCurrentRound() + 1;
+        businessAccessValidator.validateResubmit(instance.getBusinessType(), instance.getBusinessId(),
+                instance.getTenantId(), instance.getProjectId(), instance.getContractId());
         instance.setCurrentRound(newRound);
         instance.setResubmitCount(instance.getResubmitCount() + 1);
         instance.setInstanceStatus(WorkflowConstants.INSTANCE_RUNNING);
@@ -146,12 +240,36 @@ public class WorkflowSubmitService {
                 instanceId, null, null, newRound,
                 null, null, WorkflowConstants.ACTION_RESUBMIT, "重新提交",
                 userId, username, null);
+        core.notifyHandler(instance.getBusinessType(), instance, WorkflowConstants.ACTION_SUBMIT, username, null);
 
         // Notify approvers for the new round
         notifyApprovers(instance,
                 username + "重新提交了审批", username + "重新提交了审批：" + instance.getTitle(), "RESUBMIT_PENDING");
 
         return instance;
+    }
+
+    private void rejectGenericProtectedRoute(String businessType, String dedicatedBusinessType) {
+        if (com.cgcpms.workflow.WorkflowBusinessTypes.COST_TARGET.equals(businessType)
+                && !businessType.equals(dedicatedBusinessType)) {
+            throw new BusinessException("COST_TARGET_DEDICATED_SUBMIT_REQUIRED",
+                    "目标成本必须通过专用接口提交");
+        }
+        if (com.cgcpms.workflow.WorkflowBusinessTypes.COST_CORRECTIVE_ACTION.equals(businessType)
+                && !businessType.equals(dedicatedBusinessType)) {
+            throw new BusinessException("COST_CORRECTIVE_DEDICATED_SUBMIT_REQUIRED",
+                    "成本纠偏必须通过专用接口提交");
+        }
+        if (com.cgcpms.workflow.WorkflowBusinessTypes.PROJECT_BUDGET.equals(businessType)
+                && !businessType.equals(dedicatedBusinessType)) {
+            throw new BusinessException("PROJECT_BUDGET_DEDICATED_SUBMIT_REQUIRED",
+                    "项目预算必须通过专用接口提交");
+        }
+        if (com.cgcpms.workflow.WorkflowBusinessTypes.PRODUCTION_MEASUREMENT.equals(businessType)
+                && !businessType.equals(dedicatedBusinessType)) {
+            throw new BusinessException("PRODUCTION_MEASUREMENT_DEDICATED_SUBMIT_REQUIRED",
+                    "产值计量必须通过专用接口提交");
+        }
     }
 
     // ──────────────────────── Extracted helpers ────────────────────────

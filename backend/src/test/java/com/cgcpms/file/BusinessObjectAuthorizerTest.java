@@ -164,6 +164,56 @@ class BusinessObjectAuthorizerTest {
     }
 
     @Test
+    void variationTraceAuthorityCanReadButCannotMutateAttachments() {
+        TestUserContext.setUser(TestUserContext.TENANT_0, 9L, "variation-trace", List.of("USER"));
+        setAuthentication("variation:trace");
+        VarOrder variation = variation("DRAFT", "NOT_SUBMITTED", 10010L);
+        when(variationMapper.selectById(60010L)).thenReturn(variation);
+
+        authorizer.checkReadAccess("VARIATION", 60010L);
+        BusinessException denied = assertThrows(BusinessException.class,
+                () -> authorizer.checkVariationDocumentStage("VARIATION", 60010L, "SITE_EVIDENCE"));
+
+        assertEquals("FILE_ACCESS_DENIED", denied.getCode());
+        verify(projectAccessChecker).checkAccess(10010L, "读取变更单文件");
+    }
+
+    @Test
+    void variationDocumentStagesRequireExactActionAuthorityAndState() {
+        VarOrder draft = variation("DRAFT", "NOT_SUBMITTED", 10011L);
+        when(variationMapper.selectById(60011L)).thenReturn(draft);
+        setAuthentication("variation:order:edit");
+        authorizer.checkVariationDocumentStage("VARIATION", 60011L, "SITE_EVIDENCE");
+
+        setAuthentication("variation:owner:submit");
+        BusinessException wrongStage = assertThrows(BusinessException.class,
+                () -> authorizer.checkVariationDocumentStage("VARIATION", 60011L, "OWNER_SUBMISSION"));
+        assertEquals("VARIATION_DOCUMENT_STAGE_INVALID", wrongStage.getCode());
+
+        VarOrder ownerApproved = variation("APPROVED", "INTERNAL_APPROVED", 10011L);
+        when(variationMapper.selectById(60011L)).thenReturn(ownerApproved);
+        authorizer.checkVariationDocumentStage("VARIATION", 60011L, "OWNER_SUBMISSION");
+
+        BusinessException unsupported = assertThrows(BusinessException.class,
+                () -> authorizer.checkVariationDocumentStage("VARIATION", 60011L, "OTHER"));
+        assertEquals("VARIATION_DOCUMENT_STAGE_INVALID", unsupported.getCode());
+    }
+
+    @Test
+    void variationOwnerConfirmationRequiresSubmittedState() {
+        setAuthentication("variation:owner:review");
+        when(variationMapper.selectById(60012L))
+                .thenReturn(variation("APPROVED", "OWNER_SUBMITTED", 10012L));
+        authorizer.checkVariationDocumentStage("VARIATION", 60012L, "OWNER_CONFIRMATION");
+
+        when(variationMapper.selectById(60012L))
+                .thenReturn(variation("APPROVED", "OWNER_RETURNED", 10012L));
+        BusinessException wrongStage = assertThrows(BusinessException.class,
+                () -> authorizer.checkVariationDocumentStage("VARIATION", 60012L, "OWNER_CONFIRMATION"));
+        assertEquals("VARIATION_DOCUMENT_STAGE_INVALID", wrongStage.getCode());
+    }
+
+    @Test
     void settlementFileAccessChecksRealProject() {
         StlSettlement settlement = new StlSettlement();
         settlement.setTenantId(TestUserContext.TENANT_0);
@@ -319,5 +369,14 @@ class BusinessObjectAuthorizerTest {
         var granted = Arrays.stream(authorities).map(SimpleGrantedAuthority::new).toList();
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken("test-user", null, granted));
+    }
+
+    private VarOrder variation(String approvalStatus, String ownerStatus, Long projectId) {
+        VarOrder variation = new VarOrder();
+        variation.setTenantId(TestUserContext.TENANT_0);
+        variation.setProjectId(projectId);
+        variation.setApprovalStatus(approvalStatus);
+        variation.setOwnerStatus(ownerStatus);
+        return variation;
     }
 }

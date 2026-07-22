@@ -198,6 +198,10 @@ class ContractApprovalIntegrationTest {
         contractMapper.insert(contract);
     }
 
+    private Integer currentVersion(Long contractId) {
+        return contractMapper.selectById(contractId).getVersion();
+    }
+
     // ═══════════════════════════════════════════════════════════
     // 场景1: 提交合同审批
     // ═══════════════════════════════════════════════════════════
@@ -211,7 +215,7 @@ class ContractApprovalIntegrationTest {
         assertEquals(ContractStatusConstants.APPROVAL_DRAFT, before.getApprovalStatus());
 
         // 提交审批
-        contractService.submitForApproval(DRAFT_CONTRACT_ID);
+        contractService.submitForApproval(DRAFT_CONTRACT_ID, currentVersion(DRAFT_CONTRACT_ID));
 
         // 断言审批状态已变为 APPROVING
         CtContract after = contractMapper.selectById(DRAFT_CONTRACT_ID);
@@ -250,7 +254,7 @@ class ContractApprovalIntegrationTest {
     @DisplayName("场景2: 审批中合同不可编辑 → 抛出 CONTRACT_NOT_EDITABLE")
     void test02_approvalStatusGuard() {
         // 先提交审批，使其进入 APPROVING 状态
-        contractService.submitForApproval(DRAFT_CONTRACT_ID);
+        contractService.submitForApproval(DRAFT_CONTRACT_ID, currentVersion(DRAFT_CONTRACT_ID));
 
         // 构造编辑请求（尝试修改合同名称）
         CtContract editContract = new CtContract();
@@ -348,13 +352,13 @@ class ContractApprovalIntegrationTest {
     @DisplayName("场景4: 重复提交审批 → 抛出 CONTRACT_ALREADY_SUBMITTED")
     void test04_submitDuplicateRejected() {
         // 第一次提交成功
-        contractService.submitForApproval(DRAFT_CONTRACT_ID);
+        contractService.submitForApproval(DRAFT_CONTRACT_ID, currentVersion(DRAFT_CONTRACT_ID));
         CtContract afterFirst = contractMapper.selectById(DRAFT_CONTRACT_ID);
         assertEquals(ContractStatusConstants.APPROVAL_APPROVING, afterFirst.getApprovalStatus());
 
         // 第二次提交应失败
         BusinessException ex = assertThrows(BusinessException.class, () -> {
-            contractService.submitForApproval(DRAFT_CONTRACT_ID);
+            contractService.submitForApproval(DRAFT_CONTRACT_ID, currentVersion(DRAFT_CONTRACT_ID));
         }, "重复提交应抛出异常");
         assertEquals("CONTRACT_ALREADY_SUBMITTED", ex.getCode(), "错误码应为 CONTRACT_ALREADY_SUBMITTED");
 
@@ -374,7 +378,7 @@ class ContractApprovalIntegrationTest {
     @DisplayName("场景5: 审批记录查询 → 返回审批记录（含 SUBMIT）")
     void test05_getApprovalRecords() {
         // 提交审批
-        contractService.submitForApproval(DRAFT_CONTRACT_ID);
+        contractService.submitForApproval(DRAFT_CONTRACT_ID, currentVersion(DRAFT_CONTRACT_ID));
 
         // 查询审批记录
         List<ContractApprovalRecordVO> records = contractService.getApprovalRecords(DRAFT_CONTRACT_ID);

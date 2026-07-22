@@ -3,7 +3,7 @@ package com.cgcpms.cost.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
-import com.cgcpms.common.TestUserContext;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
@@ -31,6 +31,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 class CostLedgerServiceTest {
 
+    private static final long TENANT_ID = 0L;
+    private static final long USER_ADMIN = 1L;
     private static final long PROJECT_ID = 10001L;
     private static final long LEDGER_DEMO_PROJECT_ID = 2071032241708793858L;
     private static final long TEST_KEYWORD_PROJECT_ID = 99010001L;
@@ -46,7 +48,7 @@ class CostLedgerServiceTest {
 
     @BeforeEach
     void setUp() {
-        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        setAdminContext();
         // Clean up any leftover test data (tests do not use @Transactional)
         costItemMapper.delete(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostItem>()
                 .eq(CostItem::getProjectId, PROJECT_ID)
@@ -61,16 +63,16 @@ class CostLedgerServiceTest {
 
     @AfterEach
     void tearDown() {
-        TestUserContext.clear();
+        UserContext.clear();
     }
 
     @Test
     @DisplayName("getPage handles cost items with null optional relation ids")
     void getPageHandlesNullOptionalRelationIds() {
-        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        setAdminContext();
 
         CostItem item = new CostItem();
-        item.setTenantId(TestUserContext.TENANT_0);
+        item.setTenantId(TENANT_ID);
         item.setProjectId(PROJECT_ID);
         item.setContractId(null);
         item.setPartnerId(null);
@@ -85,8 +87,8 @@ class CostLedgerServiceTest {
         item.setCostDate(LocalDate.now());
         item.setCostStatus("CONFIRMED");
         item.setGeneratedFlag(1);
-        item.setCreatedBy(TestUserContext.USER_ADMIN);
-        item.setUpdatedBy(TestUserContext.USER_ADMIN);
+        item.setCreatedBy(USER_ADMIN);
+        item.setUpdatedBy(USER_ADMIN);
         costItemMapper.insert(item);
 
         IPage<CostLedgerVO> page = Assertions.assertDoesNotThrow(
@@ -147,8 +149,8 @@ class CostLedgerServiceTest {
         item.setCostDate(LocalDate.now());
         item.setCostStatus("CONFIRMED");
         item.setGeneratedFlag(1);
-        item.setCreatedBy(TestUserContext.USER_ADMIN);
-        item.setUpdatedBy(TestUserContext.USER_ADMIN);
+        item.setCreatedBy(USER_ADMIN);
+        item.setUpdatedBy(USER_ADMIN);
         costItemMapper.insert(item);
 
         try {
@@ -157,6 +159,45 @@ class CostLedgerServiceTest {
             assertEquals("COST_ITEM_NOT_FOUND", ex.getCode());
         } finally {
             costItemMapper.deleteById(item.getId());
+        }
+    }
+
+    @Test
+    @DisplayName("getById: 无项目权限时拒绝访问")
+    void getByIdDeniedWithoutProjectAccess() {
+        long itemId = insertSimpleCostItem("TEST_SCOPE_DENIED", new BigDecimal("88.00"), BigDecimal.ZERO, PROJECT_ID);
+        PmProject project = pmProjectMapper.selectById(PROJECT_ID);
+        Long originalCreatedBy = project.getCreatedBy();
+        Long originalManagerId = project.getProjectManagerId();
+        project.setCreatedBy(66L);
+        project.setProjectManagerId(null);
+        pmProjectMapper.updateById(project);
+        UserContext.clear();
+        UserContext.set(io.jsonwebtoken.Jwts.claims()
+                .add("userId", 77L)
+                .add("username", "ledger-reader")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", java.util.List.of())
+                .build());
+
+        try {
+            BusinessException ex = assertThrows(BusinessException.class,
+                    () -> costLedgerService.getById(itemId));
+            assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
+            BusinessException pageDenied = assertThrows(BusinessException.class,
+                    () -> costLedgerService.getPage(1, 20, PROJECT_ID, null, null, null,
+                            null, null, null, null, null, null));
+            assertEquals("PROJECT_ACCESS_DENIED", pageDenied.getCode());
+            BusinessException summaryDenied = assertThrows(BusinessException.class,
+                    () -> costLedgerService.getSummary(PROJECT_ID, null, null, null,
+                            null, null, null, null, null, null));
+            assertEquals("PROJECT_ACCESS_DENIED", summaryDenied.getCode());
+        } finally {
+            project.setCreatedBy(originalCreatedBy);
+            project.setProjectManagerId(originalManagerId);
+            pmProjectMapper.updateById(project);
+            setAdminContext();
+            costItemMapper.deleteById(itemId);
         }
     }
 
@@ -309,7 +350,7 @@ class CostLedgerServiceTest {
     @DisplayName("keyword查询使用参数绑定且不把恶意字符拼入SQL")
     @SuppressWarnings("unchecked")
     void keywordFilterUsesBoundParametersForLikeSearch() {
-        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        setAdminContext();
         String maliciousKeyword = "x%' OR 1=1 --";
 
         LambdaQueryWrapper<CostItem> wrapper = (LambdaQueryWrapper<CostItem>) ReflectionTestUtils.invokeMethod(
@@ -335,7 +376,7 @@ class CostLedgerServiceTest {
     void keywordSearchHandlesRegressionCases() {
         PmProject project = new PmProject();
         project.setId(TEST_KEYWORD_PROJECT_ID);
-        project.setTenantId(TestUserContext.TENANT_0);
+        project.setTenantId(TENANT_ID);
         project.setProjectCode("TEST-KW-PROJ");
         project.setProjectName("成本台账关键字项目");
         project.setProjectType("BUILDING");
@@ -373,7 +414,7 @@ class CostLedgerServiceTest {
     private CostItem buildCostItem(String sourceType, BigDecimal amount, BigDecimal taxAmount,
                                    Long projectId, String costType) {
         CostItem item = new CostItem();
-        item.setTenantId(TestUserContext.TENANT_0);
+        item.setTenantId(TENANT_ID);
         item.setProjectId(projectId);
         item.setContractId(null);
         item.setPartnerId(null);
@@ -388,8 +429,8 @@ class CostLedgerServiceTest {
         item.setCostDate(LocalDate.now());
         item.setCostStatus("CONFIRMED");
         item.setGeneratedFlag(1);
-        item.setCreatedBy(TestUserContext.USER_ADMIN);
-        item.setUpdatedBy(TestUserContext.USER_ADMIN);
+        item.setCreatedBy(USER_ADMIN);
+        item.setUpdatedBy(USER_ADMIN);
         return item;
     }
 
@@ -408,5 +449,14 @@ class CostLedgerServiceTest {
         assertTrue(page.getRecords().stream()
                         .anyMatch(vo -> expectedId.toString().equals(vo.getId())),
                 "keyword should find cost item " + expectedId + ": " + keyword);
+    }
+
+    private void setAdminContext() {
+        UserContext.set(io.jsonwebtoken.Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", java.util.List.of("ADMIN"))
+                .build());
     }
 }

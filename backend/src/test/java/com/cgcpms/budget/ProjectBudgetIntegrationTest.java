@@ -31,6 +31,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -166,6 +167,36 @@ class ProjectBudgetIntegrationTest {
         assertEquals(0, new BigDecimal("700.00").compareTo(line.getReservedAmount()));
         BigDecimal available = line.getBudgetAmount().subtract(line.getReservedAmount()).subtract(line.getConsumedAmount());
         assertTrue(available.compareTo(BigDecimal.ZERO) >= 0);
+    }
+
+    @Test
+    @DisplayName("空项目筛选列表在无项目权限时 fail-close")
+    void getPageFailsClosedWithoutProjectAccess() {
+        jdbcTemplate.update("UPDATE pm_project SET created_by=?, project_manager_id=NULL WHERE id=?", 2L, PROJECT_ID);
+        UserContext.set(Jwts.claims()
+                .add("userId", 3L)
+                .add("username", "budget-reader")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of())
+                .build());
+
+        var page = budgetService.getPage(1, 20, null, null, null, null);
+        assertEquals(0L, page.getTotal());
+        assertTrue(page.getRecords().isEmpty());
+    }
+
+    @Test
+    @DisplayName("预算报告期按服务端审计创建日期过滤且边界包含")
+    void budgetReportWindowUsesAuditableCreatedAt() {
+        jdbcTemplate.update("UPDATE project_budget SET created_at='2026-07-15 12:00:00' WHERE id=?", budgetId);
+
+        assertEquals(1L, budgetService.getPage(1, 20, PROJECT_ID, null,
+                LocalDate.of(2026, 7, 15), LocalDate.of(2026, 7, 15)).getTotal());
+        assertEquals(0L, budgetService.getPage(1, 20, PROJECT_ID, null,
+                LocalDate.of(2026, 7, 16), LocalDate.of(2026, 7, 31)).getTotal());
+        BusinessException invalid = assertThrows(BusinessException.class, () -> budgetService.getPage(
+                1, 20, PROJECT_ID, null, LocalDate.of(2026, 8, 1), LocalDate.of(2026, 7, 31)));
+        assertEquals("BUDGET_REPORT_DATE_INVALID", invalid.getCode());
     }
 
     private boolean reserveConcurrently(Long businessId, String key, CountDownLatch ready, CountDownLatch start) {

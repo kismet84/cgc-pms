@@ -16,6 +16,15 @@ const DashboardPage = () => import('./pages/dashboard/DashboardPage.vue')
 const WorkflowWorkbenchPage = () => import('./pages/workbench/WorkflowWorkbenchPage.vue')
 const ReportCatalogPage = () => import('./pages/workbench/ReportCatalogPage.vue')
 const ProjectPage = () => import('./pages/projects/ProjectPage.vue')
+const ContractPage = () => import('./pages/commercial/ContractPage.vue')
+const VariationPage = () => import('./pages/commercial/VariationPage.vue')
+const BidCostPage = () => import('./pages/commercial/BidCostPage.vue')
+const CostTargetPage = () => import('./pages/commercial/CostTargetPage.vue')
+const CostLedgerPage = () => import('./pages/commercial/CostLedgerPage.vue')
+const CostSummaryPage = () => import('./pages/commercial/CostSummaryPage.vue')
+const CostControlPage = () => import('./pages/commercial/CostControlPage.vue')
+const BudgetPage = () => import('./pages/commercial/BudgetPage.vue')
+const ProductionMeasurementPage = () => import('./pages/commercial/ProductionMeasurementPage.vue')
 const SchedulePage = () => import('./pages/delivery/SchedulePage.vue')
 const DailyLogPage = () => import('./pages/delivery/DailyLogPage.vue')
 const QualitySafetyPage = () => import('./pages/delivery/QualitySafetyPage.vue')
@@ -70,17 +79,35 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
                   ? WorkflowWorkbenchPage
                   : tab.path === '/project/list'
                     ? ProjectPage
-                    : tab.path === '/project-schedule'
-                      ? SchedulePage
-                      : tab.path === '/site/daily-log'
-                        ? DailyLogPage
-                        : tab.path === '/quality-safety'
-                          ? QualitySafetyPage
-                          : tab.path === '/technical-management'
-                            ? TechnicalManagementPage
-                            : tab.path === '/project-closeout'
-                              ? ProjectCloseoutPage
-                              : ShellPlaceholderPage,
+                    : tab.path === '/contract/ledger'
+                      ? ContractPage
+                      : tab.path === '/variation/order'
+                        ? VariationPage
+                        : tab.path === '/bid-cost'
+                          ? BidCostPage
+                          : tab.path === '/cost-target/index'
+                            ? CostTargetPage
+                            : tab.path === '/cost/ledger'
+                              ? CostLedgerPage
+                              : tab.path === '/cost/summary'
+                                ? CostSummaryPage
+                                : tab.path === '/cost/control'
+                                  ? CostControlPage
+                                  : tab.path === '/budget'
+                                    ? BudgetPage
+                                    : tab.path === '/production-measurement'
+                                      ? ProductionMeasurementPage
+                                      : tab.path === '/project-schedule'
+                                        ? SchedulePage
+                                        : tab.path === '/site/daily-log'
+                                          ? DailyLogPage
+                                          : tab.path === '/quality-safety'
+                                            ? QualitySafetyPage
+                                            : tab.path === '/technical-management'
+                                              ? TechnicalManagementPage
+                                              : tab.path === '/project-closeout'
+                                                ? ProjectCloseoutPage
+                                                : ShellPlaceholderPage,
           meta: {
             shell: true,
             permission: tab.permission,
@@ -156,15 +183,65 @@ const contextRoutes: RouteRecordRaw[] = [
     meta: { shell: true, permission: 'project:edit' },
   },
   {
+    path: '/contract',
+    name: 'V2ContractRootRedirect',
+    redirect: (to) => ({ path: '/contract/ledger', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'contract:query' },
+  },
+  {
+    path: '/variation',
+    name: 'V2VariationRootRedirect',
+    redirect: (to) => ({ path: '/variation/order', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'variation:order:query' },
+  },
+  {
+    path: '/cost',
+    name: 'V2CostRootRedirect',
+    redirect: (to) => ({ path: '/cost/ledger', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'cost:ledger:query' },
+  },
+  {
+    path: '/cost-target',
+    name: 'V2CostTargetRootRedirect',
+    redirect: (to) => ({ path: '/cost-target/index', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'cost:target:query' },
+  },
+  {
+    path: '/cost-target/create',
+    name: 'V2ShellCostTargetCreate',
+    component: CostTargetPage,
+    meta: {
+      shell: true,
+      permission: 'cost:target:add',
+      workspaceContext: { project: true, period: false },
+    },
+  },
+  {
+    path: '/cost-target/:id/edit',
+    name: 'V2ShellCostTargetEdit',
+    component: CostTargetPage,
+    meta: {
+      shell: true,
+      permission: 'cost:target:edit',
+      workspaceContext: { project: true, period: false },
+    },
+  },
+  {
+    path: '/contract/create',
+    name: 'V2ShellContractCreate',
+    component: ContractPage,
+    meta: { shell: true, permission: 'contract:add' },
+  },
+  {
     path: '/contract/:id',
     name: 'V2ShellContractDetail',
-    component: ShellPlaceholderPage,
+    component: ContractPage,
     meta: { shell: true, permission: 'contract:query' },
   },
   {
     path: '/contract/:id/edit',
     name: 'V2ShellContractEdit',
-    component: ShellPlaceholderPage,
+    component: ContractPage,
     meta: { shell: true, permission: 'contract:edit' },
   },
   {

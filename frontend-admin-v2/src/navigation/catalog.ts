@@ -165,18 +165,38 @@ export const navigationDomains: NavigationDomain[] = [
         defaultPath: '/contract/ledger',
         matchPrefixes: ['/contract', '/variation'],
         tabs: [
-          { path: '/contract/ledger', label: '合同台账', permission: 'contract:query' },
-          { path: '/variation/order', label: '签证变更', permission: 'variation:order:query' },
+          {
+            path: '/contract/ledger',
+            label: '合同台账',
+            permission: 'contract:query',
+            workspaceContext: { project: true, period: true },
+          },
+          {
+            path: '/variation/order',
+            label: '签证变更',
+            permission: 'variation:order:query',
+            workspaceContext: { project: true, period: true },
+          },
         ],
       },
       {
         id: 'target-cost',
         label: '投标与成本目标',
         defaultPath: '/bid-cost',
-        matchPrefixes: ['/cost-target'],
+        matchPrefixes: ['/bid-cost', '/cost-target'],
         tabs: [
-          { path: '/bid-cost', label: '投标成本', permission: 'bid:query' },
-          { path: '/cost-target/index', label: '成本目标', permission: 'cost:target:query' },
+          {
+            path: '/bid-cost',
+            label: '投标成本',
+            permission: 'bid:query',
+            workspaceContext: { project: true, period: true },
+          },
+          {
+            path: '/cost-target/index',
+            label: '成本目标',
+            permission: 'cost:target:query',
+            workspaceContext: { project: true, period: false },
+          },
         ],
       },
       {
@@ -185,9 +205,24 @@ export const navigationDomains: NavigationDomain[] = [
         defaultPath: '/cost/ledger',
         matchPrefixes: ['/cost'],
         tabs: [
-          { path: '/cost/ledger', label: '成本台账', permission: 'cost:ledger:query' },
-          { path: '/cost/summary', label: '成本核对', permission: 'cost:summary:view' },
-          { path: '/cost/control', label: '动态利润控制', permission: 'cost:control:query' },
+          {
+            path: '/cost/ledger',
+            label: '成本台账',
+            permission: 'cost:ledger:query',
+            workspaceContext: { project: true, period: true },
+          },
+          {
+            path: '/cost/summary',
+            label: '成本核对',
+            permission: 'cost:summary:view',
+            workspaceContext: { project: true, period: true },
+          },
+          {
+            path: '/cost/control',
+            label: '动态利润控制',
+            permission: 'cost:control:query',
+            workspaceContext: { project: true, period: true },
+          },
         ],
       },
       {
@@ -195,8 +230,18 @@ export const navigationDomains: NavigationDomain[] = [
         label: '预算与产值',
         defaultPath: '/budget',
         tabs: [
-          { path: '/budget', label: '项目预算', permission: 'budget:query' },
-          { path: '/production-measurement', label: '产值计量', permission: 'measurement:query' },
+          {
+            path: '/budget',
+            label: '项目预算',
+            permission: 'budget:query',
+            workspaceContext: { project: true, period: true },
+          },
+          {
+            path: '/production-measurement',
+            label: '产值计量',
+            permission: 'measurement:query',
+            workspaceContext: { project: true, period: true },
+          },
         ],
       },
     ],

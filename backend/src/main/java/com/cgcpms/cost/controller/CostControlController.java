@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
@@ -47,15 +48,16 @@ public class CostControlController {
     @PutMapping("/forecasts/{id}")
     @PreAuthorize("hasAuthority('cost:forecast:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     @AuditedOperation(type = "UPDATE", businessType = "COST_FORECAST", businessIdExpression = "#id")
-    public ApiResponse<Map<String, Object>> updateForecast(@PathVariable Long id, @Valid @RequestBody ForecastRequest request) {
-        return ApiResponse.success(service.updateForecast(id, request));
+    public ApiResponse<Map<String, Object>> updateForecast(@PathVariable Long id, @RequestParam Integer version,
+                                                            @Valid @RequestBody ForecastRequest request) {
+        return ApiResponse.success(service.updateForecast(id, version, request));
     }
 
     @PostMapping("/forecasts/{id}/confirm")
     @PreAuthorize("hasAuthority('cost:forecast:confirm') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     @AuditedOperation(type = "CONFIRM", businessType = "COST_FORECAST", businessIdExpression = "#id")
-    public ApiResponse<Map<String, Object>> confirmForecast(@PathVariable Long id) {
-        return ApiResponse.success(service.confirmForecast(id));
+    public ApiResponse<Map<String, Object>> confirmForecast(@PathVariable Long id, @RequestParam Integer version) {
+        return ApiResponse.success(service.confirmForecast(id, version));
     }
 
     @PostMapping("/corrective-actions")
@@ -68,21 +70,23 @@ public class CostControlController {
     @PutMapping("/corrective-actions/{id}")
     @PreAuthorize("hasAuthority('cost:corrective:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     @AuditedOperation(type = "UPDATE", businessType = "COST_CORRECTIVE_ACTION", businessIdExpression = "#id")
-    public ApiResponse<Map<String, Object>> updateCorrective(@PathVariable Long id, @Valid @RequestBody CorrectiveActionRequest request) {
-        return ApiResponse.success(service.updateCorrectiveAction(id, request));
+    public ApiResponse<Map<String, Object>> updateCorrective(@PathVariable Long id, @RequestParam Integer version,
+                                                              @Valid @RequestBody CorrectiveActionRequest request) {
+        return ApiResponse.success(service.updateCorrectiveAction(id, version, request));
     }
 
     @PostMapping("/corrective-actions/{id}/submit")
     @PreAuthorize("hasAuthority('cost:corrective:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     @AuditedOperation(type = "SUBMIT", businessType = "COST_CORRECTIVE_ACTION", businessIdExpression = "#id")
-    public ApiResponse<Map<String, Object>> submitCorrective(@PathVariable Long id) {
-        return ApiResponse.success(service.submitCorrectiveAction(id));
+    public ApiResponse<Map<String, Object>> submitCorrective(@PathVariable Long id, @RequestParam Integer version) {
+        return ApiResponse.success(service.submitCorrectiveAction(id, version));
     }
 
     @PostMapping("/corrective-actions/{id}/close")
     @PreAuthorize("hasAuthority('cost:corrective:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     @AuditedOperation(type = "CLOSE", businessType = "COST_CORRECTIVE_ACTION", businessIdExpression = "#id")
-    public ApiResponse<Map<String, Object>> closeCorrective(@PathVariable Long id, @Valid @RequestBody CorrectiveCloseRequest request) {
-        return ApiResponse.success(service.closeCorrectiveAction(id, request));
+    public ApiResponse<Map<String, Object>> closeCorrective(@PathVariable Long id, @RequestParam Integer version,
+                                                             @Valid @RequestBody CorrectiveCloseRequest request) {
+        return ApiResponse.success(service.closeCorrectiveAction(id, version, request));
     }
 }

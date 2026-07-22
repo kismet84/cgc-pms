@@ -121,6 +121,10 @@ class VariationClaimClosedLoopIntegrationTest {
                 () -> service.submitToOwner(orderId, firstRequest));
         assertEquals("VARIATION_OWNER_SUBMISSION_ATTACHMENT_REQUIRED", noSubmissionFile.getCode());
         addFile(orderId, "OWNER_SUBMISSION", "索赔申报R1.pdf");
+        Integer ownerSubmitVersion = orderMapper.selectById(orderId).getVersion();
+        BusinessException staleOwnerSubmit = assertThrows(BusinessException.class,
+                () -> service.submitToOwner(orderId, firstRequest, ownerSubmitVersion - 1));
+        assertEquals("VARIATION_OWNER_CONCURRENT_SUBMIT", staleOwnerSubmit.getCode());
         Map<String, Object> first = service.submitToOwner(orderId, firstRequest);
         Long firstId = ((Number) first.get("id")).longValue();
 
@@ -139,10 +143,16 @@ class VariationClaimClosedLoopIntegrationTest {
         Long snapshotId = ((Number) snapshots.get(0).get("id")).longValue();
 
         addFile(orderId, "OWNER_CONFIRMATION", "业主核定函.pdf");
+        Integer ownerReviewVersion = orderMapper.selectById(orderId).getVersion();
+        OwnerReviewRequest confirmedReview = new OwnerReviewRequest(
+                "CONFIRMED", "OWNER-CFM-001", "核定1200元", LocalDateTime.now(),
+                List.of(new OwnerReviewLine(snapshotId, new BigDecimal("1200.00"), "扣除重复措施费")));
+        BusinessException staleOwnerReview = assertThrows(BusinessException.class,
+                () -> service.reviewOwnerSubmission(orderId, secondId, confirmedReview,
+                        ownerReviewVersion - 1));
+        assertEquals("VAR_ORDER_VERSION_CONFLICT", staleOwnerReview.getCode());
         service.reviewOwnerSubmission(orderId, secondId,
-                new OwnerReviewRequest("CONFIRMED", "OWNER-CFM-001", "核定1200元",
-                        LocalDateTime.now(), List.of(new OwnerReviewLine(snapshotId,
-                        new BigDecimal("1200.00"), "扣除重复措施费"))));
+                confirmedReview);
 
         VarOrder pending = orderMapper.selectById(orderId);
         assertEquals("CHANGE_PENDING", pending.getOwnerStatus());

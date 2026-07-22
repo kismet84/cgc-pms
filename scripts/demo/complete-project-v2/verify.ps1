@@ -90,6 +90,71 @@ UNION ALL SELECT 'document_template',COUNT(*) FROM biz_document_template WHERE t
 UNION ALL SELECT 'document_generation',COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND id BETWEEN 520000000000008511 AND 520000000000008512 AND deleted_flag=0
 UNION ALL SELECT 'demo_user',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username='demo.manager' AND status='ENABLE' AND deleted_flag=0
 UNION ALL SELECT 'role_test_account',COUNT(*) FROM sys_user WHERE tenant_id=0 AND username IN ('admin','demo.manager','demo.business','demo.cost','demo.purchase','demo.production','demo.chief','demo.finance') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'project_manager_contract_query',COUNT(*) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.manager' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms='contract:query' AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'project_manager_variation_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.manager' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms IN ('variation:order:query','variation:order:add','variation:order:edit','variation:order:delete','variation:order:item:edit',
+      'variation:order:submit','variation:owner:submit','variation:owner:review','variation:trace')
+    AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'business_variation_bid_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.business' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms IN ('variation:order:query','variation:order:add','variation:order:edit','variation:order:delete','variation:order:item:edit',
+      'variation:order:submit','variation:owner:submit','variation:owner:review','variation:trace',
+      'bid:query','bid:add','bid:edit','bid:delete','bid:status')
+    AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'project_manager_cost_target_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.manager' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms IN ('cost:target:query','cost:target:add','cost:target:edit','cost:target:delete','cost:target:submit','cost:target:activate')
+    AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'cost_manager_cost_target_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.cost' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms IN ('cost:target:query','cost:target:add','cost:target:edit','cost:target:delete','cost:target:submit','cost:target:activate')
+    AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'project_manager_cost_summary_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.manager' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms IN ('cost:summary:view','cost:summary:refresh')
+    AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'cost_manager_cost_summary_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.cost' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms IN ('cost:summary:view','cost:summary:refresh')
+    AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'cost_manager_budget_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.cost' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms IN ('budget:query','budget:add','budget:edit','budget:delete','budget:submit')
+    AND m.status='ENABLE' AND m.deleted_flag=0
+UNION ALL SELECT 'production_measurement_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.production' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND m.perms IN ('measurement:query','measurement:maintain','measurement:submit','measurement:owner:submit','measurement:owner:review')
+    AND m.status='ENABLE' AND m.deleted_flag=0
 UNION ALL SELECT 'role_alert_permission',COUNT(DISTINCT u.username) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
   JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
@@ -527,7 +592,12 @@ $oneKeys = @('project','material','bid_transfer','target','purchase_request','pu
     'material_return_reversal','document_template','demo_user')
 $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $invalidCreditPartners.Count -eq 0 `
     -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 21 `
-    -and $metrics.role_test_account -eq 8 -and $metrics.role_alert_permission -eq 8 -and $metrics.role_alert_edit_permission -eq 8 `
+    -and $metrics.role_test_account -eq 8 -and $metrics.project_manager_contract_query -eq 1 `
+    -and $metrics.project_manager_variation_permissions -eq 9 -and $metrics.business_variation_bid_permissions -eq 14 `
+    -and $metrics.project_manager_cost_target_permissions -eq 6 -and $metrics.cost_manager_cost_target_permissions -eq 6 `
+    -and $metrics.project_manager_cost_summary_permissions -eq 2 -and $metrics.cost_manager_cost_summary_permissions -eq 2 `
+    -and $metrics.cost_manager_budget_permissions -eq 5 -and $metrics.production_measurement_permissions -eq 5 `
+    -and $metrics.role_alert_permission -eq 8 -and $metrics.role_alert_edit_permission -eq 8 `
     -and $metrics.role_alert_project_members -eq 7 `
     -and $metrics.dashboard_trend_month -eq 7 -and $metrics.role_test_scope -eq 8 `
     -and $metrics.document_generation -eq 2 -and $metrics.finance_demo_budget -eq 1 `

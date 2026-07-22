@@ -10,6 +10,7 @@ import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
 import com.cgcpms.workflow.handler.WorkflowContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.time.LocalDateTime;
 
@@ -17,6 +18,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class ProjectBudgetWorkflowHandler implements WorkflowBusinessHandler {
     private final ProjectBudgetMapper budgetMapper;
+    private final JdbcTemplate jdbc;
 
     @Override
     public String supportBusinessType() {
@@ -35,6 +37,8 @@ public class ProjectBudgetWorkflowHandler implements WorkflowBusinessHandler {
         if (budget == null) throw new IllegalStateException("项目预算不存在，budgetId=" + budgetId);
         if (BudgetStatusConstants.STATUS_ACTIVE.equals(budget.getStatus())
                 && Integer.valueOf(1).equals(budget.getActiveFlag())) return;
+        jdbc.queryForObject("SELECT id FROM pm_project WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE",
+                Long.class, budget.getProjectId(), budget.getTenantId());
 
         budgetMapper.update(null, new LambdaUpdateWrapper<ProjectBudget>()
                 .eq(ProjectBudget::getTenantId, budget.getTenantId())
@@ -43,16 +47,19 @@ public class ProjectBudgetWorkflowHandler implements WorkflowBusinessHandler {
                 .ne(ProjectBudget::getId, budgetId)
                 .set(ProjectBudget::getActiveFlag, 0)
                 .set(ProjectBudget::getActiveToken, null)
-                .set(ProjectBudget::getStatus, BudgetStatusConstants.STATUS_SUPERSEDED));
+                .set(ProjectBudget::getStatus, BudgetStatusConstants.STATUS_SUPERSEDED)
+                .setSql("version=version+1"));
 
         int rows = budgetMapper.update(null, new LambdaUpdateWrapper<ProjectBudget>()
                 .eq(ProjectBudget::getId, budgetId)
                 .eq(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_APPROVING)
+                .eq(ProjectBudget::getVersion, budget.getVersion())
                 .set(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_APPROVED)
                 .set(ProjectBudget::getStatus, BudgetStatusConstants.STATUS_ACTIVE)
                 .set(ProjectBudget::getActiveFlag, 1)
                 .set(ProjectBudget::getActiveToken, budget.getProjectId())
-                .set(ProjectBudget::getEffectiveAt, LocalDateTime.now()));
+                .set(ProjectBudget::getEffectiveAt, LocalDateTime.now())
+                .setSql("version=version+1"));
         if (rows != 1) throw new IllegalStateException("预算审批状态冲突，budgetId=" + budgetId);
     }
 
@@ -60,14 +67,18 @@ public class ProjectBudgetWorkflowHandler implements WorkflowBusinessHandler {
     public void onRejected(WorkflowContext context) {
         budgetMapper.update(null, new LambdaUpdateWrapper<ProjectBudget>()
                 .eq(ProjectBudget::getId, resolveId(context.getInstance()))
-                .set(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_REJECTED));
+                .eq(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_APPROVING)
+                .set(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_REJECTED)
+                .setSql("version=version+1"));
     }
 
     @Override
     public void onWithdrawn(WorkflowContext context) {
         budgetMapper.update(null, new LambdaUpdateWrapper<ProjectBudget>()
                 .eq(ProjectBudget::getId, resolveId(context.getInstance()))
-                .set(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_DRAFT));
+                .eq(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_APPROVING)
+                .set(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_DRAFT)
+                .setSql("version=version+1"));
     }
 
     private static Long resolveId(WfInstance instance) {

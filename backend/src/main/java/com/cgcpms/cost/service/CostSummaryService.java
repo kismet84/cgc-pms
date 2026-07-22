@@ -574,6 +574,7 @@ public class CostSummaryService {
         costSummaryMapper.update(null, new LambdaUpdateWrapper<CostSummary>()
                 .eq(CostSummary::getTenantId, tenantId)
                 .eq(CostSummary::getProjectId, projectId)
+                .eq(CostSummary::getSummaryDate, LocalDate.now())
                 .set(CostSummary::getPaidAmount, totalPaid));
     }
 

@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -65,6 +66,13 @@ class VarOrderControllerMockMvcTest {
                 ADMIN_ID, ADMIN_USERNAME, TENANT_ID,
                 List.of("ADMIN"),
                 List.of());
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
+    private Cookie userCookie(List<String> permissions) {
+        String token = jwtUtils.generateToken(
+                2L, "variation-editor", TENANT_ID,
+                List.of("USER"), permissions);
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
@@ -147,6 +155,21 @@ class VarOrderControllerMockMvcTest {
     void testUnauthorized() throws Exception {
         mockMvc.perform(getWithApi("/var-orders/" + orderId + "/items"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @Order(3)
+    @DisplayName("POST /items/batch requires variation:order:item:edit")
+    void testBatchItemsRejectsHeaderEditAuthority() throws Exception {
+        Integer version = jdbcTemplate.queryForObject(
+                "SELECT version FROM var_order WHERE id = ?", Integer.class, orderId);
+        mockMvc.perform(post("/api/var-orders/" + orderId + "/items/batch")
+                        .contextPath("/api")
+                        .queryParam("version", String.valueOf(version))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[]")
+                        .cookie(userCookie(List.of("variation:order:edit"))))
+                .andExpect(status().isForbidden());
     }
 
     // ---- helpers ----

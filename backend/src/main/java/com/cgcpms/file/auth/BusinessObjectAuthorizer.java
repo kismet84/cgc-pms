@@ -110,20 +110,47 @@ public class BusinessObjectAuthorizer {
      * 验证当前用户对指定业务对象拥有附件上传权限。
      */
     public void checkUploadAccess(String businessType, Long businessId) {
+        checkUploadAccess(businessType, businessId, null);
+    }
+
+    public void checkUploadAccess(String businessType, Long businessId, String documentType) {
         checkAccess(businessType, businessId, "写入", true,
-                "file:upload", "cashbook:journal:maintain");
+                "file:upload", "cashbook:journal:maintain", documentType);
     }
 
     /**
      * 验证当前用户对指定业务对象拥有附件删除权限。
      */
     public void checkDeleteAccess(String businessType, Long businessId) {
+        checkDeleteAccess(businessType, businessId, null);
+    }
+
+    public void checkDeleteAccess(String businessType, Long businessId, String documentType) {
         checkAccess(businessType, businessId, "删除", true,
-                "file:delete", "cashbook:journal:maintain");
+                "file:delete", "cashbook:journal:maintain", documentType);
     }
 
     /** 变更签证附件按业务阶段不可逆约束，防止事后替换现场证据或伪造业主核定。 */
     public void checkVariationDocumentStage(String businessType, Long businessId, String documentType) {
+        if ("PRODUCTION_MEASUREMENT".equalsIgnoreCase(businessType)) {
+            String type = documentType == null ? "" : documentType.toUpperCase();
+            if ("MEASUREMENT_GENERAL".equals(type) || type.startsWith("ML_")) {
+                requireAuthority("measurement:submit");
+                return;
+            }
+            if ("OWNER_SUBMISSION".equals(type)) {
+                requireAuthority("measurement:owner:submit");
+                return;
+            }
+            throw new BusinessException("MEASUREMENT_DOCUMENT_STAGE_INVALID", "不支持的产值计量附件类型");
+        }
+        if ("OWNER_MEASUREMENT_SUBMISSION".equalsIgnoreCase(businessType)) {
+            if (!"OWNER_CONFIRMATION".equalsIgnoreCase(documentType)) {
+                throw new BusinessException("MEASUREMENT_DOCUMENT_STAGE_INVALID", "不支持的业主核定附件类型");
+            }
+            requireAuthority("measurement:owner:review");
+            return;
+        }
         if (businessType != null && businessType.toUpperCase().startsWith("QS_")) {
             checkQualityDocumentStage(businessType.toUpperCase(), businessId, documentType);
             return;
@@ -145,6 +172,15 @@ public class BusinessObjectAuthorizer {
         if (variation == null || !java.util.Objects.equals(variation.getTenantId(), UserContext.getCurrentTenantId()))
             throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "变更单不存在: " + businessId);
         String type = documentType == null ? "" : documentType.toUpperCase();
+        String authority = switch (type) {
+            case "SITE_EVIDENCE", "COST_ESTIMATE" -> "variation:order:edit";
+            case "OWNER_SUBMISSION" -> "variation:owner:submit";
+            case "OWNER_CONFIRMATION" -> "variation:owner:review";
+            default -> null;
+        };
+        if (authority == null)
+            throw new BusinessException("VARIATION_DOCUMENT_STAGE_INVALID", "不支持的变更附件类型");
+        requireAuthority(authority);
         boolean allowed = switch (type) {
             case "SITE_EVIDENCE", "COST_ESTIMATE" -> Set.of("DRAFT", "REJECTED").contains(variation.getApprovalStatus());
             case "OWNER_SUBMISSION" -> "APPROVED".equals(variation.getApprovalStatus())
@@ -158,6 +194,11 @@ public class BusinessObjectAuthorizer {
 
     private void checkAccess(String businessType, Long businessId, String action, boolean write,
                              String genericAuthority, String cashJournalAuthority) {
+        checkAccess(businessType, businessId, action, write, genericAuthority, cashJournalAuthority, null);
+    }
+
+    private void checkAccess(String businessType, Long businessId, String action, boolean write,
+                             String genericAuthority, String cashJournalAuthority, String documentType) {
         if (businessType == null || !KNOWN_BUSINESS_TYPES.contains(businessType.toUpperCase())) {
             throw new BusinessException("FILE_BIZ_TYPE_UNKNOWN",
                     "不支持的业务类型: " + businessType);
@@ -167,9 +208,13 @@ public class BusinessObjectAuthorizer {
         String requiredAuthority = switch (upperType) {
             case "CASH_JOURNAL" -> cashJournalAuthority;
             case "SITE_DAILY_LOG" -> write ? "site:daily:edit" : "site:daily:query";
+            case "PRODUCTION_MEASUREMENT" -> write ? measurementFileAuthority(documentType) : "measurement:query";
+            case "OWNER_MEASUREMENT_SUBMISSION" -> write ? "measurement:owner:review" : "measurement:query";
             default -> genericAuthority;
         };
-        if (upperType.startsWith("QS_")) requireQualityAuthority(upperType, write);
+        if ("VARIATION".equals(upperType)) {
+            if (!write) requireAnyAuthority(Set.of("variation:order:query", "variation:trace"));
+        } else if (upperType.startsWith("QS_")) requireQualityAuthority(upperType, write);
         else if (upperType.startsWith("SUPPLIER_")) requireSupplierAuthority(upperType, write);
         else if (upperType.startsWith("TECH_")) requireTechnicalAuthority(upperType, write);
         else if (upperType.startsWith("CLOSEOUT_")) requireCloseoutAuthority(upperType, write);
@@ -244,14 +289,14 @@ public class BusinessObjectAuthorizer {
             }
             case "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD",
                     "PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION": {
-                RevenueFileObject object = findRevenueFileObject(upperType, businessId);
+                RevenueFileObject object = findRevenueFileObject(upperType, businessId, write);
                 if (object == null) {
                     throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "收入回款业务对象不存在: " + businessId);
                 }
                 if (!object.tenantId().equals(UserContext.getCurrentTenantId())) {
                     throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该收入回款业务文件");
                 }
-                if (write && isRevenueFileImmutable(upperType, object.status())) {
+                if (write && isRevenueFileImmutable(upperType, object.status(), documentType)) {
                     throw new BusinessException("REVENUE_DOCUMENT_IMMUTABLE", "当前状态的收入回款业务附件不可变更");
                 }
                 checkProjectAccess(object.projectId(), action + "收入回款业务文件");
@@ -426,6 +471,13 @@ public class BusinessObjectAuthorizer {
         }
     }
 
+    private String measurementFileAuthority(String documentType) {
+        String type = documentType == null ? "" : documentType.toUpperCase();
+        if ("OWNER_SUBMISSION".equals(type)) return "measurement:owner:submit";
+        if ("MEASUREMENT_GENERAL".equals(type) || type.startsWith("ML_")) return "measurement:submit";
+        throw new BusinessException("MEASUREMENT_DOCUMENT_STAGE_INVALID", "不支持的产值计量附件类型");
+    }
+
     private boolean isEditableDocumentStatus(String approvalStatus) {
         return "DRAFT".equals(approvalStatus) || "REJECTED".equals(approvalStatus);
     }
@@ -437,7 +489,7 @@ public class BusinessObjectAuthorizer {
         projectAccessChecker.checkAccess(projectId, action);
     }
 
-    private RevenueFileObject findRevenueFileObject(String businessType, Long businessId) {
+    private RevenueFileObject findRevenueFileObject(String businessType, Long businessId, boolean write) {
         String table = switch (businessType) {
             case "CONTRACT_REVENUE" -> "contract_revenue";
             case "OWNER_SETTLEMENT" -> "owner_settlement";
@@ -448,8 +500,10 @@ public class BusinessObjectAuthorizer {
             default -> throw new IllegalArgumentException("Unsupported revenue file type");
         };
         String statusColumn = "CONTRACT_REVENUE".equals(businessType) ? "approval_status" : "status";
+        boolean lockForEvidenceMutation = write && Set.of("PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION").contains(businessType);
         try {
-            return jdbcTemplate.queryForObject("SELECT tenant_id,project_id," + statusColumn + " FROM " + table + " WHERE id=? AND deleted_flag=0",
+            return jdbcTemplate.queryForObject("SELECT tenant_id,project_id," + statusColumn + " FROM " + table
+                            + " WHERE id=? AND deleted_flag=0" + (lockForEvidenceMutation ? " FOR UPDATE" : ""),
                     (rs, rowNum) -> new RevenueFileObject(rs.getLong("tenant_id"), rs.getLong("project_id"), rs.getString(statusColumn)), businessId);
         } catch (EmptyResultDataAccessException e) {
             return null;
@@ -457,6 +511,17 @@ public class BusinessObjectAuthorizer {
     }
 
     private boolean isRevenueFileImmutable(String businessType, String status) {
+        return isRevenueFileImmutable(businessType, status, null);
+    }
+
+    private boolean isRevenueFileImmutable(String businessType, String status, String documentType) {
+        String type = documentType == null ? "" : documentType.toUpperCase();
+        if ("PRODUCTION_MEASUREMENT".equals(businessType) && "OWNER_SUBMISSION".equals(type)) {
+            return !Set.of("INTERNAL_APPROVED", "OWNER_RETURNED").contains(status);
+        }
+        if ("OWNER_MEASUREMENT_SUBMISSION".equals(businessType) && "OWNER_CONFIRMATION".equals(type)) {
+            return !"SUBMITTED".equals(status);
+        }
         return switch (businessType) {
             case "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "PRODUCTION_MEASUREMENT" -> !Set.of("DRAFT", "REJECTED").contains(status);
             case "OWNER_MEASUREMENT_SUBMISSION" -> !"SUBMITTED".equals(status);
@@ -701,6 +766,16 @@ public class BusinessObjectAuthorizer {
         if (!allowed) {
             throw new BusinessException("FILE_ACCESS_DENIED", "无权执行该文件操作");
         }
+    }
+
+    private void requireAnyAuthority(Set<String> requiredAuthorities) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean allowed = authentication != null && authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> requiredAuthorities.contains(authority)
+                        || "ROLE_ADMIN".equals(authority)
+                        || "ROLE_SUPER_ADMIN".equals(authority));
+        if (!allowed) throw new BusinessException("FILE_ACCESS_DENIED", "无权执行该文件操作");
     }
 
     private Long resolveInvoiceProjectId(PayInvoice invoice) {

@@ -216,7 +216,7 @@ class FileServiceTest {
                 fileService.upload(file, "CONTRACT/../etc", 1L));
 
         assertEquals("FILE_PARAM_INVALID", ex.getCode());
-        verify(authorizer, never()).checkUploadAccess(any(), any());
+        verify(authorizer, never()).checkUploadAccess(any(), any(), any());
         verifyNoInteractions(minioClient);
     }
 
@@ -248,13 +248,14 @@ class FileServiceTest {
         String businessType = "CONTRACT";
         long businessId = Math.abs(System.nanoTime());
         doThrow(new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "合同不存在: " + businessId))
-                .when(authorizer).checkUploadAccess(businessType, businessId);
+                .when(authorizer).checkUploadAccess(businessType, businessId, "CONTRACT_ATTACHMENT");
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> fileService.upload(file, businessType, businessId));
 
         assertEquals("FILE_BIZ_OBJ_NOT_FOUND", ex.getCode());
         assertEquals(0L, fileCountFor(businessType, businessId));
+        verify(authorizer).checkUploadAccess(businessType, businessId, "CONTRACT_ATTACHMENT");
         verifyNoInteractions(minioClient);
     }
 
@@ -266,13 +267,14 @@ class FileServiceTest {
         String businessType = "CONTRACT";
         long businessId = Math.abs(System.nanoTime());
         doThrow(new BusinessException("FILE_ACCESS_DENIED", "无权访问该合同文件"))
-                .when(authorizer).checkUploadAccess(businessType, businessId);
+                .when(authorizer).checkUploadAccess(businessType, businessId, "CONTRACT_ATTACHMENT");
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> fileService.upload(file, businessType, businessId));
 
         assertEquals("FILE_ACCESS_DENIED", ex.getCode());
         assertEquals(0L, fileCountFor(businessType, businessId));
+        verify(authorizer).checkUploadAccess(businessType, businessId, "CONTRACT_ATTACHMENT");
         verifyNoInteractions(minioClient);
     }
 
@@ -333,7 +335,7 @@ class FileServiceTest {
         assertEquals("FILE_DUPLICATE", ex.getCode());
         assertTrue(ex.getMessage().contains("文件已存在"));
         assertEquals(1L, fileCountFor(businessType, businessId));
-        verify(authorizer, times(2)).checkUploadAccess(businessType, businessId);
+        verify(authorizer, times(2)).checkUploadAccess(businessType, businessId, "OTHER");
         verify(minioClient, times(1)).putObject(any(PutObjectArgs.class));
     }
 
@@ -564,7 +566,7 @@ class FileServiceTest {
 
         assertEquals("FILE_NOT_FOUND", ex.getCode());
         assertEquals(1, countRawFileRows(file.getId(), 0));
-        verify(authorizer, never()).checkDeleteAccess(any(), any());
+        verify(authorizer, never()).checkDeleteAccess(any(), any(), any());
         verifyNoInteractions(minioClient);
     }
 
@@ -574,13 +576,14 @@ class FileServiceTest {
         SysFile file = insertFile("CONTRACT", 30005L, TestUserContext.TENANT_0,
                 "contract-denied.pdf", "application/pdf");
         doThrow(new BusinessException("FILE_ACCESS_DENIED", "无权删除该合同文件"))
-                .when(authorizer).checkDeleteAccess("CONTRACT", 30005L);
+                .when(authorizer).checkDeleteAccess("CONTRACT", 30005L, "OTHER");
 
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> fileService.delete(file.getId()));
 
         assertEquals("FILE_ACCESS_DENIED", ex.getCode());
         assertNotNull(sysFileMapper.selectById(file.getId()));
+        verify(authorizer).checkDeleteAccess("CONTRACT", 30005L, "OTHER");
         verifyNoInteractions(minioClient);
     }
 
@@ -592,6 +595,7 @@ class FileServiceTest {
 
         fileService.delete(file.getId());
 
+        verify(authorizer).checkDeleteAccess("CONTRACT", 30006L, "OTHER");
         var args = org.mockito.ArgumentCaptor.forClass(RemoveObjectArgs.class);
         verify(minioClient).removeObject(args.capture());
         assertEquals("test-bucket", args.getValue().bucket());
@@ -611,7 +615,7 @@ class FileServiceTest {
 
         assertEquals("FILE_IMMUTABLE", ex.getCode());
         assertNotNull(sysFileMapper.selectById(file.getId()));
-        verify(authorizer, never()).checkDeleteAccess(any(), any());
+        verify(authorizer, never()).checkDeleteAccess(any(), any(), any());
         verifyNoInteractions(minioClient);
     }
 

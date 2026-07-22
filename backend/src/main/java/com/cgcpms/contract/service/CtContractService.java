@@ -1,6 +1,7 @@
 package com.cgcpms.contract.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -43,6 +44,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.common.util.CodeGenerationService;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -52,6 +54,7 @@ import java.util.stream.Collectors;
 public class CtContractService {
 
     private static final int CODE_GENERATION_MAX_RETRIES = 3;
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     private final CtContractMapper ctContractMapper;
     private final CtContractChangeMapper ctContractChangeMapper;
@@ -70,8 +73,10 @@ public class CtContractService {
     public IPage<CtContractVO> getPage(long pageNo, long pageSize, String keyword,
                                        String contractCode, String contractName,
                                        String contractType, String contractStatus, String approvalStatus,
-                                       Long projectId, Long partyAId, Long partyBId) {
+                                       Long projectId, Long partyAId, Long partyBId,
+                                       LocalDate startDate, LocalDate endDate) {
         LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
+        applyProjectScope(wrapper, CtContract::getProjectId, projectId, "查看合同台账");
         // keyword 全局搜索：匹配合同编号、合同名称、合同类型、甲方名称、乙方名称等字段
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w ->
@@ -85,9 +90,10 @@ public class CtContractService {
         if (StringUtils.hasText(contractType)) wrapper.eq(CtContract::getContractType, contractType);
         if (StringUtils.hasText(contractStatus)) wrapper.eq(CtContract::getContractStatus, contractStatus);
         if (StringUtils.hasText(approvalStatus)) wrapper.eq(CtContract::getApprovalStatus, approvalStatus);
-        if (projectId != null) wrapper.eq(CtContract::getProjectId, projectId);
         if (partyAId != null) wrapper.eq(CtContract::getPartyAId, partyAId);
         if (partyBId != null) wrapper.eq(CtContract::getPartyBId, partyBId);
+        if (startDate != null) wrapper.ge(CtContract::getSignedDate, startDate);
+        if (endDate != null) wrapper.le(CtContract::getSignedDate, endDate);
         wrapper.eq(CtContract::getTenantId, UserContext.getCurrentTenantId());
         wrapper.orderByDesc(CtContract::getCreatedAt);
 
@@ -122,16 +128,19 @@ public class CtContractService {
 
     public Map<String, Object> getKpi(String contractCode, String contractName,
                                       String contractType, String contractStatus, String approvalStatus,
-                                      Long projectId, Long partyAId, Long partyBId) {
+                                      Long projectId, Long partyAId, Long partyBId,
+                                      LocalDate startDate, LocalDate endDate) {
         LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<>();
+        applyProjectScope(wrapper, CtContract::getProjectId, projectId, "查看合同台账");
         if (StringUtils.hasText(contractCode)) wrapper.like(CtContract::getContractCode, contractCode);
         if (StringUtils.hasText(contractName)) wrapper.like(CtContract::getContractName, contractName);
         if (StringUtils.hasText(contractType)) wrapper.eq(CtContract::getContractType, contractType);
         if (StringUtils.hasText(contractStatus)) wrapper.eq(CtContract::getContractStatus, contractStatus);
         if (StringUtils.hasText(approvalStatus)) wrapper.eq(CtContract::getApprovalStatus, approvalStatus);
-        if (projectId != null) wrapper.eq(CtContract::getProjectId, projectId);
         if (partyAId != null) wrapper.eq(CtContract::getPartyAId, partyAId);
         if (partyBId != null) wrapper.eq(CtContract::getPartyBId, partyBId);
+        if (startDate != null) wrapper.ge(CtContract::getSignedDate, startDate);
+        if (endDate != null) wrapper.le(CtContract::getSignedDate, endDate);
         wrapper.eq(CtContract::getTenantId, UserContext.getCurrentTenantId());
 
         List<CtContract> contracts = ctContractMapper.selectList(wrapper);
@@ -166,10 +175,7 @@ public class CtContractService {
         Long tenantId = UserContext.getCurrentTenantId();
         LambdaQueryWrapper<CtContract> wrapper = new LambdaQueryWrapper<CtContract>()
                 .eq(CtContract::getTenantId, tenantId);
-        if (projectId != null) {
-            projectAccessChecker.checkAccess(projectId, "查看合同履约报表");
-            wrapper.eq(CtContract::getProjectId, projectId);
-        }
+        applyProjectScope(wrapper, CtContract::getProjectId, projectId, "查看合同履约报表");
         List<CtContract> contracts = ctContractMapper.selectList(wrapper);
         List<Long> contractIds = contracts.stream().map(CtContract::getId).toList();
 
@@ -222,11 +228,10 @@ public class CtContractService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(CtContract contract) {
+        sanitizeContractForCreate(contract);
         normalizeContractType(contract);
-        validateContractReferences(contract);
-        contract.setContractStatus("DRAFT");
-        contract.setApprovalStatus("DRAFT");
-        contract.setTenantId(UserContext.getCurrentTenantId());
+        validateContractReferences(contract, "创建合同");
+        validateContractCoreFinancials(contract);
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             contract.setContractCode(nextContractCode(attempt));
@@ -242,16 +247,11 @@ public class CtContractService {
 
     @Transactional(rollbackFor = Exception.class)
     public void update(CtContract contract) {
-        CtContract existing = ctContractMapper.selectById(contract.getId());
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
-            throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
-
-        // 编辑守卫：只允许 DRAFT 状态编辑
-        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
-            throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
-
+        CtContract existing = requireEditableContract(contract.getId(), "编辑合同");
+        ensureClientVersionMatches(contract.getVersion(), existing.getVersion());
         normalizeContractType(contract);
-        validateContractReferences(contract);
+        validateContractReferences(contract, "编辑合同");
+        validateContractCoreFinancials(contract);
 
         // 校验合同状态：仅允许在有效状态集合内修改
         if (contract.getContractStatus() != null
@@ -263,34 +263,7 @@ public class CtContractService {
             throw new BusinessException("CONTRACT_STATUS_INVALID", "合同状态不合法");
         }
 
-        // 乐观锁：携带现有版本号，更新时自动校验
-        contract.setVersion(existing.getVersion());
-
-        // 使用字段白名单更新，禁止通过 update 接口覆盖受保护字段
-        ctContractMapper.update(null,
-                new LambdaUpdateWrapper<CtContract>()
-                        .eq(CtContract::getId, contract.getId())
-                        .eq(CtContract::getVersion, existing.getVersion())
-                        .set(CtContract::getContractName, contract.getContractName())
-                        .set(CtContract::getContractType, contract.getContractType())
-                        .set(CtContract::getProjectId, contract.getProjectId())
-                        .set(CtContract::getOrgId, contract.getOrgId())
-                        .set(CtContract::getPartyAId, contract.getPartyAId())
-                        .set(CtContract::getPartyBId, contract.getPartyBId())
-                        .set(CtContract::getContractAmount, contract.getContractAmount())
-                        .set(CtContract::getCurrentAmount, contract.getCurrentAmount())
-                        .set(CtContract::getTaxRate, contract.getTaxRate())
-                        .set(CtContract::getTaxAmount, contract.getTaxAmount())
-                        .set(CtContract::getAmountWithoutTax, contract.getAmountWithoutTax())
-                        .set(CtContract::getSignedDate, contract.getSignedDate())
-                        .set(CtContract::getStartDate, contract.getStartDate())
-                        .set(CtContract::getEndDate, contract.getEndDate())
-                        .set(CtContract::getPaymentMethod, contract.getPaymentMethod())
-                        .set(CtContract::getSettlementMethod, contract.getSettlementMethod())
-                        .set(CtContract::getContractStatus, contract.getContractStatus())
-                        .set(CtContract::getRemark, contract.getRemark())
-                        .set(CtContract::getVersion, existing.getVersion() + 1)
-        );
+        updateEditableContract(contract, existing);
     }
 
     /**
@@ -298,9 +271,18 @@ public class CtContractService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long contractId) {
+        throw new BusinessException("CONTRACT_VERSION_REQUIRED", "提交合同审批必须携带最新版本号");
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void submitForApproval(Long contractId, Integer clientVersion) {
         CtContract contract = ctContractMapper.selectById(contractId);
         if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        if (contract.getProjectId() != null) {
+            projectAccessChecker.checkAccess(contract.getProjectId(), "提交合同审批");
+        }
+        ensureClientVersionMatches(clientVersion, contract.getVersion());
 
         // 只允许草稿状态提交
         if (!ContractStatusConstants.APPROVAL_DRAFT.equals(contract.getApprovalStatus()))
@@ -318,7 +300,10 @@ public class CtContractService {
                 .eq(CtContract::getVersion, contract.getVersion())
                 .set(CtContract::getApprovalStatus, ContractStatusConstants.APPROVAL_APPROVING)
                 .set(CtContract::getVersion, contract.getVersion() + 1);
-        ctContractMapper.update(null, updateWrapper);
+        int updated = ctContractMapper.update(null, updateWrapper);
+        if (updated != 1) {
+            throw new BusinessException("CONTRACT_VERSION_CONFLICT", "合同已被其他用户修改，请刷新后重试");
+        }
 
         // 调用审批引擎
         Long userId = UserContext.getCurrentUserId();
@@ -342,6 +327,9 @@ public class CtContractService {
         CtContract existing = ctContractMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        if (existing.getProjectId() != null) {
+            projectAccessChecker.checkAccess(existing.getProjectId(), "删除合同");
+        }
 
         if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus())
                 && !UserContext.hasRole("SUPER_ADMIN"))
@@ -364,14 +352,15 @@ public class CtContractService {
         if (contract == null) {
             throw new BusinessException("CONTRACT_REQUIRED", "合同不能为空");
         }
+        List<CtContractItem> items = request.getItems();
+        List<CtContractPaymentTerm> terms = request.getPaymentTerms();
 
         if (contract.getId() == null) {
             // ── 新建 ──
+            sanitizeContractForCreate(contract);
             normalizeContractType(contract);
-            validateContractReferences(contract);
-            contract.setContractStatus("DRAFT");
-            contract.setApprovalStatus("DRAFT");
-            contract.setTenantId(UserContext.getCurrentTenantId());
+            validateContractReferences(contract, "创建合同");
+            validateCompositeFinancials(contract, items, terms);
 
             for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
                 contract.setContractCode(nextContractCode(attempt));
@@ -387,39 +376,22 @@ public class CtContractService {
             }
         } else {
             // ── 更新 ──
-            CtContract existing = ctContractMapper.selectById(contract.getId());
-            if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
-                throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
-
-            // 编辑守卫：只允许 DRAFT 状态编辑
-            if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
-                throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
-
+            CtContract existing = requireEditableContract(contract.getId(), "编辑合同");
+            ensureClientVersionMatches(contract.getVersion(), existing.getVersion());
             normalizeContractType(contract);
-            validateContractReferences(contract);
-
-            // 禁止通过更新接口覆盖受保护字段
-            contract.setApprovalStatus(existing.getApprovalStatus());
-            contract.setTenantId(existing.getTenantId());
-            contract.setPaidAmount(existing.getPaidAmount());
-            contract.setCreatedBy(existing.getCreatedBy());
-            contract.setCreatedAt(existing.getCreatedAt());
-            // @Version 不会在 selectById 时自动填充，需手动复制以确保 MyBatis-Plus
-            // 在 UPDATE WHERE 中携带正确版本号实现乐观锁
-            contract.setVersion(existing.getVersion());
-            ctContractMapper.updateById(contract);
+            validateContractReferences(contract, "编辑合同");
+            validateCompositeFinancials(contract, items, terms);
+            updateEditableContract(contract, existing);
         }
 
         Long contractId = contract.getId();
 
         // ── 批量保存明细项（delete-then-insert）──
-        List<CtContractItem> items = request.getItems();
         if (items != null) {
             itemService.batchSave(contractId, items);
         }
 
         // ── 批量保存付款条款（delete-then-insert）──
-        List<CtContractPaymentTerm> terms = request.getPaymentTerms();
         if (terms != null) {
             paymentTermService.batchSave(contractId, terms);
         }
@@ -443,6 +415,13 @@ public class CtContractService {
      */
     public List<ContractApprovalRecordVO> getApprovalRecords(Long contractId) {
         Long tenantId = UserContext.getCurrentTenantId();
+        CtContract contract = ctContractMapper.selectById(contractId);
+        if (contract == null || !Objects.equals(contract.getTenantId(), tenantId)) {
+            throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        }
+        if (contract.getProjectId() != null) {
+            projectAccessChecker.checkAccess(contract.getProjectId(), "查看合同审批记录");
+        }
         // 1. 查 wf_instance WHERE businessType=CONTRACT_APPROVAL AND businessId=contractId AND tenantId=?
         LambdaQueryWrapper<WfInstance> instQw = new LambdaQueryWrapper<>();
         instQw.eq(WfInstance::getBusinessType, ContractStatusConstants.BUSINESS_TYPE_CONTRACT_APPROVAL)
@@ -472,7 +451,7 @@ public class CtContractService {
         }).toList();
     }
 
-    private void validateContractReferences(CtContract contract) {
+    private void validateContractReferences(CtContract contract, String action) {
         if (contract == null || contract.getPartyAId() == null || contract.getPartyBId() == null) {
             throw new BusinessException("CONTRACT_PARTY_REQUIRED", "合同甲方和乙方不能为空");
         }
@@ -488,6 +467,7 @@ public class CtContractService {
         if (project == null || !java.util.Objects.equals(project.getTenantId(), tenantId)) {
             throw new BusinessException("CONTRACT_PROJECT_NOT_FOUND", "关联合同项目不存在");
         }
+        projectAccessChecker.checkAccess(project, action);
         MdPartner partyA = mdPartnerMapper.selectById(contract.getPartyAId());
         if (partyA == null || !java.util.Objects.equals(partyA.getTenantId(), tenantId)) {
             throw new BusinessException("CONTRACT_PARTY_A_NOT_FOUND", "合同甲方不存在");
@@ -559,6 +539,7 @@ public class CtContractService {
         vo.setTenantId(c.getTenantId() != null ? c.getTenantId().toString() : null);
         vo.setOrgId(c.getOrgId() != null ? c.getOrgId().toString() : null);
         vo.setProjectId(c.getProjectId() != null ? c.getProjectId().toString() : null);
+        vo.setVersion(c.getVersion());
         
         vo.setContractCode(c.getContractCode());
         vo.setContractName(c.getContractName());
@@ -617,5 +598,204 @@ public class CtContractService {
             return "0.0000";
         }
         return numerator.divide(denominator, 4, java.math.RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private CtContract requireEditableContract(Long contractId, String action) {
+        CtContract existing = ctContractMapper.selectById(contractId);
+        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        }
+        if (existing.getProjectId() != null) {
+            projectAccessChecker.checkAccess(existing.getProjectId(), action);
+        }
+        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus())) {
+            throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
+        }
+        return existing;
+    }
+
+    private void ensureClientVersionMatches(Integer clientVersion, Integer currentVersion) {
+        if (clientVersion == null) {
+            throw new BusinessException("CONTRACT_VERSION_REQUIRED", "请求必须携带最新版本号");
+        }
+        if (!Objects.equals(clientVersion, currentVersion)) {
+            throw new BusinessException("CONTRACT_VERSION_CONFLICT", "合同已被其他用户修改，请刷新后重试");
+        }
+    }
+
+    private void sanitizeContractForCreate(CtContract contract) {
+        contract.setId(null);
+        contract.setContractCode(null);
+        contract.setTenantId(UserContext.getCurrentTenantId());
+        contract.setApprovalStatus(ContractStatusConstants.APPROVAL_DRAFT);
+        contract.setContractStatus(ContractStatusConstants.STATUS_DRAFT);
+        contract.setPaidAmount(BigDecimal.ZERO);
+        contract.setSettlementAmount(BigDecimal.ZERO);
+        contract.setCostGeneratedFlag(0);
+        contract.setCreatedBy(null);
+        contract.setCreatedAt(null);
+        contract.setUpdatedAt(null);
+        contract.setVersion(null);
+    }
+
+    private void updateEditableContract(CtContract contract, CtContract existing) {
+        Integer currentVersion = existing.getVersion();
+        int updated = ctContractMapper.update(null,
+                new LambdaUpdateWrapper<CtContract>()
+                        .eq(CtContract::getId, contract.getId())
+                        .eq(CtContract::getVersion, currentVersion)
+                        .set(CtContract::getContractName, contract.getContractName())
+                        .set(CtContract::getContractType, contract.getContractType())
+                        .set(CtContract::getProjectId, contract.getProjectId())
+                        .set(CtContract::getOrgId, contract.getOrgId())
+                        .set(CtContract::getPartyAId, contract.getPartyAId())
+                        .set(CtContract::getPartyBId, contract.getPartyBId())
+                        .set(CtContract::getContractAmount, contract.getContractAmount())
+                        .set(CtContract::getCurrentAmount, contract.getCurrentAmount())
+                        .set(CtContract::getTaxRate, contract.getTaxRate())
+                        .set(CtContract::getTaxAmount, contract.getTaxAmount())
+                        .set(CtContract::getAmountWithoutTax, contract.getAmountWithoutTax())
+                        .set(CtContract::getSignedDate, contract.getSignedDate())
+                        .set(CtContract::getStartDate, contract.getStartDate())
+                        .set(CtContract::getEndDate, contract.getEndDate())
+                        .set(CtContract::getPaymentMethod, contract.getPaymentMethod())
+                        .set(CtContract::getSettlementMethod, contract.getSettlementMethod())
+                        .set(CtContract::getContractStatus,
+                                contract.getContractStatus() != null ? contract.getContractStatus() : existing.getContractStatus())
+                        .set(CtContract::getRemark, contract.getRemark())
+                        .set(CtContract::getVersion, currentVersion + 1));
+        if (updated != 1) {
+            throw new BusinessException("CONTRACT_VERSION_CONFLICT", "合同已被其他用户修改，请刷新后重试");
+        }
+    }
+
+    private void validateCompositeFinancials(CtContract contract, List<CtContractItem> items,
+                                             List<CtContractPaymentTerm> terms) {
+        validateContractCoreFinancials(contract);
+
+        if (items != null && !items.isEmpty()) {
+            BigDecimal totalAmount = BigDecimal.ZERO;
+            BigDecimal totalTaxAmount = BigDecimal.ZERO;
+            BigDecimal totalAmountWithoutTax = BigDecimal.ZERO;
+            for (CtContractItem item : items) {
+                requireMoneyField(item.getAmount(), "CONTRACT_ITEM_AMOUNT_REQUIRED", "合同清单金额不能为空");
+                requireMoneyField(item.getTaxAmount(), "CONTRACT_ITEM_TAX_AMOUNT_REQUIRED", "合同清单税额不能为空");
+                requireMoneyField(item.getAmountWithoutTax(), "CONTRACT_ITEM_AMOUNT_WITHOUT_TAX_REQUIRED", "合同清单不含税金额不能为空");
+                requireNonNegative(item.getTaxRate(), "CONTRACT_ITEM_TAX_RATE_INVALID", "合同清单税率不能为负数");
+                if (item.getQuantity() != null && item.getUnitPrice() != null
+                        && item.getQuantity().multiply(item.getUnitPrice()).compareTo(item.getAmount()) != 0) {
+                    throw new BusinessException("CONTRACT_ITEM_AMOUNT_MISMATCH", "合同清单金额必须等于数量乘以单价");
+                }
+                validateAmountBreakdown(item.getAmount(), item.getTaxAmount(), item.getAmountWithoutTax(),
+                        "CONTRACT_ITEM_AMOUNT_BREAKDOWN_MISMATCH", "合同清单含税金额必须等于税额加不含税金额");
+                totalAmount = totalAmount.add(item.getAmount());
+                totalTaxAmount = totalTaxAmount.add(item.getTaxAmount());
+                totalAmountWithoutTax = totalAmountWithoutTax.add(item.getAmountWithoutTax());
+            }
+            if (totalAmount.compareTo(contract.getContractAmount()) != 0
+                    || totalTaxAmount.compareTo(contract.getTaxAmount()) != 0
+                    || totalAmountWithoutTax.compareTo(contract.getAmountWithoutTax()) != 0) {
+                throw new BusinessException("CONTRACT_ITEMS_TOTAL_MISMATCH", "合同头金额与清单合计不一致");
+            }
+        }
+
+        if (terms != null && !terms.isEmpty()) {
+            BigDecimal totalRatio = BigDecimal.ZERO;
+            BigDecimal totalAmount = BigDecimal.ZERO;
+            for (CtContractPaymentTerm term : terms) {
+                requireMoneyField(term.getPaymentRatio(), "CONTRACT_PAYMENT_RATIO_REQUIRED", "付款条款比例不能为空");
+                requireMoneyField(term.getPaymentAmount(), "CONTRACT_PAYMENT_AMOUNT_REQUIRED", "付款条款金额不能为空");
+                validatePaymentTermDates(contract, term);
+                totalRatio = totalRatio.add(term.getPaymentRatio());
+                totalAmount = totalAmount.add(term.getPaymentAmount());
+            }
+            if (totalAmount.compareTo(contract.getContractAmount()) != 0) {
+                throw new BusinessException("CONTRACT_PAYMENT_TERMS_TOTAL_MISMATCH", "付款条款金额合计必须等于合同金额");
+            }
+            if (totalRatio.compareTo(HUNDRED) != 0) {
+                throw new BusinessException("CONTRACT_PAYMENT_TERMS_RATIO_MISMATCH", "付款条款比例合计必须等于100");
+            }
+        }
+    }
+
+    private void validateContractCoreFinancials(CtContract contract) {
+        requireMoneyField(contract.getContractAmount(), "CONTRACT_AMOUNT_REQUIRED", "合同金额不能为空");
+        requireNonNegative(contract.getCurrentAmount(), "CONTRACT_CURRENT_AMOUNT_INVALID", "合同当前金额不能为负数");
+        requireNonNegative(contract.getTaxRate(), "CONTRACT_TAX_RATE_INVALID", "合同税率不能为负数");
+        requireMoneyField(contract.getTaxAmount(), "CONTRACT_TAX_AMOUNT_REQUIRED", "合同税额不能为空");
+        requireMoneyField(contract.getAmountWithoutTax(), "CONTRACT_AMOUNT_WITHOUT_TAX_REQUIRED", "合同不含税金额不能为空");
+        validateAmountBreakdown(contract.getContractAmount(), contract.getTaxAmount(), contract.getAmountWithoutTax(),
+                "CONTRACT_AMOUNT_BREAKDOWN_MISMATCH", "合同含税金额必须等于税额加不含税金额");
+        validateContractDates(contract);
+    }
+
+    private void validateContractDates(CtContract contract) {
+        if (contract.getStartDate() != null && contract.getEndDate() != null
+                && contract.getStartDate().isAfter(contract.getEndDate())) {
+            throw new BusinessException("CONTRACT_DATE_INVALID", "合同开始日期不能晚于结束日期");
+        }
+        if (contract.getSignedDate() != null && contract.getEndDate() != null
+                && contract.getSignedDate().isAfter(contract.getEndDate())) {
+            throw new BusinessException("CONTRACT_SIGNED_DATE_INVALID", "合同签订日期不能晚于结束日期");
+        }
+    }
+
+    private void validatePaymentTermDates(CtContract contract, CtContractPaymentTerm term) {
+        if (term.getPlannedDate() != null && term.getActualDate() != null
+                && term.getActualDate().isBefore(term.getPlannedDate())) {
+            throw new BusinessException("CONTRACT_PAYMENT_TERM_DATE_INVALID", "付款条款实际日期不能早于计划日期");
+        }
+        LocalDate startDate = contract.getStartDate();
+        LocalDate endDate = contract.getEndDate();
+        if (startDate != null && term.getPlannedDate() != null && term.getPlannedDate().isBefore(startDate)) {
+            throw new BusinessException("CONTRACT_PAYMENT_TERM_DATE_INVALID", "付款条款计划日期不能早于合同开始日期");
+        }
+        if (endDate != null && term.getPlannedDate() != null && term.getPlannedDate().isAfter(endDate)) {
+            throw new BusinessException("CONTRACT_PAYMENT_TERM_DATE_INVALID", "付款条款计划日期不能晚于合同结束日期");
+        }
+        if (startDate != null && term.getActualDate() != null && term.getActualDate().isBefore(startDate)) {
+            throw new BusinessException("CONTRACT_PAYMENT_TERM_DATE_INVALID", "付款条款实际日期不能早于合同开始日期");
+        }
+        if (endDate != null && term.getActualDate() != null && term.getActualDate().isAfter(endDate)) {
+            throw new BusinessException("CONTRACT_PAYMENT_TERM_DATE_INVALID", "付款条款实际日期不能晚于合同结束日期");
+        }
+    }
+
+    private void requireMoneyField(BigDecimal value, String code, String message) {
+        if (value == null) {
+            throw new BusinessException(code, message);
+        }
+        requireNonNegative(value, code, message);
+    }
+
+    private void requireNonNegative(BigDecimal value, String code, String message) {
+        if (value != null && value.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException(code, message);
+        }
+    }
+
+    private void validateAmountBreakdown(BigDecimal totalAmount, BigDecimal taxAmount, BigDecimal amountWithoutTax,
+                                         String code, String message) {
+        if (totalAmount == null || taxAmount == null || amountWithoutTax == null) {
+            return;
+        }
+        if (taxAmount.add(amountWithoutTax).compareTo(totalAmount) != 0) {
+            throw new BusinessException(code, message);
+        }
+    }
+
+    private <T> void applyProjectScope(LambdaQueryWrapper<T> wrapper, SFunction<T, Long> projectField,
+                                       Long projectId, String action) {
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, action);
+            wrapper.eq(projectField, projectId);
+            return;
+        }
+        List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+        if (accessibleProjectIds.isEmpty()) {
+            wrapper.eq(projectField, -1L);
+            return;
+        }
+        wrapper.in(projectField, accessibleProjectIds);
     }
 }

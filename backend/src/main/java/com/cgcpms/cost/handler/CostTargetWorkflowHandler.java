@@ -54,39 +54,52 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
 
     @Override
     public void beforeSubmit(WorkflowContext context) {
-        Long targetId = resolveTargetId(context.getInstance());
+        WfInstance instance = context.getInstance();
+        Long targetId = resolveTargetId(instance);
         log.info("提交目标成本审批前校验 targetId={}", targetId);
 
         CostTarget target = costTargetMapper.selectById(targetId);
-        if (target == null) {
+        if (target == null || !java.util.Objects.equals(target.getTenantId(), instance.getTenantId())) {
             throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在，targetId=" + targetId);
         }
 
         costTargetService.validateForSubmit(target);
 
-        // 将状态改为审批中
-        target.setApprovalStatus("APPROVING");
-        costTargetMapper.updateById(target);
+        int updated = costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
+                .eq(CostTarget::getId, targetId)
+                .eq(CostTarget::getTenantId, instance.getTenantId())
+                .in(CostTarget::getApprovalStatus, "DRAFT", "REJECTED", "APPROVING")
+                .set(CostTarget::getApprovalStatus, "APPROVING")
+                .set(CostTarget::getStatus, "APPROVING"));
+        requireSingleTransition(updated, targetId, "提交/重提");
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void onApproved(WorkflowContext context) {
-        Long targetId = resolveTargetId(context.getInstance());
+        WfInstance instance = context.getInstance();
+        Long targetId = resolveTargetId(instance);
         log.info("目标成本审批通过，激活版本并更新成本汇总 targetId={}", targetId);
 
         CostTarget target = costTargetMapper.selectById(targetId);
-        if (target == null) {
+        if (target == null || !java.util.Objects.equals(target.getTenantId(), instance.getTenantId())) {
             throw new IllegalStateException("目标成本不存在，targetId=" + targetId);
         }
+        if ("APPROVED".equals(target.getApprovalStatus()) && Integer.valueOf(1).equals(target.getIsActive())) return;
+        requireMatchingRunningInstance(target, instance);
 
-        // 1. 设置审批状态为 APPROVED
-        target.setApprovalStatus("APPROVED");
-        target.setStatus("APPROVED");
-        costTargetMapper.updateById(target);
+        int updated = costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
+                .eq(CostTarget::getId, targetId)
+                .eq(CostTarget::getTenantId, instance.getTenantId())
+                .eq(CostTarget::getApprovalStatus, "APPROVING")
+                .eq(CostTarget::getApprovalInstanceId, instance.getId())
+                .set(CostTarget::getApprovalStatus, "APPROVED")
+                .set(CostTarget::getStatus, "APPROVED")
+                .setSql("version=version+1"));
+        requireSingleTransition(updated, targetId, "审批通过");
 
         // 2. 版本切换：旧版本 is_active=0，新版本 is_active=1 + status=ACTIVE
-        costTargetService.activate(targetId);
+        costTargetService.activate(targetId, target.getVersion() + 1);
 
         // 3. 更新 cost_summary.cost_target_id 指向新激活的版本
         costSummaryMapper.update(null, new LambdaUpdateWrapper<CostSummary>()
@@ -107,24 +120,36 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
 
     @Override
     public void onRejected(WorkflowContext context) {
-        Long targetId = resolveTargetId(context.getInstance());
+        WfInstance instance = context.getInstance();
+        Long targetId = resolveTargetId(instance);
         log.info("目标成本审批驳回 targetId={}", targetId);
 
-        costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
+        int updated = costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
                 .eq(CostTarget::getId, targetId)
+                .eq(CostTarget::getTenantId, instance.getTenantId())
+                .eq(CostTarget::getApprovalStatus, "APPROVING")
+                .eq(CostTarget::getApprovalInstanceId, instance.getId())
                 .set(CostTarget::getApprovalStatus, "REJECTED")
-                .set(CostTarget::getStatus, "REJECTED"));
+                .set(CostTarget::getStatus, "REJECTED")
+                .setSql("version=version+1"));
+        requireSingleTransition(updated, targetId, "审批驳回");
     }
 
     @Override
     public void onWithdrawn(WorkflowContext context) {
-        Long targetId = resolveTargetId(context.getInstance());
+        WfInstance instance = context.getInstance();
+        Long targetId = resolveTargetId(instance);
         log.info("目标成本审批撤回，恢复为草稿 targetId={}", targetId);
 
-        costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
+        int updated = costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
                 .eq(CostTarget::getId, targetId)
+                .eq(CostTarget::getTenantId, instance.getTenantId())
+                .eq(CostTarget::getApprovalStatus, "APPROVING")
+                .eq(CostTarget::getApprovalInstanceId, instance.getId())
                 .set(CostTarget::getApprovalStatus, "DRAFT")
-                .set(CostTarget::getStatus, "DRAFT"));
+                .set(CostTarget::getStatus, "DRAFT")
+                .setSql("version=version+1"));
+        requireSingleTransition(updated, targetId, "审批撤回");
     }
 
     private Long resolveTargetId(WfInstance instance) {
@@ -134,5 +159,17 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
                     "审批实例缺少业务ID（目标成本ID），instanceId=" + instance.getId());
         }
         return targetId;
+    }
+
+    private void requireMatchingRunningInstance(CostTarget target, WfInstance instance) {
+        if (!java.util.Objects.equals(target.getTenantId(), instance.getTenantId())
+                || !java.util.Objects.equals(target.getApprovalInstanceId(), instance.getId())
+                || !"APPROVING".equals(target.getApprovalStatus())) {
+            throw new IllegalStateException("审批实例与目标成本状态不一致，targetId=" + target.getId());
+        }
+    }
+
+    private void requireSingleTransition(int updated, Long targetId, String action) {
+        if (updated != 1) throw new IllegalStateException("目标成本" + action + "状态同步失败 targetId=" + targetId);
     }
 }

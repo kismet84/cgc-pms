@@ -18,9 +18,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -46,6 +48,9 @@ class BidCostServiceTest {
 
     @Autowired
     private PmProjectMapper projectMapper;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -88,9 +93,53 @@ class BidCostServiceTest {
         bid.setBidProjectName("分页测试项目");
         bidCostService.create(bid);
 
-        var page = bidCostService.getPage(1, 10, null, null);
+        var page = bidCostService.getPage(1, 10, null, null, null, null, null);
         assertNotNull(page);
         assertTrue(page.getTotal() > 0, "应能查到数据");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("分页查询 — 已关联项目受项目范围约束，未关联项目保留租户级可见")
+    void testGetPageKeepsPreProjectBidVisibleButHidesInaccessibleBoundBid() {
+        BidCost unbound = new BidCost();
+        unbound.setBidProjectName("未关联项目投标");
+        Long unboundId = bidCostService.create(unbound);
+
+        BidCost bound = new BidCost();
+        bound.setBidProjectName("已关联项目投标");
+        Long boundId = bidCostService.create(bound);
+        bidCostService.markAsWon(boundId, PROJECT_ID);
+
+        setCommonUserContext();
+        var page = bidCostService.getPage(1, 20, null, null, null, null, null);
+
+        assertTrue(page.getRecords().stream().anyMatch(item -> item.getId().equals(unboundId)));
+        assertFalse(page.getRecords().stream().anyMatch(item -> item.getId().equals(boundId)));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("分页查询 — 指定项目和报告期按创建时间共同过滤")
+    void testGetPageFiltersByProjectAndCreatedPeriod() {
+        BidCost july = new BidCost();
+        july.setBidProjectName("七月项目投标");
+        july.setCreatedAt(LocalDateTime.of(2026, 7, 31, 23, 59));
+        Long julyId = bidCostService.create(july);
+        bidCostService.markAsWon(julyId, PROJECT_ID);
+
+        BidCost august = new BidCost();
+        august.setBidProjectName("八月项目投标");
+        august.setCreatedAt(LocalDateTime.of(2026, 8, 1, 0, 0));
+        Long augustId = bidCostService.create(august);
+        bidCostService.markAsWon(augustId, PROJECT_ID);
+
+        var page = bidCostService.getPage(
+                1, 20, null, null, PROJECT_ID,
+                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31));
+
+        assertTrue(page.getRecords().stream().anyMatch(item -> item.getId().equals(julyId)));
+        assertFalse(page.getRecords().stream().anyMatch(item -> item.getId().equals(augustId)));
     }
 
     @Test
@@ -315,6 +364,33 @@ class BidCostServiceTest {
 
         BusinessException ex = assertThrows(BusinessException.class, () -> bidCostService.markAsLost(id));
         assertEquals("BID_STATUS_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("markAsLost → 同 sourceId 的其他租户费用不被冲销")
+    void testMarkAsLostKeepsOtherTenantCost() {
+        BidCost bid = new BidCost();
+        bid.setBidProjectName("跨租户冲销隔离");
+        Long id = bidCostService.create(bid);
+        insertBidCostItem(id);
+        long otherCostId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbcTemplate.update("""
+                INSERT INTO cost_item
+                    (id,tenant_id,project_id,cost_subject_id,cost_type,amount,amount_without_tax,tax_amount,
+                     source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,deleted_flag)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,0)
+                """, otherCostId, 999L, PROJECT_ID, 900010L, "BID", new BigDecimal("800.00"),
+                new BigDecimal("800.00"), BigDecimal.ZERO, "BID_COST", id, 1L,
+                java.sql.Date.valueOf(LocalDate.now()), "CONFIRMED", 1);
+
+        bidCostService.markAsLost(id);
+
+        assertEquals("WRITE_OFF", jdbcTemplate.queryForObject(
+                "SELECT cost_status FROM cost_item WHERE tenant_id=0 AND source_type='BID_COST' AND source_id=?",
+                String.class, id));
+        assertEquals("CONFIRMED", jdbcTemplate.queryForObject(
+                "SELECT cost_status FROM cost_item WHERE id=? AND tenant_id=999", String.class, otherCostId));
     }
 
     private void insertBidCostItem(Long bidCostId) {

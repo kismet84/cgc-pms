@@ -53,7 +53,17 @@ public class CostTargetService {
                                      String approvalStatus, Integer isActive) {
         LambdaQueryWrapper<CostTarget> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CostTarget::getTenantId, UserContext.getCurrentTenantId());
-        if (projectId != null) wrapper.eq(CostTarget::getProjectId, projectId);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看目标成本");
+            wrapper.eq(CostTarget::getProjectId, projectId);
+        } else {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            if (accessibleProjectIds.isEmpty()) {
+                wrapper.eq(CostTarget::getProjectId, -1L);
+            } else {
+                wrapper.in(CostTarget::getProjectId, accessibleProjectIds);
+            }
+        }
         if (StringUtils.hasText(versionNo)) wrapper.eq(CostTarget::getVersionNo, versionNo);
         if (StringUtils.hasText(approvalStatus)) wrapper.eq(CostTarget::getApprovalStatus, approvalStatus);
         if (isActive != null) wrapper.eq(CostTarget::getIsActive, isActive);
@@ -67,6 +77,7 @@ public class CostTargetService {
         if (target == null || !target.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
         }
+        projectAccessChecker.checkAccess(target.getProjectId(), "查看目标成本");
         return target;
     }
 
@@ -96,10 +107,12 @@ public class CostTargetService {
 
     @Transactional(rollbackFor = Exception.class)
     public void update(CostTarget target) {
-        CostTarget existing = costTargetMapper.selectById(target.getId());
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
+        CostTarget existing = getOwnedTarget(target.getId());
+        if (existing == null) {
             throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
         }
+        int expectedVersion = requireVersion(target.getVersion());
+        assertVersion(expectedVersion, existing.getVersion());
 
         if (!Set.of("DRAFT", "REJECTED").contains(existing.getApprovalStatus()) || Integer.valueOf(1).equals(existing.getIsActive())) {
             throw new BusinessException("COST_TARGET_NOT_EDITABLE", "仅草稿或驳回且未生效的目标成本可编辑");
@@ -107,8 +120,8 @@ public class CostTargetService {
         requireWritableProject(existing.getProjectId(), "编辑目标成本");
         target.setTenantId(existing.getTenantId());
         target.setProjectId(existing.getProjectId());
-        target.setApprovalStatus("DRAFT");
-        target.setStatus("DRAFT");
+        target.setApprovalStatus(existing.getApprovalStatus());
+        target.setStatus(existing.getStatus());
         target.setIsActive(0);
         target.setApprovalInstanceId(existing.getApprovalInstanceId());
         target.setVersion(existing.getVersion());
@@ -124,16 +137,10 @@ public class CostTargetService {
     // ── Delete ──
 
     @Transactional(rollbackFor = Exception.class)
-    public void delete(Long id) {
-        CostTarget existing = costTargetMapper.selectById(id);
-        if (existing == null) {
-            // 幂等删除：记录已被逻辑删除或不存在，直接返回成功
-            log.info("目标成本已不存在或已被删除，跳过删除操作 targetId={}", id);
-            return;
-        }
-        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
-        }
+    public void delete(Long id, Integer version) {
+        CostTarget existing = getOwnedTargetForUpdate(id);
+        projectAccessChecker.checkAccess(existing.getProjectId(), "删除目标成本");
+        assertVersion(requireVersion(version), existing.getVersion());
 
         // 删除守卫：被 cost_summary.cost_target_id 引用时禁止删除
         LambdaQueryWrapper<CostSummary> summaryQw = new LambdaQueryWrapper<>();
@@ -148,7 +155,13 @@ public class CostTargetService {
             throw new BusinessException("COST_TARGET_NOT_DELETABLE", "仅草稿或驳回且未生效的目标成本可删除");
         }
 
-        costTargetMapper.deleteById(id); // MyBatis-Plus 逻辑删除（BaseEntity @TableLogic）
+        LambdaQueryWrapper<CostTarget> deleteWrapper = new LambdaQueryWrapper<>();
+        deleteWrapper.eq(CostTarget::getId, id)
+                .eq(CostTarget::getTenantId, UserContext.getCurrentTenantId())
+                .eq(CostTarget::getVersion, existing.getVersion());
+        if (costTargetMapper.delete(deleteWrapper) != 1) {
+            throw new BusinessException("COST_TARGET_CONCURRENT_UPDATE", "目标成本已被其他用户修改，请刷新后重试");
+        }
     }
 
     // ── Activate (版本切换) ──
@@ -164,18 +177,13 @@ public class CostTargetService {
      * 该方法有 @Transactional 保护，在单事务内保证原子性，H2 环境测试通过。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void activate(Long id) {
+    public void activate(Long id, Integer version) {
         Long tenantId = UserContext.getCurrentTenantId();
-
-        // SELECT FOR UPDATE 锁定目标行，防止并发
-        LambdaQueryWrapper<CostTarget> lockQw = new LambdaQueryWrapper<>();
-        lockQw.eq(CostTarget::getId, id)
-                .eq(CostTarget::getTenantId, tenantId)
-                .last("FOR UPDATE"); // SQL-SAFETY: fixed-sql-fragment
-        CostTarget target = costTargetMapper.selectOne(lockQw);
-        if (target == null) {
-            throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
-        }
+        CostTarget snapshot = getOwnedTarget(id);
+        if (snapshot == null) throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
+        lockWritableProject(snapshot.getProjectId(), "生效目标成本");
+        CostTarget target = getOwnedTargetForUpdate(id);
+        assertVersion(requireVersion(version), target.getVersion());
 
         if (!"APPROVED".equals(target.getApprovalStatus())) {
             throw new BusinessException("COST_TARGET_NOT_APPROVED", "目标成本审批通过后才能生效");
@@ -189,10 +197,17 @@ public class CostTargetService {
         costTargetMapper.update(null, deactivateWrapper);
 
         // 激活当前版本
-        target.setIsActive(1);
-        target.setStatus("ACTIVE");
-        if (target.getEffectiveDate() == null) target.setEffectiveDate(java.time.LocalDate.now());
-        costTargetMapper.updateById(target);
+        LambdaUpdateWrapper<CostTarget> activateWrapper = new LambdaUpdateWrapper<>();
+        activateWrapper.eq(CostTarget::getId, id)
+                .eq(CostTarget::getTenantId, tenantId)
+                .eq(CostTarget::getVersion, target.getVersion())
+                .set(CostTarget::getIsActive, 1)
+                .set(CostTarget::getStatus, "ACTIVE")
+                .set(target.getEffectiveDate() == null, CostTarget::getEffectiveDate, java.time.LocalDate.now())
+                .setSql("version = version + 1");
+        if (costTargetMapper.update(null, activateWrapper) != 1) {
+            throw new BusinessException("COST_TARGET_CONCURRENT_UPDATE", "目标成本已被其他用户修改，请刷新后重试");
+        }
     }
 
     // ── Items ──
@@ -206,6 +221,7 @@ public class CostTargetService {
         if (target == null || !target.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
         }
+        projectAccessChecker.checkAccess(target.getProjectId(), "查看目标成本");
 
         LambdaQueryWrapper<CostTargetItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CostTargetItem::getTargetId, targetId)
@@ -217,12 +233,10 @@ public class CostTargetService {
      * 批量保存目标成本明细项（先删后插）。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void batchSaveItems(Long targetId, List<CostTargetItem> items) {
-        // 验证目标成本存在且属于当前租户
-        CostTarget target = costTargetMapper.selectById(targetId);
-        if (target == null || !target.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
-        }
+    public void batchSaveItems(Long targetId, Integer version, List<CostTargetItem> items) {
+        CostTarget target = getOwnedTargetForUpdate(targetId);
+        int expectedVersion = requireVersion(version);
+        assertVersion(expectedVersion, target.getVersion());
 
         if (!Set.of("DRAFT", "REJECTED").contains(target.getApprovalStatus()) || Integer.valueOf(1).equals(target.getIsActive())) {
             throw new BusinessException("COST_TARGET_NOT_EDITABLE", "仅草稿或驳回且未生效的目标成本可编辑");
@@ -254,10 +268,13 @@ public class CostTargetService {
             }
         }
 
-        if ("REJECTED".equals(target.getApprovalStatus())) {
-            target.setApprovalStatus("DRAFT");
-            target.setStatus("DRAFT");
-            costTargetMapper.updateById(target);
+        LambdaUpdateWrapper<CostTarget> touchWrapper = new LambdaUpdateWrapper<>();
+        touchWrapper.eq(CostTarget::getId, targetId)
+                .eq(CostTarget::getTenantId, UserContext.getCurrentTenantId())
+                .eq(CostTarget::getVersion, target.getVersion())
+                .setSql("version = version + 1");
+        if (costTargetMapper.update(null, touchWrapper) != 1) {
+            throw new BusinessException("COST_TARGET_CONCURRENT_UPDATE", "目标成本已被其他用户修改，请刷新后重试");
         }
 
         log.info("Batch saved {} items for cost target {}", items != null ? items.size() : 0, targetId);
@@ -286,13 +303,11 @@ public class CostTargetService {
      * 提交目标成本审批。
      */
     @Transactional(rollbackFor = Exception.class)
-    public void submitForApproval(Long targetId) {
+    public void submitForApproval(Long targetId, Integer version) {
         Long tenantId = UserContext.getCurrentTenantId();
 
-        CostTarget target = costTargetMapper.selectById(targetId);
-        if (target == null || !target.getTenantId().equals(tenantId)) {
-            throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
-        }
+        CostTarget target = getOwnedTargetForUpdate(targetId);
+        assertVersion(requireVersion(version), target.getVersion());
 
         if (!Set.of("DRAFT", "REJECTED").contains(target.getApprovalStatus())) {
             throw new BusinessException("COST_TARGET_ALREADY_SUBMITTED", "仅草稿或驳回状态可以提交审批");
@@ -302,15 +317,19 @@ public class CostTargetService {
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
         WfInstance instance = "REJECTED".equals(target.getApprovalStatus()) && target.getApprovalInstanceId() != null
-                ? workflowEngineProvider.getObject().resubmit(target.getApprovalInstanceId(), userId, username)
-                : workflowEngineProvider.getObject().submit(userId, username, tenantId, "COST_TARGET", targetId,
+                ? workflowEngineProvider.getObject().resubmitCostTarget(target.getApprovalInstanceId(), userId, username)
+                : workflowEngineProvider.getObject().submitCostTarget(userId, username, tenantId, "COST_TARGET", targetId,
                     target.getVersionName() != null ? target.getVersionName() : target.getVersionNo(), target.getTotalTargetAmount(),
                     target.getProjectId(), null, "投标成本→目标成本→责任预算", null, null);
-        costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
-                .eq(CostTarget::getId, targetId).eq(CostTarget::getTenantId, tenantId)
+        int updated = costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
+                .eq(CostTarget::getId, targetId).eq(CostTarget::getTenantId, tenantId).eq(CostTarget::getVersion, target.getVersion())
                 .set(CostTarget::getApprovalStatus, "APPROVING")
                 .set(CostTarget::getStatus, "APPROVING")
-                .set(CostTarget::getApprovalInstanceId, instance.getId()));
+                .set(CostTarget::getApprovalInstanceId, instance.getId())
+                .setSql("version = version + 1"));
+        if (updated != 1) {
+            throw new BusinessException("COST_TARGET_CONCURRENT_UPDATE", "目标成本已被其他用户修改，请刷新后重试");
+        }
 
         log.info("Submitted cost target {} for approval", targetId);
     }
@@ -350,6 +369,18 @@ public class CostTargetService {
         return project;
     }
 
+    private PmProject lockWritableProject(Long projectId, String action) {
+        PmProject project = projectMapper.selectOne(new LambdaQueryWrapper<PmProject>()
+                .eq(PmProject::getId, projectId)
+                .eq(PmProject::getTenantId, UserContext.getCurrentTenantId())
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+        projectAccessChecker.checkAccess(project, action);
+        if (!"ACTIVE".equals(project.getStatus())) {
+            throw new BusinessException("PROJECT_NOT_ACTIVE", "只有进行中的项目可以维护目标成本");
+        }
+        return project;
+    }
+
     private void requireEnabledUser(Long userId) {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM sys_user WHERE id=? AND tenant_id=? AND status='ENABLE' AND deleted_flag=0", Integer.class, userId, UserContext.getCurrentTenantId());
         if (count == null || count != 1) throw new BusinessException("COST_TARGET_RESPONSIBLE_INVALID", "责任人不存在、跨租户或已停用");
@@ -381,5 +412,38 @@ public class CostTargetService {
 
     private static BigDecimal money(BigDecimal amount) {
         return (amount == null ? BigDecimal.ZERO : amount).setScale(2, java.math.RoundingMode.HALF_UP);
+    }
+
+    private CostTarget getOwnedTarget(Long id) {
+        CostTarget target = costTargetMapper.selectById(id);
+        if (target == null || !target.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            return null;
+        }
+        return target;
+    }
+
+    private CostTarget getOwnedTargetForUpdate(Long id) {
+        LambdaQueryWrapper<CostTarget> lockQw = new LambdaQueryWrapper<>();
+        lockQw.eq(CostTarget::getId, id)
+                .eq(CostTarget::getTenantId, UserContext.getCurrentTenantId())
+                .last("FOR UPDATE"); // SQL-SAFETY: fixed-sql-fragment
+        CostTarget target = costTargetMapper.selectOne(lockQw);
+        if (target == null) {
+            throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
+        }
+        return target;
+    }
+
+    private int requireVersion(Integer version) {
+        if (version == null) {
+            throw new BusinessException("COST_TARGET_VERSION_REQUIRED", "缺少最新版本，请刷新后重试");
+        }
+        return version;
+    }
+
+    private void assertVersion(Integer expectedVersion, Integer actualVersion) {
+        if (!Objects.equals(expectedVersion, actualVersion)) {
+            throw new BusinessException("COST_TARGET_CONCURRENT_UPDATE", "目标成本已被其他用户修改，请刷新后重试");
+        }
     }
 }

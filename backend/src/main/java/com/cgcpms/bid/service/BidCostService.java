@@ -18,6 +18,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -36,18 +38,35 @@ public class BidCostService {
     private final PmProjectMapper projectMapper;
     private final ProjectAccessChecker projectAccessChecker;
 
-    public IPage<BidCost> getPage(long pageNo, long pageSize, String bidStatus, String keyword) {
+    public IPage<BidCost> getPage(long pageNo, long pageSize, String bidStatus, String keyword,
+                                  Long projectId, LocalDate startDate, LocalDate endDate) {
         Long tenantId = UserContext.getCurrentTenantId();
         LambdaQueryWrapper<BidCost> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BidCost::getTenantId, tenantId);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查询投标成本");
+            wrapper.eq(BidCost::getProjectId, projectId);
+        } else {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            wrapper.and(w -> {
+                w.isNull(BidCost::getProjectId);
+                if (!accessibleProjectIds.isEmpty()) {
+                    w.or().in(BidCost::getProjectId, accessibleProjectIds);
+                }
+            });
+        }
         if (bidStatus != null && !bidStatus.isEmpty()) wrapper.eq(BidCost::getBidStatus, bidStatus);
         if (keyword != null && !keyword.isEmpty()) wrapper.like(BidCost::getBidProjectName, keyword);
+        if (startDate != null) wrapper.ge(BidCost::getCreatedAt, startDate.atStartOfDay());
+        if (endDate != null) wrapper.lt(BidCost::getCreatedAt, endDate.plusDays(1).atStartOfDay());
         wrapper.orderByDesc(BidCost::getCreatedAt);
         return mapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
     }
 
     public BidCost getById(Long id) {
-        return requireExisting(id);
+        BidCost bid = requireExisting(id);
+        ensureBoundProjectVisible(bid, "查看投标成本");
+        return bid;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -63,19 +82,33 @@ public class BidCostService {
     @Transactional(rollbackFor = Exception.class)
     public void update(BidCost bid) {
         BidCost existing = requireExisting(bid.getId());
+        ensureBoundProjectVisible(existing, "编辑投标成本");
         if (!"BIDDING".equals(existing.getBidStatus())) {
             throw new BusinessException("BID_STATUS_NOT_EDITABLE", "仅投标中状态可编辑");
         }
-        mapper.updateById(bid);
+        int updated = mapper.update(null, new LambdaUpdateWrapper<BidCost>()
+                .eq(BidCost::getId, bid.getId())
+                .eq(BidCost::getTenantId, UserContext.getCurrentTenantId())
+                .eq(BidCost::getBidStatus, "BIDDING")
+                .set(BidCost::getBidProjectName, bid.getBidProjectName())
+                .set(BidCost::getRemark, bid.getRemark()));
+        if (updated != 1)
+            throw new BusinessException("BID_CONCURRENT_STATE_CHANGE", "投标状态已变化，请刷新后重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         BidCost existing = requireExisting(id);
+        ensureBoundProjectVisible(existing, "删除投标成本");
         if (!"BIDDING".equals(existing.getBidStatus())) {
             throw new BusinessException("BID_STATUS_NOT_DELETABLE", "仅投标中状态可删除");
         }
-        mapper.deleteById(id);
+        int deleted = mapper.delete(new LambdaQueryWrapper<BidCost>()
+                .eq(BidCost::getId, id)
+                .eq(BidCost::getTenantId, UserContext.getCurrentTenantId())
+                .eq(BidCost::getBidStatus, "BIDDING"));
+        if (deleted != 1)
+            throw new BusinessException("BID_CONCURRENT_STATE_CHANGE", "投标状态已变化，请刷新后重试");
     }
 
     /**
@@ -84,6 +117,7 @@ public class BidCostService {
     @Transactional(rollbackFor = Exception.class)
     public void markAsWon(Long bidCostId, Long projectId) {
         BidCost bid = requireExisting(bidCostId);
+        ensureBoundProjectVisible(bid, "标记投标中标");
         if (!"BIDDING".equals(bid.getBidStatus())) {
             throw new BusinessException("BID_STATUS_INVALID", "仅投标中状态可标记为中标");
         }
@@ -94,9 +128,15 @@ public class BidCostService {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         projectAccessChecker.checkAccess(project, "关联中标项目");
 
-        bid.setProjectId(projectId);
-        bid.setBidStatus("WON");
-        mapper.updateById(bid);
+        int updated = mapper.update(null, new LambdaUpdateWrapper<BidCost>()
+                .eq(BidCost::getId, bidCostId)
+                .eq(BidCost::getTenantId, UserContext.getCurrentTenantId())
+                .eq(BidCost::getBidStatus, "BIDDING")
+                .isNull(BidCost::getProjectId)
+                .set(BidCost::getProjectId, projectId)
+                .set(BidCost::getBidStatus, "WON"));
+        if (updated != 1)
+            throw new BusinessException("BID_CONCURRENT_STATE_CHANGE", "投标状态已变化，请刷新后重试");
 
         // 原投标成本事实保持不变；V2 由独立、审批通过的目标成本转入事实承担项目归集。
         log.info("投标项目中标，等待目标成本转入 bidCostId={} projectId={}", bidCostId, projectId);
@@ -108,14 +148,22 @@ public class BidCostService {
     @Transactional(rollbackFor = Exception.class)
     public void markAsLost(Long bidCostId) {
         BidCost bid = requireExisting(bidCostId);
+        ensureBoundProjectVisible(bid, "标记投标未中标");
         if (!"BIDDING".equals(bid.getBidStatus())) {
             throw new BusinessException("BID_STATUS_INVALID", "仅投标中状态可标记为未中标");
         }
 
-        bid.setBidStatus("LOST");
-        mapper.updateById(bid);
+        int updated = mapper.update(null, new LambdaUpdateWrapper<BidCost>()
+                .eq(BidCost::getId, bidCostId)
+                .eq(BidCost::getTenantId, UserContext.getCurrentTenantId())
+                .eq(BidCost::getBidStatus, "BIDDING")
+                .isNull(BidCost::getProjectId)
+                .set(BidCost::getBidStatus, "LOST"));
+        if (updated != 1)
+            throw new BusinessException("BID_CONCURRENT_STATE_CHANGE", "投标状态已变化，请刷新后重试");
 
         costItemMapper.update(null, new LambdaUpdateWrapper<CostItem>()
+                .eq(CostItem::getTenantId, UserContext.getCurrentTenantId())
                 .eq(CostItem::getSourceType, "BID_COST")
                 .eq(CostItem::getSourceId, bidCostId)
                 .set(CostItem::getCostStatus, "WRITE_OFF"));
@@ -129,5 +177,11 @@ public class BidCostService {
         if (!Objects.equals(bid.getTenantId(), UserContext.getCurrentTenantId()))
             throw new BusinessException("BID_COST_NOT_FOUND", "投标项目不存在");
         return bid;
+    }
+
+    private void ensureBoundProjectVisible(BidCost bid, String action) {
+        if (bid.getProjectId() != null) {
+            projectAccessChecker.checkAccess(bid.getProjectId(), action);
+        }
     }
 }

@@ -12,7 +12,281 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 2026-07-22 第53条主线M3已完成；`ISSUE-053-010～016`全部通过并完成治理收口。当前无M3 Ready。
 
-2026-07-22 第53条主线M4启动裁决通过；`ISSUE-053-017`为唯一Ready。其余`ISSUE-053-018～023`保持Planned，须在金丝雀通过后逐条补充，不得并行放行。
+2026-07-23 第53条主线M4的`ISSUE-053-017～022`已通过并收口；当前无M4 Ready。`ISSUE-053-023`保持Planned，须另行补货并获授权后方可实施。
+
+### ISSUE-053-020：M4目标成本版本V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 目标成本 / 四路由迁移 / 版本、金额、权限与并发
+状态：Done（2026-07-23，本地dev/test验收通过）
+来源锚点：`docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`的ISSUE-053-020；`ISSUE-053-019`通过事实；candidateEvidenceHead=c7ca210db53edece87124ac28945479093af3e49
+存量问题键：[mainline:053-M4-020-COST-TARGET-VERSION]
+Migration：需要
+依赖：`ISSUE-053-017～019`已通过；复用商务共享契约、V2请求核心、现有目标成本Controller/Service及公共壳项目上下文；迁移只登记既有目标成本动作权限，不修改业务表结构。
+风险等级：高
+运行态要求：本地dev/test；禁止连接生产。写侧浏览器验收仅使用可识别测试数据并精确回滚。
+Reviewer要求：独立复核项目/租户范围、普通角色动作权限、CAS、驳回重提、并发激活唯一性、历史只读与金额字符串边界。
+归档报告：`docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md`
+最小回滚：回退四路由V2页面、契约/服务、精确后端并发根修、权限登记、测试和台账状态；017～019、Legacy、业务数据及正式入口保持不变。
+目标：
+
+- 将`/cost-target`、`/cost-target/index`、`/cost-target/create`、`/cost-target/:id/edit`迁移为真实Clean-room V2；根路由只作确定性重定向。
+- 完成版本列表、创建、编辑、明细保存、提交、激活、删除与历史只读追溯；服务端保证同项目活动版本唯一。
+- 投标成本、责任成本、目标成本全部按服务端十进制字符串回读和对账，前端不形成权威合计。
+非目标：
+
+- 不迁移M7成本科目中心，不复制Legacy UI，不新增平行金额账本、状态库、表格库、第二请求层或前端浮点权威计算。
+- 不修改正式入口、生产环境或其他M4页面；不扩大既有目标成本业务状态。
+允许修改：
+
+- `packages/frontend-contracts/src/commercial.ts`
+- `frontend-admin-v2/src/services/commercial.ts`
+- `frontend-admin-v2/src/pages/commercial/CostTargetPage.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m4-cost-target.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/tests/unit/navigation.test.ts`
+- `frontend-admin-v2/e2e/m4-cost-target.spec.ts`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `backend/src/main/java/com/cgcpms/cost/controller/CostTargetController.java`
+- `backend/src/main/java/com/cgcpms/cost/service/CostTargetService.java`
+- `backend/src/main/java/com/cgcpms/cost/handler/CostTargetWorkflowHandler.java`
+- `backend/src/test/java/com/cgcpms/cost/**`
+- `backend/src/main/resources/db/migration/V220__register_cost_target_action_permissions.sql`
+- `scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql`
+- `scripts/demo/complete-project-v2/verify.ps1`
+- `docs/plans/**`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- 其他未列明业务域后端与V2页面
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+
+- 四路由由真实V2承接；台账从`60/27/0`变为`56/31/0`，重定向保留query/hash。
+- 写动作按`cost:target:add/edit/delete/submit/activate`授权；只读角色前后端均不能写，普通目标成本角色可操作授权动作。
+- 所有对象和明细按租户/项目失败关闭；客户端旧version、重复提交、并发明细保存、并发激活稳定冲突，不发生后写覆盖或双活动版本。
+- 驳回后编辑仍走既有工作流重提；提交/活动版本保持只读，历史版本可查询不可静默覆盖。
+- 页面具备loading、empty、error、403/404/409/422/500、重复点击防护、Abort与陈旧响应隔离；三视口无横向溢出，axe serious/critical为0。
+- Ready lint、后端专项、契约/V2类型、V2单测、Lint、Clean-room边界、路由台账、构建、目标E2E、demo verify与`git diff --check`全部通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-020`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=CostTargetControllerTest,CostTargetWorkflowHandlerTest,TargetCostDynamicProfitClosedLoopIntegrationTest,CostTargetServiceConcurrencyTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m4-commercial-contract-baseline.test.ts m4-cost-target.test.ts router.test.ts navigation.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m4-cost-target.spec.ts`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1`
+- `git diff --check`
+
+### ISSUE-053-021：M4成本台账、核对与动态利润V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 成本与利润 / 四路由迁移 / 快照、金额、权限与并发
+状态：Done（2026-07-23，本地dev/test验收通过）
+来源锚点：`docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`的ISSUE-053-021；`ISSUE-053-020`通过事实；candidateEvidenceHead=c7ca210db53edece87124ac28945479093af3e49
+存量问题键：[mainline:053-M4-021-COST-PROFIT-CONTROL]
+Migration：需要
+依赖：`ISSUE-053-017～020`已通过；复用商务共享契约、V2请求核心、现有成本台账/汇总/控制Controller与公共壳项目上下文；迁移只登记成本汇总刷新权限，不修改业务表结构。
+风险等级：高
+运行态要求：本地dev/test；禁止连接生产。浏览器写侧仅使用可识别测试数据并精确回滚。
+Reviewer要求：独立复核项目/租户范围、刷新写权限、历史快照不可变、预测/纠偏CAS、责任人项目成员、跨源金额字符串及纠偏合计并发。
+归档报告：`docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md`
+最小回滚：回退四路由V2页面、契约/服务、精确后端快照/CAS根修、权限登记、测试和台账状态；017～020、Legacy、成本科目中心、业务数据及正式入口保持不变。
+目标：
+
+- 将`/cost`、`/cost/ledger`、`/cost/summary`、`/cost/control`迁移为真实Clean-room V2；`/cost`仅确定性重定向台账。
+- 成本台账提供服务端分页、汇总与详情；成本核对提供最新汇总、不可变历史与显式去重刷新；动态利润覆盖预测、确认、纠偏、提交、关闭及追溯。
+- 投标、目标、责任、承诺、实际、预计剩余、完工预测与利润全部按服务端十进制字符串读取和回读，前端不形成权威合计。
+非目标：
+
+- 不迁移M7成本科目taxonomy/rules/scope/trace，不新增成本科目模型、平行账本、状态库、表格库、第二请求层或前端浮点权威计算。
+- 不修改正式入口、生产环境、预算/产值页面或其他M4路由；不扩大既有成本状态机。
+允许修改：
+
+- `packages/frontend-contracts/src/commercial.ts`
+- `frontend-admin-v2/src/services/commercial.ts`
+- `frontend-admin-v2/src/pages/commercial/CostLedgerPage.vue`
+- `frontend-admin-v2/src/pages/commercial/CostSummaryPage.vue`
+- `frontend-admin-v2/src/pages/commercial/CostControlPage.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m4-costs.test.ts`
+- `frontend-admin-v2/tests/unit/m4-costs-pages.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/tests/unit/navigation.test.ts`
+- `frontend-admin-v2/e2e/m4-costs.spec.ts`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `backend/src/main/java/com/cgcpms/cost/controller/CostSummaryController.java`
+- `backend/src/main/java/com/cgcpms/cost/service/CostSummaryService.java`
+- `backend/src/main/java/com/cgcpms/cost/dto/CostControlModels.java`
+- `backend/src/main/java/com/cgcpms/cost/service/CostControlService.java`
+- `backend/src/main/java/com/cgcpms/cost/handler/CostCorrectiveWorkflowHandler.java`
+- `backend/src/test/java/com/cgcpms/cost/**`
+- `backend/src/main/resources/db/migration/V221__register_cost_summary_refresh_permission.sql`
+- `scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql`
+- `scripts/demo/complete-project-v2/verify.ps1`
+- `docs/plans/**`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/java/com/cgcpms/cost/subject/**`
+- 其他未列明业务域后端与V2页面
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+
+- 四路由由真实V2承接；台账从`56/31/0`变为`52/35/0`，根重定向保留query/hash，台账生成器交叉核验V2路由与导航事实。
+- 台账/详情只读且按服务端分页、汇总、项目/租户范围失败关闭；报告期转换为服务端日期窗口，详情不产生写请求。
+- 汇总刷新使用独立`cost:summary:refresh`权限、审计、加载态和去重；历史日期快照不可改写，同日刷新保持单一当前快照。
+- 预测/纠偏写动作强制客户端version/CAS；并发创建版本、更新、确认、提交、关闭及纠偏合计稳定冲突，不发生后写覆盖或超额节约。
+- 纠偏责任人必须为目标项目有效成员；普通成本角色按动作权限可用，只读角色和项目外用户前后端均不能写或读取越权对象。
+- 所有金额出口与写命令为DecimalString/BigDecimal，含超`2^53`、0、负数和小数边界；Map中的ID也以字符串稳定传输。
+- 页面具备loading、empty、error、403/404/409/422/500、重复点击防护、Abort与陈旧响应隔离；三视口无横向溢出，axe serious/critical为0。
+- Ready lint、后端专项、契约/V2类型、V2单测、Lint、Clean-room边界、路由台账、构建、目标E2E、demo verify与`git diff --check`全部通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-021`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=CostLedgerServiceTest,CostSummaryControllerTest,CostSummaryServiceTest,CostControlControllerTest,CostControlServiceConcurrencyTest,TargetCostDynamicProfitClosedLoopIntegrationTest,CostCorrectiveWorkflowHandlerTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m4-commercial-contract-baseline.test.ts m4-costs.test.ts m4-costs-pages.test.ts router.test.ts navigation.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m4-costs.spec.ts`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1`
+- `git diff --check`
+
+### ISSUE-053-022：M4项目预算与产值计量V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 预算与产值 / 双路由迁移 / 金额、附件、权限与并发
+状态：Done（2026-07-23，本地dev/test验收通过）
+来源锚点：`docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`的ISSUE-053-022；`ISSUE-053-021`通过事实；candidateEvidenceHead=c7ca210db53edece87124ac28945479093af3e49
+存量问题键：[mainline:053-M4-022-BUDGET-MEASUREMENT]
+Migration：不需要
+依赖：`ISSUE-053-017～021`已通过；复用商务共享契约、V2请求核心、现有预算/产值Controller、公共壳项目/报告期上下文及受控文件服务。
+风险等级：高
+运行态要求：本地dev/test；禁止连接生产。浏览器写侧仅使用可识别测试数据与文件并精确回滚。
+Reviewer要求：独立复核预算项目/租户范围、版本CAS与驳回重提、可用额权威口径；产值期间/来源/申报/核定/结算状态机、真实附件事实、重复请求、金额与数量边界。
+归档报告：`docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md`
+最小回滚：回退双路由V2页面、契约/服务、精确预算CAS/工作流与产值附件根修、测试和台账状态；017～021、Legacy、业务数据及正式入口保持不变。
+目标：
+
+- 将`/budget`、`/production-measurement`迁移为真实Clean-room V2，复用公共壳项目/报告期选择器和服务端受权对象源。
+- 预算覆盖列表、详情/编辑、明细、可用额、创建、更新、删除、提交及驳回后重提；版本/状态和权威余额由服务端判定。
+- 产值覆盖计量期间、来源、计量单、内部提交、业主申报、业主核定/退回及结算追溯；阶段附件必须核对真实受控文件记录。
+
+实施结果：已通过。两路由由真实Clean-room V2承接，台账达到`50/37/0`；预算CRUD、明细、可用额、全写version/CAS、驳回同实例重提，以及产值期间、来源、内部审批、业主申报、核定/退回与结算追溯闭环成立。公共项目/报告期服务端过滤、完整HTTP权限矩阵、真实CLEAN文件门禁和确定性文件/状态并发锁序均已验收。正式证据见`docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md`。
+非目标：
+
+- 不新增预算账本、产值算法、成本科目中心、自由附件层、状态库、表格库、第二请求层或前端金额乘价/累计权威计算。
+- 不修改正式入口、生产环境、合同/成本页面或M7路由；不扩大既有预算和产值状态机。
+允许修改：
+
+- `packages/frontend-contracts/src/commercial.ts`
+- `frontend-admin-v2/src/services/commercial.ts`
+- `frontend-admin-v2/src/pages/commercial/BudgetPage.vue`
+- `frontend-admin-v2/src/pages/commercial/ProductionMeasurementPage.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m4-budget-measurement.test.ts`
+- `frontend-admin-v2/tests/unit/m4-budget-measurement-pages.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/tests/unit/navigation.test.ts`
+- `frontend-admin-v2/e2e/m4-budget-measurement.spec.ts`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `backend/src/main/java/com/cgcpms/budget/controller/ProjectBudgetController.java`
+- `backend/src/main/java/com/cgcpms/budget/service/ProjectBudgetService.java`
+- `backend/src/main/java/com/cgcpms/budget/handler/ProjectBudgetWorkflowHandler.java`
+- `backend/src/main/java/com/cgcpms/measurement/controller/ProductionMeasurementController.java`
+- `backend/src/main/java/com/cgcpms/measurement/service/ProductionMeasurementService.java`
+- `backend/src/main/java/com/cgcpms/measurement/dto/MeasurementModels.java`
+- `backend/src/main/java/com/cgcpms/file/**`
+- `backend/src/main/java/com/cgcpms/workflow/**`
+- `backend/src/test/java/com/cgcpms/budget/**`
+- `backend/src/test/java/com/cgcpms/measurement/**`
+- `backend/src/test/java/com/cgcpms/file/**`
+- `backend/src/test/java/com/cgcpms/workflow/**`
+- `scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql`
+- `scripts/demo/complete-project-v2/verify.ps1`
+- `docs/plans/**`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- 其他未列明业务域后端与V2页面
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+
+- 两路由由真实V2承接；台账从`52/35/0`变为`50/37/0`，台账生成器交叉核验V2路由与导航事实。
+- 预算所有写动作强制客户端version/CAS；驳回后编辑保持可重提状态并复用原实例；同项目版本/活动状态、明细和可用额按服务端失败关闭，前端不重算余额。
+- 产值期间、来源、计量、内部提交、业主申报、核定/退回与结算追溯按租户/项目/合同/状态失败关闭；重复提交、核定、退回稳定幂等或冲突。
+- 附件数量和阶段门禁只承认当前业务对象的真实CLEAN文件记录；客户端计数、跨项目/跨业务文件、上传失败或缺文件不能通过提交、核定或结算。
+- 预算、占用、消耗、可用、申报、核定、结算金额为DecimalString/BigDecimal；数量为受控十进制字符串，数量乘价与累计金额由服务端返回。
+- 普通预算/计量角色按动作权限可用；只读角色和项目外用户前后端均不能写或读取越权对象；公共项目/报告期切换产生真实服务端查询。
+- 页面具备loading、empty、error、403/404/409/422/500、重复点击防护、Abort与陈旧响应隔离；三视口无横向溢出，axe serious/critical为0。
+- Ready lint、后端预算/产值/文件/工作流专项、契约/V2类型、V2单测、Lint、Clean-room边界、路由台账、构建、目标E2E、demo verify与`git diff --check`全部通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-022`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=ProjectBudgetControllerTest,ProjectBudgetIntegrationTest,ProjectBudgetConcurrencyTest,ProductionMeasurementControllerTest,ProductionMeasurementClosedLoopIntegrationTest,ProductionMeasurementConcurrencyTest,BusinessObjectAuthorizerTest,FileControllerAuthorizationTest,WorkflowSubmitServiceTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m4-commercial-contract-baseline.test.ts m4-budget-measurement.test.ts m4-budget-measurement-pages.test.ts router.test.ts navigation.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m4-budget-measurement.spec.ts`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1`
+- `git diff --check`
 
 ### ISSUE-053-017：M4商务契约、金额与权限金丝雀
 
@@ -26,13 +300,29 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 - 为后续18条商务合约路由迁移提供唯一共享契约，不复制Legacy UI状态或建立第二请求层。
 非目标：
 - 不迁移、渲染或切换任何M4路由，不修改路由迁移台账状态。
-- 不修改后端、数据库、Legacy页面、正式入口、业务数据、权限码或状态机；不新增依赖、缓存、Store、业务mock或前端权威金额计算。
+- 除“允许修改”中精确列明的金额出口、项目范围守卫与负向测试外，不修改其他后端、数据库、Legacy页面、正式入口、业务数据、权限码或状态机；不新增依赖、缓存、Store、业务mock或前端权威金额计算。
 - 不纳入`/cost/subject`及其taxonomy、rules、scope、trace五条M7路由。
 允许修改：
 - `packages/frontend-contracts/src/commercial.ts`
 - `packages/frontend-contracts/src/index.ts`
 - `frontend-admin-v2/src/services/commercial.ts`
 - `frontend-admin-v2/tests/unit/m4-commercial-contract-baseline.test.ts`
+- `backend/src/main/java/com/cgcpms/contract/service/CtContractService.java`
+- `backend/src/main/java/com/cgcpms/variation/service/VarOrderService.java`
+- `backend/src/main/java/com/cgcpms/bid/service/BidCostService.java`
+- `backend/src/main/java/com/cgcpms/cost/service/CostTargetService.java`
+- `backend/src/main/java/com/cgcpms/cost/service/CostLedgerService.java`
+- `backend/src/main/java/com/cgcpms/budget/service/ProjectBudgetService.java`
+- `backend/src/main/java/com/cgcpms/cost/vo/CostTargetVO.java`
+- `backend/src/main/java/com/cgcpms/cost/vo/CostTargetItemVO.java`
+- `backend/src/main/java/com/cgcpms/cost/service/CostControlService.java`
+- `backend/src/main/java/com/cgcpms/measurement/service/ProductionMeasurementService.java`
+- `backend/src/test/java/com/cgcpms/contract/**`
+- `backend/src/test/java/com/cgcpms/variation/**`
+- `backend/src/test/java/com/cgcpms/bid/**`
+- `backend/src/test/java/com/cgcpms/cost/**`
+- `backend/src/test/java/com/cgcpms/budget/**`
+- `backend/src/test/java/com/cgcpms/measurement/**`
 - `docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`
 - `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
 - `docs/backlog/ready-issues.md`
@@ -42,7 +332,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 - `docs/product-intelligence/evolution-decision.md`
 - `docs/quality/ISSUE-053-017-M4商务契约金额与权限金丝雀验收报告.md`
 禁止修改：
-- `backend/**`
+- 其他未在“允许修改”中逐项列明的后端文件
 - `frontend-admin/**`
 - `frontend-admin-v2/src/pages/**`
 - `frontend-admin-v2/src/router.ts`
@@ -62,7 +352,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 - 权威金额字段不得声明为`number`或经`Number`、`parseFloat`、隐式算术处理；税率和数量须显式标注非金额边界，不在前端形成权威金额。
 - 契约与服务不得依赖Vue、Pinia、DOM、CSS、Legacy源码或本地业务mock；不产生新V2页面、路由或路由台账变化。
 - Ready lint、契约类型、目标单测、V2类型、Lint、Clean-room边界、构建和`git diff --check`全部通过。
-状态：Ready
+状态：Done（2026-07-22，本地验收通过）
 来源锚点：`docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`的ISSUE-053-017；`docs/quality/第53条主线-M3-项目履约全量退出门验收报告.md`的M3本地正式收口通过事实；`docs/product-intelligence/evolution-decision.md`的`PI-2026-07-18-02`；candidateEvidenceHead=c7ca210db53edece87124ac28945479093af3e49
 存量问题键：[mainline:053-M4-017-COMMERCIAL-CONTRACT-MONEY-GATE]
 验证命令：
@@ -80,7 +370,208 @@ Migration：不需要
 风险等级：高
 运行态要求：无；仅执行契约、请求构造、静态与单元验证，不连接数据库或生产，不创建业务数据。
 Reviewer要求：独立交叉核对九个Controller/VO、Legacy类型与权限菜单；确认金额不转浮点、项目/租户范围不扩大、signal不丢失、查询零写、无Legacy UI依赖，并核实五条成本科目路由仍归M7。
-最小回滚：回退商务共享契约、薄服务、目标测试及本Issue治理回写；M0～M3、Legacy入口、后端、数据库和`68/19/0`路由台账保持不变。
+最小回滚：回退商务共享契约、薄服务、精确后端金额/项目范围修正、目标测试及本Issue治理回写；M0～M3、Legacy入口、数据库和`68/19/0`路由台账保持不变。
+
+### ISSUE-053-018：M4合同台账与全生命周期V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 商务合约 / 五路由迁移 / 金额、权限、并发与原子保存
+目标：
+
+- 将`/contract`、`/contract/ledger`、`/contract/create`、`/contract/:id`、`/contract/:id/edit`五条路由迁移为真实Clean-room V2；`/contract`仅确定性重定向台账。
+- 复用017共享契约和V2请求核心，完成服务端分页/KPI/筛选、独立详情、复合原子保存、提交审批、删除、清单、付款条款与审批历史。
+- 根修启动核验发现的合同子资源项目范围、复合更新受保护字段、客户端版本并发、合同金额对账及工作流重提状态缺口。
+非目标：
+
+- 不修改数据库迁移、Legacy页面、正式入口、生产环境、合同变更、投标、目标成本或M7成本科目页面。
+- 不新增依赖、状态库、表格库、第二请求层、前端权威金额计算或自由附件能力；合同附件不在018计划范围。
+- 复合保存是合同聚合命令，`contract:add/edit`为其权威权限；不额外叠加子资源CRUD权限。子资源细粒度权限继续只约束独立子资源端点。
+允许修改：
+
+- `packages/frontend-contracts/src/commercial.ts`
+- `frontend-admin-v2/src/services/commercial.ts`
+- `frontend-admin-v2/src/pages/commercial/ContractPage.vue`
+- `frontend-admin-v2/src/pages/commercial/ContractForm.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m4-contracts.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/e2e/m4-contracts.spec.ts`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `backend/src/main/java/com/cgcpms/contract/controller/CtContractController.java`
+- `backend/src/main/java/com/cgcpms/contract/entity/CtContractItem.java`
+- `backend/src/main/java/com/cgcpms/contract/entity/CtContractPaymentTerm.java`
+- `backend/src/main/java/com/cgcpms/contract/handler/ContractWorkflowHandler.java`
+- `backend/src/main/java/com/cgcpms/contract/service/CtContractService.java`
+- `backend/src/main/java/com/cgcpms/contract/service/CtContractItemService.java`
+- `backend/src/main/java/com/cgcpms/contract/service/CtContractPaymentTermService.java`
+- `backend/src/main/java/com/cgcpms/contract/vo/CtContractVO.java`
+- `backend/src/main/java/com/cgcpms/workflow/service/WorkflowSubmitService.java`
+- `backend/src/main/java/com/cgcpms/workflow/service/WorkflowBusinessAccessValidator.java`
+- `backend/src/test/java/com/cgcpms/contract/**`
+- `backend/src/test/java/com/cgcpms/workflow/**`
+- `docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md`
+禁止修改：
+
+- 其他未在“允许修改”中逐项列明的后端和前端文件
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- `scripts/demo/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+
+- 五路由均由真实V2页面承接，`/contract`保留query/hash确定性重定向；生成台账由`68/19/0`变为`63/24/0`，无手写台账漂移或Shell占位。
+- 台账使用服务端分页、项目范围、KPI和筛选；详情独立URL展示合同头、清单、付款条款、审批历史，不产生隐式写请求。
+- 新建/编辑只调用复合原子端点；头、清单、条款任一失败整体回滚。保存成功后权威回读；保存后提交失败时明确保留草稿，不伪装整体成功。
+- 创建、编辑、提交、删除严格绑定`contract:add/edit/submit/delete`，只读身份不显示且后端拒绝写动作；子资源所有独立读写按父合同项目范围失败关闭。
+- 复合更新不能覆盖合同编号、已付额、结算额、成本生成标记、审批状态、租户和创建事实；旧`version`更新/提交稳定冲突，不能后写覆盖或启动重复工作流。
+- 服务端校验合同金额、税额、不含税额、清单合计、付款条款合计、付款比例及日期边界；金额和比例使用十进制字符串/BigDecimal，不使用JavaScript浮点形成权威结果。
+- 通用工作流合同提交与合同专用提交共享对象范围、可提交状态和handler状态；驳回/撤回重提进入`APPROVING`并锁定编辑。
+- 页面具备loading、empty、error、403/404/409/422/500、重复点击防护、Abort与陈旧响应隔离；1440/1024/390三视口无横向溢出，axe serious/critical为0，控制台无error。
+- Ready lint、后端合同/工作流专项、契约/V2类型、V2单测、Lint、Clean-room边界、路由台账、构建、目标E2E和`git diff --check`全部通过。
+状态：Done（2026-07-22，本地验收通过）
+来源锚点：`docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`的ISSUE-053-018；`ISSUE-053-017`通过事实；`docs/product-intelligence/project-map.md`的M4金丝雀事实；candidateEvidenceHead=b6e46f9e37424f3f70889ccffb86bc2d662f6922
+存量问题键：[mainline:053-M4-018-CONTRACT-LIFECYCLE]
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-018`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=CtContractServiceTest,CtContractControllerTest,CtContractItemServiceTest,CtContractPaymentTermServiceTest,ContractWorkflowHandlerTest,WorkflowSubmitServiceTest,ContractApprovalIntegrationTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m4-commercial-contract-baseline.test.ts m4-contracts.test.ts router.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m4-contracts.spec.ts`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md`
+Migration：不需要
+依赖：`ISSUE-053-017`已通过；017未提交diff必须原样保留并与018一并验收；合作方候选复用既有`GET /partners`，写角色运行态验收必须具备`partner:query`，项目候选复用当前认证用户可见项目选项。
+风险等级：高
+运行态要求：本地dev/test；禁止连接生产。若执行真实写侧浏览器验收，只能使用可识别测试数据并在证据完成后精确回滚。
+Reviewer要求：独立安全复核租户/项目、聚合权限、受保护字段、并发、工作流和金额；独立测试复核五路由、失败恢复、三视口、权限矩阵与真实HTTP金额字符串。
+最小回滚：回退合同V2页面、路由、契约/服务、精确后端根修、测试和五条台账状态；017契约、M0～M3、数据库、Legacy和正式入口保持不变。
+
+### ISSUE-053-019：M4变更签证与投标成本V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 商务合约 / 三路由迁移 / 跨域状态、金额、权限与幂等
+目标：
+
+- 将`/variation`、`/variation/order`、`/bid-cost`三条路由迁移为真实Clean-room V2；`/variation`仅确定性重定向变更台账。
+- 复用017共享契约和V2请求核心，完成变更列表、详情/编辑、明细保存、提交审批、业主申报/核定/退回及追溯；完成投标成本列表、详情、新增、编辑、删除和中标/未中标。
+- 根修启动核验发现的投标状态先查后写竞态、未中标费用跨租户更新条件、变更重复业主申报/核定幂等与项目范围缺口；跨域动作失败关闭且不产生部分副作用。
+非目标：
+
+- 不修改数据库迁移、Legacy页面、正式入口、生产环境、目标成本编辑、成本科目映射/转入页面、合同编辑或其他M4路由。
+- 不新增依赖、状态库、表格库、第二请求层、前端权威金额计算或自由附件管理；附件仅复用既有受控上传能力及后端附件ID契约。
+- 中标只绑定用户可见项目并保留既有投标费用事实；目标成本转入继续归020/M7，不在本Issue扩展。
+允许修改：
+
+- `packages/frontend-contracts/src/commercial.ts`
+- `frontend-admin-v2/src/services/commercial.ts`
+- `frontend-admin-v2/src/pages/commercial/VariationPage.vue`
+- `frontend-admin-v2/src/pages/commercial/BidCostPage.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m4-variation.test.ts`
+- `frontend-admin-v2/tests/unit/m4-bid-cost.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/e2e/m4-variation-bid.spec.ts`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `backend/src/main/java/com/cgcpms/variation/controller/VarOrderController.java`
+- `backend/src/main/java/com/cgcpms/variation/dto/VariationClaimModels.java`
+- `backend/src/main/java/com/cgcpms/variation/handler/VarOrderWorkflowHandler.java`
+- `backend/src/main/java/com/cgcpms/variation/service/VarOrderService.java`
+- `backend/src/main/java/com/cgcpms/variation/vo/VarOrderVO.java`
+- `backend/src/main/java/com/cgcpms/variation/vo/VarOrderItemVO.java`
+- `backend/src/main/java/com/cgcpms/bid/service/BidCostService.java`
+- `backend/src/main/java/com/cgcpms/contract/service/CtContractChangeService.java`
+- `backend/src/main/java/com/cgcpms/file/auth/BusinessObjectAuthorizer.java`
+- `backend/src/main/java/com/cgcpms/file/controller/FileController.java`
+- `backend/src/main/java/com/cgcpms/workflow/service/WorkflowBusinessAccessValidator.java`
+- `backend/src/test/java/com/cgcpms/variation/**`
+- `backend/src/test/java/com/cgcpms/bid/**`
+- `backend/src/test/java/com/cgcpms/contract/CtContractChangeServiceTest.java`
+- `backend/src/test/java/com/cgcpms/contract/handler/CtContractChangeWorkflowHandlerTest.java`
+- `backend/src/test/java/com/cgcpms/file/BusinessObjectAuthorizerTest.java`
+- `backend/src/test/java/com/cgcpms/file/FileControllerAuthorizationTest.java`
+- `backend/src/test/java/com/cgcpms/file/FileServiceTest.java`
+- `backend/src/test/java/com/cgcpms/workflow/**`
+- `backend/src/main/resources/db/migration/V219__register_variation_action_permissions.sql`
+- `scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql`
+- `scripts/demo/complete-project-v2/verify.ps1`
+- `docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md`
+禁止修改：
+
+- 其他未在“允许修改”中逐项列明的后端和前端文件
+- `frontend-admin/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+
+- 三路由均由真实V2页面承接，`/variation`保留query/hash确定性重定向；生成台账由`63/24/0`变为`60/27/0`，无手写台账漂移或Shell占位。
+- 变更列表按服务端分页及项目范围筛选；详情/编辑独立工作区覆盖头信息、明细、业主申报记录与追溯，GET不产生隐式写请求。
+- 变更新增/编辑/删除/明细保存/提交分别绑定`variation:order:add/edit/delete/item:edit/submit`，业主申报/核定/追溯分别绑定`variation:owner:submit`、`variation:owner:review`、`variation:trace`；只读身份不显示且后端拒绝写动作。
+- 变更金额、明细金额、申报金额和核定金额使用十进制字符串/BigDecimal；前端不得直接改写合同当前额，核定后必须权威回读；退回或重复核定不新增合同变更、不重复调整合同金额。
+- 变更重复提交、重复业主申报、重复核定及并发请求稳定幂等或冲突；租户、项目、合同与合作方范围失败关闭，任一跨域步骤失败整体回滚。
+- 投标成本覆盖服务端分页/筛选、详情、新增、编辑、删除、选择可见项目中标及未中标；动作严格绑定`bid:add/edit/delete/status`，只读身份不能写。
+- BIDDING到WON/LOST、编辑和删除使用服务端条件写；并发竞争最多一个成功。LOST费用核销具备租户条件，重复请求或跨租户同sourceId不产生额外变化；WON不能绑定无权项目。
+- 页面具备loading、empty、error、403/404/409/422/500、重复点击防护、Abort与陈旧响应隔离；1440/1024/390三视口无横向溢出，axe serious/critical为0，控制台无error。
+- 项目经理取得变更查询与既有变更动作，商务经理取得变更及投标查询/动作；权限码通过V219登记并授权，demo脚本只绑定测试账号，不以管理员或仅本地临时权限替代正式权限模型。
+- 变更附件上传/查询按业务动作权限、项目范围和阶段共同授权，不泛授通用`file:*`；现场证据、业主申报、核定/退回附件的阶段与时序门禁均有负向测试。
+- Ready lint、后端变更/投标专项、契约/V2类型、V2单测、Lint、Clean-room边界、路由台账、构建、目标E2E、demo verify和`git diff --check`全部通过。
+状态：Done（2026-07-22，本地dev/test验收通过）
+来源锚点：`docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`的ISSUE-053-019；`ISSUE-053-017`与`ISSUE-053-018`通过事实；`docs/product-intelligence/project-map.md`的M4合同迁移事实；candidateEvidenceHead=b6e46f9e37424f3f70889ccffb86bc2d662f6922
+存量问题键：[mainline:053-M4-019-VARIATION-BID]
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-019`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=VarOrderServiceTest,VarOrderControllerMockMvcTest,VariationClaimClosedLoopIntegrationTest,VarOrderWorkflowHandlerTest,BidCostServiceTest,BidCostServiceConcurrencyTest,BidCostControllerTest,CostSubjectV2ServiceIntegrationTest,CtContractChangeServiceTest,CtContractChangeWorkflowHandlerTest,BusinessObjectAuthorizerTest,FileControllerAuthorizationTest,FileServiceTest,WorkflowSubmitServiceTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m4-commercial-contract-baseline.test.ts m4-contracts.test.ts m4-variation.test.ts m4-bid-cost.test.ts router.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m4-variation-bid.spec.ts`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1 -Environment dev -Database cgc_pms_demo_v2 -MySqlContainer cgc-pms-mysql-dev`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md`
+Migration：需要
+依赖：`ISSUE-053-017`与`ISSUE-053-018`已通过；其未提交diff必须原样保留并与019一并验收。变更和中标项目候选复用当前认证用户可见项目选项；普通商务角色权限必须由可重复demo脚本提供。
+风险等级：高
+运行态要求：本地dev/test；禁止连接生产。真实写侧浏览器验收仅使用可识别测试数据，证据完成后精确回滚。
+Reviewer要求：独立安全复核租户/项目/合同/合作方范围、权限、跨域事务、状态CAS、重复请求和金额；独立测试复核三路由、失败恢复、三视口、普通/只读角色矩阵、真实HTTP字符串金额及核定后合同权威回读。
+最小回滚：回退变更/投标V2页面、路由、契约/服务、精确后端根修、demo权限、测试和三条台账状态；017/018、M0～M3、数据库迁移、Legacy和正式入口保持不变。
 
 ### ISSUE-053-010：M3项目契约与只读请求基线
 

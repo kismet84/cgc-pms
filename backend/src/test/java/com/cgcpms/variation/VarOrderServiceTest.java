@@ -1,7 +1,7 @@
 package com.cgcpms.variation;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.cgcpms.common.TestUserContext;
+import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -26,6 +26,8 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -44,6 +46,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 @DisplayName("VarOrderService — VAR_ORDER submit and template verification")
 class VarOrderServiceTest {
+    private static final long TENANT_ID = 0L;
+    private static final long USER_ADMIN = 1L;
 
     // Use unique IDs to avoid collisions with ContractCompositeSaveTest
     // which seeds PmProject(id=10001) with a different name.
@@ -80,35 +84,35 @@ class VarOrderServiceTest {
 
     @BeforeEach
     void setupContext() {
-        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        setAdminContext();
         seedWorkflowApprover();
         seedReferenceData();
     }
 
     @AfterEach
     void clearContext() {
-        TestUserContext.clear();
+        UserContext.clear();
     }
 
     private void seedWorkflowApprover() {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, TestUserContext.USER_ADMIN);
+                "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, USER_ADMIN);
         if (count != null && count == 0) {
             jdbcTemplate.update("""
                     INSERT INTO sys_user
                         (id, tenant_id, username, password, real_name, status, is_admin,
                          created_by, updated_by, deleted_flag, remark)
                     VALUES (?, ?, ?, ?, ?, 'ENABLE', 1, ?, ?, 0, ?)
-                    """, TestUserContext.USER_ADMIN, TestUserContext.TENANT_0,
+                    """, USER_ADMIN, TENANT_ID,
                     "var_order_test_approver", "{noop}test", "变更审批测试人",
-                    TestUserContext.USER_ADMIN, TestUserContext.USER_ADMIN,
+                    USER_ADMIN, USER_ADMIN,
                     "VarOrderServiceTest local approver");
         } else {
             jdbcTemplate.update("""
                     UPDATE sys_user
                     SET tenant_id = ?, status = 'ENABLE', deleted_flag = 0
                     WHERE id = ?
-                    """, TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+                    """, TENANT_ID, USER_ADMIN);
         }
     }
 
@@ -358,6 +362,66 @@ class VarOrderServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("CAS: 旧版本不可更新、保存明细或删除草稿")
+    void staleVersionRejectsDraftMutations() {
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(PARTNER_ID);
+        order.setVarName("变更单测-CAS");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+        Long id = varOrderService.create(order);
+        Integer staleVersion = varOrderMapper.selectById(id).getVersion() + 1;
+
+        VarOrder update = new VarOrder();
+        update.setId(id);
+        update.setVersion(staleVersion);
+        update.setPartnerId(PARTNER_ID);
+        update.setVarName("旧版本更新");
+        update.setVarType("DESIGN_CHANGE");
+        update.setDirection("COST");
+        BusinessException updateError = assertThrows(BusinessException.class,
+                () -> varOrderService.update(update));
+        assertEquals("VAR_ORDER_VERSION_CONFLICT", updateError.getCode());
+
+        VarOrderItem item = new VarOrderItem();
+        item.setItemName("旧版本明细");
+        item.setQuantity(BigDecimal.ONE);
+        item.setUnitPrice(BigDecimal.ONE);
+        item.setCostSubjectId(90001L);
+        BusinessException itemError = assertThrows(BusinessException.class,
+                () -> varOrderService.saveItems(id, List.of(item), staleVersion));
+        assertEquals("VAR_ORDER_VERSION_CONFLICT", itemError.getCode());
+
+        BusinessException deleteError = assertThrows(BusinessException.class,
+                () -> varOrderService.delete(id, staleVersion));
+        assertEquals("VAR_ORDER_VERSION_CONFLICT", deleteError.getCode());
+        assertNotNull(varOrderMapper.selectById(id));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("CAS: 旧版本提交审批失败关闭")
+    void staleVersionRejectsApprovalSubmission() {
+        VarOrder order = new VarOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(PARTNER_ID);
+        order.setVarName("变更单测-提交CAS");
+        order.setVarType("DESIGN_CHANGE");
+        order.setDirection("COST");
+        Long id = varOrderService.create(order);
+        prepareSubmission(id);
+        Integer currentVersion = varOrderMapper.selectById(id).getVersion();
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> varOrderService.submitForApproval(id, currentVersion - 1));
+        assertEquals("VAR_ORDER_CONCURRENT_SUBMIT", error.getCode());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("GREEN-4D: create plus saveItems can be queried by list and detail")
     void testCreatedDraftCanBeQueried() {
         VarOrder order = new VarOrder();
@@ -367,6 +431,7 @@ class VarOrderServiceTest {
         order.setVarName("变更单测-可查询草稿");
         order.setVarType("现场签证");
         order.setDirection("COST");
+        order.setEventDate(LocalDate.of(2026, 7, 15));
         Long id = varOrderService.create(order);
 
         VarOrderItem item = new VarOrderItem();
@@ -384,9 +449,31 @@ class VarOrderServiceTest {
         assertNotNull(detail.getItems());
         assertEquals(1, detail.getItems().size());
 
-        var page = varOrderService.getPage(1, 20, PROJECT_ID, CONTRACT_ID, PARTNER_ID, null, null, null);
+        var page = varOrderService.getPage(1, 20, PROJECT_ID, CONTRACT_ID, PARTNER_ID, null, null, null,
+                LocalDate.of(2026, 7, 1), LocalDate.of(2026, 7, 31));
         assertTrue(page.getRecords().stream().anyMatch(record -> id.toString().equals(record.getId())),
                 "分页列表应能查到新建草稿");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("SAFE-0: 无项目权限时列表 fail-close")
+    void testGetPageWithoutProjectAccessReturnsEmpty() {
+        PmProject project = projectMapper.selectById(PROJECT_ID);
+        project.setCreatedBy(77L);
+        project.setProjectManagerId(null);
+        projectMapper.updateById(project);
+
+        UserContext.set(io.jsonwebtoken.Jwts.claims()
+                .add("userId", 88L)
+                .add("username", "var-reader")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of())
+                .build());
+
+        var page = varOrderService.getPage(1, 20, null, null, null, null, null, null, null, null);
+        assertTrue(page.getRecords().isEmpty());
+        assertEquals(0L, page.getTotal());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -454,7 +541,7 @@ class VarOrderServiceTest {
         assertNotNull(id);
 
         com.baomidou.mybatisplus.core.metadata.IPage<com.cgcpms.variation.vo.VarOrderVO> page =
-                varOrderService.getPage(1, 10, null, null, null, null, null, null);
+                varOrderService.getPage(1, 10, null, null, null, null, null, null, null, null);
         assertNotNull(page);
         assertTrue(page.getTotal() > 0, "至少应有一条记录");
 
@@ -484,7 +571,7 @@ class VarOrderServiceTest {
         assertNotNull(id);
 
         com.baomidou.mybatisplus.core.metadata.IPage<com.cgcpms.variation.vo.VarOrderVO> page =
-                varOrderService.getPage(1, 10, null, null, null, null, null, null);
+                varOrderService.getPage(1, 10, null, null, null, null, null, null, null, null);
         assertNotNull(page);
         assertTrue(page.getTotal() > 0, "至少应有一条记录");
 
@@ -496,5 +583,14 @@ class VarOrderServiceTest {
         assertEquals("变更单测合同", vo.getContractName());
         assertNotNull(vo.getPartnerName(), "partnerName 应填充");
         assertEquals("变更单测合作方", vo.getPartnerName());
+    }
+
+    private void setAdminContext() {
+        UserContext.set(io.jsonwebtoken.Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of("ADMIN"))
+                .build());
     }
 }

@@ -8,6 +8,7 @@ public class CtContractVO {
     private String tenantId;
     private String orgId;
     private String projectId;
+    private Integer version;
     private String contractCode;
     private String contractName;
     private String contractType;

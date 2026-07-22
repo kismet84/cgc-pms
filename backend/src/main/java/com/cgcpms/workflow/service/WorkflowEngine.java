@@ -84,6 +84,7 @@ public class WorkflowEngine {
             case WorkflowBusinessTypes.CT_CHANGE -> "contract:change:submit";
             case WorkflowBusinessTypes.SETTLEMENT -> "settlement:submit";
             case WorkflowBusinessTypes.COST_TARGET -> "cost:target:submit";
+            case WorkflowBusinessTypes.COST_CORRECTIVE_ACTION -> "cost:corrective:submit";
             case WorkflowBusinessTypes.MATERIAL_REQUISITION -> "requisition:submit";
             case WorkflowBusinessTypes.PROJECT_BUDGET -> "budget:submit";
             case WorkflowBusinessTypes.EXPENSE -> "expense:submit";
@@ -111,10 +112,70 @@ public class WorkflowEngine {
                 projectId, contractId, businessSummary, variables, ccUserIds);
     }
 
+    public WfInstance submitCostTarget(Long userId, String username, Long tenantId,
+                                       String businessType, Long businessId,
+                                       String title, java.math.BigDecimal amount,
+                                       Long projectId, Long contractId,
+                                       String businessSummary, String variables,
+                                       List<Long> ccUserIds) {
+        return submitService.submitCostTarget(userId, username, tenantId,
+                businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
+    public WfInstance submitCostCorrectiveAction(Long userId, String username, Long tenantId,
+                                                 String businessType, Long businessId,
+                                                 String title, java.math.BigDecimal amount,
+                                                 Long projectId, Long contractId,
+                                                 String businessSummary, String variables,
+                                                 List<Long> ccUserIds) {
+        return submitService.submitCostCorrectiveAction(userId, username, tenantId,
+                businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
+    public WfInstance submitProjectBudget(Long userId, String username, Long tenantId,
+                                          String businessType, Long businessId,
+                                          String title, java.math.BigDecimal amount,
+                                          Long projectId, Long contractId,
+                                          String businessSummary, String variables,
+                                          List<Long> ccUserIds) {
+        return submitService.submitProjectBudget(userId, username, tenantId,
+                businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
+    public WfInstance submitProductionMeasurement(Long userId, String username, Long tenantId,
+                                                  String businessType, Long businessId,
+                                                  String title, java.math.BigDecimal amount,
+                                                  Long projectId, Long contractId,
+                                                  String businessSummary, String variables,
+                                                  List<Long> ccUserIds) {
+        return submitService.submitProductionMeasurement(userId, username, tenantId,
+                businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
     // ───────────────────── RESUBMIT ─────────────────────
 
     public WfInstance resubmit(Long instanceId, Long userId, String username) {
         return submitService.resubmit(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitCostTarget(Long instanceId, Long userId, String username) {
+        return submitService.resubmitCostTarget(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitCostCorrectiveAction(Long instanceId, Long userId, String username) {
+        return submitService.resubmitCostCorrectiveAction(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitProjectBudget(Long instanceId, Long userId, String username) {
+        return submitService.resubmitProjectBudget(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitProductionMeasurement(Long instanceId, Long userId, String username) {
+        return submitService.resubmitProductionMeasurement(instanceId, userId, username);
     }
 
     // ───────────────────── APPROVE ─────────────────────

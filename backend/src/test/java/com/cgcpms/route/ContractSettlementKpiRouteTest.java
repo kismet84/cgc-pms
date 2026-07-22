@@ -25,7 +25,7 @@ class ContractSettlementKpiRouteTest {
     @DisplayName("GET /contracts/kpi routes to contract KPI endpoint")
     void contractKpiRouteIsStaticEndpoint() throws Exception {
         CtContractService contractService = mock(CtContractService.class);
-        when(contractService.getKpi(null, null, null, null, null, null, null, null))
+        when(contractService.getKpi(null, null, null, null, null, null, null, null, null, null))
                 .thenReturn(Map.of(
                         "totalCount", 0L,
                         "totalAmount", "0",

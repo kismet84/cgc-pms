@@ -16,6 +16,7 @@ import com.cgcpms.cost.vo.CostLedgerSummaryVO;
 import com.cgcpms.cost.vo.CostLedgerVO;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class CostLedgerService {
     private final CtContractMapper ctContractMapper;
     private final MdPartnerMapper mdPartnerMapper;
     private final CostSubjectMapper costSubjectMapper;
+    private final ProjectAccessChecker projectAccessChecker;
 
     /**
      * Paginated cost ledger query with dynamic filters and batch name resolution.
@@ -119,6 +121,7 @@ public class CostLedgerService {
         if (item == null || !item.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("COST_ITEM_NOT_FOUND", "成本记录不存在");
         }
+        projectAccessChecker.checkAccess(item.getProjectId(), "查看成本台账");
         return toVO(item);
     }
 
@@ -142,7 +145,17 @@ public class CostLedgerService {
             LocalDate startDate, LocalDate endDate, String keyword) {
         LambdaQueryWrapper<CostItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CostItem::getTenantId, UserContext.getCurrentTenantId());
-        if (projectId != null) wrapper.eq(CostItem::getProjectId, projectId);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看成本台账");
+            wrapper.eq(CostItem::getProjectId, projectId);
+        } else {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            if (accessibleProjectIds.isEmpty()) {
+                wrapper.eq(CostItem::getProjectId, -1L);
+            } else {
+                wrapper.in(CostItem::getProjectId, accessibleProjectIds);
+            }
+        }
         if (contractId != null) wrapper.eq(CostItem::getContractId, contractId);
         if (partnerId != null) wrapper.eq(CostItem::getPartnerId, partnerId);
         if (costSubjectId != null) wrapper.eq(CostItem::getCostSubjectId, costSubjectId);
@@ -179,7 +192,17 @@ public class CostLedgerService {
             LocalDate startDate, LocalDate endDate, String keyword) {
         QueryWrapper<CostItem> wrapper = new QueryWrapper<>();
         wrapper.eq("tenant_id", UserContext.getCurrentTenantId());
-        if (projectId != null) wrapper.eq("project_id", projectId);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看成本台账");
+            wrapper.eq("project_id", projectId);
+        } else {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            if (accessibleProjectIds.isEmpty()) {
+                wrapper.eq("project_id", -1L);
+            } else {
+                wrapper.in("project_id", accessibleProjectIds);
+            }
+        }
         if (contractId != null) wrapper.eq("contract_id", contractId);
         if (partnerId != null) wrapper.eq("partner_id", partnerId);
         if (costSubjectId != null) wrapper.eq("cost_subject_id", costSubjectId);

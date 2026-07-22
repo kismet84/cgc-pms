@@ -1,4 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { UserInfo } from '@cgc-pms/frontend-contracts'
@@ -33,12 +35,67 @@ beforeEach(() => {
 })
 
 describe('V2 application-shell routes', () => {
+  it('keeps Legacy as ledger universe and locks four CostTarget V2 acceptances', () => {
+    const ledger = JSON.parse(
+      readFileSync(resolve(process.cwd(), '../docs/ui-v2/route-migration-ledger.json'), 'utf8'),
+    ) as {
+      source: string
+      summary: { legacyOnly: number; v2Accepted: number; v2SourceAvailable: number }
+      routes: Array<{ name: string; path: string; status: string; v2View: string | null }>
+    }
+    const costTargetRoutes = ledger.routes.filter((route) => route.path.startsWith('/cost-target'))
+
+    expect(ledger.source).toBe(['frontend-admin', 'src', 'router', 'index.ts'].join('/'))
+    expect(ledger.summary).toMatchObject({
+      legacyOnly: 50,
+      v2Accepted: 37,
+      v2SourceAvailable: 0,
+    })
+    expect(costTargetRoutes).toEqual([
+      expect.objectContaining({
+        name: 'CostTarget',
+        status: 'V2_ACCEPTED',
+        v2View: '@/router.ts#V2CostTargetRootRedirect',
+      }),
+      expect.objectContaining({
+        name: 'CostTargetList',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/commercial/CostTargetPage.vue',
+      }),
+      expect.objectContaining({
+        name: 'CostTargetCreate',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/commercial/CostTargetPage.vue',
+      }),
+      expect.objectContaining({
+        name: 'CostTargetEdit',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/commercial/CostTargetPage.vue',
+      }),
+    ])
+  })
+
   it('keeps technical routes and exposes permission-bearing shell routes', () => {
     expect(routes.find((route) => route.name === 'V2Health')).toMatchObject({ path: '/health' })
     expect(routes.find((route) => route.name === 'V2Login')).toMatchObject({ path: '/login' })
     const shell = routes.find((route) => route.path === '/shell')
     const dashboard = shell?.children?.find((route) => route.path === '/dashboard')
     const project = shell?.children?.find((route) => route.path === '/project/list')
+    const contractLedger = shell?.children?.find((route) => route.path === '/contract/ledger')
+    const contractCreate = shell?.children?.find((route) => route.path === '/contract/create')
+    const contractRoot = shell?.children?.find((route) => route.path === '/contract')
+    const contractDetail = shell?.children?.find((route) => route.path === '/contract/:id')
+    const contractEdit = shell?.children?.find((route) => route.path === '/contract/:id/edit')
+    const costTargetList = shell?.children?.find((route) => route.path === '/cost-target/index')
+    const costTargetRoot = shell?.children?.find((route) => route.path === '/cost-target')
+    const costTargetCreate = shell?.children?.find((route) => route.path === '/cost-target/create')
+    const costTargetEdit = shell?.children?.find((route) => route.path === '/cost-target/:id/edit')
+    const costRoot = shell?.children?.find((route) => route.path === '/cost')
+    const costLedger = shell?.children?.find((route) => route.path === '/cost/ledger')
+    const costSummary = shell?.children?.find((route) => route.path === '/cost/summary')
+    const costControl = shell?.children?.find((route) => route.path === '/cost/control')
+    const budget = shell?.children?.find((route) => route.path === '/budget')
+    const measurement = shell?.children?.find((route) => route.path === '/production-measurement')
     const quality = shell?.children?.find((route) => route.path === '/quality-safety')
     const technical = shell?.children?.find((route) => route.path === '/technical-management')
     const closeout = shell?.children?.find((route) => route.path === '/project-closeout')
@@ -48,6 +105,34 @@ describe('V2 application-shell routes', () => {
 
     expect(dashboard?.meta?.permission).toBe('dashboard:view')
     expect(project?.meta?.permission).toBe('project:query')
+    expect(contractLedger?.meta?.permission).toBe('contract:query')
+    expect(String(contractLedger?.component)).not.toContain('ShellPlaceholderPage')
+    expect(contractCreate?.meta?.permission).toBe('contract:add')
+    expect(String(contractCreate?.component)).not.toContain('ShellPlaceholderPage')
+    expect(contractRoot?.redirect).toBeTypeOf('function')
+    expect(contractDetail?.meta?.permission).toBe('contract:query')
+    expect(String(contractDetail?.component)).not.toContain('ShellPlaceholderPage')
+    expect(contractEdit?.meta?.permission).toBe('contract:edit')
+    expect(String(contractEdit?.component)).not.toContain('ShellPlaceholderPage')
+    expect(costTargetList?.meta).toMatchObject({
+      permission: 'cost:target:query',
+      workspaceContext: { project: true, period: false },
+    })
+    expect(String(costTargetList?.component)).not.toContain('ShellPlaceholderPage')
+    expect(costTargetRoot?.redirect).toBeTypeOf('function')
+    expect(costTargetCreate?.meta?.permission).toBe('cost:target:add')
+    expect(String(costTargetCreate?.component)).not.toContain('ShellPlaceholderPage')
+    expect(costTargetEdit?.meta?.permission).toBe('cost:target:edit')
+    expect(String(costTargetEdit?.component)).not.toContain('ShellPlaceholderPage')
+    expect(costRoot?.redirect).toBeTypeOf('function')
+    for (const route of [costLedger, costSummary, costControl]) {
+      expect(route?.meta?.workspaceContext).toEqual({ project: true, period: true })
+      expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
+    }
+    for (const route of [budget, measurement]) {
+      expect(route?.meta?.workspaceContext).toEqual({ project: true, period: true })
+      expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
+    }
     expect(quality?.meta?.permission).toBe('quality:safety:query')
     expect(quality?.meta?.workspaceContext).toEqual({
       project: true,
@@ -113,6 +198,44 @@ describe('V2 application-shell routes', () => {
 
     await router.push('/approval/81?returnTab=done')
     expect(router.currentRoute.value.fullPath).toBe('/approval/instances/81?returnTab=done')
+  })
+
+  it('keeps contract root redirect and deep links compatible', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(
+      user(['contract:query', 'contract:add', 'contract:edit']),
+    )
+    const router = guardedRouter()
+
+    await router.push('/contract?projectId=23#ledger')
+    await router.isReady()
+    expect(router.currentRoute.value.fullPath).toBe('/contract/ledger?projectId=23#ledger')
+
+    await router.push('/contract/81/edit?projectId=23')
+    expect(router.currentRoute.value.fullPath).toBe('/contract/81/edit?projectId=23')
+  })
+
+  it('keeps cost target root redirect and edit deep link compatible', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(
+      user(['cost:target:query', 'cost:target:add', 'cost:target:edit']),
+    )
+    const router = guardedRouter()
+
+    await router.push('/cost-target?projectId=P1#versions')
+    await router.isReady()
+    expect(router.currentRoute.value.fullPath).toBe('/cost-target/index?projectId=P1#versions')
+
+    await router.push('/cost-target/81/edit?projectId=P1')
+    expect(router.currentRoute.value.fullPath).toBe('/cost-target/81/edit?projectId=P1')
+  })
+
+  it('keeps cost root query and hash on the ledger redirect', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user(['cost:ledger:query']))
+    const router = guardedRouter()
+    await router.push('/cost?projectId=P1&period=2026-07#items')
+    await router.isReady()
+    expect(router.currentRoute.value.fullPath).toBe(
+      '/cost/ledger?projectId=P1&period=2026-07#items',
+    )
   })
 
   it('restores a permitted deep link and blocks a missing permission', async () => {

@@ -33,6 +33,7 @@ public class VarOrderVO {
     private Integer impactDays;
     private String approvalStatus;
     private Integer costGeneratedFlag;
+    private Integer version;
     private String projectName;
     private String contractName;
     private String partnerName;

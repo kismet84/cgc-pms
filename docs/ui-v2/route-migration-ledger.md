@@ -5,9 +5,9 @@
 - 命名路由：87
 - Legacy 路由视图引用：73
 - Legacy 独立页面模块：65
-- `LEGACY_ONLY`：68
+- `LEGACY_ONLY`：50
 - `V2_SOURCE_AVAILABLE`：0
-- `V2_ACCEPTED`：19
+- `V2_ACCEPTED`：37
 
 | 域 | route name | URL | Legacy 视图 | V2 视图 | permission | adminOnly | 状态 | Stitch / 测试 / 验收 |
 |---|---|---|---|---|---|---:|---|---|
@@ -15,26 +15,26 @@
 | 工作台 | Dashboard | /dashboard | @/pages/dashboard/index.vue | @/pages/dashboard/DashboardPage.vue | dashboard:view | 否 | V2_ACCEPTED | 用户已选新版经营驾驶舱视觉概念；M2 已验收；frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
 | 系统与全局 | Forbidden | /403 | @/pages/error/403.vue | — | — | 否 | LEGACY_ONLY | — |
 | 工作台 | ReportCatalog | /dashboard/reports | @/pages/report/catalog.vue | @/pages/workbench/ReportCatalogPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
-| 商务合约 | Contract | /contract | — | — | contract:query | 否 | LEGACY_ONLY | — |
-| 商务合约 | ContractLedger | /contract/ledger | @/pages/contract/ContractLedgerPage.vue | — | contract:query | 否 | LEGACY_ONLY | — |
-| 商务合约 | ContractCreate | /contract/create | @/pages/contract/ContractFormPage.vue | — | contract:add | 否 | LEGACY_ONLY | — |
-| 商务合约 | ContractDetail | /contract/:id | @/pages/contract/ContractDetailPage.vue | — | contract:query | 否 | LEGACY_ONLY | — |
-| 商务合约 | ContractEdit | /contract/:id/edit | @/pages/contract/ContractFormPage.vue | — | contract:edit | 否 | LEGACY_ONLY | — |
-| 商务合约 | Cost | /cost | — | — | cost:query | 否 | LEGACY_ONLY | — |
-| 商务合约 | CostLedger | /cost/ledger | @/pages/cost/ledger.vue | — | cost:ledger:query | 否 | LEGACY_ONLY | — |
-| 商务合约 | CostSummary | /cost/summary | @/pages/cost/summary.vue | — | cost:summary:view | 否 | LEGACY_ONLY | — |
-| 商务合约 | CostControl | /cost/control | @/pages/cost/control.vue | — | cost:control:query | 否 | LEGACY_ONLY | — |
+| 商务合约 | Contract | /contract | — | @/router.ts#V2ContractRootRedirect | contract:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md |
+| 商务合约 | ContractLedger | /contract/ledger | @/pages/contract/ContractLedgerPage.vue | @/pages/commercial/ContractPage.vue | contract:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md |
+| 商务合约 | ContractCreate | /contract/create | @/pages/contract/ContractFormPage.vue | @/pages/commercial/ContractPage.vue | contract:add | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md |
+| 商务合约 | ContractDetail | /contract/:id | @/pages/contract/ContractDetailPage.vue | @/pages/commercial/ContractPage.vue | contract:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md |
+| 商务合约 | ContractEdit | /contract/:id/edit | @/pages/contract/ContractFormPage.vue | @/pages/commercial/ContractPage.vue | contract:edit | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md |
+| 商务合约 | Cost | /cost | — | @/router.ts#V2CostRootRedirect | cost:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md |
+| 商务合约 | CostLedger | /cost/ledger | @/pages/cost/ledger.vue | @/pages/commercial/CostLedgerPage.vue | cost:ledger:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md |
+| 商务合约 | CostSummary | /cost/summary | @/pages/cost/summary.vue | @/pages/commercial/CostSummaryPage.vue | cost:summary:view | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md |
+| 商务合约 | CostControl | /cost/control | @/pages/cost/control.vue | @/pages/commercial/CostControlPage.vue | cost:control:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md |
 | 商务合约 | CostSubject | /cost/subject | — | — | cost:query | 否 | LEGACY_ONLY | — |
 | 商务合约 | CostSubjectTaxonomy | /cost/subject/taxonomy | @/pages/cost-subject/index.vue | — | cost:query | 否 | LEGACY_ONLY | — |
 | 商务合约 | CostSubjectRules | /cost/subject/rules | @/pages/cost-subject/index.vue | — | cost:subject:rule:query | 否 | LEGACY_ONLY | — |
 | 商务合约 | CostSubjectScope | /cost/subject/scope | @/pages/cost-subject/index.vue | — | cost:subject:scope:query | 否 | LEGACY_ONLY | — |
 | 商务合约 | CostSubjectTrace | /cost/subject/trace | @/pages/cost-subject/index.vue | — | cost:subject:audit:query | 否 | LEGACY_ONLY | — |
-| 商务合约 | CostTarget | /cost-target | — | — | cost:target:query | 否 | LEGACY_ONLY | — |
-| 商务合约 | CostTargetList | /cost-target/index | @/pages/cost-target/index.vue | — | cost:target:query | 否 | LEGACY_ONLY | — |
-| 商务合约 | CostTargetCreate | /cost-target/create | @/pages/cost-target/edit.vue | — | cost:target:add | 否 | LEGACY_ONLY | — |
-| 商务合约 | CostTargetEdit | /cost-target/:id/edit | @/pages/cost-target/edit.vue | — | cost:target:edit | 否 | LEGACY_ONLY | — |
-| 商务合约 | Variation | /variation | — | — | variation:order:query | 否 | LEGACY_ONLY | — |
-| 商务合约 | VariationOrder | /variation/order | @/pages/variation/order.vue | — | variation:order:query | 否 | LEGACY_ONLY | — |
+| 商务合约 | CostTarget | /cost-target | — | @/router.ts#V2CostTargetRootRedirect | cost:target:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md |
+| 商务合约 | CostTargetList | /cost-target/index | @/pages/cost-target/index.vue | @/pages/commercial/CostTargetPage.vue | cost:target:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md |
+| 商务合约 | CostTargetCreate | /cost-target/create | @/pages/cost-target/edit.vue | @/pages/commercial/CostTargetPage.vue | cost:target:add | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md |
+| 商务合约 | CostTargetEdit | /cost-target/:id/edit | @/pages/cost-target/edit.vue | @/pages/commercial/CostTargetPage.vue | cost:target:edit | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md |
+| 商务合约 | Variation | /variation | — | @/router.ts#V2VariationRootRedirect | variation:order:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md |
+| 商务合约 | VariationOrder | /variation/order | @/pages/variation/order.vue | @/pages/commercial/VariationPage.vue | variation:order:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md |
 | 分包与结算 | Settlement | /settlement | — | — | settlement:query | 否 | LEGACY_ONLY | — |
 | 分包与结算 | SettlementList | /settlement/list | @/pages/settlement/index.vue | — | settlement:query | 否 | LEGACY_ONLY | — |
 | 分包与结算 | SettlementDetail | /settlement/:id | @/pages/settlement/detail.vue | — | settlement:query | 否 | LEGACY_ONLY | — |
@@ -50,7 +50,7 @@
 | 项目履约 | TechnicalManagement | /technical-management | @/pages/technical-management/index.vue | @/pages/delivery/TechnicalManagementPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md |
 | 项目履约 | ProjectCloseout | /project-closeout | @/pages/project-closeout/index.vue | @/pages/delivery/ProjectCloseoutPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md |
 | 供应链与物资 | SupplierSourcing | /supplier-sourcing | @/pages/supplier-sourcing/index.vue | — | — | 否 | LEGACY_ONLY | — |
-| 商务合约 | BidCost | /bid-cost | @/pages/bid-cost/index.vue | — | — | 否 | LEGACY_ONLY | — |
+| 商务合约 | BidCost | /bid-cost | @/pages/bid-cost/index.vue | @/pages/commercial/BidCostPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md |
 | 基础资料 | Org | /org | @/pages/org/index.vue | — | org:query | 否 | LEGACY_ONLY | — |
 | 分包与结算 | Subcontract | /subcontract | — | — | subcontract:task:query | 否 | LEGACY_ONLY | — |
 | 分包与结算 | SubcontractTask | /subcontract/task | @/pages/subcontract/task.vue | — | subcontract:task:query | 否 | LEGACY_ONLY | — |
@@ -61,10 +61,10 @@
 | 资金财务 | Payment | /payment | — | — | payment:app:query | 否 | LEGACY_ONLY | — |
 | 资金财务 | PaymentApplication | /payment/application | @/pages/payment/index.vue | — | payment:app:query | 否 | LEGACY_ONLY | — |
 | 资金财务 | ExpenseApplication | /payment/expense | @/pages/expense/index.vue | — | — | 否 | LEGACY_ONLY | — |
-| 商务合约 | ProjectBudget | /budget | @/pages/budget/index.vue | — | — | 否 | LEGACY_ONLY | — |
+| 商务合约 | ProjectBudget | /budget | @/pages/budget/index.vue | @/pages/commercial/BudgetPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md |
 | 资金财务 | FinanceOperations | /finance-operations | @/pages/finance-operations/index.vue | — | finance:operations:query | 否 | LEGACY_ONLY | — |
 | 资金财务 | RevenueOperations | /revenue | @/pages/revenue/index.vue | — | — | 否 | LEGACY_ONLY | — |
-| 商务合约 | ProductionMeasurement | /production-measurement | @/pages/production-measurement/index.vue | — | — | 否 | LEGACY_ONLY | — |
+| 商务合约 | ProductionMeasurement | /production-measurement | @/pages/production-measurement/index.vue | @/pages/commercial/ProductionMeasurementPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md |
 | 资金财务 | CashJournal | /cash-journal | @/pages/cash-journal/index.vue | — | cashbook:journal:query | 否 | LEGACY_ONLY | — |
 | 资金财务 | AccountingEntry | /accounting-entry | @/pages/accounting-entry/index.vue | — | — | 否 | LEGACY_ONLY | — |
 | 资金财务 | CashForecast | /cash-forecast | @/pages/cash-forecast/index.vue | — | — | 否 | LEGACY_ONLY | — |

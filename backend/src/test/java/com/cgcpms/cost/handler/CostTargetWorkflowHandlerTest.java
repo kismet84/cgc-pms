@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
@@ -30,6 +31,9 @@ class CostTargetWorkflowHandlerTest {
 
     @Autowired
     private CostTargetMapper costTargetMapper;
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @BeforeEach
     void setupContext() {
@@ -66,14 +70,16 @@ class CostTargetWorkflowHandlerTest {
         target.setProjectId(10001L);
         target.setVersionNo("V1.0");
         target.setVersionName("CT-HDLR-TEST-" + System.nanoTime());
-        target.setApprovalStatus("DRAFT");
-        target.setStatus("DRAFT");
+        target.setApprovalStatus("APPROVING");
+        target.setStatus("APPROVING");
         target.setTenantId(0L);
         costTargetMapper.insert(target);
+        attachWorkflow(target, 2200001L);
 
         WfInstance instance = new WfInstance();
         instance.setBusinessId(target.getId());
         instance.setId(2200001L);
+        instance.setTenantId(TENANT_0);
         WorkflowContext ctx = new WorkflowContext();
         ctx.setInstance(instance);
 
@@ -91,6 +97,7 @@ class CostTargetWorkflowHandlerTest {
         WfInstance instance = new WfInstance();
         instance.setId(2200002L);
         instance.setBusinessId(null);
+        instance.setTenantId(TENANT_0);
         WorkflowContext ctx = new WorkflowContext();
         ctx.setInstance(instance);
 
@@ -110,9 +117,12 @@ class CostTargetWorkflowHandlerTest {
         target.setStatus("APPROVING");
         target.setTenantId(0L);
         costTargetMapper.insert(target);
+        attachWorkflow(target, 2200003L);
 
         WfInstance instance = new WfInstance();
         instance.setBusinessId(target.getId());
+        instance.setId(2200003L);
+        instance.setTenantId(TENANT_0);
         WorkflowContext ctx = new WorkflowContext();
         ctx.setInstance(instance);
 
@@ -134,9 +144,12 @@ class CostTargetWorkflowHandlerTest {
         target.setStatus("APPROVING");
         target.setTenantId(0L);
         costTargetMapper.insert(target);
+        attachWorkflow(target, 2200004L);
 
         WfInstance instance = new WfInstance();
         instance.setBusinessId(target.getId());
+        instance.setId(2200004L);
+        instance.setTenantId(TENANT_0);
         WorkflowContext ctx = new WorkflowContext();
         ctx.setInstance(instance);
 
@@ -144,5 +157,14 @@ class CostTargetWorkflowHandlerTest {
 
         CostTarget updated = costTargetMapper.selectById(target.getId());
         assertEquals("DRAFT", updated.getApprovalStatus(), "撤回后审批状态应变为 DRAFT");
+    }
+
+    private void attachWorkflow(CostTarget target, long instanceId) {
+        jdbc.update("""
+                INSERT INTO wf_instance
+                  (id,tenant_id,template_id,business_type,business_id,title,instance_status,initiator_id,deleted_flag)
+                VALUES (?,0,1,'COST_TARGET',?,'目标成本测试','RUNNING',1,0)
+                """, instanceId, target.getId());
+        jdbc.update("UPDATE cost_target SET approval_instance_id=? WHERE id=?", instanceId, target.getId());
     }
 }
