@@ -5,6 +5,12 @@ export interface ProjectListItem {
   status: string;
 }
 
+export interface ProjectContextOption {
+  id: string;
+  projectName: string;
+  status: string;
+}
+
 export interface ProjectRecord extends ProjectListItem {
   tenantId: string;
   orgId: string;
@@ -123,6 +129,7 @@ export interface ProjectUserOption {
 
 export const PROJECT_API = {
   list: "/projects",
+  contextOptions: "/project-context/options",
   detail: (projectId: string) => `/projects/${encodeURIComponent(projectId)}`,
   overview: (projectId: string) =>
     `/projects/${encodeURIComponent(projectId)}/overview`,

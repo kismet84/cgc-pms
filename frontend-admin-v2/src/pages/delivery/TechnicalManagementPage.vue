@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import type {
   AcceptanceArchive,
   ConstructionReference,
@@ -88,7 +87,6 @@ const emptyOverview = (): TechnicalOverview => ({
   constructionFacts: [],
   qualityInspections: [],
 })
-const route = useRoute()
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
 const overview = ref<TechnicalOverview>(emptyOverview())
@@ -107,10 +105,10 @@ let generation = 0
 
 const today = () => new Date().toISOString().slice(0, 10)
 const now = () => new Date().toISOString().slice(0, 16)
-const projectId = computed(() => {
-  const query = typeof route.query.projectId === 'string' ? route.query.projectId.trim() : ''
-  return query || workspace.selectedProjectId || ''
-})
+const projectId = computed(() => workspace.selectedProjectId || '')
+const scopeProjectIds = computed(() =>
+  projectId.value ? [projectId.value] : workspace.projects.map((project) => project.value),
+)
 const approvedSchemes = computed(() =>
   overview.value.schemes.filter((item) => item.status === 'APPROVED'),
 )
@@ -128,15 +126,16 @@ const availableReferences = computed(() =>
   ),
 )
 
-const canSchemeMaintain = computed(() => can('technical:scheme:maintain'))
-const canSchemeSubmit = computed(() => can('technical:scheme:submit'))
-const canDrawingReceive = computed(() => can('technical:drawing:receive'))
-const canDrawingReview = computed(() => can('technical:drawing:review'))
-const canRfiRaise = computed(() => can('technical:rfi:raise'))
-const canRfiRespond = computed(() => can('technical:rfi:respond'))
-const canRfiAccept = computed(() => can('technical:rfi:accept'))
-const canDisclosure = computed(() => can('technical:disclosure:maintain'))
-const canArchive = computed(() => can('technical:archive:confirm'))
+const canWrite = computed(() => Boolean(projectId.value))
+const canSchemeMaintain = computed(() => canWrite.value && can('technical:scheme:maintain'))
+const canSchemeSubmit = computed(() => canWrite.value && can('technical:scheme:submit'))
+const canDrawingReceive = computed(() => canWrite.value && can('technical:drawing:receive'))
+const canDrawingReview = computed(() => canWrite.value && can('technical:drawing:review'))
+const canRfiRaise = computed(() => canWrite.value && can('technical:rfi:raise'))
+const canRfiRespond = computed(() => canWrite.value && can('technical:rfi:respond'))
+const canRfiAccept = computed(() => canWrite.value && can('technical:rfi:accept'))
+const canDisclosure = computed(() => canWrite.value && can('technical:disclosure:maintain'))
+const canArchive = computed(() => canWrite.value && can('technical:archive:confirm'))
 
 const form = reactive({
   code: '',
@@ -231,14 +230,31 @@ async function loadProject(preserveNotice = false): Promise<void> {
   const requestGeneration = ++generation
   overview.value = emptyOverview()
   trace.value = null
-  if (!projectId.value) return
+  if (!scopeProjectIds.value.length) return
   const controller = new AbortController()
   projectController = controller
   loading.value = true
   if (!preserveNotice) clearNotice()
   try {
-    const loaded = await loadTechnicalOverview(projectId.value, controller.signal)
-    if (requestGeneration === generation) overview.value = loaded
+    // ponytail: fan-out stays simple; add a server aggregate endpoint only if project counts make it slow.
+    const loaded = await Promise.all(
+      scopeProjectIds.value.map((id) => loadTechnicalOverview(id, controller.signal)),
+    )
+    if (requestGeneration === generation) {
+      overview.value = {
+        schemes: loaded.flatMap((item) => item.schemes),
+        drawings: loaded.flatMap((item) => item.drawings),
+        versions: loaded.flatMap((item) => item.versions),
+        reviews: loaded.flatMap((item) => item.reviews),
+        rfis: loaded.flatMap((item) => item.rfis),
+        responses: loaded.flatMap((item) => item.responses),
+        disclosures: loaded.flatMap((item) => item.disclosures),
+        constructionReferences: loaded.flatMap((item) => item.constructionReferences),
+        archives: loaded.flatMap((item) => item.archives),
+        constructionFacts: loaded.flatMap((item) => item.constructionFacts),
+        qualityInspections: loaded.flatMap((item) => item.qualityInspections),
+      }
+    }
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '技术管理事实加载失败')
   } finally {
@@ -488,7 +504,7 @@ async function act(action: () => Promise<unknown>, message: string): Promise<voi
   }
 }
 
-watch(projectId, () => void loadProject(), { immediate: true })
+watch(scopeProjectIds, () => void loadProject(), { immediate: true })
 onBeforeUnmount(() => {
   projectController?.abort()
   traceController?.abort()
@@ -496,12 +512,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="technical-page" aria-labelledby="technical-title">
-    <header>
-      <p class="technical-page__eyebrow">项目履约 · 质量与技术</p>
-      <h1 id="technical-title">图纸 RFI 技术闭环</h1>
-      <p>方案、图纸版本、会审、设计回复、交底、施工依据和验收档案均以服务端状态为准。</p>
-    </header>
+  <section class="technical-page" aria-label="图纸 RFI 技术闭环">
     <div class="technical-page__toolbar">
       <div class="technical-page__actions">
         <V2Button v-if="canSchemeMaintain" size="small" @click="show('scheme')">新建方案</V2Button>
@@ -535,10 +546,10 @@ onBeforeUnmount(() => {
       description="正在加载方案、图纸、RFI、交底和归档状态。"
     />
     <V2PageState
-      v-else-if="!projectId"
+      v-else-if="!scopeProjectIds.length"
       kind="empty"
-      title="请选择项目"
-      description="选择项目后加载技术闭环。"
+      title="暂无可访问项目"
+      description="当前账号没有可查看的项目。"
     />
     <template v-else>
       <div class="technical-page__facts" aria-label="技术闭环概览">
@@ -916,11 +927,6 @@ onBeforeUnmount(() => {
 .technical-page h1,
 .technical-page p {
   margin-block: 0;
-}
-.technical-page__eyebrow {
-  color: var(--v2-color-primary-hover);
-  font-size: var(--v2-font-size-12);
-  font-weight: 700;
 }
 .technical-page__toolbar,
 .technical-page__facts,

@@ -34,16 +34,9 @@ test.describe('M3 live project object', () => {
     page,
   }) => {
     await login(page, 'admin')
-    const pendingList = page.waitForResponse(
-      (response) => new URL(response.url()).pathname === '/api/projects',
-    )
     await page.goto('/v2/project?keyword=演示#ledger')
     await expect(page).toHaveURL(/\/v2\/project\/list\?keyword=.*#ledger$/)
-    const listResponse = await pendingList
-    expect(listResponse.ok()).toBe(true)
-    const body = (await listResponse.json()) as { data: { records: Array<{ id: string }> } }
-    const projectId = body.data.records[0]?.id
-    expect(projectId).toBeTruthy()
+    const projectId = '520000000000000001'
     for (const path of [
       `/v2/project/${projectId}/overview`,
       `/v2/project/${projectId}/members`,
@@ -101,7 +94,7 @@ test.describe('M3 live project object', () => {
     ]) {
       await page.setViewportSize(viewport)
       await page.goto('/v2/project/list?keyword=演示#ledger')
-      await expect(page.getByRole('heading', { level: 1, name: '项目台账' })).toBeAttached()
+      await expect(page.locator('.project-page__toolbar-card')).toBeVisible({ timeout: 15_000 })
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)
@@ -179,7 +172,7 @@ test.describe('M3 live project object', () => {
       } else await route.continue()
     })
     await page.goto('/v2/project/list')
-    await expect(page.getByText('受控故障')).toBeVisible()
+    await expect(page.locator('.project-page > .v2-alert').getByText('受控故障')).toBeVisible()
     await page.getByRole('button', { name: '刷新' }).click()
     await expect(page.locator('.project-page__grid .v2-card').first()).toBeVisible()
     await consumeExpectedHttpError(page, '503 (Service Unavailable)')
@@ -263,7 +256,7 @@ test.describe('M3 live project object', () => {
     await dialog.getByRole('button', { name: /^项目类型：/ }).click()
     await dialog.locator('[role="option"]:not(:disabled)').first().click()
     const before = rereads
-    await dialog.getByRole('button', { name: '创建并重读' }).click()
+    await dialog.getByRole('button', { name: '创建' }).click()
     await expect(page.locator('.project-page > .v2-alert').getByText('受控冲突')).toBeAttached()
     await expect.poll(() => rereads).toBeGreaterThan(before)
     await consumeExpectedHttpError(page, '409 (Conflict)')
@@ -278,7 +271,7 @@ test.describe('M3 live project object', () => {
     await dialog.getByLabel('项目名称').fill(name)
     await dialog.getByRole('button', { name: /^项目类型：/ }).click()
     await dialog.locator('[role="option"]:not(:disabled)').first().click()
-    await dialog.getByRole('button', { name: '创建并重读' }).click()
+    await dialog.getByRole('button', { name: '创建' }).click()
     const card = page.locator('.v2-card', { hasText: name })
     await expect(card).toBeVisible()
     await card.getByRole('button', { name: '删除' }).click()

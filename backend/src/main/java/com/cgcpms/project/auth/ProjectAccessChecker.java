@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.entity.PmProject;
+import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.mapper.PmProjectMemberMapper;
 import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.mapper.SysRoleMapper;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,8 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 统一项目数据范围访问判定器。
@@ -28,6 +32,7 @@ import java.util.Objects;
 public class ProjectAccessChecker {
 
     private final PmProjectMapper projectMapper;
+    private final PmProjectMemberMapper projectMemberMapper;
     private final SysRoleMapper sysRoleMapper;
 
     /**
@@ -56,7 +61,8 @@ public class ProjectAccessChecker {
         List<String> roles = UserContext.getCurrentRoles();
         Long currentUserId = UserContext.getCurrentUserId();
         String dataScope = resolveEffectiveDataScope();
-        if (isAccessible(project, roles, currentUserId, dataScope)) return;
+        Set<Long> memberProjectIds = activeMemberProjectIds(currentTenantId, currentUserId);
+        if (isAccessible(project, roles, currentUserId, dataScope, memberProjectIds)) return;
 
         log.warn("PROJECT_ACCESS_DENIED: 数据范围 {}，用户 {} 无法访问项目 {}",
                 dataScope, currentUserId, project.getId());
@@ -71,9 +77,10 @@ public class ProjectAccessChecker {
         List<String> roles = UserContext.getCurrentRoles();
         Long userId = UserContext.getCurrentUserId();
         String dataScope = resolveEffectiveDataScope();
+        Set<Long> memberProjectIds = activeMemberProjectIds(tenantId, userId);
         return projects.stream()
                 .filter(p -> Objects.equals(tenantId, p.getTenantId()))
-                .filter(p -> isAccessible(p, roles, userId, dataScope))
+                .filter(p -> isAccessible(p, roles, userId, dataScope, memberProjectIds))
                 .toList();
     }
 
@@ -81,25 +88,51 @@ public class ProjectAccessChecker {
      * 返回当前用户在当前租户内可访问的项目 ID，供跨项目列表查询复用。
      */
     public List<Long> accessibleProjectIds() {
-        Long tenantId = UserContext.getCurrentTenantId();
-        if (tenantId == null) return List.of();
-        List<PmProject> tenantProjects = projectMapper.selectList(
-                new LambdaQueryWrapper<PmProject>().eq(PmProject::getTenantId, tenantId));
-        return filterAccessible(tenantProjects).stream()
+        return accessibleProjects().stream()
                 .map(PmProject::getId)
                 .toList();
     }
 
-    private boolean isAccessible(PmProject project, List<String> roles, Long userId, String dataScope) {
+    /**
+     * 返回当前用户在当前租户内可访问的项目，供轻量上下文选项复用。
+     */
+    public List<PmProject> accessibleProjects() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (tenantId == null) return List.of();
+        List<PmProject> tenantProjects = projectMapper.selectList(
+                new LambdaQueryWrapper<PmProject>().eq(PmProject::getTenantId, tenantId));
+        return filterAccessible(tenantProjects);
+    }
+
+    private boolean isAccessible(PmProject project, List<String> roles, Long userId, String dataScope,
+                                 Set<Long> memberProjectIds) {
         if (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN")) return true;
         if (userId != null && userId.equals(project.getProjectManagerId())) return true;
+        if (memberProjectIds.contains(project.getId())) return true;
         if ("ALL".equals(dataScope)) return true;
         return "SELF".equals(dataScope) && userId != null && userId.equals(project.getCreatedBy());
+    }
+
+    private Set<Long> activeMemberProjectIds(Long tenantId, Long userId) {
+        if (tenantId == null || userId == null) return Set.of();
+        return projectMemberMapper.selectList(
+                        new LambdaQueryWrapper<PmProjectMember>()
+                                .eq(PmProjectMember::getTenantId, tenantId)
+                                .eq(PmProjectMember::getUserId, userId)
+                                .eq(PmProjectMember::getStatus, "ACTIVE"))
+                .stream()
+                .map(PmProjectMember::getProjectId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
     }
 
     private String resolveEffectiveDataScope() {
         List<String> roleCodes = UserContext.getCurrentRoles();
         if (roleCodes.isEmpty()) return "SELF";
+        if (roleCodes.stream().anyMatch(
+                code -> "ADMIN".equalsIgnoreCase(code) || "SUPER_ADMIN".equalsIgnoreCase(code))) {
+            return "ALL";
+        }
 
         Long tenantId = UserContext.getCurrentTenantId();
         if (tenantId == null) return "SELF";
@@ -113,6 +146,7 @@ public class ProjectAccessChecker {
         if (roles.stream().anyMatch(r -> "SELF".equals(r.getDataScope()))) return "SELF";
         if (roles.stream().anyMatch(r -> "DEPT".equals(r.getDataScope()))) return "DEPT";
         if (roles.stream().anyMatch(r -> "CUSTOM".equals(r.getDataScope()))) return "CUSTOM";
-        return "ALL";
+        if (roles.stream().allMatch(r -> "ALL".equals(r.getDataScope()))) return "ALL";
+        return "NONE";
     }
 }

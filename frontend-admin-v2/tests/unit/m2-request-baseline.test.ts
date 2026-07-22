@@ -51,29 +51,17 @@ describe('M2 request baseline', () => {
   })
 
   it('loads every visible project page using the supplied abort signal', async () => {
-    fetchMock
-      .mockResolvedValueOnce(
-        apiResponse({
-          records: [{ id: '1', projectCode: 'P1', projectName: '项目一', status: 'ACTIVE' }],
-          total: 2,
-          pageNo: 1,
-          pageSize: 200,
-        }),
-      )
-      .mockResolvedValueOnce(
-        apiResponse({
-          records: [{ id: '2', projectCode: 'P2', projectName: '项目二', status: 'ACTIVE' }],
-          total: 2,
-          pageNo: 2,
-          pageSize: 200,
-        }),
-      )
+    fetchMock.mockResolvedValueOnce(
+      apiResponse([
+        { id: '1', projectName: '项目一', status: 'ACTIVE' },
+        { id: '2', projectName: '项目二', status: 'ACTIVE' },
+      ]),
+    )
     const controller = new AbortController()
 
     await expect(loadVisibleProjects(controller.signal)).resolves.toHaveLength(2)
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
-      '/api/projects?pageNo=1&pageSize=200',
-      '/api/projects?pageNo=2&pageSize=200',
+      '/api/project-context/options',
     ])
     expect(fetchMock.mock.calls.every(([, init]) => init?.signal === controller.signal)).toBe(true)
   })

@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { buildDashboardReportPeriods } from '@cgc-pms/frontend-contracts'
 import type { LocationQuery, RouteParamsGeneric } from 'vue-router'
 import { loadVisibleProjects } from '@/services/projects'
+import { navigationDomains } from '@/navigation/catalog'
 import { registerSessionCacheClearer } from '@/stores/session'
 
 export interface ContextOption {
@@ -15,6 +16,16 @@ export interface ObjectContext {
   kind: 'project' | 'contract' | 'settlement'
   id: string
 }
+
+const projectContextPermissions = new Set(
+  navigationDomains.flatMap((domain) =>
+    domain.workspaces.flatMap((workspace) =>
+      workspace.tabs
+        .filter((tab) => tab.workspaceContext?.project && tab.permission)
+        .map((tab) => tab.permission!),
+    ),
+  ),
+)
 
 function queryValue(value: LocationQuery[string]): string | null {
   return typeof value === 'string' && value.trim() ? value : null
@@ -98,11 +109,11 @@ export const useWorkspaceStore = defineStore('v2-workspace', () => {
     contextLoadController?.abort()
     setReportPeriods(buildDashboardReportPeriods())
 
-    const canQueryProjects =
+    const canLoadProjectContext =
       roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN') ||
       permissions.includes('*') ||
-      permissions.includes('project:query')
-    if (!canQueryProjects) {
+      permissions.some((permission) => projectContextPermissions.has(permission))
+    if (!canLoadProjectContext) {
       setProjects([])
       return
     }

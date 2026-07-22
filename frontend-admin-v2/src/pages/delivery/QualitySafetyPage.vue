@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
 import type {
   QualityConsequenceCommand,
   QualityInspectionCommand,
@@ -64,7 +63,6 @@ interface EvidenceTarget {
   label: string
   issue?: QualityIssueRecord
 }
-const route = useRoute()
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
 const loading = ref(false)
@@ -89,18 +87,20 @@ let traceController: AbortController | null = null
 let generation = 0
 
 const today = () => new Date().toISOString().slice(0, 10)
-const projectId = computed(() => {
-  const query = typeof route.query.projectId === 'string' ? route.query.projectId.trim() : ''
-  return query || workspace.selectedProjectId || ''
-})
+const projectId = computed(() => workspace.selectedProjectId || '')
+const scopeProjectIds = computed(() =>
+  projectId.value ? [projectId.value] : workspace.projects.map((project) => project.value),
+)
 const selectedPlan = computed(
   () => plans.value.find((item) => item.id === selectedPlanId.value) ?? null,
 )
-const canPlan = computed(() => can('quality:safety:plan:maintain'))
-const canInspect = computed(() => can('quality:safety:inspection:maintain'))
-const canRectify = computed(() => can('quality:safety:rectify'))
-const canReinspect = computed(() => can('quality:safety:reinspect'))
-const canConsequence = computed(() => can('quality:safety:consequence'))
+const canPlan = computed(() => Boolean(projectId.value) && can('quality:safety:plan:maintain'))
+const canInspect = computed(
+  () => Boolean(projectId.value) && can('quality:safety:inspection:maintain'),
+)
+const canRectify = computed(() => Boolean(projectId.value) && can('quality:safety:rectify'))
+const canReinspect = computed(() => Boolean(projectId.value) && can('quality:safety:reinspect'))
+const canConsequence = computed(() => Boolean(projectId.value) && can('quality:safety:consequence'))
 
 const planForm = reactive<QualityPlanCommand>({
   projectId: '',
@@ -186,20 +186,25 @@ async function loadProject(preserveNotice = false): Promise<void> {
   selectedPlanId.value = ''
   trace.value = null
   traceFiles.value = []
-  if (!projectId.value) return
+  if (!scopeProjectIds.value.length) return
   const controller = new AbortController()
   projectController = controller
   loading.value = true
   if (!preserveNotice) clearNotice()
   try {
-    const [loadedPlans, loadedIssues] = await Promise.all([
-      loadQualityPlans(projectId.value, controller.signal),
-      loadQualityIssues(projectId.value, undefined, controller.signal),
-    ])
+    // ponytail: fan-out stays simple; add a server aggregate endpoint only if project counts make it slow.
+    const loaded = await Promise.all(
+      scopeProjectIds.value.map(async (id) =>
+        Promise.all([
+          loadQualityPlans(id, controller.signal),
+          loadQualityIssues(id, undefined, controller.signal),
+        ]),
+      ),
+    )
     if (requestGeneration !== generation) return
-    plans.value = loadedPlans
-    issues.value = loadedIssues
-    selectedPlanId.value = loadedPlans[0]?.id ?? ''
+    plans.value = loaded.flatMap(([projectPlans]) => projectPlans)
+    issues.value = loaded.flatMap(([, projectIssues]) => projectIssues)
+    selectedPlanId.value = plans.value[0]?.id ?? ''
     await loadInspections()
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '质量安全事实加载失败')
@@ -363,6 +368,10 @@ async function runWrite(
   success: string,
   issue?: QualityIssueRecord,
 ): Promise<void> {
+  if (!projectId.value) {
+    errorMessage.value = '请先选择具体项目'
+    return
+  }
   saving.value = true
   clearNotice()
   try {
@@ -480,7 +489,7 @@ const submitDraftRectification = (item: QualityRectificationRecord) => {
   )
 }
 
-watch(projectId, () => void loadProject(), { immediate: true })
+watch(scopeProjectIds, () => void loadProject(), { immediate: true })
 watch(selectedPlanId, () => void loadInspections())
 onBeforeUnmount(() => {
   generation += 1
@@ -491,12 +500,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="quality-page" aria-labelledby="quality-title">
-    <header>
-      <p class="quality-page__eyebrow">项目履约 · 质量安全</p>
-      <h1 id="quality-title">质量安全整改闭环</h1>
-      <p>计划 → 检查 → 问题 → 整改 → 复检 → 后果，完整记录质量安全整改过程。</p>
-    </header>
+  <section class="quality-page" aria-label="质量安全整改闭环">
     <div class="quality-page__notice" role="status" aria-live="polite">
       <V2Alert v-if="errorMessage" tone="danger" title="操作未完成">{{ errorMessage }}</V2Alert>
       <V2Alert v-else-if="successMessage" tone="success" title="操作完成">{{
@@ -515,10 +519,10 @@ onBeforeUnmount(() => {
       description="读取计划和问题链。"
     />
     <V2PageState
-      v-else-if="!projectId"
+      v-else-if="!scopeProjectIds.length"
       kind="empty"
-      title="尚未选择项目"
-      description="从工作区选择项目后查看质量安全闭环。"
+      title="暂无可访问项目"
+      description="当前账号没有可查看的项目。"
     />
     <template v-else>
       <div class="quality-page__columns">
@@ -1013,11 +1017,6 @@ onBeforeUnmount(() => {
 .quality-page h3,
 .quality-page p {
   margin-block: 0;
-}
-.quality-page__eyebrow {
-  color: var(--v2-color-primary-hover);
-  font-size: var(--v2-font-size-12);
-  font-weight: 700;
 }
 .quality-page__notice:empty {
   display: none;

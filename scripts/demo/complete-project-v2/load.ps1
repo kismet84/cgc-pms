@@ -81,14 +81,14 @@ $stages = @(
     [pscustomobject]@{ Id = 'COST_BREAKDOWN_DATA'; Files = @('scripts/demo/complete-project-v2/sql/180-cost-breakdown-data.sql') },
     [pscustomobject]@{ Id = 'STANDARDIZE_BUSINESS_CODES'; Files = @('scripts/demo/complete-project-v2/sql/190-standardize-business-codes.sql') },
     [pscustomobject]@{ Id = 'ROLE_WORKFLOW_STATUS_DATA'; Files = @('scripts/demo/complete-project-v2/sql/200-role-workflow-status-data.sql') },
-    [pscustomobject]@{ Id = 'M3_DOMAIN_PERMISSION_DATA'; Version = 10; Files = @('scripts/demo/complete-project-v2/sql/210-m3-domain-permission-data.sql') }
+    [pscustomobject]@{ Id = 'M3_DOMAIN_PERMISSION_DATA'; Version = 10; AlwaysApply = $true; Files = @('scripts/demo/complete-project-v2/sql/210-m3-domain-permission-data.sql') }
 )
 
 foreach ($stage in $stages) {
     $key = "DEMO_CGC_V2_$($stage.Id)"
     $stageVersion = if ($null -ne $stage.Version) { [int]$stage.Version } else { 2 }
     $status = Invoke-MySql -Sql "SELECT COALESCE(MAX(status),'') FROM sys_bootstrap_state WHERE bootstrap_key='$key' AND bootstrap_version=$stageVersion;" -Capture
-    if (($status | Select-Object -First 1) -eq 'COMPLETED') {
+    if (($status | Select-Object -First 1) -eq 'COMPLETED' -and -not $stage.AlwaysApply) {
         continue
     }
 

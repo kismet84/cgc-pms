@@ -948,10 +948,10 @@ function isAbort(errorValue: unknown): boolean {
     <V2Dialog
       :open="Boolean(selectedAlert)"
       title="预警详情"
-      description="查看权威预警记录并执行当前账号允许的操作。"
+      description="查看预警记录并执行当前账号允许的操作。"
       close-label="关闭预警详情"
       panel-class="v2-dialog-standard v2-detail-dialog"
-      :close-on-backdrop="!alertActionLoading"
+      :close-on-backdrop="false"
       @close="selectedAlert = null"
     >
       <template v-if="selectedAlert">

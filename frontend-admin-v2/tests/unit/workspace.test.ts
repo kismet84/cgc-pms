@@ -96,7 +96,19 @@ describe('V2 workspace context store', () => {
     expect(workspace.reportPeriods).toHaveLength(12)
   })
 
-  it('does not request projects without project query access', async () => {
+  it('loads project context for a project-scoped workspace permission', async () => {
+    const workspace = useWorkspaceStore()
+    loadVisibleProjectsMock.mockResolvedValueOnce([
+      { id: 'P-1', projectName: '项目一', status: 'ACTIVE' },
+    ])
+
+    await workspace.initialize(['USER'], ['technical:query'])
+
+    expect(loadVisibleProjectsMock).toHaveBeenCalledOnce()
+    expect(workspace.projects).toEqual([{ value: 'P-1', label: '项目一', status: 'ACTIVE' }])
+  })
+
+  it('does not request projects without project-context workspace access', async () => {
     const workspace = useWorkspaceStore()
 
     await workspace.initialize(['USER'], ['dashboard:finance:view'])
