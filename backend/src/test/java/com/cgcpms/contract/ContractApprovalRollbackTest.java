@@ -37,8 +37,8 @@ class ContractApprovalRollbackTest {
 
     private static final long USER_ADMIN = 1L;
 
-    /** Demo data: APPROVED contract CT-2026-001 (id=30001) */
-    private static final long APPROVED_CONTRACT_ID = 30001L;
+    /** Dedicated fixture ID: must not mutate demo contract 30001 shared by other suites. */
+    private static final long APPROVED_CONTRACT_ID = 39999001L;
 
     @Autowired
     private ContractWorkflowHandler contractHandler;
@@ -71,6 +71,7 @@ class ContractApprovalRollbackTest {
 
     @AfterEach
     void clearContext() {
+        contractMapper.deleteById(APPROVED_CONTRACT_ID);
         UserContext.clear();
     }
 
@@ -142,7 +143,7 @@ class ContractApprovalRollbackTest {
     void testCallbackExceptionPropagatesOnCostFailure() {
         // 1. Prepare the state presented to an approval callback, then record it.
         CtContract prepared = contractMapper.selectById(APPROVED_CONTRACT_ID);
-        assertNotNull(prepared, "合同 30001 应存在");
+        assertNotNull(prepared, "回滚测试合同应存在");
         prepared.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVING);
         contractMapper.updateById(prepared);
         CtContract original = contractMapper.selectById(APPROVED_CONTRACT_ID);
