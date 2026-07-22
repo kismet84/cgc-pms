@@ -15,6 +15,9 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -119,12 +122,15 @@ class WorkflowEngineIntegrationTest {
                 .add("tenantId", 0L)
                 .add("roleCodes", java.util.List.of("ADMIN"))
                 .build());
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "admin", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
         seedContracts();
     }
 
     @AfterEach
     void clearContext() {
         UserContext.clear();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -1076,7 +1082,7 @@ class WorkflowEngineIntegrationTest {
                 """,
                 businessId, tenantId, projectId, "WF-ENG-" + businessId, "workflow集成测试合同-" + businessId, "SUB",
                 20001L, 20002L, new BigDecimal("10000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
-                "DRAFT", "DRAFT", USER_ADMIN, USER_ADMIN,
+                "DRAFT", "APPROVING", USER_ADMIN, USER_ADMIN,
                 businessId);
     }
 

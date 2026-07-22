@@ -477,7 +477,7 @@ class WorkflowCoreServiceTest {
                 """,
                 businessId, TENANT_0, 100L, "WF-CORE-" + businessId, "workflow核心测试合同-" + businessId, "SUB",
                 20001L, 20002L, new BigDecimal("10000.00"), new BigDecimal("10000.00"), BigDecimal.ZERO,
-                "DRAFT", "DRAFT", USER_ADMIN, USER_ADMIN,
+                "DRAFT", "APPROVING", USER_ADMIN, USER_ADMIN,
                 businessId);
     }
 

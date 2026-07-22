@@ -23,6 +23,9 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,8 +59,10 @@ class SubMeasureServiceTest {
     @BeforeEach void setupContext() {
         UserContext.set(Jwts.claims().add("userId", USER_ADMIN).add("username", "admin")
                 .add("tenantId", TENANT_ID).add("roleCodes", List.of("ADMIN")).build());
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "admin", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
     }
-    @AfterEach void clearContext() { UserContext.clear(); }
+    @AfterEach void clearContext() { UserContext.clear(); SecurityContextHolder.clearContext(); }
 
     SubMeasure buildMeasure() {
         SubMeasure m = new SubMeasure();

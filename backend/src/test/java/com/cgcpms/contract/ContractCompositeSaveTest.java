@@ -23,6 +23,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -143,10 +144,12 @@ class ContractCompositeSaveTest {
         item.setUnit("m³");
         item.setQuantity(qty);
         item.setUnitPrice(price);
-        item.setAmount(qty.multiply(price));
+        BigDecimal amount = qty.multiply(price);
+        BigDecimal amountWithoutTax = amount.divide(new BigDecimal("1.13"), 2, RoundingMode.HALF_UP);
+        item.setAmount(amount);
         item.setTaxRate(new BigDecimal("13.00"));
-        item.setTaxAmount(qty.multiply(price).multiply(new BigDecimal("0.13")));
-        item.setAmountWithoutTax(qty.multiply(price).multiply(new BigDecimal("0.87")));
+        item.setTaxAmount(amount.subtract(amountWithoutTax));
+        item.setAmountWithoutTax(amountWithoutTax);
         item.setSortOrder(1);
         return item;
     }
@@ -186,8 +189,8 @@ class ContractCompositeSaveTest {
     @DisplayName("GREEN-1: compositeSave persists header + items + terms atomically")
     void testCompositeSaveAllThreePersist() {
         CtContractItem item = buildItem("CI-GRN1-001", "测试清单项-混凝土",
-                new BigDecimal("100.00"), new BigDecimal("450.00"));
-        CtContractPaymentTerm term = buildTerm("预付款", new BigDecimal("30.00"), 1);
+                new BigDecimal("100.00"), new BigDecimal("6400.00"));
+        CtContractPaymentTerm term = buildTerm("预付款", new BigDecimal("100.00"), 1);
 
         ContractSaveRequest request = buildRequest("原子保存测试-GREEN1-全量保存",
                 List.of(item), List.of(term), false);
@@ -225,7 +228,7 @@ class ContractCompositeSaveTest {
     @DisplayName("GREEN-2: transactional rollback on child failure — no orphan header")
     void testTransactionalRollbackOnChildFailure() {
         CtContractItem item = buildItem("CI-GRN2-001", "测试清单项-钢筋",
-                new BigDecimal("50.00"), new BigDecimal("3800.00"));
+                new BigDecimal("50.00"), new BigDecimal("12800.00"));
 
         // termName 超过 VARCHAR(200) — 必定触发 SQL 错误
         CtContractPaymentTerm badTerm = new CtContractPaymentTerm();
@@ -258,7 +261,7 @@ class ContractCompositeSaveTest {
     @DisplayName("GREEN-3: composite save with full data — all fields persisted correctly")
     void testCompositeSaveFullDataIntegrity() {
         CtContractItem item = buildItem("CI-GRN3-001", "测试清单项-模板",
-                new BigDecimal("200.00"), new BigDecimal("350.00"));
+                new BigDecimal("200.00"), new BigDecimal("3200.00"));
         CtContractPaymentTerm term1 = buildTerm("首付款", new BigDecimal("40.00"), 1);
         CtContractPaymentTerm term2 = buildTerm("验收款", new BigDecimal("55.00"), 2);
         CtContractPaymentTerm term3 = buildTerm("质保金", new BigDecimal("5.00"), 3);
@@ -389,8 +392,8 @@ class ContractCompositeSaveTest {
     @DisplayName("GREEN-4: compositeSave never triggers approval — submitForApproval flag ignored")
     void testCompositeSaveNeverTriggersApproval() {
         CtContractItem item = buildItem("CI-GRN4-001", "测试清单项-装饰",
-                new BigDecimal("80.00"), new BigDecimal("200.00"));
-        CtContractPaymentTerm term = buildTerm("进度款", new BigDecimal("50.00"), 1);
+                new BigDecimal("80.00"), new BigDecimal("8000.00"));
+        CtContractPaymentTerm term = buildTerm("进度款", new BigDecimal("100.00"), 1);
 
         // 即使 submitForApproval=true，也不会触发审批
         ContractSaveRequest request = buildRequest("原子保存测试-GREEN4-无审批",

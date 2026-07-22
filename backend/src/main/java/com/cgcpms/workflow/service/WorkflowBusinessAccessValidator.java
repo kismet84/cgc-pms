@@ -245,7 +245,7 @@ public class WorkflowBusinessAccessValidator {
                 entity == null ? null : entity.getId(), requestContractId,
                 entity == null ? null : entity.getApprovalStatus(),
                 "CONTRACT_NOT_FOUND",
-                "REJECTED", "WITHDRAWN");
+                "DRAFT", "REJECTED", "WITHDRAWN");
     }
 
     public void requireSubmitPermission(String businessType) {

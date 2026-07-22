@@ -21,7 +21,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -54,6 +55,9 @@ class ContractApprovalRollbackTest {
 
     @Autowired
     private MdPartnerMapper partnerMapper;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void setupContext() {
@@ -125,7 +129,7 @@ class ContractApprovalRollbackTest {
         contract.setPaymentMethod("银行转账");
         contract.setSettlementMethod("按进度结算");
         contract.setContractStatus(ContractStatusConstants.STATUS_PERFORMING);
-        contract.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVED);
+        contract.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVING);
         contract.setCostGeneratedFlag(0);
         contractMapper.insert(contract);
     }
@@ -134,18 +138,21 @@ class ContractApprovalRollbackTest {
     // 场景: 回调异常传播 — 成本生成失败触发事务回滚
     // ═══════════════════════════════════════════════════════════
     @Test
-    @Transactional
     @DisplayName("场景: 成本生成失败时 isCritical=true 保证异常传播，触发事务回滚")
     void testCallbackExceptionPropagatesOnCostFailure() {
-        // 1. Record original contract state before the handler runs
+        // 1. Prepare the state presented to an approval callback, then record it.
+        CtContract prepared = contractMapper.selectById(APPROVED_CONTRACT_ID);
+        assertNotNull(prepared, "合同 30001 应存在");
+        prepared.setApprovalStatus(ContractStatusConstants.APPROVAL_APPROVING);
+        contractMapper.updateById(prepared);
         CtContract original = contractMapper.selectById(APPROVED_CONTRACT_ID);
-        assertNotNull(original, "合同 30001 应存在");
         String originalApprovalStatus = original.getApprovalStatus();
         String originalContractStatus = original.getContractStatus();
 
         // 2. Build a WorkflowContext that points to this contract
         WfInstance instance = new WfInstance();
         instance.setId(9990001L);
+        instance.setTenantId(0L);
         instance.setBusinessId(APPROVED_CONTRACT_ID);
         instance.setBusinessType(ContractStatusConstants.BUSINESS_TYPE_CONTRACT_APPROVAL);
 
@@ -159,9 +166,10 @@ class ContractApprovalRollbackTest {
                 .when(costGenerationService).generateLockedCost(APPROVED_CONTRACT_ID);
 
         // 4. onApproved should throw RuntimeException (isCritical=true behavior)
-        RuntimeException ex = assertThrows(RuntimeException.class, () -> {
-            contractHandler.onApproved(ctx);
-        }, "isCritical=true: 成本生成失败应向上传播异常");
+        RuntimeException ex = assertThrows(RuntimeException.class,
+                () -> new TransactionTemplate(transactionManager)
+                        .executeWithoutResult(status -> contractHandler.onApproved(ctx)),
+                "isCritical=true: 成本生成失败应向上传播异常");
         assertEquals("Simulated cost generation failure", ex.getMessage());
 
         // 5. Verify contract status was NOT updated (transaction rolled back)
