@@ -13,7 +13,8 @@
 
 | 编号 | 文档 |
 | --- | --- |
-| 00 | [UI 设计基线](standards/00-UI-Design-Baselines-and-Code-Specifications.md) |
+| 00 | [Legacy UI 设计基线（V2 禁用）](standards/00-UI-Design-Baselines-and-Code-Specifications.md) |
+| V2 | [Clean-room V2 设计系统与全路由迁移退出门](ui-v2/m1-design-system-baseline.md) |
 | 01 | [快速开始](standards/01-快速开始.md) |
 | 02 | [系统架构](standards/02-系统架构.md) |
 | 03 | [业务模块说明](standards/03-业务模块说明.md) |

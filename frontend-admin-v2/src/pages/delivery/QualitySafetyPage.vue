@@ -501,6 +501,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="quality-page" aria-label="质量安全整改闭环">
+    <h1 class="v2-visually-hidden">质量安全整改闭环</h1>
     <div class="quality-page__notice" role="status" aria-live="polite">
       <V2Alert v-if="errorMessage" tone="danger" title="操作未完成">{{ errorMessage }}</V2Alert>
       <V2Alert v-else-if="successMessage" tone="success" title="操作完成">{{
@@ -672,8 +673,24 @@ onBeforeUnmount(() => {
         </div>
         <p v-else>暂无质量安全问题。</p>
       </V2Card>
+    </template>
 
-      <V2Card v-if="trace" title="闭环追溯" :subtitle="`${trace.issue.issueCode} · 整改与复检记录`">
+    <V2Dialog
+      :open="Boolean(trace)"
+      title="闭环追溯"
+      :description="trace ? `${trace.issue.issueCode} · 整改与复检记录` : undefined"
+      :close-on-backdrop="true"
+      panel-class="v2-detail-dialog"
+      @update:open="
+        (open) => {
+          if (!open) {
+            trace = null
+            traceFiles = []
+          }
+        }
+      "
+    >
+      <template v-if="trace">
         <ol class="quality-page__timeline">
           <li>
             <strong>计划</strong
@@ -714,7 +731,9 @@ onBeforeUnmount(() => {
             </ul>
           </section>
         </div>
-        <template #footer>
+      </template>
+      <template #footer>
+        <template v-if="trace">
           <template v-for="item in trace.rectifications" :key="item.id">
             <V2Button
               v-if="canRectify && item.status === 'DRAFT'"
@@ -748,8 +767,8 @@ onBeforeUnmount(() => {
             确认既有后果
           </V2Button>
         </template>
-      </V2Card>
-    </template>
+      </template>
+    </V2Dialog>
 
     <V2Dialog
       :open="dialog === 'evidence'"
@@ -1012,6 +1031,7 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--v2-space-3);
   color: var(--v2-color-text);
+  font-size: var(--v2-font-size-12);
 }
 .quality-page h1,
 .quality-page h3,
@@ -1049,13 +1069,19 @@ onBeforeUnmount(() => {
   border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
 }
+.quality-page__item > strong,
+.quality-page__item > h3 {
+  font-size: var(--v2-font-size-14);
+  font-weight: var(--v2-font-weight-semibold);
+}
 .quality-page__title {
   padding: 0;
   color: var(--v2-color-primary-hover);
   background: none;
   border: 0;
   font: inherit;
-  font-weight: 700;
+  font-size: var(--v2-font-size-14);
+  font-weight: var(--v2-font-weight-semibold);
   text-align: left;
   cursor: pointer;
 }

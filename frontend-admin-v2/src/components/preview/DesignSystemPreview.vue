@@ -6,9 +6,13 @@ import {
   V2Button,
   V2Card,
   V2Cluster,
+  V2ConfirmDialog,
   V2Dialog,
+  V2ErrorBoundary,
+  V2GlassButton,
   V2Grid,
   V2Input,
+  V2PageState,
   V2Select,
   V2Skeleton,
   V2Stack,
@@ -16,6 +20,7 @@ import {
 } from '@/components'
 
 const dialogOpen = ref(false)
+const confirmOpen = ref(false)
 const keyword = ref('中建国际金融中心项目')
 const emptyKeyword = ref('')
 const period = ref('2026-07')
@@ -87,8 +92,23 @@ const options: V2SelectOption[] = [
       </V2Grid>
 
       <V2Card title="对话框" subtitle="Escape、背景关闭、焦点进入和恢复">
-        <V2Button variant="secondary" @click="dialogOpen = true">打开对话框</V2Button>
+        <V2Cluster :gap="2">
+          <V2Button variant="secondary" @click="dialogOpen = true">打开对话框</V2Button>
+          <V2Button variant="danger" @click="confirmOpen = true">打开确认框</V2Button>
+          <V2GlassButton text="玻璃操作" />
+        </V2Cluster>
       </V2Card>
+
+      <V2ErrorBoundary>
+        <V2PageState
+          kind="empty"
+          title="暂无组件数据"
+          description="页面状态与全局错误边界使用统一语义和恢复入口。"
+          :heading-level="2"
+        >
+          <template #actions><V2Button variant="secondary">刷新状态</V2Button></template>
+        </V2PageState>
+      </V2ErrorBoundary>
     </V2Stack>
 
     <V2Dialog
@@ -102,6 +122,14 @@ const options: V2SelectOption[] = [
         <V2Button @click="dialogOpen = false">确认</V2Button>
       </template>
     </V2Dialog>
+    <V2ConfirmDialog
+      :open="confirmOpen"
+      title="确认演示操作"
+      description="组件预览不会执行业务写入。"
+      danger
+      @close="confirmOpen = false"
+      @confirm="confirmOpen = false"
+    />
   </main>
 </template>
 

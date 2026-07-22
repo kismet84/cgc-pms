@@ -558,14 +558,42 @@ describe('Clean-room V2 design system', () => {
     expect(dashboard).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
     expect(dashboard).toContain('class="v2-detail-dialog__section"')
     expect(dashboard).not.toContain('dashboard-alert-detail')
+    for (const [index, pageClass] of [
+      'schedule-page',
+      'quality-page',
+      'technical-page',
+      'closeout-page',
+    ].entries()) {
+      expect(deliveryPages[index]).toMatch(
+        new RegExp(`\\.${pageClass} \\{[\\s\\S]*?font-size: var\\(--v2-font-size-12\\);`),
+      )
+    }
+    for (const [page, title] of [
+      [deliveryPages[1], '质量安全整改闭环'],
+      [deliveryPages[2], '图纸 RFI 技术闭环'],
+      [deliveryPages[3], '竣工收尾闭环'],
+    ]) {
+      expect(page).toContain(`<h1 class="v2-visually-hidden">${title}</h1>`)
+      expect(page).toContain('panel-class="v2-detail-dialog"')
+      expect(page).not.toMatch(/<V2Card[\s\S]{0,160}v-if="trace"/)
+    }
+    for (const page of deliveryPages.slice(1)) {
+      expect(page).toMatch(
+        /__item > (?:strong|h3)[\s\S]*?font-size: var\(--v2-font-size-14\);[\s\S]*?font-weight: var\(--v2-font-weight-semibold\);/,
+      )
+    }
     for (const page of deliveryPages) {
       expect(page).toContain('<template #footer>')
       expect(page).not.toMatch(/\{\{\s*(?:\w+\.)+(?:status|severity|conclusion)\s*\}\}/)
     }
-    for (const page of deliveryPages.slice(1)) {
-      expect(page).not.toContain('title="项目范围"')
-      expect(page).not.toContain('v-model="workspace.selectedProjectId"')
-      expect(page).not.toContain('@update:model-value="workspace.selectProject"')
+    for (const { name, source } of migratedPageSources()) {
+      expect(source, `${name} duplicated project scope card`).not.toContain('title="项目范围"')
+      expect(source, `${name} duplicated shell project selector`).not.toContain(
+        'v-model="workspace.selectedProjectId"',
+      )
+      expect(source, `${name} duplicated shell project update`).not.toContain(
+        '@update:model-value="workspace.selectProject"',
+      )
     }
     for (const formId of [
       'schedule-create-form',
@@ -634,9 +662,36 @@ describe('Clean-room V2 design system', () => {
     expect(placeholder).not.toContain('tone="warning"')
   })
 
+  it('keeps mobile shell context controls touch sized and previews every shared state primitive', () => {
+    const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
+    const preview = readFileSync(
+      resolve(sourceRoot, 'components/preview/DesignSystemPreview.vue'),
+      'utf-8',
+    )
+
+    expect(appShell).toMatch(
+      /\.app-shell__context-controls :deep\(\.v2-field__control\) \{[\s\S]*?min-height: var\(--v2-control-height-touch\);/,
+    )
+    for (const component of [
+      'V2ConfirmDialog',
+      'V2ErrorBoundary',
+      'V2GlassButton',
+      'V2PageState',
+    ]) {
+      expect(preview).toContain(`<${component}`)
+    }
+  })
+
   it('locks the current V2 standard style contract', () => {
     const baseline = readFileSync(
       resolve(sourceRoot, '../../docs/ui-v2/m1-design-system-baseline.md'),
+      'utf-8',
+    )
+    const mainline = readFileSync(
+      resolve(
+        sourceRoot,
+        '../../docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md',
+      ),
       'utf-8',
     )
     const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
@@ -657,6 +712,11 @@ describe('Clean-room V2 design system', () => {
     ]) {
       expect(baseline).toContain(marker)
     }
+    expect(baseline).not.toContain('21–28')
+    expect(baseline).toContain('完整对象“详情”进入独立详情路由')
+    expect(baseline).toContain('“追溯/预览”使用标准只读 `V2Dialog`')
+    expect(mainline).not.toContain('每个实施阶段必须在 Stitch 交付可编辑设计')
+    expect(mainline).toContain('只有新增视觉方向、复杂交互或现有模式无法覆盖时')
 
     expect(components).toMatch(
       /\.v2-detail-dialog__section \{[\s\S]*?margin-block-end: 10px;[\s\S]*?padding-block-end: 10px;[\s\S]*?color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,

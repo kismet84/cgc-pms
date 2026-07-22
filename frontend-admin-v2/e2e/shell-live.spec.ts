@@ -42,6 +42,13 @@ test.describe('V2 live application shell', () => {
       ).toBe(true)
 
       if (viewport.name === 'mobile') {
+        const contextControlHeights = await page
+          .locator('.app-shell__context-controls .v2-field__control')
+          .evaluateAll((controls) =>
+            controls.map((control) => control.getBoundingClientRect().height),
+          )
+        expect(contextControlHeights).toHaveLength(2)
+        expect(contextControlHeights.every((height) => height >= 44)).toBe(true)
         await page.getByRole('button', { name: '打开导航' }).click()
         await expect(page.locator('.app-shell__sidebar')).toHaveCSS(
           'transform',
@@ -67,7 +74,7 @@ test.describe('V2 live application shell', () => {
       }
     }
 
-    expect(businessRequests).toContain('/api/projects')
+    expect(businessRequests).toContain('/api/project-context/options')
     expect(businessRequests).toContain('/api/dashboard/management')
     expect(
       runtimeErrors.filter(

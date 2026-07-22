@@ -127,6 +127,16 @@ VALUES
   (520000000000010144,0,'QS_RECTIFICATION','REINSPECTION_EVIDENCE',520000000000010132,'m53-reinspection.pdf','M3复检证据.pdf',128,'application/pdf','QS_RECTIFICATION/520000000000010132/m53-reinspection.pdf','cgc-pms','CLEAN',NOW(),@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质量阶段验收')
 ON DUPLICATE KEY UPDATE document_type=VALUES(document_type),business_id=VALUES(business_id),virus_scan_status='CLEAN',deleted_flag=0,updated_by=VALUES(updated_by),updated_at=NOW();
 
+-- The original control-closure stage is intentionally one-shot. Restore corrected UTF-8
+-- schedule text from this idempotent M3 stage so existing demo databases do not retain
+-- rows imported by an older, incorrectly decoded package.
+UPDATE project_corrective_action
+SET reason='关键线路材料到场延迟。',
+    action_plan='调整资源投入并按周复核关键线路。',
+    updated_by=@demo_admin,
+    updated_at=NOW()
+WHERE tenant_id=0 AND id=520000000000008166 AND deleted_flag=0;
+
 -- ISSUE-053-015: closeout split permissions, legal closed-chain facts and writable stages.
 INSERT INTO sys_role
   (id,tenant_id,role_code,role_name,role_type,status,data_scope,created_by,created_at,updated_by,updated_at,deleted_flag,remark,role_level)
