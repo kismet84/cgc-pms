@@ -62,5 +62,11 @@ stages:
   - id: standardize-business-codes
     source: sql/190-standardize-business-codes.sql
     scope: [internal-business-code, historical-normalization, payment-record-code]
+  - id: role-workflow-status-data
+    source: sql/200-role-workflow-status-data.sql
+    scope: [workflow-status, role-action-permission]
+  - id: m3-domain-permission-data
+    source: sql/210-m3-domain-permission-data.sql
+    scope: [delivery-query-permission, quality-split-permission, quality-stage-evidence, technical-split-permission, technical-stage-evidence, responsible-project-membership, closeout-split-permission, closeout-stage-evidence, defect-action-stages, legal-ready-to-close, legal-closed-chain]
 checkpoint-prefix: DEMO_CGC_V2_
 cleanup-policy: rebuild-local-demo-database

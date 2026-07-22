@@ -26,6 +26,9 @@ const acceptedRoutes = {
   ProjectEdit: '@/pages/projects/ProjectPage.vue',
   ProjectSchedule: '@/pages/delivery/SchedulePage.vue',
   SiteDailyLog: '@/pages/delivery/DailyLogPage.vue',
+  QualitySafety: '@/pages/delivery/QualitySafetyPage.vue',
+  TechnicalManagement: '@/pages/delivery/TechnicalManagementPage.vue',
+  ProjectCloseout: '@/pages/delivery/ProjectCloseoutPage.vue',
 }
 
 const sourceAvailableRoutes = {}
@@ -33,6 +36,10 @@ const sourceAvailableRoutes = {}
 const m2AcceptanceEvidence = 'docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md'
 const m3ProjectAcceptanceEvidence = 'docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md'
 const m3DeliveryAcceptanceEvidence = 'docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md'
+const m3QualityAcceptanceEvidence = 'docs/quality/ISSUE-053-013-M3质量安全整改闭环验收报告.md'
+const m3TechnicalAcceptanceEvidence =
+  'docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md'
+const m3CloseoutAcceptanceEvidence = 'docs/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md'
 
 function findVariable(sourceFile, name) {
   for (const statement of sourceFile.statements) {
@@ -76,7 +83,8 @@ function routePath(parent, child) {
 
 function domainFor(path) {
   if (/^\/(dashboard|approval|alert)/.test(path)) return '工作台'
-  if (/^\/(project|site|quality-safety|technical-management)/.test(path)) return '项目履约'
+  if (/^\/(project|site|quality-safety|technical-management|project-closeout)/.test(path))
+    return '项目履约'
   if (/^\/(contract|variation|bid-cost|cost-target|cost|budget|production-measurement)/.test(path))
     return '商务合约'
   if (/^\/(supplier-sourcing|purchase|inventory)/.test(path)) return '供应链与物资'
@@ -129,6 +137,9 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
       const v2View = acceptedView || sourceView
       const isM3Project = name === 'Project' || name.startsWith('Project')
       const isM3Delivery = name === 'ProjectSchedule' || name === 'SiteDailyLog'
+      const isM3Quality = name === 'QualitySafety'
+      const isM3Technical = name === 'TechnicalManagement'
+      const isM3Closeout = name === 'ProjectCloseout'
       result.push({
         name,
         path: fullPath,
@@ -145,9 +156,15 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
         acceptanceEvidence: acceptedView
           ? isM3Delivery
             ? m3DeliveryAcceptanceEvidence
-            : isM3Project
-              ? m3ProjectAcceptanceEvidence
-              : m2AcceptanceEvidence
+            : isM3Quality
+              ? m3QualityAcceptanceEvidence
+              : isM3Technical
+                ? m3TechnicalAcceptanceEvidence
+                : isM3Closeout
+                  ? m3CloseoutAcceptanceEvidence
+                  : isM3Project
+                    ? m3ProjectAcceptanceEvidence
+                    : m2AcceptanceEvidence
           : null,
       })
     }

@@ -21,6 +21,7 @@ import com.cgcpms.quality.entity.*;
 import com.cgcpms.quality.mapper.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +56,7 @@ public class QualitySafetyService {
     private final SysFileMapper fileMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectV2Service costSubjectV2Service;
+    private final JdbcTemplate jdbc;
 
     public List<QualityInspectionPlan> listPlans(Long projectId) {
         projectAccessChecker.checkAccess(projectId, "查询质量安全检查计划");
@@ -70,6 +72,7 @@ public class QualitySafetyService {
         validatePlanCommand(command);
         projectAccessChecker.checkAccess(command.projectId(), "创建质量安全检查计划");
         requireProjectActive(command.projectId());
+        requireActiveProjectMember(command.projectId(), command.ownerUserId());
         QualityInspectionPlan plan = new QualityInspectionPlan();
         applyPlan(plan, command);
         plan.setTenantId(tenantId());
@@ -90,6 +93,7 @@ public class QualitySafetyService {
         projectAccessChecker.checkAccess(plan.getProjectId(), "修改质量安全检查计划");
         projectAccessChecker.checkAccess(command.projectId(), "修改质量安全检查计划");
         requireProjectActive(command.projectId());
+        requireActiveProjectMember(command.projectId(), command.ownerUserId());
         if (!"DRAFT".equals(plan.getStatus())) throw immutable("已激活的检查计划不可修改");
         applyPlan(plan, command);
         try {
@@ -158,6 +162,7 @@ public class QualitySafetyService {
         QualityInspectionPlan plan = requirePlan(command.planId());
         projectAccessChecker.checkAccess(plan.getProjectId(), "创建质量安全检查记录");
         requireProjectActive(plan.getProjectId());
+        requireActiveProjectMember(plan.getProjectId(), command.inspectorUserId());
         if (!"ACTIVE".equals(plan.getStatus())) throw new BusinessException("QS_PLAN_NOT_ACTIVE", "只有执行中的检查计划可以录入检查记录");
         if (command.inspectionDate().isBefore(plan.getStartDate()) || command.inspectionDate().isAfter(plan.getEndDate())) {
             throw new BusinessException("QS_INSPECTION_DATE_OUT_OF_PLAN", "检查日期必须在计划起止日期内");
@@ -189,6 +194,7 @@ public class QualitySafetyService {
             throw new BusinessException("QS_INSPECTION_ID_MISMATCH", "路径检查记录与请求数据不一致");
         QualityInspectionRecord inspection = requireInspection(inspectionId);
         projectAccessChecker.checkAccess(inspection.getProjectId(), "创建质量安全问题单");
+        requireActiveProjectMember(inspection.getProjectId(), command.responsibleUserId());
         if (!"DRAFT".equals(inspection.getStatus())) throw immutable("已提交检查记录不能新增问题单");
         String severity = upper(command.severity());
         if (!SEVERITIES.contains(severity)) throw new BusinessException("QS_ISSUE_SEVERITY_INVALID", "问题严重程度不合法");
@@ -276,6 +282,7 @@ public class QualitySafetyService {
     public QualityRectification createRectification(RectificationCommand command) {
         QualitySafetyIssue issue = requireIssue(command.issueId());
         projectAccessChecker.checkAccess(issue.getProjectId(), "创建质量安全整改记录");
+        requireActiveProjectMember(issue.getProjectId(), command.responsibleUserId());
         if (!"RECTIFYING".equals(issue.getStatus())) throw new BusinessException("QS_ISSUE_NOT_RECTIFYING", "当前问题单不在整改状态");
         if (!Objects.equals(issue.getResponsibleUserId(), command.responsibleUserId()))
             throw new BusinessException("QS_RECTIFICATION_RESPONSIBLE_MISMATCH", "整改责任人必须与问题单责任人一致");
@@ -551,6 +558,17 @@ public class QualitySafetyService {
             throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
         if (!"ACTIVE".equals(project.getStatus()))
             throw new BusinessException("QS_PROJECT_NOT_ACTIVE", "只有进行中的项目可以新建或激活质量安全检查");
+    }
+
+    private void requireActiveProjectMember(Long projectId, Long userId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM sys_user u
+                JOIN pm_project_member m ON m.tenant_id=u.tenant_id AND m.user_id=u.id
+                WHERE u.id=? AND u.tenant_id=? AND u.status='ENABLE' AND u.deleted_flag=0
+                 AND m.project_id=? AND m.status='ACTIVE' AND m.deleted_flag=0
+                """, Integer.class, userId, tenantId(), projectId);
+        if (count == null || count == 0)
+            throw new BusinessException("QS_RESPONSIBLE_PROJECT_MEMBER_INVALID", "责任人不存在、跨租户、已停用或不是目标项目有效成员");
     }
 
     private MdPartner requireExternalPartner(Long partnerId) {

@@ -18,6 +18,9 @@ const ReportCatalogPage = () => import('./pages/workbench/ReportCatalogPage.vue'
 const ProjectPage = () => import('./pages/projects/ProjectPage.vue')
 const SchedulePage = () => import('./pages/delivery/SchedulePage.vue')
 const DailyLogPage = () => import('./pages/delivery/DailyLogPage.vue')
+const QualitySafetyPage = () => import('./pages/delivery/QualitySafetyPage.vue')
+const TechnicalManagementPage = () => import('./pages/delivery/TechnicalManagementPage.vue')
+const ProjectCloseoutPage = () => import('./pages/delivery/ProjectCloseoutPage.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -71,7 +74,13 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
                       ? SchedulePage
                       : tab.path === '/site/daily-log'
                         ? DailyLogPage
-                        : ShellPlaceholderPage,
+                        : tab.path === '/quality-safety'
+                          ? QualitySafetyPage
+                          : tab.path === '/technical-management'
+                            ? TechnicalManagementPage
+                            : tab.path === '/project-closeout'
+                              ? ProjectCloseoutPage
+                              : ShellPlaceholderPage,
           meta: {
             shell: true,
             permission: tab.permission,

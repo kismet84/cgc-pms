@@ -172,26 +172,26 @@ UNION ALL SELECT 'cost_breakdown_permission',COUNT(DISTINCT u.id) FROM sys_user 
   WHERE u.tenant_id=0 AND u.username='demo.cost' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms='dashboard:cost-breakdown:view' AND m.status='ENABLE' AND m.deleted_flag=0
 UNION ALL SELECT 'invalid_business_code',SUM(invalid_count) FROM (
-  SELECT COUNT(*) invalid_count FROM pm_project WHERE project_code NOT REGEXP '^XM-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM md_partner WHERE partner_code NOT REGEXP '^PTN-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM ct_contract WHERE contract_code NOT REGEXP '^CT-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM ct_contract_change WHERE change_code NOT REGEXP '^CC-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM var_order WHERE var_code NOT REGEXP '^VO-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM mat_purchase_request WHERE request_code NOT REGEXP '^PR-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM mat_purchase_order WHERE order_code NOT REGEXP '^PO-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM mat_receipt WHERE receipt_code NOT REGEXP '^MR-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM mat_requisition WHERE requisition_code NOT REGEXP '^REQ-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM mat_material_return WHERE return_code NOT REGEXP '^MRT-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM sp_supplier_return WHERE return_code NOT REGEXP '^SRT-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM sub_task WHERE task_code NOT REGEXP '^SUB-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM sub_measure WHERE measure_code NOT REGEXP '^SM-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM pay_application WHERE apply_code NOT REGEXP '^PAY-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM pay_record WHERE record_code IS NULL OR record_code NOT REGEXP '^PMT-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM stl_settlement WHERE settlement_code NOT REGEXP '^STL-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM expense_application WHERE expense_code NOT REGEXP '^EXP-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM contract_revenue WHERE revenue_code NOT REGEXP '^RV-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM cash_journal_entry WHERE entry_no NOT REGEXP '^CJ-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM biz_document_generation WHERE generation_no NOT REGEXP '^DOC-[0-9]{8}-[0-9]{3}$'
+  SELECT COUNT(*) invalid_count FROM pm_project WHERE tenant_id=0 AND deleted_flag=0 AND project_code NOT REGEXP '^XM-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM md_partner WHERE tenant_id=0 AND deleted_flag=0 AND partner_code NOT REGEXP '^PTN-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM ct_contract WHERE tenant_id=0 AND deleted_flag=0 AND contract_code NOT REGEXP '^CT-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM ct_contract_change WHERE tenant_id=0 AND deleted_flag=0 AND change_code NOT REGEXP '^CC-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM var_order WHERE tenant_id=0 AND deleted_flag=0 AND var_code NOT REGEXP '^VO-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_purchase_request WHERE tenant_id=0 AND deleted_flag=0 AND request_code NOT REGEXP '^PR-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_purchase_order WHERE tenant_id=0 AND deleted_flag=0 AND order_code NOT REGEXP '^PO-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_receipt WHERE tenant_id=0 AND deleted_flag=0 AND receipt_code NOT REGEXP '^MR-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_requisition WHERE tenant_id=0 AND deleted_flag=0 AND requisition_code NOT REGEXP '^REQ-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_material_return WHERE tenant_id=0 AND deleted_flag=0 AND return_code NOT REGEXP '^MRT-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM sp_supplier_return WHERE tenant_id=0 AND deleted_flag=0 AND return_code NOT REGEXP '^SRT-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM sub_task WHERE tenant_id=0 AND deleted_flag=0 AND task_code NOT REGEXP '^SUB-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM sub_measure WHERE tenant_id=0 AND deleted_flag=0 AND measure_code NOT REGEXP '^SM-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM pay_application WHERE tenant_id=0 AND deleted_flag=0 AND apply_code NOT REGEXP '^PAY-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM pay_record WHERE tenant_id=0 AND deleted_flag=0 AND (record_code IS NULL OR record_code NOT REGEXP '^PMT-[0-9]{8}-[0-9]{3}$')
+  UNION ALL SELECT COUNT(*) FROM stl_settlement WHERE tenant_id=0 AND deleted_flag=0 AND settlement_code NOT REGEXP '^STL-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM expense_application WHERE tenant_id=0 AND deleted_flag=0 AND expense_code NOT REGEXP '^EXP-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM contract_revenue WHERE tenant_id=0 AND deleted_flag=0 AND revenue_code NOT REGEXP '^RV-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM cash_journal_entry WHERE tenant_id=0 AND deleted_flag=0 AND entry_no NOT REGEXP '^CJ-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND deleted_flag=0 AND generation_no NOT REGEXP '^DOC-[0-9]{8}-[0-9]{3}$'
 ) standardized_codes
 UNION ALL SELECT 'role_test_scope',COUNT(DISTINCT u.username) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
@@ -233,7 +233,7 @@ UNION ALL SELECT 'collection_delta',ABS(
   COALESCE((SELECT amount-allocated_amount-unallocated_amount FROM collection_record WHERE id=520000000000002901),0))
 UNION ALL SELECT 'quality_safety_cost',COALESCE(SUM(amount),0) FROM cost_item WHERE project_id=520000000000000001 AND cost_type='QUALITY_SAFETY' AND deleted_flag=0
 UNION ALL SELECT 'actual_cost_total',COALESCE(SUM(amount),0) FROM cost_item WHERE project_id=520000000000000001 AND deleted_flag=0
-UNION ALL SELECT 'project_total',COUNT(*) FROM pm_project WHERE tenant_id=0 AND id IN (520000000000000001,520000000000009001,520000000000009002,520000000000009003,520000000000009004,520000000000009005,520000000000009006,520000000000009007) AND deleted_flag=0
+UNION ALL SELECT 'project_total',COUNT(*) FROM pm_project WHERE tenant_id=0 AND id IN (520000000000000001,520000000000009001,520000000000009002,520000000000009003,520000000000009004,520000000000009005,520000000000009006,520000000000009007,520000000000009008,520000000000009009,520000000000009010,520000000000009011) AND deleted_flag=0
 UNION ALL SELECT 'partner_incomplete',COUNT(*) FROM md_partner
   WHERE tenant_id=0 AND id IN (520000000000000101,520000000000000102,520000000000000103,520000000000006001,520000000000006002,520000000000009101,520000000000009102) AND deleted_flag=0
     AND (NULLIF(TRIM(credit_code),'') IS NULL OR NULLIF(TRIM(legal_person),'') IS NULL OR NULLIF(TRIM(contact_name),'') IS NULL
@@ -330,7 +330,150 @@ UNION ALL SELECT 'quality_contract_trace_invalid',COUNT(*) FROM qs_consequence q
 UNION ALL SELECT 'quality_contract_trace',COUNT(*) FROM qs_consequence q
   JOIN ct_contract c ON c.id=q.contract_id AND c.tenant_id=q.tenant_id AND c.project_id=q.project_id AND c.deleted_flag=0
   WHERE q.tenant_id=0 AND q.id=520000000000008201 AND q.deleted_flag=0
-    AND q.partner_id IN (c.party_a_id,c.party_b_id);
+    AND q.partner_id IN (c.party_a_id,c.party_b_id)
+UNION ALL SELECT 'm3_delivery_accounts',COUNT(*) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id
+  WHERE u.tenant_id=0 AND u.username='demo.schedule.query' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND r.role_code='M3_SCHEDULE_QUERY' AND r.data_scope='SELF' AND r.status='ENABLE' AND r.deleted_flag=0
+UNION ALL SELECT 'm3_delivery_query_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.schedule.query' AND u.deleted_flag=0
+    AND m.perms IN ('project:query','schedule:query')
+UNION ALL SELECT 'm3_delivery_action_overgrant',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.schedule.query' AND u.deleted_flag=0
+    AND m.perms IN ('schedule:maintain','schedule:submit','schedule:progress','schedule:correct','site:daily:edit')
+UNION ALL SELECT 'm3_delivery_project_members',COUNT(*) FROM pm_project_member
+  WHERE tenant_id=0 AND project_id=520000000000009011 AND user_id=520000000000013002 AND status='ACTIVE' AND deleted_flag=0
+UNION ALL SELECT 'm3_quality_accounts',COUNT(*) FROM sys_user
+  WHERE tenant_id=0 AND username LIKE 'demo.qs.%' AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'm3_quality_action_permissions',COUNT(DISTINCT CONCAT(u.username,':',m.perms)) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username LIKE 'demo.qs.%' AND u.deleted_flag=0
+    AND m.perms IN ('quality:safety:plan:maintain','quality:safety:inspection:maintain','quality:safety:rectify','quality:safety:reinspect','quality:safety:consequence')
+UNION ALL SELECT 'm3_quality_action_overgrant',COUNT(*) FROM (
+  SELECT u.id FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username LIKE 'demo.qs.%' AND u.deleted_flag=0
+    AND m.perms IN ('quality:safety:plan:maintain','quality:safety:inspection:maintain','quality:safety:rectify','quality:safety:reinspect','quality:safety:consequence')
+  GROUP BY u.id HAVING COUNT(DISTINCT m.perms)>1
+) overgranted
+UNION ALL SELECT 'm3_quality_project_members',COUNT(*) FROM pm_project_member
+  WHERE tenant_id=0 AND project_id=520000000000000001 AND user_id BETWEEN 520000000000010011 AND 520000000000010016 AND status='ACTIVE' AND deleted_flag=0
+UNION ALL SELECT 'm3_quality_stage_rows',(
+  (SELECT COUNT(*) FROM qs_inspection_plan WHERE id=520000000000010101 AND status='ACTIVE' AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM qs_inspection_record WHERE id=520000000000010111 AND status='DRAFT' AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM qs_issue WHERE id=520000000000010121 AND status='PENDING_REINSPECTION' AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM qs_issue WHERE id=520000000000010123 AND status='RECTIFYING' AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM qs_rectification WHERE id=520000000000010131 AND status='REJECTED' AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM qs_rectification WHERE id=520000000000010132 AND status='SUBMITTED' AND deleted_flag=0))
+UNION ALL SELECT 'm3_quality_document_types',COUNT(DISTINCT document_type) FROM sys_file
+  WHERE tenant_id=0 AND id BETWEEN 520000000000010141 AND 520000000000010144 AND virus_scan_status='CLEAN' AND deleted_flag=0
+UNION ALL SELECT 'm3_quality_responsible_invalid',COUNT(*) FROM (
+  SELECT owner_user_id user_id,project_id FROM qs_inspection_plan WHERE tenant_id=0 AND id=520000000000010101 AND deleted_flag=0
+  UNION ALL SELECT inspector_user_id,project_id FROM qs_inspection_record WHERE tenant_id=0 AND id BETWEEN 520000000000010111 AND 520000000000010112 AND deleted_flag=0
+  UNION ALL SELECT responsible_user_id,project_id FROM qs_issue WHERE tenant_id=0 AND id BETWEEN 520000000000010121 AND 520000000000010123 AND deleted_flag=0
+  UNION ALL SELECT responsible_user_id,project_id FROM qs_rectification WHERE tenant_id=0 AND id BETWEEN 520000000000010131 AND 520000000000010132 AND deleted_flag=0
+) responsible WHERE NOT EXISTS (
+  SELECT 1 FROM sys_user u JOIN pm_project_member pm ON pm.tenant_id=u.tenant_id AND pm.user_id=u.id
+  WHERE u.tenant_id=0 AND u.id=responsible.user_id AND u.status='ENABLE' AND u.deleted_flag=0
+    AND pm.project_id=responsible.project_id AND pm.status='ACTIVE' AND pm.deleted_flag=0)
+UNION ALL SELECT 'm3_technical_accounts',COUNT(*) FROM sys_user
+  WHERE tenant_id=0 AND username LIKE 'demo.tech.%' AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'm3_technical_action_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username LIKE 'demo.tech.%' AND u.deleted_flag=0
+    AND m.perms IN ('technical:scheme:maintain','technical:scheme:submit','technical:drawing:receive','technical:drawing:review','technical:rfi:raise','technical:rfi:respond','technical:rfi:accept','technical:disclosure:maintain','technical:archive:confirm')
+UNION ALL SELECT 'm3_technical_action_overgrant',COUNT(*) FROM (
+  SELECT u.id FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username LIKE 'demo.tech.%' AND u.deleted_flag=0
+    AND m.perms IN ('technical:scheme:maintain','technical:scheme:submit','technical:drawing:receive','technical:drawing:review','technical:rfi:raise','technical:rfi:respond','technical:rfi:accept','technical:disclosure:maintain','technical:archive:confirm')
+  GROUP BY u.id HAVING COUNT(DISTINCT m.perms)>1
+) overgranted
+UNION ALL SELECT 'm3_technical_project_members',COUNT(*) FROM pm_project_member
+  WHERE tenant_id=0 AND project_id=520000000000000001 AND user_id BETWEEN 520000000000011011 AND 520000000000011020 AND status='ACTIVE' AND deleted_flag=0
+UNION ALL SELECT 'm3_technical_stage_rows',(
+  (SELECT COUNT(*) FROM technical_scheme WHERE id=520000000000006402 AND status='DRAFT' AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM tech_drawing WHERE id=520000000000011210 AND status='ACTIVE' AND current_version_id=520000000000011202 AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM tech_drawing_version WHERE id=520000000000011202 AND status='RECEIVED' AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM tech_rfi WHERE id=520000000000011201 AND status='SUBMITTED' AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM tech_rfi_response WHERE id=520000000000006541 AND status='SUBMITTED')+
+  (SELECT COUNT(*) FROM tech_disclosure WHERE id=520000000000006551 AND status='CONFIRMED' AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM tech_acceptance_archive WHERE id=520000000000006572 AND status='DRAFT' AND deleted_flag=0))
+UNION ALL SELECT 'm3_technical_document_types',COUNT(DISTINCT document_type) FROM sys_file
+  WHERE tenant_id=0 AND id BETWEEN 520000000000011301 AND 520000000000011306 AND virus_scan_status='CLEAN' AND deleted_flag=0
+UNION ALL SELECT 'm3_technical_responsible_invalid',COUNT(*) FROM (
+  SELECT responsible_user_id user_id,project_id FROM technical_scheme WHERE tenant_id=0 AND project_id=520000000000000001 AND deleted_flag=0
+  UNION ALL SELECT chair_user_id,project_id FROM tech_drawing_review WHERE tenant_id=0 AND project_id=520000000000000001 AND deleted_flag=0
+  UNION ALL SELECT presenter_user_id,project_id FROM tech_disclosure WHERE tenant_id=0 AND project_id=520000000000000001 AND deleted_flag=0
+) responsible WHERE NOT EXISTS (
+  SELECT 1 FROM sys_user u JOIN pm_project_member pm ON pm.tenant_id=u.tenant_id AND pm.user_id=u.id
+  WHERE u.tenant_id=0 AND u.id=responsible.user_id AND u.status='ENABLE' AND u.deleted_flag=0
+    AND pm.project_id=responsible.project_id AND pm.status='ACTIVE' AND pm.deleted_flag=0)
+UNION ALL SELECT 'm3_closeout_accounts',COUNT(*) FROM sys_user
+  WHERE tenant_id=0 AND username LIKE 'demo.closeout.%' AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'm3_closeout_action_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username LIKE 'demo.closeout.%' AND u.deleted_flag=0
+    AND m.perms IN ('closeout:initiate','closeout:section:maintain','closeout:acceptance:submit','closeout:settlement:bind','closeout:collection:verify','closeout:warranty:maintain','closeout:defect:maintain','closeout:defect:verify','closeout:archive:maintain','closeout:close')
+UNION ALL SELECT 'm3_closeout_action_overgrant',COUNT(*) FROM (
+  SELECT u.id FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username LIKE 'demo.closeout.%' AND u.deleted_flag=0
+    AND m.perms IN ('closeout:initiate','closeout:section:maintain','closeout:acceptance:submit','closeout:settlement:bind','closeout:collection:verify','closeout:warranty:maintain','closeout:defect:maintain','closeout:defect:verify','closeout:archive:maintain','closeout:close')
+  GROUP BY u.id HAVING COUNT(DISTINCT m.perms)>1
+) overgranted
+UNION ALL SELECT 'm3_closeout_project_members',COUNT(*) FROM pm_project_member
+  WHERE tenant_id=0 AND project_id=520000000000000001 AND user_id BETWEEN 520000000000012021 AND 520000000000012031 AND status='ACTIVE' AND deleted_flag=0
+UNION ALL SELECT 'm3_closeout_stage_rows',(
+  (SELECT COUNT(*) FROM project_closeout WHERE id=520000000000003501 AND status='CLOSED' AND deleted_flag=0)+
+  (SELECT COUNT(*) FROM project_closeout WHERE id BETWEEN 520000000000012301 AND 520000000000012309 AND deleted_flag=0))
+UNION ALL SELECT 'm3_closeout_document_types',COUNT(DISTINCT document_type) FROM sys_file
+  WHERE tenant_id=0 AND id BETWEEN 520000000000012401 AND 520000000000012405 AND virus_scan_status='CLEAN' AND deleted_flag=0
+UNION ALL SELECT 'm3_closeout_legal_closed',COUNT(*) FROM project_closeout c
+  JOIN owner_settlement s ON s.id=c.final_owner_settlement_id AND s.tenant_id=c.tenant_id AND s.project_id=c.project_id
+  WHERE c.tenant_id=0 AND c.id=520000000000003501 AND c.status='CLOSED' AND c.deleted_flag=0
+    AND s.status='RECEIVABLE_CREATED' AND s.settlement_type='FINAL' AND s.deleted_flag=0
+    AND NOT EXISTS (SELECT 1 FROM account_receivable r WHERE r.tenant_id=c.tenant_id AND r.settlement_id=s.id AND r.deleted_flag=0 AND r.outstanding_amount<>0)
+    AND EXISTS (SELECT 1 FROM account_receivable r WHERE r.tenant_id=c.tenant_id AND r.settlement_id=s.id AND r.receivable_type='REGULAR' AND r.deleted_flag=0)
+    AND EXISTS (SELECT 1 FROM account_receivable r WHERE r.tenant_id=c.tenant_id AND r.settlement_id=s.id AND r.receivable_type='RETENTION' AND r.deleted_flag=0)
+UNION ALL SELECT 'm3_closeout_ready_chain',COUNT(*) FROM project_closeout c
+  JOIN owner_settlement s ON s.id=c.final_owner_settlement_id AND s.tenant_id=c.tenant_id AND s.project_id=c.project_id
+  JOIN account_receivable regular ON regular.tenant_id=s.tenant_id AND regular.settlement_id=s.id AND regular.receivable_type='REGULAR' AND regular.deleted_flag=0
+  JOIN account_receivable retention ON retention.tenant_id=s.tenant_id AND retention.settlement_id=s.id AND retention.receivable_type='RETENTION' AND retention.deleted_flag=0
+  JOIN closeout_warranty w ON w.tenant_id=c.tenant_id AND w.closeout_id=c.id AND w.project_id=c.project_id AND w.deleted_flag=0
+  WHERE c.tenant_id=0 AND c.id=520000000000012309 AND c.project_id=520000000000009010
+    AND c.final_owner_settlement_id=520000000000012505 AND c.deleted_flag=0
+    AND s.contract_id=520000000000012504 AND s.gross_amount=100000 AND s.retention_amount=1000 AND s.net_receivable_amount=99000
+    AND regular.id=520000000000012506 AND regular.original_amount=99000 AND regular.collected_amount=99000 AND regular.outstanding_amount=0
+    AND retention.id=520000000000012516 AND retention.original_amount=1000 AND retention.collected_amount=1000 AND retention.outstanding_amount=0
+    AND w.id=520000000000012513 AND w.contract_id=520000000000012504 AND w.receivable_id=520000000000012516 AND w.warranty_amount=1000
+UNION ALL SELECT 'm3_closeout_responsible_invalid',COUNT(*) FROM (
+  SELECT w.responsible_user_id user_id,w.project_id FROM closeout_warranty w WHERE w.tenant_id=0 AND (w.closeout_id=520000000000003501 OR w.closeout_id BETWEEN 520000000000012307 AND 520000000000012309) AND w.deleted_flag=0
+  UNION ALL
+  SELECT d.responsible_user_id user_id,d.project_id FROM closeout_defect d WHERE d.tenant_id=0 AND (d.closeout_id=520000000000003501 OR d.closeout_id BETWEEN 520000000000012307 AND 520000000000012309) AND d.deleted_flag=0
+) responsible
+WHERE NOT EXISTS (SELECT 1 FROM sys_user u JOIN pm_project_member pm ON pm.tenant_id=u.tenant_id AND pm.user_id=u.id
+  WHERE u.tenant_id=0 AND u.id=responsible.user_id AND u.status='ENABLE' AND u.deleted_flag=0
+    AND pm.project_id=responsible.project_id AND pm.status='ACTIVE' AND pm.deleted_flag=0);
 '@
 $tempFile = Join-Path ([System.IO.Path]::GetTempPath()) ("cgc-demo-verify-{0}.sql" -f [guid]::NewGuid().ToString('N'))
 $containerFile = "/tmp/cgc-demo-verify-$([guid]::NewGuid().ToString('N')).sql"
@@ -380,7 +523,7 @@ $oneKeys = @('project','material','bid_transfer','target','purchase_request','pu
     'cost_forecast','cost_corrective_action','finance_reconciliation_run','finance_import_batch','inventory_exception',
     'material_return_reversal','document_template','demo_user')
 $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $invalidCreditPartners.Count -eq 0 `
-    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 20 `
+    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 21 `
     -and $metrics.role_test_account -eq 8 -and $metrics.role_alert_permission -eq 8 -and $metrics.role_alert_edit_permission -eq 8 `
     -and $metrics.role_alert_project_members -eq 7 `
     -and $metrics.dashboard_trend_month -eq 7 -and $metrics.role_test_scope -eq 8 `
@@ -406,7 +549,19 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.role_workflow_status_cc -eq 40 -and $metrics.role_workflow_business_types -eq 25 `
     -and $metrics.role_workflow_action_permissions -eq 48 `
     -and $metrics.role_workflow_orphans -eq 0 `
-    -and $metrics.invalid_business_code -eq 0
+    -and $metrics.invalid_business_code -eq 0 `
+    -and $metrics.m3_delivery_accounts -eq 1 -and $metrics.m3_delivery_query_permissions -eq 2 `
+    -and $metrics.m3_delivery_action_overgrant -eq 0 -and $metrics.m3_delivery_project_members -eq 1 `
+    -and $metrics.m3_quality_accounts -eq 6 -and $metrics.m3_quality_action_permissions -eq 5 `
+    -and $metrics.m3_quality_action_overgrant -eq 0 -and $metrics.m3_quality_project_members -eq 6 `
+    -and $metrics.m3_quality_stage_rows -eq 6 -and $metrics.m3_quality_document_types -eq 4 -and $metrics.m3_quality_responsible_invalid -eq 0 `
+    -and $metrics.m3_technical_accounts -eq 10 -and $metrics.m3_technical_action_permissions -eq 9 `
+    -and $metrics.m3_technical_action_overgrant -eq 0 -and $metrics.m3_technical_project_members -eq 10 `
+    -and $metrics.m3_technical_stage_rows -eq 7 -and $metrics.m3_technical_document_types -eq 6 -and $metrics.m3_technical_responsible_invalid -eq 0 `
+    -and $metrics.m3_closeout_accounts -eq 11 -and $metrics.m3_closeout_action_permissions -eq 10 `
+    -and $metrics.m3_closeout_action_overgrant -eq 0 -and $metrics.m3_closeout_project_members -eq 11 `
+    -and $metrics.m3_closeout_stage_rows -eq 10 -and $metrics.m3_closeout_document_types -eq 5 `
+    -and $metrics.m3_closeout_legal_closed -eq 1 -and $metrics.m3_closeout_ready_chain -eq 1 -and $metrics.m3_closeout_responsible_invalid -eq 0
 foreach ($key in $oneKeys) { $passed = $passed -and $metrics[$key] -eq 1 }
 $passed = $passed -and $metrics.requested_qty -eq 100 -and $metrics.ordered_qty -eq 100 `
     -and $metrics.received_qty -eq 100 -and $metrics.issued_qty -eq 20 -and $metrics.stock_qty -eq 80 `
@@ -414,7 +569,7 @@ $passed = $passed -and $metrics.requested_qty -eq 100 -and $metrics.ordered_qty 
     -and $metrics.material_cost_delta -eq 0 -and $metrics.bid_transfer_delta -eq 0 `
     -and $metrics.subcontract_delta -eq 0 -and $metrics.receivable_delta -eq 0 -and $metrics.collection_delta -eq 0 `
     -and $metrics.quality_safety_cost -eq 5000 -and $metrics.actual_cost_total -eq 85000
-$passed = $passed -and $metrics.project_total -eq 8 `
+$passed = $passed -and $metrics.project_total -eq 12 `
     -and $metrics.partner_incomplete -eq 0 -and $metrics.partner_invalid_credit -eq 0 -and $metrics.partner_invalid_type -eq 0 `
     -and $metrics.project_type_missing -eq 0 -and $metrics.project_status_missing -eq 0 -and $metrics.project_approval_missing -eq 0 `
     -and $metrics.project_invalid_authority -eq 0 -and $metrics.project_invalid_dates -eq 0 `
@@ -437,7 +592,7 @@ $passed = $passed -and $metrics.sourcing_event -eq 3 -and $metrics.supplier_quot
     -and $metrics.technical_archive -eq 2
 $passed = $passed -and $metrics.variation_order -eq 3 -and $metrics.variation_submission -eq 2 `
     -and $metrics.contract_change -eq 1 -and $metrics.closeout_detail -eq 5 `
-    -and $metrics.organization_position -eq 2 -and $metrics.project_member -eq 1 -and $metrics.user_preference -eq 1
+    -and $metrics.organization_position -eq 2 -and $metrics.project_member -eq 28 -and $metrics.user_preference -eq 1
 $result = [pscustomobject]@{
     package='CGC-COMPLETE-PROJECT'; version=2; environment=$Environment; database=$Database; passed=$passed
     credit_code_validation=[pscustomobject]@{ standard='GB 32100'; checked=$partnerCreditCodes.Count; invalid_partners=$invalidCreditPartners }

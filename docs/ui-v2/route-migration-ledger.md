@@ -5,9 +5,9 @@
 - 命名路由：87
 - Legacy 路由视图引用：73
 - Legacy 独立页面模块：65
-- `LEGACY_ONLY`：71
+- `LEGACY_ONLY`：68
 - `V2_SOURCE_AVAILABLE`：0
-- `V2_ACCEPTED`：16
+- `V2_ACCEPTED`：19
 
 | 域 | route name | URL | Legacy 视图 | V2 视图 | permission | adminOnly | 状态 | Stitch / 测试 / 验收 |
 |---|---|---|---|---|---|---:|---|---|
@@ -46,9 +46,9 @@
 | 基础资料 | Partner | /partner | @/pages/partner/index.vue | — | partner:query | 否 | LEGACY_ONLY | — |
 | 项目履约 | SiteDailyLog | /site/daily-log | @/pages/site/daily-log.vue | @/pages/delivery/DailyLogPage.vue | site:daily:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md |
 | 项目履约 | ProjectSchedule | /project-schedule | @/pages/project-schedule/index.vue | @/pages/delivery/SchedulePage.vue | schedule:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md |
-| 项目履约 | QualitySafety | /quality-safety | @/pages/quality-safety/index.vue | — | — | 否 | LEGACY_ONLY | — |
-| 项目履约 | TechnicalManagement | /technical-management | @/pages/technical-management/index.vue | — | — | 否 | LEGACY_ONLY | — |
-| 项目履约 | ProjectCloseout | /project-closeout | @/pages/project-closeout/index.vue | — | — | 否 | LEGACY_ONLY | — |
+| 项目履约 | QualitySafety | /quality-safety | @/pages/quality-safety/index.vue | @/pages/delivery/QualitySafetyPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-013-M3质量安全整改闭环验收报告.md |
+| 项目履约 | TechnicalManagement | /technical-management | @/pages/technical-management/index.vue | @/pages/delivery/TechnicalManagementPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md |
+| 项目履约 | ProjectCloseout | /project-closeout | @/pages/project-closeout/index.vue | @/pages/delivery/ProjectCloseoutPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md |
 | 供应链与物资 | SupplierSourcing | /supplier-sourcing | @/pages/supplier-sourcing/index.vue | — | — | 否 | LEGACY_ONLY | — |
 | 商务合约 | BidCost | /bid-cost | @/pages/bid-cost/index.vue | — | — | 否 | LEGACY_ONLY | — |
 | 基础资料 | Org | /org | @/pages/org/index.vue | — | org:query | 否 | LEGACY_ONLY | — |

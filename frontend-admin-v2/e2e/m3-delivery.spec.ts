@@ -1,9 +1,11 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
+import { captureRuntimeErrors } from './runtime-errors'
 
 const runLiveDelivery = process.env.V2_LIVE_DELIVERY === '1'
-const splitRoleUser = process.env.V2_SCHEDULE_READONLY_USER
-const controlledProjectId = process.env.V2_DELIVERY_PROJECT_ID
+const splitRoleUser = process.env.V2_SCHEDULE_READONLY_USER || 'demo.schedule.query'
+const controlledProjectId = process.env.V2_DELIVERY_PROJECT_ID || '520000000000009011'
+const runtimeErrors = new WeakMap<Page, string[]>()
 
 async function login(page: Page, username: string) {
   expect((await page.goto(`/api/auth/dev-login?username=${username}`))?.ok()).toBe(true)
@@ -20,6 +22,8 @@ async function firstProjectId(page: Page): Promise<string> {
 
 test.describe('M3 live delivery workspace', () => {
   test.skip(!runLiveDelivery, 'Set V2_LIVE_DELIVERY=1 only against local test/demo runtime')
+  test.beforeEach(({ page }) => runtimeErrors.set(page, captureRuntimeErrors(page)))
+  test.afterEach(({ page }) => expect(runtimeErrors.get(page) ?? []).toEqual([]))
 
   test('schedule and daily-log routes resolve to real V2 pages', async ({ page }) => {
     await login(page, 'admin')
@@ -153,11 +157,6 @@ test.describe('M3 live delivery workspace', () => {
   })
 
   test('real split roles expose only authorized delivery actions', async ({ page }) => {
-    test.skip(
-      !splitRoleUser || !controlledProjectId,
-      'Set V2_SCHEDULE_READONLY_USER and V2_DELIVERY_PROJECT_ID for split-role acceptance',
-    )
-    if (!splitRoleUser || !controlledProjectId) return
     const mutatingRequests: string[] = []
     page.on('request', (request) => {
       if (!['GET', 'HEAD'].includes(request.method())) mutatingRequests.push(request.url())
@@ -168,6 +167,9 @@ test.describe('M3 live delivery workspace', () => {
     await expect(page.getByRole('heading', { level: 1, name: '项目计划与施工履约' })).toBeVisible()
     await expect(page.getByRole('button', { name: '新建基线计划' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '维护 WBS' })).toHaveCount(0)
+    expect(
+      (await page.request.get('/api/project-schedules?projectId=520000000000000001')).status(),
+    ).toBe(403)
     expect(mutatingRequests).toEqual([])
 
     await login(page, 'demo.production')

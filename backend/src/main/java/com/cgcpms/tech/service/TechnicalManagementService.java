@@ -116,6 +116,7 @@ public class TechnicalManagementService {
     public Map<String, Object> createScheme(SchemeCommand command) {
         projectAccessChecker.checkAccess(command.projectId(), "创建技术方案");
         requireActiveProject(command.projectId());
+        requireActiveProjectMember(command.projectId(), command.responsibleUserId());
         Long id = IdWorker.getId();
         try {
             jdbc.update("""
@@ -240,6 +241,7 @@ public class TechnicalManagementService {
         Map<String, Object> version = requireVersion(versionId, true);
         Long projectId = longValue(version.get("project_id"));
         projectAccessChecker.checkAccess(projectId, "登记图纸会审");
+        requireActiveProjectMember(projectId, command.chairUserId());
         if (!"RECEIVED".equals(string(version.get("status"))))
             throw error("TECH_DRAWING_REVIEW_STATE_INVALID", "只有已接收图纸版本可以发起会审");
         requireFile("TECH_DRAWING_VERSION", versionId, "DRAWING_FILE", "会审前必须上传本版完整图纸");
@@ -377,6 +379,7 @@ public class TechnicalManagementService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createDisclosure(Long projectId, DisclosureCommand command) {
         projectAccessChecker.checkAccess(projectId, "创建技术交底");
+        requireActiveProjectMember(projectId, command.presenterUserId());
         Map<String, Object> version = requireVersion(command.drawingVersionId(), false);
         if (!projectId.equals(longValue(version.get("project_id"))) || !"APPROVED".equals(string(version.get("status"))))
             throw error("TECH_DISCLOSURE_APPROVED_DRAWING_REQUIRED", "技术交底必须绑定同项目当前批准图纸版本");
@@ -708,6 +711,17 @@ public class TechnicalManagementService {
                  AND document_type=? AND virus_scan_status='CLEAN' AND deleted_flag=0
                 """, Integer.class, tenant(), businessType, businessId, documentType);
         if (count == null || count == 0) throw error("TECH_ATTACHMENT_REQUIRED", message);
+    }
+
+    private void requireActiveProjectMember(Long projectId, Long userId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM sys_user u
+                JOIN pm_project_member m ON m.tenant_id=u.tenant_id AND m.user_id=u.id
+                WHERE u.id=? AND u.tenant_id=? AND u.status='ENABLE' AND u.deleted_flag=0
+                 AND m.project_id=? AND m.status='ACTIVE' AND m.deleted_flag=0
+                """, Integer.class, userId, tenant(), projectId);
+        if (count == null || count == 0)
+            throw error("TECH_RESPONSIBLE_PROJECT_MEMBER_INVALID", "责任人不存在、跨租户、已停用或不是目标项目有效成员");
     }
 
     private void insertTechItem(String sourceType, Long sourceId, Long projectId, String itemType, String itemCode,

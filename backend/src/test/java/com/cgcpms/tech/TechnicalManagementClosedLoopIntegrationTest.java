@@ -43,6 +43,12 @@ class TechnicalManagementClosedLoopIntegrationTest {
     private static final long QUALITY_PLAN = 99190006L;
     private static final long QUALITY_INSPECTION = 99190007L;
     private static final long WEEKLY_PLAN = 99190008L;
+    private static final long OUTSIDE_USER = 99190009L;
+    private static final long DISABLED_USER = 99190010L;
+    private static final long CROSS_TENANT_USER = 99190011L;
+    private static final long MEMBER_ONE = 99190012L;
+    private static final long MEMBER_TWO = 99190013L;
+    private static final long MEMBER_DISABLED = 99190014L;
     private static final AtomicLong FILE_ID = new AtomicLong(99190100L);
 
     @Autowired TechnicalManagementService service;
@@ -57,7 +63,14 @@ class TechnicalManagementClosedLoopIntegrationTest {
         asUser(1L);
         cleanup();
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 1,0,'admin','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','系统管理员','ENABLE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=1)");
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 2,0,'tech-reviewer-2','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','技术复核人','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=2)");
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'tech-outsider','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','非项目成员','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OUTSIDE_USER);
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'tech-disabled','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','停用项目成员','DISABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", DISABLED_USER);
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,1,'tech-cross-tenant','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','跨租户用户','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CROSS_TENANT_USER);
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'TECH-IT','技术闭环测试项目','ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(?,0,?,1,'PROJECT_MANAGER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", MEMBER_ONE, PROJECT);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(?,0,?,2,'TECH_REVIEWER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", MEMBER_TWO, PROJECT);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(?,0,?,?,'TECH_OWNER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", MEMBER_DISABLED, PROJECT, DISABLED_USER);
         jdbc.update("""
                 INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
                  planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag)
@@ -107,6 +120,10 @@ class TechnicalManagementClosedLoopIntegrationTest {
 
     @Test
     void closesSchemeDrawingReviewRfiRevisionDisclosureConstructionAndArchive() {
+        BusinessException outsider = assertThrows(BusinessException.class, () -> service.createScheme(new SchemeCommand(
+                PROJECT, "TS-OUTSIDER", "越界责任人方案", "SPECIAL", OUTSIDE_USER,
+                LocalDate.now().plusDays(2), "项目成员边界")));
+        assertEquals("TECH_RESPONSIBLE_PROJECT_MEMBER_INVALID", outsider.getCode());
         long schemeId = id(service.createScheme(new SchemeCommand(PROJECT, "TS-001", "主体结构专项施工方案",
                 "SPECIAL", 1L, LocalDate.now().plusDays(2), "专项方案")));
         evidence("TECH_SCHEME", schemeId, "SCHEME_FILE");
@@ -120,6 +137,9 @@ class TechnicalManagementClosedLoopIntegrationTest {
         long drawingId = id((Map<?, ?>) received.get("drawing"));
         long versionA = id((Map<?, ?>) ((List<?>) received.get("versions")).get(0));
         evidence("TECH_DRAWING_VERSION", versionA, "DRAWING_FILE");
+        BusinessException disabled = assertThrows(BusinessException.class, () -> service.createReview(versionA,
+                new ReviewCommand("RV-DISABLED", LocalDate.now(), DISABLED_USER, "停用成员", "PASS", "边界复核", false, null)));
+        assertEquals("TECH_RESPONSIBLE_PROJECT_MEMBER_INVALID", disabled.getCode());
         long reviewA = id(service.createReview(versionA, new ReviewCommand("RV-001", LocalDate.now(), 1L,
                 "项目总工、工程部、施工班组", "CONDITIONAL", "节点详图标注不明确", true, null)));
         evidence("TECH_DRAWING_REVIEW", reviewA, "REVIEW_MINUTES");
@@ -146,6 +166,11 @@ class TechnicalManagementClosedLoopIntegrationTest {
         assertEquals("SUPERSEDED", jdbc.queryForObject("SELECT status FROM tech_drawing_version WHERE id=?", String.class, versionA));
         assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM tech_drawing_version WHERE id=?", String.class, versionB));
         assertEquals("CLOSED", jdbc.queryForObject("SELECT status FROM tech_rfi WHERE id=?", String.class, rfiId));
+
+        BusinessException crossTenant = assertThrows(BusinessException.class, () -> service.createDisclosure(PROJECT,
+                new DisclosureCommand(versionB, schemeId, "TD-CROSS", "跨租户交底人", LocalDate.now(), CROSS_TENANT_USER,
+                        "工程部", "跨租户责任人边界", null)));
+        assertEquals("TECH_RESPONSIBLE_PROJECT_MEMBER_INVALID", crossTenant.getCode());
 
         long disclosureId = id(service.createDisclosure(PROJECT, new DisclosureCommand(versionB, schemeId,
                 "TD-001", "主体结构B版图纸技术交底", LocalDate.now(), 2L,
@@ -247,6 +272,7 @@ class TechnicalManagementClosedLoopIntegrationTest {
     }
 
     private void cleanup() {
+        jdbc.update("DELETE FROM pm_project_member WHERE id IN (?,?,?)", MEMBER_ONE, MEMBER_TWO, MEMBER_DISABLED);
         jdbc.update("DELETE FROM sys_file WHERE business_type IN('TECH_SCHEME','TECH_DRAWING_VERSION','TECH_DRAWING_REVIEW','TECH_RFI','TECH_RFI_RESPONSE','TECH_DISCLOSURE','TECH_ARCHIVE')");
         jdbc.update("DELETE FROM tech_acceptance_archive WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM tech_construction_reference WHERE project_id=?", PROJECT);
@@ -273,5 +299,6 @@ class TechnicalManagementClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM project_wbs_task WHERE id=?", WBS);
         jdbc.update("DELETE FROM project_schedule_plan WHERE id=?", SCHEDULE);
         jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT);
+        jdbc.update("DELETE FROM sys_user WHERE id IN (?,?,?)", OUTSIDE_USER, DISABLED_USER, CROSS_TENANT_USER);
     }
 }

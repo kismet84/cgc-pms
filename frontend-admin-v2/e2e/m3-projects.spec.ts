@@ -1,7 +1,14 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
+import { captureRuntimeErrors } from './runtime-errors'
 
 const runLiveProjects = process.env.V2_LIVE_PROJECTS === '1'
+const runtimeErrors = new WeakMap<Page, string[]>()
+
+async function consumeExpectedHttpError(page: Page, status: string) {
+  await expect.poll(() => runtimeErrors.get(page) ?? []).toEqual([expect.stringContaining(status)])
+  runtimeErrors.get(page)?.splice(0)
+}
 
 async function login(page: Page, username: string) {
   expect((await page.goto(`/api/auth/dev-login?username=${username}`))?.ok()).toBe(true)
@@ -20,6 +27,8 @@ async function rewritePermissions(page: Page, permissions: string[]) {
 
 test.describe('M3 live project object', () => {
   test.skip(!runLiveProjects, 'Set V2_LIVE_PROJECTS=1 only against local test/demo runtime')
+  test.beforeEach(({ page }) => runtimeErrors.set(page, captureRuntimeErrors(page)))
+  test.afterEach(({ page }) => expect(runtimeErrors.get(page) ?? []).toEqual([]))
 
   test('five accepted routes resolve without placeholder and preserve legacy redirect context', async ({
     page,
@@ -139,6 +148,7 @@ test.describe('M3 live project object', () => {
       return { status: response.status, body: await response.json() }
     })
     expect(denied).toMatchObject({ status: 403, body: { code: 'AUTH_FORBIDDEN' } })
+    await consumeExpectedHttpError(page, '403 (Forbidden)')
   })
 
   test('anonymous and permissionless deep links fail closed', async ({ browser }) => {
@@ -172,6 +182,7 @@ test.describe('M3 live project object', () => {
     await expect(page.getByText('受控故障')).toBeVisible()
     await page.getByRole('button', { name: '刷新' }).click()
     await expect(page.locator('.project-page__grid .v2-card').first()).toBeVisible()
+    await consumeExpectedHttpError(page, '503 (Service Unavailable)')
   })
 
   test('rapid query changes keep only the newest response', async ({ page }) => {
@@ -255,6 +266,7 @@ test.describe('M3 live project object', () => {
     await dialog.getByRole('button', { name: '创建并重读' }).click()
     await expect(page.locator('.project-page > .v2-alert').getByText('受控冲突')).toBeAttached()
     await expect.poll(() => rereads).toBeGreaterThan(before)
+    await consumeExpectedHttpError(page, '409 (Conflict)')
   })
 
   test('SUPER_ADMIN creates then deletes a controlled demo project', async ({ page }) => {

@@ -44,6 +44,12 @@ class QualitySafetyClosedLoopIntegrationTest {
     private static final long CROSS_TENANT_PARTNER_A = 99188014L;
     private static final long CROSS_TENANT_PARTNER_B = 99188015L;
     private static final long CROSS_TENANT_CONTRACT = 99188016L;
+    private static final long OUTSIDE_USER = 99188017L;
+    private static final long DISABLED_USER = 99188018L;
+    private static final long CROSS_TENANT_USER = 99188019L;
+    private static final long MEMBER_ONE = 99188020L;
+    private static final long MEMBER_TWO = 99188021L;
+    private static final long MEMBER_DISABLED = 99188022L;
     private static final AtomicLong FILE_ID = new AtomicLong(99188100L);
 
     @Autowired QualitySafetyService service;
@@ -55,7 +61,14 @@ class QualitySafetyClosedLoopIntegrationTest {
         asUser(1L);
         cleanup();
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 1,0,'admin','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','系统管理员','ENABLE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=1)");
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 2,0,'qs-reviewer-2','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','质量复检人','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=2)");
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'qs-outsider','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','非项目成员','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OUTSIDE_USER);
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'qs-disabled','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','停用项目成员','DISABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", DISABLED_USER);
+        jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,1,'qs-cross-tenant','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','跨租户用户','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CROSS_TENANT_USER);
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,contract_amount,target_cost,project_manager_id,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'QS-IT','质量安全闭环测试项目',100000,80000,1,'ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(?,0,?,1,'PROJECT_MANAGER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", MEMBER_ONE, PROJECT);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(?,0,?,2,'QUALITY_REVIEWER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", MEMBER_TWO, PROJECT);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(?,0,?,?,'QUALITY_OWNER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", MEMBER_DISABLED, PROJECT, DISABLED_USER);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'QS-SUP','测试供应商','SUPPLIER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", PARTNER);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'QS-OWNER','测试合同相对方','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACT_COUNTERPARTY);
         jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'QS-PO','测试采购合同','PURCHASE',?,?,10000,10000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACT, PROJECT, CONTRACT_COUNTERPARTY, PARTNER);
@@ -184,6 +197,26 @@ class QualitySafetyClosedLoopIntegrationTest {
     }
 
     @Test
+    void rejectsOutsiderDisabledAndCrossTenantResponsibilityAssignments() {
+        BusinessException outsider = assertThrows(BusinessException.class, () -> service.createPlan(new PlanCommand(
+                PROJECT, "QS-PLAN-OUTSIDER", "越界责任人检查", "SAFETY", "SINGLE",
+                LocalDate.now(), LocalDate.now().plusDays(3), OUTSIDE_USER, null)));
+        assertEquals("QS_RESPONSIBLE_PROJECT_MEMBER_INVALID", outsider.getCode());
+
+        QualityInspectionPlan plan = service.activatePlan(service.createPlan(planCommand("QS-PLAN-MEMBER-BOUNDARY")).getId());
+        BusinessException disabled = assertThrows(BusinessException.class, () -> service.createInspection(new InspectionCommand(
+                plan.getId(), "QS-CHK-DISABLED", LocalDate.now(), "边界区", DISABLED_USER, "停用成员边界", null)));
+        assertEquals("QS_RESPONSIBLE_PROJECT_MEMBER_INVALID", disabled.getCode());
+
+        QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
+                plan.getId(), "QS-CHK-MEMBER-BOUNDARY", LocalDate.now(), "边界区", 1L, "跨租户责任人边界", null));
+        BusinessException crossTenant = assertThrows(BusinessException.class, () -> service.createIssue(
+                inspection.getId(), new IssueCommand(inspection.getId(), "边界", "HIGH", "责任人越界", "跨租户责任人",
+                        "PARTNER", PARTNER, CROSS_TENANT_USER, LocalDate.now().plusDays(2), null)));
+        assertEquals("QS_RESPONSIBLE_PROJECT_MEMBER_INVALID", crossTenant.getCode());
+    }
+
+    @Test
     void enforcesQualityEvidencePermissionAndImmutableDocumentStages() {
         QualityInspectionPlan plan = service.activatePlan(service.createPlan(planCommand("QS-PLAN-FILE")).getId());
         QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
@@ -208,6 +241,40 @@ class QualitySafetyClosedLoopIntegrationTest {
         assertEquals("QS_DOCUMENT_STAGE_INVALID", assertThrows(BusinessException.class,
                 () -> fileAuthorizer.checkVariationDocumentStage(
                         "QS_INSPECTION", inspection.getId(), "INSPECTION_EVIDENCE")).getCode());
+    }
+
+    @Test
+    void separatesRectificationAndReinspectionEvidenceAuthorities() {
+        QualityInspectionPlan plan = service.activatePlan(service.createPlan(planCommand("QS-PLAN-SPLIT-FILE")).getId());
+        QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
+                plan.getId(), "QS-CHK-SPLIT-FILE", LocalDate.now(), "D区", 1L, "整改复检分权", null));
+        QualitySafetyIssue issue = service.createIssue(inspection.getId(), new IssueCommand(
+                inspection.getId(), "临电", "HIGH", "接地缺失", "配电箱接地缺失",
+                "PARTNER", PARTNER, 1L, LocalDate.now().plusDays(3), null));
+        evidence("QS_INSPECTION", inspection.getId(), "INSPECTION_EVIDENCE");
+        evidence("QS_ISSUE", issue.getId(), "ISSUE_EVIDENCE");
+        service.submitInspection(inspection.getId());
+        QualityRectification rectification = service.createRectification(new RectificationCommand(
+                issue.getId(), "补齐接地并复测", 1L, LocalDate.now().plusDays(2), null));
+
+        authenticate("quality:safety:rectify");
+        assertDoesNotThrow(() -> fileAuthorizer.checkVariationDocumentStage(
+                "QS_RECTIFICATION", rectification.getId(), "RECTIFICATION_EVIDENCE"));
+        assertEquals("FILE_ACCESS_DENIED", assertThrows(BusinessException.class,
+                () -> fileAuthorizer.checkVariationDocumentStage(
+                        "QS_RECTIFICATION", rectification.getId(), "REINSPECTION_EVIDENCE")).getCode());
+
+        authenticate("quality:safety:reinspect");
+        assertEquals("FILE_ACCESS_DENIED", assertThrows(BusinessException.class,
+                () -> fileAuthorizer.checkVariationDocumentStage(
+                        "QS_RECTIFICATION", rectification.getId(), "RECTIFICATION_EVIDENCE")).getCode());
+
+        authenticate("quality:safety:rectify");
+        evidence("QS_RECTIFICATION", rectification.getId(), "RECTIFICATION_EVIDENCE");
+        service.submitRectification(rectification.getId());
+        authenticate("quality:safety:reinspect");
+        assertDoesNotThrow(() -> fileAuthorizer.checkVariationDocumentStage(
+                "QS_RECTIFICATION", rectification.getId(), "REINSPECTION_EVIDENCE"));
     }
 
     private PlanCommand planCommand(String code) {
@@ -251,6 +318,7 @@ class QualitySafetyClosedLoopIntegrationTest {
     }
 
     private void cleanup() {
+        jdbc.update("DELETE FROM pm_project_member WHERE id IN (?,?,?)", MEMBER_ONE, MEMBER_TWO, MEMBER_DISABLED);
         jdbc.update("UPDATE qs_consequence SET evaluation_id=NULL,cost_item_id=NULL WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM qs_partner_evaluation WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM cost_item WHERE project_id=? AND source_type='QUALITY_SAFETY_CONSEQUENCE'", PROJECT);
@@ -266,5 +334,6 @@ class QualitySafetyClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM cost_subject_mapping_version WHERE id=?", MAPPING_VERSION);
         jdbc.update("DELETE FROM cost_subject WHERE id=?", SUBJECT);
         jdbc.update("DELETE FROM pm_project WHERE id IN (?,?,?)", PROJECT, OTHER_PROJECT, CROSS_TENANT_PROJECT);
+        jdbc.update("DELETE FROM sys_user WHERE id IN (?,?,?)", OUTSIDE_USER, DISABLED_USER, CROSS_TENANT_USER);
     }
 }
