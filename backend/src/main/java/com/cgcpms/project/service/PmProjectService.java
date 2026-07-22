@@ -76,7 +76,7 @@ public class PmProjectService {
         wrapper.eq(PmProject::getTenantId, UserContext.getCurrentTenantId());
 
         List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
-        if (accessibleProjectIds.isEmpty()) wrapper.apply("1 = 0");
+        if (accessibleProjectIds.isEmpty()) wrapper.eq(PmProject::getId, -1L);
         else wrapper.in(PmProject::getId, accessibleProjectIds);
 
         // keyword 全局搜索：匹配项目编号、项目名称、项目类型、合同金额、项目地址等字段
