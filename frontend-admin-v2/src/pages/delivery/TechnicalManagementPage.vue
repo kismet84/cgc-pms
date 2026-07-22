@@ -46,6 +46,7 @@ import {
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { deliveryLabel } from './labels'
 
 type DialogKind =
   | 'scheme'
@@ -110,9 +111,6 @@ const projectId = computed(() => {
   const query = typeof route.query.projectId === 'string' ? route.query.projectId.trim() : ''
   return query || workspace.selectedProjectId || ''
 })
-const projectOptions = computed(() =>
-  workspace.projects.map((item) => ({ value: item.value, label: item.label })),
-)
 const approvedSchemes = computed(() =>
   overview.value.schemes.filter((item) => item.status === 'APPROVED'),
 )
@@ -462,7 +460,7 @@ async function save(): Promise<void> {
       })
       await attachEvidence(kind, 'ACCEPTANCE_ARCHIVE', 'TECH_ARCHIVE', created.id)
     }
-    successMessage.value = '业务步骤已完成，并已回读后端权威状态'
+    successMessage.value = '业务步骤已完成。'
     dialog.value = null
   } catch (error) {
     errorMessage.value = pendingEvidence.value
@@ -505,12 +503,6 @@ onBeforeUnmount(() => {
       <p>方案、图纸版本、会审、设计回复、交底、施工依据和验收档案均以服务端状态为准。</p>
     </header>
     <div class="technical-page__toolbar">
-      <V2Select
-        v-model="workspace.selectedProjectId"
-        label="当前项目"
-        :options="projectOptions"
-        placeholder="请选择项目"
-      />
       <div class="technical-page__actions">
         <V2Button v-if="canSchemeMaintain" size="small" @click="show('scheme')">新建方案</V2Button>
         <V2Button v-if="canDrawingReceive" size="small" variant="secondary" @click="show('drawing')"
@@ -540,7 +532,7 @@ onBeforeUnmount(() => {
       v-if="loading"
       kind="loading"
       title="正在加载技术事实"
-      description="正在回读方案、图纸、RFI、交底和归档状态。"
+      description="正在加载方案、图纸、RFI、交底和归档状态。"
     />
     <V2PageState
       v-else-if="!projectId"
@@ -566,11 +558,11 @@ onBeforeUnmount(() => {
           <div class="technical-page__stack">
             <article v-for="item in overview.schemes" :key="item.id" class="technical-page__item">
               <strong>{{ item.schemeCode }} · {{ item.schemeName }}</strong
-              ><V2Badge :tone="tone(item.status)">{{ item.status }}</V2Badge
+              ><V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge
               ><V2Button
                 v-if="canSchemeSubmit && item.status === 'DRAFT'"
                 size="small"
-                @click="act(() => submitTechnicalScheme(item.id), '方案已提交审批并回读')"
+                @click="act(() => submitTechnicalScheme(item.id), '方案已提交审批')"
                 >提交方案</V2Button
               >
             </article>
@@ -586,7 +578,10 @@ onBeforeUnmount(() => {
             >
               <button class="technical-page__title" type="button" @click="openTrace(drawing)">
                 {{ drawing.drawingCode }} · {{ drawing.drawingName }}</button
-              ><span>{{ drawing.currentVersionNo }} / {{ drawing.currentVersionStatus }}</span>
+              ><span
+                >{{ drawing.currentVersionNo }} /
+                {{ deliveryLabel(drawing.currentVersionStatus) }}</span
+              >
               <div class="technical-page__actions">
                 <V2Button size="small" variant="secondary" @click="openTrace(drawing)"
                   >追溯</V2Button
@@ -602,7 +597,7 @@ onBeforeUnmount(() => {
           </div>
         </V2Card>
       </div>
-      <V2Card title="版本、会审与 RFI" subtitle="可执行动作严格跟随后端阶段">
+      <V2Card title="版本、会审与 RFI" subtitle="可用操作随业务阶段变化">
         <div class="technical-page__grid">
           <article
             v-for="version in overview.versions"
@@ -610,7 +605,7 @@ onBeforeUnmount(() => {
             class="technical-page__item"
           >
             <strong>{{ versionLabel(version.id) }}</strong
-            ><V2Badge :tone="tone(version.status)">{{ version.status }}</V2Badge
+            ><V2Badge :tone="tone(version.status)">{{ deliveryLabel(version.status) }}</V2Badge
             ><V2Button
               v-if="canDrawingReview && version.status === 'RECEIVED'"
               size="small"
@@ -619,12 +614,12 @@ onBeforeUnmount(() => {
             >
           </article>
           <article v-for="review in overview.reviews" :key="review.id" class="technical-page__item">
-            <strong>{{ review.reviewCode }} · {{ review.conclusion }}</strong
-            ><V2Badge :tone="tone(review.status)">{{ review.status }}</V2Badge
+            <strong>{{ review.reviewCode }} · {{ deliveryLabel(review.conclusion) }}</strong
+            ><V2Badge :tone="tone(review.status)">{{ deliveryLabel(review.status) }}</V2Badge
             ><V2Button
               v-if="canDrawingReview && review.status === 'DRAFT'"
               size="small"
-              @click="act(() => confirmDrawingReview(review.id), '会审已确认并回读')"
+              @click="act(() => confirmDrawingReview(review.id), '会审已确认')"
               >确认会审</V2Button
             ><V2Button
               v-if="canRfiRaise && review.status === 'CONFIRMED' && Boolean(review.requiresRfi)"
@@ -635,11 +630,11 @@ onBeforeUnmount(() => {
           </article>
           <article v-for="rfi in overview.rfis" :key="rfi.id" class="technical-page__item">
             <strong>{{ rfi.rfiCode }} · {{ rfi.subject }}</strong
-            ><V2Badge :tone="tone(rfi.status)">{{ rfi.status }}</V2Badge
+            ><V2Badge :tone="tone(rfi.status)">{{ deliveryLabel(rfi.status) }}</V2Badge
             ><V2Button
               v-if="canRfiRaise && rfi.status === 'DRAFT'"
               size="small"
-              @click="act(() => submitTechnicalRfi(rfi.id), 'RFI 已提交并回读')"
+              @click="act(() => submitTechnicalRfi(rfi.id), 'RFI 已提交')"
               >提交 RFI</V2Button
             ><V2Button
               v-if="canRfiRespond && rfi.status === 'SUBMITTED'"
@@ -657,7 +652,7 @@ onBeforeUnmount(() => {
               >{{ response.responderName }} ·
               {{ response.changeRequired ? '要求改版' : '无需改版' }}</strong
             ><V2Badge :tone="tone(response.reviewStatus ?? response.status)">{{
-              response.reviewStatus ?? response.status
+              deliveryLabel(response.reviewStatus ?? response.status)
             }}</V2Badge
             ><V2Button
               v-if="canRfiAccept && (response.reviewStatus ?? response.status) === 'SUBMITTED'"
@@ -680,11 +675,11 @@ onBeforeUnmount(() => {
         <div class="technical-page__grid">
           <article v-for="item in overview.disclosures" :key="item.id" class="technical-page__item">
             <strong>{{ item.disclosureCode }} · {{ item.disclosureTitle }}</strong
-            ><V2Badge :tone="tone(item.status)">{{ item.status }}</V2Badge
+            ><V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge
             ><V2Button
               v-if="canDisclosure && item.status === 'DRAFT'"
               size="small"
-              @click="act(() => confirmTechnicalDisclosure(item.id), '技术交底已确认并回读')"
+              @click="act(() => confirmTechnicalDisclosure(item.id), '技术交底已确认')"
               >确认交底</V2Button
             ><V2Button
               v-if="canDisclosure && item.status === 'CONFIRMED'"
@@ -695,7 +690,7 @@ onBeforeUnmount(() => {
           </article>
           <article v-for="item in availableReferences" :key="item.id" class="technical-page__item">
             <strong>{{ item.workArea }} · {{ item.referenceDate }}</strong
-            ><V2Badge :tone="tone(item.status)">{{ item.status }}</V2Badge
+            ><V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge
             ><V2Button
               v-if="canArchive && overview.qualityInspections.length"
               size="small"
@@ -705,11 +700,11 @@ onBeforeUnmount(() => {
           </article>
           <article v-for="item in overview.archives" :key="item.id" class="technical-page__item">
             <strong>{{ item.archiveCode }} · {{ item.archiveLocation }}</strong
-            ><V2Badge :tone="tone(item.status)">{{ item.status }}</V2Badge
+            ><V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge
             ><V2Button
               v-if="canArchive && item.status === 'DRAFT'"
               size="small"
-              @click="act(() => confirmAcceptanceArchive(item.id), '验收档案已确认并回读')"
+              @click="act(() => confirmAcceptanceArchive(item.id), '验收档案已确认')"
               >确认归档</V2Button
             >
           </article>
@@ -718,27 +713,27 @@ onBeforeUnmount(() => {
       <V2Card
         v-if="trace"
         title="图纸闭环追溯"
-        :subtitle="`${trace.drawing.drawingCode} · 后端权威链`"
+        :subtitle="`${trace.drawing.drawingCode} · 版本、会审、RFI、交底与归档记录`"
         ><ol class="technical-page__timeline">
           <li v-for="item in trace.versions" :key="`v-${item.id}`">
             <strong>版本 {{ item.versionNo }}</strong
-            ><span>{{ item.status }}</span>
+            ><span>{{ deliveryLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.reviews" :key="`review-${item.id}`">
             <strong>会审 {{ item.reviewCode }}</strong
-            ><span>{{ item.status }}</span>
+            ><span>{{ deliveryLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.rfis" :key="`rfi-${item.id}`">
             <strong>RFI {{ item.rfiCode }}</strong
-            ><span>{{ item.status }}</span>
+            ><span>{{ deliveryLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.disclosures" :key="`d-${item.id}`">
             <strong>交底 {{ item.disclosureCode }}</strong
-            ><span>{{ item.status }}</span>
+            ><span>{{ deliveryLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.archives" :key="`a-${item.id}`">
             <strong>档案 {{ item.archiveCode }}</strong
-            ><span>{{ item.status }}</span>
+            ><span>{{ deliveryLabel(item.status) }}</span>
           </li>
         </ol></V2Card
       >
@@ -748,13 +743,15 @@ onBeforeUnmount(() => {
       :open="Boolean(dialog)"
       :title="dialogTitle"
       :close-disabled="saving || Boolean(pendingEvidence)"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
       @update:open="
         (open) => {
           if (!open) dialog = null
         }
       "
     >
-      <form class="technical-page__form" @submit.prevent="save">
+      <form id="technical-dialog-form" class="technical-page__form" @submit.prevent="save">
         <template v-if="dialog === 'scheme'"
           ><V2Input v-model="form.code" label="方案编码" required /><V2Input
             v-model="form.name"
@@ -764,7 +761,7 @@ onBeforeUnmount(() => {
             label="方案类型"
             :options="
               ['GENERAL', 'SPECIAL', 'CONSTRUCTION_ORGANIZATION', 'METHOD_STATEMENT'].map(
-                (value) => ({ value, label: value }),
+                (value) => ({ value, label: deliveryLabel(value) }),
               )
             " /><V2Input v-model="form.responsibleUserId" label="负责人 ID" required
         /></template>
@@ -798,7 +795,10 @@ onBeforeUnmount(() => {
             v-model="form.conclusion"
             label="会审结论"
             :options="
-              ['PASS', 'CONDITIONAL', 'REJECTED'].map((value) => ({ value, label: value }))
+              ['PASS', 'CONDITIONAL', 'REJECTED'].map((value) => ({
+                value,
+                label: deliveryLabel(value),
+              }))
             " /><label><input v-model="form.requiresRfi" type="checkbox" /> 需要 RFI</label
           ><label class="technical-page__wide"
             >会审摘要<textarea v-model="form.summary" required /></label
@@ -811,7 +811,7 @@ onBeforeUnmount(() => {
             v-model="form.priority"
             label="优先级"
             :options="
-              ['NORMAL', 'HIGH', 'URGENT'].map((value) => ({ value, label: value }))
+              ['NORMAL', 'HIGH', 'URGENT'].map((value) => ({ value, label: deliveryLabel(value) }))
             " /><label>回复期限<input v-model="form.dueDate" type="date" required /></label
           ><label class="technical-page__wide"
             >问题<textarea v-model="form.question" required /></label
@@ -896,10 +896,13 @@ onBeforeUnmount(() => {
           class="technical-page__wide"
           >阶段证据<input type="file" required @change="chooseEvidence"
         /></label>
-        <V2Button type="submit" :loading="saving">{{
-          pendingEvidence ? '仅重试附件上传' : '提交并权威回读'
-        }}</V2Button>
       </form>
+      <template #footer>
+        <V2Button variant="secondary" :disabled="saving" @click="dialog = null">取消</V2Button>
+        <V2Button type="submit" form="technical-dialog-form" :loading="saving">{{
+          pendingEvidence ? '重试附件上传' : '确认提交'
+        }}</V2Button>
+      </template>
     </V2Dialog>
   </section>
 </template>
@@ -988,10 +991,14 @@ onBeforeUnmount(() => {
   min-height: 2.5rem;
   padding: var(--v2-space-2);
   color: var(--v2-color-text);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
   border-radius: var(--v2-radius-md);
   font: inherit;
+}
+.technical-page__form :deep(.v2-field__control) {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
 }
 .technical-page__form textarea {
   min-height: 6rem;

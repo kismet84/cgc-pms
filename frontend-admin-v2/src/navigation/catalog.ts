@@ -104,6 +104,7 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'execution',
         label: '计划与现场',
         defaultPath: '/project-schedule',
+        matchPrefixes: ['/project-schedule'],
         tabs: [
           {
             path: '/project-schedule',
@@ -124,11 +125,17 @@ export const navigationDomains: NavigationDomain[] = [
         label: '质量与技术',
         defaultPath: '/quality-safety',
         tabs: [
-          { path: '/quality-safety', label: '质量安全整改', permission: 'quality:safety:query' },
+          {
+            path: '/quality-safety',
+            label: '质量安全整改',
+            permission: 'quality:safety:query',
+            workspaceContext: { project: true, period: false },
+          },
           {
             path: '/technical-management',
             label: '图纸 RFI 技术闭环',
             permission: 'technical:query',
+            workspaceContext: { project: true, period: false },
           },
         ],
       },

@@ -46,6 +46,7 @@ import {
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
+import { deliveryLabel } from './labels'
 
 type DialogKind =
   | 'plan'
@@ -92,9 +93,6 @@ const projectId = computed(() => {
   const query = typeof route.query.projectId === 'string' ? route.query.projectId.trim() : ''
   return query || workspace.selectedProjectId || ''
 })
-const projectOptions = computed(() =>
-  workspace.projects.map((item) => ({ value: item.value, label: item.label })),
-)
 const selectedPlan = computed(
   () => plans.value.find((item) => item.id === selectedPlanId.value) ?? null,
 )
@@ -377,7 +375,7 @@ async function runWrite(
   } catch (error) {
     errorMessage.value = errorText(
       error,
-      error instanceof Error ? error.message : '操作失败，已保留权威状态',
+      error instanceof Error ? error.message : '操作失败，当前数据未变更',
     )
     await loadProject(true).catch(() => undefined)
     const refreshed = issue ? issues.value.find((item) => item.id === issue.id) : null
@@ -390,31 +388,31 @@ async function runWrite(
 const savePlan = () =>
   runWrite(async () => {
     await createQualityPlan(planForm)
-  }, '检查计划已创建并回读')
+  }, '检查计划已创建')
 const activatePlan = (plan: QualityPlanRecord) =>
   runWrite(async () => {
     await activateQualityPlan(plan.id)
-  }, '计划已激活并回读')
+  }, '计划已激活')
 const finishPlan = (plan: QualityPlanRecord) =>
   runWrite(async () => {
     await completeQualityPlan(plan.id)
-  }, '计划已完成并回读')
+  }, '计划已完成')
 const saveInspection = () =>
   runWrite(async () => {
     const created = await createQualityInspection(inspectionForm)
     await uploadRequired('QS_INSPECTION', created.id, 'INSPECTION_EVIDENCE')
-  }, '检查及证据已创建并回读')
+  }, '检查及证据已创建')
 const saveIssue = () =>
   runWrite(async () => {
     const inspection = activeInspection.value
     if (!inspection) throw new TypeError('检查记录不存在')
     const created = await createQualityIssue(inspection.id, issueForm)
     await uploadRequired('QS_ISSUE', created.id, 'ISSUE_EVIDENCE')
-  }, '问题及证据已创建并回读')
+  }, '问题及证据已创建')
 const submitInspection = (inspection: QualityInspectionRecord) =>
   runWrite(async () => {
     await submitQualityInspection(inspection.id)
-  }, '检查已提交并回读')
+  }, '检查已提交')
 const saveRectification = () =>
   runWrite(
     async () => {
@@ -424,7 +422,7 @@ const saveRectification = () =>
       await uploadRequired('QS_RECTIFICATION', created.id, 'RECTIFICATION_EVIDENCE')
       await submitQualityRectification(created.id)
     },
-    '整改已提交复检并回读',
+    '整改已提交复检',
     activeIssue.value ?? undefined,
   )
 const saveReinspection = () =>
@@ -435,7 +433,7 @@ const saveReinspection = () =>
       await uploadRequired('QS_RECTIFICATION', item.id, 'REINSPECTION_EVIDENCE')
       await reinspectQualityRectification(item.id, reinspectionForm)
     },
-    '复检结果已提交并回读',
+    '复检结果已提交',
     activeIssue.value ?? undefined,
   )
 const saveConsequence = () =>
@@ -444,7 +442,7 @@ const saveConsequence = () =>
       const created = await createQualityConsequence(consequenceForm)
       await postQualityConsequence(created.id)
     },
-    '后果已确认并回读',
+    '后果已确认',
     activeIssue.value ?? undefined,
   )
 const postExistingConsequence = () => {
@@ -455,7 +453,7 @@ const postExistingConsequence = () => {
     async () => {
       await postQualityConsequence(consequence.id)
     },
-    '后果已确认并回读',
+    '后果已确认',
     issue,
   )
 }
@@ -466,7 +464,7 @@ const saveEvidence = () => {
     async () => {
       await uploadRequired(target.businessType, target.businessId, target.documentType)
     },
-    `${target.label}已上传并回读`,
+    `${target.label}已上传`,
     target.issue,
   )
 }
@@ -477,7 +475,7 @@ const submitDraftRectification = (item: QualityRectificationRecord) => {
     async () => {
       await submitQualityRectification(item.id)
     },
-    '整改已提交复检并回读',
+    '整改已提交复检',
     issue,
   )
 }
@@ -497,7 +495,7 @@ onBeforeUnmount(() => {
     <header>
       <p class="quality-page__eyebrow">项目履约 · 质量安全</p>
       <h1 id="quality-title">质量安全整改闭环</h1>
-      <p>计划 → 检查 → 问题 → 整改 → 复检 → 后果；所有动作完成后回读权威状态。</p>
+      <p>计划 → 检查 → 问题 → 整改 → 复检 → 后果，完整记录质量安全整改过程。</p>
     </header>
     <div class="quality-page__notice" role="status" aria-live="polite">
       <V2Alert v-if="errorMessage" tone="danger" title="操作未完成">{{ errorMessage }}</V2Alert>
@@ -506,21 +504,9 @@ onBeforeUnmount(() => {
       }}</V2Alert>
     </div>
 
-    <V2Card title="项目范围" subtitle="项目切换会取消旧请求，避免串项目。">
-      <div class="quality-page__toolbar">
-        <V2Select
-          v-if="projectOptions.length"
-          :model-value="projectId"
-          label="项目"
-          :options="projectOptions"
-          @update:model-value="workspace.selectProject"
-        />
-        <span v-else>{{ projectId ? `项目 ${projectId}` : '请选择有权访问的项目' }}</span>
-        <V2Button v-if="canPlan && projectId" size="small" @click="show('plan')"
-          >新建检查计划</V2Button
-        >
-      </div>
-    </V2Card>
+    <div v-if="canPlan && projectId" class="quality-page__actions">
+      <V2Button size="small" @click="show('plan')">新建检查计划</V2Button>
+    </div>
 
     <V2PageState
       v-if="loading"
@@ -543,7 +529,7 @@ onBeforeUnmount(() => {
                 {{ plan.planCode }} · {{ plan.planName }}
               </button>
               <div class="quality-page__facts">
-                <V2Badge :tone="statusTone(plan.status)">{{ plan.status }}</V2Badge
+                <V2Badge :tone="statusTone(plan.status)">{{ deliveryLabel(plan.status) }}</V2Badge
                 ><span>{{ plan.startDate }} 至 {{ plan.endDate }}</span>
               </div>
               <div class="quality-page__actions">
@@ -587,7 +573,9 @@ onBeforeUnmount(() => {
               <strong>{{ inspection.inspectionCode }}</strong>
               <p>{{ inspection.location }} · {{ inspection.summary }}</p>
               <div class="quality-page__facts">
-                <V2Badge :tone="statusTone(inspection.status)">{{ inspection.status }}</V2Badge
+                <V2Badge :tone="statusTone(inspection.status)">{{
+                  deliveryLabel(inspection.status)
+                }}</V2Badge
                 ><span>{{ inspection.inspectionDate }}</span>
               </div>
               <div class="quality-page__actions">
@@ -631,8 +619,10 @@ onBeforeUnmount(() => {
         <div v-if="issues.length" class="quality-page__issue-grid">
           <article v-for="issue in issues" :key="issue.id" class="quality-page__item">
             <div class="quality-page__facts">
-              <V2Badge :tone="statusTone(issue.severity)">{{ issue.severity }}</V2Badge
-              ><V2Badge :tone="statusTone(issue.status)">{{ issue.status }}</V2Badge>
+              <V2Badge :tone="statusTone(issue.severity)">{{
+                deliveryLabel(issue.severity)
+              }}</V2Badge
+              ><V2Badge :tone="statusTone(issue.status)">{{ deliveryLabel(issue.status) }}</V2Badge>
             </div>
             <h3>{{ issue.issueCode }} · {{ issue.title }}</h3>
             <p>{{ issue.description }}</p>
@@ -679,27 +669,34 @@ onBeforeUnmount(() => {
         <p v-else>暂无质量安全问题。</p>
       </V2Card>
 
-      <V2Card v-if="trace" title="闭环追溯" :subtitle="`${trace.issue.issueCode} · 后端权威链`">
+      <V2Card v-if="trace" title="闭环追溯" :subtitle="`${trace.issue.issueCode} · 整改与复检记录`">
         <ol class="quality-page__timeline">
           <li>
-            <strong>计划</strong><span>{{ trace.plan.planCode }} / {{ trace.plan.status }}</span>
+            <strong>计划</strong
+            ><span>{{ trace.plan.planCode }} / {{ deliveryLabel(trace.plan.status) }}</span>
           </li>
           <li>
             <strong>检查</strong
-            ><span>{{ trace.inspection.inspectionCode }} / {{ trace.inspection.status }}</span>
+            ><span
+              >{{ trace.inspection.inspectionCode }} /
+              {{ deliveryLabel(trace.inspection.status) }}</span
+            >
           </li>
           <li>
-            <strong>问题</strong><span>{{ trace.issue.issueCode }} / {{ trace.issue.status }}</span>
+            <strong>问题</strong
+            ><span>{{ trace.issue.issueCode }} / {{ deliveryLabel(trace.issue.status) }}</span>
           </li>
           <li v-for="item in trace.rectifications" :key="item.id">
             <strong>整改第 {{ item.roundNo }} 轮</strong
-            ><span>{{ item.status }} · {{ item.reinspectionComment || '未复检' }}</span>
+            ><span
+              >{{ deliveryLabel(item.status) }} · {{ item.reinspectionComment || '未复检' }}</span
+            >
           </li>
           <li>
             <strong>后果</strong
             ><span>{{
               trace.consequence
-                ? `${trace.consequence.consequenceCode} / ${trace.consequence.status}`
+                ? `${trace.consequence.consequenceCode} / ${deliveryLabel(trace.consequence.status)}`
                 : '未登记'
             }}</span>
           </li>
@@ -753,28 +750,35 @@ onBeforeUnmount(() => {
     <V2Dialog
       :open="dialog === 'evidence'"
       :title="evidenceTarget?.label || '上传阶段证据'"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
       @update:open="
         (open) => {
           if (!open) dialog = null
         }
       "
-      ><form class="quality-page__form" @submit.prevent="saveEvidence">
+      ><form id="quality-evidence-form" class="quality-page__form" @submit.prevent="saveEvidence">
         <label class="quality-page__wide"
           >阶段证据<input type="file" required @change="chooseEvidence"
         /></label>
-        <V2Button type="submit" :loading="saving">上传并回读</V2Button>
-      </form></V2Dialog
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
+        <V2Button type="submit" form="quality-evidence-form" :loading="saving">上传证据</V2Button>
+      </template></V2Dialog
     >
 
     <V2Dialog
       :open="dialog === 'plan'"
       title="新建检查计划"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
       @update:open="
         (open) => {
           if (!open) dialog = null
         }
       "
-      ><form class="quality-page__form" @submit.prevent="savePlan">
+      ><form id="quality-plan-form" class="quality-page__form" @submit.prevent="savePlan">
         <V2Input v-model="planForm.planCode" label="计划编码" required /><V2Input
           v-model="planForm.planName"
           label="计划名称"
@@ -796,22 +800,28 @@ onBeforeUnmount(() => {
           ]"
         /><label>开始日期<input v-model="planForm.startDate" type="date" required /></label
         ><label>结束日期<input v-model="planForm.endDate" type="date" required /></label
-        ><V2Input v-model="planForm.ownerUserId" label="负责人用户 ID" required /><V2Button
-          type="submit"
-          :loading="saving"
-          >保存并回读</V2Button
-        >
-      </form></V2Dialog
+        ><V2Input v-model="planForm.ownerUserId" label="负责人用户 ID" required />
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
+        <V2Button type="submit" form="quality-plan-form" :loading="saving">保存计划</V2Button>
+      </template></V2Dialog
     >
     <V2Dialog
       :open="dialog === 'inspection'"
       title="新建检查"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
       @update:open="
         (open) => {
           if (!open) dialog = null
         }
       "
-      ><form class="quality-page__form" @submit.prevent="saveInspection">
+      ><form
+        id="quality-inspection-form"
+        class="quality-page__form"
+        @submit.prevent="saveInspection"
+      >
         <V2Input v-model="inspectionForm.inspectionCode" label="检查编码" required /><label
           >检查日期<input v-model="inspectionForm.inspectionDate" type="date" required /></label
         ><V2Input v-model="inspectionForm.location" label="检查地点" required /><V2Input
@@ -821,23 +831,34 @@ onBeforeUnmount(() => {
         /><label class="quality-page__wide"
           >检查摘要<textarea v-model="inspectionForm.summary" required /></label
         ><label class="quality-page__wide"
-          >检查证据<input type="file" required @change="chooseEvidence" /></label
-        ><V2Button type="submit" :loading="saving">保存证据并回读</V2Button>
-      </form></V2Dialog
+          >检查证据<input type="file" required @change="chooseEvidence"
+        /></label>
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
+        <V2Button type="submit" form="quality-inspection-form" :loading="saving">保存检查</V2Button>
+      </template></V2Dialog
     >
     <V2Dialog
       :open="dialog === 'issue'"
       title="登记问题"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
       @update:open="
         (open) => {
           if (!open) dialog = null
         }
       "
-      ><form class="quality-page__form" @submit.prevent="saveIssue">
+      ><form id="quality-issue-form" class="quality-page__form" @submit.prevent="saveIssue">
         <V2Input v-model="issueForm.category" label="问题分类" required /><V2Select
           v-model="issueForm.severity"
           label="严重程度"
-          :options="['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((value) => ({ value, label: value }))"
+          :options="
+            ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].map((value) => ({
+              value,
+              label: deliveryLabel(value),
+            }))
+          "
         /><V2Input v-model="issueForm.title" label="问题标题" required /><V2Select
           v-model="issueForm.responsibleKind"
           label="责任类型"
@@ -855,19 +876,29 @@ onBeforeUnmount(() => {
         ><label class="quality-page__wide"
           >问题描述<textarea v-model="issueForm.description" required /></label
         ><label class="quality-page__wide"
-          >问题证据<input type="file" required @change="chooseEvidence" /></label
-        ><V2Button type="submit" :loading="saving">保存证据并回读</V2Button>
-      </form></V2Dialog
+          >问题证据<input type="file" required @change="chooseEvidence"
+        /></label>
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
+        <V2Button type="submit" form="quality-issue-form" :loading="saving">登记问题</V2Button>
+      </template></V2Dialog
     >
     <V2Dialog
       :open="dialog === 'rectification'"
       title="提交整改"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
       @update:open="
         (open) => {
           if (!open) dialog = null
         }
       "
-      ><form class="quality-page__form" @submit.prevent="saveRectification">
+      ><form
+        id="quality-rectification-form"
+        class="quality-page__form"
+        @submit.prevent="saveRectification"
+      >
         <V2Input
           v-model="rectificationForm.responsibleUserId"
           label="整改责任人 ID"
@@ -880,19 +911,31 @@ onBeforeUnmount(() => {
         ><label class="quality-page__wide"
           >整改措施<textarea v-model="rectificationForm.actionDescription" required /></label
         ><label class="quality-page__wide"
-          >整改证据<input type="file" required @change="chooseEvidence" /></label
-        ><V2Button type="submit" :loading="saving">提交整改并回读</V2Button>
-      </form></V2Dialog
+          >整改证据<input type="file" required @change="chooseEvidence"
+        /></label>
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
+        <V2Button type="submit" form="quality-rectification-form" :loading="saving"
+          >提交整改</V2Button
+        >
+      </template></V2Dialog
     >
     <V2Dialog
       :open="dialog === 'reinspection'"
       title="整改复检"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
       @update:open="
         (open) => {
           if (!open) dialog = null
         }
       "
-      ><form class="quality-page__form" @submit.prevent="saveReinspection">
+      ><form
+        id="quality-reinspection-form"
+        class="quality-page__form"
+        @submit.prevent="saveReinspection"
+      >
         <V2Select
           v-model="reinspectionForm.result"
           label="复检结论"
@@ -903,19 +946,31 @@ onBeforeUnmount(() => {
         /><label class="quality-page__wide"
           >复检意见<textarea v-model="reinspectionForm.comment" required /></label
         ><label class="quality-page__wide"
-          >复检证据<input type="file" required @change="chooseEvidence" /></label
-        ><V2Button type="submit" :loading="saving">提交复检并回读</V2Button>
-      </form></V2Dialog
+          >复检证据<input type="file" required @change="chooseEvidence"
+        /></label>
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
+        <V2Button type="submit" form="quality-reinspection-form" :loading="saving"
+          >提交复检</V2Button
+        >
+      </template></V2Dialog
     >
     <V2Dialog
       :open="dialog === 'consequence'"
       title="登记合作方后果"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
       @update:open="
         (open) => {
           if (!open) dialog = null
         }
       "
-      ><form class="quality-page__form" @submit.prevent="saveConsequence">
+      ><form
+        id="quality-consequence-form"
+        class="quality-page__form"
+        @submit.prevent="saveConsequence"
+      >
         <V2Input v-model="consequenceForm.partnerId" label="合作方 ID" required /><V2Input
           v-model="consequenceForm.contractId"
           label="关联合同 ID"
@@ -924,7 +979,10 @@ onBeforeUnmount(() => {
           v-model="consequenceForm.decisionType"
           label="处置类型"
           :options="
-            ['NONE', 'FINE', 'REWORK_COST', 'BOTH'].map((value) => ({ value, label: value }))
+            ['NONE', 'FINE', 'REWORK_COST', 'BOTH'].map((value) => ({
+              value,
+              label: deliveryLabel(value),
+            }))
           "
         /><V2Input v-model="consequenceForm.fineAmount" label="罚款金额" required /><V2Input
           v-model="consequenceForm.reworkCostAmount"
@@ -932,9 +990,15 @@ onBeforeUnmount(() => {
           required
         /><V2Input v-model="consequenceForm.evaluationScore" label="评价得分" required /><label
           class="quality-page__wide"
-          >评价意见<textarea v-model="consequenceForm.evaluationComment" required /></label
-        ><V2Button type="submit" :loading="saving">确认后果并回读</V2Button>
-      </form></V2Dialog
+          >评价意见<textarea v-model="consequenceForm.evaluationComment" required />
+        </label>
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
+        <V2Button type="submit" form="quality-consequence-form" :loading="saving"
+          >确认登记</V2Button
+        >
+      </template></V2Dialog
     >
   </section>
 </template>
@@ -958,16 +1022,12 @@ onBeforeUnmount(() => {
 .quality-page__notice:empty {
   display: none;
 }
-.quality-page__toolbar,
 .quality-page__facts,
 .quality-page__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--v2-space-2);
   align-items: center;
-}
-.quality-page__toolbar {
-  justify-content: space-between;
 }
 .quality-page__columns,
 .quality-page__issue-grid,
@@ -1028,10 +1088,14 @@ onBeforeUnmount(() => {
   min-height: 2.5rem;
   padding: var(--v2-space-2);
   color: var(--v2-color-text);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
   border-radius: var(--v2-radius-md);
   font: inherit;
+}
+.quality-page__form :deep(.v2-field__control) {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
 }
 .quality-page__form textarea {
   min-height: 6rem;

@@ -23,11 +23,14 @@ import {
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 
-export function loadSchedules(projectId: string, signal?: AbortSignal): Promise<ScheduleRecord[]> {
-  return apiRequest<Record<string, unknown>[]>(
-    `${DELIVERY_API.schedules}?projectId=${encodeURIComponent(requiredId(projectId))}`,
-    { signal },
-  ).then((rows) => rows.map(normalizeSchedule))
+export function loadSchedules(projectId?: string, signal?: AbortSignal): Promise<ScheduleRecord[]> {
+  const normalizedProjectId = projectId?.trim()
+  const query = normalizedProjectId
+    ? `?projectId=${encodeURIComponent(requiredId(normalizedProjectId))}`
+    : ''
+  return apiRequest<Record<string, unknown>[]>(`${DELIVERY_API.schedules}${query}`, {
+    signal,
+  }).then((rows) => rows.map(normalizeSchedule))
 }
 
 export function loadSchedule(id: string, signal?: AbortSignal): Promise<ScheduleDetail> {

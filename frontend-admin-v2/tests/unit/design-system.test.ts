@@ -45,6 +45,27 @@ describe('Clean-room V2 design system', () => {
     expect(button.attributes()).toHaveProperty('disabled')
   })
 
+  it('forwards native form association from a footer button', async () => {
+    const form = document.createElement('form')
+    form.id = 'external-dialog-form'
+    const submitted = vi.fn((event: SubmitEvent) => event.preventDefault())
+    form.addEventListener('submit', submitted)
+    document.body.appendChild(form)
+    const wrapper = mount(V2Button, {
+      attachTo: document.body,
+      props: { type: 'submit' },
+      attrs: { form: form.id },
+      slots: { default: '确认提交' },
+    })
+
+    expect(wrapper.get('button').attributes('form')).toBe(form.id)
+    await wrapper.get('button').trigger('click')
+    expect(submitted).toHaveBeenCalledOnce()
+
+    wrapper.unmount()
+    form.remove()
+  })
+
   it('exposes a reusable glass button with text, state and click props', async () => {
     let clicks = 0
     const wrapper = mount(V2GlassButton, {
@@ -441,6 +462,12 @@ describe('Clean-room V2 design system', () => {
       'utf-8',
     )
     const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+    const deliveryPages = [
+      'pages/delivery/SchedulePage.vue',
+      'pages/delivery/QualitySafetyPage.vue',
+      'pages/delivery/TechnicalManagementPage.vue',
+      'pages/delivery/ProjectCloseoutPage.vue',
+    ].map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
 
     expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog'")
     expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog daily-log-page__dialog'")
@@ -474,6 +501,27 @@ describe('Clean-room V2 design system', () => {
     expect(dashboard).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
     expect(dashboard).toContain('class="v2-detail-dialog__section"')
     expect(dashboard).not.toContain('dashboard-alert-detail')
+    for (const page of deliveryPages) {
+      expect(page).toContain('panel-class="v2-dialog-standard')
+      expect(page).toContain(':close-on-backdrop="false"')
+      expect(page).toContain('<template #footer>')
+      expect(page).not.toMatch(/权威|回读|重读|后端状态|后端阶段/)
+      expect(page).not.toMatch(/\{\{\s*(?:\w+\.)+(?:status|severity|conclusion)\s*\}\}/)
+    }
+    for (const page of deliveryPages.slice(1)) {
+      expect(page).not.toContain('title="项目范围"')
+      expect(page).not.toContain('v-model="workspace.selectedProjectId"')
+      expect(page).not.toContain('@update:model-value="workspace.selectProject"')
+    }
+    for (const formId of [
+      'schedule-create-form',
+      'schedule-wbs-form',
+      'schedule-period-form',
+      'schedule-corrective-form',
+    ]) {
+      expect(deliveryPages[0]).toContain(`id="${formId}"`)
+      expect(deliveryPages[0]).toContain(`type="submit" form="${formId}"`)
+    }
     expect(components).toContain('.v2-detail-dialog .v2-card {')
     expect(components).toMatch(/\.v2-dialog-standard \{[\s\S]*?width: min\(32rem, 100%\);/)
     expect(components).toMatch(/@media \(min-width: 64rem\) \{[\s\S]*?width: min\(46rem, 100%\);/)
