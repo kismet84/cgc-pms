@@ -12,6 +12,76 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 2026-07-22 第53条主线M3已完成；`ISSUE-053-010～016`全部通过并完成治理收口。当前无M3 Ready。
 
+2026-07-22 第53条主线M4启动裁决通过；`ISSUE-053-017`为唯一Ready。其余`ISSUE-053-018～023`保持Planned，须在金丝雀通过后逐条补充，不得并行放行。
+
+### ISSUE-053-017：M4商务契约、金额与权限金丝雀
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 商务合约 / 稳定契约 / 金额与权限金丝雀
+目标：
+
+- 冻结合同、变更、投标成本、目标成本、成本台账/汇总/控制、预算和产值计量的稳定DTO、只读API路径、金额字段与查询权限基线。
+- 复用V2请求核心，建立合同台账、合同详情和成本汇总历史三条只读金丝雀请求，并以可重复测试证明项目/租户范围、AbortSignal和十进制字符串边界。
+- 为后续18条商务合约路由迁移提供唯一共享契约，不复制Legacy UI状态或建立第二请求层。
+非目标：
+- 不迁移、渲染或切换任何M4路由，不修改路由迁移台账状态。
+- 不修改后端、数据库、Legacy页面、正式入口、业务数据、权限码或状态机；不新增依赖、缓存、Store、业务mock或前端权威金额计算。
+- 不纳入`/cost/subject`及其taxonomy、rules、scope、trace五条M7路由。
+允许修改：
+- `packages/frontend-contracts/src/commercial.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/commercial.ts`
+- `frontend-admin-v2/tests/unit/m4-commercial-contract-baseline.test.ts`
+- `docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/product-intelligence/evolution-decision.md`
+- `docs/quality/ISSUE-053-017-M4商务契约金额与权限金丝雀验收报告.md`
+禁止修改：
+- `backend/**`
+- `frontend-admin/**`
+- `frontend-admin-v2/src/pages/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/**`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `docs/ui-v2/**`
+- `backend/src/main/resources/db/migration/**`
+- `scripts/demo/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `AGENTS.override.md`
+验收标准：
+- DTO字段、枚举、查询参数与当前九个后端Controller、响应VO及Legacy类型交叉一致；未知字段不猜测，金额、税额、成本、利润、预算和产值金额统一为规范十进制字符串。
+- 合同台账、合同详情和成本汇总历史只访问既有GET端点；query安全编码，空筛选不发送，AbortSignal完整传递，查询不产生POST/PUT/PATCH/DELETE。
+- 页面查询权限基线固定为`contract:query`、`variation:order:query`、`bid:query`、`cost:target:query`、`cost:ledger:query`、`cost:summary:view`、`cost:control:query`、`budget:query`、`measurement:query`；不实现管理员或前端范围兜底。
+- 权威金额字段不得声明为`number`或经`Number`、`parseFloat`、隐式算术处理；税率和数量须显式标注非金额边界，不在前端形成权威金额。
+- 契约与服务不得依赖Vue、Pinia、DOM、CSS、Legacy源码或本地业务mock；不产生新V2页面、路由或路由台账变化。
+- Ready lint、契约类型、目标单测、V2类型、Lint、Clean-room边界、构建和`git diff --check`全部通过。
+状态：Ready
+来源锚点：`docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`的ISSUE-053-017；`docs/quality/第53条主线-M3-项目履约全量退出门验收报告.md`的M3本地正式收口通过事实；`docs/product-intelligence/evolution-decision.md`的`PI-2026-07-18-02`；candidateEvidenceHead=c7ca210db53edece87124ac28945479093af3e49
+存量问题键：[mainline:053-M4-017-COMMERCIAL-CONTRACT-MONEY-GATE]
+验证命令：
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-017`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m4-commercial-contract-baseline.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+归档报告：`docs/quality/ISSUE-053-017-M4商务契约金额与权限金丝雀验收报告.md`
+Migration：不需要
+依赖：M3全量退出门已通过；当前生成台账为`68/19/0`；九个商务域Controller、Legacy API模块及现有金额类型已核实；本Issue是M4唯一实施金丝雀，通过后方可补充`ISSUE-053-018`。
+风险等级：高
+运行态要求：无；仅执行契约、请求构造、静态与单元验证，不连接数据库或生产，不创建业务数据。
+Reviewer要求：独立交叉核对九个Controller/VO、Legacy类型与权限菜单；确认金额不转浮点、项目/租户范围不扩大、signal不丢失、查询零写、无Legacy UI依赖，并核实五条成本科目路由仍归M7。
+最小回滚：回退商务共享契约、薄服务、目标测试及本Issue治理回写；M0～M3、Legacy入口、后端、数据库和`68/19/0`路由台账保持不变。
+
 ### ISSUE-053-010：M3项目契约与只读请求基线
 
 优先级：P0
