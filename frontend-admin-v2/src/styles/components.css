@@ -303,6 +303,17 @@
   border-top: var(--v2-border-width) solid var(--v2-color-border-subtle);
 }
 
+.v2-card__body :where(dl, table),
+.v2-dialog__body :where(dl, table) {
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+
+:where(nav, [role='navigation'])[aria-label$='分页'] {
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+
 .v2-card__title {
   margin: 0;
   color: var(--v2-color-text-strong);
@@ -569,6 +580,7 @@
     var(--v2-font-sans);
 }
 
+.v2-dialog-standard .v2-field__control,
 .v2-dialog-standard
   label:not(.v2-field)
   > input:not([type='checkbox']):not([type='radio']):not([type='file']),

@@ -3,17 +3,11 @@ import type {
   CostLedgerQuery,
   CostLedgerRecord,
   CostLedgerSummary,
-  ProjectContextOption,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { V2Alert, V2Button, V2Card, V2Dialog, V2Input, V2PageState, V2Select } from '@/components'
-import {
-  loadCostLedger,
-  loadCostLedgerPage,
-  loadCostLedgerSummary,
-  loadProjectContextOptions,
-} from '@/services/commercial'
+import { V2Alert, V2Button, V2Card, V2Dialog, V2Input, V2PageState } from '@/components'
+import { loadCostLedger, loadCostLedgerPage, loadCostLedgerSummary } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
@@ -21,11 +15,10 @@ import { useSessionStore } from '@/stores/session'
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
-const filter = reactive<CostLedgerQuery>({ pageNo: 1, pageSize: 20 })
+const filter = reactive<CostLedgerQuery>({ pageNo: 1, pageSize: 10 })
 const records = ref<CostLedgerRecord[]>([])
 const summary = ref<CostLedgerSummary | null>(null)
 const detail = ref<CostLedgerRecord | null>(null)
-const projects = ref<ProjectContextOption[]>([])
 const total = ref(0)
 const loading = ref(false)
 const detailLoading = ref(false)
@@ -36,11 +29,7 @@ let detailGeneration = 0
 let controller: AbortController | null = null
 let detailController: AbortController | null = null
 const canQuery = computed(() => session.hasPermission('cost:ledger:query'))
-const projectOptions = computed(() => [
-  { value: '', label: '全部项目' },
-  ...projects.value.map((p) => ({ value: p.id, label: p.projectName })),
-])
-const pageCount = computed(() => Math.max(1, Math.ceil(total.value / 20)))
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pageSize || 10))))
 const errorText = (e: unknown, fallback: string) =>
   isApiClientError(e) ? e.message : e instanceof Error ? e.message : fallback
 function hydrate() {
@@ -49,7 +38,7 @@ function hydrate() {
   )
   Object.assign(filter, {
     pageNo: Math.max(1, Number(route.query.pageNo) || 1),
-    pageSize: 20,
+    pageSize: 10,
     projectId: typeof route.query.projectId === 'string' ? route.query.projectId : undefined,
     keyword: typeof route.query.keyword === 'string' ? route.query.keyword : undefined,
     startDate: bounds?.startDate,
@@ -66,16 +55,14 @@ async function load() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [page, totals, options] = await Promise.all([
+    const [page, totals] = await Promise.all([
       loadCostLedgerPage({ ...filter }, current.signal),
       loadCostLedgerSummary({ ...filter }, current.signal),
-      loadProjectContextOptions(current.signal),
     ])
     if (token !== generation) return
     records.value = page.records
     total.value = page.total
     summary.value = totals
-    projects.value = options
   } catch (e) {
     if (!current.signal.aborted && token === generation) {
       records.value = []
@@ -91,9 +78,9 @@ async function query() {
   await router.replace({
     path: '/cost/ledger',
     query: {
-      ...(filter.projectId ? { projectId: filter.projectId } : {}),
-      ...(filter.keyword?.trim() ? { keyword: filter.keyword.trim() } : {}),
-      ...(typeof route.query.period === 'string' ? { period: route.query.period } : {}),
+      ...route.query,
+      keyword: filter.keyword?.trim() || undefined,
+      pageNo: undefined,
     },
     hash: route.hash,
   })
@@ -141,12 +128,7 @@ onBeforeUnmount(() => {
       }}</V2Alert
       ><V2Card title="成本台账" :heading-level="1"
         ><div class="filters">
-          <V2Select
-            v-model="filter.projectId"
-            label="项目"
-            :options="projectOptions"
-            allow-empty
-          /><V2Input v-model="filter.keyword" label="关键词" @keyup.enter="query" /><V2Button
+          <V2Input v-model="filter.keyword" label="关键词" @keyup.enter="query" /><V2Button
             variant="secondary"
             :loading="loading"
             @click="query"
@@ -160,51 +142,78 @@ onBeforeUnmount(() => {
           <dt>税额</dt>
           <dd>{{ summary.totalTaxAmount }}</dd>
         </dl></V2Card
-      ><V2PageState
-        v-if="loading && !records.length"
-        title="正在加载成本台账"
-        description="正在读取当前项目和报告期内的成本记录。"
-        kind="loading"
-      /><V2PageState
-        v-else-if="!records.length"
-        title="暂无成本台账"
-        description="当前筛选条件下没有可访问的成本记录。"
-        kind="empty"
-      /><V2Card
-        v-for="row in records"
-        v-else
-        :key="row.id"
-        :title="row.costSubjectName || row.costType"
-        ><dl>
-          <dt>项目</dt>
-          <dd>{{ row.projectName || row.projectId }}</dd>
-          <dt>发生日期</dt>
-          <dd>{{ row.costDate || '—' }}</dd>
-          <dt>金额</dt>
-          <dd>{{ row.amount }}</dd>
-          <dt>税额</dt>
-          <dd>{{ row.taxAmount }}</dd>
-          <dt>来源</dt>
-          <dd>{{ row.sourceType }}</dd>
-        </dl>
-        <template #footer
-          ><V2Button variant="secondary" @click="openDetail(row.id)">详情</V2Button></template
-        ></V2Card
-      >
-      <nav v-if="records.length">
-        <V2Button
-          variant="secondary"
-          :disabled="(filter.pageNo || 1) <= 1"
-          @click="page((filter.pageNo || 1) - 1)"
-          >上一页</V2Button
-        ><span>第 {{ filter.pageNo }} / {{ pageCount }} 页，共 {{ total }} 条</span
-        ><V2Button
-          variant="secondary"
-          :disabled="(filter.pageNo || 1) >= pageCount"
-          @click="page((filter.pageNo || 1) + 1)"
-          >下一页</V2Button
+      ><V2Card title="成本明细"
+        ><V2PageState
+          v-if="loading && !records.length"
+          title="正在加载成本台账"
+          description="正在读取当前项目和报告期内的成本记录。"
+          kind="loading"
+        /><V2PageState
+          v-else-if="!records.length"
+          title="暂无成本台账"
+          description="当前筛选条件下没有可访问的成本记录。"
+          kind="empty"
+        />
+        <div
+          v-else
+          class="table-wrap"
+          role="region"
+          aria-label="成本台账列表"
+          tabindex="0"
+          :aria-busy="loading"
         >
-      </nav>
+          <table>
+            <caption class="v2-visually-hidden">
+              成本台账列表
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">成本科目</th>
+                <th scope="col">项目</th>
+                <th scope="col">发生日期</th>
+                <th scope="col">金额</th>
+                <th scope="col">税额</th>
+                <th scope="col">来源</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in records" :key="row.id">
+                <td>{{ row.costSubjectName || row.costType }}</td>
+                <td>{{ row.projectName || row.projectId }}</td>
+                <td>{{ row.costDate || '—' }}</td>
+                <td>{{ row.amount }}</td>
+                <td>{{ row.taxAmount }}</td>
+                <td>{{ row.sourceType }}</td>
+                <td>
+                  <V2Button size="small" variant="secondary" @click="openDetail(row.id)"
+                    >详情</V2Button
+                  >
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <template v-if="records.length" #footer>
+          <nav aria-label="成本台账分页">
+            <span>共 {{ total }} 条</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="(filter.pageNo || 1) <= 1"
+              @click="page((filter.pageNo || 1) - 1)"
+              >上一页</V2Button
+            ><span>第 {{ filter.pageNo }} 页</span
+            ><V2Button
+              size="small"
+              variant="secondary"
+              :disabled="(filter.pageNo || 1) >= pageCount"
+              @click="page((filter.pageNo || 1) + 1)"
+              >下一页</V2Button
+            >
+          </nav>
+        </template></V2Card
+      >
       <V2Dialog
         :open="detailOpen"
         title="成本台账详情"
@@ -217,7 +226,7 @@ onBeforeUnmount(() => {
           description="正在读取成本来源、金额和业务关联。"
           kind="loading"
         />
-        <dl v-else-if="detail">
+        <dl v-else-if="detail" class="v2-detail-dialog__facts">
           <dt>ID</dt>
           <dd>{{ detail.id }}</dd>
           <dt>项目</dt>
@@ -244,7 +253,7 @@ onBeforeUnmount(() => {
 }
 .filters {
   display: grid;
-  grid-template-columns: minmax(12rem, 1fr) minmax(12rem, 1fr) auto;
+  grid-template-columns: minmax(12rem, 1fr) auto;
   gap: var(--v2-space-3);
   align-items: end;
 }
@@ -257,6 +266,29 @@ dl {
 dd {
   margin: 0;
   overflow-wrap: anywhere;
+}
+.table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  min-width: 56rem;
+  border-collapse: collapse;
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+th,
+td {
+  padding: var(--v2-space-3);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--v2-color-border-subtle);
+}
+th {
+  color: var(--v2-color-text-secondary);
+  background: var(--v2-color-surface-subtle);
+  font-weight: var(--v2-font-weight-semibold);
 }
 nav {
   display: flex;

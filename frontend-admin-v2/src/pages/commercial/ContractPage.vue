@@ -906,14 +906,37 @@ onBeforeUnmount(() => {
           </dl>
         </V2Card>
         <V2Card title="合同清单" :subtitle="`共 ${detail?.items.length ?? 0} 条`">
-          <div v-if="detail?.items.length" class="contract-page__rows">
-            <article v-for="item in detail?.items" :key="item.id || item.itemName">
-              <strong>{{ item.itemName }}</strong>
-              <p>
-                {{ item.itemCode || '未编号' }} · {{ item.unit || '—' }} · 数量
-                {{ item.quantity || '—' }} · 金额 {{ formatAmount(item.amount || null) }}
-              </p>
-            </article>
+          <div
+            v-if="detail?.items.length"
+            class="contract-page__table-wrap"
+            role="region"
+            aria-label="合同清单表格"
+            tabindex="0"
+          >
+            <table class="contract-page__table contract-page__detail-table">
+              <thead>
+                <tr>
+                  <th scope="col">名称</th>
+                  <th scope="col">编号</th>
+                  <th scope="col">规格</th>
+                  <th scope="col">单位</th>
+                  <th scope="col">数量</th>
+                  <th scope="col">单价</th>
+                  <th scope="col">金额</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in detail?.items" :key="item.id || item.itemName">
+                  <td>{{ item.itemName }}</td>
+                  <td>{{ item.itemCode || '未编号' }}</td>
+                  <td>{{ item.itemSpec || '—' }}</td>
+                  <td>{{ item.unit || '—' }}</td>
+                  <td>{{ item.quantity || '—' }}</td>
+                  <td>{{ formatAmount(item.unitPrice || null) }}</td>
+                  <td>{{ formatAmount(item.amount || null) }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
           <V2PageState
             v-else
@@ -924,15 +947,37 @@ onBeforeUnmount(() => {
           />
         </V2Card>
         <V2Card title="付款条款" :subtitle="`共 ${detail?.paymentTerms.length ?? 0} 条`">
-          <div v-if="detail?.paymentTerms.length" class="contract-page__rows">
-            <article v-for="term in detail?.paymentTerms" :key="term.id || term.termName">
-              <strong>{{ term.termName }}</strong>
-              <p>
-                比例 {{ term.paymentRatio || '—' }} · 金额
-                {{ formatAmount(term.paymentAmount || null) }} · 计划日
-                {{ term.plannedDate || '—' }}
-              </p>
-            </article>
+          <div
+            v-if="detail?.paymentTerms.length"
+            class="contract-page__table-wrap"
+            role="region"
+            aria-label="付款条款表格"
+            tabindex="0"
+          >
+            <table class="contract-page__table contract-page__detail-table">
+              <thead>
+                <tr>
+                  <th scope="col">条款名称</th>
+                  <th scope="col">付款比例</th>
+                  <th scope="col">付款金额</th>
+                  <th scope="col">付款条件</th>
+                  <th scope="col">计划日期</th>
+                  <th scope="col">实际日期</th>
+                  <th scope="col">状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="term in detail?.paymentTerms" :key="term.id || term.termName">
+                  <td>{{ term.termName }}</td>
+                  <td>{{ term.paymentRatio || '—' }}</td>
+                  <td>{{ formatAmount(term.paymentAmount || null) }}</td>
+                  <td>{{ term.paymentCondition || '—' }}</td>
+                  <td>{{ term.plannedDate || '—' }}</td>
+                  <td>{{ term.actualDate || '—' }}</td>
+                  <td>{{ term.termStatus || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
           <V2PageState
             v-else
@@ -1339,6 +1384,13 @@ onBeforeUnmount(() => {
 
 .contract-page__table td:nth-child(6),
 .contract-page__table td:nth-child(7) {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.contract-page__detail-table td:nth-child(2),
+.contract-page__detail-table td:nth-child(3),
+.contract-page__detail-table td:nth-child(5) {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }

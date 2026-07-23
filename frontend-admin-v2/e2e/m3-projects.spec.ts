@@ -73,7 +73,7 @@ test.describe('M3 live project object', () => {
       .locator(`[role="option"][data-value="${projectId}"]`)
       .click()
     expect((await detailResponse).ok()).toBe(true)
-    await expect(page.locator('.project-page__grid > .v2-card')).toHaveCount(1)
+    await expect(page.locator('.project-page__table tbody tr')).toHaveCount(1)
 
     await page.goto(`/v2/project/${projectId}/overview`)
     await expect(page.locator('.app-shell__object-context')).toHaveCount(0)
@@ -174,7 +174,7 @@ test.describe('M3 live project object', () => {
     await page.goto('/v2/project/list')
     await expect(page.locator('.project-page > .v2-alert').getByText('受控故障')).toBeVisible()
     await page.getByRole('button', { name: '刷新' }).click()
-    await expect(page.locator('.project-page__grid .v2-card').first()).toBeVisible()
+    await expect(page.locator('.project-page__table tbody tr').first()).toBeVisible()
     await consumeExpectedHttpError(page, '503 (Service Unavailable)')
   })
 

@@ -174,6 +174,11 @@ test.describe('M4 costs routes', () => {
       await expect(page.getByRole('heading', { name: '成本台账', exact: true })).toBeVisible()
       await expect(page.getByText('9007199254740993.12').first()).toBeVisible()
       await expect(page.getByRole('button', { name: '查询' })).toHaveAttribute('aria-busy', 'false')
+      await expect(page.locator('.v2-card__body dl').first()).toHaveCSS('font-size', '12px')
+      await expect(page.getByRole('navigation', { name: '成本台账分页' })).toHaveCSS(
+        'font-size',
+        '12px',
+      )
       await expect(page.locator('.shell-placeholder')).toHaveCount(0)
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -184,7 +189,10 @@ test.describe('M4 costs routes', () => {
       ).toEqual([])
     }
     await page.getByRole('button', { name: '详情' }).click()
-    await expect(page.getByRole('dialog')).toContainText('9007199254740993')
+    const detailDialog = page.getByRole('dialog')
+    await expect(detailDialog).toHaveClass(/v2-detail-dialog/)
+    await expect(detailDialog.locator('.v2-detail-dialog__facts')).toHaveCSS('font-size', '12px')
+    await expect(detailDialog).toContainText('9007199254740993')
     expect(writes).toEqual([])
     expect(errors).toEqual([])
   })

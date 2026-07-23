@@ -110,6 +110,7 @@ const mode = computed(() =>
 )
 const can = (code: string) => session.hasPermission(code)
 const canDeleteProject = computed(() => isSuperAdmin(session.roles))
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / filter.pageSize)))
 const typeOptions = computed(() =>
   projectTypes.value
     .filter((item) => ['ACTIVE', 'ENABLE'].includes(item.status))
@@ -400,6 +401,11 @@ function applySelectFilter(key: 'projectType' | 'status', value: string) {
   filter[key] = value
   void search()
 }
+async function changePage(next: number) {
+  if (next < 1 || next > pageCount.value || next === filter.pageNo) return
+  filter.pageNo = next
+  if (!(await setQuery())) await load()
+}
 function go(path: string) {
   void router.push({ path, query: route.query, hash: route.hash })
 }
@@ -467,65 +473,105 @@ onBeforeUnmount(() => controller?.abort())
         description="调整查询条件，或联系管理员核对项目范围。"
         :heading-level="2"
       />
-      <div v-else class="project-page__grid">
-        <V2Card
-          v-for="item in projects"
-          :key="item.id"
-          :title="item.projectName"
-          :subtitle="item.projectCode"
-        >
-          <div class="project-page__facts">
-            <span>{{ dictLabel(projectTypes, item.projectType) }}</span
-            ><V2Badge tone="info">{{ dictLabel(projectStatuses, item.status) }}</V2Badge
-            ><span>合同额 {{ item.contractAmount || '0' }} 元</span>
-          </div>
-          <template #footer
-            ><div class="project-page__actions">
-              <V2Button size="small" variant="secondary" @click="go(`/project/${item.id}/overview`)"
-                >总览</V2Button
-              >
-              <V2Button
-                v-if="can('project:member:list')"
-                size="small"
-                variant="ghost"
-                @click="go(`/project/${item.id}/members`)"
-                >成员</V2Button
-              >
-              <V2Button
-                v-if="can('project:edit')"
-                size="small"
-                variant="ghost"
-                @click="go(`/project/${item.id}/edit`)"
-                >编辑</V2Button
-              >
-              <V2Button
-                v-if="can('project:submit')"
-                size="small"
-                variant="ghost"
-                :loading="saving"
-                @click="requestProjectAction('submit', item)"
-                >提交</V2Button
-              >
-              <V2Button
-                v-if="can('project:edit')"
-                size="small"
-                variant="ghost"
-                :loading="saving"
-                @click="requestProjectAction('archive', item)"
-                >归档</V2Button
-              >
-              <V2Button
-                v-if="canDeleteProject"
-                size="small"
-                variant="danger"
-                :loading="saving"
-                @click="requestProjectAction('delete', item)"
-                >删除</V2Button
-              >
-            </div></template
-          >
-        </V2Card>
+      <div v-else class="project-page__table-wrap">
+        <table class="project-page__table">
+          <caption class="v2-visually-hidden">
+            项目台账
+          </caption>
+          <thead>
+            <tr>
+              <th>项目编号 / 名称</th>
+              <th>项目类型</th>
+              <th>项目状态</th>
+              <th>合同额</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in projects" :key="item.id">
+              <td class="project-page__primary">
+                <strong>{{ item.projectCode }}</strong>
+                <span>{{ item.projectName }}</span>
+              </td>
+              <td>{{ dictLabel(projectTypes, item.projectType) }}</td>
+              <td>
+                <V2Badge tone="info">{{ dictLabel(projectStatuses, item.status) }}</V2Badge>
+              </td>
+              <td>{{ item.contractAmount || '0' }} 元</td>
+              <td>
+                <div class="project-page__actions">
+                  <V2Button
+                    size="small"
+                    variant="secondary"
+                    @click="go(`/project/${item.id}/overview`)"
+                    >总览</V2Button
+                  >
+                  <V2Button
+                    v-if="can('project:member:list')"
+                    size="small"
+                    variant="ghost"
+                    @click="go(`/project/${item.id}/members`)"
+                    >成员</V2Button
+                  >
+                  <V2Button
+                    v-if="can('project:edit')"
+                    size="small"
+                    variant="ghost"
+                    @click="go(`/project/${item.id}/edit`)"
+                    >编辑</V2Button
+                  >
+                  <V2Button
+                    v-if="can('project:submit')"
+                    size="small"
+                    variant="ghost"
+                    :loading="saving"
+                    @click="requestProjectAction('submit', item)"
+                    >提交</V2Button
+                  >
+                  <V2Button
+                    v-if="can('project:edit')"
+                    size="small"
+                    variant="ghost"
+                    :loading="saving"
+                    @click="requestProjectAction('archive', item)"
+                    >归档</V2Button
+                  >
+                  <V2Button
+                    v-if="canDeleteProject"
+                    size="small"
+                    variant="danger"
+                    :loading="saving"
+                    @click="requestProjectAction('delete', item)"
+                    >删除</V2Button
+                  >
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
+      <nav
+        v-if="projects.length && !contextProjectId"
+        class="project-page__pagination"
+        aria-label="项目台账分页"
+      >
+        <span>共 {{ total }} 条</span>
+        <V2Button
+          size="small"
+          variant="secondary"
+          :disabled="filter.pageNo <= 1"
+          @click="changePage(filter.pageNo - 1)"
+          >上一页</V2Button
+        >
+        <span>第 {{ filter.pageNo }} 页</span>
+        <V2Button
+          size="small"
+          variant="secondary"
+          :disabled="filter.pageNo >= pageCount"
+          @click="changePage(filter.pageNo + 1)"
+          >下一页</V2Button
+        >
+      </nav>
     </template>
 
     <template v-else-if="project">
@@ -776,12 +822,43 @@ onBeforeUnmount(() => controller?.abort())
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--v2-space-3);
 }
-.project-page__facts,
 .project-page__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--v2-space-2);
   align-items: center;
+}
+.project-page__table-wrap {
+  overflow: auto;
+}
+.project-page__table {
+  width: 100%;
+  min-width: 68rem;
+  border-collapse: collapse;
+}
+.project-page__table th,
+.project-page__table td {
+  padding: var(--v2-space-3);
+  border-bottom: 1px solid var(--v2-color-border);
+  font-size: var(--v2-font-size-12);
+  text-align: left;
+  vertical-align: top;
+}
+.project-page__table th {
+  color: var(--v2-color-text-secondary);
+  white-space: nowrap;
+}
+.project-page__primary {
+  display: grid;
+  gap: var(--v2-space-1);
+}
+.project-page__pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--v2-space-2);
+  align-items: center;
+  font-size: var(--v2-font-size-12);
 }
 .project-page__members {
   display: grid;

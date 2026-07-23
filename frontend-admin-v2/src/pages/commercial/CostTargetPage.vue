@@ -150,13 +150,14 @@ async function replaceQuery(): Promise<boolean> {
   const location = {
     path: '/cost-target/index',
     query: {
-      ...(filter.projectId ? { projectId: filter.projectId } : {}),
-      ...(filter.versionNo?.trim() ? { versionNo: filter.versionNo.trim() } : {}),
-      ...(filter.approvalStatus ? { approvalStatus: filter.approvalStatus } : {}),
-      ...(filter.isActive !== undefined && filter.isActive !== ''
-        ? { isActive: String(filter.isActive) }
-        : {}),
-      ...(filter.pageNo && filter.pageNo > 1 ? { pageNo: String(filter.pageNo) } : {}),
+      ...route.query,
+      versionNo: filter.versionNo?.trim() || undefined,
+      approvalStatus: filter.approvalStatus || undefined,
+      isActive:
+        filter.isActive !== undefined && filter.isActive !== ''
+          ? String(filter.isActive)
+          : undefined,
+      pageNo: filter.pageNo && filter.pageNo > 1 ? String(filter.pageNo) : undefined,
     },
     hash: route.hash,
   }
@@ -475,12 +476,6 @@ onBeforeUnmount(() => {
             >
           </template>
           <div class="cost-target-page__filters">
-            <V2Select
-              v-model="filter.projectId"
-              label="项目"
-              :options="projectOptions"
-              allow-empty
-            />
             <V2Input v-model="filter.versionNo" label="版本号" @keyup.enter="query" />
             <V2Select
               v-model="filter.approvalStatus"
@@ -811,7 +806,7 @@ onBeforeUnmount(() => {
           kind="loading"
         />
         <div v-else-if="detail" class="cost-target-page__detail">
-          <dl>
+          <dl class="v2-detail-dialog__facts">
             <dt>版本</dt>
             <dd>{{ detail.versionNo }} / {{ detail.versionName }}</dd>
             <dt>项目</dt>

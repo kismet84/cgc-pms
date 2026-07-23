@@ -44,7 +44,7 @@ const budget: ProjectBudgetRecord = {
   budgetName: '项目预算',
   totalAmount: '9007199254740993.12',
   approvalStatus: 'DRAFT',
-  status: 'DRAFT',
+  status: 'ACTIVE',
   active: false,
   version: '7',
   lines: [
@@ -172,6 +172,25 @@ beforeEach(() => {
   vi.mocked(commercial.submitMeasurement).mockReset().mockResolvedValue({})
 })
 describe('M4 budget and measurement pages', () => {
+  it('keeps project budget on the standard table and 10-row pagination contract', async () => {
+    const { wrapper } = await mountPage(BudgetPageView, '/budget?projectId=P1&period=2026-07', [
+      'budget:query',
+    ])
+
+    expect(commercial.loadBudgetPage).toHaveBeenCalledWith(
+      expect.objectContaining({ pageNo: 1, pageSize: 10 }),
+      expect.any(AbortSignal),
+    )
+    expect(wrapper.get('table').element.closest('.v2-card')).not.toBeNull()
+    const pagination = wrapper.get('nav[aria-label="项目预算分页"]')
+    expect(pagination.text()).toContain('共 1 条')
+    expect(pagination.text()).toContain('第 1 页')
+    expect(pagination.text()).not.toContain('/ 1')
+    expect(wrapper.get('tbody').text()).toContain('草稿')
+    expect(wrapper.get('tbody').text()).toContain('已启用')
+    expect(wrapper.get('tbody').text()).not.toMatch(/\b(?:DRAFT|ACTIVE)\b/)
+  })
+
   it('fails closed without route permissions and sends no business requests', async () => {
     const b = await mountPage(BudgetPageView, '/budget', [])
     expect(b.wrapper.text()).toContain('无权访问项目预算')

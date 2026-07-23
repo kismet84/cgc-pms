@@ -638,29 +638,55 @@ onBeforeUnmount(() => {
     />
     <template v-else>
       <V2Card
-        v-for="item in projectId ? [] : scopedOverviews"
-        :key="item.projectId"
-        :title="item.projectName"
-        :subtitle="
-          item.overview.closeout
-            ? `${item.overview.closeout.closeoutCode} · ${deliveryLabel(item.overview.closeout.status)}`
-            : '尚未发起收尾'
-        "
+        v-if="!projectId && scopedOverviews.length"
+        title="全部项目收尾概览"
+        :subtitle="`共 ${scopedOverviews.length} 个项目`"
       >
-        <div class="closeout-page__facts">
-          <V2Badge v-if="item.overview.closeout" :tone="badgeTone(item.overview.closeout.status)">
-            {{ deliveryLabel(item.overview.closeout.status) }}
-          </V2Badge>
-          <span>分项验收 {{ item.overview.sectionAcceptances.length }}</span>
-          <span>竣工验收 {{ item.overview.finalAcceptances.length }}</span>
-          <span>质保 {{ item.overview.warranties.length }}</span>
-          <span>缺陷 {{ item.overview.defects.length }}</span>
+        <div class="closeout-page__table-wrap">
+          <table class="closeout-page__table">
+            <thead>
+              <tr>
+                <th scope="col">项目</th>
+                <th scope="col">收尾编号</th>
+                <th scope="col">状态</th>
+                <th scope="col">分项验收</th>
+                <th scope="col">竣工验收</th>
+                <th scope="col">质保</th>
+                <th scope="col">缺陷</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in scopedOverviews" :key="item.projectId">
+                <th scope="row">{{ item.projectName }}</th>
+                <td>{{ item.overview.closeout?.closeoutCode || '尚未发起' }}</td>
+                <td>
+                  <V2Badge
+                    v-if="item.overview.closeout"
+                    :tone="badgeTone(item.overview.closeout.status)"
+                  >
+                    {{ deliveryLabel(item.overview.closeout.status) }}
+                  </V2Badge>
+                  <span v-else>—</span>
+                </td>
+                <td>{{ item.overview.sectionAcceptances.length }}</td>
+                <td>{{ item.overview.finalAcceptances.length }}</td>
+                <td>{{ item.overview.warranties.length }}</td>
+                <td>{{ item.overview.defects.length }}</td>
+                <td>
+                  <V2Button
+                    v-if="item.overview.closeout"
+                    size="small"
+                    variant="secondary"
+                    @click="openTrace(item.overview.closeout.id)"
+                    >追溯</V2Button
+                  >
+                  <span v-else>—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <template v-if="item.overview.closeout" #footer>
-          <V2Button size="small" variant="secondary" @click="openTrace(item.overview.closeout.id)"
-            >追溯</V2Button
-          >
-        </template>
       </V2Card>
 
       <V2Card
@@ -1222,6 +1248,32 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--v2-space-3);
+}
+.closeout-page__table-wrap {
+  overflow-x: auto;
+}
+.closeout-page__table {
+  width: 100%;
+  min-width: 54rem;
+  border-collapse: collapse;
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+.closeout-page__table th,
+.closeout-page__table td {
+  padding: var(--v2-space-3);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border-subtle);
+  text-align: left;
+  vertical-align: middle;
+}
+.closeout-page__table thead th {
+  color: var(--v2-color-text-secondary);
+  background: var(--v2-color-surface-subtle);
+  font-weight: var(--v2-font-weight-semibold);
+}
+.closeout-page__table tbody th {
+  color: var(--v2-color-text-strong);
+  font-weight: var(--v2-font-weight-semibold);
 }
 .closeout-page__stack,
 .closeout-page__item {

@@ -609,41 +609,58 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
       description="具备维护权限的账号可以创建基线计划。"
       :heading-level="2"
     />
-    <div v-else-if="!isDetailRoute" class="schedule-page__grid">
-      <V2Card
-        v-for="item in schedules"
-        :key="item.id"
-        :title="item.planName"
-        :subtitle="`${item.planCode} · V${item.versionNo}`"
-      >
-        <div class="schedule-page__facts">
-          <V2Badge :tone="statusTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
-          <span v-if="!projectId">
-            {{
-              workspace.projects.find((project) => project.value === item.projectId)?.label ??
-              `项目 ${item.projectId}`
-            }}
-          </span>
-          <span>{{ item.planType === 'REVISION' ? '修订计划' : '基线计划' }}</span>
-          <span>{{ item.plannedStartDate }} 至 {{ item.plannedEndDate }}</span>
-        </div>
-        <template #footer>
-          <div class="schedule-page__actions">
-            <V2Button size="small" variant="secondary" @click="goToDetail(item.id)"
-              >履约详情</V2Button
-            >
-            <V2Button
-              v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(item.status)"
-              size="small"
-              variant="ghost"
-              @click="requestScheduleSubmit(item)"
-            >
-              提交审批
-            </V2Button>
-          </div>
-        </template>
-      </V2Card>
-    </div>
+    <V2Card v-else-if="!isDetailRoute" title="主计划列表">
+      <div class="schedule-page__table-wrap">
+        <table class="schedule-page__table">
+          <caption class="v2-visually-hidden">
+            项目主计划列表
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">计划编号 / 名称</th>
+              <th v-if="!projectId" scope="col">项目</th>
+              <th scope="col">类型</th>
+              <th scope="col">计划周期</th>
+              <th scope="col">状态</th>
+              <th scope="col">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in schedules" :key="item.id">
+              <td>
+                <strong>{{ item.planCode }} · V{{ item.versionNo }} · {{ item.planName }}</strong>
+              </td>
+              <td v-if="!projectId">
+                {{
+                  workspace.projects.find((project) => project.value === item.projectId)?.label ??
+                  `项目 ${item.projectId}`
+                }}
+              </td>
+              <td>{{ item.planType === 'REVISION' ? '修订计划' : '基线计划' }}</td>
+              <td>{{ item.plannedStartDate }} 至 {{ item.plannedEndDate }}</td>
+              <td>
+                <V2Badge :tone="statusTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
+              </td>
+              <td>
+                <div class="schedule-page__actions">
+                  <V2Button size="small" variant="secondary" @click="goToDetail(item.id)"
+                    >履约详情</V2Button
+                  >
+                  <V2Button
+                    v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(item.status)"
+                    size="small"
+                    variant="ghost"
+                    @click="requestScheduleSubmit(item)"
+                  >
+                    提交审批
+                  </V2Button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </V2Card>
 
     <V2PageState
       v-if="isDetailRoute && !detail && !detailLoading"
@@ -1110,6 +1127,11 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
   border-bottom: 1px solid var(--v2-color-border);
   text-align: left;
   vertical-align: top;
+}
+.schedule-page__table th:last-child,
+.schedule-page__table td:last-child {
+  width: 1%;
+  white-space: nowrap;
 }
 .schedule-page__form {
   display: grid;

@@ -124,6 +124,13 @@ async function installCommercialMock(page: Page, readIdentity: () => Identity): 
       }),
     }),
   )
+  await page.route('**/api/bid-cost/71', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: '0', message: 'success', data: bid }),
+    }),
+  )
 }
 
 test.describe('M4 variation and bid routes', () => {
@@ -183,6 +190,21 @@ test.describe('M4 variation and bid routes', () => {
         ).toEqual([])
       }
     }
+
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/v2/bid-cost')
+    await page.getByRole('button', { name: '详情' }).first().click()
+    const detailDialog = page.getByRole('dialog')
+    const glassButton = detailDialog.locator('.v2-glass-button').first()
+    await expect(detailDialog).toHaveClass(/v2-detail-dialog/)
+    await expect(detailDialog.locator('.v2-detail-dialog__facts')).toHaveCSS('font-size', '12px')
+    await expect(glassButton).toBeVisible()
+    expect(
+      await glassButton.evaluate((element) => getComputedStyle(element).backgroundImage),
+    ).toContain('linear-gradient')
+    expect(
+      await glassButton.evaluate((element) => getComputedStyle(element).backdropFilter),
+    ).toContain('blur(16px)')
 
     expect(runtimeErrors).toEqual([])
   })

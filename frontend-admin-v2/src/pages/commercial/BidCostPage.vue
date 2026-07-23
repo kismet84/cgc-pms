@@ -9,6 +9,7 @@ import {
   V2Card,
   V2ConfirmDialog,
   V2Dialog,
+  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -381,56 +382,80 @@ onBeforeUnmount(() => {
         kind="empty"
       />
 
-      <div v-else class="bid-cost-page__list" aria-label="投标成本列表" :aria-busy="loading">
-        <V2Card
-          v-for="record in records"
-          :key="record.id"
-          :title="record.bidProjectName"
-          interactive
+      <V2Card v-else title="投标成本列表">
+        <div
+          class="bid-cost-page__table-wrap"
+          role="region"
+          aria-label="投标成本列表"
+          :aria-busy="loading"
+          tabindex="0"
         >
-          <template #actions>
-            <V2Badge :tone="statusTone(record.bidStatus)" dot>{{
-              statusLabel(record.bidStatus)
-            }}</V2Badge>
-          </template>
-          <dl>
-            <dt>关联项目</dt>
-            <dd>{{ record.projectId || '—' }}</dd>
-            <dt>备注</dt>
-            <dd>{{ record.remark || '—' }}</dd>
-            <dt>更新时间</dt>
-            <dd>{{ record.updatedAt || '—' }}</dd>
-          </dl>
-          <template #footer>
-            <div class="bid-cost-page__actions">
-              <V2Button variant="secondary" @click="openDetail(record.id)">详情</V2Button>
-              <V2Button
-                v-if="canEdit && record.bidStatus === 'BIDDING'"
-                variant="secondary"
-                @click="openDetail(record.id, 'edit')"
-                >编辑</V2Button
-              >
-              <V2Button
-                v-if="canChangeStatus && record.bidStatus === 'BIDDING'"
-                @click="requestWon(record)"
-                >标记中标</V2Button
-              >
-              <V2Button
-                v-if="canChangeStatus && record.bidStatus === 'BIDDING'"
-                variant="secondary"
-                @click="requestLost(record)"
-                >标记未中标</V2Button
-              >
-              <V2Button
-                v-if="canDelete && record.bidStatus === 'BIDDING'"
-                variant="danger"
-                @click="requestDelete(record)"
-                >删除</V2Button
-              >
-            </div>
-          </template>
-        </V2Card>
-      </div>
+          <table class="bid-cost-page__table">
+            <caption class="v2-visually-hidden">
+              投标成本列表
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">投标项目</th>
+                <th scope="col">关联项目</th>
+                <th scope="col">状态</th>
+                <th scope="col">备注</th>
+                <th scope="col">更新时间</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="record in records" :key="record.id">
+                <td>
+                  <strong>{{ record.bidProjectName }}</strong>
+                </td>
+                <td>{{ projectLabel(record.projectId) }}</td>
+                <td>
+                  <V2Badge :tone="statusTone(record.bidStatus)" dot>{{
+                    statusLabel(record.bidStatus)
+                  }}</V2Badge>
+                </td>
+                <td>{{ record.remark || '—' }}</td>
+                <td>{{ record.updatedAt || '—' }}</td>
+                <td>
+                  <div class="bid-cost-page__actions">
+                    <V2Button size="small" variant="secondary" @click="openDetail(record.id)"
+                      >详情</V2Button
+                    >
+                    <V2Button
+                      v-if="canEdit && record.bidStatus === 'BIDDING'"
+                      size="small"
+                      variant="ghost"
+                      @click="openDetail(record.id, 'edit')"
+                      >编辑</V2Button
+                    >
+                    <V2Button
+                      v-if="canChangeStatus && record.bidStatus === 'BIDDING'"
+                      size="small"
+                      @click="requestWon(record)"
+                      >标记中标</V2Button
+                    >
+                    <V2Button
+                      v-if="canChangeStatus && record.bidStatus === 'BIDDING'"
+                      size="small"
+                      variant="secondary"
+                      @click="requestLost(record)"
+                      >标记未中标</V2Button
+                    >
+                    <V2Button
+                      v-if="canDelete && record.bidStatus === 'BIDDING'"
+                      size="small"
+                      variant="danger"
+                      @click="requestDelete(record)"
+                      >删除</V2Button
+                    >
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </V2Card>
 
       <nav v-if="records.length" class="bid-cost-page__pagination" aria-label="投标成本分页">
         <span>共 {{ total }} 条</span>
@@ -470,7 +495,7 @@ onBeforeUnmount(() => {
           kind="loading"
         />
         <div v-else-if="panelMode === 'detail' && selected" class="bid-cost-page__detail">
-          <dl>
+          <dl class="v2-detail-dialog__facts">
             <dt>投标项目</dt>
             <dd>{{ selected.bidProjectName }}</dd>
             <dt>状态</dt>
@@ -489,27 +514,26 @@ onBeforeUnmount(() => {
             <dd>{{ selected.updatedAt || '—' }}</dd>
           </dl>
           <div class="bid-cost-page__actions">
-            <V2Button
+            <V2GlassButton
               v-if="canEdit && selectedIsBidding"
-              variant="secondary"
-              @click="panelMode = 'edit'"
-              >编辑</V2Button
-            >
-            <V2Button v-if="canChangeStatus && selectedIsBidding" @click="requestWon(selected)"
-              >标记中标</V2Button
-            >
-            <V2Button
+              text="编辑"
+              :on-click="() => (panelMode = 'edit')"
+            />
+            <V2GlassButton
               v-if="canChangeStatus && selectedIsBidding"
-              variant="secondary"
-              @click="requestLost(selected)"
-              >标记未中标</V2Button
-            >
-            <V2Button
+              text="标记中标"
+              :on-click="() => requestWon(selected)"
+            />
+            <V2GlassButton
+              v-if="canChangeStatus && selectedIsBidding"
+              text="标记未中标"
+              :on-click="() => requestLost(selected)"
+            />
+            <V2GlassButton
               v-if="canDelete && selectedIsBidding"
-              variant="danger"
-              @click="requestDelete(selected)"
-              >删除</V2Button
-            >
+              text="删除"
+              :on-click="() => requestDelete(selected)"
+            />
           </div>
         </div>
         <form v-else class="bid-cost-page__form" @submit.prevent="save">
@@ -527,7 +551,7 @@ onBeforeUnmount(() => {
             <V2Button type="submit" :loading="actionBusy">{{
               panelMode === 'create' ? '创建' : '保存变更'
             }}</V2Button>
-            <V2Button variant="secondary" :disabled="actionBusy" @click="closePanel">取消</V2Button>
+            <V2GlassButton text="取消" :disabled="actionBusy" :on-click="closePanel" />
           </div>
         </form>
       </V2Dialog>
@@ -566,7 +590,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .bid-cost-page,
-.bid-cost-page__list,
 .bid-cost-page__form,
 .bid-cost-page__detail {
   display: grid;
@@ -592,6 +615,38 @@ onBeforeUnmount(() => {
   justify-content: flex-end;
   font-size: var(--v2-font-size-12);
   line-height: var(--v2-line-height-ui);
+}
+
+.bid-cost-page__table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+.bid-cost-page__table {
+  width: 100%;
+  min-width: 64rem;
+  border-collapse: collapse;
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+
+.bid-cost-page__table th,
+.bid-cost-page__table td {
+  padding: var(--v2-space-3);
+  border-bottom: 1px solid var(--v2-color-border-subtle);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.bid-cost-page__table th {
+  color: var(--v2-color-text-secondary);
+  background: var(--v2-color-surface-subtle);
+  font-weight: var(--v2-font-weight-semibold);
+}
+
+.bid-cost-page__table .bid-cost-page__actions {
+  flex-wrap: nowrap;
 }
 
 dl {

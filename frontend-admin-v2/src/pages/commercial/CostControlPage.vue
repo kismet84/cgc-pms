@@ -5,11 +5,18 @@ import type {
   CostCorrectiveCloseCommand,
   CostCorrectiveCommand,
   CostForecastCommand,
-  ProjectContextOption,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { V2Alert, V2Button, V2Card, V2Dialog, V2Input, V2PageState, V2Select } from '@/components'
+import { useRoute } from 'vue-router'
+import {
+  V2Alert,
+  V2Button,
+  V2Card,
+  V2Dialog,
+  V2GlassButton,
+  V2Input,
+  V2PageState,
+} from '@/components'
 import {
   closeCostCorrective,
   confirmCostForecast,
@@ -17,7 +24,6 @@ import {
   createCostForecast,
   loadCostControl,
   loadCostForecastTrace,
-  loadProjectContextOptions,
   submitCostCorrective,
   updateCostCorrective,
   updateCostForecast,
@@ -25,10 +31,8 @@ import {
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 const route = useRoute()
-const router = useRouter()
 const session = useSessionStore()
 const projectId = ref('')
-const projects = ref<ProjectContextOption[]>([])
 const overview = ref<CostControlOverview | null>(null)
 const trace = ref<CostControlOverview | null>(null)
 const loading = ref(false)
@@ -75,9 +79,6 @@ const canForecast = computed(() => session.hasPermission('cost:forecast:maintain
 const canConfirm = computed(() => session.hasPermission('cost:forecast:confirm'))
 const canCorrective = computed(() => session.hasPermission('cost:corrective:maintain'))
 const canSubmit = computed(() => session.hasPermission('cost:corrective:submit'))
-const projectOptions = computed(() =>
-  projects.value.map((p) => ({ value: p.id, label: p.projectName })),
-)
 const latest = computed(() => overview.value?.latestForecast ?? {})
 const actions = computed(() => overview.value?.correctiveActions ?? [])
 const inputItems = computed(() => overview.value?.forecastInputItems ?? [])
@@ -101,8 +102,6 @@ async function load() {
   loading.value = true
   errorMessage.value = ''
   try {
-    projects.value = await loadProjectContextOptions(current.signal)
-    if (!projectId.value && projects.value.length) projectId.value = projects.value[0]!.id
     if (!projectId.value) {
       overview.value = null
       return
@@ -117,16 +116,6 @@ async function load() {
   } finally {
     if (token === generation) loading.value = false
   }
-}
-async function changeProject() {
-  await router.replace({
-    path: '/cost/control',
-    query: {
-      ...(projectId.value ? { projectId: projectId.value } : {}),
-      ...(typeof route.query.period === 'string' ? { period: route.query.period } : {}),
-    },
-    hash: route.hash,
-  })
 }
 function openForecast(row?: CostControlAmountRow) {
   editingForecastId.value = row ? text(row, 'id') : ''
@@ -311,14 +300,9 @@ onBeforeUnmount(() => {
         successMessage
       }}</V2Alert
       ><V2Card title="动态利润控制" :heading-level="1"
-        ><div class="filters">
-          <V2Select
-            v-model="projectId"
-            label="项目"
-            :options="projectOptions"
-            @update:model-value="changeProject"
-          /><V2Button variant="secondary" :loading="loading" @click="load">刷新</V2Button>
-        </div></V2Card
+        ><template #actions
+          ><V2Button variant="secondary" :loading="loading" @click="load">刷新</V2Button></template
+        ></V2Card
       ><V2PageState
         v-if="loading"
         title="正在加载动态利润控制"
@@ -367,33 +351,50 @@ onBeforeUnmount(() => {
             description="当前项目尚未登记可执行的成本纠偏措施。"
             kind="empty"
           />
-          <div v-for="row in actions" v-else :key="text(row, 'id')" class="row">
-            <dl>
-              <dt>措施</dt>
-              <dd>{{ text(row, 'action_title') }}</dd>
-              <dt>预计节约</dt>
-              <dd>{{ text(row, 'expected_saving_amount') }}</dd>
-              <dt>状态</dt>
-              <dd>{{ text(row, 'status') }}</dd>
-            </dl>
-            <div class="actions">
-              <V2Button
-                v-if="canCorrective && ['DRAFT', 'REJECTED'].includes(text(row, 'status'))"
-                variant="secondary"
-                @click="openCorrective(row)"
-                >编辑</V2Button
-              ><V2Button
-                v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(text(row, 'status'))"
-                variant="secondary"
-                :disabled="actionBusy"
-                @click="submitAction(row)"
-                >提交</V2Button
-              ><V2Button
-                v-if="canSubmit && text(row, 'status') === 'APPROVED'"
-                @click="openClose(row)"
-                >关闭</V2Button
-              >
-            </div>
+          <div
+            v-else
+            class="cost-page__table-wrap"
+            role="region"
+            aria-label="纠偏措施表格"
+            tabindex="0"
+          >
+            <table class="cost-page__table">
+              <thead>
+                <tr>
+                  <th scope="col">措施</th>
+                  <th scope="col">预计节约</th>
+                  <th scope="col">状态</th>
+                  <th scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in actions" :key="text(row, 'id')">
+                  <td>{{ text(row, 'action_title') }}</td>
+                  <td>{{ text(row, 'expected_saving_amount') }}</td>
+                  <td>{{ text(row, 'status') }}</td>
+                  <td>
+                    <div class="actions">
+                      <V2Button
+                        v-if="canCorrective && ['DRAFT', 'REJECTED'].includes(text(row, 'status'))"
+                        variant="secondary"
+                        @click="openCorrective(row)"
+                        >编辑</V2Button
+                      ><V2Button
+                        v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(text(row, 'status'))"
+                        variant="secondary"
+                        :disabled="actionBusy"
+                        @click="submitAction(row)"
+                        >提交</V2Button
+                      ><V2Button
+                        v-if="canSubmit && text(row, 'status') === 'APPROVED'"
+                        @click="openClose(row)"
+                        >关闭</V2Button
+                      >
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div></V2Card
         ><V2Dialog
           :open="!!trace"
@@ -401,13 +402,15 @@ onBeforeUnmount(() => {
           panel-class="v2-dialog-standard v2-detail-dialog"
           :close-on-backdrop="false"
           @close="trace = null"
-          ><p>目标版本、预测明细、纠偏措施与审批轨迹已加载。</p>
-          <dl>
-            <dt>预测编号</dt>
-            <dd>{{ text(trace?.forecast || {}, 'forecast_code') }}</dd>
-            <dt>预测利润</dt>
-            <dd>{{ text(trace?.forecast || {}, 'forecast_profit_amount') }}</dd>
-          </dl></V2Dialog
+          ><section class="v2-detail-dialog__section">
+            <p class="v2-detail-dialog__message">目标版本、预测明细、纠偏措施与审批轨迹已加载。</p>
+            <dl class="v2-detail-dialog__facts">
+              <dt>预测编号</dt>
+              <dd>{{ text(trace?.forecast || {}, 'forecast_code') }}</dd>
+              <dt>预测利润</dt>
+              <dd>{{ text(trace?.forecast || {}, 'forecast_profit_amount') }}</dd>
+            </dl>
+          </section></V2Dialog
         ></template
       ><V2PageState
         v-else
@@ -417,12 +420,12 @@ onBeforeUnmount(() => {
     /></template>
     <V2Dialog
       :open="forecastOpen"
-      title="完工预测"
+      :title="editingForecastId ? '编辑完工预测' : '新建完工预测'"
       panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="forecastOpen = false"
-      ><form class="form" @submit.prevent="saveForecast">
+      ><form id="cost-forecast-form" class="form" @submit.prevent="saveForecast">
         <V2Input v-model="forecast.forecastCode" label="预测编号" required /><V2Input
           v-model="forecast.forecastName"
           label="预测名称"
@@ -432,17 +435,24 @@ onBeforeUnmount(() => {
           <span>成本科目 {{ item.costSubjectId }}</span
           ><V2Input v-model="item.estimatedRemainingAmount" label="预计剩余成本" required />
         </div>
-        <V2Button type="submit" :loading="actionBusy">保存预测</V2Button>
-      </form></V2Dialog
+      </form>
+      <template #footer>
+        <V2GlassButton
+          text="取消"
+          :disabled="actionBusy"
+          :on-click="() => (forecastOpen = false)"
+        />
+        <V2Button type="submit" form="cost-forecast-form" :loading="actionBusy">保存预测</V2Button>
+      </template></V2Dialog
     >
     <V2Dialog
       :open="correctiveOpen"
-      title="纠偏措施"
+      :title="editingCorrectiveId ? '编辑纠偏措施' : '新建纠偏措施'"
       panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="correctiveOpen = false"
-      ><form class="form" @submit.prevent="saveCorrective">
+      ><form id="cost-corrective-form" class="form" @submit.prevent="saveCorrective">
         <V2Input v-model="corrective.actionCode" label="措施编号" required /><V2Input
           v-model="corrective.actionTitle"
           label="措施标题"
@@ -460,8 +470,18 @@ onBeforeUnmount(() => {
           label="截止日期"
           type="date"
           required
-        /><V2Button type="submit" :loading="actionBusy">保存措施</V2Button>
-      </form></V2Dialog
+        />
+      </form>
+      <template #footer>
+        <V2GlassButton
+          text="取消"
+          :disabled="actionBusy"
+          :on-click="() => (correctiveOpen = false)"
+        />
+        <V2Button type="submit" form="cost-corrective-form" :loading="actionBusy"
+          >保存措施</V2Button
+        >
+      </template></V2Dialog
     >
     <V2Dialog
       :open="closeOpen"
@@ -470,13 +490,19 @@ onBeforeUnmount(() => {
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="closeOpen = false"
-      ><form class="form" @submit.prevent="closeAction">
+      ><form id="cost-corrective-close-form" class="form" @submit.prevent="closeAction">
         <V2Input v-model="closing.actualSavingAmount" label="实际节约金额" required /><V2Input
           v-model="closing.resultDescription"
           label="结果说明"
           required
-        /><V2Button type="submit" :loading="actionBusy">确认关闭</V2Button>
-      </form></V2Dialog
+        />
+      </form>
+      <template #footer>
+        <V2GlassButton text="取消" :disabled="actionBusy" :on-click="() => (closeOpen = false)" />
+        <V2Button type="submit" form="cost-corrective-close-form" :loading="actionBusy"
+          >确认关闭</V2Button
+        >
+      </template></V2Dialog
     >
   </div>
 </template>
@@ -486,15 +512,11 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--v2-space-4);
 }
-.filters,
 .actions {
   display: flex;
   gap: var(--v2-space-2);
   align-items: end;
   flex-wrap: wrap;
-}
-.filters > *:first-child {
-  flex: 1;
 }
 dl {
   display: grid;
@@ -506,11 +528,36 @@ dd {
   margin: 0;
   overflow-wrap: anywhere;
 }
-.row {
-  display: grid;
-  gap: var(--v2-space-2);
-  padding-block: var(--v2-space-3);
-  border-bottom: 1px solid var(--v2-color-border);
+.cost-page__table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+.cost-page__table {
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: collapse;
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+.cost-page__table th,
+.cost-page__table td {
+  padding: var(--v2-space-3);
+  border-bottom: 1px solid var(--v2-color-border-subtle);
+  text-align: left;
+  vertical-align: middle;
+}
+.cost-page__table th {
+  color: var(--v2-color-text-secondary);
+  background: var(--v2-color-surface-subtle);
+  white-space: nowrap;
+}
+.cost-page__table td:nth-child(2) {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cost-page__table .actions {
+  align-items: center;
+  flex-wrap: nowrap;
 }
 .item {
   display: grid;

@@ -9,7 +9,16 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { V2Alert, V2Button, V2Card, V2Dialog, V2Input, V2PageState, V2Select } from '@/components'
+import {
+  V2Alert,
+  V2Button,
+  V2Card,
+  V2Dialog,
+  V2GlassButton,
+  V2Input,
+  V2PageState,
+  V2Select,
+} from '@/components'
 import {
   createBudget,
   deleteBudget,
@@ -27,7 +36,7 @@ import { useSessionStore } from '@/stores/session'
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
-const filter = reactive<BudgetQuery>({ pageNo: 1, pageSize: 20 })
+const filter = reactive<BudgetQuery>({ pageNo: 1, pageSize: 10 })
 const records = ref<ProjectBudgetRecord[]>([])
 const total = ref(0)
 const projects = ref<ProjectContextOption[]>([])
@@ -50,16 +59,37 @@ const canAdd = computed(() => session.hasPermission('budget:add'))
 const canEdit = computed(() => session.hasPermission('budget:edit'))
 const canDelete = computed(() => session.hasPermission('budget:delete'))
 const canSubmit = computed(() => session.hasPermission('budget:submit'))
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pageSize || 10))))
 const projectOptions = computed(() =>
   projects.value.map((p) => ({ value: p.id, label: p.projectName })),
 )
+const approvalStatusLabels: Record<string, string> = {
+  DRAFT: '草稿',
+  APPROVING: '审批中',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
+}
+const budgetStatusLabels: Record<string, string> = {
+  DRAFT: '草稿',
+  ACTIVE: '已启用',
+  SUPERSEDED: '已替代',
+  CLOSED: '已关闭',
+}
 const statusOptions = [
   { value: '', label: '全部状态' },
-  { value: 'DRAFT', label: '草稿' },
-  { value: 'PENDING', label: '审批中' },
-  { value: 'APPROVED', label: '已通过' },
-  { value: 'REJECTED', label: '已驳回' },
+  ...Object.entries(budgetStatusLabels).map(([value, label]) => ({ value, label })),
 ]
+const approvalStatusLabel = (value: string) => approvalStatusLabels[value] ?? '未知状态'
+const budgetStatusLabel = (value: string) => budgetStatusLabels[value] ?? '未知状态'
+const approvalStatusTone = (value: string) =>
+  value === 'APPROVED'
+    ? 'success'
+    : value === 'REJECTED'
+      ? 'danger'
+      : value === 'APPROVING'
+        ? 'warning'
+        : 'neutral'
+const budgetStatusTone = (value: string) => (value === 'ACTIVE' ? 'success' : 'neutral')
 const decimal = (v: string) => /^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(v) && !/^0(?:\.0+)?$/.test(v)
 const errorText = (e: unknown, f: string) =>
   isApiClientError(e) ? e.message : e instanceof Error ? e.message : f
@@ -80,7 +110,7 @@ function hydrate() {
   )
   Object.assign(filter, {
     pageNo: Math.max(1, Number(route.query.pageNo) || 1),
-    pageSize: 20,
+    pageSize: 10,
     projectId: typeof route.query.projectId === 'string' ? route.query.projectId : undefined,
     status: typeof route.query.status === 'string' ? route.query.status : undefined,
     startDate: bounds?.startDate,
@@ -120,10 +150,16 @@ async function query() {
   await router.replace({
     path: '/budget',
     query: {
-      ...(filter.projectId ? { projectId: filter.projectId } : {}),
-      ...(filter.status ? { status: filter.status } : {}),
-      ...(typeof route.query.period === 'string' ? { period: route.query.period } : {}),
+      ...route.query,
+      status: filter.status || undefined,
+      pageNo: undefined,
     },
+    hash: route.hash,
+  })
+}
+async function page(value: number) {
+  await router.replace({
+    query: { ...route.query, ...(value > 1 ? { pageNo: String(value) } : { pageNo: undefined }) },
     hash: route.hash,
   })
 }
@@ -261,11 +297,6 @@ onBeforeUnmount(() => {
         >
         <div class="filters">
           <V2Select
-            v-model="filter.projectId"
-            label="项目"
-            :options="projectOptions"
-            allow-empty
-          /><V2Select
             v-model="filter.status"
             label="状态"
             :options="statusOptions"
@@ -273,52 +304,107 @@ onBeforeUnmount(() => {
           /><V2Button class="budget-query" variant="secondary" :loading="loading" @click="query"
             >查询</V2Button
           >
-        </div></V2Card
-      ><V2PageState
-        v-if="loading && !records.length"
-        title="正在加载项目预算"
-        description="正在读取当前项目和报告期内的预算版本。"
-        kind="loading"
-      /><V2PageState
-        v-else-if="!records.length"
-        title="暂无项目预算"
-        description="当前筛选条件下没有可访问的预算版本。"
-        kind="empty"
-      /><V2Card v-for="row in records" v-else :key="row.id" :title="row.budgetName"
-        ><dl>
-          <dt>版本</dt>
-          <dd>{{ row.versionNo }}</dd>
-          <dt>预算总额</dt>
-          <dd>{{ row.totalAmount }}</dd>
-          <dt>审批状态</dt>
-          <dd>{{ row.approvalStatus }}</dd>
-          <dt>业务状态</dt>
-          <dd>{{ row.status }}</dd>
-        </dl>
-        <template #footer
-          ><div class="actions">
-            <V2Button variant="secondary" @click="openDetail(row.id)">详情</V2Button
-            ><V2Button
-              v-if="canEdit && ['DRAFT', 'REJECTED'].includes(row.approvalStatus)"
+        </div>
+        <V2PageState
+          v-if="loading && !records.length"
+          title="正在加载项目预算"
+          description="正在读取当前项目和报告期内的预算版本。"
+          kind="loading"
+        /><V2PageState
+          v-else-if="!records.length"
+          title="暂无项目预算"
+          description="当前筛选条件下没有可访问的预算版本。"
+          kind="empty"
+        />
+        <div
+          v-else
+          class="table-wrap"
+          role="region"
+          aria-label="项目预算列表"
+          tabindex="0"
+          :aria-busy="loading"
+        >
+          <table>
+            <caption class="v2-visually-hidden">
+              项目预算列表
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">预算名称</th>
+                <th scope="col">版本</th>
+                <th scope="col">预算总额</th>
+                <th scope="col">审批状态</th>
+                <th scope="col">业务状态</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in records" :key="row.id">
+                <td>{{ row.budgetName }}</td>
+                <td>{{ row.versionNo }}</td>
+                <td>{{ row.totalAmount }}</td>
+                <td>
+                  <V2Badge :tone="approvalStatusTone(row.approvalStatus)">{{
+                    approvalStatusLabel(row.approvalStatus)
+                  }}</V2Badge>
+                </td>
+                <td>
+                  <V2Badge :tone="budgetStatusTone(row.status)">{{
+                    budgetStatusLabel(row.status)
+                  }}</V2Badge>
+                </td>
+                <td>
+                  <div class="actions">
+                    <V2Button size="small" variant="secondary" @click="openDetail(row.id)"
+                      >详情</V2Button
+                    ><V2Button
+                      v-if="canEdit && ['DRAFT', 'REJECTED'].includes(row.approvalStatus)"
+                      size="small"
+                      variant="secondary"
+                      @click="openDetail(row.id, 'edit')"
+                      >编辑</V2Button
+                    ><V2Button
+                      v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(row.approvalStatus)"
+                      size="small"
+                      variant="secondary"
+                      :disabled="actionBusy"
+                      @click="run(() => submitBudget(row.id, row.version ?? ''), '预算已提交')"
+                      >提交</V2Button
+                    ><V2Button
+                      v-if="canDelete && row.approvalStatus === 'DRAFT'"
+                      size="small"
+                      variant="danger"
+                      :disabled="actionBusy"
+                      @click="run(() => deleteBudget(row.id, row.version ?? ''), '预算已删除')"
+                      >删除</V2Button
+                    >
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <template v-if="records.length" #footer>
+          <nav aria-label="项目预算分页">
+            <span>共 {{ total }} 条</span>
+            <V2Button
+              size="small"
               variant="secondary"
-              @click="openDetail(row.id, 'edit')"
-              >编辑</V2Button
+              :disabled="(filter.pageNo || 1) <= 1"
+              @click="page((filter.pageNo || 1) - 1)"
+              >上一页</V2Button
+            ><span>第 {{ filter.pageNo }} 页</span
             ><V2Button
-              v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(row.approvalStatus)"
+              size="small"
               variant="secondary"
-              :disabled="actionBusy"
-              @click="run(() => submitBudget(row.id, row.version ?? ''), '预算已提交')"
-              >提交</V2Button
-            ><V2Button
-              v-if="canDelete && row.approvalStatus === 'DRAFT'"
-              variant="danger"
-              :disabled="actionBusy"
-              @click="run(() => deleteBudget(row.id, row.version ?? ''), '预算已删除')"
-              >删除</V2Button
+              :disabled="(filter.pageNo || 1) >= pageCount"
+              @click="page((filter.pageNo || 1) + 1)"
+              >下一页</V2Button
             >
-          </div></template
-        ></V2Card
-      ><V2Dialog
+          </nav>
+        </template></V2Card
+      >
+      <V2Dialog
         :open="dialog !== 'closed'"
         :title="dialog === 'create' ? '新建预算' : dialog === 'edit' ? '编辑预算' : '预算详情'"
         panel-class="v2-dialog-standard v2-detail-dialog"
@@ -353,12 +439,12 @@ onBeforeUnmount(() => {
                 label="预算金额"
               />
             </div>
-            <V2Button type="button" variant="secondary" @click="addLine">添加明细</V2Button>
+            <V2GlassButton text="添加明细" :on-click="addLine" />
           </div>
           <V2Button type="submit" variant="secondary" :loading="actionBusy">保存预算</V2Button>
         </form>
         <div v-else-if="detail" class="form">
-          <dl>
+          <dl class="v2-detail-dialog__facts">
             <dt>ID</dt>
             <dd>{{ detail.id }}</dd>
             <dt>预算总额</dt>
@@ -376,10 +462,11 @@ onBeforeUnmount(() => {
                 label="预算金额"
               />
             </div>
-            <V2Button variant="secondary" @click="addLine">添加明细</V2Button
-            ><V2Button variant="secondary" :loading="actionBusy" @click="saveLines"
-              >保存明细</V2Button
-            >
+            <V2GlassButton text="添加明细" :on-click="addLine" /><V2GlassButton
+              text="保存明细"
+              :loading="actionBusy"
+              :on-click="saveLines"
+            />
           </div>
           <div class="table-wrap" role="region" aria-label="预算可用额" tabindex="0">
             <table>
@@ -422,6 +509,9 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-3);
   align-items: end;
 }
+.filters {
+  grid-template-columns: minmax(12rem, 1fr) auto;
+}
 .actions {
   display: flex;
   gap: var(--v2-space-2);
@@ -440,17 +530,33 @@ dd {
   margin: 0;
 }
 .table-wrap {
-  overflow: auto;
+  min-width: 0;
+  overflow-x: auto;
 }
 table {
   width: 100%;
+  min-width: 48rem;
   border-collapse: collapse;
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
 }
 th,
 td {
   text-align: left;
-  padding: var(--v2-space-2);
-  border-bottom: 1px solid var(--v2-color-border);
+  padding: var(--v2-space-3);
+  white-space: nowrap;
+  border-bottom: 1px solid var(--v2-color-border-subtle);
+}
+th {
+  color: var(--v2-color-text-secondary);
+  background: var(--v2-color-surface-subtle);
+  font-weight: var(--v2-font-weight-semibold);
+}
+nav {
+  display: flex;
+  gap: var(--v2-space-2);
+  align-items: center;
+  justify-content: flex-end;
 }
 @media (max-width: 48rem) {
   .filters,

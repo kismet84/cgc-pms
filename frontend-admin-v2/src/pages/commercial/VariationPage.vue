@@ -191,12 +191,11 @@ async function replaceListQuery(): Promise<boolean> {
   const location = {
     path: '/variation/order',
     query: {
-      ...(filter.projectId ? { projectId: filter.projectId } : {}),
-      ...(filter.varCode ? { varCode: filter.varCode } : {}),
-      ...(filter.varType ? { varType: filter.varType } : {}),
-      ...(filter.direction ? { direction: filter.direction } : {}),
-      ...(textQuery('period') ? { period: textQuery('period') } : {}),
-      ...(filter.pageNo && filter.pageNo > 1 ? { pageNo: String(filter.pageNo) } : {}),
+      ...route.query,
+      varCode: filter.varCode || undefined,
+      varType: filter.varType || undefined,
+      direction: filter.direction || undefined,
+      pageNo: filter.pageNo && filter.pageNo > 1 ? String(filter.pageNo) : undefined,
     },
   }
   if (router.resolve(location).fullPath === route.fullPath) return false
@@ -574,7 +573,6 @@ onBeforeUnmount(() => {
         <V2Button v-if="canCreate" @click="openWorkspace('create')">新建变更</V2Button>
       </template>
       <form class="variation-page__filters" @submit.prevent="search">
-        <V2Input v-model="filter.projectId" label="项目 ID" />
         <V2Input v-model="filter.varCode" label="变更编号" />
         <V2Select
           v-model="filter.varType"
@@ -655,7 +653,7 @@ onBeforeUnmount(() => {
           </tbody>
         </table>
       </div>
-      <div class="variation-page__pager">
+      <nav class="variation-page__pager" aria-label="变更签证分页">
         <span>共 {{ total }} 条</span
         ><V2Button
           size="small"
@@ -671,7 +669,7 @@ onBeforeUnmount(() => {
           @click="changePage((filter.pageNo ?? 1) + 1)"
           >下一页</V2Button
         >
-      </div>
+      </nav>
     </V2Card>
 
     <V2Card

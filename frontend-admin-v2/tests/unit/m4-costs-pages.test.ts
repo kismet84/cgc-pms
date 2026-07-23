@@ -154,6 +154,24 @@ beforeEach(() => {
 })
 
 describe('M4 costs pages', () => {
+  it('keeps cost ledger on the standard table and 10-row pagination contract', async () => {
+    const { wrapper } = await mountPage(
+      CostLedgerPage,
+      '/cost/ledger?projectId=P1&period=2026-07',
+      ['cost:ledger:query'],
+    )
+
+    expect(commercial.loadCostLedgerPage).toHaveBeenCalledWith(
+      expect.objectContaining({ pageNo: 1, pageSize: 10 }),
+      expect.any(AbortSignal),
+    )
+    expect(wrapper.get('table').element.closest('.v2-card')).not.toBeNull()
+    const pagination = wrapper.get('nav[aria-label="成本台账分页"]')
+    expect(pagination.text()).toContain('共 1 条')
+    expect(pagination.text()).toContain('第 1 页')
+    expect(pagination.text()).not.toContain('/ 1')
+  })
+
   it('fails closed on all three pages without cost permissions and loads no business data', async () => {
     const cases = [
       { component: CostLedgerPage, path: '/cost/ledger', title: '无权访问成本台账' },

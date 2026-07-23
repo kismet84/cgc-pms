@@ -31,6 +31,43 @@ function migratedPageSources() {
     .map((name) => ({ name, source: readFileSync(resolve(pagesRoot, name), 'utf-8') }))
 }
 
+const migratedPages = migratedPageSources()
+const migratedSurfaces = [
+  ...migratedPages,
+  ...readdirSync(resolve(sourceRoot, 'layouts'))
+    .filter((name) => name.endsWith('.vue'))
+    .map((name) => ({
+      name: `layouts/${name}`,
+      source: readFileSync(resolve(sourceRoot, 'layouts', name), 'utf-8'),
+    })),
+]
+const dialogPattern = /(<V2Dialog\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>)([\s\S]*?)<\/V2Dialog\s*>/g
+const paginationPattern = /(<nav\b[^>]*aria-label=(['"])[^'"]*分页\2[^>]*>)([\s\S]*?)<\/nav\s*>/g
+
+function dialogBlocks(source: string) {
+  return [...source.matchAll(dialogPattern)].map(([, openingTag, body]) => ({
+    openingTag,
+    body,
+  }))
+}
+
+function paginationBlocks(source: string) {
+  return [...source.matchAll(paginationPattern)].map(([, openingTag, , body]) => ({
+    openingTag,
+    body,
+  }))
+}
+
+function styleRules(source: string) {
+  const styles = [...source.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/g)]
+    .map(([, css]) => css)
+    .join('\n')
+  return [...styles.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map(([, selector, declarations]) => ({
+    selector,
+    declarations,
+  }))
+}
+
 afterEach(() => {
   document.body.innerHTML = ''
 })
@@ -361,381 +398,501 @@ describe('Clean-room V2 design system', () => {
     expect(componentCss).toContain('.v2-card__header + .v2-card__body:not(:empty)')
   })
 
-  it('keeps migrated pages on declared typography and color tokens', () => {
-    const sourceFiles = readdirSync(sourceRoot, { recursive: true })
-      .map(String)
-      .filter((name) => /\.(?:css|ts|vue)$/.test(name))
-    const allSources = sourceFiles
-      .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
-      .join('\n')
-    const implementationSources = sourceFiles
-      .filter((name) => name !== 'styles\\tokens.css' && name !== 'styles/tokens.css')
-      .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
-      .join('\n')
-    const pageAndLayoutSources = sourceFiles
-      .filter((name) => /^(?:pages|layouts)[\\/]/.test(name))
-      .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
-      .join('\n')
-    const declaredTokens = new Set(
-      readFileSync(resolve(sourceRoot, 'styles/tokens.css'), 'utf-8').match(
-        /--v2-[\w-]+(?=\s*:)/g,
-      ) ?? [],
-    )
-    const runtimeLayoutTokens = new Set([
-      '--v2-cluster-align',
-      '--v2-cluster-gap',
-      '--v2-cluster-justify',
-      '--v2-grid-align',
-      '--v2-grid-min',
-      '--v2-stack-align',
-      '--v2-stack-gap',
-      '--v2-stack-justify',
-    ])
-    const referencedTokens = [
-      ...[...allSources.matchAll(/var\((--v2-[\w-]+)/g)].map(([, token]) => token),
-      ...[...allSources.matchAll(/['"](--v2-[\w-]+)['"]/g)].map(([, token]) => token),
-    ]
-    const unknownTokens = [
-      ...new Set(
-        referencedTokens.filter(
-          (token) =>
-            !token.endsWith('-') && !runtimeLayoutTokens.has(token) && !declaredTokens.has(token),
-        ),
-      ),
-    ]
-
-    expect(unknownTokens).toEqual([])
-    expect(implementationSources).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i)
-    expect(implementationSources).not.toMatch(/font-size:\s*[0-9.]+(?:px|rem)\b/i)
-    expect(pageAndLayoutSources).not.toMatch(/\.(?:sr-only|v2-visually-hidden)\s*\{/)
-  })
-
-  it('keeps migrated page title ids stable and page states below the page heading', () => {
-    const sources = Object.fromEntries(
-      [
-        'pages/dashboard/DashboardPage.vue',
-        'pages/delivery/DailyLogPage.vue',
-        'pages/delivery/SchedulePage.vue',
-        'pages/projects/ProjectPage.vue',
-        'pages/workbench/ReportCatalogPage.vue',
-        'pages/workbench/WorkflowWorkbenchPage.vue',
-      ].map((name) => [name, readFileSync(resolve(sourceRoot, name), 'utf-8')]),
-    )
-
-    const cardTitles = {
-      'pages/delivery/DailyLogPage.vue': 'daily-log-title',
-      'pages/delivery/SchedulePage.vue': 'schedule-title',
-      'pages/projects/ProjectPage.vue': 'project-title',
-      'pages/workbench/ReportCatalogPage.vue': 'report-catalog-title',
-    }
-    for (const [name, titleId] of Object.entries(cardTitles)) {
-      const source = sources[name]
-      expect(source).toContain(`aria-labelledby="${titleId}"`)
-      const titleCards = [...source.matchAll(/<V2Card\b[^>]*>/g)].map(([tag]) => tag)
-      expect(
-        titleCards.some(
-          (tag) => tag.includes(`title-id="${titleId}"`) && tag.includes(':heading-level="1"'),
-        ),
-      ).toBe(true)
-    }
-
-    const nativeTitles = {
-      'pages/dashboard/DashboardPage.vue': 'dashboard-title',
-      'pages/workbench/WorkflowWorkbenchPage.vue': 'workflow-title',
-    }
-    for (const [name, titleId] of Object.entries(nativeTitles)) {
-      const source = sources[name]
-      expect(source).toContain(`aria-labelledby="${titleId}"`)
-      expect(source).toMatch(new RegExp(`<h1[^>]*id="${titleId}"`))
-    }
-
-    for (const source of Object.values(sources)) {
-      const stateTags = [...source.matchAll(/<V2PageState\b[^>]*>/g)].map(([tag]) => tag)
-      for (const tag of stateTags) expect(tag).toMatch(/:heading-level="[123]"/)
-    }
-  })
-
-  it('keeps native browser confirmation dialogs out of V2 pages', () => {
-    const pageSources = migratedPageSources()
-      .map(({ source }) => source)
-      .join('\n')
-
-    expect(pageSources).not.toContain('window.confirm(')
-  })
-
-  it('keeps implementation wording out of every migrated page', () => {
-    const pageSources = migratedPageSources()
-      .map(({ source }) => source)
-      .join('\n')
-
-    expect(pageSources).not.toMatch(/权威|回读|重读|后端状态|后端阶段/)
-  })
-
-  it('keeps text and select fields on shared V2 components across every migrated page', () => {
-    const nativeInputPattern = /<input\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g
-    const allowedNativeTypes = new Set(['checkbox', 'date', 'file', 'hidden', 'number', 'radio'])
-
-    for (const { name, source } of migratedPageSources()) {
-      expect(source, `${name} native select`).not.toMatch(/<select\b/)
-      for (const [tag] of source.matchAll(nativeInputPattern)) {
-        const type = tag.match(/\btype=["']([^"']+)["']/)?.[1]
-        expect(allowedNativeTypes.has(type ?? ''), `${name} ${tag}`).toBe(true)
-      }
-    }
-  })
-
-  it('enforces the standard dialog contract across every migrated page', () => {
-    const dialogPattern = /(<V2Dialog\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>)([\s\S]*?)<\/V2Dialog\s*>/g
-
-    for (const { name, source } of migratedPageSources()) {
-      const dialogs = [...source.matchAll(dialogPattern)]
-      expect(dialogs, `${name} V2Dialog parser coverage`).toHaveLength(
-        [...source.matchAll(/<V2Dialog\b/g)].length,
+  describe('V2 migration gates', () => {
+    it('keeps migrated pages on declared typography and color tokens', () => {
+      const sourceFiles = readdirSync(sourceRoot, { recursive: true })
+        .map(String)
+        .filter((name) => /\.(?:css|ts|vue)$/.test(name))
+      const allSources = sourceFiles
+        .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
+        .join('\n')
+      const implementationSources = sourceFiles
+        .filter((name) => name !== 'styles\\tokens.css' && name !== 'styles/tokens.css')
+        .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
+        .join('\n')
+      const pageAndLayoutSources = sourceFiles
+        .filter((name) => /^(?:pages|layouts)[\\/]/.test(name))
+        .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
+        .join('\n')
+      const declaredTokens = new Set(
+        readFileSync(resolve(sourceRoot, 'styles/tokens.css'), 'utf-8').match(
+          /--v2-[\w-]+(?=\s*:)/g,
+        ) ?? [],
       )
-      for (const [index, [, openingTag, body]] of dialogs.entries()) {
-        const evidence = `${name} V2Dialog #${index + 1}`
-        expect(openingTag, evidence).toMatch(/\b:?close-on-backdrop=/)
+      const runtimeLayoutTokens = new Set([
+        '--v2-cluster-align',
+        '--v2-cluster-gap',
+        '--v2-cluster-justify',
+        '--v2-grid-align',
+        '--v2-grid-min',
+        '--v2-stack-align',
+        '--v2-stack-gap',
+        '--v2-stack-justify',
+      ])
+      const referencedTokens = [
+        ...[...allSources.matchAll(/var\((--v2-[\w-]+)/g)].map(([, token]) => token),
+        ...[...allSources.matchAll(/['"](--v2-[\w-]+)['"]/g)].map(([, token]) => token),
+      ]
+      const unknownTokens = [
+        ...new Set(
+          referencedTokens.filter(
+            (token) =>
+              !token.endsWith('-') && !runtimeLayoutTokens.has(token) && !declaredTokens.has(token),
+          ),
+        ),
+      ]
 
-        const hasEditableControl = /<(?:form|input|textarea|select)\b|<V2(?:Input|Select)\b/.test(
-          body,
-        )
-        if (hasEditableControl) {
-          expect(openingTag, evidence).toMatch(/:close-on-backdrop="false"|@backdrop-click=/)
+      expect(unknownTokens).toEqual([])
+      expect(implementationSources).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i)
+      expect(implementationSources).not.toMatch(/font-size:\s*[0-9.]+(?:px|rem)\b/i)
+      expect(pageAndLayoutSources).not.toMatch(/\.(?:sr-only|v2-visually-hidden)\s*\{/)
+    })
+
+    it('keeps migrated page title ids stable and page states below the page heading', () => {
+      const sources = Object.fromEntries(
+        [
+          'pages/dashboard/DashboardPage.vue',
+          'pages/delivery/DailyLogPage.vue',
+          'pages/delivery/SchedulePage.vue',
+          'pages/projects/ProjectPage.vue',
+          'pages/workbench/ReportCatalogPage.vue',
+          'pages/workbench/WorkflowWorkbenchPage.vue',
+        ].map((name) => [name, readFileSync(resolve(sourceRoot, name), 'utf-8')]),
+      )
+
+      const cardTitles = {
+        'pages/delivery/DailyLogPage.vue': 'daily-log-title',
+        'pages/delivery/SchedulePage.vue': 'schedule-title',
+        'pages/projects/ProjectPage.vue': 'project-title',
+        'pages/workbench/ReportCatalogPage.vue': 'report-catalog-title',
+      }
+      for (const [name, titleId] of Object.entries(cardTitles)) {
+        const source = sources[name]
+        expect(source).toContain(`aria-labelledby="${titleId}"`)
+        const titleCards = [...source.matchAll(/<V2Card\b[^>]*>/g)].map(([tag]) => tag)
+        expect(
+          titleCards.some(
+            (tag) => tag.includes(`title-id="${titleId}"`) && tag.includes(':heading-level="1"'),
+          ),
+        ).toBe(true)
+      }
+
+      const nativeTitles = {
+        'pages/dashboard/DashboardPage.vue': 'dashboard-title',
+        'pages/workbench/WorkflowWorkbenchPage.vue': 'workflow-title',
+      }
+      for (const [name, titleId] of Object.entries(nativeTitles)) {
+        const source = sources[name]
+        expect(source).toContain(`aria-labelledby="${titleId}"`)
+        expect(source).toMatch(new RegExp(`<h1[^>]*id="${titleId}"`))
+      }
+
+      for (const source of Object.values(sources)) {
+        const stateTags = [...source.matchAll(/<V2PageState\b[^>]*>/g)].map(([tag]) => tag)
+        for (const tag of stateTags) expect(tag).toMatch(/:heading-level="[123]"/)
+      }
+    })
+
+    it('keeps native browser confirmation dialogs out of V2 pages', () => {
+      const pageSources = migratedPages.map(({ source }) => source).join('\n')
+
+      expect(pageSources).not.toContain('window.confirm(')
+    })
+
+    it('reserves repeated cards for grouped navigation instead of dense records', () => {
+      const repeatedCardPattern =
+        /<V2Card\b(?:(?:"[^"]*"|'[^']*')|[^'">])*\bv-for=(['"])[^'"]+\1(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g
+      const allowedGroupedNavigation = new Set(['workbench/ReportCatalogPage.vue'])
+
+      for (const { name, source } of migratedPages) {
+        for (const [card] of source.matchAll(repeatedCardPattern)) {
+          expect(
+            allowedGroupedNavigation.has(name.replaceAll('\\', '/')),
+            `${name} dense repeated card: ${card}`,
+          ).toBe(true)
         }
       }
-    }
-  })
+    })
 
-  it('uses the standard dialog shell for confirmation and detail dialogs', () => {
-    const dailyLog = readFileSync(resolve(sourceRoot, 'pages/delivery/DailyLogPage.vue'), 'utf-8')
-    const workflow = readFileSync(
-      resolve(sourceRoot, 'pages/workbench/WorkflowWorkbenchPage.vue'),
-      'utf-8',
-    )
-    const dashboard = readFileSync(
-      resolve(sourceRoot, 'pages/dashboard/DashboardPage.vue'),
-      'utf-8',
-    )
-    const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
-    const deliveryPages = [
-      'pages/delivery/SchedulePage.vue',
-      'pages/delivery/QualitySafetyPage.vue',
-      'pages/delivery/TechnicalManagementPage.vue',
-      'pages/delivery/ProjectCloseoutPage.vue',
-    ].map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
-    const projectPage = readFileSync(resolve(sourceRoot, 'pages/projects/ProjectPage.vue'), 'utf-8')
-    const projectForm = readFileSync(resolve(sourceRoot, 'pages/projects/ProjectForm.vue'), 'utf-8')
+    it('keeps implementation wording out of every migrated page', () => {
+      const pageSources = migratedPages.map(({ source }) => source).join('\n')
 
-    expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog'")
-    expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog daily-log-page__dialog'")
-    expect(dailyLog).toContain('class="v2-detail-dialog__section"')
-    expect(dailyLog).toContain('class="v2-detail-dialog__facts"')
-    expect(
-      dailyLog.match(/dialogMode !== 'view' && canEdit && activeRecord\.status === 'DRAFT'/g),
-    ).toHaveLength(2)
-    expect(dailyLog).toContain('<template v-if="dialogMode !== \'view\'" #footer>')
-    expect(dailyLog).toContain(':close-on-backdrop="dialogMode === \'view\'"')
-    expect(dailyLog).toContain('@backdrop-click="warnUnsavedDialog"')
-    expect(dailyLog).toContain('class="daily-log-page__dialog-actions"')
-    expect(dailyLog).toContain('text="选择文件"')
-    expect(dailyLog).toContain('text="保存实际进度"')
-    expect(dailyLog).toContain('text="保存草稿"')
-    expect(dailyLog).toContain('text="提交定稿"')
-    expect(dailyLog).toContain('class="daily-log-page__stack daily-log-page__linked-facts"')
-    expect(workflow).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
-    expect(workflow).toContain('title="审批详情"')
-    expect(workflow).toContain('<dt>审批事项</dt>')
-    expect(workflow).toContain('<V2GlassButton')
-    expect(workflow).toContain('class="v2-detail-dialog__section"')
-    expect(workflow).toContain('class="v2-detail-dialog__facts"')
-    expect(workflow).toContain('class="v2-detail-dialog__actions"')
-    expect(workflow).toContain('<span>第 {{ pageNo }} 页</span>')
-    expect(workflow).toMatch(
-      /\.workflow-pagination \{[\s\S]*?justify-content: flex-end;[\s\S]*?font-size: var\(--v2-font-size-12\);/,
-    )
-    expect(workflow).not.toContain('workflow-detail-overview')
-    expect(workflow).not.toContain('workflow-summary')
-    expect(dashboard).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
-    expect(dashboard).toContain('class="v2-detail-dialog__section"')
-    expect(dashboard).not.toContain('dashboard-alert-detail')
-    for (const [index, pageClass] of [
-      'schedule-page',
-      'quality-page',
-      'technical-page',
-      'closeout-page',
-    ].entries()) {
-      expect(deliveryPages[index]).toMatch(
-        new RegExp(`\\.${pageClass} \\{[\\s\\S]*?font-size: var\\(--v2-font-size-12\\);`),
+      expect(pageSources).not.toMatch(/权威|回读|重读|后端状态|后端阶段/)
+    })
+
+    it('keeps text and select fields on shared V2 components across every migrated page', () => {
+      const nativeInputPattern = /<input\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g
+      const allowedNativeTypes = new Set(['checkbox', 'date', 'file', 'hidden', 'number', 'radio'])
+
+      for (const { name, source } of migratedPages) {
+        expect(source, `${name} native select`).not.toMatch(/<select\b/)
+        for (const [tag] of source.matchAll(nativeInputPattern)) {
+          const type = tag.match(/\btype=["']([^"']+)["']/)?.[1]
+          expect(allowedNativeTypes.has(type ?? ''), `${name} ${tag}`).toBe(true)
+        }
+      }
+    })
+
+    it('enforces the standard dialog contract across every migrated page', () => {
+      for (const { name, source } of migratedPages) {
+        const dialogs = dialogBlocks(source)
+        expect(dialogs, `${name} V2Dialog parser coverage`).toHaveLength(
+          [...source.matchAll(/<V2Dialog\b/g)].length,
+        )
+        for (const [index, { openingTag, body }] of dialogs.entries()) {
+          const evidence = `${name} V2Dialog #${index + 1}`
+          expect(openingTag, evidence).toMatch(/\b:?close-on-backdrop=/)
+
+          const hasEditableControl = /<(?:form|input|textarea|select)\b|<V2(?:Input|Select)\b/.test(
+            body,
+          )
+          if (hasEditableControl) {
+            expect(openingTag, evidence).toMatch(/:close-on-backdrop="false"|@backdrop-click=/)
+          }
+        }
+      }
+    })
+
+    it('enforces detail dialog and shared data typography across every migrated page', () => {
+      const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+
+      expect(componentCss).toMatch(
+        /\.v2-card__body :where\(dl, table\),[\s\S]*?\.v2-dialog__body :where\(dl, table\) \{[\s\S]*?font-size: var\(--v2-font-size-12\);[\s\S]*?line-height: var\(--v2-line-height-ui\);/,
       )
-    }
-    for (const [page, title] of [
-      [deliveryPages[1], '质量安全整改闭环'],
-      [deliveryPages[2], '图纸 RFI 技术闭环'],
-      [deliveryPages[3], '竣工收尾闭环'],
-    ]) {
-      expect(page).toContain(`<h1 class="v2-visually-hidden">${title}</h1>`)
-      expect(page).toContain('panel-class="v2-detail-dialog"')
-      expect(page).not.toMatch(/<V2Card[\s\S]{0,160}v-if="trace"/)
-    }
-    for (const page of deliveryPages.slice(1)) {
-      expect(page).toMatch(
-        /__item > (?:strong|h3)[\s\S]*?font-size: var\(--v2-font-size-14\);[\s\S]*?font-weight: var\(--v2-font-weight-semibold\);/,
+
+      for (const { name, source } of migratedPages) {
+        for (const [index, { openingTag, body }] of dialogBlocks(source).entries()) {
+          const evidence = `${name} V2Dialog #${index + 1}`
+          const title = openingTag.match(/\b:?title=(['"])(.*?)\1/)?.[2] ?? ''
+          if (/(?:详情|追溯|预览)/.test(title)) {
+            expect(openingTag, `${evidence} ${title}`).toContain('v2-detail-dialog')
+          }
+          if (!openingTag.includes('v2-detail-dialog')) continue
+
+          expect(body, `${evidence} raw detail dump`).not.toMatch(/<pre\b/)
+          for (const [dl] of body.matchAll(/<dl\b[^>]*>/g)) {
+            expect(dl, `${evidence} detail facts`).toMatch(
+              /\bclass=(['"])[^'"]*\bv2-detail-dialog__facts\b[^'"]*\1/,
+            )
+          }
+          for (const [button] of body.matchAll(/<V2Button\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g)) {
+            expect(button, `${evidence} detail/edit action material`).toMatch(
+              /\btype=['"]submit['"]/,
+            )
+          }
+        }
+      }
+    })
+
+    it('enforces every pagination block independently', () => {
+      const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+      expect(componentCss).toMatch(
+        /:where\(nav, \[role='navigation'\]\)\[aria-label\$='分页'\] \{[\s\S]*?font-size: var\(--v2-font-size-12\);[\s\S]*?line-height: var\(--v2-line-height-ui\);/,
       )
-    }
-    for (const page of deliveryPages) {
-      expect(page).toContain('<template #footer>')
-      expect(page).not.toMatch(/\{\{\s*(?:\w+\.)+(?:status|severity|conclusion)\s*\}\}/)
-    }
-    for (const { name, source } of migratedPageSources()) {
-      expect(source, `${name} duplicated project scope card`).not.toContain('title="项目范围"')
-      expect(source, `${name} duplicated shell project selector`).not.toContain(
-        'v-model="workspace.selectedProjectId"',
+
+      for (const { name, source } of migratedPages) {
+        const blocks = paginationBlocks(source)
+        const landmarks = [...source.matchAll(/<nav\b[^>]*aria-label=(['"])[^'"]*分页\1[^>]*>/g)]
+        expect(blocks, `${name} pagination parser coverage`).toHaveLength(landmarks.length)
+        for (const [index, { body }] of blocks.entries()) {
+          if (!body.includes('上一页') && !body.includes('下一页')) continue
+          const evidence = `${name} pagination #${index + 1}`
+          const previous = body.indexOf('上一页')
+          const current = body.search(/第\s+\{\{[^}]+\}\}\s+页/)
+          const next = body.indexOf('下一页')
+          expect(previous, `${evidence} previous page`).toBeGreaterThanOrEqual(0)
+          expect(current, `${evidence} current page`).toBeGreaterThan(previous)
+          expect(next, `${evidence} next page`).toBeGreaterThan(current)
+          expect(body, `${evidence} legacy page-count separator`).not.toMatch(
+            /第\s+\{\{[^}]+\}\}\s*\/\s*\{\{/,
+          )
+        }
+      }
+    })
+
+    it('keeps shared component material owned by the shared styles', () => {
+      const sharedMaterialSelector =
+        /\.(?:v2-button|v2-glass-button|v2-card|v2-badge|v2-dialog__panel)\b/
+      const sharedMaterialProperty =
+        /(?:^|;)\s*(?:color|background(?:-color)?|border(?:-color|-radius)?|box-shadow|backdrop-filter|font(?:-family|-size|-weight)?)\s*:/i
+
+      for (const { name, source } of migratedSurfaces) {
+        for (const { selector, declarations } of styleRules(source)) {
+          if (!sharedMaterialSelector.test(selector)) continue
+          expect(
+            declarations,
+            `${name} overrides shared material in ${selector.trim()}`,
+          ).not.toMatch(sharedMaterialProperty)
+        }
+      }
+    })
+
+    it('keeps migrated page-specific interaction contracts', () => {
+      const dailyLog = readFileSync(resolve(sourceRoot, 'pages/delivery/DailyLogPage.vue'), 'utf-8')
+      const workflow = readFileSync(
+        resolve(sourceRoot, 'pages/workbench/WorkflowWorkbenchPage.vue'),
+        'utf-8',
       )
-      expect(source, `${name} duplicated shell project update`).not.toContain(
-        '@update:model-value="workspace.selectProject"',
+      const dashboard = readFileSync(
+        resolve(sourceRoot, 'pages/dashboard/DashboardPage.vue'),
+        'utf-8',
       )
-    }
-    for (const formId of [
-      'schedule-create-form',
-      'schedule-wbs-form',
-      'schedule-period-form',
-      'schedule-corrective-form',
-    ]) {
-      expect(deliveryPages[0]).toContain(`id="${formId}"`)
-      expect(deliveryPages[0]).toContain(`type="submit" form="${formId}"`)
-    }
-    expect(deliveryPages[0]).toMatch(/class="schedule-page__span-2"[\s\S]*?label="项目"/)
-    expect(deliveryPages[0]).toContain('label="计划编号"')
-    expect(projectPage).toContain('class="project-form--dialog"')
-    expect(projectForm).toMatch(
-      /\.project-form--dialog \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
-    )
-    expect(projectForm).toContain('.project-form--dialog :deep(.v2-field__control) {')
-    expect(components).toContain('.v2-dialog-standard label:not(.v2-field) {')
-    expect(components).toContain('var(--v2-font-size-12) / var(--v2-line-height-ui)')
-    expect(components).toContain('var(--v2-font-size-13) / var(--v2-line-height-ui)')
-    expect(components).toContain('.v2-detail-dialog .v2-card {')
-    expect(components).toMatch(/\.v2-dialog-standard \{[\s\S]*?width: min\(32rem, 100%\);/)
-    expect(components).toMatch(/@media \(min-width: 64rem\) \{[\s\S]*?width: min\(46rem, 100%\);/)
-    expect(components).toContain('scrollbar-width: none;')
-    expect(components).toContain('.v2-dialog__panel::-webkit-scrollbar')
-    expect(components).toContain('.v2-select__menu::-webkit-scrollbar')
-    expect(components).not.toContain('.v2-dialog__panel:has(.v2-select[open])')
-    expect(dailyLog).toMatch(
-      /\.daily-log-page__table th,[\s\S]*?\.daily-log-page__table td \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
-    )
-    expect(dailyLog).toMatch(
-      /\.daily-log-page__panel \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
-    )
-    expect(dailyLog).toMatch(
-      /\.daily-log-page__facts,[\s\S]*?\.daily-log-page__summary \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
-    )
-    expect(dailyLog).toMatch(
-      /\.daily-log-page__form \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
-    )
-    expect(dailyLog).toMatch(
-      /\.daily-log-page__form input,[\s\S]*?\.daily-log-page__form textarea \{[\s\S]*?background: transparent;[\s\S]*?border: 1px solid color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
-    )
-    expect(dailyLog).toMatch(
-      /\.daily-log-page__form :deep\(\.v2-field__control\) \{[\s\S]*?background: transparent;[\s\S]*?border-color: color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
-    )
-    expect(dailyLog).toMatch(
-      /\.daily-log-page__pagination \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
-    )
-    expect(dailyLog).toMatch(
-      /\.daily-log-page__linked-facts \{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/,
-    )
-    expect(components).toMatch(/\.v2-detail-dialog \.v2-card \{[\s\S]*?border: 0;/)
-    expect(components).toMatch(/\.v2-detail-dialog \.v2-card \{[\s\S]*?background: transparent;/)
-    expect(components).toMatch(/\.v2-detail-dialog__quick-actions \{[\s\S]*?display: flex;/)
-  })
+      const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+      const deliveryPages = [
+        'pages/delivery/SchedulePage.vue',
+        'pages/delivery/QualitySafetyPage.vue',
+        'pages/delivery/TechnicalManagementPage.vue',
+        'pages/delivery/ProjectCloseoutPage.vue',
+      ].map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
+      const projectPage = readFileSync(
+        resolve(sourceRoot, 'pages/projects/ProjectPage.vue'),
+        'utf-8',
+      )
+      const projectForm = readFileSync(
+        resolve(sourceRoot, 'pages/projects/ProjectForm.vue'),
+        'utf-8',
+      )
+      const costControl = readFileSync(
+        resolve(sourceRoot, 'pages/commercial/CostControlPage.vue'),
+        'utf-8',
+      )
 
-  it('keeps navigation accents separate from risk colors', () => {
-    const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
-    const placeholder = readFileSync(
-      resolve(sourceRoot, 'pages/shell/ShellPlaceholderPage.vue'),
-      'utf-8',
-    )
+      expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog'")
+      expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog daily-log-page__dialog'")
+      expect(dailyLog).toContain('class="v2-detail-dialog__section"')
+      expect(dailyLog).toContain('class="v2-detail-dialog__facts"')
+      expect(
+        dailyLog.match(/dialogMode !== 'view' && canEdit && activeRecord\.status === 'DRAFT'/g),
+      ).toHaveLength(2)
+      expect(dailyLog).toContain('<template v-if="dialogMode !== \'view\'" #footer>')
+      expect(dailyLog).toContain(':close-on-backdrop="dialogMode === \'view\'"')
+      expect(dailyLog).toContain('@backdrop-click="warnUnsavedDialog"')
+      expect(dailyLog).toContain('class="daily-log-page__dialog-actions"')
+      expect(dailyLog).toContain('text="选择文件"')
+      expect(dailyLog).toContain('text="保存实际进度"')
+      expect(dailyLog).toContain('text="保存草稿"')
+      expect(dailyLog).toContain('text="提交定稿"')
+      expect(dailyLog).toContain('class="daily-log-page__stack daily-log-page__linked-facts"')
+      expect(workflow).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
+      expect(workflow).toContain('title="审批详情"')
+      expect(workflow).toContain('<dt>审批事项</dt>')
+      expect(workflow).toContain('<V2GlassButton')
+      expect(workflow).toContain('class="v2-detail-dialog__section"')
+      expect(workflow).toContain('class="v2-detail-dialog__facts"')
+      expect(workflow).toContain('class="v2-detail-dialog__actions"')
+      expect(workflow).not.toContain('workflow-detail-overview')
+      expect(workflow).not.toContain('workflow-summary')
+      expect(dashboard).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
+      expect(dashboard).toContain('class="v2-detail-dialog__section"')
+      expect(dashboard).not.toContain('dashboard-alert-detail')
+      for (const [index, pageClass] of [
+        'schedule-page',
+        'quality-page',
+        'technical-page',
+        'closeout-page',
+      ].entries()) {
+        expect(deliveryPages[index]).toMatch(
+          new RegExp(`\\.${pageClass} \\{[\\s\\S]*?font-size: var\\(--v2-font-size-12\\);`),
+        )
+      }
+      for (const [page, title] of [
+        [deliveryPages[1], '质量安全整改闭环'],
+        [deliveryPages[2], '图纸 RFI 技术闭环'],
+        [deliveryPages[3], '竣工收尾闭环'],
+      ]) {
+        expect(page).toContain(`<h1 class="v2-visually-hidden">${title}</h1>`)
+        expect(page).toContain('panel-class="v2-detail-dialog"')
+        expect(page).not.toMatch(/<V2Card[\s\S]{0,160}v-if="trace"/)
+      }
+      for (const page of deliveryPages.slice(1)) {
+        expect(page).toMatch(
+          /__item > (?:strong|h3)[\s\S]*?font-size: var\(--v2-font-size-14\);[\s\S]*?font-weight: var\(--v2-font-weight-semibold\);/,
+        )
+      }
+      for (const page of deliveryPages) {
+        expect(page).toContain('<template #footer>')
+        expect(page).not.toMatch(/\{\{\s*(?:\w+\.)+(?:status|severity|conclusion)\s*\}\}/)
+      }
+      for (const formId of [
+        'schedule-create-form',
+        'schedule-wbs-form',
+        'schedule-period-form',
+        'schedule-corrective-form',
+      ]) {
+        expect(deliveryPages[0]).toContain(`id="${formId}"`)
+        expect(deliveryPages[0]).toContain(`type="submit" form="${formId}"`)
+      }
+      expect(deliveryPages[0]).toMatch(/class="schedule-page__span-2"[\s\S]*?label="项目"/)
+      expect(deliveryPages[0]).toContain('label="计划编号"')
+      expect(projectPage).toContain('class="project-form--dialog"')
+      expect(projectForm).toMatch(
+        /\.project-form--dialog \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+      )
+      expect(projectForm).toContain('.project-form--dialog :deep(.v2-field__control) {')
+      expect(components).toContain('.v2-dialog-standard label:not(.v2-field) {')
+      expect(components).toContain('.v2-dialog-standard .v2-field__control,')
+      expect(components).toContain('var(--v2-font-size-12) / var(--v2-line-height-ui)')
+      expect(components).toContain('var(--v2-font-size-13) / var(--v2-line-height-ui)')
+      expect(costControl).toContain('class="v2-detail-dialog__section"')
+      for (const formId of [
+        'cost-forecast-form',
+        'cost-corrective-form',
+        'cost-corrective-close-form',
+      ]) {
+        expect(costControl).toContain(`id="${formId}"`)
+        expect(costControl).toContain(`type="submit" form="${formId}"`)
+      }
+      expect(costControl.match(/<template #footer>/g)).toHaveLength(3)
+      expect(costControl.match(/<V2GlassButton/g)).toHaveLength(3)
+      expect(components).toContain('.v2-detail-dialog .v2-card {')
+      expect(components).toMatch(/\.v2-dialog-standard \{[\s\S]*?width: min\(32rem, 100%\);/)
+      expect(components).toMatch(/@media \(min-width: 64rem\) \{[\s\S]*?width: min\(46rem, 100%\);/)
+      expect(components).toContain('scrollbar-width: none;')
+      expect(components).toContain('.v2-dialog__panel::-webkit-scrollbar')
+      expect(components).toContain('.v2-select__menu::-webkit-scrollbar')
+      expect(components).not.toContain('.v2-dialog__panel:has(.v2-select[open])')
+      expect(dailyLog).toMatch(
+        /\.daily-log-page__table th,[\s\S]*?\.daily-log-page__table td \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+      )
+      expect(dailyLog).toMatch(
+        /\.daily-log-page__panel \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+      )
+      expect(dailyLog).toMatch(
+        /\.daily-log-page__facts,[\s\S]*?\.daily-log-page__summary \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+      )
+      expect(dailyLog).toMatch(
+        /\.daily-log-page__form \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+      )
+      expect(dailyLog).toMatch(
+        /\.daily-log-page__form input,[\s\S]*?\.daily-log-page__form textarea \{[\s\S]*?background: transparent;[\s\S]*?border: 1px solid color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
+      )
+      expect(dailyLog).toMatch(
+        /\.daily-log-page__form :deep\(\.v2-field__control\) \{[\s\S]*?background: transparent;[\s\S]*?border-color: color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
+      )
+      expect(dailyLog).toMatch(
+        /\.daily-log-page__pagination \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+      )
+      expect(dailyLog).toMatch(
+        /\.daily-log-page__linked-facts \{[\s\S]*?grid-template-columns: repeat\(4, minmax\(0, 1fr\)\);/,
+      )
+      expect(components).toMatch(/\.v2-detail-dialog \.v2-card \{[\s\S]*?border: 0;/)
+      expect(components).toMatch(/\.v2-detail-dialog \.v2-card \{[\s\S]*?background: transparent;/)
+      expect(components).toMatch(/\.v2-detail-dialog__quick-actions \{[\s\S]*?display: flex;/)
+    })
 
-    expect(appShell).toContain('var(--v2-color-workspace-tab-accent)')
-    expect(placeholder).toContain('title="业务页面建设中" tone="info"')
-    expect(placeholder).not.toContain('tone="warning"')
-  })
+    it('keeps navigation accents separate from risk colors', () => {
+      const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
+      const placeholder = readFileSync(
+        resolve(sourceRoot, 'pages/shell/ShellPlaceholderPage.vue'),
+        'utf-8',
+      )
 
-  it('keeps mobile shell context controls touch sized and previews every shared state primitive', () => {
-    const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
-    const preview = readFileSync(
-      resolve(sourceRoot, 'components/preview/DesignSystemPreview.vue'),
-      'utf-8',
-    )
+      expect(appShell).toContain('var(--v2-color-workspace-tab-accent)')
+      expect(placeholder).toContain('title="业务页面建设中" tone="info"')
+      expect(placeholder).not.toContain('tone="warning"')
+    })
 
-    expect(appShell).toMatch(
-      /\.app-shell__context-controls :deep\(\.v2-field__control\) \{[\s\S]*?min-height: var\(--v2-control-height-touch\);/,
-    )
-    for (const component of [
-      'V2ConfirmDialog',
-      'V2ErrorBoundary',
-      'V2GlassButton',
-      'V2PageState',
-    ]) {
-      expect(preview).toContain(`<${component}`)
-    }
-  })
+    it('keeps mobile shell context controls touch sized and previews every shared state primitive', () => {
+      const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
+      const preview = readFileSync(
+        resolve(sourceRoot, 'components/preview/DesignSystemPreview.vue'),
+        'utf-8',
+      )
 
-  it('locks the current V2 standard style contract', () => {
-    const baseline = readFileSync(
-      resolve(sourceRoot, '../../docs/ui-v2/m1-design-system-baseline.md'),
-      'utf-8',
-    )
-    const mainline = readFileSync(
-      resolve(
-        sourceRoot,
-        '../../docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md',
-      ),
-      'utf-8',
-    )
-    const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
-    const glassButton = readFileSync(resolve(sourceRoot, 'components/V2GlassButton.vue'), 'utf-8')
-    const dailyLog = readFileSync(resolve(sourceRoot, 'pages/delivery/DailyLogPage.vue'), 'utf-8')
-    const workflow = readFileSync(
-      resolve(sourceRoot, 'pages/workbench/WorkflowWorkbenchPage.vue'),
-      'utf-8',
-    )
+      expect(appShell).toMatch(
+        /\.app-shell__context-controls :deep\(\.v2-field__control\) \{[\s\S]*?min-height: var\(--v2-control-height-touch\);/,
+      )
+      for (const component of [
+        'V2ConfirmDialog',
+        'V2ErrorBoundary',
+        'V2GlassButton',
+        'V2PageState',
+      ]) {
+        expect(preview).toContain(`<${component}`)
+      }
+    })
 
-    for (const marker of [
-      '现行 V2 标准样式合同',
-      'v2-dialog-standard',
-      'v2-detail-dialog',
-      'V2ConfirmDialog',
-      'V2GlassButton',
-      '上一页 — 第 N 页 — 下一页',
-    ]) {
-      expect(baseline).toContain(marker)
-    }
-    expect(baseline).not.toContain('21–28')
-    expect(baseline).toContain('完整对象“详情”进入独立详情路由')
-    expect(baseline).toContain('“追溯/预览”使用标准只读 `V2Dialog`')
-    expect(mainline).not.toContain('每个实施阶段必须在 Stitch 交付可编辑设计')
-    expect(mainline).toContain('只有新增视觉方向、复杂交互或现有模式无法覆盖时')
+    it('keeps project and report-period selectors owned by the shared shell', () => {
+      const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
+      const contextControlPattern =
+        /<(?:V2Select|V2Input|select|input)\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g
+      const pageOwnedContextBinding =
+        /\b(?:v-model|:model-value)=(['"])(?:workspace\.selected(?:ProjectId|ReportPeriod)|(?:filter\.)?(?:projectId|reportPeriod|period))\1/
+      const pageOwnedContextUpdate =
+        /@update:model-value=(['"])workspace\.select(?:Project|ReportPeriod)\1/
 
-    expect(components).toMatch(
-      /\.v2-detail-dialog__section \{[\s\S]*?margin-block-end: 10px;[\s\S]*?padding-block-end: 10px;[\s\S]*?color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
-    )
-    expect(glassButton).toContain('color-mix(in srgb, var(--v2-color-surface) 50%, transparent)')
-    expect(glassButton).toContain('backdrop-filter: blur(16px) saturate(160%);')
-    expect(glassButton).toContain('-webkit-backdrop-filter: blur(16px) saturate(160%);')
-    expect(glassButton).toContain('.v2-glass-button.v2-button:hover:not(:disabled)')
-    expect(glassButton).toContain('.v2-glass-button.v2-button:active:not(:disabled)')
-    expect(glassButton).toContain('.v2-glass-button.v2-button:focus-visible')
-    expect(glassButton).toContain('@media (prefers-reduced-motion: reduce)')
+      expect(appShell).toContain('id="global-project"')
+      expect(appShell).toContain('id="global-report-period"')
+      expect(migratedPages.length).toBeGreaterThan(0)
 
-    for (const source of [dailyLog, workflow]) {
-      const previous = source.indexOf('上一页')
-      const current = source.indexOf('第 {{ pageNo }} 页')
-      const next = source.indexOf('下一页')
-      expect(previous).toBeGreaterThan(-1)
-      expect(previous).toBeLessThan(current)
-      expect(current).toBeLessThan(next)
-    }
+      for (const { name, source } of migratedPages) {
+        expect(source, `${name} duplicated project scope card`).not.toContain('title="项目范围"')
+        expect(source, `${name} duplicated shell context update`).not.toMatch(
+          pageOwnedContextUpdate,
+        )
+        for (const [control] of source.matchAll(contextControlPattern)) {
+          expect(control, `${name} must reuse shared shell context selectors`).not.toMatch(
+            pageOwnedContextBinding,
+          )
+        }
+      }
+    })
+
+    it('locks the current V2 standard style contract', () => {
+      const baseline = readFileSync(
+        resolve(sourceRoot, '../../docs/ui-v2/m1-design-system-baseline.md'),
+        'utf-8',
+      )
+      const mainline = readFileSync(
+        resolve(
+          sourceRoot,
+          '../../docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md',
+        ),
+        'utf-8',
+      )
+      const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+      const glassButton = readFileSync(resolve(sourceRoot, 'components/V2GlassButton.vue'), 'utf-8')
+      const dailyLog = readFileSync(resolve(sourceRoot, 'pages/delivery/DailyLogPage.vue'), 'utf-8')
+      const workflow = readFileSync(
+        resolve(sourceRoot, 'pages/workbench/WorkflowWorkbenchPage.vue'),
+        'utf-8',
+      )
+
+      for (const marker of [
+        '现行 V2 标准样式合同',
+        'v2-dialog-standard',
+        'v2-detail-dialog',
+        'V2ConfirmDialog',
+        'V2GlassButton',
+        '上一页 — 第 N 页 — 下一页',
+      ]) {
+        expect(baseline).toContain(marker)
+      }
+      expect(baseline).not.toContain('21–28')
+      expect(baseline).toContain('完整对象“详情”进入独立详情路由')
+      expect(baseline).toContain('“追溯/预览”使用标准只读 `V2Dialog`')
+      expect(mainline).not.toContain('每个实施阶段必须在 Stitch 交付可编辑设计')
+      expect(mainline).toContain('只有新增视觉方向、复杂交互或现有模式无法覆盖时')
+
+      expect(components).toMatch(
+        /\.v2-detail-dialog__section \{[\s\S]*?margin-block-end: 10px;[\s\S]*?padding-block-end: 10px;[\s\S]*?color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
+      )
+      expect(glassButton).toContain('color-mix(in srgb, var(--v2-color-surface) 50%, transparent)')
+      expect(glassButton).toContain('backdrop-filter: blur(16px) saturate(160%);')
+      expect(glassButton).toContain('-webkit-backdrop-filter: blur(16px) saturate(160%);')
+      expect(glassButton).toContain('.v2-glass-button.v2-button:hover:not(:disabled)')
+      expect(glassButton).toContain('.v2-glass-button.v2-button:active:not(:disabled)')
+      expect(glassButton).toContain('.v2-glass-button.v2-button:focus-visible')
+      expect(glassButton).toContain('@media (prefers-reduced-motion: reduce)')
+
+      for (const source of [dailyLog, workflow]) {
+        const previous = source.indexOf('上一页')
+        const current = source.indexOf('第 {{ pageNo }} 页')
+        const next = source.indexOf('下一页')
+        expect(previous).toBeGreaterThan(-1)
+        expect(previous).toBeLessThan(current)
+        expect(current).toBeLessThan(next)
+      }
+    })
   })
 })
