@@ -9,12 +9,17 @@ import com.cgcpms.cost.service.CostTargetService;
 import com.cgcpms.cost.vo.CostTargetItemVO;
 import com.cgcpms.cost.vo.CostTargetVO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -59,7 +64,8 @@ public class CostTargetController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:edit')")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CostTarget target) {
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CostTargetUpdateRequest request) {
+        CostTarget target = request.toEntity();
         target.setId(id);
         costTargetService.update(target);
         return ApiResponse.success();
@@ -67,15 +73,15 @@ public class CostTargetController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:delete')")
-    public ApiResponse<Void> delete(@PathVariable Long id) {
-        costTargetService.delete(id);
+    public ApiResponse<Void> delete(@PathVariable Long id, @RequestParam Integer version) {
+        costTargetService.delete(id, version);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/activate")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:activate')")
-    public ApiResponse<Void> activate(@PathVariable Long id) {
-        costTargetService.activate(id);
+    public ApiResponse<Void> activate(@PathVariable Long id, @RequestParam Integer version) {
+        costTargetService.activate(id, version);
         return ApiResponse.success();
     }
 
@@ -94,9 +100,10 @@ public class CostTargetController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:edit')")
     public ApiResponse<Void> batchSaveItems(@PathVariable Long targetId,
                                             @Valid @Size(max = 200, message = "批量明细不能超过200条")
-                                            @RequestBody List<@Valid CostTargetItem> items) {
+                                            @RequestBody List<@Valid CostTargetItem> items,
+                                            @RequestParam Integer version) {
         log.info("POST /cost-targets/{}/items — batch save {} items", targetId, items != null ? items.size() : 0);
-        costTargetService.batchSaveItems(targetId, items);
+        costTargetService.batchSaveItems(targetId, version, items);
         return ApiResponse.success();
     }
 
@@ -104,9 +111,9 @@ public class CostTargetController {
 
     @PostMapping("/{id}/submit")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:submit')")
-    public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
+    public ApiResponse<Void> submitForApproval(@PathVariable Long id, @RequestParam Integer version) {
         log.info("POST /cost-targets/{}/submit", id);
-        costTargetService.submitForApproval(id);
+        costTargetService.submitForApproval(id, version);
         return ApiResponse.success();
     }
 
@@ -146,5 +153,33 @@ public class CostTargetController {
         vo.setSortOrder(item.getSortOrder());
         vo.setRemark(item.getRemark());
         return vo;
+    }
+
+    /** Update request keeps client version writable while entity version stays response-only. */
+    public record CostTargetUpdateRequest(
+            @NotNull(message = "所属项目不能为空") Long projectId,
+            @NotBlank(message = "版本号不能为空") String versionNo,
+            @NotBlank(message = "版本名称不能为空") String versionName,
+            @NotNull(message = "成本目标总额不能为空")
+            @DecimalMin(value = "0.00", message = "成本目标总额不能为负数") BigDecimal totalTargetAmount,
+            @DecimalMin(value = "0.00", message = "投标成本总额不能为负数") BigDecimal totalBidCostAmount,
+            @DecimalMin(value = "0.00", message = "责任预算总额不能为负数") BigDecimal totalResponsibilityAmount,
+            LocalDate effectiveDate,
+            @NotNull(message = "缺少最新版本，请刷新后重试") Integer version,
+            String remark) {
+
+        CostTarget toEntity() {
+            CostTarget target = new CostTarget();
+            target.setProjectId(projectId);
+            target.setVersionNo(versionNo);
+            target.setVersionName(versionName);
+            target.setTotalTargetAmount(totalTargetAmount);
+            target.setTotalBidCostAmount(totalBidCostAmount);
+            target.setTotalResponsibilityAmount(totalResponsibilityAmount);
+            target.setEffectiveDate(effectiveDate);
+            target.setVersion(version);
+            target.setRemark(remark);
+            return target;
+        }
     }
 }

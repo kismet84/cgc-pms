@@ -16,6 +16,9 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -101,12 +104,15 @@ class WorkflowApproverResolverTest {
     @BeforeEach
     void setupContext() {
         TestUserContext.setAdmin(TENANT_0, USER_SUBMITTER);
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "admin", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
         seedTestData();
     }
 
     @AfterEach
     void clearContext() {
         TestUserContext.clear();
+        SecurityContextHolder.clearContext();
     }
 
     @AfterAll
@@ -436,7 +442,7 @@ class WorkflowApproverResolverTest {
                 """,
                 businessId, TENANT_0, 100L, "WF-APR-" + businessId, "workflow审批测试合同-" + businessId, "SUB",
                 20001L, 20002L, new BigDecimal("100000.00"), new BigDecimal("100000.00"), BigDecimal.ZERO,
-                "DRAFT", "DRAFT", USER_SUBMITTER, USER_SUBMITTER,
+                "DRAFT", "APPROVING", USER_SUBMITTER, USER_SUBMITTER,
                 businessId);
     }
 

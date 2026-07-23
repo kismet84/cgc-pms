@@ -55,6 +55,36 @@ describe('V2 eight-domain navigation contract', () => {
         (tab) => tab.path === '/project-closeout',
       )?.workspaceContext,
     ).toEqual({ project: true, period: false })
+    expect(
+      findWorkspace('/variation/order')?.workspace.tabs.find(
+        (tab) => tab.path === '/variation/order',
+      )?.workspaceContext,
+    ).toEqual({ project: true, period: true })
     expect(findWorkspace('/contract/C-100/edit')?.workspace.label).toBe('合同与变更')
+    expect(
+      findWorkspace('/contract/ledger')?.workspace.tabs.find(
+        (tab) => tab.path === '/contract/ledger',
+      )?.workspaceContext,
+    ).toEqual({ project: true, period: true })
+    expect(
+      findWorkspace('/bid-cost')?.workspace.tabs.find((tab) => tab.path === '/bid-cost')
+        ?.workspaceContext,
+    ).toEqual({ project: true, period: true })
+    expect(findWorkspace('/cost-target/81/edit')?.workspace.label).toBe('投标与成本目标')
+    expect(
+      findWorkspace('/cost-target/index')?.workspace.tabs.find(
+        (tab) => tab.path === '/cost-target/index',
+      )?.workspaceContext,
+    ).toEqual({ project: true, period: false })
+    for (const path of ['/cost/ledger', '/cost/summary', '/cost/control']) {
+      expect(
+        findWorkspace(path)?.workspace.tabs.find((tab) => tab.path === path)?.workspaceContext,
+      ).toEqual({ project: true, period: true })
+    }
+    for (const path of ['/budget', '/production-measurement']) {
+      expect(
+        findWorkspace(path)?.workspace.tabs.find((tab) => tab.path === path)?.workspaceContext,
+      ).toEqual({ project: true, period: true })
+    }
   })
 })

@@ -1,5 +1,41 @@
 # CGC-PMS 项目地图
 
+## 2026-07-23 主线53 M4：053-022项目预算与产值计量V2通过
+
+- `/budget`、`/production-measurement`由真实Clean-room V2承接，台账达到`LEGACY_ONLY=50 / V2_ACCEPTED=37 / V2_SOURCE_AVAILABLE=0`。
+- 预算CRUD/明细/可用额/提交与产值期间/计量/内部审批/业主申报核定/结算追溯成立；金额与ID字符串、全写CAS、项目/租户/合同范围、真实CLEAN文件和确定性行锁并发门禁通过。
+- `ISSUE-053-017～022`均已收口，当前无M4 Ready；`ISSUE-053-023`仍为Planned。M7成本科目中心、正式入口、Legacy退役和生产发布边界不变。
+
+## 2026-07-23 主线53 M4：053-021成本台账、核对与动态利润V2通过
+
+- `/cost`、台账、核对与动态利润四路由由真实Clean-room V2承接，台账达到`LEGACY_ONLY=52 / V2_ACCEPTED=35 / V2_SOURCE_AVAILABLE=0`。
+- 成本分页/汇总/详情、独立刷新权限、历史不可变、预测/纠偏闭环成立；金额/ID字符串、version/CAS、项目成员与forecast锁共同保证项目范围和并发一致性。
+- `ISSUE-053-022`为当前唯一Ready；预算/产值尚未提前迁移，M7成本科目中心、正式入口、Legacy退役、push和生产发布边界不变。
+
+## 2026-07-23 主线53 M4：053-020目标成本版本V2通过
+
+- `/cost-target`、列表、创建与编辑四路由已由真实Clean-room V2承接，台账达到`LEGACY_ONLY=56 / V2_ACCEPTED=31 / V2_SOURCE_AVAILABLE=0`。
+- 目标成本版本、明细、提交、驳回重提、激活与删除闭环成立；金额字符串、version/CAS、项目/租户范围、通用工作流fail-close及同项目唯一活动版本通过。
+- V220登记普通角色动作权限；`ISSUE-053-021`为当前唯一Ready，成本/利润、预算/产值尚未提前迁移。正式入口、Legacy退役、push和生产发布边界不变。
+
+## 2026-07-22 主线53 M4：053-019变更签证与投标成本V2通过
+
+- `/variation`、`/variation/order`、`/bid-cost`已由真实Clean-room V2承接，台账达到`LEGACY_ONLY=60 / V2_ACCEPTED=27 / V2_SOURCE_AVAILABLE=0`。
+- 变更内部审批、业主申报/核定、合同变更追溯与投标BIDDING→WON/LOST闭环成立；version/CAS、租户/项目/合同/合作方范围、附件动作/阶段及明细专属权限失败关闭。
+- 项目经理具备9项变更权限，商务经理具备14项变更/投标权限；`ISSUE-053-020～023`仍为Planned，目标成本、成本/利润、预算/产值未被019提前迁移。正式入口、Legacy退役、提交、push和生产发布边界不变。
+
+## 2026-07-22 主线53 M4：053-018合同全生命周期V2通过
+
+- `/contract`、`/contract/ledger`、`/contract/create`、`/contract/:id`、`/contract/:id/edit`五路由已由真实Clean-room V2承接，台账达到`LEGACY_ONLY=63 / V2_ACCEPTED=24 / V2_SOURCE_AVAILABLE=0`。
+- 合同台账、KPI、筛选、详情、清单、付款条款、审批历史、复合原子保存、提交和删除成立；服务端统一执行项目范围、强制version/CAS、受保护字段、金额/日期对账及工作流状态与重提权限门禁。
+- `ISSUE-053-019～023`仍为Planned；变更、成本、预算和产值未被018提前迁移。正式入口、Legacy退役、数据库、提交、push和生产发布边界不变。
+
+## 2026-07-22 主线53 M4：053-017商务契约、金额与权限金丝雀通过
+
+- 已建立商务域九项查询权限、稳定DTO/API与合同台账、合同详情、成本汇总历史三条只读请求基线；金额在HTTP与V2契约边界保持十进制字符串。
+- 合同、变更、投标成本、目标成本、成本台账、预算及成本纠偏对象访问按租户和服务端项目范围fail-close；无项目范围时不退化为租户全量。
+- 本切片未迁移任何页面，路由台账保持`68/19/0`。`ISSUE-053-018～023`仍为Planned，须逐条补货与授权；正式入口、Legacy退役、数据库和生产发布边界不变。
+
 ## 2026-07-22 主线53 M3：全量退出门通过
 
 - 项目对象、计划现场、质量技术与竣工收尾共十个路由已通过统一退出验收，台账固定`LEGACY_ONLY=68 / V2_ACCEPTED=19 / V2_SOURCE_AVAILABLE=0`。

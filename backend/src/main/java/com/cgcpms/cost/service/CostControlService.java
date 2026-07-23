@@ -33,6 +33,19 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class CostControlService {
+    private static final Set<String> MONEY_KEYS = Set.of(
+            "amount", "contract_amount", "target_cost", "total_target_amount", "total_bid_cost_amount", "total_responsibility_amount",
+            "target_amount", "bid_cost_amount", "responsibility_amount", "committed_amount", "actual_amount", "recommended_remaining_amount",
+            "estimated_remaining_amount", "forecast_at_completion_amount", "contract_income_amount", "forecast_profit_amount",
+            "cost_variance_amount", "expected_saving_amount", "actual_saving_amount", "paid_amount", "estimated_remaining_cost",
+            "dynamic_cost", "contract_income", "confirmed_revenue", "expected_profit", "cost_deviation", "responsibility_cost",
+            "forecast_at_completion_cost", "forecast_profit", "contract_locked_cost", "source_amount", "allocated_amount",
+            "unit_price", "gross_amount", "deducted_amount", "tax_amount", "retention_amount",
+            "targetCost", "targetAmount", "bidCostAmount", "responsibilityAmount", "committedAmount", "actualAmount",
+            "recommendedRemainingAmount", "estimatedRemainingAmount", "forecastAtCompletionAmount", "contractIncomeAmount",
+            "forecastProfitAmount", "costVarianceAmount", "expectedSavingAmount", "actualSavingAmount", "unitPrice"
+    );
+
     private final JdbcTemplate jdbc;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
@@ -54,7 +67,7 @@ public class CostControlService {
         result.put("forecastHistory", jdbc.queryForList("SELECT * FROM cost_forecast WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY version_no DESC", tenant(), projectId));
         result.put("costSources", costSourceBreakdown(projectId, LocalDate.now()));
         result.put("summary", latestSummary(projectId));
-        return result;
+        return moneyPayload(result);
     }
 
     public Map<String, Object> trace(Long forecastId) {
@@ -74,35 +87,37 @@ public class CostControlService {
         result.put("approvalInstances", jdbc.queryForList("SELECT w.* FROM wf_instance w JOIN cost_corrective_action c ON c.approval_instance_id=w.id WHERE c.tenant_id=? AND c.forecast_id=? AND c.deleted_flag=0 ORDER BY w.started_at", tenant(), forecastId));
         result.put("costSources", costSourceBreakdown(projectId, localDate(forecast.get("forecast_date"))));
         result.put("summary", jdbc.queryForList("SELECT * FROM cost_summary WHERE tenant_id=? AND project_id=? AND cost_forecast_id=? AND deleted_flag=0 ORDER BY summary_date DESC,cost_subject_id", tenant(), projectId, forecastId));
-        return result;
+        return moneyPayload(result);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createForecast(ForecastRequest request) {
         requireProject(request.projectId(), true);
-        Map<String, Object> activeTarget = requireActiveTarget(request.projectId(), false);
+        Map<String, Object> activeTarget = requireActiveTarget(request.projectId(), true);
         ensureNoOpenPriorVariance(request.projectId(), null);
         Integer versionNo = jdbc.queryForObject("SELECT COALESCE(MAX(version_no),0)+1 FROM cost_forecast WHERE tenant_id=? AND project_id=? AND deleted_flag=0", Integer.class, tenant(), request.projectId());
         long forecastId = IdWorker.getId();
         persistForecast(forecastId, activeTarget, versionNo == null ? 1 : versionNo, request, true);
-        return requireForecast(forecastId, false);
+        return moneyPayload(requireForecast(forecastId, false));
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> updateForecast(Long forecastId, ForecastRequest request) {
+    public Map<String, Object> updateForecast(Long forecastId, Integer version, ForecastRequest request) {
         Map<String, Object> existing = requireForecast(forecastId, true);
+        requireVersion(version, existing, "COST_FORECAST");
         if (!"DRAFT".equals(string(existing.get("status")))) throw error("COST_FORECAST_IMMUTABLE", "仅草稿预测可编辑");
         if (!Objects.equals(idValue(existing.get("project_id")), request.projectId())) throw error("COST_FORECAST_PROJECT_IMMUTABLE", "预测所属项目不可修改");
         requireProject(request.projectId(), true);
         Map<String, Object> activeTarget = requireActiveTarget(request.projectId(), false);
         if (!Objects.equals(idValue(existing.get("cost_target_id")), id(activeTarget))) throw error("COST_FORECAST_TARGET_CHANGED", "目标成本版本已切换，请重新创建预测");
-        persistForecast(forecastId, activeTarget, intValue(existing.get("version_no")), request, false);
-        return requireForecast(forecastId, false);
+        persistForecast(forecastId, activeTarget, intValue(existing.get("version_no")), request, false, version);
+        return moneyPayload(requireForecast(forecastId, false));
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> confirmForecast(Long forecastId) {
+    public Map<String, Object> confirmForecast(Long forecastId, Integer version) {
         Map<String, Object> forecast = requireForecast(forecastId, true);
+        requireVersion(version, forecast, "COST_FORECAST");
         if (!"DRAFT".equals(string(forecast.get("status")))) throw error("COST_FORECAST_ALREADY_CONFIRMED", "完工预测已确认，不可重复确认");
         Long projectId = idValue(forecast.get("project_id"));
         requireProject(projectId, true);
@@ -114,17 +129,18 @@ public class CostControlService {
                 localDate(forecast.get("forecast_date")), forecastItems(forecastId).stream().map(row -> new ForecastItemRequest(
                         idValue(row.get("cost_subject_id")), money(row.get("estimated_remaining_amount")), stringNullable(row.get("remark")))).toList(),
                 stringNullable(forecast.get("remark")));
-        persistForecast(forecastId, activeTarget, intValue(forecast.get("version_no")), refreshed, false);
+        persistForecast(forecastId, activeTarget, intValue(forecast.get("version_no")), refreshed, false, version);
         forecast = requireForecast(forecastId, true);
         String status = money(forecast.get("cost_variance_amount")).compareTo(BigDecimal.ZERO) > 0 ? "ACTION_REQUIRED" : "CONTROLLED";
         jdbc.update("UPDATE cost_forecast SET status='SUPERSEDED',updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND project_id=? AND id<>? AND status IN('ACTION_REQUIRED','CONTROLLED') AND deleted_flag=0", user(), tenant(), projectId, forecastId);
-        jdbc.update("UPDATE cost_forecast SET status=?,confirmed_at=CURRENT_TIMESTAMP,confirmed_by=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='DRAFT'", status, user(), user(), forecastId, tenant());
+        int confirmedRows = jdbc.update("UPDATE cost_forecast SET status=?,confirmed_at=CURRENT_TIMESTAMP,confirmed_by=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='DRAFT' AND version=?", status, user(), user(), forecastId, tenant(), version + 1);
+        if (confirmedRows != 1) throw error("COST_FORECAST_CONCURRENT_UPDATE", "完工预测版本冲突，请刷新后重试");
 
         costSummaryService.refreshSummary(tenant(), projectId);
         Map<String, Object> confirmed = requireForecast(forecastId, false);
         jdbc.update("UPDATE cost_summary SET cost_forecast_id=?,responsibility_cost=?,forecast_at_completion_cost=?,forecast_profit=?,profit_margin=? WHERE tenant_id=? AND project_id=? AND summary_date=? AND deleted_flag=0",
                 forecastId, confirmed.get("responsibility_amount"), confirmed.get("forecast_at_completion_amount"), confirmed.get("forecast_profit_amount"), confirmed.get("profit_margin"), tenant(), projectId, LocalDate.now());
-        return confirmed;
+        return moneyPayload(confirmed);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -138,7 +154,7 @@ public class CostControlService {
         if (money(allocated).add(expected).compareTo(money(forecast.get("cost_variance_amount"))) > 0) {
             throw error("COST_CORRECTIVE_SAVING_EXCEEDS_VARIANCE", "纠偏预计节约金额合计不能超过预测成本偏差");
         }
-        requireEnabledUser(request.responsibleUserId());
+        requireActiveProjectMember(projectId, request.responsibleUserId());
         long id = IdWorker.getId();
         try {
             jdbc.update("""
@@ -150,57 +166,69 @@ public class CostControlService {
         } catch (DuplicateKeyException e) {
             throw error("COST_CORRECTIVE_CODE_DUPLICATE", "纠偏措施编号已存在");
         }
-        return requireCorrection(id, false);
+        return moneyPayload(requireCorrection(id, false));
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> updateCorrectiveAction(Long id, CorrectiveActionRequest request) {
+    public Map<String, Object> updateCorrectiveAction(Long id, Integer version, CorrectiveActionRequest request) {
+        Map<String, Object> probe = requireCorrection(id, false);
+        if (!Objects.equals(idValue(probe.get("forecast_id")), request.forecastId())) throw error("COST_CORRECTIVE_FORECAST_IMMUTABLE", "纠偏措施所属预测不可修改");
+        Map<String, Object> forecast = requireForecast(request.forecastId(), true);
         Map<String, Object> action = requireCorrection(id, true);
+        requireVersion(version, action, "COST_CORRECTIVE");
+        requireProject(idValue(action.get("project_id")), true);
         if (!Set.of("DRAFT", "REJECTED").contains(string(action.get("status")))) throw error("COST_CORRECTIVE_IMMUTABLE", "仅草稿或驳回纠偏措施可编辑");
         if (!Objects.equals(idValue(action.get("forecast_id")), request.forecastId())) throw error("COST_CORRECTIVE_FORECAST_IMMUTABLE", "纠偏措施所属预测不可修改");
-        requireEnabledUser(request.responsibleUserId());
+        requireActiveProjectMember(idValue(action.get("project_id")), request.responsibleUserId());
         BigDecimal allocated = jdbc.queryForObject("SELECT COALESCE(SUM(expected_saving_amount),0) FROM cost_corrective_action WHERE tenant_id=? AND forecast_id=? AND id<>? AND deleted_flag=0 AND status<>'CANCELLED'", BigDecimal.class, tenant(), request.forecastId(), id);
-        BigDecimal variance = money(requireForecast(request.forecastId(), false).get("cost_variance_amount"));
+        BigDecimal variance = money(forecast.get("cost_variance_amount"));
         if (money(allocated).add(money(request.expectedSavingAmount())).compareTo(variance) > 0) throw error("COST_CORRECTIVE_SAVING_EXCEEDS_VARIANCE", "纠偏预计节约金额合计不能超过预测成本偏差");
         try {
-            jdbc.update("UPDATE cost_corrective_action SET action_code=?,action_title=?,root_cause=?,action_plan=?,expected_saving_amount=?,responsible_user_id=?,due_date=?,status='DRAFT',remark=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                    request.actionCode().trim(), request.actionTitle().trim(), request.rootCause().trim(), request.actionPlan().trim(), money(request.expectedSavingAmount()), request.responsibleUserId(), request.dueDate(), request.remark(), user(), id, tenant());
+            int updated = jdbc.update("UPDATE cost_corrective_action SET action_code=?,action_title=?,root_cause=?,action_plan=?,expected_saving_amount=?,responsible_user_id=?,due_date=?,remark=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND version=?",
+                    request.actionCode().trim(), request.actionTitle().trim(), request.rootCause().trim(), request.actionPlan().trim(), money(request.expectedSavingAmount()), request.responsibleUserId(), request.dueDate(), request.remark(), user(), id, tenant(), version);
+            if (updated != 1) throw error("COST_CORRECTIVE_CONCURRENT_UPDATE", "成本纠偏措施版本冲突，请刷新后重试");
         } catch (DuplicateKeyException e) {
             throw error("COST_CORRECTIVE_CODE_DUPLICATE", "纠偏措施编号已存在");
         }
-        return requireCorrection(id, false);
+        return moneyPayload(requireCorrection(id, false));
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> submitCorrectiveAction(Long id) {
+    public Map<String, Object> submitCorrectiveAction(Long id, Integer version) {
         Map<String, Object> action = requireCorrection(id, true);
+        requireVersion(version, action, "COST_CORRECTIVE");
         String status = string(action.get("status"));
         if (!Set.of("DRAFT", "REJECTED").contains(status)) throw error("COST_CORRECTIVE_NOT_SUBMITTABLE", "仅草稿或驳回纠偏措施可提交");
         requireProject(idValue(action.get("project_id")), true);
         WfInstance instance;
         Long existing = idValueNullable(action.get("approval_instance_id"));
         if ("REJECTED".equals(status) && existing != null) {
-            instance = workflowEngine.resubmit(existing, user(), UserContext.getCurrentUsername());
+            instance = workflowEngine.resubmitCostCorrectiveAction(existing, user(), UserContext.getCurrentUsername());
         } else {
-            instance = workflowEngine.submit(user(), UserContext.getCurrentUsername(), tenant(), WorkflowBusinessTypes.COST_CORRECTIVE_ACTION,
+            instance = workflowEngine.submitCostCorrectiveAction(user(), UserContext.getCurrentUsername(), tenant(), WorkflowBusinessTypes.COST_CORRECTIVE_ACTION,
                     id, string(action.get("action_title")), money(action.get("expected_saving_amount")), idValue(action.get("project_id")), null,
                     string(action.get("root_cause")), null, null);
         }
-        jdbc.update("UPDATE cost_corrective_action SET status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", instance.getId(), user(), id, tenant());
-        return requireCorrection(id, false);
+        int submitted = jdbc.update("UPDATE cost_corrective_action SET status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND version=?", instance.getId(), user(), id, tenant(), version);
+        if (submitted != 1) throw error("COST_CORRECTIVE_CONCURRENT_UPDATE", "成本纠偏措施版本冲突，请刷新后重试");
+        return moneyPayload(requireCorrection(id, false));
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> closeCorrectiveAction(Long id, CorrectiveCloseRequest request) {
+    public Map<String, Object> closeCorrectiveAction(Long id, Integer version, CorrectiveCloseRequest request) {
+        Map<String, Object> probe = requireCorrection(id, false);
+        Long forecastId = idValue(probe.get("forecast_id"));
+        requireForecast(forecastId, true);
         Map<String, Object> action = requireCorrection(id, true);
+        requireVersion(version, action, "COST_CORRECTIVE");
         if (!"APPROVED".equals(string(action.get("status")))) throw error("COST_CORRECTIVE_NOT_CLOSABLE", "仅审批通过的纠偏措施可关闭");
         requireProject(idValue(action.get("project_id")), true);
-        jdbc.update("UPDATE cost_corrective_action SET status='CLOSED',actual_saving_amount=?,result_description=?,completed_at=CURRENT_TIMESTAMP,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='APPROVED'",
-                money(request.actualSavingAmount()), request.resultDescription().trim(), user(), id, tenant());
-        Long forecastId = idValue(action.get("forecast_id"));
+        int closed = jdbc.update("UPDATE cost_corrective_action SET status='CLOSED',actual_saving_amount=?,result_description=?,completed_at=CURRENT_TIMESTAMP,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='APPROVED' AND version=?",
+                money(request.actualSavingAmount()), request.resultDescription().trim(), user(), id, tenant(), version);
+        if (closed != 1) throw error("COST_CORRECTIVE_CONCURRENT_UPDATE", "成本纠偏措施版本冲突，请刷新后重试");
         Integer remaining = jdbc.queryForObject("SELECT COUNT(*) FROM cost_corrective_action WHERE tenant_id=? AND forecast_id=? AND deleted_flag=0 AND status NOT IN('CLOSED','CANCELLED')", Integer.class, tenant(), forecastId);
         if (remaining != null && remaining == 0) jdbc.update("UPDATE cost_forecast SET status='CONTROLLED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='ACTION_REQUIRED'", user(), forecastId, tenant());
-        return requireCorrection(id, false);
+        return moneyPayload(requireCorrection(id, false));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -214,6 +242,10 @@ public class CostControlService {
     }
 
     private void persistForecast(long forecastId, Map<String, Object> target, int versionNo, ForecastRequest request, boolean insert) {
+        persistForecast(forecastId, target, versionNo, request, insert, null);
+    }
+
+    private void persistForecast(long forecastId, Map<String, Object> target, int versionNo, ForecastRequest request, boolean insert, Integer expectedVersion) {
         List<Map<String, Object>> targetItems = targetItems(id(target));
         if (targetItems.isEmpty()) throw error("COST_FORECAST_TARGET_ITEMS_REQUIRED", "生效目标成本缺少科目责任预算");
         Map<Long, ForecastItemRequest> requested = new LinkedHashMap<>();
@@ -265,8 +297,9 @@ public class CostControlService {
                         """, forecastId, tenant(), request.projectId(), id(target), request.forecastCode().trim(), request.forecastName().trim(), versionNo,
                         request.forecastDate(), totalBid, totalTarget, totalResponsibility, totalCommitted, totalActual, totalRemaining, completion, income, profit, variance, margin, user(), user(), request.remark());
             } else {
-                jdbc.update("UPDATE cost_forecast SET forecast_code=?,forecast_name=?,forecast_date=?,bid_cost_amount=?,target_cost_amount=?,responsibility_amount=?,committed_cost_amount=?,actual_cost_amount=?,estimated_remaining_amount=?,forecast_at_completion_amount=?,contract_income_amount=?,forecast_profit_amount=?,cost_variance_amount=?,profit_margin=?,remark=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='DRAFT'",
-                        request.forecastCode().trim(), request.forecastName().trim(), request.forecastDate(), totalBid, totalTarget, totalResponsibility, totalCommitted, totalActual, totalRemaining, completion, income, profit, variance, margin, request.remark(), user(), forecastId, tenant());
+                int updated = jdbc.update("UPDATE cost_forecast SET forecast_code=?,forecast_name=?,forecast_date=?,bid_cost_amount=?,target_cost_amount=?,responsibility_amount=?,committed_cost_amount=?,actual_cost_amount=?,estimated_remaining_amount=?,forecast_at_completion_amount=?,contract_income_amount=?,forecast_profit_amount=?,cost_variance_amount=?,profit_margin=?,remark=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='DRAFT' AND version=?",
+                        request.forecastCode().trim(), request.forecastName().trim(), request.forecastDate(), totalBid, totalTarget, totalResponsibility, totalCommitted, totalActual, totalRemaining, completion, income, profit, variance, margin, request.remark(), user(), forecastId, tenant(), expectedVersion);
+                if (updated != 1) throw error("COST_FORECAST_CONCURRENT_UPDATE", "完工预测版本冲突，请刷新后重试");
                 jdbc.update("DELETE FROM cost_forecast_item WHERE tenant_id=? AND forecast_id=?", tenant(), forecastId);
             }
             for (Map<String, Object> row : snapshots) {
@@ -392,9 +425,19 @@ public class CostControlService {
         return queryOne("SELECT * FROM cost_corrective_action WHERE id=? AND tenant_id=? AND deleted_flag=0" + (lock ? " FOR UPDATE" : ""), "COST_CORRECTIVE_NOT_FOUND", "成本纠偏措施不存在", id, tenant());
     }
 
-    private void requireEnabledUser(Long userId) {
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM sys_user WHERE id=? AND tenant_id=? AND status='ENABLE' AND deleted_flag=0", Integer.class, userId, tenant());
-        if (count == null || count != 1) throw error("COST_RESPONSIBLE_USER_INVALID", "责任人不存在、跨租户或已停用");
+    private void requireActiveProjectMember(Long projectId, Long userId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM sys_user u
+                WHERE u.id=? AND u.tenant_id=? AND u.status='ENABLE' AND u.deleted_flag=0
+                  AND EXISTS (SELECT 1 FROM pm_project_member m WHERE m.tenant_id=u.tenant_id
+                    AND m.user_id=u.id AND m.project_id=? AND m.status='ACTIVE' AND m.deleted_flag=0)
+                """, Integer.class, userId, tenant(), projectId);
+        if (count == null || count != 1) throw error("COST_RESPONSIBLE_PROJECT_MEMBER_INVALID", "责任人不存在、跨租户、已停用或不是目标项目有效成员");
+    }
+
+    private static void requireVersion(Integer expected, Map<String, Object> row, String prefix) {
+        if (expected == null || expected < 0) throw error(prefix + "_VERSION_REQUIRED", "客户端版本不能为空且必须大于等于0");
+        if (expected != intValue(row.get("version"))) throw error(prefix + "_CONCURRENT_UPDATE", "数据版本冲突，请刷新后重试");
     }
 
     private Map<String, Object> queryOne(String sql, String code, String message, Object... args) {
@@ -413,4 +456,34 @@ public class CostControlService {
     private static String stringNullable(Object value) { return value == null ? null : String.valueOf(value); }
     private static LocalDate localDate(Object value) { if (value instanceof LocalDate d) return d; if (value instanceof java.sql.Date d) return d.toLocalDate(); return LocalDate.parse(String.valueOf(value)); }
     private static BigDecimal money(Object value) { BigDecimal amount = value == null ? BigDecimal.ZERO : value instanceof BigDecimal b ? b : new BigDecimal(String.valueOf(value)); return amount.setScale(2, RoundingMode.HALF_UP); }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T moneyPayload(T value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> normalized = new LinkedHashMap<>();
+            map.forEach((key, item) -> normalized.put(String.valueOf(key), payloadEntry(String.valueOf(key), item)));
+            return (T) normalized;
+        }
+        if (value instanceof List<?> list) {
+            List<Object> normalized = new ArrayList<>(list.size());
+            for (Object item : list) normalized.add(moneyPayload(item));
+            return (T) normalized;
+        }
+        return value;
+    }
+
+    private static Object payloadEntry(String key, Object value) {
+        if (value instanceof BigDecimal decimal && isMoneyKey(key)) return decimal.toPlainString();
+        if (value instanceof Number && isIdKey(key)) return String.valueOf(value);
+        return moneyPayload(value);
+    }
+
+    private static boolean isIdKey(String key) {
+        return key.equals("id") || key.endsWith("_id") || key.endsWith("Id")
+                || Set.of("created_by", "updated_by", "confirmed_by").contains(key);
+    }
+
+    private static boolean isMoneyKey(String key) {
+        return MONEY_KEYS.contains(key) || key.endsWith("_amount") || key.endsWith("Amount");
+    }
 }

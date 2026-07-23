@@ -12,8 +12,10 @@ import com.cgcpms.contract.vo.CtContractVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -37,9 +39,11 @@ public class CtContractController {
             @RequestParam(required = false) String approvalStatus,
             @RequestParam(required = false) Long projectId,
             @RequestParam(required = false) Long partyAId,
-            @RequestParam(required = false) Long partyBId) {
+            @RequestParam(required = false) Long partyBId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         IPage<CtContractVO> page = ctContractService.getPage(pageNo, pageSize, keyword, contractCode, contractName,
-                contractType, contractStatus, approvalStatus, projectId, partyAId, partyBId);
+                contractType, contractStatus, approvalStatus, projectId, partyAId, partyBId, startDate, endDate);
         return ApiResponse.success(PageResult.of(page));
     }
 
@@ -53,9 +57,11 @@ public class CtContractController {
             @RequestParam(required = false) String approvalStatus,
             @RequestParam(required = false) Long projectId,
             @RequestParam(required = false) Long partyAId,
-            @RequestParam(required = false) Long partyBId) {
+            @RequestParam(required = false) Long partyBId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ApiResponse.success(ctContractService.getKpi(contractCode, contractName,
-                contractType, contractStatus, approvalStatus, projectId, partyAId, partyBId));
+                contractType, contractStatus, approvalStatus, projectId, partyAId, partyBId, startDate, endDate));
     }
 
     @GetMapping("/{id}")
@@ -83,8 +89,9 @@ public class CtContractController {
     @PostMapping("/{id}/submit")
     @AuditedOperation(type = "SUBMIT", businessType = "CONTRACT", businessIdExpression = "#id")
     @PreAuthorize("hasAuthority('contract:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
-        ctContractService.submitForApproval(id);
+    public ApiResponse<Void> submitForApproval(@PathVariable Long id,
+                                               @RequestParam Integer version) {
+        ctContractService.submitForApproval(id, version);
         return ApiResponse.success();
     }
 
@@ -97,6 +104,7 @@ public class CtContractController {
     }
 
     @PostMapping("/composite")
+    @AuditedOperation(type = "CREATE", businessType = "CONTRACT", businessIdExpression = "#request.contract.id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:add')")
     public ApiResponse<String> compositeCreate(@Valid @RequestBody ContractSaveRequest request) {
         return ApiResponse.success(String.valueOf(ctContractService.compositeSave(request)));
@@ -108,6 +116,7 @@ public class CtContractController {
      * This is an intentional design choice — POST for create, PUT for create-or-update (upsert).
      */
     @PutMapping("/{id}/composite")
+    @AuditedOperation(type = "UPDATE", businessType = "CONTRACT", businessIdExpression = "#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:edit')")
     public ApiResponse<Void> compositeUpdate(@PathVariable Long id, @Valid @RequestBody ContractSaveRequest request) {
         request.getContract().setId(id);

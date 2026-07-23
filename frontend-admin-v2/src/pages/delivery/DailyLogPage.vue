@@ -590,40 +590,57 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
       description="调整筛选条件，或由具备权限的账号创建日报草稿。"
       :heading-level="2"
     />
-    <div v-else class="daily-log-page__list">
-      <V2Card
-        v-for="record in records"
-        :key="record.id"
-        :title="record.projectName || record.projectId"
-        :subtitle="record.reportDate"
-      >
-        <div class="daily-log-page__facts">
-          <V2Badge :tone="record.status === 'DRAFT' ? 'neutral' : 'success'">
-            {{ record.status === 'DRAFT' ? '草稿' : '已提交' }}
-          </V2Badge>
-          <span>{{ record.weatherSummary || '未填写天气摘要' }}</span>
-          <span>在场人数 {{ record.onSiteHeadcount ?? '未填写' }}</span>
-        </div>
-        <p class="daily-log-page__summary">{{ record.constructionContent }}</p>
-        <template #footer>
-          <div class="daily-log-page__actions">
-            <V2Button size="small" variant="secondary" @click="openRecord(record)"
-              >查看详情</V2Button
-            >
-            <V2Button
-              v-if="canEdit && record.status === 'DRAFT'"
-              size="small"
-              variant="ghost"
-              @click="openRecord(record, true)"
-            >
-              编辑草稿
-            </V2Button>
-          </div>
-        </template>
-      </V2Card>
+    <div v-else class="daily-log-page__table-wrap">
+      <table class="daily-log-page__table daily-log-page__list-table">
+        <caption class="v2-visually-hidden">
+          现场日报列表
+        </caption>
+        <thead>
+          <tr>
+            <th>日报日期</th>
+            <th>项目</th>
+            <th>状态</th>
+            <th>天气摘要</th>
+            <th>在场人数</th>
+            <th>施工内容</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="record in records" :key="record.id">
+            <td>{{ record.reportDate }}</td>
+            <td>{{ record.projectName || record.projectId }}</td>
+            <td class="daily-log-page__facts">
+              <V2Badge :tone="record.status === 'DRAFT' ? 'neutral' : 'success'">
+                {{ record.status === 'DRAFT' ? '草稿' : '已提交' }}
+              </V2Badge>
+            </td>
+            <td>{{ record.weatherSummary || '未填写天气摘要' }}</td>
+            <td>{{ record.onSiteHeadcount ?? '未填写' }}</td>
+            <td class="daily-log-page__summary daily-log-page__summary-cell">
+              {{ record.constructionContent }}
+            </td>
+            <td>
+              <div class="daily-log-page__actions">
+                <V2Button size="small" variant="secondary" @click="openRecord(record)"
+                  >查看详情</V2Button
+                >
+                <V2Button
+                  v-if="canEdit && record.status === 'DRAFT'"
+                  size="small"
+                  variant="ghost"
+                  @click="openRecord(record, true)"
+                >
+                  编辑草稿
+                </V2Button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <div v-if="records.length" class="daily-log-page__pagination">
+    <nav v-if="records.length" class="daily-log-page__pagination" aria-label="现场日报分页">
       <div class="daily-log-page__actions">
         <V2Button
           size="small"
@@ -643,7 +660,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
           下一页
         </V2Button>
       </div>
-    </div>
+    </nav>
 
     <V2Dialog
       v-model:open="dialogOpen"
@@ -1034,12 +1051,10 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
 .daily-log-page__span-2 {
   grid-column: 1 / -1;
 }
-.daily-log-page__list,
 .daily-log-page__stack {
   display: grid;
   gap: var(--v2-space-3);
 }
-.daily-log-page__facts,
 .daily-log-page__actions,
 .daily-log-page__pagination,
 .daily-log-page__row {
@@ -1052,7 +1067,6 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
   justify-content: flex-end;
   font-size: var(--v2-font-size-12);
 }
-.daily-log-page__summary,
 .daily-log-page__empty-copy {
   margin: 0;
   color: var(--v2-color-text-secondary);
@@ -1133,6 +1147,9 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
   width: 100%;
   border-collapse: collapse;
 }
+.daily-log-page__list-table {
+  min-width: 72rem;
+}
 .daily-log-page__table th,
 .daily-log-page__table td {
   padding: 0.75rem;
@@ -1140,6 +1157,15 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
   font-size: var(--v2-font-size-12);
   text-align: left;
   vertical-align: top;
+}
+.daily-log-page__table th {
+  color: var(--v2-color-text-secondary);
+  white-space: nowrap;
+}
+.daily-log-page__summary-cell {
+  min-width: 16rem;
+  max-width: 28rem;
+  overflow-wrap: anywhere;
 }
 .daily-log-page__panel {
   padding: var(--v2-space-3);

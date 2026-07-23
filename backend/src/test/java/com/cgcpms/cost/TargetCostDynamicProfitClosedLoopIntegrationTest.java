@@ -23,6 +23,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -30,11 +33,18 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(properties = "spring.main.allow-circular-references=true")
 @ActiveProfiles("local")
@@ -56,9 +66,12 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
     void setup() {
         UserContext.set(Jwts.claims().subject("admin").add("userId", 1L).add("username", "admin")
                 .add("tenantId", 0L).add("roleCodes", List.of("ADMIN")).build());
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "admin", "", List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
         cleanup();
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 1,0,'admin','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','系统管理员','ENABLE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=1)");
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,contract_amount,target_cost,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'COST-CTRL-IT','动态利润闭环测试项目',12000,0,'ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(99187006,0,?,1,'COST_MANAGER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", PROJECT);
         jdbc.update("INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,created_at,updated_at,deleted_flag) VALUES(?,0,0,'CTRL-A','主体工程','DETAIL','COST',1,1,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", SUBJECT_A);
         jdbc.update("INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,account_category,level,sort_order,status,created_at,updated_at,deleted_flag) VALUES(?,0,0,'CTRL-B','措施工程','DETAIL','COST',1,2,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", SUBJECT_B);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'CTRL-P','业主单位','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", PARTNER);
@@ -69,6 +82,7 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
     void teardown() {
         cleanup();
         UserContext.clear();
+        SecurityContextHolder.clearContext();
     }
 
     @Test
@@ -85,8 +99,17 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         ForecastRequest forecastRequest = new ForecastRequest(PROJECT, "FC-IT-001", "首期完工预测", LocalDate.now(), List.of(
                 new ForecastItemRequest(SUBJECT_A, new BigDecimal("2500.00"), "主体剩余"),
                 new ForecastItemRequest(SUBJECT_B, new BigDecimal("1000.00"), "措施剩余")), "月度滚动预测");
-        long forecastId = id(controlService.createForecast(forecastRequest));
-        Map<String, Object> confirmed = controlService.confirmForecast(forecastId);
+        Map<String, Object> createdForecast = controlService.createForecast(forecastRequest);
+        assertTrue(createdForecast.get("id") instanceof String);
+        assertTrue(createdForecast.get("project_id") instanceof String);
+        long forecastId = id(createdForecast);
+        ForecastRequest renamedForecast = new ForecastRequest(PROJECT, "FC-IT-001", "首期完工预测-已复核", LocalDate.now(),
+                forecastRequest.items(), "月度滚动预测");
+        controlService.updateForecast(forecastId, 0, renamedForecast);
+        BusinessException staleForecast = assertThrows(BusinessException.class,
+                () -> controlService.updateForecast(forecastId, 0, forecastRequest));
+        assertEquals("COST_FORECAST_CONCURRENT_UPDATE", staleForecast.getCode());
+        Map<String, Object> confirmed = controlService.confirmForecast(forecastId, 1);
 
         assertEquals(targetId, number(confirmed.get("cost_target_id")));
         assertEquals("ACTION_REQUIRED", confirmed.get("status"));
@@ -101,7 +124,7 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         assertEquals(new BigDecimal("0.250000"), new BigDecimal(String.valueOf(confirmed.get("profit_margin"))));
         assertEquals(forecastId, jdbc.queryForObject("SELECT cost_forecast_id FROM cost_summary WHERE project_id=? LIMIT 1", Long.class, PROJECT));
 
-        BusinessException duplicateConfirm = assertThrows(BusinessException.class, () -> controlService.confirmForecast(forecastId));
+        BusinessException duplicateConfirm = assertThrows(BusinessException.class, () -> controlService.confirmForecast(forecastId, 3));
         assertEquals("COST_FORECAST_ALREADY_CONFIRMED", duplicateConfirm.getCode());
         BusinessException skippedAction = assertThrows(BusinessException.class, () -> controlService.createForecast(
                 new ForecastRequest(PROJECT, "FC-IT-002", "跳过纠偏", LocalDate.now(), forecastRequest.items(), null)));
@@ -110,13 +133,55 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         long actionId = id(controlService.createCorrectiveAction(new CorrectiveActionRequest(
                 forecastId, "CA-IT-001", "压降措施成本", "措施投入超出责任预算", "优化租赁周期并复核现场签证",
                 new BigDecimal("1000.00"), 1L, LocalDate.now().plusDays(10), "正偏差纠偏")));
+        UserContext.set(Jwts.claims().subject("reader").add("userId", 2L).add("username", "reader")
+                .add("tenantId", 0L).add("roleCodes", List.of()).build());
+        BusinessException crossProjectUpdate = assertThrows(BusinessException.class, () -> controlService.updateCorrectiveAction(actionId, 0,
+                new CorrectiveActionRequest(forecastId, "CA-IT-001", "越权修改", "越权根因", "越权计划",
+                        new BigDecimal("500.00"), 1L, LocalDate.now().plusDays(5), "越权备注")));
+        assertEquals("PROJECT_ACCESS_DENIED", crossProjectUpdate.getCode());
+        assertEquals("压降措施成本", jdbc.queryForObject("SELECT action_title FROM cost_corrective_action WHERE id=?", String.class, actionId));
+        UserContext.set(Jwts.claims().subject("admin").add("userId", 1L).add("username", "admin")
+                .add("tenantId", 0L).add("roleCodes", List.of("ADMIN")).build());
+        CorrectiveActionRequest revisedAction = new CorrectiveActionRequest(
+                forecastId, "CA-IT-001", "压降措施成本-已复核", "措施投入超出责任预算", "优化租赁周期并复核现场签证",
+                new BigDecimal("1000.00"), 1L, LocalDate.now().plusDays(10), "正偏差纠偏");
+        controlService.updateCorrectiveAction(actionId, 0, revisedAction);
+        BusinessException staleCorrective = assertThrows(BusinessException.class,
+                () -> controlService.updateCorrectiveAction(actionId, 0, revisedAction));
+        assertEquals("COST_CORRECTIVE_CONCURRENT_UPDATE", staleCorrective.getCode());
         BusinessException draftActionStillOpen = assertThrows(BusinessException.class, () -> controlService.createForecast(
                 new ForecastRequest(PROJECT, "FC-IT-003", "纠偏草稿未闭合", LocalDate.now(), forecastRequest.items(), null)));
         assertEquals("COST_FORECAST_PREVIOUS_ACTION_REQUIRED", draftActionStillOpen.getCode());
-        controlService.submitCorrectiveAction(actionId);
+        long instanceCount = instanceMapper.selectCount(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getBusinessType, "COST_CORRECTIVE_ACTION")
+                .eq(WfInstance::getBusinessId, actionId));
+        BusinessException genericSubmit = assertThrows(BusinessException.class, () -> workflowEngine.submit(
+                1L, "admin", 0L, "COST_CORRECTIVE_ACTION", actionId, "禁止通用提交",
+                new BigDecimal("1000"), PROJECT, null, null, null, null));
+        assertEquals("COST_CORRECTIVE_DEDICATED_SUBMIT_REQUIRED", genericSubmit.getCode());
+        assertEquals(instanceCount, instanceMapper.selectCount(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getBusinessType, "COST_CORRECTIVE_ACTION")
+                .eq(WfInstance::getBusinessId, actionId)));
+
+        controlService.submitCorrectiveAction(actionId, 1);
+        WfInstance correctiveInstance = findInstance("COST_CORRECTIVE_ACTION", actionId);
+        WfTask rejectTask = taskMapper.selectOne(new LambdaQueryWrapper<WfTask>()
+                .eq(WfTask::getInstanceId, correctiveInstance.getId()).eq(WfTask::getTaskStatus, "PENDING")
+                .last("LIMIT 1"));
+        workflowEngine.reject(rejectTask.getId(), 1L, "admin", "退回修改", "cost-control-reject-" + UUID.randomUUID());
+        assertEquals("REJECTED", jdbc.queryForObject("SELECT status FROM cost_corrective_action WHERE id=?", String.class, actionId));
+        controlService.updateCorrectiveAction(actionId, 3, revisedAction);
+        assertEquals("REJECTED", jdbc.queryForObject("SELECT status FROM cost_corrective_action WHERE id=?", String.class, actionId));
+        int recordCount = jdbc.queryForObject("SELECT COUNT(*) FROM wf_record WHERE instance_id=?", Integer.class, correctiveInstance.getId());
+        BusinessException genericResubmit = assertThrows(BusinessException.class,
+                () -> workflowEngine.resubmit(correctiveInstance.getId(), 1L, "admin"));
+        assertEquals("COST_CORRECTIVE_DEDICATED_SUBMIT_REQUIRED", genericResubmit.getCode());
+        assertEquals(recordCount, jdbc.queryForObject("SELECT COUNT(*) FROM wf_record WHERE instance_id=?", Integer.class, correctiveInstance.getId()));
+        controlService.submitCorrectiveAction(actionId, 4);
+        assertEquals(correctiveInstance.getId(), findInstance("COST_CORRECTIVE_ACTION", actionId).getId());
         approveAll("COST_CORRECTIVE_ACTION", actionId);
         assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM cost_corrective_action WHERE id=?", String.class, actionId));
-        controlService.closeCorrectiveAction(actionId, new CorrectiveCloseRequest(new BigDecimal("800.00"), "措施已执行，剩余偏差纳入下期预测"));
+        controlService.closeCorrectiveAction(actionId, 6, new CorrectiveCloseRequest(new BigDecimal("800.00"), "措施已执行，剩余偏差纳入下期预测"));
         assertEquals("CLOSED", jdbc.queryForObject("SELECT status FROM cost_corrective_action WHERE id=?", String.class, actionId));
         assertEquals("CONTROLLED", jdbc.queryForObject("SELECT status FROM cost_forecast WHERE id=?", String.class, forecastId));
 
@@ -128,6 +193,14 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         assertFalse(((List<?>) trace.get("correctiveActions")).isEmpty());
         assertFalse(((List<?>) trace.get("approvalInstances")).isEmpty());
         assertFalse(((List<?>) trace.get("costSources")).isEmpty());
+        assertTrue(cast(trace.get("forecast")).get("id") instanceof String);
+        assertTrue(cast(((List<?>) trace.get("forecastItems")).get(0)).get("cost_subject_id") instanceof String);
+        assertEquals("8000.00", cast(trace.get("target")).get("total_target_amount"));
+        @SuppressWarnings("unchecked") Map<String, Object> contractLocked = ((List<Map<String, Object>>) trace.get("costSources")).stream()
+                .filter(row -> "CT_CONTRACT".equals(row.get("source_type")))
+                .findFirst()
+                .orElseThrow();
+        assertTrue(contractLocked.get("amount") instanceof String);
     }
 
     @Test
@@ -142,7 +215,11 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
                 new ForecastItemRequest(SUBJECT_A, new BigDecimal("7000"), null),
                 new ForecastItemRequest(SUBJECT_B, new BigDecimal("2000"), null)), null);
         long forecastId = id(controlService.createForecast(request));
-        controlService.confirmForecast(forecastId);
+        controlService.confirmForecast(forecastId, 0);
+        BusinessException outsiderResponsible = assertThrows(BusinessException.class, () -> controlService.createCorrectiveAction(
+                new CorrectiveActionRequest(forecastId, "CA-OUTSIDER", "项目外责任人", "偏差", "措施",
+                        new BigDecimal("500"), 2L, LocalDate.now().plusDays(1), null)));
+        assertEquals("COST_RESPONSIBLE_PROJECT_MEMBER_INVALID", outsiderResponsible.getCode());
         BusinessException overflow = assertThrows(BusinessException.class, () -> controlService.createCorrectiveAction(
                 new CorrectiveActionRequest(forecastId, "CA-OVER", "超额措施", "偏差", "措施", new BigDecimal("1001"), 1L, LocalDate.now().plusDays(1), null)));
         assertEquals("COST_CORRECTIVE_SAVING_EXCEEDS_VARIANCE", overflow.getCode());
@@ -153,13 +230,61 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         assertEquals("PROJECT_NOT_ACTIVE", suspended.getCode());
     }
 
+    @Test
+    void targetQueryFailsClosedWithoutProjectAccess() {
+        CostTarget target = target("TC-SCOPE");
+        long targetId = targetService.create(target);
+
+        UserContext.set(Jwts.claims().subject("reader").add("userId", 2L).add("username", "reader")
+                .add("tenantId", 0L).add("roleCodes", List.of()).build());
+
+        assertEquals(0L, targetService.getPage(1, 20, null, null, null, null).getTotal());
+        BusinessException denied = assertThrows(BusinessException.class, () -> targetService.getById(targetId));
+        assertEquals("PROJECT_ACCESS_DENIED", denied.getCode());
+    }
+
+    @Test
+    void concurrentForecastCreationAllocatesStableVersions() throws Exception {
+        approveTarget();
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        List<Throwable> errors = Collections.synchronizedList(new ArrayList<>());
+        for (int i = 1; i <= 2; i++) {
+            int sequence = i;
+            pool.submit(() -> {
+                try {
+                    UserContext.set(Jwts.claims().subject("admin").add("userId", 1L).add("username", "admin")
+                            .add("tenantId", 0L).add("roleCodes", List.of("ADMIN")).build());
+                    ready.countDown();
+                    start.await();
+                    controlService.createForecast(new ForecastRequest(PROJECT, "FC-CONCURRENT-" + sequence,
+                            "并发预测" + sequence, LocalDate.now(), List.of(
+                            new ForecastItemRequest(SUBJECT_A, new BigDecimal("6000"), null),
+                            new ForecastItemRequest(SUBJECT_B, new BigDecimal("2000"), null)), null));
+                } catch (Throwable error) {
+                    errors.add(error);
+                } finally {
+                    UserContext.clear();
+                }
+            });
+        }
+        assertTrue(ready.await(10, TimeUnit.SECONDS));
+        start.countDown();
+        pool.shutdown();
+        assertTrue(pool.awaitTermination(30, TimeUnit.SECONDS));
+        assertTrue(errors.isEmpty(), "并发创建不应冲突: " + errors);
+        assertEquals(List.of(1, 2), jdbc.queryForList(
+                "SELECT version_no FROM cost_forecast WHERE project_id=? ORDER BY version_no", Integer.class, PROJECT));
+    }
+
     private long approveTarget() {
         CostTarget target = target("TC-IT-001");
         long targetId = targetService.create(target);
         CostTargetItem a = item(SUBJECT_A, "6000", "7500", "6000", "项目成本组");
         CostTargetItem b = item(SUBJECT_B, "2000", "2500", "2000", "项目工程组");
-        targetService.batchSaveItems(targetId, List.of(a, b));
-        targetService.submitForApproval(targetId);
+        targetService.batchSaveItems(targetId, 0, List.of(a, b));
+        targetService.submitForApproval(targetId, 1);
         approveAll("COST_TARGET", targetId);
         assertEquals("ACTIVE", jdbc.queryForObject("SELECT status FROM cost_target WHERE id=?", String.class, targetId));
         return targetId;
@@ -193,8 +318,7 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
     }
 
     private void approveAll(String businessType, long businessId) {
-        WfInstance instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
-                .eq(WfInstance::getBusinessType, businessType).eq(WfInstance::getBusinessId, businessId));
+        WfInstance instance = findInstance(businessType, businessId);
         assertNotNull(instance);
         for (int i = 0; i < 10; i++) {
             List<WfTask> pending = taskMapper.selectList(new LambdaQueryWrapper<WfTask>()
@@ -203,6 +327,13 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
             for (WfTask task : pending) workflowEngine.approve(task.getId(), 1L, "admin", "同意", "cost-control-it-" + UUID.randomUUID());
         }
         assertEquals("APPROVED", instanceMapper.selectById(instance.getId()).getInstanceStatus());
+    }
+
+    private WfInstance findInstance(String businessType, long businessId) {
+        WfInstance instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
+                .eq(WfInstance::getBusinessType, businessType).eq(WfInstance::getBusinessId, businessId));
+        assertNotNull(instance);
+        return instance;
     }
 
     private void cleanup() {
@@ -223,6 +354,7 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM ct_contract WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM md_partner WHERE id=?", PARTNER);
         jdbc.update("DELETE FROM cost_subject WHERE id IN(?,?)", SUBJECT_A, SUBJECT_B);
+        jdbc.update("DELETE FROM pm_project_member WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT);
     }
 

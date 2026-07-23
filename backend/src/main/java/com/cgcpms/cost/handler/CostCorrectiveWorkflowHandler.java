@@ -23,7 +23,17 @@ public class CostCorrectiveWorkflowHandler implements WorkflowBusinessHandler {
     @Override
     public void beforeSubmit(WorkflowContext context) {
         Long id = businessId(context.getInstance());
-        Integer valid = jdbc.queryForObject("SELECT COUNT(*) FROM cost_corrective_action c JOIN cost_forecast f ON f.id=c.forecast_id AND f.tenant_id=c.tenant_id WHERE c.id=? AND c.tenant_id=? AND c.status IN('DRAFT','REJECTED') AND c.deleted_flag=0 AND f.status='ACTION_REQUIRED' AND f.cost_variance_amount>0",
+        Integer valid = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM cost_corrective_action c
+                JOIN cost_forecast f ON f.id=c.forecast_id AND f.tenant_id=c.tenant_id
+                JOIN sys_user u ON u.id=c.responsible_user_id AND u.tenant_id=c.tenant_id
+                WHERE c.id=? AND c.tenant_id=? AND c.status IN('DRAFT','REJECTED') AND c.deleted_flag=0
+                  AND f.status='ACTION_REQUIRED' AND f.cost_variance_amount>0
+                  AND u.status='ENABLE' AND u.deleted_flag=0
+                  AND EXISTS (SELECT 1 FROM pm_project_member m WHERE m.tenant_id=c.tenant_id
+                    AND m.project_id=c.project_id AND m.user_id=c.responsible_user_id
+                    AND m.status='ACTIVE' AND m.deleted_flag=0)
+                """,
                 Integer.class, id, context.getInstance().getTenantId());
         if (valid == null || valid != 1) throw new BusinessException("COST_CORRECTIVE_INCOMPLETE", "纠偏措施不存在、状态不正确或预测已不需要纠偏");
     }

@@ -33,6 +33,9 @@ import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -79,7 +82,7 @@ public class WorkflowBusinessAccessValidator {
                 return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
                         entity == null ? null : entity.getProjectId(), requestProjectId,
                         entity == null ? null : entity.getId(), requestContractId,
-                        entity == null ? null : entity.getApprovalStatus(), "CONTRACT_NOT_FOUND");
+                        entity == null ? null : entity.getApprovalStatus(), "CONTRACT_NOT_FOUND", "APPROVING");
             }
             case WorkflowBusinessTypes.PURCHASE_ORDER -> {
                 MatPurchaseOrder entity = purchaseOrderMapper.selectById(businessId);
@@ -156,10 +159,11 @@ public class WorkflowBusinessAccessValidator {
                 return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
                         entity == null ? null : entity.getProjectId(), requestProjectId,
                         entity == null ? null : entity.getContractId(), requestContractId,
-                        entity == null ? null : entity.getApprovalStatus(), "PRODUCTION_MEASUREMENT_NOT_FOUND", "DRAFT", "REJECTED");
+                        entity == null ? null : entity.getApprovalStatus(), "PRODUCTION_MEASUREMENT_NOT_FOUND", "DRAFT");
             }
             case WorkflowBusinessTypes.PROJECT_BUDGET -> {
-                return validateJdbc("project_budget", "approval_status", businessId, tenantId, requestProjectId, requestContractId, "PROJECT_BUDGET_NOT_FOUND");
+                return validateJdbc("project_budget", "approval_status", businessId, tenantId,
+                        requestProjectId, requestContractId, "PROJECT_BUDGET_NOT_FOUND", "DRAFT");
             }
             case WorkflowBusinessTypes.EXPENSE -> {
                 return validateJdbc("expense_application", "approval_status", businessId, tenantId, requestProjectId, requestContractId, "EXPENSE_NOT_FOUND");
@@ -184,7 +188,8 @@ public class WorkflowBusinessAccessValidator {
                 return validateJdbc("project_corrective_action", "status", businessId, tenantId, requestProjectId, requestContractId, "PROJECT_CORRECTIVE_NOT_FOUND");
             }
             case WorkflowBusinessTypes.COST_CORRECTIVE_ACTION -> {
-                return validateJdbc("cost_corrective_action", "status", businessId, tenantId, requestProjectId, requestContractId, "COST_CORRECTIVE_NOT_FOUND");
+                return validateJdbc("cost_corrective_action", "status", businessId, tenantId,
+                        requestProjectId, requestContractId, "COST_CORRECTIVE_NOT_FOUND", "DRAFT");
             }
             case WorkflowBusinessTypes.TECHNICAL_SCHEME -> {
                 return validateJdbc("technical_scheme", "status", businessId, tenantId, requestProjectId, requestContractId, "TECH_SCHEME_NOT_FOUND");
@@ -196,8 +201,106 @@ public class WorkflowBusinessAccessValidator {
         }
     }
 
+    public ValidationResult validateResubmit(String businessType, Long businessId, Long tenantId,
+                                             Long requestProjectId, Long requestContractId) {
+        requireSubmitPermission(businessType);
+        if (WorkflowBusinessTypes.VAR_ORDER.equals(businessType)) {
+            VarOrder entity = varOrderMapper.selectById(businessId);
+            return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
+                    entity == null ? null : entity.getProjectId(), requestProjectId,
+                    entity == null ? null : entity.getContractId(), requestContractId,
+                    entity == null ? null : entity.getApprovalStatus(),
+                    "VAR_ORDER_NOT_FOUND", "REJECTED", "WITHDRAWN");
+        }
+        if (WorkflowBusinessTypes.COST_TARGET.equals(businessType)) {
+            CostTarget entity = costTargetMapper.selectById(businessId);
+            return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
+                    entity == null ? null : entity.getProjectId(), requestProjectId,
+                    null, requestContractId,
+                    entity == null ? null : entity.getApprovalStatus(),
+                    "COST_TARGET_NOT_FOUND", "REJECTED");
+        }
+        if (WorkflowBusinessTypes.COST_CORRECTIVE_ACTION.equals(businessType)) {
+            return validateJdbc("cost_corrective_action", "status", businessId, tenantId,
+                    requestProjectId, requestContractId, "COST_CORRECTIVE_NOT_FOUND", "REJECTED");
+        }
+        if (WorkflowBusinessTypes.PROJECT_BUDGET.equals(businessType)) {
+            return validateJdbc("project_budget", "approval_status", businessId, tenantId,
+                    requestProjectId, requestContractId, "PROJECT_BUDGET_NOT_FOUND", "REJECTED");
+        }
+        if (WorkflowBusinessTypes.PRODUCTION_MEASUREMENT.equals(businessType)) {
+            ProductionMeasurement entity = productionMeasurementMapper.selectById(businessId);
+            return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
+                    entity == null ? null : entity.getProjectId(), requestProjectId,
+                    entity == null ? null : entity.getContractId(), requestContractId,
+                    entity == null ? null : entity.getApprovalStatus(),
+                    "PRODUCTION_MEASUREMENT_NOT_FOUND", "REJECTED");
+        }
+        if (!WorkflowBusinessTypes.CONTRACT_APPROVAL.equals(businessType)) {
+            return validateSubmit(businessType, businessId, tenantId, requestProjectId, requestContractId);
+        }
+        CtContract entity = contractMapper.selectById(businessId);
+        return validate(entity != null, tenantId, entity == null ? null : entity.getTenantId(),
+                entity == null ? null : entity.getProjectId(), requestProjectId,
+                entity == null ? null : entity.getId(), requestContractId,
+                entity == null ? null : entity.getApprovalStatus(),
+                "CONTRACT_NOT_FOUND",
+                "DRAFT", "REJECTED", "WITHDRAWN");
+    }
+
+    public void requireSubmitPermission(String businessType) {
+        String requiredPermission = getRequiredPermission(businessType);
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null) {
+            throw new BusinessException("WORKFLOW_PERMISSION_DENIED", "缺少权限: " + requiredPermission);
+        }
+        for (GrantedAuthority authority : auth.getAuthorities()) {
+            String authStr = authority.getAuthority();
+            if ("ROLE_ADMIN".equals(authStr) || "ROLE_SUPER_ADMIN".equals(authStr) || requiredPermission.equals(authStr)) {
+                return;
+            }
+        }
+        throw new BusinessException("WORKFLOW_PERMISSION_DENIED", "缺少权限: " + requiredPermission);
+    }
+
+    private String getRequiredPermission(String businessType) {
+        return switch (businessType) {
+            case WorkflowBusinessTypes.CONTRACT_APPROVAL -> "contract:submit";
+            case WorkflowBusinessTypes.PROJECT_APPROVAL -> "project:submit";
+            case WorkflowBusinessTypes.CONTRACT_REVENUE -> "revenue:submit";
+            case WorkflowBusinessTypes.PURCHASE_ORDER -> "purchase:order:submit";
+            case WorkflowBusinessTypes.PURCHASE_REQUEST -> "purchase:request:submit";
+            case WorkflowBusinessTypes.MATERIAL_RECEIPT -> "receipt:submit";
+            case WorkflowBusinessTypes.SUB_MEASURE -> "subcontract:measure:submit";
+            case WorkflowBusinessTypes.PAY_REQUEST -> "payment:app:submit";
+            case WorkflowBusinessTypes.VAR_ORDER -> "variation:order:submit";
+            case WorkflowBusinessTypes.CT_CHANGE -> "contract:change:submit";
+            case WorkflowBusinessTypes.SETTLEMENT -> "settlement:submit";
+            case WorkflowBusinessTypes.COST_TARGET -> "cost:target:submit";
+            case WorkflowBusinessTypes.COST_CORRECTIVE_ACTION -> "cost:corrective:submit";
+            case WorkflowBusinessTypes.MATERIAL_REQUISITION -> "requisition:submit";
+            case WorkflowBusinessTypes.PROJECT_BUDGET -> "budget:submit";
+            case WorkflowBusinessTypes.EXPENSE -> "expense:submit";
+            case WorkflowBusinessTypes.OWNER_SETTLEMENT -> "revenue:settlement:submit";
+            case WorkflowBusinessTypes.PRODUCTION_MEASUREMENT -> "measurement:submit";
+            case WorkflowBusinessTypes.PROJECT_SCHEDULE -> "schedule:submit";
+            case WorkflowBusinessTypes.PROJECT_PERIOD_PLAN -> "schedule:submit";
+            case WorkflowBusinessTypes.PROJECT_CORRECTIVE_ACTION -> "schedule:correct";
+            case WorkflowBusinessTypes.TECHNICAL_SCHEME -> "technical:scheme:submit";
+            case WorkflowBusinessTypes.PROJECT_FINAL_ACCEPTANCE -> "closeout:acceptance:submit";
+            default -> throw new BusinessException("UNSUPPORTED_BUSINESS_TYPE", "不支持的业务类型: " + businessType);
+        };
+    }
+
     private ValidationResult validateJdbc(String table, String statusColumn, Long businessId, Long tenantId,
                                             Long requestProjectId, Long requestContractId, String notFoundCode) {
+        return validateJdbc(table, statusColumn, businessId, tenantId, requestProjectId, requestContractId,
+                notFoundCode, "DRAFT", "REJECTED");
+    }
+
+    private ValidationResult validateJdbc(String table, String statusColumn, Long businessId, Long tenantId,
+                                           Long requestProjectId, Long requestContractId, String notFoundCode,
+                                           String... allowedStatuses) {
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
                 "SELECT tenant_id,project_id," + (hasNoContractColumn(table) ? "NULL" : "contract_id")
                         + " contract_id," + statusColumn + " approval_status FROM " + table + " WHERE id=? AND deleted_flag=0",
@@ -206,7 +309,7 @@ public class WorkflowBusinessAccessValidator {
         return validate(row != null, tenantId, row == null ? null : ((Number) row.get("tenant_id")).longValue(),
                 row == null ? null : ((Number) row.get("project_id")).longValue(), requestProjectId,
                 row == null || row.get("contract_id") == null ? null : ((Number) row.get("contract_id")).longValue(), requestContractId,
-                row == null ? null : Objects.toString(row.get("approval_status"), null), notFoundCode, "DRAFT", "REJECTED");
+                row == null ? null : Objects.toString(row.get("approval_status"), null), notFoundCode, allowedStatuses);
     }
 
     private boolean hasNoContractColumn(String table) {

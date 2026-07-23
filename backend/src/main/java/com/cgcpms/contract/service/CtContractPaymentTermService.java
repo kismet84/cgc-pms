@@ -8,6 +8,7 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -22,12 +23,13 @@ public class CtContractPaymentTermService {
 
     private final CtContractPaymentTermMapper ctContractPaymentTermMapper;
     private final CtContractMapper ctContractMapper;
+    private final ProjectAccessChecker projectAccessChecker;
 
     /**
      * Verify parent contract belongs to current tenant and is in DRAFT status (editable).
      */
-    private CtContract requireDraftParentContract(Long contractId) {
-        CtContract contract = requireParentContract(contractId);
+    private CtContract requireDraftParentContract(Long contractId, String action) {
+        CtContract contract = requireParentContract(contractId, action);
         if (!ContractStatusConstants.APPROVAL_DRAFT.equals(contract.getApprovalStatus()))
             throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
         return contract;
@@ -36,15 +38,18 @@ public class CtContractPaymentTermService {
     /**
      * Verify parent contract belongs to current tenant.
      */
-    private CtContract requireParentContract(Long contractId) {
+    private CtContract requireParentContract(Long contractId, String action) {
         CtContract contract = ctContractMapper.selectById(contractId);
         if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
+        if (contract.getProjectId() != null) {
+            projectAccessChecker.checkAccess(contract.getProjectId(), action);
+        }
         return contract;
     }
 
     public List<CtContractPaymentTerm> getByContractId(Long contractId) {
-        requireParentContract(contractId);
+        requireParentContract(contractId, "查看合同付款条款");
         LambdaQueryWrapper<CtContractPaymentTerm> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CtContractPaymentTerm::getContractId, contractId)
                 .orderByAsc(CtContractPaymentTerm::getSortOrder);
@@ -53,7 +58,7 @@ public class CtContractPaymentTermService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(CtContractPaymentTerm term) {
-        requireDraftParentContract(term.getContractId());
+        requireDraftParentContract(term.getContractId(), "编辑合同付款条款");
         term.setTenantId(UserContext.getCurrentTenantId());
         ctContractPaymentTermMapper.insert(term);
         return term.getId();
@@ -76,7 +81,7 @@ public class CtContractPaymentTermService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void batchSave(Long contractId, List<CtContractPaymentTerm> newTerms) {
-        requireDraftParentContract(contractId);
+        requireDraftParentContract(contractId, "编辑合同付款条款");
         LambdaQueryWrapper<CtContractPaymentTerm> deleteWrapper = new LambdaQueryWrapper<>();
         deleteWrapper.eq(CtContractPaymentTerm::getContractId, contractId);
         ctContractPaymentTermMapper.delete(deleteWrapper);
@@ -95,7 +100,7 @@ public class CtContractPaymentTermService {
 
     @Transactional(rollbackFor = Exception.class)
     public void update(CtContractPaymentTerm term) {
-        requireDraftParentContract(term.getContractId());
+        requireDraftParentContract(term.getContractId(), "编辑合同付款条款");
         CtContractPaymentTerm existing = ctContractPaymentTermMapper.selectById(term.getId());
         if (existing == null)
             throw new BusinessException("PAYMENT_TERM_NOT_FOUND", "付款条款不存在");
@@ -107,7 +112,7 @@ public class CtContractPaymentTermService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long contractId, Long id) {
-        requireDraftParentContract(contractId);
+        requireDraftParentContract(contractId, "编辑合同付款条款");
         CtContractPaymentTerm existing = ctContractPaymentTermMapper.selectById(id);
         if (existing == null || !existing.getContractId().equals(contractId))
             throw new BusinessException("PAYMENT_TERM_NOT_FOUND", "付款条款不存在");

@@ -186,6 +186,11 @@ public class CtContractChangeService {
                 || !ContractStatusConstants.STATUS_PERFORMING.equals(contract.getContractStatus()))
             throw new BusinessException("OWNER_CONTRACT_NOT_PERFORMING", "只有已审批且履约中的业主主合同可以生成正式变更");
 
+        existing = ctContractChangeMapper.selectOne(new LambdaQueryWrapper<CtContractChange>()
+                .eq(CtContractChange::getTenantId, UserContext.getCurrentTenantId())
+                .eq(CtContractChange::getSourceVarOrderId, order.getId()));
+        if (existing != null) return existing.getId();
+
         BigDecimal before = contract.getCurrentAmount() == null ? contract.getContractAmount() : contract.getCurrentAmount();
         CtContractChange change = new CtContractChange();
         change.setTenantId(UserContext.getCurrentTenantId());

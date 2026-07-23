@@ -65,15 +65,28 @@ public class VarOrderService {
     private final JdbcTemplate jdbcTemplate;
 
     public IPage<VarOrderVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
-                                      Long partnerId, String varType, String direction, String varCode) {
+                                      Long partnerId, String varType, String direction, String varCode,
+                                      LocalDate startDate, LocalDate endDate) {
         LambdaQueryWrapper<VarOrder> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(VarOrder::getTenantId, UserContext.getCurrentTenantId());
-        if (projectId != null) wrapper.eq(VarOrder::getProjectId, projectId);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看变更签证");
+            wrapper.eq(VarOrder::getProjectId, projectId);
+        } else {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            if (accessibleProjectIds.isEmpty()) {
+                wrapper.eq(VarOrder::getProjectId, -1L);
+            } else {
+                wrapper.in(VarOrder::getProjectId, accessibleProjectIds);
+            }
+        }
         if (contractId != null) wrapper.eq(VarOrder::getContractId, contractId);
         if (partnerId != null) wrapper.eq(VarOrder::getPartnerId, partnerId);
         if (StringUtils.hasText(varType)) wrapper.eq(VarOrder::getVarType, varType);
         if (StringUtils.hasText(direction)) wrapper.eq(VarOrder::getDirection, direction);
         if (StringUtils.hasText(varCode)) wrapper.like(VarOrder::getVarCode, varCode);
+        if (startDate != null) wrapper.ge(VarOrder::getEventDate, startDate);
+        if (endDate != null) wrapper.le(VarOrder::getEventDate, endDate);
         wrapper.orderByDesc(VarOrder::getCreatedAt);
 
         Page<VarOrder> page = varOrderMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
@@ -140,6 +153,7 @@ public class VarOrderService {
         applyClaimDefaults(order);
         validateDraftOrder(order);
         validateProjectAndContract(order.getProjectId(), order.getContractId(), "创建变更签证");
+        validatePartner(order.getPartnerId());
 
         // Auto-generate var code: VO-yyyyMMdd-XXX（含软删除记录查询最大编号，避免 UK 冲突）
         String today = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
@@ -201,14 +215,17 @@ public class VarOrderService {
             throw new BusinessException("VAR_ORDER_IN_APPROVAL", "签证变更审批中或已审批，不可编辑");
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
+        int expectedVersion = requiredVersion(order.getVersion());
+        if (!java.util.Objects.equals(existing.getVersion(), expectedVersion))
+            throw new BusinessException("VAR_ORDER_VERSION_CONFLICT", "签证已被其他人修改，请刷新后重试");
 
+        order.setProjectId(existing.getProjectId());
+        order.setContractId(existing.getContractId());
         normalizeDirection(order);
         applyClaimDefaults(order);
         validateDraftOrder(order);
-        validateProjectAndContract(
-                order.getProjectId() != null ? order.getProjectId() : existing.getProjectId(),
-                order.getContractId() != null ? order.getContractId() : existing.getContractId(),
-                "编辑变更签证");
+        validateProjectAndContract(existing.getProjectId(), existing.getContractId(), "编辑变更签证");
+        validatePartner(order.getPartnerId());
 
         if (order.getBusinessMatterKey() != null) {
             businessMatterRegistryService.replace(BusinessMatterRegistryService.SOURCE_VARIATION_ORDER,
@@ -216,11 +233,36 @@ public class VarOrderService {
                     existing.getBusinessMatterKey(), order.getBusinessMatterKey());
             order.setBusinessMatterKey(businessMatterRegistryService.normalize(order.getBusinessMatterKey()));
         }
-        varOrderMapper.updateById(order);
+        int updated = varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
+                .eq(VarOrder::getId, existing.getId())
+                .eq(VarOrder::getTenantId, existing.getTenantId())
+                .eq(VarOrder::getVersion, expectedVersion)
+                .in(VarOrder::getApprovalStatus, "DRAFT", "REJECTED")
+                .set(VarOrder::getPartnerId, order.getPartnerId())
+                .set(VarOrder::getVarName, order.getVarName())
+                .set(VarOrder::getEventDate, order.getEventDate())
+                .set(VarOrder::getClaimDeadline, order.getClaimDeadline())
+                .set(VarOrder::getEventDescription, order.getEventDescription())
+                .set(VarOrder::getCauseCategory, order.getCauseCategory())
+                .set(VarOrder::getResponsibleParty, order.getResponsibleParty())
+                .set(VarOrder::getBusinessMatterKey, order.getBusinessMatterKey())
+                .set(VarOrder::getVarType, order.getVarType())
+                .set(VarOrder::getDirection, order.getDirection())
+                .set(VarOrder::getImpactDays, order.getImpactDays())
+                .set(VarOrder::getRemark, order.getRemark())
+                .set(VarOrder::getVersion, expectedVersion + 1));
+        if (updated != 1)
+            throw new BusinessException("VAR_ORDER_VERSION_CONFLICT", "签证已被其他人修改，请刷新后重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void saveItems(Long varOrderId, List<VarOrderItem> items) {
+        VarOrder current = requireOrder(varOrderId, "编辑变更签证明细");
+        saveItems(varOrderId, items, current.getVersion());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void saveItems(Long varOrderId, List<VarOrderItem> items, Integer version) {
         // Verify order exists and belongs to tenant
         VarOrder order = varOrderMapper.selectById(varOrderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
@@ -231,6 +273,9 @@ public class VarOrderService {
             throw new BusinessException("VAR_ORDER_IN_APPROVAL", "签证变更审批中或已审批，不可编辑");
         if (order.getCostGeneratedFlag() != null && order.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
+        int expectedVersion = requiredVersion(version);
+        if (!java.util.Objects.equals(order.getVersion(), expectedVersion))
+            throw new BusinessException("VAR_ORDER_VERSION_CONFLICT", "签证已被其他人修改，请刷新后重试");
 
         List<VarOrderItem> validItems = normalizeDraftItems(items);
 
@@ -262,13 +307,26 @@ public class VarOrderService {
         Db.saveBatch(validItems, 50);
 
         // Update header reported amount
-        order.setEstimatedCostAmount(totalCost);
-        order.setReportedAmount(totalClaim);
-        varOrderMapper.updateById(order);
+        int updated = varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
+                .eq(VarOrder::getId, varOrderId)
+                .eq(VarOrder::getTenantId, order.getTenantId())
+                .eq(VarOrder::getVersion, expectedVersion)
+                .in(VarOrder::getApprovalStatus, "DRAFT", "REJECTED")
+                .set(VarOrder::getEstimatedCostAmount, totalCost)
+                .set(VarOrder::getReportedAmount, totalClaim)
+                .set(VarOrder::getVersion, expectedVersion + 1));
+        if (updated != 1)
+            throw new BusinessException("VAR_ORDER_VERSION_CONFLICT", "签证已被其他人修改，请刷新后重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        VarOrder current = requireOrder(id, "删除变更签证");
+        delete(id, current.getVersion());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long id, Integer version) {
         VarOrder existing = varOrderMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
@@ -279,7 +337,13 @@ public class VarOrderService {
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可删除，请走冲销");
 
-        varOrderMapper.deleteById(id);
+        int deleted = varOrderMapper.delete(new LambdaQueryWrapper<VarOrder>()
+                .eq(VarOrder::getId, id)
+                .eq(VarOrder::getTenantId, existing.getTenantId())
+                .eq(VarOrder::getVersion, requiredVersion(version))
+                .in(VarOrder::getApprovalStatus, "DRAFT", "REJECTED"));
+        if (deleted != 1)
+            throw new BusinessException("VAR_ORDER_VERSION_CONFLICT", "签证已被其他人修改，请刷新后重试");
         businessMatterRegistryService.release(BusinessMatterRegistryService.SOURCE_VARIATION_ORDER,
                 id, "现场签证草稿删除");
     }
@@ -289,6 +353,12 @@ public class VarOrderService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long varOrderId) {
+        VarOrder current = requireOrder(varOrderId, "提交变更签证审批");
+        submitForApproval(varOrderId, current.getVersion());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void submitForApproval(Long varOrderId, Integer version) {
         VarOrder order = varOrderMapper.selectById(varOrderId);
         if (order == null || !order.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("VAR_ORDER_NOT_FOUND", "变更签证不存在");
@@ -310,16 +380,25 @@ public class VarOrderService {
 
         LambdaUpdateWrapper<VarOrder> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(VarOrder::getId, varOrderId)
+                .eq(VarOrder::getTenantId, tenantId)
+                .eq(VarOrder::getVersion, requiredVersion(version))
                 .in(VarOrder::getApprovalStatus, "DRAFT", "REJECTED")
                 .set(VarOrder::getApprovalStatus, "APPROVING")
                 .set(VarOrder::getInternalApprovalInstanceId, instance.getId())
-                .set(VarOrder::getOwnerStatus, "NOT_READY");
+                .set(VarOrder::getOwnerStatus, "NOT_READY")
+                .set(VarOrder::getVersion, requiredVersion(version) + 1);
         if (varOrderMapper.update(null, updateWrapper) != 1)
             throw new BusinessException("VAR_ORDER_CONCURRENT_SUBMIT", "签证状态已变化，请刷新后重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> submitToOwner(Long varOrderId, OwnerSubmissionRequest request) {
+        VarOrder current = requireOrder(varOrderId, "提交业主申报");
+        return submitToOwner(varOrderId, request, current.getVersion());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> submitToOwner(Long varOrderId, OwnerSubmissionRequest request, Integer version) {
         VarOrder order = requireOrder(varOrderId, "提交业主申报");
         if (!"APPROVED".equals(order.getApprovalStatus()))
             throw new BusinessException("VARIATION_INTERNAL_APPROVAL_REQUIRED", "内部审批通过后才能向业主申报");
@@ -342,6 +421,16 @@ public class VarOrderService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
         if (submittedAmount.signum() <= 0)
             throw new BusinessException("VARIATION_OWNER_SUBMITTED_AMOUNT_INVALID", "业主申报金额必须大于0");
+        int expectedVersion = requiredVersion(version);
+        int reserved = varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
+                .eq(VarOrder::getId, varOrderId)
+                .eq(VarOrder::getTenantId, order.getTenantId())
+                .eq(VarOrder::getVersion, expectedVersion)
+                .in(VarOrder::getOwnerStatus, "INTERNAL_APPROVED", "OWNER_RETURNED")
+                .set(VarOrder::getOwnerStatus, "OWNER_SUBMITTED")
+                .set(VarOrder::getVersion, expectedVersion + 1));
+        if (reserved != 1)
+            throw new BusinessException("VARIATION_OWNER_CONCURRENT_SUBMIT", "业主申报状态已变化，请刷新后重试");
         String code = order.getVarCode() + "-R" + revision;
         jdbcTemplate.update("INSERT INTO variation_owner_submission " +
                         "(id,tenant_id,project_id,contract_id,var_order_id,revision_no,submission_code,external_document_no," +
@@ -357,16 +446,22 @@ public class VarOrderService {
                     IdWorker.getId(), order.getTenantId(), submissionId, item.getId(), item.getItemName(), item.getUnit(),
                     item.getQuantity(), item.getClaimUnitPrice(), item.getClaimAmount(), UserContext.getCurrentUserId());
         }
-        varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
-                .eq(VarOrder::getId, varOrderId)
-                .in(VarOrder::getOwnerStatus, "INTERNAL_APPROVED", "OWNER_RETURNED")
-                .set(VarOrder::getOwnerStatus, "OWNER_SUBMITTED"));
         return ownerSubmission(submissionId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> reviewOwnerSubmission(Long varOrderId, Long submissionId, OwnerReviewRequest request) {
+        VarOrder current = requireOrder(varOrderId, "登记业主核定");
+        return reviewOwnerSubmission(varOrderId, submissionId, request, current.getVersion());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Map<String, Object> reviewOwnerSubmission(Long varOrderId, Long submissionId,
+                                                      OwnerReviewRequest request, Integer version) {
         VarOrder order = requireOrder(varOrderId, "登记业主核定");
+        int expectedVersion = requiredVersion(version);
+        if (!java.util.Objects.equals(order.getVersion(), expectedVersion))
+            throw new BusinessException("VAR_ORDER_VERSION_CONFLICT", "签证已被其他人修改，请刷新后重试");
         Map<String, Object> submission = ownerSubmission(submissionId);
         if (!java.util.Objects.equals(((Number) submission.get("var_order_id")).longValue(), varOrderId))
             throw new BusinessException("VARIATION_OWNER_SUBMISSION_MISMATCH", "业主申报版本不属于当前签证");
@@ -382,8 +477,15 @@ public class VarOrderService {
             if (!StringUtils.hasText(request.responseComment()))
                 throw new BusinessException("VARIATION_OWNER_RETURN_REASON_REQUIRED", "业主退回时必须填写原因");
             updateSubmissionReview(submissionId, "RETURNED", request, BigDecimal.ZERO, null);
-            varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>().eq(VarOrder::getId, varOrderId)
-                    .eq(VarOrder::getOwnerStatus, "OWNER_SUBMITTED").set(VarOrder::getOwnerStatus, "OWNER_RETURNED"));
+            int updated = varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>()
+                    .eq(VarOrder::getId, varOrderId)
+                    .eq(VarOrder::getTenantId, order.getTenantId())
+                    .eq(VarOrder::getVersion, expectedVersion)
+                    .eq(VarOrder::getOwnerStatus, "OWNER_SUBMITTED")
+                    .set(VarOrder::getOwnerStatus, "OWNER_RETURNED")
+                    .set(VarOrder::getVersion, expectedVersion + 1));
+            if (updated != 1)
+                throw new BusinessException("VARIATION_OWNER_REVIEW_DUPLICATE", "该申报版本已被处理，请刷新后重试");
             return ownerSubmission(submissionId);
         }
 
@@ -413,10 +515,15 @@ public class VarOrderService {
         Long changeId = ctContractChangeService.createFromVariationAndSubmit(order, confirmed);
         jdbcTemplate.update("UPDATE variation_owner_submission SET status='CHANGE_PENDING',generated_contract_change_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                 changeId, submissionId, order.getTenantId());
-        varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>().eq(VarOrder::getId, varOrderId)
+        int updated = varOrderMapper.update(null, new LambdaUpdateWrapper<VarOrder>().eq(VarOrder::getId, varOrderId)
+                .eq(VarOrder::getTenantId, order.getTenantId())
+                .eq(VarOrder::getVersion, expectedVersion)
                 .eq(VarOrder::getOwnerStatus, "OWNER_SUBMITTED")
                 .set(VarOrder::getConfirmedAmount, confirmed).set(VarOrder::getOwnerConfirmFlag, 1)
-                .set(VarOrder::getGeneratedContractChangeId, changeId).set(VarOrder::getOwnerStatus, "CHANGE_PENDING"));
+                .set(VarOrder::getGeneratedContractChangeId, changeId).set(VarOrder::getOwnerStatus, "CHANGE_PENDING")
+                .set(VarOrder::getVersion, expectedVersion + 1));
+        if (updated != 1)
+            throw new BusinessException("VARIATION_OWNER_REVIEW_DUPLICATE", "该申报版本已被处理，请刷新后重试");
         return ownerSubmission(submissionId);
     }
 
@@ -603,6 +710,19 @@ public class VarOrderService {
         }
     }
 
+    private void validatePartner(Long partnerId) {
+        if (partnerId == null) return;
+        MdPartner partner = mdPartnerMapper.selectById(partnerId);
+        if (partner == null || !java.util.Objects.equals(partner.getTenantId(), UserContext.getCurrentTenantId()))
+            throw new BusinessException("PARTNER_NOT_FOUND", "合作方不存在");
+    }
+
+    private int requiredVersion(Integer version) {
+        if (version == null || version < 0)
+            throw new BusinessException("VAR_ORDER_VERSION_REQUIRED", "请刷新后携带有效版本重试");
+        return version;
+    }
+
     private void checkProjectAccess(Long projectId, String action) {
         if (projectId == null) {
             throw new BusinessException("PROJECT_REQUIRED", "变更签证缺少项目关系");
@@ -727,6 +847,7 @@ public class VarOrderService {
         vo.setImpactDays(m.getImpactDays());
         vo.setApprovalStatus(m.getApprovalStatus());
         vo.setCostGeneratedFlag(m.getCostGeneratedFlag());
+        vo.setVersion(m.getVersion());
         vo.setCreatedBy(m.getCreatedBy() != null ? m.getCreatedBy().toString() : null);
         vo.setCreatedAt(m.getCreatedAt() != null ? m.getCreatedAt().format(DateTimeUtils.DTF) : null);
         vo.setUpdatedAt(m.getUpdatedAt() != null ? m.getUpdatedAt().format(DateTimeUtils.DTF) : null);

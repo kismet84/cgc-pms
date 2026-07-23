@@ -118,8 +118,8 @@ public class FileService {
 
         validateBusinessBindingParams(businessType, businessId);
         // 业务对象上传权限校验
-        authorizer.checkUploadAccess(businessType, businessId);
         String normalizedDocumentType = normalizeDocumentType(documentType, businessType);
+        authorizer.checkUploadAccess(businessType, businessId, normalizedDocumentType);
         authorizer.checkVariationDocumentStage(businessType, businessId, normalizedDocumentType);
         scanOrReject(content);
 
@@ -290,7 +290,7 @@ public class FileService {
             throw new BusinessException("FILE_IMMUTABLE", "已归档生成文档不可删除");
         }
         // 业务对象删除权限校验
-        authorizer.checkDeleteAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
+        authorizer.checkDeleteAccess(sysFile.getBusinessType(), sysFile.getBusinessId(), sysFile.getDocumentType());
         authorizer.checkVariationDocumentStage(sysFile.getBusinessType(), sysFile.getBusinessId(), sysFile.getDocumentType());
 
         if (!TransactionSynchronizationManager.isActualTransactionActive()

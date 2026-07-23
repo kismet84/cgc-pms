@@ -149,6 +149,9 @@ class TenantIsolationTest {
         item.setQuantity(new BigDecimal("100"));
         item.setUnitPrice(new BigDecimal("350"));
         item.setAmount(new BigDecimal("35000"));
+        item.setTaxRate(new BigDecimal("13.00"));
+        item.setTaxAmount(new BigDecimal("4550.00"));
+        item.setAmountWithoutTax(new BigDecimal("30450.00"));
         item.setSortOrder(1);
         ContractSaveRequest req = new ContractSaveRequest();
         CtContract c = new CtContract();
@@ -157,10 +160,12 @@ class TenantIsolationTest {
         c.setContractType("SUB");
         c.setPartyAId(20003L);
         c.setPartyBId(20004L);
-        c.setContractAmount(new BigDecimal("500000.00"));
-        c.setCurrentAmount(new BigDecimal("500000.00"));
+        c.setContractAmount(new BigDecimal("35000.00"));
+        c.setCurrentAmount(new BigDecimal("35000.00"));
         c.setPaidAmount(BigDecimal.ZERO);
         c.setTaxRate(new BigDecimal("13.00"));
+        c.setTaxAmount(new BigDecimal("4550.00"));
+        c.setAmountWithoutTax(new BigDecimal("30450.00"));
         c.setSignedDate(LocalDate.now());
         c.setPaymentMethod("银行转账");
         c.setSettlementMethod("按进度");

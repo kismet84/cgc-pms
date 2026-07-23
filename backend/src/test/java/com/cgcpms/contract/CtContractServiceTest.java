@@ -22,7 +22,6 @@ import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
-import com.cgcpms.payment.PaymentTestFixtures;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
@@ -212,6 +211,14 @@ class CtContractServiceTest {
         return contractService.create(contract);
     }
 
+    private Integer currentVersion(Long contractId) {
+        return contractMapper.selectById(contractId).getVersion();
+    }
+
+    private void submitCurrentVersion(Long contractId) {
+        contractService.submitForApproval(contractId, currentVersion(contractId));
+    }
+
     private CtContractItem buildItem(String code, String name, BigDecimal qty, BigDecimal price) {
         CtContractItem item = new CtContractItem();
         item.setItemCode(code);
@@ -263,7 +270,7 @@ class CtContractServiceTest {
     @DisplayName("分页查询 — 无过滤条件返回全部合同")
     void testGetPageNoFilter() {
         IPage<CtContractVO> page = contractService.getPage(1, 20,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null);
         assertNotNull(page);
         assertTrue(page.getTotal() >= 3, "V90 seed 至少包含 3 条合同");
     }
@@ -273,7 +280,7 @@ class CtContractServiceTest {
     @DisplayName("分页查询 — 按合同类型精确过滤")
     void testGetPageByContractType() {
         IPage<CtContractVO> page = contractService.getPage(1, 20,
-                null, null, null, "SUB", null, null, null, null, null);
+                null, null, null, "SUB", null, null, null, null, null, null, null);
         assertNotNull(page);
         assertTrue(page.getTotal() >= 1, "应至少有一条 SUB 类型合同");
         for (CtContractVO vo : page.getRecords()) {
@@ -286,7 +293,7 @@ class CtContractServiceTest {
     @DisplayName("分页查询 — 按审批状态过滤")
     void testGetPageByApprovalStatus() {
         IPage<CtContractVO> page = contractService.getPage(1, 20,
-                null, null, null, null, null, "APPROVED", null, null, null);
+                null, null, null, null, null, "APPROVED", null, null, null, null, null);
         assertNotNull(page);
         assertTrue(page.getTotal() >= 2, "seed 中 30001/30002/30003 均为 APPROVED");
         for (CtContractVO vo : page.getRecords()) {
@@ -299,7 +306,7 @@ class CtContractServiceTest {
     @DisplayName("分页查询 — 按 projectId 过滤")
     void testGetPageByProjectId() {
         IPage<CtContractVO> page = contractService.getPage(1, 20,
-                null, null, null, null, null, null, PROJECT_ID, null, null);
+                null, null, null, null, null, null, PROJECT_ID, null, null, null, null);
         assertNotNull(page);
         assertTrue(page.getTotal() >= 3);
         for (CtContractVO vo : page.getRecords()) {
@@ -309,10 +316,32 @@ class CtContractServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("分页查询 — 无项目权限时空项目筛选 fail-close")
+    void testGetPageWithoutProjectAccessReturnsEmpty() {
+        PmProject project = projectMapper.selectById(PROJECT_ID);
+        project.setCreatedBy(USER_PROJECT_OWNER);
+        project.setProjectManagerId(null);
+        projectMapper.updateById(project);
+
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_NO_PROJECT_ACCESS)
+                .add("username", "no-project-access")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of())
+                .build());
+
+        IPage<CtContractVO> page = contractService.getPage(1, 20,
+                null, null, null, null, null, null, null, null, null, null, null);
+        assertEquals(0L, page.getTotal());
+        assertTrue(page.getRecords().isEmpty());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("分页查询 — keyword 模糊搜索（匹配合同名称）")
     void testGetPageByKeyword() {
         IPage<CtContractVO> page = contractService.getPage(1, 20,
-                "主体结构", null, null, null, null, null, null, null, null);
+                "主体结构", null, null, null, null, null, null, null, null, null, null);
         assertNotNull(page);
         assertTrue(page.getTotal() >= 1, "应匹配到种子合同 30001");
         assertTrue(page.getRecords().stream()
@@ -324,7 +353,7 @@ class CtContractServiceTest {
     @DisplayName("分页查询 — 返回 VO 中 projectName/partyAName/partyBName 非空")
     void testGetPageRelatedNamesPopulated() {
         IPage<CtContractVO> page = contractService.getPage(1, 20,
-                null, null, null, null, null, null, PROJECT_ID, null, null);
+                null, null, null, null, null, null, PROJECT_ID, null, null, null, null);
         assertTrue(page.getTotal() >= 1);
         CtContractVO vo = page.getRecords().get(0);
         assertNotNull(vo.getProjectName(), "projectName 应通过 batch-prefetch 填充");
@@ -337,11 +366,28 @@ class CtContractServiceTest {
     @DisplayName("分页查询 — 按合同状态过滤 DRAFT 返回空或仅 DRAFT 记录")
     void testGetPageByContractStatusDraft() {
         IPage<CtContractVO> page = contractService.getPage(1, 20,
-                null, null, null, null, "DRAFT", null, null, null, null);
+                null, null, null, null, "DRAFT", null, null, null, null, null, null);
         assertNotNull(page);
         for (CtContractVO vo : page.getRecords()) {
             assertEquals("DRAFT", vo.getContractStatus());
         }
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("报告期 — 列表与 KPI 均按签订日期过滤")
+    void testReportPeriodFiltersListAndKpiBySignedDate() {
+        Long id = createDraftContract("报告期过滤合同");
+        LocalDate signedDate = LocalDate.now();
+
+        IPage<CtContractVO> page = contractService.getPage(1, 20,
+                null, null, null, null, null, null, PROJECT_ID, null, null,
+                signedDate, signedDate);
+        Map<String, Object> kpi = contractService.getKpi(
+                null, null, null, null, null, PROJECT_ID, null, null, signedDate, signedDate);
+
+        assertTrue(page.getRecords().stream().anyMatch(record -> id.toString().equals(record.getId())));
+        assertTrue((Long) kpi.get("totalCount") >= 1L);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -353,7 +399,7 @@ class CtContractServiceTest {
     @DisplayName("KPI 聚合 — 无过滤返回汇总统计")
     void testGetKpiAll() {
         Map<String, Object> kpi = contractService.getKpi(
-                null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null);
         assertNotNull(kpi);
         assertTrue(((Long) kpi.get("totalCount")) >= 3, "seed 中至少 3 条合同");
         // totalAmount >= 50,000,000 + 30,000,000 + 10,000,000
@@ -369,7 +415,7 @@ class CtContractServiceTest {
     @DisplayName("KPI 聚合 — projectId 过滤后正确统计")
     void testGetKpiByProject() {
         Map<String, Object> kpi = contractService.getKpi(
-                null, null, null, null, null, PROJECT_ID, null, null);
+                null, null, null, null, null, PROJECT_ID, null, null, null, null);
         assertNotNull(kpi);
         assertTrue(((Long) kpi.get("totalCount")) >= 3,
                 "project 10001 应匹配全部 3 条 seed 合同");
@@ -379,12 +425,9 @@ class CtContractServiceTest {
     @Transactional
     @DisplayName("KPI 聚合 — 无匹配条件时返回零值统计")
     void testGetKpiEmptyResult() {
-        Map<String, Object> kpi = contractService.getKpi(
-                null, "不存在的合同", null, null, null, -999L, null, null);
-        assertNotNull(kpi);
-        assertEquals(0L, kpi.get("totalCount"));
-        assertEquals("0", kpi.get("totalAmount"));
-        assertEquals("0", kpi.get("paidAmount"));
+        BusinessException ex = assertThrows(BusinessException.class, () -> contractService.getKpi(
+                null, "不存在的合同", null, null, null, -999L, null, null, null, null));
+        assertEquals("PROJECT_NOT_FOUND", ex.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -527,9 +570,11 @@ class CtContractServiceTest {
     @DisplayName("更新 — DRAFT 合同允许编辑，字段正确更新")
     void testUpdateDraftAllowed() {
         Long id = insertDraftContract("更新前合同名称");
+        CtContract existing = contractMapper.selectById(id);
 
         CtContract toUpdate = new CtContract();
         toUpdate.setId(id);
+        toUpdate.setVersion(existing.getVersion());
         toUpdate.setContractName("更新后合同名称");
         toUpdate.setContractType("SERVICE");
         toUpdate.setProjectId(PROJECT_ID);
@@ -635,7 +680,7 @@ class CtContractServiceTest {
     void testSubmitForApprovalSuccess() {
         Long id = insertDraftContract("提交审批测试合同");
 
-        contractService.submitForApproval(id);
+        submitCurrentVersion(id);
 
         CtContract after = contractMapper.selectById(id);
         assertEquals(ContractStatusConstants.APPROVAL_APPROVING, after.getApprovalStatus());
@@ -656,7 +701,7 @@ class CtContractServiceTest {
     @DisplayName("提交审批 — 不存在时抛 CONTRACT_NOT_FOUND")
     void testSubmitNotFound() {
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> contractService.submitForApproval(-999L));
+                () -> contractService.submitForApproval(-999L, 0));
         assertEquals("CONTRACT_NOT_FOUND", ex.getCode());
     }
 
@@ -666,10 +711,10 @@ class CtContractServiceTest {
     void testSubmitDuplicateRejected() {
         Long id = insertDraftContract("重复提交测试合同");
 
-        contractService.submitForApproval(id);
+        submitCurrentVersion(id);
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> contractService.submitForApproval(id));
+                () -> contractService.submitForApproval(id, currentVersion(id)));
         assertEquals("CONTRACT_ALREADY_SUBMITTED", ex.getCode());
     }
 
@@ -688,9 +733,10 @@ class CtContractServiceTest {
         contract.setContractCode("CT-TEST-BL-" + System.nanoTime());
         contract.setTenantId(TENANT_ID);
         contractMapper.insert(contract);
+        CtContract saved = contractMapper.selectById(contract.getId());
 
         BusinessException ex = assertThrows(BusinessException.class,
-                () -> contractService.submitForApproval(contract.getId()));
+                () -> contractService.submitForApproval(contract.getId(), saved.getVersion()));
         assertEquals("PURCHASE_SUPPLIER_BLACKLISTED", ex.getCode());
     }
 
@@ -703,9 +749,14 @@ class CtContractServiceTest {
     @DisplayName("复合保存 — 新建合同：header + items + terms 全量持久化")
     void testCompositeSaveCreateAllThreePersist() {
         CtContract contract = buildDraftContract("复合保存创建测试");
+        contract.setContractAmount(new BigDecimal("45000.00"));
+        contract.setCurrentAmount(new BigDecimal("45000.00"));
+        contract.setTaxAmount(new BigDecimal("5850.00"));
+        contract.setAmountWithoutTax(new BigDecimal("39150.00"));
         CtContractItem item = buildItem("CI-CMP-001", "测试清单项",
                 new BigDecimal("100.00"), new BigDecimal("450.00"));
-        CtContractPaymentTerm term = buildTerm("预付款", new BigDecimal("30.00"), 1);
+        CtContractPaymentTerm term = buildTerm("预付款", new BigDecimal("100.00"), 1);
+        term.setPaymentAmount(new BigDecimal("45000.00"));
 
         ContractSaveRequest request = new ContractSaveRequest();
         request.setContract(contract);
@@ -741,6 +792,7 @@ class CtContractServiceTest {
     @DisplayName("复合保存 — 更新已有 DRAFT 合同：旧 items/terms 被全量替换")
     void testCompositeSaveUpdateReplaceAll() {
         Long id = insertDraftContract("复合保存更新测试");
+        CtContract existing = contractMapper.selectById(id);
 
         CtContractItem item = buildItem("CI-CMP-UPD-001", "新清单项",
                 new BigDecimal("50.00"), new BigDecimal("200.00"));
@@ -748,21 +800,27 @@ class CtContractServiceTest {
 
         CtContract updateContract = new CtContract();
         updateContract.setId(id);
+        updateContract.setVersion(existing.getVersion());
         updateContract.setContractName("复合保存更新后名称");
         updateContract.setContractType("SUB");
         updateContract.setProjectId(PROJECT_ID);
         updateContract.setPartyAId(PARTY_A_ID);
         updateContract.setPartyBId(PARTY_B_ID);
-        updateContract.setContractAmount(new BigDecimal("500000.00"));
-        updateContract.setCurrentAmount(new BigDecimal("500000.00"));
+        updateContract.setContractAmount(new BigDecimal("10000.00"));
+        updateContract.setCurrentAmount(new BigDecimal("10000.00"));
         updateContract.setPaidAmount(BigDecimal.ZERO);
         updateContract.setTaxRate(new BigDecimal("13.00"));
+        updateContract.setTaxAmount(new BigDecimal("1300.00"));
+        updateContract.setAmountWithoutTax(new BigDecimal("8700.00"));
         updateContract.setPaymentMethod("电汇");
         updateContract.setSettlementMethod("按节点结算");
+        updateContract.setContractStatus("DRAFT");
 
         ContractSaveRequest request = new ContractSaveRequest();
         request.setContract(updateContract);
         request.setItems(List.of(item));
+        term.setPaymentRatio(new BigDecimal("100.00"));
+        term.setPaymentAmount(new BigDecimal("10000.00"));
         request.setPaymentTerms(List.of(term));
 
         Long resultId = contractService.compositeSave(request);
@@ -813,7 +871,7 @@ class CtContractServiceTest {
     @DisplayName("审批记录查询 — 提交审批后存在 SUBMIT 记录")
     void testGetApprovalRecordsAfterSubmit() {
         Long id = insertDraftContract("审批记录查询测试");
-        contractService.submitForApproval(id);
+        submitCurrentVersion(id);
 
         List<ContractApprovalRecordVO> records = contractService.getApprovalRecords(id);
         assertNotNull(records);
@@ -875,10 +933,8 @@ class CtContractServiceTest {
         draftChange.setApprovalStatus("DRAFT");
         contractChangeMapper.insert(draftChange);
 
-        PaymentTestFixtures.insertApplication(payApplicationMapper, 90001L, TENANT_ID,
-                PROJECT_ID, contract.getId(), PARTY_B_ID, new BigDecimal("300000.00"));
-        PaymentTestFixtures.insertApplication(payApplicationMapper, 90002L, TENANT_ID,
-                PROJECT_ID, contract.getId(), PARTY_B_ID, new BigDecimal("100000.00"));
+        insertPayApplication(90001L, contract.getId(), new BigDecimal("300000.00"));
+        insertPayApplication(90002L, contract.getId(), new BigDecimal("100000.00"));
 
         PayRecord paid = new PayRecord();
         paid.setTenantId(TENANT_ID);
@@ -925,7 +981,7 @@ class CtContractServiceTest {
     @DisplayName("边界 — getPage 分页参数 pageSize=1 返回单条记录")
     void testGetPageSizeOne() {
         IPage<CtContractVO> page = contractService.getPage(1, 1,
-                null, null, null, null, null, null, PROJECT_ID, null, null);
+                null, null, null, null, null, null, PROJECT_ID, null, null, null, null);
         assertNotNull(page);
         assertTrue(page.getRecords().size() <= 1, "pageSize=1 最多返回 1 条");
     }
@@ -983,6 +1039,28 @@ class CtContractServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("引用约束 — 创建时拒绝无项目权限用户")
+    void testCreateRejectsInaccessibleProject() {
+        PmProject project = projectMapper.selectById(PROJECT_ID);
+        project.setCreatedBy(USER_PROJECT_OWNER);
+        project.setProjectManagerId(null);
+        projectMapper.updateById(project);
+
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_NO_PROJECT_ACCESS)
+                .add("username", "no-project-access")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of())
+                .build());
+
+        CtContract contract = buildDraftContract("无权限合同");
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.create(contract));
+        assertEquals("PROJECT_ACCESS_DENIED", error.getCode());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("引用约束 — 创建时分别拒绝跨租户甲方和乙方")
     void testCreateRejectsCrossTenantParties() {
         long crossTenantPartnerId = 990002L;
@@ -1018,10 +1096,240 @@ class CtContractServiceTest {
                 .build());
 
         IPage<CtContractVO> page = contractService.getPage(1, 20,
-                null, null, null, null, null, null, null, null, null);
+                null, null, null, null, null, null, null, null, null, null, null);
         for (CtContractVO vo : page.getRecords()) {
             assertNotEquals("CT-2026-001", vo.getContractCode(),
                     "跨租户不应看到 seed 合同数据");
         }
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("复合保存 — 旧 version 更新抛 CONTRACT_VERSION_CONFLICT")
+    void testCompositeSaveRejectsStaleVersion() {
+        Long id = insertDraftContract("复合保存版本冲突");
+        CtContract existing = contractMapper.selectById(id);
+
+        CtContract updateContract = new CtContract();
+        updateContract.setId(id);
+        updateContract.setVersion(existing.getVersion() - 1);
+        updateContract.setContractName("版本冲突修改");
+        updateContract.setContractType("SUB");
+        updateContract.setProjectId(PROJECT_ID);
+        updateContract.setPartyAId(PARTY_A_ID);
+        updateContract.setPartyBId(PARTY_B_ID);
+        updateContract.setContractAmount(new BigDecimal("640000.00"));
+        updateContract.setCurrentAmount(new BigDecimal("640000.00"));
+        updateContract.setTaxRate(new BigDecimal("13.00"));
+        updateContract.setTaxAmount(new BigDecimal("73628.32"));
+        updateContract.setAmountWithoutTax(new BigDecimal("566371.68"));
+
+        ContractSaveRequest request = new ContractSaveRequest();
+        request.setContract(updateContract);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.compositeSave(request));
+        assertEquals("CONTRACT_VERSION_CONFLICT", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("复合保存 — 受保护字段不会被客户端覆盖")
+    void testCompositeSaveProtectsImmutableFields() {
+        Long id = insertDraftContract("复合保存保护字段");
+        CtContract existing = contractMapper.selectById(id);
+        existing.setPaidAmount(new BigDecimal("123.45"));
+        existing.setSettlementAmount(new BigDecimal("678.90"));
+        existing.setCostGeneratedFlag(1);
+        contractMapper.updateById(existing);
+
+        CtContract updateContract = new CtContract();
+        updateContract.setId(id);
+        updateContract.setVersion(existing.getVersion());
+        updateContract.setContractName("复合保存保护字段-更新");
+        updateContract.setContractType("SUB");
+        updateContract.setProjectId(PROJECT_ID);
+        updateContract.setPartyAId(PARTY_A_ID);
+        updateContract.setPartyBId(PARTY_B_ID);
+        updateContract.setContractCode("FORGED-CODE");
+        updateContract.setContractAmount(new BigDecimal("640000.00"));
+        updateContract.setCurrentAmount(new BigDecimal("640000.00"));
+        updateContract.setPaidAmount(new BigDecimal("9999.99"));
+        updateContract.setSettlementAmount(new BigDecimal("8888.88"));
+        updateContract.setTaxRate(new BigDecimal("13.00"));
+        updateContract.setTaxAmount(new BigDecimal("73628.32"));
+        updateContract.setAmountWithoutTax(new BigDecimal("566371.68"));
+        updateContract.setApprovalStatus("APPROVED");
+        updateContract.setCostGeneratedFlag(0);
+        updateContract.setContractStatus("DRAFT");
+
+        ContractSaveRequest request = new ContractSaveRequest();
+        request.setContract(updateContract);
+
+        Long savedId = contractService.compositeSave(request);
+        assertEquals(id, savedId);
+
+        CtContract after = contractMapper.selectById(id);
+        assertEquals(existing.getContractCode(), after.getContractCode());
+        assertEquals(0, existing.getPaidAmount().compareTo(after.getPaidAmount()));
+        assertEquals(0, existing.getSettlementAmount().compareTo(after.getSettlementAmount()));
+        assertEquals(existing.getCostGeneratedFlag(), after.getCostGeneratedFlag());
+        assertEquals(ContractStatusConstants.APPROVAL_DRAFT, after.getApprovalStatus());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("复合保存 — 清单与付款条款合计不一致时整体回滚")
+    void testCompositeSaveRejectsMismatchedTotals() {
+        CtContract contract = buildDraftContract("复合保存金额对账失败");
+        CtContractItem item = buildItem("CI-MISMATCH-001", "金额不一致清单",
+                new BigDecimal("100.00"), new BigDecimal("450.00"));
+        CtContractPaymentTerm term = buildTerm("付款条款", new BigDecimal("50.00"), 1);
+        term.setPaymentAmount(new BigDecimal("100.00"));
+
+        ContractSaveRequest request = new ContractSaveRequest();
+        request.setContract(contract);
+        request.setItems(List.of(item));
+        request.setPaymentTerms(List.of(term));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.compositeSave(request));
+        assertEquals("CONTRACT_ITEMS_TOTAL_MISMATCH", error.getCode());
+        assertEquals(0L, contractMapper.selectCount(new LambdaQueryWrapper<CtContract>()
+                .eq(CtContract::getContractName, "复合保存金额对账失败")));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("提交审批 — 旧 version 提交抛 CONTRACT_VERSION_CONFLICT")
+    void testSubmitRejectsStaleVersion() {
+        Long id = insertDraftContract("提交审批版本冲突");
+        CtContract existing = contractMapper.selectById(id);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.submitForApproval(id, existing.getVersion() + 1));
+        assertEquals("CONTRACT_VERSION_CONFLICT", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("更新 — 缺少 version 抛 CONTRACT_VERSION_REQUIRED")
+    void testUpdateRequiresVersion() {
+        Long id = insertDraftContract("更新缺少版本");
+
+        CtContract update = buildDraftContract("更新缺少版本-修改");
+        update.setId(id);
+        update.setVersion(null);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.update(update));
+        assertEquals("CONTRACT_VERSION_REQUIRED", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("复合保存更新 — 缺少 version 抛 CONTRACT_VERSION_REQUIRED")
+    void testCompositeSaveUpdateRequiresVersion() {
+        Long id = insertDraftContract("复合更新缺少版本");
+
+        CtContract updateContract = buildDraftContract("复合更新缺少版本-修改");
+        updateContract.setId(id);
+        updateContract.setVersion(null);
+
+        ContractSaveRequest request = new ContractSaveRequest();
+        request.setContract(updateContract);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.compositeSave(request));
+        assertEquals("CONTRACT_VERSION_REQUIRED", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("提交审批 — 缺少 version 抛 CONTRACT_VERSION_REQUIRED")
+    void testSubmitRequiresVersion() {
+        Long id = insertDraftContract("提交缺少版本");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.submitForApproval(id));
+        assertEquals("CONTRACT_VERSION_REQUIRED", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("创建 — 当前金额为负数抛 CONTRACT_CURRENT_AMOUNT_INVALID")
+    void testCreateRejectsNegativeCurrentAmount() {
+        CtContract contract = buildDraftContract("负当前金额合同");
+        contract.setCurrentAmount(new BigDecimal("-1.00"));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.create(contract));
+        assertEquals("CONTRACT_CURRENT_AMOUNT_INVALID", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("创建 — 头部税额拆分不一致抛 CONTRACT_AMOUNT_BREAKDOWN_MISMATCH")
+    void testCreateRejectsMismatchedAmountBreakdown() {
+        CtContract contract = buildDraftContract("头部拆分不一致合同");
+        contract.setTaxAmount(new BigDecimal("1.00"));
+        contract.setAmountWithoutTax(new BigDecimal("2.00"));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.create(contract));
+        assertEquals("CONTRACT_AMOUNT_BREAKDOWN_MISMATCH", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("创建 — 开始日期晚于结束日期抛 CONTRACT_DATE_INVALID")
+    void testCreateRejectsInvalidDateRange() {
+        CtContract contract = buildDraftContract("日期非法合同");
+        contract.setStartDate(LocalDate.of(2026, 12, 31));
+        contract.setEndDate(LocalDate.of(2026, 1, 1));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.create(contract));
+        assertEquals("CONTRACT_DATE_INVALID", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("更新 — 头部日期非法同样走核心校验")
+    void testUpdateReusesCoreDateValidation() {
+        Long id = insertDraftContract("更新日期非法合同");
+        CtContract existing = contractMapper.selectById(id);
+
+        CtContract update = buildDraftContract("更新日期非法合同-修改");
+        update.setId(id);
+        update.setVersion(existing.getVersion());
+        update.setSignedDate(LocalDate.of(2027, 1, 1));
+        update.setEndDate(LocalDate.of(2026, 12, 31));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.update(update));
+        assertEquals("CONTRACT_SIGNED_DATE_INVALID", error.getCode());
+    }
+
+    private void insertPayApplication(Long id, Long contractId, BigDecimal amount) {
+        if (payApplicationMapper.selectById(id) != null) {
+            return;
+        }
+        com.cgcpms.payment.entity.PayApplication application = new com.cgcpms.payment.entity.PayApplication();
+        application.setId(id);
+        application.setTenantId(TENANT_ID);
+        application.setProjectId(PROJECT_ID);
+        application.setContractId(contractId);
+        application.setPartnerId(PARTY_B_ID);
+        application.setApplyCode("TEST-PAY-" + id);
+        application.setApplyAmount(amount);
+        application.setApprovedAmount(amount);
+        application.setActualPayAmount(BigDecimal.ZERO);
+        application.setPayType("TEST");
+        application.setPayStatus("PENDING");
+        application.setApprovalStatus("APPROVED");
+        application.setIntegrityVersion("LEGACY_UNVERIFIED");
+        application.setVersion(0);
+        payApplicationMapper.insert(application);
     }
 }

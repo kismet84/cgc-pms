@@ -610,69 +610,183 @@ onBeforeUnmount(() => {
         </V2Card>
       </div>
       <V2Card title="版本、会审与 RFI" subtitle="可用操作随业务阶段变化">
-        <div class="technical-page__grid">
-          <article
-            v-for="version in overview.versions"
-            :key="version.id"
-            class="technical-page__item"
-          >
-            <strong>{{ versionLabel(version.id) }}</strong
-            ><V2Badge :tone="tone(version.status)">{{ deliveryLabel(version.status) }}</V2Badge
-            ><V2Button
-              v-if="canDrawingReview && version.status === 'RECEIVED'"
-              size="small"
-              @click="show('review', version)"
-              >登记会审</V2Button
-            >
-          </article>
-          <article v-for="review in overview.reviews" :key="review.id" class="technical-page__item">
-            <strong>{{ review.reviewCode }} · {{ deliveryLabel(review.conclusion) }}</strong
-            ><V2Badge :tone="tone(review.status)">{{ deliveryLabel(review.status) }}</V2Badge
-            ><V2Button
-              v-if="canDrawingReview && review.status === 'DRAFT'"
-              size="small"
-              @click="act(() => confirmDrawingReview(review.id), '会审已确认')"
-              >确认会审</V2Button
-            ><V2Button
-              v-if="canRfiRaise && review.status === 'CONFIRMED' && Boolean(review.requiresRfi)"
-              size="small"
-              @click="show('rfi', review)"
-              >发起 RFI</V2Button
-            >
-          </article>
-          <article v-for="rfi in overview.rfis" :key="rfi.id" class="technical-page__item">
-            <strong>{{ rfi.rfiCode }} · {{ rfi.subject }}</strong
-            ><V2Badge :tone="tone(rfi.status)">{{ deliveryLabel(rfi.status) }}</V2Badge
-            ><V2Button
-              v-if="canRfiRaise && rfi.status === 'DRAFT'"
-              size="small"
-              @click="act(() => submitTechnicalRfi(rfi.id), 'RFI 已提交')"
-              >提交 RFI</V2Button
-            ><V2Button
-              v-if="canRfiRespond && rfi.status === 'SUBMITTED'"
-              size="small"
-              @click="show('response', rfi)"
-              >设计回复</V2Button
-            >
-          </article>
-          <article
-            v-for="response in overview.responses"
-            :key="response.id"
-            class="technical-page__item"
-          >
-            <strong
-              >{{ response.responderName }} ·
-              {{ response.changeRequired ? '要求改版' : '无需改版' }}</strong
-            ><V2Badge :tone="tone(response.reviewStatus ?? response.status)">{{
-              deliveryLabel(response.reviewStatus ?? response.status)
-            }}</V2Badge
-            ><V2Button
-              v-if="canRfiAccept && (response.reviewStatus ?? response.status) === 'SUBMITTED'"
-              size="small"
-              @click="show('responseReview', response)"
-              >接受/驳回</V2Button
-            >
-          </article>
+        <div class="technical-page__record-sections">
+          <section aria-labelledby="technical-version-title">
+            <h3 id="technical-version-title">图纸版本</h3>
+            <div v-if="overview.versions.length" class="technical-page__table-wrap">
+              <table class="technical-page__table" aria-labelledby="technical-version-title">
+                <thead>
+                  <tr>
+                    <th scope="col">版本</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="version in overview.versions" :key="version.id">
+                    <td>{{ versionLabel(version.id) }}</td>
+                    <td>
+                      <V2Badge :tone="tone(version.status)">{{
+                        deliveryLabel(version.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>
+                      <V2Button
+                        v-if="canDrawingReview && version.status === 'RECEIVED'"
+                        size="small"
+                        @click="show('review', version)"
+                        >登记会审</V2Button
+                      >
+                      <span v-else>—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无图纸版本。</p>
+          </section>
+
+          <section aria-labelledby="technical-review-title">
+            <h3 id="technical-review-title">图纸会审</h3>
+            <div v-if="overview.reviews.length" class="technical-page__table-wrap">
+              <table class="technical-page__table" aria-labelledby="technical-review-title">
+                <thead>
+                  <tr>
+                    <th scope="col">会审记录</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="review in overview.reviews" :key="review.id">
+                    <td>{{ review.reviewCode }} · {{ deliveryLabel(review.conclusion) }}</td>
+                    <td>
+                      <V2Badge :tone="tone(review.status)">{{
+                        deliveryLabel(review.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>
+                      <div class="technical-page__actions">
+                        <V2Button
+                          v-if="canDrawingReview && review.status === 'DRAFT'"
+                          size="small"
+                          @click="act(() => confirmDrawingReview(review.id), '会审已确认')"
+                          >确认会审</V2Button
+                        ><V2Button
+                          v-if="
+                            canRfiRaise &&
+                            review.status === 'CONFIRMED' &&
+                            Boolean(review.requiresRfi)
+                          "
+                          size="small"
+                          @click="show('rfi', review)"
+                          >发起 RFI</V2Button
+                        ><span
+                          v-if="
+                            !(
+                              (canDrawingReview && review.status === 'DRAFT') ||
+                              (canRfiRaise &&
+                                review.status === 'CONFIRMED' &&
+                                Boolean(review.requiresRfi))
+                            )
+                          "
+                          >—</span
+                        >
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无会审记录。</p>
+          </section>
+
+          <section aria-labelledby="technical-rfi-title">
+            <h3 id="technical-rfi-title">RFI 记录</h3>
+            <div v-if="overview.rfis.length" class="technical-page__table-wrap">
+              <table class="technical-page__table" aria-labelledby="technical-rfi-title">
+                <thead>
+                  <tr>
+                    <th scope="col">编号 / 主题</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="rfi in overview.rfis" :key="rfi.id">
+                    <td>{{ rfi.rfiCode }} · {{ rfi.subject }}</td>
+                    <td>
+                      <V2Badge :tone="tone(rfi.status)">{{ deliveryLabel(rfi.status) }}</V2Badge>
+                    </td>
+                    <td>
+                      <div class="technical-page__actions">
+                        <V2Button
+                          v-if="canRfiRaise && rfi.status === 'DRAFT'"
+                          size="small"
+                          @click="act(() => submitTechnicalRfi(rfi.id), 'RFI 已提交')"
+                          >提交 RFI</V2Button
+                        ><V2Button
+                          v-if="canRfiRespond && rfi.status === 'SUBMITTED'"
+                          size="small"
+                          @click="show('response', rfi)"
+                          >设计回复</V2Button
+                        ><span
+                          v-if="
+                            !(
+                              (canRfiRaise && rfi.status === 'DRAFT') ||
+                              (canRfiRespond && rfi.status === 'SUBMITTED')
+                            )
+                          "
+                          >—</span
+                        >
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无 RFI 记录。</p>
+          </section>
+
+          <section aria-labelledby="technical-response-title">
+            <h3 id="technical-response-title">设计回复</h3>
+            <div v-if="overview.responses.length" class="technical-page__table-wrap">
+              <table class="technical-page__table" aria-labelledby="technical-response-title">
+                <thead>
+                  <tr>
+                    <th scope="col">回复人 / 结论</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="response in overview.responses" :key="response.id">
+                    <td>
+                      {{ response.responderName }} ·
+                      {{ response.changeRequired ? '要求改版' : '无需改版' }}
+                    </td>
+                    <td>
+                      <V2Badge :tone="tone(response.reviewStatus ?? response.status)">{{
+                        deliveryLabel(response.reviewStatus ?? response.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>
+                      <V2Button
+                        v-if="
+                          canRfiAccept && (response.reviewStatus ?? response.status) === 'SUBMITTED'
+                        "
+                        size="small"
+                        @click="show('responseReview', response)"
+                        >接受/驳回</V2Button
+                      >
+                      <span v-else>—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无设计回复。</p>
+          </section>
         </div>
       </V2Card>
       <V2Card title="交底、施工依据与验收归档" subtitle="归档只接受已提交且通过的质量检查事实">
@@ -965,6 +1079,43 @@ onBeforeUnmount(() => {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: var(--v2-space-3);
 }
+.technical-page__record-sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-4);
+}
+.technical-page__record-sections section {
+  min-width: 0;
+}
+.technical-page__record-sections h3 {
+  margin: 0 0 var(--v2-space-2);
+  color: var(--v2-color-text-strong);
+  font-size: var(--v2-font-size-15);
+  font-weight: var(--v2-font-weight-semibold);
+}
+.technical-page__table-wrap {
+  overflow-x: auto;
+}
+.technical-page__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.technical-page__table th,
+.technical-page__table td {
+  padding: var(--v2-space-2) var(--v2-space-3);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+  text-align: left;
+  vertical-align: middle;
+}
+.technical-page__table th {
+  color: var(--v2-color-text-secondary);
+  font-weight: var(--v2-font-weight-semibold);
+}
+.technical-page__table th:last-child,
+.technical-page__table td:last-child {
+  width: 1%;
+  white-space: nowrap;
+}
 .technical-page__stack,
 .technical-page__item {
   display: grid;
@@ -1032,13 +1183,15 @@ onBeforeUnmount(() => {
   grid-column: 1 / -1;
 }
 @media (max-width: 64rem) {
-  .technical-page__grid {
+  .technical-page__grid,
+  .technical-page__record-sections {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 40rem) {
   .technical-page__columns,
   .technical-page__grid,
+  .technical-page__record-sections,
   .technical-page__form {
     grid-template-columns: 1fr;
   }

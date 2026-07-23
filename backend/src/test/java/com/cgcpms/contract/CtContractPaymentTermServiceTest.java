@@ -129,6 +129,23 @@ class CtContractPaymentTermServiceTest {
     }
 
     @Test
+    @DisplayName("按合同查询 — 无项目权限时拒绝访问")
+    void testGetByContractIdProjectAccessDenied() {
+        jdbcTemplate.update("UPDATE pm_project SET created_by = ?, project_manager_id = NULL WHERE id = ?",
+                2L, 10001L);
+
+        UserContext.set(Jwts.claims()
+                .add("userId", 3L)
+                .add("username", "no-project-access")
+                .add("tenantId", TENANT_0)
+                .add("roleCodes", List.of())
+                .build());
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> termService.getByContractId(draftContractId));
+        assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
+    }
+
+    @Test
     @DisplayName("按合同查询 — 按 sortOrder 升序排列")
     void testGetByContractIdOrderBySortOrder() {
         CtContractPaymentTerm t1 = buildDraftTerm("排序条款1");

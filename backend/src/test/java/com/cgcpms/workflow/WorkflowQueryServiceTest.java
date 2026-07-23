@@ -1070,7 +1070,7 @@ class WorkflowQueryServiceTest {
                 contractId, TENANT_0, PROJECT_ID,
                 "WQ-CONTRACT-" + contractId, "审批查询测试合同-" + contractId, "SUB",
                 20001L, 20002L, new BigDecimal("500.00"), new BigDecimal("500.00"), BigDecimal.ZERO,
-                "DRAFT", "DRAFT", USER_ADMIN, USER_ADMIN);
+                "DRAFT", "APPROVING", USER_ADMIN, USER_ADMIN);
     }
 
     private void insertParticipantTask(Long approverId) {

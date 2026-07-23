@@ -433,7 +433,7 @@ onBeforeUnmount(() => {
           </table>
         </div>
         <template #footer>
-          <div class="workflow-pagination">
+          <nav class="workflow-pagination" aria-label="审批任务分页">
             <div>
               <V2Button size="small" variant="ghost" :disabled="pageNo <= 1" @click="changePage(-1)"
                 >上一页</V2Button
@@ -447,7 +447,7 @@ onBeforeUnmount(() => {
                 >下一页</V2Button
               >
             </div>
-          </div>
+          </nav>
         </template>
       </V2Card>
     </template>

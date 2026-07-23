@@ -27,6 +27,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -316,11 +317,48 @@ class CostSummaryServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("TC13-1: updatePaidAmount 只更新今日快照，历史不可变")
+    void testUpdatePaidAmountOnlyTouchesCurrentSnapshot() {
+        CostSummary yesterday = summaryRow(8000101L, LocalDate.now().minusDays(1), "7.00");
+        CostSummary today = summaryRow(8000102L, LocalDate.now(), "8.00");
+        costSummaryMapper.insert(yesterday);
+        costSummaryMapper.insert(today);
+
+        PayApplication app = new PayApplication();
+        app.setId(80001L); app.setTenantId(TENANT_ID); app.setProjectId(testProjectId);
+        app.setApplyCode("PAY-HISTORY-IMMUTABLE"); app.setPayType("进度款");
+        app.setApplyAmount(new BigDecimal("123.45")); app.setPayStatus("APPROVED"); app.setApprovalStatus("APPROVED");
+        payApplicationMapper.insert(app);
+        PayRecord record = new PayRecord();
+        record.setId(80001L); record.setTenantId(TENANT_ID); record.setProjectId(testProjectId);
+        record.setPayApplicationId(80001L); record.setPayAmount(new BigDecimal("123.45"));
+        record.setPayDate(LocalDate.now()); record.setPayStatus("SUCCESS");
+        payRecordMapper.insert(record);
+
+        costSummaryService.updatePaidAmount(TENANT_ID, testProjectId);
+
+        assertEquals(0, new BigDecimal("7.00").compareTo(costSummaryMapper.selectById(8000101L).getPaidAmount()));
+        assertEquals(0, new BigDecimal("123.45").compareTo(costSummaryMapper.selectById(8000102L).getPaidAmount()));
+    }
+
+    @Test
+    @Transactional
     @DisplayName("TC14: updatePaidAmount — projectId 不存在时也不抛异常")
     void testUpdatePaidAmount_ProjectNotExist() {
         // updatePaidAmount 只更新匹配条件行，不存在时 update count=0 不抛异常
         assertDoesNotThrow(() -> costSummaryService.updatePaidAmount(TENANT_ID, 999999L),
                 "项目不存在时 updatePaidAmount 应优雅降级");
+    }
+
+    private CostSummary summaryRow(long id, LocalDate date, String paid) {
+        CostSummary row = new CostSummary();
+        row.setId(id); row.setTenantId(TENANT_ID); row.setProjectId(testProjectId); row.setSummaryDate(date);
+        row.setTargetCost(BigDecimal.ZERO); row.setContractLockedCost(BigDecimal.ZERO); row.setActualCost(BigDecimal.ZERO);
+        row.setPaidAmount(new BigDecimal(paid)); row.setEstimatedRemainingCost(BigDecimal.ZERO); row.setDynamicCost(BigDecimal.ZERO);
+        row.setContractIncome(BigDecimal.ZERO); row.setConfirmedRevenue(BigDecimal.ZERO); row.setExpectedProfit(BigDecimal.ZERO);
+        row.setCostDeviation(BigDecimal.ZERO); row.setResponsibilityCost(BigDecimal.ZERO);
+        row.setForecastAtCompletionCost(BigDecimal.ZERO); row.setForecastProfit(BigDecimal.ZERO); row.setProfitMargin(BigDecimal.ZERO);
+        return row;
     }
 
     // ═══════════════════════════════════════════════════════════════

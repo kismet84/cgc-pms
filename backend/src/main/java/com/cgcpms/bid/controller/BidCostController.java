@@ -10,7 +10,10 @@ import com.cgcpms.common.result.PageResult;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/bid-cost")
@@ -25,8 +28,11 @@ public class BidCostController {
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
             @RequestParam(required = false) String bidStatus,
-            @RequestParam(required = false) String keyword) {
-        IPage<BidCost> page = service.getPage(pageNo, pageSize, bidStatus, keyword);
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+        IPage<BidCost> page = service.getPage(pageNo, pageSize, bidStatus, keyword, projectId, startDate, endDate);
         return ApiResponse.success(PageResult.of(page));
     }
 

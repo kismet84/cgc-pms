@@ -44,6 +44,8 @@ class CostTargetControllerTest {
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
     private static final long PROJECT_ID = 10001L;
+    private static final long ACTION_USER_ID = 33001L;
+    private static final long OUTSIDER_USER_ID = 33002L;
     private static final long[] SUBJECT_IDS = {101L, 102L, 103L, 201L, 202L, 301L, 302L};
     private static final String TEST_VERSION = "V1.0-TEST-" + Long.toUnsignedString(System.nanoTime());
 
@@ -80,12 +82,33 @@ class CostTargetControllerTest {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
+    private Cookie authorityCookie(long userId, String username, String... authorities) {
+        String token = jwtUtils.generateToken(userId, username, TENANT_ID, List.of(), List.of(authorities));
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
+    }
+
     @BeforeEach
     void seedAdminUser() {
         jdbcTemplate.update(
                 "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
                 "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
+        jdbcTemplate.update("""
+                INSERT INTO sys_user (id,tenant_id,username,password,real_name,status,is_admin,created_by,deleted_flag)
+                SELECT ?,0,'cost.action.user','x','目标成本动作用户','ENABLE',0,1,0
+                WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id=?)
+                """, ACTION_USER_ID, ACTION_USER_ID);
+        jdbcTemplate.update("""
+                INSERT INTO sys_user (id,tenant_id,username,password,real_name,status,is_admin,created_by,deleted_flag)
+                SELECT ?,0,'cost.outsider','x','目标成本越权用户','ENABLE',0,1,0
+                WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id=?)
+                """, OUTSIDER_USER_ID, OUTSIDER_USER_ID);
+        jdbcTemplate.update("""
+                INSERT INTO pm_project_member
+                  (id,tenant_id,project_id,user_id,role_code,position_name,start_date,status,created_by,deleted_flag)
+                SELECT 33003,0,?,?,'CSTM','成本经理',CURRENT_DATE,'ACTIVE',1,0
+                WHERE NOT EXISTS (SELECT 1 FROM pm_project_member WHERE id=33003)
+                """, PROJECT_ID, ACTION_USER_ID);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -188,7 +211,7 @@ class CostTargetControllerTest {
                 .andExpect(jsonPath("$.data.projectId").value(String.valueOf(PROJECT_ID)))
                 .andExpect(jsonPath("$.data.versionNo").value(TEST_VERSION))
                 .andExpect(jsonPath("$.data.versionName").value("测试版本"))
-                .andExpect(jsonPath("$.data.totalTargetAmount").value(500000.00))
+                .andExpect(jsonPath("$.data.totalTargetAmount").value("500000.00"))
                 .andExpect(jsonPath("$.data.isActive").value(0))
                 .andExpect(jsonPath("$.data.approvalStatus").value("DRAFT"))
                 .andExpect(jsonPath("$.data.status").value("DRAFT"))
@@ -199,6 +222,28 @@ class CostTargetControllerTest {
     // ═══════════════════════════════════════════════════════════════
     // T3: GET items — empty list
     // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @Order(5)
+    @DisplayName("T2d: PUT /cost-targets/{id} accepts writable client version")
+    void testUpdateCostTarget_UsesClientVersion() throws Exception {
+        String body = """
+                {
+                    "projectId": "%d",
+                    "versionNo": "%s",
+                    "versionName": "测试版本已编辑",
+                    "totalTargetAmount": "500000.00",
+                    "version": %s
+                }
+                """.formatted(PROJECT_ID, TEST_VERSION, currentVersion(testTargetId));
+
+        mockMvc.perform(putWithApiContext("/cost-targets/" + testTargetId)
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
 
     @Test
     @Order(5)
@@ -231,6 +276,7 @@ class CostTargetControllerTest {
                 """;
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
                         .cookie(adminCookie())
+                        .param("version", currentVersion(testTargetId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(items))
                 .andExpect(status().isOk())
@@ -254,7 +300,7 @@ class CostTargetControllerTest {
                 .andExpect(jsonPath("$.data.length()").value(3))
                 .andExpect(jsonPath("$.data[0].id").exists())
                 .andExpect(jsonPath("$.data[0].costSubjectId").value("101"))
-                .andExpect(jsonPath("$.data[0].targetAmount").value(100000.00))
+                .andExpect(jsonPath("$.data[0].targetAmount").value("100000.00"))
                 .andExpect(jsonPath("$.data[0].targetId").value(String.valueOf(testTargetId)))
                 .andExpect(jsonPath("$.data[0].projectId").value(String.valueOf(PROJECT_ID)))
                 .andExpect(jsonPath("$.data[0].tenantId").doesNotExist())
@@ -278,6 +324,7 @@ class CostTargetControllerTest {
                 """;
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
                         .cookie(adminCookie())
+                        .param("version", currentVersion(testTargetId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(items))
                 .andExpect(status().isOk())
@@ -304,10 +351,39 @@ class CostTargetControllerTest {
                 """;
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
                         .cookie(adminCookie())
+                        .param("version", currentVersion(testTargetId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(items))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COST_TARGET_AMOUNT_MISMATCH"));
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("generic workflow submit cannot bypass target-cost version route")
+    void testGenericWorkflowSubmitFailsWithoutMutation() throws Exception {
+        int version = Integer.parseInt(currentVersion(testTargetId));
+        String statusBefore = jdbcTemplate.queryForObject(
+                "SELECT approval_status FROM cost_target WHERE id=?", String.class, testTargetId);
+        long instancesBefore = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM wf_instance WHERE business_type='COST_TARGET' AND business_id=?",
+                Long.class, testTargetId);
+        String body = """
+                {"businessType":"COST_TARGET","businessId":"%s","title":"绕过提交",
+                 "amount":"500000.00","projectId":"%s"}
+                """.formatted(testTargetId, PROJECT_ID);
+
+        mockMvc.perform(postWithApiContext("/workflow/submit")
+                        .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COST_TARGET_DEDICATED_SUBMIT_REQUIRED"));
+
+        Assertions.assertEquals(version, Integer.parseInt(currentVersion(testTargetId)));
+        Assertions.assertEquals(statusBefore, jdbcTemplate.queryForObject(
+                "SELECT approval_status FROM cost_target WHERE id=?", String.class, testTargetId));
+        Assertions.assertEquals(instancesBefore, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM wf_instance WHERE business_type='COST_TARGET' AND business_id=?",
+                Long.class, testTargetId));
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -320,7 +396,8 @@ class CostTargetControllerTest {
     void testSubmitForApproval() throws Exception {
         ensureDraftTargetExists();
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/submit")
-                        .cookie(adminCookie()))
+                        .cookie(adminCookie())
+                        .param("version", currentVersion(testTargetId)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
     }
@@ -335,7 +412,8 @@ class CostTargetControllerTest {
     void testSubmitForApproval_Duplicate() throws Exception {
         ensureSubmittedTargetExists();
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/submit")
-                        .cookie(adminCookie()))
+                        .cookie(adminCookie())
+                        .param("version", currentVersion(testTargetId)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COST_TARGET_ALREADY_SUBMITTED"));
     }
@@ -393,12 +471,100 @@ class CostTargetControllerTest {
         Assertions.assertTrue(idFromList.matches("\\d+"), "List response should contain string id");
 
         mockMvc.perform(deleteWithApiContext("/cost-targets/" + idFromList)
-                        .cookie(adminCookie()))
+                        .cookie(adminCookie())
+                        .param("version", currentVersion(Long.parseLong(idFromList))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
 
         mockMvc.perform(getWithApiContext("/cost-targets/" + idFromList)
                         .cookie(adminCookie()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("COST_TARGET_NOT_FOUND"));
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("ordinary action authorities pass security while read-only authority is 403")
+    void testOrdinaryActionPermissionsAndReadOnlyDenials() throws Exception {
+        String versionNo = "V-ACTION-" + System.nanoTime();
+        String createBody = """
+                {"projectId":"%s","versionNo":"%s","versionName":"普通角色新建",
+                 "totalTargetAmount":"10.00"}
+                """.formatted(PROJECT_ID, versionNo);
+        String response = mockMvc.perform(postWithApiContext("/cost-targets")
+                        .cookie(authorityCookie(ACTION_USER_ID, "cost.action.user", "cost:target:add"))
+                        .contentType(MediaType.APPLICATION_JSON).content(createBody))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        long createdId = Long.parseLong(response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+        try {
+            assertActionPassesSecurity("cost:target:edit", putWithApiContext("/cost-targets/99999999")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("{\"projectId\":\"10001\",\"versionNo\":\"X\",\"versionName\":\"X\",\"totalTargetAmount\":\"1.00\",\"version\":0}"));
+            assertActionPassesSecurity("cost:target:delete", deleteWithApiContext("/cost-targets/99999999").param("version", "0"));
+            assertActionPassesSecurity("cost:target:submit", postWithApiContext("/cost-targets/99999999/submit").param("version", "0"));
+            assertActionPassesSecurity("cost:target:activate", postWithApiContext("/cost-targets/99999999/activate").param("version", "0"));
+
+            Cookie readOnly = authorityCookie(ACTION_USER_ID, "cost.action.user", "cost:target:query");
+            mockMvc.perform(postWithApiContext("/cost-targets").cookie(readOnly)
+                            .contentType(MediaType.APPLICATION_JSON).content(createBody)).andExpect(status().isForbidden());
+            mockMvc.perform(putWithApiContext("/cost-targets/99999999").cookie(readOnly)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"projectId\":\"10001\",\"versionNo\":\"X\",\"versionName\":\"X\",\"totalTargetAmount\":\"1.00\",\"version\":0}"))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(deleteWithApiContext("/cost-targets/99999999").cookie(readOnly).param("version", "0"))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(postWithApiContext("/cost-targets/99999999/submit").cookie(readOnly).param("version", "0"))
+                    .andExpect(status().isForbidden());
+            mockMvc.perform(postWithApiContext("/cost-targets/99999999/activate").cookie(readOnly).param("version", "0"))
+                    .andExpect(status().isForbidden());
+        } finally {
+            jdbcTemplate.update("DELETE FROM cost_target WHERE id=?", createdId);
+        }
+    }
+
+    @Test
+    @Order(15)
+    @DisplayName("project outsider fails closed on target detail")
+    void testProjectOutsiderDenied() throws Exception {
+        mockMvc.perform(getWithApiContext("/cost-targets/" + testTargetId)
+                        .cookie(authorityCookie(OUTSIDER_USER_ID, "cost.outsider", "cost:target:query")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+    }
+
+    @Test
+    @Order(16)
+    @DisplayName("activate endpoint keeps one active version per project")
+    void testActivateEndpointKeepsUniqueActiveVersion() throws Exception {
+        long firstId = 3399101L;
+        long secondId = 3399102L;
+        jdbcTemplate.update("DELETE FROM cost_target WHERE id IN (?,?)", firstId, secondId);
+        jdbcTemplate.update("""
+                INSERT INTO cost_target
+                  (id,tenant_id,project_id,version_no,version_name,total_target_amount,total_bid_cost_amount,
+                   total_responsibility_amount,is_active,approval_status,status,version,deleted_flag)
+                VALUES (?,0,?,'V-ACT-1','激活一',1,1,1,0,'APPROVED','APPROVED',0,0),
+                       (?,0,?,'V-ACT-2','激活二',1,1,1,0,'APPROVED','APPROVED',0,0)
+                """, firstId, PROJECT_ID, secondId, PROJECT_ID);
+        try {
+            mockMvc.perform(postWithApiContext("/cost-targets/" + firstId + "/activate")
+                            .cookie(adminCookie()).param("version", "0"))
+                    .andExpect(status().isOk());
+            mockMvc.perform(postWithApiContext("/cost-targets/" + secondId + "/activate")
+                            .cookie(adminCookie()).param("version", "0"))
+                    .andExpect(status().isOk());
+            Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM cost_target WHERE tenant_id=0 AND project_id=? AND is_active=1 AND deleted_flag=0",
+                    Integer.class, PROJECT_ID));
+            Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+                    "SELECT is_active FROM cost_target WHERE id=?", Integer.class, secondId));
+        } finally {
+            jdbcTemplate.update("DELETE FROM cost_target WHERE id IN (?,?)", firstId, secondId);
+        }
+    }
+
+    private void assertActionPassesSecurity(String authority, MockHttpServletRequestBuilder request) throws Exception {
+        mockMvc.perform(request.cookie(authorityCookie(ACTION_USER_ID, "cost.action.user", authority)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("COST_TARGET_NOT_FOUND"));
     }
@@ -411,6 +577,10 @@ class CostTargetControllerTest {
 
     private MockHttpServletRequestBuilder postWithApiContext(String pathWithinContext) {
         return post("/api" + pathWithinContext).contextPath("/api");
+    }
+
+    private MockHttpServletRequestBuilder putWithApiContext(String pathWithinContext) {
+        return put("/api" + pathWithinContext).contextPath("/api");
     }
 
     private MockHttpServletRequestBuilder deleteWithApiContext(String pathWithinContext) {
@@ -453,6 +623,7 @@ class CostTargetControllerTest {
                 """;
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
                         .cookie(adminCookie())
+                        .param("version", currentVersion(testTargetId))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(items))
                 .andExpect(status().isOk())
@@ -467,9 +638,15 @@ class CostTargetControllerTest {
                 testTargetId);
         if ("DRAFT".equals(approvalStatus)) {
             mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/submit")
-                            .cookie(adminCookie()))
+                            .cookie(adminCookie())
+                            .param("version", currentVersion(testTargetId)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value("0"));
         }
+    }
+
+    private String currentVersion(Long targetId) {
+        return String.valueOf(jdbcTemplate.queryForObject(
+                "SELECT version FROM cost_target WHERE id=? AND deleted_flag=0", Integer.class, targetId));
     }
 }

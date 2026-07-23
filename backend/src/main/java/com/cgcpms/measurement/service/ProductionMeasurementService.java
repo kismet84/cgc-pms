@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -53,23 +54,28 @@ public class ProductionMeasurementService {
         return period(id);
     }
 
-    public List<Map<String, Object>> periods(Long projectId, Long contractId) {
+    public List<Map<String, Object>> periods(Long projectId, Long contractId, LocalDate startDate, LocalDate endDate) {
         if (projectId == null) return List.of();
+        validateDateWindow(startDate, endDate);
         projectAccessChecker.checkAccess(projectId, "查看计量周期");
         return jdbc.queryForList("""
                 SELECT p.* FROM measurement_period p
                  WHERE p.tenant_id=? AND p.deleted_flag=0
                    AND (? IS NULL OR p.project_id=?) AND (? IS NULL OR p.contract_id=?)
+                   AND (? IS NULL OR p.end_date>=?) AND (? IS NULL OR p.start_date<=?)
                  ORDER BY p.start_date DESC,p.id DESC
-                """, tenant(), projectId, projectId, contractId, contractId);
+                """, tenant(), projectId, projectId, contractId, contractId,
+                startDate, startDate, endDate, endDate);
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> closePeriod(Long id) {
+    public Map<String, Object> closePeriod(Long id, Integer version) {
         Map<String, Object> row = requirePeriod(id, true);
+        requireVersion(version, row, "MEASUREMENT_PERIOD");
         Integer active = jdbc.queryForObject("SELECT COUNT(*) FROM production_measurement WHERE tenant_id=? AND period_id=? AND deleted_flag=0 AND status IN('DRAFT','REJECTED','PENDING','OWNER_SUBMITTED')", Integer.class, tenant(), id);
         if (active != null && active > 0) throw error("MEASUREMENT_PERIOD_HAS_ACTIVE_DOCUMENT", "存在未完成计量或业主报量，周期不能关闭");
-        jdbc.update("UPDATE measurement_period SET status='CLOSED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='OPEN'", user(), id, tenant());
+        int updated = jdbc.update("UPDATE measurement_period SET status='CLOSED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='OPEN' AND version=?", user(), id, tenant(), version);
+        if (updated != 1) throw error("MEASUREMENT_PERIOD_CONCURRENT_UPDATE", "计量周期版本冲突，请刷新后重试");
         return period(longValue(row.get("id")));
     }
 
@@ -92,7 +98,7 @@ public class ProductionMeasurementService {
             row.put("approvedQuantity", measured); row.put("remainingQuantity", quantity(BigDecimal.ONE).subtract(measured));
             result.add(row);
         }
-        return result;
+        return moneyPayload(result);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -126,7 +132,7 @@ public class ProductionMeasurementService {
                      created_by,created_at,updated_by,updated_at,deleted_flag,remark)
                     VALUES(?,?,?,?,?,?,?, ?,?,'DRAFT','DRAFT',?,'PRODUCTION_MEASUREMENT_V1',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
                     """, id, tenant(), request.projectId(), request.contractId(), request.periodId(), "PM-" + id, request.measureDate(),
-                    currentTotal, priorTotal.add(currentTotal), request.attachmentCount(), user(), user(), request.remark());
+                    currentTotal, priorTotal.add(currentTotal), 0, user(), user(), request.remark());
             for (ResolvedLine line : resolved) {
                 jdbc.update("""
                         INSERT INTO production_measurement_line(id,tenant_id,measurement_id,source_type,contract_item_id,contract_change_id,
@@ -136,7 +142,7 @@ public class ProductionMeasurementService {
                         """, IdWorker.getId(), tenant(), id, line.sourceType(), line.contractItemId(), line.contractChangeId(),
                         line.itemCode(), line.itemName(), line.itemSpec(), line.unit(), line.contractQuantity(), line.priorQuantity(),
                         line.currentQuantity(), line.priorQuantity().add(line.currentQuantity()), line.unitPrice(), line.currentAmount(),
-                        money(line.priorQuantity().multiply(line.unitPrice())).add(line.currentAmount()), line.evidenceCount(), sort++, user());
+                        money(line.priorQuantity().multiply(line.unitPrice())).add(line.currentAmount()), 0, sort++, user());
             }
         } catch (DuplicateKeyException e) {
             throw error("MEASUREMENT_PERIOD_DOCUMENT_DUPLICATE", "同一合同周期只能存在一张产值计量单");
@@ -144,14 +150,16 @@ public class ProductionMeasurementService {
         return measurement(id);
     }
 
-    public List<Map<String, Object>> measurements(Long projectId, String status) {
+    public List<Map<String, Object>> measurements(Long projectId, String status, LocalDate startDate, LocalDate endDate) {
         if (projectId == null) return List.of();
+        validateDateWindow(startDate, endDate);
         projectAccessChecker.checkAccess(projectId, "查看产值计量");
-        return jdbc.queryForList("""
+        return moneyPayload(jdbc.queryForList("""
                 SELECT m.*,p.period_code,p.period_name FROM production_measurement m JOIN measurement_period p ON p.id=m.period_id
                  WHERE m.tenant_id=? AND m.deleted_flag=0 AND (? IS NULL OR m.project_id=?) AND (? IS NULL OR m.status=?)
+                   AND (? IS NULL OR m.measure_date>=?) AND (? IS NULL OR m.measure_date<=?)
                  ORDER BY m.measure_date DESC,m.id DESC
-                """, tenant(), projectId, projectId, status, status);
+                """, tenant(), projectId, projectId, status, status, startDate, startDate, endDate, endDate));
     }
 
     public Map<String, Object> measurement(Long id) {
@@ -161,31 +169,48 @@ public class ProductionMeasurementService {
         Map<String, Object> result = new LinkedHashMap<>(header);
         result.put("lines", jdbc.queryForList("SELECT * FROM production_measurement_line WHERE tenant_id=? AND measurement_id=? ORDER BY sort_order,id", tenant(), id));
         result.put("submissions", jdbc.queryForList("SELECT * FROM owner_measurement_submission WHERE tenant_id=? AND measurement_id=? AND deleted_flag=0 ORDER BY revision_no", tenant(), id));
-        return result;
+        return moneyPayload(result);
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> submitMeasurement(Long id) {
+    public Map<String, Object> submitMeasurement(Long id, Integer version) {
         Map<String, Object> row = requireMeasurement(id, true);
+        requireVersion(version, row, "PRODUCTION_MEASUREMENT");
         String status = string(row.get("status"));
         if (!Set.of("DRAFT", "REJECTED").contains(status)) throw error("PRODUCTION_MEASUREMENT_NOT_SUBMITTABLE", "只有草稿或驳回状态可以提交");
         Map<String, Object> period = requirePeriod(longValue(row.get("period_id")), true);
         if (!"OPEN".equals(period.get("status"))) throw error("MEASUREMENT_PERIOD_CLOSED", "计量周期已关闭，禁止提交");
-        if (intValue(row.get("attachment_count")) < 1) throw error("PRODUCTION_MEASUREMENT_ATTACHMENT_REQUIRED", "计量单必须上传总体计量依据");
-        List<Map<String, Object>> lines = jdbc.queryForList("SELECT * FROM production_measurement_line WHERE tenant_id=? AND measurement_id=? ORDER BY id FOR UPDATE", tenant(), id);
-        if (lines.isEmpty()) throw error("PRODUCTION_MEASUREMENT_LINE_REQUIRED", "计量单至少包含一条明细");
-        for (Map<String, Object> line : lines) {
-            if (intValue(line.get("evidence_count")) < 1) throw error("PRODUCTION_MEASUREMENT_LINE_EVIDENCE_REQUIRED", "每条计量明细都必须有现场完成依据");
-            revalidateCapacity(id, line);
-        }
+        int attachmentCount = validateAndSyncEvidence(id);
         WfInstance instance;
         Long existing = longValue(row.get("approval_instance_id"));
-        if ("REJECTED".equals(status) && existing != null) instance = workflowEngine.resubmit(existing, user(), UserContext.getCurrentUsername());
-        else instance = workflowEngine.submit(user(), UserContext.getCurrentUsername(), tenant(), WorkflowBusinessTypes.PRODUCTION_MEASUREMENT,
+        if ("REJECTED".equals(status) && existing != null) instance = workflowEngine.resubmitProductionMeasurement(existing, user(), UserContext.getCurrentUsername());
+        else instance = workflowEngine.submitProductionMeasurement(user(), UserContext.getCurrentUsername(), tenant(), WorkflowBusinessTypes.PRODUCTION_MEASUREMENT,
                 id, string(row.get("measure_code")), decimal(row.get("current_reported_amount")), longValue(row.get("project_id")),
                 longValue(row.get("contract_id")), "产值计量", null, null);
-        jdbc.update("UPDATE production_measurement SET status='PENDING',approval_status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", instance.getId(), user(), id, tenant());
+        int submitted = jdbc.update("UPDATE production_measurement SET status='PENDING',approval_status='PENDING',approval_instance_id=?,attachment_count=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND version=?", instance.getId(), attachmentCount, user(), id, tenant(), version);
+        if (submitted != 1) throw error("PRODUCTION_MEASUREMENT_CONCURRENT_UPDATE", "产值计量版本冲突，请刷新后重试");
         return measurement(id);
+    }
+
+    /** Workflow handler also calls this method so persisted client/count fields can never bypass real-file gates. */
+    @Transactional(rollbackFor = Exception.class)
+    public int validateAndSyncEvidence(Long id) {
+        Map<String, Object> row = requireMeasurement(id, true);
+        if (!Set.of("DRAFT", "REJECTED").contains(string(row.get("status")))) {
+            throw error("PRODUCTION_MEASUREMENT_NOT_SUBMITTABLE", "只有草稿或驳回状态可以提交");
+        }
+        List<Map<String, Object>> lines = jdbc.queryForList("SELECT * FROM production_measurement_line WHERE tenant_id=? AND measurement_id=? ORDER BY id FOR UPDATE", tenant(), id);
+        if (lines.isEmpty()) throw error("PRODUCTION_MEASUREMENT_LINE_REQUIRED", "计量单至少包含一条明细");
+        int attachmentCount = cleanFileCount("PRODUCTION_MEASUREMENT", id, "MEASUREMENT_GENERAL");
+        if (attachmentCount < 1) throw error("PRODUCTION_MEASUREMENT_ATTACHMENT_REQUIRED", "计量单必须上传真实且扫描通过的总体计量依据");
+        for (Map<String, Object> line : lines) {
+            int evidenceCount = cleanFileCount("PRODUCTION_MEASUREMENT", id, "ML_" + line.get("id"));
+            if (evidenceCount < 1) throw error("PRODUCTION_MEASUREMENT_LINE_EVIDENCE_REQUIRED", "每条计量明细都必须有真实且扫描通过的现场完成依据");
+            jdbc.update("UPDATE production_measurement_line SET evidence_count=? WHERE id=? AND tenant_id=?", evidenceCount, line.get("id"), tenant());
+            revalidateCapacity(id, line);
+        }
+        jdbc.update("UPDATE production_measurement SET attachment_count=? WHERE id=? AND tenant_id=?", attachmentCount, id, tenant());
+        return attachmentCount;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -203,11 +228,14 @@ public class ProductionMeasurementService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> submitToOwner(Long measurementId, OwnerSubmissionRequest request) {
+    public Map<String, Object> submitToOwner(Long measurementId, Integer version, OwnerSubmissionRequest request) {
         Map<String, Object> measurement = requireMeasurement(measurementId, true);
+        requireVersion(version, measurement, "PRODUCTION_MEASUREMENT");
         if (!Set.of("INTERNAL_APPROVED", "OWNER_RETURNED").contains(string(measurement.get("status")))) {
             throw error("OWNER_SUBMISSION_MEASUREMENT_STATE_INVALID", "只有内部审批通过或业主退回的计量单可以报送业主");
         }
+        int attachmentCount = cleanFileCount("PRODUCTION_MEASUREMENT", measurementId, "OWNER_SUBMISSION");
+        if (attachmentCount < 1) throw error("OWNER_SUBMISSION_ATTACHMENT_REQUIRED", "业主申报必须上传真实且扫描通过的报送附件");
         Integer revision = jdbc.queryForObject("SELECT COALESCE(MAX(revision_no),0)+1 FROM owner_measurement_submission WHERE tenant_id=? AND measurement_id=? AND deleted_flag=0", Integer.class, tenant(), measurementId);
         Long id = IdWorker.getId();
         jdbc.update("""
@@ -217,19 +245,21 @@ public class ProductionMeasurementService {
                 VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?,0,0,'SUBMITTED',?,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
                 """, id, tenant(), measurement.get("project_id"), measurement.get("contract_id"), measurementId,
                 "OMS-" + measurementId + "-R" + revision, revision, blankToNull(request.externalDocumentNo()),
-                measurement.get("current_reported_amount"), request.attachmentCount(), user(), user(), request.remark());
+                measurement.get("current_reported_amount"), attachmentCount, user(), user(), request.remark());
         for (Map<String, Object> line : jdbc.queryForList("SELECT id,current_reported_quantity,current_reported_amount FROM production_measurement_line WHERE tenant_id=? AND measurement_id=? ORDER BY id", tenant(), measurementId)) {
             jdbc.update("INSERT INTO owner_measurement_review_line(id,tenant_id,submission_id,measurement_line_id,submitted_quantity,submitted_amount,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP)",
                     IdWorker.getId(), tenant(), id, line.get("id"), line.get("current_reported_quantity"), line.get("current_reported_amount"), user(), user());
         }
-        jdbc.update("UPDATE production_measurement SET status='OWNER_SUBMITTED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", user(), measurementId, tenant());
+        int submitted = jdbc.update("UPDATE production_measurement SET status='OWNER_SUBMITTED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND version=?", user(), measurementId, tenant(), version);
+        if (submitted != 1) throw error("PRODUCTION_MEASUREMENT_CONCURRENT_UPDATE", "产值计量版本冲突，请刷新后重试");
         return submission(id);
     }
 
-    public List<Map<String, Object>> submissions(Long projectId, String status) {
+    public List<Map<String, Object>> submissions(Long projectId, String status, LocalDate startDate, LocalDate endDate) {
         if (projectId == null) return List.of();
+        validateDateWindow(startDate, endDate);
         projectAccessChecker.checkAccess(projectId, "查看业主报量");
-        return jdbc.queryForList("SELECT s.*,m.measure_code,p.period_code FROM owner_measurement_submission s JOIN production_measurement m ON m.id=s.measurement_id JOIN measurement_period p ON p.id=m.period_id WHERE s.tenant_id=? AND s.deleted_flag=0 AND (? IS NULL OR s.project_id=?) AND (? IS NULL OR s.status=?) ORDER BY s.submitted_at DESC,s.id DESC", tenant(), projectId, projectId, status, status);
+        return moneyPayload(jdbc.queryForList("SELECT s.*,m.measure_code,p.period_code FROM owner_measurement_submission s JOIN production_measurement m ON m.id=s.measurement_id JOIN measurement_period p ON p.id=m.period_id WHERE s.tenant_id=? AND s.deleted_flag=0 AND (? IS NULL OR s.project_id=?) AND (? IS NULL OR s.status=?) AND (? IS NULL OR m.measure_date>=?) AND (? IS NULL OR m.measure_date<=?) ORDER BY s.submitted_at DESC,s.id DESC", tenant(), projectId, projectId, status, status, startDate, startDate, endDate, endDate));
     }
 
     public Map<String, Object> submission(Long id) {
@@ -240,23 +270,28 @@ public class ProductionMeasurementService {
         result.put("lines", jdbc.queryForList("SELECT r.*,l.item_code,l.item_name,l.unit,l.unit_price FROM owner_measurement_review_line r JOIN production_measurement_line l ON l.id=r.measurement_line_id WHERE r.tenant_id=? AND r.submission_id=? ORDER BY l.sort_order,l.id", tenant(), id));
         Map<String, Object> settlement = one("SELECT * FROM owner_settlement WHERE tenant_id=? AND owner_submission_id=? AND deleted_flag=0", tenant(), id);
         result.put("settlement", settlement);
-        return result;
+        return moneyPayload(result);
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Map<String, Object> review(Long submissionId, OwnerReviewRequest request) {
+    public Map<String, Object> review(Long submissionId, Integer version, OwnerReviewRequest request) {
         Map<String, Object> submission = requireSubmission(submissionId, true);
         String decision = request.decision().trim().toUpperCase(Locale.ROOT);
         if ("SETTLEMENT_CREATED".equals(submission.get("status")) && "CONFIRMED".equals(decision)) return submission(submissionId);
+        if ("RETURNED".equals(submission.get("status")) && "RETURNED".equals(decision)) return submission(submissionId);
+        requireVersion(version, submission, "OWNER_MEASUREMENT_SUBMISSION");
         if (!"SUBMITTED".equals(submission.get("status"))) throw error("OWNER_REVIEW_STATE_INVALID", "只有已报送版本可以登记业主核定");
         if ("RETURNED".equals(decision)) {
             if (request.reviewComment() == null || request.reviewComment().isBlank()) throw error("OWNER_RETURN_REASON_REQUIRED", "业主退回必须填写原因");
-            jdbc.update("UPDATE owner_measurement_submission SET status='RETURNED',reviewer_name=?,review_comment=?,reviewed_at=CURRENT_TIMESTAMP,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", request.reviewerName().trim(), request.reviewComment().trim(), user(), submissionId, tenant());
+            int returned = jdbc.update("UPDATE owner_measurement_submission SET status='RETURNED',reviewer_name=?,review_comment=?,reviewed_at=CURRENT_TIMESTAMP,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND version=?", request.reviewerName().trim(), request.reviewComment().trim(), user(), submissionId, tenant(), version);
+            if (returned != 1) throw error("OWNER_MEASUREMENT_SUBMISSION_CONCURRENT_UPDATE", "业主报量版本冲突，请刷新后重试");
             jdbc.update("UPDATE production_measurement SET status='OWNER_RETURNED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", user(), submission.get("measurement_id"), tenant());
             return submission(submissionId);
         }
         if (!"CONFIRMED".equals(decision)) throw error("OWNER_REVIEW_DECISION_INVALID", "业主核定结论只能为 CONFIRMED 或 RETURNED");
         validateSettlementFields(request);
+        int attachmentCount = cleanFileCount("OWNER_MEASUREMENT_SUBMISSION", submissionId, "OWNER_CONFIRMATION");
+        if (attachmentCount < 1) throw error("OWNER_CONFIRMATION_ATTACHMENT_REQUIRED", "业主核定与结算必须上传真实且扫描通过的核定附件");
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT r.*,l.unit_price FROM owner_measurement_review_line r JOIN production_measurement_line l ON l.id=r.measurement_line_id WHERE r.tenant_id=? AND r.submission_id=? ORDER BY r.id FOR UPDATE", tenant(), submissionId);
         if (request.lines() == null || request.lines().size() != rows.size()) throw error("OWNER_REVIEW_LINE_INCOMPLETE", "必须逐项核定全部报量明细");
         Map<Long, OwnerReviewLineRequest> requested = new LinkedHashMap<>();
@@ -285,14 +320,15 @@ public class ProductionMeasurementService {
         if (confirmedTotal.signum() <= 0) throw error("OWNER_CONFIRMED_AMOUNT_REQUIRED", "业主核定总额必须大于零");
         if (money(request.taxAmount()).compareTo(confirmedTotal) > 0) throw error("OWNER_SETTLEMENT_TAX_EXCEEDED", "税额不能超过业主核定金额");
         if (money(request.retentionAmount()).compareTo(confirmedTotal) > 0) throw error("OWNER_SETTLEMENT_RETENTION_EXCEEDED", "保留金不能超过业主核定金额");
-        jdbc.update("UPDATE owner_measurement_submission SET confirmed_amount=?,deducted_amount=?,status='CONFIRMED',reviewer_name=?,review_comment=?,reviewed_at=CURRENT_TIMESTAMP,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?", confirmedTotal, deductedTotal, request.reviewerName().trim(), blankToNull(request.reviewComment()), user(), submissionId, tenant());
+        int confirmed = jdbc.update("UPDATE owner_measurement_submission SET confirmed_amount=?,deducted_amount=?,status='CONFIRMED',reviewer_name=?,review_comment=?,reviewed_at=CURRENT_TIMESTAMP,attachment_count=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND version=?", confirmedTotal, deductedTotal, request.reviewerName().trim(), blankToNull(request.reviewComment()), attachmentCount, user(), submissionId, tenant(), version);
+        if (confirmed != 1) throw error("OWNER_MEASUREMENT_SUBMISSION_CONCURRENT_UPDATE", "业主报量版本冲突，请刷新后重试");
 
         Map<String, Object> contract = requireMainContract(longValue(submission.get("project_id")), longValue(submission.get("contract_id")));
         Map<String, Object> period = one("SELECT p.* FROM measurement_period p JOIN production_measurement m ON m.period_id=p.id WHERE m.id=? AND m.tenant_id=?", submission.get("measurement_id"), tenant());
         OwnerSettlementRequest settlementRequest = new OwnerSettlementRequest(
                 longValue(submission.get("project_id")), longValue(submission.get("contract_id")), null,
                 string(period.get("period_code")), request.settlementDate(), confirmedTotal, money(request.taxAmount()),
-                money(request.retentionAmount()), request.dueDate(), longValue(contract.get("party_a_id")), request.attachmentCount(),
+                money(request.retentionAmount()), request.dueDate(), longValue(contract.get("party_a_id")), attachmentCount,
                 "由业主报量核定自动生成，报量版本=" + submission.get("submission_code"));
         Map<String, Object> settlement = revenueOperationsService.createSettlement(settlementRequest);
         Long settlementId = longValue(settlement.get("id"));
@@ -325,7 +361,7 @@ public class ProductionMeasurementService {
         if (longValue(settlement.get("approval_instance_id")) != null) approvalIds.add(longValue(settlement.get("approval_instance_id")));
         trace.put("approvalInstances", approvalIds.isEmpty() ? List.of() : jdbc.queryForList("SELECT * FROM wf_instance WHERE tenant_id=? AND id IN(" + placeholders(approvalIds.size()) + ")", args(tenant(), approvalIds)));
         trace.put("approvalRecords", approvalIds.isEmpty() ? List.of() : jdbc.queryForList("SELECT * FROM wf_record WHERE tenant_id=? AND instance_id IN(" + placeholders(approvalIds.size()) + ") AND deleted_flag=0 ORDER BY created_at,id", args(tenant(), approvalIds)));
-        return trace;
+        return moneyPayload(trace);
     }
 
     private ResolvedLine resolveLine(Long contractId, MeasurementLineRequest request) {
@@ -420,6 +456,20 @@ public class ProductionMeasurementService {
         if (request.settlementDate() == null || request.dueDate() == null || request.taxAmount() == null || request.retentionAmount() == null || request.attachmentCount() == null) throw error("OWNER_SETTLEMENT_FIELDS_REQUIRED", "确认业主核定时必须填写结算日、到期日、税额、保留金和附件数量");
         if (request.dueDate().isBefore(request.settlementDate())) throw error("OWNER_SETTLEMENT_DUE_DATE_INVALID", "应收到期日不能早于结算日期");
     }
+    private void validateDateWindow(LocalDate startDate, LocalDate endDate) {
+        if (startDate != null && endDate != null && startDate.isAfter(endDate)) {
+            throw error("MEASUREMENT_REPORT_DATE_INVALID", "计量报表开始日期不能晚于结束日期");
+        }
+    }
+    private int cleanFileCount(String businessType, Long businessId, String documentType) {
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM sys_file WHERE tenant_id=? AND business_type=? AND business_id=? AND document_type=? AND virus_scan_status='CLEAN' AND deleted_flag=0",
+                Integer.class, tenant(), businessType, businessId, documentType);
+        return count == null ? 0 : count;
+    }
+    private void requireVersion(Integer expected, Map<String, Object> row, String prefix) {
+        if (expected == null || expected < 0) throw error(prefix + "_VERSION_REQUIRED", "客户端版本不能为空且必须大于等于0");
+        if (expected != intValue(row.get("version"))) throw error(prefix + "_CONCURRENT_UPDATE", "数据版本冲突，请刷新后重试");
+    }
     private Map<String, Object> one(String sql, Object... args) { try { return jdbc.queryForMap(sql, args); } catch (EmptyResultDataAccessException e) { return null; } }
     private Long tenant() { return UserContext.getCurrentTenantId(); }
     private Long user() { return UserContext.getCurrentUserId(); }
@@ -435,6 +485,26 @@ public class ProductionMeasurementService {
     private BusinessException error(String code, String message) { return new BusinessException(code, message); }
     private String placeholders(int count) { return String.join(",", Collections.nCopies(count, "?")); }
     private Object[] args(Object first, Collection<?> rest) { List<Object> values = new ArrayList<>(); values.add(first); values.addAll(rest); return values.toArray(); }
+
+    @SuppressWarnings("unchecked")
+    private static <T> T moneyPayload(T value) {
+        if (value instanceof Map<?, ?> map) {
+            Map<String, Object> normalized = new LinkedHashMap<>();
+            map.forEach((key, item) -> normalized.put(String.valueOf(key), moneyEntry(String.valueOf(key), item)));
+            return (T) normalized;
+        }
+        if (value instanceof List<?> list) {
+            List<Object> normalized = new ArrayList<>(list.size());
+            for (Object item : list) normalized.add(moneyPayload(item));
+            return (T) normalized;
+        }
+        return value;
+    }
+
+    private static Object moneyEntry(String key, Object value) {
+        if (value instanceof BigDecimal decimal) return decimal.toPlainString();
+        return moneyPayload(value);
+    }
 
     private record ResolvedLine(String sourceType, Long contractItemId, Long contractChangeId, Long sourceId,
                                 String itemCode, String itemName, String itemSpec, String unit,

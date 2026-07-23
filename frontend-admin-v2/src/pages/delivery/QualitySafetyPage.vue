@@ -20,6 +20,7 @@ import {
   V2Button,
   V2Card,
   V2Dialog,
+  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -621,55 +622,82 @@ onBeforeUnmount(() => {
       </div>
 
       <V2Card title="问题、整改与后果" :subtitle="`共 ${issues.length} 条`">
-        <div v-if="issues.length" class="quality-page__issue-grid">
-          <article v-for="issue in issues" :key="issue.id" class="quality-page__item">
-            <div class="quality-page__facts">
-              <V2Badge :tone="statusTone(issue.severity)">{{
-                deliveryLabel(issue.severity)
-              }}</V2Badge
-              ><V2Badge :tone="statusTone(issue.status)">{{ deliveryLabel(issue.status) }}</V2Badge>
-            </div>
-            <h3>{{ issue.issueCode }} · {{ issue.title }}</h3>
-            <p>{{ issue.description }}</p>
-            <small>期限 {{ issue.dueDate }}</small>
-            <div class="quality-page__actions">
-              <V2Button size="small" variant="secondary" @click="openTrace(issue)">追溯</V2Button>
-              <V2Button
-                v-if="canInspect && issue.status === 'OPEN'"
-                size="small"
-                variant="ghost"
-                @click="
-                  showEvidence({
-                    businessType: 'QS_ISSUE',
-                    businessId: issue.id,
-                    documentType: 'ISSUE_EVIDENCE',
-                    label: '问题证据',
-                    issue,
-                  })
-                "
-                >上传问题证据</V2Button
-              >
-              <V2Button
-                v-if="canRectify && issue.status === 'RECTIFYING'"
-                size="small"
-                @click="show('rectification', issue)"
-                >提交整改</V2Button
-              >
-              <V2Button
-                v-if="canReinspect && issue.status === 'PENDING_REINSPECTION'"
-                size="small"
-                @click="showReinspection(issue)"
-                >复检</V2Button
-              >
-              <V2Button
-                v-if="canConsequence && issue.status === 'CLOSED' && issue.responsiblePartnerId"
-                size="small"
-                variant="ghost"
-                @click="show('consequence', issue)"
-                >登记后果</V2Button
-              >
-            </div>
-          </article>
+        <div v-if="issues.length" class="quality-page__table-wrap">
+          <table class="quality-page__table">
+            <thead>
+              <tr>
+                <th scope="col">问题编号 / 标题</th>
+                <th scope="col">描述</th>
+                <th scope="col">严重度</th>
+                <th scope="col">状态</th>
+                <th scope="col">整改期限</th>
+                <th scope="col">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="issue in issues" :key="issue.id">
+                <th scope="row">
+                  <strong>{{ issue.issueCode }}</strong>
+                  <span>{{ issue.title }}</span>
+                </th>
+                <td>{{ issue.description }}</td>
+                <td>
+                  <V2Badge :tone="statusTone(issue.severity)">{{
+                    deliveryLabel(issue.severity)
+                  }}</V2Badge>
+                </td>
+                <td>
+                  <V2Badge :tone="statusTone(issue.status)">{{
+                    deliveryLabel(issue.status)
+                  }}</V2Badge>
+                </td>
+                <td>{{ issue.dueDate }}</td>
+                <td>
+                  <div class="quality-page__actions">
+                    <V2Button size="small" variant="secondary" @click="openTrace(issue)"
+                      >追溯</V2Button
+                    >
+                    <V2Button
+                      v-if="canInspect && issue.status === 'OPEN'"
+                      size="small"
+                      variant="ghost"
+                      @click="
+                        showEvidence({
+                          businessType: 'QS_ISSUE',
+                          businessId: issue.id,
+                          documentType: 'ISSUE_EVIDENCE',
+                          label: '问题证据',
+                          issue,
+                        })
+                      "
+                      >上传问题证据</V2Button
+                    >
+                    <V2Button
+                      v-if="canRectify && issue.status === 'RECTIFYING'"
+                      size="small"
+                      @click="show('rectification', issue)"
+                      >提交整改</V2Button
+                    >
+                    <V2Button
+                      v-if="canReinspect && issue.status === 'PENDING_REINSPECTION'"
+                      size="small"
+                      @click="showReinspection(issue)"
+                      >复检</V2Button
+                    >
+                    <V2Button
+                      v-if="
+                        canConsequence && issue.status === 'CLOSED' && issue.responsiblePartnerId
+                      "
+                      size="small"
+                      variant="ghost"
+                      @click="show('consequence', issue)"
+                      >登记后果</V2Button
+                    >
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
         <p v-else>暂无质量安全问题。</p>
       </V2Card>
@@ -735,37 +763,33 @@ onBeforeUnmount(() => {
       <template #footer>
         <template v-if="trace">
           <template v-for="item in trace.rectifications" :key="item.id">
-            <V2Button
+            <V2GlassButton
               v-if="canRectify && item.status === 'DRAFT'"
-              size="small"
-              variant="ghost"
-              @click="
-                showEvidence({
-                  businessType: 'QS_RECTIFICATION',
-                  businessId: item.id,
-                  documentType: 'RECTIFICATION_EVIDENCE',
-                  label: `整改第 ${item.roundNo} 轮证据`,
-                  issue: trace.issue,
-                })
+              text="上传整改证据"
+              :on-click="
+                () =>
+                  showEvidence({
+                    businessType: 'QS_RECTIFICATION',
+                    businessId: item.id,
+                    documentType: 'RECTIFICATION_EVIDENCE',
+                    label: `整改第 ${item.roundNo} 轮证据`,
+                    issue: trace.issue,
+                  })
               "
-              >上传整改证据</V2Button
-            >
-            <V2Button
+            />
+            <V2GlassButton
               v-if="canRectify && item.status === 'DRAFT'"
-              size="small"
+              text="提交既有整改"
               :loading="saving"
-              @click="submitDraftRectification(item)"
-              >提交既有整改</V2Button
-            >
+              :on-click="() => submitDraftRectification(item)"
+            />
           </template>
-          <V2Button
+          <V2GlassButton
             v-if="canConsequence && trace.consequence?.status === 'DRAFT'"
-            size="small"
+            text="确认既有后果"
             :loading="saving"
-            @click="postExistingConsequence"
-          >
-            确认既有后果
-          </V2Button>
+            :on-click="postExistingConsequence"
+          />
         </template>
       </template>
     </V2Dialog>
@@ -1049,18 +1073,46 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 .quality-page__columns,
-.quality-page__issue-grid,
 .quality-page__evidence {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--v2-space-3);
 }
-.quality-page__issue-grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
 .quality-page__stack {
   display: grid;
   gap: var(--v2-space-2);
+}
+.quality-page__table-wrap {
+  overflow-x: auto;
+}
+.quality-page__table {
+  width: 100%;
+  min-width: 64rem;
+  border-collapse: collapse;
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+.quality-page__table th,
+.quality-page__table td {
+  padding: var(--v2-space-3);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border-subtle);
+  text-align: left;
+  vertical-align: top;
+}
+.quality-page__table thead th {
+  color: var(--v2-color-text-secondary);
+  background: var(--v2-color-surface-subtle);
+  font-weight: var(--v2-font-weight-semibold);
+}
+.quality-page__table tbody th {
+  color: var(--v2-color-text-strong);
+  font-weight: var(--v2-font-weight-semibold);
+}
+.quality-page__table tbody th span {
+  display: block;
+  margin-top: var(--v2-space-1);
+  color: var(--v2-color-text-secondary);
+  font-weight: var(--v2-font-weight-regular);
 }
 .quality-page__item {
   display: grid;
@@ -1130,13 +1182,12 @@ onBeforeUnmount(() => {
   grid-column: 1 / -1;
 }
 @media (max-width: 64rem) {
-  .quality-page__issue-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .quality-page__table {
+    min-width: 56rem;
   }
 }
 @media (max-width: 40rem) {
   .quality-page__columns,
-  .quality-page__issue-grid,
   .quality-page__evidence,
   .quality-page__form {
     grid-template-columns: 1fr;
