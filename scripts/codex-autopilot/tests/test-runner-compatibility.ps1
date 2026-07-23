@@ -311,7 +311,7 @@ function Assert-ResultSchema {
   if (@("done", "blocked", "failed", "noop") -notcontains $Result.status) {
     throw "Invalid result status: $($Result.status)"
   }
-  if (@("none", "tool_config", "environment", "quality_security", "ready_issue_config", "execution_disabled") -notcontains $Result.failureCategory) {
+  if (@("none", "tool_config", "tool_invocation", "environment_prerequisite", "ready_issue_config", "retrieval_gap", "quality_or_security", "unknown", "execution_disabled") -notcontains $Result.failureCategory) {
     throw "Invalid failureCategory: $($Result.failureCategory)"
   }
 }
@@ -832,7 +832,7 @@ try {
   $FailResult = Get-LatestResult $FailRoot
   Assert-ResultSchema $FailResult
   if ($FailResult.status -ne "failed") { throw "Expected failed executor status failed" }
-  if ($FailResult.failureCategory -ne "quality_security") { throw "Expected failed executor failureCategory quality_security" }
+  if ($FailResult.failureCategory -ne "quality_or_security") { throw "Expected failed executor failureCategory quality_or_security" }
 
   $NoChangeRoot = New-Fixture -Name "executor-no-change" -Enabled -ExecutorMode "no-change" -Ready @"
 # Ready Issues

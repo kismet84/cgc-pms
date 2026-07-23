@@ -8,7 +8,7 @@ $env:V2_LIVE_QUALITY = '1'
 $env:V2_LIVE_TECHNICAL = '1'
 $env:V2_LIVE_CLOSEOUT = '1'
 $env:V2_SCHEDULE_READONLY_USER = 'demo.schedule.query'
-$env:V2_DELIVERY_PROJECT_ID = '520000000000009011'
+$env:V2_DELIVERY_PROJECT_ID = '520000000000009002'
 
 Push-Location $frontendRoot
 try {

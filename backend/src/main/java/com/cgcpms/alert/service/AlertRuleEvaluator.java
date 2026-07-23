@@ -428,8 +428,11 @@ class AlertRuleEvaluator {
                 new LambdaQueryWrapper<AlertLog>()
                         .eq(AlertLog::getTenantId, tenantId)
                         .eq(AlertLog::getDedupKey, dedupKey)
-                        .in(AlertLog::getProcessStatus, List.of("OPEN", "PROCESSED"))
-                        .ge(AlertLog::getTriggeredAt, since));
+                        .and(status -> status
+                                .eq(AlertLog::getProcessStatus, "OPEN")
+                                .or(processed -> processed
+                                        .eq(AlertLog::getProcessStatus, "PROCESSED")
+                                        .ge(AlertLog::getTriggeredAt, since))));
         return count != null && count > 0;
     }
 

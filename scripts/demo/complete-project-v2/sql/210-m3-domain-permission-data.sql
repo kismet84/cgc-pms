@@ -25,19 +25,10 @@ INSERT IGNORE INTO sys_role_menu (id,tenant_id,role_id,menu_id) VALUES
   (520000000000013004,0,520000000000013001,803),
   (520000000000013005,0,520000000000013001,1085);
 
-INSERT INTO pm_project
-  (id,tenant_id,org_id,project_code,project_name,project_type,project_address,owner_unit,supervisor_unit,design_unit,
-   contract_amount,target_cost,planned_start_date,planned_end_date,actual_start_date,actual_end_date,project_manager_id,status,approval_status,
-   created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-VALUES
-  (520000000000009011,0,@demo_org,'XM-20260722-904','计划只读验收项目','CONSTRUCTION','演示地址11号','演示建设单位','演示监理','演示设计',100000,80000,'2026-01-01','2026-12-31','2026-01-01',NULL,520000000000013002,'ACTIVE','APPROVED',520000000000013002,NOW(),520000000000013002,NOW(),0,'M3计划只读项目范围验收')
-ON DUPLICATE KEY UPDATE project_code=VALUES(project_code),project_name=VALUES(project_name),project_manager_id=VALUES(project_manager_id),
-  status='ACTIVE',approval_status='APPROVED',created_by=VALUES(created_by),updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0,remark=VALUES(remark);
-
 INSERT INTO pm_project_member
   (id,tenant_id,project_id,user_id,role_code,position_name,start_date,end_date,status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000013006,0,520000000000009011,520000000000013002,'SCHEDULE_VIEWER','计划只读',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3计划分权验收')
+  (520000000000013006,0,520000000000009002,520000000000013002,'SCHEDULE_VIEWER','计划只读',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3计划分权验收：复用在建项目')
 ON DUPLICATE KEY UPDATE project_id=VALUES(project_id),user_id=VALUES(user_id),role_code=VALUES(role_code),position_name=VALUES(position_name),status='ACTIVE',end_date=NULL,updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
 
 INSERT INTO sys_role
@@ -258,7 +249,6 @@ INSERT INTO pm_project
    created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
   (520000000000009008,0,@demo_org,'XM-20260722-901','收尾缺陷登记演示项目','CONSTRUCTION','演示地址8号','演示建设单位','演示监理','演示设计',100000,80000,'2025-01-01','2026-06-30','2025-01-01',NULL,@demo_admin,'ACTIVE','APPROVED',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记正向阶段'),
-  (520000000000009009,0,@demo_org,'XM-20260722-902','收尾缺陷复验演示项目','CONSTRUCTION','演示地址9号','演示建设单位','演示监理','演示设计',100000,80000,'2025-01-01','2026-06-30','2025-01-01',NULL,@demo_admin,'ACTIVE','APPROVED',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验正向阶段'),
   (520000000000009010,0,@demo_org,'XM-20260722-903','收尾关闭演示项目','CONSTRUCTION','演示地址10号','演示建设单位','演示监理','演示设计',100000,80000,'2025-01-01','2026-06-30','2025-01-01',NULL,@demo_admin,'ACTIVE','APPROVED',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目关闭正向阶段')
 ON DUPLICATE KEY UPDATE project_code=VALUES(project_code),project_name=VALUES(project_name),status='ACTIVE',approval_status='APPROVED',updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0,remark=VALUES(remark);
 
@@ -266,7 +256,6 @@ INSERT INTO pm_project_member
   (id,tenant_id,project_id,user_id,role_code,position_name,start_date,end_date,status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
   (520000000000012501,0,520000000000009008,@demo_admin,'PROJECT_MANAGER','项目经理',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记责任人'),
-  (520000000000012502,0,520000000000009009,@demo_admin,'PROJECT_MANAGER','项目经理',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验责任人'),
   (520000000000012503,0,520000000000009010,@demo_admin,'PROJECT_MANAGER','项目经理',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目关闭责任人')
 ON DUPLICATE KEY UPDATE status='ACTIVE',end_date=NULL,updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
 
@@ -275,8 +264,8 @@ INSERT INTO ct_contract
    paid_amount,signed_date,start_date,end_date,contract_status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag,remark,settlement_amount,version)
 VALUES
   (520000000000012504,0,520000000000009010,'CT-20260722-901','关闭阶段已结清合同','MAIN',520000000000000101,520000000000000102,100000,100000,100000,'2025-01-01','2025-01-01','2026-06-30','SETTLED','APPROVED',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3关闭阶段合法合同',100000,0),
-  (520000000000012507,0,520000000000009008,'CT-20260722-902','缺陷登记阶段已结清合同','MAIN',520000000000000101,520000000000000102,100000,100000,100000,'2025-01-01','2025-01-01','2026-06-30','SETTLED','APPROVED',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记合法合同',100000,0),
-  (520000000000012508,0,520000000000009009,'CT-20260722-903','缺陷复验阶段已结清合同','MAIN',520000000000000101,520000000000000102,100000,100000,100000,'2025-01-01','2025-01-01','2026-06-30','SETTLED','APPROVED',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验合法合同',100000,0)
+  (520000000000012507,0,520000000000009008,'CT-20260722-902','缺陷处理阶段已结清合同','MAIN',520000000000000101,520000000000000102,100000,100000,100000,'2025-01-01','2025-01-01','2026-06-30','SETTLED','APPROVED',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记合同',100000,0),
+  (520000000000012508,0,520000000000009008,'CT-20260722-903','缺陷复验阶段已结清合同','MAIN',520000000000000101,520000000000000102,100000,100000,100000,'2025-01-01','2025-01-01','2026-06-30','SETTLED','APPROVED',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验合同：复用缺陷处理项目',100000,0)
 ON DUPLICATE KEY UPDATE contract_code=VALUES(contract_code),contract_status='SETTLED',approval_status='APPROVED',deleted_flag=0,updated_by=VALUES(updated_by),updated_at=NOW();
 
 INSERT INTO owner_settlement
@@ -285,8 +274,8 @@ INSERT INTO owner_settlement
    reported_amount,deducted_amount,settlement_type,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
   (520000000000012505,0,520000000000009010,520000000000012504,NULL,'M53-CLOSE-READY-STL','FINAL','2026-06-30',100000,0,1000,99000,'2026-07-15',520000000000000101,'RECEIVABLE_CREATED',1,'OWNER_SETTLEMENT_V1',0,100000,0,'FINAL',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3关闭阶段最终结算'),
-  (520000000000012509,0,520000000000009008,520000000000012507,NULL,'M53-DEFECT-STL','FINAL','2026-06-30',100000,0,1000,99000,'2026-07-15',520000000000000101,'RECEIVABLE_CREATED',1,'OWNER_SETTLEMENT_V1',0,100000,0,'FINAL',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记阶段最终结算'),
-  (520000000000012510,0,520000000000009009,520000000000012508,NULL,'M53-VERIFY-STL','FINAL','2026-06-30',100000,0,1000,99000,'2026-07-15',520000000000000101,'RECEIVABLE_CREATED',1,'OWNER_SETTLEMENT_V1',0,100000,0,'FINAL',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验阶段最终结算')
+  (520000000000012509,0,520000000000009008,520000000000012507,NULL,'M53-DEFECT-STL','FINAL','2026-06-30',100000,0,500,99500,'2026-07-15',520000000000000101,'RECEIVABLE_CREATED',1,'OWNER_SETTLEMENT_V1',0,100000,0,'FINAL',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记最终结算'),
+  (520000000000012510,0,520000000000009008,520000000000012508,NULL,'M53-VERIFY-STL','FINAL','2026-06-30',100000,0,500,99500,'2026-07-15',520000000000000101,'RECEIVABLE_CREATED',1,'OWNER_SETTLEMENT_V1',0,100000,0,'FINAL',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验最终结算：复用缺陷处理项目')
 ON DUPLICATE KEY UPDATE project_id=VALUES(project_id),contract_id=VALUES(contract_id),settlement_code=VALUES(settlement_code),
   settlement_period=VALUES(settlement_period),settlement_date=VALUES(settlement_date),gross_amount=VALUES(gross_amount),
   tax_amount=VALUES(tax_amount),retention_amount=VALUES(retention_amount),net_receivable_amount=VALUES(net_receivable_amount),
@@ -299,8 +288,8 @@ INSERT INTO account_receivable
    collected_amount,credited_amount,outstanding_amount,due_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
   (520000000000012506,0,520000000000009010,520000000000012504,520000000000012505,520000000000000101,'REGULAR','M53-CLOSE-READY-AR',99000,99000,0,0,'2026-07-15','COLLECTED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3关闭阶段常规应收已清'),
-  (520000000000012514,0,520000000000009008,520000000000012507,520000000000012509,520000000000000101,'RETENTION','M53-DEFECT-AR',1000,1000,0,0,'2026-07-15','COLLECTED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记质保金已收'),
-  (520000000000012515,0,520000000000009009,520000000000012508,520000000000012510,520000000000000101,'RETENTION','M53-VERIFY-AR',1000,1000,0,0,'2026-07-15','COLLECTED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验质保金已收'),
+  (520000000000012514,0,520000000000009008,520000000000012507,520000000000012509,520000000000000101,'RETENTION','M53-DEFECT-AR',500,500,0,0,'2026-07-15','COLLECTED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记质保金已收'),
+  (520000000000012515,0,520000000000009008,520000000000012508,520000000000012510,520000000000000101,'RETENTION','M53-VERIFY-AR',500,500,0,0,'2026-07-15','COLLECTED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验质保金已收'),
   (520000000000012516,0,520000000000009010,520000000000012504,520000000000012505,520000000000000101,'RETENTION','M53-CLOSE-READY-RETENTION',1000,1000,0,0,'2026-07-15','COLLECTED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3关闭阶段质保金已收')
 ON DUPLICATE KEY UPDATE project_id=VALUES(project_id),contract_id=VALUES(contract_id),settlement_id=VALUES(settlement_id),
   customer_id=VALUES(customer_id),receivable_type=VALUES(receivable_type),receivable_code=VALUES(receivable_code),
@@ -317,15 +306,12 @@ VALUES
   (520000000000012304,0,520000000000009005,'M53-CLOSEOUT-SETTLEMENT','2027-06-30','FINAL_SETTLEMENT_BOUND',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3尾款核验可写阶段'),
   (520000000000012305,0,520000000000009006,'M53-CLOSEOUT-TAIL','2027-06-30','TAIL_PAYMENT_COLLECTED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3质保登记可写阶段'),
   (520000000000012306,0,520000000000009007,'M53-CLOSEOUT-WARRANTY','2027-06-30','WARRANTY_RELEASED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3档案移交可写阶段'),
-  (520000000000012307,0,520000000000009008,'M53-CLOSEOUT-DEFECT','2026-06-30','TAIL_PAYMENT_COLLECTED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记可写阶段'),
-  (520000000000012308,0,520000000000009009,'M53-CLOSEOUT-VERIFY','2026-06-30','TAIL_PAYMENT_COLLECTED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验可写阶段'),
+  (520000000000012307,0,520000000000009008,'M53-CLOSEOUT-DEFECT','2026-06-30','TAIL_PAYMENT_COLLECTED',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记与复验共用阶段'),
   (520000000000012309,0,520000000000009010,'M53-CLOSEOUT-CLOSE','2026-06-30','READY_TO_CLOSE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目关闭可写阶段')
 ON DUPLICATE KEY UPDATE status=VALUES(status),deleted_flag=0,updated_by=VALUES(updated_by),updated_at=NOW();
 
 UPDATE project_closeout SET final_owner_settlement_id=520000000000012509,tail_collection_verified_at=COALESCE(tail_collection_verified_at,NOW()),
   updated_by=@demo_admin,updated_at=NOW() WHERE id=520000000000012307 AND tenant_id=0;
-UPDATE project_closeout SET final_owner_settlement_id=520000000000012510,tail_collection_verified_at=COALESCE(tail_collection_verified_at,NOW()),
-  updated_by=@demo_admin,updated_at=NOW() WHERE id=520000000000012308 AND tenant_id=0;
 UPDATE project_closeout SET final_owner_settlement_id=520000000000012505,tail_collection_verified_at=COALESCE(tail_collection_verified_at,NOW()),
   updated_by=@demo_admin,updated_at=NOW() WHERE id=520000000000012309 AND tenant_id=0;
 
@@ -333,8 +319,8 @@ INSERT INTO closeout_warranty
   (id,tenant_id,closeout_id,project_id,contract_id,receivable_id,warranty_code,warranty_amount,warranty_start_date,warranty_end_date,
    responsible_user_id,status,released_by,released_at,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000012511,0,520000000000012307,520000000000009008,520000000000012507,520000000000012514,'M53-WARRANTY-DEFECT',1000,'2026-06-01','2027-06-01',@demo_admin,'ACTIVE',NULL,NULL,0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记正向样本'),
-  (520000000000012512,0,520000000000012308,520000000000009009,520000000000012508,520000000000012515,'M53-WARRANTY-VERIFY',1000,'2026-06-01','2027-06-01',@demo_admin,'DEFECT_LIABILITY',NULL,NULL,0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验正向样本'),
+  (520000000000012511,0,520000000000012307,520000000000009008,520000000000012507,520000000000012514,'M53-WARRANTY-DEFECT',500,'2026-06-01','2027-06-01',@demo_admin,'ACTIVE',NULL,NULL,0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷登记正向样本'),
+  (520000000000012512,0,520000000000012307,520000000000009008,520000000000012508,520000000000012515,'M53-WARRANTY-VERIFY',500,'2026-06-01','2027-06-01',@demo_admin,'DEFECT_LIABILITY',NULL,NULL,0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验正向样本'),
   (520000000000012513,0,520000000000012309,520000000000009010,520000000000012504,520000000000012516,'M53-WARRANTY-CLOSE',1000,'2026-06-01','2026-06-30',@demo_admin,'RELEASED',@demo_admin,NOW(),1,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目关闭合法质保样本')
 ON DUPLICATE KEY UPDATE closeout_id=VALUES(closeout_id),project_id=VALUES(project_id),contract_id=VALUES(contract_id),
   receivable_id=VALUES(receivable_id),warranty_code=VALUES(warranty_code),warranty_amount=VALUES(warranty_amount),
@@ -347,7 +333,7 @@ INSERT INTO closeout_defect
    status,rectification_content,rectified_by,rectified_at,verified_by,verified_at,verification_comment,version,created_by,created_at,updated_by,
    updated_at,deleted_flag,remark)
 VALUES
-  (520000000000012521,0,520000000000012308,520000000000009009,520000000000012512,'M53-DEFECT-VERIFY','待复验缺陷','缺陷已整改等待独立复验',@demo_admin,'2026-07-31','PENDING_VERIFICATION','已完成整改',@demo_admin,NOW(),NULL,NULL,NULL,1,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验正向样本')
+  (520000000000012521,0,520000000000012307,520000000000009008,520000000000012512,'M53-DEFECT-VERIFY','待复验缺陷','缺陷已整改等待独立复验',@demo_admin,'2026-07-31','PENDING_VERIFICATION','已完成整改',@demo_admin,NOW(),NULL,NULL,NULL,1,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3缺陷复验正向样本')
 ON DUPLICATE KEY UPDATE status='PENDING_VERIFICATION',rectification_content=VALUES(rectification_content),rectified_by=VALUES(rectified_by),rectified_at=VALUES(rectified_at),verified_by=NULL,verified_at=NULL,verification_comment=NULL,deleted_flag=0,updated_by=VALUES(updated_by),updated_at=NOW();
 
 INSERT INTO closeout_archive_transfer

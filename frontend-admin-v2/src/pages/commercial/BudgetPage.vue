@@ -11,6 +11,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   V2Alert,
+  V2Badge,
   V2Button,
   V2Card,
   V2Dialog,

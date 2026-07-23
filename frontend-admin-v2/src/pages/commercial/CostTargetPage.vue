@@ -54,7 +54,7 @@ const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
 
-const filter = reactive<CostTargetQuery>({ pageNo: 1, pageSize: 20 })
+const filter = reactive<CostTargetQuery>({ pageNo: 1, pageSize: 10 })
 const records = ref<CostTargetRecord[]>([])
 const total = ref(0)
 const projects = ref<ProjectContextOption[]>([])
@@ -94,10 +94,14 @@ const editable = computed(
       detail.value.isActive !== 1 &&
       ['DRAFT', 'REJECTED'].includes(detail.value.approvalStatus)),
 )
-const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pageSize ?? 20))))
+const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pageSize ?? 10))))
 const projectOptions = computed(() =>
   projects.value.map((project) => ({ value: project.id, label: project.projectName })),
 )
+
+function projectLabel(projectId?: string | null): string {
+  return projects.value.find((project) => project.id === projectId)?.projectName ?? '—'
+}
 
 function emptyForm(): CostTargetSaveCommand {
   return {
@@ -138,7 +142,7 @@ function resetNotices(): void {
 function hydrateFilter(): void {
   const pageNo = typeof route.query.pageNo === 'string' ? Number(route.query.pageNo) : 1
   filter.pageNo = Number.isInteger(pageNo) && pageNo > 0 ? pageNo : 1
-  filter.pageSize = 20
+  filter.pageSize = 10
   filter.projectId = typeof route.query.projectId === 'string' ? route.query.projectId : undefined
   filter.versionNo = typeof route.query.versionNo === 'string' ? route.query.versionNo : undefined
   filter.approvalStatus =
@@ -521,7 +525,7 @@ onBeforeUnmount(() => {
                 <td>
                   {{ record.versionNo }}<small>{{ record.versionName }}</small>
                 </td>
-                <td>{{ record.projectId }}</td>
+                <td>{{ projectLabel(record.projectId) }}</td>
                 <td>{{ record.totalTargetAmount }}</td>
                 <td>{{ record.totalBidCostAmount }}</td>
                 <td>{{ record.totalResponsibilityAmount }}</td>
@@ -810,7 +814,7 @@ onBeforeUnmount(() => {
             <dt>版本</dt>
             <dd>{{ detail.versionNo }} / {{ detail.versionName }}</dd>
             <dt>项目</dt>
-            <dd>{{ detail.projectId }}</dd>
+            <dd>{{ projectLabel(detail.projectId) }}</dd>
             <dt>目标成本</dt>
             <dd>{{ detail.totalTargetAmount }}</dd>
             <dt>投标成本</dt>

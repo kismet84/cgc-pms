@@ -1,110 +1,56 @@
 # AGENTS.md
 
-若仓库根存在 `AGENTS.override.md`，必须先读取并遵守；本文件只提供项目级基础规则、项目背景、常用命令和长期约定；如与 `AGENTS.override.md` 冲突，以 `AGENTS.override.md` 为准。
+所有回答使用中文。本文件是仓库自动加载的唯一根规则，只保留必须始终生效的硬门禁；专项流程仅在任务命中时读取对应 Skill。
 
-本文件是 AI 编程助手在本仓库工作的高优先级入口说明。保持精简：这里只放必须马上知道的规则；详细流程放在 `docs/` 中，经验索引见 `memory/MEMORY.md`。
+## 角色与授权
 
-## 强制规则
+- 作为项目总负责人，明确目标、范围、非目标、验收、风险和回滚，并对授权范围内的实施、验证与收口负责。
+- 未获明确授权，只做分析、计划、评审、验收或只读诊断；“修改、修复、实现、执行、运行测试”授权本地实施和必要验证，不自动授权 commit、push、PR、合并、发布或生产变更。
+- 普通任务不强制进入 Ready；用户指定主线、Backlog 或治理流程时使用对应载体；AutoPilot 连续迭代只处理合格 Ready Issue。
+- 只做目标所需最小改动，不扩大业务、权限、环境、生产或 Git 范围；不确定内容标记“需要确认”，不得猜测。
 
-- 所有回答必须使用中文。
-- 先通过授权门再执行：普通交互任务获用户明确授权后不强制进入 Ready；用户指定主线/backlog/治理流程时遵守对应载体；AutoPilot 连续迭代仍必须来自合格 Ready Issue。
-- 任何代码、配置、文档、Git 或运行环境状态变更前，执行者必须核对 `git branch --show-current` 与 `git status --short`；怀疑 worktree 冲突时再查 `git worktree list`。
-- 数据库、权限、安全、金额、租户、数据一致性与正式裁决必须有客观证据和必要复核；证据不足时明确写出“不通过”或“需要确认”，不得以其他执行方式替代证据。
-- 任务收口实行“非阻塞问题零悬空”：当前目标、验收标准、当前 diff 根因或本轮直接引入的问题必须本轮修复并复验，否则不得判定通过；真正超出范围的问题必须去重后写入唯一正式载体并具备证据、价值、优先级、延期原因/前置与验收标准；无明确价值或验收方式的泛化建议直接关闭，不制造 backlog。
-- 收口时必须统计 `新增后续项`、`关闭后续项`、`后续项净变化`；没有正式承接载体的遗留项一律视为未收口。连续两个 Issue 净增后续项时，AutoPilot 暂停新的能力新增，优先消化缺口直至恢复到净增前基线。
-- AutoPilot 死进程恢复必须优先校验活动 Issue 的 durable phase checkpoint；Ready/base/worktree/branch/diff/evidence 一致时只从首个未完成的验证、Reviewer 或收口阶段继续，不得删除有效 worktree 后重新派发实现。Reviewer `tool_config` 重试耗尽只暂停 Reviewer；控制面指纹变化后 N>1/无界执行必须先通过用户启动的单任务金丝雀。
-- AutoPilot 控制面、子进程和测试入口统一使用 PowerShell 7 `pwsh`；缺失时归类为 `tool_config/AUTOPILOT_POWERSHELL7_REQUIRED` 并安全停止，不得回退到 Windows PowerShell 5.1。原生命令以退出码和命令契约裁决，stderr warning 仅作诊断证据。
-- AutoPilot 只有持有当前 `runInstanceId + leaseEpoch + controlPlaneFingerprint` fencing token 的 APPLY 实例可以派发、写状态或执行 Git 变更；CPU/心跳变化不算任务进度，进度只由工作区内容或 durable checkpoint/result/evidence 变化推进。
-- AutoPilot 各阶段统一返回可校验 `StageResult`，不得以自由文本路由；活动 Issue 的 checkpoint 阶段迁移只能经 `autopilot-transition.ps1`，并校验合法边、fencing、控制面指纹及 `transitionId + generation` 读回，state/checkpoint 底层模块不得自行决定业务阶段。
-- AutoPilot 生产默认宿主为 Codex 桌面主线程（`executionHost=desktop-native`）：主线程直接推进 checkpoint 与 A-F 职责，PowerShell 只做确定性原子动作；禁止 runner 启动嵌套 Planner、Executor、Reviewer `codex exec`。`cli-legacy` 仅可显式兼容或经授权紧急回退，不得静默降级。
-- `autoPush=false` / `no push` 禁止自动推送；提交或 push 只可在用户明确授权且其他适用门禁通过后执行。
-- 首次非 Draft PR（含 Draft 转 Ready）前必须通过同 HEAD SHA 的功能分支等价 CI；必跑项、证据契约、失败分类和“PR 首次 CI 通过率”口径统一读取 `docs/standards/codex-task-execution-policy.md`。证据不全时禁止声明“可提 PR”。
-- 修改代码后必须运行相关验证：后端至少跑相关测试/构建，前端至少跑类型检查/测试/构建中的相关项。
-- 不要修改已经应用过的 Flyway 迁移脚本；数据库结构变化必须新增版本化 migration。
-- 做外科手术式修改：只改必要文件，遵循现有命名、目录、异常处理和测试风格。
-- 解决错误或工具陷阱后，优先在当前会话中沉淀可复用结论；只有在当前运行环境允许且用户明确要求时，才写入 `memory/` 并更新 `memory/MEMORY.md`。
-- `AGENTS.md` 为仓库级协作规则入口；`CLAUDE.md` 若存在则属于本地 AI 协作配置，不影响系统运行。
-- 通用任务状态机、短指令、工具路由、失败分类、浏览器/验证/Git 模板、事件驱动沟通与恢复胶囊统一读取 `docs/standards/codex-task-execution-policy.md`；本文件只保留必须马上知道的边界和入口。
-- `codebase-memory-mcp` 只允许用于本地索引与只读查询；禁止由其创建、修改、删除或覆盖 `AGENTS.md`、`AGENTS.override.md`，禁止运行会自动改写智能体规则、Codex 配置、skills 或 hooks 的 `codebase-memory-mcp install` / `uninstall` 入口。需要升级时只能在用户明确授权后替换独立安装目录中的二进制，不得改写仓库规则文件。
-- commentary 只在统一策略定义的状态变化事件中发送；不为每条命令、纯等待或相同状态重复播报。
-- 任务结束只做清理预览；仅清理本任务创建且确认无用的临时进程和产物，不影响用户已有运行环境，不得盲删。
+## 工作区与安全
 
-## 产品演进基本流程
+- 任何代码、配置、文档、Git 或运行环境写入前，执行者必须核对 `git branch --show-current` 与 `git status --short`；怀疑隔离或归属冲突时再查 `git worktree list`。
+- 保留既有脏改动和未跟踪文件；禁止覆盖、回退、清理或顺带提交非本任务成果。数据库变更、Git 发布和同文件写入由主线程串行处理。
+- 数据库、权限、安全、金额、租户、数据一致性、状态机和正式裁决必须有客观证据与必要复核；证据不足判定“不通过”或“需要确认”。
+- 禁止默认读取、扫描、修改、总结或清理 `.omc/`、`.omo/`、`.opencode/`、`.claude/`、`.mimocode/`、`graphify-out/`、`.sisyphus/`、`.archive/`、`archive/v1.0/private/`；仅用户点名并明确解除禁止后例外。
+- 删除、移动、重置、迁移等破坏性操作前必须确认精确目标、环境、影响和恢复方式；禁止宽泛路径、盲删、删除 `.git`、用户目录或仓库外文件。
+- 禁止自动发布生产、连接生产数据库或执行生产写操作；需要时必须另获明确授权。
+- 不修改已应用的 Flyway migration；数据库结构变化新增版本化 migration。数据库重置只允许 dev/test/demo、host 为 `localhost`/`127.0.0.1` 且存在 `.codex-autopilot/ALLOW_TEST_DATA_RESET`，缺一即禁止。
 
-- 当用户要求判断产品方向、生成下一轮计划，或 Ready 为空且 `docs/backlog/current-issues.json` 中没有可自动拆分的存量问题、也没有已通过决策门的候选时，先读取 `docs/product-intelligence/`，按“项目地图 → 竞品情报 → 迭代决策 → Ad-hoc Candidate → Ready → 实施 → 地图回写”推进。
-- AutoPilot 的 Ready 来源、知识图谱健康/HEAD 游标门禁、补货顺序、回写与停止条件统一读取 `plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md`；`current-issues.json` 是正式写回源，不是默认发现入口。图谱异常时 fail-close，不静默回退到文件扫描或长期计划凑任务。
-- `docs/backlog/cgc-pms-production-enhancement-plan.md` 只作为研究和候选输入，不能直接生成 Ready；产品 Candidate 必须引用当前项目地图和迭代决策证据。
-- 工程治理 Candidate 默认不能替代产品方向；仅当当前证据证明它直接阻塞已选产品目标、安全边界或正式验收时，才可按 `缺口修复` 或 `运维治理` 进入 Ready，并明确关联目标、阻塞证据、解除条件、非目标和回滚方式。
-- Ready 以证据和字段完整为准，不为凑数量放宽门槛；1 条合格 Ready 即可实施，队列上限仍为 5 条。
-- 主线或 Ready Issue 完成后，必须回写项目地图；若结果影响候选排序，同步刷新竞品差距或迭代决策。
+## 验证与裁决
 
-## 自动经验记录
+- 修改后运行与风险相称的最小相关验证；后端至少覆盖相关测试或构建，前端至少覆盖相关测试、类型检查或构建，文档/规则至少做引用、格式或静态契约检查。
+- 页面、接口、CI、工具失败先按唯一失败分类契约分诊，未分类不得判为业务缺陷；分类权威见 `.agents/skills/cgc-pms-ci-gate-triage/SKILL.md`。
+- 首次非 Draft PR（含 Draft 转 Ready）前必须取得同 HEAD SHA 功能分支等价 CI；证据不全不得声明“可提 PR”。
+- 正式验收或上线裁决必须给出通过/不通过、阻塞/非阻塞、依据、剩余风险和回滚条件；本地实现、同 SHA CI 与目标环境发布证据不得混同。
 
-每次解决一个错误或问题后，优先整理成可复用结论；只有在当前运行环境允许且用户明确要求时，才保存到 `memory/`：
+## Git
 
-- 覆盖编译失败、测试失败、运行时异常、配置错误、Flyway 失败、工具调用陷阱等。
-- 每个经验单独一个 `.md` 文件，包含 frontmatter：`name`、`description`、`metadata type/feedback`、`tags`。
-- 保存后更新 `memory/MEMORY.md` 索引：一行链接 + 一句话描述。
-- 如果当前运行环境不允许直接写 memory，则保留在会话或普通文档中，不强制落盘。
+- 创建/切换分支、commit、push、PR、合并、Tag、Release 和分支删除分别需要用户明确授权；禁止直接推送 `master/main`，禁止绕过保护、强推或改写历史。
+- `autoPush=false` / `no push` 时不得自动推送。普通“推送”只路由 `git-publish-and-cleanup`；版本发布、升版本、Tag 或 GitHub Release 才路由 `release-skills`。
+- 清理前必须只读预览并证明目标已合并、无未推送提交、无活动 worktree 占用；不得为删除分支而破坏其他 worktree。
 
-## 新会话启动模板（可复制粘贴）
+## 零悬空收口
 
-每次新会话（尤其是新线程）建议先发送：
+- 每个发现项只能归入：`本轮修复并复验`、`超出范围并正式承接`、`证据不足或无明确价值而关闭`。
+- 与当前目标、验收标准、当前 diff 根因或本轮直接引入风险相关的问题必须本轮处理；不得以“非阻塞”带病通过。
+- 超出范围项必须去重写入唯一正式载体，具备证据、价值、优先级、延期原因/前置和验收标准；无价值或不可验收建议直接关闭，不制造 backlog。
+- 收口必须统计 `新增后续项`、`关闭后续项`、`后续项净变化`；存在无载体遗留项时结论为“不通过”。
 
-```text
-请先读取并严格遵循 D:\projects-test\cgc-pms\AGENTS.override.md、D:\projects-test\cgc-pms\AGENTS.md 和本仓库可见的工具说明；先按 CODEGRAPH 要求在检索代码时优先使用 CodeGraph；
-如任务涉及审计，按仓库现状直接输出基于代码证据的审计结论；如需归档正式审计报告，按 AGENTS.override.md 的审计与归档边界写入 docs/quality/。
-```
+## AutoPilot 硬门禁
 
-## 项目与运行入口
+- 只有完整短语 `启动预演`、`启动迭代`、`启动迭代-N`、`停止迭代` 触发 AutoPilot；单字“启动/停止”不触发。
+- Ready、授权、stop/pause/enabled checkpoint、fencing、控制面指纹、验证、Reviewer、收口、Git 与 no-push 门禁不可绕过。
+- 控制面行为变化必须更新指纹；新指纹进入 N>1 或无界执行前，必须由用户明确发送 `启动迭代-1` 启动单 Issue 金丝雀。
+- 动态状态、评分、超时、恢复、调度和桌面执行宿主只以 AutoPilot Owner、references、配置和 Schema 为准，不在根规则复制。
 
-- 项目目录：`backend/` 后端、`frontend-admin/` 前端、`deploy/` 部署、`docs/` 文档中心。
-- 快速启动、本地访问地址、运行态刷新、常见验证：`docs/standards/01-快速开始.md`
-- 系统分层、模块域、数据与部署架构：`docs/standards/02-系统架构.md`
-- Docker、生产部署、回滚、备份、监控：`docs/standards/10-部署运维手册.md`
-- 前端本地验收默认入口：`http://localhost:5173`
-- 前后端重启后的统一稳定等待时间读取 `scripts/codex-autopilot/codex-autopilot.config.json` 的 `runtimeRefresh.waitSeconds`；等待完成后，后端再做 health / Flyway / 接口验收，前端确认 Vite ready 后再做 Playwright UI 验收。
-- 若 Docker 连续多次不可用（如 `dockerDesktopLinuxEngine` 管道不存在、`docker ps` 无法连接、`5173/8080` 均拒绝连接），在需要运行态验收且用户允许运维动作时，先尝试重启 WSL2 与 Docker Desktop，再等待 `180秒` 后复查 `docker ps`、后端 health、前端入口；不得把 Docker 不可用伪装成业务失败或验收通过。
-- 若 `http://localhost:5173` 回退到 `/login`，且前端日志出现 `/api/*` 代理到旧 `172.19.x.x:8080` 的错误，优先判定为前端 dev server 持有旧 backend 容器 IP；先执行 `python scripts/rebuild.py frontend` 再复验，不要先误判为路由守卫或后端业务回退。
+## 按需入口
 
-## 质量与避坑入口
-
-- 高频陷阱索引：`memory/MEMORY.md`。
-- 测试规范与测试数据隔离：`docs/standards/09-测试规范.md`。
-- 后端开发规范：`docs/standards/04-后端开发规范.md`。
-- 前端开发规范与 `lg-*` 设计系统：`docs/standards/05-前端开发规范.md`、`frontend-admin/src/assets/styles/global.css`。
-- 数据库与迁移规范：`docs/standards/07-数据库与迁移规范.md`。
-- UI 基线：`docs/standards/00-UI-Design-Baselines-and-Code-Specifications.md`。
-- CI、页面异常、接口失败先分三类再定性：`工具配置/规则加载问题`、`环境前置问题`、`真实质量/安全问题`；不要把所有红灯都直接归因为业务代码缺陷。
-- Codex 通用执行协议：`docs/standards/codex-task-execution-policy.md`。
-
-## 触发协议
-
-### 代码审计 / 代码评审 / 安全审计 / 生产可用性审计
-
-审计报告写入：
-
-```text
-docs/quality/code-audit-YYYY-MM-DD-<short-topic>.md
-```
-
-落盘动作遵循 `AGENTS.override.md` 的授权门与审计归档边界，并始终保留明确结论和验收证据。
-
-### 飞书确认交互
-
-遇到必须用户决策且需要飞书确认时，读取：
-
-```text
-docs/prompt/lark-confirmation-flow.md
-```
-
-## 文档入口
-
-- 文档索引：`docs/README.md`
-- 快速开始：`docs/standards/01-快速开始.md`
-- 系统架构：`docs/standards/02-系统架构.md`
-- 业务模块说明：`docs/standards/03-业务模块说明.md`
-- API 契约：`docs/standards/06-API契约规范.md`
-- 权限与审批：`docs/standards/08-权限与审批流程.md`
-- 安全规范：`docs/standards/11-安全规范.md`
-- Codex 任务执行策略：`docs/standards/codex-task-execution-policy.md`
+- 普通任务无需显式重读本文件。运行态/浏览器：`.agents/skills/cgc-pms-runtime-refresh/SKILL.md`。
+- CI、PR、失败分类：`.agents/skills/cgc-pms-ci-gate-triage/SKILL.md`。
+- 主线、计划、正式验收与收口：`.agents/skills/cgc-pms-mainline-owner-flow/SKILL.md`。
+- Git 交付：`git-publish-and-cleanup`；版本发布：`.agents/skills/release-skills/SKILL.md`。
+- AutoPilot：`plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md`；项目地图、候选、Ready 与回写按该 Skill 的事实入口执行。
+- 路由索引：`docs/standards/codex-task-execution-policy.md`。正式质量报告只写 `docs/quality/`，计划书只写 `docs/plans/`；临时日志、截图、缓存和 run id 不入长期规则。

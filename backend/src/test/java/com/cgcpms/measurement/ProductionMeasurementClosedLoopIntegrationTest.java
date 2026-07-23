@@ -72,6 +72,7 @@ class ProductionMeasurementClosedLoopIntegrationTest {
         var measurement = service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, periodId, LocalDate.of(2026, 7, 15), 1,
                 List.of(new MeasurementLineRequest(ITEM, null, new BigDecimal("20"), 1),
                         new MeasurementLineRequest(null, CHANGE, new BigDecimal("0.5"), 1)), "本期完成量"));
+        assertTrue(String.valueOf(measurement.get("measure_code")).matches("PM-202607-\\d{3}"));
         long measurementId = id(measurement);
         addMeasurementEvidence(measurementId);
         service.submitMeasurement(measurementId, version("production_measurement", measurementId));
@@ -80,6 +81,7 @@ class ProductionMeasurementClosedLoopIntegrationTest {
 
         addCleanFile("PRODUCTION_MEASUREMENT", measurementId, "OWNER_SUBMISSION");
         var submission = service.submitToOwner(measurementId, version("production_measurement", measurementId), new OwnerSubmissionRequest("OWNER-REPORT-001", 999, "业主报量"));
+        assertEquals("OMS-" + String.valueOf(measurement.get("measure_code")).substring(3) + "-R1", submission.get("submission_code"));
         long submissionId = id(submission);
         addCleanFile("OWNER_MEASUREMENT_SUBMISSION", submissionId, "OWNER_CONFIRMATION");
         assertEquals("300.00", submission.get("submitted_amount"));
@@ -115,6 +117,21 @@ class ProductionMeasurementClosedLoopIntegrationTest {
                 .map(ProductionMeasurementClosedLoopIntegrationTest::cast)
                 .map(row -> row.get("original_amount"))
                 .allMatch(String.class::isInstance));
+    }
+
+    @Test
+    void measurementCodesUseMonthlyThreeDigitSequence() {
+        long firstPeriod = createPeriod("2026-01");
+        long secondPeriod = id(service.createPeriod(new PeriodRequest(PROJECT, CONTRACT, "2026-01-B", "2026年1月补充计量",
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 20), LocalDate.of(2026, 1, 25), null)));
+
+        var first = service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, firstPeriod, LocalDate.of(2026, 1, 10), 1,
+                List.of(new MeasurementLineRequest(ITEM, null, BigDecimal.ONE, 1)), null));
+        var second = service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, secondPeriod, LocalDate.of(2026, 1, 11), 1,
+                List.of(new MeasurementLineRequest(ITEM, null, BigDecimal.ONE, 1)), null));
+
+        assertEquals("PM-202601-001", first.get("measure_code"));
+        assertEquals("PM-202601-002", second.get("measure_code"));
     }
 
     @Test
@@ -178,6 +195,7 @@ class ProductionMeasurementClosedLoopIntegrationTest {
         service.review(first, version("owner_measurement_submission", first), new OwnerReviewRequest("RETURNED", "业主代表", "签章页缺失", null, null, null, null, null, List.of()));
         long second = id(service.submitToOwner(measurementId, version("production_measurement", measurementId), new OwnerSubmissionRequest("OWNER-REPORT-R2", 1, null)));
         assertEquals(2, jdbc.queryForObject("SELECT revision_no FROM owner_measurement_submission WHERE id=?", Integer.class, second));
+        assertTrue(jdbc.queryForObject("SELECT submission_code FROM owner_measurement_submission WHERE id=?", String.class, second).matches("OMS-202610-\\d{3}-R2"));
         jdbc.update("UPDATE pm_project SET status='SUSPENDED' WHERE id=?", PROJECT);
         assertThrows(BusinessException.class, () -> createPeriod("2026-11"));
     }
@@ -220,6 +238,15 @@ class ProductionMeasurementClosedLoopIntegrationTest {
         assertTrue(service.measurements(PROJECT, null, LocalDate.of(2026, 6, 11), LocalDate.of(2026, 6, 30)).isEmpty());
         assertEquals(1, service.submissions(PROJECT, null, LocalDate.of(2026, 6, 10), LocalDate.of(2026, 6, 10)).size());
         assertTrue(service.submissions(PROJECT, null, LocalDate.of(2026, 6, 11), LocalDate.of(2026, 6, 30)).isEmpty());
+        assertTrue(service.periods(null, CONTRACT, LocalDate.of(2026, 6, 20), LocalDate.of(2026, 6, 20))
+                .stream().anyMatch(row -> PROJECT == ((Number) row.get("project_id")).longValue()));
+        assertTrue(service.measurements(null, null, LocalDate.of(2026, 6, 10), LocalDate.of(2026, 6, 10))
+                .stream().anyMatch(row -> PROJECT == ((Number) row.get("project_id")).longValue()));
+        assertTrue(service.submissions(null, null, LocalDate.of(2026, 6, 10), LocalDate.of(2026, 6, 10))
+                .stream().anyMatch(row -> PROJECT == ((Number) row.get("project_id")).longValue()));
+        UserContext.set(Jwts.claims().subject("restricted").add("userId", 2L).add("username", "restricted")
+                .add("tenantId", 0L).add("roleCodes", List.of()).build());
+        assertTrue(service.measurements(null, null, LocalDate.of(2026, 6, 10), LocalDate.of(2026, 6, 10)).isEmpty());
         BusinessException invalid = assertThrows(BusinessException.class, () ->
                 service.measurements(PROJECT, null, LocalDate.of(2026, 7, 1), LocalDate.of(2026, 6, 30)));
         assertEquals("MEASUREMENT_REPORT_DATE_INVALID", invalid.getCode());

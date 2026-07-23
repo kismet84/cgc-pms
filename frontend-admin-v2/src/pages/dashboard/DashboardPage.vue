@@ -22,6 +22,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
 } from '@/components'
 import DomainNavigationIcon from '@/components/DomainNavigationIcon.vue'
 import { loadCostBreakdown, loadDashboard } from '@/services/dashboard'
@@ -44,7 +45,9 @@ import {
   dashboardActivityItems,
   dashboardHealth,
   dashboardMetrics,
+  dashboardStatusLabel,
   formatAmount,
+  formatDashboardMessage,
   primaryRiskItems,
 } from './model'
 import { alertRuleLabel, alertStatusLabel, severityTone } from '../workbench/alert-report-model'
@@ -83,10 +86,15 @@ const expandedSubjects = ref(new Set<string>())
 const expandedFinanceContracts = ref(new Set<string>())
 const trendRange = ref<'year' | 'half' | 'quarter'>('year')
 const riskFilter = ref<'all' | DashboardRiskLevel>('all')
-const riskFilterMenu = ref<HTMLDetailsElement>()
-const riskFilterLabel = computed(
-  () => ({ all: '全部预警', ...DASHBOARD_RISK_LABELS })[riskFilter.value],
-)
+const riskPage = ref(1)
+const riskPageSize = 10
+const riskFilterOptions = [
+  { value: 'all', label: '全部预警' },
+  { value: 'high', label: '高' },
+  { value: 'medium', label: '中' },
+  { value: 'low', label: '低' },
+  { value: 'other', label: '其他' },
+]
 const refreshToken = ref(0)
 let generation = 0
 let controller: AbortController | null = null
@@ -105,8 +113,12 @@ const projectUnsupported = computed(
     currentProject.value?.status !== undefined &&
     currentProject.value.status !== 'ACTIVE',
 )
-const currentProjectLabel = computed(() =>
-  selectedRole.value === 'mgmt' ? '租户汇总' : (currentProject.value?.label ?? '全部项目'),
+const currentProjectLabel = computed(
+  () => currentProject.value?.label ?? (selectedRole.value === 'mgmt' ? '租户汇总' : '全部项目'),
+)
+const selectedAlertProjectLabel = computed(
+  () =>
+    workspace.projects.find((item) => item.value === selectedAlert.value?.projectId)?.label ?? '—',
 )
 const metrics = computed(() => (data.value ? dashboardMetrics(selectedRole.value, data.value) : []))
 const displayMetrics = computed(() =>
@@ -126,9 +138,27 @@ const alertRisks = computed(() =>
     alert,
   })),
 )
-const risks = computed(() => (canViewAlerts.value ? alertRisks.value : derivedRisks.value))
+const risks = computed(() =>
+  (canViewAlerts.value ? alertRisks.value : derivedRisks.value).map((item) => ({
+    ...item,
+    title: formatDashboardMessage(item.title),
+    status: dashboardStatusLabel(item.status),
+  })),
+)
+const showRiskValueColumn = computed(() =>
+  risks.value.some((item) => 'value' in item && Boolean(item.value)),
+)
+const riskTableColumnCount = computed(() => (showRiskValueColumn.value ? 6 : 5))
 const activityItems = computed(() =>
-  data.value ? dashboardActivityItems(selectedRole.value, data.value).slice(0, 6) : [],
+  data.value
+    ? dashboardActivityItems(selectedRole.value, data.value)
+        .slice(0, 6)
+        .map((item) => ({
+          ...item,
+          title: formatDashboardMessage(item.title),
+          status: dashboardStatusLabel(item.status),
+        }))
+    : [],
 )
 const costData = computed(() =>
   selectedRole.value === 'cost' && data.value ? (data.value as CostManagerDashboardVO) : null,
@@ -213,6 +243,13 @@ const filteredRisks = computed(() => {
       : risks.value.filter((item) => item.riskLevel === riskFilter.value)
   return items
 })
+const riskPageCount = computed(() =>
+  Math.max(1, Math.ceil(filteredRisks.value.length / riskPageSize)),
+)
+const visibleRisks = computed(() => {
+  const start = (riskPage.value - 1) * riskPageSize
+  return filteredRisks.value.slice(start, start + riskPageSize)
+})
 const targetAlertStatusOptions = [
   { value: 'PROCESSED', label: '已处理' },
   { value: 'ARCHIVED', label: '已归档' },
@@ -259,6 +296,14 @@ watch(selectedRole, (role) => {
   void router.replace({ path: route.path, query, hash: route.hash })
 })
 
+watch(riskFilter, () => {
+  riskPage.value = 1
+})
+
+watch(riskPageCount, (pageCount) => {
+  if (riskPage.value > pageCount) riskPage.value = pageCount
+})
+
 watch(
   [
     selectedRole,
@@ -294,11 +339,6 @@ async function showHighestRisks(): Promise<void> {
   document.getElementById('risk-list')?.scrollIntoView?.({ block: 'start' })
 }
 
-function selectRiskFilter(value: 'all' | DashboardRiskLevel): void {
-  riskFilter.value = value
-  riskFilterMenu.value?.removeAttribute('open')
-}
-
 async function refreshAlerts(): Promise<void> {
   alertController?.abort()
   alertRows.value = []
@@ -309,26 +349,39 @@ async function refreshAlerts(): Promise<void> {
   const currentController = alertController
   alertLoading.value = true
   try {
-    const supportsProject = selectedRole.value !== 'mgmt'
-    const supportsPeriod = !['bm', 'finance', 'mgmt'].includes(selectedRole.value)
-    const periodBounds = dashboardPeriodBounds(
-      supportsPeriod ? workspace.selectedReportPeriod : null,
-    )
+    const periodBounds = dashboardPeriodBounds(workspace.selectedReportPeriod)
     const result = await loadAlerts(
       {
         pageNum: 1,
         pageSize: 50,
-        projectId: supportsProject ? workspace.selectedProjectId || undefined : undefined,
+        projectId: workspace.selectedProjectId || undefined,
+        processStatus: 'OPEN',
         ...periodBounds,
       },
       currentController.signal,
     )
     if (currentController.signal.aborted) return
-    alertRows.value = result.records.map((row) => ({
-      ...row,
-      id: String(row.id),
-      projectId: String(row.projectId),
-    }))
+    const seen = new Set<string>()
+    alertRows.value = result.records.flatMap((row) => {
+      const normalized = {
+        ...row,
+        id: String(row.id),
+        projectId: String(row.projectId),
+      }
+      const signature =
+        normalized.dedupKey ??
+        [
+          normalized.projectId,
+          normalized.ruleType,
+          normalized.severity,
+          normalized.message,
+          normalized.triggeredAt,
+          normalized.processStatus,
+        ].join('\u0000')
+      if (seen.has(signature)) return []
+      seen.add(signature)
+      return [normalized]
+    })
   } catch (caught) {
     if (!currentController.signal.aborted) {
       alertError.value = isApiClientError(caught) ? caught.message : '预警列表加载失败'
@@ -477,6 +530,17 @@ async function refresh(): Promise<void> {
   }
 }
 
+async function refreshDashboard(): Promise<void> {
+  await Promise.all([refresh(), refreshAlerts()])
+  if (error.value || alertError.value) {
+    showToast('error', '刷新失败', '驾驶舱数据未能完整更新')
+  } else if (breakdownError.value) {
+    showToast('warn', '刷新完成', '驾驶舱已更新，成本分解加载失败')
+  } else {
+    showToast('success', '刷新成功', '驾驶舱数据已更新')
+  }
+}
+
 function selectRole(role: DashboardRole): void {
   selectedRole.value = role
 }
@@ -562,9 +626,9 @@ function isAbort(errorValue: unknown): boolean {
     <template v-else-if="data">
       <section id="health-overview" class="command-panel health-panel">
         <header class="command-panel__title">
-          <strong>项目经营健康度</strong>
+          <strong>项目经营健康评分</strong>
           <span>{{ currentProjectLabel }} · {{ DASHBOARD_ROLE_LABELS[selectedRole] }}</span>
-          <V2Button size="small" variant="ghost" :loading="loading" @click="refreshToken += 1">
+          <V2Button size="small" variant="ghost" :loading="loading" @click="refreshDashboard">
             刷新
           </V2Button>
           <button type="button" class="dashboard-page__outline-link" @click="showHighestRisks">
@@ -572,7 +636,12 @@ function isAbort(errorValue: unknown): boolean {
           </button>
         </header>
         <div class="health-content">
-          <div v-if="health" class="health-score">
+          <div
+            v-if="health"
+            class="health-score"
+            role="img"
+            :aria-label="`经营健康评分 ${health.score} 分，${health.label}；分数越高越健康`"
+          >
             <div class="health-score__chart">
               <DashboardGauge
                 :value="health.score"
@@ -583,7 +652,7 @@ function isAbort(errorValue: unknown): boolean {
                 <span :class="`is-${health.tone}`">{{ health.label }}</span>
               </div>
             </div>
-            <p>综合成本、资金、履约与待办风险；经营健康为辅助判断，非财务/结算口径</p>
+            <p>分数越高表示经营状况越健康；仅作辅助判断，非财务/结算口径</p>
           </div>
 
           <div class="highest-risk">
@@ -665,52 +734,13 @@ function isAbort(errorValue: unknown): boolean {
           <header class="panel-toolbar">
             <strong>预警列表（{{ risks.length }}）</strong>
             <div class="risk-panel__actions">
-              <details ref="riskFilterMenu" class="risk-filter">
-                <span class="v2-visually-hidden">筛选预警</span>
-                <summary aria-label="筛选预警">{{ riskFilterLabel }}</summary>
-                <div class="risk-filter__menu" role="listbox" aria-label="筛选预警选项">
-                  <button
-                    type="button"
-                    role="option"
-                    :aria-selected="riskFilter === 'all'"
-                    @click="selectRiskFilter('all')"
-                  >
-                    全部预警
-                  </button>
-                  <button
-                    type="button"
-                    role="option"
-                    :aria-selected="riskFilter === 'high'"
-                    @click="selectRiskFilter('high')"
-                  >
-                    高
-                  </button>
-                  <button
-                    type="button"
-                    role="option"
-                    :aria-selected="riskFilter === 'medium'"
-                    @click="selectRiskFilter('medium')"
-                  >
-                    中
-                  </button>
-                  <button
-                    type="button"
-                    role="option"
-                    :aria-selected="riskFilter === 'low'"
-                    @click="selectRiskFilter('low')"
-                  >
-                    低
-                  </button>
-                  <button
-                    type="button"
-                    role="option"
-                    :aria-selected="riskFilter === 'other'"
-                    @click="selectRiskFilter('other')"
-                  >
-                    其他
-                  </button>
-                </div>
-              </details>
+              <V2Select
+                v-model="riskFilter"
+                class="risk-filter"
+                label="预警级别"
+                hide-label
+                :options="riskFilterOptions"
+              />
               <div v-if="canEvaluateAlerts" class="risk-evaluate-action">
                 <V2Alert
                   v-if="alertEvaluationMessage"
@@ -743,15 +773,15 @@ function isAbort(errorValue: unknown): boolean {
                 <tr>
                   <th>优先级</th>
                   <th>预警事项</th>
-                  <th>金额 / 指标</th>
+                  <th v-if="showRiskValueColumn">金额 / 指标</th>
                   <th>状态</th>
                   <th>责任范围</th>
-                  <th>来源</th>
+                  <th>规则 / 触发时间</th>
                 </tr>
               </thead>
               <tbody>
                 <tr
-                  v-for="item in filteredRisks"
+                  v-for="item in visibleRisks"
                   :key="item.id"
                   :class="{ 'is-actionable': 'alert' in item && item.alert }"
                   :tabindex="'alert' in item && item.alert ? 0 : undefined"
@@ -766,20 +796,35 @@ function isAbort(errorValue: unknown): boolean {
                   <td>
                     <strong>{{ item.title }}</strong>
                   </td>
-                  <td>{{ item.value || '—' }}</td>
+                  <td v-if="showRiskValueColumn">{{ item.value }}</td>
                   <td>{{ item.status }}</td>
                   <td>{{ currentProjectLabel }}</td>
                   <td>{{ item.meta }}</td>
                 </tr>
                 <tr v-if="alertLoading" class="empty-row">
-                  <td colspan="6">正在加载预警</td>
+                  <td :colspan="riskTableColumnCount">正在加载预警</td>
                 </tr>
                 <tr v-else-if="!filteredRisks.length" class="empty-row">
-                  <td colspan="6">当前筛选条件下暂无预警</td>
+                  <td :colspan="riskTableColumnCount">当前筛选条件下暂无预警</td>
                 </tr>
               </tbody>
             </table>
           </div>
+          <footer v-if="filteredRisks.length" class="risk-pagination" aria-label="预警分页">
+            <span>共 {{ filteredRisks.length }} 条</span>
+            <V2Button size="small" variant="ghost" :disabled="riskPage <= 1" @click="riskPage -= 1">
+              上一页
+            </V2Button>
+            <span>第 {{ riskPage }} / {{ riskPageCount }} 页</span>
+            <V2Button
+              size="small"
+              variant="ghost"
+              :disabled="riskPage >= riskPageCount"
+              @click="riskPage += 1"
+            >
+              下一页
+            </V2Button>
+          </footer>
         </section>
       </div>
 
@@ -935,7 +980,7 @@ function isAbort(errorValue: unknown): boolean {
                   <td>—</td>
                   <td>—</td>
                   <td>—</td>
-                  <td>{{ payment.payStatus }}</td>
+                  <td>{{ dashboardStatusLabel(payment.payStatus) }}</td>
                 </tr>
               </template>
             </tbody>
@@ -975,7 +1020,7 @@ function isAbort(errorValue: unknown): boolean {
             </div>
             <div>
               <dt>项目</dt>
-              <dd>{{ selectedAlert.projectId }}</dd>
+              <dd>{{ selectedAlertProjectLabel }}</dd>
             </div>
             <div>
               <dt>触发时间</dt>
@@ -1219,12 +1264,10 @@ function isAbort(errorValue: unknown): boolean {
 }
 .highest-risk h2 {
   margin: 8px 0 4px;
-  overflow: hidden;
   color: var(--v2-color-text-strong);
   font-size: var(--v2-font-size-17);
   line-height: 24px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .highest-risk p {
   min-height: 30px;
@@ -1310,6 +1353,7 @@ function isAbort(errorValue: unknown): boolean {
 .command-grid {
   display: grid;
   grid-template-columns: minmax(430px, 0.92fr) minmax(550px, 1.18fr);
+  align-items: start;
   gap: 12px;
 }
 .trend-range {
@@ -1384,7 +1428,7 @@ function isAbort(errorValue: unknown): boolean {
   font-size: var(--v2-font-size-12);
 }
 .risk-filter {
-  position: relative;
+  width: 112px;
   font-size: var(--v2-font-size-11);
   font-weight: var(--v2-font-weight-regular);
 }
@@ -1425,54 +1469,6 @@ function isAbort(errorValue: unknown): boolean {
   content: '';
   transform: translateY(-50%) rotate(45deg);
 }
-.risk-filter summary {
-  width: 94px;
-  min-height: 32px;
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-sm);
-  list-style: none;
-  cursor: pointer;
-}
-.risk-filter summary::after {
-  margin-inline-start: auto;
-  content: '⌄';
-}
-.risk-filter summary::-webkit-details-marker {
-  display: none;
-}
-.risk-filter__menu {
-  position: absolute;
-  z-index: var(--v2-z-dropdown);
-  inset-block-start: calc(100% + 4px);
-  inset-inline-end: 0;
-  width: 112px;
-  padding: 4px;
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-sm);
-  box-shadow: var(--v2-shadow-panel);
-}
-.risk-filter__menu button {
-  width: 100%;
-  min-height: 32px;
-  padding: 0 8px;
-  color: var(--v2-color-text-secondary);
-  background: transparent;
-  border: 0;
-  border-radius: var(--v2-radius-sm);
-  text-align: start;
-  cursor: pointer;
-}
-.risk-filter__menu button:hover,
-.risk-filter__menu button[aria-selected='true'] {
-  color: var(--v2-color-primary);
-  background: var(--v2-color-primary-soft);
-}
 .finance-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1505,6 +1501,17 @@ function isAbort(errorValue: unknown): boolean {
 }
 .risk-table-wrap {
   overflow: auto;
+}
+.risk-pagination {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--v2-color-border-subtle);
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
 }
 .dashboard-page .risk-table {
   width: 100%;
@@ -1661,6 +1668,14 @@ function isAbort(errorValue: unknown): boolean {
   }
 }
 @media (max-width: 48rem) {
+  .dashboard-page__roles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+  .dashboard-page__roles button {
+    width: 100%;
+  }
   .command-panel__title {
     align-items: flex-start;
     flex-direction: column;
@@ -1698,6 +1713,15 @@ function isAbort(errorValue: unknown): boolean {
     align-items: flex-start;
     flex-direction: column;
     padding-block: 10px;
+  }
+  .risk-panel__actions {
+    width: 100%;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+  .risk-pagination {
+    flex-wrap: wrap;
+    justify-content: center;
   }
   .utility-panel {
     grid-template-columns: 1fr;

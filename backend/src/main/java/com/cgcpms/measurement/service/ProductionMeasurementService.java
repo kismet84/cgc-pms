@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 @Service
@@ -28,6 +29,8 @@ import java.util.*;
 public class ProductionMeasurementService {
     private static final Set<String> INTERNALLY_APPROVED_STATUSES = Set.of(
             "INTERNAL_APPROVED", "OWNER_SUBMITTED", "OWNER_RETURNED", "OWNER_CONFIRMED", "SETTLEMENT_CREATED");
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
+    private static final DateTimeFormatter MONTH_CODE = DateTimeFormatter.ofPattern("yyyyMM");
 
     private final JdbcTemplate jdbc;
     private final WorkflowEngine workflowEngine;
@@ -55,17 +58,20 @@ public class ProductionMeasurementService {
     }
 
     public List<Map<String, Object>> periods(Long projectId, Long contractId, LocalDate startDate, LocalDate endDate) {
-        if (projectId == null) return List.of();
         validateDateWindow(startDate, endDate);
-        projectAccessChecker.checkAccess(projectId, "查看计量周期");
+        List<Long> projectIds = projectIdsForQuery(projectId, "查看计量周期");
+        if (projectIds.isEmpty()) return List.of();
+        List<Object> params = new ArrayList<>();
+        params.add(tenant());
+        params.addAll(projectIds);
+        Collections.addAll(params, contractId, contractId, startDate, startDate, endDate, endDate);
         return jdbc.queryForList("""
                 SELECT p.* FROM measurement_period p
                  WHERE p.tenant_id=? AND p.deleted_flag=0
-                   AND (? IS NULL OR p.project_id=?) AND (? IS NULL OR p.contract_id=?)
+                   AND p.project_id IN (%s) AND (? IS NULL OR p.contract_id=?)
                    AND (? IS NULL OR p.end_date>=?) AND (? IS NULL OR p.start_date<=?)
                  ORDER BY p.start_date DESC,p.id DESC
-                """, tenant(), projectId, projectId, contractId, contractId,
-                startDate, startDate, endDate, endDate);
+                """.formatted(placeholders(projectIds.size())), params.toArray());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -125,41 +131,50 @@ public class ProductionMeasurementService {
             currentTotal = currentTotal.add(value.currentAmount());
         }
         BigDecimal priorTotal = money(jdbc.queryForObject("SELECT COALESCE(SUM(current_reported_amount),0) FROM production_measurement WHERE tenant_id=? AND contract_id=? AND deleted_flag=0 AND status IN('INTERNAL_APPROVED','OWNER_SUBMITTED','OWNER_RETURNED','OWNER_CONFIRMED','SETTLEMENT_CREATED')", BigDecimal.class, tenant(), request.contractId()));
-        try {
-            jdbc.update("""
-                    INSERT INTO production_measurement(id,tenant_id,project_id,contract_id,period_id,measure_code,measure_date,
-                     current_reported_amount,cumulative_reported_amount,status,approval_status,attachment_count,formula_version,version,
-                     created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?, ?,?,'DRAFT','DRAFT',?,'PRODUCTION_MEASUREMENT_V1',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), request.projectId(), request.contractId(), request.periodId(), "PM-" + id, request.measureDate(),
-                    currentTotal, priorTotal.add(currentTotal), 0, user(), user(), request.remark());
-            for (ResolvedLine line : resolved) {
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            String measureCode = nextMeasurementCode(request.measureDate(), attempt);
+            try {
                 jdbc.update("""
-                        INSERT INTO production_measurement_line(id,tenant_id,measurement_id,source_type,contract_item_id,contract_change_id,
-                         item_code,item_name,item_spec,unit,contract_quantity,prior_approved_quantity,current_reported_quantity,
-                         cumulative_reported_quantity,unit_price,current_reported_amount,cumulative_reported_amount,evidence_count,sort_order,created_by,created_at)
-                        VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
-                        """, IdWorker.getId(), tenant(), id, line.sourceType(), line.contractItemId(), line.contractChangeId(),
-                        line.itemCode(), line.itemName(), line.itemSpec(), line.unit(), line.contractQuantity(), line.priorQuantity(),
-                        line.currentQuantity(), line.priorQuantity().add(line.currentQuantity()), line.unitPrice(), line.currentAmount(),
-                        money(line.priorQuantity().multiply(line.unitPrice())).add(line.currentAmount()), 0, sort++, user());
+                        INSERT INTO production_measurement(id,tenant_id,project_id,contract_id,period_id,measure_code,measure_date,
+                         current_reported_amount,cumulative_reported_amount,status,approval_status,attachment_count,formula_version,version,
+                         created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?, ?,?,'DRAFT','DRAFT',?,'PRODUCTION_MEASUREMENT_V1',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), request.projectId(), request.contractId(), request.periodId(), measureCode, request.measureDate(),
+                        currentTotal, priorTotal.add(currentTotal), 0, user(), user(), request.remark());
+                for (ResolvedLine line : resolved) {
+                    jdbc.update("""
+                            INSERT INTO production_measurement_line(id,tenant_id,measurement_id,source_type,contract_item_id,contract_change_id,
+                             item_code,item_name,item_spec,unit,contract_quantity,prior_approved_quantity,current_reported_quantity,
+                             cumulative_reported_quantity,unit_price,current_reported_amount,cumulative_reported_amount,evidence_count,sort_order,created_by,created_at)
+                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+                            """, IdWorker.getId(), tenant(), id, line.sourceType(), line.contractItemId(), line.contractChangeId(),
+                            line.itemCode(), line.itemName(), line.itemSpec(), line.unit(), line.contractQuantity(), line.priorQuantity(),
+                            line.currentQuantity(), line.priorQuantity().add(line.currentQuantity()), line.unitPrice(), line.currentAmount(),
+                            money(line.priorQuantity().multiply(line.unitPrice())).add(line.currentAmount()), 0, sort++, user());
+                }
+                return measurement(id);
+            } catch (DuplicateKeyException e) {
+                if (duplicateOf(e, "uk_production_measure_code")) continue;
+                throw error("MEASUREMENT_PERIOD_DOCUMENT_DUPLICATE", "同一合同周期只能存在一张产值计量单");
             }
-        } catch (DuplicateKeyException e) {
-            throw error("MEASUREMENT_PERIOD_DOCUMENT_DUPLICATE", "同一合同周期只能存在一张产值计量单");
         }
-        return measurement(id);
+        throw error("PRODUCTION_MEASUREMENT_CODE_CONFLICT", "计量编号生成冲突，请重试");
     }
 
     public List<Map<String, Object>> measurements(Long projectId, String status, LocalDate startDate, LocalDate endDate) {
-        if (projectId == null) return List.of();
         validateDateWindow(startDate, endDate);
-        projectAccessChecker.checkAccess(projectId, "查看产值计量");
+        List<Long> projectIds = projectIdsForQuery(projectId, "查看产值计量");
+        if (projectIds.isEmpty()) return List.of();
+        List<Object> params = new ArrayList<>();
+        params.add(tenant());
+        params.addAll(projectIds);
+        Collections.addAll(params, status, status, startDate, startDate, endDate, endDate);
         return moneyPayload(jdbc.queryForList("""
                 SELECT m.*,p.period_code,p.period_name FROM production_measurement m JOIN measurement_period p ON p.id=m.period_id
-                 WHERE m.tenant_id=? AND m.deleted_flag=0 AND (? IS NULL OR m.project_id=?) AND (? IS NULL OR m.status=?)
+                 WHERE m.tenant_id=? AND m.deleted_flag=0 AND m.project_id IN (%s) AND (? IS NULL OR m.status=?)
                    AND (? IS NULL OR m.measure_date>=?) AND (? IS NULL OR m.measure_date<=?)
                  ORDER BY m.measure_date DESC,m.id DESC
-                """, tenant(), projectId, projectId, status, status, startDate, startDate, endDate, endDate));
+                """.formatted(placeholders(projectIds.size())), params.toArray()));
     }
 
     public Map<String, Object> measurement(Long id) {
@@ -238,13 +253,17 @@ public class ProductionMeasurementService {
         if (attachmentCount < 1) throw error("OWNER_SUBMISSION_ATTACHMENT_REQUIRED", "业主申报必须上传真实且扫描通过的报送附件");
         Integer revision = jdbc.queryForObject("SELECT COALESCE(MAX(revision_no),0)+1 FROM owner_measurement_submission WHERE tenant_id=? AND measurement_id=? AND deleted_flag=0", Integer.class, tenant(), measurementId);
         Long id = IdWorker.getId();
+        String measureCode = string(measurement.get("measure_code"));
+        String submissionCode = measureCode != null && measureCode.matches("PM-\\d{6}-\\d{3}")
+                ? "OMS-" + measureCode.substring(3) + "-R" + revision
+                : "OMS-" + measurementId + "-R" + revision;
         jdbc.update("""
                 INSERT INTO owner_measurement_submission(id,tenant_id,project_id,contract_id,measurement_id,submission_code,revision_no,
                  submitted_at,external_document_no,submitted_amount,confirmed_amount,deducted_amount,status,attachment_count,version,
                  created_by,created_at,updated_by,updated_at,deleted_flag,remark)
                 VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,?,0,0,'SUBMITTED',?,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
                 """, id, tenant(), measurement.get("project_id"), measurement.get("contract_id"), measurementId,
-                "OMS-" + measurementId + "-R" + revision, revision, blankToNull(request.externalDocumentNo()),
+                submissionCode, revision, blankToNull(request.externalDocumentNo()),
                 measurement.get("current_reported_amount"), attachmentCount, user(), user(), request.remark());
         for (Map<String, Object> line : jdbc.queryForList("SELECT id,current_reported_quantity,current_reported_amount FROM production_measurement_line WHERE tenant_id=? AND measurement_id=? ORDER BY id", tenant(), measurementId)) {
             jdbc.update("INSERT INTO owner_measurement_review_line(id,tenant_id,submission_id,measurement_line_id,submitted_quantity,submitted_amount,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP)",
@@ -256,10 +275,20 @@ public class ProductionMeasurementService {
     }
 
     public List<Map<String, Object>> submissions(Long projectId, String status, LocalDate startDate, LocalDate endDate) {
-        if (projectId == null) return List.of();
         validateDateWindow(startDate, endDate);
-        projectAccessChecker.checkAccess(projectId, "查看业主报量");
-        return moneyPayload(jdbc.queryForList("SELECT s.*,m.measure_code,p.period_code FROM owner_measurement_submission s JOIN production_measurement m ON m.id=s.measurement_id JOIN measurement_period p ON p.id=m.period_id WHERE s.tenant_id=? AND s.deleted_flag=0 AND (? IS NULL OR s.project_id=?) AND (? IS NULL OR s.status=?) AND (? IS NULL OR m.measure_date>=?) AND (? IS NULL OR m.measure_date<=?) ORDER BY s.submitted_at DESC,s.id DESC", tenant(), projectId, projectId, status, status, startDate, startDate, endDate, endDate));
+        List<Long> projectIds = projectIdsForQuery(projectId, "查看业主报量");
+        if (projectIds.isEmpty()) return List.of();
+        List<Object> params = new ArrayList<>();
+        params.add(tenant());
+        params.addAll(projectIds);
+        Collections.addAll(params, status, status, startDate, startDate, endDate, endDate);
+        String sql = "SELECT s.*,m.measure_code,p.period_code FROM owner_measurement_submission s "
+                + "JOIN production_measurement m ON m.id=s.measurement_id "
+                + "JOIN measurement_period p ON p.id=m.period_id "
+                + "WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.project_id IN (" + placeholders(projectIds.size()) + ") "
+                + "AND (? IS NULL OR s.status=?) AND (? IS NULL OR m.measure_date>=?) "
+                + "AND (? IS NULL OR m.measure_date<=?) ORDER BY s.submitted_at DESC,s.id DESC";
+        return moneyPayload(jdbc.queryForList(sql, params.toArray()));
     }
 
     public Map<String, Object> submission(Long id) {
@@ -477,12 +506,34 @@ public class ProductionMeasurementService {
     private int intValue(Object value) { return value == null ? 0 : ((Number) value).intValue(); }
     private String string(Object value) { return value == null ? null : value.toString(); }
     private String blankToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
+    private String nextMeasurementCode(LocalDate measureDate, int offset) {
+        String prefix = "PM-" + measureDate.format(MONTH_CODE) + "-";
+        String last = jdbc.query("SELECT measure_code FROM production_measurement WHERE tenant_id=? AND measure_code LIKE ? AND deleted_flag=0 ORDER BY measure_code DESC LIMIT 1",
+                rs -> rs.next() ? rs.getString(1) : null, tenant(), prefix + "%");
+        int sequence = 1 + offset;
+        if (last != null) {
+            try { sequence = Integer.parseInt(last.substring(prefix.length())) + 1 + offset; }
+            catch (RuntimeException ignored) { /* 非标准历史编号不阻止新规则编号生成。 */ }
+        }
+        if (sequence > 999) throw error("PRODUCTION_MEASUREMENT_MONTHLY_LIMIT", "当月计量编号已用尽");
+        return prefix + String.format("%03d", sequence);
+    }
+    private boolean duplicateOf(DuplicateKeyException error, String constraint) {
+        return String.valueOf(error.getMostSpecificCause().getMessage()).toLowerCase(Locale.ROOT).contains(constraint);
+    }
     private BigDecimal decimal(Object value) { return value == null ? BigDecimal.ZERO : new BigDecimal(value.toString()); }
     private BigDecimal money(Object value) { return decimal(value).setScale(2, RoundingMode.HALF_UP); }
     private BigDecimal quantity(Object value) { return decimal(value).setScale(4, RoundingMode.HALF_UP); }
     private BigDecimal price(Object value) { return decimal(value).setScale(4, RoundingMode.HALF_UP); }
     private java.time.LocalDate localDate(Object value) { if (value instanceof java.time.LocalDate d) return d; if (value instanceof java.sql.Date d) return d.toLocalDate(); return java.time.LocalDate.parse(value.toString()); }
     private BusinessException error(String code, String message) { return new BusinessException(code, message); }
+    private List<Long> projectIdsForQuery(Long projectId, String permission) {
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, permission);
+            return List.of(projectId);
+        }
+        return projectAccessChecker.accessibleProjectIds();
+    }
     private String placeholders(int count) { return String.join(",", Collections.nCopies(count, "?")); }
     private Object[] args(Object first, Collection<?> rest) { List<Object> values = new ArrayList<>(); values.add(first); values.addAll(rest); return values.toArray(); }
 

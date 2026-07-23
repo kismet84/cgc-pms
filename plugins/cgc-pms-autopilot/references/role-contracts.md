@@ -36,7 +36,5 @@
 2. D/E/F 输出必须短、稳定、可复核，不复制真实长日志。
 3. 若输入边界不清，先补 repair-request 或任务说明，不直接扩 scope。
 4. loop runner 只负责串联 phase 和建议动作，不替代主线程最终裁决。
-5. 知识图谱只负责发现、筛选和关联导航；候选进入 Ready 前必须核实当前分支事实与唯一正式载体，图谱异常或过期时 fail-close。
-6. Ready allow/forbid 完全覆盖矛盾属于 `ready_issue_config`，必须在 executor/worktree 前拒绝；合法窄禁止 carve-out 不得误伤。
-7. 评分只对通过全部硬门禁的实施型 Ready 生效；低分不改变任务裁决。未批准 scoring candidate 不计数，已激活版本按跨批次周期累计。
-8. 回顾只提出并正式承接 `NEEDS_CONFIRMATION` 改进方案；报告、问题事实、图谱游标和稳定 Episode 未完成可恢复收口前不得清零周期或恢复派发。
+
+调度、Ready、评分和回顾规则统一读取 `control-plane-policy.md`；输出字段统一读取 `output-contract.md`。

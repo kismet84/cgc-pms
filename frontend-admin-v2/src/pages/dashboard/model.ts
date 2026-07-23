@@ -54,6 +54,37 @@ export function formatAmount(value: string | null | undefined): string {
   return `¥${sign}${integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${fraction}`
 }
 
+const DASHBOARD_STATUS_LABELS: Record<string, string> = {
+  ACTIVE: '进行中',
+  APPROVED: '已通过',
+  ARCHIVED: '已归档',
+  BLOCKED: '已阻塞',
+  CLOSED: '已关闭',
+  COMPLETED: '已完成',
+  CONFIRMED: '已确认',
+  DRAFT: '草稿',
+  FAILED: '失败',
+  INVALID: '已失效',
+  OPEN: '待处理',
+  OVERDUE: '已逾期',
+  PENDING: '待处理',
+  PROCESSED: '已处理',
+  PROCESSING: '处理中',
+  REJECTED: '已驳回',
+  RUNNING: '进行中',
+  SUCCESS: '已完成',
+}
+
+export function dashboardStatusLabel(value: string | null | undefined): string {
+  const normalized = value?.trim()
+  if (!normalized) return '—'
+  return DASHBOARD_STATUS_LABELS[normalized.toUpperCase()] ?? normalized
+}
+
+export function formatDashboardMessage(message: string): string {
+  return message.replace(/-?\d{1,18}\.\d{2}(?!\d)/g, (value) => formatAmount(value))
+}
+
 export function formatRatio(value: string | null | undefined): string {
   const normalized = value?.trim()
   if (!normalized) return '—'
@@ -474,17 +505,19 @@ export function dashboardActivityItems(
 function businessItem(item: {
   sourceType: string
   sourceId: string
-  title: string
-  projectName: string
-  amount: string
-  status: string
+  code?: string | null
+  title?: string | null
+  itemSummary?: string | null
+  projectName?: string | null
+  amount?: string | null
+  status?: string | null
 }): DashboardListItem {
   return {
     id: `${item.sourceType}-${item.sourceId}`,
-    title: item.title,
-    meta: item.projectName,
+    title: item.title?.trim() || item.itemSummary?.trim() || item.code?.trim() || '未命名事项',
+    meta: item.projectName?.trim() || '全部项目',
     value: formatAmount(item.amount),
-    status: item.status,
+    status: item.status ?? undefined,
   }
 }
 

@@ -56,7 +56,7 @@ function Get-AutopilotCandidateRef {
 function Get-AutopilotRefillStageFailureCategory {
   param([object[]]$CandidateDecisions)
   $categories = @($CandidateDecisions | Where-Object outcome -eq 'BLOCKED' | ForEach-Object { [string]$_.failureCategory })
-  foreach ($category in @('quality_security','tool_config','environment_prereq','ready_issue_config')) {
+  foreach ($category in @('quality_or_security','tool_config','tool_invocation','environment_prerequisite','ready_issue_config','retrieval_gap','unknown')) {
     if ($categories -contains $category) { return $category }
   }
   if ($categories -contains 'needs_confirmation') { return 'ready_issue_config' }
@@ -218,7 +218,7 @@ function Get-AutopilotKnowledgeGraphIssueSnapshot {
     $refreshed = $false
     if (!$gitCursor -or [string]$gitCursor.cursor -ne $head) {
       if ($config.issueGraph.refreshWhenHeadDiffers -ne $true) {
-        return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_security'; message = 'git cursor differs from current HEAD and refresh is disabled'; issues = @() }
+        return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_or_security'; message = 'git cursor differs from current HEAD and refresh is disabled'; issues = @() }
       }
       $null = Invoke-AutopilotKnowledgeGraphCli -RepoRoot $RepoRoot -CliPath $cliFull -Arguments @('collect','--trigger','autopilot-refill') -CommandInvoker $CommandInvoker
       $refreshed = $true
@@ -227,18 +227,18 @@ function Get-AutopilotKnowledgeGraphIssueSnapshot {
       $healthyRun = !$status.lastRunStatus -or ([string]$status.lastRunStatus).ToUpperInvariant() -in @('SUCCESS','SUCCEEDED','COMPLETED')
       $failures = if ($null -eq $status.lastRunFailures) { 0 } else { [int]$status.lastRunFailures }
       if (!$healthyRun -or $failures -ne 0 -or !$gitCursor -or [string]$gitCursor.cursor -ne $head) {
-        return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_security'; message = 'knowledge graph remains stale or unhealthy after one refresh'; issues = @() }
+        return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_or_security'; message = 'knowledge graph remains stale or unhealthy after one refresh'; issues = @() }
       }
     }
     $issueResult = Invoke-AutopilotKnowledgeGraphCli -RepoRoot $RepoRoot -CliPath $cliFull -Arguments @('issues','--view','list','--current-only','--limit',[string]$limit) -CommandInvoker $CommandInvoker
     if ($null -eq $issueResult.total -or $null -eq $issueResult.issues) { throw 'knowledge graph issues response does not match the expected schema' }
     if ([int]$status.currentIssues -ne [int]$issueResult.total) {
-      return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_security'; message = 'status currentIssues differs from issues query total'; issues = @() }
+      return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_or_security'; message = 'status currentIssues differs from issues query total'; issues = @() }
     }
     return [pscustomobject]@{ available = $true; source = 'knowledge-graph'; head = $head; cursor = [string]$gitCursor.cursor; refreshed = $refreshed; issues = @($issueResult.issues) }
   } catch {
     $message = $_.Exception.Message
-    $category = if ($message -match 'ECONNREFUSED|connection|connectivity|Neo4j|socket|port') { 'environment_prereq' } else { 'tool_config' }
+    $category = if ($message -match 'ECONNREFUSED|connection|connectivity|Neo4j|socket|port') { 'environment_prerequisite' } else { 'tool_config' }
     return [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_UNAVAILABLE'; failureCategory = $category; message = $message; issues = @() }
   }
 }
@@ -374,7 +374,7 @@ function Import-AutopilotReadyPlan {
     if ($expected.Count -ne $actual.Count -or (Compare-Object $expected $actual)) { throw 'candidate decisions must exactly cover the bounded candidate set' }
   }
   $allowedOutcomes = @('CREATED','REJECTED','BLOCKED')
-  $allowedBlockedCategories = @('ready_issue_config','tool_config','environment_prereq','quality_security','needs_confirmation')
+  $allowedBlockedCategories = @('ready_issue_config','tool_config','tool_invocation','environment_prerequisite','retrieval_gap','quality_or_security','unknown','needs_confirmation')
   foreach ($decision in $decisions) {
     if ([string]$decision.outcome -notin $allowedOutcomes) { throw "unsupported candidate outcome: $($decision.outcome)" }
     if ([string]::IsNullOrWhiteSpace([string]$decision.reason)) { throw "candidate decision reason is required: $($decision.candidateRef)" }
@@ -429,7 +429,7 @@ function Invoke-AutopilotReadyPlanner {
   $codex = Resolve-AutopilotCodexInvocation
   $candidateJson = $Candidates | ConvertTo-Json -Depth 5 -Compress
   $prompt = @"
-Act as the fresh AutoPilot Planner for cgc-pms. Read AGENTS.override.md, AGENTS.md, docs/backlog/current-focus.md,
+Act as the fresh AutoPilot Planner for cgc-pms. Repository root rules are already loaded. Read docs/backlog/current-focus.md,
 docs/backlog/ready-issues.md, docs/backlog/blocked-issues.md, docs/backlog/ad-hoc-plan.md,
 docs/product-intelligence/project-map.md and docs/product-intelligence/evolution-decision.md. Do not scan the complete
 current-issues.json registry to discover alternatives; discovery has already been bounded by the knowledge graph.
@@ -439,7 +439,7 @@ backlog carrier. Explicitly decide whether the issue still exists, user value is
 dependencies are satisfied, and it is not duplicated by Ready/Done/Blocked. If verification fails, do not create Ready.
 Return schemaVersion=2 and exactly one candidateDecisions entry for every supplied candidateRef. Return one readyBlocks
 entry for every CREATED decision, in the same order. REJECTED/BLOCKED-only output with zero Ready blocks is valid.
-BLOCKED failureCategory must be ready_issue_config, tool_config, environment_prereq, quality_security, or needs_confirmation.
+BLOCKED failureCategory must be ready_issue_config, tool_config, tool_invocation, environment_prerequisite, retrieval_gap, quality_or_security, unknown, or needs_confirmation.
 Each block must satisfy scripts/codex-autopilot/autopilot-ready.ps1, use real existing paths and validation entrypoints,
 state explicit non-goals/migration/risk/runtime/reviewer requirements, and must not modify business code.
 In 禁止修改, put only actual forbidden path rules in backticks. Never repeat an allowed path there, including inside

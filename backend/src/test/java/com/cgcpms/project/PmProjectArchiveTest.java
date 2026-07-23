@@ -20,6 +20,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,6 +56,8 @@ class PmProjectArchiveTest {
     private StlSettlementMapper settlementMapper;
     @Autowired
     private WfInstanceMapper wfInstanceMapper;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private Long projectId;
 
@@ -324,9 +327,9 @@ class PmProjectArchiveTest {
 
         projectService.delete(projectId);
 
-        // After physical delete (soft-delete via MyBatis-Plus @TableLogic), the project should be gone
-        PmProject deleted = projectMapper.selectById(projectId);
-        assertNull(deleted, "SUPER_ADMIN物理删除(软删)后项目应不可查询");
+        Integer remaining = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM pm_project WHERE id=?", Integer.class, projectId);
+        assertEquals(0, remaining, "SUPER_ADMIN物理删除后不得残留逻辑删除记录");
     }
 
     // ═══════════════════════════════════════════════════════════

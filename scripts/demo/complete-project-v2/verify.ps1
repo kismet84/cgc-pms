@@ -298,7 +298,7 @@ UNION ALL SELECT 'collection_delta',ABS(
   COALESCE((SELECT amount-allocated_amount-unallocated_amount FROM collection_record WHERE id=520000000000002901),0))
 UNION ALL SELECT 'quality_safety_cost',COALESCE(SUM(amount),0) FROM cost_item WHERE project_id=520000000000000001 AND cost_type='QUALITY_SAFETY' AND deleted_flag=0
 UNION ALL SELECT 'actual_cost_total',COALESCE(SUM(amount),0) FROM cost_item WHERE project_id=520000000000000001 AND deleted_flag=0
-UNION ALL SELECT 'project_total',COUNT(*) FROM pm_project WHERE tenant_id=0 AND id IN (520000000000000001,520000000000009001,520000000000009002,520000000000009003,520000000000009004,520000000000009005,520000000000009006,520000000000009007,520000000000009008,520000000000009009,520000000000009010,520000000000009011) AND deleted_flag=0
+UNION ALL SELECT 'project_total',COUNT(*) FROM pm_project WHERE tenant_id=0 AND id IN (520000000000000001,520000000000009001,520000000000009002,520000000000009003,520000000000009004,520000000000009005,520000000000009006,520000000000009007,520000000000009008,520000000000009010) AND deleted_flag=0
 UNION ALL SELECT 'partner_incomplete',COUNT(*) FROM md_partner
   WHERE tenant_id=0 AND id IN (520000000000000101,520000000000000102,520000000000000103,520000000000006001,520000000000006002,520000000000009101,520000000000009102) AND deleted_flag=0
     AND (NULLIF(TRIM(credit_code),'') IS NULL OR NULLIF(TRIM(legal_person),'') IS NULL OR NULLIF(TRIM(contact_name),'') IS NULL
@@ -414,7 +414,7 @@ UNION ALL SELECT 'm3_delivery_action_overgrant',COUNT(DISTINCT m.perms) FROM sys
   WHERE u.tenant_id=0 AND u.username='demo.schedule.query' AND u.deleted_flag=0
     AND m.perms IN ('schedule:maintain','schedule:submit','schedule:progress','schedule:correct','site:daily:edit')
 UNION ALL SELECT 'm3_delivery_project_members',COUNT(*) FROM pm_project_member
-  WHERE tenant_id=0 AND project_id=520000000000009011 AND user_id=520000000000013002 AND status='ACTIVE' AND deleted_flag=0
+  WHERE tenant_id=0 AND project_id=520000000000009002 AND user_id=520000000000013002 AND status='ACTIVE' AND deleted_flag=0
 UNION ALL SELECT 'm3_schedule_corrective_text_valid',COUNT(*) FROM project_corrective_action
   WHERE tenant_id=0 AND id=520000000000008166 AND deleted_flag=0
     AND reason='关键线路材料到场延迟。' AND action_plan='调整资源投入并按周复核关键线路。'
@@ -569,6 +569,14 @@ foreach ($row in $rows) {
         $metrics[$parts[0]] = [decimal]$parts[1]
     }
 }
+$allowedProjectSeedFiles = @('10-core.sql','140-data-quality-normalization.sql','210-m3-domain-permission-data.sql')
+$metrics.unexpected_project_seed_files = @(
+    Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'sql') -Filter '*.sql' |
+        Where-Object {
+            $_.Name -notin $allowedProjectSeedFiles -and
+            (Select-String -LiteralPath $_.FullName -Pattern '(?i)\bINSERT\s+INTO\s+pm_project\b' -Quiet)
+        }
+).Count
 
 function Test-Gb32100CreditCode([string]$CreditCode) {
     if ($CreditCode -notmatch '^[0-9A-HJ-NPQRTUWXY]{18}$') { return $false }
@@ -591,7 +599,7 @@ $oneKeys = @('project','material','bid_transfer','target','purchase_request','pu
     'cost_forecast','cost_corrective_action','finance_reconciliation_run','finance_import_batch','inventory_exception',
     'material_return_reversal','document_template','demo_user')
 $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $invalidCreditPartners.Count -eq 0 `
-    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 21 `
+    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 22 -and $metrics.unexpected_project_seed_files -eq 0 `
     -and $metrics.role_test_account -eq 8 -and $metrics.project_manager_contract_query -eq 1 `
     -and $metrics.project_manager_variation_permissions -eq 9 -and $metrics.business_variation_bid_permissions -eq 14 `
     -and $metrics.project_manager_cost_target_permissions -eq 6 -and $metrics.cost_manager_cost_target_permissions -eq 6 `
@@ -634,7 +642,7 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.m3_technical_stage_rows -eq 7 -and $metrics.m3_technical_document_types -eq 6 -and $metrics.m3_technical_responsible_invalid -eq 0 `
     -and $metrics.m3_closeout_accounts -eq 11 -and $metrics.m3_closeout_action_permissions -eq 10 `
     -and $metrics.m3_closeout_action_overgrant -eq 0 -and $metrics.m3_closeout_project_members -eq 11 `
-    -and $metrics.m3_closeout_stage_rows -eq 10 -and $metrics.m3_closeout_document_types -eq 5 `
+    -and $metrics.m3_closeout_stage_rows -eq 9 -and $metrics.m3_closeout_document_types -eq 5 `
     -and $metrics.m3_closeout_legal_closed -eq 1 -and $metrics.m3_closeout_ready_chain -eq 1 -and $metrics.m3_closeout_responsible_invalid -eq 0
 foreach ($key in $oneKeys) { $passed = $passed -and $metrics[$key] -eq 1 }
 $passed = $passed -and $metrics.requested_qty -eq 100 -and $metrics.ordered_qty -eq 100 `
@@ -643,7 +651,7 @@ $passed = $passed -and $metrics.requested_qty -eq 100 -and $metrics.ordered_qty 
     -and $metrics.material_cost_delta -eq 0 -and $metrics.bid_transfer_delta -eq 0 `
     -and $metrics.subcontract_delta -eq 0 -and $metrics.receivable_delta -eq 0 -and $metrics.collection_delta -eq 0 `
     -and $metrics.quality_safety_cost -eq 5000 -and $metrics.actual_cost_total -eq 85000
-$passed = $passed -and $metrics.project_total -eq 12 `
+$passed = $passed -and $metrics.project_total -eq 10 `
     -and $metrics.partner_incomplete -eq 0 -and $metrics.partner_invalid_credit -eq 0 -and $metrics.partner_invalid_type -eq 0 `
     -and $metrics.project_type_missing -eq 0 -and $metrics.project_status_missing -eq 0 -and $metrics.project_approval_missing -eq 0 `
     -and $metrics.project_invalid_authority -eq 0 -and $metrics.project_invalid_dates -eq 0 `

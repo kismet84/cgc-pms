@@ -99,8 +99,9 @@ public class DashboardController {
     @GetMapping("/management")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:management:view')")
     @RateLimit(maxRequests = 60, windowSeconds = 60, key = RateLimitKey.TENANT)
-    public ApiResponse<ManagementDashboardVO> getManagementView() {
-        return ApiResponse.success(dashboardService.getManagementView());
+    public ApiResponse<ManagementDashboardVO> getManagementView(
+            @RequestParam(required = false) Long projectId) {
+        return ApiResponse.success(dashboardService.getManagementView(projectId));
     }
 
     /**

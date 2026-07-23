@@ -13,6 +13,7 @@ public class WfCcVO {
     private String ccUserName;
     private String businessType;
     private String businessId;
+    private String businessCode;
     private String title;
     private Integer isRead;
     private String createdTime;

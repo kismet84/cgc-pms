@@ -60,6 +60,16 @@ describe('V2 eight-domain navigation contract', () => {
         (tab) => tab.path === '/variation/order',
       )?.workspaceContext,
     ).toEqual({ project: true, period: true })
+    expect(
+      ['/contract/ledger', '/variation/order', '/bid-cost'].map((path) => ({
+        path,
+        label: findWorkspace(path)?.workspace.tabs.find((tab) => tab.path === path)?.label,
+      })),
+    ).toEqual([
+      { path: '/contract/ledger', label: '合同台账' },
+      { path: '/variation/order', label: '签证变更' },
+      { path: '/bid-cost', label: '投标成本' },
+    ])
     expect(findWorkspace('/contract/C-100/edit')?.workspace.label).toBe('合同与变更')
     expect(
       findWorkspace('/contract/ledger')?.workspace.tabs.find(

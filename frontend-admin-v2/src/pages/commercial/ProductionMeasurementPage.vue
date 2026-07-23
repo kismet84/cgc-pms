@@ -9,14 +9,22 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { V2Alert, V2Button, V2Card, V2Dialog, V2Input, V2PageState, V2Select } from '@/components'
+import {
+  V2Alert,
+  V2Badge,
+  V2Button,
+  V2Card,
+  V2Dialog,
+  V2Input,
+  V2PageState,
+  V2Select,
+} from '@/components'
 import { uploadSiteFile } from '@/services/delivery'
 import {
   closeMeasurementPeriod,
   createMeasurement,
   createMeasurementPeriod,
   loadContractPage,
-  loadMeasurement,
   loadMeasurementPeriods,
   loadMeasurementSettlementTrace,
   loadMeasurementSources,
@@ -30,21 +38,23 @@ import {
 import { isApiClientError } from '@/services/request'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
+import { useWorkspaceStore } from '@/stores/workspace'
 type SourceLine = { source: MeasurementAmountRow; selected: boolean; currentQuantity: string }
-type Dialog = 'closed' | 'period' | 'measurement' | 'detail' | 'owner' | 'review' | 'trace'
+type Dialog = 'closed' | 'period' | 'measurement' | 'owner' | 'review' | 'trace'
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
+const workspace = useWorkspaceStore()
 const projectId = ref('')
-const contractId = ref('')
 const status = ref('')
 const contracts = ref<ContractRecord[]>([])
 const periods = ref<MeasurementAmountRow[]>([])
+const creationPeriods = ref<MeasurementAmountRow[]>([])
 const measurements = ref<MeasurementAmountRow[]>([])
 const submissions = ref<MeasurementAmountRow[]>([])
+const expandedMeasurements = ref<Set<string>>(new Set())
 const sourceLines = ref<SourceLine[]>([])
 const selected = ref<MeasurementAmountRow | null>(null)
-const detail = ref<MeasurementAmountRow | null>(null)
 const trace = ref<MeasurementAmountRow | null>(null)
 const dialog = ref<Dialog>('closed')
 const loading = ref(false)
@@ -56,7 +66,6 @@ const evidenceFile = ref<File | null>(null)
 let controller: AbortController | null = null
 let detailController: AbortController | null = null
 let generation = 0
-let detailGeneration = 0
 const today = new Date().toISOString().slice(0, 10)
 const periodForm = reactive<MeasurementPeriodCommand>({
   projectId: '',
@@ -68,7 +77,13 @@ const periodForm = reactive<MeasurementPeriodCommand>({
   cutoffDate: today,
   remark: null,
 })
-const measurementForm = reactive({ periodId: '', measureDate: today, remark: '' })
+const measurementForm = reactive({
+  projectId: '',
+  contractId: '',
+  periodId: '',
+  measureDate: today,
+  remark: '',
+})
 const ownerForm = reactive({ externalDocumentNo: '', remark: '' })
 const reviewForm = reactive({
   decision: 'CONFIRMED' as 'CONFIRMED' | 'RETURNED',
@@ -90,8 +105,9 @@ const canOwnerReview = computed(() => session.hasPermission('measurement:owner:r
 const contractOptions = computed(() =>
   contracts.value.map((c) => ({ value: c.id, label: c.contractName })),
 )
+const projectOptions = computed(() => workspace.projects)
 const periodOptions = computed(() =>
-  periods.value
+  creationPeriods.value
     .filter((p) => text(p, 'status') === 'OPEN')
     .map((p) => ({
       value: text(p, 'id'),
@@ -107,11 +123,70 @@ const statusOptions = [
   { value: 'OWNER_RETURNED', label: '业主退回' },
   { value: 'SETTLEMENT_CREATED', label: '已生成结算' },
 ]
+const statusLabels: Record<string, string> = {
+  OPEN: '开放',
+  CLOSED: '已关闭',
+  DRAFT: '草稿',
+  REJECTED: '已驳回',
+  PENDING: '内部审批中',
+  INTERNAL_APPROVED: '内部已通过',
+  APPROVED: '内部已通过',
+  OWNER_SUBMITTED: '已报业主',
+  OWNER_RETURNED: '业主退回',
+  SUBMITTED: '已报送',
+  CONFIRMED: '已核定',
+  RETURNED: '已退回',
+  SETTLEMENT_CREATED: '已生成结算',
+}
+const statusLabel = (value: string) => statusLabels[value] || value || '—'
 const text = (row: MeasurementAmountRow | undefined, ...keys: string[]) => {
   for (const key of keys) {
     if (row?.[key] !== undefined && row[key] !== null) return String(row[key])
   }
   return ''
+}
+const visibleMeasurements = computed(() => measurements.value)
+const periodFor = (row: MeasurementAmountRow) =>
+  periods.value.find((period) => text(period, 'id') === text(row, 'period_id'))
+const projectLabel = (row: MeasurementAmountRow) =>
+  workspace.projects.find((project) => project.value === text(row, 'project_id'))?.label || '—'
+const submissionsFor = (row: MeasurementAmountRow) =>
+  submissions.value.filter(
+    (submission) =>
+      text(submission, 'measurement_id') === text(row, 'id') ||
+      text(submission, 'measure_code') === text(row, 'measure_code'),
+  )
+const approvalStatus = (row: MeasurementAmountRow) =>
+  text(row, 'approval_status') ||
+  (['DRAFT', 'REJECTED', 'PENDING'].includes(text(row, 'status'))
+    ? text(row, 'status')
+    : 'APPROVED')
+const ownerStatus = (row: MeasurementAmountRow) => {
+  const latest = submissionsFor(row)[0]
+  if (latest) return text(latest, 'status')
+  const measurementStatus = text(row, 'status')
+  if (measurementStatus === 'OWNER_SUBMITTED') return 'SUBMITTED'
+  if (measurementStatus === 'OWNER_RETURNED') return 'RETURNED'
+  if (measurementStatus === 'OWNER_CONFIRMED') return 'CONFIRMED'
+  if (measurementStatus === 'SETTLEMENT_CREATED') return 'SETTLEMENT_CREATED'
+  return ''
+}
+const statusTone = (value: string): 'neutral' | 'info' | 'success' | 'warning' | 'danger' => {
+  if (['REJECTED', 'RETURNED', 'OWNER_RETURNED'].includes(value)) return 'warning'
+  if (['CONFIRMED', 'SETTLEMENT_CREATED'].includes(value)) return 'success'
+  if (['OPEN', 'APPROVED', 'INTERNAL_APPROVED', 'SUBMITTED', 'OWNER_SUBMITTED'].includes(value))
+    return 'info'
+  return 'neutral'
+}
+const dateText = (row: MeasurementAmountRow, ...keys: string[]) =>
+  text(row, ...keys).slice(0, 10) || '—'
+const isExpanded = (row: MeasurementAmountRow) => expandedMeasurements.value.has(text(row, 'id'))
+function toggleExpanded(row: MeasurementAmountRow) {
+  const id = text(row, 'id')
+  const next = new Set(expandedMeasurements.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedMeasurements.value = next
 }
 const decimal = (value: string, allowZero = false) =>
   /^(?:0|[1-9]\d*)(?:\.\d{1,4})?$/.test(value) && (allowZero || !/^0(?:\.0+)?$/.test(value))
@@ -124,7 +199,6 @@ function bounds() {
 async function load() {
   if (!canQuery.value) return
   projectId.value = typeof route.query.projectId === 'string' ? route.query.projectId : ''
-  contractId.value = typeof route.query.contractId === 'string' ? route.query.contractId : ''
   status.value = typeof route.query.status === 'string' ? route.query.status : ''
   controller?.abort()
   const current = new AbortController()
@@ -134,15 +208,6 @@ async function load() {
   errorMessage.value = ''
   const date = bounds()
   try {
-    const contractPage = projectId.value
-      ? await loadContractPage(
-          { pageNo: 1, pageSize: 100, projectId: projectId.value },
-          current.signal,
-        )
-      : { records: [], total: 0, pageNo: 1, pageSize: 100 }
-    contracts.value = contractPage.records
-    if (contractId.value && !contracts.value.some((c) => c.id === contractId.value))
-      contractId.value = ''
     const query = {
       projectId: projectId.value || undefined,
       status: status.value || undefined,
@@ -150,28 +215,19 @@ async function load() {
       endDate: date?.endDate,
     }
     const [periodRows, measurementRows, submissionRows] = await Promise.all([
-      loadMeasurementPeriods(
-        { ...query, contractId: contractId.value || undefined },
-        current.signal,
-      ),
+      loadMeasurementPeriods(query, current.signal),
       loadMeasurements(query, current.signal),
       loadOwnerMeasurementSubmissions(query, current.signal),
     ])
-    const sources =
-      projectId.value && contractId.value
-        ? await loadMeasurementSources(projectId.value, contractId.value, current.signal)
-        : []
     if (token !== generation) return
     periods.value = periodRows
     measurements.value = measurementRows
     submissions.value = submissionRows
-    sourceLines.value = sources.map((source) => ({ source, selected: false, currentQuantity: '' }))
   } catch (e) {
     if (!current.signal.aborted && token === generation) {
       periods.value = []
       measurements.value = []
       submissions.value = []
-      sourceLines.value = []
       errorMessage.value = errorText(e, '产值计量加载失败')
     }
   } finally {
@@ -183,11 +239,14 @@ async function applyFilter() {
     path: '/production-measurement',
     query: {
       ...route.query,
-      contractId: contractId.value || undefined,
       status: status.value || undefined,
     },
     hash: route.hash,
   })
+}
+async function changeStatus(value: string) {
+  status.value = value
+  await applyFilter()
 }
 async function run(action: () => Promise<unknown>, success: string) {
   if (actionBusy.value) return
@@ -209,23 +268,82 @@ async function run(action: () => Promise<unknown>, success: string) {
 function selectFile(event: Event) {
   evidenceFile.value = (event.target as HTMLInputElement).files?.[0] ?? null
 }
-function openPeriod() {
-  if (!projectId.value || !contractId.value) {
-    errorMessage.value = '请先选择项目和业主合同'
-    return
+async function loadCreationContracts(selectedProjectId: string) {
+  try {
+    contracts.value = selectedProjectId
+      ? (
+          await loadContractPage({
+            pageNo: 1,
+            pageSize: 100,
+            projectId: selectedProjectId,
+          })
+        ).records
+      : []
+  } catch (e) {
+    contracts.value = []
+    errorMessage.value = errorText(e, '业主合同加载失败')
   }
-  Object.assign(periodForm, { projectId: projectId.value, contractId: contractId.value })
+}
+async function changePeriodProject(value: string) {
+  periodForm.projectId = value
+  periodForm.contractId = ''
+  await loadCreationContracts(value)
+}
+async function openPeriod() {
+  Object.assign(periodForm, { projectId: projectId.value, contractId: '' })
+  await loadCreationContracts(periodForm.projectId)
   dialog.value = 'period'
 }
 async function savePeriod() {
-  await run(() => createMeasurementPeriod({ ...periodForm }), '计量期间已创建')
-}
-function openMeasurement() {
-  if (!projectId.value || !contractId.value) {
-    errorMessage.value = '请先选择项目和业主合同'
+  if (!periodForm.projectId || !periodForm.contractId) {
+    errorMessage.value = '请选择项目和业主合同'
     return
   }
-  measurementForm.periodId = periodOptions.value[0]?.value ?? ''
+  await run(() => createMeasurementPeriod({ ...periodForm }), '计量期间已创建')
+}
+async function changeMeasurementProject(value: string) {
+  Object.assign(measurementForm, { projectId: value, contractId: '', periodId: '' })
+  creationPeriods.value = []
+  sourceLines.value = []
+  await loadCreationContracts(value)
+}
+async function changeMeasurementContract(value: string) {
+  measurementForm.contractId = value
+  measurementForm.periodId = ''
+  creationPeriods.value = []
+  sourceLines.value = []
+  if (!measurementForm.projectId || !value) return
+  const date = bounds()
+  try {
+    const [availablePeriods, sources] = await Promise.all([
+      loadMeasurementPeriods({
+        projectId: measurementForm.projectId,
+        contractId: value,
+        startDate: date?.startDate,
+        endDate: date?.endDate,
+      }),
+      loadMeasurementSources(measurementForm.projectId, value),
+    ])
+    creationPeriods.value = availablePeriods
+    measurementForm.periodId = periodOptions.value[0]?.value ?? ''
+    sourceLines.value = sources.map((source) => ({
+      source,
+      selected: false,
+      currentQuantity: '',
+    }))
+  } catch (e) {
+    errorMessage.value = errorText(e, '计量期间和来源加载失败')
+  }
+}
+async function openMeasurement() {
+  Object.assign(measurementForm, {
+    projectId: projectId.value,
+    contractId: '',
+    periodId: '',
+  })
+  creationPeriods.value = []
+  sourceLines.value = []
+  await loadCreationContracts(measurementForm.projectId)
   sourceLines.value.forEach((row) => {
     row.selected = false
     row.currentQuantity = ''
@@ -237,6 +355,8 @@ async function saveMeasurement() {
   const chosen = sourceLines.value.filter((row) => row.selected)
   if (
     !measurementForm.periodId ||
+    !measurementForm.projectId ||
+    !measurementForm.contractId ||
     !evidenceFile.value ||
     !chosen.length ||
     chosen.some((row) => !decimal(row.currentQuantity))
@@ -245,8 +365,8 @@ async function saveMeasurement() {
     return
   }
   const command: MeasurementSaveCommand = {
-    projectId: projectId.value,
-    contractId: contractId.value,
+    projectId: measurementForm.projectId,
+    contractId: measurementForm.contractId,
     periodId: measurementForm.periodId,
     measureDate: measurementForm.measureDate,
     attachmentCount: 1,
@@ -269,25 +389,6 @@ async function saveMeasurement() {
       'MEASUREMENT_EVIDENCE',
     )
   }, '产值计量草稿已创建')
-}
-async function openDetail(row: MeasurementAmountRow) {
-  detailController?.abort()
-  const current = new AbortController()
-  detailController = current
-  const token = ++detailGeneration
-  selected.value = row
-  detail.value = null
-  dialog.value = 'detail'
-  detailLoading.value = true
-  try {
-    const value = await loadMeasurement(text(row, 'id'), current.signal)
-    if (token === detailGeneration) detail.value = value
-  } catch (e) {
-    if (!current.signal.aborted && token === detailGeneration)
-      errorMessage.value = errorText(e, '计量详情加载失败')
-  } finally {
-    if (token === detailGeneration) detailLoading.value = false
-  }
 }
 function openOwner(row: MeasurementAmountRow) {
   selected.value = row
@@ -411,193 +512,270 @@ onBeforeUnmount(() => {
       ><V2Card title="产值计量与业主结算" :heading-level="1"
         ><template #actions
           ><div class="actions">
-            <V2Button v-if="canMaintain" variant="secondary" @click="openPeriod">新建期间</V2Button
+            <V2Select
+              class="measurement-page__status-filter"
+              :model-value="status"
+              label="状态"
+              :options="statusOptions"
+              allow-empty
+              @update:model-value="changeStatus"
+            /><V2Button v-if="canMaintain" variant="secondary" @click="openPeriod"
+              >新建期间</V2Button
             ><V2Button v-if="canMaintain" variant="secondary" @click="openMeasurement"
               >新建计量</V2Button
             >
           </div></template
         >
-        <div class="filters">
-          <V2Select
-            v-model="contractId"
-            label="业主合同"
-            :options="contractOptions"
-            allow-empty
-          /><V2Select v-model="status" label="状态" :options="statusOptions" allow-empty /><V2Button
-            variant="secondary"
-            :loading="loading"
-            @click="applyFilter"
-            >查询</V2Button
-          >
-        </div></V2Card
-      ><V2PageState
-        v-if="loading && !measurements.length"
-        title="正在加载产值计量"
-        description="正在读取当前项目和报告期内的计量与业主报量。"
-        kind="loading"
-      /><V2PageState
-        v-else-if="!measurements.length"
-        title="暂无产值计量"
-        description="当前筛选条件下没有可访问的计量记录。"
-        kind="empty"
-      /><V2Card v-else title="计量记录"
-        ><div
-          class="measurement-page__table-wrap"
-          role="region"
-          aria-label="计量记录"
-          :aria-busy="loading"
-          tabindex="0"
-        >
-          <table class="measurement-page__table">
-            <caption class="v2-visually-hidden">
-              计量记录
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">计量编号</th>
-                <th scope="col">期间</th>
-                <th scope="col">本期申报</th>
-                <th scope="col">累计申报</th>
-                <th scope="col">状态</th>
-                <th scope="col">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in measurements" :key="text(row, 'id')">
-                <td>
-                  <strong>{{ text(row, 'measure_code') || '计量单' }}</strong>
-                </td>
-                <td>{{ text(row, 'period_name', 'period_code') || '—' }}</td>
-                <td>{{ text(row, 'current_reported_amount') || '—' }}</td>
-                <td>{{ text(row, 'cumulative_reported_amount') || '—' }}</td>
-                <td>{{ text(row, 'status') || '—' }}</td>
-                <td>
-                  <div class="actions">
-                    <V2Button size="small" variant="secondary" @click="openDetail(row)"
-                      >详情</V2Button
-                    ><V2Button
-                      v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(text(row, 'status'))"
-                      size="small"
-                      variant="secondary"
-                      :disabled="actionBusy"
-                      @click="
-                        run(
-                          () => submitMeasurement(text(row, 'id'), text(row, 'version')),
-                          '计量已提交',
-                        )
-                      "
-                      >提交内部审批</V2Button
-                    ><V2Button
-                      v-if="
-                        canOwnerSubmit &&
-                        ['INTERNAL_APPROVED', 'OWNER_RETURNED'].includes(text(row, 'status'))
-                      "
-                      size="small"
-                      variant="secondary"
-                      @click="openOwner(row)"
-                      >对业主报量</V2Button
-                    >
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div></V2Card
-      ><V2Card title="业主报量与结算"
-        ><V2PageState
-          v-if="!submissions.length"
-          title="暂无业主报量"
-          description="当前项目尚未提交业主报量或生成结算。"
+        <V2PageState
+          v-if="loading && !periods.length && !measurements.length && !submissions.length"
+          title="正在加载产值计量"
+          description="正在读取当前项目和报告期内的计量与业主报量。"
+          kind="loading"
+        /><V2PageState
+          v-else-if="!visibleMeasurements.length"
+          title="暂无产值计量"
+          description="当前项目、计量日期和状态下没有可访问的计量记录。"
           kind="empty"
         />
         <div
           v-else
           class="measurement-page__table-wrap"
           role="region"
-          aria-label="业主报量与结算"
+          aria-label="产值计量列表"
+          :aria-busy="loading"
           tabindex="0"
         >
-          <table class="measurement-page__table measurement-page__submission-table">
+          <table class="measurement-page__table measurement-page__measurement-table">
             <caption class="v2-visually-hidden">
-              业主报量与结算
+              产值计量与业主结算记录
             </caption>
             <thead>
               <tr>
-                <th scope="col">报量单</th>
-                <th scope="col">申报金额</th>
-                <th scope="col">核定金额</th>
-                <th scope="col">状态</th>
+                <th scope="col">所属项目</th>
+                <th scope="col">计量期间</th>
+                <th scope="col">计量编号</th>
+                <th scope="col">计量日期</th>
+                <th scope="col">本期申报</th>
+                <th scope="col">累计申报</th>
+                <th scope="col">内部状态</th>
+                <th scope="col">业主状态</th>
+                <th scope="col">时间窗口</th>
                 <th scope="col">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in submissions" :key="text(row, 'id')">
-                <td>
-                  <strong>{{ text(row, 'external_document_no', 'measure_code') }}</strong>
-                </td>
-                <td>{{ text(row, 'submitted_amount') || '—' }}</td>
-                <td>{{ text(row, 'confirmed_amount') || '—' }}</td>
-                <td>{{ text(row, 'status') || '—' }}</td>
-                <td>
-                  <div class="actions">
-                    <V2Button
-                      v-if="canOwnerReview && text(row, 'status') === 'SUBMITTED'"
-                      size="small"
-                      variant="secondary"
-                      @click="openReview(row)"
-                      >业主核定</V2Button
-                    ><V2Button
-                      v-if="
-                        text(row, 'settlement_id') || text(row, 'status') === 'SETTLEMENT_CREATED'
-                      "
-                      size="small"
-                      variant="secondary"
-                      @click="openTrace(row)"
-                      >结算追溯</V2Button
+              <template v-for="row in visibleMeasurements" :key="text(row, 'id')">
+                <tr>
+                  <td>{{ projectLabel(row) }}</td>
+                  <td>{{ text(row, 'period_name', 'period_code') || '—' }}</td>
+                  <td>
+                    <strong>{{ text(row, 'measure_code') || '计量单' }}</strong>
+                  </td>
+                  <td>{{ dateText(row, 'measure_date') }}</td>
+                  <td>{{ text(row, 'current_reported_amount') || '—' }}</td>
+                  <td>{{ text(row, 'cumulative_reported_amount') || '—' }}</td>
+                  <td>
+                    <V2Badge :tone="statusTone(approvalStatus(row))">{{
+                      statusLabel(approvalStatus(row))
+                    }}</V2Badge>
+                  </td>
+                  <td>
+                    <V2Badge :tone="statusTone(ownerStatus(row))">{{
+                      ownerStatus(row) ? statusLabel(ownerStatus(row)) : '未报送'
+                    }}</V2Badge>
+                  </td>
+                  <td>
+                    <V2Badge :tone="statusTone(text(periodFor(row), 'status'))">{{
+                      statusLabel(text(periodFor(row), 'status'))
+                    }}</V2Badge>
+                  </td>
+                  <td>
+                    <div class="actions">
+                      <V2Button
+                        size="small"
+                        variant="secondary"
+                        :aria-expanded="isExpanded(row)"
+                        :aria-controls="`measurement-detail-${text(row, 'id')}`"
+                        @click="toggleExpanded(row)"
+                        >详情</V2Button
+                      ><V2Button
+                        v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(text(row, 'status'))"
+                        size="small"
+                        variant="secondary"
+                        :disabled="actionBusy"
+                        @click="
+                          run(
+                            () => submitMeasurement(text(row, 'id'), text(row, 'version')),
+                            '计量已提交',
+                          )
+                        "
+                        >提交内部审批</V2Button
+                      ><V2Button
+                        v-if="
+                          canOwnerSubmit &&
+                          ['INTERNAL_APPROVED', 'OWNER_RETURNED'].includes(text(row, 'status'))
+                        "
+                        size="small"
+                        variant="secondary"
+                        @click="openOwner(row)"
+                        >对业主报量</V2Button
+                      ><V2Button
+                        v-if="
+                          canMaintain &&
+                          text(periodFor(row), 'status') === 'OPEN' &&
+                          !['DRAFT', 'REJECTED', 'PENDING', 'OWNER_SUBMITTED'].includes(
+                            text(row, 'status'),
+                          )
+                        "
+                        size="small"
+                        variant="secondary"
+                        :disabled="actionBusy"
+                        @click="
+                          run(
+                            () =>
+                              closeMeasurementPeriod(
+                                text(periodFor(row), 'id'),
+                                text(periodFor(row), 'version'),
+                              ),
+                            '期间已关闭',
+                          )
+                        "
+                        >关闭期间</V2Button
+                      >
+                    </div>
+                  </td>
+                </tr>
+                <tr
+                  v-if="isExpanded(row)"
+                  :id="`measurement-detail-${text(row, 'id')}`"
+                  class="measurement-page__detail-row"
+                >
+                  <td colspan="10">
+                    <section
+                      class="measurement-page__detail"
+                      :aria-label="`${text(row, 'measure_code')} 业主报送记录`"
                     >
-                  </div>
-                </td>
-              </tr>
+                      <h3>{{ text(row, 'measure_code') }} · 业主报送记录</h3>
+                      <p v-if="!submissionsFor(row).length" class="measurement-page__empty">
+                        尚未报送。内部审批通过后才能登记业主报送。
+                      </p>
+                      <div v-else class="measurement-page__table-wrap">
+                        <table class="measurement-page__table measurement-page__submission-table">
+                          <caption class="v2-visually-hidden">
+                            业主报送版本
+                          </caption>
+                          <thead>
+                            <tr>
+                              <th scope="col">报送编号</th>
+                              <th scope="col">版本</th>
+                              <th scope="col">报送时间</th>
+                              <th scope="col">报送金额</th>
+                              <th scope="col">核定金额</th>
+                              <th scope="col">业主状态</th>
+                              <th scope="col">结算编号</th>
+                              <th scope="col">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr
+                              v-for="submission in submissionsFor(row)"
+                              :key="text(submission, 'id')"
+                            >
+                              <td>
+                                <strong>{{ text(submission, 'submission_code') || '—' }}</strong>
+                              </td>
+                              <td>V{{ text(submission, 'revision_no') || '1' }}</td>
+                              <td>{{ dateText(submission, 'submitted_at') }}</td>
+                              <td>{{ text(submission, 'submitted_amount') || '—' }}</td>
+                              <td>{{ text(submission, 'confirmed_amount') || '—' }}</td>
+                              <td>
+                                <V2Badge :tone="statusTone(text(submission, 'status'))">{{
+                                  statusLabel(text(submission, 'status'))
+                                }}</V2Badge>
+                              </td>
+                              <td>
+                                {{ text(submission, 'settlement_code', 'settlement_id') || '—' }}
+                              </td>
+                              <td>
+                                <div class="actions">
+                                  <V2Button
+                                    v-if="
+                                      canOwnerReview && text(submission, 'status') === 'SUBMITTED'
+                                    "
+                                    size="small"
+                                    variant="secondary"
+                                    @click="openReview(submission)"
+                                    >业主核定</V2Button
+                                  ><V2Button
+                                    v-if="
+                                      text(submission, 'settlement_id') ||
+                                      text(submission, 'status') === 'SETTLEMENT_CREATED'
+                                    "
+                                    size="small"
+                                    variant="secondary"
+                                    @click="openTrace(submission)"
+                                    >结算追溯</V2Button
+                                  >
+                                </div>
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </section>
+                  </td>
+                </tr>
+              </template>
             </tbody>
           </table>
-        </div></V2Card
-      ><V2Card title="计量期间"
-        ><div v-for="row in periods" :key="text(row, 'id')" class="submission">
-          <span>{{ text(row, 'period_name', 'period_code') }} · {{ text(row, 'status') }}</span
-          ><V2Button
-            v-if="canMaintain && text(row, 'status') === 'OPEN'"
-            variant="secondary"
-            :disabled="actionBusy"
-            @click="
-              run(() => closeMeasurementPeriod(text(row, 'id'), text(row, 'version')), '期间已关闭')
-            "
-            >关闭期间</V2Button
-          >
-        </div></V2Card
-      ></template
+        </div>
+      </V2Card></template
     >
     <V2Dialog
       :open="dialog === 'period'"
       title="新建计量期间"
+      description="选择项目和业主合同，并设置本计量期间的日期范围。"
       panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="dialog = 'closed'"
-      ><form class="form" @submit.prevent="savePeriod">
-        <V2Input v-model="periodForm.periodCode" label="期间编码" /><V2Input
+      ><form
+        id="measurement-period-form"
+        class="measurement-page__period-form"
+        @submit.prevent="savePeriod"
+      >
+        <V2Select
+          :model-value="periodForm.projectId"
+          label="项目"
+          :options="projectOptions"
+          required
+          @update:model-value="changePeriodProject"
+        /><V2Select
+          v-model="periodForm.contractId"
+          label="业主合同"
+          :options="contractOptions"
+          required
+        /><V2Input v-model="periodForm.periodCode" label="期间编码" required /><V2Input
           v-model="periodForm.periodName"
           label="期间名称"
-        /><V2Input v-model="periodForm.startDate" label="开始日期" type="date" /><V2Input
-          v-model="periodForm.endDate"
-          label="结束日期"
-          type="date"
-        /><V2Input v-model="periodForm.cutoffDate" label="截止日期" type="date" /><V2Button
-          type="submit"
-          variant="secondary"
-          :loading="actionBusy"
+          required
+        />
+        <fieldset class="measurement-page__period-dates">
+          <legend>日期范围</legend>
+          <V2Input v-model="periodForm.startDate" label="开始日期" type="date" required /><V2Input
+            v-model="periodForm.endDate"
+            label="结束日期"
+            type="date"
+            required
+          /><V2Input v-model="periodForm.cutoffDate" label="截止日期" type="date" required />
+        </fieldset>
+      </form>
+      <template #footer>
+        <V2Button variant="ghost" :disabled="actionBusy" @click="dialog = 'closed'">取消</V2Button
+        ><V2Button type="submit" form="measurement-period-form" :loading="actionBusy"
           >保存期间</V2Button
         >
-      </form></V2Dialog
+      </template></V2Dialog
     >
     <V2Dialog
       :open="dialog === 'measurement'"
@@ -608,6 +786,16 @@ onBeforeUnmount(() => {
       @close="dialog = 'closed'"
       ><form class="form" @submit.prevent="saveMeasurement">
         <V2Select
+          :model-value="measurementForm.projectId"
+          label="项目"
+          :options="projectOptions"
+          @update:model-value="changeMeasurementProject"
+        /><V2Select
+          :model-value="measurementForm.contractId"
+          label="业主合同"
+          :options="contractOptions"
+          @update:model-value="changeMeasurementContract"
+        /><V2Select
           v-model="measurementForm.periodId"
           label="计量期间"
           :options="periodOptions"
@@ -629,35 +817,6 @@ onBeforeUnmount(() => {
         <V2Button type="submit" variant="secondary" :loading="actionBusy">创建计量</V2Button>
       </form></V2Dialog
     >
-    <V2Dialog
-      :open="dialog === 'detail'"
-      title="计量详情"
-      panel-class="v2-dialog-standard v2-detail-dialog"
-      :close-on-backdrop="false"
-      @close="dialog = 'closed'"
-      ><V2PageState
-        v-if="detailLoading"
-        title="正在加载计量详情"
-        description="正在读取计量来源、数量和审批状态。"
-        kind="loading"
-      />
-      <section v-else-if="detail" class="v2-detail-dialog__section">
-        <dl class="v2-detail-dialog__facts">
-          <dt>计量编号</dt>
-          <dd>{{ text(detail, 'measure_code', 'id') }}</dd>
-          <dt>计量期间</dt>
-          <dd>{{ text(detail, 'period_name', 'period_code') || '—' }}</dd>
-          <dt>本期申报</dt>
-          <dd>{{ text(detail, 'current_reported_amount') || '—' }}</dd>
-          <dt>累计申报</dt>
-          <dd>{{ text(detail, 'cumulative_reported_amount') || '—' }}</dd>
-          <dt>状态</dt>
-          <dd>{{ text(detail, 'status') || '—' }}</dd>
-          <dt>备注</dt>
-          <dd>{{ text(detail, 'remark') || '—' }}</dd>
-        </dl>
-      </section>
-    </V2Dialog>
     <V2Dialog
       :open="dialog === 'owner'"
       title="对业主报量"
@@ -730,7 +889,7 @@ onBeforeUnmount(() => {
           <dt>结算金额</dt>
           <dd>{{ text(trace, 'settlement_amount', 'confirmed_amount') || '—' }}</dd>
           <dt>状态</dt>
-          <dd>{{ text(trace, 'status') || '—' }}</dd>
+          <dd>{{ statusLabel(text(trace, 'status')) }}</dd>
         </dl>
       </section>
     </V2Dialog>
@@ -742,16 +901,39 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--v2-space-4);
 }
-.filters {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(10rem, 1fr)) auto;
-  gap: var(--v2-space-3);
-  align-items: end;
-}
 .actions {
   display: flex;
+  align-items: center;
   gap: var(--v2-space-2);
   flex-wrap: wrap;
+}
+.measurement-page__status-filter {
+  width: 12rem;
+}
+.measurement-page__status-filter :deep(.v2-field__label) {
+  display: none;
+}
+.measurement-page__period-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--v2-space-4);
+}
+.measurement-page__period-dates {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--v2-space-3);
+  min-width: 0;
+  margin: 0;
+  padding: var(--v2-space-4);
+  border: 1px solid var(--v2-color-border-subtle);
+  border-radius: var(--v2-radius-md);
+}
+.measurement-page__period-dates legend {
+  padding-inline: var(--v2-space-2);
+  color: var(--v2-color-text-secondary);
+  font-size: var(--v2-font-size-12);
+  font-weight: var(--v2-font-weight-semibold);
 }
 .measurement-page__table-wrap {
   min-width: 0;
@@ -764,8 +946,13 @@ onBeforeUnmount(() => {
   font-size: var(--v2-font-size-12);
   line-height: var(--v2-line-height-ui);
 }
+.measurement-page__measurement-table {
+  min-width: 90rem;
+}
 .measurement-page__submission-table {
-  min-width: 48rem;
+  min-width: 64rem;
+  border: 1px solid var(--v2-color-border);
+  background: var(--v2-color-surface);
 }
 .measurement-page__table th,
 .measurement-page__table td {
@@ -781,7 +968,30 @@ onBeforeUnmount(() => {
   font-weight: var(--v2-font-weight-semibold);
 }
 .measurement-page__table .actions {
-  flex-wrap: nowrap;
+  align-items: center;
+}
+.measurement-page__detail-row > td {
+  padding: 0;
+  background: var(--v2-color-surface-subtle);
+}
+.measurement-page__detail {
+  display: grid;
+  gap: var(--v2-space-3);
+  padding: var(--v2-space-4) var(--v2-space-5);
+  border-bottom: 1px solid var(--v2-color-border);
+}
+.measurement-page__detail h3 {
+  margin: 0;
+  font-size: var(--v2-font-size-15);
+  line-height: var(--v2-line-height-tight);
+}
+.measurement-page__empty {
+  margin: 0;
+  padding: var(--v2-space-4);
+  border: 1px dashed var(--v2-color-border);
+  color: var(--v2-color-text-muted);
+  background: var(--v2-color-surface);
+  text-align: center;
 }
 dl {
   display: grid;
@@ -792,7 +1002,6 @@ dl {
 dd {
   margin: 0;
 }
-.submission,
 .source {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -814,7 +1023,9 @@ label {
 }
 @media (max-width: 48rem) {
   .filters,
-  .source {
+  .source,
+  .measurement-page__period-form,
+  .measurement-page__period-dates {
     grid-template-columns: 1fr;
   }
 }

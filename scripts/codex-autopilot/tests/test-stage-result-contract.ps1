@@ -15,14 +15,14 @@ if ($passed.schemaVersion -ne 2 -or $passed.scope -ne 'ISSUE' -or $passed.subjec
 $runResult = New-AutopilotStageResult -Scope RUN -SubjectId 'run-test-001' -Stage refill -Outcome SUCCEEDED -NextStage select -SemanticProgress $true -TransitionIntent SELECT
 if ($runResult.issueId -or $runResult.scope -ne 'RUN' -or $runResult.nextStage -ne 'SELECT') { throw 'RUN StageResult contract is unstable' }
 
-$retryable = ConvertTo-AutopilotStageResult -IssueId 'ISSUE-TEST-001' -Stage review -ExecutorResult ([pscustomobject]@{status='blocked';failureCategory='quality_security';stopReason='STOP_REVIEW_NEEDS_REPAIR';nextAction='REPAIR';summary='review finding'})
+$retryable = ConvertTo-AutopilotStageResult -IssueId 'ISSUE-TEST-001' -Stage review -ExecutorResult ([pscustomobject]@{status='blocked';failureCategory='quality_or_security';stopReason='STOP_REVIEW_NEEDS_REPAIR';nextAction='REPAIR';summary='review finding'})
 if ($retryable.outcome -ne 'RETRYABLE' -or !$retryable.retryKey -or $retryable.transitionIntent -ne 'REPAIR') { throw 'StageResult repair routing is unstable' }
 
 $toolBlocked = ConvertTo-AutopilotStageResult -IssueId 'ISSUE-TEST-001' -Stage review -ExecutorResult ([pscustomobject]@{status='blocked';failureCategory='tool_config';stopReason='STOP_REVIEWER_TOOL_RETRY_EXHAUSTED';nextAction='STOP';summary='reviewer unavailable'})
 if ($toolBlocked.outcome -ne 'PAUSED' -or $toolBlocked.failureCategory -ne 'tool_config') { throw 'StageResult tool_config routing is unstable' }
 
 $invalidRejected = $false
-try { New-AutopilotStageResult -IssueId 'ISSUE-TEST-001' -Stage review -Outcome BLOCKED -FailureCategory quality_security | Out-Null } catch { $invalidRejected = $true }
+try { New-AutopilotStageResult -IssueId 'ISSUE-TEST-001' -Stage review -Outcome BLOCKED -FailureCategory quality_or_security | Out-Null } catch { $invalidRejected = $true }
 if (!$invalidRejected) { throw 'StageResult accepted a blocked outcome without stopReason' }
 
 $runWithIssueRejected = $false

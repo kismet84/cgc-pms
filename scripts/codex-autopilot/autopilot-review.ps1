@@ -189,7 +189,7 @@ function Invoke-AutopilotReviewerProcess {
 
 function Test-AutopilotCodeRepairAllowed {
   param([string]$FailureCategory, [string]$StopReason)
-  return $FailureCategory -eq 'quality_security' -and $StopReason -in @('STOP_VERIFICATION_FAILED','STOP_REVIEW_NEEDS_REPAIR','STOP_CLOSEOUT_ARTIFACTS_MISSING')
+  return $FailureCategory -eq 'quality_or_security' -and $StopReason -in @('STOP_VERIFICATION_FAILED','STOP_REVIEW_NEEDS_REPAIR','STOP_CLOSEOUT_ARTIFACTS_MISSING')
 }
 
 function Invoke-AutopilotReviewer {

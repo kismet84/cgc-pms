@@ -25,6 +25,8 @@ public class WorkflowVOAssembler {
         vo.setId(String.valueOf(task.getId()));
         vo.setInstanceId(String.valueOf(task.getInstanceId()));
         vo.setNodeInstanceId(String.valueOf(task.getNodeInstanceId()));
+        vo.setBusinessType(task.getBusinessType());
+        if (task.getBusinessId() != null) vo.setBusinessId(String.valueOf(task.getBusinessId()));
         vo.setApproverId(String.valueOf(task.getApproverId()));
         vo.setApproverName(task.getApproverName());
         vo.setTaskStatus(task.getTaskStatus());

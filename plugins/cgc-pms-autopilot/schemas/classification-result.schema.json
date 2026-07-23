@@ -21,9 +21,11 @@
       "enum": [
         "none",
         "tool_config",
-        "environment_prereq",
+        "tool_invocation",
+        "environment_prerequisite",
         "ready_issue_config",
-        "real_quality_or_security",
+        "retrieval_gap",
+        "quality_or_security",
         "unknown"
       ]
     },
@@ -42,6 +44,7 @@
         "backend_not_ready",
         "frontend_not_ready",
         "ready_issue_verification_config",
+        "index_or_graph_coverage_missing",
         "real_test_failure",
         "real_build_failure",
         "real_permission_or_security_failure",
@@ -77,6 +80,7 @@
         "wait_and_retry_frontend_health",
         "fix_ready_selector",
         "fix_ready_issue_metadata",
+        "use_bounded_fallback",
         "open_repair_request",
         "mark_blocked",
         "collect_more_evidence"

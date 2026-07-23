@@ -1,36 +1,32 @@
 ---
 name: cgc-pms-runtime-refresh
-description: 用于 cgc-pms 本地运行态刷新与验真：处理 Docker、backend、frontend、Vite 代理、5173 dev-login、旧 172.19.x.x:8080 代理漂移和真实 URL 可达性。当用户要求重建前后端、刷新本地运行态、排查页面跳登录或确认 localhost 访问是否真实可用时使用。
+description: 用于 cgc-pms 本地运行态刷新与验真：处理 Docker、backend、frontend、Vite 代理、dev-login、旧 backend 代理漂移和真实 URL 可达性。仅在用户要求重建、刷新、浏览器验收或排查本地运行态时使用。
 ---
 
 # cgc-pms 本地运行态刷新
 
-通用协议=`docs/standards/codex-task-execution-policy.md`
+根规则由 Codex 自动加载，本 Skill 只保存运行态领域步骤。
 
-1. 先读仓库根 `AGENTS.override.md`、`AGENTS.md` 与通用协议，运行态问题先和代码问题分开判断。
-2. 每个线程首次做浏览器验收时只初始化一次工具能力和页面状态；不猜测 API/参数，同一参数错误不得原样重试。
-3. 默认健康与前端验收入口：
-   - `http://localhost:8080/api/actuator/health`
-   - `http://localhost:5173/`
-   - 跳登录验收入口：`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`
-4. 运行态刷新后，后端和前端统一按当前项目规则或动态配置的稳定等待时间再验真；不得在等待窗口内把未就绪定性为业务失败。
-5. 若 `http://localhost:5173` 回到 `/login`，且前端日志出现 `/api/*` 指向旧 `172.19.x.x:8080` 的 `ECONNREFUSED` 或同类代理错误，优先判定为前端 dev server 持有旧 backend 容器 IP；先刷新前端运行态，再决定是否继续排查路由守卫或后端逻辑。
-6. 并行或批量验收必须使用唯一输出目录，不共享截图名、Playwright 报告、测试结果或缓存目录。
-7. 需要回报真实可达性时，至少说明：
-   - 实际访问 URL
-   - 最终落点页面或路由
-   - 关键日志或端口证据
-   - 当前问题属于环境前置还是业务质量
-8. 不要只报命令退出码；要给真实 URL 状态与浏览器或 HTTP 结果。
+1. 先把环境前置与业务失败分开；分类名称及处理原则引用 `../cgc-pms-ci-gate-triage/SKILL.md`，不在此复制。
+2. 按目标页面选择入口：
+   - 后端健康：`http://localhost:8080/api/actuator/health`
+   - Legacy 前端：`http://localhost:5173/`
+   - Clean-room V2：`http://localhost:5174/v2/`
+   - dev-login：`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`
+3. 首次浏览器验收只初始化一次能力和页面状态；不猜 API/参数，同一参数错误不得原样重试。
+4. 服务刷新后读取 `scripts/codex-autopilot/codex-autopilot.config.json` 的 `runtimeRefresh.waitSeconds`，稳定等待后再检查 health、端口、最终路由和关键接口。
+5. 前端回到 `/login` 且日志显示 `/api/*` 指向旧 backend 容器 IP 时，先刷新对应前端 dev server，再排查路由守卫或业务逻辑。
+6. 并行或批量验收使用唯一输出目录，不共享截图、Playwright 报告、测试结果或缓存。
+7. 回报实际 URL、最终落点、关键端口/日志/HTTP 证据、失败分类和复验结果；不能只报命令退出码。
 
-## 最小回报骨架
+## 最小回报
 
 ```text
 刷新范围=
 访问 URL=
 实际落点=
 关键证据=
-问题分类=环境前置类 / 真实质量安全类 / 需要确认
+失败分类=
 输出目录=
 下一步=
 ```

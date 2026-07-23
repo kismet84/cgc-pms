@@ -57,24 +57,19 @@ async function installIdentity(page: Page, readIdentity: () => Identity): Promis
   })
   await page.route('**/api/auth/refresh', (route) =>
     route.fulfill({
-      status: 200,
+      status: 401,
       contentType: 'application/json',
       body: JSON.stringify(anonymousEnvelope),
     }),
   )
-  await page.route('**/api/projects?**', (route) =>
+  await page.route('**/api/project-context/options', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         code: '0',
         message: 'success',
-        data: {
-          records: [{ id: '1', projectCode: 'P-001', projectName: '测试项目', status: 'ACTIVE' }],
-          total: 1,
-          pageNo: 1,
-          pageSize: 200,
-        },
+        data: [{ id: '1', projectName: '测试项目', status: 'ACTIVE' }],
       }),
     }),
   )
@@ -146,8 +141,8 @@ async function expectNoSeriousAxeViolations(page: Page): Promise<void> {
   ).toEqual([])
 }
 
-test('keeps login and authenticated shell accessible at 1440, 1024 and 390', async ({ page }) => {
-  let identity: Identity = 'anonymous'
+test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page }) => {
+  const identity: Identity = 'admin'
   await installIdentity(page, () => identity)
   const runtimeProblems: string[] = []
   const businessRequests: string[] = []
@@ -175,20 +170,12 @@ test('keeps login and authenticated shell accessible at 1440, 1024 and 390', asy
     { name: 'mobile', width: 390, height: 844 },
   ]) {
     await page.setViewportSize(viewport)
-    identity = 'anonymous'
-    await page.goto('/v2/dashboard')
-    await expect(page).toHaveURL(/\/v2\/login\?redirect=/)
-    await expect(page.getByRole('heading', { name: '登录新版工作台' })).toBeVisible()
-    await expectNoHorizontalOverflow(page)
-    await expectNoSeriousAxeViolations(page)
-
-    identity = 'admin'
     await page.goto('/v2/dashboard')
     await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
     await expect(page.getByRole('main')).toBeVisible()
     await expect(page.getByLabel('当前位置')).toContainText('工作台经营驾驶舱')
     await expect(page.getByRole('navigation', { name: '工作区标签页' })).toHaveCount(1)
-    await expect(page.getByText('经营健康为辅助判断')).toBeVisible()
+    await expect(page.getByText('分数越高表示经营状况越健康')).toBeVisible()
     await expectNoHorizontalOverflow(page)
     await expectNoSeriousAxeViolations(page)
 
@@ -246,7 +233,7 @@ test('keeps login and authenticated shell accessible at 1440, 1024 and 390', asy
     }
   }
 
-  expect(businessRequests).toContain('/api/projects')
+  expect(businessRequests).toContain('/api/project-context/options')
   expect(businessRequests).toContain('/api/dashboard/project-manager')
   expect(runtimeProblems).toEqual([])
 })
@@ -261,8 +248,8 @@ test('honors reduced motion and distinguishes identity, 403 and 404 states', asy
 
   identity = 'ordinary'
   await page.goto('/v2/project/list')
-  await expect(page.getByRole('heading', { level: 1, name: '项目管理' })).toBeVisible()
-  await expect(page.locator('[data-domain]')).toHaveCount(2)
+  await expect(page.getByRole('heading', { level: 1, name: '项目台账' })).toBeVisible()
+  await expect(page.locator('[data-domain]')).toHaveCount(1)
 
   identity = 'denied'
   await page.goto('/v2/contract/ledger')
@@ -279,4 +266,7 @@ test('honors reduced motion and distinguishes identity, 403 and 404 states', asy
   identity = 'anonymous'
   await page.goto('/v2/project/list')
   await expect(page).toHaveURL(/\/v2\/login\?redirect=/)
+  await expect(page.getByRole('heading', { name: '登录新版工作台' })).toBeVisible()
+  await expectNoHorizontalOverflow(page)
+  await expectNoSeriousAxeViolations(page)
 })

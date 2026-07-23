@@ -147,7 +147,7 @@ test.describe('M4 variation and bid routes', () => {
     for (const target of [
       {
         path: '/v2/variation/order',
-        heading: '变更签证',
+        heading: '签证变更',
         selector: '.variation-page',
         record: '基坑设计变更',
       },
@@ -193,8 +193,8 @@ test.describe('M4 variation and bid routes', () => {
 
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/v2/bid-cost')
-    await page.getByRole('button', { name: '详情' }).first().click()
-    const detailDialog = page.getByRole('dialog')
+    await page.getByRole('button', { name: '预览' }).first().click()
+    const detailDialog = page.getByRole('dialog', { name: '投标成本预览' })
     const glassButton = detailDialog.locator('.v2-glass-button').first()
     await expect(detailDialog).toHaveClass(/v2-detail-dialog/)
     await expect(detailDialog.locator('.v2-detail-dialog__facts')).toHaveCSS('font-size', '12px')

@@ -370,7 +370,7 @@ async function loadProject(preserveNotice = false): Promise<void> {
     const loaded = await Promise.all(
       scopeProjectIds.value.map(async (id) => ({
         projectId: id,
-        projectName: workspace.projects.find((project) => project.value === id)?.label ?? id,
+        projectName: workspace.projects.find((project) => project.value === id)?.label ?? '—',
         overview: await loadCloseoutOverview(id, controller.signal),
       })),
     )
@@ -642,8 +642,16 @@ onBeforeUnmount(() => {
         title="全部项目收尾概览"
         :subtitle="`共 ${scopedOverviews.length} 个项目`"
       >
-        <div class="closeout-page__table-wrap">
+        <div
+          class="closeout-page__table-wrap"
+          role="region"
+          aria-label="全部项目收尾概览表格"
+          tabindex="0"
+        >
           <table class="closeout-page__table">
+            <caption class="v2-visually-hidden">
+              全部项目收尾概览
+            </caption>
             <thead>
               <tr>
                 <th scope="col">项目</th>

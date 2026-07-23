@@ -279,9 +279,9 @@ function Get-AutopilotConcatenatedEvidencePaths {
 
 function Get-AutopilotRetryBudget {
   param([string]$Category, [string]$Subcategory = '')
-  if ($Category -in @('tool_config','environment_prereq','ready_issue_config','unknown')) { return 1 }
-  if ($Category -eq 'real_quality_or_security' -and $Subcategory -eq 'real_permission_or_security_failure') { return 1 }
-  if ($Category -eq 'real_quality_or_security') { return 2 }
+  if ($Category -in @('tool_config','tool_invocation','environment_prerequisite','ready_issue_config','retrieval_gap','unknown')) { return 1 }
+  if ($Category -eq 'quality_or_security' -and $Subcategory -eq 'real_permission_or_security_failure') { return 1 }
+  if ($Category -eq 'quality_or_security') { return 2 }
   return 0
 }
 

@@ -16,6 +16,8 @@ import {
   V2Select,
   V2Skeleton,
   V2Stack,
+  V2ToastHost,
+  showToast,
   type V2SelectOption,
 } from '@/components'
 
@@ -79,6 +81,20 @@ const options: V2SelectOption[] = [
           <V2Stack :gap="3">
             <V2Alert title="保存成功" tone="success">变更已进入当前 V2 会话。</V2Alert>
             <V2Alert title="存在校验错误" tone="danger" dismissible> 请检查必填项后重试。 </V2Alert>
+            <V2Cluster :gap="2">
+              <V2Button @click="showToast('success', '操作成功', '数据已保存至云端')"
+                >成功提示</V2Button
+              >
+              <V2Button variant="secondary" @click="showToast('info', '提示信息', '新版本已可用')"
+                >信息提示</V2Button
+              >
+              <V2Button variant="secondary" @click="showToast('warn', '注意', '磁盘空间不足 10%')"
+                >警告提示</V2Button
+              >
+              <V2Button variant="danger" @click="showToast('error', '错误', '网络连接已断开')"
+                >错误提示</V2Button
+              >
+            </V2Cluster>
             <V2Skeleton variant="rect" label="面板加载中" />
             <V2Cluster :gap="3">
               <V2Skeleton variant="circle" label="头像加载中" />
@@ -130,6 +146,7 @@ const options: V2SelectOption[] = [
       @close="confirmOpen = false"
       @confirm="confirmOpen = false"
     />
+    <V2ToastHost />
   </main>
 </template>
 

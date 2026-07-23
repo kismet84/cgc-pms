@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { flushPromises, mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   V2Alert,
   V2Badge,
@@ -22,6 +22,8 @@ import {
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const sourceRoot = resolve(currentDir, '../../src')
+const repositoryRoot = resolve(currentDir, '../../..')
+const uiStandardPath = resolve(repositoryRoot, 'docs/ui-v2/m1-design-system-baseline.md')
 
 function migratedPageSources() {
   const pagesRoot = resolve(sourceRoot, 'pages')
@@ -133,6 +135,11 @@ describe('Clean-room V2 design system', () => {
     await wrapper.setProps({ loading: true })
     expect(button.attributes('aria-busy')).toBe('true')
     expect(button.attributes()).toHaveProperty('disabled')
+
+    const source = readFileSync(resolve(sourceRoot, 'components/V2GlassButton.vue'), 'utf-8')
+    expect(source).toMatch(
+      /@media \(max-width: 48rem\)[\s\S]*min-height: var\(--v2-control-height-touch\)/,
+    )
   })
 
   it('associates input hints and errors and emits model updates', async () => {
@@ -171,6 +178,20 @@ describe('Clean-room V2 design system', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([['2026-07']])
   })
 
+  it('can visually hide a select label while preserving its accessible name', () => {
+    const wrapper = mount(V2Select, {
+      props: {
+        label: '预警级别',
+        hideLabel: true,
+        modelValue: 'all',
+        options: [{ value: 'all', label: '全部预警' }],
+      },
+    })
+
+    expect(wrapper.get('.v2-field__label').classes()).toContain('v2-visually-hidden')
+    expect(wrapper.get('[role="button"]').attributes('aria-label')).toBe('预警级别：全部预警')
+  })
+
   it('supports an explicit or inferred empty option without duplicating the placeholder', async () => {
     const wrapper = mount(V2Select, {
       props: {
@@ -199,6 +220,38 @@ describe('Clean-room V2 design system', () => {
     expect(inferred.findAll('[role="option"]')).toHaveLength(2)
     await inferred.get('[role="option"][data-value=""]').trigger('click')
     expect(inferred.emitted('update:modelValue')).toEqual([['']])
+  })
+
+  it('supports arrow, home, end and escape keyboard navigation in selects', async () => {
+    const wrapper = mount(V2Select, {
+      attachTo: document.body,
+      props: {
+        label: '报告期',
+        modelValue: '',
+        options: [
+          { value: '2026-07', label: '2026年7月' },
+          { value: '2026-06', label: '2026年6月' },
+        ],
+      },
+    })
+    const trigger = wrapper.get('summary')
+    const options = wrapper.findAll<HTMLButtonElement>('[role="option"]:not(:disabled)')
+
+    await trigger.trigger('keydown', { key: 'ArrowDown' })
+    await flushPromises()
+    expect(document.activeElement).toBe(options[0]?.element)
+
+    await options[0]?.trigger('keydown', { key: 'End' })
+    expect(document.activeElement).toBe(options[1]?.element)
+    await options[1]?.trigger('keydown', { key: 'Home' })
+    expect(document.activeElement).toBe(options[0]?.element)
+    await options[0]?.trigger('keydown', { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(options[1]?.element)
+
+    await options[1]?.trigger('keydown', { key: 'Escape' })
+    await flushPromises()
+    expect(wrapper.get('details').attributes()).not.toHaveProperty('open')
+    expect(document.activeElement).toBe(trigger.element)
   })
 
   it('covers card, badge, alert and skeleton status primitives', async () => {
@@ -359,6 +412,23 @@ describe('Clean-room V2 design system', () => {
     wrapper.unmount()
   })
 
+  it('closes the top dialog with Escape when focus temporarily leaves it', async () => {
+    const wrapper = mount(V2Dialog, {
+      attachTo: document.body,
+      props: { open: true, title: '审批详情' },
+    })
+    await flushPromises()
+
+    document.body.tabIndex = -1
+    document.body.focus()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+
+    expect(wrapper.emitted('update:open')).toEqual([[false]])
+    wrapper.unmount()
+    document.body.removeAttribute('tabindex')
+  })
+
   it('keeps stack, cluster and grid spacing on the shared token scale', () => {
     const stack = mount(V2Stack, { props: { gap: 4 } })
     const cluster = mount(V2Cluster, { props: { gap: 2, justify: 'between' } })
@@ -396,9 +466,58 @@ describe('Clean-room V2 design system', () => {
     expect(componentFiles).not.toMatch(/#[0-9a-f]{3,8}\b/i)
     expect(componentCss).toContain('.v2-card__body:empty')
     expect(componentCss).toContain('.v2-card__header + .v2-card__body:not(:empty)')
+    expect(componentCss).toContain('#shell-main-content table')
   })
 
   describe('V2 migration gates', () => {
+    it('keeps the authoritative UI checklist complete, ordered and wired into CI', () => {
+      const standard = readFileSync(uiStandardPath, 'utf-8')
+      const checklistIds = [...standard.matchAll(/^\| (S\d{2}) \|/gm)].map(([, id]) => id)
+      const expectedIds = Array.from(
+        { length: 24 },
+        (_, index) => `S${String(index + 1).padStart(2, '0')}`,
+      )
+      const packageJson = readFileSync(resolve(sourceRoot, '../package.json'), 'utf-8')
+      const workflow = readFileSync(resolve(repositoryRoot, '.github/workflows/ci.yml'), 'utf-8')
+
+      expect(checklistIds).toEqual(expectedIds)
+      expect(standard).toContain('P0 失败立即阻断迁移或合并')
+      expect(standard).toContain('不设置泛化 P2')
+      for (const component of [
+        'V2Input',
+        'V2Select',
+        'V2Button',
+        'V2GlassButton',
+        'V2Dialog',
+        'V2ConfirmDialog',
+        'V2Badge',
+        'V2Alert',
+      ]) {
+        expect(standard).toContain(`\`${component}\``)
+      }
+      for (const command of ['unit', 'lint', 'type-check', 'build', '迁移 E2E', 'diff-check']) {
+        expect(standard).toContain(command)
+      }
+      expect(packageJson).toContain('"test:e2e:migration-gate"')
+      expect(workflow).toContain('pnpm test:e2e:migration-gate')
+    })
+
+    it('keeps project and report-period context selectors owned by the public shell', () => {
+      const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
+      expect(appShell).toContain('id="global-project"')
+      expect(appShell).toContain('id="global-report-period"')
+      expect(appShell).not.toContain('const dashboardRole')
+
+      const copiedContextControl =
+        /<V2(?:Input|Select)\b(?:(?:"[^"]*"|'[^']*')|[^'">])*\blabel=(['"])(?:当前项目|报告期)\1/
+      for (const { name, source } of migratedPages) {
+        expect(source, `${name} copied public-shell selector`).not.toMatch(copiedContextControl)
+        expect(source, `${name} copied public-shell id`).not.toMatch(
+          /\bid=['"]global-(?:project|report-period)['"]/,
+        )
+      }
+    })
+
     it('keeps migrated pages on declared typography and color tokens', () => {
       const sourceFiles = readdirSync(sourceRoot, { recursive: true })
         .map(String)
@@ -446,6 +565,34 @@ describe('Clean-room V2 design system', () => {
       expect(implementationSources).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i)
       expect(implementationSources).not.toMatch(/font-size:\s*[0-9.]+(?:px|rem)\b/i)
       expect(pageAndLayoutSources).not.toMatch(/\.(?:sr-only|v2-visually-hidden)\s*\{/)
+    })
+
+    it('keeps workspace table material centralized and prevents page-level overrides', () => {
+      const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+      expect(componentCss).toMatch(
+        /#shell-main-content table \{[\s\S]*?border-collapse: collapse;[\s\S]*?font-size: var\(--v2-font-size-12\);[\s\S]*?line-height: var\(--v2-line-height-ui\);/,
+      )
+      expect(componentCss).toMatch(
+        /#shell-main-content table :where\(th, td\) \{[\s\S]*?padding: var\(--v2-space-3\);[\s\S]*?border-bottom: var\(--v2-border-width\) solid var\(--v2-color-border-subtle\);[\s\S]*?white-space: nowrap;/,
+      )
+
+      for (const { name, source } of migratedPages) {
+        for (const rule of styleRules(source)) {
+          if (!rule.selector.includes('table') && !/\b(?:th|td)\b/.test(rule.selector)) continue
+          expect(rule.declarations, `${name}: ${rule.selector.trim()}`).not.toContain('!important')
+        }
+      }
+    })
+
+    it('keeps the closeout overview table keyboard-scrollable and named', () => {
+      const source = readFileSync(
+        resolve(sourceRoot, 'pages/delivery/ProjectCloseoutPage.vue'),
+        'utf-8',
+      )
+      expect(source).toMatch(
+        /class="closeout-page__table-wrap"[\s\S]*?role="region"[\s\S]*?aria-label="全部项目收尾概览表格"[\s\S]*?tabindex="0"/,
+      )
+      expect(source).toContain('<caption class="v2-visually-hidden">')
     })
 
     it('keeps migrated page title ids stable and page states below the page heading', () => {
@@ -594,6 +741,10 @@ describe('Clean-room V2 design system', () => {
         const blocks = paginationBlocks(source)
         const landmarks = [...source.matchAll(/<nav\b[^>]*aria-label=(['"])[^'"]*分页\1[^>]*>/g)]
         expect(blocks, `${name} pagination parser coverage`).toHaveLength(landmarks.length)
+        if (blocks.length > 0) {
+          const firstPageSize = source.match(/\bpageSize\s*(?::|=)[^\d]*(\d+)/)?.[1]
+          expect(firstPageSize, `${name} paginated list pageSize`).toBe('10')
+        }
         for (const [index, { body }] of blocks.entries()) {
           if (!body.includes('上一页') && !body.includes('下一页')) continue
           const evidence = `${name} pagination #${index + 1}`
@@ -608,6 +759,13 @@ describe('Clean-room V2 design system', () => {
           )
         }
       }
+    })
+
+    it('locks third-level workspace tab labels and typography', () => {
+      const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
+      expect(appShell).toMatch(
+        /\.app-shell__tab \{[\s\S]*?font-size: var\(--v2-font-size-12\);[\s\S]*?font-weight: var\(--v2-font-weight-semibold\);[\s\S]*?line-height: var\(--v2-line-height-ui\);/,
+      )
     })
 
     it('keeps shared component material owned by the shared styles', () => {
@@ -675,11 +833,25 @@ describe('Clean-room V2 design system', () => {
       expect(dailyLog).toContain('class="daily-log-page__stack daily-log-page__linked-facts"')
       expect(workflow).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
       expect(workflow).toContain('title="审批详情"')
+      expect(workflow).toContain(':open="isDetailRoute"')
+      expect(workflow).toContain(':close-on-backdrop="true"')
+      expect(workflow).toContain('@close="closeDetail"')
+      expect(workflow).toContain('query: { returnTab: activeTab.value }')
+      expect(workflow).toContain("const returnTab = String(route.query.returnTab ?? 'todo')")
       expect(workflow).toContain('<dt>审批事项</dt>')
       expect(workflow).toContain('<V2GlassButton')
       expect(workflow).toContain('class="v2-detail-dialog__section"')
       expect(workflow).toContain('class="v2-detail-dialog__facts"')
       expect(workflow).toContain('class="v2-detail-dialog__actions"')
+      expect(workflow).toContain('class="workflow-table__title"')
+      expect(workflow).toContain('hide-label')
+      expect(workflow).toContain(':close-disabled="actionLoading"')
+      expect(workflow.slice(0, workflow.indexOf('<V2Dialog'))).not.toContain('<V2GlassButton')
+      expect(workflow).toContain('role="region"')
+      expect(workflow).toContain('aria-label="审批任务表格"')
+      expect(workflow).toContain('<caption class="v2-visually-hidden">')
+      expect(workflow).toContain('<th scope="col">')
+      expect(workflow).not.toContain('size="small"')
       expect(workflow).not.toContain('workflow-detail-overview')
       expect(workflow).not.toContain('workflow-summary')
       expect(dashboard).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
@@ -869,8 +1041,11 @@ describe('Clean-room V2 design system', () => {
         expect(baseline).toContain(marker)
       }
       expect(baseline).not.toContain('21–28')
-      expect(baseline).toContain('完整对象“详情”进入独立详情路由')
-      expect(baseline).toContain('“追溯/预览”使用标准只读 `V2Dialog`')
+      expect(baseline).toContain('审批工作台是受控例外')
+      expect(baseline).toContain('完整详情与快速预览均使用标准只读 `V2Dialog`')
+      expect(baseline).toContain('点击遮罩、按 Escape 或点击关闭按钮')
+      expect(baseline).toContain('页面标题区、筛选区、表格行、分页和正文中的')
+      expect(baseline).toContain('`V2ConfirmDialog` 继续使用语义明确的普通或危险按钮')
       expect(mainline).not.toContain('每个实施阶段必须在 Stitch 交付可编辑设计')
       expect(mainline).toContain('只有新增视觉方向、复杂交互或现有模式无法覆盖时')
 

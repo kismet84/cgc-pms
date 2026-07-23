@@ -1529,8 +1529,8 @@ class AlertEvaluationServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("TA14c: 规则治理 — 缩小 dedup_hours 后窗口外旧告警允许重新生成")
-    void testRuleGovernance_DedupHoursAllowsAfterWindowShrinks() {
+    @DisplayName("TA14c: 规则治理 — 窗口外开放告警仍阻止重复生成")
+    void testRuleGovernance_OpenAlertSuppressesOutsideConfiguredWindow() {
         deleteRuleConfig("CONTRACT_OVERDUE");
         deleteAlerts("CONTRACT_OVERDUE");
         insertRuleConfig("CONTRACT_OVERDUE", null, null, null, 1);
@@ -1543,8 +1543,30 @@ class AlertEvaluationServiceTest {
 
         alertService.evaluateProject(TENANT_ID, testProjectId);
 
+        assertEquals(1, alertsByRuleType("CONTRACT_OVERDUE").size(),
+                "同一 dedupKey 已有 OPEN 告警时，超出去重窗口也不能新增开放告警");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("TA14c2: 规则治理 — 已处理告警超出窗口后允许重新生成")
+    void testRuleGovernance_ProcessedAlertAllowsAfterWindow() {
+        deleteRuleConfig("CONTRACT_OVERDUE");
+        deleteAlerts("CONTRACT_OVERDUE");
+        insertRuleConfig("CONTRACT_OVERDUE", null, null, null, 1);
+        AlertLog processed = insertDedupAlert(testProjectId, "CONTRACT_OVERDUE", "CONTRACT", "CONTRACT_TERM",
+                "P:" + testProjectId + ":R:CONTRACT_OVERDUE", LocalDateTime.now().minusHours(2));
+        processed.setProcessStatus("PROCESSED");
+        alertLogMapper.updateById(processed);
+
+        CtContract contract = contractMapper.selectById(testContractId);
+        contract.setEndDate(LocalDate.now().minusDays(1));
+        contractMapper.updateById(contract);
+
+        alertService.evaluateProject(TENANT_ID, testProjectId);
+
         assertEquals(2, alertsByRuleType("CONTRACT_OVERDUE").size(),
-                "旧告警在默认24小时内但已超出配置 dedup_hours=1 时，应允许重新生成");
+                "已处理告警超出 dedup_hours 后，应允许新的业务预警周期");
     }
 
     @Test

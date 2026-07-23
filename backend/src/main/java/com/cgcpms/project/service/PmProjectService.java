@@ -369,16 +369,9 @@ public class PmProjectService {
                 .eq(SysFile::getBusinessId, id)
                 .eq(SysFile::getTenantId, tenantId));
 
-        // Avoid unique key collision with previously deleted projects sharing the same code.
-        // project_code 列长度限制为 50 字符，超出时截断以避免 DB 错误。
-        String delCode = existing.getProjectCode() + "-DEL-" + id;
-        if (delCode.length() > 50) {
-            delCode = delCode.substring(0, 50);
+        if (pmProjectMapper.physicalDelete(id, tenantId) != 1) {
+            throw new BusinessException("PROJECT_DELETE_CONFLICT", "项目删除失败，请刷新后重试");
         }
-        existing.setProjectCode(delCode);
-        pmProjectMapper.updateById(existing);
-
-        pmProjectMapper.deleteById(id);
         log.info("Project {} physically deleted by SUPER_ADMIN", id);
     }
 

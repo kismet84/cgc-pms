@@ -166,6 +166,13 @@ describe('M4 costs pages', () => {
       expect.any(AbortSignal),
     )
     expect(wrapper.get('table').element.closest('.v2-card')).not.toBeNull()
+    const detailHeader = wrapper
+      .get('table')
+      .element.closest('.v2-card')
+      ?.querySelector('.v2-card__header')
+    expect(detailHeader?.textContent).toContain('成本总额9007199254740993.12')
+    expect(detailHeader?.textContent).toContain('税额0')
+    expect(wrapper.text()).not.toContain('筛选汇总')
     const pagination = wrapper.get('nav[aria-label="成本台账分页"]')
     expect(pagination.text()).toContain('共 1 条')
     expect(pagination.text()).toContain('第 1 页')

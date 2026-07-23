@@ -22,7 +22,7 @@
           "readyIssueId": { "type": ["string", "null"], "pattern": "^ISSUE-[0-9-]+$" },
           "failureCategory": {
             "type": ["string", "null"],
-            "enum": ["ready_issue_config", "tool_config", "environment_prereq", "quality_security", "needs_confirmation", null]
+            "enum": ["ready_issue_config", "tool_config", "tool_invocation", "environment_prerequisite", "retrieval_gap", "quality_or_security", "unknown", "needs_confirmation", null]
           }
         }
       }

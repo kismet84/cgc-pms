@@ -46,7 +46,7 @@ describe('M2 request baseline', () => {
       '/api/dashboard/finance?projectId=7',
       '/api/dashboard/cost-manager?projectId=7',
       '/api/dashboard/cost-manager?month=2026-07',
-      '/api/dashboard/management',
+      '/api/dashboard/management?projectId=7',
     ])
   })
 

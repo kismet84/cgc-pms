@@ -129,10 +129,12 @@ describe('M4 cost target page', () => {
     const { wrapper } = await mountPage(['cost:target:query'], '/cost-target/index?projectId=P1')
 
     expect(loadCostTargetPage).toHaveBeenCalledWith(
-      expect.objectContaining({ projectId: 'P1', pageNo: 1, pageSize: 20 }),
+      expect.objectContaining({ projectId: 'P1', pageNo: 1, pageSize: 10 }),
       expect.any(AbortSignal),
     )
     expect(wrapper.text()).toContain('9007199254740993.12')
+    expect(wrapper.text()).toContain('项目一')
+    expect(wrapper.text()).not.toContain('P1')
     expect(button(wrapper, '新建版本')).toBeUndefined()
     expect(button(wrapper, '编辑')).toBeUndefined()
     expect(button(wrapper, '提交')).toBeUndefined()

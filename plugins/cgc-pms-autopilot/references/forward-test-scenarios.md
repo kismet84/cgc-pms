@@ -16,7 +16,7 @@
 
 - 输入：Neo4j 不可用，或 Git 游标落后当前 HEAD 且单次 `autopilot-refill` 增量刷新后仍不一致
 - 预期：分别输出 `STOP_KG_REFILL_UNAVAILABLE` 或 `STOP_KG_REFILL_STALE`；不读取 `current-issues.json` 静默补货
-- 通过条件：不创建 Ready、不创建 issue worktree、不启动 executor；失败分类可区分 `environment_prereq`、`tool_config` 与数据一致性 `quality_security`
+- 通过条件：不创建 Ready、不创建 issue worktree、不启动 executor；失败分类可区分 `environment_prerequisite`、`tool_config` 与数据一致性 `quality_or_security`
 
 ## 场景1d：Ready 范围契约矛盾
 
@@ -33,8 +33,8 @@
 ## 场景2：命令失败
 
 - 输入：`ECONNREFUSED localhost:8080`
-- 预期：classifier 输出 `environment_prereq`；`nextAction` 指向 runtime refresh
-- 通过条件：不会把该错误直接判成 `real_quality_or_security`
+- 预期：classifier 输出 `environment_prerequisite`；`nextAction` 指向 runtime refresh
+- 通过条件：不会把该错误直接判成 `quality_or_security`
 
 ## 场景3：D/E 不通过
 
@@ -51,7 +51,7 @@
 ## 场景5：loop runner classify dry-run
 
 - 输入：`-Scenario classify -ErrorText "ECONNREFUSED 172.19.0.8:8080"`
-- 预期：runner 经 `observe -> classify -> repair-request -> next` 输出 `environment_prereq / vite_proxy_stale_backend`
+- 预期：runner 经 `observe -> classify -> repair-request -> next` 输出 `environment_prerequisite / vite_proxy_stale_backend`
 - 通过条件：`suggestedNextAction=refresh_frontend_runtime`，`retryPolicy=rerun_after_refresh`
 
 ## 场景6：loop runner closeout dry-run

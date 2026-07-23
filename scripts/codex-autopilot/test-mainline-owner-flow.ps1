@@ -27,21 +27,20 @@ foreach ($path in @($skillPath,$autopilotOwnerSkillPath,$policyPath,$taskPolicyP
 $skill = Get-Content -LiteralPath $skillPath -Raw -Encoding UTF8
 if ($skill -notmatch '(?m)^description:.*explicitly requests.*mainline.*Backlog.*AutoPilot') { throw 'mainline owner skill trigger is not explicitly scoped' }
 if ($skill -match 'autopilot-task-score/v\d|\b35/25/20/10/10\b|达到\s*20\s*个有效任务|timeoutSeconds\s*[=:]') { throw 'mainline owner skill copied dynamic AutoPilot facts' }
-foreach ($reference in @('AGENTS.override.md','AGENTS.md','docs/standards/codex-task-execution-policy.md','scripts/codex-autopilot/codex-autopilot.config.json','plugins/cgc-pms-autopilot/references/control-plane-policy.md')) {
+foreach ($reference in @('../cgc-pms-ci-gate-triage/SKILL.md','../cgc-pms-runtime-refresh/SKILL.md','git-publish-and-cleanup','plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md')) {
   if ($skill -notmatch [regex]::Escape($reference)) { throw "mainline owner skill does not reference $reference" }
 }
+if ($skill -match 'AGENTS\.override\.md|(?:^|[/`])AGENTS\.md|docs/standards/codex-task-execution-policy\.md') { throw 'mainline owner skill requires rereading a root rule' }
 $taskPolicy = Get-Content -LiteralPath $taskPolicyPath -Raw -Encoding UTF8
-foreach ($pattern in @('状态机与粘性模式','确定性工具路由','失败分类','浏览器执行模板','分层验证与证据复用','Git 生命周期','事件驱动沟通','任务恢复胶囊')) {
+foreach ($pattern in @('任务路由','普通任务不读取本索引','运行态与 CI 各只读取对应 Skill','非 AutoPilot 任务不得读取 checkpoint','Skill 不重新读取根规则')) {
   if ($taskPolicy -notmatch [regex]::Escape($pattern)) { throw "shared task policy is missing required section: $pattern" }
 }
 if ($taskPolicy -match 'autopilot-task-score/v\d|\b35/25/20/10/10\b|timeoutSeconds\s*[=:]') { throw 'shared task policy copied dynamic AutoPilot facts' }
 $autopilotOwnerSkill = Get-Content -LiteralPath $autopilotOwnerSkillPath -Raw -Encoding UTF8
-foreach ($pattern in @('非 PowerShell 源码才允许回退 CodeGraph 与 `rg`','PowerShell 检索必须改用 `rg` 与直接读取','禁止使用 CodeGraph')) {
-  if ($autopilotOwnerSkill -notmatch [regex]::Escape($pattern)) { throw "AutoPilot owner skill is missing safe PowerShell fallback: $pattern" }
+foreach ($pattern in @('触发协议','不可绕过边界','唯一事实入口','scripts/codex-autopilot/codex-autopilot.config.json','control-plane-policy.md','role-contracts.md','classifier-rules.md')) {
+  if ($autopilotOwnerSkill -notmatch [regex]::Escape($pattern)) { throw "AutoPilot owner skill is missing authority routing: $pattern" }
 }
-foreach ($pattern in @('scripts/codex-autopilot/codex-autopilot.config.json','issueExecutor','runtimeRefresh.waitSeconds','maxParallel','maxParallelIssues','parallelSafetyMode')) {
-  if ($autopilotOwnerSkill -notmatch [regex]::Escape($pattern)) { throw "AutoPilot owner skill is missing dynamic config reference: $pattern" }
-}
+if (@($autopilotOwnerSkill -split "\r?\n").Count -gt 70) { throw 'AutoPilot owner skill is not a short entrypoint' }
 if ($autopilotOwnerSkill -match '默认\s*45\s*分钟|5\s*分钟检查停滞|10\s*分钟终止|稳定等待\s*180\s*秒|每轮最多并行\s*3') {
   throw 'AutoPilot owner skill copied dynamic timeout, wait, or parallel values'
 }

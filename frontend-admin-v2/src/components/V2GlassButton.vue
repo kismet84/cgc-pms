@@ -145,4 +145,10 @@ function handleClick(event: MouseEvent): void {
     transform: none;
   }
 }
+
+@media (max-width: 48rem) {
+  .v2-glass-button.v2-button {
+    min-height: var(--v2-control-height-touch);
+  }
+}
 </style>

@@ -70,7 +70,11 @@ public class DashboardService {
     }
 
     public ManagementDashboardVO getManagementView() {
-        return financeManagementService.getManagementView();
+        return getManagementView(null);
+    }
+
+    public ManagementDashboardVO getManagementView(Long projectId) {
+        return financeManagementService.getManagementView(projectId);
     }
 
     public CostBreakdownVO getCostBreakdown(Long projectId) {

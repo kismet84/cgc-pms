@@ -25,8 +25,8 @@ function Invoke-IssueExecutor {
     $healthPath = Join-Path $healthDir 'runtime-health.json'
     [IO.File]::WriteAllText($healthPath, ($preflight | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
     if ($preflight.status -ne 'pass') {
-      Write-State $autoDir 'BLOCKED' $false 'RUNTIME_HEALTH_FAILED' $Issue.title 'environment' 'STOP_RUNTIME_HEALTH_FAILED'
-      return New-AutopilotStageResult -IssueId $Issue.lint.issueId -Stage validate -Outcome PAUSED -FailureCategory environment -StopReason STOP_RUNTIME_HEALTH_FAILED -Reason 'runtime health preflight failed' -EvidencePaths @($healthPath) -TransitionIntent PAUSED
+      Write-State $autoDir 'BLOCKED' $false 'RUNTIME_HEALTH_FAILED' $Issue.title 'environment_prerequisite' 'STOP_RUNTIME_HEALTH_FAILED'
+      return New-AutopilotStageResult -IssueId $Issue.lint.issueId -Stage validate -Outcome PAUSED -FailureCategory environment_prerequisite -StopReason STOP_RUNTIME_HEALTH_FAILED -Reason 'runtime health preflight failed' -EvidencePaths @($healthPath) -TransitionIntent PAUSED
     }
   }
   $baseCommit = if ($resuming) { [string]$ResumeCheckpoint.baseCommit } else { (Invoke-AutopilotGit -RepoRoot $RepoRoot -Arguments @('rev-parse','HEAD') -ThrowOnFailure).stdout.Trim() }
@@ -147,7 +147,7 @@ function Invoke-IssueExecutor {
       Write-RunEvent 'review.pass-result-restored' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='PASS'; status='RECOVERED'; reason='bound Reviewer PASS supersedes the historical blocked executor result for closeout'; reviewedDiffHash=$reviewHash })
     }
     if ($resuming -and $script:RecoveryDecision.action -eq 'RESUME_VALIDATION' -and [string]$result.status -eq 'blocked') {
-      if ([string]$result.failureCategory -eq 'environment' -and [string]$result.stopReason -eq 'STOP_VERIFICATION_FAILED') {
+      if ([string]$result.failureCategory -eq 'environment_prerequisite' -and [string]$result.stopReason -eq 'STOP_VERIFICATION_FAILED') {
         $result.status = 'done'; $result.failureCategory = 'none'; $result.nextAction = 'VERIFY'; $result.stopReason = ''
         $result.validation = @()
         Write-RunEvent 'validation.environment-retry' ([pscustomobject]@{ issueId=$Issue.lint.issueId; decision='RETRY_VALIDATION'; status='RECOVERED'; reason='one classified environment prerequisite retry uses the preserved implementation diff' })
@@ -172,14 +172,14 @@ function Invoke-IssueExecutor {
       try {
         Assert-AutopilotAllowedChanges -ChangedPaths $changes -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
       } catch {
-        $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
+        $result.status = 'blocked'; $result.failureCategory = 'quality_or_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
         $result.validation += [pscustomobject]@{ name = 'scope-allowlist'; status = 'fail'; message = $_.Exception.Message }
       }
       if ($result.status -eq 'done') {
         try {
           Assert-AutopilotImplementationCloseoutArtifacts -Worktree $worktree.path -Issue $Issue.contract | Out-Null
         } catch {
-          $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'REPAIR'; $result.stopReason = 'STOP_CLOSEOUT_ARTIFACTS_MISSING'
+          $result.status = 'blocked'; $result.failureCategory = 'quality_or_security'; $result.nextAction = 'REPAIR'; $result.stopReason = 'STOP_CLOSEOUT_ARTIFACTS_MISSING'
           $failureSummary = "D/E 尚未开始；只补齐 F 文档与治理回写，不得重做或扩大 BC 实现。缺失项：$($_.Exception.Message)"
           $currentFingerprint = Get-AutopilotTextHash ("closeout-artifacts|" + $_.Exception.Message)
           $result | Add-Member -NotePropertyName failureFingerprint -NotePropertyValue $currentFingerprint -Force
@@ -266,9 +266,9 @@ function Invoke-IssueExecutor {
             $classifierPath = Join-Path (Resolve-Path (Join-Path $scriptDir '..\..')).Path 'plugins\cgc-pms-autopilot\scripts\test-failure-classifier.ps1'
             $classification = & $classifierPath -ErrorText ([string]$evidence.summary) -ExitCode ([int]$evidence.exitCode) | ConvertFrom-Json
             $result.status = 'blocked'
-            $result.failureCategory = if ($classification.category -eq 'environment_prereq') { 'environment' } elseif ($classification.category -eq 'ready_issue_config') { 'ready_issue_config' } elseif ($classification.category -eq 'tool_config') { 'tool_config' } else { 'quality_security' }
+            $result.failureCategory = if ([string]$classification.category -in @('tool_config','tool_invocation','environment_prerequisite','ready_issue_config','retrieval_gap','quality_or_security','unknown')) { [string]$classification.category } else { 'unknown' }
             $result.nextAction = 'STOP'; $result.stopReason = 'STOP_VERIFICATION_FAILED'
-            if ($classification.category -eq 'environment_prereq') {
+            if ($classification.category -eq 'environment_prerequisite') {
               $environmentDiffHash = Get-AutopilotRecoveryDiffHash -Worktree $worktree.path -BaseCommit $baseCommit
               $checkpoint = Move-AutopilotIssuePhase -Path $checkpointPath -Phase IMPLEMENTED -Evidence @{diffHash=$environmentDiffHash} -IncrementEnvironmentRetry
               $script:IssuePhase = 'IMPLEMENTED'
@@ -290,7 +290,7 @@ function Invoke-IssueExecutor {
             Assert-AutopilotEvidenceCurrent -Evidence $boundEvidence -IssueId $Issue.lint.issueId -Worktree $worktree.path -BaseCommit $baseCommit -ReadyContentHash ([string]$Issue.lint.readyContentHash) -ContextBaseId $boundContextBase.baseId -ContextBaseHash $boundContextBase.contentHash -CandidateEvidenceHead $boundCandidateEvidenceHead -ExecutionBaseCommit $boundContextBase.executionBaseCommit -ControlPlanePolicyHash $boundContextBase.controlPlanePolicyHash | Out-Null
             if ([int]$boundEvidence.schemaVersion -eq 2 -and @($boundCheckpoint.artifacts.contextDeltaIds) -notcontains [string]$boundEvidence.contextDeltaId) { throw 'Evidence v2 context delta is not bound to the checkpoint' }
           } catch {
-            $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_EVIDENCE_STALE'
+            $result.status = 'blocked'; $result.failureCategory = 'quality_or_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_EVIDENCE_STALE'
             $result.validation += [pscustomobject]@{ name='evidence-current'; status='fail'; message=$_.Exception.Message }
             break
           }
@@ -306,7 +306,7 @@ function Invoke-IssueExecutor {
         try {
           Assert-AutopilotAllowedChanges -ChangedPaths @(Get-AutopilotIssueChanges -Worktree $worktree.path -BaseCommit $baseCommit) -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
         } catch {
-          $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
+          $result.status = 'blocked'; $result.failureCategory = 'quality_or_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
           $result | Add-Member -NotePropertyName scopeViolationCount -NotePropertyValue 1 -Force
           $result.validation += [pscustomobject]@{ name = 'post-validation-scope-allowlist'; status = 'fail'; message = $_.Exception.Message }
         }
@@ -393,11 +393,11 @@ function Invoke-IssueExecutor {
             $checkpoint = Move-AutopilotIssuePhase -Path $checkpointPath -Phase REVIEWED -Artifacts @{reviewRequestPath=$requestPath;reviewResultPath=$reviewPath} -Evidence @{diffHash=$request.diffSha256;reviewDiffHash=$request.diffSha256}
             $script:IssuePhase = 'REVIEWED'
           } elseif ($reviewDisposition.action -eq 'REPAIR') {
-            $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_NEEDS_REPAIR'
+            $result.status = 'blocked'; $result.failureCategory = 'quality_or_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_NEEDS_REPAIR'
             $failureSummary = $reviewDisposition.summary; $currentFingerprint = $reviewDisposition.failureFingerprint
             $result | Add-Member -NotePropertyName failureFingerprint -NotePropertyValue $currentFingerprint -Force
           } elseif ($reviewDisposition.action -eq 'BLOCK') {
-            $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_FAILED'
+            $result.status = 'blocked'; $result.failureCategory = 'quality_or_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEW_FAILED'
           } elseif ($reviewDisposition.action -eq 'BLOCK_TOOL') {
             $result.status = 'blocked'; $result.failureCategory = 'tool_config'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_REVIEWER_TOOL_FAILURE'
             $checkpoint = Move-AutopilotIssuePhase -Path $checkpointPath -Phase REVIEW_TOOL_BLOCKED -Artifacts @{reviewRequestPath=$requestPath;reviewResultPath=$reviewPath} -Evidence @{diffHash=$request.diffSha256} -IncrementToolConfigBlock
@@ -411,7 +411,7 @@ function Invoke-IssueExecutor {
         try {
           Assert-AutopilotAllowedChanges -ChangedPaths $finalChanges -AllowedPaths $Issue.contract.allowedPaths -ForbiddenPaths $Issue.contract.forbiddenPaths | Out-Null
         } catch {
-          $result.status = 'blocked'; $result.failureCategory = 'quality_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
+          $result.status = 'blocked'; $result.failureCategory = 'quality_or_security'; $result.nextAction = 'STOP'; $result.stopReason = 'STOP_SCOPE_VIOLATION'
           $result.scopeViolationCount = 1
           $result.validation += [pscustomobject]@{ name = 'final-scope-allowlist'; status = 'fail'; message = $_.Exception.Message }
         }

@@ -5,7 +5,7 @@ counts:
   partner: 7
   contract: 4
   material: 1
-  completed-stage: 21
+  completed-stage: 22
 inventory:
   requested-qty: 100
   ordered-qty: 100
@@ -55,7 +55,7 @@ m3-technical:
 m3-closeout:
   split-permission-accounts: 11
   action-permissions: 10
-  stage-rows: 10
+  stage-rows: 9
   clean-document-types: 5
   legal-closed-chains: 1
   invalid-responsible-members: 0

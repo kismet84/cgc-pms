@@ -1,6 +1,6 @@
 ## READY-33-M4
 
-- 分类：environment_prereq
+- 分类：environment_prerequisite
 - 阻塞原因：本地验收前置服务未就绪，无法完成目标验证。
 - 当前 WIP：插件脚本与模板已落地，等待运行态恢复后复验。
 - 恢复条件：相关服务恢复可访问，目标验证命令可稳定执行。

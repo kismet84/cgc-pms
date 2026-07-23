@@ -4,7 +4,7 @@ import { captureRuntimeErrors } from './runtime-errors'
 
 const runLiveDelivery = process.env.V2_LIVE_DELIVERY === '1'
 const splitRoleUser = process.env.V2_SCHEDULE_READONLY_USER || 'demo.schedule.query'
-const controlledProjectId = process.env.V2_DELIVERY_PROJECT_ID || '520000000000009011'
+const controlledProjectId = process.env.V2_DELIVERY_PROJECT_ID || '520000000000009002'
 const scheduleProjectId = process.env.V2_SCHEDULE_PROJECT_ID || '520000000000000001'
 const runtimeErrors = new WeakMap<Page, string[]>()
 

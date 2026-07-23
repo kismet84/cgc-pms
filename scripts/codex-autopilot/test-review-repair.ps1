@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -34,7 +34,7 @@ try {
 
   $pass = [pscustomobject]@{ schemaVersion = 1; issueId = 'ISSUE-900-030'; decision = 'pass'; findings = @(); reviewedDiffHash = $request.diffSha256; reviewedAt = [datetimeoffset]::Now.ToString('o') }
   Assert-AutopilotReviewGate -Route $route -ReviewResult $pass | Out-Null
-  $historicalBlockedResult = [pscustomobject]@{ status='blocked'; failureCategory='quality_security'; nextAction='STOP'; stopReason='STOP_REVIEW_NEEDS_REPAIR' }
+  $historicalBlockedResult = [pscustomobject]@{ status='blocked'; failureCategory='quality_or_security'; nextAction='STOP'; stopReason='STOP_REVIEW_NEEDS_REPAIR' }
   $restoredResult = Restore-AutopilotReviewedResultForCloseout -Result $historicalBlockedResult -ReviewResult $pass -IssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256
   if ($restoredResult.status -ne 'done' -or $restoredResult.failureCategory -ne 'none' -or $restoredResult.nextAction -ne 'CHECKPOINT' -or $restoredResult.stopReason -or $restoredResult.review.decision -ne 'pass') { throw 'bound Reviewer PASS did not restore the historical blocked result for closeout' }
   $mismatchRejected = $false
@@ -66,9 +66,9 @@ try {
   if ($sandboxDisposition.action -ne 'BLOCK_TOOL') { throw 'Reviewer sandbox failure was not classified as tool_config' }
   $structuredToolBlocked = New-AutopilotReviewerToolBlockedResult -RequestPath (Join-Path $root 'review-request.json') -ResultPath (Join-Path $root 'tool-blocked.json') -Reason 'sandbox initialization failed (os error 3)'
   if ($structuredToolBlocked.decision -ne 'tool_blocked' -or (Get-AutopilotReviewDisposition -ReviewResult $structuredToolBlocked -ExpectedIssueId 'ISSUE-900-030' -ExpectedDiffHash $request.diffSha256).action -ne 'BLOCK_TOOL') { throw 'structured Reviewer tool block was not isolated from business repair' }
-  if (Test-AutopilotCodeRepairAllowed -FailureCategory 'environment' -StopReason 'STOP_VERIFICATION_FAILED') { throw 'environment failure was routed to code repair' }
-  if (!(Test-AutopilotCodeRepairAllowed -FailureCategory 'quality_security' -StopReason 'STOP_VERIFICATION_FAILED')) { throw 'quality failure lost bounded repair' }
-  if (!(Test-AutopilotCodeRepairAllowed -FailureCategory 'quality_security' -StopReason 'STOP_CLOSEOUT_ARTIFACTS_MISSING')) { throw 'missing F artifacts lost bounded repair' }
+  if (Test-AutopilotCodeRepairAllowed -FailureCategory 'environment_prerequisite' -StopReason 'STOP_VERIFICATION_FAILED') { throw 'environment prerequisite failure was routed to code repair' }
+  if (!(Test-AutopilotCodeRepairAllowed -FailureCategory 'quality_or_security' -StopReason 'STOP_VERIFICATION_FAILED')) { throw 'quality failure lost bounded repair' }
+  if (!(Test-AutopilotCodeRepairAllowed -FailureCategory 'quality_or_security' -StopReason 'STOP_CLOSEOUT_ARTIFACTS_MISSING')) { throw 'missing F artifacts lost bounded repair' }
 
   if (Test-AutopilotRetryAllowed -PreviousFingerprint 'same' -CurrentFingerprint 'same' -Attempt 1) { throw 'same failure fingerprint was retried' }
   if (!(Test-AutopilotRetryAllowed -PreviousFingerprint 'old' -CurrentFingerprint 'new' -Attempt 1)) { throw 'new failure fingerprint was not allowed within budget' }

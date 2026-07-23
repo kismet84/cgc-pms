@@ -34,6 +34,7 @@ public class WorkflowQueryService {
     private final WfCcMapper wfCcMapper;
     private final WorkflowEngine workflowEngine;
     private final WorkflowVOAssembler voAssembler;
+    private final WorkflowBusinessCodeResolver businessCodeResolver;
     private final ProjectAccessChecker projectAccessChecker;
 
     private static final Pattern BUSINESS_TYPE_PATTERN = Pattern.compile("[A-Z][A-Z0-9_]{0,63}");
@@ -161,11 +162,14 @@ public class WorkflowQueryService {
 
         Map<Long, WfInstance> instanceMap = batchLoadInstances(
                 page.getRecords(), WfTask::getInstanceId, tenantId);
+        Map<Long, String> businessCodes = businessCodeResolver.resolveByInstanceId(
+                tenantId, instanceMap.values());
 
         return page.convert(task -> {
             WfTaskVO vo = voAssembler.toTaskVO(task);
             vo.setBusinessType(task.getBusinessType());
             vo.setBusinessId(String.valueOf(task.getBusinessId()));
+            vo.setBusinessCode(businessCodes.get(task.getInstanceId()));
             enrichTaskWithInstance(vo, instanceMap.get(task.getInstanceId()));
             return vo;
         });
@@ -218,12 +222,15 @@ public class WorkflowQueryService {
 
         Page<WfInstance> page = wfInstanceMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
         Map<Long, String> currentNodeNames = batchLoadCurrentNodeNames(tenantId, page.getRecords());
+        Map<Long, String> businessCodes = businessCodeResolver.resolveByInstanceId(
+                tenantId, page.getRecords());
 
         return page.convert(instance -> {
             WfMyInstanceVO vo = new WfMyInstanceVO();
             vo.setInstanceId(String.valueOf(instance.getId()));
             vo.setBusinessType(instance.getBusinessType());
             if (instance.getBusinessId() != null) vo.setBusinessId(String.valueOf(instance.getBusinessId()));
+            vo.setBusinessCode(businessCodes.get(instance.getId()));
             vo.setTitle(instance.getTitle());
             vo.setInstanceStatus(instance.getInstanceStatus());
             if (instance.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(instance.getCreatedAt()));
@@ -278,9 +285,12 @@ public class WorkflowQueryService {
 
         Map<Long, WfInstance> instanceMap = batchLoadInstances(
                 page.getRecords(), WfRecord::getInstanceId, tenantId);
+        Map<Long, String> businessCodes = businessCodeResolver.resolveByInstanceId(
+                tenantId, instanceMap.values());
 
         return page.convert(record -> {
             WfRecordVO vo = voAssembler.toRecordVO(record);
+            vo.setBusinessCode(businessCodes.get(record.getInstanceId()));
             enrichRecordWithInstance(vo, instanceMap.get(record.getInstanceId()));
             return vo;
         });
@@ -379,6 +389,8 @@ public class WorkflowQueryService {
         requireProjectAccess(instance);
 
         WfInstanceVO vo = voAssembler.toInstanceVO(instance);
+        vo.setBusinessCode(businessCodeResolver.resolveByInstanceId(
+                tenantId, List.of(instance)).get(instance.getId()));
         WfTemplate template = wfTemplateMapper.selectById(instance.getTemplateId());
         if (template != null) vo.setTemplateName(template.getTemplateName());
         vo.setAvailableActions(workflowEngine.getAvailableActions(tenantId, instanceId, currentUserId));
@@ -391,7 +403,7 @@ public class WorkflowQueryService {
                         .orderByAsc(WfNodeInstance::getNodeOrder));
 
         Map<Long, List<WfTask>> tasksByNode = batchLoadTasksByNode(tenantId, nodes);
-        List<WfNodeVO> nodeVOs = buildNodeVOs(nodes, tasksByNode);
+        List<WfNodeVO> nodeVOs = buildNodeVOs(nodes, tasksByNode, vo.getBusinessCode());
         vo.setNodes(nodeVOs);
 
         // Records
@@ -446,9 +458,12 @@ public class WorkflowQueryService {
 
         Map<Long, WfInstance> instanceMap = batchLoadInstances(
                 page.getRecords(), WfCc::getInstanceId, tenantId);
+        Map<Long, String> businessCodes = businessCodeResolver.resolveByInstanceId(
+                tenantId, instanceMap.values());
 
         return page.convert(cc -> {
             WfCcVO vo = voAssembler.toCcVO(cc);
+            vo.setBusinessCode(businessCodes.get(cc.getInstanceId()));
             WfInstance instance = instanceMap.get(cc.getInstanceId());
             if (instance != null) vo.setInstanceStatus(instance.getInstanceStatus());
             return vo;
@@ -477,9 +492,14 @@ public class WorkflowQueryService {
         if (normalizedStatus != null) {
             wrapper.eq(WfInstance::getInstanceStatus, normalizedStatus);
         }
-        return wfInstanceMapper.selectList(wrapper).stream()
+        Set<Long> result = wfInstanceMapper.selectList(wrapper).stream()
                 .map(WfInstance::getId)
                 .collect(Collectors.toSet());
+        if (normalizedKeyword != null) {
+            result.addAll(businessCodeResolver.findInstanceIds(
+                    tenantId, normalizedKeyword, normalizedBusinessType, normalizedStatus));
+        }
+        return result;
     }
 
     private boolean isUnsupportedBusinessType(String businessType) {
@@ -636,12 +656,17 @@ public class WorkflowQueryService {
     }
 
     private List<WfNodeVO> buildNodeVOs(List<WfNodeInstance> nodes,
-                                        Map<Long, List<WfTask>> tasksByNode) {
+                                        Map<Long, List<WfTask>> tasksByNode,
+                                        String businessCode) {
         List<WfNodeVO> result = new ArrayList<>();
         for (WfNodeInstance n : nodes) {
             WfNodeVO nvo = voAssembler.toNodeVO(n);
             List<WfTask> tasks = tasksByNode.getOrDefault(n.getId(), Collections.emptyList());
-            nvo.setTasks(tasks.stream().map(voAssembler::toTaskVO).collect(Collectors.toList()));
+            nvo.setTasks(tasks.stream().map(task -> {
+                WfTaskVO taskVO = voAssembler.toTaskVO(task);
+                taskVO.setBusinessCode(businessCode);
+                return taskVO;
+            }).collect(Collectors.toList()));
             result.add(nvo);
         }
         return result;

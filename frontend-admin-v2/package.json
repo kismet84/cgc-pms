@@ -12,6 +12,7 @@
     "lint:check": "eslint src tests e2e scripts eslint.config.js playwright.config.ts vite.config.ts vitest.config.ts --ext .vue,.js,.mjs,.ts,.jsx,.tsx",
     "test:unit": "vitest run tests/unit",
     "test:e2e:health": "playwright test e2e/health.spec.ts",
+    "test:e2e:migration-gate": "node scripts/run-migration-ui-gate.mjs",
     "check:boundary": "node scripts/check-clean-room-boundary.mjs",
     "generate:route-ledger": "node scripts/generate-route-ledger.mjs --write",
     "check:route-ledger": "node scripts/generate-route-ledger.mjs --check",

@@ -8,8 +8,9 @@ import type {
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import DashboardPage from '@/pages/dashboard/DashboardPage.vue'
+import { dismissToast, toastItems } from '@/components/toast'
 import { evaluateAlerts, loadAlerts, updateAlertStatus } from '@/services/alerts'
 import { loadCostBreakdown, loadDashboard } from '@/services/dashboard'
 import { useSessionStore } from '@/stores/session'
@@ -230,6 +231,10 @@ beforeEach(() => {
   vi.mocked(evaluateAlerts).mockReset()
 })
 
+afterEach(() => {
+  toastItems.slice().forEach((toast) => dismissToast(toast.id))
+})
+
 describe('M2 dashboard page', () => {
   it('requests and renders only the permitted role with real service data', async () => {
     vi.mocked(loadDashboard).mockResolvedValue(pmData)
@@ -245,7 +250,8 @@ describe('M2 dashboard page', () => {
     expect(wrapper.find('[aria-label="驾驶舱角色视图"]').exists()).toBe(false)
     expect(wrapper.text()).toContain('待处理任务')
     expect(wrapper.text()).toContain('2')
-    expect(wrapper.text()).toContain('项目经营健康度')
+    expect(wrapper.text()).toContain('项目经营健康评分')
+    expect(wrapper.get('.health-score').attributes('aria-label')).toContain('分数越高越健康')
     expect(wrapper.text()).toContain('经营动态')
     expect(wrapper.text()).not.toContain('当前角色暂无趋势数据')
     expect(wrapper.text()).toContain('预警列表')
@@ -253,6 +259,26 @@ describe('M2 dashboard page', () => {
       '查看最高风险',
     )
     expect(wrapper.find('.highest-risk .dashboard-page__outline-link').exists()).toBe(false)
+  })
+
+  it('refreshes the dashboard and reports success', async () => {
+    vi.mocked(loadDashboard).mockResolvedValue(pmData)
+    const { wrapper } = await mountDashboard(['dashboard:project-manager:view'])
+    vi.mocked(loadDashboard).mockClear()
+
+    await wrapper
+      .get('.command-panel__title')
+      .findAll('button')
+      .find((button) => button.text() === '刷新')!
+      .trigger('click')
+    await flushPromises()
+
+    expect(loadDashboard).toHaveBeenCalledTimes(1)
+    expect(toastItems.at(-1)).toMatchObject({
+      type: 'success',
+      title: '刷新成功',
+      message: '驾驶舱数据已更新',
+    })
   })
 
   it('filters by semantic risk level and the header action selects highest risks', async () => {
@@ -306,6 +332,7 @@ describe('M2 dashboard page', () => {
     expect(wrapper.get('.risk-level').text()).toBe('中')
 
     await wrapper.get('.command-panel__title .dashboard-page__outline-link').trigger('click')
+    expect(filter.get('summary').attributes('role')).toBe('button')
     expect(filter.get('summary').text()).toBe('高')
     expect(riskList.text()).toContain('最高风险事项')
     expect(riskList.text()).not.toContain('一般关注事项')
@@ -315,6 +342,56 @@ describe('M2 dashboard page', () => {
     expect(filter.get('summary').text()).toBe('全部预警')
     expect(riskList.text()).toContain('最高风险事项')
     expect(riskList.text()).toContain('一般关注事项')
+  })
+
+  it('deduplicates authoritative alerts, formats money and paginates ten rows per page', async () => {
+    const alerts = Array.from({ length: 11 }, (_, index): AlertRecord => ({
+      id: String(index + 1),
+      projectId: '1',
+      dedupKey: `DYNAMIC_COST_EXCEEDS_TARGET:${index + 1}`,
+      ruleType: 'DYNAMIC_COST_EXCEEDS_TARGET',
+      severity: 'HIGH',
+      message: `预警 ${index + 1}，金额 ${3970000 + index}.00`,
+      triggeredAt: `2026-07-${String(index + 1).padStart(2, '0')} 11:00:00`,
+      isRead: 0,
+      processStatus: 'OPEN',
+    }))
+    vi.mocked(loadDashboard).mockResolvedValue(costData)
+    vi.mocked(loadAlerts).mockResolvedValue({
+      records: [
+        ...alerts,
+        {
+          ...alerts[0]!,
+          id: 'duplicate',
+          triggeredAt: '2026-07-23 11:00:00',
+        },
+      ],
+      total: 12,
+      pageNo: 1,
+      pageSize: 50,
+    })
+
+    const { wrapper } = await mountDashboard(['dashboard:cost-manager:view', 'alert:view'])
+    const riskList = wrapper.get('#risk-list')
+
+    expect(loadAlerts).toHaveBeenCalledWith(
+      expect.objectContaining({ processStatus: 'OPEN' }),
+      expect.any(AbortSignal),
+    )
+    expect(riskList.findAll('tbody tr')).toHaveLength(10)
+    expect(riskList.text()).toContain('¥3,970,000.00')
+    expect(riskList.text()).not.toContain('金额 / 指标')
+    expect(riskList.text()).toContain('规则 / 触发时间')
+    expect(riskList.text()).toContain('共 11 条')
+    expect(riskList.text()).toContain('第 1 / 2 页')
+
+    await riskList
+      .findAll('button')
+      .find((button) => button.text() === '下一页')!
+      .trigger('click')
+
+    expect(riskList.findAll('tbody tr')).toHaveLength(1)
+    expect(riskList.text()).toContain('第 2 / 2 页')
   })
 
   it('shows the alert evaluation result in a bubble anchored above its button', async () => {
@@ -372,11 +449,13 @@ describe('M2 dashboard page', () => {
       'alert:edit',
     ])
 
+    expect(wrapper.get('.risk-filter .v2-field__label').classes()).toContain('v2-visually-hidden')
     expect(loadAlerts).toHaveBeenCalledWith(
       {
         pageNum: 1,
         pageSize: 50,
         projectId: '1',
+        processStatus: 'OPEN',
         triggeredStart: '2026-07-01T00:00:00',
         triggeredEnd: '2026-07-31T23:59:59',
       },
@@ -386,6 +465,7 @@ describe('M2 dashboard page', () => {
     expect(wrapper.get('.v2-detail-dialog').classes()).toContain('v2-dialog-standard')
     expect(wrapper.get('.v2-dialog__title').text()).toBe('预警详情')
     expect(wrapper.get('.v2-detail-dialog__message').text()).toBe(alert.message)
+    expect(wrapper.get('.v2-detail-dialog__facts').text()).toContain('项目一')
     expect(wrapper.get('.v2-detail-dialog__quick-actions').findAll('button')).toHaveLength(2)
     expect(wrapper.get('.v2-detail-dialog__form-row').findAll('.v2-field')).toHaveLength(2)
     expect(wrapper.text()).toContain('查看预警记录并执行当前账号允许的操作。')
@@ -415,6 +495,7 @@ describe('M2 dashboard page', () => {
         pageNum: 1,
         pageSize: 50,
         projectId: '1',
+        processStatus: 'OPEN',
         triggeredStart: '2026-06-01T00:00:00',
         triggeredEnd: '2026-06-30T23:59:59',
       },
@@ -542,13 +623,13 @@ describe('M2 dashboard page', () => {
     expect(wrapper.text()).toContain('合同金额')
     expect(wrapper.text()).toContain('累计支付')
     expect(wrapper.text()).toContain('项目管理服务合同')
-    expect(wrapper.text()).toContain('PROCESSING')
+    expect(wrapper.text()).toContain('处理中')
     const breakdown = wrapper.get('#finance-contract-breakdown')
     expect(breakdown.text()).toContain('合同资金分解')
     expect(breakdown.findAll('tbody tr')).toHaveLength(1)
     await breakdown.get('button[aria-expanded="false"]').trigger('click')
     expect(breakdown.findAll('tbody tr')).toHaveLength(2)
     expect(breakdown.text()).toContain('PMT-20260718-001 · 2026-07-18')
-    expect(breakdown.text()).toContain('SUCCESS')
+    expect(breakdown.text()).toContain('已完成')
   })
 })

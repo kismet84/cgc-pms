@@ -11,6 +11,7 @@ import BudgetPageView from '@/pages/commercial/BudgetPage.vue'
 import MeasurementPageView from '@/pages/commercial/ProductionMeasurementPage.vue'
 import * as commercial from '@/services/commercial'
 import { useSessionStore } from '@/stores/session'
+import { useWorkspaceStore } from '@/stores/workspace'
 vi.mock('@/services/commercial', () => ({
   createBudget: vi.fn(),
   deleteBudget: vi.fn(),
@@ -18,7 +19,6 @@ vi.mock('@/services/commercial', () => ({
   loadBudgetAvailability: vi.fn(),
   loadBudgetPage: vi.fn(),
   loadContractPage: vi.fn(),
-  loadMeasurement: vi.fn(),
   loadMeasurementPeriods: vi.fn(),
   loadMeasurementSettlementTrace: vi.fn(),
   loadMeasurementSources: vi.fn(),
@@ -64,9 +64,13 @@ const measurement: MeasurementAmountRow = {
   id: 'M1',
   measure_code: 'ME-1',
   project_id: 'P1',
+  contract_id: 'C1',
+  period_id: 'P01',
   period_name: '2026-07',
+  measure_date: '2026-07-25',
   current_reported_amount: '9007199254740993.12',
   cumulative_reported_amount: '9007199254740993.12',
+  approval_status: 'DRAFT',
   status: 'DRAFT',
   version: '9',
 }
@@ -87,6 +91,10 @@ async function mountPage(component: typeof BudgetPageView, path: string, permiss
   const session = useSessionStore()
   session.userInfo = { userId: '1', username: 'tester', roles: ['USER'], permissions }
   session.status = 'authenticated'
+  useWorkspaceStore().setProjects([
+    { value: 'P1', label: '项目一', status: 'ACTIVE' },
+    { value: 'P2', label: '项目二', status: 'ACTIVE' },
+  ])
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -159,11 +167,19 @@ beforeEach(() => {
     })
   vi.mocked(commercial.loadMeasurementPeriods)
     .mockReset()
-    .mockResolvedValue([{ id: 'P01', period_name: '2026-07', status: 'OPEN', version: '2' }])
+    .mockResolvedValue([
+      {
+        id: 'P01',
+        project_id: 'P1',
+        contract_id: 'C1',
+        period_name: '2026-07',
+        status: 'OPEN',
+        version: '2',
+      },
+    ])
   vi.mocked(commercial.loadMeasurements).mockReset().mockResolvedValue([measurement])
   vi.mocked(commercial.loadOwnerMeasurementSubmissions).mockReset().mockResolvedValue([])
   vi.mocked(commercial.loadMeasurementSources).mockReset().mockResolvedValue([])
-  vi.mocked(commercial.loadMeasurement).mockReset().mockResolvedValue(measurement)
   vi.mocked(commercial.createBudget).mockReset().mockResolvedValue('NEW-1')
   vi.mocked(commercial.updateBudget).mockReset().mockResolvedValue()
   vi.mocked(commercial.saveBudgetLines).mockReset().mockResolvedValue()
@@ -191,6 +207,111 @@ describe('M4 budget and measurement pages', () => {
     expect(wrapper.get('tbody').text()).not.toMatch(/\b(?:DRAFT|ACTIVE)\b/)
   })
 
+  it('uses one measurement table and expands owner submission versions', async () => {
+    vi.mocked(commercial.loadMeasurements).mockResolvedValueOnce([
+      { ...measurement, status: 'OWNER_SUBMITTED', approval_status: 'APPROVED' },
+    ])
+    vi.mocked(commercial.loadOwnerMeasurementSubmissions).mockResolvedValueOnce([
+      {
+        id: 'S1',
+        measurement_id: 'M1',
+        measure_code: 'ME-1',
+        submission_code: 'OMS-202607-001-R2',
+        external_document_no: 'OWNER-DOC-2026-07',
+        revision_no: '2',
+        submitted_at: '2026-07-25T10:00:00',
+        submitted_amount: '9007199254740993.12',
+        confirmed_amount: '0',
+        status: 'SUBMITTED',
+      },
+    ])
+    const { wrapper } = await mountPage(
+      MeasurementPageView,
+      '/production-measurement?projectId=P1&period=2026-07',
+      ['measurement:query'],
+    )
+
+    const table = wrapper.get('[aria-label="产值计量列表"]')
+    expect(table.findAll('th').map((item) => item.text())).toEqual([
+      '所属项目',
+      '计量期间',
+      '计量编号',
+      '计量日期',
+      '本期申报',
+      '累计申报',
+      '内部状态',
+      '业主状态',
+      '时间窗口',
+      '操作',
+    ])
+    expect(table.text()).toContain('项目一')
+    expect(table.text()).toContain('ME-1')
+    expect(table.text()).toContain('内部已通过')
+    expect(table.text()).toContain('已报送')
+    expect(wrapper.findAll('button').some((item) => item.text() === '报送记录')).toBe(false)
+    expect(vi.mocked(commercial.loadMeasurements).mock.calls[0]?.[0]).toMatchObject({
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+    })
+
+    await button(wrapper, '详情')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[aria-label="ME-1 业主报送记录"]').text()).toContain('OMS-202607-001-R2')
+    expect(wrapper.get('[aria-label="ME-1 业主报送记录"]').text()).toContain('V2')
+  })
+
+  it('shows one empty state when the current filter has no measurement records', async () => {
+    vi.mocked(commercial.loadMeasurements).mockResolvedValueOnce([])
+    const { wrapper } = await mountPage(
+      MeasurementPageView,
+      '/production-measurement?projectId=P1&period=2026-07',
+      ['measurement:query'],
+    )
+
+    expect(wrapper.text()).toContain('暂无产值计量')
+    expect(wrapper.find('[aria-label="产值计量列表"]').exists()).toBe(false)
+  })
+
+  it('selects project and owner contract inside both create dialogs', async () => {
+    const { wrapper } = await mountPage(
+      MeasurementPageView,
+      '/production-measurement?projectId=P1',
+      ['measurement:query', 'measurement:maintain'],
+    )
+
+    expect(wrapper.find('[aria-label="业主合同"]').exists()).toBe(false)
+    await button(wrapper, '新建期间')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[role="dialog"]').text()).toContain('项目')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('业主合同')
+    expect(wrapper.get('.measurement-page__period-form').attributes('id')).toBe(
+      'measurement-period-form',
+    )
+    expect(wrapper.get('.measurement-page__period-dates').text()).toContain('日期范围')
+    expect(wrapper.get('button[form="measurement-period-form"]').text()).toContain('保存期间')
+    await wrapper.get('[role="dialog"]').get('button[aria-label="关闭对话框"]').trigger('click')
+
+    await button(wrapper, '新建计量')!.trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[role="dialog"]').text()).toContain('项目')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('业主合同')
+  })
+
+  it('puts status before create actions and applies it immediately', async () => {
+    const { wrapper, router } = await mountPage(
+      MeasurementPageView,
+      '/production-measurement?projectId=P1',
+      ['measurement:query', 'measurement:maintain'],
+    )
+
+    const actions = wrapper.get('.v2-card__header > .actions')
+    expect(actions.text().indexOf('全部状态')).toBeLessThan(actions.text().indexOf('新建期间'))
+    expect(button(wrapper, '查询')).toBeUndefined()
+    await wrapper.get('button[data-value="DRAFT"]').trigger('click')
+    await flushPromises()
+    expect(router.currentRoute.value.query.status).toBe('DRAFT')
+  })
+
   it('fails closed without route permissions and sends no business requests', async () => {
     const b = await mountPage(BudgetPageView, '/budget', [])
     expect(b.wrapper.text()).toContain('无权访问项目预算')
@@ -200,7 +321,7 @@ describe('M4 budget and measurement pages', () => {
     expect(commercial.loadMeasurements).not.toHaveBeenCalled()
     expect(commercial.loadProjectContextOptions).not.toHaveBeenCalled()
   })
-  it('shows list 500 and detail 404 for both pages', async () => {
+  it('shows list failures and keeps budget detail 404 visible', async () => {
     vi.mocked(commercial.loadBudgetPage).mockRejectedValueOnce(apiError('预算服务异常', 500))
     const b500 = await mountPage(BudgetPageView, '/budget?projectId=P1', ['budget:query'])
     expect(b500.wrapper.text()).toContain('预算服务异常')
@@ -215,14 +336,6 @@ describe('M4 budget and measurement pages', () => {
       'measurement:query',
     ])
     expect(m500.wrapper.text()).toContain('计量服务异常')
-    vi.mocked(commercial.loadMeasurements).mockResolvedValueOnce([measurement])
-    vi.mocked(commercial.loadMeasurement).mockRejectedValueOnce(apiError('计量不存在', 404))
-    const m404 = await mountPage(MeasurementPageView, '/production-measurement?projectId=P1', [
-      'measurement:query',
-    ])
-    await button(m404.wrapper, '详情')!.trigger('click')
-    await flushPromises()
-    expect(m404.wrapper.text()).toContain('计量不存在')
   })
   it('aborts budget and measurement requests and ignores stale project/period responses', async () => {
     const oldBudget = deferred<BudgetPage>()
