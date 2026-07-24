@@ -19,6 +19,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
 import { formatAmount } from '@/pages/dashboard/model'
 import {
@@ -46,7 +47,7 @@ const session = useSessionStore()
 const loading = ref(false)
 const action = ref('')
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const records = ref<VariationPage['records']>([])
 const total = ref(0)
 const detail = ref<VariationRecord | null>(null)
@@ -559,25 +560,24 @@ onBeforeUnmount(() => {
       @dismiss="errorMessage = ''"
       >{{ errorMessage }}</V2Alert
     >
-    <V2Alert
-      v-if="successMessage"
-      tone="success"
-      title="操作完成"
-      dismissible
-      @dismiss="successMessage = ''"
-      >{{ successMessage }}</V2Alert
-    >
-
     <V2Card v-if="mode === 'list'" title="签证变更" :heading-level="1">
       <template #actions>
         <V2Button v-if="canCreate" @click="openWorkspace('create')">新建变更</V2Button>
       </template>
       <form class="variation-page__filters" @submit.prevent="search">
-        <V2Input v-model="filter.varCode" label="变更编号" />
+        <V2Input
+          v-model="filter.varCode"
+          type="search"
+          label="变更编号"
+          hide-label
+          placeholder="输入变更编号"
+        />
         <V2Select
           v-model="filter.varType"
           label="变更类型"
+          hide-label
           allow-empty
+          placeholder="全部类型"
           :options="[
             { value: '', label: '全部类型' },
             { value: 'DESIGN', label: '设计变更' },
@@ -588,7 +588,9 @@ onBeforeUnmount(() => {
         <V2Select
           v-model="filter.direction"
           label="方向"
+          hide-label
           allow-empty
+          placeholder="全部方向"
           :options="[
             { value: '', label: '全部方向' },
             { value: 'COST', label: '成本' },
@@ -1050,20 +1052,6 @@ onBeforeUnmount(() => {
 .variation-page__table-wrap {
   overflow-x: auto;
 }
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-  line-height: var(--v2-line-height-ui);
-}
-th,
-td {
-  padding: var(--v2-space-3);
-  border-bottom: 1px solid var(--v2-color-border);
-  text-align: left;
-  vertical-align: middle;
-  white-space: nowrap;
-}
 .variation-page__table-wrap table {
   min-width: 64rem;
 }
@@ -1118,15 +1106,11 @@ dd {
 }
 .variation-page__native-field input,
 .variation-page__native-field textarea {
-  min-height: 2.75rem;
+  min-height: var(--v2-control-height-touch);
   padding: var(--v2-space-2) var(--v2-space-3);
-  color: var(--v2-color-text);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
 }
 .variation-page__native-field textarea {
-  min-height: 6rem;
+  min-height: var(--v2-control-height-textarea);
   resize: vertical;
 }
 .variation-page__wide {

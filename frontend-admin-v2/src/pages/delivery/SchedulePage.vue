@@ -20,6 +20,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
 } from '@/components'
 import { isApiClientError } from '@/services/request'
 import {
@@ -52,7 +53,6 @@ const loading = ref(false)
 const detailLoading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
 const schedules = ref<ScheduleRecord[]>([])
 const detail = ref<ScheduleDetail | null>(null)
 const traceSummary = ref<string[]>([])
@@ -143,7 +143,6 @@ function hasPermission(code: string): boolean {
 
 function resetNotices(): void {
   errorMessage.value = ''
-  successMessage.value = ''
 }
 
 function message(error: unknown, fallback: string): string {
@@ -236,7 +235,7 @@ async function saveSchedule(): Promise<void> {
   try {
     const created = await createSchedule(command)
     createOpen.value = false
-    successMessage.value = '项目计划已创建。'
+    showToast('success', '操作成功', '项目计划已创建。')
     await reloadList(true)
     goToDetail(created.id)
   } catch (error) {
@@ -296,7 +295,7 @@ async function saveWbs(): Promise<void> {
     const next = await replaceWbsTasks(detail.value.id, detail.value.version ?? 0, tasks)
     detail.value = next
     wbsOpen.value = false
-    successMessage.value = 'WBS 已保存。'
+    showToast('success', '操作成功', 'WBS 已保存。')
     await reloadList(true)
   } catch (error) {
     errorMessage.value = message(error, 'WBS 保存失败')
@@ -351,7 +350,7 @@ async function savePeriod(): Promise<void> {
     )
     await submitPeriodPlan(itemDetail.id)
     periodOpen.value = false
-    successMessage.value = '月周计划已提交。'
+    showToast('success', '操作成功', '月周计划已提交。')
     await openDetail(detail.value.id, true)
     await reloadList(true)
   } catch (error) {
@@ -374,7 +373,7 @@ async function submitCurrentSchedule(): Promise<void> {
   try {
     const next = await submitSchedule(pending.id)
     detail.value = next
-    successMessage.value = '项目计划已提交。'
+    showToast('success', '操作成功', '项目计划已提交。')
     await reloadList(true)
   } catch (error) {
     errorMessage.value = message(error, '项目计划提交失败')
@@ -391,7 +390,7 @@ async function calculateSnapshot(): Promise<void> {
   resetNotices()
   try {
     await calculateScheduleSnapshot(detail.value.id, snapshotDate.value)
-    successMessage.value = '偏差快照已更新。'
+    showToast('success', '操作成功', '偏差快照已更新。')
     await openDetail(detail.value.id, true)
   } catch (error) {
     errorMessage.value = message(error, '偏差快照计算失败')
@@ -436,7 +435,7 @@ async function saveCorrective(): Promise<void> {
     const created = await createCorrectiveAction(detail.value.id, command)
     await submitCorrectiveAction(created.id)
     correctiveOpen.value = false
-    successMessage.value = '纠偏单已提交。'
+    showToast('success', '操作成功', '纠偏单已提交。')
     await openDetail(detail.value.id, true)
   } catch (error) {
     errorMessage.value = message(error, '纠偏单提交失败')
@@ -570,7 +569,6 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
 <template>
   <section class="schedule-page" aria-labelledby="schedule-title">
     <V2Alert v-if="errorMessage" tone="danger" title="请求未完成">{{ errorMessage }}</V2Alert>
-    <V2Alert v-if="successMessage" tone="success" title="操作完成">{{ successMessage }}</V2Alert>
 
     <V2Card
       :title="isDetailRoute ? '施工履约详情' : '项目计划与施工履约'"
@@ -611,13 +609,15 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
     />
     <V2Card v-else-if="!isDetailRoute" title="主计划列表">
       <div class="schedule-page__table-wrap">
-        <table class="schedule-page__table">
+        <table class="schedule-page__table v2-table--top">
           <caption class="v2-visually-hidden">
             项目主计划列表
           </caption>
           <thead>
             <tr>
-              <th scope="col">计划编号 / 名称</th>
+              <th scope="col">计划编号</th>
+              <th scope="col">版本</th>
+              <th scope="col">计划名称</th>
               <th v-if="!projectId" scope="col">项目</th>
               <th scope="col">类型</th>
               <th scope="col">计划周期</th>
@@ -627,9 +627,9 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
           </thead>
           <tbody>
             <tr v-for="item in schedules" :key="item.id">
-              <td>
-                <strong>{{ item.planCode }} · V{{ item.versionNo }} · {{ item.planName }}</strong>
-              </td>
+              <th scope="row">{{ item.planCode }}</th>
+              <td>V{{ item.versionNo }}</td>
+              <td>{{ item.planName }}</td>
               <td v-if="!projectId">
                 {{
                   workspace.projects.find((project) => project.value === item.projectId)?.label ??
@@ -770,7 +770,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
 
         <V2Card title="WBS 任务" :subtitle="`共 ${detail.tasks.length} 条`" :heading-level="3">
           <div v-if="detail.tasks.length" class="schedule-page__table-wrap">
-            <table class="schedule-page__table">
+            <table class="schedule-page__table v2-table--top">
               <thead>
                 <tr>
                   <th>任务编码</th>
@@ -830,7 +830,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
             </div>
           </template>
           <div v-if="detail.periodPlans.length" class="schedule-page__table-wrap">
-            <table class="schedule-page__table">
+            <table class="schedule-page__table v2-table--top">
               <thead>
                 <tr>
                   <th>类型</th>
@@ -1081,14 +1081,12 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
   color: var(--v2-color-text);
   font-size: var(--v2-font-size-12);
 }
-.schedule-page__grid,
 .schedule-page__detail-grid {
   display: grid;
   gap: var(--v2-space-3);
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .schedule-page__actions,
-.schedule-page__facts,
 .schedule-page__snapshot-toolbar,
 .schedule-page__panel-actions {
   display: flex;
@@ -1117,48 +1115,17 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
 .schedule-page__table-wrap {
   overflow: auto;
 }
-.schedule-page__table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.schedule-page__table th,
-.schedule-page__table td {
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--v2-color-border);
-  text-align: left;
-  vertical-align: top;
-}
 .schedule-page__table th:last-child,
 .schedule-page__table td:last-child {
   width: 1%;
-  white-space: nowrap;
 }
 .schedule-page__form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--v2-space-3);
 }
-.schedule-page__form label {
-  display: grid;
-  gap: var(--v2-space-1);
-  color: var(--v2-color-text-secondary);
-}
-.schedule-page__form input,
 .schedule-page__form textarea {
-  min-height: 2.5rem;
-  padding: 0 var(--v2-space-3);
-  color: var(--v2-color-text);
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-  border-radius: var(--v2-radius-md);
-  font: inherit;
-}
-.schedule-page__form :deep(.v2-field__control) {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-}
-.schedule-page__form textarea {
-  min-height: 6rem;
+  min-height: var(--v2-control-height-textarea);
   padding: var(--v2-space-2) var(--v2-space-3);
   resize: vertical;
 }
@@ -1177,7 +1144,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
 }
 .schedule-page__trace {
   margin: var(--v2-space-3) 0 0;
-  padding-left: 1.25rem;
+  padding-left: var(--v2-space-5);
   color: var(--v2-color-text-secondary);
 }
 .schedule-page__fieldset {
@@ -1197,7 +1164,6 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
   width: min(72rem, calc(100vw - 2rem));
 }
 @media (max-width: 64rem) {
-  .schedule-page__grid,
   .schedule-page__detail-grid,
   .schedule-page__form {
     grid-template-columns: 1fr;

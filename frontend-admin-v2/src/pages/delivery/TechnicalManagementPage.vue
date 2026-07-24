@@ -21,6 +21,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
 import { uploadSiteFile } from '@/services/delivery'
 import {
@@ -94,7 +95,7 @@ const trace = ref<DrawingTrace | null>(null)
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const dialog = ref<DialogKind>(null)
 const target = ref<Target | null>(null)
 const evidence = ref<File | null>(null)
@@ -514,14 +515,6 @@ onBeforeUnmount(() => {
 <template>
   <section class="technical-page" aria-label="图纸 RFI 技术闭环">
     <h1 class="v2-visually-hidden">图纸 RFI 技术闭环</h1>
-    <div class="technical-page__toolbar">
-      <div class="technical-page__actions">
-        <V2Button v-if="canSchemeMaintain" size="small" @click="show('scheme')">新建方案</V2Button>
-        <V2Button v-if="canDrawingReceive" size="small" variant="secondary" @click="show('drawing')"
-          >接收图纸</V2Button
-        >
-      </div>
-    </div>
     <div class="technical-page__notice" aria-live="polite">
       <V2Alert
         v-if="errorMessage"
@@ -530,14 +523,6 @@ onBeforeUnmount(() => {
         dismissible
         @dismiss="errorMessage = ''"
         >{{ errorMessage }}</V2Alert
-      >
-      <V2Alert
-        v-if="successMessage"
-        tone="success"
-        title="操作完成"
-        dismissible
-        @dismiss="successMessage = ''"
-        >{{ successMessage }}</V2Alert
       >
     </div>
     <V2PageState
@@ -553,64 +538,111 @@ onBeforeUnmount(() => {
       description="当前账号没有可查看的项目。"
     />
     <template v-else>
-      <div class="technical-page__facts" aria-label="技术闭环概览">
-        <V2Badge>方案 {{ overview.schemes.length }}</V2Badge
-        ><V2Badge>图纸 {{ overview.drawings.length }}</V2Badge
-        ><V2Badge tone="warning"
-          >开放 RFI
-          {{
-            overview.rfis.filter((item) => !['CLOSED', 'CANCELLED'].includes(item.status)).length
-          }}</V2Badge
-        ><V2Badge tone="success"
-          >归档 {{ overview.archives.filter((item) => item.status === 'ARCHIVED').length }}</V2Badge
-        >
-      </div>
-      <div class="technical-page__columns">
-        <V2Card title="技术方案" subtitle="方案维护与提交权限分离">
-          <div class="technical-page__stack">
-            <article v-for="item in overview.schemes" :key="item.id" class="technical-page__item">
-              <strong>{{ item.schemeCode }} · {{ item.schemeName }}</strong
-              ><V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge
-              ><V2Button
-                v-if="canSchemeSubmit && item.status === 'DRAFT'"
-                size="small"
-                @click="act(() => submitTechnicalScheme(item.id), '方案已提交审批')"
-                >提交方案</V2Button
-              >
-            </article>
-            <p v-if="!overview.schemes.length">暂无技术方案。</p>
-          </div>
-        </V2Card>
-        <V2Card title="图纸与版本" subtitle="变更版必须关联已接受且要求改版的 RFI">
-          <div class="technical-page__stack">
-            <article
-              v-for="drawing in overview.drawings"
-              :key="drawing.id"
-              class="technical-page__item"
+      <V2Card title="方案、图纸、会审与 RFI">
+        <template #title-extra>
+          <div class="technical-page__facts" aria-label="技术闭环概览">
+            <V2Badge>方案 {{ overview.schemes.length }}</V2Badge
+            ><V2Badge>图纸 {{ overview.drawings.length }}</V2Badge
+            ><V2Badge tone="warning"
+              >开放 RFI
+              {{
+                overview.rfis.filter((item) => !['CLOSED', 'CANCELLED'].includes(item.status))
+                  .length
+              }}</V2Badge
+            ><V2Badge tone="success"
+              >归档
+              {{ overview.archives.filter((item) => item.status === 'ARCHIVED').length }}</V2Badge
             >
-              <button class="technical-page__title" type="button" @click="openTrace(drawing)">
-                {{ drawing.drawingCode }} · {{ drawing.drawingName }}</button
-              ><span
-                >{{ drawing.currentVersionNo }} /
-                {{ deliveryLabel(drawing.currentVersionStatus) }}</span
-              >
-              <div class="technical-page__actions">
-                <V2Button size="small" variant="secondary" @click="openTrace(drawing)"
-                  >追溯</V2Button
-                ><V2Button
-                  v-if="canDrawingReceive && acceptedChangeRfis.length"
-                  size="small"
-                  @click="show('version', drawing)"
-                  >接收变更版</V2Button
-                >
-              </div>
-            </article>
-            <p v-if="!overview.drawings.length">暂无图纸。</p>
           </div>
-        </V2Card>
-      </div>
-      <V2Card title="版本、会审与 RFI" subtitle="可用操作随业务阶段变化">
+        </template>
+        <template #actions>
+          <div class="technical-page__actions">
+            <V2Button v-if="canSchemeMaintain" size="small" @click="show('scheme')"
+              >新建方案</V2Button
+            >
+            <V2Button
+              v-if="canDrawingReceive"
+              size="small"
+              variant="secondary"
+              @click="show('drawing')"
+              >接收图纸</V2Button
+            >
+          </div>
+        </template>
         <div class="technical-page__record-sections">
+          <section aria-labelledby="technical-scheme-title">
+            <h3 id="technical-scheme-title">技术方案</h3>
+            <div v-if="overview.schemes.length" class="technical-page__table-wrap">
+              <table class="technical-page__table" aria-labelledby="technical-scheme-title">
+                <thead>
+                  <tr>
+                    <th scope="col">方案编号</th>
+                    <th scope="col">方案名称</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in overview.schemes" :key="item.id">
+                    <th scope="row">{{ item.schemeCode }}</th>
+                    <td>{{ item.schemeName }}</td>
+                    <td>
+                      <V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
+                    </td>
+                    <td>
+                      <V2Button
+                        v-if="canSchemeSubmit && item.status === 'DRAFT'"
+                        size="small"
+                        @click="act(() => submitTechnicalScheme(item.id), '方案已提交审批')"
+                        >提交方案</V2Button
+                      >
+                      <span v-else>—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无技术方案。</p>
+          </section>
+
+          <section aria-labelledby="technical-drawing-title">
+            <h3 id="technical-drawing-title">图纸与版本</h3>
+            <div v-if="overview.drawings.length" class="technical-page__table-wrap">
+              <table class="technical-page__table" aria-labelledby="technical-drawing-title">
+                <thead>
+                  <tr>
+                    <th scope="col">图纸编码</th>
+                    <th scope="col">图纸名称</th>
+                    <th scope="col">当前版本</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="drawing in overview.drawings" :key="drawing.id">
+                    <th scope="row">{{ drawing.drawingCode }}</th>
+                    <td>{{ drawing.drawingName }}</td>
+                    <td>{{ drawing.currentVersionNo }}</td>
+                    <td>{{ deliveryLabel(drawing.currentVersionStatus) }}</td>
+                    <td>
+                      <div class="technical-page__actions">
+                        <V2Button size="small" variant="secondary" @click="openTrace(drawing)"
+                          >追溯</V2Button
+                        ><V2Button
+                          v-if="canDrawingReceive && acceptedChangeRfis.length"
+                          size="small"
+                          @click="show('version', drawing)"
+                          >接收变更版</V2Button
+                        >
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无图纸。</p>
+          </section>
+
           <section aria-labelledby="technical-version-title">
             <h3 id="technical-version-title">图纸版本</h3>
             <div v-if="overview.versions.length" class="technical-page__table-wrap">
@@ -652,14 +684,16 @@ onBeforeUnmount(() => {
               <table class="technical-page__table" aria-labelledby="technical-review-title">
                 <thead>
                   <tr>
-                    <th scope="col">会审记录</th>
+                    <th scope="col">会审编号</th>
+                    <th scope="col">会审结论</th>
                     <th scope="col">状态</th>
                     <th scope="col">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="review in overview.reviews" :key="review.id">
-                    <td>{{ review.reviewCode }} · {{ deliveryLabel(review.conclusion) }}</td>
+                    <th scope="row">{{ review.reviewCode }}</th>
+                    <td>{{ deliveryLabel(review.conclusion) }}</td>
                     <td>
                       <V2Badge :tone="tone(review.status)">{{
                         deliveryLabel(review.status)
@@ -707,14 +741,16 @@ onBeforeUnmount(() => {
               <table class="technical-page__table" aria-labelledby="technical-rfi-title">
                 <thead>
                   <tr>
-                    <th scope="col">编号 / 主题</th>
+                    <th scope="col">RFI 编号</th>
+                    <th scope="col">主题</th>
                     <th scope="col">状态</th>
                     <th scope="col">操作</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="rfi in overview.rfis" :key="rfi.id">
-                    <td>{{ rfi.rfiCode }} · {{ rfi.subject }}</td>
+                    <th scope="row">{{ rfi.rfiCode }}</th>
+                    <td>{{ rfi.subject }}</td>
                     <td>
                       <V2Badge :tone="tone(rfi.status)">{{ deliveryLabel(rfi.status) }}</V2Badge>
                     </td>
@@ -798,42 +834,118 @@ onBeforeUnmount(() => {
             >登记交底</V2Button
           >
         </div>
-        <div class="technical-page__grid">
-          <article v-for="item in overview.disclosures" :key="item.id" class="technical-page__item">
-            <strong>{{ item.disclosureCode }} · {{ item.disclosureTitle }}</strong
-            ><V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge
-            ><V2Button
-              v-if="canDisclosure && item.status === 'DRAFT'"
-              size="small"
-              @click="act(() => confirmTechnicalDisclosure(item.id), '技术交底已确认')"
-              >确认交底</V2Button
-            ><V2Button
-              v-if="canDisclosure && item.status === 'CONFIRMED'"
-              size="small"
-              @click="show('reference', item)"
-              >登记施工依据</V2Button
-            >
-          </article>
-          <article v-for="item in availableReferences" :key="item.id" class="technical-page__item">
-            <strong>{{ item.workArea }} · {{ item.referenceDate }}</strong
-            ><V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge
-            ><V2Button
-              v-if="canArchive && overview.qualityInspections.length"
-              size="small"
-              @click="show('archive', item)"
-              >登记验收归档</V2Button
-            >
-          </article>
-          <article v-for="item in overview.archives" :key="item.id" class="technical-page__item">
-            <strong>{{ item.archiveCode }} · {{ item.archiveLocation }}</strong
-            ><V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge
-            ><V2Button
-              v-if="canArchive && item.status === 'DRAFT'"
-              size="small"
-              @click="act(() => confirmAcceptanceArchive(item.id), '验收档案已确认')"
-              >确认归档</V2Button
-            >
-          </article>
+        <div class="technical-page__record-sections">
+          <section aria-labelledby="technical-disclosure-title">
+            <h3 id="technical-disclosure-title">技术交底</h3>
+            <div v-if="overview.disclosures.length" class="technical-page__table-wrap">
+              <table class="technical-page__table" aria-labelledby="technical-disclosure-title">
+                <thead>
+                  <tr>
+                    <th scope="col">交底编号</th>
+                    <th scope="col">交底标题</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in overview.disclosures" :key="item.id">
+                    <th scope="row">{{ item.disclosureCode }}</th>
+                    <td>{{ item.disclosureTitle }}</td>
+                    <td>
+                      <V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
+                    </td>
+                    <td>
+                      <div class="technical-page__actions">
+                        <V2Button
+                          v-if="canDisclosure && item.status === 'DRAFT'"
+                          size="small"
+                          @click="act(() => confirmTechnicalDisclosure(item.id), '技术交底已确认')"
+                          >确认交底</V2Button
+                        ><V2Button
+                          v-if="canDisclosure && item.status === 'CONFIRMED'"
+                          size="small"
+                          @click="show('reference', item)"
+                          >登记施工依据</V2Button
+                        ><span
+                          v-if="!(canDisclosure && ['DRAFT', 'CONFIRMED'].includes(item.status))"
+                          >—</span
+                        >
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无技术交底。</p>
+          </section>
+
+          <section aria-labelledby="technical-reference-title">
+            <h3 id="technical-reference-title">施工依据</h3>
+            <div v-if="availableReferences.length" class="technical-page__table-wrap">
+              <table class="technical-page__table" aria-labelledby="technical-reference-title">
+                <thead>
+                  <tr>
+                    <th scope="col">施工区域 / 日期</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in availableReferences" :key="item.id">
+                    <td>{{ item.workArea }} · {{ item.referenceDate }}</td>
+                    <td>
+                      <V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
+                    </td>
+                    <td>
+                      <V2Button
+                        v-if="canArchive && overview.qualityInspections.length"
+                        size="small"
+                        @click="show('archive', item)"
+                        >登记验收归档</V2Button
+                      >
+                      <span v-else>—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无待归档施工依据。</p>
+          </section>
+
+          <section aria-labelledby="technical-archive-title">
+            <h3 id="technical-archive-title">验收归档</h3>
+            <div v-if="overview.archives.length" class="technical-page__table-wrap">
+              <table class="technical-page__table" aria-labelledby="technical-archive-title">
+                <thead>
+                  <tr>
+                    <th scope="col">档案编号</th>
+                    <th scope="col">档案位置</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in overview.archives" :key="item.id">
+                    <th scope="row">{{ item.archiveCode }}</th>
+                    <td>{{ item.archiveLocation }}</td>
+                    <td>
+                      <V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
+                    </td>
+                    <td>
+                      <V2Button
+                        v-if="canArchive && item.status === 'DRAFT'"
+                        size="small"
+                        @click="act(() => confirmAcceptanceArchive(item.id), '验收档案已确认')"
+                        >确认归档</V2Button
+                      >
+                      <span v-else>—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无验收归档。</p>
+          </section>
         </div>
       </V2Card>
     </template>
@@ -1055,7 +1167,6 @@ onBeforeUnmount(() => {
 .technical-page p {
   margin-block: 0;
 }
-.technical-page__toolbar,
 .technical-page__facts,
 .technical-page__actions {
   display: flex;
@@ -1063,21 +1174,8 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-2);
   align-items: center;
 }
-.technical-page__toolbar {
-  justify-content: space-between;
-}
 .technical-page__notice:empty {
   display: none;
-}
-.technical-page__columns,
-.technical-page__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--v2-space-3);
-}
-.technical-page__grid {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: var(--v2-space-3);
 }
 .technical-page__record-sections {
   display: grid;
@@ -1092,59 +1190,19 @@ onBeforeUnmount(() => {
   color: var(--v2-color-text-strong);
   font-size: var(--v2-font-size-15);
   font-weight: var(--v2-font-weight-semibold);
+  line-height: var(--v2-line-height-tight);
 }
 .technical-page__table-wrap {
   overflow-x: auto;
 }
-.technical-page__table {
-  width: 100%;
-  border-collapse: collapse;
-}
-.technical-page__table th,
-.technical-page__table td {
-  padding: var(--v2-space-2) var(--v2-space-3);
-  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
-  text-align: left;
-  vertical-align: middle;
-}
-.technical-page__table th {
-  color: var(--v2-color-text-secondary);
-  font-weight: var(--v2-font-weight-semibold);
-}
 .technical-page__table th:last-child,
 .technical-page__table td:last-child {
   width: 1%;
-  white-space: nowrap;
-}
-.technical-page__stack,
-.technical-page__item {
-  display: grid;
-  gap: var(--v2-space-2);
-}
-.technical-page__item {
-  padding: var(--v2-space-3);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
-}
-.technical-page__item > strong {
-  font-size: var(--v2-font-size-14);
-  font-weight: var(--v2-font-weight-semibold);
-}
-.technical-page__title {
-  padding: 0;
-  color: var(--v2-color-primary-hover);
-  background: none;
-  border: 0;
-  font: inherit;
-  font-size: var(--v2-font-size-14);
-  font-weight: var(--v2-font-weight-semibold);
-  text-align: left;
-  cursor: pointer;
 }
 .technical-page__timeline {
   display: grid;
   gap: var(--v2-space-2);
-  padding-left: 1.25rem;
+  padding-left: var(--v2-space-5);
 }
 .technical-page__timeline span {
   display: block;
@@ -1156,41 +1214,19 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-3);
   align-items: end;
 }
-.technical-page__form label {
-  display: grid;
-  gap: var(--v2-space-1);
-  color: var(--v2-color-text-secondary);
-}
-.technical-page__form input,
 .technical-page__form textarea {
-  min-height: 2.5rem;
-  padding: var(--v2-space-2);
-  color: var(--v2-color-text);
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-  border-radius: var(--v2-radius-md);
-  font: inherit;
-}
-.technical-page__form :deep(.v2-field__control) {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-}
-.technical-page__form textarea {
-  min-height: 6rem;
+  min-height: var(--v2-control-height-textarea);
   resize: vertical;
 }
 .technical-page__wide {
   grid-column: 1 / -1;
 }
 @media (max-width: 64rem) {
-  .technical-page__grid,
   .technical-page__record-sections {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 40rem) {
-  .technical-page__columns,
-  .technical-page__grid,
   .technical-page__record-sections,
   .technical-page__form {
     grid-template-columns: 1fr;

@@ -30,6 +30,36 @@ let controller: AbortController | null = null
 let detailController: AbortController | null = null
 const canQuery = computed(() => session.hasPermission('cost:ledger:query'))
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pageSize || 10))))
+const COST_STATUS_LABELS: Record<string, string> = {
+  DRAFT: '草稿',
+  CONFIRMED: '已确认',
+  REVERSED: '已冲销',
+  CANCELLED: '已取消',
+}
+const COST_TYPE_LABELS: Record<string, string> = {
+  DIRECT: '直接成本',
+  INDIRECT: '间接成本',
+  MATERIAL: '材料费',
+  SUBCONTRACT: '分包费',
+  MACHINERY: '机械费',
+  LABOR: '人工费',
+  VISA: '签证费',
+  MANAGEMENT: '管理费',
+}
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  MAT_RECEIPT: '材料验收成本',
+  MATERIAL_RECEIPT: '材料验收成本',
+  SUB_MEASURE: '分包计量成本',
+  VAR_ORDER: '签证变更成本',
+  VARIATION: '签证变更成本',
+  CT_CHANGE: '合同变更成本',
+  BID_COST: '投标前期费用',
+  BID_COST_TRANSFERRED: '已结转投标费用',
+  OVERHEAD_ALLOCATION: '间接费用分摊',
+}
+const costStatusLabel = (value: string) => COST_STATUS_LABELS[value] ?? '未知状态'
+const costTypeLabel = (value: string) => COST_TYPE_LABELS[value] ?? '其他成本'
+const sourceTypeLabel = (value: string) => SOURCE_TYPE_LABELS[value] ?? '其他来源'
 const errorText = (e: unknown, fallback: string) =>
   isApiClientError(e) ? e.message : e instanceof Error ? e.message : fallback
 function hydrate() {
@@ -99,9 +129,17 @@ async function openDetail(id: string) {
   detailOpen.value = true
   detailLoading.value = true
   detail.value = null
+  const listRecord = records.value.find((record) => record.id === id)
   try {
     const value = await loadCostLedger(id, current.signal)
-    if (token === detailGeneration) detail.value = value
+    if (token === detailGeneration)
+      detail.value = {
+        ...value,
+        projectName: value.projectName || listRecord?.projectName,
+        contractName: value.contractName || listRecord?.contractName,
+        partnerName: value.partnerName || listRecord?.partnerName,
+        costSubjectName: value.costSubjectName || listRecord?.costSubjectName,
+      }
   } catch (e) {
     if (!current.signal.aborted && token === detailGeneration)
       errorMessage.value = errorText(e, '台账详情加载失败')
@@ -128,12 +166,14 @@ onBeforeUnmount(() => {
       }}</V2Alert
       ><V2Card title="成本台账" :heading-level="1"
         ><div class="filters">
-          <V2Input v-model="filter.keyword" label="关键词" @keyup.enter="query" /><V2Button
-            variant="secondary"
-            :loading="loading"
-            @click="query"
-            >查询</V2Button
-          >
+          <V2Input
+            v-model="filter.keyword"
+            type="search"
+            label="关键词"
+            hide-label
+            placeholder="输入关键词"
+            @keyup.enter="query"
+          /><V2Button variant="secondary" :loading="loading" @click="query">查询</V2Button>
         </div></V2Card
       ><V2Card title="成本明细"
         ><template v-if="summary" #actions>
@@ -180,12 +220,12 @@ onBeforeUnmount(() => {
             </thead>
             <tbody>
               <tr v-for="row in records" :key="row.id">
-                <td>{{ row.costSubjectName || row.costType }}</td>
+                <td>{{ row.costSubjectName || costTypeLabel(row.costType) }}</td>
                 <td>{{ row.projectName || '—' }}</td>
                 <td>{{ row.costDate || '—' }}</td>
                 <td>{{ row.amount }}</td>
                 <td>{{ row.taxAmount }}</td>
-                <td>{{ row.sourceType }}</td>
+                <td>{{ sourceTypeLabel(row.sourceType) }}</td>
                 <td>
                   <V2Button size="small" variant="secondary" @click="openDetail(row.id)"
                     >详情</V2Button
@@ -218,7 +258,7 @@ onBeforeUnmount(() => {
       <V2Dialog
         :open="detailOpen"
         title="成本台账详情"
-        panel-class="v2-dialog-standard v2-detail-dialog"
+        panel-class="v2-detail-dialog"
         :close-on-backdrop="false"
         @close="detailOpen = false"
         ><V2PageState
@@ -228,20 +268,20 @@ onBeforeUnmount(() => {
           kind="loading"
         />
         <dl v-else-if="detail" class="v2-detail-dialog__facts">
-          <dt>ID</dt>
-          <dd>{{ detail.id }}</dd>
           <dt>项目</dt>
           <dd>{{ detail.projectName || '—' }}</dd>
           <dt>合同</dt>
-          <dd>{{ detail.contractName || detail.contractId || '—' }}</dd>
+          <dd>{{ detail.contractName || (detail.contractId ? '已关联合同' : '—') }}</dd>
+          <dt>成本科目</dt>
+          <dd>{{ detail.costSubjectName || costTypeLabel(detail.costType) }}</dd>
+          <dt>成本来源</dt>
+          <dd>{{ sourceTypeLabel(detail.sourceType) }}</dd>
           <dt>含税金额</dt>
           <dd>{{ detail.amount }}</dd>
           <dt>未税金额</dt>
           <dd>{{ detail.amountWithoutTax }}</dd>
           <dt>状态</dt>
-          <dd>{{ detail.costStatus }}</dd>
-          <dt>备注</dt>
-          <dd>{{ detail.remark || '—' }}</dd>
+          <dd>{{ costStatusLabel(detail.costStatus) }}</dd>
         </dl></V2Dialog
       ></template
     >
@@ -286,23 +326,7 @@ dd {
   overflow-x: auto;
 }
 table {
-  width: 100%;
   min-width: 56rem;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-  line-height: var(--v2-line-height-ui);
-}
-th,
-td {
-  padding: var(--v2-space-3);
-  text-align: left;
-  white-space: nowrap;
-  border-bottom: 1px solid var(--v2-color-border-subtle);
-}
-th {
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface-subtle);
-  font-weight: var(--v2-font-weight-semibold);
 }
 nav {
   display: flex;

@@ -18,6 +18,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
 import { uploadSiteFile } from '@/services/delivery'
 import {
@@ -61,7 +62,7 @@ const loading = ref(false)
 const detailLoading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const evidenceFile = ref<File | null>(null)
 let controller: AbortController | null = null
 let detailController: AbortController | null = null
@@ -506,9 +507,6 @@ onBeforeUnmount(() => {
       ><V2Alert v-if="errorMessage" tone="danger" title="产值计量操作未完成">{{
         errorMessage
       }}</V2Alert
-      ><V2Alert v-if="successMessage" tone="success" title="产值计量操作完成">{{
-        successMessage
-      }}</V2Alert
       ><V2Card title="产值计量与业主结算" :heading-level="1"
         ><template #actions
           ><div class="actions">
@@ -516,8 +514,10 @@ onBeforeUnmount(() => {
               class="measurement-page__status-filter"
               :model-value="status"
               label="状态"
+              hide-label
               :options="statusOptions"
               allow-empty
+              placeholder="全部状态"
               @update:model-value="changeStatus"
             /><V2Button v-if="canMaintain" variant="secondary" @click="openPeriod"
               >新建期间</V2Button
@@ -735,7 +735,6 @@ onBeforeUnmount(() => {
       :open="dialog === 'period'"
       title="新建计量期间"
       description="选择项目和业主合同，并设置本计量期间的日期范围。"
-      panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="dialog = 'closed'"
@@ -780,11 +779,10 @@ onBeforeUnmount(() => {
     <V2Dialog
       :open="dialog === 'measurement'"
       title="新建产值计量"
-      panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="dialog = 'closed'"
-      ><form class="form" @submit.prevent="saveMeasurement">
+      ><form id="measurement-form" class="form" @submit.prevent="saveMeasurement">
         <V2Select
           :model-value="measurementForm.projectId"
           label="项目"
@@ -814,26 +812,33 @@ onBeforeUnmount(() => {
           ><span>剩余 {{ text(row.source, 'remainingQuantity') }}</span
           ><V2Input v-model="row.currentQuantity" label="本次计量量" />
         </div>
-        <V2Button type="submit" variant="secondary" :loading="actionBusy">创建计量</V2Button>
-      </form></V2Dialog
+      </form>
+      <template #footer>
+        <V2Button variant="ghost" :disabled="actionBusy" @click="dialog = 'closed'">取消</V2Button>
+        <V2Button type="submit" form="measurement-form" :loading="actionBusy">创建计量</V2Button>
+      </template></V2Dialog
     >
     <V2Dialog
       :open="dialog === 'owner'"
       title="对业主报量"
-      panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="dialog = 'closed'"
-      ><form class="form" @submit.prevent="saveOwner">
+      ><form id="owner-measurement-form" class="form" @submit.prevent="saveOwner">
         <V2Input v-model="ownerForm.externalDocumentNo" label="外部单据号" /><label
-          >业主报量文件<input aria-label="业主报量文件" type="file" @change="selectFile" /></label
-        ><V2Button type="submit" variant="secondary" :loading="actionBusy">登记报量</V2Button>
-      </form></V2Dialog
+          >业主报量文件<input aria-label="业主报量文件" type="file" @change="selectFile"
+        /></label>
+      </form>
+      <template #footer>
+        <V2Button variant="ghost" :disabled="actionBusy" @click="dialog = 'closed'">取消</V2Button>
+        <V2Button type="submit" form="owner-measurement-form" :loading="actionBusy"
+          >登记报量</V2Button
+        >
+      </template></V2Dialog
     >
     <V2Dialog
       :open="dialog === 'review'"
       title="业主核定"
-      panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="dialog = 'closed'"
@@ -843,7 +848,7 @@ onBeforeUnmount(() => {
         description="正在读取业主报量明细和核定数据。"
         kind="loading"
       />
-      <form v-else class="form" @submit.prevent="saveReview">
+      <form v-else id="owner-review-form" class="form" @submit.prevent="saveReview">
         <V2Select
           v-model="reviewForm.decision"
           label="核定结论"
@@ -860,18 +865,19 @@ onBeforeUnmount(() => {
             label="保留金" /><label
             >业主核定依据<input aria-label="业主核定依据" type="file" @change="selectFile"
           /></label>
-          <div v-for="line in reviewLines" :key="line.measurementLineId">
-            <V2Input
-              v-model="line.confirmedQuantity"
-              :label="`核定数量 ${line.measurementLineId}`"
-            /></div></template
-        ><V2Button type="submit" variant="secondary" :loading="actionBusy">保存核定</V2Button>
-      </form></V2Dialog
+          <div v-for="(line, index) in reviewLines" :key="line.measurementLineId">
+            <V2Input v-model="line.confirmedQuantity" :label="`第 ${index + 1} 项核定数量`" /></div
+        ></template>
+      </form>
+      <template v-if="!detailLoading" #footer>
+        <V2Button variant="ghost" :disabled="actionBusy" @click="dialog = 'closed'">取消</V2Button>
+        <V2Button type="submit" form="owner-review-form" :loading="actionBusy">保存核定</V2Button>
+      </template></V2Dialog
     >
     <V2Dialog
       :open="dialog === 'trace'"
       title="结算追溯"
-      panel-class="v2-dialog-standard v2-detail-dialog"
+      panel-class="v2-detail-dialog"
       :close-on-backdrop="false"
       @close="dialog = 'closed'"
       ><V2PageState
@@ -910,9 +916,6 @@ onBeforeUnmount(() => {
 .measurement-page__status-filter {
   width: 12rem;
 }
-.measurement-page__status-filter :deep(.v2-field__label) {
-  display: none;
-}
 .measurement-page__period-form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -940,32 +943,13 @@ onBeforeUnmount(() => {
   overflow-x: auto;
 }
 .measurement-page__table {
-  width: 100%;
   min-width: 56rem;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-  line-height: var(--v2-line-height-ui);
 }
 .measurement-page__measurement-table {
   min-width: 90rem;
 }
 .measurement-page__submission-table {
   min-width: 64rem;
-  border: 1px solid var(--v2-color-border);
-  background: var(--v2-color-surface);
-}
-.measurement-page__table th,
-.measurement-page__table td {
-  padding: var(--v2-space-3);
-  border-bottom: 1px solid var(--v2-color-border-subtle);
-  text-align: left;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-.measurement-page__table th {
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface-subtle);
-  font-weight: var(--v2-font-weight-semibold);
 }
 .measurement-page__table .actions {
   align-items: center;
@@ -1022,7 +1006,6 @@ label {
   gap: var(--v2-space-1);
 }
 @media (max-width: 48rem) {
-  .filters,
   .source,
   .measurement-page__period-form,
   .measurement-page__period-dates {

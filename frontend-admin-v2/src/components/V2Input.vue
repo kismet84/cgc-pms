@@ -6,6 +6,7 @@ const props = withDefaults(
     modelValue?: string
     id?: string
     label?: string
+    hideLabel?: boolean
     type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url'
     placeholder?: string
     hint?: string
@@ -19,6 +20,7 @@ const props = withDefaults(
     modelValue: '',
     id: undefined,
     label: undefined,
+    hideLabel: false,
     type: 'text',
     placeholder: undefined,
     hint: undefined,
@@ -51,7 +53,7 @@ function onInput(event: Event) {
 
 <template>
   <label class="v2-field" :for="controlId">
-    <span v-if="label" class="v2-field__label">
+    <span v-if="label" class="v2-field__label" :class="{ 'v2-visually-hidden': hideLabel }">
       {{ label }}<span v-if="required" class="v2-field__required" aria-hidden="true">*</span>
     </span>
     <span class="v2-field__control-wrap">

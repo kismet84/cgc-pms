@@ -7,10 +7,11 @@ import type {
   ProjectRecord,
   ProjectUpsertCommand,
 } from '@cgc-pms/frontend-contracts'
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   V2Alert,
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -19,6 +20,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
 import { isApiClientError } from '@/services/request'
 import {
@@ -55,7 +57,7 @@ const session = useSessionStore()
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const projects = ref<ProjectRecord[]>([])
 const total = ref(0)
 const project = ref<ProjectRecord | null>(null)
@@ -150,12 +152,6 @@ const hasMoreActions = (item: ProjectRecord) =>
   canSubmitProject(item) ||
   canArchiveProject(item) ||
   canDeleteProject.value
-function closeOpenProjectMenus(event: PointerEvent) {
-  if (!(event.target instanceof Node)) return
-  document.querySelectorAll<HTMLDetailsElement>('.project-page__more[open]').forEach((menu) => {
-    if (!menu.contains(event.target as Node)) menu.open = false
-  })
-}
 const confirmationCopy = computed(() => {
   const pending = pendingConfirmation.value
   if (!pending) return { title: '', description: '', confirmText: '确认', danger: false }
@@ -446,17 +442,14 @@ watch(
   () => void load(),
   { immediate: true },
 )
-onMounted(() => document.addEventListener('pointerdown', closeOpenProjectMenus))
 onBeforeUnmount(() => {
   controller?.abort()
-  document.removeEventListener('pointerdown', closeOpenProjectMenus)
 })
 </script>
 
 <template>
   <section class="project-page" aria-labelledby="project-title">
     <V2Alert v-if="errorMessage" tone="danger" title="请求未完成">{{ errorMessage }}</V2Alert>
-    <V2Alert v-if="successMessage" tone="success" title="操作完成">{{ successMessage }}</V2Alert>
     <V2PageState
       v-if="loading"
       kind="loading"
@@ -475,11 +468,13 @@ onBeforeUnmount(() => {
               v-model="filter.keyword"
               type="search"
               label="关键词"
+              hide-label
               placeholder="项目编号或名称"
             />
             <V2Select
               :model-value="filter.projectType"
               label="项目类型"
+              hide-label
               :options="typeOptions"
               allow-empty
               placeholder="全部类型"
@@ -488,6 +483,7 @@ onBeforeUnmount(() => {
             <V2Select
               :model-value="filter.status"
               label="项目状态"
+              hide-label
               :options="statusOptions"
               allow-empty
               placeholder="全部状态"
@@ -508,53 +504,50 @@ onBeforeUnmount(() => {
         description="调整查询条件，或联系管理员核对项目范围。"
         :heading-level="2"
       />
-      <div v-else class="project-page__table-wrap" role="region" aria-label="项目台账" tabindex="0">
-        <table class="project-page__table">
-          <caption class="v2-visually-hidden">
-            项目台账
-          </caption>
-          <thead>
-            <tr>
-              <th>项目编号 / 名称</th>
-              <th>项目类型</th>
-              <th>项目状态</th>
-              <th>审批状态</th>
-              <th>合同额</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in projects" :key="item.id">
-              <td class="project-page__primary">
-                <strong>{{ item.projectCode }}</strong>
-                <span>{{ item.projectName }}</span>
-              </td>
-              <td>{{ dictLabel(projectTypes, item.projectType) }}</td>
-              <td>
-                <V2Badge tone="info">{{ dictLabel(projectStatuses, item.status) }}</V2Badge>
-              </td>
-              <td>
-                <V2Badge :tone="approvalStatusTone(item.approvalStatus)">
-                  {{ approvalStatusLabel(item.approvalStatus) }}
-                </V2Badge>
-              </td>
-              <td>{{ item.contractAmount || '0' }} 元</td>
-              <td>
-                <div class="project-page__actions">
-                  <V2Button
-                    size="small"
-                    variant="secondary"
-                    @click="go(`/project/${item.id}/overview`)"
-                    >总览</V2Button
-                  >
-                  <details v-if="hasMoreActions(item)" class="project-page__more">
-                    <summary
-                      class="v2-button v2-button--ghost v2-button--small"
-                      :aria-label="`${item.projectName}更多操作`"
+      <V2Card v-else title="项目台账" :heading-level="2">
+        <div class="project-page__table-wrap" role="region" aria-label="项目台账" tabindex="0">
+          <table class="project-page__table v2-table--top">
+            <caption class="v2-visually-hidden">
+              项目台账
+            </caption>
+            <thead>
+              <tr>
+                <th>项目编号</th>
+                <th>项目名称</th>
+                <th>项目类型</th>
+                <th>项目状态</th>
+                <th>审批状态</th>
+                <th>合同额</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(item, index) in projects" :key="item.id">
+                <th scope="row" class="project-page__primary">{{ item.projectCode }}</th>
+                <td>{{ item.projectName }}</td>
+                <td>{{ dictLabel(projectTypes, item.projectType) }}</td>
+                <td>
+                  <V2Badge tone="info">{{ dictLabel(projectStatuses, item.status) }}</V2Badge>
+                </td>
+                <td>
+                  <V2Badge :tone="approvalStatusTone(item.approvalStatus)">
+                    {{ approvalStatusLabel(item.approvalStatus) }}
+                  </V2Badge>
+                </td>
+                <td>{{ item.contractAmount || '0' }} 元</td>
+                <td>
+                  <div class="project-page__actions">
+                    <V2Button
+                      size="small"
+                      variant="secondary"
+                      @click="go(`/project/${item.id}/overview`)"
+                      >总览</V2Button
                     >
-                      更多
-                    </summary>
-                    <div class="project-page__more-menu">
+                    <V2ActionMenu
+                      v-if="hasMoreActions(item)"
+                      :label="`${item.projectName}更多操作`"
+                      :placement="index >= projects.length - 3 ? 'top-end' : 'bottom-end'"
+                    >
                       <V2Button
                         v-if="can('project:member:list')"
                         size="small"
@@ -593,36 +586,34 @@ onBeforeUnmount(() => {
                         @click="requestProjectAction('delete', item)"
                         >删除</V2Button
                       >
-                    </div>
-                  </details>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <nav
-        v-if="projects.length && !contextProjectId"
-        class="project-page__pagination"
-        aria-label="项目台账分页"
-      >
-        <span>共 {{ total }} 条</span>
-        <V2Button
-          size="small"
-          variant="secondary"
-          :disabled="filter.pageNo <= 1"
-          @click="changePage(filter.pageNo - 1)"
-          >上一页</V2Button
-        >
-        <span>第 {{ filter.pageNo }} 页</span>
-        <V2Button
-          size="small"
-          variant="secondary"
-          :disabled="filter.pageNo >= pageCount"
-          @click="changePage(filter.pageNo + 1)"
-          >下一页</V2Button
-        >
-      </nav>
+                    </V2ActionMenu>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <template v-if="!contextProjectId" #footer>
+          <nav class="project-page__pagination" aria-label="项目台账分页">
+            <span>共 {{ total }} 条</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="filter.pageNo <= 1"
+              @click="changePage(filter.pageNo - 1)"
+              >上一页</V2Button
+            >
+            <span>第 {{ filter.pageNo }} 页</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="filter.pageNo >= pageCount"
+              @click="changePage(filter.pageNo + 1)"
+              >下一页</V2Button
+            >
+          </nav>
+        </template>
+      </V2Card>
     </template>
 
     <template v-else-if="project">
@@ -852,22 +843,9 @@ onBeforeUnmount(() => {
 .project-page__form--dialog {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.project-page__toolbar-card :deep(.v2-card__header) {
-  display: block;
-}
-.project-page__toolbar-card :deep(.v2-card__body) {
-  display: none;
-}
 .project-page__toolbar-card .project-page__filters {
   grid-template-columns: minmax(14rem, 2fr) repeat(2, minmax(10rem, 1fr)) repeat(3, auto);
   align-items: center;
-}
-.project-page__toolbar-card :deep(.v2-field__label) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
 }
 .project-page__grid {
   display: grid;
@@ -880,56 +858,11 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-2);
   align-items: flex-start;
 }
-.project-page__more > summary {
-  list-style: none;
-}
-.project-page__more > summary::-webkit-details-marker {
-  display: none;
-}
-.project-page__more {
-  position: relative;
-}
-.project-page__more-menu {
-  position: absolute;
-  z-index: 50;
-  top: calc(100% + var(--v2-space-1));
-  right: 0;
-  display: grid;
-  min-width: 6rem;
-  gap: var(--v2-space-1);
-  padding: var(--v2-space-2);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
-  box-shadow: var(--v2-shadow-float);
-}
-.project-page__table tbody tr:nth-last-child(-n + 3) .project-page__more-menu {
-  top: auto;
-  bottom: calc(100% + var(--v2-space-1));
-}
-.project-page__more-menu .v2-button {
-  width: 100%;
-  justify-content: flex-start;
-}
 .project-page__table-wrap {
   overflow: auto;
 }
 .project-page__table {
-  width: 100%;
   min-width: 56rem;
-  border-collapse: collapse;
-}
-.project-page__table th,
-.project-page__table td {
-  padding: var(--v2-space-3);
-  border-bottom: 1px solid var(--v2-color-border);
-  font-size: var(--v2-font-size-12);
-  text-align: left;
-  vertical-align: top;
-}
-.project-page__table th {
-  color: var(--v2-color-text-secondary);
-  white-space: nowrap;
 }
 .project-page__primary {
   display: grid;
@@ -978,12 +911,8 @@ dd {
   color: var(--v2-color-text-secondary);
 }
 .project-page__form input {
-  min-height: 2.5rem;
+  min-height: var(--v2-control-height-md);
   padding: 0 var(--v2-space-3);
-  color: var(--v2-color-text);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
 }
 @media (max-width: 64rem) {
   .project-page__filters,
@@ -1003,7 +932,7 @@ dd {
   }
   .project-page__detail-actions :deep(.v2-button) {
     width: 100%;
-    min-height: 2.75rem;
+    min-height: var(--v2-control-height-touch);
     white-space: nowrap;
   }
   .project-page__grid,

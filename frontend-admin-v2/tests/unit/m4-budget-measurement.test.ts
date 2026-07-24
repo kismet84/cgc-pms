@@ -9,6 +9,7 @@ import {
   deleteBudget,
   loadBudgetAvailability,
   loadBudgetPage,
+  loadCostSubjectOptions,
   loadMeasurementPeriods,
   loadMeasurements,
   reviewOwnerMeasurement,
@@ -42,6 +43,7 @@ describe('M4 budget and measurement contracts', () => {
       },
       signal,
     )
+    await loadCostSubjectOptions(signal)
     await loadMeasurementPeriods(
       {
         projectId: '9007199254740993',
@@ -62,6 +64,7 @@ describe('M4 budget and measurement contracts', () => {
     )
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       '/api/project-budgets?pageNo=2&pageSize=20&projectId=9007199254740993&startDate=2026-07-01&endDate=2026-07-31',
+      '/api/cost-subjects?category=COST',
       '/api/production-measurements/periods?projectId=9007199254740993&contractId=8&startDate=2026-07-01&endDate=2026-07-31',
       '/api/production-measurements?projectId=9007199254740993&status=DRAFT&startDate=2026-07-01&endDate=2026-07-31',
     ])

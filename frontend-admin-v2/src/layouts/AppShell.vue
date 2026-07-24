@@ -60,8 +60,6 @@ const reportPeriodOptions = computed(() => [
   { value: '', label: '全部报告期' },
   ...workspaceStore.reportPeriods,
 ])
-const projectFilterUnsupported = computed(() => route.meta.workspaceContext?.project !== true)
-const periodFilterUnsupported = computed(() => route.meta.workspaceContext?.period !== true)
 const projectFilterLabel = '当前项目'
 const periodFilterLabel = '报告期'
 const accountName = computed(
@@ -111,7 +109,7 @@ watch(mobileNavigationOpen, async (open) => {
 })
 
 onMounted(() => {
-  void workspaceStore.initialize(session.roles, session.permissions).catch(() => undefined)
+  void workspaceStore.initialize().catch(() => undefined)
   mobileMedia = window.matchMedia('(max-width: 48rem)')
   syncMobileMode(mobileMedia)
   mobileMedia.addEventListener('change', syncMobileMode)
@@ -443,8 +441,9 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
             :model-value="workspaceStore.selectedProjectId || ''"
             :options="projectOptions"
             :label="projectFilterLabel"
+            hide-label
             placeholder="暂无可用项目"
-            :disabled="!workspaceStore.projects.length || projectFilterUnsupported"
+            :disabled="!workspaceStore.projects.length"
             allow-empty
             @update:model-value="selectProject"
           />
@@ -453,8 +452,9 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
             :model-value="workspaceStore.selectedReportPeriod || ''"
             :options="reportPeriodOptions"
             :label="periodFilterLabel"
+            hide-label
             placeholder="暂无可用报告期"
-            :disabled="!workspaceStore.reportPeriods.length || periodFilterUnsupported"
+            :disabled="!workspaceStore.reportPeriods.length"
             allow-empty
             @update:model-value="selectReportPeriod"
           />
@@ -598,9 +598,12 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 
 <style scoped>
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   display: grid;
   grid-template-columns: 12.5rem minmax(0, 1fr);
+  overflow: hidden;
   background: var(--v2-color-canvas);
 }
 
@@ -778,7 +781,7 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 
 .app-shell__main {
   min-width: 0;
-  min-height: 100vh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -828,7 +831,7 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
   background: var(--v2-color-danger);
   border-radius: 999px;
   font-size: var(--v2-font-size-11);
-  line-height: 1rem;
+  line-height: var(--v2-line-height-ui);
   text-align: center;
 }
 
@@ -898,14 +901,13 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 
 .app-shell__context-controls {
   display: grid;
-  grid-template-columns: repeat(2, minmax(15rem, 20rem));
+  grid-template-columns: minmax(16rem, 20rem) minmax(11rem, 14rem);
   gap: var(--v2-space-3);
 }
 
 .app-shell__context-controls :deep(.v2-field) {
-  grid-template-columns: auto minmax(10rem, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
-  gap: var(--v2-space-2);
 }
 
 .app-shell__context-controls :deep(.v2-field__label) {
@@ -1042,7 +1044,11 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
 
 .app-shell__content {
   width: min(100%, var(--v2-page-max-width));
+  min-height: 0;
+  flex: 1;
   margin-inline: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 10px;
 }
 
@@ -1268,7 +1274,6 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
     min-width: 0;
     min-height: var(--v2-control-height-touch);
     padding-inline: var(--v2-space-2) var(--v2-space-6);
-    font-size: var(--v2-font-size-11);
   }
 
   .app-shell__context-controls :deep(.v2-field__label),

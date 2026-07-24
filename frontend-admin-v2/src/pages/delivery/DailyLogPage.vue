@@ -19,6 +19,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
 import { isApiClientError } from '@/services/request'
 import { reportPeriodBounds } from '@/services/workspace-context'
@@ -63,7 +64,7 @@ const pendingDailyAction = ref<PendingDailyAction | null>(null)
 const filesLoading = ref(false)
 const qualityLoading = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const qualityError = ref('')
 const records = ref<SiteDailyLogRecord[]>([])
 const total = ref(0)
@@ -521,10 +522,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
 
 <template>
   <section class="daily-log-page" aria-labelledby="daily-log-title">
-    <div
-      v-if="(errorMessage || successMessage) && !dialogOpen"
-      class="daily-log-page__notice-region"
-    >
+    <div v-if="errorMessage && !dialogOpen" class="daily-log-page__notice-region">
       <V2Alert
         v-if="errorMessage"
         class="daily-log-page__feedback"
@@ -534,16 +532,6 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
         @dismiss="errorMessage = ''"
       >
         {{ errorMessage }}
-      </V2Alert>
-      <V2Alert
-        v-else
-        class="daily-log-page__feedback"
-        tone="success"
-        title="操作完成"
-        dismissible
-        @dismiss="successMessage = ''"
-      >
-        {{ successMessage }}
       </V2Alert>
     </div>
 
@@ -557,8 +545,10 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
       <template #actions>
         <div class="daily-log-page__toolbar">
           <V2Select
+            class="daily-log-page__status-filter"
             :model-value="filter.status"
             label="日报状态"
+            hide-label
             :options="[
               { value: 'DRAFT', label: '草稿' },
               { value: 'SUBMITTED', label: '已提交' },
@@ -590,77 +580,80 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
       description="调整筛选条件，或由具备权限的账号创建日报草稿。"
       :heading-level="2"
     />
-    <div v-else class="daily-log-page__table-wrap">
-      <table class="daily-log-page__table daily-log-page__list-table">
-        <caption class="v2-visually-hidden">
-          现场日报列表
-        </caption>
-        <thead>
-          <tr>
-            <th>日报日期</th>
-            <th>项目</th>
-            <th>状态</th>
-            <th>天气摘要</th>
-            <th>在场人数</th>
-            <th>施工内容</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="record in records" :key="record.id">
-            <td>{{ record.reportDate }}</td>
-            <td>{{ record.projectName || '—' }}</td>
-            <td class="daily-log-page__facts">
-              <V2Badge :tone="record.status === 'DRAFT' ? 'neutral' : 'success'">
-                {{ record.status === 'DRAFT' ? '草稿' : '已提交' }}
-              </V2Badge>
-            </td>
-            <td>{{ record.weatherSummary || '未填写天气摘要' }}</td>
-            <td>{{ record.onSiteHeadcount ?? '未填写' }}</td>
-            <td class="daily-log-page__summary daily-log-page__summary-cell">
-              {{ record.constructionContent }}
-            </td>
-            <td>
-              <div class="daily-log-page__actions">
-                <V2Button size="small" variant="secondary" @click="openRecord(record)"
-                  >查看详情</V2Button
-                >
-                <V2Button
-                  v-if="canEdit && record.status === 'DRAFT'"
-                  size="small"
-                  variant="ghost"
-                  @click="openRecord(record, true)"
-                >
-                  编辑草稿
-                </V2Button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    <nav v-if="records.length" class="daily-log-page__pagination" aria-label="现场日报分页">
-      <div class="daily-log-page__actions">
-        <V2Button
-          size="small"
-          variant="secondary"
-          :disabled="pageNo <= 1"
-          @click="changePage(pageNo - 1)"
-        >
-          上一页
-        </V2Button>
-        <span>第 {{ pageNo }} 页</span>
-        <V2Button
-          size="small"
-          variant="secondary"
-          :disabled="pageNo * pageSize >= total"
-          @click="changePage(pageNo + 1)"
-        >
-          下一页
-        </V2Button>
+    <V2Card v-else title="现场日报列表" :heading-level="2">
+      <div class="daily-log-page__table-wrap">
+        <table class="daily-log-page__table daily-log-page__list-table v2-table--top">
+          <caption class="v2-visually-hidden">
+            现场日报列表
+          </caption>
+          <thead>
+            <tr>
+              <th>日报日期</th>
+              <th>项目</th>
+              <th>状态</th>
+              <th>天气摘要</th>
+              <th>在场人数</th>
+              <th>施工内容</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="record in records" :key="record.id">
+              <td>{{ record.reportDate }}</td>
+              <td>{{ record.projectName || '—' }}</td>
+              <td class="daily-log-page__facts">
+                <V2Badge :tone="record.status === 'DRAFT' ? 'neutral' : 'success'">
+                  {{ record.status === 'DRAFT' ? '草稿' : '已提交' }}
+                </V2Badge>
+              </td>
+              <td>{{ record.weatherSummary || '未填写天气摘要' }}</td>
+              <td>{{ record.onSiteHeadcount ?? '未填写' }}</td>
+              <td class="daily-log-page__summary daily-log-page__summary-cell v2-table-cell--wrap">
+                {{ record.constructionContent }}
+              </td>
+              <td>
+                <div class="daily-log-page__actions">
+                  <V2Button size="small" variant="secondary" @click="openRecord(record)"
+                    >查看详情</V2Button
+                  >
+                  <V2Button
+                    v-if="canEdit && record.status === 'DRAFT'"
+                    size="small"
+                    variant="ghost"
+                    @click="openRecord(record, true)"
+                  >
+                    编辑草稿
+                  </V2Button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </nav>
+      <template #footer>
+        <nav class="daily-log-page__pagination" aria-label="现场日报分页">
+          <div class="daily-log-page__actions">
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo <= 1"
+              @click="changePage(pageNo - 1)"
+            >
+              上一页
+            </V2Button>
+            <span>第 {{ pageNo }} 页</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo * pageSize >= total"
+              @click="changePage(pageNo + 1)"
+            >
+              下一页
+            </V2Button>
+          </div>
+        </nav>
+      </template>
+    </V2Card>
 
     <V2Dialog
       v-model:open="dialogOpen"
@@ -778,17 +771,18 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
           />
           <div v-else-if="files.length" class="daily-log-page__stack">
             <article v-for="file in files" :key="file.id" class="daily-log-page__row">
-              <button type="button" class="daily-log-page__link" @click="downloadFile(file.id)">
+              <V2Button type="button" size="small" variant="ghost" @click="downloadFile(file.id)">
                 {{ file.originalName }}
-              </button>
-              <button
+              </V2Button>
+              <V2Button
                 v-if="dialogMode !== 'view' && canEdit && activeRecord.status === 'DRAFT'"
                 type="button"
-                class="daily-log-page__danger-link"
+                size="small"
+                variant="danger"
                 @click="requestFileRemoval(file.id, file.originalName)"
               >
                 删除
-              </button>
+              </V2Button>
             </article>
           </div>
           <p v-else class="daily-log-page__empty-copy">暂无附件。</p>
@@ -805,7 +799,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
           "
         >
           <div v-if="progressRows.length" class="daily-log-page__table-wrap">
-            <table class="daily-log-page__table">
+            <table class="daily-log-page__table v2-table--top">
               <thead>
                 <tr>
                   <th v-if="canReportProgress">填报</th>
@@ -1021,14 +1015,6 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
   align-items: end;
   font-size: var(--v2-font-size-12);
 }
-.daily-log-page__toolbar-card :deep(.v2-card__body) {
-  display: none;
-}
-.daily-log-page__toolbar-card :deep(.v2-card__header) {
-  display: grid;
-  grid-template-columns: minmax(14rem, 1fr) auto;
-  align-items: center;
-}
 .daily-log-page__toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -1036,17 +1022,10 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
   align-items: center;
   justify-content: flex-end;
 }
-.daily-log-page__toolbar :deep(.v2-field) {
+.daily-log-page__status-filter {
   flex: 0 0 11rem;
   min-width: 10rem;
   max-width: 14rem;
-}
-.daily-log-page__toolbar :deep(.v2-field__label) {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
 }
 .daily-log-page__span-2 {
   grid-column: 1 / -1;
@@ -1075,35 +1054,16 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
 .daily-log-page__summary {
   font-size: var(--v2-font-size-12);
 }
-.daily-log-page__form label {
-  display: grid;
-  gap: var(--v2-space-1);
-  color: var(--v2-color-text-secondary);
-}
-.daily-log-page__form input,
-.daily-log-page__form textarea {
-  min-height: 2.5rem;
-  padding: 0 var(--v2-space-3);
-  color: var(--v2-color-text);
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-  border-radius: var(--v2-radius-md);
-  font: inherit;
-}
-.daily-log-page__form :deep(.v2-field__control) {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-}
 .daily-log-page__file-input {
   position: absolute;
-  width: 1px;
-  height: 1px;
+  width: var(--v2-border-width);
+  height: var(--v2-border-width);
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
 }
 .daily-log-page__dialog :deep(.daily-log-page__glass-button) {
   width: auto;
-  min-height: 2.5rem;
+  min-height: var(--v2-control-height-md);
 }
 .daily-log-page__dialog-actions {
   position: relative;
@@ -1124,8 +1084,8 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
   position: absolute;
   inset-block-start: 100%;
   inset-inline-end: var(--v2-space-5);
-  width: 8px;
-  height: 8px;
+  width: var(--v2-space-2);
+  height: var(--v2-space-2);
   background: var(--v2-color-danger-soft);
   border-inline-end: var(--v2-border-width) solid var(--v2-color-danger);
   border-block-end: var(--v2-border-width) solid var(--v2-color-danger);
@@ -1133,7 +1093,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
   transform: translateY(-50%) rotate(45deg);
 }
 .daily-log-page__form textarea {
-  min-height: 6rem;
+  min-height: var(--v2-control-height-textarea);
   padding: var(--v2-space-2) var(--v2-space-3);
   resize: vertical;
 }
@@ -1143,29 +1103,12 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
 .daily-log-page__table-wrap {
   overflow: auto;
 }
-.daily-log-page__table {
-  width: 100%;
-  border-collapse: collapse;
-}
 .daily-log-page__list-table {
   min-width: 72rem;
-}
-.daily-log-page__table th,
-.daily-log-page__table td {
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--v2-color-border);
-  font-size: var(--v2-font-size-12);
-  text-align: left;
-  vertical-align: top;
-}
-.daily-log-page__table th {
-  color: var(--v2-color-text-secondary);
-  white-space: nowrap;
+  table-layout: fixed;
 }
 .daily-log-page__summary-cell {
-  min-width: 16rem;
-  max-width: 28rem;
-  overflow-wrap: anywhere;
+  width: 28%;
 }
 .daily-log-page__panel {
   padding: var(--v2-space-3);
@@ -1176,20 +1119,6 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
 .daily-log-page__linked-facts {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
-.daily-log-page__link,
-.daily-log-page__danger-link {
-  padding: 0;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  font: inherit;
-}
-.daily-log-page__link {
-  color: var(--v2-color-primary-hover);
-}
-.daily-log-page__danger-link {
-  color: var(--v2-color-danger-text);
-}
 @media (max-width: 64rem) {
   .daily-log-page__form {
     grid-template-columns: 1fr;
@@ -1197,10 +1126,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
   .daily-log-page__toolbar {
     width: 100%;
   }
-  .daily-log-page__toolbar-card :deep(.v2-card__header) {
-    grid-template-columns: 1fr;
-  }
-  .daily-log-page__toolbar :deep(.v2-field) {
+  .daily-log-page__status-filter {
     max-width: none;
   }
   .daily-log-page__pagination {

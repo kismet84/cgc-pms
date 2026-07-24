@@ -11,6 +11,7 @@ import CostControlPage from '@/pages/commercial/CostControlPage.vue'
 import CostLedgerPage from '@/pages/commercial/CostLedgerPage.vue'
 import CostSummaryPage from '@/pages/commercial/CostSummaryPage.vue'
 import * as commercial from '@/services/commercial'
+import * as projects from '@/services/projects'
 import { useSessionStore } from '@/stores/session'
 
 vi.mock('@/services/commercial', () => ({
@@ -18,6 +19,7 @@ vi.mock('@/services/commercial', () => ({
   confirmCostForecast: vi.fn(),
   createCostCorrective: vi.fn(),
   createCostForecast: vi.fn(),
+  loadCostSubjectOptions: vi.fn(),
   loadCostControl: vi.fn(),
   loadCostForecastTrace: vi.fn(),
   loadCostLedger: vi.fn(),
@@ -31,6 +33,7 @@ vi.mock('@/services/commercial', () => ({
   updateCostCorrective: vi.fn(),
   updateCostForecast: vi.fn(),
 }))
+vi.mock('@/services/projects', () => ({ loadProjectUsers: vi.fn() }))
 
 const ledger = {
   id: '9007199254740993',
@@ -129,6 +132,17 @@ function button(wrapper: Awaited<ReturnType<typeof mountPage>>['wrapper'], label
 }
 
 beforeEach(() => {
+  vi.mocked(commercial.loadCostSubjectOptions)
+    .mockReset()
+    .mockResolvedValue([{ id: 'S1', subjectCode: '6001', subjectName: '材料费', status: 'ACTIVE' }])
+  vi.mocked(projects.loadProjectUsers)
+    .mockReset()
+    .mockResolvedValue({
+      records: [{ id: 'U1', username: 'owner', realName: '负责人', status: 'ACTIVE' }],
+      total: 1,
+      pageNo: 1,
+      pageSize: 200,
+    })
   vi.mocked(commercial.loadProjectContextOptions)
     .mockReset()
     .mockResolvedValue([
@@ -177,6 +191,27 @@ describe('M4 costs pages', () => {
     expect(pagination.text()).toContain('共 1 条')
     expect(pagination.text()).toContain('第 1 页')
     expect(pagination.text()).not.toContain('/ 1')
+  })
+
+  it('keeps ledger and cost-control dialogs business-labelled', async () => {
+    const ledgerView = await mountPage(CostLedgerPage, '/cost/ledger?projectId=P1', [
+      'cost:ledger:query',
+    ])
+    await button(ledgerView.wrapper, '详情')!.trigger('click')
+    await flushPromises()
+    expect(ledgerView.wrapper.text()).toContain('已确认')
+    expect(ledgerView.wrapper.text()).not.toContain('CONFIRMED')
+    expect(
+      ledgerView.wrapper.findAll('.v2-dialog__body dt').map((item) => item.text()),
+    ).not.toContain('ID')
+
+    const controlView = await mountPage(CostControlPage, '/cost/control?projectId=P1', [
+      'cost:control:query',
+      'cost:forecast:maintain',
+      'cost:corrective:maintain',
+    ])
+    expect(controlView.wrapper.text()).not.toContain('负责人ID')
+    expect(controlView.wrapper.text()).not.toContain('成本科目 S1')
   })
 
   it('fails closed on all three pages without cost permissions and loads no business data', async () => {

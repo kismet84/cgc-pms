@@ -2,7 +2,7 @@
 import type { CostProjectSummary, CostSummaryHistoryRecord } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { V2Alert, V2Button, V2Card, V2PageState } from '@/components'
+import { V2Alert, V2Button, V2Card, V2PageState, useToastMessage } from '@/components'
 import { loadCostSummary, loadCostSummaryHistory, refreshCostSummary } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
@@ -14,7 +14,7 @@ const history = ref<CostSummaryHistoryRecord[]>([])
 const loading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 let controller: AbortController | null = null
 let generation = 0
 const canQuery = computed(() => session.hasPermission('cost:summary:view'))
@@ -85,9 +85,6 @@ onBeforeUnmount(() => controller?.abort())
     /><template v-else
       ><V2Alert v-if="errorMessage" tone="danger" title="成本核对请求未完成">{{
         errorMessage
-      }}</V2Alert
-      ><V2Alert v-if="successMessage" tone="success" title="成本核对操作完成">{{
-        successMessage
       }}</V2Alert
       ><V2Card title="成本核对" :heading-level="1"
         ><template #actions
@@ -174,15 +171,5 @@ dd {
 }
 .table-wrap {
   overflow: auto;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-th,
-td {
-  text-align: left;
-  padding: var(--v2-space-2);
-  border-bottom: 1px solid var(--v2-color-border);
 }
 </style>

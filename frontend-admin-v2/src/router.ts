@@ -39,10 +39,6 @@ declare module 'vue-router' {
     shell?: boolean
     permission?: string
     workflowTab?: WorkflowTab
-    workspaceContext?: {
-      project: boolean
-      period: boolean
-    }
   }
 }
 
@@ -112,7 +108,6 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
             shell: true,
             permission: tab.permission,
             workflowTab: approvalTab,
-            workspaceContext: tab.workspaceContext,
           },
         },
       ]
@@ -161,7 +156,6 @@ const contextRoutes: RouteRecordRaw[] = [
     meta: {
       shell: true,
       permission: 'schedule:query',
-      workspaceContext: { project: true, period: false },
     },
   },
   {
@@ -213,7 +207,6 @@ const contextRoutes: RouteRecordRaw[] = [
     meta: {
       shell: true,
       permission: 'cost:target:add',
-      workspaceContext: { project: true, period: false },
     },
   },
   {
@@ -223,7 +216,6 @@ const contextRoutes: RouteRecordRaw[] = [
     meta: {
       shell: true,
       permission: 'cost:target:edit',
-      workspaceContext: { project: true, period: false },
     },
   },
   {

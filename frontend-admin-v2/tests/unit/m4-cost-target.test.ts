@@ -8,10 +8,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CostTargetPageView from '@/pages/commercial/CostTargetPage.vue'
+import { dismissToast, toastItems } from '@/components/toast'
 import {
   activateCostTarget,
   createCostTarget,
   deleteCostTarget,
+  loadCostSubjectOptions,
   loadCostTarget,
   loadCostTargetItems,
   loadCostTargetPage,
@@ -26,6 +28,7 @@ vi.mock('@/services/commercial', () => ({
   activateCostTarget: vi.fn(),
   createCostTarget: vi.fn(),
   deleteCostTarget: vi.fn(),
+  loadCostSubjectOptions: vi.fn(),
   loadCostTarget: vi.fn(),
   loadCostTargetItems: vi.fn(),
   loadCostTargetPage: vi.fn(),
@@ -101,6 +104,10 @@ function button(wrapper: Awaited<ReturnType<typeof mountPage>>['wrapper'], label
 }
 
 beforeEach(() => {
+  toastItems.slice().forEach((toast) => dismissToast(toast.id))
+  vi.mocked(loadCostSubjectOptions)
+    .mockReset()
+    .mockResolvedValue([{ id: 'S1', subjectCode: '6001', subjectName: '材料费', status: 'ACTIVE' }])
   vi.mocked(loadCostTargetPage).mockReset().mockResolvedValue(page)
   vi.mocked(loadCostTarget).mockReset().mockResolvedValue(target)
   vi.mocked(loadCostTargetItems).mockReset().mockResolvedValue([item])
@@ -146,6 +153,8 @@ describe('M4 cost target page', () => {
 
     await button(wrapper, '详情')!.trigger('click')
     await flushPromises()
+    expect(wrapper.text()).toContain('6001 · 材料费')
+    expect(wrapper.text()).not.toContain('S1')
 
     expect(loadCostTarget).toHaveBeenCalledWith('81', expect.any(AbortSignal))
     expect(loadCostTargetItems).toHaveBeenCalledWith('81', expect.any(AbortSignal))
@@ -244,7 +253,7 @@ describe('M4 cost target page', () => {
       '7',
     )
     expect(loadCostTarget).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('目标成本明细已保存')
+    expect(toastItems.at(-1)?.message).toContain('目标成本明细已保存')
   })
 
   it('shows item validation 422 and refreshes the latest detail', async () => {
@@ -277,7 +286,7 @@ describe('M4 cost target page', () => {
     expect(submitCostTarget).toHaveBeenCalledWith('81', '7')
     pending.resolve()
     await flushPromises()
-    expect(wrapper.text()).toContain('目标成本已提交审批')
+    expect(toastItems.at(-1)?.message).toContain('目标成本已提交审批')
   })
 
   it('shows submit conflict 409 and refreshes the latest status', async () => {

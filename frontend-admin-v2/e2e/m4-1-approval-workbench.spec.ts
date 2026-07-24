@@ -148,7 +148,7 @@ test.describe('M4-1 approval workbench', () => {
         /v2-visually-hidden/,
       )
       const filterLabels = page.locator('.workflow-filter .v2-field__label')
-      await expect(filterLabels).toHaveCount(2)
+      await expect(filterLabels).toHaveCount(3)
       expect(
         await filterLabels.evaluateAll((labels) =>
           labels.every((label) => label.classList.contains('v2-visually-hidden')),

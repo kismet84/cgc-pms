@@ -7,6 +7,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import BidCostPageView from '@/pages/commercial/BidCostPage.vue'
+import { dismissToast, toastItems } from '@/components/toast'
 import {
   createBidCost,
   deleteBidCost,
@@ -85,6 +86,7 @@ function button(wrapper: Awaited<ReturnType<typeof mountPage>>['wrapper'], label
 }
 
 beforeEach(() => {
+  toastItems.slice().forEach((toast) => dismissToast(toast.id))
   vi.mocked(loadBidCostPage).mockReset().mockResolvedValue(page)
   vi.mocked(loadBidCost).mockReset().mockResolvedValue(bidding)
   vi.mocked(loadProjectContextOptions)
@@ -217,7 +219,7 @@ describe('M4 bid cost page', () => {
     pending.resolve('11')
     await flushPromises()
     expect(loadBidCost).toHaveBeenCalledWith('11', expect.any(AbortSignal))
-    expect(wrapper.text()).toContain('投标成本已创建')
+    expect(toastItems.at(-1)?.message).toContain('投标成本已创建')
   })
 
   it('keeps local input and edit mode after save failure', async () => {
@@ -287,7 +289,7 @@ describe('M4 bid cost page', () => {
     expect(markBidCostWon).toHaveBeenCalledWith('11', 'P1')
     expect(loadBidCostPage).toHaveBeenCalledTimes(2)
     expect(wrapper.text()).toContain('已中标')
-    expect(wrapper.text()).toContain('投标状态已更新')
+    expect(toastItems.at(-1)?.message).toContain('投标状态已更新')
   })
 
   it('fails closed on status 403 and does not fake success', async () => {
@@ -299,7 +301,7 @@ describe('M4 bid cost page', () => {
 
     expect(markBidCostLost).toHaveBeenCalledWith('11')
     expect(wrapper.text()).toContain('无状态变更权限')
-    expect(wrapper.text()).not.toContain('投标状态已更新')
+    expect(toastItems.some((toast) => toast.message.includes('投标状态已更新'))).toBe(false)
   })
 
   it('confirms delete and preserves record when delete fails', async () => {

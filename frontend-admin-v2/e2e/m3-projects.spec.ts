@@ -62,7 +62,7 @@ test.describe('M3 live project object', () => {
 
     await page.goto('/v2/project/list')
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
     const detailResponse = page.waitForResponse(
       (response) => new URL(response.url()).pathname === `/api/projects/${projectId}`,
     )
@@ -78,8 +78,8 @@ test.describe('M3 live project object', () => {
     await page.goto(`/v2/project/${projectId}/overview`)
     await expect(page.locator('.app-shell__object-context')).toHaveCount(0)
     await expect(page.getByText(`对象 project / ${projectId}`)).toHaveCount(0)
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'true')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
     await expect(page.getByText('当前项目（当前页面不适用）')).toHaveCount(0)
   })
 

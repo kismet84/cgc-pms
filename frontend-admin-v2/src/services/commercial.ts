@@ -54,6 +54,13 @@ import {
 } from '@cgc-pms/frontend-contracts'
 import { apiRequest } from '@/services/request'
 
+export interface CostSubjectOption {
+  id: string
+  subjectCode: string
+  subjectName: string
+  status: string
+}
+
 const WRITE_METHOD = {
   create: 'POST' as const,
   update: 'PUT' as const,
@@ -168,6 +175,10 @@ export function loadPartners(
 
 export function loadProjectContextOptions(signal?: AbortSignal): Promise<ProjectContextOption[]> {
   return apiRequest<ProjectContextOption[]>(COMMERCIAL_API.projectContextOptions, { signal })
+}
+
+export function loadCostSubjectOptions(signal?: AbortSignal): Promise<CostSubjectOption[]> {
+  return apiRequest<CostSubjectOption[]>('/cost-subjects?category=COST', { signal })
 }
 
 export function loadVariationPage(

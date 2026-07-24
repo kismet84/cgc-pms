@@ -118,9 +118,9 @@ describe('WorkflowWorkbenchPage', () => {
     const heading = wrapper.get('h1')
     expect(heading.text()).toBe('审批工作台')
     expect(heading.classes()).toContain('v2-visually-hidden')
-    expect(wrapper.get('.workflow-filter__keyword input').attributes('aria-label')).toBe(
-      '搜索标题或业务编号',
-    )
+    const keywordInput = wrapper.get('.workflow-filter__keyword input')
+    expect(keywordInput.attributes('aria-label')).toBe('关键词')
+    expect(keywordInput.attributes('placeholder')).toBe('搜索标题或业务编号')
     expect(
       wrapper
         .findAll('.workflow-filter .v2-field__label')

@@ -18,11 +18,13 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
 import {
   activateCostTarget,
   createCostTarget,
   deleteCostTarget,
+  loadCostSubjectOptions,
   loadCostTarget,
   loadCostTargetItems,
   loadCostTargetPage,
@@ -31,6 +33,7 @@ import {
   submitCostTarget,
   updateCostTarget,
 } from '@/services/commercial'
+import type { CostSubjectOption } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 
@@ -58,6 +61,7 @@ const filter = reactive<CostTargetQuery>({ pageNo: 1, pageSize: 10 })
 const records = ref<CostTargetRecord[]>([])
 const total = ref(0)
 const projects = ref<ProjectContextOption[]>([])
+const costSubjects = ref<CostSubjectOption[]>([])
 const detail = ref<CostTargetRecord | null>(null)
 const items = ref<CostTargetItemRecord[]>([])
 const form = reactive<CostTargetSaveCommand>(emptyForm())
@@ -65,7 +69,7 @@ const loading = ref(false)
 const detailLoading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const detailOpen = ref(false)
 const pendingAction = ref<PendingAction>(null)
 
@@ -98,6 +102,10 @@ const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pag
 const projectOptions = computed(() =>
   projects.value.map((project) => ({ value: project.id, label: project.projectName })),
 )
+const costSubjectLabel = (id: string, index: number) => {
+  const subject = costSubjects.value.find((item) => item.id === id)
+  return subject ? `${subject.subjectCode} · ${subject.subjectName}` : `成本科目 ${index + 1}`
+}
 
 function projectLabel(projectId?: string | null): string {
   return projects.value.find((project) => project.id === projectId)?.projectName ?? '—'
@@ -175,9 +183,13 @@ async function loadProjects(): Promise<void> {
   const controller = new AbortController()
   projectController = controller
   try {
-    const value = await loadProjectContextOptions(controller.signal)
+    const [value, subjects] = await Promise.all([
+      loadProjectContextOptions(controller.signal),
+      loadCostSubjectOptions(controller.signal),
+    ])
     if (projectController !== controller) return
     projects.value = value
+    costSubjects.value = subjects
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '可见项目加载失败')
   }
@@ -460,16 +472,6 @@ onBeforeUnmount(() => {
       >
         {{ errorMessage }}
       </V2Alert>
-      <V2Alert
-        v-if="successMessage"
-        tone="success"
-        title="操作成功"
-        dismissible
-        @dismiss="successMessage = ''"
-      >
-        {{ successMessage }}
-      </V2Alert>
-
       <template v-if="mode === 'list'">
         <V2Card title="目标成本版本" :heading-level="1">
           <template #actions>
@@ -480,18 +482,29 @@ onBeforeUnmount(() => {
             >
           </template>
           <div class="cost-target-page__filters">
-            <V2Input v-model="filter.versionNo" label="版本号" @keyup.enter="query" />
+            <V2Input
+              v-model="filter.versionNo"
+              type="search"
+              label="版本号"
+              hide-label
+              placeholder="输入版本号"
+              @keyup.enter="query"
+            />
             <V2Select
               v-model="filter.approvalStatus"
               label="审批状态"
+              hide-label
               :options="APPROVAL_OPTIONS"
               allow-empty
+              placeholder="全部审批状态"
             />
             <V2Select
               v-model="filter.isActive"
               label="版本范围"
+              hide-label
               :options="ACTIVE_OPTIONS"
               allow-empty
+              placeholder="全部版本"
             />
             <V2Button variant="secondary" :loading="loading" @click="query">查询</V2Button>
           </div>
@@ -507,102 +520,111 @@ onBeforeUnmount(() => {
           title="暂无目标成本"
           description="当前筛选条件下没有可访问版本。"
         />
-        <div v-else class="cost-target-page__table-wrap" :aria-busy="loading">
-          <table aria-label="目标成本版本列表">
-            <thead>
-              <tr>
-                <th>版本</th>
-                <th>项目</th>
-                <th>目标成本</th>
-                <th>投标成本</th>
-                <th>责任成本</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="record in records" :key="record.id">
-                <td>
-                  {{ record.versionNo }}<small>{{ record.versionName }}</small>
-                </td>
-                <td>{{ projectLabel(record.projectId) }}</td>
-                <td>{{ record.totalTargetAmount }}</td>
-                <td>{{ record.totalBidCostAmount }}</td>
-                <td>{{ record.totalResponsibilityAmount }}</td>
-                <td>
-                  <V2Badge :tone="approvalTone(record.approvalStatus)">{{
-                    approvalLabel(record.approvalStatus)
-                  }}</V2Badge
-                  ><V2Badge v-if="record.isActive === 1" tone="success">活动版本</V2Badge>
-                </td>
-                <td>
-                  <div class="cost-target-page__actions">
-                    <V2Button size="small" variant="secondary" @click="openDetail(record)"
-                      >详情</V2Button
-                    >
-                    <V2Button
-                      v-if="
-                        canEdit &&
-                        record.isActive !== 1 &&
-                        ['DRAFT', 'REJECTED'].includes(record.approvalStatus)
-                      "
-                      size="small"
-                      variant="secondary"
-                      @click="
-                        router.push({ path: `/cost-target/${record.id}/edit`, query: route.query })
-                      "
-                      >编辑</V2Button
-                    >
-                    <V2Button
-                      v-if="
-                        canSubmit &&
-                        record.isActive !== 1 &&
-                        ['DRAFT', 'REJECTED'].includes(record.approvalStatus)
-                      "
-                      size="small"
-                      @click="requestAction('submit', record)"
-                      >提交</V2Button
-                    >
-                    <V2Button
-                      v-if="
-                        canActivate && record.approvalStatus === 'APPROVED' && record.isActive !== 1
-                      "
-                      size="small"
-                      @click="requestAction('activate', record)"
-                      >激活</V2Button
-                    >
-                    <V2Button
-                      v-if="
-                        canDelete &&
-                        record.isActive !== 1 &&
-                        ['DRAFT', 'REJECTED'].includes(record.approvalStatus)
-                      "
-                      size="small"
-                      variant="danger"
-                      @click="requestAction('delete', record)"
-                      >删除</V2Button
-                    >
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <nav v-if="records.length" class="cost-target-page__pager" aria-label="目标成本分页">
-          <span>共 {{ total }} 条</span
-          ><V2Button
-            variant="secondary"
-            :disabled="(filter.pageNo ?? 1) <= 1"
-            @click="changePage((filter.pageNo ?? 1) - 1)"
-            >上一页</V2Button
-          ><span>第 {{ filter.pageNo }} 页</span
-          ><V2Button
-            variant="secondary"
-            :disabled="(filter.pageNo ?? 1) >= pageCount"
-            @click="changePage((filter.pageNo ?? 1) + 1)"
-            >下一页</V2Button
-          >
-        </nav>
+        <V2Card v-else title="目标成本版本列表" :heading-level="2">
+          <div class="cost-target-page__table-wrap" :aria-busy="loading">
+            <table class="v2-table--top" aria-label="目标成本版本列表">
+              <thead>
+                <tr>
+                  <th>版本</th>
+                  <th>项目</th>
+                  <th>目标成本</th>
+                  <th>投标成本</th>
+                  <th>责任成本</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="record in records" :key="record.id">
+                  <td>
+                    {{ record.versionNo }}<small>{{ record.versionName }}</small>
+                  </td>
+                  <td>{{ projectLabel(record.projectId) }}</td>
+                  <td>{{ record.totalTargetAmount }}</td>
+                  <td>{{ record.totalBidCostAmount }}</td>
+                  <td>{{ record.totalResponsibilityAmount }}</td>
+                  <td>
+                    <V2Badge :tone="approvalTone(record.approvalStatus)">{{
+                      approvalLabel(record.approvalStatus)
+                    }}</V2Badge
+                    ><V2Badge v-if="record.isActive === 1" tone="success">活动版本</V2Badge>
+                  </td>
+                  <td>
+                    <div class="cost-target-page__actions">
+                      <V2Button size="small" variant="secondary" @click="openDetail(record)"
+                        >详情</V2Button
+                      >
+                      <V2Button
+                        v-if="
+                          canEdit &&
+                          record.isActive !== 1 &&
+                          ['DRAFT', 'REJECTED'].includes(record.approvalStatus)
+                        "
+                        size="small"
+                        variant="secondary"
+                        @click="
+                          router.push({
+                            path: `/cost-target/${record.id}/edit`,
+                            query: route.query,
+                          })
+                        "
+                        >编辑</V2Button
+                      >
+                      <V2Button
+                        v-if="
+                          canSubmit &&
+                          record.isActive !== 1 &&
+                          ['DRAFT', 'REJECTED'].includes(record.approvalStatus)
+                        "
+                        size="small"
+                        @click="requestAction('submit', record)"
+                        >提交</V2Button
+                      >
+                      <V2Button
+                        v-if="
+                          canActivate &&
+                          record.approvalStatus === 'APPROVED' &&
+                          record.isActive !== 1
+                        "
+                        size="small"
+                        @click="requestAction('activate', record)"
+                        >激活</V2Button
+                      >
+                      <V2Button
+                        v-if="
+                          canDelete &&
+                          record.isActive !== 1 &&
+                          ['DRAFT', 'REJECTED'].includes(record.approvalStatus)
+                        "
+                        size="small"
+                        variant="danger"
+                        @click="requestAction('delete', record)"
+                        >删除</V2Button
+                      >
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <template #footer>
+            <nav class="cost-target-page__pager" aria-label="目标成本分页">
+              <span>共 {{ total }} 条</span
+              ><V2Button
+                variant="secondary"
+                :disabled="(filter.pageNo ?? 1) <= 1"
+                @click="changePage((filter.pageNo ?? 1) - 1)"
+                >上一页</V2Button
+              ><span>第 {{ filter.pageNo }} 页</span
+              ><V2Button
+                variant="secondary"
+                :disabled="(filter.pageNo ?? 1) >= pageCount"
+                @click="changePage((filter.pageNo ?? 1) + 1)"
+                >下一页</V2Button
+              >
+            </nav>
+          </template>
+        </V2Card>
       </template>
 
       <template v-else>
@@ -799,7 +821,7 @@ onBeforeUnmount(() => {
       <V2Dialog
         :open="detailOpen"
         title="目标成本详情"
-        panel-class="v2-dialog-standard v2-detail-dialog"
+        panel-class="v2-detail-dialog"
         :close-on-backdrop="false"
         @close="closeDetail"
       >
@@ -835,7 +857,7 @@ onBeforeUnmount(() => {
             description="当前目标成本版本尚未录入科目明细。"
           />
           <div v-else class="cost-target-page__table-wrap">
-            <table>
+            <table class="v2-table--top">
               <thead>
                 <tr>
                   <th>成本科目</th>
@@ -845,8 +867,8 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in items" :key="item.id || item.costSubjectId">
-                  <td>{{ item.costSubjectId }}</td>
+                <tr v-for="(item, index) in items" :key="item.id || item.costSubjectId">
+                  <td>{{ costSubjectLabel(item.costSubjectId, index) }}</td>
                   <td>{{ item.targetAmount }}</td>
                   <td>{{ item.bidCostAmount }}</td>
                   <td>{{ item.responsibilityAmount }}</td>
@@ -909,17 +931,7 @@ onBeforeUnmount(() => {
   overflow-x: auto;
 }
 table {
-  width: 100%;
   min-width: 52rem;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-}
-th,
-td {
-  padding: var(--v2-space-3);
-  text-align: left;
-  border-bottom: 1px solid var(--v2-color-border);
-  vertical-align: top;
 }
 td small {
   display: block;
@@ -951,15 +963,11 @@ td small {
 }
 .cost-target-page__native-field input,
 .cost-target-page__native-field textarea {
-  min-height: 2.5rem;
+  min-height: var(--v2-control-height-md);
   padding: var(--v2-space-2) var(--v2-space-3);
-  color: var(--v2-color-text);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
 }
 .cost-target-page__native-field textarea {
-  min-height: 6rem;
+  min-height: var(--v2-control-height-textarea);
   resize: vertical;
 }
 dl {

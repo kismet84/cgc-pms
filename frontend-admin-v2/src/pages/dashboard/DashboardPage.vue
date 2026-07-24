@@ -23,6 +23,7 @@ import {
   V2PageState,
   V2Select,
   showToast,
+  useToastMessage,
 } from '@/components'
 import DomainNavigationIcon from '@/components/DomainNavigationIcon.vue'
 import { loadCostBreakdown, loadDashboard } from '@/services/dashboard'
@@ -72,8 +73,7 @@ const alertLoading = ref(false)
 const alertError = ref('')
 const alertActionLoading = ref(false)
 const alertActionMessage = ref('')
-const alertEvaluationMessage = ref('')
-let alertEvaluationTimer: ReturnType<typeof setTimeout> | undefined
+const alertEvaluationMessage = useToastMessage('info', '操作结果')
 const selectedAlert = ref<AlertRecord | null>(null)
 const targetAlertStatus = ref<AlertProcessStatus>('PROCESSED')
 const alertRemark = ref('')
@@ -330,7 +330,6 @@ watch(
 onBeforeUnmount(() => {
   controller?.abort()
   alertController?.abort()
-  if (alertEvaluationTimer) clearTimeout(alertEvaluationTimer)
 })
 
 async function showHighestRisks(): Promise<void> {
@@ -459,15 +458,10 @@ function disposeSelectedAlert(): void {
 function evaluateCurrentAlerts(): void {
   alertActionLoading.value = true
   alertError.value = ''
-  if (alertEvaluationTimer) clearTimeout(alertEvaluationTimer)
   alertEvaluationMessage.value = ''
   void evaluateAlerts()
     .then(async (result) => {
       alertEvaluationMessage.value = `评估完成，生成 ${result.alertsGenerated} 项预警`
-      alertEvaluationTimer = setTimeout(() => {
-        alertEvaluationMessage.value = ''
-        alertEvaluationTimer = undefined
-      }, 3000)
       await refreshAlerts()
     })
     .catch((caught: unknown) => {
@@ -577,16 +571,17 @@ function isAbort(errorValue: unknown): boolean {
     <h1 id="dashboard-title" class="v2-visually-hidden">经营驾驶舱</h1>
 
     <nav v-if="allowedRoles.length > 1" class="dashboard-page__roles" aria-label="驾驶舱角色视图">
-      <button
+      <V2Button
         v-for="role in allowedRoles"
         :key="role"
-        type="button"
+        class="dashboard-page__role-button"
+        size="small"
+        :variant="selectedRole === role ? 'primary' : 'secondary'"
         :aria-pressed="selectedRole === role"
-        :class="{ 'is-active': selectedRole === role }"
         @click="selectRole(role)"
       >
         {{ DASHBOARD_ROLE_LABELS[role] }}
-      </button>
+      </V2Button>
     </nav>
 
     <V2PageState
@@ -631,9 +626,9 @@ function isAbort(errorValue: unknown): boolean {
           <V2Button size="small" variant="ghost" :loading="loading" @click="refreshDashboard">
             刷新
           </V2Button>
-          <button type="button" class="dashboard-page__outline-link" @click="showHighestRisks">
+          <V2Button size="small" variant="secondary" @click="showHighestRisks">
             查看最高风险
-          </button>
+          </V2Button>
         </header>
         <div class="health-content">
           <div
@@ -689,20 +684,20 @@ function isAbort(errorValue: unknown): boolean {
               <span v-else>（{{ activityItems.length }}）</span>
             </div>
             <div v-if="trendDefinition.series.length" class="trend-range" aria-label="趋势时间范围">
-              <button
+              <V2Button
                 v-for="range in [
                   { value: 'year', label: '当年累计' },
                   { value: 'half', label: '近6个月' },
                   { value: 'quarter', label: '近3个月' },
                 ] as const"
                 :key="range.value"
-                type="button"
+                size="small"
+                :variant="trendRange === range.value ? 'secondary' : 'ghost'"
                 :aria-pressed="trendRange === range.value"
-                :class="{ 'is-active': trendRange === range.value }"
                 @click="trendRange = range.value"
               >
                 {{ range.label }}
-              </button>
+              </V2Button>
             </div>
           </header>
           <DashboardTrendChart
@@ -740,16 +735,9 @@ function isAbort(errorValue: unknown): boolean {
                 label="预警级别"
                 hide-label
                 :options="riskFilterOptions"
+                placeholder="全部预警"
               />
               <div v-if="canEvaluateAlerts" class="risk-evaluate-action">
-                <V2Alert
-                  v-if="alertEvaluationMessage"
-                  class="risk-evaluate-feedback"
-                  tone="info"
-                  title="操作结果"
-                >
-                  {{ alertEvaluationMessage }}
-                </V2Alert>
                 <V2Button
                   size="small"
                   variant="ghost"
@@ -765,7 +753,7 @@ function isAbort(errorValue: unknown): boolean {
             {{ alertError }}
           </V2Alert>
           <div class="risk-table-wrap" tabindex="0">
-            <table class="risk-table">
+            <table class="risk-table v2-table--compact">
               <caption class="v2-visually-hidden">
                 预警列表
               </caption>
@@ -899,14 +887,15 @@ function isAbort(errorValue: unknown): boolean {
             <tbody>
               <tr v-for="subject in visibleSubjects" :key="subject.costSubjectId">
                 <td :class="{ 'is-child': subject.level === 2 }">
-                  <button
+                  <V2Button
                     v-if="subject.level <= 1 && hasChildren(subject)"
-                    type="button"
+                    size="small"
+                    variant="ghost"
                     :aria-expanded="expandedSubjects.has(subject.costSubjectId)"
                     @click="toggleSubject(subject)"
                   >
                     {{ expandedSubjects.has(subject.costSubjectId) ? '收起' : '展开' }}
-                  </button>
+                  </V2Button>
                   {{ subject.costSubjectName }}
                 </td>
                 <td>{{ formatAmount(subject.targetCost) }}</td>
@@ -933,7 +922,9 @@ function isAbort(errorValue: unknown): boolean {
             </caption>
             <thead>
               <tr>
-                <th>合同 / 付款记录</th>
+                <th>名称</th>
+                <th>编号</th>
+                <th>业务日期</th>
                 <th>合同金额</th>
                 <th>累计支付 / 付款金额</th>
                 <th>审批中</th>
@@ -949,16 +940,19 @@ function isAbort(errorValue: unknown): boolean {
               >
                 <tr>
                   <td>
-                    <button
+                    <V2Button
                       v-if="contract.paymentRecords.length"
-                      type="button"
+                      size="small"
+                      variant="ghost"
                       :aria-expanded="expandedFinanceContracts.has(contract.contractId)"
                       @click="toggleFinanceContract(contract.contractId)"
                     >
                       {{ expandedFinanceContracts.has(contract.contractId) ? '收起' : '展开' }}
-                    </button>
-                    {{ contract.contractName }}（{{ contract.contractCode }}）
+                    </V2Button>
+                    {{ contract.contractName }}
                   </td>
+                  <th scope="row">{{ contract.contractCode }}</th>
+                  <td>—</td>
                   <td>{{ formatAmount(contract.contractAmount) }}</td>
                   <td>{{ formatAmount(contract.paidAmount) }}</td>
                   <td>{{ formatAmount(contract.approvingAmount) }}</td>
@@ -972,9 +966,9 @@ function isAbort(errorValue: unknown): boolean {
                     : []"
                   :key="payment.payRecordId"
                 >
-                  <td class="is-child">
-                    {{ payment.recordCode || '付款记录' }} · {{ payment.payDate || '日期未定' }}
-                  </td>
+                  <td class="is-child">付款记录</td>
+                  <th scope="row">{{ payment.recordCode || '—' }}</th>
+                  <td>{{ payment.payDate || '日期未定' }}</td>
                   <td>—</td>
                   <td>{{ formatAmount(payment.payAmount) }}</td>
                   <td>—</td>
@@ -1084,23 +1078,6 @@ function isAbort(errorValue: unknown): boolean {
   padding-block-end: var(--v2-space-1);
   scrollbar-width: thin;
 }
-.dashboard-page__roles button {
-  min-height: 2.75rem;
-  padding: 0 var(--v2-space-4);
-  white-space: nowrap;
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-round);
-  font: inherit;
-  cursor: pointer;
-}
-.dashboard-page__roles button.is-active {
-  color: var(--v2-color-surface);
-  background: var(--v2-color-primary);
-  border-color: var(--v2-color-primary);
-  box-shadow: var(--v2-shadow-primary);
-}
 .dashboard-page__panel {
   min-width: 0;
 }
@@ -1120,35 +1097,8 @@ function isAbort(errorValue: unknown): boolean {
   max-width: 100%;
   overflow-x: auto;
 }
-.dashboard-page table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-}
-.dashboard-page th,
-.dashboard-page td {
-  padding: var(--v2-space-3);
-  border-block-end: 1px solid var(--v2-color-border-subtle);
-  text-align: start;
-  white-space: nowrap;
-}
-.dashboard-page th {
-  color: var(--v2-color-text-muted);
-  background: var(--v2-color-surface-subtle);
-}
-.dashboard-page td {
-  color: var(--v2-color-text-secondary);
-}
 .dashboard-page td.is-child {
   padding-inline-start: var(--v2-space-8);
-}
-.dashboard-page td button {
-  min-height: 2rem;
-  margin-inline-end: var(--v2-space-2);
-  color: var(--v2-color-primary);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
 }
 @media (max-width: 48rem) {
   .dashboard-page__panel header {
@@ -1158,17 +1108,10 @@ function isAbort(errorValue: unknown): boolean {
 }
 
 .dashboard-page {
-  gap: 12px;
+  gap: var(--v2-space-3);
 }
 .dashboard-page__roles {
-  min-height: 34px;
   padding: 0;
-}
-.dashboard-page__roles button {
-  min-height: 32px;
-  padding: 0 14px;
-  border-radius: var(--v2-radius-sm);
-  font-size: var(--v2-font-size-12);
 }
 .command-panel {
   min-width: 0;
@@ -1180,12 +1123,12 @@ function isAbort(errorValue: unknown): boolean {
 }
 .command-panel__title,
 .panel-toolbar {
-  min-height: 48px;
-  padding: 0 14px;
+  min-height: var(--v2-space-12);
+  padding: 0 var(--v2-space-4);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--v2-space-3);
   border-bottom: 1px solid var(--v2-color-border-subtle);
   color: var(--v2-color-text-strong);
   font-size: var(--v2-font-size-15);
@@ -1199,10 +1142,12 @@ function isAbort(errorValue: unknown): boolean {
   font-weight: var(--v2-font-weight-regular);
 }
 .health-panel > .command-panel__title {
-  min-height: 55px;
+  min-height: calc(var(--v2-space-7) + var(--v2-space-7));
 }
 .health-content {
-  min-height: 168px;
+  min-height: calc(
+    var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-6)
+  );
   display: grid;
   grid-template-columns: 205px minmax(230px, 1fr) minmax(520px, 1.8fr);
   align-items: center;
@@ -1210,16 +1155,16 @@ function isAbort(errorValue: unknown): boolean {
 .health-score {
   display: grid;
   place-items: center;
-  padding: 12px;
+  padding: var(--v2-space-3);
 }
 .health-score__chart {
   position: relative;
-  width: 112px;
-  height: 112px;
+  width: calc(var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-4));
+  height: calc(var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-4));
 }
 .health-score__chart canvas {
-  width: 112px;
-  height: 112px;
+  width: calc(var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-4));
+  height: calc(var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-4));
 }
 .health-score__value {
   position: absolute;
@@ -1236,26 +1181,26 @@ function isAbort(errorValue: unknown): boolean {
 .health-score__value span {
   grid-column: 1 / -1;
   width: max-content;
-  margin: 5px auto 0;
-  padding: 2px 7px;
+  margin: var(--v2-space-1) auto 0;
+  padding: var(--v2-space-1) var(--v2-space-2);
   border-radius: var(--v2-radius-xs);
   font-size: var(--v2-font-size-11);
   font-weight: var(--v2-font-weight-bold);
 }
 .health-score p {
-  margin: 10px 0 0;
+  margin: var(--v2-space-2) 0 0;
   color: var(--v2-color-text-muted);
   font-size: var(--v2-font-size-11);
   text-align: center;
 }
 .highest-risk {
   min-width: 0;
-  padding: 12px 20px;
+  padding: var(--v2-space-3) var(--v2-space-5);
   border-inline: 1px solid var(--v2-color-border-subtle);
 }
 .highest-risk__tag {
   display: inline-flex;
-  padding: 3px 8px;
+  padding: var(--v2-space-1) var(--v2-space-2);
   color: var(--v2-color-danger-text);
   background: var(--v2-color-danger-soft);
   border-radius: var(--v2-radius-xs);
@@ -1263,37 +1208,18 @@ function isAbort(errorValue: unknown): boolean {
   font-weight: var(--v2-font-weight-bold);
 }
 .highest-risk h2 {
-  margin: 8px 0 4px;
+  margin: var(--v2-space-2) 0 var(--v2-space-1);
   color: var(--v2-color-text-strong);
   font-size: var(--v2-font-size-17);
-  line-height: 24px;
+  line-height: var(--v2-line-height-tight);
   overflow-wrap: anywhere;
 }
 .highest-risk p {
-  min-height: 30px;
+  min-height: var(--v2-control-height-sm);
   margin: 0;
   color: var(--v2-color-text-secondary);
   font-size: var(--v2-font-size-12);
-  line-height: 19px;
-}
-.dashboard-page__outline-link {
-  display: inline-flex;
-  min-height: 36px;
-  align-items: center;
-  padding: 0 16px;
-  background: transparent;
-  color: var(--v2-color-primary);
-  border: 1px solid var(--v2-color-primary);
-  border-radius: var(--v2-radius-sm);
-  font-size: var(--v2-font-size-12);
-  font-family: inherit;
-  text-decoration: none;
-  cursor: pointer;
-}
-.command-panel__title .dashboard-page__outline-link {
-  min-height: 32px;
-  padding-inline: 12px;
-  white-space: nowrap;
+  line-height: var(--v2-line-height-body);
 }
 .health-metrics {
   align-self: stretch;
@@ -1302,7 +1228,7 @@ function isAbort(errorValue: unknown): boolean {
 }
 .health-metric {
   min-width: 0;
-  padding: 28px 16px 16px;
+  padding: var(--v2-space-7) var(--v2-space-4) var(--v2-space-4);
   border-inline-end: 1px solid var(--v2-color-border-subtle);
 }
 .health-metric:last-child {
@@ -1314,7 +1240,7 @@ function isAbort(errorValue: unknown): boolean {
 }
 .health-metric strong {
   display: block;
-  margin: 12px 0 10px;
+  margin: var(--v2-space-3) 0 var(--v2-space-2);
   color: var(--v2-color-text);
   font-size: var(--v2-font-size-21);
   font-variant-numeric: tabular-nums;
@@ -1354,34 +1280,19 @@ function isAbort(errorValue: unknown): boolean {
   display: grid;
   grid-template-columns: minmax(430px, 0.92fr) minmax(550px, 1.18fr);
   align-items: start;
-  gap: 12px;
+  gap: var(--v2-space-3);
 }
 .trend-range {
   display: flex;
-  padding: 2px;
-  background: var(--v2-color-surface-subtle);
-  border-radius: var(--v2-radius-sm);
-}
-.trend-range button {
-  min-height: 28px;
-  padding: 0 8px;
-  color: var(--v2-color-text-muted);
-  background: transparent;
-  border: 0;
-  border-radius: var(--v2-radius-xs);
-  font: inherit;
-  font-size: var(--v2-font-size-11);
-  cursor: pointer;
-}
-.trend-range button.is-active {
-  color: var(--v2-color-text-strong);
-  background: var(--v2-color-surface);
-  box-shadow: var(--v2-shadow-control);
+  gap: var(--v2-space-1);
 }
 .trend-chart,
 .trend-empty {
   width: 100%;
-  height: 180px;
+  height: calc(
+    var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-8) +
+      var(--v2-space-1)
+  );
 }
 .dashboard-activity-list {
   padding: 0;
@@ -1390,17 +1301,17 @@ function isAbort(errorValue: unknown): boolean {
 }
 .dashboard-activity-list li {
   display: flex;
-  gap: 16px;
+  gap: var(--v2-space-4);
   align-items: center;
   justify-content: space-between;
-  min-height: 45px;
-  padding: 8px 14px;
+  min-height: var(--v2-control-height-touch);
+  padding: var(--v2-space-2) var(--v2-space-4);
   border-bottom: 1px solid var(--v2-color-border-subtle);
 }
 .dashboard-activity-list li > div {
   display: grid;
   min-width: 0;
-  gap: 3px;
+  gap: var(--v2-space-1);
 }
 .dashboard-activity-list li > div:last-child {
   flex: 0 0 auto;
@@ -1435,7 +1346,7 @@ function isAbort(errorValue: unknown): boolean {
 .risk-panel__actions {
   display: flex;
   align-items: end;
-  gap: 8px;
+  gap: var(--v2-space-2);
 }
 .risk-panel {
   overflow: visible;
@@ -1444,38 +1355,13 @@ function isAbort(errorValue: unknown): boolean {
   position: relative;
   flex: 0 0 auto;
 }
-.risk-evaluate-feedback {
-  position: absolute;
-  z-index: var(--v2-z-toast);
-  inset-block-end: calc(100% + 8px);
-  inset-inline-end: 0;
-  width: max-content;
-  max-width: min(22rem, 75vw);
-  display: block;
-  padding: 8px 10px;
-  border-radius: var(--v2-radius-md);
-  box-shadow: var(--v2-shadow-panel);
-  white-space: normal;
-}
-.risk-evaluate-feedback::after {
-  position: absolute;
-  inset-block-start: 100%;
-  inset-inline-end: 18px;
-  width: 8px;
-  height: 8px;
-  background: var(--v2-color-primary-soft);
-  border-inline-end: var(--v2-border-width) solid var(--v2-color-primary);
-  border-block-end: var(--v2-border-width) solid var(--v2-color-primary);
-  content: '';
-  transform: translateY(-50%) rotate(45deg);
-}
 .finance-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 .finance-summary-grid article {
   min-width: 0;
-  padding: 14px;
+  padding: var(--v2-space-4);
   border-inline-end: 1px solid var(--v2-color-border-subtle);
   border-block-end: 1px solid var(--v2-color-border-subtle);
 }
@@ -1494,7 +1380,7 @@ function isAbort(errorValue: unknown): boolean {
   font-size: var(--v2-font-size-11);
 }
 .finance-summary-grid strong {
-  margin-top: 7px;
+  margin-top: var(--v2-space-2);
   color: var(--v2-color-text-strong);
   font-size: var(--v2-font-size-15);
   font-variant-numeric: tabular-nums;
@@ -1503,32 +1389,15 @@ function isAbort(errorValue: unknown): boolean {
   overflow: auto;
 }
 .risk-pagination {
-  min-height: 48px;
+  min-height: var(--v2-space-12);
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: var(--v2-space-2);
+  padding: var(--v2-space-2) var(--v2-space-3);
   border-top: 1px solid var(--v2-color-border-subtle);
   color: var(--v2-color-text-muted);
   font-size: var(--v2-font-size-11);
-}
-.dashboard-page .risk-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-11);
-}
-.dashboard-page .risk-table th,
-.dashboard-page .risk-table td {
-  height: 40px;
-  padding: 0 10px;
-  border: 0;
-  border-top: 1px solid var(--v2-color-border-subtle);
-  white-space: nowrap;
-}
-.dashboard-page .risk-table th {
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface-subtle);
 }
 .dashboard-page .risk-table td:nth-child(2) {
   max-width: 220px;
@@ -1549,8 +1418,8 @@ function isAbort(errorValue: unknown): boolean {
 }
 .risk-level {
   display: inline-flex;
-  width: 25px;
-  height: 24px;
+  width: var(--v2-space-6);
+  height: var(--v2-space-6);
   align-items: center;
   justify-content: center;
   border: 1px solid;
@@ -1578,33 +1447,36 @@ function isAbort(errorValue: unknown): boolean {
   border-color: var(--v2-color-border);
 }
 .dashboard-page .empty-row td {
-  height: 180px;
+  height: calc(
+    var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-8) +
+      var(--v2-space-1)
+  );
   color: var(--v2-color-text-muted);
   text-align: center;
 }
 .utility-panel {
-  min-height: 104px;
+  min-height: calc(var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-2));
   display: grid;
   grid-template-columns: 1fr 1fr;
-  padding: 16px 14px;
+  padding: var(--v2-space-4);
 }
 .quick-entry {
-  padding-inline-end: 24px;
+  padding-inline-end: var(--v2-space-6);
   border-inline-end: 1px solid var(--v2-color-border-subtle);
 }
 .recent-entry {
-  padding-inline-start: 28px;
+  padding-inline-start: var(--v2-space-7);
 }
 .quick-entry > strong,
 .recent-entry > strong {
   display: block;
-  margin-bottom: 12px;
+  margin-bottom: var(--v2-space-3);
   font-size: var(--v2-font-size-13);
 }
 .quick-actions {
   display: grid;
   grid-template-columns: repeat(7, minmax(58px, 1fr));
-  gap: 8px;
+  gap: var(--v2-space-2);
 }
 .quick-actions a,
 .recent-entry a {
@@ -1614,13 +1486,13 @@ function isAbort(errorValue: unknown): boolean {
 .quick-actions a {
   display: grid;
   justify-items: center;
-  gap: 7px;
-  padding: 5px;
+  gap: var(--v2-space-2);
+  padding: var(--v2-space-1);
   font-size: var(--v2-font-size-11);
 }
 .quick-actions svg {
-  width: 22px;
-  height: 22px;
+  width: var(--v2-space-5);
+  height: var(--v2-space-5);
 }
 .quick-actions a:hover {
   color: var(--v2-color-primary);
@@ -1629,12 +1501,12 @@ function isAbort(errorValue: unknown): boolean {
   min-width: 0;
   display: grid;
   grid-template-columns: 20px minmax(0, 1fr);
-  gap: 8px;
+  gap: var(--v2-space-2);
   align-items: start;
 }
 .recent-entry svg {
-  width: 18px;
-  height: 18px;
+  width: var(--v2-space-4);
+  height: var(--v2-space-4);
 }
 .recent-entry b,
 .recent-entry small {
@@ -1647,7 +1519,7 @@ function isAbort(errorValue: unknown): boolean {
   font-size: var(--v2-font-size-11);
 }
 .recent-entry small {
-  margin-top: 5px;
+  margin-top: var(--v2-space-1);
   color: var(--v2-color-text-muted);
   font-size: var(--v2-font-size-11);
 }
@@ -1661,7 +1533,7 @@ function isAbort(errorValue: unknown): boolean {
     border-top: 1px solid var(--v2-color-border-subtle);
   }
   .health-metric {
-    padding: 24px 20px;
+    padding: var(--v2-space-6) var(--v2-space-5);
   }
   .command-grid {
     grid-template-columns: 1fr;
@@ -1673,13 +1545,13 @@ function isAbort(errorValue: unknown): boolean {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     overflow: visible;
   }
-  .dashboard-page__roles button {
+  .dashboard-page__role-button {
     width: 100%;
   }
   .command-panel__title {
     align-items: flex-start;
     flex-direction: column;
-    padding-block: 10px;
+    padding-block: var(--v2-space-2);
   }
   .command-panel__title > span {
     margin-inline-start: 0;
@@ -1712,7 +1584,7 @@ function isAbort(errorValue: unknown): boolean {
   .panel-toolbar {
     align-items: flex-start;
     flex-direction: column;
-    padding-block: 10px;
+    padding-block: var(--v2-space-2);
   }
   .risk-panel__actions {
     width: 100%;
@@ -1727,12 +1599,12 @@ function isAbort(errorValue: unknown): boolean {
     grid-template-columns: 1fr;
   }
   .quick-entry {
-    padding: 0 0 18px;
+    padding: 0 0 var(--v2-space-5);
     border-inline-end: 0;
     border-block-end: 1px solid var(--v2-color-border-subtle);
   }
   .recent-entry {
-    padding: 18px 0 0;
+    padding: var(--v2-space-5) 0 0;
   }
 }
 @media (max-width: 25rem) {

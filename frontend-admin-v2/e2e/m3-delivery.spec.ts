@@ -34,7 +34,7 @@ test.describe('M3 live delivery workspace', () => {
     await expect(page.locator('.shell-placeholder')).toHaveCount(0)
     await expect(page.getByRole('main')).toContainText('项目计划与施工履约')
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
 
     await page.goto(`/v2/site/daily-log?projectId=${projectId}#delivery`)
     await expect(page.locator('.shell-placeholder')).toHaveCount(0)
@@ -208,6 +208,90 @@ test.describe('M3 live delivery workspace', () => {
       expect(
         dailyAxe.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? '')),
       ).toEqual([])
+    }
+  })
+
+  test('delivery section headings keep the shared computed typography', async ({ page }) => {
+    await login(page, 'admin')
+
+    for (const [route, selector] of [
+      ['/v2/quality-safety', '.quality-page__record-sections h3'],
+      ['/v2/technical-management', '.technical-page__record-sections h3'],
+      ['/v2/project-closeout', '.closeout-page__record-sections h3'],
+    ]) {
+      await page.goto(`${route}?projectId=${scheduleProjectId}`)
+      const headings = page.locator(selector)
+      await expect(headings.first()).toBeVisible()
+      expect(
+        await headings.evaluateAll((nodes) =>
+          nodes.map((node) => {
+            const style = getComputedStyle(node)
+            return [style.fontSize, style.fontWeight, style.lineHeight]
+          }),
+        ),
+      ).toEqual(Array.from({ length: await headings.count() }, () => ['15px', '600', '18px']))
+    }
+  })
+
+  test('quality, technical and closeout routes remain usable at three viewports', async ({
+    page,
+  }) => {
+    await login(page, 'admin')
+    const routes = [
+      {
+        path: '/v2/quality-safety',
+        root: '.quality-page',
+        heading: '质量安全整改闭环',
+        dialog: '闭环追溯',
+      },
+      {
+        path: '/v2/technical-management',
+        root: '.technical-page',
+        heading: '图纸 RFI 技术闭环',
+        dialog: '图纸闭环追溯',
+      },
+      {
+        path: '/v2/project-closeout',
+        root: '.closeout-page',
+        heading: '竣工收尾闭环',
+        dialog: '收尾追溯',
+      },
+    ]
+
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 1024, height: 768 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport)
+      for (const route of routes) {
+        await page.goto(`${route.path}?projectId=${scheduleProjectId}`)
+        await expect(page.locator(route.root)).toBeVisible()
+        await expect(page.getByRole('heading', { level: 1, name: route.heading })).toBeAttached()
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+        ).toBe(true)
+        expect(
+          await page.locator('#shell-main-content').evaluate((main) => {
+            const canFit = main.scrollHeight <= main.clientHeight
+            if (!canFit) main.scrollTop = Math.min(240, main.scrollHeight - main.clientHeight)
+            return canFit || main.scrollTop > 0
+          }),
+        ).toBe(true)
+        const axe = await new AxeBuilder({ page }).include(route.root).analyze()
+        expect(
+          axe.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? '')),
+        ).toEqual([])
+      }
+    }
+
+    await page.setViewportSize({ width: 1440, height: 900 })
+    for (const route of routes) {
+      await page.goto(`${route.path}?projectId=${scheduleProjectId}`)
+      await page.getByRole('button', { name: '追溯', exact: true }).first().click()
+      await expect(page.getByRole('dialog', { name: route.dialog })).toBeVisible()
+      await page.keyboard.press('Escape')
+      await expect(page.getByRole('dialog', { name: route.dialog })).toHaveCount(0)
     }
   })
 

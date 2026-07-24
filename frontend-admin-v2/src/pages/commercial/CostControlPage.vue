@@ -16,18 +16,23 @@ import {
   V2GlassButton,
   V2Input,
   V2PageState,
+  V2Select,
+  useToastMessage,
 } from '@/components'
 import {
   closeCostCorrective,
   confirmCostForecast,
   createCostCorrective,
   createCostForecast,
+  loadCostSubjectOptions,
   loadCostControl,
   loadCostForecastTrace,
   submitCostCorrective,
   updateCostCorrective,
   updateCostForecast,
 } from '@/services/commercial'
+import type { CostSubjectOption } from '@/services/commercial'
+import { loadProjectUsers } from '@/services/projects'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 const route = useRoute()
@@ -35,10 +40,12 @@ const session = useSessionStore()
 const projectId = ref('')
 const overview = ref<CostControlOverview | null>(null)
 const trace = ref<CostControlOverview | null>(null)
+const costSubjects = ref<CostSubjectOption[]>([])
+const userOptions = ref<Array<{ value: string; label: string }>>([])
 const loading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const forecastOpen = ref(false)
 const correctiveOpen = ref(false)
 const closeOpen = ref(false)
@@ -82,7 +89,34 @@ const canSubmit = computed(() => session.hasPermission('cost:corrective:submit')
 const latest = computed(() => overview.value?.latestForecast ?? {})
 const actions = computed(() => overview.value?.correctiveActions ?? [])
 const inputItems = computed(() => overview.value?.forecastInputItems ?? [])
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: '草稿',
+  SUBMITTED: '已提交',
+  APPROVING: '审批中',
+  APPROVED: '已批准',
+  REJECTED: '已驳回',
+  PENDING: '待执行',
+  OPEN: '执行中',
+  ACTION_REQUIRED: '需要纠偏',
+  CLOSED: '已关闭',
+  CONFIRMED: '已确认',
+}
 const text = (row: CostControlAmountRow, key: string) => String(row[key] ?? '')
+const statusLabel = (value: string) => STATUS_LABELS[value] ?? '未知状态'
+const costSubjectLabel = (id: string, index: number) => {
+  const subject = costSubjects.value.find((item) => item.id === id)
+  return subject ? `${subject.subjectCode} · ${subject.subjectName}` : `成本科目 ${index + 1}`
+}
+const traceRow = (key: string): CostControlAmountRow => {
+  const value = (trace.value as unknown as Record<string, unknown> | null)?.[key]
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as CostControlAmountRow)
+    : {}
+}
+const traceRows = (key: string): CostControlAmountRow[] => {
+  const value = (trace.value as unknown as Record<string, unknown> | null)?.[key]
+  return Array.isArray(value) ? (value as CostControlAmountRow[]) : []
+}
 const errorText = (e: unknown, f: string) =>
   isApiClientError(e) ? e.message : e instanceof Error ? e.message : f
 const needsAuthoritativeReload = (e: unknown) =>
@@ -106,8 +140,30 @@ async function load() {
       overview.value = null
       return
     }
-    const value = await loadCostControl(projectId.value, current.signal)
-    if (token === generation) overview.value = value
+    const [value, subjects, users] = await Promise.all([
+      loadCostControl(projectId.value, current.signal),
+      loadCostSubjectOptions(current.signal),
+      loadProjectUsers(current.signal).catch(() => null),
+    ])
+    if (token === generation) {
+      overview.value = value
+      costSubjects.value = subjects
+      userOptions.value =
+        users?.records
+          .filter((user) => ['ACTIVE', 'ENABLE'].includes(user.status))
+          .map((user) => ({
+            value: user.id,
+            label: user.realName ? `${user.realName}（${user.username}）` : user.username,
+          })) ??
+        (session.userInfo?.userId
+          ? [
+              {
+                value: session.userInfo.userId,
+                label: session.userInfo.username || '当前用户',
+              },
+            ]
+          : [])
+    }
   } catch (e) {
     if (!current.signal.aborted && token === generation) {
       overview.value = null
@@ -296,9 +352,6 @@ onBeforeUnmount(() => {
       ><V2Alert v-if="errorMessage" tone="danger" title="动态利润操作未完成">{{
         errorMessage
       }}</V2Alert
-      ><V2Alert v-if="successMessage" tone="success" title="动态利润操作完成">{{
-        successMessage
-      }}</V2Alert
       ><V2Card title="动态利润控制" :heading-level="1"
         ><template #actions
           ><V2Button variant="secondary" :loading="loading" @click="load">刷新</V2Button></template
@@ -319,7 +372,7 @@ onBeforeUnmount(() => {
             <dt>成本偏差</dt>
             <dd>{{ text(latest, 'cost_variance_amount') || '—' }}</dd>
             <dt>状态</dt>
-            <dd>{{ text(latest, 'status') || '—' }}</dd>
+            <dd>{{ statusLabel(text(latest, 'status')) }}</dd>
           </dl>
           <template #footer
             ><div class="actions">
@@ -371,7 +424,7 @@ onBeforeUnmount(() => {
                 <tr v-for="row in actions" :key="text(row, 'id')">
                   <td>{{ text(row, 'action_title') }}</td>
                   <td>{{ text(row, 'expected_saving_amount') }}</td>
-                  <td>{{ text(row, 'status') }}</td>
+                  <td>{{ statusLabel(text(row, 'status')) }}</td>
                   <td>
                     <div class="actions">
                       <V2Button
@@ -399,16 +452,66 @@ onBeforeUnmount(() => {
         ><V2Dialog
           :open="!!trace"
           title="预测追溯"
-          panel-class="v2-dialog-standard v2-detail-dialog"
+          panel-class="v2-detail-dialog"
           :close-on-backdrop="false"
           @close="trace = null"
           ><section class="v2-detail-dialog__section">
-            <p class="v2-detail-dialog__message">目标版本、预测明细、纠偏措施与审批轨迹已加载。</p>
             <dl class="v2-detail-dialog__facts">
               <dt>预测编号</dt>
-              <dd>{{ text(trace?.forecast || {}, 'forecast_code') }}</dd>
+              <dd>{{ text(traceRow('forecast'), 'forecast_code') || '—' }}</dd>
+              <dt>预测名称</dt>
+              <dd>{{ text(traceRow('forecast'), 'forecast_name') || '—' }}</dd>
+              <dt>预测日期</dt>
+              <dd>{{ text(traceRow('forecast'), 'forecast_date') || '—' }}</dd>
               <dt>预测利润</dt>
-              <dd>{{ text(trace?.forecast || {}, 'forecast_profit_amount') }}</dd>
+              <dd>{{ text(traceRow('forecast'), 'forecast_profit_amount') || '—' }}</dd>
+              <dt>状态</dt>
+              <dd>{{ statusLabel(text(traceRow('forecast'), 'status')) }}</dd>
+            </dl>
+            <h3>目标版本</h3>
+            <dl class="v2-detail-dialog__facts">
+              <dt>版本</dt>
+              <dd>
+                {{ text(traceRow('target'), 'version_no') || '—' }} /
+                {{ text(traceRow('target'), 'version_name') || '—' }}
+              </dd>
+              <dt>目标成本</dt>
+              <dd>{{ text(traceRow('target'), 'total_target_amount') || '—' }}</dd>
+            </dl>
+            <h3>预测明细</h3>
+            <V2PageState
+              v-if="!traceRows('forecastItems').length"
+              title="暂无预测明细"
+              description="当前预测没有科目明细。"
+            />
+            <div
+              v-else
+              class="cost-page__table-wrap"
+              role="region"
+              aria-label="预测明细"
+              tabindex="0"
+            >
+              <table class="cost-page__table">
+                <thead>
+                  <tr>
+                    <th>成本科目</th>
+                    <th>预计剩余成本</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(item, index) in traceRows('forecastItems')" :key="text(item, 'id')">
+                    <td>{{ costSubjectLabel(text(item, 'cost_subject_id'), index) }}</td>
+                    <td>{{ text(item, 'estimated_remaining_amount') || '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <h3>纠偏与审批</h3>
+            <dl class="v2-detail-dialog__facts">
+              <dt>纠偏措施</dt>
+              <dd>{{ traceRows('correctiveActions').length }} 项</dd>
+              <dt>审批记录</dt>
+              <dd>{{ traceRows('approvalInstances').length }} 条</dd>
             </dl>
           </section></V2Dialog
         ></template
@@ -421,7 +524,6 @@ onBeforeUnmount(() => {
     <V2Dialog
       :open="forecastOpen"
       :title="editingForecastId ? '编辑完工预测' : '新建完工预测'"
-      panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="forecastOpen = false"
@@ -431,8 +533,8 @@ onBeforeUnmount(() => {
           label="预测名称"
           required
         /><V2Input v-model="forecast.forecastDate" label="预测日期" type="date" required />
-        <div v-for="item in forecast.items" :key="item.costSubjectId" class="item">
-          <span>成本科目 {{ item.costSubjectId }}</span
+        <div v-for="(item, index) in forecast.items" :key="item.costSubjectId" class="item">
+          <span>{{ costSubjectLabel(item.costSubjectId, index) }}</span
           ><V2Input v-model="item.estimatedRemainingAmount" label="预计剩余成本" required />
         </div>
       </form>
@@ -448,7 +550,6 @@ onBeforeUnmount(() => {
     <V2Dialog
       :open="correctiveOpen"
       :title="editingCorrectiveId ? '编辑纠偏措施' : '新建纠偏措施'"
-      panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="correctiveOpen = false"
@@ -465,12 +566,12 @@ onBeforeUnmount(() => {
           v-model="corrective.expectedSavingAmount"
           label="预计节约金额"
           required
-        /><V2Input v-model="corrective.responsibleUserId" label="负责人ID" required /><V2Input
-          v-model="corrective.dueDate"
-          label="截止日期"
-          type="date"
+        /><V2Select
+          v-model="corrective.responsibleUserId"
+          label="负责人"
+          :options="userOptions"
           required
-        />
+        /><V2Input v-model="corrective.dueDate" label="截止日期" type="date" required />
       </form>
       <template #footer>
         <V2GlassButton
@@ -486,7 +587,6 @@ onBeforeUnmount(() => {
     <V2Dialog
       :open="closeOpen"
       title="关闭纠偏措施"
-      panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="actionBusy"
       @close="closeOpen = false"
@@ -533,27 +633,10 @@ dd {
   overflow-x: auto;
 }
 .cost-page__table {
-  width: 100%;
   min-width: 40rem;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-  line-height: var(--v2-line-height-ui);
-}
-.cost-page__table th,
-.cost-page__table td {
-  padding: var(--v2-space-3);
-  border-bottom: 1px solid var(--v2-color-border-subtle);
-  text-align: left;
-  vertical-align: middle;
-}
-.cost-page__table th {
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface-subtle);
-  white-space: nowrap;
 }
 .cost-page__table td:nth-child(2) {
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 .cost-page__table .actions {
   align-items: center;

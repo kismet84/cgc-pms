@@ -8,6 +8,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import VariationPageView from '@/pages/commercial/VariationPage.vue'
+import { dismissToast, toastItems } from '@/components/toast'
 import {
   createVariation,
   deleteVariation,
@@ -121,6 +122,7 @@ async function chooseFile(wrapper: Awaited<ReturnType<typeof mountPage>>['wrappe
 }
 
 beforeEach(() => {
+  toastItems.slice().forEach((toast) => dismissToast(toast.id))
   vi.mocked(loadVariationPage).mockReset().mockResolvedValue(page)
   vi.mocked(loadVariation).mockReset().mockResolvedValue(baseRecord)
   vi.mocked(loadVariationTrace).mockReset().mockResolvedValue({ variation: baseRecord })
@@ -223,7 +225,7 @@ describe('M4 variation page', () => {
       '3',
     )
     expect(loadVariation).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('变更明细已保存并刷新')
+    expect(toastItems.at(-1)?.message).toContain('变更明细已保存并刷新')
     expect(wrapper.text()).toContain('4')
   })
 
@@ -345,7 +347,7 @@ describe('M4 variation page', () => {
       }),
       '3',
     )
-    expect(wrapper.text()).toContain('合同金额以系统结果为准')
+    expect(toastItems.at(-1)?.message).toContain('合同金额以系统结果为准')
   })
 
   it('fails closed on submit conflict and keeps authoritative state', async () => {

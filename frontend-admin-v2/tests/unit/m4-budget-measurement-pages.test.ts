@@ -9,6 +9,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import BudgetPageView from '@/pages/commercial/BudgetPage.vue'
 import MeasurementPageView from '@/pages/commercial/ProductionMeasurementPage.vue'
+import { dismissToast, toastItems } from '@/components/toast'
 import * as commercial from '@/services/commercial'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -18,6 +19,7 @@ vi.mock('@/services/commercial', () => ({
   loadBudget: vi.fn(),
   loadBudgetAvailability: vi.fn(),
   loadBudgetPage: vi.fn(),
+  loadCostSubjectOptions: vi.fn(),
   loadContractPage: vi.fn(),
   loadMeasurementPeriods: vi.fn(),
   loadMeasurementSettlementTrace: vi.fn(),
@@ -112,6 +114,10 @@ function button(wrapper: Awaited<ReturnType<typeof mountPage>>['wrapper'], label
   return wrapper.findAll('button').find((item) => item.text().includes(label))
 }
 beforeEach(() => {
+  toastItems.slice().forEach((toast) => dismissToast(toast.id))
+  vi.mocked(commercial.loadCostSubjectOptions)
+    .mockReset()
+    .mockResolvedValue([{ id: 'S1', subjectCode: '6001', subjectName: '材料费', status: 'ACTIVE' }])
   vi.mocked(commercial.loadProjectContextOptions)
     .mockReset()
     .mockResolvedValue([
@@ -494,7 +500,7 @@ describe('M4 budget and measurement pages', () => {
     expect(commercial.loadBudgetAvailability).toHaveBeenCalledTimes(2)
     expect(page.wrapper.text()).toContain('7.78')
     expect(page.wrapper.text()).not.toContain('8.89')
-    expect(page.wrapper.text()).toContain('预算明细已保存')
+    expect(toastItems.at(-1)?.message).toContain('预算明细已保存')
   })
   it('retains edited lines on 422 without a success notice or authority overwrite', async () => {
     vi.mocked(commercial.saveBudgetLines).mockRejectedValueOnce(apiError('明细校验失败', 422))
@@ -514,7 +520,7 @@ describe('M4 budget and measurement pages', () => {
     )
     expect(page.wrapper.get('input[aria-label="预算金额"]').element.value).toBe('77.77')
     expect(page.wrapper.text()).toContain('明细校验失败')
-    expect(page.wrapper.text()).not.toContain('预算明细已保存')
+    expect(toastItems.some((toast) => toast.message.includes('预算明细已保存'))).toBe(false)
     expect(commercial.loadBudgetPage).toHaveBeenCalledTimes(1)
     expect(commercial.loadBudgetAvailability).toHaveBeenCalledTimes(1)
   })

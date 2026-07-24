@@ -13,6 +13,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
 import {
   createBidCost,
@@ -57,7 +58,7 @@ const loading = ref(false)
 const detailLoading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const panelErrorMessage = ref('')
 const bidProjectNameError = ref('')
 const selected = ref<BidCostRecord | null>(null)
@@ -363,16 +364,6 @@ onBeforeUnmount(() => {
       >
         {{ errorMessage }}
       </V2Alert>
-      <V2Alert
-        v-if="successMessage"
-        tone="success"
-        title="操作成功"
-        dismissible
-        @dismiss="successMessage = ''"
-      >
-        {{ successMessage }}
-      </V2Alert>
-
       <V2Card title="投标成本" :heading-level="1">
         <template #actions>
           <V2Button v-if="canAdd" @click="openCreate">新建投标成本</V2Button>
@@ -380,15 +371,19 @@ onBeforeUnmount(() => {
         <div class="bid-cost-page__filters">
           <V2Input
             v-model="filter.keyword"
+            type="search"
             label="关键词"
-            placeholder="投标项目名称"
+            hide-label
+            placeholder="输入投标项目名称"
             @keyup.enter="query"
           />
           <V2Select
             :model-value="filter.bidStatus"
             label="状态"
+            hide-label
             :options="STATUS_OPTIONS"
             allow-empty
+            placeholder="全部状态"
             @update:model-value="changeStatus"
           />
           <V2Button :loading="loading" @click="query">查询</V2Button>
@@ -663,7 +658,7 @@ onBeforeUnmount(() => {
 }
 
 .bid-cost-page__native-field textarea {
-  min-height: 6rem;
+  min-height: var(--v2-control-height-textarea);
   resize: vertical;
 }
 

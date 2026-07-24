@@ -90,6 +90,14 @@ async function install(
   await page.route('**/api/project-context/options', (route) =>
     fulfill(route, [{ id: 'P1', projectName: '项目一', status: 'ACTIVE' }]),
   )
+  await page.route('**/api/cost-subjects**', (route) =>
+    fulfill(route, [
+      { id: 'S1', subjectCode: 'COST-001', subjectName: '直接成本', status: 'ENABLE' },
+    ]),
+  )
+  await page.route('**/api/system/users**', (route) =>
+    fulfill(route, { records: [], total: 0, pageNo: 1, pageSize: 200 }),
+  )
   await page.route('**/api/cost-ledger**', (route) => {
     requests.push(route.request().url())
     const url = new URL(route.request().url())
