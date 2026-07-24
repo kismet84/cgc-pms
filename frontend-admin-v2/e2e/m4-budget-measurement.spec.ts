@@ -73,6 +73,11 @@ async function install(page: Page, writes: string[], identity = business, traffi
       { id: 'P2', projectName: '项目二', status: 'ACTIVE' },
     ]),
   )
+  await page.route('**/api/cost-subjects**', (route) =>
+    fulfill(route, [
+      { id: 'S1', subjectCode: 'COST-001', subjectName: '直接成本', status: 'ENABLE' },
+    ]),
+  )
   await page.route('**/api/contracts**', (route) => {
     const projectId = new URL(route.request().url()).searchParams.get('projectId') ?? 'P1'
     return fulfill(route, {
@@ -293,12 +298,13 @@ test.describe('M4 budget and measurement routes', () => {
     row = page.getByRole('row').filter({ hasText: 'E2E编辑预算' })
     await row.getByRole('button', { name: '详情' }).click()
     await page.getByRole('button', { name: '添加明细' }).click()
-    await page.getByLabel('成本科目ID').fill('SUBJECT-E2E')
+    await page.getByRole('button', { name: '成本科目：请选择' }).click()
+    await page.getByRole('option', { name: 'COST-001 · 直接成本' }).click()
     await page.getByLabel('预算金额').fill('100.00')
     await page.getByRole('button', { name: '保存明细' }).click()
     await expect(page.getByText('预算明细已保存')).toBeVisible()
     await expect(page.getByRole('dialog')).toContainText('96.67')
-    await page.getByRole('button', { name: '关闭' }).click()
+    await page.getByRole('dialog').getByRole('button', { name: '关闭对话框' }).click()
 
     row = page.getByRole('row').filter({ hasText: 'E2E编辑预算' })
     await row.getByRole('button', { name: '删除' }).click()

@@ -45,21 +45,6 @@ describe('V2 eight-domain navigation contract', () => {
     ).toMatchObject([{ path: '/dashboard', label: '驾驶舱' }])
     expect(findWorkspace('/project/42/overview')?.workspace.label).toBe('项目管理')
     expect(findWorkspace('/project-schedule/11')?.workspace.label).toBe('计划与现场')
-    for (const path of ['/quality-safety', '/technical-management', '/project-closeout']) {
-      expect(
-        findWorkspace(path)?.workspace.tabs.find((tab) => tab.path === path)?.workspaceContext,
-      ).toEqual({ project: true, period: false })
-    }
-    expect(
-      findWorkspace('/project-closeout')?.workspace.tabs.find(
-        (tab) => tab.path === '/project-closeout',
-      )?.workspaceContext,
-    ).toEqual({ project: true, period: false })
-    expect(
-      findWorkspace('/variation/order')?.workspace.tabs.find(
-        (tab) => tab.path === '/variation/order',
-      )?.workspaceContext,
-    ).toEqual({ project: true, period: true })
     expect(
       ['/contract/ledger', '/variation/order', '/bid-cost'].map((path) => ({
         path,
@@ -71,30 +56,6 @@ describe('V2 eight-domain navigation contract', () => {
       { path: '/bid-cost', label: '投标成本' },
     ])
     expect(findWorkspace('/contract/C-100/edit')?.workspace.label).toBe('合同与变更')
-    expect(
-      findWorkspace('/contract/ledger')?.workspace.tabs.find(
-        (tab) => tab.path === '/contract/ledger',
-      )?.workspaceContext,
-    ).toEqual({ project: true, period: true })
-    expect(
-      findWorkspace('/bid-cost')?.workspace.tabs.find((tab) => tab.path === '/bid-cost')
-        ?.workspaceContext,
-    ).toEqual({ project: true, period: true })
     expect(findWorkspace('/cost-target/81/edit')?.workspace.label).toBe('投标与成本目标')
-    expect(
-      findWorkspace('/cost-target/index')?.workspace.tabs.find(
-        (tab) => tab.path === '/cost-target/index',
-      )?.workspaceContext,
-    ).toEqual({ project: true, period: false })
-    for (const path of ['/cost/ledger', '/cost/summary', '/cost/control']) {
-      expect(
-        findWorkspace(path)?.workspace.tabs.find((tab) => tab.path === path)?.workspaceContext,
-      ).toEqual({ project: true, period: true })
-    }
-    for (const path of ['/budget', '/production-measurement']) {
-      expect(
-        findWorkspace(path)?.workspace.tabs.find((tab) => tab.path === path)?.workspaceContext,
-      ).toEqual({ project: true, period: true })
-    }
   })
 })

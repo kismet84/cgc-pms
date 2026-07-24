@@ -1,4 +1,4 @@
-import { reactive } from 'vue'
+import { reactive, ref, watch, type Ref } from 'vue'
 
 export type V2ToastType = 'success' | 'info' | 'warn' | 'error'
 
@@ -30,4 +30,18 @@ export function showToast(type: V2ToastType, title: string, message: string): nu
     setTimeout(() => dismissToast(id), V2_TOAST_DURATION_MS),
   )
   return id
+}
+
+export function useToastMessage(type: V2ToastType = 'success', title = '操作成功'): Ref<string> {
+  const message = ref('')
+  watch(
+    message,
+    (value) => {
+      if (!value) return
+      showToast(type, title, value)
+      message.value = ''
+    },
+    { flush: 'sync' },
+  )
+  return message
 }

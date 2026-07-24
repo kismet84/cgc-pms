@@ -103,8 +103,12 @@ function readErrorCode(error: unknown): string | null {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(22rem, 0.85fr);
   align-items: center;
-  gap: clamp(var(--v2-space-8), 7vw, 7rem);
-  padding: clamp(var(--v2-space-6), 6vw, 6rem);
+  gap: clamp(
+    var(--v2-space-8),
+    7vw,
+    calc(var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-4))
+  );
+  padding: clamp(var(--v2-space-6), 6vw, calc(var(--v2-space-12) + var(--v2-space-12)));
   background:
     linear-gradient(120deg, var(--v2-color-primary-soft), transparent 52%), var(--v2-color-canvas);
 }
@@ -124,7 +128,7 @@ function readErrorCode(error: unknown): string | null {
 .auth-intro h1 {
   max-width: 12em;
   color: var(--v2-color-text-strong);
-  font-size: clamp(var(--v2-font-size-28), 4vw, 3rem);
+  font-size: clamp(var(--v2-font-size-28), 4vw, var(--v2-font-size-42));
   line-height: var(--v2-line-height-tight);
 }
 

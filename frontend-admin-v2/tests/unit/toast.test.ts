@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { showToast, V2ToastHost } from '@/components'
+import { showToast, useToastMessage, V2ToastHost } from '@/components'
 
 afterEach(() => {
   vi.runOnlyPendingTimers()
@@ -36,6 +36,19 @@ describe('V2 toast', () => {
     await nextTick()
     expect(wrapper.findAll('.v2-toast')).toHaveLength(0)
 
+    wrapper.unmount()
+  })
+
+  it('bridges existing message refs into the shared toast queue', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(V2ToastHost, { attachTo: document.body })
+    const message = useToastMessage('success', '操作成功')
+
+    message.value = '数据已保存'
+    await nextTick()
+
+    expect(message.value).toBe('')
+    expect(wrapper.get('.v2-toast').text()).toContain('数据已保存')
     wrapper.unmount()
   })
 })

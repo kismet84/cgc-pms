@@ -5,10 +5,6 @@ export interface NavigationAccess {
 export interface WorkspaceTab extends NavigationAccess {
   path: string
   label: string
-  workspaceContext?: {
-    project: boolean
-    period: boolean
-  }
 }
 
 export interface NavigationWorkspace {
@@ -41,7 +37,6 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/dashboard',
             label: '驾驶舱',
             permission: 'dashboard:view',
-            workspaceContext: { project: true, period: true },
           },
         ],
       },
@@ -54,22 +49,18 @@ export const navigationDomains: NavigationDomain[] = [
           {
             path: '/approval/todo',
             label: '待我处理',
-            workspaceContext: { project: false, period: true },
           },
           {
             path: '/approval/done',
             label: '我已处理',
-            workspaceContext: { project: false, period: true },
           },
           {
             path: '/approval/cc',
             label: '抄送我的',
-            workspaceContext: { project: false, period: true },
           },
           {
             path: '/approval/mine',
             label: '我发起',
-            workspaceContext: { project: false, period: true },
           },
         ],
       },
@@ -96,7 +87,6 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/project/list',
             label: '项目列表',
             permission: 'project:query',
-            workspaceContext: { project: true, period: false },
           },
         ],
       },
@@ -110,13 +100,11 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/project-schedule',
             label: '项目计划',
             permission: 'schedule:query',
-            workspaceContext: { project: true, period: false },
           },
           {
             path: '/site/daily-log',
             label: '现场日报',
             permission: 'site:daily:query',
-            workspaceContext: { project: true, period: true },
           },
         ],
       },
@@ -129,13 +117,11 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/quality-safety',
             label: '质量安全整改',
             permission: 'quality:safety:query',
-            workspaceContext: { project: true, period: false },
           },
           {
             path: '/technical-management',
             label: '图纸 RFI 技术闭环',
             permission: 'technical:query',
-            workspaceContext: { project: true, period: false },
           },
         ],
       },
@@ -148,7 +134,6 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/project-closeout',
             label: '竣工收尾',
             permission: 'closeout:query',
-            workspaceContext: { project: true, period: false },
           },
         ],
       },
@@ -169,13 +154,11 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/contract/ledger',
             label: '合同台账',
             permission: 'contract:query',
-            workspaceContext: { project: true, period: true },
           },
           {
             path: '/variation/order',
             label: '签证变更',
             permission: 'variation:order:query',
-            workspaceContext: { project: true, period: true },
           },
         ],
       },
@@ -189,13 +172,11 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/bid-cost',
             label: '投标成本',
             permission: 'bid:query',
-            workspaceContext: { project: true, period: true },
           },
           {
             path: '/cost-target/index',
             label: '成本目标',
             permission: 'cost:target:query',
-            workspaceContext: { project: true, period: false },
           },
         ],
       },
@@ -209,19 +190,16 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/cost/ledger',
             label: '成本台账',
             permission: 'cost:ledger:query',
-            workspaceContext: { project: true, period: true },
           },
           {
             path: '/cost/summary',
             label: '成本核对',
             permission: 'cost:summary:view',
-            workspaceContext: { project: true, period: true },
           },
           {
             path: '/cost/control',
             label: '动态利润控制',
             permission: 'cost:control:query',
-            workspaceContext: { project: true, period: true },
           },
         ],
       },
@@ -234,13 +212,11 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/budget',
             label: '项目预算',
             permission: 'budget:query',
-            workspaceContext: { project: true, period: true },
           },
           {
             path: '/production-measurement',
             label: '产值计量',
             permission: 'measurement:query',
-            workspaceContext: { project: true, period: true },
           },
         ],
       },

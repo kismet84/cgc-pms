@@ -85,21 +85,8 @@ function set(key: keyof ProjectUpsertCommand, value: string) {
   color: var(--v2-color-text-secondary);
 }
 .project-form input {
-  min-height: 2.5rem;
+  min-height: var(--v2-control-height-md);
   padding: 0 var(--v2-space-3);
-  color: var(--v2-color-text);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
-}
-.project-form--dialog input {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-  border-radius: var(--v2-radius-sm);
-}
-.project-form--dialog :deep(.v2-field__control) {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
 }
 @media (max-width: 64rem) {
   .project-form {

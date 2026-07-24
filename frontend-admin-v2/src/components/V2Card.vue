@@ -19,17 +19,23 @@ const props = withDefaults(
 
 <template>
   <section class="v2-card" :class="{ 'v2-card--interactive': interactive }">
-    <header v-if="title || subtitle || $slots.actions" class="v2-card__header">
-      <div>
-        <component
-          :is="`h${props.headingLevel}`"
-          v-if="title"
-          :id="titleId"
-          class="v2-card__title"
-          :class="{ 'v2-card__title--page': props.headingLevel === 1 }"
-        >
-          {{ title }}
-        </component>
+    <header
+      v-if="title || subtitle || $slots.actions || $slots['title-extra']"
+      class="v2-card__header"
+    >
+      <div v-if="title || subtitle || $slots['title-extra']" class="v2-card__heading">
+        <div class="v2-card__title-row">
+          <component
+            :is="`h${props.headingLevel}`"
+            v-if="title"
+            :id="titleId"
+            class="v2-card__title"
+            :class="{ 'v2-card__title--page': props.headingLevel === 1 }"
+          >
+            {{ title }}
+          </component>
+          <slot name="title-extra"></slot>
+        </div>
         <p v-if="subtitle" class="v2-card__subtitle">{{ subtitle }}</p>
       </div>
       <slot name="actions"></slot>

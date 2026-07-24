@@ -114,10 +114,7 @@ describe('V2 application-shell routes', () => {
     expect(String(contractDetail?.component)).not.toContain('ShellPlaceholderPage')
     expect(contractEdit?.meta?.permission).toBe('contract:edit')
     expect(String(contractEdit?.component)).not.toContain('ShellPlaceholderPage')
-    expect(costTargetList?.meta).toMatchObject({
-      permission: 'cost:target:query',
-      workspaceContext: { project: true, period: false },
-    })
+    expect(costTargetList?.meta?.permission).toBe('cost:target:query')
     expect(String(costTargetList?.component)).not.toContain('ShellPlaceholderPage')
     expect(costTargetRoot?.redirect).toBeTypeOf('function')
     expect(costTargetCreate?.meta?.permission).toBe('cost:target:add')
@@ -126,38 +123,19 @@ describe('V2 application-shell routes', () => {
     expect(String(costTargetEdit?.component)).not.toContain('ShellPlaceholderPage')
     expect(costRoot?.redirect).toBeTypeOf('function')
     for (const route of [costLedger, costSummary, costControl]) {
-      expect(route?.meta?.workspaceContext).toEqual({ project: true, period: true })
       expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
     }
     for (const route of [budget, measurement]) {
-      expect(route?.meta?.workspaceContext).toEqual({ project: true, period: true })
       expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
     }
     expect(quality?.meta?.permission).toBe('quality:safety:query')
-    expect(quality?.meta?.workspaceContext).toEqual({
-      project: true,
-      period: false,
-    })
     expect(String(quality?.component)).not.toContain('ShellPlaceholderPage')
     expect(technical?.meta?.permission).toBe('technical:query')
-    expect(technical?.meta?.workspaceContext).toEqual({
-      project: true,
-      period: false,
-    })
     expect(String(technical?.component)).not.toContain('ShellPlaceholderPage')
     expect(closeout?.meta?.permission).toBe('closeout:query')
-    expect(closeout?.meta?.workspaceContext).toEqual({
-      project: true,
-      period: false,
-    })
     expect(String(closeout?.component)).not.toContain('ShellPlaceholderPage')
-    expect(scheduleDetail?.meta).toMatchObject({
-      permission: 'schedule:query',
-      workspaceContext: { project: true, period: false },
-    })
+    expect(scheduleDetail?.meta?.permission).toBe('schedule:query')
     expect(String(scheduleDetail?.component)).not.toContain('ShellPlaceholderPage')
-    expect(dashboard?.meta?.workspaceContext).toEqual({ project: true, period: true })
-    expect(project?.meta?.workspaceContext).toEqual({ project: true, period: false })
     const approval = shell?.children?.find((route) => route.path === '/approval/todo')
     const approvalRoot = shell?.children?.find((route) => route.path === '/approval')
     const approvalDetail = shell?.children?.find(
@@ -168,10 +146,7 @@ describe('V2 application-shell routes', () => {
     )
     const alert = shell?.children?.find((route) => route.path === '/alert')
     const reports = shell?.children?.find((route) => route.path === '/dashboard/reports')
-    expect(approval?.meta).toMatchObject({
-      workflowTab: 'todo',
-      workspaceContext: { project: false, period: true },
-    })
+    expect(approval?.meta?.workflowTab).toBe('todo')
     expect(approval?.meta?.permission).toBeUndefined()
     expect(approvalRoot?.redirect).toBeTypeOf('function')
     expect(approvalDetail?.meta?.permission).toBeUndefined()
@@ -179,13 +154,6 @@ describe('V2 application-shell routes', () => {
     expect(alert?.meta?.permission).toBe('alert:view')
     expect(alert?.redirect).toBeTypeOf('function')
     expect(String(reports?.component)).not.toContain('ShellPlaceholderPage')
-    expect(reports?.meta?.workspaceContext).toBeUndefined()
-    expect(approvalDetail?.meta?.workspaceContext).toBeUndefined()
-
-    const projectOverview = shell?.children?.find(
-      (route) => route.path === '/project/:projectId/overview',
-    )
-    expect(projectOverview?.meta?.workspaceContext).toBeUndefined()
   })
 
   it('keeps legacy approval entry and detail deep links compatible', async () => {

@@ -19,6 +19,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
 import {
   createBudget,
@@ -26,11 +27,13 @@ import {
   loadBudget,
   loadBudgetAvailability,
   loadBudgetPage,
+  loadCostSubjectOptions,
   loadProjectContextOptions,
   saveBudgetLines,
   submitBudget,
   updateBudget,
 } from '@/services/commercial'
+import type { CostSubjectOption } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
@@ -41,6 +44,7 @@ const filter = reactive<BudgetQuery>({ pageNo: 1, pageSize: 10 })
 const records = ref<ProjectBudgetRecord[]>([])
 const total = ref(0)
 const projects = ref<ProjectContextOption[]>([])
+const costSubjects = ref<CostSubjectOption[]>([])
 const detail = ref<ProjectBudgetRecord | null>(null)
 const availability = ref<BudgetAvailabilityRecord[]>([])
 const form = reactive<BudgetSaveCommand>(blank())
@@ -49,7 +53,7 @@ const loading = ref(false)
 const detailLoading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const dialog = ref<'closed' | 'detail' | 'create' | 'edit'>('closed')
 let controller: AbortController | null = null
 let detailController: AbortController | null = null
@@ -64,6 +68,21 @@ const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pag
 const projectOptions = computed(() =>
   projects.value.map((p) => ({ value: p.id, label: p.projectName })),
 )
+const costSubjectOptions = computed(() =>
+  costSubjects.value
+    .filter((subject) => ['ACTIVE', 'ENABLE'].includes(subject.status))
+    .map((subject) => ({
+      value: subject.id,
+      label: `${subject.subjectCode} · ${subject.subjectName}`,
+    })),
+)
+const projectLabel = (id: string) =>
+  projects.value.find((project) => project.id === id)?.projectName ?? '未识别项目'
+const costSubjectLabel = (id: string, name?: string | null) => {
+  if (name) return name
+  const subject = costSubjects.value.find((item) => item.id === id)
+  return subject ? `${subject.subjectCode} · ${subject.subjectName}` : '未识别成本科目'
+}
 const approvalStatusLabels: Record<string, string> = {
   DRAFT: '草稿',
   APPROVING: '审批中',
@@ -128,14 +147,16 @@ async function load() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [page, options] = await Promise.all([
+    const [page, options, subjects] = await Promise.all([
       loadBudgetPage({ ...filter }, current.signal),
       loadProjectContextOptions(current.signal),
+      loadCostSubjectOptions(current.signal),
     ])
     if (token !== generation) return
     records.value = page.records
     total.value = page.total
     projects.value = options
+    costSubjects.value = subjects
   } catch (e) {
     if (!current.signal.aborted && token === generation) {
       records.value = []
@@ -287,9 +308,6 @@ onBeforeUnmount(() => {
       kind="forbidden"
     /><template v-else
       ><V2Alert v-if="errorMessage" tone="danger" title="预算操作未完成">{{ errorMessage }}</V2Alert
-      ><V2Alert v-if="successMessage" tone="success" title="预算操作完成">{{
-        successMessage
-      }}</V2Alert
       ><V2Card title="项目预算" :heading-level="1"
         ><template #actions
           ><V2Button v-if="canAdd" variant="secondary" @click="openCreate"
@@ -300,8 +318,10 @@ onBeforeUnmount(() => {
           <V2Select
             v-model="filter.status"
             label="状态"
+            hide-label
             :options="statusOptions"
             allow-empty
+            placeholder="全部状态"
           /><V2Button class="budget-query" variant="secondary" :loading="loading" @click="query"
             >查询</V2Button
           >
@@ -408,7 +428,7 @@ onBeforeUnmount(() => {
       <V2Dialog
         :open="dialog !== 'closed'"
         :title="dialog === 'create' ? '新建预算' : dialog === 'edit' ? '编辑预算' : '预算详情'"
-        panel-class="v2-dialog-standard v2-detail-dialog"
+        :panel-class="dialog === 'detail' ? 'v2-detail-dialog' : undefined"
         :close-on-backdrop="false"
         :close-disabled="actionBusy"
         @close="dialog = 'closed'"
@@ -420,6 +440,7 @@ onBeforeUnmount(() => {
         />
         <form
           v-else-if="dialog === 'create' || dialog === 'edit'"
+          id="budget-form"
           class="form"
           @submit.prevent="save"
         >
@@ -435,33 +456,40 @@ onBeforeUnmount(() => {
           /><V2Input v-model="form.totalAmount" label="预算总额" required />
           <div v-if="dialog === 'create'" class="lines">
             <div v-for="(line, index) in lines" :key="index" class="line">
-              <V2Input v-model="line.costSubjectId" label="成本科目ID" /><V2Input
-                v-model="line.budgetAmount"
-                label="预算金额"
-              />
+              <V2Select
+                v-model="line.costSubjectId"
+                label="成本科目"
+                :options="costSubjectOptions"
+              /><V2Input v-model="line.budgetAmount" label="预算金额" />
             </div>
             <V2GlassButton text="添加明细" :on-click="addLine" />
           </div>
-          <V2Button type="submit" variant="secondary" :loading="actionBusy">保存预算</V2Button>
         </form>
         <div v-else-if="detail" class="form">
           <dl class="v2-detail-dialog__facts">
-            <dt>ID</dt>
-            <dd>{{ detail.id }}</dd>
+            <dt>预算名称</dt>
+            <dd>{{ detail.budgetName }}</dd>
+            <dt>项目</dt>
+            <dd>{{ projectLabel(detail.projectId) }}</dd>
+            <dt>预算版本</dt>
+            <dd>{{ detail.versionNo }}</dd>
             <dt>预算总额</dt>
             <dd>{{ detail.totalAmount }}</dd>
-            <dt>版本</dt>
-            <dd>{{ detail.version }}</dd>
+            <dt>审批状态</dt>
+            <dd>{{ approvalStatusLabel(detail.approvalStatus) }}</dd>
+            <dt>预算状态</dt>
+            <dd>{{ budgetStatusLabel(detail.status) }}</dd>
           </dl>
           <div
             v-if="canEdit && ['DRAFT', 'REJECTED'].includes(detail.approvalStatus)"
             class="lines"
           >
             <div v-for="(line, index) in lines" :key="line.id || index" class="line">
-              <V2Input v-model="line.costSubjectId" label="成本科目ID" /><V2Input
-                v-model="line.budgetAmount"
-                label="预算金额"
-              />
+              <V2Select
+                v-model="line.costSubjectId"
+                label="成本科目"
+                :options="costSubjectOptions"
+              /><V2Input v-model="line.budgetAmount" label="预算金额" />
             </div>
             <V2GlassButton text="添加明细" :on-click="addLine" /><V2GlassButton
               text="保存明细"
@@ -482,7 +510,7 @@ onBeforeUnmount(() => {
               </thead>
               <tbody>
                 <tr v-for="row in availability" :key="row.budgetLineId">
-                  <td>{{ row.costSubjectId }}</td>
+                  <td>{{ costSubjectLabel(row.costSubjectId) }}</td>
                   <td>{{ row.budgetAmount }}</td>
                   <td>{{ row.reservedAmount }}</td>
                   <td>{{ row.consumedAmount }}</td>
@@ -491,7 +519,11 @@ onBeforeUnmount(() => {
               </tbody>
             </table>
           </div>
-        </div></V2Dialog
+        </div>
+        <template v-if="dialog === 'create' || dialog === 'edit'" #footer>
+          <V2GlassButton text="取消" :disabled="actionBusy" :on-click="() => (dialog = 'closed')" />
+          <V2Button type="submit" form="budget-form" :loading="actionBusy">保存预算</V2Button>
+        </template></V2Dialog
       ></template
     >
   </div>
@@ -535,23 +567,7 @@ dd {
   overflow-x: auto;
 }
 table {
-  width: 100%;
   min-width: 48rem;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-  line-height: var(--v2-line-height-ui);
-}
-th,
-td {
-  text-align: left;
-  padding: var(--v2-space-3);
-  white-space: nowrap;
-  border-bottom: 1px solid var(--v2-color-border-subtle);
-}
-th {
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface-subtle);
-  font-weight: var(--v2-font-weight-semibold);
 }
 nav {
   display: flex;

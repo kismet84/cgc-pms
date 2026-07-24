@@ -124,7 +124,7 @@ import { dismissToast, toastItems, V2_TOAST_DURATION_MS } from './toast'
   color: var(--v2-color-text-secondary);
   font: inherit;
   font-size: var(--v2-font-size-17);
-  line-height: 1;
+  line-height: var(--v2-line-height-icon);
   background: transparent;
   border: 0;
   border-radius: var(--v2-radius-sm);

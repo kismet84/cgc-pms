@@ -263,7 +263,7 @@ function assertCostTargetV2Acceptance(routerSource, catalogSource) {
     /path:\s*['"]\/cost-target\/:id\/edit['"][\s\S]{0,240}name:\s*['"]V2ShellCostTargetEdit['"][\s\S]{0,240}component:\s*CostTargetPage/,
   ]
   const catalogCheck =
-    /path:\s*['"]\/cost-target\/index['"][\s\S]{0,180}permission:\s*['"]cost:target:query['"][\s\S]{0,180}workspaceContext:\s*\{\s*project:\s*true,\s*period:\s*false\s*\}/
+    /path:\s*['"]\/cost-target\/index['"][\s\S]{0,180}permission:\s*['"]cost:target:query['"]/
   if (
     routerChecks.some((check) => !check.test(routerSource)) ||
     !catalogCheck.test(catalogSource)
@@ -302,8 +302,8 @@ function assertBudgetMeasurementV2Acceptance(routerSource, catalogSource) {
     /tab\.path\s*===\s*['"]\/production-measurement['"]\s*\?\s*ProductionMeasurementPage/,
   ]
   const catalogChecks = [
-    /path:\s*['"]\/budget['"][\s\S]{0,240}permission:\s*['"]budget:query['"][\s\S]{0,240}workspaceContext:\s*\{\s*project:\s*true,\s*period:\s*true\s*\}/,
-    /path:\s*['"]\/production-measurement['"][\s\S]{0,240}permission:\s*['"]measurement:query['"][\s\S]{0,240}workspaceContext:\s*\{\s*project:\s*true,\s*period:\s*true\s*\}/,
+    /path:\s*['"]\/budget['"][\s\S]{0,240}permission:\s*['"]budget:query['"]/,
+    /path:\s*['"]\/production-measurement['"][\s\S]{0,240}permission:\s*['"]measurement:query['"]/,
   ]
   if (
     routerChecks.some((check) => !check.test(routerSource)) ||

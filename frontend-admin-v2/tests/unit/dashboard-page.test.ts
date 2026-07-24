@@ -255,10 +255,8 @@ describe('M2 dashboard page', () => {
     expect(wrapper.text()).toContain('经营动态')
     expect(wrapper.text()).not.toContain('当前角色暂无趋势数据')
     expect(wrapper.text()).toContain('预警列表')
-    expect(wrapper.get('.command-panel__title .dashboard-page__outline-link').text()).toBe(
-      '查看最高风险',
-    )
-    expect(wrapper.find('.highest-risk .dashboard-page__outline-link').exists()).toBe(false)
+    expect(wrapper.get('.command-panel__title .v2-button--secondary').text()).toBe('查看最高风险')
+    expect(wrapper.find('.highest-risk .v2-button').exists()).toBe(false)
   })
 
   it('refreshes the dashboard and reports success', async () => {
@@ -331,14 +329,14 @@ describe('M2 dashboard page', () => {
     expect(riskList.text()).not.toContain('最高风险事项')
     expect(wrapper.get('.risk-level').text()).toBe('中')
 
-    await wrapper.get('.command-panel__title .dashboard-page__outline-link').trigger('click')
+    await wrapper.get('.command-panel__title .v2-button--secondary').trigger('click')
     expect(filter.get('summary').attributes('role')).toBe('button')
     expect(filter.get('summary').text()).toBe('高')
     expect(riskList.text()).toContain('最高风险事项')
     expect(riskList.text()).not.toContain('一般关注事项')
     expect(wrapper.get('.risk-level').text()).toBe('高')
 
-    await wrapper.get('.command-panel__title .dashboard-page__outline-link').trigger('click')
+    await wrapper.get('.command-panel__title .v2-button--secondary').trigger('click')
     expect(filter.get('summary').text()).toBe('全部预警')
     expect(riskList.text()).toContain('最高风险事项')
     expect(riskList.text()).toContain('一般关注事项')
@@ -394,7 +392,7 @@ describe('M2 dashboard page', () => {
     expect(riskList.text()).toContain('第 2 / 2 页')
   })
 
-  it('shows the alert evaluation result in a bubble anchored above its button', async () => {
+  it('shows the alert evaluation result in the shared toast queue', async () => {
     vi.useFakeTimers()
     vi.mocked(loadDashboard).mockResolvedValue(pmData)
     vi.mocked(evaluateAlerts).mockResolvedValue({ alertsGenerated: 0, tenantId: '1' })
@@ -409,15 +407,17 @@ describe('M2 dashboard page', () => {
       await flushPromises()
 
       expect(evaluateAlerts).toHaveBeenCalledTimes(1)
-      const feedback = wrapper.get('.risk-evaluate-feedback[role="status"]')
-      expect(feedback.text()).toContain('评估完成，生成 0 项预警')
-      expect(feedback.element.parentElement).toBe(wrapper.get('.risk-evaluate-action').element)
-      expect(wrapper.find('#risk-list > .v2-alert--info').exists()).toBe(false)
-
-      await vi.advanceTimersByTimeAsync(2999)
-      expect(wrapper.find('.risk-evaluate-feedback').exists()).toBe(true)
-      await vi.advanceTimersByTimeAsync(1)
+      expect(toastItems.at(-1)).toMatchObject({
+        type: 'info',
+        title: '操作结果',
+        message: '评估完成，生成 0 项预警',
+      })
       expect(wrapper.find('.risk-evaluate-feedback').exists()).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(3499)
+      expect(toastItems).toHaveLength(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(toastItems).toHaveLength(0)
     } finally {
       vi.useRealTimers()
     }
@@ -629,7 +629,7 @@ describe('M2 dashboard page', () => {
     expect(breakdown.findAll('tbody tr')).toHaveLength(1)
     await breakdown.get('button[aria-expanded="false"]').trigger('click')
     expect(breakdown.findAll('tbody tr')).toHaveLength(2)
-    expect(breakdown.text()).toContain('PMT-20260718-001 · 2026-07-18')
+    expect(breakdown.text()).toContain('PMT-20260718-0012026-07-18')
     expect(breakdown.text()).toContain('已完成')
   })
 })

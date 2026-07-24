@@ -369,6 +369,8 @@ onBeforeUnmount(() => {
             v-model="keyword"
             class="workflow-filter__keyword"
             type="search"
+            label="关键词"
+            hide-label
             placeholder="搜索标题或业务编号"
           />
           <V2Select
@@ -379,6 +381,7 @@ onBeforeUnmount(() => {
             hide-label
             :options="workflowBusinessTypeOptions"
             allow-empty
+            placeholder="全部业务类型"
             @update:model-value="changeBusinessType"
           />
           <V2Select
@@ -389,6 +392,7 @@ onBeforeUnmount(() => {
             hide-label
             :options="workflowInstanceStatusOptions"
             allow-empty
+            placeholder="全部状态"
             @update:model-value="changeInstanceStatus"
           />
           <div class="workflow-filter__actions">
@@ -720,7 +724,7 @@ onBeforeUnmount(() => {
 }
 .workflow-timeline__empty {
   justify-content: center;
-  min-height: 4rem;
+  min-height: calc(var(--v2-space-8) + var(--v2-space-8));
   color: var(--v2-color-text-muted);
   border-bottom: 0 !important;
 }

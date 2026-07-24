@@ -193,7 +193,7 @@ test.describe('M2 live approval workbench', () => {
     await expect(detailDialog).toHaveCount(0)
     await expect(page.getByRole('cell', { name: '合同审批', exact: true })).toBeVisible()
 
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
     const periodControl = page.locator('#global-report-period')
     await periodControl.click()
     const periodMenu = page.getByRole('listbox', { name: '报告期' })

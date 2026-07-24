@@ -44,6 +44,7 @@ const LABELS: Record<string, string> = {
   READY_TO_CLOSE: '待关闭',
   RECEIVED: '已接收',
   RECORDED: '已记录',
+  REGULAR: '工程款',
   RETENTION: '质保金',
   RECTIFYING: '整改中',
   REJECT: '驳回',

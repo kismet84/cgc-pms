@@ -97,6 +97,17 @@ async function installCostTargetMock(
       }),
     }),
   )
+  await page.route('**/api/cost-subjects**', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '0',
+        message: 'success',
+        data: [{ id: 'S1', subjectCode: 'COST-001', subjectName: '直接成本', status: 'ENABLE' }],
+      }),
+    }),
+  )
   await page.route('**/api/cost-targets**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())

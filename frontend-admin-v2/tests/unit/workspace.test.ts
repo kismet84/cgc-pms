@@ -82,8 +82,8 @@ describe('V2 workspace context store', () => {
       ])
     const workspace = useWorkspaceStore()
 
-    const stale = workspace.initialize(['ADMIN'], [])
-    await workspace.initialize(['ADMIN'], [])
+    const stale = workspace.initialize()
+    await workspace.initialize()
     resolveFirst?.([{ id: 'P-1', projectCode: 'P1', projectName: '项目一', status: 'ACTIVE' }])
     await stale
 
@@ -96,25 +96,15 @@ describe('V2 workspace context store', () => {
     expect(workspace.reportPeriods).toHaveLength(12)
   })
 
-  it('loads project context for a project-scoped workspace permission', async () => {
+  it('loads authorized project context independently of page permission', async () => {
     const workspace = useWorkspaceStore()
     loadVisibleProjectsMock.mockResolvedValueOnce([
       { id: 'P-1', projectName: '项目一', status: 'ACTIVE' },
     ])
 
-    await workspace.initialize(['USER'], ['technical:query'])
+    await workspace.initialize()
 
     expect(loadVisibleProjectsMock).toHaveBeenCalledOnce()
     expect(workspace.projects).toEqual([{ value: 'P-1', label: '项目一', status: 'ACTIVE' }])
-  })
-
-  it('does not request projects without project-context workspace access', async () => {
-    const workspace = useWorkspaceStore()
-
-    await workspace.initialize(['USER'], ['dashboard:finance:view'])
-
-    expect(loadVisibleProjectsMock).not.toHaveBeenCalled()
-    expect(workspace.projects).toEqual([])
-    expect(workspace.reportPeriods).toHaveLength(12)
   })
 })

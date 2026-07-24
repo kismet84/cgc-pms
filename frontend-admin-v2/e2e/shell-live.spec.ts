@@ -36,7 +36,7 @@ test.describe('V2 live application shell', () => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
       await page.goto('/v2/dashboard?role=mgmt')
       await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
-      await expect(page.getByText('经营健康为辅助判断')).toBeVisible()
+      await expect(page.getByText('仅作辅助判断，非财务/结算口径', { exact: false })).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)

@@ -22,6 +22,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
 import { formatAmount } from '@/pages/dashboard/model'
 import {
@@ -97,7 +98,7 @@ const saving = ref(false)
 const submitting = ref(false)
 const deleting = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const contracts = ref<ContractPage['records']>([])
 const total = ref(0)
 const kpi = ref<ContractKpi | null>(null)
@@ -691,8 +692,6 @@ onBeforeUnmount(() => {
 <template>
   <section class="contract-page" aria-labelledby="contract-title">
     <V2Alert v-if="errorMessage" tone="danger" title="请求未完成">{{ errorMessage }}</V2Alert>
-    <V2Alert v-if="successMessage" tone="success" title="操作完成">{{ successMessage }}</V2Alert>
-
     <V2PageState
       v-if="loading"
       kind="loading"
@@ -703,8 +702,16 @@ onBeforeUnmount(() => {
     />
 
     <template v-else-if="mode === 'ledger'">
-      <V2Card v-if="kpi">
-        <dl class="contract-page__kpi-grid">
+      <V2Card
+        class="contract-page__list-card"
+        title="合同台账"
+        title-id="contract-title"
+        :heading-level="1"
+      >
+        <template #actions>
+          <V2Button v-if="canCreate" @click="openCreate">新建合同</V2Button>
+        </template>
+        <dl v-if="kpi" class="contract-page__kpi-grid">
           <div>
             <dt>合同总数</dt>
             <dd>{{ kpi.totalCount }}</dd>
@@ -726,17 +733,6 @@ onBeforeUnmount(() => {
             <dd>{{ kpi.overdueCount }}</dd>
           </div>
         </dl>
-      </V2Card>
-
-      <V2Card
-        class="contract-page__list-card"
-        title="合同列表"
-        title-id="contract-title"
-        :heading-level="1"
-      >
-        <template #actions>
-          <V2Button v-if="canCreate" @click="openCreate">新建合同</V2Button>
-        </template>
         <nav class="contract-page__preset-views" aria-label="合同预设视图">
           <V2Button
             v-for="preset in CONTRACT_PRESET_VIEWS"
@@ -766,7 +762,8 @@ onBeforeUnmount(() => {
             </caption>
             <thead>
               <tr>
-                <th scope="col">合同编号 / 名称</th>
+                <th scope="col">合同编号</th>
+                <th scope="col">合同名称</th>
                 <th scope="col">项目</th>
                 <th scope="col">类型</th>
                 <th scope="col">合同状态</th>
@@ -779,10 +776,8 @@ onBeforeUnmount(() => {
             </thead>
             <tbody>
               <tr v-for="contract in contracts" :key="contract.id">
-                <td>
-                  <strong>{{ contract.contractCode }}</strong>
-                  <span>{{ contract.contractName }}</span>
-                </td>
+                <th scope="row">{{ contract.contractCode }}</th>
+                <td>{{ contract.contractName }}</td>
                 <td>{{ projectLabel(contract.projectId) }}</td>
                 <td>
                   <V2Badge tone="info">{{ contractTypeLabel(contract.contractType) }}</V2Badge>
@@ -1309,7 +1304,7 @@ onBeforeUnmount(() => {
   margin-top: var(--v2-space-2);
   color: var(--v2-color-text-strong);
   font-size: var(--v2-font-size-15);
-  font-weight: 600;
+  font-weight: var(--v2-font-weight-semibold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1351,25 +1346,7 @@ onBeforeUnmount(() => {
 }
 
 .contract-page__table {
-  width: 100%;
   min-width: 68rem;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-  line-height: var(--v2-line-height-ui);
-}
-
-.contract-page__table th,
-.contract-page__table td {
-  padding: var(--v2-space-3);
-  border-bottom: 1px solid var(--v2-color-border-subtle);
-  text-align: left;
-  vertical-align: middle;
-}
-
-.contract-page__table th {
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface-subtle);
-  white-space: nowrap;
 }
 
 .contract-page__table td:first-child strong,
@@ -1384,14 +1361,12 @@ onBeforeUnmount(() => {
 
 .contract-page__table td:nth-child(6),
 .contract-page__table td:nth-child(7) {
-  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
 .contract-page__detail-table td:nth-child(2),
 .contract-page__detail-table td:nth-child(3),
 .contract-page__detail-table td:nth-child(5) {
-  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1424,16 +1399,12 @@ onBeforeUnmount(() => {
 
 .contract-page__native-field input,
 .contract-page__native-field textarea {
-  min-height: 2.5rem;
+  min-height: var(--v2-control-height-md);
   padding: 0 var(--v2-space-3);
-  color: var(--v2-color-text);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
 }
 
 .contract-page__native-field textarea {
-  min-height: 6rem;
+  min-height: var(--v2-control-height-textarea);
   padding: var(--v2-space-2) var(--v2-space-3);
   resize: vertical;
 }

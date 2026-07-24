@@ -26,7 +26,9 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
+import { formatAmount } from '@/pages/dashboard/model'
 import { listSiteFiles, uploadSiteFile } from '@/services/delivery'
 import {
   acceptArchiveTransfer,
@@ -91,7 +93,7 @@ const workspace = useWorkspaceStore()
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const dialog = ref<DialogKind>(null)
 const overview = ref<CloseoutOverview | null>(null)
 const scopedOverviews = ref<ScopedCloseoutOverview[]>([])
@@ -506,10 +508,6 @@ async function run(
   }
 }
 
-function formatAmount(value?: string | null): string {
-  return value?.trim() ? value : '0'
-}
-
 const saveDialog = () =>
   run(async () => {
     if (!projectId.value) throw new Error('缺少项目范围')
@@ -609,9 +607,6 @@ onBeforeUnmount(() => {
     <h1 class="v2-visually-hidden">竣工收尾闭环</h1>
     <div class="closeout-page__notice" aria-live="polite">
       <V2Alert v-if="errorMessage" tone="danger" title="操作未完成">{{ errorMessage }}</V2Alert>
-      <V2Alert v-else-if="successMessage" tone="success" title="操作完成">{{
-        successMessage
-      }}</V2Alert>
     </div>
 
     <div v-if="canInitiate && !closeout && projectId" class="closeout-page__actions">
@@ -698,7 +693,7 @@ onBeforeUnmount(() => {
       </V2Card>
 
       <V2Card
-        v-if="closeout"
+        v-if="closeout && projectId"
         title="收尾主线"
         :subtitle="`${closeout.closeoutCode} · ${deliveryLabel(closeout.status)}`"
       >
@@ -773,212 +768,344 @@ onBeforeUnmount(() => {
         </template>
       </V2Card>
 
-      <div class="closeout-page__columns">
-        <V2Card
-          title="分项与竣工验收"
-          :subtitle="`分项 ${overview?.sectionAcceptances.length ?? 0} / 竣工 ${overview?.finalAcceptances.length ?? 0}`"
-        >
-          <div class="closeout-page__stack">
-            <article
-              v-for="section in overview?.sectionAcceptances ?? []"
-              :key="section.id"
-              class="closeout-page__item"
+      <V2Card
+        v-if="projectId && closeout"
+        title="收尾阶段台账"
+        :subtitle="`验收、结算、质保、缺陷、前置与档案统一核对`"
+      >
+        <div class="closeout-page__record-sections">
+          <section aria-labelledby="closeout-acceptance-title">
+            <h3 id="closeout-acceptance-title">分项与竣工验收</h3>
+            <div
+              v-if="overview?.sectionAcceptances.length || overview?.finalAcceptances.length"
+              class="closeout-page__table-wrap"
+              role="region"
+              aria-labelledby="closeout-acceptance-title"
+              tabindex="0"
             >
-              <strong>{{ section.acceptanceCode }} · {{ section.acceptanceName }}</strong>
-              <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(section.status)">{{
-                  deliveryLabel(section.status)
-                }}</V2Badge>
-                <span>{{ section.taskCode }} / {{ section.acceptanceDate }}</span>
-              </div>
-              <V2Button
-                v-if="canSection && section.status === 'DRAFT'"
-                size="small"
-                :loading="saving"
-                @click="
-                  run(
-                    () => confirmSectionAcceptance(section.id).then(() => undefined),
-                    '分项验收已确认',
-                  )
-                "
-                >确认分项验收</V2Button
-              >
-            </article>
-            <article
-              v-for="item in overview?.finalAcceptances ?? []"
-              :key="item.id"
-              class="closeout-page__item"
-            >
-              <strong>{{ item.acceptanceCode }} · {{ item.organizer }}</strong>
-              <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
-                <span>{{ deliveryLabel(item.conclusion) }} / {{ item.acceptanceDate }}</span>
-              </div>
-              <V2Button
-                v-if="canAcceptance && ['DRAFT', 'REJECTED'].includes(item.status)"
-                size="small"
-                :loading="saving"
-                @click="
-                  run(
-                    () => submitFinalAcceptance(item.id).then(() => undefined),
-                    '竣工验收已提交审批',
-                  )
-                "
-                >提交竣工验收</V2Button
-              >
-            </article>
-          </div>
-        </V2Card>
-
-        <V2Card title="结算与回款" subtitle="关联最终结算时，请输入已确认的结算 ID。">
-          <div class="closeout-page__stack">
-            <article
-              v-for="item in overview?.settlements ?? []"
-              :key="item.id"
-              class="closeout-page__item"
-            >
-              <strong>{{ item.settlementCode }}</strong>
-              <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
-                <span>结算类型 {{ deliveryLabel(item.settlementType) }}</span>
-                <span>净应收 {{ formatAmount(item.netReceivableAmount) }}</span>
-              </div>
-            </article>
-            <article
-              v-for="item in overview?.receivables ?? []"
-              :key="item.id"
-              class="closeout-page__item"
-            >
-              <strong>{{ item.receivableCode }} · {{ deliveryLabel(item.receivableType) }}</strong>
-              <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
-                <span>原值 {{ formatAmount(item.originalAmount) }}</span>
-                <span>未收 {{ formatAmount(item.outstandingAmount) }}</span>
-              </div>
-            </article>
-            <p v-if="!(overview?.settlements?.length || overview?.receivables?.length)">
-              暂无最终结算和回款事实。
-            </p>
-          </div>
-        </V2Card>
-      </div>
-
-      <div class="closeout-page__columns">
-        <V2Card
-          title="质保与缺陷"
-          :subtitle="`质保 ${overview?.warranties.length ?? 0} / 缺陷 ${overview?.defects.length ?? 0}`"
-        >
-          <div class="closeout-page__stack">
-            <article
-              v-for="item in overview?.warranties ?? []"
-              :key="item.id"
-              class="closeout-page__item"
-            >
-              <strong>{{ item.warrantyCode }}</strong>
-              <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
-                <span>金额 {{ formatAmount(item.warrantyAmount) }}</span>
-                <span>{{ item.warrantyStartDate }} 至 {{ item.warrantyEndDate }}</span>
-              </div>
-              <div class="closeout-page__actions">
-                <V2Button
-                  v-if="canDefect && ['ACTIVE', 'DEFECT_LIABILITY'].includes(item.status)"
-                  size="small"
-                  @click="show('defect', item)"
-                  >登记缺陷</V2Button
-                >
-                <V2Button
-                  v-if="canWarranty && ['ACTIVE', 'DEFECT_LIABILITY'].includes(item.status)"
-                  size="small"
-                  variant="secondary"
-                  @click="show('release', item)"
-                  >释放质保</V2Button
-                >
-              </div>
-            </article>
-            <article
-              v-for="item in overview?.defects ?? []"
-              :key="item.id"
-              class="closeout-page__item"
-            >
-              <strong>{{ item.defectCode }} · {{ item.defectTitle }}</strong>
-              <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
-                <span>期限 {{ item.rectificationDeadline }}</span>
-              </div>
-              <div class="closeout-page__actions">
-                <V2Button
-                  v-if="canDefect && item.status === 'OPEN'"
-                  size="small"
-                  @click="show('rectification', item)"
-                  >提交整改</V2Button
-                >
-                <V2Button
-                  v-if="canDefectVerify && item.status === 'PENDING_VERIFICATION'"
-                  size="small"
-                  variant="secondary"
-                  @click="show('verification', item)"
-                  >复验缺陷</V2Button
-                >
-              </div>
-            </article>
-          </div>
-        </V2Card>
-
-        <V2Card
-          title="WBS 与质量前置"
-          :subtitle="`未完工 ${overview?.wbsReadiness?.incompleteTasks ?? 0}`"
-        >
-          <div class="closeout-page__stack">
-            <article
-              v-for="item in overview?.wbsTasks ?? []"
-              :key="item.id"
-              class="closeout-page__item"
-            >
-              <strong>{{ item.taskCode }} · {{ item.taskName }}</strong>
-              <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
-                <span>进度 {{ item.actualProgress }}</span>
-              </div>
-            </article>
-            <article
-              v-for="item in overview?.qualityInspections ?? []"
-              :key="item.id"
-              class="closeout-page__item"
-            >
-              <strong>{{ item.inspectionCode }}</strong>
-              <div class="closeout-page__facts">
-                <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
-                <span>{{ deliveryLabel(item.conclusion) }} / {{ item.inspectionDate }}</span>
-              </div>
-            </article>
-          </div>
-        </V2Card>
-      </div>
-
-      <V2Card title="档案移交" :subtitle="`共 ${overview?.archiveTransfers.length ?? 0} 条`">
-        <div class="closeout-page__stack">
-          <article
-            v-for="item in overview?.archiveTransfers ?? []"
-            :key="item.id"
-            class="closeout-page__item"
-          >
-            <strong>{{ item.transferCode }} · {{ item.recipientOrganization }}</strong>
-            <div class="closeout-page__facts">
-              <V2Badge :tone="badgeTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
-              <span>{{ item.archiveLocation }}</span>
+              <table class="closeout-page__table" aria-labelledby="closeout-acceptance-title">
+                <thead>
+                  <tr>
+                    <th scope="col">类型</th>
+                    <th scope="col">验收编号</th>
+                    <th scope="col">名称 / 组织</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">关联任务 / 结论</th>
+                    <th scope="col">日期</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="section in overview?.sectionAcceptances ?? []" :key="section.id">
+                    <td>分项验收</td>
+                    <th scope="row">{{ section.acceptanceCode }}</th>
+                    <td>{{ section.acceptanceName }}</td>
+                    <td>
+                      <V2Badge :tone="badgeTone(section.status)">{{
+                        deliveryLabel(section.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>{{ section.taskCode }}</td>
+                    <td>{{ section.acceptanceDate }}</td>
+                    <td>
+                      <V2Button
+                        v-if="canSection && section.status === 'DRAFT'"
+                        size="small"
+                        :loading="saving"
+                        @click="
+                          run(
+                            () => confirmSectionAcceptance(section.id).then(() => undefined),
+                            '分项验收已确认',
+                          )
+                        "
+                        >确认分项验收</V2Button
+                      >
+                      <span v-else>—</span>
+                    </td>
+                  </tr>
+                  <tr v-for="item in overview?.finalAcceptances ?? []" :key="item.id">
+                    <td>竣工验收</td>
+                    <th scope="row">{{ item.acceptanceCode }}</th>
+                    <td>{{ item.organizer }}</td>
+                    <td>
+                      <V2Badge :tone="badgeTone(item.status)">{{
+                        deliveryLabel(item.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>{{ deliveryLabel(item.conclusion) }}</td>
+                    <td>{{ item.acceptanceDate }}</td>
+                    <td>
+                      <V2Button
+                        v-if="canAcceptance && ['DRAFT', 'REJECTED'].includes(item.status)"
+                        size="small"
+                        :loading="saving"
+                        @click="
+                          run(
+                            () => submitFinalAcceptance(item.id).then(() => undefined),
+                            '竣工验收已提交审批',
+                          )
+                        "
+                        >提交竣工验收</V2Button
+                      >
+                      <span v-else>—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-            <V2Button
-              v-if="canArchive && item.status === 'DRAFT'"
-              size="small"
-              :loading="saving"
-              @click="
-                run(() => acceptArchiveTransfer(item.id).then(() => undefined), '档案移交已签收')
-              "
-              >确认签收</V2Button
+            <p v-else>暂无验收事实。</p>
+          </section>
+
+          <section aria-labelledby="closeout-settlement-title">
+            <h3 id="closeout-settlement-title">结算与回款</h3>
+            <div
+              v-if="overview?.settlements.length || overview?.receivables.length"
+              class="closeout-page__table-wrap"
+              role="region"
+              aria-labelledby="closeout-settlement-title"
+              tabindex="0"
             >
-          </article>
-          <p v-if="!overview?.archiveTransfers.length">暂无档案移交事实。</p>
+              <table class="closeout-page__table" aria-labelledby="closeout-settlement-title">
+                <thead>
+                  <tr>
+                    <th scope="col">类型</th>
+                    <th scope="col">编号</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">金额</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in overview?.settlements ?? []" :key="item.id">
+                    <td>{{ deliveryLabel(item.settlementType) }}结算</td>
+                    <th scope="row">{{ item.settlementCode }}</th>
+                    <td>
+                      <V2Badge :tone="badgeTone(item.status)">{{
+                        deliveryLabel(item.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>净应收 {{ formatAmount(item.netReceivableAmount) }}</td>
+                  </tr>
+                  <tr v-for="item in overview?.receivables ?? []" :key="item.id">
+                    <td>{{ deliveryLabel(item.receivableType) }}</td>
+                    <th scope="row">{{ item.receivableCode }}</th>
+                    <td>
+                      <V2Badge :tone="badgeTone(item.status)">{{
+                        deliveryLabel(item.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>
+                      原值 {{ formatAmount(item.originalAmount) }} / 未收
+                      {{ formatAmount(item.outstandingAmount) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无最终结算和回款事实。</p>
+          </section>
+
+          <section aria-labelledby="closeout-warranty-title">
+            <h3 id="closeout-warranty-title">质保与缺陷</h3>
+            <div
+              v-if="overview?.warranties.length || overview?.defects.length"
+              class="closeout-page__table-wrap"
+              role="region"
+              aria-labelledby="closeout-warranty-title"
+              tabindex="0"
+            >
+              <table class="closeout-page__table" aria-labelledby="closeout-warranty-title">
+                <thead>
+                  <tr>
+                    <th scope="col">类型</th>
+                    <th scope="col">编号</th>
+                    <th scope="col">标题</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">金额 / 期限</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in overview?.warranties ?? []" :key="item.id">
+                    <td>质保</td>
+                    <th scope="row">{{ item.warrantyCode }}</th>
+                    <td>—</td>
+                    <td>
+                      <V2Badge :tone="badgeTone(item.status)">{{
+                        deliveryLabel(item.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>
+                      {{ formatAmount(item.warrantyAmount) }} / {{ item.warrantyStartDate }} 至
+                      {{ item.warrantyEndDate }}
+                    </td>
+                    <td>
+                      <div class="closeout-page__actions">
+                        <V2Button
+                          v-if="canDefect && ['ACTIVE', 'DEFECT_LIABILITY'].includes(item.status)"
+                          size="small"
+                          @click="show('defect', item)"
+                          >登记缺陷</V2Button
+                        >
+                        <V2Button
+                          v-if="canWarranty && ['ACTIVE', 'DEFECT_LIABILITY'].includes(item.status)"
+                          size="small"
+                          variant="secondary"
+                          @click="show('release', item)"
+                          >释放质保</V2Button
+                        >
+                        <span
+                          v-if="
+                            !(
+                              ['ACTIVE', 'DEFECT_LIABILITY'].includes(item.status) &&
+                              (canDefect || canWarranty)
+                            )
+                          "
+                          >—</span
+                        >
+                      </div>
+                    </td>
+                  </tr>
+                  <tr v-for="item in overview?.defects ?? []" :key="item.id">
+                    <td>缺陷</td>
+                    <th scope="row">{{ item.defectCode }}</th>
+                    <td>{{ item.defectTitle }}</td>
+                    <td>
+                      <V2Badge :tone="badgeTone(item.status)">{{
+                        deliveryLabel(item.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>期限 {{ item.rectificationDeadline }}</td>
+                    <td>
+                      <div class="closeout-page__actions">
+                        <V2Button
+                          v-if="canDefect && item.status === 'OPEN'"
+                          size="small"
+                          @click="show('rectification', item)"
+                          >提交整改</V2Button
+                        >
+                        <V2Button
+                          v-if="canDefectVerify && item.status === 'PENDING_VERIFICATION'"
+                          size="small"
+                          variant="secondary"
+                          @click="show('verification', item)"
+                          >复验缺陷</V2Button
+                        >
+                        <span
+                          v-if="
+                            !(
+                              (canDefect && item.status === 'OPEN') ||
+                              (canDefectVerify && item.status === 'PENDING_VERIFICATION')
+                            )
+                          "
+                          >—</span
+                        >
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无质保和缺陷事实。</p>
+          </section>
+
+          <section aria-labelledby="closeout-readiness-title">
+            <h3 id="closeout-readiness-title">WBS 与质量前置</h3>
+            <div
+              v-if="overview?.wbsTasks.length || overview?.qualityInspections.length"
+              class="closeout-page__table-wrap"
+              role="region"
+              aria-labelledby="closeout-readiness-title"
+              tabindex="0"
+            >
+              <table class="closeout-page__table" aria-labelledby="closeout-readiness-title">
+                <thead>
+                  <tr>
+                    <th scope="col">类型</th>
+                    <th scope="col">编号</th>
+                    <th scope="col">名称</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">进度 / 结论</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in overview?.wbsTasks ?? []" :key="item.id">
+                    <td>WBS</td>
+                    <th scope="row">{{ item.taskCode }}</th>
+                    <td>{{ item.taskName }}</td>
+                    <td>
+                      <V2Badge :tone="badgeTone(item.status)">{{
+                        deliveryLabel(item.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>进度 {{ item.actualProgress }}</td>
+                  </tr>
+                  <tr v-for="item in overview?.qualityInspections ?? []" :key="item.id">
+                    <td>质量检查</td>
+                    <th scope="row">{{ item.inspectionCode }}</th>
+                    <td>—</td>
+                    <td>
+                      <V2Badge :tone="badgeTone(item.status)">{{
+                        deliveryLabel(item.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>{{ deliveryLabel(item.conclusion) }} / {{ item.inspectionDate }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无 WBS 与质量前置事实。</p>
+          </section>
+
+          <section aria-labelledby="closeout-archive-title">
+            <h3 id="closeout-archive-title">档案移交</h3>
+            <div
+              v-if="overview?.archiveTransfers.length"
+              class="closeout-page__table-wrap"
+              role="region"
+              aria-labelledby="closeout-archive-title"
+              tabindex="0"
+            >
+              <table class="closeout-page__table" aria-labelledby="closeout-archive-title">
+                <thead>
+                  <tr>
+                    <th scope="col">移交编号</th>
+                    <th scope="col">接收单位</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">档案位置</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="item in overview?.archiveTransfers ?? []" :key="item.id">
+                    <th scope="row">{{ item.transferCode }}</th>
+                    <td>{{ item.recipientOrganization }}</td>
+                    <td>
+                      <V2Badge :tone="badgeTone(item.status)">{{
+                        deliveryLabel(item.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>{{ item.archiveLocation }}</td>
+                    <td>
+                      <V2Button
+                        v-if="canArchive && item.status === 'DRAFT'"
+                        size="small"
+                        :loading="saving"
+                        @click="
+                          run(
+                            () => acceptArchiveTransfer(item.id).then(() => undefined),
+                            '档案移交已签收',
+                          )
+                        "
+                        >确认签收</V2Button
+                      >
+                      <span v-else>—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无档案移交事实。</p>
+          </section>
         </div>
       </V2Card>
     </template>
@@ -1013,7 +1140,10 @@ onBeforeUnmount(() => {
           </li>
           <li v-for="item in trace.collectionAllocations" :key="item.id">
             <strong>回款分配 {{ item.collectionCode || item.id }}</strong>
-            <span>{{ item.receivableType }} / {{ item.allocatedAmount }}</span>
+            <span
+              >{{ deliveryLabel(item.receivableType) }} /
+              {{ formatAmount(item.allocatedAmount) }}</span
+            >
           </li>
           <li v-for="item in trace.warranties" :key="String(item.id)">
             <strong>质保 {{ item.warranty_code || item.warrantyCode }}</strong>
@@ -1236,11 +1366,6 @@ onBeforeUnmount(() => {
 .closeout-page p {
   margin-block: 0;
 }
-.closeout-page__eyebrow {
-  color: var(--v2-color-primary-hover);
-  font-size: var(--v2-font-size-12);
-  font-weight: 700;
-}
 .closeout-page__notice:empty {
   display: none;
 }
@@ -1251,56 +1376,32 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-2);
   align-items: center;
 }
-.closeout-page__columns,
 .closeout-page__evidence {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--v2-space-3);
 }
+.closeout-page__record-sections {
+  display: grid;
+  gap: var(--v2-space-4);
+}
+.closeout-page__record-sections h3 {
+  margin: 0 0 var(--v2-space-2);
+  color: var(--v2-color-text-strong);
+  font-size: var(--v2-font-size-15);
+  font-weight: var(--v2-font-weight-semibold);
+  line-height: var(--v2-line-height-tight);
+}
 .closeout-page__table-wrap {
   overflow-x: auto;
 }
 .closeout-page__table {
-  width: 100%;
   min-width: 54rem;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-  line-height: var(--v2-line-height-ui);
-}
-.closeout-page__table th,
-.closeout-page__table td {
-  padding: var(--v2-space-3);
-  border-bottom: var(--v2-border-width) solid var(--v2-color-border-subtle);
-  text-align: left;
-  vertical-align: middle;
-}
-.closeout-page__table thead th {
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface-subtle);
-  font-weight: var(--v2-font-weight-semibold);
-}
-.closeout-page__table tbody th {
-  color: var(--v2-color-text-strong);
-  font-weight: var(--v2-font-weight-semibold);
-}
-.closeout-page__stack,
-.closeout-page__item {
-  display: grid;
-  gap: var(--v2-space-2);
-}
-.closeout-page__item {
-  padding: var(--v2-space-3);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
-}
-.closeout-page__item > strong {
-  font-size: var(--v2-font-size-14);
-  font-weight: var(--v2-font-weight-semibold);
 }
 .closeout-page__timeline {
   display: grid;
   gap: var(--v2-space-2);
-  padding-left: 1.25rem;
+  padding-left: var(--v2-space-5);
 }
 .closeout-page__timeline span {
   display: block;
@@ -1312,35 +1413,16 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-3);
   align-items: end;
 }
-.closeout-page__form label {
-  display: grid;
-  gap: var(--v2-space-1);
-  color: var(--v2-color-text-secondary);
-}
-.closeout-page__form input,
 .closeout-page__form textarea {
-  min-height: 2.5rem;
-  padding: var(--v2-space-2);
-  color: var(--v2-color-text);
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-  border-radius: var(--v2-radius-md);
-  font: inherit;
-}
-.closeout-page__form :deep(.v2-field__control) {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-}
-.closeout-page__form textarea {
-  min-height: 6rem;
+  min-height: var(--v2-control-height-textarea);
   resize: vertical;
 }
 .closeout-page__wide {
   grid-column: 1 / -1;
 }
 @media (max-width: 64rem) {
-  .closeout-page__columns {
-    grid-template-columns: 1fr;
+  .closeout-page__table {
+    min-width: 48rem;
   }
 }
 @media (max-width: 40rem) {

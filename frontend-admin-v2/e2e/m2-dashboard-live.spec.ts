@@ -31,7 +31,7 @@ test.describe('M2 live eight-role dashboard', () => {
     expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
     await page.goto('/v2/project/list')
     await selectOption(page.locator('#global-project'), projectId)
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
 
     await page.getByRole('link', { name: '工作台', exact: true }).click()
     await selectOption(page.locator('#global-report-period'), period)

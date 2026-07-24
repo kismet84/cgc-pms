@@ -24,6 +24,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  useToastMessage,
 } from '@/components'
 import { listSiteFiles, uploadSiteFile } from '@/services/delivery'
 import {
@@ -69,7 +70,7 @@ const workspace = useWorkspaceStore()
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+const successMessage = useToastMessage()
 const plans = ref<QualityPlanRecord[]>([])
 const inspections = ref<QualityInspectionRecord[]>([])
 const issues = ref<QualityIssueRecord[]>([])
@@ -505,13 +506,6 @@ onBeforeUnmount(() => {
     <h1 class="v2-visually-hidden">质量安全整改闭环</h1>
     <div class="quality-page__notice" role="status" aria-live="polite">
       <V2Alert v-if="errorMessage" tone="danger" title="操作未完成">{{ errorMessage }}</V2Alert>
-      <V2Alert v-else-if="successMessage" tone="success" title="操作完成">{{
-        successMessage
-      }}</V2Alert>
-    </div>
-
-    <div v-if="canPlan && projectId" class="quality-page__actions">
-      <V2Button size="small" @click="show('plan')">新建检查计划</V2Button>
     </div>
 
     <V2PageState
@@ -527,179 +521,244 @@ onBeforeUnmount(() => {
       description="当前账号没有可查看的项目。"
     />
     <template v-else>
-      <div class="quality-page__columns">
-        <V2Card title="检查计划" :subtitle="`共 ${plans.length} 条`">
-          <div v-if="plans.length" class="quality-page__stack">
-            <article v-for="plan in plans" :key="plan.id" class="quality-page__item">
-              <button type="button" class="quality-page__title" @click="selectedPlanId = plan.id">
-                {{ plan.planCode }} · {{ plan.planName }}
-              </button>
-              <div class="quality-page__facts">
-                <V2Badge :tone="statusTone(plan.status)">{{ deliveryLabel(plan.status) }}</V2Badge
-                ><span>{{ plan.startDate }} 至 {{ plan.endDate }}</span>
-              </div>
-              <div class="quality-page__actions">
-                <V2Button
-                  v-if="canPlan && plan.status === 'DRAFT'"
-                  size="small"
-                  variant="secondary"
-                  :loading="saving"
-                  @click="activatePlan(plan)"
-                  >激活</V2Button
-                >
-                <V2Button
-                  v-if="canPlan && plan.status === 'ACTIVE'"
-                  size="small"
-                  variant="ghost"
-                  :loading="saving"
-                  @click="finishPlan(plan)"
-                  >完成</V2Button
-                >
-              </div>
-            </article>
+      <V2Card title="质量安全闭环台账">
+        <template #title-extra>
+          <div class="quality-page__facts" aria-label="质量安全闭环概览">
+            <V2Badge>计划 {{ plans.length }}</V2Badge>
+            <V2Badge>检查 {{ inspections.length }}</V2Badge>
+            <V2Badge tone="warning">问题 {{ issues.length }}</V2Badge>
           </div>
-          <p v-else>暂无检查计划。</p>
-        </V2Card>
-
-        <V2Card title="检查记录" :subtitle="selectedPlan ? selectedPlan.planName : '先选择计划'">
-          <template #actions
-            ><V2Button
+        </template>
+        <template #actions>
+          <div class="quality-page__actions">
+            <V2Button v-if="canPlan && projectId" size="small" @click="show('plan')"
+              >新建检查计划</V2Button
+            >
+            <V2Button
               v-if="canInspect && selectedPlan?.status === 'ACTIVE'"
               size="small"
+              variant="secondary"
               @click="show('inspection')"
               >新建检查</V2Button
-            ></template
-          >
-          <div v-if="inspections.length" class="quality-page__stack">
-            <article
-              v-for="inspection in inspections"
-              :key="inspection.id"
-              class="quality-page__item"
             >
-              <strong>{{ inspection.inspectionCode }}</strong>
-              <p>{{ inspection.location }} · {{ inspection.summary }}</p>
-              <div class="quality-page__facts">
-                <V2Badge :tone="statusTone(inspection.status)">{{
-                  deliveryLabel(inspection.status)
-                }}</V2Badge
-                ><span>{{ inspection.inspectionDate }}</span>
-              </div>
-              <div class="quality-page__actions">
-                <V2Button
-                  v-if="canInspect && inspection.status === 'DRAFT'"
-                  size="small"
-                  variant="ghost"
-                  @click="
-                    showEvidence({
-                      businessType: 'QS_INSPECTION',
-                      businessId: inspection.id,
-                      documentType: 'INSPECTION_EVIDENCE',
-                      label: '检查证据',
-                    })
-                  "
-                  >上传检查证据</V2Button
-                >
-                <V2Button
-                  v-if="canInspect && inspection.status === 'DRAFT'"
-                  size="small"
-                  variant="secondary"
-                  @click="show('issue', inspection)"
-                  >登记问题</V2Button
-                >
-                <V2Button
-                  v-if="canInspect && inspection.status === 'DRAFT'"
-                  size="small"
-                  variant="ghost"
-                  :loading="saving"
-                  @click="submitInspection(inspection)"
-                  >提交检查</V2Button
-                >
-              </div>
-            </article>
           </div>
-          <p v-else>暂无检查记录。</p>
-        </V2Card>
-      </div>
+        </template>
+        <div class="quality-page__record-sections">
+          <section aria-labelledby="quality-plan-title">
+            <h3 id="quality-plan-title">检查计划</h3>
+            <div v-if="plans.length" class="quality-page__table-wrap">
+              <table class="quality-page__table v2-table--top" aria-labelledby="quality-plan-title">
+                <thead>
+                  <tr>
+                    <th scope="col">计划编号</th>
+                    <th scope="col">计划名称</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">周期</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="plan in plans" :key="plan.id">
+                    <th scope="row">{{ plan.planCode }}</th>
+                    <td>
+                      <V2Button
+                        size="small"
+                        variant="ghost"
+                        :aria-pressed="selectedPlanId === plan.id"
+                        @click="selectedPlanId = plan.id"
+                      >
+                        {{ plan.planName }}
+                      </V2Button>
+                    </td>
+                    <td>
+                      <V2Badge :tone="statusTone(plan.status)">{{
+                        deliveryLabel(plan.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>{{ plan.startDate }} 至 {{ plan.endDate }}</td>
+                    <td>
+                      <div class="quality-page__actions">
+                        <V2Button
+                          v-if="canPlan && plan.status === 'DRAFT'"
+                          size="small"
+                          variant="secondary"
+                          :loading="saving"
+                          @click="activatePlan(plan)"
+                          >激活</V2Button
+                        >
+                        <V2Button
+                          v-if="canPlan && plan.status === 'ACTIVE'"
+                          size="small"
+                          variant="ghost"
+                          :loading="saving"
+                          @click="finishPlan(plan)"
+                          >完成</V2Button
+                        >
+                        <span v-if="!canPlan || !['DRAFT', 'ACTIVE'].includes(plan.status)">—</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无检查计划。</p>
+          </section>
 
-      <V2Card title="问题、整改与后果" :subtitle="`共 ${issues.length} 条`">
-        <div v-if="issues.length" class="quality-page__table-wrap">
-          <table class="quality-page__table">
-            <thead>
-              <tr>
-                <th scope="col">问题编号 / 标题</th>
-                <th scope="col">描述</th>
-                <th scope="col">严重度</th>
-                <th scope="col">状态</th>
-                <th scope="col">整改期限</th>
-                <th scope="col">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="issue in issues" :key="issue.id">
-                <th scope="row">
-                  <strong>{{ issue.issueCode }}</strong>
-                  <span>{{ issue.title }}</span>
-                </th>
-                <td>{{ issue.description }}</td>
-                <td>
-                  <V2Badge :tone="statusTone(issue.severity)">{{
-                    deliveryLabel(issue.severity)
-                  }}</V2Badge>
-                </td>
-                <td>
-                  <V2Badge :tone="statusTone(issue.status)">{{
-                    deliveryLabel(issue.status)
-                  }}</V2Badge>
-                </td>
-                <td>{{ issue.dueDate }}</td>
-                <td>
-                  <div class="quality-page__actions">
-                    <V2Button size="small" variant="secondary" @click="openTrace(issue)"
-                      >追溯</V2Button
-                    >
-                    <V2Button
-                      v-if="canInspect && issue.status === 'OPEN'"
-                      size="small"
-                      variant="ghost"
-                      @click="
-                        showEvidence({
-                          businessType: 'QS_ISSUE',
-                          businessId: issue.id,
-                          documentType: 'ISSUE_EVIDENCE',
-                          label: '问题证据',
-                          issue,
-                        })
-                      "
-                      >上传问题证据</V2Button
-                    >
-                    <V2Button
-                      v-if="canRectify && issue.status === 'RECTIFYING'"
-                      size="small"
-                      @click="show('rectification', issue)"
-                      >提交整改</V2Button
-                    >
-                    <V2Button
-                      v-if="canReinspect && issue.status === 'PENDING_REINSPECTION'"
-                      size="small"
-                      @click="showReinspection(issue)"
-                      >复检</V2Button
-                    >
-                    <V2Button
-                      v-if="
-                        canConsequence && issue.status === 'CLOSED' && issue.responsiblePartnerId
-                      "
-                      size="small"
-                      variant="ghost"
-                      @click="show('consequence', issue)"
-                      >登记后果</V2Button
-                    >
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <section aria-labelledby="quality-inspection-title">
+            <h3 id="quality-inspection-title">
+              检查记录{{ selectedPlan ? ` · ${selectedPlan.planName}` : '' }}
+            </h3>
+            <div v-if="inspections.length" class="quality-page__table-wrap">
+              <table
+                class="quality-page__table v2-table--top"
+                aria-labelledby="quality-inspection-title"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">检查编号</th>
+                    <th scope="col">位置 / 摘要</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">日期</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="inspection in inspections" :key="inspection.id">
+                    <th scope="row">{{ inspection.inspectionCode }}</th>
+                    <td>{{ inspection.location }} · {{ inspection.summary }}</td>
+                    <td>
+                      <V2Badge :tone="statusTone(inspection.status)">{{
+                        deliveryLabel(inspection.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>{{ inspection.inspectionDate }}</td>
+                    <td>
+                      <div class="quality-page__actions">
+                        <V2Button
+                          v-if="canInspect && inspection.status === 'DRAFT'"
+                          size="small"
+                          variant="ghost"
+                          @click="
+                            showEvidence({
+                              businessType: 'QS_INSPECTION',
+                              businessId: inspection.id,
+                              documentType: 'INSPECTION_EVIDENCE',
+                              label: '检查证据',
+                            })
+                          "
+                          >上传检查证据</V2Button
+                        >
+                        <V2Button
+                          v-if="canInspect && inspection.status === 'DRAFT'"
+                          size="small"
+                          variant="secondary"
+                          @click="show('issue', inspection)"
+                          >登记问题</V2Button
+                        >
+                        <V2Button
+                          v-if="canInspect && inspection.status === 'DRAFT'"
+                          size="small"
+                          variant="ghost"
+                          :loading="saving"
+                          @click="submitInspection(inspection)"
+                          >提交检查</V2Button
+                        >
+                        <span v-if="!canInspect || inspection.status !== 'DRAFT'">—</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无检查记录。</p>
+          </section>
+
+          <section aria-labelledby="quality-issue-title">
+            <h3 id="quality-issue-title">问题、整改与后果</h3>
+            <div v-if="issues.length" class="quality-page__table-wrap">
+              <table
+                class="quality-page__table v2-table--top"
+                aria-labelledby="quality-issue-title"
+              >
+                <thead>
+                  <tr>
+                    <th scope="col">问题编号</th>
+                    <th scope="col">标题</th>
+                    <th scope="col">描述</th>
+                    <th scope="col">严重度</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">整改期限</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="issue in issues" :key="issue.id">
+                    <th scope="row">{{ issue.issueCode }}</th>
+                    <td>{{ issue.title }}</td>
+                    <td>{{ issue.description }}</td>
+                    <td>
+                      <V2Badge :tone="statusTone(issue.severity)">{{
+                        deliveryLabel(issue.severity)
+                      }}</V2Badge>
+                    </td>
+                    <td>
+                      <V2Badge :tone="statusTone(issue.status)">{{
+                        deliveryLabel(issue.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>{{ issue.dueDate }}</td>
+                    <td>
+                      <div class="quality-page__actions">
+                        <V2Button size="small" variant="secondary" @click="openTrace(issue)"
+                          >追溯</V2Button
+                        >
+                        <V2Button
+                          v-if="canInspect && issue.status === 'OPEN'"
+                          size="small"
+                          variant="ghost"
+                          @click="
+                            showEvidence({
+                              businessType: 'QS_ISSUE',
+                              businessId: issue.id,
+                              documentType: 'ISSUE_EVIDENCE',
+                              label: '问题证据',
+                              issue,
+                            })
+                          "
+                          >上传问题证据</V2Button
+                        >
+                        <V2Button
+                          v-if="canRectify && issue.status === 'RECTIFYING'"
+                          size="small"
+                          @click="show('rectification', issue)"
+                          >提交整改</V2Button
+                        >
+                        <V2Button
+                          v-if="canReinspect && issue.status === 'PENDING_REINSPECTION'"
+                          size="small"
+                          @click="showReinspection(issue)"
+                          >复检</V2Button
+                        >
+                        <V2Button
+                          v-if="
+                            canConsequence &&
+                            issue.status === 'CLOSED' &&
+                            issue.responsiblePartnerId
+                          "
+                          size="small"
+                          variant="ghost"
+                          @click="show('consequence', issue)"
+                          >登记后果</V2Button
+                        >
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p v-else>暂无质量安全问题。</p>
+          </section>
         </div>
-        <p v-else>暂无质量安全问题。</p>
       </V2Card>
     </template>
 
@@ -1072,41 +1131,27 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-2);
   align-items: center;
 }
-.quality-page__columns,
 .quality-page__evidence {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--v2-space-3);
 }
-.quality-page__stack {
+.quality-page__record-sections {
   display: grid;
-  gap: var(--v2-space-2);
+  gap: var(--v2-space-4);
+}
+.quality-page__record-sections h3 {
+  margin: 0 0 var(--v2-space-2);
+  color: var(--v2-color-text-strong);
+  font-size: var(--v2-font-size-15);
+  font-weight: var(--v2-font-weight-semibold);
+  line-height: var(--v2-line-height-tight);
 }
 .quality-page__table-wrap {
   overflow-x: auto;
 }
 .quality-page__table {
-  width: 100%;
   min-width: 64rem;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-  line-height: var(--v2-line-height-ui);
-}
-.quality-page__table th,
-.quality-page__table td {
-  padding: var(--v2-space-3);
-  border-bottom: var(--v2-border-width) solid var(--v2-color-border-subtle);
-  text-align: left;
-  vertical-align: top;
-}
-.quality-page__table thead th {
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface-subtle);
-  font-weight: var(--v2-font-weight-semibold);
-}
-.quality-page__table tbody th {
-  color: var(--v2-color-text-strong);
-  font-weight: var(--v2-font-weight-semibold);
 }
 .quality-page__table tbody th span {
   display: block;
@@ -1114,33 +1159,10 @@ onBeforeUnmount(() => {
   color: var(--v2-color-text-secondary);
   font-weight: var(--v2-font-weight-regular);
 }
-.quality-page__item {
-  display: grid;
-  gap: var(--v2-space-2);
-  padding: var(--v2-space-3);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
-}
-.quality-page__item > strong,
-.quality-page__item > h3 {
-  font-size: var(--v2-font-size-14);
-  font-weight: var(--v2-font-weight-semibold);
-}
-.quality-page__title {
-  padding: 0;
-  color: var(--v2-color-primary-hover);
-  background: none;
-  border: 0;
-  font: inherit;
-  font-size: var(--v2-font-size-14);
-  font-weight: var(--v2-font-weight-semibold);
-  text-align: left;
-  cursor: pointer;
-}
 .quality-page__timeline {
   display: grid;
   gap: var(--v2-space-2);
-  padding-left: 1.25rem;
+  padding-left: var(--v2-space-5);
 }
 .quality-page__timeline li {
   padding-left: var(--v2-space-2);
@@ -1155,27 +1177,8 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-3);
   align-items: end;
 }
-.quality-page__form label {
-  display: grid;
-  gap: var(--v2-space-1);
-  color: var(--v2-color-text-secondary);
-}
-.quality-page__form input,
 .quality-page__form textarea {
-  min-height: 2.5rem;
-  padding: var(--v2-space-2);
-  color: var(--v2-color-text);
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-  border-radius: var(--v2-radius-md);
-  font: inherit;
-}
-.quality-page__form :deep(.v2-field__control) {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--v2-color-primary) 22%, var(--v2-color-surface));
-}
-.quality-page__form textarea {
-  min-height: 6rem;
+  min-height: var(--v2-control-height-textarea);
   resize: vertical;
 }
 .quality-page__wide {
@@ -1187,7 +1190,6 @@ onBeforeUnmount(() => {
   }
 }
 @media (max-width: 40rem) {
-  .quality-page__columns,
   .quality-page__evidence,
   .quality-page__form {
     grid-template-columns: 1fr;

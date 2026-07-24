@@ -5,6 +5,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   V2Alert,
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -58,6 +59,51 @@ function paginationBlocks(source: string) {
     openingTag,
     body,
   }))
+}
+
+function listTablesOutsideCards(source: string) {
+  const templateStart = source.indexOf('<template')
+  const templateEnd = source.lastIndexOf('</template>')
+  if (templateStart < 0 || templateEnd < 0) return []
+
+  const stack: Array<{ tag: string; classes: string }> = []
+  const violations: number[] = []
+  const template = source.slice(templateStart, templateEnd)
+  const tags = /<(?:[^>"']|"[^"]*"|'[^']*')+>/g
+
+  for (const match of template.matchAll(tags)) {
+    const markup = match[0]
+    if (markup.startsWith('<!--')) continue
+    const closing = /^<\s*\//.test(markup)
+    const tag = /^<\s*\/?\s*([A-Za-z][\w-]*)/.exec(markup)?.[1]
+    if (!tag) continue
+
+    if (closing) {
+      for (let index = stack.length - 1; index >= 0; index -= 1) {
+        if (stack[index]?.tag === tag) {
+          stack.length = index
+          break
+        }
+      }
+      continue
+    }
+
+    if (tag === 'table') {
+      const inListRegion = stack.some(({ classes }) =>
+        /(?:^|\s)(?:table-wrap|[\w-]+__table-wrap)(?:\s|$)/.test(classes),
+      )
+      const hasCard = stack.some(({ tag: ancestor }) => ancestor === 'V2Card')
+      const inDialog = stack.some(({ tag: ancestor }) => ancestor === 'V2Dialog')
+      if (inListRegion && !hasCard && !inDialog) {
+        violations.push(source.slice(0, templateStart + match.index).split('\n').length)
+      }
+    }
+
+    if (!/\/\s*>$/.test(markup)) {
+      stack.push({ tag, classes: /\sclass=(['"])(.*?)\1/.exec(markup)?.[2] ?? '' })
+    }
+  }
+  return violations
 }
 
 function styleRules(source: string) {
@@ -142,6 +188,27 @@ describe('Clean-room V2 design system', () => {
     )
   })
 
+  it('keeps overflow actions in a shared menu with Escape and outside-click closing', async () => {
+    const wrapper = mount(V2ActionMenu, {
+      attachTo: document.body,
+      props: { label: '演示项目更多操作' },
+      slots: { default: '<button type="button">编辑</button>' },
+    })
+    const details = wrapper.get('details')
+    const summary = wrapper.get('summary')
+
+    ;(details.element as HTMLDetailsElement).open = true
+    await details.trigger('keydown', { key: 'Escape' })
+    expect((details.element as HTMLDetailsElement).open).toBe(false)
+    expect(document.activeElement).toBe(summary.element)
+
+    ;(details.element as HTMLDetailsElement).open = true
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await flushPromises()
+    expect((details.element as HTMLDetailsElement).open).toBe(false)
+    wrapper.unmount()
+  })
+
   it('associates input hints and errors and emits model updates', async () => {
     const wrapper = mount(V2Input, {
       props: { label: '项目名称', hint: '输入项目名称', modelValue: '' },
@@ -158,6 +225,9 @@ describe('Clean-room V2 design system', () => {
     expect(input.attributes('aria-describedby')).toBe(
       wrapper.get('.v2-field__error').attributes('id'),
     )
+
+    await wrapper.setProps({ hideLabel: true })
+    expect(wrapper.get('.v2-field__label').classes()).toContain('v2-visually-hidden')
   })
 
   it('renders an anchored select with placeholder and disabled options', async () => {
@@ -257,9 +327,10 @@ describe('Clean-room V2 design system', () => {
   it('covers card, badge, alert and skeleton status primitives', async () => {
     const card = mount(V2Card, {
       props: { title: '经营健康度', subtitle: '当前报告期', interactive: true },
-      slots: { default: '面板内容', footer: '底部动作' },
+      slots: { default: '面板内容', footer: '底部动作', 'title-extra': '4 项' },
     })
     expect(card.get('.v2-card__title').text()).toBe('经营健康度')
+    expect(card.get('.v2-card__title-row').text()).toBe('经营健康度4 项')
     expect(card.get('h2').exists()).toBe(true)
     expect(card.classes()).toContain('v2-card--interactive')
     expect(card.get('.v2-card__body').text()).toBe('面板内容')
@@ -502,10 +573,31 @@ describe('Clean-room V2 design system', () => {
       expect(workflow).toContain('pnpm test:e2e:migration-gate')
     })
 
+    it('lists every exported public V2 component in the current standard', () => {
+      const standard = readFileSync(uiStandardPath, 'utf-8')
+      const componentIndex = readFileSync(resolve(sourceRoot, 'components/index.ts'), 'utf-8')
+      const exportedComponents = [...componentIndex.matchAll(/default as (V2[A-Za-z]+)/g)].map(
+        ([, name]) => name,
+      )
+
+      expect(exportedComponents.length).toBeGreaterThan(0)
+      for (const name of exportedComponents) expect(standard).toContain(`\`${name}\``)
+      expect(standard).toContain('`showToast`')
+      expect(standard).toContain('`useToastMessage`')
+    })
+
     it('keeps project and report-period context selectors owned by the public shell', () => {
       const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
+      const navigationCatalog = readFileSync(resolve(sourceRoot, 'navigation/catalog.ts'), 'utf-8')
+      const router = readFileSync(resolve(sourceRoot, 'router.ts'), 'utf-8')
       expect(appShell).toContain('id="global-project"')
       expect(appShell).toContain('id="global-report-period"')
+      expect(appShell).toContain(':disabled="!workspaceStore.projects.length"')
+      expect(appShell).toContain(':disabled="!workspaceStore.reportPeriods.length"')
+      expect(appShell).not.toContain('projectFilterUnsupported')
+      expect(appShell).not.toContain('periodFilterUnsupported')
+      expect(navigationCatalog).not.toContain('workspaceContext')
+      expect(router).not.toContain('workspaceContext')
       expect(appShell).not.toContain('const dashboardRole')
 
       const copiedContextControl =
@@ -515,6 +607,14 @@ describe('Clean-room V2 design system', () => {
         expect(source, `${name} copied public-shell id`).not.toMatch(
           /\bid=['"]global-(?:project|report-period)['"]/,
         )
+      }
+    })
+
+    it('wraps every top-level list table in one V2Card', () => {
+      const standard = readFileSync(uiStandardPath, 'utf-8')
+      expect(standard).toContain('顶层列表表格与分页必须置于同一个 `V2Card`')
+      for (const { name, source } of migratedPages) {
+        expect(listTablesOutsideCards(source), `${name} has an uncarded list table`).toEqual([])
       }
     })
 
@@ -533,6 +633,11 @@ describe('Clean-room V2 design system', () => {
         .filter((name) => /^(?:pages|layouts)[\\/]/.test(name))
         .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
         .join('\n')
+      const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+      const dashboard = readFileSync(
+        resolve(sourceRoot, 'pages/dashboard/DashboardPage.vue'),
+        'utf-8',
+      )
       const declaredTokens = new Set(
         readFileSync(resolve(sourceRoot, 'styles/tokens.css'), 'utf-8').match(
           /--v2-[\w-]+(?=\s*:)/g,
@@ -563,12 +668,32 @@ describe('Clean-room V2 design system', () => {
 
       expect(unknownTokens).toEqual([])
       expect(implementationSources).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i)
-      expect(implementationSources).not.toMatch(/font-size:\s*[0-9.]+(?:px|rem)\b/i)
+      expect(implementationSources).not.toMatch(/font-size:\s*[^;{}]*\b[0-9.]+(?:px|rem)\b/i)
+      expect(implementationSources).not.toMatch(/font-weight:\s*[0-9]+\b/i)
+      expect(implementationSources).not.toMatch(/line-height:\s*[0-9.]+(?:px|rem)?\b/i)
+      expect(implementationSources).not.toMatch(/font:\s*[^;{}]*\/\s*[0-9.]+(?:px|rem)?\b/i)
+      expect(migratedPages.map(({ source }) => source).join('\n')).not.toMatch(
+        /(?:gap|padding(?:-[\w-]+)?|margin(?:-[\w-]+)?|min-height|height|border-radius)\s*:[^;{}]*\b(?:[1-9][0-9]*|0?\.[0-9]+)(?:px|rem)\b/i,
+      )
+      expect(componentCss).toMatch(
+        /\.v2-card__title \{[\s\S]*?line-height: var\(--v2-line-height-tight\);/,
+      )
+      expect(componentCss).toMatch(
+        /\.v2-dialog__title \{[\s\S]*?line-height: var\(--v2-line-height-tight\);/,
+      )
+      expect(dashboard).toMatch(
+        /\.highest-risk h2 \{[\s\S]*?line-height: var\(--v2-line-height-tight\);/,
+      )
+      expect(dashboard).toMatch(
+        /\.highest-risk p \{[\s\S]*?line-height: var\(--v2-line-height-body\);/,
+      )
       expect(pageAndLayoutSources).not.toMatch(/\.(?:sr-only|v2-visually-hidden)\s*\{/)
     })
 
     it('keeps workspace table material centralized and prevents page-level overrides', () => {
       const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+      const pageTableMaterial =
+        /(?:^|;)\s*(?:width|border-collapse|font-size|line-height|padding|border(?:-bottom|-block-end)?|text-align|vertical-align|color|background|font-weight|white-space)\s*:/i
       expect(componentCss).toMatch(
         /#shell-main-content table \{[\s\S]*?border-collapse: collapse;[\s\S]*?font-size: var\(--v2-font-size-12\);[\s\S]*?line-height: var\(--v2-line-height-ui\);/,
       )
@@ -578,8 +703,16 @@ describe('Clean-room V2 design system', () => {
 
       for (const { name, source } of migratedPages) {
         for (const rule of styleRules(source)) {
-          if (!rule.selector.includes('table') && !/\b(?:th|td)\b/.test(rule.selector)) continue
+          const targetsGenericTableMaterial = rule.selector.split(',').some((part) => {
+            const selector = part.trim()
+            if (/[:>+~]/.test(selector)) return false
+            return /^(?:(?:table|[.#][\w-]*table)(?:\s+(?:th|td))?|th|td)$/.test(selector)
+          })
+          if (!targetsGenericTableMaterial) continue
           expect(rule.declarations, `${name}: ${rule.selector.trim()}`).not.toContain('!important')
+          expect(rule.declarations, `${name}: ${rule.selector.trim()}`).not.toMatch(
+            pageTableMaterial,
+          )
         }
       }
     })
@@ -640,6 +773,58 @@ describe('Clean-room V2 design system', () => {
       }
     })
 
+    it('keeps commercial list headings unified', () => {
+      const headings = {
+        'pages/commercial/ContractPage.vue': '合同台账',
+        'pages/commercial/VariationPage.vue': '签证变更',
+        'pages/commercial/BidCostPage.vue': '投标成本',
+        'pages/commercial/CostTargetPage.vue': '目标成本版本',
+        'pages/commercial/CostLedgerPage.vue': '成本台账',
+        'pages/commercial/CostSummaryPage.vue': '成本核对',
+        'pages/commercial/CostControlPage.vue': '动态利润控制',
+        'pages/commercial/BudgetPage.vue': '项目预算',
+        'pages/commercial/ProductionMeasurementPage.vue': '产值计量与业主结算',
+      }
+
+      for (const [name, title] of Object.entries(headings)) {
+        const source = readFileSync(resolve(sourceRoot, name), 'utf-8')
+        const titleCards = [...source.matchAll(/<V2Card\b[^>]*>/g)].map(([tag]) => tag)
+        expect(
+          titleCards.some(
+            (tag) => tag.includes(`title="${title}"`) && tag.includes(':heading-level="1"'),
+          ),
+          `${name} missing shared H1 title card`,
+        ).toBe(true)
+      }
+
+      const contract = readFileSync(
+        resolve(sourceRoot, 'pages/commercial/ContractPage.vue'),
+        'utf-8',
+      )
+      expect(contract.indexOf('title="合同台账"')).toBeLessThan(
+        contract.indexOf('contract-page__kpi-grid'),
+      )
+    })
+
+    it('keeps every search and filter control label hidden with an in-control prompt', () => {
+      const controlPattern = /<V2(?:Input|Select)\b[\s\S]*?\/>/g
+      const filterBindingPattern =
+        /(?:\bv-model|:model-value)="filter\.|\btype="search"|\bclass="[^"]*filter|\bid="global-(?:project|report-period)"/
+      let filterControlCount = 0
+
+      for (const { name, source } of migratedSurfaces) {
+        for (const [control] of source.matchAll(controlPattern)) {
+          if (!filterBindingPattern.test(control)) continue
+          filterControlCount += 1
+          expect(control, `${name} filter control accessible label`).toMatch(/\blabel=/)
+          expect(control, `${name} visible filter label`).toContain('hide-label')
+          expect(control, `${name} missing in-control prompt`).toMatch(/\bplaceholder=/)
+        }
+      }
+
+      expect(filterControlCount).toBeGreaterThanOrEqual(21)
+    })
+
     it('keeps native browser confirmation dialogs out of V2 pages', () => {
       const pageSources = migratedPages.map(({ source }) => source).join('\n')
 
@@ -661,6 +846,37 @@ describe('Clean-room V2 design system', () => {
       }
     })
 
+    it('consolidates related lifecycle ledgers instead of sibling record cards', () => {
+      const standard = readFileSync(uiStandardPath, 'utf-8')
+      expect(standard).toContain('同一主对象或生命周期的阶段账册合并为一个复合数据区')
+      expect(standard).toContain('跨项目子记录不得在概览下失去项目归属后直接铺开')
+
+      const lifecyclePages = {
+        'pages/delivery/QualitySafetyPage.vue': ['质量安全闭环台账'],
+        'pages/delivery/TechnicalManagementPage.vue': [
+          '方案、图纸、会审与 RFI',
+          '交底、施工依据与验收归档',
+        ],
+        'pages/delivery/ProjectCloseoutPage.vue': ['全部项目收尾概览', '收尾主线', '收尾阶段台账'],
+      }
+
+      for (const [name, titles] of Object.entries(lifecyclePages)) {
+        const source = readFileSync(resolve(sourceRoot, name), 'utf-8')
+        const pageBody = source.split('<V2Dialog', 1)[0] ?? ''
+        expect(pageBody, `${name} repeated record article`).not.toMatch(
+          /<article\b(?:(?:"[^"]*"|'[^']*')|[^'">])*\bv-for=/,
+        )
+        for (const title of titles) expect(pageBody).toContain(`title="${title}"`)
+      }
+
+      const closeout = readFileSync(
+        resolve(sourceRoot, 'pages/delivery/ProjectCloseoutPage.vue'),
+        'utf-8',
+      )
+      expect(closeout).toContain('v-if="closeout && projectId"')
+      expect(closeout).toContain('v-if="projectId && closeout"')
+    })
+
     it('keeps implementation wording out of every migrated page', () => {
       const pageSources = migratedPages.map(({ source }) => source).join('\n')
 
@@ -677,6 +893,12 @@ describe('Clean-room V2 design system', () => {
           const type = tag.match(/\btype=["']([^"']+)["']/)?.[1]
           expect(allowedNativeTypes.has(type ?? ''), `${name} ${tag}`).toBe(true)
         }
+      }
+    })
+
+    it('keeps page actions on the shared button component', () => {
+      for (const { name, source } of migratedPages) {
+        expect(source, `${name} native action button`).not.toMatch(/<button\b/)
       }
     })
 
@@ -700,9 +922,47 @@ describe('Clean-room V2 design system', () => {
       }
     })
 
+    it('keeps commercial dialogs business-labelled with reachable form actions', () => {
+      const commercialPages = [
+        'pages/commercial/ContractPage.vue',
+        'pages/commercial/VariationPage.vue',
+        'pages/commercial/BidCostPage.vue',
+        'pages/commercial/CostTargetPage.vue',
+        'pages/commercial/CostLedgerPage.vue',
+        'pages/commercial/CostSummaryPage.vue',
+        'pages/commercial/CostControlPage.vue',
+        'pages/commercial/BudgetPage.vue',
+        'pages/commercial/ProductionMeasurementPage.vue',
+      ]
+      const rawVisibleIdentifier =
+        /<dt>\s*ID\s*<\/dt>|label=(['"`])[^'"`]*ID\1|\{\{\s*(?:item|detail|line)\.(?:costSubjectId|measurementLineId|responsibleUserId|costStatus)\s*\}\}/
+
+      for (const name of commercialPages) {
+        const source = readFileSync(resolve(sourceRoot, name), 'utf-8')
+        for (const [index, { body }] of dialogBlocks(source).entries()) {
+          const evidence = `${name} V2Dialog #${index + 1}`
+          expect(body, `${evidence} raw visible identifier`).not.toMatch(rawVisibleIdentifier)
+          if (/<form\b/.test(body)) {
+            expect(body, `${evidence} missing footer actions`).toMatch(/<template\b[^>]*#footer/)
+          }
+        }
+      }
+
+      const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+      expect(componentCss).toMatch(
+        /\.v2-dialog__footer \{[\s\S]*?position: sticky;[\s\S]*?bottom: 0;/,
+      )
+    })
+
     it('enforces detail dialog and shared data typography across every migrated page', () => {
       const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
 
+      expect(componentCss).toMatch(
+        /\.v2-dialog__body \{[\s\S]*?font-size: var\(--v2-font-size-12\);[\s\S]*?line-height: var\(--v2-line-height-body\);[\s\S]*?overflow-wrap: anywhere;/,
+      )
+      expect(componentCss).toMatch(
+        /#shell-main-content \[class\*='__record-sections'\] > section \{[\s\S]*?min-width: 0;/,
+      )
       expect(componentCss).toMatch(
         /\.v2-card__body :where\(dl, table\),[\s\S]*?\.v2-dialog__body :where\(dl, table\) \{[\s\S]*?font-size: var\(--v2-font-size-12\);[\s\S]*?line-height: var\(--v2-line-height-ui\);/,
       )
@@ -724,11 +984,109 @@ describe('Clean-room V2 design system', () => {
           }
           for (const [button] of body.matchAll(/<V2Button\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g)) {
             expect(button, `${evidence} detail/edit action material`).toMatch(
-              /\btype=['"]submit['"]/,
+              /\btype=['"](?:button|submit)['"]/,
             )
           }
         }
       }
+    })
+
+    it('keeps the public shell scrollable and all transient success feedback on toast', () => {
+      const standard = readFileSync(uiStandardPath, 'utf-8')
+      const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
+
+      expect(standard).toContain('公共壳主内容区必须可独立纵向滚动')
+      expect(standard).toContain('页面不得用占据文档流的成功横幅替代 Toast')
+      expect(appShell).toMatch(/\.app-shell \{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden;/)
+      expect(appShell).toMatch(
+        /\.app-shell__content \{[\s\S]*?min-height: 0;[\s\S]*?flex: 1;[\s\S]*?overflow-y: auto;/,
+      )
+      for (const { name, source } of migratedPages) {
+        if (name.replaceAll('\\', '/') === 'auth/SessionPage.vue') continue
+        expect(source, `${name} renders transient success as an alert`).not.toMatch(
+          /<V2Alert\b[^>]*tone="success"/,
+        )
+        if (source.includes('successMessage')) {
+          expect(source, `${name} does not bridge success state to the shared toast`).toContain(
+            'useToastMessage',
+          )
+        }
+      }
+      const dashboard = readFileSync(
+        resolve(sourceRoot, 'pages/dashboard/DashboardPage.vue'),
+        'utf-8',
+      )
+      expect(dashboard).toContain("useToastMessage('info', '操作结果')")
+      expect(dashboard).not.toContain('risk-evaluate-feedback')
+    })
+
+    it('keeps long table and trace facts readable and business-labelled', () => {
+      const dailyLog = readFileSync(resolve(sourceRoot, 'pages/delivery/DailyLogPage.vue'), 'utf-8')
+      const technical = readFileSync(
+        resolve(sourceRoot, 'pages/delivery/TechnicalManagementPage.vue'),
+        'utf-8',
+      )
+      const quality = readFileSync(
+        resolve(sourceRoot, 'pages/delivery/QualitySafetyPage.vue'),
+        'utf-8',
+      )
+      const closeout = readFileSync(
+        resolve(sourceRoot, 'pages/delivery/ProjectCloseoutPage.vue'),
+        'utf-8',
+      )
+      const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+
+      expect(dailyLog).toMatch(/\.daily-log-page__list-table \{[\s\S]*?table-layout: fixed;/)
+      expect(dailyLog).toMatch(
+        /class="daily-log-page__summary daily-log-page__summary-cell v2-table-cell--wrap"/,
+      )
+      expect(componentCss).toMatch(
+        /#shell-main-content table \.v2-table-cell--wrap \{[\s\S]*?white-space: normal;[\s\S]*?overflow-wrap: anywhere;[\s\S]*?word-break: break-word;/,
+      )
+      expect(technical).toContain('<th scope="col">图纸编码</th>')
+      expect(technical).toContain('<th scope="col">图纸名称</th>')
+      expect(technical).not.toContain('{{ drawing.drawingCode }} · {{ drawing.drawingName }}')
+      expect(technical).not.toContain('technical-page__toolbar')
+      expect(technical).not.toContain('subtitle="按技术闭环阶段集中核对与处理"')
+      expect(technical).toMatch(
+        /<V2Card title="方案、图纸、会审与 RFI"[\s\S]*?<template #title-extra>[\s\S]*?technical-page__facts[\s\S]*?<template #actions>[\s\S]*?technical-page__actions/,
+      )
+      expect(quality).not.toContain(':subtitle="`计划 ${plans.length}')
+      expect(quality).toMatch(
+        /<V2Card title="质量安全闭环台账">[\s\S]*?<template #title-extra>[\s\S]*?quality-page__facts[\s\S]*?计划 \{\{ plans\.length \}\}[\s\S]*?检查 \{\{ inspections\.length \}\}[\s\S]*?问题 \{\{ issues\.length \}\}/,
+      )
+      expect(closeout).toContain('deliveryLabel(item.receivableType)')
+      expect(closeout).toContain('formatAmount(item.allocatedAmount)')
+      for (const [tableWrap] of closeout.matchAll(
+        /<div\b(?:(?:"[^"]*"|'[^']*')|[^'">])*\bclass="closeout-page__table-wrap"(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g,
+      )) {
+        expect(tableWrap).toContain('role="region"')
+        expect(tableWrap).toMatch(/aria-label(?:ledby)?="[^"]+"/)
+        expect(tableWrap).toContain('tabindex="0"')
+      }
+    })
+
+    it('keeps business codes in dedicated table columns on every page', () => {
+      const violations: string[] = []
+
+      for (const { name, source } of migratedPages) {
+        for (const match of source.matchAll(/<(?:th|td)\b[^>]*>([\s\S]*?)<\/(?:th|td)>/g)) {
+          const cell = match[1] ?? ''
+          if (cell.includes('<table')) continue
+          const expressions = [...cell.matchAll(/\{\{([\s\S]*?)\}\}/g)].map(
+            ([, expression]) => expression?.trim() ?? '',
+          )
+          if (
+            expressions.length > 1 &&
+            expressions.some((expression) => /(?:code|_code)/i.test(expression))
+          ) {
+            const line = source.slice(0, match.index).split('\n').length
+            violations.push(`${name}:${line}`)
+          }
+        }
+      }
+
+      expect(violations, 'business code cells must not combine other fields').toEqual([])
     })
 
     it('enforces every pagination block independently', () => {
@@ -770,19 +1128,35 @@ describe('Clean-room V2 design system', () => {
 
     it('keeps shared component material owned by the shared styles', () => {
       const sharedMaterialSelector =
-        /\.(?:v2-button|v2-glass-button|v2-card|v2-badge|v2-dialog__panel)\b/
+        /\.(?:v2-button|v2-action-menu|v2-glass-button|v2-card|v2-badge|v2-dialog__panel|v2-field__control)\b/
+      const nativeFieldSelector = /\b(?:input|textarea|select)\b/
       const sharedMaterialProperty =
         /(?:^|;)\s*(?:color|background(?:-color)?|border(?:-color|-radius)?|box-shadow|backdrop-filter|font(?:-family|-size|-weight)?)\s*:/i
 
       for (const { name, source } of migratedSurfaces) {
         for (const { selector, declarations } of styleRules(source)) {
-          if (!sharedMaterialSelector.test(selector)) continue
+          if (!sharedMaterialSelector.test(selector) && !nativeFieldSelector.test(selector))
+            continue
           expect(
             declarations,
             `${name} overrides shared material in ${selector.trim()}`,
           ).not.toMatch(sharedMaterialProperty)
         }
       }
+    })
+
+    it('keeps overflow action shells on the shared action-menu component', () => {
+      for (const { name, source } of migratedPages) {
+        expect(source, `${name} creates a private disclosure menu`).not.toMatch(/<details\b/)
+        expect(source, `${name} copies public button classes onto native markup`).not.toMatch(
+          /\bclass=(['"])[^'"]*\bv2-button\b[^'"]*\1/,
+        )
+      }
+      const projectPage = readFileSync(
+        resolve(sourceRoot, 'pages/projects/ProjectPage.vue'),
+        'utf-8',
+      )
+      expect(projectPage).toContain('<V2ActionMenu')
     })
 
     it('keeps migrated page-specific interaction contracts', () => {
@@ -878,9 +1252,14 @@ describe('Clean-room V2 design system', () => {
       }
       for (const page of deliveryPages.slice(1)) {
         expect(page).toMatch(
-          /__item > (?:strong|h3)[\s\S]*?font-size: var\(--v2-font-size-14\);[\s\S]*?font-weight: var\(--v2-font-weight-semibold\);/,
+          /__record-sections h3[\s\S]*?font-size: var\(--v2-font-size-15\);[\s\S]*?font-weight: var\(--v2-font-weight-semibold\);[\s\S]*?line-height: var\(--v2-line-height-tight\);/,
         )
+        expect(page).not.toMatch(/__item\b/)
       }
+      expect(deliveryPages[1]).not.toContain('quality-page__title')
+      expect(deliveryPages[1]).toMatch(
+        /<V2Button[\s\S]{0,180}variant="ghost"[\s\S]{0,180}:aria-pressed="selectedPlanId === plan\.id"/,
+      )
       for (const page of deliveryPages) {
         expect(page).toContain('<template #footer>')
         expect(page).not.toMatch(/\{\{\s*(?:\w+\.)+(?:status|severity|conclusion)\s*\}\}/)
@@ -900,7 +1279,7 @@ describe('Clean-room V2 design system', () => {
       expect(projectForm).toMatch(
         /\.project-form--dialog \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
       )
-      expect(projectForm).toContain('.project-form--dialog :deep(.v2-field__control) {')
+      expect(projectForm).not.toContain('.project-form--dialog :deep(.v2-field__control)')
       expect(components).toContain('.v2-dialog-standard label:not(.v2-field) {')
       expect(components).toContain('.v2-dialog-standard .v2-field__control,')
       expect(components).toContain('var(--v2-font-size-12) / var(--v2-line-height-ui)')
@@ -923,8 +1302,9 @@ describe('Clean-room V2 design system', () => {
       expect(components).toContain('.v2-dialog__panel::-webkit-scrollbar')
       expect(components).toContain('.v2-select__menu::-webkit-scrollbar')
       expect(components).not.toContain('.v2-dialog__panel:has(.v2-select[open])')
-      expect(dailyLog).toMatch(
-        /\.daily-log-page__table th,[\s\S]*?\.daily-log-page__table td \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
+      expect(dailyLog).toContain('class="daily-log-page__table v2-table--top"')
+      expect(components).toMatch(
+        /#shell-main-content table \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
       )
       expect(dailyLog).toMatch(
         /\.daily-log-page__panel \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
@@ -935,12 +1315,7 @@ describe('Clean-room V2 design system', () => {
       expect(dailyLog).toMatch(
         /\.daily-log-page__form \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
       )
-      expect(dailyLog).toMatch(
-        /\.daily-log-page__form input,[\s\S]*?\.daily-log-page__form textarea \{[\s\S]*?background: transparent;[\s\S]*?border: 1px solid color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
-      )
-      expect(dailyLog).toMatch(
-        /\.daily-log-page__form :deep\(\.v2-field__control\) \{[\s\S]*?background: transparent;[\s\S]*?border-color: color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
-      )
+      expect(dailyLog).not.toContain('.daily-log-page__form :deep(.v2-field__control)')
       expect(dailyLog).toMatch(
         /\.daily-log-page__pagination \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,
       )
@@ -995,6 +1370,15 @@ describe('Clean-room V2 design system', () => {
 
       expect(appShell).toContain('id="global-project"')
       expect(appShell).toContain('id="global-report-period"')
+      expect(appShell).toContain(
+        'grid-template-columns: minmax(16rem, 20rem) minmax(11rem, 14rem);',
+      )
+      expect(appShell).toMatch(
+        /\.app-shell__context-controls :deep\(\.v2-field\) \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/,
+      )
+      expect(appShell).toMatch(
+        /@media \(max-width: 70rem\)[\s\S]*?\.app-shell__context-controls \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(10rem, 1fr\)\);/,
+      )
       expect(migratedPages.length).toBeGreaterThan(0)
 
       for (const { name, source } of migratedPages) {
