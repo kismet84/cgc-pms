@@ -10,6 +10,7 @@ export interface WorkflowTask {
   nodeInstanceId: string;
   businessType: string;
   businessId: string;
+  businessCode?: string;
   approverId: string;
   approverName: string;
   taskStatus: string;
@@ -40,6 +41,7 @@ export interface WorkflowRecord {
   createdAt: string;
   businessType?: string;
   businessId?: string;
+  businessCode?: string;
   title?: string;
   instanceStatus?: string;
 }
@@ -51,6 +53,7 @@ export interface WorkflowCc {
   ccUserName: string;
   businessType: string;
   businessId?: string;
+  businessCode?: string;
   title: string;
   isRead: number;
   createdTime: string;
@@ -61,6 +64,7 @@ export interface WorkflowMine {
   instanceId: string;
   businessType: string;
   businessId?: string;
+  businessCode?: string;
   title: string;
   instanceStatus: string;
   createdAt: string;
@@ -88,6 +92,7 @@ export interface WorkflowInstance {
   templateName: string;
   businessType: string;
   businessId: string;
+  businessCode?: string;
   projectId?: string;
   contractId?: string;
   title: string;

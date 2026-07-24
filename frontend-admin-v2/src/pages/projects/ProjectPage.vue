@@ -7,7 +7,7 @@ import type {
   ProjectRecord,
   ProjectUpsertCommand,
 } from '@cgc-pms/frontend-contracts'
-import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   V2Alert,
@@ -67,7 +67,7 @@ const userOptions = ref<Array<{ value: string; label: string }>>([])
 const createOpen = ref(false)
 const memberOpen = ref(false)
 const editingMemberId = ref('')
-const filter = reactive({ keyword: '', projectType: '', status: '', pageNo: 1, pageSize: 20 })
+const filter = reactive({ keyword: '', projectType: '', status: '', pageNo: 1, pageSize: 10 })
 const form = reactive<ProjectUpsertCommand>(emptyProjectCommand())
 const memberForm = reactive<ProjectMemberCommand>({
   userId: '',
@@ -125,6 +125,37 @@ const roleLabel = (value: string) =>
   PROJECT_ROLE_OPTIONS.find((item) => item.value === value)?.label ?? value
 const dictLabel = (items: DictionaryItem[], value: string) =>
   items.find((item) => item.dictValue === value)?.dictLabel ?? value
+const approvalStatusLabels: Record<string, string> = {
+  DRAFT: '草稿',
+  APPROVING: '审批中',
+  APPROVED: '已通过',
+  REJECTED: '已驳回',
+  WITHDRAWN: '已撤回',
+}
+const approvalStatusLabel = (value: string) => approvalStatusLabels[value] ?? '未知状态'
+const approvalStatusTone = (value: string) =>
+  value === 'APPROVED'
+    ? 'success'
+    : value === 'REJECTED'
+      ? 'danger'
+      : value === 'APPROVING'
+        ? 'info'
+        : 'neutral'
+const canSubmitProject = (item: ProjectRecord) =>
+  can('project:submit') && ['DRAFT', 'REJECTED'].includes(item.approvalStatus)
+const canArchiveProject = (item: ProjectRecord) => can('project:edit') && item.status === 'CLOSED'
+const hasMoreActions = (item: ProjectRecord) =>
+  can('project:member:list') ||
+  can('project:edit') ||
+  canSubmitProject(item) ||
+  canArchiveProject(item) ||
+  canDeleteProject.value
+function closeOpenProjectMenus(event: PointerEvent) {
+  if (!(event.target instanceof Node)) return
+  document.querySelectorAll<HTMLDetailsElement>('.project-page__more[open]').forEach((menu) => {
+    if (!menu.contains(event.target as Node)) menu.open = false
+  })
+}
 const confirmationCopy = computed(() => {
   const pending = pendingConfirmation.value
   if (!pending) return { title: '', description: '', confirmText: '确认', danger: false }
@@ -415,7 +446,11 @@ watch(
   () => void load(),
   { immediate: true },
 )
-onBeforeUnmount(() => controller?.abort())
+onMounted(() => document.addEventListener('pointerdown', closeOpenProjectMenus))
+onBeforeUnmount(() => {
+  controller?.abort()
+  document.removeEventListener('pointerdown', closeOpenProjectMenus)
+})
 </script>
 
 <template>
@@ -473,7 +508,7 @@ onBeforeUnmount(() => controller?.abort())
         description="调整查询条件，或联系管理员核对项目范围。"
         :heading-level="2"
       />
-      <div v-else class="project-page__table-wrap">
+      <div v-else class="project-page__table-wrap" role="region" aria-label="项目台账" tabindex="0">
         <table class="project-page__table">
           <caption class="v2-visually-hidden">
             项目台账
@@ -483,6 +518,7 @@ onBeforeUnmount(() => controller?.abort())
               <th>项目编号 / 名称</th>
               <th>项目类型</th>
               <th>项目状态</th>
+              <th>审批状态</th>
               <th>合同额</th>
               <th>操作</th>
             </tr>
@@ -497,6 +533,11 @@ onBeforeUnmount(() => controller?.abort())
               <td>
                 <V2Badge tone="info">{{ dictLabel(projectStatuses, item.status) }}</V2Badge>
               </td>
+              <td>
+                <V2Badge :tone="approvalStatusTone(item.approvalStatus)">
+                  {{ approvalStatusLabel(item.approvalStatus) }}
+                </V2Badge>
+              </td>
               <td>{{ item.contractAmount || '0' }} 元</td>
               <td>
                 <div class="project-page__actions">
@@ -506,44 +547,54 @@ onBeforeUnmount(() => controller?.abort())
                     @click="go(`/project/${item.id}/overview`)"
                     >总览</V2Button
                   >
-                  <V2Button
-                    v-if="can('project:member:list')"
-                    size="small"
-                    variant="ghost"
-                    @click="go(`/project/${item.id}/members`)"
-                    >成员</V2Button
-                  >
-                  <V2Button
-                    v-if="can('project:edit')"
-                    size="small"
-                    variant="ghost"
-                    @click="go(`/project/${item.id}/edit`)"
-                    >编辑</V2Button
-                  >
-                  <V2Button
-                    v-if="can('project:submit')"
-                    size="small"
-                    variant="ghost"
-                    :loading="saving"
-                    @click="requestProjectAction('submit', item)"
-                    >提交</V2Button
-                  >
-                  <V2Button
-                    v-if="can('project:edit')"
-                    size="small"
-                    variant="ghost"
-                    :loading="saving"
-                    @click="requestProjectAction('archive', item)"
-                    >归档</V2Button
-                  >
-                  <V2Button
-                    v-if="canDeleteProject"
-                    size="small"
-                    variant="danger"
-                    :loading="saving"
-                    @click="requestProjectAction('delete', item)"
-                    >删除</V2Button
-                  >
+                  <details v-if="hasMoreActions(item)" class="project-page__more">
+                    <summary
+                      class="v2-button v2-button--ghost v2-button--small"
+                      :aria-label="`${item.projectName}更多操作`"
+                    >
+                      更多
+                    </summary>
+                    <div class="project-page__more-menu">
+                      <V2Button
+                        v-if="can('project:member:list')"
+                        size="small"
+                        variant="ghost"
+                        @click="go(`/project/${item.id}/members`)"
+                        >成员</V2Button
+                      >
+                      <V2Button
+                        v-if="can('project:edit')"
+                        size="small"
+                        variant="ghost"
+                        @click="go(`/project/${item.id}/edit`)"
+                        >编辑</V2Button
+                      >
+                      <V2Button
+                        v-if="canSubmitProject(item)"
+                        size="small"
+                        variant="ghost"
+                        :loading="saving"
+                        @click="requestProjectAction('submit', item)"
+                        >提交</V2Button
+                      >
+                      <V2Button
+                        v-if="canArchiveProject(item)"
+                        size="small"
+                        variant="ghost"
+                        :loading="saving"
+                        @click="requestProjectAction('archive', item)"
+                        >归档</V2Button
+                      >
+                      <V2Button
+                        v-if="canDeleteProject"
+                        size="small"
+                        variant="danger"
+                        :loading="saving"
+                        @click="requestProjectAction('delete', item)"
+                        >删除</V2Button
+                      >
+                    </div>
+                  </details>
                 </div>
               </td>
             </tr>
@@ -576,13 +627,14 @@ onBeforeUnmount(() => controller?.abort())
 
     <template v-else-if="project">
       <V2Card
+        class="project-page__detail-card"
         :title="project.projectName"
         title-id="project-title"
         :heading-level="1"
         :subtitle="`${project.projectCode} · ${dictLabel(projectStatuses, project.status)}`"
       >
         <template #actions
-          ><div class="project-page__actions">
+          ><div class="project-page__actions project-page__detail-actions">
             <V2Button size="small" variant="ghost" @click="go('/project/list')">返回台账</V2Button
             ><V2Button
               size="small"
@@ -824,16 +876,47 @@ onBeforeUnmount(() => controller?.abort())
 }
 .project-page__actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: var(--v2-space-2);
-  align-items: center;
+  align-items: flex-start;
+}
+.project-page__more > summary {
+  list-style: none;
+}
+.project-page__more > summary::-webkit-details-marker {
+  display: none;
+}
+.project-page__more {
+  position: relative;
+}
+.project-page__more-menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + var(--v2-space-1));
+  right: 0;
+  display: grid;
+  min-width: 6rem;
+  gap: var(--v2-space-1);
+  padding: var(--v2-space-2);
+  background: var(--v2-color-surface);
+  border: 1px solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+  box-shadow: var(--v2-shadow-float);
+}
+.project-page__table tbody tr:nth-last-child(-n + 3) .project-page__more-menu {
+  top: auto;
+  bottom: calc(100% + var(--v2-space-1));
+}
+.project-page__more-menu .v2-button {
+  width: 100%;
+  justify-content: flex-start;
 }
 .project-page__table-wrap {
   overflow: auto;
 }
 .project-page__table {
   width: 100%;
-  min-width: 68rem;
+  min-width: 56rem;
   border-collapse: collapse;
 }
 .project-page__table th,
@@ -910,6 +993,19 @@ dd {
   }
 }
 @media (max-width: 48rem) {
+  .project-page__detail-card :deep(.v2-card__header) {
+    flex-direction: column;
+  }
+  .project-page__detail-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  .project-page__detail-actions :deep(.v2-button) {
+    width: 100%;
+    min-height: 2.75rem;
+    white-space: nowrap;
+  }
   .project-page__grid,
   .project-page__filters,
   .project-page__toolbar-card .project-page__filters,

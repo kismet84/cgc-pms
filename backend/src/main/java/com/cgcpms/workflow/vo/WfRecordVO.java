@@ -21,6 +21,7 @@ public class WfRecordVO {
     private String createdAt;
     private String businessType;
     private String businessId;
+    private String businessCode;
     private String title;
     private String instanceStatus;
 }

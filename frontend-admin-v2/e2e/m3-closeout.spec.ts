@@ -77,7 +77,7 @@ test.describe('M3 live project closeout workspace', () => {
     ['demo.closeout.collection', '核验尾款回收', '520000000000009005'],
     ['demo.closeout.warranty', '登记质保责任', '520000000000009006'],
     ['demo.closeout.defect', '登记缺陷', '520000000000009008'],
-    ['demo.closeout.defect-verify', '复验缺陷', '520000000000009009'],
+    ['demo.closeout.defect-verify', '复验缺陷', '520000000000009008'],
     ['demo.closeout.archive', '登记档案移交', '520000000000009007'],
     ['demo.closeout.close', '关闭项目', '520000000000009010'],
   ] as const) {

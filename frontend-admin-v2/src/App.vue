@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
-import { V2ErrorBoundary } from '@/components'
+import { V2ErrorBoundary, V2ToastHost } from '@/components'
 import ShellLoadingPage from '@/pages/shell/ShellLoadingPage.vue'
 </script>
 
@@ -13,6 +13,7 @@ import ShellLoadingPage from '@/pages/shell/ShellLoadingPage.vue'
       </Suspense>
     </RouterView>
   </V2ErrorBoundary>
+  <V2ToastHost />
 </template>
 
 <style>

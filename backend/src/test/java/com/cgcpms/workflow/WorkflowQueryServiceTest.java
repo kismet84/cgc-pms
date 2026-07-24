@@ -172,6 +172,18 @@ class WorkflowQueryServiceTest {
         assertEquals(WorkflowConstants.INSTANCE_RUNNING, todo.getInstanceStatus());
         assertNotNull(todo.getBusinessType());
         assertNotNull(todo.getBusinessId());
+        assertEquals("WQ-CONTRACT-33333001", todo.getBusinessCode());
+    }
+
+    @Test
+    @DisplayName("getMyTodos 支持按展示业务编号查询")
+    void getMyTodosSearchesPersistedBusinessCode() {
+        IPage<WfTaskVO> page = queryService.getMyTodos(
+                TENANT_0, USER_ADMIN, "WQ-CONTRACT-33333001",
+                null, null, null, null, 1, 20);
+
+        assertTrue(page.getRecords().stream()
+                .anyMatch(task -> String.valueOf(submittedTaskId).equals(task.getId())));
     }
 
     @Test
@@ -647,6 +659,14 @@ class WorkflowQueryServiceTest {
         assertNotNull(detail.getTemplateName());
         assertEquals(String.valueOf(USER_ADMIN), detail.getInitiatorId());
         assertNotNull(detail.getInitiatorName());
+        assertEquals("WQ-CONTRACT-33333001", detail.getBusinessCode());
+        WfTaskVO nodeTask = detail.getNodes().get(0).getTasks().stream()
+                .filter(task -> String.valueOf(submittedTaskId).equals(task.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(BUSINESS_TYPE, nodeTask.getBusinessType());
+        assertEquals("33333001", nodeTask.getBusinessId());
+        assertEquals("WQ-CONTRACT-33333001", nodeTask.getBusinessCode());
 
         // Nodes
         assertNotNull(detail.getNodes());

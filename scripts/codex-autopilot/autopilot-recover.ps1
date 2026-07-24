@@ -27,7 +27,7 @@ function Get-AutopilotStallLevel {
 function Get-AutopilotRecoveryFailureCategory {
   param([Parameter(Mandatory)][string]$Message)
   if ($Message -match '(?i)Native command failed|not installed|not available|cannot read run\.lock|AUTOPILOT_POWERSHELL7_REQUIRED') { return 'tool_config' }
-  if ($Message -match '(?i)ECONNREFUSED|Docker|database|port|runtime') { return 'environment_prereq' }
+  if ($Message -match '(?i)ECONNREFUSED|Docker|database|port|runtime') { return 'environment_prerequisite' }
   return 'integrity_conflict'
 }
 
@@ -146,7 +146,7 @@ function Get-AutopilotRecoveryDecision {
     } catch {
       $category = Get-AutopilotRecoveryFailureCategory -Message $_.Exception.Message
       if ($category -ne 'integrity_conflict') {
-        return [pscustomobject]@{ action=$(if ($category -eq 'environment_prereq') { 'PAUSE_RECOVERY_ENVIRONMENT' } else { 'PAUSE_RECOVERY_TOOL_CONFIG' }); reason=$_.Exception.Message; failureCategory=$category; runId=$lock.runId; worktree=$checkpoint.worktree; checkpointPath=$checkpointPath; issueId=$checkpoint.issueId }
+        return [pscustomobject]@{ action=$(if ($category -eq 'environment_prerequisite') { 'PAUSE_RECOVERY_ENVIRONMENT' } else { 'PAUSE_RECOVERY_TOOL_CONFIG' }); reason=$_.Exception.Message; failureCategory=$category; runId=$lock.runId; worktree=$checkpoint.worktree; checkpointPath=$checkpointPath; issueId=$checkpoint.issueId }
       }
       try { Move-AutopilotIssuePhase -Path $checkpointPath -Phase QUARANTINED -QuarantineReason $_.Exception.Message | Out-Null } catch {}
       return [pscustomobject]@{ action='QUARANTINE'; reason=$_.Exception.Message; failureCategory='integrity_conflict'; runId=$lock.runId; worktree=$checkpoint.worktree; checkpointPath=$checkpointPath; issueId=$checkpoint.issueId }

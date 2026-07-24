@@ -105,6 +105,35 @@ test.describe('M3 live project object', () => {
     }
   })
 
+  test('ledger shows approval status, ten rows, and only valid lifecycle actions', async ({
+    page,
+  }) => {
+    await login(page, 'admin')
+    await page.goto('/v2/project/list')
+    await expect(page.getByRole('columnheader', { name: '审批状态' })).toBeVisible()
+    await expect(page.locator('.project-page__table tbody tr')).toHaveCount(10)
+
+    const approving = page.getByRole('row').filter({ hasText: '审批中演示项目' })
+    await expect(approving.getByText('审批中', { exact: true })).toBeVisible()
+    await approving.locator('summary').click()
+    await expect(approving.getByRole('button', { name: /提交|归档/ })).toHaveCount(0)
+
+    const rejected = page.getByRole('row').filter({ hasText: '已驳回演示项目' })
+    await rejected.locator('summary').click()
+    await expect(rejected.getByRole('button', { name: '提交' })).toBeVisible()
+    await expect(rejected.getByRole('button', { name: '归档' })).toHaveCount(0)
+
+    await page.getByLabel('关键词').fill('全业务闭环演示项目')
+    await page.getByRole('button', { name: '查询' }).click()
+    const closed = page.getByRole('row').filter({ hasText: '全业务闭环演示项目' })
+    await expect(closed).toBeVisible()
+    await closed.locator('summary').click()
+    await expect(closed.getByRole('button', { name: '归档' })).toBeVisible()
+    await expect(closed.getByRole('button', { name: '提交' })).toHaveCount(0)
+    await page.getByLabel('关键词').click()
+    await expect(closed.locator('details')).not.toHaveAttribute('open', '')
+  })
+
   test('real query-only identity cannot see writes or member route', async ({ page }) => {
     await login(page, 'demo.business')
     await page.goto('/v2/project/list')
@@ -272,17 +301,19 @@ test.describe('M3 live project object', () => {
     await dialog.getByRole('button', { name: /^项目类型：/ }).click()
     await dialog.locator('[role="option"]:not(:disabled)').first().click()
     await dialog.getByRole('button', { name: '创建' }).click()
-    const card = page.locator('.v2-card', { hasText: name })
-    await expect(card).toBeVisible()
-    await card.getByRole('button', { name: '删除' }).click()
+    const row = page.getByRole('row').filter({ hasText: name })
+    await expect(row).toBeVisible()
+    await row.locator('summary').click()
+    await row.getByRole('button', { name: '删除' }).click()
     const confirmDialog = page.getByRole('dialog', { name: '删除项目' })
     await expect(confirmDialog).toBeVisible()
     await confirmDialog.getByRole('button', { name: '取消' }).click()
     await expect(confirmDialog).toBeHidden()
-    await expect(card).toBeVisible()
+    await expect(row).toBeVisible()
 
-    await card.getByRole('button', { name: '删除' }).click()
+    await row.locator('summary').click()
+    await row.getByRole('button', { name: '删除' }).click()
     await confirmDialog.getByRole('button', { name: '永久删除' }).click()
-    await expect(card).toHaveCount(0)
+    await expect(row).toHaveCount(0)
   })
 })

@@ -12,6 +12,7 @@ public class WfTaskVO {
     private String nodeInstanceId;
     private String businessType;
     private String businessId;
+    private String businessCode;
     private String approverId;
     private String approverName;
     private String taskStatus;

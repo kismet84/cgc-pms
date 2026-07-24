@@ -368,7 +368,7 @@ function Get-ExecutorFailureCategory {
   if ($leaf -match "^codex(\.exe)?$" -and $LogText -notmatch "OpenAI Codex v") {
     return "tool_config"
   }
-  return "quality_security"
+  return "quality_or_security"
 }
 
 function Invoke-ConfiguredIssueExecutor {
@@ -474,7 +474,7 @@ function Invoke-ConfiguredIssueExecutor {
   if ($requireChangedFiles -and $artifactChanges.artifacts.Count -eq 0) {
     return [pscustomobject]@{
       status = "blocked"
-      failureCategory = "quality_security"
+      failureCategory = "quality_or_security"
       nextAction = "STOP"
       stopReason = "STOP_NO_EXECUTION_ARTIFACTS"
       validation = @(
@@ -513,7 +513,7 @@ function New-Result {
   if (@("done", "blocked", "failed", "noop") -notcontains $Status) {
     throw "Invalid result status: $Status"
   }
-  if (@("", "none", "tool_config", "environment", "quality_security", "ready_issue_config", "execution_disabled") -notcontains $FailureCategory) {
+  if (@("", "none", "tool_config", "tool_invocation", "environment_prerequisite", "ready_issue_config", "retrieval_gap", "quality_or_security", "unknown", "execution_disabled") -notcontains $FailureCategory) {
     throw "Invalid failureCategory: $FailureCategory"
   }
 

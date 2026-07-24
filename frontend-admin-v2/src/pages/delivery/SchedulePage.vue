@@ -115,7 +115,7 @@ const projectOptions = computed(() =>
 )
 const projectLabel = computed(() =>
   projectId.value
-    ? (workspace.projects.find((item) => item.value === projectId.value)?.label ?? projectId.value)
+    ? (workspace.projects.find((item) => item.value === projectId.value)?.label ?? '—')
     : '全部项目',
 )
 const canMaintain = computed(() => hasPermission('schedule:maintain'))
@@ -633,7 +633,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
               <td v-if="!projectId">
                 {{
                   workspace.projects.find((project) => project.value === item.projectId)?.label ??
-                  `项目 ${item.projectId}`
+                  '—'
                 }}
               </td>
               <td>{{ item.planType === 'REVISION' ? '修订计划' : '基线计划' }}</td>

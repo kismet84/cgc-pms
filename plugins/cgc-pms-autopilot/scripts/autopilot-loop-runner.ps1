@@ -252,8 +252,8 @@ if ($selectedIssue.ready) {
             'closeout' { 'wait_for_owner_decision' }
             default {
                 switch ($classification.category) {
-                    'real_quality_or_security' { 'open_repair_request' }
-                    'environment_prereq' { 'refresh_then_retry' }
+                    'quality_or_security' { 'open_repair_request' }
+                    'environment_prerequisite' { 'refresh_then_retry' }
                     'ready_issue_config' { 'fix_ready_then_retry' }
                     'tool_config' { 'fix_tooling_before_retry' }
                     'none' { 'preview_only' }

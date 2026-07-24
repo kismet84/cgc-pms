@@ -284,18 +284,14 @@ test.describe('M4 budget and measurement routes', () => {
     await page.getByRole('button', { name: '保存预算' }).click()
     await expect(page.getByText('预算已创建')).toBeVisible()
 
-    let card = page
-      .locator('section.v2-card')
-      .filter({ has: page.getByRole('heading', { name: 'E2E新增预算' }) })
-    await card.getByRole('button', { name: '编辑' }).click()
+    let row = page.getByRole('row').filter({ hasText: 'E2E新增预算' })
+    await row.getByRole('button', { name: '编辑' }).click()
     await page.getByLabel('预算名称').fill('E2E编辑预算')
     await page.getByRole('button', { name: '保存预算' }).click()
     await expect(page.getByText('预算已更新')).toBeVisible()
 
-    card = page
-      .locator('section.v2-card')
-      .filter({ has: page.getByRole('heading', { name: 'E2E编辑预算' }) })
-    await card.getByRole('button', { name: '详情' }).click()
+    row = page.getByRole('row').filter({ hasText: 'E2E编辑预算' })
+    await row.getByRole('button', { name: '详情' }).click()
     await page.getByRole('button', { name: '添加明细' }).click()
     await page.getByLabel('成本科目ID').fill('SUBJECT-E2E')
     await page.getByLabel('预算金额').fill('100.00')
@@ -304,12 +300,10 @@ test.describe('M4 budget and measurement routes', () => {
     await expect(page.getByRole('dialog')).toContainText('96.67')
     await page.getByRole('button', { name: '关闭' }).click()
 
-    card = page
-      .locator('section.v2-card')
-      .filter({ has: page.getByRole('heading', { name: 'E2E编辑预算' }) })
-    await card.getByRole('button', { name: '删除' }).click()
+    row = page.getByRole('row').filter({ hasText: 'E2E编辑预算' })
+    await row.getByRole('button', { name: '删除' }).click()
     await expect(page.getByText('预算已删除')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'E2E编辑预算' })).toHaveCount(0)
+    await expect(page.getByRole('row').filter({ hasText: 'E2E编辑预算' })).toHaveCount(0)
 
     expect(operations).toEqual([
       expect.objectContaining({
@@ -346,7 +340,7 @@ test.describe('M4 budget and measurement routes', () => {
     const projectControl = page.locator('#global-project')
     await projectControl.click()
     await projectControl.locator('..').locator('[role="option"][data-value="P2"]').click()
-    await expect(page.getByRole('heading', { name: '项目二预算-全部' })).toBeVisible()
+    await expect(page.getByRole('row').filter({ hasText: '项目二预算-全部' })).toBeVisible()
 
     const periodControl = page.locator('#global-report-period')
     await periodControl.click()
@@ -356,13 +350,15 @@ test.describe('M4 budget and measurement routes', () => {
     const firstPeriod = (await periodOptions.nth(0).getAttribute('data-value'))!
     const secondPeriod = (await periodOptions.nth(1).getAttribute('data-value'))!
     await periodOptions.nth(0).click()
-    await expect(page.getByRole('heading', { name: `项目二预算-${firstPeriod}` })).toBeVisible()
+    await expect(
+      page.getByRole('row').filter({ hasText: `项目二预算-${firstPeriod}` }),
+    ).toBeVisible()
 
     await page.getByRole('link', { name: '产值计量' }).click()
-    await expect(page.getByRole('heading', { name: `ME-P2-${firstPeriod}` })).toBeVisible()
+    await expect(page.getByText(`ME-P2-${firstPeriod}`, { exact: true })).toBeVisible()
     await projectControl.click()
     await projectControl.locator('..').locator('[role="option"][data-value="P1"]').click()
-    await expect(page.getByRole('heading', { name: 'ME-1' })).toBeVisible()
+    await expect(page.getByText('ME-1', { exact: true })).toBeVisible()
     await periodControl.click()
     await periodControl
       .locator('..')
@@ -404,7 +400,7 @@ test.describe('M4 budget and measurement routes', () => {
       ),
     ).toBe(true)
   })
-  test('renders measurement in three viewports and uploads controlled evidence without numeric coercion', async ({
+  test('renders measurement in three viewports and uploads controlled evidence once', async ({
     page,
   }) => {
     const writes: string[] = []
@@ -415,14 +411,22 @@ test.describe('M4 budget and measurement routes', () => {
       '9007199254740993.12',
     )
     await page.getByRole('button', { name: '新建计量' }).click()
-    await page.getByRole('checkbox').check()
-    await page.getByLabel('本次计量量').fill('9999999999999999.9999')
-    await page.getByLabel('总体计量依据').setInputFiles({
+    const dialog = page.getByRole('dialog', { name: '新建产值计量' })
+    const contract = dialog.getByRole('button', { name: /^业主合同：/ })
+    await contract.press('ArrowDown')
+    const contractOption = contract.locator('..').getByRole('option', { name: '业主合同' })
+    await expect(contractOption).toBeFocused()
+    await contractOption.press('Enter')
+    await expect(dialog.getByRole('button', { name: '计量期间：2026-07' })).toBeVisible()
+    await expect(dialog.getByRole('checkbox')).toBeVisible()
+    await dialog.getByRole('checkbox').check()
+    await dialog.getByLabel('本次计量量').fill('9999999999999999.9999')
+    await dialog.getByLabel('总体计量依据').setInputFiles({
       name: 'measurement.pdf',
       mimeType: 'application/pdf',
       buffer: Buffer.from('controlled evidence'),
     })
-    await page.getByRole('button', { name: '创建计量' }).dblclick()
+    await dialog.getByRole('button', { name: '创建计量' }).dblclick()
     await expect(page.getByText('产值计量草稿已创建')).toBeVisible()
     expect(
       writes.filter((url) => new URL(url).pathname === '/api/production-measurements'),

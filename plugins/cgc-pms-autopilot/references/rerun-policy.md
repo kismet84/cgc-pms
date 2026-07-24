@@ -11,13 +11,11 @@ same failure repeated -> repair or blocked
 different failure -> collect stronger evidence
 ```
 
-## 分类基线
+## 分类入口
 
-1. `ECONNREFUSED`、端口未通、`actuator/health` 不通、`dev-login` 不通：`environment_prereq`
-2. `ParserError`、参数拆分错误、脚本入口不存在、工具未加载：`tool_config`
-3. 测试类/方法选择器不存在、Ready issue 验证命令失真：`ready_issue_config`
-4. 可稳定复现的断言失败、编译错误与当前 diff 相关、越权或安全断言失败：`real_quality_or_security`
-5. 编译失败但证据无法指向当前 diff、错误模式冲突、日志不充分：`unknown`
+- 一级分类唯一读取 `.agents/skills/cgc-pms-ci-gate-triage/SKILL.md`。
+- AutoPilot 子分类与动作读取 `classifier-rules.md`。
+- 不在本文件复制分类枚举或证据映射。
 
 ## 结构化输出约定
 

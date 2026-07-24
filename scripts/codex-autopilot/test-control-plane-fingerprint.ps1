@@ -9,6 +9,10 @@ if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/cod
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/control-plane-policy.md') { throw 'control-plane fingerprint does not cover its behavior policy' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/desktop-execution-policy.md') { throw 'control-plane fingerprint does not cover the desktop execution policy' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'docs/standards/codex-task-execution-policy.md') { throw 'control-plane fingerprint does not cover the shared Codex execution policy' }
+if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'AGENTS.md') { throw 'control-plane fingerprint does not cover the root hard gates' }
+if (@($realConfig.controlPlaneCanary.fingerprintPaths) -contains 'AGENTS.override.md') { throw 'control-plane fingerprint still references removed AGENTS.override.md' }
+if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/classifier-rules.md') { throw 'control-plane fingerprint does not cover classifier behavior' }
+if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/schemas/classification-result.schema.json') { throw 'control-plane fingerprint does not cover classifier schema' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains '.github/workflows/ci.yml') { throw 'control-plane fingerprint does not cover the pre-PR equivalent CI workflow' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/codex-autopilot/verify-pre-pr-ci.ps1') { throw 'control-plane fingerprint does not cover the pre-PR evidence gate' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md') { throw 'control-plane fingerprint does not cover the AutoPilot owner skill' }
@@ -19,6 +23,8 @@ if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/cod
 if ([int]$realConfig.readyPlanner.timeoutSeconds -lt 600) { throw 'ready Planner timeout budget is below the proven local planning floor' }
 $realPolicy = Get-AutopilotControlPlanePolicyDescriptor -RepoRoot (Resolve-Path (Join-Path $scriptDir '..\..')).Path -PolicyPath $realConfig.controlPlaneCanary.policyPath
 if ($realPolicy.version -ne '2' -or $realPolicy.hash -notmatch '^[a-f0-9]{64}$') { throw 'control-plane policy descriptor is invalid' }
+$realFingerprint = Get-AutopilotControlPlaneFingerprint -RepoRoot (Resolve-Path (Join-Path $scriptDir '..\..')).Path -Paths @($realConfig.controlPlaneCanary.fingerprintPaths)
+if ($realFingerprint -notmatch '^[a-f0-9]{64}$') { throw 'real control-plane fingerprint is invalid' }
 
 $root = Join-Path ([IO.Path]::GetTempPath()) ('autopilot-control-plane-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $root -Force | Out-Null

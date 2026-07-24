@@ -135,15 +135,16 @@ onBeforeUnmount(() => {
             >查询</V2Button
           >
         </div></V2Card
-      ><V2Card v-if="summary" title="筛选汇总"
-        ><dl>
-          <dt>成本总额</dt>
-          <dd>{{ summary.totalAmount }}</dd>
-          <dt>税额</dt>
-          <dd>{{ summary.totalTaxAmount }}</dd>
-        </dl></V2Card
       ><V2Card title="成本明细"
-        ><V2PageState
+        ><template v-if="summary" #actions>
+          <dl class="cost-page__summary">
+            <dt>成本总额</dt>
+            <dd>{{ summary.totalAmount }}</dd>
+            <dt>税额</dt>
+            <dd>{{ summary.totalTaxAmount }}</dd>
+          </dl>
+        </template>
+        <V2PageState
           v-if="loading && !records.length"
           title="正在加载成本台账"
           description="正在读取当前项目和报告期内的成本记录。"
@@ -180,7 +181,7 @@ onBeforeUnmount(() => {
             <tbody>
               <tr v-for="row in records" :key="row.id">
                 <td>{{ row.costSubjectName || row.costType }}</td>
-                <td>{{ row.projectName || row.projectId }}</td>
+                <td>{{ row.projectName || '—' }}</td>
                 <td>{{ row.costDate || '—' }}</td>
                 <td>{{ row.amount }}</td>
                 <td>{{ row.taxAmount }}</td>
@@ -230,7 +231,7 @@ onBeforeUnmount(() => {
           <dt>ID</dt>
           <dd>{{ detail.id }}</dd>
           <dt>项目</dt>
-          <dd>{{ detail.projectName || detail.projectId }}</dd>
+          <dd>{{ detail.projectName || '—' }}</dd>
           <dt>合同</dt>
           <dd>{{ detail.contractName || detail.contractId || '—' }}</dd>
           <dt>含税金额</dt>
@@ -262,6 +263,19 @@ dl {
   grid-template-columns: auto 1fr;
   gap: var(--v2-space-2) var(--v2-space-4);
   margin: 0;
+}
+.cost-page__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2) var(--v2-space-3);
+  align-items: baseline;
+  justify-content: flex-end;
+  color: var(--v2-color-text-secondary);
+  font-size: var(--v2-font-size-12);
+}
+.cost-page__summary dd {
+  color: var(--v2-color-text);
+  font-weight: var(--v2-font-weight-semibold);
 }
 dd {
   margin: 0;
@@ -299,6 +313,9 @@ nav {
 @media (max-width: 48rem) {
   .filters {
     grid-template-columns: 1fr;
+  }
+  .cost-page__summary {
+    justify-content: flex-start;
   }
 }
 </style>

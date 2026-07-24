@@ -220,7 +220,7 @@ async function loadList(preserveNotice = false): Promise<void> {
     if (!controller.signal.aborted && generation === listGeneration) {
       records.value = []
       total.value = 0
-      errorMessage.value = errorText(error, '变更签证台账加载失败')
+      errorMessage.value = errorText(error, '签证变更台账加载失败')
     }
   } finally {
     if (generation === listGeneration) loading.value = false
@@ -230,7 +230,7 @@ async function loadList(preserveNotice = false): Promise<void> {
 async function loadDetail(preserveNotice = false): Promise<void> {
   if (!variationId.value) {
     detail.value = null
-    errorMessage.value = '缺少变更签证 ID'
+    errorMessage.value = '缺少签证变更 ID'
     return
   }
   detailController?.abort()
@@ -249,7 +249,7 @@ async function loadDetail(preserveNotice = false): Promise<void> {
   } catch (error) {
     if (!controller.signal.aborted && generation === detailGeneration) {
       detail.value = null
-      errorMessage.value = errorText(error, '变更签证详情加载失败')
+      errorMessage.value = errorText(error, '签证变更详情加载失败')
     }
   } finally {
     if (generation === detailGeneration) loading.value = false
@@ -333,12 +333,12 @@ async function saveForm(): Promise<void> {
         path: '/variation/order',
         query: { ...route.query, id, mode: 'detail' },
       })
-      successMessage.value = '变更签证已创建。'
+      successMessage.value = '签证变更已创建。'
       return
     }
     await updateVariation(variationId.value, command)
     await loadDetail(true)
-    successMessage.value = '变更签证已保存并刷新。'
+    successMessage.value = '签证变更已保存并刷新。'
   })
 }
 
@@ -379,7 +379,7 @@ async function submitApproval(): Promise<void> {
     }
     await submitVariation(variationId.value, versionOf())
     await loadDetail(true)
-    successMessage.value = '变更签证已提交审批。'
+    successMessage.value = '签证变更已提交审批。'
   })
 }
 
@@ -392,7 +392,7 @@ async function confirmDelete(): Promise<void> {
     await deleteVariation(variationId.value, versionOf())
     pendingDelete.value = false
     await router.replace('/variation/order')
-    successMessage.value = '变更签证已删除。'
+    successMessage.value = '签证变更已删除。'
   })
 }
 
@@ -568,7 +568,7 @@ onBeforeUnmount(() => {
       >{{ successMessage }}</V2Alert
     >
 
-    <V2Card v-if="mode === 'list'" title="变更签证" :heading-level="1">
+    <V2Card v-if="mode === 'list'" title="签证变更" :heading-level="1">
       <template #actions>
         <V2Button v-if="canCreate" @click="openWorkspace('create')">新建变更</V2Button>
       </template>
@@ -600,12 +600,12 @@ onBeforeUnmount(() => {
       <V2PageState
         v-if="loading && !records.length"
         kind="loading"
-        title="正在加载变更签证"
+        title="正在加载签证变更"
         description="请稍候。"
       />
       <V2PageState
         v-else-if="!records.length"
-        title="暂无变更签证"
+        title="暂无签证变更"
         description="当前筛选条件下没有数据。"
       />
       <div v-else class="variation-page__table-wrap">
@@ -628,7 +628,7 @@ onBeforeUnmount(() => {
                 <strong>{{ record.varCode }}</strong>
               </td>
               <td>{{ record.varName }}</td>
-              <td>{{ record.projectName || record.projectId }}</td>
+              <td>{{ record.projectName || '—' }}</td>
               <td>{{ record.contractName || record.contractId || '—' }}</td>
               <td>{{ formatAmount(record.reportedAmount) }}</td>
               <td>
@@ -653,7 +653,7 @@ onBeforeUnmount(() => {
           </tbody>
         </table>
       </div>
-      <nav class="variation-page__pager" aria-label="变更签证分页">
+      <nav class="variation-page__pager" aria-label="签证变更分页">
         <span>共 {{ total }} 条</span
         ><V2Button
           size="small"
@@ -674,13 +674,13 @@ onBeforeUnmount(() => {
 
     <V2Card
       v-else-if="mode === 'create' || mode === 'edit'"
-      :title="mode === 'create' ? '新建变更签证' : '编辑变更签证'"
+      :title="mode === 'create' ? '新建签证变更' : '编辑签证变更'"
       :heading-level="1"
     >
       <template #actions
         ><V2Button variant="secondary" @click="backToList">返回台账</V2Button></template
       >
-      <V2PageState v-if="loading" kind="loading" title="正在加载变更签证" description="请稍候。" />
+      <V2PageState v-if="loading" kind="loading" title="正在加载签证变更" description="请稍候。" />
       <form v-else class="variation-page__form" @submit.prevent="saveForm">
         <V2Input
           :model-value="form.projectId"
@@ -787,14 +787,14 @@ onBeforeUnmount(() => {
       <V2PageState
         v-if="loading && !detail"
         kind="loading"
-        title="正在加载变更签证"
+        title="正在加载签证变更"
         description="请稍候。"
       />
       <V2PageState
         v-else-if="!detail"
         kind="error"
         code="404"
-        title="变更签证不可访问"
+        title="签证变更不可访问"
         :description="errorMessage || '记录不存在或当前账号无权查看。'"
       >
         <template #actions><V2Button @click="backToList">返回台账</V2Button></template>
@@ -827,7 +827,7 @@ onBeforeUnmount(() => {
           >
           <dl class="variation-page__detail-grid">
             <dt>项目</dt>
-            <dd>{{ detail.projectName || detail.projectId }}</dd>
+            <dd>{{ detail.projectName || '—' }}</dd>
             <dt>合同</dt>
             <dd>{{ detail.contractName || detail.contractId || '—' }}</dd>
             <dt>审批状态</dt>
@@ -1021,7 +1021,7 @@ onBeforeUnmount(() => {
 
     <V2ConfirmDialog
       :open="pendingDelete"
-      title="删除变更签证"
+      title="删除签证变更"
       description="删除后不可恢复；仅草稿可删除。"
       confirm-text="确认删除"
       danger

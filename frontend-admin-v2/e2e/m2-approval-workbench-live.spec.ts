@@ -84,11 +84,14 @@ test.describe('M2 live approval workbench', () => {
     test(`${viewport.name} exposes four scoped lists without page overflow`, async ({ page }) => {
       await page.setViewportSize(viewport)
       const response = page.waitForResponse((item) =>
-        item.url().includes('/api/workflow/tasks/todo?pageNo=1&pageSize=20'),
+        item.url().includes('/api/workflow/tasks/todo?pageNo=1&pageSize=10'),
       )
       await page.goto('/v2/approval/todo')
       expect((await response).ok()).toBe(true)
       await expect(page.getByRole('heading', { level: 1, name: '审批工作台' })).toBeAttached()
+      await expect(page.getByRole('heading', { level: 1, name: '审批工作台' })).toHaveClass(
+        /v2-visually-hidden/,
+      )
       await expect(page.getByRole('navigation', { name: '审批列表' })).toHaveCount(0)
       await expect(page.getByRole('heading', { name: '筛选条件', exact: true })).toHaveCount(0)
       const layout = await page.locator('.workflow-page').evaluate((element) => {
@@ -107,7 +110,7 @@ test.describe('M2 live approval workbench', () => {
           viewportHeight: window.innerHeight,
         }
       })
-      expect(layout.spacing).toEqual(['10px', '10px', '10px', '10px', '10px'])
+      expect(layout.spacing).toEqual(['0px', '0px', '0px', '0px', '12px'])
       expect(layout.right).toBeGreaterThanOrEqual(viewport.width - 1)
       expect(layout.bottom).toBeGreaterThanOrEqual(layout.viewportHeight - 1)
       const shellTabs = page.getByRole('navigation', { name: '工作区标签页' })
@@ -116,21 +119,15 @@ test.describe('M2 live approval workbench', () => {
         'page',
       )
       if (viewport.name === 'mobile') {
-        await expect(page.locator('.workflow-filter__keyword')).toBeHidden()
-        await expect(page.locator('.workflow-filter__business-type')).toBeHidden()
-        await expect(page.locator('.workflow-filter__search')).toBeHidden()
+        await expect(page.locator('.workflow-filter__keyword')).toBeVisible()
+        await expect(page.locator('.workflow-filter__business-type')).toBeVisible()
+        await expect(page.locator('.workflow-filter__search')).toBeVisible()
         const status = page.locator('.workflow-filter__status')
         const reset = page.getByRole('button', { name: '重置', exact: true })
         await expect(status).toBeVisible()
         await expect(reset).toBeVisible()
-        const [statusBox, resetBox] = await Promise.all([
-          status.locator('.v2-select__trigger').boundingBox(),
-          reset.boundingBox(),
-        ])
-        expect((statusBox?.y ?? 0) + (statusBox?.height ?? 0)).toBeCloseTo(
-          (resetBox?.y ?? 0) + (resetBox?.height ?? 0),
-          0,
-        )
+        const resetBox = await reset.boundingBox()
+        expect(resetBox?.height).toBeGreaterThanOrEqual(44)
         const filtered = page.waitForResponse((item) => {
           const url = new URL(item.url())
           return (
@@ -155,12 +152,22 @@ test.describe('M2 live approval workbench', () => {
       const dialogBounds = await responsiveDialog.boundingBox()
       expect(dialogBounds?.width).toBeLessThanOrEqual(viewport.width)
       if (viewport.name === 'mobile') {
-        expect(dialogBounds?.y).toBeLessThanOrEqual(1)
-        await expect(responsiveDialog.locator('.v2-dialog__title')).toHaveCSS('font-size', '16px')
-        await expect(responsiveDialog.locator('.workflow-summary dd').first()).toHaveCSS(
-          'font-size',
-          '13px',
+        expect(dialogBounds?.y).toBeGreaterThanOrEqual(0)
+        expect((dialogBounds?.y ?? 0) + (dialogBounds?.height ?? 0)).toBeLessThanOrEqual(
+          viewport.height,
         )
+        const titleSize = await responsiveDialog
+          .locator('.v2-dialog__title')
+          .evaluate((element) => getComputedStyle(element).fontSize)
+        const titleToken = await page.evaluate(() => {
+          const probe = document.createElement('span')
+          probe.style.fontSize = 'var(--v2-font-size-21)'
+          document.body.appendChild(probe)
+          const value = getComputedStyle(probe).fontSize
+          probe.remove()
+          return value
+        })
+        expect(titleSize).toBe(titleToken)
       }
       await page.keyboard.press('Escape')
       await expect(page).toHaveURL(/\/v2\/approval\/mine$/)
@@ -174,11 +181,11 @@ test.describe('M2 live approval workbench', () => {
     await expect(headers.nth(0)).toHaveText('审批事项')
     await expect(headers.nth(1)).toHaveText('业务编号')
     await expect(page.getByRole('button', { name: '查看', exact: true })).toHaveCount(0)
-    await expect(page.locator('.workflow-pagination > span')).toHaveCSS('font-size', '12px')
+    await expect(page.locator('.workflow-pagination > span').first()).toHaveCSS('font-size', '12px')
 
     await page.getByRole('button', { name: '在建项目临期材料采购合同审批' }).click()
     await expect(page).toHaveURL(/\/v2\/approval\/instances\/520000000000009541/)
-    const detailDialog = page.getByRole('dialog', { name: '在建项目临期材料采购合同审批' })
+    const detailDialog = page.getByRole('dialog', { name: '审批详情' })
     await expect(detailDialog).toBeVisible()
     await expect(detailDialog).toHaveCSS('backdrop-filter', /blur\([^)]+\)/)
     await page.locator('.v2-dialog__backdrop').click({ position: { x: 4, y: 4 } })
@@ -290,7 +297,11 @@ test.describe('M2 live approval workbench', () => {
     )
     await page.goto(`/v2/approval/instances/${controlledInstanceId}?returnTab=todo`)
     expect((await response).ok()).toBe(true)
-    await expect(page.getByRole('heading', { name: '在建项目临期材料采购合同审批' })).toBeVisible()
+    const detailDialog = page.getByRole('dialog', { name: '审批详情' })
+    await expect(
+      detailDialog.getByText('在建项目临期材料采购合同审批', { exact: true }),
+    ).toBeVisible()
+    await expect(detailDialog.getByText('CT-20260720-001', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '同意', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '驳回', exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '撤回', exact: true })).toBeVisible()
@@ -317,7 +328,11 @@ test.describe('M2 live approval workbench', () => {
       permissions.filter((permission) => !permission.startsWith('workflow:')),
     )
     await page.goto(`/v2/approval/instances/${controlledInstanceId}`)
-    await expect(page.getByRole('heading', { name: '在建项目临期材料采购合同审批' })).toBeVisible()
+    await expect(
+      page
+        .getByRole('dialog', { name: '审批详情' })
+        .getByText('在建项目临期材料采购合同审批', { exact: true }),
+    ).toBeVisible()
     await expect(page.getByRole('button', { name: '同意', exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '驳回', exact: true })).toHaveCount(0)
   })

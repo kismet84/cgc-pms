@@ -2,8 +2,6 @@
 import {
   canRequestAlertNotifications,
   hasPermission,
-  resolveDashboardRoles,
-  type DashboardRole,
   type NotificationRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -62,26 +60,9 @@ const reportPeriodOptions = computed(() => [
   { value: '', label: '全部报告期' },
   ...workspaceStore.reportPeriods,
 ])
-const dashboardRole = computed<DashboardRole | null>(() => {
-  if (route.path !== '/dashboard') return null
-  const allowed = resolveDashboardRoles(session.roles, session.permissions)
-  const requested = typeof route.query.role === 'string' ? route.query.role : ''
-  return allowed.includes(requested as DashboardRole)
-    ? (requested as DashboardRole)
-    : (allowed[0] ?? null)
-})
-const projectFilterUnsupported = computed(
-  () => route.meta.workspaceContext?.project !== true || dashboardRole.value === 'mgmt',
-)
-const periodFilterUnsupported = computed(
-  () =>
-    route.meta.workspaceContext?.period !== true ||
-    (dashboardRole.value ? ['bm', 'finance', 'mgmt'].includes(dashboardRole.value) : false),
-)
-const projectFilterLabel = computed(() => {
-  if (!projectFilterUnsupported.value) return '当前项目'
-  return dashboardRole.value === 'mgmt' ? '当前项目（管理层为租户汇总）' : '当前项目'
-})
+const projectFilterUnsupported = computed(() => route.meta.workspaceContext?.project !== true)
+const periodFilterUnsupported = computed(() => route.meta.workspaceContext?.period !== true)
+const projectFilterLabel = '当前项目'
 const periodFilterLabel = '报告期'
 const accountName = computed(
   () => session.userInfo?.realName || session.userInfo?.username || '当前用户',
@@ -1030,6 +1011,7 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
   filter: drop-shadow(-1px 0 0 var(--v2-color-border)) drop-shadow(1px 0 0 var(--v2-color-border));
   font-size: var(--v2-font-size-12);
   font-weight: var(--v2-font-weight-semibold);
+  line-height: var(--v2-line-height-ui);
   text-decoration: none;
   white-space: nowrap;
 }

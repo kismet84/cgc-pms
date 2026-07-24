@@ -246,15 +246,23 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
     // 5. Management Dashboard (tenant-wide)
     // ========================================================================
     public ManagementDashboardVO getManagementView() {
+        return getManagementView(null);
+    }
+
+    public ManagementDashboardVO getManagementView(Long projectId) {
         Long tenantId = UserContext.getCurrentTenantId();
 
         ManagementDashboardVO vo = new ManagementDashboardVO();
 
         // Active projects
-        List<PmProject> activeProjects = projectAccessChecker.filterAccessible(projectMapper.selectList(
-                new LambdaQueryWrapper<PmProject>()
-                        .eq(PmProject::getTenantId, tenantId)
-                        .eq(PmProject::getStatus, "ACTIVE")));
+        LambdaQueryWrapper<PmProject> projectQuery = new LambdaQueryWrapper<PmProject>()
+                .eq(PmProject::getTenantId, tenantId)
+                .eq(PmProject::getStatus, "ACTIVE");
+        if (projectId != null) {
+            projectQuery.eq(PmProject::getId, projectId);
+        }
+        List<PmProject> activeProjects = projectAccessChecker.filterAccessible(
+                projectMapper.selectList(projectQuery));
         vo.setActiveProjectCount((long) activeProjects.size());
 
         if (activeProjects.isEmpty()) {

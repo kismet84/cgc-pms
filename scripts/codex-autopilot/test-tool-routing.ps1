@@ -17,9 +17,11 @@ function Assert-Contains {
   }
 }
 
-Assert-Contains 'AGENTS.override.md' @('docs/standards/codex-task-execution-policy.md', 'PowerShell', 'codebase-memory-mcp', 'retrieval_gap')
-Assert-Contains 'docs/standards/codex-task-execution-policy.md' @('已知文件、配置键、错误文本、精确字符串', 'CodeGraph，一次有界查询', '跨前后端、跨语言、多跳调用链、架构边界', 'PowerShell 定义、引用、动态调用和调用链', '禁止使用 CodeGraph', 'retrieval_gap', '原样重试')
-Assert-Contains 'plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md' @('查询目的', '交叉核验', '图谱检索证据')
+if (Test-Path -LiteralPath (Join-Path $repoRoot 'AGENTS.override.md')) { throw 'removed AGENTS.override.md still exists' }
+Assert-Contains 'AGENTS.md' @('普通任务无需显式重读本文件', '运行态/浏览器', 'CI、PR、失败分类', '主线、计划、正式验收与收口')
+Assert-Contains 'docs/standards/codex-task-execution-policy.md' @('普通任务不读取本索引', '运行态与 CI 各只读取对应 Skill', '非 AutoPilot 任务不得读取 checkpoint')
+Assert-Contains '.agents/skills/cgc-pms-ci-gate-triage/SKILL.md' @('retrieval_gap', '使用允许的备用检索', '不作不存在断言')
+Assert-Contains 'plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md' @('role-contracts.md', 'classifier-rules.md', '普通任务不读取本 Skill')
 Assert-Contains 'plugins/cgc-pms-autopilot/references/role-contracts.md' @('查询目的', '交叉核验', '图谱检索证据')
 Assert-Contains 'plugins/cgc-pms-autopilot/templates/iteration-report-entry.md' @('图谱检索证据', '{{graph_evidence}}')
 Assert-Contains 'plugins/cgc-pms-autopilot/examples/iteration-report-entry.example.md' @('CodeGraph', 'codebase-memory-mcp', '查询目的', '交叉核验')

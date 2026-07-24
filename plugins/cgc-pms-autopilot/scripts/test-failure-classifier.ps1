@@ -70,9 +70,9 @@ function New-Classification {
 
 $result = $null
 
-if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|missing argument|cannot process argument|parameterbinding') {
+if ($normalizedText -match 'parsererror|unexpected argument|missing argument|cannot process argument|parameterbinding') {
     $result = New-Classification `
-        -Category 'tool_config' `
+        -Category 'tool_invocation' `
         -Subcategory 'powershell_parser_error' `
         -Confidence 'high' `
         -EvidencePatterns @('parsererror', 'unexpected argument', 'cannot process argument', 'parameterbinding') `
@@ -90,7 +90,7 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -RetryPolicy 'no_retry'
 } elseif ($normalizedText -match 'econnrefused|connection refused' -and $normalizedText -match '172\.19\.|vite|proxy') {
     $result = New-Classification `
-        -Category 'environment_prereq' `
+        -Category 'environment_prerequisite' `
         -Subcategory 'vite_proxy_stale_backend' `
         -Confidence 'high' `
         -EvidencePatterns @('econnrefused', '172\.19\.', 'vite', 'proxy') `
@@ -99,7 +99,7 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -RetryPolicy 'rerun_after_refresh'
 } elseif ($normalizedText -match 'dev-login') {
     $result = New-Classification `
-        -Category 'environment_prereq' `
+        -Category 'environment_prerequisite' `
         -Subcategory 'dev_login_unreachable' `
         -Confidence 'medium' `
         -EvidencePatterns @('dev-login', '/login') `
@@ -108,7 +108,7 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -RetryPolicy 'rerun_after_refresh'
 } elseif ($normalizedText -match 'docker|wsl|dockerdesktoplinuxengine|cannot connect to the docker daemon') {
     $result = New-Classification `
-        -Category 'environment_prereq' `
+        -Category 'environment_prerequisite' `
         -Subcategory 'docker_not_ready' `
         -Confidence 'high' `
         -EvidencePatterns @('docker', 'wsl', 'dockerdesktoplinuxengine', 'cannot connect to the docker daemon') `
@@ -117,7 +117,7 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -RetryPolicy 'rerun_after_refresh'
 } elseif ($normalizedText -match 'actuator/health|localhost:8080|port 8080|backend.*not ready|service unavailable') {
     $result = New-Classification `
-        -Category 'environment_prereq' `
+        -Category 'environment_prerequisite' `
         -Subcategory 'backend_not_ready' `
         -Confidence 'medium' `
         -EvidencePatterns @('actuator/health', 'localhost:8080', 'port 8080', 'service unavailable') `
@@ -126,7 +126,7 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -RetryPolicy 'rerun_after_refresh'
 } elseif ($normalizedText -match 'localhost:5173|vite ready|frontend.*not ready|port 5173') {
     $result = New-Classification `
-        -Category 'environment_prereq' `
+        -Category 'environment_prerequisite' `
         -Subcategory 'frontend_not_ready' `
         -Confidence 'medium' `
         -EvidencePatterns @('localhost:5173', 'vite ready', 'frontend.*not ready', 'port 5173') `
@@ -151,9 +151,18 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -Reason 'Ready issue metadata or verification wiring is incomplete.' `
         -SuggestedNextAction 'fix_ready_issue_metadata' `
         -RetryPolicy 'retry_after_ready_fix'
+} elseif ($normalizedText -match 'not indexed|index.*missing|retrieval.?gap|graph.*coverage|codegraph.*unavailable') {
+    $result = New-Classification `
+        -Category 'retrieval_gap' `
+        -Subcategory 'index_or_graph_coverage_missing' `
+        -Confidence 'high' `
+        -EvidencePatterns @('not indexed', 'index.*missing', 'retrieval.?gap', 'graph.*coverage', 'codegraph.*unavailable') `
+        -Reason 'Graph or index coverage is insufficient for a nonexistence conclusion.' `
+        -SuggestedNextAction 'use_bounded_fallback' `
+        -RetryPolicy 'no_retry'
 } elseif ($normalizedText -match 'testcompile|compilation error|cannot find symbol|compil(ation|e) failed') {
     $result = New-Classification `
-        -Category 'real_quality_or_security' `
+        -Category 'quality_or_security' `
         -Subcategory 'maven_test_compile' `
         -Confidence 'high' `
         -EvidencePatterns @('testcompile', 'compilation error', 'cannot find symbol', 'compile failed') `
@@ -162,7 +171,7 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -RetryPolicy 'manual_review_required'
 } elseif ($normalizedText -match 'surefire|there are test failures|tests run:|failures:|errors:') {
     $result = New-Classification `
-        -Category 'real_quality_or_security' `
+        -Category 'quality_or_security' `
         -Subcategory 'maven_surefire' `
         -Confidence 'high' `
         -EvidencePatterns @('surefire', 'there are test failures', 'failures:', 'errors:') `
@@ -171,7 +180,7 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -RetryPolicy 'manual_review_required'
 } elseif ($normalizedText -match 'assert|expected:|but was:|comparisonfailure|test failed') {
     $result = New-Classification `
-        -Category 'real_quality_or_security' `
+        -Category 'quality_or_security' `
         -Subcategory 'real_test_failure' `
         -Confidence 'high' `
         -EvidencePatterns @('assert', 'expected:', 'but was:', 'comparisonfailure', 'test failed') `
@@ -180,7 +189,7 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -RetryPolicy 'manual_review_required'
 } elseif ($normalizedText -match 'unauthorized|forbidden|access denied|permission|security|tenant') {
     $result = New-Classification `
-        -Category 'real_quality_or_security' `
+        -Category 'quality_or_security' `
         -Subcategory 'real_permission_or_security_failure' `
         -Confidence 'high' `
         -EvidencePatterns @('unauthorized', 'forbidden', 'access denied', 'permission', 'security', 'tenant') `
@@ -189,7 +198,7 @@ if ($normalizedText -match 'parsererror|unexpected argument|commandnotfound|miss
         -RetryPolicy 'manual_review_required'
 } elseif ($ExitCode -ne 0) {
     $result = New-Classification `
-        -Category 'real_quality_or_security' `
+        -Category 'quality_or_security' `
         -Subcategory 'real_build_failure' `
         -Confidence 'medium' `
         -EvidencePatterns @('failed', 'error', 'exception') `

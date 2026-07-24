@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -159,10 +159,10 @@ Reviewer要求：不需要
   if ($sufficientDecision.action -ne 'READY_SUFFICIENT' -or $sufficientDecision.targetReadyCount -ne 1) { throw 'one valid Ready issue was not treated as sufficient' }
 
   '# Ready Issues' | Set-Content -LiteralPath (Join-Path $backlog 'ready-issues.md') -Encoding UTF8
-  $unavailable = [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_UNAVAILABLE'; failureCategory = 'environment_prereq'; message = 'neo4j unavailable'; issues = @() }
+  $unavailable = [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_UNAVAILABLE'; failureCategory = 'environment_prerequisite'; message = 'neo4j unavailable'; issues = @() }
   $unavailableDecision = Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot $unavailable
-  if ($unavailableDecision.action -ne 'STOP_KG_REFILL_UNAVAILABLE' -or $unavailableDecision.failureCategory -ne 'environment_prereq') { throw 'unavailable graph did not stop refill safely' }
-  $stale = [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_security'; message = 'git cursor stale after refresh'; issues = @() }
+  if ($unavailableDecision.action -ne 'STOP_KG_REFILL_UNAVAILABLE' -or $unavailableDecision.failureCategory -ne 'environment_prerequisite') { throw 'unavailable graph did not stop refill safely' }
+  $stale = [pscustomobject]@{ available = $false; stopReason = 'STOP_KG_REFILL_STALE'; failureCategory = 'quality_or_security'; message = 'git cursor stale after refresh'; issues = @() }
   if ((Get-AutopilotRefillDecision -RepoRoot $root -KnowledgeGraphSnapshot $stale).action -ne 'STOP_KG_REFILL_STALE') { throw 'stale graph did not stop refill safely' }
 
   $configDir = Join-Path $root 'scripts\codex-autopilot'
@@ -197,11 +197,11 @@ Reviewer要求：不需要
     return [pscustomobject]@{ lastRunStatus = 'SUCCESS'; lastRunFailures = 0; currentIssues = 0; cursors = @([pscustomobject]@{ source = 'git'; cursor = 'still-stale' }) }
   }
   $staleAfterRefresh = Get-AutopilotKnowledgeGraphIssueSnapshot -RepoRoot $root -CommandInvoker $alwaysStaleInvoker
-  if ($staleAfterRefresh.stopReason -ne 'STOP_KG_REFILL_STALE' -or $staleAfterRefresh.failureCategory -ne 'quality_security') { throw 'post-refresh cursor mismatch was not classified as data consistency failure' }
+  if ($staleAfterRefresh.stopReason -ne 'STOP_KG_REFILL_STALE' -or $staleAfterRefresh.failureCategory -ne 'quality_or_security') { throw 'post-refresh cursor mismatch was not classified as data consistency failure' }
 
   $unavailableInvoker = { param($CliPath,$Arguments,$RepoRoot) throw 'ECONNREFUSED localhost:7687' }
   $environmentStop = Get-AutopilotKnowledgeGraphIssueSnapshot -RepoRoot $root -CommandInvoker $unavailableInvoker
-  if ($environmentStop.stopReason -ne 'STOP_KG_REFILL_UNAVAILABLE' -or $environmentStop.failureCategory -ne 'environment_prereq') { throw 'Neo4j outage was not classified as environment prerequisite' }
+  if ($environmentStop.stopReason -ne 'STOP_KG_REFILL_UNAVAILABLE' -or $environmentStop.failureCategory -ne 'environment_prerequisite') { throw 'Neo4j outage was not classified as environment prerequisite' }
 
   $planPath = Join-Path $root 'ready-plan.json'
   [ordered]@{ schemaVersion = 2; candidateDecisions = @(
@@ -224,10 +224,10 @@ Reviewer要求：不需要
   [ordered]@{ schemaVersion=2; candidateDecisions=@([ordered]@{candidateRef='candidate-r';outcome='REJECTED';reason='duplicate'}); readyBlocks=@() } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $invalidPlanPath -Encoding UTF8
   $rejected = Import-AutopilotReadyPlan -PlanPath $invalidPlanPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root -ExpectedCandidateRefs @('candidate-r')
   if ($rejected.createdCount -ne 0) { throw 'REJECTED-only planner result created Ready content' }
-  [ordered]@{ schemaVersion=2; candidateDecisions=@([ordered]@{candidateRef='candidate-b';outcome='BLOCKED';reason='runtime unavailable';failureCategory='environment_prereq'}); readyBlocks=@() } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $invalidPlanPath -Encoding UTF8
+  [ordered]@{ schemaVersion=2; candidateDecisions=@([ordered]@{candidateRef='candidate-b';outcome='BLOCKED';reason='runtime unavailable';failureCategory='environment_prerequisite'}); readyBlocks=@() } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $invalidPlanPath -Encoding UTF8
   $blocked = Import-AutopilotReadyPlan -PlanPath $invalidPlanPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root -ExpectedCandidateRefs @('candidate-b')
   if ($blocked.createdCount -ne 0) { throw 'BLOCKED-only planner result created Ready content' }
-  if ((Get-AutopilotRefillStageFailureCategory -CandidateDecisions $blocked.candidateDecisions) -ne 'environment_prereq') { throw 'blocked Planner category was not preserved for StageResult' }
+  if ((Get-AutopilotRefillStageFailureCategory -CandidateDecisions $blocked.candidateDecisions) -ne 'environment_prerequisite') { throw 'blocked Planner category was not preserved for StageResult' }
   if ((Get-AutopilotRefillStageFailureCategory -CandidateDecisions @([pscustomobject]@{outcome='BLOCKED';failureCategory='needs_confirmation'})) -ne 'ready_issue_config') { throw 'needs_confirmation was not mapped into the stable StageResult category set' }
   $candidateMismatchRejected = $false
   try { Import-AutopilotReadyPlan -PlanPath $invalidPlanPath -ReadyPath (Join-Path $backlog 'ready-issues.md') -RepoRoot $root -ExpectedCandidateRefs @('different-candidate') | Out-Null } catch { $candidateMismatchRejected = $true }

@@ -90,6 +90,13 @@
   --v2-dialog-divider: rgb(94 118 150 / 14%);
   --v2-dialog-radius: 1.5625rem;
   --v2-dialog-shadow: 0 18px 45px rgb(45 68 98 / 20%), 0 3px 10px rgb(61 88 121 / 8%);
+  --v2-toast-accent: var(--v2-color-primary);
+  --v2-toast-surface: color-mix(in srgb, var(--v2-color-primary-soft) 82%, transparent);
+  --v2-toast-surface-success: color-mix(in srgb, var(--v2-color-success-soft) 82%, transparent);
+  --v2-toast-surface-info: color-mix(in srgb, var(--v2-color-primary-soft) 82%, transparent);
+  --v2-toast-surface-warning: color-mix(in srgb, var(--v2-color-warning-soft) 84%, transparent);
+  --v2-toast-surface-danger: color-mix(in srgb, var(--v2-color-danger-soft) 84%, transparent);
+  --v2-toast-close-hover: color-mix(in srgb, var(--v2-color-surface) 52%, transparent);
 
   --v2-control-height-sm: 2rem;
   --v2-control-height-md: 2.5rem;

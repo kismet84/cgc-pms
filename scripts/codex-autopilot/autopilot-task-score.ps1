@@ -333,7 +333,7 @@ function New-AutopilotTaskScoreEvidenceFromResult {
   $governanceComplete = $report -match '(?:本轮)?新增后续项[：:]' -and $report -match '(?:本轮)?关闭后续项[：:]'
   if (!$governanceComplete) { throw 'formal report is missing 新增后续项 or 关闭后续项' }
   $validation = @($Result.validation)
-  $failedStatuses = @('fail','failed','quality_security')
+  $failedStatuses = @('fail','failed','quality_or_security')
   $validationPassed = $validation.Count -gt 0 -and @($validation | Where-Object { $failedStatuses -contains ([string]$_.status) }).Count -eq 0
   $sourceRefs = foreach ($rawRef in @([string]$ReportPath) + @($Result.evidencePaths)) {
     $sourceRef = [string]$rawRef

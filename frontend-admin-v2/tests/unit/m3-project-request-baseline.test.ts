@@ -31,6 +31,9 @@ describe('M3 project request baseline', () => {
     expect(source).toContain(`@update:model-value="applySelectFilter('projectType', $event)"`)
     expect(source).toContain(`@update:model-value="applySelectFilter('status', $event)"`)
     expect(source).toMatch(
+      /\.project-page__detail-actions\s*\{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,
+    )
+    expect(source).toMatch(
       /async function setQuery[\s\S]*router\.resolve[\s\S]*await router\.replace/,
     )
     expect(source).toMatch(
@@ -78,6 +81,27 @@ describe('M3 project request baseline', () => {
     expect(readFileSync(resolve('src/pages/delivery/QualitySafetyPage.vue'), 'utf-8')).toMatch(
       /async function runWrite[\s\S]*if \(!projectId\.value\)/,
     )
+  })
+
+  it('never renders a database project id as a project label', () => {
+    const pages = [
+      'commercial/BidCostPage.vue',
+      'commercial/ContractPage.vue',
+      'commercial/CostLedgerPage.vue',
+      'commercial/CostTargetPage.vue',
+      'commercial/VariationPage.vue',
+      'dashboard/DashboardPage.vue',
+      'delivery/DailyLogPage.vue',
+      'delivery/ProjectCloseoutPage.vue',
+      'delivery/SchedulePage.vue',
+    ].map((page) => readFileSync(resolve(`src/pages/${page}`), 'utf-8'))
+
+    for (const source of pages) {
+      expect(source).not.toMatch(/\|\|\s*(?:record|row|detail|activeRecord)\.projectId/)
+      expect(source).not.toMatch(/\?\?\s*(?:projectId(?:\.value)?|id)\s*(?:\?\?|[,):])/)
+      expect(source).not.toMatch(/\{\{\s*(?:record|detail|selectedAlert)\.projectId\s*\}\}/)
+      expect(source).not.toContain('`项目 ${item.projectId}`')
+    }
   })
 
   it('encodes non-empty project filters and passes the abort signal', async () => {

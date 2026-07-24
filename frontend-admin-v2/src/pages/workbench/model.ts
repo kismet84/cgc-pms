@@ -11,7 +11,7 @@ export interface WorkflowRow {
   instanceId: string
   title: string
   businessType: string
-  businessId: string
+  businessCode: string
   status: string
   actor: string
   time: string
@@ -97,7 +97,7 @@ export function workflowRows(
       instanceId: item.instanceId,
       title: item.title,
       businessType: item.businessType,
-      businessId: item.businessId,
+      businessCode: item.businessCode ?? '-',
       status: item.taskStatus,
       actor: item.approverName,
       time: item.receivedAt,
@@ -110,7 +110,7 @@ export function workflowRows(
       instanceId: item.instanceId,
       title: item.title ?? '-',
       businessType: item.businessType ?? '-',
-      businessId: item.businessId ?? '-',
+      businessCode: item.businessCode ?? '-',
       status: item.actionType,
       actor: item.operatorName,
       time: item.createdAt,
@@ -123,7 +123,7 @@ export function workflowRows(
       instanceId: item.instanceId,
       title: item.title,
       businessType: item.businessType,
-      businessId: item.businessId ?? '-',
+      businessCode: item.businessCode ?? '-',
       status: item.instanceStatus ?? '-',
       actor: item.ccUserName,
       time: item.createdTime,
@@ -135,7 +135,7 @@ export function workflowRows(
     instanceId: item.instanceId,
     title: item.title,
     businessType: item.businessType,
-    businessId: item.businessId ?? '-',
+    businessCode: item.businessCode ?? '-',
     status: item.instanceStatus,
     actor: item.currentNodeName ?? '-',
     time: item.updatedAt ?? item.createdAt,

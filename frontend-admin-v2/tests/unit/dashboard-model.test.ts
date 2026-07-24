@@ -80,6 +80,27 @@ describe('dashboard display model', () => {
     ])
   })
 
+  it('falls back to business code when runtime data has no title', () => {
+    const production = {
+      recentReceipts: [],
+      recentRequisitions: [
+        {
+          sourceType: 'MATERIAL_REQUISITION',
+          sourceId: '1',
+          code: 'REQ-20260720-001',
+          title: null,
+          itemSummary: null,
+          projectName: '在建项目',
+          amount: '32000.00',
+          status: 'APPROVED',
+        },
+      ],
+      recentSubMeasures: [],
+    } as unknown as DashboardDataByRole['production']
+
+    expect(dashboardActivityItems('production', production)[0]?.title).toBe('REQ-20260720-001')
+  })
+
   it('classifies risk filters from business severity instead of list position', () => {
     const cost = {
       overBudgetAlerts: [

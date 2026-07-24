@@ -50,7 +50,9 @@ test.describe('M2 live eight-role dashboard', () => {
     await expect(page).toHaveURL(new RegExp(`projectId=${projectId}.*period=${period}`))
   })
 
-  test('shell disables filters unsupported by the selected dashboard role', async ({ page }) => {
+  test('shell keeps project and report-period selectors active across dashboard roles', async ({
+    page,
+  }) => {
     const projectId = '520000000000009002'
     const period = '2026-07'
     const alertUrls: URL[] = []
@@ -62,20 +64,16 @@ test.describe('M2 live eight-role dashboard', () => {
     await page.goto(`/v2/dashboard?role=mgmt&projectId=${projectId}&period=${period}`, {
       waitUntil: 'networkidle',
     })
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'true')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'true')
-    await expect(page.getByText('当前项目（管理层为租户汇总）')).toBeVisible()
-    await expect(page.locator('.health-panel .command-panel__title > span')).toHaveText(
-      '租户汇总 · 管理层',
-    )
-    await expect(page.locator('.recent-entry b')).toHaveText('租户汇总')
+    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.getByText('当前项目', { exact: true })).toBeVisible()
     expect(alertUrls.length).toBeGreaterThan(0)
     expect(
-      alertUrls.every(
+      alertUrls.some(
         (url) =>
-          !url.searchParams.has('projectId') &&
-          !url.searchParams.has('triggeredStart') &&
-          !url.searchParams.has('triggeredEnd'),
+          url.searchParams.get('projectId') === projectId &&
+          url.searchParams.has('triggeredStart') &&
+          url.searchParams.has('triggeredEnd'),
       ),
     ).toBe(true)
 
@@ -84,12 +82,29 @@ test.describe('M2 live eight-role dashboard', () => {
       waitUntil: 'networkidle',
     })
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
-    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'true')
+    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
     await expect(page.getByText('报告期（当前页面不适用）')).toHaveCount(0)
-    expect(alertUrls.some((url) => url.searchParams.get('projectId') === projectId)).toBe(true)
     expect(
-      alertUrls.every(
-        (url) => !url.searchParams.has('triggeredStart') && !url.searchParams.has('triggeredEnd'),
+      alertUrls.some(
+        (url) =>
+          url.searchParams.get('projectId') === projectId &&
+          url.searchParams.has('triggeredStart') &&
+          url.searchParams.has('triggeredEnd'),
+      ),
+    ).toBe(true)
+
+    alertUrls.length = 0
+    await page.goto(`/v2/dashboard?role=finance&projectId=${projectId}&period=${period}`, {
+      waitUntil: 'networkidle',
+    })
+    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
+    expect(
+      alertUrls.some(
+        (url) =>
+          url.searchParams.get('projectId') === projectId &&
+          url.searchParams.has('triggeredStart') &&
+          url.searchParams.has('triggeredEnd'),
       ),
     ).toBe(true)
   })

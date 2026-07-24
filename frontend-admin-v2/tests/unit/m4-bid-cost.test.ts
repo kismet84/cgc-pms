@@ -1,4 +1,7 @@
 import type { BidCostPage, BidCostRecord } from '@cgc-pms/frontend-contracts'
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -15,6 +18,9 @@ import {
   updateBidCost,
 } from '@/services/commercial'
 import { useSessionStore } from '@/stores/session'
+
+const currentDir = dirname(fileURLToPath(import.meta.url))
+const bidCostPagePath = resolve(currentDir, '../../src/pages/commercial/BidCostPage.vue')
 
 vi.mock('@/services/commercial', () => ({
   createBidCost: vi.fn(),
@@ -41,7 +47,7 @@ const page: BidCostPage = {
   records: [bidding],
   total: 1,
   pageNo: 1,
-  pageSize: 20,
+  pageSize: 10,
 }
 
 function deferred<T>() {
@@ -92,6 +98,20 @@ beforeEach(() => {
 })
 
 describe('M4 bid cost page', () => {
+  it('keeps the audited page inside the V2 design-system gate', () => {
+    const source = readFileSync(bidCostPagePath, 'utf-8')
+    const style = source.match(/<style scoped>([\s\S]*?)<\/style>/)?.[1] ?? ''
+
+    expect(source).toContain('<V2Button variant="secondary" @click="openDetail(record.id)">预览')
+    expect(source).toContain('class="v2-detail-dialog__quick-actions"')
+    expect(source).toContain('id="bid-cost-form"')
+    expect(source.indexOf('text="取消"')).toBeLessThan(source.indexOf('form="bid-cost-form"'))
+    expect(source).not.toMatch(/<V2Button\b[^>]*\bsize="small"/)
+    expect(style).not.toMatch(/\.bid-cost-page__table-wrap\s*\{/)
+    expect(style).not.toMatch(/\.bid-cost-page__table\s+(?:th|td)/)
+    expect(style).not.toMatch(/textarea\s*\{[^}]*\b(?:background|border|color|padding)\s*:/)
+  })
+
   it('fails closed without bid:query and does not load business data', async () => {
     const { wrapper } = await mountPage([])
 
@@ -105,12 +125,14 @@ describe('M4 bid cost page', () => {
     const { wrapper } = await mountPage(['bid:query'])
 
     expect(loadBidCostPage).toHaveBeenCalledWith(
-      expect.objectContaining({ pageNo: 1, pageSize: 20 }),
+      expect.objectContaining({ pageNo: 1, pageSize: 10 }),
       expect.any(AbortSignal),
     )
     expect(wrapper.text()).toContain('市民中心投标')
     expect(wrapper.text()).toContain('投标中')
     expect(wrapper.text()).toContain('第 1 页')
+    expect(loadProjectContextOptions).not.toHaveBeenCalled()
+    expect(button(wrapper, '预览')?.classes()).not.toContain('v2-glass-button')
     expect(wrapper.text()).not.toContain('投标前期成本记录与中标、未中标状态闭环')
     expect(button(wrapper, '新建投标成本')).toBeUndefined()
     expect(button(wrapper, '编辑')).toBeUndefined()
@@ -132,14 +154,21 @@ describe('M4 bid cost page', () => {
   })
 
   it('opens bid detail in a correctly titled dialog', async () => {
+    vi.mocked(loadBidCost).mockResolvedValueOnce({
+      ...bidding,
+      projectId: 'P1',
+      bidStatus: 'WON',
+    })
     const { wrapper } = await mountPage(['bid:query'])
 
-    await button(wrapper, '详情')!.trigger('click')
+    await button(wrapper, '预览')!.trigger('click')
     await flushPromises()
 
     expect(loadBidCost).toHaveBeenCalledWith('11', expect.any(AbortSignal))
-    expect(wrapper.get('[role="dialog"] h2').text()).toBe('投标成本详情')
+    expect(wrapper.get('[role="dialog"] h2').text()).toBe('投标成本预览')
     expect(wrapper.get('[role="dialog"]').text()).toContain('市民中心投标')
+    expect(wrapper.get('[role="dialog"]').text()).not.toContain('关联项目')
+    expect(wrapper.get('[role="dialog"]').text()).not.toContain('P1')
     await wrapper.get('button[aria-label="关闭对话框"]').trigger('click')
     expect(wrapper.find('[role="dialog"]').exists()).toBe(false)
   })
@@ -191,11 +220,8 @@ describe('M4 bid cost page', () => {
     expect(wrapper.text()).toContain('投标成本已创建')
   })
 
-  it('re-reads authoritative detail after edit failure and keeps error visible', async () => {
+  it('keeps local input and edit mode after save failure', async () => {
     vi.mocked(updateBidCost).mockRejectedValueOnce(apiError('状态已变化', 409))
-    vi.mocked(loadBidCost)
-      .mockResolvedValueOnce(bidding)
-      .mockResolvedValueOnce({ ...bidding, bidProjectName: '权威投标', bidStatus: 'WON' })
     const { wrapper } = await mountPage(['bid:query', 'bid:edit'])
     await button(wrapper, '编辑')!.trigger('click')
     await flushPromises()
@@ -204,10 +230,40 @@ describe('M4 bid cost page', () => {
     await flushPromises()
 
     expect(updateBidCost).toHaveBeenCalledTimes(1)
-    expect(loadBidCost).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('状态已变化')
-    expect(wrapper.text()).toContain('权威投标')
+    expect(loadBidCost).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[role="dialog"] h2').text()).toBe('编辑投标成本')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('状态已变化')
+    expect(wrapper.get('input[aria-label="投标项目名称"]').element.value).toBe('本地改名')
     expect(wrapper.text()).not.toContain('投标成本已保存')
+  })
+
+  it('keeps form validation inside the dialog and orders cancel before submit', async () => {
+    const { wrapper } = await mountPage(['bid:query', 'bid:add'])
+    await button(wrapper, '新建投标成本')!.trigger('click')
+
+    const dialog = wrapper.get('[role="dialog"]')
+    const labels = dialog.findAll('button').map((item) => item.text())
+    expect(labels.indexOf('取消')).toBeLessThan(labels.indexOf('创建'))
+    expect(button(wrapper, '创建')?.classes()).toContain('v2-glass-button')
+    expect(dialog.get('form').attributes()).toHaveProperty('novalidate')
+    await dialog.get('form').trigger('submit')
+
+    expect(dialog.text()).toContain('投标项目名称不能为空')
+    expect(dialog.get('input[aria-label="投标项目名称"]').attributes('aria-invalid')).toBe('true')
+    expect(createBidCost).not.toHaveBeenCalled()
+  })
+
+  it('queries immediately when status changes', async () => {
+    const { wrapper } = await mountPage(['bid:query'])
+
+    await wrapper.get('button[data-value="WON"]').trigger('click')
+    await flushPromises()
+
+    expect(loadBidCostPage).toHaveBeenCalledTimes(2)
+    expect(loadBidCostPage).toHaveBeenLastCalledWith(
+      expect.objectContaining({ pageNo: 1, bidStatus: 'WON' }),
+      expect.any(AbortSignal),
+    )
   })
 
   it('marks won only with a visible project and refreshes authoritative list', async () => {
@@ -221,6 +277,9 @@ describe('M4 bid cost page', () => {
     await button(wrapper, '标记中标')!.trigger('click')
     await flushPromises()
     expect(loadProjectContextOptions).toHaveBeenCalledTimes(1)
+    await button(wrapper, '确认更新')!.trigger('click')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('中标项目不能为空')
+    expect(wrapper.get('[role="dialog"] [role="button"]').attributes('aria-invalid')).toBe('true')
     await wrapper.get('button[data-value="P1"]').trigger('click')
     await button(wrapper, '确认更新')!.trigger('click')
     await flushPromises()

@@ -193,6 +193,22 @@ jobs:
         run: cd frontend-admin-v2 && pnpm check:boundary && pnpm check:route-ledger
       - name: Lint, test, type-check and build V2
         run: cd frontend-admin-v2 && pnpm lint:check && pnpm test:unit && pnpm type-check:contracts && pnpm type-check && pnpm build && pnpm check:bundle-size
+      - name: Install V2 browser
+        run: cd frontend-admin-v2 && pnpm exec playwright install chromium
+      - name: Run deterministic V2 migration browser gate
+        run: cd frontend-admin-v2 && pnpm test:e2e:migration-gate
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:4174
+          PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4174
+      - name: Upload V2 browser failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-v2-gate-failure-${{ github.run_number }}-${{ github.sha }}
+          path: |
+            frontend-admin-v2/playwright-report
+            frontend-admin-v2/test-results
+          if-no-files-found: ignore
       - name: Audit V2 dependencies with official registry
         run: cd frontend-admin-v2 && pnpm audit --audit-level high --registry=https://registry.npmjs.org
 

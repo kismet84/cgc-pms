@@ -324,6 +324,7 @@ test.describe('M4 contract routes', () => {
     ]) {
       await page.setViewportSize(viewport)
       await page.goto('/v2/contract/ledger')
+      await expect(page.locator('.contract-page')).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)

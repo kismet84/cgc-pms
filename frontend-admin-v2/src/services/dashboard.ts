@@ -37,8 +37,6 @@ export async function loadDashboard<R extends DashboardRole>(
   }
 
   const contract = DASHBOARD_ROLE_CONTRACTS[role]
-  if (role === 'mgmt') return apiRequest<DashboardDataByRole[R]>(contract.endpoint, { signal })
-
   const params = new URLSearchParams()
   const projectId = query.projectId?.trim()
   if (projectId) params.set('projectId', projectId)

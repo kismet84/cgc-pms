@@ -309,6 +309,38 @@
   line-height: var(--v2-line-height-ui);
 }
 
+#shell-main-content :where(.table-wrap, [class*='__table-wrap']) {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+#shell-main-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+
+#shell-main-content table :where(th, td) {
+  padding: var(--v2-space-3);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border-subtle);
+  text-align: left;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+#shell-main-content table thead th {
+  color: var(--v2-color-text-secondary);
+  background: var(--v2-color-surface-subtle);
+  font-weight: var(--v2-font-weight-semibold);
+  white-space: nowrap;
+}
+
+#shell-main-content table tbody th {
+  color: var(--v2-color-text-strong);
+  font-weight: var(--v2-font-weight-semibold);
+}
+
 :where(nav, [role='navigation'])[aria-label$='分页'] {
   font-size: var(--v2-font-size-12);
   line-height: var(--v2-line-height-ui);

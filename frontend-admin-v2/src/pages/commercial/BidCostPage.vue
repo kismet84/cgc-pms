@@ -44,7 +44,7 @@ const session = useSessionStore()
 
 const filter = reactive({
   pageNo: 1,
-  pageSize: 20,
+  pageSize: 10,
   keyword: '',
   bidStatus: '',
   projectId: '',
@@ -58,12 +58,15 @@ const detailLoading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const panelErrorMessage = ref('')
+const bidProjectNameError = ref('')
 const selected = ref<BidCostRecord | null>(null)
 const panelMode = ref<PanelMode>('closed')
 const form = reactive({ bidProjectName: '', remark: '' })
 const pendingAction = ref<PendingAction>(null)
 const projects = ref<ProjectContextOption[]>([])
 const wonProjectId = ref('')
+const wonProjectError = ref('')
 
 let listGeneration = 0
 let detailGeneration = 0
@@ -159,6 +162,11 @@ async function query(): Promise<void> {
   if (!(await replaceQuery())) await loadList()
 }
 
+function changeStatus(value: string): void {
+  filter.bidStatus = value
+  void query()
+}
+
 async function changePage(nextPage: number): Promise<void> {
   if (nextPage < 1 || nextPage > pageCount.value || loading.value) return
   filter.pageNo = nextPage
@@ -183,6 +191,8 @@ async function openDetail(
     panelMode.value = mode
     form.bidProjectName = value.bidProjectName
     form.remark = value.remark ?? ''
+    panelErrorMessage.value = ''
+    bidProjectNameError.value = ''
   } catch (error) {
     if (!controller.signal.aborted && generation === detailGeneration) {
       selected.value = null
@@ -200,23 +210,28 @@ function openCreate(): void {
   form.remark = ''
   panelMode.value = 'create'
   errorMessage.value = ''
+  panelErrorMessage.value = ''
+  bidProjectNameError.value = ''
 }
 
 function closePanel(): void {
   detailController?.abort()
   selected.value = null
   panelMode.value = 'closed'
+  panelErrorMessage.value = ''
+  bidProjectNameError.value = ''
 }
 
 async function save(): Promise<void> {
   if (actionBusy.value) return
   const bidProjectName = form.bidProjectName.trim()
   if (!bidProjectName) {
-    errorMessage.value = '投标项目名称不能为空'
+    bidProjectNameError.value = '投标项目名称不能为空'
     return
   }
   actionBusy.value = true
-  errorMessage.value = ''
+  panelErrorMessage.value = ''
+  bidProjectNameError.value = ''
   successMessage.value = ''
   const command = { bidProjectName, remark: form.remark.trim() || null }
   try {
@@ -233,8 +248,7 @@ async function save(): Promise<void> {
       successMessage.value = '投标成本已保存，并已刷新最新数据。'
     }
   } catch (error) {
-    errorMessage.value = errorText(error, '投标成本保存失败')
-    if (selected.value) await openDetail(selected.value.id, 'detail', true)
+    panelErrorMessage.value = errorText(error, '投标成本保存失败')
   } finally {
     actionBusy.value = false
   }
@@ -248,12 +262,15 @@ function requestDelete(record: BidCostRecord): void {
 async function requestWon(record: BidCostRecord): Promise<void> {
   selected.value = record
   wonProjectId.value = ''
+  wonProjectError.value = ''
   projectController?.abort()
   const controller = new AbortController()
   projectController = controller
   errorMessage.value = ''
   try {
-    projects.value = await loadProjectContextOptions(controller.signal)
+    if (!projects.value.length) {
+      projects.value = await loadProjectContextOptions(controller.signal)
+    }
     if (projectController !== controller) return
     pendingAction.value = 'won'
   } catch (error) {
@@ -268,16 +285,22 @@ function requestLost(record: BidCostRecord): void {
   pendingAction.value = 'lost'
 }
 
+function closeConfirmation(): void {
+  pendingAction.value = null
+  wonProjectError.value = ''
+}
+
 async function confirmAction(): Promise<void> {
   const action = pendingAction.value
   const record = selected.value
   if (!action || !record || actionBusy.value) return
   if (action === 'won' && !wonProjectId.value) {
-    errorMessage.value = '中标项目不能为空'
+    wonProjectError.value = '中标项目不能为空'
     return
   }
   actionBusy.value = true
   errorMessage.value = ''
+  wonProjectError.value = ''
   successMessage.value = ''
   try {
     if (action === 'delete') await deleteBidCost(record.id)
@@ -306,10 +329,6 @@ function statusTone(status: BidStatus): 'info' | 'success' | 'neutral' {
   return status === 'WON' ? 'success' : status === 'LOST' ? 'neutral' : 'info'
 }
 
-function projectLabel(projectId?: string | null): string {
-  return projects.value.find((project) => project.id === projectId)?.projectName ?? projectId ?? '—'
-}
-
 watch(
   () => route.fullPath,
   () => void loadList(),
@@ -331,6 +350,7 @@ onBeforeUnmount(() => {
       title="无权访问投标成本"
       description="当前账号没有访问权限，页面未加载业务数据。"
       kind="error"
+      :heading-level="1"
     />
 
     <template v-else>
@@ -364,7 +384,13 @@ onBeforeUnmount(() => {
             placeholder="投标项目名称"
             @keyup.enter="query"
           />
-          <V2Select v-model="filter.bidStatus" label="状态" :options="STATUS_OPTIONS" allow-empty />
+          <V2Select
+            :model-value="filter.bidStatus"
+            label="状态"
+            :options="STATUS_OPTIONS"
+            allow-empty
+            @update:model-value="changeStatus"
+          />
           <V2Button :loading="loading" @click="query">查询</V2Button>
         </div>
       </V2Card>
@@ -374,12 +400,14 @@ onBeforeUnmount(() => {
         title="正在加载投标成本"
         description="正在读取当前筛选结果。"
         kind="loading"
+        :heading-level="2"
       />
       <V2PageState
         v-else-if="!loading && records.length === 0"
         title="暂无投标成本"
         description="当前筛选条件下没有可访问记录。"
         kind="empty"
+        :heading-level="2"
       />
 
       <V2Card v-else title="投标成本列表">
@@ -396,8 +424,7 @@ onBeforeUnmount(() => {
             </caption>
             <thead>
               <tr>
-                <th scope="col">投标项目</th>
-                <th scope="col">关联项目</th>
+                <th scope="col">项目名称</th>
                 <th scope="col">状态</th>
                 <th scope="col">备注</th>
                 <th scope="col">更新时间</th>
@@ -409,7 +436,6 @@ onBeforeUnmount(() => {
                 <td>
                   <strong>{{ record.bidProjectName }}</strong>
                 </td>
-                <td>{{ projectLabel(record.projectId) }}</td>
                 <td>
                   <V2Badge :tone="statusTone(record.bidStatus)" dot>{{
                     statusLabel(record.bidStatus)
@@ -419,32 +445,26 @@ onBeforeUnmount(() => {
                 <td>{{ record.updatedAt || '—' }}</td>
                 <td>
                   <div class="bid-cost-page__actions">
-                    <V2Button size="small" variant="secondary" @click="openDetail(record.id)"
-                      >详情</V2Button
-                    >
+                    <V2Button variant="secondary" @click="openDetail(record.id)">预览</V2Button>
                     <V2Button
                       v-if="canEdit && record.bidStatus === 'BIDDING'"
-                      size="small"
                       variant="ghost"
                       @click="openDetail(record.id, 'edit')"
                       >编辑</V2Button
                     >
                     <V2Button
                       v-if="canChangeStatus && record.bidStatus === 'BIDDING'"
-                      size="small"
                       @click="requestWon(record)"
                       >标记中标</V2Button
                     >
                     <V2Button
                       v-if="canChangeStatus && record.bidStatus === 'BIDDING'"
-                      size="small"
                       variant="secondary"
                       @click="requestLost(record)"
                       >标记未中标</V2Button
                     >
                     <V2Button
                       v-if="canDelete && record.bidStatus === 'BIDDING'"
-                      size="small"
                       variant="danger"
                       @click="requestDelete(record)"
                       >删除</V2Button
@@ -481,22 +501,26 @@ onBeforeUnmount(() => {
             ? '新建投标成本'
             : panelMode === 'edit'
               ? '编辑投标成本'
-              : '投标成本详情'
+              : '投标成本预览'
         "
-        panel-class="v2-dialog-standard v2-detail-dialog"
+        :panel-class="panelMode === 'detail' ? 'v2-detail-dialog' : undefined"
         :close-on-backdrop="false"
         :close-disabled="actionBusy"
         @close="closePanel"
       >
+        <V2Alert v-if="panelErrorMessage && !detailLoading" tone="danger" title="保存失败">
+          {{ panelErrorMessage }}
+        </V2Alert>
         <V2PageState
           v-if="detailLoading"
           title="正在加载投标详情"
           description="请稍候。"
           kind="loading"
+          :heading-level="2"
         />
         <div v-else-if="panelMode === 'detail' && selected" class="bid-cost-page__detail">
           <dl class="v2-detail-dialog__facts">
-            <dt>投标项目</dt>
+            <dt>项目名称</dt>
             <dd>{{ selected.bidProjectName }}</dd>
             <dt>状态</dt>
             <dd>
@@ -504,16 +528,12 @@ onBeforeUnmount(() => {
                 statusLabel(selected.bidStatus)
               }}</V2Badge>
             </dd>
-            <dt>关联项目</dt>
-            <dd>{{ projectLabel(selected.projectId) }}</dd>
             <dt>备注</dt>
             <dd>{{ selected.remark || '—' }}</dd>
-            <dt>创建时间</dt>
-            <dd>{{ selected.createdAt || '—' }}</dd>
             <dt>更新时间</dt>
             <dd>{{ selected.updatedAt || '—' }}</dd>
           </dl>
-          <div class="bid-cost-page__actions">
+          <div class="v2-detail-dialog__quick-actions">
             <V2GlassButton
               v-if="canEdit && selectedIsBidding"
               text="编辑"
@@ -536,24 +556,34 @@ onBeforeUnmount(() => {
             />
           </div>
         </div>
-        <form v-else class="bid-cost-page__form" @submit.prevent="save">
+        <form
+          v-else
+          id="bid-cost-form"
+          class="bid-cost-page__form"
+          novalidate
+          @submit.prevent="save"
+        >
           <V2Input
             v-model="form.bidProjectName"
             label="投标项目名称"
             required
             :disabled="actionBusy"
+            :error="bidProjectNameError"
           />
           <label class="bid-cost-page__native-field">
             <span>备注</span>
             <textarea v-model="form.remark" maxlength="500" :disabled="actionBusy"></textarea>
           </label>
-          <div class="bid-cost-page__actions">
-            <V2Button type="submit" :loading="actionBusy">{{
-              panelMode === 'create' ? '创建' : '保存变更'
-            }}</V2Button>
-            <V2GlassButton text="取消" :disabled="actionBusy" :on-click="closePanel" />
-          </div>
         </form>
+        <template v-if="panelMode === 'create' || panelMode === 'edit'" #footer>
+          <V2GlassButton text="取消" :disabled="actionBusy" :on-click="closePanel" />
+          <V2GlassButton
+            :text="panelMode === 'create' ? '创建' : '保存变更'"
+            type="submit"
+            form="bid-cost-form"
+            :loading="actionBusy"
+          />
+        </template>
       </V2Dialog>
     </template>
 
@@ -574,7 +604,7 @@ onBeforeUnmount(() => {
       :confirm-text="pendingAction === 'delete' ? '确认删除' : '确认更新'"
       :danger="pendingAction === 'delete' || pendingAction === 'lost'"
       :loading="actionBusy"
-      @close="pendingAction = null"
+      @close="closeConfirmation"
       @confirm="confirmAction"
     >
       <V2Select
@@ -583,6 +613,8 @@ onBeforeUnmount(() => {
         label="中标关联项目"
         :options="projectOptions"
         required
+        :error="wonProjectError"
+        @update:model-value="wonProjectError = ''"
       />
     </V2ConfirmDialog>
   </div>
@@ -617,55 +649,12 @@ onBeforeUnmount(() => {
   line-height: var(--v2-line-height-ui);
 }
 
-.bid-cost-page__table-wrap {
-  min-width: 0;
-  overflow-x: auto;
-}
-
 .bid-cost-page__table {
-  width: 100%;
   min-width: 64rem;
-  border-collapse: collapse;
-  font-size: var(--v2-font-size-12);
-  line-height: var(--v2-line-height-ui);
-}
-
-.bid-cost-page__table th,
-.bid-cost-page__table td {
-  padding: var(--v2-space-3);
-  border-bottom: 1px solid var(--v2-color-border-subtle);
-  text-align: left;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-
-.bid-cost-page__table th {
-  color: var(--v2-color-text-secondary);
-  background: var(--v2-color-surface-subtle);
-  font-weight: var(--v2-font-weight-semibold);
 }
 
 .bid-cost-page__table .bid-cost-page__actions {
   flex-wrap: nowrap;
-}
-
-dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--v2-space-2) var(--v2-space-4);
-  margin: 0;
-  font-size: var(--v2-font-size-12);
-  line-height: var(--v2-line-height-ui);
-}
-
-dt,
-.bid-cost-page__native-field {
-  color: var(--v2-color-text-secondary);
-}
-
-dd {
-  margin: 0;
-  overflow-wrap: anywhere;
 }
 
 .bid-cost-page__native-field {
@@ -675,11 +664,6 @@ dd {
 
 .bid-cost-page__native-field textarea {
   min-height: 6rem;
-  padding: var(--v2-space-2) var(--v2-space-3);
-  color: var(--v2-color-text);
-  background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
   resize: vertical;
 }
 

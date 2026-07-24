@@ -365,6 +365,6 @@ describe('M4 variation page', () => {
     expect(wrapper.text()).toContain('版本冲突')
     expect(wrapper.text()).toContain('草稿')
     expect(wrapper.text()).not.toContain('DRAFT')
-    expect(wrapper.text()).not.toContain('变更签证已提交审批')
+    expect(wrapper.text()).not.toContain('签证变更已提交审批')
   })
 })

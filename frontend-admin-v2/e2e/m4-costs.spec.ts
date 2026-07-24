@@ -174,7 +174,10 @@ test.describe('M4 costs routes', () => {
       await expect(page.getByRole('heading', { name: '成本台账', exact: true })).toBeVisible()
       await expect(page.getByText('9007199254740993.12').first()).toBeVisible()
       await expect(page.getByRole('button', { name: '查询' })).toHaveAttribute('aria-busy', 'false')
-      await expect(page.locator('.v2-card__body dl').first()).toHaveCSS('font-size', '12px')
+      await expect(page.getByRole('table').locator('tbody td').first()).toHaveCSS(
+        'font-size',
+        '12px',
+      )
       await expect(page.getByRole('navigation', { name: '成本台账分页' })).toHaveCSS(
         'font-size',
         '12px',

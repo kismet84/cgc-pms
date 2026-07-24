@@ -72,7 +72,7 @@ class ProductionMeasurementControllerTest {
 
     @Test void projectScopeProtectsListDetailWriteAndTrace()throws Exception{
         Cookie scoped=cookie(USER,"MEASUREMENT_USER","measurement:query","measurement:submit","measurement:maintain","measurement:owner:submit","measurement:owner:review");
-        mockMvc.perform(get("/production-measurements").cookie(scoped)).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(0));
+        mockMvc.perform(get("/production-measurements").cookie(scoped)).andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1)).andExpect(jsonPath("$.data[0].id").value(String.valueOf(MEASUREMENT)));
         mockMvc.perform(get("/production-measurements").param("projectId",String.valueOf(OUTSIDE)).cookie(scoped)).andExpect(status().isForbidden());
         mockMvc.perform(get("/production-measurements/"+OUT_MEASUREMENT).cookie(scoped)).andExpect(status().isForbidden());
         mockMvc.perform(post("/production-measurements/"+OUT_MEASUREMENT+"/submit").param("version","0").cookie(scoped)).andExpect(status().isForbidden());

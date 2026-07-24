@@ -609,7 +609,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
         <tbody>
           <tr v-for="record in records" :key="record.id">
             <td>{{ record.reportDate }}</td>
-            <td>{{ record.projectName || record.projectId }}</td>
+            <td>{{ record.projectName || '—' }}</td>
             <td class="daily-log-page__facts">
               <V2Badge :tone="record.status === 'DRAFT' ? 'neutral' : 'success'">
                 {{ record.status === 'DRAFT' ? '草稿' : '已提交' }}
@@ -687,7 +687,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
         <dl class="v2-detail-dialog__facts">
           <div>
             <dt>项目</dt>
-            <dd>{{ activeRecord.projectName || activeRecord.projectId }}</dd>
+            <dd>{{ activeRecord.projectName || '—' }}</dd>
           </div>
           <div>
             <dt>日报日期</dt>

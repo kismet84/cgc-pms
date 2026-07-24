@@ -16,6 +16,10 @@ Status: active
 - 补货只能消费有界候选。权威 ReadySpec 通过确定性校验时可直接生成；否则调用有硬超时和心跳的语义 Planner。
 - Planner 必须逐候选返回 CREATED、REJECTED 或 BLOCKED；只有 CREATED 可写入 Ready，零 Ready 是合法终态。
 - 补货产生 Ready 后可在同一 run 内重新经过 checkpoint 并继续选择；不得绕过迭代上限、回顾门禁或金丝雀门禁。
+- Ready allow/forbid 完全覆盖矛盾按 `ready_issue_config/READY_SCOPE_CONTRADICTION` 在 executor/worktree 前拒绝；合法窄禁止 carve-out 保持有效。
+- Ready 为空时，先确认知识图谱健康且 Git 游标覆盖当前 HEAD，再用有界查询发现存量候选；候选必须按 `sourceRefs`、当前代码/配置和唯一正式台账交叉核验。
+- 图谱异常按统一失败分类 fail-close，不静默回退到全仓文件扫描；存量候选耗尽后，才处理 current focus 可解除阻塞、证据完整的 Ad-hoc Candidate 或刷新产品情报。
+- 只允许自动拆分非阻塞、非聚合父项且证据/验收完整的 OPEN/OBSERVATION；RELEASE_GATE、FROZEN、NEEDS_CONFIRMATION 和生产前置不得自动实施。
 
 ## 状态、恢复与审查
 
@@ -38,6 +42,7 @@ Status: active
 - 结构契约：`plugins/cgc-pms-autopilot/schemas/**`
 - 状态迁移：`scripts/codex-autopilot/autopilot-transition.ps1`
 - 恢复规则：`plugins/cgc-pms-autopilot/references/rerun-policy.md`
+- 子分类与动作：`plugins/cgc-pms-autopilot/references/classifier-rules.md`
 - 角色边界：`plugins/cgc-pms-autopilot/references/owner-boundary.md`
 - 桌面执行宿主：`plugins/cgc-pms-autopilot/references/desktop-execution-policy.md`
 

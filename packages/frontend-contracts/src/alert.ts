@@ -11,6 +11,7 @@ export interface AlertRecord {
   alertCategory?: string;
   sourceType?: string;
   sourceId?: string;
+  dedupKey?: string;
   ruleType: string;
   severity: AlertSeverity;
   message: string;

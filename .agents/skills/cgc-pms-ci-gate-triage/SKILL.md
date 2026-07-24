@@ -1,45 +1,52 @@
 ---
 name: cgc-pms-ci-gate-triage
-description: 用于 cgc-pms 项目的 GitHub Actions 与 CI 门禁排障：读取 workflow 或门禁日志、先做失败分类、核对远端 checks 与分支保护、区分工具配置问题、环境前置问题和真实质量安全问题。当用户要求排查 CI 红灯、门禁失败、checks 不通过或上线门禁阻塞时使用。
+description: 用于 cgc-pms 的统一失败分类、GitHub Actions、PR 与 CI 门禁排障。用户要求排查 CI 红灯、checks、构建/测试失败、PR 门禁或需要判断失败归因时使用。
 ---
 
-# cgc-pms CI 门禁分诊
+# cgc-pms CI、PR 与失败分类
 
-通用协议=`docs/standards/codex-task-execution-policy.md`
+根规则由 Codex 自动加载。本 Skill 是项目失败分类、CI 与 PR 契约的唯一权威正文。
 
-1. 先读仓库根 `AGENTS.override.md`、`AGENTS.md` 与通用协议，不要把所有红灯直接归因为业务代码失败。
-2. 先收集最小事实：
-   - 工作流名、job、step
-   - 分支名、提交号
-   - 失败关键词
-   - 本地与远端 checks 是否一致
-3. 按通用协议分类：
-   - `tool_config`：workflow 触发、脚本入口、凭据、工具版本、规则文件加载
-   - `tool_invocation`：参数、schema、转义、PowerShell/Maven 调用格式
-   - `environment_prerequisite`：对 GitHub Actions，只有 GitHub 服务、网络或 Runner 基础设施故障可归入；本地预验的 Docker/WSL/数据库/端口前置仍按通用协议处理
-   - `ready_issue_config`：测试选择器、验证入口或 Ready 契约失真
-   - `quality_or_security`：测试、构建、类型、契约、权限、安全、数据一致性真实失败
-   - `unknown`：证据不足或本地/远端结果冲突
-4. 代码、测试、迁移或基线不同步导致的 CI 失败必须标记 `quality_or_security/DELIVERY_GATE_OMISSION`；workflow 内 Docker、service container、数据库、端口或测试数据配置失败不得自动归为外部环境问题。
-5. 最小处理顺序固定为：先分类 -> 配置修复/调用纠正/环境恢复 -> 一次最小等价复验 -> 仍失败才进入代码整改或阻塞裁决。相同前置和参数下不得原样重试。
-6. CI 轮询采用退避节奏；状态未变化时保持静默，只在状态变化、超过预期、确定失败或需要用户决策时播报。
-7. 需要核对远端状态时，优先使用绑定当前提交的真实远端 checks、分支保护规则和最新 workflow 结果，不只看本地缓存状态。首次非 Draft PR 前必须运行 `scripts/codex-autopilot/verify-pre-pr-ci.ps1`；缺少同 HEAD SHA 全量证据时禁止声明“可提 PR”。
-8. GitHub 整份 job 日志或 artifact 因 EOF、Schannel 或稳定超时不可得时，不切换 Git SSH、不无界尝试下载端点。优先从已登录的 job 页面定位失败 step 的临时日志入口；确认服务端支持 `Accept-Ranges` 后只读取末段，默认 `256 KB`，若缺少最终测试摘要只允许扩大一次。临时签名 URL 只作会话证据，不写入长期规则或正式报告。
-9. 首次 PR CI 结果必须单独记录；后续修绿不追溯改写 `PR 首次 CI 通过率`。
-10. 回报时明确：
-   - 失败分类
-   - 当前是否阻塞
-   - 下一步由主线程执行配置修复、环境恢复、代码整改还是验收复核
+## 统一失败分类
 
-## 最小回报骨架
+所有新结论和新写入只使用以下七类：
+
+| 分类 | 适用证据 | 处理 |
+| --- | --- | --- |
+| `tool_config` | 工具未加载、索引/凭据/规则/入口缺失、版本不兼容 | 修复配置或前置，不判业务失败 |
+| `tool_invocation` | schema、参数、转义、命令调用格式错误 | 修正调用后做一次最小复验 |
+| `environment_prerequisite` | Docker、端口、数据库、服务、代理、等待时间或测试数据未就绪 | 恢复环境后复验 |
+| `ready_issue_config` | Ready 范围、验证选择器、命令或报告路径失真 | 最小修正 Ready 契约 |
+| `retrieval_gap` | 图谱召回或索引覆盖不足 | 使用允许的备用检索，不作不存在断言 |
+| `quality_or_security` | 可复现的代码、测试、构建、契约、权限、安全或数据一致性失败 | 实施整改或阻塞裁决 |
+| `unknown` | 证据不足或冲突 | 补证据，禁止强行归因 |
+
+先分类，再决定重试、修复或阻塞；相同前置和参数下禁止原样重试。历史旧值只读兼容，不得继续写入。
+
+## CI 分诊
+
+1. 收集 workflow、job、step、分支、HEAD SHA、失败关键词和本地/远端差异。
+2. GitHub Actions 只有 GitHub 服务、网络或 Runner 基础设施故障可归 `environment_prerequisite`。workflow 内 Docker、数据库、端口、测试数据配置，以及代码/测试/迁移/基线不同步，都不是外部环境故障。
+3. 代码、测试、迁移或基线不同步导致 CI 失败归 `quality_or_security/DELIVERY_GATE_OMISSION`；后续修绿不得改写 PR 首次 CI 结果。
+4. 最小顺序：分类 → 修配置/调用/环境 → 一次最小等价复验 → 仍失败才整改代码或阻塞。
+5. 轮询采用退避；状态未变化保持静默，只在状态变化、超时、确定失败或需用户决策时回报。
+6. 远端日志因 EOF、Schannel 或超时不可得时，不切 Git SSH、不无界下载。优先定位失败 step；支持 `Accept-Ranges` 时读取末段，默认 `256 KB`，缺最终摘要只扩大一次。临时签名 URL 不写长期文件。
+
+## 首次非 Draft PR 门禁
+
+1. 功能分支最终提交先 push，并在 `event=push`、`headSha=git rev-parse HEAD` 的同一 SHA 上取得完整成功 CI；任何新提交使旧证据失效。
+2. 必须覆盖：后端全量与顺序复验、MySQL 最小权限迁移、前端 lint/test/type-check/build、安全扫描、V2 门禁、E2E 与 `build-summary`。
+3. 运行 `scripts/codex-autopilot/verify-pre-pr-ci.ps1` 绑定分支、SHA、tracked 工作区和全部 job。缺任一证据时禁止创建/转为非 Draft PR，也禁止声明“可提 PR”。
+4. PR 创建后的首次 CI 独立计入 `PR 首次 CI 通过率`；本地成功或后续重跑转绿不能追溯改写。
+5. 默认分支合并后只运行轻量 post-merge 证据核验；无法证明来自合格已合并 PR 时 fail-close，并通过 `workflow_dispatch` 补跑完整 CI。
+
+## 最小回报
 
 ```text
-失败任务=
-失败步骤=
+失败任务/步骤=
 失败分类=
 关键证据=
-当前处理=
-下一步=
+当前处理与复验=
 是否阻塞=
-复验次数=
+首次 PR CI 结论=
 ```

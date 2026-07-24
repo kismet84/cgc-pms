@@ -3,7 +3,7 @@
 Policy-Version: 1
 Status: active
 
-普通任务与 AutoPilot 共享的状态语义、工具路由、失败分类、分层验证、Git 生命周期、commentary 和恢复胶囊统一读取 `docs/standards/codex-task-execution-policy.md`；本文件只定义桌面原生 AutoPilot 的专项执行边界。
+根硬门禁由 `AGENTS.md` 自动加载，一级失败分类引用 `.agents/skills/cgc-pms-ci-gate-triage/SKILL.md`；本文件只定义桌面原生 AutoPilot 专项执行边界。
 
 ## 默认执行宿主
 

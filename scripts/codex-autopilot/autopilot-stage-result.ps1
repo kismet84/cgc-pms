@@ -1,5 +1,5 @@
 $script:AutopilotStageOutcomes = @('SUCCEEDED','RETRYABLE','PAUSED','BLOCKED','TERMINAL')
-$script:AutopilotFailureCategories = @('none','tool_config','environment','environment_prereq','quality_security','ready_issue_config','integrity_conflict','executor_stall_timeout')
+$script:AutopilotFailureCategories = @('none','tool_config','tool_invocation','environment_prerequisite','ready_issue_config','retrieval_gap','quality_or_security','unknown','integrity_conflict','executor_stall_timeout')
 if (!(Get-Variable -Name ControlPlanePolicyVersion -Scope Script -ErrorAction SilentlyContinue)) { $script:ControlPlanePolicyVersion = '' }
 if (!(Get-Variable -Name ControlPlanePolicyHash -Scope Script -ErrorAction SilentlyContinue)) { $script:ControlPlanePolicyHash = '' }
 if (!(Get-Variable -Name ControlPlanePolicyRefs -Scope Script -ErrorAction SilentlyContinue)) { $script:ControlPlanePolicyRefs = @() }
@@ -111,7 +111,7 @@ function ConvertTo-AutopilotStageResult {
     'TERMINAL'
   } elseif ([string]$ExecutorResult.status -eq 'done') {
     'SUCCEEDED'
-  } elseif ($stopReason -eq 'STOP_REVIEWER_TOOL_RETRY_EXHAUSTED' -or $failureCategory -in @('tool_config','environment','environment_prereq')) {
+  } elseif ($stopReason -eq 'STOP_REVIEWER_TOOL_RETRY_EXHAUSTED' -or $failureCategory -in @('tool_config','tool_invocation','environment_prerequisite','retrieval_gap','unknown')) {
     'PAUSED'
   } elseif ($nextStage -eq 'REPAIR') {
     'RETRYABLE'

@@ -88,7 +88,15 @@ Assert-Contains $backendMySql @(
 ) 'backend-test-mysql'
 Assert-Contains $backendDependency @('permissions:','contents: read','bash ./scripts/ci/scan-backend-dependencies.sh') 'backend-dependency-scan'
 Assert-Contains $frontendBuild @('name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin/dist','if: always()') 'frontend-build'
-Assert-Contains $frontendV2 @('pnpm check:boundary','pnpm check:route-ledger','pnpm lint:check','pnpm test:unit','pnpm type-check:contracts','pnpm type-check','pnpm build','pnpm check:bundle-size','pnpm audit --audit-level high') 'frontend-v2-gate'
+Assert-Contains $frontendV2 @(
+  'pnpm check:boundary','pnpm check:route-ledger','pnpm lint:check','pnpm test:unit',
+  'pnpm type-check:contracts','pnpm type-check','pnpm build','pnpm check:bundle-size',
+  'pnpm exec playwright install chromium','pnpm test:e2e:migration-gate',
+  'PLAYWRIGHT_BASE_URL: http://127.0.0.1:4174',
+  'PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4174',
+  'frontend-admin-v2/playwright-report','frontend-admin-v2/test-results',
+  'pnpm audit --audit-level high'
+) 'frontend-v2-gate'
 Assert-Contains $supplyChain @(
   'needs: [backend-test, backend-dependency-scan, frontend-build]',
   'contents: read','id-token: write','attestations: write',
@@ -108,7 +116,7 @@ Assert-Contains $e2e @(
 ) 'e2e'
 Assert-Contains $sqlSafety @('./scripts/ci/test-workflow-contract.ps1','./scripts/check-sql-safety.ps1') 'sql-safety-scan'
 
-if ([regex]::Matches($workflow,'uses: actions/upload-artifact@v7').Count -ne 9) { throw 'artifact upload count changed' }
+if ([regex]::Matches($workflow,'uses: actions/upload-artifact@v7').Count -ne 10) { throw 'artifact upload count changed' }
 if ([regex]::Matches($workflow,'uses: actions/download-artifact@v8').Count -ne 3) { throw 'artifact download count changed' }
 if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-backend').Count -ne 3) { throw 'backend setup composite usage count changed' }
 if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-frontend').Count -ne 7) { throw 'frontend setup composite usage count changed' }
@@ -144,7 +152,7 @@ foreach ($name in @('check:boundary','check:route-ledger','lint:check','test:uni
   ok = $true
   jobs = @($actualJobs)
   requiredJobCount = $requiredJobs.Count
-  artifactUploads = 9
+  artifactUploads = 10
   artifactDownloads = 3
   permissionBlocks = 2
   postMergeJobs = $postMergeJobs.Count

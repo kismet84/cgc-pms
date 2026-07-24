@@ -219,7 +219,26 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
 
     @Test
     @Transactional
-    @DisplayName("5.3 Management view: rankings, tasks and risks respect SELF project scope")
+    @DisplayName("5.3 Management view: selected project scopes rankings and totals")
+    void testManagementView_SelectedProject() {
+        SeedResult selected = seed("MGMT_SELECTED");
+        seed("MGMT_OTHER");
+
+        ManagementDashboardVO vo = dashboardService.getManagementView(selected.projectId);
+
+        assertEquals(1L, vo.getActiveProjectCount());
+        assertEquals(List.of(selected.projectId.toString()), vo.getProjectRankings().stream()
+                .map(DashboardProjectSummaryVO::getProjectId).toList());
+        DashboardProjectSummaryVO ranking = vo.getProjectRankings().getFirst();
+        assertEquals(ranking.getContractIncome(), vo.getTotalContractAmount());
+        assertEquals(ranking.getDynamicCost(), vo.getTotalDynamicCost());
+        assertEquals(ranking.getExpectedProfit(), vo.getTotalExpectedProfit());
+        assertEquals(ranking.getPaidAmount(), vo.getTotalPaidAmount());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("5.4 Management view: rankings, tasks and risks respect SELF project scope")
     void testManagementView_RespectsProjectDataScope() {
         SeedResult visible = seed("MGMT_SELF_VISIBLE");
         SeedResult hidden = seed("MGMT_SELF_HIDDEN");

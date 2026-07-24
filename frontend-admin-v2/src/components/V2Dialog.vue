@@ -81,7 +81,8 @@ function onKeydown(event: KeyboardEvent) {
 
 function onDocumentKeydown(event: KeyboardEvent) {
   if (!props.open || event.defaultPrevented || event.key !== 'Escape') return
-  if (!panel.value?.contains(document.activeElement)) return
+  const openPanels = document.querySelectorAll<HTMLElement>('.v2-dialog__panel')
+  if (!panel.value || openPanels.item(openPanels.length - 1) !== panel.value) return
   event.preventDefault()
   close()
 }

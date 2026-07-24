@@ -419,7 +419,7 @@ function contractTitle(): string {
 }
 
 function projectLabel(projectId?: string | null): string {
-  return projects.value.find((item) => item.id === projectId)?.projectName ?? projectId ?? '—'
+  return projects.value.find((item) => item.id === projectId)?.projectName ?? '—'
 }
 
 function partnerLabel(partnerId?: string | null): string {

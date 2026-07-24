@@ -13,6 +13,7 @@ public class WfInstanceVO {
     private String templateName;
     private String businessType;
     private String businessId;
+    private String businessCode;
     private String projectId;
     private String contractId;
     private String title;
