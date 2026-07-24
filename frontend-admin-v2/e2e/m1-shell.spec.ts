@@ -73,6 +73,24 @@ async function installIdentity(page: Page, readIdentity: () => Identity): Promis
       }),
     }),
   )
+  await page.route('**/api/system/dict/data/by-code/*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: '0', message: 'success', data: [] }),
+    }),
+  )
+  await page.route(/\/api\/projects(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '0',
+        message: 'success',
+        data: { records: [], total: 0, pageNo: 1, pageSize: 20 },
+      }),
+    }),
+  )
   await page.route(/\/api\/dashboard\/project-manager(?:\?.*)?$/, (route) =>
     route.fulfill({
       status: 200,
@@ -249,7 +267,7 @@ test('honors reduced motion and distinguishes identity, 403 and 404 states', asy
   identity = 'ordinary'
   await page.goto('/v2/project/list')
   await expect(page.getByRole('heading', { level: 1, name: '项目台账' })).toBeVisible()
-  await expect(page.locator('[data-domain]')).toHaveCount(1)
+  await expect(page.locator('[data-domain]')).toHaveCount(2)
 
   identity = 'denied'
   await page.goto('/v2/contract/ledger')
