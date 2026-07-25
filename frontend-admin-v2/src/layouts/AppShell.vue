@@ -1057,7 +1057,6 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
   flex: 1;
   display: flex;
   margin: 0;
-  padding: 0;
 }
 
 .app-shell__content:focus {
