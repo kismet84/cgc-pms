@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { relative, resolve } from 'node:path'
 
 const sourceRoot = resolve('src')
 const pageRoot = resolve(sourceRoot, 'pages')
@@ -18,7 +18,7 @@ function vuePages(root = pageRoot): string[] {
 }
 
 function pageName(path: string): string {
-  return path.replace(`${pageRoot}\\`, '').replaceAll('\\', '/')
+  return relative(pageRoot, path).replaceAll('\\', '/')
 }
 
 function templateOf(source: string): string {

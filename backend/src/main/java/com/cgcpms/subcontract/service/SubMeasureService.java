@@ -80,7 +80,7 @@ public class SubMeasureService {
             wrapper.eq(SubMeasure::getProjectId, projectId);
         } else {
             List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
-            if (projectIds.isEmpty()) wrapper.apply("1 = 0");
+            if (projectIds.isEmpty()) wrapper.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment
             else wrapper.in(SubMeasure::getProjectId, projectIds);
         }
         if (contractId != null) wrapper.eq(SubMeasure::getContractId, contractId);
