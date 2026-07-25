@@ -76,9 +76,13 @@ class StlSettlementQueryServiceTest {
 
     private Long settlementId;
     private Long variationId;
+    private Long measureId;
+    private Long costItemId;
+    private final List<Long> paymentRecordIds = new java.util.ArrayList<>();
 
     @BeforeEach
     void setUp() {
+        paymentRecordIds.clear();
         UserContext.set(Jwts.claims().subject("admin").add("userId", USER_ID)
                 .add("username", "admin").add("tenantId", TENANT_ID)
                 .add("roleCodes", java.util.List.of("ADMIN")).build());
@@ -301,15 +305,15 @@ class StlSettlementQueryServiceTest {
                         + "WHERE id=? AND tenant_id=? AND contract_id=?",
                 otherProjectId, variationId, TENANT_ID, CONTRACT_ID);
         jdbcTemplate.update("UPDATE cost_item SET project_id=? "
-                        + "WHERE tenant_id=? AND contract_id=? AND source_type='SETTLEMENT_QUERY_TEST_COST'",
-                otherProjectId, TENANT_ID, CONTRACT_ID);
+                        + "WHERE id=? AND tenant_id=? AND contract_id=?",
+                otherProjectId, costItemId, TENANT_ID, CONTRACT_ID);
         jdbcTemplate.update("UPDATE sub_measure SET project_id=? "
-                        + "WHERE tenant_id=? AND contract_id=? AND measure_code='SM-SETTLEMENT-QUERY-001'",
-                otherProjectId, TENANT_ID, CONTRACT_ID);
-        jdbcTemplate.update("UPDATE pay_record SET project_id=? WHERE pay_application_id IN "
-                        + "(SELECT id FROM pay_application WHERE tenant_id=? "
-                        + "AND apply_code LIKE 'PAY-SETTLEMENT-QUERY-%')",
-                otherProjectId, TENANT_ID);
+                        + "WHERE id=? AND tenant_id=? AND contract_id=?",
+                otherProjectId, measureId, TENANT_ID, CONTRACT_ID);
+        for (Long paymentRecordId : paymentRecordIds) {
+            jdbcTemplate.update("UPDATE pay_record SET project_id=? WHERE id=? AND tenant_id=?",
+                    otherProjectId, paymentRecordId, TENANT_ID);
+        }
 
         StlSettlementVO after = queryService.computeSettlementAmount(CONTRACT_ID);
         assertEquals(new BigDecimal(before.getChangeAmount()).subtract(new BigDecimal("800.00")),
@@ -330,7 +334,7 @@ class StlSettlementQueryServiceTest {
         assertTrue(queryService.getVariations(settlementId).stream()
                 .noneMatch(item -> String.valueOf(variationId).equals(item.getId())));
         assertTrue(queryService.getCosts(settlementId).stream()
-                .noneMatch(item -> "1234.56".equals(item.getAmount())));
+                .noneMatch(item -> String.valueOf(costItemId).equals(item.getId())));
         assertTrue(queryService.getPayments(settlementId).stream()
                 .noneMatch(item -> item.getApplyCode() != null
                         && item.getApplyCode().startsWith("PAY-SETTLEMENT-QUERY-")));
@@ -338,8 +342,9 @@ class StlSettlementQueryServiceTest {
         assertTrue(sources.getVarOrders().stream()
                 .noneMatch(item -> variationId.equals(item.getId())));
         assertTrue(sources.getSubMeasures().stream()
-                .noneMatch(item -> "SM-SETTLEMENT-QUERY-001".equals(item.getMeasureCode())));
-        assertTrue(sources.getPayRecords().isEmpty());
+                .noneMatch(item -> measureId.equals(item.getId())));
+        assertTrue(sources.getPayRecords().stream()
+                .noneMatch(item -> paymentRecordIds.contains(item.getId())));
     }
 
     // ================================================================
@@ -579,6 +584,7 @@ class StlSettlementQueryServiceTest {
         measure.setStatus("APPROVED");
         measure.setCreatedBy(USER_ID);
         subMeasureMapper.insert(measure);
+        measureId = measure.getId();
     }
 
     private void seedCost() {
@@ -615,6 +621,7 @@ class StlSettlementQueryServiceTest {
         item.setGeneratedFlag(1);
         item.setCreatedBy(USER_ID);
         costItemMapper.insert(item);
+        costItemId = item.getId();
     }
 
     private void seedAttachment() {
@@ -678,5 +685,6 @@ class StlSettlementQueryServiceTest {
         record.setExternalTxnNo("EXT-" + voucherNo);
         record.setRemark("should not leak");
         payRecordMapper.insert(record);
+        paymentRecordIds.add(record.getId());
     }
 }

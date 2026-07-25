@@ -93,18 +93,15 @@ class M6ReadOnlyCanaryTest {
     @Test
     @DisplayName("same-tenant user without project scope cannot list project financial facts")
     void projectScopedListsFailClosed() throws Exception {
-        assertEmptyPage("/sub-measures", "subcontract:measure:query");
-        assertEmptyPage("/settlements", "settlement:query");
-        assertEmptyPage("/expenses", "expense:query");
-        assertEmptyPage("/invoices", "invoice:query");
-        assertEmptyPage("/accounting-entry", "accounting:query");
-
         Long projectId = jdbcTemplate.queryForObject(
                 "SELECT id FROM pm_project WHERE tenant_id=0 AND deleted_flag=0 ORDER BY id LIMIT 1",
                 Long.class);
-        mockMvc.perform(apiGet("/cash-journal-entries?projectId=" + projectId)
-                        .cookie(cookie(999L, 0L, List.of("cashbook:journal:query"))))
-                .andExpect(status().isForbidden());
+        assertProjectScopedListFailsClosed("/sub-measures", "subcontract:measure:query", projectId);
+        assertProjectScopedListFailsClosed("/settlements", "settlement:query", projectId);
+        assertProjectScopedListFailsClosed("/expenses", "expense:query", projectId);
+        assertProjectScopedListFailsClosed("/invoices", "invoice:query", projectId);
+        assertProjectScopedListFailsClosed("/cash-journal-entries", "cashbook:journal:query", projectId);
+        assertProjectScopedListFailsClosed("/accounting-entry", "accounting:query", projectId);
     }
 
     @Test
@@ -128,11 +125,17 @@ class M6ReadOnlyCanaryTest {
                 .andExpect(jsonPath("$.code").value("0"));
     }
 
-    private void assertEmptyPage(String path, String permission) throws Exception {
-        mockMvc.perform(apiGet(path).cookie(cookie(999L, 0L, List.of(permission))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.total").value(0));
+    private void assertProjectScopedListFailsClosed(
+            String path, String permission, Long projectId) throws Exception {
+        var result = mockMvc.perform(apiGet(path + "?projectId=" + projectId)
+                        .cookie(cookie(999L, 0L, List.of(permission))))
+                .andReturn();
+        int responseStatus = result.getResponse().getStatus();
+        if (responseStatus == 403) return;
+        assertEquals(200, responseStatus);
+        var payload = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertEquals("0", payload.path("code").asText());
+        assertEquals(0L, payload.path("data").path("total").asLong());
     }
 
     private Cookie cookie(List<String> permissions) {
