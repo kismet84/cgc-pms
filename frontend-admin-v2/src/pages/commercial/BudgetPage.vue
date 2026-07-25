@@ -10,7 +10,6 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -19,6 +18,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import {
@@ -54,6 +54,10 @@ const detailLoading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
+
+watch(errorMessage, (message) => {
+  if (message) showToast('error', '预算操作未完成', message)
+})
 const dialog = ref<'closed' | 'detail' | 'create' | 'edit'>('closed')
 let controller: AbortController | null = null
 let detailController: AbortController | null = null
@@ -307,38 +311,41 @@ onBeforeUnmount(() => {
       description="系统未加载预算业务数据。"
       kind="forbidden"
     /><template v-else
-      ><V2Alert v-if="errorMessage" tone="danger" title="预算操作未完成">{{ errorMessage }}</V2Alert
       ><V2Card title="项目预算" :heading-level="1"
         ><template #actions
-          ><V2Button v-if="canAdd" variant="secondary" @click="openCreate"
-            >新建预算</V2Button
-          ></template
-        >
-        <div class="filters">
-          <V2Select
-            v-model="filter.status"
-            label="状态"
-            hide-label
-            :options="statusOptions"
-            allow-empty
-            placeholder="全部状态"
-          /><V2Button class="budget-query" variant="secondary" :loading="loading" @click="query"
-            >查询</V2Button
-          >
-        </div>
+          ><div class="filters">
+            <V2Select
+              v-model="filter.status"
+              label="状态"
+              hide-label
+              :options="statusOptions"
+              allow-empty
+              placeholder="全部状态"
+            /><V2Button
+              class="budget-query"
+              size="small"
+              variant="secondary"
+              :loading="loading"
+              @click="query"
+              >查询</V2Button
+            >
+          </div>
+          <V2Button v-if="canAdd" size="small" @click="openCreate">新建预算</V2Button></template
+        ></V2Card
+      ><V2Card>
         <V2PageState
           v-if="loading && !records.length"
           title="正在加载项目预算"
           description="正在读取当前项目和报告期内的预算版本。"
           kind="loading"
         /><V2PageState
-          v-else-if="!records.length"
+          v-else-if="!records.length && !errorMessage"
           title="暂无项目预算"
           description="当前筛选条件下没有可访问的预算版本。"
           kind="empty"
         />
         <div
-          v-else
+          v-else-if="records.length"
           class="table-wrap"
           role="region"
           aria-label="项目预算列表"
@@ -351,6 +358,7 @@ onBeforeUnmount(() => {
             </caption>
             <thead>
               <tr>
+                <th scope="col">预算编号</th>
                 <th scope="col">预算名称</th>
                 <th scope="col">版本</th>
                 <th scope="col">预算总额</th>
@@ -361,6 +369,16 @@ onBeforeUnmount(() => {
             </thead>
             <tbody>
               <tr v-for="row in records" :key="row.id">
+                <th scope="row">
+                  <V2Button
+                    size="small"
+                    variant="ghost"
+                    class="v2-table__record-link"
+                    @click="openDetail(row.id)"
+                  >
+                    {{ row.budgetCode }}
+                  </V2Button>
+                </th>
                 <td>{{ row.budgetName }}</td>
                 <td>{{ row.versionNo }}</td>
                 <td>{{ row.totalAmount }}</td>
@@ -376,9 +394,7 @@ onBeforeUnmount(() => {
                 </td>
                 <td>
                   <div class="actions">
-                    <V2Button size="small" variant="secondary" @click="openDetail(row.id)"
-                      >详情</V2Button
-                    ><V2Button
+                    <V2Button
                       v-if="canEdit && ['DRAFT', 'REJECTED'].includes(row.approvalStatus)"
                       size="small"
                       variant="secondary"
@@ -467,6 +483,8 @@ onBeforeUnmount(() => {
         </form>
         <div v-else-if="detail" class="form">
           <dl class="v2-detail-dialog__facts">
+            <dt>预算编号</dt>
+            <dd>{{ detail.budgetCode }}</dd>
             <dt>预算名称</dt>
             <dd>{{ detail.budgetName }}</dd>
             <dt>项目</dt>
@@ -497,8 +515,13 @@ onBeforeUnmount(() => {
               :on-click="saveLines"
             />
           </div>
-          <div class="table-wrap" role="region" aria-label="预算可用额" tabindex="0">
-            <table>
+          <div
+            class="table-wrap budget-page__availability"
+            role="region"
+            aria-label="预算可用额"
+            tabindex="0"
+          >
+            <table class="v2-table--compact">
               <thead>
                 <tr>
                   <th>科目</th>
@@ -568,6 +591,18 @@ dd {
 }
 table {
   min-width: 48rem;
+}
+.budget-page__availability table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+.budget-page__availability :is(th, td) {
+  padding-inline: var(--v2-space-2);
+}
+.budget-page__availability :is(th, td):first-child {
+  width: 32%;
+  white-space: normal;
 }
 nav {
   display: flex;

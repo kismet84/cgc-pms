@@ -49,6 +49,31 @@ const acceptedRoutes = {
   CostControl: '@/pages/commercial/CostControlPage.vue',
   ProjectBudget: '@/pages/commercial/BudgetPage.vue',
   ProductionMeasurement: '@/pages/commercial/ProductionMeasurementPage.vue',
+  SupplierSourcing: '@/pages/supply-chain/SupplierSourcingPage.vue',
+  Purchase: '@/router.ts#V2PurchaseRedirect',
+  PurchaseOrder: '@/pages/supply-chain/PurchaseExecutionPage.vue',
+  PurchaseReceipt: '@/pages/supply-chain/PurchaseExecutionPage.vue',
+  InventoryPurchaseRequest: '@/pages/supply-chain/PurchaseExecutionPage.vue',
+  Inventory: '@/router.ts#V2InventoryRedirect',
+  InventoryWarehouse: '@/pages/supply-chain/InventoryWorkspacePage.vue',
+  InventoryStock: '@/pages/supply-chain/InventoryWorkspacePage.vue',
+  InventoryTransaction: '@/pages/supply-chain/InventoryWorkspacePage.vue',
+  InventoryMaterialRequisition: '@/pages/supply-chain/RequisitionWorkspacePage.vue',
+  Subcontract: '@/router.ts#V2SubcontractRedirect',
+  SubcontractTask: '@/pages/subcontract/SubcontractWorkspacePage.vue',
+  SubcontractMeasure: '@/pages/subcontract/SubcontractWorkspacePage.vue',
+}
+
+const acceptedRoutePermissions = {
+  Inventory: 'inventory:warehouse:list',
+  InventoryWarehouse: 'inventory:warehouse:list',
+  Subcontract: 'subtask:query',
+  SubcontractTask: 'subtask:query',
+  ExpenseApplication: 'expense:query',
+  RevenueOperations: 'revenue:operations:query',
+  AccountingEntry: 'accounting:query',
+  CashForecast: 'finance:forecast:query',
+  FinancialClose: 'finance:close:query',
 }
 
 const sourceAvailableRoutes = {}
@@ -68,6 +93,13 @@ const m4CostTargetAcceptanceEvidence = 'docs/quality/ISSUE-053-020-M4目标成�
 const m4CostsAcceptanceEvidence = 'docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md'
 const m4BudgetMeasurementAcceptanceEvidence =
   'docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md'
+const m5SupplierSourcingAcceptanceEvidence =
+  'docs/quality/ISSUE-053-025-M5供应商招采与履约V2验收报告.md'
+const m5PurchaseReceiptAcceptanceEvidence =
+  'docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md'
+const m5InventoryAcceptanceEvidence = 'docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md'
+const m5RequisitionAcceptanceEvidence = 'docs/quality/ISSUE-053-028-M5领料出库与退料V2验收报告.md'
+const m6SubcontractAcceptanceEvidence = 'docs/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md'
 
 function findVariable(sourceFile, name) {
   for (const statement of sourceFile.statements) {
@@ -174,12 +206,29 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
       const isM4CostTarget = name === 'CostTarget' || name.startsWith('CostTarget')
       const isM4Costs = ['Cost', 'CostLedger', 'CostSummary', 'CostControl'].includes(name)
       const isM4BudgetMeasurement = ['ProjectBudget', 'ProductionMeasurement'].includes(name)
+      const isM5SupplierSourcing = name === 'SupplierSourcing'
+      const isM5PurchaseReceipt = [
+        'Purchase',
+        'PurchaseOrder',
+        'PurchaseReceipt',
+        'InventoryPurchaseRequest',
+      ].includes(name)
+      const isM5Inventory = [
+        'Inventory',
+        'InventoryWarehouse',
+        'InventoryStock',
+        'InventoryTransaction',
+      ].includes(name)
+      const isM5Requisition = name === 'InventoryMaterialRequisition'
+      const isM6Subcontract = ['Subcontract', 'SubcontractTask', 'SubcontractMeasure'].includes(
+        name,
+      )
       result.push({
         name,
         path: fullPath,
         legacyView: component,
         v2View,
-        permission: permissions[name] || null,
+        permission: acceptedRoutePermissions[name] || permissions[name] || null,
         adminOnly: effectiveAdmin,
         public: meta ? literal(objectValue(meta, 'public')) === true : false,
         redirect,
@@ -188,27 +237,37 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
         stitchDesign: name === 'Dashboard' ? '用户已选新版经营驾驶舱视觉概念；M2 已验收' : null,
         testEvidence: v2View ? 'frontend-admin-v2/tests/unit；frontend-admin-v2/e2e' : null,
         acceptanceEvidence: acceptedView
-          ? isM4BudgetMeasurement
-            ? m4BudgetMeasurementAcceptanceEvidence
-            : isM4Costs
-              ? m4CostsAcceptanceEvidence
-              : isM4CostTarget
-                ? m4CostTargetAcceptanceEvidence
-                : isM4Contract
-                  ? m4ContractAcceptanceEvidence
-                  : isM4VariationBid
-                    ? m4VariationBidAcceptanceEvidence
-                    : isM3Delivery
-                      ? m3DeliveryAcceptanceEvidence
-                      : isM3Quality
-                        ? m3QualityAcceptanceEvidence
-                        : isM3Technical
-                          ? m3TechnicalAcceptanceEvidence
-                          : isM3Closeout
-                            ? m3CloseoutAcceptanceEvidence
-                            : isM3Project
-                              ? m3ProjectAcceptanceEvidence
-                              : m2AcceptanceEvidence
+          ? isM6Subcontract
+            ? m6SubcontractAcceptanceEvidence
+            : isM5Requisition
+              ? m5RequisitionAcceptanceEvidence
+              : isM5Inventory
+                ? m5InventoryAcceptanceEvidence
+                : isM5PurchaseReceipt
+                  ? m5PurchaseReceiptAcceptanceEvidence
+                  : isM5SupplierSourcing
+                    ? m5SupplierSourcingAcceptanceEvidence
+                    : isM4BudgetMeasurement
+                      ? m4BudgetMeasurementAcceptanceEvidence
+                      : isM4Costs
+                        ? m4CostsAcceptanceEvidence
+                        : isM4CostTarget
+                          ? m4CostTargetAcceptanceEvidence
+                          : isM4Contract
+                            ? m4ContractAcceptanceEvidence
+                            : isM4VariationBid
+                              ? m4VariationBidAcceptanceEvidence
+                              : isM3Delivery
+                                ? m3DeliveryAcceptanceEvidence
+                                : isM3Quality
+                                  ? m3QualityAcceptanceEvidence
+                                  : isM3Technical
+                                    ? m3TechnicalAcceptanceEvidence
+                                    : isM3Closeout
+                                      ? m3CloseoutAcceptanceEvidence
+                                      : isM3Project
+                                        ? m3ProjectAcceptanceEvidence
+                                        : m2AcceptanceEvidence
           : null,
       })
     }
@@ -312,6 +371,82 @@ function assertBudgetMeasurementV2Acceptance(routerSource, catalogSource) {
     throw new Error('M4 budget/measurement V2 acceptance mapping is missing or stale')
 }
 
+function assertSupplierSourcingV2Acceptance(routerSource, catalogSource) {
+  const routerCheck =
+    /const SupplierSourcingPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/supply-chain\/SupplierSourcingPage\.vue['"]\)[\s\S]*tab\.path\s*===\s*['"]\/supplier-sourcing['"]\s*\?\s*SupplierSourcingPage/
+  const catalogCheck =
+    /path:\s*['"]\/supplier-sourcing['"][\s\S]{0,180}permission:\s*['"]supplier:sourcing:query['"]/
+  if (!routerCheck.test(routerSource) || !catalogCheck.test(catalogSource))
+    throw new Error('M5 supplier sourcing V2 acceptance mapping is missing or stale')
+}
+
+function assertPurchaseReceiptV2Acceptance(routerSource, catalogSource) {
+  const routerChecks = [
+    /const PurchaseExecutionPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/supply-chain\/PurchaseExecutionPage\.vue['"]\)/,
+    /['"]\/inventory\/purchase-request['"]/,
+    /['"]\/purchase\/order['"]/,
+    /['"]\/purchase\/receipt['"]/,
+    /name:\s*['"]V2PurchaseRedirect['"]/,
+  ]
+  const catalogChecks = [
+    /path:\s*['"]\/inventory\/purchase-request['"][\s\S]{0,180}permission:\s*['"]purchase:request:list['"]/,
+    /path:\s*['"]\/purchase\/order['"][\s\S]{0,180}permission:\s*['"]purchase:order:query['"]/,
+    /path:\s*['"]\/purchase\/receipt['"][\s\S]{0,180}permission:\s*['"]receipt:query['"]/,
+  ]
+  if (
+    routerChecks.some((check) => !check.test(routerSource)) ||
+    catalogChecks.some((check) => !check.test(catalogSource))
+  )
+    throw new Error('M5 purchase/receipt V2 acceptance mapping is missing or stale')
+}
+
+function assertInventoryV2Acceptance(routerSource, catalogSource) {
+  const routerChecks = [
+    /const InventoryWorkspacePage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/supply-chain\/InventoryWorkspacePage\.vue['"]\)/,
+    /['"]\/inventory\/warehouse['"]/,
+    /['"]\/inventory\/stock['"]/,
+    /['"]\/inventory\/transaction['"]/,
+    /name:\s*['"]V2InventoryRedirect['"]/,
+  ]
+  const catalogChecks = [
+    /path:\s*['"]\/inventory\/warehouse['"][\s\S]{0,180}permission:\s*['"]inventory:warehouse:list['"]/,
+    /path:\s*['"]\/inventory\/stock['"][\s\S]{0,180}permission:\s*['"]inventory:stock:list['"]/,
+    /path:\s*['"]\/inventory\/transaction['"][\s\S]{0,180}permission:\s*['"]inventory:transaction:list['"]/,
+  ]
+  if (
+    routerChecks.some((check) => !check.test(routerSource)) ||
+    catalogChecks.some((check) => !check.test(catalogSource))
+  )
+    throw new Error('M5 inventory V2 acceptance mapping is missing or stale')
+}
+
+function assertRequisitionV2Acceptance(routerSource, catalogSource) {
+  const routerCheck =
+    /const RequisitionWorkspacePage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/supply-chain\/RequisitionWorkspacePage\.vue['"]\)[\s\S]*tab\.path\s*===\s*['"]\/inventory\/material-requisition['"]\s*\?\s*RequisitionWorkspacePage/
+  const catalogCheck =
+    /path:\s*['"]\/inventory\/material-requisition['"][\s\S]{0,180}permission:\s*['"]requisition:query['"]/
+  if (!routerCheck.test(routerSource) || !catalogCheck.test(catalogSource))
+    throw new Error('M5 requisition V2 acceptance mapping is missing or stale')
+}
+
+function assertSubcontractV2Acceptance(routerSource, catalogSource) {
+  const routerChecks = [
+    /const SubcontractWorkspacePage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/subcontract\/SubcontractWorkspacePage\.vue['"]\)/,
+    /['"]\/subcontract\/task['"]/,
+    /['"]\/subcontract\/measure['"]/,
+    /name:\s*['"]V2SubcontractRedirect['"]/,
+  ]
+  const catalogChecks = [
+    /path:\s*['"]\/subcontract\/task['"][\s\S]{0,180}permission:\s*['"]subtask:query['"]/,
+    /path:\s*['"]\/subcontract\/measure['"][\s\S]{0,180}permission:\s*['"]subcontract:measure:query['"]/,
+  ]
+  if (
+    routerChecks.some((check) => !check.test(routerSource)) ||
+    catalogChecks.some((check) => !check.test(catalogSource))
+  )
+    throw new Error('M6 subcontract V2 acceptance mapping is missing or stale')
+}
+
 async function buildLedger() {
   const [source, v2RouterSource, navigationCatalogSource] = await Promise.all([
     readFile(routerPath, 'utf8'),
@@ -321,6 +456,11 @@ async function buildLedger() {
   assertCostTargetV2Acceptance(v2RouterSource, navigationCatalogSource)
   assertCostsV2Acceptance(v2RouterSource, navigationCatalogSource)
   assertBudgetMeasurementV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertSupplierSourcingV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertPurchaseReceiptV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertInventoryV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertRequisitionV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertSubcontractV2Acceptance(v2RouterSource, navigationCatalogSource)
   const sourceFile = ts.createSourceFile(
     routerPath,
     source,

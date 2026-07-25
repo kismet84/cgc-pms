@@ -37,6 +37,7 @@ vi.mock('@/services/commercial', () => ({
 const bidding: BidCostRecord = {
   id: '11',
   projectId: null,
+  bidCode: 'BID-20260720-001',
   bidProjectName: '市民中心投标',
   bidStatus: 'BIDDING',
   createdAt: '2026-07-20 09:00:00',
@@ -104,11 +105,11 @@ describe('M4 bid cost page', () => {
     const source = readFileSync(bidCostPagePath, 'utf-8')
     const style = source.match(/<style scoped>([\s\S]*?)<\/style>/)?.[1] ?? ''
 
-    expect(source).toContain('<V2Button variant="secondary" @click="openDetail(record.id)">预览')
+    expect(source).toContain('class="v2-table__record-link"')
+    expect(source).toContain('@click="openDetail(record.id)"')
     expect(source).toContain('class="v2-detail-dialog__quick-actions"')
     expect(source).toContain('id="bid-cost-form"')
     expect(source.indexOf('text="取消"')).toBeLessThan(source.indexOf('form="bid-cost-form"'))
-    expect(source).not.toMatch(/<V2Button\b[^>]*\bsize="small"/)
     expect(style).not.toMatch(/\.bid-cost-page__table-wrap\s*\{/)
     expect(style).not.toMatch(/\.bid-cost-page__table\s+(?:th|td)/)
     expect(style).not.toMatch(/textarea\s*\{[^}]*\b(?:background|border|color|padding)\s*:/)
@@ -134,12 +135,21 @@ describe('M4 bid cost page', () => {
     expect(wrapper.text()).toContain('投标中')
     expect(wrapper.text()).toContain('第 1 页')
     expect(loadProjectContextOptions).not.toHaveBeenCalled()
-    expect(button(wrapper, '预览')?.classes()).not.toContain('v2-glass-button')
+    expect(button(wrapper, 'BID-20260720-001')?.classes()).toContain('v2-table__record-link')
     expect(wrapper.text()).not.toContain('投标前期成本记录与中标、未中标状态闭环')
     expect(button(wrapper, '新建投标成本')).toBeUndefined()
     expect(button(wrapper, '编辑')).toBeUndefined()
     expect(button(wrapper, '标记中标')).toBeUndefined()
     expect(button(wrapper, '删除')).toBeUndefined()
+    const headingCard = wrapper.get('.v2-card--page-heading')
+    expect(headingCard.find('.v2-card__body').exists()).toBe(false)
+    expect(headingCard.get('.v2-card__header .bid-cost-page__filters').exists()).toBe(true)
+    expect(
+      headingCard
+        .findAll('button')
+        .find((item) => item.text().includes('查询'))
+        ?.classes(),
+    ).toContain('v2-button--small')
   })
 
   it('applies public project and report period context', async () => {
@@ -163,7 +173,7 @@ describe('M4 bid cost page', () => {
     })
     const { wrapper } = await mountPage(['bid:query'])
 
-    await button(wrapper, '预览')!.trigger('click')
+    await button(wrapper, 'BID-20260720-001')!.trigger('click')
     await flushPromises()
 
     expect(loadBidCost).toHaveBeenCalledWith('11', expect.any(AbortSignal))
@@ -300,7 +310,7 @@ describe('M4 bid cost page', () => {
     await flushPromises()
 
     expect(markBidCostLost).toHaveBeenCalledWith('11')
-    expect(wrapper.text()).toContain('无状态变更权限')
+    expect(toastItems.some((toast) => toast.message.includes('无状态变更权限'))).toBe(true)
     expect(toastItems.some((toast) => toast.message.includes('投标状态已更新'))).toBe(false)
   })
 
@@ -312,7 +322,7 @@ describe('M4 bid cost page', () => {
     await flushPromises()
 
     expect(deleteBidCost).toHaveBeenCalledWith('11')
-    expect(wrapper.text()).toContain('仅投标中记录可删除')
+    expect(toastItems.some((toast) => toast.message.includes('仅投标中记录可删除'))).toBe(true)
     expect(wrapper.text()).toContain('市民中心投标')
     expect(wrapper.text()).not.toContain('投标成本已删除')
   })

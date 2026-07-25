@@ -6,11 +6,13 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.inventory.entity.MatStock;
 import com.cgcpms.inventory.entity.MatWarehouse;
 import com.cgcpms.inventory.mapper.MatStockMapper;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.vo.MatWarehouseVO;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import com.cgcpms.common.util.DateTimeUtils;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -32,10 +34,20 @@ public class MatWarehouseService {
 
     private final PmProjectMapper pmProjectMapper;
 
+    private final ProjectAccessChecker projectAccessChecker;
+
     public PageResult<MatWarehouseVO> getPage(long pageNo, long pageSize, Long projectId, String warehouseCode, String warehouseName, String status) {
+        List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+        if (accessibleProjectIds.isEmpty()) {
+            return new PageResult<>(pageNo, pageSize, 0, List.of());
+        }
         LambdaQueryWrapper<MatWarehouse> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MatWarehouse::getTenantId, UserContext.getCurrentTenantId());
-        if (projectId != null) wrapper.eq(MatWarehouse::getProjectId, projectId);
+        wrapper.in(MatWarehouse::getProjectId, accessibleProjectIds);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查询仓库列表");
+            wrapper.eq(MatWarehouse::getProjectId, projectId);
+        }
         if (StringUtils.hasText(warehouseCode)) wrapper.like(MatWarehouse::getWarehouseCode, warehouseCode);
         if (StringUtils.hasText(warehouseName)) wrapper.like(MatWarehouse::getWarehouseName, warehouseName);
         if (StringUtils.hasText(status)) wrapper.eq(MatWarehouse::getStatus, status);

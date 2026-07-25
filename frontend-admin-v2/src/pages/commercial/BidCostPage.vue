@@ -13,6 +13,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import {
@@ -66,6 +67,10 @@ const panelMode = ref<PanelMode>('closed')
 const form = reactive({ bidProjectName: '', remark: '' })
 const pendingAction = ref<PendingAction>(null)
 const projects = ref<ProjectContextOption[]>([])
+
+watch(errorMessage, (message) => {
+  if (message) showToast('error', '操作未完成', message)
+})
 const wonProjectId = ref('')
 const wonProjectError = ref('')
 
@@ -355,39 +360,30 @@ onBeforeUnmount(() => {
     />
 
     <template v-else>
-      <V2Alert
-        v-if="errorMessage"
-        tone="danger"
-        title="操作失败"
-        dismissible
-        @dismiss="errorMessage = ''"
-      >
-        {{ errorMessage }}
-      </V2Alert>
       <V2Card title="投标成本" :heading-level="1">
         <template #actions>
-          <V2Button v-if="canAdd" @click="openCreate">新建投标成本</V2Button>
+          <div class="bid-cost-page__filters">
+            <V2Input
+              v-model="filter.keyword"
+              type="search"
+              label="关键词"
+              hide-label
+              placeholder="输入投标项目名称"
+              @keyup.enter="query"
+            />
+            <V2Select
+              :model-value="filter.bidStatus"
+              label="状态"
+              hide-label
+              :options="STATUS_OPTIONS"
+              allow-empty
+              placeholder="全部状态"
+              @update:model-value="changeStatus"
+            />
+            <V2Button size="small" :loading="loading" @click="query">查询</V2Button>
+          </div>
+          <V2Button v-if="canAdd" size="small" @click="openCreate">新建投标成本</V2Button>
         </template>
-        <div class="bid-cost-page__filters">
-          <V2Input
-            v-model="filter.keyword"
-            type="search"
-            label="关键词"
-            hide-label
-            placeholder="输入投标项目名称"
-            @keyup.enter="query"
-          />
-          <V2Select
-            :model-value="filter.bidStatus"
-            label="状态"
-            hide-label
-            :options="STATUS_OPTIONS"
-            allow-empty
-            placeholder="全部状态"
-            @update:model-value="changeStatus"
-          />
-          <V2Button :loading="loading" @click="query">查询</V2Button>
-        </div>
       </V2Card>
 
       <V2PageState
@@ -398,14 +394,14 @@ onBeforeUnmount(() => {
         :heading-level="2"
       />
       <V2PageState
-        v-else-if="!loading && records.length === 0"
+        v-else-if="!loading && records.length === 0 && !errorMessage"
         title="暂无投标成本"
         description="当前筛选条件下没有可访问记录。"
         kind="empty"
         :heading-level="2"
       />
 
-      <V2Card v-else title="投标成本列表">
+      <V2Card v-else-if="records.length">
         <div
           class="bid-cost-page__table-wrap"
           role="region"
@@ -419,6 +415,7 @@ onBeforeUnmount(() => {
             </caption>
             <thead>
               <tr>
+                <th scope="col">投标成本编号</th>
                 <th scope="col">项目名称</th>
                 <th scope="col">状态</th>
                 <th scope="col">备注</th>
@@ -429,8 +426,16 @@ onBeforeUnmount(() => {
             <tbody>
               <tr v-for="record in records" :key="record.id">
                 <td>
-                  <strong>{{ record.bidProjectName }}</strong>
+                  <V2Button
+                    size="small"
+                    variant="ghost"
+                    class="v2-table__record-link"
+                    @click="openDetail(record.id)"
+                  >
+                    {{ record.bidCode }}
+                  </V2Button>
                 </td>
+                <td>{{ record.bidProjectName }}</td>
                 <td>
                   <V2Badge :tone="statusTone(record.bidStatus)" dot>{{
                     statusLabel(record.bidStatus)
@@ -440,7 +445,6 @@ onBeforeUnmount(() => {
                 <td>{{ record.updatedAt || '—' }}</td>
                 <td>
                   <div class="bid-cost-page__actions">
-                    <V2Button variant="secondary" @click="openDetail(record.id)">预览</V2Button>
                     <V2Button
                       v-if="canEdit && record.bidStatus === 'BIDDING'"
                       variant="ghost"

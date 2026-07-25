@@ -21,8 +21,8 @@ public class SupplierQuote extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class) private Long sourcingSupplierId;
     @JsonSerialize(using = ToStringSerializer.class) private Long partnerId;
     private String quoteCode;
-    private BigDecimal totalAmount;
-    private BigDecimal taxRate;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal totalAmount;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal taxRate;
     private Integer deliveryDays;
     private LocalDate validityDate;
     private String commercialTerms;

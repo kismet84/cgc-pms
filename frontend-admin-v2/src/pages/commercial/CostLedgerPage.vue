@@ -6,7 +6,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { V2Alert, V2Button, V2Card, V2Dialog, V2Input, V2PageState } from '@/components'
+import { V2Button, V2Card, V2Dialog, V2Input, V2PageState, showToast } from '@/components'
 import { loadCostLedger, loadCostLedgerPage, loadCostLedgerSummary } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import { reportPeriodBounds } from '@/services/workspace-context'
@@ -24,6 +24,10 @@ const loading = ref(false)
 const detailLoading = ref(false)
 const errorMessage = ref('')
 const detailOpen = ref(false)
+
+watch(errorMessage, (message) => {
+  if (message) showToast('error', '成本台账请求未完成', message)
+})
 let generation = 0
 let detailGeneration = 0
 let controller: AbortController | null = null
@@ -161,20 +165,21 @@ onBeforeUnmount(() => {
       description="请联系管理员开通访问权限。"
       kind="forbidden"
     /><template v-else
-      ><V2Alert v-if="errorMessage" tone="danger" title="成本台账请求未完成">{{
-        errorMessage
-      }}</V2Alert
       ><V2Card title="成本台账" :heading-level="1"
-        ><div class="filters">
-          <V2Input
-            v-model="filter.keyword"
-            type="search"
-            label="关键词"
-            hide-label
-            placeholder="输入关键词"
-            @keyup.enter="query"
-          /><V2Button variant="secondary" :loading="loading" @click="query">查询</V2Button>
-        </div></V2Card
+        ><template #actions
+          ><div class="filters">
+            <V2Input
+              v-model="filter.keyword"
+              type="search"
+              label="关键词"
+              hide-label
+              placeholder="输入关键词"
+              @keyup.enter="query"
+            /><V2Button size="small" variant="secondary" :loading="loading" @click="query"
+              >查询</V2Button
+            >
+          </div></template
+        ></V2Card
       ><V2Card title="成本明细"
         ><template v-if="summary" #actions>
           <dl class="cost-page__summary">
@@ -190,13 +195,13 @@ onBeforeUnmount(() => {
           description="正在读取当前项目和报告期内的成本记录。"
           kind="loading"
         /><V2PageState
-          v-else-if="!records.length"
+          v-else-if="!records.length && !errorMessage"
           title="暂无成本台账"
           description="当前筛选条件下没有可访问的成本记录。"
           kind="empty"
         />
         <div
-          v-else
+          v-else-if="records.length"
           class="table-wrap"
           role="region"
           aria-label="成本台账列表"
@@ -209,28 +214,33 @@ onBeforeUnmount(() => {
             </caption>
             <thead>
               <tr>
+                <th scope="col">来源业务编号</th>
                 <th scope="col">成本科目</th>
                 <th scope="col">项目</th>
                 <th scope="col">发生日期</th>
                 <th scope="col">金额</th>
                 <th scope="col">税额</th>
                 <th scope="col">来源</th>
-                <th scope="col">操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="row in records" :key="row.id">
+                <td>
+                  <V2Button
+                    size="small"
+                    variant="ghost"
+                    class="v2-table__record-link"
+                    @click="openDetail(row.id)"
+                  >
+                    {{ row.sourceCode || '来源编号缺失' }}
+                  </V2Button>
+                </td>
                 <td>{{ row.costSubjectName || costTypeLabel(row.costType) }}</td>
                 <td>{{ row.projectName || '—' }}</td>
                 <td>{{ row.costDate || '—' }}</td>
                 <td>{{ row.amount }}</td>
                 <td>{{ row.taxAmount }}</td>
                 <td>{{ sourceTypeLabel(row.sourceType) }}</td>
-                <td>
-                  <V2Button size="small" variant="secondary" @click="openDetail(row.id)"
-                    >详情</V2Button
-                  >
-                </td>
               </tr>
             </tbody>
           </table>
@@ -271,7 +281,7 @@ onBeforeUnmount(() => {
           <dt>项目</dt>
           <dd>{{ detail.projectName || '—' }}</dd>
           <dt>合同</dt>
-          <dd>{{ detail.contractName || (detail.contractId ? '已关联合同' : '—') }}</dd>
+          <dd>{{ detail.contractName || (detail.contractId ? '合同名称缺失' : '—') }}</dd>
           <dt>成本科目</dt>
           <dd>{{ detail.costSubjectName || costTypeLabel(detail.costType) }}</dd>
           <dt>成本来源</dt>

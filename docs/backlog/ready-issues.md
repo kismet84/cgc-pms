@@ -12,7 +12,848 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 2026-07-22 第53条主线M3已完成；`ISSUE-053-010～016`全部通过并完成治理收口。当前无M3 Ready。
 
-2026-07-23 第53条主线M4的`ISSUE-053-017～022`已通过并收口；当前无M4 Ready。`ISSUE-053-023`保持Planned，须另行补货并获授权后方可实施。
+2026-07-24 第53条主线M4的`ISSUE-053-017～023`已通过并正式收口；当前无M4 Ready。
+
+2026-07-24 第53条主线M5的`ISSUE-053-024～029`已全部通过并正式收口；当前无M5 Ready。
+
+2026-07-25 第53条主线M6执行中；`ISSUE-053-030～031`已通过，`ISSUE-053-032`为当前唯一Ready，`ISSUE-053-033～035`保持Planned。
+
+### ISSUE-053-032：M6结算台账、详情与追溯V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / M6业务切片 / 结算台账与追溯 / 服务端金额来源权威
+状态：Ready
+来源锚点：`docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`的ISSUE-053-032；`ISSUE-053-030～031`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M6-032-SETTLEMENT-V2]
+Migration：不需要
+依赖：`ISSUE-053-030～031`已通过；复用V2公共壳、请求核心、项目/合同/计量/签证候选、业务附件与现有`/settlements`后端闭环。
+风险等级：高
+运行态要求：仅本地dev/test/demo；写侧只使用本Issue可识别数据，先记前值，成功后回读，最终使用既有删除/撤回能力恢复。禁止连接生产。
+Reviewer要求：独立复核查询与写权限、租户/项目/合同范围、结算来源、金额快照与服务端重算、并发、付款/成本/签证/附件追溯、提交状态、失败原子性、恢复结果、三视口和可访问性。
+归档报告：`docs/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md`
+最小回滚：回退032页面、薄服务/契约增量、路由/导航/台账、测试、必要后端根修及治理回写；删除或撤回032专属dev/test/demo数据。030～031、Legacy、数据库结构与其他M6路由保持不变。
+目标：
+
+- `/settlement`确定性受控重定向到`/settlement/list`；`/settlement/list`与`/settlement/:id`由真实Clean-room V2页面承接。
+- 覆盖结算列表、KPI、详情、批量明细、服务端金额试算、计量/签证来源、付款、成本、附件、审批记录、新增、编辑、删除与提交。
+- 修正切换合同时仍按旧合同回填金额，以及明细直接信任客户端数量、单价、金额的缺口；锁定服务端合同清单/计量事实重算，并覆盖并发和跨范围负样本。
+- 项目、合同、计量、签证与合同清单候选均来自服务端范围；金额、来源、状态和累计值写后回读，不做前端权威试算或并行结算账。
+- 三条路由逐条完成权限、空态/错误、响应式、可访问性和真实后端验收后更新为`V2_ACCEPTED`；目标台账`34/53/0`。
+非目标：
+
+- 不迁移付款、费用、收入、发票、资金运营、日记账、预测、凭证或月结页面。
+- 不新增结算领域模型、数据库migration、结算公式、审批流、客户端账本或通用财务框架。
+- 不复制Legacy Vue/CSS，不新增依赖、请求层、状态库或表格库。
+- 不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `packages/frontend-contracts/src/subcontract.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/subcontract.ts`
+- `frontend-admin-v2/src/pages/settlement/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/tests/unit/m6-settlement*.test.ts`
+- `frontend-admin-v2/e2e/m6-settlement*.spec.ts`
+- `backend/src/main/java/com/cgcpms/settlement/**`（仅证据证明必要的最小根修）
+- `backend/src/test/java/com/cgcpms/settlement/**`（仅对应根修或专项证明）
+- `backend/src/main/java/com/cgcpms/file/**`与`backend/src/test/java/com/cgcpms/file/**`（仅结算附件对象权限缺口）
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `frontend-admin-v2/src/pages/finance/**`
+- `backend/src/main/resources/db/migration/**`
+- M6付款/费用/收入/发票/资金财务写侧及M7～M8业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- 三条结算路由由真实V2页面或受控重定向承接，Legacy导入为0，台账精确为`34/53/0`。
+- `settlement:query/add/edit/delete/submit`分别控制路由和按钮；缺权限、跨租户/项目/合同、非法来源或状态均失败关闭。
+- 结算业务编号进入详情；原始主键不作为可见主信息，英文枚举映射为中文。
+- 数量、单价、金额快照、累计结算、可付金额、付款、成本和状态均来自服务端字符串与回读；空值与`0`区分。
+- 合同切换按新合同重建服务端金额基线；明细数量、单价、金额由服务端事实重算，并发不得突破合同/来源约束。
+- 新增/编辑/明细/提交失败不留下部分事实；专属测试数据恢复后表计数、金额与状态符合前值或合法业务反向状态。
+- 后端专项、V2单测、类型、Lint、Clean-room边界、路由台账、构建、目标Playwright、三视口、axe、console、失败网络请求及`git diff --check`通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-032`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=StlSettlementControllerMockMvcTest,StlSettlementQueryServiceTest,StlSettlementServiceTest,StlSettlementWriteServiceAmountTest,SettlementAmountPolicyTest,SettlementWorkflowHandlerTest' test`
+- `cd frontend-admin-v2; pnpm test:unit -- m6-settlement`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m6-settlement.spec.ts`
+- `git diff --check`
+
+### ISSUE-053-031：M6分包任务与计量V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / M6业务切片 / 分包任务与计量 / 服务端数量金额权威
+状态：Done
+来源锚点：`docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`的ISSUE-053-031；`ISSUE-053-030`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M6-031-SUBCONTRACT-MEASURE-V2]
+Migration：不需要
+依赖：`ISSUE-053-030`已通过；复用V2公共壳、请求核心、项目/合同/合作方候选、业务单据附件能力，以及现有`/sub-tasks`、`/sub-measures`后端闭环。
+风险等级：高
+运行态要求：仅本地dev/test/demo；写侧只使用本Issue可识别数据，先记前值，成功后回读，最终使用既有删除/撤回能力恢复。禁止连接生产。
+Reviewer要求：独立复核任务/计量查询与写权限分离、租户/项目/合同/合作方范围、服务端数量/单价/累计量/金额、提交幂等与状态、附件、失败原子性、恢复结果、三视口和可访问性。
+归档报告：`docs/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md`
+最小回滚：回退031页面、薄服务/契约增量、路由/导航/台账、测试及治理回写；删除或撤回031专属dev/test/demo数据。030契约、Legacy、数据库结构与其他M6路由保持不变。
+目标：
+
+- `/subcontract`确定性受控重定向到`/subcontract/task`；`/subcontract/task`与`/subcontract/measure`由真实Clean-room V2页面承接。
+- 分包任务覆盖列表、查询、详情、新增、编辑、删除；计量覆盖列表、详情、清单明细、新增、编辑、删除与提交审批。
+- 项目、合同、合作方与合同清单候选均来自服务端范围；显式跨范围引用失败关闭。
+- 数量、单价、累计量和金额只展示服务端字符串；提交成功后重新读取任务/计量、明细和状态，不做前端权威累计或金额计算。
+- 路由逐条完成权限、空态/错误、响应式、可访问性和真实后端验收后更新为`V2_ACCEPTED`；目标台账`37/50/0`。
+实施结果：已通过。三条分包路由由真实V2页面或受控重定向承接；任务/计量CRUD、清单、附件与提交写后读取成立。服务端范围、金额重算、锁与CAS、附件级联权限及失败原子性由后端专项105项、权限补充23项、V2全量334项、目标E2E两轮10项、静态门、构建、当前fat JAR运行态及独立复核证明。正式证据见归档报告。
+非目标：
+
+- 不迁移结算、付款、费用、收入、发票、资金运营、日记账、预测、凭证或月结页面。
+- 不新增分包领域模型、数据库migration、结算公式、工资代发、劳务实名制、门户、审批流或客户端账本。
+- 不复制Legacy Vue/CSS，不新增依赖、请求层、状态库、表格库或通用财务框架。
+- 不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `packages/frontend-contracts/src/subcontract.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/subcontract.ts`
+- `frontend-admin-v2/src/pages/subcontract/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`（仅登记031三条V2路由与报告证据）
+- `frontend-admin-v2/tests/unit/m6-subcontract*.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`（仅路由台账计数断言）
+- `frontend-admin-v2/e2e/m6-subcontract*.spec.ts`
+- `backend/src/main/java/com/cgcpms/subcontract/**`（仅证据证明必要的最小根修）
+- `backend/src/main/java/com/cgcpms/contract/mapper/CtContractItemMapper.java`（合同清单行锁根修）
+- `backend/src/main/java/com/cgcpms/file/**`（计量附件对象权限与级联删除根修）
+- `backend/src/test/java/com/cgcpms/subcontract/**`（仅对应根修或专项证明）
+- `backend/src/test/java/com/cgcpms/file/**`（仅对应附件根修证明）
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `frontend-admin-v2/src/pages/finance/**`
+- `backend/src/main/resources/db/migration/**`
+- M6的结算/资金财务写侧及M7～M8业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- 三条路由由真实V2页面或受控重定向承接，Legacy导入为0，台账精确为`37/50/0`。
+- `subtask:query/add/edit/delete`与`subcontract:measure:query/add/edit/delete/submit`分别控制路由和按钮；缺权限、跨租户/项目/合同/合作方均失败关闭。
+- 任务和计量的业务编号进入详情；原始主键不作为可见主信息，英文枚举映射为中文。
+- 数量、单价、累计量、金额和状态均以服务端回读为准；空值与`0`区分，重复提交、快速筛选和陈旧响应隔离成立。
+- 新增/编辑/明细/提交失败不留下部分事实；专属测试数据恢复后表计数、金额与状态符合前值或合法业务反向状态。
+- 后端专项、V2单测、类型、Lint、Clean-room边界、路由台账、构建、目标Playwright、三视口、axe、console、失败网络请求及`git diff --check`通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-031`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=SubTaskControllerTest,SubTaskDeleteTransactionTest,SubMeasureServiceTest,SubMeasureControllerTest,SubMeasureControllerMockMvcTest,SubMeasureWorkflowHandlerTest,FileServiceTest' test`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=FileControllerAuthorizationTest,BusinessObjectAuthorizerTest,SubcontractPermissionContractTest' test`
+- `cd frontend-admin-v2; pnpm exec vitest run tests/unit/m6-subcontract-workspace.test.ts`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m6-subcontract-workspace.spec.ts`
+- `git diff --check`
+
+### ISSUE-053-030：M6契约、权限、金额期间与只读金丝雀
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / M6金丝雀 / 分包结算与资金财务共享契约 / 查询零写
+状态：Done
+来源锚点：`docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`的ISSUE-053-030；M5退出门通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M6-030-FINANCE-CONTRACT-CANARY]
+Migration：不需要
+依赖：`ISSUE-053-024～029`均已通过；复用V2请求核心、公共壳、现有分包/结算/付款/费用/收入/发票/资金/凭证/月结后端闭环。
+风险等级：高
+运行态要求：仅本地dev/test；禁止连接生产。金丝雀以代表性GET和测试事务为主，不创建或修改业务数据，不执行浏览器写侧。
+Reviewer要求：独立复核权限码、租户/项目/合同/结算对象范围、ID/金额/数量稳定字符串、空值与0、状态/期间/冲销语义、查询零写，以及任何后端根修的正向、负权限、跨范围和回归覆盖。
+归档报告：`docs/quality/ISSUE-053-030-M6分包结算与资金财务契约及只读金丝雀验收报告.md`
+最小回滚：回退M6共享契约、只读服务适配、权限/台账修正、专项测试与对应治理回写；不迁移路由、不修改数据库，台账保持`40/47/0`。
+目标：
+
+- 冻结M6 16条路由使用的API、DTO、权限、对象范围、金额/数量、状态、期间、冲销和错误契约。
+- 修正已确认的导航、Controller、菜单和路由台账权限错配；普通角色正向及缺权限、跨租户/项目/合同负向失败关闭。
+- 以分包任务、结算、付款、日记账、凭证/月结代表性GET完成类型解析和查询零写金丝雀。
+- 为031～034留下最小共享契约和V2 GET薄服务；不创建页面或第二请求层。
+实施结果：已通过。冻结分包/资金财务稳定读契约与精确查询权限；修正导航/台账权限及分包计量、结算、费用、发票、日记账、凭证项目范围；结算合同—项目关系与变更/计量/付款金额汇总按项目失败关闭；原始财务Map未暴露。后端定向42项、受影响域93项、V2单测331项、类型/Lint/边界/台账/构建通过，独立复核无阻塞，台账保持`40/47/0`。报告`docs/quality/ISSUE-053-030-M6分包结算与资金财务契约及只读金丝雀验收报告.md`。
+非目标：
+
+- 不迁移M6路由，不创建M6业务页面，不改变路由台账计数。
+- 不新增领域模型、数据库migration、状态、权限、金额/资金账本、结算公式、预测算法、审批流或手工凭证入口。
+- 不复制Legacy Vue/CSS，不新增依赖、请求层、状态库、表格库或通用财务框架。
+- 不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `packages/frontend-contracts/src/subcontract.ts`
+- `packages/frontend-contracts/src/finance.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/subcontract.ts`
+- `frontend-admin-v2/src/services/finance.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m6-contract-baseline.test.ts`
+- `backend/src/main/java/com/cgcpms/subcontract/**`
+- `backend/src/main/java/com/cgcpms/settlement/**`
+- `backend/src/main/java/com/cgcpms/payment/**`
+- `backend/src/main/java/com/cgcpms/expense/**`
+- `backend/src/main/java/com/cgcpms/revenue/**`
+- `backend/src/main/java/com/cgcpms/invoice/**`
+- `backend/src/main/java/com/cgcpms/financeops/**`
+- `backend/src/main/java/com/cgcpms/cashbook/**`
+- `backend/src/main/resources/mapper/cashbook/CashJournalEntryMapper.xml`
+- `backend/src/main/java/com/cgcpms/cashforecast/**`
+- `backend/src/main/java/com/cgcpms/accounting/**`
+- `backend/src/main/java/com/cgcpms/financeclose/**`
+- `backend/src/test/java/com/cgcpms/m6/**`
+- `backend/src/test/java/com/cgcpms/cashbook/CashJournalEntryMapperTest.java`
+- `backend/src/test/java/com/cgcpms/settlement/StlSettlementQueryServiceTest.java`
+- `backend/src/test/java/com/cgcpms/settlement/service/StlSettlementWriteServiceAmountTest.java`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-053-030-M6分包结算与资金财务契约及只读金丝雀验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `frontend-admin-v2/src/pages/**`
+- `frontend-admin-v2/src/router.ts`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- M6共享契约和V2服务只复用现有请求核心；ID、金额和数量保持稳定字符串，空值与`0`可区分。
+- Controller、角色菜单、V2导航和路由台账的查询权限一致；普通角色不依赖ADMIN/SUPER_ADMIN兜底。
+- 代表性GET成功、空态、403、404、500与Abort/陈旧响应契约可测；执行前后业务表计数和更新时间不变。
+- 权限、租户/项目/合同范围、金额、状态、期间和冲销契约有自动化正负证据；必要后端根修保持最小。
+- Ready lint、M6后端专项、契约/V2类型、目标单测、Lint、Clean-room边界、路由台账、构建及`git diff --check`通过；台账保持`40/47/0`。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-030`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=M6ReadOnlyCanaryTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m6-contract-baseline.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+
+### ISSUE-053-029：M5全量回归与正式收口
+
+优先级：P0
+任务性质：回归证明
+类型：Clean-room V2 / M5退出门 / 跨切片回归 / 治理收口
+状态：Done
+来源锚点：`docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`的ISSUE-053-029；`ISSUE-053-024～028`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M5-029-SUPPLY-CHAIN-EXIT-GATE]
+Migration：不需要
+依赖：`ISSUE-053-024～028`已通过；10条目标路由已达到`V2_ACCEPTED`，台账为`40/47/0`。
+风险等级：高
+运行态要求：仅本地dev/test/demo；禁止连接生产。退出门以只读回归和既有E2E精确恢复为主，禁止清库。
+Reviewer要求：独立复核10路由、台账、权限、租户/项目范围、数量/金额字符串、状态、幂等、来源流水、库存守恒、全量Maven终态、V2门禁、demo verify及治理一致性。
+归档报告：`docs/quality/第53条主线-M5-供应链与物资全量退出门验收报告.md`
+最小回滚：只回退029治理回写或本轮证据证明必要的最小缺陷修正；024～028已验收业务事实、Legacy、数据库与既有业务数据保持不变。
+目标：
+
+- 对M5 10条路由执行跨切片、后端全量、V2全量、目标E2E和demo验证，正式裁决M5退出门。
+- 确认台账`40/47/0`，服务端数量、价值、来源、状态及写后回读契约未被切片间组合破坏。
+- 完成正式报告、主计划、Ready、Current Focus、Done和项目地图一致回写，悬空项为0。
+
+实施结果：已通过。M5 10条目标路由全部由真实V2承接或受控重定向，台账`40/47/0`；2026-07-25复核关闭可见原始主键、E2E契约漂移和后端并行夹具隔离缺口。后端全量264类2198项、M5顺序复验25类244项、V2单测321项、目标E2E 39/39、静态门、构建及demo verify通过。正式证据见`docs/quality/第53条主线-M5-供应链与物资全量退出门验收报告.md`。
+非目标：
+
+- 不新增业务功能，不迁移M6～M8路由，不切正式入口，不退役Legacy。
+- 不修改数据库结构或演示数据，不连接生产，不执行commit、push、PR、发布。
+允许修改：
+
+- M5现有V2契约、服务、页面、路由、导航、台账及测试（仅回归证明的最小根修）
+- M5现有后端业务与测试（仅回归证明的最小根修）
+- `scripts/demo/complete-project-v2/verify.ps1`（仅回归证明的最小根修）
+- `docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/第53条主线-M5-供应链与物资全量退出门验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- M6～M8业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- M5 10条路由全部真实V2承接或受控重定向，台账精确为`40/47/0`。
+- 024～028权限、范围、数量/金额、状态、幂等、来源流水及库存守恒跨切片回归通过。
+- 后端全量Maven同时满足`BUILD SUCCESS`与Surefire零失败/零错误；V2全量单测、类型、Lint、边界、台账、生产构建和包体通过。
+- 四组M5 Playwright共36项通过；三视口、axe、console和失败网络请求无未分类异常。
+- demo verify通过；报告与六处治理载体一致，新增后续项、关闭后续项、净变化及悬空项明确。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-029`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' test`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=SupplyChainReadOnlyCanaryTest,SupplierSourcingClosedLoopIntegrationTest,PurchaseRequestServiceTest,MatPurchaseRequestControllerTest,MatPurchaseOrderServiceTest,MatPurchaseOrderControllerTest,MatReceiptServiceTest,MatReceiptControllerTest,PurchaseRequestWorkflowHandlerTest,PurchaseOrderWorkflowHandlerTest,MaterialReceiptWorkflowHandlerTest,WarehouseServiceTest,MatWarehouseControllerTest,MatStockServiceTest,MatStockControllerTest,MatStockConsumptionBaselineServiceTest,MatStockConsumptionBaselineControllerTest,MatStockReplenishmentConflictTest,MatStockTransferServiceTest,MatStockTransferControllerTest,MatStockTransferConcurrencyTest,MatStockRealConcurrencyTest,MatRequisitionServiceTest,MatRequisitionWorkflowSubmitTest,MaterialReturnConcurrencyTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m5-supplier-sourcing.spec.ts e2e/m5-purchase-receipt.spec.ts e2e/m5-inventory-ledger.spec.ts e2e/m5-requisition-return.spec.ts`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1 -Environment demo -Database cgc_pms_demo_v2`
+- `git diff --check`
+
+### ISSUE-053-028：M5领料、出库与退料V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 领退料 / 单路由迁移 / 审批、库存与成本守恒
+状态：Done
+来源锚点：`docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`的ISSUE-053-028；`ISSUE-053-024～027`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M5-028-REQUISITION-RETURN-V2]
+Migration：不需要
+依赖：`ISSUE-053-024～027`已通过；复用共享供应链契约、V2请求核心及现有领料、工作流、库存出库、退料冲销、成本和全链路追溯服务。
+风险等级：高
+运行态要求：本地dev/test/demo；禁止连接生产。浏览器写侧只创建可识别草稿并通过既有删除/冲销API精确恢复；无恢复证据不得执行真实出库或退料。
+Reviewer要求：独立复核查询/新增/编辑/删除/提交/出库/退料分权、租户与项目范围、审批状态、明细数量/金额字符串、库存和成本守恒、原始流水绑定、重复出库、重复退料、并发及事务回滚。
+归档报告：`docs/quality/ISSUE-053-028-M5领料出库与退料V2验收报告.md`
+最小回滚：回退领退料V2页面、契约/服务扩展、路由/台账状态、测试及被证据证明必要的最小后端根修；024～027、Legacy、数据库和既有业务数据保持不变。
+目标：
+
+- 将`/inventory/material-requisition`迁移为真实Clean-room V2，覆盖领料申请列表/详情/明细、创建、更新、删除、提交审批、审批后实际出库、退料确认/冲销和全链路追溯。
+- 领料数量、单价、金额、审批、出库标记、库存流水、成本与退料结果全部写后重新读取；页面不得本地推进状态或累计库存。
+- 退料必须绑定原领料明细和原出库流水；重复出库、超量/重复退料、跨项目及非法状态失败关闭。
+
+实施结果：已通过。`/inventory/material-requisition`由真实Clean-room V2承接；领料、审批、出库、退料/冲销和trace均以服务端状态与数值为准。后端专项4项、V2单测288项、目标E2E 7/7、类型/Lint/边界/台账/构建通过，台账达到`40/47/0`。正式证据见`docs/quality/ISSUE-053-028-M5领料出库与退料V2验收报告.md`。
+非目标：
+
+- 不迁移M5其他路由，不新增领料审批流、平行库存/成本账、通用手工出入库、离线草稿或预测能力。
+- 不复制Legacy Vue/CSS，不新增请求层、状态库、表格库、依赖或通用领料框架。
+- 不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `packages/frontend-contracts/src/supply-chain.ts`
+- `frontend-admin-v2/src/services/supply-chain.ts`
+- `frontend-admin-v2/src/pages/supply-chain/RequisitionWorkspacePage.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m5-requisition-return.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/tests/unit/navigation.test.ts`
+- `frontend-admin-v2/e2e/m5-requisition-return.spec.ts`
+- `backend/src/main/java/com/cgcpms/requisition/**`
+- `backend/src/main/java/com/cgcpms/materialreturn/**`
+- `backend/src/main/java/com/cgcpms/procurement/controller/ProcurementTraceController.java`
+- `backend/src/main/java/com/cgcpms/procurement/service/ProcurementTraceService.java`
+- `backend/src/main/java/com/cgcpms/procurement/vo/ProcurementTraceVO.java`
+- `backend/src/test/java/com/cgcpms/requisition/**`
+- `backend/src/test/java/com/cgcpms/materialreturn/**`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-053-028-M5领料出库与退料V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- M5其他业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- `/inventory/material-requisition`由真实V2页面承接并达到`V2_ACCEPTED`；台账从`41/46/0`变为`40/47/0`。
+- 领料申请、明细、审批、出库、退料/冲销及trace均与服务端响应一致；前端无权威数量、金额、库存或状态累计。
+- 七组动作权限正负样本、租户/项目范围、空明细、超长物料名、驳回重提、重复出库、超量/重复退料、跨项目、并发和失败回滚成立。
+- 出库后库存/流水/成本守恒；退料后库存、反向流水、负成本与原领料明细/流水绑定守恒。
+- 页面具备loading、empty、error、403/404/409/422/500、重复点击防护、Abort与陈旧响应隔离、服务端分页；三视口无横向溢出，axe serious/critical为0。
+- Ready lint、领退料后端专项、契约/V2类型、目标单测、Lint、边界、路由台账、构建、目标E2E及`git diff --check`通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-028`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=MatRequisitionServiceTest,MatRequisitionWorkflowSubmitTest,MaterialReturnConcurrencyTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m5-requisition-return.test.ts router.test.ts navigation.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m5-requisition-return.spec.ts`
+- `git diff --check`
+
+### ISSUE-053-027：M5仓库、库存与来源流水V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 仓储库存 / 四路由迁移 / 数量、价值、来源与调拨幂等
+状态：Done
+来源锚点：`docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`的ISSUE-053-027；`ISSUE-053-024～026`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M5-027-WAREHOUSE-STOCK-LEDGER-V2]
+Migration：不需要
+依赖：`ISSUE-053-024～026`已通过；复用共享供应链契约、V2请求核心及现有仓库、库存台账、KPI、阈值、在途、消耗基线和幂等调拨Controller/Service。
+风险等级：高
+运行态要求：本地dev/test/demo；禁止连接生产。浏览器写侧只使用可识别仓库/库存事实并通过既有API精确回滚；无恢复证据不得执行真实调拨。
+Reviewer要求：独立复核仓库`list/add/edit/delete`分权、租户/项目范围、库存数量/价值字符串、来源流水、在途与历史净领料、阈值CAS、调拨候选、幂等重放、并发、安全库存和事务回滚。
+归档报告：`docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md`
+最小回滚：回退仓储库存V2页面、契约/服务扩展、路由/导航/台账状态、测试及被证据证明必要的最小后端根修；024～026、Legacy、数据库和既有业务数据保持不变。
+目标：
+
+- 将`/inventory`、`/inventory/warehouse`、`/inventory/stock`、`/inventory/transaction`迁移为真实Clean-room V2；`/inventory`仅作确定性重定向。
+- 覆盖仓库列表/详情/创建/更新/状态/删除，库存台账/KPI/阈值/在途/历史净领料及幂等调拨；数量、价值、来源和状态全部写后回读。
+- `/inventory/transaction`只读展示服务端来源流水；继续禁止通用手工`stock/in`与`stock/out`。
+非目标：
+
+- 不迁移领退料或其他M5路由，不新增平行库存账、通用手工出入库、预测、自动采购或跨项目资产调拨。
+- 不复制Legacy Vue/CSS，不新增请求层、状态库、表格库、依赖或通用库存框架。
+- 不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `packages/frontend-contracts/src/supply-chain.ts`
+- `frontend-admin-v2/src/services/supply-chain.ts`
+- `frontend-admin-v2/src/pages/supply-chain/InventoryWorkspacePage.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m5-inventory-ledger.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/tests/unit/navigation.test.ts`
+- `frontend-admin-v2/e2e/m5-inventory-ledger.spec.ts`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- M5其他业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- 四条路由由真实V2页面或受控重定向承接并达到`V2_ACCEPTED`；台账从`45/42/0`变为`41/46/0`。
+- 仓库范围、库存数量/价值、来源流水、在途、历史净领料、安全阈值和调拨结果均与服务端响应一致；前端无权威累计。
+- 查询及各写动作权限正负样本、租户/项目范围、空库存、超长物料名、跨仓候选、幂等重放、并发、安全库存、非法状态和失败回滚成立。
+- `stock/in`、`stock/out`继续返回`MANUAL_STOCK_MOVEMENT_DISABLED`；页面无对应入口。
+- 页面具备loading、empty、error、403/404/409/422/500、重复点击防护、Abort与陈旧响应隔离、服务端分页；三视口无横向溢出，axe serious/critical为0。
+- Ready lint、库存后端专项、契约/V2类型、目标单测、Lint、边界、路由台账、构建、目标E2E及`git diff --check`通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-027`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=WarehouseServiceTest,MatWarehouseControllerTest,MatStockServiceTest,MatStockControllerTest,MatStockConsumptionBaselineServiceTest,MatStockConsumptionBaselineControllerTest,MatStockReplenishmentConflictTest,MatStockTransferServiceTest,MatStockTransferControllerTest,MatStockTransferConcurrencyTest,MatStockRealConcurrencyTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m5-inventory-ledger.test.ts router.test.ts navigation.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m5-inventory-ledger.spec.ts`
+- `git diff --check`
+
+### ISSUE-053-026：M5采购申请、订单与验收V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 采购执行 / 四路由迁移 / 数量、来源、预算与状态
+状态：Done（2026-07-24，本地dev/test验收通过）
+来源锚点：`docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`的ISSUE-053-026；`ISSUE-053-024～025`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M5-026-PURCHASE-RECEIPT-V2]
+Migration：不需要
+依赖：`ISSUE-053-024～025`已通过；复用供应链共享契约、V2请求核心及现有采购申请、采购订单、材料验收Controller/Service和工作流。
+风险等级：高
+运行态要求：本地dev/test/demo；禁止连接生产。浏览器写侧仅创建可识别测试单据并通过既有API精确回滚。
+Reviewer要求：独立复核租户/项目范围、申请/订单/验收细分权限、来源与合同/供应商一致性、申请转订单数量、部分/完整验收、预算/审批状态、重复提交及库存写入幂等。
+归档报告：`docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md`
+最小回滚：回退采购执行V2页面、契约/服务扩展、路由/导航/台账状态、测试及被证据证明必要的最小后端根修；024～025、Legacy、数据库和既有业务数据保持不变。
+目标：
+
+- 将`/purchase`、`/inventory/purchase-request`、`/purchase/order`、`/purchase/receipt`迁移为真实Clean-room V2；`/purchase`仅作确定性重定向。
+- 覆盖采购申请创建/明细/提交、采购订单创建/明细/提交及材料部分/完整验收；服务端回读来源、数量、金额、预算、审批和业务状态。
+- 保持采购申请、合同、供应商、订单、验收与库存流水的既有一致性和幂等门禁，前端不形成权威数量或金额账。
+非目标：
+
+- 不迁移仓库、库存、流水、领退料或供应商招采路由，不新增自动采购、预测、供应商门户或平行库存账。
+- 不复制Legacy Vue/CSS，不新增请求层、状态库、表格库、依赖或通用采购框架。
+- 不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `packages/frontend-contracts/src/supply-chain.ts`
+- `frontend-admin-v2/src/services/supply-chain.ts`
+- `frontend-admin-v2/src/pages/supply-chain/PurchaseExecutionPage.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m5-purchase-receipt.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/tests/unit/navigation.test.ts`
+- `frontend-admin-v2/e2e/m5-purchase-receipt.spec.ts`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `backend/src/main/java/com/cgcpms/receipt/**`
+- `backend/src/test/java/com/cgcpms/purchase/**`
+- `backend/src/test/java/com/cgcpms/receipt/**`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- M5其他业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- 四条路由由真实V2页面或受控重定向承接并达到`V2_ACCEPTED`；台账从`49/38/0`变为`45/42/0`。
+- 申请→订单→部分/完整验收闭环成立；服务端统一裁决来源、合同/供应商、预算、数量、金额、审批、库存流水和重复提交。
+- 查询及各写动作权限正负样本、租户/项目范围、并发/幂等、非法状态和超量验收失败关闭；管理员不替代普通角色验收。
+- 页面具备loading、empty、error、403/404/409/422/500、重复点击防护、Abort与陈旧响应隔离；三视口无横向溢出，axe serious/critical为0。
+- Ready lint、采购/验收后端专项、契约/V2类型、目标单测、Lint、边界、路由台账、构建、目标E2E及`git diff --check`通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-026`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=PurchaseRequestServiceTest,MatPurchaseRequestControllerTest,MatPurchaseOrderServiceTest,MatPurchaseOrderControllerTest,MatReceiptServiceTest,MatReceiptControllerTest,PurchaseRequestWorkflowHandlerTest,PurchaseOrderWorkflowHandlerTest,MaterialReceiptWorkflowHandlerTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m5-purchase-receipt.test.ts router.test.ts navigation.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m5-purchase-receipt.spec.ts`
+- `git diff --check`
+
+### ISSUE-053-025：M5供应商招采与履约V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / 供应商招采 / 单路由迁移 / 状态与分权
+状态：Done（2026-07-24，本地dev/test验收通过）
+来源锚点：`docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`的ISSUE-053-025；`ISSUE-053-024`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M5-025-SUPPLIER-SOURCING-V2]
+Migration：不需要
+依赖：`ISSUE-053-024`已通过；复用供应链共享契约、V2请求核心、现有SupplierSourcingController/Service及P0闭环。
+风险等级：高
+运行态要求：本地dev/test/demo；禁止连接生产。浏览器写侧仅使用可识别测试数据并通过既有API精确回滚。
+Reviewer要求：独立复核租户/项目范围、query/maintain/quote/evaluate/award/performance/blacklist分权、状态动作、定标与合同关联、退货/评价/黑名单追溯及重复提交。
+归档报告：`docs/quality/ISSUE-053-025-M5供应商招采与履约V2验收报告.md`
+最小回滚：回退供应商招采V2页面、契约/服务扩展、路由/导航/台账状态、测试及被证据证明必要的最小后端根修；024、Legacy、数据库和业务数据保持不变。
+目标：
+
+- 将`/supplier-sourcing`迁移为真实Clean-room V2页面，覆盖事件、邀请、报价、评审、定标、关联合同、履约评价、退货、黑名单和trace。
+- 动作严格使用现有细分权限与服务端状态；查询、维护、报价、评审、定标、履约评价和黑名单审核不互相兜底。
+- 长供应商/项目名称、空态、失败态、重复点击、Abort和陈旧响应隔离可验收。
+实施结果：已通过。`/supplier-sourcing`由真实Clean-room V2承接；事件、邀请、报价、评审、定标、关联合同、履约评价、退货、黑名单及trace使用现有服务端状态与七组细分权限。后端专项5项、V2单测277项、目标E2E 9项、类型/Lint/边界/台账/构建通过，台账达到`49/38/0`。正式证据见`docs/quality/ISSUE-053-025-M5供应商招采与履约V2验收报告.md`。
+非目标：
+
+- 不建设供应商门户、外部登录、申诉解除、集团共享、新评分模型或新状态机。
+- 不复制Legacy Vue/CSS，不新增请求层、状态库、表格库、依赖或通用招采框架。
+- 不迁移采购/库存/领料路由，不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `packages/frontend-contracts/src/supply-chain.ts`
+- `frontend-admin-v2/src/services/supply-chain.ts`
+- `frontend-admin-v2/src/pages/supply-chain/SupplierSourcingPage.vue`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m5-supplier-sourcing.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/tests/unit/navigation.test.ts`
+- `frontend-admin-v2/e2e/m5-supplier-sourcing.spec.ts`
+- `backend/src/main/java/com/cgcpms/supplier/**`
+- `backend/src/test/java/com/cgcpms/supplier/**`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-053-025-M5供应商招采与履约V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- M5其他业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- `/supplier-sourcing`由真实V2页面承接并达到`V2_ACCEPTED`；台账从`50/37/0`变为`49/38/0`。
+- 招采事件至合同/履约/退货/评价/黑名单trace闭环成立；服务端状态回读，前端不越权推进。
+- 七组权限正负样本、租户/项目范围、重复提交和非法状态动作失败关闭；管理员不替代普通角色验收。
+- 页面具备loading、empty、error、403/404/409/422/500、重复点击防护、Abort与陈旧响应隔离；三视口无横向溢出，axe serious/critical为0。
+- Ready lint、供应商后端专项、契约/V2类型、目标单测、Lint、边界、路由台账、构建、目标E2E及`git diff --check`通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-025`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=SupplierSourcingClosedLoopIntegrationTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m5-supplier-sourcing.test.ts router.test.ts navigation.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m5-supplier-sourcing.spec.ts`
+- `git diff --check`
+
+### ISSUE-053-024：M5契约、权限、数量与只读金丝雀
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / M5金丝雀 / 供应链共享契约 / 查询零写
+状态：Done（2026-07-24，本地dev/test验收通过）
+来源锚点：`docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`的ISSUE-053-024；M4退出门通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M5-024-SUPPLY-CONTRACT-CANARY]
+Migration：不需要
+依赖：`ISSUE-053-017～023`均已通过；复用V2请求核心、公共壳、Legacy供应链API和现有供应商/采购/验收/库存/领料后端闭环。
+风险等级：高
+运行态要求：本地dev/test；禁止连接生产。金丝雀以只读GET为主，不创建业务数据；若后端专项测试需要数据，仅用测试事务。
+Reviewer要求：独立复核权限码、租户/项目范围、ID/数量/金额字符串、状态枚举、查询零写、通用手工出入库继续禁用，以及任何后端根修的正负向覆盖。
+归档报告：`docs/quality/ISSUE-053-024-M5供应链契约与只读金丝雀验收报告.md`
+最小回滚：回退供应链共享契约、V2服务适配、专项测试及被证据证明必要的最小后端根修；不迁移路由、不修改数据库，台账保持`50/37/0`。
+目标：
+
+- 冻结M5 10条路由使用的API、DTO、权限、状态、数量、金额、来源流水和幂等契约，复用现有后端事实。
+- 以仓库列表、库存台账、采购订单或验收列表中的三个代表性GET完成类型解析、项目/租户范围、错误映射及查询零写金丝雀。
+- 核实路由台账`inventory:warehouse:query`与后端`inventory:warehouse:list`差异的权威来源；有漂移则最小修正台账/契约和负向测试，不扩大权限。
+- 为后续025～028留下一个共享契约文件、一层V2服务适配和最小可运行测试，不创建页面或通用抽象。
+实施结果：已通过。8项查询权限、8组API入口、四条GET薄服务、十进制字符串、错误/Abort契约、仓库`list`权限正负样本及三条真实GET四表零写快照成立；后端55项、V2 274项、类型/Lint/边界/台账/构建通过，台账保持`50/37/0`。正式证据见`docs/quality/ISSUE-053-024-M5供应链契约与只读金丝雀验收报告.md`。
+非目标：
+
+- 不迁移M5路由，不创建业务页面，不改变路由台账计数。
+- 不新增migration、平行库存账、手工出入库、预测、自动采购、供应商门户或新状态机。
+- 不复制Legacy Vue/CSS，不新增依赖、请求层、状态库、表格库或通用仓储框架。
+- 不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `packages/frontend-contracts/src/supply-chain.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/supply-chain.ts`
+- `frontend-admin-v2/tests/unit/m5-supply-chain-contract-baseline.test.ts`
+- `backend/src/main/java/com/cgcpms/supplier/**`
+- `backend/src/main/java/com/cgcpms/purchase/**`
+- `backend/src/main/java/com/cgcpms/receipt/**`
+- `backend/src/main/java/com/cgcpms/inventory/**`
+- `backend/src/main/java/com/cgcpms/requisition/**`
+- `backend/src/test/java/com/cgcpms/supplier/**`
+- `backend/src/test/java/com/cgcpms/purchase/**`
+- `backend/src/test/java/com/cgcpms/receipt/**`
+- `backend/src/test/java/com/cgcpms/inventory/**`
+- `backend/src/test/java/com/cgcpms/requisition/**`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M5-供应链与物资任务计划书-2026-07-24.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-053-024-M5供应链契约与只读金丝雀验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `frontend-admin-v2/src/pages/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/**`
+- `backend/src/main/resources/db/migration/**`
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- 供应链共享契约和V2服务仅复用现有请求核心；ID、数量和金额保持稳定字符串，空值与`0`可区分。
+- 三个代表性GET成功、空态、403、404、500与Abort/陈旧响应契约可测；执行前后业务表计数和更新时间不变。
+- 仓库权限映射以代码、权限数据和自动化负测闭环；前端隐藏不替代后端授权。
+- 通用手工出入库继续返回`MANUAL_STOCK_MOVEMENT_DISABLED`；库存权威值不由前端乐观修改。
+- Ready lint、相关后端专项、契约/V2类型、目标单测、Lint、Clean-room边界、路由台账、构建及`git diff --check`通过；路由台账保持`50/37/0`。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-024`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=SupplyChainReadOnlyCanaryTest,MatWarehouseControllerTest,MatStockControllerTest,MatPurchaseOrderControllerTest,MatReceiptControllerTest' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit -- m5-supply-chain-contract-baseline.test.ts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `git diff --check`
+
+### ISSUE-053-023：M4全量回归与正式收口
+
+优先级：P0
+任务性质：回归证明
+类型：Clean-room V2 / M4全量回归 / 正式验收 / 治理收口
+状态：Done（2026-07-24，本地dev/test验收通过）
+来源锚点：`docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`的ISSUE-053-023；`ISSUE-053-017～022`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M4-023-EXIT-GATE]
+Migration：不需要
+依赖：`ISSUE-053-017～022`均已通过；本Issue仅执行M4全量复验、缺口最小修正和治理收口。
+风险等级：高
+运行态要求：本地V2、Legacy、后端、MySQL、Redis和MinIO健康；仅使用dev/test/demo数据，禁止连接生产。
+Reviewer要求：复核18路由、金额字符串、租户/项目范围、权限、状态机、附件、并发、三视口、axe、查询零写及证据完整性。
+归档报告：`docs/quality/第53条主线-M4-商务合约全量退出门验收报告.md`
+最小回滚：回退本Issue治理与报告回写；若复验发现具体缺陷，仅回退对应最小修正，不改写017～022既有业务事实，不影响M0～M3、Legacy入口或数据库。
+目标：
+
+- 对M4全部18条真实V2路由执行跨切片回归，确认合同、变更、投标成本、目标成本、成本台账/汇总/动态利润、预算和产值计量闭环仍成立。
+- 确认路由台账固定为`LEGACY_ONLY=50 / V2_ACCEPTED=37 / V2_SOURCE_AVAILABLE=0`，5条成本科目路由继续归属M7。
+- 完成正式验收报告及主计划、Ready、Current Focus、Done、项目地图等唯一治理载体一致回写。
+实施结果：已通过。18条目标路由全部为真实Clean-room V2页面或受控重定向，台账`50/37/0`；后端全量263类2173项、顺序复验12类159项、V2单测264项、M4 E2E 16/16及demo verify通过。Surefire堆耗尽和demo验证器契约漂移已最小根修。正式证据见`docs/quality/第53条主线-M4-商务合约全量退出门验收报告.md`。
+非目标：
+
+- 不新增业务能力、数据库migration、页面、状态、权限、金额账本、前端权威计算或通用抽象。
+- 不迁移M5～M7路由，不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `frontend-admin-v2/src/pages/commercial/**`
+- `frontend-admin-v2/src/services/commercial.ts`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/scripts/generate-route-ledger.mjs`
+- `frontend-admin-v2/tests/unit/m4-*.test.ts`
+- `frontend-admin-v2/tests/unit/router.test.ts`
+- `frontend-admin-v2/tests/unit/navigation.test.ts`
+- `frontend-admin-v2/e2e/m4-*.spec.ts`
+- `packages/frontend-contracts/src/commercial.ts`
+- `backend/src/main/java/com/cgcpms/contract/**`
+- `backend/src/main/java/com/cgcpms/variation/**`
+- `backend/src/main/java/com/cgcpms/bid/**`
+- `backend/src/main/java/com/cgcpms/cost/**`
+- `backend/src/main/java/com/cgcpms/budget/**`
+- `backend/src/main/java/com/cgcpms/measurement/**`
+- `backend/src/test/java/com/cgcpms/contract/**`
+- `backend/src/test/java/com/cgcpms/variation/**`
+- `backend/src/test/java/com/cgcpms/bid/**`
+- `backend/src/test/java/com/cgcpms/cost/**`
+- `backend/src/test/java/com/cgcpms/budget/**`
+- `backend/src/test/java/com/cgcpms/measurement/**`
+- `backend/pom.xml`
+- `scripts/demo/complete-project-v2/verify.ps1`
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M4-商务合约任务计划书-2026-07-22.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/第53条主线-M4-商务合约全量退出门验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- M4以外业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+- `scripts/codex-autopilot/test-codex-task-execution-policy.ps1`
+验收标准：
+
+- M4全部18条目标路由为真实V2页面并达到`V2_ACCEPTED`；台账固定为`50/37/0`，无`V2_SOURCE_AVAILABLE`。
+- 合同、变更/投标、目标成本、成本/利润、预算/产值的权限、租户/项目范围、金额字符串、状态机、附件、CAS、幂等和并发证据通过。
+- 后端全量与顺序复验、V2全量单测、契约/V2类型、Lint、Clean-room边界、路由台账、构建、包体和M4全部E2E通过。
+- Demo验证通过；三视口、axe、console、失败网络请求及查询零写满足既有M4验收契约。
+- 主计划、Ready、Current Focus、Done、项目地图、路由台账和正式验收报告一致回写；所有发现均修复、正式承接或关闭。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-023`
+- `cd backend; .\mvnw.cmd -C verify`
+- `cd backend; .\mvnw.cmd -C -Ptest-order-independence test`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm check:bundle-size`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m4-contracts.spec.ts e2e/m4-variation-bid.spec.ts e2e/m4-cost-target.spec.ts e2e/m4-costs.spec.ts e2e/m4-budget-measurement.spec.ts`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1 -Environment demo -Database cgc_pms_demo_v2`
+- `git diff --check`
 
 ### ISSUE-053-020：M4目标成本版本V2
 

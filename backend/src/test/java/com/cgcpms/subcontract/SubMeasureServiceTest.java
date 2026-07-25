@@ -220,6 +220,47 @@ class SubMeasureServiceTest {
         assertThrows(BusinessException.class, () -> service.update(upd));
     }
 
+    @Test @Transactional @DisplayName("update → locked latest APPROVING state cannot be edited")
+    void testUpdate_WhenApproving() {
+        Long id = service.create(buildMeasure());
+        SubMeasure db = measureMapper.selectById(id);
+        db.setApprovalStatus("APPROVING");
+        db.setStatus("APPROVING");
+        measureMapper.updateById(db);
+        SubMeasure upd = buildMeasure();
+        upd.setId(id);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.update(upd));
+
+        assertEquals("MEASURE_IN_APPROVAL", error.getCode());
+    }
+
+    @Test @Transactional @DisplayName("create → ignores client lifecycle and amount fields")
+    void testCreate_IgnoresClientControlledFields() {
+        SubMeasure measure = buildMeasure();
+        measure.setApprovalStatus("APPROVED");
+        measure.setStatus("CONFIRMED");
+        measure.setCostGeneratedFlag(1);
+
+        Long id = service.create(measure);
+        SubMeasure stored = measureMapper.selectById(id);
+
+        assertEquals("DRAFT", stored.getApprovalStatus());
+        assertEquals("DRAFT", stored.getStatus());
+        assertEquals(0, stored.getCostGeneratedFlag());
+        assertEquals(0, BigDecimal.ZERO.compareTo(stored.getReportedAmount()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(stored.getNetAmount()));
+    }
+
+    @Test @Transactional @DisplayName("create → rejects contract outside selected project")
+    void testCreate_RejectsCrossProjectContract() {
+        SubMeasure measure = buildMeasure();
+        measure.setProjectId(2071032241708793858L);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.create(measure));
+        assertEquals("SUB_MEASURE_CONTRACT_INVALID", error.getCode());
+    }
+
     @Test @Transactional @DisplayName("saveItemsBatch → bulk saves items")
     void testSaveItemsBatch() {
         Long id = service.create(buildMeasure());
@@ -254,6 +295,36 @@ class SubMeasureServiceTest {
         Long id = createReadyMeasure();
         service.submitForApproval(id);
         assertThrows(BusinessException.class, () -> service.submitForApproval(id));
+    }
+
+    @Test @Transactional @DisplayName("submitForApproval → rejects stale contract price and preserves draft")
+    void testSubmitForApproval_RejectsStaleContractPrice() {
+        Long id = createReadyMeasure();
+        Long contractItemId = Long.valueOf(service.getById(id).getItems().get(0).getContractItemId());
+        CtContractItem contractItem = contractItemMapper.selectById(contractItemId);
+        contractItem.setUnitPrice(new BigDecimal("501.0000"));
+        contractItemMapper.updateById(contractItem);
+
+        BusinessException error = assertThrows(BusinessException.class, () -> service.submitForApproval(id));
+        assertEquals("SUB_MEASURE_ITEM_STALE", error.getCode());
+        assertEquals("DRAFT", service.getById(id).getApprovalStatus());
+    }
+
+    @Test @Transactional @DisplayName("delete → atomically removes header, items and attachments")
+    void testDelete_RemovesOwnedData() {
+        Long id = createReadyMeasure();
+        assertFalse(service.getById(id).getItems().isEmpty());
+
+        service.delete(id);
+
+        assertNull(measureMapper.selectById(id));
+        assertEquals(0, itemMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SubMeasureItem>()
+                .eq(SubMeasureItem::getTenantId, TENANT_ID)
+                .eq(SubMeasureItem::getMeasureId, id)));
+        assertEquals(0, fileMapper.selectCount(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getTenantId, TENANT_ID)
+                .eq(SysFile::getBusinessType, "SUBCONTRACT")
+                .eq(SysFile::getBusinessId, id)));
     }
 
     @Test @Transactional @DisplayName("submitForApproval → withdrawn draft resubmits existing workflow")

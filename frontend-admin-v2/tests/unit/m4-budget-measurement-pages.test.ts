@@ -42,6 +42,7 @@ vi.mock('@/services/delivery', () => ({ uploadSiteFile: vi.fn() }))
 const budget: ProjectBudgetRecord = {
   id: '9007199254740993',
   projectId: 'P1',
+  budgetCode: 'BUD-20260725-001',
   versionNo: 'V1',
   budgetName: '项目预算',
   totalAmount: '9007199254740993.12',
@@ -210,7 +211,19 @@ describe('M4 budget and measurement pages', () => {
     expect(pagination.text()).not.toContain('/ 1')
     expect(wrapper.get('tbody').text()).toContain('草稿')
     expect(wrapper.get('tbody').text()).toContain('已启用')
+    expect(wrapper.get('thead th').text()).toBe('预算编号')
+    expect(wrapper.get('tbody th').text()).toContain('BUD-20260725-001')
     expect(wrapper.get('tbody').text()).not.toMatch(/\b(?:DRAFT|ACTIVE)\b/)
+    const headingCard = wrapper.get('.v2-card--page-heading')
+    expect(headingCard.find('.v2-card__body').exists()).toBe(false)
+    expect(headingCard.get('.v2-card__header .filters').exists()).toBe(true)
+    expect(
+      headingCard
+        .findAll('button')
+        .find((item) => item.text().includes('查询'))
+        ?.classes(),
+    ).toContain('v2-button--small')
+    expect(wrapper.get('table').element.closest('.v2-card--page-heading')).toBeNull()
   })
 
   it('uses one measurement table and expands owner submission versions', async () => {
@@ -260,7 +273,7 @@ describe('M4 budget and measurement pages', () => {
       endDate: '2026-07-31',
     })
 
-    await button(wrapper, '详情')!.trigger('click')
+    await button(wrapper, 'ME-1')!.trigger('click')
     await flushPromises()
     expect(wrapper.get('[aria-label="ME-1 业主报送记录"]').text()).toContain('OMS-202607-001-R2')
     expect(wrapper.get('[aria-label="ME-1 业主报送记录"]').text()).toContain('V2')
@@ -310,7 +323,7 @@ describe('M4 budget and measurement pages', () => {
       ['measurement:query', 'measurement:maintain'],
     )
 
-    const actions = wrapper.get('.v2-card__header > .actions')
+    const actions = wrapper.get('.v2-card__actions > .actions')
     expect(actions.text().indexOf('全部状态')).toBeLessThan(actions.text().indexOf('新建期间'))
     expect(button(wrapper, '查询')).toBeUndefined()
     await wrapper.get('button[data-value="DRAFT"]').trigger('click')
@@ -329,19 +342,19 @@ describe('M4 budget and measurement pages', () => {
   })
   it('shows list failures and keeps budget detail 404 visible', async () => {
     vi.mocked(commercial.loadBudgetPage).mockRejectedValueOnce(apiError('预算服务异常', 500))
-    const b500 = await mountPage(BudgetPageView, '/budget?projectId=P1', ['budget:query'])
-    expect(b500.wrapper.text()).toContain('预算服务异常')
+    await mountPage(BudgetPageView, '/budget?projectId=P1', ['budget:query'])
+    expect(toastItems.some((toast) => toast.message.includes('预算服务异常'))).toBe(true)
     vi.mocked(commercial.loadBudgetPage).mockResolvedValueOnce(budgetPage)
     vi.mocked(commercial.loadBudget).mockRejectedValueOnce(apiError('预算不存在', 404))
     const b404 = await mountPage(BudgetPageView, '/budget?projectId=P1', ['budget:query'])
-    await button(b404.wrapper, '详情')!.trigger('click')
+    await button(b404.wrapper, 'BUD-20260725-001')!.trigger('click')
     await flushPromises()
-    expect(b404.wrapper.text()).toContain('预算不存在')
+    expect(toastItems.some((toast) => toast.message.includes('预算不存在'))).toBe(true)
     vi.mocked(commercial.loadMeasurements).mockRejectedValueOnce(apiError('计量服务异常', 500))
-    const m500 = await mountPage(MeasurementPageView, '/production-measurement?projectId=P1', [
+    await mountPage(MeasurementPageView, '/production-measurement?projectId=P1', [
       'measurement:query',
     ])
-    expect(m500.wrapper.text()).toContain('计量服务异常')
+    expect(toastItems.some((toast) => toast.message.includes('计量服务异常'))).toBe(true)
   })
   it('aborts budget and measurement requests and ignores stale project/period responses', async () => {
     const oldBudget = deferred<BudgetPage>()
@@ -420,7 +433,7 @@ describe('M4 budget and measurement pages', () => {
     await flushPromises()
     expect(commercial.submitMeasurement).toHaveBeenCalledWith('M1', '9')
     expect(commercial.loadMeasurements).toHaveBeenCalledTimes(2)
-    expect(m.wrapper.text()).toContain('计量版本冲突')
+    expect(toastItems.some((toast) => toast.message.includes('计量版本冲突'))).toBe(true)
   })
   it('retains create and edit form values on 422 without false success or reload', async () => {
     vi.mocked(commercial.createBudget).mockRejectedValueOnce(apiError('版本号重复', 422))
@@ -438,7 +451,7 @@ describe('M4 budget and measurement pages', () => {
       expect.objectContaining({ projectId: 'P1', version: null, versionNo: 'V-NEW' }),
     )
     expect(created.wrapper.get('input[aria-label="预算名称"]').element.value).toBe('新预算保留值')
-    expect(created.wrapper.text()).toContain('版本号重复')
+    expect(toastItems.some((toast) => toast.message.includes('版本号重复'))).toBe(true)
     expect(created.wrapper.text()).not.toContain('预算已创建')
     expect(commercial.loadBudgetPage).toHaveBeenCalledTimes(1)
 
@@ -457,7 +470,7 @@ describe('M4 budget and measurement pages', () => {
       expect.objectContaining({ budgetName: '编辑后保留值', version: '7' }),
     )
     expect(edited.wrapper.get('input[aria-label="预算名称"]').element.value).toBe('编辑后保留值')
-    expect(edited.wrapper.text()).toContain('预算校验失败')
+    expect(toastItems.some((toast) => toast.message.includes('预算校验失败'))).toBe(true)
     expect(edited.wrapper.text()).not.toContain('预算已更新')
     expect(commercial.loadBudgetPage).toHaveBeenCalledTimes(2)
   })
@@ -491,7 +504,7 @@ describe('M4 budget and measurement pages', () => {
       'budget:query',
       'budget:edit',
     ])
-    await button(page.wrapper, '详情')!.trigger('click')
+    await button(page.wrapper, 'BUD-20260725-001')!.trigger('click')
     await flushPromises()
     expect(page.wrapper.text()).toContain('8.89')
     await button(page.wrapper, '保存明细')!.trigger('click')
@@ -508,7 +521,7 @@ describe('M4 budget and measurement pages', () => {
       'budget:query',
       'budget:edit',
     ])
-    await button(page.wrapper, '详情')!.trigger('click')
+    await button(page.wrapper, 'BUD-20260725-001')!.trigger('click')
     await flushPromises()
     await page.wrapper.get('input[aria-label="预算金额"]').setValue('77.77')
     await button(page.wrapper, '保存明细')!.trigger('click')
@@ -519,7 +532,7 @@ describe('M4 budget and measurement pages', () => {
       '7',
     )
     expect(page.wrapper.get('input[aria-label="预算金额"]').element.value).toBe('77.77')
-    expect(page.wrapper.text()).toContain('明细校验失败')
+    expect(toastItems.some((toast) => toast.message.includes('明细校验失败'))).toBe(true)
     expect(toastItems.some((toast) => toast.message.includes('预算明细已保存'))).toBe(false)
     expect(commercial.loadBudgetPage).toHaveBeenCalledTimes(1)
     expect(commercial.loadBudgetAvailability).toHaveBeenCalledTimes(1)
@@ -533,7 +546,7 @@ describe('M4 budget and measurement pages', () => {
     await button(page.wrapper, '删除')!.trigger('click')
     await flushPromises()
     expect(commercial.deleteBudget).toHaveBeenCalledWith(budget.id, '7')
-    expect(page.wrapper.text()).toContain('预算已被引用')
+    expect(toastItems.some((toast) => toast.message.includes('预算已被引用'))).toBe(true)
     expect(page.wrapper.text()).toContain('项目预算')
     expect(page.wrapper.text()).not.toContain('预算已删除')
     expect(commercial.loadBudgetPage).toHaveBeenCalledTimes(1)

@@ -8,6 +8,7 @@ import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.bid.service.BidCostService;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
@@ -35,6 +36,7 @@ class BidCostServiceConcurrencyTest {
     @Mock CostItemMapper costItemMapper;
     @Mock PmProjectMapper projectMapper;
     @Mock ProjectAccessChecker projectAccessChecker;
+    @Mock CodeGenerationService codeGenerationService;
 
     private BidCostService service;
 
@@ -46,7 +48,8 @@ class BidCostServiceConcurrencyTest {
             assistant.setCurrentNamespace("BidCostServiceConcurrencyTest");
             TableInfoHelper.initTableInfo(assistant, BidCost.class);
         }
-        service = new BidCostService(mapper, costItemMapper, projectMapper, projectAccessChecker);
+        service = new BidCostService(
+                mapper, costItemMapper, projectMapper, projectAccessChecker, codeGenerationService);
     }
 
     @AfterEach

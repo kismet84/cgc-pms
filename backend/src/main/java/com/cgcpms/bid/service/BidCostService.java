@@ -8,6 +8,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.bid.entity.BidCost;
 import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -33,10 +35,13 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class BidCostService {
 
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
+
     private final BidCostMapper mapper;
     private final CostItemMapper costItemMapper;
     private final PmProjectMapper projectMapper;
     private final ProjectAccessChecker projectAccessChecker;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<BidCost> getPage(long pageNo, long pageSize, String bidStatus, String keyword,
                                   Long projectId, LocalDate startDate, LocalDate endDate) {
@@ -71,12 +76,22 @@ public class BidCostService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(BidCost bid) {
-        bid.setId(null);
-        bid.setTenantId(UserContext.getCurrentTenantId());
+        Long tenantId = UserContext.getCurrentTenantId();
+        bid.setTenantId(tenantId);
         bid.setProjectId(null);
         bid.setBidStatus("BIDDING");
-        mapper.insert(bid);
-        return bid.getId();
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            bid.setId(null);
+            bid.setBidCode(codeGenerationService.nextCode(
+                    mapper, BidCost::getBidCode, "BID-", tenantId, true, attempt));
+            try {
+                mapper.insert(bid);
+                return bid.getId();
+            } catch (DuplicateKeyException ignored) {
+                log.info("投标成本编号冲突，重试生成 bidCode={}", bid.getBidCode());
+            }
+        }
+        throw new BusinessException("BID_COST_CODE_CONFLICT", "投标成本编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)

@@ -11,12 +11,12 @@ import type {
   WbsTaskCommand,
 } from '@cgc-pms/frontend-contracts'
 import {
-  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
   V2ConfirmDialog,
   V2Dialog,
+  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -53,6 +53,9 @@ const loading = ref(false)
 const detailLoading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
+watch(errorMessage, (value) => {
+  if (value) showToast('error', '操作未完成', value)
+})
 const schedules = ref<ScheduleRecord[]>([])
 const detail = ref<ScheduleDetail | null>(null)
 const traceSummary = ref<string[]>([])
@@ -113,11 +116,12 @@ const isDetailRoute = computed(() => Boolean(scheduleId.value))
 const projectOptions = computed(() =>
   workspace.projects.map((item) => ({ value: item.value, label: item.label })),
 )
-const projectLabel = computed(() =>
-  projectId.value
-    ? (workspace.projects.find((item) => item.value === projectId.value)?.label ?? '—')
-    : '全部项目',
-)
+const currentUserOptions = computed(() => {
+  const value = String(session.userInfo?.userId ?? '')
+  return value
+    ? [{ value, label: session.userInfo?.realName || session.userInfo?.username || '当前用户' }]
+    : []
+})
 const canMaintain = computed(() => hasPermission('schedule:maintain'))
 const canSubmit = computed(() => hasPermission('schedule:submit'))
 const canProgress = computed(() => hasPermission('schedule:progress'))
@@ -156,19 +160,21 @@ function statusTone(status: string): 'info' | 'success' | 'warning' | 'danger' |
   return 'neutral'
 }
 
-async function reloadList(preserveNotice = false): Promise<void> {
+async function reloadList(preserveNotice = false): Promise<boolean> {
   listController?.abort()
   listController = new AbortController()
   loading.value = true
   if (!preserveNotice) resetNotices()
   try {
     schedules.value = await loadSchedules(projectId.value || undefined, listController.signal)
+    return true
   } catch (error) {
     if (!listController.signal.aborted) {
       schedules.value = []
       detail.value = null
       errorMessage.value = message(error, '项目计划加载失败')
     }
+    return false
   } finally {
     if (!listController.signal.aborted) loading.value = false
   }
@@ -195,6 +201,20 @@ async function openDetail(scheduleId: string, preserveNotice = false): Promise<v
   } finally {
     if (requestId === detailRequestId.value) detailLoading.value = false
   }
+}
+
+async function refreshSchedules(): Promise<void> {
+  if (await reloadList()) showToast('success', '刷新完成', '项目计划已刷新。')
+}
+
+async function refreshScheduleDetail(): Promise<void> {
+  if (!detail.value) return
+  await openDetail(detail.value.id)
+  showToast(
+    errorMessage.value ? 'error' : 'success',
+    errorMessage.value ? '刷新失败' : '刷新完成',
+    errorMessage.value || '计划详情已刷新。',
+  )
 }
 
 function goToDetail(id: string): void {
@@ -407,7 +427,7 @@ function openCorrective(): void {
     actionCode: `COR-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}`,
     reason: '',
     actionPlan: '',
-    responsibleUserId: '',
+    responsibleUserId: currentUserOptions.value[0]?.value ?? '',
     dueDate: '',
     remark: '',
   })
@@ -453,7 +473,6 @@ async function loadTrace(): Promise<void> {
     const trace = await loadScheduleTrace(detail.value.id)
     const latestSnapshot = trace.snapshots.at(-1)
     const latestCorrectiveAction = trace.correctiveActions.at(-1)
-    const latestAlert = trace.alerts.at(-1)
     traceSummary.value = [
       `计划：${trace.schedule.planCode} / ${deliveryLabel(trace.schedule.status)}`,
       `WBS / 周期计划：${trace.wbsTasks.length} / ${trace.periodPlans.length}`,
@@ -461,7 +480,7 @@ async function loadTrace(): Promise<void> {
       `纠偏 / 修订：${trace.correctiveActions.length} / ${trace.revisions.length}`,
       `最近快照：${latestSnapshot ? `${latestSnapshot.snapshotDate} / ${deliveryLabel(latestSnapshot.status)}` : '暂无'}`,
       `最近纠偏：${latestCorrectiveAction ? latestCorrectiveAction.actionCode : '暂无'}`,
-      `最近预警ID：${latestAlert?.id || '暂无'}`,
+      `最近预警：${trace.alerts.length ? '已产生' : '暂无'}`,
     ]
     traceLoaded.value = true
   } catch (error) {
@@ -568,29 +587,17 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
 
 <template>
   <section class="schedule-page" aria-labelledby="schedule-title">
-    <V2Alert v-if="errorMessage" tone="danger" title="请求未完成">{{ errorMessage }}</V2Alert>
-
     <V2Card
       :title="isDetailRoute ? '施工履约详情' : '项目计划与施工履约'"
       title-id="schedule-title"
       :heading-level="1"
-      :subtitle="
-        isDetailRoute && detail
-          ? `${detail.planCode} · ${deliveryLabel(detail.status)}`
-          : projectLabel
-            ? `当前范围：${projectLabel}`
-            : '当前范围：全部项目'
-      "
     >
       <template #actions>
         <div v-if="!isDetailRoute" class="schedule-page__actions">
-          <V2Button size="small" variant="ghost" @click="reloadList()">刷新</V2Button>
+          <V2Button size="small" variant="ghost" @click="refreshSchedules">刷新</V2Button>
           <V2Button v-if="canMaintain" size="small" @click="openCreate">新建基线计划</V2Button>
         </div>
       </template>
-      <p v-if="isDetailRoute" class="schedule-page__hint">
-        查看计划任务、月周计划、进度偏差与纠偏记录。
-      </p>
     </V2Card>
 
     <V2PageState
@@ -601,15 +608,15 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
       :heading-level="2"
     />
     <V2PageState
-      v-else-if="!isDetailRoute && !schedules.length"
+      v-else-if="!isDetailRoute && !schedules.length && !errorMessage"
       kind="empty"
       :title="projectId ? '当前项目暂无计划' : '全部项目暂无计划'"
       description="具备维护权限的账号可以创建基线计划。"
       :heading-level="2"
     />
-    <V2Card v-else-if="!isDetailRoute" title="主计划列表">
+    <V2Card v-else-if="!isDetailRoute" title="主计划台账">
       <div class="schedule-page__table-wrap">
-        <table class="schedule-page__table v2-table--top">
+        <table class="schedule-page__table">
           <caption class="v2-visually-hidden">
             项目主计划列表
           </caption>
@@ -621,13 +628,22 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
               <th v-if="!projectId" scope="col">项目</th>
               <th scope="col">类型</th>
               <th scope="col">计划周期</th>
-              <th scope="col">状态</th>
-              <th scope="col">操作</th>
+              <th scope="col" class="v2-table-cell--status">状态</th>
+              <th scope="col" class="v2-table-cell--actions">操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="item in schedules" :key="item.id">
-              <th scope="row">{{ item.planCode }}</th>
+              <th scope="row">
+                <V2Button
+                  size="small"
+                  variant="ghost"
+                  class="v2-table__record-link"
+                  @click="goToDetail(item.id)"
+                >
+                  {{ item.planCode }}
+                </V2Button>
+              </th>
               <td>V{{ item.versionNo }}</td>
               <td>{{ item.planName }}</td>
               <td v-if="!projectId">
@@ -638,14 +654,11 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
               </td>
               <td>{{ item.planType === 'REVISION' ? '修订计划' : '基线计划' }}</td>
               <td>{{ item.plannedStartDate }} 至 {{ item.plannedEndDate }}</td>
-              <td>
+              <td class="v2-table-cell--status">
                 <V2Badge :tone="statusTone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
               </td>
-              <td>
+              <td class="v2-table-cell--actions">
                 <div class="schedule-page__actions">
-                  <V2Button size="small" variant="secondary" @click="goToDetail(item.id)"
-                    >履约详情</V2Button
-                  >
                   <V2Button
                     v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(item.status)"
                     size="small"
@@ -682,7 +695,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
       <template #actions>
         <div class="schedule-page__actions">
           <V2Button size="small" variant="secondary" @click="backToList">返回计划列表</V2Button>
-          <V2Button v-if="detail" size="small" variant="ghost" @click="openDetail(detail.id)"
+          <V2Button v-if="detail" size="small" variant="ghost" @click="refreshScheduleDetail"
             >刷新详情</V2Button
           >
           <V2Button
@@ -768,7 +781,10 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
           </V2Card>
         </div>
 
-        <V2Card title="WBS 任务" :subtitle="`共 ${detail.tasks.length} 条`" :heading-level="3">
+        <V2Card title="WBS 任务" :heading-level="3">
+          <template #title-extra>
+            <V2Badge tone="neutral">共 {{ detail.tasks.length }} 条</V2Badge>
+          </template>
           <div v-if="detail.tasks.length" class="schedule-page__table-wrap">
             <table class="schedule-page__table v2-table--top">
               <thead>
@@ -796,7 +812,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
             </table>
           </div>
           <V2PageState
-            v-else
+            v-else-if="!errorMessage"
             kind="empty"
             title="暂无 WBS"
             description="计划提交前至少需要一条 WBS 任务。"
@@ -804,11 +820,10 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
           />
         </V2Card>
 
-        <V2Card
-          title="月周计划"
-          :subtitle="`共 ${detail.periodPlans.length} 条`"
-          :heading-level="3"
-        >
+        <V2Card title="月周计划" :heading-level="3">
+          <template #title-extra>
+            <V2Badge tone="neutral">共 {{ detail.periodPlans.length }} 条</V2Badge>
+          </template>
           <template #actions>
             <div class="schedule-page__actions">
               <V2Button
@@ -854,11 +869,10 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
           <p v-else class="schedule-page__empty-copy">暂无月周计划。</p>
         </V2Card>
 
-        <V2Card
-          title="纠偏链与追溯"
-          :subtitle="`纠偏单 ${detail.correctiveActions.length} 条`"
-          :heading-level="3"
-        >
+        <V2Card title="纠偏链与追溯" :heading-level="3">
+          <template #title-extra>
+            <V2Badge tone="neutral">纠偏单 {{ detail.correctiveActions.length }} 条</V2Badge>
+          </template>
           <template #actions>
             <V2Button size="small" variant="ghost" :loading="saving" @click="loadTrace"
               >加载追溯</V2Button
@@ -902,20 +916,12 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
     >
       <form id="schedule-create-form" class="schedule-page__form" @submit.prevent="saveSchedule">
         <V2Select
-          v-if="projectOptions.length"
           v-model="scheduleForm.projectId"
           class="schedule-page__span-2"
           label="项目"
           :options="projectOptions"
           required
-        />
-        <V2Input
-          v-else
-          v-model="scheduleForm.projectId"
-          class="schedule-page__span-2"
-          label="项目 ID"
-          required
-          hint="没有项目列表时，使用已确认的项目 ID。"
+          placeholder="请选择项目"
         />
         <V2Input v-model="scheduleForm.planCode" label="计划编号" required />
         <V2Input v-model="scheduleForm.planName" label="计划名称" required />
@@ -933,7 +939,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
         </label>
       </form>
       <template #footer>
-        <V2Button variant="secondary" @click="createOpen = false">取消</V2Button>
+        <V2GlassButton text="取消" :on-click="() => (createOpen = false)" />
         <V2Button type="submit" form="schedule-create-form" :loading="saving">创建计划</V2Button>
       </template>
     </V2Dialog>
@@ -959,7 +965,6 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
             <V2Input v-model="task.parentTaskCode" label="父任务编码" />
             <V2Input v-model="task.predecessorTaskCode" label="前置任务编码" />
             <V2Input v-model="task.workArea" label="作业面" />
-            <V2Input v-model="task.responsibleUserId" label="责任人用户 ID" />
             <label>
               计划开始
               <input v-model="task.plannedStartDate" type="date" />
@@ -1046,7 +1051,12 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
         @submit.prevent="saveCorrective"
       >
         <V2Input v-model="correctiveForm.actionCode" label="纠偏编码" required />
-        <V2Input v-model="correctiveForm.responsibleUserId" label="责任人用户 ID" required />
+        <V2Select
+          v-model="correctiveForm.responsibleUserId"
+          label="责任人"
+          :options="currentUserOptions"
+          required
+        />
         <label>
           完成期限
           <input v-model="correctiveForm.dueDate" type="date" required />
@@ -1094,7 +1104,6 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
   gap: var(--v2-space-2);
   align-items: center;
 }
-.schedule-page__hint,
 .schedule-page__empty-copy {
   margin: 0;
   color: var(--v2-color-text-secondary);

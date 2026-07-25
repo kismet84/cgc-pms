@@ -604,6 +604,34 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("business cascade delete uses the exact parent binding without child edit authorization")
+    void testBusinessCascadeDeleteUsesExactBindingWithoutChildAuthorization() throws Exception {
+        SysFile file = insertFile("SUBCONTRACT", 30013L, TestUserContext.TENANT_0,
+                "measure-cascade.pdf", "application/pdf");
+
+        fileService.deleteForBusinessCascade(file.getId(), "SUBCONTRACT", 30013L);
+
+        verify(authorizer, never()).checkDeleteAccess(any(), any(), any());
+        verify(minioClient).removeObject(any(RemoveObjectArgs.class));
+        assertNull(sysFileMapper.selectById(file.getId()));
+    }
+
+    @Test
+    @DisplayName("business cascade delete rejects a mismatched parent binding")
+    void testBusinessCascadeDeleteRejectsMismatchedBinding() {
+        SysFile file = insertFile("SUBCONTRACT", 30014L, TestUserContext.TENANT_0,
+                "measure-binding.pdf", "application/pdf");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.deleteForBusinessCascade(file.getId(), "SUBCONTRACT", 30015L));
+
+        assertEquals("FILE_NOT_FOUND", ex.getCode());
+        assertNotNull(sysFileMapper.selectById(file.getId()));
+        verify(authorizer, never()).checkDeleteAccess(any(), any(), any());
+        verifyNoInteractions(minioClient);
+    }
+
+    @Test
     @DisplayName("delete rejects immutable generated documents before authorization and storage side effects")
     void testDeleteRejectsGeneratedDocument() {
         SysFile file = insertFile("PAYMENT", 30012L, TestUserContext.TENANT_0,

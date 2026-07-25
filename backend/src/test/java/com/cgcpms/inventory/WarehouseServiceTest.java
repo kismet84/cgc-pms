@@ -1,13 +1,11 @@
 package com.cgcpms.inventory;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.inventory.entity.MatStock;
 import com.cgcpms.inventory.entity.MatWarehouse;
 import com.cgcpms.inventory.mapper.MatStockMapper;
-import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.service.MatWarehouseService;
 import com.cgcpms.inventory.vo.MatWarehouseVO;
 import com.cgcpms.project.entity.PmProject;
@@ -29,13 +27,11 @@ class WarehouseServiceTest {
 
     private static final long USER_ADMIN = 1L;
     private static final long TENANT_ID = 0L;
-    private static final long PROJECT_ID = 100L;
+    private static final long PROJECT_ID = 98100100L;
+    private static final long SECOND_PROJECT_ID = 98100200L;
 
     @Autowired
     private MatWarehouseService warehouseService;
-
-    @Autowired
-    private MatWarehouseMapper warehouseMapper;
 
     @Autowired
     private MatStockMapper stockMapper;
@@ -43,13 +39,8 @@ class WarehouseServiceTest {
     @Autowired
     private PmProjectMapper projectMapper;
 
-    private Long createdWarehouseId;
-
     @BeforeEach
     void setupContext() {
-        // Clean seed data for test isolation (V42 migration seeds 2 warehouses)
-        warehouseMapper.delete(new LambdaQueryWrapper<MatWarehouse>()
-                .eq(MatWarehouse::getTenantId, TENANT_ID));
         PmProject project = new PmProject();
         project.setId(PROJECT_ID);
         project.setTenantId(TENANT_ID);
@@ -57,10 +48,18 @@ class WarehouseServiceTest {
         project.setProjectName("仓库测试项目");
         project.setStatus("ACTIVE");
         projectMapper.insertOrUpdate(project);
+        PmProject secondProject = new PmProject();
+        secondProject.setId(SECOND_PROJECT_ID);
+        secondProject.setTenantId(TENANT_ID);
+        secondProject.setProjectCode("P-WH-200");
+        secondProject.setProjectName("仓库测试项目二");
+        secondProject.setStatus("ACTIVE");
+        projectMapper.insertOrUpdate(secondProject);
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_ID)
+                .add("roleCodes", java.util.List.of("ADMIN"))
                 .build());
     }
 
@@ -94,7 +93,6 @@ class WarehouseServiceTest {
         assertEquals("仓库测试项目", vo.getProjectName());
         assertEquals(String.valueOf(TENANT_ID), vo.getTenantId());
 
-        createdWarehouseId = id;
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -113,7 +111,7 @@ class WarehouseServiceTest {
         warehouseService.create(w1);
 
         MatWarehouse w2 = new MatWarehouse();
-        w2.setProjectId(200L);
+        w2.setProjectId(SECOND_PROJECT_ID);
         w2.setWarehouseCode("WH-P200-A");
         w2.setWarehouseName("项目200仓库A");
         w2.setStatus("ENABLE");
@@ -125,8 +123,28 @@ class WarehouseServiceTest {
         assertEquals("WH-P100-A", page1.getRecords().get(0).getWarehouseCode());
 
         // Query without project filter (all tenant warehouses)
-        PageResult<MatWarehouseVO> page2 = warehouseService.getPage(1, 20, null, null, null, null);
+        PageResult<MatWarehouseVO> page2 = warehouseService.getPage(1, 20, null, "WH-P", null, null);
         assertEquals(2, page2.getTotal(), "应返回租户下所有2个仓库");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("仓库列表对无项目访问权用户 fail-close")
+    void testPageQueryFailsClosedWithoutProjectAccess() {
+        MatWarehouse warehouse = new MatWarehouse();
+        warehouse.setProjectId(PROJECT_ID);
+        warehouse.setWarehouseCode("WH-SCOPED");
+        warehouse.setWarehouseName("范围仓库");
+        warehouse.setStatus("ENABLE");
+        warehouseService.create(warehouse);
+
+        UserContext.set(Jwts.claims()
+                .add("userId", 99999L)
+                .add("username", "no-project-access")
+                .add("tenantId", TENANT_ID)
+                .build());
+
+        assertEquals(0, warehouseService.getPage(1, 20, null, null, null, null).getTotal());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -150,11 +168,11 @@ class WarehouseServiceTest {
         w2.setStatus("DISABLE");
         warehouseService.create(w2);
 
-        PageResult<MatWarehouseVO> enabled = warehouseService.getPage(1, 20, null, null, null, "ENABLE");
+        PageResult<MatWarehouseVO> enabled = warehouseService.getPage(1, 20, null, "WH-ENB", null, "ENABLE");
         assertEquals(1, enabled.getTotal(), "应只有1个启用仓库");
         assertEquals("WH-ENB", enabled.getRecords().get(0).getWarehouseCode());
 
-        PageResult<MatWarehouseVO> disabled = warehouseService.getPage(1, 20, null, null, null, "DISABLE");
+        PageResult<MatWarehouseVO> disabled = warehouseService.getPage(1, 20, null, "WH-DIS", null, "DISABLE");
         assertEquals(1, disabled.getTotal(), "应只有1个禁用仓库");
         assertEquals("WH-DIS", disabled.getRecords().get(0).getWarehouseCode());
     }

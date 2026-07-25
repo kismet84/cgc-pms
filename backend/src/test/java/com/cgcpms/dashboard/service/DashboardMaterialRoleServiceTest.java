@@ -473,12 +473,12 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
 
     @Test
     @Transactional
-    @DisplayName("8.2a Purchase view: invalid month returns data without 500")
-    void testPurchaseView_InvalidMonthDoesNotThrow() {
+    @DisplayName("8.2a Purchase view: invalid month fails closed")
+    void testPurchaseView_InvalidMonthFailsClosed() {
         SeedResult sr = seed("PUR_BAD_MONTH");
-        PurchaseManagerDashboardVO vo = dashboardService.getPurchaseManagerView(sr.projectId, "garbage");
-        assertNotNull(vo);
-        assertTrue(vo.getActiveOrderCount() >= 1, "Invalid month should be ignored");
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> dashboardService.getPurchaseManagerView(sr.projectId, "garbage"));
+        assertEquals("INVALID_DASHBOARD_MONTH", error.getCode());
     }
 
     @Test
@@ -820,6 +820,10 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         BusinessException denied = assertThrows(BusinessException.class,
                 () -> dashboardService.getPurchaseManagerView(hidden.projectId));
         assertEquals("PROJECT_ACCESS_DENIED", denied.getCode());
+        assertEquals("PROJECT_ACCESS_DENIED", assertThrows(BusinessException.class,
+                () -> dashboardService.getProductionManagerView(hidden.projectId)).getCode());
+        assertEquals("PROJECT_ACCESS_DENIED", assertThrows(BusinessException.class,
+                () -> dashboardService.getChiefEngineerView(hidden.projectId)).getCode());
 
         PurchaseManagerDashboardVO allVisible = dashboardService.getPurchaseManagerView(null);
         assertTrue(allVisible.getSupplierScores().stream()
@@ -854,11 +858,11 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
 
     @Test
     @Transactional
-    @DisplayName("8.3a Production view: invalid month returns data without 500")
-    void testProductionView_InvalidMonthDoesNotThrow() {
+    @DisplayName("8.3a Production view: invalid month fails closed")
+    void testProductionView_InvalidMonthFailsClosed() {
         SeedResult sr = seed("PROD_BAD_MONTH");
-        ProductionManagerDashboardVO vo = dashboardService.getProductionManagerView(sr.projectId, "invalid-month");
-        assertNotNull(vo);
-        assertTrue(vo.getReceiptCount() >= 1, "Invalid month should be ignored");
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> dashboardService.getProductionManagerView(sr.projectId, "invalid-month"));
+        assertEquals("INVALID_DASHBOARD_MONTH", error.getCode());
     }
 }

@@ -10,10 +10,14 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.file.service.FileService;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
 import com.cgcpms.subcontract.entity.SubTask;
@@ -29,6 +33,7 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -40,6 +45,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -59,12 +67,22 @@ public class SubMeasureService {
     private final WorkflowEngine workflowEngine;
     private final WfInstanceMapper wfInstanceMapper;
     private final SubMeasureIntegrityService integrityService;
+    private final ProjectAccessChecker projectAccessChecker;
+    private final SysFileMapper sysFileMapper;
+    private final ObjectProvider<FileService> fileServiceProvider;
 
     public IPage<SubMeasureVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                         Long partnerId, String status, String measureCode) {
         LambdaQueryWrapper<SubMeasure> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SubMeasure::getTenantId, UserContext.getCurrentTenantId());
-        if (projectId != null) wrapper.eq(SubMeasure::getProjectId, projectId);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看分包计量");
+            wrapper.eq(SubMeasure::getProjectId, projectId);
+        } else {
+            List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+            if (projectIds.isEmpty()) wrapper.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment
+            else wrapper.in(SubMeasure::getProjectId, projectIds);
+        }
         if (contractId != null) wrapper.eq(SubMeasure::getContractId, contractId);
         if (partnerId != null) wrapper.eq(SubMeasure::getPartnerId, partnerId);
         if (StringUtils.hasText(status)) wrapper.eq(SubMeasure::getStatus, status);
@@ -112,6 +130,7 @@ public class SubMeasureService {
         SubMeasure measure = subMeasureMapper.selectById(id);
         if (measure == null || !measure.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
+        projectAccessChecker.checkAccess(measure.getProjectId(), "查看分包计量");
 
         SubMeasureVO vo = toVO(measure);
 
@@ -126,21 +145,21 @@ public class SubMeasureService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(SubMeasure measure) {
-        // Validate subTaskId belongs to same project/contract/partner
+        measure.setTenantId(UserContext.getCurrentTenantId());
+        validateBusinessContext(measure, "创建分包计量");
         validateSubTaskBelongsToSameContext(measure);
 
         // Auto-generate measure code: SM-yyyyMMdd-XXX
         String prefix = "SM-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
 
-        // Auto-calculate net amount
-        calcNetAmount(measure);
-
-        // Default status
-        if (measure.getStatus() == null || measure.getStatus().isBlank()) {
-            measure.setStatus("DRAFT");
-        }
-
-        measure.setTenantId(UserContext.getCurrentTenantId());
+        // Amounts and lifecycle fields become authoritative only after server-side item saving.
+        measure.setReportedAmount(BigDecimal.ZERO.setScale(2));
+        measure.setApprovedAmount(BigDecimal.ZERO.setScale(2));
+        measure.setDeductionAmount(BigDecimal.ZERO.setScale(2));
+        measure.setNetAmount(BigDecimal.ZERO.setScale(2));
+        measure.setApprovalStatus("DRAFT");
+        measure.setCostGeneratedFlag(0);
+        measure.setStatus("DRAFT");
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             measure.setMeasureCode(nextMeasureCode(prefix, attempt));
             try {
@@ -175,21 +194,59 @@ public class SubMeasureService {
 
     @Transactional(rollbackFor = Exception.class)
     public void update(SubMeasure measure) {
-        SubMeasure existing = subMeasureMapper.selectById(measure.getId());
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+        SubMeasure existing = subMeasureMapper.selectByIdForUpdate(
+                measure.getId(), UserContext.getCurrentTenantId());
+        if (existing == null)
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
 
+        projectAccessChecker.checkAccess(existing.getProjectId(), "修改分包计量");
         if (!Set.of("DRAFT", "REJECTED").contains(existing.getApprovalStatus()))
             throw new BusinessException("MEASURE_IN_APPROVAL", "计量单审批中或已审批，不可编辑");
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
-        // Validate subTaskId belongs to same project/contract/partner
+        measure.setProjectId(measure.getProjectId() == null ? existing.getProjectId() : measure.getProjectId());
+        measure.setContractId(measure.getContractId() == null ? existing.getContractId() : measure.getContractId());
+        measure.setPartnerId(measure.getPartnerId() == null ? existing.getPartnerId() : measure.getPartnerId());
+        measure.setSubTaskId(measure.getSubTaskId() == null ? existing.getSubTaskId() : measure.getSubTaskId());
+        validateBusinessContext(measure, "修改分包计量");
+        boolean contextChanged = !Objects.equals(measure.getProjectId(), existing.getProjectId())
+                || !Objects.equals(measure.getContractId(), existing.getContractId())
+                || !Objects.equals(measure.getPartnerId(), existing.getPartnerId());
+        if (contextChanged && subMeasureItemMapper.selectCount(new LambdaQueryWrapper<SubMeasureItem>()
+                .eq(SubMeasureItem::getTenantId, existing.getTenantId())
+                .eq(SubMeasureItem::getMeasureId, existing.getId())) > 0) {
+            throw new BusinessException("SUB_MEASURE_CONTEXT_IN_USE", "计量已有明细，不可变更项目、合同或分包商");
+        }
         validateSubTaskBelongsToSameContext(measure);
-
-        calcNetAmount(measure);
-
+        measure.setTenantId(existing.getTenantId());
+        measure.setMeasureCode(existing.getMeasureCode());
+        measure.setReportedAmount(existing.getReportedAmount());
+        measure.setApprovedAmount(existing.getApprovedAmount());
+        measure.setDeductionAmount(existing.getDeductionAmount());
+        measure.setNetAmount(existing.getNetAmount());
+        measure.setApprovalStatus(existing.getApprovalStatus());
+        measure.setCostGeneratedFlag(existing.getCostGeneratedFlag());
+        measure.setStatus(existing.getStatus());
         subMeasureMapper.updateById(measure);
+    }
+
+    private void validateBusinessContext(SubMeasure measure, String action) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        projectAccessChecker.checkAccess(measure.getProjectId(), action);
+        CtContract contract = ctContractMapper.selectById(measure.getContractId());
+        String contractType = contract == null || contract.getContractType() == null
+                ? "" : contract.getContractType().trim().toUpperCase();
+        if (contract == null || !Objects.equals(contract.getTenantId(), tenantId)
+                || !Objects.equals(contract.getProjectId(), measure.getProjectId())
+                || !Set.of("SUB", "SUBCONTRACT").contains(contractType)) {
+            throw new BusinessException("SUB_MEASURE_CONTRACT_INVALID", "计量必须关联当前项目的本租户分包合同");
+        }
+        MdPartner partner = mdPartnerMapper.selectById(measure.getPartnerId());
+        if (partner == null || !Objects.equals(partner.getTenantId(), tenantId)
+                || !Objects.equals(contract.getPartyBId(), measure.getPartnerId())) {
+            throw new BusinessException("SUB_MEASURE_PARTNER_MISMATCH", "计量分包商必须等于分包合同乙方");
+        }
     }
 
     /**
@@ -224,23 +281,27 @@ public class SubMeasureService {
         SubMeasure measure = subMeasureMapper.selectByIdForUpdate(measureId, tenantId);
         if (measure == null)
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
+        projectAccessChecker.checkAccess(measure.getProjectId(), "编辑分包计量明细");
+        validateBusinessContext(measure, "编辑分包计量明细");
 
         if (!Set.of("DRAFT", "REJECTED").contains(measure.getApprovalStatus()))
             throw new BusinessException("MEASURE_IN_APPROVAL", "计量单审批中或已审批，不可编辑");
         if (measure.getCostGeneratedFlag() != null && measure.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可编辑，请走冲销");
 
-        List<SubMeasureItem> normalizedItems = items == null ? List.of() : items;
+        List<SubMeasureItem> normalizedItems = items == null ? List.of() : new ArrayList<>(items);
         if (normalizedItems.size() > 200) {
             throw new BusinessException("SUB_MEASURE_ITEMS_LIMIT", "分包计量明细不能超过200条");
         }
+        normalizedItems.sort(Comparator.comparing(SubMeasureItem::getContractItemId,
+                Comparator.nullsFirst(Comparator.naturalOrder())));
         Set<Long> contractItemIds = new HashSet<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
         for (SubMeasureItem item : normalizedItems) {
             if (item.getContractItemId() == null || !contractItemIds.add(item.getContractItemId())) {
                 throw new BusinessException("SUB_MEASURE_ITEM_DUPLICATE", "合同清单项不能为空且同一计量单内不可重复");
             }
-            CtContractItem contractItem = ctContractItemMapper.selectById(item.getContractItemId());
+            CtContractItem contractItem = ctContractItemMapper.selectByIdForUpdate(item.getContractItemId(), tenantId);
             if (contractItem == null || !tenantId.equals(contractItem.getTenantId())
                     || !java.util.Objects.equals(measure.getContractId(), contractItem.getContractId())) {
                 throw new BusinessException("SUB_MEASURE_CONTRACT_ITEM_INVALID", "合同清单项不存在、跨租户或不属于当前分包合同");
@@ -318,16 +379,34 @@ public class SubMeasureService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        SubMeasure existing = subMeasureMapper.selectById(id);
-        if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
+        Long tenantId = UserContext.getCurrentTenantId();
+        SubMeasure existing = subMeasureMapper.selectByIdForUpdate(id, tenantId);
+        if (existing == null)
             throw new BusinessException("SUB_MEASURE_NOT_FOUND", "分包计量单不存在");
 
+        projectAccessChecker.checkAccess(existing.getProjectId(), "删除分包计量");
         if (!Set.of("DRAFT", "REJECTED").contains(existing.getApprovalStatus()))
             throw new BusinessException("MEASURE_IN_APPROVAL", "计量单审批中或已审批，不可删除");
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可删除，请走冲销");
 
-        subMeasureMapper.deleteById(id);
+        List<SysFile> attachments = sysFileMapper.selectList(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getTenantId, tenantId)
+                .eq(SysFile::getBusinessType, "SUBCONTRACT")
+                .eq(SysFile::getBusinessId, id));
+        FileService fileService = fileServiceProvider.getIfAvailable();
+        for (SysFile attachment : attachments) {
+            if (fileService != null)
+                fileService.deleteForBusinessCascade(attachment.getId(), "SUBCONTRACT", id);
+            else if (sysFileMapper.deleteById(attachment.getId()) != 1)
+                throw new BusinessException("SUB_MEASURE_DELETE_FAILED", "分包计量附件清理失败");
+        }
+        subMeasureItemMapper.delete(new LambdaQueryWrapper<SubMeasureItem>()
+                .eq(SubMeasureItem::getTenantId, tenantId)
+                .eq(SubMeasureItem::getMeasureId, id));
+        if (subMeasureMapper.deleteById(id) != 1) {
+            throw new BusinessException("SUB_MEASURE_DELETE_FAILED", "分包计量删除失败");
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -345,10 +424,15 @@ public class SubMeasureService {
         integrityService.validateForSubmit(measure);
 
         // Update submission state before starting workflow; transaction rolls back if workflow creation fails.
-        subMeasureMapper.update(null, new LambdaUpdateWrapper<SubMeasure>()
+        int updated = subMeasureMapper.update(null, new LambdaUpdateWrapper<SubMeasure>()
                 .eq(SubMeasure::getId, measureId)
+                .eq(SubMeasure::getTenantId, UserContext.getCurrentTenantId())
+                .in(SubMeasure::getApprovalStatus, "DRAFT", "REJECTED")
                 .set(SubMeasure::getApprovalStatus, "APPROVING")
                 .set(SubMeasure::getStatus, "APPROVING"));
+        if (updated != 1) {
+            throw new BusinessException("SUB_MEASURE_CONCURRENT_UPDATE", "计量状态已变化，请刷新后重试");
+        }
 
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -378,12 +462,6 @@ public class SubMeasureService {
     }
 
     // ---- VO conversion helpers ----
-
-    private void calcNetAmount(SubMeasure measure) {
-        BigDecimal approved = measure.getApprovedAmount() == null ? BigDecimal.ZERO : measure.getApprovedAmount();
-        BigDecimal deduction = measure.getDeductionAmount() == null ? BigDecimal.ZERO : measure.getDeductionAmount();
-        measure.setNetAmount(approved.subtract(deduction));
-    }
 
     private SubMeasureVO toVO(SubMeasure m) {
         // Single-record variant: fetch project/contract/partner individually (for getById)

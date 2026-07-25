@@ -43,7 +43,7 @@ class SubTaskControllerTest {
 
     @Test @Order(3) @DisplayName("POST /sub-tasks -> 200 creates task")
     void testCreate() throws Exception {
-        String body = "{\"projectId\":10001,\"contractId\":30001,\"taskName\":\"测试分包任务\","
+        String body = "{\"projectId\":10001,\"taskName\":\"测试分包任务\","
                 + "\"workArea\":\"1.1 地基施工\",\"plannedStartDate\":\"2026-07-01\","
                 + "\"plannedEndDate\":\"2026-07-15\",\"actualStartDate\":\"2026-07-02\","
                 + "\"progressPercent\":35.50,\"status\":\"IN_PROGRESS\"}";

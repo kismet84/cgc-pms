@@ -40,8 +40,8 @@ public class MatStockController {
     }
 
     @GetMapping("/ledger")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:stock:list')")
-    public ApiResponse<MatStockLedgerVO> getLedger(@RequestParam Long warehouseId,
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('inventory:stock:list','inventory:transaction:list')")
+    public ApiResponse<MatStockLedgerVO> getLedger(@RequestParam(required = false) Long warehouseId,
                                                     @RequestParam Long materialId,
                                                     @RequestParam(required = false) Long projectId,
                                                     @RequestParam(required = false) String keyword,

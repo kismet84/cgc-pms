@@ -30,6 +30,11 @@ const DailyLogPage = () => import('./pages/delivery/DailyLogPage.vue')
 const QualitySafetyPage = () => import('./pages/delivery/QualitySafetyPage.vue')
 const TechnicalManagementPage = () => import('./pages/delivery/TechnicalManagementPage.vue')
 const ProjectCloseoutPage = () => import('./pages/delivery/ProjectCloseoutPage.vue')
+const SupplierSourcingPage = () => import('./pages/supply-chain/SupplierSourcingPage.vue')
+const PurchaseExecutionPage = () => import('./pages/supply-chain/PurchaseExecutionPage.vue')
+const InventoryWorkspacePage = () => import('./pages/supply-chain/InventoryWorkspacePage.vue')
+const RequisitionWorkspacePage = () => import('./pages/supply-chain/RequisitionWorkspacePage.vue')
+const SubcontractWorkspacePage = () => import('./pages/subcontract/SubcontractWorkspacePage.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -39,6 +44,7 @@ declare module 'vue-router' {
     shell?: boolean
     permission?: string
     workflowTab?: WorkflowTab
+    migration?: 'pending'
   }
 }
 
@@ -103,11 +109,34 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
                                               ? TechnicalManagementPage
                                               : tab.path === '/project-closeout'
                                                 ? ProjectCloseoutPage
-                                                : ShellPlaceholderPage,
+                                                : tab.path === '/supplier-sourcing'
+                                                  ? SupplierSourcingPage
+                                                  : [
+                                                        '/inventory/purchase-request',
+                                                        '/purchase/order',
+                                                        '/purchase/receipt',
+                                                      ].includes(tab.path)
+                                                    ? PurchaseExecutionPage
+                                                    : [
+                                                          '/inventory/warehouse',
+                                                          '/inventory/stock',
+                                                          '/inventory/transaction',
+                                                        ].includes(tab.path)
+                                                      ? InventoryWorkspacePage
+                                                      : tab.path ===
+                                                          '/inventory/material-requisition'
+                                                        ? RequisitionWorkspacePage
+                                                        : [
+                                                              '/subcontract/task',
+                                                              '/subcontract/measure',
+                                                            ].includes(tab.path)
+                                                          ? SubcontractWorkspacePage
+                                                          : ShellPlaceholderPage,
           meta: {
             shell: true,
             permission: tab.permission,
             workflowTab: approvalTab,
+            migration: tab.migration,
           },
         },
       ]
@@ -116,6 +145,24 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
 )
 
 const contextRoutes: RouteRecordRaw[] = [
+  {
+    path: '/inventory',
+    name: 'V2InventoryRedirect',
+    redirect: (to) => ({ path: '/inventory/warehouse', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'inventory:warehouse:list' },
+  },
+  {
+    path: '/purchase',
+    name: 'V2PurchaseRedirect',
+    redirect: (to) => ({ path: '/purchase/order', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'purchase:order:query' },
+  },
+  {
+    path: '/subcontract',
+    name: 'V2SubcontractRedirect',
+    redirect: (to) => ({ path: '/subcontract/task', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'subtask:query' },
+  },
   {
     path: '/project',
     name: 'V2ProjectRedirect',
@@ -240,7 +287,7 @@ const contextRoutes: RouteRecordRaw[] = [
     path: '/settlement/:id',
     name: 'V2ShellSettlementDetail',
     component: ShellPlaceholderPage,
-    meta: { shell: true, permission: 'settlement:query' },
+    meta: { shell: true, permission: 'settlement:query', migration: 'pending' },
   },
 ]
 

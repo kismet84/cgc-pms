@@ -104,6 +104,17 @@ describe('M3 project request baseline', () => {
     }
   })
 
+  it('keeps delivery filters business-labelled and hides raw identifier prompts', () => {
+    const dailyLog = readFileSync(resolve('src/pages/delivery/DailyLogPage.vue'), 'utf-8')
+    const schedule = readFileSync(resolve('src/pages/delivery/SchedulePage.vue'), 'utf-8')
+
+    for (const source of [dailyLog, schedule])
+      expect(source).not.toMatch(/(?:label|placeholder)="[^"]*(?:\bID\b|\w+Id\b)[^"]*"/)
+    expect(dailyLog).toContain(':options="projectOptions"')
+    expect(schedule).toContain(':options="currentUserOptions"')
+    expect(schedule).not.toContain('最近预警ID')
+  })
+
   it('encodes non-empty project filters and passes the abort signal', async () => {
     const controller = new AbortController()
     await loadProjectPage(

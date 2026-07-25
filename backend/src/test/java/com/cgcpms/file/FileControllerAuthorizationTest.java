@@ -34,6 +34,16 @@ class FileControllerAuthorizationTest {
         assertAuthorizationContains("delete", new Class<?>[]{Long.class}, "variation:owner:review");
     }
 
+    @Test
+    void subcontractMeasureAuthoritiesCanEnterOnlyTheirFileActions() throws Exception {
+        Class<?>[] uploadParameters = {MultipartFile.class, String.class, Long.class, String.class};
+        assertAuthorizationContains("upload", uploadParameters, "subcontract:measure:edit");
+        assertAuthorizationContains("listByBusiness", new Class<?>[]{String.class, Long.class},
+                "subcontract:measure:query");
+        assertAuthorizationContains("getUrl", new Class<?>[]{Long.class}, "subcontract:measure:query");
+        assertAuthorizationContains("delete", new Class<?>[]{Long.class}, "subcontract:measure:edit");
+    }
+
     private void assertAuthorizationContains(String method, Class<?>[] parameterTypes, String authority)
             throws Exception {
         PreAuthorize annotation = FileController.class.getMethod(method, parameterTypes)

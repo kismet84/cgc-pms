@@ -1,5 +1,6 @@
 import type {
   AlertRecord,
+  BusinessManagerDashboardVO,
   CostBreakdownVO,
   CostManagerDashboardVO,
   FinanceDashboardVO,
@@ -48,6 +49,49 @@ const pmData: ProjectManagerDashboardVO = {
   laggingProjects: [],
   pendingApprovals: [],
   expiringContracts: [],
+}
+
+const businessData: BusinessManagerDashboardVO = {
+  projectId: '1',
+  projectName: '项目一',
+  totalContractAmount: '1000000.00',
+  contractChangeAmount: '120000.00',
+  varOrderAmount: '80000.00',
+  subMeasureAmount: '650000.00',
+  paidRatio: '65.00',
+  settlementProgress: '1/3',
+  recentChanges: [
+    {
+      contractId: 'C-1',
+      contractCode: 'CON-001',
+      contractName: '商务合同',
+      contractType: 'MAIN',
+      contractAmount: '1000000.00',
+      currentAmount: '1120000.00',
+      paidAmount: '728000.00',
+      endDate: '2027-01-01',
+      projectId: '1',
+      projectName: '项目一',
+      contractStatus: 'ACTIVE',
+    },
+  ],
+  settlementItems: [
+    {
+      projectId: '2',
+      projectName: '结算项目',
+      projectCode: 'PJ-002',
+      status: 'SETTLING',
+      targetCost: '0.00',
+      dynamicCost: '0.00',
+      contractIncome: '0.00',
+      expectedProfit: '0.00',
+      costDeviation: '0.00',
+      paidAmount: '0.00',
+      contractAmount: '0.00',
+      pendingTaskCount: 0,
+      riskCount: 0,
+    },
+  ],
 }
 
 const costData: CostManagerDashboardVO = {
@@ -236,6 +280,29 @@ afterEach(() => {
 })
 
 describe('M2 dashboard page', () => {
+  it('renders business metrics and settlement activity without converting settlement progress to a percentage', async () => {
+    vi.mocked(loadDashboard).mockResolvedValue(businessData)
+    const { wrapper } = await mountDashboard(['dashboard:business-manager:view'])
+
+    expect(loadDashboard).toHaveBeenCalledWith(
+      'bm',
+      { projectId: '1', period: '2026-07' },
+      expect.any(Object),
+      expect.any(AbortSignal),
+    )
+    expect(wrapper.text()).toContain('分包计量')
+    expect(wrapper.text()).toContain('65.00 万元')
+    expect(wrapper.text()).toContain('支付比例')
+    expect(wrapper.text()).toContain('65.00%')
+    expect(wrapper.text()).toContain('结算进度')
+    expect(wrapper.text()).toContain('1/3')
+    expect(wrapper.text()).not.toContain('1/3%')
+    expect(wrapper.get('.dashboard-activity-list').text()).toContain('商务合同')
+    expect(wrapper.get('.dashboard-activity-list').text()).toContain('结算项目')
+    expect(wrapper.get('.dashboard-activity-list').text()).toContain('PJ-002')
+    expect(wrapper.get('.dashboard-activity-list').text()).toContain('SETTLING')
+  })
+
   it('requests and renders only the permitted role with real service data', async () => {
     vi.mocked(loadDashboard).mockResolvedValue(pmData)
     const { wrapper } = await mountDashboard(['dashboard:project-manager:view'])
@@ -254,6 +321,9 @@ describe('M2 dashboard page', () => {
     expect(wrapper.get('.health-score').attributes('aria-label')).toContain('分数越高越健康')
     expect(wrapper.text()).toContain('经营动态')
     expect(wrapper.text()).not.toContain('当前角色暂无趋势数据')
+    expect(wrapper.text()).toContain(
+      '事件型数据按所选报告期的对应时间字段筛选；实时指标和记录状态取当前值，不构成历史快照。',
+    )
     expect(wrapper.text()).toContain('预警列表')
     expect(wrapper.get('.command-panel__title .v2-button--secondary').text()).toBe('查看最高风险')
     expect(wrapper.find('.highest-risk .v2-button').exists()).toBe(false)
@@ -574,8 +644,11 @@ describe('M2 dashboard page', () => {
     expect(wrapper.text()).toContain('100.00 万元')
     expect(wrapper.findAll('.quick-actions a')).toHaveLength(7)
     expect(wrapper.findAll('.health-metric')[3]?.classes()).toContain('is-danger')
-    expect(wrapper.text()).toContain('成本分解加载失败')
-    expect(wrapper.text()).toContain('主驾驶舱数据未受影响')
+    expect(toastItems.at(-1)).toMatchObject({
+      type: 'warn',
+      title: '成本分解读取失败',
+      message: '主驾驶舱数据未受影响',
+    })
     expect(wrapper.get('.test-trend-chart').text()).toContain('· 7')
 
     await wrapper.get('button[aria-pressed="false"]').trigger('click')
@@ -595,7 +668,14 @@ describe('M2 dashboard page', () => {
     ])
     const breakdownPanel = wrapper.get('#cost-breakdown')
 
-    expect(loadCostBreakdown).toHaveBeenCalledWith('1', expect.any(Object), expect.any(AbortSignal))
+    expect(loadCostBreakdown).toHaveBeenCalledWith(
+      '1',
+      '2026-07',
+      expect.any(Object),
+      expect.any(AbortSignal),
+    )
+    expect(wrapper.text()).toContain('近12个月')
+    expect(wrapper.text()).not.toContain('当年累计')
     expect(breakdownPanel.findAll('tbody tr')).toHaveLength(1)
     expect(breakdownPanel.text()).toContain('合同履约成本')
     expect(breakdownPanel.text()).not.toContain('招投标及前期费用')
@@ -607,6 +687,21 @@ describe('M2 dashboard page', () => {
 
     await breakdownPanel.get('button[aria-expanded="true"]').trigger('click')
     expect(breakdownPanel.findAll('tbody tr')).toHaveLength(1)
+
+    const workspace = useWorkspaceStore()
+    vi.mocked(loadCostBreakdown).mockClear()
+    workspace.setReportPeriods([
+      { value: '2026-06', label: '2026年6月' },
+      { value: '2026-07', label: '2026年7月' },
+    ])
+    workspace.selectReportPeriod('2026-06')
+    await flushPromises()
+    expect(loadCostBreakdown).toHaveBeenCalledWith(
+      '1',
+      '2026-06',
+      expect.any(Object),
+      expect.any(AbortSignal),
+    )
   })
 
   it('renders finance payment trend, closed-loop indicators and pending work', async () => {

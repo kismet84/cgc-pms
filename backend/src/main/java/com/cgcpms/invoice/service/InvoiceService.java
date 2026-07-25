@@ -67,6 +67,9 @@ public class InvoiceService {
                                      String invoiceNo, String verifyStatus) {
         LambdaQueryWrapper<PayInvoice> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PayInvoice::getTenantId, UserContext.getCurrentTenantId());
+        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+        if (projectIds.isEmpty()) wrapper.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment
+        else wrapper.in(PayInvoice::getProjectId, projectIds);
         if (payRecordId != null) wrapper.eq(PayInvoice::getPayRecordId, payRecordId);
         if (payApplicationId != null) wrapper.eq(PayInvoice::getPayApplicationId, payApplicationId);
         if (StringUtils.hasText(invoiceNo)) wrapper.like(PayInvoice::getInvoiceNo, invoiceNo);

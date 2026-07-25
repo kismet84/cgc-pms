@@ -6,6 +6,8 @@ import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.supplier.dto.SupplierSourcingModels.*;
 import com.cgcpms.supplier.entity.*;
 import com.cgcpms.supplier.service.SupplierSourcingService;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +45,7 @@ class SupplierSourcingClosedLoopIntegrationTest {
     @Autowired SupplierSourcingService service;
     @Autowired BusinessObjectAuthorizer fileAuthorizer;
     @Autowired JdbcTemplate jdbc;
+    @Autowired ObjectMapper objectMapper;
 
     @BeforeEach
     void setup() {
@@ -169,6 +172,51 @@ class SupplierSourcingClosedLoopIntegrationTest {
         service.confirmSupplierReturn(row.getId());
         assertEquals("SP_RETURN_IMMUTABLE", assertThrows(BusinessException.class,
                 () -> service.confirmSupplierReturn(row.getId())).getCode());
+    }
+
+    @Test
+    void serializesSupplierDecimalsAsContractStrings() throws Exception {
+        SupplierQuote quote = new SupplierQuote();
+        quote.setTotalAmount(new BigDecimal("10000.50"));
+        quote.setTaxRate(new BigDecimal("13.00"));
+        BidEvaluation evaluation = new BidEvaluation();
+        evaluation.setCommercialScore(new BigDecimal("90.10"));
+        evaluation.setTechnicalScore(new BigDecimal("92.20"));
+        evaluation.setDeliveryScore(new BigDecimal("89.30"));
+        evaluation.setQualityScore(new BigDecimal("93.40"));
+        evaluation.setTotalScore(new BigDecimal("91.25"));
+        SupplierPerformanceEvaluation performance = new SupplierPerformanceEvaluation();
+        performance.setDeliveryScore(new BigDecimal("80.10"));
+        performance.setQualityScore(new BigDecimal("82.20"));
+        performance.setServiceScore(new BigDecimal("84.30"));
+        performance.setCommercialScore(new BigDecimal("88.40"));
+        performance.setTotalScore(new BigDecimal("83.75"));
+        performance.setQualitySafetyAverage(new BigDecimal("86.50"));
+        SupplierReturn supplierReturn = new SupplierReturn();
+        supplierReturn.setReturnQuantity(new BigDecimal("2.500"));
+        supplierReturn.setReturnAmount(new BigDecimal("2000.00"));
+
+        assertTextDecimal(quote, "totalAmount", "10000.50");
+        assertTextDecimal(quote, "taxRate", "13.00");
+        assertTextDecimal(evaluation, "commercialScore", "90.10");
+        assertTextDecimal(evaluation, "technicalScore", "92.20");
+        assertTextDecimal(evaluation, "deliveryScore", "89.30");
+        assertTextDecimal(evaluation, "qualityScore", "93.40");
+        assertTextDecimal(evaluation, "totalScore", "91.25");
+        assertTextDecimal(performance, "deliveryScore", "80.10");
+        assertTextDecimal(performance, "qualityScore", "82.20");
+        assertTextDecimal(performance, "serviceScore", "84.30");
+        assertTextDecimal(performance, "commercialScore", "88.40");
+        assertTextDecimal(performance, "totalScore", "83.75");
+        assertTextDecimal(performance, "qualitySafetyAverage", "86.50");
+        assertTextDecimal(supplierReturn, "returnQuantity", "2.500");
+        assertTextDecimal(supplierReturn, "returnAmount", "2000.00");
+    }
+
+    private void assertTextDecimal(Object value, String field, String expected) throws Exception {
+        JsonNode node = objectMapper.readTree(objectMapper.writeValueAsString(value)).get(field);
+        assertTrue(node.isTextual());
+        assertEquals(expected, node.textValue());
     }
 
     private SupplierQuote quote(Long eventId, Long partnerId, String code, String amount) {

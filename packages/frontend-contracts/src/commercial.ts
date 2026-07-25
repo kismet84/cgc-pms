@@ -299,6 +299,7 @@ export type VariationTrace = Record<string, unknown>;
 export interface BidCostRecord {
   id: string;
   projectId?: string | null;
+  bidCode: string;
   bidProjectName: string;
   bidStatus: BidStatus;
   createdAt?: string | null;
@@ -401,6 +402,7 @@ export interface CostLedgerRecord {
   costType: string;
   sourceType: string;
   sourceId?: string | null;
+  sourceCode?: string | null;
   costDate?: string | null;
   costStatus: string;
   remark?: string | null;
@@ -523,6 +525,7 @@ export interface CostControlOverview extends Record<string, unknown> {
 export interface ProjectBudgetRecord {
   id: string;
   projectId: string;
+  budgetCode: string;
   versionNo: string;
   budgetName: string;
   totalAmount: DecimalString;

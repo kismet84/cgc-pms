@@ -68,6 +68,7 @@ const variation = {
 const bid = {
   id: '71',
   tenantId: '1',
+  bidCode: 'BID-071',
   bidProjectName: '市民中心投标',
   bidStatus: 'BIDDING',
   projectId: null,
@@ -193,7 +194,7 @@ test.describe('M4 variation and bid routes', () => {
 
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/v2/bid-cost')
-    await page.getByRole('button', { name: '预览' }).first().click()
+    await page.getByRole('button', { name: 'BID-071' }).click()
     const detailDialog = page.getByRole('dialog', { name: '投标成本预览' })
     const glassButton = detailDialog.locator('.v2-glass-button').first()
     await expect(detailDialog).toHaveClass(/v2-detail-dialog/)

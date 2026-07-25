@@ -105,7 +105,8 @@ public class PmProjectService {
     public List<ProjectContextOptionVO> getContextOptions() {
         return projectAccessChecker.accessibleProjects().stream()
                 .map(project -> new ProjectContextOptionVO(
-                        project.getId().toString(), project.getProjectName(), project.getStatus()))
+                        project.getId().toString(), project.getProjectCode(),
+                        project.getProjectName(), project.getStatus()))
                 .toList();
     }
 

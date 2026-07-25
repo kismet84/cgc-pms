@@ -13,6 +13,7 @@ import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.budget.vo.BudgetAvailabilityVO;
 import com.cgcpms.budget.vo.ProjectBudgetVO;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
@@ -43,6 +44,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ProjectBudgetService {
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
+
     private final ProjectBudgetMapper budgetMapper;
     private final ProjectBudgetLineMapper lineMapper;
     private final PmProjectMapper projectMapper;
@@ -50,6 +53,7 @@ public class ProjectBudgetService {
     private final ProjectAccessChecker projectAccessChecker;
     private final WorkflowEngine workflowEngine;
     private final WfInstanceMapper wfInstanceMapper;
+    private final CodeGenerationService codeGenerationService;
 
     public IPage<ProjectBudgetVO> getPage(long pageNo, long pageSize, Long projectId, String status,
                                           LocalDate startDate, LocalDate endDate) {
@@ -100,12 +104,20 @@ public class ProjectBudgetService {
         budget.setActiveFlag(0);
         budget.setActiveToken(null);
         budget.setVersion(0);
-        try {
-            budgetMapper.insert(budget);
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException("BUDGET_VERSION_DUPLICATE", "该项目预算版本号已存在");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            budget.setId(null);
+            budget.setBudgetCode(codeGenerationService.nextCode(
+                    budgetMapper, ProjectBudget::getBudgetCode, "BUD-", tenantId, true, attempt));
+            try {
+                budgetMapper.insert(budget);
+                return budget.getId();
+            } catch (DuplicateKeyException ignored) {
+                if (budgetVersionExists(tenantId, project.getId(), budget.getVersionNo())) {
+                    throw new BusinessException("BUDGET_VERSION_DUPLICATE", "该项目预算版本号已存在");
+                }
+            }
         }
-        return budget.getId();
+        throw new BusinessException("BUDGET_CODE_CONFLICT", "项目预算编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -320,6 +332,7 @@ public class ProjectBudgetService {
         ProjectBudgetVO vo = new ProjectBudgetVO();
         vo.setId(String.valueOf(budget.getId()));
         vo.setProjectId(String.valueOf(budget.getProjectId()));
+        vo.setBudgetCode(budget.getBudgetCode());
         vo.setVersionNo(budget.getVersionNo());
         vo.setBudgetName(budget.getBudgetName());
         vo.setTotalAmount(money(budget.getTotalAmount()).toPlainString());
@@ -339,6 +352,13 @@ public class ProjectBudgetService {
             vo.setLines(lines.stream().map(line -> toLineVO(line, names.get(line.getCostSubjectId()))).toList());
         }
         return vo;
+    }
+
+    private boolean budgetVersionExists(Long tenantId, Long projectId, String versionNo) {
+        return budgetMapper.selectCount(new LambdaQueryWrapper<ProjectBudget>()
+                .eq(ProjectBudget::getTenantId, tenantId)
+                .eq(ProjectBudget::getProjectId, projectId)
+                .eq(ProjectBudget::getVersionNo, versionNo)) > 0;
     }
 
     private ProjectBudgetVO.BudgetLineVO toLineVO(ProjectBudgetLine line, String subjectName) {

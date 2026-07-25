@@ -14,6 +14,7 @@ defineEmits<{ retry: [] }>()
       code="500"
       kind="error"
       live="assertive"
+      :heading-level="1"
       title="页面暂时无法显示"
       description="界面运行时发生异常。可重试当前页面，或返回安全入口。"
     >

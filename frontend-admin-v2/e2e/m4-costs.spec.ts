@@ -29,6 +29,7 @@ const ledger = {
   id: '9007199254740993',
   projectId: 'P1',
   projectName: '项目一',
+  sourceCode: 'MR-001',
   costSubjectName: '材料费',
   amount: '9007199254740993.12',
   taxAmount: '0',
@@ -199,7 +200,7 @@ test.describe('M4 costs routes', () => {
         axe.violations.filter((v) => ['serious', 'critical'].includes(v.impact ?? '')),
       ).toEqual([])
     }
-    await page.getByRole('button', { name: '详情' }).click()
+    await page.getByRole('button', { name: 'MR-001' }).click()
     const detailDialog = page.getByRole('dialog')
     await expect(detailDialog).toHaveClass(/v2-detail-dialog/)
     await expect(detailDialog.locator('.v2-detail-dialog__facts')).toHaveCSS('font-size', '12px')
@@ -233,7 +234,7 @@ test.describe('M4 costs routes', () => {
       new URL(url).pathname.endsWith('/cost-summary/P1'),
     ).length
     await page.getByRole('button', { name: '刷新汇总' }).dblclick()
-    await expect(page.locator('#shell-main-content').getByText('服务异常')).toBeVisible()
+    await expect(page.getByText('服务异常', { exact: true }).first()).toBeVisible()
     expect(
       requests.filter((url) => new URL(url).pathname.endsWith('/cost-summary/P1')).length,
     ).toBeGreaterThan(readsBefore)

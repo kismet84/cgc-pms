@@ -142,7 +142,9 @@ export function dashboardMetrics(
         { label: '合同总额', value: formatAmount(item.totalContractAmount) },
         { label: '合同变更', value: formatAmount(item.contractChangeAmount) },
         { label: '签证金额', value: formatAmount(item.varOrderAmount) },
-        { label: '结算进度', value: formatRatio(item.settlementProgress) },
+        { label: '分包计量', value: formatAmount(item.subMeasureAmount) },
+        { label: '支付比例', value: formatRatio(item.paidRatio) },
+        { label: '结算进度', value: item.settlementProgress?.trim() || '—' },
       ]
     }
     case 'cost': {
@@ -269,7 +271,13 @@ export function dashboardHealth(
     }
     case 'bm': {
       const item = data as DashboardDataByRole['bm']
-      return deriveDashboardHealth(item.recentChanges.length, 0, item.settlementItems.length)
+      const atRiskContracts = item.recentChanges.filter((contract) =>
+        ['high', 'medium'].includes(contractRiskLevel(contract.endDate)),
+      ).length
+      const pendingSettlements = (item.settlementItems ?? []).filter(
+        (project) => !['FINALIZED', 'COMPLETED', 'CLOSED'].includes(project.status?.toUpperCase()),
+      ).length
+      return deriveDashboardHealth(atRiskContracts, 0, pendingSettlements)
     }
   }
 }
@@ -462,13 +470,21 @@ export function dashboardActivityItems(
     }
     case 'bm': {
       const item = data as DashboardDataByRole['bm']
-      return item.recentChanges.map((contract) => ({
-        id: contract.contractId,
-        title: contract.contractName,
-        meta: [contract.projectName, contract.contractCode].filter(Boolean).join(' · '),
-        value: formatAmount(contract.currentAmount),
-        status: contract.contractStatus,
-      }))
+      return [
+        ...item.recentChanges.map((contract) => ({
+          id: contract.contractId,
+          title: contract.contractName,
+          meta: [contract.projectName, contract.contractCode].filter(Boolean).join(' · '),
+          value: formatAmount(contract.currentAmount),
+          status: contract.contractStatus,
+        })),
+        ...(item.settlementItems ?? []).map((project, index) => ({
+          id: `settlement-${project.projectId}-${index}`,
+          title: project.projectName,
+          meta: project.projectCode,
+          status: project.status,
+        })),
+      ]
     }
     case 'purchase': {
       const item = data as DashboardDataByRole['purchase']

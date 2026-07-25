@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CostControlPage from '@/pages/commercial/CostControlPage.vue'
 import CostLedgerPage from '@/pages/commercial/CostLedgerPage.vue'
 import CostSummaryPage from '@/pages/commercial/CostSummaryPage.vue'
+import { dismissToast, toastItems } from '@/components/toast'
 import * as commercial from '@/services/commercial'
 import * as projects from '@/services/projects'
 import { useSessionStore } from '@/stores/session'
@@ -44,6 +45,7 @@ const ledger = {
   amountWithoutTax: '9007199254740993.12',
   costType: 'DIRECT',
   sourceType: 'MAT_RECEIPT',
+  sourceCode: 'MR-20260720-001',
   costStatus: 'CONFIRMED',
 }
 const ledgerPage: CostLedgerPage = { records: [ledger], total: 1, pageNo: 1, pageSize: 20 }
@@ -132,6 +134,7 @@ function button(wrapper: Awaited<ReturnType<typeof mountPage>>['wrapper'], label
 }
 
 beforeEach(() => {
+  toastItems.slice().forEach((toast) => dismissToast(toast.id))
   vi.mocked(commercial.loadCostSubjectOptions)
     .mockReset()
     .mockResolvedValue([{ id: 'S1', subjectCode: '6001', subjectName: '材料费', status: 'ACTIVE' }])
@@ -191,13 +194,22 @@ describe('M4 costs pages', () => {
     expect(pagination.text()).toContain('共 1 条')
     expect(pagination.text()).toContain('第 1 页')
     expect(pagination.text()).not.toContain('/ 1')
+    const headingCard = wrapper.get('.v2-card--page-heading')
+    expect(headingCard.find('.v2-card__body').exists()).toBe(false)
+    expect(headingCard.get('.v2-card__header .filters').exists()).toBe(true)
+    expect(
+      headingCard
+        .findAll('button')
+        .find((item) => item.text().includes('查询'))
+        ?.classes(),
+    ).toContain('v2-button--small')
   })
 
   it('keeps ledger and cost-control dialogs business-labelled', async () => {
     const ledgerView = await mountPage(CostLedgerPage, '/cost/ledger?projectId=P1', [
       'cost:ledger:query',
     ])
-    await button(ledgerView.wrapper, '详情')!.trigger('click')
+    await button(ledgerView.wrapper, 'MR-20260720-001')!.trigger('click')
     await flushPromises()
     expect(ledgerView.wrapper.text()).toContain('已确认')
     expect(ledgerView.wrapper.text()).not.toContain('CONFIRMED')
@@ -237,16 +249,16 @@ describe('M4 costs pages', () => {
     const first = await mountPage(CostLedgerPage, '/cost/ledger?projectId=P1', [
       'cost:ledger:query',
     ])
-    expect(first.wrapper.text()).toContain('台账服务异常')
-    expect(first.wrapper.text()).toContain('暂无成本台账')
+    expect(toastItems.some((toast) => toast.message.includes('台账服务异常'))).toBe(true)
+    expect(first.wrapper.text()).not.toContain('暂无成本台账')
     vi.mocked(commercial.loadCostLedgerPage).mockResolvedValueOnce(ledgerPage)
     vi.mocked(commercial.loadCostLedger).mockRejectedValueOnce(apiError('台账记录不存在', 404))
     const second = await mountPage(CostLedgerPage, '/cost/ledger?projectId=P1', [
       'cost:ledger:query',
     ])
-    await button(second.wrapper, '详情')!.trigger('click')
+    await button(second.wrapper, 'MR-20260720-001')!.trigger('click')
     await flushPromises()
-    expect(second.wrapper.text()).toContain('台账记录不存在')
+    expect(toastItems.some((toast) => toast.message.includes('台账记录不存在'))).toBe(true)
     expect(commercial.refreshCostSummary).not.toHaveBeenCalled()
   })
 
@@ -255,15 +267,15 @@ describe('M4 costs pages', () => {
     const summaryPage = await mountPage(CostSummaryPage, '/cost/summary?projectId=P1', [
       'cost:summary:view',
     ])
-    expect(summaryPage.wrapper.text()).toContain('汇总服务异常')
-    expect(summaryPage.wrapper.text()).toContain('暂无成本汇总')
+    expect(toastItems.some((toast) => toast.message.includes('汇总服务异常'))).toBe(true)
+    expect(summaryPage.wrapper.text()).not.toContain('暂无成本汇总')
 
     vi.mocked(commercial.loadCostControl).mockRejectedValueOnce(apiError('控制服务异常', 500))
     const controlPage = await mountPage(CostControlPage, '/cost/control?projectId=P1', [
       'cost:control:query',
     ])
-    expect(controlPage.wrapper.text()).toContain('控制服务异常')
-    expect(controlPage.wrapper.text()).toContain('暂无动态利润数据')
+    expect(toastItems.some((toast) => toast.message.includes('控制服务异常'))).toBe(true)
+    expect(controlPage.wrapper.text()).not.toContain('暂无动态利润数据')
   })
 
   it('aborts ledger requests and ignores stale response after project and period switch', async () => {
@@ -308,7 +320,7 @@ describe('M4 costs pages', () => {
     await button(wrapper, '刷新汇总')!.trigger('click')
     await flushPromises()
     expect(commercial.loadCostSummary).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('汇总版本冲突')
+    expect(toastItems.some((toast) => toast.message.includes('汇总版本冲突'))).toBe(true)
   })
 
   it('aborts summary loading and ignores a stale period response', async () => {
@@ -353,12 +365,12 @@ describe('M4 costs pages', () => {
     await button(wrapper, '确认预测')!.trigger('click')
     await flushPromises()
     expect(commercial.confirmCostForecast).toHaveBeenCalledWith('F1', '7')
-    expect(wrapper.text()).toContain('预测版本冲突')
+    expect(toastItems.some((toast) => toast.message.includes('预测版本冲突'))).toBe(true)
     await button(wrapper, '提交')!.trigger('click')
     await flushPromises()
     expect(commercial.submitCostCorrective).toHaveBeenCalledWith('A1', '11')
     expect(commercial.loadCostControl).toHaveBeenCalledTimes(3)
-    expect(wrapper.text()).toContain('纠偏状态已变化')
+    expect(toastItems.some((toast) => toast.message.includes('纠偏状态已变化'))).toBe(true)
   })
 
   it('aborts control loading and ignores stale project response', async () => {

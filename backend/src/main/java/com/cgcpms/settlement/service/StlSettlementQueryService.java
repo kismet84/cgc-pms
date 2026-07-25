@@ -22,6 +22,7 @@ import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.settlement.constant.SettlementStatusConstants;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.StlSettlementItem;
@@ -86,6 +87,7 @@ public class StlSettlementQueryService {
     private final WfRecordMapper wfRecordMapper;
     private final StlSettlementAssembler assembler;
     private final VarOrderService varOrderService;
+    private final ProjectAccessChecker projectAccessChecker;
 
     // ================================================================
     // Page / KPI / Detail
@@ -97,7 +99,7 @@ public class StlSettlementQueryService {
         Long tenantId = UserContext.getCurrentTenantId();
         LambdaQueryWrapper<StlSettlement> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(StlSettlement::getTenantId, tenantId);
-        if (projectId != null) wrapper.eq(StlSettlement::getProjectId, projectId);
+        applyProjectScope(wrapper, projectId);
         if (contractId != null) wrapper.eq(StlSettlement::getContractId, contractId);
         if (partnerId != null) wrapper.eq(StlSettlement::getPartnerId, partnerId);
         if (StringUtils.hasText(settlementCode)) wrapper.like(StlSettlement::getSettlementCode, settlementCode);
@@ -116,7 +118,7 @@ public class StlSettlementQueryService {
         Long tenantId = UserContext.getCurrentTenantId();
         LambdaQueryWrapper<StlSettlement> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(StlSettlement::getTenantId, tenantId);
-        if (projectId != null) wrapper.eq(StlSettlement::getProjectId, projectId);
+        applyProjectScope(wrapper, projectId);
         if (contractId != null) wrapper.eq(StlSettlement::getContractId, contractId);
         if (partnerId != null) wrapper.eq(StlSettlement::getPartnerId, partnerId);
         if (StringUtils.hasText(settlementCode)) wrapper.like(StlSettlement::getSettlementCode, settlementCode);
@@ -158,10 +160,7 @@ public class StlSettlementQueryService {
 
     public StlSettlementVO getById(Long id) {
         Long tenantId = UserContext.getCurrentTenantId();
-        StlSettlement settlement = stlSettlementMapper.selectById(id);
-        if (settlement == null || !Objects.equals(settlement.getTenantId(), tenantId)) {
-            throw new BusinessException("STL_SETTLEMENT_NOT_FOUND", "结算单不存在");
-        }
+        StlSettlement settlement = validateAndGetSettlement(id);
 
         StlSettlementVO vo = assembler.toVO(settlement, resolveNameMaps(List.of(settlement)));
 
@@ -173,6 +172,17 @@ public class StlSettlementQueryService {
         vo.setItems(items.stream().map(assembler::toItemVO).collect(Collectors.toList()));
 
         return vo;
+    }
+
+    private void applyProjectScope(LambdaQueryWrapper<StlSettlement> wrapper, Long projectId) {
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看结算单");
+            wrapper.eq(StlSettlement::getProjectId, projectId);
+            return;
+        }
+        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+        if (projectIds.isEmpty()) wrapper.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment
+        else wrapper.in(StlSettlement::getProjectId, projectIds);
     }
 
     // ================================================================
@@ -189,13 +199,14 @@ public class StlSettlementQueryService {
         if (contract == null || !Objects.equals(contract.getTenantId(), tenantId)) {
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
         }
+        projectAccessChecker.checkAccess(contract.getProjectId(), "查看结算试算");
 
         SettlementAmountSnapshot snapshot = SettlementAmountPolicy.calculate(
                 contract.getCurrentAmount(),
-                sumVarOrderConfirmed(tenantId, contractId),
-                sumSubMeasureApproved(tenantId, contractId),
+                sumVarOrderConfirmed(tenantId, contract.getProjectId(), contractId),
+                sumSubMeasureApproved(tenantId, contract.getProjectId(), contractId),
                 BigDecimal.ZERO,
-                sumPaidAmount(tenantId, contractId));
+                sumPaidAmount(tenantId, contract.getProjectId(), contractId));
 
         StlSettlementVO vo = new StlSettlementVO();
         vo.setContractAmount(snapshot.effectiveContractAmount().toPlainString());
@@ -219,11 +230,12 @@ public class StlSettlementQueryService {
         Long tenantId = UserContext.getCurrentTenantId();
         long safePageNo = Math.max(1, pageNo);
         long safePageSize = Math.min(100, Math.max(1, pageSize));
+        LambdaQueryWrapper<StlSettlement> wrapper = new LambdaQueryWrapper<StlSettlement>()
+                .eq(StlSettlement::getTenantId, tenantId);
+        applyProjectScope(wrapper, null);
+        wrapper.orderByAsc(StlSettlement::getCreatedAt);
         Page<StlSettlement> page = stlSettlementMapper.selectPage(
-                new Page<>(safePageNo, safePageSize),
-                new LambdaQueryWrapper<StlSettlement>()
-                        .eq(StlSettlement::getTenantId, tenantId)
-                        .orderByAsc(StlSettlement::getCreatedAt));
+                new Page<>(safePageNo, safePageSize), wrapper);
         return page.convert(settlement -> toAmountBaseline(settlement, tenantId));
     }
 
@@ -245,13 +257,17 @@ public class StlSettlementQueryService {
             vo.setRecommendedAction("MISSING_CONTRACT");
             return vo;
         }
+        if (!Objects.equals(contract.getProjectId(), settlement.getProjectId())) {
+            throw new BusinessException("STL_SETTLEMENT_CONTRACT_SCOPE_INVALID",
+                    "结算单项目与合同项目不一致");
+        }
 
         SettlementAmountSnapshot recalculated = SettlementAmountPolicy.calculate(
                 contract.getCurrentAmount(),
-                sumVarOrderConfirmed(tenantId, contract.getId()),
-                sumSubMeasureApproved(tenantId, contract.getId()),
+                sumVarOrderConfirmed(tenantId, settlement.getProjectId(), contract.getId()),
+                sumSubMeasureApproved(tenantId, settlement.getProjectId(), contract.getId()),
                 settlement.getDeductionAmount(),
-                sumPaidAmount(tenantId, contract.getId()));
+                sumPaidAmount(tenantId, settlement.getProjectId(), contract.getId()));
 
         vo.setStoredContractAmount(plain(settlement.getContractAmount()));
         vo.setCurrentEffectiveContractAmount(recalculated.effectiveContractAmount().toPlainString());
@@ -298,21 +314,23 @@ public class StlSettlementQueryService {
         return SettlementAmountPolicy.money(value).toPlainString();
     }
 
+    private static String plainNullable(BigDecimal value) {
+        return value == null ? null : value.toPlainString();
+    }
+
     // ================================================================
     // Source data query
     // ================================================================
 
     public SettlementSourcesVO getSources(Long settlementId) {
         Long tenantId = UserContext.getCurrentTenantId();
-        StlSettlement settlement = stlSettlementMapper.selectById(settlementId);
-        if (settlement == null || !Objects.equals(settlement.getTenantId(), tenantId)) {
-            throw new BusinessException("STL_SETTLEMENT_NOT_FOUND", "结算单不存在");
-        }
+        StlSettlement settlement = validateAndGetSettlement(settlementId);
         Long contractId = settlement.getContractId();
 
         List<VarOrder> varOrders = varOrderMapper.selectList(
             new LambdaQueryWrapper<VarOrder>()
                 .eq(VarOrder::getTenantId, tenantId)
+                .eq(VarOrder::getProjectId, settlement.getProjectId())
                 .eq(VarOrder::getContractId, contractId)
                 .eq(VarOrder::getDirection, "COST")
                 .eq(VarOrder::getOwnerConfirmFlag, 1));
@@ -320,12 +338,14 @@ public class StlSettlementQueryService {
         List<SubMeasure> subMeasures = subMeasureMapper.selectList(
             new LambdaQueryWrapper<SubMeasure>()
                 .eq(SubMeasure::getTenantId, tenantId)
+                .eq(SubMeasure::getProjectId, settlement.getProjectId())
                 .eq(SubMeasure::getContractId, contractId)
                 .eq(SubMeasure::getApprovalStatus, "APPROVED"));
 
         List<PayRecord> payRecords = payRecordMapper.selectList(
             new LambdaQueryWrapper<PayRecord>()
                 .eq(PayRecord::getTenantId, tenantId)
+                .eq(PayRecord::getProjectId, settlement.getProjectId())
                 .eq(PayRecord::getContractId, contractId)
                 .eq(PayRecord::getPayStatus, "SUCCESS"));
 
@@ -336,7 +356,7 @@ public class StlSettlementQueryService {
             vvo.setVarCode(v.getVarCode());
             vvo.setVarName(v.getVarName());
             vvo.setVarType(v.getVarType());
-            vvo.setConfirmedAmount(v.getConfirmedAmount());
+            vvo.setConfirmedAmount(plainNullable(v.getConfirmedAmount()));
             vvo.setApprovalStatus(v.getApprovalStatus());
             return vvo;
         }).collect(Collectors.toList()));
@@ -346,7 +366,7 @@ public class StlSettlementQueryService {
             svo.setId(s.getId());
             svo.setMeasureCode(s.getMeasureCode());
             svo.setMeasurePeriod(s.getMeasurePeriod());
-            svo.setApprovedAmount(s.getApprovedAmount());
+            svo.setApprovedAmount(plainNullable(s.getApprovedAmount()));
             svo.setApprovalStatus(s.getApprovalStatus());
             return svo;
         }).collect(Collectors.toList()));
@@ -354,7 +374,7 @@ public class StlSettlementQueryService {
         vo.setPayRecords(payRecords.stream().map(p -> {
             SettlementSourcesVO.PayRecordVO pvo = new SettlementSourcesVO.PayRecordVO();
             pvo.setId(p.getId());
-            pvo.setPayAmount(p.getPayAmount());
+            pvo.setPayAmount(plainNullable(p.getPayAmount()));
             pvo.setPayDate(p.getPayDate() != null ? p.getPayDate().toString() : null);
             pvo.setPayMethod(p.getPayMethod());
             pvo.setVoucherNo(p.getVoucherNo());
@@ -374,6 +394,7 @@ public class StlSettlementQueryService {
         Long tenantId = UserContext.getCurrentTenantId();
         List<VarOrder> variations = varOrderMapper.selectList(new LambdaQueryWrapper<VarOrder>()
                 .eq(VarOrder::getTenantId, tenantId)
+                .eq(VarOrder::getProjectId, settlement.getProjectId())
                 .eq(VarOrder::getContractId, settlement.getContractId()));
         return varOrderService.toVOList(variations);
     }
@@ -383,6 +404,7 @@ public class StlSettlementQueryService {
         Long tenantId = UserContext.getCurrentTenantId();
         List<PayRecord> payRecords = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
                 .eq(PayRecord::getTenantId, tenantId)
+                .eq(PayRecord::getProjectId, settlement.getProjectId())
                 .eq(PayRecord::getContractId, settlement.getContractId()));
         if (payRecords.isEmpty()) {
             return List.of();
@@ -407,6 +429,7 @@ public class StlSettlementQueryService {
         Long tenantId = UserContext.getCurrentTenantId();
         List<CostItem> costItems = costItemMapper.selectList(new LambdaQueryWrapper<CostItem>()
                 .eq(CostItem::getTenantId, tenantId)
+                .eq(CostItem::getProjectId, settlement.getProjectId())
                 .eq(CostItem::getContractId, settlement.getContractId()));
         Map<Long, String> subjectNames = resolveCostSubjectNames(costItems);
         return costItems.stream()
@@ -462,21 +485,29 @@ public class StlSettlementQueryService {
     // Shared helpers (package-private — used by WriteService)
     // ================================================================
 
-    /**
-     * 验证结算单存在且属于当前租户。
-     */
+    /** 验证结算单存在、属于当前租户且当前用户可访问其项目。 */
     StlSettlement validateAndGetSettlement(Long settlementId) {
         Long tenantId = UserContext.getCurrentTenantId();
         StlSettlement settlement = stlSettlementMapper.selectById(settlementId);
         if (settlement == null || !Objects.equals(settlement.getTenantId(), tenantId)) {
             throw new BusinessException("STL_SETTLEMENT_NOT_FOUND", "结算单不存在");
         }
+        projectAccessChecker.checkAccess(settlement.getProjectId(), "查看结算单");
+        CtContract contract = settlement.getContractId() == null
+                ? null
+                : ctContractMapper.selectById(settlement.getContractId());
+        if (contract == null || !Objects.equals(contract.getTenantId(), tenantId)
+                || !Objects.equals(contract.getProjectId(), settlement.getProjectId())) {
+            throw new BusinessException("STL_SETTLEMENT_CONTRACT_SCOPE_INVALID",
+                    "结算单项目与合同项目不一致");
+        }
         return settlement;
     }
 
-    BigDecimal sumVarOrderConfirmed(Long tenantId, Long contractId) {
+    BigDecimal sumVarOrderConfirmed(Long tenantId, Long projectId, Long contractId) {
         LambdaQueryWrapper<VarOrder> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(VarOrder::getTenantId, tenantId);
+        wrapper.eq(VarOrder::getProjectId, projectId);
         wrapper.eq(VarOrder::getContractId, contractId);
         wrapper.eq(VarOrder::getDirection, "COST");
         wrapper.eq(VarOrder::getOwnerConfirmFlag, 1);
@@ -486,9 +517,10 @@ public class StlSettlementQueryService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    BigDecimal sumSubMeasureApproved(Long tenantId, Long contractId) {
+    BigDecimal sumSubMeasureApproved(Long tenantId, Long projectId, Long contractId) {
         LambdaQueryWrapper<SubMeasure> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(SubMeasure::getTenantId, tenantId);
+        wrapper.eq(SubMeasure::getProjectId, projectId);
         wrapper.eq(SubMeasure::getContractId, contractId);
         wrapper.eq(SubMeasure::getApprovalStatus, "APPROVED");
         List<SubMeasure> measures = subMeasureMapper.selectList(wrapper);
@@ -497,9 +529,10 @@ public class StlSettlementQueryService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
-    BigDecimal sumPaidAmount(Long tenantId, Long contractId) {
+    BigDecimal sumPaidAmount(Long tenantId, Long projectId, Long contractId) {
         LambdaQueryWrapper<PayRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PayRecord::getTenantId, tenantId);
+        wrapper.eq(PayRecord::getProjectId, projectId);
         wrapper.eq(PayRecord::getContractId, contractId);
         wrapper.eq(PayRecord::getPayStatus, "SUCCESS");
         List<PayRecord> records = payRecordMapper.selectList(wrapper);

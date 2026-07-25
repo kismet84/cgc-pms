@@ -27,8 +27,8 @@ public class SupplierReturn extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class) private Long receiptId;
     private String returnCode;
     private LocalDate returnDate;
-    private BigDecimal returnQuantity;
-    private BigDecimal returnAmount;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal returnQuantity;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal returnAmount;
     private String reason;
     private String status;
     @JsonSerialize(using = ToStringSerializer.class) private Long confirmedBy;

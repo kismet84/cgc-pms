@@ -9,7 +9,6 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
-  V2Alert,
   V2Button,
   V2Card,
   V2Dialog,
@@ -17,6 +16,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import {
@@ -46,6 +46,10 @@ const loading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
+
+watch(errorMessage, (message) => {
+  if (message) showToast('error', '动态利润操作未完成', message)
+})
 const forecastOpen = ref(false)
 const correctiveOpen = ref(false)
 const closeOpen = ref(false)
@@ -105,7 +109,9 @@ const text = (row: CostControlAmountRow, key: string) => String(row[key] ?? '')
 const statusLabel = (value: string) => STATUS_LABELS[value] ?? '未知状态'
 const costSubjectLabel = (id: string, index: number) => {
   const subject = costSubjects.value.find((item) => item.id === id)
-  return subject ? `${subject.subjectCode} · ${subject.subjectName}` : `成本科目 ${index + 1}`
+  return subject
+    ? `${subject.subjectCode} · ${subject.subjectName}`
+    : `成本科目名称缺失（第 ${index + 1} 行）`
 }
 const traceRow = (key: string): CostControlAmountRow => {
   const value = (trace.value as unknown as Record<string, unknown> | null)?.[key]
@@ -173,6 +179,12 @@ async function load() {
     if (token === generation) loading.value = false
   }
 }
+
+async function refreshCostControl() {
+  await load()
+  if (!errorMessage.value) showToast('success', '刷新完成', '动态利润控制已刷新。')
+}
+
 function openForecast(row?: CostControlAmountRow) {
   editingForecastId.value = row ? text(row, 'id') : ''
   Object.assign(forecast, {
@@ -349,12 +361,11 @@ onBeforeUnmount(() => {
       description="请联系管理员开通访问权限。"
       kind="forbidden"
     /><template v-else
-      ><V2Alert v-if="errorMessage" tone="danger" title="动态利润操作未完成">{{
-        errorMessage
-      }}</V2Alert
       ><V2Card title="动态利润控制" :heading-level="1"
         ><template #actions
-          ><V2Button variant="secondary" :loading="loading" @click="load">刷新</V2Button></template
+          ><V2Button size="small" variant="secondary" :loading="loading" @click="refreshCostControl"
+            >刷新</V2Button
+          ></template
         ></V2Card
       ><V2PageState
         v-if="loading"
@@ -399,13 +410,13 @@ onBeforeUnmount(() => {
           ></V2Card
         ><V2Card title="纠偏措施"
           ><V2PageState
-            v-if="!actions.length"
+            v-if="!actions.length && !errorMessage"
             title="暂无纠偏措施"
             description="当前项目尚未登记可执行的成本纠偏措施。"
             kind="empty"
           />
           <div
-            v-else
+            v-else-if="actions.length"
             class="cost-page__table-wrap"
             role="region"
             aria-label="纠偏措施表格"
@@ -414,6 +425,7 @@ onBeforeUnmount(() => {
             <table class="cost-page__table">
               <thead>
                 <tr>
+                  <th scope="col">措施编号</th>
                   <th scope="col">措施</th>
                   <th scope="col">预计节约</th>
                   <th scope="col">状态</th>
@@ -422,6 +434,7 @@ onBeforeUnmount(() => {
               </thead>
               <tbody>
                 <tr v-for="row in actions" :key="text(row, 'id')">
+                  <th scope="row">{{ text(row, 'action_code') || '措施编号缺失' }}</th>
                   <td>{{ text(row, 'action_title') }}</td>
                   <td>{{ text(row, 'expected_saving_amount') }}</td>
                   <td>{{ statusLabel(text(row, 'status')) }}</td>
@@ -480,12 +493,12 @@ onBeforeUnmount(() => {
             </dl>
             <h3>预测明细</h3>
             <V2PageState
-              v-if="!traceRows('forecastItems').length"
+              v-if="!traceRows('forecastItems').length && !errorMessage"
               title="暂无预测明细"
               description="当前预测没有科目明细。"
             />
             <div
-              v-else
+              v-else-if="traceRows('forecastItems').length"
               class="cost-page__table-wrap"
               role="region"
               aria-label="预测明细"
@@ -516,7 +529,7 @@ onBeforeUnmount(() => {
           </section></V2Dialog
         ></template
       ><V2PageState
-        v-else
+        v-else-if="!errorMessage"
         title="暂无动态利润数据"
         description="请选择项目，或先生成该项目的完工预测。"
         kind="empty"

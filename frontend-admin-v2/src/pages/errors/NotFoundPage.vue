@@ -8,6 +8,7 @@ import V2PageState from '@/components/V2PageState.vue'
   <V2PageState
     code="404"
     kind="empty"
+    :heading-level="1"
     title="页面不存在"
     description="地址可能已变更，或该页面尚未纳入新版应用壳。"
   >

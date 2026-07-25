@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.List;
 
@@ -186,6 +187,40 @@ class MatStockControllerTest {
     void testGetLedgerWithMaterialIdSucceeds() throws Exception {
         mockMvc.perform(getWithApi("/inventory/stock/ledger")
                         .cookie(adminCookie())
+                        .param("warehouseId", String.valueOf(WAREHOUSE_ID))
+                        .param("materialId", String.valueOf(MATERIAL_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("GET /inventory/stock/ledger without warehouseId aggregates all enabled warehouses")
+    void testGetLedgerWithoutWarehouseIdAggregatesAllWarehouses() throws Exception {
+        BigDecimal expectedAvailable = jdbcTemplate.queryForObject("""
+                SELECT COALESCE(SUM(s.available_qty), 0)
+                FROM mat_stock s
+                JOIN mat_warehouse w ON w.id = s.warehouse_id
+                WHERE s.tenant_id = ? AND s.material_id = ? AND s.deleted_flag = 0
+                  AND w.project_id = ? AND w.status = 'ENABLE' AND w.deleted_flag = 0
+                """, BigDecimal.class, TENANT_ID, MATERIAL_ID, 10001L);
+
+        mockMvc.perform(getWithApi("/inventory/stock/ledger")
+                        .cookie(adminCookie())
+                        .param("materialId", String.valueOf(MATERIAL_ID))
+                        .param("projectId", "10001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.stock.warehouseName").value("全部仓库"))
+                .andExpect(jsonPath("$.data.stock.availableQty").value(expectedAvailable.doubleValue()));
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("来源流水查询权限可只读库存流水")
+    void testTransactionReaderCanReadLedger() throws Exception {
+        mockMvc.perform(getWithApi("/inventory/stock/ledger")
+                        .cookie(purchaseManagerCookie(List.of("inventory:transaction:list")))
                         .param("warehouseId", String.valueOf(WAREHOUSE_ID))
                         .param("materialId", String.valueOf(MATERIAL_ID)))
                 .andExpect(status().isOk())

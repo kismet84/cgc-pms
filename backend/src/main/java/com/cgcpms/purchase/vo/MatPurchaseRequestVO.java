@@ -14,6 +14,7 @@ public class MatPurchaseRequestVO {
     private String contractName;
     private String purpose;
     private String requestCode;
+    private String totalAmount;
     private String approvalStatus;
     private String status;
     private String createdBy;

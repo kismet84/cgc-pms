@@ -26,7 +26,8 @@ public interface CashJournalEntryMapper extends BaseMapper<CashJournalEntry> {
 
     IPage<CashJournalEntryVO> selectPageWithBalance(Page<CashJournalEntryVO> page,
                                                      @Param("tenantId") Long tenantId,
-                                                     @Param("query") CashJournalQuery query);
+                                                     @Param("query") CashJournalQuery query,
+                                                     @Param("accessibleProjectIds") java.util.List<Long> accessibleProjectIds);
 
     @Select("SELECT entry_no FROM cash_journal_entry WHERE tenant_id = #{tenantId} AND entry_no LIKE CONCAT(#{prefix}, '%') ORDER BY entry_no DESC LIMIT 1")
     String selectLastEntryNo(@Param("tenantId") Long tenantId, @Param("prefix") String prefix);

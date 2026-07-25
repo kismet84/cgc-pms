@@ -13,7 +13,6 @@ import type {
   TechnicalRfi,
 } from '@cgc-pms/frontend-contracts'
 import {
-  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -21,6 +20,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import { uploadSiteFile } from '@/services/delivery'
@@ -95,6 +95,9 @@ const trace = ref<DrawingTrace | null>(null)
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
+watch(errorMessage, (value) => {
+  if (value) showToast('error', '操作未完成', value)
+})
 const successMessage = useToastMessage()
 const dialog = ref<DialogKind>(null)
 const target = ref<Target | null>(null)
@@ -110,6 +113,17 @@ const projectId = computed(() => workspace.selectedProjectId || '')
 const scopeProjectIds = computed(() =>
   projectId.value ? [projectId.value] : workspace.projects.map((project) => project.value),
 )
+const currentUserId = computed(() => String(session.userInfo?.userId ?? ''))
+const currentUserLabel = computed(
+  () => session.userInfo?.realName || session.userInfo?.username || '当前用户',
+)
+const userOptions = (value = '') => {
+  const options = currentUserId.value
+    ? [{ value: currentUserId.value, label: currentUserLabel.value }]
+    : []
+  if (value && value !== currentUserId.value) options.push({ value, label: '已指定项目成员' })
+  return options
+}
 const approvedSchemes = computed(() =>
   overview.value.schemes.filter((item) => item.status === 'APPROVED'),
 )
@@ -222,7 +236,7 @@ function tone(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
 }
 function versionLabel(id?: string | null): string {
   const item = overview.value.versions.find((row) => row.id === id)
-  return item ? `${item.drawingCode ?? '图纸'}-${item.versionNo}` : (id ?? '-')
+  return item ? `${item.drawingCode ?? '图纸'}-${item.versionNo}` : '未识别图纸版本'
 }
 
 async function loadProject(preserveNotice = false): Promise<void> {
@@ -514,17 +528,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="technical-page" aria-label="图纸 RFI 技术闭环">
-    <h1 class="v2-visually-hidden">图纸 RFI 技术闭环</h1>
-    <div class="technical-page__notice" aria-live="polite">
-      <V2Alert
-        v-if="errorMessage"
-        tone="danger"
-        title="操作未完成"
-        dismissible
-        @dismiss="errorMessage = ''"
-        >{{ errorMessage }}</V2Alert
-      >
-    </div>
+    <V2Card title="图纸 RFI 技术闭环" :heading-level="1" />
     <V2PageState
       v-if="loading"
       kind="loading"
@@ -532,7 +536,7 @@ onBeforeUnmount(() => {
       description="正在加载方案、图纸、RFI、交底和归档状态。"
     />
     <V2PageState
-      v-else-if="!scopeProjectIds.length"
+      v-else-if="!scopeProjectIds.length && !errorMessage"
       kind="empty"
       title="暂无可访问项目"
       description="当前账号没有可查看的项目。"
@@ -620,15 +624,22 @@ onBeforeUnmount(() => {
                 </thead>
                 <tbody>
                   <tr v-for="drawing in overview.drawings" :key="drawing.id">
-                    <th scope="row">{{ drawing.drawingCode }}</th>
+                    <th scope="row">
+                      <V2Button
+                        size="small"
+                        variant="ghost"
+                        class="v2-table__record-link"
+                        @click="openTrace(drawing)"
+                      >
+                        {{ drawing.drawingCode }}
+                      </V2Button>
+                    </th>
                     <td>{{ drawing.drawingName }}</td>
                     <td>{{ drawing.currentVersionNo }}</td>
                     <td>{{ deliveryLabel(drawing.currentVersionStatus) }}</td>
                     <td>
                       <div class="technical-page__actions">
-                        <V2Button size="small" variant="secondary" @click="openTrace(drawing)"
-                          >追溯</V2Button
-                        ><V2Button
+                        <V2Button
                           v-if="canDrawingReceive && acceptedChangeRfis.length"
                           size="small"
                           @click="show('version', drawing)"
@@ -787,7 +798,11 @@ onBeforeUnmount(() => {
           <section aria-labelledby="technical-response-title">
             <h3 id="technical-response-title">设计回复</h3>
             <div v-if="overview.responses.length" class="technical-page__table-wrap">
-              <table class="technical-page__table" aria-labelledby="technical-response-title">
+              <table
+                class="technical-page__table"
+                data-table-identity="contextual"
+                aria-labelledby="technical-response-title"
+              >
                 <thead>
                   <tr>
                     <th scope="col">回复人 / 结论</th>
@@ -1012,7 +1027,11 @@ onBeforeUnmount(() => {
               ['GENERAL', 'SPECIAL', 'CONSTRUCTION_ORGANIZATION', 'METHOD_STATEMENT'].map(
                 (value) => ({ value, label: deliveryLabel(value) }),
               )
-            " /><V2Input v-model="form.responsibleUserId" label="负责人 ID" required
+            " /><V2Select
+            v-model="form.responsibleUserId"
+            label="负责人"
+            :options="userOptions(form.responsibleUserId)"
+            required
         /></template>
         <template v-if="dialog === 'drawing'"
           ><V2Input v-model="form.code" label="图纸编码" required /><V2Input
@@ -1032,14 +1051,20 @@ onBeforeUnmount(() => {
                 value: item.id,
                 label: `${item.rfiCode} · ${item.subject}`,
               }))
-            " /><V2Input v-model="form.previousVersionId" label="前版 ID" required /><label
-            class="technical-page__wide"
+            " /><V2Select
+            v-model="form.previousVersionId"
+            label="前版图纸"
+            :options="
+              overview.versions.map((item) => ({ value: item.id, label: versionLabel(item.id) }))
+            "
+            required /><label class="technical-page__wide"
             >变更摘要<textarea v-model="form.changeSummary" required /></label
         ></template>
         <template v-if="dialog === 'review'"
-          ><V2Input v-model="form.code" label="会审编码" required /><V2Input
+          ><V2Input v-model="form.code" label="会审编码" required /><V2Select
             v-model="form.chairUserId"
-            label="主持人 ID"
+            label="主持人"
+            :options="userOptions(form.chairUserId)"
             required /><V2Input v-model="form.participants" label="参与人" required /><V2Select
             v-model="form.conclusion"
             label="会审结论"
@@ -1095,10 +1120,12 @@ onBeforeUnmount(() => {
             " /><V2Input v-model="form.code" label="交底编码" required /><V2Input
             v-model="form.name"
             label="交底标题"
-            required /><V2Input v-model="form.presenterUserId" label="交底人 ID" required /><V2Input
-            v-model="form.recipients"
-            label="接受人"
-            required /><label class="technical-page__wide"
+            required /><V2Select
+            v-model="form.presenterUserId"
+            label="交底人"
+            :options="userOptions(form.presenterUserId)"
+            required /><V2Input v-model="form.recipients" label="接受人" required /><label
+            class="technical-page__wide"
             >交底内容<textarea v-model="form.content" required /></label
         ></template>
         <template v-if="dialog === 'reference'"
@@ -1188,7 +1215,7 @@ onBeforeUnmount(() => {
 .technical-page__record-sections h3 {
   margin: 0 0 var(--v2-space-2);
   color: var(--v2-color-text-strong);
-  font-size: var(--v2-font-size-15);
+  font-size: var(--v2-font-size-14);
   font-weight: var(--v2-font-weight-semibold);
   line-height: var(--v2-line-height-tight);
 }

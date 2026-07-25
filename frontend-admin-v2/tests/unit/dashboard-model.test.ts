@@ -4,6 +4,8 @@ import {
   alertRiskLevel,
   compactDashboardValue,
   dashboardActivityItems,
+  dashboardHealth,
+  dashboardMetrics,
   deriveDashboardHealth,
   formatAmount,
   formatRatio,
@@ -198,5 +200,85 @@ describe('dashboard display model', () => {
     ])
     expect(primaryRiskItems('bm', business)[0]?.meta).toBe('C-001')
     expect(dashboardActivityItems('bm', business)[0]?.meta).toBe('C-001')
+  })
+
+  it('keeps business settlement progress as finalized/total and exposes authoritative metrics', () => {
+    const business = {
+      totalContractAmount: '1000000.00',
+      contractChangeAmount: '120000.00',
+      varOrderAmount: '80000.00',
+      subMeasureAmount: '650000.00',
+      paidRatio: '65.00',
+      settlementProgress: '1/3',
+      recentChanges: [],
+      settlementItems: [],
+    } as DashboardDataByRole['bm']
+
+    expect(dashboardMetrics('bm', business)).toEqual([
+      { label: '合同总额', value: '¥1,000,000.00' },
+      { label: '合同变更', value: '¥120,000.00' },
+      { label: '签证金额', value: '¥80,000.00' },
+      { label: '分包计量', value: '¥650,000.00' },
+      { label: '支付比例', value: '65.00%' },
+      { label: '结算进度', value: '1/3' },
+    ])
+  })
+
+  it('adds settlement project activity without fabricating a monetary value', () => {
+    const business = {
+      recentChanges: [],
+      settlementItems: [
+        {
+          projectId: '2',
+          projectName: '结算项目',
+          projectCode: 'PJ-002',
+          status: 'SETTLING',
+        },
+        {
+          projectId: '2',
+          projectName: '结算项目（第二项）',
+          projectCode: 'PJ-002-2',
+          status: 'PENDING',
+        },
+      ],
+    } as DashboardDataByRole['bm']
+
+    expect(dashboardActivityItems('bm', business)).toEqual([
+      {
+        id: 'settlement-2-0',
+        title: '结算项目',
+        meta: 'PJ-002',
+        status: 'SETTLING',
+      },
+      {
+        id: 'settlement-2-1',
+        title: '结算项目（第二项）',
+        meta: 'PJ-002-2',
+        status: 'PENDING',
+      },
+    ])
+  })
+
+  it('counts only imminent business contracts and unfinished settlements in health', () => {
+    const dateAfter = (days: number) => {
+      const date = new Date()
+      date.setDate(date.getDate() + days)
+      return date.toISOString().slice(0, 10)
+    }
+    const business = {
+      recentChanges: [
+        { endDate: dateAfter(20) },
+        { endDate: dateAfter(60) },
+        { endDate: dateAfter(365) },
+      ],
+      settlementItems: [
+        { status: 'FINALIZED' },
+        { status: 'COMPLETED' },
+        { status: 'CLOSED' },
+        { status: 'PENDING' },
+      ],
+    } as DashboardDataByRole['bm']
+
+    expect(dashboardHealth('bm', business)).toEqual({ score: 82, label: '关注', tone: 'warning' })
   })
 })

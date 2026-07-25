@@ -45,7 +45,8 @@ const migratedSurfaces = [
     })),
 ]
 const dialogPattern = /(<V2Dialog\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>)([\s\S]*?)<\/V2Dialog\s*>/g
-const paginationPattern = /(<nav\b[^>]*aria-label=(['"])[^'"]*分页\2[^>]*>)([\s\S]*?)<\/nav\s*>/g
+const paginationPattern =
+  /(<nav\b[^>]*:?aria-label=(['"])(?:`)?[^'"]*分页(?:`)?\2[^>]*>)([\s\S]*?)<\/nav\s*>/g
 
 function dialogBlocks(source: string) {
   return [...source.matchAll(dialogPattern)].map(([, openingTag, body]) => ({
@@ -335,11 +336,18 @@ describe('Clean-room V2 design system', () => {
     expect(card.classes()).toContain('v2-card--interactive')
     expect(card.get('.v2-card__body').text()).toBe('面板内容')
 
+    const actionsCard = mount(V2Card, {
+      props: { title: '供应商招采履约' },
+      slots: { actions: '<button>新建</button><button>登记</button>' },
+    })
+    expect(actionsCard.get('.v2-card__actions').findAll('button')).toHaveLength(2)
+
     const pageCard = mount(V2Card, {
       props: { title: '现场日报', headingLevel: 1, titleId: 'daily-log-title' },
     })
     expect(pageCard.get('h1').attributes('id')).toBe('daily-log-title')
     expect(pageCard.get('h1').classes()).toContain('v2-card__title--page')
+    expect(pageCard.classes()).toContain('v2-card--page-heading')
     expect(pageCard.find('.v2-card__body').exists()).toBe(false)
 
     const nestedCard = mount(V2Card, { props: { title: '附件', headingLevel: 3 } })
@@ -634,15 +642,13 @@ describe('Clean-room V2 design system', () => {
         .map((name) => readFileSync(resolve(sourceRoot, name), 'utf-8'))
         .join('\n')
       const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+      const baseCss = readFileSync(resolve(sourceRoot, 'styles/base.css'), 'utf-8')
+      const tokenCss = readFileSync(resolve(sourceRoot, 'styles/tokens.css'), 'utf-8')
       const dashboard = readFileSync(
         resolve(sourceRoot, 'pages/dashboard/DashboardPage.vue'),
         'utf-8',
       )
-      const declaredTokens = new Set(
-        readFileSync(resolve(sourceRoot, 'styles/tokens.css'), 'utf-8').match(
-          /--v2-[\w-]+(?=\s*:)/g,
-        ) ?? [],
-      )
+      const declaredTokens = new Set(tokenCss.match(/--v2-[\w-]+(?=\s*:)/g) ?? [])
       const runtimeLayoutTokens = new Set([
         '--v2-cluster-align',
         '--v2-cluster-gap',
@@ -676,8 +682,33 @@ describe('Clean-room V2 design system', () => {
         /(?:gap|padding(?:-[\w-]+)?|margin(?:-[\w-]+)?|min-height|height|border-radius)\s*:[^;{}]*\b(?:[1-9][0-9]*|0?\.[0-9]+)(?:px|rem)\b/i,
       )
       expect(componentCss).toMatch(
-        /\.v2-card__title \{[\s\S]*?line-height: var\(--v2-line-height-tight\);/,
+        /\.v2-card__title \{[\s\S]*?font-size: var\(--v2-font-size-14\);[\s\S]*?line-height: var\(--v2-line-height-tight\);/,
       )
+      expect(baseCss).toMatch(
+        /h1 \{[\s\S]*?font-size: var\(--v2-font-size-21\);[\s\S]*?font-weight: var\(--v2-font-weight-bold\);/,
+      )
+      expect(baseCss).toMatch(
+        /h2,\s*h3 \{[\s\S]*?font-size: var\(--v2-font-size-14\);[\s\S]*?font-weight: var\(--v2-font-weight-semibold\);/,
+      )
+      expect(tokenCss).toMatch(/--v2-control-height-sm:\s*2rem;/)
+      expect(componentCss).toMatch(
+        /\.v2-card--page-heading \{[\s\S]*?min-height: 70px;[\s\S]*?\.v2-card--page-heading\s*>\s*\.v2-card__header[\s\S]*?min-height: calc\(70px - \(2 \* var\(--v2-border-width\)\)\);/,
+      )
+      expect(componentCss).toMatch(
+        /\.v2-card--page-heading[\s\S]*?:is\(\.v2-button, \.v2-action-menu__trigger, \.v2-field__control\)[\s\S]*?height: var\(--v2-control-height-sm\);[\s\S]*?min-height: var\(--v2-control-height-sm\);/,
+      )
+      expect(componentCss).toMatch(
+        /@media \(max-width: 48rem\)[\s\S]*?\.v2-card--page-heading[\s\S]*?:is\(\.v2-button, \.v2-action-menu__trigger, \.v2-field__control\)[\s\S]*?height: var\(--v2-control-height-touch\);[\s\S]*?min-height: var\(--v2-control-height-touch\);/,
+      )
+      for (const { name, source } of migratedPages) {
+        for (const rule of styleRules(source)) {
+          if (!/(?:^|[\s,>+~])h[23](?:$|[\s.:#,[>+~])/.test(rule.selector)) continue
+          if (!/\bfont-size\s*:/.test(rule.declarations)) continue
+          expect(rule.declarations, `${name}: ${rule.selector.trim()}`).toMatch(
+            /font-size:\s*var\(--v2-font-size-14\);/,
+          )
+        }
+      }
       expect(componentCss).toMatch(
         /\.v2-dialog__title \{[\s\S]*?line-height: var\(--v2-line-height-tight\);/,
       )
@@ -741,10 +772,12 @@ describe('Clean-room V2 design system', () => {
       )
 
       const cardTitles = {
+        'pages/dashboard/DashboardPage.vue': 'dashboard-title',
         'pages/delivery/DailyLogPage.vue': 'daily-log-title',
         'pages/delivery/SchedulePage.vue': 'schedule-title',
         'pages/projects/ProjectPage.vue': 'project-title',
         'pages/workbench/ReportCatalogPage.vue': 'report-catalog-title',
+        'pages/workbench/WorkflowWorkbenchPage.vue': 'workflow-title',
       }
       for (const [name, titleId] of Object.entries(cardTitles)) {
         const source = sources[name]
@@ -757,19 +790,40 @@ describe('Clean-room V2 design system', () => {
         ).toBe(true)
       }
 
-      const nativeTitles = {
-        'pages/dashboard/DashboardPage.vue': 'dashboard-title',
-        'pages/workbench/WorkflowWorkbenchPage.vue': 'workflow-title',
-      }
-      for (const [name, titleId] of Object.entries(nativeTitles)) {
-        const source = sources[name]
-        expect(source).toContain(`aria-labelledby="${titleId}"`)
-        expect(source).toMatch(new RegExp(`<h1[^>]*id="${titleId}"`))
-      }
-
       for (const source of Object.values(sources)) {
         const stateTags = [...source.matchAll(/<V2PageState\b[^>]*>/g)].map(([tag]) => tag)
         for (const tag of stateTags) expect(tag).toMatch(/:heading-level="[123]"/)
+      }
+    })
+
+    it('keeps one primary heading source and defaults nested page states to h2', () => {
+      const pageState = readFileSync(resolve(sourceRoot, 'components/V2PageState.vue'), 'utf-8')
+      expect(pageState).toContain('headingLevel: 2')
+
+      for (const { name, source } of migratedPages) {
+        expect(source, `${name} duplicate primary heading sources`).not.toMatch(
+          /<h1\b[^>]*\bv2-visually-hidden\b[^>]*>[\s\S]*?<\/h1>[\s\S]*?<template\s+v-else>[\s\S]*?<V2Card\b[^>]*:heading-level="1"/,
+        )
+
+        for (const [article] of source.matchAll(
+          /<article\b(?:(?:"[^"]*"|'[^']*')|[^'">])*\bv-for=(['"])[^'"]+\1(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g,
+        )) {
+          expect(article, `${name} dense record article`).not.toMatch(
+            /\bclass=(['"])[^'"]*__card(?:\s|['"])/,
+          )
+        }
+      }
+
+      for (const name of [
+        'pages/errors/ForbiddenPage.vue',
+        'pages/errors/GlobalErrorPage.vue',
+        'pages/errors/NotFoundPage.vue',
+        'pages/shell/ShellLoadingPage.vue',
+      ]) {
+        const source = readFileSync(resolve(sourceRoot, name), 'utf-8')
+        expect(source, `${name} standalone page state`).toMatch(
+          /<V2PageState\b[^>]*:heading-level="1"/,
+        )
       }
     })
 
@@ -880,7 +934,9 @@ describe('Clean-room V2 design system', () => {
     it('keeps implementation wording out of every migrated page', () => {
       const pageSources = migratedPages.map(({ source }) => source).join('\n')
 
-      expect(pageSources).not.toMatch(/权威|回读|重读|后端状态|后端阶段/)
+      expect(pageSources).not.toMatch(
+        /权威|回读|重读|后端状态|后端阶段|服务端(?:状态|金额|详情|明细|事实|裁决|读取|响应|结果)|保存并读取/,
+      )
     })
 
     it('keeps text and select fields on shared V2 components across every migrated page', () => {
@@ -922,6 +978,14 @@ describe('Clean-room V2 design system', () => {
       }
     })
 
+    it('keeps raw database identifiers out of every migrated page', () => {
+      const rawVisibleIdentifier =
+        /<(?:dt|th|label)\b[^>]*>\s*[^<{]*(?:ID|Id)\b[^<{]*<|(?:label|placeholder)=(['"`])[^'"`]*(?:ID|Id)\b[^'"`]*\1|\{\{\s*(?:item|detail|line|record)\.(?:id|[a-zA-Z]+Id)\s*\}\}/
+
+      for (const { name, source } of migratedPages)
+        expect(source, `${name} raw visible identifier`).not.toMatch(rawVisibleIdentifier)
+    })
+
     it('keeps commercial dialogs business-labelled with reachable form actions', () => {
       const commercialPages = [
         'pages/commercial/ContractPage.vue',
@@ -934,14 +998,10 @@ describe('Clean-room V2 design system', () => {
         'pages/commercial/BudgetPage.vue',
         'pages/commercial/ProductionMeasurementPage.vue',
       ]
-      const rawVisibleIdentifier =
-        /<dt>\s*ID\s*<\/dt>|label=(['"`])[^'"`]*ID\1|\{\{\s*(?:item|detail|line)\.(?:costSubjectId|measurementLineId|responsibleUserId|costStatus)\s*\}\}/
-
       for (const name of commercialPages) {
         const source = readFileSync(resolve(sourceRoot, name), 'utf-8')
         for (const [index, { body }] of dialogBlocks(source).entries()) {
           const evidence = `${name} V2Dialog #${index + 1}`
-          expect(body, `${evidence} raw visible identifier`).not.toMatch(rawVisibleIdentifier)
           if (/<form\b/.test(body)) {
             expect(body, `${evidence} missing footer actions`).toMatch(/<template\b[^>]*#footer/)
           }
@@ -996,7 +1056,7 @@ describe('Clean-room V2 design system', () => {
       const appShell = readFileSync(resolve(sourceRoot, 'layouts/AppShell.vue'), 'utf-8')
 
       expect(standard).toContain('公共壳主内容区必须可独立纵向滚动')
-      expect(standard).toContain('页面不得用占据文档流的成功横幅替代 Toast')
+      expect(standard).toContain('刷新、读取和短暂操作结果只使用一次公共 Toast')
       expect(appShell).toMatch(/\.app-shell \{[\s\S]*?height: 100dvh;[\s\S]*?overflow: hidden;/)
       expect(appShell).toMatch(
         /\.app-shell__content \{[\s\S]*?min-height: 0;[\s\S]*?flex: 1;[\s\S]*?overflow-y: auto;/,
@@ -1097,7 +1157,9 @@ describe('Clean-room V2 design system', () => {
 
       for (const { name, source } of migratedPages) {
         const blocks = paginationBlocks(source)
-        const landmarks = [...source.matchAll(/<nav\b[^>]*aria-label=(['"])[^'"]*分页\1[^>]*>/g)]
+        const landmarks = [
+          ...source.matchAll(/<nav\b[^>]*:?aria-label=(['"])(?:`)?[^'"]*分页(?:`)?\1[^>]*>/g),
+        ]
         expect(blocks, `${name} pagination parser coverage`).toHaveLength(landmarks.length)
         if (blocks.length > 0) {
           const firstPageSize = source.match(/\bpageSize\s*(?::|=)[^\d]*(\d+)/)?.[1]
@@ -1217,7 +1279,7 @@ describe('Clean-room V2 design system', () => {
       expect(workflow).toContain('class="v2-detail-dialog__section"')
       expect(workflow).toContain('class="v2-detail-dialog__facts"')
       expect(workflow).toContain('class="v2-detail-dialog__actions"')
-      expect(workflow).toContain('class="workflow-table__title"')
+      expect(workflow).toContain('class="v2-table__record-link"')
       expect(workflow).toContain('hide-label')
       expect(workflow).toContain(':close-disabled="actionLoading"')
       expect(workflow.slice(0, workflow.indexOf('<V2Dialog'))).not.toContain('<V2GlassButton')
@@ -1225,7 +1287,7 @@ describe('Clean-room V2 design system', () => {
       expect(workflow).toContain('aria-label="审批任务表格"')
       expect(workflow).toContain('<caption class="v2-visually-hidden">')
       expect(workflow).toContain('<th scope="col">')
-      expect(workflow).not.toContain('size="small"')
+      expect(workflow).toMatch(/class="v2-table__record-link"[\s\S]{0,80}size="small"/)
       expect(workflow).not.toContain('workflow-detail-overview')
       expect(workflow).not.toContain('workflow-summary')
       expect(dashboard).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
@@ -1246,13 +1308,15 @@ describe('Clean-room V2 design system', () => {
         [deliveryPages[2], '图纸 RFI 技术闭环'],
         [deliveryPages[3], '竣工收尾闭环'],
       ]) {
-        expect(page).toContain(`<h1 class="v2-visually-hidden">${title}</h1>`)
+        expect(page).toMatch(
+          new RegExp(`<V2Card\\b(?=[^>]*title="${title}")(?=[^>]*:heading-level="1")[^>]*>`),
+        )
         expect(page).toContain('panel-class="v2-detail-dialog"')
         expect(page).not.toMatch(/<V2Card[\s\S]{0,160}v-if="trace"/)
       }
       for (const page of deliveryPages.slice(1)) {
         expect(page).toMatch(
-          /__record-sections h3[\s\S]*?font-size: var\(--v2-font-size-15\);[\s\S]*?font-weight: var\(--v2-font-weight-semibold\);[\s\S]*?line-height: var\(--v2-line-height-tight\);/,
+          /__record-sections h3[\s\S]*?font-size: var\(--v2-font-size-14\);[\s\S]*?font-weight: var\(--v2-font-weight-semibold\);[\s\S]*?line-height: var\(--v2-line-height-tight\);/,
         )
         expect(page).not.toMatch(/__item\b/)
       }

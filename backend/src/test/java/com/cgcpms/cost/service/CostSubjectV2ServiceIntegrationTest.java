@@ -109,8 +109,8 @@ class CostSubjectV2ServiceIntegrationTest {
                 """, 99351201L, VERSION_ID, SOURCE_SUBJECT_ID, PROJECT_SUBJECT_ID);
         jdbc.update("""
                 INSERT INTO bid_cost
-                (id,tenant_id,project_id,bid_project_name,bid_status,created_by,deleted_flag)
-                VALUES (?,0,?,'V2集成测试投标','WON',1,0)
+                (id,tenant_id,project_id,bid_code,bid_project_name,bid_status,created_by,deleted_flag)
+                VALUES (?,0,?,'BID-V2-INTEGRATION','V2集成测试投标','WON',1,0)
                 """, BID_ID, PROJECT_ID);
         jdbc.update("""
                 INSERT INTO cost_target

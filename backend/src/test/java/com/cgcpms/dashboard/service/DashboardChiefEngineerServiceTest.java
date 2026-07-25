@@ -3,6 +3,7 @@ package com.cgcpms.dashboard.service;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -278,10 +279,11 @@ class DashboardChiefEngineerServiceTest extends DashboardServiceTestSupport {
 
     @Test
     @Transactional
-    @DisplayName("8.4a Chief engineer view: invalid month returns data without 500")
-    void testChiefEngineerView_InvalidMonthDoesNotThrow() {
+    @DisplayName("8.4a Chief engineer view: invalid month fails closed")
+    void testChiefEngineerView_InvalidMonthFailsClosed() {
         SeedResult sr = seed("CHIEF_BAD_MONTH");
-        ChiefEngineerDashboardVO vo = dashboardService.getChiefEngineerView(sr.projectId, "not-valid");
-        assertNotNull(vo);
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> dashboardService.getChiefEngineerView(sr.projectId, "not-valid"));
+        assertEquals("INVALID_DASHBOARD_MONTH", error.getCode());
     }
 }

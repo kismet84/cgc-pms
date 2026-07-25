@@ -5,9 +5,15 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
-import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
+import com.cgcpms.subcontract.entity.SubTask;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
+import com.cgcpms.subcontract.service.SubMeasureService;
+import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowContext;
@@ -38,8 +44,11 @@ class SubMeasureWorkflowHandlerTest {
     @Autowired
     private SubMeasureMapper subMeasureMapper;
 
-    @Autowired private SubMeasureItemMapper subMeasureItemMapper;
     @Autowired private CostItemMapper costItemMapper;
+    @Autowired private SubMeasureService subMeasureService;
+    @Autowired private SubTaskMapper subTaskMapper;
+    @Autowired private CtContractItemMapper contractItemMapper;
+    @Autowired private SysFileMapper fileMapper;
 
     @BeforeEach
     void setupContext() {
@@ -70,17 +79,9 @@ class SubMeasureWorkflowHandlerTest {
 
     @Test
     @Transactional
-    @DisplayName("onApproved -> DRAFT→APPROVED")
+    @DisplayName("onApproved -> APPROVING→APPROVED")
     void testOnApproved_Success() {
-        SubMeasure measure = new SubMeasure();
-        measure.setProjectId(10001L);
-        measure.setContractId(30001L);
-        measure.setPartnerId(50001L);
-        measure.setMeasureCode("SM-HDLR-TEST-" + System.nanoTime());
-        measure.setApprovalStatus("DRAFT");
-        measure.setStatus("DRAFT");
-        measure.setTenantId(0L);
-        subMeasureMapper.insert(measure);
+        SubMeasure measure = createApprovalReadyMeasure(List.of(new BigDecimal("100.00")));
 
         WfInstance instance = new WfInstance();
         instance.setBusinessId(measure.getId());
@@ -99,23 +100,12 @@ class SubMeasureWorkflowHandlerTest {
     @Transactional
     @DisplayName("onApproved -> 成本明细按净计量额分摊且金额守恒")
     void testOnApproved_AllocatesNetMeasureCost() {
-        SubMeasure measure = new SubMeasure();
-        measure.setProjectId(10001L);
-        measure.setContractId(30001L);
-        measure.setPartnerId(20002L);
-        measure.setMeasureCode("SM-HDLR-COST-" + System.nanoTime());
-        measure.setMeasureDate(LocalDate.now());
-        measure.setReportedAmount(new BigDecimal("100.00"));
+        SubMeasure measure = createApprovalReadyMeasure(
+                List.of(new BigDecimal("60.00"), new BigDecimal("40.00")));
         measure.setApprovedAmount(new BigDecimal("95.00"));
         measure.setDeductionAmount(new BigDecimal("5.00"));
         measure.setNetAmount(new BigDecimal("90.00"));
-        measure.setApprovalStatus("APPROVING");
-        measure.setStatus("APPROVING");
-        measure.setTenantId(TENANT_0);
-        subMeasureMapper.insert(measure);
-
-        insertMeasureItem(measure.getId(), new BigDecimal("60.00"));
-        insertMeasureItem(measure.getId(), new BigDecimal("40.00"));
+        subMeasureMapper.updateById(measure);
 
         WfInstance instance = new WfInstance();
         instance.setBusinessId(measure.getId());
@@ -132,15 +122,6 @@ class SubMeasureWorkflowHandlerTest {
         assertEquals(0, new BigDecimal("90.00").compareTo(total));
         assertTrue(costs.stream().anyMatch(cost -> new BigDecimal("54.00").compareTo(cost.getAmount()) == 0));
         assertTrue(costs.stream().anyMatch(cost -> new BigDecimal("36.00").compareTo(cost.getAmount()) == 0));
-    }
-
-    private void insertMeasureItem(Long measureId, BigDecimal amount) {
-        SubMeasureItem item = new SubMeasureItem();
-        item.setTenantId(TENANT_0);
-        item.setMeasureId(measureId);
-        item.setItemName("成本分摊项");
-        item.setAmount(amount);
-        subMeasureItemMapper.insert(item);
     }
 
     @Test
@@ -207,5 +188,87 @@ class SubMeasureWorkflowHandlerTest {
         SubMeasure updated = subMeasureMapper.selectById(measure.getId());
         assertEquals("DRAFT", updated.getApprovalStatus(), "撤回后审批状态应变为 DRAFT");
         assertEquals("DRAFT", updated.getStatus(), "撤回后业务状态应同步恢复为 DRAFT");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("workflow callback rejects stale state")
+    void testCallbackRejectsStaleState() {
+        SubMeasure measure = new SubMeasure();
+        measure.setProjectId(10001L);
+        measure.setContractId(30001L);
+        measure.setPartnerId(20002L);
+        measure.setMeasureCode("SM-HDLR-STALE-" + System.nanoTime());
+        measure.setApprovalStatus("APPROVED");
+        measure.setStatus("CONFIRMED");
+        measure.setTenantId(TENANT_0);
+        subMeasureMapper.insert(measure);
+        WfInstance instance = new WfInstance();
+        instance.setBusinessId(measure.getId());
+        WorkflowContext context = new WorkflowContext();
+        context.setInstance(instance);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> handler.onRejected(context));
+        assertEquals("SUB_MEASURE_WORKFLOW_STATE_INVALID", error.getCode());
+    }
+
+    private SubMeasure createApprovalReadyMeasure(List<BigDecimal> amounts) {
+        SubTask task = new SubTask();
+        task.setTenantId(TENANT_0);
+        task.setProjectId(10001L);
+        task.setContractId(30001L);
+        task.setPartnerId(20002L);
+        task.setTaskCode("HDLR-TASK-" + System.nanoTime());
+        task.setTaskName("审批回调测试任务");
+        task.setStatus("IN_PROGRESS");
+        subTaskMapper.insert(task);
+
+        SubMeasure measure = new SubMeasure();
+        measure.setProjectId(10001L);
+        measure.setContractId(30001L);
+        measure.setPartnerId(20002L);
+        measure.setSubTaskId(task.getId());
+        measure.setMeasurePeriod("2026-07");
+        measure.setMeasureDate(LocalDate.now());
+        Long measureId = subMeasureService.create(measure);
+
+        List<SubMeasureItem> commands = amounts.stream().map(amount -> {
+            CtContractItem contractItem = new CtContractItem();
+            contractItem.setTenantId(TENANT_0);
+            contractItem.setContractId(30001L);
+            contractItem.setItemCode("HDLR-ITEM-" + System.nanoTime());
+            contractItem.setItemName("成本分摊项");
+            contractItem.setUnit("项");
+            contractItem.setQuantity(amount);
+            contractItem.setUnitPrice(BigDecimal.ONE);
+            contractItem.setAmount(amount);
+            contractItemMapper.insert(contractItem);
+            SubMeasureItem command = new SubMeasureItem();
+            command.setContractItemId(contractItem.getId());
+            command.setCurrentQuantity(amount);
+            return command;
+        }).toList();
+        subMeasureService.saveItems(measureId, commands);
+
+        SysFile file = new SysFile();
+        file.setTenantId(TENANT_0);
+        file.setBusinessType("SUBCONTRACT");
+        file.setBusinessId(measureId);
+        file.setDocumentType("OTHER");
+        file.setFileName("handler-proof.pdf");
+        file.setOriginalName("审批依据.pdf");
+        file.setFileSize(10L);
+        file.setContentType("application/pdf");
+        file.setStoragePath("SUBCONTRACT/" + measureId + "/handler-proof.pdf");
+        file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
+        fileMapper.insert(file);
+
+        SubMeasure ready = subMeasureMapper.selectById(measureId);
+        ready.setApprovalStatus("APPROVING");
+        ready.setStatus("APPROVING");
+        subMeasureMapper.updateById(ready);
+        return ready;
     }
 }

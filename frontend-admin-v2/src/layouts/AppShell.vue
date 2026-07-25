@@ -29,8 +29,8 @@ const notificationItems = ref<NotificationRecord[]>([])
 const notificationUnreadCount = ref<number | null>(null)
 const notificationLoading = ref(false)
 const notificationError = ref('')
-const roleTesterOpen = ref(false)
-const switchingTestUser = ref<string | null>(null)
+const demoRoleSwitcherOpen = ref(false)
+const switchingDemoUser = ref<string | null>(null)
 const isMobile = ref(false)
 const menuToggle = ref<HTMLButtonElement | null>(null)
 const navigationPanel = ref<HTMLElement | null>(null)
@@ -65,8 +65,8 @@ const periodFilterLabel = '报告期'
 const accountName = computed(
   () => session.userInfo?.realName || session.userInfo?.username || '当前用户',
 )
-const showRoleTester = import.meta.env.DEV
-const roleTestAccounts = [
+const showDemoRoleSwitcher = import.meta.env.DEV
+const demoRoleAccounts = [
   { role: 'pm', username: 'demo.manager', label: '项目经理' },
   { role: 'bm', username: 'demo.business', label: '商务经理' },
   { role: 'cost', username: 'demo.cost', label: '成本经理' },
@@ -256,9 +256,9 @@ async function signOut(): Promise<void> {
   }
 }
 
-async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Promise<void> {
-  if (!import.meta.env.DEV || switchingTestUser.value) return
-  switchingTestUser.value = account.username
+async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Promise<void> {
+  if (!import.meta.env.DEV || switchingDemoUser.value) return
+  switchingDemoUser.value = account.username
   session.setRequestNotice(null)
   try {
     const response = await fetch(
@@ -273,8 +273,8 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
     const target = router.resolve({ path: route.path, query }).href
     window.location.assign(target)
   } catch {
-    switchingTestUser.value = null
-    session.setRequestNotice({ code: 'DEV_ROLE_SWITCH_FAILED', message: '角色账号切换失败' })
+    switchingDemoUser.value = null
+    session.setRequestNotice({ code: 'DEV_ROLE_SWITCH_FAILED', message: '演示角色切换失败' })
   }
 }
 </script>
@@ -361,27 +361,27 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
       </div>
 
       <div
-        v-if="showRoleTester"
+        v-if="showDemoRoleSwitcher"
         class="app-shell__role-tester"
-        @keydown.esc="roleTesterOpen = false"
+        @keydown.esc="demoRoleSwitcherOpen = false"
       >
         <section
-          v-if="roleTesterOpen"
+          v-if="demoRoleSwitcherOpen"
           id="role-tester-panel"
           class="app-shell__role-tester-panel"
-          aria-label="角色测试账号"
+          aria-label="演示角色"
         >
           <header>
-            <strong>角色测试</strong>
-            <small>仅本地开发环境</small>
+            <strong>演示角色</strong>
+            <small>免密码切换 · 仅本地</small>
           </header>
           <button
-            v-for="account in roleTestAccounts"
+            v-for="account in demoRoleAccounts"
             :key="account.username"
             type="button"
             :class="{ 'is-active': session.userInfo?.username === account.username }"
-            :disabled="Boolean(switchingTestUser)"
-            @click="switchTestAccount(account)"
+            :disabled="Boolean(switchingDemoUser)"
+            @click="switchDemoAccount(account)"
           >
             <span>{{ account.label }}</span>
             <small>{{ account.username }}</small>
@@ -390,10 +390,10 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
         <button
           type="button"
           class="app-shell__role-tester-trigger"
-          aria-label="切换角色测试账号"
+          aria-label="切换演示角色"
           aria-controls="role-tester-panel"
-          :aria-expanded="roleTesterOpen"
-          @click="roleTesterOpen = !roleTesterOpen"
+          :aria-expanded="demoRoleSwitcherOpen"
+          @click="demoRoleSwitcherOpen = !demoRoleSwitcherOpen"
         >
           角
         </button>
@@ -1057,7 +1057,6 @@ async function switchTestAccount(account: (typeof roleTestAccounts)[number]): Pr
   flex: 1;
   display: flex;
   margin: 0;
-  padding: 0;
 }
 
 .app-shell__content:focus {

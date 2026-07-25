@@ -80,11 +80,11 @@ class StlSettlementWriteServiceAmountTest {
         when(contractMapper.selectById(CONTRACT_ID)).thenReturn(contract);
         when(settlementMapper.selectCount(any())).thenReturn(0L);
         when(settlementMapper.selectPage(any(Page.class), any())).thenReturn(new Page<>(0, 1));
-        when(queryService.sumVarOrderConfirmed(TENANT_ID, CONTRACT_ID))
+        when(queryService.sumVarOrderConfirmed(TENANT_ID, PROJECT_ID, CONTRACT_ID))
                 .thenReturn(new BigDecimal("100.00"));
-        when(queryService.sumSubMeasureApproved(TENANT_ID, CONTRACT_ID))
+        when(queryService.sumSubMeasureApproved(TENANT_ID, PROJECT_ID, CONTRACT_ID))
                 .thenReturn(new BigDecimal("200.00"));
-        when(queryService.sumPaidAmount(TENANT_ID, CONTRACT_ID))
+        when(queryService.sumPaidAmount(TENANT_ID, PROJECT_ID, CONTRACT_ID))
                 .thenReturn(new BigDecimal("300.00"));
         doAnswer(invocation -> {
             StlSettlement inserted = invocation.getArgument(0);
@@ -120,8 +120,8 @@ class StlSettlementWriteServiceAmountTest {
         assertEquals(new BigDecimal("12.50"), settlement.getWarrantyAmount());
         assertEquals(new BigDecimal("-62.50"), settlement.getUnpaidAmount());
         assertEquals(SettlementAmountPolicy.FORMULA_VERSION, settlement.getAmountFormulaVersion());
-        verify(queryService).sumVarOrderConfirmed(TENANT_ID, CONTRACT_ID);
-        verify(queryService).sumSubMeasureApproved(TENANT_ID, CONTRACT_ID);
-        verify(queryService).sumPaidAmount(TENANT_ID, CONTRACT_ID);
+        verify(queryService).sumVarOrderConfirmed(TENANT_ID, PROJECT_ID, CONTRACT_ID);
+        verify(queryService).sumSubMeasureApproved(TENANT_ID, PROJECT_ID, CONTRACT_ID);
+        verify(queryService).sumPaidAmount(TENANT_ID, PROJECT_ID, CONTRACT_ID);
     }
 }

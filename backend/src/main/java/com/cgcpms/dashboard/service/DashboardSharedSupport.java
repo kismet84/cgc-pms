@@ -170,8 +170,10 @@ abstract class DashboardSharedSupport {
         try {
             return YearMonth.parse(month);
         } catch (DateTimeParseException e) {
-            log.warn("Invalid dashboard month format '{}', ignoring. Expected yyyy-MM.", month);
-            return null;
+            throw new BusinessException(
+                    "INVALID_DASHBOARD_MONTH",
+                    "报告月份格式无效，应为 yyyy-MM",
+                    e);
         }
     }
 

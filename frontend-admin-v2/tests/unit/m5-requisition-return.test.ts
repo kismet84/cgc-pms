@@ -1,0 +1,152 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { REQUISITION_PERMISSIONS } from '@cgc-pms/frontend-contracts'
+import {
+  confirmMaterialReturn,
+  createRequisition,
+  deleteRequisition,
+  loadMaterialReturn,
+  loadMaterialReturnItems,
+  loadRequisition,
+  loadRequisitionItems,
+  loadRequisitions,
+  loadRequisitionTrace,
+  reverseMaterialReturn,
+  saveRequisitionItems,
+  stockOutRequisition,
+  submitRequisition,
+  updateRequisition,
+} from '@/services/supply-chain'
+
+const fetchMock = vi.fn<typeof fetch>()
+const response = (data: unknown = {}) =>
+  new Response(JSON.stringify({ code: '0', message: 'success', data }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+beforeEach(() => {
+  fetchMock.mockReset().mockResolvedValue(response({}))
+  vi.stubGlobal('fetch', fetchMock)
+})
+afterEach(() => vi.unstubAllGlobals())
+
+describe('M5 requisition, stock-out and return contract', () => {
+  it('keeps all seven actions independently permissioned', () => {
+    expect(Object.values(REQUISITION_PERMISSIONS)).toEqual([
+      'requisition:query',
+      'requisition:add',
+      'requisition:edit',
+      'requisition:delete',
+      'requisition:submit',
+      'requisition:stock-out',
+      'requisition:return',
+    ])
+  })
+
+  it('uses server stages, exact rollback, idempotency and no inventory totals', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/pages/supply-chain/RequisitionWorkspacePage.vue'),
+      'utf8',
+    )
+    expect(source).toContain("selected.value?.approvalStatus === 'DRAFT'")
+    expect(source).toContain("selected.value?.approvalStatus === 'APPROVED'")
+    expect(source).toContain("selected.value?.stockOutFlag !== '1'")
+    expect(source).toContain('crypto.randomUUID()')
+    expect(source).toContain('await deleteRequisition(createdId)')
+    expect(source).toContain('loadRequisitionTrace')
+    expect(source).toContain('warehouseLabel(item)')
+    expect(source).toContain('loadWarehouses')
+    expect(source).toContain('loadMaterials')
+    expect(source).toContain('loadPartners')
+    expect(source).toContain(':options="warehouseOptions"')
+    expect(source).toContain(':options="materialOptions"')
+    expect(source).toMatch(
+      /<V2Card title="领料申请" :heading-level="1">[\s\S]*?<template #actions>[\s\S]*?requisition-page__filter-grid[\s\S]*?查询领料单[\s\S]*?新建领料单[\s\S]*?<\/template>[\s\S]*?<\/V2Card>/,
+    )
+    expect(source).not.toContain('class="requisition-page__filters"')
+    expect(source).not.toContain("{{ item.warehouseId || '-' }}")
+    expect(source).not.toMatch(/label="[^"]*ID/)
+    expect(source).not.toMatch(
+      /availableQty\s*[+]=|totalAmount\s*[+]=|stock\/in|stock\/out|frontend-admin\/src/,
+    )
+  })
+
+  it('encodes ids and preserves decimal strings across the closed loop', async () => {
+    const signal = new AbortController().signal
+    fetchMock.mockImplementation(async (url, init) => {
+      if (
+        init?.method === 'POST' &&
+        (String(url).endsWith('/requisitions') ||
+          String(url).endsWith('/material-returns/confirm') ||
+          String(url).endsWith('/reverse'))
+      )
+        return response('9007199254740993')
+      if (String(url).endsWith('/items')) return response([])
+      if (String(url).includes('/procurement-trace/'))
+        return response({
+          requisitionItems: [],
+          stockTransactions: [],
+          costs: [],
+          materialReturnItems: [],
+          approvalInstances: [],
+          approvalRecords: [],
+        })
+      return response({ records: [], total: 0, pageNo: 1, pageSize: 20 })
+    })
+    await loadRequisitions({ projectId: 'P/1', pageNo: 2 }, signal)
+    await loadRequisition('R/1', signal)
+    await loadRequisitionItems('R/1', signal)
+    const id = await createRequisition({ projectId: 'P1', warehouseId: 'W1' })
+    await updateRequisition('R/1', { projectId: 'P1', warehouseId: 'W1' })
+    await saveRequisitionItems('R/1', [
+      {
+        requisitionId: 'R/1',
+        materialId: 'M1',
+        quantity: '9007199254740993.1234',
+        unitPrice: '3.25',
+      },
+    ])
+    await submitRequisition('R/1')
+    await stockOutRequisition('R/1')
+    await loadRequisitionTrace('R/1', signal)
+    const returnId = await confirmMaterialReturn({
+      requisitionItemId: 'RI1',
+      originalStockTxnId: 'T1',
+      quantity: '1.2500',
+      returnDate: '2026-07-24',
+      reason: '余料',
+      idempotencyKey: 'K1',
+    })
+    await loadMaterialReturn('MR/1', signal)
+    await loadMaterialReturnItems('MR/1', signal)
+    await reverseMaterialReturn('MR/1', '误退')
+    await deleteRequisition('R/1')
+    expect(id).toBe('9007199254740993')
+    expect(returnId).toBe('9007199254740993')
+    const calls = fetchMock.mock.calls
+    expect(calls.map(([url]) => String(url))).toContain('/api/requisitions/R%2F1/stock-out')
+    expect(calls.map(([url]) => String(url))).toContain('/api/procurement-trace/requisitions/R%2F1')
+    expect(calls.map(([url]) => String(url))).toContain('/api/material-returns/MR%2F1/items')
+    const itemWrite = calls.find(([url]) => String(url).endsWith('/requisitions/R%2F1/items/batch'))
+    expect(JSON.parse(String(itemWrite?.[1]?.body))[0].quantity).toBe('9007199254740993.1234')
+  })
+
+  it('propagates duplicate stock-out without client retry', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ code: 'REQUISITION_ALREADY_STOCKED_OUT', message: '领料单已出库' }),
+        {
+          status: 409,
+          headers: { 'Content-Type': 'application/json' },
+        },
+      ),
+    )
+    await expect(stockOutRequisition('R1')).rejects.toMatchObject({
+      status: 409,
+      code: 'REQUISITION_ALREADY_STOCKED_OUT',
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})

@@ -67,6 +67,10 @@ public class ExpenseApplicationService {
         if (projectId != null) {
             projectAccessChecker.checkAccess(projectId, "查看费用申请");
             wrapper.eq(ExpenseApplication::getProjectId, projectId);
+        } else {
+            List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+            if (projectIds.isEmpty()) wrapper.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment
+            else wrapper.in(ExpenseApplication::getProjectId, projectIds);
         }
         if (contractId != null) wrapper.eq(ExpenseApplication::getContractId, contractId);
         if (StringUtils.hasText(approvalStatus)) wrapper.eq(ExpenseApplication::getApprovalStatus, approvalStatus);

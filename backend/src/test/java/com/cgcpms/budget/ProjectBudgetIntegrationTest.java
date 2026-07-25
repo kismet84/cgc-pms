@@ -119,6 +119,7 @@ class ProjectBudgetIntegrationTest {
         ProjectBudget active = budgetMapper.selectById(budgetId);
         assertEquals(BudgetStatusConstants.STATUS_ACTIVE, active.getStatus());
         assertEquals(1, active.getActiveFlag());
+        assertTrue(active.getBudgetCode().matches("BUD-\\d{8}-\\d{3}"));
 
         BudgetLedger reserved = ledgerService.reserve(lineId, "PAY_REQUEST", 1001L,
                 new BigDecimal("700.00"), "reserve-1001");

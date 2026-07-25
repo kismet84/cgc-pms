@@ -90,16 +90,16 @@ public class SiteDailyLogService {
         query.orderByDesc(SiteDailyLog::getReportDate).orderByDesc(SiteDailyLog::getCreatedAt);
         Page<SiteDailyLog> page = mapper.selectPage(new Page<>(pageNo, pageSize), query);
         Set<Long> projectIds = page.getRecords().stream().map(SiteDailyLog::getProjectId).collect(Collectors.toSet());
-        Map<Long, String> names = projectIds.isEmpty() ? Map.of() : projectMapper.selectByIds(projectIds).stream()
-                .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
-        return page.convert(log -> toVO(log, names.get(log.getProjectId())));
+        Map<Long, PmProject> projects = projectIds.isEmpty() ? Map.of() : projectMapper.selectByIds(projectIds).stream()
+                .collect(Collectors.toMap(PmProject::getId, project -> project, (a, b) -> a));
+        return page.convert(log -> toVO(log, projects.get(log.getProjectId())));
     }
 
     public SiteDailyLogVO getById(Long id) {
         SiteDailyLog log = requireLog(id);
         projectAccessChecker.checkAccess(log.getProjectId(), "访问现场日报");
         PmProject project = projectMapper.selectById(log.getProjectId());
-        SiteDailyLogVO detail = toVO(log, project == null ? null : project.getProjectName());
+        SiteDailyLogVO detail = toVO(log, project);
         detail.setDeliveries(loadDeliveries(log));
         detail.setRequisitions(loadRequisitions(log));
         boolean scheduleManaged = projectScheduleService.hasActiveSchedule(log.getProjectId());
@@ -216,11 +216,15 @@ public class SiteDailyLogService {
             throw new BusinessException("SITE_DAILY_LOG_STATUS_INVALID", "现场日报状态不合法");
     }
 
-    private SiteDailyLogVO toVO(SiteDailyLog log, String projectName) {
+    private SiteDailyLogVO toVO(SiteDailyLog log, PmProject project) {
         SiteDailyLogVO vo = new SiteDailyLogVO();
         vo.setId(log.getId().toString());
         vo.setProjectId(log.getProjectId().toString());
-        vo.setProjectName(projectName);
+        vo.setProjectName(project == null ? null : project.getProjectName());
+        vo.setDailyLogCode(project == null || project.getProjectCode() == null
+                ? null
+                : project.getProjectCode() + "-DL-"
+                        + log.getReportDate().format(DateTimeUtils.DATE_COMPACT));
         vo.setReportDate(log.getReportDate().format(DateTimeUtils.DATE_FMT));
         vo.setConstructionContent(log.getConstructionContent());
         vo.setIssuesDelays(log.getIssuesDelays());

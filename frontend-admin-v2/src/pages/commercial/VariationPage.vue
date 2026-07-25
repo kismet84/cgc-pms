@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import type {
+  ContractRecord,
+  PartnerRecord,
+  ProjectContextOption,
   VariationItemRecord,
   VariationOwnerReviewCommand,
   VariationOwnerSubmissionRecord,
@@ -11,7 +14,6 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -19,12 +21,18 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import { formatAmount } from '@/pages/dashboard/model'
 import {
+  type CostSubjectOption,
   createVariation,
   deleteVariation,
+  loadContractPage,
+  loadCostSubjectOptions,
+  loadPartners,
+  loadProjectContextOptions,
   loadVariation,
   loadVariationPage,
   loadVariationTrace,
@@ -48,12 +56,20 @@ const loading = ref(false)
 const action = ref('')
 const errorMessage = ref('')
 const successMessage = useToastMessage()
+
+watch(errorMessage, (message) => {
+  if (message) showToast('error', '签证变更操作未完成', message)
+})
 const records = ref<VariationPage['records']>([])
 const total = ref(0)
 const detail = ref<VariationRecord | null>(null)
 const trace = ref<Array<{ key: string; value: string }>>([])
 const form = ref<VariationSaveCommand>(emptyForm())
 const items = ref<VariationItemRecord[]>([])
+const projects = ref<ProjectContextOption[]>([])
+const contracts = ref<ContractRecord[]>([])
+const partners = ref<PartnerRecord[]>([])
+const costSubjects = ref<CostSubjectOption[]>([])
 const siteEvidenceFile = ref<File | null>(null)
 const ownerFile = ref<File | null>(null)
 const externalDocumentNo = ref('')
@@ -77,6 +93,7 @@ let listGeneration = 0
 let detailGeneration = 0
 let listController: AbortController | null = null
 let detailController: AbortController | null = null
+let referenceController: AbortController | null = null
 
 const mode = computed<WorkspaceMode>(() => {
   const requested = typeof route.query.mode === 'string' ? route.query.mode : ''
@@ -101,6 +118,65 @@ const latestSubmission = computed<VariationOwnerSubmissionRecord | null>(
   () => detail.value?.ownerSubmissions?.at(-1) ?? null,
 )
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pageSize ?? 10))))
+const projectOptions = computed(() => {
+  const options = projects.value.map((item) => ({
+    value: item.id,
+    label: `${item.projectCode} · ${item.projectName}`,
+  }))
+  if (
+    form.value.projectId &&
+    !options.some((option) => option.value === form.value.projectId) &&
+    detail.value?.projectName
+  ) {
+    options.push({ value: form.value.projectId, label: detail.value.projectName })
+  }
+  return options
+})
+const contractOptions = computed(() => {
+  const options = contracts.value
+    .filter((item) => !form.value.projectId || item.projectId === form.value.projectId)
+    .map((item) => ({
+      value: item.id,
+      label: `${item.contractCode} · ${item.contractName}`,
+    }))
+  if (
+    form.value.contractId &&
+    !options.some((option) => option.value === form.value.contractId) &&
+    detail.value?.contractName
+  ) {
+    options.push({ value: form.value.contractId, label: detail.value.contractName })
+  }
+  return options
+})
+const partnerOptions = computed(() => {
+  const options = partners.value.map((item) => ({
+    value: item.id,
+    label: `${item.partnerCode} · ${item.partnerName}`,
+  }))
+  if (
+    form.value.partnerId &&
+    !options.some((option) => option.value === form.value.partnerId) &&
+    detail.value?.partnerName
+  ) {
+    options.push({ value: form.value.partnerId, label: detail.value.partnerName })
+  }
+  return options
+})
+const costSubjectOptions = computed(() => {
+  const options = costSubjects.value.map((item) => ({
+    value: item.id,
+    label: `${item.subjectCode} · ${item.subjectName}`,
+  }))
+  for (const [index, item] of items.value.entries()) {
+    if (item.costSubjectId && !options.some((option) => option.value === item.costSubjectId)) {
+      options.push({
+        value: item.costSubjectId,
+        label: `成本科目名称缺失（第 ${index + 1} 行）`,
+      })
+    }
+  }
+  return options
+})
 
 const APPROVAL_STATUS_LABELS: Record<string, string> = {
   DRAFT: '草稿',
@@ -231,7 +307,7 @@ async function loadList(preserveNotice = false): Promise<void> {
 async function loadDetail(preserveNotice = false): Promise<void> {
   if (!variationId.value) {
     detail.value = null
-    errorMessage.value = '缺少签证变更 ID'
+    errorMessage.value = '缺少签证变更编号'
     return
   }
   detailController?.abort()
@@ -364,7 +440,7 @@ async function saveItems(): Promise<void> {
   await runAction('保存明细', async () => {
     const command = cleanItems()
     if (command.some((item) => !item.itemName || !item.quantity || !item.costSubjectId)) {
-      throw new TypeError('明细名称、数量和成本科目 ID 不能为空')
+      throw new TypeError('明细名称、数量和成本科目不能为空')
     }
     await saveVariationItems(variationId.value, command, versionOf())
     await loadDetail(true)
@@ -484,6 +560,35 @@ function updateForm(key: keyof VariationSaveCommand, value: string): void {
   form.value = { ...form.value, [key]: value }
 }
 
+function updateProject(value: string): void {
+  form.value = { ...form.value, projectId: value, contractId: '' }
+}
+
+async function loadReferences(): Promise<void> {
+  referenceController?.abort()
+  const controller = new AbortController()
+  referenceController = controller
+  try {
+    const [projectValues, contractPage, partnerPage, subjectValues] = await Promise.all([
+      loadProjectContextOptions(controller.signal),
+      loadContractPage({ pageNo: 1, pageSize: 200 }, controller.signal),
+      loadPartners(undefined, controller.signal),
+      loadCostSubjectOptions(controller.signal),
+    ])
+    if (referenceController !== controller) return
+    projects.value = projectValues
+    contracts.value = contractPage.records
+    partners.value = partnerPage.records
+    costSubjects.value = subjectValues
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      errorMessage.value = errorText(error, '业务候选数据加载失败')
+    }
+  } finally {
+    if (referenceController === controller) referenceController = null
+  }
+}
+
 function updateItem(index: number, key: keyof VariationItemRecord, value: string): void {
   items.value = items.value.map((item, itemIndex) =>
     itemIndex === index ? { ...item, [key]: value } : item,
@@ -539,7 +644,11 @@ watch(
       items.value = []
       form.value = emptyForm()
       resetNotices()
-    } else void loadDetail()
+      void loadReferences()
+    } else {
+      void loadDetail()
+      void loadReferences()
+    }
   },
   { immediate: true },
 )
@@ -547,22 +656,15 @@ watch(
 onBeforeUnmount(() => {
   listController?.abort()
   detailController?.abort()
+  referenceController?.abort()
 })
 </script>
 
 <template>
   <div class="variation-page">
-    <V2Alert
-      v-if="errorMessage"
-      tone="danger"
-      title="操作未完成"
-      dismissible
-      @dismiss="errorMessage = ''"
-      >{{ errorMessage }}</V2Alert
-    >
     <V2Card v-if="mode === 'list'" title="签证变更" :heading-level="1">
       <template #actions>
-        <V2Button v-if="canCreate" @click="openWorkspace('create')">新建变更</V2Button>
+        <V2Button v-if="canCreate" size="small" @click="openWorkspace('create')">新建变更</V2Button>
       </template>
       <form class="variation-page__filters" @submit.prevent="search">
         <V2Input
@@ -606,11 +708,17 @@ onBeforeUnmount(() => {
         description="请稍候。"
       />
       <V2PageState
-        v-else-if="!records.length"
+        v-else-if="!records.length && !errorMessage"
         title="暂无签证变更"
         description="当前筛选条件下没有数据。"
       />
-      <div v-else class="variation-page__table-wrap">
+      <div
+        v-else-if="records.length"
+        class="variation-page__table-wrap"
+        role="region"
+        aria-label="签证变更列表"
+        tabindex="0"
+      >
         <table>
           <thead>
             <tr>
@@ -627,11 +735,18 @@ onBeforeUnmount(() => {
           <tbody>
             <tr v-for="record in records" :key="record.id">
               <td>
-                <strong>{{ record.varCode }}</strong>
+                <V2Button
+                  size="small"
+                  variant="ghost"
+                  class="v2-table__record-link"
+                  @click="openWorkspace('detail', record.id)"
+                >
+                  {{ record.varCode }}
+                </V2Button>
               </td>
               <td>{{ record.varName }}</td>
               <td>{{ record.projectName || '—' }}</td>
-              <td>{{ record.contractName || record.contractId || '—' }}</td>
+              <td>{{ record.contractName || '合同名称缺失' }}</td>
               <td>{{ formatAmount(record.reportedAmount) }}</td>
               <td>
                 <V2Badge>{{ approvalStatusLabel(record.approvalStatus) }}</V2Badge>
@@ -639,11 +754,6 @@ onBeforeUnmount(() => {
               <td>{{ ownerStatusLabel(record.ownerStatus) }}</td>
               <td class="variation-page__actions">
                 <V2Button
-                  size="small"
-                  variant="secondary"
-                  @click="openWorkspace('detail', record.id)"
-                  >查看</V2Button
-                ><V2Button
                   v-if="canEdit && record.approvalStatus === 'DRAFT'"
                   size="small"
                   variant="ghost"
@@ -684,23 +794,28 @@ onBeforeUnmount(() => {
       >
       <V2PageState v-if="loading" kind="loading" title="正在加载签证变更" description="请稍候。" />
       <form v-else class="variation-page__form" @submit.prevent="saveForm">
-        <V2Input
+        <V2Select
           :model-value="form.projectId"
-          label="项目 ID"
+          label="项目"
+          :options="projectOptions"
           required
           :disabled="mode === 'edit'"
-          @update:model-value="updateForm('projectId', $event)"
+          @update:model-value="updateProject"
         />
-        <V2Input
+        <V2Select
           :model-value="form.contractId"
-          label="合同 ID"
+          label="合同"
+          :options="contractOptions"
           required
           :disabled="mode === 'edit'"
           @update:model-value="updateForm('contractId', $event)"
         />
-        <V2Input
+        <V2Select
           :model-value="form.partnerId ?? ''"
-          label="往来单位 ID"
+          label="往来单位"
+          :options="partnerOptions"
+          allow-empty
+          placeholder="请选择往来单位"
           @update:model-value="updateForm('partnerId', $event)"
         />
         <V2Input
@@ -802,23 +917,26 @@ onBeforeUnmount(() => {
         <template #actions><V2Button @click="backToList">返回台账</V2Button></template>
       </V2PageState>
       <template v-else>
-        <V2Card :title="detail.varName" :subtitle="detail.varCode" :heading-level="1">
+        <V2Card :title="detail.varName" :heading-level="1">
           <template #actions
             ><div class="variation-page__actions">
-              <V2Button variant="secondary" @click="backToList">返回台账</V2Button
+              <V2Button size="small" variant="secondary" @click="backToList">返回台账</V2Button
               ><V2Button
                 v-if="canEdit && isDraft"
+                size="small"
                 variant="secondary"
                 @click="openWorkspace('edit', detail.id)"
                 >编辑</V2Button
               ><V2Button
                 v-if="canSubmit && isDraft"
+                size="small"
                 :loading="action === '提交审批'"
                 :disabled="busy"
                 @click="submitApproval"
                 >提交审批</V2Button
               ><V2Button
                 v-if="canDelete && isDraft"
+                size="small"
                 variant="danger"
                 :loading="action === '删除'"
                 :disabled="busy"
@@ -831,7 +949,7 @@ onBeforeUnmount(() => {
             <dt>项目</dt>
             <dd>{{ detail.projectName || '—' }}</dd>
             <dt>合同</dt>
-            <dd>{{ detail.contractName || detail.contractId || '—' }}</dd>
+            <dd>{{ detail.contractName || '合同名称缺失' }}</dd>
             <dt>审批状态</dt>
             <dd>{{ approvalStatusLabel(detail.approvalStatus) }}</dd>
             <dt>业主状态</dt>
@@ -867,8 +985,12 @@ onBeforeUnmount(() => {
               >添加明细</V2Button
             ></template
           >
-          <V2PageState v-if="!items.length" title="暂无明细" description="草稿可添加变更明细。" />
-          <div v-else class="variation-page__items">
+          <V2PageState
+            v-if="!items.length && !errorMessage"
+            title="暂无明细"
+            description="草稿可添加变更明细。"
+          />
+          <div v-else-if="items.length" class="variation-page__items">
             <div
               v-for="(item, index) in items"
               :key="item.id || index"
@@ -904,9 +1026,10 @@ onBeforeUnmount(() => {
                 :disabled="!canEditItems || !isDraft"
                 @update:model-value="updateItem(index, 'claimUnitPrice', $event)"
               />
-              <V2Input
+              <V2Select
                 :model-value="item.costSubjectId"
-                label="成本科目 ID"
+                label="成本科目"
+                :options="costSubjectOptions"
                 :disabled="!canEditItems || !isDraft"
                 @update:model-value="updateItem(index, 'costSubjectId', $event)"
               />
@@ -975,7 +1098,9 @@ onBeforeUnmount(() => {
               :key="line.submissionItemId"
               class="variation-page__item"
             >
-              <span>申报明细 {{ line.submissionItemId }}</span
+              <span>{{
+                latestSubmission?.items?.[index]?.item_name || `申报明细 ${index + 1}`
+              }}</span
               ><V2Input
                 :model-value="line.confirmedAmount"
                 label="核定金额"

@@ -17,6 +17,8 @@ public class MatRequisitionVO {
     private String requisitionCode;
     private String requisitionDate;
     private String warehouseId;
+    private String warehouseCode;
+    private String warehouseName;
     private String requisitionerId;
     private String approvalStatus;
     private String totalAmount;

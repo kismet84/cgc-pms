@@ -35,7 +35,7 @@ beforeEach(() => {
 })
 
 describe('V2 application-shell routes', () => {
-  it('keeps Legacy as ledger universe and locks four CostTarget V2 acceptances', () => {
+  it('keeps Legacy as ledger universe and locks current V2 acceptance counts', () => {
     const ledger = JSON.parse(
       readFileSync(resolve(process.cwd(), '../docs/ui-v2/route-migration-ledger.json'), 'utf8'),
     ) as {
@@ -47,8 +47,8 @@ describe('V2 application-shell routes', () => {
 
     expect(ledger.source).toBe(['frontend-admin', 'src', 'router', 'index.ts'].join('/'))
     expect(ledger.summary).toMatchObject({
-      legacyOnly: 50,
-      v2Accepted: 37,
+      legacyOnly: 37,
+      v2Accepted: 50,
       v2SourceAvailable: 0,
     })
     expect(costTargetRoutes).toEqual([
@@ -99,6 +99,20 @@ describe('V2 application-shell routes', () => {
     const quality = shell?.children?.find((route) => route.path === '/quality-safety')
     const technical = shell?.children?.find((route) => route.path === '/technical-management')
     const closeout = shell?.children?.find((route) => route.path === '/project-closeout')
+    const supplierSourcing = shell?.children?.find((route) => route.path === '/supplier-sourcing')
+    const purchaseRoot = shell?.children?.find((route) => route.path === '/purchase')
+    const purchaseRequest = shell?.children?.find(
+      (route) => route.path === '/inventory/purchase-request',
+    )
+    const purchaseOrder = shell?.children?.find((route) => route.path === '/purchase/order')
+    const purchaseReceipt = shell?.children?.find((route) => route.path === '/purchase/receipt')
+    const inventoryRoot = shell?.children?.find((route) => route.path === '/inventory')
+    const warehouse = shell?.children?.find((route) => route.path === '/inventory/warehouse')
+    const stock = shell?.children?.find((route) => route.path === '/inventory/stock')
+    const transaction = shell?.children?.find((route) => route.path === '/inventory/transaction')
+    const requisition = shell?.children?.find(
+      (route) => route.path === '/inventory/material-requisition',
+    )
     const scheduleDetail = shell?.children?.find(
       (route) => route.path === '/project-schedule/:scheduleId',
     )
@@ -134,6 +148,25 @@ describe('V2 application-shell routes', () => {
     expect(String(technical?.component)).not.toContain('ShellPlaceholderPage')
     expect(closeout?.meta?.permission).toBe('closeout:query')
     expect(String(closeout?.component)).not.toContain('ShellPlaceholderPage')
+    expect(supplierSourcing?.meta?.permission).toBe('supplier:sourcing:query')
+    expect(String(supplierSourcing?.component)).not.toContain('ShellPlaceholderPage')
+    expect(purchaseRoot?.redirect).toBeTypeOf('function')
+    expect(purchaseRoot?.meta?.permission).toBe('purchase:order:query')
+    expect(purchaseRequest?.meta?.permission).toBe('purchase:request:list')
+    expect(purchaseOrder?.meta?.permission).toBe('purchase:order:query')
+    expect(purchaseReceipt?.meta?.permission).toBe('receipt:query')
+    for (const route of [purchaseRequest, purchaseOrder, purchaseReceipt]) {
+      expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
+    }
+    expect(inventoryRoot?.redirect).toBeTypeOf('function')
+    expect(inventoryRoot?.meta?.permission).toBe('inventory:warehouse:list')
+    expect(warehouse?.meta?.permission).toBe('inventory:warehouse:list')
+    expect(stock?.meta?.permission).toBe('inventory:stock:list')
+    expect(transaction?.meta?.permission).toBe('inventory:transaction:list')
+    expect(requisition?.meta?.permission).toBe('requisition:query')
+    for (const route of [warehouse, stock, transaction, requisition]) {
+      expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
+    }
     expect(scheduleDetail?.meta?.permission).toBe('schedule:query')
     expect(String(scheduleDetail?.component)).not.toContain('ShellPlaceholderPage')
     const approval = shell?.children?.find((route) => route.path === '/approval/todo')

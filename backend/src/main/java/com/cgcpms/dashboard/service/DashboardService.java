@@ -30,7 +30,11 @@ public class DashboardService {
     }
 
     public BusinessManagerDashboardVO getBusinessManagerView(Long projectId) {
-        return projectBusinessService.getBusinessManagerView(projectId);
+        return getBusinessManagerView(projectId, null);
+    }
+
+    public BusinessManagerDashboardVO getBusinessManagerView(Long projectId, String month) {
+        return projectBusinessService.getBusinessManagerView(projectId, month);
     }
 
     public CostManagerDashboardVO getCostManagerView(Long projectId) {
@@ -66,7 +70,11 @@ public class DashboardService {
     }
 
     public FinanceDashboardVO getFinanceView(Long projectId) {
-        return financeManagementService.getFinanceView(projectId);
+        return getFinanceView(projectId, null);
+    }
+
+    public FinanceDashboardVO getFinanceView(Long projectId, String month) {
+        return financeManagementService.getFinanceView(projectId, month);
     }
 
     public ManagementDashboardVO getManagementView() {
@@ -74,10 +82,18 @@ public class DashboardService {
     }
 
     public ManagementDashboardVO getManagementView(Long projectId) {
-        return financeManagementService.getManagementView(projectId);
+        return getManagementView(projectId, null);
+    }
+
+    public ManagementDashboardVO getManagementView(Long projectId, String month) {
+        return financeManagementService.getManagementView(projectId, month);
     }
 
     public CostBreakdownVO getCostBreakdown(Long projectId) {
-        return costService.getCostBreakdown(projectId);
+        return getCostBreakdown(projectId, null);
+    }
+
+    public CostBreakdownVO getCostBreakdown(Long projectId, String month) {
+        return costService.getCostBreakdown(projectId, month);
     }
 }

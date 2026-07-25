@@ -21,6 +21,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
 } from '@/components'
 import {
   addSignWorkflowTask,
@@ -34,6 +35,7 @@ import {
   withdrawWorkflowInstance,
 } from '@/services/workflow'
 import { isApiClientError } from '@/services/request'
+import { loadProjectUsers } from '@/services/projects'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -94,11 +96,14 @@ const targetUserError = ref('')
 const additionalUsersError = ref('')
 const comment = ref('')
 const targetUserId = ref('')
-const additionalUserIds = ref('')
+const additionalUserId = ref('')
+const actionUserOptions = ref<Array<{ value: string; label: string }>>([])
+const actionUsersLoading = ref(false)
 const idempotencyKey = ref('')
 let listController: AbortController | null = null
 let businessTypesController: AbortController | null = null
 let detailController: AbortController | null = null
+let actionUsersController: AbortController | null = null
 
 const rows = computed(() => workflowRows(activeTab.value, records.value))
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
@@ -140,8 +145,8 @@ function listQuery() {
     keyword: keyword.value.trim() || undefined,
     businessType: businessType.value.trim() || undefined,
     instanceStatus: instanceStatus.value || undefined,
-    startTime: periodBounds ? `${periodBounds.startDate}T00:00:00` : undefined,
-    endTime: periodBounds ? `${periodBounds.endDate}T23:59:59` : undefined,
+    startTime: periodBounds ? `${periodBounds.startDate} 00:00:00` : undefined,
+    endTime: periodBounds ? `${periodBounds.endDate} 23:59:59` : undefined,
   }
 }
 
@@ -159,6 +164,7 @@ async function loadList() {
     records.value = []
     total.value = 0
     errorMessage.value = errorText(error, '审批列表加载失败')
+    showToast('error', '审批列表读取失败', errorMessage.value)
   } finally {
     if (!listController.signal.aborted) {
       listLoading.value = false
@@ -195,6 +201,7 @@ async function loadDetail() {
   } catch (error) {
     if (detailController.signal.aborted) return
     errorMessage.value = errorText(error, '审批详情不可访问或不存在')
+    showToast('error', '审批详情读取失败', errorMessage.value)
   } finally {
     if (!detailController.signal.aborted) detailLoading.value = false
   }
@@ -250,9 +257,38 @@ function openAction(nextAction: WorkflowUiAction) {
   additionalUsersError.value = ''
   comment.value = ''
   targetUserId.value = ''
-  additionalUserIds.value = ''
+  additionalUserId.value = ''
   idempotencyKey.value = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${instanceId.value}`
   actionOpen.value = true
+  if (nextAction === 'transfer' || nextAction === 'addSign') void loadActionUsers()
+}
+
+async function loadActionUsers() {
+  actionUsersController?.abort()
+  const controller = new AbortController()
+  actionUsersController = controller
+  actionUsersLoading.value = true
+  try {
+    const users = await loadProjectUsers(controller.signal)
+    if (actionUsersController !== controller) return
+    actionUserOptions.value = users.records
+      .filter((item) => ['ACTIVE', 'ENABLE'].includes(item.status))
+      .map((item) => ({
+        value: item.id,
+        label: item.realName ? `${item.realName}（${item.username}）` : item.username,
+      }))
+    if (!actionUserOptions.value.length) actionErrorMessage.value = '暂无可选用户'
+  } catch (error) {
+    if (!controller.signal.aborted) {
+      actionUserOptions.value = []
+      actionErrorMessage.value = errorText(error, '用户候选读取失败')
+    }
+  } finally {
+    if (actionUsersController === controller) {
+      actionUsersLoading.value = false
+      actionUsersController = null
+    }
+  }
 }
 
 async function submitAction() {
@@ -261,6 +297,7 @@ async function submitAction() {
     actionOpen.value = false
     await loadDetail()
     errorMessage.value = '当前账号无权执行该动作，详情已刷新'
+    showToast('error', '审批动作未执行', errorMessage.value)
     return
   }
   if (action.value === 'reject' && !comment.value.trim()) {
@@ -272,18 +309,16 @@ async function submitAction() {
     actionOpen.value = false
     await loadDetail()
     errorMessage.value = '当前没有可处理任务，详情已刷新'
+    showToast('error', '审批动作未执行', errorMessage.value)
     return
   }
   if (action.value === 'transfer' && !targetUserId.value.trim()) {
-    targetUserError.value = '请输入转办目标用户 ID'
+    targetUserError.value = '请选择转办用户'
     return
   }
-  const userIds = additionalUserIds.value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+  const userIds = additionalUserId.value ? [additionalUserId.value] : []
   if (action.value === 'addSign' && userIds.length === 0) {
-    additionalUsersError.value = '请输入至少一个加签用户 ID'
+    additionalUsersError.value = '请选择加签用户'
     return
   }
 
@@ -346,24 +381,14 @@ onBeforeUnmount(() => {
   listController?.abort()
   businessTypesController?.abort()
   detailController?.abort()
+  actionUsersController?.abort()
 })
 </script>
 
 <template>
   <section class="workflow-page" aria-labelledby="workflow-title">
-    <h1 id="workflow-title" class="v2-visually-hidden">审批工作台</h1>
-    <V2Alert
-      v-if="errorMessage"
-      tone="danger"
-      title="请求未完成"
-      dismissible
-      @dismiss="errorMessage = ''"
-    >
-      {{ errorMessage }}
-    </V2Alert>
-
-    <template v-if="true">
-      <V2Card class="workflow-filter">
+    <V2Card class="workflow-filter" title="审批工作台" title-id="workflow-title" :heading-level="1">
+      <template #actions>
         <form class="workflow-filter__form" @submit.prevent="search">
           <V2Input
             v-model="keyword"
@@ -396,85 +421,96 @@ onBeforeUnmount(() => {
             @update:model-value="changeInstanceStatus"
           />
           <div class="workflow-filter__actions">
-            <V2Button class="workflow-filter__search" type="submit">查询</V2Button>
-            <V2Button type="button" variant="ghost" @click="resetFilters">重置</V2Button>
+            <V2Button class="workflow-filter__search" type="submit" size="small">查询</V2Button>
+            <V2Button type="button" size="small" variant="ghost" @click="resetFilters"
+              >重置</V2Button
+            >
           </div>
         </form>
-      </V2Card>
+      </template>
+    </V2Card>
+    <p class="workflow-page__period-note">
+      口径：各标签按所选报告期的对应事件时间筛选；记录状态取当前值，不构成历史快照。
+    </p>
 
-      <V2PageState
-        v-if="listLoading && !hasLoadedList"
-        kind="loading"
-        title="正在加载审批列表"
-        description="请稍候。"
-        :heading-level="2"
-      />
-      <V2PageState
-        v-else-if="!errorMessage && rows.length === 0"
-        title="暂无审批记录"
-        description="当前筛选范围内没有可显示记录。"
-        :heading-level="2"
-      />
-      <V2Card
-        v-else
-        :title="`${WORKFLOW_TABS.find((tab) => tab.value === activeTab)?.label}（${total}）`"
-        :aria-busy="listLoading"
+    <V2PageState
+      v-if="listLoading && !hasLoadedList"
+      kind="loading"
+      title="正在加载审批列表"
+      description="请稍候。"
+      :heading-level="2"
+    />
+    <V2PageState
+      v-else-if="!errorMessage && rows.length === 0"
+      title="暂无审批记录"
+      description="当前筛选范围内没有可显示记录。"
+      :heading-level="2"
+    />
+    <V2Card
+      v-else
+      :title="WORKFLOW_TABS.find((tab) => tab.value === activeTab)?.label"
+      :aria-busy="listLoading"
+    >
+      <template #title-extra
+        ><V2Badge>{{ total }} 条</V2Badge></template
       >
-        <div class="workflow-table-wrap" role="region" aria-label="审批任务表格" tabindex="0">
-          <table class="workflow-table">
-            <caption class="v2-visually-hidden">
-              当前审批任务列表
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">审批事项</th>
-                <th scope="col">业务编号</th>
-                <th scope="col">业务类型</th>
-                <th scope="col">状态</th>
-                <th scope="col">处理人/节点</th>
-                <th scope="col">时间</th>
-                <th scope="col">说明</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in rows" :key="row.key">
-                <td>
-                  <V2Button
-                    class="workflow-table__title"
-                    variant="ghost"
-                    @click="openDetail(row.instanceId)"
-                  >
-                    <strong>{{ row.title }}</strong>
-                  </V2Button>
-                </td>
-                <td>{{ row.businessCode }}</td>
-                <td>{{ workflowBusinessTypeLabel(row.businessType) }}</td>
-                <td>
-                  <V2Badge :tone="statusTone(row.status)" dot>{{
-                    workflowStatusLabel(row.status)
-                  }}</V2Badge>
-                </td>
-                <td>{{ row.actor }}</td>
-                <td>{{ workflowDate(row.time) }}</td>
-                <td>{{ row.note }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <template #footer>
-          <nav class="workflow-pagination" aria-label="审批任务分页">
-            <span>共 {{ total }} 条</span>
-            <V2Button variant="ghost" :disabled="pageNo <= 1" @click="changePage(-1)"
-              >上一页</V2Button
-            >
-            <span>第 {{ pageNo }} 页</span>
-            <V2Button variant="ghost" :disabled="pageNo >= pageCount" @click="changePage(1)"
-              >下一页</V2Button
-            >
-          </nav>
-        </template>
-      </V2Card>
-    </template>
+      <div class="workflow-table-wrap" role="region" aria-label="审批任务表格" tabindex="0">
+        <table class="workflow-table">
+          <caption class="v2-visually-hidden">
+            当前审批任务列表
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">审批事项</th>
+              <th scope="col">业务编号</th>
+              <th scope="col">业务类型</th>
+              <th scope="col">状态</th>
+              <th scope="col">处理人/节点</th>
+              <th scope="col">时间</th>
+              <th scope="col">说明</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in rows" :key="row.key">
+              <td>
+                <strong>{{ row.title }}</strong>
+              </td>
+              <td>
+                <V2Button
+                  class="v2-table__record-link"
+                  variant="ghost"
+                  size="small"
+                  @click="openDetail(row.instanceId)"
+                >
+                  {{ row.businessCode }}
+                </V2Button>
+              </td>
+              <td>{{ workflowBusinessTypeLabel(row.businessType) }}</td>
+              <td>
+                <V2Badge :tone="statusTone(row.status)" dot>{{
+                  workflowStatusLabel(row.status)
+                }}</V2Badge>
+              </td>
+              <td>{{ row.actor }}</td>
+              <td>{{ workflowDate(row.time) }}</td>
+              <td>{{ row.note }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <template #footer>
+        <nav class="workflow-pagination" aria-label="审批任务分页">
+          <span>共 {{ total }} 条</span>
+          <V2Button variant="ghost" :disabled="pageNo <= 1" @click="changePage(-1)"
+            >上一页</V2Button
+          >
+          <span>第 {{ pageNo }} 页</span>
+          <V2Button variant="ghost" :disabled="pageNo >= pageCount" @click="changePage(1)"
+            >下一页</V2Button
+          >
+        </nav>
+      </template>
+    </V2Card>
 
     <V2Dialog
       :open="isDetailRoute"
@@ -497,7 +533,7 @@ onBeforeUnmount(() => {
         :heading-level="3"
       />
       <V2PageState
-        v-else-if="!detail"
+        v-else-if="!errorMessage && !detail"
         kind="empty"
         title="无法显示审批详情"
         description="实例不存在或当前账号无权访问。"
@@ -546,7 +582,8 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="workflow-detail-grid">
-          <V2Card title="审批节点" :heading-level="3">
+          <section class="v2-detail-dialog__section">
+            <h3>审批节点</h3>
             <ol class="workflow-timeline">
               <li v-for="node in detail.nodes" :key="node.id">
                 <V2Badge :tone="statusTone(node.nodeStatus)">{{
@@ -561,8 +598,9 @@ onBeforeUnmount(() => {
                 </div>
               </li>
             </ol>
-          </V2Card>
-          <V2Card title="操作记录" :heading-level="3">
+          </section>
+          <section class="v2-detail-dialog__section">
+            <h3>操作记录</h3>
             <ol class="workflow-timeline">
               <li v-if="detail.records.length === 0" class="workflow-timeline__empty">
                 暂无操作记录
@@ -577,7 +615,7 @@ onBeforeUnmount(() => {
                 </div>
               </li>
             </ol>
-          </V2Card>
+          </section>
         </div>
       </template>
     </V2Dialog>
@@ -594,17 +632,20 @@ onBeforeUnmount(() => {
         <V2Alert v-if="actionErrorMessage" tone="danger" title="审批动作未完成">
           {{ actionErrorMessage }}
         </V2Alert>
-        <V2Input
+        <V2Select
           v-if="action === 'transfer'"
           v-model="targetUserId"
-          label="目标用户 ID"
+          label="转办用户"
+          :options="actionUserOptions"
+          :disabled="actionUsersLoading || !actionUserOptions.length"
           :error="targetUserError"
         />
-        <V2Input
+        <V2Select
           v-if="action === 'addSign'"
-          v-model="additionalUserIds"
-          label="加签用户 ID"
-          placeholder="多个 ID 用逗号分隔"
+          v-model="additionalUserId"
+          label="加签用户"
+          :options="actionUserOptions"
+          :disabled="actionUsersLoading || !actionUserOptions.length"
           :error="additionalUsersError"
         />
         <label>
@@ -656,6 +697,11 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-3);
   align-items: end;
 }
+.workflow-page__period-note {
+  margin: 0;
+  color: var(--v2-color-text-secondary);
+  font-size: var(--v2-font-size-12);
+}
 .workflow-action-form label {
   display: grid;
   gap: var(--v2-space-1);
@@ -678,10 +724,6 @@ onBeforeUnmount(() => {
 }
 .workflow-table strong {
   color: var(--v2-color-text);
-}
-.workflow-table__title {
-  justify-content: flex-start;
-  text-align: left;
 }
 .workflow-pagination {
   display: flex;

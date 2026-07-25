@@ -10,7 +10,6 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -18,6 +17,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import { uploadSiteFile } from '@/services/delivery'
@@ -63,6 +63,10 @@ const detailLoading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
+
+watch(errorMessage, (message) => {
+  if (message) showToast('error', '产值计量操作未完成', message)
+})
 const evidenceFile = ref<File | null>(null)
 let controller: AbortController | null = null
 let detailController: AbortController | null = null
@@ -504,9 +508,6 @@ onBeforeUnmount(() => {
       description="系统未加载计量业务数据。"
       kind="forbidden"
     /><template v-else
-      ><V2Alert v-if="errorMessage" tone="danger" title="产值计量操作未完成">{{
-        errorMessage
-      }}</V2Alert
       ><V2Card title="产值计量与业主结算" :heading-level="1"
         ><template #actions
           ><div class="actions">
@@ -519,9 +520,9 @@ onBeforeUnmount(() => {
               allow-empty
               placeholder="全部状态"
               @update:model-value="changeStatus"
-            /><V2Button v-if="canMaintain" variant="secondary" @click="openPeriod"
+            /><V2Button v-if="canMaintain" size="small" variant="secondary" @click="openPeriod"
               >新建期间</V2Button
-            ><V2Button v-if="canMaintain" variant="secondary" @click="openMeasurement"
+            ><V2Button v-if="canMaintain" size="small" variant="secondary" @click="openMeasurement"
               >新建计量</V2Button
             >
           </div></template
@@ -532,13 +533,13 @@ onBeforeUnmount(() => {
           description="正在读取当前项目和报告期内的计量与业主报量。"
           kind="loading"
         /><V2PageState
-          v-else-if="!visibleMeasurements.length"
+          v-else-if="!visibleMeasurements.length && !errorMessage"
           title="暂无产值计量"
           description="当前项目、计量日期和状态下没有可访问的计量记录。"
           kind="empty"
         />
         <div
-          v-else
+          v-else-if="visibleMeasurements.length"
           class="measurement-page__table-wrap"
           role="region"
           aria-label="产值计量列表"
@@ -569,7 +570,16 @@ onBeforeUnmount(() => {
                   <td>{{ projectLabel(row) }}</td>
                   <td>{{ text(row, 'period_name', 'period_code') || '—' }}</td>
                   <td>
-                    <strong>{{ text(row, 'measure_code') || '计量单' }}</strong>
+                    <V2Button
+                      size="small"
+                      variant="ghost"
+                      class="v2-table__record-link"
+                      :aria-expanded="isExpanded(row)"
+                      :aria-controls="`measurement-detail-${text(row, 'id')}`"
+                      @click="toggleExpanded(row)"
+                    >
+                      {{ text(row, 'measure_code') || '计量单' }}
+                    </V2Button>
                   </td>
                   <td>{{ dateText(row, 'measure_date') }}</td>
                   <td>{{ text(row, 'current_reported_amount') || '—' }}</td>
@@ -592,13 +602,6 @@ onBeforeUnmount(() => {
                   <td>
                     <div class="actions">
                       <V2Button
-                        size="small"
-                        variant="secondary"
-                        :aria-expanded="isExpanded(row)"
-                        :aria-controls="`measurement-detail-${text(row, 'id')}`"
-                        @click="toggleExpanded(row)"
-                        >详情</V2Button
-                      ><V2Button
                         v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(text(row, 'status'))"
                         size="small"
                         variant="secondary"
@@ -694,7 +697,19 @@ onBeforeUnmount(() => {
                                 }}</V2Badge>
                               </td>
                               <td>
-                                {{ text(submission, 'settlement_code', 'settlement_id') || '—' }}
+                                <V2Button
+                                  v-if="
+                                    text(submission, 'settlement_id') ||
+                                    text(submission, 'status') === 'SETTLEMENT_CREATED'
+                                  "
+                                  size="small"
+                                  variant="ghost"
+                                  class="v2-table__record-link"
+                                  @click="openTrace(submission)"
+                                >
+                                  {{ text(submission, 'settlement_code') || '结算编号缺失' }}
+                                </V2Button>
+                                <span v-else>—</span>
                               </td>
                               <td>
                                 <div class="actions">
@@ -706,15 +721,6 @@ onBeforeUnmount(() => {
                                     variant="secondary"
                                     @click="openReview(submission)"
                                     >业主核定</V2Button
-                                  ><V2Button
-                                    v-if="
-                                      text(submission, 'settlement_id') ||
-                                      text(submission, 'status') === 'SETTLEMENT_CREATED'
-                                    "
-                                    size="small"
-                                    variant="secondary"
-                                    @click="openTrace(submission)"
-                                    >结算追溯</V2Button
                                   >
                                 </div>
                               </td>
@@ -889,9 +895,9 @@ onBeforeUnmount(() => {
       <section v-else-if="trace" class="v2-detail-dialog__section">
         <dl class="v2-detail-dialog__facts">
           <dt>结算编号</dt>
-          <dd>{{ text(trace, 'settlement_code', 'settlement_id', 'id') }}</dd>
+          <dd>{{ text(trace, 'settlement_code') || '结算编号缺失' }}</dd>
           <dt>计量编号</dt>
-          <dd>{{ text(trace, 'measure_code', 'measurement_id') || '—' }}</dd>
+          <dd>{{ text(trace, 'measure_code') || '计量编号缺失' }}</dd>
           <dt>结算金额</dt>
           <dd>{{ text(trace, 'settlement_amount', 'confirmed_amount') || '—' }}</dd>
           <dt>状态</dt>
@@ -966,7 +972,7 @@ onBeforeUnmount(() => {
 }
 .measurement-page__detail h3 {
   margin: 0;
-  font-size: var(--v2-font-size-15);
+  font-size: var(--v2-font-size-14);
   line-height: var(--v2-line-height-tight);
 }
 .measurement-page__empty {

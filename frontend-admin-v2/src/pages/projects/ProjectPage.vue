@@ -10,7 +10,6 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  V2Alert,
   V2ActionMenu,
   V2Badge,
   V2Button,
@@ -20,6 +19,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import { isApiClientError } from '@/services/request'
@@ -58,6 +58,9 @@ const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
+watch(errorMessage, (value) => {
+  if (value) showToast('error', '操作未完成', value)
+})
 const projects = ref<ProjectRecord[]>([])
 const total = ref(0)
 const project = ref<ProjectRecord | null>(null)
@@ -125,6 +128,10 @@ const statusOptions = computed(() =>
 )
 const roleLabel = (value: string) =>
   PROJECT_ROLE_OPTIONS.find((item) => item.value === value)?.label ?? value
+const memberName = (userId: string) =>
+  userOptions.value.find((item) => item.value === userId)?.label ?? '成员姓名缺失'
+const memberStatusLabel = (status: string) =>
+  ({ ACTIVE: '在岗', INACTIVE: '离岗', ENABLE: '启用', DISABLE: '停用' })[status] ?? '状态缺失'
 const dictLabel = (items: DictionaryItem[], value: string) =>
   items.find((item) => item.dictValue === value)?.dictLabel ?? value
 const approvalStatusLabels: Record<string, string> = {
@@ -158,7 +165,7 @@ const confirmationCopy = computed(() => {
   if (pending.kind === 'member')
     return {
       title: '移除项目成员',
-      description: `确认移除成员 ${pending.member.userId}？该成员将失去当前项目角色。`,
+      description: `确认移除成员 ${memberName(pending.member.userId)}？该成员将失去当前项目角色。`,
       confirmText: '确认移除',
       danger: true,
     }
@@ -222,7 +229,7 @@ function hydrateQuery() {
   filter.pageNo = Number.isInteger(page) && page > 0 ? page : 1
 }
 
-async function load(preserveNotice = false) {
+async function load(preserveNotice = false): Promise<boolean> {
   controller?.abort()
   controller = new AbortController()
   const active = ++requestId
@@ -285,6 +292,7 @@ async function load(preserveNotice = false) {
       }
       if (mode.value === 'edit') Object.assign(form, projectCommand(current))
     }
+    return true
   } catch (error) {
     if (!controller.signal.aborted && active === requestId) {
       project.value = null
@@ -292,9 +300,14 @@ async function load(preserveNotice = false) {
       members.value = []
       errorMessage.value = message(error, '项目数据加载失败')
     }
+    return false
   } finally {
     if (active === requestId) loading.value = false
   }
+}
+
+async function refreshProjects() {
+  if (await load()) showToast('success', '刷新完成', '项目台账已刷新。')
 }
 
 function openCreate() {
@@ -449,7 +462,6 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="project-page" aria-labelledby="project-title">
-    <V2Alert v-if="errorMessage" tone="danger" title="请求未完成">{{ errorMessage }}</V2Alert>
     <V2PageState
       v-if="loading"
       kind="loading"
@@ -460,10 +472,14 @@ onBeforeUnmount(() => {
     />
 
     <template v-else-if="mode === 'list'">
-      <V2Card class="project-page__toolbar-card">
+      <V2Card
+        class="project-page__toolbar-card"
+        title="项目台账"
+        title-id="project-title"
+        :heading-level="1"
+      >
         <template #actions>
           <form class="project-page__filters" @submit.prevent="search">
-            <h1 id="project-title" class="v2-visually-hidden">项目台账</h1>
             <V2Input
               v-model="filter.keyword"
               type="search"
@@ -489,8 +505,10 @@ onBeforeUnmount(() => {
               placeholder="全部状态"
               @update:model-value="applySelectFilter('status', $event)"
             />
-            <V2Button type="submit">查询</V2Button>
-            <V2Button type="button" size="small" variant="ghost" @click="load()">刷新</V2Button>
+            <V2Button type="submit" size="small">查询</V2Button>
+            <V2Button type="button" size="small" variant="ghost" @click="refreshProjects"
+              >刷新</V2Button
+            >
             <V2Button v-if="can('project:add')" type="button" size="small" @click="openCreate"
               >新建项目</V2Button
             >
@@ -498,13 +516,13 @@ onBeforeUnmount(() => {
         </template>
       </V2Card>
       <V2PageState
-        v-if="!projects.length"
+        v-if="!projects.length && !errorMessage"
         kind="empty"
         title="没有可见项目"
         description="调整查询条件，或联系管理员核对项目范围。"
         :heading-level="2"
       />
-      <V2Card v-else title="项目台账" :heading-level="2">
+      <V2Card v-else>
         <div class="project-page__table-wrap" role="region" aria-label="项目台账" tabindex="0">
           <table class="project-page__table v2-table--top">
             <caption class="v2-visually-hidden">
@@ -523,7 +541,16 @@ onBeforeUnmount(() => {
             </thead>
             <tbody>
               <tr v-for="(item, index) in projects" :key="item.id">
-                <th scope="row" class="project-page__primary">{{ item.projectCode }}</th>
+                <th scope="row" class="project-page__primary">
+                  <V2Button
+                    size="small"
+                    variant="ghost"
+                    class="v2-table__record-link"
+                    @click="go(`/project/${item.id}/overview`)"
+                  >
+                    {{ item.projectCode }}
+                  </V2Button>
+                </th>
                 <td>{{ item.projectName }}</td>
                 <td>{{ dictLabel(projectTypes, item.projectType) }}</td>
                 <td>
@@ -537,12 +564,6 @@ onBeforeUnmount(() => {
                 <td>{{ item.contractAmount || '0' }} 元</td>
                 <td>
                   <div class="project-page__actions">
-                    <V2Button
-                      size="small"
-                      variant="secondary"
-                      @click="go(`/project/${item.id}/overview`)"
-                      >总览</V2Button
-                    >
                     <V2ActionMenu
                       v-if="hasMoreActions(item)"
                       :label="`${item.projectName}更多操作`"
@@ -622,7 +643,6 @@ onBeforeUnmount(() => {
         :title="project.projectName"
         title-id="project-title"
         :heading-level="1"
-        :subtitle="`${project.projectCode} · ${dictLabel(projectStatuses, project.status)}`"
       >
         <template #actions
           ><div class="project-page__actions project-page__detail-actions">
@@ -705,7 +725,9 @@ onBeforeUnmount(() => {
       </template>
 
       <template v-if="mode === 'members'">
-        <V2Card title="项目成员" :subtitle="`共 ${members.length} 人`"
+        <V2Card title="项目成员"
+          ><template #title-extra
+            ><V2Badge tone="neutral">共 {{ members.length }} 人</V2Badge></template
           ><template #actions
             ><V2Button v-if="can('project:member:add')" size="small" @click="openMember()"
               >添加成员</V2Button
@@ -714,10 +736,10 @@ onBeforeUnmount(() => {
           <div class="project-page__members">
             <article v-for="member in members" :key="member.id">
               <div>
-                <strong>用户 {{ member.userId }}</strong>
+                <strong>{{ memberName(member.userId) }}</strong>
                 <p>
                   {{ roleLabel(member.roleCode) }} · {{ member.positionName || '未填写岗位' }} ·
-                  {{ member.status }}
+                  {{ memberStatusLabel(member.status) }}
                 </p>
               </div>
               <div class="project-page__actions">
@@ -739,7 +761,7 @@ onBeforeUnmount(() => {
             </article>
           </div>
           <V2PageState
-            v-if="!members.length"
+            v-if="!members.length && !errorMessage"
             kind="empty"
             title="暂无项目成员"
             description="具备添加权限的账号可维护成员。"
@@ -797,18 +819,13 @@ onBeforeUnmount(() => {
     >
       <form class="project-page__form project-page__form--dialog" @submit.prevent="saveMember">
         <V2Select
-          v-if="userOptions.length && !editingMemberId"
+          v-if="!editingMemberId"
           v-model="memberForm.userId"
           label="用户"
           :options="userOptions"
+          placeholder="请选择用户"
+          :disabled="!userOptions.length"
           required
-        /><V2Input
-          v-else
-          v-model="memberForm.userId"
-          label="用户 ID"
-          :disabled="Boolean(editingMemberId)"
-          required
-          hint="无用户目录权限时，请输入已确认的用户 ID。"
         /><V2Select
           v-model="memberForm.roleCode"
           label="项目角色"

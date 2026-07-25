@@ -311,10 +311,10 @@ public class StlSettlementWriteService {
         }
         SettlementAmountSnapshot snapshot = SettlementAmountPolicy.calculate(
                 contract.getCurrentAmount(),
-                queryService.sumVarOrderConfirmed(tenantId, contract.getId()),
-                queryService.sumSubMeasureApproved(tenantId, contract.getId()),
+                queryService.sumVarOrderConfirmed(tenantId, settlement.getProjectId(), contract.getId()),
+                queryService.sumSubMeasureApproved(tenantId, settlement.getProjectId(), contract.getId()),
                 settlement.getDeductionAmount(),
-                queryService.sumPaidAmount(tenantId, contract.getId()));
+                queryService.sumPaidAmount(tenantId, settlement.getProjectId(), contract.getId()));
         BigDecimal performanceCeiling = snapshot.effectiveContractAmount()
                 .add(snapshot.confirmedVariationAmount());
         if (snapshot.finalAmount().compareTo(BigDecimal.ZERO) <= 0
@@ -374,10 +374,10 @@ public class StlSettlementWriteService {
 
         SettlementAmountSnapshot snapshot = SettlementAmountPolicy.calculate(
                 contract.getCurrentAmount(),
-                queryService.sumVarOrderConfirmed(tenantId, contractId),
-                queryService.sumSubMeasureApproved(tenantId, contractId),
+                queryService.sumVarOrderConfirmed(tenantId, contract.getProjectId(), contractId),
+                queryService.sumSubMeasureApproved(tenantId, contract.getProjectId(), contractId),
                 settlement.getDeductionAmount(),
-                queryService.sumPaidAmount(tenantId, contractId));
+                queryService.sumPaidAmount(tenantId, contract.getProjectId(), contractId));
 
         settlement.setContractAmount(snapshot.effectiveContractAmount());
         settlement.setChangeAmount(snapshot.confirmedVariationAmount());

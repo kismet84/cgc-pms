@@ -7,6 +7,7 @@ export interface ProjectListItem {
 
 export interface ProjectContextOption {
   id: string;
+  projectCode: string;
   projectName: string;
   status: string;
 }

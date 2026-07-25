@@ -31,6 +31,9 @@ public class ProjectBudget extends BaseEntity {
     @NotNull(message = "项目不能为空")
     private Long projectId;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String budgetCode;
+
     @NotBlank(message = "预算版本号不能为空")
     private String versionNo;
 

@@ -27,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -151,7 +152,8 @@ class CashJournalEntryMapperTest {
 
         CashJournalQuery query = new CashJournalQuery();
         query.setAccountId(account.getId());
-        var records = entryMapper.selectPageWithBalance(new Page<CashJournalEntryVO>(1, 20), TENANT_ID, query)
+        var records = entryMapper.selectPageWithBalance(
+                        new Page<CashJournalEntryVO>(1, 20), TENANT_ID, query, List.of())
                 .getRecords();
 
         assertEquals("110.00", records.stream().filter(row -> row.getId().equals(String.valueOf(current.getId())))

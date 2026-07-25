@@ -12,6 +12,7 @@ describe('M1 responsive and error-state baseline', () => {
         kind: 'loading',
         title: '正在加载工作区',
         description: '只加载页面结构',
+        headingLevel: 1,
       },
     })
 
