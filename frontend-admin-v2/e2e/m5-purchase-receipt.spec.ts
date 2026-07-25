@@ -18,7 +18,9 @@ async function selectBusinessOption(
   await trigger.click()
   const option = scope.getByRole('option', { name: optionName })
   await expect(option).toBeVisible()
-  await option.click()
+  await option.focus()
+  await option.press('Enter')
+  await expect(trigger).toHaveAccessibleName(optionName)
 }
 
 const permissions = [
