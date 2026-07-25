@@ -374,7 +374,7 @@ class BidCostServiceTest {
         bid.setBidProjectName("跨租户冲销隔离");
         Long id = bidCostService.create(bid);
         insertBidCostItem(id);
-        long otherCostId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        long otherCostId = -id;
         jdbcTemplate.update("""
                 INSERT INTO cost_item
                     (id,tenant_id,project_id,cost_subject_id,cost_type,amount,amount_without_tax,tax_amount,

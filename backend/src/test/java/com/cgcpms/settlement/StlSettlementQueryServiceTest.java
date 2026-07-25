@@ -75,6 +75,7 @@ class StlSettlementQueryServiceTest {
     @Autowired private JdbcTemplate jdbcTemplate;
 
     private Long settlementId;
+    private Long variationId;
 
     @BeforeEach
     void setUp() {
@@ -297,8 +298,8 @@ class StlSettlementQueryServiceTest {
                         + "AND deleted_flag=0 ORDER BY id LIMIT 1",
                 Long.class, TENANT_ID, PROJECT_ID);
         jdbcTemplate.update("UPDATE var_order SET project_id=? "
-                        + "WHERE tenant_id=? AND contract_id=? AND var_name='settlement-query-test-variation'",
-                otherProjectId, TENANT_ID, CONTRACT_ID);
+                        + "WHERE id=? AND tenant_id=? AND contract_id=?",
+                otherProjectId, variationId, TENANT_ID, CONTRACT_ID);
         jdbcTemplate.update("UPDATE cost_item SET project_id=? "
                         + "WHERE tenant_id=? AND contract_id=? AND source_type='SETTLEMENT_QUERY_TEST_COST'",
                 otherProjectId, TENANT_ID, CONTRACT_ID);
@@ -327,7 +328,7 @@ class StlSettlementQueryServiceTest {
         assertEquals(after.getPaidAmount(), baseline.getCurrentPaidAmount());
 
         assertTrue(queryService.getVariations(settlementId).stream()
-                .noneMatch(item -> "VO-SETTLEMENT-QUERY-001".equals(item.getVarCode())));
+                .noneMatch(item -> String.valueOf(variationId).equals(item.getId())));
         assertTrue(queryService.getCosts(settlementId).stream()
                 .noneMatch(item -> "1234.56".equals(item.getAmount())));
         assertTrue(queryService.getPayments(settlementId).stream()
@@ -335,7 +336,7 @@ class StlSettlementQueryServiceTest {
                         && item.getApplyCode().startsWith("PAY-SETTLEMENT-QUERY-")));
         SettlementSourcesVO sources = queryService.getSources(settlementId);
         assertTrue(sources.getVarOrders().stream()
-                .noneMatch(item -> "VO-SETTLEMENT-QUERY-001".equals(item.getVarCode())));
+                .noneMatch(item -> variationId.equals(item.getId())));
         assertTrue(sources.getSubMeasures().stream()
                 .noneMatch(item -> "SM-SETTLEMENT-QUERY-001".equals(item.getMeasureCode())));
         assertTrue(sources.getPayRecords().isEmpty());
@@ -557,6 +558,7 @@ class StlSettlementQueryServiceTest {
         order.setCostGeneratedFlag(0);
         order.setCreatedBy(USER_ID);
         varOrderMapper.insert(order);
+        variationId = order.getId();
     }
 
     private void seedMeasure() {

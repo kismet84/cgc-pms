@@ -97,8 +97,14 @@ class M6ReadOnlyCanaryTest {
         assertEmptyPage("/settlements", "settlement:query");
         assertEmptyPage("/expenses", "expense:query");
         assertEmptyPage("/invoices", "invoice:query");
-        assertEmptyPage("/cash-journal-entries", "cashbook:journal:query");
         assertEmptyPage("/accounting-entry", "accounting:query");
+
+        Long projectId = jdbcTemplate.queryForObject(
+                "SELECT id FROM pm_project WHERE tenant_id=0 AND deleted_flag=0 ORDER BY id LIMIT 1",
+                Long.class);
+        mockMvc.perform(apiGet("/cash-journal-entries?projectId=" + projectId)
+                        .cookie(cookie(999L, 0L, List.of("cashbook:journal:query"))))
+                .andExpect(status().isForbidden());
     }
 
     @Test
