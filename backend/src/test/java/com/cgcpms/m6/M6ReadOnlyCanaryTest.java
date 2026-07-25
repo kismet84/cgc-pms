@@ -19,6 +19,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -101,7 +102,7 @@ class M6ReadOnlyCanaryTest {
         assertProjectScopedListFailsClosed("/expenses", "expense:query", projectId);
         assertProjectScopedListFailsClosed("/invoices", "invoice:query", projectId);
         assertProjectScopedListFailsClosed("/cash-journal-entries", "cashbook:journal:query", projectId);
-        assertProjectScopedListFailsClosed("/accounting-entry", "accounting:query", projectId);
+        assertAccountingProjectFactsHidden("accounting:query");
     }
 
     @Test
@@ -136,6 +137,19 @@ class M6ReadOnlyCanaryTest {
         var payload = objectMapper.readTree(result.getResponse().getContentAsString());
         assertEquals("0", payload.path("code").asText());
         assertEquals(0L, payload.path("data").path("total").asLong());
+    }
+
+    private void assertAccountingProjectFactsHidden(String permission) throws Exception {
+        var result = mockMvc.perform(apiGet("/accounting-entry")
+                        .cookie(cookie(999L, 0L, List.of(permission))))
+                .andExpect(status().isOk())
+                .andReturn();
+        var payload = objectMapper.readTree(result.getResponse().getContentAsString());
+        assertEquals("0", payload.path("code").asText());
+        for (var record : payload.path("data").path("records")) {
+            var projectId = record.path("projectId");
+            assertTrue(projectId.isNull() || projectId.isMissingNode());
+        }
     }
 
     private Cookie cookie(List<String> permissions) {
