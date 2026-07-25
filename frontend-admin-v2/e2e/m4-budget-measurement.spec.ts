@@ -24,6 +24,7 @@ const denied = { ...business, userId: '2', username: 'denied', permissions: [] }
 const budget = {
   id: '9007199254740993',
   projectId: 'P1',
+  budgetCode: 'BUD-001',
   versionNo: 'V1',
   budgetName: '项目预算',
   totalAmount: '9007199254740993.12',
@@ -180,6 +181,7 @@ async function installBudgetCrud(page: Page, operations: BudgetOperation[]) {
         ...budget,
         ...command,
         id: 'NEW-1',
+        budgetCode: 'BUD-NEW-1',
         approvalStatus: 'DRAFT',
         status: 'DRAFT',
         active: false,
@@ -263,7 +265,7 @@ test.describe('M4 budget and measurement routes', () => {
     await install(page, writes)
     const errors = captureRuntimeErrors(page)
     await audit(page, '/v2/budget?projectId=P1&period=2026-07', '项目预算')
-    await page.getByRole('button', { name: '详情' }).click()
+    await page.getByRole('button', { name: 'BUD-001' }).click()
     await expect(page.getByRole('dialog')).toContainText('9007199254740993')
     await expect(page.getByRole('dialog')).toContainText('9007199254740993.13')
     await page.getByRole('button', { name: '关闭' }).click()
@@ -296,7 +298,7 @@ test.describe('M4 budget and measurement routes', () => {
     await expect(page.getByText('预算已更新')).toBeVisible()
 
     row = page.getByRole('row').filter({ hasText: 'E2E编辑预算' })
-    await row.getByRole('button', { name: '详情' }).click()
+    await row.getByRole('button', { name: 'BUD-NEW-1' }).click()
     await page.getByRole('button', { name: '添加明细' }).click()
     await page.getByRole('button', { name: '成本科目：请选择' }).click()
     await page.getByRole('option', { name: 'COST-001 · 直接成本' }).click()

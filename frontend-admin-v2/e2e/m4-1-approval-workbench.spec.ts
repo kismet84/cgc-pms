@@ -143,10 +143,7 @@ test.describe('M4-1 approval workbench', () => {
     ]) {
       await page.setViewportSize(viewport)
       await page.goto('/v2/approval/todo')
-      await expect(page.getByRole('heading', { level: 1, name: '审批工作台' })).toBeAttached()
-      await expect(page.getByRole('heading', { level: 1, name: '审批工作台' })).toHaveClass(
-        /v2-visually-hidden/,
-      )
+      await expect(page.getByRole('heading', { level: 1, name: '审批工作台' })).toBeVisible()
       const filterLabels = page.locator('.workflow-filter .v2-field__label')
       await expect(filterLabels).toHaveCount(3)
       expect(
@@ -155,7 +152,7 @@ test.describe('M4-1 approval workbench', () => {
         ),
       ).toBe(true)
       await expect(page.getByLabel('审批任务表格')).toBeVisible()
-      await expect(page.getByRole('button', { name: '付款申请审批', exact: true })).toBeVisible()
+      await expect(page.getByText('付款申请审批', { exact: true })).toBeVisible()
       await expect(page.getByRole('cell', { name: 'PAY-2026-001', exact: true })).toBeVisible()
 
       for (const tab of ['我已处理', '抄送我的', '我发起', '待我处理']) {
@@ -163,7 +160,7 @@ test.describe('M4-1 approval workbench', () => {
         await expect(page.getByText('付款申请审批', { exact: true })).toBeVisible()
       }
 
-      await page.getByRole('button', { name: '付款申请审批', exact: true }).click()
+      await page.getByRole('button', { name: 'PAY-2026-001', exact: true }).click()
       await expect(page).toHaveURL(/\/v2\/approval\/instances\/81\?returnTab=todo$/)
       const detailDialog = page.getByRole('dialog', { name: '审批详情' })
       await expect(detailDialog).toBeVisible()

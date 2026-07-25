@@ -699,7 +699,7 @@ onBeforeUnmount(() => {
 }
 .workflow-page__period-note {
   margin: 0;
-  color: var(--v2-color-text-muted);
+  color: var(--v2-color-text-secondary);
   font-size: var(--v2-font-size-12);
 }
 .workflow-action-form label {

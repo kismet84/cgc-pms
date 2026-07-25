@@ -135,6 +135,26 @@ async function installIdentity(page: Page, readIdentity: () => Identity): Promis
       }),
     }),
   )
+  await page.route(/\/api\/partners(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '0',
+        message: 'success',
+        data: { records: [], total: 0, pageNo: 1, pageSize: 200 },
+      }),
+    }),
+  )
+  await page.route(
+    /\/api\/supplier-sourcing\/(?:events|performance|returns)(?:\?.*)?$/,
+    (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: '0', message: 'success', data: [] }),
+      }),
+  )
   await page.route('**/api/notifications/unread-count', (route) =>
     route.fulfill({
       status: 200,

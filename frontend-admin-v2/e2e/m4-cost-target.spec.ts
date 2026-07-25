@@ -230,9 +230,7 @@ test.describe('M4 cost target routes', () => {
     await page.getByRole('button', { name: '激活版本' }).click()
     await page.getByRole('button', { name: '确认激活' }).click()
 
-    await expect(
-      page.locator('.v2-alert__message').filter({ hasText: '其他版本已被激活' }).first(),
-    ).toBeVisible()
+    await expect(page.getByText('其他版本已被激活', { exact: true }).first()).toBeVisible()
     expect(activationUrls).toHaveLength(1)
     expect(new URL(activationUrls[0]!).searchParams.get('version')).toBe('7')
     expect(detailReads).toBeGreaterThanOrEqual(2)
