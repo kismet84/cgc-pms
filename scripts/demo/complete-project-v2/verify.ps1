@@ -38,7 +38,7 @@ UNION ALL SELECT 'receivable',COUNT(*) FROM account_receivable WHERE tenant_id=0
 UNION ALL SELECT 'collection',COUNT(*) FROM collection_record WHERE tenant_id=0 AND collection_code='M52-COLLECTION-001' AND deleted_flag=0
 UNION ALL SELECT 'quality_issue',COUNT(*) FROM qs_issue WHERE tenant_id=0 AND issue_code='M52-QS-ISSUE-001' AND status='CLOSED' AND deleted_flag=0
 UNION ALL SELECT 'rectification',COUNT(*) FROM qs_rectification WHERE tenant_id=0 AND issue_id=520000000000003203 AND status='PASSED' AND deleted_flag=0
-UNION ALL SELECT 'progress',COUNT(*) FROM project_progress_snapshot WHERE tenant_id=0 AND project_id=520000000000000001 AND status='COMPLETED'
+UNION ALL SELECT 'progress',COUNT(*) FROM project_progress_snapshot WHERE tenant_id=0 AND id=520000000000003001 AND project_id=520000000000000001 AND status='COMPLETED'
 UNION ALL SELECT 'workflow_instance',COUNT(*) FROM wf_instance WHERE tenant_id=0 AND id=520000000000000901 AND instance_status='APPROVED' AND deleted_flag=0
 UNION ALL SELECT 'workflow_task',COUNT(*) FROM wf_task WHERE tenant_id=0 AND instance_id=520000000000000901 AND task_status='APPROVED' AND deleted_flag=0
 UNION ALL SELECT 'workflow_record',COUNT(*) FROM wf_record WHERE tenant_id=0 AND instance_id=520000000000000901 AND record_status='EFFECTIVE' AND deleted_flag=0
@@ -55,8 +55,8 @@ UNION ALL SELECT 'invoice_allocation_delta',ABS(
   COALESCE((SELECT invoice_amount FROM pay_invoice WHERE id=520000000000004101),0)
   -COALESCE((SELECT SUM(allocated_amount) FROM invoice_payment_allocation WHERE invoice_id=520000000000004101),0))
 UNION ALL SELECT 'measurement_period',COUNT(*) FROM measurement_period WHERE tenant_id=0 AND period_code LIKE 'M52-MEASURE-%' AND deleted_flag=0
-UNION ALL SELECT 'production_measurement',COUNT(*) FROM production_measurement WHERE tenant_id=0 AND measure_code LIKE 'M52-PM-%' AND deleted_flag=0
-UNION ALL SELECT 'owner_measurement_submission',COUNT(*) FROM owner_measurement_submission WHERE tenant_id=0 AND submission_code LIKE 'M52-OWNER-SUB-%' AND deleted_flag=0
+UNION ALL SELECT 'production_measurement',COUNT(*) FROM production_measurement WHERE tenant_id=0 AND measure_code IN ('PM-202504-001','PM-202505-001','PM-202506-001') AND deleted_flag=0
+UNION ALL SELECT 'owner_measurement_submission',COUNT(*) FROM owner_measurement_submission WHERE tenant_id=0 AND submission_code IN ('OMS-202504-001-R1','OMS-202505-001-R1') AND deleted_flag=0
 UNION ALL SELECT 'site_daily_log',COUNT(*) FROM site_daily_log WHERE tenant_id=0 AND id BETWEEN 520000000000005501 AND 520000000000005503 AND deleted_flag=0
 UNION ALL SELECT 'measurement_amount_delta',ABS(
   COALESCE((SELECT current_reported_amount FROM production_measurement WHERE id=520000000000005301),0)

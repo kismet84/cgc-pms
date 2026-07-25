@@ -208,6 +208,7 @@ public class BusinessObjectAuthorizer {
         String requiredAuthority = switch (upperType) {
             case "CASH_JOURNAL" -> cashJournalAuthority;
             case "SITE_DAILY_LOG" -> write ? "site:daily:edit" : "site:daily:query";
+            case "SUBCONTRACT" -> write ? "subcontract:measure:edit" : "subcontract:measure:query";
             case "PRODUCTION_MEASUREMENT" -> write ? measurementFileAuthority(documentType) : "measurement:query";
             case "OWNER_MEASUREMENT_SUBMISSION" -> write ? "measurement:owner:review" : "measurement:query";
             default -> genericAuthority;

@@ -151,7 +151,7 @@ describe('M4 cost target page', () => {
   it('loads header and items for detail with abort signals', async () => {
     const { wrapper } = await mountPage(['cost:target:query'])
 
-    await button(wrapper, '详情')!.trigger('click')
+    await button(wrapper, 'V1')!.trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('6001 · 材料费')
     expect(wrapper.text()).not.toContain('S1')
@@ -166,8 +166,8 @@ describe('M4 cost target page', () => {
     vi.mocked(loadCostTargetPage).mockRejectedValueOnce(apiError('目标成本服务暂不可用', 500))
     const { wrapper } = await mountPage(['cost:target:query'])
 
-    expect(wrapper.text()).toContain('目标成本服务暂不可用')
-    expect(wrapper.text()).toContain('暂无目标成本')
+    expect(toastItems.some((toast) => toast.message.includes('目标成本服务暂不可用'))).toBe(true)
+    expect(wrapper.text()).not.toContain('暂无目标成本')
     expect(wrapper.text()).not.toContain('首版目标成本')
   })
 
@@ -175,10 +175,10 @@ describe('M4 cost target page', () => {
     vi.mocked(loadCostTarget).mockRejectedValueOnce(apiError('目标成本不存在', 404))
     const { wrapper } = await mountPage(['cost:target:query'])
 
-    await button(wrapper, '详情')!.trigger('click')
+    await button(wrapper, 'V1')!.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('目标成本不存在')
+    expect(toastItems.some((toast) => toast.message.includes('目标成本不存在'))).toBe(true)
     expect(wrapper.get('[role="dialog"]').text()).not.toContain('首版目标成本')
   })
 
@@ -263,7 +263,9 @@ describe('M4 cost target page', () => {
     await button(wrapper, '保存明细')!.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('明细合计与目标总额不一致')
+    expect(toastItems.some((toast) => toast.message.includes('明细合计与目标总额不一致'))).toBe(
+      true,
+    )
     expect(loadCostTarget).toHaveBeenCalledTimes(2)
     expect(loadCostTargetItems).toHaveBeenCalledTimes(2)
   })
@@ -300,7 +302,7 @@ describe('M4 cost target page', () => {
     await button(wrapper, '确认提交')!.trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('目标成本版本已变更')
+    expect(toastItems.some((toast) => toast.message.includes('目标成本版本已变更'))).toBe(true)
     expect(loadCostTarget).toHaveBeenCalledTimes(2)
     expect(loadCostTargetItems).toHaveBeenCalledTimes(2)
   })
@@ -319,7 +321,7 @@ describe('M4 cost target page', () => {
     await flushPromises()
 
     expect(activateCostTarget).toHaveBeenCalledWith('81', '7')
-    expect(wrapper.text()).toContain('其他版本已被激活')
+    expect(toastItems.some((toast) => toast.message.includes('其他版本已被激活'))).toBe(true)
     expect(loadCostTarget).toHaveBeenCalledTimes(2)
   })
 
@@ -336,7 +338,7 @@ describe('M4 cost target page', () => {
 
     expect(deleteCostTarget).toHaveBeenCalledWith('81', '7')
     expect(loadCostTargetPage).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('目标成本已被引用')
+    expect(toastItems.some((toast) => toast.message.includes('目标成本已被引用'))).toBe(true)
     expect(wrapper.text()).toContain('首版目标成本')
   })
 
@@ -356,7 +358,7 @@ describe('M4 cost target page', () => {
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('目标成本已被修改')
+    expect(toastItems.some((toast) => toast.message.includes('目标成本已被修改'))).toBe(true)
     expect(wrapper.get('input[aria-label="版本名称"]').element).toHaveProperty(
       'value',
       '服务端权威版',

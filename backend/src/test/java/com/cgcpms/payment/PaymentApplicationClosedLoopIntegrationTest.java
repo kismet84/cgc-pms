@@ -636,6 +636,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
         budget.setId(BUDGET_ID);
         budget.setTenantId(TENANT_ID);
         budget.setProjectId(PROJECT_ID);
+        budget.setBudgetCode("BUD-PAYMENT-CLOSED-LOOP");
         budget.setVersionNo("V1");
         budget.setBudgetName("付款闭环预算");
         budget.setTotalAmount(new BigDecimal("1000.00"));

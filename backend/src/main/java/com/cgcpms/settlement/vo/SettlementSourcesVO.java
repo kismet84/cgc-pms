@@ -2,7 +2,6 @@ package com.cgcpms.settlement.vo;
 
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Data
@@ -17,7 +16,7 @@ public class SettlementSourcesVO {
         private String varCode;
         private String varName;
         private String varType;
-        private BigDecimal confirmedAmount;
+        private String confirmedAmount;
         private String approvalStatus;
     }
 
@@ -26,14 +25,14 @@ public class SettlementSourcesVO {
         private Long id;
         private String measureCode;
         private String measurePeriod;
-        private BigDecimal approvedAmount;
+        private String approvedAmount;
         private String approvalStatus;
     }
 
     @Data
     public static class PayRecordVO {
         private Long id;
-        private BigDecimal payAmount;
+        private String payAmount;
         private String payDate;
         private String payMethod;
         private String voucherNo;

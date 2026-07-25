@@ -2,7 +2,7 @@
 import { canOpenReportTarget, type ReportCatalogItem } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { V2Alert, V2Badge, V2Button, V2Card, V2PageState } from '@/components'
+import { V2Badge, V2Button, V2Card, V2PageState, showToast } from '@/components'
 import { navigationDomains } from '@/navigation/catalog'
 import { isApiClientError } from '@/services/request'
 import { loadReportCatalog } from '@/services/reports'
@@ -40,7 +40,7 @@ function open(item: ReportCatalogItem) {
   if (canOpen(item)) void router.push(item.target)
 }
 
-async function refresh() {
+async function load() {
   controller?.abort()
   controller = new AbortController()
   loading.value = true
@@ -51,34 +51,35 @@ async function refresh() {
     if (!controller.signal.aborted) {
       items.value = []
       errorMessage.value = isApiClientError(error) ? error.message : '报表目录加载失败'
+      showToast('error', '报表目录读取失败', errorMessage.value)
     }
   } finally {
     if (!controller.signal.aborted) loading.value = false
   }
 }
 
-void refresh()
+async function refreshCatalog() {
+  await load()
+  showToast(
+    errorMessage.value ? 'error' : 'success',
+    errorMessage.value ? '刷新失败' : '刷新完成',
+    errorMessage.value || '报表目录已刷新。',
+  )
+}
+
+void load()
 onBeforeUnmount(() => controller?.abort())
 </script>
 
 <template>
   <section class="report-catalog-page" aria-labelledby="report-catalog-title">
-    <V2Card
-      title="报表目录"
-      title-id="report-catalog-title"
-      :heading-level="1"
-      subtitle="仅展示服务端按当前账号权限返回的报表。"
-    >
+    <V2Card title="报表目录" title-id="report-catalog-title" :heading-level="1">
       <template #actions
-        ><V2Button variant="ghost" size="small" :loading="loading" @click="refresh"
+        ><V2Button variant="ghost" size="small" :loading="loading" @click="refreshCatalog"
           >刷新</V2Button
         ></template
       >
-      <p class="report-catalog-page__summary">
-        可见 {{ items.length }} 项；API-only 仅展示接口能力，不伪装成页面入口。
-      </p>
     </V2Card>
-    <V2Alert v-if="errorMessage" tone="danger" title="请求未完成">{{ errorMessage }}</V2Alert>
     <V2PageState
       v-if="loading"
       kind="loading"
@@ -87,7 +88,7 @@ onBeforeUnmount(() => controller?.abort())
       :heading-level="2"
     />
     <V2PageState
-      v-else-if="!groups.length"
+      v-else-if="!errorMessage && !groups.length"
       kind="empty"
       title="当前账号暂无可见报表"
       description="请联系管理员核对报表权限。"
@@ -126,11 +127,6 @@ onBeforeUnmount(() => controller?.abort())
   color: var(--v2-color-text);
   font-size: var(--v2-font-size-13);
   line-height: var(--v2-line-height-body);
-}
-.report-catalog-page__summary {
-  margin: 0;
-  color: var(--v2-color-text-secondary);
-  font-size: var(--v2-font-size-13);
 }
 .report-catalog-page__groups {
   display: grid;

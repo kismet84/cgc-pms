@@ -9,7 +9,6 @@ import type {
   SiteDailyQualitySafetyRecord,
 } from '@cgc-pms/frontend-contracts'
 import {
-  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -19,6 +18,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import { isApiClientError } from '@/services/request'
@@ -65,7 +65,9 @@ const filesLoading = ref(false)
 const qualityLoading = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
-const qualityError = ref('')
+watch(errorMessage, (value) => {
+  if (value) showToast('error', '操作未完成', value)
+})
 const records = ref<SiteDailyLogRecord[]>([])
 const total = ref(0)
 const pageNo = ref(1)
@@ -160,7 +162,7 @@ function resetFilters(): void {
   search()
 }
 
-async function loadList(preserveNotice = false): Promise<void> {
+async function loadList(preserveNotice = false): Promise<boolean> {
   listController?.abort()
   listController = new AbortController()
   loading.value = true
@@ -180,22 +182,27 @@ async function loadList(preserveNotice = false): Promise<void> {
     )
     records.value = page.records
     total.value = page.total
+    return true
   } catch (error) {
     if (!listController.signal.aborted) {
       records.value = []
       total.value = 0
       errorMessage.value = message(error, '现场日报加载失败')
     }
+    return false
   } finally {
     if (!listController.signal.aborted) loading.value = false
   }
+}
+
+async function refreshDailyLogs(): Promise<void> {
+  if (await loadList()) showToast('success', '刷新完成', '现场日报已刷新。')
 }
 
 function openCreate(): void {
   dialogMode.value = 'create'
   activeRecord.value = null
   qualityFacts.value = []
-  qualityError.value = ''
   files.value = []
   progressRows.value = []
   Object.assign(form, {
@@ -218,7 +225,6 @@ async function openRecord(record: SiteDailyLogRecord, edit = false): Promise<voi
   const requestId = ++detailRequestId.value
   dialogMode.value = edit ? 'edit' : 'view'
   qualityFacts.value = []
-  qualityError.value = ''
   files.value = []
   progressRows.value = []
   filesLoading.value = true
@@ -303,7 +309,6 @@ async function loadFiles(id: string, requestId: number): Promise<void> {
 
 async function loadQuality(id: string, requestId: number): Promise<void> {
   qualityFacts.value = []
-  qualityError.value = ''
   if (!canViewQuality.value) return
   qualityLoading.value = true
   try {
@@ -311,7 +316,11 @@ async function loadQuality(id: string, requestId: number): Promise<void> {
     if (requestId === detailRequestId.value) qualityFacts.value = facts
   } catch (error) {
     if (requestId === detailRequestId.value) {
-      qualityError.value = message(error, '当日质量安全检查加载失败，不影响日报正文查看。')
+      showToast(
+        'error',
+        '质量安全摘要读取失败',
+        message(error, '当日质量安全检查加载失败，不影响日报正文查看。'),
+      )
     }
   } finally {
     if (requestId === detailRequestId.value) qualityLoading.value = false
@@ -369,7 +378,7 @@ async function saveProgress(): Promise<boolean> {
   resetNotices()
   try {
     await replaceDailyProgress(activeRecord.value.id, items)
-    successMessage.value = '实际进度已保存；后续提交将继续使用服务端事实。'
+    successMessage.value = '实际进度已保存；后续提交将使用最新进度。'
     return true
   } catch (error) {
     errorMessage.value = message(error, '实际进度保存失败')
@@ -522,25 +531,11 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
 
 <template>
   <section class="daily-log-page" aria-labelledby="daily-log-title">
-    <div v-if="errorMessage && !dialogOpen" class="daily-log-page__notice-region">
-      <V2Alert
-        v-if="errorMessage"
-        class="daily-log-page__feedback"
-        tone="danger"
-        title="请求未完成"
-        dismissible
-        @dismiss="errorMessage = ''"
-      >
-        {{ errorMessage }}
-      </V2Alert>
-    </div>
-
     <V2Card
       class="daily-log-page__toolbar-card"
       title="现场日报"
       title-id="daily-log-title"
       :heading-level="1"
-      subtitle="范围由顶部项目与报告期控制；可按状态筛选"
     >
       <template #actions>
         <div class="daily-log-page__toolbar">
@@ -560,7 +555,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
           <V2Button v-if="filter.status" size="small" variant="ghost" @click="resetFilters"
             >重置</V2Button
           >
-          <V2Button size="small" variant="ghost" @click="loadList()">刷新</V2Button>
+          <V2Button size="small" variant="ghost" @click="refreshDailyLogs">刷新</V2Button>
           <V2Button v-if="canEdit" size="small" @click="openCreate">新建日报</V2Button>
         </div>
       </template>
@@ -574,13 +569,13 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
       :heading-level="2"
     />
     <V2PageState
-      v-else-if="!records.length"
+      v-else-if="!records.length && !errorMessage"
       kind="empty"
       title="暂无现场日报"
       description="调整筛选条件，或由具备权限的账号创建日报草稿。"
       :heading-level="2"
     />
-    <V2Card v-else title="现场日报列表" :heading-level="2">
+    <V2Card v-else>
       <div class="daily-log-page__table-wrap">
         <table class="daily-log-page__table daily-log-page__list-table v2-table--top">
           <caption class="v2-visually-hidden">
@@ -588,6 +583,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
           </caption>
           <thead>
             <tr>
+              <th>日报标识</th>
               <th>日报日期</th>
               <th>项目</th>
               <th>状态</th>
@@ -599,6 +595,16 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
           </thead>
           <tbody>
             <tr v-for="record in records" :key="record.id">
+              <td>
+                <V2Button
+                  size="small"
+                  variant="ghost"
+                  class="v2-table__record-link"
+                  @click="openRecord(record)"
+                >
+                  {{ record.dailyLogCode || '日报标识缺失' }}
+                </V2Button>
+              </td>
               <td>{{ record.reportDate }}</td>
               <td>{{ record.projectName || '—' }}</td>
               <td class="daily-log-page__facts">
@@ -613,9 +619,6 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
               </td>
               <td>
                 <div class="daily-log-page__actions">
-                  <V2Button size="small" variant="secondary" @click="openRecord(record)"
-                    >查看详情</V2Button
-                  >
                   <V2Button
                     v-if="canEdit && record.status === 'DRAFT'"
                     size="small"
@@ -707,13 +710,12 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
 
       <form v-else class="daily-log-page__form" @submit.prevent="saveRecord">
         <V2Select
-          v-if="projectOptions.length"
           v-model="form.projectId"
           label="项目"
           :options="projectOptions"
           required
+          placeholder="请选择项目"
         />
-        <V2Input v-else v-model="form.projectId" label="项目 ID" required />
         <label>
           日报日期
           <input v-model="form.reportDate" type="date" required />
@@ -741,27 +743,25 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
       </form>
 
       <template v-if="activeRecord">
-        <V2Card
-          :heading-level="3"
-          title="附件"
-          :subtitle="activeRecord.status === 'DRAFT' ? '仅草稿可上传/删除' : '已提交附件只读不可变'"
-        >
-          <template #actions>
-            <template v-if="dialogMode !== 'view' && canEdit && activeRecord.status === 'DRAFT'">
-              <input
-                ref="fileInput"
-                class="daily-log-page__file-input"
-                type="file"
-                @change="onFileChange"
-              />
-              <V2GlassButton
-                text="选择文件"
-                :disabled="saving"
-                :on-click="openFilePicker"
-                class-name="daily-log-page__glass-button"
-              />
-            </template>
-          </template>
+        <section class="v2-detail-dialog__section">
+          <h3>附件</h3>
+          <p>
+            {{ activeRecord.status === 'DRAFT' ? '仅草稿可上传/删除' : '已提交附件只读不可变' }}
+          </p>
+          <div v-if="dialogMode !== 'view' && canEdit && activeRecord.status === 'DRAFT'">
+            <input
+              ref="fileInput"
+              class="daily-log-page__file-input"
+              type="file"
+              @change="onFileChange"
+            />
+            <V2GlassButton
+              text="选择文件"
+              :disabled="saving"
+              :on-click="openFilePicker"
+              class-name="daily-log-page__glass-button"
+            />
+          </div>
           <V2PageState
             v-if="filesLoading"
             kind="loading"
@@ -786,19 +786,24 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
             </article>
           </div>
           <p v-else class="daily-log-page__empty-copy">暂无附件。</p>
-        </V2Card>
+        </section>
 
-        <V2Card
-          v-if="activeRecord.scheduleManaged"
-          :heading-level="3"
-          title="WBS 实际进度"
-          :subtitle="
-            canReportProgress
-              ? '仅周计划内任务可填报；提交后统一刷新进度。'
-              : '当前账号无进度填报权限，正文详情继续可读且不会发起进度请求。'
-          "
-        >
-          <div v-if="progressRows.length" class="daily-log-page__table-wrap">
+        <section v-if="activeRecord.scheduleManaged" class="v2-detail-dialog__section">
+          <h3>WBS 实际进度</h3>
+          <p>
+            {{
+              canReportProgress
+                ? '仅周计划内任务可填报；提交后统一刷新进度。'
+                : '当前账号无进度填报权限，正文详情继续可读且不会发起进度请求。'
+            }}
+          </p>
+          <div
+            v-if="progressRows.length"
+            class="daily-log-page__table-wrap"
+            role="region"
+            aria-label="WBS 实际进度表格"
+            tabindex="0"
+          >
             <table class="daily-log-page__table v2-table--top">
               <thead>
                 <tr>
@@ -865,7 +870,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
             </table>
           </div>
           <p v-else class="daily-log-page__empty-copy">暂无当日周计划任务。</p>
-          <template #footer>
+          <div>
             <V2GlassButton
               v-if="dialogMode !== 'view' && canReportProgress && activeRecord.status === 'DRAFT'"
               text="保存实际进度"
@@ -873,18 +878,18 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
               :on-click="saveProgress"
               class-name="daily-log-page__glass-button"
             />
-          </template>
-        </V2Card>
+          </div>
+        </section>
 
-        <V2Card
-          :heading-level="3"
-          title="质量安全摘要"
-          :subtitle="
-            canViewQuality
-              ? '仅有质量安全查询权限时读取；失败不阻断日报正文。'
-              : '当前账号无质量安全摘要权限，零请求。'
-          "
-        >
+        <section class="v2-detail-dialog__section">
+          <h3>质量安全摘要</h3>
+          <p>
+            {{
+              canViewQuality
+                ? '仅有质量安全查询权限时读取；失败不阻断日报正文。'
+                : '当前账号无质量安全摘要权限，零请求。'
+            }}
+          </p>
           <V2PageState
             v-if="qualityLoading"
             kind="loading"
@@ -892,9 +897,6 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
             description="摘要只读，不反向改写来源业务。"
             :heading-level="3"
           />
-          <V2Alert v-else-if="qualityError" tone="danger" title="读取失败">{{
-            qualityError
-          }}</V2Alert>
           <div v-else-if="qualityFacts.length" class="daily-log-page__stack">
             <article
               v-for="item in qualityFacts"
@@ -910,13 +912,11 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
             </article>
           </div>
           <p v-else class="daily-log-page__empty-copy">暂无当日质量安全摘要。</p>
-        </V2Card>
+        </section>
 
-        <V2Card
-          title="只读联动事实"
-          subtitle="材料到货、领料、计划任务与审计均只读展示。"
-          :heading-level="3"
-        >
+        <section class="v2-detail-dialog__section">
+          <h3>只读联动事实</h3>
+          <p>材料到货、领料、计划任务与审计均只读展示。</p>
           <div class="daily-log-page__stack daily-log-page__linked-facts">
             <article class="daily-log-page__panel">
               <strong>材料到货</strong>
@@ -935,21 +935,11 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
               <p>{{ activeRecord.auditTrail?.length ?? 0 }} 条</p>
             </article>
           </div>
-        </V2Card>
+        </section>
       </template>
 
       <template v-if="dialogMode !== 'view'" #footer>
         <div class="daily-log-page__dialog-actions">
-          <V2Alert
-            v-if="errorMessage"
-            class="daily-log-page__feedback"
-            tone="danger"
-            title="请求未完成"
-            dismissible
-            @dismiss="errorMessage = ''"
-          >
-            {{ errorMessage }}
-          </V2Alert>
           <V2GlassButton
             text="关闭"
             :on-click="() => (dialogOpen = false)"

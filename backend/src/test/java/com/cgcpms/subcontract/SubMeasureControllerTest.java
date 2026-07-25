@@ -219,6 +219,10 @@ class SubMeasureControllerTest {
 
         SubMeasure measure = subMeasureMapper.selectById(measureId);
         measure.setSubTaskId(task.getId());
+        measure.setReportedAmount(new BigDecimal("50000.00"));
+        measure.setApprovedAmount(new BigDecimal("50000.00"));
+        measure.setDeductionAmount(BigDecimal.ZERO.setScale(2));
+        measure.setNetAmount(new BigDecimal("50000.00"));
         subMeasureMapper.updateById(measure);
 
         SubMeasureItem item = new SubMeasureItem();

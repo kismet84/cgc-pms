@@ -384,6 +384,7 @@ async function refreshAlerts(): Promise<void> {
   } catch (caught) {
     if (!currentController.signal.aborted) {
       alertError.value = isApiClientError(caught) ? caught.message : '预警列表加载失败'
+      showToast('error', '预警读取失败', alertError.value)
     }
   } finally {
     if (!currentController.signal.aborted) alertLoading.value = false
@@ -513,12 +514,16 @@ async function refresh(): Promise<void> {
   try {
     const result = await loadCostBreakdown(
       workspace.selectedProjectId,
+      workspace.selectedReportPeriod,
       access.value,
       controller.signal,
     )
     if (currentGeneration === generation) breakdown.value = result
   } catch (caught) {
-    if (!isAbort(caught) && currentGeneration === generation) breakdownError.value = true
+    if (!isAbort(caught) && currentGeneration === generation) {
+      breakdownError.value = true
+      showToast('warn', '成本分解读取失败', '主驾驶舱数据未受影响')
+    }
   } finally {
     if (currentGeneration === generation) breakdownLoading.value = false
   }
@@ -568,21 +573,30 @@ function isAbort(errorValue: unknown): boolean {
 
 <template>
   <section class="dashboard-page" aria-labelledby="dashboard-title">
-    <h1 id="dashboard-title" class="v2-visually-hidden">经营驾驶舱</h1>
-
-    <nav v-if="allowedRoles.length > 1" class="dashboard-page__roles" aria-label="驾驶舱角色视图">
-      <V2Button
-        v-for="role in allowedRoles"
-        :key="role"
-        class="dashboard-page__role-button"
-        size="small"
-        :variant="selectedRole === role ? 'primary' : 'secondary'"
-        :aria-pressed="selectedRole === role"
-        @click="selectRole(role)"
-      >
-        {{ DASHBOARD_ROLE_LABELS[role] }}
-      </V2Button>
-    </nav>
+    <V2Card title="经营驾驶舱" title-id="dashboard-title" :heading-level="1">
+      <template #actions>
+        <nav
+          v-if="allowedRoles.length > 1"
+          class="dashboard-page__roles"
+          aria-label="驾驶舱角色视图"
+        >
+          <V2Button
+            v-for="role in allowedRoles"
+            :key="role"
+            class="dashboard-page__role-button"
+            size="small"
+            :variant="selectedRole === role ? 'primary' : 'secondary'"
+            :aria-pressed="selectedRole === role"
+            @click="selectRole(role)"
+          >
+            {{ DASHBOARD_ROLE_LABELS[role] }}
+          </V2Button>
+        </nav>
+      </template>
+    </V2Card>
+    <p class="dashboard-page__period-note">
+      口径：事件型数据按所选报告期的对应时间字段筛选；实时指标和记录状态取当前值，不构成历史快照。
+    </p>
 
     <V2PageState
       v-if="!allowedRoles.length"
@@ -667,7 +681,13 @@ function isAbort(errorValue: unknown): boolean {
               <strong
                 >{{ metric.value }} <small v-if="metric.unit">{{ metric.unit }}</small></strong
               >
-              <p>当前报告期经营口径</p>
+              <p>
+                {{
+                  ['公司资金余额', '预算执行率'].includes(metric.label)
+                    ? '当前实时经营口径'
+                    : '当前报告期经营口径'
+                }}
+              </p>
             </article>
           </div>
         </div>
@@ -686,7 +706,7 @@ function isAbort(errorValue: unknown): boolean {
             <div v-if="trendDefinition.series.length" class="trend-range" aria-label="趋势时间范围">
               <V2Button
                 v-for="range in [
-                  { value: 'year', label: '当年累计' },
+                  { value: 'year', label: '近12个月' },
                   { value: 'half', label: '近6个月' },
                   { value: 'quarter', label: '近3个月' },
                 ] as const"
@@ -749,9 +769,6 @@ function isAbort(errorValue: unknown): boolean {
               </div>
             </div>
           </header>
-          <V2Alert v-if="alertError && !selectedAlert" tone="danger" title="预警请求未完成">
-            {{ alertError }}
-          </V2Alert>
           <div class="risk-table-wrap" tabindex="0">
             <table class="risk-table v2-table--compact">
               <caption class="v2-visually-hidden">
@@ -866,11 +883,13 @@ function isAbort(errorValue: unknown): boolean {
           description="主驾驶舱数据保持可见。"
           :heading-level="3"
         />
-        <V2Alert v-else-if="breakdownError" title="成本分解加载失败" tone="warning">
-          主驾驶舱数据未受影响；刷新可重试独立下钻请求。
-        </V2Alert>
-        <p v-else-if="!canLoadBreakdown" class="dashboard-page__empty">当前账号无成本分解权限。</p>
-        <div v-else-if="visibleSubjects.length" class="dashboard-page__table-wrap">
+        <p v-else-if="!breakdownError && !canLoadBreakdown" class="dashboard-page__empty">
+          当前账号无成本分解权限。
+        </p>
+        <div
+          v-else-if="!breakdownError && visibleSubjects.length"
+          class="dashboard-page__table-wrap"
+        >
           <table>
             <caption class="v2-visually-hidden">
               最多两级成本科目分解
@@ -906,7 +925,7 @@ function isAbort(errorValue: unknown): boolean {
             </tbody>
           </table>
         </div>
-        <p v-else class="dashboard-page__empty">当前项目暂无成本科目分解。</p>
+        <p v-else-if="!breakdownError" class="dashboard-page__empty">当前项目暂无成本科目分解。</p>
       </V2Card>
 
       <V2Card
@@ -1078,6 +1097,11 @@ function isAbort(errorValue: unknown): boolean {
   padding-block-end: var(--v2-space-1);
   scrollbar-width: thin;
 }
+.dashboard-page__period-note {
+  margin: 0;
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-12);
+}
 .dashboard-page__panel {
   min-width: 0;
 }
@@ -1087,7 +1111,7 @@ function isAbort(errorValue: unknown): boolean {
 }
 .dashboard-page__panel h2 {
   margin: 0;
-  font-size: var(--v2-font-size-17);
+  font-size: var(--v2-font-size-14);
 }
 .dashboard-page__empty {
   color: var(--v2-color-text-muted);
@@ -1210,7 +1234,7 @@ function isAbort(errorValue: unknown): boolean {
 .highest-risk h2 {
   margin: var(--v2-space-2) 0 var(--v2-space-1);
   color: var(--v2-color-text-strong);
-  font-size: var(--v2-font-size-17);
+  font-size: var(--v2-font-size-14);
   line-height: var(--v2-line-height-tight);
   overflow-wrap: anywhere;
 }

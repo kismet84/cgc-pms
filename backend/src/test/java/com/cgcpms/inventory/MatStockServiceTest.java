@@ -10,6 +10,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -49,7 +50,9 @@ class MatStockServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
+        insertWarehouse(WAREHOUSE_ID, 10001L, "WH-STOCK-TEST");
     }
 
     @AfterEach
@@ -289,6 +292,7 @@ class MatStockServiceTest {
     void testConcurrentStockOutOptimisticLock() throws Exception {
         long whId = 901L;  // 独立仓库ID，避免与其他测试冲突
         long matId = 9901L;
+        insertWarehouse(whId, 10001L, "WH-CONCURRENT-OUT");
 
         // 先入库 100
         stockService.stockIn(whId, matId, new BigDecimal("100.0000"));
@@ -371,6 +375,7 @@ class MatStockServiceTest {
     void testConcurrentStockInOptimisticLock() throws Exception {
         long whId = 908L;
         long matId = 9908L;
+        insertWarehouse(whId, 10001L, "WH-CONCURRENT-IN");
 
         CountDownLatch latch = new CountDownLatch(1);
         AtomicInteger successCount = new AtomicInteger(0);
@@ -458,6 +463,8 @@ class MatStockServiceTest {
         long whId0 = 101L;
         long whId999 = 199L;
         long matId = 9001L;
+        insertWarehouse(whId0, 10001L, "WH-TENANT-0");
+        insertWarehouse(999L, whId999, 99901L, "WH-TENANT-999", "ENABLE");
 
         // 租户0入库
         stockService.stockIn(whId0, matId, new BigDecimal("100.0000"));
@@ -468,6 +475,7 @@ class MatStockServiceTest {
                 .add("userId", 999L)
                 .add("username", "other")
                 .add("tenantId", 999L)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
 
         // 租户999应看不到租户0的库存
@@ -486,6 +494,7 @@ class MatStockServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of("ADMIN"))
                 .build());
         ledger = stockService.getLedger(whId0, matId, null, null, null, null, 1, 20);
         assertEquals(0, new BigDecimal("100.0000").compareTo(ledger.getStock().getAvailableQty()),
@@ -502,6 +511,7 @@ class MatStockServiceTest {
     void testConcurrentFirstStockIn_DuplicateKeyFallback() throws Exception {
         long whId = 920L;
         long matId = 9920L;
+        insertWarehouse(whId, 10001L, "WH-CONCURRENT-FIRST");
 
         CountDownLatch latch = new CountDownLatch(1);
         AtomicInteger successCount = new AtomicInteger(0);
@@ -664,11 +674,11 @@ class MatStockServiceTest {
     @Transactional
     @DisplayName("RED→GREEN: getKpi 不存在的 warehouseId 过滤后返回零值")
     void testGetKpiEmptyReturnsZeros() {
-        // 使用不存在的 warehouseId + projectId 确保所有过滤都无数据
-        var kpi = stockService.getKpi(99999L, 99999L);
+        // 使用可访问项目内不存在的 warehouseId，确保过滤结果为空。
+        var kpi = stockService.getKpi(99999L, 10001L);
 
         assertNotNull(kpi, "KPI 应非 null");
-        assertEquals(0, kpi.getWarehouseCount(), "不存在的 projectId 应返回 0 仓库");
+        assertEquals(0, kpi.getWarehouseCount(), "不存在的 warehouseId 应返回 0 仓库");
         assertEquals(0, kpi.getMaterialTypeCount(), "无库存时 materialTypeCount 应为 0");
         assertEquals(0, kpi.getLowStockCount(), "无库存时 lowStockCount 应为 0");
         assertEquals(0, kpi.getTxnInCount(), "无流水时 txnInCount 应为 0");
@@ -1026,9 +1036,9 @@ class MatStockServiceTest {
     @DisplayName("RED→GREEN: getKpi 按 warehouseId 过滤统计范围")
     void testGetKpiFilterByWarehouseId() {
         long whA = 100L;
-        long whB = 200L;
+        long whB = 98000200L;
         insertWarehouse(whA, 10001L, "WH-KPI-A");
-        insertWarehouse(whB, 10002L, "WH-KPI-B");
+        insertWarehouse(whB, 98200200L, "WH-KPI-B");
 
         stockService.stockIn(whA, 1001L, new BigDecimal("100.0000"));
         stockService.stockIn(whB, 1001L, new BigDecimal("50.0000"));
@@ -1205,19 +1215,20 @@ class MatStockServiceTest {
         var kpi = stockService.getKpi(null, existingProjectId);
         assertTrue(kpi.getWarehouseCount() >= 1, "按 projectId 过滤应有仓库");
 
-        // 用不存在的 projectId 过滤
-        var kpiNone = stockService.getKpi(null, 99999L);
-        assertEquals(0, kpiNone.getWarehouseCount(), "不存在的项目应无仓库");
+        BusinessException notFound = assertThrows(
+                BusinessException.class,
+                () -> stockService.getKpi(null, 99999L));
+        assertEquals("PROJECT_NOT_FOUND", notFound.getCode());
     }
 
     @Test
     @Transactional
     @DisplayName("RED→GREEN: projectId 按仓库项目过滤库存台账和 KPI")
     void testProjectIdFiltersLedgerAndKpiByWarehouseProject() {
-        long projectA = 92001L;
-        long projectB = 92002L;
-        long warehouseA = 920001L;
-        long warehouseB = 920002L;
+        long projectA = 98200101L;
+        long projectB = 98200102L;
+        long warehouseA = 98200111L;
+        long warehouseB = 98200112L;
         long materialId = 1001L;
         insertWarehouse(warehouseA, projectA, "WH-PROJECT-A");
         insertWarehouse(warehouseB, projectB, "WH-PROJECT-B");
@@ -1247,6 +1258,77 @@ class MatStockServiceTest {
         assertTrue(allKpi.getMaterialTypeCount() >= 2, "无 projectId 时保持全量库存统计");
         assertTrue(allKpi.getTxnInCount() >= 2, "无 projectId 时保持全量入库统计");
         assertTrue(allKpi.getTxnOutCount() >= 1, "无 projectId 时保持全量出库统计");
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("全仓台账仅汇总启用仓库并由后端计算价值和加权均价")
+    void testAllWarehouseLedgerAggregatesServerFacts() {
+        long projectA = 92301L;
+        long projectB = 92302L;
+        long warehouseA1 = 923001L;
+        long warehouseA2 = 923002L;
+        long disabledWarehouse = 923003L;
+        long otherProjectWarehouse = 923004L;
+        long materialId = 1001L;
+        insertWarehouse(warehouseA1, projectA, "WH-AGG-A1");
+        insertWarehouse(warehouseA2, projectA, "WH-AGG-A2");
+        insertWarehouse(disabledWarehouse, projectA, "WH-AGG-DISABLED", "DISABLE");
+        insertWarehouse(otherProjectWarehouse, projectB, "WH-AGG-B");
+
+        stockService.stockIn(warehouseA1, materialId, new BigDecimal("5.0000"));
+        stockService.stockIn(warehouseA2, materialId, new BigDecimal("10.0000"));
+        stockService.stockIn(disabledWarehouse, materialId, new BigDecimal("20.0000"));
+        stockService.stockIn(otherProjectWarehouse, materialId, new BigDecimal("40.0000"));
+        jdbcTemplate.update(
+                "UPDATE mat_stock SET inventory_value = 10.00 WHERE warehouse_id = ? AND material_id = ?",
+                warehouseA1, materialId);
+        jdbcTemplate.update(
+                "UPDATE mat_stock SET inventory_value = 25.00 WHERE warehouse_id = ? AND material_id = ?",
+                warehouseA2, materialId);
+
+        MatStockLedgerVO ledger = stockService.getLedger(
+                null, materialId, projectA, null, null, null, 1, 20);
+
+        assertNull(ledger.getStock().getId(), "汇总记录不得伪造单库存 ID");
+        assertNull(ledger.getStock().getWarehouseId(), "汇总记录不得伪造单仓库 ID");
+        assertEquals("全部仓库", ledger.getStock().getWarehouseName());
+        assertEquals(new BigDecimal("15.0000"), ledger.getStock().getAvailableQty());
+        assertEquals(new BigDecimal("35.00"), ledger.getStock().getInventoryValue());
+        assertEquals(new BigDecimal("2.3333"), ledger.getStock().getAverageUnitCost());
+        assertEquals(2, ledger.getTxns().getTotal());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("全仓台账与 KPI 对无项目权限用户 fail-close")
+    void testAllWarehouseReadsFailClosedWithoutProjectAccess() {
+        long projectId = 92401L;
+        long warehouseId = 924001L;
+        insertWarehouse(warehouseId, projectId, "WH-SCOPE");
+        stockService.stockIn(warehouseId, MATERIAL_ID, new BigDecimal("5.0000"));
+
+        UserContext.clear();
+        UserContext.set(Jwts.claims()
+                .add("userId", 99999L)
+                .add("username", "outsider")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of())
+                .build());
+
+        BusinessException ledgerDenied = assertThrows(
+                BusinessException.class,
+                () -> stockService.getLedger(
+                        null, MATERIAL_ID, projectId, null, null, null, 1, 20));
+        assertEquals("PROJECT_ACCESS_DENIED", ledgerDenied.getCode());
+        BusinessException kpiDenied = assertThrows(
+                BusinessException.class,
+                () -> stockService.getKpi(null, projectId));
+        assertEquals("PROJECT_ACCESS_DENIED", kpiDenied.getCode());
+        assertNull(stockService.getLedger(
+                null, MATERIAL_ID, null, null, null, null, 1, 20).getStock());
+        assertNull(stockService.getLedger(
+                warehouseId, MATERIAL_ID, null, null, null, null, 1, 20).getStock());
     }
 
     @Test
@@ -1311,12 +1393,23 @@ class MatStockServiceTest {
     }
 
     private void insertWarehouse(long warehouseId, long projectId, String code, String status) {
+        insertWarehouse(TENANT_ID, warehouseId, projectId, code, status);
+    }
+
+    private void insertWarehouse(long tenantId, long warehouseId, long projectId, String code, String status) {
+        jdbcTemplate.update("""
+                INSERT INTO pm_project
+                    (id, tenant_id, project_code, project_name, status, approval_status,
+                     created_by, created_at, updated_by, updated_at, deleted_flag)
+                SELECT ?, ?, ?, ?, 'ACTIVE', 'APPROVED', 1, CURRENT_TIMESTAMP, 1, CURRENT_TIMESTAMP, 0
+                WHERE NOT EXISTS (SELECT 1 FROM pm_project WHERE id = ?)
+                """, projectId, tenantId, "STOCK-" + projectId, "库存测试项目-" + projectId, projectId);
         jdbcTemplate.update("DELETE FROM mat_warehouse WHERE id = ?", warehouseId);
         jdbcTemplate.update("""
                 INSERT INTO mat_warehouse
                     (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
                 VALUES (?, ?, ?, ?, ?, ?, 0)
-                """, warehouseId, TENANT_ID, projectId, code, code, status);
+                """, warehouseId, tenantId, projectId, code, code, status);
     }
 
     private void insertPurchaseOrder(long id, long projectId, String code, String deliveryDate,

@@ -1,6 +1,7 @@
 package com.cgcpms.subcontract;
 
 import com.cgcpms.common.TestUserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.subcontract.service.SubTaskService;
@@ -15,6 +16,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 
+import java.math.BigDecimal;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -34,6 +36,9 @@ class SubTaskDeleteTransactionTest {
     private static final long PROJECT_ID = 10001L;
     private static final long TASK_ID = 947001L;
     private static final long REUSED_TASK_ID = 947002L;
+    private static final long CONTEXT_TASK_ID = 947003L;
+    private static final long CONTEXT_SUCCESSOR_ID = 947004L;
+    private static final long MEASURE_ID = 947101L;
     private static final String ORIGINAL_CODE = "WBS-TXN-ROLLBACK-947001";
 
     @Autowired
@@ -107,6 +112,63 @@ class SubTaskDeleteTransactionTest {
         assertEquals(1, activeWithOriginalCode);
     }
 
+    @Test
+    @DisplayName("被计量引用的任务禁止删除且双方数据不变")
+    void referencedTaskCannotBeDeleted() {
+        jdbcTemplate.update("""
+                INSERT INTO sub_measure
+                    (id, tenant_id, project_id, sub_task_id, measure_code, approval_status, status,
+                     cost_generated_flag, created_at, updated_at, created_by, updated_by, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, 'DRAFT', 'DRAFT', 0,
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, 0)
+                """, MEASURE_ID, TENANT_ID, PROJECT_ID, TASK_ID,
+                "SM-TASK-REF-" + MEASURE_ID, USER_ID, USER_ID);
+
+        BusinessException failure = assertThrows(BusinessException.class,
+                () -> subTaskService.delete(TASK_ID));
+        assertEquals("SUB_TASK_MEASURE_IN_USE", failure.getCode());
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sub_task WHERE id = ? AND deleted_flag = 0",
+                Integer.class, TASK_ID));
+        assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM sub_measure WHERE id = ? AND deleted_flag = 0",
+                Integer.class, MEASURE_ID));
+    }
+
+    @Test
+    @DisplayName("前置任务必须与后续任务属于同一合同和分包商")
+    void predecessorMustUseSameContractAndPartner() {
+        insertContextTask(CONTEXT_TASK_ID, null, 30001L, 20002L);
+        SubTask dependent = new SubTask();
+        dependent.setProjectId(PROJECT_ID);
+        dependent.setPredecessorTaskId(CONTEXT_TASK_ID);
+        dependent.setTaskName("跨合同依赖");
+        dependent.setProgressPercent(BigDecimal.ZERO);
+        dependent.setStatus("NOT_STARTED");
+
+        BusinessException failure = assertThrows(BusinessException.class,
+                () -> subTaskService.create(dependent));
+
+        assertEquals("SUB_TASK_DEPENDENCY_INVALID", failure.getCode());
+    }
+
+    @Test
+    @DisplayName("被后续任务引用时不得变更为不同合同或分包商上下文")
+    void predecessorContextCannotDivergeFromSuccessor() {
+        insertContextTask(CONTEXT_SUCCESSOR_ID, TASK_ID, 30001L, 20002L);
+        SubTask update = new SubTask();
+        update.setId(TASK_ID);
+        update.setProjectId(PROJECT_ID);
+        update.setTaskName("保持空合同上下文");
+        update.setProgressPercent(BigDecimal.ZERO);
+        update.setStatus("NOT_STARTED");
+
+        BusinessException failure = assertThrows(BusinessException.class,
+                () -> subTaskService.update(update));
+
+        assertEquals("SUB_TASK_DEPENDENCY_INVALID", failure.getCode());
+    }
+
     private void insertTask(long id, String taskCode, String taskName) {
         jdbcTemplate.update("""
                 INSERT INTO sub_task
@@ -116,7 +178,22 @@ class SubTaskDeleteTransactionTest {
                 """, id, TENANT_ID, PROJECT_ID, taskCode, taskName, USER_ID, USER_ID);
     }
 
+    private void insertContextTask(long id, Long predecessorId, Long contractId, Long partnerId) {
+        jdbcTemplate.update("""
+                INSERT INTO sub_task
+                    (id, tenant_id, project_id, contract_id, partner_id, predecessor_task_id,
+                     task_code, task_name, progress_percent, status,
+                     created_at, updated_at, created_by, updated_by, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 'NOT_STARTED',
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?, ?, 0)
+                """, id, TENANT_ID, PROJECT_ID, contractId, partnerId, predecessorId,
+                "WBS-CONTEXT-" + id, "上下文依赖任务-" + id, USER_ID, USER_ID);
+    }
+
     private void cleanupFixture() {
+        jdbcTemplate.update("DELETE FROM sub_measure WHERE id = ?", MEASURE_ID);
+        jdbcTemplate.update("DELETE FROM sub_task WHERE id IN (?, ?)",
+                CONTEXT_SUCCESSOR_ID, CONTEXT_TASK_ID);
         jdbcTemplate.update("DELETE FROM sub_task WHERE id IN (?, ?)", TASK_ID, REUSED_TASK_ID);
     }
 }

@@ -16,7 +16,7 @@ const props = withDefaults(
     code: undefined,
     kind: 'empty',
     live: 'polite',
-    headingLevel: 1,
+    headingLevel: 2,
   },
 )
 

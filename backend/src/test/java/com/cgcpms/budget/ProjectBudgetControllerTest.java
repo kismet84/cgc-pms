@@ -152,7 +152,7 @@ class ProjectBudgetControllerTest {
     private String budgetBody(long project,String version,String name){return "{\"projectId\":"+project+",\"versionNo\":\""+version+"\",\"budgetName\":\""+name+"\",\"totalAmount\":\"1000.00\"}";}
     private String lineBody(){return "[{\"costSubjectId\":"+SUBJECT+",\"budgetAmount\":\"1000.00\"}]";}
     private void insertBudget(long id,long project,String version,String created){
-        jdbc.update("INSERT INTO project_budget(id,tenant_id,project_id,version_no,budget_name,total_amount,approval_status,status,active_flag,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,1000,'DRAFT','DRAFT',0,0,?,?,?,CURRENT_TIMESTAMP,0)",id,project,version,"预算"+version,USER,created,USER);
+        jdbc.update("INSERT INTO project_budget(id,tenant_id,project_id,budget_code,version_no,budget_name,total_amount,approval_status,status,active_flag,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?, ?,1000,'DRAFT','DRAFT',0,0,?,?,?,CURRENT_TIMESTAMP,0)",id,project,"BUD-TEST-"+id,version,"预算"+version,USER,created,USER);
     }
     private void cleanup(){
         jdbc.update("DELETE FROM project_budget_line WHERE project_id IN (?,?)",PROJECT,OUTSIDE);

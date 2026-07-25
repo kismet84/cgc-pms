@@ -18,7 +18,6 @@ import type {
   WarrantyCommand,
 } from '@cgc-pms/frontend-contracts'
 import {
-  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -26,6 +25,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import { formatAmount } from '@/pages/dashboard/model'
@@ -93,6 +93,9 @@ const workspace = useWorkspaceStore()
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
+watch(errorMessage, (value) => {
+  if (value) showToast('error', '操作未完成', value)
+})
 const successMessage = useToastMessage()
 const dialog = ref<DialogKind>(null)
 const overview = ref<CloseoutOverview | null>(null)
@@ -143,9 +146,28 @@ const retentionReceivables = computed(() =>
 const warrantyContractOptions = computed(() =>
   (overview.value?.settlements ?? []).map((item) => ({
     value: item.contractId,
-    label: `${item.settlementCode} · 合同 ${item.contractId}`,
+    label: `${item.settlementCode} · ${deliveryLabel(item.settlementType)}结算`,
   })),
 )
+const settlementOptions = computed(() =>
+  (overview.value?.settlements ?? []).map((item) => ({
+    value: item.id,
+    label: `${item.settlementCode} · ${formatAmount(item.netReceivableAmount)}`,
+  })),
+)
+const currentUserId = computed(() => String(session.userInfo?.userId ?? ''))
+const userOptions = (value = '') => {
+  const options = currentUserId.value
+    ? [
+        {
+          value: currentUserId.value,
+          label: session.userInfo?.realName || session.userInfo?.username || '当前用户',
+        },
+      ]
+    : []
+  if (value && value !== currentUserId.value) options.push({ value, label: '已指定项目成员' })
+  return options
+}
 
 const initiateForm = reactive<InitiateCloseoutCommand>({
   projectId: '',
@@ -604,14 +626,16 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="closeout-page" aria-label="竣工收尾闭环">
-    <h1 class="v2-visually-hidden">竣工收尾闭环</h1>
-    <div class="closeout-page__notice" aria-live="polite">
-      <V2Alert v-if="errorMessage" tone="danger" title="操作未完成">{{ errorMessage }}</V2Alert>
-    </div>
-
-    <div v-if="canInitiate && !closeout && projectId" class="closeout-page__actions">
-      <V2Button size="small" @click="show('initiate')">发起收尾</V2Button>
-    </div>
+    <V2Card title="竣工收尾闭环" :heading-level="1">
+      <template #actions>
+        <V2Button
+          v-if="canInitiate && !closeout && projectId"
+          size="small"
+          @click="show('initiate')"
+          >发起收尾</V2Button
+        >
+      </template>
+    </V2Card>
 
     <V2PageState
       v-if="loading"
@@ -620,23 +644,22 @@ onBeforeUnmount(() => {
       description="正在加载收尾主线、验收、结算、回款、质保与档案。"
     />
     <V2PageState
-      v-else-if="!scopeProjectIds.length"
+      v-else-if="!scopeProjectIds.length && !errorMessage"
       kind="empty"
       title="暂无可访问项目"
       description="当前账号没有可查看的项目。"
     />
     <V2PageState
-      v-else-if="!canQuery"
+      v-else-if="!canQuery && !errorMessage"
       kind="empty"
       title="缺少 closeout:query"
       description="当前身份没有收尾查询权限。"
     />
     <template v-else>
-      <V2Card
-        v-if="!projectId && scopedOverviews.length"
-        title="全部项目收尾概览"
-        :subtitle="`共 ${scopedOverviews.length} 个项目`"
-      >
+      <V2Card v-if="!projectId && scopedOverviews.length" title="全部项目收尾概览">
+        <template #title-extra>
+          <V2Badge>{{ scopedOverviews.length }} 个项目</V2Badge>
+        </template>
         <div
           class="closeout-page__table-wrap"
           role="region"
@@ -649,20 +672,30 @@ onBeforeUnmount(() => {
             </caption>
             <thead>
               <tr>
-                <th scope="col">项目</th>
                 <th scope="col">收尾编号</th>
+                <th scope="col">项目</th>
                 <th scope="col">状态</th>
                 <th scope="col">分项验收</th>
                 <th scope="col">竣工验收</th>
                 <th scope="col">质保</th>
                 <th scope="col">缺陷</th>
-                <th scope="col">操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="item in scopedOverviews" :key="item.projectId">
-                <th scope="row">{{ item.projectName }}</th>
-                <td>{{ item.overview.closeout?.closeoutCode || '尚未发起' }}</td>
+                <th scope="row">
+                  <V2Button
+                    v-if="item.overview.closeout"
+                    size="small"
+                    variant="ghost"
+                    class="v2-table__record-link"
+                    @click="openTrace(item.overview.closeout.id)"
+                  >
+                    {{ item.overview.closeout.closeoutCode }}
+                  </V2Button>
+                  <span v-else>尚未发起</span>
+                </th>
+                <td>{{ item.projectName }}</td>
                 <td>
                   <V2Badge
                     v-if="item.overview.closeout"
@@ -676,16 +709,6 @@ onBeforeUnmount(() => {
                 <td>{{ item.overview.finalAcceptances.length }}</td>
                 <td>{{ item.overview.warranties.length }}</td>
                 <td>{{ item.overview.defects.length }}</td>
-                <td>
-                  <V2Button
-                    v-if="item.overview.closeout"
-                    size="small"
-                    variant="secondary"
-                    @click="openTrace(item.overview.closeout.id)"
-                    >追溯</V2Button
-                  >
-                  <span v-else>—</span>
-                </td>
               </tr>
             </tbody>
           </table>
@@ -700,9 +723,7 @@ onBeforeUnmount(() => {
         <div class="closeout-page__facts">
           <V2Badge :tone="badgeTone(closeout.status)">{{ deliveryLabel(closeout.status) }}</V2Badge>
           <span>计划完成 {{ closeout.plannedCompletionDate }}</span>
-          <span v-if="closeout.finalOwnerSettlementId"
-            >结算 {{ closeout.finalOwnerSettlementId }}</span
-          >
+          <span v-if="closeout.finalOwnerSettlementId">最终结算已绑定</span>
           <span v-if="closeout.tailCollectionVerifiedAt"
             >尾款核验 {{ closeout.tailCollectionVerifiedAt }}</span
           >
@@ -1139,7 +1160,7 @@ onBeforeUnmount(() => {
             <span>{{ deliveryLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.collectionAllocations" :key="item.id">
-            <strong>回款分配 {{ item.collectionCode || item.id }}</strong>
+            <strong>回款分配 {{ item.collectionCode || '未提供回款编号' }}</strong>
             <span
               >{{ deliveryLabel(item.receivableType) }} /
               {{ formatAmount(item.allocatedAmount) }}</span
@@ -1251,11 +1272,12 @@ onBeforeUnmount(() => {
           /></label>
         </template>
         <template v-else-if="dialog === 'settlement'">
-          <V2Input
+          <V2Select
             v-model="settlementForm.ownerSettlementId"
-            label="最终结算 ID"
+            label="最终结算"
+            :options="settlementOptions"
             required
-            placeholder="手工输入 ownerSettlementId"
+            placeholder="请选择最终结算"
           />
         </template>
         <template v-else-if="dialog === 'warranty'">
@@ -1282,12 +1304,22 @@ onBeforeUnmount(() => {
           <label
             >截止日期<input v-model="warrantyForm.warrantyEndDate" type="date" required
           /></label>
-          <V2Input v-model="warrantyForm.responsibleUserId" label="责任人 ID" required />
+          <V2Select
+            v-model="warrantyForm.responsibleUserId"
+            label="责任人"
+            :options="userOptions(warrantyForm.responsibleUserId)"
+            required
+          />
         </template>
         <template v-else-if="dialog === 'defect'">
           <V2Input v-model="defectForm.defectCode" label="缺陷编号" required />
           <V2Input v-model="defectForm.defectTitle" label="缺陷标题" required />
-          <V2Input v-model="defectForm.responsibleUserId" label="责任人 ID" required />
+          <V2Select
+            v-model="defectForm.responsibleUserId"
+            label="责任人"
+            :options="userOptions(defectForm.responsibleUserId)"
+            required
+          />
           <label
             >整改期限<input v-model="defectForm.rectificationDeadline" type="date" required
           /></label>
@@ -1388,7 +1420,7 @@ onBeforeUnmount(() => {
 .closeout-page__record-sections h3 {
   margin: 0 0 var(--v2-space-2);
   color: var(--v2-color-text-strong);
-  font-size: var(--v2-font-size-15);
+  font-size: var(--v2-font-size-14);
   font-weight: var(--v2-font-weight-semibold);
   line-height: var(--v2-line-height-tight);
 }

@@ -362,6 +362,17 @@ describe('M4 contracts page', () => {
     expect(wrapper.text()).not.toContain('合同台账加载失败')
   })
 
+  it('does not render a false empty state when the ledger request fails', async () => {
+    vi.mocked(loadContractPage).mockRejectedValueOnce(
+      apiError('服务响应格式无效', 502, 'API_MALFORMED_RESPONSE'),
+    )
+
+    const { wrapper } = await mountPage('/contract/ledger', ['contract:query'])
+
+    expect(wrapper.text()).not.toContain('暂无可见合同')
+    expect(wrapper.find('section.v2-alert--danger').exists()).toBe(false)
+  })
+
   it('aborts stale detail request and keeps newest detail only', async () => {
     const first = deferred<ContractCompositeRecord>()
     const second = deferred<ContractCompositeRecord>()
@@ -418,7 +429,7 @@ describe('M4 contracts page', () => {
     expect(wrapper.text()).toContain('合同不可访问')
   })
 
-  it('shows explicit error on save 422 and does not fake success', async () => {
+  it('does not render an inline alert or fake success on save 422', async () => {
     vi.mocked(updateContractComposite).mockRejectedValueOnce(
       apiError('付款条款合计不匹配', 422, 'CONTRACT_VALIDATION_FAILED'),
     )
@@ -431,11 +442,11 @@ describe('M4 contracts page', () => {
       .trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('付款条款合计不匹配')
+    expect(wrapper.find('section.v2-alert--danger').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('操作完成')
   })
 
-  it('shows explicit error on save 500 and does not fake success', async () => {
+  it('does not render an inline alert or fake success on save 500', async () => {
     vi.mocked(updateContractComposite).mockRejectedValueOnce(
       apiError('合同服务暂不可用', 500, 'INTERNAL_ERROR'),
     )
@@ -447,7 +458,7 @@ describe('M4 contracts page', () => {
       .trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('合同服务暂不可用')
+    expect(wrapper.find('section.v2-alert--danger').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('操作完成')
   })
 
@@ -475,7 +486,6 @@ describe('M4 contracts page', () => {
 
     expect(updateContractComposite).toHaveBeenCalledTimes(1)
     expect(loadContractComposite).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('已刷新最新数据')
     expect((wrapper.get('input[aria-label="合同名称"]').element as HTMLInputElement).value).toBe(
       '权威合同-2',
     )
@@ -491,7 +501,7 @@ describe('M4 contracts page', () => {
       .trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('提交失败')
+    expect(wrapper.find('section.v2-alert--danger').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('合同已提交审批。')
     expect(wrapper.text()).not.toContain('操作完成')
   })
@@ -509,7 +519,7 @@ describe('M4 contracts page', () => {
     await flushPromises()
 
     expect(loadContractComposite).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('无合同提交权限')
+    expect(wrapper.find('section.v2-alert--danger').exists()).toBe(false)
     expect(wrapper.text()).toContain('草稿')
     expect(wrapper.text()).not.toContain('DRAFT')
     expect(wrapper.text()).not.toContain('合同已提交审批。')
@@ -531,7 +541,7 @@ describe('M4 contracts page', () => {
       .trigger('click')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('删除失败')
+    expect(wrapper.find('section.v2-alert--danger').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('操作完成')
   })
 

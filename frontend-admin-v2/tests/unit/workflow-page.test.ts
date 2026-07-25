@@ -11,6 +11,7 @@ import {
   loadWorkflowList,
 } from '@/services/workflow'
 import { useSessionStore } from '@/stores/session'
+import { useWorkspaceStore } from '@/stores/workspace'
 
 vi.mock('@/services/workflow', () => ({
   loadWorkflowList: vi.fn(),
@@ -86,7 +87,7 @@ afterEach(() => {
 })
 
 describe('WorkflowWorkbenchPage', () => {
-  it('hides redundant labels, opens detail from the event title, and keeps pagination', async () => {
+  it('hides redundant labels, opens detail from the business code, and keeps pagination', async () => {
     vi.mocked(loadWorkflowList).mockResolvedValue({
       records: [detail.nodes[0]!.tasks[0]!],
       total: 1,
@@ -115,25 +116,79 @@ describe('WorkflowWorkbenchPage', () => {
     })
     await flushPromises()
 
-    const heading = wrapper.get('h1')
+    const headingCard = wrapper.get('.workflow-filter')
+    const heading = headingCard.get('h1')
     expect(heading.text()).toBe('审批工作台')
-    expect(heading.classes()).toContain('v2-visually-hidden')
-    const keywordInput = wrapper.get('.workflow-filter__keyword input')
+    expect(heading.classes()).not.toContain('v2-visually-hidden')
+    expect(wrapper.text()).toContain(
+      '各标签按所选报告期的对应事件时间筛选；记录状态取当前值，不构成历史快照。',
+    )
+    const keywordInput = headingCard.get('.workflow-filter__keyword input')
     expect(keywordInput.attributes('aria-label')).toBe('关键词')
     expect(keywordInput.attributes('placeholder')).toBe('搜索标题或业务编号')
     expect(
-      wrapper
-        .findAll('.workflow-filter .v2-field__label')
+      headingCard
+        .findAll('.v2-field__label')
         .every((label) => label.classes().includes('v2-visually-hidden')),
     ).toBe(true)
-    const rowAction = wrapper.get('.workflow-table__title')
-    expect(rowAction.text()).toBe('付款申请审批')
+    expect(
+      headingCard.findAll('.workflow-filter__actions button').map((button) => button.text()),
+    ).toEqual(['查询', '重置'])
+    const listCard = wrapper.get('.workflow-table-wrap').element.closest('.v2-card')
+    expect(listCard?.querySelector('h2')?.textContent).toBe('待我处理')
+    expect(listCard?.querySelector('.v2-card__title-row .v2-badge')?.textContent).toBe('1 条')
+    const rowAction = wrapper.get('.v2-table__record-link')
+    expect(rowAction.text()).toBe('PAY-2026-001')
     expect(rowAction.classes()).toContain('v2-button--ghost')
     await rowAction.trigger('click')
     await flushPromises()
     expect(router.currentRoute.value.path).toBe('/approval/instances/81')
     expect(wrapper.get('[aria-label="审批任务分页"]').text()).toContain(
       '共 1 条上一页第 1 页下一页',
+    )
+    wrapper.unmount()
+  })
+
+  it('uses backend date-time format for every report-period tab query', async () => {
+    vi.mocked(loadWorkflowList).mockResolvedValue({
+      records: [],
+      total: 0,
+      pageNo: 1,
+      pageSize: 10,
+    })
+    const workspace = useWorkspaceStore()
+    workspace.setReportPeriods([{ value: '2026-07', label: '2026年7月' }])
+    workspace.selectReportPeriod('2026-07')
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: (['todo', 'done', 'cc', 'mine'] as const).map((tab) => ({
+        path: `/approval/${tab}`,
+        component: WorkflowWorkbenchPage,
+        meta: { workflowTab: tab },
+      })),
+    })
+    await router.push('/approval/todo')
+    await router.isReady()
+    const wrapper = mount(WorkflowWorkbenchPage, { global: { plugins: [router] } })
+    await flushPromises()
+
+    for (const tab of ['done', 'cc', 'mine'] as const) {
+      await router.push(`/approval/${tab}`)
+      await flushPromises()
+    }
+
+    expect(
+      vi.mocked(loadWorkflowList).mock.calls.map(([tab, query]) => ({
+        tab,
+        startTime: query.startTime,
+        endTime: query.endTime,
+      })),
+    ).toEqual(
+      (['todo', 'done', 'cc', 'mine'] as const).map((tab) => ({
+        tab,
+        startTime: '2026-07-01 00:00:00',
+        endTime: '2026-07-31 23:59:59',
+      })),
     )
     wrapper.unmount()
   })

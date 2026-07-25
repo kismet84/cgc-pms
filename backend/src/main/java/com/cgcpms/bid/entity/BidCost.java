@@ -24,6 +24,8 @@ public class BidCost extends BaseEntity {
     /** 中标后关联的项目ID，未中标时为 NULL */
     private Long projectId;
 
+    private String bidCode;
+
     private String bidProjectName;
 
     /** BIDDING 投标中 / WON 已中标 / LOST 未中标 */

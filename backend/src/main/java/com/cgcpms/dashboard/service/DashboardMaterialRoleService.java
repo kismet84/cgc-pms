@@ -125,7 +125,7 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
     public PurchaseManagerDashboardVO getPurchaseManagerView(Long projectId, String month) {
         Long tenantId = UserContext.getCurrentTenantId();
         YearMonth selectedMonth = parseDashboardMonth(month);
-        List<PmProject> projects = resolvePurchaseProjects(tenantId, projectId);
+        List<PmProject> projects = resolveAccessibleProjects(tenantId, projectId, "查看采购驾驶舱");
         List<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toList());
         Map<Long, String> projectNameMap = projectNameMap(projects);
 
@@ -254,10 +254,10 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
         return vo;
     }
 
-    private List<PmProject> resolvePurchaseProjects(Long tenantId, Long projectId) {
+    private List<PmProject> resolveAccessibleProjects(Long tenantId, Long projectId, String action) {
         if (projectId != null) {
             PmProject project = requireProject(tenantId, projectId);
-            projectAccessChecker.checkAccess(project, "查看采购驾驶舱");
+            projectAccessChecker.checkAccess(project, action);
             return List.of(project);
         }
         List<PmProject> projects = projectMapper.selectList(new LambdaQueryWrapper<PmProject>()
@@ -364,7 +364,7 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
     public ProductionManagerDashboardVO getProductionManagerView(Long projectId, String month) {
         Long tenantId = UserContext.getCurrentTenantId();
         YearMonth selectedMonth = parseDashboardMonth(month);
-        List<PmProject> projects = resolveDashboardProjects(tenantId, projectId);
+        List<PmProject> projects = resolveAccessibleProjects(tenantId, projectId, "查看生产驾驶舱");
         List<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toList());
         Map<Long, String> projectNameMap = projectNameMap(projects);
 
@@ -442,7 +442,7 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
     public ChiefEngineerDashboardVO getChiefEngineerView(Long projectId, String month) {
         Long tenantId = UserContext.getCurrentTenantId();
         YearMonth selectedMonth = parseDashboardMonth(month);
-        List<PmProject> projects = resolveDashboardProjects(tenantId, projectId);
+        List<PmProject> projects = resolveAccessibleProjects(tenantId, projectId, "查看总工程师驾驶舱");
         List<Long> projectIds = projects.stream().map(PmProject::getId).collect(Collectors.toList());
         Map<Long, String> projectNameMap = projectNameMap(projects);
 

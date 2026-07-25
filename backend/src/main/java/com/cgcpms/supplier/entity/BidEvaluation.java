@@ -19,11 +19,11 @@ public class BidEvaluation extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class) private Long sourcingEventId;
     @JsonSerialize(using = ToStringSerializer.class) private Long quoteId;
     @JsonSerialize(using = ToStringSerializer.class) private Long partnerId;
-    private BigDecimal commercialScore;
-    private BigDecimal technicalScore;
-    private BigDecimal deliveryScore;
-    private BigDecimal qualityScore;
-    private BigDecimal totalScore;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal commercialScore;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal technicalScore;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal deliveryScore;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal qualityScore;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal totalScore;
     private String evaluationComment;
     @JsonSerialize(using = ToStringSerializer.class) private Long evaluatedBy;
     private LocalDateTime evaluatedAt;

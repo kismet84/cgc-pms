@@ -10,6 +10,7 @@ const route = useRoute()
   <V2PageState
     code="403"
     kind="error"
+    :heading-level="1"
     title="无权访问此页面"
     description="当前账号缺少该页面所需权限。系统没有加载业务页面或业务数据。"
   >

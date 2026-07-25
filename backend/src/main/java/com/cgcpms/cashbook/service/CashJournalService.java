@@ -324,7 +324,8 @@ public class CashJournalService {
     public IPage<CashJournalEntryVO> page(CashJournalQuery query) {
         normalizeQuery(query);
         return entryMapper.selectPageWithBalance(
-                new Page<>(query.getPageNo(), query.getPageSize()), tenantId(), query);
+                new Page<>(query.getPageNo(), query.getPageSize()), tenantId(), query,
+                query.getProjectId() == null ? projectAccessChecker.accessibleProjectIds() : List.of(query.getProjectId()));
     }
 
     public CashJournalSummaryVO summary(CashJournalQuery query) {
@@ -410,6 +411,7 @@ public class CashJournalService {
         if (entry == null || !Objects.equals(entry.getTenantId(), tenantId())) {
             throw new BusinessException("CASH_JOURNAL_NOT_FOUND", "资金流水不存在");
         }
+        if (entry.getProjectId() != null) projectAccessChecker.checkAccess(entry.getProjectId(), "查看资金流水");
         return entry;
     }
 
@@ -447,6 +449,13 @@ public class CashJournalService {
         if (StringUtils.hasText(query.getSourceType())) wrapper.eq(CashJournalEntry::getSourceType, query.getSourceType());
         if (query.getSourceId() != null) wrapper.eq(CashJournalEntry::getSourceId, query.getSourceId());
         if (query.getProjectId() != null) wrapper.eq(CashJournalEntry::getProjectId, query.getProjectId());
+        else {
+            List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+            wrapper.and(scope -> {
+                scope.isNull(CashJournalEntry::getProjectId);
+                if (!projectIds.isEmpty()) scope.or().in(CashJournalEntry::getProjectId, projectIds);
+            });
+        }
         if (query.getContractId() != null) wrapper.eq(CashJournalEntry::getContractId, query.getContractId());
         if (query.getBusinessDateStart() != null) wrapper.ge(CashJournalEntry::getBusinessDate, query.getBusinessDateStart());
         if (query.getBusinessDateEnd() != null) wrapper.le(CashJournalEntry::getBusinessDate, query.getBusinessDateEnd());

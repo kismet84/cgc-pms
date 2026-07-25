@@ -100,7 +100,7 @@ describe('M3 closeout closed loop', () => {
     })
   })
 
-  it('uses closeout write endpoints and CSRF headers without loading settlement candidates', async () => {
+  it('uses closeout write endpoints, CSRF headers and business-labelled settlement candidates', async () => {
     fetchMock
       .mockResolvedValueOnce(
         response({ id: 11, final_owner_settlement_id: 22, status: 'FINAL_SETTLEMENT_BOUND' }),
@@ -132,7 +132,8 @@ describe('M3 closeout closed loop', () => {
       'closeout-csrf',
     )
     expect(pageSource).not.toContain('revenue:operations:query')
-    expect(pageSource).toContain('手工输入 ownerSettlementId')
+    expect(pageSource).toContain(':options="settlementOptions"')
+    expect(pageSource).not.toContain('手工输入 ownerSettlementId')
   })
 
   it('keeps permissions, evidence stages, reread and responsive semantics explicit', () => {
@@ -170,7 +171,13 @@ describe('M3 closeout closed loop', () => {
     expect(pageSource).toContain('await loadProject(true)')
     expect(pageSource).toContain('loaded.filter((item) => hasCloseoutData(item.overview))')
     expect(pageSource).toContain('aria-label="竣工收尾闭环"')
-    expect(pageSource).toContain('aria-live="polite"')
+    expect(pageSource).toMatch(
+      /title="全部项目收尾概览"[\s\S]*?<template #title-extra>[\s\S]*?<V2Badge>\{\{ scopedOverviews\.length \}\} 个项目<\/V2Badge>/,
+    )
+    expect(pageSource).not.toContain(':subtitle="`共 ${scopedOverviews.length} 个项目`"')
+    expect(pageSource).not.toMatch(/(?:label|placeholder)="[^"]*(?:\bID\b|\w+Id\b)[^"]*"/)
+    expect(pageSource).toContain(':options="userOptions(warrantyForm.responsibleUserId)"')
+    expect(pageSource).toContain("showToast('error', '操作未完成', value)")
     expect(pageSource).toContain('@media (max-width: 64rem)')
     expect(pageSource).toContain('@media (max-width: 40rem)')
   })

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import type {
+  ContractRecord,
+  PartnerRecord,
   QualityConsequenceCommand,
   QualityInspectionCommand,
   QualityInspectionRecord,
@@ -15,7 +17,6 @@ import type {
   SiteFileRecord,
 } from '@cgc-pms/frontend-contracts'
 import {
-  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -24,8 +25,10 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
+import { loadContractPage, loadPartners } from '@/services/commercial'
 import { listSiteFiles, uploadSiteFile } from '@/services/delivery'
 import {
   activateQualityPlan,
@@ -70,6 +73,9 @@ const workspace = useWorkspaceStore()
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
+watch(errorMessage, (value) => {
+  if (value) showToast('error', '操作未完成', value)
+})
 const successMessage = useToastMessage()
 const plans = ref<QualityPlanRecord[]>([])
 const inspections = ref<QualityInspectionRecord[]>([])
@@ -80,6 +86,8 @@ const activeIssue = ref<QualityIssueRecord | null>(null)
 const activeRectification = ref<QualityRectificationRecord | null>(null)
 const trace = ref<QualityTraceRecord | null>(null)
 const traceFiles = ref<Array<{ stage: string; files: SiteFileRecord[] }>>([])
+const partners = ref<PartnerRecord[]>([])
+const contracts = ref<ContractRecord[]>([])
 const dialog = ref<DialogKind>(null)
 const evidence = ref<File | null>(null)
 const evidenceTarget = ref<EvidenceTarget | null>(null)
@@ -95,6 +103,33 @@ const scopeProjectIds = computed(() =>
 )
 const selectedPlan = computed(
   () => plans.value.find((item) => item.id === selectedPlanId.value) ?? null,
+)
+const currentUserId = computed(() => String(session.userInfo?.userId ?? ''))
+const userOptions = (value = '') => {
+  const options = currentUserId.value
+    ? [
+        {
+          value: currentUserId.value,
+          label: session.userInfo?.realName || session.userInfo?.username || '当前用户',
+        },
+      ]
+    : []
+  if (value && value !== currentUserId.value) options.push({ value, label: '已指定项目成员' })
+  return options
+}
+const partnerOptions = computed(() =>
+  partners.value.map((item) => ({
+    value: item.id,
+    label: `${item.partnerCode} · ${item.partnerName}`,
+  })),
+)
+const contractOptions = computed(() =>
+  contracts.value
+    .filter((item) => !projectId.value || item.projectId === projectId.value)
+    .map((item) => ({
+      value: item.id,
+      label: `${item.contractCode} · ${item.contractName}`,
+    })),
 )
 const canPlan = computed(() => Boolean(projectId.value) && can('quality:safety:plan:maintain'))
 const canInspect = computed(
@@ -261,12 +296,29 @@ async function openTrace(issue: QualityIssueRecord, preserveNotice = false): Pro
   }
 }
 
-function show(
+async function loadCommercialOptions(): Promise<void> {
+  if (partners.value.length && contracts.value.length) return
+  try {
+    const [partnerPage, contractPage] = await Promise.all([
+      loadPartners(),
+      loadContractPage({ pageNo: 1, pageSize: 200, projectId: projectId.value || undefined }),
+    ])
+    partners.value = partnerPage.records
+    contracts.value = contractPage.records
+  } catch (error) {
+    partners.value = []
+    contracts.value = []
+    errorMessage.value = errorText(error, '合作方与合同候选加载失败')
+  }
+}
+
+async function show(
   kind: Exclude<DialogKind, null>,
   target?: QualityInspectionRecord | QualityIssueRecord,
-): void {
+): Promise<void> {
   clearNotice()
   evidence.value = null
+  if (kind === 'issue' || kind === 'consequence') await loadCommercialOptions()
   dialog.value = kind
   if (kind === 'plan')
     Object.assign(planForm, {
@@ -503,10 +555,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="quality-page" aria-label="质量安全整改闭环">
-    <h1 class="v2-visually-hidden">质量安全整改闭环</h1>
-    <div class="quality-page__notice" role="status" aria-live="polite">
-      <V2Alert v-if="errorMessage" tone="danger" title="操作未完成">{{ errorMessage }}</V2Alert>
-    </div>
+    <V2Card title="质量安全整改闭环" :heading-level="1" />
 
     <V2PageState
       v-if="loading"
@@ -515,7 +564,7 @@ onBeforeUnmount(() => {
       description="读取计划和问题链。"
     />
     <V2PageState
-      v-else-if="!scopeProjectIds.length"
+      v-else-if="!scopeProjectIds.length && !errorMessage"
       kind="empty"
       title="暂无可访问项目"
       description="当前账号没有可查看的项目。"
@@ -693,7 +742,16 @@ onBeforeUnmount(() => {
                 </thead>
                 <tbody>
                   <tr v-for="issue in issues" :key="issue.id">
-                    <th scope="row">{{ issue.issueCode }}</th>
+                    <th scope="row">
+                      <V2Button
+                        size="small"
+                        variant="ghost"
+                        class="v2-table__record-link"
+                        @click="openTrace(issue)"
+                      >
+                        {{ issue.issueCode }}
+                      </V2Button>
+                    </th>
                     <td>{{ issue.title }}</td>
                     <td>{{ issue.description }}</td>
                     <td>
@@ -709,9 +767,6 @@ onBeforeUnmount(() => {
                     <td>{{ issue.dueDate }}</td>
                     <td>
                       <div class="quality-page__actions">
-                        <V2Button size="small" variant="secondary" @click="openTrace(issue)"
-                          >追溯</V2Button
-                        >
                         <V2Button
                           v-if="canInspect && issue.status === 'OPEN'"
                           size="small"
@@ -906,7 +961,12 @@ onBeforeUnmount(() => {
           ]"
         /><label>开始日期<input v-model="planForm.startDate" type="date" required /></label
         ><label>结束日期<input v-model="planForm.endDate" type="date" required /></label
-        ><V2Input v-model="planForm.ownerUserId" label="负责人用户 ID" required />
+        ><V2Select
+          v-model="planForm.ownerUserId"
+          label="负责人"
+          :options="userOptions(planForm.ownerUserId)"
+          required
+        />
       </form>
       <template #footer>
         <V2Button variant="secondary" @click="dialog = null">取消</V2Button>
@@ -930,9 +990,10 @@ onBeforeUnmount(() => {
       >
         <V2Input v-model="inspectionForm.inspectionCode" label="检查编码" required /><label
           >检查日期<input v-model="inspectionForm.inspectionDate" type="date" required /></label
-        ><V2Input v-model="inspectionForm.location" label="检查地点" required /><V2Input
+        ><V2Input v-model="inspectionForm.location" label="检查地点" required /><V2Select
           v-model="inspectionForm.inspectorUserId"
-          label="检查人用户 ID"
+          label="检查人"
+          :options="userOptions(inspectionForm.inspectorUserId)"
           required
         /><label class="quality-page__wide"
           >检查摘要<textarea v-model="inspectionForm.summary" required /></label
@@ -972,13 +1033,19 @@ onBeforeUnmount(() => {
             { value: 'INTERNAL', label: '内部' },
             { value: 'PARTNER', label: '合作方' },
           ]"
-        /><V2Input
+        /><V2Select
           v-if="issueForm.responsibleKind === 'PARTNER'"
           v-model="issueForm.responsiblePartnerId"
-          label="责任合作方 ID"
+          label="责任合作方"
+          :options="partnerOptions"
           required
-        /><V2Input v-model="issueForm.responsibleUserId" label="责任人用户 ID" required /><label
-          >整改期限<input v-model="issueForm.dueDate" type="date" required /></label
+          placeholder="请选择责任合作方"
+        /><V2Select
+          v-model="issueForm.responsibleUserId"
+          label="责任人"
+          :options="userOptions(issueForm.responsibleUserId)"
+          required
+        /><label>整改期限<input v-model="issueForm.dueDate" type="date" required /></label
         ><label class="quality-page__wide"
           >问题描述<textarea v-model="issueForm.description" required /></label
         ><label class="quality-page__wide"
@@ -1005,9 +1072,10 @@ onBeforeUnmount(() => {
         class="quality-page__form"
         @submit.prevent="saveRectification"
       >
-        <V2Input
+        <V2Select
           v-model="rectificationForm.responsibleUserId"
-          label="整改责任人 ID"
+          label="整改责任人"
+          :options="userOptions(rectificationForm.responsibleUserId)"
           required
         /><label
           >计划完成日期<input
@@ -1077,10 +1145,18 @@ onBeforeUnmount(() => {
         class="quality-page__form"
         @submit.prevent="saveConsequence"
       >
-        <V2Input v-model="consequenceForm.partnerId" label="合作方 ID" required /><V2Input
-          v-model="consequenceForm.contractId"
-          label="关联合同 ID"
+        <V2Select
+          v-model="consequenceForm.partnerId"
+          label="合作方"
+          :options="partnerOptions"
           required
+          placeholder="请选择合作方"
+        /><V2Select
+          v-model="consequenceForm.contractId"
+          label="关联合同"
+          :options="contractOptions"
+          required
+          placeholder="请选择合同"
         /><V2Input v-model="consequenceForm.consequenceCode" label="后果编码" required /><V2Select
           v-model="consequenceForm.decisionType"
           label="处置类型"
@@ -1143,7 +1219,7 @@ onBeforeUnmount(() => {
 .quality-page__record-sections h3 {
   margin: 0 0 var(--v2-space-2);
   color: var(--v2-color-text-strong);
-  font-size: var(--v2-font-size-15);
+  font-size: var(--v2-font-size-14);
   font-weight: var(--v2-font-weight-semibold);
   line-height: var(--v2-line-height-tight);
 }

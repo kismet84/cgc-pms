@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.service.BusinessReferenceService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -41,6 +42,7 @@ public class CostLedgerService {
     private final MdPartnerMapper mdPartnerMapper;
     private final CostSubjectMapper costSubjectMapper;
     private final ProjectAccessChecker projectAccessChecker;
+    private final BusinessReferenceService businessReferenceService;
 
     /**
      * Paginated cost ledger query with dynamic filters and batch name resolution.
@@ -63,8 +65,13 @@ public class CostLedgerService {
         Map<Long, String> contractNames = batchResolveContractNames(records);
         Map<Long, String> partnerNames = batchResolvePartnerNames(records);
         Map<Long, String> subjectNames = batchResolveSubjectNames(records);
+        Map<String, Map<Long, String>> sourceCodes = resolveSourceCodes(records);
 
-        return page.convert(item -> toVO(item, projectNames, contractNames, partnerNames, subjectNames));
+        return page.convert(item -> {
+            CostLedgerVO vo = toVO(item, projectNames, contractNames, partnerNames, subjectNames);
+            vo.setSourceCode(sourceCode(sourceCodes, item));
+            return vo;
+        });
     }
 
     /**
@@ -122,7 +129,13 @@ public class CostLedgerService {
             throw new BusinessException("COST_ITEM_NOT_FOUND", "成本记录不存在");
         }
         projectAccessChecker.checkAccess(item.getProjectId(), "查看成本台账");
-        return toVO(item);
+        CostLedgerVO vo = toVO(item);
+        if (item.getSourceType() != null && item.getSourceId() != null) {
+            vo.setSourceCode(businessReferenceService
+                    .resolve(item.getSourceType(), List.of(item.getSourceId()))
+                    .get(item.getSourceId()));
+        }
+        return vo;
     }
 
     // ---- Private helpers ----
@@ -300,6 +313,24 @@ public class CostLedgerService {
         if (ids.isEmpty()) return Map.of();
         return costSubjectMapper.selectByIds(ids).stream()
                 .collect(Collectors.toMap(CostSubject::getId, CostSubject::getSubjectName, (a, b) -> a));
+    }
+
+    private Map<String, Map<Long, String>> resolveSourceCodes(List<CostItem> items) {
+        return items.stream()
+                .filter(item -> item.getSourceType() != null && item.getSourceId() != null)
+                .collect(Collectors.groupingBy(
+                        CostItem::getSourceType,
+                        Collectors.mapping(CostItem::getSourceId, Collectors.toSet())))
+                .entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> businessReferenceService.resolve(entry.getKey(), entry.getValue())));
+    }
+
+    private String sourceCode(Map<String, Map<Long, String>> sourceCodes, CostItem item) {
+        if (item.getSourceType() == null || item.getSourceId() == null) return null;
+        Map<Long, String> codes = sourceCodes.get(item.getSourceType());
+        return codes == null ? null : codes.get(item.getSourceId());
     }
 
     private CostLedgerVO toVO(CostItem item) {

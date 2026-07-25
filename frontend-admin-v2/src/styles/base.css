@@ -84,7 +84,16 @@ textarea {
 
 h1 {
   margin: 0;
-  font-size: clamp(var(--v2-font-size-28), 5vw, var(--v2-font-size-42));
+  font-size: var(--v2-font-size-21);
+  font-weight: var(--v2-font-weight-bold);
+  line-height: var(--v2-line-height-tight);
+}
+
+h2,
+h3 {
+  margin: 0;
+  font-size: var(--v2-font-size-14);
+  font-weight: var(--v2-font-weight-semibold);
   line-height: var(--v2-line-height-tight);
 }
 

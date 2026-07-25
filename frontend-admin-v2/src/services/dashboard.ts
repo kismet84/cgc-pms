@@ -40,16 +40,15 @@ export async function loadDashboard<R extends DashboardRole>(
   const params = new URLSearchParams()
   const projectId = query.projectId?.trim()
   if (projectId) params.set('projectId', projectId)
-  if (supportsMonth(role)) {
-    const month = normalizeDashboardMonth(query.period)
-    if (month) params.set('month', month)
-  }
+  const month = normalizeDashboardMonth(query.period)
+  if (month) params.set('month', month)
   const search = params.size ? `?${params}` : ''
   return apiRequest<DashboardDataByRole[R]>(`${contract.endpoint}${search}`, { signal })
 }
 
 export async function loadCostBreakdown(
   projectId: string,
+  period: string | null | undefined,
   access: DashboardAccess,
   signal?: AbortSignal,
 ): Promise<CostBreakdownVO> {
@@ -59,11 +58,7 @@ export async function loadCostBreakdown(
     access.permissions.includes(DASHBOARD_COST_BREAKDOWN_CONTRACT.permission)
   if (!allowed) throw new DashboardRequestError('DASHBOARD_ROLE_FORBIDDEN')
   if (!projectId.trim()) throw new DashboardRequestError('DASHBOARD_PROJECT_REQUIRED')
-  return apiRequest<CostBreakdownVO>(DASHBOARD_COST_BREAKDOWN_CONTRACT.endpoint(projectId), {
-    signal,
-  })
-}
-
-function supportsMonth(role: DashboardRole): boolean {
-  return ['pm', 'cost', 'purchase', 'production', 'chiefEngineer'].includes(role)
+  const endpoint = DASHBOARD_COST_BREAKDOWN_CONTRACT.endpoint(projectId)
+  const month = normalizeDashboardMonth(period)
+  return apiRequest<CostBreakdownVO>(month ? `${endpoint}?month=${month}` : endpoint, { signal })
 }

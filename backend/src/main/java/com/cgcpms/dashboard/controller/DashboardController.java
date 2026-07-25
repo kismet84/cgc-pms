@@ -34,8 +34,9 @@ public class DashboardController {
     @GetMapping("/business-manager")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:business-manager:view')")
     public ApiResponse<BusinessManagerDashboardVO> getBusinessManagerView(
-            @RequestParam(required = false) Long projectId) {
-        return ApiResponse.success(dashboardService.getBusinessManagerView(projectId));
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String month) {
+        return ApiResponse.success(dashboardService.getBusinessManagerView(projectId, month));
     }
 
     /**
@@ -89,8 +90,9 @@ public class DashboardController {
     @GetMapping("/finance")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:finance:view')")
     public ApiResponse<FinanceDashboardVO> getFinanceView(
-            @RequestParam(required = false) Long projectId) {
-        return ApiResponse.success(dashboardService.getFinanceView(projectId));
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String month) {
+        return ApiResponse.success(dashboardService.getFinanceView(projectId, month));
     }
 
     /**
@@ -100,8 +102,9 @@ public class DashboardController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:management:view')")
     @RateLimit(maxRequests = 60, windowSeconds = 60, key = RateLimitKey.TENANT)
     public ApiResponse<ManagementDashboardVO> getManagementView(
-            @RequestParam(required = false) Long projectId) {
-        return ApiResponse.success(dashboardService.getManagementView(projectId));
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String month) {
+        return ApiResponse.success(dashboardService.getManagementView(projectId, month));
     }
 
     /**
@@ -109,7 +112,9 @@ public class DashboardController {
      */
     @GetMapping("/project/{id}/cost-breakdown")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('dashboard:cost-breakdown:view')")
-    public ApiResponse<CostBreakdownVO> getCostBreakdown(@PathVariable("id") Long projectId) {
-        return ApiResponse.success(dashboardService.getCostBreakdown(projectId));
+    public ApiResponse<CostBreakdownVO> getCostBreakdown(
+            @PathVariable("id") Long projectId,
+            @RequestParam(required = false) String month) {
+        return ApiResponse.success(dashboardService.getCostBreakdown(projectId, month));
     }
 }

@@ -5,9 +5,9 @@
 - 命名路由：87
 - Legacy 路由视图引用：73
 - Legacy 独立页面模块：65
-- `LEGACY_ONLY`：50
+- `LEGACY_ONLY`：37
 - `V2_SOURCE_AVAILABLE`：0
-- `V2_ACCEPTED`：37
+- `V2_ACCEPTED`：50
 
 | 域 | route name | URL | Legacy 视图 | V2 视图 | permission | adminOnly | 状态 | Stitch / 测试 / 验收 |
 |---|---|---|---|---|---|---:|---|---|
@@ -49,32 +49,32 @@
 | 项目履约 | QualitySafety | /quality-safety | @/pages/quality-safety/index.vue | @/pages/delivery/QualitySafetyPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-013-M3质量安全整改闭环验收报告.md |
 | 项目履约 | TechnicalManagement | /technical-management | @/pages/technical-management/index.vue | @/pages/delivery/TechnicalManagementPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md |
 | 项目履约 | ProjectCloseout | /project-closeout | @/pages/project-closeout/index.vue | @/pages/delivery/ProjectCloseoutPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md |
-| 供应链与物资 | SupplierSourcing | /supplier-sourcing | @/pages/supplier-sourcing/index.vue | — | — | 否 | LEGACY_ONLY | — |
+| 供应链与物资 | SupplierSourcing | /supplier-sourcing | @/pages/supplier-sourcing/index.vue | @/pages/supply-chain/SupplierSourcingPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-025-M5供应商招采与履约V2验收报告.md |
 | 商务合约 | BidCost | /bid-cost | @/pages/bid-cost/index.vue | @/pages/commercial/BidCostPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md |
 | 基础资料 | Org | /org | @/pages/org/index.vue | — | org:query | 否 | LEGACY_ONLY | — |
-| 分包与结算 | Subcontract | /subcontract | — | — | subcontract:task:query | 否 | LEGACY_ONLY | — |
-| 分包与结算 | SubcontractTask | /subcontract/task | @/pages/subcontract/task.vue | — | subcontract:task:query | 否 | LEGACY_ONLY | — |
-| 分包与结算 | SubcontractMeasure | /subcontract/measure | @/pages/subcontract/measure.vue | — | subcontract:measure:query | 否 | LEGACY_ONLY | — |
-| 供应链与物资 | Purchase | /purchase | — | — | purchase:order:query | 否 | LEGACY_ONLY | — |
-| 供应链与物资 | PurchaseOrder | /purchase/order | @/pages/purchase/order.vue | — | purchase:order:query | 否 | LEGACY_ONLY | — |
-| 供应链与物资 | PurchaseReceipt | /purchase/receipt | @/pages/receipt/index.vue | — | receipt:query | 否 | LEGACY_ONLY | — |
+| 分包与结算 | Subcontract | /subcontract | — | @/router.ts#V2SubcontractRedirect | subtask:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md |
+| 分包与结算 | SubcontractTask | /subcontract/task | @/pages/subcontract/task.vue | @/pages/subcontract/SubcontractWorkspacePage.vue | subtask:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md |
+| 分包与结算 | SubcontractMeasure | /subcontract/measure | @/pages/subcontract/measure.vue | @/pages/subcontract/SubcontractWorkspacePage.vue | subcontract:measure:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md |
+| 供应链与物资 | Purchase | /purchase | — | @/router.ts#V2PurchaseRedirect | purchase:order:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md |
+| 供应链与物资 | PurchaseOrder | /purchase/order | @/pages/purchase/order.vue | @/pages/supply-chain/PurchaseExecutionPage.vue | purchase:order:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md |
+| 供应链与物资 | PurchaseReceipt | /purchase/receipt | @/pages/receipt/index.vue | @/pages/supply-chain/PurchaseExecutionPage.vue | receipt:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md |
 | 资金财务 | Payment | /payment | — | — | payment:app:query | 否 | LEGACY_ONLY | — |
 | 资金财务 | PaymentApplication | /payment/application | @/pages/payment/index.vue | — | payment:app:query | 否 | LEGACY_ONLY | — |
-| 资金财务 | ExpenseApplication | /payment/expense | @/pages/expense/index.vue | — | — | 否 | LEGACY_ONLY | — |
+| 资金财务 | ExpenseApplication | /payment/expense | @/pages/expense/index.vue | — | expense:query | 否 | LEGACY_ONLY | — |
 | 商务合约 | ProjectBudget | /budget | @/pages/budget/index.vue | @/pages/commercial/BudgetPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md |
 | 资金财务 | FinanceOperations | /finance-operations | @/pages/finance-operations/index.vue | — | finance:operations:query | 否 | LEGACY_ONLY | — |
-| 资金财务 | RevenueOperations | /revenue | @/pages/revenue/index.vue | — | — | 否 | LEGACY_ONLY | — |
+| 资金财务 | RevenueOperations | /revenue | @/pages/revenue/index.vue | — | revenue:operations:query | 否 | LEGACY_ONLY | — |
 | 商务合约 | ProductionMeasurement | /production-measurement | @/pages/production-measurement/index.vue | @/pages/commercial/ProductionMeasurementPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md |
 | 资金财务 | CashJournal | /cash-journal | @/pages/cash-journal/index.vue | — | cashbook:journal:query | 否 | LEGACY_ONLY | — |
-| 资金财务 | AccountingEntry | /accounting-entry | @/pages/accounting-entry/index.vue | — | — | 否 | LEGACY_ONLY | — |
-| 资金财务 | CashForecast | /cash-forecast | @/pages/cash-forecast/index.vue | — | — | 否 | LEGACY_ONLY | — |
-| 资金财务 | FinancialClose | /financial-close | @/pages/financial-close/index.vue | — | — | 否 | LEGACY_ONLY | — |
-| 供应链与物资 | Inventory | /inventory | — | — | inventory:warehouse:query | 否 | LEGACY_ONLY | — |
-| 供应链与物资 | InventoryWarehouse | /inventory/warehouse | @/pages/inventory/warehouse.vue | — | inventory:warehouse:query | 否 | LEGACY_ONLY | — |
-| 供应链与物资 | InventoryStock | /inventory/stock | @/pages/inventory/stock.vue | — | inventory:stock:list | 否 | LEGACY_ONLY | — |
-| 供应链与物资 | InventoryTransaction | /inventory/transaction | @/pages/inventory/transaction.vue | — | inventory:transaction:list | 否 | LEGACY_ONLY | — |
-| 供应链与物资 | InventoryPurchaseRequest | /inventory/purchase-request | @/pages/inventory/purchase-request.vue | — | purchase:request:list | 否 | LEGACY_ONLY | — |
-| 供应链与物资 | InventoryMaterialRequisition | /inventory/material-requisition | @/pages/requisition/index.vue | — | requisition:query | 否 | LEGACY_ONLY | — |
+| 资金财务 | AccountingEntry | /accounting-entry | @/pages/accounting-entry/index.vue | — | accounting:query | 否 | LEGACY_ONLY | — |
+| 资金财务 | CashForecast | /cash-forecast | @/pages/cash-forecast/index.vue | — | finance:forecast:query | 否 | LEGACY_ONLY | — |
+| 资金财务 | FinancialClose | /financial-close | @/pages/financial-close/index.vue | — | finance:close:query | 否 | LEGACY_ONLY | — |
+| 供应链与物资 | Inventory | /inventory | — | @/router.ts#V2InventoryRedirect | inventory:warehouse:list | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md |
+| 供应链与物资 | InventoryWarehouse | /inventory/warehouse | @/pages/inventory/warehouse.vue | @/pages/supply-chain/InventoryWorkspacePage.vue | inventory:warehouse:list | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md |
+| 供应链与物资 | InventoryStock | /inventory/stock | @/pages/inventory/stock.vue | @/pages/supply-chain/InventoryWorkspacePage.vue | inventory:stock:list | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md |
+| 供应链与物资 | InventoryTransaction | /inventory/transaction | @/pages/inventory/transaction.vue | @/pages/supply-chain/InventoryWorkspacePage.vue | inventory:transaction:list | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md |
+| 供应链与物资 | InventoryPurchaseRequest | /inventory/purchase-request | @/pages/inventory/purchase-request.vue | @/pages/supply-chain/PurchaseExecutionPage.vue | purchase:request:list | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md |
+| 供应链与物资 | InventoryMaterialRequisition | /inventory/material-requisition | @/pages/requisition/index.vue | @/pages/supply-chain/RequisitionWorkspacePage.vue | requisition:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-028-M5领料出库与退料V2验收报告.md |
 | 资金财务 | Invoice | /invoice | @/pages/invoice/index.vue | — | invoice:query | 否 | LEGACY_ONLY | — |
 | 基础资料 | Material | /material | — | — | material:query | 否 | LEGACY_ONLY | — |
 | 基础资料 | MaterialDictionary | /material/dictionary | @/pages/material/dictionary.vue | — | material:query | 否 | LEGACY_ONLY | — |

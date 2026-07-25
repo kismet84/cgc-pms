@@ -24,11 +24,11 @@ public class SupplierPerformanceEvaluation extends BaseEntity {
     private String evaluationCode;
     private LocalDate periodStart;
     private LocalDate periodEnd;
-    private BigDecimal deliveryScore;
-    private BigDecimal qualityScore;
-    private BigDecimal serviceScore;
-    private BigDecimal commercialScore;
-    private BigDecimal totalScore;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal deliveryScore;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal qualityScore;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal serviceScore;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal commercialScore;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal totalScore;
     private String grade;
     private Integer onTimeFlag;
     private Integer approvedReceiptCount;
@@ -36,7 +36,7 @@ public class SupplierPerformanceEvaluation extends BaseEntity {
     private Integer returnCount;
     private Integer finalizedSettlementCount;
     private Integer qualitySafetyFactCount;
-    private BigDecimal qualitySafetyAverage;
+    @JsonSerialize(using = ToStringSerializer.class) private BigDecimal qualitySafetyAverage;
     private String evaluationComment;
     private Integer recommendBlacklist;
     private String status;

@@ -19,7 +19,10 @@ public class MatWarehouseController {
     private final MatWarehouseService matWarehouseService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:warehouse:list')")
+    @PreAuthorize("""
+            hasAnyRole('ADMIN','SUPER_ADMIN')
+            or hasAnyAuthority('inventory:warehouse:list','inventory:stock:list','inventory:transaction:list')
+            """)
     public ApiResponse<PageResult<MatWarehouseVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,

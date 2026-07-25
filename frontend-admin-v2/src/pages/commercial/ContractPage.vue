@@ -22,6 +22,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import { formatAmount } from '@/pages/dashboard/model'
@@ -76,6 +77,13 @@ const CONTRACT_PRESET_VIEWS: Array<{
   { id: 'settled', label: '已结算', contractStatus: 'SETTLED' },
   { id: 'terminated', label: '已终止', contractStatus: 'TERMINATED' },
 ]
+const PAYMENT_TERM_STATUS_LABELS: Record<string, string> = {
+  PLANNED: '计划中',
+  DUE: '待支付',
+  PAID: '已支付',
+  OVERDUE: '已逾期',
+  CANCELLED: '已取消',
+}
 
 function contractTypeLabel(value?: string | null): string {
   return CONTRACT_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? '未知类型'
@@ -99,6 +107,10 @@ const submitting = ref(false)
 const deleting = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
+
+watch(errorMessage, (message) => {
+  if (message) showToast('error', '合同操作未完成', message)
+})
 const contracts = ref<ContractPage['records']>([])
 const total = ref(0)
 const kpi = ref<ContractKpi | null>(null)
@@ -420,12 +432,15 @@ function contractTitle(): string {
 }
 
 function projectLabel(projectId?: string | null): string {
-  return projects.value.find((item) => item.id === projectId)?.projectName ?? '—'
+  return projects.value.find((item) => item.id === projectId)?.projectName ?? '项目名称缺失'
 }
 
 function partnerLabel(partnerId?: string | null): string {
-  return partners.value.find((item) => item.id === partnerId)?.partnerName ?? partnerId ?? '—'
+  return partners.value.find((item) => item.id === partnerId)?.partnerName ?? '合作方名称缺失'
 }
+
+const paymentTermStatusLabel = (value?: string | null) =>
+  PAYMENT_TERM_STATUS_LABELS[value ?? ''] ?? '未知状态'
 
 function updateContractField(
   key: keyof ContractSaveCommand['contract'],
@@ -691,7 +706,6 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="contract-page" aria-labelledby="contract-title">
-    <V2Alert v-if="errorMessage" tone="danger" title="请求未完成">{{ errorMessage }}</V2Alert>
     <V2PageState
       v-if="loading"
       kind="loading"
@@ -709,7 +723,7 @@ onBeforeUnmount(() => {
         :heading-level="1"
       >
         <template #actions>
-          <V2Button v-if="canCreate" @click="openCreate">新建合同</V2Button>
+          <V2Button v-if="canCreate" size="small" @click="openCreate">新建合同</V2Button>
         </template>
         <dl v-if="kpi" class="contract-page__kpi-grid">
           <div>
@@ -748,14 +762,14 @@ onBeforeUnmount(() => {
         </nav>
 
         <V2PageState
-          v-if="!contracts.length"
+          v-if="!contracts.length && !errorMessage"
           kind="empty"
           title="暂无可见合同"
           description="调整筛选条件，或联系管理员核对项目和权限范围。"
           :heading-level="3"
         />
 
-        <div v-else class="contract-page__table-wrap" tabindex="0">
+        <div v-else-if="contracts.length" class="contract-page__table-wrap" tabindex="0">
           <table class="contract-page__table">
             <caption class="v2-visually-hidden">
               合同列表
@@ -776,7 +790,16 @@ onBeforeUnmount(() => {
             </thead>
             <tbody>
               <tr v-for="contract in contracts" :key="contract.id">
-                <th scope="row">{{ contract.contractCode }}</th>
+                <th scope="row">
+                  <V2Button
+                    size="small"
+                    variant="ghost"
+                    class="v2-table__record-link"
+                    @click="openDetail(contract.id)"
+                  >
+                    {{ contract.contractCode }}
+                  </V2Button>
+                </th>
                 <td>{{ contract.contractName }}</td>
                 <td>{{ projectLabel(contract.projectId) }}</td>
                 <td>
@@ -793,9 +816,6 @@ onBeforeUnmount(() => {
                 <td>{{ contract.partyBName || partnerLabel(contract.partyBId) }}</td>
                 <td>
                   <div class="contract-page__actions">
-                    <V2Button size="small" variant="secondary" @click="openDetail(contract.id)"
-                      >详情</V2Button
-                    >
                     <V2Button
                       v-if="canEdit && contract.approvalStatus === 'DRAFT'"
                       size="small"
@@ -836,16 +856,7 @@ onBeforeUnmount(() => {
     </template>
 
     <template v-else-if="mode === 'create' || detail">
-      <V2Card
-        :title="contractTitle()"
-        title-id="contract-title"
-        :heading-level="1"
-        :subtitle="
-          mode === 'detail' && currentContract
-            ? `${currentContract.contractCode} · ${projectLabel(currentContract.projectId)}`
-            : undefined
-        "
-      >
+      <V2Card :title="contractTitle()" title-id="contract-title" :heading-level="1">
         <template #actions>
           <div class="contract-page__actions">
             <V2Button size="small" variant="ghost" @click="backToLedger">返回台账</V2Button>
@@ -900,7 +911,10 @@ onBeforeUnmount(() => {
             <dd>{{ approvalStatusLabel(currentContract.approvalStatus) }}</dd>
           </dl>
         </V2Card>
-        <V2Card title="合同清单" :subtitle="`共 ${detail?.items.length ?? 0} 条`">
+        <V2Card title="合同清单">
+          <template #title-extra>
+            <V2Badge tone="neutral">共 {{ detail?.items.length ?? 0 }} 条</V2Badge>
+          </template>
           <div
             v-if="detail?.items.length"
             class="contract-page__table-wrap"
@@ -934,14 +948,17 @@ onBeforeUnmount(() => {
             </table>
           </div>
           <V2PageState
-            v-else
+            v-else-if="!detail?.items.length && !errorMessage"
             kind="empty"
             title="暂无合同清单"
             description="当前合同还没有明细。"
             :heading-level="3"
           />
         </V2Card>
-        <V2Card title="付款条款" :subtitle="`共 ${detail?.paymentTerms.length ?? 0} 条`">
+        <V2Card title="付款条款">
+          <template #title-extra>
+            <V2Badge tone="neutral">共 {{ detail?.paymentTerms.length ?? 0 }} 条</V2Badge>
+          </template>
           <div
             v-if="detail?.paymentTerms.length"
             class="contract-page__table-wrap"
@@ -969,20 +986,23 @@ onBeforeUnmount(() => {
                   <td>{{ term.paymentCondition || '—' }}</td>
                   <td>{{ term.plannedDate || '—' }}</td>
                   <td>{{ term.actualDate || '—' }}</td>
-                  <td>{{ term.termStatus || '—' }}</td>
+                  <td>{{ paymentTermStatusLabel(term.termStatus) }}</td>
                 </tr>
               </tbody>
             </table>
           </div>
           <V2PageState
-            v-else
+            v-else-if="!detail?.paymentTerms.length && !errorMessage"
             kind="empty"
             title="暂无付款条款"
             description="当前合同还没有付款节点。"
             :heading-level="3"
           />
         </V2Card>
-        <V2Card title="审批记录" :subtitle="`共 ${detail?.approvalRecords.length ?? 0} 条`">
+        <V2Card title="审批记录">
+          <template #title-extra>
+            <V2Badge tone="neutral">共 {{ detail?.approvalRecords.length ?? 0 }} 条</V2Badge>
+          </template>
           <div v-if="detail?.approvalRecords.length" class="contract-page__rows">
             <article
               v-for="record in detail?.approvalRecords"
@@ -995,7 +1015,7 @@ onBeforeUnmount(() => {
             </article>
           </div>
           <V2PageState
-            v-else
+            v-else-if="!detail?.approvalRecords.length && !errorMessage"
             kind="empty"
             title="暂无审批历史"
             description="草稿合同还没有审批轨迹。"
@@ -1159,7 +1179,7 @@ onBeforeUnmount(() => {
             </article>
           </div>
           <V2PageState
-            v-else
+            v-else-if="!form.items.length && !errorMessage"
             kind="empty"
             title="暂无合同清单"
             description="可按最小闭环先保存合同头，再补录清单。"
@@ -1212,7 +1232,7 @@ onBeforeUnmount(() => {
             </article>
           </div>
           <V2PageState
-            v-else
+            v-else-if="!form.paymentTerms.length && !errorMessage"
             kind="empty"
             title="暂无付款条款"
             description="可先保存草稿，再按节点补录付款安排。"

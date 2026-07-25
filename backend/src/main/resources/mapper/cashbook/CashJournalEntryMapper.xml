@@ -11,6 +11,17 @@
         <if test="query.sourceType != null and query.sourceType != ''">AND e.source_type = #{query.sourceType}</if>
         <if test="query.sourceId != null">AND e.source_id = #{query.sourceId}</if>
         <if test="query.projectId != null">AND e.project_id = #{query.projectId}</if>
+        <if test="query.projectId == null">
+            AND (
+                e.project_id IS NULL
+                <if test="accessibleProjectIds != null and !accessibleProjectIds.isEmpty()">
+                    OR e.project_id IN
+                    <foreach collection="accessibleProjectIds" item="projectId" open="(" separator="," close=")">
+                        #{projectId}
+                    </foreach>
+                </if>
+            )
+        </if>
         <if test="query.contractId != null">AND e.contract_id = #{query.contractId}</if>
         <if test="query.businessDateStart != null">AND e.business_date &gt;= #{query.businessDateStart}</if>
         <if test="query.businessDateEnd != null">AND e.business_date &lt;= #{query.businessDateEnd}</if>

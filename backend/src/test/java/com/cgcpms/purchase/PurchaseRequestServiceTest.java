@@ -130,9 +130,9 @@ class PurchaseRequestServiceTest {
                 "SELECT id FROM cost_subject ORDER BY id LIMIT 1", Long.class);
         jdbcTemplate.update("""
                 INSERT INTO project_budget (
-                    id, tenant_id, project_id, version_no, budget_name, total_amount,
+                    id, tenant_id, project_id, budget_code, version_no, budget_name, total_amount,
                     approval_status, status, active_flag, active_token, created_by, deleted_flag
-                ) SELECT ?, ?, ?, 'PR-TDD-V1', '采购申请测试预算', 1000000,
+                ) SELECT ?, ?, ?, 'BUD-PR-SERVICE', 'PR-TDD-V1', '采购申请测试预算', 1000000,
                     'APPROVED', 'ACTIVE', 1, ?, ?, 0
                 WHERE NOT EXISTS (SELECT 1 FROM project_budget WHERE id = ?)
                 """, BUDGET_ID, TENANT_ID, PROJECT_ID, BUDGET_ID, USER_ADMIN, BUDGET_ID);
@@ -196,6 +196,22 @@ class PurchaseRequestServiceTest {
         assertEquals("DRAFT", vo.getStatus());
         assertEquals(String.valueOf(PROJECT_ID), vo.getProjectId());
         assertEquals(String.valueOf(TENANT_ID), vo.getTenantId());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("采购申请列表与详情返回明细汇总金额")
+    void purchaseRequestReturnsAggregatedItemAmount() {
+        Long id = requestService.create(completeRequestHeader());
+        requestService.saveItemsBatch(id, List.of(completeRequestItem()));
+
+        assertEquals("1000.00", requestService.getById(id).getTotalAmount());
+        MatPurchaseRequestVO row = requestService.getPage(1, 20, PROJECT_ID, null, null, null)
+                .getRecords().stream()
+                .filter(item -> id.toString().equals(item.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("1000.00", row.getTotalAmount());
     }
 
     @Test

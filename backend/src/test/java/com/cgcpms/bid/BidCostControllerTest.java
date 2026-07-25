@@ -73,10 +73,7 @@ class BidCostControllerTest {
     void testList_TenantIsolation() throws Exception {
         long id = 900000000000L + Math.abs(System.nanoTime() % 100000000L);
         String name = "CROSS-TENANT-BID-" + id;
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'BIDDING', 0)
-                """, id, 9001L, name);
+        insertBidCost(id, 9001L, name, "BIDDING");
         try {
             mockMvc.perform(getWith("/bid-cost")
                             .cookie(userCookie(TENANT_ID, List.of("bid:query")))
@@ -281,10 +278,7 @@ class BidCostControllerTest {
     @Test @Order(6) @DisplayName("GET /bid-cost/{id} hides another tenant record as not found")
     void testGetById_TenantIsolation() throws Exception {
         long id = 910000000000L + Math.abs(System.nanoTime() % 100000000L);
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'BIDDING', 0)
-                """, id, 9001L, "CROSS-TENANT-BID-DETAIL-" + id);
+        insertBidCost(id, 9001L, "CROSS-TENANT-BID-DETAIL-" + id, "BIDDING");
         try {
             mockMvc.perform(getWith("/bid-cost/" + id)
                             .cookie(userCookie(TENANT_ID, List.of("bid:query"))))
@@ -352,18 +346,9 @@ class BidCostControllerTest {
                 ) VALUES (?, ?, ?, ?, '房建工程', 'ACTIVE', 'APPROVED', ?, 0)
                 """, ownedProjectId, TENANT_ID, "BID-WON-PROJECT-" + ownedProjectId,
                 "投标中标权限测试项目", 99L);
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'BIDDING', 0)
-                """, allowedId, TENANT_ID, "BID-WON-PERMISSION-" + allowedId);
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'BIDDING', 0)
-                """, crossTenantId, 9001L, "BID-WON-CROSS-TENANT-" + crossTenantId);
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'WON', 0)
-                """, invalidStateId, TENANT_ID, "BID-WON-INVALID-STATE-" + invalidStateId);
+        insertBidCost(allowedId, TENANT_ID, "BID-WON-PERMISSION-" + allowedId, "BIDDING");
+        insertBidCost(crossTenantId, 9001L, "BID-WON-CROSS-TENANT-" + crossTenantId, "BIDDING");
+        insertBidCost(invalidStateId, TENANT_ID, "BID-WON-INVALID-STATE-" + invalidStateId, "WON");
         try {
             mockMvc.perform(putWith("/bid-cost/" + allowedId + "/won").param("projectId", "10001"))
                     .andExpect(status().isUnauthorized());
@@ -421,22 +406,10 @@ class BidCostControllerTest {
         long adminId = base + 2;
         long crossTenantId = base + 3;
         long invalidStateId = base + 4;
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'BIDDING', 0)
-                """, allowedId, TENANT_ID, "BID-LOST-PERMISSION-" + allowedId);
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'BIDDING', 0)
-                """, adminId, TENANT_ID, "BID-LOST-ADMIN-" + adminId);
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'BIDDING', 0)
-                """, crossTenantId, 9001L, "BID-LOST-CROSS-TENANT-" + crossTenantId);
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'WON', 0)
-                """, invalidStateId, TENANT_ID, "BID-LOST-INVALID-STATE-" + invalidStateId);
+        insertBidCost(allowedId, TENANT_ID, "BID-LOST-PERMISSION-" + allowedId, "BIDDING");
+        insertBidCost(adminId, TENANT_ID, "BID-LOST-ADMIN-" + adminId, "BIDDING");
+        insertBidCost(crossTenantId, 9001L, "BID-LOST-CROSS-TENANT-" + crossTenantId, "BIDDING");
+        insertBidCost(invalidStateId, TENANT_ID, "BID-LOST-INVALID-STATE-" + invalidStateId, "WON");
         try {
             mockMvc.perform(putWith("/bid-cost/" + allowedId + "/lost"))
                     .andExpect(status().isUnauthorized());
@@ -492,10 +465,7 @@ class BidCostControllerTest {
     @Test @Order(6) @DisplayName("PUT /bid-cost/{id} hides another tenant record as not found")
     void testUpdate_TenantIsolation() throws Exception {
         long id = 920000000000L + Math.abs(System.nanoTime() % 100000000L);
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'BIDDING', 0)
-                """, id, 9001L, "CROSS-TENANT-BID-UPDATE-" + id);
+        insertBidCost(id, 9001L, "CROSS-TENANT-BID-UPDATE-" + id, "BIDDING");
         try {
             mockMvc.perform(putWith("/bid-cost/" + id)
                             .cookie(userCookie(TENANT_ID, List.of("bid:edit")))
@@ -521,10 +491,7 @@ class BidCostControllerTest {
     @Test @Order(6) @DisplayName("DELETE /bid-cost/{id} enforces authentication and bid:delete")
     void testDelete_PermissionBoundary() throws Exception {
         long id = 930000000000L + Math.abs(System.nanoTime() % 100000000L);
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'BIDDING', 0)
-                """, id, TENANT_ID, "BID-DELETE-PERMISSION-" + id);
+        insertBidCost(id, TENANT_ID, "BID-DELETE-PERMISSION-" + id, "BIDDING");
         try {
             mockMvc.perform(deleteWith("/bid-cost/" + id))
                     .andExpect(status().isUnauthorized());
@@ -545,10 +512,7 @@ class BidCostControllerTest {
     @Test @Order(6) @DisplayName("DELETE /bid-cost/{id} hides another tenant record as not found")
     void testDelete_TenantIsolation() throws Exception {
         long id = 940000000000L + Math.abs(System.nanoTime() % 100000000L);
-        jdbcTemplate.update("""
-                INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                VALUES (?, ?, ?, 'BIDDING', 0)
-                """, id, 9001L, "CROSS-TENANT-BID-DELETE-" + id);
+        insertBidCost(id, 9001L, "CROSS-TENANT-BID-DELETE-" + id, "BIDDING");
         try {
             mockMvc.perform(deleteWith("/bid-cost/" + id)
                             .cookie(userCookie(TENANT_ID, List.of("bid:delete"))))
@@ -566,10 +530,7 @@ class BidCostControllerTest {
     void testDelete_NonBiddingRejected() throws Exception {
         for (String statusValue : List.of("WON", "LOST")) {
             long id = 950000000000L + Math.abs(System.nanoTime() % 100000000L);
-            jdbcTemplate.update("""
-                    INSERT INTO bid_cost (id, tenant_id, bid_project_name, bid_status, deleted_flag)
-                    VALUES (?, ?, ?, ?, 0)
-                    """, id, TENANT_ID, "NON-BIDDING-DELETE-" + statusValue + "-" + id, statusValue);
+            insertBidCost(id, TENANT_ID, "NON-BIDDING-DELETE-" + statusValue + "-" + id, statusValue);
             try {
                 mockMvc.perform(deleteWith("/bid-cost/" + id)
                                 .cookie(userCookie(TENANT_ID, List.of("bid:delete"))))
@@ -605,6 +566,14 @@ class BidCostControllerTest {
         Assertions.assertNotNull(bidId);
         mockMvc.perform(putWith("/bid-cost/" + bidId + "/won").cookie(adminCookie()).param("projectId", "10001"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+    }
+
+    private void insertBidCost(long id, long tenantId, String name, String status) {
+        jdbcTemplate.update("""
+                INSERT INTO bid_cost
+                    (id, tenant_id, bid_code, bid_project_name, bid_status, deleted_flag)
+                VALUES (?, ?, ?, ?, ?, 0)
+                """, id, tenantId, "BID-TEST-" + id, name, status);
     }
 
     private MockHttpServletRequestBuilder getWith(String p) { return get("/api" + p).contextPath("/api"); }

@@ -240,6 +240,7 @@ export interface SiteDailyLogRecord {
   id: string;
   projectId: string;
   projectName?: string | null;
+  dailyLogCode?: string | null;
   reportDate: string;
   constructionContent: string;
   issuesDelays?: string | null;

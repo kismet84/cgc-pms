@@ -2,7 +2,7 @@
 import type { CostProjectSummary, CostSummaryHistoryRecord } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { V2Alert, V2Button, V2Card, V2PageState, useToastMessage } from '@/components'
+import { V2Button, V2Card, V2PageState, showToast } from '@/components'
 import { loadCostSummary, loadCostSummaryHistory, refreshCostSummary } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
@@ -14,7 +14,10 @@ const history = ref<CostSummaryHistoryRecord[]>([])
 const loading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
-const successMessage = useToastMessage()
+
+watch(errorMessage, (message) => {
+  if (message) showToast('error', '成本核对请求未完成', message)
+})
 let controller: AbortController | null = null
 let generation = 0
 const canQuery = computed(() => session.hasPermission('cost:summary:view'))
@@ -59,11 +62,10 @@ async function refresh() {
   if (actionBusy.value || !canRefresh.value || !projectId.value) return
   actionBusy.value = true
   errorMessage.value = ''
-  successMessage.value = ''
   try {
     await refreshCostSummary(projectId.value)
-    successMessage.value = '成本汇总已刷新'
     await load()
+    showToast('success', '刷新完成', '成本汇总已刷新。')
   } catch (e) {
     const message = errorText(e, '成本汇总刷新失败')
     if (needsAuthoritativeReload(e)) await load()
@@ -83,13 +85,11 @@ onBeforeUnmount(() => controller?.abort())
       description="请联系管理员开通访问权限。"
       kind="forbidden"
     /><template v-else
-      ><V2Alert v-if="errorMessage" tone="danger" title="成本核对请求未完成">{{
-        errorMessage
-      }}</V2Alert
       ><V2Card title="成本核对" :heading-level="1"
         ><template #actions
           ><V2Button
             v-if="canRefresh"
+            size="small"
             variant="secondary"
             :loading="actionBusy"
             :disabled="!projectId"
@@ -103,11 +103,11 @@ onBeforeUnmount(() => controller?.abort())
         description="正在读取项目成本汇总及历史记录。"
         kind="loading"
       /><V2PageState
-        v-else-if="!latest"
+        v-else-if="!latest && !errorMessage"
         title="暂无成本汇总"
         description="请在公共壳选择项目，或当前项目尚未生成可核对的成本汇总。"
         kind="empty"
-      /><template v-else
+      /><template v-else-if="latest"
         ><V2Card :title="latest.projectName || '项目汇总'"
           ><dl>
             <dt>目标成本</dt>
@@ -123,12 +123,18 @@ onBeforeUnmount(() => controller?.abort())
           </dl></V2Card
         ><V2Card title="汇总历史"
           ><V2PageState
-            v-if="!history.length"
+            v-if="!history.length && !errorMessage"
             title="暂无历史记录"
             description="当前项目尚无成本汇总快照历史。"
             kind="empty"
           />
-          <div v-else class="table-wrap" role="region" aria-label="成本汇总历史表格" tabindex="0">
+          <div
+            v-else-if="history.length"
+            class="table-wrap"
+            role="region"
+            aria-label="成本汇总历史表格"
+            tabindex="0"
+          >
             <table>
               <thead>
                 <tr>

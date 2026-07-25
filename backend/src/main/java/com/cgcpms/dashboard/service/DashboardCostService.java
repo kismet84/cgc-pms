@@ -28,6 +28,7 @@ import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
@@ -71,6 +72,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
@@ -82,6 +84,8 @@ import java.util.stream.Stream;
 @Slf4j
 @Service
 public class DashboardCostService extends DashboardSharedSupport {
+
+    private final ProjectAccessChecker projectAccessChecker;
 
     public DashboardCostService(
             CostSummaryService costSummaryService,
@@ -109,8 +113,10 @@ public class DashboardCostService extends DashboardSharedSupport {
             TechItemMapper techItemMapper,
             MdPartnerMapper partnerMapper,
             MdMaterialMapper materialMapper,
-            SysUserMapper userMapper) {
+            SysUserMapper userMapper,
+            ProjectAccessChecker projectAccessChecker) {
         super(costSummaryService, costSummaryMapper, costSubjectMapper, costItemMapper, projectMapper, ctContractMapper, wfTaskMapper, wfInstanceMapper, payRecordMapper, stlSettlementMapper, varOrderMapper, subMeasureMapper, alertLogMapper, purchaseRequestMapper, purchaseRequestItemMapper, purchaseOrderMapper, purchaseOrderItemMapper, receiptMapper, receiptItemMapper, requisitionMapper, warehouseMapper, stockMapper, techItemMapper, partnerMapper, materialMapper, userMapper);
+        this.projectAccessChecker = projectAccessChecker;
     }
 
     public CostManagerDashboardVO getCostManagerView(Long projectId) {
@@ -126,6 +132,7 @@ public class DashboardCostService extends DashboardSharedSupport {
         }
 
         PmProject project = requireProject(tenantId, projectId);
+        projectAccessChecker.checkAccess(project, "查看成本驾驶舱");
 
         // Use pre-aggregated cost_summary via existing service
         CostProjectSummaryVO summary = selectedMonth == null ? costSummaryService.getProjectSummary(tenantId, projectId) : null;
@@ -155,25 +162,41 @@ public class DashboardCostService extends DashboardSharedSupport {
     }
 
     public CostBreakdownVO getCostBreakdown(Long projectId) {
-        Long tenantId = UserContext.getCurrentTenantId();
-        PmProject project = requireProject(tenantId, projectId);
+        return getCostBreakdown(projectId, null);
+    }
 
-        // Get project-level summary
-        CostProjectSummaryVO projectSummary = costSummaryService.getProjectSummary(tenantId, projectId);
+    public CostBreakdownVO getCostBreakdown(Long projectId, String month) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        YearMonth selectedMonth = parseDashboardMonth(month);
+        PmProject project = requireProject(tenantId, projectId);
+        projectAccessChecker.checkAccess(project, "查看成本分解");
+
+        CostProjectSummaryVO projectSummary = selectedMonth == null
+                ? costSummaryService.getProjectSummary(tenantId, projectId)
+                : null;
+        CostSummary projectLevelSummary = findLatestProjectLevelSummary(tenantId, projectId, selectedMonth);
 
         CostBreakdownVO vo = new CostBreakdownVO();
         vo.setProjectId(projectId.toString());
         vo.setProjectName(project.getProjectName());
-        vo.setTargetCost(projectSummary.getTargetCost());
-        vo.setDynamicCost(projectSummary.getDynamicCost());
-        vo.setExpectedProfit(projectSummary.getExpectedProfit());
+        vo.setTargetCost(projectLevelSummary != null && projectLevelSummary.getTargetCost() != null
+                ? projectLevelSummary.getTargetCost().toPlainString()
+                : projectSummary != null ? projectSummary.getTargetCost() : "0");
+        vo.setDynamicCost(projectLevelSummary != null && projectLevelSummary.getDynamicCost() != null
+                ? projectLevelSummary.getDynamicCost().toPlainString()
+                : projectSummary != null ? projectSummary.getDynamicCost() : "0");
+        vo.setExpectedProfit(projectLevelSummary != null && projectLevelSummary.getExpectedProfit() != null
+                ? projectLevelSummary.getExpectedProfit().toPlainString()
+                : projectSummary != null ? projectSummary.getExpectedProfit() : "0");
 
-        // Drill-down: group cost_summary by cost_subject_id (level 1 only)
-        List<CostSummary> summaries = costSummaryMapper.selectList(
-                new LambdaQueryWrapper<CostSummary>()
-                        .eq(CostSummary::getTenantId, tenantId)
-                        .eq(CostSummary::getProjectId, projectId)
-                        .isNotNull(CostSummary::getCostSubjectId));
+        LambdaQueryWrapper<CostSummary> summaryQuery = new LambdaQueryWrapper<CostSummary>()
+                .eq(CostSummary::getTenantId, tenantId)
+                .eq(CostSummary::getProjectId, projectId)
+                .isNotNull(CostSummary::getCostSubjectId);
+        if (selectedMonth != null) {
+            summaryQuery.le(CostSummary::getSummaryDate, selectedMonth.atEndOfMonth());
+        }
+        List<CostSummary> summaries = latestSubjectSummaries(costSummaryMapper.selectList(summaryQuery));
 
         if (CollectionUtils.isEmpty(summaries)) {
             vo.setSubjectBreakdowns(Collections.emptyList());
@@ -224,10 +247,10 @@ public class DashboardCostService extends DashboardSharedSupport {
 
 
     private CostManagerDashboardVO getCostManagerViewAllProjects(Long tenantId, YearMonth selectedMonth) {
-        List<PmProject> activeProjects = projectMapper.selectList(
+        List<PmProject> activeProjects = projectAccessChecker.filterAccessible(projectMapper.selectList(
                 new LambdaQueryWrapper<PmProject>()
                         .eq(PmProject::getTenantId, tenantId)
-                        .eq(PmProject::getStatus, "ACTIVE"));
+                        .eq(PmProject::getStatus, "ACTIVE")));
         List<Long> projectIds = activeProjects.stream().map(PmProject::getId).collect(Collectors.toList());
 
         CostManagerDashboardVO vo = new CostManagerDashboardVO();
@@ -286,6 +309,7 @@ public class DashboardCostService extends DashboardSharedSupport {
         // Over-budget alerts — tenant-wide
         LambdaQueryWrapper<AlertLog> alertQuery = new LambdaQueryWrapper<AlertLog>()
                 .eq(AlertLog::getTenantId, tenantId)
+                .in(AlertLog::getProjectId, projectIds)
                 .in(AlertLog::getRuleType, Set.of("DYNAMIC_COST_EXCEEDS_TARGET", "MATERIAL_EXCEEDS_BUDGET"));
         applyMonthDateTimeRange(alertQuery, selectedMonth, AlertLog::getTriggeredAt);
         List<AlertLog> overBudgetAlerts = alertLogMapper.selectList(
@@ -337,10 +361,13 @@ public class DashboardCostService extends DashboardSharedSupport {
         }
         vo.setSubjectRankings(subjectRankings);
 
+        LocalDateTime overdueAsOf = selectedMonth == null
+                ? LocalDateTime.now()
+                : selectedMonth.atEndOfMonth().atTime(LocalTime.MAX);
         LambdaQueryWrapper<WfTask> taskQuery = new LambdaQueryWrapper<WfTask>()
                 .eq(WfTask::getTenantId, tenantId)
                 .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING)
-                .le(WfTask::getReceivedAt, LocalDateTime.now().minusDays(7));
+                .le(WfTask::getReceivedAt, overdueAsOf.minusDays(7));
         applyMonthDateTimeRange(taskQuery, selectedMonth, WfTask::getReceivedAt);
         List<WfTask> tasks = wfTaskMapper.selectList(taskQuery);
         Map<Long, WfInstance> instanceMap = batchLoadInstances(tasks);
@@ -351,7 +378,7 @@ public class DashboardCostService extends DashboardSharedSupport {
                 })
                 .sorted(Comparator.comparing(WfTask::getReceivedAt))
                 .limit(5)
-                .map(t -> toCostOverdueItem(t, instanceMap.get(t.getInstanceId()), projectNameMap))
+                .map(t -> toCostOverdueItem(t, instanceMap.get(t.getInstanceId()), projectNameMap, overdueAsOf))
                 .collect(Collectors.toList()));
 
         LambdaQueryWrapper<PayRecord> pendingPayQuery = new LambdaQueryWrapper<PayRecord>()
@@ -433,7 +460,7 @@ public class DashboardCostService extends DashboardSharedSupport {
             query.le(CostSummary::getSummaryDate, selectedMonth.atEndOfMonth());
         }
         return costSummaryMapper.selectList(
-                query.orderByDesc(CostSummary::getSummaryDate).last("limit 1")) // SQL-SAFETY: fixed-sql-fragment
+                query.orderByDesc(CostSummary::getSummaryDate, CostSummary::getId).last("limit 1")) // SQL-SAFETY: fixed-sql-fragment
                 .stream()
                 .findFirst()
                 .orElse(null);
@@ -451,7 +478,7 @@ public class DashboardCostService extends DashboardSharedSupport {
             query.le(CostSummary::getSummaryDate, selectedMonth.atEndOfMonth());
         }
         List<CostSummary> summaries = costSummaryMapper.selectList(
-                query.orderByDesc(CostSummary::getSummaryDate));
+                query.orderByDesc(CostSummary::getSummaryDate, CostSummary::getId));
         Map<Long, CostSummary> result = new HashMap<>();
         for (CostSummary summary : summaries) {
             result.putIfAbsent(summary.getProjectId(), summary);
@@ -474,9 +501,7 @@ public class DashboardCostService extends DashboardSharedSupport {
         for (CostSummary summary : summaries) {
             String key = summary.getProjectId() + ":" + summary.getCostSubjectId();
             CostSummary current = latest.get(key);
-            if (current == null
-                    || (summary.getSummaryDate() != null
-                    && (current.getSummaryDate() == null || summary.getSummaryDate().isAfter(current.getSummaryDate())))) {
+            if (isLaterSummary(summary, current)) {
                 latest.put(key, summary);
             }
         }
@@ -508,17 +533,20 @@ public class DashboardCostService extends DashboardSharedSupport {
     }
 
     private List<CostManagerDashboardVO.TrendPoint> toCostTrendPoints(List<CostSummary> projectSummaries) {
-        Map<String, CostSummaryAccumulator> byMonth = new TreeMap<>();
+        Map<String, Map<Long, CostSummary>> latestByProjectAndMonth = new TreeMap<>();
         projectSummaries.stream()
                 .filter(s -> s.getSummaryDate() != null)
                 .forEach(s -> {
                     String month = s.getSummaryDate().withDayOfMonth(1).toString().substring(0, 7);
-                    byMonth.computeIfAbsent(month, key -> new CostSummaryAccumulator()).add(s);
+                    latestByProjectAndMonth.computeIfAbsent(month, key -> new HashMap<>())
+                            .merge(s.getProjectId(), s,
+                                    (current, candidate) -> isLaterSummary(candidate, current) ? candidate : current);
                 });
-        return byMonth.entrySet().stream()
-                .skip(Math.max(0, byMonth.size() - 12))
+        return latestByProjectAndMonth.entrySet().stream()
+                .skip(Math.max(0, latestByProjectAndMonth.size() - 12))
                 .map(entry -> {
-                    CostSummaryAccumulator acc = entry.getValue();
+                    CostSummaryAccumulator acc = new CostSummaryAccumulator();
+                    entry.getValue().values().forEach(acc::add);
                     CostManagerDashboardVO.TrendPoint point = new CostManagerDashboardVO.TrendPoint();
                     point.setMonth(entry.getKey());
                     point.setTargetCost(acc.targetCost.toPlainString());
@@ -527,6 +555,16 @@ public class DashboardCostService extends DashboardSharedSupport {
                     return point;
                 })
                 .collect(Collectors.toList());
+    }
+
+    private static boolean isLaterSummary(CostSummary candidate, CostSummary current) {
+        if (current == null) {
+            return true;
+        }
+        Comparator<CostSummary> comparator = Comparator
+                .comparing(CostSummary::getSummaryDate, Comparator.nullsFirst(Comparator.naturalOrder()))
+                .thenComparing(CostSummary::getId, Comparator.nullsFirst(Comparator.naturalOrder()));
+        return comparator.compare(candidate, current) > 0;
     }
 
     private Map<Long, CostSubject> loadCostSubjects(List<CostSummary> subjectSummaries) {
@@ -659,14 +697,15 @@ public class DashboardCostService extends DashboardSharedSupport {
 
     private CostManagerDashboardVO.OverdueItem toCostOverdueItem(WfTask task,
                                                                  WfInstance instance,
-                                                                 Map<Long, String> projectNameMap) {
+                                                                 Map<Long, String> projectNameMap,
+                                                                 LocalDateTime overdueAsOf) {
         CostManagerDashboardVO.OverdueItem item = new CostManagerDashboardVO.OverdueItem();
         item.setTaskId(String.valueOf(task.getId()));
         item.setInstanceId(String.valueOf(task.getInstanceId()));
         item.setBusinessType(task.getBusinessType());
         item.setBusinessId(task.getBusinessId() != null ? String.valueOf(task.getBusinessId()) : null);
         item.setTitle(instance != null ? instance.getTitle() : task.getBusinessType());
-        item.setOverdueDays(task.getReceivedAt() == null ? 0L : Math.max(0L, ChronoUnit.DAYS.between(task.getReceivedAt(), LocalDateTime.now())));
+        item.setOverdueDays(task.getReceivedAt() == null ? 0L : Math.max(0L, ChronoUnit.DAYS.between(task.getReceivedAt(), overdueAsOf)));
         item.setOwnerName(task.getApproverName());
         item.setPlannedAt(task.getReceivedAt() != null ? DateTimeUtils.DTF.format(task.getReceivedAt().plusDays(7)) : null);
         if (instance != null && instance.getProjectId() != null) {

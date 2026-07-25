@@ -3,6 +3,8 @@ package com.cgcpms.dashboard.service;
 import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.TestUserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -43,6 +45,8 @@ import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.entity.SysRole;
+import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.tech.entity.TechItem;
 import com.cgcpms.tech.mapper.TechItemMapper;
@@ -74,6 +78,8 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 @DisplayName("Dashboard cost view and breakdown")
 class DashboardCostServiceTest extends DashboardServiceTestSupport {
+
+    @Autowired private SysRoleMapper sysRoleMapper;
 
     @Test
     @Transactional
@@ -201,6 +207,59 @@ class DashboardCostServiceTest extends DashboardServiceTestSupport {
 
     @Test
     @Transactional
+    @DisplayName("3.1d2 Cost view: monthly trend uses latest project snapshot only")
+    void testCostView_TrendDoesNotAccumulateDailySnapshots() {
+        SeedResult sr = seed("COST_TREND_LATEST");
+        LocalDate latestDate = LocalDate.now().withDayOfMonth(1).plusDays(2);
+        CostSummary latest = new CostSummary();
+        latest.setTenantId(TENANT_ID);
+        latest.setProjectId(sr.projectId);
+        latest.setSummaryDate(latestDate);
+        latest.setTargetCost(new BigDecimal("8100000.00"));
+        latest.setDynamicCost(new BigDecimal("8300000.00"));
+        latest.setCostDeviation(new BigDecimal("200000.00"));
+        costSummaryMapper.insert(latest);
+
+        CostManagerDashboardVO vo = dashboardService.getCostManagerView(sr.projectId);
+
+        String currentMonth = latestDate.toString().substring(0, 7);
+        CostManagerDashboardVO.TrendPoint point = vo.getTrendPoints().stream()
+                .filter(item -> currentMonth.equals(item.getMonth()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals("8100000.00", point.getTargetCost());
+        assertEquals("8300000.00", point.getDynamicCost());
+        assertEquals("200000.00", point.getCostDeviation());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("3.1d3 Cost view: historical overdue threshold is selected month end")
+    void testCostView_HistoricalOverdueUsesSelectedMonthEnd() {
+        SeedResult sr = seed("COST_OVERDUE_AS_OF");
+        LocalDate historicalMonthEnd = LocalDate.now().minusMonths(1).withDayOfMonth(1)
+                .withDayOfMonth(LocalDate.now().minusMonths(1).lengthOfMonth());
+        wfTaskMapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<WfTask>()
+                        .eq(WfTask::getTenantId, TENANT_ID))
+                .stream()
+                .filter(task -> {
+                    WfInstance instance = wfInstanceMapper.selectById(task.getInstanceId());
+                    return instance != null && sr.projectId.equals(instance.getProjectId());
+                })
+                .forEach(task -> {
+                    task.setReceivedAt(historicalMonthEnd.minusDays(3).atTime(10, 0));
+                    wfTaskMapper.updateById(task);
+                });
+
+        CostManagerDashboardVO vo = dashboardService.getCostManagerView(
+                sr.projectId, historicalMonthEnd.toString().substring(0, 7));
+
+        assertTrue(vo.getOverdueItems().isEmpty(),
+                "month-end age below seven days must not become overdue because current time is later");
+    }
+
+    @Test
+    @Transactional
     @DisplayName("3.1e Cost view: fallback rankings include variation cost items")
     void testCostView_FallbackRankingsIncludeVariationCostItems() {
         SeedResult sr = seed("COST_VAR_ITEM");
@@ -262,6 +321,47 @@ class DashboardCostServiceTest extends DashboardServiceTestSupport {
         assertTrue(vo.getLedgerTotal() >= 1L);
     }
 
+    @Test
+    @Transactional
+    @DisplayName("3.2b Cost view and breakdown respect SELF project scope")
+    void testCostView_RespectsProjectDataScope() {
+        SeedResult visible = seed("COST_SCOPE_VISIBLE");
+        SeedResult hidden = seed("COST_SCOPE_HIDDEN");
+        long scopedUserId = 88_201L;
+
+        PmProject visibleProject = projectMapper.selectById(visible.projectId);
+        visibleProject.setCreatedBy(scopedUserId);
+        visibleProject.setProjectManagerId(null);
+        projectMapper.updateById(visibleProject);
+        PmProject hiddenProject = projectMapper.selectById(hidden.projectId);
+        hiddenProject.setCreatedBy(scopedUserId + 1);
+        hiddenProject.setProjectManagerId(null);
+        projectMapper.updateById(hiddenProject);
+
+        String roleCode = "COST_DASH_SELF_" + System.nanoTime();
+        SysRole role = new SysRole();
+        role.setTenantId(TENANT_ID);
+        role.setRoleCode(roleCode);
+        role.setRoleName("Cost dashboard SELF scope");
+        role.setRoleType("CUSTOM");
+        role.setStatus("ENABLE");
+        role.setDataScope("SELF");
+        sysRoleMapper.insert(role);
+        TestUserContext.setUser(TENANT_ID, scopedUserId, "cost-dashboard-self", List.of(roleCode));
+
+        BusinessException viewDenied = assertThrows(BusinessException.class,
+                () -> dashboardService.getCostManagerView(hidden.projectId));
+        assertEquals("PROJECT_ACCESS_DENIED", viewDenied.getCode());
+        BusinessException breakdownDenied = assertThrows(BusinessException.class,
+                () -> dashboardService.getCostBreakdown(hidden.projectId));
+        assertEquals("PROJECT_ACCESS_DENIED", breakdownDenied.getCode());
+
+        CostManagerDashboardVO all = dashboardService.getCostManagerView(null);
+        assertEquals("8000000.00", all.getTargetCost());
+        assertTrue(all.getOverBudgetAlerts().stream()
+                .allMatch(item -> visible.projectId.toString().equals(item.getProjectId())));
+    }
+
     // ========================================================================
     // 4. Finance View
     // ========================================================================
@@ -316,17 +416,53 @@ class DashboardCostServiceTest extends DashboardServiceTestSupport {
         }
     }
 
+    @Test
+    @Transactional
+    @DisplayName("6.4 Cost breakdown: selected month keeps latest subject snapshot")
+    void testCostBreakdown_SelectedMonthKeepsLatestSubjectSnapshot() {
+        SeedResult sr = seed("BD_MONTH_LATEST");
+        CostSummary currentSubject = costSummaryMapper.selectList(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CostSummary>()
+                                .eq(CostSummary::getTenantId, TENANT_ID)
+                                .eq(CostSummary::getProjectId, sr.projectId)
+                                .isNotNull(CostSummary::getCostSubjectId))
+                .stream()
+                .findFirst()
+                .orElseThrow();
+        LocalDate monthStart = LocalDate.now().withDayOfMonth(1);
+        currentSubject.setSummaryDate(monthStart.plusDays(2));
+        costSummaryMapper.updateById(currentSubject);
+
+        CostSummary older = new CostSummary();
+        older.setTenantId(TENANT_ID);
+        older.setProjectId(sr.projectId);
+        older.setSummaryDate(monthStart.plusDays(1));
+        older.setCostSubjectId(currentSubject.getCostSubjectId());
+        older.setTargetCost(new BigDecimal("999.00"));
+        older.setContractLockedCost(new BigDecimal("999.00"));
+        older.setActualCost(new BigDecimal("999.00"));
+        older.setDynamicCost(new BigDecimal("999.00"));
+        older.setCostDeviation(BigDecimal.ZERO);
+        costSummaryMapper.insert(older);
+
+        CostBreakdownVO vo = dashboardService.getCostBreakdown(
+                sr.projectId, monthStart.toString().substring(0, 7));
+
+        assertEquals(1, vo.getSubjectBreakdowns().size());
+        assertEquals("3000000.00", vo.getSubjectBreakdowns().get(0).getTargetCost());
+    }
+
     // ========================================================================
     // 7. Edges
     // ========================================================================
 
     @Test
     @Transactional
-    @DisplayName("8.5 Cost view: invalid month returns data without 500")
-    void testCostView_InvalidMonthDoesNotThrow() {
+    @DisplayName("8.5 Cost view: invalid month is rejected")
+    void testCostView_InvalidMonthThrows() {
         SeedResult sr = seed("COST_BAD_MONTH");
-        CostManagerDashboardVO vo = dashboardService.getCostManagerView(sr.projectId, "bad-month");
-        assertNotNull(vo);
-        assertEquals(sr.projectId.toString(), vo.getProjectId());
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> dashboardService.getCostManagerView(sr.projectId, "bad-month"));
+        assertEquals("INVALID_DASHBOARD_MONTH", error.getCode());
     }
 }

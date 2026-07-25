@@ -9,7 +9,6 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -18,6 +17,7 @@ import {
   V2Input,
   V2PageState,
   V2Select,
+  showToast,
   useToastMessage,
 } from '@/components'
 import {
@@ -70,6 +70,10 @@ const detailLoading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
+
+watch(errorMessage, (message) => {
+  if (message) showToast('error', '目标成本操作未完成', message)
+})
 const detailOpen = ref(false)
 const pendingAction = ref<PendingAction>(null)
 
@@ -102,13 +106,30 @@ const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pag
 const projectOptions = computed(() =>
   projects.value.map((project) => ({ value: project.id, label: project.projectName })),
 )
+const costSubjectOptions = computed(() => {
+  const options = costSubjects.value.map((subject) => ({
+    value: subject.id,
+    label: `${subject.subjectCode} · ${subject.subjectName}`,
+  }))
+  for (const [index, item] of items.value.entries()) {
+    if (item.costSubjectId && !options.some((option) => option.value === item.costSubjectId)) {
+      options.push({
+        value: item.costSubjectId,
+        label: `成本科目名称缺失（第 ${index + 1} 行）`,
+      })
+    }
+  }
+  return options
+})
 const costSubjectLabel = (id: string, index: number) => {
   const subject = costSubjects.value.find((item) => item.id === id)
-  return subject ? `${subject.subjectCode} · ${subject.subjectName}` : `成本科目 ${index + 1}`
+  return subject
+    ? `${subject.subjectCode} · ${subject.subjectName}`
+    : `成本科目名称缺失（第 ${index + 1} 行）`
 }
 
 function projectLabel(projectId?: string | null): string {
-  return projects.value.find((project) => project.id === projectId)?.projectName ?? '—'
+  return projects.value.find((project) => project.id === projectId)?.projectName ?? '项目名称缺失'
 }
 
 function emptyForm(): CostTargetSaveCommand {
@@ -358,7 +379,7 @@ async function saveItems(): Promise<void> {
   resetNotices()
   try {
     const payload = cleanItems()
-    if (payload.some((item) => !item.costSubjectId)) throw new TypeError('成本科目ID不能为空')
+    if (payload.some((item) => !item.costSubjectId)) throw new TypeError('成本科目不能为空')
     await saveCostTargetItems(routeId.value, payload, versionOf())
     await loadDetail(routeId.value, true)
     successMessage.value = '目标成本明细已保存。'
@@ -463,51 +484,45 @@ onBeforeUnmount(() => {
       kind="error"
     />
     <template v-else>
-      <V2Alert
-        v-if="errorMessage"
-        tone="danger"
-        title="操作失败"
-        dismissible
-        @dismiss="errorMessage = ''"
-      >
-        {{ errorMessage }}
-      </V2Alert>
       <template v-if="mode === 'list'">
         <V2Card title="目标成本版本" :heading-level="1">
           <template #actions>
+            <form class="cost-target-page__filters" @submit.prevent="query">
+              <V2Input
+                v-model="filter.versionNo"
+                type="search"
+                label="版本号"
+                hide-label
+                placeholder="输入版本号"
+              />
+              <V2Select
+                v-model="filter.approvalStatus"
+                label="审批状态"
+                hide-label
+                :options="APPROVAL_OPTIONS"
+                allow-empty
+                placeholder="全部审批状态"
+              />
+              <V2Select
+                v-model="filter.isActive"
+                label="版本范围"
+                hide-label
+                :options="ACTIVE_OPTIONS"
+                allow-empty
+                placeholder="全部版本"
+              />
+              <V2Button type="submit" size="small" variant="secondary" :loading="loading">
+                查询
+              </V2Button>
+            </form>
             <V2Button
               v-if="canAdd"
+              type="button"
+              size="small"
               @click="router.push({ path: '/cost-target/create', query: route.query })"
               >新建版本</V2Button
             >
           </template>
-          <div class="cost-target-page__filters">
-            <V2Input
-              v-model="filter.versionNo"
-              type="search"
-              label="版本号"
-              hide-label
-              placeholder="输入版本号"
-              @keyup.enter="query"
-            />
-            <V2Select
-              v-model="filter.approvalStatus"
-              label="审批状态"
-              hide-label
-              :options="APPROVAL_OPTIONS"
-              allow-empty
-              placeholder="全部审批状态"
-            />
-            <V2Select
-              v-model="filter.isActive"
-              label="版本范围"
-              hide-label
-              :options="ACTIVE_OPTIONS"
-              allow-empty
-              placeholder="全部版本"
-            />
-            <V2Button variant="secondary" :loading="loading" @click="query">查询</V2Button>
-          </div>
         </V2Card>
         <V2PageState
           v-if="loading && !records.length"
@@ -516,11 +531,11 @@ onBeforeUnmount(() => {
           kind="loading"
         />
         <V2PageState
-          v-else-if="!records.length"
+          v-else-if="!records.length && !errorMessage"
           title="暂无目标成本"
           description="当前筛选条件下没有可访问版本。"
         />
-        <V2Card v-else title="目标成本版本列表" :heading-level="2">
+        <V2Card v-else-if="records.length">
           <div class="cost-target-page__table-wrap" :aria-busy="loading">
             <table class="v2-table--top" aria-label="目标成本版本列表">
               <thead>
@@ -537,7 +552,15 @@ onBeforeUnmount(() => {
               <tbody>
                 <tr v-for="record in records" :key="record.id">
                   <td>
-                    {{ record.versionNo }}<small>{{ record.versionName }}</small>
+                    <V2Button
+                      size="small"
+                      variant="ghost"
+                      class="v2-table__record-link"
+                      @click="openDetail(record)"
+                    >
+                      {{ record.versionNo }}
+                    </V2Button>
+                    <small>{{ record.versionName }}</small>
                   </td>
                   <td>{{ projectLabel(record.projectId) }}</td>
                   <td>{{ record.totalTargetAmount }}</td>
@@ -551,9 +574,6 @@ onBeforeUnmount(() => {
                   </td>
                   <td>
                     <div class="cost-target-page__actions">
-                      <V2Button size="small" variant="secondary" @click="openDetail(record)"
-                        >详情</V2Button
-                      >
                       <V2Button
                         v-if="
                           canEdit &&
@@ -638,7 +658,8 @@ onBeforeUnmount(() => {
           <V2Card
             :title="mode === 'create' ? '新建目标成本版本' : '编辑目标成本版本'"
             :heading-level="1"
-          >
+          />
+          <V2Card title="版本信息">
             <form class="cost-target-page__form" @submit.prevent="saveHeader">
               <V2Select
                 v-model="form.projectId"
@@ -751,19 +772,20 @@ onBeforeUnmount(() => {
               ></template
             >
             <V2PageState
-              v-if="!items.length"
+              v-if="!items.length && !errorMessage"
               title="暂无明细"
               description="草稿或驳回版本可添加明细。"
             />
-            <div v-else class="cost-target-page__items">
+            <div v-else-if="items.length" class="cost-target-page__items">
               <div
                 v-for="(item, index) in items"
                 :key="item.id || index"
                 class="cost-target-page__item"
               >
-                <V2Input
+                <V2Select
                   :model-value="item.costSubjectId"
-                  label="成本科目ID"
+                  label="成本科目"
+                  :options="costSubjectOptions"
                   required
                   :disabled="!canEdit || !editable"
                   @update:model-value="updateItem(index, 'costSubjectId', $event)"
@@ -788,12 +810,6 @@ onBeforeUnmount(() => {
                   required
                   :disabled="!canEdit || !editable"
                   @update:model-value="updateItem(index, 'responsibilityAmount', $event)"
-                />
-                <V2Input
-                  :model-value="item.responsibleUserId ?? ''"
-                  label="责任人ID"
-                  :disabled="!canEdit || !editable"
-                  @update:model-value="updateItem(index, 'responsibleUserId', $event)"
                 />
                 <V2Input
                   :model-value="item.responsibilityUnit ?? ''"
@@ -852,11 +868,17 @@ onBeforeUnmount(() => {
           </dl>
           <h3>明细</h3>
           <V2PageState
-            v-if="!items.length"
+            v-if="!items.length && !errorMessage"
             title="暂无明细"
             description="当前目标成本版本尚未录入科目明细。"
           />
-          <div v-else class="cost-target-page__table-wrap">
+          <div
+            v-else-if="items.length"
+            class="cost-target-page__table-wrap"
+            role="region"
+            aria-label="目标成本明细表格"
+            tabindex="0"
+          >
             <table class="v2-table--top">
               <thead>
                 <tr>

@@ -67,9 +67,9 @@ class MatPurchaseOrderServiceTest {
                 "SELECT id FROM cost_subject ORDER BY id LIMIT 1", Long.class);
         jdbcTemplate.update("""
                 INSERT INTO project_budget (
-                    id, tenant_id, project_id, version_no, budget_name, total_amount,
+                    id, tenant_id, project_id, budget_code, version_no, budget_name, total_amount,
                     approval_status, status, active_flag, active_token, created_by, deleted_flag
-                ) SELECT ?, ?, ?, 'PO-TDD-V1', '采购订单测试预算', 5000000,
+                ) SELECT ?, ?, ?, 'BUD-PO-SERVICE', 'PO-TDD-V1', '采购订单测试预算', 5000000,
                     'APPROVED', 'ACTIVE', 1, ?, ?, 0
                 WHERE NOT EXISTS (SELECT 1 FROM project_budget WHERE id = ?)
                 """, BUDGET_ID, TENANT_ID, PROJECT_ID, BUDGET_ID, USER_ADMIN, BUDGET_ID);
@@ -105,6 +105,32 @@ class MatPurchaseOrderServiceTest {
         assertTrue(vo.getOrderCode().startsWith("PO-"), "编码应以 PO- 开头");
         assertEquals("DRAFT", vo.getApprovalStatus());
         assertEquals("DRAFT", vo.getOrderStatus());
+    }
+
+    @Test @Transactional @DisplayName("订单详情与列表返回采购申请业务编号")
+    void orderReturnsPurchaseRequestBusinessCode() {
+        long requestId = Math.abs(System.nanoTime());
+        String requestCode = "PR-SOURCE-" + requestId;
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request (
+                    id, tenant_id, project_id, request_code, approval_status, status,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, ?, 'APPROVED', 'APPROVED', ?, ?, 0)
+                """, requestId, TENANT_ID, PROJECT_ID, requestCode, USER_ADMIN, USER_ADMIN);
+
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setRequestId(requestId);
+        order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+
+        assertEquals(requestCode, service.getById(id).getRequestCode());
+        MatPurchaseOrderVO row = service.getPage(1, 20, PROJECT_ID, null, null, null, null, null)
+                .getRecords().stream()
+                .filter(item -> id.toString().equals(item.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(requestCode, row.getRequestCode());
     }
 
     @Test @Transactional @DisplayName("create → contract validation with PERFORMING contract")

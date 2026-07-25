@@ -21,6 +21,7 @@ public class MatStockTxnVO implements Serializable {
     private BigDecimal amount;
     private String sourceType;
     private Long sourceId;
+    private String sourceCode;
     private Long sourceLineId;
     private String createdTime;
 

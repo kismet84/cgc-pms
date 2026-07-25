@@ -13,6 +13,8 @@ const username = ref('')
 const password = ref('')
 const errorMessage = ref('')
 const submitting = computed(() => session.status === 'authenticating')
+const demoSubmitting = ref(false)
+const showDemoEntry = import.meta.env.DEV
 
 async function submit(): Promise<void> {
   errorMessage.value = ''
@@ -29,6 +31,25 @@ async function submit(): Promise<void> {
   } catch (error) {
     password.value = ''
     errorMessage.value = authErrorMessage(error)
+  }
+}
+
+async function enterDemo(): Promise<void> {
+  if (!showDemoEntry || demoSubmitting.value) return
+  errorMessage.value = ''
+  demoSubmitting.value = true
+  try {
+    const response = await fetch('/api/auth/dev-login?username=admin', {
+      credentials: 'same-origin',
+    })
+    const payload = (await response.json()) as { code?: string }
+    if (!response.ok || payload.code !== '0') throw new Error('DEMO_LOGIN_FAILED')
+    window.location.assign(
+      router.resolve(normalizeRedirect(route.query.redirect, '/dashboard')).href,
+    )
+  } catch {
+    demoSubmitting.value = false
+    errorMessage.value = '示例环境暂时不可用，请检查本地示例库'
   }
 }
 
@@ -76,7 +97,7 @@ function readErrorCode(error: unknown): string | null {
             autocomplete="username"
             placeholder="请输入用户名"
             required
-            :disabled="submitting"
+            :disabled="submitting || demoSubmitting"
           />
           <V2Input
             v-model="password"
@@ -85,11 +106,25 @@ function readErrorCode(error: unknown): string | null {
             autocomplete="current-password"
             placeholder="请输入密码"
             required
-            :disabled="submitting"
+            :disabled="submitting || demoSubmitting"
           />
-          <V2Button type="submit" size="touch" :loading="submitting">
+          <V2Button type="submit" size="touch" :loading="submitting" :disabled="demoSubmitting">
             {{ submitting ? '正在登录' : '登录' }}
           </V2Button>
+          <V2Button
+            v-if="showDemoEntry"
+            type="button"
+            variant="secondary"
+            size="touch"
+            :loading="demoSubmitting"
+            :disabled="submitting"
+            @click="enterDemo"
+          >
+            {{ demoSubmitting ? '正在进入示例环境' : '免密码进入示例环境' }}
+          </V2Button>
+          <p v-if="showDemoEntry" class="auth-demo-note">
+            仅本地开发环境可用；进入后可切换演示角色。
+          </p>
           <p class="auth-security-note">认证凭据不会写入浏览器存储、URL 或前端日志。</p>
         </V2Stack>
       </form>
@@ -187,6 +222,14 @@ function readErrorCode(error: unknown): string | null {
 .auth-security-note {
   margin: 0;
   color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
+  line-height: var(--v2-line-height-body);
+  text-align: center;
+}
+
+.auth-demo-note {
+  margin: 0;
+  color: var(--v2-color-text-secondary);
   font-size: var(--v2-font-size-11);
   line-height: var(--v2-line-height-body);
   text-align: center;

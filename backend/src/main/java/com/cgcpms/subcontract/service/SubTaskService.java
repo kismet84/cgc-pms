@@ -14,6 +14,8 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.subcontract.entity.SubTask;
+import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import com.cgcpms.subcontract.vo.SubTaskVO;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +45,7 @@ public class SubTaskService {
     private final PmProjectMapper pmProjectMapper;
     private final CtContractMapper ctContractMapper;
     private final MdPartnerMapper mdPartnerMapper;
+    private final SubMeasureMapper subMeasureMapper;
     private final ProjectAccessChecker projectAccessChecker;
 
     public IPage<SubTaskVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
@@ -120,6 +123,7 @@ public class SubTaskService {
         // Force tenantId from authenticated context, ignore client-supplied value
         task.setTenantId(UserContext.getCurrentTenantId());
         projectAccessChecker.checkAccess(task.getProjectId(), "创建分包任务");
+        validateBusinessContext(task.getProjectId(), task.getContractId(), task.getPartnerId());
         // Auto-generate task code: SUB-yyyyMMdd-XXX
         String prefix = "SUB-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
 
@@ -170,8 +174,18 @@ public class SubTaskService {
 
         projectAccessChecker.checkAccess(existing.getProjectId(), "修改分包任务");
         Long effectiveProjectId = task.getProjectId() != null ? task.getProjectId() : existing.getProjectId();
+        Long effectiveContractId = task.getContractId() != null ? task.getContractId() : existing.getContractId();
+        Long effectivePartnerId = task.getPartnerId() != null ? task.getPartnerId() : existing.getPartnerId();
         projectAccessChecker.checkAccess(effectiveProjectId, "修改分包任务");
+        validateBusinessContext(effectiveProjectId, effectiveContractId, effectivePartnerId);
+        if ((!Objects.equals(effectiveProjectId, existing.getProjectId())
+                || !Objects.equals(effectiveContractId, existing.getContractId())
+                || !Objects.equals(effectivePartnerId, existing.getPartnerId()))
+                && hasMeasureReference(existing.getId(), existing.getTenantId())) {
+            throw new BusinessException("SUB_TASK_CONTEXT_IN_USE", "任务已被计量引用，不可变更项目、合同或分包商");
+        }
         task.setTenantId(existing.getTenantId());
+        task.setTaskCode(existing.getTaskCode());
         validateScheduleConsistency(task, existing);
         validateDependencyConsistency(task, existing);
         subTaskMapper.updateById(task);
@@ -224,6 +238,10 @@ public class SubTaskService {
         Long currentId = existing == null ? null : existing.getId();
         Long projectId = task.getProjectId() != null ? task.getProjectId()
                 : existing == null ? null : existing.getProjectId();
+        Long contractId = task.getContractId() != null ? task.getContractId()
+                : existing == null ? null : existing.getContractId();
+        Long partnerId = task.getPartnerId() != null ? task.getPartnerId()
+                : existing == null ? null : existing.getPartnerId();
         Long predecessorId = task.isPredecessorTaskIdSpecified() ? task.getPredecessorTaskId()
                 : existing == null ? null : existing.getPredecessorTaskId();
         LocalDate plannedStart = task.getPlannedStartDate() != null ? task.getPlannedStartDate()
@@ -245,8 +263,11 @@ public class SubTaskService {
                     throw new BusinessException("SUB_TASK_DEPENDENCY_CYCLE", "前置任务不能形成循环依赖");
                 SubTask node = subTaskMapper.selectById(cursor);
                 if (node == null || !Objects.equals(tenantId, node.getTenantId())
-                        || !Objects.equals(projectId, node.getProjectId()))
-                    throw new BusinessException("SUB_TASK_DEPENDENCY_INVALID", "前置任务必须属于当前租户和同一项目");
+                        || !Objects.equals(projectId, node.getProjectId())
+                        || !Objects.equals(contractId, node.getContractId())
+                        || !Objects.equals(partnerId, node.getPartnerId()))
+                    throw new BusinessException("SUB_TASK_DEPENDENCY_INVALID",
+                            "前置任务必须属于当前租户及同一项目、合同和分包商");
                 if (predecessor == null) predecessor = node;
                 cursor = node.getPredecessorTaskId();
             }
@@ -263,12 +284,45 @@ public class SubTaskService {
                 .eq(SubTask::getTenantId, tenantId)
                 .eq(SubTask::getPredecessorTaskId, currentId));
         for (SubTask successor : successors) {
-            if (!Objects.equals(projectId, successor.getProjectId()))
-                throw new BusinessException("SUB_TASK_DEPENDENCY_INVALID", "任务调整不能造成跨项目依赖");
+            if (!Objects.equals(projectId, successor.getProjectId())
+                    || !Objects.equals(contractId, successor.getContractId())
+                    || !Objects.equals(partnerId, successor.getPartnerId()))
+                throw new BusinessException("SUB_TASK_DEPENDENCY_INVALID",
+                        "任务调整不能造成跨项目、合同或分包商依赖");
             if (plannedEnd != null && successor.getPlannedStartDate() != null
                     && successor.getPlannedStartDate().isBefore(plannedEnd))
                 throw new BusinessException("SUB_TASK_FS_DATE_INVALID", "前置任务计划结束不能晚于后续任务计划开始");
         }
+    }
+
+    private void validateBusinessContext(Long projectId, Long contractId, Long partnerId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        CtContract contract = null;
+        if (contractId != null) {
+            contract = ctContractMapper.selectById(contractId);
+            String contractType = contract == null || contract.getContractType() == null
+                    ? "" : contract.getContractType().trim().toUpperCase();
+            if (contract == null || !Objects.equals(contract.getTenantId(), tenantId)
+                    || !Objects.equals(contract.getProjectId(), projectId)
+                    || !Set.of("SUB", "SUBCONTRACT").contains(contractType)) {
+                throw new BusinessException("SUB_TASK_CONTRACT_INVALID", "分包任务必须关联当前项目的本租户分包合同");
+            }
+        }
+        if (partnerId != null) {
+            MdPartner partner = mdPartnerMapper.selectById(partnerId);
+            if (partner == null || !Objects.equals(partner.getTenantId(), tenantId)) {
+                throw new BusinessException("SUB_TASK_PARTNER_INVALID", "分包商不存在或不属于当前租户");
+            }
+            if (contract != null && !Objects.equals(contract.getPartyBId(), partnerId)) {
+                throw new BusinessException("SUB_TASK_PARTNER_MISMATCH", "分包商必须等于分包合同乙方");
+            }
+        }
+    }
+
+    private boolean hasMeasureReference(Long taskId, Long tenantId) {
+        return subMeasureMapper.selectCount(new LambdaQueryWrapper<SubMeasure>()
+                .eq(SubMeasure::getTenantId, tenantId)
+                .eq(SubMeasure::getSubTaskId, taskId)) > 0;
     }
 
     private void validateStoredPredecessor(SubTask task, Map<Long, SubTask> predecessors) {
@@ -300,6 +354,8 @@ public class SubTaskService {
                 .eq(SubTask::getPredecessorTaskId, id));
         if (successorCount > 0)
             throw new BusinessException("SUB_TASK_DEPENDENCY_IN_USE", "前置任务仍被后续任务引用");
+        if (hasMeasureReference(id, existing.getTenantId()))
+            throw new BusinessException("SUB_TASK_MEASURE_IN_USE", "分包任务已被计量引用，不可删除");
 
         existing.setTaskCode("DELETED-" + id);
         subTaskMapper.updateById(existing);

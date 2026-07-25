@@ -23,6 +23,7 @@ public class CostLedgerVO {
     private String amountWithoutTax;
     private String sourceType;
     private String sourceId;
+    private String sourceCode;
     private String sourceItemId;
     private String costDate;
     private String costStatus;

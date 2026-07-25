@@ -89,8 +89,12 @@ public class MatPurchaseRequestService {
         Map<Long, String> contractNames = contractIds.isEmpty() ? Map.of()
                 : ctContractMapper.selectByIds(contractIds).stream()
                         .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
+        Map<Long, BigDecimal> requestTotals = requestTotals(
+                UserContext.getCurrentTenantId(),
+                records.stream().map(MatPurchaseRequest::getId).collect(Collectors.toSet()));
 
-        IPage<MatPurchaseRequestVO> voPage = page.convert(r -> toVO(r, projectNames, contractNames));
+        IPage<MatPurchaseRequestVO> voPage = page.convert(
+                r -> toVO(r, projectNames, contractNames, requestTotals.getOrDefault(r.getId(), BigDecimal.ZERO)));
         return PageResult.of(voPage);
     }
 
@@ -102,7 +106,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest r = requestMapper.selectById(id);
         if (r == null || !r.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
-        return toVO(r);
+        return toVO(r, requestTotals(r.getTenantId(), Set.of(r.getId())).getOrDefault(r.getId(), BigDecimal.ZERO));
     }
 
     // ================================================================
@@ -453,8 +457,9 @@ public class MatPurchaseRequestService {
     // VO 转换
     // ================================================================
 
-    private MatPurchaseRequestVO toVO(MatPurchaseRequest r) {
+    private MatPurchaseRequestVO toVO(MatPurchaseRequest r, BigDecimal totalAmount) {
         MatPurchaseRequestVO vo = buildBaseVO(r);
+        vo.setTotalAmount(totalAmount.toPlainString());
         if (r.getProjectId() != null) {
             PmProject project = pmProjectMapper.selectById(r.getProjectId());
             if (project != null) vo.setProjectName(project.getProjectName());
@@ -466,11 +471,28 @@ public class MatPurchaseRequestService {
         return vo;
     }
 
-    private MatPurchaseRequestVO toVO(MatPurchaseRequest r, Map<Long, String> projectNames, Map<Long, String> contractNames) {
+    private MatPurchaseRequestVO toVO(MatPurchaseRequest r, Map<Long, String> projectNames,
+                                      Map<Long, String> contractNames, BigDecimal totalAmount) {
         MatPurchaseRequestVO vo = buildBaseVO(r);
+        vo.setTotalAmount(totalAmount.toPlainString());
         if (r.getProjectId() != null) vo.setProjectName(projectNames.get(r.getProjectId()));
         if (r.getContractId() != null) vo.setContractName(contractNames.get(r.getContractId()));
         return vo;
+    }
+
+    private Map<Long, BigDecimal> requestTotals(Long tenantId, Set<Long> requestIds) {
+        if (requestIds.isEmpty()) return Map.of();
+        return requestItemMapper.selectList(new LambdaQueryWrapper<MatPurchaseRequestItem>()
+                        .eq(MatPurchaseRequestItem::getTenantId, tenantId)
+                        .in(MatPurchaseRequestItem::getRequestId, requestIds))
+                .stream()
+                .collect(Collectors.groupingBy(
+                        MatPurchaseRequestItem::getRequestId,
+                        Collectors.reducing(
+                                BigDecimal.ZERO,
+                                item -> item.getEstimatedAmount() == null
+                                        ? BigDecimal.ZERO : item.getEstimatedAmount(),
+                                BigDecimal::add)));
     }
 
     private MatPurchaseRequestVO buildBaseVO(MatPurchaseRequest r) {

@@ -27,6 +27,7 @@ import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.site.entity.SiteDailyLog;
 import com.cgcpms.site.mapper.SiteDailyLogMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -224,6 +225,26 @@ class BusinessObjectAuthorizerTest {
         authorizer.checkUploadAccess("SETTLEMENT", 70001L);
 
         verify(projectAccessChecker).checkAccess(10006L, "写入结算单文件");
+    }
+
+    @Test
+    void subcontractMeasureUsesQueryForReadAndEditForMutation() {
+        TestUserContext.setUser(TestUserContext.TENANT_0, 9L, "measure-user", List.of("USER"));
+        SubMeasure measure = new SubMeasure();
+        measure.setTenantId(TestUserContext.TENANT_0);
+        measure.setProjectId(10016L);
+        measure.setApprovalStatus("DRAFT");
+        when(subcontractMapper.selectById(71001L)).thenReturn(measure);
+
+        setAuthentication("subcontract:measure:query");
+        authorizer.checkReadAccess("SUBCONTRACT", 71001L);
+        BusinessException denied = assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess("SUBCONTRACT", 71001L));
+        assertEquals("FILE_ACCESS_DENIED", denied.getCode());
+
+        setAuthentication("subcontract:measure:edit");
+        authorizer.checkUploadAccess("SUBCONTRACT", 71001L);
+        verify(projectAccessChecker, times(2)).checkAccess(eq(10016L), anyString());
     }
 
     @Test

@@ -84,9 +84,9 @@ class MatPurchaseOrderControllerTest {
         long costSubjectId = ensureCostSubject();
         jdbcTemplate.update("""
                 INSERT INTO project_budget (
-                    id, tenant_id, project_id, version_no, budget_name, total_amount,
+                    id, tenant_id, project_id, budget_code, version_no, budget_name, total_amount,
                     approval_status, status, active_flag, active_token, created_by, deleted_flag
-                ) SELECT ?, ?, ?, 'PO-CONTROLLER-V1', '采购订单接口测试预算', 5000000,
+                ) SELECT ?, ?, ?, 'BUD-PO-CONTROLLER', 'PO-CONTROLLER-V1', '采购订单接口测试预算', 5000000,
                     'APPROVED', 'ACTIVE', 1, ?, ?, 0
                 WHERE NOT EXISTS (SELECT 1 FROM project_budget WHERE id = ?)
                 """, BUDGET_ID, TENANT_ID, PROJECT_ID, BUDGET_ID, ADMIN_ID, BUDGET_ID);

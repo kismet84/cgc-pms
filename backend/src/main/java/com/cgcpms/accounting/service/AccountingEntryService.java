@@ -12,6 +12,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -33,6 +34,7 @@ public class AccountingEntryService {
     private final AccountingEntryLineMapper lineMapper;
     private final CostSubjectMapper subjectMapper;
     private final AccountingPeriodGuard periodGuard;
+    private final ProjectAccessChecker projectAccessChecker;
 
     public IPage<AccountingEntry> getPage(long pageNo, long pageSize,
                                            String entryType, String sourceType,
@@ -41,6 +43,11 @@ public class AccountingEntryService {
         Long tenantId = UserContext.getCurrentTenantId();
         LambdaQueryWrapper<AccountingEntry> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AccountingEntry::getTenantId, tenantId);
+        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+        wrapper.and(scope -> {
+            scope.isNull(AccountingEntry::getProjectId);
+            if (!projectIds.isEmpty()) scope.or().in(AccountingEntry::getProjectId, projectIds);
+        });
         if (StringUtils.hasText(entryType)) wrapper.eq(AccountingEntry::getEntryType, entryType);
         if (StringUtils.hasText(sourceType)) wrapper.eq(AccountingEntry::getSourceType, sourceType);
         if (StringUtils.hasText(entryStatus)) wrapper.eq(AccountingEntry::getEntryStatus, entryStatus);
@@ -233,6 +240,7 @@ public class AccountingEntryService {
         AccountingEntry entry = entryMapper.selectById(id);
         if (entry == null || !entry.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("ENTRY_NOT_FOUND", "凭证不存在");
+        if (entry.getProjectId() != null) projectAccessChecker.checkAccess(entry.getProjectId(), "查看凭证");
         return entry;
     }
 }

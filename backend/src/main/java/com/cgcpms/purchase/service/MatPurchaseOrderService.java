@@ -19,7 +19,9 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.procurement.service.ProcurementIntegrityService;
 import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
+import com.cgcpms.purchase.entity.MatPurchaseRequest;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
@@ -62,6 +64,7 @@ public class MatPurchaseOrderService {
     private final ProcurementIntegrityService integrityService;
     private final BudgetLedgerService budgetLedgerService;
     private final MatPurchaseRequestItemMapper purchaseRequestItemMapper;
+    private final MatPurchaseRequestMapper purchaseRequestMapper;
 
     public IPage<MatPurchaseOrderVO> getPage(long pageNum, long pageSize, Long projectId, Long contractId,
                                               Long partnerId, String orderStatus, String orderType, String orderCode) {
@@ -85,6 +88,8 @@ public class MatPurchaseOrderService {
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
         Set<Long> contractIds = records.stream().map(MatPurchaseOrder::getContractId)
                 .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+        Set<Long> requestIds = records.stream().map(MatPurchaseOrder::getRequestId)
+                .filter(java.util.Objects::nonNull).collect(Collectors.toSet());
 
         Map<Long, String> projectNames = projectIds.isEmpty() ? Map.of()
                 : pmProjectMapper.selectByIds(projectIds).stream()
@@ -95,8 +100,13 @@ public class MatPurchaseOrderService {
         Map<Long, String> contractNames = contractIds.isEmpty() ? Map.of()
                 : ctContractMapper.selectByIds(contractIds).stream()
                         .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
+        Map<Long, String> requestCodes = requestIds.isEmpty() ? Map.of()
+                : purchaseRequestMapper.selectByIds(requestIds).stream()
+                        .filter(request -> request.getRequestCode() != null)
+                        .collect(Collectors.toMap(MatPurchaseRequest::getId, MatPurchaseRequest::getRequestCode,
+                                (a, b) -> a));
 
-        return page.convert(o -> toVO(o, projectNames, partnerNames, contractNames));
+        return page.convert(o -> toVO(o, projectNames, partnerNames, contractNames, requestCodes));
     }
 
     public MatPurchaseOrderVO getById(Long id) {
@@ -472,6 +482,10 @@ public class MatPurchaseOrderService {
             CtContract contract = ctContractMapper.selectById(o.getContractId());
             if (contract != null) vo.setContractName(contract.getContractName());
         }
+        if (o.getRequestId() != null) {
+            MatPurchaseRequest request = purchaseRequestMapper.selectById(o.getRequestId());
+            if (request != null) vo.setRequestCode(request.getRequestCode());
+        }
         return vo;
     }
 
@@ -483,11 +497,13 @@ public class MatPurchaseOrderService {
     }
 
     private MatPurchaseOrderVO toVO(MatPurchaseOrder o, Map<Long, String> projectNames,
-                                     Map<Long, String> partnerNames, Map<Long, String> contractNames) {
+                                     Map<Long, String> partnerNames, Map<Long, String> contractNames,
+                                     Map<Long, String> requestCodes) {
         MatPurchaseOrderVO vo = buildBaseVO(o);
         if (o.getProjectId() != null) vo.setProjectName(projectNames.get(o.getProjectId()));
         if (o.getPartnerId() != null) vo.setPartnerName(partnerNames.get(o.getPartnerId()));
         if (o.getContractId() != null) vo.setContractName(contractNames.get(o.getContractId()));
+        if (o.getRequestId() != null) vo.setRequestCode(requestCodes.get(o.getRequestId()));
         return vo;
     }
 

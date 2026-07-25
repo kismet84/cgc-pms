@@ -6,6 +6,8 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractChange;
+import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
@@ -69,6 +71,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -79,6 +82,34 @@ import static org.junit.jupiter.api.Assertions.*;
 class DashboardProjectBusinessServiceTest extends DashboardServiceTestSupport {
 
     @Autowired private SysRoleMapper sysRoleMapper;
+    @Autowired private CtContractChangeMapper ctContractChangeMapper;
+
+    @Test
+    @Transactional
+    @DisplayName("报告期切换同步更新项目经理与商务经理指标")
+    void reportMonthChangesProjectAndBusinessMetrics() {
+        SeedResult sr = seed("REPORT_MONTH");
+        YearMonth current = YearMonth.now();
+        YearMonth previous = current.minusMonths(1);
+
+        PmProject project = projectMapper.selectById(sr.projectId);
+        project.setPlannedEndDate(current.atDay(1));
+        projectMapper.updateById(project);
+        CtContract contract = ctContractMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getProjectId, sr.projectId));
+        contract.setSignedDate(current.atDay(1));
+        ctContractMapper.updateById(contract);
+
+        assertEquals(0L, dashboardService.getProjectManagerView(sr.projectId, previous.toString())
+                .getLaggingProjectCount());
+        assertEquals(1L, dashboardService.getProjectManagerView(sr.projectId, current.toString())
+                .getLaggingProjectCount());
+        assertEquals("0", dashboardService.getBusinessManagerView(sr.projectId, previous.toString())
+                .getTotalContractAmount());
+        assertEquals("5000000.00", dashboardService.getBusinessManagerView(sr.projectId, current.toString())
+                .getTotalContractAmount());
+    }
 
     @Test
     @Transactional
@@ -258,6 +289,9 @@ class DashboardProjectBusinessServiceTest extends DashboardServiceTestSupport {
         BusinessException inactiveDenied = assertThrows(BusinessException.class,
                 () -> dashboardService.getProjectManagerView(completed.projectId));
         assertEquals("PROJECT_ACCESS_DENIED", inactiveDenied.getCode());
+        BusinessException businessDenied = assertThrows(BusinessException.class,
+                () -> dashboardService.getBusinessManagerView(hidden.projectId));
+        assertEquals("PROJECT_ACCESS_DENIED", businessDenied.getCode());
 
         ProjectManagerDashboardVO specified = dashboardService.getProjectManagerView(visible.projectId);
         assertEquals(List.of(visible.projectId.toString()), specified.getLaggingProjects().stream()
@@ -275,6 +309,10 @@ class DashboardProjectBusinessServiceTest extends DashboardServiceTestSupport {
                 .allMatch(item -> visible.projectId.toString().equals(item.getProjectId())));
         assertEquals(List.of(visible.projectId.toString()), all.getLaggingProjects().stream()
                 .map(DashboardProjectSummaryVO::getProjectId).toList());
+
+        BusinessManagerDashboardVO visibleBusiness = dashboardService.getBusinessManagerView(visible.projectId);
+        BusinessManagerDashboardVO allBusiness = dashboardService.getBusinessManagerView(null);
+        assertEquals(visibleBusiness.getTotalContractAmount(), allBusiness.getTotalContractAmount());
 
         TestUserContext.setUser(TENANT_ID, scopedUserId + 99, "dashboard-self-empty",
                 UserContext.getCurrentRoles());
@@ -372,6 +410,77 @@ class DashboardProjectBusinessServiceTest extends DashboardServiceTestSupport {
         assertNotNull(vo.getTotalContractAmount());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("2.4 BM recent changes use approved effective changes, latest per contract, and project name")
+    void testBMRecentChanges_UsesApprovedEffectiveChanges() {
+        SeedResult first = seed("BM_CHANGE_FIRST");
+        SeedResult second = seed("BM_CHANGE_SECOND");
+        LocalDateTime base = LocalDateTime.of(2026, 6, 10, 9, 0);
+        insertContractChange(first.projectId, contractId(first.projectId), "old", "APPROVED", 1, base);
+        insertContractChange(first.projectId, contractId(first.projectId), "latest", "APPROVED", 1, base.plusDays(2));
+        insertContractChange(second.projectId, contractId(second.projectId), "second", "APPROVED", 1, base.plusDays(1));
+        insertContractChange(first.projectId, contractId(first.projectId), "draft", "DRAFT", 1, base.plusDays(3));
+        insertContractChange(first.projectId, contractId(first.projectId), "ineffective", "APPROVED", 0, base.plusDays(4));
+
+        BusinessManagerDashboardVO single = dashboardService.getBusinessManagerView(first.projectId);
+        assertEquals(1, single.getRecentChanges().size());
+        assertEquals(first.projectId.toString(), single.getRecentChanges().get(0).getProjectId());
+        assertEquals("Dashboard Test BM_CHANGE_FIRST", single.getRecentChanges().get(0).getProjectName());
+
+        BusinessManagerDashboardVO all = dashboardService.getBusinessManagerView(null);
+        assertEquals(List.of(first.projectId.toString(), second.projectId.toString()), all.getRecentChanges().stream()
+                .map(DashboardContractItemVO::getProjectId).toList());
+        assertTrue(all.getRecentChanges().stream().allMatch(item -> item.getProjectName() != null));
+        assertTrue(all.getSettlementItems().stream()
+                .allMatch(item -> item.getProjectName() != null && item.getProjectCode() != null));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("2.5 BM recent changes stop at selected month end and omit contracts without effective changes")
+    void testBMRecentChanges_RespectsReportMonthAndEmptyState() {
+        SeedResult sr = seed("BM_CHANGE_MONTH");
+        Long contractId = contractId(sr.projectId);
+        insertContractChange(sr.projectId, contractId, "june", "APPROVED", 1,
+                LocalDateTime.of(2026, 6, 30, 23, 59, 59, 999_999_000));
+        insertContractChange(sr.projectId, contractId, "july", "APPROVED", 1,
+                LocalDateTime.of(2026, 7, 1, 0, 0));
+
+        assertEquals(2, ctContractChangeMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CtContractChange>()
+                        .eq(CtContractChange::getProjectId, sr.projectId)
+                        .eq(CtContractChange::getApprovalStatus, "APPROVED")
+                        .eq(CtContractChange::getEffectiveFlag, 1)).size());
+
+        assertEquals(1, dashboardService.getBusinessManagerView(sr.projectId, "2026-06").getRecentChanges().size());
+        assertEquals(0, dashboardService.getBusinessManagerView(sr.projectId, "2026-05").getRecentChanges().size());
+    }
+
+    private Long contractId(Long projectId) {
+        return ctContractMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CtContract>()
+                .eq(CtContract::getProjectId, projectId)).getId();
+    }
+
+    private void insertContractChange(Long projectId, Long contractId, String suffix, String approvalStatus,
+                                      int effectiveFlag, LocalDateTime timestamp) {
+        CtContractChange change = new CtContractChange();
+        change.setTenantId(TENANT_ID);
+        change.setProjectId(projectId);
+        change.setContractId(contractId);
+        change.setChangeCode("BM-CHANGE-" + suffix + "-" + projectId);
+        change.setChangeName("商务变更-" + suffix);
+        change.setChangeType("AMOUNT");
+        change.setBeforeAmount(BigDecimal.ZERO);
+        change.setChangeAmount(BigDecimal.ONE);
+        change.setAfterAmount(BigDecimal.ONE);
+        change.setApprovalStatus(approvalStatus);
+        change.setEffectiveFlag(effectiveFlag);
+        change.setCreatedTime(timestamp);
+        change.setUpdatedTime(timestamp);
+        ctContractChangeMapper.insert(change);
+    }
+
     // ========================================================================
     // 3. Cost Manager View
     // ========================================================================
@@ -435,11 +544,11 @@ class DashboardProjectBusinessServiceTest extends DashboardServiceTestSupport {
 
     @Test
     @Transactional
-    @DisplayName("8.1a PM view: invalid month returns data without 500")
-    void testPMView_InvalidMonthDoesNotThrow() {
+    @DisplayName("8.1a PM view: invalid month fails closed")
+    void testPMView_InvalidMonthFailsClosed() {
         SeedResult sr = seed("PM_BAD_MONTH");
-        ProjectManagerDashboardVO vo = dashboardService.getProjectManagerView(sr.projectId, "not-a-month");
-        assertNotNull(vo);
-        assertTrue(vo.getPendingTaskCount() >= 1, "Invalid month should be ignored, return full data");
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> dashboardService.getProjectManagerView(sr.projectId, "not-a-month"));
+        assertEquals("INVALID_DASHBOARD_MONTH", error.getCode());
     }
 }

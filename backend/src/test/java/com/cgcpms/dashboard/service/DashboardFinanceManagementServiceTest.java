@@ -4,6 +4,7 @@ import com.cgcpms.alert.entity.AlertLog;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.TestUserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -69,6 +70,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -81,6 +83,24 @@ import static org.junit.jupiter.api.Assertions.*;
 class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport {
 
     @Autowired private SysRoleMapper sysRoleMapper;
+
+    @Test
+    @Transactional
+    @DisplayName("报告期切换同步更新财务与管理层指标")
+    void reportMonthChangesFinanceAndManagementMetrics() {
+        SeedResult sr = seed("REPORT_MONTH");
+        YearMonth current = YearMonth.now();
+        YearMonth previous = current.minusMonths(1);
+
+        assertEquals("0", dashboardService.getFinanceView(sr.projectId, previous.toString())
+                .getTotalPaidAmount());
+        assertEquals("100000.00", dashboardService.getFinanceView(sr.projectId, current.toString())
+                .getTotalPaidAmount());
+        assertEquals(0L, dashboardService.getManagementView(sr.projectId, previous.toString())
+                .getActiveProjectCount());
+        assertEquals(1L, dashboardService.getManagementView(sr.projectId, current.toString())
+                .getActiveProjectCount());
+    }
 
     @Test
     @Transactional
@@ -144,6 +164,9 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertEquals(Set.of(visible.projectId.toString()), vo.getContractFundBreakdowns().stream()
                 .map(FinanceDashboardVO.ContractFundBreakdown::getProjectId)
                 .collect(Collectors.toSet()));
+        BusinessException denied = assertThrows(BusinessException.class,
+                () -> dashboardService.getFinanceView(hidden.projectId));
+        assertEquals("PROJECT_ACCESS_DENIED", denied.getCode());
     }
 
     // ========================================================================

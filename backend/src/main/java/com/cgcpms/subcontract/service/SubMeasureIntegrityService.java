@@ -5,6 +5,8 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
@@ -16,6 +18,7 @@ import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
 import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -25,6 +28,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Comparator;
 
 /** 分包计量进入审批前的唯一完整性门禁。 */
 @Service
@@ -37,6 +41,8 @@ public class SubMeasureIntegrityService {
     private final CtContractMapper contractMapper;
     private final SubTaskMapper taskMapper;
     private final SubMeasureItemMapper itemMapper;
+    private final SubMeasureMapper measureMapper;
+    private final CtContractItemMapper contractItemMapper;
     private final SysFileMapper fileMapper;
     private final ProjectAccessChecker projectAccessChecker;
 
@@ -85,6 +91,7 @@ public class SubMeasureIntegrityService {
         if (items.isEmpty()) {
             throw new BusinessException("SUB_MEASURE_ITEMS_REQUIRED", "分包计量必须至少包含一条合同清单明细");
         }
+        validateAuthoritativeItems(measure, items, tenantId);
         BigDecimal itemTotal = items.stream().map(SubMeasureItem::getAmount)
                 .map(value -> value == null ? BigDecimal.ZERO : value)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -107,6 +114,39 @@ public class SubMeasureIntegrityService {
         if (cleanAttachmentCount == 0) {
             throw new BusinessException("SUB_MEASURE_ATTACHMENT_REQUIRED", "分包计量必须上传至少一份已通过安全扫描的计量附件");
         }
+    }
+
+    private void validateAuthoritativeItems(SubMeasure measure, List<SubMeasureItem> items, Long tenantId) {
+        for (SubMeasureItem item : items.stream()
+                .sorted(Comparator.comparing(SubMeasureItem::getContractItemId,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .toList()) {
+            CtContractItem contractItem = item.getContractItemId() == null ? null
+                    : contractItemMapper.selectByIdForUpdate(item.getContractItemId(), tenantId);
+            if (contractItem == null || !Objects.equals(contractItem.getContractId(), measure.getContractId())) {
+                throw new BusinessException("SUB_MEASURE_CONTRACT_ITEM_INVALID", "计量明细不属于当前分包合同");
+            }
+            BigDecimal current = item.getCurrentQuantity() == null ? BigDecimal.ZERO : item.getCurrentQuantity();
+            BigDecimal contractQuantity = contractItem.getQuantity() == null
+                    ? BigDecimal.ZERO : contractItem.getQuantity();
+            BigDecimal previous = measureMapper.sumApprovedQuantity(tenantId, contractItem.getId(), measure.getId());
+            BigDecimal cumulative = (previous == null ? BigDecimal.ZERO : previous).add(current);
+            BigDecimal unitPrice = contractItem.getUnitPrice() == null ? BigDecimal.ZERO : contractItem.getUnitPrice();
+            BigDecimal amount = current.multiply(unitPrice).setScale(2, java.math.RoundingMode.HALF_UP);
+            if (current.compareTo(BigDecimal.ZERO) <= 0 || cumulative.compareTo(contractQuantity) > 0
+                    || !Objects.equals(item.getItemName(), contractItem.getItemName())
+                    || !Objects.equals(item.getUnit(), contractItem.getUnit())
+                    || !sameNumber(item.getContractQuantity(), contractQuantity)
+                    || !sameNumber(item.getCumulativeQuantity(), cumulative)
+                    || !sameNumber(item.getUnitPrice(), unitPrice)
+                    || !sameNumber(item.getAmount(), amount)) {
+                throw new BusinessException("SUB_MEASURE_ITEM_STALE", "计量明细与当前合同量价或累计值不一致，请重新保存");
+            }
+        }
+    }
+
+    private static boolean sameNumber(BigDecimal left, BigDecimal right) {
+        return left != null && right != null && left.compareTo(right) == 0;
     }
 
     private static BigDecimal money(BigDecimal value) {

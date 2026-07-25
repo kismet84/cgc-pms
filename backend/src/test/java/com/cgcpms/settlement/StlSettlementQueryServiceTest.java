@@ -18,9 +18,13 @@ import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.service.StlSettlementQueryService;
 import com.cgcpms.settlement.vo.SettlementAttachmentVO;
+import com.cgcpms.settlement.vo.SettlementAmountBaselineVO;
 import com.cgcpms.settlement.vo.SettlementCostItemVO;
 import com.cgcpms.settlement.vo.SettlementPaymentItemVO;
+import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
+import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.cgcpms.variation.entity.VarOrder;
@@ -55,10 +59,12 @@ class StlSettlementQueryServiceTest {
     private static final long USER_ID = 1L;
     private static final long PROJECT_ID = 10001L;
     private static final long CONTRACT_ID = 30001L;
+    private static final long CROSS_PROJECT_CONTRACT_ID = 9_005_300_300_001L;
     private static final long COST_SUBJECT_ID = 910001L;
 
     @Autowired private StlSettlementQueryService queryService;
     @Autowired private StlSettlementMapper settlementMapper;
+    @Autowired private SubMeasureMapper subMeasureMapper;
     @Autowired private VarOrderMapper varOrderMapper;
     @Autowired private CostItemMapper costItemMapper;
     @Autowired private CostSubjectMapper costSubjectMapper;
@@ -79,6 +85,9 @@ class StlSettlementQueryServiceTest {
         cleanupPayments();
         jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND settlement_code = ?",
                 TENANT_ID, "STL-20260520-001");
+        cleanupCrossProjectContract();
+        jdbcTemplate.update("DELETE FROM sub_measure WHERE tenant_id = ? AND measure_code = 'SM-SETTLEMENT-QUERY-001'",
+                TENANT_ID);
 
         StlSettlement s = new StlSettlement();
         s.setTenantId(TENANT_ID); s.setProjectId(PROJECT_ID); s.setContractId(CONTRACT_ID);
@@ -98,6 +107,7 @@ class StlSettlementQueryServiceTest {
         settlementId = s.getId();
 
         seedVariation();
+        seedMeasure();
         seedCost();
         seedAttachment();
         seedPayments();
@@ -107,12 +117,19 @@ class StlSettlementQueryServiceTest {
     void tearDown() {
         jdbcTemplate.update("DELETE FROM sys_file WHERE business_type = 'SETTLEMENT' AND business_id = ?", settlementId);
         jdbcTemplate.update("DELETE FROM cost_item WHERE contract_id = ? AND source_type = 'SETTLEMENT_QUERY_TEST_COST'", CONTRACT_ID);
+        jdbcTemplate.update("DELETE FROM sub_measure WHERE tenant_id = ? AND measure_code = 'SM-SETTLEMENT-QUERY-001'",
+                TENANT_ID);
         jdbcTemplate.update("DELETE FROM var_order WHERE contract_id = ? AND var_name = 'settlement-query-test-variation'", CONTRACT_ID);
         cleanupPayments();
         jdbcTemplate.update("DELETE FROM cost_subject WHERE id = ?", COST_SUBJECT_ID);
         jdbcTemplate.update("DELETE FROM stl_settlement WHERE tenant_id = ? AND settlement_code = ?",
                 TENANT_ID, "STL-20260520-001");
+        cleanupCrossProjectContract();
         UserContext.clear();
+    }
+
+    private void cleanupCrossProjectContract() {
+        jdbcTemplate.update("DELETE FROM ct_contract WHERE id = ?", CROSS_PROJECT_CONTRACT_ID);
     }
 
     private void cleanupPayments() {
@@ -198,9 +215,130 @@ class StlSettlementQueryServiceTest {
 
     @Test @DisplayName("getKpi — 无匹配数据全为零")
     void testGetKpi_NoData() {
-        Map<String, Object> kpi = queryService.getKpi(99999L, null, null, null, null);
+        Map<String, Object> kpi = queryService.getKpi(PROJECT_ID, null, null, "NO-SUCH-SETTLEMENT", null);
         assertEquals(0L, (long) kpi.get("totalCount"));
         assertEquals("0", kpi.get("totalContractAmount"));
+    }
+
+    @Test
+    @DisplayName("同租户跨项目和跨租户结算读取失败关闭")
+    void testProjectAndTenantScopedReadsFailClosed() {
+        UserContext.set(Jwts.claims().subject("no-project").add("userId", 999L)
+                .add("username", "no-project").add("tenantId", TENANT_ID)
+                .add("roleCodes", List.of()).build());
+
+        assertThrows(BusinessException.class, () -> queryService.getById(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.computeSettlementAmount(CONTRACT_ID));
+        assertThrows(BusinessException.class, () -> queryService.getSources(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.getVariations(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.getPayments(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.getCosts(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.getAttachments(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.getApprovalRecords(settlementId));
+        assertEquals(0, queryService.previewAmountBaseline(1, 50).getTotal());
+
+        UserContext.set(Jwts.claims().subject("other-tenant").add("userId", 999L)
+                .add("username", "other-tenant").add("tenantId", 999L)
+                .add("roleCodes", List.of()).build());
+        assertThrows(BusinessException.class, () -> queryService.getById(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.computeSettlementAmount(CONTRACT_ID));
+    }
+
+    @Test
+    @DisplayName("结算来源金额序列化为字符串")
+    void testSettlementSourceAmountsSerializeAsStrings() {
+        JsonNode json = objectMapper.valueToTree(queryService.getSources(settlementId));
+        assertTrue(json.path("varOrders").get(0).path("confirmedAmount").isTextual());
+        assertTrue(json.path("subMeasures").get(0).path("approvedAmount").isTextual());
+        assertTrue(json.path("payRecords").get(0).path("payAmount").isTextual());
+    }
+
+    @Test
+    @DisplayName("结算合同关系漂移时全部详情读取失败关闭")
+    void testSettlementContractRelationshipMismatchFailsClosed() {
+        Long otherProjectId = jdbcTemplate.queryForObject(
+                "SELECT id FROM pm_project WHERE tenant_id=? AND id<>? "
+                        + "AND deleted_flag=0 ORDER BY id LIMIT 1",
+                Long.class, TENANT_ID, PROJECT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract(
+                    id, tenant_id, project_id, contract_code, contract_name, contract_type,
+                    party_a_id, party_b_id, contract_amount, current_amount, paid_amount,
+                    contract_status, approval_status, version, created_at, updated_at, deleted_flag
+                )
+                SELECT ?, tenant_id, ?, 'CT-SETTLEMENT-QUERY-CROSS-PROJECT',
+                    '结算查询跨项目合同', contract_type, party_a_id, party_b_id,
+                    contract_amount, current_amount, paid_amount, contract_status,
+                    approval_status, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0
+                FROM ct_contract
+                WHERE id=? AND tenant_id=? AND deleted_flag=0
+                """, CROSS_PROJECT_CONTRACT_ID, otherProjectId, CONTRACT_ID, TENANT_ID);
+        jdbcTemplate.update("UPDATE stl_settlement SET contract_id=? WHERE id=?",
+                CROSS_PROJECT_CONTRACT_ID, settlementId);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class, () -> queryService.getById(settlementId));
+        assertEquals("STL_SETTLEMENT_CONTRACT_SCOPE_INVALID", exception.getCode());
+        assertThrows(BusinessException.class, () -> queryService.getSources(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.getVariations(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.getPayments(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.getCosts(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.getAttachments(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.getApprovalRecords(settlementId));
+        assertThrows(BusinessException.class, () -> queryService.previewAmountBaseline(1, 50));
+    }
+
+    @Test
+    @DisplayName("结算来源查询排除同合同跨项目漂移事实")
+    void testSettlementSourcesExcludeCrossProjectFacts() {
+        StlSettlementVO before = queryService.computeSettlementAmount(CONTRACT_ID);
+        Long otherProjectId = jdbcTemplate.queryForObject(
+                "SELECT id FROM pm_project WHERE tenant_id=? AND id<>? "
+                        + "AND deleted_flag=0 ORDER BY id LIMIT 1",
+                Long.class, TENANT_ID, PROJECT_ID);
+        jdbcTemplate.update("UPDATE var_order SET project_id=? "
+                        + "WHERE tenant_id=? AND contract_id=? AND var_name='settlement-query-test-variation'",
+                otherProjectId, TENANT_ID, CONTRACT_ID);
+        jdbcTemplate.update("UPDATE cost_item SET project_id=? "
+                        + "WHERE tenant_id=? AND contract_id=? AND source_type='SETTLEMENT_QUERY_TEST_COST'",
+                otherProjectId, TENANT_ID, CONTRACT_ID);
+        jdbcTemplate.update("UPDATE sub_measure SET project_id=? "
+                        + "WHERE tenant_id=? AND contract_id=? AND measure_code='SM-SETTLEMENT-QUERY-001'",
+                otherProjectId, TENANT_ID, CONTRACT_ID);
+        jdbcTemplate.update("UPDATE pay_record SET project_id=? WHERE pay_application_id IN "
+                        + "(SELECT id FROM pay_application WHERE tenant_id=? "
+                        + "AND apply_code LIKE 'PAY-SETTLEMENT-QUERY-%')",
+                otherProjectId, TENANT_ID);
+
+        StlSettlementVO after = queryService.computeSettlementAmount(CONTRACT_ID);
+        assertEquals(new BigDecimal(before.getChangeAmount()).subtract(new BigDecimal("800.00")),
+                new BigDecimal(after.getChangeAmount()));
+        assertEquals(new BigDecimal(before.getMeasuredAmount()).subtract(new BigDecimal("777.77")),
+                new BigDecimal(after.getMeasuredAmount()));
+        assertEquals(new BigDecimal(before.getPaidAmount()).subtract(new BigDecimal("1500.00")),
+                new BigDecimal(after.getPaidAmount()));
+
+        SettlementAmountBaselineVO baseline = queryService.previewAmountBaseline(1, 50).getRecords().stream()
+                .filter(item -> String.valueOf(settlementId).equals(item.getSettlementId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(after.getChangeAmount(), baseline.getCurrentConfirmedVariationAmount());
+        assertEquals(after.getMeasuredAmount(), baseline.getCurrentApprovedMeasuredAmount());
+        assertEquals(after.getPaidAmount(), baseline.getCurrentPaidAmount());
+
+        assertTrue(queryService.getVariations(settlementId).stream()
+                .noneMatch(item -> "VO-SETTLEMENT-QUERY-001".equals(item.getVarCode())));
+        assertTrue(queryService.getCosts(settlementId).stream()
+                .noneMatch(item -> "1234.56".equals(item.getAmount())));
+        assertTrue(queryService.getPayments(settlementId).stream()
+                .noneMatch(item -> item.getApplyCode() != null
+                        && item.getApplyCode().startsWith("PAY-SETTLEMENT-QUERY-")));
+        SettlementSourcesVO sources = queryService.getSources(settlementId);
+        assertTrue(sources.getVarOrders().stream()
+                .noneMatch(item -> "VO-SETTLEMENT-QUERY-001".equals(item.getVarCode())));
+        assertTrue(sources.getSubMeasures().stream()
+                .noneMatch(item -> "SM-SETTLEMENT-QUERY-001".equals(item.getMeasureCode())));
+        assertTrue(sources.getPayRecords().isEmpty());
     }
 
     // ================================================================
@@ -419,6 +557,26 @@ class StlSettlementQueryServiceTest {
         order.setCostGeneratedFlag(0);
         order.setCreatedBy(USER_ID);
         varOrderMapper.insert(order);
+    }
+
+    private void seedMeasure() {
+        SubMeasure measure = new SubMeasure();
+        measure.setTenantId(TENANT_ID);
+        measure.setProjectId(PROJECT_ID);
+        measure.setContractId(CONTRACT_ID);
+        measure.setPartnerId(20002L);
+        measure.setMeasureCode("SM-SETTLEMENT-QUERY-001");
+        measure.setMeasurePeriod("2026-07");
+        measure.setMeasureDate(LocalDate.of(2026, 7, 2));
+        measure.setReportedAmount(new BigDecimal("800.00"));
+        measure.setApprovedAmount(new BigDecimal("777.77"));
+        measure.setDeductionAmount(BigDecimal.ZERO);
+        measure.setNetAmount(new BigDecimal("777.77"));
+        measure.setApprovalStatus("APPROVED");
+        measure.setCostGeneratedFlag(0);
+        measure.setStatus("APPROVED");
+        measure.setCreatedBy(USER_ID);
+        subMeasureMapper.insert(measure);
     }
 
     private void seedCost() {

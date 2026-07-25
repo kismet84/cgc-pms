@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadDashboard } from '@/services/dashboard'
+import { loadCostBreakdown, loadDashboard } from '@/services/dashboard'
 import { loadVisibleProjects } from '@/services/projects'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -31,7 +31,7 @@ describe('M2 request baseline', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/dashboard/finance')
   })
 
-  it('requests only the selected role and emits month only for supported valid periods', async () => {
+  it('requests only the selected role and emits every valid report month', async () => {
     fetchMock.mockImplementation(async () => apiResponse({ projectId: '7' }))
     const access = { roles: ['ADMIN'], permissions: [] }
 
@@ -43,10 +43,23 @@ describe('M2 request baseline', () => {
 
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       '/api/dashboard/cost-manager?projectId=7&month=2026-07',
-      '/api/dashboard/finance?projectId=7',
+      '/api/dashboard/finance?projectId=7&month=2026-07',
       '/api/dashboard/cost-manager?projectId=7',
       '/api/dashboard/cost-manager?month=2026-07',
-      '/api/dashboard/management?projectId=7',
+      '/api/dashboard/management?projectId=7&month=2026-07',
+    ])
+  })
+
+  it('emits only a valid report month for cost breakdown', async () => {
+    fetchMock.mockImplementation(async () => apiResponse({ projectId: '7' }))
+    const access = { roles: ['ADMIN'], permissions: [] }
+
+    await loadCostBreakdown('7', '2026-07', access)
+    await loadCostBreakdown('7', 'invalid', access)
+
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      '/api/dashboard/project/7/cost-breakdown?month=2026-07',
+      '/api/dashboard/project/7/cost-breakdown',
     ])
   })
 

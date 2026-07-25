@@ -5,6 +5,7 @@ export interface NavigationAccess {
 export interface WorkspaceTab extends NavigationAccess {
   path: string
   label: string
+  migration?: 'pending'
 }
 
 export interface NavigationWorkspace {
@@ -261,7 +262,7 @@ export const navigationDomains: NavigationDomain[] = [
           {
             path: '/inventory/warehouse',
             label: '仓库管理',
-            permission: 'inventory:warehouse:query',
+            permission: 'inventory:warehouse:list',
           },
           { path: '/inventory/stock', label: '库存台账', permission: 'inventory:stock:list' },
           {
@@ -295,7 +296,11 @@ export const navigationDomains: NavigationDomain[] = [
         label: '分包履约',
         defaultPath: '/subcontract/task',
         tabs: [
-          { path: '/subcontract/task', label: '分包任务', permission: 'subcontract:task:query' },
+          {
+            path: '/subcontract/task',
+            label: '分包任务',
+            permission: 'subtask:query',
+          },
           {
             path: '/subcontract/measure',
             label: '分包计量',
@@ -308,7 +313,14 @@ export const navigationDomains: NavigationDomain[] = [
         label: '结算管理',
         defaultPath: '/settlement/list',
         matchPrefixes: ['/settlement'],
-        tabs: [{ path: '/settlement/list', label: '结算台账', permission: 'settlement:query' }],
+        tabs: [
+          {
+            path: '/settlement/list',
+            label: '结算台账',
+            permission: 'settlement:query',
+            migration: 'pending',
+          },
+        ],
       },
     ],
   },
@@ -322,10 +334,30 @@ export const navigationDomains: NavigationDomain[] = [
         label: '收付款与发票',
         defaultPath: '/payment/application',
         tabs: [
-          { path: '/payment/application', label: '付款申请', permission: 'payment:app:query' },
-          { path: '/payment/expense', label: '费用申请', permission: 'expense:query' },
-          { path: '/revenue', label: '收入与回款', permission: 'revenue:operations:query' },
-          { path: '/invoice', label: '发票管理', permission: 'invoice:query' },
+          {
+            path: '/payment/application',
+            label: '付款申请',
+            permission: 'payment:app:query',
+            migration: 'pending',
+          },
+          {
+            path: '/payment/expense',
+            label: '费用申请',
+            permission: 'expense:query',
+            migration: 'pending',
+          },
+          {
+            path: '/revenue',
+            label: '收入与回款',
+            permission: 'revenue:operations:query',
+            migration: 'pending',
+          },
+          {
+            path: '/invoice',
+            label: '发票管理',
+            permission: 'invoice:query',
+            migration: 'pending',
+          },
         ],
       },
       {
@@ -337,9 +369,20 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/finance-operations',
             label: '资金运营',
             permission: 'finance:operations:query',
+            migration: 'pending',
           },
-          { path: '/cash-journal', label: '资金日记账', permission: 'cashbook:journal:query' },
-          { path: '/cash-forecast', label: '项目资金预测', permission: 'finance:forecast:query' },
+          {
+            path: '/cash-journal',
+            label: '资金日记账',
+            permission: 'cashbook:journal:query',
+            migration: 'pending',
+          },
+          {
+            path: '/cash-forecast',
+            label: '项目资金预测',
+            permission: 'finance:forecast:query',
+            migration: 'pending',
+          },
         ],
       },
       {
@@ -347,8 +390,18 @@ export const navigationDomains: NavigationDomain[] = [
         label: '财务核算',
         defaultPath: '/accounting-entry',
         tabs: [
-          { path: '/accounting-entry', label: '会计凭证', permission: 'accounting:query' },
-          { path: '/financial-close', label: '财务核算与月结', permission: 'finance:close:query' },
+          {
+            path: '/accounting-entry',
+            label: '会计凭证',
+            permission: 'accounting:query',
+            migration: 'pending',
+          },
+          {
+            path: '/financial-close',
+            label: '财务核算与月结',
+            permission: 'finance:close:query',
+            migration: 'pending',
+          },
         ],
       },
     ],
@@ -362,19 +415,33 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'partners',
         label: '合作方管理',
         defaultPath: '/partner',
-        tabs: [{ path: '/partner', label: '合作方管理', permission: 'partner:query' }],
+        tabs: [
+          {
+            path: '/partner',
+            label: '合作方管理',
+            permission: 'partner:query',
+            migration: 'pending',
+          },
+        ],
       },
       {
         id: 'organization',
         label: '组织架构',
         defaultPath: '/org',
-        tabs: [{ path: '/org', label: '组织架构', permission: 'org:query' }],
+        tabs: [{ path: '/org', label: '组织架构', permission: 'org:query', migration: 'pending' }],
       },
       {
         id: 'materials',
         label: '物资主数据',
         defaultPath: '/material/dictionary',
-        tabs: [{ path: '/material/dictionary', label: '材料字典', permission: 'material:query' }],
+        tabs: [
+          {
+            path: '/material/dictionary',
+            label: '材料字典',
+            permission: 'material:query',
+            migration: 'pending',
+          },
+        ],
       },
       {
         id: 'finance-data',
@@ -382,17 +449,29 @@ export const navigationDomains: NavigationDomain[] = [
         defaultPath: '/cost/subject/taxonomy',
         matchPrefixes: ['/cost/subject'],
         tabs: [
-          { path: '/cost/subject/taxonomy', label: '科目体系', permission: 'cost:query' },
-          { path: '/cost/subject/rules', label: '归集规则', permission: 'cost:subject:rule:query' },
+          {
+            path: '/cost/subject/taxonomy',
+            label: '科目体系',
+            permission: 'cost:query',
+            migration: 'pending',
+          },
+          {
+            path: '/cost/subject/rules',
+            label: '归集规则',
+            permission: 'cost:subject:rule:query',
+            migration: 'pending',
+          },
           {
             path: '/cost/subject/scope',
             label: '项目适用与目标成本',
             permission: 'cost:subject:scope:query',
+            migration: 'pending',
           },
           {
             path: '/cost/subject/trace',
             label: '影响与转入追踪',
             permission: 'cost:subject:audit:query',
+            migration: 'pending',
           },
         ],
       },
@@ -408,7 +487,12 @@ export const navigationDomains: NavigationDomain[] = [
         label: '流程配置',
         defaultPath: '/approval/process',
         tabs: [
-          { path: '/approval/process', label: '审批流程', permission: 'workflow:process:query' },
+          {
+            path: '/approval/process',
+            label: '审批流程',
+            permission: 'workflow:process:query',
+            migration: 'pending',
+          },
         ],
       },
       {
@@ -416,9 +500,24 @@ export const navigationDomains: NavigationDomain[] = [
         label: '访问控制',
         defaultPath: '/system/users',
         tabs: [
-          { path: '/system/users', label: '用户管理', permission: 'system:user:query' },
-          { path: '/system/roles', label: '角色管理', permission: 'system:role:query' },
-          { path: '/system/permissions', label: '权限清单', permission: 'system:permission:query' },
+          {
+            path: '/system/users',
+            label: '用户管理',
+            permission: 'system:user:query',
+            migration: 'pending',
+          },
+          {
+            path: '/system/roles',
+            label: '角色管理',
+            permission: 'system:role:query',
+            migration: 'pending',
+          },
+          {
+            path: '/system/permissions',
+            label: '权限清单',
+            permission: 'system:permission:query',
+            migration: 'pending',
+          },
         ],
       },
       {
@@ -426,11 +525,17 @@ export const navigationDomains: NavigationDomain[] = [
         label: '系统配置',
         defaultPath: '/system/dict',
         tabs: [
-          { path: '/system/dict', label: '字典管理', permission: 'system:dict:query' },
+          {
+            path: '/system/dict',
+            label: '字典管理',
+            permission: 'system:dict:query',
+            migration: 'pending',
+          },
           {
             path: '/system/document-templates',
             label: '业务单据模板',
             permission: 'document:template:query',
+            migration: 'pending',
           },
         ],
       },
@@ -438,13 +543,27 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'audit',
         label: '操作审计',
         defaultPath: '/system/audit',
-        tabs: [{ path: '/system/audit', label: '操作审计', permission: 'audit:query' }],
+        tabs: [
+          {
+            path: '/system/audit',
+            label: '操作审计',
+            permission: 'audit:query',
+            migration: 'pending',
+          },
+        ],
       },
       {
         id: 'data',
         label: '数据维护',
         defaultPath: '/system/data',
-        tabs: [{ path: '/system/data', label: '数据维护', permission: 'system:data:query' }],
+        tabs: [
+          {
+            path: '/system/data',
+            label: '数据维护',
+            permission: 'system:data:query',
+            migration: 'pending',
+          },
+        ],
       },
     ],
   },

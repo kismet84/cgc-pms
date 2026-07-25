@@ -7,6 +7,8 @@ import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractChange;
+import com.cgcpms.contract.mapper.CtContractChangeMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.entity.CostItem;
@@ -85,6 +87,7 @@ import java.util.stream.Stream;
 public class DashboardProjectBusinessService extends DashboardSharedSupport {
 
     private final ProjectAccessChecker projectAccessChecker;
+    private final CtContractChangeMapper ctContractChangeMapper;
 
     public DashboardProjectBusinessService(
             CostSummaryService costSummaryService,
@@ -93,6 +96,7 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
             CostItemMapper costItemMapper,
             PmProjectMapper projectMapper,
             CtContractMapper ctContractMapper,
+            CtContractChangeMapper ctContractChangeMapper,
             WfTaskMapper wfTaskMapper,
             WfInstanceMapper wfInstanceMapper,
             PayRecordMapper payRecordMapper,
@@ -116,6 +120,7 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
             ProjectAccessChecker projectAccessChecker) {
         super(costSummaryService, costSummaryMapper, costSubjectMapper, costItemMapper, projectMapper, ctContractMapper, wfTaskMapper, wfInstanceMapper, payRecordMapper, stlSettlementMapper, varOrderMapper, subMeasureMapper, alertLogMapper, purchaseRequestMapper, purchaseRequestItemMapper, purchaseOrderMapper, purchaseOrderItemMapper, receiptMapper, receiptItemMapper, requisitionMapper, warehouseMapper, stockMapper, techItemMapper, partnerMapper, materialMapper, userMapper);
         this.projectAccessChecker = projectAccessChecker;
+        this.ctContractChangeMapper = ctContractChangeMapper;
     }
 
     public ProjectManagerDashboardVO getProjectManagerView(Long projectId) {
@@ -168,10 +173,12 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
         vo.setPendingTasks(taskItems);
         vo.setPendingTaskCount((long) taskItems.size());
 
-        // Lagging projects: planned end date in the past, not completed
-        // NOT filtered by month — current-state indicator
+        // Lagging projects as of the selected report period.
+        LocalDate periodCutoff = selectedMonth == null
+                ? LocalDate.now()
+                : selectedMonth.atEndOfMonth().plusDays(1);
         List<DashboardProjectSummaryVO> lagging = Stream.of(project)
-                .filter(p -> p.getPlannedEndDate() != null && p.getPlannedEndDate().isBefore(LocalDate.now())
+                .filter(p -> p.getPlannedEndDate() != null && p.getPlannedEndDate().isBefore(periodCutoff)
                         && !"COMPLETED".equals(p.getStatus()))
                 .map(this::toProjectSummary)
                 .collect(Collectors.toList());
@@ -214,21 +221,15 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
         vo.setPendingApprovalCount(pendingApprovalCount);
 
         // Expiring contracts (end date within 30 days)
-        LocalDate cutoff = LocalDate.now().plusDays(30);
+        LocalDate windowStart = selectedMonth == null ? LocalDate.now() : selectedMonth.atDay(1);
+        LocalDate cutoff = selectedMonth == null ? windowStart.plusDays(30) : selectedMonth.atEndOfMonth();
         List<CtContract> expiringContracts = ctContractMapper.selectList(
                 new LambdaQueryWrapper<CtContract>()
                         .eq(CtContract::getTenantId, tenantId)
                         .eq(CtContract::getProjectId, projectId)
                         .le(CtContract::getEndDate, cutoff)
-                        .ge(CtContract::getEndDate, LocalDate.now())
+                        .ge(CtContract::getEndDate, windowStart)
                         .eq(CtContract::getContractStatus, "PERFORMING"));
-        if (selectedMonth != null) {
-            expiringContracts = expiringContracts.stream()
-                    .filter(c -> c.getEndDate() != null
-                            && !c.getEndDate().isBefore(selectedMonth.atDay(1))
-                            && !c.getEndDate().isAfter(selectedMonth.atEndOfMonth()))
-                    .collect(Collectors.toList());
-        }
         vo.setExpiringContracts(expiringContracts.stream().map(this::toContractItem).collect(Collectors.toList()));
         vo.setExpiringContractCount((long) expiringContracts.size());
 
@@ -239,13 +240,19 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
     // 2. Business Manager Dashboard
     // ========================================================================
     public BusinessManagerDashboardVO getBusinessManagerView(Long projectId) {
+        return getBusinessManagerView(projectId, null);
+    }
+
+    public BusinessManagerDashboardVO getBusinessManagerView(Long projectId, String month) {
         Long tenantId = UserContext.getCurrentTenantId();
+        YearMonth selectedMonth = parseDashboardMonth(month);
 
         if (projectId == null) {
-            return getBusinessManagerViewAllProjects(tenantId);
+            return getBusinessManagerViewAllProjects(tenantId, selectedMonth);
         }
 
         PmProject project = requireProject(tenantId, projectId);
+        projectAccessChecker.checkAccess(project, "查看商务经理驾驶舱");
 
         BusinessManagerDashboardVO vo = new BusinessManagerDashboardVO();
         vo.setProjectId(projectId.toString());
@@ -256,6 +263,9 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                 new LambdaQueryWrapper<CtContract>()
                         .eq(CtContract::getTenantId, tenantId)
                         .eq(CtContract::getProjectId, projectId));
+        contracts = contracts.stream()
+                .filter(contract -> existedBy(contract.getSignedDate(), contract.getCreatedAt(), selectedMonth))
+                .collect(Collectors.toList());
         BigDecimal totalContractAmount = contracts.stream()
                 .map(c -> c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -285,7 +295,14 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                 new LambdaQueryWrapper<StlSettlement>()
                         .eq(StlSettlement::getTenantId, tenantId)
                         .eq(StlSettlement::getProjectId, projectId));
-        long finalizedCount = settlements.stream().filter(s -> "FINALIZED".equals(s.getSettlementStatus())).count();
+        settlements = settlements.stream()
+                .filter(settlement -> existedBy(null, settlement.getCreatedAt(), selectedMonth))
+                .collect(Collectors.toList());
+        long finalizedCount = settlements.stream()
+                .filter(s -> "FINALIZED".equals(s.getSettlementStatus()))
+                .filter(s -> selectedMonth == null || (s.getFinalizedAt() != null
+                        && !s.getFinalizedAt().toLocalDate().isAfter(selectedMonth.atEndOfMonth())))
+                .count();
         vo.setSettlementProgress(settlements.isEmpty() ? "0/0" : finalizedCount + "/" + settlements.size());
 
         // Var order amount: SUM(approvedAmount) WHERE approvalStatus='APPROVED'
@@ -295,6 +312,8 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                         .eq(VarOrder::getProjectId, projectId)
                         .eq(VarOrder::getApprovalStatus, "APPROVED"))
                 .stream()
+                .filter(v -> selectedMonth == null || (v.getEventDate() != null
+                        && !v.getEventDate().isAfter(selectedMonth.atEndOfMonth())))
                 .map(v -> v.getApprovedAmount() != null ? v.getApprovedAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         vo.setVarOrderAmount(varOrderTotal.toPlainString());
@@ -306,23 +325,21 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                         .eq(SubMeasure::getProjectId, projectId)
                         .eq(SubMeasure::getApprovalStatus, "APPROVED"))
                 .stream()
+                .filter(s -> selectedMonth == null || (s.getMeasureDate() != null
+                        && !s.getMeasureDate().isAfter(selectedMonth.atEndOfMonth())))
                 .map(s -> s.getApprovedAmount() != null ? s.getApprovedAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         vo.setSubMeasureAmount(subMeasureTotal.toPlainString());
 
-        // Recent changes (top 5 contracts by currentAmount)
-        vo.setRecentChanges(contracts.stream()
-                .sorted(Comparator.comparing(c -> c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO,
-                        Comparator.reverseOrder()))
-                .limit(5)
-                .map(this::toContractItem)
-                .collect(Collectors.toList()));
+        vo.setRecentChanges(recentChangedContracts(tenantId, List.of(projectId), selectedMonth,
+                Map.of(projectId, project.getProjectName())));
 
         // Settlement items
         vo.setSettlementItems(settlements.stream().map(s -> {
             DashboardProjectSummaryVO item = new DashboardProjectSummaryVO();
             item.setProjectId(String.valueOf(s.getProjectId()));
             item.setProjectName(project.getProjectName());
+            item.setProjectCode(project.getProjectCode());
             item.setStatus(s.getSettlementStatus());
             return item;
         }).collect(Collectors.toList()));
@@ -367,10 +384,11 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
         vo.setPendingTasks(taskItems);
         vo.setPendingTaskCount((long) taskItems.size());
 
-        // Lagging projects: all active projects with planned end date in the past
-        // NOT filtered by month — current-state indicator
+        LocalDate periodCutoff = selectedMonth == null
+                ? LocalDate.now()
+                : selectedMonth.atEndOfMonth().plusDays(1);
         List<DashboardProjectSummaryVO> lagging = activeProjects.stream()
-                .filter(p -> p.getPlannedEndDate() != null && p.getPlannedEndDate().isBefore(LocalDate.now()))
+                .filter(p -> p.getPlannedEndDate() != null && p.getPlannedEndDate().isBefore(periodCutoff))
                 .map(this::toProjectSummary)
                 .collect(Collectors.toList());
         vo.setLaggingProjects(lagging);
@@ -402,22 +420,16 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
         vo.setPendingApprovalCount((long) projectManagerPendingApprovals.size());
 
         // Expiring contracts: tenant-wide within 30 days
-        LocalDate cutoff = LocalDate.now().plusDays(30);
+        LocalDate windowStart = selectedMonth == null ? LocalDate.now() : selectedMonth.atDay(1);
+        LocalDate cutoff = selectedMonth == null ? windowStart.plusDays(30) : selectedMonth.atEndOfMonth();
         List<CtContract> expiringContracts = visibleProjectIds.isEmpty()
                 ? Collections.emptyList()
                 : ctContractMapper.selectList(new LambdaQueryWrapper<CtContract>()
                 .eq(CtContract::getTenantId, tenantId)
                 .in(CtContract::getProjectId, visibleProjectIds)
                 .le(CtContract::getEndDate, cutoff)
-                .ge(CtContract::getEndDate, LocalDate.now())
+                .ge(CtContract::getEndDate, windowStart)
                 .eq(CtContract::getContractStatus, "PERFORMING"));
-        if (selectedMonth != null) {
-            expiringContracts = expiringContracts.stream()
-                    .filter(c -> c.getEndDate() != null
-                            && !c.getEndDate().isBefore(selectedMonth.atDay(1))
-                            && !c.getEndDate().isAfter(selectedMonth.atEndOfMonth()))
-                    .collect(Collectors.toList());
-        }
         vo.setExpiringContracts(expiringContracts.stream().map(this::toContractItem).collect(Collectors.toList()));
         vo.setExpiringContractCount((long) expiringContracts.size());
 
@@ -435,11 +447,11 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                 && visibleProjectIds.contains(instance.getProjectId());
     }
 
-    private BusinessManagerDashboardVO getBusinessManagerViewAllProjects(Long tenantId) {
-        List<PmProject> activeProjects = projectMapper.selectList(
+    private BusinessManagerDashboardVO getBusinessManagerViewAllProjects(Long tenantId, YearMonth selectedMonth) {
+        List<PmProject> activeProjects = projectAccessChecker.filterAccessible(projectMapper.selectList(
                 new LambdaQueryWrapper<PmProject>()
                         .eq(PmProject::getTenantId, tenantId)
-                        .eq(PmProject::getStatus, "ACTIVE"));
+                        .eq(PmProject::getStatus, "ACTIVE")));
         List<Long> projectIds = activeProjects.stream().map(PmProject::getId).collect(Collectors.toList());
 
         BusinessManagerDashboardVO vo = new BusinessManagerDashboardVO();
@@ -463,6 +475,9 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                 new LambdaQueryWrapper<CtContract>()
                         .eq(CtContract::getTenantId, tenantId)
                         .in(CtContract::getProjectId, projectIds));
+        allContracts = allContracts.stream()
+                .filter(contract -> existedBy(contract.getSignedDate(), contract.getCreatedAt(), selectedMonth))
+                .collect(Collectors.toList());
         BigDecimal totalContractAmount = BigDecimal.ZERO;
         BigDecimal totalCurrentAmount = BigDecimal.ZERO;
         BigDecimal totalPaidAmount = BigDecimal.ZERO;
@@ -486,7 +501,14 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                 new LambdaQueryWrapper<StlSettlement>()
                         .eq(StlSettlement::getTenantId, tenantId)
                         .in(StlSettlement::getProjectId, projectIds));
-        long finalizedCount = allSettlements.stream().filter(s -> "FINALIZED".equals(s.getSettlementStatus())).count();
+        allSettlements = allSettlements.stream()
+                .filter(settlement -> existedBy(null, settlement.getCreatedAt(), selectedMonth))
+                .collect(Collectors.toList());
+        long finalizedCount = allSettlements.stream()
+                .filter(s -> "FINALIZED".equals(s.getSettlementStatus()))
+                .filter(s -> selectedMonth == null || (s.getFinalizedAt() != null
+                        && !s.getFinalizedAt().toLocalDate().isAfter(selectedMonth.atEndOfMonth())))
+                .count();
         vo.setSettlementProgress(allSettlements.isEmpty() ? "0/0" : finalizedCount + "/" + allSettlements.size());
 
         // Var order amount — tenant-wide
@@ -496,6 +518,8 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                         .in(VarOrder::getProjectId, projectIds)
                         .eq(VarOrder::getApprovalStatus, "APPROVED"))
                 .stream()
+                .filter(v -> selectedMonth == null || (v.getEventDate() != null
+                        && !v.getEventDate().isAfter(selectedMonth.atEndOfMonth())))
                 .map(v -> v.getApprovedAmount() != null ? v.getApprovedAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         vo.setVarOrderAmount(varOrderTotal.toPlainString());
@@ -507,26 +531,79 @@ public class DashboardProjectBusinessService extends DashboardSharedSupport {
                         .in(SubMeasure::getProjectId, projectIds)
                         .eq(SubMeasure::getApprovalStatus, "APPROVED"))
                 .stream()
+                .filter(s -> selectedMonth == null || (s.getMeasureDate() != null
+                        && !s.getMeasureDate().isAfter(selectedMonth.atEndOfMonth())))
                 .map(s -> s.getApprovedAmount() != null ? s.getApprovedAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         vo.setSubMeasureAmount(subMeasureTotal.toPlainString());
 
-        // Recent changes: top 5 contracts by currentAmount
-        vo.setRecentChanges(allContracts.stream()
-                .sorted(Comparator.comparing(c -> c.getCurrentAmount() != null ? c.getCurrentAmount() : BigDecimal.ZERO,
-                        Comparator.reverseOrder()))
-                .limit(5)
-                .map(this::toContractItem)
-                .collect(Collectors.toList()));
+        Map<Long, String> projectNames = projectNameMap(activeProjects);
+        Map<Long, String> projectCodes = activeProjects.stream()
+                .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectCode));
+        vo.setRecentChanges(recentChangedContracts(tenantId, projectIds, selectedMonth, projectNames));
 
         // Settlement items
         vo.setSettlementItems(allSettlements.stream().map(s -> {
             DashboardProjectSummaryVO item = new DashboardProjectSummaryVO();
             item.setProjectId(String.valueOf(s.getProjectId()));
+            item.setProjectName(projectNames.get(s.getProjectId()));
+            item.setProjectCode(projectCodes.get(s.getProjectId()));
             item.setStatus(s.getSettlementStatus());
             return item;
         }).collect(Collectors.toList()));
 
         return vo;
+    }
+
+    private List<DashboardContractItemVO> recentChangedContracts(Long tenantId, List<Long> projectIds,
+                                                                   YearMonth selectedMonth,
+                                                                   Map<Long, String> projectNames) {
+        LocalDateTime nextMonthStart = selectedMonth == null ? null : selectedMonth.plusMonths(1).atDay(1).atStartOfDay();
+        Map<Long, CtContractChange> latestByContract = ctContractChangeMapper.selectList(
+                        new LambdaQueryWrapper<CtContractChange>()
+                                .eq(CtContractChange::getTenantId, tenantId)
+                                .in(CtContractChange::getProjectId, projectIds)
+                                .eq(CtContractChange::getApprovalStatus, "APPROVED")
+                                .eq(CtContractChange::getEffectiveFlag, 1))
+                .stream()
+                .filter(change -> changeTime(change) != null
+                        && (nextMonthStart == null || changeTime(change).isBefore(nextMonthStart)))
+                .collect(Collectors.toMap(CtContractChange::getContractId, change -> change,
+                        (left, right) -> changeComparator().compare(left, right) >= 0 ? left : right));
+        if (latestByContract.isEmpty()) {
+            return Collections.emptyList();
+        }
+        Map<Long, CtContract> contracts = ctContractMapper.selectList(new LambdaQueryWrapper<CtContract>()
+                        .eq(CtContract::getTenantId, tenantId)
+                        .in(CtContract::getId, latestByContract.keySet()))
+                .stream().collect(Collectors.toMap(CtContract::getId, contract -> contract));
+        return latestByContract.values().stream()
+                .sorted(changeComparator().reversed())
+                .map(change -> contracts.get(change.getContractId()))
+                .filter(Objects::nonNull)
+                .limit(5)
+                .map(contract -> {
+                    DashboardContractItemVO item = toContractItem(contract);
+                    item.setProjectName(projectNames.get(contract.getProjectId()));
+                    return item;
+                })
+                .collect(Collectors.toList());
+    }
+
+    private Comparator<CtContractChange> changeComparator() {
+        return Comparator.comparing(this::changeTime, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(CtContractChange::getId, Comparator.nullsLast(Comparator.naturalOrder()));
+    }
+
+    private LocalDateTime changeTime(CtContractChange change) {
+        return change.getUpdatedTime() != null ? change.getUpdatedTime() : change.getCreatedTime();
+    }
+
+    private boolean existedBy(LocalDate businessDate, LocalDateTime createdAt, YearMonth selectedMonth) {
+        if (selectedMonth == null) return true;
+        LocalDate date = businessDate != null
+                ? businessDate
+                : createdAt == null ? null : createdAt.toLocalDate();
+        return date != null && !date.isAfter(selectedMonth.atEndOfMonth());
     }
 }

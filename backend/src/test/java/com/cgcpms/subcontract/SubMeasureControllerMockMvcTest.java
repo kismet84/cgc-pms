@@ -106,6 +106,7 @@ class SubMeasureControllerMockMvcTest {
             SubMeasure measure = new SubMeasure();
             measure.setProjectId(PROJECT_ID);
             measure.setContractId(CONTRACT_ID);
+            measure.setPartnerId(20001L);
             measureId = subMeasureService.create(measure);
         } finally {
             clearUserContext();

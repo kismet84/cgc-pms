@@ -12,6 +12,10 @@ import { dismissToast, toastItems } from '@/components/toast'
 import {
   createVariation,
   deleteVariation,
+  loadContractPage,
+  loadCostSubjectOptions,
+  loadPartners,
+  loadProjectContextOptions,
   loadVariation,
   loadVariationPage,
   loadVariationTrace,
@@ -27,6 +31,10 @@ import { useSessionStore } from '@/stores/session'
 vi.mock('@/services/commercial', () => ({
   createVariation: vi.fn(),
   deleteVariation: vi.fn(),
+  loadContractPage: vi.fn(),
+  loadCostSubjectOptions: vi.fn(),
+  loadPartners: vi.fn(),
+  loadProjectContextOptions: vi.fn(),
   loadVariation: vi.fn(),
   loadVariationPage: vi.fn(),
   loadVariationTrace: vi.fn(),
@@ -124,6 +132,59 @@ async function chooseFile(wrapper: Awaited<ReturnType<typeof mountPage>>['wrappe
 beforeEach(() => {
   toastItems.slice().forEach((toast) => dismissToast(toast.id))
   vi.mocked(loadVariationPage).mockReset().mockResolvedValue(page)
+  vi.mocked(loadProjectContextOptions)
+    .mockReset()
+    .mockResolvedValue([
+      { id: 'P1', projectCode: 'PRJ-001', projectName: '项目一', status: 'ACTIVE' },
+    ])
+  vi.mocked(loadContractPage)
+    .mockReset()
+    .mockResolvedValue({
+      records: [
+        {
+          id: 'C1',
+          tenantId: '1',
+          orgId: '1',
+          projectId: 'P1',
+          contractCode: 'CT-001',
+          contractName: '合同一',
+          contractType: 'MAIN',
+          partyAId: 'A',
+          partyAName: '甲方',
+          partyBId: 'B',
+          partyBName: '乙方',
+          contractAmount: '1.00',
+          currentAmount: '1.00',
+          taxRate: '0',
+          taxAmount: '0',
+          amountWithoutTax: '1.00',
+          signedDate: '2026-01-01',
+          startDate: '2026-01-01',
+          endDate: '2026-12-31',
+          paymentMethod: '',
+          settlementMethod: '',
+          paidAmount: '0',
+          settlementAmount: '0',
+          contractStatus: 'PERFORMING',
+          approvalStatus: 'APPROVED',
+          projectName: '项目一',
+          version: '1',
+        },
+      ],
+      total: 1,
+      pageNo: 1,
+      pageSize: 200,
+    })
+  vi.mocked(loadPartners)
+    .mockReset()
+    .mockResolvedValue({
+      records: [{ id: 'A1', partnerCode: 'PTN-001', partnerName: '往来单位一', status: 'ENABLE' }],
+    })
+  vi.mocked(loadCostSubjectOptions)
+    .mockReset()
+    .mockResolvedValue([
+      { id: 'CS1', subjectCode: '5401', subjectName: '合同履约成本', status: 'ENABLE' },
+    ])
   vi.mocked(loadVariation).mockReset().mockResolvedValue(baseRecord)
   vi.mocked(loadVariationTrace).mockReset().mockResolvedValue({ variation: baseRecord })
   vi.mocked(createVariation).mockReset().mockResolvedValue('10')
@@ -364,7 +425,7 @@ describe('M4 variation page', () => {
 
     expect(submitVariation).toHaveBeenCalledWith('9', '3')
     expect(loadVariation).toHaveBeenCalledTimes(2)
-    expect(wrapper.text()).toContain('版本冲突')
+    expect(toastItems.some((toast) => toast.message.includes('版本冲突'))).toBe(true)
     expect(wrapper.text()).toContain('草稿')
     expect(wrapper.text()).not.toContain('DRAFT')
     expect(wrapper.text()).not.toContain('签证变更已提交审批')

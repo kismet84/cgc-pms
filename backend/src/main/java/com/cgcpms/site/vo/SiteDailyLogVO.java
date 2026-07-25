@@ -9,6 +9,7 @@ public class SiteDailyLogVO {
     private String id;
     private String projectId;
     private String projectName;
+    private String dailyLogCode;
     private String reportDate;
     private String constructionContent;
     private String issuesDelays;

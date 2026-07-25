@@ -279,20 +279,36 @@ public class FileService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long fileId) {
-        SysFile sysFile = sysFileMapper.selectById(fileId);
-        if (sysFile == null) {
+        SysFile sysFile = requireOwnedMutableFile(fileId);
+        // 业务对象删除权限校验
+        authorizer.checkDeleteAccess(sysFile.getBusinessType(), sysFile.getBusinessId(), sysFile.getDocumentType());
+        authorizer.checkVariationDocumentStage(sysFile.getBusinessType(), sysFile.getBusinessId(), sysFile.getDocumentType());
+        deleteStoredFile(sysFile);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteForBusinessCascade(Long fileId, String businessType, Long businessId) {
+        validateBusinessBindingParams(businessType, businessId);
+        SysFile sysFile = requireOwnedMutableFile(fileId);
+        if (!businessType.equals(sysFile.getBusinessType()) || !businessId.equals(sysFile.getBusinessId())) {
             throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
         }
-        if (!sysFile.getTenantId().equals(UserContext.getCurrentTenantId())) {
+        deleteStoredFile(sysFile);
+    }
+
+    private SysFile requireOwnedMutableFile(Long fileId) {
+        SysFile sysFile = sysFileMapper.selectById(fileId);
+        if (sysFile == null || !sysFile.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
         }
         if ("GENERATED_DOCUMENT".equals(sysFile.getDocumentType())) {
             throw new BusinessException("FILE_IMMUTABLE", "已归档生成文档不可删除");
         }
-        // 业务对象删除权限校验
-        authorizer.checkDeleteAccess(sysFile.getBusinessType(), sysFile.getBusinessId(), sysFile.getDocumentType());
-        authorizer.checkVariationDocumentStage(sysFile.getBusinessType(), sysFile.getBusinessId(), sysFile.getDocumentType());
+        return sysFile;
+    }
 
+    private void deleteStoredFile(SysFile sysFile) {
+        Long fileId = sysFile.getId();
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive()) {
             log.error("File delete requires active transaction synchronization: fileId={}, storagePath={}",

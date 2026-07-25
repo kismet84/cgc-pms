@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.inventory.entity.MatWarehouse;
+import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.partner.entity.MdPartner;
@@ -41,6 +43,7 @@ public class MatRequisitionAssembler {
     private final CtContractMapper ctContractMapper;
     private final MdPartnerMapper mdPartnerMapper;
     private final MdMaterialMapper mdMaterialMapper;
+    private final MatWarehouseMapper matWarehouseMapper;
 
     // ────────────────────────── Requisition VO ──────────────────────────
 
@@ -49,7 +52,7 @@ public class MatRequisitionAssembler {
         if (r == null) return null;
         List<MatRequisition> list = List.of(r);
         var pre = prefetchRelationals(list);
-        return toVO(r, pre.projectNames, pre.contractNames, pre.partnerNames);
+        return toVO(r, pre.projectNames, pre.contractNames, pre.partnerNames, pre.warehouses);
     }
 
     /** Batch assemble with single round-trip prefetch for all relational names. */
@@ -57,7 +60,7 @@ public class MatRequisitionAssembler {
         if (requisitions == null || requisitions.isEmpty()) return List.of();
         var pre = prefetchRelationals(requisitions);
         return requisitions.stream()
-                .map(r -> toVO(r, pre.projectNames, pre.contractNames, pre.partnerNames))
+                .map(r -> toVO(r, pre.projectNames, pre.contractNames, pre.partnerNames, pre.warehouses))
                 .toList();
     }
 
@@ -85,22 +88,26 @@ public class MatRequisitionAssembler {
     private record PrefetchResult(
             Map<Long, String> projectNames,
             Map<Long, String> contractNames,
-            Map<Long, String> partnerNames) {}
+            Map<Long, String> partnerNames,
+            Map<Long, MatWarehouse> warehouses) {}
 
     private PrefetchResult prefetchRelationals(List<MatRequisition> records) {
         Set<Long> projectIds = ids(records, MatRequisition::getProjectId);
         Set<Long> contractIds = ids(records, MatRequisition::getContractId);
         Set<Long> partnerIds = ids(records, MatRequisition::getPartnerId);
+        Set<Long> warehouseIds = ids(records, MatRequisition::getWarehouseId);
         return new PrefetchResult(
                 resolveNames(projectIds, pmProjectMapper, PmProject::getId, PmProject::getProjectName),
                 resolveNames(contractIds, ctContractMapper, CtContract::getId, CtContract::getContractName),
-                resolveNames(partnerIds, mdPartnerMapper, MdPartner::getId, MdPartner::getPartnerName));
+                resolveNames(partnerIds, mdPartnerMapper, MdPartner::getId, MdPartner::getPartnerName),
+                resolveEntities(warehouseIds, matWarehouseMapper));
     }
 
     // ──────── internal VO builders ────────
 
     private MatRequisitionVO toVO(MatRequisition r, Map<Long, String> projectNames,
-                                   Map<Long, String> contractNames, Map<Long, String> partnerNames) {
+                                   Map<Long, String> contractNames, Map<Long, String> partnerNames,
+                                   Map<Long, MatWarehouse> warehouses) {
         MatRequisitionVO vo = new MatRequisitionVO();
         vo.setId(r.getId() != null ? r.getId().toString() : null);
         vo.setTenantId(r.getTenantId() != null ? r.getTenantId().toString() : null);
@@ -124,6 +131,13 @@ public class MatRequisitionAssembler {
         if (r.getProjectId() != null) vo.setProjectName(projectNames.get(r.getProjectId()));
         if (r.getContractId() != null) vo.setContractName(contractNames.get(r.getContractId()));
         if (r.getPartnerId() != null) vo.setPartnerName(partnerNames.get(r.getPartnerId()));
+        if (r.getWarehouseId() != null) {
+            MatWarehouse warehouse = warehouses.get(r.getWarehouseId());
+            if (warehouse != null) {
+                vo.setWarehouseCode(warehouse.getWarehouseCode());
+                vo.setWarehouseName(warehouse.getWarehouseName());
+            }
+        }
         return vo;
     }
 

@@ -11,6 +11,7 @@ public class MatPurchaseOrderVO {
     private String projectId;
     private String projectName;
     private String requestId;
+    private String requestCode;
     private String contractId;
     private String contractName;
     private String partnerId;
