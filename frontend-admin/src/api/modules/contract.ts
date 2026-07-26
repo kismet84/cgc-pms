@@ -7,6 +7,7 @@ import type {
   ContractItem,
   ContractPaymentTerm,
   ContractApprovalRecord,
+  ContractBudgetAllocation,
 } from '@/types/contract'
 
 /** 合同台账分页查询 */
@@ -147,5 +148,27 @@ export function getContractApprovalRecords(contractId: string) {
   return request<ContractApprovalRecord[]>({
     url: `/contracts/${contractId}/approval-records`,
     method: 'get',
+  })
+}
+
+export function getContractBudgetAllocations(contractId: string) {
+  return request<ContractBudgetAllocation[]>({
+    url: `/contracts/${contractId}/budget-allocations`,
+    method: 'get',
+  })
+}
+
+export function saveContractBudgetAllocations(
+  contractId: string,
+  rows: ContractBudgetAllocation[],
+) {
+  return request<void>({
+    url: `/contracts/${contractId}/budget-allocations`,
+    method: 'put',
+    data: rows.map(({ budgetLineId, allocatedAmount }) => ({
+      contractId,
+      budgetLineId,
+      allocatedAmount,
+    })),
   })
 }

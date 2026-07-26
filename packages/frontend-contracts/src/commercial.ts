@@ -109,6 +109,18 @@ export interface ContractApprovalRecord {
   createdAt: string;
 }
 
+export interface ContractBudgetAllocationRecord {
+  id?: string | null;
+  tenantId?: string | null;
+  projectId?: string | null;
+  contractId: string;
+  budgetLineId: string;
+  allocatedAmount: DecimalString;
+  reservedAmount?: DecimalString | null;
+  consumedAmount?: DecimalString | null;
+  version?: string | number | null;
+}
+
 export interface ContractCompositeRecord {
   contract: ContractRecord;
   items: ContractItemRecord[];
@@ -713,6 +725,8 @@ export const COMMERCIAL_API = {
     `/contracts/${encodeURIComponent(id)}/payment-terms`,
   contractApprovalRecords: (id: string) =>
     `/contracts/${encodeURIComponent(id)}/approval-records`,
+  contractBudgetAllocations: (id: string) =>
+    `/contracts/${encodeURIComponent(id)}/budget-allocations`,
   contractSubmit: (id: string) => `/contracts/${encodeURIComponent(id)}/submit`,
   contractCompositeCreate: "/contracts/composite",
   contractCompositeUpdate: (id: string) =>

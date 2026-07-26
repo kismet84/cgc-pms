@@ -3,6 +3,13 @@ package com.cgcpms.contract;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.budget.entity.ContractBudgetAllocation;
+import com.cgcpms.budget.entity.ProjectBudget;
+import com.cgcpms.budget.entity.ProjectBudgetLine;
+import com.cgcpms.budget.mapper.ContractBudgetAllocationMapper;
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
+import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
+import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.dto.ContractSaveRequest;
@@ -40,6 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -65,6 +73,8 @@ class CtContractServiceTest {
     private static final long PROJECT_ID = 10001L;
     private static final long PARTY_A_ID = 20001L;
     private static final long PARTY_B_ID = 20002L;
+    private static final long BUDGET_ID = 99100001L;
+    private static final long BUDGET_LINE_ID = 99100002L;
 
     /** V90 seed contract 30001 — PERFORMING, APPROVED (只读操作可用) */
     private static final long SEED_CONTRACT_30001 = 30001L;
@@ -94,6 +104,18 @@ class CtContractServiceTest {
     private PmProjectMapper projectMapper;
 
     @Autowired
+    private ProjectBudgetMapper projectBudgetMapper;
+
+    @Autowired
+    private ContractBudgetAllocationMapper contractBudgetAllocationMapper;
+
+    @Autowired
+    private ContractBudgetAllocationService contractBudgetAllocationService;
+
+    @Autowired
+    private ProjectBudgetLineMapper projectBudgetLineMapper;
+
+    @Autowired
     private MdPartnerMapper partnerMapper;
 
     @Autowired
@@ -121,6 +143,88 @@ class CtContractServiceTest {
         UserContext.clear();
     }
 
+    @Test
+    @Transactional
+    @DisplayName("项目非进行中或无生效预算时禁止创建合同")
+    void createRequiresActiveProjectAndBudget() {
+        PmProject project = projectMapper.selectById(PROJECT_ID);
+        project.setStatus("SUSPENDED");
+        projectMapper.updateById(project);
+        BusinessException inactiveProject = assertThrows(BusinessException.class,
+                () -> contractService.create(buildDraftContract("暂停项目合同")));
+        assertEquals("PROJECT_NOT_ACTIVE", inactiveProject.getCode());
+
+        project.setStatus("ACTIVE");
+        projectMapper.updateById(project);
+        ProjectBudget budget = projectBudgetMapper.selectById(BUDGET_ID);
+        budget.setStatus("CLOSED");
+        budget.setActiveFlag(0);
+        projectBudgetMapper.updateById(budget);
+        BusinessException inactiveBudget = assertThrows(BusinessException.class,
+                () -> contractService.create(buildDraftContract("无预算合同")));
+        assertEquals("BUDGET_NOT_ACTIVE", inactiveBudget.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("SUPER_ADMIN 不能删除非草稿或有下游引用的合同")
+    void superAdminCannotBypassContractDeleteGuards() {
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_ADMIN).add("username", "admin")
+                .add("tenantId", TENANT_ID).add("roleCodes", List.of("SUPER_ADMIN")).build());
+        BusinessException approved = assertThrows(BusinessException.class,
+                () -> contractService.delete(SEED_CONTRACT_30001));
+        assertEquals("CONTRACT_IN_APPROVAL", approved.getCode());
+
+        Long draftId = insertDraftContract("有预算分配引用合同");
+        ContractBudgetAllocation allocation = new ContractBudgetAllocation();
+        allocation.setTenantId(TENANT_ID);
+        allocation.setProjectId(PROJECT_ID);
+        allocation.setContractId(draftId);
+        allocation.setBudgetLineId(BUDGET_LINE_ID);
+        allocation.setAllocatedAmount(new BigDecimal("100.00"));
+        allocation.setReservedAmount(BigDecimal.ZERO);
+        allocation.setConsumedAmount(BigDecimal.ZERO);
+        allocation.setVersion(0);
+        contractBudgetAllocationMapper.insert(allocation);
+        BusinessException referenced = assertThrows(BusinessException.class,
+                () -> contractService.delete(draftId));
+        assertEquals("CONTRACT_HAS_DEPENDENCIES", referenced.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("合同预算分配按预算科目总额失败关闭且审批后不可覆盖")
+    void contractBudgetAllocationIsFailClosed() {
+        Long firstContractId = insertDraftContract("合同预算分配一");
+        ContractBudgetAllocation first = new ContractBudgetAllocation();
+        first.setContractId(firstContractId);
+        first.setBudgetLineId(BUDGET_LINE_ID);
+        first.setAllocatedAmount(new BigDecimal("400000.00"));
+        contractBudgetAllocationService.save(firstContractId, List.of(first));
+        assertEquals(1, contractBudgetAllocationService.list(firstContractId).size());
+
+        Long secondContractId = insertDraftContract("合同预算分配二");
+        CtContract secondContract = contractMapper.selectById(secondContractId);
+        secondContract.setContractAmount(new BigDecimal("5000000.00"));
+        secondContract.setCurrentAmount(new BigDecimal("5000000.00"));
+        contractMapper.updateById(secondContract);
+        ContractBudgetAllocation over = new ContractBudgetAllocation();
+        over.setContractId(secondContractId);
+        over.setBudgetLineId(BUDGET_LINE_ID);
+        over.setAllocatedAmount(new BigDecimal("4700000.00"));
+        BusinessException overallocated = assertThrows(BusinessException.class,
+                () -> contractBudgetAllocationService.save(secondContractId, List.of(over)));
+        assertEquals("CONTRACT_BUDGET_OVERALLOCATED", overallocated.getCode());
+        assertEquals(0L, contractBudgetAllocationMapper.selectCount(
+                new LambdaQueryWrapper<ContractBudgetAllocation>()
+                        .eq(ContractBudgetAllocation::getContractId, secondContractId)));
+
+        BusinessException approved = assertThrows(BusinessException.class,
+                () -> contractBudgetAllocationService.save(SEED_CONTRACT_30001, List.of(first)));
+        assertEquals("CONTRACT_BUDGET_NOT_EDITABLE", approved.getCode());
+    }
+
     /** Ensure project 10001 + partners 20001/20002 + admin user exist for foreign-key references. */
     private void seedReferenceData() {
         if (projectMapper.selectById(PROJECT_ID) == null) {
@@ -131,9 +235,43 @@ class CtContractServiceTest {
             project.setProjectType("CONSTRUCTION");
             project.setContractAmount(new BigDecimal("5000000.00"));
             project.setTargetCost(new BigDecimal("4200000.00"));
-            project.setStatus("RUNNING");
+            project.setStatus("ACTIVE");
             project.setApprovalStatus("APPROVED");
             projectMapper.insert(project);
+        }
+
+        if (projectBudgetMapper.selectCount(new LambdaQueryWrapper<ProjectBudget>()
+                .eq(ProjectBudget::getProjectId, PROJECT_ID)
+                .eq(ProjectBudget::getStatus, "ACTIVE")
+                .eq(ProjectBudget::getActiveFlag, 1)) == 0) {
+            ProjectBudget budget = new ProjectBudget();
+            budget.setId(BUDGET_ID);
+            budget.setTenantId(TENANT_ID);
+            budget.setProjectId(PROJECT_ID);
+            budget.setBudgetCode("BUD-CONTRACT-SERVICE-TEST");
+            budget.setVersionNo("V1");
+            budget.setBudgetName("合同服务测试预算");
+            budget.setTotalAmount(new BigDecimal("5000000.00"));
+            budget.setApprovalStatus("APPROVED");
+            budget.setStatus("ACTIVE");
+            budget.setActiveFlag(1);
+            budget.setActiveToken(PROJECT_ID);
+            budget.setEffectiveAt(LocalDateTime.now());
+            budget.setVersion(0);
+            projectBudgetMapper.insert(budget);
+        }
+        if (projectBudgetLineMapper.selectById(BUDGET_LINE_ID) == null) {
+            ProjectBudgetLine line = new ProjectBudgetLine();
+            line.setId(BUDGET_LINE_ID);
+            line.setTenantId(TENANT_ID);
+            line.setBudgetId(BUDGET_ID);
+            line.setProjectId(PROJECT_ID);
+            line.setCostSubjectId(900010L);
+            line.setBudgetAmount(new BigDecimal("5000000.00"));
+            line.setReservedAmount(BigDecimal.ZERO);
+            line.setConsumedAmount(BigDecimal.ZERO);
+            line.setVersion(0);
+            projectBudgetLineMapper.insert(line);
         }
 
         if (partnerMapper.selectById(PARTY_A_ID) == null) {
@@ -216,6 +354,20 @@ class CtContractServiceTest {
     }
 
     private void submitCurrentVersion(Long contractId) {
+        if (contractBudgetAllocationMapper.selectCount(new LambdaQueryWrapper<ContractBudgetAllocation>()
+                .eq(ContractBudgetAllocation::getContractId, contractId)
+                .eq(ContractBudgetAllocation::getTenantId, TENANT_ID)) == 0) {
+            ContractBudgetAllocation allocation = new ContractBudgetAllocation();
+            allocation.setTenantId(TENANT_ID);
+            allocation.setProjectId(PROJECT_ID);
+            allocation.setContractId(contractId);
+            allocation.setBudgetLineId(BUDGET_LINE_ID);
+            allocation.setAllocatedAmount(contractMapper.selectById(contractId).getCurrentAmount());
+            allocation.setReservedAmount(BigDecimal.ZERO);
+            allocation.setConsumedAmount(BigDecimal.ZERO);
+            allocation.setVersion(0);
+            contractBudgetAllocationMapper.insert(allocation);
+        }
         contractService.submitForApproval(contractId, currentVersion(contractId));
     }
 

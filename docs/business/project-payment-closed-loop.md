@@ -1,12 +1,80 @@
 # CGC-PMS 项目资金支出闭环业务标准
 
-状态：Implemented Baseline
-基线日期：2026-07-16
+状态：Locally Implemented / CI Pending / Production Blocked
+基线日期：2026-07-26
 适用范围：项目资金支出主线
-事实基线：master 当前源码、数据库迁移、前后端测试
-结论：第 9 章 P0—P3 开发工作包已完成并通过本地全量自动化与运行态验收；生产启用仍受历史数据处置和外部平台联调两项已登记前置约束
+事实基线：`master@6b134b423a3f3f770b8a4e45cb1456ce3484ea91` 上的当前未提交工作区、B215基线及V216—V231增量迁移；结论不冒充HEAD已包含本轮修改
+结论：`PPCL-01`—`PPCL-10` 已完成本地实现与验收，`PPCL-11` 的真实角色FLOW-001、负向、并发、迁移、权限和本地全量已通过；同HEAD SHA CI未取得，正式开发闭环尚不通过，生产继续禁止上线
 
 > 本文是 CGC-PMS “项目资金支出”主线的唯一业务标准。后续需求、数据迁移、接口、页面、审批、测试和上线验收若与本文冲突，必须先修订本文并完成评审，禁止在实现阶段自行改变金额口径、状态机或追溯关系。
+
+## 0. 2026-07-26冻结基线与2026-07-27本地实施状态
+
+### 0.1 当前治理状态
+
+| 项目 | 当前事实 |
+| --- | --- |
+| 唯一全局父项 | `PROJECT-PAYMENT-CLOSED-LOOP`，P0 |
+| 当前阶段 | S1—S4本地实施与验收完成 |
+| 后续阶段 | PPCL-11同HEAD SHA CI待首次非Draft PR前执行 |
+| 内部验收子键 | `PPCL-01`—`PPCL-11`；不得复制进 `current-issues.json` |
+| 当前活动问题源 | `current-issues.json` 保持14项；本支线不新增第二状态源 |
+| 授权 | 已授权本地业务实现、migration、本地数据库和运行态验证；不含Git交付、目标环境或生产 |
+
+第4、5节的数据关系、金额时点与状态机已按S0冻结口径实施。后续若需改变当前口径，必须先回到本标准和支线计划完成显式变更与复核。
+
+第1、3—8、10、12节作为目标业务契约继续有效。第2、9、11、13节中标注为2026-07-16“已完成/已通过”的文字只保留历史来源，不是当前完成证据；当前状态只以本节、第55条支线计划和阶段验收报告为准。
+
+### 0.2 结构化付款文档关系裁决
+
+S0选择新增 `payment_document_link`，不以现有 `sys_file.business_type/business_id` 单独承担财务证据关系。现有 `sys_file` 虽有 `document_type` 和病毒扫描状态，但只有普通业务索引，无付款链FK、唯一关系或同链约束，不能证明同一证据与付款事实的不可变关系。
+
+最小模型固定为单事实锚点：
+
+- `payment_document_link(id, tenant_id, cash_journal_id, file_id, document_type, created_by, created_at)`。
+- `cash_journal_id`、`file_id` 均非空并使用 `ON DELETE RESTRICT`；同租户 `file_id` 唯一，同一日记允许多份证据。
+- `document_type` 仅允许 `BANK_RECEIPT`、`PAYMENT_PROOF`；服务端校验文件同租户、病毒扫描 `CLEAN`、状态有效。
+- 付款通过 CashJournal 唯一 `pay_record_id` 追溯；发票继续通过 `pay_invoice`、`invoice_payment_allocation` 与发票文件关系追溯。
+- 关系创建后不可原地改链或物理删除；只能随受控冲销保留历史状态。禁止再增加三个可空FK或通用 `type+id` 多态关系。
+
+### 0.3 历史条目去重
+
+- 历史 `P0-1`—`P0-11` 仅作为2026-07-16自述工作包，当前一一映射到 `PPCL-01`—`PPCL-11`，不形成第二执行队列。
+- 历史 `PROD-GATE-001` 的目标数据、迁移和回滚要求并入既有 `REL-TARGET-SHA-REVALIDATION`；不重复建立发布门。
+- 历史 `PROD-GATE-002` 涉及真实银行、ERP、税务平台，属于本主线非目标；未选定真实平台前关闭其当前执行语义，不作为内部付款闭环完成条件。
+- 当前生产门只沿用 `REL-CREDENTIAL-ROTATION`、`REL-FILE-RESCAN`、`REL-TARGET-SHA-REVALIDATION`。任一未解除均禁止上线。
+
+### 0.4 十三节点当前事实矩阵
+
+| 节点 | 当前事实 | S0裁决 |
+| --- | --- | --- |
+| Project | 核心对象、权限和状态存在 | 复用；S1补合同创建/提交与付款链状态门 |
+| ProjectBudget | 预算头、行、不可变台账和并发余额存在 | 复用；合同日常分配入口及归档消费时点未闭合 |
+| Contract | CRUD、审批和PERFORMING状态存在 | 复用；项目/预算/合同分配前置及删除保护未闭合 |
+| Expense | ACTIVE预算占用、驳回/撤回释放、付款来源存在 | 复用；转付款时只冻结可转换额，禁止二次占用预算 |
+| Settlement | 审批、重提和FINALIZED来源存在 | 复用；进入付款申请后的预算与合同分配门仍受父链约束 |
+| PaymentApplication | `CLOSED_LOOP_V1`完整性校验和显式来源存在 | 部分；DIRECT权限、重提业务同步和来源分层占用未闭合 |
+| Approval | 原实例round+1、旧记录保留的通用引擎存在 | 部分；PAY_REQUEST重提未恢复APPROVING或重新冻结/占用 |
+| PayRecord | 单一writeback、外部流水幂等和项目/合同二次门存在 | 部分；SUCCESS过早消耗预算，预算二次门不足 |
+| CashJournal | 唯一PENDING_ARCHIVE、显式付款链、归档和红冲存在 | 部分；只验任意CLEAN附件，归档不消费预算 |
+| Invoice | 创建、付款分配、核验存在 | 部分；已分配PENDING发票仍可先删分配再删发票 |
+| Voucher | PayRecord SUCCESS可生成DRAFT | 部分；缺CashJournal显式关系和归档后过账门 |
+| Dashboard | 财务与管理读模型存在 | 部分；执行率、现金流、利润未使用冻结权威口径 |
+| Trace | CashJournal、PayRecord、PaymentApplication三入口存在 | 部分；入口不足且逐跳租户/项目关系校验不完整 |
+
+### 0.5 来源分层的预算事件
+
+| 事件 | EXPENSE来源 | SETTLEMENT/SUB_MEASURE/DIRECT来源 |
+| --- | --- | --- |
+| 来源业务提交 | 由Expense占用项目预算 | 不在此处占用付款预算 |
+| 付款申请提交 | 只冻结Expense可转换额度，不二次RESERVE | 由PAY_REQUEST执行RESERVE |
+| 付款申请驳回/撤回 | 释放Expense可转换额度，保留Expense原预算占用 | RELEASE本轮PAY_REQUEST占用 |
+| 原实例重提 | 重新冻结Expense可转换额度 | 以新round幂等键重新RESERVE |
+| PayRecord SUCCESS | 保持预算占用，不CONSUME | 保持预算占用，不CONSUME |
+| CashJournal ARCHIVED | 对应Expense占用转CONSUME | 对应PAY_REQUEST占用转CONSUME |
+| 归档前撤销/付款冲销 | 恢复来源可付与原占用，不重复占用 | 恢复来源可付与PAY_REQUEST占用 |
+
+任何实现不得把Expense原占用和PAY_REQUEST占用同时记在同一笔来源金额上。
 
 ## 1. 目标、边界与强制原则
 
@@ -63,7 +131,9 @@
 
 实施前裁决：C2。模块覆盖较高，但当时 P0 资金闭环未形成，不具备以本主线名义上线的条件。
 
-### 2.2 节点完成度矩阵
+### 2.2 2026-07-16历史节点完成度矩阵
+
+本表保留实施前来源，不代表2026-07-26当前完成度；当前事实以0.4节为准。
 
 | 节点 | 当前等级 | 已实现证据 | 缺失或不成立 | 裁决 |
 | --- | --- | --- | --- | --- |
@@ -160,7 +230,9 @@
 9. 无付款自动生成会计凭证测试。
 10. 前端 payment-invoice E2E 主要覆盖列表、筛选和创建付款申请，没有覆盖真实审批后付款、现金日记归档和驾驶舱更新。
 
-### 2.8 实施前 P0 缺陷（均已在第 13 章关闭）
+### 2.8 2026-07-16实施前P0缺陷与历史处置声明
+
+下表“当前处置”是2026-07-16历史自述；2026-07-26 S0复核未接受其作为当前关闭证据，实际差异以 `PPCL-01`—`PPCL-11` 为准。
 
 | 编号 | 缺陷 | 影响 | 当前处置 |
 | --- | --- | --- | --- |
@@ -194,11 +266,11 @@ flowchart TD
     F --> G{完整性校验}
     G -- 项目/合同/预算/附件/分类/付款对象不完整 --> G1[禁止提交并返回字段级错误]
     G1 --> F
-    G -- 通过 --> H[冻结申请快照并占用预算]
+    G -- 通过 --> H[冻结申请快照并按来源冻结额度或占用预算]
     H --> I[多级审批 Approval]
-    I -- 驳回 --> I1[释放预算占用并保留审批记录]
+    I -- 驳回 --> I1[按来源释放可转换额度或本轮预算占用并保留审批记录]
     I1 --> F
-    I -- 撤回 --> I2[释放预算占用并恢复草稿]
+    I -- 撤回 --> I2[按来源释放可转换额度或本轮预算占用并恢复草稿]
     I2 --> F
     I -- 通过 --> J[财务付款 Payment]
     J --> J1{付款写回幂等与余额校验}
@@ -242,13 +314,13 @@ sequenceDiagram
     Contract->>WF: 提交合同审批
     WF-->>Contract: 审批通过，合同进入履约
     PM->>App: 创建费用/结算/直接付款申请
-    App->>Budget: 校验可用预算并锁定预算行
-    Budget-->>App: 返回预算占用凭证
+    App->>Budget: EXPENSE校验既有占用；其他来源锁行并占用
+    Budget-->>App: 返回既有占用校验或PAY_REQUEST占用凭证
     App->>File: 校验必需附件与文档类型
     App->>WF: 提交申请审批并冻结业务快照
     alt 审批驳回或撤回
         WF-->>App: REJECTED/WITHDRAWN
-        App->>Budget: 释放预算占用
+        App->>Budget: 释放Expense可转换额度或PAY_REQUEST占用
         App-->>PM: 允许修订并重新提交
     else 审批通过
         WF-->>App: APPROVED
@@ -293,7 +365,6 @@ erDiagram
     PAYMENT ||--|| CASH_JOURNAL : generates
     PAYMENT ||--o{ INVOICE_PAYMENT_ALLOCATION : allocates
     INVOICE ||--o{ INVOICE_PAYMENT_ALLOCATION : covers
-    PAYMENT ||--o{ PAYMENT_DOCUMENT_LINK : evidenced_by
     CASH_JOURNAL ||--o{ PAYMENT_DOCUMENT_LINK : evidenced_by
     SYS_FILE ||--o{ PAYMENT_DOCUMENT_LINK : links
     PAYMENT ||--o| ACCOUNTING_VOUCHER : generates
@@ -320,7 +391,7 @@ erDiagram
 | CashJournal | cash_journal_entry | id | pay_record_id、pay_application_id、approval_instance_id、project_id、contract_id、account_id FK；pay_record_id 唯一 | 复用并扩显式关系 |
 | Invoice | pay_invoice | id | project_id、contract_id、pay_application_id FK；invoice_no 租户唯一 | 复用并改为发票头 |
 | InvoicePaymentAllocation | invoice_payment_allocation | id | invoice_id、pay_record_id FK；两列唯一 | 新增，支持一票多付/一付多票 |
-| PaymentEvidence | payment_document_link | id | file_id、pay_record_id/cash_journal_id/invoice_id FK | 新增结构化附件关系 |
+| PaymentEvidence | payment_document_link | id | cash_journal_id、file_id FK；tenant/file 唯一 | 新增日记证据关系；付款由日记唯一pay_record_id追溯，发票沿用现有分配关系 |
 | Voucher | accounting_entry/accounting_entry_line | id | project_id、contract_id、pay_record_id、cash_journal_id FK；source 唯一 | 复用并实现付款策略 |
 | Dashboard | 查询读模型/物化视图 | 无业务主键 | 只读取上述事实，不作为权威写入源 | 不新建第二套金额事实 |
 
@@ -352,8 +423,10 @@ erDiagram
 
 #### PaymentDocumentLink
 
-- document_type：E_INVOICE、INVOICE_SCAN、BANK_RECEIPT、PAYMENT_VOUCHER、CONTRACT_ATTACHMENT、OTHER。
-- 文件必须通过病毒扫描且状态有效后才能计入完整性。
+- cash_journal_id、file_id 均必填；同租户 file_id 只能属于一条付款日记证据链。
+- document_type：BANK_RECEIPT、PAYMENT_PROOF。
+- 文件必须同租户、病毒扫描为 CLEAN 且状态有效后才能计入完整性。
+- 链接只追加，不改链、不物理删除；付款通过 CashJournal.pay_record_id 追溯，发票文件不重复进入本表。
 
 ### 4.4 删除与保留策略
 
@@ -394,8 +467,8 @@ erDiagram
 ### 5.2 驳回与重新提交
 
 1. 驳回必须写 WfRecord，保存操作人、节点、意见、时间、轮次和幂等键。
-2. 驳回事务中将付款申请 approvalStatus 置为 REJECTED，并追加 RELEASE 预算台账。
-3. 申请人修改后重新提交，生成新审批轮次和新 RESERVE；不得覆盖旧审批记录。
+2. 驳回事务中将付款申请 approvalStatus 置为 REJECTED；EXPENSE来源只释放可转换额度，其他来源追加本轮 RELEASE。
+3. 申请人修改后重新提交，生成新审批轮次；EXPENSE来源重新冻结可转换额度，其他来源使用新round幂等键追加 RESERVE；不得覆盖旧审批记录。
 4. 同一轮次同一 idempotencyKey 重复操作只允许一次成功。
 5. 审批通过前再次执行预算、合同余额、项目状态和来源金额二次校验。
 
@@ -543,9 +616,9 @@ erDiagram
 | 项目 | 标准 |
 | --- | --- |
 | 输入数据 | 来源类型、项目、合同、预算行、费用分类、付款对象、申请金额、附件 |
-| 输出数据 | paymentApplicationId、校验报告、预算占用、审批实例 |
+| 输出数据 | paymentApplicationId、校验报告、来源冻结或预算占用、审批实例 |
 | 前置条件 | 来源已审批或 DIRECT 获专门权限；项目/合同可支付 |
-| 后置条件 | 通过校验后冻结快照、占用预算、进入审批 |
+| 后置条件 | 通过校验后冻结快照；EXPENSE只冻结可转换额度，其他来源占用预算；进入审批 |
 | 业务规则 | 申请金额=来源分配合计；不得超过预算、合同和来源剩余可付金额 |
 | 异常处理 | 返回稳定错误码与字段级错误，不产生审批和预算占用 |
 | 数据校验 | 项目、合同、附件、分类、对象、预算、来源九项校验 |
@@ -568,8 +641,8 @@ erDiagram
 | --- | --- |
 | 输入数据 | 业务快照、审批模板、金额、项目、合同、发起人 |
 | 输出数据 | 实例、节点、任务、记录、最终状态 |
-| 前置条件 | 业务完整性通过；预算已占用；模板和审批人可解析 |
-| 后置条件 | APPROVED 允许付款；REJECTED/WITHDRAWN 释放预算 |
+| 前置条件 | 业务完整性通过；EXPENSE既有预算占用有效或其他来源PAY_REQUEST占用成立；模板和审批人可解析 |
+| 后置条件 | APPROVED 允许付款；REJECTED/WITHDRAWN按来源释放可转换额度或PAY_REQUEST占用 |
 | 业务规则 | 多级顺序；幂等；每次重提新轮次；关键回调失败整体回滚 |
 | 异常处理 | 无审批人、并发处理、重复幂等键明确失败 |
 | 数据校验 | 实例项目/合同/业务对象必须与快照一致 |
@@ -869,7 +942,7 @@ erDiagram
 
 P0 完成前禁止宣称“项目资金支出闭环已完成”。
 
-实施状态（2026-07-16）：P0-1 至 P0-11 已完成；数据库迁移为 V156—V167，闭环主验收由 `PaymentApplicationClosedLoopIntegrationTest`、预算/费用/跨域事项集成测试及全量回归共同证明。生产历史数据仍必须遵循下述只读预览和人工确认流程。
+历史实施声明（2026-07-16，已被2026-07-26 S0复核降级）：当时记录为P0-1至P0-11已完成；该声明不得作为当前关闭、同SHA或生产证据。当前只按 `PPCL-01`—`PPCL-11` 重新验收。
 
 P0-1 历史金额处置必须遵循以下顺序：
 
@@ -881,7 +954,7 @@ P0-1 历史金额处置必须遵循以下顺序：
 
 ### 9.2 P1：建议完成
 
-实施状态（2026-07-16）：已完成。V168 及付款冲销服务覆盖失败、退款、冲销、预算反向恢复、预算运营、付款计划、预警、日终对账、审计导出和发票异常处理。
+历史实施声明（2026-07-16）：曾记录为已完成；当前只把相关源码作为候选复用证据，不外推 `PPCL-01`—`PPCL-11` 已关闭。
 
 - 付款失败、退款、冲销和预算恢复的完整业务入口。
 - 预算调整、预算调拨、合同额度释放和版本对比。
@@ -892,7 +965,7 @@ P0-1 历史金额处置必须遵循以下顺序：
 
 ### 9.3 P2：优化
 
-实施状态（2026-07-16）：已完成。V169 及资金运营服务覆盖驾驶舱快照、OCR 人工复核、批量导入差异、审批路由和冷热审计检索；事实重算能力保留。
+历史实施声明（2026-07-16）：曾记录为已完成；当前只把相关源码作为候选复用证据，Dashboard与Trace仍分别受 `PPCL-09/10` 约束。
 
 - 驾驶舱物化视图和增量刷新，保留事实重算能力。
 - 发票 OCR 置信度、票面字段比对和人工复核工作台。
@@ -902,7 +975,7 @@ P0-1 历史金额处置必须遵循以下顺序：
 
 ### 9.4 P3：未来版本
 
-实施状态（2026-07-16）：产品内核与集成契约已完成。V170 及资金运营服务覆盖集成端点、幂等消息/重试、回调、银行回单匹配、现金流预测、资金池和会计外部同步状态；真实银行、ERP、总账、税务/电子发票平台的生产凭据、沙箱认证和厂商验收属于第 13.4 节生产启用前置，不得以本地模拟代替。
+历史实施声明（2026-07-16）：曾记录为产品内核与集成契约已完成；真实外部平台不属于当前内部付款闭环范围，未选定平台前不形成S0—S4执行项。
 
 - 银企直联、银行回单自动匹配和付款状态回调。
 - 电子发票平台验真、查重和税务集成。
@@ -957,9 +1030,11 @@ P0-1 历史金额处置必须遵循以下顺序：
 5. 驳回、撤回、失败、重复、冲销和跨租户场景均不产生孤儿数据或重复金额。
 6. 历史数据迁移有正式差异报告、处置结果和回滚/补偿方案。
 
-当前裁决：开发验收通过；生产上线有条件不通过。原 P0 阻塞项已全部关闭，但 PROD-GATE-001（历史数据差异处置）和 PROD-GATE-002（真实外部平台联调认证）完成前禁止生产启用。两项均已在第 13.4 节唯一承接，不属于悬空问题。
+当前裁决：`Locally Implemented / CI Pending / Production Blocked`。`PPCL-01`—`PPCL-10`本地关闭，`PPCL-11`除同HEAD SHA CI外本地通过；首次非Draft PR前未取得同HEAD SHA CI，正式开发闭环不通过。3项既有`REL-*`生产发布门未解除前，生产不通过、禁止上线。
 
-## 13. 实施收口与验收证据
+## 13. 2026-07-16历史实施收口与当前证据边界
+
+本章保留历史自述，不能替代2026-07-26 S0后的当前代码、阶段测试、同HEAD SHA CI或目标环境证据。
 
 ### 13.1 路线图完成度
 
@@ -988,18 +1063,33 @@ P0-1 历史金额处置必须遵循以下顺序：
 - 已只读验收 `/dashboard`、`/payment/application`、`/payment/expense`、`/budget`、`/invoice`、`/cash-journal`、`/finance-operations`；关键操作入口可见，无页面级告警。
 - 资金运营页面实际调用付款计划、集成端点和预警接口并返回 200；本地运行态刷新产生的环境问题已关闭。
 
-### 13.4 生产启用前置（唯一承接）
+### 13.4 历史生产启用前置映射
 
 | 编号 | 优先级 | 前置与原因 | 解除条件 | 验收标准 |
 | --- | --- | --- | --- | --- |
 | PROD-GATE-001 | 生产 P0 | 本地无权接触生产数据；FK 加固、金额口径和预算台账上线前必须先证明历史数据无孤儿、错链或金额漂移 | 在生产等价脱敏副本执行只读扫描与金额差异预览，由财务/合同负责人逐笔签认，并形成可回滚迁移方案 | 孤儿数据为 0；待确认金额差异为 0；迁移前后合同、结算、付款、预算和现金日记金额对账一致；回滚演练通过 |
 | PROD-GATE-002 | 生产 P0 | 银行、ERP/总账、税务/电子发票平台的凭据、网络白名单、沙箱和厂商规则不在仓库内，不能用模拟端点宣称生产可用 | 各平台凭据与白名单到位，在沙箱完成双向幂等、签名验签、回调、超时重试和人工补偿演练 | 真实沙箱端到端成功；重复回调不重复入账；失败可重试/补偿；凭据不落库明文；厂商与企业财务共同签字验收 |
 
-两项仅阻塞生产启用，不阻塞本地开发验收。完成后必须把证据摘要回写本节并重新执行第 12 章上线裁决，禁止另建重复条目。
+`PROD-GATE-001` 只作为 `REL-TARGET-SHA-REVALIDATION` 的历史来源；`PROD-GATE-002` 因外部平台未选定且属于本主线非目标，当前不进入执行队列。禁止另建重复条目。
 
 ### 13.5 后续项收口
 
-- 本轮修复并复验：第 9 章 P0—P3 全部开发工作包及回归兼容问题。
-- 超出当前仓库范围并正式承接：PROD-GATE-001、PROD-GATE-002。
-- 证据不足或无明确价值而关闭：无。
-- 新增后续项：2；关闭后续项：0；后续项净变化：+2。两项均为生产启用外部前置，不是开发缺陷。
+- 历史“P0—P3全部完成”只保留来源，不计当前关闭。
+- `PROD-GATE-001` 去重映射 `REL-TARGET-SHA-REVALIDATION`；`PROD-GATE-002` 关闭当前执行语义。
+- 当前全局新增0、关闭0、净变化0；`PROJECT-PAYMENT-CLOSED-LOOP` 父项和11个内部子键保持唯一载体。
+
+## 14. 2026-07-27 当前本地实施证据
+
+| 领域 | 当前事实 |
+| --- | --- |
+| 审批与权限 | PAY_REQUEST原实例`round+1`重提并保留旧记录；角色节点间串行、同角色多人`OR_SIGN`；DIRECT、付款申请和附件均使用服务端权限 |
+| 合同与预算 | 合同预算分配复用项目预算行；合同提交、付款提交和writeback逐层校验项目、合同、预算、分配、来源与付款对象 |
+| 金额时点 | PayRecord SUCCESS只生成唯一待归档日记和DRAFT凭证；CashJournal ARCHIVED才把对应占用转为消耗并更新现金 |
+| 不可变事实 | 已分配或已核验发票不可删除；归档证据要求类型、CLEAN、同租户；归档前凭证不可过账 |
+| Dashboard与Trace | 汇总使用服务端预算、已归档现金、有效付款和动态成本事实；核心事实进入统一Trace，错链显式失败、跨租户零泄漏 |
+| 数据库 | 新增V224—V231 MySQL/H2镜像；本地MySQL八个版本均`success=1` |
+| 自动化 | 后端274类2292项通过；Legacy 133文件740项通过；V2 49文件361项通过；真实角色Chromium FLOW-001 1/1通过 |
+
+本地运行态：后端`http://localhost:8080/api/actuator/health`返回`UP`，Legacy入口`http://localhost:5173/`，V2入口`http://localhost:5174/`。这些证据只证明本地工作区，不替代同HEAD CI或目标环境。
+
+正式证据见[`第55条主线-支线-资金支出闭环收口验收报告`](../quality/第55条主线-支线-资金支出闭环收口验收报告.md)。

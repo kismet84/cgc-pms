@@ -38,6 +38,9 @@ public class PayApplication extends BaseEntity {
 
     private Long budgetLineId;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long contractBudgetAllocationId;
+
     private String expenseCategory;
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)

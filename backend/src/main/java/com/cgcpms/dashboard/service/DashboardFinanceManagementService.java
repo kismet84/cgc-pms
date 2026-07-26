@@ -35,7 +35,9 @@ import com.cgcpms.budget.entity.ProjectBudgetLine;
 import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
 import com.cgcpms.cashbook.entity.FundAccount;
+import com.cgcpms.cashbook.entity.CashJournalEntry;
 import com.cgcpms.cashbook.mapper.FundAccountMapper;
+import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -97,6 +99,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
     private final ProjectBudgetMapper projectBudgetMapper;
     private final ProjectBudgetLineMapper projectBudgetLineMapper;
     private final FundAccountMapper fundAccountMapper;
+    private final CashJournalEntryMapper cashJournalEntryMapper;
 
     public DashboardFinanceManagementService(
             CostSummaryService costSummaryService,
@@ -129,13 +132,15 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             PayApplicationMapper payApplicationMapper,
             ProjectBudgetMapper projectBudgetMapper,
             ProjectBudgetLineMapper projectBudgetLineMapper,
-            FundAccountMapper fundAccountMapper) {
+            FundAccountMapper fundAccountMapper,
+            CashJournalEntryMapper cashJournalEntryMapper) {
         super(costSummaryService, costSummaryMapper, costSubjectMapper, costItemMapper, projectMapper, ctContractMapper, wfTaskMapper, wfInstanceMapper, payRecordMapper, stlSettlementMapper, varOrderMapper, subMeasureMapper, alertLogMapper, purchaseRequestMapper, purchaseRequestItemMapper, purchaseOrderMapper, purchaseOrderItemMapper, receiptMapper, receiptItemMapper, requisitionMapper, warehouseMapper, stockMapper, techItemMapper, partnerMapper, materialMapper, userMapper);
         this.projectAccessChecker = projectAccessChecker;
         this.payApplicationMapper = payApplicationMapper;
         this.projectBudgetMapper = projectBudgetMapper;
         this.projectBudgetLineMapper = projectBudgetLineMapper;
         this.fundAccountMapper = fundAccountMapper;
+        this.cashJournalEntryMapper = cashJournalEntryMapper;
     }
 
     public FinanceDashboardVO getFinanceView(Long projectId) {
@@ -586,6 +591,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             vo.setTotalContractAmount("0.00");
             vo.setTotalPaidAmount("0.00");
             vo.setBudgetAmount("0.00");
+            vo.setBudgetReservedAmount("0.00");
             vo.setBudgetConsumedAmount("0.00");
             vo.setBudgetExecutionRate("0.00");
             vo.setCashOutflowAmount("0.00");
@@ -615,7 +621,10 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         vo.setApprovedUnpaidAmount(approvedUnpaid.toPlainString());
 
         List<CtContract> contracts = ctContractMapper.selectList(new LambdaQueryWrapper<CtContract>()
-                .eq(CtContract::getTenantId, tenantId).in(CtContract::getProjectId, projectIds));
+                .eq(CtContract::getTenantId, tenantId)
+                .in(CtContract::getProjectId, projectIds)
+                .eq(CtContract::getApprovalStatus, "APPROVED")
+                .eq(CtContract::getContractStatus, "PERFORMING"));
         contracts = contracts.stream()
                 .filter(contract -> existedBy(contract.getSignedDate(), contract.getCreatedAt(), selectedMonth))
                 .collect(Collectors.toList());
@@ -643,30 +652,67 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
         BigDecimal budgetAmount = activeBudgets.stream().map(ProjectBudget::getTotalAmount)
                 .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
         List<Long> budgetIds = activeBudgets.stream().map(ProjectBudget::getId).toList();
-        BigDecimal consumed = budgetIds.isEmpty() ? BigDecimal.ZERO : projectBudgetLineMapper.selectList(
+        List<ProjectBudgetLine> budgetLines = budgetIds.isEmpty() ? List.of() : projectBudgetLineMapper.selectList(
                 new LambdaQueryWrapper<ProjectBudgetLine>().eq(ProjectBudgetLine::getTenantId, tenantId)
-                        .in(ProjectBudgetLine::getBudgetId, budgetIds)).stream()
-                .map(ProjectBudgetLine::getConsumedAmount).filter(Objects::nonNull)
+                        .in(ProjectBudgetLine::getBudgetId, budgetIds));
+        BigDecimal reserved = budgetLines.stream().map(ProjectBudgetLine::getReservedAmount)
+                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal consumed = budgetLines.stream().map(ProjectBudgetLine::getConsumedAmount)
+                .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal executionRate = budgetAmount.compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ZERO
-                : consumed.multiply(new BigDecimal("100")).divide(budgetAmount, 2, RoundingMode.HALF_UP);
+                : reserved.add(consumed).multiply(new BigDecimal("100"))
+                        .divide(budgetAmount, 2, RoundingMode.HALF_UP);
 
         List<PmProject> projects = projectMapper.selectList(new LambdaQueryWrapper<PmProject>()
                 .eq(PmProject::getTenantId, tenantId).in(PmProject::getId, projectIds));
         Map<Long, String> projectNames = projects.stream().collect(Collectors.toMap(
                 PmProject::getId, PmProject::getProjectName, (a, b) -> a));
-        BigDecimal projectIncome = projects.stream().map(PmProject::getContractAmount)
-                .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<CashJournalEntry> archivedJournals = cashJournalEntryMapper.selectList(
+                new LambdaQueryWrapper<CashJournalEntry>().eq(CashJournalEntry::getTenantId, tenantId)
+                        .in(CashJournalEntry::getProjectId, projectIds)
+                        .eq(CashJournalEntry::getStatus, "ARCHIVED")).stream()
+                .filter(journal -> existedBy(journal.getBusinessDate(), journal.getCreatedAt(), selectedMonth))
+                .toList();
+        BigDecimal cashOutflow = archivedJournals.stream()
+                .filter(journal -> "OUT".equals(journal.getDirection()))
+                .map(CashJournalEntry::getAmount).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Map<Long, CostProjectSummaryVO> currentSummaries = selectedMonth == null
+                ? costSummaryService.getBatchProjectSummaries(tenantId, projectIds)
+                : Map.of();
+        Map<Long, CostSummary> periodSummaries = selectedMonth == null ? Map.of()
+                : costSummaryMapper.selectList(new LambdaQueryWrapper<CostSummary>()
+                        .eq(CostSummary::getTenantId, tenantId)
+                        .in(CostSummary::getProjectId, projectIds)
+                        .isNull(CostSummary::getCostSubjectId)
+                        .le(CostSummary::getSummaryDate, selectedMonth.atEndOfMonth())
+                        .orderByDesc(CostSummary::getSummaryDate)).stream()
+                .collect(Collectors.toMap(CostSummary::getProjectId, summary -> summary,
+                        (latest, ignored) -> latest, LinkedHashMap::new));
+        BigDecimal confirmedRevenue = selectedMonth == null
+                ? currentSummaries.values().stream()
+                        .map(summary -> new BigDecimal(summary.getConfirmedRevenue()))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)
+                : periodSummaries.values().stream().map(CostSummary::getConfirmedRevenue)
+                        .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal dynamicCost = selectedMonth == null
+                ? currentSummaries.values().stream()
+                        .map(summary -> new BigDecimal(summary.getDynamicCost()))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)
+                : periodSummaries.values().stream().map(CostSummary::getDynamicCost)
+                        .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
         vo.setTotalContractAmount(contractAmount.toPlainString());
         vo.setTotalPaidAmount(paid.toPlainString());
         vo.setBudgetAmount(budgetAmount.toPlainString());
+        vo.setBudgetReservedAmount(reserved.toPlainString());
         vo.setBudgetConsumedAmount(consumed.toPlainString());
         vo.setBudgetExecutionRate(executionRate.toPlainString());
-        vo.setCashOutflowAmount(paid.toPlainString());
+        vo.setCashOutflowAmount(cashOutflow.toPlainString());
         vo.setCashBalance(companyCashBalance(tenantId).toPlainString());
-        vo.setProjectProfit(projectIncome.subtract(consumed).toPlainString());
+        vo.setProjectProfit(confirmedRevenue.subtract(dynamicCost).toPlainString());
         vo.setMetricFormulaVersion("PAYMENT_CLOSED_LOOP_V1");
-        vo.setTrendPoints(buildFinanceTrendPoints(allPayRecords));
+        vo.setTrendPoints(buildFinanceTrendPoints(archivedJournals));
         vo.setContractFundBreakdowns(buildContractFundBreakdowns(
                 contracts, applications, allPayRecords, projectNames));
     }
@@ -740,27 +786,24 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
                 }).collect(Collectors.toList());
     }
 
-    private List<FinanceDashboardVO.TrendPoint> buildFinanceTrendPoints(List<PayRecord> records) {
-        List<PayRecord> datedRecords = records.stream().filter(record -> record.getPayDate() != null).toList();
+    private List<FinanceDashboardVO.TrendPoint> buildFinanceTrendPoints(List<CashJournalEntry> records) {
+        List<CashJournalEntry> datedRecords = records.stream()
+                .filter(record -> record.getBusinessDate() != null && "OUT".equals(record.getDirection()))
+                .toList();
         if (datedRecords.isEmpty()) return Collections.emptyList();
 
-        YearMonth latest = datedRecords.stream().map(record -> YearMonth.from(record.getPayDate()))
+        YearMonth latest = datedRecords.stream().map(record -> YearMonth.from(record.getBusinessDate()))
                 .max(Comparator.naturalOrder()).orElseThrow();
-        YearMonth earliest = datedRecords.stream().map(record -> YearMonth.from(record.getPayDate()))
+        YearMonth earliest = datedRecords.stream().map(record -> YearMonth.from(record.getBusinessDate()))
                 .min(Comparator.naturalOrder()).orElse(latest);
         YearMonth first = earliest.isBefore(latest.minusMonths(11)) ? latest.minusMonths(11) : earliest;
         Map<YearMonth, BigDecimal> paidByMonth = new HashMap<>();
-        Map<YearMonth, BigDecimal> pendingByMonth = new HashMap<>();
         BigDecimal cumulative = BigDecimal.ZERO;
-        for (PayRecord record : datedRecords) {
-            BigDecimal amount = nz(record.getPayAmount());
-            YearMonth month = YearMonth.from(record.getPayDate());
-            if ("SUCCESS".equals(record.getPayStatus())) {
-                if (month.isBefore(first)) cumulative = cumulative.add(amount);
-                else paidByMonth.merge(month, amount, BigDecimal::add);
-            } else if (!month.isBefore(first)) {
-                pendingByMonth.merge(month, amount, BigDecimal::add);
-            }
+        for (CashJournalEntry record : datedRecords) {
+            BigDecimal amount = nz(record.getAmount());
+            YearMonth month = YearMonth.from(record.getBusinessDate());
+            if (month.isBefore(first)) cumulative = cumulative.add(amount);
+            else paidByMonth.merge(month, amount, BigDecimal::add);
         }
 
         List<FinanceDashboardVO.TrendPoint> points = new ArrayList<>();
@@ -771,7 +814,7 @@ public class DashboardFinanceManagementService extends DashboardSharedSupport {
             point.setMonth(month.toString());
             point.setCashOutflowAmount(monthlyPaid.toPlainString());
             point.setCumulativePaidAmount(cumulative.toPlainString());
-            point.setPendingPaymentAmount(pendingByMonth.getOrDefault(month, BigDecimal.ZERO).toPlainString());
+            point.setPendingPaymentAmount("0");
             points.add(point);
         }
         return points;

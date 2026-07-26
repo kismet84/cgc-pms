@@ -2,6 +2,7 @@ package com.cgcpms.payment.handler;
 
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.service.PayApplicationService;
@@ -29,6 +30,7 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
     private final PayApplicationService payApplicationService;
     private final PaymentApplicationIntegrityService integrityService;
     private final PaymentApplicationSourceService sourceService;
+    private final ContractBudgetAllocationService contractBudgetAllocationService;
 
     @Override
     public String supportBusinessType() {
@@ -38,6 +40,37 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
     @Override
     public boolean isCritical() {
         return true;
+    }
+
+    @Override
+    public void beforeSubmit(WorkflowContext context) {
+        WfInstance instance = context.getInstance();
+        int currentRound = round(instance);
+        if (currentRound <= 1) {
+            return;
+        }
+
+        Long payAppId = resolveBusinessId(instance);
+        PayApplication app = requireApplication(payAppId);
+        if (!"DRAFT".equals(app.getApprovalStatus())) {
+            throw new BusinessException("PAY_APP_RESUBMIT_STATUS_INVALID", "只有已恢复为草稿的付款申请可以重新提交");
+        }
+
+        payApplicationService.validatePaymentAmount(app);
+        if (PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(app.getIntegrityVersion())) {
+            integrityService.validateAndAllocateForSubmit(app, currentRound);
+        }
+
+        int rows = payApplicationMapper.update(null, new LambdaUpdateWrapper<PayApplication>()
+                .eq(PayApplication::getId, payAppId)
+                .eq(PayApplication::getTenantId, app.getTenantId())
+                .eq(PayApplication::getApprovalStatus, "DRAFT")
+                .set(PayApplication::getApprovalStatus, "APPROVING")
+                .set(PayApplication::getPayStatus, "PENDING"));
+        if (rows != 1) {
+            throw new BusinessException("PAY_APP_STATUS_CONFLICT",
+                    "付款申请已被并发更新，请刷新后重试");
+        }
     }
 
     @Override
@@ -73,6 +106,7 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
 
         PayApplication app = requireApplication(payAppId);
         if (PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(app.getIntegrityVersion())) {
+            contractBudgetAllocationService.releaseForPayment(app);
             sourceService.releaseAllocations(app, "REJECT", round(context.getInstance()));
         }
 
@@ -88,6 +122,7 @@ public class PayRequestWorkflowHandler implements WorkflowBusinessHandler {
 
         PayApplication app = requireApplication(payAppId);
         if (PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(app.getIntegrityVersion())) {
+            contractBudgetAllocationService.releaseForPayment(app);
             sourceService.releaseAllocations(app, "WITHDRAW", round(context.getInstance()));
         }
 

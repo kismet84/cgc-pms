@@ -11,6 +11,7 @@ import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
 import com.cgcpms.cashbook.mapper.FundAccountMapper;
 import com.cgcpms.cashbook.service.CashJournalAlertService;
 import com.cgcpms.cashbook.service.CashJournalService;
+import com.cgcpms.cashbook.service.PaymentArchiveEvidenceService;
 import com.cgcpms.cashbook.service.FundAccountService;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -195,7 +196,12 @@ class CashJournalConcurrencyTest {
 
     private CashJournalService service(CashJournalEntryMapper mapper) {
         return new CashJournalService(mapper, accountMapper, accountService, contractMapper, projectAccessChecker,
-                changeLogMapper, fileMapper, objectMapper, alertService, new AccountingPeriodGuard(jdbcTemplate));
+                changeLogMapper, fileMapper, objectMapper, alertService, new AccountingPeriodGuard(jdbcTemplate),
+                org.mockito.Mockito.mock(com.cgcpms.payment.mapper.PayRecordMapper.class),
+                org.mockito.Mockito.mock(com.cgcpms.payment.mapper.PayApplicationMapper.class),
+                org.mockito.Mockito.mock(com.cgcpms.payment.service.PaymentApplicationSourceService.class),
+                org.mockito.Mockito.mock(com.cgcpms.budget.service.ContractBudgetAllocationService.class),
+                org.mockito.Mockito.mock(PaymentArchiveEvidenceService.class));
     }
 
     private long createAccount(String code, String openingBalance) {

@@ -6,6 +6,12 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.budget.constant.BudgetStatusConstants;
+import com.cgcpms.budget.entity.ContractBudgetAllocation;
+import com.cgcpms.budget.entity.ProjectBudget;
+import com.cgcpms.budget.mapper.ContractBudgetAllocationMapper;
+import com.cgcpms.budget.mapper.ProjectBudgetMapper;
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.dto.ContractSaveRequest;
@@ -20,11 +26,16 @@ import com.cgcpms.contract.vo.ContractPerformanceReportVO;
 import com.cgcpms.contract.vo.CtContractVO;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
+import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.constant.ProjectStatusConstants;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.settlement.entity.StlSettlement;
+import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.entity.WfRecord;
@@ -58,7 +69,12 @@ public class CtContractService {
 
     private final CtContractMapper ctContractMapper;
     private final CtContractChangeMapper ctContractChangeMapper;
+    private final ContractBudgetAllocationMapper contractBudgetAllocationMapper;
+    private final ContractBudgetAllocationService contractBudgetAllocationService;
+    private final ProjectBudgetMapper projectBudgetMapper;
+    private final PayApplicationMapper payApplicationMapper;
     private final PayRecordMapper payRecordMapper;
+    private final StlSettlementMapper settlementMapper;
     private final PmProjectMapper pmProjectMapper;
     private final MdPartnerMapper mdPartnerMapper;
     private final CtContractItemService itemService;
@@ -232,6 +248,7 @@ public class CtContractService {
         normalizeContractType(contract);
         validateContractReferences(contract, "创建合同");
         validateContractCoreFinancials(contract);
+        validateProjectBudgetGate(contract);
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             contract.setContractCode(nextContractCode(attempt));
@@ -284,8 +301,8 @@ public class CtContractService {
         }
         ensureClientVersionMatches(clientVersion, contract.getVersion());
 
-        // 只允许草稿状态提交
-        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(contract.getApprovalStatus()))
+        boolean resubmit = ContractStatusConstants.APPROVAL_REJECTED.equals(contract.getApprovalStatus());
+        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(contract.getApprovalStatus()) && !resubmit)
             throw new BusinessException("CONTRACT_ALREADY_SUBMITTED", "合同已提交审批，不可重复提交");
 
         // 必须有合同编号
@@ -293,6 +310,10 @@ public class CtContractService {
             throw new BusinessException("CONTRACT_NO_CODE", "合同编号不能为空，无法提交审批");
 
         validatePurchaseSupplierAdmission(contract);
+        validateContractReferences(contract, "提交合同审批");
+        validateContractCoreFinancials(contract);
+        validateProjectBudgetGate(contract);
+        contractBudgetAllocationService.validateForContractSubmit(contractId);
 
         // 更新审批状态为审批中（携带版本号乐观锁）
         LambdaUpdateWrapper<CtContract> updateWrapper = new LambdaUpdateWrapper<>();
@@ -309,14 +330,25 @@ public class CtContractService {
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
         Long tenantId = UserContext.getCurrentTenantId();
-        workflowEngine.submit(userId, username, tenantId,
-                ContractStatusConstants.BUSINESS_TYPE_CONTRACT_APPROVAL,
-                contractId,
-                contract.getContractName(),
-                contract.getContractAmount(),
-                contract.getProjectId(),
-                contractId,
-                null, null, null);
+        if (resubmit) {
+            WfInstance existingInstance = wfInstanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
+                    .eq(WfInstance::getTenantId, tenantId)
+                    .eq(WfInstance::getBusinessType, ContractStatusConstants.BUSINESS_TYPE_CONTRACT_APPROVAL)
+                    .eq(WfInstance::getBusinessId, contractId));
+            if (existingInstance == null) {
+                throw new BusinessException("CONTRACT_WORKFLOW_INSTANCE_NOT_FOUND", "驳回合同缺少原审批实例");
+            }
+            workflowEngine.resubmit(existingInstance.getId(), userId, username);
+        } else {
+            workflowEngine.submit(userId, username, tenantId,
+                    ContractStatusConstants.BUSINESS_TYPE_CONTRACT_APPROVAL,
+                    contractId,
+                    contract.getContractName(),
+                    contract.getContractAmount(),
+                    contract.getProjectId(),
+                    contractId,
+                    null, null, null);
+        }
     }
 
     /**
@@ -331,9 +363,29 @@ public class CtContractService {
             projectAccessChecker.checkAccess(existing.getProjectId(), "删除合同");
         }
 
-        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus())
-                && !UserContext.hasRole("SUPER_ADMIN"))
+        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus()))
             throw new BusinessException("CONTRACT_IN_APPROVAL", "合同审批中或已审批，不可删除");
+
+        Long tenantId = existing.getTenantId();
+        boolean hasDependencies =
+                contractBudgetAllocationMapper.selectCount(new LambdaQueryWrapper<ContractBudgetAllocation>()
+                        .eq(ContractBudgetAllocation::getTenantId, tenantId)
+                        .eq(ContractBudgetAllocation::getContractId, id)) > 0
+                || payApplicationMapper.selectCount(new LambdaQueryWrapper<PayApplication>()
+                        .eq(PayApplication::getTenantId, tenantId)
+                        .eq(PayApplication::getContractId, id)) > 0
+                || payRecordMapper.selectCount(new LambdaQueryWrapper<PayRecord>()
+                        .eq(PayRecord::getTenantId, tenantId)
+                        .eq(PayRecord::getContractId, id)) > 0
+                || settlementMapper.selectCount(new LambdaQueryWrapper<StlSettlement>()
+                        .eq(StlSettlement::getTenantId, tenantId)
+                        .eq(StlSettlement::getContractId, id)) > 0
+                || wfInstanceMapper.selectCount(new LambdaQueryWrapper<WfInstance>()
+                        .eq(WfInstance::getTenantId, tenantId)
+                        .eq(WfInstance::getBusinessId, id)) > 0;
+        if (hasDependencies) {
+            throw new BusinessException("CONTRACT_HAS_DEPENDENCIES", "合同已被预算、付款、结算或审批引用，不可删除");
+        }
 
         ctContractMapper.deleteById(id);
     }
@@ -361,6 +413,7 @@ public class CtContractService {
             normalizeContractType(contract);
             validateContractReferences(contract, "创建合同");
             validateCompositeFinancials(contract, items, terms);
+            validateProjectBudgetGate(contract);
 
             for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
                 contract.setContractCode(nextContractCode(attempt));
@@ -475,6 +528,23 @@ public class CtContractService {
         MdPartner partyB = mdPartnerMapper.selectById(contract.getPartyBId());
         if (partyB == null || !java.util.Objects.equals(partyB.getTenantId(), tenantId)) {
             throw new BusinessException("CONTRACT_PARTY_B_NOT_FOUND", "合同乙方不存在");
+        }
+    }
+
+    private void validateProjectBudgetGate(CtContract contract) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        PmProject project = pmProjectMapper.selectById(contract.getProjectId());
+        if (project == null || !Objects.equals(project.getTenantId(), tenantId)
+                || !ProjectStatusConstants.ACTIVE.equals(project.getStatus())) {
+            throw new BusinessException("PROJECT_NOT_ACTIVE", "只有进行中的项目可以创建或提交合同");
+        }
+        long activeBudgetCount = projectBudgetMapper.selectCount(new LambdaQueryWrapper<ProjectBudget>()
+                .eq(ProjectBudget::getTenantId, tenantId)
+                .eq(ProjectBudget::getProjectId, contract.getProjectId())
+                .eq(ProjectBudget::getStatus, BudgetStatusConstants.STATUS_ACTIVE)
+                .eq(ProjectBudget::getActiveFlag, 1));
+        if (activeBudgetCount == 0) {
+            throw new BusinessException("BUDGET_NOT_ACTIVE", "项目必须存在当前生效预算才能创建或提交合同");
         }
     }
 
@@ -608,8 +678,9 @@ public class CtContractService {
         if (existing.getProjectId() != null) {
             projectAccessChecker.checkAccess(existing.getProjectId(), action);
         }
-        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(existing.getApprovalStatus())) {
-            throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
+        if (!List.of(ContractStatusConstants.APPROVAL_DRAFT, ContractStatusConstants.APPROVAL_REJECTED)
+                .contains(existing.getApprovalStatus())) {
+            throw new BusinessException("CONTRACT_NOT_EDITABLE", "只有草稿或驳回合同可以编辑");
         }
         return existing;
     }

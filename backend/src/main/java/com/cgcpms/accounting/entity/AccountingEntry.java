@@ -43,6 +43,7 @@ public class AccountingEntry extends BaseEntity {
     private Long contractId;
     private Long payApplicationId;
     private Long payRecordId;
+    private Long cashJournalId;
     private Long collectionRecordId;
 
     /** DRAFT / POSTED / REVERSED */

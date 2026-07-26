@@ -54,6 +54,19 @@ class FileControllerAuthorizationTest {
         assertAuthorizationContains("delete", new Class<?>[]{Long.class}, "settlement:edit");
     }
 
+    @Test
+    void paymentClosedLoopAuthoritiesCanManageTheirOwnEvidence() throws Exception {
+        Class<?>[] uploadParameters = {MultipartFile.class, String.class, Long.class, String.class};
+        for (String authority : new String[]{"expense:edit", "payment:app:edit", "invoice:edit"}) {
+            assertAuthorizationContains("upload", uploadParameters, authority);
+            assertAuthorizationContains("delete", new Class<?>[]{Long.class}, authority);
+        }
+        for (String authority : new String[]{"expense:query", "payment:app:query", "invoice:query"}) {
+            assertAuthorizationContains("listByBusiness", new Class<?>[]{String.class, Long.class}, authority);
+            assertAuthorizationContains("getUrl", new Class<?>[]{Long.class}, authority);
+        }
+    }
+
     private void assertAuthorizationContains(String method, Class<?>[] parameterTypes, String authority)
             throws Exception {
         PreAuthorize annotation = FileController.class.getMethod(method, parameterTypes)

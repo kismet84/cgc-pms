@@ -1,5 +1,6 @@
 package com.cgcpms.workflow;
 
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.TestUserContext;
@@ -29,6 +30,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -52,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 @DisplayName("WorkflowSubmitService — duplicate and logical-delete conflicts")
 class WorkflowSubmitServiceTest {
+    @MockitoBean private ContractBudgetAllocationService contractBudgetAllocationService;
 
     private static final long PROJECT_ID = 10001L;
     private static final long PARTNER_A_ID = 20001L;

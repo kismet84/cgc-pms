@@ -18,11 +18,15 @@ import com.cgcpms.cashbook.mapper.FundAccountMapper;
 import com.cgcpms.cashbook.vo.CashJournalEntryVO;
 import com.cgcpms.cashbook.vo.CashJournalSummaryVO;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.entity.PayApplication;
+import com.cgcpms.payment.mapper.PayApplicationMapper;
+import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.payment.service.PaymentApplicationSourceService;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.vo.SysFileVO;
@@ -57,6 +61,11 @@ public class CashJournalService {
     private final ObjectMapper objectMapper;
     private final CashJournalAlertService cashJournalAlertService;
     private final AccountingPeriodGuard periodGuard;
+    private final PayRecordMapper payRecordMapper;
+    private final PayApplicationMapper payApplicationMapper;
+    private final PaymentApplicationSourceService paymentSourceService;
+    private final ContractBudgetAllocationService contractBudgetAllocationService;
+    private final PaymentArchiveEvidenceService paymentArchiveEvidenceService;
 
     @Transactional(rollbackFor = Exception.class)
     public CashJournalEntryVO createManual(CashJournalCreateRequest request) {
@@ -204,12 +213,15 @@ public class CashJournalService {
         }
         FundAccount account = lockEnabledAccount(entry.getAccountId());
         validateAccountOpeningDate(account, entry.getBusinessDate());
-        long attachmentCount = sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
+        PaymentBudgetContext payment = null;
+        if (CashbookConstants.SourceType.PAY_RECORD.equals(entry.getSourceType())) {
+            payment = requirePaymentBudgetContext(entry);
+            paymentArchiveEvidenceService.requireEvidenceAndBind(entry, payment.record());
+        } else if (sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
                 .eq(SysFile::getTenantId, tenantId())
                 .eq(SysFile::getBusinessType, "CASH_JOURNAL")
                 .eq(SysFile::getBusinessId, entry.getId())
-                .eq(SysFile::getVirusScanStatus, "CLEAN"));
-        if (attachmentCount < 1) {
+                .eq(SysFile::getVirusScanStatus, "CLEAN")) < 1) {
             throw new BusinessException("CASH_JOURNAL_ATTACHMENT_REQUIRED", "至少上传一个有效附件后才能归档");
         }
         BigDecimal currentBalance = fundAccountMapper.selectCurrentBalance(account.getId(), tenantId());
@@ -220,6 +232,12 @@ public class CashJournalService {
 
         boolean reopened = isCurrentlyReopened(entry.getId());
         String before = reopened ? snapshot(entry) : null;
+        if (payment != null) {
+            long cycle = reopenCount(entry.getId());
+            paymentSourceService.consumeBudgetForArchive(
+                    payment.application(), payment.record(), entry.getId(), cycle);
+            contractBudgetAllocationService.consumeForArchive(payment.application(), payment.record());
+        }
         entry.setStatus(CashbookConstants.Status.ARCHIVED);
         entry.setArchivedBy(UserContext.getCurrentUserId());
         entry.setArchivedAt(LocalDateTime.now());
@@ -250,6 +268,15 @@ public class CashJournalService {
         }
         CashJournalEntry original = requireEntryForUpdate(id);
         periodGuard.assertWritable(original.getBusinessDate());
+        if (CashbookConstants.Status.PENDING_ARCHIVE.equals(original.getStatus())
+                && reversalPayRecordId != null
+                && CashbookConstants.SourceType.PAY_RECORD.equals(original.getSourceType())) {
+            String before = snapshot(original);
+            original.setStatus(CashbookConstants.Status.REVERSED);
+            updateEntry(original);
+            appendChange(original, CashbookConstants.ChangeAction.REVERSE, reason.trim(), before, snapshot(original));
+            return toVO(original);
+        }
         if (!CashbookConstants.Status.ARCHIVED.equals(original.getStatus())
                 || CashbookConstants.SourceType.REVERSAL.equals(original.getSourceType())
                 || original.getReverseOfEntryId() != null) {
@@ -293,6 +320,9 @@ public class CashJournalService {
         reversal.setReverseOfEntryId(original.getId());
         reversal.setVersion(0);
         insertWithEntryNo(reversal);
+        if (reversalPayRecordId != null) {
+            paymentArchiveEvidenceService.bindReversal(reversal, reversalPayRecordId);
+        }
 
         original.setStatus(CashbookConstants.Status.REVERSED);
         original.setReversalEntryId(reversal.getId());
@@ -317,6 +347,15 @@ public class CashJournalService {
             throw new BusinessException("CASH_JOURNAL_REOPEN_INVALID", "当前流水不可撤销归档");
         }
         String before = snapshot(entry);
+        if (CashbookConstants.SourceType.PAY_RECORD.equals(entry.getSourceType())) {
+            paymentArchiveEvidenceService.assertReopenAllowed(entry);
+            PaymentBudgetContext payment = requirePaymentBudgetContext(entry);
+            long cycle = reopenCount(entry.getId()) + 1;
+            paymentSourceService.restoreBudgetAfterArchive(
+                    payment.application(), payment.record(),
+                    "CASH_JOURNAL_REOPEN:" + entry.getId() + ":CYCLE:" + cycle);
+            contractBudgetAllocationService.restoreAfterArchive(payment.application(), payment.record());
+        }
         if (CashbookConstants.Direction.IN.equals(entry.getDirection()) && entry.getAccountId() != null) {
             fundAccountMapper.selectByIdForUpdate(entry.getAccountId(), tenantId());
             BigDecimal current = fundAccountMapper.selectCurrentBalance(entry.getAccountId(), tenantId());
@@ -606,15 +645,37 @@ public class CashJournalService {
     }
 
     private boolean isCurrentlyReopened(Long entryId) {
-        long reopenCount = changeLogMapper.selectCount(new LambdaQueryWrapper<CashJournalChangeLog>()
-                .eq(CashJournalChangeLog::getTenantId, tenantId())
-                .eq(CashJournalChangeLog::getJournalEntryId, entryId)
-                .eq(CashJournalChangeLog::getAction, CashbookConstants.ChangeAction.REOPEN));
+        long reopenCount = reopenCount(entryId);
         long rearchiveCount = changeLogMapper.selectCount(new LambdaQueryWrapper<CashJournalChangeLog>()
                 .eq(CashJournalChangeLog::getTenantId, tenantId())
                 .eq(CashJournalChangeLog::getJournalEntryId, entryId)
                 .eq(CashJournalChangeLog::getAction, CashbookConstants.ChangeAction.REARCHIVE));
         return reopenCount > rearchiveCount;
+    }
+
+    private long reopenCount(Long entryId) {
+        return changeLogMapper.selectCount(new LambdaQueryWrapper<CashJournalChangeLog>()
+                .eq(CashJournalChangeLog::getTenantId, tenantId())
+                .eq(CashJournalChangeLog::getJournalEntryId, entryId)
+                .eq(CashJournalChangeLog::getAction, CashbookConstants.ChangeAction.REOPEN));
+    }
+
+    private PaymentBudgetContext requirePaymentBudgetContext(CashJournalEntry entry) {
+        if (entry.getPayRecordId() == null || entry.getPayApplicationId() == null) {
+            throw new BusinessException("PAYMENT_CASH_JOURNAL_TRACE_MISSING", "付款现金日记缺少付款记录或申请关系");
+        }
+        PayRecord record = payRecordMapper.selectByIdForUpdate(entry.getPayRecordId(), tenantId());
+        PayApplication application = payApplicationMapper.selectByIdForUpdate(entry.getPayApplicationId(), tenantId());
+        if (record == null || application == null
+                || !Objects.equals(record.getPayApplicationId(), application.getId())
+                || !Objects.equals(record.getProjectId(), entry.getProjectId())
+                || !Objects.equals(record.getContractId(), entry.getContractId())) {
+            throw new BusinessException("PAYMENT_CASH_JOURNAL_TRACE_MISMATCH", "付款现金日记关系不一致");
+        }
+        return new PaymentBudgetContext(record, application);
+    }
+
+    private record PaymentBudgetContext(PayRecord record, PayApplication application) {
     }
 
     private void appendChange(CashJournalEntry entry, String action, String reason,

@@ -157,6 +157,7 @@ const financeData: FinanceDashboardVO = {
   totalContractAmount: '800000.00',
   totalPaidAmount: '340000.00',
   budgetAmount: '3900000.00',
+  budgetReservedAmount: '150000.00',
   budgetConsumedAmount: '800000.00',
   budgetExecutionRate: '20.51',
   cashOutflowAmount: '340000.00',
@@ -710,6 +711,7 @@ describe('M2 dashboard page', () => {
 
     expect(wrapper.text()).toContain('审批中付款')
     expect(wrapper.text()).toContain('预算执行率')
+    expect(wrapper.text()).toContain('预算已占用')
     expect(wrapper.text()).toContain('公司资金余额')
     expect(wrapper.text()).toContain('资金支付趋势')
     expect(wrapper.get('.test-trend-chart').text()).toContain('本月支付、累计支付和处理中付款')

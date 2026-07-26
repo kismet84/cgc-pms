@@ -102,6 +102,8 @@ class PayApplicationControllerTest {
                 "CREATE", "PAYMENT", "#app.id");
         assertAudit("update", new Class<?>[] {Long.class, com.cgcpms.payment.entity.PayApplication.class},
                 "UPDATE", "PAYMENT", "#id");
+        assertAudit("batchSaveSources", new Class<?>[] {Long.class, List.class},
+                "UPDATE_SOURCES", "PAYMENT", "#id");
         assertAudit("submitForApproval", new Class<?>[] {Long.class},
                 "SUBMIT", "PAYMENT", "#id");
     }

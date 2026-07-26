@@ -346,6 +346,7 @@ export interface FinanceDashboardVO {
   totalContractAmount: string;
   totalPaidAmount: string;
   budgetAmount: string;
+  budgetReservedAmount: string;
   budgetConsumedAmount: string;
   budgetExecutionRate: string;
   cashOutflowAmount: string;

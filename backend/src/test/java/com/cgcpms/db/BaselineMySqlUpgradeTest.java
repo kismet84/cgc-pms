@@ -37,7 +37,7 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("223", current.info().current().getVersion().getVersion());
+        assertEquals("231", current.info().current().getVersion().getVersion());
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
         assertFalse(Arrays.stream(current.info().applied())

@@ -198,7 +198,11 @@ public class InvoiceService {
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
         checkInvoiceProjectAccess(existing, "删除发票");
         ensurePending(existing);
-        allocationMapper.hardDeletePending(id, existing.getTenantId());
+        if (allocationMapper.selectCount(new LambdaQueryWrapper<InvoicePaymentAllocation>()
+                .eq(InvoicePaymentAllocation::getTenantId, existing.getTenantId())
+                .eq(InvoicePaymentAllocation::getInvoiceId, id)) > 0) {
+            throw new BusinessException("INVOICE_ALLOCATED_LOCKED", "已分配付款的发票不可删除");
+        }
         payInvoiceMapper.deleteById(id);
     }
 

@@ -1,5 +1,6 @@
 package com.cgcpms.workflow;
 
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -20,6 +21,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -43,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("Workflow ApproverResolver and Resubmit State Machine")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class WorkflowApproverResolverTest {
+    @MockitoBean private ContractBudgetAllocationService contractBudgetAllocationService;
 
     private static final long TENANT_0 = 0L;
     private static final long USER_SUBMITTER = TestUserContext.USER_ADMIN; // 1
@@ -188,7 +191,7 @@ class WorkflowApproverResolverTest {
             node.setNodeOrder(1);
             node.setNodeType("APPROVAL");
             node.setApproveMode("SEQUENTIAL");
-            node.setApproverConfig("{\"type\":\"ROLE\",\"roleId\":" + TEST_ROLE_ID + "}");
+            node.setApproverConfig("{\"type\":\"ROLE\",\"roleCode\":\"TEST_APPROVER\"}");
             node.setAllowTransfer(1);
             node.setAllowAddSign(1);
             templateNodeMapper.insert(node);

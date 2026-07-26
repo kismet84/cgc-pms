@@ -59,6 +59,16 @@ describe('PaymentPage save chain integrity', () => {
       expect(paymentSource).toMatch(/await\s+saveApplicationSources\(id!,\s*sources\)/)
     })
 
+    it('requires explicit payment:direct permission in both page and modal', () => {
+      expect(paymentSource).toContain("userStore.hasPermission('payment:direct')")
+      expect(paymentSource).toContain("sourceType: canDirectPayment.value ? 'DIRECT' : 'EXPENSE'")
+      expect(paymentSource).toContain(':can-direct-payment="canDirectPayment"')
+      expect(formModalSource).toContain(
+        'v-if="props.canDirectPayment || record.sourceType === \'DIRECT\'"',
+      )
+      expect(formModalSource).toContain(':disabled="!props.canDirectPayment"')
+    })
+
     it('selects subcontract payment documents and shows server-computed available balance', () => {
       expect(paymentSource).toContain('getPaymentSourceOptions')
       expect(paymentSource).not.toContain('excludeApplicationId')

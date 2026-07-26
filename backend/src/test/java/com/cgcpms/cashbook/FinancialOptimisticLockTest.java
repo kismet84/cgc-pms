@@ -11,6 +11,7 @@ import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
 import com.cgcpms.cashbook.mapper.FundAccountMapper;
 import com.cgcpms.cashbook.service.CashJournalAlertService;
 import com.cgcpms.cashbook.service.CashJournalService;
+import com.cgcpms.cashbook.service.PaymentArchiveEvidenceService;
 import com.cgcpms.cashbook.service.FundAccountService;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -56,7 +57,11 @@ class FinancialOptimisticLockTest {
         CashJournalService service = new CashJournalService(entryMapper, mock(FundAccountMapper.class),
                 mock(FundAccountService.class), mock(CtContractMapper.class), mock(ProjectAccessChecker.class),
                 changeLogMapper, mock(SysFileMapper.class), new ObjectMapper(), mock(CashJournalAlertService.class),
-                mock(AccountingPeriodGuard.class));
+                mock(AccountingPeriodGuard.class), mock(com.cgcpms.payment.mapper.PayRecordMapper.class),
+                mock(com.cgcpms.payment.mapper.PayApplicationMapper.class),
+                mock(com.cgcpms.payment.service.PaymentApplicationSourceService.class),
+                mock(com.cgcpms.budget.service.ContractBudgetAllocationService.class),
+                mock(PaymentArchiveEvidenceService.class));
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.updateDraft(1L, new CashJournalUpdateRequest()));

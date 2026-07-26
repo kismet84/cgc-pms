@@ -29,8 +29,11 @@ import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -84,6 +87,7 @@ public class PaymentApplicationSourceService {
         }
         List<PaymentApplicationSource> sources = inputSources == null ? List.of() : inputSources;
         normalizeAndValidateShape(app, sources);
+        requireDirectPaymentAccess(app, sources);
         validateSourceBusiness(app, sources, false);
         sourceMapper.hardDeleteDraftSources(app.getId(), app.getTenantId());
         for (PaymentApplicationSource source : sources) {
@@ -96,7 +100,7 @@ public class PaymentApplicationSourceService {
         }
     }
 
-    /** 将一次成功付款按来源顺序分配，并同步消耗对应预算占用。 */
+    /** 将一次成功付款按来源顺序分配；预算仍保持占用，直到现金日记归档。 */
     public void consumeForPayment(PayApplication app, PayRecord record) {
         BigDecimal remaining = money(record.getPayAmount());
         for (PaymentApplicationSource source : loadSources(app)) {
@@ -112,11 +116,6 @@ public class PaymentApplicationSourceService {
                 if (expense == null || expenseMapper.consumePayment(expense.getId(), app.getTenantId(), allocated) != 1) {
                     throw new BusinessException("EXPENSE_PAYMENT_CONSUME_CONFLICT", "费用来源实付金额更新失败");
                 }
-                ledgerService.consume(expense.getBudgetLineId(), WorkflowBusinessTypes.EXPENSE, expense.getId(), allocated,
-                        "EXPENSE:CONSUME:PAY_RECORD:" + record.getId() + ":SOURCE:" + source.getId());
-            } else {
-                ledgerService.consume(app.getBudgetLineId(), WorkflowBusinessTypes.PAY_REQUEST, app.getId(), allocated,
-                        "PAY_REQUEST:CONSUME:PAY_RECORD:" + record.getId() + ":SOURCE:" + source.getId());
             }
             PaymentRecordSourceAllocation allocation = new PaymentRecordSourceAllocation();
             allocation.setTenantId(app.getTenantId());
@@ -135,23 +134,54 @@ public class PaymentApplicationSourceService {
         }
     }
 
-    /** 付款冲销时按原付款分摊逐笔恢复来源实付与预算消耗，保持金额守恒。 */
-    public void reversePayment(PayApplication app, PayRecord record) {
-        List<PaymentRecordSourceAllocation> allocations = allocationMapper.selectList(
-                new LambdaQueryWrapper<PaymentRecordSourceAllocation>()
-                        .eq(PaymentRecordSourceAllocation::getTenantId, app.getTenantId())
-                        .eq(PaymentRecordSourceAllocation::getPayRecordId, record.getId())
-                        .orderByAsc(PaymentRecordSourceAllocation::getCreatedAt));
-        BigDecimal total = allocations.stream().map(PaymentRecordSourceAllocation::getAllocatedAmount)
-                .map(PaymentApplicationSourceService::money).reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (total.compareTo(money(record.getPayAmount())) != 0) {
-            throw new BusinessException("PAYMENT_REVERSAL_ALLOCATION_MISMATCH", "原付款来源分摊不完整，禁止冲销");
+    /** 现金日记归档时，才把付款对应预算占用转为消耗。 */
+    public void consumeBudgetForArchive(PayApplication app, PayRecord record, Long journalId, long cycle) {
+        for (PaymentRecordSourceAllocation allocation : requireRecordAllocations(app, record)) {
+            BigDecimal amount = money(allocation.getAllocatedAmount());
+            PaymentApplicationSource source = requireSource(app, allocation);
+            String suffix = ":CASH_JOURNAL:" + journalId + ":CYCLE:" + cycle + ":SOURCE:" + source.getId();
+            if (PaymentIntegrityConstants.SOURCE_EXPENSE.equals(allocation.getSourceType())) {
+                ExpenseApplication expense = expenseMapper.selectByIdForUpdate(source.getExpenseId(), app.getTenantId());
+                if (expense == null) {
+                    throw new BusinessException("EXPENSE_SOURCE_NOT_FOUND", "费用付款来源不存在");
+                }
+                ledgerService.consume(expense.getBudgetLineId(), WorkflowBusinessTypes.EXPENSE,
+                        expense.getId(), amount, "EXPENSE:CONSUME" + suffix);
+            } else {
+                ledgerService.consume(app.getBudgetLineId(), WorkflowBusinessTypes.PAY_REQUEST,
+                        app.getId(), amount, "PAY_REQUEST:CONSUME" + suffix);
+            }
         }
+    }
+
+    /** 撤销归档或已归档付款冲销时，将预算消耗恢复为原审批占用。 */
+    public void restoreBudgetAfterArchive(PayApplication app, PayRecord record, String eventKey) {
+        for (PaymentRecordSourceAllocation allocation : requireRecordAllocations(app, record)) {
+            BigDecimal amount = money(allocation.getAllocatedAmount());
+            PaymentApplicationSource source = requireSource(app, allocation);
+            if (PaymentIntegrityConstants.SOURCE_EXPENSE.equals(allocation.getSourceType())) {
+                ExpenseApplication expense = expenseMapper.selectByIdForUpdate(source.getExpenseId(), app.getTenantId());
+                if (expense == null) {
+                    throw new BusinessException("EXPENSE_SOURCE_NOT_FOUND", "费用付款来源不存在");
+                }
+                ledgerService.restoreReservation(expense.getBudgetLineId(), WorkflowBusinessTypes.EXPENSE,
+                        expense.getId(), amount, "EXPENSE:RESTORE_RESERVATION:" + eventKey
+                                + ":SOURCE:" + source.getId());
+            } else {
+                ledgerService.restoreReservation(app.getBudgetLineId(), WorkflowBusinessTypes.PAY_REQUEST,
+                        app.getId(), amount, "PAY_REQUEST:RESTORE_RESERVATION:" + eventKey
+                                + ":SOURCE:" + source.getId());
+            }
+        }
+    }
+
+    /** 付款冲销时恢复来源实付；仅已归档付款需要同时恢复预算消耗。 */
+    public void reversePayment(PayApplication app, PayRecord record, boolean archived) {
+        List<PaymentRecordSourceAllocation> allocations = requireRecordAllocations(app, record);
         for (PaymentRecordSourceAllocation allocation : allocations) {
             BigDecimal amount = money(allocation.getAllocatedAmount());
-            PaymentApplicationSource source = sourceMapper.selectById(allocation.getPaymentSourceId());
-            if (source == null || !Objects.equals(source.getTenantId(), app.getTenantId())
-                    || sourceMapper.reversePayment(source.getId(), app.getTenantId(), amount) != 1) {
+            PaymentApplicationSource source = requireSource(app, allocation);
+            if (sourceMapper.reversePayment(source.getId(), app.getTenantId(), amount) != 1) {
                 throw new BusinessException("PAYMENT_SOURCE_REVERSE_CONFLICT", "付款来源实付金额恢复失败");
             }
             if (PaymentIntegrityConstants.SOURCE_EXPENSE.equals(allocation.getSourceType())) {
@@ -159,21 +189,27 @@ public class PaymentApplicationSourceService {
                 if (expense == null || expenseMapper.reversePayment(expense.getId(), app.getTenantId(), amount) != 1) {
                     throw new BusinessException("EXPENSE_PAYMENT_REVERSE_CONFLICT", "费用来源实付金额恢复失败");
                 }
-                ledgerService.restoreReservation(expense.getBudgetLineId(), WorkflowBusinessTypes.EXPENSE,
-                        expense.getId(), amount,
-                        "EXPENSE:RESTORE_RESERVATION:PAY_RECORD:" + record.getId() + ":SOURCE:" + source.getId());
-            } else {
-                ledgerService.restoreReservation(app.getBudgetLineId(), WorkflowBusinessTypes.PAY_REQUEST,
-                        app.getId(), amount,
-                        "PAY_REQUEST:RESTORE_RESERVATION:PAY_RECORD:" + record.getId() + ":SOURCE:" + source.getId());
             }
         }
+        if (archived) {
+            restoreBudgetAfterArchive(app, record, "PAYMENT_REVERSAL:" + record.getId());
+        }
+    }
+
+    /** 兼容内部旧调用；旧语义均来自已归档付款。 */
+    public void reversePayment(PayApplication app, PayRecord record) {
+        reversePayment(app, record, true);
     }
 
     /** 提交事务内调用：锁定来源并冻结费用额度/占用直接付款预算。 */
     public void validateAndAllocateForSubmit(PayApplication app) {
+        validateAndAllocateForSubmit(app, 1);
+    }
+
+    public void validateAndAllocateForSubmit(PayApplication app, int round) {
         List<PaymentApplicationSource> sources = loadSources(app);
         normalizeAndValidateShape(app, sources);
+        requireDirectPaymentAccess(app, sources);
         validateSourceBusiness(app, sources, false);
         BigDecimal reserveAmount = BigDecimal.ZERO;
         for (PaymentApplicationSource source : sources) {
@@ -189,7 +225,7 @@ public class PaymentApplicationSourceService {
         }
         if (reserveAmount.compareTo(BigDecimal.ZERO) > 0) {
             ledgerService.reserve(app.getBudgetLineId(), WorkflowBusinessTypes.PAY_REQUEST,
-                    app.getId(), reserveAmount, "PAY_REQUEST:RESERVE:" + app.getId() + ":V" + app.getVersion());
+                    app.getId(), reserveAmount, "PAY_REQUEST:RESERVE:" + app.getId() + ":R" + round);
         }
     }
 
@@ -269,6 +305,23 @@ public class PaymentApplicationSourceService {
         if (money(app.getApplyAmount()).compareTo(total) != 0) {
             throw new BusinessException("PAYMENT_SOURCE_AMOUNT_MISMATCH",
                     "付款申请金额与统一来源金额合计不一致");
+        }
+    }
+
+    private void requireDirectPaymentAccess(PayApplication app, List<PaymentApplicationSource> sources) {
+        if (sources.stream().noneMatch(source ->
+                PaymentIntegrityConstants.SOURCE_DIRECT.equals(source.getSourceType()))) {
+            return;
+        }
+        if (!StringUtils.hasText(app.getApplyReason())) {
+            throw new BusinessException("PAYMENT_DIRECT_REASON_REQUIRED", "直接付款必须填写申请原因");
+        }
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean allowed = authentication != null && authentication.isAuthenticated()
+                && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "payment:direct".equals(authority.getAuthority()));
+        if (!allowed) {
+            throw new BusinessException("PAYMENT_DIRECT_PERMISSION_DENIED", "缺少直接付款增强权限 payment:direct");
         }
     }
 
@@ -365,6 +418,29 @@ public class PaymentApplicationSourceService {
         }
         projectAccessChecker.checkAccess(app.getProjectId(), action);
         return app;
+    }
+
+    private List<PaymentRecordSourceAllocation> requireRecordAllocations(PayApplication app, PayRecord record) {
+        List<PaymentRecordSourceAllocation> allocations = allocationMapper.selectList(
+                new LambdaQueryWrapper<PaymentRecordSourceAllocation>()
+                        .eq(PaymentRecordSourceAllocation::getTenantId, app.getTenantId())
+                        .eq(PaymentRecordSourceAllocation::getPayRecordId, record.getId())
+                        .orderByAsc(PaymentRecordSourceAllocation::getCreatedAt));
+        BigDecimal total = allocations.stream().map(PaymentRecordSourceAllocation::getAllocatedAmount)
+                .map(PaymentApplicationSourceService::money).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (total.compareTo(money(record.getPayAmount())) != 0) {
+            throw new BusinessException("PAYMENT_REVERSAL_ALLOCATION_MISMATCH", "付款来源分摊不完整");
+        }
+        return allocations;
+    }
+
+    private PaymentApplicationSource requireSource(PayApplication app, PaymentRecordSourceAllocation allocation) {
+        PaymentApplicationSource source = sourceMapper.selectById(allocation.getPaymentSourceId());
+        if (source == null || !Objects.equals(source.getTenantId(), app.getTenantId())
+                || !Objects.equals(source.getPayApplicationId(), app.getId())) {
+            throw new BusinessException("PAYMENT_SOURCE_NOT_FOUND", "付款来源不存在或关系不一致");
+        }
+        return source;
     }
 
     private PaymentApplicationSourceVO toVO(PaymentApplicationSource source) {
