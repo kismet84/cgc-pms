@@ -154,6 +154,7 @@ abstract class DashboardServiceTestSupport {
         contract.setContractAmount(new BigDecimal("5000000.00"));
         contract.setCurrentAmount(new BigDecimal("5500000.00"));
         contract.setPaidAmount(new BigDecimal("2000000.00"));
+        contract.setApprovalStatus("APPROVED");
         contract.setContractStatus("PERFORMING");
         contract.setEndDate(expiringContractDate);
         ctContractMapper.insert(contract);

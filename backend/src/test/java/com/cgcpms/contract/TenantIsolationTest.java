@@ -1,6 +1,8 @@
 package com.cgcpms.contract;
 
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.budget.entity.ProjectBudget;
+import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.dto.ContractSaveRequest;
@@ -57,6 +59,7 @@ class TenantIsolationTest {
     @Autowired private CtContractService contractService;
     @Autowired private PmProjectService projectService;
     @Autowired private PmProjectMapper projectMapper;
+    @Autowired private ProjectBudgetMapper projectBudgetMapper;
     @Autowired private MdPartnerMapper partnerMapper;
     @Autowired private PayRecordService payRecordService;
     @Autowired private PayRecordMapper payRecordMapper;
@@ -75,7 +78,8 @@ class TenantIsolationTest {
         TestUserContext.setAdmin(TENANT_B, 999L);
 
         // Project for tenant B (needed for contract reference)
-        if (projectMapper.selectById(10002L) == null) {
+        PmProject tenantBProject = projectMapper.selectById(10002L);
+        if (tenantBProject == null) {
             PmProject p = new PmProject();
             p.setId(10002L);
             p.setProjectCode("XM-TB-001");
@@ -83,10 +87,30 @@ class TenantIsolationTest {
             p.setProjectType("CONSTRUCTION");
             p.setContractAmount(new BigDecimal("1000000.00"));
             p.setTargetCost(new BigDecimal("800000.00"));
-            p.setStatus("RUNNING");
+            p.setStatus("ACTIVE");
             p.setApprovalStatus("APPROVED");
             p.setTenantId(TENANT_B);
             projectMapper.insert(p);
+        } else {
+            tenantBProject.setStatus("ACTIVE");
+            tenantBProject.setApprovalStatus("APPROVED");
+            projectMapper.updateById(tenantBProject);
+        }
+        if (projectBudgetMapper.selectById(51020L) == null) {
+            ProjectBudget budget = new ProjectBudget();
+            budget.setId(51020L);
+            budget.setTenantId(TENANT_B);
+            budget.setProjectId(10002L);
+            budget.setBudgetCode("BUD-TENANT-B-TEST");
+            budget.setVersionNo("V1");
+            budget.setBudgetName("租户B合同测试预算");
+            budget.setTotalAmount(new BigDecimal("1000000.00"));
+            budget.setApprovalStatus("APPROVED");
+            budget.setStatus("ACTIVE");
+            budget.setActiveFlag(1);
+            budget.setActiveToken(10002L);
+            budget.setVersion(0);
+            projectBudgetMapper.insert(budget);
         }
 
         // Partner for tenant B (needed for contract)

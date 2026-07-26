@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type {
+  BudgetLineRecord,
+  ContractBudgetAllocationRecord,
   ContractCompositeRecord,
   ContractItemRecord,
   ContractKpi,
@@ -30,10 +32,14 @@ import {
   createContractComposite,
   deleteContract,
   loadContractComposite,
+  loadContractBudgetAllocations,
   loadContractKpi,
   loadContractPage,
+  loadBudget,
+  loadBudgetPage,
   loadPartners,
   loadProjectContextOptions,
+  saveContractBudgetAllocations,
   submitContract,
   updateContractComposite,
 } from '@/services/commercial'
@@ -115,6 +121,11 @@ const contracts = ref<ContractPage['records']>([])
 const total = ref(0)
 const kpi = ref<ContractKpi | null>(null)
 const detail = ref<ContractCompositeRecord | null>(null)
+const budgetAllocations = ref<ContractBudgetAllocationRecord[]>([])
+const allocationDrafts = ref<ContractBudgetAllocationRecord[]>([])
+const activeBudgetLines = ref<BudgetLineRecord[]>([])
+const allocationEditing = ref(false)
+const allocationSaving = ref(false)
 const projects = ref<ProjectContextOption[]>([])
 const partners = ref<PartnerRecord[]>([])
 const form = ref<ContractSaveCommand>(emptyCommand())
@@ -151,8 +162,23 @@ const canEdit = computed(() => session.hasPermission('contract:edit'))
 const canSubmit = computed(() => session.hasPermission('contract:submit'))
 const canDelete = computed(() => session.hasPermission('contract:delete'))
 const canQuery = computed(() => session.hasPermission('contract:query'))
+const canQueryBudget = computed(() => session.hasPermission('budget:query'))
+const canEditBudget = computed(() => session.hasPermission('budget:edit'))
 const currentContract = computed(() => detail.value?.contract ?? null)
 const currentContractIsDraft = computed(() => currentContract.value?.approvalStatus === 'DRAFT')
+const currentContractBudgetEditable = computed(
+  () =>
+    canEditBudget.value &&
+    ['DRAFT', 'REJECTED'].includes(currentContract.value?.approvalStatus ?? ''),
+)
+const budgetLineOptions = computed(() =>
+  activeBudgetLines.value
+    .filter((line): line is BudgetLineRecord & { id: string } => Boolean(line.id))
+    .map((line) => ({
+      value: line.id,
+      label: line.costSubjectName || line.costSubjectId,
+    })),
+)
 const pageCount = computed(() => {
   const pageSize = filter.pageSize ?? 10
   return Math.max(1, Math.ceil(total.value / pageSize))
@@ -413,6 +439,7 @@ async function loadDetail(preserveNotice = false): Promise<void> {
     const value = await loadContractComposite(contractId.value, controller.signal)
     if (generation !== detailGeneration) return
     detail.value = value
+    await loadAllocationContext(value.contract.projectId, controller.signal)
     if (mode.value === 'edit') form.value = cloneCommandFromDetail(value)
   } catch (error) {
     if (!controller.signal.aborted && generation === detailGeneration) {
@@ -421,6 +448,63 @@ async function loadDetail(preserveNotice = false): Promise<void> {
     }
   } finally {
     if (generation === detailGeneration) loading.value = false
+  }
+}
+
+async function loadAllocationContext(projectId: string, signal?: AbortSignal): Promise<void> {
+  allocationEditing.value = false
+  if (!canQueryBudget.value) {
+    budgetAllocations.value = []
+    activeBudgetLines.value = []
+    return
+  }
+  const [allocations, page] = await Promise.all([
+    loadContractBudgetAllocations(contractId.value, signal),
+    loadBudgetPage({ projectId, status: 'ACTIVE', pageNo: 1, pageSize: 100 }, signal),
+  ])
+  budgetAllocations.value = allocations
+  const activeBudget = page.records.find((row) => row.active)
+  activeBudgetLines.value = activeBudget
+    ? ((await loadBudget(activeBudget.id, signal)).lines ?? [])
+    : []
+}
+
+function budgetLineLabel(id: string): string {
+  const line = activeBudgetLines.value.find((row) => row.id === id)
+  return line?.costSubjectName || line?.costSubjectId || id
+}
+
+function beginAllocationEdit(): void {
+  allocationDrafts.value = budgetAllocations.value.map((row) => ({ ...row }))
+  if (!allocationDrafts.value.length) addAllocation()
+  allocationEditing.value = true
+}
+
+function addAllocation(): void {
+  allocationDrafts.value.push({
+    contractId: contractId.value,
+    budgetLineId: '',
+    allocatedAmount: '',
+  })
+}
+
+async function saveAllocations(): Promise<void> {
+  if (
+    !allocationDrafts.value.length ||
+    allocationDrafts.value.some((row) => !row.budgetLineId || !row.allocatedAmount)
+  ) {
+    errorMessage.value = '请完整填写预算科目和分配金额'
+    return
+  }
+  allocationSaving.value = true
+  try {
+    await saveContractBudgetAllocations(contractId.value, allocationDrafts.value)
+    await loadAllocationContext(currentContract.value?.projectId ?? '')
+    successMessage.value = '合同预算分配已保存。'
+  } catch (error) {
+    errorMessage.value = errorText(error, '合同预算分配保存失败')
+  } finally {
+    allocationSaving.value = false
   }
 }
 
@@ -911,6 +995,107 @@ onBeforeUnmount(() => {
             <dd>{{ approvalStatusLabel(currentContract.approvalStatus) }}</dd>
           </dl>
         </V2Card>
+        <V2Card v-if="canQueryBudget" title="合同预算">
+          <template #actions>
+            <div class="contract-page__inline-actions">
+              <template v-if="allocationEditing">
+                <V2Button type="button" size="small" variant="ghost" @click="addAllocation"
+                  >新增科目</V2Button
+                >
+                <V2Button
+                  type="button"
+                  size="small"
+                  variant="ghost"
+                  @click="allocationEditing = false"
+                  >取消</V2Button
+                >
+                <V2Button
+                  type="button"
+                  size="small"
+                  :loading="allocationSaving"
+                  @click="saveAllocations"
+                  >保存</V2Button
+                >
+              </template>
+              <V2Button
+                v-else-if="currentContractBudgetEditable"
+                type="button"
+                size="small"
+                variant="secondary"
+                @click="beginAllocationEdit"
+                >编辑分配</V2Button
+              >
+            </div>
+          </template>
+          <div
+            v-if="allocationEditing || budgetAllocations.length"
+            class="contract-page__table-wrap"
+            role="region"
+            aria-label="合同预算分配表格"
+            tabindex="0"
+          >
+            <table
+              class="contract-page__table contract-page__detail-table"
+              data-table-identity="contextual"
+            >
+              <thead>
+                <tr>
+                  <th scope="col">科目名称</th>
+                  <th scope="col">分配金额</th>
+                  <th scope="col">已占用</th>
+                  <th scope="col">已消耗</th>
+                  <th v-if="allocationEditing" scope="col">操作</th>
+                </tr>
+              </thead>
+              <tbody v-if="allocationEditing">
+                <tr v-for="(row, index) in allocationDrafts" :key="row.id || index">
+                  <td>
+                    <V2Select
+                      v-model="row.budgetLineId"
+                      :options="budgetLineOptions"
+                      label="预算科目"
+                      hide-label
+                    />
+                  </td>
+                  <td>
+                    <V2Input
+                      v-model="row.allocatedAmount"
+                      label="分配金额"
+                      hide-label
+                      autocomplete="off"
+                    />
+                  </td>
+                  <td>{{ row.reservedAmount || '0.00' }}</td>
+                  <td>{{ row.consumedAmount || '0.00' }}</td>
+                  <td>
+                    <V2Button
+                      type="button"
+                      size="small"
+                      variant="ghost"
+                      @click="allocationDrafts.splice(index, 1)"
+                      >删除</V2Button
+                    >
+                  </td>
+                </tr>
+              </tbody>
+              <tbody v-else>
+                <tr v-for="row in budgetAllocations" :key="row.id || row.budgetLineId">
+                  <td>{{ budgetLineLabel(row.budgetLineId) }}</td>
+                  <td>{{ row.allocatedAmount }}</td>
+                  <td>{{ row.reservedAmount || '0.00' }}</td>
+                  <td>{{ row.consumedAmount || '0.00' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <V2PageState
+            v-else-if="!errorMessage"
+            kind="empty"
+            title="尚未配置合同预算"
+            description="提交审批前需按已生效预算科目完成分配。"
+            :heading-level="3"
+          />
+        </V2Card>
         <V2Card title="合同清单">
           <template #title-extra>
             <V2Badge tone="neutral">共 {{ detail?.items.length ?? 0 }} 条</V2Badge>
@@ -1363,6 +1548,12 @@ onBeforeUnmount(() => {
 .contract-page__table-wrap {
   min-width: 0;
   overflow-x: auto;
+}
+
+.contract-page__inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
 }
 
 .contract-page__table {

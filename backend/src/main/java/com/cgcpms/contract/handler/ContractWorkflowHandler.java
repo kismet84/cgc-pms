@@ -5,6 +5,7 @@ import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.service.CostGenerationService;
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -24,6 +25,7 @@ public class ContractWorkflowHandler implements WorkflowBusinessHandler {
 
     private final CtContractMapper contractMapper;
     private final CostGenerationService costGenerationService;
+    private final ContractBudgetAllocationService contractBudgetAllocationService;
 
     @Override
     public String supportBusinessType() {
@@ -40,6 +42,7 @@ public class ContractWorkflowHandler implements WorkflowBusinessHandler {
         WfInstance instance = context.getInstance();
         Long contractId = resolveContractId(instance);
         log.info("合同提交/重提审批，进入审批中 contractId={}", contractId);
+        contractBudgetAllocationService.validateForContractSubmit(contractId);
 
         int updated = contractMapper.update(null, new LambdaUpdateWrapper<CtContract>()
                 .eq(CtContract::getId, contractId)

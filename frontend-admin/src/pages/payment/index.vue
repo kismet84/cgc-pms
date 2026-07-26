@@ -110,6 +110,7 @@ const canGenerateDocument = computed(
 const canViewDocumentHistory = computed(
   () => isPrivileged.value || userStore.hasPermission('document:history:query'),
 )
+const canDirectPayment = computed(() => userStore.hasPermission('payment:direct'))
 const documentBusyId = ref<string>()
 const documentHistoryOpen = ref(false)
 const documentHistoryLoading = ref(false)
@@ -670,7 +671,7 @@ function handleWritebackCancel() {
 function handleAddSource() {
   sourceList.value.push({
     key: sourceKeyCounter++,
-    sourceType: 'DIRECT',
+    sourceType: canDirectPayment.value ? 'DIRECT' : 'EXPENSE',
     sourceAmount: undefined,
     sourceRefId: '',
   })
@@ -707,6 +708,10 @@ function validateForm(): boolean {
   }
   if (!formData.applyReason?.trim()) {
     message.warning('请填写申请原因')
+    return false
+  }
+  if (!canDirectPayment.value && sourceList.value.some((item) => item.sourceType === 'DIRECT')) {
+    message.warning('缺少直接付款增强权限')
     return false
   }
   if (!editingId.value && !proofFile.value) {
@@ -1044,6 +1049,7 @@ onMounted(() => {
       :source-list="sourceList"
       :source-options="sourceOptions"
       :source-options-loading="sourceOptionsLoading"
+      :can-direct-payment="canDirectPayment"
       :proof-file-name="proofFile?.name"
       :on-form-project-change="handleFormProjectChange"
       :on-contract-change="onContractChange"

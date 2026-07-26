@@ -30,4 +30,15 @@ public interface AccountingEntryMapper extends BaseMapper<AccountingEntry> {
     AccountingEntry selectPaymentByRecordForUpdate(
             @Param("tenantId") Long tenantId,
             @Param("payRecordId") Long payRecordId);
+
+    @Select("""
+            SELECT status
+            FROM cash_journal_entry
+            WHERE id = #{cashJournalId}
+              AND tenant_id = #{tenantId}
+              AND deleted_flag = 0
+            """)
+    String selectCashJournalStatus(
+            @Param("tenantId") Long tenantId,
+            @Param("cashJournalId") Long cashJournalId);
 }

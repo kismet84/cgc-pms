@@ -39,6 +39,18 @@ export interface ContractApprovalRecord {
   createdAt: string
 }
 
+export interface ContractBudgetAllocation {
+  id?: string
+  tenantId?: string
+  projectId?: string
+  contractId: string
+  budgetLineId: string
+  allocatedAmount: string
+  reservedAmount?: string
+  consumedAmount?: string
+  version?: number
+}
+
 export interface ContractVO {
   id: string
   tenantId: string

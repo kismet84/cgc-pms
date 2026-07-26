@@ -126,6 +126,13 @@ public class AccountingEntryService {
             throw new BusinessException("ENTRY_STATUS_INVALID", "仅草稿状态可过账");
         if (!"APPROVED".equals(entry.getReviewStatus()))
             throw new BusinessException("ENTRY_REVIEW_REQUIRED", "凭证复核通过后才能过账");
+        if (entry.getPayRecordId() != null
+                && (entry.getCashJournalId() == null
+                || !"ARCHIVED".equals(entryMapper.selectCashJournalStatus(
+                        entry.getTenantId(), entry.getCashJournalId())))) {
+            throw new BusinessException("PAYMENT_CASH_JOURNAL_ARCHIVE_REQUIRED",
+                    "付款凭证必须显式关联已归档现金日记后才能过账");
+        }
         periodGuard.assertWritable(entry.getEntryDate());
         entry.setEntryStatus("POSTED");
         entry.setPostedAt(LocalDateTime.now());
@@ -246,6 +253,25 @@ public class AccountingEntryService {
         original.setReversedEntryId(reversal.getId());
         updateOrThrow(original);
         return reversal;
+    }
+
+    /** 归档前付款撤销不产生第二张永远无法过账的冲销凭证，直接关闭原DRAFT。 */
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelDraftPaymentEntry(Long originalPayRecordId, String reason) {
+        AccountingEntry original = entryMapper.selectPaymentByRecordForUpdate(
+                UserContext.getCurrentTenantId(), originalPayRecordId);
+        if (original == null) {
+            throw new BusinessException("PAYMENT_ENTRY_NOT_FOUND", "原付款会计凭证不存在，禁止撤销");
+        }
+        if (!"DRAFT".equals(original.getEntryStatus()) || original.getReversedEntryId() != null) {
+            throw new BusinessException("PAYMENT_ENTRY_CANCEL_STATUS_INVALID", "归档前只能撤销未冲销的付款草稿凭证");
+        }
+        authorize(original);
+        periodGuard.assertWritable(original.getEntryDate());
+        original.setEntryStatus("REVERSED");
+        original.setReversedAt(LocalDateTime.now());
+        original.setRemark("归档前撤销：" + reason);
+        updateOrThrow(original);
     }
 
     private AccountingEntry requireExisting(Long id) {

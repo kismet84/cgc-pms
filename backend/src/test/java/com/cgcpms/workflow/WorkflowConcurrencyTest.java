@@ -1,5 +1,6 @@
 package com.cgcpms.workflow;
 
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -13,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -39,6 +41,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class WorkflowConcurrencyTest {
+    @MockitoBean private ContractBudgetAllocationService contractBudgetAllocationService;
 
     private static final long USER_ADMIN = 1L;
     private static final long USER_MANAGER = 2L;

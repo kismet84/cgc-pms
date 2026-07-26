@@ -3,7 +3,15 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { useContractStore } from '@/stores/contract'
-import { submitForApproval } from '@/api/modules/contract'
+import { useUserStore } from '@/stores/user'
+import {
+  getContractBudgetAllocations,
+  saveContractBudgetAllocations,
+  submitForApproval,
+} from '@/api/modules/contract'
+import { getBudgetDetail, getBudgetList } from '@/api/modules/budget'
+import type { BudgetLineVO } from '@/types/budget'
+import type { ContractBudgetAllocation } from '@/types/contract'
 import ContractStatusTag from '@/components/ContractStatusTag.vue'
 import ApprovalStatusTag from '@/components/ApprovalStatusTag.vue'
 import ContractChangeList from '@/components/ContractChangeList.vue'
@@ -12,10 +20,17 @@ import { fetchDictData, getDictLabelSync, getDictTagColorSync } from '@/utils/di
 const route = useRoute()
 const router = useRouter()
 const contractStore = useContractStore()
+const userStore = useUserStore()
 
 const contractId = route.params.id as string
 const activeTab = ref('items')
 const submitting = ref(false)
+const allocationLoading = ref(false)
+const allocationSaving = ref(false)
+const allocationEditing = ref(false)
+const budgetAllocations = ref<ContractBudgetAllocation[]>([])
+const allocationDrafts = ref<ContractBudgetAllocation[]>([])
+const activeBudgetLines = ref<BudgetLineVO[]>([])
 
 const CONTRACT_TYPE_DICT = 'contract_type'
 
@@ -93,7 +108,69 @@ async function loadData() {
     contractStore.fetchItems(contractId),
     contractStore.fetchPaymentTerms(contractId),
     contractStore.fetchApprovalRecords(contractId),
+    canQueryBudget.value ? loadBudgetAllocations() : Promise.resolve(),
   ])
+}
+
+async function loadBudgetAllocations() {
+  allocationLoading.value = true
+  try {
+    budgetAllocations.value = await getContractBudgetAllocations(contractId)
+    const current = contractStore.currentContract
+    if (!current) return
+    const page = await getBudgetList({
+      projectId: current.projectId,
+      status: 'ACTIVE',
+      pageNo: 1,
+      pageSize: 100,
+    })
+    const activeBudget = page.records.find((row) => row.active)
+    activeBudgetLines.value = activeBudget
+      ? ((await getBudgetDetail(activeBudget.id)).lines ?? [])
+      : []
+  } finally {
+    allocationLoading.value = false
+  }
+}
+
+function budgetLineName(id: string) {
+  const line = activeBudgetLines.value.find((row) => row.id === id)
+  return line?.costSubjectName || line?.costSubjectId || id
+}
+
+function beginAllocationEdit() {
+  allocationDrafts.value = budgetAllocations.value.map((row) => ({ ...row }))
+  if (!allocationDrafts.value.length) {
+    allocationDrafts.value.push({
+      contractId,
+      budgetLineId: '',
+      allocatedAmount: '',
+    })
+  }
+  allocationEditing.value = true
+}
+
+function addAllocation() {
+  allocationDrafts.value.push({ contractId, budgetLineId: '', allocatedAmount: '' })
+}
+
+async function saveAllocations() {
+  if (
+    !allocationDrafts.value.length ||
+    allocationDrafts.value.some((row) => !row.budgetLineId || !row.allocatedAmount)
+  ) {
+    message.error('请完整填写预算科目和分配金额')
+    return
+  }
+  allocationSaving.value = true
+  try {
+    await saveContractBudgetAllocations(contractId, allocationDrafts.value)
+    await loadBudgetAllocations()
+    allocationEditing.value = false
+    message.success('合同预算分配已保存')
+  } finally {
+    allocationSaving.value = false
+  }
 }
 
 function handleSubmitApproval() {
@@ -135,6 +212,16 @@ const loading = computed(() => contractStore.loading)
 const itemsLoading = computed(() => contractStore.itemsLoading)
 const termsLoading = computed(() => contractStore.termsLoading)
 const recordsLoading = computed(() => contractStore.recordsLoading)
+const isAdmin = computed(() =>
+  userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(role.toUpperCase())),
+)
+const canQueryBudget = computed(() => isAdmin.value || userStore.hasPermission('budget:query'))
+const canEditBudget = computed(() => isAdmin.value || userStore.hasPermission('budget:edit'))
+const allocationEditable = computed(
+  () =>
+    canEditBudget.value &&
+    (contract.value?.approvalStatus === 'DRAFT' || contract.value?.approvalStatus === 'REJECTED'),
+)
 
 // ---- Mobile detection ----
 const MOBILE_BP = 768
@@ -473,6 +560,91 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
             </a-tab-pane>
 
             <!-- Approval History Tab -->
+            <a-tab-pane v-if="canQueryBudget" key="budget-allocations" tab="合同预算">
+              <a-spin :spinning="allocationLoading">
+                <div class="contract-detail-allocation-actions">
+                  <template v-if="allocationEditing">
+                    <a-button size="small" @click="addAllocation">新增科目</a-button>
+                    <a-button size="small" @click="allocationEditing = false">取消</a-button>
+                    <a-button
+                      type="primary"
+                      size="small"
+                      :loading="allocationSaving"
+                      @click="saveAllocations"
+                    >
+                      保存并回读
+                    </a-button>
+                  </template>
+                  <a-button
+                    v-else-if="allocationEditable"
+                    type="primary"
+                    size="small"
+                    @click="beginAllocationEdit"
+                  >
+                    编辑分配
+                  </a-button>
+                </div>
+                <a-table
+                  v-if="allocationEditing"
+                  :data-source="allocationDrafts"
+                  :pagination="false"
+                  size="small"
+                  row-key="budgetLineId"
+                >
+                  <a-table-column title="预算科目">
+                    <template #default="{ record }">
+                      <a-select
+                        v-model:value="record.budgetLineId"
+                        class="contract-detail-allocation-input"
+                        placeholder="选择服务端生效预算科目"
+                      >
+                        <a-select-option
+                          v-for="line in activeBudgetLines"
+                          :key="line.id"
+                          :value="line.id"
+                        >
+                          {{ line.costSubjectName || line.costSubjectId }}
+                        </a-select-option>
+                      </a-select>
+                    </template>
+                  </a-table-column>
+                  <a-table-column title="分配金额">
+                    <template #default="{ record }">
+                      <a-input v-model:value="record.allocatedAmount" inputmode="decimal" />
+                    </template>
+                  </a-table-column>
+                  <a-table-column title="操作" width="80">
+                    <template #default="{ index }">
+                      <a-button type="link" danger @click="allocationDrafts.splice(index, 1)">
+                        删除
+                      </a-button>
+                    </template>
+                  </a-table-column>
+                </a-table>
+                <a-table
+                  v-else
+                  :data-source="budgetAllocations"
+                  :pagination="false"
+                  size="small"
+                  row-key="id"
+                >
+                  <a-table-column title="预算科目">
+                    <template #default="{ record }">
+                      {{ budgetLineName(record.budgetLineId) }}
+                    </template>
+                  </a-table-column>
+                  <a-table-column title="分配金额" data-index="allocatedAmount" />
+                  <a-table-column title="已占用" data-index="reservedAmount" />
+                  <a-table-column title="已消耗" data-index="consumedAmount" />
+                </a-table>
+                <a-empty
+                  v-if="!allocationEditing && !budgetAllocations.length"
+                  description="尚未配置合同预算分配"
+                />
+              </a-spin>
+            </a-tab-pane>
+
+            <!-- Approval History Tab -->
             <a-tab-pane key="approval-history" tab="审批记录">
               <a-spin :spinning="recordsLoading">
                 <a-timeline
@@ -688,5 +860,16 @@ onUnmounted(() => window.removeEventListener('resize', onResize))
 .contract-detail-record-time {
   color: var(--muted);
   font-size: 12px;
+}
+
+.contract-detail-allocation-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.contract-detail-allocation-input {
+  width: 100%;
 }
 </style>

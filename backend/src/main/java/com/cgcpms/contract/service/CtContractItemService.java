@@ -29,8 +29,9 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
      */
     private CtContract requireDraftParentContract(Long contractId, String action) {
         CtContract contract = requireParentContract(contractId, action);
-        if (!ContractStatusConstants.APPROVAL_DRAFT.equals(contract.getApprovalStatus()))
-            throw new BusinessException("CONTRACT_NOT_EDITABLE", "合同非草稿状态，不可编辑");
+        if (!java.util.List.of(ContractStatusConstants.APPROVAL_DRAFT, ContractStatusConstants.APPROVAL_REJECTED)
+                .contains(contract.getApprovalStatus()))
+            throw new BusinessException("CONTRACT_NOT_EDITABLE", "只有草稿或驳回合同可以编辑");
         return contract;
     }
 

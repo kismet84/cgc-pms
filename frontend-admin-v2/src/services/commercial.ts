@@ -1,6 +1,7 @@
 import {
   COMMERCIAL_API,
   type ContractApprovalRecord,
+  type ContractBudgetAllocationRecord,
   type ContractCompositeRecord,
   type ContractItemRecord,
   type ContractKpi,
@@ -109,6 +110,34 @@ export function loadContractApprovalRecords(
   return apiRequest<ContractApprovalRecord[]>(
     COMMERCIAL_API.contractApprovalRecords(requiredId(id, '合同ID')),
     { signal },
+  )
+}
+
+export function loadContractBudgetAllocations(
+  id: string,
+  signal?: AbortSignal,
+): Promise<ContractBudgetAllocationRecord[]> {
+  return apiRequest<ContractBudgetAllocationRecord[]>(
+    COMMERCIAL_API.contractBudgetAllocations(requiredId(id, '合同ID')),
+    { signal },
+  )
+}
+
+export function saveContractBudgetAllocations(
+  id: string,
+  rows: ContractBudgetAllocationRecord[],
+): Promise<void> {
+  const contractId = requiredId(id, '合同ID')
+  return apiRequest<void, ContractBudgetAllocationRecord[]>(
+    COMMERCIAL_API.contractBudgetAllocations(contractId),
+    {
+      method: WRITE_METHOD.update,
+      body: rows.map(({ budgetLineId, allocatedAmount }) => ({
+        contractId,
+        budgetLineId,
+        allocatedAmount,
+      })),
+    },
   )
 }
 

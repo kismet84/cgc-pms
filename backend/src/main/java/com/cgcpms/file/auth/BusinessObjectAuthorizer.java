@@ -212,6 +212,9 @@ public class BusinessObjectAuthorizer {
             case "SITE_DAILY_LOG" -> write ? "site:daily:edit" : "site:daily:query";
             case "SUBCONTRACT" -> write ? "subcontract:measure:edit" : "subcontract:measure:query";
             case "SETTLEMENT" -> write ? "settlement:edit" : "settlement:query";
+            case "EXPENSE" -> write ? "expense:edit" : "expense:query";
+            case "PAYMENT" -> write ? "payment:app:edit" : "payment:app:query";
+            case "INVOICE" -> write ? "invoice:edit" : "invoice:query";
             case "PRODUCTION_MEASUREMENT" -> write ? measurementFileAuthority(documentType) : "measurement:query";
             case "OWNER_MEASUREMENT_SUBMISSION" -> write ? "measurement:owner:review" : "measurement:query";
             default -> genericAuthority;
@@ -274,7 +277,9 @@ public class BusinessObjectAuthorizer {
                 break;
             }
             case "PAYMENT": {
-                PayApplication payment = paymentMapper.selectById(businessId);
+                PayApplication payment = write
+                        ? paymentMapper.selectByIdForUpdate(businessId, UserContext.getCurrentTenantId())
+                        : paymentMapper.selectById(businessId);
                 if (payment == null) {
                     throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
                             "付款申请不存在: " + businessId);
@@ -282,6 +287,11 @@ public class BusinessObjectAuthorizer {
                 if (!payment.getTenantId().equals(UserContext.getCurrentTenantId())) {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该付款申请文件");
+                }
+                if (write && !Set.of("DRAFT", "REJECTED", "WITHDRAWN")
+                        .contains(payment.getApprovalStatus())) {
+                    throw new BusinessException("PAYMENT_DOCUMENT_IMMUTABLE",
+                            "付款申请提交后附件不可变更");
                 }
                 checkProjectAccess(payment.getProjectId(), action + "付款申请文件");
                 break;

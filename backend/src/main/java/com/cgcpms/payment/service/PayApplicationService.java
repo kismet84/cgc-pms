@@ -459,7 +459,7 @@ public class PayApplicationService {
 
         boolean strictClosedLoop = PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(payApp.getIntegrityVersion());
         if (strictClosedLoop) {
-            integrityService.validateAndAllocateForSubmit(payApp);
+            integrityService.validateAndAllocateForSubmit(payApp, 1);
         }
 
         // 合同余额双重校验（与 writeback 时 checkContractBalance 互补）
@@ -754,6 +754,8 @@ public class PayApplicationService {
         vo.setPartnerId(app.getPartnerId() != null ? app.getPartnerId().toString() : null);
         vo.setCostSubjectId(app.getCostSubjectId() != null ? app.getCostSubjectId().toString() : null);
         vo.setBudgetLineId(app.getBudgetLineId() != null ? app.getBudgetLineId().toString() : null);
+        vo.setContractBudgetAllocationId(app.getContractBudgetAllocationId() == null
+                ? null : app.getContractBudgetAllocationId().toString());
         vo.setExpenseCategory(app.getExpenseCategory());
         vo.setApprovalInstanceId(app.getApprovalInstanceId() != null ? app.getApprovalInstanceId().toString() : null);
         vo.setIntegrityVersion(app.getIntegrityVersion());

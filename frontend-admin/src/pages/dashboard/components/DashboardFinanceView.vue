@@ -85,6 +85,9 @@ const riskOpt = computed(() => financeRiskOption())
           <span>预算总额</span><b>{{ fmtWan(data.budgetAmount) }} 万元</b>
         </div>
         <div class="role-reference-summary-item">
+          <span>预算已占用</span><b>{{ fmtWan(data.budgetReservedAmount) }} 万元</b>
+        </div>
+        <div class="role-reference-summary-item">
           <span>预算已消耗</span><b>{{ fmtWan(data.budgetConsumedAmount) }} 万元</b>
         </div>
         <div class="role-reference-summary-item">
