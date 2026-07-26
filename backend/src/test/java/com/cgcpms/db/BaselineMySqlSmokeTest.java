@@ -40,7 +40,7 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("231", flyway.info().current().getVersion().getVersion());
+        assertEquals("233", flyway.info().current().getVersion().getVersion());
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
         assertEquals(196, count("SELECT COUNT(*) FROM information_schema.tables "
@@ -52,6 +52,21 @@ class BaselineMySqlSmokeTest {
         assertTrue(count("SELECT COUNT(*) FROM sys_dict_type") > 0);
         assertTrue(count("SELECT COUNT(*) FROM cost_subject WHERE deleted_flag=0") > 0);
         assertTrue(count("SELECT COUNT(*) FROM wf_template WHERE deleted_flag=0") > 0);
+        assertEquals(5, count("""
+                SELECT COUNT(*) FROM sys_role_menu rm
+                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
+                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+                WHERE r.role_code IN
+                  ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE')
+                  AND r.deleted_flag=0 AND m.deleted_flag=0 AND m.perms='project:query'
+                """));
+        assertEquals(1, count("""
+                SELECT COUNT(*) FROM sys_role_menu rm
+                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
+                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+                WHERE r.role_code='PROJECT_MANAGER' AND r.deleted_flag=0
+                  AND m.deleted_flag=0 AND m.perms='workflow:resubmit'
+                """));
 
         assertEquals(0, count("SELECT COUNT(*) FROM pm_project WHERE deleted_flag=0"));
         assertEquals(0, count("SELECT COUNT(*) FROM md_material WHERE deleted_flag=0"));

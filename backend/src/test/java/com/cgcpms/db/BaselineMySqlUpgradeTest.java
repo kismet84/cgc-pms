@@ -37,7 +37,22 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("231", current.info().current().getVersion().getVersion());
+        assertEquals("233", current.info().current().getVersion().getVersion());
+        assertEquals(5, count(current, """
+                SELECT COUNT(*) FROM sys_role_menu rm
+                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
+                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+                WHERE r.role_code IN
+                  ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE')
+                  AND r.deleted_flag=0 AND m.deleted_flag=0 AND m.perms='project:query'
+                """));
+        assertEquals(1, count(current, """
+                SELECT COUNT(*) FROM sys_role_menu rm
+                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
+                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+                WHERE r.role_code='PROJECT_MANAGER' AND r.deleted_flag=0
+                  AND m.deleted_flag=0 AND m.perms='workflow:resubmit'
+                """));
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
         assertFalse(Arrays.stream(current.info().applied())
@@ -50,5 +65,16 @@ class BaselineMySqlUpgradeTest {
             throw new IllegalStateException(name + "_REQUIRED");
         }
         return value;
+    }
+
+    private static int count(Flyway flyway, String sql) {
+        try (var connection = flyway.getConfiguration().getDataSource().getConnection();
+             var statement = connection.createStatement();
+             var result = statement.executeQuery(sql)) {
+            result.next();
+            return result.getInt(1);
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to verify upgraded role permissions", exception);
+        }
     }
 }

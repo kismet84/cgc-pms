@@ -346,6 +346,9 @@ test('FLOW-001 real-role payment closed loop', async ({ browser, playwright }) =
   expect(pmLogin.userInfo.permissions).toContain('payment:app:add')
   expect(pmLogin.userInfo.permissions).toContain('payment:app:edit')
   expect(pmLogin.userInfo.permissions).toContain('payment:app:submit')
+  expect(pmLogin.userInfo.permissions).toContain('project:query')
+  expect(pmLogin.userInfo.permissions).toContain('workflow:resubmit')
+  expect(financeLogin.userInfo.permissions).toContain('project:query')
   expect(financeLogin.userInfo.permissions).toContain('payment:record:writeback')
 
   try {
