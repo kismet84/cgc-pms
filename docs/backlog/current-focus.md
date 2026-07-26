@@ -21,7 +21,7 @@
 - `CODE-001` 有据关闭：查询拆分只令原服务减少2个直接依赖，却新增6依赖服务和Controller双注入；无量化运行时、回归或金额安全收益，`PayApplicationService` 未修改。
 - `CODE-002` 已关闭：3处 `@MockBean` 等价迁移为既有 `@MockitoBean`；生产及测试各1处无行为 `useFastMode()` 删除，默认fast-mode与PDF安全回归保持。
 - `AUDIT-PROMETHEUS-SCRAPE-AUTH/OBS-002` 保持 `NEEDS_CONFIRMATION`；`DEV-001` 保持 `NEEDS_CONFIRMATION`。两项沿用原稳定键等待目标网络、Secret/轮换责任或一次性MySQL 8 TLS运行证据。
-- 后端定向28项、全量273类2273项及补充renderer spike 2项通过；Compose静态检查与`git diff --check`通过。新增0、关闭2、净变化-2、悬空0；活动事项18项。
+- 后端定向28项、集成全量274类2298项及补充renderer spike 2项通过；Compose静态检查与`git diff --check`通过。新增0、关闭2、净变化-2、悬空0；当时活动事项18项。
 - M2本地通过；3项生产发布门及资金支出闭环P0未解除，生产不通过、禁止上线。未commit、push、PR、切正式入口、退役Legacy或操作生产。
 - 计划：`docs/plans/第55条主线-M2-待确认维护项裁决任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-M2-待确认维护项裁决验收报告.md`。
 
@@ -29,8 +29,8 @@
 
 - `AUDIT-FINANCE-RECONCILIATION-ATOMICITY`、`OBS-001`、`TEST-001`、`GOV-001`、`FE-001` 五项完成本地根因整改、全量验证和独立安全复核。
 - 财务调度按租户/操作独立事务，失败全回滚且不阻断后续；两端只上报固定枚举和本地指纹，后端认证、限流、低基数指标及 Prometheus 规则成立。
-- 普通限流污染登录锁定状态的共享根因已关闭；全仓仅真实登录入口启用 `loginLockout`。JaCoCo instruction `80.64%`、branch `60.25%`，branch floor 提升至60%。
-- 后端273类2273项、Legacy 738项、V2 361项及两端静态门/构建/包体通过；Legacy lint 0 error/0 warning。
+- 普通限流污染登录锁定状态的共享根因已关闭；全仓仅真实登录入口启用 `loginLockout`。集成 JaCoCo instruction `81.00%`、branch `60.53%`，branch floor 保持60%。
+- 集成后端274类2298项、Legacy 743项、V2 364项及两端静态门/构建/包体通过；Legacy lint 0 error/0 warning。
 - 新增0、关闭5、净变化-5、悬空0；现行问题源14项，第55条直接承接5项，活动事项19项。3项P0继续为`RELEASE_GATE`，生产不通过、禁止上线。
 - 计划：`docs/plans/第55条主线-M1-已确认本地问题整改任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-M1-已确认本地问题整改验收报告.md`。未commit、push、PR、切正式入口或操作生产。
 
