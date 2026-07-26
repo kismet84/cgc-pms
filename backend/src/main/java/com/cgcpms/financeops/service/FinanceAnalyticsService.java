@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.financeops.dto.FinanceOperationsModels.*;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,9 +26,11 @@ import java.util.*;
 public class FinanceAnalyticsService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final ProjectAccessChecker projectAccessChecker;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> rebuildSnapshot(Long projectId, LocalDate snapshotDate, String mode) {
+        projectAccessChecker.checkAccess(projectId, "刷新项目财务快照");
         Long tenant = tenant();
         LocalDate date = snapshotDate == null ? LocalDate.now() : snapshotDate;
         if (one("SELECT id FROM pm_project WHERE id=? AND tenant_id=? AND deleted_flag=0", projectId, tenant) == null) {
@@ -66,6 +69,7 @@ public class FinanceAnalyticsService {
     }
 
     public List<Map<String,Object>> snapshots(Long projectId) {
+        projectAccessChecker.checkAccess(projectId, "查看项目财务快照");
         return jdbc.queryForList("SELECT * FROM dashboard_finance_snapshot WHERE tenant_id=? AND project_id=? ORDER BY snapshot_date DESC", tenant(), projectId);
     }
 
@@ -100,6 +104,7 @@ public class FinanceAnalyticsService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> previewImport(ImportPreviewRequest request) {
+        projectAccessChecker.checkAccess(request.projectId(), "预览项目财务导入");
         String type = request.importType().trim().toUpperCase();
         if (!Set.of("BUDGET_LINE", "CONTRACT_ALLOCATION").contains(type)) throw error("IMPORT_TYPE_INVALID", "仅支持预算科目或合同分配导入");
         Map<String,Object> existing = one("SELECT * FROM finance_import_batch WHERE tenant_id=? AND import_type=? AND project_id=? AND file_hash=?",
@@ -127,6 +132,7 @@ public class FinanceAnalyticsService {
     public Map<String,Object> applyImport(Long batchId) {
         Map<String,Object> batch = one("SELECT * FROM finance_import_batch WHERE id=? AND tenant_id=? FOR UPDATE", batchId, tenant());
         if (batch == null) throw error("IMPORT_BATCH_NOT_FOUND", "导入批次不存在");
+        projectAccessChecker.checkAccess(longValue(batch.get("project_id")), "应用项目财务导入");
         if ("APPLIED".equals(batch.get("status"))) return batch;
         if (((Number)batch.get("invalid_rows")).intValue() > 0) throw error("IMPORT_BATCH_HAS_ERRORS", "存在无效行，禁止应用导入");
         String type = String.valueOf(batch.get("import_type"));
@@ -141,6 +147,9 @@ public class FinanceAnalyticsService {
     }
 
     public List<Map<String,Object>> importRows(Long batchId) {
+        Map<String,Object> batch = one("SELECT project_id FROM finance_import_batch WHERE id=? AND tenant_id=?", batchId, tenant());
+        if (batch == null) throw error("IMPORT_BATCH_NOT_FOUND", "导入批次不存在");
+        projectAccessChecker.checkAccess(longValue(batch.get("project_id")), "查看项目财务导入");
         return jdbc.queryForList("SELECT * FROM finance_import_row WHERE tenant_id=? AND batch_id=? ORDER BY row_no", tenant(), batchId);
     }
 

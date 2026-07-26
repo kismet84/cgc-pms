@@ -44,9 +44,12 @@ public class StlSettlementController {
             @RequestParam(required = false) Long partnerId,
             @RequestParam(required = false) String settlementCode,
             @RequestParam(required = false) String settlementType,
+            @RequestParam(required = false) String settlementStatus,
+            @RequestParam(required = false) String approvalStatus,
             @RequestParam(required = false) String keyword) {
         IPage<StlSettlementVO> page = queryService.getPage(pageNo, pageSize,
-                projectId, contractId, partnerId, settlementCode, settlementType, keyword);
+                projectId, contractId, partnerId, settlementCode, settlementType,
+                settlementStatus, approvalStatus, keyword);
         return ApiResponse.success(PageResult.of(page));
     }
 
@@ -57,9 +60,11 @@ public class StlSettlementController {
             @RequestParam(required = false) Long contractId,
             @RequestParam(required = false) Long partnerId,
             @RequestParam(required = false) String settlementCode,
-            @RequestParam(required = false) String settlementType) {
+            @RequestParam(required = false) String settlementType,
+            @RequestParam(required = false) String settlementStatus,
+            @RequestParam(required = false) String approvalStatus) {
         return ApiResponse.success(queryService.getKpi(projectId, contractId,
-                partnerId, settlementCode, settlementType));
+                partnerId, settlementCode, settlementType, settlementStatus, approvalStatus));
     }
 
     @GetMapping("/{id}")

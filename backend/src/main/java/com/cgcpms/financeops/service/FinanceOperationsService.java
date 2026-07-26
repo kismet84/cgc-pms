@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.financeops.dto.FinanceOperationsModels.*;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,16 +27,20 @@ import java.util.*;
 public class FinanceOperationsService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
+    private final ProjectAccessChecker projectAccessChecker;
+    private final TransactionTemplate transactionTemplate;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> adjustBudget(BudgetAdjustmentRequest request) {
         requireKey(request.idempotencyKey());
-        Map<String,Object> existing = operationByKey(request.idempotencyKey());
-        if (existing != null) return existing;
         BigDecimal delta = money(request.deltaAmount());
         if (delta.signum() == 0) throw error("BUDGET_ADJUSTMENT_ZERO", "预算调整金额不能为零");
         Map<String,Object> line = lockBudgetLine(request.budgetLineId());
+        checkProject(line, "调整项目预算");
         requireActiveBudget(longValue(line.get("budget_id")));
+        Map<String,Object> existing = operationByKey(request.idempotencyKey());
+        if (existing != null) return requireSameOperation(existing, "ADJUST",
+                request.budgetLineId(), null, null, delta);
         BigDecimal current = decimal(line.get("budget_amount"));
         BigDecimal locked = decimal(line.get("reserved_amount")).add(decimal(line.get("consumed_amount")));
         if (current.add(delta).compareTo(locked) < 0) {
@@ -53,8 +59,6 @@ public class FinanceOperationsService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> transferBudget(BudgetTransferRequest request) {
         requireKey(request.idempotencyKey());
-        Map<String,Object> existing = operationByKey(request.idempotencyKey());
-        if (existing != null) return existing;
         if (Objects.equals(request.fromBudgetLineId(), request.toBudgetLineId())) {
             throw error("BUDGET_TRANSFER_SAME_LINE", "预算调拨的转出与转入科目不能相同");
         }
@@ -65,10 +69,15 @@ public class FinanceOperationsService {
         Map<String,Object> secondLine = lockBudgetLine(second);
         Map<String,Object> from = Objects.equals(request.fromBudgetLineId(), first) ? firstLine : secondLine;
         Map<String,Object> to = Objects.equals(request.toBudgetLineId(), first) ? firstLine : secondLine;
+        checkProject(from, "调拨项目预算");
+        checkProject(to, "调拨项目预算");
         if (!Objects.equals(longValue(from.get("budget_id")), longValue(to.get("budget_id")))) {
             throw error("BUDGET_TRANSFER_VERSION_MISMATCH", "仅允许在同一生效预算版本内调拨");
         }
         requireActiveBudget(longValue(from.get("budget_id")));
+        Map<String,Object> existing = operationByKey(request.idempotencyKey());
+        if (existing != null) return requireSameOperation(existing, "TRANSFER",
+                request.fromBudgetLineId(), request.toBudgetLineId(), null, amount);
         BigDecimal available = decimal(from.get("budget_amount"))
                 .subtract(decimal(from.get("reserved_amount"))).subtract(decimal(from.get("consumed_amount")));
         if (available.compareTo(amount) < 0) throw error("BUDGET_TRANSFER_INSUFFICIENT", "转出科目可用预算不足");
@@ -88,12 +97,14 @@ public class FinanceOperationsService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> releaseContractQuota(ContractQuotaReleaseRequest request) {
         requireKey(request.idempotencyKey());
-        Map<String,Object> existing = operationByKey(request.idempotencyKey());
-        if (existing != null) return existing;
         BigDecimal amount = positiveMoney(request.amount(), "CONTRACT_QUOTA_RELEASE_AMOUNT_INVALID");
         Map<String,Object> allocation = one("SELECT * FROM contract_budget_allocation WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE",
                 request.contractAllocationId(), tenant());
         if (allocation == null) throw error("CONTRACT_BUDGET_ALLOCATION_NOT_FOUND", "合同预算分配不存在");
+        checkProject(allocation, "释放合同预算");
+        Map<String,Object> existing = operationByKey(request.idempotencyKey());
+        if (existing != null) return requireSameOperation(existing, "CONTRACT_RELEASE",
+                longValue(allocation.get("budget_line_id")), null, request.contractAllocationId(), amount);
         BigDecimal releasable = decimal(allocation.get("allocated_amount"))
                 .subtract(decimal(allocation.get("reserved_amount"))).subtract(decimal(allocation.get("consumed_amount")));
         if (releasable.compareTo(amount) < 0) throw error("CONTRACT_QUOTA_RELEASE_EXCEEDED", "释放金额超过合同未使用额度");
@@ -106,6 +117,7 @@ public class FinanceOperationsService {
     }
 
     public Map<String,Object> budgetVersionComparison(Long projectId) {
+        projectAccessChecker.checkAccess(projectId, "查看项目预算");
         List<Map<String,Object>> versions = jdbc.queryForList("""
                 SELECT b.id,b.version_no,b.budget_name,b.total_amount,b.status,b.effective_at,
                        COALESCE(SUM(l.reserved_amount),0) reserved_amount,
@@ -128,6 +140,7 @@ public class FinanceOperationsService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createSchedule(PaymentScheduleRequest request) {
+        projectAccessChecker.checkAccess(request.projectId(), "维护付款计划");
         Map<String,Object> contract = one("SELECT id,project_id,contract_status FROM ct_contract WHERE id=? AND tenant_id=? AND deleted_flag=0",
                 request.contractId(), tenant());
         if (contract == null || !Objects.equals(longValue(contract.get("project_id")), request.projectId())) {
@@ -149,9 +162,17 @@ public class FinanceOperationsService {
     }
 
     public List<Map<String,Object>> schedules(String status) {
-        return status == null || status.isBlank()
+        return schedules(null, status);
+    }
+
+    public List<Map<String,Object>> schedules(Long projectId, String status) {
+        if (projectId != null) projectAccessChecker.checkAccess(projectId, "查看付款计划");
+        Set<Long> accessible = new HashSet<>(projectAccessChecker.accessibleProjectIds());
+        return (status == null || status.isBlank()
                 ? jdbc.queryForList("SELECT * FROM payment_schedule WHERE tenant_id=? ORDER BY planned_date,id", tenant())
-                : jdbc.queryForList("SELECT * FROM payment_schedule WHERE tenant_id=? AND status=? ORDER BY planned_date,id", tenant(), status);
+                : jdbc.queryForList("SELECT * FROM payment_schedule WHERE tenant_id=? AND status=? ORDER BY planned_date,id", tenant(), status))
+                .stream().filter(row -> accessible.contains(longValue(row.get("project_id"))))
+                .filter(row -> projectId == null || Objects.equals(projectId, longValue(row.get("project_id")))).toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -166,12 +187,27 @@ public class FinanceOperationsService {
     }
 
     public List<Map<String,Object>> alerts(String status) {
-        return jdbc.queryForList("SELECT * FROM finance_alert WHERE tenant_id=? AND (? IS NULL OR status=?) ORDER BY severity DESC,due_at,id",
-                tenant(), status, status);
+        return alerts(null, status);
+    }
+
+    public List<Map<String,Object>> alerts(Long projectId, String status) {
+        if (projectId != null) projectAccessChecker.checkAccess(projectId, "查看资金预警");
+        Set<Long> accessible = new HashSet<>(projectAccessChecker.accessibleProjectIds());
+        return jdbc.queryForList("SELECT a.*,l.project_id FROM finance_alert a JOIN alert_log l ON l.id=a.alert_log_id AND l.tenant_id=a.tenant_id"
+                        + " WHERE a.tenant_id=? AND (? IS NULL OR a.status=?) ORDER BY a.severity DESC,a.due_at,a.id",
+                tenant(), status, status).stream()
+                .filter(row -> row.get("project_id") == null || accessible.contains(longValue(row.get("project_id"))))
+                .filter(row -> projectId == null || Objects.equals(projectId, longValue(row.get("project_id")))).toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void handleAlert(Long id, AlertHandleRequest request) {
+        Map<String,Object> alert = one("SELECT l.project_id FROM finance_alert a JOIN alert_log l ON l.id=a.alert_log_id"
+                + " WHERE a.id=? AND a.tenant_id=? FOR UPDATE", id, tenant());
+        if (alert == null) throw error("FINANCE_ALERT_NOT_OPEN", "预警不存在或已处理");
+        if (alert.get("project_id") != null) {
+            projectAccessChecker.checkAccess(longValue(alert.get("project_id")), "处理资金预警");
+        }
         String status = request.status().trim().toUpperCase();
         if (!Set.of("RESOLVED", "IGNORED").contains(status)) throw error("FINANCE_ALERT_STATUS_INVALID", "预警只能处理为 RESOLVED 或 IGNORED");
         if (jdbc.update("UPDATE finance_alert SET status=?,handled_by=?,handled_at=CURRENT_TIMESTAMP,handle_note=? WHERE id=? AND tenant_id=? AND status='OPEN'",
@@ -186,14 +222,19 @@ public class FinanceOperationsService {
         if (!Set.of("NORMAL", "SUSPECT", "REJECTED", "PENDING_CREDIT").contains(status)) {
             throw error("INVOICE_EXCEPTION_STATUS_INVALID", "异常票状态不合法");
         }
+        Map<String,Object> invoice = one("SELECT id,project_id FROM pay_invoice WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE",
+                invoiceId, tenant());
+        if (invoice == null) throw error("INVOICE_NOT_FOUND", "发票不存在");
+        checkProject(invoice, "维护发票异常");
         if (jdbc.update("UPDATE pay_invoice SET exception_status=?,exception_reason=?,version=version+1 WHERE id=? AND tenant_id=? AND deleted_flag=0",
                 status, request.reason().trim(), invoiceId, tenant()) != 1) throw error("INVOICE_NOT_FOUND", "发票不存在");
     }
 
     public Map<String,Object> invoiceWriteOffProgress(Long invoiceId) {
-        Map<String,Object> invoice = one("SELECT id,invoice_no,invoice_amount,verify_status,exception_status FROM pay_invoice WHERE id=? AND tenant_id=? AND deleted_flag=0",
+        Map<String,Object> invoice = one("SELECT id,project_id,invoice_no,invoice_amount,verify_status,exception_status FROM pay_invoice WHERE id=? AND tenant_id=? AND deleted_flag=0",
                 invoiceId, tenant());
         if (invoice == null) throw error("INVOICE_NOT_FOUND", "发票不存在");
+        checkProject(invoice, "查看发票核销进度");
         BigDecimal allocated = decimal(jdbc.queryForObject("SELECT COALESCE(SUM(allocated_amount),0) FROM invoice_payment_allocation WHERE tenant_id=? AND invoice_id=?",
                 BigDecimal.class, tenant(), invoiceId));
         BigDecimal total = decimal(invoice.get("invoice_amount"));
@@ -206,6 +247,7 @@ public class FinanceOperationsService {
     }
 
     public byte[] exportAudit(Long projectId, LocalDate from, LocalDate to) {
+        projectAccessChecker.checkAccess(projectId, "导出项目财务审计");
         LocalDate start = from == null ? LocalDate.of(2000,1,1) : from;
         LocalDate end = to == null ? LocalDate.now() : to;
         List<Map<String,Object>> rows = jdbc.queryForList("""
@@ -236,8 +278,18 @@ public class FinanceOperationsService {
     @Scheduled(cron = "0 15 1 * * ?")
     public void scheduledReconciliationAndAlerts() {
         for (Long tenantId : jdbc.queryForList("SELECT DISTINCT tenant_id FROM pay_application", Long.class)) {
-            try { runReconciliationForTenant(tenantId, LocalDate.now().minusDays(1), null); } catch (RuntimeException ignored) { }
-            try { generateAlertsForTenant(tenantId, LocalDateTime.now()); } catch (RuntimeException ignored) { }
+            try {
+                transactionTemplate.executeWithoutResult(status ->
+                        runReconciliationForTenant(tenantId, LocalDate.now().minusDays(1), null));
+            } catch (RuntimeException error) {
+                // 单租户失败已回滚；调度继续处理其他租户。
+            }
+            try {
+                transactionTemplate.executeWithoutResult(status ->
+                        generateAlertsForTenant(tenantId, LocalDateTime.now()));
+            } catch (RuntimeException error) {
+                // 单租户失败已回滚；调度继续处理其他租户。
+            }
         }
     }
 
@@ -362,6 +414,10 @@ public class FinanceOperationsService {
         return line;
     }
 
+    private void checkProject(Map<String,Object> row, String action) {
+        projectAccessChecker.checkAccess(longValue(row.get("project_id")), action);
+    }
+
     private void requireActiveBudget(Long id) {
         Map<String,Object> budget = one("SELECT status,active_flag FROM project_budget WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE", id, tenant());
         if (budget == null || !"ACTIVE".equals(budget.get("status")) || ((Number)budget.get("active_flag")).intValue() != 1) {
@@ -370,7 +426,21 @@ public class FinanceOperationsService {
     }
 
     private Map<String,Object> operationByKey(String key) {
-        return one("SELECT * FROM budget_operation WHERE tenant_id=? AND idempotency_key=?", tenant(), key.trim());
+        Map<String,Object> operation = one("SELECT * FROM budget_operation WHERE tenant_id=? AND idempotency_key=?", tenant(), key.trim());
+        if (operation != null) checkProject(operation, "读取预算操作");
+        return operation;
+    }
+    private Map<String,Object> requireSameOperation(Map<String,Object> operation, String type,
+                                                    Long budgetLineId, Long targetBudgetLineId,
+                                                    Long contractAllocationId, BigDecimal amount) {
+        if (!type.equals(operation.get("operation_type"))
+                || !Objects.equals(budgetLineId, longValue(operation.get("from_budget_line_id")))
+                || !Objects.equals(targetBudgetLineId, longValue(operation.get("to_budget_line_id")))
+                || !Objects.equals(contractAllocationId, longValue(operation.get("contract_allocation_id")))
+                || decimal(operation.get("amount")).compareTo(amount) != 0) {
+            throw error("BUDGET_OPERATION_IDEMPOTENCY_CONFLICT", "预算操作幂等键已被其他业务使用");
+        }
+        return operation;
     }
     private Map<String,Object> one(String sql, Object... args) {
         List<Map<String,Object>> rows = jdbc.queryForList(sql, args);

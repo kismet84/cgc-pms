@@ -43,7 +43,7 @@ class MatStockConsumptionBaselineControllerTest {
     void stockListPermissionCanReadBaseline() throws Exception {
         mockMvc.perform(request(cookie(List.of("inventory:stock:list"), List.of("PURCHASE_MANAGER"))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.netIssued30").value(8.0000));
+                .andExpect(jsonPath("$.data.netIssued30").value("8.0000"));
     }
 
     @Test

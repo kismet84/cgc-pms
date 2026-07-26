@@ -15,6 +15,10 @@ import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -203,5 +207,36 @@ class AccountingEntryServiceTest {
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         entryService.submitReview(draftEntryId);
         assertEquals("PENDING", entryService.getById(draftEntryId).getReviewStatus());
+    }
+
+    @Test
+    @DisplayName("A-8: 并发复核只有一个请求可以修改凭证")
+    void concurrentReviewFailsClosed() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<Boolean> first = pool.submit(() -> reviewConcurrently(start, 2L));
+            Future<Boolean> second = pool.submit(() -> reviewConcurrently(start, 3L));
+            start.countDown();
+            assertEquals(1, (first.get() ? 1 : 0) + (second.get() ? 1 : 0));
+            assertEquals("APPROVED", entryService.getById(draftEntryId).getReviewStatus());
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    private boolean reviewConcurrently(CountDownLatch start, long reviewerId) throws Exception {
+        TestUserContext.setUser(TestUserContext.TENANT_0, reviewerId, "reviewer-" + reviewerId,
+                java.util.List.of("FINANCE"));
+        try {
+            start.await();
+            entryService.review(draftEntryId, true, "并发复核");
+            return true;
+        } catch (BusinessException exception) {
+            assertEquals("ENTRY_REVIEW_STATUS_INVALID", exception.getCode());
+            return false;
+        } finally {
+            TestUserContext.clear();
+        }
     }
 }

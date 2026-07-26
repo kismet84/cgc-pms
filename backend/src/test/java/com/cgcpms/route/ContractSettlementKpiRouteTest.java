@@ -51,7 +51,7 @@ class ContractSettlementKpiRouteTest {
     @DisplayName("GET /settlements/kpi routes to settlement KPI endpoint")
     void settlementKpiRouteIsStaticEndpoint() throws Exception {
         StlSettlementQueryService settlementService = mock(StlSettlementQueryService.class);
-        when(settlementService.getKpi(null, null, null, null, null))
+        when(settlementService.getKpi(null, null, null, null, null, null, null))
                 .thenReturn(Map.of(
                         "totalCount", 0L,
                         "totalContractAmount", "0",

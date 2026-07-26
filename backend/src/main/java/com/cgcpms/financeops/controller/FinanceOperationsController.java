@@ -5,6 +5,7 @@ import com.cgcpms.financeops.dto.FinanceOperationsModels.*;
 import com.cgcpms.financeops.service.FinanceAnalyticsService;
 import com.cgcpms.financeops.service.FinanceIntegrationService;
 import com.cgcpms.financeops.service.FinanceOperationsService;
+import com.cgcpms.financeops.vo.FinanceWorkspaceVOs.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -25,6 +26,15 @@ public class FinanceOperationsController {
     private final FinanceAnalyticsService analytics;
     private final FinanceIntegrationService integrations;
 
+    @GetMapping("/workspace")
+    @PreAuthorize("hasAuthority('finance:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<FinanceOperationsWorkspaceVO> workspace(@RequestParam Long projectId) {
+        return ApiResponse.success(new FinanceOperationsWorkspaceVO(
+                operations.schedules(projectId, null).stream().map(PaymentScheduleVO::from).toList(),
+                operations.alerts(projectId, null).stream().map(FinanceAlertVO::from).toList(),
+                analytics.snapshots(projectId).stream().map(FinanceSnapshotVO::from).toList()));
+    }
+
     @PostMapping("/budgets/adjust") @PreAuthorize("hasAuthority('finance:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String,Object>> adjust(@Valid @RequestBody BudgetAdjustmentRequest r){return ApiResponse.success(operations.adjustBudget(r));}
     @PostMapping("/budgets/transfer") @PreAuthorize("hasAuthority('finance:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
@@ -37,13 +47,13 @@ public class FinanceOperationsController {
     @PostMapping("/schedules") @PreAuthorize("hasAuthority('finance:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String,Object>> schedule(@Valid @RequestBody PaymentScheduleRequest r){return ApiResponse.success(operations.createSchedule(r));}
     @GetMapping("/schedules") @PreAuthorize("hasAuthority('finance:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<List<Map<String,Object>>> schedules(@RequestParam(required=false)String status){return ApiResponse.success(operations.schedules(status));}
+    public ApiResponse<List<Map<String,Object>>> schedules(@RequestParam(required=false)Long projectId,@RequestParam(required=false)String status){return ApiResponse.success(operations.schedules(projectId,status));}
     @PostMapping("/reconciliations/run") @PreAuthorize("hasAuthority('finance:reconciliation:run') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String,Object>> reconcile(@RequestParam(required=false)@DateTimeFormat(iso=DateTimeFormat.ISO.DATE)LocalDate businessDate){return ApiResponse.success(operations.runReconciliation(businessDate));}
     @PostMapping("/alerts/generate") @PreAuthorize("hasAuthority('finance:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String,Object>> generateAlerts(){return ApiResponse.success(operations.generateAlerts());}
     @GetMapping("/alerts") @PreAuthorize("hasAuthority('finance:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<List<Map<String,Object>>> alerts(@RequestParam(required=false)String status){return ApiResponse.success(operations.alerts(status));}
+    public ApiResponse<List<Map<String,Object>>> alerts(@RequestParam(required=false)Long projectId,@RequestParam(required=false)String status){return ApiResponse.success(operations.alerts(projectId,status));}
     @PostMapping("/alerts/{id}/handle") @PreAuthorize("hasAuthority('finance:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> handleAlert(@PathVariable Long id,@Valid@RequestBody AlertHandleRequest r){operations.handleAlert(id,r);return ApiResponse.success();}
     @PostMapping("/invoices/{id}/exception") @PreAuthorize("hasAuthority('invoice:verify') or hasAnyRole('ADMIN','SUPER_ADMIN')")

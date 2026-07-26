@@ -18,6 +18,7 @@ import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.vo.PayRecordVO;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,12 +39,14 @@ public class PaymentReversalService {
     private final PayApplicationService applicationService;
     private final PayRecordService payRecordService;
     private final CostSummaryService costSummaryService;
+    private final ProjectAccessChecker projectAccessChecker;
 
     @Transactional(rollbackFor = Exception.class)
     public PayRecordVO reverse(Long payRecordId, PaymentReversalRequest request) {
         Long tenantId = UserContext.getCurrentTenantId();
         PayRecord original = payRecordMapper.selectByIdForUpdate(payRecordId, tenantId);
         if (original == null) throw new BusinessException("PAY_RECORD_NOT_FOUND", "付款记录不存在");
+        projectAccessChecker.checkAccess(original.getProjectId(), "冲销付款");
         if (!"SUCCESS".equals(original.getPayStatus()) || original.getReversedRecordId() != null) {
             throw new BusinessException("PAYMENT_REVERSAL_STATUS_INVALID", "仅未冲销的成功付款可以冲销");
         }
@@ -118,6 +121,11 @@ public class PaymentReversalService {
     @Transactional(rollbackFor = Exception.class)
     public PayRecordVO recordFailure(PaymentFailureRequest request) {
         Long tenantId = UserContext.getCurrentTenantId();
+        PayApplication app = applicationMapper.selectByIdForUpdate(request.getPayApplicationId(), tenantId);
+        if (app == null || !"APPROVED".equals(app.getApprovalStatus())) {
+            throw new BusinessException("PAY_APP_NOT_APPROVED", "仅审批通过的付款申请可记录付款失败");
+        }
+        projectAccessChecker.checkAccess(app.getProjectId(), "记录付款失败");
         PayRecord duplicate = payRecordMapper.selectOne(new LambdaQueryWrapper<PayRecord>()
                 .eq(PayRecord::getTenantId, tenantId)
                 .eq(PayRecord::getExternalTxnNo, request.getExternalTxnNo().trim()));
@@ -128,10 +136,6 @@ public class PaymentReversalService {
                 return payRecordService.getById(duplicate.getId());
             }
             throw new BusinessException("PAYMENT_FAILURE_IDEMPOTENCY_CONFLICT", "失败流水号已被不同业务使用");
-        }
-        PayApplication app = applicationMapper.selectByIdForUpdate(request.getPayApplicationId(), tenantId);
-        if (app == null || !"APPROVED".equals(app.getApprovalStatus())) {
-            throw new BusinessException("PAY_APP_NOT_APPROVED", "仅审批通过的付款申请可记录付款失败");
         }
         PayRecord failed = new PayRecord();
         failed.setTenantId(tenantId);

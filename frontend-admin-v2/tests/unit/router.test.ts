@@ -47,8 +47,8 @@ describe('V2 application-shell routes', () => {
 
     expect(ledger.source).toBe(['frontend-admin', 'src', 'router', 'index.ts'].join('/'))
     expect(ledger.summary).toMatchObject({
-      legacyOnly: 37,
-      v2Accepted: 50,
+      legacyOnly: 24,
+      v2Accepted: 63,
       v2SourceAvailable: 0,
     })
     expect(costTargetRoutes).toEqual([
@@ -237,6 +237,27 @@ describe('V2 application-shell routes', () => {
     expect(router.currentRoute.value.fullPath).toBe(
       '/cost/ledger?projectId=P1&period=2026-07#items',
     )
+  })
+
+  it('keeps transaction-only access on the inventory ledger redirect', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user(['inventory:transaction:list']))
+    const router = guardedRouter()
+
+    await router.push('/inventory/transaction?projectId=P1')
+    await router.isReady()
+
+    expect(router.currentRoute.value.fullPath).toBe('/inventory/stock?projectId=P1#transactions')
+  })
+
+  it('fails the inventory ledger redirect closed without looping', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user([]))
+    const router = guardedRouter()
+
+    await router.push('/inventory/transaction?projectId=P1')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/forbidden')
+    expect(router.currentRoute.value.query.from).toBe('/inventory/stock?projectId=P1#transactions')
   })
 
   it('restores a permitted deep link and blocks a missing permission', async () => {

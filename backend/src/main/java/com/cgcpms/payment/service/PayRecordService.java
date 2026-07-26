@@ -21,6 +21,7 @@ import com.cgcpms.payment.constant.PaymentIntegrityConstants;
 import com.cgcpms.project.constant.ProjectStatusConstants;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -53,12 +54,16 @@ public class PayRecordService {
     private final PaymentApplicationSourceService sourceService;
     private final EntryGenerator entryGenerator;
     private final CodeGenerationService codeGenerationService;
+    private final ProjectAccessChecker projectAccessChecker;
 
     // ---- Query ----
 
     public IPage<PayRecordVO> getPage(long pageNo, long pageSize, Long payApplicationId, Long contractId) {
         LambdaQueryWrapper<PayRecord> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PayRecord::getTenantId, UserContext.getCurrentTenantId());
+        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+        if (projectIds.isEmpty()) wrapper.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment
+        else wrapper.in(PayRecord::getProjectId, projectIds);
         if (payApplicationId != null) wrapper.eq(PayRecord::getPayApplicationId, payApplicationId);
         if (contractId != null) wrapper.eq(PayRecord::getContractId, contractId);
         wrapper.orderByDesc(PayRecord::getCreatedAt);
@@ -71,6 +76,7 @@ public class PayRecordService {
         PayRecord record = payRecordMapper.selectById(id);
         if (record == null || !record.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_RECORD_NOT_FOUND", "付款记录不存在");
+        projectAccessChecker.checkAccess(record.getProjectId(), "查看付款记录");
         return toVO(record);
     }
 
@@ -89,6 +95,7 @@ public class PayRecordService {
         PayApplication app = payApplicationMapper.selectByIdForUpdate(payApplicationId, UserContext.getCurrentTenantId());
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+        projectAccessChecker.checkAccess(app.getProjectId(), "付款回写");
         if (!"APPROVED".equals(app.getApprovalStatus()))
             throw new BusinessException("PAY_APP_NOT_APPROVED", "仅审批通过的付款申请可付款");
         boolean strictClosedLoop = PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(app.getIntegrityVersion());

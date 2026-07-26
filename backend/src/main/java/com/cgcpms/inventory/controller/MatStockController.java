@@ -3,6 +3,7 @@ package com.cgcpms.inventory.controller;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.result.PageResult;
 import com.cgcpms.inventory.dto.StockTransactionDTO;
 import com.cgcpms.inventory.dto.StockTransferDTO;
 import com.cgcpms.inventory.dto.SafetyStockThresholdDTO;
@@ -37,6 +38,18 @@ public class MatStockController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('inventory:transaction:add')")
     public ApiResponse<MatStockVO> stockOut(@Valid @RequestBody StockTransactionDTO dto) {
         throw new BusinessException("MANUAL_STOCK_MOVEMENT_DISABLED", "手工出库已停用，请从领料实发或库存调整审批单过账");
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('inventory:stock:list','inventory:transaction:list')")
+    public ApiResponse<PageResult<MatStockVO>> list(@RequestParam(required = false) Long warehouseId,
+                                                    @RequestParam(required = false) Long materialId,
+                                                    @RequestParam(required = false) Long projectId,
+                                                    @RequestParam(required = false) String keyword,
+                                                    @RequestParam(defaultValue = "1") long pageNo,
+                                                    @RequestParam(defaultValue = "10") long pageSize) {
+        return ApiResponse.success(matStockService.getPage(
+                warehouseId, materialId, projectId, keyword, pageNo, pageSize));
     }
 
     @GetMapping("/ledger")

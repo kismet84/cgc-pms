@@ -3,6 +3,7 @@ package com.cgcpms.cashbook.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.cashbook.constant.CashbookConstants;
 import com.cgcpms.cashbook.dto.CashJournalCreateRequest;
@@ -55,10 +56,12 @@ public class CashJournalService {
     private final SysFileMapper sysFileMapper;
     private final ObjectMapper objectMapper;
     private final CashJournalAlertService cashJournalAlertService;
+    private final AccountingPeriodGuard periodGuard;
 
     @Transactional(rollbackFor = Exception.class)
     public CashJournalEntryVO createManual(CashJournalCreateRequest request) {
         validateManual(request);
+        periodGuard.assertWritable(request.getBusinessDate());
         if (request.getAccountId() != null) {
             validateAccountOpeningDate(lockEnabledAccount(request.getAccountId()), request.getBusinessDate());
         }
@@ -108,6 +111,7 @@ public class CashJournalService {
                 .eq(CashJournalEntry::getSourceType, CashbookConstants.SourceType.PAY_RECORD)
                 .eq(CashJournalEntry::getSourceId, record.getId()));
         if (existing != null) return toVO(existing);
+        periodGuard.assertWritable(record.getPayDate());
 
         CashJournalEntry entry = new CashJournalEntry();
         entry.setTenantId(tenantId());
@@ -150,6 +154,14 @@ public class CashJournalService {
         }
         boolean reopened = isCurrentlyReopened(entry.getId());
         String before = reopened ? snapshot(entry) : null;
+        LocalDate businessDate = request.getBusinessDate() != null
+                ? request.getBusinessDate() : entry.getBusinessDate();
+        periodGuard.assertWritable(entry.getBusinessDate(), businessDate);
+        if (!CashbookConstants.SourceType.MANUAL.equals(entry.getSourceType())
+                && request.getAccountId() != null
+                && !Objects.equals(request.getAccountId(), entry.getAccountId())) {
+            throw new BusinessException("CASH_JOURNAL_SOURCE_ACCOUNT_IMMUTABLE", "业务派生流水的资金账户必须与来源事实一致");
+        }
         Long accountId = request.getAccountId() != null ? request.getAccountId() : entry.getAccountId();
         FundAccount account = accountId == null ? null : lockEnabledAccount(accountId);
         Long projectId = request.getProjectId() != null ? request.getProjectId() : entry.getProjectId();
@@ -171,7 +183,7 @@ public class CashJournalService {
             entry.setProjectId(projectId);
             entry.setContractId(contractId);
         }
-        validateAccountOpeningDate(account, entry.getBusinessDate());
+        validateAccountOpeningDate(account, businessDate);
         updateEntry(entry);
         if (reopened) {
             appendChange(entry, CashbookConstants.ChangeAction.UPDATE_AFTER_REOPEN, null, before, snapshot(entry));
@@ -181,8 +193,8 @@ public class CashJournalService {
 
     @Transactional(rollbackFor = Exception.class)
     public CashJournalEntryVO archive(Long id) {
-        CashJournalEntry entry = entryMapper.selectByIdForUpdate(id, tenantId());
-        if (entry == null) throw new BusinessException("CASH_JOURNAL_NOT_FOUND", "资金流水不存在");
+        CashJournalEntry entry = requireEntryForUpdate(id);
+        periodGuard.assertWritable(entry.getBusinessDate());
         if (!List.of(CashbookConstants.Status.DRAFT, CashbookConstants.Status.PENDING_ARCHIVE)
                 .contains(entry.getStatus())) {
             throw new BusinessException("CASH_JOURNAL_ARCHIVED_IMMUTABLE", "流水已归档或已红冲");
@@ -195,7 +207,8 @@ public class CashJournalService {
         long attachmentCount = sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
                 .eq(SysFile::getTenantId, tenantId())
                 .eq(SysFile::getBusinessType, "CASH_JOURNAL")
-                .eq(SysFile::getBusinessId, entry.getId()));
+                .eq(SysFile::getBusinessId, entry.getId())
+                .eq(SysFile::getVirusScanStatus, "CLEAN"));
         if (attachmentCount < 1) {
             throw new BusinessException("CASH_JOURNAL_ATTACHMENT_REQUIRED", "至少上传一个有效附件后才能归档");
         }
@@ -235,8 +248,8 @@ public class CashJournalService {
         if (!StringUtils.hasText(reason)) {
             throw new BusinessException("CASH_JOURNAL_REVERSE_REASON_REQUIRED", "红冲原因不能为空");
         }
-        CashJournalEntry original = entryMapper.selectByIdForUpdate(id, tenantId());
-        if (original == null) throw new BusinessException("CASH_JOURNAL_NOT_FOUND", "资金流水不存在");
+        CashJournalEntry original = requireEntryForUpdate(id);
+        periodGuard.assertWritable(original.getBusinessDate());
         if (!CashbookConstants.Status.ARCHIVED.equals(original.getStatus())
                 || CashbookConstants.SourceType.REVERSAL.equals(original.getSourceType())
                 || original.getReverseOfEntryId() != null) {
@@ -297,8 +310,8 @@ public class CashJournalService {
         if (!StringUtils.hasText(reason)) {
             throw new BusinessException("CASH_JOURNAL_REOPEN_REASON_REQUIRED", "撤销归档原因不能为空");
         }
-        CashJournalEntry entry = entryMapper.selectByIdForUpdate(id, tenantId());
-        if (entry == null) throw new BusinessException("CASH_JOURNAL_NOT_FOUND", "资金流水不存在");
+        CashJournalEntry entry = requireEntryForUpdate(id);
+        periodGuard.assertWritable(entry.getBusinessDate());
         if (!CashbookConstants.Status.ARCHIVED.equals(entry.getStatus())
                 || CashbookConstants.SourceType.REVERSAL.equals(entry.getSourceType())) {
             throw new BusinessException("CASH_JOURNAL_REOPEN_INVALID", "当前流水不可撤销归档");
@@ -516,6 +529,9 @@ public class CashJournalService {
     private CashJournalEntry requireEntryForUpdate(Long id) {
         CashJournalEntry entry = id == null ? null : entryMapper.selectByIdForUpdate(id, tenantId());
         if (entry == null) throw new BusinessException("CASH_JOURNAL_NOT_FOUND", "资金流水不存在");
+        if (entry.getProjectId() != null) {
+            projectAccessChecker.checkAccess(entry.getProjectId(), "维护资金流水");
+        }
         return entry;
     }
 

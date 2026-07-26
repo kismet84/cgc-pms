@@ -689,6 +689,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
             case "PAYMENT" -> "PAYMENT_PROOF";
             default -> "OTHER";
         });
+        file.setVirusScanStatus("CLEAN");
         fileMapper.insert(file);
     }
 

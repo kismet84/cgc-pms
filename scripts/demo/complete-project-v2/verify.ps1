@@ -27,9 +27,17 @@ UNION ALL SELECT 'purchase_request',COUNT(*) FROM mat_purchase_request WHERE ten
 UNION ALL SELECT 'purchase_order',COUNT(*) FROM mat_purchase_order WHERE tenant_id=0 AND id=520000000000001201 AND deleted_flag=0
 UNION ALL SELECT 'receipt',COUNT(*) FROM mat_receipt WHERE tenant_id=0 AND id=520000000000001301 AND deleted_flag=0
 UNION ALL SELECT 'requisition',COUNT(*) FROM mat_requisition WHERE tenant_id=0 AND id=520000000000001501 AND deleted_flag=0
+UNION ALL SELECT 'requisition_approval_trace',COUNT(*) FROM wf_record r JOIN wf_instance i ON i.id=r.instance_id AND i.tenant_id=r.tenant_id WHERE r.tenant_id=0 AND r.id=520000000000001804 AND r.business_type='MATERIAL_REQUISITION' AND r.business_id=520000000000001501 AND r.action_type='APPROVE' AND r.record_status='EFFECTIVE' AND i.instance_status='APPROVED' AND r.deleted_flag=0 AND i.deleted_flag=0
 UNION ALL SELECT 'stock',COUNT(*) FROM mat_stock WHERE tenant_id=0 AND warehouse_id=520000000000000301 AND material_id=520000000000000201 AND deleted_flag=0
 UNION ALL SELECT 'sub_measure',COUNT(*) FROM sub_measure WHERE tenant_id=0 AND id=520000000000002101 AND deleted_flag=0
 UNION ALL SELECT 'settlement',COUNT(*) FROM stl_settlement WHERE tenant_id=0 AND id=520000000000002201 AND deleted_flag=0
+UNION ALL SELECT 'settlement_contract_item',COUNT(*) FROM ct_contract_item WHERE tenant_id=0 AND id=520000000000002103 AND contract_id=520000000000000703 AND deleted_flag=0
+UNION ALL SELECT 'settlement_measure_source',COUNT(*) FROM sub_measure_item WHERE tenant_id=0 AND id=520000000000002102 AND contract_item_id=520000000000002103 AND deleted_flag=0
+UNION ALL SELECT 'settlement_item_source',COUNT(*) FROM stl_settlement_item WHERE tenant_id=0 AND id=520000000000002202 AND source_type='CT_CONTRACT' AND source_id=520000000000002103 AND amount=200000 AND deleted_flag=0
+UNION ALL SELECT 'settlement_action_permission',COUNT(*) FROM sys_menu WHERE tenant_id=0 AND perms IN ('settlement:add','settlement:edit','settlement:delete') AND status='ENABLE' AND deleted_flag=0
+UNION ALL SELECT 'settlement_commercial_permission',COUNT(DISTINCT m.perms) FROM sys_role_menu rm JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id WHERE rm.tenant_id=0 AND rm.role_id=4 AND m.perms IN ('settlement:query','settlement:add','settlement:edit','settlement:delete','settlement:submit') AND m.deleted_flag=0
+UNION ALL SELECT 'settlement_draft_candidate',COUNT(*) FROM ct_contract c JOIN ct_contract_item ci ON ci.contract_id=c.id AND ci.deleted_flag=0 JOIN sub_measure sm ON sm.contract_id=c.id AND sm.approval_status='APPROVED' AND sm.deleted_flag=0 JOIN sub_measure_item smi ON smi.measure_id=sm.id AND smi.contract_item_id=ci.id AND smi.deleted_flag=0 LEFT JOIN stl_settlement st ON st.contract_id=c.id AND st.deleted_flag=0 WHERE c.tenant_id=0 AND c.id=520000000000014201 AND c.deleted_flag=0 AND st.id IS NULL
+UNION ALL SELECT 'settlement_workflow_approver_invalid',COUNT(*) FROM wf_template t JOIN wf_template_node n ON n.template_id=t.id AND n.tenant_id=t.tenant_id LEFT JOIN sys_user u ON u.tenant_id=t.tenant_id AND u.id=CAST(JSON_UNQUOTE(JSON_EXTRACT(n.approver_config,'$.userId')) AS UNSIGNED) AND u.status='ENABLE' AND u.deleted_flag=0 WHERE t.tenant_id=0 AND t.business_type='SETTLEMENT' AND t.enabled=1 AND t.deleted_flag=0 AND n.deleted_flag=0 AND u.id IS NULL
 UNION ALL SELECT 'pay_application',COUNT(*) FROM pay_application WHERE tenant_id=0 AND id=520000000000002401 AND deleted_flag=0
 UNION ALL SELECT 'pay_record',COUNT(*) FROM pay_record WHERE tenant_id=0 AND external_txn_no='M52-PAY-TXN-001' AND deleted_flag=0
 UNION ALL SELECT 'expense',COUNT(*) FROM expense_application WHERE tenant_id=0 AND id=520000000000002501 AND deleted_flag=0
@@ -203,6 +211,7 @@ UNION ALL SELECT 'role_dashboard_settlement',COUNT(*) FROM stl_settlement WHERE 
 UNION ALL SELECT 'role_dashboard_purchase',COUNT(*) FROM mat_purchase_order WHERE tenant_id=0 AND id=520000000000009513 AND project_id=520000000000009002 AND order_status='IN_PROGRESS' AND deleted_flag=0
 UNION ALL SELECT 'role_dashboard_receipt',COUNT(*) FROM mat_receipt WHERE tenant_id=0 AND id=520000000000009517 AND project_id=520000000000009002 AND approval_status='PENDING' AND deleted_flag=0
 UNION ALL SELECT 'role_dashboard_requisition',COUNT(*) FROM mat_requisition WHERE tenant_id=0 AND id=520000000000009519 AND project_id=520000000000009002 AND stock_out_flag=0 AND deleted_flag=0
+UNION ALL SELECT 'role_dashboard_requisition_trace',COUNT(*) FROM wf_record r JOIN wf_instance i ON i.id=r.instance_id AND i.tenant_id=r.tenant_id WHERE r.tenant_id=0 AND r.id=520000000000009547 AND r.business_type='MATERIAL_REQUISITION' AND r.business_id=520000000000009519 AND r.action_type='APPROVE' AND r.record_status='EFFECTIVE' AND i.instance_status='APPROVED' AND r.deleted_flag=0 AND i.deleted_flag=0
 UNION ALL SELECT 'role_dashboard_low_stock',COUNT(*) FROM mat_stock WHERE tenant_id=0 AND id=520000000000009516 AND available_qty=0 AND deleted_flag=0
 UNION ALL SELECT 'role_dashboard_tech',COUNT(*) FROM tech_item WHERE tenant_id=0 AND id BETWEEN 520000000000009531 AND 520000000000009533 AND project_id=520000000000009002 AND deleted_flag=0
 UNION ALL SELECT 'role_dashboard_task',COUNT(*) FROM wf_task t JOIN wf_instance i ON i.id=t.instance_id AND i.tenant_id=t.tenant_id WHERE t.tenant_id=0 AND t.id=520000000000009543 AND t.task_status='PENDING' AND i.project_id=520000000000009002 AND t.deleted_flag=0 AND i.deleted_flag=0
@@ -593,13 +602,16 @@ function Test-Gb32100CreditCode([string]$CreditCode) {
 }
 
 $invalidCreditPartners = @($partnerCreditCodes.GetEnumerator() | Where-Object { -not (Test-Gb32100CreditCode $_.Value) } | ForEach-Object Key)
-$oneKeys = @('project','material','bid_transfer','target','purchase_request','purchase_order','receipt','requisition',
-    'stock','sub_measure','settlement','pay_application','pay_record','expense','revenue','receivable','collection',
+$oneKeys = @('project','material','bid_transfer','target','purchase_request','purchase_order','receipt','requisition','requisition_approval_trace',
+    'stock','sub_measure','settlement','settlement_contract_item','settlement_measure_source','settlement_item_source','settlement_draft_candidate',
+    'pay_application','pay_record','expense','revenue','receivable','collection',
     'quality_issue','rectification','progress','workflow_instance','workflow_task','workflow_record','alert','closeout',
     'cost_forecast','cost_corrective_action','finance_reconciliation_run','finance_import_batch','inventory_exception',
     'material_return_reversal','document_template','demo_user')
 $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $invalidCreditPartners.Count -eq 0 `
-    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 22 -and $metrics.unexpected_project_seed_files -eq 0 `
+    -and $metrics.contract -eq 4 -and $metrics.completed_stage -eq 23 -and $metrics.unexpected_project_seed_files -eq 0 `
+    -and $metrics.settlement_action_permission -eq 3 -and $metrics.settlement_commercial_permission -eq 5 `
+    -and $metrics.settlement_workflow_approver_invalid -eq 0 `
     -and $metrics.role_test_account -eq 8 -and $metrics.project_manager_contract_query -eq 1 `
     -and $metrics.project_manager_variation_permissions -eq 9 -and $metrics.business_variation_bid_permissions -eq 14 `
     -and $metrics.project_manager_cost_target_permissions -eq 6 -and $metrics.cost_manager_cost_target_permissions -eq 6 `
@@ -614,7 +626,8 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.role_dashboard_contract -eq 1 -and $metrics.role_dashboard_variation -eq 1 `
     -and $metrics.role_dashboard_measure -eq 1 -and $metrics.role_dashboard_settlement -eq 1 `
     -and $metrics.role_dashboard_purchase -eq 1 -and $metrics.role_dashboard_receipt -eq 1 `
-    -and $metrics.role_dashboard_requisition -eq 1 -and $metrics.role_dashboard_low_stock -eq 1 `
+    -and $metrics.role_dashboard_requisition -eq 1 -and $metrics.role_dashboard_requisition_trace -eq 1 `
+    -and $metrics.role_dashboard_low_stock -eq 1 `
     -and $metrics.role_dashboard_tech -eq 3 -and $metrics.role_dashboard_task -eq 1 `
     -and $metrics.role_dashboard_lagging -eq 1 `
     -and $metrics.risk_level_contracts -eq 2 -and $metrics.risk_level_project_task -eq 1 `

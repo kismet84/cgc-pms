@@ -40,6 +40,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.dao.EmptyResultDataAccessException;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -209,6 +211,7 @@ public class BusinessObjectAuthorizer {
             case "CASH_JOURNAL" -> cashJournalAuthority;
             case "SITE_DAILY_LOG" -> write ? "site:daily:edit" : "site:daily:query";
             case "SUBCONTRACT" -> write ? "subcontract:measure:edit" : "subcontract:measure:query";
+            case "SETTLEMENT" -> write ? "settlement:edit" : "settlement:query";
             case "PRODUCTION_MEASUREMENT" -> write ? measurementFileAuthority(documentType) : "measurement:query";
             case "OWNER_MEASUREMENT_SUBMISSION" -> write ? "measurement:owner:review" : "measurement:query";
             default -> genericAuthority;
@@ -239,6 +242,7 @@ public class BusinessObjectAuthorizer {
                 break;
             }
             case "INVOICE": {
+                if (write) lockInvoiceForFileMutation(businessId);
                 PayInvoice invoice = invoiceMapper.selectById(businessId);
                 if (invoice == null) {
                     throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
@@ -248,6 +252,11 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该发票文件");
                 }
+                if (write && !"PENDING".equals(invoice.getVerifyStatus())) {
+                    throw new BusinessException("INVOICE_DOCUMENT_IMMUTABLE",
+                            "已核验或异常发票的附件不可变更");
+                }
+                if (write) requireInvoiceDocumentType(documentType);
                 checkProjectAccess(resolveInvoiceProjectId(invoice), action + "发票文件");
                 break;
             }
@@ -297,7 +306,11 @@ public class BusinessObjectAuthorizer {
                 if (!object.tenantId().equals(UserContext.getCurrentTenantId())) {
                     throw new BusinessException("FILE_ACCESS_DENIED", "无权访问该收入回款业务文件");
                 }
-                if (write && isRevenueFileImmutable(upperType, object.status(), documentType)) {
+                if (write && "SALES_INVOICE".equals(upperType)) {
+                    requireInvoiceDocumentType(documentType);
+                }
+                if (write && isRevenueFileImmutable(upperType, object.status(),
+                        object.verificationStatus(), documentType)) {
                     throw new BusinessException("REVENUE_DOCUMENT_IMMUTABLE", "当前状态的收入回款业务附件不可变更");
                 }
                 checkProjectAccess(object.projectId(), action + "收入回款业务文件");
@@ -320,7 +333,10 @@ public class BusinessObjectAuthorizer {
                 break;
             }
             case "SETTLEMENT": {
-                StlSettlement settlement = settlementMapper.selectById(businessId);
+                StlSettlement settlement = write
+                        ? settlementMapper.selectByIdForUpdate(
+                                businessId, UserContext.getCurrentTenantId())
+                        : settlementMapper.selectById(businessId);
                 if (settlement == null) {
                     throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
                             "结算单不存在: " + businessId);
@@ -490,6 +506,27 @@ public class BusinessObjectAuthorizer {
         projectAccessChecker.checkAccess(projectId, action);
     }
 
+    private void lockInvoiceForFileMutation(Long businessId) {
+        try {
+            jdbcTemplate.queryForObject("""
+                    SELECT id
+                    FROM pay_invoice
+                    WHERE id=? AND tenant_id=? AND deleted_flag=0
+                    FOR UPDATE
+                    """, Long.class, businessId, UserContext.getCurrentTenantId());
+        } catch (EmptyResultDataAccessException e) {
+            throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "发票不存在: " + businessId);
+        }
+    }
+
+    private void requireInvoiceDocumentType(String documentType) {
+        String type = documentType == null ? "" : documentType.trim().toUpperCase();
+        if (!Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE").contains(type)) {
+            throw new BusinessException("INVOICE_DOCUMENT_TYPE_INVALID",
+                    "发票附件仅支持电子发票或扫描件");
+        }
+    }
+
     private RevenueFileObject findRevenueFileObject(String businessType, Long businessId, boolean write) {
         String table = switch (businessType) {
             case "CONTRACT_REVENUE" -> "contract_revenue";
@@ -501,21 +538,27 @@ public class BusinessObjectAuthorizer {
             default -> throw new IllegalArgumentException("Unsupported revenue file type");
         };
         String statusColumn = "CONTRACT_REVENUE".equals(businessType) ? "approval_status" : "status";
-        boolean lockForEvidenceMutation = write && Set.of("PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION").contains(businessType);
-        try {
-            return jdbcTemplate.queryForObject("SELECT tenant_id,project_id," + statusColumn + " FROM " + table
-                            + " WHERE id=? AND deleted_flag=0" + (lockForEvidenceMutation ? " FOR UPDATE" : ""),
-                    (rs, rowNum) -> new RevenueFileObject(rs.getLong("tenant_id"), rs.getLong("project_id"), rs.getString(statusColumn)), businessId);
-        } catch (EmptyResultDataAccessException e) {
-            return null;
-        }
+        String verificationColumn = "SALES_INVOICE".equals(businessType) ? ",verification_status" : "";
+        boolean lockForEvidenceMutation = write
+                && Set.of("CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE",
+                        "PRODUCTION_MEASUREMENT", "OWNER_MEASUREMENT_SUBMISSION")
+                .contains(businessType);
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT tenant_id,project_id," + statusColumn + verificationColumn + " FROM " + table
+                        + " WHERE id=? AND tenant_id=? AND deleted_flag=0"
+                        + (lockForEvidenceMutation ? " FOR UPDATE" : ""),
+                businessId, UserContext.getCurrentTenantId());
+        if (rows.isEmpty()) return null;
+        Map<String, Object> row = rows.get(0);
+        return new RevenueFileObject(
+                ((Number) row.get("tenant_id")).longValue(),
+                ((Number) row.get("project_id")).longValue(),
+                value(row.get(statusColumn)),
+                value(row.get("verification_status")));
     }
 
-    private boolean isRevenueFileImmutable(String businessType, String status) {
-        return isRevenueFileImmutable(businessType, status, null);
-    }
-
-    private boolean isRevenueFileImmutable(String businessType, String status, String documentType) {
+    private boolean isRevenueFileImmutable(String businessType, String status,
+                                           String verificationStatus, String documentType) {
         String type = documentType == null ? "" : documentType.toUpperCase();
         if ("PRODUCTION_MEASUREMENT".equals(businessType) && "OWNER_SUBMISSION".equals(type)) {
             return !Set.of("INTERNAL_APPROVED", "OWNER_RETURNED").contains(status);
@@ -526,13 +569,18 @@ public class BusinessObjectAuthorizer {
         return switch (businessType) {
             case "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "PRODUCTION_MEASUREMENT" -> !Set.of("DRAFT", "REJECTED").contains(status);
             case "OWNER_MEASUREMENT_SUBMISSION" -> !"SUBMITTED".equals(status);
-            case "SALES_INVOICE" -> "VOIDED".equals(status);
+            case "SALES_INVOICE" -> "VOIDED".equals(status) || !"UNVERIFIED".equals(verificationStatus);
             case "COLLECTION_RECORD" -> "REVERSED".equals(status);
             default -> true;
         };
     }
 
-    private record RevenueFileObject(Long tenantId, Long projectId, String status) {}
+    private String value(Object value) {
+        return value == null ? null : value.toString();
+    }
+
+    private record RevenueFileObject(Long tenantId, Long projectId, String status,
+                                     String verificationStatus) {}
 
     private void checkQualityDocumentStage(String businessType, Long businessId, String documentType) {
         QualityFileObject object = findQualityFileObject(businessType, businessId);

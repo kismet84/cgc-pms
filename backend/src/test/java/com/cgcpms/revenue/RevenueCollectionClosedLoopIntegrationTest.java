@@ -1,5 +1,6 @@
 package com.cgcpms.revenue;
 
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.*;
@@ -7,10 +8,14 @@ import com.cgcpms.revenue.service.RevenueOperationsService;
 import com.cgcpms.revenue.service.RevenueAdvancedService;
 import com.cgcpms.financeops.dto.FinanceOperationsModels.BankReceiptRequest;
 import com.cgcpms.financeops.service.FinanceIntegrationService;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
+import com.cgcpms.workflow.service.WorkflowEngine;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -22,6 +27,8 @@ import java.util.Map;
 import java.util.concurrent.*;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doAnswer;
 
 @SpringBootTest(properties = "spring.main.allow-circular-references=true")
 @ActiveProfiles("local")
@@ -37,6 +44,8 @@ class RevenueCollectionClosedLoopIntegrationTest {
     @Autowired RevenueAdvancedService advanced;
     @Autowired FinanceIntegrationService financeIntegration;
     @Autowired JdbcTemplate jdbc;
+    @Autowired WfInstanceMapper wfInstanceMapper;
+    @MockBean WorkflowEngine workflowEngine;
 
     @BeforeEach
     void setup() {
@@ -49,6 +58,28 @@ class RevenueCollectionClosedLoopIntegrationTest {
         jdbc.update("INSERT INTO contract_revenue(id,tenant_id,project_id,contract_id,revenue_code,revenue_date,progress_percent,revenue_amount,revenue_tax,revenue_amount_with_tax,billed_amount,billed_tax,approval_status,formula_version,attachment_count,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,?,'REV-IT-R',CURRENT_DATE,50,8000,0,8000,0,0,'APPROVED','REVENUE_PROGRESS_V1',1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", REVENUE, PROJECT, CONTRACT);
         jdbc.update("INSERT INTO fund_account(id,tenant_id,account_code,account_name,account_type,opening_date,opening_balance,enabled_flag,version,created_at,updated_at,deleted_flag) VALUES(?,0,'REV-IT-A','回款账户','BANK',CURRENT_DATE,1000,1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", ACCOUNT);
         jdbc.update("INSERT INTO finance_integration_endpoint(id,tenant_id,endpoint_type,endpoint_code,endpoint_name,enabled_flag,version,created_at,updated_at) VALUES(?,0,'ERP','REV-IT-ENDPOINT','收入集成测试端点',1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)",ENDPOINT);
+        doAnswer(invocation -> {
+            WfInstance instance = new WfInstance();
+            instance.setId(IdWorker.getId());
+            instance.setTenantId(0L);
+            instance.setTemplateId(50031L);
+            instance.setBusinessType(invocation.getArgument(3));
+            instance.setBusinessId(invocation.getArgument(4));
+            instance.setProjectId(invocation.getArgument(7));
+            instance.setContractId(invocation.getArgument(8));
+            instance.setTitle(invocation.getArgument(5));
+            instance.setAmount(invocation.getArgument(6));
+            instance.setInstanceStatus("RUNNING");
+            instance.setCurrentRound(1);
+            instance.setResubmitCount(0);
+            instance.setBusinessRevision(1);
+            instance.setInitiatorId(1L);
+            instance.setStartedAt(LocalDateTime.now());
+            wfInstanceMapper.insert(instance);
+            return instance;
+        }).when(workflowEngine).submit(anyLong(), anyString(), anyLong(), anyString(), anyLong(),
+                anyString(), any(BigDecimal.class), anyLong(), anyLong(), nullable(String.class),
+                nullable(String.class), nullable(List.class));
     }
 
     @AfterEach
@@ -60,7 +91,12 @@ class RevenueCollectionClosedLoopIntegrationTest {
                 LocalDate.now(),new BigDecimal("1000"),BigDecimal.ZERO,new BigDecimal("100"),
                 LocalDate.now().plusDays(30),CUSTOMER,1,"业主确认"));
         long settlementId = ((Number) settlement.get("id")).longValue();
-        jdbc.update("UPDATE owner_settlement SET status='PENDING' WHERE id=?", settlementId);
+        assertEquals(0, ((Number) settlement.get("attachment_count")).intValue());
+        BusinessException missingAttachment = assertThrows(BusinessException.class,
+                () -> service.submitSettlement(settlementId));
+        assertEquals("OWNER_SETTLEMENT_ATTACHMENT_REQUIRED", missingAttachment.getCode());
+        attachOwnerSettlement(settlementId);
+        service.submitSettlement(settlementId);
         service.onSettlementApproved(settlementId);
 
         var receivables = service.receivables(PROJECT,null);
@@ -72,13 +108,16 @@ class RevenueCollectionClosedLoopIntegrationTest {
                 LocalDate.now(),new BigDecimal("600"),BigDecimal.ZERO,1,
                 List.of(new AmountAllocation(progressReceivable,new BigDecimal("600"))),"销项发票"));
 
-        var collection = service.createCollection(new CollectionRequest(PROJECT,CONTRACT,CUSTOMER,ACCOUNT,"BANK-REV-001",
+        var collectionRequest = new CollectionRequest(PROJECT,CONTRACT,CUSTOMER,ACCOUNT,"BANK-REV-001",
                 LocalDateTime.now(),new BigDecimal("600"),"测试业主",1,
-                List.of(new AmountAllocation(progressReceivable,new BigDecimal("600"))),"进度款回款"));
+                List.of(new AmountAllocation(progressReceivable,new BigDecimal("600"))),"进度款回款");
+        var collection = service.createCollection(collectionRequest);
         long collectionId = ((Number) collection.get("id")).longValue();
-        var duplicate = service.createCollection(new CollectionRequest(PROJECT,CONTRACT,CUSTOMER,ACCOUNT,"BANK-REV-001",
-                LocalDateTime.now(),new BigDecimal("600"),"测试业主",1,List.of(),"重复回调"));
+        var duplicate = service.createCollection(collectionRequest);
         assertEquals(collectionId, ((Number) duplicate.get("id")).longValue());
+        assertThrows(BusinessException.class, () -> service.createCollection(new CollectionRequest(
+                PROJECT,CONTRACT,CUSTOMER,ACCOUNT,"BANK-REV-001",collectionRequest.collectedAt(),
+                new BigDecimal("601"),"测试业主",1,collectionRequest.allocations(),"篡改金额")));
 
         Long journalId = jdbc.queryForObject("SELECT id FROM cash_journal_entry WHERE collection_record_id=?", Long.class, collectionId);
         assertNotNull(journalId);
@@ -118,8 +157,10 @@ class RevenueCollectionClosedLoopIntegrationTest {
         var collection=service.createCollection(new CollectionRequest(PROJECT,CONTRACT,CUSTOMER,ACCOUNT,"BANK-REV-P1",LocalDateTime.now(),new BigDecimal("200"),"测试业主",1,List.of(new AmountAllocation(ar,new BigDecimal("200"))),null));
         long collectionId=((Number)collection.get("id")).longValue();
         advanced.reverseCollection(collectionId,new CollectionReverseRequest("银行退回","REV-COL-1"));
-        var second=advanced.reverseCollection(collectionId,new CollectionReverseRequest("重复回调","REV-COL-1"));
+        var second=advanced.reverseCollection(collectionId,new CollectionReverseRequest("银行退回","REV-COL-1"));
         assertEquals(collectionId,((Number)second.get("collection_id")).longValue());
+        assertThrows(BusinessException.class, () ->
+                advanced.reverseCollection(collectionId,new CollectionReverseRequest("篡改原因","REV-COL-1")));
         assertEquals("REVERSED",jdbc.queryForObject("SELECT status FROM collection_record WHERE id=?",String.class,collectionId));
 
         assertNotNull(advanced.reconcile(LocalDate.of(2099,1,1)).get("id"));
@@ -137,6 +178,7 @@ class RevenueCollectionClosedLoopIntegrationTest {
     @Test
     void concurrentDuplicateBankCallbacksCreateOnlyOneCollectionJournalAndEntry() throws Exception {
         long ar = createReceivable("2026-10", new BigDecimal("300"));
+        LocalDateTime collectedAt = LocalDateTime.now();
         ExecutorService pool = Executors.newFixedThreadPool(2);
         CountDownLatch ready = new CountDownLatch(2);
         CountDownLatch start = new CountDownLatch(1);
@@ -147,7 +189,7 @@ class RevenueCollectionClosedLoopIntegrationTest {
                 ready.countDown();
                 assertTrue(start.await(5, TimeUnit.SECONDS));
                 var result = service.createCollection(new CollectionRequest(PROJECT,CONTRACT,CUSTOMER,ACCOUNT,"BANK-REV-CONCURRENT",
-                        LocalDateTime.now(),new BigDecimal("100"),"测试业主",1,
+                        collectedAt,new BigDecimal("100"),"测试业主",1,
                         List.of(new AmountAllocation(ar,new BigDecimal("100"))),"并发银行回调"));
                 return ((Number) result.get("id")).longValue();
             } finally {
@@ -166,6 +208,42 @@ class RevenueCollectionClosedLoopIntegrationTest {
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM collection_record WHERE external_txn_no='BANK-REV-CONCURRENT'", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM cash_journal_entry WHERE collection_record_id IN(SELECT id FROM collection_record WHERE external_txn_no='BANK-REV-CONCURRENT')", Integer.class));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM accounting_entry WHERE collection_record_id IN(SELECT id FROM collection_record WHERE external_txn_no='BANK-REV-CONCURRENT')", Integer.class));
+    }
+
+    @Test
+    void concurrentSettlementsCannotExceedContractAmount() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        Callable<Boolean> create = () -> {
+            UserContext.set(Jwts.claims().subject("admin").add("userId",1L).add("username","admin")
+                    .add("tenantId",0L).add("roleCodes", List.of("ADMIN")).build());
+            try {
+                ready.countDown();
+                assertTrue(start.await(5, TimeUnit.SECONDS));
+                service.createSettlement(new OwnerSettlementRequest(PROJECT,CONTRACT,REVENUE,"2026-12",
+                        LocalDate.now(),new BigDecimal("6000"),BigDecimal.ZERO,BigDecimal.ZERO,
+                        LocalDate.now().plusDays(30),CUSTOMER,1,"并发额度测试"));
+                return true;
+            } catch (BusinessException expected) {
+                assertEquals("OWNER_SETTLEMENT_CONTRACT_EXCEEDED", expected.getCode());
+                return false;
+            } finally {
+                UserContext.clear();
+            }
+        };
+        try {
+            Future<Boolean> first = pool.submit(create);
+            Future<Boolean> second = pool.submit(create);
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+            assertNotEquals(first.get(15, TimeUnit.SECONDS), second.get(15, TimeUnit.SECONDS));
+        } finally {
+            pool.shutdownNow();
+        }
+        assertEquals(1, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM owner_settlement WHERE contract_id=? AND gross_amount=6000 AND deleted_flag=0",
+                Integer.class, CONTRACT));
     }
 
     @Test
@@ -190,6 +268,16 @@ class RevenueCollectionClosedLoopIntegrationTest {
         var settlement=service.createSettlement(new OwnerSettlementRequest(PROJECT,CONTRACT,REVENUE,period,LocalDate.now(),amount,BigDecimal.ZERO,BigDecimal.ZERO,LocalDate.now().plusDays(15),CUSTOMER,1,null));
         long id=((Number)settlement.get("id")).longValue();jdbc.update("UPDATE owner_settlement SET status='PENDING' WHERE id=?",id);service.onSettlementApproved(id);
         return ((Number)service.receivables(PROJECT,null).stream().filter(r->((Number)r.get("settlement_id")).longValue()==id).findFirst().orElseThrow().get("id")).longValue();
+    }
+
+    private void attachOwnerSettlement(long settlementId) {
+        jdbc.update("""
+                INSERT INTO sys_file(id,tenant_id,business_type,business_id,file_name,original_name,file_size,
+                 content_type,storage_path,bucket_name,document_type,virus_scan_status,created_by,created_at,
+                 updated_by,updated_at,deleted_flag)
+                VALUES(?,0,'OWNER_SETTLEMENT',?,'owner-confirmation.pdf','业主确认单.pdf',128,
+                 'application/pdf',?,'test','CONTRACT_ATTACHMENT','CLEAN',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, IdWorker.getId(), settlementId, "OWNER_SETTLEMENT/" + settlementId + "/owner-confirmation.pdf");
     }
 
     private void cleanup() {
@@ -218,8 +306,10 @@ class RevenueCollectionClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM collection_record WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM sales_invoice_allocation WHERE invoice_id IN(SELECT id FROM sales_invoice WHERE project_id=?)", PROJECT);
         jdbc.update("DELETE FROM sales_invoice WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM sys_file WHERE business_type='OWNER_SETTLEMENT' AND business_id IN(SELECT id FROM owner_settlement WHERE project_id=?)", PROJECT);
         jdbc.update("DELETE FROM account_receivable WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM owner_settlement WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM wf_instance WHERE business_type='OWNER_SETTLEMENT' AND project_id=?", PROJECT);
         jdbc.update("DELETE FROM contract_revenue WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM fund_account WHERE id=?", ACCOUNT);
         jdbc.update("DELETE FROM ct_contract WHERE id=?", CONTRACT);

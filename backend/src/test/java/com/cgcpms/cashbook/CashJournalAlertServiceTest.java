@@ -144,6 +144,7 @@ class CashJournalAlertServiceTest {
         file.setContentType("application/pdf");
         file.setStoragePath("CASH_JOURNAL/" + entryId + "/alert.pdf");
         file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
         fileMapper.insert(file);
     }
 

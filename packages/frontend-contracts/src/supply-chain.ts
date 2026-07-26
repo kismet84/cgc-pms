@@ -24,6 +24,7 @@ export const SUPPLY_CHAIN_API = {
   purchaseOrders: "/purchase-orders",
   receipts: "/receipts",
   warehouses: "/inventory/warehouses",
+  stocks: "/inventory/stock",
   stockLedger: "/inventory/stock/ledger",
   stockKpi: "/inventory/stock/kpi",
   requisitions: "/requisitions",
@@ -334,6 +335,15 @@ export interface MaterialRecord {
 
 export type MaterialPage = PageResult<MaterialRecord>;
 
+export interface StockQuery {
+  warehouseId?: string;
+  materialId?: string;
+  projectId?: string;
+  keyword?: string;
+  pageNo?: number;
+  pageSize?: number;
+}
+
 export interface StockLedgerQuery {
   warehouseId?: string;
   materialId: string;
@@ -347,6 +357,8 @@ export interface StockLedgerQuery {
 
 export interface StockRecord {
   id?: string | null;
+  projectId?: string | null;
+  projectName?: string | null;
   warehouseId?: string | null;
   materialId: string;
   availableQty: SupplyChainDecimalString;
@@ -362,6 +374,8 @@ export interface StockRecord {
   createdTime?: string | null;
   updatedTime?: string | null;
 }
+
+export type StockPage = PageResult<StockRecord>;
 
 export interface StockTransactionRecord {
   id: string;
@@ -452,6 +466,8 @@ export interface RequisitionQuery {
   pageNo?: number;
   pageSize?: number;
   projectId?: string;
+  dateFrom?: string;
+  dateTo?: string;
   contractId?: string;
   warehouseId?: string;
   approvalStatus?: string;

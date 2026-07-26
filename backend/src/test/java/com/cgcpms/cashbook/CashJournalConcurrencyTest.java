@@ -1,5 +1,6 @@
 package com.cgcpms.cashbook;
 
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.cashbook.constant.CashbookConstants;
 import com.cgcpms.cashbook.dto.CashJournalCreateRequest;
@@ -194,7 +195,7 @@ class CashJournalConcurrencyTest {
 
     private CashJournalService service(CashJournalEntryMapper mapper) {
         return new CashJournalService(mapper, accountMapper, accountService, contractMapper, projectAccessChecker,
-                changeLogMapper, fileMapper, objectMapper, alertService);
+                changeLogMapper, fileMapper, objectMapper, alertService, new AccountingPeriodGuard(jdbcTemplate));
     }
 
     private long createAccount(String code, String openingBalance) {

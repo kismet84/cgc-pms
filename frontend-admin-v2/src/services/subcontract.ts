@@ -1,7 +1,19 @@
 import {
   SUBCONTRACT_API,
+  type SettlementApprovalRecord,
+  type SettlementAttachmentRecord,
+  type SettlementCommand,
+  type SettlementCompute,
+  type SettlementCostRecord,
+  type SettlementItemCommand,
+  type SettlementItemRecord,
+  type SettlementKpi,
   type SettlementPage,
+  type SettlementPaymentRecord,
   type SettlementQuery,
+  type SettlementRecord,
+  type SettlementSources,
+  type SettlementVariationRecord,
   type SubcontractMeasureCommand,
   type SubcontractMeasureItemCommand,
   type SubcontractMeasureItemRecord,
@@ -75,6 +87,71 @@ export const submitSubcontractMeasure = (id: string) =>
 
 export const loadSettlements = (query: SettlementQuery = {}, signal?: AbortSignal) =>
   apiRequest<SettlementPage>(withQuery(SUBCONTRACT_API.settlements, query), { signal })
+
+export const loadSettlementKpi = (query: SettlementQuery = {}, signal?: AbortSignal) =>
+  apiRequest<SettlementKpi>(withQuery(SUBCONTRACT_API.settlementKpi, query), { signal })
+
+export const loadSettlement = (id: string, signal?: AbortSignal) =>
+  apiRequest<SettlementRecord>(SUBCONTRACT_API.settlement(requiredId(id)), { signal })
+
+export const createSettlement = (command: SettlementCommand) =>
+  apiRequest<string, SettlementCommand>(SUBCONTRACT_API.settlements, {
+    method: 'POST',
+    body: command,
+  })
+
+export const updateSettlement = (id: string, command: SettlementCommand) =>
+  apiRequest<void, SettlementCommand>(SUBCONTRACT_API.settlement(requiredId(id)), {
+    method: 'PUT',
+    body: command,
+  })
+
+export const deleteSettlement = (id: string) =>
+  apiRequest<void>(SUBCONTRACT_API.settlement(requiredId(id)), { method: 'DELETE' })
+
+export const loadSettlementItems = (id: string, signal?: AbortSignal) =>
+  apiRequest<SettlementItemRecord[]>(SUBCONTRACT_API.settlementItems(requiredId(id)), { signal })
+
+export const saveSettlementItems = (id: string, items: SettlementItemCommand[]) =>
+  apiRequest<void, SettlementItemCommand[]>(SUBCONTRACT_API.settlementItemsBatch(requiredId(id)), {
+    method: 'POST',
+    body: items,
+  })
+
+export const computeSettlement = (contractId: string, signal?: AbortSignal) =>
+  apiRequest<SettlementCompute>(SUBCONTRACT_API.settlementCompute(requiredId(contractId)), {
+    signal,
+  })
+
+export const loadSettlementSources = (id: string, signal?: AbortSignal) =>
+  apiRequest<SettlementSources>(SUBCONTRACT_API.settlementSources(requiredId(id)), { signal })
+
+export const loadSettlementVariations = (id: string, signal?: AbortSignal) =>
+  apiRequest<SettlementVariationRecord[]>(SUBCONTRACT_API.settlementVariations(requiredId(id)), {
+    signal,
+  })
+
+export const loadSettlementPayments = (id: string, signal?: AbortSignal) =>
+  apiRequest<SettlementPaymentRecord[]>(SUBCONTRACT_API.settlementPayments(requiredId(id)), {
+    signal,
+  })
+
+export const loadSettlementCosts = (id: string, signal?: AbortSignal) =>
+  apiRequest<SettlementCostRecord[]>(SUBCONTRACT_API.settlementCosts(requiredId(id)), { signal })
+
+export const loadSettlementAttachments = (id: string, signal?: AbortSignal) =>
+  apiRequest<SettlementAttachmentRecord[]>(SUBCONTRACT_API.settlementAttachments(requiredId(id)), {
+    signal,
+  })
+
+export const loadSettlementApprovalRecords = (id: string, signal?: AbortSignal) =>
+  apiRequest<SettlementApprovalRecord[]>(
+    SUBCONTRACT_API.settlementApprovalRecords(requiredId(id)),
+    { signal },
+  )
+
+export const submitSettlement = (id: string) =>
+  apiRequest<void>(SUBCONTRACT_API.settlementSubmit(requiredId(id)), { method: 'POST' })
 
 function requiredId(id: string): string {
   const normalized = id.trim()

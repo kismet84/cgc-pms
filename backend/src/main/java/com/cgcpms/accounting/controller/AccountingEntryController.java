@@ -7,6 +7,9 @@ import com.cgcpms.accounting.service.AccountingEntryService;
 import com.cgcpms.accounting.service.EntryGenerator;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.financeops.vo.FinanceWorkspaceVOs.AccountingEntryDetailVO;
+import com.cgcpms.financeops.vo.FinanceWorkspaceVOs.AccountingEntryLineVO;
+import com.cgcpms.financeops.vo.FinanceWorkspaceVOs.AccountingEntryVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -21,6 +24,29 @@ public class AccountingEntryController {
 
     private final AccountingEntryService entryService;
     private final EntryGenerator generator;
+
+    @GetMapping("/workspace")
+    @PreAuthorize("hasAuthority('accounting:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<PageResult<AccountingEntryVO>> workspace(
+            @RequestParam(defaultValue = "1") long pageNo,
+            @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) String entryStatus) {
+        IPage<AccountingEntry> page = entryService.getPage(pageNo, pageSize, projectId,
+                null, null, null, null, entryStatus);
+        return ApiResponse.success(new PageResult<>(page.getCurrent(), page.getSize(), page.getTotal(),
+                page.getRecords().stream().map(AccountingEntryVO::from).toList()));
+    }
+
+    @GetMapping("/workspace/{id}")
+    @PreAuthorize("hasAuthority('accounting:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<AccountingEntryDetailVO> workspaceDetail(@PathVariable Long id) {
+        AccountingEntry entry = entryService.getById(id);
+        List<AccountingEntryLine> lines = entryService.getLines(id);
+        Map<Long, String> subjectNames = entryService.getLineSubjectNames(lines);
+        return ApiResponse.success(new AccountingEntryDetailVO(AccountingEntryVO.from(entry),
+                lines.stream().map(line -> AccountingEntryLineVO.from(line, subjectNames)).toList()));
+    }
 
     @GetMapping
     @PreAuthorize("hasAuthority('accounting:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")

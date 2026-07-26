@@ -1,6 +1,7 @@
 package com.cgcpms.financeops;
 
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.financeops.dto.FinanceOperationsModels.*;
 import com.cgcpms.financeops.service.FinanceAnalyticsService;
 import com.cgcpms.financeops.service.FinanceIntegrationService;
@@ -30,6 +31,7 @@ class FinanceOperationsIntegrationTest {
     static final long PARTNER=98400105L, BUDGET=98400106L, LINE1=98400107L, LINE2=98400108L;
     static final long ACCOUNT1=98400109L, ACCOUNT2=98400110L;
     static final long REVENUE_CONTRACT=98400111L;
+    static final long INVOICE=98400112L;
     @Autowired FinanceOperationsService operations;
     @Autowired FinanceAnalyticsService analytics;
     @Autowired FinanceIntegrationService integrations;
@@ -50,6 +52,8 @@ class FinanceOperationsIntegrationTest {
         jdbc.update("INSERT INTO project_budget_line(id,tenant_id,budget_id,project_id,cost_subject_id,budget_amount,reserved_amount,consumed_amount,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,?,?,400,0,0,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",LINE2,BUDGET,PROJECT,SUBJECT2);
         jdbc.update("INSERT INTO fund_account(id,tenant_id,account_code,account_name,account_type,opening_date,opening_balance,enabled_flag,version,created_at,updated_at,deleted_flag) VALUES(?,0,'FINOPS-A1','账户1','BANK',CURRENT_DATE,1000,1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",ACCOUNT1);
         jdbc.update("INSERT INTO fund_account(id,tenant_id,account_code,account_name,account_type,opening_date,opening_balance,enabled_flag,version,created_at,updated_at,deleted_flag) VALUES(?,0,'FINOPS-A2','账户2','BANK',CURRENT_DATE,1000,1,0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",ACCOUNT2);
+        jdbc.update("INSERT INTO pay_invoice(id,tenant_id,invoice_no,invoice_amount,project_id,contract_id,partner_id,created_at,updated_at,deleted_flag) VALUES(?,0,'FINOPS-INV',100,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",
+                INVOICE,PROJECT,CONTRACT,PARTNER);
     }
 
     @Test
@@ -74,6 +78,29 @@ class FinanceOperationsIntegrationTest {
         var run=operations.runReconciliation(LocalDate.now());
         assertTrue(String.valueOf(run.get("status")).startsWith("COMPLETED"));
         assertFalse(operations.budgetVersionComparison(PROJECT).isEmpty());
+    }
+
+    @Test
+    void idempotencyAndInvoiceReadsFailClosedAcrossProjectScope() {
+        Map<String,Object> first = operations.adjustBudget(
+                new BudgetAdjustmentRequest(LINE1,new BigDecimal("100"),"授权测试","IT-SCOPE"));
+        Map<String,Object> replay = operations.adjustBudget(
+                new BudgetAdjustmentRequest(LINE1,new BigDecimal("100"),"授权测试","IT-SCOPE"));
+        assertEquals(first.get("id"), replay.get("id"));
+        assertEquals(0, new BigDecimal("700").compareTo(jdbc.queryForObject(
+                "SELECT budget_amount FROM project_budget_line WHERE id=?", BigDecimal.class, LINE1)));
+        BusinessException conflict = assertThrows(BusinessException.class, () ->
+                operations.adjustBudget(new BudgetAdjustmentRequest(LINE1,new BigDecimal("99"),"授权测试","IT-SCOPE")));
+        assertEquals("BUDGET_OPERATION_IDEMPOTENCY_CONFLICT", conflict.getCode());
+
+        UserContext.set(Jwts.claims().add("userId",2L).add("username","outsider").add("tenantId",0L)
+                .add("roleCodes", List.of()).build());
+        assertEquals("PROJECT_ACCESS_DENIED", assertThrows(BusinessException.class, () ->
+                operations.adjustBudget(new BudgetAdjustmentRequest(LINE1,new BigDecimal("100"),"授权测试","IT-SCOPE"))).getCode());
+        assertEquals("PROJECT_ACCESS_DENIED", assertThrows(BusinessException.class, () ->
+                operations.invoiceWriteOffProgress(INVOICE)).getCode());
+        assertEquals("PROJECT_ACCESS_DENIED", assertThrows(BusinessException.class, () ->
+                operations.markInvoiceException(INVOICE, new InvoiceExceptionRequest("SUSPECT","越权测试"))).getCode());
     }
 
     @Test

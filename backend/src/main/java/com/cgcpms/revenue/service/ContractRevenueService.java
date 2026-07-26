@@ -11,6 +11,8 @@ import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.service.CostSummaryService;
+import com.cgcpms.file.entity.SysFile;
+import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.contract.entity.CtContract;
@@ -25,6 +27,8 @@ import org.springframework.context.annotation.Lazy;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -59,8 +63,10 @@ public class ContractRevenueService {
     private final CostSubjectMapper costSubjectMapper;
     private final PmProjectMapper projectMapper;
     private final CtContractMapper contractMapper;
+    private final SysFileMapper sysFileMapper;
     private final CostSummaryService costSummaryService;
     private final CodeGenerationService codeGenerationService;
+    private final JdbcTemplate jdbcTemplate;
     @Lazy
     private final WorkflowEngine workflowEngine;
 
@@ -138,7 +144,7 @@ public class ContractRevenueService {
         revenue.setTenantId(UserContext.getCurrentTenantId());
         revenue.setApprovalStatus("DRAFT");
         revenue.setFormulaVersion("REVENUE_PROGRESS_V1");
-        revenue.setAttachmentCount(revenue.getAttachmentCount() == null ? 0 : revenue.getAttachmentCount());
+        revenue.setAttachmentCount(0);
         revenue.setVersion(0);
         boolean autoGenerateCode = !StringUtils.hasText(revenue.getRevenueCode());
         // 计算含税金额
@@ -176,7 +182,6 @@ public class ContractRevenueService {
         if (revenue.getRevenueTax() != null) existing.setRevenueTax(revenue.getRevenueTax());
         if (revenue.getBilledAmount() != null) existing.setBilledAmount(revenue.getBilledAmount());
         if (revenue.getBilledTax() != null) existing.setBilledTax(revenue.getBilledTax());
-        if (revenue.getAttachmentCount() != null) existing.setAttachmentCount(revenue.getAttachmentCount());
         // 计算含税金额
         if (existing.getRevenueAmount() != null && existing.getRevenueTax() != null) {
             existing.setRevenueAmountWithTax(existing.getRevenueAmount().add(existing.getRevenueTax()));
@@ -214,6 +219,7 @@ public class ContractRevenueService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void submitForApproval(Long id) {
+        lockRevenue(id);
         ContractRevenue existing = requireExisting(id);
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
             throw new BusinessException("REVENUE_SUBMIT_INVALID", "仅草稿状态可提交审批");
@@ -224,7 +230,8 @@ public class ContractRevenueService {
                 .eq(ContractRevenue::getId, id)
                 .eq(ContractRevenue::getTenantId, existing.getTenantId())
                 .eq(ContractRevenue::getApprovalStatus, "DRAFT")
-                .set(ContractRevenue::getApprovalStatus, "PENDING"));
+                .set(ContractRevenue::getApprovalStatus, "PENDING")
+                .set(ContractRevenue::getAttachmentCount, existing.getAttachmentCount()));
         if (rows != 1) {
             throw new BusinessException("REVENUE_SUBMIT_CONFLICT",
                     "收入确认单状态冲突：已被并发操作，请刷新后重试");
@@ -278,10 +285,17 @@ public class ContractRevenueService {
         CostItem item = buildRevenueCostItem(revenue);
         try {
             costItemMapper.insert(item);
-        } catch (Exception e) {
-            // unique constraint on cost source → 幂等
-            log.info("收入确认 cost_item 已存在（幂等） revenueId={}", id);
-            return;
+        } catch (DuplicateKeyException e) {
+            CostItem existing = costItemMapper.selectOne(new LambdaQueryWrapper<CostItem>()
+                    .eq(CostItem::getTenantId, revenue.getTenantId())
+                    .eq(CostItem::getSourceType, SOURCE_TYPE_CT_REVENUE)
+                    .eq(CostItem::getSourceId, revenue.getId()));
+            if (!sameRevenueCostItem(existing, revenue)) {
+                throw new BusinessException("REVENUE_COST_ITEM_IDEMPOTENCY_CONFLICT",
+                        "收入确认已存在不一致的成本调整项");
+            }
+            item = existing;
+            log.info("收入确认 cost_item 已存在且上下文一致 revenueId={} costItemId={}", id, item.getId());
         }
 
         // 2. 回写关联
@@ -352,8 +366,13 @@ public class ContractRevenueService {
         if (revenue.getRevenueAmount() == null || revenue.getRevenueAmount().signum() <= 0) {
             throw new BusinessException("REVENUE_AMOUNT_INVALID", "本期确认收入必须大于零");
         }
-        if (submitting && (revenue.getAttachmentCount() == null || revenue.getAttachmentCount() < 1)) {
-            throw new BusinessException("REVENUE_ATTACHMENT_REQUIRED", "收入确认提交审批前必须上传履约或产值依据");
+        if (submitting) {
+            long cleanAttachmentCount = countCleanAttachments(revenue.getId(), tenantId);
+            if (cleanAttachmentCount < 1) {
+                throw new BusinessException("REVENUE_ATTACHMENT_REQUIRED",
+                        "收入确认提交审批前必须上传病毒扫描通过的履约或产值依据");
+            }
+            revenue.setAttachmentCount(Math.toIntExact(cleanAttachmentCount));
         }
         LambdaQueryWrapper<ContractRevenue> amountQuery = new LambdaQueryWrapper<ContractRevenue>()
                 .eq(ContractRevenue::getTenantId, tenantId)
@@ -393,6 +412,42 @@ public class ContractRevenueService {
         item.setCostStatus("CONFIRMED");
         item.setGeneratedFlag(1);
         return item;
+    }
+
+    private void lockRevenue(Long id) {
+        try {
+            jdbcTemplate.queryForObject("""
+                    SELECT id
+                    FROM contract_revenue
+                    WHERE id=? AND tenant_id=? AND deleted_flag=0
+                    FOR UPDATE
+                    """, Long.class, id, UserContext.getCurrentTenantId());
+        } catch (EmptyResultDataAccessException e) {
+            throw new BusinessException("REVENUE_NOT_FOUND", "收入确认单不存在");
+        }
+    }
+
+    private long countCleanAttachments(Long revenueId, Long tenantId) {
+        if (revenueId == null) return 0;
+        return sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getTenantId, tenantId)
+                .eq(SysFile::getBusinessType, "CONTRACT_REVENUE")
+                .eq(SysFile::getBusinessId, revenueId)
+                .eq(SysFile::getVirusScanStatus, "CLEAN")
+                .ne(SysFile::getDocumentType, "GENERATED_DOCUMENT"));
+    }
+
+    private boolean sameRevenueCostItem(CostItem item, ContractRevenue revenue) {
+        return item != null
+                && Objects.equals(item.getProjectId(), revenue.getProjectId())
+                && Objects.equals(item.getContractId(), revenue.getContractId())
+                && sameMoney(item.getAmount(), revenue.getRevenueAmount())
+                && sameMoney(item.getTaxAmount(), revenue.getRevenueTax())
+                && Objects.equals(item.getCostType(), COST_TYPE_REVENUE_CONFIRMED);
+    }
+
+    private boolean sameMoney(BigDecimal left, BigDecimal right) {
+        return left != null && right != null && left.compareTo(right) == 0;
     }
 
     /**

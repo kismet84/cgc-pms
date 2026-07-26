@@ -104,6 +104,23 @@ class MatStockServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("库存台账默认返回仓库内全部库存余额")
+    void testStockPageDoesNotRequireMaterialFilter() {
+        MatStock stock = stockService.stockIn(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("12.5000"));
+
+        var page = stockService.getPage(WAREHOUSE_ID, null, null, null, 1, 20);
+
+        assertTrue(page.getRecords().stream().anyMatch(item -> stock.getId().equals(item.getId())));
+        var record = page.getRecords().stream()
+                .filter(item -> stock.getId().equals(item.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertEquals(new BigDecimal("12.5000"), record.getAvailableQty());
+        assertEquals("WH-STOCK-TEST", record.getWarehouseName());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("REGRESSION: 收货来源入库保留库存流水来源")
     void testStockInKeepsReceiptSourceOnTxn() {
         long receiptId = 88002002L;

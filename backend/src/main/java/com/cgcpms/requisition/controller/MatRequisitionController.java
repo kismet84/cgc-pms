@@ -13,8 +13,10 @@ import jakarta.validation.Validator;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -34,9 +36,11 @@ public class MatRequisitionController {
             @RequestParam(required = false) Long contractId,
             @RequestParam(required = false) Long warehouseId,
             @RequestParam(required = false) String approvalStatus,
-            @RequestParam(required = false) String requisitionCode) {
+            @RequestParam(required = false) String requisitionCode,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo) {
         PageResult<MatRequisitionVO> page = requisitionService.getPage(pageNo, pageSize, projectId,
-                contractId, warehouseId, approvalStatus, requisitionCode);
+                contractId, warehouseId, approvalStatus, requisitionCode, dateFrom, dateTo);
         return ApiResponse.success(page);
     }
 

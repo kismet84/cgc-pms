@@ -50,6 +50,13 @@ describe('M6 subcontract task and measure V2', () => {
         delete: 'subcontract:measure:delete',
         submit: 'subcontract:measure:submit',
       },
+      settlement: {
+        query: 'settlement:query',
+        add: 'settlement:add',
+        edit: 'settlement:edit',
+        delete: 'settlement:delete',
+        submit: 'settlement:submit',
+      },
     })
   })
 

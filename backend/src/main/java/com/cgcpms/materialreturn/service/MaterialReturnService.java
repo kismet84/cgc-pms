@@ -49,7 +49,10 @@ public class MaterialReturnService {
         MaterialReturn existing = returnMapper.selectOne(new LambdaQueryWrapper<MaterialReturn>()
                 .eq(MaterialReturn::getTenantId, tenantId)
                 .eq(MaterialReturn::getIdempotencyKey, request.idempotencyKey()));
-        if (existing != null) return existing.getId();
+        if (existing != null) {
+            projectAccessChecker.checkAccess(existing.getProjectId(), "确认材料退料");
+            return resolveExisting(existing, request, tenantId);
+        }
 
         MatRequisitionItem requisitionItem = requisitionItemMapper.selectById(request.requisitionItemId());
         if (requisitionItem == null || !tenantId.equals(requisitionItem.getTenantId())) {
@@ -141,6 +144,22 @@ public class MaterialReturnService {
         reversal.setRemark("冲销原领料成本 " + originalCost.getId() + "：" + request.reason().trim());
         costItemMapper.insert(reversal);
         return materialReturn.getId();
+    }
+
+    private Long resolveExisting(MaterialReturn existing, MaterialReturnRequest request, Long tenantId) {
+        MaterialReturnItem item = returnItemMapper.selectOne(new LambdaQueryWrapper<MaterialReturnItem>()
+                .eq(MaterialReturnItem::getTenantId, tenantId)
+                .eq(MaterialReturnItem::getReturnId, existing.getId()));
+        if (item == null
+                || !Objects.equals(item.getRequisitionItemId(), request.requisitionItemId())
+                || !Objects.equals(item.getOriginalStockTxnId(), request.originalStockTxnId())
+                || item.getQuantity() == null
+                || item.getQuantity().compareTo(request.quantity()) != 0
+                || !Objects.equals(existing.getReturnDate(), request.returnDate())
+                || !Objects.equals(existing.getReason(), request.reason().trim())) {
+            throw new BusinessException("MATERIAL_RETURN_IDEMPOTENCY_CONFLICT", "幂等键已被不同退料请求使用");
+        }
+        return existing.getId();
     }
 
     @Transactional(rollbackFor = Exception.class)

@@ -273,9 +273,10 @@ class Phase4IntegrationTest {
         jdbcTemplate.update("""
                 INSERT INTO sys_file(id, tenant_id, business_type, document_type, business_id,
                     file_name, original_name, file_size, content_type, storage_path, bucket_name,
-                    created_at, updated_at, deleted_flag)
+                    virus_scan_status, created_at, updated_at, deleted_flag)
                 VALUES(?, 0, 'INVOICE', 'ELECTRONIC_INVOICE', ?, 'invoice.pdf', 'invoice.pdf',
-                    128, 'application/pdf', ?, 'cgc-pms', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
+                    128, 'application/pdf', ?, 'cgc-pms', 'CLEAN',
+                    CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
                 """, System.nanoTime(), invoiceId, "INVOICE/" + invoiceId + "/invoice.pdf");
 
         // 4. 核验通过 → VERIFIED

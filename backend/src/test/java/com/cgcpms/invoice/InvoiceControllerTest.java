@@ -174,6 +174,19 @@ class InvoiceControllerTest {
                 .andExpect(jsonPath("$.data.total").isString());
     }
 
+    @Test
+    @Order(2)
+    @DisplayName("GET /invoices filters by accessible project")
+    void testListByProject() throws Exception {
+        mockMvc.perform(getWithApi("/invoices")
+                        .cookie(adminCookie())
+                        .param("projectId", String.valueOf(Long.MAX_VALUE)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.records").isEmpty())
+                .andExpect(jsonPath("$.data.total").value("0"));
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // POST create
     // ═══════════════════════════════════════════════════════════════
@@ -337,9 +350,10 @@ class InvoiceControllerTest {
             jdbcTemplate.update("""
                     INSERT INTO sys_file(id, tenant_id, business_type, document_type, business_id,
                         file_name, original_name, file_size, content_type, storage_path, bucket_name,
-                        created_at, updated_at, deleted_flag)
+                        virus_scan_status, created_at, updated_at, deleted_flag)
                     VALUES(?, 0, 'INVOICE', 'ELECTRONIC_INVOICE', ?, 'invoice.pdf', 'invoice.pdf',
-                        128, 'application/pdf', ?, 'cgc-pms', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
+                        128, 'application/pdf', ?, 'cgc-pms', 'CLEAN',
+                        CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
                     """, System.nanoTime(), invoiceId, "INVOICE/" + invoiceId + "/invoice.pdf");
         } finally {
             clearUserContext();

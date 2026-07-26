@@ -2,6 +2,13 @@
 SET @demo_user := (SELECT id FROM sys_user WHERE tenant_id=0 AND username='admin' AND deleted_flag=0 LIMIT 1);
 SET @demo_subject := (SELECT id FROM cost_subject WHERE tenant_id=0 AND status='ENABLE' AND deleted_flag=0 ORDER BY sort_order,id LIMIT 1);
 
+INSERT INTO ct_contract_item
+  (id,tenant_id,contract_id,item_code,item_name,item_spec,unit,quantity,unit_price,amount,tax_rate,tax_amount,amount_without_tax,
+   sort_order,created_by,updated_by,remark,created_at,updated_at,deleted_flag)
+VALUES
+  (520000000000002103,0,520000000000000703,'M52-SUB-ITEM-001','主体结构劳务','按已审批计量据实结算','项',10,200000,2000000,
+   0,0,2000000,1,@demo_user,@demo_user,'结算来源合同清单项',NOW(),NOW(),0);
+
 INSERT INTO sub_measure
   (id,tenant_id,project_id,contract_id,partner_id,measure_code,measure_period,measure_date,reported_amount,approved_amount,
    deduction_amount,net_amount,approval_status,cost_generated_flag,status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
@@ -10,10 +17,10 @@ VALUES
    200000,200000,10000,190000,'APPROVED',1,'CONFIRMED',@demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1');
 
 INSERT INTO sub_measure_item
-  (id,tenant_id,measure_id,item_name,unit,contract_quantity,current_quantity,cumulative_quantity,unit_price,amount,
+  (id,tenant_id,measure_id,contract_item_id,item_name,unit,contract_quantity,current_quantity,cumulative_quantity,unit_price,amount,
    created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000002102,0,520000000000002101,'主体结构劳务','项',1,1,1,200000,200000,
+  (520000000000002102,0,520000000000002101,520000000000002103,'主体结构劳务','项',10,1,1,200000,200000,
    @demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1');
 
 INSERT INTO stl_settlement
@@ -29,7 +36,7 @@ INSERT INTO stl_settlement_item
   (id,tenant_id,settlement_id,item_name,unit,quantity,unit_price,amount,cost_subject_id,source_type,source_id,
    created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000002202,0,520000000000002201,'主体结构劳务结算','项',1,190000,190000,@demo_subject,'SUB_MEASURE',520000000000002101,
+  (520000000000002202,0,520000000000002201,'主体结构劳务','项',1,200000,200000,@demo_subject,'CT_CONTRACT',520000000000002103,
    @demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1');
 
 INSERT INTO fund_account

@@ -3,6 +3,10 @@ package com.cgcpms.settlement;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
+import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostItemMapper;
@@ -18,9 +22,12 @@ import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.service.SettlementAmountPolicy;
 import com.cgcpms.settlement.service.StlSettlementWriteService;
 import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.entity.SubMeasureItem;
+import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.Cookie;
@@ -62,6 +69,14 @@ class StlSettlementControllerMockMvcTest {
     private JwtUtils jwtUtils;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private ObjectMapper objectMapper;
+    @Autowired
+    private CtContractMapper contractMapper;
+    @Autowired
+    private CtContractItemMapper contractItemMapper;
+    @Autowired
+    private SubMeasureItemMapper subMeasureItemMapper;
 
     @Autowired
     private StlSettlementWriteService stlSettlementWriteService;
@@ -92,6 +107,7 @@ class StlSettlementControllerMockMvcTest {
 
     private Long settlementId;
     private Long measureId;
+    private Long seededContractItemId;
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
@@ -159,7 +175,13 @@ class StlSettlementControllerMockMvcTest {
                     .eq(PayApplication::getTenantId, TENANT_ID));
             costSubjectMapper.deleteById(COST_SUBJECT_ID);
             settlementMapper.deleteById(settlementId);
+            subMeasureItemMapper.delete(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<SubMeasureItem>()
+                            .eq(SubMeasureItem::getMeasureId, measureId));
             subMeasureMapper.deleteById(measureId);
+            if (seededContractItemId != null) {
+                contractItemMapper.deleteById(seededContractItemId);
+            }
         } finally {
             clearUserContext();
         }
@@ -290,6 +312,47 @@ class StlSettlementControllerMockMvcTest {
                 .andExpect(jsonPath("$.code").value("0"));
     }
 
+    @Test
+    @Order(7)
+    @DisplayName("POST/PUT /settlements accepts contract-scoped command without projectId")
+    void testCreateAndUpdateWithoutProjectId() throws Exception {
+        CtContract contract = contractMapper.selectById(CONTRACT_ID);
+        contract.setId(null);
+        contract.setContractCode("CT-SETTLEMENT-MVC-" + System.nanoTime());
+        contract.setContractName("结算控制器命令测试合同");
+        contractMapper.insert(contract);
+        Long createdSettlementId = null;
+        try {
+            String body = mockMvc.perform(postWithApi("/settlements")
+                            .cookie(adminCookie())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"contractId":"%s","settlementType":"FINAL","remark":"无项目字段创建"}
+                                    """.formatted(contract.getId())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"))
+                    .andExpect(jsonPath("$.data").isString())
+                    .andReturn().getResponse().getContentAsString();
+            createdSettlementId = Long.valueOf(objectMapper.readTree(body).path("data").asText());
+
+            mockMvc.perform(put("/api/settlements/" + createdSettlementId)
+                            .contextPath("/api")
+                            .cookie(adminCookie())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"contractId":"%s","settlementType":"FINAL",
+                                     "deductionAmount":"0.00","remark":"无项目字段更新"}
+                                    """.formatted(contract.getId())))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"));
+        } finally {
+            if (createdSettlementId != null) {
+                settlementMapper.deleteById(createdSettlementId);
+            }
+            contractMapper.deleteById(contract.getId());
+        }
+    }
+
     // ---- helpers ----
 
     private MockHttpServletRequestBuilder getWithApi(String pathWithinContext) {
@@ -326,6 +389,35 @@ class StlSettlementControllerMockMvcTest {
         measure.setCostGeneratedFlag(1);
         subMeasureMapper.insert(measure);
         measureId = measure.getId();
+        CtContractItem contractItem = contractItemMapper.selectList(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CtContractItem>()
+                        .eq(CtContractItem::getTenantId, TENANT_ID)
+                        .eq(CtContractItem::getContractId, CONTRACT_ID)
+                        .orderByAsc(CtContractItem::getId)
+                        .last("LIMIT 1")).stream().findFirst().orElse(null);
+        if (contractItem == null) {
+            contractItem = new CtContractItem();
+            contractItem.setTenantId(TENANT_ID);
+            contractItem.setContractId(CONTRACT_ID);
+            contractItem.setItemCode("CI-SETTLEMENT-CONTROLLER-001");
+            contractItem.setItemName("控制器结算清单");
+            contractItem.setUnit("项");
+            contractItem.setQuantity(new BigDecimal("10.0000"));
+            contractItem.setUnitPrice(new BigDecimal("4800.00"));
+            contractItem.setAmount(new BigDecimal("48000.00"));
+            contractItemMapper.insert(contractItem);
+            seededContractItemId = contractItem.getId();
+        }
+        SubMeasureItem item = new SubMeasureItem();
+        item.setTenantId(TENANT_ID);
+        item.setMeasureId(measureId);
+        item.setContractItemId(contractItem.getId());
+        item.setItemName(contractItem.getItemName());
+        item.setUnit(contractItem.getUnit());
+        item.setCurrentQuantity(BigDecimal.ONE);
+        item.setUnitPrice(contractItem.getUnitPrice());
+        item.setAmount(contractItem.getUnitPrice());
+        subMeasureItemMapper.insert(item);
     }
 
     private void seedVariation() {

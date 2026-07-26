@@ -31,6 +31,8 @@ public class FileController {
             + " and hasAuthority('site:daily:edit'))"
             + " or (#businessType != null and #businessType.equalsIgnoreCase('SUBCONTRACT')"
             + " and hasAuthority('subcontract:measure:edit'))"
+            + " or (#businessType != null and #businessType.equalsIgnoreCase('SETTLEMENT')"
+            + " and hasAuthority('settlement:edit'))"
             + " or (#businessType != null and #businessType.equalsIgnoreCase('PRODUCTION_MEASUREMENT') and ("
             + " ((#documentType.equalsIgnoreCase('MEASUREMENT_GENERAL') or #documentType.toUpperCase().startsWith('ML_')) and hasAuthority('measurement:submit'))"
             + " or (#documentType.equalsIgnoreCase('OWNER_SUBMISSION') and hasAuthority('measurement:owner:submit'))))"
@@ -55,6 +57,7 @@ public class FileController {
             + " or hasAuthority('cashbook:journal:query') or hasAuthority('site:daily:query')"
             + " or hasAuthority('measurement:query')"
             + " or hasAuthority('subcontract:measure:query')"
+            + " or hasAuthority('settlement:query')"
             + " or hasAuthority('variation:order:query') or hasAuthority('variation:trace')")
     public ApiResponse<String> getUrl(@PathVariable Long id) {
         return ApiResponse.success(fileService.getPresignedUrl(id));
@@ -65,6 +68,7 @@ public class FileController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:delete')"
             + " or hasAuthority('cashbook:journal:maintain') or hasAuthority('site:daily:edit')"
             + " or hasAuthority('subcontract:measure:edit')"
+            + " or hasAuthority('settlement:edit')"
             + " or hasAuthority('variation:order:edit') or hasAuthority('variation:owner:submit')"
             + " or hasAuthority('variation:owner:review')"
             + " or hasAuthority('measurement:submit') or hasAuthority('measurement:owner:submit')"
@@ -82,6 +86,8 @@ public class FileController {
             + " and hasAuthority('site:daily:query'))"
             + " or (#businessType != null and #businessType.equalsIgnoreCase('SUBCONTRACT')"
             + " and hasAuthority('subcontract:measure:query'))"
+            + " or (#businessType != null and #businessType.equalsIgnoreCase('SETTLEMENT')"
+            + " and hasAuthority('settlement:query'))"
             + " or (#businessType != null and (#businessType.equalsIgnoreCase('PRODUCTION_MEASUREMENT')"
             + " or #businessType.equalsIgnoreCase('OWNER_MEASUREMENT_SUBMISSION')) and hasAuthority('measurement:query'))"
             + " or (#businessType != null and #businessType.equalsIgnoreCase('VARIATION')"
