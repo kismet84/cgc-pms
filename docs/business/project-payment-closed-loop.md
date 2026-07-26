@@ -1,6 +1,6 @@
 # CGC-PMS 项目资金支出闭环业务标准
 
-状态：Locally Implemented / CI Pending / Production Blocked
+状态：Development Passed / Production Blocked
 基线日期：2026-07-26
 适用范围：项目资金支出主线
 事实基线：当前资金支出闭环交付分支、B215基线及V216—V233增量迁移；结论不冒充目标环境发布证据
@@ -16,7 +16,7 @@
 | --- | --- |
 | 唯一全局父项 | `PROJECT-PAYMENT-CLOSED-LOOP`，P0 |
 | 当前阶段 | S1—S4本地实施与验收完成 |
-| 后续阶段 | PPCL-11同HEAD SHA CI待首次非Draft PR前执行 |
+| 后续阶段 | PPCL-11已由功能提交`7a28d661c09cdcb38c6e941ef5c1b537a97c82a2`的同SHA CI run `30221661061`验证通过 |
 | 内部验收子键 | `PPCL-01`—`PPCL-11`；不得复制进 `current-issues.json` |
 | 当前活动问题源 | `current-issues.json` 保持14项；本支线不新增第二状态源 |
 | 授权 | 已授权本地业务实现、migration、本地数据库和运行态验证；不含Git交付、目标环境或生产 |
@@ -1030,7 +1030,7 @@ P0-1 历史金额处置必须遵循以下顺序：
 5. 驳回、撤回、失败、重复、冲销和跨租户场景均不产生孤儿数据或重复金额。
 6. 历史数据迁移有正式差异报告、处置结果和回滚/补偿方案。
 
-当前裁决：`Locally Implemented / CI Pending / Production Blocked`。`PPCL-01`—`PPCL-10`本地关闭，`PPCL-11`除同HEAD SHA CI外本地通过；首次非Draft PR前未取得同HEAD SHA CI，正式开发闭环不通过。3项既有`REL-*`生产发布门未解除前，生产不通过、禁止上线。
+当前裁决：`Development Passed / Production Blocked`。`PPCL-01`—`PPCL-11`均已关闭；功能提交`7a28d661c09cdcb38c6e941ef5c1b537a97c82a2`的同SHA CI run `30221661061`共13项全绿，正式开发闭环通过。3项既有`REL-*`生产发布门未解除前，生产不通过、禁止上线。
 
 ## 13. 2026-07-16历史实施收口与当前证据边界
 
