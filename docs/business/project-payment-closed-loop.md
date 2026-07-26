@@ -1,9 +1,9 @@
 # CGC-PMS 项目资金支出闭环业务标准
 
-状态：Locally Implemented / CI Pending / Production Blocked
+状态：Development Passed / Production Blocked
 基线日期：2026-07-26
 适用范围：项目资金支出主线
-事实基线：`master@6b134b423a3f3f770b8a4e45cb1456ce3484ea91` 上的当前未提交工作区、B215基线及V216—V231增量迁移；结论不冒充HEAD已包含本轮修改
+事实基线：当前资金支出闭环交付分支、B215基线及V216—V233增量迁移；结论不冒充目标环境发布证据
 结论：`PPCL-01`—`PPCL-10` 已完成本地实现与验收，`PPCL-11` 的真实角色FLOW-001、负向、并发、迁移、权限和本地全量已通过；同HEAD SHA CI未取得，正式开发闭环尚不通过，生产继续禁止上线
 
 > 本文是 CGC-PMS “项目资金支出”主线的唯一业务标准。后续需求、数据迁移、接口、页面、审批、测试和上线验收若与本文冲突，必须先修订本文并完成评审，禁止在实现阶段自行改变金额口径、状态机或追溯关系。
@@ -16,7 +16,7 @@
 | --- | --- |
 | 唯一全局父项 | `PROJECT-PAYMENT-CLOSED-LOOP`，P0 |
 | 当前阶段 | S1—S4本地实施与验收完成 |
-| 后续阶段 | PPCL-11同HEAD SHA CI待首次非Draft PR前执行 |
+| 后续阶段 | PPCL-11已由功能提交`7a28d661c09cdcb38c6e941ef5c1b537a97c82a2`的同SHA CI run `30221661061`验证通过 |
 | 内部验收子键 | `PPCL-01`—`PPCL-11`；不得复制进 `current-issues.json` |
 | 当前活动问题源 | `current-issues.json` 保持14项；本支线不新增第二状态源 |
 | 授权 | 已授权本地业务实现、migration、本地数据库和运行态验证；不含Git交付、目标环境或生产 |
@@ -1030,7 +1030,7 @@ P0-1 历史金额处置必须遵循以下顺序：
 5. 驳回、撤回、失败、重复、冲销和跨租户场景均不产生孤儿数据或重复金额。
 6. 历史数据迁移有正式差异报告、处置结果和回滚/补偿方案。
 
-当前裁决：`Locally Implemented / CI Pending / Production Blocked`。`PPCL-01`—`PPCL-10`本地关闭，`PPCL-11`除同HEAD SHA CI外本地通过；首次非Draft PR前未取得同HEAD SHA CI，正式开发闭环不通过。3项既有`REL-*`生产发布门未解除前，生产不通过、禁止上线。
+当前裁决：`Development Passed / Production Blocked`。`PPCL-01`—`PPCL-11`均已关闭；功能提交`7a28d661c09cdcb38c6e941ef5c1b537a97c82a2`的同SHA CI run `30221661061`共13项全绿，正式开发闭环通过。3项既有`REL-*`生产发布门未解除前，生产不通过、禁止上线。
 
 ## 13. 2026-07-16历史实施收口与当前证据边界
 
@@ -1087,8 +1087,8 @@ P0-1 历史金额处置必须遵循以下顺序：
 | 金额时点 | PayRecord SUCCESS只生成唯一待归档日记和DRAFT凭证；CashJournal ARCHIVED才把对应占用转为消耗并更新现金 |
 | 不可变事实 | 已分配或已核验发票不可删除；归档证据要求类型、CLEAN、同租户；归档前凭证不可过账 |
 | Dashboard与Trace | 汇总使用服务端预算、已归档现金、有效付款和动态成本事实；核心事实进入统一Trace，错链显式失败、跨租户零泄漏 |
-| 数据库 | 新增V224—V231 MySQL/H2镜像；本地MySQL八个版本均`success=1` |
-| 自动化 | 后端274类2292项通过；Legacy 133文件740项通过；V2 49文件361项通过；真实角色Chromium FLOW-001 1/1通过 |
+| 数据库 | 新增V224—V233 MySQL/H2迁移；本地MySQL十个版本均`success=1` |
+| 自动化 | 后端272类2282项通过；Legacy 131文件734项通过；V2 48文件351项通过；真实角色Chromium FLOW-001 1/1通过 |
 
 本地运行态：后端`http://localhost:8080/api/actuator/health`返回`UP`，Legacy入口`http://localhost:5173/`，V2入口`http://localhost:5174/`。这些证据只证明本地工作区，不替代同HEAD CI或目标环境。
 

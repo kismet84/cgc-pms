@@ -21,7 +21,6 @@ import {
   V2Button,
   V2Card,
   V2ConfirmDialog,
-  V2Dialog,
   V2Input,
   V2PageState,
   V2Select,
@@ -40,8 +39,8 @@ import {
   loadBudgetPage,
   loadPartners,
   loadProjectContextOptions,
-  submitContract,
   saveContractBudgetAllocations,
+  submitContract,
   updateContractComposite,
 } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
@@ -667,14 +666,12 @@ async function saveContract(): Promise<void> {
   try {
     if (mode.value === 'create') {
       const id = await createContractComposite(command)
-      detail.value = await loadContractComposite(id)
-      await backToLedger()
+      await router.replace({ path: `/contract/${id}`, query: route.query })
       successMessage.value = '合同已创建，并已刷新最新数据。'
       return
     }
     await updateContractComposite(contractId.value, command)
     await loadDetail(true)
-    await backToLedger()
     successMessage.value = '合同已保存，并已刷新最新数据。'
   } catch (error) {
     errorMessage.value = errorText(error, '合同保存失败')
@@ -700,7 +697,6 @@ async function submitCurrentContract(): Promise<void> {
       currentContract.value?.version ?? form.value.contract.version,
     )
     await loadDetail(true)
-    await backToLedger()
     successMessage.value = '合同已提交审批。'
   } catch (error) {
     errorMessage.value = errorText(error, '合同提交失败')
@@ -746,8 +742,8 @@ function openCreate(): void {
   void router.push({ path: '/contract/create', query: route.query })
 }
 
-async function backToLedger(): Promise<void> {
-  await router.push({ path: '/contract/ledger', query: route.query })
+function backToLedger(): void {
+  void router.push({ path: '/contract/ledger', query: route.query })
 }
 
 async function applyPresetView(preset: (typeof CONTRACT_PRESET_VIEWS)[number]): Promise<void> {
@@ -774,16 +770,12 @@ watch(
   () => route.fullPath,
   async () => {
     await loadReferenceData()
-    if (mode.value === 'ledger') {
-      await loadLedger()
+    if (mode.value === 'ledger') await loadLedger()
+    else if (mode.value === 'create') {
+      resetNotices()
+      startCreate()
     } else {
-      if (!contracts.value.length) await loadLedger(true)
-      if (mode.value === 'create') {
-        resetNotices()
-        startCreate()
-      } else {
-        await loadDetail()
-      }
+      await loadDetail()
     }
   },
   { immediate: true },
@@ -807,7 +799,7 @@ onBeforeUnmount(() => {
       :heading-level="1"
     />
 
-    <template v-else>
+    <template v-else-if="mode === 'ledger'">
       <V2Card
         class="contract-page__list-card"
         title="合同台账"
@@ -817,7 +809,7 @@ onBeforeUnmount(() => {
         <template #actions>
           <V2Button v-if="canCreate" size="small" @click="openCreate">新建合同</V2Button>
         </template>
-        <dl v-if="kpi" class="v2-ledger-kpis v2-ledger-kpis--five">
+        <dl v-if="kpi" class="contract-page__kpi-grid">
           <div>
             <dt>合同总数</dt>
             <dd>{{ kpi.totalCount }}</dd>
@@ -947,64 +939,64 @@ onBeforeUnmount(() => {
       </V2Card>
     </template>
 
-    <V2Dialog
-      :open="mode !== 'ledger' && (mode === 'create' || Boolean(detail))"
-      :title="contractTitle()"
-      :description="mode === 'detail' ? '查看合同台账详情。' : '维护合同及其清单和付款条款。'"
-      :close-on-backdrop="mode === 'detail'"
-      :close-disabled="saving || submitting || deleting"
-      panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-wide"
-      @close="backToLedger"
-    >
+    <template v-else-if="mode === 'create' || detail">
+      <V2Card :title="contractTitle()" title-id="contract-title" :heading-level="1">
+        <template #actions>
+          <div class="contract-page__actions">
+            <V2Button size="small" variant="ghost" @click="backToLedger">返回台账</V2Button>
+            <V2Button
+              v-if="mode === 'detail' && canEdit && currentContractIsDraft"
+              size="small"
+              variant="secondary"
+              @click="openEdit"
+              >编辑</V2Button
+            >
+            <V2Button
+              v-if="mode === 'detail' && canSubmit && currentContractIsDraft"
+              size="small"
+              :loading="submitting"
+              @click="submitCurrentContract"
+              >提交审批</V2Button
+            >
+            <V2Button
+              v-if="mode === 'detail' && canDelete && currentContractIsDraft"
+              size="small"
+              variant="danger"
+              :loading="deleting"
+              @click="pendingDelete = true"
+              >删除</V2Button
+            >
+          </div>
+        </template>
+      </V2Card>
+
       <div v-if="mode === 'detail' && currentContract" class="contract-page__detail-grid">
-        <section class="v2-detail-dialog__section">
-          <div class="v2-detail-dialog__section-heading"><h3>合同头</h3></div>
-          <dl class="v2-detail-dialog__facts">
-            <div>
-              <dt>项目</dt>
-              <dd>{{ projectLabel(currentContract.projectId) }}</dd>
-            </div>
-            <div>
-              <dt>甲方</dt>
-              <dd>{{ currentContract.partyAName || partnerLabel(currentContract.partyAId) }}</dd>
-            </div>
-            <div>
-              <dt>乙方</dt>
-              <dd>{{ currentContract.partyBName || partnerLabel(currentContract.partyBId) }}</dd>
-            </div>
-            <div>
-              <dt>合同额</dt>
-              <dd>{{ formatAmount(currentContract.contractAmount) }}</dd>
-            </div>
-            <div>
-              <dt>当前额</dt>
-              <dd>{{ formatAmount(currentContract.currentAmount) }}</dd>
-            </div>
-            <div>
-              <dt>已付额</dt>
-              <dd>{{ formatAmount(currentContract.paidAmount) }}</dd>
-            </div>
-            <div>
-              <dt>结算额</dt>
-              <dd>{{ formatAmount(currentContract.settlementAmount) }}</dd>
-            </div>
-            <div>
-              <dt>税额</dt>
-              <dd>{{ formatAmount(currentContract.taxAmount) }}</dd>
-            </div>
-            <div>
-              <dt>不含税额</dt>
-              <dd>{{ formatAmount(currentContract.amountWithoutTax) }}</dd>
-            </div>
-            <div>
-              <dt>审批状态</dt>
-              <dd>{{ approvalStatusLabel(currentContract.approvalStatus) }}</dd>
-            </div>
+        <V2Card title="合同头">
+          <dl>
+            <dt>项目</dt>
+            <dd>{{ projectLabel(currentContract.projectId) }}</dd>
+            <dt>甲方</dt>
+            <dd>{{ currentContract.partyAName || partnerLabel(currentContract.partyAId) }}</dd>
+            <dt>乙方</dt>
+            <dd>{{ currentContract.partyBName || partnerLabel(currentContract.partyBId) }}</dd>
+            <dt>合同额</dt>
+            <dd>{{ formatAmount(currentContract.contractAmount) }}</dd>
+            <dt>当前额</dt>
+            <dd>{{ formatAmount(currentContract.currentAmount) }}</dd>
+            <dt>已付额</dt>
+            <dd>{{ formatAmount(currentContract.paidAmount) }}</dd>
+            <dt>结算额</dt>
+            <dd>{{ formatAmount(currentContract.settlementAmount) }}</dd>
+            <dt>税额</dt>
+            <dd>{{ formatAmount(currentContract.taxAmount) }}</dd>
+            <dt>不含税额</dt>
+            <dd>{{ formatAmount(currentContract.amountWithoutTax) }}</dd>
+            <dt>审批状态</dt>
+            <dd>{{ approvalStatusLabel(currentContract.approvalStatus) }}</dd>
           </dl>
-        </section>
-        <section v-if="canQueryBudget" class="v2-detail-dialog__section">
-          <div class="v2-detail-dialog__section-heading">
-            <h3>合同预算</h3>
+        </V2Card>
+        <V2Card v-if="canQueryBudget" title="合同预算">
+          <template #actions>
             <div class="contract-page__inline-actions">
               <template v-if="allocationEditing">
                 <V2Button type="button" size="small" variant="ghost" @click="addAllocation"
@@ -1034,7 +1026,7 @@ onBeforeUnmount(() => {
                 >编辑分配</V2Button
               >
             </div>
-          </div>
+          </template>
           <div
             v-if="allocationEditing || budgetAllocations.length"
             class="contract-page__table-wrap"
@@ -1103,12 +1095,11 @@ onBeforeUnmount(() => {
             description="提交审批前需按已生效预算科目完成分配。"
             :heading-level="3"
           />
-        </section>
-        <section class="v2-detail-dialog__section">
-          <div class="v2-detail-dialog__section-heading">
-            <h3>合同清单</h3>
+        </V2Card>
+        <V2Card title="合同清单">
+          <template #title-extra>
             <V2Badge tone="neutral">共 {{ detail?.items.length ?? 0 }} 条</V2Badge>
-          </div>
+          </template>
           <div
             v-if="detail?.items.length"
             class="contract-page__table-wrap"
@@ -1148,12 +1139,11 @@ onBeforeUnmount(() => {
             description="当前合同还没有明细。"
             :heading-level="3"
           />
-        </section>
-        <section class="v2-detail-dialog__section">
-          <div class="v2-detail-dialog__section-heading">
-            <h3>付款条款</h3>
+        </V2Card>
+        <V2Card title="付款条款">
+          <template #title-extra>
             <V2Badge tone="neutral">共 {{ detail?.paymentTerms.length ?? 0 }} 条</V2Badge>
-          </div>
+          </template>
           <div
             v-if="detail?.paymentTerms.length"
             class="contract-page__table-wrap"
@@ -1193,12 +1183,11 @@ onBeforeUnmount(() => {
             description="当前合同还没有付款节点。"
             :heading-level="3"
           />
-        </section>
-        <section class="v2-detail-dialog__section">
-          <div class="v2-detail-dialog__section-heading">
-            <h3>审批记录</h3>
+        </V2Card>
+        <V2Card title="审批记录">
+          <template #title-extra>
             <V2Badge tone="neutral">共 {{ detail?.approvalRecords.length ?? 0 }} 条</V2Badge>
-          </div>
+          </template>
           <div v-if="detail?.approvalRecords.length" class="contract-page__rows">
             <article
               v-for="record in detail?.approvalRecords"
@@ -1217,7 +1206,7 @@ onBeforeUnmount(() => {
             description="草稿合同还没有审批轨迹。"
             :heading-level="3"
           />
-        </section>
+        </V2Card>
       </div>
 
       <template v-else>
@@ -1225,8 +1214,7 @@ onBeforeUnmount(() => {
           >当前合同不处于草稿状态，禁止再次编辑。</V2Alert
         >
 
-        <section class="v2-detail-dialog__section">
-          <div class="v2-detail-dialog__section-heading"><h3>合同头</h3></div>
+        <V2Card title="合同头">
           <div class="contract-page__form-grid">
             <V2Select
               :model-value="form.contract.projectId || ''"
@@ -1315,15 +1303,12 @@ onBeforeUnmount(() => {
               <textarea v-model="form.contract.remark" rows="3" :disabled="formLocked" />
             </label>
           </div>
-        </section>
+        </V2Card>
 
-        <section class="v2-detail-dialog__section">
-          <div class="v2-detail-dialog__section-heading">
-            <h3>合同清单</h3>
-            <V2Button type="button" size="small" :disabled="formLocked" @click="addItem"
-              >新增清单</V2Button
-            >
-          </div>
+        <V2Card title="合同清单">
+          <template #actions>
+            <V2Button size="small" :disabled="formLocked" @click="addItem">新增清单</V2Button>
+          </template>
           <div v-if="form.items.length" class="contract-page__editor-list">
             <article
               v-for="(item, index) in form.items"
@@ -1369,7 +1354,6 @@ onBeforeUnmount(() => {
               </div>
               <div class="contract-page__actions">
                 <V2Button
-                  type="button"
                   size="small"
                   variant="danger"
                   :disabled="formLocked"
@@ -1386,15 +1370,12 @@ onBeforeUnmount(() => {
             description="可按最小闭环先保存合同头，再补录清单。"
             :heading-level="3"
           />
-        </section>
+        </V2Card>
 
-        <section class="v2-detail-dialog__section">
-          <div class="v2-detail-dialog__section-heading">
-            <h3>付款条款</h3>
-            <V2Button type="button" size="small" :disabled="formLocked" @click="addTerm"
-              >新增条款</V2Button
-            >
-          </div>
+        <V2Card title="付款条款">
+          <template #actions>
+            <V2Button size="small" :disabled="formLocked" @click="addTerm">新增条款</V2Button>
+          </template>
           <div v-if="form.paymentTerms.length" class="contract-page__editor-list">
             <article
               v-for="(term, index) in form.paymentTerms"
@@ -1426,7 +1407,6 @@ onBeforeUnmount(() => {
               </div>
               <div class="contract-page__actions">
                 <V2Button
-                  type="button"
                   size="small"
                   variant="danger"
                   :disabled="formLocked"
@@ -1443,52 +1423,25 @@ onBeforeUnmount(() => {
             description="可先保存草稿，再按节点补录付款安排。"
             :heading-level="3"
           />
-        </section>
+        </V2Card>
+
+        <V2Card title="保存">
+          <div class="contract-page__actions">
+            <V2Button
+              v-if="mode === 'create' ? canCreate : canEdit"
+              :loading="saving"
+              :disabled="formLocked || !canQuery"
+              @click="saveContract"
+              >{{ mode === 'create' ? '创建合同' : '保存变更' }}</V2Button
+            >
+            <V2Button variant="secondary" :disabled="saving" @click="backToLedger">取消</V2Button>
+          </div>
+        </V2Card>
       </template>
-      <template #footer>
-        <V2Button
-          type="button"
-          variant="secondary"
-          :disabled="saving || submitting || deleting"
-          @click="backToLedger"
-        >
-          {{ mode === 'detail' ? '关闭' : '取消' }}
-        </V2Button>
-        <V2Button
-          type="button"
-          v-if="mode === 'detail' && canEdit && currentContractIsDraft"
-          variant="secondary"
-          @click="openEdit"
-          >编辑</V2Button
-        >
-        <V2Button
-          type="button"
-          v-if="mode === 'detail' && canSubmit && currentContractIsDraft"
-          :loading="submitting"
-          @click="submitCurrentContract"
-          >提交审批</V2Button
-        >
-        <V2Button
-          type="button"
-          v-if="mode === 'detail' && canDelete && currentContractIsDraft"
-          variant="danger"
-          :loading="deleting"
-          @click="pendingDelete = true"
-          >删除</V2Button
-        >
-        <V2Button
-          type="button"
-          v-if="mode !== 'detail' && (mode === 'create' ? canCreate : canEdit)"
-          :loading="saving"
-          :disabled="formLocked || !canQuery"
-          @click="saveContract"
-          >{{ mode === 'create' ? '创建合同' : '保存变更' }}</V2Button
-        >
-      </template>
-    </V2Dialog>
+    </template>
 
     <V2PageState
-      v-if="mode !== 'ledger' && mode !== 'create' && !loading && !detail"
+      v-else
       kind="error"
       title="合同不可访问"
       description="合同不存在、超出项目范围，或当前账号没有访问权限。"
@@ -1531,6 +1484,33 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--v2-space-3);
+}
+
+.contract-page__kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+}
+
+.contract-page__kpi-grid > div {
+  min-width: 0;
+  padding: var(--v2-space-3);
+}
+
+.contract-page__kpi-grid > div:not(:last-child) {
+  border-right: 1px solid var(--v2-color-border-subtle);
+}
+
+.contract-page__kpi-grid dt {
+  font-size: var(--v2-font-size-12);
+}
+
+.contract-page__kpi-grid dd {
+  margin-top: var(--v2-space-2);
+  color: var(--v2-color-text-strong);
+  font-size: var(--v2-font-size-15);
+  font-weight: var(--v2-font-weight-semibold);
+  font-variant-numeric: tabular-nums;
 }
 
 .contract-page__editor-list,
@@ -1608,7 +1588,7 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-2);
   align-items: end;
   padding: var(--v2-space-3);
-  border: var(--v2-border-width) solid var(--v2-color-border);
+  border: 1px solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
 }
 
@@ -1670,12 +1650,25 @@ dd {
   .contract-page__editor-list article {
     grid-template-columns: 1fr;
   }
+
+  .contract-page__kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .contract-page__kpi-grid > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--v2-color-border-subtle);
+  }
 }
 
 @media (max-width: 48rem) {
   .contract-page__form-grid,
   .contract-page__editor-list .contract-page__form-grid,
   .contract-page__detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .contract-page__kpi-grid {
     grid-template-columns: 1fr;
   }
 }
