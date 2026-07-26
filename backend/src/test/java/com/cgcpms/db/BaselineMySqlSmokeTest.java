@@ -43,11 +43,11 @@ class BaselineMySqlSmokeTest {
         assertEquals("233", flyway.info().current().getVersion().getVersion());
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
-        assertEquals(196, count("SELECT COUNT(*) FROM information_schema.tables "
+        assertEquals(197, count("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema=DATABASE() AND table_type='BASE TABLE' "
                 + "AND table_name<>'flyway_schema_history'"));
 
-        assertEquals(9, count("SELECT COUNT(*) FROM sys_role WHERE deleted_flag=0"));
+        assertEquals(12, count("SELECT COUNT(*) FROM sys_role WHERE deleted_flag=0"));
         assertTrue(count("SELECT COUNT(*) FROM sys_menu WHERE deleted_flag=0") > 0);
         assertTrue(count("SELECT COUNT(*) FROM sys_dict_type") > 0);
         assertTrue(count("SELECT COUNT(*) FROM cost_subject WHERE deleted_flag=0") > 0);
