@@ -8,7 +8,6 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -27,7 +26,6 @@ public class StlSettlement extends BaseEntity {
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long tenantId;
 
-    @NotNull
     private Long projectId;
 
     private Long contractId;

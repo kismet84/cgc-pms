@@ -4,6 +4,7 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.*;
 import com.cgcpms.revenue.service.RevenueOperationsService;
 import com.cgcpms.revenue.service.RevenueAdvancedService;
+import com.cgcpms.revenue.vo.RevenueOperationsVOs.*;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -27,42 +28,60 @@ public class RevenueOperationsController {
     @PostMapping("/settlements")
     @AuditedOperation(type="CREATE",businessType="OWNER_SETTLEMENT",businessIdExpression="#request.projectId")
     @PreAuthorize("hasAuthority('revenue:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String,Object>> createSettlement(@Valid @RequestBody OwnerSettlementRequest request) { return ApiResponse.success(service.createSettlement(request)); }
+    public ApiResponse<OwnerSettlementVO> createSettlement(@Valid @RequestBody OwnerSettlementRequest request) {
+        return ApiResponse.success(service.ownerSettlementView(service.createSettlement(request)));
+    }
 
     @PostMapping("/settlements/{id}/submit")
     @AuditedOperation(type="SUBMIT",businessType="OWNER_SETTLEMENT",businessIdExpression="#id")
     @PreAuthorize("hasAuthority('revenue:settlement:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String,Object>> submitSettlement(@PathVariable Long id) { return ApiResponse.success(service.submitSettlement(id)); }
+    public ApiResponse<OwnerSettlementVO> submitSettlement(@PathVariable Long id) {
+        return ApiResponse.success(service.ownerSettlementView(service.submitSettlement(id)));
+    }
 
     @GetMapping("/settlements")
     @PreAuthorize("hasAuthority('revenue:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<List<Map<String,Object>>> settlements(@RequestParam(required=false) Long projectId,@RequestParam(required=false) String status) { return ApiResponse.success(service.settlements(projectId,status)); }
+    public ApiResponse<List<OwnerSettlementVO>> settlements(@RequestParam(required=false) Long projectId,@RequestParam(required=false) String status) {
+        return ApiResponse.success(service.settlementViews(projectId,status));
+    }
 
     @GetMapping("/receivables")
     @PreAuthorize("hasAuthority('revenue:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<List<Map<String,Object>>> receivables(@RequestParam(required=false) Long projectId,@RequestParam(required=false) String status) { return ApiResponse.success(service.receivables(projectId,status)); }
+    public ApiResponse<List<ReceivableVO>> receivables(@RequestParam(required=false) Long projectId,@RequestParam(required=false) String status) {
+        return ApiResponse.success(service.receivableViews(projectId,status));
+    }
 
     @PostMapping("/sales-invoices")
     @AuditedOperation(type="CREATE",businessType="SALES_INVOICE",businessIdExpression="#request.projectId")
     @PreAuthorize("hasAuthority('revenue:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String,Object>> createInvoice(@Valid @RequestBody SalesInvoiceRequest request) { return ApiResponse.success(service.createSalesInvoice(request)); }
+    public ApiResponse<SalesInvoiceVO> createInvoice(@Valid @RequestBody SalesInvoiceRequest request) {
+        return ApiResponse.success(service.salesInvoiceView(service.createSalesInvoice(request)));
+    }
 
     @GetMapping("/sales-invoices")
     @PreAuthorize("hasAuthority('revenue:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<List<Map<String,Object>>> invoices(@RequestParam(required=false) Long projectId) { return ApiResponse.success(service.invoices(projectId)); }
+    public ApiResponse<List<SalesInvoiceVO>> invoices(@RequestParam(required=false) Long projectId) {
+        return ApiResponse.success(service.invoiceViews(projectId));
+    }
 
     @PostMapping("/collections")
     @AuditedOperation(type="CREATE",businessType="COLLECTION_RECORD",businessIdExpression="#request.projectId")
     @PreAuthorize("hasAuthority('revenue:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String,Object>> createCollection(@Valid @RequestBody CollectionRequest request) { return ApiResponse.success(service.createCollection(request)); }
+    public ApiResponse<CollectionVO> createCollection(@Valid @RequestBody CollectionRequest request) {
+        return ApiResponse.success(service.collectionView(service.createCollection(request)));
+    }
 
     @GetMapping("/collections")
     @PreAuthorize("hasAuthority('revenue:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<List<Map<String,Object>>> collections(@RequestParam(required=false) Long projectId,@RequestParam(required=false) String status) { return ApiResponse.success(service.collections(projectId,status)); }
+    public ApiResponse<List<CollectionVO>> collections(@RequestParam(required=false) Long projectId,@RequestParam(required=false) String status) {
+        return ApiResponse.success(service.collectionViews(projectId,status));
+    }
 
     @GetMapping("/dashboard/{projectId}")
     @PreAuthorize("hasAuthority('revenue:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String,Object>> dashboard(@PathVariable Long projectId) { return ApiResponse.success(service.dashboard(projectId)); }
+    public ApiResponse<RevenueDashboardVO> dashboard(@PathVariable Long projectId) {
+        return ApiResponse.success(service.dashboardView(projectId));
+    }
 
     @GetMapping("/trace/cash-journals/{journalId}")
     @PreAuthorize("hasAuthority('revenue:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
@@ -71,12 +90,16 @@ public class RevenueOperationsController {
     @PostMapping("/receivables/{id}/credit")
     @AuditedOperation(type="ADJUST",businessType="ACCOUNT_RECEIVABLE",businessIdExpression="#id")
     @PreAuthorize("hasAuthority('revenue:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String,Object>> credit(@PathVariable Long id,@Valid@RequestBody ReceivableCreditRequest request){return ApiResponse.success(advanced.creditReceivable(id,request));}
+    public ApiResponse<ReceivableAdjustmentVO> credit(@PathVariable Long id,@Valid@RequestBody ReceivableCreditRequest request){
+        return ApiResponse.success(service.receivableAdjustmentView(advanced.creditReceivable(id,request)));
+    }
 
     @PostMapping("/collections/{id}/reverse")
     @AuditedOperation(type="REVERSE",businessType="COLLECTION_RECORD",businessIdExpression="#id")
     @PreAuthorize("hasAuthority('revenue:collection:reverse') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<Map<String,Object>> reverse(@PathVariable Long id,@Valid@RequestBody CollectionReverseRequest request){return ApiResponse.success(advanced.reverseCollection(id,request));}
+    public ApiResponse<CollectionReversalVO> reverse(@PathVariable Long id,@Valid@RequestBody CollectionReverseRequest request){
+        return ApiResponse.success(service.collectionReversalView(advanced.reverseCollection(id,request)));
+    }
 
     @PostMapping("/schedules")
     @AuditedOperation(type="CREATE",businessType="COLLECTION_SCHEDULE",businessIdExpression="#request.projectId")

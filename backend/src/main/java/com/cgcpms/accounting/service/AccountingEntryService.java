@@ -40,14 +40,26 @@ public class AccountingEntryService {
                                            String entryType, String sourceType,
                                            String startDate, String endDate,
                                            String entryStatus) {
+        return getPage(pageNo, pageSize, null, entryType, sourceType, startDate, endDate, entryStatus);
+    }
+
+    public IPage<AccountingEntry> getPage(long pageNo, long pageSize, Long projectId,
+                                           String entryType, String sourceType,
+                                           String startDate, String endDate,
+                                           String entryStatus) {
         Long tenantId = UserContext.getCurrentTenantId();
         LambdaQueryWrapper<AccountingEntry> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AccountingEntry::getTenantId, tenantId);
-        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
-        wrapper.and(scope -> {
-            scope.isNull(AccountingEntry::getProjectId);
-            if (!projectIds.isEmpty()) scope.or().in(AccountingEntry::getProjectId, projectIds);
-        });
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看凭证");
+            wrapper.eq(AccountingEntry::getProjectId, projectId);
+        } else {
+            List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+            wrapper.and(scope -> {
+                scope.isNull(AccountingEntry::getProjectId);
+                if (!projectIds.isEmpty()) scope.or().in(AccountingEntry::getProjectId, projectIds);
+            });
+        }
         if (StringUtils.hasText(entryType)) wrapper.eq(AccountingEntry::getEntryType, entryType);
         if (StringUtils.hasText(sourceType)) wrapper.eq(AccountingEntry::getSourceType, sourceType);
         if (StringUtils.hasText(entryStatus)) wrapper.eq(AccountingEntry::getEntryStatus, entryStatus);
@@ -79,7 +91,7 @@ public class AccountingEntryService {
 
     @Transactional(rollbackFor = Exception.class)
     public void submitReview(Long id) {
-        AccountingEntry entry = requireExisting(id);
+        AccountingEntry entry = requireExistingForUpdate(id);
         if (!"DRAFT".equals(entry.getEntryStatus()) || !"REJECTED".equals(entry.getReviewStatus()))
             throw new BusinessException("ENTRY_REVIEW_STATUS_INVALID", "仅被驳回的草稿凭证可重新提交复核");
         periodGuard.assertWritable(entry.getEntryDate());
@@ -87,12 +99,12 @@ public class AccountingEntryService {
         entry.setReviewedBy(null);
         entry.setReviewedAt(null);
         entry.setReviewComment(null);
-        entryMapper.updateById(entry);
+        updateOrThrow(entry);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void review(Long id, boolean approved, String comment) {
-        AccountingEntry entry = requireExisting(id);
+        AccountingEntry entry = requireExistingForUpdate(id);
         if (!"DRAFT".equals(entry.getEntryStatus()) || !"PENDING".equals(entry.getReviewStatus()))
             throw new BusinessException("ENTRY_REVIEW_STATUS_INVALID", "仅待复核草稿凭证可复核");
         if (java.util.Objects.equals(entry.getCreatedBy(), UserContext.getCurrentUserId()))
@@ -104,12 +116,12 @@ public class AccountingEntryService {
         entry.setReviewedBy(UserContext.getCurrentUserId());
         entry.setReviewedAt(LocalDateTime.now());
         entry.setReviewComment(comment);
-        entryMapper.updateById(entry);
+        updateOrThrow(entry);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void post(Long id) {
-        AccountingEntry entry = requireExisting(id);
+        AccountingEntry entry = requireExistingForUpdate(id);
         if (!"DRAFT".equals(entry.getEntryStatus()))
             throw new BusinessException("ENTRY_STATUS_INVALID", "仅草稿状态可过账");
         if (!"APPROVED".equals(entry.getReviewStatus()))
@@ -119,13 +131,13 @@ public class AccountingEntryService {
         entry.setPostedAt(LocalDateTime.now());
         entry.setPostedBy(UserContext.getCurrentUserId());
         entry.setPeriodId(periodGuard.findPeriodId(entry.getEntryDate()));
-        entryMapper.updateById(entry);
+        updateOrThrow(entry);
         if (entry.getOriginalEntryId() != null) {
-            AccountingEntry original = requireExisting(entry.getOriginalEntryId());
+            AccountingEntry original = requireExistingForUpdate(entry.getOriginalEntryId());
             original.setEntryStatus("REVERSED");
             original.setReversedAt(LocalDateTime.now());
             original.setReversedEntryId(entry.getId());
-            entryMapper.updateById(original);
+            updateOrThrow(original);
         }
     }
 
@@ -136,7 +148,7 @@ public class AccountingEntryService {
 
     @Transactional(rollbackFor = Exception.class)
     public AccountingEntry createReversal(Long id, String reason) {
-        AccountingEntry entry = requireExisting(id);
+        AccountingEntry entry = requireExistingForUpdate(id);
         if (!"POSTED".equals(entry.getEntryStatus()))
             throw new BusinessException("ENTRY_STATUS_INVALID", "仅已过账状态可冲销");
         if (entry.getReversedEntryId() != null)
@@ -175,23 +187,23 @@ public class AccountingEntryService {
             line.setSummary("冲销：" + old.getSummary()); lineMapper.insert(line);
         }
         entry.setReversedEntryId(reversal.getId());
-        entryMapper.updateById(entry);
+        updateOrThrow(entry);
         return reversal;
     }
 
     /** 基于原付款凭证生成借贷方向相反的冲销凭证，并把两张凭证显式互链。 */
     @Transactional(rollbackFor = Exception.class)
     public AccountingEntry reversePaymentEntry(Long originalPayRecordId, PayRecord reversalRecord, String reason) {
-        AccountingEntry original = entryMapper.selectOne(new LambdaQueryWrapper<AccountingEntry>()
-                .eq(AccountingEntry::getTenantId, UserContext.getCurrentTenantId())
-                .eq(AccountingEntry::getPayRecordId, originalPayRecordId)
-                .eq(AccountingEntry::getEntryType, "PAYMENT"));
+        AccountingEntry original = entryMapper.selectPaymentByRecordForUpdate(
+                UserContext.getCurrentTenantId(), originalPayRecordId);
         if (original == null) {
             throw new BusinessException("PAYMENT_ENTRY_NOT_FOUND", "原付款会计凭证不存在，禁止冲销");
         }
         if ("REVERSED".equals(original.getEntryStatus()) || original.getReversedEntryId() != null) {
             throw new BusinessException("PAYMENT_ENTRY_ALREADY_REVERSED", "原付款会计凭证已冲销");
         }
+        authorize(original);
+        periodGuard.assertWritable(reversalRecord.getPaidAt().toLocalDate());
         List<AccountingEntryLine> originalLines = getLines(original.getId());
         if (originalLines.isEmpty()) {
             throw new BusinessException("PAYMENT_ENTRY_LINES_MISSING", "原付款会计分录不存在");
@@ -232,15 +244,30 @@ public class AccountingEntryService {
             lineMapper.insert(line);
         }
         original.setReversedEntryId(reversal.getId());
-        entryMapper.updateById(original);
+        updateOrThrow(original);
         return reversal;
     }
 
     private AccountingEntry requireExisting(Long id) {
         AccountingEntry entry = entryMapper.selectById(id);
+        return authorize(entry);
+    }
+
+    private AccountingEntry requireExistingForUpdate(Long id) {
+        AccountingEntry entry = entryMapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
+        return authorize(entry);
+    }
+
+    private AccountingEntry authorize(AccountingEntry entry) {
         if (entry == null || !entry.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("ENTRY_NOT_FOUND", "凭证不存在");
         if (entry.getProjectId() != null) projectAccessChecker.checkAccess(entry.getProjectId(), "查看凭证");
         return entry;
+    }
+
+    private void updateOrThrow(AccountingEntry entry) {
+        if (entryMapper.updateById(entry) != 1) {
+            throw new BusinessException("ENTRY_CONCURRENT_MODIFICATION", "凭证已被其他操作修改，请刷新后重试");
+        }
     }
 }

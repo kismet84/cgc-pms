@@ -16,14 +16,248 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 2026-07-24 第53条主线M5的`ISSUE-053-024～029`已全部通过并正式收口；当前无M5 Ready。
 
-2026-07-25 第53条主线M6执行中；`ISSUE-053-030～031`已通过，`ISSUE-053-032`为当前唯一Ready，`ISSUE-053-033～035`保持Planned。
+2026-07-26 第53条主线M6的`ISSUE-053-030～035`已全部通过并正式收口；当前无M6 Ready，M7未启动。
+
+### ISSUE-053-035：M6全量回归与正式收口
+
+优先级：P0
+任务性质：回归证明
+类型：Clean-room V2 / M6退出门 / 跨切片回归 / 治理收口
+状态：Done
+来源锚点：`docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`的ISSUE-053-035；`ISSUE-053-030～034`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M6-035-FINANCE-EXIT-GATE]
+Migration：不需要
+依赖：`ISSUE-053-030～034`已通过；16条目标路由均已由真实V2或受控重定向承接，台账为`24/63/0`。
+风险等级：高
+运行态要求：仅本地dev/test/demo；禁止连接生产。退出门以只读回归和既有E2E精确恢复为主，禁止清库。
+Reviewer要求：独立复核16条路由、台账、权限、租户/项目/合同/账户/凭证/期间范围、金额字符串、来源与状态、幂等、并发守恒、冲销/撤回/反结账、全量Maven终态、V2门禁、demo verify及治理一致性。
+归档报告：`docs/quality/第53条主线-M6-分包结算与资金财务全量退出门验收报告.md`
+最小回滚：只回退035治理回写或本轮证据证明必要的最小缺陷修正；030～034已验收业务事实、Legacy、数据库与既有业务数据保持不变。
+实施结果：已通过。16条M6路由全部由真实V2或受控重定向承接，台账`24/63/0`；后端全量273类2263项、当前fat JAR、V2全量351项、四组M6 E2E 12/12、类型/Lint/边界/台账/构建/包体、23阶段demo verify、真实内置浏览器及独立复核通过。新增后续项0、关闭后续项0、净变化0、悬空项0；报告见归档报告。
+目标：
+
+- 对M6 16条路由执行跨切片、后端全量、V2全量、四组M6 E2E和demo验证，正式裁决M6退出门。
+- 确认台账`24/63/0`，服务端金额、来源、状态、项目范围、幂等、并发、冲销与期间契约未被切片组合破坏。
+- 完成正式报告、主计划、Ready、Current Focus、Done和项目地图一致回写，悬空项为0。
+非目标：
+
+- 不新增业务功能，不迁移M7～M8路由，不切正式入口，不退役Legacy。
+- 不修改数据库结构或演示数据，不连接生产，不执行commit、push、PR、发布。
+允许修改：
+
+- M6现有V2契约、服务、页面、路由、导航、台账及测试（仅回归证明的最小根修）
+- M6现有后端业务与测试（仅回归证明的最小根修）
+- `scripts/demo/complete-project-v2/verify.ps1`（仅回归证明的最小根修）
+- `docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`
+- `docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/第53条主线-M6-分包结算与资金财务全量退出门验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- M7～M8业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- M6 16条目标路由全部由真实V2或受控重定向承接，Legacy导入为0，台账精确为`24/63/0`。
+- 030～034权限、范围、金额、来源、状态、幂等、并发、冲销、附件和期间契约跨切片回归通过。
+- 后端全量Maven同时满足`BUILD SUCCESS`与Surefire零失败/零错误；V2全量单测、类型、Lint、边界、台账、生产构建和包体通过。
+- 四组M6 Playwright通过；三视口、axe、console和失败网络请求无未分类异常。
+- demo verify通过；报告与六处治理载体一致，新增后续项、关闭后续项、净变化及悬空项明确。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-035`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' test`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm test:unit`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm check:bundle-size`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m6-subcontract-workspace.spec.ts e2e/m6-settlement.spec.ts e2e/m6-payment-revenue-invoice.spec.ts e2e/m6-finance-control.spec.ts`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1 -Environment demo -Database cgc_pms_demo_v2`
+- `git diff --check`
+
+### ISSUE-053-034：M6资金运营、日记账、预测、凭证与月结V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / M6业务切片 / 资金运营与会计期间 / 服务端资金与期间权威
+状态：Done
+来源锚点：`docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`的ISSUE-053-034；`ISSUE-053-030～033`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M6-034-FINANCE-ACCOUNTING-CLOSE-V2]
+Migration：不需要
+依赖：`ISSUE-053-030～033`已通过；复用稳定财务契约、V2公共壳、请求核心，以及现有资金运营、现金日记账、资金预测、会计凭证和月结后端闭环。
+风险等级：高
+运行态要求：仅本地dev/test/demo；写侧只使用本Issue可识别且可逆的数据，先记前值，成功后回读，日记账和凭证只允许业务冲销，月结仅用独立测试期间并以反结账恢复。禁止连接生产。
+Reviewer要求：独立复核租户/项目/账户/凭证/期间范围、金额字符串、日记账归档与重开、冲销互链、预测版本与实际回写、借贷平衡、凭证复核/过账/驳回/重提、关账检查和反结账、并发CAS、失败原子性、恢复结果、三视口和可访问性。
+归档报告：`docs/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md`
+最小回滚：回退034页面、薄服务/契约增量、路由/导航/台账、测试、必要后端根修及治理回写；以既有冲销、草稿删除或反结账恢复034专属dev/test/demo事实。030～033、Legacy、数据库结构与其他路由保持不变。
+实施结果：已通过。五条资金运营与会计核算路由由真实V2承接；资金/预测稳定DTO、预算幂等语义、日记账对象锁与附件门禁、凭证CAS、统一期间/回单锁序、月结锁内重检和追溯成立。后端联合77/77、DTO复验14/14及根修定向复验，V2全量351/351、静态门、目标E2E、受控demo、真实内置浏览器和独立复核通过；台账达到`24/63/0`。报告见归档报告。
+目标：
+
+- `/finance-operations`、`/cash-journal`、`/cash-forecast`、`/accounting-entry`、`/financial-close`由真实Clean-room V2页面承接。
+- 资金运营展示服务端收付与对账事实；日记账覆盖账户、流水、归档、重开和冲销；预测覆盖版本、计划、缺口措施、审批与实际回写。
+- 凭证覆盖查询、详情、复核、过账、驳回、同实例重提和冲销；月结覆盖期间、检查、对账、关账、反结账和报表。
+- `AccountingEntryService`写状态必须检查受影响行数并对并发冲突失败关闭；`FinancialCloseService`检查、关账和反结账使用期间行锁或等价CAS。
+- 原始资金运营、预测`Map<String,Object>`转换为稳定DTO；ID与金额保持字符串，前端不累计余额、生成预测、校验借贷或伪造期间结论。
+- 五条路由逐条完成权限、空态/错误、响应式、可访问性和真实后端验收后更新为`V2_ACCEPTED`；目标台账`24/63/0`。
+非目标：
+
+- 不开放手工会计凭证生成，不新增资金账户、预测算法、会计科目、凭证策略、期间模型或数据库migration。
+- 不建设银行直联、集团资金中心、多币种、多账簿、合并报表、税务申报或概率预测。
+- 不复制Legacy Vue/CSS，不新增依赖、请求层、状态库或通用财务框架。
+- 不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `packages/frontend-contracts/src/finance.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/finance.ts`
+- `frontend-admin-v2/src/pages/finance/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/tests/unit/m6-finance*.test.ts`
+- `frontend-admin-v2/e2e/m6-finance-control.spec.ts`
+- 证据证明必要的资金运营、现金日记账、资金预测、会计凭证、月结后端Controller/Service/VO/Mapper与对应专项测试
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- M7～M8业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- 五条目标路由由真实V2页面承接，Legacy导入为0，台账精确为`24/63/0`。
+- 查询和写权限分别控制路由与动作；缺权限、跨租户/项目/账户/凭证/期间及非法状态失败关闭。
+- 账户余额、日记账、预测、凭证、借贷、期间检查和报表金额均来自服务端字符串与写后回读；空值与`0`区分。
+- 日记账归档/重开/冲销、凭证复核/过账/驳回/重提/冲销及关账/反结账保持幂等或稳定冲突；并发不穿透检查和状态门禁。
+- 失败不留下部分流水、预测、凭证、对账或期间事实；专属数据恢复后金额、状态、互链和审计符合前值或合法业务反向状态。
+- 后端专项、V2单测、类型、Lint、Clean-room边界、路由台账、构建、目标Playwright、三视口、axe、console、失败网络请求、demo verify及`git diff --check`通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-034`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=*FinanceOperations*,*CashJournal*,*CashForecast*,*AccountingEntry*,*FinancialClose*' test`
+- `cd frontend-admin-v2; pnpm test:unit -- m6-finance`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m6-finance-control.spec.ts`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1 -Environment demo -Database cgc_pms_demo_v2`
+- `git diff --check`
+
+### ISSUE-053-033：M6付款、费用、收入回款与发票V2
+
+优先级：P0
+任务性质：能力新增
+类型：Clean-room V2 / M6业务切片 / 收付款与发票 / 服务端金额来源权威
+状态：Done
+来源锚点：`docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`的ISSUE-053-033；`ISSUE-053-030～032`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
+存量问题键：[mainline:053-M6-033-PAYMENT-REVENUE-INVOICE-V2]
+Migration：不需要
+依赖：`ISSUE-053-030～032`已通过；复用稳定财务读契约、V2公共壳、请求核心、业务附件，以及现有付款申请、费用、收入回款和发票后端闭环。
+风险等级：高
+运行态要求：仅本地dev/test/demo；写侧只使用本Issue可识别数据，先记前值，成功后回读，最终使用既有撤回、冲销或删除能力恢复。禁止连接生产。
+Reviewer要求：独立复核租户/项目/合同/结算对象范围、服务端来源与可付/可收余额、金额字符串、并发守恒、审批、支付/回款、核销、发票校验、附件安全、冲销互链、失败原子性、恢复结果、三视口和可访问性。
+归档报告：`docs/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md`
+最小回滚：回退033页面、薄服务/契约增量、路由/导航/台账、测试、必要后端根修及治理回写；撤回、冲销或删除033专属dev/test/demo数据。030～032、Legacy、数据库结构与其他M6路由保持不变。
+实施结果：已通过。五条收付款与发票路由由真实V2或受控重定向承接；合同级业主结算锁、稳定收入DTO、付款幂等、发票对象锁/CLEAN附件及项目筛选成立。后端联合147/147、发票根修复验41/41、V2静态门、目标E2E、受控demo和真实内置浏览器通过；台账达到`29/58/0`。报告见归档报告。
+目标：
+
+- `/payment`确定性受控重定向到`/payment/application`；`/payment/application`、`/payment/expense`、`/revenue`、`/invoice`由真实Clean-room V2页面承接。
+- 付款申请覆盖来源、服务端可付余额、审批和支付追溯；费用覆盖申请、审批和转付款来源；收入覆盖业主结算、应收、回款、核销与冲销；发票覆盖校验、关联、附件及单据预览/下载。
+- 修复业主结算“先汇总后插入”的并发超合同金额缺口；以合同级行锁或等价服务端约束串行化并留下并发回归测试。
+- 收入原始`Map<String,Object>`在页面接入前转换为稳定DTO；ID与金额保持字符串，前端不计算可付、可收、核销、税额或累计金额。
+- 五条路由逐条完成权限、空态/错误、响应式、可访问性和真实后端验收后更新为`V2_ACCEPTED`；目标台账`29/58/0`。
+非目标：
+
+- 不迁移资金运营、日记账、预测、凭证或月结页面。
+- 不新增平行资金账、应收应付模型、发票模型、审批流、数据库migration或通用财务框架。
+- 不复制Legacy Vue/CSS，不新增依赖、请求层、状态库或表格库。
+- 不切正式入口，不退役Legacy，不执行commit、push、PR、发布或生产操作。
+允许修改：
+
+- `packages/frontend-contracts/src/finance.ts`
+- `packages/frontend-contracts/src/index.ts`
+- `frontend-admin-v2/src/services/finance.ts`
+- `frontend-admin-v2/src/pages/finance/**`
+- `frontend-admin-v2/src/router.ts`
+- `frontend-admin-v2/src/navigation/catalog.ts`
+- `frontend-admin-v2/tests/unit/m6-finance*.test.ts`
+- `frontend-admin-v2/e2e/m6-payment-revenue-invoice*.spec.ts`
+- 证据证明必要的付款、费用、收入、发票及文件后端Controller/Service/VO/Mapper与对应专项测试
+- `docs/ui-v2/route-migration-ledger.md`
+- `docs/ui-v2/route-migration-ledger.json`
+- `docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/done-issues.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md`
+禁止修改：
+
+- `frontend-admin/**`
+- `backend/src/main/resources/db/migration/**`
+- M6资金运营、日记账、预测、凭证、月结写侧及M7～M8业务域
+- `deploy/**`
+- `.github/**`
+- `AGENTS.md`
+- `.agents/skills/**`
+验收标准：
+
+- 五条目标路由由真实V2页面或受控重定向承接，Legacy导入为0，台账精确为`29/58/0`。
+- 查询和写权限分别控制路由与动作；缺权限、跨租户/项目/合同/结算对象、非法来源或状态均失败关闭。
+- 付款、费用、收入、应收、回款、核销和发票金额、余额、累计、税额、状态均来自服务端字符串与写后回读；空值与`0`区分。
+- 合同级并发业主结算总额不超过服务端合同当前金额；重复提交、支付、回款、核销和冲销保持幂等或稳定冲突。
+- 发票文件类型、病毒扫描、对象权限、预览/下载和删除阶段失败关闭；原始主键不作为页面主信息。
+- 失败不留下部分付款、回款、核销、发票或日记账事实；专属测试数据恢复后表计数、金额与状态符合前值或合法业务反向状态。
+- 后端专项、V2单测、类型、Lint、Clean-room边界、路由台账、构建、目标Playwright、三视口、axe、console、失败网络请求、demo verify及`git diff --check`通过。
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-053-033`
+- `cd backend; .\mvnw.cmd '-Djacoco.skip=true' '-Dtest=*Payment*,*Expense*,*Revenue*,*Invoice*' test`
+- `cd frontend-admin-v2; pnpm test:unit -- m6-finance`
+- `cd frontend-admin-v2; pnpm type-check:contracts`
+- `cd frontend-admin-v2; pnpm type-check`
+- `cd frontend-admin-v2; pnpm lint:check`
+- `cd frontend-admin-v2; pnpm check:boundary`
+- `cd frontend-admin-v2; pnpm generate:route-ledger`
+- `cd frontend-admin-v2; pnpm check:route-ledger`
+- `cd frontend-admin-v2; pnpm build`
+- `cd frontend-admin-v2; pnpm exec playwright test e2e/m6-payment-revenue-invoice.spec.ts`
+- `pwsh -NoProfile -File scripts/demo/complete-project-v2/verify.ps1 -Environment demo -Database cgc_pms_demo_v2`
+- `git diff --check`
 
 ### ISSUE-053-032：M6结算台账、详情与追溯V2
 
 优先级：P0
 任务性质：能力新增
 类型：Clean-room V2 / M6业务切片 / 结算台账与追溯 / 服务端金额来源权威
-状态：Ready
+状态：Done
 来源锚点：`docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`的ISSUE-053-032；`ISSUE-053-030～031`通过事实；candidateEvidenceHead=d5b93242fa64b429f4658cb48d5c4090e1e59578
 存量问题键：[mainline:053-M6-032-SETTLEMENT-V2]
 Migration：不需要
@@ -33,6 +267,7 @@ Migration：不需要
 Reviewer要求：独立复核查询与写权限、租户/项目/合同范围、结算来源、金额快照与服务端重算、并发、付款/成本/签证/附件追溯、提交状态、失败原子性、恢复结果、三视口和可访问性。
 归档报告：`docs/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md`
 最小回滚：回退032页面、薄服务/契约增量、路由/导航/台账、测试、必要后端根修及治理回写；删除或撤回032专属dev/test/demo数据。030～031、Legacy、数据库结构与其他M6路由保持不变。
+实施结果：已通过。附件写与提交共用结算行锁；结算删除精确级联附件、明细和计量关联，主记录删除返回0时全事务回滚。后端10类134/134、V2全量346项、目标E2E 5项、静态门、三视口、demo保留附件直接删除及独立复核通过；报告见归档报告。
 目标：
 
 - `/settlement`确定性受控重定向到`/settlement/list`；`/settlement/list`与`/settlement/:id`由真实Clean-room V2页面承接。

@@ -54,17 +54,39 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(source).toContain("selected.value?.approvalStatus === 'APPROVED'")
     expect(source).toContain("selected.value?.stockOutFlag !== '1'")
     expect(source).toContain('crypto.randomUUID()')
-    expect(source).toContain('await deleteRequisition(createdId)')
+    expect(source).not.toContain('await deleteRequisition(createdId)')
+    expect(source).toMatch(
+      /const canAdd = computed\(\s*\(\) => hasPermission\('requisition:add'\) && hasPermission\('requisition:edit'\)/,
+    )
+    expect(source).toContain('发起领料申请')
+    expect(source).toContain('requisition-page__workspace')
+    expect(source).not.toContain('data-master-detail="true"')
+    expect(source).toContain(
+      'panel-class="v2-dialog-standard v2-detail-dialog requisition-page__detail"',
+    )
+    expect(source).toContain(':close-on-backdrop="true"')
+    expect(source).toContain('panel-class="v2-dialog-standard requisition-page__editor-dialog"')
+    expect(source).toContain(':close-on-backdrop="false"')
+    expect(source).toContain('tabindex="0"')
+    expect(source).toContain('<th v-if="!projectId">项目</th>')
+    expect(source).toContain('<th>仓库编码</th>')
+    expect(source).toContain('<th>仓库名称</th>')
+    expect(source).toContain('dateFrom: reportPeriod.value?.startDate')
+    expect(source).toContain('dateTo: reportPeriod.value?.endDate')
+    expect(source).toContain('editorItems')
+    expect(source).toContain('loadContractPage')
+    expect(source).toContain('saveEditor(true)')
+    expect(source).toContain('await Promise.all([loadRequisition(id), loadRequisitionItems(id)])')
+    expect(source).toContain("'MAT_REQUISITION', 'REQUISITION'")
     expect(source).toContain('loadRequisitionTrace')
-    expect(source).toContain('warehouseLabel(item)')
+    expect(source).toContain("hasPermission('procurement:trace:query')")
+    expect(source).toContain("{{ item.warehouseCode || '仓库编码缺失' }}")
+    expect(source).toContain("{{ item.warehouseName || '仓库名称缺失' }}")
     expect(source).toContain('loadWarehouses')
     expect(source).toContain('loadMaterials')
     expect(source).toContain('loadPartners')
     expect(source).toContain(':options="warehouseOptions"')
     expect(source).toContain(':options="materialOptions"')
-    expect(source).toMatch(
-      /<V2Card title="领料申请" :heading-level="1">[\s\S]*?<template #actions>[\s\S]*?requisition-page__filter-grid[\s\S]*?查询领料单[\s\S]*?新建领料单[\s\S]*?<\/template>[\s\S]*?<\/V2Card>/,
-    )
     expect(source).not.toContain('class="requisition-page__filters"')
     expect(source).not.toContain("{{ item.warehouseId || '-' }}")
     expect(source).not.toMatch(/label="[^"]*ID/)
@@ -84,7 +106,7 @@ describe('M5 requisition, stock-out and return contract', () => {
       )
         return response('9007199254740993')
       if (String(url).endsWith('/items')) return response([])
-      if (String(url).includes('/procurement-trace/'))
+      if (String(url).includes('/procurement-traces/'))
         return response({
           requisitionItems: [],
           stockTransactions: [],
@@ -95,7 +117,10 @@ describe('M5 requisition, stock-out and return contract', () => {
         })
       return response({ records: [], total: 0, pageNo: 1, pageSize: 20 })
     })
-    await loadRequisitions({ projectId: 'P/1', pageNo: 2 }, signal)
+    await loadRequisitions(
+      { projectId: 'P/1', dateFrom: '2026-07-01', dateTo: '2026-07-31', pageNo: 2 },
+      signal,
+    )
     await loadRequisition('R/1', signal)
     await loadRequisitionItems('R/1', signal)
     const id = await createRequisition({ projectId: 'P1', warehouseId: 'W1' })
@@ -127,7 +152,12 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(returnId).toBe('9007199254740993')
     const calls = fetchMock.mock.calls
     expect(calls.map(([url]) => String(url))).toContain('/api/requisitions/R%2F1/stock-out')
-    expect(calls.map(([url]) => String(url))).toContain('/api/procurement-trace/requisitions/R%2F1')
+    expect(calls.map(([url]) => String(url))).toContain(
+      '/api/requisitions?projectId=P%2F1&dateFrom=2026-07-01&dateTo=2026-07-31&pageNo=2',
+    )
+    expect(calls.map(([url]) => String(url))).toContain(
+      '/api/procurement-traces/requisitions/R%2F1',
+    )
     expect(calls.map(([url]) => String(url))).toContain('/api/material-returns/MR%2F1/items')
     const itemWrite = calls.find(([url]) => String(url).endsWith('/requisitions/R%2F1/items/batch'))
     expect(JSON.parse(String(itemWrite?.[1]?.body))[0].quantity).toBe('9007199254740993.1234')

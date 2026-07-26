@@ -117,6 +117,20 @@ class MatStockControllerTest {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
+    @Test
+    @Order(0)
+    @DisplayName("GET /inventory/stock → 默认10条并返回项目身份")
+    void stockListUsesV2PageSizeAndProjectIdentity() throws Exception {
+        mockMvc.perform(getWithApi("/inventory/stock")
+                        .cookie(adminCookie())
+                        .param("warehouseId", String.valueOf(SETTINGS_WAREHOUSE_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andExpect(jsonPath("$.data.pageSize").value(10))
+                .andExpect(jsonPath("$.data.records[0].projectId").value(10001))
+                .andExpect(jsonPath("$.data.records[0].projectName").isNotEmpty());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // RED-1: POST JSON body to /inventory/stock/in → EXPECTS 200
     // Bug: controller uses @RequestParam, frontend sends JSON body
@@ -212,7 +226,9 @@ class MatStockControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.stock.warehouseName").value("全部仓库"))
-                .andExpect(jsonPath("$.data.stock.availableQty").value(expectedAvailable.doubleValue()));
+                .andExpect(jsonPath("$.data.stock.availableQty").value(expectedAvailable.toPlainString()))
+                .andExpect(jsonPath("$.data.stock.inventoryValue").isString())
+                .andExpect(jsonPath("$.data.stock.averageUnitCost").isString());
     }
 
     @Test
@@ -225,6 +241,25 @@ class MatStockControllerTest {
                         .param("materialId", String.valueOf(MATERIAL_ID)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("来源流水查询权限可读取库存列表但不能维护阈值")
+    void testTransactionReaderCanReadStockListButCannotWriteThreshold() throws Exception {
+        Cookie reader = purchaseManagerCookie(List.of("inventory:transaction:list"));
+
+        mockMvc.perform(getWithApi("/inventory/stock")
+                        .cookie(reader)
+                        .param("warehouseId", String.valueOf(WAREHOUSE_ID)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+
+        mockMvc.perform(putWithApi("/inventory/stock/" + SETTINGS_STOCK_ID + "/safety-threshold")
+                        .cookie(reader)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"safetyStockQty\":\"30.0000\"}"))
+                .andExpect(status().isForbidden());
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -254,7 +289,7 @@ class MatStockControllerTest {
                         .content("{\"safetyStockQty\":\"125.5000\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.safetyStockQty").value(125.5000));
+                .andExpect(jsonPath("$.data.safetyStockQty").value("125.5000"));
     }
 
     @Test
@@ -282,8 +317,8 @@ class MatStockControllerTest {
                         .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\",\"replenishmentLeadDays\":7}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.safetyStockQty").value(100.0000))
-                .andExpect(jsonPath("$.data.replenishmentTargetQty").value(150.0000))
+                .andExpect(jsonPath("$.data.safetyStockQty").value("100.0000"))
+                .andExpect(jsonPath("$.data.replenishmentTargetQty").value("150.0000"))
                 .andExpect(jsonPath("$.data.replenishmentLeadDays").value(7));
 
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
@@ -376,7 +411,7 @@ class MatStockControllerTest {
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].warehouseId").value(TRANSFER_WAREHOUSE_ID))
-                .andExpect(jsonPath("$.data[0].transferableQty").value(70.0000));
+                .andExpect(jsonPath("$.data[0].transferableQty").value("70.0000"));
     }
 
     @Test

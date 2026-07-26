@@ -7,6 +7,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.invoice.entity.InvoicePaymentAllocation;
@@ -32,7 +33,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -40,6 +45,13 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -74,6 +86,12 @@ class InvoiceServiceTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    private BusinessObjectAuthorizer businessObjectAuthorizer;
+
+    @Autowired
+    private TransactionTemplate transactionTemplate;
+
     @BeforeEach
     void setUp() {
         Claims claims = Jwts.claims()
@@ -86,6 +104,7 @@ class InvoiceServiceTest {
         UserContext.set(claims);
 
         // 物理清理本测试关心的数据，防止逻辑删除和并行测试类复用固定主键触发 PK 冲突。
+        jdbcTemplate.update("DELETE FROM sys_file WHERE tenant_id = ? AND business_type = 'INVOICE'", TENANT_ID);
         jdbcTemplate.update("DELETE FROM invoice_payment_allocation WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE pay_record_id = ?", SEED_PAY_RECORD_ID);
         jdbcTemplate.update("DELETE FROM pay_invoice WHERE tenant_id = ?", TENANT_ID);
@@ -498,7 +517,190 @@ class InvoiceServiceTest {
         file.setContentType("application/pdf");
         file.setStoragePath("INVOICE/" + invoiceId + "/invoice.pdf");
         file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
         sysFileMapper.insert(file);
+    }
+
+    @Test
+    @Order(21)
+    @DisplayName("VERIFY: wrong document type or non-clean attachment cannot unlock verification")
+    void shouldRequireCleanInvoiceEvidenceType() {
+        PayInvoice invoice = new PayInvoice();
+        invoice.setInvoiceNo("INV-EVIDENCE-021");
+        invoice.setInvoiceType("VAT_SPECIAL");
+        invoice.setInvoiceAmount(new BigDecimal("1200.00"));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
+        Long id = invoiceService.create(invoice);
+
+        InvoicePaymentAllocation allocation = new InvoicePaymentAllocation();
+        allocation.setPayRecordId(SEED_PAY_RECORD_ID);
+        allocation.setAllocatedAmount(new BigDecimal("1200.00"));
+        invoiceService.saveAllocations(id, List.of(allocation));
+        insertInvoiceFile(id, "OTHER", "CLEAN");
+        insertInvoiceFile(id, "ELECTRONIC_INVOICE", "NOT_SCANNED");
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> invoiceService.verify(id, "VERIFIED"));
+        assertEquals("INVOICE_ATTACHMENT_REQUIRED", error.getCode());
+        assertEquals("PENDING", invoiceService.getById(id).getVerifyStatus());
+    }
+
+    @Test
+    @Order(22)
+    @DisplayName("CONCURRENCY: verification holding invoice lock makes later attachment mutation fail closed")
+    void verifyFirstMakesConcurrentAttachmentMutationFailClosed() throws Exception {
+        Long id = createPreparedInvoice("INV-LOCK-VERIFY-FIRST", "1300.00");
+        CountDownLatch verifiedHoldingLock = new CountDownLatch(1);
+        CountDownLatch releaseVerification = new CountDownLatch(1);
+        CountDownLatch mutationStarted = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> verification = pool.submit(() -> withThreadContext(() -> {
+                transactionTemplate.executeWithoutResult(status -> {
+                        invoiceService.verify(id, "VERIFIED");
+                        verifiedHoldingLock.countDown();
+                        await(releaseVerification);
+                    });
+                return null;
+            }));
+            assertTrue(verifiedHoldingLock.await(5, TimeUnit.SECONDS));
+
+            Future<String> mutation = pool.submit(() -> withThreadContext(() -> {
+                mutationStarted.countDown();
+                return transactionTemplate.execute(status -> {
+                    try {
+                        businessObjectAuthorizer.checkDeleteAccess(
+                                "INVOICE", id, "ELECTRONIC_INVOICE");
+                        return "ALLOWED";
+                    } catch (BusinessException e) {
+                        return e.getCode();
+                    }
+                });
+            }));
+            assertTrue(mutationStarted.await(5, TimeUnit.SECONDS));
+            assertThrows(TimeoutException.class, () -> mutation.get(200, TimeUnit.MILLISECONDS),
+                    "附件变更必须等待核验事务释放同一发票行锁");
+
+            releaseVerification.countDown();
+            verification.get(5, TimeUnit.SECONDS);
+            assertEquals("INVOICE_DOCUMENT_IMMUTABLE", mutation.get(5, TimeUnit.SECONDS));
+        } finally {
+            releaseVerification.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    @Order(23)
+    @DisplayName("CONCURRENCY: attachment deletion holding invoice lock makes later verification reread and fail")
+    void attachmentMutationFirstMakesConcurrentVerificationRereadEvidence() throws Exception {
+        Long id = createPreparedInvoice("INV-LOCK-FILE-FIRST", "1400.00");
+        SysFile file = sysFileMapper.selectOne(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getTenantId, TENANT_ID)
+                .eq(SysFile::getBusinessType, "INVOICE")
+                .eq(SysFile::getBusinessId, id));
+        assertNotNull(file);
+
+        CountDownLatch mutationHoldingLock = new CountDownLatch(1);
+        CountDownLatch releaseMutation = new CountDownLatch(1);
+        CountDownLatch verificationStarted = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<?> mutation = pool.submit(() -> withThreadContext(() -> {
+                transactionTemplate.executeWithoutResult(status -> {
+                        businessObjectAuthorizer.checkDeleteAccess(
+                                "INVOICE", id, "ELECTRONIC_INVOICE");
+                        sysFileMapper.deleteById(file.getId());
+                        mutationHoldingLock.countDown();
+                        await(releaseMutation);
+                    });
+                return null;
+            }));
+            assertTrue(mutationHoldingLock.await(5, TimeUnit.SECONDS));
+
+            Future<?> verification = pool.submit(() -> withThreadContext(() -> {
+                verificationStarted.countDown();
+                invoiceService.verify(id, "VERIFIED");
+                return null;
+            }));
+            assertTrue(verificationStarted.await(5, TimeUnit.SECONDS));
+            assertThrows(TimeoutException.class, () -> verification.get(200, TimeUnit.MILLISECONDS),
+                    "核验必须等待附件变更事务释放同一发票行锁");
+
+            releaseMutation.countDown();
+            mutation.get(5, TimeUnit.SECONDS);
+            ExecutionException failure = assertThrows(ExecutionException.class,
+                    () -> verification.get(5, TimeUnit.SECONDS));
+            assertInstanceOf(BusinessException.class, failure.getCause());
+            assertEquals("INVOICE_ATTACHMENT_REQUIRED",
+                    ((BusinessException) failure.getCause()).getCode());
+            assertEquals("PENDING", invoiceService.getById(id).getVerifyStatus());
+        } finally {
+            releaseMutation.countDown();
+            pool.shutdownNow();
+        }
+    }
+
+    private Long createPreparedInvoice(String invoiceNo, String amount) {
+        PayInvoice invoice = new PayInvoice();
+        invoice.setInvoiceNo(invoiceNo);
+        invoice.setInvoiceType("VAT_SPECIAL");
+        invoice.setInvoiceAmount(new BigDecimal(amount));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
+        Long id = invoiceService.create(invoice);
+        prepareVerification(id, amount);
+        return id;
+    }
+
+    private void insertInvoiceFile(Long invoiceId, String documentType, String virusScanStatus) {
+        SysFile file = new SysFile();
+        file.setTenantId(TENANT_ID);
+        file.setBusinessType("INVOICE");
+        file.setBusinessId(invoiceId);
+        file.setDocumentType(documentType);
+        file.setFileName(documentType + "-" + invoiceId + ".pdf");
+        file.setOriginalName("invoice.pdf");
+        file.setFileSize(100L);
+        file.setContentType("application/pdf");
+        file.setStoragePath("INVOICE/" + invoiceId + "/" + file.getFileName());
+        file.setBucketName("test");
+        file.setVirusScanStatus(virusScanStatus);
+        sysFileMapper.insert(file);
+    }
+
+    private <T> T withThreadContext(java.util.concurrent.Callable<T> action) {
+        Claims claims = Jwts.claims()
+                .subject("admin")
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", TENANT_ID)
+                .add("roleCodes", java.util.List.of("ADMIN"))
+                .build();
+        UserContext.set(claims);
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken("admin", null,
+                        List.of(new SimpleGrantedAuthority("ROLE_ADMIN"))));
+        try {
+            return action.call();
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        } finally {
+            UserContext.clear();
+            SecurityContextHolder.clearContext();
+        }
+    }
+
+    private void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("并发测试等待超时");
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("并发测试被中断", e);
+        }
     }
 
     @Test

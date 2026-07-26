@@ -31,6 +31,7 @@ const permissions = [
   'requisition:submit',
   'requisition:stock-out',
   'requisition:return',
+  'procurement:trace:query',
 ]
 const requisitions = [
   {
@@ -71,7 +72,7 @@ const stockTransactions = [
     availableAfter: '70.0000',
     unitCost: '3.25',
     amount: '32.50',
-    sourceType: 'REQUISITION',
+    sourceType: 'MAT_REQUISITION',
     sourceId: 'R1',
     sourceLineId: 'RI1',
   },
@@ -142,7 +143,23 @@ async function install(page: Page, granted = permissions, rejectStockOut = false
       ],
     }),
   )
-  await page.route('**/api/{requisitions,procurement-trace,material-returns}**', async (route) => {
+  await page.route('**/api/contracts**', (route) =>
+    fulfill(route, {
+      records: [
+        {
+          id: 'C1',
+          projectId: 'P1',
+          contractCode: 'CT-001',
+          contractName: '示范项目材料合同',
+          contractStatus: 'PERFORMING',
+        },
+      ],
+      total: 1,
+      pageNo: 1,
+      pageSize: 200,
+    }),
+  )
+  await page.route('**/api/{requisitions,procurement-traces,material-returns}**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname.replace('/api', '')
     const method = request.method()
@@ -172,7 +189,9 @@ async function install(page: Page, granted = permissions, rejectStockOut = false
     }
     if (path.endsWith('/items') && path.startsWith('/requisitions/')) return fulfill(route, items)
     if (path.endsWith('/submit')) {
-      requisitions[0]!.approvalStatus = 'APPROVING'
+      const id = path.split('/').at(-2)
+      const requisition = requisitions.find((item) => item.id === id)
+      if (requisition) requisition.approvalStatus = 'APPROVING'
       return fulfill(route, null)
     }
     if (path.endsWith('/stock-out')) {
@@ -187,7 +206,7 @@ async function install(page: Page, granted = permissions, rejectStockOut = false
         requisitions.find((item) => path === `/requisitions/${item.id}`),
       )
     if (path.startsWith('/requisitions/') && method === 'DELETE') return fulfill(route, null)
-    if (path.startsWith('/procurement-trace/requisitions/'))
+    if (path.startsWith('/procurement-traces/requisitions/'))
       return fulfill(route, {
         requisition: requisitions[0],
         requisitionItems: items,
@@ -251,8 +270,9 @@ async function install(page: Page, granted = permissions, rejectStockOut = false
 }
 
 async function openDetail(page: Page) {
-  await page.getByRole('button', { name: requisitions[0]!.requisitionCode, exact: true }).click()
-  await expect(page.getByText('领退料完整链路', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'REQ-001', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '领退料链路' })).toBeVisible()
+  await expect(page.getByRole('dialog', { name: '领退料链路' }).getByText('当前申请')).toBeVisible()
 }
 
 test.describe('M5 requisition, stock-out and return V2', () => {
@@ -287,10 +307,19 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     ]) {
       await page.setViewportSize(viewport)
       await page.goto('/v2/inventory/material-requisition?projectId=P1')
-      await expect(page.getByText('REQ-001', { exact: true })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'REQ-001', exact: true })).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)
+      if (viewport.width === 390) {
+        const header = page.locator('.v2-card--page-heading > .v2-card__header')
+        await expect(header).toHaveCSS('flex-direction', 'column')
+        const [headerBox, actionsBox] = await Promise.all([
+          header.boundingBox(),
+          header.locator(':scope > .v2-card__actions').boundingBox(),
+        ])
+        expect(actionsBox?.width).toBeGreaterThan((headerBox?.width ?? 0) * 0.9)
+      }
     }
     const axe = await new AxeBuilder({ page }).include('.requisition-page').analyze()
     expect(
@@ -299,18 +328,46 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     expect(errors).toEqual([])
   })
 
-  test('requires add, edit and delete before showing safe create', async ({ page }) => {
-    await install(page, ['requisition:query', 'requisition:add', 'requisition:edit'])
+  test('requires add and edit before showing create action', async ({ page }) => {
+    await install(page, ['requisition:query', 'requisition:add'])
     await page.goto('/v2/inventory/material-requisition?projectId=P1')
-    await expect(page.getByRole('button', { name: '新建领料单' })).toHaveCount(0)
-    await install(page, [
-      'requisition:query',
-      'requisition:add',
-      'requisition:edit',
-      'requisition:delete',
-    ])
+    await expect(page.getByRole('button', { name: '发起领料申请' })).toHaveCount(0)
+    await install(page, ['requisition:query', 'requisition:add', 'requisition:edit'])
     await page.reload()
-    await expect(page.getByRole('button', { name: '新建领料单' })).toBeVisible()
+    await expect(page.getByRole('button', { name: '发起领料申请' })).toBeVisible()
+  })
+
+  test('maps report period to server dates and shows project in all-project view', async ({
+    page,
+  }) => {
+    const listRequests: string[] = []
+    page.on('request', (request) => {
+      if (new URL(request.url()).pathname === '/api/requisitions') listRequests.push(request.url())
+    })
+    await install(page)
+    await page.goto('/v2/inventory/material-requisition?period=2026-07')
+    await expect(
+      page.getByRole('region', { name: '领料申请列表' }).getByText('示范项目', { exact: true }),
+    ).toBeVisible()
+    await expect
+      .poll(() => listRequests.some((url) => url.includes('dateFrom=2026-07-01')))
+      .toBe(true)
+    expect(listRequests.some((url) => url.includes('dateTo=2026-07-31'))).toBe(true)
+  })
+
+  test('query-only role opens detail without requesting trace and keeps return hidden', async ({
+    page,
+  }) => {
+    const traceRequests: string[] = []
+    page.on('request', (request) => {
+      if (request.url().includes('/procurement-traces/')) traceRequests.push(request.url())
+    })
+    await install(page, ['requisition:query'])
+    await page.goto('/v2/inventory/material-requisition?projectId=P1')
+    await openDetail(page)
+    await expect(page.getByText('无追溯权限').first()).toBeVisible()
+    await expect(page.getByRole('button', { name: '发起退料' })).toHaveCount(0)
+    expect(traceRequests).toEqual([])
   })
 
   for (const sample of [
@@ -330,7 +387,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
       permission: 'requisition:return',
       approvalStatus: 'APPROVED',
       stockOutFlag: '1',
-      action: '确认退料',
+      action: '发起退料',
     },
   ]) {
     test(`${sample.permission} fails closed for ordinary user`, async ({ page }) => {
@@ -349,15 +406,15 @@ test.describe('M5 requisition, stock-out and return V2', () => {
   test('creates decimal-string requisition and submits once', async ({ page }) => {
     const writes = await install(page)
     await page.goto('/v2/inventory/material-requisition?projectId=P1')
-    await page.getByRole('button', { name: '新建领料单' }).click()
-    const dialog = page.getByRole('dialog', { name: '新建领料单' })
-    await selectBusinessOption(dialog, /^仓库：/, /WH-001 · 主仓/)
-    await selectBusinessOption(dialog, /^物料：/, /MAT-001 · 钢筋/)
-    await dialog.getByLabel('领料数量').fill('9007199254740993.1234')
-    await dialog.getByLabel('单价').fill('3.25')
-    await dialog.getByRole('button', { name: '保存', exact: true }).dblclick()
+    await page.getByRole('button', { name: '发起领料申请' }).click()
+    const editor = page.getByRole('dialog', { name: '发起领料申请' })
+    await selectBusinessOption(editor, /^合同：/, /CT-001 · 示范项目材料合同/)
+    await selectBusinessOption(editor, /^领用仓库：/, /WH-001 · 主仓/)
+    await selectBusinessOption(editor, /^物料：/, /MAT-001 · 钢筋/)
+    await editor.getByLabel('领用数量').fill('9007199254740993.1234')
+    await editor.getByLabel('参考单价').fill('3.25')
+    await editor.getByRole('button', { name: '保存并提交审批' }).dblclick()
     await expect(page.getByText('REQ-002', { exact: true }).first()).toBeVisible()
-    await page.getByRole('button', { name: '提交审批' }).dblclick()
     expect(writes.filter((item) => item.path === 'POST /requisitions')).toHaveLength(1)
     expect(writes.filter((item) => item.path.endsWith('/items/batch'))).toHaveLength(1)
     expect(writes.filter((item) => item.path.endsWith('/submit'))).toHaveLength(1)
@@ -379,8 +436,8 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     const writes = await install(page)
     await page.goto('/v2/inventory/material-requisition?projectId=P1')
     await openDetail(page)
-    await page.getByRole('button', { name: '确认退料' }).click()
-    const dialog = page.getByRole('dialog', { name: '确认退料' })
+    await page.getByRole('button', { name: '发起退料' }).click()
+    const dialog = page.getByRole('dialog', { name: '发起退料' })
     await expect(dialog).toBeVisible()
     await page.waitForTimeout(300)
     await dialog.getByRole('button', { name: /领料明细/ }).click()

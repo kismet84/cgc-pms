@@ -201,3 +201,112 @@ VALUES
 ON DUPLICATE KEY UPDATE
   approver_id=VALUES(approver_id),approver_name=VALUES(approver_name),task_status=VALUES(task_status),received_at=VALUES(received_at),
   handled_at=NULL,action_type=NULL,comment=NULL,updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=0;
+
+SET @requisition_template := (SELECT id FROM wf_template WHERE tenant_id=0 AND business_type='MATERIAL_REQUISITION' AND enabled=1 AND deleted_flag=0 ORDER BY id LIMIT 1);
+SET @requisition_node := (SELECT id FROM wf_template_node WHERE tenant_id=0 AND template_id=@requisition_template AND node_type='APPROVAL' AND deleted_flag=0 ORDER BY node_order,id LIMIT 1);
+
+INSERT INTO wf_instance
+  (id,tenant_id,template_id,business_type,business_id,project_id,contract_id,title,amount,instance_status,current_round,resubmit_count,business_revision,
+   initiator_id,business_summary,variables,started_at,ended_at,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000009544,0,@requisition_template,'MATERIAL_REQUISITION',520000000000009519,@demo_project,@demo_contract,
+   '在建项目二次结构材料领用审批',32000,'APPROVED',1,0,1,@demo_manager,'领用10吨HRB400E钢筋用于二次结构施工',
+   JSON_OBJECT('dashboardDemo',TRUE),'2026-07-20 09:10:00','2026-07-20 10:00:00',
+   @demo_manager,NOW(),@demo_admin,NOW(),0,'M2生产经理领用审批闭环样本')
+ON DUPLICATE KEY UPDATE
+  template_id=VALUES(template_id),project_id=VALUES(project_id),contract_id=VALUES(contract_id),title=VALUES(title),amount=VALUES(amount),
+  instance_status=VALUES(instance_status),ended_at=VALUES(ended_at),business_summary=VALUES(business_summary),
+  updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=0,remark=VALUES(remark);
+
+INSERT INTO wf_node_instance
+  (id,tenant_id,instance_id,template_node_id,node_code,node_name,node_order,approve_mode,node_status,round_no,started_at,ended_at,
+   created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+SELECT 520000000000009545,0,520000000000009544,n.id,n.node_code,n.node_name,n.node_order,n.approve_mode,'COMPLETED',1,
+       '2026-07-20 09:10:00','2026-07-20 10:00:00',@demo_manager,NOW(),@demo_admin,NOW(),0,'M2领用审批已完成节点'
+FROM wf_template_node n WHERE n.id=@requisition_node
+ON DUPLICATE KEY UPDATE
+  template_node_id=VALUES(template_node_id),node_code=VALUES(node_code),node_name=VALUES(node_name),node_order=VALUES(node_order),
+  approve_mode=VALUES(approve_mode),node_status=VALUES(node_status),started_at=VALUES(started_at),ended_at=VALUES(ended_at),
+  updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=0,remark=VALUES(remark);
+
+INSERT INTO wf_task
+  (id,tenant_id,instance_id,node_instance_id,business_type,business_id,approver_id,approver_name,task_status,round_no,task_version,
+   received_at,handled_at,action_type,comment,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000009546,0,520000000000009544,520000000000009545,'MATERIAL_REQUISITION',520000000000009519,@demo_admin,
+   '平台管理员','APPROVED',1,1,'2026-07-20 09:10:00','2026-07-20 10:00:00','APPROVE','数量、用途及库存校验通过，同意领用',
+   @demo_manager,NOW(),@demo_admin,NOW(),0,'M2领用审批已办任务')
+ON DUPLICATE KEY UPDATE
+  node_instance_id=VALUES(node_instance_id),approver_id=VALUES(approver_id),approver_name=VALUES(approver_name),task_status=VALUES(task_status),
+  received_at=VALUES(received_at),handled_at=VALUES(handled_at),action_type=VALUES(action_type),comment=VALUES(comment),
+  updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=0,remark=VALUES(remark);
+
+INSERT INTO wf_record
+  (id,tenant_id,instance_id,node_instance_id,task_id,round_no,business_type,business_id,node_code,node_name,action_type,action_name,
+   operator_id,operator_name,comment,record_status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+SELECT 520000000000009547,0,520000000000009544,520000000000009545,520000000000009546,1,'MATERIAL_REQUISITION',520000000000009519,
+       n.node_code,n.node_name,'APPROVE','同意',@demo_admin,'平台管理员','数量、用途及库存校验通过，同意领用','EFFECTIVE',
+       @demo_admin,'2026-07-20 10:00:00',@demo_admin,NOW(),0,'M2领用审批有效记录'
+FROM wf_template_node n WHERE n.id=@requisition_node
+ON DUPLICATE KEY UPDATE
+  node_code=VALUES(node_code),node_name=VALUES(node_name),action_type=VALUES(action_type),action_name=VALUES(action_name),
+  operator_id=VALUES(operator_id),operator_name=VALUES(operator_name),comment=VALUES(comment),record_status=VALUES(record_status),
+  updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=0,remark=VALUES(remark);
+
+INSERT INTO wf_instance
+  (id,tenant_id,template_id,business_type,business_id,project_id,contract_id,title,amount,instance_status,current_round,resubmit_count,business_revision,
+   initiator_id,business_summary,variables,started_at,ended_at,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000001801,0,@requisition_template,'MATERIAL_REQUISITION',520000000000001501,520000000000000001,520000000000000702,
+   '主体结构钢筋领用审批',20000,'APPROVED',1,0,1,@demo_admin,'主楼主体结构领用20吨HRB400E钢筋',
+   JSON_OBJECT('demoPackage','CGC-COMPLETE-PROJECT'),'2025-04-01 08:30:00','2025-04-01 09:10:00',
+   @demo_admin,'2025-04-01 08:30:00',@demo_admin,NOW(),0,'完整项目示例：领用审批闭环')
+ON DUPLICATE KEY UPDATE
+  template_id=VALUES(template_id),business_type=VALUES(business_type),business_id=VALUES(business_id),project_id=VALUES(project_id),
+  contract_id=VALUES(contract_id),title=VALUES(title),amount=VALUES(amount),instance_status=VALUES(instance_status),
+  initiator_id=VALUES(initiator_id),business_summary=VALUES(business_summary),variables=VALUES(variables),
+  started_at=VALUES(started_at),ended_at=VALUES(ended_at),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),
+  deleted_flag=0,remark=VALUES(remark);
+
+INSERT INTO wf_node_instance
+  (id,tenant_id,instance_id,template_node_id,node_code,node_name,node_order,approve_mode,node_status,round_no,started_at,ended_at,
+   created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+SELECT 520000000000001802,0,520000000000001801,n.id,n.node_code,n.node_name,n.node_order,n.approve_mode,'COMPLETED',1,
+       '2025-04-01 08:30:00','2025-04-01 09:10:00',@demo_admin,'2025-04-01 08:30:00',@demo_admin,NOW(),0,
+       '完整项目示例：领用审批已完成节点'
+FROM wf_template_node n WHERE n.id=@requisition_node
+ON DUPLICATE KEY UPDATE
+  instance_id=VALUES(instance_id),template_node_id=VALUES(template_node_id),node_code=VALUES(node_code),node_name=VALUES(node_name),
+  node_order=VALUES(node_order),approve_mode=VALUES(approve_mode),node_status=VALUES(node_status),round_no=VALUES(round_no),
+  started_at=VALUES(started_at),ended_at=VALUES(ended_at),updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),
+  deleted_flag=0,remark=VALUES(remark);
+
+INSERT INTO wf_task
+  (id,tenant_id,instance_id,node_instance_id,business_type,business_id,approver_id,approver_name,task_status,round_no,task_version,
+   received_at,handled_at,action_type,comment,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000001803,0,520000000000001801,520000000000001802,'MATERIAL_REQUISITION',520000000000001501,@demo_admin,
+   '平台管理员','APPROVED',1,1,'2025-04-01 08:30:00','2025-04-01 09:10:00','APPROVE',
+   '用途、数量与可用库存核验通过，同意出库',@demo_admin,'2025-04-01 08:30:00',@demo_admin,NOW(),0,
+   '完整项目示例：领用审批已办任务')
+ON DUPLICATE KEY UPDATE
+  instance_id=VALUES(instance_id),node_instance_id=VALUES(node_instance_id),business_type=VALUES(business_type),
+  business_id=VALUES(business_id),approver_id=VALUES(approver_id),approver_name=VALUES(approver_name),
+  task_status=VALUES(task_status),round_no=VALUES(round_no),task_version=VALUES(task_version),
+  received_at=VALUES(received_at),handled_at=VALUES(handled_at),action_type=VALUES(action_type),comment=VALUES(comment),
+  updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=0,remark=VALUES(remark);
+
+INSERT INTO wf_record
+  (id,tenant_id,instance_id,node_instance_id,task_id,round_no,business_type,business_id,node_code,node_name,action_type,action_name,
+   operator_id,operator_name,comment,record_status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+SELECT 520000000000001804,0,520000000000001801,520000000000001802,520000000000001803,1,
+       'MATERIAL_REQUISITION',520000000000001501,n.node_code,n.node_name,'APPROVE','同意',@demo_admin,'平台管理员',
+       '用途、数量与可用库存核验通过，同意出库','EFFECTIVE',@demo_admin,'2025-04-01 09:10:00',
+       @demo_admin,NOW(),0,'完整项目示例：领用审批有效记录'
+FROM wf_template_node n WHERE n.id=@requisition_node
+ON DUPLICATE KEY UPDATE
+  instance_id=VALUES(instance_id),node_instance_id=VALUES(node_instance_id),task_id=VALUES(task_id),
+  business_type=VALUES(business_type),business_id=VALUES(business_id),node_code=VALUES(node_code),node_name=VALUES(node_name),
+  action_type=VALUES(action_type),action_name=VALUES(action_name),operator_id=VALUES(operator_id),
+  operator_name=VALUES(operator_name),comment=VALUES(comment),record_status=VALUES(record_status),
+  updated_by=VALUES(updated_by),updated_at=VALUES(updated_at),deleted_flag=0,remark=VALUES(remark);

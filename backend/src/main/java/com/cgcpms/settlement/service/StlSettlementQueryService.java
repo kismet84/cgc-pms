@@ -7,6 +7,8 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.entity.CostItem;
@@ -37,6 +39,8 @@ import com.cgcpms.settlement.vo.SettlementSourcesVO;
 import com.cgcpms.settlement.vo.StlSettlementItemVO;
 import com.cgcpms.settlement.vo.StlSettlementVO;
 import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.entity.SubMeasureItem;
+import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.variation.entity.VarOrder;
 import com.cgcpms.variation.mapper.VarOrderMapper;
@@ -57,6 +61,7 @@ import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMEN
 import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -74,10 +79,12 @@ public class StlSettlementQueryService {
     private final StlSettlementMapper stlSettlementMapper;
     private final StlSettlementItemMapper stlSettlementItemMapper;
     private final CtContractMapper ctContractMapper;
+    private final CtContractItemMapper ctContractItemMapper;
     private final PmProjectMapper pmProjectMapper;
     private final MdPartnerMapper mdPartnerMapper;
     private final VarOrderMapper varOrderMapper;
     private final SubMeasureMapper subMeasureMapper;
+    private final SubMeasureItemMapper subMeasureItemMapper;
     private final PayApplicationMapper payApplicationMapper;
     private final PayRecordMapper payRecordMapper;
     private final CostItemMapper costItemMapper;
@@ -96,6 +103,14 @@ public class StlSettlementQueryService {
     public IPage<StlSettlementVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                           Long partnerId, String settlementCode, String settlementType,
                                           String keyword) {
+        return getPage(pageNo, pageSize, projectId, contractId, partnerId, settlementCode,
+                settlementType, null, null, keyword);
+    }
+
+    public IPage<StlSettlementVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
+                                          Long partnerId, String settlementCode, String settlementType,
+                                          String settlementStatus, String approvalStatus,
+                                          String keyword) {
         Long tenantId = UserContext.getCurrentTenantId();
         LambdaQueryWrapper<StlSettlement> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(StlSettlement::getTenantId, tenantId);
@@ -104,6 +119,12 @@ public class StlSettlementQueryService {
         if (partnerId != null) wrapper.eq(StlSettlement::getPartnerId, partnerId);
         if (StringUtils.hasText(settlementCode)) wrapper.like(StlSettlement::getSettlementCode, settlementCode);
         if (StringUtils.hasText(settlementType)) wrapper.eq(StlSettlement::getSettlementType, settlementType);
+        if (StringUtils.hasText(settlementStatus)) {
+            wrapper.eq(StlSettlement::getSettlementStatus, settlementStatus);
+        }
+        if (StringUtils.hasText(approvalStatus)) {
+            wrapper.eq(StlSettlement::getApprovalStatus, approvalStatus);
+        }
         if (StringUtils.hasText(keyword)) {
             wrapper.and(w -> w.like(StlSettlement::getRemark, "%" + keyword.trim() + "%"));
         }
@@ -115,6 +136,12 @@ public class StlSettlementQueryService {
 
     public Map<String, Object> getKpi(Long projectId, Long contractId, Long partnerId,
                                       String settlementCode, String settlementType) {
+        return getKpi(projectId, contractId, partnerId, settlementCode, settlementType, null, null);
+    }
+
+    public Map<String, Object> getKpi(Long projectId, Long contractId, Long partnerId,
+                                      String settlementCode, String settlementType,
+                                      String settlementStatus, String approvalStatus) {
         Long tenantId = UserContext.getCurrentTenantId();
         LambdaQueryWrapper<StlSettlement> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(StlSettlement::getTenantId, tenantId);
@@ -123,6 +150,12 @@ public class StlSettlementQueryService {
         if (partnerId != null) wrapper.eq(StlSettlement::getPartnerId, partnerId);
         if (StringUtils.hasText(settlementCode)) wrapper.like(StlSettlement::getSettlementCode, settlementCode);
         if (StringUtils.hasText(settlementType)) wrapper.eq(StlSettlement::getSettlementType, settlementType);
+        if (StringUtils.hasText(settlementStatus)) {
+            wrapper.eq(StlSettlement::getSettlementStatus, settlementStatus);
+        }
+        if (StringUtils.hasText(approvalStatus)) {
+            wrapper.eq(StlSettlement::getApprovalStatus, approvalStatus);
+        }
 
         List<StlSettlement> settlements = stlSettlementMapper.selectList(wrapper);
         // Single-pass accumulation: 5 fields + 2 counters in one loop
@@ -350,9 +383,52 @@ public class StlSettlementQueryService {
                 .eq(PayRecord::getPayStatus, "SUCCESS"));
 
         SettlementSourcesVO vo = new SettlementSourcesVO();
+        Map<Long, BigDecimal> measuredQuantities = new java.util.TreeMap<>();
+        if (!subMeasures.isEmpty()) {
+            List<Long> measureIds = subMeasures.stream().map(SubMeasure::getId).toList();
+            for (SubMeasureItem item : subMeasureItemMapper.selectList(
+                    new LambdaQueryWrapper<SubMeasureItem>()
+                            .eq(SubMeasureItem::getTenantId, tenantId)
+                            .in(SubMeasureItem::getMeasureId, measureIds))) {
+                if (item.getContractItemId() != null && item.getCurrentQuantity() != null) {
+                    measuredQuantities.merge(
+                            item.getContractItemId(), item.getCurrentQuantity(), BigDecimal::add);
+                }
+            }
+        }
+        Map<Long, CtContractItem> contractItemsById = measuredQuantities.isEmpty()
+                ? Map.of()
+                : ctContractItemMapper.selectByIds(measuredQuantities.keySet()).stream()
+                        .filter(item -> Objects.equals(item.getTenantId(), tenantId)
+                                && Objects.equals(item.getContractId(), contractId))
+                        .collect(Collectors.toMap(
+                                CtContractItem::getId,
+                                item -> item,
+                                (left, right) -> left,
+                                LinkedHashMap::new));
+        vo.setContractItems(measuredQuantities.entrySet().stream()
+                .filter(entry -> contractItemsById.containsKey(entry.getKey()))
+                .map(entry -> {
+                    CtContractItem item = contractItemsById.get(entry.getKey());
+                    BigDecimal quantity = entry.getValue();
+                    BigDecimal unitPrice = item.getUnitPrice() == null
+                            ? BigDecimal.ZERO : item.getUnitPrice();
+                    SettlementSourcesVO.ContractItemVO source =
+                            new SettlementSourcesVO.ContractItemVO();
+                    source.setId(String.valueOf(item.getId()));
+                    source.setItemCode(item.getItemCode());
+                    source.setItemName(item.getItemName());
+                    source.setUnit(item.getUnit());
+                    source.setMeasuredQuantity(quantity.toPlainString());
+                    source.setUnitPrice(unitPrice.toPlainString());
+                    source.setAmount(quantity.multiply(unitPrice)
+                            .setScale(2, java.math.RoundingMode.HALF_UP).toPlainString());
+                    return source;
+                })
+                .toList());
         vo.setVarOrders(varOrders.stream().map(v -> {
             SettlementSourcesVO.VarOrderVO vvo = new SettlementSourcesVO.VarOrderVO();
-            vvo.setId(v.getId());
+            vvo.setId(String.valueOf(v.getId()));
             vvo.setVarCode(v.getVarCode());
             vvo.setVarName(v.getVarName());
             vvo.setVarType(v.getVarType());
@@ -363,7 +439,7 @@ public class StlSettlementQueryService {
 
         vo.setSubMeasures(subMeasures.stream().map(s -> {
             SettlementSourcesVO.SubMeasureVO svo = new SettlementSourcesVO.SubMeasureVO();
-            svo.setId(s.getId());
+            svo.setId(String.valueOf(s.getId()));
             svo.setMeasureCode(s.getMeasureCode());
             svo.setMeasurePeriod(s.getMeasurePeriod());
             svo.setApprovedAmount(plainNullable(s.getApprovedAmount()));
@@ -373,7 +449,7 @@ public class StlSettlementQueryService {
 
         vo.setPayRecords(payRecords.stream().map(p -> {
             SettlementSourcesVO.PayRecordVO pvo = new SettlementSourcesVO.PayRecordVO();
-            pvo.setId(p.getId());
+            pvo.setId(String.valueOf(p.getId()));
             pvo.setPayAmount(plainNullable(p.getPayAmount()));
             pvo.setPayDate(p.getPayDate() != null ? p.getPayDate().toString() : null);
             pvo.setPayMethod(p.getPayMethod());
@@ -552,12 +628,18 @@ public class StlSettlementQueryService {
 
         Map<Long, String> projectNames = projectIds.isEmpty() ? Collections.emptyMap()
                 : pmProjectMapper.selectByIds(projectIds).stream()
+                .filter(project -> Objects.equals(project.getTenantId(), UserContext.getCurrentTenantId()))
                 .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName, (a, b) -> a));
         Map<Long, String> contractNames = contractIds.isEmpty() ? Collections.emptyMap()
                 : ctContractMapper.selectByIds(contractIds).stream()
+                .filter(contract -> Objects.equals(contract.getTenantId(), UserContext.getCurrentTenantId()))
+                .filter(contract -> records.stream().anyMatch(record ->
+                        Objects.equals(record.getContractId(), contract.getId())
+                                && Objects.equals(record.getProjectId(), contract.getProjectId())))
                 .collect(Collectors.toMap(CtContract::getId, CtContract::getContractName, (a, b) -> a));
         Map<Long, String> partnerNames = partnerIds.isEmpty() ? Collections.emptyMap()
                 : mdPartnerMapper.selectByIds(partnerIds).stream()
+                .filter(partner -> Objects.equals(partner.getTenantId(), UserContext.getCurrentTenantId()))
                 .collect(Collectors.toMap(MdPartner::getId, MdPartner::getPartnerName, (a, b) -> a));
 
         return new StlSettlementAssembler.NameMaps(projectNames, contractNames, partnerNames);

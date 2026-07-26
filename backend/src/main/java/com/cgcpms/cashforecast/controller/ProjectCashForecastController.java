@@ -3,6 +3,7 @@ package com.cgcpms.cashforecast.controller;
 import com.cgcpms.cashforecast.dto.CashForecastModels.*;
 import com.cgcpms.cashforecast.service.ProjectCashForecastService;
 import com.cgcpms.common.result.ApiResponse;
+import com.cgcpms.financeops.vo.FinanceWorkspaceVOs.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,6 +16,18 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ProjectCashForecastController {
     private final ProjectCashForecastService service;
+    @GetMapping("/workspace") @PreAuthorize("hasAuthority('finance:forecast:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<CashForecastCycleVO>> workspace(@RequestParam Long projectId){return ApiResponse.success(service.cycles(projectId).stream().map(CashForecastCycleVO::from).toList());}
+    @GetMapping("/workspace/{id}") @PreAuthorize("hasAuthority('finance:forecast:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @SuppressWarnings("unchecked")
+    public ApiResponse<CashForecastTraceVO> workspaceTrace(@PathVariable Long id){
+        Map<String,Object> trace=service.trace(id);
+        return ApiResponse.success(new CashForecastTraceVO(
+                CashForecastCycleVO.from((Map<String,Object>)trace.get("cycle")),
+                ((List<Map<String,Object>>)trace.get("lines")).stream().map(CashForecastLineVO::from).toList(),
+                ((List<Map<String,Object>>)trace.get("actions")).stream().map(CashFundingActionVO::from).toList(),
+                ((List<Map<String,Object>>)trace.get("actualJournals")).stream().map(CashJournalFactVO::from).toList()));
+    }
     @PostMapping("/cycles") @PreAuthorize("hasAuthority('finance:forecast:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')") public ApiResponse<Map<String,Object>> create(@Valid@RequestBody CycleRequest r){return ApiResponse.success(service.createCycle(r));}
     @GetMapping("/cycles") @PreAuthorize("hasAuthority('finance:forecast:query') or hasAnyRole('ADMIN','SUPER_ADMIN')") public ApiResponse<List<Map<String,Object>>> list(@RequestParam Long projectId){return ApiResponse.success(service.cycles(projectId));}
     @GetMapping("/cycles/{id}/trace") @PreAuthorize("hasAuthority('finance:forecast:query') or hasAnyRole('ADMIN','SUPER_ADMIN')") public ApiResponse<Map<String,Object>> trace(@PathVariable Long id){return ApiResponse.success(service.trace(id));}

@@ -22,6 +22,13 @@ export const SUBCONTRACT_PERMISSIONS = {
     delete: "subcontract:measure:delete",
     submit: "subcontract:measure:submit",
   },
+  settlement: {
+    query: "settlement:query",
+    add: "settlement:add",
+    edit: "settlement:edit",
+    delete: "settlement:delete",
+    submit: "settlement:submit",
+  },
 } as const;
 
 export const SUBCONTRACT_API = {
@@ -35,6 +42,28 @@ export const SUBCONTRACT_API = {
   measureSubmit: (id: string) =>
     `/sub-measures/${encodeURIComponent(id)}/submit`,
   settlements: "/settlements",
+  settlementKpi: "/settlements/kpi",
+  settlement: (id: string) => `/settlements/${encodeURIComponent(id)}`,
+  settlementItems: (id: string) =>
+    `/settlements/${encodeURIComponent(id)}/items`,
+  settlementItemsBatch: (id: string) =>
+    `/settlements/${encodeURIComponent(id)}/items/batch`,
+  settlementCompute: (contractId: string) =>
+    `/settlements/compute/${encodeURIComponent(contractId)}`,
+  settlementSources: (id: string) =>
+    `/settlements/${encodeURIComponent(id)}/sources`,
+  settlementVariations: (id: string) =>
+    `/settlements/${encodeURIComponent(id)}/variations`,
+  settlementPayments: (id: string) =>
+    `/settlements/${encodeURIComponent(id)}/payments`,
+  settlementCosts: (id: string) =>
+    `/settlements/${encodeURIComponent(id)}/costs`,
+  settlementAttachments: (id: string) =>
+    `/settlements/${encodeURIComponent(id)}/attachments`,
+  settlementApprovalRecords: (id: string) =>
+    `/settlements/${encodeURIComponent(id)}/approval-records`,
+  settlementSubmit: (id: string) =>
+    `/settlements/${encodeURIComponent(id)}/submit`,
 } as const;
 
 export interface SubcontractTaskQuery {
@@ -170,6 +199,8 @@ export interface SettlementQuery {
   partnerId?: string;
   settlementCode?: string;
   settlementType?: string;
+  settlementStatus?: string;
+  approvalStatus?: string;
   keyword?: string;
 }
 
@@ -200,9 +231,156 @@ export interface SettlementRecord {
   createdAt?: string | null;
   updatedAt?: string | null;
   remark?: string | null;
+  items?: SettlementItemRecord[];
 }
 
 export type SettlementPage = PageResult<SettlementRecord>;
+
+export interface SettlementKpi {
+  totalCount: number;
+  totalContractAmount: SubcontractDecimalString;
+  totalFinalAmount: SubcontractDecimalString;
+  totalChangeAmount: SubcontractDecimalString;
+  totalPaidAmount: SubcontractDecimalString;
+  totalUnpaidAmount: SubcontractDecimalString;
+  draftCount: number;
+  finalizedCount: number;
+}
+
+export interface SettlementCommand {
+  contractId: string;
+  deductionAmount?: SubcontractDecimalString | null;
+  remark?: string | null;
+}
+
+export interface SettlementItemRecord {
+  id: string;
+  settlementId: string;
+  itemName: string;
+  unit?: string | null;
+  quantity?: SubcontractDecimalString | null;
+  unitPrice?: SubcontractDecimalString | null;
+  amount?: SubcontractDecimalString | null;
+  sourceType?: string | null;
+  sourceId?: string | null;
+  remark?: string | null;
+}
+
+export interface SettlementItemCommand {
+  sourceType: "CT_CONTRACT";
+  sourceId: string;
+  remark?: string | null;
+}
+
+export interface SettlementCompute {
+  contractId?: string | null;
+  contractAmount?: SubcontractDecimalString | null;
+  changeAmount: SubcontractDecimalString;
+  measuredAmount: SubcontractDecimalString;
+  deductionAmount: SubcontractDecimalString;
+  paidAmount: SubcontractDecimalString;
+  finalAmount?: SubcontractDecimalString | null;
+  unpaidAmount: SubcontractDecimalString;
+  warrantyAmount: SubcontractDecimalString;
+  amountFormulaVersion: string;
+}
+
+export interface SettlementContractItemSource {
+  id: string;
+  itemCode?: string | null;
+  itemName: string;
+  unit?: string | null;
+  measuredQuantity: SubcontractDecimalString;
+  unitPrice: SubcontractDecimalString;
+  amount: SubcontractDecimalString;
+}
+
+export interface SettlementMeasureSource {
+  id: string;
+  measureCode: string;
+  measurePeriod?: string | null;
+  approvedAmount?: SubcontractDecimalString | null;
+  approvalStatus: string;
+}
+
+export interface SettlementVariationSource {
+  id: string;
+  varCode: string;
+  varName: string;
+  varType?: string | null;
+  confirmedAmount?: SubcontractDecimalString | null;
+  approvalStatus?: string | null;
+}
+
+export interface SettlementPaySource {
+  id: string;
+  payAmount?: SubcontractDecimalString | null;
+  payDate?: string | null;
+  payMethod?: string | null;
+  voucherNo?: string | null;
+  payStatus?: string | null;
+}
+
+export interface SettlementSources {
+  contractItems: SettlementContractItemSource[];
+  varOrders: SettlementVariationSource[];
+  subMeasures: SettlementMeasureSource[];
+  payRecords: SettlementPaySource[];
+}
+
+export interface SettlementVariationRecord {
+  id: string;
+  varCode: string;
+  varName: string;
+  varType?: string | null;
+  direction?: string | null;
+  confirmedAmount?: SubcontractDecimalString | null;
+  approvalStatus?: string | null;
+}
+
+export interface SettlementPaymentRecord {
+  id: string;
+  applicationId?: string | null;
+  applyCode?: string | null;
+  payType?: string | null;
+  applyAmount?: SubcontractDecimalString | null;
+  approvedAmount?: SubcontractDecimalString | null;
+  actualPayAmount?: SubcontractDecimalString | null;
+  payStatus?: string | null;
+  payDate?: string | null;
+  voucherNo?: string | null;
+}
+
+export interface SettlementCostRecord {
+  id: string;
+  costSubjectName?: string | null;
+  costType?: string | null;
+  sourceType?: string | null;
+  amount?: SubcontractDecimalString | null;
+  taxAmount?: SubcontractDecimalString | null;
+  amountWithoutTax?: SubcontractDecimalString | null;
+  costDate?: string | null;
+  costStatus?: string | null;
+}
+
+export interface SettlementAttachmentRecord {
+  id: string;
+  originalName: string;
+  fileSize?: number | null;
+  fileType?: string | null;
+  uploadedBy?: string | null;
+  uploadedAt?: string | null;
+}
+
+export interface SettlementApprovalRecord {
+  id: string;
+  nodeName?: string | null;
+  operatorName?: string | null;
+  actionType?: string | null;
+  actionName?: string | null;
+  comment?: string | null;
+  createdAt?: string | null;
+}
 
 export const SUBCONTRACT_DECIMAL_FIELDS = {
   task: ["progressPercent"],

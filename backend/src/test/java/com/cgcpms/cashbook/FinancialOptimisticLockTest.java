@@ -1,5 +1,6 @@
 package com.cgcpms.cashbook;
 
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.cashbook.constant.CashbookConstants;
 import com.cgcpms.cashbook.dto.CashJournalUpdateRequest;
 import com.cgcpms.cashbook.dto.FundAccountCommand;
@@ -54,7 +55,8 @@ class FinancialOptimisticLockTest {
         when(entryMapper.updateById(any(CashJournalEntry.class))).thenReturn(0);
         CashJournalService service = new CashJournalService(entryMapper, mock(FundAccountMapper.class),
                 mock(FundAccountService.class), mock(CtContractMapper.class), mock(ProjectAccessChecker.class),
-                changeLogMapper, mock(SysFileMapper.class), new ObjectMapper(), mock(CashJournalAlertService.class));
+                changeLogMapper, mock(SysFileMapper.class), new ObjectMapper(), mock(CashJournalAlertService.class),
+                mock(AccountingPeriodGuard.class));
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.updateDraft(1L, new CashJournalUpdateRequest()));

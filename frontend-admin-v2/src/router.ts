@@ -35,6 +35,9 @@ const PurchaseExecutionPage = () => import('./pages/supply-chain/PurchaseExecuti
 const InventoryWorkspacePage = () => import('./pages/supply-chain/InventoryWorkspacePage.vue')
 const RequisitionWorkspacePage = () => import('./pages/supply-chain/RequisitionWorkspacePage.vue')
 const SubcontractWorkspacePage = () => import('./pages/subcontract/SubcontractWorkspacePage.vue')
+const SettlementWorkspacePage = () => import('./pages/settlement/SettlementWorkspacePage.vue')
+const ReceivablesWorkspacePage = () => import('./pages/finance/ReceivablesWorkspacePage.vue')
+const FinanceControlWorkspacePage = () => import('./pages/finance/FinanceControlWorkspacePage.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -120,7 +123,6 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
                                                     : [
                                                           '/inventory/warehouse',
                                                           '/inventory/stock',
-                                                          '/inventory/transaction',
                                                         ].includes(tab.path)
                                                       ? InventoryWorkspacePage
                                                       : tab.path ===
@@ -131,7 +133,24 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
                                                               '/subcontract/measure',
                                                             ].includes(tab.path)
                                                           ? SubcontractWorkspacePage
-                                                          : ShellPlaceholderPage,
+                                                          : [
+                                                                '/payment/application',
+                                                                '/payment/expense',
+                                                                '/revenue',
+                                                                '/invoice',
+                                                              ].includes(tab.path)
+                                                            ? ReceivablesWorkspacePage
+                                                            : [
+                                                                  '/finance-operations',
+                                                                  '/cash-journal',
+                                                                  '/cash-forecast',
+                                                                  '/accounting-entry',
+                                                                  '/financial-close',
+                                                                ].includes(tab.path)
+                                                              ? FinanceControlWorkspacePage
+                                                              : tab.path === '/settlement/list'
+                                                                ? SettlementWorkspacePage
+                                                                : ShellPlaceholderPage,
           meta: {
             shell: true,
             permission: tab.permission,
@@ -146,10 +165,22 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
 
 const contextRoutes: RouteRecordRaw[] = [
   {
+    path: '/payment',
+    name: 'V2PaymentRedirect',
+    redirect: (to) => ({ path: '/payment/application', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'payment:app:query' },
+  },
+  {
     path: '/inventory',
     name: 'V2InventoryRedirect',
     redirect: (to) => ({ path: '/inventory/warehouse', query: to.query, hash: to.hash }),
     meta: { shell: true, permission: 'inventory:warehouse:list' },
+  },
+  {
+    path: '/inventory/transaction',
+    name: 'V2InventoryTransactionRedirect',
+    redirect: (to) => ({ path: '/inventory/stock', query: to.query, hash: '#transactions' }),
+    meta: { shell: true, permission: 'inventory:transaction:list' },
   },
   {
     path: '/purchase',
@@ -162,6 +193,12 @@ const contextRoutes: RouteRecordRaw[] = [
     name: 'V2SubcontractRedirect',
     redirect: (to) => ({ path: '/subcontract/task', query: to.query, hash: to.hash }),
     meta: { shell: true, permission: 'subtask:query' },
+  },
+  {
+    path: '/settlement',
+    name: 'V2SettlementRedirect',
+    redirect: (to) => ({ path: '/settlement/list', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'settlement:query' },
   },
   {
     path: '/project',
@@ -286,8 +323,8 @@ const contextRoutes: RouteRecordRaw[] = [
   {
     path: '/settlement/:id',
     name: 'V2ShellSettlementDetail',
-    component: ShellPlaceholderPage,
-    meta: { shell: true, permission: 'settlement:query', migration: 'pending' },
+    component: SettlementWorkspacePage,
+    meta: { shell: true, permission: 'settlement:query' },
   },
 ]
 
@@ -359,7 +396,11 @@ export function installSessionGuard(targetRouter: Router): void {
       return { path: firstAccessiblePath(session.permissions) ?? '/forbidden', query: to.query }
     }
 
-    if (to.meta.permission && !session.hasPermission(to.meta.permission)) {
+    const requiredPermission =
+      to.path === '/inventory/stock' && to.redirectedFrom?.path === '/inventory/transaction'
+        ? 'inventory:transaction:list'
+        : to.meta.permission
+    if (requiredPermission && !session.hasPermission(requiredPermission)) {
       return { path: '/forbidden', query: { from: to.fullPath } }
     }
 

@@ -119,6 +119,7 @@ class CashJournalReverseTest {
         file.setContentType("application/pdf");
         file.setStoragePath("CASH_JOURNAL/" + entryId + "/reverse.pdf");
         file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
         fileMapper.insert(file);
     }
 }

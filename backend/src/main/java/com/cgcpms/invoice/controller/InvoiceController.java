@@ -34,8 +34,10 @@ public class InvoiceController {
             @RequestParam(required = false) Long payRecordId,
             @RequestParam(required = false) Long payApplicationId,
             @RequestParam(required = false) String invoiceNo,
-            @RequestParam(required = false) String verifyStatus) {
-        IPage<InvoiceVO> page = invoiceService.getPage(pageNo, pageSize, payRecordId, payApplicationId, invoiceNo, verifyStatus);
+            @RequestParam(required = false) String verifyStatus,
+            @RequestParam(required = false) Long projectId) {
+        IPage<InvoiceVO> page = invoiceService.getPage(
+                pageNo, pageSize, payRecordId, payApplicationId, invoiceNo, verifyStatus, projectId);
         return ApiResponse.success(PageResult.of(page));
     }
 

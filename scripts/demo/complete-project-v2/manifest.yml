@@ -71,5 +71,8 @@ stages:
   - id: project-fixture-consolidation
     source: sql/220-project-fixture-consolidation.sql
     scope: [shared-project-reuse, closeout-action-state-consolidation, obsolete-project-removal]
+  - id: settlement-source-data
+    source: sql/230-settlement-source-data.sql
+    scope: [contract-item, approved-measure-source, settlement-item-source, recoverable-settlement-candidate, valid-settlement-workflow-approver]
 checkpoint-prefix: DEMO_CGC_V2_
 cleanup-policy: rebuild-local-demo-database

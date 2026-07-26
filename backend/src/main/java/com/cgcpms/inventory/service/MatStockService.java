@@ -26,6 +26,7 @@ import com.cgcpms.inventory.dto.StockTransferDTO;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
@@ -339,6 +340,64 @@ public class MatStockService {
     }
 
     /**
+     * 分页查询当前可访问项目下的库存余额。
+     * 列表只返回服务端库存事实，不在客户端聚合数量或金额。
+     */
+    public PageResult<MatStockVO> getPage(Long warehouseId, Long materialId,
+                                          Long projectId, String keyword,
+                                          long pageNo, long pageSize) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查询库存台账");
+        }
+        long safePageNo = Math.max(1, pageNo);
+        long safePageSize = Math.min(200, Math.max(1, pageSize));
+        List<Long> warehouseIds = findEnabledWarehouseIds(tenantId, warehouseId, projectId);
+        if (warehouseIds.isEmpty()) {
+            return new PageResult<>(safePageNo, safePageSize, 0, List.of());
+        }
+
+        List<Long> keywordMaterialIds = null;
+        if (StringUtils.hasText(keyword)) {
+            String normalized = keyword.trim();
+            keywordMaterialIds = mdMaterialMapper.selectList(new LambdaQueryWrapper<MdMaterial>()
+                            .eq(MdMaterial::getTenantId, tenantId)
+                            .and(wrapper -> wrapper
+                                    .like(MdMaterial::getMaterialCode, normalized)
+                                    .or()
+                                    .like(MdMaterial::getMaterialName, normalized)
+                                    .or()
+                                    .like(MdMaterial::getSpecification, normalized)))
+                    .stream()
+                    .map(MdMaterial::getId)
+                    .toList();
+            if (keywordMaterialIds.isEmpty()) {
+                return new PageResult<>(safePageNo, safePageSize, 0, List.of());
+            }
+        }
+
+        LambdaQueryWrapper<MatStock> wrapper = new LambdaQueryWrapper<MatStock>()
+                .eq(MatStock::getTenantId, tenantId)
+                .in(MatStock::getWarehouseId, warehouseIds);
+        if (materialId != null) {
+            wrapper.eq(MatStock::getMaterialId, materialId);
+        }
+        if (keywordMaterialIds != null) {
+            wrapper.in(MatStock::getMaterialId, keywordMaterialIds);
+        }
+        wrapper.orderByDesc(MatStock::getUpdatedTime).orderByAsc(MatStock::getId);
+
+        Page<MatStock> page = matStockMapper.selectPage(new Page<>(safePageNo, safePageSize), wrapper);
+        Map<Long, MatWarehouse> warehouseMap = getWarehouseMap(tenantId);
+        Map<Long, MdMaterial> materialMap = getMaterialMap(tenantId);
+        Map<Long, String> projectNameMap = getProjectNameMap();
+        List<MatStockVO> records = page.getRecords().stream()
+                .map(stock -> toStockVO(stock, warehouseMap, materialMap, projectNameMap))
+                .toList();
+        return new PageResult<>(page.getCurrent(), page.getSize(), page.getTotal(), records);
+    }
+
+    /**
      * 查询库存台账：当前库存余额 + 分页流水记录。
      * <p>
      * 包含仓库名、物料名/编码/单位的 JOIN 查询，支持 keyword 模糊搜索和动态排序。
@@ -397,14 +456,18 @@ public class MatStockService {
                 new Page<>(pageNo, pageSize), txnWrapper);
 
         // 3. 批量获取 display name
-        Map<Long, String> warehouseNameMap = getWarehouseNameMap(tenantId);
+        Map<Long, MatWarehouse> warehouseMap = getWarehouseMap(tenantId);
+        Map<Long, String> warehouseNameMap = warehouseMap.values().stream()
+                .collect(Collectors.toMap(MatWarehouse::getId, MatWarehouse::getWarehouseName));
         Map<Long, MdMaterial> materialMap = getMaterialMap(tenantId);
+        Map<Long, String> projectNameMap = getProjectNameMap();
 
         // 4. 组装 VO
         MatStockLedgerVO ledger = new MatStockLedgerVO();
         ledger.setStock(warehouseId == null
                 ? aggregateStock(stocks, materialId, materialMap)
-                : toStockVO(stocks.isEmpty() ? null : stocks.getFirst(), warehouseNameMap, materialMap));
+                : toStockVO(stocks.isEmpty() ? null : stocks.getFirst(),
+                        warehouseMap, materialMap, projectNameMap));
 
         Map<String, Map<Long, String>> sourceCodes = page.getRecords().stream()
                 .filter(txn -> txn.getSourceType() != null && txn.getSourceId() != null)
@@ -791,7 +854,7 @@ public class MatStockService {
 
     public MatStockVO toStockVO(MatStock entity) {
         Long tenantId = UserContext.getCurrentTenantId();
-        return toStockVO(entity, getWarehouseNameMap(tenantId), getMaterialMap(tenantId));
+        return toStockVO(entity, getWarehouseMap(tenantId), getMaterialMap(tenantId), getProjectNameMap());
     }
 
     // ── 内部工具方法 ──
@@ -975,13 +1038,18 @@ public class MatStockService {
     /**
      * 获取当前租户下所有仓库 ID→名称 映射。
      */
-    private Map<Long, String> getWarehouseNameMap(Long tenantId) {
+    private Map<Long, MatWarehouse> getWarehouseMap(Long tenantId) {
         LambdaQueryWrapper<MatWarehouse> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(MatWarehouse::getTenantId, tenantId);
-        wrapper.select(MatWarehouse::getId, MatWarehouse::getWarehouseName);
+        wrapper.select(MatWarehouse::getId, MatWarehouse::getProjectId, MatWarehouse::getWarehouseName);
         List<MatWarehouse> warehouses = matWarehouseMapper.selectList(wrapper);
         return warehouses.stream()
-                .collect(Collectors.toMap(MatWarehouse::getId, MatWarehouse::getWarehouseName));
+                .collect(Collectors.toMap(MatWarehouse::getId, warehouse -> warehouse));
+    }
+
+    private Map<Long, String> getProjectNameMap() {
+        return projectAccessChecker.accessibleProjects().stream()
+                .collect(Collectors.toMap(PmProject::getId, PmProject::getProjectName));
     }
 
     /**
@@ -999,8 +1067,9 @@ public class MatStockService {
      * 将 MatStock 实体转为 MatStockVO，填充 display name。
      */
     private MatStockVO toStockVO(MatStock entity,
-                                  Map<Long, String> warehouseNameMap,
-                                  Map<Long, MdMaterial> materialMap) {
+                                  Map<Long, MatWarehouse> warehouseMap,
+                                  Map<Long, MdMaterial> materialMap,
+                                  Map<Long, String> projectNameMap) {
         if (entity == null) return null;
         MatStockVO vo = new MatStockVO();
         vo.setId(entity.getId());
@@ -1015,7 +1084,12 @@ public class MatStockService {
         vo.setCreatedTime(entity.getCreatedTime() != null ? entity.getCreatedTime().toString() : null);
         vo.setUpdatedTime(entity.getUpdatedTime() != null ? entity.getUpdatedTime().toString() : null);
 
-        vo.setWarehouseName(warehouseNameMap.get(entity.getWarehouseId()));
+        MatWarehouse warehouse = warehouseMap.get(entity.getWarehouseId());
+        if (warehouse != null) {
+            vo.setWarehouseName(warehouse.getWarehouseName());
+            vo.setProjectId(warehouse.getProjectId());
+            vo.setProjectName(projectNameMap.get(warehouse.getProjectId()));
+        }
         MdMaterial mat = materialMap.get(entity.getMaterialId());
         if (mat != null) {
             vo.setMaterialName(mat.getMaterialName());

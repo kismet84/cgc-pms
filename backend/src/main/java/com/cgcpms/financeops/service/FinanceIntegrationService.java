@@ -2,12 +2,14 @@ package com.cgcpms.financeops.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.financeops.dto.FinanceOperationsModels.*;
 import com.cgcpms.payment.dto.PaymentFailureRequest;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.service.PayRecordService;
 import com.cgcpms.payment.service.PaymentReversalService;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.AmountAllocation;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.CollectionRequest;
 import com.cgcpms.revenue.service.RevenueOperationsService;
@@ -35,6 +37,8 @@ public class FinanceIntegrationService {
     private final PayRecordService payRecordService;
     private final PaymentReversalService paymentReversalService;
     private final RevenueOperationsService revenueOperationsService;
+    private final ProjectAccessChecker projectAccessChecker;
+    private final AccountingPeriodGuard periodGuard;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createEndpoint(IntegrationEndpointRequest request) {
@@ -118,6 +122,7 @@ public class FinanceIntegrationService {
         String direction=request.direction().trim().toUpperCase();
         if(!Set.of("IN","OUT").contains(direction))throw error("BANK_RECEIPT_DIRECTION_INVALID","银行回单方向仅支持 IN 或 OUT");
         validateIncomingContext(request,direction);
+        periodGuard.assertWritable(request.transactionTime().toLocalDate());
         Map<String,Object> old=one("SELECT * FROM bank_receipt WHERE tenant_id=? AND endpoint_id=? AND bank_txn_no=?",tenant(),request.endpointId(),request.bankTxnNo());
         if(old!=null){
             if("IN".equals(direction)&&request.projectId()!=null){
@@ -134,9 +139,15 @@ public class FinanceIntegrationService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> autoMatchReceipt(Long receiptId) {
+        Map<String,Object> snapshot=one("SELECT transaction_time FROM bank_receipt WHERE id=? AND tenant_id=?",receiptId,tenant());
+        if(snapshot==null)throw error("BANK_RECEIPT_NOT_FOUND","银行回单不存在");
+        LocalDate transactionDate=dateTime(snapshot.get("transaction_time")).toLocalDate();
+        periodGuard.assertWritable(transactionDate);
         Map<String,Object> receipt=one("SELECT * FROM bank_receipt WHERE id=? AND tenant_id=? FOR UPDATE",receiptId,tenant());
         if(receipt==null)throw error("BANK_RECEIPT_NOT_FOUND","银行回单不存在");
         if(!"UNMATCHED".equals(receipt.get("match_status")))return receipt;
+        if(!transactionDate.equals(dateTime(receipt.get("transaction_time")).toLocalDate()))
+            throw error("BANK_RECEIPT_DATE_CHANGED_RETRY","银行回单日期已变化，请重试");
         String direction=String.valueOf(receipt.get("direction"));
         BigDecimal receiptAmount=decimal(receipt.get("amount"));
         BigDecimal confidence=new BigDecimal("1.0000");
@@ -193,6 +204,7 @@ public class FinanceIntegrationService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createForecast(CashForecastRequest request){
+        if(request.projectId()!=null)projectAccessChecker.checkAccess(request.projectId(),"创建项目资金预测");
         if(request.projectId()!=null&&one("SELECT id FROM pm_project WHERE id=? AND tenant_id=? AND deleted_flag=0",request.projectId(),tenant())==null)throw error("PROJECT_NOT_FOUND","预测项目不存在");
         Long id=IdWorker.getId();jdbc.update("INSERT INTO cash_forecast(id,tenant_id,project_id,forecast_date,scenario,inflow_amount,outflow_amount,financing_amount,source_type,source_id,confidence,status,version,created_by,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',0,?,CURRENT_TIMESTAMP)",id,tenant(),request.projectId(),request.forecastDate(),request.scenario().trim().toUpperCase(),money(request.inflowAmount()),money(request.outflowAmount()),money(request.financingAmount()),request.sourceType().trim().toUpperCase(),request.sourceId(),request.confidence()==null?BigDecimal.ONE:request.confidence(),user());return one("SELECT * FROM cash_forecast WHERE id=?",id);
     }

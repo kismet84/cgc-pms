@@ -109,7 +109,7 @@ watch(mobileNavigationOpen, async (open) => {
 })
 
 onMounted(() => {
-  void workspaceStore.initialize().catch(() => undefined)
+  void initializeWorkspaceContext()
   mobileMedia = window.matchMedia('(max-width: 48rem)')
   syncMobileMode(mobileMedia)
   mobileMedia.addEventListener('change', syncMobileMode)
@@ -121,6 +121,25 @@ onMounted(() => {
     })
   })
 })
+
+async function initializeWorkspaceContext(): Promise<void> {
+  try {
+    await workspaceStore.initialize()
+    const query = { ...route.query }
+    let changed = false
+    if (Object.hasOwn(query, 'projectId') && !workspaceStore.selectedProjectId) {
+      delete query.projectId
+      changed = true
+    }
+    if (Object.hasOwn(query, 'period') && !workspaceStore.selectedReportPeriod) {
+      delete query.period
+      changed = true
+    }
+    if (changed) await router.replace({ path: route.path, query, hash: route.hash })
+  } catch {
+    // 页面仍可按无上下文模式运行；请求错误由统一请求提示处理。
+  }
+}
 
 onBeforeUnmount(() => {
   notificationController?.abort()

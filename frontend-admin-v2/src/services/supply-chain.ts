@@ -30,6 +30,8 @@ import {
   type MaterialQuery,
   type StockLedger,
   type StockLedgerQuery,
+  type StockPage,
+  type StockQuery,
   type StockRecord,
   type StockKpiRecord,
   type StockTransferCandidateRecord,
@@ -108,6 +110,10 @@ export function loadStockLedger(
     materialId: requiredId(query.materialId, '物料ID'),
   }
   return apiRequest<StockLedger>(withQuery(SUPPLY_CHAIN_API.stockLedger, normalized), { signal })
+}
+
+export function loadStocks(query: StockQuery = {}, signal?: AbortSignal): Promise<StockPage> {
+  return apiRequest<StockPage>(withQuery(SUPPLY_CHAIN_API.stocks, query), { signal })
 }
 
 export function loadStockKpi(
@@ -211,7 +217,7 @@ export function stockOutRequisition(id: string): Promise<void> {
 
 export function loadRequisitionTrace(id: string, signal?: AbortSignal) {
   return apiRequest<RequisitionTraceRecord>(
-    `/procurement-trace/requisitions/${encodedId(id, '领料单ID')}`,
+    `/procurement-traces/requisitions/${encodedId(id, '领料单ID')}`,
     { signal, notifyError: false },
   )
 }

@@ -48,7 +48,9 @@ export function formatAmount(value: string | null | undefined): string {
   if (!match) return normalized
   const [, rawSign, rawInteger, rawFraction] = match
   const integer = rawInteger!.replace(/^0+(?=\d)/, '')
-  const fraction = rawFraction ? rawFraction.padEnd(2, '0') : '00'
+  const paddedFraction = rawFraction ? rawFraction.padEnd(2, '0') : '00'
+  const fraction =
+    paddedFraction.length > 2 ? paddedFraction.replace(/0+$/, '').padEnd(2, '0') : paddedFraction
   const isZero = /^0+$/.test(integer) && /^0+$/.test(fraction)
   const sign = rawSign && !isZero ? '−' : ''
   return `¥${sign}${integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${fraction}`

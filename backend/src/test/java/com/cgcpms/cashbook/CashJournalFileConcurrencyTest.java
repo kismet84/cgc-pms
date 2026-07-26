@@ -224,6 +224,7 @@ class CashJournalFileConcurrencyTest {
         file.setContentType("application/pdf");
         file.setStoragePath("CASH_JOURNAL/" + entryId + "/" + fileId + ".pdf");
         file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
         fileMapper.insert(file);
         return fileId;
     }

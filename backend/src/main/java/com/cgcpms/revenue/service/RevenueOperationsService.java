@@ -1,10 +1,13 @@
 package com.cgcpms.revenue.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.accounting.service.EntryGenerator;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.*;
+import com.cgcpms.revenue.vo.RevenueOperationsVOs.*;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -27,6 +30,8 @@ public class RevenueOperationsService {
     private final JdbcTemplate jdbc;
     private final WorkflowEngine workflowEngine;
     private final EntryGenerator entryGenerator;
+    private final ProjectAccessChecker projectAccessChecker;
+    private final AccountingPeriodGuard periodGuard;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createSettlement(OwnerSettlementRequest request) {
@@ -47,11 +52,7 @@ public class RevenueOperationsService {
             }
         }
         BigDecimal contractAmount = decimal(contract.get("current_amount"));
-        BigDecimal settled = decimal(jdbc.queryForObject("SELECT COALESCE(SUM(gross_amount),0) FROM owner_settlement WHERE tenant_id=? AND contract_id=? AND deleted_flag=0 AND status IN('APPROVED','RECEIVABLE_CREATED')",
-                BigDecimal.class, tenant(), request.contractId()));
-        if (settled.add(money(request.grossAmount())).compareTo(contractAmount) > 0) {
-            throw error("OWNER_SETTLEMENT_CONTRACT_EXCEEDED", "累计业主结算金额不能超过合同当前金额");
-        }
+        ensureSettlementWithinContract(request.contractId(), null, request.grossAmount(), contractAmount);
         Long id = IdWorker.getId();
         String code = "OS-" + id;
         BigDecimal gross = money(request.grossAmount());
@@ -60,25 +61,41 @@ public class RevenueOperationsService {
                 INSERT INTO owner_settlement(id,tenant_id,project_id,contract_id,revenue_id,settlement_code,
                  settlement_period,settlement_date,gross_amount,tax_amount,retention_amount,net_receivable_amount,
                  due_date,customer_id,status,attachment_count,formula_version,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,'OWNER_SETTLEMENT_V1',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                """, id, tenant(), request.projectId(), request.contractId(), request.revenueId(), code,
-                request.settlementPeriod().trim(), request.settlementDate(), gross, money(request.taxAmount()), retention,
-                gross.subtract(retention), request.dueDate(), request.customerId(),
-                request.attachmentCount() == null ? 0 : request.attachmentCount(), user(), user(), request.remark());
+                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT',?,'OWNER_SETTLEMENT_V1',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                 """, id, tenant(), request.projectId(), request.contractId(), request.revenueId(), code,
+                 request.settlementPeriod().trim(), request.settlementDate(), gross, money(request.taxAmount()), retention,
+                 gross.subtract(retention), request.dueDate(), request.customerId(),
+                0, user(), user(), request.remark());
         return settlement(id);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> submitSettlement(Long id) {
-        Map<String,Object> settlement = one("SELECT * FROM owner_settlement WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE", id, tenant());
+        Map<String,Object> settlement = one("""
+                SELECT id,status,project_id,contract_id,customer_id,gross_amount,approval_instance_id,settlement_code
+                  FROM owner_settlement
+                 WHERE id=? AND tenant_id=? AND deleted_flag=0
+                 FOR UPDATE
+                """, id, tenant());
         if (settlement == null) throw error("OWNER_SETTLEMENT_NOT_FOUND", "业主结算不存在");
         String status = string(settlement.get("status"));
         if (!Set.of("DRAFT", "REJECTED").contains(status)) {
             throw error("OWNER_SETTLEMENT_NOT_SUBMITTABLE", "只有草稿或驳回状态可以提交");
         }
-        requireRevenueContract(longValue(settlement.get("project_id")), longValue(settlement.get("contract_id")), longValue(settlement.get("customer_id")));
-        if (intValue(settlement.get("attachment_count")) < 1) {
-            throw error("OWNER_SETTLEMENT_ATTACHMENT_REQUIRED", "业主确认单或结算附件不能为空");
+        Map<String,Object> contract = requireRevenueContract(longValue(settlement.get("project_id")),
+                longValue(settlement.get("contract_id")), longValue(settlement.get("customer_id")));
+        ensureSettlementWithinContract(longValue(settlement.get("contract_id")), id,
+                decimal(settlement.get("gross_amount")), decimal(contract.get("current_amount")));
+        int cleanAttachmentCount = cleanAttachmentCount("OWNER_SETTLEMENT", id);
+        if (cleanAttachmentCount < 1) {
+            throw error("OWNER_SETTLEMENT_ATTACHMENT_REQUIRED", "业主结算提交前必须上传病毒扫描通过的确认单或结算附件");
+        }
+        if (jdbc.update("""
+                UPDATE owner_settlement
+                   SET attachment_count=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                 WHERE id=? AND tenant_id=? AND status=?
+                """, cleanAttachmentCount, user(), id, tenant(), status) != 1) {
+            throw error("OWNER_SETTLEMENT_CONCURRENT_MODIFICATION", "业主结算已被修改，请刷新后重试");
         }
         WfInstance instance;
         Long existingInstanceId = longValue(settlement.get("approval_instance_id"));
@@ -90,14 +107,24 @@ public class RevenueOperationsService {
                     decimal(settlement.get("gross_amount")), longValue(settlement.get("project_id")),
                     longValue(settlement.get("contract_id")), "业主结算", null, null);
         }
-        jdbc.update("UPDATE owner_settlement SET status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
-                instance.getId(), user(), id, tenant());
+        if (jdbc.update("""
+                UPDATE owner_settlement
+                   SET status='PENDING',approval_instance_id=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                 WHERE id=? AND tenant_id=? AND status=?
+                """, instance.getId(), user(), id, tenant(), status) != 1) {
+            throw error("OWNER_SETTLEMENT_CONCURRENT_MODIFICATION", "业主结算已被修改，请刷新后重试");
+        }
         return settlement(id);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void onSettlementApproved(Long id) {
-        Map<String,Object> settlement = one("SELECT * FROM owner_settlement WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE", id, tenant());
+        Map<String,Object> settlement = one("""
+                SELECT id,status,project_id,contract_id,customer_id,net_receivable_amount,retention_amount,due_date
+                  FROM owner_settlement
+                 WHERE id=? AND tenant_id=? AND deleted_flag=0
+                 FOR UPDATE
+                """, id, tenant());
         if (settlement == null) throw error("OWNER_SETTLEMENT_NOT_FOUND", "业主结算不存在");
         if ("RECEIVABLE_CREATED".equals(settlement.get("status"))) return;
         if (jdbc.update("UPDATE owner_settlement SET status='APPROVED',version=version+1 WHERE id=? AND tenant_id=? AND status='PENDING'", id, tenant()) != 1) {
@@ -148,7 +175,7 @@ public class RevenueOperationsService {
     public Map<String,Object> createCollection(CollectionRequest request) {
         Map<String,Object> existing = one("SELECT * FROM collection_record WHERE tenant_id=? AND external_txn_no=? AND deleted_flag=0",
                 tenant(), request.externalTxnNo().trim());
-        if (existing != null) return existing;
+        if (existing != null) return requireSameCollection(existing, request);
         requireRevenueContract(request.projectId(), request.contractId(), request.customerId());
         Map<String,Object> account = one("SELECT id,opening_date,enabled_flag FROM fund_account WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE",
                 request.fundAccountId(), tenant());
@@ -156,7 +183,7 @@ public class RevenueOperationsService {
         // 同一账户上的回款串行后再次检查，避免两个并发请求在首次幂等查询后同时落库。
         existing = one("SELECT * FROM collection_record WHERE tenant_id=? AND external_txn_no=? AND deleted_flag=0",
                 tenant(), request.externalTxnNo().trim());
-        if (existing != null) return existing;
+        if (existing != null) return requireSameCollection(existing, request);
         LocalDate openingDate = localDate(account.get("opening_date"));
         if (request.collectedAt().toLocalDate().isBefore(openingDate)) throw error("COLLECTION_BEFORE_ACCOUNT_OPENING", "到账时间不能早于账户启用日期");
         List<AmountAllocation> allocations = request.allocations() == null ? List.of() : request.allocations();
@@ -183,29 +210,45 @@ public class RevenueOperationsService {
         } catch (DuplicateKeyException e) {
             Map<String,Object> duplicate = one("SELECT * FROM collection_record WHERE tenant_id=? AND external_txn_no=? AND deleted_flag=0",
                     tenant(), request.externalTxnNo().trim());
-            if (duplicate != null) return duplicate;
+            if (duplicate != null) return requireSameCollection(duplicate, request);
             throw e;
         }
         return one("SELECT * FROM collection_record WHERE id=? AND tenant_id=?", id, tenant());
     }
 
     public List<Map<String,Object>> settlements(Long projectId, String status) {
-        return jdbc.queryForList("SELECT * FROM owner_settlement WHERE tenant_id=? AND deleted_flag=0 AND (? IS NULL OR project_id=?) AND (? IS NULL OR status=?) ORDER BY settlement_date DESC,id DESC",
-                tenant(), projectId, projectId, status, status);
+        List<Long> projectIds = visibleProjectIds(projectId, "查看收入结算");
+        if (projectIds.isEmpty()) return List.of();
+        List<Object> arguments = scopedArguments(projectIds, status);
+        return jdbc.queryForList("SELECT * FROM owner_settlement WHERE tenant_id=? AND deleted_flag=0 AND project_id IN(" +
+                        placeholders(projectIds.size()) + ") AND (? IS NULL OR status=?) ORDER BY settlement_date DESC,id DESC",
+                arguments.toArray());
     }
 
     public List<Map<String,Object>> receivables(Long projectId, String status) {
-        return jdbc.queryForList("SELECT r.*,CASE WHEN r.outstanding_amount>0 AND r.due_date<CURRENT_DATE THEN 1 ELSE 0 END overdue_flag FROM account_receivable r WHERE tenant_id=? AND deleted_flag=0 AND (? IS NULL OR project_id=?) AND (? IS NULL OR status=?) ORDER BY due_date,id",
-                tenant(), projectId, projectId, status, status);
+        List<Long> projectIds = visibleProjectIds(projectId, "查看应收款");
+        if (projectIds.isEmpty()) return List.of();
+        List<Object> arguments = scopedArguments(projectIds, status);
+        return jdbc.queryForList("SELECT r.*,CASE WHEN r.outstanding_amount>0 AND r.due_date<CURRENT_DATE THEN 1 ELSE 0 END overdue_flag FROM account_receivable r WHERE tenant_id=? AND deleted_flag=0 AND project_id IN(" +
+                        placeholders(projectIds.size()) + ") AND (? IS NULL OR status=?) ORDER BY due_date,id",
+                arguments.toArray());
     }
 
     public List<Map<String,Object>> invoices(Long projectId) {
-        return jdbc.queryForList("SELECT * FROM sales_invoice WHERE tenant_id=? AND deleted_flag=0 AND (? IS NULL OR project_id=?) ORDER BY invoice_date DESC,id DESC", tenant(), projectId, projectId);
+        List<Long> projectIds = visibleProjectIds(projectId, "查看销项发票");
+        if (projectIds.isEmpty()) return List.of();
+        return jdbc.queryForList("SELECT * FROM sales_invoice WHERE tenant_id=? AND deleted_flag=0 AND project_id IN(" +
+                        placeholders(projectIds.size()) + ") ORDER BY invoice_date DESC,id DESC",
+                args(tenant(), projectIds));
     }
 
     public List<Map<String,Object>> collections(Long projectId, String status) {
-        return jdbc.queryForList("SELECT * FROM collection_record WHERE tenant_id=? AND deleted_flag=0 AND (? IS NULL OR project_id=?) AND (? IS NULL OR status=?) ORDER BY collected_at DESC,id DESC",
-                tenant(), projectId, projectId, status, status);
+        List<Long> projectIds = visibleProjectIds(projectId, "查看回款");
+        if (projectIds.isEmpty()) return List.of();
+        List<Object> arguments = scopedArguments(projectIds, status);
+        return jdbc.queryForList("SELECT * FROM collection_record WHERE tenant_id=? AND deleted_flag=0 AND project_id IN(" +
+                        placeholders(projectIds.size()) + ") AND (? IS NULL OR status=?) ORDER BY collected_at DESC,id DESC",
+                arguments.toArray());
     }
 
     public Map<String,Object> dashboard(Long projectId) {
@@ -231,6 +274,8 @@ public class RevenueOperationsService {
         if (journal == null || journal.get("collection_record_id") == null) throw error("REVENUE_TRACE_NOT_FOUND", "现金日记不存在或不是回款收入流水");
         Long collectionId = longValue(journal.get("collection_record_id"));
         Map<String,Object> collection = one("SELECT * FROM collection_record WHERE id=? AND tenant_id=?", collectionId, tenant());
+        if (collection == null) throw error("REVENUE_TRACE_NOT_FOUND", "回款记录不存在");
+        projectAccessChecker.checkAccess(longValue(collection.get("project_id")), "查看收入回款追溯");
         List<Map<String,Object>> allocations = jdbc.queryForList("SELECT ca.*,r.receivable_code,r.settlement_id,r.outstanding_amount FROM collection_allocation ca JOIN account_receivable r ON r.id=ca.receivable_id WHERE ca.tenant_id=? AND ca.collection_id=? ORDER BY ca.id", tenant(), collectionId);
         Set<Long> receivableIds = new LinkedHashSet<>();
         Set<Long> settlementIds = new LinkedHashSet<>();
@@ -282,7 +327,85 @@ public class RevenueOperationsService {
     public Map<String,Object> settlement(Long id) {
         Map<String,Object> result = one("SELECT * FROM owner_settlement WHERE id=? AND tenant_id=? AND deleted_flag=0", id, tenant());
         if (result == null) throw error("OWNER_SETTLEMENT_NOT_FOUND", "业主结算不存在");
+        projectAccessChecker.checkAccess(longValue(result.get("project_id")), "查看收入结算");
         return result;
+    }
+
+    public List<OwnerSettlementVO> settlementViews(Long projectId, String status) {
+        return settlements(projectId, status).stream().map(this::ownerSettlementView).toList();
+    }
+
+    public List<ReceivableVO> receivableViews(Long projectId, String status) {
+        return receivables(projectId, status).stream().map(this::receivableView).toList();
+    }
+
+    public List<SalesInvoiceVO> invoiceViews(Long projectId) {
+        return invoices(projectId).stream().map(this::salesInvoiceView).toList();
+    }
+
+    public List<CollectionVO> collectionViews(Long projectId, String status) {
+        return collections(projectId, status).stream().map(this::collectionView).toList();
+    }
+
+    public OwnerSettlementVO ownerSettlementView(Map<String,Object> row) {
+        return new OwnerSettlementVO(text(row, "id"), text(row, "project_id"),
+                text(row, "contract_id"), text(row, "revenue_id"), text(row, "customer_id"),
+                text(row, "settlement_code"), text(row, "settlement_period"),
+                text(row, "settlement_date"), text(row, "gross_amount"), text(row, "tax_amount"),
+                text(row, "retention_amount"), text(row, "net_receivable_amount"),
+                text(row, "due_date"), text(row, "status"), integer(row, "attachment_count"),
+                text(row, "approval_instance_id"), text(row, "formula_version"),
+                text(row, "version"), text(row, "remark"));
+    }
+
+    public SalesInvoiceVO salesInvoiceView(Map<String,Object> row) {
+        return new SalesInvoiceVO(text(row, "id"), text(row, "project_id"),
+                text(row, "contract_id"), text(row, "customer_id"), text(row, "invoice_code"),
+                text(row, "invoice_no"), text(row, "invoice_type"), text(row, "invoice_date"),
+                text(row, "amount_without_tax"), text(row, "tax_amount"), text(row, "total_amount"),
+                text(row, "allocated_amount"), text(row, "status"),
+                text(row, "verification_status"), integer(row, "attachment_count"),
+                text(row, "version"), text(row, "remark"));
+    }
+
+    public CollectionVO collectionView(Map<String,Object> row) {
+        return new CollectionVO(text(row, "id"), text(row, "project_id"),
+                text(row, "contract_id"), text(row, "customer_id"), text(row, "fund_account_id"),
+                text(row, "collection_code"), text(row, "external_txn_no"),
+                text(row, "collected_at"), text(row, "amount"), text(row, "allocated_amount"),
+                text(row, "unallocated_amount"), text(row, "payer_name"), text(row, "status"),
+                integer(row, "attachment_count"), text(row, "version"), text(row, "remark"));
+    }
+
+    public ReceivableAdjustmentVO receivableAdjustmentView(Map<String,Object> row) {
+        return new ReceivableAdjustmentVO(text(row, "id"), text(row, "receivable_id"),
+                text(row, "adjustment_type"), text(row, "amount"), text(row, "reason"),
+                text(row, "idempotency_key"), text(row, "status"));
+    }
+
+    public CollectionReversalVO collectionReversalView(Map<String,Object> row) {
+        return new CollectionReversalVO(text(row, "id"), text(row, "collection_id"),
+                text(row, "idempotency_key"), text(row, "reason"), text(row, "status"));
+    }
+
+    public RevenueDashboardVO dashboardView(Long projectId) {
+        Map<String,Object> row = dashboard(projectId);
+        return new RevenueDashboardVO(text(row, "projectId"), text(row, "confirmedRevenue"),
+                text(row, "settledAmount"), text(row, "receivableAmount"),
+                text(row, "outstandingAmount"), text(row, "collectedAmount"),
+                text(row, "overdueAmount"), text(row, "invoicedAmount"),
+                text(row, "collectionRate"));
+    }
+
+    private ReceivableVO receivableView(Map<String,Object> row) {
+        return new ReceivableVO(text(row, "id"), text(row, "project_id"),
+                text(row, "contract_id"), text(row, "settlement_id"), text(row, "customer_id"),
+                text(row, "receivable_code"), text(row, "receivable_type"),
+                text(row, "original_amount"), text(row, "collected_amount"),
+                text(row, "credited_amount"), text(row, "outstanding_amount"),
+                text(row, "due_date"), text(row, "status"),
+                integer(row, "overdue_flag") != null && integer(row, "overdue_flag") == 1,
+                text(row, "version"));
     }
 
     private void createReceivable(Map<String,Object> settlement, String type, BigDecimal amount, LocalDate dueDate) {
@@ -315,6 +438,7 @@ public class RevenueOperationsService {
     }
 
     private void insertCollectionJournal(Long id, CollectionRequest request, BigDecimal amount) {
+        periodGuard.assertWritable(request.collectedAt().toLocalDate());
         jdbc.update("""
                 INSERT INTO cash_journal_entry(id,tenant_id,entry_no,account_id,direction,amount,business_date,counterparty_name,
                  summary,project_id,contract_id,source_type,source_id,collection_record_id,status,closure_due_at,version,
@@ -342,11 +466,51 @@ public class RevenueOperationsService {
         }
     }
 
+    private Map<String,Object> requireSameCollection(Map<String,Object> existing, CollectionRequest request) {
+        projectAccessChecker.checkAccess(longValue(existing.get("project_id")), "复用回款幂等结果");
+        List<AmountAllocation> requestedAllocations = request.allocations() == null ? List.of() : request.allocations();
+        Map<Long,BigDecimal> requested = new LinkedHashMap<>();
+        for (AmountAllocation allocation : requestedAllocations) {
+            if (requested.put(allocation.receivableId(), money(allocation.amount())) != null) {
+                throw error("COLLECTION_IDEMPOTENCY_CONFLICT", "银行流水号已被不同回款事实使用");
+            }
+        }
+        List<Map<String,Object>> stored = jdbc.queryForList("""
+                SELECT receivable_id,allocated_amount
+                  FROM collection_allocation
+                 WHERE tenant_id=? AND collection_id=?
+                 ORDER BY receivable_id
+                """, tenant(), longValue(existing.get("id")));
+        boolean same = Objects.equals(longValue(existing.get("project_id")), request.projectId())
+                && Objects.equals(longValue(existing.get("contract_id")), request.contractId())
+                && Objects.equals(longValue(existing.get("customer_id")), request.customerId())
+                && Objects.equals(longValue(existing.get("fund_account_id")), request.fundAccountId())
+                && money(decimal(existing.get("amount"))).compareTo(money(request.amount())) == 0
+                && money(decimal(existing.get("allocated_amount"))).compareTo(allocationTotal(requestedAllocations)) == 0
+                && Objects.equals(string(existing.get("payer_name")), request.payerName().trim())
+                && stored.size() == requested.size();
+        if (same) {
+            for (Map<String,Object> row : stored) {
+                BigDecimal expected = requested.get(longValue(row.get("receivable_id")));
+                if (expected == null || expected.compareTo(money(decimal(row.get("allocated_amount")))) != 0) {
+                    same = false;
+                    break;
+                }
+            }
+        }
+        if (!same) {
+            throw error("COLLECTION_IDEMPOTENCY_CONFLICT", "银行流水号已被不同回款事实使用");
+        }
+        return existing;
+    }
+
     private Map<String,Object> requireRevenueContract(Long projectId, Long contractId, Long customerId) {
+        projectAccessChecker.checkAccess(projectId, "办理收入业务");
         Map<String,Object> row = one("""
                 SELECT c.id,c.project_id,c.party_a_id,c.contract_type,c.contract_status,c.approval_status,c.current_amount,p.status project_status
                   FROM ct_contract c JOIN pm_project p ON p.id=c.project_id AND p.tenant_id=c.tenant_id AND p.deleted_flag=0
                  WHERE c.id=? AND c.tenant_id=? AND c.deleted_flag=0
+                 FOR UPDATE
                 """, contractId, tenant());
         if (row == null || !Objects.equals(longValue(row.get("project_id")), projectId)) throw error("REVENUE_CONTRACT_PROJECT_MISMATCH", "业主合同不属于所选项目");
         if (!"ACTIVE".equals(row.get("project_status"))) throw error("REVENUE_PROJECT_NOT_ACTIVE", "只有 ACTIVE 项目可以办理收入业务");
@@ -358,7 +522,47 @@ public class RevenueOperationsService {
     }
 
     private void requireProjectVisible(Long projectId) {
-        if (one("SELECT id FROM pm_project WHERE id=? AND tenant_id=? AND deleted_flag=0", projectId, tenant()) == null) throw error("PROJECT_NOT_FOUND", "项目不存在");
+        projectAccessChecker.checkAccess(projectId, "查看收入回款");
+    }
+
+    private void ensureSettlementWithinContract(Long contractId, Long excludedSettlementId,
+                                                BigDecimal grossAmount, BigDecimal contractAmount) {
+        BigDecimal reserved = decimal(jdbc.queryForObject("""
+                SELECT COALESCE(SUM(gross_amount),0)
+                  FROM owner_settlement
+                 WHERE tenant_id=? AND contract_id=? AND deleted_flag=0
+                   AND status<>'REJECTED' AND (? IS NULL OR id<>?)
+                """, BigDecimal.class, tenant(), contractId, excludedSettlementId, excludedSettlementId));
+        if (reserved.add(money(grossAmount)).compareTo(contractAmount) > 0) {
+            throw error("OWNER_SETTLEMENT_CONTRACT_EXCEEDED", "累计业主结算金额不能超过合同当前金额");
+        }
+    }
+
+    private int cleanAttachmentCount(String businessType, Long businessId) {
+        Integer count = jdbc.queryForObject("""
+                SELECT COUNT(*)
+                  FROM sys_file
+                 WHERE tenant_id=? AND business_type=? AND business_id=?
+                   AND virus_scan_status='CLEAN' AND document_type<>'GENERATED_DOCUMENT'
+                """, Integer.class, tenant(), businessType, businessId);
+        return count == null ? 0 : count;
+    }
+
+    private List<Long> visibleProjectIds(Long projectId, String action) {
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, action);
+            return List.of(projectId);
+        }
+        return projectAccessChecker.accessibleProjectIds();
+    }
+
+    private List<Object> scopedArguments(List<Long> projectIds, String status) {
+        List<Object> arguments = new ArrayList<>();
+        arguments.add(tenant());
+        arguments.addAll(projectIds);
+        arguments.add(status);
+        arguments.add(status);
+        return arguments;
     }
 
     private BigDecimal allocationTotal(List<AmountAllocation> allocations) {
@@ -382,6 +586,14 @@ public class RevenueOperationsService {
     private Long longValue(Object value) { return value == null ? null : ((Number) value).longValue(); }
     private int intValue(Object value) { return value == null ? 0 : ((Number) value).intValue(); }
     private String string(Object value) { return value == null ? null : value.toString(); }
+    private String text(Map<String,Object> row, String key) {
+        Object value = row.get(key);
+        return value == null ? null : value.toString();
+    }
+    private Integer integer(Map<String,Object> row, String key) {
+        Object value = row.get(key);
+        return value == null ? null : ((Number) value).intValue();
+    }
     private LocalDate localDate(Object value) {
         if (value instanceof LocalDate date) return date;
         if (value instanceof java.sql.Date date) return date.toLocalDate();

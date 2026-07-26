@@ -11,6 +11,7 @@ import {
   loadStockKpi,
   loadStockLedger,
   loadStockTransferCandidates,
+  loadStocks,
   loadWarehouse,
   loadWarehouses,
   updateStockReplenishment,
@@ -52,19 +53,31 @@ describe('M5 inventory workspace contract', () => {
       resolve(process.cwd(), 'src/pages/supply-chain/InventoryWorkspacePage.vue'),
       'utf8',
     )
-    expect(source).toContain("route.path === '/inventory/stock'")
-    expect(source).toContain("route.path === '/inventory/transaction'")
+    expect(source).toContain("route.path === '/inventory/warehouse' ? 'warehouse' : 'stock'")
+    expect(source).not.toContain("route.path === '/inventory/transaction'")
+    expect(source).toContain('loadStocks')
+    expect(source).toContain('title="全部库存余额"')
+    expect(source).toContain('title="库存明细与流水"')
+    expect(source).toContain(
+      'panel-class="v2-dialog-standard v2-detail-dialog inventory-ledger-drawer"',
+    )
+    expect(source).toContain(':close-on-backdrop="true"')
+    expect(source).toContain('class="v2-table__record-link"')
+    expect(source).toContain('@click="openStock(item)"')
     expect(source).toContain('pageNo: pageNo.value')
+    expect(source).toContain('const pageSize = 10')
+    expect(source).toContain('<th v-if="!projectId">项目</th>')
+    expect(source).toContain("item.projectName || '项目信息缺失'")
+    expect(source).not.toContain("item.projectName || item.projectId || '项目信息缺失'")
+    expect(source).toContain('aria-label="库存流水列表"')
+    expect(source).toContain('tabindex="0"')
     expect(source).toContain('controller?.abort()')
     expect(source).toContain('await loadPage()')
     expect(source).toContain('crypto.randomUUID()')
     expect(source).toContain("{ value: '', label: '全部仓库' }")
     expect(source).toContain('allow-empty')
-    expect(source).toMatch(
-      /<V2Card :title="title" :heading-level="1">[\s\S]*?<template #actions>[\s\S]*?inventory-workspace-page__filter-grid[\s\S]*?查询库存[\s\S]*?<\/template>[\s\S]*?<\/V2Card>/,
-    )
     expect(source).not.toContain('inventory-workspace-page__filters')
-    expect(source).toContain('v-if="!errorMessage && !filter.materialId"')
+    expect(source).not.toContain('v-if="!errorMessage && !filter.materialId"')
     expect(source).toContain(':options="materialOptions"')
     expect(source).not.toContain('label="物料ID"')
     expect(source).toContain("{{ item.warehouseName || '仓库名称缺失' }}")
@@ -73,8 +86,10 @@ describe('M5 inventory workspace contract', () => {
     expect(source).toContain("MATERIAL_RETURN_REVERSAL: '退料冲销'")
     expect(source).toContain("STOCK_TRANSFER: '库存调拨'")
     expect(source).not.toMatch(/PURCHASE_RECEIPT|\\bREQUISITION:|\\bTRANSFER:/)
-    expect(source).toMatch(/mode\.value === 'stock'[\s\S]{0,180}\? await loadStockKpi/)
-    expect(source).toMatch(/mode\.value === 'stock'[\s\S]{0,180}\? loadStockKpi/)
+    expect(source).toContain('loadStockKpi(')
+    expect(source).toContain("session.hasPermission('material:dict:list')")
+    expect(source).toContain('canReadMaterials.value')
+    expect(source).toContain('canReadStock.value')
     expect(source).not.toMatch(
       /stock\/in|stock\/out|Number\(ledger\.stock\.(?:availableQty|safetyStockQty)\)|availableQty\s*[+]=|inventoryValue\s*[+]=|frontend-admin\/src/,
     )
@@ -111,6 +126,7 @@ describe('M5 inventory workspace contract', () => {
     await deleteWarehouse('W/1')
     await loadStockLedger({ warehouseId: 'W/1', materialId: 'M/1', pageNo: 2 }, signal)
     await loadStockLedger({ materialId: 'M/1', pageNo: 2 }, signal)
+    await loadStocks({ warehouseId: 'W/1', keyword: '钢 筋', pageNo: 2 }, signal)
     await loadStockKpi({ warehouseId: 'W/1' }, signal)
     await loadStockTransferCandidates('S/1', signal)
     await loadStockIncomingSupplies('S/1', signal)
@@ -136,7 +152,10 @@ describe('M5 inventory workspace contract', () => {
     expect(calls.map(([url]) => String(url))).toContain(
       '/api/inventory/stock/ledger?materialId=M%2F1&pageNo=2',
     )
-    expect(calls.filter(([, init]) => init?.signal === signal)).toHaveLength(8)
+    expect(calls.map(([url]) => String(url))).toContain(
+      '/api/inventory/stock?warehouseId=W%2F1&keyword=%E9%92%A2+%E7%AD%8B&pageNo=2',
+    )
+    expect(calls.filter(([, init]) => init?.signal === signal)).toHaveLength(9)
     const settings = calls.find(([url]) => String(url).includes('/replenishment-settings'))
     expect(JSON.parse(String(settings?.[1]?.body)).safetyStockQty).toBe('9007199254740993.1234')
   })

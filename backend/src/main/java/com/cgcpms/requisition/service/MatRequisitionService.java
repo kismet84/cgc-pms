@@ -69,13 +69,26 @@ public class MatRequisitionService {
 
     public PageResult<MatRequisitionVO> getPage(long pageNo, long pageSize, Long projectId,
                                                  Long contractId, Long warehouseId,
-                                                 String approvalStatus, String requisitionCode) {
+                                                 String approvalStatus, String requisitionCode,
+                                                 LocalDate dateFrom, LocalDate dateTo) {
+        List<Long> projectIds;
+        if (projectId != null) {
+            checkProjectAccess(projectId, "查询领料申请");
+            projectIds = List.of(projectId);
+        } else {
+            projectIds = projectAccessChecker.accessibleProjectIds();
+            if (projectIds.isEmpty()) {
+                return new PageResult<>(pageNo, pageSize, 0, List.of());
+            }
+        }
         LambdaQueryWrapper<MatRequisition> wrapper = new LambdaQueryWrapper<>();
-        if (projectId != null) wrapper.eq(MatRequisition::getProjectId, projectId);
+        wrapper.in(MatRequisition::getProjectId, projectIds);
         if (contractId != null) wrapper.eq(MatRequisition::getContractId, contractId);
         if (warehouseId != null) wrapper.eq(MatRequisition::getWarehouseId, warehouseId);
         if (StringUtils.hasText(approvalStatus)) wrapper.eq(MatRequisition::getApprovalStatus, approvalStatus);
         if (StringUtils.hasText(requisitionCode)) wrapper.like(MatRequisition::getRequisitionCode, requisitionCode);
+        if (dateFrom != null) wrapper.ge(MatRequisition::getRequisitionDate, dateFrom);
+        if (dateTo != null) wrapper.le(MatRequisition::getRequisitionDate, dateTo);
         wrapper.eq(MatRequisition::getTenantId, UserContext.getCurrentTenantId());
         wrapper.orderByDesc(MatRequisition::getCreatedTime);
 
@@ -184,6 +197,7 @@ public class MatRequisitionService {
         requisition.setApprovalStatus("DRAFT");
         requisition.setRequisitionCode(existing.getRequisitionCode());
         requisition.setStockOutFlag(existing.getStockOutFlag());
+        checkProjectAccess(requisition.getProjectId(), "编辑领料申请");
         validateRelations(requisition);
 
         requisitionMapper.updateById(requisition);

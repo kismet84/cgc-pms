@@ -121,6 +121,7 @@ class CashJournalReopenAuditTest {
         file.setContentType("application/pdf");
         file.setStoragePath("CASH_JOURNAL/" + entryId + "/proof.pdf");
         file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
         fileMapper.insert(file);
         journalService.archive(entryId);
         return entryId;

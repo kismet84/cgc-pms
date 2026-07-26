@@ -9,8 +9,12 @@ import {
 } from '@cgc-pms/frontend-contracts'
 import {
   loadAccountingEntries,
+  loadAccountingEntryDetail,
+  loadCashForecastCycles,
   loadCashJournal,
   loadExpenseApplications,
+  loadFinanceOperationsWorkspace,
+  loadFinancePeriods,
   loadInvoices,
   loadPaymentApplications,
 } from '@/services/finance'
@@ -78,6 +82,10 @@ describe('M6 contract and read-only canary baseline', () => {
     await loadPaymentApplications({ contractId: ' C/1 ', applyCode: ' PAY&1 ' }, signal)
     await loadCashJournal({ projectId: ' P/1 ', hasAttachment: false }, signal)
     await loadAccountingEntries({ entryType: ' PAYMENT ', pageNo: 2 }, signal)
+    await loadAccountingEntryDetail(' 9007199254740993 ', signal)
+    await loadFinanceOperationsWorkspace(' P/1 ', signal)
+    await loadCashForecastCycles(' P/1 ', signal)
+    await loadFinancePeriods(2031, signal)
 
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
       '/api/sub-tasks?projectId=P%2F1&taskName=A%26B',
@@ -85,7 +93,11 @@ describe('M6 contract and read-only canary baseline', () => {
       '/api/settlements?projectId=P%2F1&settlementType=FINAL&keyword=A%26B',
       '/api/pay-applications?contractId=C%2F1&applyCode=PAY%261',
       '/api/cash-journal-entries?projectId=P%2F1&hasAttachment=false',
-      '/api/accounting-entry?entryType=PAYMENT&pageNo=2',
+      '/api/accounting-entry/workspace?entryType=PAYMENT&pageNo=2',
+      '/api/accounting-entry/workspace/9007199254740993',
+      '/api/finance-operations/workspace?projectId=P%2F1',
+      '/api/cash-forecasts/workspace?projectId=P%2F1',
+      '/api/financial-close/workspace?year=2031',
     ])
     for (const [, options] of fetchMock.mock.calls)
       expect(options).toMatchObject({ method: 'GET', body: undefined, signal })
@@ -181,13 +193,14 @@ describe('M6 contract and read-only canary baseline', () => {
     expect(sources).not.toContain('frontend-admin/')
     expect(sources).not.toMatch(/\b(?:Number|parseFloat|parseInt)\s*\(/)
     const financeService = readFileSync(resolve('src/services/finance.ts'), 'utf-8')
-    expect(financeService).not.toMatch(/method:\s*["'](?:POST|PUT|PATCH|DELETE)["']/)
+    expect(financeService).toContain('createOwnerSettlement')
   })
 
-  it('does not expose raw finance map responses before stable adapters exist', () => {
+  it('exposes ISSUE-053-033 revenue and ISSUE-053-034 finance-control adapters', () => {
     const source = readFileSync(resolve('src/services/finance.ts'), 'utf-8')
-    expect(source).not.toMatch(
-      /load(?:RevenueSettlements|FinanceSchedules|CashForecastCycles|FinancePeriods)/,
-    )
+    expect(source).toContain('loadRevenueSettlements')
+    expect(source).toContain('loadFinanceOperationsWorkspace')
+    expect(source).toContain('loadCashForecastCycles')
+    expect(source).toContain('loadFinancePeriods')
   })
 })

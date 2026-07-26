@@ -27,6 +27,8 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.EmptyResultDataAccessException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -59,17 +61,25 @@ public class InvoiceService {
     private final ProjectAccessChecker projectAccessChecker;
     private final InvoicePaymentAllocationMapper allocationMapper;
     private final SysFileMapper sysFileMapper;
+    private final JdbcTemplate jdbcTemplate;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     // ── Query ──
 
     public IPage<InvoiceVO> getPage(long pageNo, long pageSize, Long payRecordId, Long payApplicationId,
                                      String invoiceNo, String verifyStatus) {
+        return getPage(pageNo, pageSize, payRecordId, payApplicationId, invoiceNo, verifyStatus, null);
+    }
+
+    public IPage<InvoiceVO> getPage(long pageNo, long pageSize, Long payRecordId, Long payApplicationId,
+                                     String invoiceNo, String verifyStatus, Long projectId) {
         LambdaQueryWrapper<PayInvoice> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PayInvoice::getTenantId, UserContext.getCurrentTenantId());
         List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
         if (projectIds.isEmpty()) wrapper.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment
-        else wrapper.in(PayInvoice::getProjectId, projectIds);
+        else if (projectId == null) wrapper.in(PayInvoice::getProjectId, projectIds);
+        else if (projectIds.contains(projectId)) wrapper.eq(PayInvoice::getProjectId, projectId);
+        else wrapper.apply("1 = 0"); // SQL-SAFETY: fixed-sql-fragment
         if (payRecordId != null) wrapper.eq(PayInvoice::getPayRecordId, payRecordId);
         if (payApplicationId != null) wrapper.eq(PayInvoice::getPayApplicationId, payApplicationId);
         if (StringUtils.hasText(invoiceNo)) wrapper.like(PayInvoice::getInvoiceNo, invoiceNo);
@@ -138,6 +148,7 @@ public class InvoiceService {
 
     @Transactional(rollbackFor = Exception.class)
     public void update(PayInvoice invoice) {
+        lockInvoice(invoice.getId());
         PayInvoice existing = payInvoiceMapper.selectById(invoice.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
@@ -181,6 +192,7 @@ public class InvoiceService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        lockInvoice(id);
         PayInvoice existing = payInvoiceMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
@@ -199,6 +211,7 @@ public class InvoiceService {
                     "核验状态只能为 VERIFIED 或 ABNORMAL，当前值: " + targetStatus);
         }
 
+        lockInvoice(id);
         PayInvoice invoice = payInvoiceMapper.selectById(id);
         if (invoice == null || !invoice.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
@@ -209,24 +222,30 @@ public class InvoiceService {
                     "当前核验状态为 " + invoice.getVerifyStatus() + "，仅 PENDING 状态的发票可核验");
         }
 
-        if ("VERIFIED".equals(targetStatus)
-                && "CLOSED_LOOP_V1".equals(invoice.getIntegrityVersion())) {
-            List<InvoicePaymentAllocation> allocations = listAllocations(id);
-            BigDecimal allocated = allocations.stream().map(InvoicePaymentAllocation::getAllocatedAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            if (money(invoice.getInvoiceAmount()).compareTo(money(allocated)) != 0) {
-                throw new BusinessException("INVOICE_ALLOCATION_INCOMPLETE", "发票分配金额合计必须等于发票金额");
+        if ("VERIFIED".equals(targetStatus)) {
+            if ("CLOSED_LOOP_V1".equals(invoice.getIntegrityVersion())) {
+                List<InvoicePaymentAllocation> allocations = listAllocations(id);
+                BigDecimal allocated = allocations.stream().map(InvoicePaymentAllocation::getAllocatedAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                if (money(invoice.getInvoiceAmount()).compareTo(money(allocated)) != 0) {
+                    throw new BusinessException("INVOICE_ALLOCATION_INCOMPLETE", "发票分配金额合计必须等于发票金额");
+                }
             }
             if (sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
                     .eq(SysFile::getTenantId, invoice.getTenantId())
                     .eq(SysFile::getBusinessType, "INVOICE")
-                    .eq(SysFile::getBusinessId, invoice.getId())) == 0) {
-                throw new BusinessException("INVOICE_ATTACHMENT_REQUIRED", "发票核验前必须上传电子发票或扫描件");
+                    .eq(SysFile::getBusinessId, invoice.getId())
+                    .in(SysFile::getDocumentType, "ELECTRONIC_INVOICE", "SCANNED_INVOICE")
+                    .eq(SysFile::getVirusScanStatus, "CLEAN")) == 0) {
+                throw new BusinessException("INVOICE_ATTACHMENT_REQUIRED",
+                        "发票核验前必须上传病毒扫描通过的电子发票或扫描件");
             }
         }
 
         invoice.setVerifyStatus(targetStatus);
-        payInvoiceMapper.updateById(invoice);
+        if (payInvoiceMapper.updateById(invoice) != 1) {
+            throw new BusinessException("VERIFY_STATUS_CONFLICT", "发票核验状态已被并发修改，请刷新后重试");
+        }
         log.info("Invoice verified: id={}, status={}→{}", id, "PENDING", targetStatus);
     }
 
@@ -256,6 +275,7 @@ public class InvoiceService {
 
     @Transactional(rollbackFor = Exception.class)
     public void saveAllocations(Long invoiceId, List<InvoicePaymentAllocation> inputs) {
+        lockInvoice(invoiceId);
         PayInvoice invoice = payInvoiceMapper.selectById(invoiceId);
         if (invoice == null || !Objects.equals(invoice.getTenantId(), UserContext.getCurrentTenantId())) {
             throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
@@ -458,6 +478,19 @@ public class InvoiceService {
 
     private void checkInvoiceProjectAccess(PayInvoice invoice, String action) {
         checkProjectAccess(resolveProjectId(invoice.getPayRecordId(), invoice.getPayApplicationId()), action);
+    }
+
+    private void lockInvoice(Long id) {
+        try {
+            jdbcTemplate.queryForObject("""
+                    SELECT id
+                    FROM pay_invoice
+                    WHERE id=? AND tenant_id=? AND deleted_flag=0
+                    FOR UPDATE
+                    """, Long.class, id, UserContext.getCurrentTenantId());
+        } catch (EmptyResultDataAccessException e) {
+            throw new BusinessException("INVOICE_NOT_FOUND", "发票不存在");
+        }
     }
 
     private Long resolveProjectId(Long payRecordId, Long payApplicationId) {

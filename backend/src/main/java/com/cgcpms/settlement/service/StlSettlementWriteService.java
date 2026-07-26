@@ -7,9 +7,14 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.file.service.FileService;
+import com.cgcpms.payment.entity.PayRecord;
+import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.constant.ProjectStatusConstants;
 import com.cgcpms.project.entity.PmProject;
@@ -22,7 +27,11 @@ import com.cgcpms.settlement.mapper.StlSettlementItemMapper;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.settlement.mapper.SettlementSubMeasureMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
+import com.cgcpms.subcontract.entity.SubMeasureItem;
+import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.variation.entity.VarOrder;
+import com.cgcpms.variation.mapper.VarOrderMapper;
 import com.cgcpms.settlement.vo.StlSettlementVO;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -32,6 +41,7 @@ import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,7 +51,12 @@ import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMEN
 import static com.cgcpms.settlement.constant.SettlementStatusConstants.STATUS_DRAFT;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -63,10 +78,15 @@ public class StlSettlementWriteService {
     private final StlSettlementQueryService queryService;
     private final SettlementSubMeasureMapper settlementSubMeasureMapper;
     private final SubMeasureMapper subMeasureMapper;
+    private final SubMeasureItemMapper subMeasureItemMapper;
+    private final CtContractItemMapper ctContractItemMapper;
     private final SysFileMapper fileMapper;
+    private final ObjectProvider<FileService> fileServiceProvider;
     private final PmProjectMapper projectMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final WfInstanceMapper wfInstanceMapper;
+    private final VarOrderMapper varOrderMapper;
+    private final PayRecordMapper payRecordMapper;
 
     // ================================================================
     // Create
@@ -75,9 +95,11 @@ public class StlSettlementWriteService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(StlSettlement settlement) {
         Long tenantId = UserContext.getCurrentTenantId();
+        settlement.setId(null);
         settlement.setTenantId(tenantId);
 
         CtContract contract = validateAndGetContract(settlement.getContractId(), tenantId, settlement.getProjectId());
+        projectAccessChecker.checkAccess(contract.getProjectId(), "创建结算单");
         settlement.setProjectId(contract.getProjectId());
         settlement.setPartnerId(contract.getPartyBId());
 
@@ -95,13 +117,10 @@ public class StlSettlementWriteService {
         String prefix = "STL-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
 
         // Default statuses
-        if (settlement.getApprovalStatus() == null || settlement.getApprovalStatus().isBlank()) {
-            settlement.setApprovalStatus(APPROVAL_DRAFT);
-        }
-        if (settlement.getSettlementStatus() == null || settlement.getSettlementStatus().isBlank()) {
-            settlement.setSettlementStatus(SETTLEMENT_DRAFT);
-        }
+        settlement.setApprovalStatus(APPROVAL_DRAFT);
+        settlement.setSettlementStatus(SETTLEMENT_DRAFT);
         settlement.setSettlementType("FINAL");
+        settlement.setFinalizedAt(null);
 
         // Auto-compute amounts
         autoFillAmounts(settlement, contract);
@@ -152,38 +171,81 @@ public class StlSettlementWriteService {
     @Transactional(rollbackFor = Exception.class)
     public void update(StlSettlement settlement) {
         Long tenantId = UserContext.getCurrentTenantId();
-        StlSettlement existing = queryService.validateAndGetSettlement(settlement.getId());
+        StlSettlement existing = stlSettlementMapper.selectByIdForUpdate(settlement.getId(), tenantId);
+        if (existing == null) {
+            throw new BusinessException("STL_SETTLEMENT_NOT_FOUND", "结算单不存在");
+        }
+        projectAccessChecker.checkAccess(existing.getProjectId(), "编辑结算单");
         if (!Set.of(APPROVAL_DRAFT, SettlementStatusConstants.APPROVAL_REJECTED)
                 .contains(existing.getApprovalStatus())) {
             throw new BusinessException("STL_SETTLEMENT_IN_APPROVAL", "结算单审批中或已审批，不可编辑");
         }
 
-        if (settlement.getContractId() != null && !Objects.equals(settlement.getContractId(), existing.getContractId())) {
-            validateAndGetContract(settlement.getContractId(), tenantId, existing.getProjectId());
+        Long contractId = settlement.getContractId() == null
+                ? existing.getContractId() : settlement.getContractId();
+        CtContract contract = validateAndGetContract(contractId, tenantId, existing.getProjectId());
+        boolean contractChanged = !Objects.equals(contract.getId(), existing.getContractId());
+        existing.setContractId(contract.getId());
+        existing.setProjectId(contract.getProjectId());
+        existing.setPartnerId(contract.getPartyBId());
+        existing.setSettlementType("FINAL");
+        existing.setDeductionAmount(settlement.getDeductionAmount());
+        existing.setRemark(settlement.getRemark());
+        autoFillAmounts(existing, contract);
+        if (contractChanged) {
+            stlSettlementItemMapper.delete(new LambdaQueryWrapper<StlSettlementItem>()
+                    .eq(StlSettlementItem::getTenantId, tenantId)
+                    .eq(StlSettlementItem::getSettlementId, existing.getId()));
+            settlementSubMeasureMapper.delete(new LambdaQueryWrapper<SettlementSubMeasure>()
+                    .eq(SettlementSubMeasure::getTenantId, tenantId)
+                    .eq(SettlementSubMeasure::getSettlementId, existing.getId()));
         }
-
-        CtContract contract = ctContractMapper.selectById(existing.getContractId());
-        autoFillAmounts(settlement, contract);
-
-        stlSettlementMapper.updateById(settlement);
+        if (stlSettlementMapper.updateById(existing) != 1) {
+            throw new BusinessException("STL_SETTLEMENT_CONCURRENT_MODIFICATION", "结算单已被修改，请刷新后重试");
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
         Long tenantId = UserContext.getCurrentTenantId();
-        StlSettlement existing = queryService.validateAndGetSettlement(id);
+        StlSettlement existing = stlSettlementMapper.selectByIdForUpdate(id, tenantId);
+        if (existing == null) {
+            throw new BusinessException("STL_SETTLEMENT_NOT_FOUND", "结算单不存在");
+        }
+        projectAccessChecker.checkAccess(existing.getProjectId(), "删除结算单");
         if (!Set.of(APPROVAL_DRAFT, SettlementStatusConstants.APPROVAL_REJECTED)
                 .contains(existing.getApprovalStatus())) {
             throw new BusinessException("STL_SETTLEMENT_IN_APPROVAL", "结算单审批中或已审批，不可删除");
         }
 
+        FileService fileService = fileServiceProvider.getIfAvailable();
+        for (SysFile file : fileMapper.selectList(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getTenantId, tenantId)
+                .eq(SysFile::getBusinessType, "SETTLEMENT")
+                .eq(SysFile::getBusinessId, id))) {
+            if (fileService != null) {
+                fileService.deleteForBusinessCascade(file.getId(), "SETTLEMENT", id);
+            } else if (fileMapper.deleteById(file.getId()) != 1) {
+                throw new BusinessException("FILE_DELETE_FAILED", "文件删除失败，请稍后重试");
+            }
+        }
         stlSettlementItemMapper.delete(new LambdaQueryWrapper<StlSettlementItem>()
                 .eq(StlSettlementItem::getTenantId, tenantId)
                 .eq(StlSettlementItem::getSettlementId, id));
         settlementSubMeasureMapper.delete(new LambdaQueryWrapper<SettlementSubMeasure>()
                 .eq(SettlementSubMeasure::getTenantId, tenantId)
                 .eq(SettlementSubMeasure::getSettlementId, id));
-        stlSettlementMapper.deleteById(id);
+        if (stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
+                .set(StlSettlement::getContractId, null)
+                .set(StlSettlement::getSettlementCode, "DELETED-" + id)
+                .eq(StlSettlement::getId, id)
+                .eq(StlSettlement::getTenantId, tenantId)
+                .eq(StlSettlement::getDeletedFlag, 0)) != 1) {
+            throw new BusinessException("STL_SETTLEMENT_CONCURRENT_MODIFICATION", "结算单已被修改，请刷新后重试");
+        }
+        if (stlSettlementMapper.deleteById(id) != 1) {
+            throw new BusinessException("STL_SETTLEMENT_CONCURRENT_MODIFICATION", "结算单已被修改，请刷新后重试");
+        }
     }
 
     // ================================================================
@@ -193,23 +255,52 @@ public class StlSettlementWriteService {
     @Transactional(rollbackFor = Exception.class)
     public void saveItems(Long settlementId, List<StlSettlementItem> items) {
         Long tenantId = UserContext.getCurrentTenantId();
-        StlSettlement settlement = queryService.validateAndGetSettlement(settlementId);
+        StlSettlement settlement = stlSettlementMapper.selectByIdForUpdate(settlementId, tenantId);
+        if (settlement == null) {
+            throw new BusinessException("STL_SETTLEMENT_NOT_FOUND", "结算单不存在");
+        }
+        projectAccessChecker.checkAccess(settlement.getProjectId(), "编辑结算明细");
         if (!Set.of(APPROVAL_DRAFT, SettlementStatusConstants.APPROVAL_REJECTED)
                 .contains(settlement.getApprovalStatus())) {
             throw new BusinessException("STL_SETTLEMENT_IN_APPROVAL", "结算单审批中或已审批，不可编辑");
+        }
+
+        List<StlSettlementItem> requests = items == null ? List.of() : new ArrayList<>(items);
+        if (requests.size() > 200) {
+            throw new BusinessException("STL_SETTLEMENT_ITEMS_LIMIT", "结算明细不能超过200条");
+        }
+        Map<Long, ContractItemSnapshot> availableSources = approvedContractItemSnapshots(settlement).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        snapshot -> snapshot.contractItem().getId(),
+                        snapshot -> snapshot,
+                        (left, right) -> left,
+                        LinkedHashMap::new));
+        requests.sort(Comparator.comparing(StlSettlementItem::getSourceId,
+                Comparator.nullsFirst(Comparator.naturalOrder())));
+        Set<Long> sourceIds = new HashSet<>();
+        List<StlSettlementItem> normalizedItems = new ArrayList<>(requests.size());
+        for (StlSettlementItem request : requests) {
+            if (!"CT_CONTRACT".equals(request.getSourceType()) || request.getSourceId() == null
+                    || !sourceIds.add(request.getSourceId())) {
+                throw new BusinessException("STL_SETTLEMENT_SOURCE_INVALID",
+                        "结算明细必须引用唯一且存在已审批计量的合同清单");
+            }
+            ContractItemSnapshot source = availableSources.get(request.getSourceId());
+            if (source == null) {
+                throw new BusinessException("STL_SETTLEMENT_SOURCE_SCOPE_INVALID",
+                        "合同清单不存在、无已审批计量或不属于当前结算范围");
+            }
+            StlSettlementItem normalized = toSettlementItem(settlementId, source, tenantId);
+            normalized.setRemark(request.getRemark());
+            normalizedItems.add(normalized);
         }
 
         stlSettlementItemMapper.delete(new LambdaQueryWrapper<StlSettlementItem>()
                 .eq(StlSettlementItem::getTenantId, tenantId)
                 .eq(StlSettlementItem::getSettlementId, settlementId));
 
-        if (items != null) {
-            for (StlSettlementItem item : items) {
-                item.setSettlementId(settlementId);
-                item.setTenantId(tenantId);
-                item.setId(null);
-                stlSettlementItemMapper.insert(item);
-            }
+        for (StlSettlementItem item : normalizedItems) {
+            stlSettlementItemMapper.insert(item);
         }
     }
 
@@ -229,16 +320,29 @@ public class StlSettlementWriteService {
             throw new BusinessException("STL_ALREADY_SUBMITTED", "结算单已提交审批，不可重复提交");
         }
 
-        validateSettlementIntegrity(settlement);
+        LockedSettlementSources sources = lockSettlementSources(settlement);
+        validateSettlementIntegrity(settlement, sources.contract(), sources.amounts());
+        snapshotApprovedMeasures(settlement, sources.measures());
+        applyAmountSnapshot(settlement, sources.amounts());
 
-        // Recompute amount snapshot before approval
-        CtContract contract = ctContractMapper.selectById(settlement.getContractId());
-        autoFillAmounts(settlement, contract);
-        snapshotApprovedMeasures(settlement);
-
-        stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
+        int changed = stlSettlementMapper.update(null, new LambdaUpdateWrapper<StlSettlement>()
                 .eq(StlSettlement::getId, settlementId)
+                .eq(StlSettlement::getTenantId, tenantId)
+                .in(StlSettlement::getApprovalStatus,
+                        APPROVAL_DRAFT, SettlementStatusConstants.APPROVAL_REJECTED)
+                .set(StlSettlement::getContractAmount, settlement.getContractAmount())
+                .set(StlSettlement::getChangeAmount, settlement.getChangeAmount())
+                .set(StlSettlement::getMeasuredAmount, settlement.getMeasuredAmount())
+                .set(StlSettlement::getDeductionAmount, settlement.getDeductionAmount())
+                .set(StlSettlement::getPaidAmount, settlement.getPaidAmount())
+                .set(StlSettlement::getFinalAmount, settlement.getFinalAmount())
+                .set(StlSettlement::getWarrantyAmount, settlement.getWarrantyAmount())
+                .set(StlSettlement::getUnpaidAmount, settlement.getUnpaidAmount())
+                .set(StlSettlement::getAmountFormulaVersion, settlement.getAmountFormulaVersion())
                 .set(StlSettlement::getApprovalStatus, APPROVAL_APPROVING));
+        if (changed != 1) {
+            throw new BusinessException("STL_SETTLEMENT_CONCURRENT_MODIFICATION", "结算单已被修改，请刷新后重试");
+        }
 
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
@@ -281,10 +385,12 @@ public class StlSettlementWriteService {
         if (projectId != null && !Objects.equals(contract.getProjectId(), projectId)) {
             throw new BusinessException("CROSS_PROJECT_NOT_ALLOWED", "结算单项目与合同项目不一致，不允许跨项目引用");
         }
+        validateSettlementContract(contract);
         return contract;
     }
 
-    private void validateSettlementIntegrity(StlSettlement settlement) {
+    private void validateSettlementIntegrity(
+            StlSettlement settlement, CtContract contract, SettlementAmountSnapshot snapshot) {
         Long tenantId = settlement.getTenantId();
         if (settlement.getProjectId() == null || settlement.getContractId() == null
                 || settlement.getPartnerId() == null) {
@@ -296,25 +402,14 @@ public class StlSettlementWriteService {
                 || !ProjectStatusConstants.ACTIVE.equals(project.getStatus())) {
             throw new BusinessException("SETTLEMENT_PROJECT_NOT_ACTIVE", "只有进行中的本租户项目可以提交分包结算");
         }
-        CtContract contract = validateAndGetContract(settlement.getContractId(), tenantId, settlement.getProjectId());
-        String contractType = contract.getContractType() == null ? "" : contract.getContractType().trim().toUpperCase();
-        if (!Set.of("SUB", "SUBCONTRACT").contains(contractType)
-                || !"APPROVED".equals(contract.getApprovalStatus())
-                || !"PERFORMING".equals(contract.getContractStatus())) {
-            throw new BusinessException("SETTLEMENT_CONTRACT_INVALID", "终期结算必须关联已审批且履约中的分包合同");
-        }
+        validateSettlementContract(contract);
         if (!Objects.equals(contract.getPartyBId(), settlement.getPartnerId())) {
             throw new BusinessException("SETTLEMENT_PARTNER_MISMATCH", "结算分包商必须等于分包合同乙方");
         }
         if (!"FINAL".equalsIgnoreCase(settlement.getSettlementType())) {
             throw new BusinessException("SETTLEMENT_TYPE_INVALID", "本闭环结算单仅允许终期结算 FINAL");
         }
-        SettlementAmountSnapshot snapshot = SettlementAmountPolicy.calculate(
-                contract.getCurrentAmount(),
-                queryService.sumVarOrderConfirmed(tenantId, settlement.getProjectId(), contract.getId()),
-                queryService.sumSubMeasureApproved(tenantId, settlement.getProjectId(), contract.getId()),
-                settlement.getDeductionAmount(),
-                queryService.sumPaidAmount(tenantId, settlement.getProjectId(), contract.getId()));
+        validateDeduction(settlement.getDeductionAmount());
         BigDecimal performanceCeiling = snapshot.effectiveContractAmount()
                 .add(snapshot.confirmedVariationAmount());
         if (snapshot.finalAmount().compareTo(BigDecimal.ZERO) <= 0
@@ -336,22 +431,91 @@ public class StlSettlementWriteService {
         }
     }
 
-    private void snapshotApprovedMeasures(StlSettlement settlement) {
+    private void validateSettlementContract(CtContract contract) {
+        String contractType = contract.getContractType() == null
+                ? "" : contract.getContractType().trim().toUpperCase();
+        if (!Set.of("SUB", "SUBCONTRACT").contains(contractType)
+                || !"APPROVED".equals(contract.getApprovalStatus())
+                || !"PERFORMING".equals(contract.getContractStatus())) {
+            throw new BusinessException("SETTLEMENT_CONTRACT_INVALID",
+                    "终期结算必须关联已审批且履约中的分包合同");
+        }
+    }
+
+    private LockedSettlementSources lockSettlementSources(StlSettlement settlement) {
         Long tenantId = settlement.getTenantId();
+        CtContract contract = ctContractMapper.selectByIdForUpdate(settlement.getContractId(), tenantId);
+        if (contract == null || !Objects.equals(contract.getProjectId(), settlement.getProjectId())) {
+            throw new BusinessException("STL_SETTLEMENT_CONTRACT_SCOPE_INVALID",
+                    "结算单项目与合同项目不一致");
+        }
+        validateSettlementContract(contract);
+
+        List<VarOrder> variations = varOrderMapper.selectList(new LambdaQueryWrapper<VarOrder>()
+                .eq(VarOrder::getTenantId, tenantId)
+                .eq(VarOrder::getProjectId, settlement.getProjectId())
+                .eq(VarOrder::getContractId, settlement.getContractId())
+                .eq(VarOrder::getDirection, "COST")
+                .eq(VarOrder::getOwnerConfirmFlag, 1)
+                .orderByAsc(VarOrder::getId)
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
         List<SubMeasure> measures = subMeasureMapper.selectList(new LambdaQueryWrapper<SubMeasure>()
                 .eq(SubMeasure::getTenantId, tenantId)
                 .eq(SubMeasure::getProjectId, settlement.getProjectId())
                 .eq(SubMeasure::getContractId, settlement.getContractId())
                 .eq(SubMeasure::getPartnerId, settlement.getPartnerId())
                 .eq(SubMeasure::getApprovalStatus, "APPROVED")
-                .orderByAsc(SubMeasure::getMeasureDate, SubMeasure::getCreatedAt));
+                .orderByAsc(SubMeasure::getId)
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+        List<PayRecord> payments = payRecordMapper.selectList(new LambdaQueryWrapper<PayRecord>()
+                .eq(PayRecord::getTenantId, tenantId)
+                .eq(PayRecord::getProjectId, settlement.getProjectId())
+                .eq(PayRecord::getContractId, settlement.getContractId())
+                .eq(PayRecord::getPayStatus, "SUCCESS")
+                .orderByAsc(PayRecord::getId)
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
         if (measures.isEmpty()) {
             throw new BusinessException("SETTLEMENT_APPROVED_MEASURE_REQUIRED", "终期结算前必须至少存在一笔已审批分包计量");
+        }
+        if (measures.stream().anyMatch(measure ->
+                SettlementAmountPolicy.money(measure.getApprovedAmount()).compareTo(BigDecimal.ZERO) <= 0)) {
+            throw new BusinessException("STL_SETTLEMENT_SOURCE_AMOUNT_INVALID",
+                    "计量来源审定金额必须大于0");
+        }
+        SettlementAmountSnapshot amounts = SettlementAmountPolicy.calculate(
+                contract.getCurrentAmount(),
+                variations.stream()
+                        .map(VarOrder::getConfirmedAmount)
+                        .filter(Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add),
+                measures.stream()
+                        .map(SubMeasure::getApprovedAmount)
+                        .filter(Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add),
+                settlement.getDeductionAmount(),
+                payments.stream()
+                        .map(PayRecord::getPayAmount)
+                        .filter(Objects::nonNull)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add));
+        return new LockedSettlementSources(contract, measures, amounts);
+    }
+
+    private void snapshotApprovedMeasures(
+            StlSettlement settlement, List<SubMeasure> lockedMeasures) {
+        Long tenantId = settlement.getTenantId();
+        List<ContractItemSnapshot> contractItemSnapshots =
+                approvedContractItemSnapshots(settlement, lockedMeasures);
+        if (contractItemSnapshots.isEmpty()) {
+            throw new BusinessException("STL_SETTLEMENT_SOURCE_ITEM_REQUIRED",
+                    "已审批分包计量缺少可结算合同清单明细");
         }
         settlementSubMeasureMapper.delete(new LambdaQueryWrapper<SettlementSubMeasure>()
                 .eq(SettlementSubMeasure::getTenantId, tenantId)
                 .eq(SettlementSubMeasure::getSettlementId, settlement.getId()));
-        for (SubMeasure measure : measures) {
+        stlSettlementItemMapper.delete(new LambdaQueryWrapper<StlSettlementItem>()
+                .eq(StlSettlementItem::getTenantId, tenantId)
+                .eq(StlSettlementItem::getSettlementId, settlement.getId()));
+        for (SubMeasure measure : lockedMeasures) {
             SettlementSubMeasure relation = new SettlementSubMeasure();
             relation.setTenantId(tenantId);
             relation.setSettlementId(settlement.getId());
@@ -364,10 +528,79 @@ public class StlSettlementWriteService {
             relation.setCreatedAt(java.time.LocalDateTime.now());
             settlementSubMeasureMapper.insert(relation);
         }
+        for (ContractItemSnapshot source : contractItemSnapshots) {
+            stlSettlementItemMapper.insert(toSettlementItem(settlement.getId(), source, tenantId));
+        }
+    }
+
+    private List<ContractItemSnapshot> approvedContractItemSnapshots(
+            StlSettlement settlement, List<SubMeasure> measures) {
+        Long tenantId = settlement.getTenantId();
+        if (measures.isEmpty()) {
+            return List.of();
+        }
+        List<Long> measureIds = measures.stream().map(SubMeasure::getId).toList();
+        Map<Long, BigDecimal> quantities = new java.util.TreeMap<>();
+        for (SubMeasureItem item : subMeasureItemMapper.selectList(
+                new LambdaQueryWrapper<SubMeasureItem>()
+                        .eq(SubMeasureItem::getTenantId, tenantId)
+                        .in(SubMeasureItem::getMeasureId, measureIds)
+                        .orderByAsc(SubMeasureItem::getId)
+                        .last("FOR UPDATE"))) { // SQL-SAFETY: fixed-sql-fragment
+            if (item.getContractItemId() != null && item.getCurrentQuantity() != null) {
+                quantities.merge(item.getContractItemId(), item.getCurrentQuantity(), BigDecimal::add);
+            }
+        }
+        List<ContractItemSnapshot> snapshots = new ArrayList<>(quantities.size());
+        for (Map.Entry<Long, BigDecimal> entry : quantities.entrySet()) {
+            CtContractItem contractItem = ctContractItemMapper.selectByIdForUpdate(entry.getKey(), tenantId);
+            if (contractItem == null || !Objects.equals(contractItem.getTenantId(), tenantId)
+                    || !Objects.equals(contractItem.getContractId(), settlement.getContractId())
+                    || entry.getValue().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessException("STL_SETTLEMENT_SOURCE_SCOPE_INVALID",
+                        "合同清单不存在、无有效已审批计量或不属于当前结算范围");
+            }
+            snapshots.add(new ContractItemSnapshot(contractItem, entry.getValue()));
+        }
+        return snapshots;
+    }
+
+    private List<ContractItemSnapshot> approvedContractItemSnapshots(StlSettlement settlement) {
+        Long tenantId = settlement.getTenantId();
+        List<SubMeasure> measures = subMeasureMapper.selectList(new LambdaQueryWrapper<SubMeasure>()
+                .eq(SubMeasure::getTenantId, tenantId)
+                .eq(SubMeasure::getProjectId, settlement.getProjectId())
+                .eq(SubMeasure::getContractId, settlement.getContractId())
+                .eq(SubMeasure::getPartnerId, settlement.getPartnerId())
+                .eq(SubMeasure::getApprovalStatus, "APPROVED")
+                .orderByAsc(SubMeasure::getId));
+        return approvedContractItemSnapshots(settlement, measures);
+    }
+
+    private StlSettlementItem toSettlementItem(
+            Long settlementId, ContractItemSnapshot source, Long tenantId) {
+        CtContractItem contractItem = source.contractItem();
+        BigDecimal quantity = source.quantity();
+        BigDecimal unitPrice = contractItem.getUnitPrice() == null
+                ? BigDecimal.ZERO : contractItem.getUnitPrice();
+        BigDecimal amount = quantity.multiply(unitPrice)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
+        StlSettlementItem item = new StlSettlementItem();
+        item.setTenantId(tenantId);
+        item.setSettlementId(settlementId);
+        item.setItemName(contractItem.getItemName());
+        item.setUnit(contractItem.getUnit());
+        item.setQuantity(quantity);
+        item.setUnitPrice(unitPrice);
+        item.setAmount(amount);
+        item.setSourceType("CT_CONTRACT");
+        item.setSourceId(contractItem.getId());
+        return item;
     }
 
     private void autoFillAmounts(StlSettlement settlement, CtContract contract) {
         if (contract == null) return;
+        validateDeduction(settlement.getDeductionAmount());
 
         Long tenantId = settlement.getTenantId() != null ? settlement.getTenantId() : UserContext.getCurrentTenantId();
         Long contractId = contract.getId();
@@ -388,5 +621,31 @@ public class StlSettlementWriteService {
         settlement.setWarrantyAmount(snapshot.warrantyAmount());
         settlement.setUnpaidAmount(snapshot.unpaidAmount());
         settlement.setAmountFormulaVersion(snapshot.formulaVersion());
+    }
+
+    private void applyAmountSnapshot(
+            StlSettlement settlement, SettlementAmountSnapshot snapshot) {
+        settlement.setContractAmount(snapshot.effectiveContractAmount());
+        settlement.setChangeAmount(snapshot.confirmedVariationAmount());
+        settlement.setMeasuredAmount(snapshot.approvedMeasuredAmount());
+        settlement.setDeductionAmount(snapshot.deductionAmount());
+        settlement.setPaidAmount(snapshot.paidAmount());
+        settlement.setFinalAmount(snapshot.finalAmount());
+        settlement.setWarrantyAmount(snapshot.warrantyAmount());
+        settlement.setUnpaidAmount(snapshot.unpaidAmount());
+        settlement.setAmountFormulaVersion(snapshot.formulaVersion());
+    }
+
+    private void validateDeduction(BigDecimal deductionAmount) {
+        if (deductionAmount != null && deductionAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException("STL_SETTLEMENT_DEDUCTION_INVALID", "扣款金额不能小于0");
+        }
+    }
+
+    private record ContractItemSnapshot(CtContractItem contractItem, BigDecimal quantity) {
+    }
+
+    private record LockedSettlementSources(
+            CtContract contract, List<SubMeasure> measures, SettlementAmountSnapshot amounts) {
     }
 }

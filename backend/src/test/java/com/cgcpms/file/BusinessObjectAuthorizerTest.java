@@ -43,11 +43,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -153,6 +155,89 @@ class BusinessObjectAuthorizerTest {
     }
 
     @Test
+    void invoiceMutationLocksInvoiceAndAllowsOnlyPendingInvoiceEvidenceTypes() {
+        PayInvoice invoice = new PayInvoice();
+        invoice.setTenantId(TestUserContext.TENANT_0);
+        invoice.setPayRecordId(50003L);
+        invoice.setVerifyStatus("PENDING");
+        PayRecord record = new PayRecord();
+        record.setTenantId(TestUserContext.TENANT_0);
+        record.setProjectId(10013L);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class),
+                eq(51003L), eq(TestUserContext.TENANT_0))).thenReturn(51003L);
+        when(invoiceMapper.selectById(51003L)).thenReturn(invoice);
+        when(payRecordMapper.selectById(50003L)).thenReturn(record);
+
+        authorizer.checkUploadAccess("INVOICE", 51003L, "ELECTRONIC_INVOICE");
+        authorizer.checkDeleteAccess("INVOICE", 51003L, "SCANNED_INVOICE");
+
+        verify(jdbcTemplate, times(2)).queryForObject(
+                argThat(sql -> sql.contains("pay_invoice") && sql.contains("FOR UPDATE")),
+                eq(Long.class), eq(51003L), eq(TestUserContext.TENANT_0));
+        verify(projectAccessChecker, times(2)).checkAccess(eq(10013L), anyString());
+
+        BusinessException invalidType = assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess("INVOICE", 51003L, "OTHER"));
+        assertEquals("INVOICE_DOCUMENT_TYPE_INVALID", invalidType.getCode());
+
+        invoice.setVerifyStatus("VERIFIED");
+        BusinessException immutable = assertThrows(BusinessException.class,
+                () -> authorizer.checkDeleteAccess("INVOICE", 51003L, "ELECTRONIC_INVOICE"));
+        assertEquals("INVOICE_DOCUMENT_IMMUTABLE", immutable.getCode());
+    }
+
+    @Test
+    void salesInvoiceMutationUsesRowLockAndFreezesVerifiedEvidence() {
+        when(jdbcTemplate.queryForList(anyString(), eq(52001L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                "tenant_id", TestUserContext.TENANT_0,
+                "project_id", 10014L,
+                "status", "FULLY_ALLOCATED",
+                "verification_status", "UNVERIFIED")));
+        authorizer.checkUploadAccess("SALES_INVOICE", 52001L, "ELECTRONIC_INVOICE");
+        verify(jdbcTemplate).queryForList(
+                argThat(sql -> sql.contains("sales_invoice") && sql.contains("FOR UPDATE")
+                        && sql.contains("verification_status")),
+                eq(52001L), eq(TestUserContext.TENANT_0));
+        verify(projectAccessChecker).checkAccess(10014L, "写入收入回款业务文件");
+
+        when(jdbcTemplate.queryForList(anyString(), eq(52002L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                "tenant_id", TestUserContext.TENANT_0,
+                "project_id", 10014L,
+                "status", "FULLY_ALLOCATED",
+                "verification_status", "VERIFIED")));
+        BusinessException immutable = assertThrows(BusinessException.class,
+                () -> authorizer.checkDeleteAccess("SALES_INVOICE", 52002L, "SCANNED_INVOICE"));
+        assertEquals("REVENUE_DOCUMENT_IMMUTABLE", immutable.getCode());
+    }
+
+    @Test
+    void revenueAndOwnerSettlementEvidenceMutationLocksBusinessRows() {
+        when(jdbcTemplate.queryForList(anyString(), eq(52003L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                "tenant_id", TestUserContext.TENANT_0,
+                "project_id", 10015L,
+                "approval_status", "DRAFT")));
+        when(jdbcTemplate.queryForList(anyString(), eq(52004L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                "tenant_id", TestUserContext.TENANT_0,
+                "project_id", 10015L,
+                "status", "DRAFT")));
+
+        authorizer.checkUploadAccess("CONTRACT_REVENUE", 52003L, "OTHER");
+        authorizer.checkUploadAccess("OWNER_SETTLEMENT", 52004L, "OTHER");
+
+        verify(jdbcTemplate).queryForList(
+                argThat(sql -> sql.contains("contract_revenue") && sql.contains("FOR UPDATE")),
+                eq(52003L), eq(TestUserContext.TENANT_0));
+        verify(jdbcTemplate).queryForList(
+                argThat(sql -> sql.contains("owner_settlement") && sql.contains("FOR UPDATE")),
+                eq(52004L), eq(TestUserContext.TENANT_0));
+        verify(projectAccessChecker, times(2)).checkAccess(eq(10015L), anyString());
+    }
+
+    @Test
     void variationFileAccessChecksRealProject() {
         VarOrder variation = new VarOrder();
         variation.setTenantId(TestUserContext.TENANT_0);
@@ -216,15 +301,45 @@ class BusinessObjectAuthorizerTest {
 
     @Test
     void settlementFileAccessChecksRealProject() {
+        TestUserContext.setUser(TestUserContext.TENANT_0, 9L, "settlement-user", List.of("USER"));
         StlSettlement settlement = new StlSettlement();
         settlement.setTenantId(TestUserContext.TENANT_0);
         settlement.setProjectId(10006L);
         settlement.setApprovalStatus("DRAFT");
         when(settlementMapper.selectById(70001L)).thenReturn(settlement);
+        when(settlementMapper.selectByIdForUpdate(70001L, TestUserContext.TENANT_0))
+                .thenReturn(settlement);
 
+        setAuthentication("settlement:query");
+        authorizer.checkReadAccess("SETTLEMENT", 70001L);
+        setAuthentication("settlement:edit");
         authorizer.checkUploadAccess("SETTLEMENT", 70001L);
+        authorizer.checkDeleteAccess("SETTLEMENT", 70001L);
 
+        verify(projectAccessChecker).checkAccess(10006L, "读取结算单文件");
         verify(projectAccessChecker).checkAccess(10006L, "写入结算单文件");
+        verify(projectAccessChecker).checkAccess(10006L, "删除结算单文件");
+        verify(settlementMapper, times(2))
+                .selectByIdForUpdate(70001L, TestUserContext.TENANT_0);
+    }
+
+    @Test
+    void settlementMutationRequiresEditAndEditableStatus() {
+        TestUserContext.setUser(TestUserContext.TENANT_0, 9L, "settlement-user", List.of("USER"));
+        StlSettlement settlement = new StlSettlement();
+        settlement.setTenantId(TestUserContext.TENANT_0);
+        settlement.setProjectId(10006L);
+        settlement.setApprovalStatus("APPROVING");
+        when(settlementMapper.selectByIdForUpdate(70002L, TestUserContext.TENANT_0))
+                .thenReturn(settlement);
+
+        setAuthentication("settlement:query");
+        assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess("SETTLEMENT", 70002L));
+        setAuthentication("settlement:edit");
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess("SETTLEMENT", 70002L));
+        assertEquals("SETTLEMENT_DOCUMENT_IMMUTABLE", exception.getCode());
     }
 
     @Test

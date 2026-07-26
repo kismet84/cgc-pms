@@ -74,3 +74,15 @@ test('keeps the M4 public context contract in the shared V2 shell', async ({ pag
   await expect.poll(() => new URL(page.url()).search).toBe('')
   await expect(page.getByText(/请(?:先)?选择项目/)).toHaveCount(0)
 })
+
+test('removes unavailable context values from the URL after options load', async ({ page }) => {
+  await install(page)
+  await page.goto('/v2/dashboard?projectId=missing&period=1900-01')
+
+  await expect.poll(() => new URL(page.url()).search).toBe('')
+  await expect(page.locator('#global-project')).toHaveAttribute('aria-label', '当前项目：全部项目')
+  await expect(page.locator('#global-report-period')).toHaveAttribute(
+    'aria-label',
+    '报告期：全部报告期',
+  )
+})

@@ -198,6 +198,21 @@ class StlSettlementQueryServiceTest {
         assertEquals(0, page.getTotal());
     }
 
+    @Test @DisplayName("getPage — 结算状态和审批状态由服务端组合过滤")
+    void testGetPage_FilterByStatuses() {
+        StlSettlement stored = settlementMapper.selectById(settlementId);
+        IPage<StlSettlementVO> page = queryService.getPage(
+                1, 10, PROJECT_ID, CONTRACT_ID, null, null, null,
+                stored.getSettlementStatus(), stored.getApprovalStatus(), null);
+        assertTrue(page.getRecords().stream()
+                .anyMatch(item -> String.valueOf(settlementId).equals(item.getId())));
+
+        IPage<StlSettlementVO> empty = queryService.getPage(
+                1, 10, PROJECT_ID, CONTRACT_ID, null, null, null,
+                "NOT_A_STATUS", stored.getApprovalStatus(), null);
+        assertEquals(0, empty.getTotal());
+    }
+
     // ================================================================
     // getKpi
     // ================================================================
@@ -253,6 +268,9 @@ class StlSettlementQueryServiceTest {
     @DisplayName("结算来源金额序列化为字符串")
     void testSettlementSourceAmountsSerializeAsStrings() {
         JsonNode json = objectMapper.valueToTree(queryService.getSources(settlementId));
+        assertTrue(json.path("varOrders").get(0).path("id").isTextual());
+        assertTrue(json.path("subMeasures").get(0).path("id").isTextual());
+        assertTrue(json.path("payRecords").get(0).path("id").isTextual());
         assertTrue(json.path("varOrders").get(0).path("confirmedAmount").isTextual());
         assertTrue(json.path("subMeasures").get(0).path("approvedAmount").isTextual());
         assertTrue(json.path("payRecords").get(0).path("payAmount").isTextual());
@@ -291,6 +309,13 @@ class StlSettlementQueryServiceTest {
         assertThrows(BusinessException.class, () -> queryService.getAttachments(settlementId));
         assertThrows(BusinessException.class, () -> queryService.getApprovalRecords(settlementId));
         assertThrows(BusinessException.class, () -> queryService.previewAmountBaseline(1, 50));
+        StlSettlementVO listRow = queryService.getPage(
+                        1, 50, PROJECT_ID, null, null, null, null, null)
+                .getRecords().stream()
+                .filter(item -> String.valueOf(settlementId).equals(item.getId()))
+                .findFirst()
+                .orElseThrow();
+        assertNull(listRow.getContractName(), "跨项目合同名称不得通过列表名称解析泄露");
     }
 
     @Test
@@ -340,11 +365,12 @@ class StlSettlementQueryServiceTest {
                         && item.getApplyCode().startsWith("PAY-SETTLEMENT-QUERY-")));
         SettlementSourcesVO sources = queryService.getSources(settlementId);
         assertTrue(sources.getVarOrders().stream()
-                .noneMatch(item -> variationId.equals(item.getId())));
+                .noneMatch(item -> String.valueOf(variationId).equals(item.getId())));
         assertTrue(sources.getSubMeasures().stream()
-                .noneMatch(item -> measureId.equals(item.getId())));
+                .noneMatch(item -> String.valueOf(measureId).equals(item.getId())));
         assertTrue(sources.getPayRecords().stream()
-                .noneMatch(item -> paymentRecordIds.contains(item.getId())));
+                .noneMatch(item -> paymentRecordIds.stream()
+                        .map(String::valueOf).toList().contains(item.getId())));
     }
 
     // ================================================================
@@ -410,6 +436,7 @@ class StlSettlementQueryServiceTest {
     void testGetSources() {
         var sources = queryService.getSources(settlementId);
         assertNotNull(sources);
+        assertNotNull(sources.getContractItems());
         assertNotNull(sources.getVarOrders());
         assertNotNull(sources.getSubMeasures());
         assertNotNull(sources.getPayRecords());

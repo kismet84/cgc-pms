@@ -125,7 +125,7 @@ class CashJournalArchiveTest {
         CashJournalUpdateRequest bind = new CashJournalUpdateRequest();
         bind.setAccountId(accountId);
 
-        assertEquals("CASH_JOURNAL_BEFORE_ACCOUNT_OPENING_DATE",
+        assertEquals("CASH_JOURNAL_SOURCE_ACCOUNT_IMMUTABLE",
                 assertThrows(BusinessException.class, () -> journalService.updateDraft(entryId, bind)).getCode());
 
         CashJournalEntry legacy = entryMapper.selectById(entryId);
@@ -168,6 +168,7 @@ class CashJournalArchiveTest {
         file.setContentType("application/pdf");
         file.setStoragePath("CASH_JOURNAL/" + entryId + "/" + fileId + ".pdf");
         file.setBucketName("test");
+        file.setVirusScanStatus("CLEAN");
         fileMapper.insert(file);
     }
 }

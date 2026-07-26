@@ -1019,6 +1019,16 @@
 }
 
 @media (max-width: 48rem) {
+  .v2-card--page-heading > .v2-card__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .v2-card--page-heading > .v2-card__header > .v2-card__actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
   .v2-button:not(.v2-button--small),
   .v2-field__control {
     min-height: var(--v2-control-height-touch);

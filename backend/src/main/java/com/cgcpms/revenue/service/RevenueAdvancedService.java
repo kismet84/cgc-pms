@@ -2,9 +2,11 @@ package com.cgcpms.revenue.service;
 
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.accounting.service.AccountingEntryService;
+import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.cashbook.service.CashJournalService;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.*;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -32,34 +34,53 @@ public class RevenueAdvancedService {
     private final RevenueOperationsService core;
     private final CashJournalService cashJournalService;
     private final AccountingEntryService accountingEntryService;
+    private final ProjectAccessChecker projectAccessChecker;
+    private final AccountingPeriodGuard periodGuard;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> creditReceivable(Long receivableId, ReceivableCreditRequest request) {
-        Map<String,Object> existing = one("SELECT * FROM receivable_adjustment WHERE tenant_id=? AND idempotency_key=?", tenant(), request.idempotencyKey());
-        if (existing != null) return existing;
+        String idempotencyKey = request.idempotencyKey().trim();
+        String reason = request.reason().trim();
+        BigDecimal amount = money(request.amount());
         Map<String,Object> ar = one("SELECT * FROM account_receivable WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE", receivableId, tenant());
         if (ar == null) throw error("RECEIVABLE_NOT_FOUND", "应收不存在");
-        BigDecimal amount = money(request.amount());
+        projectAccessChecker.checkAccess(longValue(ar.get("project_id")), "冲减应收款");
+        Map<String,Object> existing = one("SELECT * FROM receivable_adjustment WHERE tenant_id=? AND idempotency_key=?", tenant(), idempotencyKey);
+        if (existing != null) return requireSameCredit(existing, receivableId, amount, reason);
         BigDecimal outstanding = decimal(ar.get("outstanding_amount"));
         if (amount.compareTo(outstanding) > 0) throw error("RECEIVABLE_CREDIT_EXCEEDED", "冲减金额不能超过应收余额");
         BigDecimal remaining = outstanding.subtract(amount);
         String status = remaining.signum() == 0 ? "CREDITED" : "PARTIALLY_COLLECTED";
         Long id = IdWorker.getId();
-        jdbc.update("INSERT INTO receivable_adjustment(id,tenant_id,receivable_id,adjustment_type,amount,reason,idempotency_key,status,created_by,created_at) VALUES(?,?,?,'CREDIT',?,?,?,'COMPLETED',?,CURRENT_TIMESTAMP)",
-                id,tenant(),receivableId,amount,request.reason().trim(),request.idempotencyKey().trim(),user());
+        try {
+            jdbc.update("INSERT INTO receivable_adjustment(id,tenant_id,receivable_id,adjustment_type,amount,reason,idempotency_key,status,created_by,created_at) VALUES(?,?,?,'CREDIT',?,?,?,'COMPLETED',?,CURRENT_TIMESTAMP)",
+                    id,tenant(),receivableId,amount,reason,idempotencyKey,user());
+        } catch (DuplicateKeyException e) {
+            throw error("RECEIVABLE_CREDIT_IDEMPOTENCY_CONFLICT", "冲减幂等键已被其他业务使用");
+        }
         jdbc.update("UPDATE account_receivable SET credited_amount=credited_amount+?,outstanding_amount=?,status=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                 amount,remaining,status,user(),receivableId,tenant());
-        audit("RECEIVABLE_CREDIT","ACCOUNT_RECEIVABLE",receivableId,longValue(ar.get("project_id")),Map.of("amount",amount,"reason",request.reason()));
+        audit("RECEIVABLE_CREDIT","ACCOUNT_RECEIVABLE",receivableId,longValue(ar.get("project_id")),Map.of("amount",amount,"reason",reason));
         return one("SELECT * FROM receivable_adjustment WHERE id=?",id);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> reverseCollection(Long collectionId, CollectionReverseRequest request) {
-        Map<String,Object> done = one("SELECT * FROM collection_reversal WHERE tenant_id=? AND idempotency_key=?",tenant(),request.idempotencyKey());
-        if (done != null) return done;
+        String idempotencyKey = request.idempotencyKey().trim();
+        String reason = request.reason().trim();
         Map<String,Object> collection = one("SELECT * FROM collection_record WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE",collectionId,tenant());
         if (collection == null) throw error("COLLECTION_NOT_FOUND","回款不存在");
+        projectAccessChecker.checkAccess(longValue(collection.get("project_id")), "冲销回款");
+        Map<String,Object> done = one("SELECT * FROM collection_reversal WHERE tenant_id=? AND idempotency_key=?",tenant(),idempotencyKey);
+        if (done != null) return requireSameReversal(done, collectionId, reason);
         if (!"SUCCESS".equals(collection.get("status"))) throw error("COLLECTION_NOT_REVERSIBLE","只有成功且未冲销的回款可以冲销");
+        Long reversalId=IdWorker.getId();
+        try {
+            jdbc.update("INSERT INTO collection_reversal(id,tenant_id,collection_id,idempotency_key,reason,status,created_by,created_at) VALUES(?,?,?,?,?,'COMPLETED',?,CURRENT_TIMESTAMP)",
+                    reversalId,tenant(),collectionId,idempotencyKey,reason,user());
+        } catch (DuplicateKeyException e) {
+            throw error("COLLECTION_REVERSAL_IDEMPOTENCY_CONFLICT", "冲销幂等键已被其他业务使用");
+        }
         List<Map<String,Object>> allocations = jdbc.queryForList("SELECT * FROM collection_allocation WHERE tenant_id=? AND collection_id=? AND allocation_type='COLLECTION'",tenant(),collectionId);
         for (Map<String,Object> allocation : allocations) {
             Long arId = longValue(allocation.get("receivable_id"));
@@ -71,22 +92,22 @@ public class RevenueAdvancedService {
             jdbc.update("UPDATE account_receivable SET collected_amount=collected_amount-?,outstanding_amount=?,status='OPEN',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                     amount,restored,user(),arId,tenant());
         }
-        Long reversalId=IdWorker.getId();
-        jdbc.update("INSERT INTO collection_reversal(id,tenant_id,collection_id,idempotency_key,reason,status,created_by,created_at) VALUES(?,?,?,?,?,'COMPLETED',?,CURRENT_TIMESTAMP)",
-                reversalId,tenant(),collectionId,request.idempotencyKey().trim(),request.reason().trim(),user());
         jdbc.update("UPDATE collection_record SET status='REVERSED',reversed_at=CURRENT_TIMESTAMP,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",user(),collectionId,tenant());
-        Map<String,Object> journal=one("SELECT id,status FROM cash_journal_entry WHERE tenant_id=? AND collection_record_id=? AND deleted_flag=0",tenant(),collectionId);
+        Map<String,Object> journal=one("SELECT id,status,business_date FROM cash_journal_entry WHERE tenant_id=? AND collection_record_id=? AND deleted_flag=0",tenant(),collectionId);
         if (journal!=null) {
             Long journalId=longValue(journal.get("id"));
-            if ("ARCHIVED".equals(journal.get("status"))) cashJournalService.reverse(journalId,request.reason());
-            else jdbc.update("UPDATE cash_journal_entry SET status='REVERSED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",user(),journalId,tenant());
+            if ("ARCHIVED".equals(journal.get("status"))) cashJournalService.reverse(journalId,reason);
+            else {
+                periodGuard.assertWritable(localDate(journal.get("business_date")));
+                jdbc.update("UPDATE cash_journal_entry SET status='REVERSED',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",user(),journalId,tenant());
+            }
         }
         Map<String,Object> entry=one("SELECT id,entry_status FROM accounting_entry WHERE tenant_id=? AND collection_record_id=? AND deleted_flag=0",tenant(),collectionId);
         if(entry!=null && !"REVERSED".equals(entry.get("entry_status"))) {
             if("POSTED".equals(entry.get("entry_status"))) accountingEntryService.reverse(longValue(entry.get("id")));
             else jdbc.update("UPDATE accounting_entry SET entry_status='REVERSED',reversed_at=CURRENT_TIMESTAMP,version=version+1 WHERE id=?",longValue(entry.get("id")));
         }
-        audit("COLLECTION_REVERSED","COLLECTION_RECORD",collectionId,longValue(collection.get("project_id")),Map.of("reason",request.reason()));
+        audit("COLLECTION_REVERSED","COLLECTION_RECORD",collectionId,longValue(collection.get("project_id")),Map.of("reason",reason));
         return one("SELECT * FROM collection_reversal WHERE id=?",reversalId);
     }
 
@@ -188,6 +209,21 @@ public class RevenueAdvancedService {
     private BigDecimal agingBucket(Long projectId,int min,int max){BigDecimal total=BigDecimal.ZERO;for(Map<String,Object>row:jdbc.queryForList("SELECT due_date,outstanding_amount FROM account_receivable WHERE tenant_id=? AND project_id=? AND deleted_flag=0 AND outstanding_amount>0",tenant(),projectId)){long days=ChronoUnit.DAYS.between(localDate(row.get("due_date")),LocalDate.now());if(days>=min&&days<=max)total=total.add(decimal(row.get("outstanding_amount")));}return total.setScale(2,RoundingMode.HALF_UP);}
     private int insertIssues(Long runId,String query){List<Map<String,Object>>rows=jdbc.queryForList(query,tenant());for(Map<String,Object>r:rows)jdbc.update("INSERT INTO revenue_reconciliation_issue(id,tenant_id,run_id,dimension_type,business_id,issue_code,expected_amount,actual_amount,status,detail,created_at) VALUES(?,?,?,?,?,?,?,?,'OPEN',?,CURRENT_TIMESTAMP)",IdWorker.getId(),tenant(),runId,r.get("dimension_type"),r.get("business_id"),r.get("issue_code"),r.get("expected_amount"),r.get("actual_amount"),r.get("detail"));return rows.size();}
     private void audit(String event,String type,Long businessId,Long projectId,Object payload){String body=json(payload);jdbc.update("INSERT INTO revenue_audit_event(id,tenant_id,event_type,business_type,business_id,project_id,operator_id,event_at,archive_bucket,payload_json,payload_hash) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP,'HOT',?,?)",IdWorker.getId(),tenant(),event,type,businessId,projectId,user(),body,sha256(body));}
+    private Map<String,Object> requireSameCredit(Map<String,Object> existing,Long receivableId,BigDecimal amount,String reason){
+        if(!Objects.equals(longValue(existing.get("receivable_id")),receivableId)
+                || decimal(existing.get("amount")).compareTo(amount)!=0
+                || !Objects.equals(String.valueOf(existing.get("reason")),reason)){
+            throw error("RECEIVABLE_CREDIT_IDEMPOTENCY_CONFLICT","冲减幂等键已被不同业务数据使用");
+        }
+        return existing;
+    }
+    private Map<String,Object> requireSameReversal(Map<String,Object> existing,Long collectionId,String reason){
+        if(!Objects.equals(longValue(existing.get("collection_id")),collectionId)
+                || !Objects.equals(String.valueOf(existing.get("reason")),reason)){
+            throw error("COLLECTION_REVERSAL_IDEMPOTENCY_CONFLICT","冲销幂等键已被不同业务数据使用");
+        }
+        return existing;
+    }
     private String json(Object value){if(value==null)return null;try{return objectMapper.writeValueAsString(value);}catch(JsonProcessingException e){throw error("REVENUE_JSON_INVALID","收入业务数据无法序列化");}}
     private String sha256(String value){try{byte[] hash=MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));return java.util.HexFormat.of().formatHex(hash);}catch(Exception e){throw new IllegalStateException(e);}}
     private Map<String,Object> one(String sql,Object...args){try{return jdbc.queryForMap(sql,args);}catch(EmptyResultDataAccessException e){return null;}}

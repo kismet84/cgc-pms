@@ -8,6 +8,7 @@ import com.cgcpms.financeclose.dto.FinancialCloseModels.CloseRequest;
 import com.cgcpms.financeclose.dto.FinancialCloseModels.PeriodRequest;
 import com.cgcpms.financeclose.dto.FinancialCloseModels.ReopenRequest;
 import com.cgcpms.financeclose.service.FinancialCloseService;
+import com.cgcpms.financeops.vo.FinanceWorkspaceVOs.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,6 +22,37 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class FinancialCloseController {
     private final FinancialCloseService service;
+
+    @GetMapping("/workspace")
+    @PreAuthorize("hasAuthority('finance:close:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<FinancePeriodVO>> workspace(@RequestParam(required=false) Integer year){
+        return ApiResponse.success(service.periods(year).stream().map(FinancePeriodVO::from).toList());
+    }
+
+    @GetMapping("/workspace/{id}")
+    @PreAuthorize("hasAuthority('finance:close:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @SuppressWarnings("unchecked")
+    public ApiResponse<FinancialCloseTraceVO> workspaceTrace(@PathVariable Long id){
+        Map<String,Object> trace=service.trace(id);
+        return ApiResponse.success(new FinancialCloseTraceVO(
+                FinancePeriodVO.from((Map<String,Object>)trace.get("period")),
+                ((List<Map<String,Object>>)trace.get("checks")).stream().map(PeriodCheckVO::from).toList(),
+                ((List<Map<String,Object>>)trace.get("accountReconciliations")).stream().map(ReconciliationVO::from).toList(),
+                ((List<Map<String,Object>>)trace.get("bankReconciliations")).stream().map(ReconciliationVO::from).toList(),
+                ((List<Map<String,Object>>)trace.get("entries")).stream().map(AccountingEntryVO::from).toList()));
+    }
+
+    @GetMapping("/workspace/{year}/{month}/statements")
+    @PreAuthorize("hasAuthority('finance:close:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @SuppressWarnings("unchecked")
+    public ApiResponse<FinancialStatementVO> workspaceStatements(@PathVariable int year,@PathVariable int month){
+        Map<String,Object> statement=service.statements(year,month);
+        return ApiResponse.success(new FinancialStatementVO(
+                FinancePeriodVO.from((Map<String,Object>)statement.get("period")),
+                ((List<Map<String,Object>>)statement.get("trialBalance")).stream().map(TrialBalanceVO::from).toList(),
+                statement.get("receivableOutstanding").toString(),statement.get("payableOutstanding").toString(),
+                CashFlowVO.from((Map<String,Object>)statement.get("cashFlow"))));
+    }
 
     @GetMapping("/periods")
     @PreAuthorize("hasAuthority('finance:close:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")

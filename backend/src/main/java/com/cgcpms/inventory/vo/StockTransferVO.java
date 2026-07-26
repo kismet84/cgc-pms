@@ -1,5 +1,7 @@
 package com.cgcpms.inventory.vo;
 
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -16,8 +18,11 @@ public class StockTransferVO implements Serializable {
     private Long sourceWarehouseId;
     private Long targetWarehouseId;
     private Long materialId;
+    @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal quantity;
+    @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal unitCost;
+    @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal amount;
     private String idempotencyKey;
     private String status;

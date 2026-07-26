@@ -100,6 +100,7 @@ class ProductionMeasurementClosedLoopIntegrationTest {
         assertEquals(new BigDecimal("20.00"), jdbc.queryForObject("SELECT deducted_amount FROM owner_settlement WHERE id=?", BigDecimal.class, settlementId));
         assertEquals(submissionId, jdbc.queryForObject("SELECT owner_submission_id FROM owner_settlement WHERE id=?", Long.class, settlementId));
 
+        addCleanFile("OWNER_SETTLEMENT", settlementId, "OWNER_CONFIRMATION");
         revenueService.submitSettlement(settlementId);
         approveAll("OWNER_SETTLEMENT", settlementId);
         assertEquals("RECEIVABLE_CREATED", jdbc.queryForObject("SELECT status FROM owner_settlement WHERE id=?", String.class, settlementId));
@@ -308,7 +309,7 @@ class ProductionMeasurementClosedLoopIntegrationTest {
     @SuppressWarnings("unchecked") private static Map<String, Object> cast(Object value) { return (Map<String, Object>) value; }
 
     private void cleanup() {
-        jdbc.update("DELETE FROM sys_file WHERE (business_type='PRODUCTION_MEASUREMENT' AND business_id IN(SELECT id FROM production_measurement WHERE project_id=?)) OR (business_type='OWNER_MEASUREMENT_SUBMISSION' AND business_id IN(SELECT id FROM owner_measurement_submission WHERE project_id=?))", PROJECT, PROJECT);
+        jdbc.update("DELETE FROM sys_file WHERE (business_type='PRODUCTION_MEASUREMENT' AND business_id IN(SELECT id FROM production_measurement WHERE project_id=?)) OR (business_type='OWNER_MEASUREMENT_SUBMISSION' AND business_id IN(SELECT id FROM owner_measurement_submission WHERE project_id=?)) OR (business_type='OWNER_SETTLEMENT' AND business_id IN(SELECT id FROM owner_settlement WHERE project_id=?))", PROJECT, PROJECT, PROJECT);
         jdbc.update("DELETE FROM account_receivable WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM owner_settlement WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM owner_measurement_review_line WHERE submission_id IN(SELECT id FROM owner_measurement_submission WHERE project_id=?)", PROJECT);

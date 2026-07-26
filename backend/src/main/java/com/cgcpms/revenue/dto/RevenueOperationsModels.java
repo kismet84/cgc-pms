@@ -19,7 +19,7 @@ public final class RevenueOperationsModels {
             @NotNull @PositiveOrZero @Digits(integer=16, fraction=2) BigDecimal taxAmount,
             @NotNull @PositiveOrZero @Digits(integer=16, fraction=2) BigDecimal retentionAmount,
             @NotNull LocalDate dueDate, @NotNull Long customerId,
-            @NotNull @Min(1) Integer attachmentCount, String remark) {}
+            @PositiveOrZero Integer attachmentCount, String remark) {}
 
     public record AmountAllocation(@NotNull Long receivableId,
                                    @NotNull @Positive @Digits(integer=16, fraction=2) BigDecimal amount) {}

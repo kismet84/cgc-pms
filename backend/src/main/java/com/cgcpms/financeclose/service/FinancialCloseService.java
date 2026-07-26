@@ -10,6 +10,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.financeclose.dto.FinancialCloseModels.AdjustmentRequest;
 import com.cgcpms.financeclose.dto.FinancialCloseModels.BankResolveRequest;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -23,12 +24,12 @@ import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 @Service
@@ -39,6 +40,7 @@ public class FinancialCloseService {
     private final AccountingEntryMapper entryMapper;
     private final AccountingEntryLineMapper lineMapper;
     private final AccountingPeriodGuard periodGuard;
+    private final ProjectAccessChecker projectAccessChecker;
 
     public List<Map<String, Object>> periods(Integer year) {
         return jdbc.queryForList("SELECT * FROM finance_period WHERE tenant_id=? AND (? IS NULL OR fiscal_year=?) ORDER BY fiscal_year DESC,fiscal_month DESC",
@@ -64,14 +66,19 @@ public class FinancialCloseService {
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> runChecks(int year, int month) {
-        Map<String, Object> period = ensurePeriod(year, month);
+        ensurePeriod(year, month);
+        return runChecksLocked(requiredPeriodForUpdate(year, month));
+    }
+
+    private Map<String, Object> runChecksLocked(Map<String, Object> period) {
         String originalStatus = String.valueOf(period.get("status"));
         if ("CLOSED".equals(originalStatus)) throw error("FINANCE_PERIOD_CLOSED", "已结账期间不能重复检查，请先反结账");
         Long periodId = longValue(period.get("id"));
         LocalDate start = date(period.get("start_date"));
         LocalDate end = date(period.get("end_date"));
         LocalDate endExclusive = end.plusDays(1);
-        jdbc.update("UPDATE finance_period SET status='CHECKING',version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=?", periodId);
+        updatePeriod("UPDATE finance_period SET status='CHECKING',version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                periodId, tenant());
         jdbc.update("DELETE FROM finance_period_check WHERE tenant_id=? AND period_id=?", tenant(), periodId);
         jdbc.update("DELETE FROM finance_account_reconciliation WHERE tenant_id=? AND period_id=?", tenant(), periodId);
         jdbc.update("DELETE FROM finance_bank_reconciliation WHERE tenant_id=? AND period_id=?", tenant(), periodId);
@@ -91,27 +98,27 @@ public class FinancialCloseService {
         issues += buildAccountReconciliation(periodId, "AP", start, endExclusive);
 
         String nextStatus = "REOPENED".equals(originalStatus) ? "REOPENED" : "OPEN";
-        jdbc.update("UPDATE finance_period SET status=?,last_check_at=CURRENT_TIMESTAMP,issue_count=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                nextStatus, issues, periodId);
+        updatePeriod("UPDATE finance_period SET status=?,last_check_at=CURRENT_TIMESTAMP,issue_count=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                nextStatus, issues, periodId, tenant());
         audit("FINANCE_PERIOD_CHECKED", "FINANCE_PERIOD", periodId, Map.of("issueCount", issues));
         return trace(periodId);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> close(int year, int month, String comment) {
-        Map<String, Object> period = requiredPeriod(year, month);
+        Map<String, Object> period = requiredPeriodForUpdate(year, month);
         if ("CLOSED".equals(period.get("status"))) throw error("FINANCE_PERIOD_ALREADY_CLOSED", "会计期间已结账");
         if (period.get("last_check_at") == null) throw error("FINANCE_PERIOD_CHECK_REQUIRED", "月结前必须运行完整性检查");
+        if (((Number) period.get("issue_count")).intValue() > 0) throw error("FINANCE_PERIOD_ISSUES_EXIST", "月结检查存在未解决异常，禁止结账");
+        runChecksLocked(period);
+        period = requiredPeriodForUpdate(year, month);
         if (((Number) period.get("issue_count")).intValue() > 0) throw error("FINANCE_PERIOD_ISSUES_EXIST", "月结检查存在未解决异常，禁止结账");
         Long id = longValue(period.get("id"));
         LocalDate start = date(period.get("start_date"));
         LocalDate end = date(period.get("end_date"));
-        LocalDateTime checkedAt = dateTime(period.get("last_check_at"));
-        int changed = count("SELECT COUNT(*) FROM accounting_entry WHERE tenant_id=? AND entry_date BETWEEN ? AND ? AND deleted_flag=0 AND updated_at>?", tenant(), start, end, checkedAt);
-        if (changed > 0) throw error("FINANCE_PERIOD_CHECK_STALE", "检查后凭证发生变化，请重新运行月结检查");
         jdbc.update("UPDATE accounting_entry SET period_id=? WHERE tenant_id=? AND entry_date BETWEEN ? AND ? AND deleted_flag=0", id, tenant(), start, end);
-        jdbc.update("UPDATE finance_period SET status='CLOSED',closed_by=?,closed_at=CURRENT_TIMESTAMP,close_comment=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                user(), blank(comment), id);
+        updatePeriod("UPDATE finance_period SET status='CLOSED',closed_by=?,closed_at=CURRENT_TIMESTAMP,close_comment=?,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                user(), blank(comment), id, tenant());
         audit("FINANCE_PERIOD_CLOSED", "FINANCE_PERIOD", id, Map.of("comment", comment == null ? "" : comment));
         return trace(id);
     }
@@ -119,11 +126,11 @@ public class FinancialCloseService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> reopen(int year, int month, String reason) {
         if (reason == null || reason.isBlank()) throw error("FINANCE_REOPEN_REASON_REQUIRED", "反结账必须填写原因");
-        Map<String, Object> period = requiredPeriod(year, month);
+        Map<String, Object> period = requiredPeriodForUpdate(year, month);
         if (!"CLOSED".equals(period.get("status"))) throw error("FINANCE_PERIOD_NOT_CLOSED", "仅已结账期间可反结账");
         Long id = longValue(period.get("id"));
-        jdbc.update("UPDATE finance_period SET status='REOPENED',reopened_by=?,reopened_at=CURRENT_TIMESTAMP,reopen_reason=?,last_check_at=NULL,issue_count=0,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                user(), reason.trim(), id);
+        updatePeriod("UPDATE finance_period SET status='REOPENED',reopened_by=?,reopened_at=CURRENT_TIMESTAMP,reopen_reason=?,last_check_at=NULL,issue_count=0,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
+                user(), reason.trim(), id, tenant());
         audit("FINANCE_PERIOD_REOPENED", "FINANCE_PERIOD", id, Map.of("reason", reason.trim()));
         return trace(id);
     }
@@ -139,18 +146,51 @@ public class FinancialCloseService {
         if (!expectedDirection.equals(row.get("direction"))) throw error("BANK_RECONCILIATION_DIRECTION_MISMATCH", "银行收支方向与业务类型不一致");
         String table = "PAY_RECORD".equals(type) ? "pay_record" : "collection_record";
         String amountColumn = "PAY_RECORD".equals(type) ? "pay_amount" : "amount";
-        Map<String, Object> business = one("SELECT " + amountColumn + " amount FROM " + table + " WHERE id=? AND tenant_id=? AND deleted_flag=0", request.businessId(), tenant());
+        String statusColumn = "PAY_RECORD".equals(type) ? "pay_status" : "status";
+        Map<String, Object> business = one("SELECT " + amountColumn + " amount,project_id,fund_account_id,"
+                + statusColumn + " business_status FROM " + table
+                + " WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE", request.businessId(), tenant());
         if (business == null) throw error("BANK_RECONCILIATION_BUSINESS_NOT_FOUND", "匹配业务记录不存在");
+        if (!"SUCCESS".equals(business.get("business_status"))) {
+            throw error("BANK_RECONCILIATION_BUSINESS_STATUS_INVALID", "仅成功收付款可参与银行对账");
+        }
+        projectAccessChecker.checkAccess(longValue(business.get("project_id")), "处理银行对账");
         BigDecimal bankAmount = money(row.get("bank_amount"));
         BigDecimal businessAmount = money(business.get("amount"));
         if (bankAmount.compareTo(businessAmount) != 0) throw error("BANK_RECONCILIATION_AMOUNT_MISMATCH", "银行回单金额与业务金额不一致");
-        Map<String, Object> journal = one("SELECT id FROM cash_journal_entry WHERE id=? AND tenant_id=? AND deleted_flag=0", request.cashJournalId(), tenant());
+        Map<String, Object> journal = one("SELECT id,direction,amount,project_id,account_id,pay_record_id,collection_record_id,status"
+                + " FROM cash_journal_entry WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE",
+                request.cashJournalId(), tenant());
         if (journal == null) throw error("BANK_RECONCILIATION_JOURNAL_NOT_FOUND", "现金日记账不存在");
         Long receiptId = longValue(row.get("bank_receipt_id"));
-        if ("PAY_RECORD".equals(type)) jdbc.update("UPDATE bank_receipt SET match_status='MATCHED',pay_record_id=?,collection_record_id=NULL,cash_journal_id=?,confidence=1,matched_at=CURRENT_TIMESTAMP WHERE id=?", request.businessId(), request.cashJournalId(), receiptId);
-        else jdbc.update("UPDATE bank_receipt SET match_status='MATCHED',collection_record_id=?,pay_record_id=NULL,cash_journal_id=?,confidence=1,matched_at=CURRENT_TIMESTAMP WHERE id=?", request.businessId(), request.cashJournalId(), receiptId);
-        jdbc.update("UPDATE finance_bank_reconciliation SET business_type=?,business_id=?,cash_journal_id=?,business_amount=?,difference_amount=0,status='RESOLVED',match_method='MANUAL',resolved_by=?,resolved_at=CURRENT_TIMESTAMP,resolution_note=? WHERE id=?",
-                type, request.businessId(), request.cashJournalId(), businessAmount, user(), request.note().trim(), reconciliationId);
+        Map<String, Object> receipt = one("SELECT id,match_status,direction,amount,project_id,fund_account_id"
+                + " FROM bank_receipt WHERE id=? AND tenant_id=? FOR UPDATE", receiptId, tenant());
+        if (receipt == null || !"EXCEPTION".equals(row.get("status"))
+                || !Set.of("UNMATCHED", "MANUAL_REVIEW").contains(String.valueOf(receipt.get("match_status")))) {
+            throw error("BANK_RECONCILIATION_CONCURRENT_MODIFICATION", "银行对账事实已变化，请刷新后重试");
+        }
+        Long expectedLink = "PAY_RECORD".equals(type)
+                ? longValue(journal.get("pay_record_id")) : longValue(journal.get("collection_record_id"));
+        if (!expectedDirection.equals(journal.get("direction"))
+                || !"ARCHIVED".equals(journal.get("status"))
+                || money(journal.get("amount")).compareTo(bankAmount) != 0
+                || !Objects.equals(expectedLink, request.businessId())
+                || !Objects.equals(longValue(journal.get("project_id")), longValue(business.get("project_id")))
+                || !Objects.equals(longValue(journal.get("account_id")), longValue(business.get("fund_account_id")))
+                || !expectedDirection.equals(receipt.get("direction"))
+                || money(receipt.get("amount")).compareTo(bankAmount) != 0
+                || (receipt.get("project_id") != null && !Objects.equals(longValue(receipt.get("project_id")), longValue(business.get("project_id"))))
+                || (receipt.get("fund_account_id") != null && !Objects.equals(longValue(receipt.get("fund_account_id")), longValue(business.get("fund_account_id"))))) {
+            throw error("BANK_RECONCILIATION_CONTEXT_MISMATCH", "回单、收付款与现金日记账事实不一致");
+        }
+        String receiptUpdate = "PAY_RECORD".equals(type)
+                ? "UPDATE bank_receipt SET match_status='MATCHED',pay_record_id=?,collection_record_id=NULL,cash_journal_id=?,confidence=1,matched_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND match_status IN ('UNMATCHED','MANUAL_REVIEW')"
+                : "UPDATE bank_receipt SET match_status='MATCHED',collection_record_id=?,pay_record_id=NULL,cash_journal_id=?,confidence=1,matched_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND match_status IN ('UNMATCHED','MANUAL_REVIEW')";
+        if (jdbc.update(receiptUpdate, request.businessId(), request.cashJournalId(), receiptId, tenant()) != 1
+                || jdbc.update("UPDATE finance_bank_reconciliation SET business_type=?,business_id=?,cash_journal_id=?,business_amount=?,difference_amount=0,status='RESOLVED',match_method='MANUAL',resolved_by=?,resolved_at=CURRENT_TIMESTAMP,resolution_note=? WHERE id=? AND tenant_id=? AND status='EXCEPTION'",
+                type, request.businessId(), request.cashJournalId(), businessAmount, user(), request.note().trim(), reconciliationId, tenant()) != 1) {
+            throw error("BANK_RECONCILIATION_CONCURRENT_MODIFICATION", "银行对账事实已变化，请刷新后重试");
+        }
         audit("BANK_RECONCILIATION_RESOLVED", "FINANCE_BANK_RECONCILIATION", reconciliationId, Map.of("businessType", type, "businessId", request.businessId()));
         return one("SELECT * FROM finance_bank_reconciliation WHERE id=?", reconciliationId);
     }
@@ -158,6 +198,7 @@ public class FinancialCloseService {
     @Transactional(rollbackFor = Exception.class)
     public AccountingEntry createAdjustment(AdjustmentRequest request) {
         periodGuard.assertWritable(request.entryDate());
+        validateAdjustmentDimensions(request);
         BigDecimal debit = request.lines().stream().filter(v -> "DEBIT".equalsIgnoreCase(v.direction())).map(v -> v.amount()).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal credit = request.lines().stream().filter(v -> "CREDIT".equalsIgnoreCase(v.direction())).map(v -> v.amount()).reduce(BigDecimal.ZERO, BigDecimal::add);
         if (debit.signum() <= 0 || debit.compareTo(credit) != 0) throw error("ADJUSTMENT_ENTRY_UNBALANCED", "调整凭证必须借贷平衡且金额大于零");
@@ -178,14 +219,33 @@ public class FinancialCloseService {
         return entry;
     }
 
+    private void validateAdjustmentDimensions(AdjustmentRequest request) {
+        if (request.projectId() != null) {
+            projectAccessChecker.checkAccess(request.projectId(), "创建调整凭证");
+        }
+        if (request.contractId() != null) {
+            if (request.projectId() == null || one("SELECT id FROM ct_contract WHERE id=? AND tenant_id=? AND project_id=? AND deleted_flag=0",
+                    request.contractId(), tenant(), request.projectId()) == null) {
+                throw error("ADJUSTMENT_CONTRACT_MISMATCH", "调整凭证合同不属于所选项目");
+            }
+        }
+        for (Long subjectId : request.lines().stream().map(v -> v.costSubjectId())
+                .filter(java.util.Objects::nonNull).distinct().toList()) {
+            if (one("SELECT id FROM cost_subject WHERE id=? AND tenant_id=? AND deleted_flag=0",
+                    subjectId, tenant()) == null) {
+                throw error("ADJUSTMENT_COST_SUBJECT_NOT_FOUND", "调整凭证成本科目不存在");
+            }
+        }
+    }
+
     public Map<String, Object> statements(int year, int month) {
         Map<String, Object> period = requiredPeriod(year, month);
         LocalDate start = date(period.get("start_date")); LocalDate end = date(period.get("end_date"));
         Map<String, Object> result = new LinkedHashMap<>(); result.put("period", period);
-        result.put("trialBalance", jdbc.queryForList("SELECT l.account_code,l.account_name,SUM(CASE WHEN l.direction='DEBIT' THEN l.amount ELSE 0 END) debit,SUM(CASE WHEN l.direction='CREDIT' THEN l.amount ELSE 0 END) credit FROM accounting_entry e JOIN accounting_entry_line l ON l.entry_id=e.id AND l.tenant_id=e.tenant_id WHERE e.tenant_id=? AND e.entry_date BETWEEN ? AND ? AND e.entry_status='POSTED' AND e.deleted_flag=0 AND l.deleted_flag=0 GROUP BY l.account_code,l.account_name ORDER BY l.account_code", tenant(), start, end));
+        result.put("trialBalance", jdbc.queryForList("SELECT l.account_code,l.account_name,SUM(CASE WHEN l.direction='DEBIT' THEN l.amount ELSE 0 END) debit,SUM(CASE WHEN l.direction='CREDIT' THEN l.amount ELSE 0 END) credit FROM accounting_entry e JOIN accounting_entry_line l ON l.entry_id=e.id AND l.tenant_id=e.tenant_id WHERE e.tenant_id=? AND e.entry_date BETWEEN ? AND ? AND e.entry_status IN ('POSTED','REVERSED') AND e.deleted_flag=0 AND l.deleted_flag=0 GROUP BY l.account_code,l.account_name ORDER BY l.account_code", tenant(), start, end));
         result.put("receivableOutstanding", amount("SELECT COALESCE(SUM(outstanding_amount),0) FROM account_receivable WHERE tenant_id=? AND deleted_flag=0", tenant()));
         result.put("payableOutstanding", amount("SELECT COALESCE(SUM(GREATEST(approved_amount-actual_pay_amount,0)),0) FROM pay_application WHERE tenant_id=? AND approval_status='APPROVED' AND deleted_flag=0", tenant()));
-        result.put("cashFlow", one("SELECT COALESCE(SUM(CASE WHEN direction='IN' THEN amount ELSE 0 END),0) inflow,COALESCE(SUM(CASE WHEN direction='OUT' THEN amount ELSE 0 END),0) outflow FROM cash_journal_entry WHERE tenant_id=? AND business_date BETWEEN ? AND ? AND deleted_flag=0", tenant(), start, end));
+        result.put("cashFlow", one("SELECT COALESCE(SUM(CASE WHEN direction='IN' THEN amount ELSE 0 END),0) inflow,COALESCE(SUM(CASE WHEN direction='OUT' THEN amount ELSE 0 END),0) outflow FROM cash_journal_entry WHERE tenant_id=? AND business_date BETWEEN ? AND ? AND status IN ('ARCHIVED','REVERSED') AND deleted_flag=0", tenant(), start, end));
         return result;
     }
 
@@ -233,17 +293,18 @@ public class FinancialCloseService {
 
     private int addCheck(Long periodId,String type,int issueCount,Object detail){jdbc.update("INSERT INTO finance_period_check(id,tenant_id,period_id,check_type,check_status,issue_count,detail_json,checked_by,checked_at) VALUES(?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",IdWorker.getId(),tenant(),periodId,type,issueCount==0?"PASS":"FAIL",issueCount,json(detail),user());return issueCount;}
     private Map<String,Object> requiredPeriod(int year,int month){validateYearMonth(year,month);Map<String,Object>v=period(year,month);if(v==null)throw error("FINANCE_PERIOD_NOT_FOUND","会计期间不存在");return v;}
+    private Map<String,Object> requiredPeriodForUpdate(int year,int month){validateYearMonth(year,month);Map<String,Object>v=one("SELECT * FROM finance_period WHERE tenant_id=? AND fiscal_year=? AND fiscal_month=? FOR UPDATE",tenant(),year,month);if(v==null)throw error("FINANCE_PERIOD_NOT_FOUND","会计期间不存在");return v;}
     private Map<String,Object> period(int year,int month){return one("SELECT * FROM finance_period WHERE tenant_id=? AND fiscal_year=? AND fiscal_month=?",tenant(),year,month);}
     private Map<String,Object> byId(Long id){Map<String,Object>v=one("SELECT * FROM finance_period WHERE id=? AND tenant_id=?",id,tenant());if(v==null)throw error("FINANCE_PERIOD_NOT_FOUND","会计期间不存在");return v;}
     private Map<String,Object> one(String sql,Object...args){List<Map<String,Object>>rows=jdbc.queryForList(sql,args);return rows.isEmpty()?null:rows.getFirst();}
     private int count(String sql,Object...args){Number v=jdbc.queryForObject(sql,Number.class,args);return v==null?0:v.intValue();}
+    private void updatePeriod(String sql,Object...args){if(jdbc.update(sql,args)!=1)throw error("FINANCE_PERIOD_CONCURRENT_MODIFICATION","会计期间已被其他操作修改，请刷新后重试");}
     private BigDecimal amount(String sql,Object...args){Object v=jdbc.queryForObject(sql,Object.class,args);return money(v);}
     private static BigDecimal money(Object v){return(v==null?BigDecimal.ZERO:new BigDecimal(v.toString())).setScale(2,RoundingMode.HALF_UP);}
     private Long tenant(){Long v=UserContext.getCurrentTenantId();if(v==null)throw error("TENANT_CONTEXT_REQUIRED","缺少租户上下文");return v;}
     private Long user(){return UserContext.getCurrentUserId();}
     private static Long longValue(Object v){return v==null?null:Long.valueOf(v.toString());}
     private static LocalDate date(Object v){if(v instanceof LocalDate value)return value;if(v instanceof java.sql.Date value)return value.toLocalDate();return LocalDate.parse(v.toString());}
-    private static LocalDateTime dateTime(Object v){if(v instanceof LocalDateTime value)return value;if(v instanceof java.sql.Timestamp value)return value.toLocalDateTime();return LocalDateTime.parse(v.toString().replace(' ','T'));}
     private static String blank(String v){return v==null||v.isBlank()?null:v.trim();}
     private static void validateYearMonth(int year,int month){if(year<2000||month<1||month>12)throw error("FINANCE_PERIOD_INVALID","会计期间年月不合法");}
     private void audit(String event,String type,Long id,Object payload){String body=json(payload);jdbc.update("INSERT INTO finance_audit_event(id,tenant_id,event_type,business_type,business_id,operator_id,event_at,archive_bucket,payload_json,payload_hash) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP,'HOT',?,?)",IdWorker.getId(),tenant(),event,type,id,user(),body,sha256(body));}
