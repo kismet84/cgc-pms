@@ -53,7 +53,7 @@ public class AuthController {
         this.meterRegistryProvider = meterRegistryProvider;
     }
 
-    @RateLimit(maxRequests = 5, windowSeconds = 60)
+    @RateLimit(maxRequests = 5, windowSeconds = 60, loginLockout = true)
     @AuditedOperation(type = "LOGIN")
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request,

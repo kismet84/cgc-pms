@@ -44,6 +44,7 @@ async function loadRequestModule(options: {
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  vi.unstubAllGlobals()
   mockLogout.mockReset()
   mockMessageError.mockReset()
   document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
@@ -161,6 +162,29 @@ describe('api request csrf header injection', () => {
 
     expect(capture).toHaveBeenCalledTimes(1)
     expect(capture.mock.calls[0]?.[0].headers.get('X-XSRF-TOKEN')).toBeUndefined()
+  })
+
+  it('posts client errors silently with csrf and credentials', async () => {
+    const requestModule = await loadRequestModule({ dev: false })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }))
+    vi.stubGlobal('fetch', fetchMock)
+    document.cookie = 'XSRF-TOKEN=csrf%20token'
+
+    await requestModule.postClientError({
+      app: 'LEGACY',
+      source: 'WINDOW',
+      kind: 'TYPE_ERROR',
+      fingerprint: 'a'.repeat(64),
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/env-api/client-errors',
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        headers: expect.objectContaining({ 'X-XSRF-TOKEN': 'csrf token' }),
+      }),
+    )
   })
 })
 

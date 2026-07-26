@@ -76,6 +76,13 @@ class SensitiveDataMaskingTest {
     }
 
     @Test
+    void fingerprintIsNeverLoggedInFull() {
+        String fingerprint = "a".repeat(64);
+        assertEquals("aaaaaaaa...", SensitiveDataUtils.maskFieldValue("fingerprint", fingerprint));
+        assertNotEquals(fingerprint, SensitiveDataUtils.maskFieldValue("fingerprint", fingerprint));
+    }
+
+    @Test
     void masksPasswordEqualsValue() {
         String result = SENSITIVE.matcher("password=secret123").replaceAll("$1=***MASKED***");
         assertEquals("password=***MASKED***", result);

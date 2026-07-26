@@ -6,7 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Rate-limit annotation for brute-force protection on sensitive endpoints.
+ * Rate-limit annotation for sensitive endpoints.
  * Supports multiple key dimensions: IP, USER, TENANT, IP_AND_ACCOUNT.
  */
 @Target(ElementType.METHOD)
@@ -21,4 +21,7 @@ public @interface RateLimit {
 
     /** Key dimension for rate limiting. Defaults to IP. */
     RateLimitKey key() default RateLimitKey.IP;
+
+    /** Whether this endpoint participates in login failure lockout. */
+    boolean loginLockout() default false;
 }

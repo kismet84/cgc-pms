@@ -293,7 +293,9 @@ describe('router lazy loading', () => {
     expect(route?.meta?.title).toBe('业务单据模板')
     expect(route?.meta?.adminOnly).toBe(true)
     expect(typeof route?.component).toBe('function')
-    expect(router.resolve('/system/document-templates').meta.permission).toBe('document:template:query')
+    expect(router.resolve('/system/document-templates').meta.permission).toBe(
+      'document:template:query',
+    )
   })
 
   it('registers dedicated approval done, cc and mine routes', () => {

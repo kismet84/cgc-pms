@@ -82,7 +82,7 @@ public final class SensitiveDataUtils {
         if (lower.contains("password") || lower.contains("pwd") || lower.contains("secret")) {
             return maskPassword();
         }
-        if (lower.contains("token")) {
+        if (lower.contains("token") || lower.contains("fingerprint")) {
             return maskToken(value);
         }
         if (lower.equals("bankaccountno") || lower.equals("bankaccount")) {

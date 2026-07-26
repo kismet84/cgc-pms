@@ -1,5 +1,39 @@
 # Current Focus
 
+## 2026-07-27 第55条主线支线：资金支出闭环本地收口
+
+- `PPCL-01`—`PPCL-10`完成本地根因整改和验收；`PPCL-11`的真实角色FLOW-001、负向、并发、迁移、权限和本地全量通过，同HEAD SHA CI待首次非Draft PR前执行。
+- PayRecord SUCCESS不消费预算；CashJournal ARCHIVED才转消耗和更新现金。合同预算分配、付款证据、发票不可变、凭证归档门、Dashboard权威口径及统一Trace已闭合。
+- 本地MySQL V224—V231成功；后端274类2292项、Legacy 133文件740项、V2 49文件361项、Chromium FLOW-001 1/1通过。
+- 当前状态：`LOCAL_PASS / CI_PENDING / PRODUCTION_BLOCKED`。新增后续项0、后续项净变化0、悬空0；同HEAD CI由既有PR门承接，不复制Issue。
+- 3项生产发布门未解除，生产不通过、禁止上线。未commit、push、PR、切正式入口、退役Legacy或操作生产。
+- 计划：`docs/plans/第55条主线-支线-资金支出闭环任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-支线-资金支出闭环收口验收报告.md`。
+
+## 2026-07-26 第55条主线支线：资金支出闭环S0标准冻结通过
+
+- `PROJECT-PAYMENT-CLOSED-LOOP` 保持唯一P0父项；`PPCL-01`—`PPCL-11` 仅为父项内部验收子键，不复制进 `current-issues.json`。
+- 13节点当前事实、来源型预算事件、付款成功/现金归档时点、`payment_document_link` 单锚点和S1—S4退出门已冻结。
+- S0仅文档验收通过；S1代码、migration、数据库、运行态和Git均未启动。活动事项18项、新增0、关闭0、净变化0、悬空0。
+- 计划：`docs/plans/第55条主线-支线-资金支出闭环任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-支线-资金支出闭环-S0标准冻结验收报告.md`。
+
+## 2026-07-26 第55条主线 M2：待确认维护项裁决通过
+
+- `CODE-001` 有据关闭：查询拆分只令原服务减少2个直接依赖，却新增6依赖服务和Controller双注入；无量化运行时、回归或金额安全收益，`PayApplicationService` 未修改。
+- `CODE-002` 已关闭：3处 `@MockBean` 等价迁移为既有 `@MockitoBean`；生产及测试各1处无行为 `useFastMode()` 删除，默认fast-mode与PDF安全回归保持。
+- `AUDIT-PROMETHEUS-SCRAPE-AUTH/OBS-002` 保持 `NEEDS_CONFIRMATION`；`DEV-001` 保持 `NEEDS_CONFIRMATION`。两项沿用原稳定键等待目标网络、Secret/轮换责任或一次性MySQL 8 TLS运行证据。
+- 后端定向28项、全量273类2273项及补充renderer spike 2项通过；Compose静态检查与`git diff --check`通过。新增0、关闭2、净变化-2、悬空0；活动事项18项。
+- M2本地通过；3项生产发布门及资金支出闭环P0未解除，生产不通过、禁止上线。未commit、push、PR、切正式入口、退役Legacy或操作生产。
+- 计划：`docs/plans/第55条主线-M2-待确认维护项裁决任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-M2-待确认维护项裁决验收报告.md`。
+
+## 2026-07-26 第55条主线 M1：已确认本地问题整改通过
+
+- `AUDIT-FINANCE-RECONCILIATION-ATOMICITY`、`OBS-001`、`TEST-001`、`GOV-001`、`FE-001` 五项完成本地根因整改、全量验证和独立安全复核。
+- 财务调度按租户/操作独立事务，失败全回滚且不阻断后续；两端只上报固定枚举和本地指纹，后端认证、限流、低基数指标及 Prometheus 规则成立。
+- 普通限流污染登录锁定状态的共享根因已关闭；全仓仅真实登录入口启用 `loginLockout`。JaCoCo instruction `80.64%`、branch `60.25%`，branch floor 提升至60%。
+- 后端273类2273项、Legacy 738项、V2 361项及两端静态门/构建/包体通过；Legacy lint 0 error/0 warning。
+- 新增0、关闭5、净变化-5、悬空0；现行问题源14项，第55条直接承接5项，活动事项19项。3项P0继续为`RELEASE_GATE`，生产不通过、禁止上线。
+- 计划：`docs/plans/第55条主线-M1-已确认本地问题整改任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-M1-已确认本地问题整改验收报告.md`。未commit、push、PR、切正式入口或操作生产。
+
 ## 2026-07-26 第55条主线支线：视觉组件治理关闭
 
 - 唯一设计标准、唯一预览、V3详情基线、共享弹窗结构、V2 Token和全页设计门已落地；全页复审阻塞项3/5/6/7/8整改通过。

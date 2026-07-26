@@ -266,8 +266,11 @@ async function handleDocumentPreview() {
 async function handleDocumentGenerate() {
   documentBusy.value = true
   try {
-    const marker = `${detail.value?.amountFormulaVersion ?? 'v1'}:${detail.value?.finalizedAt ?? 'finalized'}`
-      .replace(/[^A-Za-z0-9._:-]/g, '-')
+    const marker =
+      `${detail.value?.amountFormulaVersion ?? 'v1'}:${detail.value?.finalizedAt ?? 'finalized'}`.replace(
+        /[^A-Za-z0-9._:-]/g,
+        '-',
+      )
     const generated = await generateBusinessDocument(
       'SETTLEMENT',
       settlementId,
@@ -351,10 +354,7 @@ onMounted(() => {
         <a-button @click="goBack"><ArrowLeftOutlined />返回</a-button>
         <template v-if="detail">
           <a-button
-            v-if="
-              canGenerateDocument &&
-              ['APPROVING', 'APPROVED'].includes(detail.approvalStatus)
-            "
+            v-if="canGenerateDocument && ['APPROVING', 'APPROVED'].includes(detail.approvalStatus)"
             :loading="documentBusy"
             @click="handleDocumentPreview"
           >
@@ -372,7 +372,11 @@ onMounted(() => {
           >
             生成并归档PDF
           </a-button>
-          <a-button v-if="canViewDocumentHistory" :loading="documentHistoryLoading" @click="openDocumentHistory">
+          <a-button
+            v-if="canViewDocumentHistory"
+            :loading="documentHistoryLoading"
+            @click="openDocumentHistory"
+          >
             单据生成历史
           </a-button>
           <a-button

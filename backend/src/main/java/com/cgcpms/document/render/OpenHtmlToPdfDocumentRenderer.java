@@ -65,7 +65,6 @@ public class OpenHtmlToPdfDocumentRenderer implements DocumentRenderer {
     private byte[] renderInternal(String html) {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
-            builder.useFastMode();
             addConfiguredFont(builder);
             builder.useExternalResourceAccessControl(
                     (uri, type) -> uri != null && uri.startsWith("data:image/"),

@@ -66,7 +66,8 @@ function blankEditor(type: DocumentBusinessType): EditorForm {
     templateCode: '',
     templateName: '',
     businessType: type,
-    schemaVersion: catalog.value?.businessType === type ? catalog.value.schemaVersion : defaultSchema(type),
+    schemaVersion:
+      catalog.value?.businessType === type ? catalog.value.schemaVersion : defaultSchema(type),
     templateContent: `<html><body><h1>新业务单据</h1><p>{{${field}}}</p></body></html>`,
     fieldManifest: JSON.stringify([field], null, 2),
     remark: '',
@@ -79,15 +80,19 @@ const isAdmin = computed(() =>
   userStore.roles.some((role) => ['ADMIN', 'SUPER_ADMIN'].includes(String(role).toUpperCase())),
 )
 const canEdit = computed(() => isAdmin.value || userStore.hasPermission('document:template:edit'))
-const canPublish = computed(() => isAdmin.value || userStore.hasPermission('document:template:publish'))
+const canPublish = computed(
+  () => isAdmin.value || userStore.hasPermission('document:template:publish'),
+)
 const canPreview = computed(
   () => canEdit.value && (isAdmin.value || userStore.hasPermission('document:generate')),
 )
 const versions = computed(() => detail.value?.versions ?? [])
-const selectedVersion = computed(() =>
-  versions.value.find((version) => String(version.id) === selectedVersionId.value) ?? null,
+const selectedVersion = computed(
+  () => versions.value.find((version) => String(version.id) === selectedVersionId.value) ?? null,
 )
-const scalarFields = computed(() => catalog.value?.fields.filter((field) => !field.collectionPath) ?? [])
+const scalarFields = computed(
+  () => catalog.value?.fields.filter((field) => !field.collectionPath) ?? [],
+)
 const collectionGroups = computed(() => {
   const groups = new Map<string, DocumentTemplateField[]>()
   ;(catalog.value?.fields ?? []).forEach((field) => {
@@ -146,7 +151,8 @@ async function loadTemplates(preferredTemplateId?: string, preferredVersionId?: 
   try {
     templates.value = await getDocumentTemplates(businessType.value)
     const target =
-      templates.value.find((template) => String(template.id) === preferredTemplateId) ?? templates.value[0]
+      templates.value.find((template) => String(template.id) === preferredTemplateId) ??
+      templates.value[0]
     if (target) {
       await loadDetail(String(target.id), preferredVersionId)
     } else {
@@ -242,13 +248,17 @@ function ensureManifestField(path: string) {
 }
 
 function insertText(value: string) {
-  const textarea = document.querySelector<HTMLTextAreaElement>('[data-testid="document-template-editor"]')
+  const textarea = document.querySelector<HTMLTextAreaElement>(
+    '[data-testid="document-template-editor"]',
+  )
   const source = editorForm.templateContent
   const start = textarea?.selectionStart ?? source.length
   const end = textarea?.selectionEnd ?? source.length
   editorForm.templateContent = `${source.slice(0, start)}${value}${source.slice(end)}`
   void nextTick(() => {
-    const current = document.querySelector<HTMLTextAreaElement>('[data-testid="document-template-editor"]')
+    const current = document.querySelector<HTMLTextAreaElement>(
+      '[data-testid="document-template-editor"]',
+    )
     current?.focus()
     current?.setSelectionRange(start + value.length, start + value.length)
   })
@@ -334,7 +344,10 @@ function requestCopy(version: DocumentTemplateVersion) {
     okText: '创建草稿',
     cancelText: '取消',
     onOk: async () => {
-      const copied = await copyDocumentTemplateVersion(String(detail.value!.template.id), String(version.id))
+      const copied = await copyDocumentTemplateVersion(
+        String(detail.value!.template.id),
+        String(version.id),
+      )
       message.success('已创建新草稿版本')
       await loadDetail(selectedTemplateId.value, String(copied.id))
     },
@@ -391,7 +404,9 @@ async function bindDefault(version: DocumentTemplateVersion) {
 async function exportVersion(version: DocumentTemplateVersion) {
   try {
     const payload = await exportDocumentTemplateVersion(String(version.id))
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' })
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json;charset=utf-8',
+    })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -447,7 +462,10 @@ async function previewVersion(version: DocumentTemplateVersion) {
   }
   previewing.value = true
   try {
-    const blob = await previewDocumentTemplateVersion(String(version.id), previewBusinessId.value.trim())
+    const blob = await previewDocumentTemplateVersion(
+      String(version.id),
+      previewBusinessId.value.trim(),
+    )
     const url = URL.createObjectURL(blob)
     window.open(url, '_blank', 'noopener,noreferrer')
     window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
@@ -481,7 +499,12 @@ onMounted(reloadForBusinessType)
           <a-select-option value="SETTLEMENT">结算单</a-select-option>
         </a-select>
         <a-button @click="loadTemplates(selectedTemplateId, selectedVersionId)">刷新</a-button>
-        <a-button v-if="canEdit" type="primary" data-testid="create-document-template" @click="openCreate">
+        <a-button
+          v-if="canEdit"
+          type="primary"
+          data-testid="create-document-template"
+          @click="openCreate"
+        >
           新建模板
         </a-button>
         <a-button v-if="canEdit" data-testid="import-document-template" @click="triggerImport">
@@ -495,7 +518,9 @@ onMounted(reloadForBusinessType)
           @change="importFile"
         />
       </div>
-      <span class="page-tip">仅受限 HTML/CSS、字段目录和单层循环可发布；不支持脚本或拖拽设计器。</span>
+      <span class="page-tip"
+        >仅受限 HTML/CSS、字段目录和单层循环可发布；不支持脚本或拖拽设计器。</span
+      >
     </div>
 
     <div class="template-layout">
@@ -518,7 +543,10 @@ onMounted(reloadForBusinessType)
             >
               {{ record.templateName }}
             </a-button>
-            <a-tag v-else-if="column.dataIndex === 'enabled'" :color="record.enabled === 1 ? 'success' : 'default'">
+            <a-tag
+              v-else-if="column.dataIndex === 'enabled'"
+              :color="record.enabled === 1 ? 'success' : 'default'"
+            >
               {{ record.enabled === 1 ? '启用' : '停用' }}
             </a-tag>
             <span v-else-if="column.dataIndex === 'defaultVersionId'">
@@ -526,7 +554,10 @@ onMounted(reloadForBusinessType)
             </span>
           </template>
         </a-table>
-        <a-empty v-if="!loading && !templates.length" description="当前类型暂无模板，可新建或导入草稿" />
+        <a-empty
+          v-if="!loading && !templates.length"
+          description="当前类型暂无模板，可新建或导入草稿"
+        />
       </main>
 
       <main class="lg-list-table-panel version-panel">
@@ -565,7 +596,11 @@ onMounted(reloadForBusinessType)
               <a-tag v-if="isDefault(record)" color="gold">默认</a-tag>
             </template>
             <a-space v-else-if="column.key === 'action'" size="small" wrap>
-              <a-button v-if="canEdit && record.status === 'DRAFT'" size="small" @click="openEdit(record)">
+              <a-button
+                v-if="canEdit && record.status === 'DRAFT'"
+                size="small"
+                @click="openEdit(record)"
+              >
                 编辑
               </a-button>
               <a-button v-if="canEdit" size="small" @click="exportVersion(record)">导出</a-button>
@@ -606,7 +641,11 @@ onMounted(reloadForBusinessType)
           <span class="page-tip">仅预览已保存草稿/发布版本；不写入生成记录、不归档。</span>
         </div>
         <a-space>
-          <a-input v-model:value="previewBusinessId" placeholder="业务对象 ID" style="width: 220px" />
+          <a-input
+            v-model:value="previewBusinessId"
+            placeholder="业务对象 ID"
+            style="width: 220px"
+          />
           <a-button
             v-if="canPreview"
             :loading="previewing"
@@ -623,7 +662,13 @@ onMounted(reloadForBusinessType)
 
     <a-modal
       v-model:open="editorVisible"
-      :title="editorMode === 'edit' ? '编辑草稿版本' : editorMode === 'import' ? '导入模板草稿' : '新建模板草稿'"
+      :title="
+        editorMode === 'edit'
+          ? '编辑草稿版本'
+          : editorMode === 'import'
+            ? '导入模板草稿'
+            : '新建模板草稿'
+      "
       width="1120px"
       :mask-closable="!saving"
       :closable="!saving"
@@ -677,7 +722,9 @@ onMounted(reloadForBusinessType)
 
           <aside class="field-catalog">
             <h4>字段目录</h4>
-            <p class="page-tip">点击字段会插入占位符，并同步加入字段清单。集合字段必须放在对应循环内。</p>
+            <p class="page-tip">
+              点击字段会插入占位符，并同步加入字段清单。集合字段必须放在对应循环内。
+            </p>
             <a-collapse ghost>
               <a-collapse-panel key="scalar" header="普通字段">
                 <a-space wrap>
@@ -697,7 +744,11 @@ onMounted(reloadForBusinessType)
                 :header="`循环：${group.path}`"
               >
                 <a-space wrap>
-                  <a-button size="small" type="dashed" @click="insertCollection(group.path, group.fields)">
+                  <a-button
+                    size="small"
+                    type="dashed"
+                    @click="insertCollection(group.path, group.fields)"
+                  >
                     插入循环骨架
                   </a-button>
                   <a-button

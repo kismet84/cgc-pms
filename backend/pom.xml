@@ -356,7 +356,7 @@
                                 <rule>
                                     <element>BUNDLE</element>
                                     <limits>
-                                        <!-- 临时：当前基线 73/53，随覆盖率提升恢复 80/70 -->
+                                        <!-- 当前基线 73/60，随覆盖率提升恢复 80/70 -->
                                         <limit>
                                             <counter>INSTRUCTION</counter>
                                             <value>COVEREDRATIO</value>
@@ -365,7 +365,7 @@
                                         <limit>
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.53</minimum>
+                                            <minimum>0.60</minimum>
                                         </limit>
                                     </limits>
                                 </rule>

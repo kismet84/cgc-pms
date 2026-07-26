@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-26T10:23:30+08:00",
+  "updatedAt": "2026-07-26T21:51:00+08:00",
   "issues": [
     {
       "issueKey": "A-02",
@@ -274,50 +274,28 @@
       ]
     },
     {
-      "issueKey": "AUDIT-FINANCE-RECONCILIATION-ATOMICITY",
-      "title": "定时财务对账按租户事务与失败可观测性",
-      "status": "OPEN",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "定时入口已通过TransactionTemplate为每租户建立独立事务并在失败后继续其他租户；RuntimeException仍被静默吞掉，且缺少失败注入、多租户回滚与继续执行测试。",
-      "acceptanceCriteria": "以失败注入证明每租户对账原子提交或回滚、失败可观测且不阻断其他租户；日志与指标不得泄露租户业务数据。",
-      "candidate": {
-        "userValue": "避免夜间财务对账留下部分状态或静默失效。",
-        "minimalLoop": "复用现有TransactionTemplate，只补脱敏失败日志/低基数指标及故障注入、多租户隔离测试。",
-        "nonGoals": "不新增调度器、消息队列或第二套对账模型。",
-        "dependencies": "确认调度失败日志和告警指标口径。",
-        "risk": "记录未脱敏异常可能泄露租户业务数据，高基数标签可能破坏监控。",
-        "readyPreconditions": "明确脱敏字段、低基数指标、故障注入测试和回滚方式。"
-      },
-      "sourceRefs": [
-        "backend/src/main/java/com/cgcpms/financeops/service/FinanceOperationsService.java",
-        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md",
-        "docs/quality/第55条主线-M0-事实刷新与治理唯一化验收报告.md"
-      ]
-    },
-    {
       "issueKey": "AUDIT-PROMETHEUS-SCRAPE-AUTH",
       "title": "Prometheus抓取认证方案缺失",
       "status": "NEEDS_CONFIRMATION",
       "classification": "OPERATIONAL_RISK",
       "priority": "P1",
       "blocking": false,
-      "summary": "Prometheus抓取配置未携带认证信息，而后端回归明确要求未登录访问指标端点被拒绝；直接启用监控Compose无法证明抓取成功。",
-      "acceptanceCriteria": "选定不暴露指标的机器认证或受控网络方案，以Secret注入凭据并完成未认证拒绝、认证抓取成功、凭据不落库验证。",
-      "deferReason": "缺少目标环境网络边界、Secret载体和机器身份认证决策；不得通过公开指标端点绕过。",
+      "summary": "Prometheus抓取配置未携带机器凭据；后端匿名拒绝、管理员JWT可访问，但当前15分钟用户JWT不适合作为长期抓取身份，直接启用监控Compose无法成功抓取。",
+      "acceptanceCriteria": "使用可轮换的非公开机器身份和Secret文件完成无/错凭据拒绝、普通用户JWT拒绝、认证抓取连续成功、旧凭据失效、凭据不入库及Prometheus UI非公网监听验证。",
+      "deferReason": "第55条M2确认缺少目标环境网络边界、Secret载体、轮换责任人和真实运行证据；不得通过公开指标端点或长期用户JWT绕过。",
       "candidate": {
         "userValue": "避免生产监控盲区，同时保持指标端点不匿名暴露。",
-        "minimalLoop": "复用既有安全链和部署Secret能力，只补一个可轮换的机器抓取身份。",
+        "minimalLoop": "优先复用Spring Security Basic机器身份、Prometheus password_file和Spring Boot configtree，只补一个可轮换监控角色。",
         "nonGoals": "不公开Actuator，不在仓库写静态密码，不新增监控平台。",
-        "dependencies": "目标环境网络拓扑、Secret注入方式和机器认证机制。",
+        "dependencies": "目标环境网络拓扑、Secret文件载体、凭据保管与轮换责任人、Prometheus UI访问边界。",
         "risk": "错误放行会泄露运行指标；短期JWT会造成周期性抓取中断。",
         "readyPreconditions": "认证机制、凭据轮换责任人、目标环境验证和回滚方案明确。"
       },
       "sourceRefs": [
         "deploy/monitoring/prometheus.yml",
         "backend/src/test/java/com/cgcpms/config/ActuatorMetricsTest.java",
-        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md"
+        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md",
+        "docs/quality/第55条主线-M2-待确认维护项裁决验收报告.md"
       ]
     }
   ]
