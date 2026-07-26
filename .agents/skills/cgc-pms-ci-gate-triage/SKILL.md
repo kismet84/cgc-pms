@@ -29,8 +29,20 @@ description: 用于 cgc-pms 的统一失败分类、GitHub Actions、PR 与 CI �
 2. GitHub Actions 只有 GitHub 服务、网络或 Runner 基础设施故障可归 `environment_prerequisite`。workflow 内 Docker、数据库、端口、测试数据配置，以及代码/测试/迁移/基线不同步，都不是外部环境故障。
 3. 代码、测试、迁移或基线不同步导致 CI 失败归 `quality_or_security/DELIVERY_GATE_OMISSION`；后续修绿不得改写 PR 首次 CI 结果。
 4. 最小顺序：分类 → 修配置/调用/环境 → 一次最小等价复验 → 仍失败才整改代码或阻塞。
-5. 轮询采用退避；状态未变化保持静默，只在状态变化、超时、确定失败或需用户决策时回报。
+5. 后端全量测试使用下述长时监控规则；其他等待同样禁止把内部轮询转换成无变化用户心跳。
 6. 远端日志因 EOF、Schannel 或超时不可得时，不切 Git SSH、不无界下载。优先定位失败 step；支持 `Accept-Ranges` 时读取末段，默认 `256 KB`，缺最终摘要只扩大一次。临时签名 URL 不写长期文件。
+
+### 后端全量测试长时监控
+
+1. 适用于本地后端全量 Maven 验证及 GitHub Actions `backend-test` 的 `Run backend tests with coverage` 步骤。
+2. 每次启动前读取最近 10 次成功 GitHub Actions `backend-test` 中该步骤的 `startedAt`、`completedAt`，按步骤实际耗时更新平均值、中位数和范围；排除失败、取消、跳过、超时、缺时间及非正耗时记录。查询暂不可用时使用最近已确认快照，不猜测。
+3. 当前已确认快照：平均 `344.8` 秒（约 `5分45秒`），中位数 `5分52秒`，范围 `4分19秒～6分15秒`。
+4. 启动时只播报一次预计耗时。达到平均时长前，状态未变化必须保持用户可见静默；禁止固定 60 秒心跳，禁止重复发送“仍在执行”“未见失败”等无新证据消息。内部轮询可以继续。
+5. 超过平均时长仍未结束时，检查 Maven/Java 子进程、CPU、最新 Surefire 报告时间和终端新增输出；只有取得状态变化或新证据才播报。
+6. 动态异常阈值为 `max(平均时长 × 1.5, 最近最大值 + 120秒)`；当前约 `8分37秒`。超过阈值进入疑似卡住检查，先分类为 `unknown`，取得线程、进程或测试报告证据后再归因，不因单纯变慢判定失败。
+7. 终态必须同时读取 Maven `BUILD SUCCESS`/`BUILD FAILURE` 和 Surefire tests/failures/errors/skipped 汇总；不能只凭进程退出码裁决。
+8. 用户可见更新仅限：启动、阶段变化、明确失败、超过动态异常阈值、最终完成。
+9. 监控只读；不得因等待时间触发重跑、取消、修改 CI 或终止 Maven。
 
 ## 首次非 Draft PR 门禁
 

@@ -884,7 +884,7 @@ onBeforeUnmount(() => {
       :open="dialog === 'trace'"
       title="结算追溯"
       panel-class="v2-detail-dialog"
-      :close-on-backdrop="false"
+      :close-on-backdrop="true"
       @close="dialog = 'closed'"
       ><V2PageState
         v-if="detailLoading"
@@ -894,14 +894,22 @@ onBeforeUnmount(() => {
       />
       <section v-else-if="trace" class="v2-detail-dialog__section">
         <dl class="v2-detail-dialog__facts">
-          <dt>结算编号</dt>
-          <dd>{{ text(trace, 'settlement_code') || '结算编号缺失' }}</dd>
-          <dt>计量编号</dt>
-          <dd>{{ text(trace, 'measure_code') || '计量编号缺失' }}</dd>
-          <dt>结算金额</dt>
-          <dd>{{ text(trace, 'settlement_amount', 'confirmed_amount') || '—' }}</dd>
-          <dt>状态</dt>
-          <dd>{{ statusLabel(text(trace, 'status')) }}</dd>
+          <div>
+            <dt>结算编号</dt>
+            <dd>{{ text(trace, 'settlement_code') || '结算编号缺失' }}</dd>
+          </div>
+          <div>
+            <dt>计量编号</dt>
+            <dd>{{ text(trace, 'measure_code') || '计量编号缺失' }}</dd>
+          </div>
+          <div>
+            <dt>结算金额</dt>
+            <dd>{{ text(trace, 'settlement_amount', 'confirmed_amount') || '—' }}</dd>
+          </div>
+          <div>
+            <dt>状态</dt>
+            <dd>{{ statusLabel(text(trace, 'status')) }}</dd>
+          </div>
         </dl>
       </section>
     </V2Dialog>
@@ -935,7 +943,7 @@ onBeforeUnmount(() => {
   min-width: 0;
   margin: 0;
   padding: var(--v2-space-4);
-  border: 1px solid var(--v2-color-border-subtle);
+  border: var(--v2-border-width) solid var(--v2-color-border-subtle);
   border-radius: var(--v2-radius-md);
 }
 .measurement-page__period-dates legend {
@@ -968,7 +976,7 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--v2-space-3);
   padding: var(--v2-space-4) var(--v2-space-5);
-  border-bottom: 1px solid var(--v2-color-border);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
 }
 .measurement-page__detail h3 {
   margin: 0;
@@ -978,7 +986,7 @@ onBeforeUnmount(() => {
 .measurement-page__empty {
   margin: 0;
   padding: var(--v2-space-4);
-  border: 1px dashed var(--v2-color-border);
+  border: var(--v2-border-width) dashed var(--v2-color-border);
   color: var(--v2-color-text-muted);
   background: var(--v2-color-surface);
   text-align: center;
@@ -998,7 +1006,7 @@ dd {
   gap: var(--v2-space-3);
   align-items: center;
   padding-block: var(--v2-space-2);
-  border-bottom: 1px solid var(--v2-color-border);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
 }
 .source {
   grid-template-columns: 1fr auto minmax(10rem, 1fr);

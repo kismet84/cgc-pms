@@ -49,6 +49,8 @@ class CostSummaryControllerTest {
     private static final long TENANT_ID = 0L;
     private static final long PROJECT_ID = 10001L;
     private static final long MANAGED_PROJECT_ID = 8261001L;
+    private static final long CONFIRMED_REVENUE_ITEM_ID = 995301711L;
+    private static final long SOURCE_ONLY_REVENUE_ITEM_ID = 995301712L;
     private static final long PROJECT_MANAGER_ID = 93061L;
     private static final long NO_PROJECT_ACCESS_USER_ID = 93062L;
 
@@ -89,6 +91,14 @@ class CostSummaryControllerTest {
     @DisplayName("GET /cost-summary/{projectId} without JWT -> 401")
     void testGetLatest_Unauthorized() throws Exception {
         mockMvc.perform(getWithApi("/cost-summary/" + PROJECT_ID))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @Order(1)
+    @DisplayName("GET /cost-summary without JWT -> 401")
+    void testGetAccessible_Unauthorized() throws Exception {
+        mockMvc.perform(getWithApi("/cost-summary"))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -265,6 +275,34 @@ class CostSummaryControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.projectId").value(String.valueOf(MANAGED_PROJECT_ID)));
+    }
+
+    @Test
+    @Order(11)
+    @DisplayName("GET /cost-summary returns only current user's accessible projects")
+    void testGetAccessible_ProjectManagerScope() throws Exception {
+        seedManagedProjectIfAbsent();
+
+        try {
+            jdbc.update("INSERT INTO cost_item(id,tenant_id,project_id,cost_type,amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,created_by,created_at,updated_at,deleted_flag) VALUES(?,0,?,'REVENUE_CONFIRMED',123.45,0,123.45,'OWNER_SETTLEMENT',?,?,CURRENT_DATE,'CONFIRMED',1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",
+                    CONFIRMED_REVENUE_ITEM_ID, MANAGED_PROJECT_ID, CONFIRMED_REVENUE_ITEM_ID, CONFIRMED_REVENUE_ITEM_ID);
+            jdbc.update("INSERT INTO cost_item(id,tenant_id,project_id,cost_type,amount,tax_amount,amount_without_tax,source_type,source_id,source_item_id,cost_date,cost_status,generated_flag,created_by,created_at,updated_at,deleted_flag) VALUES(?,0,?,'OTHER',999.99,0,999.99,'REVENUE',?,?,CURRENT_DATE,'CONFIRMED',1,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)",
+                    SOURCE_ONLY_REVENUE_ITEM_ID, MANAGED_PROJECT_ID, SOURCE_ONLY_REVENUE_ITEM_ID, SOURCE_ONLY_REVENUE_ITEM_ID);
+
+            mockMvc.perform(getWithApi("/cost-summary")
+                            .cookie(summaryViewerCookie(PROJECT_MANAGER_ID, TENANT_ID, List.of("COMMON_USER"))))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.code").value("0"))
+                    .andExpect(jsonPath("$.data.accessibleProjectCount").value(1))
+                    .andExpect(jsonPath("$.data.projects").isArray())
+                    .andExpect(jsonPath("$.data.projects[0].projectId").value(String.valueOf(MANAGED_PROJECT_ID)))
+                    .andExpect(jsonPath("$.data.projects[0].targetCost").isString())
+                    .andExpect(jsonPath("$.data.projects[0].confirmedRevenue").value("123.45"))
+                    .andExpect(jsonPath("$.data.projects[0].forecastProfit").isString());
+        } finally {
+            jdbc.update("DELETE FROM cost_item WHERE id IN (?,?)",
+                    CONFIRMED_REVENUE_ITEM_ID, SOURCE_ONLY_REVENUE_ITEM_ID);
+        }
     }
 
     @Test

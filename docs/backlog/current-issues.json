@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-20T00:00:00+08:00",
+  "updatedAt": "2026-07-26T10:23:30+08:00",
   "issues": [
     {
       "issueKey": "A-02",
@@ -280,19 +280,20 @@
       "classification": "STILL_APPLICABLE",
       "priority": "P1",
       "blocking": false,
-      "summary": "定时入口直接调用同类私有方法，未进入Spring事务代理；多步写入失败可能保留RUNNING或部分问题明细，且RuntimeException被静默吞掉。",
-      "acceptanceCriteria": "每个租户的定时对账在独立事务中原子提交或回滚；失败可观测且不阻断其他租户；补充失败注入与多租户隔离测试。",
+      "summary": "定时入口已通过TransactionTemplate为每租户建立独立事务并在失败后继续其他租户；RuntimeException仍被静默吞掉，且缺少失败注入、多租户回滚与继续执行测试。",
+      "acceptanceCriteria": "以失败注入证明每租户对账原子提交或回滚、失败可观测且不阻断其他租户；日志与指标不得泄露租户业务数据。",
       "candidate": {
         "userValue": "避免夜间财务对账留下部分状态或静默失效。",
-        "minimalLoop": "复用Spring现有事务能力，为每租户对账建立真实代理事务边界并记录脱敏失败信息。",
+        "minimalLoop": "复用现有TransactionTemplate，只补脱敏失败日志/低基数指标及故障注入、多租户隔离测试。",
         "nonGoals": "不新增调度器、消息队列或第二套对账模型。",
-        "dependencies": "确认现有对账运行表允许的失败状态与告警记录口径。",
-        "risk": "事务边界不当可能扩大锁范围或影响其他租户批次。",
-        "readyPreconditions": "明确失败状态、最小文件范围、故障注入测试和回滚方式。"
+        "dependencies": "确认调度失败日志和告警指标口径。",
+        "risk": "记录未脱敏异常可能泄露租户业务数据，高基数标签可能破坏监控。",
+        "readyPreconditions": "明确脱敏字段、低基数指标、故障注入测试和回滚方式。"
       },
       "sourceRefs": [
         "backend/src/main/java/com/cgcpms/financeops/service/FinanceOperationsService.java",
-        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md"
+        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md",
+        "docs/quality/第55条主线-M0-事实刷新与治理唯一化验收报告.md"
       ]
     },
     {
@@ -316,29 +317,6 @@
       "sourceRefs": [
         "deploy/monitoring/prometheus.yml",
         "backend/src/test/java/com/cgcpms/config/ActuatorMetricsTest.java",
-        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "AUDIT-CASH-FORECAST-VERSION-CONCURRENCY",
-      "title": "现金预测版本号并发创建冲突",
-      "status": "OPEN",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "现金预测创建在事务中使用MAX(version_no)+1，但未锁定项目或版本命名空间；并发请求可取得相同版本并由唯一键随机拒绝其中一个。",
-      "acceptanceCriteria": "同租户、项目、场景并发创建得到互不冲突的连续版本；跨租户和跨项目不互相阻塞；补充真实并发测试。",
-      "candidate": {
-        "userValue": "避免财务人员并发创建预测时出现非业务性唯一键失败。",
-        "minimalLoop": "复用现有项目行和事务，在读取下一版本前锁定最小项目级命名空间。",
-        "nonGoals": "不新增序列服务、分布式锁或重构预测状态机。",
-        "dependencies": "确认项目行锁对预测创建吞吐的影响可接受。",
-        "risk": "锁顺序不一致可能引入死锁，必须保持单一固定锁顺序。",
-        "readyPreconditions": "锁点、异常契约、并发测试和回滚方式明确。"
-      },
-      "sourceRefs": [
-        "backend/src/main/java/com/cgcpms/cashforecast/service/ProjectCashForecastService.java",
-        "backend/src/main/resources/db/migration-legacy/V193__project_cash_forecast_closed_loop.sql",
         "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md"
       ]
     }

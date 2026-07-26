@@ -61,11 +61,9 @@ describe('M5 requisition, stock-out and return contract', () => {
     expect(source).toContain('发起领料申请')
     expect(source).toContain('requisition-page__workspace')
     expect(source).not.toContain('data-master-detail="true"')
-    expect(source).toContain(
-      'panel-class="v2-dialog-standard v2-detail-dialog requisition-page__detail"',
-    )
+    expect(source).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
     expect(source).toContain(':close-on-backdrop="true"')
-    expect(source).toContain('panel-class="v2-dialog-standard requisition-page__editor-dialog"')
+    expect(source).toContain('panel-class="v2-dialog-standard"')
     expect(source).toContain(':close-on-backdrop="false"')
     expect(source).toContain('tabindex="0"')
     expect(source).toContain('<th v-if="!projectId">项目</th>')

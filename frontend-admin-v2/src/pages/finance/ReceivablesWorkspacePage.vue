@@ -650,7 +650,7 @@ onBeforeUnmount(() => controller?.abort())
 </script>
 
 <template>
-  <main class="finance-workspace">
+  <section class="finance-workspace">
     <V2PageState
       v-if="!canQuery"
       kind="error"
@@ -852,7 +852,12 @@ onBeforeUnmount(() => controller?.abort())
         :close-disabled="busy"
         :close-on-backdrop="false"
       >
-        <form v-if="editor" class="finance-workspace__form" @submit.prevent="save">
+        <form
+          v-if="editor"
+          id="finance-workspace-editor-form"
+          class="finance-workspace__form"
+          @submit.prevent="save"
+        >
           <template v-if="editorKind !== 'invoice'">
             <V2Select
               v-model="editor.projectId"
@@ -1000,13 +1005,15 @@ onBeforeUnmount(() => controller?.abort())
           </template>
 
           <V2Input v-model="editor.remark" label="备注" />
-          <div class="finance-workspace__actions">
-            <V2Button type="submit" :loading="busy">保存</V2Button>
-            <V2Button type="button" variant="secondary" :disabled="busy" @click="dialog = false">
-              取消
-            </V2Button>
-          </div>
         </form>
+        <template #footer>
+          <V2Button type="button" variant="secondary" :disabled="busy" @click="dialog = false">
+            取消
+          </V2Button>
+          <V2Button type="submit" form="finance-workspace-editor-form" :loading="busy">
+            保存
+          </V2Button>
+        </template>
       </V2Dialog>
 
       <V2ConfirmDialog
@@ -1019,7 +1026,7 @@ onBeforeUnmount(() => controller?.abort())
         @close="pending = null"
       />
     </template>
-  </main>
+  </section>
 </template>
 
 <style scoped>

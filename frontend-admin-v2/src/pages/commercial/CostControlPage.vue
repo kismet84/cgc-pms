@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  AccessibleCostControlOverview,
   CostControlAmountRow,
   CostControlOverview,
   CostCorrectiveCloseCommand,
@@ -12,7 +13,6 @@ import {
   V2Button,
   V2Card,
   V2Dialog,
-  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -24,6 +24,7 @@ import {
   confirmCostForecast,
   createCostCorrective,
   createCostForecast,
+  loadAccessibleCostControl,
   loadCostSubjectOptions,
   loadCostControl,
   loadCostForecastTrace,
@@ -38,6 +39,7 @@ import { useSessionStore } from '@/stores/session'
 const route = useRoute()
 const session = useSessionStore()
 const projectId = ref('')
+const accessible = ref<AccessibleCostControlOverview | null>(null)
 const overview = ref<CostControlOverview | null>(null)
 const trace = ref<CostControlOverview | null>(null)
 const costSubjects = ref<CostSubjectOption[]>([])
@@ -143,9 +145,16 @@ async function load() {
   errorMessage.value = ''
   try {
     if (!projectId.value) {
-      overview.value = null
+      const scope = await loadAccessibleCostControl(current.signal)
+      if (token === generation) {
+        accessible.value = scope
+        overview.value = null
+        costSubjects.value = []
+        userOptions.value = []
+      }
       return
     }
+    accessible.value = null
     const [value, subjects, users] = await Promise.all([
       loadCostControl(projectId.value, current.signal),
       loadCostSubjectOptions(current.signal),
@@ -173,6 +182,7 @@ async function load() {
   } catch (e) {
     if (!current.signal.aborted && token === generation) {
       overview.value = null
+      accessible.value = null
       errorMessage.value = errorText(e, '动态利润控制加载失败')
     }
   } finally {
@@ -371,7 +381,67 @@ onBeforeUnmount(() => {
         v-if="loading"
         title="正在加载动态利润控制"
         description="正在读取完工预测、利润指标和纠偏措施。"
-        kind="loading" /><template v-else-if="overview"
+        kind="loading" /><template v-else-if="!projectId && accessible"
+        ><V2Card :title="`全部项目动态利润（${accessible.accessibleProjectCount}）`">
+          <dl class="v2-ledger-kpis v2-ledger-kpis--five" aria-label="全部项目动态利润汇总">
+            <div>
+              <dt>可访问项目</dt>
+              <dd>{{ accessible.accessibleProjectCount }}</dd>
+            </div>
+            <div>
+              <dt>已有预测</dt>
+              <dd>
+                {{ accessible.forecastProjectCount }}
+                <small>{{ accessible.noForecastProjectCount }} 个项目未生成预测</small>
+              </dd>
+            </div>
+            <div>
+              <dt>合同收入</dt>
+              <dd>{{ accessible.contractIncome }}</dd>
+            </div>
+            <div>
+              <dt>完工成本</dt>
+              <dd>{{ accessible.forecastAtCompletionCost }}</dd>
+            </div>
+            <div>
+              <dt>预测利润</dt>
+              <dd>
+                {{ accessible.forecastProfit }}
+                <small>整体利润率 {{ accessible.profitMargin }}</small>
+              </dd>
+            </div>
+          </dl>
+          <div
+            class="cost-page__table-wrap"
+            role="region"
+            aria-label="全部项目动态利润表格"
+            tabindex="0"
+          >
+            <table class="cost-page__table">
+              <thead>
+                <tr>
+                  <th scope="col">项目</th>
+                  <th scope="col">动态成本</th>
+                  <th scope="col">完工成本</th>
+                  <th scope="col">预测利润</th>
+                  <th scope="col">利润率</th>
+                  <th scope="col">预测状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in accessible.projects" :key="row.projectId">
+                  <th scope="row">{{ row.projectName }}</th>
+                  <td>{{ row.dynamicCost }}</td>
+                  <td>{{ row.forecastAtCompletionCost }}</td>
+                  <td>{{ row.forecastProfit }}</td>
+                  <td>{{ row.profitMargin }}</td>
+                  <td>{{ row.costForecastId ? '已有预测' : '未生成预测' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </V2Card></template
+      ><template v-else-if="overview"
         ><V2Card title="最新完工预测"
           ><dl>
             <dt>预测编号</dt>
@@ -466,30 +536,44 @@ onBeforeUnmount(() => {
           :open="!!trace"
           title="预测追溯"
           panel-class="v2-detail-dialog"
-          :close-on-backdrop="false"
+          :close-on-backdrop="true"
           @close="trace = null"
           ><section class="v2-detail-dialog__section">
             <dl class="v2-detail-dialog__facts">
-              <dt>预测编号</dt>
-              <dd>{{ text(traceRow('forecast'), 'forecast_code') || '—' }}</dd>
-              <dt>预测名称</dt>
-              <dd>{{ text(traceRow('forecast'), 'forecast_name') || '—' }}</dd>
-              <dt>预测日期</dt>
-              <dd>{{ text(traceRow('forecast'), 'forecast_date') || '—' }}</dd>
-              <dt>预测利润</dt>
-              <dd>{{ text(traceRow('forecast'), 'forecast_profit_amount') || '—' }}</dd>
-              <dt>状态</dt>
-              <dd>{{ statusLabel(text(traceRow('forecast'), 'status')) }}</dd>
+              <div>
+                <dt>预测编号</dt>
+                <dd>{{ text(traceRow('forecast'), 'forecast_code') || '—' }}</dd>
+              </div>
+              <div>
+                <dt>预测名称</dt>
+                <dd>{{ text(traceRow('forecast'), 'forecast_name') || '—' }}</dd>
+              </div>
+              <div>
+                <dt>预测日期</dt>
+                <dd>{{ text(traceRow('forecast'), 'forecast_date') || '—' }}</dd>
+              </div>
+              <div>
+                <dt>预测利润</dt>
+                <dd>{{ text(traceRow('forecast'), 'forecast_profit_amount') || '—' }}</dd>
+              </div>
+              <div>
+                <dt>状态</dt>
+                <dd>{{ statusLabel(text(traceRow('forecast'), 'status')) }}</dd>
+              </div>
             </dl>
             <h3>目标版本</h3>
             <dl class="v2-detail-dialog__facts">
-              <dt>版本</dt>
-              <dd>
-                {{ text(traceRow('target'), 'version_no') || '—' }} /
-                {{ text(traceRow('target'), 'version_name') || '—' }}
-              </dd>
-              <dt>目标成本</dt>
-              <dd>{{ text(traceRow('target'), 'total_target_amount') || '—' }}</dd>
+              <div>
+                <dt>版本</dt>
+                <dd>
+                  {{ text(traceRow('target'), 'version_no') || '—' }} /
+                  {{ text(traceRow('target'), 'version_name') || '—' }}
+                </dd>
+              </div>
+              <div>
+                <dt>目标成本</dt>
+                <dd>{{ text(traceRow('target'), 'total_target_amount') || '—' }}</dd>
+              </div>
             </dl>
             <h3>预测明细</h3>
             <V2PageState
@@ -521,17 +605,21 @@ onBeforeUnmount(() => {
             </div>
             <h3>纠偏与审批</h3>
             <dl class="v2-detail-dialog__facts">
-              <dt>纠偏措施</dt>
-              <dd>{{ traceRows('correctiveActions').length }} 项</dd>
-              <dt>审批记录</dt>
-              <dd>{{ traceRows('approvalInstances').length }} 条</dd>
+              <div>
+                <dt>纠偏措施</dt>
+                <dd>{{ traceRows('correctiveActions').length }} 项</dd>
+              </div>
+              <div>
+                <dt>审批记录</dt>
+                <dd>{{ traceRows('approvalInstances').length }} 条</dd>
+              </div>
             </dl>
           </section></V2Dialog
         ></template
       ><V2PageState
         v-else-if="!errorMessage"
         title="暂无动态利润数据"
-        description="请选择项目，或先生成该项目的完工预测。"
+        description="当前范围尚未生成可读取的完工预测。"
         kind="empty"
     /></template>
     <V2Dialog
@@ -552,11 +640,14 @@ onBeforeUnmount(() => {
         </div>
       </form>
       <template #footer>
-        <V2GlassButton
-          text="取消"
+        <V2Button
+          type="button"
+          variant="secondary"
           :disabled="actionBusy"
-          :on-click="() => (forecastOpen = false)"
-        />
+          @click="forecastOpen = false"
+        >
+          取消
+        </V2Button>
         <V2Button type="submit" form="cost-forecast-form" :loading="actionBusy">保存预测</V2Button>
       </template></V2Dialog
     >
@@ -587,11 +678,14 @@ onBeforeUnmount(() => {
         /><V2Input v-model="corrective.dueDate" label="截止日期" type="date" required />
       </form>
       <template #footer>
-        <V2GlassButton
-          text="取消"
+        <V2Button
+          type="button"
+          variant="secondary"
           :disabled="actionBusy"
-          :on-click="() => (correctiveOpen = false)"
-        />
+          @click="correctiveOpen = false"
+        >
+          取消
+        </V2Button>
         <V2Button type="submit" form="cost-corrective-form" :loading="actionBusy"
           >保存措施</V2Button
         >
@@ -611,7 +705,14 @@ onBeforeUnmount(() => {
         />
       </form>
       <template #footer>
-        <V2GlassButton text="取消" :disabled="actionBusy" :on-click="() => (closeOpen = false)" />
+        <V2Button
+          type="button"
+          variant="secondary"
+          :disabled="actionBusy"
+          @click="closeOpen = false"
+        >
+          取消
+        </V2Button>
         <V2Button type="submit" form="cost-corrective-close-form" :loading="actionBusy"
           >确认关闭</V2Button
         >
@@ -645,6 +746,18 @@ dd {
   min-width: 0;
   overflow-x: auto;
 }
+.cost-page .v2-ledger-kpis {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: var(--v2-space-4);
+}
+.cost-page .v2-ledger-kpis small {
+  display: block;
+  margin-top: var(--v2-space-1);
+  color: var(--v2-color-text-secondary);
+  font-size: var(--v2-font-size-12);
+  font-weight: var(--v2-font-weight-regular);
+}
 .cost-page__table {
   min-width: 40rem;
 }
@@ -654,6 +767,16 @@ dd {
 .cost-page__table .actions {
   align-items: center;
   flex-wrap: nowrap;
+}
+@media (max-width: 64rem) {
+  .cost-page .v2-ledger-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 48rem) {
+  .cost-page .v2-ledger-kpis {
+    grid-template-columns: 1fr;
+  }
 }
 .item {
   display: grid;

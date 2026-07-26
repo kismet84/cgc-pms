@@ -89,7 +89,7 @@ Assert-Contains $backendMySql @(
 Assert-Contains $backendDependency @('permissions:','contents: read','bash ./scripts/ci/scan-backend-dependencies.sh') 'backend-dependency-scan'
 Assert-Contains $frontendBuild @('name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin/dist','if: always()') 'frontend-build'
 Assert-Contains $frontendV2 @(
-  'pnpm check:boundary','pnpm check:route-ledger','pnpm lint:check','pnpm test:unit',
+  'pnpm check:boundary','pnpm check:route-ledger','pnpm check:design-system','pnpm lint:check','pnpm test:unit',
   'pnpm type-check:contracts','pnpm type-check','pnpm build','pnpm check:bundle-size',
   'pnpm exec playwright install chromium','pnpm test:e2e:migration-gate',
   'PLAYWRIGHT_BASE_URL: http://127.0.0.1:4174',
@@ -144,7 +144,7 @@ $v2Package = Read-RepoText 'frontend-admin-v2\package.json' | ConvertFrom-Json
 foreach ($name in @('lint:check','type-check','build','test:coverage','test:e2e:ui','check:bundle-size')) {
   if ($frontendPackage.scripts.PSObject.Properties.Name -notcontains $name) { throw "frontend-admin script is missing: $name" }
 }
-foreach ($name in @('check:boundary','check:route-ledger','lint:check','test:unit','type-check:contracts','type-check','build','check:bundle-size')) {
+foreach ($name in @('check:boundary','check:route-ledger','check:design-system','lint:check','test:unit','type-check:contracts','type-check','build','check:bundle-size')) {
   if ($v2Package.scripts.PSObject.Properties.Name -notcontains $name) { throw "frontend-admin-v2 script is missing: $name" }
 }
 

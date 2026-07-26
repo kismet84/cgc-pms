@@ -24,7 +24,11 @@ import {
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const sourceRoot = resolve(currentDir, '../../src')
 const repositoryRoot = resolve(currentDir, '../../..')
-const uiStandardPath = resolve(repositoryRoot, 'docs/ui-v2/m1-design-system-baseline.md')
+const uiStandardPath = resolve(
+  repositoryRoot,
+  'docs/standards/00-UI-Design-Baselines-and-Code-Specifications.md',
+)
+const historicalUiBaselinePath = resolve(repositoryRoot, 'docs/ui-v2/m1-design-system-baseline.md')
 
 function migratedPageSources() {
   const pagesRoot = resolve(sourceRoot, 'pages')
@@ -394,7 +398,10 @@ describe('Clean-room V2 design system', () => {
     const wrapper = mount(V2Dialog, {
       attachTo: document.body,
       props: { open: false, title: '确认操作', description: '不执行业务写入' },
-      slots: { default: '<button data-testid="inside">对话框操作</button>' },
+      slots: {
+        default: '<button data-testid="inside">对话框操作</button>',
+        'title-suffix': '<span>审批通过</span>',
+      },
     })
     await wrapper.setProps({ open: true })
     await flushPromises()
@@ -402,6 +409,7 @@ describe('Clean-room V2 design system', () => {
     const dialog = document.querySelector<HTMLElement>('[role="dialog"]')
     expect(dialog).not.toBeNull()
     expect(dialog?.classList).toContain('v2-dialog-standard')
+    expect(dialog?.textContent).toContain('审批通过')
     expect(document.activeElement).toBe(dialog)
     dialog?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
     await flushPromises()
@@ -413,7 +421,7 @@ describe('Clean-room V2 design system', () => {
     wrapper.unmount()
   })
 
-  it('keeps a dialog open and emits a signal when backdrop closing is disabled', async () => {
+  it('keeps an editor dialog open for backdrop and Escape when implicit closing is disabled', async () => {
     const wrapper = mount(V2Dialog, {
       attachTo: document.body,
       props: { open: true, title: '编辑日报', closeOnBackdrop: false },
@@ -426,6 +434,26 @@ describe('Clean-room V2 design system', () => {
     await flushPromises()
     expect(wrapper.emitted('backdrop-click')).toHaveLength(1)
     expect(wrapper.emitted('update:open')).toBeUndefined()
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+    expect(wrapper.emitted('update:open')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('closes a read-only dialog when its backdrop is clicked', async () => {
+    const wrapper = mount(V2Dialog, {
+      attachTo: document.body,
+      props: { open: true, title: '项目详情', closeOnBackdrop: true },
+    })
+    await flushPromises()
+
+    document
+      .querySelector<HTMLElement>('.v2-dialog__backdrop')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+    await flushPromises()
+
+    expect(wrapper.emitted('update:open')).toEqual([[false]])
     wrapper.unmount()
   })
 
@@ -546,6 +574,23 @@ describe('Clean-room V2 design system', () => {
     expect(componentCss).toContain('.v2-card__body:empty')
     expect(componentCss).toContain('.v2-card__header + .v2-card__body:not(:empty)')
     expect(componentCss).toContain('#shell-main-content table')
+    expect(tokens).toContain('--v2-dialog-border')
+    expect(tokens).toContain('--v2-dialog-width-detail')
+    expect(componentCss).toMatch(
+      /\.v2-dialog__panel\.v2-confirm-dialog \{[\s\S]*?width: min\(32rem, 100%\);/,
+    )
+    expect(componentCss).toMatch(
+      /\.v2-dialog__panel\.v2-detail-dialog \{[\s\S]*?width: min\(var\(--v2-dialog-width-detail\), 100%\);[\s\S]*?height: auto;/,
+    )
+    expect(componentCss).toMatch(
+      /\.v2-dialog__panel \{[\s\S]*?max-height: min\(var\(--v2-dialog-max-height\), calc\(100dvh - 2 \* var\(--v2-page-gutter\)\)\);/,
+    )
+    expect(componentCss).not.toContain('.v2-dialog-liquid-review')
+    expect(componentCss).toContain('background: var(--v2-dialog-surface)')
+    expect(componentCss).toContain('background: var(--v2-dialog-backdrop)')
+    expect(componentCss).toContain('@supports not (')
+    expect(componentCss).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(componentCss).toContain('@media (forced-colors: active)')
   })
 
   describe('V2 migration gates', () => {
@@ -578,7 +623,43 @@ describe('Clean-room V2 design system', () => {
         expect(standard).toContain(command)
       }
       expect(packageJson).toContain('"test:e2e:migration-gate"')
+      expect(packageJson).toContain('"check:design-system"')
+      expect(workflow).toContain('pnpm check:design-system')
       expect(workflow).toContain('pnpm test:e2e:migration-gate')
+    })
+
+    it('keeps one normative design authority and demotes historical style documents', () => {
+      const standard = readFileSync(uiStandardPath, 'utf-8')
+      const historicalBaseline = readFileSync(historicalUiBaselinePath, 'utf-8')
+      const frontendStandard = readFileSync(
+        resolve(repositoryRoot, 'docs/standards/05-前端开发规范.md'),
+        'utf-8',
+      )
+      const docsIndex = readFileSync(resolve(repositoryRoot, 'docs/README.md'), 'utf-8')
+      const authorityMarker = '<!-- UI-DESIGN-STANDARD: canonical -->'
+      const activeStandardRoots = [
+        resolve(repositoryRoot, 'docs/standards'),
+        resolve(repositoryRoot, 'docs/ui-v2'),
+      ]
+      const designAuthorities = activeStandardRoots.flatMap((root) =>
+        readdirSync(root, { recursive: true })
+          .map(String)
+          .filter((name) => name.endsWith('.md'))
+          .map((name) => resolve(root, name))
+          .filter((path) => readFileSync(path, 'utf-8').includes(authorityMarker)),
+      )
+
+      expect(designAuthorities).toEqual([uiStandardPath])
+      expect(standard).toContain('状态：现行、唯一权威')
+      expect(standard).toContain(
+        '唯一可视入口：`http://127.0.0.1:5174/v2/src/components/preview/index.html`',
+      )
+      expect(historicalBaseline).toContain('状态：已完成、非现行规范')
+      expect(historicalBaseline).not.toMatch(/^\| S\d{2} \|/m)
+      expect(frontendStandard).not.toContain('新代码一律使用 `lg-*`')
+      expect(frontendStandard).toContain('唯一设计系统标准与门禁')
+      expect(docsIndex).toContain('唯一设计系统标准与门禁')
+      expect(docsIndex).not.toContain('Clean-room V2 设计系统与全路由迁移退出门')
     })
 
     it('lists every exported public V2 component in the current standard', () => {
@@ -660,8 +741,11 @@ describe('Clean-room V2 design system', () => {
         '--v2-stack-justify',
       ])
       const referencedTokens = [
-        ...[...allSources.matchAll(/var\((--v2-[\w-]+)/g)].map(([, token]) => token),
+        ...[...implementationSources.matchAll(/var\((--[\w-]+)/g)].map(([, token]) => token),
         ...[...allSources.matchAll(/['"](--v2-[\w-]+)['"]/g)].map(([, token]) => token),
+      ]
+      const legacyTokens = [
+        ...new Set(referencedTokens.filter((token) => !token.startsWith('--v2-'))),
       ]
       const unknownTokens = [
         ...new Set(
@@ -672,6 +756,7 @@ describe('Clean-room V2 design system', () => {
         ),
       ]
 
+      expect(legacyTokens).toEqual([])
       expect(unknownTokens).toEqual([])
       expect(implementationSources).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i)
       expect(implementationSources).not.toMatch(/font-size:\s*[^;{}]*\b[0-9.]+(?:px|rem)\b/i)
@@ -680,6 +765,9 @@ describe('Clean-room V2 design system', () => {
       expect(implementationSources).not.toMatch(/font:\s*[^;{}]*\/\s*[0-9.]+(?:px|rem)?\b/i)
       expect(migratedPages.map(({ source }) => source).join('\n')).not.toMatch(
         /(?:gap|padding(?:-[\w-]+)?|margin(?:-[\w-]+)?|min-height|height|border-radius)\s*:[^;{}]*\b(?:[1-9][0-9]*|0?\.[0-9]+)(?:px|rem)\b/i,
+      )
+      expect(migratedPages.map(({ source }) => source).join('\n')).not.toMatch(
+        /border(?:-[\w-]+)?\s*:[^;{}]*\b1px\b/i,
       )
       expect(componentCss).toMatch(
         /\.v2-card__title \{[\s\S]*?font-size: var\(--v2-font-size-14\);[\s\S]*?line-height: var\(--v2-line-height-tight\);/,
@@ -855,9 +943,7 @@ describe('Clean-room V2 design system', () => {
         resolve(sourceRoot, 'pages/commercial/ContractPage.vue'),
         'utf-8',
       )
-      expect(contract.indexOf('title="合同台账"')).toBeLessThan(
-        contract.indexOf('contract-page__kpi-grid'),
-      )
+      expect(contract.indexOf('title="合同台账"')).toBeLessThan(contract.indexOf('v2-ledger-kpis'))
     })
 
     it('keeps every search and filter control label hidden with an in-control prompt', () => {
@@ -967,14 +1053,41 @@ describe('Clean-room V2 design system', () => {
         for (const [index, { openingTag, body }] of dialogs.entries()) {
           const evidence = `${name} V2Dialog #${index + 1}`
           expect(openingTag, evidence).toMatch(/\b:?close-on-backdrop=/)
+          expect(body, `${evidence} shared action button`).not.toMatch(/<V2GlassButton\b/)
 
           const hasEditableControl = /<(?:form|input|textarea|select)\b|<V2(?:Input|Select)\b/.test(
             body,
           )
           if (hasEditableControl) {
-            expect(openingTag, evidence).toMatch(/:close-on-backdrop="false"|@backdrop-click=/)
+            expect(openingTag, evidence).toMatch(
+              /:close-on-backdrop="false"|:close-on-backdrop="(?!true")[^"]+"|@backdrop-click=/,
+            )
+          }
+
+          const footer = body.match(/<template\b[^>]*#footer[^>]*>([\s\S]*?)<\/template\s*>/)?.[1]
+          if (/<form\b/.test(body)) {
+            expect(footer, `${evidence} missing footer actions`).toBeDefined()
+          }
+          if (footer) {
+            expect(footer, `${evidence} footer wrapper`).not.toMatch(/<div\b/)
           }
         }
+      }
+
+      const readOnlyDetailContracts = {
+        'commercial/BudgetPage.vue': ':close-on-backdrop="dialog === \'detail\'"',
+        'commercial/BidCostPage.vue': ':close-on-backdrop="panelMode === \'detail\'"',
+        'commercial/CostControlPage.vue': ':close-on-backdrop="true"',
+        'commercial/CostLedgerPage.vue': ':close-on-backdrop="true"',
+        'commercial/CostTargetPage.vue': ':close-on-backdrop="true"',
+        'commercial/ProductionMeasurementPage.vue': ':close-on-backdrop="true"',
+        'subcontract/SubcontractWorkspacePage.vue': ':close-on-backdrop="!selectedEditable"',
+      }
+      for (const [name, contract] of Object.entries(readOnlyDetailContracts)) {
+        const source = migratedPages.find(
+          (page) => page.name.replaceAll('\\', '/') === name,
+        )?.source
+        expect(source, `${name} read-only detail dialog`).toContain(contract)
       }
     })
 
@@ -1097,9 +1210,12 @@ describe('Clean-room V2 design system', () => {
       const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
 
       expect(dailyLog).toMatch(/\.daily-log-page__list-table \{[\s\S]*?table-layout: fixed;/)
+      expect(dailyLog).toContain('<colgroup>')
+      expect(dailyLog).toContain('min-width: 82rem;')
       expect(dailyLog).toMatch(
         /class="daily-log-page__summary daily-log-page__summary-cell v2-table-cell--wrap"/,
       )
+      expect(dailyLog).toMatch(/<td class="v2-table-cell--wrap">\s*\{\{ record\.weatherSummary/)
       expect(componentCss).toMatch(
         /#shell-main-content table \.v2-table-cell--wrap \{[\s\S]*?white-space: normal;[\s\S]*?overflow-wrap: anywhere;[\s\S]*?word-break: break-word;/,
       )
@@ -1252,7 +1368,7 @@ describe('Clean-room V2 design system', () => {
       )
 
       expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog'")
-      expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog daily-log-page__dialog'")
+      expect(dailyLog).toContain("'v2-dialog-standard v2-detail-dialog v2-dialog-wide'")
       expect(dailyLog).toContain('class="v2-detail-dialog__section"')
       expect(dailyLog).toContain('class="v2-detail-dialog__facts"')
       expect(
@@ -1261,11 +1377,10 @@ describe('Clean-room V2 design system', () => {
       expect(dailyLog).toContain('<template v-if="dialogMode !== \'view\'" #footer>')
       expect(dailyLog).toContain(':close-on-backdrop="dialogMode === \'view\'"')
       expect(dailyLog).toContain('@backdrop-click="warnUnsavedDialog"')
-      expect(dailyLog).toContain('class="daily-log-page__dialog-actions"')
-      expect(dailyLog).toContain('text="选择文件"')
-      expect(dailyLog).toContain('text="保存实际进度"')
-      expect(dailyLog).toContain('text="保存草稿"')
-      expect(dailyLog).toContain('text="提交定稿"')
+      expect(dailyLog).toContain('@click="openFilePicker"')
+      expect(dailyLog).toContain('保存实际进度')
+      expect(dailyLog).toContain('保存草稿')
+      expect(dailyLog).toContain('提交定稿')
       expect(dailyLog).toContain('class="daily-log-page__stack daily-log-page__linked-facts"')
       expect(workflow).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
       expect(workflow).toContain('title="审批详情"')
@@ -1275,10 +1390,11 @@ describe('Clean-room V2 design system', () => {
       expect(workflow).toContain('query: { returnTab: activeTab.value }')
       expect(workflow).toContain("const returnTab = String(route.query.returnTab ?? 'todo')")
       expect(workflow).toContain('<dt>审批事项</dt>')
-      expect(workflow).toContain('<V2GlassButton')
+      expect(workflow).toContain('<template #footer>')
+      expect(workflow).toContain('v-for="candidate in availableActions"')
+      expect(workflow).not.toContain('<V2GlassButton')
       expect(workflow).toContain('class="v2-detail-dialog__section"')
       expect(workflow).toContain('class="v2-detail-dialog__facts"')
-      expect(workflow).toContain('class="v2-detail-dialog__actions"')
       expect(workflow).toContain('class="v2-table__record-link"')
       expect(workflow).toContain('hide-label')
       expect(workflow).toContain(':close-disabled="actionLoading"')
@@ -1290,7 +1406,8 @@ describe('Clean-room V2 design system', () => {
       expect(workflow).toMatch(/class="v2-table__record-link"[\s\S]{0,80}size="small"/)
       expect(workflow).not.toContain('workflow-detail-overview')
       expect(workflow).not.toContain('workflow-summary')
-      expect(dashboard).toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
+      expect(dashboard).not.toContain('panel-class="v2-dialog-standard v2-detail-dialog"')
+      expect(dashboard).toContain('<template #title-suffix>')
       expect(dashboard).toContain('class="v2-detail-dialog__section"')
       expect(dashboard).not.toContain('dashboard-alert-detail')
       for (const [index, pageClass] of [
@@ -1358,10 +1475,13 @@ describe('Clean-room V2 design system', () => {
         expect(costControl).toContain(`type="submit" form="${formId}"`)
       }
       expect(costControl.match(/<template #footer>/g)).toHaveLength(3)
-      expect(costControl.match(/<V2GlassButton/g)).toHaveLength(3)
+      expect(costControl).not.toContain('<V2GlassButton')
+      expect(costControl.match(/variant="secondary"/g)?.length).toBeGreaterThanOrEqual(3)
       expect(components).toContain('.v2-detail-dialog .v2-card {')
       expect(components).toMatch(/\.v2-dialog-standard \{[\s\S]*?width: min\(32rem, 100%\);/)
-      expect(components).toMatch(/@media \(min-width: 64rem\) \{[\s\S]*?width: min\(46rem, 100%\);/)
+      expect(components).toMatch(
+        /@media \(min-width: 64rem\) \{[\s\S]*?width: min\(var\(--v2-dialog-width-standard\), 100%\);/,
+      )
       expect(components).toContain('scrollbar-width: none;')
       expect(components).toContain('.v2-dialog__panel::-webkit-scrollbar')
       expect(components).toContain('.v2-select__menu::-webkit-scrollbar')
@@ -1389,6 +1509,33 @@ describe('Clean-room V2 design system', () => {
       expect(components).toMatch(/\.v2-detail-dialog \.v2-card \{[\s\S]*?border: 0;/)
       expect(components).toMatch(/\.v2-detail-dialog \.v2-card \{[\s\S]*?background: transparent;/)
       expect(components).toMatch(/\.v2-detail-dialog__quick-actions \{[\s\S]*?display: flex;/)
+    })
+
+    it('keeps ledger detail routes modal and editor dismissal explicit', () => {
+      const project = readFileSync(resolve(sourceRoot, 'pages/projects/ProjectPage.vue'), 'utf-8')
+      const contract = readFileSync(
+        resolve(sourceRoot, 'pages/commercial/ContractPage.vue'),
+        'utf-8',
+      )
+      const variation = readFileSync(
+        resolve(sourceRoot, 'pages/commercial/VariationPage.vue'),
+        'utf-8',
+      )
+      const settlement = readFileSync(
+        resolve(sourceRoot, 'pages/settlement/SettlementWorkspacePage.vue'),
+        'utf-8',
+      )
+
+      expect(project).toContain(':open="mode !== \'list\' && Boolean(project)"')
+      expect(project).toContain(':close-on-backdrop="mode !== \'edit\'"')
+      expect(project).toContain('v-model:open="statusOpen"')
+      expect(contract).toContain(':close-on-backdrop="mode === \'detail\'"')
+      expect(contract).toContain(":open=\"mode !== 'ledger'")
+      expect(variation).toContain(":open=\"mode === 'create' || mode === 'edit'\"")
+      expect(variation).toContain(':close-on-backdrop="false"')
+      expect(variation).toContain(':open="mode === \'detail\'"')
+      expect(settlement).toContain(':open="isDetail"')
+      expect(settlement).toContain(':close-on-backdrop="!editable"')
     })
 
     it('keeps navigation accents separate from risk colors', () => {
@@ -1420,6 +1567,86 @@ describe('Clean-room V2 design system', () => {
         'V2PageState',
       ]) {
         expect(preview).toContain(`<${component}`)
+      }
+    })
+
+    it('keeps one navigable design-system gallery for foundations, pages, states and dialogs', () => {
+      const preview = readFileSync(
+        resolve(sourceRoot, 'components/preview/DesignSystemPreview.vue'),
+        'utf-8',
+      )
+
+      expect(preview).toContain('<nav class="preview-nav" aria-label="设计系统章节">')
+      for (const anchor of ['foundations', 'page-data', 'actions', 'forms-feedback', 'dialogs']) {
+        expect(preview).toContain(`href="#${anchor}"`)
+        expect(preview).toContain(`id="${anchor}"`)
+      }
+      for (const marker of [
+        'DomainNavigationIcon',
+        '<V2ActionMenu',
+        'v2-ledger-kpis',
+        'v2-table--top',
+        'role="region"',
+        '<caption class="v2-visually-hidden">',
+        'kind="empty"',
+        'kind="loading"',
+        'kind="error"',
+        'panel-class="v2-dialog-standard"',
+        'panel-class="v2-detail-dialog"',
+        'panel-class="v2-dialog-wide"',
+        'panel-class="v2-dialog-bottom-sheet"',
+      ]) {
+        expect(preview).toContain(marker)
+      }
+      for (const tone of ['neutral', 'info', 'success', 'warning', 'danger']) {
+        expect(preview).toContain(`tone="${tone}"`)
+      }
+      expect(preview).not.toMatch(/#[0-9a-f]{3,8}\b/i)
+    })
+
+    it('keeps the approval-detail V3 baseline fully shared and content-adaptive', () => {
+      const preview = readFileSync(
+        resolve(sourceRoot, 'components/preview/DesignSystemPreview.vue'),
+        'utf-8',
+      )
+      const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+
+      for (const sharedClass of [
+        'v2-detail-dialog__facts',
+        'v2-detail-dialog__section',
+        'v2-detail-dialog__section-heading',
+        'v2-detail-dialog__table',
+        'v2-detail-dialog__accent',
+      ]) {
+        expect(preview).toContain(sharedClass)
+        expect(components).toContain(`.${sharedClass}`)
+      }
+      expect(preview).not.toContain('preview-approval-')
+      expect(components).toMatch(/\.v2-dialog__panel\.v2-detail-dialog \{[\s\S]*?height: auto;/)
+      expect(components).toMatch(
+        /\.v2-dialog__body \{[\s\S]*?min-height: 0;[\s\S]*?overflow: auto;/,
+      )
+      expect(components).toMatch(
+        /\.v2-dialog__body \{[\s\S]*?scrollbar-width: none;[\s\S]*?\}[\s\S]*?\.v2-dialog__body::?-webkit-scrollbar/,
+      )
+      expect(components).toMatch(
+        /\.v2-dialog-standard \.v2-field__control,[\s\S]*?input:not\(\[type='checkbox'\]\):not\(\[type='radio'\]\):not\(\[type='file'\]\),[\s\S]*?width: 100%;/,
+      )
+      expect(components).toMatch(
+        /\.v2-detail-dialog__actions \{[\s\S]*?padding-block: var\(--v2-space-3\);[\s\S]*?border-top:/,
+      )
+      expect(components).toMatch(
+        /\.v2-dialog__panel \.v2-button \{[\s\S]*?padding-inline: var\(--v2-space-5\);[\s\S]*?border-radius: var\(--v2-radius-md\);/,
+      )
+      expect(components).toContain('.v2-dialog__panel.v2-dialog-wide')
+      expect(components).toContain('.v2-dialog__panel.v2-dialog-bottom-sheet')
+
+      for (const { name, source } of migratedPages) {
+        for (const [, facts] of source.matchAll(
+          /<dl\b[^>]*class="[^"]*v2-detail-dialog__facts[^"]*"[^>]*>([\s\S]*?)<\/dl>/g,
+        )) {
+          expect(facts.trimStart(), `${name} must group each shared detail fact`).toMatch(/^<div\b/)
+        }
       }
     })
 
@@ -1459,17 +1686,7 @@ describe('Clean-room V2 design system', () => {
     })
 
     it('locks the current V2 standard style contract', () => {
-      const baseline = readFileSync(
-        resolve(sourceRoot, '../../docs/ui-v2/m1-design-system-baseline.md'),
-        'utf-8',
-      )
-      const mainline = readFileSync(
-        resolve(
-          sourceRoot,
-          '../../docs/plans/第53条主线-CGC-PMS全量UI Clean-room V2重构任务计划书.md',
-        ),
-        'utf-8',
-      )
+      const baseline = readFileSync(uiStandardPath, 'utf-8')
       const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
       const glassButton = readFileSync(resolve(sourceRoot, 'components/V2GlassButton.vue'), 'utf-8')
       const dailyLog = readFileSync(resolve(sourceRoot, 'pages/delivery/DailyLogPage.vue'), 'utf-8')
@@ -1479,7 +1696,7 @@ describe('Clean-room V2 design system', () => {
       )
 
       for (const marker of [
-        '现行 V2 标准样式合同',
+        '唯一设计系统标准与门禁',
         'v2-dialog-standard',
         'v2-detail-dialog',
         'V2ConfirmDialog',
@@ -1489,16 +1706,14 @@ describe('Clean-room V2 design system', () => {
         expect(baseline).toContain(marker)
       }
       expect(baseline).not.toContain('21–28')
-      expect(baseline).toContain('审批工作台是受控例外')
-      expect(baseline).toContain('完整详情与快速预览均使用标准只读 `V2Dialog`')
-      expect(baseline).toContain('点击遮罩、按 Escape 或点击关闭按钮')
-      expect(baseline).toContain('页面标题区、筛选区、表格行、分页和正文中的')
-      expect(baseline).toContain('`V2ConfirmDialog` 继续使用语义明确的普通或危险按钮')
-      expect(mainline).not.toContain('每个实施阶段必须在 Stitch 交付可编辑设计')
-      expect(mainline).toContain('只有新增视觉方向、复杂交互或现有模式无法覆盖时')
+      expect(baseline).toContain('“审批详情”是唯一 V3 详情弹窗视觉基线')
+      expect(baseline).toContain('完整对象查看统一使用 `v2-detail-dialog` 覆盖原台账')
+      expect(baseline).toContain('只读查看允许点击遮罩、Escape或关闭按钮退出')
+      expect(baseline).toContain('业务弹窗页脚禁止 `V2GlassButton`')
+      expect(baseline).toContain('`V2ConfirmDialog` 使用普通或危险语义按钮')
 
       expect(components).toMatch(
-        /\.v2-detail-dialog__section \{[\s\S]*?margin-block-end: 10px;[\s\S]*?padding-block-end: 10px;[\s\S]*?color-mix\(in srgb, var\(--v2-color-primary\) 22%, var\(--v2-color-surface\)\);/,
+        /\.v2-detail-dialog__section \{[\s\S]*?padding: var\(--v2-space-5\) var\(--v2-space-6\);[\s\S]*?background: color-mix\(in srgb, var\(--v2-color-surface\) 54%, transparent\);[\s\S]*?border-radius: var\(--v2-dialog-radius\);[\s\S]*?box-shadow: var\(--v2-shadow-panel\);/,
       )
       expect(glassButton).toContain('color-mix(in srgb, var(--v2-color-surface) 50%, transparent)')
       expect(glassButton).toContain('backdrop-filter: blur(16px) saturate(160%);')
@@ -1507,6 +1722,8 @@ describe('Clean-room V2 design system', () => {
       expect(glassButton).toContain('.v2-glass-button.v2-button:active:not(:disabled)')
       expect(glassButton).toContain('.v2-glass-button.v2-button:focus-visible')
       expect(glassButton).toContain('@media (prefers-reduced-motion: reduce)')
+      expect(glassButton).toContain('padding-inline: var(--v2-space-5);')
+      expect(glassButton).toContain('border-radius: var(--v2-radius-md);')
 
       for (const source of [dailyLog, workflow]) {
         const previous = source.indexOf('上一页')

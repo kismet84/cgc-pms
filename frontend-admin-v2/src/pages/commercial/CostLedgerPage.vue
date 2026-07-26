@@ -269,7 +269,7 @@ onBeforeUnmount(() => {
         :open="detailOpen"
         title="成本台账详情"
         panel-class="v2-detail-dialog"
-        :close-on-backdrop="false"
+        :close-on-backdrop="true"
         @close="detailOpen = false"
         ><V2PageState
           v-if="detailLoading"
@@ -278,20 +278,34 @@ onBeforeUnmount(() => {
           kind="loading"
         />
         <dl v-else-if="detail" class="v2-detail-dialog__facts">
-          <dt>项目</dt>
-          <dd>{{ detail.projectName || '—' }}</dd>
-          <dt>合同</dt>
-          <dd>{{ detail.contractName || (detail.contractId ? '合同名称缺失' : '—') }}</dd>
-          <dt>成本科目</dt>
-          <dd>{{ detail.costSubjectName || costTypeLabel(detail.costType) }}</dd>
-          <dt>成本来源</dt>
-          <dd>{{ sourceTypeLabel(detail.sourceType) }}</dd>
-          <dt>含税金额</dt>
-          <dd>{{ detail.amount }}</dd>
-          <dt>未税金额</dt>
-          <dd>{{ detail.amountWithoutTax }}</dd>
-          <dt>状态</dt>
-          <dd>{{ costStatusLabel(detail.costStatus) }}</dd>
+          <div>
+            <dt>项目</dt>
+            <dd>{{ detail.projectName || '—' }}</dd>
+          </div>
+          <div>
+            <dt>合同</dt>
+            <dd>{{ detail.contractName || (detail.contractId ? '合同名称缺失' : '—') }}</dd>
+          </div>
+          <div>
+            <dt>成本科目</dt>
+            <dd>{{ detail.costSubjectName || costTypeLabel(detail.costType) }}</dd>
+          </div>
+          <div>
+            <dt>成本来源</dt>
+            <dd>{{ sourceTypeLabel(detail.sourceType) }}</dd>
+          </div>
+          <div>
+            <dt>含税金额</dt>
+            <dd>{{ detail.amount }}</dd>
+          </div>
+          <div>
+            <dt>未税金额</dt>
+            <dd>{{ detail.amountWithoutTax }}</dd>
+          </div>
+          <div>
+            <dt>状态</dt>
+            <dd>{{ costStatusLabel(detail.costStatus) }}</dd>
+          </div>
         </dl></V2Dialog
       ></template
     >

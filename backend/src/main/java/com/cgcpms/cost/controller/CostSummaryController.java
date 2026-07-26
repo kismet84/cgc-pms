@@ -10,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/cost-summary")
@@ -17,6 +18,15 @@ import java.util.List;
 public class CostSummaryController {
 
     private final CostSummaryService costSummaryService;
+
+    @GetMapping
+    @PreAuthorize("hasAuthority('cost:summary:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Map<String, Object>> getAccessible() {
+        List<CostProjectSummaryVO> projects = costSummaryService.getAccessibleProjectSummaries();
+        return ApiResponse.success(Map.of(
+                "accessibleProjectCount", projects.size(),
+                "projects", projects));
+    }
 
     @GetMapping("/{projectId}")
     @PreAuthorize("hasAuthority('cost:summary:view') or hasAnyRole('ADMIN','SUPER_ADMIN')")

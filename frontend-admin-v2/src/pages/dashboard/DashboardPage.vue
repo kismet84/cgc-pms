@@ -18,7 +18,6 @@ import {
   V2Button,
   V2Card,
   V2Dialog,
-  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -1005,22 +1004,23 @@ function isAbort(errorValue: unknown): boolean {
 
     <V2Dialog
       :open="Boolean(selectedAlert)"
-      title="预警详情"
+      title="预警处置"
       description="查看预警记录并执行当前账号允许的操作。"
-      close-label="关闭预警详情"
-      panel-class="v2-dialog-standard v2-detail-dialog"
+      close-label="关闭预警处置"
       :close-on-backdrop="false"
       @close="selectedAlert = null"
     >
+      <template #title-suffix>
+        <V2Badge v-if="selectedAlert" :tone="severityTone(selectedAlert.severity)">{{
+          DASHBOARD_RISK_LABELS[alertRiskLevel(selectedAlert.severity)]
+        }}</V2Badge>
+      </template>
       <template v-if="selectedAlert">
         <V2Alert v-if="alertError" tone="danger" title="处置未完成">{{ alertError }}</V2Alert>
         <V2Alert v-if="alertActionMessage" tone="info" title="操作结果">
           {{ alertActionMessage }}
         </V2Alert>
         <div class="v2-detail-dialog__section">
-          <V2Badge :tone="severityTone(selectedAlert.severity)">{{
-            DASHBOARD_RISK_LABELS[alertRiskLevel(selectedAlert.severity)]
-          }}</V2Badge>
           <p class="v2-detail-dialog__message">{{ selectedAlert.message }}</p>
           <dl class="v2-detail-dialog__facts">
             <div>
@@ -1042,22 +1042,6 @@ function isAbort(errorValue: unknown): boolean {
           </dl>
         </div>
         <div v-if="canEditAlerts" class="v2-detail-dialog__actions">
-          <div class="v2-detail-dialog__quick-actions">
-            <V2GlassButton
-              v-if="selectedAlert.isRead !== 1"
-              text="标记已读"
-              :loading="alertActionLoading"
-              @click="markSelectedAlertRead"
-            />
-            <V2GlassButton
-              v-if="
-                (selectedAlert.processStatus || 'OPEN') === 'OPEN' && !selectedAlert.acknowledgedBy
-              "
-              text="接单"
-              :loading="alertActionLoading"
-              @click="acknowledgeSelectedAlert"
-            />
-          </div>
           <div class="v2-detail-dialog__form-row">
             <V2Select
               v-model="targetAlertStatus"
@@ -1065,14 +1049,41 @@ function isAbort(errorValue: unknown): boolean {
               :options="targetAlertStatusOptions"
             />
             <V2Input v-model="alertRemark" label="处理说明" placeholder="必填，最多500字" />
-            <V2GlassButton
-              text="确认处置"
-              :loading="alertActionLoading"
-              @click="disposeSelectedAlert"
-            />
           </div>
         </div>
         <p v-else class="v2-detail-dialog__readonly">当前账号仅可查看预警。</p>
+      </template>
+      <template #footer>
+        <V2Button
+          v-if="canEditAlerts && selectedAlert?.isRead !== 1"
+          type="button"
+          variant="secondary"
+          :loading="alertActionLoading"
+          @click="markSelectedAlertRead"
+        >
+          标记已读
+        </V2Button>
+        <V2Button
+          v-if="
+            canEditAlerts &&
+            (selectedAlert?.processStatus || 'OPEN') === 'OPEN' &&
+            !selectedAlert?.acknowledgedBy
+          "
+          type="button"
+          variant="secondary"
+          :loading="alertActionLoading"
+          @click="acknowledgeSelectedAlert"
+        >
+          接单
+        </V2Button>
+        <V2Button
+          v-if="canEditAlerts"
+          type="button"
+          :loading="alertActionLoading"
+          @click="disposeSelectedAlert"
+        >
+          确认处置
+        </V2Button>
       </template>
     </V2Dialog>
   </section>
@@ -1141,7 +1152,7 @@ function isAbort(errorValue: unknown): boolean {
   min-width: 0;
   overflow: hidden;
   background: var(--v2-color-surface);
-  border: 1px solid var(--v2-color-border);
+  border: var(--v2-border-width) solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
   box-shadow: var(--v2-shadow-panel);
 }
@@ -1153,7 +1164,7 @@ function isAbort(errorValue: unknown): boolean {
   align-items: center;
   justify-content: space-between;
   gap: var(--v2-space-3);
-  border-bottom: 1px solid var(--v2-color-border-subtle);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border-subtle);
   color: var(--v2-color-text-strong);
   font-size: var(--v2-font-size-15);
   font-weight: var(--v2-font-weight-bold);
@@ -1220,7 +1231,7 @@ function isAbort(errorValue: unknown): boolean {
 .highest-risk {
   min-width: 0;
   padding: var(--v2-space-3) var(--v2-space-5);
-  border-inline: 1px solid var(--v2-color-border-subtle);
+  border-inline: var(--v2-border-width) solid var(--v2-color-border-subtle);
 }
 .highest-risk__tag {
   display: inline-flex;
@@ -1253,7 +1264,7 @@ function isAbort(errorValue: unknown): boolean {
 .health-metric {
   min-width: 0;
   padding: var(--v2-space-7) var(--v2-space-4) var(--v2-space-4);
-  border-inline-end: 1px solid var(--v2-color-border-subtle);
+  border-inline-end: var(--v2-border-width) solid var(--v2-color-border-subtle);
 }
 .health-metric:last-child {
   border-inline-end: 0;
@@ -1330,7 +1341,7 @@ function isAbort(errorValue: unknown): boolean {
   justify-content: space-between;
   min-height: var(--v2-control-height-touch);
   padding: var(--v2-space-2) var(--v2-space-4);
-  border-bottom: 1px solid var(--v2-color-border-subtle);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border-subtle);
 }
 .dashboard-activity-list li > div {
   display: grid;
@@ -1386,8 +1397,8 @@ function isAbort(errorValue: unknown): boolean {
 .finance-summary-grid article {
   min-width: 0;
   padding: var(--v2-space-4);
-  border-inline-end: 1px solid var(--v2-color-border-subtle);
-  border-block-end: 1px solid var(--v2-color-border-subtle);
+  border-inline-end: var(--v2-border-width) solid var(--v2-color-border-subtle);
+  border-block-end: var(--v2-border-width) solid var(--v2-color-border-subtle);
 }
 .finance-summary-grid article:nth-child(4n) {
   border-inline-end: 0;
@@ -1419,7 +1430,7 @@ function isAbort(errorValue: unknown): boolean {
   justify-content: flex-end;
   gap: var(--v2-space-2);
   padding: var(--v2-space-2) var(--v2-space-3);
-  border-top: 1px solid var(--v2-color-border-subtle);
+  border-top: var(--v2-border-width) solid var(--v2-color-border-subtle);
   color: var(--v2-color-text-muted);
   font-size: var(--v2-font-size-11);
 }
@@ -1446,7 +1457,7 @@ function isAbort(errorValue: unknown): boolean {
   height: var(--v2-space-6);
   align-items: center;
   justify-content: center;
-  border: 1px solid;
+  border: var(--v2-border-width) solid;
   border-radius: var(--v2-radius-xs);
   font-weight: var(--v2-font-weight-bold);
 }
@@ -1486,7 +1497,7 @@ function isAbort(errorValue: unknown): boolean {
 }
 .quick-entry {
   padding-inline-end: var(--v2-space-6);
-  border-inline-end: 1px solid var(--v2-color-border-subtle);
+  border-inline-end: var(--v2-border-width) solid var(--v2-color-border-subtle);
 }
 .recent-entry {
   padding-inline-start: var(--v2-space-7);
@@ -1554,7 +1565,7 @@ function isAbort(errorValue: unknown): boolean {
   }
   .health-metrics {
     grid-column: 1 / -1;
-    border-top: 1px solid var(--v2-color-border-subtle);
+    border-top: var(--v2-border-width) solid var(--v2-color-border-subtle);
   }
   .health-metric {
     padding: var(--v2-space-6) var(--v2-space-5);
@@ -1585,7 +1596,7 @@ function isAbort(errorValue: unknown): boolean {
   }
   .highest-risk {
     border-inline: 0;
-    border-block: 1px solid var(--v2-color-border-subtle);
+    border-block: var(--v2-border-width) solid var(--v2-color-border-subtle);
   }
   .health-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1597,7 +1608,7 @@ function isAbort(errorValue: unknown): boolean {
     border-inline-end: 0;
   }
   .finance-summary-grid article:nth-last-child(-n + 4) {
-    border-block-end: 1px solid var(--v2-color-border-subtle);
+    border-block-end: var(--v2-border-width) solid var(--v2-color-border-subtle);
   }
   .finance-summary-grid article:nth-last-child(-n + 2) {
     border-block-end: 0;
@@ -1625,7 +1636,7 @@ function isAbort(errorValue: unknown): boolean {
   .quick-entry {
     padding: 0 0 var(--v2-space-5);
     border-inline-end: 0;
-    border-block-end: 1px solid var(--v2-color-border-subtle);
+    border-block-end: var(--v2-border-width) solid var(--v2-color-border-subtle);
   }
   .recent-entry {
     padding: var(--v2-space-5) 0 0;

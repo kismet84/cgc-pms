@@ -366,8 +366,10 @@ test.describe('M6 settlement V2', () => {
     await selectOption(form, /^分包合同：/, /SUB-2026-001 · 主体结构劳务分包合同/)
     await form.getByLabel('终期扣款').fill('0.00')
     await form.getByRole('button', { name: '保存', exact: true }).dblclick()
-    await expect(page).toHaveURL(/\/v2\/settlement\/S2/)
+    await expect(page).toHaveURL(/\/v2\/settlement\/list\?projectId=P1/)
     await expect(page.getByText('STL-2026-002', { exact: true })).toBeVisible()
+    await page.getByRole('button', { name: 'STL-2026-002' }).click()
+    await expect(page).toHaveURL(/\/v2\/settlement\/S2/)
 
     await page.getByRole('button', { name: '维护明细' }).click()
     const items = page.getByRole('dialog', { name: '维护结算明细' })
@@ -388,7 +390,12 @@ test.describe('M6 settlement V2', () => {
       .getByRole('dialog', { name: '提交结算审批' })
       .getByRole('button', { name: '确认提交' })
       .click()
-    await expect(page.getByText('审批中', { exact: true }).first()).toBeVisible()
+    await expect(
+      page
+        .getByRole('row')
+        .filter({ hasText: 'STL-2026-002' })
+        .getByText('审批中', { exact: true }),
+    ).toBeVisible()
 
     expect(state.writes.filter((item) => item === 'POST /settlements')).toHaveLength(1)
     expect(state.writes.filter((item) => item.endsWith('/items/batch'))).toHaveLength(1)

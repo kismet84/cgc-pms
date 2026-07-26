@@ -107,9 +107,11 @@ describe('M4 bid cost page', () => {
 
     expect(source).toContain('class="v2-table__record-link"')
     expect(source).toContain('@click="openDetail(record.id)"')
-    expect(source).toContain('class="v2-detail-dialog__quick-actions"')
+    expect(source).toContain('v-else-if="panelMode === \'detail\'" #footer')
     expect(source).toContain('id="bid-cost-form"')
-    expect(source.indexOf('text="取消"')).toBeLessThan(source.indexOf('form="bid-cost-form"'))
+    expect(source.indexOf('variant="secondary"')).toBeLessThan(
+      source.indexOf('form="bid-cost-form"'),
+    )
     expect(style).not.toMatch(/\.bid-cost-page__table-wrap\s*\{/)
     expect(style).not.toMatch(/\.bid-cost-page__table\s+(?:th|td)/)
     expect(style).not.toMatch(/textarea\s*\{[^}]*\b(?:background|border|color|padding)\s*:/)
@@ -256,7 +258,7 @@ describe('M4 bid cost page', () => {
     const dialog = wrapper.get('[role="dialog"]')
     const labels = dialog.findAll('button').map((item) => item.text())
     expect(labels.indexOf('取消')).toBeLessThan(labels.indexOf('创建'))
-    expect(button(wrapper, '创建')?.classes()).toContain('v2-glass-button')
+    expect(button(wrapper, '创建')?.classes()).toContain('v2-button--primary')
     expect(dialog.get('form').attributes()).toHaveProperty('novalidate')
     await dialog.get('form').trigger('submit')
 

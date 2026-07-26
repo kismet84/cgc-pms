@@ -656,7 +656,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="subcontract-workspace">
+  <section class="subcontract-workspace">
     <V2PageState
       v-if="!canQuery"
       kind="forbidden"
@@ -771,7 +771,7 @@ onBeforeUnmount(() => {
         :title="`${title}详情`"
         :description="selected ? recordCode(selected) : ''"
         panel-class="v2-detail-dialog"
-        :close-on-backdrop="false"
+        :close-on-backdrop="!selectedEditable"
         @close="clearDetail"
       >
         <V2PageState
@@ -867,42 +867,6 @@ onBeforeUnmount(() => {
               </div>
             </template>
           </dl>
-          <div class="subcontract-workspace__actions">
-            <V2Button
-              v-if="selectedEditable"
-              type="button"
-              size="small"
-              variant="secondary"
-              @click="openForm(selected)"
-              >编辑</V2Button
-            >
-            <V2Button
-              v-if="selectedMeasure && selectedEditable"
-              type="button"
-              size="small"
-              variant="secondary"
-              @click="openItems"
-              >维护计量清单</V2Button
-            >
-            <V2Button
-              v-if="selectedSubmittable"
-              type="button"
-              size="small"
-              :loading="busy"
-              @click="submitSelected"
-              >提交审批</V2Button
-            >
-            <V2Button
-              v-if="canDelete"
-              type="button"
-              size="small"
-              variant="danger"
-              :loading="busy"
-              @click="removeSelected"
-              >删除</V2Button
-            >
-          </div>
-
           <template v-if="selectedMeasure">
             <h3>计量清单</h3>
             <V2PageState
@@ -980,6 +944,33 @@ onBeforeUnmount(() => {
             </div>
           </template>
         </template>
+        <template #footer>
+          <V2Button
+            v-if="selectedEditable"
+            type="button"
+            variant="secondary"
+            @click="openForm(selected)"
+            >编辑</V2Button
+          >
+          <V2Button
+            v-if="selectedMeasure && selectedEditable"
+            type="button"
+            variant="secondary"
+            @click="openItems"
+            >维护计量清单</V2Button
+          >
+          <V2Button
+            v-if="canDelete"
+            type="button"
+            variant="danger"
+            :loading="busy"
+            @click="removeSelected"
+            >删除</V2Button
+          >
+          <V2Button v-if="selectedSubmittable" type="button" :loading="busy" @click="submitSelected"
+            >提交审批</V2Button
+          >
+        </template>
       </V2Dialog>
 
       <V2Dialog
@@ -989,7 +980,11 @@ onBeforeUnmount(() => {
         :close-disabled="busy"
         :close-on-backdrop="false"
       >
-        <form class="subcontract-workspace__form" @submit.prevent="saveForm">
+        <form
+          id="subcontract-workspace-editor-form"
+          class="subcontract-workspace__form"
+          @submit.prevent="saveForm"
+        >
           <V2Select
             v-model="form.projectId"
             label="项目"
@@ -1045,13 +1040,15 @@ onBeforeUnmount(() => {
           </template>
           <V2Select v-model="form.status" label="状态" :options="statusOptions" required />
           <V2Input v-model="form.remark" label="备注" />
-          <div class="subcontract-workspace__actions">
-            <V2Button type="submit" :loading="busy">保存</V2Button>
-            <V2Button type="button" variant="secondary" :disabled="busy" @click="formOpen = false"
-              >取消</V2Button
-            >
-          </div>
         </form>
+        <template #footer>
+          <V2Button type="button" variant="secondary" :disabled="busy" @click="formOpen = false"
+            >取消</V2Button
+          >
+          <V2Button type="submit" form="subcontract-workspace-editor-form" :loading="busy">
+            保存
+          </V2Button>
+        </template>
       </V2Dialog>
 
       <V2Dialog
@@ -1061,7 +1058,11 @@ onBeforeUnmount(() => {
         :close-disabled="busy"
         :close-on-backdrop="false"
       >
-        <form class="subcontract-workspace__form" @submit.prevent="saveItems">
+        <form
+          id="subcontract-workspace-items-form"
+          class="subcontract-workspace__form"
+          @submit.prevent="saveItems"
+        >
           <div
             v-for="(item, index) in itemDrafts"
             :key="index"
@@ -1096,13 +1097,15 @@ onBeforeUnmount(() => {
             @click="addItemDraft"
             >添加清单项</V2Button
           >
-          <div class="subcontract-workspace__actions">
-            <V2Button type="submit" :loading="busy">保存清单</V2Button>
-            <V2Button type="button" variant="secondary" :disabled="busy" @click="itemsOpen = false"
-              >取消</V2Button
-            >
-          </div>
         </form>
+        <template #footer>
+          <V2Button type="button" variant="secondary" :disabled="busy" @click="itemsOpen = false"
+            >取消</V2Button
+          >
+          <V2Button type="submit" form="subcontract-workspace-items-form" :loading="busy">
+            保存清单
+          </V2Button>
+        </template>
       </V2Dialog>
 
       <V2ConfirmDialog
@@ -1116,13 +1119,13 @@ onBeforeUnmount(() => {
         @confirm="confirmAction"
       />
     </template>
-  </main>
+  </section>
 </template>
 
 <style scoped>
 .subcontract-workspace {
   display: grid;
-  gap: var(--space-4);
+  gap: var(--v2-space-4);
 }
 .subcontract-workspace__filters,
 .subcontract-workspace__actions,
@@ -1131,7 +1134,7 @@ onBeforeUnmount(() => {
 .subcontract-workspace__pagination > div {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--v2-space-2);
   flex-wrap: wrap;
 }
 .subcontract-workspace__table-wrap {
@@ -1139,38 +1142,38 @@ onBeforeUnmount(() => {
 }
 .subcontract-workspace__pagination {
   justify-content: space-between;
-  padding-top: var(--space-3);
+  padding-top: var(--v2-space-3);
 }
 .subcontract-workspace__facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-3);
+  gap: var(--v2-space-3);
 }
 .subcontract-workspace__facts div {
-  padding: var(--space-3);
-  background: var(--color-surface-subtle);
-  border-radius: var(--radius-md);
+  padding: var(--v2-space-3);
+  background: var(--v2-color-surface-subtle);
+  border-radius: var(--v2-radius-md);
 }
 .subcontract-workspace__facts dt {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-12);
 }
 .subcontract-workspace__facts dd {
-  margin: var(--space-1) 0 0;
+  margin: var(--v2-space-1) 0 0;
 }
 .subcontract-workspace__form {
   display: grid;
-  gap: var(--space-3);
+  gap: var(--v2-space-3);
 }
 .subcontract-workspace__item-row {
   display: grid;
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
-  gap: var(--space-2);
+  gap: var(--v2-space-2);
   align-items: end;
 }
 .subcontract-workspace__files {
   display: grid;
-  gap: var(--space-2);
+  gap: var(--v2-space-2);
   padding: 0;
   list-style: none;
 }
@@ -1178,11 +1181,11 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-2);
+  gap: var(--v2-space-2);
 }
 .subcontract-workspace__upload label {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--v2-space-1);
 }
 @media (max-width: 720px) {
   .subcontract-workspace__facts {

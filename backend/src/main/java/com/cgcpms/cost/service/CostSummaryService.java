@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -291,6 +292,12 @@ public class CostSummaryService {
         return getProjectSummary(UserContext.getCurrentTenantId(), projectId);
     }
 
+    public List<CostProjectSummaryVO> getAccessibleProjectSummaries() {
+        Long tenantId = currentTenantIdRequired();
+        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+        return new ArrayList<>(getBatchProjectSummaries(tenantId, projectIds).values());
+    }
+
     public CostProjectSummaryVO getProjectSummary(Long tenantId, Long projectId) {
         PmProject project = assembler.requireProjectInTenant(tenantId, projectId);
         List<CostSummaryVO> subjects = getSummary(tenantId, projectId);
@@ -368,7 +375,10 @@ public class CostSummaryService {
         if (projectMap.isEmpty()) {
             return Collections.emptyMap();
         }
-        List<Long> validProjectIds = new ArrayList<>(projectMap.keySet());
+        List<Long> validProjectIds = projectIds.stream()
+                .filter(projectMap::containsKey)
+                .distinct()
+                .toList();
 
         // 2. Batch load cost_summary for all projects
         List<CostSummary> allSummaries = costSummaryMapper.selectList(
@@ -402,6 +412,42 @@ public class CostSummaryService {
         Map<Long, List<MatReceipt>> matReceiptsByProject = allMatReceipts.stream()
                 .collect(Collectors.groupingBy(MatReceipt::getProjectId));
 
+        List<CostItem> confirmedRevenueItems = costItemMapper.selectList(
+                new LambdaQueryWrapper<CostItem>()
+                        .eq(CostItem::getTenantId, tenantId)
+                        .in(CostItem::getProjectId, validProjectIds)
+                        .eq(CostItem::getCostStatus, "CONFIRMED")
+                        .eq(CostItem::getCostType, "REVENUE_CONFIRMED"));
+        Map<Long, BigDecimal> confirmedRevenueByProject = confirmedRevenueItems.stream()
+                .collect(Collectors.groupingBy(CostItem::getProjectId,
+                        Collectors.reducing(BigDecimal.ZERO,
+                                item -> item.getAmount() == null ? BigDecimal.ZERO : item.getAmount(),
+                                BigDecimal::add)));
+
+        List<CostTarget> activeTargets = costTargetMapper.selectList(
+                new LambdaQueryWrapper<CostTarget>()
+                        .eq(CostTarget::getTenantId, tenantId)
+                        .in(CostTarget::getProjectId, validProjectIds)
+                        .eq(CostTarget::getIsActive, 1)
+                        .eq(CostTarget::getApprovalStatus, "APPROVED")
+                        .eq(CostTarget::getStatus, "ACTIVE"));
+        Map<Long, CostTarget> activeTargetByProject = activeTargets.stream()
+                .collect(Collectors.toMap(CostTarget::getProjectId, target -> target, (a, b) -> a));
+
+        String placeholders = String.join(",", Collections.nCopies(validProjectIds.size(), "?"));
+        List<Object> forecastArgs = new ArrayList<>(validProjectIds.size() + 1);
+        forecastArgs.add(tenantId);
+        forecastArgs.addAll(validProjectIds);
+        List<Map<String, Object>> confirmedForecasts = jdbc.queryForList(
+                "SELECT * FROM cost_forecast WHERE tenant_id=? AND project_id IN (" + placeholders
+                        + ") AND status IN('ACTION_REQUIRED','CONTROLLED') AND deleted_flag=0"
+                        + " ORDER BY project_id,version_no DESC,id DESC",
+                forecastArgs.toArray());
+        Map<Long, Map<String, Object>> latestForecastByProject = new HashMap<>();
+        for (Map<String, Object> forecast : confirmedForecasts) {
+            latestForecastByProject.putIfAbsent(longNullable(forecast.get("project_id")), forecast);
+        }
+
         // 4. Build result map
         Map<Long, CostProjectSummaryVO> result = new LinkedHashMap<>();
         for (Long projectId : validProjectIds) {
@@ -421,7 +467,10 @@ public class CostSummaryService {
                         .collect(Collectors.toList())
                     : Collections.emptyList();
 
-            BigDecimal targetCost = project.getTargetCost() != null ? project.getTargetCost() : BigDecimal.ZERO;
+            CostTarget activeTarget = activeTargetByProject.get(projectId);
+            BigDecimal targetCost = activeTarget != null && activeTarget.getTotalTargetAmount() != null
+                    ? activeTarget.getTotalTargetAmount()
+                    : project.getTargetCost() != null ? project.getTargetCost() : BigDecimal.ZERO;
             BigDecimal contractLockedCost = latestSummaries.stream()
                     .map(s -> s.getContractLockedCost() != null ? s.getContractLockedCost() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -456,10 +505,11 @@ public class CostSummaryService {
                     .map(c -> c.getCurrentAmount() != null ? c.getCurrentAmount()
                             : c.getContractAmount() != null ? c.getContractAmount() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal projectConfirmedRevenue = assembler.computeBatchProjectConfirmedRevenue(tenantId, projectId);
+            BigDecimal projectConfirmedRevenue = confirmedRevenueByProject.getOrDefault(projectId, BigDecimal.ZERO);
             BigDecimal dynamicCost = actualCost.add(estimatedRemainingCost);
             BigDecimal expectedProfit = contractIncome.subtract(dynamicCost);
             BigDecimal costDeviation = dynamicCost.subtract(targetCost);
+            Map<String, Object> forecast = latestForecastByProject.getOrDefault(projectId, Collections.emptyMap());
 
             CostProjectSummaryVO vo = new CostProjectSummaryVO();
             vo.setProjectId(projectId.toString());
@@ -474,10 +524,15 @@ public class CostSummaryService {
             vo.setConfirmedRevenue(projectConfirmedRevenue.toPlainString());
             vo.setExpectedProfit(expectedProfit.toPlainString());
             vo.setCostDeviation(costDeviation.toPlainString());
-            vo.setResponsibilityCost(targetCost.toPlainString());
-            vo.setForecastAtCompletionCost(dynamicCost.toPlainString());
-            vo.setForecastProfit(expectedProfit.toPlainString());
-            vo.setProfitMargin(contractIncome.compareTo(BigDecimal.ZERO) == 0 ? "0.000000" : expectedProfit.divide(contractIncome, 6, java.math.RoundingMode.HALF_UP).toPlainString());
+            vo.setCostTargetId(activeTarget == null ? null : String.valueOf(activeTarget.getId()));
+            vo.setCostForecastId(forecast.isEmpty() ? null : String.valueOf(forecast.get("id")));
+            vo.setResponsibilityCost(decimal(forecast.getOrDefault("responsibility_amount", targetCost)).toPlainString());
+            vo.setForecastAtCompletionCost(decimal(forecast.getOrDefault("forecast_at_completion_amount", dynamicCost)).toPlainString());
+            vo.setForecastProfit(decimal(forecast.getOrDefault("forecast_profit_amount", expectedProfit)).toPlainString());
+            vo.setProfitMargin(forecast.isEmpty()
+                    ? (contractIncome.compareTo(BigDecimal.ZERO) == 0 ? "0.000000"
+                    : expectedProfit.divide(contractIncome, 6, java.math.RoundingMode.HALF_UP).toPlainString())
+                    : decimal(forecast.get("profit_margin")).toPlainString());
             vo.setSubjects(Collections.emptyList());
 
             result.put(projectId, vo);
@@ -591,5 +646,11 @@ public class CostSummaryService {
     private static Long longNullable(Object value) {
         if (value == null) return null;
         return value instanceof Number number ? number.longValue() : Long.valueOf(String.valueOf(value));
+    }
+
+    private static Long currentTenantIdRequired() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (tenantId == null) throw new BusinessException("TENANT_CONTEXT_REQUIRED", "缺少租户上下文");
+        return tenantId;
     }
 }

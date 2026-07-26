@@ -167,7 +167,8 @@ test.describe('M4-1 approval workbench', () => {
       await expect(detailDialog).toHaveClass(/v2-detail-dialog/)
       await expect(detailDialog.getByText('付款申请审批', { exact: true })).toBeVisible()
       await expect(detailDialog.getByText('PAY-2026-001', { exact: true })).toBeVisible()
-      await expect(detailDialog.locator('.v2-glass-button')).not.toHaveCount(0)
+      await expect(detailDialog.locator('.v2-glass-button')).toHaveCount(0)
+      expect(await detailDialog.locator('.v2-button').count()).toBeGreaterThan(0)
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)

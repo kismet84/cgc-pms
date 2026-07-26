@@ -87,10 +87,19 @@
   --v2-shadow-float: 0 16px 42px rgb(31 52 80 / 16%);
   --v2-shadow-primary: 0 6px 18px rgb(37 99 235 / 18%);
   --v2-shadow-control: 0 1px 3px rgb(31 52 80 / 8%);
-  --v2-dialog-surface: rgb(245 248 252 / 88%);
+  --v2-dialog-surface: rgb(245 249 255 / 72%);
+  --v2-dialog-border: rgb(255 255 255 / 88%);
+  --v2-dialog-backdrop: rgb(148 171 207 / 20%);
   --v2-dialog-divider: rgb(94 118 150 / 14%);
-  --v2-dialog-radius: 1.5625rem;
-  --v2-dialog-shadow: 0 18px 45px rgb(45 68 98 / 20%), 0 3px 10px rgb(61 88 121 / 8%);
+  --v2-dialog-radius: 2.5rem;
+  --v2-dialog-shadow:
+    0 30px 80px rgb(49 79 128 / 24%), inset 0 1px 1px rgb(255 255 255 / 98%),
+    inset 0 -1px 0 rgb(125 164 224 / 18%);
+  --v2-dialog-width-standard: 46rem;
+  --v2-dialog-width-detail: 65rem;
+  --v2-dialog-max-height: 55rem;
+  --v2-dialog-blur: 2.125rem;
+  --v2-dialog-backdrop-blur: 0.9375rem;
   --v2-toast-accent: var(--v2-color-primary);
   --v2-toast-surface: color-mix(in srgb, var(--v2-color-primary-soft) 82%, transparent);
   --v2-toast-surface-success: color-mix(in srgb, var(--v2-color-success-soft) 82%, transparent);

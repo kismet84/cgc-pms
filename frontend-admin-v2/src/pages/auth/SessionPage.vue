@@ -17,12 +17,12 @@ async function signOut(): Promise<void> {
 
 <template>
   <main class="session-page">
-    <V2Card
-      title="安全会话已恢复"
-      subtitle="当前页面只验证认证契约，不加载业务数据"
-      class="session-card"
-    >
+    <V2Card class="session-card">
       <V2Stack :gap="5">
+        <div class="session-heading">
+          <h1>安全会话已恢复</h1>
+          <p>当前页面只验证认证契约，不加载业务数据</p>
+        </div>
         <V2Alert title="登录状态正常" tone="success">
           请求通过 HttpOnly 同源 Cookie 鉴权，前端不持有 token。
         </V2Alert>
@@ -68,6 +68,17 @@ async function signOut(): Promise<void> {
 
 .session-card {
   width: min(38rem, 100%);
+}
+
+.session-heading h1,
+.session-heading p {
+  margin: 0;
+}
+
+.session-heading p {
+  margin-block-start: var(--v2-space-2);
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-12);
 }
 
 .session-summary {

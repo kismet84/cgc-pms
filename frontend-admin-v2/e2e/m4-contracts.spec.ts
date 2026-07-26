@@ -305,7 +305,8 @@ test.describe('M4 contract routes', () => {
     await page.goto('/v2/contract/ledger?projectId=P1#ledger')
     await expect(page.locator('.shell-placeholder')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: '合同台账', exact: true })).toBeVisible()
-    await expect(page.locator('.contract-page__kpi-grid > div')).toHaveCount(5)
+    await expect(page.locator('.contract-page__kpi-grid')).toHaveCount(0)
+    await expect(page.locator('.v2-ledger-kpis > div')).toHaveCount(5)
     await expect(
       page.locator('.contract-page__list-card').getByRole('button', { name: '新建合同' }),
     ).toBeVisible()

@@ -81,6 +81,7 @@ function onKeydown(event: KeyboardEvent) {
 
 function onDocumentKeydown(event: KeyboardEvent) {
   if (!props.open || event.defaultPrevented || event.key !== 'Escape') return
+  if (!props.closeOnBackdrop) return
   const openPanels = document.querySelectorAll<HTMLElement>('.v2-dialog__panel')
   if (!panel.value || openPanels.item(openPanels.length - 1) !== panel.value) return
   event.preventDefault()
@@ -126,7 +127,10 @@ onBeforeUnmount(() => {
         >
           <header class="v2-dialog__header">
             <div>
-              <h2 :id="titleId" class="v2-dialog__title">{{ title }}</h2>
+              <h2 :id="titleId" class="v2-dialog__title">
+                <span>{{ title }}</span>
+                <slot name="title-suffix" />
+              </h2>
               <p v-if="description" :id="descriptionId" class="v2-dialog__description">
                 {{ description }}
               </p>

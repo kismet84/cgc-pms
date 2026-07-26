@@ -16,7 +16,6 @@ import {
   V2Card,
   V2ConfirmDialog,
   V2Dialog,
-  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -939,7 +938,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
         </label>
       </form>
       <template #footer>
-        <V2GlassButton text="取消" :on-click="() => (createOpen = false)" />
+        <V2Button type="button" variant="secondary" @click="createOpen = false">取消</V2Button>
         <V2Button type="submit" form="schedule-create-form" :loading="saving">创建计划</V2Button>
       </template>
     </V2Dialog>
@@ -949,7 +948,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
       title="维护 WBS"
       description="仅支持单前置 FS；权重合计必须等于 100%。"
       :close-on-backdrop="false"
-      panel-class="v2-dialog-standard schedule-page__dialog-wide"
+      panel-class="v2-dialog-standard v2-dialog-wide"
     >
       <form id="schedule-wbs-form" class="schedule-page__stack" @submit.prevent="saveWbs">
         <article v-for="(task, index) in wbsRows" :key="task.key" class="schedule-page__panel">
@@ -1147,7 +1146,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
 }
 .schedule-page__panel {
   padding: var(--v2-space-3);
-  border: 1px solid var(--v2-color-border);
+  border: var(--v2-border-width) solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
   background: var(--v2-color-surface);
 }
@@ -1160,7 +1159,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
   display: grid;
   gap: var(--v2-space-2);
   padding: var(--v2-space-3);
-  border: 1px solid var(--v2-color-border);
+  border: var(--v2-border-width) solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
 }
 .schedule-page__checkbox {
@@ -1168,9 +1167,6 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
   gap: var(--v2-space-2);
   align-items: center;
   color: var(--v2-color-text);
-}
-.schedule-page__dialog-wide {
-  width: min(72rem, calc(100vw - 2rem));
 }
 @media (max-width: 64rem) {
   .schedule-page__detail-grid,

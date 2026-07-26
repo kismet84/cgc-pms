@@ -48,7 +48,7 @@ describe('M3 project request baseline', () => {
     expect(schedule).toContain('@click="requestScheduleSubmit(item)"')
     expect(schedule).not.toContain('openDetail(item.id).then(() => requestScheduleSubmit())')
     expect(schedule).not.toContain('集中管理基线计划、WBS、月周计划、进度偏差与纠偏。')
-    expect(dailyLog).toContain(':on-click="requestDailySubmit"')
+    expect(dailyLog).toContain('@click="requestDailySubmit"')
     expect(dailyLog).toContain('@click="requestFileRemoval(file.id, file.originalName)"')
   })
 

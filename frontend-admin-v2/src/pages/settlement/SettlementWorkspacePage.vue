@@ -95,6 +95,7 @@ const loading = ref(false)
 const detailLoading = ref(false)
 const busy = ref(false)
 const errorMessage = ref('')
+const detailErrorMessage = ref('')
 const formOpen = ref(false)
 const itemsOpen = ref(false)
 const pendingAction = ref<PendingAction | null>(null)
@@ -247,7 +248,7 @@ async function loadDetail(id: string): Promise<boolean> {
   detailController = controller
   const generation = ++detailGeneration
   detailLoading.value = true
-  errorMessage.value = ''
+  detailErrorMessage.value = ''
   try {
     const [
       record,
@@ -278,8 +279,8 @@ async function loadDetail(id: string): Promise<boolean> {
   } catch (error) {
     if (!controller.signal.aborted && generation === detailGeneration) {
       selected.value = null
-      errorMessage.value = errorText(error, '结算详情加载失败')
-      showToast('error', '结算详情读取失败', errorMessage.value)
+      detailErrorMessage.value = errorText(error, '结算详情加载失败')
+      showToast('error', '结算详情读取失败', detailErrorMessage.value)
     }
     return false
   } finally {
@@ -354,6 +355,7 @@ async function saveForm(): Promise<void> {
   busy.value = true
   try {
     const editingId = selected.value?.id
+    const wasDetailRoute = isDetail.value
     let id: string
     if (editingId) {
       await updateSettlement(editingId, command())
@@ -367,7 +369,8 @@ async function saveForm(): Promise<void> {
       showToast('warning', '结算已保存，结果未确认', '暂未取得最新结果，请刷新重试。')
       return
     }
-    await router.push({ path: `/settlement/${id}`, query: route.query })
+    await router.push({ path: '/settlement/list', query: route.query })
+    if (!wasDetailRoute) await loadPage()
     showToast('success', '结算已保存', '最新金额与状态已加载。')
   } catch (error) {
     showToast('error', '结算保存失败', errorText(error, '保存失败'))
@@ -418,6 +421,7 @@ async function confirmAction(): Promise<void> {
     if (action === 'submit') {
       await submitSettlement(record.id)
       await loadDetail(record.id)
+      await router.push({ path: '/settlement/list', query: route.query })
       showToast('success', '结算已提交', '最新金额、来源与审批状态已加载。')
     } else if (action === 'delete') {
       await deleteSettlement(record.id)
@@ -481,8 +485,10 @@ function changePage(next: number): void {
 watch(
   [detailId, projectId, settlementStatus, approvalStatus],
   ([id]) => {
-    if (id) void loadDetail(id)
-    else {
+    if (id) {
+      if (!records.value.length) void loadPage()
+      void loadDetail(id)
+    } else {
       selected.value = null
       pageNo.value = 1
       void loadPage()
@@ -498,7 +504,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="settlement-workspace">
+  <section class="settlement-workspace">
     <V2PageState
       v-if="!canQuery"
       kind="forbidden"
@@ -506,7 +512,7 @@ onBeforeUnmount(() => {
       description="系统未加载结算数据。"
     />
 
-    <template v-else-if="!isDetail">
+    <template v-else>
       <V2Card title="结算台账" :heading-level="1">
         <template #actions>
           <div class="settlement-workspace__filters">
@@ -537,26 +543,25 @@ onBeforeUnmount(() => {
             <V2Button v-if="canAdd" size="small" @click="openForm(false)">新建结算</V2Button>
           </div>
         </template>
+        <dl class="v2-ledger-kpis" aria-label="结算汇总">
+          <div>
+            <dt>结算单</dt>
+            <dd>{{ kpi.totalCount }} <small>共计</small></dd>
+          </div>
+          <div>
+            <dt>合同金额</dt>
+            <dd>{{ money(kpi.totalContractAmount) }} <small>当前快照</small></dd>
+          </div>
+          <div>
+            <dt>结算金额</dt>
+            <dd>{{ money(kpi.totalFinalAmount) }} <small>当前汇总</small></dd>
+          </div>
+          <div>
+            <dt>未付金额</dt>
+            <dd>{{ money(kpi.totalUnpaidAmount) }} <small>含质保金口径</small></dd>
+          </div>
+        </dl>
       </V2Card>
-
-      <section class="settlement-workspace__kpis" aria-label="结算汇总">
-        <V2Card title="结算单"
-          ><strong>{{ kpi.totalCount }}</strong
-          ><span>共计</span></V2Card
-        >
-        <V2Card title="合同金额"
-          ><strong>{{ money(kpi.totalContractAmount) }}</strong
-          ><span>当前快照</span></V2Card
-        >
-        <V2Card title="结算金额"
-          ><strong>{{ money(kpi.totalFinalAmount) }}</strong
-          ><span>当前汇总</span></V2Card
-        >
-        <V2Card title="未付金额"
-          ><strong>{{ money(kpi.totalUnpaidAmount) }}</strong
-          ><span>含质保金口径</span></V2Card
-        >
-      </section>
 
       <V2PageState
         v-if="loading && !records.length"
@@ -641,35 +646,15 @@ onBeforeUnmount(() => {
       </V2Card>
     </template>
 
-    <template v-else>
-      <V2Card :title="selected?.settlementCode || '结算详情'" :heading-level="1">
-        <template #actions>
-          <div class="settlement-workspace__actions">
-            <V2Button
-              size="small"
-              variant="secondary"
-              @click="router.push({ path: '/settlement/list', query: route.query })"
-              >返回台账</V2Button
-            >
-            <V2Button v-if="editable" size="small" variant="secondary" @click="openForm(true)"
-              >编辑</V2Button
-            >
-            <V2Button v-if="editable" size="small" variant="secondary" @click="openItems"
-              >维护明细</V2Button
-            >
-            <V2Button v-if="submittable" size="small" @click="pendingAction = 'submit'"
-              >提交审批</V2Button
-            >
-            <V2Button
-              v-if="deletable"
-              size="small"
-              variant="secondary"
-              @click="pendingAction = 'delete'"
-              >删除</V2Button
-            >
-          </div>
-        </template>
-      </V2Card>
+    <V2Dialog
+      :open="isDetail"
+      :title="selected?.settlementCode || '结算详情'"
+      description="查看结算金额、来源、付款、成本与审批记录。"
+      :close-disabled="busy"
+      :close-on-backdrop="!editable"
+      panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-wide"
+      @close="router.push({ path: '/settlement/list', query: route.query })"
+    >
       <V2PageState
         v-if="detailLoading && !selected"
         kind="loading"
@@ -677,60 +662,96 @@ onBeforeUnmount(() => {
         description="正在读取结算详情与追溯数据。"
       />
       <V2PageState
-        v-else-if="errorMessage"
+        v-else-if="detailErrorMessage"
         kind="error"
         title="详情加载失败"
-        :description="errorMessage"
+        :description="detailErrorMessage"
       >
-        <template #actions><V2Button @click="loadDetail(detailId)">重试</V2Button></template>
+        <template #actions
+          ><V2Button type="button" @click="loadDetail(detailId)">重试</V2Button></template
+        >
       </V2PageState>
       <template v-else-if="selected">
         <section class="settlement-workspace__summary">
-          <V2Card title="业务范围">
-            <dl>
-              <dt>项目</dt>
-              <dd>{{ selected.projectName || '—' }}</dd>
-              <dt>合同</dt>
-              <dd>{{ selected.contractName || '—' }}</dd>
-              <dt>分包单位</dt>
-              <dd>{{ selected.partnerName || '—' }}</dd>
-              <dt>类型</dt>
-              <dd>{{ statusLabel(selected.settlementType) }}</dd>
+          <section class="v2-detail-dialog__section">
+            <div class="v2-detail-dialog__section-heading"><h3>业务范围</h3></div>
+            <dl class="v2-detail-dialog__facts">
+              <div>
+                <dt>项目</dt>
+                <dd>{{ selected.projectName || '—' }}</dd>
+              </div>
+              <div>
+                <dt>合同</dt>
+                <dd>{{ selected.contractName || '—' }}</dd>
+              </div>
+              <div>
+                <dt>分包单位</dt>
+                <dd>{{ selected.partnerName || '—' }}</dd>
+              </div>
+              <div>
+                <dt>类型</dt>
+                <dd>{{ statusLabel(selected.settlementType) }}</dd>
+              </div>
             </dl>
-          </V2Card>
-          <V2Card title="金额快照">
-            <dl>
-              <dt>合同额</dt>
-              <dd>{{ money(selected.contractAmount) }}</dd>
-              <dt>签证额</dt>
-              <dd>{{ money(selected.changeAmount) }}</dd>
-              <dt>审定计量</dt>
-              <dd>{{ money(selected.measuredAmount) }}</dd>
-              <dt>扣款</dt>
-              <dd>{{ money(selected.deductionAmount) }}</dd>
-              <dt>结算额</dt>
-              <dd>{{ money(selected.finalAmount) }}</dd>
-              <dt>质保金</dt>
-              <dd>{{ money(selected.warrantyAmount) }}</dd>
+          </section>
+          <section class="v2-detail-dialog__section">
+            <div class="v2-detail-dialog__section-heading"><h3>金额快照</h3></div>
+            <dl class="v2-detail-dialog__facts">
+              <div>
+                <dt>合同额</dt>
+                <dd>{{ money(selected.contractAmount) }}</dd>
+              </div>
+              <div>
+                <dt>签证额</dt>
+                <dd>{{ money(selected.changeAmount) }}</dd>
+              </div>
+              <div>
+                <dt>审定计量</dt>
+                <dd>{{ money(selected.measuredAmount) }}</dd>
+              </div>
+              <div>
+                <dt>扣款</dt>
+                <dd>{{ money(selected.deductionAmount) }}</dd>
+              </div>
+              <div>
+                <dt>结算额</dt>
+                <dd>{{ money(selected.finalAmount) }}</dd>
+              </div>
+              <div>
+                <dt>质保金</dt>
+                <dd>{{ money(selected.warrantyAmount) }}</dd>
+              </div>
             </dl>
-          </V2Card>
-          <V2Card title="状态与余额">
-            <dl>
-              <dt>审批</dt>
-              <dd>{{ statusLabel(selected.approvalStatus) }}</dd>
-              <dt>结算</dt>
-              <dd>{{ statusLabel(selected.settlementStatus) }}</dd>
-              <dt>累计付款</dt>
-              <dd>{{ money(selected.paidAmount) }}</dd>
-              <dt>未付金额</dt>
-              <dd>{{ money(selected.unpaidAmount) }}</dd>
-              <dt>金额口径</dt>
-              <dd>{{ statusLabel(selected.amountFormulaVersion) }}</dd>
+          </section>
+          <section class="v2-detail-dialog__section">
+            <div class="v2-detail-dialog__section-heading"><h3>状态与余额</h3></div>
+            <dl class="v2-detail-dialog__facts">
+              <div>
+                <dt>审批</dt>
+                <dd>{{ statusLabel(selected.approvalStatus) }}</dd>
+              </div>
+              <div>
+                <dt>结算</dt>
+                <dd>{{ statusLabel(selected.settlementStatus) }}</dd>
+              </div>
+              <div>
+                <dt>累计付款</dt>
+                <dd>{{ money(selected.paidAmount) }}</dd>
+              </div>
+              <div>
+                <dt>未付金额</dt>
+                <dd>{{ money(selected.unpaidAmount) }}</dd>
+              </div>
+              <div>
+                <dt>金额口径</dt>
+                <dd>{{ statusLabel(selected.amountFormulaVersion) }}</dd>
+              </div>
             </dl>
-          </V2Card>
+          </section>
         </section>
 
-        <V2Card title="结算明细" :heading-level="2">
+        <section class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading"><h3>结算明细</h3></div>
           <div
             class="settlement-workspace__table-wrap"
             role="region"
@@ -761,10 +782,11 @@ onBeforeUnmount(() => {
               </tbody>
             </table>
           </div>
-        </V2Card>
+        </section>
 
         <section class="settlement-workspace__trace">
-          <V2Card title="计量与签证来源" :heading-level="2">
+          <section class="v2-detail-dialog__section">
+            <div class="v2-detail-dialog__section-heading"><h3>计量与签证来源</h3></div>
             <ul>
               <li v-for="item in sources.subMeasures" :key="item.id">
                 {{ item.measureCode }} · {{ money(item.approvedAmount) }} ·
@@ -775,8 +797,9 @@ onBeforeUnmount(() => {
               </li>
               <li v-if="!sources.subMeasures.length && !sources.varOrders.length">暂无来源</li>
             </ul>
-          </V2Card>
-          <V2Card title="付款追溯" :heading-level="2">
+          </section>
+          <section class="v2-detail-dialog__section">
+            <div class="v2-detail-dialog__section-heading"><h3>付款追溯</h3></div>
             <ul>
               <li v-for="item in payments" :key="item.id">
                 {{ item.applyCode || '付款记录' }} · {{ money(item.actualPayAmount) }} ·
@@ -784,8 +807,9 @@ onBeforeUnmount(() => {
               </li>
               <li v-if="!payments.length">暂无付款记录</li>
             </ul>
-          </V2Card>
-          <V2Card title="成本追溯" :heading-level="2">
+          </section>
+          <section class="v2-detail-dialog__section">
+            <div class="v2-detail-dialog__section-heading"><h3>成本追溯</h3></div>
             <ul>
               <li v-for="item in costs" :key="item.id">
                 {{ item.costSubjectName || '成本记录' }} · {{ money(item.amount) }} ·
@@ -793,8 +817,9 @@ onBeforeUnmount(() => {
               </li>
               <li v-if="!costs.length">暂无成本记录</li>
             </ul>
-          </V2Card>
-          <V2Card title="审批记录" :heading-level="2">
+          </section>
+          <section class="v2-detail-dialog__section">
+            <div class="v2-detail-dialog__section-heading"><h3>审批记录</h3></div>
             <ul>
               <li v-for="item in approvals" :key="item.id">
                 {{ item.nodeName || '审批节点' }} · {{ item.operatorName || '—' }} ·
@@ -802,14 +827,19 @@ onBeforeUnmount(() => {
               </li>
               <li v-if="!approvals.length">暂无审批记录</li>
             </ul>
-          </V2Card>
+          </section>
         </section>
 
-        <V2Card title="结算附件" :heading-level="2">
+        <section class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading"><h3>结算附件</h3></div>
           <div v-if="editable" class="settlement-workspace__upload">
             <label for="settlement-file">选择附件</label>
             <input id="settlement-file" type="file" @change="chooseFile" />
-            <V2Button size="small" :disabled="!uploadFile || busy" @click="uploadAttachment"
+            <V2Button
+              type="button"
+              size="small"
+              :disabled="!uploadFile || busy"
+              @click="uploadAttachment"
               >上传</V2Button
             >
           </div>
@@ -817,6 +847,7 @@ onBeforeUnmount(() => {
             <li v-for="file in attachments" :key="file.id">
               <span>{{ file.originalName }} · {{ file.uploadedAt || '—' }}</span>
               <V2Button
+                type="button"
                 v-if="editable"
                 size="small"
                 variant="ghost"
@@ -826,9 +857,49 @@ onBeforeUnmount(() => {
             </li>
             <li v-if="!attachments.length">暂无附件</li>
           </ul>
-        </V2Card>
+        </section>
       </template>
-    </template>
+      <template #footer>
+        <V2Button
+          type="button"
+          variant="secondary"
+          :disabled="busy"
+          @click="router.push({ path: '/settlement/list', query: route.query })"
+          >关闭</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="editable"
+          variant="secondary"
+          :disabled="busy"
+          @click="openForm(true)"
+          >编辑</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="editable"
+          variant="secondary"
+          :disabled="busy"
+          @click="openItems"
+          >维护明细</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="submittable"
+          :disabled="busy"
+          @click="pendingAction = 'submit'"
+          >提交审批</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="deletable"
+          variant="danger"
+          :disabled="busy"
+          @click="pendingAction = 'delete'"
+          >删除</V2Button
+        >
+      </template>
+    </V2Dialog>
 
     <V2Dialog
       v-model:open="formOpen"
@@ -837,7 +908,11 @@ onBeforeUnmount(() => {
       :close-disabled="busy"
       :close-on-backdrop="false"
     >
-      <form class="settlement-workspace__form" @submit.prevent="saveForm">
+      <form
+        id="settlement-workspace-editor-form"
+        class="settlement-workspace__form"
+        @submit.prevent="saveForm"
+      >
         <V2Select
           v-model="form.projectId"
           label="项目"
@@ -867,13 +942,15 @@ onBeforeUnmount(() => {
           <span>审定计量 {{ money(preview.measuredAmount) }}</span>
           <span>已付 {{ money(preview.paidAmount) }}</span>
         </div>
-        <div class="settlement-workspace__actions">
-          <V2Button type="submit" :loading="busy">保存</V2Button>
-          <V2Button type="button" variant="secondary" :disabled="busy" @click="formOpen = false"
-            >取消</V2Button
-          >
-        </div>
       </form>
+      <template #footer>
+        <V2Button type="button" variant="secondary" :disabled="busy" @click="formOpen = false"
+          >取消</V2Button
+        >
+        <V2Button type="submit" form="settlement-workspace-editor-form" :loading="busy">
+          保存
+        </V2Button>
+      </template>
     </V2Dialog>
 
     <V2Dialog
@@ -897,10 +974,10 @@ onBeforeUnmount(() => {
         </label>
         <p v-if="!sources.contractItems.length">暂无可结算合同清单。</p>
       </div>
-      <div class="settlement-workspace__actions">
-        <V2Button :loading="busy" @click="saveItems">保存明细</V2Button>
+      <template #footer>
         <V2Button variant="secondary" :disabled="busy" @click="itemsOpen = false">取消</V2Button>
-      </div>
+        <V2Button :loading="busy" @click="saveItems">保存明细</V2Button>
+      </template>
     </V2Dialog>
 
     <V2ConfirmDialog
@@ -913,7 +990,7 @@ onBeforeUnmount(() => {
       @confirm="confirmAction"
       @close="closeConfirmation"
     />
-  </main>
+  </section>
 </template>
 
 <style scoped>
@@ -935,7 +1012,6 @@ onBeforeUnmount(() => {
 .settlement-workspace__filters {
   justify-content: flex-end;
 }
-.settlement-workspace__kpis,
 .settlement-workspace__summary,
 .settlement-workspace__trace {
   display: grid;
@@ -945,17 +1021,21 @@ onBeforeUnmount(() => {
 .settlement-workspace__summary {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
+.settlement-workspace__summary .v2-detail-dialog__facts {
+  grid-template-columns: minmax(0, 1fr);
+}
+.settlement-workspace__summary .v2-detail-dialog__facts > div:nth-last-child(2) {
+  border-bottom: var(--v2-border-width) solid var(--v2-dialog-divider);
+}
 .settlement-workspace__trace {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.settlement-workspace__kpis strong {
+.settlement-workspace .v2-ledger-kpis small {
   display: block;
-  color: var(--v2-color-text);
-  font-size: var(--v2-font-size-21);
-}
-.settlement-workspace__kpis span {
+  margin-top: var(--v2-space-1);
   color: var(--v2-color-text-secondary);
-  font-size: var(--v2-font-size-12);
+  font-size: var(--v2-font-size-11);
+  font-weight: var(--v2-font-weight-regular);
 }
 .settlement-workspace__table-wrap {
   max-width: 100%;
@@ -973,6 +1053,10 @@ onBeforeUnmount(() => {
   grid-template-columns: max-content 1fr;
   gap: var(--v2-space-2) var(--v2-space-3);
   margin: 0;
+}
+.settlement-workspace dl.v2-ledger-kpis {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
 }
 .settlement-workspace dt {
   color: var(--v2-color-text-secondary);
@@ -1003,7 +1087,7 @@ onBeforeUnmount(() => {
   border-radius: var(--v2-radius-sm);
 }
 @media (max-width: 56.25rem) {
-  .settlement-workspace__kpis,
+  .settlement-workspace dl.v2-ledger-kpis,
   .settlement-workspace__summary,
   .settlement-workspace__trace {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1014,7 +1098,7 @@ onBeforeUnmount(() => {
   .settlement-workspace__actions > * {
     flex: 1 1 100%;
   }
-  .settlement-workspace__kpis,
+  .settlement-workspace dl.v2-ledger-kpis,
   .settlement-workspace__summary,
   .settlement-workspace__trace {
     grid-template-columns: minmax(0, 1fr);

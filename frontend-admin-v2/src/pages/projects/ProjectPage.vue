@@ -71,6 +71,7 @@ const projectStatuses = ref<DictionaryItem[]>([])
 const userOptions = ref<Array<{ value: string; label: string }>>([])
 const createOpen = ref(false)
 const memberOpen = ref(false)
+const statusOpen = ref(false)
 const editingMemberId = ref('')
 const filter = reactive({ keyword: '', projectType: '', status: '', pageNo: 1, pageSize: 10 })
 const form = reactive<ProjectUpsertCommand>(emptyProjectCommand())
@@ -266,6 +267,10 @@ async function load(preserveNotice = false): Promise<boolean> {
       const current = await loadProject(projectId.value, controller.signal)
       if (active !== requestId) return
       project.value = current
+      if (!projects.value.length) {
+        projects.value = [current]
+        total.value = 1
+      }
       if (mode.value === 'overview')
         overview.value = await loadProjectOverview(projectId.value, controller.signal)
       if (mode.value === 'members') {
@@ -315,6 +320,12 @@ function openCreate() {
   createOpen.value = true
   resetNotices()
 }
+function openStatus() {
+  statusForm.targetStatus = ''
+  statusForm.reason = ''
+  statusOpen.value = true
+  resetNotices()
+}
 async function saveProject(create: boolean) {
   const command = cleanProjectCommand(form)
   if (!command.projectName || !command.projectType) {
@@ -324,11 +335,16 @@ async function saveProject(create: boolean) {
   saving.value = true
   resetNotices()
   try {
-    if (create) await createProject(command)
-    else await updateProject(projectId.value, command)
+    if (create) {
+      await createProject(command)
+      createOpen.value = false
+      await load(true)
+    } else {
+      await updateProject(projectId.value, command)
+      await load(true)
+      await router.push({ path: '/project/list', query: route.query, hash: route.hash })
+    }
     successMessage.value = create ? '项目已创建。' : '项目已更新。'
-    createOpen.value = false
-    await load(true)
   } catch (error) {
     errorMessage.value = message(error, '项目保存失败')
     await load(true)
@@ -362,6 +378,7 @@ async function act(pending: Extract<PendingConfirmation, { kind: 'project' }>) {
       })
     if (pending.action === 'delete') await deleteProject(pending.target.id)
     successMessage.value = '操作成功。'
+    if (pending.action === 'status') statusOpen.value = false
     await load(true)
   } catch (error) {
     errorMessage.value = message(error, '项目操作失败')
@@ -471,7 +488,7 @@ onBeforeUnmount(() => {
       :heading-level="1"
     />
 
-    <template v-else-if="mode === 'list'">
+    <template v-else>
       <V2Card
         class="project-page__toolbar-card"
         title="项目台账"
@@ -637,102 +654,84 @@ onBeforeUnmount(() => {
       </V2Card>
     </template>
 
-    <template v-else-if="project">
-      <V2Card
-        class="project-page__detail-card"
-        :title="project.projectName"
-        title-id="project-title"
-        :heading-level="1"
-      >
-        <template #actions
-          ><div class="project-page__actions project-page__detail-actions">
-            <V2Button size="small" variant="ghost" @click="go('/project/list')">返回台账</V2Button
-            ><V2Button
-              size="small"
-              variant="secondary"
-              @click="go(`/project/${project.id}/overview`)"
-              >总览</V2Button
-            ><V2Button
-              v-if="can('project:member:list')"
-              size="small"
-              variant="secondary"
-              @click="go(`/project/${project.id}/members`)"
-              >成员</V2Button
-            ><V2Button
-              v-if="can('project:edit')"
-              size="small"
-              variant="secondary"
-              @click="go(`/project/${project.id}/edit`)"
-              >编辑</V2Button
-            >
-          </div></template
-        >
-      </V2Card>
-
+    <V2Dialog
+      :open="mode !== 'list' && Boolean(project)"
+      :title="project?.projectName || '项目详情'"
+      :description="mode === 'edit' ? '编辑项目基础资料。' : '查看项目台账详情。'"
+      :close-on-backdrop="mode !== 'edit'"
+      :close-disabled="saving"
+      panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-wide"
+      @close="go('/project/list')"
+    >
       <div v-if="mode === 'overview' && overview" class="project-page__grid">
-        <V2Card title="合同与成本"
-          ><dl>
-            <dt>合同数</dt>
-            <dd>{{ overview.contractCount }}</dd>
-            <dt>合同总额</dt>
-            <dd>{{ overview.totalContractAmount }} 元</dd>
-            <dt>动态成本</dt>
-            <dd>{{ overview.dynamicCost }} 元</dd>
-            <dt>已付款</dt>
-            <dd>{{ overview.paidAmount }} 元</dd>
-          </dl></V2Card
-        >
-        <V2Card title="项目态势"
-          ><dl>
-            <dt>预警数</dt>
-            <dd>{{ overview.warningCount }}</dd>
-            <dt>成员数</dt>
-            <dd>{{ overview.memberCount }}</dd>
-            <dt>计划周期</dt>
-            <dd>{{ project.plannedStartDate || '—' }} 至 {{ project.plannedEndDate || '—' }}</dd>
-            <dt>地址</dt>
-            <dd>{{ project.projectAddress || '—' }}</dd>
-          </dl></V2Card
-        >
-        <V2Card
-          v-if="can('project:status')"
-          title="状态变更"
-          subtitle="原因必填；提交后刷新项目状态。"
-          ><div class="project-page__filters">
-            <V2Select
-              v-model="statusForm.targetStatus"
-              label="目标状态"
-              :options="statusOptions"
-            /><V2Input v-model="statusForm.reason" label="变更原因" /><V2Button
-              :loading="saving"
-              @click="requestProjectAction('status', project)"
-              >确认变更</V2Button
-            >
-          </div></V2Card
-        >
+        <section class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading"><h3>合同与成本</h3></div>
+          <dl class="v2-detail-dialog__facts">
+            <div>
+              <dt>合同数</dt>
+              <dd>{{ overview.contractCount }}</dd>
+            </div>
+            <div>
+              <dt>合同总额</dt>
+              <dd>{{ overview.totalContractAmount }} 元</dd>
+            </div>
+            <div>
+              <dt>动态成本</dt>
+              <dd>{{ overview.dynamicCost }} 元</dd>
+            </div>
+            <div>
+              <dt>已付款</dt>
+              <dd>{{ overview.paidAmount }} 元</dd>
+            </div>
+          </dl>
+        </section>
+        <section class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading"><h3>项目态势</h3></div>
+          <dl class="v2-detail-dialog__facts">
+            <div>
+              <dt>预警数</dt>
+              <dd>{{ overview.warningCount }}</dd>
+            </div>
+            <div>
+              <dt>成员数</dt>
+              <dd>{{ overview.memberCount }}</dd>
+            </div>
+            <div>
+              <dt>计划周期</dt>
+              <dd>{{ project.plannedStartDate || '—' }} 至 {{ project.plannedEndDate || '—' }}</dd>
+            </div>
+            <div>
+              <dt>地址</dt>
+              <dd>{{ project.projectAddress || '—' }}</dd>
+            </div>
+          </dl>
+        </section>
       </div>
 
       <template v-if="mode === 'edit'">
-        <V2Card title="编辑项目" subtitle="只提交服务端允许写入的字段。"
-          ><ProjectForm
+        <section class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading"><h3>编辑项目</h3></div>
+          <ProjectForm
             :model-value="form"
             :type-options="typeOptions"
             @update:model-value="Object.assign(form, $event)"
-          /><template #footer
-            ><V2Button :loading="saving" @click="saveProject(false)">保存</V2Button></template
-          ></V2Card
-        >
+          />
+        </section>
       </template>
 
       <template v-if="mode === 'members'">
-        <V2Card title="项目成员"
-          ><template #title-extra
-            ><V2Badge tone="neutral">共 {{ members.length }} 人</V2Badge></template
-          ><template #actions
-            ><V2Button v-if="can('project:member:add')" size="small" @click="openMember()"
+        <section class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading">
+            <h3>项目成员</h3>
+            <V2Badge tone="neutral">共 {{ members.length }} 人</V2Badge>
+            <V2Button
+              type="button"
+              v-if="can('project:member:add')"
+              size="small"
+              @click="openMember()"
               >添加成员</V2Button
-            ></template
-          >
+            >
+          </div>
           <div class="project-page__members">
             <article v-for="member in members" :key="member.id">
               <div>
@@ -744,12 +743,14 @@ onBeforeUnmount(() => {
               </div>
               <div class="project-page__actions">
                 <V2Button
+                  type="button"
                   v-if="can('project:member:edit')"
                   size="small"
                   variant="ghost"
                   @click="openMember(member)"
                   >编辑</V2Button
                 ><V2Button
+                  type="button"
                   v-if="can('project:member:delete')"
                   size="small"
                   variant="danger"
@@ -767,11 +768,84 @@ onBeforeUnmount(() => {
             description="具备添加权限的账号可维护成员。"
             :heading-level="3"
           />
-        </V2Card>
+        </section>
       </template>
-    </template>
+      <template #footer>
+        <V2Button type="button" variant="secondary" :disabled="saving" @click="go('/project/list')">
+          {{ mode === 'edit' ? '取消' : '关闭' }}
+        </V2Button>
+        <V2Button
+          v-if="mode === 'overview' && can('project:status')"
+          type="button"
+          variant="secondary"
+          :disabled="saving"
+          @click="openStatus"
+          >变更状态</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="mode !== 'overview'"
+          variant="secondary"
+          :disabled="saving"
+          @click="go(`/project/${project?.id}/overview`)"
+          >总览</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="mode !== 'members' && can('project:member:list')"
+          variant="secondary"
+          :disabled="saving"
+          @click="go(`/project/${project?.id}/members`)"
+          >成员</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="mode !== 'edit' && can('project:edit')"
+          variant="secondary"
+          :disabled="saving"
+          @click="go(`/project/${project?.id}/edit`)"
+          >编辑</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="mode === 'edit'"
+          :loading="saving"
+          @click="saveProject(false)"
+        >
+          保存
+        </V2Button>
+      </template>
+    </V2Dialog>
+    <V2Dialog
+      v-model:open="statusOpen"
+      title="变更项目状态"
+      description="选择目标状态并填写原因。"
+      :close-disabled="saving"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard"
+    >
+      <form
+        id="project-status-form"
+        class="project-page__filters"
+        @submit.prevent="project && requestProjectAction('status', project)"
+      >
+        <V2Select
+          v-model="statusForm.targetStatus"
+          label="目标状态"
+          :options="statusOptions"
+          required
+        />
+        <V2Input v-model="statusForm.reason" label="变更原因" required />
+      </form>
+      <template #footer>
+        <V2Button type="button" variant="secondary" :disabled="saving" @click="statusOpen = false"
+          >取消</V2Button
+        >
+        <V2Button type="submit" form="project-status-form" :loading="saving">确认变更</V2Button>
+      </template>
+    </V2Dialog>
     <V2PageState
-      v-else
+      v-if="mode !== 'list' && !loading && !project"
       kind="error"
       title="项目不可访问"
       description="项目不存在、超出当前账号范围，或请求被拒绝。"
@@ -902,7 +976,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: var(--v2-space-3);
   padding: var(--v2-space-3);
-  border: 1px solid var(--v2-color-border);
+  border: var(--v2-border-width) solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
 }
 .project-page__members p {

@@ -1,14 +1,24 @@
 <script setup lang="ts">
-import type { CostProjectSummary, CostSummaryHistoryRecord } from '@cgc-pms/frontend-contracts'
+import type {
+  AccessibleCostSummary,
+  CostProjectSummary,
+  CostSummaryHistoryRecord,
+} from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { V2Button, V2Card, V2PageState, showToast } from '@/components'
-import { loadCostSummary, loadCostSummaryHistory, refreshCostSummary } from '@/services/commercial'
+import {
+  loadAccessibleCostSummary,
+  loadCostSummary,
+  loadCostSummaryHistory,
+  refreshCostSummary,
+} from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 const route = useRoute()
 const session = useSessionStore()
 const projectId = ref('')
+const accessible = ref<AccessibleCostSummary | null>(null)
 const latest = ref<CostProjectSummary | null>(null)
 const history = ref<CostSummaryHistoryRecord[]>([])
 const loading = ref(false)
@@ -37,10 +47,15 @@ async function load() {
   errorMessage.value = ''
   try {
     if (!projectId.value) {
-      latest.value = null
-      history.value = []
+      const scope = await loadAccessibleCostSummary(current.signal)
+      if (token === generation) {
+        accessible.value = scope
+        latest.value = null
+        history.value = []
+      }
       return
     }
+    accessible.value = null
     const [now, rows] = await Promise.all([
       loadCostSummary(projectId.value, current.signal),
       loadCostSummaryHistory(projectId.value, current.signal),
@@ -51,6 +66,7 @@ async function load() {
   } catch (e) {
     if (!current.signal.aborted && token === generation) {
       latest.value = null
+      accessible.value = null
       history.value = []
       errorMessage.value = errorText(e, '成本核对加载失败')
     }
@@ -88,11 +104,10 @@ onBeforeUnmount(() => controller?.abort())
       ><V2Card title="成本核对" :heading-level="1"
         ><template #actions
           ><V2Button
-            v-if="canRefresh"
+            v-if="canRefresh && projectId"
             size="small"
             variant="secondary"
             :loading="actionBusy"
-            :disabled="!projectId"
             @click="refresh"
             >刷新汇总</V2Button
           ></template
@@ -103,9 +118,43 @@ onBeforeUnmount(() => controller?.abort())
         description="正在读取项目成本汇总及历史记录。"
         kind="loading"
       /><V2PageState
+        v-else-if="!projectId && !accessible?.projects.length && !errorMessage"
+        title="暂无成本汇总"
+        description="当前账号可访问项目尚未生成可核对的成本汇总。"
+        kind="empty"
+      /><V2Card
+        v-else-if="!projectId && accessible"
+        :title="`全部项目成本汇总（${accessible.accessibleProjectCount}）`"
+      >
+        <div class="table-wrap" role="region" aria-label="全部项目成本汇总表格" tabindex="0">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">项目</th>
+                <th scope="col">目标成本</th>
+                <th scope="col">实际成本</th>
+                <th scope="col">动态成本</th>
+                <th scope="col">预测利润</th>
+                <th scope="col">利润率</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in accessible.projects" :key="row.projectId">
+                <th scope="row">{{ row.projectName }}</th>
+                <td>{{ row.targetCost }}</td>
+                <td>{{ row.actualCost }}</td>
+                <td>{{ row.dynamicCost }}</td>
+                <td>{{ row.forecastProfit }}</td>
+                <td>{{ row.profitMargin }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </V2Card>
+      <V2PageState
         v-else-if="!latest && !errorMessage"
         title="暂无成本汇总"
-        description="请在公共壳选择项目，或当前项目尚未生成可核对的成本汇总。"
+        description="当前项目尚未生成可核对的成本汇总。"
         kind="empty"
       /><template v-else-if="latest"
         ><V2Card :title="latest.projectName || '项目汇总'"

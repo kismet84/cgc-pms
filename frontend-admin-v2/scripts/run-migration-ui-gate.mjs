@@ -4,7 +4,7 @@ import { spawnSync } from 'node:child_process'
 
 const e2eDir = resolve('e2e')
 const specs = readdirSync(e2eDir)
-  .filter((name) => /^m\d.*\.spec\.ts$/.test(name))
+  .filter((name) => /^m\d.*\.spec\.ts$/.test(name) || name === 'design-system-preview.spec.ts')
   .filter((name) => !readFileSync(resolve(e2eDir, name), 'utf-8').includes('const runLive'))
   .sort()
   .map((name) => `e2e/${name}`)

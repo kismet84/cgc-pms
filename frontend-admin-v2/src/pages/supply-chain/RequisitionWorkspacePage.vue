@@ -670,7 +670,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="requisition-page">
+  <section class="requisition-page">
     <V2Card title="领用与退料" :heading-level="1">
       <template #actions>
         <div class="requisition-page__toolbar">
@@ -796,7 +796,7 @@ onBeforeUnmount(() => {
       :open="editorOpen"
       :title="editingId ? '编辑领料申请' : '发起领料申请'"
       description="先保存完整草稿，再按权限提交审批。"
-      panel-class="v2-dialog-standard requisition-page__editor-dialog"
+      panel-class="v2-dialog-standard"
       :close-on-backdrop="false"
       :close-disabled="busy"
       @close="closeEditor"
@@ -884,26 +884,25 @@ onBeforeUnmount(() => {
             >
           </article>
         </div>
-
-        <div class="requisition-page__editor-actions">
-          <V2Button type="button" variant="ghost" :disabled="busy" @click="closeEditor"
-            >取消</V2Button
-          >
-          <V2Button type="button" variant="secondary" :loading="busy" @click="saveEditor(false)"
-            >保存草稿</V2Button
-          >
-          <V2Button v-if="canSubmit" type="button" :loading="busy" @click="saveEditor(true)"
-            >保存并提交审批</V2Button
-          >
-        </div>
       </section>
+      <template #footer>
+        <V2Button type="button" variant="secondary" :disabled="busy" @click="closeEditor">
+          取消
+        </V2Button>
+        <V2Button type="button" variant="secondary" :loading="busy" @click="saveEditor(false)">
+          保存草稿
+        </V2Button>
+        <V2Button v-if="canSubmit" type="button" :loading="busy" @click="saveEditor(true)">
+          保存并提交审批
+        </V2Button>
+      </template>
     </V2Dialog>
 
     <V2Dialog
       :open="detailOpen"
       title="领退料链路"
       :description="selected?.requisitionCode || ''"
-      panel-class="v2-dialog-standard v2-detail-dialog requisition-page__detail"
+      panel-class="v2-dialog-standard v2-detail-dialog"
       :close-on-backdrop="true"
       :close-disabled="busy"
       @close="clearDetail"
@@ -923,33 +922,6 @@ onBeforeUnmount(() => {
             <span
               >{{ selected.projectName || '项目名称缺失' }} · {{ warehouseLabel(selected) }}</span
             >
-          </div>
-          <div class="requisition-page__actions">
-            <V2Button v-if="canEditSelected" type="button" variant="secondary" @click="openEdit"
-              >编辑</V2Button
-            >
-            <V2Button
-              v-if="canDelete && selected.approvalStatus === 'DRAFT'"
-              type="button"
-              variant="danger"
-              @click="deleteOpen = true"
-              >删除</V2Button
-            >
-            <V2Button
-              v-if="canSubmitSelected"
-              type="button"
-              :loading="busy"
-              @click="execute('submit')"
-              >提交审批</V2Button
-            >
-            <V2Button
-              v-if="canStockOutSelected"
-              type="button"
-              :loading="busy"
-              @click="execute('stock-out')"
-              >执行出库</V2Button
-            >
-            <V2Button v-if="canReturnSelected" type="button" @click="openReturn">发起退料</V2Button>
           </div>
         </div>
 
@@ -1072,6 +1044,29 @@ onBeforeUnmount(() => {
           </p>
         </section>
       </template>
+      <template #footer>
+        <V2Button v-if="canEditSelected" type="button" variant="secondary" @click="openEdit">
+          编辑
+        </V2Button>
+        <V2Button
+          v-if="canDelete && selected?.approvalStatus === 'DRAFT'"
+          type="button"
+          variant="danger"
+          @click="deleteOpen = true"
+          >删除</V2Button
+        >
+        <V2Button v-if="canSubmitSelected" type="button" :loading="busy" @click="execute('submit')"
+          >提交审批</V2Button
+        >
+        <V2Button
+          v-if="canStockOutSelected"
+          type="button"
+          :loading="busy"
+          @click="execute('stock-out')"
+          >执行出库</V2Button
+        >
+        <V2Button v-if="canReturnSelected" type="button" @click="openReturn">发起退料</V2Button>
+      </template>
     </V2Dialog>
 
     <V2Dialog
@@ -1134,7 +1129,7 @@ onBeforeUnmount(() => {
       @close="deleteOpen = false"
       @confirm="confirmDelete"
     />
-  </main>
+  </section>
 </template>
 
 <style scoped>

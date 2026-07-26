@@ -323,7 +323,7 @@ onBeforeUnmount(() => controller?.abort())
 </script>
 
 <template>
-  <main class="finance-control">
+  <section class="finance-control">
     <V2PageState
       v-if="!canQuery"
       kind="error"
@@ -961,7 +961,7 @@ onBeforeUnmount(() => controller?.abort())
         </V2Card>
       </template>
     </template>
-  </main>
+  </section>
 </template>
 
 <style scoped>

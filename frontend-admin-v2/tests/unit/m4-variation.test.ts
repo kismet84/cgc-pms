@@ -230,6 +230,7 @@ describe('M4 variation page', () => {
     expect(wrapper.text()).not.toContain('INTERNAL_APPROVED')
     expect(wrapper.text()).toContain('第 1 页')
     expect(wrapper.text()).not.toContain('变更、申报、核定与追溯台账')
+    expect(wrapper.get('.v2-card__header .variation-page__filters').exists()).toBe(true)
     expect(wrapper.text()).not.toContain('新建变更')
     expect(wrapper.text()).not.toContain('编辑')
   })

@@ -1,5 +1,7 @@
 import {
   COMMERCIAL_API,
+  type AccessibleCostControlOverview,
+  type AccessibleCostSummary,
   type ContractApprovalRecord,
   type ContractCompositeRecord,
   type ContractItemRecord,
@@ -359,11 +361,21 @@ export function loadCostSummary(
   )
 }
 
+export function loadAccessibleCostSummary(signal?: AbortSignal): Promise<AccessibleCostSummary> {
+  return apiRequest<AccessibleCostSummary>(COMMERCIAL_API.accessibleCostSummary, { signal })
+}
+
 export function refreshCostSummary(projectId: string): Promise<CostProjectSummary> {
   return apiRequest<CostProjectSummary>(
     COMMERCIAL_API.costSummaryRefresh(requiredId(projectId, '项目ID')),
     { method: WRITE_METHOD.create },
   )
+}
+
+export function loadAccessibleCostControl(
+  signal?: AbortSignal,
+): Promise<AccessibleCostControlOverview> {
+  return apiRequest<AccessibleCostControlOverview>(COMMERCIAL_API.accessibleCostControl, { signal })
 }
 
 export function loadCostControl(

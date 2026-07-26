@@ -18,6 +18,7 @@ import {
   V2Button,
   V2Card,
   V2ConfirmDialog,
+  V2Dialog,
   V2Input,
   V2PageState,
   V2Select,
@@ -114,6 +115,15 @@ const canOwnerSubmit = computed(() => session.hasPermission('variation:owner:sub
 const canOwnerReview = computed(() => session.hasPermission('variation:owner:review'))
 const canTrace = computed(() => session.hasPermission('variation:trace'))
 const isDraft = computed(() => detail.value?.approvalStatus === 'DRAFT')
+const detailHasEditableControls = computed(
+  () =>
+    Boolean(detail.value) &&
+    ((canEdit.value && isDraft.value) ||
+      (canEditItems.value && isDraft.value) ||
+      (canOwnerSubmit.value &&
+        ['INTERNAL_APPROVED', 'OWNER_RETURNED'].includes(detail.value?.ownerStatus || '')) ||
+      (canOwnerReview.value && detail.value?.ownerStatus === 'OWNER_SUBMITTED')),
+)
 const latestSubmission = computed<VariationOwnerSubmissionRecord | null>(
   () => detail.value?.ownerSubmissions?.at(-1) ?? null,
 )
@@ -406,15 +416,14 @@ async function saveForm(): Promise<void> {
     }
     if (mode.value === 'create') {
       const id = await createVariation(command)
-      await router.replace({
-        path: '/variation/order',
-        query: { ...route.query, id, mode: 'detail' },
-      })
+      detail.value = await loadVariation(id)
+      await backToList()
       successMessage.value = '签证变更已创建。'
       return
     }
     await updateVariation(variationId.value, command)
     await loadDetail(true)
+    await backToList()
     successMessage.value = '签证变更已保存并刷新。'
   })
 }
@@ -456,6 +465,7 @@ async function submitApproval(): Promise<void> {
     }
     await submitVariation(variationId.value, versionOf())
     await loadDetail(true)
+    await backToList()
     successMessage.value = '签证变更已提交审批。'
   })
 }
@@ -635,19 +645,23 @@ async function changePage(pageNo: number): Promise<void> {
 
 watch(
   () => route.fullPath,
-  () => {
+  async () => {
     trace.value = []
-    if (mode.value === 'list') void loadList()
-    else if (mode.value === 'create') {
-      detailController?.abort()
-      detail.value = null
-      items.value = []
-      form.value = emptyForm()
-      resetNotices()
-      void loadReferences()
+    if (mode.value === 'list') {
+      await loadList()
     } else {
-      void loadDetail()
-      void loadReferences()
+      await loadList(true)
+      if (mode.value === 'create') {
+        detailController?.abort()
+        detail.value = null
+        items.value = []
+        form.value = emptyForm()
+        resetNotices()
+        await loadReferences()
+      } else {
+        await loadDetail()
+        await loadReferences()
+      }
     }
   },
   { immediate: true },
@@ -662,45 +676,49 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="variation-page">
-    <V2Card v-if="mode === 'list'" title="签证变更" :heading-level="1">
+    <V2Card title="签证变更" :heading-level="1">
       <template #actions>
-        <V2Button v-if="canCreate" size="small" @click="openWorkspace('create')">新建变更</V2Button>
+        <div class="variation-page__toolbar">
+          <form class="variation-page__filters" @submit.prevent="search">
+            <V2Input
+              v-model="filter.varCode"
+              type="search"
+              label="变更编号"
+              hide-label
+              placeholder="输入变更编号"
+            />
+            <V2Select
+              v-model="filter.varType"
+              label="变更类型"
+              hide-label
+              allow-empty
+              placeholder="全部类型"
+              :options="[
+                { value: '', label: '全部类型' },
+                { value: 'DESIGN', label: '设计变更' },
+                { value: 'SITE', label: '现场签证' },
+                { value: 'OTHER', label: '其他' },
+              ]"
+            />
+            <V2Select
+              v-model="filter.direction"
+              label="方向"
+              hide-label
+              allow-empty
+              placeholder="全部方向"
+              :options="[
+                { value: '', label: '全部方向' },
+                { value: 'COST', label: '成本' },
+                { value: 'INCOME', label: '收入' },
+              ]"
+            />
+            <V2Button type="submit" size="small" :loading="loading">查询</V2Button>
+          </form>
+          <V2Button v-if="canCreate" size="small" @click="openWorkspace('create')"
+            >新建变更</V2Button
+          >
+        </div>
       </template>
-      <form class="variation-page__filters" @submit.prevent="search">
-        <V2Input
-          v-model="filter.varCode"
-          type="search"
-          label="变更编号"
-          hide-label
-          placeholder="输入变更编号"
-        />
-        <V2Select
-          v-model="filter.varType"
-          label="变更类型"
-          hide-label
-          allow-empty
-          placeholder="全部类型"
-          :options="[
-            { value: '', label: '全部类型' },
-            { value: 'DESIGN', label: '设计变更' },
-            { value: 'SITE', label: '现场签证' },
-            { value: 'OTHER', label: '其他' },
-          ]"
-        />
-        <V2Select
-          v-model="filter.direction"
-          label="方向"
-          hide-label
-          allow-empty
-          placeholder="全部方向"
-          :options="[
-            { value: '', label: '全部方向' },
-            { value: 'COST', label: '成本' },
-            { value: 'INCOME', label: '收入' },
-          ]"
-        />
-        <V2Button type="submit" :loading="loading">查询</V2Button>
-      </form>
       <V2PageState
         v-if="loading && !records.length"
         kind="loading"
@@ -784,16 +802,22 @@ onBeforeUnmount(() => {
       </nav>
     </V2Card>
 
-    <V2Card
-      v-else-if="mode === 'create' || mode === 'edit'"
+    <V2Dialog
+      :open="mode === 'create' || mode === 'edit'"
       :title="mode === 'create' ? '新建签证变更' : '编辑签证变更'"
-      :heading-level="1"
+      description="维护签证变更基础事实。"
+      :close-disabled="busy"
+      :close-on-backdrop="false"
+      panel-class="v2-dialog-standard v2-dialog-wide"
+      @close="backToList"
     >
-      <template #actions
-        ><V2Button variant="secondary" @click="backToList">返回台账</V2Button></template
-      >
       <V2PageState v-if="loading" kind="loading" title="正在加载签证变更" description="请稍候。" />
-      <form v-else class="variation-page__form" @submit.prevent="saveForm">
+      <form
+        v-else
+        id="variation-editor-form"
+        class="variation-page__form"
+        @submit.prevent="saveForm"
+      >
         <V2Select
           :model-value="form.projectId"
           label="项目"
@@ -888,19 +912,30 @@ onBeforeUnmount(() => {
             @input="updateForm('remark', ($event.target as HTMLTextAreaElement).value)"
           />
         </label>
-        <div class="variation-page__wide variation-page__actions">
-          <V2Button type="submit" :loading="action === '保存'" :disabled="busy">保存</V2Button
-          ><V2Button
-            variant="secondary"
-            :disabled="busy"
-            @click="mode === 'edit' ? openWorkspace('detail', variationId) : backToList()"
-            >取消</V2Button
-          >
-        </div>
       </form>
-    </V2Card>
+      <template #footer>
+        <V2Button type="button" variant="secondary" :disabled="busy" @click="backToList"
+          >取消</V2Button
+        >
+        <V2Button
+          type="submit"
+          form="variation-editor-form"
+          :loading="action === '保存'"
+          :disabled="busy"
+          >保存</V2Button
+        >
+      </template>
+    </V2Dialog>
 
-    <template v-else>
+    <V2Dialog
+      :open="mode === 'detail'"
+      :title="detail?.varName || '签证变更详情'"
+      description="查看签证变更、明细和业务追溯。"
+      :close-disabled="busy"
+      :close-on-backdrop="!detailHasEditableControls"
+      panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-wide"
+      @close="backToList"
+    >
       <V2PageState
         v-if="loading && !detail"
         kind="loading"
@@ -914,54 +949,46 @@ onBeforeUnmount(() => {
         title="签证变更不可访问"
         :description="errorMessage || '记录不存在或当前账号无权查看。'"
       >
-        <template #actions><V2Button @click="backToList">返回台账</V2Button></template>
+        <template #actions
+          ><V2Button type="button" @click="backToList">返回台账</V2Button></template
+        >
       </V2PageState>
       <template v-else>
-        <V2Card :title="detail.varName" :heading-level="1">
-          <template #actions
-            ><div class="variation-page__actions">
-              <V2Button size="small" variant="secondary" @click="backToList">返回台账</V2Button
-              ><V2Button
-                v-if="canEdit && isDraft"
-                size="small"
-                variant="secondary"
-                @click="openWorkspace('edit', detail.id)"
-                >编辑</V2Button
-              ><V2Button
-                v-if="canSubmit && isDraft"
-                size="small"
-                :loading="action === '提交审批'"
-                :disabled="busy"
-                @click="submitApproval"
-                >提交审批</V2Button
-              ><V2Button
-                v-if="canDelete && isDraft"
-                size="small"
-                variant="danger"
-                :loading="action === '删除'"
-                :disabled="busy"
-                @click="removeVariation"
-                >删除</V2Button
-              >
-            </div></template
-          >
-          <dl class="variation-page__detail-grid">
-            <dt>项目</dt>
-            <dd>{{ detail.projectName || '—' }}</dd>
-            <dt>合同</dt>
-            <dd>{{ detail.contractName || '合同名称缺失' }}</dd>
-            <dt>审批状态</dt>
-            <dd>{{ approvalStatusLabel(detail.approvalStatus) }}</dd>
-            <dt>业主状态</dt>
-            <dd>{{ ownerStatusLabel(detail.ownerStatus) }}</dd>
-            <dt>申报金额</dt>
-            <dd>{{ formatAmount(detail.reportedAmount) }}</dd>
-            <dt>核定金额</dt>
-            <dd>{{ formatAmount(detail.confirmedAmount) }}</dd>
-            <dt>预计成本</dt>
-            <dd>{{ formatAmount(detail.estimatedCostAmount) }}</dd>
-            <dt>版本</dt>
-            <dd>{{ detail.version ?? '—' }}</dd>
+        <section class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading"><h3>基本信息</h3></div>
+          <dl class="variation-page__detail-grid v2-detail-dialog__facts">
+            <div>
+              <dt>项目</dt>
+              <dd>{{ detail.projectName || '—' }}</dd>
+            </div>
+            <div>
+              <dt>合同</dt>
+              <dd>{{ detail.contractName || '合同名称缺失' }}</dd>
+            </div>
+            <div>
+              <dt>审批状态</dt>
+              <dd>{{ approvalStatusLabel(detail.approvalStatus) }}</dd>
+            </div>
+            <div>
+              <dt>业主状态</dt>
+              <dd>{{ ownerStatusLabel(detail.ownerStatus) }}</dd>
+            </div>
+            <div>
+              <dt>申报金额</dt>
+              <dd>{{ formatAmount(detail.reportedAmount) }}</dd>
+            </div>
+            <div>
+              <dt>核定金额</dt>
+              <dd>{{ formatAmount(detail.confirmedAmount) }}</dd>
+            </div>
+            <div>
+              <dt>预计成本</dt>
+              <dd>{{ formatAmount(detail.estimatedCostAmount) }}</dd>
+            </div>
+            <div>
+              <dt>版本</dt>
+              <dd>{{ detail.version ?? '—' }}</dd>
+            </div>
           </dl>
           <label v-if="canEdit && isDraft" class="variation-page__native-field">
             本次现场证据（提交审批前上传）
@@ -972,19 +999,21 @@ onBeforeUnmount(() => {
               @change="onSiteEvidence"
             />
           </label>
-        </V2Card>
+        </section>
 
-        <V2Card title="变更明细" subtitle="维护工程量、单价和申报金额">
-          <template #actions
-            ><V2Button
+        <section class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading">
+            <h3>变更明细</h3>
+            <V2Button
+              type="button"
               v-if="canEditItems && isDraft"
               size="small"
               variant="secondary"
               :disabled="busy"
               @click="items = [...items, blankItem()]"
               >添加明细</V2Button
-            ></template
-          >
+            >
+          </div>
           <V2PageState
             v-if="!items.length && !errorMessage"
             title="暂无明细"
@@ -1035,6 +1064,7 @@ onBeforeUnmount(() => {
               />
               <div v-if="canEditItems && isDraft" class="variation-page__actions">
                 <V2Button
+                  type="button"
                   size="small"
                   variant="danger"
                   :disabled="busy"
@@ -1044,39 +1074,47 @@ onBeforeUnmount(() => {
               </div>
             </div>
           </div>
-          <template v-if="canEditItems && isDraft && items.length" #footer
-            ><V2Button :loading="action === '保存明细'" :disabled="busy" @click="saveItems"
+          <div v-if="canEditItems && isDraft && items.length" class="variation-page__actions">
+            <V2Button
+              type="button"
+              :loading="action === '保存明细'"
+              :disabled="busy"
+              @click="saveItems"
               >保存明细</V2Button
-            ></template
-          >
-        </V2Card>
+            >
+          </div>
+        </section>
 
-        <V2Card
+        <section
           v-if="
             canOwnerSubmit &&
             ['INTERNAL_APPROVED', 'OWNER_RETURNED'].includes(detail.ownerStatus || '')
           "
-          title="提交业主申报"
-          subtitle="每版申报必须上传对应往来文件"
+          class="v2-detail-dialog__section"
         >
+          <div class="v2-detail-dialog__section-heading"><h3>提交业主申报</h3></div>
           <div class="variation-page__form">
             <V2Input v-model="externalDocumentNo" label="对外发文号" required /><label
               class="variation-page__native-field"
               >业主申报文件<input type="file" :disabled="busy" @change="onOwnerFile"
             /></label>
           </div>
-          <template #footer
-            ><V2Button :loading="action === '业主申报'" :disabled="busy" @click="submitOwner"
+          <div class="variation-page__actions">
+            <V2Button
+              type="button"
+              :loading="action === '业主申报'"
+              :disabled="busy"
+              @click="submitOwner"
               >提交业主申报</V2Button
-            ></template
-          >
-        </V2Card>
+            >
+          </div>
+        </section>
 
-        <V2Card
+        <section
           v-if="canOwnerReview && detail.ownerStatus === 'OWNER_SUBMITTED'"
-          title="登记业主回复"
-          subtitle="登记本版核定或退回结果"
+          class="v2-detail-dialog__section"
         >
+          <div class="v2-detail-dialog__section-heading"><h3>登记业主回复</h3></div>
           <div class="variation-page__form">
             <V2Select
               v-model="ownerConclusion"
@@ -1113,38 +1151,74 @@ onBeforeUnmount(() => {
               />
             </div>
           </div>
-          <template #footer
-            ><V2Button :loading="action === '业主回复'" :disabled="busy" @click="reviewOwner"
+          <div class="variation-page__actions">
+            <V2Button
+              type="button"
+              :loading="action === '业主回复'"
+              :disabled="busy"
+              @click="reviewOwner"
               >登记业主回复</V2Button
-            ></template
-          >
-        </V2Card>
+            >
+          </div>
+        </section>
 
-        <V2Card v-if="canTrace" title="全链追溯">
-          <template #actions
-            ><V2Button
+        <section v-if="canTrace" class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading">
+            <h3>全链追溯</h3>
+            <V2Button
+              type="button"
               size="small"
               variant="secondary"
               :loading="action === '加载追溯'"
               :disabled="busy"
               @click="showTrace"
               >加载追溯</V2Button
-            ></template
-          >
+            >
+          </div>
           <V2PageState
             v-if="!trace.length"
             title="尚未加载追溯"
             description="按需读取审批、业主申报与合同变更链。"
           />
-          <dl v-else class="variation-page__trace">
-            <template v-for="row in trace" :key="row.key"
-              ><dt>{{ row.key }}</dt>
-              <dd>{{ row.value }}</dd></template
-            >
+          <dl v-else class="variation-page__trace v2-detail-dialog__facts">
+            <div v-for="row in trace" :key="row.key">
+              <dt>{{ row.key }}</dt>
+              <dd>{{ row.value }}</dd>
+            </div>
           </dl>
-        </V2Card>
+        </section>
       </template>
-    </template>
+      <template #footer>
+        <V2Button type="button" variant="secondary" :disabled="busy" @click="backToList"
+          >关闭</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="detail && canEdit && isDraft"
+          variant="secondary"
+          :disabled="busy"
+          @click="openWorkspace('edit', detail.id)"
+          >编辑</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="detail && canSubmit && isDraft"
+          :loading="action === '提交审批'"
+          :disabled="busy"
+          @click="submitApproval"
+          >提交审批</V2Button
+        >
+        <V2Button
+          type="button"
+          v-if="detail && canDelete && isDraft"
+          variant="danger"
+          :loading="action === '删除'"
+          :disabled="busy"
+          @click="removeVariation"
+          >删除</V2Button
+        >
+      </template>
+    </V2Dialog>
 
     <V2ConfirmDialog
       :open="pendingDelete"
@@ -1164,15 +1238,22 @@ onBeforeUnmount(() => {
   display: grid;
   gap: var(--v2-space-4);
 }
-.variation-page__filters,
 .variation-page__form {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--v2-space-3);
   align-items: end;
 }
+.variation-page__toolbar {
+  display: flex;
+  align-items: end;
+  gap: var(--v2-space-2);
+}
 .variation-page__filters {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(10rem, 1fr)) auto;
+  gap: var(--v2-space-2);
+  width: min(68vw, 64rem);
 }
 .variation-page__table-wrap {
   overflow-x: auto;
@@ -1221,7 +1302,7 @@ dd {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--v2-space-3);
   padding: var(--v2-space-3);
-  border: 1px solid var(--v2-color-border);
+  border: var(--v2-border-width) solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
 }
 .variation-page__native-field {
@@ -1242,10 +1323,17 @@ dd {
   grid-column: 1 / -1;
 }
 @media (max-width: 64rem) {
+  .variation-page__toolbar {
+    flex-wrap: wrap;
+    width: 100%;
+  }
   .variation-page__filters,
   .variation-page__form,
   .variation-page__item {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .variation-page__filters {
+    width: 100%;
   }
 }
 @media (max-width: 48rem) {

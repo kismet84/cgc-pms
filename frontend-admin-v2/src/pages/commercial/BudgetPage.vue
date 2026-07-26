@@ -14,7 +14,6 @@ import {
   V2Button,
   V2Card,
   V2Dialog,
-  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -445,7 +444,7 @@ onBeforeUnmount(() => {
         :open="dialog !== 'closed'"
         :title="dialog === 'create' ? '新建预算' : dialog === 'edit' ? '编辑预算' : '预算详情'"
         :panel-class="dialog === 'detail' ? 'v2-detail-dialog' : undefined"
-        :close-on-backdrop="false"
+        :close-on-backdrop="dialog === 'detail'"
         :close-disabled="actionBusy"
         @close="dialog = 'closed'"
         ><V2PageState
@@ -478,25 +477,41 @@ onBeforeUnmount(() => {
                 :options="costSubjectOptions"
               /><V2Input v-model="line.budgetAmount" label="预算金额" />
             </div>
-            <V2GlassButton text="添加明细" :on-click="addLine" />
+            <V2Button type="button" size="small" variant="secondary" @click="addLine">
+              添加明细
+            </V2Button>
           </div>
         </form>
         <div v-else-if="detail" class="form">
           <dl class="v2-detail-dialog__facts">
-            <dt>预算编号</dt>
-            <dd>{{ detail.budgetCode }}</dd>
-            <dt>预算名称</dt>
-            <dd>{{ detail.budgetName }}</dd>
-            <dt>项目</dt>
-            <dd>{{ projectLabel(detail.projectId) }}</dd>
-            <dt>预算版本</dt>
-            <dd>{{ detail.versionNo }}</dd>
-            <dt>预算总额</dt>
-            <dd>{{ detail.totalAmount }}</dd>
-            <dt>审批状态</dt>
-            <dd>{{ approvalStatusLabel(detail.approvalStatus) }}</dd>
-            <dt>预算状态</dt>
-            <dd>{{ budgetStatusLabel(detail.status) }}</dd>
+            <div>
+              <dt>预算编号</dt>
+              <dd>{{ detail.budgetCode }}</dd>
+            </div>
+            <div>
+              <dt>预算名称</dt>
+              <dd>{{ detail.budgetName }}</dd>
+            </div>
+            <div>
+              <dt>项目</dt>
+              <dd>{{ projectLabel(detail.projectId) }}</dd>
+            </div>
+            <div>
+              <dt>预算版本</dt>
+              <dd>{{ detail.versionNo }}</dd>
+            </div>
+            <div>
+              <dt>预算总额</dt>
+              <dd>{{ detail.totalAmount }}</dd>
+            </div>
+            <div>
+              <dt>审批状态</dt>
+              <dd>{{ approvalStatusLabel(detail.approvalStatus) }}</dd>
+            </div>
+            <div>
+              <dt>预算状态</dt>
+              <dd>{{ budgetStatusLabel(detail.status) }}</dd>
+            </div>
           </dl>
           <div
             v-if="canEdit && ['DRAFT', 'REJECTED'].includes(detail.approvalStatus)"
@@ -509,11 +524,12 @@ onBeforeUnmount(() => {
                 :options="costSubjectOptions"
               /><V2Input v-model="line.budgetAmount" label="预算金额" />
             </div>
-            <V2GlassButton text="添加明细" :on-click="addLine" /><V2GlassButton
-              text="保存明细"
-              :loading="actionBusy"
-              :on-click="saveLines"
-            />
+            <V2Button type="button" size="small" variant="secondary" @click="addLine">
+              添加明细
+            </V2Button>
+            <V2Button type="button" size="small" :loading="actionBusy" @click="saveLines">
+              保存明细
+            </V2Button>
           </div>
           <div
             class="table-wrap budget-page__availability"
@@ -544,7 +560,14 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <template v-if="dialog === 'create' || dialog === 'edit'" #footer>
-          <V2GlassButton text="取消" :disabled="actionBusy" :on-click="() => (dialog = 'closed')" />
+          <V2Button
+            type="button"
+            variant="secondary"
+            :disabled="actionBusy"
+            @click="dialog = 'closed'"
+          >
+            取消
+          </V2Button>
           <V2Button type="submit" form="budget-form" :loading="actionBusy">保存预算</V2Button>
         </template></V2Dialog
       ></template

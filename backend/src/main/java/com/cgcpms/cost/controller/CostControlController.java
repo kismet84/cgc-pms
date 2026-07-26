@@ -26,6 +26,12 @@ import java.util.Map;
 public class CostControlController {
     private final CostControlService service;
 
+    @GetMapping("/overview")
+    @PreAuthorize("hasAuthority('cost:control:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Map<String, Object>> overview() {
+        return ApiResponse.success(service.overview());
+    }
+
     @GetMapping("/projects/{projectId}/overview")
     @PreAuthorize("hasAuthority('cost:control:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Map<String, Object>> overview(@PathVariable Long projectId) {

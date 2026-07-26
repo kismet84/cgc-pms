@@ -21,7 +21,6 @@ import {
   V2Button,
   V2Card,
   V2Dialog,
-  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -877,33 +876,39 @@ onBeforeUnmount(() => {
       <template #footer>
         <template v-if="trace">
           <template v-for="item in trace.rectifications" :key="item.id">
-            <V2GlassButton
+            <V2Button
               v-if="canRectify && item.status === 'DRAFT'"
-              text="上传整改证据"
-              :on-click="
-                () =>
-                  showEvidence({
-                    businessType: 'QS_RECTIFICATION',
-                    businessId: item.id,
-                    documentType: 'RECTIFICATION_EVIDENCE',
-                    label: `整改第 ${item.roundNo} 轮证据`,
-                    issue: trace.issue,
-                  })
+              type="button"
+              variant="secondary"
+              @click="
+                showEvidence({
+                  businessType: 'QS_RECTIFICATION',
+                  businessId: item.id,
+                  documentType: 'RECTIFICATION_EVIDENCE',
+                  label: `整改第 ${item.roundNo} 轮证据`,
+                  issue: trace.issue,
+                })
               "
-            />
-            <V2GlassButton
+            >
+              上传整改证据
+            </V2Button>
+            <V2Button
               v-if="canRectify && item.status === 'DRAFT'"
-              text="提交既有整改"
+              type="button"
               :loading="saving"
-              :on-click="() => submitDraftRectification(item)"
-            />
+              @click="submitDraftRectification(item)"
+            >
+              提交既有整改
+            </V2Button>
           </template>
-          <V2GlassButton
+          <V2Button
             v-if="canConsequence && trace.consequence?.status === 'DRAFT'"
-            text="确认既有后果"
+            type="button"
             :loading="saving"
-            :on-click="postExistingConsequence"
-          />
+            @click="postExistingConsequence"
+          >
+            确认既有后果
+          </V2Button>
         </template>
       </template>
     </V2Dialog>

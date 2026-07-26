@@ -17,7 +17,6 @@ import {
   V2Button,
   V2Card,
   V2Dialog,
-  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -568,19 +567,6 @@ onBeforeUnmount(() => {
             </div>
           </dl>
         </div>
-        <div v-if="availableActions.length" class="v2-detail-dialog__actions" aria-label="审批动作">
-          <p class="v2-detail-dialog__message">可用操作</p>
-          <div class="v2-detail-dialog__quick-actions">
-            <V2GlassButton
-              v-for="candidate in availableActions"
-              :key="candidate"
-              :text="WORKFLOW_ACTION_LABELS[candidate]"
-              :disabled="actionLoading"
-              :on-click="() => openAction(candidate)"
-            />
-          </div>
-        </div>
-
         <div class="workflow-detail-grid">
           <section class="v2-detail-dialog__section">
             <h3>审批节点</h3>
@@ -617,6 +603,24 @@ onBeforeUnmount(() => {
             </ol>
           </section>
         </div>
+      </template>
+      <template #footer>
+        <V2Button
+          v-for="candidate in availableActions"
+          :key="candidate"
+          type="button"
+          :variant="
+            candidate === 'reject' || candidate === 'withdraw'
+              ? 'danger'
+              : candidate === 'approve' || candidate === 'resubmit'
+                ? 'primary'
+                : 'secondary'
+          "
+          :disabled="actionLoading"
+          @click="openAction(candidate)"
+        >
+          {{ WORKFLOW_ACTION_LABELS[candidate] }}
+        </V2Button>
       </template>
     </V2Dialog>
 
@@ -667,12 +671,15 @@ onBeforeUnmount(() => {
         </label>
       </div>
       <template #footer>
-        <V2GlassButton
-          text="取消"
+        <V2Button
+          type="button"
+          variant="secondary"
           :disabled="actionLoading"
-          :on-click="() => (actionOpen = false)"
-        />
-        <V2GlassButton text="确认提交" :loading="actionLoading" :on-click="submitAction" />
+          @click="actionOpen = false"
+        >
+          取消
+        </V2Button>
+        <V2Button type="button" :loading="actionLoading" @click="submitAction">确认提交</V2Button>
       </template>
     </V2Dialog>
   </section>
@@ -754,7 +761,7 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   gap: var(--v2-space-3);
   padding-bottom: var(--v2-space-3);
-  border-bottom: 1px solid var(--v2-color-border-subtle);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border-subtle);
 }
 .workflow-timeline strong,
 .workflow-timeline small {

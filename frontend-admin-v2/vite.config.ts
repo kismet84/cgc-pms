@@ -32,6 +32,12 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 300,
     rollupOptions: {
+      input: {
+        app: fileURLToPath(new URL('./index.html', import.meta.url)),
+        designSystem: fileURLToPath(
+          new URL('./src/components/preview/index.html', import.meta.url),
+        ),
+      },
       output: {
         manualChunks(id: string) {
           if (id.includes('node_modules')) return 'vendor-vue'

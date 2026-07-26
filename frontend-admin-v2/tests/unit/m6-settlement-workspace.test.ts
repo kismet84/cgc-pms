@@ -106,6 +106,9 @@ describe('M6 settlement V2', () => {
     expect(page).toContain("contractType: 'SUB'")
     expect(page).toContain('v-if="deletable"')
     expect(page).not.toContain('v-if="canDelete && editable"')
+    expect(page).toMatch(
+      /\.settlement-workspace__summary \.v2-detail-dialog__facts\s*{\s*grid-template-columns: minmax\(0, 1fr\)/,
+    )
     expect(page).not.toMatch(
       /frontend-admin\/src|Legacy|label="[^"]*ID|\b(?:Number|parseFloat|parseInt)\s*\(|(?:contractAmount|changeAmount|measuredAmount|deductionAmount|paidAmount|finalAmount|unpaidAmount|warrantyAmount)\s*[+\-*/]=/,
     )

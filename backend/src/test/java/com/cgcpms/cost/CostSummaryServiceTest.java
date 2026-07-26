@@ -266,6 +266,18 @@ class CostSummaryServiceTest {
         assertTrue(result.isEmpty(), "不同租户应返回空");
     }
 
+    @Test
+    @Transactional
+    @DisplayName("TC10-1: 全部项目摘要缺少租户上下文时 fail-close")
+    void testGetAccessibleProjectSummaries_TenantRequired() {
+        TestUserContext.clear();
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> costSummaryService.getAccessibleProjectSummaries());
+
+        assertEquals("TENANT_CONTEXT_REQUIRED", ex.getCode());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // getSummaryHistory
     // ═══════════════════════════════════════════════════════════════

@@ -259,13 +259,84 @@ function itemName(item: DetailItem): string {
   return item.materialName || '物料名称缺失'
 }
 
-function itemQuantity(item: DetailItem): string {
-  if ('actualQuantity' in item)
-    return `实收 ${item.actualQuantity}；合格 ${item.qualifiedQuantity}；不合格 ${item.unqualifiedQuantity}；订单 ${item.orderedQuantity ?? '-'}；累计 ${item.receivedQuantity ?? '-'}；剩余 ${item.remainingQuantity ?? '-'}`
-  if ('unitPrice' in item)
-    return `数量 ${item.quantity}；单价 ${item.unitPrice}；金额 ${item.amount ?? '-'}；已收 ${item.receivedQuantity ?? '-'}`
-  return `数量 ${item.quantity}；预计单价 ${item.estimatedUnitPrice ?? '-'}；预计金额 ${item.estimatedAmount ?? '-'}`
-}
+const detailTable = computed(() => {
+  if (mode.value === 'request') {
+    return {
+      columns: ['物料', '规格', '单位', '数量', '预计单价', '预计金额', '计划日期'],
+      rows: detailItems.value.map((item, index) => {
+        const requestItem = item as PurchaseRequestItemRecord
+        return {
+          key: requestItem.id || `${index}`,
+          cells: [
+            itemName(requestItem),
+            '-',
+            requestItem.unit || '-',
+            requestItem.quantity,
+            requestItem.estimatedUnitPrice ?? '-',
+            requestItem.estimatedAmount ?? '-',
+            requestItem.plannedDate || '-',
+          ],
+        }
+      }),
+    }
+  }
+  if (mode.value === 'order') {
+    return {
+      columns: ['物料', '规格', '单位', '数量', '单价', '金额', '已收数量'],
+      rows: detailItems.value.map((item, index) => {
+        const orderItem = item as PurchaseOrderItemRecord
+        return {
+          key: orderItem.id || `${index}`,
+          cells: [
+            itemName(orderItem),
+            orderItem.specification || '-',
+            orderItem.unit || '-',
+            orderItem.quantity,
+            orderItem.unitPrice,
+            orderItem.amount ?? '-',
+            orderItem.receivedQuantity ?? '-',
+          ],
+        }
+      }),
+    }
+  }
+  return {
+    columns: [
+      '物料',
+      '规格',
+      '单位',
+      '实收数量',
+      '合格数量',
+      '不合格数量',
+      '订单数量',
+      '累计收货',
+      '剩余数量',
+      '单价',
+      '金额',
+      '使用部位',
+    ],
+    rows: detailItems.value.map((item, index) => {
+      const receiptItem = item as ReceiptItemRecord
+      return {
+        key: receiptItem.id || `${index}`,
+        cells: [
+          itemName(receiptItem),
+          receiptItem.specification || '-',
+          receiptItem.unit || '-',
+          receiptItem.actualQuantity,
+          receiptItem.qualifiedQuantity,
+          receiptItem.unqualifiedQuantity,
+          receiptItem.orderedQuantity ?? '-',
+          receiptItem.receivedQuantity ?? '-',
+          receiptItem.remainingQuantity ?? '-',
+          receiptItem.unitPrice ?? '-',
+          receiptItem.amount ?? '-',
+          receiptItem.useLocation || '-',
+        ],
+      }
+    }),
+  }
+})
 
 async function loadPage(): Promise<void> {
   listController?.abort()
@@ -622,7 +693,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="purchase-execution-page">
+  <section class="purchase-execution-page">
     <V2Card :title="title" :heading-level="1">
       <template #actions>
         <V2Button v-if="canAdd" size="small" @click="openCreate">新建{{ title }}</V2Button>
@@ -754,30 +825,50 @@ onBeforeUnmount(() => {
                 <dd>{{ recordAmount(selected) }}</dd>
               </div>
             </dl>
-            <div class="purchase-execution-page__actions">
-              <V2Button
-                v-if="canSubmitSelected"
-                type="button"
-                :loading="busy"
-                @click="submitSelected"
-                >提交审批</V2Button
+            <section class="v2-detail-dialog__section" aria-labelledby="purchase-detail-title">
+              <div class="v2-detail-dialog__section-heading">
+                <h3 id="purchase-detail-title">单据明细</h3>
+                <V2Badge tone="info">{{ detailItems.length }} 条</V2Badge>
+              </div>
+              <V2PageState
+                v-if="!errorMessage && !detailItems.length"
+                title="暂无明细"
+                description="当前单据暂无明细。"
+                :heading-level="3"
+              />
+              <div
+                v-else
+                class="v2-detail-dialog__table"
+                role="region"
+                :aria-label="`${title}明细表格`"
+                tabindex="0"
               >
-            </div>
-            <h3>单据明细</h3>
-            <V2PageState
-              v-if="!errorMessage && !detailItems.length"
-              title="暂无明细"
-              description="当前单据暂无明细。"
-              :heading-level="3"
-            />
-            <ul v-else class="purchase-execution-page__items">
-              <li v-for="(item, index) in detailItems" :key="item.id || index">
-                <strong>{{ itemName(item) }}</strong
-                ><span>{{ itemQuantity(item) }}</span>
-              </li>
-            </ul>
+                <table>
+                  <thead>
+                    <tr>
+                      <th v-for="column in detailTable.columns" :key="column" scope="col">
+                        {{ column }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in detailTable.rows" :key="row.key">
+                      <th scope="row">{{ row.cells[0] }}</th>
+                      <td v-for="(cell, index) in row.cells.slice(1)" :key="index">
+                        {{ cell }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </template></template
         >
+        <template #footer>
+          <V2Button v-if="canSubmitSelected" type="button" :loading="busy" @click="submitSelected"
+            >提交审批</V2Button
+          >
+        </template>
       </V2Dialog>
     </section>
 
@@ -788,7 +879,11 @@ onBeforeUnmount(() => {
       :close-disabled="busy"
       :close-on-backdrop="false"
     >
-      <form class="purchase-execution-page__form" @submit.prevent="save">
+      <form
+        id="purchase-execution-editor-form"
+        class="purchase-execution-page__form"
+        @submit.prevent="save"
+      >
         <V2Select
           v-model="form.projectId"
           label="项目"
@@ -913,13 +1008,15 @@ onBeforeUnmount(() => {
           />
         </template>
         <V2Input v-model="form.remark" label="备注" />
-        <div class="purchase-execution-page__actions">
-          <V2Button variant="secondary" :disabled="busy" @click="dialogOpen = false">取消</V2Button
-          ><V2Button type="submit" :loading="busy">保存</V2Button>
-        </div>
       </form>
+      <template #footer>
+        <V2Button variant="secondary" :disabled="busy" @click="dialogOpen = false">取消</V2Button>
+        <V2Button type="submit" form="purchase-execution-editor-form" :loading="busy">
+          保存
+        </V2Button>
+      </template>
     </V2Dialog>
-  </main>
+  </section>
 </template>
 
 <style scoped>
@@ -957,18 +1054,6 @@ tr.selected {
 .purchase-execution-page__facts dd {
   margin: 0;
   overflow-wrap: anywhere;
-}
-.purchase-execution-page__items {
-  display: grid;
-  gap: var(--v2-space-2);
-  padding: 0;
-  list-style: none;
-}
-.purchase-execution-page__items li {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--v2-space-3);
-  padding: var(--v2-space-2);
 }
 .purchase-execution-page__actions {
   display: flex;
