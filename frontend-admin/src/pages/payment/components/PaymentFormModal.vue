@@ -22,6 +22,7 @@ const props = defineProps<{
   sourceList: SourceRow[]
   sourceOptions: PaymentSourceOptionVO[]
   sourceOptionsLoading: boolean
+  canDirectPayment: boolean
   proofFileName?: string
   onFormProjectChange: (value: string) => void
   onContractChange: (value: string) => void
@@ -158,7 +159,12 @@ const emit = defineEmits<{
               ><a-select-option value="EXPENSE">费用申请</a-select-option
               ><a-select-option value="SUB_MEASURE">已审批分包计量（进度款）</a-select-option
               ><a-select-option value="SETTLEMENT">结算申请</a-select-option
-              ><a-select-option value="DIRECT">直接付款</a-select-option></a-select
+              ><a-select-option
+                v-if="props.canDirectPayment || record.sourceType === 'DIRECT'"
+                value="DIRECT"
+                :disabled="!props.canDirectPayment"
+                >直接付款</a-select-option
+              ></a-select
             ></template
           ></a-table-column
         >

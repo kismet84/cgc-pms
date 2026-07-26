@@ -5,6 +5,12 @@ import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.budget.entity.ProjectBudget;
+import com.cgcpms.budget.entity.ProjectBudgetLine;
+import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
+import com.cgcpms.budget.mapper.ProjectBudgetMapper;
+import com.cgcpms.cashbook.entity.CashJournalEntry;
+import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -13,6 +19,7 @@ import com.cgcpms.cost.entity.CostSummary;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.mapper.CostSummaryMapper;
+import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.inventory.entity.MatStock;
 import com.cgcpms.inventory.entity.MatWarehouse;
 import com.cgcpms.inventory.mapper.MatStockMapper;
@@ -83,6 +90,10 @@ import static org.junit.jupiter.api.Assertions.*;
 class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport {
 
     @Autowired private SysRoleMapper sysRoleMapper;
+    @Autowired private ProjectBudgetMapper projectBudgetMapper;
+    @Autowired private ProjectBudgetLineMapper projectBudgetLineMapper;
+    @Autowired private CashJournalEntryMapper cashJournalEntryMapper;
+    @Autowired private CostSummaryService costSummaryService;
 
     @Test
     @Transactional
@@ -148,6 +159,86 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         assertNotNull(vo.getPendingPaymentAmount());
         assertNotNull(vo.getTrendPoints());
         assertFalse(vo.getContractFundBreakdowns().isEmpty());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("财务口径仅使用生效预算占用加消耗、已归档现金日记和确认收入减动态成本")
+    void financeMetricsUseClosedLoopAuthorities() {
+        SeedResult sr = seed("FIN_AUTHORITY");
+        Long subjectId = costSubjectMapper.selectOne(new LambdaQueryWrapper<CostSubject>()
+                .eq(CostSubject::getTenantId, TENANT_ID)
+                .eq(CostSubject::getSubjectCode, "SUBJ-FIN_AUTHORITY")).getId();
+
+        ProjectBudget budget = new ProjectBudget();
+        budget.setTenantId(TENANT_ID);
+        budget.setProjectId(sr.projectId);
+        budget.setBudgetCode("BUD-FIN-AUTHORITY");
+        budget.setVersionNo("V1");
+        budget.setBudgetName("Finance authority budget");
+        budget.setTotalAmount(new BigDecimal("1000.00"));
+        budget.setApprovalStatus("APPROVED");
+        budget.setStatus("ACTIVE");
+        budget.setActiveFlag(1);
+        budget.setActiveToken(sr.projectId);
+        budget.setEffectiveAt(LocalDateTime.now());
+        budget.setVersion(0);
+        projectBudgetMapper.insert(budget);
+
+        ProjectBudgetLine line = new ProjectBudgetLine();
+        line.setTenantId(TENANT_ID);
+        line.setBudgetId(budget.getId());
+        line.setProjectId(sr.projectId);
+        line.setCostSubjectId(subjectId);
+        line.setBudgetAmount(new BigDecimal("1000.00"));
+        line.setReservedAmount(new BigDecimal("200.00"));
+        line.setConsumedAmount(new BigDecimal("300.00"));
+        line.setVersion(0);
+        projectBudgetLineMapper.insert(line);
+
+        cashJournalEntryMapper.insert(journal(sr.projectId, "FIN-AUTH-ARCHIVED", 91001L,
+                "ARCHIVED", new BigDecimal("400.00")));
+        cashJournalEntryMapper.insert(journal(sr.projectId, "FIN-AUTH-DRAFT", 91002L,
+                "DRAFT", new BigDecimal("900.00")));
+
+        FinanceDashboardVO vo = dashboardService.getFinanceView(sr.projectId);
+        var cost = costSummaryService.getProjectSummary(TENANT_ID, sr.projectId);
+
+        assertEquals("1000.00", vo.getBudgetAmount());
+        assertEquals("200.00", vo.getBudgetReservedAmount());
+        assertEquals("300.00", vo.getBudgetConsumedAmount());
+        assertEquals("50.00", vo.getBudgetExecutionRate());
+        assertEquals("400.00", vo.getCashOutflowAmount());
+        assertEquals("400.00", vo.getTrendPoints().getLast().getCashOutflowAmount());
+        assertEquals(new BigDecimal(cost.getConfirmedRevenue())
+                .subtract(new BigDecimal(cost.getDynamicCost())).toPlainString(), vo.getProjectProfit());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("财务合同金额只汇总审批通过且履约中的有效合同")
+    void financeContractAmountExcludesDraftRejectedAndTerminatedContracts() {
+        SeedResult sr = seed("FIN_VALID_CONTRACT");
+        for (String[] state : List.of(
+                new String[]{"DRAFT", "DRAFT"},
+                new String[]{"REJECTED", "DRAFT"},
+                new String[]{"APPROVED", "TERMINATED"})) {
+            CtContract invalid = new CtContract();
+            invalid.setTenantId(TENANT_ID);
+            invalid.setProjectId(sr.projectId);
+            invalid.setContractCode("CT-INVALID-" + state[0] + "-" + state[1]);
+            invalid.setContractName("Invalid contract " + state[0] + " " + state[1]);
+            invalid.setContractType("SUB");
+            invalid.setContractAmount(new BigDecimal("9000000.00"));
+            invalid.setCurrentAmount(new BigDecimal("9000000.00"));
+            invalid.setApprovalStatus(state[0]);
+            invalid.setContractStatus(state[1]);
+            ctContractMapper.insert(invalid);
+        }
+
+        FinanceDashboardVO vo = dashboardService.getFinanceView(sr.projectId);
+
+        assertEquals("5500000.00", vo.getTotalContractAmount());
     }
 
     @Test
@@ -316,6 +407,28 @@ class DashboardFinanceManagementServiceTest extends DashboardServiceTestSupport 
         sysRoleMapper.insert(role);
         TestUserContext.setUser(TENANT_ID, scopedUserId, "management-dashboard-self", List.of(roleCode));
         return roleCode;
+    }
+
+    private CashJournalEntry journal(
+            Long projectId, String entryNo, Long sourceId, String status, BigDecimal amount) {
+        CashJournalEntry journal = new CashJournalEntry();
+        journal.setTenantId(TENANT_ID);
+        journal.setEntryNo(entryNo);
+        journal.setDirection("OUT");
+        journal.setAmount(amount);
+        journal.setBusinessDate(LocalDate.now());
+        journal.setSummary(entryNo);
+        journal.setProjectId(projectId);
+        journal.setSourceType("MANUAL");
+        journal.setSourceId(sourceId);
+        journal.setStatus(status);
+        journal.setClosureDueAt(LocalDateTime.now().plusDays(1));
+        journal.setVersion(0);
+        if ("ARCHIVED".equals(status)) {
+            journal.setArchivedBy(1L);
+            journal.setArchivedAt(LocalDateTime.now());
+        }
+        return journal;
     }
 
     // ========================================================================

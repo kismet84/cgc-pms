@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/payment-traces")
 @RequiredArgsConstructor
@@ -32,5 +34,47 @@ public class PaymentTraceController {
     @PreAuthorize("hasAuthority('payment:trace:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PaymentTraceVO> byApplication(@PathVariable Long id) {
         return ApiResponse.success(traceService.byApplication(id));
+    }
+
+    @GetMapping("/expenses/{id}")
+    @PreAuthorize("hasAuthority('payment:trace:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<PaymentTraceVO>> byExpense(@PathVariable Long id) {
+        return ApiResponse.success(traceService.byExpense(id));
+    }
+
+    @GetMapping("/settlements/{id}")
+    @PreAuthorize("hasAuthority('payment:trace:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<PaymentTraceVO>> bySettlement(@PathVariable Long id) {
+        return ApiResponse.success(traceService.bySettlement(id));
+    }
+
+    @GetMapping("/approvals/{id}")
+    @PreAuthorize("hasAuthority('payment:trace:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<PaymentTraceVO>> byApproval(@PathVariable Long id) {
+        return ApiResponse.success(traceService.byApproval(id));
+    }
+
+    @GetMapping("/invoices/{id}")
+    @PreAuthorize("hasAuthority('payment:trace:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<PaymentTraceVO>> byInvoice(@PathVariable Long id) {
+        return ApiResponse.success(traceService.byInvoice(id));
+    }
+
+    @GetMapping("/vouchers/{id}")
+    @PreAuthorize("hasAuthority('payment:trace:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<PaymentTraceVO>> byVoucher(@PathVariable Long id) {
+        return ApiResponse.success(traceService.byVoucher(id));
+    }
+
+    @GetMapping("/contracts/{id}")
+    @PreAuthorize("hasAuthority('payment:trace:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<PaymentTraceVO>> byContract(@PathVariable Long id) {
+        return ApiResponse.success(traceService.byContract(id));
+    }
+
+    @GetMapping("/projects/{id}")
+    @PreAuthorize("hasAuthority('payment:trace:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<PaymentTraceVO>> byProject(@PathVariable Long id) {
+        return ApiResponse.success(traceService.byProject(id));
     }
 }

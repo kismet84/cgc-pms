@@ -474,6 +474,28 @@ class InvoiceServiceTest {
     }
 
     @Test
+    @Order(17)
+    @DisplayName("DELETE: 已分配付款的 PENDING 发票不可删除")
+    void shouldRejectDeleteAfterAllocation() {
+        PayInvoice invoice = new PayInvoice();
+        invoice.setInvoiceNo("INV-ALLOC-LOCK-017");
+        invoice.setInvoiceType("VAT_SPECIAL");
+        invoice.setInvoiceAmount(new BigDecimal("1000.00"));
+        invoice.setPayRecordId(SEED_PAY_RECORD_ID);
+        Long id = invoiceService.create(invoice);
+        InvoicePaymentAllocation allocation = new InvoicePaymentAllocation();
+        allocation.setPayRecordId(SEED_PAY_RECORD_ID);
+        allocation.setAllocatedAmount(new BigDecimal("1000.00"));
+        invoiceService.saveAllocations(id, List.of(allocation));
+
+        BusinessException error = assertThrows(BusinessException.class, () -> invoiceService.delete(id));
+
+        assertEquals("INVOICE_ALLOCATED_LOCKED", error.getCode());
+        assertEquals("PENDING", invoiceService.getById(id).getVerifyStatus());
+        assertEquals(1, invoiceService.listAllocations(id).size());
+    }
+
+    @Test
     @Order(18)
     @DisplayName("UPDATE: invalid payRecordId is rejected and original invoice fields remain unchanged")
     void shouldRejectUpdateToInvalidPayRecordAndKeepOriginalFields() {

@@ -316,9 +316,7 @@ public class CostSummaryService {
         BigDecimal actualCost = subjects.stream()
                 .map(s -> new BigDecimal(s.getActualCost()))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        // paidAmount is project-level (same value on every subject row) — take from first subject, not sum
-        BigDecimal paidAmount = subjects.isEmpty() ? BigDecimal.ZERO
-                : new BigDecimal(subjects.get(0).getPaidAmount());
+        BigDecimal paidAmount = assembler.computeProjectPaidAmount(tenantId, projectId);
 
         // Project-level fields: compute directly (not aggregated from subjects, to avoid N× duplication)
         BigDecimal estimatedRemainingCost = assembler.computeProjectEstimatedRemainingCost(tenantId, projectId);
@@ -389,6 +387,16 @@ public class CostSummaryService {
                 .collect(Collectors.groupingBy(CostSummary::getProjectId));
 
         // 3. Batch load supporting data for project-level computations
+        Map<Long, BigDecimal> paidByProject = payRecordMapper.selectList(
+                new LambdaQueryWrapper<PayRecord>()
+                        .eq(PayRecord::getTenantId, tenantId)
+                        .in(PayRecord::getProjectId, validProjectIds)
+                        .eq(PayRecord::getPayStatus, "SUCCESS"))
+                .stream()
+                .collect(Collectors.groupingBy(PayRecord::getProjectId,
+                        Collectors.reducing(BigDecimal.ZERO,
+                                record -> record.getPayAmount() == null ? BigDecimal.ZERO : record.getPayAmount(),
+                                BigDecimal::add)));
         List<CtContract> allContracts = ctContractMapper.selectList(
                 new LambdaQueryWrapper<CtContract>()
                         .eq(CtContract::getTenantId, tenantId)
@@ -477,9 +485,7 @@ public class CostSummaryService {
             BigDecimal actualCost = latestSummaries.stream()
                     .map(s -> s.getActualCost() != null ? s.getActualCost() : BigDecimal.ZERO)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
-            // paidAmount is project-level (same value on every subject row) — take from first subject, not sum
-            BigDecimal paidAmount = latestSummaries.isEmpty() ? BigDecimal.ZERO
-                    : (latestSummaries.get(0).getPaidAmount() != null ? latestSummaries.get(0).getPaidAmount() : BigDecimal.ZERO);
+            BigDecimal paidAmount = paidByProject.getOrDefault(projectId, BigDecimal.ZERO);
 
             // Compute project-level values from batched data
             List<CtContract> projectContracts = contractsByProject.getOrDefault(projectId, Collections.emptyList());

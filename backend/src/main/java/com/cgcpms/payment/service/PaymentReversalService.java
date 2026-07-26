@@ -2,6 +2,7 @@ package com.cgcpms.payment.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.accounting.service.AccountingEntryService;
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.cashbook.constant.CashbookConstants;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
@@ -9,7 +10,6 @@ import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
 import com.cgcpms.cashbook.service.CashJournalService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.service.CostSummaryService;
-import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.payment.dto.PaymentReversalRequest;
 import com.cgcpms.payment.dto.PaymentFailureRequest;
@@ -40,6 +40,7 @@ public class PaymentReversalService {
     private final PayRecordService payRecordService;
     private final CostSummaryService costSummaryService;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ContractBudgetAllocationService contractBudgetAllocationService;
 
     @Transactional(rollbackFor = Exception.class)
     public PayRecordVO reverse(Long payRecordId, PaymentReversalRequest request) {
@@ -47,18 +48,19 @@ public class PaymentReversalService {
         PayRecord original = payRecordMapper.selectByIdForUpdate(payRecordId, tenantId);
         if (original == null) throw new BusinessException("PAY_RECORD_NOT_FOUND", "付款记录不存在");
         projectAccessChecker.checkAccess(original.getProjectId(), "冲销付款");
-        if (!"SUCCESS".equals(original.getPayStatus()) || original.getReversedRecordId() != null) {
-            throw new BusinessException("PAYMENT_REVERSAL_STATUS_INVALID", "仅未冲销的成功付款可以冲销");
-        }
+        String externalTxnNo = request.getExternalTxnNo().trim();
         PayRecord duplicate = payRecordMapper.selectOne(new LambdaQueryWrapper<PayRecord>()
                 .eq(PayRecord::getTenantId, tenantId)
-                .eq(PayRecord::getExternalTxnNo, request.getExternalTxnNo()));
+                .eq(PayRecord::getExternalTxnNo, externalTxnNo));
         if (duplicate != null) {
             if (Objects.equals(duplicate.getReversedRecordId(), original.getId())
                     && "REVERSAL".equals(duplicate.getPayStatus())) {
                 return payRecordService.getById(duplicate.getId());
             }
             throw new BusinessException("PAYMENT_REVERSAL_IDEMPOTENCY_CONFLICT", "冲销流水号已被其他业务使用");
+        }
+        if (!"SUCCESS".equals(original.getPayStatus()) || original.getReversedRecordId() != null) {
+            throw new BusinessException("PAYMENT_REVERSAL_STATUS_INVALID", "仅未冲销的成功付款可以冲销");
         }
         PayApplication application = applicationMapper.selectById(original.getPayApplicationId());
         if (application == null || !Objects.equals(application.getTenantId(), tenantId)) {
@@ -67,13 +69,13 @@ public class PaymentReversalService {
         CashJournalEntry journal = cashJournalMapper.selectOne(new LambdaQueryWrapper<CashJournalEntry>()
                 .eq(CashJournalEntry::getTenantId, tenantId)
                 .eq(CashJournalEntry::getPayRecordId, original.getId()));
-        if (journal == null || !CashbookConstants.Status.ARCHIVED.equals(journal.getStatus())) {
-            throw new BusinessException("PAYMENT_CASH_JOURNAL_NOT_ARCHIVED", "付款现金日记未归档，禁止冲销");
+        if (journal == null || !java.util.Set.of(
+                CashbookConstants.Status.PENDING_ARCHIVE, CashbookConstants.Status.ARCHIVED)
+                .contains(journal.getStatus())) {
+            throw new BusinessException("PAYMENT_CASH_JOURNAL_STATUS_INVALID", "付款现金日记状态不允许冲销");
         }
-        long verifiedInvoices = invoiceMapper.selectCount(new LambdaQueryWrapper<PayInvoice>()
-                .eq(PayInvoice::getTenantId, tenantId)
-                .eq(PayInvoice::getPayRecordId, original.getId())
-                .eq(PayInvoice::getVerifyStatus, "VERIFIED"));
+        boolean archived = CashbookConstants.Status.ARCHIVED.equals(journal.getStatus());
+        long verifiedInvoices = invoiceMapper.countVerifiedByPayRecord(tenantId, original.getId());
         if (verifiedInvoices > 0) {
             throw new BusinessException("PAYMENT_HAS_VERIFIED_INVOICE", "付款已关联核验通过发票，请先走异常票处理流程");
         }
@@ -89,7 +91,7 @@ public class PaymentReversalService {
         reversal.setPaidAt(request.getReversedAt().withNano(0));
         reversal.setFundAccountId(original.getFundAccountId());
         reversal.setPayMethod(original.getPayMethod());
-        reversal.setExternalTxnNo(request.getExternalTxnNo().trim());
+        reversal.setExternalTxnNo(externalTxnNo);
         reversal.setPayStatus("REVERSAL");
         reversal.setReversedRecordId(original.getId());
         reversal.setReversedAt(request.getReversedAt().withNano(0));
@@ -103,9 +105,16 @@ public class PaymentReversalService {
         reversal.setRemark("冲销付款记录 " + original.getId() + "：" + request.getReason().trim());
         payRecordMapper.insert(reversal);
 
+        if (archived) {
+            accountingEntryService.reversePaymentEntry(original.getId(), reversal, request.getReason());
+        } else {
+            accountingEntryService.cancelDraftPaymentEntry(original.getId(), request.getReason());
+        }
         cashJournalService.reverseForPayment(journal.getId(), request.getReason(), reversal.getId());
-        sourceService.reversePayment(application, original);
-        accountingEntryService.reversePaymentEntry(original.getId(), reversal, request.getReason());
+        sourceService.reversePayment(application, original, archived);
+        if (archived) {
+            contractBudgetAllocationService.restoreAfterArchive(application, original);
+        }
 
         original.setPayStatus("REVERSED");
         original.setReversedRecordId(reversal.getId());

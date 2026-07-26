@@ -117,7 +117,9 @@ class CostSummaryServiceTest {
         costSubjectMapper.deleteById(80004L);
         payRecordMapper.deleteById(80001L);
         payRecordMapper.deleteById(80002L);
+        payRecordMapper.deleteById(80003L);
         payApplicationMapper.deleteById(80001L);
+        payApplicationMapper.deleteById(80003L);
         contractMapper.deleteById(80005L);
         costSummaryMapper.physicalDeleteByTenantAndProject(TENANT_ID, 80005L);
         projectMapper.deleteById(80005L);
@@ -245,6 +247,25 @@ class CostSummaryServiceTest {
     @Transactional
     @DisplayName("TC9: getBatchProjectSummaries — 批量查询返回项目数据")
     void testGetBatchProjectSummaries_WithProjects() {
+        PayApplication app = new PayApplication();
+        app.setId(80003L);
+        app.setProjectId(testProjectId);
+        app.setApplyCode("PAY-APP-TC9");
+        app.setPayType("进度款");
+        app.setApplyAmount(new BigDecimal("123.00"));
+        app.setPayStatus("APPROVED");
+        app.setApprovalStatus("APPROVED");
+        app.setTenantId(TENANT_ID);
+        payApplicationMapper.insert(app);
+        PayRecord record = new PayRecord();
+        record.setId(80003L);
+        record.setProjectId(testProjectId);
+        record.setPayApplicationId(80003L);
+        record.setPayAmount(new BigDecimal("123.00"));
+        record.setPayDate(LocalDate.now());
+        record.setPayStatus("SUCCESS");
+        record.setTenantId(TENANT_ID);
+        payRecordMapper.insert(record);
         costSummaryService.refreshSummary(TENANT_ID, testProjectId);
 
         Map<Long, CostProjectSummaryVO> result = costSummaryService.getBatchProjectSummaries(TENANT_ID, List.of(testProjectId));
@@ -255,6 +276,7 @@ class CostSummaryServiceTest {
         CostProjectSummaryVO vo = result.get(testProjectId);
         assertEquals("成本汇总测试项目", vo.getProjectName());
         assertNotNull(vo.getTargetCost());
+        assertEquals("123.00", vo.getPaidAmount());
     }
 
     @Test

@@ -28,4 +28,11 @@ describe('contract detail page UI consistency', () => {
     expect(source).not.toContain('box-shadow:')
     expect(source).not.toContain('border-radius:')
   })
+
+  it('gates contract budget reads and edits with their exact permissions', () => {
+    expect(source).toContain("userStore.hasPermission('budget:query')")
+    expect(source).toContain("userStore.hasPermission('budget:edit')")
+    expect(source).toContain('canQueryBudget.value ? loadBudgetAllocations() : Promise.resolve()')
+    expect(source).toContain('v-if="canQueryBudget" key="budget-allocations"')
+  })
 })

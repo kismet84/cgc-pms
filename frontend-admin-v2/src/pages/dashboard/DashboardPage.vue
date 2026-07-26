@@ -225,6 +225,7 @@ const financeSummary = computed(() => {
     { label: '合同金额', value: formatAmount(item.totalContractAmount) },
     { label: '累计支付', value: formatAmount(item.totalPaidAmount) },
     { label: '预算总额', value: formatAmount(item.budgetAmount) },
+    { label: '预算已占用', value: formatAmount(item.budgetReservedAmount) },
     { label: '预算已消耗', value: formatAmount(item.budgetConsumedAmount) },
     { label: '预算执行率', value: `${item.budgetExecutionRate}%` },
     { label: '现金流出', value: formatAmount(item.cashOutflowAmount) },

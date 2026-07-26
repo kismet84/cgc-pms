@@ -21,6 +21,7 @@ public class FinanceDashboardVO {
     private String totalContractAmount;
     private String totalPaidAmount;
     private String budgetAmount;
+    private String budgetReservedAmount;
     private String budgetConsumedAmount;
     private String budgetExecutionRate;
     private String cashOutflowAmount;

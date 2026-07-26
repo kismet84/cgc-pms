@@ -7,6 +7,7 @@ import com.cgcpms.budget.entity.ProjectBudget;
 import com.cgcpms.budget.entity.ProjectBudgetLine;
 import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
 import com.cgcpms.budget.mapper.ProjectBudgetMapper;
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
@@ -41,14 +42,21 @@ public class PaymentApplicationIntegrityService {
     private final SysFileMapper fileMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final PaymentApplicationSourceService sourceService;
+    private final ContractBudgetAllocationService contractBudgetAllocationService;
 
     public void validateAndAllocateForSubmit(PayApplication app) {
+        validateAndAllocateForSubmit(app, 1);
+    }
+
+    public void validateAndAllocateForSubmit(PayApplication app, int round) {
         validateCore(app, true);
-        sourceService.validateAndAllocateForSubmit(app);
+        contractBudgetAllocationService.reserveForPayment(app);
+        sourceService.validateAndAllocateForSubmit(app, round);
     }
 
     public void validateForApproval(PayApplication app) {
         validateCore(app, true);
+        contractBudgetAllocationService.validateReserved(app);
         sourceService.validateAllocated(app);
     }
 

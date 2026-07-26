@@ -29,7 +29,7 @@ import java.util.Objects;
  * Supported config types:
  * <ul>
  *   <li>USER         — {"type":"USER","userId":123}</li>
- *   <li>ROLE         — {"type":"ROLE","roleId":456}</li>
+ *   <li>ROLE         — {"type":"ROLE","roleId":456} or {"type":"ROLE","roleCode":"FINANCE"}</li>
  *   <li>POSITION     — {"type":"POSITION","positionId":789}</li>
  *   <li>PROJECT_ROLE — {"type":"PROJECT_ROLE","roleCode":"PM"}</li>
  * </ul>
@@ -105,11 +105,13 @@ public class ApproverResolver {
     }
 
     private List<Long> resolveRole(JsonNode config, Long tenantId) {
-        if (!config.has("roleId")) {
-            throw new BusinessException("INVALID_APPROVER_CONFIG", "ROLE类型配置缺少roleId");
+        if (config.has("roleId")) {
+            return resolveRoleById(config.get("roleId").asLong(), tenantId);
         }
-        long roleId = config.get("roleId").asLong();
-        return resolveRoleById(roleId, tenantId);
+        if (config.has("roleCode")) {
+            return resolveTenantUsersByRoleCode(tenantId, config.get("roleCode").asText());
+        }
+        throw new BusinessException("INVALID_APPROVER_CONFIG", "ROLE类型配置缺少roleId或roleCode");
     }
 
     private List<Long> resolvePosition(JsonNode config, Long tenantId) {

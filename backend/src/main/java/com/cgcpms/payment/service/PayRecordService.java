@@ -4,6 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.budget.constant.BudgetStatusConstants;
+import com.cgcpms.budget.entity.ProjectBudget;
+import com.cgcpms.budget.entity.ProjectBudgetLine;
+import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
+import com.cgcpms.budget.mapper.ProjectBudgetMapper;
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.cashbook.service.CashJournalService;
@@ -51,7 +57,10 @@ public class PayRecordService {
     private final CashJournalService cashJournalService;
     private final FundAccountMapper fundAccountMapper;
     private final PmProjectMapper projectMapper;
+    private final ProjectBudgetLineMapper budgetLineMapper;
+    private final ProjectBudgetMapper budgetMapper;
     private final PaymentApplicationSourceService sourceService;
+    private final ContractBudgetAllocationService contractBudgetAllocationService;
     private final EntryGenerator entryGenerator;
     private final CodeGenerationService codeGenerationService;
     private final ProjectAccessChecker projectAccessChecker;
@@ -260,9 +269,22 @@ public class PayRecordService {
             throw new BusinessException("PROJECT_NOT_ACTIVE", "项目已暂停、关闭或不存在，禁止付款");
         }
         CtContract contract = ctContractMapper.selectById(app.getContractId());
-        if (contract == null || !ContractStatusConstants.APPROVAL_APPROVED.equals(contract.getApprovalStatus())
+        if (contract == null || !Objects.equals(contract.getTenantId(), app.getTenantId())
+                || !Objects.equals(contract.getProjectId(), app.getProjectId())
+                || !ContractStatusConstants.APPROVAL_APPROVED.equals(contract.getApprovalStatus())
                 || !ContractStatusConstants.STATUS_PERFORMING.equals(contract.getContractStatus())) {
-            throw new BusinessException("CONTRACT_STATUS_INVALID", "合同未审批通过或不在履约中，禁止付款");
+            throw new BusinessException("CONTRACT_STATUS_INVALID", "合同不存在、跨租户、不属于当前项目或不在履约中，禁止付款");
+        }
+        ProjectBudgetLine budgetLine = budgetLineMapper.selectById(app.getBudgetLineId());
+        if (budgetLine == null || !Objects.equals(budgetLine.getTenantId(), app.getTenantId())
+                || !Objects.equals(budgetLine.getProjectId(), app.getProjectId())) {
+            throw new BusinessException("PAYMENT_BUDGET_LINE_INVALID", "预算科目不存在、跨租户或不属于当前项目");
+        }
+        ProjectBudget budget = budgetMapper.selectById(budgetLine.getBudgetId());
+        if (budget == null || !Objects.equals(budget.getTenantId(), app.getTenantId())
+                || !BudgetStatusConstants.STATUS_ACTIVE.equals(budget.getStatus())
+                || !Integer.valueOf(1).equals(budget.getActiveFlag())) {
+            throw new BusinessException("BUDGET_NOT_ACTIVE", "付款申请关联预算已失效，禁止付款");
         }
         FundAccount account = fundAccountMapper.selectByIdForUpdate(input.getFundAccountId(), app.getTenantId());
         if (account == null || !Integer.valueOf(1).equals(account.getEnabledFlag())) {
@@ -271,6 +293,7 @@ public class PayRecordService {
         if (account.getOpeningDate() != null && input.getPaidAt().toLocalDate().isBefore(account.getOpeningDate())) {
             throw new BusinessException("FUND_ACCOUNT_NOT_OPEN", "付款时间早于资金账户启用日期");
         }
+        contractBudgetAllocationService.validatePaymentAvailable(app, input.getPayAmount());
     }
 
     // ---- VO conversion ----

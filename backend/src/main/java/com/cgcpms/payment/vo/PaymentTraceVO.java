@@ -22,6 +22,7 @@ import com.cgcpms.workflow.entity.WfRecord;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class PaymentTraceVO {
@@ -39,6 +40,7 @@ public class PaymentTraceVO {
     private List<PayRecord> paymentRecords;
     private List<PaymentRecordSourceAllocation> paymentSourceAllocations;
     private List<CashJournalEntry> cashJournals;
+    private List<Map<String, Object>> paymentDocuments;
     private List<PayInvoice> invoices;
     private List<InvoicePaymentAllocation> invoiceAllocations;
     private List<BudgetLedger> budgetLedgers;

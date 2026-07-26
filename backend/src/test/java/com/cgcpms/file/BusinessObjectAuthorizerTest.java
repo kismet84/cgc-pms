@@ -8,6 +8,7 @@ import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.mapper.CostTargetMapper;
+import com.cgcpms.expense.entity.ExpenseApplication;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.expense.mapper.ExpenseApplicationMapper;
 import com.cgcpms.invoice.entity.PayInvoice;
@@ -111,11 +112,63 @@ class BusinessObjectAuthorizerTest {
         PayApplication payment = new PayApplication();
         payment.setTenantId(TestUserContext.TENANT_0);
         payment.setProjectId(10002L);
-        when(paymentMapper.selectById(40001L)).thenReturn(payment);
+        payment.setApprovalStatus("DRAFT");
+        when(paymentMapper.selectByIdForUpdate(40001L, TestUserContext.TENANT_0)).thenReturn(payment);
 
         authorizer.checkUploadAccess("PAYMENT", 40001L);
 
         verify(projectAccessChecker).checkAccess(10002L, "写入付款申请文件");
+    }
+
+    @Test
+    void paymentClosedLoopAuthoritiesCanUploadTheirBusinessEvidence() {
+        PayApplication payment = new PayApplication();
+        payment.setTenantId(TestUserContext.TENANT_0);
+        payment.setProjectId(10020L);
+        payment.setApprovalStatus("DRAFT");
+        when(paymentMapper.selectByIdForUpdate(40020L, TestUserContext.TENANT_0)).thenReturn(payment);
+        setAuthentication("payment:app:edit");
+        authorizer.checkUploadAccess("PAYMENT", 40020L);
+
+        ExpenseApplication expense = new ExpenseApplication();
+        expense.setTenantId(TestUserContext.TENANT_0);
+        expense.setProjectId(10021L);
+        when(expenseApplicationMapper.selectById(40021L)).thenReturn(expense);
+        setAuthentication("expense:edit");
+        authorizer.checkUploadAccess("EXPENSE", 40021L);
+
+        PayInvoice invoice = new PayInvoice();
+        invoice.setTenantId(TestUserContext.TENANT_0);
+        invoice.setPayRecordId(50020L);
+        invoice.setVerifyStatus("PENDING");
+        PayRecord record = new PayRecord();
+        record.setTenantId(TestUserContext.TENANT_0);
+        record.setProjectId(10022L);
+        when(jdbcTemplate.queryForObject(anyString(), eq(Long.class),
+                eq(51020L), eq(TestUserContext.TENANT_0))).thenReturn(51020L);
+        when(invoiceMapper.selectById(51020L)).thenReturn(invoice);
+        when(payRecordMapper.selectById(50020L)).thenReturn(record);
+        setAuthentication("invoice:edit");
+        authorizer.checkUploadAccess("INVOICE", 51020L, "ELECTRONIC_INVOICE");
+    }
+
+    @Test
+    void paymentEvidenceIsImmutableWhileApprovingOrApproved() {
+        setAuthentication("payment:app:edit");
+        for (String status : List.of("APPROVING", "APPROVED")) {
+            PayApplication payment = new PayApplication();
+            payment.setTenantId(TestUserContext.TENANT_0);
+            payment.setProjectId(10030L);
+            payment.setApprovalStatus(status);
+            when(paymentMapper.selectByIdForUpdate(40030L, TestUserContext.TENANT_0)).thenReturn(payment);
+
+            BusinessException upload = assertThrows(BusinessException.class,
+                    () -> authorizer.checkUploadAccess("PAYMENT", 40030L));
+            assertEquals("PAYMENT_DOCUMENT_IMMUTABLE", upload.getCode());
+            BusinessException delete = assertThrows(BusinessException.class,
+                    () -> authorizer.checkDeleteAccess("PAYMENT", 40030L));
+            assertEquals("PAYMENT_DOCUMENT_IMMUTABLE", delete.getCode());
+        }
     }
 
     @Test

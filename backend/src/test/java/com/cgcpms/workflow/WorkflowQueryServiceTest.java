@@ -1,5 +1,6 @@
 package com.cgcpms.workflow;
 
+import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.auth.context.UserContext;
@@ -24,6 +25,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -46,6 +48,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @ActiveProfiles("local")
 @DisplayName("WorkflowQueryService 查询服务测试")
 class WorkflowQueryServiceTest {
+    @MockitoBean private ContractBudgetAllocationService contractBudgetAllocationService;
 
     private static final long TENANT_0 = 0L;
     private static final long USER_ADMIN = 1L;
