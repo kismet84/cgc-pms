@@ -50,15 +50,17 @@ test.describe('V2 live local authentication', () => {
 
       await page.goto('/v2/session')
       await expect(page).not.toHaveURL(/\/v2\/(?:login|session)/)
-      await expect(page.getByText('业务页面尚未迁移')).toBeVisible()
-      await expect(page.getByText(identity.visibleName)).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
+      await expect(
+        page.getByRole('banner').getByText(identity.visibleName, { exact: true }),
+      ).toBeVisible()
 
       await page.reload()
-      await expect(page.getByText('业务页面尚未迁移')).toBeVisible()
+      await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
 
       if (identity.username === 'admin') {
         await page.goto('/v2/system/users')
-        await expect(page.getByRole('heading', { level: 1, name: '访问控制' })).toBeVisible()
+        await expect(page.getByRole('heading', { level: 1, name: '用户管理' })).toBeVisible()
       } else {
         await page.goto('/v2/system/users')
         await expect(page).toHaveURL(/\/v2\/no-access\?from=/)

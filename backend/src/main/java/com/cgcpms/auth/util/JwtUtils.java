@@ -1,9 +1,13 @@
 package com.cgcpms.auth.util;
 
 import com.cgcpms.auth.config.JwtProperties;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -17,6 +21,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
+import javax.crypto.Mac;
 
 /**
  * JWT helper for generating and parsing tokens using the jjwt 0.12.x API.
@@ -30,6 +35,7 @@ public class JwtUtils {
     public static final String CLAIM_ROLES = "roleCodes";
     public static final String CLAIM_PERMISSIONS = "permissions";
     public static final String CLAIM_TOKEN_TYPE = "tokenType";
+    public static final String CLAIM_CREDENTIAL_VERSION = "credentialVersion";
     public static final String TOKEN_TYPE_ACCESS = "access";
     public static final String TOKEN_TYPE_REFRESH = "refresh";
     private static final String GZIP_PERMISSION_PREFIX = "gz:";
@@ -37,14 +43,27 @@ public class JwtUtils {
 
     private final JwtProperties jwtProperties;
     private final SecretKey key;
+    private final ObjectProvider<SysUserMapper> sysUserMapperProvider;
 
     public JwtUtils(JwtProperties jwtProperties) {
+        this(jwtProperties, null);
+    }
+
+    @Autowired
+    public JwtUtils(JwtProperties jwtProperties, ObjectProvider<SysUserMapper> sysUserMapperProvider) {
         this.jwtProperties = jwtProperties;
         this.key = Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
+        this.sysUserMapperProvider = sysUserMapperProvider;
     }
 
     public String generateToken(Long userId, String username, Long tenantId,
                                 List<String> roleCodes, List<String> permissions) {
+        return generateToken(userId, username, tenantId, roleCodes, permissions,
+                currentCredentialVersion(userId, tenantId));
+    }
+
+    public String generateToken(Long userId, String username, Long tenantId,
+                                List<String> roleCodes, List<String> permissions, String credentialVersion) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtProperties.getExpiration());
         return Jwts.builder()
@@ -55,6 +74,7 @@ public class JwtUtils {
                 .claim(CLAIM_ROLES, roleCodes)
                 .claim(CLAIM_PERMISSIONS, encodePermissionClaim(permissions))
                 .claim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_ACCESS)
+                .claim(CLAIM_CREDENTIAL_VERSION, credentialVersion)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
@@ -135,12 +155,18 @@ public class JwtUtils {
     }
 
     public String generateRefreshToken(Long userId) {
+        return generateRefreshToken(userId, null, credentialVersion(""));
+    }
+
+    public String generateRefreshToken(Long userId, Long tenantId, String credentialVersion) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtProperties.getRefreshExpiration());
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim(CLAIM_USER_ID, userId)
+                .claim(CLAIM_TENANT_ID, tenantId)
                 .claim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_REFRESH)
+                .claim(CLAIM_CREDENTIAL_VERSION, credentialVersion)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
@@ -171,6 +197,27 @@ public class JwtUtils {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    /** HMAC hides password hash while making every password change revoke all old tokens. */
+    public String credentialVersion(String passwordHash) {
+        try {
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(key);
+            return Base64.getUrlEncoder().withoutPadding().encodeToString(
+                    mac.doFinal((passwordHash == null ? "" : passwordHash).getBytes(StandardCharsets.UTF_8)));
+        } catch (Exception ex) {
+            throw new IllegalStateException("Unable to derive token credential version", ex);
+        }
+    }
+
+    private String currentCredentialVersion(Long userId, Long tenantId) {
+        SysUserMapper mapper = sysUserMapperProvider == null ? null : sysUserMapperProvider.getIfAvailable();
+        SysUser user = mapper == null ? null : mapper.selectCredentialByTenantAndId(tenantId, userId);
+        if (user == null) {
+            return credentialVersion("");
+        }
+        return credentialVersion(user.getPassword());
     }
 
     /** Returns remaining TTL in millis for a valid token, or 0 if expired/invalid. */

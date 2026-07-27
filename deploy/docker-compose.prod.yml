@@ -108,7 +108,6 @@ services:
     #   - "3307:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./mysql/conf.d:/etc/mysql/conf.d
       - ./mysql/init:/docker-entrypoint-initdb.d
     command:
       - --character-set-server=utf8mb4

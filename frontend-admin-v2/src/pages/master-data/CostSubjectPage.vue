@@ -702,6 +702,32 @@ onBeforeUnmount(() => controller?.abort())
   <V2Stack class="cost-subject-page" :gap="4">
     <V2Card :title="title" :heading-level="1">
       <template #actions>
+        <form
+          v-if="section === 'scope'"
+          class="v2-page-heading__filters"
+          @submit.prevent="queryScopes"
+        >
+          <V2Input
+            v-model="scopeProjectId"
+            label="项目标识"
+            hide-label
+            placeholder="项目标识"
+            required
+          />
+          <V2Button type="submit" size="small">查询</V2Button>
+          <V2Button
+            v-if="canScopeEdit"
+            type="button"
+            size="small"
+            :disabled="!scopeProjectId.trim()"
+            @click="editScope()"
+          >
+            维护范围
+          </V2Button>
+          <span class="cost-subject-page__hint">
+            项目存在范围配置后，目标成本和财务分摊只能使用范围内启用末级科目。
+          </span>
+        </form>
         <V2Button size="small" variant="secondary" @click="refreshActive">刷新</V2Button>
       </template>
     </V2Card>
@@ -927,25 +953,6 @@ onBeforeUnmount(() => controller?.abort())
     </template>
 
     <template v-else-if="section === 'scope'">
-      <V2Card title="项目适用范围">
-        <form class="cost-subject-page__query" @submit.prevent="queryScopes">
-          <V2Input v-model="scopeProjectId" label="项目标识" required />
-          <V2Cluster>
-            <V2Button type="submit">查询</V2Button>
-            <V2Button
-              v-if="canScopeEdit"
-              type="button"
-              :disabled="!scopeProjectId.trim()"
-              @click="editScope()"
-            >
-              维护范围
-            </V2Button>
-          </V2Cluster>
-        </form>
-        <p class="cost-subject-page__hint">
-          项目存在范围配置后，目标成本和财务分摊只能使用范围内启用末级科目。
-        </p>
-      </V2Card>
       <V2PageState
         v-if="!scopes.length"
         kind="empty"

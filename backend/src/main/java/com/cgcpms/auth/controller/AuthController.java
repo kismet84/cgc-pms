@@ -136,6 +136,9 @@ public class AuthController {
             return ApiResponse.fail("AUTH_TOKEN_INVALID", "Refresh token已失效");
         }
         Claims claims = jwtUtils.parseToken(refreshToken);
+        if (!authService.isCurrentCredential(claims)) {
+            return ApiResponse.fail("AUTH_TOKEN_INVALID", "Refresh token已失效");
+        }
         Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
         if (svc != null && !svc.blacklist(refreshToken, jwtUtils.getRemainingTtlMillis(refreshToken)) && isProdProfile()) {
             log.warn("TOKEN_BLACKLIST_WRITE_FAILED: prod profile rejects refresh because refresh token blacklist write failed");

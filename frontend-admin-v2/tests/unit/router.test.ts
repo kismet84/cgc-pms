@@ -56,8 +56,8 @@ describe('V2 application-shell routes', () => {
 
     expect(ledger.source).toBe(['frontend-admin', 'src', 'router', 'index.ts'].join('/'))
     expect(ledger.summary).toMatchObject({
-      legacyOnly: 8,
-      v2Accepted: 79,
+      legacyOnly: 0,
+      v2Accepted: 87,
       v2SourceAvailable: 0,
     })
     expect(
@@ -158,6 +158,66 @@ describe('V2 application-shell routes', () => {
         }),
       ),
     ])
+    expect(
+      ledger.routes.filter((route) =>
+        [
+          'System',
+          'SystemDict',
+          'SystemUsers',
+          'SystemData',
+          'RoleManagement',
+          'SystemPermissions',
+          'SystemAudit',
+          'DocumentTemplateManagement',
+        ].includes(route.name),
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        name: 'System',
+        status: 'V2_ACCEPTED',
+        v2View: '@/router.ts#V2SystemRedirect',
+        permission: 'system:dict:list',
+      }),
+      expect.objectContaining({
+        name: 'SystemDict',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/system/DictionaryPage.vue',
+        permission: 'system:dict:list',
+      }),
+      expect.objectContaining({
+        name: 'SystemUsers',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/system/AccessControlPage.vue',
+      }),
+      expect.objectContaining({
+        name: 'SystemData',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/system/DataMaintenancePage.vue',
+        permission: null,
+      }),
+      expect.objectContaining({
+        name: 'RoleManagement',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/system/AccessControlPage.vue',
+      }),
+      expect.objectContaining({
+        name: 'SystemPermissions',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/system/AccessControlPage.vue',
+        permission: 'system:menu:query',
+      }),
+      expect.objectContaining({
+        name: 'SystemAudit',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/system/AuditPage.vue',
+        permission: 'audit:query',
+      }),
+      expect.objectContaining({
+        name: 'DocumentTemplateManagement',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/system/DocumentTemplatePage.vue',
+      }),
+    ])
   })
 
   it('keeps technical routes and exposes permission-bearing shell routes', () => {
@@ -217,6 +277,16 @@ describe('V2 application-shell routes', () => {
       '/cost/subject/scope',
       '/cost/subject/trace',
     ].map((path) => shell?.children?.find((route) => route.path === path))
+    const systemRoutes = [
+      '/system/users',
+      '/system/roles',
+      '/system/permissions',
+      '/system/dict',
+      '/system/audit',
+      '/system/document-templates',
+      '/system/data',
+    ].map((path) => shell?.children?.find((route) => route.path === path))
+    const systemRoot = shell?.children?.find((route) => route.path === '/system')
 
     expect(dashboard?.meta?.permission).toBe('dashboard:view')
     expect(project?.meta?.permission).toBe('project:query')
@@ -293,6 +363,30 @@ describe('V2 application-shell routes', () => {
       'cost:subject:scope:query',
       'cost:subject:audit:query',
     ])
+    expect(systemRoot?.redirect).toBeTypeOf('function')
+    expect(systemRoot?.meta).toMatchObject({ permission: 'system:dict:list', adminOnly: true })
+    expect(systemRoutes.map((route) => route?.meta?.permission)).toEqual([
+      'system:user:query',
+      'system:role:query',
+      'system:menu:query',
+      'system:dict:list',
+      'audit:query',
+      'document:template:query',
+      undefined,
+    ])
+    expect(systemRoutes.map((route) => route?.meta?.adminOnly)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      undefined,
+      true,
+      undefined,
+    ])
+    expect(systemRoutes[6]?.meta?.superAdminOnly).toBe(true)
+    for (const route of systemRoutes) {
+      expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
+    }
     const approval = shell?.children?.find((route) => route.path === '/approval/todo')
     const approvalRoot = shell?.children?.find((route) => route.path === '/approval')
     const approvalDetail = shell?.children?.find(
@@ -493,6 +587,32 @@ describe('V2 application-shell routes', () => {
         expect(router.currentRoute.value.query.from).toBe(
           '/approval/process?source=deep-link#nodes',
         )
+      }
+    }
+  })
+
+  it('guards system routes with role and API-aligned permissions', async () => {
+    for (const [roles, permissions, path, allowed] of [
+      [['USER'], ['system:user:query'], '/system/users', false],
+      [['ADMIN'], [], '/system/users', false],
+      [['ADMIN'], ['system:user:query'], '/system/users', true],
+      [['ADMIN'], ['system:dict:list'], '/system?source=legacy#types', true],
+      [['USER'], ['audit:query'], '/system/audit', true],
+      [['ADMIN'], [], '/system/audit', false],
+      [['ADMIN'], ['*'], '/system/data', false],
+      [['SUPER_ADMIN'], [], '/system/data', true],
+    ] as const) {
+      setActivePinia(createPinia())
+      vi.mocked(getCurrentUser).mockResolvedValue(user([...permissions], [...roles]))
+      const router = guardedRouter()
+
+      await router.push(path)
+      await router.isReady()
+
+      if (path.startsWith('/system?') && allowed) {
+        expect(router.currentRoute.value.fullPath).toBe('/system/dict?source=legacy#types')
+      } else {
+        expect(router.currentRoute.value.path).toBe(allowed ? path : '/forbidden')
       }
     }
   })

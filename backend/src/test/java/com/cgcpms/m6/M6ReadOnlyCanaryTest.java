@@ -153,7 +153,7 @@ class M6ReadOnlyCanaryTest {
     }
 
     private Cookie cookie(List<String> permissions) {
-        return cookie(1L, 0L, permissions);
+        return cookie(999L, 0L, permissions);
     }
 
     private Cookie cookie(Long userId, Long tenantId, List<String> permissions) {

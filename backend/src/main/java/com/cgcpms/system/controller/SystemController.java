@@ -6,11 +6,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.regex.Pattern;
+import java.sql.ResultSet;
 
 /**
  * System-level management endpoints. Restricted to SUPER_ADMIN only.
@@ -53,31 +56,37 @@ public class SystemController {
 
         log.warn("SUPER_ADMIN clearing database...");
 
-        // Disable FK checks for TRUNCATE — ensure re-enable in finally
-        jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 0");
-        int cleared = 0;
-        try {
-            List<String> tables = jdbcTemplate.queryForList(
-                    "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()", String.class);
-
-            for (String table : tables) {
-                if (PROTECTED_TABLES.contains(table)) {
-                    log.info("Skipping protected table: {}", table);
-                    continue;
+        ClearResult result = jdbcTemplate.execute((ConnectionCallback<ClearResult>) connection -> {
+            List<String> failures = new ArrayList<>();
+            int cleared = 0;
+            try (var statement = connection.createStatement()) {
+                statement.execute("SET FOREIGN_KEY_CHECKS = 0");
+                try (ResultSet rows = statement.executeQuery(
+                        "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()")) {
+                    while (rows.next()) {
+                        String table = rows.getString(1);
+                        if (PROTECTED_TABLES.contains(table)) continue;
+                        try {
+                            statement.execute("TRUNCATE TABLE " + quoteIdentifier(table));
+                            cleared++;
+                        } catch (Exception ex) {
+                            failures.add(table);
+                            log.warn("Failed to truncate table {}", table, ex);
+                        }
+                    }
                 }
-                try {
-                    jdbcTemplate.execute("TRUNCATE TABLE " + quoteIdentifier(table));
-                    cleared++;
-                    log.info("Truncated table: {}", table);
-                } catch (Exception e) {
-                    log.warn("Failed to truncate table {}: {}", table, e.getMessage());
+            } finally {
+                try (var statement = connection.createStatement()) {
+                    statement.execute("SET FOREIGN_KEY_CHECKS = 1");
                 }
             }
-        } finally {
-            jdbcTemplate.execute("SET FOREIGN_KEY_CHECKS = 1");
+            return new ClearResult(cleared, failures);
+        });
+        if (!result.failures().isEmpty()) {
+            throw new BusinessException("CLEAR_DATABASE_PARTIAL_FAILURE",
+                    "数据库清理部分失败，已停止报告成功，失败表: " + String.join(",", result.failures()));
         }
-
-        String msg = "已清空 " + cleared + " 张业务数据表，系统表已保留";
+        String msg = "已清空 " + result.cleared() + " 张业务数据表，系统表已保留";
         log.info(msg);
         return ApiResponse.success(msg);
     }
@@ -88,4 +97,6 @@ public class SystemController {
         }
         return "`" + table + "`";
     }
+
+    private record ClearResult(int cleared, List<String> failures) { }
 }

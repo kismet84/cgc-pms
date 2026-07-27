@@ -2,7 +2,7 @@ package com.cgcpms.overhead;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.overhead.service.OverheadAllocationService;
 import com.cgcpms.overhead.entity.OverheadAllocationRule;
@@ -54,7 +54,7 @@ class OverheadAllocationControllerTest {
     private static final LocalDate PERIOD = LocalDate.of(2026, 6, 30);
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private JwtUtils jwtUtils;
+    @Autowired private JwtHttpTestTokenFactory jwtUtils;
     @Autowired private JdbcTemplate jdbcTemplate;
     @MockitoBean private OverheadAllocationService service;
 

@@ -17,8 +17,8 @@ public class CookieUtils {
     public static final String ACCESS_TOKEN_COOKIE = "access_token";
     public static final String REFRESH_TOKEN_COOKIE = "refresh_token";
 
-    /** Refresh token is only sent to the refresh endpoint — minimizes exposure. */
-    private static final String REFRESH_PATH = "/api/auth/refresh";
+    /** Refresh token is sent only to auth endpoints so logout can revoke it. */
+    private static final String REFRESH_PATH = "/api/auth";
 
     @Value("${cookie.secure:false}")
     private boolean secure;
@@ -33,7 +33,7 @@ public class CookieUtils {
     }
 
     /**
-     * Set the refresh-token cookie (HttpOnly, SameSite=Strict, scoped to /api/auth/refresh).
+     * Set the refresh-token cookie (HttpOnly, SameSite=Strict, scoped to /api/auth).
      */
     public void setRefreshTokenCookie(HttpServletResponse response, String token, long maxAgeSeconds) {
         String value = buildCookieValue(REFRESH_TOKEN_COOKIE, token, maxAgeSeconds, REFRESH_PATH, true);

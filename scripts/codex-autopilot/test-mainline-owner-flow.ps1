@@ -50,9 +50,9 @@ if ($PlanPath) {
   if (!(Test-Path -LiteralPath $resolvedPlan -PathType Leaf)) { throw "plan file is missing: $resolvedPlan" }
   $name = Split-Path -Leaf $resolvedPlan
   if ($name -notmatch '^第\d+(?:[-.]\d+)?条主线(?:-M\d+)?-.+任务计划书(?:-\d{4}-\d{2}-\d{2})?\.md$') { throw "plan filename does not match the mainline convention: $name" }
-  if ($name -match '^第(\d+)条主线-(?!M\d+-)') {
+  if ($name -match '^第(\d+)条主线-(?!M\d+-|支线-)') {
     $number = $matches[1]
-    $duplicates = @(Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'docs\plans') -File | Where-Object { $_.Name -match "^第${number}条主线-(?!M\d+-)" })
+    $duplicates = @(Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'docs\plans') -File | Where-Object { $_.Name -match "^第${number}条主线-(?!M\d+-|支线-)" })
     if ($duplicates.Count -gt 1) { throw "duplicate primary mainline number: $number" }
   }
   $text = Get-Content -LiteralPath $resolvedPlan -Raw -Encoding UTF8

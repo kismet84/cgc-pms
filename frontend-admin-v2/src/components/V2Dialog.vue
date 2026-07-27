@@ -125,7 +125,7 @@ onBeforeUnmount(() => {
           tabindex="-1"
           @keydown="onKeydown"
         >
-          <header class="v2-dialog__header">
+          <header class="v2-dialog__header" role="presentation">
             <div>
               <h2 :id="titleId" class="v2-dialog__title">
                 <span>{{ title }}</span>

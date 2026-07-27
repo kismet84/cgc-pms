@@ -36,7 +36,7 @@ const records = ref<PartnerRecord[]>([])
 const partnerTypes = ref<DictOption[]>([])
 const total = ref(0)
 const pageNo = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(10)
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<PartnerRecord | null>(null)
@@ -278,26 +278,40 @@ onBeforeUnmount(() => loadController?.abort())
   <V2Stack class="master-page" :gap="4">
     <V2Card title="合作方管理" :heading-level="1">
       <template #actions>
+        <form class="v2-page-heading__filters" @submit.prevent="search">
+          <V2Input
+            v-model="filters.partnerCode"
+            label="合作方编号"
+            hide-label
+            placeholder="合作方编号"
+          />
+          <V2Input
+            v-model="filters.partnerName"
+            label="合作方名称"
+            hide-label
+            placeholder="合作方名称"
+          />
+          <V2Select
+            v-model="filters.partnerType"
+            :options="typeOptions"
+            label="合作方类型"
+            hide-label
+            placeholder="合作方类型"
+            allow-empty
+          />
+          <V2Select
+            v-model="filters.status"
+            :options="statusOptions"
+            label="状态"
+            hide-label
+            placeholder="全部状态"
+            allow-empty
+          />
+          <V2Button type="submit" size="small">查询</V2Button>
+          <V2Button variant="secondary" type="button" size="small" @click="reset">重置</V2Button>
+        </form>
         <V2Button v-if="canAdd" size="small" @click="openCreate">新增合作方</V2Button>
       </template>
-    </V2Card>
-
-    <V2Card title="查询条件">
-      <form class="master-page__filters" @submit.prevent="search">
-        <V2Input v-model="filters.partnerCode" label="合作方编号" />
-        <V2Input v-model="filters.partnerName" label="合作方名称" />
-        <V2Select
-          v-model="filters.partnerType"
-          :options="typeOptions"
-          label="合作方类型"
-          allow-empty
-        />
-        <V2Select v-model="filters.status" :options="statusOptions" label="状态" allow-empty />
-        <V2Cluster>
-          <V2Button type="submit">查询</V2Button>
-          <V2Button variant="secondary" type="button" @click="reset">重置</V2Button>
-        </V2Cluster>
-      </form>
     </V2Card>
 
     <V2PageState v-if="loading" kind="loading" title="正在读取合作方" description="请稍候。" />
@@ -444,7 +458,6 @@ onBeforeUnmount(() => loadController?.abort())
 </template>
 
 <style scoped>
-.master-page__filters,
 .master-page__form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -463,7 +476,6 @@ onBeforeUnmount(() => loadController?.abort())
 }
 
 @media (max-width: 48rem) {
-  .master-page__filters,
   .master-page__form {
     grid-template-columns: 1fr;
   }

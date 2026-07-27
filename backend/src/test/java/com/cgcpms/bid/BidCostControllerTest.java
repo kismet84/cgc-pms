@@ -1,7 +1,7 @@
 package com.cgcpms.bid;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class BidCostControllerTest {
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private JwtUtils jwtUtils;
+    @Autowired private JwtHttpTestTokenFactory jwtUtils;
     @Autowired private JdbcTemplate jdbcTemplate;
     private static final long ADMIN_ID = 1L;
     private static final long TENANT_ID = 0L;

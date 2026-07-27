@@ -37,6 +37,11 @@ if (-not $MysqlPassword) {
     exit 1
 }
 
+if ($TargetDatabase -notmatch '^[A-Za-z0-9_]+$') {
+    Write-Error "Invalid target database name: '$TargetDatabase'"
+    exit 1
+}
+
 if (-not (Test-Path $BackupFile)) {
     Write-Error "Backup file not found: $BackupFile"
     exit 1
@@ -146,7 +151,7 @@ Write-Host 'Restore complete.'
 # Minimal health check
 # -------------------------------------------------------------------
 Write-Host 'Running minimal health check...'
-$checkSql = 'SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema = \"' + $TargetDatabase + '\";'
+$checkSql = "SELECT COUNT(*) AS table_count FROM information_schema.tables WHERE table_schema = '$TargetDatabase';"
 $checkArgs = @(
     'run', '--rm',
     '--network', 'host',

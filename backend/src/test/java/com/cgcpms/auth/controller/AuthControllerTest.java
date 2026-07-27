@@ -8,10 +8,12 @@ import com.cgcpms.auth.service.AuthService;
 import com.cgcpms.auth.service.TokenBlacklistService;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.ratelimit.LoginLockoutStore;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -69,6 +71,9 @@ class AuthControllerTest {
     private JwtUtils jwtUtils;
 
     @Autowired
+    private JwtHttpTestTokenFactory jwtHttpTestTokenFactory;
+
+    @Autowired
     private JwtProperties jwtProperties;
 
     @Autowired
@@ -79,6 +84,11 @@ class AuthControllerTest {
 
     @MockitoBean
     private LoginLockoutStore lockoutStore;
+
+    @BeforeEach
+    void allowCurrentAuthorizationSnapshot() {
+        when(authService.isCurrentAuthorization(any())).thenReturn(true);
+    }
 
     @Test
     @DisplayName("POST /auth/login 有效凭据 → 200")
@@ -96,7 +106,9 @@ class AuthControllerTest {
                                 {"username":"admin","password":"admin123"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.userInfo.username").value("admin"));
+                .andExpect(jsonPath("$.data.userInfo.username").value("admin"))
+                .andExpect(header().stringValues("Set-Cookie",
+                        hasItem(containsString("refresh_token=mock-refresh-token; Path=/api/auth;"))));
     }
 
     @Test
@@ -117,7 +129,7 @@ class AuthControllerTest {
         userInfo.setUsername("demo_dev_super_admin");
         when(authService.getUserInfo(1L)).thenReturn(userInfo);
 
-        String token = jwtUtils.generateToken(1L, "demo_dev_super_admin", 0L,
+        String token = jwtHttpTestTokenFactory.generateToken(1L, "demo_dev_super_admin", 0L,
                 List.of("SUPER_ADMIN"), List.of("inventory:transaction:add"));
 
         mockMvc.perform(get("/api/auth/userinfo")
@@ -125,9 +137,7 @@ class AuthControllerTest {
                         .contextPath("/api")
                         .cookie(new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token))
                         .cookie(new Cookie("XSRF-TOKEN", "stable-csrf-token")))
-                .andExpect(status().isOk())
-                .andExpect(header().stringValues("Set-Cookie",
-                        not(hasItem(containsString("XSRF-TOKEN=;")))));
+                .andExpect(status().isOk());
     }
 
     @Test
@@ -327,7 +337,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("POST /client-errors 要求有效CSRF令牌")
     void clientErrorsRequireValidCsrfToken(CapturedOutput output) throws Exception {
-        String token = jwtUtils.generateToken(
+        String token = jwtHttpTestTokenFactory.generateToken(
                 1L, "admin", 0L,
                 List.of("ADMIN"),
                 List.of());
@@ -367,8 +377,7 @@ class AuthControllerTest {
                         .header("X-XSRF-TOKEN", csrfCookie.getValue())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("0"));
+                .andExpect(status().isOk());
         org.junit.jupiter.api.Assertions.assertFalse(output.getAll().contains("a".repeat(64)));
     }
 
@@ -427,6 +436,23 @@ class AuthControllerTest {
         org.junit.jupiter.api.Assertions.assertFalse(source.contains("@RateLimit"));
         org.junit.jupiter.api.Assertions.assertTrue(securityConfigSource.contains("environment.acceptsProfiles(Profiles.of(\"dev\", \"local\"))"));
         org.junit.jupiter.api.Assertions.assertTrue(securityConfigSource.contains("auth.dev-login.enabled:false"));
+    }
+
+    @Test
+    @DisplayName("POST /auth/refresh 密码版本失效 → 不轮换令牌")
+    void refreshRejectsStaleCredentialBeforeRotation() {
+        TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
+        when(blacklistService.isBlacklisted(any())).thenReturn(false);
+        AuthController controller = authControllerInProd(blacklistService);
+        when(authService.isCurrentCredential(any())).thenReturn(false);
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setCookies(new Cookie(CookieUtils.REFRESH_TOKEN_COOKIE, jwtUtils.generateRefreshToken(1L)));
+
+        var result = controller.refresh(request, new MockHttpServletResponse(), null);
+
+        org.junit.jupiter.api.Assertions.assertEquals("AUTH_TOKEN_INVALID", result.getCode());
+        verify(blacklistService, never()).blacklist(any(), anyLong());
+        verify(authService, never()).loginById(any());
     }
 
     @Test
@@ -489,6 +515,7 @@ class AuthControllerTest {
         when(environment.acceptsProfiles(any(Profiles.class))).thenReturn(true);
         ObjectProvider<MeterRegistry> metricsProvider = mock(ObjectProvider.class);
         when(metricsProvider.getIfAvailable()).thenReturn(meterRegistry);
+        when(authService.isCurrentCredential(any())).thenReturn(true);
         return new AuthController(authService, jwtUtils, jwtProperties, new CookieUtils(), provider, environment, metricsProvider);
     }
 

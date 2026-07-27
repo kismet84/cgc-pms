@@ -1644,7 +1644,7 @@ onBeforeUnmount(() => {
   grid-column: 1 / -1;
 }
 
-dl {
+.contract-page__detail-grid dl {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: var(--v2-space-2) var(--v2-space-4);

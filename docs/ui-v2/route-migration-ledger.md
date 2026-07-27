@@ -5,9 +5,9 @@
 - 命名路由：87
 - Legacy 路由视图引用：73
 - Legacy 独立页面模块：65
-- `LEGACY_ONLY`：8
+- `LEGACY_ONLY`：0
 - `V2_SOURCE_AVAILABLE`：0
-- `V2_ACCEPTED`：79
+- `V2_ACCEPTED`：87
 
 | 域 | route name | URL | Legacy 视图 | V2 视图 | permission | adminOnly | 状态 | Stitch / 测试 / 验收 |
 |---|---|---|---|---|---|---:|---|---|
@@ -86,14 +86,14 @@
 | 工作台 | ApprovalMine | /approval/mine | @/pages/approval/todo.vue | @/pages/workbench/WorkflowWorkbenchPage.vue | workflow:instance:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
 | 工作台 | ApprovalProcess | /approval/process | @/pages/approval/process.vue | @/pages/system/WorkflowProcessPage.vue | workflow:process:query | 是 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-040-M7流程配置与adminOnly门V2验收报告.md |
 | 工作台 | ApprovalDetail | /approval/:instanceId | @/pages/approval/detail.vue | @/router.ts#V2LegacyApprovalDetailRedirect | workflow:instance:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md |
-| 系统与全局 | System | /system | — | — | system:dict:query | 是 | LEGACY_ONLY | — |
-| 系统与全局 | SystemDict | /system/dict | @/pages/system/dict/index.vue | — | system:dict:query | 是 | LEGACY_ONLY | — |
-| 系统与全局 | SystemUsers | /system/users | @/pages/system/users/index.vue | — | system:user:query | 是 | LEGACY_ONLY | — |
-| 系统与全局 | SystemData | /system/data | @/pages/system/data/index.vue | — | system:data:query | 是 | LEGACY_ONLY | — |
-| 系统与全局 | RoleManagement | /system/roles | @/pages/system/roles/index.vue | — | system:role:query | 是 | LEGACY_ONLY | — |
-| 系统与全局 | SystemPermissions | /system/permissions | @/pages/system/permissions/index.vue | — | system:permission:query | 是 | LEGACY_ONLY | — |
-| 系统与全局 | SystemAudit | /system/audit | @/pages/system/audit/index.vue | — | audit:query | 否 | LEGACY_ONLY | — |
-| 系统与全局 | DocumentTemplateManagement | /system/document-templates | @/pages/system/document-templates/index.vue | — | document:template:query | 是 | LEGACY_ONLY | — |
+| 系统与全局 | System | /system | — | @/router.ts#V2SystemRedirect | system:dict:list | 是 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md |
+| 系统与全局 | SystemDict | /system/dict | @/pages/system/dict/index.vue | @/pages/system/DictionaryPage.vue | system:dict:list | 是 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md |
+| 系统与全局 | SystemUsers | /system/users | @/pages/system/users/index.vue | @/pages/system/AccessControlPage.vue | system:user:query | 是 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md |
+| 系统与全局 | SystemData | /system/data | @/pages/system/data/index.vue | @/pages/system/DataMaintenancePage.vue | — | 是 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md |
+| 系统与全局 | RoleManagement | /system/roles | @/pages/system/roles/index.vue | @/pages/system/AccessControlPage.vue | system:role:query | 是 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md |
+| 系统与全局 | SystemPermissions | /system/permissions | @/pages/system/permissions/index.vue | @/pages/system/AccessControlPage.vue | system:menu:query | 是 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md |
+| 系统与全局 | SystemAudit | /system/audit | @/pages/system/audit/index.vue | @/pages/system/AuditPage.vue | audit:query | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md |
+| 系统与全局 | DocumentTemplateManagement | /system/document-templates | @/pages/system/document-templates/index.vue | @/pages/system/DocumentTemplatePage.vue | document:template:query | 是 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md |
 | 系统与全局 | Profile | /profile | @/pages/profile/index.vue | @/pages/account/AccountPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md |
 | 系统与全局 | Settings | /settings | @/pages/settings/index.vue | @/pages/account/AccountPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md |
 | 系统与全局 | Help | /help | @/pages/help/index.vue | @/pages/account/AccountPage.vue | — | 否 | V2_ACCEPTED | frontend-admin-v2/tests/unit；frontend-admin-v2/e2e；docs/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md |

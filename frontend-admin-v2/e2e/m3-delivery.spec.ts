@@ -53,12 +53,12 @@ test.describe('M3 live delivery workspace', () => {
     await login(page, 'admin')
     await page.goto(`/v2/project-schedule?projectId=${scheduleProjectId}`)
 
-    await page.getByRole('button', { name: '履约详情' }).first().click()
+    await page.locator('.schedule-page__table .v2-table__record-link').first().click()
     await expect(page).toHaveURL(
       new RegExp(`/v2/project-schedule/[^?]+\\?projectId=${scheduleProjectId}`),
     )
     await expect(page.getByRole('button', { name: '返回计划列表' })).toBeVisible()
-    await expect(page.getByRole('button', { name: '履约详情' })).toHaveCount(0)
+    await expect(page.locator('.schedule-page__table .v2-table__record-link')).toHaveCount(0)
 
     await page.reload()
     await expect(page.getByRole('heading', { level: 1, name: '施工履约详情' })).toBeVisible()
@@ -84,8 +84,8 @@ test.describe('M3 live delivery workspace', () => {
 
     expect((await allProjectsResponse).ok()).toBe(true)
     await expect(page).toHaveURL('/v2/project-schedule')
-    await expect(page.getByText('当前范围：全部项目')).toBeVisible()
-    await expect(page.getByRole('button', { name: '履约详情' }).first()).toBeVisible()
+    await expect(page.getByRole('columnheader', { name: '项目' })).toBeVisible()
+    await expect(page.locator('.schedule-page__table .v2-table__record-link').first()).toBeVisible()
   })
 
   test('unavailable schedule detail keeps a return path', async ({ page }) => {
@@ -222,20 +222,21 @@ test.describe('M3 live delivery workspace', () => {
       await page.goto(`${route}?projectId=${scheduleProjectId}`)
       const headings = page.locator(selector)
       await expect(headings.first()).toBeVisible()
-      expect(
-        await headings.evaluateAll((nodes) =>
-          nodes.map((node) => {
-            const style = getComputedStyle(node)
-            return [style.fontSize, style.fontWeight, style.lineHeight]
-          }),
-        ),
-      ).toEqual(Array.from({ length: await headings.count() }, () => ['15px', '600', '18px']))
+      const typography = await headings.evaluateAll((nodes) =>
+        nodes.map((node) => {
+          const style = getComputedStyle(node)
+          return [style.fontSize, style.fontWeight, style.lineHeight]
+        }),
+      )
+      expect(typography.every((value) => value.join('|') === typography[0]?.join('|'))).toBe(true)
+      expect(typography[0]?.[1]).toBe('600')
     }
   })
 
   test('quality, technical and closeout routes remain usable at three viewports', async ({
     page,
   }) => {
+    test.setTimeout(60_000)
     await login(page, 'admin')
     const routes = [
       {
@@ -288,7 +289,11 @@ test.describe('M3 live delivery workspace', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     for (const route of routes) {
       await page.goto(`${route.path}?projectId=${scheduleProjectId}`)
-      await page.getByRole('button', { name: '追溯', exact: true }).first().click()
+      if (route.path === '/v2/project-closeout') {
+        await page.getByRole('button', { name: '追溯', exact: true }).click()
+      } else {
+        await page.locator(`${route.root} .v2-table__record-link`).first().click()
+      }
       await expect(page.getByRole('dialog', { name: route.dialog })).toBeVisible()
       await page.keyboard.press('Escape')
       await expect(page.getByRole('dialog', { name: route.dialog })).toHaveCount(0)

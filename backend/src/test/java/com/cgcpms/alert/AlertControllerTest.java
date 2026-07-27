@@ -7,7 +7,7 @@ import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.audit.entity.OperationAuditLog;
 import com.cgcpms.audit.mapper.OperationAuditLogMapper;
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.entity.PmProjectMember;
 import com.cgcpms.project.mapper.PmProjectMapper;
@@ -44,7 +44,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("AlertController integration tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class AlertControllerTest {
-    @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils; @Autowired private AlertLogMapper alertLogMapper;
+    @Autowired private MockMvc mockMvc; @Autowired private JwtHttpTestTokenFactory jwtUtils; @Autowired private AlertLogMapper alertLogMapper;
     @Autowired private OperationAuditLogMapper operationAuditLogMapper;
     @Autowired private PmProjectMapper projectMapper; @Autowired private PmProjectMemberMapper projectMemberMapper;
     @Autowired private JdbcTemplate jdbcTemplate;

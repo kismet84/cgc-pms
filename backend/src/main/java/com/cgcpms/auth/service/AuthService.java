@@ -18,7 +18,9 @@ import org.springframework.util.StringUtils;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
+import io.jsonwebtoken.Claims;
 
 @Slf4j
 @Service
@@ -51,8 +53,9 @@ public class AuthService {
         List<String> permCodes = getPermissionCodes(user.getId());
 
         log.info("User login: {}", request.getUsername());
-        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(), roleCodes, permCodes);
-        String refreshToken = jwtUtils.generateRefreshToken(user.getId());
+        String credentialVersion = jwtUtils.credentialVersion(user.getPassword());
+        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(), roleCodes, permCodes, credentialVersion);
+        String refreshToken = jwtUtils.generateRefreshToken(user.getId(), user.getTenantId(), credentialVersion);
         UserInfo userInfo = UserInfo.builder()
                 .userId(String.valueOf(user.getId()))
                 .username(user.getUsername())
@@ -78,8 +81,9 @@ public class AuthService {
         }
         List<String> roleCodes = getRoleCodes(userId);
         List<String> permCodes = getPermissionCodes(userId);
-        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(), roleCodes, permCodes);
-        String refreshToken = jwtUtils.generateRefreshToken(user.getId());
+        String credentialVersion = jwtUtils.credentialVersion(user.getPassword());
+        String token = jwtUtils.generateToken(user.getId(), user.getUsername(), user.getTenantId(), roleCodes, permCodes, credentialVersion);
+        String refreshToken = jwtUtils.generateRefreshToken(user.getId(), user.getTenantId(), credentialVersion);
         UserInfo userInfo = UserInfo.builder()
                 .userId(String.valueOf(user.getId()))
                 .username(user.getUsername())
@@ -129,6 +133,56 @@ public class AuthService {
                 .permissions(permCodes)
                 .roleName(roleCodes.isEmpty() ? null : roleCodes.get(0))
                 .build();
+    }
+
+    /** Fail closed for tokens issued before password reset, disabled users, or tenant changes. */
+    public boolean isCurrentCredential(Claims claims) {
+        if (claims == null) return false;
+        Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
+        Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
+        String version = claims.get(JwtUtils.CLAIM_CREDENTIAL_VERSION, String.class);
+        if (userId == null || tenantId == null || version == null || version.isBlank()) return false;
+        SysUser user = sysUserMapper.selectById(userId);
+        return user != null && tenantId.equals(user.getTenantId())
+                && ENABLED_STATUS.equals(user.getStatus())
+                && version.equals(jwtUtils.credentialVersion(user.getPassword()));
+    }
+
+    /** Fail closed when roles or permissions changed after an access token was issued. */
+    public boolean isCurrentAuthorization(Claims claims) {
+        if (claims == null) return false;
+        Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
+        Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
+        if (userId == null || tenantId == null) return false;
+        try {
+            SysUser user = sysUserMapper.selectById(userId);
+            if (user == null || !tenantId.equals(user.getTenantId()) || !ENABLED_STATUS.equals(user.getStatus())) {
+                return false;
+            }
+            return Set.copyOf(getRoleCodes(userId)).equals(Set.copyOf(roleClaim(claims)))
+                    && Set.copyOf(getPermissionCodes(userId)).equals(
+                    Set.copyOf(JwtUtils.decodePermissionClaim(claims.get(JwtUtils.CLAIM_PERMISSIONS))));
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    private List<String> roleClaim(Claims claims) {
+        Object value = claims.get(JwtUtils.CLAIM_ROLES);
+        if (value instanceof List<?> values) {
+            return values.stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .filter(role -> !role.isBlank())
+                    .toList();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            return List.of(text.split(",")).stream()
+                    .map(String::trim)
+                    .filter(role -> !role.isEmpty())
+                    .toList();
+        }
+        return List.of();
     }
 
     /**

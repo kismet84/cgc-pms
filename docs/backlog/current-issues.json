@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-26T21:51:00+08:00",
+  "updatedAt": "2026-07-28T01:15:57+08:00",
   "issues": [
     {
       "issueKey": "A-02",
@@ -124,19 +124,21 @@
       "classification": "STILL_APPLICABLE",
       "priority": "P2",
       "blocking": false,
-      "summary": "技术方案、设计协调、技术审核、RFI/Submittal和重大技术问题对象尚未建立。",
-      "acceptanceCriteria": "获得业务对象、角色、状态和数据前置后重新通过产品决策门。",
-      "deferReason": "业务对象与验收前置不足，继续Frozen。",
+      "summary": "M3已建立技术方案、图纸会审、RFI回复复核、交底、施工依据和归档闭环；Submittal及非RFI重大技术问题是否需要独立对象仍未确认。",
+      "acceptanceCriteria": "提供真实Submittal或非RFI重大技术问题样本、角色、状态、责任、时限、附件和审计要求，完成与M3技术管理域的对象映射后重新通过产品决策门；无独立价值则有据关闭。",
+      "deferReason": "M3已覆盖原候选主要技术闭环，剩余需求缺真实样本和独立价值证据，继续Frozen。",
       "candidate": {
-        "userValue": "让重大技术决策、设计协调和RFI形成可追溯责任闭环。",
-        "minimalLoop": "业务先选择一个对象和一条审批/回复链，优先复用现有技术管理对象与权限，不建立重复技术平台。",
-        "nonGoals": "不同时建设技术方案、RFI、Submittal、设计门户、BIM和AI审图。",
-        "dependencies": "总工程师角色、首个权威对象、状态、责任人、时限、附件和现有技术管理域去重结论。",
+        "userValue": "仅在M3现有方案/RFI闭环无法承接时，让材料设备报审或独立重大技术问题形成可追溯责任闭环。",
+        "minimalLoop": "业务先提供一个M3无法表达的真实对象和一条审批/回复链，优先扩展现有技术管理对象与权限，不建立重复技术平台。",
+        "nonGoals": "不重复建设M3已有技术方案、图纸会审、RFI、交底、归档，也不同时建设设计门户、BIM和AI审图。",
+        "dependencies": "总工程师角色、M3无法承接的首个权威对象、状态、责任人、时限、附件和独立价值结论。",
         "risk": "未先去重会与现有技术管理P0闭环产生重复事实和权限冲突。",
-        "readyPreconditions": "提供真实业务样本，完成与现有技术管理域的对象映射、状态与权限评审。"
+        "readyPreconditions": "提供真实Submittal或非RFI重大技术问题样本，完成与M3技术管理域的对象映射、状态与权限评审。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md"
+        "docs/backlog/v1.0-historical-issue-classification.md",
+        "docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md",
+        "docs/quality/第55条主线-M4-Frozen与Observation复核验收报告.md"
       ]
     },
     {
@@ -230,28 +232,6 @@
       ]
     },
     {
-      "issueKey": "AUTO-IMPROVEMENT-7EFDFA50553C2152",
-      "title": "AutoPilot 改进：cycleEfficiency",
-      "status": "OBSERVATION",
-      "classification": "OPERATIONAL_RISK",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "周期平均分 5/10，低于 80%。",
-      "acceptanceCriteria": "该维度连续一个完整回顾周期平均分达到满分的 80% 及以上，且不降低硬门禁。",
-      "deferReason": "用户已于 2026-07-16 批准转为工程治理 Candidate；先补齐下一完整回顾周期的有效样本并定位可复现根因，未满足 Ready 前不得修改控制面。",
-      "candidate": {
-        "userValue": "减少控制面重复等待和无效工具路径，提升单个任务周期的有效执行占比。",
-        "minimalLoop": "在不改调度、评分或环境配置的前提下采集下一完整回顾周期证据，并将低分归因收敛为一个可验证的最小修复方案。",
-        "nonGoals": "不调整评分权重、超时、并行度、控制面状态机或运行环境。",
-        "dependencies": "下一完整回顾周期的有效效率样本和可读回的失败分类。",
-        "risk": "当前仅有一个 cycleEfficiency 样本，直接调整规则会放大偶然波动。",
-        "readyPreconditions": "存在可复现根因、最小改动范围、量化验收标准和回滚方式。"
-      },
-      "sourceRefs": [
-        "docs/quality/AutoPilot-任务周期回顾-review-b8c59c337f3e49b8a81e770e3a3d85a4-2026-07-16.md"
-      ]
-    },
-    {
       "issueKey": "AUTO-IMPROVEMENT-45AD2EFE82162775",
       "title": "AutoPilot 改进：taskExecutionEfficiency",
       "status": "OBSERVATION",
@@ -270,7 +250,8 @@
         "readyPreconditions": "存在可复现根因、最小改动范围、量化验收标准和回滚方式。"
       },
       "sourceRefs": [
-        "docs/quality/AutoPilot-任务周期回顾-review-b8c59c337f3e49b8a81e770e3a3d85a4-2026-07-16.md"
+        "docs/quality/AutoPilot-任务周期回顾-review-b8c59c337f3e49b8a81e770e3a3d85a4-2026-07-16.md",
+        "docs/quality/第55条主线-支线-候选与工程观察证据化收口验收报告-2026-07-28.md"
       ]
     },
     {

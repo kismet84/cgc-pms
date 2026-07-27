@@ -68,9 +68,9 @@ class AuthServiceDevLoginTest {
         when(sysUserRoleMapper.selectList(any())).thenReturn(List.of(userRole));
         when(sysRoleMapper.selectList(any())).thenReturn(List.of(role));
         when(sysMenuMapper.selectList(any())).thenReturn(List.of(menu("system:user:query")));
-        when(jwtUtils.generateToken(eq(user.getId()), eq(username), eq(0L), any(), any()))
+        when(jwtUtils.generateToken(eq(user.getId()), eq(username), eq(0L), any(), any(), any()))
                 .thenReturn("access-token");
-        when(jwtUtils.generateRefreshToken(anyLong())).thenReturn("refresh-token");
+        when(jwtUtils.generateRefreshToken(anyLong(), anyLong(), any())).thenReturn("refresh-token");
 
         LoginResponse response = authService.loginByUsernameEnsuringDevAccount(username, username);
 

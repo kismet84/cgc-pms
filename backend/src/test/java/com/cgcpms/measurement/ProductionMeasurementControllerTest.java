@@ -1,7 +1,7 @@
 package com.cgcpms.measurement;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.measurement.controller.ProductionMeasurementController;
 import com.cgcpms.measurement.dto.MeasurementModels.OwnerReviewRequest;
 import com.cgcpms.measurement.dto.MeasurementModels.OwnerSubmissionRequest;
@@ -33,7 +33,7 @@ class ProductionMeasurementControllerTest {
     private static final long PARTNER=99194005L,CONTRACT=99194006L,OUT_CONTRACT=99194007L;
     private static final long PERIOD=99194008L,OUT_PERIOD=99194009L,MEASUREMENT=99194010L,OUT_MEASUREMENT=99194011L;
     private static final long SUBMISSION=99194012L,SETTLEMENT=99194013L,IN_SUBMISSION=99194014L,TRACE_SUBMISSION=99194015L,IN_SETTLEMENT=99194016L;
-    @Autowired MockMvc mockMvc;@Autowired JwtUtils jwtUtils;@Autowired JdbcTemplate jdbc;
+    @Autowired MockMvc mockMvc;@Autowired JwtHttpTestTokenFactory jwtUtils;@Autowired JdbcTemplate jdbc;
 
     @BeforeEach void setup(){
         cleanup();

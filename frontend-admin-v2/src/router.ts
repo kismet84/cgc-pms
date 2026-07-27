@@ -44,6 +44,11 @@ const OrganizationPage = () => import('./pages/master-data/OrganizationPage.vue'
 const MaterialDictionaryPage = () => import('./pages/master-data/MaterialDictionaryPage.vue')
 const CostSubjectPage = () => import('./pages/master-data/CostSubjectPage.vue')
 const WorkflowProcessPage = () => import('./pages/system/WorkflowProcessPage.vue')
+const AccessControlPage = () => import('./pages/system/AccessControlPage.vue')
+const DictionaryPage = () => import('./pages/system/DictionaryPage.vue')
+const AuditPage = () => import('./pages/system/AuditPage.vue')
+const DocumentTemplatePage = () => import('./pages/system/DocumentTemplatePage.vue')
+const DataMaintenancePage = () => import('./pages/system/DataMaintenancePage.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -53,6 +58,7 @@ declare module 'vue-router' {
     shell?: boolean
     permission?: string
     adminOnly?: boolean
+    superAdminOnly?: boolean
     workflowTab?: WorkflowTab
     migration?: 'pending'
   }
@@ -171,11 +177,30 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
                                                                         : tab.path ===
                                                                             '/approval/process'
                                                                           ? WorkflowProcessPage
-                                                                          : ShellPlaceholderPage,
+                                                                          : [
+                                                                                '/system/users',
+                                                                                '/system/roles',
+                                                                                '/system/permissions',
+                                                                              ].includes(tab.path)
+                                                                            ? AccessControlPage
+                                                                            : tab.path ===
+                                                                                '/system/dict'
+                                                                              ? DictionaryPage
+                                                                              : tab.path ===
+                                                                                  '/system/audit'
+                                                                                ? AuditPage
+                                                                                : tab.path ===
+                                                                                    '/system/document-templates'
+                                                                                  ? DocumentTemplatePage
+                                                                                  : tab.path ===
+                                                                                      '/system/data'
+                                                                                    ? DataMaintenancePage
+                                                                                    : ShellPlaceholderPage,
           meta: {
             shell: true,
             permission: tab.permission,
-            adminOnly: tab.adminOnly,
+            adminOnly: workspace.adminOnly || tab.adminOnly,
+            superAdminOnly: workspace.superAdminOnly || tab.superAdminOnly,
             workflowTab: approvalTab,
             migration: tab.migration,
           },
@@ -186,6 +211,12 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
 )
 
 const contextRoutes: RouteRecordRaw[] = [
+  {
+    path: '/system',
+    name: 'V2SystemRedirect',
+    redirect: (to) => ({ path: '/system/dict', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'system:dict:list', adminOnly: true },
+  },
   {
     path: '/profile',
     name: 'V2Profile',
@@ -462,6 +493,10 @@ export function installSessionGuard(targetRouter: Router): void {
     }
 
     if (to.meta.adminOnly && !session.isAdmin) {
+      return { path: '/forbidden', query: { from: to.fullPath } }
+    }
+
+    if (to.meta.superAdminOnly && !session.roles.includes('SUPER_ADMIN')) {
       return { path: '/forbidden', query: { from: to.fullPath } }
     }
 

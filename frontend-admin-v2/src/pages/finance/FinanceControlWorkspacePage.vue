@@ -91,10 +91,12 @@ const isSuperAdmin = computed(() => session.roles.includes('SUPER_ADMIN'))
 
 const operations = ref<FinanceOperationsWorkspace | null>(null)
 const accounts = ref<FundAccountRecord[]>([])
-const journal = ref<CashJournalPage>({ pageNo: 1, pageSize: 50, total: 0, records: [] })
+const journalPageNo = ref(1)
+const journal = ref<CashJournalPage>({ pageNo: 1, pageSize: 10, total: 0, records: [] })
 const cycles = ref<CashForecastCycleRecord[]>([])
 const forecastTrace = ref<CashForecastTrace | null>(null)
-const entries = ref<AccountingEntryPage>({ pageNo: 1, pageSize: 50, total: 0, records: [] })
+const entryPageNo = ref(1)
+const entries = ref<AccountingEntryPage>({ pageNo: 1, pageSize: 10, total: 0, records: [] })
 const entryDetail = ref<AccountingEntryDetail | null>(null)
 const periods = ref<FinancePeriodRecord[]>([])
 const closeTrace = ref<FinancialCloseTrace | null>(null)
@@ -186,7 +188,10 @@ async function load(): Promise<void> {
     } else if (mode.value === 'journal') {
       const [accountRows, journalPage] = await Promise.all([
         loadFundAccounts(request.signal),
-        loadCashJournal({ pageNo: 1, pageSize: 50, projectId: projectId.value }, request.signal),
+        loadCashJournal(
+          { pageNo: journalPageNo.value, pageSize: 10, projectId: projectId.value },
+          request.signal,
+        ),
       ])
       accounts.value = accountRows
       journal.value = journalPage
@@ -199,7 +204,7 @@ async function load(): Promise<void> {
         : null
     } else if (mode.value === 'accounting') {
       entries.value = await loadAccountingEntries(
-        { pageNo: 1, pageSize: 50, projectId: projectId.value },
+        { pageNo: entryPageNo.value, pageSize: 10, projectId: projectId.value },
         request.signal,
       )
       const selected =
@@ -241,6 +246,14 @@ async function selectPeriod(row: FinancePeriodRecord): Promise<void> {
     loadFinancialCloseTrace(row.id),
     loadFinancialStatement(row.fiscalYear, row.fiscalMonth),
   ])
+}
+
+function changePage(kind: 'journal' | 'accounting', next: number): void {
+  const page = kind === 'journal' ? journal.value : entries.value
+  if (next < 1 || (next - 1) * 10 >= page.total) return
+  if (kind === 'journal') journalPageNo.value = next
+  else entryPageNo.value = next
+  void load()
 }
 
 async function run(action: () => Promise<unknown>, success: string): Promise<void> {
@@ -318,7 +331,15 @@ async function actPeriod(row: FinancePeriodRecord, action: PeriodAction) {
   )
 }
 
-watch([mode, projectId], () => void load(), { immediate: true })
+watch(
+  [mode, projectId],
+  () => {
+    journalPageNo.value = 1
+    entryPageNo.value = 1
+    void load()
+  },
+  { immediate: true },
+)
 onBeforeUnmount(() => controller?.abort())
 </script>
 
@@ -568,6 +589,28 @@ onBeforeUnmount(() => controller?.abort())
               </tbody>
             </table>
           </div>
+          <template #footer>
+            <div class="finance-control__pagination">
+              <span>共 {{ journal.total }} 条</span>
+              <V2Button
+                size="small"
+                variant="secondary"
+                :disabled="journalPageNo === 1"
+                @click="changePage('journal', journalPageNo - 1)"
+              >
+                上一页
+              </V2Button>
+              <span>第 {{ journalPageNo }} 页</span>
+              <V2Button
+                size="small"
+                variant="secondary"
+                :disabled="journalPageNo * 10 >= journal.total"
+                @click="changePage('journal', journalPageNo + 1)"
+              >
+                下一页
+              </V2Button>
+            </div>
+          </template>
         </V2Card>
       </template>
 
@@ -801,6 +844,28 @@ onBeforeUnmount(() => controller?.abort())
               </tbody>
             </table>
           </div>
+          <template #footer>
+            <div class="finance-control__pagination">
+              <span>共 {{ entries.total }} 条</span>
+              <V2Button
+                size="small"
+                variant="secondary"
+                :disabled="entryPageNo === 1"
+                @click="changePage('accounting', entryPageNo - 1)"
+              >
+                上一页
+              </V2Button>
+              <span>第 {{ entryPageNo }} 页</span>
+              <V2Button
+                size="small"
+                variant="secondary"
+                :disabled="entryPageNo * 10 >= entries.total"
+                @click="changePage('accounting', entryPageNo + 1)"
+              >
+                下一页
+              </V2Button>
+            </div>
+          </template>
         </V2Card>
         <V2Card
           v-if="entryDetail"
@@ -973,6 +1038,13 @@ onBeforeUnmount(() => controller?.abort())
 .finance-control__actions {
   display: flex;
   flex-wrap: wrap;
+  gap: var(--v2-space-2);
+}
+.finance-control__pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
   gap: var(--v2-space-2);
 }
 .finance-control__table-wrap {

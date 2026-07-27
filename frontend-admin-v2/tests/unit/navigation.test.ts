@@ -79,4 +79,21 @@ describe('V2 eight-domain navigation contract', () => {
     expect(workflowVisible(['ADMIN'], ['workflow:process:query'])).toBe(true)
     expect(workflowVisible(['SUPER_ADMIN'], ['workflow:process:query'])).toBe(true)
   })
+
+  it('freezes system route and API permission layers', () => {
+    expect(permissionForPath('/system/dict')).toBe('system:dict:list')
+    expect(permissionForPath('/system/permissions')).toBe('system:menu:query')
+    expect(permissionForPath('/system/audit')).toBe('audit:query')
+
+    const workspaces = (roles: string[], permissions: string[]) =>
+      visibleNavigation(roles, permissions)
+        .flatMap((domain) => domain.workspaces)
+        .map((workspace) => workspace.id)
+
+    expect(workspaces(['USER'], ['system:user:query'])).not.toContain('access-control')
+    expect(workspaces(['ADMIN'], ['system:user:query'])).toContain('access-control')
+    expect(workspaces(['USER'], ['audit:query'])).toContain('audit')
+    expect(workspaces(['ADMIN'], ['*'])).not.toContain('data')
+    expect(workspaces(['SUPER_ADMIN'], [])).toContain('data')
+  })
 })

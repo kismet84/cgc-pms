@@ -40,7 +40,7 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("233", flyway.info().current().getVersion().getVersion());
+        assertEquals("234", flyway.info().current().getVersion().getVersion());
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
         assertEquals(197, count("SELECT COUNT(*) FROM information_schema.tables "
@@ -66,6 +66,13 @@ class BaselineMySqlSmokeTest {
                 JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
                 WHERE r.role_code='PROJECT_MANAGER' AND r.deleted_flag=0
                   AND m.deleted_flag=0 AND m.perms='workflow:resubmit'
+                """));
+        assertEquals(1, count("""
+                SELECT COUNT(*) FROM sys_role_menu rm
+                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
+                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+                WHERE r.role_code='SUPER_ADMIN' AND r.deleted_flag=0
+                  AND m.deleted_flag=0 AND m.perms='audit:query'
                 """));
 
         assertEquals(0, count("SELECT COUNT(*) FROM pm_project WHERE deleted_flag=0"));

@@ -246,26 +246,26 @@ UNION ALL SELECT 'cost_breakdown_permission',COUNT(DISTINCT u.id) FROM sys_user 
   WHERE u.tenant_id=0 AND u.username='demo.cost' AND u.status='ENABLE' AND u.deleted_flag=0
     AND m.perms='dashboard:cost-breakdown:view' AND m.status='ENABLE' AND m.deleted_flag=0
 UNION ALL SELECT 'invalid_business_code',SUM(invalid_count) FROM (
-  SELECT COUNT(*) invalid_count FROM pm_project WHERE tenant_id=0 AND deleted_flag=0 AND project_code NOT REGEXP '^XM-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM md_partner WHERE tenant_id=0 AND deleted_flag=0 AND partner_code NOT REGEXP '^PTN-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM ct_contract WHERE tenant_id=0 AND deleted_flag=0 AND contract_code NOT REGEXP '^CT-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM ct_contract_change WHERE tenant_id=0 AND deleted_flag=0 AND change_code NOT REGEXP '^CC-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM var_order WHERE tenant_id=0 AND deleted_flag=0 AND var_code NOT REGEXP '^VO-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM mat_purchase_request WHERE tenant_id=0 AND deleted_flag=0 AND request_code NOT REGEXP '^PR-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM mat_purchase_order WHERE tenant_id=0 AND deleted_flag=0 AND order_code NOT REGEXP '^PO-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM mat_receipt WHERE tenant_id=0 AND deleted_flag=0 AND receipt_code NOT REGEXP '^MR-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM mat_requisition WHERE tenant_id=0 AND deleted_flag=0 AND requisition_code NOT REGEXP '^REQ-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM mat_material_return WHERE tenant_id=0 AND deleted_flag=0 AND return_code NOT REGEXP '^MRT-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM sp_supplier_return WHERE tenant_id=0 AND deleted_flag=0 AND return_code NOT REGEXP '^SRT-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM sub_task WHERE tenant_id=0 AND deleted_flag=0 AND task_code NOT REGEXP '^SUB-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM sub_measure WHERE tenant_id=0 AND deleted_flag=0 AND measure_code NOT REGEXP '^SM-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM pay_application WHERE tenant_id=0 AND deleted_flag=0 AND apply_code NOT REGEXP '^PAY-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM pay_record WHERE tenant_id=0 AND deleted_flag=0 AND (record_code IS NULL OR record_code NOT REGEXP '^PMT-[0-9]{8}-[0-9]{3}$')
-  UNION ALL SELECT COUNT(*) FROM stl_settlement WHERE tenant_id=0 AND deleted_flag=0 AND settlement_code NOT REGEXP '^STL-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM expense_application WHERE tenant_id=0 AND deleted_flag=0 AND expense_code NOT REGEXP '^EXP-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM contract_revenue WHERE tenant_id=0 AND deleted_flag=0 AND revenue_code NOT REGEXP '^RV-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM cash_journal_entry WHERE tenant_id=0 AND deleted_flag=0 AND entry_no NOT REGEXP '^CJ-[0-9]{8}-[0-9]{3}$'
-  UNION ALL SELECT COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND deleted_flag=0 AND generation_no NOT REGEXP '^DOC-[0-9]{8}-[0-9]{3}$'
+  SELECT COUNT(*) invalid_count FROM pm_project WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND project_code NOT REGEXP '^XM-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM md_partner WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND partner_code NOT REGEXP '^PTN-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM ct_contract WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND contract_code NOT REGEXP '^CT-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM ct_contract_change WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND change_code NOT REGEXP '^CC-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM var_order WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND var_code NOT REGEXP '^VO-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_purchase_request WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND request_code NOT REGEXP '^PR-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_purchase_order WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND order_code NOT REGEXP '^PO-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_receipt WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND receipt_code NOT REGEXP '^MR-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_requisition WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND requisition_code NOT REGEXP '^REQ-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM mat_material_return WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND return_code NOT REGEXP '^MRT-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM sp_supplier_return WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND return_code NOT REGEXP '^SRT-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM sub_task WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND task_code NOT REGEXP '^SUB-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM sub_measure WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND measure_code NOT REGEXP '^SM-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM pay_application WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND apply_code NOT REGEXP '^PAY-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM pay_record WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND (record_code IS NULL OR record_code NOT REGEXP '^PMT-[0-9]{8}-[0-9]{3}$')
+  UNION ALL SELECT COUNT(*) FROM stl_settlement WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND settlement_code NOT REGEXP '^STL-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM expense_application WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND expense_code NOT REGEXP '^EXP-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM contract_revenue WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND revenue_code NOT REGEXP '^RV-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM cash_journal_entry WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND entry_no NOT REGEXP '^CJ-[0-9]{8}-[0-9]{3}$'
+  UNION ALL SELECT COUNT(*) FROM biz_document_generation WHERE tenant_id=0 AND id BETWEEN 520000000000000000 AND 520000000000999999 AND deleted_flag=0 AND generation_no NOT REGEXP '^DOC-[0-9]{8}-[0-9]{3}$'
 ) standardized_codes
 UNION ALL SELECT 'role_test_scope',COUNT(DISTINCT u.username) FROM sys_user u
   JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
@@ -424,6 +424,25 @@ UNION ALL SELECT 'm3_delivery_action_overgrant',COUNT(DISTINCT m.perms) FROM sys
     AND m.perms IN ('schedule:maintain','schedule:submit','schedule:progress','schedule:correct','site:daily:edit')
 UNION ALL SELECT 'm3_delivery_project_members',COUNT(*) FROM pm_project_member
   WHERE tenant_id=0 AND project_id=520000000000009002 AND user_id=520000000000013002 AND status='ACTIVE' AND deleted_flag=0
+UNION ALL SELECT 'm3_project_member_account',COUNT(*) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role r ON r.tenant_id=ur.tenant_id AND r.id=ur.role_id
+  WHERE u.tenant_id=0 AND u.username='demo.member-readonly' AND u.status='ENABLE' AND u.deleted_flag=0
+    AND r.role_code='M3_PROJECT_MEMBER_QUERY' AND r.data_scope='SELF' AND r.status='ENABLE' AND r.deleted_flag=0
+UNION ALL SELECT 'm3_project_member_query_permissions',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.member-readonly' AND u.deleted_flag=0
+    AND m.perms IN ('project:query','project:member:list')
+UNION ALL SELECT 'm3_project_member_action_overgrant',COUNT(DISTINCT m.perms) FROM sys_user u
+  JOIN sys_user_role ur ON ur.tenant_id=u.tenant_id AND ur.user_id=u.id
+  JOIN sys_role_menu rm ON rm.tenant_id=ur.tenant_id AND rm.role_id=ur.role_id
+  JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+  WHERE u.tenant_id=0 AND u.username='demo.member-readonly' AND u.deleted_flag=0
+    AND m.perms IN ('project:member:add','project:member:edit','project:member:delete')
+UNION ALL SELECT 'm3_project_member_membership',COUNT(*) FROM pm_project_member
+  WHERE tenant_id=0 AND project_id=520000000000009002 AND user_id=520000000000013008 AND status='ACTIVE' AND deleted_flag=0
 UNION ALL SELECT 'm3_schedule_corrective_text_valid',COUNT(*) FROM project_corrective_action
   WHERE tenant_id=0 AND id=520000000000008166 AND deleted_flag=0
     AND reason='关键线路材料到场延迟。' AND action_plan='调整资源投入并按周复核关键线路。'
@@ -646,6 +665,8 @@ $passed = $metrics.partner -eq 7 -and $partnerCreditCodes.Count -eq 7 -and $inva
     -and $metrics.invalid_business_code -eq 0 `
     -and $metrics.m3_delivery_accounts -eq 1 -and $metrics.m3_delivery_query_permissions -eq 2 `
     -and $metrics.m3_delivery_action_overgrant -eq 0 -and $metrics.m3_delivery_project_members -eq 1 `
+    -and $metrics.m3_project_member_account -eq 1 -and $metrics.m3_project_member_query_permissions -eq 2 `
+    -and $metrics.m3_project_member_action_overgrant -eq 0 -and $metrics.m3_project_member_membership -eq 1 `
     -and $metrics.m3_schedule_corrective_text_valid -eq 1 `
     -and $metrics.m3_quality_accounts -eq 6 -and $metrics.m3_quality_action_permissions -eq 5 `
     -and $metrics.m3_quality_action_overgrant -eq 0 -and $metrics.m3_quality_project_members -eq 6 `

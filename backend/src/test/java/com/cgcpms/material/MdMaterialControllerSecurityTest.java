@@ -1,7 +1,7 @@
 package com.cgcpms.material;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.material.service.MdMaterialService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,7 +36,7 @@ class MdMaterialControllerSecurityTest {
             {"materialCode":"MAT-SEC-001","materialName":"权限测试材料","status":"ENABLE"}""";
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private JwtUtils jwtUtils;
+    @Autowired private JwtHttpTestTokenFactory jwtUtils;
     @MockitoBean private MdMaterialService service;
 
     @BeforeEach

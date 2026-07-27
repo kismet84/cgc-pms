@@ -6,6 +6,7 @@ RUN pnpm config set registry https://registry.npmmirror.com
 
 COPY packages/frontend-contracts ./packages/frontend-contracts
 COPY frontend-admin-v2/package.json frontend-admin-v2/pnpm-lock.yaml frontend-admin-v2/pnpm-workspace.yaml ./frontend-admin-v2/
+COPY frontend-admin-v2/patches ./frontend-admin-v2/patches
 WORKDIR /workspace/frontend-admin-v2
 RUN --mount=type=cache,id=cgc-pms-v2-pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --ignore-scripts --frozen-lockfile
