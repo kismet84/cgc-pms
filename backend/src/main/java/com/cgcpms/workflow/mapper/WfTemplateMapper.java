@@ -8,6 +8,13 @@ import org.apache.ibatis.annotations.Select;
 
 @Mapper
 public interface WfTemplateMapper extends BaseMapper<WfTemplate> {
-    @Select("SELECT * FROM wf_template WHERE id = #{id} AND tenant_id = #{tenantId} FOR UPDATE")
+    @Select("""
+            SELECT id, tenant_id, template_code, template_name, business_type, enabled,
+                   amount_min, amount_max, condition_rule, form_schema,
+                   created_by, created_at, updated_by, updated_at, deleted_flag, remark
+            FROM wf_template
+            WHERE id = #{id} AND tenant_id = #{tenantId}
+            FOR UPDATE
+            """)
     WfTemplate selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 }
