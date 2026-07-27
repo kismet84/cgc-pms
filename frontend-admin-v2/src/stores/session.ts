@@ -7,6 +7,10 @@ import type { RequestNotice } from '@/services/request'
 type SessionCacheClearer = () => void | Promise<void>
 const cacheClearers = new Set<SessionCacheClearer>()
 
+export function hasAdminRole(roles: readonly string[]): boolean {
+  return roles.includes('ADMIN') || roles.includes('SUPER_ADMIN')
+}
+
 export function registerSessionCacheClearer(clearer: SessionCacheClearer): () => void {
   cacheClearers.add(clearer)
   return () => cacheClearers.delete(clearer)
@@ -23,6 +27,7 @@ export const useSessionStore = defineStore('v2-session', () => {
   )
   const roles = computed(() => userInfo.value?.roles ?? [])
   const permissions = computed(() => userInfo.value?.permissions ?? [])
+  const isAdmin = computed(() => hasAdminRole(roles.value))
 
   async function login(params: LoginParams): Promise<UserInfo> {
     status.value = 'authenticating'
@@ -81,6 +86,11 @@ export const useSessionStore = defineStore('v2-session', () => {
     requestNotice.value = notice
   }
 
+  function replaceUserInfo(currentUser: UserInfo): void {
+    userInfo.value = currentUser
+    status.value = 'authenticated'
+  }
+
   function hasPermission(code: string): boolean {
     return permissions.value.includes('*') || permissions.value.includes(code)
   }
@@ -92,11 +102,13 @@ export const useSessionStore = defineStore('v2-session', () => {
     isAuthenticated,
     roles,
     permissions,
+    isAdmin,
     login,
     restore,
     logout,
     clearSession,
     setRequestNotice,
+    replaceUserInfo,
     hasPermission,
   }
 })

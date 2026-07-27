@@ -412,6 +412,8 @@ class MdPartnerServiceTest {
         MdPartner p1 = new MdPartner();
         p1.setPartnerName("分页测试A");
         p1.setPartnerType("SUPPLIER");
+        p1.setContactPhone("13800000000");
+        p1.setBankAccount("6222000000000000");
         partnerService.create(p1);
 
         MdPartner p2 = new MdPartner();
@@ -422,6 +424,14 @@ class MdPartnerServiceTest {
         IPage<MdPartnerVO> page = partnerService.getPage(1, 10, null, null, null, null);
         assertTrue(page.getTotal() >= 2, "至少应有2条记录");
         assertTrue(page.getRecords().size() >= 2, "记录数应 >= 2");
+        MdPartnerVO listRecord = page.getRecords().stream()
+                .filter(item -> p1.getId().toString().equals(item.getId()))
+                .findFirst().orElseThrow();
+        assertNull(listRecord.getContactPhone(), "列表不得返回联系电话");
+        assertNull(listRecord.getBankAccount(), "列表不得返回银行账号");
+        MdPartnerVO detail = partnerService.getById(p1.getId());
+        assertEquals("13800000000", detail.getContactPhone(), "详情按需返回联系电话");
+        assertEquals("6222000000000000", detail.getBankAccount(), "详情按需返回银行账号");
 
         System.out.println("✅ testGetPage_All 通过: total=" + page.getTotal());
     }

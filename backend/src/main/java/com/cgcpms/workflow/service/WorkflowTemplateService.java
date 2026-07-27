@@ -73,8 +73,9 @@ public class WorkflowTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public void updateTemplate(Long templateId, WorkflowTemplateUpdateRequest request) {
-        WfTemplate template = getTemplateOrThrow(templateId);
+        WfTemplate template = getTemplateForUpdate(templateId);
         validateAmountRange(request.getAmountMin(), request.getAmountMax());
+        validateEnabled(request.getEnabled());
         rejectUnsupportedConfig(request.getConditionRule(), "conditionRule");
         rejectUnsupportedConfig(request.getFormSchema(), "formSchema");
         template.setTemplateName(request.getTemplateName());
@@ -93,7 +94,7 @@ public class WorkflowTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public WfTemplateNodeVO createNode(Long templateId, WorkflowTemplateNodeRequest request) {
-        WfTemplate template = getTemplateOrThrow(templateId);
+        WfTemplate template = getTemplateForUpdate(templateId);
         validateNodeRequest(request);
         List<WfTemplateNode> existingNodes = listNodes(templateId);
         int targetOrder = request.getNodeOrder() == null ? existingNodes.size() + 1 : request.getNodeOrder();
@@ -106,7 +107,7 @@ public class WorkflowTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public void updateNode(Long templateId, Long nodeId, WorkflowTemplateNodeRequest request) {
-        getTemplateOrThrow(templateId);
+        getTemplateForUpdate(templateId);
         validateNodeRequest(request);
         WfTemplateNode node = getNodeOrThrow(templateId, nodeId);
         if (request.getNodeCode() != null && !request.getNodeCode().isBlank()) {
@@ -122,7 +123,7 @@ public class WorkflowTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteNode(Long templateId, Long nodeId) {
-        getTemplateOrThrow(templateId);
+        getTemplateForUpdate(templateId);
         getNodeOrThrow(templateId, nodeId);
         if (countNodes(templateId) <= 1) throw new BusinessException("TEMPLATE_LAST_NODE", "至少保留一个审批节点");
         nodeMapper.deleteById(nodeId);
@@ -131,7 +132,7 @@ public class WorkflowTemplateService {
 
     @Transactional(rollbackFor = Exception.class)
     public void reorderNodes(Long templateId, WorkflowTemplateNodeReorderRequest request) {
-        getTemplateOrThrow(templateId);
+        getTemplateForUpdate(templateId);
         List<WfTemplateNode> nodes = listNodes(templateId);
         if (request.getNodeIds().size() != nodes.size())
             throw new BusinessException("TEMPLATE_NODE_REORDER_INVALID", "排序节点数量不一致");
@@ -153,6 +154,16 @@ public class WorkflowTemplateService {
 
     private WfTemplate getTemplateOrThrow(Long templateId) {
         WfTemplate template = templateMapper.selectById(templateId);
+        return requireCurrentTenant(template);
+    }
+
+    private WfTemplate getTemplateForUpdate(Long templateId) {
+        WfTemplate template = templateMapper.selectByIdForUpdate(
+                templateId, UserContext.getCurrentTenantId());
+        return requireCurrentTenant(template);
+    }
+
+    private WfTemplate requireCurrentTenant(WfTemplate template) {
         if (template == null) throw new BusinessException("TEMPLATE_NOT_FOUND", "审批模板不存在");
         Long tenantId = UserContext.getCurrentTenantId();
         if (tenantId != null && !tenantId.equals(template.getTenantId()))
@@ -227,6 +238,11 @@ public class WorkflowTemplateService {
     private void validateAmountRange(BigDecimal min, BigDecimal max) {
         if (min != null && max != null && min.compareTo(max) > 0)
             throw new BusinessException("TEMPLATE_AMOUNT_RANGE_INVALID", "金额下限不能大于金额上限");
+    }
+
+    private void validateEnabled(Integer enabled) {
+        if (enabled != null && enabled != 0 && enabled != 1)
+            throw new BusinessException("TEMPLATE_ENABLED_INVALID", "启用状态只能为0或1");
     }
 
     private void validateJsonOrBlank(String json, String fieldName) {

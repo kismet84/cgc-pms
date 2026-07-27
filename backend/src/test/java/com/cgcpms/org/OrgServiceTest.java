@@ -6,6 +6,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.org.entity.OrgCompany;
 import com.cgcpms.org.entity.OrgDepartment;
 import com.cgcpms.org.entity.OrgPosition;
+import com.cgcpms.org.mapper.OrgDepartmentMapper;
 import com.cgcpms.org.service.OrgCompanyService;
 import com.cgcpms.org.service.OrgDepartmentService;
 import com.cgcpms.org.service.OrgPositionService;
@@ -13,6 +14,8 @@ import com.cgcpms.org.vo.OrgCompanyVO;
 import com.cgcpms.org.vo.OrgDepartmentTreeNodeVO;
 import com.cgcpms.org.vo.OrgDepartmentVO;
 import com.cgcpms.org.vo.OrgPositionVO;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -46,6 +49,12 @@ class OrgServiceTest {
 
     @Autowired
     private OrgPositionService orgPositionService;
+
+    @Autowired
+    private OrgDepartmentMapper orgDepartmentMapper;
+
+    @Autowired
+    private SysUserMapper sysUserMapper;
 
     private Long createdCompanyId;
     private Long createdParentDeptId;
@@ -710,5 +719,102 @@ class OrgServiceTest {
         assertEquals("DISABLE", vo.getStatus());
 
         System.out.println("✅ TC21 通过: 公司更新成功, name=" + vo.getCompanyName());
+    }
+
+    @Test
+    @Order(22)
+    @Transactional
+    @DisplayName("TC22: 部门创建强制当前租户，并拒绝跨公司父节点与循环")
+    void test22_departmentTenantAndTreeGuards() {
+        OrgCompany first = new OrgCompany();
+        first.setCompanyCode("COMP-GUARD-A");
+        first.setCompanyName("守卫公司A");
+        Long firstId = orgCompanyService.create(first);
+        OrgCompany second = new OrgCompany();
+        second.setCompanyCode("COMP-GUARD-B");
+        second.setCompanyName("守卫公司B");
+        Long secondId = orgCompanyService.create(second);
+
+        OrgDepartment root = new OrgDepartment();
+        root.setTenantId(999L);
+        root.setCompanyId(firstId);
+        root.setDeptCode("GUARD-ROOT");
+        root.setDeptName("守卫根部门");
+        Long rootId = orgDepartmentService.create(root);
+        assertEquals(TENANT_0, orgDepartmentMapper.selectById(rootId).getTenantId());
+
+        OrgDepartment crossCompany = new OrgDepartment();
+        crossCompany.setCompanyId(secondId);
+        crossCompany.setParentId(rootId);
+        crossCompany.setDeptCode("GUARD-CROSS");
+        crossCompany.setDeptName("跨公司部门");
+        assertEquals("ORG_DEPT_PARENT_NOT_FOUND",
+                assertThrows(BusinessException.class,
+                        () -> orgDepartmentService.create(crossCompany)).getCode());
+
+        OrgDepartment child = new OrgDepartment();
+        child.setCompanyId(firstId);
+        child.setParentId(rootId);
+        child.setDeptCode("GUARD-CHILD");
+        child.setDeptName("守卫子部门");
+        Long childId = orgDepartmentService.create(child);
+        OrgDepartment renameOnly = new OrgDepartment();
+        renameOnly.setId(childId);
+        renameOnly.setDeptName("守卫子部门-已改名");
+        orgDepartmentService.update(renameOnly);
+        assertEquals(rootId, orgDepartmentMapper.selectById(childId).getParentId());
+        OrgDepartment cycle = new OrgDepartment();
+        cycle.setId(rootId);
+        cycle.setCompanyId(firstId);
+        cycle.setParentId(childId);
+        cycle.setDeptCode("GUARD-ROOT");
+        cycle.setDeptName("守卫根部门");
+        cycle.setStatus("ENABLE");
+        assertEquals("ORG_DEPT_PARENT_INVALID",
+                assertThrows(BusinessException.class,
+                        () -> orgDepartmentService.update(cycle)).getCode());
+    }
+
+    @Test
+    @Order(23)
+    @Transactional
+    @DisplayName("TC23: 公司、部门和岗位删除受引用保护")
+    void test23_referenceProtection() {
+        OrgCompany company = new OrgCompany();
+        company.setCompanyCode("COMP-REF");
+        company.setCompanyName("引用保护公司");
+        Long companyId = orgCompanyService.create(company);
+
+        OrgDepartment dept = new OrgDepartment();
+        dept.setCompanyId(companyId);
+        dept.setDeptCode("DEPT-REF");
+        dept.setDeptName("引用保护部门");
+        Long deptId = orgDepartmentService.create(dept);
+        assertEquals("ORG_COMPANY_REFERENCED",
+                assertThrows(BusinessException.class,
+                        () -> orgCompanyService.delete(companyId)).getCode());
+
+        OrgPosition position = new OrgPosition();
+        position.setCompanyId(companyId);
+        position.setDepartmentId(deptId);
+        position.setPositionCode("POS-REF");
+        position.setPositionName("引用保护岗位");
+        Long positionId = orgPositionService.create(position);
+        assertEquals("ORG_DEPT_REFERENCED",
+                assertThrows(BusinessException.class,
+                        () -> orgDepartmentService.delete(deptId)).getCode());
+
+        SysUser user = new SysUser();
+        user.setId(953038001L);
+        user.setTenantId(TENANT_0);
+        user.setUsername("org-reference-user");
+        user.setPassword("test");
+        user.setStatus("ENABLE");
+        user.setIsAdmin(0);
+        sysUserMapper.insert(user);
+        orgPositionService.replacePositionUsers(positionId, List.of(user.getId()));
+        assertEquals("ORG_POSITION_REFERENCED",
+                assertThrows(BusinessException.class,
+                        () -> orgPositionService.delete(positionId)).getCode());
     }
 }

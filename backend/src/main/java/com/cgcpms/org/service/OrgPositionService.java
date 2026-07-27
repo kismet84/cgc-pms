@@ -89,6 +89,7 @@ public class OrgPositionService {
             }
         }
         if (position.getStatus() == null) position.setStatus("ENABLE");
+        validateStatus(position.getStatus());
         orgPositionMapper.insert(position);
         return position.getId();
     }
@@ -121,6 +122,7 @@ public class OrgPositionService {
                 .eq(com.cgcpms.org.entity.OrgDepartment::getCompanyId, position.getCompanyId())) == null) {
             throw new BusinessException("ORG_DEPT_NOT_FOUND", "所属部门不存在或不属于所选公司");
         }
+        if (position.getStatus() != null) validateStatus(position.getStatus());
         // 强制保留原 tenantId
         position.setTenantId(existing.getTenantId());
         orgPositionMapper.updateById(position);
@@ -133,6 +135,12 @@ public class OrgPositionService {
             throw new BusinessException("ORG_POSITION_NOT_FOUND", "岗位不存在");
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("ORG_POSITION_NOT_FOUND", "岗位不存在");
+        }
+        Integer referenceCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM org_user_position WHERE tenant_id=? AND position_id=?",
+                Integer.class, UserContext.getCurrentTenantId(), id);
+        if (referenceCount != null && referenceCount > 0) {
+            throw new BusinessException("ORG_POSITION_REFERENCED", "岗位已分配用户，无法删除");
         }
         orgPositionMapper.deleteById(id);
     }
@@ -168,6 +176,12 @@ public class OrgPositionService {
             jdbcTemplate.update("INSERT INTO org_user_position(id,tenant_id,user_id,position_id,primary_flag,status,created_by,created_at,updated_by,updated_at) VALUES(?,?,?,?,?,'ACTIVE',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP)",
                     IdWorker.getId(), tenantId, normalized.get(index), positionId, index == 0 ? 1 : 0,
                     UserContext.getCurrentUserId(), UserContext.getCurrentUserId());
+        }
+    }
+
+    private void validateStatus(String status) {
+        if (!"ENABLE".equals(status) && !"DISABLE".equals(status)) {
+            throw new BusinessException("ORG_POSITION_STATUS_INVALID", "岗位状态只允许ENABLE或DISABLE");
         }
     }
 

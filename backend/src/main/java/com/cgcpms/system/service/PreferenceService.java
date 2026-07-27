@@ -81,7 +81,8 @@ public class PreferenceService {
         try {
             return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
         } catch (JsonProcessingException e) {
-            log.warn("Failed to parse preferences JSON for userId={}, json={}", userId, json, e);
+            log.warn("Failed to parse preferences JSON for userId={}, errorType={}",
+                    userId, e.getClass().getSimpleName());
             return null;
         }
     }

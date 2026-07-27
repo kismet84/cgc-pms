@@ -14,11 +14,11 @@ vi.mock('@/services/auth', () => ({
   logout: vi.fn(),
 }))
 
-function user(permissions: string[]): UserInfo {
+function user(permissions: string[], roles: string[] = ['USER']): UserInfo {
   return {
     userId: '1',
     username: 'tester',
-    roles: ['USER'],
+    roles,
     permissions,
   }
 }
@@ -41,16 +41,86 @@ describe('V2 application-shell routes', () => {
     ) as {
       source: string
       summary: { legacyOnly: number; v2Accepted: number; v2SourceAvailable: number }
-      routes: Array<{ name: string; path: string; status: string; v2View: string | null }>
+      routes: Array<{
+        name: string
+        path: string
+        status: string
+        v2View: string | null
+        permission: string | null
+      }>
     }
     const costTargetRoutes = ledger.routes.filter((route) => route.path.startsWith('/cost-target'))
+    const costSubjectRoutes = ledger.routes.filter((route) =>
+      route.path.startsWith('/cost/subject'),
+    )
 
     expect(ledger.source).toBe(['frontend-admin', 'src', 'router', 'index.ts'].join('/'))
     expect(ledger.summary).toMatchObject({
-      legacyOnly: 24,
-      v2Accepted: 63,
+      legacyOnly: 8,
+      v2Accepted: 79,
       v2SourceAvailable: 0,
     })
+    expect(
+      ledger.routes.filter((route) => ['Login', 'Forbidden', 'NotFound'].includes(route.name)),
+    ).toEqual([
+      expect.objectContaining({
+        name: 'Login',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/auth/LoginPage.vue',
+      }),
+      expect.objectContaining({
+        name: 'Forbidden',
+        status: 'V2_ACCEPTED',
+        v2View: '@/router.ts#V2LegacyForbiddenRedirect',
+      }),
+      expect.objectContaining({
+        name: 'NotFound',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/errors/NotFoundPage.vue',
+      }),
+    ])
+    expect(
+      ledger.routes.filter((route) => ['Profile', 'Settings', 'Help'].includes(route.name)),
+    ).toEqual(
+      ['Profile', 'Settings', 'Help'].map((name) =>
+        expect.objectContaining({
+          name,
+          status: 'V2_ACCEPTED',
+          v2View: '@/pages/account/AccountPage.vue',
+          permission: null,
+        }),
+      ),
+    )
+    expect(
+      ledger.routes.filter((route) =>
+        ['Partner', 'Org', 'Material', 'MaterialDictionary'].includes(route.name),
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        name: 'Partner',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/master-data/PartnerPage.vue',
+        permission: 'partner:query',
+      }),
+      expect.objectContaining({
+        name: 'Org',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/master-data/OrganizationPage.vue',
+        permission: 'org:list',
+      }),
+      expect.objectContaining({
+        name: 'Material',
+        status: 'V2_ACCEPTED',
+        v2View: '@/router.ts#V2MaterialRedirect',
+        permission: 'material:dict:list',
+      }),
+      expect.objectContaining({
+        name: 'MaterialDictionary',
+        status: 'V2_ACCEPTED',
+        v2View: '@/pages/master-data/MaterialDictionaryPage.vue',
+        permission: 'material:dict:list',
+      }),
+    ])
     expect(costTargetRoutes).toEqual([
       expect.objectContaining({
         name: 'CostTarget',
@@ -72,6 +142,21 @@ describe('V2 application-shell routes', () => {
         status: 'V2_ACCEPTED',
         v2View: '@/pages/commercial/CostTargetPage.vue',
       }),
+    ])
+    expect(costSubjectRoutes).toEqual([
+      expect.objectContaining({
+        name: 'CostSubject',
+        status: 'V2_ACCEPTED',
+        v2View: '@/router.ts#V2CostSubjectRootRedirect',
+        permission: 'cost:query',
+      }),
+      ...['Taxonomy', 'Rules', 'Scope', 'Trace'].map((suffix) =>
+        expect.objectContaining({
+          name: `CostSubject${suffix}`,
+          status: 'V2_ACCEPTED',
+          v2View: '@/pages/master-data/CostSubjectPage.vue',
+        }),
+      ),
     ])
   })
 
@@ -116,6 +201,22 @@ describe('V2 application-shell routes', () => {
     const scheduleDetail = shell?.children?.find(
       (route) => route.path === '/project-schedule/:scheduleId',
     )
+    const accountRoutes = ['/profile', '/settings', '/help'].map((path) =>
+      shell?.children?.find((route) => route.path === path),
+    )
+    const partner = shell?.children?.find((route) => route.path === '/partner')
+    const org = shell?.children?.find((route) => route.path === '/org')
+    const materialRoot = shell?.children?.find((route) => route.path === '/material')
+    const materialDictionary = shell?.children?.find(
+      (route) => route.path === '/material/dictionary',
+    )
+    const costSubjectRoot = shell?.children?.find((route) => route.path === '/cost/subject')
+    const costSubjectRoutes = [
+      '/cost/subject/taxonomy',
+      '/cost/subject/rules',
+      '/cost/subject/scope',
+      '/cost/subject/trace',
+    ].map((path) => shell?.children?.find((route) => route.path === path))
 
     expect(dashboard?.meta?.permission).toBe('dashboard:view')
     expect(project?.meta?.permission).toBe('project:query')
@@ -169,6 +270,29 @@ describe('V2 application-shell routes', () => {
     }
     expect(scheduleDetail?.meta?.permission).toBe('schedule:query')
     expect(String(scheduleDetail?.component)).not.toContain('ShellPlaceholderPage')
+    for (const route of accountRoutes) {
+      expect(route?.meta?.permission).toBeUndefined()
+      expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
+    }
+    expect(partner?.meta?.permission).toBe('partner:query')
+    expect(org?.meta?.permission).toBe('org:list')
+    expect(materialRoot?.meta?.permission).toBe('material:dict:list')
+    expect(materialRoot?.redirect).toBeTypeOf('function')
+    expect(materialDictionary?.meta?.permission).toBe('material:dict:list')
+    for (const route of [partner, org, materialDictionary]) {
+      expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
+    }
+    expect(costSubjectRoot?.meta?.permission).toBe('cost:query')
+    expect(costSubjectRoot?.redirect).toBeTypeOf('function')
+    for (const route of costSubjectRoutes) {
+      expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
+    }
+    expect(costSubjectRoutes.map((route) => route?.meta?.permission)).toEqual([
+      'cost:query',
+      'cost:subject:rule:query',
+      'cost:subject:scope:query',
+      'cost:subject:audit:query',
+    ])
     const approval = shell?.children?.find((route) => route.path === '/approval/todo')
     const approvalRoot = shell?.children?.find((route) => route.path === '/approval')
     const approvalDetail = shell?.children?.find(
@@ -215,6 +339,20 @@ describe('V2 application-shell routes', () => {
     expect(router.currentRoute.value.fullPath).toBe('/contract/81/edit?projectId=23')
   })
 
+  it('guards master-data routes with API-aligned permissions and preserves material redirect', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(
+      user(['partner:query', 'org:list', 'material:dict:list']),
+    )
+    const router = guardedRouter()
+
+    await router.push('/org?view=tree')
+    await router.isReady()
+    expect(router.currentRoute.value.fullPath).toBe('/org?view=tree')
+
+    await router.push('/material?source=legacy#dictionary')
+    expect(router.currentRoute.value.fullPath).toBe('/material/dictionary?source=legacy#dictionary')
+  })
+
   it('keeps cost target root redirect and edit deep link compatible', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(
       user(['cost:target:query', 'cost:target:add', 'cost:target:edit']),
@@ -237,6 +375,27 @@ describe('V2 application-shell routes', () => {
     expect(router.currentRoute.value.fullPath).toBe(
       '/cost/ledger?projectId=P1&period=2026-07#items',
     )
+  })
+
+  it('keeps cost-subject root query and hash on the taxonomy redirect', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user(['cost:query']))
+    const router = guardedRouter()
+
+    await router.push('/cost/subject?source=e2e#mapping')
+    await router.isReady()
+
+    expect(router.currentRoute.value.fullPath).toBe('/cost/subject/taxonomy?source=e2e#mapping')
+  })
+
+  it('fails a cost-subject tab closed without its exact read permission', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user(['cost:query']))
+    const router = guardedRouter()
+
+    await router.push('/cost/subject/rules?source=deep-link')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/forbidden')
+    expect(router.currentRoute.value.query.from).toBe('/cost/subject/rules?source=deep-link')
   })
 
   it('keeps transaction-only access on the inventory ledger redirect', async () => {
@@ -273,6 +432,28 @@ describe('V2 application-shell routes', () => {
     expect(router.currentRoute.value.query.from).toBe('/contract/ledger')
   })
 
+  it('allows every authenticated user to open account self-service deep links', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user([]))
+    const router = guardedRouter()
+
+    for (const path of ['/profile?source=menu#details', '/settings', '/help']) {
+      await router.push(path)
+      await router.isReady()
+      expect(router.currentRoute.value.fullPath).toBe(path)
+    }
+  })
+
+  it('redirects an anonymous account deep link to login', async () => {
+    vi.mocked(getCurrentUser).mockRejectedValue(new Error('anonymous'))
+    const router = guardedRouter()
+
+    await router.push('/settings?source=deep-link#preferences')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query.redirect).toBe('/settings?source=deep-link#preferences')
+  })
+
   it('restores a permitted project schedule detail deep link', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(user(['schedule:query']))
     const router = guardedRouter()
@@ -291,6 +472,29 @@ describe('V2 application-shell routes', () => {
     await router.isReady()
 
     expect(router.currentRoute.value.path).toBe('/dashboard')
+  })
+
+  it('fails closed workflow configuration unless role and permission both match', async () => {
+    for (const [roles, permissions, allowed] of [
+      [['USER'], ['workflow:process:query'], false],
+      [['ADMIN'], [], false],
+      [['ADMIN'], ['workflow:process:query'], true],
+      [['SUPER_ADMIN'], ['workflow:process:query'], true],
+    ] as const) {
+      setActivePinia(createPinia())
+      vi.mocked(getCurrentUser).mockResolvedValue(user([...permissions], [...roles]))
+      const router = guardedRouter()
+
+      await router.push('/approval/process?source=deep-link#nodes')
+      await router.isReady()
+
+      expect(router.currentRoute.value.path).toBe(allowed ? '/approval/process' : '/forbidden')
+      if (!allowed) {
+        expect(router.currentRoute.value.query.from).toBe(
+          '/approval/process?source=deep-link#nodes',
+        )
+      }
+    }
   })
 
   it('redirects an anonymous deep link to login', async () => {
@@ -313,6 +517,29 @@ describe('V2 application-shell routes', () => {
 
     expect(router.currentRoute.value.name).toBe('V2NotFound')
     expect(router.currentRoute.value.path).toBe('/definitely-not-a-v2-route')
+  })
+
+  it('keeps the Legacy 403 deep link and query/hash compatible', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(user([]))
+    const router = guardedRouter()
+
+    await router.push('/403?from=%2Fsystem%2Fusers#denied')
+    await router.isReady()
+
+    expect(router.currentRoute.value.fullPath).toBe('/forbidden?from=/system/users#denied')
+  })
+
+  it('requires a restored session before rendering an unknown route', async () => {
+    vi.mocked(getCurrentUser).mockRejectedValue(new Error('anonymous'))
+    const router = guardedRouter()
+
+    await router.push('/definitely-not-a-v2-route?source=deep-link')
+    await router.isReady()
+
+    expect(router.currentRoute.value.path).toBe('/login')
+    expect(router.currentRoute.value.query.redirect).toBe(
+      '/definitely-not-a-v2-route?source=deep-link',
+    )
   })
 
   it('accepts only internal non-login redirects', () => {

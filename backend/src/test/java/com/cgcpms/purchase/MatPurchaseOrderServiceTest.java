@@ -305,6 +305,44 @@ class MatPurchaseOrderServiceTest {
         assertEquals(1, items.size());
     }
 
+    @Test @Transactional @DisplayName("saveItemsBatch → rejects disabled and cross-tenant materials")
+    void saveItemsBatchRejectsInvalidMaterials() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setOrderType("PURCHASE");
+        Long orderId = service.create(order);
+
+        long disabledId = Math.abs(System.nanoTime());
+        jdbcTemplate.update("""
+                INSERT INTO md_material (
+                    id, tenant_id, material_code, material_name, unit, status,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, '停用材料', '个', 'DISABLE', ?, ?, 0)
+                """, disabledId, TENANT_ID, "PO-DISABLED-" + disabledId, USER_ADMIN, USER_ADMIN);
+        MatPurchaseOrderItem disabled = new MatPurchaseOrderItem();
+        disabled.setMaterialId(disabledId);
+        disabled.setQuantity(BigDecimal.ONE);
+        disabled.setUnitPrice(BigDecimal.ONE);
+        assertEquals("MATERIAL_INVALID",
+                assertThrows(BusinessException.class,
+                        () -> service.saveItemsBatch(orderId, List.of(disabled))).getCode());
+
+        long foreignId = Math.abs(System.nanoTime());
+        jdbcTemplate.update("""
+                INSERT INTO md_material (
+                    id, tenant_id, material_code, material_name, unit, status,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, 999, ?, '跨租户材料', '个', 'ENABLE', ?, ?, 0)
+                """, foreignId, "PO-FOREIGN-" + foreignId, USER_ADMIN, USER_ADMIN);
+        MatPurchaseOrderItem foreign = new MatPurchaseOrderItem();
+        foreign.setMaterialId(foreignId);
+        foreign.setQuantity(BigDecimal.ONE);
+        foreign.setUnitPrice(BigDecimal.ONE);
+        assertEquals("MATERIAL_INVALID",
+                assertThrows(BusinessException.class,
+                        () -> service.saveItemsBatch(orderId, List.of(foreign))).getCode());
+    }
+
     @Test @Transactional @DisplayName("getItems → throws on non-existent")
     void testGetItems_NotFound() {
         assertThrows(BusinessException.class, () -> service.getItems(99999999L));

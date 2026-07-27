@@ -30,9 +30,16 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -60,6 +67,7 @@ class WorkflowTemplateManagementTest {
     @Autowired private WfInstanceMapper instanceMapper;
     @Autowired private WfNodeInstanceMapper nodeInstanceMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void setUp() {
@@ -100,6 +108,29 @@ class WorkflowTemplateManagementTest {
     }
 
     @Test
+    @DisplayName("跨租户模板查询和写入均隐藏为不存在")
+    void crossTenantTemplateAccessFailsClosed() {
+        UserContext.set(io.jsonwebtoken.Jwts.claims()
+                .add("userId", USER_ADMIN + 1)
+                .add("username", "other-admin")
+                .add("tenantId", TENANT_ID + 1)
+                .add("roleCodes", java.util.List.of("ADMIN"))
+                .build());
+        assertEquals(0, workflowTemplateService
+                .listTemplates(1, 20, BUSINESS_TYPE, null, null).getTotal());
+
+        BusinessException read = assertThrows(BusinessException.class,
+                () -> workflowTemplateService.getTemplateDetail(TEMPLATE_ID));
+        assertEquals("TEMPLATE_NOT_FOUND", read.getCode());
+
+        WorkflowTemplateUpdateRequest update = new WorkflowTemplateUpdateRequest();
+        update.setTemplateName("跨租户写入");
+        BusinessException write = assertThrows(BusinessException.class,
+                () -> workflowTemplateService.updateTemplate(TEMPLATE_ID, update));
+        assertEquals("TEMPLATE_NOT_FOUND", write.getCode());
+    }
+
+    @Test
     @DisplayName("管理员可更新模板基础信息")
     void updateTemplateChangesEditableFieldsOnly() {
         WorkflowTemplateUpdateRequest request = new WorkflowTemplateUpdateRequest();
@@ -117,6 +148,19 @@ class WorkflowTemplateManagementTest {
         assertEquals(new BigDecimal("1000.00"), updated.getAmountMin());
         assertEquals(new BigDecimal("9000.00"), updated.getAmountMax());
         assertEquals(BUSINESS_TYPE, updated.getBusinessType(), "业务类型不可被编辑接口改写");
+    }
+
+    @Test
+    @DisplayName("模板启用状态仅允许0或1")
+    void updateTemplateRejectsInvalidEnabledState() {
+        WorkflowTemplateUpdateRequest request = new WorkflowTemplateUpdateRequest();
+        request.setTemplateName("非法状态");
+        request.setEnabled(2);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> workflowTemplateService.updateTemplate(TEMPLATE_ID, request));
+
+        assertEquals("TEMPLATE_ENABLED_INVALID", ex.getCode());
     }
 
     @Test
@@ -170,6 +214,36 @@ class WorkflowTemplateManagementTest {
         assertEquals(2, afterDelete.size());
         assertEquals(1, afterDelete.get(0).getNodeOrder());
         assertEquals(2, afterDelete.get(1).getNodeOrder());
+    }
+
+    @Test
+    @DisplayName("节点排序等待同模板写锁")
+    void reorderWaitsForTemplateWriteLock() throws Exception {
+        WorkflowTemplateNodeReorderRequest request = new WorkflowTemplateNodeReorderRequest();
+        request.setNodeIds(List.of(NODE_2_ID, NODE_1_ID));
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        UserContext.Snapshot userContext = UserContext.capture();
+        try {
+            Future<?>[] future = new Future<?>[1];
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                jdbcTemplate.queryForObject(
+                        "SELECT id FROM wf_template WHERE id=? FOR UPDATE", Long.class, TEMPLATE_ID);
+                future[0] = executor.submit(() -> {
+                    try {
+                        UserContext.restore(userContext);
+                        workflowTemplateService.reorderNodes(TEMPLATE_ID, request);
+                    } finally {
+                        UserContext.clear();
+                    }
+                });
+                assertThrows(TimeoutException.class, () -> future[0].get(150, TimeUnit.MILLISECONDS));
+            });
+            future[0].get(5, TimeUnit.SECONDS);
+            assertEquals(List.of(NODE_2_ID, NODE_1_ID),
+                    selectNodes().stream().map(WfTemplateNode::getId).toList());
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

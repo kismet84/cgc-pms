@@ -3,6 +3,7 @@ package com.cgcpms.cost.service;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.project.auth.ProjectAccessChecker;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -23,6 +24,7 @@ import java.util.Objects;
 public class CostSubjectV2Service {
 
     private final JdbcTemplate jdbc;
+    private final ProjectAccessChecker projectAccessChecker;
 
     public record MappingItem(Long sourceSubjectId, String targetGroupCode, Long targetSubjectId,
                               String historicalDisplayName, String mappingReason) {}
@@ -172,6 +174,7 @@ public class CostSubjectV2Service {
     }
 
     public Long resolveRule(String sourceType, String businessCategory, Long projectId) {
+        if (projectId != null) requireProject(projectId);
         requireText(sourceType, "业务来源不能为空");
         List<Map<String, Object>> result = jdbc.queryForList("""
                 SELECT r.cost_subject_id,
@@ -255,23 +258,31 @@ public class CostSubjectV2Service {
     }
 
     public List<Map<String, Object>> transfers() {
+        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+        if (projectIds.isEmpty()) return List.of();
+        List<Object> parameters = new ArrayList<>();
+        parameters.add(tenantId());
+        parameters.addAll(projectIds);
         return jdbc.queryForList("""
                 SELECT t.*,b.bid_project_name,ct.version_no,COUNT(l.id) line_count
-                FROM bid_cost_target_transfer t JOIN bid_cost b ON b.id=t.bid_cost_id
-                JOIN cost_target ct ON ct.id=t.target_id LEFT JOIN bid_cost_target_transfer_line l ON l.transfer_id=t.id
-                WHERE t.tenant_id=? GROUP BY t.id,b.bid_project_name,ct.version_no ORDER BY t.posted_at DESC
-                """, tenantId());
+                FROM bid_cost_target_transfer t
+                JOIN bid_cost b ON b.id=t.bid_cost_id AND b.tenant_id=t.tenant_id
+                JOIN cost_target ct ON ct.id=t.target_id AND ct.tenant_id=t.tenant_id
+                LEFT JOIN bid_cost_target_transfer_line l ON l.transfer_id=t.id AND l.tenant_id=t.tenant_id
+                WHERE t.tenant_id=? AND t.project_id IN (%s)
+                GROUP BY t.id,b.bid_project_name,ct.version_no ORDER BY t.posted_at DESC
+                """.formatted(placeholders(projectIds)), parameters.toArray());
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Long transferBidCost(TransferCommand command) {
         requireText(command.idempotencyKey(), "幂等键不能为空");
+        requireProject(command.projectId());
         requireApprovedWorkflow(command.approvalInstanceId(), "BID_COST_TARGET_TRANSFER", command.bidCostId());
         Map<String, Object> bid = one("SELECT id,project_id,bid_status FROM bid_cost WHERE tenant_id=? AND id=?", command.bidCostId());
         if (!"WON".equals(bid.get("bid_status")) || !Objects.equals(longValue(bid.get("project_id")), command.projectId())) {
             throw new BusinessException("BID_COST_NOT_WON", "仅已中标且绑定当前项目的投标成本可以转入");
         }
-        requireProject(command.projectId());
         Map<String, Object> target = one("SELECT id,project_id,approval_status,is_active FROM cost_target WHERE tenant_id=? AND id=? AND deleted_flag=0 FOR UPDATE", command.targetId());
         if (!Objects.equals(longValue(target.get("project_id")), command.projectId())) throw new BusinessException("COST_TARGET_PROJECT_MISMATCH", "目标成本不属于中标项目");
         if (!List.of("DRAFT", "REJECTED").contains(String.valueOf(target.get("approval_status"))) || intValue(target.get("is_active")) == 1) {
@@ -337,6 +348,7 @@ public class CostSubjectV2Service {
                 FROM bid_cost_target_transfer WHERE tenant_id=? AND id=? AND reversal_of_id IS NULL
                 """, originalId);
         if (!"POSTED".equals(original.get("status"))) throw new BusinessException("BID_COST_TRANSFER_NOT_REVERSIBLE", "仅原始已过账转入可冲销");
+        requireProject(longValue(original.get("project_id")));
         requireApprovedWorkflow(approvalInstanceId, "BID_COST_TARGET_TRANSFER_REVERSAL", originalId);
         List<Map<String, Object>> lines = jdbc.queryForList("""
                 SELECT source_cost_item_id,source_subject_id,target_subject_id,amount
@@ -385,12 +397,28 @@ public class CostSubjectV2Service {
     }
 
     public List<Map<String, Object>> financeAllocations() {
+        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+        if (projectIds.isEmpty()) return List.of();
+        List<Object> parameters = new ArrayList<>();
+        parameters.add(tenantId());
+        parameters.addAll(projectIds);
         return jdbc.queryForList("""
                 SELECT b.*,s.subject_code,s.subject_name,COUNT(l.id) line_count
-                FROM finance_cost_allocation_batch b JOIN cost_subject s ON s.id=b.cost_subject_id
-                LEFT JOIN finance_cost_allocation_line l ON l.batch_id=b.id
-                WHERE b.tenant_id=? GROUP BY b.id,s.subject_code,s.subject_name ORDER BY b.posted_at DESC
-                """, tenantId());
+                FROM finance_cost_allocation_batch b
+                JOIN cost_subject s ON s.id=b.cost_subject_id AND s.tenant_id=b.tenant_id
+                LEFT JOIN finance_cost_allocation_line l ON l.batch_id=b.id AND l.tenant_id=b.tenant_id
+                WHERE b.tenant_id=?
+                  AND EXISTS (
+                    SELECT 1 FROM finance_cost_allocation_line present_line
+                    WHERE present_line.tenant_id=b.tenant_id AND present_line.batch_id=b.id
+                  )
+                  AND NOT EXISTS (
+                    SELECT 1 FROM finance_cost_allocation_line denied_line
+                    WHERE denied_line.tenant_id=b.tenant_id AND denied_line.batch_id=b.id
+                      AND denied_line.project_id NOT IN (%s)
+                  )
+                GROUP BY b.id,s.subject_code,s.subject_name ORDER BY b.posted_at DESC
+                """.formatted(placeholders(projectIds)), parameters.toArray());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -404,8 +432,6 @@ public class CostSubjectV2Service {
                 .contains(command.allocationBasis())) {
             throw new BusinessException("FINANCE_COST_BASIS_INVALID", "不支持的财务费用分摊依据");
         }
-        requireApprovedWorkflow(command.approvalInstanceId(), "FINANCE_COST_ALLOCATION", command.sourceId());
-        requireSubject(command.costSubjectId(), true);
         if (command.lines() == null || command.lines().isEmpty()) throw new BusinessException("FINANCE_COST_LINES_EMPTY", "财务费用分摊至少包含一个项目");
         if (command.lines().stream().map(AllocationLine::projectId).distinct().count() != command.lines().size()) {
             throw new BusinessException("FINANCE_COST_PROJECT_DUPLICATE", "同一分摊批次不能重复选择项目");
@@ -417,6 +443,9 @@ public class CostSubjectV2Service {
                 && (command.remark() == null || command.remark().isBlank())) {
             throw new BusinessException("FINANCE_COST_EXCEPTION_REASON_REQUIRED", "合同额例外分摊必须说明原因");
         }
+        command.lines().stream().map(AllocationLine::projectId).distinct().forEach(this::requireProject);
+        requireApprovedWorkflow(command.approvalInstanceId(), "FINANCE_COST_ALLOCATION", command.sourceId());
+        requireSubject(command.costSubjectId(), true);
         BigDecimal sourceAmount = sourceAmount(command.sourceType(), command.sourceId());
         BigDecimal allocatedBefore = jdbc.queryForObject("""
                 SELECT COALESCE(SUM(source_amount),0)
@@ -439,7 +468,6 @@ public class CostSubjectV2Service {
                     command.approvalInstanceId(), userId(), command.remark());
             for (int index = 0; index < command.lines().size(); index++) {
                 AllocationLine line = command.lines().get(index);
-                requireProject(line.projectId());
                 requireScope(line.projectId(), command.costSubjectId());
                 Long costItemId = IdWorker.getId();
                 BigDecimal amount = amounts.get(index);
@@ -470,11 +498,12 @@ public class CostSubjectV2Service {
                 FROM finance_cost_allocation_batch WHERE tenant_id=? AND id=? AND reversal_of_id IS NULL
                 """, originalId);
         if (!"POSTED".equals(original.get("status"))) throw new BusinessException("FINANCE_COST_NOT_REVERSIBLE", "仅原始已过账分摊可冲销");
-        requireApprovedWorkflow(approvalInstanceId, "FINANCE_COST_ALLOCATION_REVERSAL", originalId);
         List<Map<String, Object>> lines = jdbc.queryForList("""
                 SELECT project_id,basis_value,allocated_amount FROM finance_cost_allocation_line
                 WHERE tenant_id=? AND batch_id=? ORDER BY id
                 """, tenantId(), originalId);
+        lines.stream().map(line -> longValue(line.get("project_id"))).distinct().forEach(this::requireProject);
+        requireApprovedWorkflow(approvalInstanceId, "FINANCE_COST_ALLOCATION_REVERSAL", originalId);
         Long reversalId = IdWorker.getId();
         BigDecimal total = money(original.get("source_amount")).negate();
         try {
@@ -617,6 +646,11 @@ public class CostSubjectV2Service {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM pm_project WHERE tenant_id=? AND id=? AND deleted_flag=0",
                 Integer.class, tenantId(), projectId);
         if (count == null || count != 1) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        projectAccessChecker.checkAccess(projectId, "访问成本科目项目数据");
+    }
+
+    private String placeholders(List<Long> values) {
+        return String.join(",", values.stream().map(value -> "?").toList());
     }
 
     private Map<String, Object> one(String sql, Long id) {

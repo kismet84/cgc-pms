@@ -38,6 +38,12 @@ const SubcontractWorkspacePage = () => import('./pages/subcontract/SubcontractWo
 const SettlementWorkspacePage = () => import('./pages/settlement/SettlementWorkspacePage.vue')
 const ReceivablesWorkspacePage = () => import('./pages/finance/ReceivablesWorkspacePage.vue')
 const FinanceControlWorkspacePage = () => import('./pages/finance/FinanceControlWorkspacePage.vue')
+const AccountPage = () => import('./pages/account/AccountPage.vue')
+const PartnerPage = () => import('./pages/master-data/PartnerPage.vue')
+const OrganizationPage = () => import('./pages/master-data/OrganizationPage.vue')
+const MaterialDictionaryPage = () => import('./pages/master-data/MaterialDictionaryPage.vue')
+const CostSubjectPage = () => import('./pages/master-data/CostSubjectPage.vue')
+const WorkflowProcessPage = () => import('./pages/system/WorkflowProcessPage.vue')
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -46,6 +52,7 @@ declare module 'vue-router' {
     technical?: boolean
     shell?: boolean
     permission?: string
+    adminOnly?: boolean
     workflowTab?: WorkflowTab
     migration?: 'pending'
   }
@@ -150,10 +157,25 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
                                                               ? FinanceControlWorkspacePage
                                                               : tab.path === '/settlement/list'
                                                                 ? SettlementWorkspacePage
-                                                                : ShellPlaceholderPage,
+                                                                : tab.path === '/partner'
+                                                                  ? PartnerPage
+                                                                  : tab.path === '/org'
+                                                                    ? OrganizationPage
+                                                                    : tab.path ===
+                                                                        '/material/dictionary'
+                                                                      ? MaterialDictionaryPage
+                                                                      : tab.path.startsWith(
+                                                                            '/cost/subject/',
+                                                                          )
+                                                                        ? CostSubjectPage
+                                                                        : tab.path ===
+                                                                            '/approval/process'
+                                                                          ? WorkflowProcessPage
+                                                                          : ShellPlaceholderPage,
           meta: {
             shell: true,
             permission: tab.permission,
+            adminOnly: tab.adminOnly,
             workflowTab: approvalTab,
             migration: tab.migration,
           },
@@ -164,6 +186,30 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
 )
 
 const contextRoutes: RouteRecordRaw[] = [
+  {
+    path: '/profile',
+    name: 'V2Profile',
+    component: AccountPage,
+    meta: { shell: true },
+  },
+  {
+    path: '/settings',
+    name: 'V2Settings',
+    component: AccountPage,
+    meta: { shell: true },
+  },
+  {
+    path: '/help',
+    name: 'V2Help',
+    component: AccountPage,
+    meta: { shell: true },
+  },
+  {
+    path: '/material',
+    name: 'V2MaterialRedirect',
+    redirect: (to) => ({ path: '/material/dictionary', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'material:dict:list' },
+  },
   {
     path: '/payment',
     name: 'V2PaymentRedirect',
@@ -279,6 +325,16 @@ const contextRoutes: RouteRecordRaw[] = [
     meta: { shell: true, permission: 'cost:ledger:query' },
   },
   {
+    path: '/cost/subject',
+    name: 'V2CostSubjectRootRedirect',
+    redirect: (to) => ({
+      path: '/cost/subject/taxonomy',
+      query: to.query,
+      hash: to.hash,
+    }),
+    meta: { shell: true, permission: 'cost:query' },
+  },
+  {
     path: '/cost-target',
     name: 'V2CostTargetRootRedirect',
     redirect: (to) => ({ path: '/cost-target/index', query: to.query, hash: to.hash }),
@@ -360,6 +416,12 @@ export const routes: RouteRecordRaw[] = [
         component: ForbiddenPage,
         meta: { shell: true },
       },
+      {
+        path: '/403',
+        name: 'V2LegacyForbiddenRedirect',
+        redirect: (to) => ({ path: '/forbidden', query: to.query, hash: to.hash }),
+        meta: { shell: true },
+      },
       { path: '/no-access', redirect: '/forbidden' },
       {
         path: '/:pathMatch(.*)*',
@@ -393,7 +455,14 @@ export function installSessionGuard(targetRouter: Router): void {
     }
 
     if (to.path === '/session') {
-      return { path: firstAccessiblePath(session.permissions) ?? '/forbidden', query: to.query }
+      return {
+        path: firstAccessiblePath(session.roles, session.permissions) ?? '/forbidden',
+        query: to.query,
+      }
+    }
+
+    if (to.meta.adminOnly && !session.isAdmin) {
+      return { path: '/forbidden', query: { from: to.fullPath } }
     }
 
     const requiredPermission =

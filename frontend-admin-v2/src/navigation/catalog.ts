@@ -1,5 +1,8 @@
+import { hasAdminRole } from '@/stores/session'
+
 export interface NavigationAccess {
   permission?: string
+  adminOnly?: boolean
 }
 
 export interface WorkspaceTab extends NavigationAccess {
@@ -8,7 +11,7 @@ export interface WorkspaceTab extends NavigationAccess {
   migration?: 'pending'
 }
 
-export interface NavigationWorkspace {
+export interface NavigationWorkspace extends NavigationAccess {
   id: string
   label: string
   defaultPath: string
@@ -405,7 +408,6 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/partner',
             label: '合作方管理',
             permission: 'partner:query',
-            migration: 'pending',
           },
         ],
       },
@@ -413,7 +415,7 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'organization',
         label: '组织架构',
         defaultPath: '/org',
-        tabs: [{ path: '/org', label: '组织架构', permission: 'org:query', migration: 'pending' }],
+        tabs: [{ path: '/org', label: '组织架构', permission: 'org:list' }],
       },
       {
         id: 'materials',
@@ -423,8 +425,7 @@ export const navigationDomains: NavigationDomain[] = [
           {
             path: '/material/dictionary',
             label: '材料字典',
-            permission: 'material:query',
-            migration: 'pending',
+            permission: 'material:dict:list',
           },
         ],
       },
@@ -438,25 +439,21 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/cost/subject/taxonomy',
             label: '科目体系',
             permission: 'cost:query',
-            migration: 'pending',
           },
           {
             path: '/cost/subject/rules',
             label: '归集规则',
             permission: 'cost:subject:rule:query',
-            migration: 'pending',
           },
           {
             path: '/cost/subject/scope',
             label: '项目适用与目标成本',
             permission: 'cost:subject:scope:query',
-            migration: 'pending',
           },
           {
             path: '/cost/subject/trace',
             label: '影响与转入追踪',
             permission: 'cost:subject:audit:query',
-            migration: 'pending',
           },
         ],
       },
@@ -471,12 +468,13 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'workflow',
         label: '流程配置',
         defaultPath: '/approval/process',
+        adminOnly: true,
         tabs: [
           {
             path: '/approval/process',
             label: '审批流程',
             permission: 'workflow:process:query',
-            migration: 'pending',
+            adminOnly: true,
           },
         ],
       },
@@ -562,14 +560,23 @@ export interface VisibleDomain extends Omit<NavigationDomain, 'workspaces'> {
   workspaces: VisibleWorkspace[]
 }
 
-export function hasAccess(permissions: readonly string[], access: NavigationAccess): boolean {
+export function hasAccess(
+  roles: readonly string[],
+  permissions: readonly string[],
+  access: NavigationAccess,
+): boolean {
+  if (access.adminOnly && !hasAdminRole(roles)) return false
   return !access.permission || permissions.includes('*') || permissions.includes(access.permission)
 }
 
-export function visibleNavigation(permissions: readonly string[]): VisibleDomain[] {
+export function visibleNavigation(
+  roles: readonly string[],
+  permissions: readonly string[],
+): VisibleDomain[] {
   return navigationDomains.flatMap((domain) => {
     const workspaces = domain.workspaces.flatMap((workspace) => {
-      const tabs = workspace.tabs.filter((tab) => hasAccess(permissions, tab))
+      if (!hasAccess(roles, permissions, workspace)) return []
+      const tabs = workspace.tabs.filter((tab) => hasAccess(roles, permissions, tab))
       return tabs.length ? [{ ...workspace, tabs }] : []
     })
     return workspaces.length ? [{ ...domain, workspaces }] : []
@@ -601,8 +608,11 @@ export function findWorkspace(path: string): WorkspaceMatch | undefined {
   return undefined
 }
 
-export function firstAccessiblePath(permissions: readonly string[]): string | undefined {
-  return visibleNavigation(permissions)[0]?.workspaces[0]?.tabs[0]?.path
+export function firstAccessiblePath(
+  roles: readonly string[],
+  permissions: readonly string[],
+): string | undefined {
+  return visibleNavigation(roles, permissions)[0]?.workspaces[0]?.tabs[0]?.path
 }
 
 export function permissionForPath(path: string): string | undefined {

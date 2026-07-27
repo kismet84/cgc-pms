@@ -48,8 +48,12 @@ class ProfileControllerTest {
 
     /** Generate a valid JWT token for the admin user and wrap as HttpOnly cookie. */
     private Cookie adminCookie() {
+        return userCookie(ADMIN_ID, TENANT_ID);
+    }
+
+    private Cookie userCookie(long userId, long tenantId) {
         String token = jwtUtils.generateToken(
-                ADMIN_ID, ADMIN_USERNAME, TENANT_ID,
+                userId, ADMIN_USERNAME, tenantId,
                 List.of("ADMIN"),
                 List.of());
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
@@ -157,6 +161,9 @@ class ProfileControllerTest {
     @Test
     @DisplayName("RED-3: PUT /api/profile ignores restricted fields (username, roles, status, isAdmin)")
     void testUpdateProfile_IgnoresRestrictedFields() throws Exception {
+        var before = jdbcTemplate.queryForMap(
+                "SELECT password, status, is_admin, tenant_id, org_id FROM sys_user WHERE id = ?",
+                ADMIN_ID);
         mockMvc.perform(putWithApiContext("/profile")
                         .cookie(adminCookie())
                         .cookie(csrfCookie())
@@ -175,6 +182,10 @@ class ProfileControllerTest {
                 .andExpect(jsonPath("$.data.username").value("admin"))
                 // realName IS allowed
                 .andExpect(jsonPath("$.data.realName").value("正常名称"));
+        var after = jdbcTemplate.queryForMap(
+                "SELECT password, status, is_admin, tenant_id, org_id FROM sys_user WHERE id = ?",
+                ADMIN_ID);
+        org.junit.jupiter.api.Assertions.assertEquals(before, after);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -311,6 +322,49 @@ class ProfileControllerTest {
                                 {"oldPassword":"admin123","newPassword":"Newsecure12"}"""))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/profile rejects blank realName")
+    void testUpdateProfile_BlankRealName() throws Exception {
+        mockMvc.perform(putWithApiContext("/profile")
+                        .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"realName":"   "}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/profile rejects overlong and invalid fields")
+    void testUpdateProfile_InvalidFields() throws Exception {
+        mockMvc.perform(putWithApiContext("/profile")
+                        .cookie(adminCookie())
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"realName":"%s","email":"not-an-email"}"""
+                                .formatted("x".repeat(101))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("PUT /api/profile cannot update the same user id across tenants")
+    void testUpdateProfile_CrossTenantForbidden() throws Exception {
+        mockMvc.perform(putWithApiContext("/profile")
+                        .cookie(userCookie(ADMIN_ID, 902L))
+                        .cookie(csrfCookie())
+                        .header("X-XSRF-TOKEN", "test-csrf-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"realName":"跨租户修改"}"""))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
     }
 
     // ---- helpers ----
