@@ -12,6 +12,21 @@ const jsonPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.json
 const markdownPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.md')
 
 const acceptedRoutes = {
+  Login: '@/pages/auth/LoginPage.vue',
+  Forbidden: '@/router.ts#V2LegacyForbiddenRedirect',
+  NotFound: '@/pages/errors/NotFoundPage.vue',
+  Profile: '@/pages/account/AccountPage.vue',
+  Settings: '@/pages/account/AccountPage.vue',
+  Help: '@/pages/account/AccountPage.vue',
+  Partner: '@/pages/master-data/PartnerPage.vue',
+  Org: '@/pages/master-data/OrganizationPage.vue',
+  Material: '@/router.ts#V2MaterialRedirect',
+  MaterialDictionary: '@/pages/master-data/MaterialDictionaryPage.vue',
+  CostSubject: '@/router.ts#V2CostSubjectRootRedirect',
+  CostSubjectTaxonomy: '@/pages/master-data/CostSubjectPage.vue',
+  CostSubjectRules: '@/pages/master-data/CostSubjectPage.vue',
+  CostSubjectScope: '@/pages/master-data/CostSubjectPage.vue',
+  CostSubjectTrace: '@/pages/master-data/CostSubjectPage.vue',
   Dashboard: '@/pages/dashboard/DashboardPage.vue',
   ReportCatalog: '@/pages/workbench/ReportCatalogPage.vue',
   Alert: '@/router.ts#V2LegacyAlertRedirect',
@@ -20,6 +35,7 @@ const acceptedRoutes = {
   ApprovalDone: '@/pages/workbench/WorkflowWorkbenchPage.vue',
   ApprovalCc: '@/pages/workbench/WorkflowWorkbenchPage.vue',
   ApprovalMine: '@/pages/workbench/WorkflowWorkbenchPage.vue',
+  ApprovalProcess: '@/pages/system/WorkflowProcessPage.vue',
   ApprovalDetail: '@/router.ts#V2LegacyApprovalDetailRedirect',
   Project: '@/router.ts#V2ProjectRedirect',
   ProjectList: '@/pages/projects/ProjectPage.vue',
@@ -78,6 +94,12 @@ const acceptedRoutes = {
 }
 
 const acceptedRoutePermissions = {
+  Profile: null,
+  Settings: null,
+  Help: null,
+  Org: 'org:list',
+  Material: 'material:dict:list',
+  MaterialDictionary: 'material:dict:list',
   Inventory: 'inventory:warehouse:list',
   InventoryWarehouse: 'inventory:warehouse:list',
   Subcontract: 'subtask:query',
@@ -119,6 +141,23 @@ const m6FinanceAcceptanceEvidence =
   'docs/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md'
 const m6FinanceControlAcceptanceEvidence =
   'docs/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md'
+const m7GlobalAcceptanceEvidence = 'docs/quality/ISSUE-053-036-M7登录与错误深链V2验收报告.md'
+const m7GlobalRoutes = new Set(['Login', 'Forbidden', 'NotFound'])
+const m7AccountAcceptanceEvidence = 'docs/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md'
+const m7AccountRoutes = new Set(['Profile', 'Settings', 'Help'])
+const m7MasterDataAcceptanceEvidence = 'docs/quality/ISSUE-053-038-M7基础资料V2验收报告.md'
+const m7MasterDataRoutes = new Set(['Partner', 'Org', 'Material', 'MaterialDictionary'])
+const m7CostSubjectAcceptanceEvidence = 'docs/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md'
+const m7CostSubjectRoutes = new Set([
+  'CostSubject',
+  'CostSubjectTaxonomy',
+  'CostSubjectRules',
+  'CostSubjectScope',
+  'CostSubjectTrace',
+])
+const m7WorkflowAcceptanceEvidence =
+  'docs/quality/ISSUE-053-040-M7流程配置与adminOnly门V2验收报告.md'
+const m7WorkflowRoutes = new Set(['ApprovalProcess'])
 
 function findVariable(sourceFile, name) {
   for (const statement of sourceFile.statements) {
@@ -262,7 +301,9 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
         path: fullPath,
         legacyView: component,
         v2View,
-        permission: acceptedRoutePermissions[name] || permissions[name] || null,
+        permission: Object.hasOwn(acceptedRoutePermissions, name)
+          ? acceptedRoutePermissions[name]
+          : permissions[name] || null,
         adminOnly: effectiveAdmin,
         public: meta ? literal(objectValue(meta, 'public')) === true : false,
         redirect,
@@ -310,6 +351,16 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
                                               : m2AcceptanceEvidence
           : null,
       })
+      if (m7GlobalRoutes.has(name))
+        result[result.length - 1].acceptanceEvidence = m7GlobalAcceptanceEvidence
+      if (m7AccountRoutes.has(name))
+        result[result.length - 1].acceptanceEvidence = m7AccountAcceptanceEvidence
+      if (m7MasterDataRoutes.has(name))
+        result[result.length - 1].acceptanceEvidence = m7MasterDataAcceptanceEvidence
+      if (m7CostSubjectRoutes.has(name))
+        result[result.length - 1].acceptanceEvidence = m7CostSubjectAcceptanceEvidence
+      if (m7WorkflowRoutes.has(name))
+        result[result.length - 1].acceptanceEvidence = m7WorkflowAcceptanceEvidence
     }
 
     const children = objectValue(element, 'children')
@@ -544,6 +595,84 @@ function assertFinanceControlV2Acceptance(routerSource, catalogSource) {
     throw new Error('M6 finance control V2 acceptance mapping is missing or stale')
 }
 
+function assertM7GlobalV2Acceptance(routerSource) {
+  const checks = [
+    /import LoginPage from ['"]\.\/pages\/auth\/LoginPage\.vue['"]/,
+    /const ForbiddenPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/errors\/ForbiddenPage\.vue['"]\)/,
+    /const NotFoundPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/errors\/NotFoundPage\.vue['"]\)/,
+    /path:\s*['"]\/login['"][\s\S]{0,180}component:\s*LoginPage[\s\S]{0,180}guestOnly:\s*true/,
+    /path:\s*['"]\/403['"][\s\S]{0,240}name:\s*['"]V2LegacyForbiddenRedirect['"][\s\S]{0,240}path:\s*['"]\/forbidden['"]/,
+    /path:\s*['"]\/:pathMatch\(\.\*\)\*['"][\s\S]{0,180}component:\s*NotFoundPage/,
+  ]
+  if (checks.some((check) => !check.test(routerSource)))
+    throw new Error('M7 global routes V2 acceptance mapping is missing or stale')
+}
+
+function assertM7AccountV2Acceptance(routerSource) {
+  const checks = [
+    /const AccountPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/account\/AccountPage\.vue['"]\)/,
+    /path:\s*['"]\/profile['"][\s\S]{0,160}component:\s*AccountPage[\s\S]{0,100}shell:\s*true/,
+    /path:\s*['"]\/settings['"][\s\S]{0,160}component:\s*AccountPage[\s\S]{0,100}shell:\s*true/,
+    /path:\s*['"]\/help['"][\s\S]{0,160}component:\s*AccountPage[\s\S]{0,100}shell:\s*true/,
+  ]
+  if (checks.some((check) => !check.test(routerSource)))
+    throw new Error('M7 account V2 acceptance mapping is missing or stale')
+}
+
+function assertM7MasterDataV2Acceptance(routerSource, catalogSource) {
+  const routerChecks = [
+    /const PartnerPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/master-data\/PartnerPage\.vue['"]\)/,
+    /const OrganizationPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/master-data\/OrganizationPage\.vue['"]\)/,
+    /const MaterialDictionaryPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/master-data\/MaterialDictionaryPage\.vue['"]\)/,
+    /tab\.path\s*===\s*['"]\/partner['"]\s*\?\s*PartnerPage/,
+    /tab\.path\s*===\s*['"]\/org['"]\s*\?\s*OrganizationPage/,
+    /tab\.path\s*===\s*['"]\/material\/dictionary['"][\s\S]{0,100}\?\s*MaterialDictionaryPage/,
+    /path:\s*['"]\/material['"][\s\S]{0,180}name:\s*['"]V2MaterialRedirect['"][\s\S]{0,220}\/material\/dictionary/,
+  ]
+  const catalogChecks = [
+    /path:\s*['"]\/partner['"][\s\S]{0,180}permission:\s*['"]partner:query['"]/,
+    /path:\s*['"]\/org['"][\s\S]{0,180}permission:\s*['"]org:list['"]/,
+    /path:\s*['"]\/material\/dictionary['"][\s\S]{0,180}permission:\s*['"]material:dict:list['"]/,
+  ]
+  if (
+    routerChecks.some((check) => !check.test(routerSource)) ||
+    catalogChecks.some((check) => !check.test(catalogSource))
+  )
+    throw new Error('M7 master-data V2 acceptance mapping is missing or stale')
+}
+
+function assertM7CostSubjectV2Acceptance(routerSource, catalogSource) {
+  const routerChecks = [
+    /const CostSubjectPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/master-data\/CostSubjectPage\.vue['"]\)/,
+    /tab\.path\.startsWith\(\s*['"]\/cost\/subject\/['"]\s*,?\s*\)[\s\S]{0,100}\?\s*CostSubjectPage/,
+    /path:\s*['"]\/cost\/subject['"][\s\S]{0,180}name:\s*['"]V2CostSubjectRootRedirect['"][\s\S]{0,260}\/cost\/subject\/taxonomy/,
+  ]
+  const catalogChecks = [
+    /path:\s*['"]\/cost\/subject\/taxonomy['"][\s\S]{0,150}permission:\s*['"]cost:query['"]/,
+    /path:\s*['"]\/cost\/subject\/rules['"][\s\S]{0,150}permission:\s*['"]cost:subject:rule:query['"]/,
+    /path:\s*['"]\/cost\/subject\/scope['"][\s\S]{0,150}permission:\s*['"]cost:subject:scope:query['"]/,
+    /path:\s*['"]\/cost\/subject\/trace['"][\s\S]{0,150}permission:\s*['"]cost:subject:audit:query['"]/,
+  ]
+  if (
+    routerChecks.some((check) => !check.test(routerSource)) ||
+    catalogChecks.some((check) => !check.test(catalogSource))
+  )
+    throw new Error('M7 cost-subject V2 acceptance mapping is missing or stale')
+}
+
+function assertM7WorkflowV2Acceptance(routerSource, catalogSource) {
+  const checks = [
+    /const WorkflowProcessPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/system\/WorkflowProcessPage\.vue['"]\)/,
+    /tab\.path\s*===\s*['"]\/approval\/process['"][\s\S]{0,100}\?\s*WorkflowProcessPage/,
+    /path:\s*['"]\/approval\/process['"][\s\S]{0,180}permission:\s*['"]workflow:process:query['"][\s\S]{0,100}adminOnly:\s*true/,
+  ]
+  if (
+    checks.slice(0, 2).some((check) => !check.test(routerSource)) ||
+    !checks[2].test(catalogSource)
+  )
+    throw new Error('M7 workflow V2 acceptance mapping is missing or stale')
+}
+
 async function buildLedger() {
   const [source, v2RouterSource, navigationCatalogSource] = await Promise.all([
     readFile(routerPath, 'utf8'),
@@ -561,6 +690,11 @@ async function buildLedger() {
   assertSettlementV2Acceptance(v2RouterSource, navigationCatalogSource)
   assertFinanceV2Acceptance(v2RouterSource, navigationCatalogSource)
   assertFinanceControlV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertM7GlobalV2Acceptance(v2RouterSource)
+  assertM7AccountV2Acceptance(v2RouterSource)
+  assertM7MasterDataV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertM7CostSubjectV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertM7WorkflowV2Acceptance(v2RouterSource, navigationCatalogSource)
   const sourceFile = ts.createSourceFile(
     routerPath,
     source,

@@ -154,7 +154,7 @@ class MdMaterialServiceTest {
 
         MdMaterial updated = new MdMaterial();
         updated.setId(id);
-        updated.setMaterialCode("UPD-MAT-001-A");
+        updated.setMaterialCode("UPD-MAT-001");
         updated.setMaterialName("更新后材料");
         updated.setCategoryId(200L);
         updated.setSpecification("M12");
@@ -164,7 +164,7 @@ class MdMaterialServiceTest {
         mdMaterialService.update(updated);
 
         MdMaterialVO saved = mdMaterialService.getById(id);
-        assertEquals("UPD-MAT-001-A", saved.getMaterialCode());
+        assertEquals("UPD-MAT-001", saved.getMaterialCode());
         assertEquals("更新后材料", saved.getMaterialName());
         assertEquals("200", saved.getCategoryId());
         assertEquals("DISABLE", saved.getStatus());
@@ -204,6 +204,38 @@ class MdMaterialServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("材料编码不可修改，非法状态与税率失败关闭")
+    void testServerValidation() {
+        MdMaterial material = new MdMaterial();
+        material.setMaterialCode("VALIDATION-001");
+        material.setMaterialName("校验材料");
+        material.setCategoryId(100L);
+        material.setStatus("ENABLE");
+        Long id = mdMaterialService.create(material);
+
+        MdMaterial changedCode = new MdMaterial();
+        changedCode.setId(id);
+        changedCode.setMaterialCode("VALIDATION-002");
+        changedCode.setMaterialName("校验材料");
+        changedCode.setStatus("ENABLE");
+        assertEquals("MATERIAL_CODE_IMMUTABLE",
+                assertThrows(BusinessException.class, () -> mdMaterialService.update(changedCode)).getCode());
+
+        MdMaterial invalidTax = new MdMaterial();
+        invalidTax.setMaterialCode("INVALID-TAX");
+        invalidTax.setMaterialName("非法税率");
+        invalidTax.setCategoryId(100L);
+        invalidTax.setDefaultTaxRate(new java.math.BigDecimal("-0.01"));
+        invalidTax.setStatus("ENABLE");
+        assertEquals("MATERIAL_TAX_RATE_INVALID",
+                assertThrows(BusinessException.class, () -> mdMaterialService.create(invalidTax)).getCode());
+
+        assertEquals("MATERIAL_STATUS_INVALID",
+                assertThrows(BusinessException.class, () -> mdMaterialService.updateStatus(id, "UNKNOWN")).getCode());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("updateStatus → 成功切换状态")
     void testUpdateStatus_Success() {
         MdMaterial material = new MdMaterial();
@@ -218,6 +250,10 @@ class MdMaterialServiceTest {
 
         MdMaterialVO saved = mdMaterialService.getById(id);
         assertEquals("DISABLE", saved.getStatus());
+        assertEquals("STATUS-MAT-001", saved.getMaterialCode());
+        assertEquals("状态测试材料", saved.getMaterialName());
+        assertEquals("100", saved.getCategoryId());
+        assertEquals("个", saved.getUnit());
     }
 
     @Test

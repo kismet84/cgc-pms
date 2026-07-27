@@ -35,6 +35,12 @@ class WorkflowTemplateControllerTest {
                 jwtUtils.generateToken(ADMIN_ID, "admin", TENANT_ID, List.of("ADMIN"), List.of()));
     }
 
+    private Cookie ordinaryCookieWithProcessPermission() {
+        return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
+                jwtUtils.generateToken(2L, "ordinary", TENANT_ID, List.of("USER"),
+                        List.of("workflow:process:query")));
+    }
+
     @Test @Order(1) @DisplayName("GET /workflow/templates without JWT -> 401")
     void testUnauthorized() throws Exception { mockMvc.perform(g("/workflow/templates")).andExpect(status().isUnauthorized()); }
 
@@ -67,6 +73,20 @@ class WorkflowTemplateControllerTest {
         String body = "{\"nodeCode\":\"NODE-TEST-" + System.nanoTime() + "\",\"nodeName\":\"测试节点\",\"nodeOrder\":99,\"nodeType\":\"APPROVAL\",\"approveMode\":\"SEQUENTIAL\",\"approverConfig\":\"{\\\"type\\\":\\\"USER\\\",\\\"userId\\\":1}\"}";
         mockMvc.perform(p("/workflow/templates/50001/nodes").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
+    }
+
+    @Test @Order(7) @DisplayName("ordinary role with process permission -> 403")
+    void testOrdinaryRoleForbidden() throws Exception {
+        mockMvc.perform(g("/workflow/templates").cookie(ordinaryCookieWithProcessPermission()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test @Order(8) @DisplayName("PUT template invalid enabled -> 400")
+    void testInvalidEnabledRejected() throws Exception {
+        mockMvc.perform(u("/workflow/templates/50001").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"templateName\":\"非法状态\",\"enabled\":2}"))
+                .andExpect(status().isBadRequest());
     }
 
     private MockHttpServletRequestBuilder g(String p) { return get("/api" + p).contextPath("/api"); }

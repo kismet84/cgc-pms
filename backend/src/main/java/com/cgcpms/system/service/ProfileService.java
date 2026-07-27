@@ -1,5 +1,6 @@
 package com.cgcpms.system.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.dto.UserInfo;
 import com.cgcpms.auth.service.AuthService;
 import com.cgcpms.common.exception.BusinessException;
@@ -34,37 +35,44 @@ public class ProfileService {
      * All other fields (username, roles, status, isAdmin, tenantId, orgId) are ignored.
      */
     @Transactional(rollbackFor = Exception.class)
-    public UserInfo updateProfile(Long userId, UpdateProfileRequest request) {
-        SysUser user = sysUserMapper.selectById(userId);
+    public UserInfo updateProfile(Long userId, Long tenantId, UpdateProfileRequest request) {
+        SysUser user = queryCurrentUser(userId, tenantId);
         if (user == null) {
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         }
 
-        // Build whitelist: only update allowed fields
+        SysUser patch = new SysUser();
+        patch.setId(userId);
         boolean changed = false;
         if (request.getRealName() != null) {
-            user.setRealName(request.getRealName());
+            patch.setRealName(request.getRealName().trim());
             changed = true;
         }
         if (request.getPhone() != null) {
-            user.setPhone(request.getPhone());
+            patch.setPhone(request.getPhone().trim());
             changed = true;
         }
         if (request.getEmail() != null) {
-            user.setEmail(request.getEmail());
+            patch.setEmail(request.getEmail().trim());
             changed = true;
         }
         if (request.getAvatar() != null) {
-            user.setAvatar(request.getAvatar());
+            patch.setAvatar(request.getAvatar().trim());
             changed = true;
         }
 
+        if (changed && sysUserMapper.updateById(patch) != 1) {
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+        }
         if (changed) {
-            sysUserMapper.updateById(user);
             log.info("用户资料更新完成");
         }
 
-        return buildUserInfo(user);
+        SysUser updated = queryCurrentUser(userId, tenantId);
+        if (updated == null) {
+            throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+        }
+        return buildUserInfo(updated);
     }
 
     /**
@@ -73,8 +81,8 @@ public class ProfileService {
      * Uses direct field update — NOT the general {@code SysUserService.update()} method.
      */
     @Transactional(rollbackFor = Exception.class)
-    public void changePassword(Long userId, ChangePasswordRequest request) {
-        SysUser user = sysUserMapper.selectById(userId);
+    public void changePassword(Long userId, Long tenantId, ChangePasswordRequest request) {
+        SysUser user = queryCurrentUser(userId, tenantId);
         if (user == null) {
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
         }
@@ -91,6 +99,12 @@ public class ProfileService {
         update.setPassword(encoded);
         sysUserMapper.updateById(update);
         log.info("用户密码更新完成");
+    }
+
+    private SysUser queryCurrentUser(Long userId, Long tenantId) {
+        return sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getId, userId)
+                .eq(SysUser::getTenantId, tenantId));
     }
 
     /**

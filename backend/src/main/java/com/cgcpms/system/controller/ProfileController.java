@@ -33,7 +33,8 @@ public class ProfileController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<UserInfo> updateProfile(@Valid @RequestBody UpdateProfileRequest request) {
         Long userId = UserContext.getCurrentUserId();
-        UserInfo updated = profileService.updateProfile(userId, request);
+        Long tenantId = UserContext.getCurrentTenantId();
+        UserInfo updated = profileService.updateProfile(userId, tenantId, request);
         return ApiResponse.success(updated);
     }
 
@@ -45,7 +46,8 @@ public class ProfileController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
         Long userId = UserContext.getCurrentUserId();
-        profileService.changePassword(userId, request);
+        Long tenantId = UserContext.getCurrentTenantId();
+        profileService.changePassword(userId, tenantId, request);
         return ApiResponse.success();
     }
 }

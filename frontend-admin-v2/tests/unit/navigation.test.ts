@@ -26,22 +26,25 @@ describe('V2 eight-domain navigation contract', () => {
   })
 
   it('shows all domains to wildcard permission and only matching domains to ordinary users', () => {
-    expect(visibleNavigation(['*'])).toHaveLength(8)
+    expect(visibleNavigation(['ADMIN'], ['*'])).toHaveLength(8)
     expect(
-      visibleNavigation(['dashboard:view', 'project:query']).map((domain) => domain.label),
+      visibleNavigation(['USER'], ['dashboard:view', 'project:query']).map(
+        (domain) => domain.label,
+      ),
     ).toEqual(['工作台', '项目履约'])
-    expect(visibleNavigation([]).map((domain) => domain.label)).toEqual(['工作台'])
-    expect(visibleNavigation([])[0]?.workspaces.map((workspace) => workspace.label)).toEqual([
-      '我的工作',
-      '报表中心',
-    ])
+    expect(visibleNavigation(['USER'], []).map((domain) => domain.label)).toEqual(['工作台'])
+    expect(
+      visibleNavigation(['USER'], [])[0]?.workspaces.map((workspace) => workspace.label),
+    ).toEqual(['我的工作', '报表中心'])
   })
 
   it('uses exact permission codes for routes and keeps object paths in their workspace', () => {
     expect(permissionForPath('/system/users')).toBe('system:user:query')
-    expect(firstAccessiblePath(['audit:query'])).toBe('/approval/todo')
+    expect(firstAccessiblePath(['USER'], ['audit:query'])).toBe('/approval/todo')
     expect(
-      visibleNavigation(['*'])[0]?.workspaces.find((workspace) => workspace.id === 'cockpit')?.tabs,
+      visibleNavigation(['ADMIN'], ['*'])[0]?.workspaces.find(
+        (workspace) => workspace.id === 'cockpit',
+      )?.tabs,
     ).toMatchObject([{ path: '/dashboard', label: '驾驶舱' }])
     expect(findWorkspace('/project/42/overview')?.workspace.label).toBe('项目管理')
     expect(findWorkspace('/project-schedule/11')?.workspace.label).toBe('计划与现场')
@@ -63,5 +66,17 @@ describe('V2 eight-domain navigation contract', () => {
     expect(permissionForPath('/purchase/order')).toBe('purchase:order:query')
     expect(permissionForPath('/purchase/receipt')).toBe('receipt:query')
     expect(findWorkspace('/purchase/order')?.workspace.label).toBe('采购执行')
+  })
+
+  it('requires admin role and exact permission for workflow configuration navigation', () => {
+    const workflowVisible = (roles: string[], permissions: string[]) =>
+      visibleNavigation(roles, permissions)
+        .flatMap((domain) => domain.workspaces)
+        .some((workspace) => workspace.id === 'workflow')
+
+    expect(workflowVisible(['USER'], ['workflow:process:query'])).toBe(false)
+    expect(workflowVisible(['ADMIN'], [])).toBe(false)
+    expect(workflowVisible(['ADMIN'], ['workflow:process:query'])).toBe(true)
+    expect(workflowVisible(['SUPER_ADMIN'], ['workflow:process:query'])).toBe(true)
   })
 })

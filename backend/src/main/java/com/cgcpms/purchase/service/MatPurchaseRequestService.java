@@ -343,6 +343,9 @@ public class MatPurchaseRequestService {
             if (material == null || !Objects.equals(material.getTenantId(), tenantId)) {
                 throw new BusinessException("MATERIAL_NOT_FOUND", "物料不存在");
             }
+            if (!"ENABLE".equals(material.getStatus())) {
+                throw new BusinessException("MATERIAL_DISABLED", "物料已停用");
+            }
             return;
         }
         if (item.getMaterialName() == null || item.getMaterialName().isBlank()) return;
@@ -352,6 +355,9 @@ public class MatPurchaseRequestService {
                         .eq(MdMaterial::getMaterialName, item.getMaterialName().trim())
                         .eq(MdMaterial::getTenantId, tenantId));
         if (existing != null) {
+            if (!"ENABLE".equals(existing.getStatus())) {
+                throw new BusinessException("MATERIAL_DISABLED", "物料已停用");
+            }
             item.setMaterialId(existing.getId());
             if (item.getUnit() == null || item.getUnit().isBlank()) {
                 item.setUnit(existing.getUnit());

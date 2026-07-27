@@ -1,8 +1,8 @@
 package com.cgcpms.cost.service;
 
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
-import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,13 +48,7 @@ class CostSubjectV2ServiceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        UserContext.set(Jwts.claims()
-                .subject("admin")
-                .add("userId", 1L)
-                .add("username", "admin")
-                .add("tenantId", 0L)
-                .add("roleCodes", List.of("ADMIN"))
-                .build());
+        TestUserContext.setAdmin(0L, 1L);
         insertSubject(SOURCE_SUBJECT_ID, "V2-IT-SOURCE", "投标费用来源");
         insertSubject(GLOBAL_SUBJECT_ID, "V2-IT-GLOBAL", "全局兜底成本");
         insertSubject(EXACT_SUBJECT_ID, "V2-IT-EXACT", "精确分类成本");
@@ -100,6 +94,26 @@ class CostSubjectV2ServiceIntegrationTest {
     }
 
     @Test
+    void rejectsProjectScopedOperationsOutsideCurrentUserDataScope() {
+        TestUserContext.setUser(0L, 99999L, "cost-user", List.of());
+
+        assertProjectDenied(() -> service.scopes(PROJECT_ID));
+        assertProjectDenied(() -> service.reconciliation(PROJECT_ID));
+        assertProjectDenied(() -> service.resolveRule("V2_RULE_TEST", "QUALITY", PROJECT_ID));
+        assertProjectDenied(() -> service.upsertScope(new CostSubjectV2Service.ScopeCommand(
+                PROJECT_ID, PROJECT_SUBJECT_ID, true, null, null, "unauthorized")));
+        assertProjectDenied(() -> service.transferBidCost(new CostSubjectV2Service.TransferCommand(
+                BID_ID, PROJECT_ID, TARGET_ID, VERSION_ID, TRANSFER_APPROVAL_ID,
+                "unauthorized-transfer", "unauthorized")));
+        assertProjectDenied(() -> service.allocateFinanceCost(
+                new CostSubjectV2Service.FinanceAllocationCommand(
+                        "ACCOUNTING_ENTRY_LINE", ACCOUNTING_LINE_ID, "DIRECT_PROJECT", "2026-07",
+                        PROJECT_SUBJECT_ID, ALLOCATION_APPROVAL_ID, "unauthorized-allocation",
+                        "unauthorized", List.of(
+                        new CostSubjectV2Service.AllocationLine(PROJECT_ID, BigDecimal.ONE)))));
+    }
+
+    @Test
     void transfersBidCostOncePerTargetVersionAndAllowsRetransferAfterReversal() {
         jdbc.update("""
                 INSERT INTO cost_subject_mapping_item
@@ -132,6 +146,9 @@ class CostSubjectV2ServiceIntegrationTest {
                 "SELECT total_target_amount FROM cost_target WHERE id=?", BigDecimal.class, TARGET_ID)));
         assertEquals("BID_COST", jdbc.queryForObject(
                 "SELECT source_type FROM cost_item WHERE id=?", String.class, SOURCE_ITEM_ID));
+        TestUserContext.setUser(0L, 99999L, "cost-user", List.of());
+        assertEquals(List.of(), service.transfers());
+        TestUserContext.setAdmin(0L, 1L);
 
         BusinessException duplicate = assertThrows(BusinessException.class,
                 () -> service.transferBidCost(new CostSubjectV2Service.TransferCommand(
@@ -141,6 +158,10 @@ class CostSubjectV2ServiceIntegrationTest {
 
         insertApprovedWorkflow(REVERSAL_APPROVAL_ID, 50052L,
                 "BID_COST_TARGET_TRANSFER_REVERSAL", firstTransfer);
+        TestUserContext.setUser(0L, 99999L, "cost-user", List.of());
+        assertProjectDenied(() -> service.reverseBidTransfer(
+                firstTransfer, REVERSAL_APPROVAL_ID, "unauthorized-reversal", "unauthorized"));
+        TestUserContext.setAdmin(0L, 1L);
         service.reverseBidTransfer(firstTransfer, REVERSAL_APPROVAL_ID, "v2-it-reversal-1", "集成测试冲销");
         assertEquals(0, BigDecimal.ZERO.compareTo(jdbc.queryForObject(
                 "SELECT total_target_amount FROM cost_target WHERE id=?", BigDecimal.class, TARGET_ID)));
@@ -188,6 +209,9 @@ class CostSubjectV2ServiceIntegrationTest {
         assertEquals(0, new BigDecimal("250.00").compareTo(jdbc.queryForObject(
                 "SELECT allocated_amount FROM finance_cost_allocation_line WHERE batch_id=? AND project_id=?",
                 BigDecimal.class, batchId, PROJECT_ID)));
+        TestUserContext.setUser(0L, 99999L, "cost-user", List.of());
+        assertEquals(List.of(), service.financeAllocations());
+        TestUserContext.setAdmin(0L, 1L);
 
         BusinessException duplicate = assertThrows(BusinessException.class,
                 () -> service.allocateFinanceCost(new CostSubjectV2Service.FinanceAllocationCommand(
@@ -198,6 +222,10 @@ class CostSubjectV2ServiceIntegrationTest {
 
         insertApprovedWorkflow(ALLOCATION_REVERSAL_APPROVAL_ID, 50054L,
                 "FINANCE_COST_ALLOCATION_REVERSAL", batchId);
+        TestUserContext.setUser(0L, 99999L, "cost-user", List.of());
+        assertProjectDenied(() -> service.reverseFinanceAllocation(
+                batchId, ALLOCATION_REVERSAL_APPROVAL_ID, "unauthorized-allocation-reversal", "unauthorized"));
+        TestUserContext.setAdmin(0L, 1L);
         service.reverseFinanceAllocation(batchId, ALLOCATION_REVERSAL_APPROVAL_ID,
                 "v2-it-allocation-reversal-1", "财务分摊冲销");
         assertEquals(0, BigDecimal.ZERO.compareTo(jdbc.queryForObject(
@@ -220,6 +248,11 @@ class CostSubjectV2ServiceIntegrationTest {
                  level,sort_order,status,deleted_flag)
                 VALUES (?,0,0,?,?,'OTHER','COST',1,1,'ENABLE',0)
                 """, id, code, name);
+    }
+
+    private void assertProjectDenied(org.junit.jupiter.api.function.Executable operation) {
+        BusinessException exception = assertThrows(BusinessException.class, operation);
+        assertEquals("PROJECT_ACCESS_DENIED", exception.getCode());
     }
 
     private void insertRule(long id, String code, String sourceType, String category,

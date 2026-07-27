@@ -32,7 +32,7 @@ public class MdMaterialController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:list')")
     public ApiResponse<MdMaterialVO> getById(@PathVariable Long id) {
         return ApiResponse.success(mdMaterialService.getById(id));
     }

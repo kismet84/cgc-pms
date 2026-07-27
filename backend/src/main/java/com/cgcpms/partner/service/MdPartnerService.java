@@ -45,7 +45,7 @@ public class MdPartnerService {
         wrapper.orderByDesc(MdPartner::getCreatedAt);
 
         Page<MdPartner> page = mdPartnerMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-        return page.convert(this::toVO);
+        return page.convert(partner -> toVO(partner, false));
     }
 
     public MdPartnerVO getById(Long id) {
@@ -54,7 +54,7 @@ public class MdPartnerService {
         if (!partner.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("PARTNER_NOT_FOUND", "合作方不存在");
         }
-        return toVO(partner);
+        return toVO(partner, true);
     }
 
     /**
@@ -182,7 +182,7 @@ public class MdPartnerService {
         mdPartnerMapper.deleteById(id);
     }
 
-    private MdPartnerVO toVO(MdPartner p) {
+    private MdPartnerVO toVO(MdPartner p, boolean includeSensitiveDetails) {
         MdPartnerVO vo = new MdPartnerVO();
         vo.setId(p.getId() == null ? null : String.valueOf(p.getId()));
         vo.setPartnerCode(p.getPartnerCode());
@@ -191,9 +191,11 @@ public class MdPartnerService {
         vo.setCreditCode(p.getCreditCode());
         vo.setLegalPerson(p.getLegalPerson());
         vo.setContactName(p.getContactName());
-        vo.setContactPhone(p.getContactPhone());
         vo.setBankName(p.getBankName());
-        vo.setBankAccount(p.getBankAccount());
+        if (includeSensitiveDetails) {
+            vo.setContactPhone(p.getContactPhone());
+            vo.setBankAccount(p.getBankAccount());
+        }
         vo.setQualificationLevel(p.getQualificationLevel());
         vo.setBlacklistFlag(p.getBlacklistFlag());
         vo.setRiskLevel(p.getRiskLevel());

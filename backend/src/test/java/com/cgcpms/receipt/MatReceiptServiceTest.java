@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -47,6 +50,9 @@ class MatReceiptServiceTest {
 
     @Autowired
     private MatPurchaseOrderItemMapper orderItemMapper;
+
+    @Autowired
+    private MdMaterialMapper materialMapper;
 
     private static final long PROJECT_ID = 10001L;
 
@@ -137,8 +143,10 @@ class MatReceiptServiceTest {
     }
 
     @Test
+    @Transactional
     @DisplayName("R-2c: 草稿验收明细不提前占用采购已验收数量")
     void testSaveItemsBatchDoesNotConfirmPurchaseReceivedQuantity() {
+        Long materialId = createActiveMaterial("RECEIPT-NO-CONFIRM");
         MatPurchaseOrder order = new MatPurchaseOrder();
         order.setProjectId(PROJECT_ID);
         order.setContractId(30001L);
@@ -149,7 +157,7 @@ class MatReceiptServiceTest {
         MatPurchaseOrderItem orderItem = new MatPurchaseOrderItem();
         orderItem.setOrderId(orderId);
         orderItem.setProjectId(PROJECT_ID);
-        orderItem.setMaterialId(1001L);
+        orderItem.setMaterialId(materialId);
         orderItem.setQuantity(new BigDecimal("10.0000"));
         orderItem.setUnitPrice(new BigDecimal("2.0000"));
         orderItem.setAmount(new BigDecimal("20.0000"));
@@ -167,7 +175,7 @@ class MatReceiptServiceTest {
 
         MatReceiptItem first = new MatReceiptItem();
         first.setOrderItemId(orderItemId);
-        first.setMaterialId(1001L);
+        first.setMaterialId(materialId);
         first.setActualQuantity(new BigDecimal("4.0000"));
         first.setQualifiedQuantity(new BigDecimal("3.0000"));
         first.setUnitPrice(new BigDecimal("2.0000"));
@@ -178,7 +186,7 @@ class MatReceiptServiceTest {
 
         MatReceiptItem replacement = new MatReceiptItem();
         replacement.setOrderItemId(orderItemId);
-        replacement.setMaterialId(1001L);
+        replacement.setMaterialId(materialId);
         replacement.setActualQuantity(new BigDecimal("2.0000"));
         replacement.setQualifiedQuantity(new BigDecimal("2.0000"));
         replacement.setUnitPrice(new BigDecimal("2.0000"));
@@ -193,8 +201,10 @@ class MatReceiptServiceTest {
     }
 
     @Test
+    @Transactional
     @DisplayName("R-2d: 保存收货明细拒绝跨订单引用与非法数量")
     void testSaveItemsBatchRejectsInvalidOrderItemAndQuantities() {
+        Long materialId = createActiveMaterial("RECEIPT-VALIDATION");
         MatPurchaseOrder firstOrder = new MatPurchaseOrder();
         firstOrder.setProjectId(PROJECT_ID);
         firstOrder.setContractId(30001L);
@@ -205,7 +215,7 @@ class MatReceiptServiceTest {
         MatPurchaseOrderItem firstOrderItem = new MatPurchaseOrderItem();
         firstOrderItem.setOrderId(firstOrderId);
         firstOrderItem.setProjectId(PROJECT_ID);
-        firstOrderItem.setMaterialId(1001L);
+        firstOrderItem.setMaterialId(materialId);
         firstOrderItem.setQuantity(new BigDecimal("10.0000"));
         firstOrderItem.setUnitPrice(BigDecimal.ONE);
         firstOrderItem.setAmount(BigDecimal.TEN);
@@ -256,6 +266,17 @@ class MatReceiptServiceTest {
         BusinessException over = assertThrows(BusinessException.class,
                 () -> receiptService.saveItemsBatch(overReceiptId, List.of(excessiveActual)));
         assertEquals("RECEIPT_EXCEEDS_ORDER", over.getCode());
+    }
+
+    private Long createActiveMaterial(String codePrefix) {
+        MdMaterial material = new MdMaterial();
+        material.setTenantId(TestUserContext.TENANT_0);
+        material.setMaterialCode(codePrefix + "-" + System.nanoTime());
+        material.setMaterialName("验收测试材料");
+        material.setUnit("件");
+        material.setStatus("ENABLE");
+        materialMapper.insert(material);
+        return material.getId();
     }
 
     // ═══════════════════════════════════════════════════════════════

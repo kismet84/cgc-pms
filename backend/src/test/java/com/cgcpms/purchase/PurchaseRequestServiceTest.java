@@ -472,6 +472,39 @@ class PurchaseRequestServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("保存采购申请明细时拒绝停用物料及同名绕过")
+    void saveItemsBatchRejectsDisabledMaterial() {
+        MdMaterial disabled = new MdMaterial();
+        disabled.setTenantId(TENANT_ID);
+        disabled.setMaterialCode("DISABLED-MATERIAL-" + System.nanoTime());
+        disabled.setMaterialName("停用物料-" + System.nanoTime());
+        disabled.setUnit("个");
+        disabled.setStatus("DISABLE");
+        mdMaterialMapper.insert(disabled);
+
+        MatPurchaseRequest first = new MatPurchaseRequest();
+        first.setProjectId(PROJECT_ID);
+        Long firstId = requestService.create(first);
+        MatPurchaseRequestItem byId = new MatPurchaseRequestItem();
+        byId.setMaterialId(disabled.getId());
+        byId.setQuantity(BigDecimal.ONE);
+        assertEquals("MATERIAL_DISABLED",
+                assertThrows(BusinessException.class,
+                        () -> requestService.saveItemsBatch(firstId, List.of(byId))).getCode());
+
+        MatPurchaseRequest second = new MatPurchaseRequest();
+        second.setProjectId(PROJECT_ID);
+        Long secondId = requestService.create(second);
+        MatPurchaseRequestItem byName = new MatPurchaseRequestItem();
+        byName.setMaterialName(disabled.getMaterialName());
+        byName.setQuantity(BigDecimal.ONE);
+        assertEquals("MATERIAL_DISABLED",
+                assertThrows(BusinessException.class,
+                        () -> requestService.saveItemsBatch(secondId, List.of(byName))).getCode());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("保存采购申请明细时拒绝非正数量")
     void saveItemsBatchRejectsNonPositiveQuantity() {
         MatPurchaseRequest request = new MatPurchaseRequest();

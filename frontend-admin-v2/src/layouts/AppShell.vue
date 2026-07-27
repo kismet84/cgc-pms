@@ -40,7 +40,7 @@ let removeAfterEach: (() => void) | null = null
 let restoreMenuFocus = false
 let notificationController: AbortController | null = null
 
-const navigation = computed(() => visibleNavigation(session.permissions))
+const navigation = computed(() => visibleNavigation(session.roles, session.permissions))
 const canRequestNotifications = computed(() => canRequestAlertNotifications(session.permissions))
 const canEditNotifications = computed(() => hasPermission(session.permissions, 'notification:edit'))
 const activeMatch = computed(() => findWorkspace(route.path))
@@ -434,6 +434,7 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
           <strong>{{ accountName }}</strong>
           <small>当前账号</small>
         </span>
+        <RouterLink class="app-shell__account-link" to="/profile">账号中心</RouterLink>
         <V2Button variant="ghost" size="small" @click="signOut">退出登录</V2Button>
       </div>
     </aside>
@@ -505,6 +506,7 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
             <strong>{{ accountName }}</strong>
             <small>权限驱动工作区</small>
           </span>
+          <RouterLink class="app-shell__account-link" to="/profile">账号中心</RouterLink>
           <V2Button variant="ghost" size="small" @click="signOut">退出</V2Button>
         </div>
       </header>
@@ -951,6 +953,13 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
   color: var(--v2-color-text-strong);
   font-size: var(--v2-font-size-12);
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell__account-link {
+  color: var(--v2-color-primary);
+  font-size: var(--v2-font-size-12);
+  font-weight: var(--v2-font-weight-heavy);
   white-space: nowrap;
 }
 

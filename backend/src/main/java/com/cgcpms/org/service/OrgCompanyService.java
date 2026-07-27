@@ -6,9 +6,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.org.entity.OrgCompany;
+import com.cgcpms.org.entity.OrgDepartment;
+import com.cgcpms.org.entity.OrgPosition;
 import com.cgcpms.org.mapper.OrgCompanyMapper;
+import com.cgcpms.org.mapper.OrgDepartmentMapper;
+import com.cgcpms.org.mapper.OrgPositionMapper;
 import com.cgcpms.org.vo.OrgCompanyVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -20,6 +25,9 @@ import com.cgcpms.common.util.DateTimeUtils;
 public class OrgCompanyService {
 
     private final OrgCompanyMapper orgCompanyMapper;
+    private final OrgDepartmentMapper orgDepartmentMapper;
+    private final OrgPositionMapper orgPositionMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public IPage<OrgCompanyVO> getPage(long pageNo, long pageSize, String companyCode, String companyName, String status) {
         LambdaQueryWrapper<OrgCompany> wrapper = new LambdaQueryWrapper<>();
@@ -55,6 +63,7 @@ public class OrgCompanyService {
             }
         }
         if (company.getStatus() == null) company.setStatus("ENABLE");
+        validateStatus(company.getStatus());
         orgCompanyMapper.insert(company);
         return company.getId();
     }
@@ -67,6 +76,8 @@ public class OrgCompanyService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("ORG_COMPANY_NOT_FOUND", "公司不存在");
         }
+        if (company.getStatus() != null) validateStatus(company.getStatus());
+        company.setTenantId(existing.getTenantId());
         // 编码唯一性校验：更新后的 companyCode 不得与同租户下其他记录重复
         if (StringUtils.hasText(company.getCompanyCode())
                 && !company.getCompanyCode().equals(existing.getCompanyCode())) {
@@ -88,7 +99,36 @@ public class OrgCompanyService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("ORG_COMPANY_NOT_FOUND", "公司不存在");
         }
+        Long tenantId = UserContext.getCurrentTenantId();
+        boolean referenced = orgDepartmentMapper.selectCount(new LambdaQueryWrapper<OrgDepartment>()
+                .eq(OrgDepartment::getTenantId, tenantId)
+                .eq(OrgDepartment::getCompanyId, id)) > 0
+                || orgPositionMapper.selectCount(new LambdaQueryWrapper<OrgPosition>()
+                .eq(OrgPosition::getTenantId, tenantId)
+                .eq(OrgPosition::getCompanyId, id)) > 0
+                || referenceCount("sys_user", id, tenantId) > 0
+                || referenceCount("pm_project", id, tenantId) > 0
+                || referenceCount("ct_contract", id, tenantId) > 0
+                || referenceCount("cost_item", id, tenantId) > 0
+                || jdbcTemplate.queryForObject(
+                        "SELECT COUNT(*) FROM fund_pool_member WHERE tenant_id=? AND company_id=?",
+                        Integer.class, tenantId, id) > 0;
+        if (referenced) {
+            throw new BusinessException("ORG_COMPANY_REFERENCED", "公司已被组织或业务数据引用，无法删除");
+        }
         orgCompanyMapper.deleteById(id);
+    }
+
+    private int referenceCount(String table, Long id, Long tenantId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE tenant_id=? AND org_id=?",
+                Integer.class, tenantId, id);
+    }
+
+    private void validateStatus(String status) {
+        if (!"ENABLE".equals(status) && !"DISABLE".equals(status)) {
+            throw new BusinessException("ORG_COMPANY_STATUS_INVALID", "公司状态只允许ENABLE或DISABLE");
+        }
     }
 
     private OrgCompanyVO toVO(OrgCompany c) {

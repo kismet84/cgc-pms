@@ -6,16 +6,22 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.org.entity.OrgDepartment;
+import com.cgcpms.org.entity.OrgCompany;
+import com.cgcpms.org.entity.OrgPosition;
+import com.cgcpms.org.mapper.OrgCompanyMapper;
 import com.cgcpms.org.mapper.OrgDepartmentMapper;
+import com.cgcpms.org.mapper.OrgPositionMapper;
 import com.cgcpms.org.vo.OrgDepartmentTreeNodeVO;
 import com.cgcpms.org.vo.OrgDepartmentVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -25,6 +31,9 @@ import java.util.stream.Collectors;
 public class OrgDepartmentService {
 
     private final OrgDepartmentMapper orgDepartmentMapper;
+    private final OrgCompanyMapper orgCompanyMapper;
+    private final OrgPositionMapper orgPositionMapper;
+    private final JdbcTemplate jdbcTemplate;
 
     public List<OrgDepartmentTreeNodeVO> getTree() {
         return getTree(null);
@@ -95,19 +104,12 @@ public class OrgDepartmentService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(OrgDepartment dept) {
-        // Validate parent exists if specified
-        if (dept.getParentId() != null && dept.getParentId() != 0L) {
-            OrgDepartment parent = orgDepartmentMapper.selectById(dept.getParentId());
-            if (parent == null) {
-                throw new BusinessException("ORG_DEPT_PARENT_NOT_FOUND", "父部门不存在");
-            }
-            if (!parent.getTenantId().equals(UserContext.getCurrentTenantId())) {
-                throw new BusinessException("ORG_DEPT_PARENT_NOT_FOUND", "父部门不存在");
-            }
-        } else {
-            dept.setParentId(null);
-        }
+        Long tenantId = UserContext.getCurrentTenantId();
+        dept.setTenantId(tenantId);
+        requireCompany(dept.getCompanyId(), tenantId);
+        dept.setParentId(normalizeParent(null, dept.getParentId(), dept.getCompanyId(), tenantId));
         if (dept.getStatus() == null) dept.setStatus("ENABLE");
+        validateStatus(dept.getStatus());
         if (dept.getOrderNum() == null) dept.setOrderNum(0);
         orgDepartmentMapper.insert(dept);
         return dept.getId();
@@ -121,11 +123,25 @@ public class OrgDepartmentService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("ORG_DEPT_NOT_FOUND", "部门不存在");
         }
-        // 与 create() 一致：parentId=0L 视为无父部门，转为 null
-        if (dept.getParentId() != null && dept.getParentId() == 0L) {
-            dept.setParentId(null);
+        Long tenantId = UserContext.getCurrentTenantId();
+        Long previousCompanyId = existing.getCompanyId();
+        Long companyId = dept.getCompanyId() == null ? existing.getCompanyId() : dept.getCompanyId();
+        requireCompany(companyId, tenantId);
+        existing.setCompanyId(companyId);
+        if (dept.getParentId() != null) {
+            existing.setParentId(normalizeParent(existing.getId(), dept.getParentId(), companyId, tenantId));
+        } else if (!companyId.equals(previousCompanyId)) {
+            existing.setParentId(null);
         }
-        orgDepartmentMapper.updateById(dept);
+        if (StringUtils.hasText(dept.getDeptCode())) existing.setDeptCode(dept.getDeptCode().trim());
+        if (StringUtils.hasText(dept.getDeptName())) existing.setDeptName(dept.getDeptName().trim());
+        if (dept.getOrderNum() != null) existing.setOrderNum(dept.getOrderNum());
+        if (dept.getStatus() != null) {
+            validateStatus(dept.getStatus());
+            existing.setStatus(dept.getStatus());
+        }
+        if (dept.getRemark() != null) existing.setRemark(dept.getRemark());
+        orgDepartmentMapper.updateById(existing);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -144,7 +160,57 @@ public class OrgDepartmentService {
         if (childCount > 0) {
             throw new BusinessException("ORG_DEPT_HAS_CHILDREN", "该部门下存在子部门，无法删除");
         }
+        Long tenantId = UserContext.getCurrentTenantId();
+        boolean referenced = orgPositionMapper.selectCount(new LambdaQueryWrapper<OrgPosition>()
+                .eq(OrgPosition::getTenantId, tenantId)
+                .eq(OrgPosition::getDepartmentId, id)) > 0
+                || referenceCount("sys_user", id, tenantId) > 0
+                || referenceCount("pm_project", id, tenantId) > 0
+                || referenceCount("ct_contract", id, tenantId) > 0
+                || referenceCount("cost_item", id, tenantId) > 0;
+        if (referenced) {
+            throw new BusinessException("ORG_DEPT_REFERENCED", "部门已被岗位或业务数据引用，无法删除");
+        }
         orgDepartmentMapper.deleteById(id);
+    }
+
+    private void requireCompany(Long companyId, Long tenantId) {
+        if (companyId == null || orgCompanyMapper.selectOne(new LambdaQueryWrapper<OrgCompany>()
+                .eq(OrgCompany::getId, companyId)
+                .eq(OrgCompany::getTenantId, tenantId)) == null) {
+            throw new BusinessException("ORG_COMPANY_NOT_FOUND", "所属公司不存在");
+        }
+    }
+
+    private Long normalizeParent(Long currentId, Long parentId, Long companyId, Long tenantId) {
+        if (parentId == null || parentId == 0L) return null;
+        HashSet<Long> visited = new HashSet<>();
+        if (currentId != null) visited.add(currentId);
+        Long cursor = parentId;
+        while (cursor != null && cursor != 0L) {
+            if (!visited.add(cursor)) {
+                throw new BusinessException("ORG_DEPT_PARENT_INVALID", "部门上级关系不能形成循环");
+            }
+            OrgDepartment parent = orgDepartmentMapper.selectById(cursor);
+            if (parent == null || !tenantId.equals(parent.getTenantId())
+                    || !companyId.equals(parent.getCompanyId())) {
+                throw new BusinessException("ORG_DEPT_PARENT_NOT_FOUND", "父部门不存在或不属于所选公司");
+            }
+            cursor = parent.getParentId();
+        }
+        return parentId;
+    }
+
+    private int referenceCount(String table, Long id, Long tenantId) {
+        return jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE tenant_id=? AND org_id=?",
+                Integer.class, tenantId, id);
+    }
+
+    private void validateStatus(String status) {
+        if (!"ENABLE".equals(status) && !"DISABLE".equals(status)) {
+            throw new BusinessException("ORG_DEPT_STATUS_INVALID", "部门状态只允许ENABLE或DISABLE");
+        }
     }
 
     private OrgDepartmentVO toVO(OrgDepartment d) {

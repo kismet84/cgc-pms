@@ -317,10 +317,11 @@ test.describe('M2 live approval workbench', () => {
     await expect(page.getByRole('heading', { name: '无法显示审批详情' })).toBeVisible()
   })
 
-  test('process management remains unmigrated', async ({ page }) => {
+  test('process management remains admin-only for ordinary workflow users', async ({ page }) => {
     await rewritePermissions(page, (permissions) => [...permissions, 'workflow:process:query'])
     await page.goto('/v2/approval/process')
-    await expect(page.getByText('业务页面建设中', { exact: true })).toBeVisible()
+    await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+    await expect(page.getByRole('heading', { name: '无权访问此页面' })).toBeVisible()
   })
 
   test('server actions remain hidden when client action permission is absent', async ({ page }) => {

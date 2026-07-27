@@ -1,6 +1,7 @@
 package com.cgcpms.material.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
@@ -12,16 +13,21 @@ import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.material.mapper.MdMaterialCategoryMapper;
 import com.cgcpms.material.vo.MdMaterialVO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.cgcpms.common.util.DateTimeUtils;
 
+import java.math.BigDecimal;
+import java.util.Set;
+
 @Service
 @RequiredArgsConstructor
 public class MdMaterialService {
 
+    private static final Set<String> STATUSES = Set.of("ENABLE", "DISABLE");
     private final MdMaterialMapper mdMaterialMapper;
     private final MdMaterialCategoryMapper categoryMapper;
 
@@ -51,9 +57,13 @@ public class MdMaterialService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(MdMaterial material) {
         material.setTenantId(UserContext.getCurrentTenantId());
+        normalizeAndValidate(material, true);
         material.setCategoryId(resolveCategory(material.getCategoryId(), material.getTenantId()));
-        if (material.getStatus() == null || material.getStatus().isBlank()) material.setStatus("ENABLE");
-        mdMaterialMapper.insert(material);
+        try {
+            mdMaterialMapper.insert(material);
+        } catch (DuplicateKeyException error) {
+            throw new BusinessException("MATERIAL_CODE_EXISTS", "材料编码已存在");
+        }
         return material.getId();
     }
 
@@ -65,11 +75,23 @@ public class MdMaterialService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("MATERIAL_NOT_FOUND", "材料不存在");
         }
+        if (StringUtils.hasText(material.getMaterialCode())
+                && !existing.getMaterialCode().equals(material.getMaterialCode().trim())) {
+            throw new BusinessException("MATERIAL_CODE_IMMUTABLE", "材料编码创建后不可修改");
+        }
+        material.setMaterialCode(existing.getMaterialCode());
+        if (!StringUtils.hasText(material.getMaterialName())) material.setMaterialName(existing.getMaterialName());
+        if (!StringUtils.hasText(material.getStatus())) material.setStatus(existing.getStatus());
         material.setTenantId(existing.getTenantId());
+        normalizeAndValidate(material, false);
         material.setCategoryId(resolveCategory(
                 material.getCategoryId() == null ? existing.getCategoryId() : material.getCategoryId(),
                 existing.getTenantId()));
-        mdMaterialMapper.updateById(material);
+        try {
+            mdMaterialMapper.updateById(material);
+        } catch (DuplicateKeyException error) {
+            throw new BusinessException("MATERIAL_CODE_EXISTS", "材料编码已存在");
+        }
     }
 
     private Long resolveCategory(Long categoryId, Long tenantId) {
@@ -92,14 +114,61 @@ public class MdMaterialService {
 
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, String status) {
+        validateStatus(status);
         MdMaterial existing = mdMaterialMapper.selectById(id);
         if (existing == null)
             throw new BusinessException("MATERIAL_NOT_FOUND", "材料不存在");
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("MATERIAL_NOT_FOUND", "材料不存在");
         }
-        existing.setStatus(status);
-        mdMaterialMapper.updateById(existing);
+        int updated = mdMaterialMapper.update(null, new LambdaUpdateWrapper<MdMaterial>()
+                .eq(MdMaterial::getId, id)
+                .eq(MdMaterial::getTenantId, existing.getTenantId())
+                .set(MdMaterial::getStatus, status));
+        if (updated != 1) throw new BusinessException("MATERIAL_NOT_FOUND", "材料不存在");
+    }
+
+    private void normalizeAndValidate(MdMaterial material, boolean creating) {
+        material.setMaterialCode(required(material.getMaterialCode(), 64,
+                "MATERIAL_CODE_REQUIRED", "材料编码不能为空"));
+        material.setMaterialName(required(material.getMaterialName(), 200,
+                "MATERIAL_NAME_REQUIRED", "材料名称不能为空"));
+        material.setSpecification(optional(material.getSpecification(), 200, "材料规格"));
+        material.setUnit(optional(material.getUnit(), 20, "计量单位"));
+        material.setBrand(optional(material.getBrand(), 100, "材料品牌"));
+        material.setRemark(optional(material.getRemark(), 500, "材料备注"));
+        if (creating && !StringUtils.hasText(material.getStatus())) material.setStatus("ENABLE");
+        validateStatus(material.getStatus());
+        BigDecimal rate = material.getDefaultTaxRate();
+        if (rate != null && (rate.scale() > 2
+                || rate.compareTo(BigDecimal.ZERO) < 0
+                || rate.compareTo(new BigDecimal("100")) > 0)) {
+            throw new BusinessException("MATERIAL_TAX_RATE_INVALID", "默认税率必须为0到100且最多2位小数");
+        }
+    }
+
+    private void validateStatus(String status) {
+        if (status == null || !STATUSES.contains(status)) {
+            throw new BusinessException("MATERIAL_STATUS_INVALID", "材料状态只允许ENABLE或DISABLE");
+        }
+    }
+
+    private String required(String value, int maxLength, String code, String message) {
+        if (!StringUtils.hasText(value)) throw new BusinessException(code, message);
+        String normalized = value.trim();
+        if (normalized.length() > maxLength) {
+            throw new BusinessException(code, message + "且长度不得超过" + maxLength);
+        }
+        return normalized;
+    }
+
+    private String optional(String value, int maxLength, String label) {
+        if (!StringUtils.hasText(value)) return null;
+        String normalized = value.trim();
+        if (normalized.length() > maxLength) {
+            throw new BusinessException("MATERIAL_FIELD_TOO_LONG", label + "长度不得超过" + maxLength);
+        }
+        return normalized;
     }
 
     private MdMaterialVO toVO(MdMaterial m) {

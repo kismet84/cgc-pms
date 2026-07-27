@@ -425,6 +425,12 @@ public class MatPurchaseOrderService {
         // Insert new items
         Long tenantId = UserContext.getCurrentTenantId();
         for (MatPurchaseOrderItem item : items) {
+            MdMaterial material = item.getMaterialId() == null
+                    ? null : mdMaterialMapper.selectById(item.getMaterialId());
+            if (material == null || !tenantId.equals(material.getTenantId())
+                    || !"ENABLE".equals(material.getStatus())) {
+                throw new BusinessException("MATERIAL_INVALID", "订单物料不存在、不属于当前租户或已停用");
+            }
             if (item.getQuantity() == null || item.getQuantity().signum() <= 0
                     || item.getUnitPrice() == null || item.getUnitPrice().signum() <= 0) {
                 throw new BusinessException("PURCHASE_ORDER_ITEM_INVALID", "订单明细数量和单价必须大于0");

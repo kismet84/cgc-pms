@@ -6,6 +6,8 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.service.CostSummaryService;
+import com.cgcpms.material.entity.MdMaterial;
+import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
@@ -52,6 +54,7 @@ class RegressionFixVerificationTest {
 
     @Autowired private MatPurchaseOrderMapper purchaseOrderMapper;
     @Autowired private MatPurchaseOrderItemMapper purchaseOrderItemMapper;
+    @Autowired private MdMaterialMapper materialMapper;
     @Autowired private MatReceiptMapper receiptMapper;
     @Autowired private MatReceiptItemMapper receiptItemMapper;
     @Autowired private CostSummaryService costSummaryService;
@@ -98,7 +101,16 @@ class RegressionFixVerificationTest {
             orderId = purchaseOrderService.create(order);
             assertNotNull(orderId);
 
+            MdMaterial material = new MdMaterial();
+            material.setTenantId(0L);
+            material.setMaterialCode("REG-F10-" + System.nanoTime());
+            material.setMaterialName("C30商品砼");
+            material.setUnit("m³");
+            material.setStatus("ENABLE");
+            materialMapper.insert(material);
+
             MatPurchaseOrderItem item = buildOrderItem("C30商品砼", "C30", "m³", 100, 450);
+            item.setMaterialId(material.getId());
             purchaseOrderService.saveItemsBatch(orderId, List.of(item));
 
             List<MatPurchaseOrderItem> orderItems = purchaseOrderItemMapper.selectList(
