@@ -263,7 +263,7 @@ public class SysUserService {
     private void requireAdministratorContinuity(Long excludedUserId, Long tenantId) {
         List<SysUser> users = sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getTenantId, tenantId).eq(SysUser::getStatus, "ENABLE")
-                .ne(SysUser::getId, excludedUserId).last("FOR UPDATE"));
+                .ne(SysUser::getId, excludedUserId).last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
         boolean replacement = users.stream().anyMatch(candidate -> hasAdministratorRole(candidate.getId(), tenantId));
         if (!replacement) throw new BusinessException("LAST_ADMIN", "不能移除最后一个管理员用户");
     }
