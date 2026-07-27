@@ -20,7 +20,6 @@ import {
   V2Button,
   V2Card,
   V2Dialog,
-  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -878,7 +877,6 @@ onBeforeUnmount(() => {
       :title="dialogTitle"
       :close-disabled="busy"
       :close-on-backdrop="false"
-      panel-class="supplier-action-dialog"
       @close="action = null"
     >
       <form id="supplier-action-form" class="supplier-page__form" @submit.prevent="save">
@@ -1020,7 +1018,9 @@ onBeforeUnmount(() => {
         </template>
       </form>
       <template #footer>
-        <V2GlassButton text="取消" :disabled="busy" :on-click="() => (action = null)" />
+        <V2Button type="button" variant="secondary" :disabled="busy" @click="action = null">
+          取消
+        </V2Button>
         <V2Button type="submit" form="supplier-action-form" :loading="busy">确认提交</V2Button>
       </template>
     </V2Dialog>
@@ -1041,9 +1041,6 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--v2-space-2);
-}
-:global(.supplier-action-dialog .v2-dialog__body) {
-  z-index: 3;
 }
 .supplier-page__table-wrap table {
   min-width: 46rem;

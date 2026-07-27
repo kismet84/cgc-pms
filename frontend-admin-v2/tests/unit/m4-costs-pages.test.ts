@@ -1,4 +1,6 @@
 import type {
+  AccessibleCostControlOverview,
+  AccessibleCostSummary,
   CostControlOverview,
   CostLedgerPage,
   CostProjectSummary,
@@ -20,6 +22,8 @@ vi.mock('@/services/commercial', () => ({
   confirmCostForecast: vi.fn(),
   createCostCorrective: vi.fn(),
   createCostForecast: vi.fn(),
+  loadAccessibleCostControl: vi.fn(),
+  loadAccessibleCostSummary: vi.fn(),
   loadCostSubjectOptions: vi.fn(),
   loadCostControl: vi.fn(),
   loadCostForecastTrace: vi.fn(),
@@ -97,6 +101,21 @@ const overview: CostControlOverview = {
   costSources: [],
   summary: {},
 }
+const accessibleSummary: AccessibleCostSummary = {
+  accessibleProjectCount: 1,
+  projects: [summary],
+}
+const accessibleControl: AccessibleCostControlOverview = {
+  accessibleProjectCount: 1,
+  forecastProjectCount: 1,
+  noForecastProjectCount: 0,
+  contractIncome: '2',
+  dynamicCost: '1',
+  forecastAtCompletionCost: '1',
+  forecastProfit: '1',
+  profitMargin: '0.5',
+  projects: [{ ...summary, costForecastId: 'F1' }],
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -162,9 +181,11 @@ beforeEach(() => {
   })
   vi.mocked(commercial.loadCostLedger).mockReset().mockResolvedValue(ledger)
   vi.mocked(commercial.loadCostSummary).mockReset().mockResolvedValue(summary)
+  vi.mocked(commercial.loadAccessibleCostSummary).mockReset().mockResolvedValue(accessibleSummary)
   vi.mocked(commercial.loadCostSummaryHistory).mockReset().mockResolvedValue([])
   vi.mocked(commercial.refreshCostSummary).mockReset().mockResolvedValue(summary)
   vi.mocked(commercial.loadCostControl).mockReset().mockResolvedValue(overview)
+  vi.mocked(commercial.loadAccessibleCostControl).mockReset().mockResolvedValue(accessibleControl)
   vi.mocked(commercial.loadCostForecastTrace).mockReset().mockResolvedValue(overview)
   vi.mocked(commercial.confirmCostForecast).mockReset().mockResolvedValue({})
   vi.mocked(commercial.submitCostCorrective).mockReset().mockResolvedValue({})
@@ -226,6 +247,20 @@ describe('M4 costs pages', () => {
     expect(controlView.wrapper.text()).not.toContain('成本科目 S1')
   })
 
+  it('loads accessible all-project facts when the public shell selects all projects', async () => {
+    const summaryView = await mountPage(CostSummaryPage, '/cost/summary', ['cost:summary:view'])
+    expect(commercial.loadAccessibleCostSummary).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(commercial.loadCostSummary).not.toHaveBeenCalled()
+    expect(summaryView.wrapper.text()).toContain('全部项目成本汇总（1）')
+    expect(summaryView.wrapper.text()).toContain('项目一')
+
+    const controlView = await mountPage(CostControlPage, '/cost/control', ['cost:control:query'])
+    expect(commercial.loadAccessibleCostControl).toHaveBeenCalledWith(expect.any(AbortSignal))
+    expect(commercial.loadCostControl).not.toHaveBeenCalled()
+    expect(controlView.wrapper.text()).toContain('全部项目动态利润（1）')
+    expect(controlView.wrapper.text()).toContain('已有预测')
+  })
+
   it('fails closed on all three pages without cost permissions and loads no business data', async () => {
     const cases = [
       { component: CostLedgerPage, path: '/cost/ledger', title: '无权访问成本台账' },
@@ -240,6 +275,8 @@ describe('M4 costs pages', () => {
       expect(commercial.loadCostLedgerPage).not.toHaveBeenCalled()
       expect(commercial.loadCostSummary).not.toHaveBeenCalled()
       expect(commercial.loadCostControl).not.toHaveBeenCalled()
+      expect(commercial.loadAccessibleCostSummary).not.toHaveBeenCalled()
+      expect(commercial.loadAccessibleCostControl).not.toHaveBeenCalled()
       wrapper.unmount()
     }
   })

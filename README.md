@@ -7,9 +7,12 @@ CGC-PMS 是面向建筑工程总包项目全过程管理的前后端分离系统
 | 项目 | 当前基线 |
 | --- | --- |
 | 发布线 | v1.5 开发中 |
-| 后端 | `1.5.0-SNAPSHOT`（Java 21、Spring Boot 3） |
-| 前端 | `1.5.0-dev.0`（Vue 3、TypeScript、Vite） |
-| 数据库迁移 | MySQL Flyway 脚本已包含至 V211；H2 迁移用于本地兼容与测试 |
+| 后端 | `1.5.0-SNAPSHOT`（Java 21、Spring Boot 3.5.16） |
+| Legacy 前端 | `1.5.0-dev.0`（`frontend-admin`） |
+| Clean-room V2 | `0.1.0-dev.0`（`frontend-admin-v2`，共享 `packages/frontend-contracts`） |
+| 数据库迁移 | MySQL Flyway 脚本已包含至 V223；H2 迁移用于本地兼容与测试 |
+| V2 迁移状态 | 截至 2026-07-26：87 条命名路由中 `V2_ACCEPTED=63`、`LEGACY_ONLY=24`、`V2_SOURCE_AVAILABLE=0`；M6 已完成，M7 未启动 |
+| 切换边界 | V2 当前用于独立开发和验收；正式入口尚未切换，Legacy 尚未退役 |
 | 交付原则 | 历史测试、审计和上线结论不替代当前分支的验证结果 |
 
 ## 核心能力范围
@@ -28,7 +31,7 @@ CGC-PMS 是面向建筑工程总包项目全过程管理的前后端分离系统
 
 | 层级 | 当前使用 |
 | --- | --- |
-| 前端 | Vue 3、TypeScript、Vite、Ant Design Vue、Pinia |
+| 前端 | Legacy：Vue 3、TypeScript、Vite、Ant Design Vue、Pinia；V2：Vue 3、TypeScript、Vite、Pinia、共享契约包 |
 | 后端 | Java 21、Spring Boot 3、Spring Security、MyBatis-Plus、Flyway |
 | 数据与中间件 | MySQL 8、H2、Redis、MinIO |
 | 部署与运维 | Docker Compose、Nginx、Spring Actuator、Prometheus 指标 |
@@ -41,7 +44,7 @@ CGC-PMS 是面向建筑工程总包项目全过程管理的前后端分离系统
 scripts\start-dev.bat
 ```
 
-脚本会在缺少后端 JAR 时构建后端，并启动开发环境所需容器。手动启动、运行态刷新、环境变量和故障排查见：
+脚本会在缺少后端 JAR 时构建后端，并启动后端、Legacy 前端、V2 前端及开发环境所需容器。手动启动、运行态刷新、环境变量和故障排查见：
 
 - [快速开始](docs/standards/01-快速开始.md)
 - [部署运维手册](docs/standards/10-部署运维手册.md)
@@ -50,7 +53,8 @@ scripts\start-dev.bat
 
 | 服务 | 地址 |
 | --- | --- |
-| 前端 | http://localhost:5173 |
+| Legacy 前端 | http://localhost:5173 |
+| Clean-room V2 | http://localhost:5174/v2/ |
 | 后端 API | http://localhost:8080/api |
 | Swagger | http://localhost:8080/api/swagger-ui.html |
 | MinIO 控制台 | http://localhost:9001 |
@@ -68,15 +72,15 @@ scripts\start-dev.bat
 - [安全规范](docs/standards/11-安全规范.md)
 - [当前工作焦点](docs/backlog/current-focus.md)
 - [项目地图与迭代决策](docs/product-intelligence/README.md)
+- [V2 路由迁移台账](docs/ui-v2/route-migration-ledger.md)
 
 ## 协作规则
 
-- [AGENTS.override.md](AGENTS.override.md)：项目协作、授权与收口规则的最高优先级入口
-- [AGENTS.md](AGENTS.md)：仓库级基础规则与常用入口
+- [AGENTS.md](AGENTS.md)：项目协作、授权、验证与收口规则入口
 - [Codex 任务执行策略](docs/standards/codex-task-execution-policy.md)：任务状态、验证、Git 和沟通约定
 
 ## 验证与交付提醒
 
 - 不复用历史测试数量、覆盖率、审计结论或上线状态作为当前交付证据
-- 前后端运行态刷新后，按现行规范等待 `180 秒`，再执行健康、接口或页面验收
-- 本地前端验收默认入口为 `http://localhost:5173`
+- 前后端运行态刷新后，以 Docker 健康状态及真实接口、页面可达性作为验收前提，不使用固定等待时间代替验真
+- Legacy 与 V2 分别从 `http://localhost:5173`、`http://localhost:5174/v2/` 验收；不要把 V2 独立入口视为正式切换完成

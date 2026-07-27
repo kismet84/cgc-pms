@@ -310,7 +310,7 @@ class AuthControllerTest {
     @Test
     @DisplayName("POST /auth/login 已锁定 IP 仍返回 RATE_LIMIT_EXCEEDED")
     void testFormalLoginStillBlockedByLockout() throws Exception {
-        when(lockoutStore.getRemainingLockoutMillis("10.0.0.88")).thenReturn(120_000L);
+        when(lockoutStore.getRemainingLockoutMillis(any())).thenReturn(120_000L);
 
         mockMvc.perform(post("/api/auth/login")
                         .servletPath("/auth/login")
@@ -322,6 +322,54 @@ class AuthControllerTest {
                 .andExpect(status().isTooManyRequests())
                 .andExpect(jsonPath("$.code").value("RATE_LIMIT_EXCEEDED"))
                 .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("登录失败次数过多")));
+    }
+
+    @Test
+    @DisplayName("POST /client-errors 要求有效CSRF令牌")
+    void clientErrorsRequireValidCsrfToken(CapturedOutput output) throws Exception {
+        String token = jwtUtils.generateToken(
+                1L, "admin", 0L,
+                List.of("ADMIN"),
+                List.of());
+        String body = """
+                {"app":"V2","source":"VUE","kind":"ERROR",
+                 "fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                """;
+        Cookie csrfCookie = mockMvc.perform(get("/api/auth/userinfo")
+                        .servletPath("/auth/userinfo")
+                        .contextPath("/api"))
+                .andReturn()
+                .getResponse()
+                .getCookie("XSRF-TOKEN");
+        org.junit.jupiter.api.Assertions.assertNotNull(csrfCookie);
+
+        mockMvc.perform(post("/api/client-errors")
+                        .servletPath("/client-errors")
+                        .contextPath("/api")
+                        .cookie(new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token), csrfCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/client-errors")
+                        .servletPath("/client-errors")
+                        .contextPath("/api")
+                        .cookie(new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token), csrfCookie)
+                        .header("X-XSRF-TOKEN", "invalid")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(post("/api/client-errors")
+                        .servletPath("/client-errors")
+                        .contextPath("/api")
+                        .cookie(new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token), csrfCookie)
+                        .header("X-XSRF-TOKEN", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+        org.junit.jupiter.api.Assertions.assertFalse(output.getAll().contains("a".repeat(64)));
     }
 
     @Test

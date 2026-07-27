@@ -191,6 +191,8 @@ jobs:
           working-directory: frontend-admin-v2
       - name: Enforce Clean-room boundary and route ledger
         run: cd frontend-admin-v2 && pnpm check:boundary && pnpm check:route-ledger
+      - name: Enforce unique design system standard
+        run: cd frontend-admin-v2 && pnpm check:design-system
       - name: Lint, test, type-check and build V2
         run: cd frontend-admin-v2 && pnpm lint:check && pnpm test:unit && pnpm type-check:contracts && pnpm type-check && pnpm build && pnpm check:bundle-size
       - name: Install V2 browser
@@ -348,7 +350,7 @@ jobs:
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
           PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4173
-          PLAYWRIGHT_USE_DEV_LOGIN: 'true'
+          PLAYWRIGHT_USE_DEV_LOGIN: "true"
           PLAYWRIGHT_DEV_LOGIN_PATH: /api/auth/dev-login?redirect=/dashboard
       - name: Upload E2E failure evidence
         if: failure()

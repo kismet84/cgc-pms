@@ -19,7 +19,6 @@ import {
   V2Card,
   V2ConfirmDialog,
   V2Dialog,
-  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -512,7 +511,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="inventory-workspace-page">
+  <section class="inventory-workspace-page">
     <V2Card :title="title" :heading-level="1">
       <template #actions>
         <V2Button
@@ -552,6 +551,24 @@ onBeforeUnmount(() => {
           >
         </div>
       </template>
+      <dl v-if="mode === 'stock' && kpi" class="v2-ledger-kpis" aria-label="库存指标">
+        <div>
+          <dt>启用仓库</dt>
+          <dd>{{ kpi.warehouseCount }}</dd>
+        </div>
+        <div>
+          <dt>低库存项</dt>
+          <dd>{{ kpi.lowStockCount }}</dd>
+        </div>
+        <div>
+          <dt>库存物料</dt>
+          <dd>{{ kpi.materialTypeCount }}</dd>
+        </div>
+        <div>
+          <dt>入库 / 出库流水</dt>
+          <dd>{{ kpi.txnInCount }} / {{ kpi.txnOutCount }}</dd>
+        </div>
+      </dl>
     </V2Card>
 
     <V2PageState
@@ -642,33 +659,6 @@ onBeforeUnmount(() => {
     </template>
 
     <template v-else>
-      <dl v-if="kpi" class="inventory-workspace-page__kpis" aria-label="库存指标">
-        <div>
-          <dt>启用仓库</dt>
-          <dd>
-            <strong>{{ kpi.warehouseCount }}</strong>
-          </dd>
-        </div>
-        <div>
-          <dt>低库存项</dt>
-          <dd>
-            <strong>{{ kpi.lowStockCount }}</strong>
-          </dd>
-        </div>
-        <div>
-          <dt>库存物料</dt>
-          <dd>
-            <strong>{{ kpi.materialTypeCount }}</strong>
-          </dd>
-        </div>
-        <div>
-          <dt>入库 / 出库流水</dt>
-          <dd>
-            <strong>{{ kpi.txnInCount }} / {{ kpi.txnOutCount }}</strong>
-          </dd>
-        </div>
-      </dl>
-
       <V2PageState
         v-if="!errorMessage && !stocks.length"
         title="暂无库存台账"
@@ -755,7 +745,7 @@ onBeforeUnmount(() => {
           ? `${selectedStock.materialCode || '物料编码缺失'} · ${selectedStock.materialName || '物料名称缺失'} · ${selectedStock.warehouseName || '仓库名称缺失'}`
           : ''
       "
-      panel-class="v2-dialog-standard v2-detail-dialog inventory-ledger-drawer"
+      panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-bottom-sheet"
       :close-on-backdrop="true"
       @backdrop-click="clearStockDetail"
       @close="clearStockDetail"
@@ -794,14 +784,6 @@ onBeforeUnmount(() => {
               <dd>{{ ledger.stock.safetyStockQty }}</dd>
             </div>
           </dl>
-          <div class="inventory-workspace-page__actions">
-            <V2Button v-if="canStockEdit" type="button" variant="secondary" @click="openSettings"
-              >维护阈值</V2Button
-            >
-            <V2Button v-if="canTransfer && candidates.length" type="button" @click="openTransfer"
-              >库存调拨</V2Button
-            >
-          </div>
         </section>
 
         <section class="inventory-workspace-page__facts">
@@ -901,6 +883,14 @@ onBeforeUnmount(() => {
           </nav>
         </section>
       </template>
+      <template #footer>
+        <V2Button v-if="canStockEdit" type="button" variant="secondary" @click="openSettings">
+          维护阈值
+        </V2Button>
+        <V2Button v-if="canTransfer && candidates.length" type="button" @click="openTransfer">
+          库存调拨
+        </V2Button>
+      </template>
     </V2Dialog>
 
     <V2Dialog
@@ -931,7 +921,14 @@ onBeforeUnmount(() => {
         <V2Input v-model="warehouseForm.remark" label="备注" />
       </div>
       <template #footer>
-        <V2GlassButton text="取消" :disabled="busy" :on-click="() => (warehouseDialog = false)" />
+        <V2Button
+          type="button"
+          variant="secondary"
+          :disabled="busy"
+          @click="warehouseDialog = false"
+        >
+          取消
+        </V2Button>
         <V2Button type="button" :loading="busy" @click="saveWarehouse">保存</V2Button>
       </template>
     </V2Dialog>
@@ -975,7 +972,7 @@ onBeforeUnmount(() => {
       @close="deleteTarget = null"
       @confirm="confirmDeleteWarehouse"
     />
-  </main>
+  </section>
 </template>
 
 <style scoped>
@@ -997,23 +994,6 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.25fr) minmax(14rem, 1.4fr) auto auto;
   width: min(72vw, 76rem);
-}
-.inventory-workspace-page__kpis {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: var(--v2-space-3);
-  margin: 0;
-}
-.inventory-workspace-page__kpis > div {
-  display: grid;
-  gap: var(--v2-space-1);
-  padding: var(--v2-space-4);
-  border: var(--v2-border-width) solid var(--v2-color-border);
-  border-radius: var(--v2-radius-lg);
-  background: var(--v2-color-surface);
-}
-.inventory-workspace-page__kpis strong {
-  font-size: var(--v2-font-size-28);
 }
 .inventory-workspace-page dt {
   color: var(--v2-color-text-muted);
@@ -1099,19 +1079,11 @@ onBeforeUnmount(() => {
   gap: var(--v2-space-4);
   align-items: end;
 }
-:global(.inventory-ledger-drawer) {
-  position: fixed;
-  inset: auto var(--v2-space-4) var(--v2-space-4);
-  width: auto;
-  max-width: none;
-  max-height: 78vh;
-}
 @media (max-width: 64rem) {
   .inventory-workspace-page__toolbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     width: min(70vw, 42rem);
   }
-  .inventory-workspace-page__kpis,
   .inventory-workspace-page__drawer-summary dl {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1123,7 +1095,6 @@ onBeforeUnmount(() => {
 }
 @media (max-width: 40rem) {
   .inventory-workspace-page__toolbar,
-  .inventory-workspace-page__kpis,
   .inventory-workspace-page__facts,
   .inventory-workspace-page__drawer-summary dl,
   .inventory-workspace-page__form {
@@ -1135,11 +1106,6 @@ onBeforeUnmount(() => {
   .inventory-workspace-page__actions,
   .inventory-workspace-page__transaction-search {
     flex-wrap: wrap;
-  }
-  :global(.inventory-ledger-drawer) {
-    inset: auto 0 0;
-    max-height: 88vh;
-    border-radius: var(--v2-radius-lg) var(--v2-radius-lg) 0 0;
   }
 }
 </style>

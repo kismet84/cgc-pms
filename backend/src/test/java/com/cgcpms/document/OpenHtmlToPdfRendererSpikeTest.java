@@ -99,7 +99,6 @@ class OpenHtmlToPdfRendererSpikeTest {
             throws Exception {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             PdfRendererBuilder builder = new PdfRendererBuilder();
-            builder.useFastMode();
             builder.useFont(font, "CGC PMS Chinese");
             builder.useExternalResourceAccessControl(
                     resourceGuard,

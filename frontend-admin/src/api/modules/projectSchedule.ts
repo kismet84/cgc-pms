@@ -89,7 +89,11 @@ export function createPeriodPlan(scheduleId: string, data: PeriodPlanRequest) {
 export function getPeriodPlan(id: string) {
   return request<ScheduleRow>({ url: `/project-schedules/period-plans/${id}`, method: 'get' })
 }
-export function replacePeriodPlanItems(id: string, expectedVersion: number, items: PeriodItemRequest[]) {
+export function replacePeriodPlanItems(
+  id: string,
+  expectedVersion: number,
+  items: PeriodItemRequest[],
+) {
   return request<ScheduleRow>({
     url: `/project-schedules/period-plans/${id}/items`,
     method: 'put',

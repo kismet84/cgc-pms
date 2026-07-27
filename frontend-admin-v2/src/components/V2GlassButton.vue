@@ -42,7 +42,7 @@ function handleClick(event: MouseEvent): void {
   min-width: 0;
   min-height: var(--v2-control-height-md);
   overflow: hidden;
-  padding-inline: clamp(var(--v2-space-4), 3vw, var(--v2-space-7));
+  padding-inline: var(--v2-space-5);
   color: var(--v2-color-text-strong);
   background: linear-gradient(
     145deg,
@@ -51,7 +51,7 @@ function handleClick(event: MouseEvent): void {
     color-mix(in srgb, var(--v2-color-border-subtle) 50%, transparent) 100%
   );
   border: var(--v2-border-width) solid color-mix(in srgb, var(--v2-color-surface) 82%, transparent);
-  border-radius: var(--v2-radius-lg);
+  border-radius: var(--v2-radius-md);
   box-shadow:
     0 10px 24px color-mix(in srgb, var(--v2-color-text-muted) 14%, transparent),
     var(--v2-shadow-control),

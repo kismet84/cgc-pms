@@ -4,6 +4,8 @@ import { resolve } from 'node:path'
 import {
   closeCostCorrective,
   confirmCostForecast,
+  loadAccessibleCostControl,
+  loadAccessibleCostSummary,
   loadCostLedgerPage,
   loadCostLedgerSummary,
   refreshCostSummary,
@@ -25,6 +27,18 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('M4 costs contract and service', () => {
+  it('loads all accessible project facts through read-only aggregate endpoints', async () => {
+    const signal = new AbortController().signal
+    await loadAccessibleCostSummary(signal)
+    await loadAccessibleCostControl(signal)
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
+      '/api/cost-summary',
+      '/api/cost-controls/overview',
+    ])
+    expect(fetchMock.mock.calls.every(([, options]) => options?.method === 'GET')).toBe(true)
+    expect(fetchMock.mock.calls.every(([, options]) => options?.signal === signal)).toBe(true)
+  })
+
   it('passes project and report-period bounds to page and server summary with abort', async () => {
     const signal = new AbortController().signal
     const query = {

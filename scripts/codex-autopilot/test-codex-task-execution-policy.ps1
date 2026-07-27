@@ -60,6 +60,32 @@ Assert-Contains 'mainline skill' $mainline @('**Goal:**','**Architecture:**','�
 
 $canonicalCategories = @('tool_config','tool_invocation','environment_prerequisite','ready_issue_config','retrieval_gap','quality_or_security','unknown')
 Assert-Contains 'CI skill categories' $ci $canonicalCategories
+Assert-Contains 'backend full test monitoring' $ci @(
+  '最近 10 次成功 GitHub Actions `backend-test`',
+  '`Run backend tests with coverage`',
+  '`startedAt`、`completedAt`',
+  '平均 `344.8` 秒',
+  '中位数 `5分52秒`',
+  '范围 `4分19秒～6分15秒`',
+  '禁止固定 60 秒心跳',
+  '“仍在执行”“未见失败”',
+  'Maven/Java 子进程、CPU、最新 Surefire 报告时间和终端新增输出',
+  'max(平均时长 × 1.5, 最近最大值 + 120秒)',
+  '当前约 `8分37秒`',
+  '先分类为 `unknown`',
+  'Maven `BUILD SUCCESS`/`BUILD FAILURE`',
+  '不能只凭进程退出码裁决',
+  '用户可见更新仅限：启动、阶段变化、明确失败、超过动态异常阈值、最终完成',
+  '不得因等待时间触发重跑、取消、修改 CI 或终止 Maven'
+)
+$fixedPollingPattern = 'Start-Sleep\s+-Seconds\s+' + '55\b'
+$fixedPollingMatches = @(
+  Get-ChildItem -LiteralPath (Join-Path $RepoRoot 'scripts') -Recurse -File -Filter '*.ps1' |
+    Select-String -Pattern $fixedPollingPattern
+)
+if ($fixedPollingMatches.Count -gt 0) {
+  throw "fixed 55-second CI polling must not return: $($fixedPollingMatches.Path -join ', ')"
+}
 $retiredCategories = @(('environment_' + 'prereq'),('real_' + 'quality_or_security'),('quality_' + 'security'))
 foreach ($retired in $retiredCategories) {
   if ($ci -match "(?<![a-z_])$([regex]::Escape($retired))(?![a-z_])") { throw "CI skill contains retired failure category: $retired" }

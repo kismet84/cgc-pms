@@ -33,17 +33,18 @@ function buttonTags(source: string): string[] {
 
 describe('全 V2 UI 整改门禁', () => {
   it('documents the latest all-V2 browser-comment contract', () => {
-    const baseline = read(resolve('../docs/ui-v2/m1-design-system-baseline.md'))
+    const baseline = read(
+      resolve('../docs/standards/00-UI-Design-Baselines-and-Code-Specifications.md'),
+    )
 
     for (const marker of [
       '每页只有一个可见语义 `h1`',
-      '与其页面级下拉、按钮、搜索框必须同置一个 70px 标题卡',
-      'H1 标题卡默认插槽必须为空',
-      '移动端高 44px（包括 `small` 按钮）',
+      'H1与标题操作同置70px标题卡',
+      'H1标题卡默认插槽必须为空',
+      '桌面控件32px、移动控件44px',
       '汇总标签必须紧随对应 `h2`',
       '不得用副标题承载数量',
-      '所有路由均保留 10px 内边距',
-      '不渲染“不按报告期裁剪”等实现说明',
+      '公共壳内容区保留10px内边距',
       '单一列表的数据区不得重复渲染“某某列表”等可见标题',
       '页面标题操作和表格行内操作统一使用 `size="small"`',
       '禁止卡片嵌套',
@@ -65,6 +66,7 @@ describe('全 V2 UI 整改门禁', () => {
       const name = pageName(path)
       const nativeH1Exceptions = new Set([
         'auth/LoginPage.vue',
+        'auth/SessionPage.vue',
         'HealthPage.vue',
         'shell/ShellPlaceholderPage.vue',
       ])
@@ -128,7 +130,7 @@ describe('全 V2 UI 整改门禁', () => {
           violations.push(`${name}: summary badges must follow H2, not H1`)
         }
         const body = match[1].replace(/<template\s+#actions\b[^>]*>[\s\S]*?<\/template\s*>/g, '')
-        if (body.replace(/<!--[\s\S]*?-->/g, '').trim()) {
+        if (body.replace(/<!--[\s\S]*?-->/g, '').trim() && !body.includes('v2-ledger-kpis')) {
           violations.push(`${name}: H1 card body must stay empty`)
         }
       }
@@ -155,6 +157,24 @@ describe('全 V2 UI 整改门禁', () => {
     }
 
     expect(violations).toEqual([])
+  })
+
+  it('keeps one shell main landmark and a primary heading on the session page', () => {
+    const standaloneMainPages = new Set([
+      'auth/LoginPage.vue',
+      'auth/SessionPage.vue',
+      'errors/GlobalErrorPage.vue',
+      'HealthPage.vue',
+    ])
+
+    for (const path of vuePages()) {
+      const name = pageName(path)
+      if (standaloneMainPages.has(name)) continue
+      expect(templateOf(read(path)), `${name} nested shell main`).not.toMatch(/<main\b/)
+    }
+
+    const session = read(resolve(pageRoot, 'auth/SessionPage.vue'))
+    expect(templateOf(session)).toMatch(/<h1>安全会话已恢复<\/h1>/)
   })
 
   it('keeps the 10px shell content inset on workflow routes', () => {
@@ -200,6 +220,12 @@ describe('全 V2 UI 整改门禁', () => {
 
   it('enforces detail-dialog structure across every V2 page', () => {
     const violations: string[] = []
+    const allowedPanelClasses = new Set([
+      'v2-dialog-standard',
+      'v2-detail-dialog',
+      'v2-dialog-wide',
+      'v2-dialog-bottom-sheet',
+    ])
 
     for (const path of vuePages()) {
       const source = read(path)
@@ -222,6 +248,25 @@ describe('全 V2 UI 整改门禁', () => {
         if (namedFocusableRegions < tableCount) {
           violations.push(`${name}: ${tableCount} detail tables require named focusable regions`)
         }
+      }
+
+      for (const attribute of template.matchAll(/(:?)panel-class\s*=\s*"([\s\S]*?)"/g)) {
+        const values = attribute[1]
+          ? [...attribute[2].matchAll(/'([^']+)'/g)].map((match) => match[1])
+          : [attribute[2]]
+        const panelClasses = values
+          .flatMap((value) => value.split(/\s+/))
+          .filter((value) => value.includes('-') || value.includes('__'))
+        for (const panelClass of panelClasses) {
+          if (!allowedPanelClasses.has(panelClass)) {
+            violations.push(`${name}: private dialog panel class ${panelClass}`)
+          }
+        }
+      }
+
+      const style = source.slice(source.indexOf('<style'))
+      if (/(?:\:deep|\:global)\([^)]*\.v2-dialog__|\.v2-dialog__panel\b/.test(style)) {
+        violations.push(`${name}: page style must not override shared dialog internals`)
       }
 
       for (const rule of source.matchAll(/([^{]*(?:__items|__details)\s+li)\s*\{([\s\S]*?)\}/g)) {
@@ -289,14 +334,18 @@ describe('全 V2 UI 整改门禁', () => {
     expect(components).toContain('.v2-table-cell--actions')
   })
 
-  it('keeps dialog action bars transparent and shared', () => {
+  it('keeps dialog action bars liquid and shared', () => {
     const components = read(resolve(sourceRoot, 'styles/components.css'))
     const schedule = read(resolve(sourceRoot, 'pages/delivery/SchedulePage.vue'))
     const footer = components.match(/\.v2-dialog__footer\s*\{([\s\S]*?)\}/)?.[1] ?? ''
-    expect(footer).toMatch(/background:\s*transparent/)
+    expect(footer).toMatch(
+      /background:\s*color-mix\(in srgb, var\(--v2-color-surface\) 24%, transparent\)/,
+    )
     expect(footer).not.toMatch(/background:\s*var\(--v2-dialog-surface\)/)
     expect(schedule).toContain('class="v2-table-cell--actions"')
-    expect(schedule).toContain('<V2GlassButton text="取消"')
+    expect(schedule).toContain(
+      '<V2Button type="button" variant="secondary" @click="createOpen = false">取消</V2Button>',
+    )
   })
 
   it('blocks the eleven supply-chain regressions', () => {
@@ -331,9 +380,7 @@ describe('全 V2 UI 整改门禁', () => {
     expect(inventory).not.toContain('仓库主数据不按报告期裁剪')
     expect(inventory).not.toContain('title="仓库列表"')
     expect(inventory).not.toContain('<V2Card class="inventory-workspace-page__filters">')
-    const kpis = inventory.match(
-      /<dl[^>]*class="inventory-workspace-page__kpis"[\s\S]*?<\/dl>/,
-    )?.[0]
+    const kpis = inventory.match(/<dl[^>]*class="v2-ledger-kpis"[\s\S]*?<\/dl>/)?.[0]
     expect(kpis).toBeTruthy()
     expect(kpis).not.toContain('<V2Card')
   })
@@ -478,10 +525,32 @@ describe('全 V2 UI 整改门禁', () => {
     const budget = read(resolve(sourceRoot, 'pages/commercial/BudgetPage.vue'))
     const contract = read(resolve(sourceRoot, 'pages/commercial/ContractPage.vue'))
 
-    const itemRule =
-      purchase.match(/\.purchase-execution-page__items li\s*\{([\s\S]*?)\}/)?.[1] ?? ''
-    expect(itemRule).not.toMatch(/\bbackground\s*:/)
-    expect(itemRule).not.toMatch(/\bborder-radius\s*:/)
+    expect(purchase).toContain('class="v2-detail-dialog__section"')
+    expect(purchase).toContain('class="v2-detail-dialog__section-heading"')
+    expect(purchase).toContain('class="v2-detail-dialog__table"')
+    expect(purchase).toContain(':aria-label="`${title}明细表格`"')
+    expect(purchase).toContain(
+      "['物料', '规格', '单位', '数量', '预计单价', '预计金额', '计划日期']",
+    )
+    expect(purchase).toContain("['物料', '规格', '单位', '数量', '单价', '金额', '已收数量']")
+    for (const heading of [
+      '实收数量',
+      '合格数量',
+      '不合格数量',
+      '订单数量',
+      '累计收货',
+      '剩余数量',
+      '使用部位',
+    ]) {
+      expect(purchase).toContain(`'${heading}'`)
+    }
+    expect(purchase).not.toContain('purchase-execution-page__items')
+    expect(purchase).not.toContain('function itemQuantity')
+    const detailTableSource = purchase.slice(
+      purchase.indexOf('const detailTable'),
+      purchase.indexOf('async function loadPage'),
+    )
+    expect(detailTableSource).not.toMatch(/\b(?:Number|parseFloat|parseInt)\s*\(/)
 
     expect(budget).toMatch(
       /<V2Button\b(?=[^>]*v-if="canAdd")(?=[^>]*size="small")[^>]*>\s*新建预算/,

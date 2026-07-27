@@ -4,9 +4,10 @@ import { onErrorCaptured } from 'vue'
 import zhCN from 'ant-design-vue/es/locale/zh_CN'
 import { message } from 'ant-design-vue'
 import { antdTheme, applyRootCssVariables } from '@/theme/tokens'
+import { reportClientError } from '@/observability/clientErrorReporter'
 
-onErrorCaptured((err, instance, info) => {
-  console.error('[App Error]', err, info)
+onErrorCaptured((err) => {
+  void reportClientError('VUE', err)
   return false // 阻止向上传播
 })
 

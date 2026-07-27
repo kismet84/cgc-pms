@@ -838,7 +838,7 @@ onBeforeUnmount(() => {
         :open="detailOpen"
         title="目标成本详情"
         panel-class="v2-detail-dialog"
-        :close-on-backdrop="false"
+        :close-on-backdrop="true"
         @close="closeDetail"
       >
         <V2PageState
@@ -849,22 +849,38 @@ onBeforeUnmount(() => {
         />
         <div v-else-if="detail" class="cost-target-page__detail">
           <dl class="v2-detail-dialog__facts">
-            <dt>版本</dt>
-            <dd>{{ detail.versionNo }} / {{ detail.versionName }}</dd>
-            <dt>项目</dt>
-            <dd>{{ projectLabel(detail.projectId) }}</dd>
-            <dt>目标成本</dt>
-            <dd>{{ detail.totalTargetAmount }}</dd>
-            <dt>投标成本</dt>
-            <dd>{{ detail.totalBidCostAmount }}</dd>
-            <dt>责任成本</dt>
-            <dd>{{ detail.totalResponsibilityAmount }}</dd>
-            <dt>审批状态</dt>
-            <dd>{{ approvalLabel(detail.approvalStatus) }}</dd>
-            <dt>活动版本</dt>
-            <dd>{{ detail.isActive === 1 ? '是' : '否' }}</dd>
-            <dt>备注</dt>
-            <dd>{{ detail.remark || '—' }}</dd>
+            <div>
+              <dt>版本</dt>
+              <dd>{{ detail.versionNo }} / {{ detail.versionName }}</dd>
+            </div>
+            <div>
+              <dt>项目</dt>
+              <dd>{{ projectLabel(detail.projectId) }}</dd>
+            </div>
+            <div>
+              <dt>目标成本</dt>
+              <dd>{{ detail.totalTargetAmount }}</dd>
+            </div>
+            <div>
+              <dt>投标成本</dt>
+              <dd>{{ detail.totalBidCostAmount }}</dd>
+            </div>
+            <div>
+              <dt>责任成本</dt>
+              <dd>{{ detail.totalResponsibilityAmount }}</dd>
+            </div>
+            <div>
+              <dt>审批状态</dt>
+              <dd>{{ approvalLabel(detail.approvalStatus) }}</dd>
+            </div>
+            <div>
+              <dt>活动版本</dt>
+              <dd>{{ detail.isActive === 1 ? '是' : '否' }}</dd>
+            </div>
+            <div>
+              <dt>备注</dt>
+              <dd>{{ detail.remark || '—' }}</dd>
+            </div>
           </dl>
           <h3>明细</h3>
           <V2PageState
@@ -975,7 +991,7 @@ td small {
   gap: var(--v2-space-3);
   align-items: end;
   padding: var(--v2-space-3);
-  border: 1px solid var(--v2-color-border);
+  border: var(--v2-border-width) solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
 }
 .cost-target-page__native-field {

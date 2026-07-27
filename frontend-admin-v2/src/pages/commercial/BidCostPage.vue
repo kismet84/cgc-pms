@@ -9,7 +9,6 @@ import {
   V2Card,
   V2ConfirmDialog,
   V2Dialog,
-  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -503,7 +502,7 @@ onBeforeUnmount(() => {
               : '投标成本预览'
         "
         :panel-class="panelMode === 'detail' ? 'v2-detail-dialog' : undefined"
-        :close-on-backdrop="false"
+        :close-on-backdrop="panelMode === 'detail'"
         :close-disabled="actionBusy"
         @close="closePanel"
       >
@@ -519,41 +518,27 @@ onBeforeUnmount(() => {
         />
         <div v-else-if="panelMode === 'detail' && selected" class="bid-cost-page__detail">
           <dl class="v2-detail-dialog__facts">
-            <dt>项目名称</dt>
-            <dd>{{ selected.bidProjectName }}</dd>
-            <dt>状态</dt>
-            <dd>
-              <V2Badge :tone="statusTone(selected.bidStatus)">{{
-                statusLabel(selected.bidStatus)
-              }}</V2Badge>
-            </dd>
-            <dt>备注</dt>
-            <dd>{{ selected.remark || '—' }}</dd>
-            <dt>更新时间</dt>
-            <dd>{{ selected.updatedAt || '—' }}</dd>
+            <div>
+              <dt>项目名称</dt>
+              <dd>{{ selected.bidProjectName }}</dd>
+            </div>
+            <div>
+              <dt>状态</dt>
+              <dd>
+                <V2Badge :tone="statusTone(selected.bidStatus)">{{
+                  statusLabel(selected.bidStatus)
+                }}</V2Badge>
+              </dd>
+            </div>
+            <div>
+              <dt>备注</dt>
+              <dd>{{ selected.remark || '—' }}</dd>
+            </div>
+            <div>
+              <dt>更新时间</dt>
+              <dd>{{ selected.updatedAt || '—' }}</dd>
+            </div>
           </dl>
-          <div class="v2-detail-dialog__quick-actions">
-            <V2GlassButton
-              v-if="canEdit && selectedIsBidding"
-              text="编辑"
-              :on-click="() => (panelMode = 'edit')"
-            />
-            <V2GlassButton
-              v-if="canChangeStatus && selectedIsBidding"
-              text="标记中标"
-              :on-click="() => requestWon(selected)"
-            />
-            <V2GlassButton
-              v-if="canChangeStatus && selectedIsBidding"
-              text="标记未中标"
-              :on-click="() => requestLost(selected)"
-            />
-            <V2GlassButton
-              v-if="canDelete && selectedIsBidding"
-              text="删除"
-              :on-click="() => requestDelete(selected)"
-            />
-          </div>
         </div>
         <form
           v-else
@@ -575,13 +560,46 @@ onBeforeUnmount(() => {
           </label>
         </form>
         <template v-if="panelMode === 'create' || panelMode === 'edit'" #footer>
-          <V2GlassButton text="取消" :disabled="actionBusy" :on-click="closePanel" />
-          <V2GlassButton
-            :text="panelMode === 'create' ? '创建' : '保存变更'"
-            type="submit"
-            form="bid-cost-form"
-            :loading="actionBusy"
-          />
+          <V2Button type="button" variant="secondary" :disabled="actionBusy" @click="closePanel">
+            取消
+          </V2Button>
+          <V2Button type="submit" form="bid-cost-form" :loading="actionBusy">
+            {{ panelMode === 'create' ? '创建' : '保存变更' }}
+          </V2Button>
+        </template>
+        <template v-else-if="panelMode === 'detail'" #footer>
+          <V2Button
+            v-if="canEdit && selectedIsBidding"
+            type="button"
+            variant="secondary"
+            @click="panelMode = 'edit'"
+          >
+            编辑
+          </V2Button>
+          <V2Button
+            v-if="canChangeStatus && selectedIsBidding"
+            type="button"
+            variant="secondary"
+            @click="requestWon(selected)"
+          >
+            标记中标
+          </V2Button>
+          <V2Button
+            v-if="canChangeStatus && selectedIsBidding"
+            type="button"
+            variant="secondary"
+            @click="requestLost(selected)"
+          >
+            标记未中标
+          </V2Button>
+          <V2Button
+            v-if="canDelete && selectedIsBidding"
+            type="button"
+            variant="danger"
+            @click="requestDelete(selected)"
+          >
+            删除
+          </V2Button>
         </template>
       </V2Dialog>
     </template>

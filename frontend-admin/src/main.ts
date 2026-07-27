@@ -28,6 +28,7 @@ import App from './App.vue'
 import router from './router'
 import vLoading from './directives/loading'
 import vPermission from './directives/permission'
+import { installGlobalErrorReporting, reportClientError } from './observability/clientErrorReporter'
 import './assets/styles/global.css'
 
 use([
@@ -51,15 +52,11 @@ app.use(VxeLoading)
 app.use(VxeUITable)
 
 app.config.errorHandler = (err) => {
-  console.error('[Global Error]', err)
-  // TODO: 接入监控服务 (Sentry / 日志上报)
+  void reportClientError('VUE', err)
   if (err instanceof Error) {
-    try {
-      message.error('系统异常，请稍后重试')
-    } catch {
-      console.error('Error boundary caught:', err.message)
-    }
+    message.error('系统异常，请稍后重试')
   }
 }
 
+installGlobalErrorReporting()
 app.mount('#app')

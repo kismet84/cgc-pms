@@ -34,8 +34,10 @@ class CostControlControllerTest {
     private static final long PROJECT = 99189001L;
     private static final long TARGET = 99189002L;
     private static final long FORECAST = 99189003L;
+    private static final long DRAFT_FORECAST = 99189009L;
     private static final long OUTSIDER = 99189004L;
     private static final long MEMBER = 99189005L;
+    private static final long PROJECT_WITHOUT_FORECAST = 99189007L;
     @Autowired MockMvc mockMvc;
     @Autowired JwtUtils jwtUtils;
     @Autowired JdbcTemplate jdbc;
@@ -46,16 +48,22 @@ class CostControlControllerTest {
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'cost.control.outsider','x','成本控制项目外用户','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OUTSIDER);
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'cost.control.member','x','成本控制项目成员','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", MEMBER);
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'COST-HTTP-SCOPE','成本控制HTTP权限项目','ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
+        jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'COST-HTTP-NO-FC','无预测成本控制项目','ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT_WITHOUT_FORECAST);
         jdbc.update("INSERT INTO cost_target(id,tenant_id,project_id,version_no,version_name,total_target_amount,total_bid_cost_amount,total_responsibility_amount,is_active,approval_status,effective_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,1,'HTTP基线',100,100,100,1,'APPROVED',CURRENT_DATE,'ACTIVE',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", TARGET, PROJECT);
         jdbc.update("INSERT INTO cost_forecast(id,tenant_id,project_id,cost_target_id,forecast_code,forecast_name,version_no,forecast_date,bid_cost_amount,target_cost_amount,responsibility_amount,committed_cost_amount,actual_cost_amount,estimated_remaining_amount,forecast_at_completion_amount,contract_income_amount,forecast_profit_amount,cost_variance_amount,profit_margin,status,formula_version,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,'FC-HTTP-SCOPE','HTTP越权预测',1,CURRENT_DATE,100,100,100,0,100,0,100,200,100,0,0.5,'CONTROLLED','COST_EAC_V1',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", FORECAST, PROJECT, TARGET);
+        jdbc.update("INSERT INTO cost_forecast(id,tenant_id,project_id,cost_target_id,forecast_code,forecast_name,version_no,forecast_date,bid_cost_amount,target_cost_amount,responsibility_amount,committed_cost_amount,actual_cost_amount,estimated_remaining_amount,forecast_at_completion_amount,contract_income_amount,forecast_profit_amount,cost_variance_amount,profit_margin,status,formula_version,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,'FC-HTTP-DRAFT','未确认预测',2,CURRENT_DATE,999,999,999,0,999,0,999,999,999,0,1,'DRAFT','COST_EAC_V1',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", DRAFT_FORECAST, PROJECT, TARGET);
         jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(99189006,0,?,?,'COST_MANAGER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", PROJECT, MEMBER);
+        jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(99189008,0,?,?,'COST_MANAGER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", PROJECT_WITHOUT_FORECAST, MEMBER);
     }
 
     @AfterEach
     void cleanup() {
+        jdbc.update("DELETE FROM cost_forecast WHERE id=?", DRAFT_FORECAST);
         jdbc.update("DELETE FROM cost_forecast WHERE id=?", FORECAST);
         jdbc.update("DELETE FROM cost_target WHERE id=?", TARGET);
+        jdbc.update("DELETE FROM pm_project_member WHERE id=99189008");
         jdbc.update("DELETE FROM pm_project_member WHERE id=99189006");
+        jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT_WITHOUT_FORECAST);
         jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT);
         jdbc.update("DELETE FROM sys_user WHERE id=?", OUTSIDER);
         jdbc.update("DELETE FROM sys_user WHERE id=?", MEMBER);
@@ -138,6 +146,25 @@ class CostControlControllerTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(get("/api/cost-controls/forecasts/{id}/trace", FORECAST).contextPath("/api").cookie(query))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void portfolioOverviewUsesAccessibleProjectsAndCountsMissingForecasts() throws Exception {
+        mockMvc.perform(get("/api/cost-controls/overview").contextPath("/api")
+                        .cookie(memberCookie("cost:control:query")))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.data.accessibleProjectCount").value(2))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.data.forecastProjectCount").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.data.noForecastProjectCount").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.data.forecastProfit").value("100.00"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.data.projects[0].costForecastId").value(String.valueOf(FORECAST)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                        "$.data.projects").isArray());
     }
 
     private Cookie cookie(String... authorities) {

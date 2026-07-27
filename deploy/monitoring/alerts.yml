@@ -1,0 +1,20 @@
+groups:
+  - name: cgc-pms-local-failures
+    rules:
+      - alert: CgcPmsFrontendClientErrors
+        expr: sum by (app, source) (increase(frontend_client_errors_total[5m])) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'CGC-PMS 前端出现集中上报错误'
+          description: '过去 5 分钟存在前端错误；按 app/source 和结构化日志 fingerprint 排查。'
+
+      - alert: CgcPmsFinanceScheduledOperationFailures
+        expr: sum by (operation) (increase(finance_scheduled_operations_total{outcome="failure"}[5m])) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'CGC-PMS 财务定时任务失败'
+          description: '过去 5 分钟存在财务对账或预警任务失败；按 operation 与脱敏日志排查。'

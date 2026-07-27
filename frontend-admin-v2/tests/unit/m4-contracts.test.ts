@@ -218,7 +218,7 @@ describe('M4 contracts page', () => {
     expect(wrapper.findAll('button').some((button) => button.text().includes('查询'))).toBe(false)
     expect(wrapper.get('.contract-page__list-card > .v2-card__header').text()).toContain('新建合同')
     expect(wrapper.find('.contract-page__list-card .v2-card__subtitle').exists()).toBe(false)
-    expect(wrapper.get('.contract-page__kpi-grid').findAll(':scope > div')).toHaveLength(5)
+    expect(wrapper.get('.v2-ledger-kpis').findAll(':scope > div')).toHaveLength(5)
   })
 
   it('applies a preset view through visible server filters and clears previous search', async () => {
@@ -558,7 +558,7 @@ describe('M4 contracts page', () => {
       'contract:delete',
     ])
 
-    const labels = wrapper.findAll('button').map((button) => button.text())
+    const labels = wrapper.findAll('.v2-dialog__footer button').map((button) => button.text())
     expect(labels.some((text) => text.includes('编辑'))).toBe(false)
     expect(labels.some((text) => text.includes('提交审批'))).toBe(false)
     expect(labels.some((text) => text.includes('删除'))).toBe(false)

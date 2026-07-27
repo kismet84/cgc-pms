@@ -15,7 +15,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -45,7 +45,7 @@ class RevenueCollectionClosedLoopIntegrationTest {
     @Autowired FinanceIntegrationService financeIntegration;
     @Autowired JdbcTemplate jdbc;
     @Autowired WfInstanceMapper wfInstanceMapper;
-    @MockBean WorkflowEngine workflowEngine;
+    @MockitoBean WorkflowEngine workflowEngine;
 
     @BeforeEach
     void setup() {

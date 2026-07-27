@@ -59,7 +59,7 @@ describe('M5 inventory workspace contract', () => {
     expect(source).toContain('title="全部库存余额"')
     expect(source).toContain('title="库存明细与流水"')
     expect(source).toContain(
-      'panel-class="v2-dialog-standard v2-detail-dialog inventory-ledger-drawer"',
+      'panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-bottom-sheet"',
     )
     expect(source).toContain(':close-on-backdrop="true"')
     expect(source).toContain('class="v2-table__record-link"')

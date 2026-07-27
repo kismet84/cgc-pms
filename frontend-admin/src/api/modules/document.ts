@@ -12,10 +12,7 @@ import type {
   DocumentTemplateVersion,
 } from '@/types/document'
 
-export function previewBusinessDocument(
-  businessType: DocumentBusinessType,
-  businessId: string,
-) {
+export function previewBusinessDocument(businessType: DocumentBusinessType, businessId: string) {
   return request<Blob>({
     url: '/documents/generations/preview',
     method: 'post',
@@ -38,10 +35,7 @@ export function generateBusinessDocument(
   })
 }
 
-export function getBusinessDocumentHistory(
-  businessType: DocumentBusinessType,
-  businessId: string,
-) {
+export function getBusinessDocumentHistory(businessType: DocumentBusinessType, businessId: string) {
   return request<DocumentGenerationPage>({
     url: '/documents/generations',
     method: 'get',

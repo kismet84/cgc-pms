@@ -62,7 +62,7 @@ describe('full V2 public context contract', () => {
 
   it('locks the global standard and executable browser gate', () => {
     const baseline = readFileSync(
-      resolve(sourceRoot, '../../docs/ui-v2/m1-design-system-baseline.md'),
+      resolve(sourceRoot, '../../docs/standards/00-UI-Design-Baselines-and-Code-Specifications.md'),
       'utf-8',
     )
     const browserGate = readFileSync(

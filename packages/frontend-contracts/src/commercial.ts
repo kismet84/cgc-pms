@@ -469,6 +469,8 @@ export interface CostSummaryHistoryRecord {
 export interface CostProjectSummary {
   projectId: string;
   projectName: string;
+  costTargetId?: string | null;
+  costForecastId?: string | null;
   targetCost: DecimalString;
   contractLockedCost: DecimalString;
   actualCost: DecimalString;
@@ -484,6 +486,23 @@ export interface CostProjectSummary {
   forecastProfit: DecimalString;
   profitMargin: DecimalString;
   subjects: CostSummaryHistoryRecord[];
+}
+
+export interface AccessibleCostSummary {
+  accessibleProjectCount: number;
+  projects: CostProjectSummary[];
+}
+
+export interface AccessibleCostControlOverview {
+  accessibleProjectCount: number;
+  forecastProjectCount: number;
+  noForecastProjectCount: number;
+  contractIncome: DecimalString;
+  dynamicCost: DecimalString;
+  forecastAtCompletionCost: DecimalString;
+  forecastProfit: DecimalString;
+  profitMargin: DecimalString;
+  projects: CostProjectSummary[];
 }
 
 export interface CostForecastItemCommand {
@@ -757,12 +776,14 @@ export const COMMERCIAL_API = {
   costLedger: "/cost-ledger",
   costLedgerSummary: "/cost-ledger/summary",
   costLedgerDetail: (id: string) => `/cost-ledger/${encodeURIComponent(id)}`,
+  accessibleCostSummary: "/cost-summary",
   costSummary: (projectId: string) =>
     `/cost-summary/${encodeURIComponent(projectId)}`,
   costSummaryHistory: (projectId: string) =>
     `/cost-summary/${encodeURIComponent(projectId)}/history`,
   costSummaryRefresh: (projectId: string) =>
     `/cost-summary/${encodeURIComponent(projectId)}/refresh`,
+  accessibleCostControl: "/cost-controls/overview",
   costControl: (projectId: string) =>
     `/cost-controls/projects/${encodeURIComponent(projectId)}/overview`,
   costForecasts: "/cost-controls/forecasts",

@@ -31,6 +31,15 @@ describe('design tokens', () => {
     expect(rootCssVariables['--brand-logo-fg']).toBe(designTokens.brand.logoForeground)
   })
 
+  it('provides one shared liquid-glass token contract for every modal', () => {
+    expect(antdTheme.components?.Modal?.contentBg).toBe(designTokens.modal.surface)
+    expect(antdTheme.components?.Modal?.headerBg).toBe(designTokens.modal.headerSurface)
+    expect(rootCssVariables['--modal-surface']).toBe(designTokens.modal.surface)
+    expect(rootCssVariables['--modal-mask']).toBe(designTokens.modal.mask)
+    expect(rootCssVariables['--modal-radius']).toBe(`${designTokens.modal.radius}px`)
+    expect(rootCssVariables['--modal-blur']).toBe(`${designTokens.modal.blur}px`)
+  })
+
   it('provides a shared chart palette instead of page-level chart colors', () => {
     expect(chartPalette.categorical).toEqual([
       designTokens.color.primary,

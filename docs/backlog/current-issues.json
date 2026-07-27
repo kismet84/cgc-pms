@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-20T00:00:00+08:00",
+  "updatedAt": "2026-07-26T21:51:00+08:00",
   "issues": [
     {
       "issueKey": "A-02",
@@ -274,72 +274,28 @@
       ]
     },
     {
-      "issueKey": "AUDIT-FINANCE-RECONCILIATION-ATOMICITY",
-      "title": "定时财务对账按租户事务与失败可观测性",
-      "status": "OPEN",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "定时入口直接调用同类私有方法，未进入Spring事务代理；多步写入失败可能保留RUNNING或部分问题明细，且RuntimeException被静默吞掉。",
-      "acceptanceCriteria": "每个租户的定时对账在独立事务中原子提交或回滚；失败可观测且不阻断其他租户；补充失败注入与多租户隔离测试。",
-      "candidate": {
-        "userValue": "避免夜间财务对账留下部分状态或静默失效。",
-        "minimalLoop": "复用Spring现有事务能力，为每租户对账建立真实代理事务边界并记录脱敏失败信息。",
-        "nonGoals": "不新增调度器、消息队列或第二套对账模型。",
-        "dependencies": "确认现有对账运行表允许的失败状态与告警记录口径。",
-        "risk": "事务边界不当可能扩大锁范围或影响其他租户批次。",
-        "readyPreconditions": "明确失败状态、最小文件范围、故障注入测试和回滚方式。"
-      },
-      "sourceRefs": [
-        "backend/src/main/java/com/cgcpms/financeops/service/FinanceOperationsService.java",
-        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md"
-      ]
-    },
-    {
       "issueKey": "AUDIT-PROMETHEUS-SCRAPE-AUTH",
       "title": "Prometheus抓取认证方案缺失",
       "status": "NEEDS_CONFIRMATION",
       "classification": "OPERATIONAL_RISK",
       "priority": "P1",
       "blocking": false,
-      "summary": "Prometheus抓取配置未携带认证信息，而后端回归明确要求未登录访问指标端点被拒绝；直接启用监控Compose无法证明抓取成功。",
-      "acceptanceCriteria": "选定不暴露指标的机器认证或受控网络方案，以Secret注入凭据并完成未认证拒绝、认证抓取成功、凭据不落库验证。",
-      "deferReason": "缺少目标环境网络边界、Secret载体和机器身份认证决策；不得通过公开指标端点绕过。",
+      "summary": "Prometheus抓取配置未携带机器凭据；后端匿名拒绝、管理员JWT可访问，但当前15分钟用户JWT不适合作为长期抓取身份，直接启用监控Compose无法成功抓取。",
+      "acceptanceCriteria": "使用可轮换的非公开机器身份和Secret文件完成无/错凭据拒绝、普通用户JWT拒绝、认证抓取连续成功、旧凭据失效、凭据不入库及Prometheus UI非公网监听验证。",
+      "deferReason": "第55条M2确认缺少目标环境网络边界、Secret载体、轮换责任人和真实运行证据；不得通过公开指标端点或长期用户JWT绕过。",
       "candidate": {
         "userValue": "避免生产监控盲区，同时保持指标端点不匿名暴露。",
-        "minimalLoop": "复用既有安全链和部署Secret能力，只补一个可轮换的机器抓取身份。",
+        "minimalLoop": "优先复用Spring Security Basic机器身份、Prometheus password_file和Spring Boot configtree，只补一个可轮换监控角色。",
         "nonGoals": "不公开Actuator，不在仓库写静态密码，不新增监控平台。",
-        "dependencies": "目标环境网络拓扑、Secret注入方式和机器认证机制。",
+        "dependencies": "目标环境网络拓扑、Secret文件载体、凭据保管与轮换责任人、Prometheus UI访问边界。",
         "risk": "错误放行会泄露运行指标；短期JWT会造成周期性抓取中断。",
         "readyPreconditions": "认证机制、凭据轮换责任人、目标环境验证和回滚方案明确。"
       },
       "sourceRefs": [
         "deploy/monitoring/prometheus.yml",
         "backend/src/test/java/com/cgcpms/config/ActuatorMetricsTest.java",
-        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md"
-      ]
-    },
-    {
-      "issueKey": "AUDIT-CASH-FORECAST-VERSION-CONCURRENCY",
-      "title": "现金预测版本号并发创建冲突",
-      "status": "OPEN",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P1",
-      "blocking": false,
-      "summary": "现金预测创建在事务中使用MAX(version_no)+1，但未锁定项目或版本命名空间；并发请求可取得相同版本并由唯一键随机拒绝其中一个。",
-      "acceptanceCriteria": "同租户、项目、场景并发创建得到互不冲突的连续版本；跨租户和跨项目不互相阻塞；补充真实并发测试。",
-      "candidate": {
-        "userValue": "避免财务人员并发创建预测时出现非业务性唯一键失败。",
-        "minimalLoop": "复用现有项目行和事务，在读取下一版本前锁定最小项目级命名空间。",
-        "nonGoals": "不新增序列服务、分布式锁或重构预测状态机。",
-        "dependencies": "确认项目行锁对预测创建吞吐的影响可接受。",
-        "risk": "锁顺序不一致可能引入死锁，必须保持单一固定锁顺序。",
-        "readyPreconditions": "锁点、异常契约、并发测试和回滚方式明确。"
-      },
-      "sourceRefs": [
-        "backend/src/main/java/com/cgcpms/cashforecast/service/ProjectCashForecastService.java",
-        "backend/src/main/resources/db/migration-legacy/V193__project_cash_forecast_closed_loop.sql",
-        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md"
+        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md",
+        "docs/quality/第55条主线-M2-待确认维护项裁决验收报告.md"
       ]
     }
   ]

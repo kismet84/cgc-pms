@@ -125,6 +125,37 @@ class AuthEndpointSecurityTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    @DisplayName("POST /api/client-errors without JWT → 401")
+    void clientErrorWithoutJwt() throws Exception {
+        mockMvc.perform(postWithApiContext("/client-errors")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"app":"V2","source":"VUE","kind":"ERROR",
+                                 "fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("POST /api/client-errors with valid JWT → 200")
+    void clientErrorWithValidJwt() throws Exception {
+        String token = jwtUtils.generateToken(
+                1L, "admin", 0L,
+                List.of("ADMIN"),
+                List.of());
+
+        mockMvc.perform(postWithApiContext("/client-errors")
+                        .cookie(new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"app":"V2","source":"VUE","kind":"ERROR",
+                                 "fingerprint":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+    }
+
     private MockHttpServletRequestBuilder getWithApiContext(String pathWithinContext) {
         return get("/api" + pathWithinContext).contextPath("/api");
     }

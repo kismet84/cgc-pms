@@ -200,7 +200,7 @@ class CostSummaryAssembler {
                                 .eq(CostItem::getTenantId, tenantId)
                                 .eq(CostItem::getProjectId, projectId)
                                 .eq(CostItem::getCostStatus, "CONFIRMED")
-                                .eq(CostItem::getSourceType, "REVENUE"))
+                                .eq(CostItem::getCostType, "REVENUE_CONFIRMED"))
                 .stream()
                 .map(CostItem::getAmount)
                 .filter(Objects::nonNull)

@@ -1,220 +1,145 @@
-UI风格的设计基准和代码参考规范文档
+<!-- UI-DESIGN-STANDARD: canonical -->
 
-> **适用范围：Legacy UI。** `frontend-admin-v2` 的唯一视觉基线为
-> `docs/ui-v2/m1-design-system-baseline.md` 与 `frontend-admin-v2/src/styles/tokens.css`；
-> 本文字号、颜色及组件尺寸不得用于 V2 新迁移页面。
+# CGC-PMS 唯一设计系统标准与门禁
 
-> 适用版本：v1.5。历史结论和旧路径仅作回溯，当前实现以本分支代码、配置和实时验证为准。
+状态：现行、唯一权威
 
----
-### 第一部分：项目列表页设计 Token 文档（唯一设计基准）
+适用范围：`frontend-admin-v2` 全部页面；`frontend-admin` 仅作兼容维护
 
-请将以下提取的视觉参数作为全局基础配置（CSS Variables 或 Tailwind Config）。
+唯一可视入口：`http://127.0.0.1:5174/v2/src/components/preview/index.html`
 
-#### 1. 字体体系 (Typography)
-*   **字体家族 (Font Family)**: `'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif`（企业级标准无衬线字体）。
-*   **字号层级 (Font Sizes)**:
-    *   `--font-size-xxl`: `24px` (统计卡片中的数值，如 "2个", "1,000.00" 等，加粗)
-    *   `--font-size-xl`: `18px` (顶部面包屑/页面标题，如 "项目管理 / 项目列表")
-    *   `--font-size-lg`: `16px` (卡片标题、表格行中的 "施工总承包" 标签、操作按钮文本)
-    *   `--font-size-md`: `14px` (表格主体内容、输入框占位符、统计卡片的副标题)
-    *   `--font-size-sm`: `12px` (表格底部的 "共 2 条"、卡片底部的辅助说明、表头极小说明)
-*   **字重 (Font Weights)**:
-    *   `Bold (600)`: 数据可视化数字、主要标题。
-    *   `Medium (500)`: 按钮文字、表格表头。
-    *   `Regular (400)`: 大部分正文。
-*   **行高 (Line Height)**: 正文 `1.5`，标题 `1.2`。
+## 1. 权威边界
 
-#### 2. 配色方案 (Color Palette)
-*   **主色 (Primary)**: `#1677FF` (品牌蓝，用于“新建项目”按钮、侧边栏选中态、环形统计图主导色)
-*   **辅色/状态色**:
-    *   悬停态 (Hover): `#4096FF`
-    *   点击态 (Active): `#0958D9`
-    *   警告/风险 (Warning/Error): `#FF4D4F` (用于右侧红框“风险项目”卡片，以及表格中的“风险”标签)
-    *   成功/安全 (Success): `#52C41A` (用于右侧“无高风险项目”前面的绿点)
-    *   蓝色标签背景: `#E6F4FF` (表格中“施工总承包”标签的底色)
-    *   红色标签背景: `#FFF1F0` (风险卡片的背景色)
-*   **中性色/背景色**:
-    *   全局背景 (Body Background): `#F5F7FA` (浅灰，提供区域感)
-    *   卡片/面板背景 (Card Background): `#FFFFFF` (纯白)
-    *   侧边栏背景: 浅灰/白，顶部 Logo 区为深蓝 `#002C8F`。
-*   **文本色 (Text)**:
-    *   主文本: `#1D2129` (深灰/黑)
-    *   次级文本 (表头、占位符): `#86909C`
-    *   禁用文本: `#C9CDD4`
-*   **边框色 (Border)**:
-    *   表格线、输入框默认边框: `#E5E6EB`
-    *   输入框 Focus/Active 边框: `#1677FF`
-*   **阴影 (Shadows)**:
-    *   卡片阴影: `box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.04);`
+本文件是仓库内唯一设计规范。其他计划、验收报告、历史基线、截图说明和组件 README 只能记录实施事实或链接本文，不得定义第二套颜色、字号、间距、组件、弹窗或页面结构规则。
 
-#### 3. 布局系统 (Layout System)
-*   **整体结构**: 左侧固定导航 (Flex 垂直布局) + 右侧自适应内容区 (Flex 1)。
-*   **内容区排列**: 顶部面包屑 -> 搜索/筛选栏 -> 统计卡片 (Flex Grid) -> 操作栏 -> 表格区 -> 底部栏。
-*   **间距标准 (Spacing)**:
-    *   基础间距 (Base): `4px`
-    *   `--spacing-xs`: `8px` (图标与文字的间距，表格单元格内边距)
-    *   `--spacing-sm`: `12px` (输入框内部的垂直间距)
-    *   `--spacing-md`: `16px` (卡片之间的间距，表格列头之间的间距)
-    *   `--spacing-lg`: `24px` (卡片内边距，右侧面板与主列表的间距)
+权威顺序：
 
-#### 4. 组件样式库 (Component Styles)
-*   **按钮**:
-    *   主要按钮 (Primary): 蓝色填充，白色文字，圆角 `4px`，内边距 `0 16px`，高度 `32px`。
-    *   默认按钮 (Default): 白色背景，灰色边框/文字，圆角 `4px`。
-    *   图标按钮: 仅有图标或带文字，行高与高度需对齐。
-*   **表格 (Table)**:
-    *   头部背景: `#FAFAFA` 或 `#F5F7FA`。
-    *   行悬停态 (Row Hover): `#F5F7FA`。
-    *   操作列: 使用纯文字链接（查看、编辑、删除），无下划线，点击/悬停变蓝。
-*   **表单输入框 (Input)**:
-    *   高度: `32px`，带搜索图标 (Left Icon)。
-    *   圆角: `4px`。
-    *   占位符颜色: `#C9CDD4`。
-*   **统计卡片 (Statistics Card)**:
-    *   图标居左，数字与文本垂直分布。
-    *   右上角（如风险卡片）带有红色的 `-` 或折线趋势图标。
+1. 本文定义设计语义、使用边界、验收标准和门禁。
+2. `frontend-admin-v2/src/styles/tokens.css` 定义 V2 数值 token。
+3. `frontend-admin-v2/src/styles/base.css` 定义画布、字体、焦点、无障碍和 reduced-motion。
+4. `frontend-admin-v2/src/styles/components.css`、`frontend-admin-v2/src/components/index.ts` 与 `V2*.vue` 定义共享组件外观和行为。
+5. 业务页面只定义业务布局、列宽、换行和字段语义，不复制公共组件材质。
 
----
+`design-qa.md`、`docs/plans/`、`docs/quality/` 与 `docs/ui-v2/m1-design-system-baseline.md` 均为历史或验收记录，不是规范源。发生冲突时以本文和当前实现门禁为准。
 
-### 第二部分：其他页面的差异点比对与修改方案清单
+## 2. 双前端边界
 
-您需要将当前应用中的**所有其他页面**（成本管理、采购与库存、分包管理等）与上述设计 Token 逐一比对，检查以下 **4 个关键差异点**并修改：
+| 目录 | 状态 | 允许 |
+| --- | --- | --- |
+| `frontend-admin-v2` | 现行设计系统 | 只使用 `--v2-*` token、V2共享组件和本文规则 |
+| `frontend-admin` | Legacy兼容冻结 | 保留既有 Ant Design Vue、`tokens.ts` 与样式护栏；只做缺陷和可用性维护，不产生新标准 |
 
-1.  **【文案与语体系】**：将所有非页面独有的报错提示（如“接口请求失败”）、空状态（如“暂无数据”）、弹窗按钮（“确认”、“取消”）全部替换为图中的中文习惯（力求简洁，语气中性，无英文混排）。
-2.  **【颜色与阴影异动】**：检查其他页面是否有随意使用自己定义的颜色（如其他颜色蓝、绿、红，而非设计的 `#1677FF` 或 `#FF4D4F`）；确保所有卡片、弹窗、气泡的阴影程度统一。
-3.  **【统计卡片与表格尺寸】**：如果其他页面包含统计卡片，强制统一使用此处提取的 **5 列/4 列弹性网格布局**，并确保统计数字 `xx个` 或 `xx万元` 的字体、字号、对齐方式完全一致。表格的**行高**、**字体大小**、**边框颜色**必须直接引用设计 Token。
-4.  **【侧边栏激活与行高】**：检查“项目列表”页当前的蓝色左侧菜单激活背景色，必须应用到所有侧边栏的选中所属父级和子级菜单中。
+禁止跨端复制组件、CSS、DOM适配层或 token。禁止把 Legacy 的 `lg-*`、`pt-*`、`app-*`、Ant Modal 或颜色值用于 V2；也禁止为统一外观反向改写 Legacy 业务页。
 
----
+## 3. 唯一视觉基线
 
-### 第三部分：可直接使用的代码调整方案 (CSS / Tailwind)
+- 设计系统只保留一个预览地址：`/v2/src/components/preview/index.html`。
+- 预览页集中展示基础令牌、页面与数据、操作与导航、表单与反馈、弹窗规格。
+- “审批详情”是唯一 V3 详情弹窗视觉基线，使用 `V2Dialog + v2-dialog-standard + v2-detail-dialog`。
+- 标准表单、宽详情、底部抽屉和确认框只展示共享规格，不形成第二套详情视觉。
+- 业务页复用共享结构和 token；禁止 `preview-*` 视觉复制、页面私有弹窗壳和页面级 `.v2-dialog__*` 覆盖。
 
-请将以下代码整合进项目的全局 CSS 或 Tailwind 配置文件中。
+## 4. 统一检查清单
 
-#### 1. 全局 CSS 变量 (`global.css`)
-```css
-:root {
-  /* 色彩体系 */
-  --color-primary: #1677FF;
-  --color-primary-hover: #4096FF;
-  --color-primary-active: #0958D9;
-  --color-success: #52C41A;
-  --color-warning: #FAAD14;
-  --color-error: #FF4D4F;
-  --color-text-main: #1D2129;
-  --color-text-secondary: #4E5969;
-  --color-text-placeholder: #86909C;
-  --color-border: #E5E6EB;
-  --color-bg-body: #F5F7FA;
-  --color-bg-card: #FFFFFF;
-  --color-bg-table-header: #FAFAFA;
-  --color-bg-hover: #F5F7FA;
-  --color-tag-blue-bg: #E6F4FF;
-  --color-tag-blue-text: #1677FF;
+本表是设计、开发、评审和验收的唯一规则索引。P0 失败立即阻断迁移或合并；P1 必须本轮整改，或进入唯一正式承接项。
 
-  /* 字体体系 */
-  --font-family: 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-size-xs: 12px;
-  --font-size-sm: 14px;
-  --font-size-base: 16px;
-  --font-size-lg: 18px;
-  --font-size-xl: 24px;
+| ID | 分类 | 标准 | 级别 |
+| --- | --- | --- | --- |
+| S01 | 页面语义 | 每页只有一个可见语义 `h1`；标题、导航和路由使用同一文案，删除重复标题、eyebrow 与实现说明。 | P0 |
+| S02 | 公共壳 | 项目、报告期、账户和主导航只由 `AppShell` 提供；页面不得复制公共壳上下文控件。 | P0 |
+| S03 | 项目范围 | “全部项目”读取服务端授权范围内全部有效数据；有时间维度的页面按报告期查询，无时间维度页面只保留上下文。 | P0 |
+| S04 | 工作区导航 | 三级 Tab 使用公共样式；路由、Tab 与标题禁止简称、倒序和近义别名。 | P0 |
+| S05 | 视觉 token | 字号、颜色、间距、圆角、阴影、控件高度、层级和动效只使用 `--v2-*` token。 | P0 |
+| S06 | 文字层级 | 页面标题 21px/bold；H1与标题操作同置70px标题卡；桌面控件32px、移动控件44px；H2/H3为14px/semibold。 | P0 |
+| S07 | 页面结构 | 公共壳内容区保留10px内边距；页面按H1标题卡和必要数据区组织，不渲染空标题正文、重复“某某列表”或无意义留白。 | P1 |
+| S08 | 卡片边界 | 列表表格与分页同属一个 `V2Card`；禁止记录卡片化、卡片嵌套和用并列卡片模拟同一账簿。 | P0 |
+| S09 | 表格结构 | 可比较记录使用语义表格；编码、名称、日期、金额和状态分列，操作列有明确列标题。 | P0 |
+| S10 | 表格密度 | 表头、事实和分页使用12px token；文本左对齐、数字右对齐、状态和操作居中；宽表使用具名可聚焦容器。 | P0 |
+| S11 | 分页 | 分页列表固定 `pageSize=10`，顺序为“上一页 — 第 N 页 — 下一页”。 | P0 |
+| S12 | 筛选 | 搜索与筛选进入标题栏，保留可访问名称；页面不得复制公共壳筛选或自建下拉层。 | P1 |
+| S13 | 表单控件 | 文本、搜索和下拉复用 `V2Input`、`V2Select`；日期、数字、文件、复选、单选和多行文本可使用原生语义控件。 | P0 |
+| S14 | 按钮与菜单 | 页面操作复用 `V2Button`；标题与行内操作使用 `size="small"`；超过两个动作使用 `V2ActionMenu`；业务弹窗页脚禁止 `V2GlassButton`。 | P0 |
+| S15 | 标准弹窗 | 新建、编辑、只读详情复用 `V2Dialog`；确认复用 `V2ConfirmDialog`；禁止 `window.confirm` 和私有弹窗壳。 | P0 |
+| S16 | 弹窗安全 | 只读查看允许点击遮罩、Escape或关闭按钮退出；新建、编辑和写入态禁止遮罩与Escape关闭，只能由关闭、取消、保存或提交等明确按钮结束。 | P0 |
+| S17 | 详情形态 | 完整对象查看统一使用 `v2-detail-dialog` 覆盖原台账；详情路由继续提供深链和刷新恢复，关闭后返回原列表状态；禁止列表下方内联完整详情。 | P0 |
+| S18 | 状态反馈 | 状态使用中文映射与 `V2Badge`；短暂结果使用公共 Toast；表单校验或持续阻断信息使用 `V2Alert`；颜色不是唯一证据。 | P0 |
+| S19 | 数据状态 | 验收加载、典型、全部项目、具体项目、空数据、部分数据、接口失败、403和超长内容；失败态与空态互斥。 | P0 |
+| S20 | 权限边界 | 无权限时 fail-close，不加载越权数据；隐藏按钮不能替代服务端权限校验。 | P0 |
+| S21 | 交互稳定 | Tab、筛选、分页、弹窗和预设视图切换保持应用壳及页面骨架稳定，不整页闪烁。 | P1 |
+| S22 | 响应式与无障碍 | 1440、1024、390无遮挡、裁切和滚动陷阱；地标、标题、字段关联、焦点、键盘路径和reduced-motion完整。 | P0 |
+| S23 | 运行态证据 | CSS、路由、代理或运行配置变化后刷新精确运行态；裁决以真实URL、DOM、computed style和控制台为准。 | P0 |
+| S24 | 迁移与交付 | 保持URL、route name、权限、状态机、金额与业务事实；通过设计系统门、unit、lint、type-check、build、迁移 E2E和diff-check。 | P0 |
 
-  /* 间距体系 */
-  --spacing-xs: 8px;
-  --spacing-sm: 12px;
-  --spacing-md: 16px;
-  --spacing-lg: 24px;
+清单裁决只允许“通过”“不通过”“需要确认”。不设置泛化 P2；纯偏好且无复现证据、用户价值或验收方式的建议直接关闭。
 
-  /* 边框与阴影 */
-  --border-radius-base: 4px;
-  --shadow-card: 0px 2px 8px rgba(0, 0, 0, 0.04);
-}
+## 5. 公共组件合同
+
+现行公共出口：
+
+`V2ActionMenu`、`V2Alert`、`V2Badge`、`V2Button`、`V2Card`、`V2Cluster`、`V2ConfirmDialog`、`V2Dialog`、`V2ErrorBoundary`、`V2GlassButton`、`V2Grid`、`V2Input`、`V2PageState`、`V2Select`、`V2Skeleton`、`V2Stack`、`V2ToastHost`、`showToast`、`useToastMessage`。
+
+使用边界：
+
+- `V2GlassButton` 只允许设计预览和明确批准的只读上下文次操作；业务页面标题区、筛选区、表格、正文和弹窗页脚均使用 `V2Button`。
+- `V2ConfirmDialog` 使用普通或危险语义按钮，不改成玻璃材质。
+- `V2Dialog` 自动提供标准壳；页面只追加已登记的 `v2-dialog-standard`、`v2-detail-dialog`、`v2-dialog-wide`、`v2-dialog-bottom-sheet`。
+- 详情统一复用 `v2-detail-dialog__section`、`__facts`、`__table`、`__actions`、`__form-row`；禁止嵌套 `V2Card`。
+- 弹窗页脚次操作在左、主操作在右，同尺寸、同基线，使用共享半透明液态背景且只保留顶部分隔线。
+
+## 6. 页面、表格与反馈
+
+- H1标题卡默认插槽必须为空；页面级搜索、下拉和按钮进入 `actions`。
+- 汇总标签必须紧随对应 `h2` 并通过 `title-extra` 使用 `V2Badge`，不得用副标题承载数量。
+- 单一列表的数据区不得重复渲染“某某列表”等可见标题。
+- 顶层列表表格与分页必须置于同一个 `V2Card`。
+- 同一主对象或生命周期的阶段账册合并为一个复合数据区；跨项目子记录不得在概览下失去项目归属后直接铺开。
+- 普通单据明细行保持透明；弹窗表格必须取消页面级最小宽度继承。
+- 页面标题操作和表格行内操作统一使用 `size="small"`。
+- 禁止卡片嵌套、私有按钮材质、原始数据库主键、未映射英文状态和“权威、回读、后端阶段”等实现语言。
+- 公共壳主内容区必须可独立纵向滚动。
+- 刷新、读取和短暂操作结果只使用一次公共 Toast；禁止同时渲染 Toast 与页面级 `V2Alert`。
+- 空态只在请求成功且结果为空时出现；失败态与空态互斥。
+
+## 7. 全 V2 强制退出门
+
+不得维护会遗漏新路由的第二份手工页面清单。静态门禁从 `src/pages/**/*.vue`、公共组件出口和导航目录动态发现现行页面与组件。
+
+本地唯一入口：
+
+```powershell
+cd frontend-admin-v2
+pnpm check:design-system
 ```
 
-#### 2. Tailwind 配置 (`tailwind.config.js`) —— 如果您使用 Vue/React + Tailwind
-```javascript
-module.exports = {
-  theme: {
-    extend: {
-      colors: {
-        primary: '#1677FF',
-        'primary-hover': '#4096FF',
-        'bg-body': '#F5F7FA',
-        'text-main': '#1D2129',
-        'text-secondary': '#4E5969',
-        'text-placeholder': '#86909C',
-        'border-color': '#E5E6EB',
-        'tag-blue': { bg: '#E6F4FF', text: '#1677FF' },
-      },
-      fontFamily: {
-        sans: ['PingFang SC', 'Microsoft YaHei', 'sans-serif'],
-      },
-      fontSize: {
-        'xs': ['12px', { lineHeight: '1.5' }], // 辅助文字
-        'sm': ['14px', { lineHeight: '1.5' }], // 正文
-        'base': ['16px', { lineHeight: '1.2' }], // 卡片标题
-        'xl': ['24px', { lineHeight: '1.2' }], // 统计数字
-      },
-      spacing: {
-        '4': '4px',
-        '8': '8px', // 间距xs
-        '12': '12px',
-        '16': '16px', // 间距md
-        '24': '24px', // 间距lg
-        '32': '32px', // 按钮/输入框高度
-      },
-      boxShadow: {
-        'card': '0px 2px 8px rgba(0, 0, 0, 0.04)',
-      },
-      borderRadius: {
-        'DEFAULT': '4px',
-      }
-    },
-  },
-}
+完整交付门：
+
+```powershell
+pnpm check:design-system
+pnpm check:boundary
+pnpm check:route-ledger
+pnpm lint:check
+pnpm test:unit
+pnpm type-check:contracts
+pnpm type-check
+pnpm build
+pnpm check:bundle-size
+pnpm test:e2e:migration-gate
+git diff --check
 ```
 
-#### 3. 针对表格中“施工总承包”标签的 CSS 类
-```css
-/* 表格中的状态/类型标签，需对齐高度和圆角 */
-.table-tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 8px;
-  height: 20px; /* 视觉高度统一 */
-  border-radius: 4px; /* 非胶囊形，4px直角圆角 */
-  font-size: 12px;
-  font-weight: 500;
-  background-color: var(--color-tag-blue-bg);
-  color: var(--color-tag-blue-text);
-}
-```
+门禁职责：
 
-#### 4. 卡片与表格的组件代码参考 (Vue/React 伪代码)
-主要操作栏（对应图中的“新建项目”、“刷新”、“列设置”）：
-```html
-<div class="flex justify-between items-center mb-4">
-  <div class="flex gap-2">
-    <button class="bg-primary text-white px-4 py-1.5 rounded flex items-center gap-1 text-sm">
-      + 新建项目
-    </button>
-    <button class="bg-white border border-border-color text-text-main px-3 py-1.5 rounded flex items-center gap-1 text-sm">
-      <icon-refresh /> 刷新
-    </button>
-    <button class="bg-white border border-border-color text-text-main px-3 py-1.5 rounded flex items-center gap-1 text-sm">
-      <icon-setting /> 列设置
-    </button>
-  </div>
-</div>
-```
+- `design-system.test.ts`：token、共享组件、页面结构、弹窗、表格、分页、表单、反馈、唯一标准与唯一预览入口。
+- `v2-ui-remediation-gate.test.ts`：动态扫描所有V2业务页，阻止私有材质和浏览器批注回归。
+- `global-context-contract.test.ts`：公共项目/报告期上下文与浏览器门。
+- `design-system-preview.spec.ts`：唯一预览页、V3弹窗、关闭策略、桌面/移动溢出和控制台。
+- `check-clean-room-boundary.mjs`：只负责V2与Legacy隔离，不替代设计门。
 
----
+CI的 `frontend-v2-gate` 必须显式执行 `pnpm check:design-system`，并继续执行完整 unit、类型、构建、迁移E2E和依赖审计。PR证据仍由同一 `frontend-v2-gate` job绑定HEAD SHA。
 
-### 第四步：给您的下一步行动建议（手动提取引导）
-由于我无法访问您的源代码，请您督促前端开发团队执行以下操作：
-1.  **建立文件结构**：在项目根目录的全局样式文件夹中，创建一个名为 `design-tokens.css` 或 `tailwind.config.js` 的文件，**完整复制**第三部分的代码。
-2.  **清理污染代码**：全局搜索代码中带有硬编码颜色（如 `#666`, `#eee`, `#3182ce`）和硬编码大小（如 `height: 30px`）的 CSS/JSX 代码，统一替换为上述的 `var(--color-x)` 或 Tailwind 类名。
-3.  **照镜子测试**：挑选 1 个非“项目列表”的页面（如“成本管理”），应用上述样式规范。截图发回给团队评审，查看统计数字、按钮、输入框的尺寸是否 **100% 像素级** 对齐项目列表页。若对齐，则批量推广到所有功能模块。
+## 8. 变更与回滚
+
+- 修改设计语义时，同一diff必须更新本文、实现token/组件、预览、静态门禁和浏览器门；计划或验收报告不得先行变成规范。
+- 未增加新视觉方向、复杂交互或现有模式无法覆盖时，不引入第二组件库、Storybook、Figma流程或新预览地址。
+- 门禁失败时回滚该批设计规则、组件和测试；不得放宽扫描、增加页面白名单或删除失败用例换取绿灯。
+- 历史计划和质量报告保留审计价值，不批量改写；只停止把它们作为现行设计依据。

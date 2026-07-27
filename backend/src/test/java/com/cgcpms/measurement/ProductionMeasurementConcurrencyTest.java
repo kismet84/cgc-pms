@@ -11,7 +11,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -37,7 +37,7 @@ class ProductionMeasurementConcurrencyTest {
     private static final long GENERAL_FILE=99192011L,LINE_FILE=99192012L,OWNER_FILE=99192013L,CONFIRM_FILE=99192014L;
     @Autowired ProductionMeasurementService service;
     @Autowired FileService fileService;
-    @MockBean MinioClient minioClient;
+    @MockitoBean MinioClient minioClient;
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transactionManager;
     @BeforeEach void setup() {

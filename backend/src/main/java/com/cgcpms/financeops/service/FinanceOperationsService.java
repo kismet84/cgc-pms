@@ -8,7 +8,11 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -24,11 +28,13 @@ import java.util.*;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class FinanceOperationsService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final TransactionTemplate transactionTemplate;
+    private final ObjectProvider<MeterRegistry> meterRegistryProvider;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> adjustBudget(BudgetAdjustmentRequest request) {
@@ -277,24 +283,45 @@ public class FinanceOperationsService {
 
     @Scheduled(cron = "0 15 1 * * ?")
     public void scheduledReconciliationAndAlerts() {
-        for (Long tenantId : jdbc.queryForList("SELECT DISTINCT tenant_id FROM pay_application", Long.class)) {
-            try {
-                transactionTemplate.executeWithoutResult(status ->
-                        runReconciliationForTenant(tenantId, LocalDate.now().minusDays(1), null));
-            } catch (RuntimeException error) {
-                // 单租户失败已回滚；调度继续处理其他租户。
-            }
-            try {
-                transactionTemplate.executeWithoutResult(status ->
-                        generateAlertsForTenant(tenantId, LocalDateTime.now()));
-            } catch (RuntimeException error) {
-                // 单租户失败已回滚；调度继续处理其他租户。
-            }
+        for (Long tenantId : scheduledTenantIds()) {
+            runScheduledOperation("reconciliation", tenantId, () -> transactionTemplate.executeWithoutResult(status ->
+                    runReconciliationForTenant(tenantId, LocalDate.now().minusDays(1), null)));
+            runScheduledOperation("alerts", tenantId, () -> transactionTemplate.executeWithoutResult(status ->
+                    generateAlertsForTenant(tenantId, LocalDateTime.now())));
         }
     }
 
-    private Map<String,Object> runReconciliationForTenant(Long tenantId, LocalDate date, Long operator) {
-        Map<String,Object> existing = one("SELECT * FROM finance_reconciliation_run WHERE tenant_id=? AND business_date=? AND run_type='DAILY'", tenantId, date);
+    List<Long> scheduledTenantIds() {
+        return jdbc.queryForList("SELECT DISTINCT tenant_id FROM pay_application", Long.class);
+    }
+
+    private void runScheduledOperation(String operation, Long tenantId, Runnable task) {
+        try {
+            task.run();
+            recordScheduledOperation(operation, "success");
+        } catch (RuntimeException error) {
+            log.error("Scheduled finance operation failed: operation={}, tenantId={}, errorType={}",
+                    operation, tenantId, error.getClass().getSimpleName());
+            recordScheduledOperation(operation, "failure");
+        }
+    }
+
+    private void recordScheduledOperation(String operation, String outcome) {
+        MeterRegistry registry = meterRegistryProvider.getIfAvailable();
+        if (registry == null) return;
+        Counter.builder("finance.scheduled.operations")
+                .tag("operation", operation)
+                .tag("outcome", outcome)
+                .register(registry)
+                .increment();
+    }
+
+    Map<String,Object> runReconciliationForTenant(Long tenantId, LocalDate date, Long operator) {
+        Map<String,Object> existing = one("""
+                SELECT id,tenant_id,business_date,run_type,status,issue_count,summary_json,started_at,finished_at,created_by
+                FROM finance_reconciliation_run
+                WHERE tenant_id=? AND business_date=? AND run_type='DAILY'
+                """, tenantId, date);
         if (existing != null && "COMPLETED".equals(existing.get("status"))) return existing;
         Long runId = existing == null ? IdWorker.getId() : longValue(existing.get("id"));
         if (existing == null) jdbc.update("INSERT INTO finance_reconciliation_run(id,tenant_id,business_date,run_type,status,issue_count,started_at,created_by) VALUES(?,?,?,'DAILY','RUNNING',0,CURRENT_TIMESTAMP,?)",
@@ -333,7 +360,10 @@ public class FinanceOperationsService {
                 "budget", "nonnegative and capacity", "issueCount", issues);
         jdbc.update("UPDATE finance_reconciliation_run SET status=?,issue_count=?,summary_json=?,finished_at=CURRENT_TIMESTAMP WHERE id=?",
                 issues == 0 ? "COMPLETED" : "COMPLETED_WITH_ISSUES", issues, json(summary), runId);
-        return one("SELECT * FROM finance_reconciliation_run WHERE id=?", runId);
+        return one("""
+                SELECT id,tenant_id,business_date,run_type,status,issue_count,summary_json,started_at,finished_at,created_by
+                FROM finance_reconciliation_run WHERE id=?
+                """, runId);
     }
 
     private int generateAlertsForTenant(Long tenantId, LocalDateTime now) {

@@ -2,6 +2,7 @@
 import { onErrorCaptured, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import GlobalErrorPage from '@/pages/errors/GlobalErrorPage.vue'
+import { reportClientError } from '@/services/clientErrorReporter'
 
 interface CapturedError {
   fingerprint: string
@@ -13,6 +14,7 @@ const captured = ref<CapturedError | null>(null)
 const renderKey = ref(0)
 
 onErrorCaptured((error) => {
+  void reportClientError('VUE', error)
   const fingerprint = errorFingerprint(error)
   captured.value = {
     fingerprint,

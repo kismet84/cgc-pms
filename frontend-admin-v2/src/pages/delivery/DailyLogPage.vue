@@ -14,7 +14,6 @@ import {
   V2Card,
   V2ConfirmDialog,
   V2Dialog,
-  V2GlassButton,
   V2Input,
   V2PageState,
   V2Select,
@@ -581,6 +580,16 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
           <caption class="v2-visually-hidden">
             现场日报列表
           </caption>
+          <colgroup>
+            <col style="width: 14rem" />
+            <col style="width: 7rem" />
+            <col style="width: 14rem" />
+            <col style="width: 6rem" />
+            <col style="width: 10rem" />
+            <col style="width: 6rem" />
+            <col style="width: 18rem" />
+            <col style="width: 7rem" />
+          </colgroup>
           <thead>
             <tr>
               <th>日报标识</th>
@@ -612,7 +621,9 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
                   {{ record.status === 'DRAFT' ? '草稿' : '已提交' }}
                 </V2Badge>
               </td>
-              <td>{{ record.weatherSummary || '未填写天气摘要' }}</td>
+              <td class="v2-table-cell--wrap">
+                {{ record.weatherSummary || '未填写天气摘要' }}
+              </td>
               <td>{{ record.onSiteHeadcount ?? '未填写' }}</td>
               <td class="daily-log-page__summary daily-log-page__summary-cell v2-table-cell--wrap">
                 {{ record.constructionContent }}
@@ -670,7 +681,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
       :panel-class="
         dialogMode === 'view'
           ? 'v2-dialog-standard v2-detail-dialog'
-          : 'v2-dialog-standard v2-detail-dialog daily-log-page__dialog'
+          : 'v2-dialog-standard v2-detail-dialog v2-dialog-wide'
       "
       :close-on-backdrop="dialogMode === 'view'"
       @backdrop-click="warnUnsavedDialog"
@@ -755,12 +766,15 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
               type="file"
               @change="onFileChange"
             />
-            <V2GlassButton
-              text="选择文件"
+            <V2Button
+              type="button"
+              size="small"
+              variant="secondary"
               :disabled="saving"
-              :on-click="openFilePicker"
-              class-name="daily-log-page__glass-button"
-            />
+              @click="openFilePicker"
+            >
+              选择文件
+            </V2Button>
           </div>
           <V2PageState
             v-if="filesLoading"
@@ -871,13 +885,15 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
           </div>
           <p v-else class="daily-log-page__empty-copy">暂无当日周计划任务。</p>
           <div>
-            <V2GlassButton
+            <V2Button
               v-if="dialogMode !== 'view' && canReportProgress && activeRecord.status === 'DRAFT'"
-              text="保存实际进度"
+              type="button"
+              size="small"
               :loading="progressSaving"
-              :on-click="saveProgress"
-              class-name="daily-log-page__glass-button"
-            />
+              @click="saveProgress"
+            >
+              保存实际进度
+            </V2Button>
           </div>
         </section>
 
@@ -939,26 +955,18 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
       </template>
 
       <template v-if="dialogMode !== 'view'" #footer>
-        <div class="daily-log-page__dialog-actions">
-          <V2GlassButton
-            text="关闭"
-            :on-click="() => (dialogOpen = false)"
-            class-name="daily-log-page__glass-button"
-          />
-          <V2GlassButton
-            text="保存草稿"
-            :loading="saving"
-            :on-click="saveRecord"
-            class-name="daily-log-page__glass-button"
-          />
-          <V2GlassButton
-            v-if="canSubmitCurrent"
-            text="提交定稿"
-            :loading="saving"
-            :on-click="requestDailySubmit"
-            class-name="daily-log-page__glass-button"
-          />
-        </div>
+        <V2Button type="button" variant="secondary" @click="dialogOpen = false">关闭</V2Button>
+        <V2Button type="button" variant="secondary" :loading="saving" @click="saveRecord">
+          保存草稿
+        </V2Button>
+        <V2Button
+          v-if="canSubmitCurrent"
+          type="button"
+          :loading="saving"
+          @click="requestDailySubmit"
+        >
+          提交定稿
+        </V2Button>
       </template>
     </V2Dialog>
 
@@ -1051,10 +1059,6 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
 }
-.daily-log-page__dialog :deep(.daily-log-page__glass-button) {
-  width: auto;
-  min-height: var(--v2-control-height-md);
-}
 .daily-log-page__dialog-actions {
   position: relative;
   display: flex;
@@ -1087,22 +1091,16 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
   padding: var(--v2-space-2) var(--v2-space-3);
   resize: vertical;
 }
-.daily-log-page__dialog {
-  width: min(72rem, calc(100vw - 2rem));
-}
 .daily-log-page__table-wrap {
   overflow: auto;
 }
 .daily-log-page__list-table {
-  min-width: 72rem;
+  min-width: 82rem;
   table-layout: fixed;
-}
-.daily-log-page__summary-cell {
-  width: 28%;
 }
 .daily-log-page__panel {
   padding: var(--v2-space-3);
-  border: 1px solid var(--v2-color-border);
+  border: var(--v2-border-width) solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
   font-size: var(--v2-font-size-12);
 }

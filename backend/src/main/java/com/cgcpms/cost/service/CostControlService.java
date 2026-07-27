@@ -7,6 +7,7 @@ import com.cgcpms.cost.dto.CostControlModels.CorrectiveActionRequest;
 import com.cgcpms.cost.dto.CostControlModels.CorrectiveCloseRequest;
 import com.cgcpms.cost.dto.CostControlModels.ForecastItemRequest;
 import com.cgcpms.cost.dto.CostControlModels.ForecastRequest;
+import com.cgcpms.cost.vo.CostProjectSummaryVO;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -22,6 +23,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -50,6 +52,61 @@ public class CostControlService {
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
     private final CostSummaryService costSummaryService;
+
+    public Map<String, Object> overview() {
+        List<CostProjectSummaryVO> projects = costSummaryService.getAccessibleProjectSummaries();
+        applyLatestForecasts(projects);
+        int forecastProjectCount = (int) projects.stream()
+                .filter(project -> project.getCostForecastId() != null)
+                .count();
+        BigDecimal contractIncome = sum(projects, CostProjectSummaryVO::getContractIncome);
+        BigDecimal dynamicCost = sum(projects, CostProjectSummaryVO::getDynamicCost);
+        BigDecimal forecastAtCompletionCost = sum(projects, CostProjectSummaryVO::getForecastAtCompletionCost);
+        BigDecimal forecastProfit = sum(projects, CostProjectSummaryVO::getForecastProfit);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("accessibleProjectCount", projects.size());
+        result.put("forecastProjectCount", forecastProjectCount);
+        result.put("noForecastProjectCount", projects.size() - forecastProjectCount);
+        result.put("contractIncome", contractIncome.toPlainString());
+        result.put("dynamicCost", dynamicCost.toPlainString());
+        result.put("forecastAtCompletionCost", forecastAtCompletionCost.toPlainString());
+        result.put("forecastProfit", forecastProfit.toPlainString());
+        result.put("profitMargin", contractIncome.compareTo(BigDecimal.ZERO) == 0
+                ? "0.000000"
+                : forecastProfit.divide(contractIncome, 6, RoundingMode.HALF_UP).toPlainString());
+        result.put("projects", projects);
+        return result;
+    }
+
+    private void applyLatestForecasts(List<CostProjectSummaryVO> projects) {
+        if (projects.isEmpty()) return;
+        List<Long> projectIds = projects.stream()
+                .map(CostProjectSummaryVO::getProjectId)
+                .map(Long::valueOf)
+                .toList();
+        String placeholders = String.join(",", Collections.nCopies(projectIds.size(), "?"));
+        List<Object> args = new ArrayList<>(projectIds.size() + 1);
+        args.add(tenant());
+        args.addAll(projectIds);
+        List<Map<String, Object>> forecasts = jdbc.queryForList(
+                "SELECT * FROM cost_forecast WHERE tenant_id=? AND project_id IN (" + placeholders
+                        + ") AND status IN('ACTION_REQUIRED','CONTROLLED') AND deleted_flag=0 ORDER BY project_id,version_no DESC,id DESC",
+                args.toArray());
+        Map<Long, Map<String, Object>> latestByProject = new HashMap<>();
+        for (Map<String, Object> forecast : forecasts) {
+            latestByProject.putIfAbsent(idValue(forecast.get("project_id")), forecast);
+        }
+        for (CostProjectSummaryVO project : projects) {
+            Map<String, Object> forecast = latestByProject.get(Long.valueOf(project.getProjectId()));
+            if (forecast == null) continue;
+            project.setCostForecastId(String.valueOf(forecast.get("id")));
+            project.setResponsibilityCost(money(forecast.get("responsibility_amount")).toPlainString());
+            project.setForecastAtCompletionCost(money(forecast.get("forecast_at_completion_amount")).toPlainString());
+            project.setForecastProfit(money(forecast.get("forecast_profit_amount")).toPlainString());
+            project.setProfitMargin(decimal(forecast.get("profit_margin")).toPlainString());
+        }
+    }
 
     public Map<String, Object> overview(Long projectId) {
         requireProject(projectId, false);
@@ -456,6 +513,16 @@ public class CostControlService {
     private static String stringNullable(Object value) { return value == null ? null : String.valueOf(value); }
     private static LocalDate localDate(Object value) { if (value instanceof LocalDate d) return d; if (value instanceof java.sql.Date d) return d.toLocalDate(); return LocalDate.parse(String.valueOf(value)); }
     private static BigDecimal money(Object value) { BigDecimal amount = value == null ? BigDecimal.ZERO : value instanceof BigDecimal b ? b : new BigDecimal(String.valueOf(value)); return amount.setScale(2, RoundingMode.HALF_UP); }
+    private static BigDecimal decimal(Object value) { return value == null ? BigDecimal.ZERO : value instanceof BigDecimal b ? b : new BigDecimal(String.valueOf(value)); }
+
+    private static BigDecimal sum(List<CostProjectSummaryVO> projects,
+                                  java.util.function.Function<CostProjectSummaryVO, String> value) {
+        return projects.stream()
+                .map(value)
+                .filter(Objects::nonNull)
+                .map(BigDecimal::new)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
 
     @SuppressWarnings("unchecked")
     private static <T> T moneyPayload(T value) {

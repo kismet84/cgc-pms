@@ -142,7 +142,7 @@ onBeforeUnmount(() => controller?.abort())
   justify-content: space-between;
   gap: var(--v2-space-4);
   padding: var(--v2-space-3);
-  border: 1px solid var(--v2-color-border);
+  border: var(--v2-border-width) solid var(--v2-color-border);
   border-radius: var(--v2-radius-md);
 }
 .report-catalog-page__item strong {

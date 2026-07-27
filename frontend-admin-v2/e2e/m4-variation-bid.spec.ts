@@ -196,16 +196,9 @@ test.describe('M4 variation and bid routes', () => {
     await page.goto('/v2/bid-cost')
     await page.getByRole('button', { name: 'BID-071' }).click()
     const detailDialog = page.getByRole('dialog', { name: '投标成本预览' })
-    const glassButton = detailDialog.locator('.v2-glass-button').first()
     await expect(detailDialog).toHaveClass(/v2-detail-dialog/)
     await expect(detailDialog.locator('.v2-detail-dialog__facts')).toHaveCSS('font-size', '12px')
-    await expect(glassButton).toBeVisible()
-    expect(
-      await glassButton.evaluate((element) => getComputedStyle(element).backgroundImage),
-    ).toContain('linear-gradient')
-    expect(
-      await glassButton.evaluate((element) => getComputedStyle(element).backdropFilter),
-    ).toContain('blur(16px)')
+    await expect(detailDialog.locator('.v2-glass-button')).toHaveCount(0)
 
     expect(runtimeErrors).toEqual([])
   })

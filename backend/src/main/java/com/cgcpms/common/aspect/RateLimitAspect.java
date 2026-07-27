@@ -1,8 +1,10 @@
 package com.cgcpms.common.aspect;
 
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.auth.dto.LoginRequest;
 import com.cgcpms.common.annotation.RateLimit;
 import com.cgcpms.common.annotation.RateLimitKey;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.exception.RateLimitExceededException;
 import com.cgcpms.common.ratelimit.LoginLockoutStore;
 import com.cgcpms.common.ratelimit.RateLimitCounterStore;
@@ -16,6 +18,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
+import java.util.Locale;
 
 /**
  * Enforces {@link RateLimit} constraints on annotated controller methods,
@@ -80,8 +88,11 @@ public class RateLimitAspect {
     public Object around(ProceedingJoinPoint joinPoint, RateLimit rateLimit) throws Throwable {
         String ip = resolveClientIp();
 
-        // --- R-27: check account lockout BEFORE proceeding ---
-        checkLockout(ip);
+        boolean loginLockout = rateLimit.loginLockout();
+        String loginLockoutKey = loginLockout ? buildLoginLockoutKey(joinPoint, ip) : null;
+        if (loginLockout) {
+            checkLockout(loginLockoutKey);
+        }
 
         String endpoint = joinPoint.getSignature().toShortString();
         RateLimitKey keyDimension = rateLimit.key();
@@ -101,18 +112,18 @@ public class RateLimitAspect {
         try {
             result = joinPoint.proceed();
         } catch (Throwable t) {
-            // --- R-27: any exception thrown during login counts as a failed attempt ---
-            recordFailedAttempt(ip);
+            if (loginLockout && isCredentialFailure(t)) {
+                recordFailedAttempt(loginLockoutKey);
+            }
             throw t;
         }
 
-        // --- R-27: check ApiResponse code for login failure ---
-        if (result instanceof ApiResponse<?> apiResp
-                && !ApiResponse.SUCCESS_CODE.equals(apiResp.getCode())) {
-            recordFailedAttempt(ip);
-        } else {
-            // Successful login (or non-ApiResponse return) – clear failure counter
-            clearFailureCounter(ip);
+        if (loginLockout && result instanceof ApiResponse<?> apiResp) {
+            if ("AUTH_FAILED".equals(apiResp.getCode())) {
+                recordFailedAttempt(loginLockoutKey);
+            } else if (ApiResponse.SUCCESS_CODE.equals(apiResp.getCode())) {
+                clearFailureCounter(loginLockoutKey);
+            }
         }
 
         return result;
@@ -152,11 +163,11 @@ public class RateLimitAspect {
      *
      * @throws RateLimitExceededException with a lockout-specific message
      */
-    private void checkLockout(String ip) {
-        long remainingMillis = lockoutStore.getRemainingLockoutMillis(ip);
+    private void checkLockout(String key) {
+        long remainingMillis = lockoutStore.getRemainingLockoutMillis(key);
         if (remainingMillis > 0L) {
             long remainingMinutes = remainingMillis / 60_000 + 1;
-            log.warn("Account locked out: ipDigest={}, remaining={}min", safeIpDigest(ip), remainingMinutes);
+            log.warn("Account locked out: keyDigest={}, remaining={}min", safeKeyDigest(key), remainingMinutes);
             throw new RateLimitExceededException(
                     String.format("登录失败次数过多，账号已锁定，请在 %d 分钟后重试", remainingMinutes));
         }
@@ -169,8 +180,8 @@ public class RateLimitAspect {
      * Once the count reaches {@link #LOCKOUT_THRESHOLD}, the IP is locked out for
      * {@link #LOCKOUT_DURATION_MINUTES} minutes and the failure counter is reset.
      */
-    private void recordFailedAttempt(String ip) {
-        lockoutStore.recordFailure(ip, LOCKOUT_THRESHOLD, FAILURE_WINDOW_MINUTES, LOCKOUT_DURATION_MINUTES);
+    private void recordFailedAttempt(String key) {
+        lockoutStore.recordFailure(key, LOCKOUT_THRESHOLD, FAILURE_WINDOW_MINUTES, LOCKOUT_DURATION_MINUTES);
     }
 
     /**
@@ -178,8 +189,32 @@ public class RateLimitAspect {
      * Called when a login succeeds, so legitimate users who occasionally mistype
      * are not penalised.
      */
-    private void clearFailureCounter(String ip) {
-        lockoutStore.clear(ip);
+    private void clearFailureCounter(String key) {
+        lockoutStore.clear(key);
+    }
+
+    private String buildLoginLockoutKey(ProceedingJoinPoint joinPoint, String ip) {
+        String account = "unknown";
+        for (Object argument : joinPoint.getArgs()) {
+            if (argument instanceof LoginRequest request
+                    && request.getUsername() != null
+                    && !request.getUsername().isBlank()) {
+                account = request.getUsername().trim().toLowerCase(Locale.ROOT);
+                break;
+            }
+        }
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                    .digest((ip + '\0' + account).getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 unavailable", exception);
+        }
+    }
+
+    private boolean isCredentialFailure(Throwable throwable) {
+        return throwable instanceof BusinessException businessException
+                && "AUTH_FAILED".equals(businessException.getCode());
     }
 
     /* =========================================================================
@@ -224,10 +259,4 @@ public class RateLimitAspect {
         return "len=" + length + ":" + Integer.toHexString(limitKey.hashCode());
     }
 
-    private String safeIpDigest(String ip) {
-        if (ip == null || ip.isBlank() || "unknown".equalsIgnoreCase(ip)) {
-            return "unknown";
-        }
-        return "ipHash=" + Integer.toHexString(ip.hashCode());
-    }
 }

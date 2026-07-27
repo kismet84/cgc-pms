@@ -863,9 +863,122 @@ input:focus-visible,
   line-height: 28px !important;
 }
 
-.ant-modal-content,
+.ant-modal-root .ant-modal-mask {
+  background: var(--modal-mask);
+  -webkit-backdrop-filter: blur(var(--modal-mask-blur));
+  backdrop-filter: blur(var(--modal-mask-blur));
+}
+
+:root .ant-modal-root .ant-modal .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  border: 1px solid var(--modal-border);
+  border-radius: var(--modal-radius);
+  background: var(--modal-surface);
+  box-shadow: var(--modal-shadow);
+  -webkit-backdrop-filter: blur(var(--modal-blur)) saturate(135%);
+  backdrop-filter: blur(var(--modal-blur)) saturate(135%);
+}
+
+:root .ant-modal-root .ant-modal .ant-modal-header,
+:root .ant-modal-root .ant-modal .ant-modal-footer {
+  flex: 0 0 auto;
+  background: var(--modal-header-surface);
+}
+
+:root .ant-modal-root .ant-modal .ant-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+:root .ant-modal-root .ant-modal .ant-modal-header {
+  border-bottom-color: var(--modal-border);
+}
+
+:root .ant-modal-root .ant-modal .ant-modal-footer {
+  border-top-color: var(--modal-border);
+}
+
+.ant-modal-root .ant-modal-close:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 .ant-drawer-content {
   border-radius: var(--radius-lg);
+}
+
+@media (max-width: 640px) {
+  .ant-modal-root .ant-modal-wrap {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: hidden;
+    padding: 16px 8px 8px;
+  }
+
+  .ant-modal-root .ant-modal {
+    top: 0;
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px);
+    margin: 0;
+    padding-bottom: 0;
+  }
+
+  :root .ant-modal-root .ant-modal .ant-modal-content {
+    max-height: calc(100dvh - 24px);
+    border-radius: var(--modal-radius) var(--modal-radius) 12px 12px;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .ant-modal-root .ant-modal-mask {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  :root .ant-modal-root .ant-modal .ant-modal-content {
+    background: var(--modal-surface-solid);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ant-modal-root .ant-modal,
+  .ant-modal-root .ant-modal-mask,
+  .ant-modal-root [class*='ant-zoom'] {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+    scroll-behavior: auto;
+  }
+}
+
+@media (forced-colors: active) {
+  .ant-modal-root .ant-modal-mask {
+    background: CanvasText;
+    opacity: 0.5;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  :root .ant-modal-root .ant-modal .ant-modal-content,
+  :root .ant-modal-root .ant-modal .ant-modal-header,
+  :root .ant-modal-root .ant-modal .ant-modal-footer {
+    border-color: CanvasText;
+    background: Canvas;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .ant-modal-root .ant-modal-close:focus-visible {
+    outline-color: Highlight;
+  }
 }
 
 @media (max-width: 1200px) {

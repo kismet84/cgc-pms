@@ -12,6 +12,9 @@ global:
   external_labels:
     app: cgc-pms
 
+rule_files:
+  - '/etc/prometheus/alerts.yml'
+
 scrape_configs:
   - job_name: 'cgc-pms-backend'
     metrics_path: '/api/actuator/prometheus'

@@ -204,4 +204,23 @@ export function request<T = unknown>(config: InternalAxiosRequestConfig | object
   return service.request<unknown, T>(config as InternalAxiosRequestConfig)
 }
 
+export async function postClientError(body: {
+  app: 'LEGACY'
+  source: 'VUE' | 'WINDOW' | 'PROMISE'
+  kind: string
+  fingerprint: string
+}): Promise<void> {
+  const csrfToken = getCsrfTokenFromCookie()
+  const response = await fetch(`${API_BASE_URL}/client-errors`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { [CSRF_HEADER_NAME]: csrfToken } : {}),
+    },
+    body: JSON.stringify(body),
+  })
+  if (!response.ok) throw new Error('CLIENT_ERROR_REPORT_FAILED')
+}
+
 export default service
