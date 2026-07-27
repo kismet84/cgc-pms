@@ -18,6 +18,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 import io.jsonwebtoken.Claims;
 
@@ -145,6 +146,43 @@ public class AuthService {
         return user != null && tenantId.equals(user.getTenantId())
                 && ENABLED_STATUS.equals(user.getStatus())
                 && version.equals(jwtUtils.credentialVersion(user.getPassword()));
+    }
+
+    /** Fail closed when roles or permissions changed after an access token was issued. */
+    public boolean isCurrentAuthorization(Claims claims) {
+        if (claims == null) return false;
+        Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
+        Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
+        if (userId == null || tenantId == null) return false;
+        try {
+            SysUser user = sysUserMapper.selectById(userId);
+            if (user == null || !tenantId.equals(user.getTenantId()) || !ENABLED_STATUS.equals(user.getStatus())) {
+                return false;
+            }
+            return Set.copyOf(getRoleCodes(userId)).equals(Set.copyOf(roleClaim(claims)))
+                    && Set.copyOf(getPermissionCodes(userId)).equals(
+                    Set.copyOf(JwtUtils.decodePermissionClaim(claims.get(JwtUtils.CLAIM_PERMISSIONS))));
+        } catch (RuntimeException exception) {
+            return false;
+        }
+    }
+
+    private List<String> roleClaim(Claims claims) {
+        Object value = claims.get(JwtUtils.CLAIM_ROLES);
+        if (value instanceof List<?> values) {
+            return values.stream()
+                    .filter(String.class::isInstance)
+                    .map(String.class::cast)
+                    .filter(role -> !role.isBlank())
+                    .toList();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            return List.of(text.split(",")).stream()
+                    .map(String::trim)
+                    .filter(role -> !role.isEmpty())
+                    .toList();
+        }
+        return List.of();
     }
 
     /**

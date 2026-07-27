@@ -39,6 +39,10 @@ minio:
 auth:
   csrf:
     enabled: false
+  # Synthetic controller-test JWTs intentionally carry fixture authorities.
+  # Dedicated AuthService/JwtAuthenticationFilter tests cover current snapshot validation.
+  authorization-snapshot-validation:
+    enabled: false
 
 # Unrelated integration tests share a cached Spring context and the in-memory
 # fallback counter store. Keep global write throttling off by default in the

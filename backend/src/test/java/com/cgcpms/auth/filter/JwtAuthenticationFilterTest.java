@@ -1,6 +1,8 @@
 package com.cgcpms.auth.filter;
 
 import com.cgcpms.auth.config.JwtProperties;
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.auth.service.AuthService;
 import com.cgcpms.auth.service.TokenBlacklistService;
 import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.auth.util.CookieUtils;
@@ -179,9 +181,51 @@ class JwtAuthenticationFilterTest {
         verify(chain).doFilter(request, response);
     }
 
+    @Test
+    @DisplayName("rejects access tokens after the server authorization snapshot changes")
+    void staleAuthorizationSnapshotIsRejected() throws Exception {
+        JwtUtils jwtUtils = mock(JwtUtils.class);
+        JwtProperties jwtProperties = mock(JwtProperties.class);
+        CookieUtils cookieUtils = mock(CookieUtils.class);
+        AuthService authService = mock(AuthService.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<TokenBlacklistService> blacklistProvider = mock(ObjectProvider.class);
+        TokenBlacklistService blacklistService = mock(TokenBlacklistService.class);
+        FilterChain chain = mock(FilterChain.class);
+        var claims = Jwts.claims()
+                .add(JwtUtils.CLAIM_USER_ID, 1L)
+                .add(JwtUtils.CLAIM_TENANT_ID, 902L)
+                .build();
+
+        when(jwtProperties.getHeader()).thenReturn("Authorization");
+        when(jwtProperties.getTokenPrefix()).thenReturn("Bearer ");
+        when(cookieUtils.getCookieValue(any(HttpServletRequest.class), eq(CookieUtils.ACCESS_TOKEN_COOKIE))).thenReturn(null);
+        when(jwtUtils.validateToken("stale-token")).thenReturn(true);
+        when(jwtUtils.isRefreshToken("stale-token")).thenReturn(false);
+        when(jwtUtils.parseToken("stale-token")).thenReturn(claims);
+        when(blacklistProvider.getIfAvailable()).thenReturn(blacklistService);
+        when(blacklistService.isBlacklisted("stale-token")).thenReturn(false);
+        when(authService.isCurrentAuthorization(claims)).thenAnswer(invocation -> {
+            assertEquals(902L, UserContext.getCurrentTenantId());
+            return false;
+        });
+
+        AuthorizationAwareFilter staleFilter = new AuthorizationAwareFilter(
+                jwtUtils, jwtProperties, cookieUtils, blacklistProvider, authService);
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/protected");
+        request.setServletPath("/protected");
+        request.addHeader("Authorization", "Bearer stale-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        staleFilter.doFilter(request, response, chain);
+
+        verify(chain, never()).doFilter(any(), any());
+        assertEquals(401, response.getStatus());
+    }
+
     private static class ExposedJwtAuthenticationFilter extends JwtAuthenticationFilter {
         ExposedJwtAuthenticationFilter() {
-            super(null, null, null, null, null, null, new MockEnvironment());
+            super(null, null, null, null, null, null, null, new MockEnvironment());
         }
 
         ExposedJwtAuthenticationFilter(JwtUtils jwtUtils,
@@ -191,7 +235,7 @@ class JwtAuthenticationFilterTest {
                                        ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider,
                                        MockEnvironment environment) {
             super(jwtUtils, jwtProperties, cookieUtils, objectMapper, tokenBlacklistServiceProvider,
-                    permissiveUserMapper(), environment);
+                    permissiveUserMapper(), authServiceProvider(mock(AuthService.class)), environment);
         }
 
         private static SysUserMapper permissiveUserMapper() {
@@ -210,6 +254,34 @@ class JwtAuthenticationFilterTest {
         protected boolean isCurrentCredential(io.jsonwebtoken.Claims claims) {
             return true;
         }
+
+        @Override
+        protected boolean isCurrentAuthorization(io.jsonwebtoken.Claims claims) {
+            return true;
+        }
+    }
+
+    private static class AuthorizationAwareFilter extends JwtAuthenticationFilter {
+        AuthorizationAwareFilter(JwtUtils jwtUtils,
+                                 JwtProperties jwtProperties,
+                                 CookieUtils cookieUtils,
+                                 ObjectProvider<TokenBlacklistService> blacklistProvider,
+                                 AuthService authService) {
+            super(jwtUtils, jwtProperties, cookieUtils, new ObjectMapper(), blacklistProvider,
+                    mock(SysUserMapper.class), authServiceProvider(authService), env("local"));
+        }
+
+        @Override
+        protected boolean isCurrentCredential(io.jsonwebtoken.Claims claims) {
+            return true;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static ObjectProvider<AuthService> authServiceProvider(AuthService authService) {
+        ObjectProvider<AuthService> provider = mock(ObjectProvider.class);
+        when(provider.getIfAvailable()).thenReturn(authService);
+        return provider;
     }
 
     private static MockEnvironment env(String profile) {

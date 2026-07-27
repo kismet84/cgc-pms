@@ -13,6 +13,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.ratelimit.LoginLockoutStore;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.Cookie;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -84,6 +85,11 @@ class AuthControllerTest {
     @MockitoBean
     private LoginLockoutStore lockoutStore;
 
+    @BeforeEach
+    void allowCurrentAuthorizationSnapshot() {
+        when(authService.isCurrentAuthorization(any())).thenReturn(true);
+    }
+
     @Test
     @DisplayName("POST /auth/login 有效凭据 → 200")
     void testLoginSuccess() throws Exception {
@@ -100,7 +106,9 @@ class AuthControllerTest {
                                 {"username":"admin","password":"admin123"}"""))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.userInfo.username").value("admin"));
+                .andExpect(jsonPath("$.data.userInfo.username").value("admin"))
+                .andExpect(header().stringValues("Set-Cookie",
+                        hasItem(containsString("refresh_token=mock-refresh-token; Path=/api/auth;"))));
     }
 
     @Test
