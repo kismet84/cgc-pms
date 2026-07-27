@@ -24,7 +24,6 @@ import {
   showToast,
   useToastMessage,
 } from '@/components'
-import DomainNavigationIcon from '@/components/DomainNavigationIcon.vue'
 import { loadCostBreakdown, loadDashboard } from '@/services/dashboard'
 import {
   acknowledgeAlert,
@@ -255,15 +254,6 @@ const targetAlertStatusOptions = [
   { value: 'ARCHIVED', label: '已归档' },
   { value: 'INVALID', label: '已失效' },
 ]
-const quickEntries = [
-  { label: '风险待办', href: '#risk-list', domain: 'workbench' },
-  { label: '经营趋势', href: '#cost-trend', domain: 'delivery' },
-  { label: '成本分解', href: '#cost-breakdown', domain: 'commercial' },
-  { label: '健康总览', href: '#health-overview', domain: 'finance' },
-  { label: '经营指标', href: '#health-overview', domain: 'master-data' },
-  { label: '预警筛选', href: '#risk-list', domain: 'supply' },
-  { label: '最近打开', href: '#recent-entry', domain: 'system-management' },
-] as const
 const visibleSubjects = computed(() => {
   if (!breakdown.value) return []
   const roots = breakdown.value.subjectBreakdowns.filter((item) => item.level <= 1)
@@ -594,10 +584,6 @@ function isAbort(errorValue: unknown): boolean {
         </nav>
       </template>
     </V2Card>
-    <p class="dashboard-page__period-note">
-      口径：事件型数据按所选报告期的对应时间字段筛选；实时指标和记录状态取当前值，不构成历史快照。
-    </p>
-
     <V2PageState
       v-if="!allowedRoles.length"
       code="403"
@@ -843,33 +829,6 @@ function isAbort(errorValue: unknown): boolean {
         </div>
       </section>
 
-      <section class="command-panel utility-panel">
-        <div class="quick-entry">
-          <strong>快捷入口</strong>
-          <div class="quick-actions">
-            <a
-              v-for="entry in quickEntries"
-              v-show="entry.label !== '成本分解' || selectedRole === 'cost'"
-              :key="entry.label"
-              :href="entry.href"
-            >
-              <DomainNavigationIcon :domain-id="entry.domain" />
-              <span>{{ entry.label }}</span>
-            </a>
-          </div>
-        </div>
-        <div id="recent-entry" class="recent-entry">
-          <strong>最近打开</strong>
-          <a href="#dashboard-title">
-            <DomainNavigationIcon domain-id="workbench" />
-            <span>
-              <b>{{ currentProjectLabel }}</b>
-              <small>{{ DASHBOARD_ROLE_LABELS[selectedRole] }} · 最近更新</small>
-            </span>
-          </a>
-        </div>
-      </section>
-
       <V2Card v-if="selectedRole === 'cost'" id="cost-breakdown" class="dashboard-page__panel">
         <header>
           <div>
@@ -1008,6 +967,7 @@ function isAbort(errorValue: unknown): boolean {
       title="预警处置"
       description="查看预警记录并执行当前账号允许的操作。"
       close-label="关闭预警处置"
+      panel-class="v2-dialog-overflow"
       :close-on-backdrop="false"
       @close="selectedAlert = null"
     >
@@ -1108,11 +1068,6 @@ function isAbort(errorValue: unknown): boolean {
   overflow-x: auto;
   padding-block-end: var(--v2-space-1);
   scrollbar-width: thin;
-}
-.dashboard-page__period-note {
-  margin: 0;
-  color: var(--v2-color-text-secondary);
-  font-size: var(--v2-font-size-12);
 }
 .dashboard-page__panel {
   min-width: 0;
@@ -1490,76 +1445,6 @@ function isAbort(errorValue: unknown): boolean {
   color: var(--v2-color-text-muted);
   text-align: center;
 }
-.utility-panel {
-  min-height: calc(var(--v2-space-12) + var(--v2-space-12) + var(--v2-space-2));
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: var(--v2-space-4);
-}
-.quick-entry {
-  padding-inline-end: var(--v2-space-6);
-  border-inline-end: var(--v2-border-width) solid var(--v2-color-border-subtle);
-}
-.recent-entry {
-  padding-inline-start: var(--v2-space-7);
-}
-.quick-entry > strong,
-.recent-entry > strong {
-  display: block;
-  margin-bottom: var(--v2-space-3);
-  font-size: var(--v2-font-size-13);
-}
-.quick-actions {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(58px, 1fr));
-  gap: var(--v2-space-2);
-}
-.quick-actions a,
-.recent-entry a {
-  color: var(--v2-color-text-secondary);
-  text-decoration: none;
-}
-.quick-actions a {
-  display: grid;
-  justify-items: center;
-  gap: var(--v2-space-2);
-  padding: var(--v2-space-1);
-  font-size: var(--v2-font-size-11);
-}
-.quick-actions svg {
-  width: var(--v2-space-5);
-  height: var(--v2-space-5);
-}
-.quick-actions a:hover {
-  color: var(--v2-color-primary);
-}
-.recent-entry a {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr);
-  gap: var(--v2-space-2);
-  align-items: start;
-}
-.recent-entry svg {
-  width: var(--v2-space-4);
-  height: var(--v2-space-4);
-}
-.recent-entry b,
-.recent-entry small {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.recent-entry b {
-  font-size: var(--v2-font-size-11);
-}
-.recent-entry small {
-  margin-top: var(--v2-space-1);
-  color: var(--v2-color-text-muted);
-  font-size: var(--v2-font-size-11);
-}
-
 @media (max-width: 78.75rem) {
   .health-content {
     grid-template-columns: 190px minmax(230px, 1fr);
@@ -1631,23 +1516,9 @@ function isAbort(errorValue: unknown): boolean {
     flex-wrap: wrap;
     justify-content: center;
   }
-  .utility-panel {
-    grid-template-columns: 1fr;
-  }
-  .quick-entry {
-    padding: 0 0 var(--v2-space-5);
-    border-inline-end: 0;
-    border-block-end: var(--v2-border-width) solid var(--v2-color-border-subtle);
-  }
-  .recent-entry {
-    padding: var(--v2-space-5) 0 0;
-  }
 }
 @media (max-width: 25rem) {
   .health-metrics {
-    grid-template-columns: 1fr;
-  }
-  .quick-actions {
     grid-template-columns: 1fr;
   }
 }

@@ -33,7 +33,7 @@ const error = ref('')
 const templates = ref<WorkflowTemplateRecord[]>([])
 const total = ref(0)
 const pageNo = ref(1)
-const pageSize = 20
+const pageSize = 10
 const current = ref<WorkflowTemplateRecord | null>(null)
 let controller: AbortController | null = null
 

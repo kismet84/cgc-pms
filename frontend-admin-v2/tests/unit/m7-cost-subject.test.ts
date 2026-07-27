@@ -136,6 +136,19 @@ describe('M7 cost-subject center', () => {
     expect(costSubject.loadBidTransfers).not.toHaveBeenCalled()
   })
 
+  it('places project scope controls in the page heading', async () => {
+    route.path = '/cost/subject/scope'
+    useSessionStore().replaceUserInfo(user(['cost:subject:scope:query']))
+    const wrapper = mount(CostSubjectPage)
+    await flushPromises()
+
+    expect(wrapper.find('.v2-card--page-heading .v2-page-heading__filters').exists()).toBe(true)
+    expect(
+      wrapper.findAllComponents(V2Input).some((input) => input.props('label') === '项目标识'),
+    ).toBe(true)
+    expect(wrapper.text()).not.toContain('项目适用范围')
+  })
+
   it('normalizes a created subject id and rereads detail plus taxonomy', async () => {
     route.path = '/cost/subject/taxonomy'
     useSessionStore().replaceUserInfo(user(['cost:query', 'cost:add']))

@@ -1,7 +1,7 @@
 package com.cgcpms.project;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,7 +34,7 @@ class PmProjectControllerTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private JwtUtils jwtUtils;
+    private JwtHttpTestTokenFactory jwtUtils;
 
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";

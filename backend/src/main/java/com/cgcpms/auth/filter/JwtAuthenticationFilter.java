@@ -4,6 +4,8 @@ import com.cgcpms.auth.config.JwtProperties;
 import com.cgcpms.auth.config.SecurityConfig;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.service.TokenBlacklistService;
+import com.cgcpms.system.mapper.SysUserMapper;
+import com.cgcpms.system.entity.SysUser;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.cgcpms.common.filter.TraceIdFilter;
@@ -53,6 +55,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CookieUtils cookieUtils;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider;
+    private final SysUserMapper sysUserMapper;
     private final Environment environment;
     private final boolean devLoginEnabled;
     private final AntPathMatcher pathMatcher = new AntPathMatcher();
@@ -62,12 +65,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                    CookieUtils cookieUtils,
                                    ObjectMapper objectMapper,
                                    ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider,
+                                   SysUserMapper sysUserMapper,
                                    Environment environment) {
         this.jwtUtils = jwtUtils;
         this.jwtProperties = jwtProperties;
         this.cookieUtils = cookieUtils;
         this.objectMapper = objectMapper;
         this.tokenBlacklistServiceProvider = tokenBlacklistServiceProvider;
+        this.sysUserMapper = sysUserMapper;
         this.environment = environment;
         this.devLoginEnabled = Boolean.parseBoolean(environment.getProperty("auth.dev-login.enabled", "false"));
     }
@@ -119,6 +124,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         try {
             Claims claims = jwtUtils.parseToken(token);
+            if (!isCurrentCredential(claims)) {
+                writeUnauthorized(response);
+                return;
+            }
             UserContext.set(claims);
             request.setAttribute(TraceIdFilter.ACCESS_LOG_USER_ID_ATTRIBUTE, UserContext.getCurrentUserId());
             request.setAttribute(TraceIdFilter.ACCESS_LOG_TENANT_ID_ATTRIBUTE, UserContext.getCurrentTenantId());
@@ -205,6 +214,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .filter(String.class::isInstance)
                 .map(String.class::cast)
                 .toList();
+    }
+
+    protected boolean isCurrentCredential(Claims claims) {
+        Long userId = claims.get(JwtUtils.CLAIM_USER_ID, Long.class);
+        Long tenantId = claims.get(JwtUtils.CLAIM_TENANT_ID, Long.class);
+        String version = claims.get(JwtUtils.CLAIM_CREDENTIAL_VERSION, String.class);
+        if (userId == null || tenantId == null || version == null || version.isBlank()) return false;
+        SysUser user = sysUserMapper.selectCredentialByTenantAndId(tenantId, userId);
+        return user != null && tenantId.equals(user.getTenantId()) && "ENABLE".equals(user.getStatus())
+                && version.equals(jwtUtils.credentialVersion(user.getPassword()));
     }
 
     private void writeUnauthorized(HttpServletResponse response) throws IOException {

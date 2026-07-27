@@ -1,7 +1,7 @@
 package com.cgcpms.inventory;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.inventory.vo.StockTransferVO;
 import jakarta.servlet.http.Cookie;
@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class MatStockTransferControllerTest {
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private JwtUtils jwtUtils;
+    @Autowired private JwtHttpTestTokenFactory jwtUtils;
     @MockitoBean private MatStockService service;
 
     @BeforeEach

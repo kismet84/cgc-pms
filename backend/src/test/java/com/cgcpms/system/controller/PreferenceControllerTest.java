@@ -1,7 +1,7 @@
 package com.cgcpms.system.controller;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
@@ -40,7 +40,7 @@ class PreferenceControllerTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private JwtUtils jwtUtils;
+    private JwtHttpTestTokenFactory jwtUtils;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;

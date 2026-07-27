@@ -171,10 +171,10 @@ ON DUPLICATE KEY UPDATE
 
 -- DQ-008/M2: active finance demo includes budget, paid flow, approved-unpaid and processing payment facts.
 INSERT INTO project_budget
-  (id,tenant_id,project_id,version_no,budget_name,total_amount,approval_status,status,active_flag,active_token,effective_at,version,
+  (id,tenant_id,project_id,budget_code,version_no,budget_name,total_amount,approval_status,status,active_flag,active_token,effective_at,version,
    created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000009410,0,520000000000009002,'V1','劳务分包在建演示项目预算 V1',3900000,'APPROVED','ACTIVE',1,520000000000009002,
+  (520000000000009410,0,520000000000009002,'M52-BUDGET-002','V1','劳务分包在建演示项目预算 V1',3900000,'APPROVED','ACTIVE',1,520000000000009002,
    '2026-01-01 00:00:00',0,@demo_user,NOW(),@demo_user,NOW(),0,'M2财务驾驶舱预算闭环样本')
 ON DUPLICATE KEY UPDATE
   budget_name=VALUES(budget_name),total_amount=VALUES(total_amount),approval_status=VALUES(approval_status),status=VALUES(status),

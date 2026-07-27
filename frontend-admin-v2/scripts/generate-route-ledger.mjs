@@ -36,6 +36,14 @@ const acceptedRoutes = {
   ApprovalCc: '@/pages/workbench/WorkflowWorkbenchPage.vue',
   ApprovalMine: '@/pages/workbench/WorkflowWorkbenchPage.vue',
   ApprovalProcess: '@/pages/system/WorkflowProcessPage.vue',
+  System: '@/router.ts#V2SystemRedirect',
+  SystemDict: '@/pages/system/DictionaryPage.vue',
+  SystemUsers: '@/pages/system/AccessControlPage.vue',
+  SystemData: '@/pages/system/DataMaintenancePage.vue',
+  RoleManagement: '@/pages/system/AccessControlPage.vue',
+  SystemPermissions: '@/pages/system/AccessControlPage.vue',
+  SystemAudit: '@/pages/system/AuditPage.vue',
+  DocumentTemplateManagement: '@/pages/system/DocumentTemplatePage.vue',
   ApprovalDetail: '@/router.ts#V2LegacyApprovalDetailRedirect',
   Project: '@/router.ts#V2ProjectRedirect',
   ProjectList: '@/pages/projects/ProjectPage.vue',
@@ -109,6 +117,10 @@ const acceptedRoutePermissions = {
   AccountingEntry: 'accounting:query',
   CashForecast: 'finance:forecast:query',
   FinancialClose: 'finance:close:query',
+  System: 'system:dict:list',
+  SystemDict: 'system:dict:list',
+  SystemPermissions: 'system:menu:query',
+  SystemData: null,
 }
 
 const sourceAvailableRoutes = {}
@@ -158,6 +170,17 @@ const m7CostSubjectRoutes = new Set([
 const m7WorkflowAcceptanceEvidence =
   'docs/quality/ISSUE-053-040-M7流程配置与adminOnly门V2验收报告.md'
 const m7WorkflowRoutes = new Set(['ApprovalProcess'])
+const m7SystemAcceptanceEvidence = 'docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md'
+const m7SystemRoutes = new Set([
+  'System',
+  'SystemDict',
+  'SystemUsers',
+  'SystemData',
+  'RoleManagement',
+  'SystemPermissions',
+  'SystemAudit',
+  'DocumentTemplateManagement',
+])
 
 function findVariable(sourceFile, name) {
   for (const statement of sourceFile.statements) {
@@ -361,6 +384,8 @@ function extractRoutes(array, permissions, sourceFile, parentPath = '', inherite
         result[result.length - 1].acceptanceEvidence = m7CostSubjectAcceptanceEvidence
       if (m7WorkflowRoutes.has(name))
         result[result.length - 1].acceptanceEvidence = m7WorkflowAcceptanceEvidence
+      if (m7SystemRoutes.has(name))
+        result[result.length - 1].acceptanceEvidence = m7SystemAcceptanceEvidence
     }
 
     const children = objectValue(element, 'children')
@@ -673,6 +698,32 @@ function assertM7WorkflowV2Acceptance(routerSource, catalogSource) {
     throw new Error('M7 workflow V2 acceptance mapping is missing or stale')
 }
 
+function assertM7SystemV2Acceptance(routerSource, catalogSource) {
+  const routerChecks = [
+    /const AccessControlPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/system\/AccessControlPage\.vue['"]\)/,
+    /const DictionaryPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/system\/DictionaryPage\.vue['"]\)/,
+    /const AuditPage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/system\/AuditPage\.vue['"]\)/,
+    /const DocumentTemplatePage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/system\/DocumentTemplatePage\.vue['"]\)/,
+    /const DataMaintenancePage\s*=\s*\(\)\s*=>\s*import\(['"]\.\/pages\/system\/DataMaintenancePage\.vue['"]\)/,
+    /path:\s*['"]\/system['"][\s\S]{0,180}name:\s*['"]V2SystemRedirect['"][\s\S]{0,240}\/system\/dict/,
+    /to\.meta\.superAdminOnly[\s\S]{0,120}session\.roles\.includes\(['"]SUPER_ADMIN['"]\)/,
+  ]
+  const catalogChecks = [
+    /id:\s*['"]access-control['"][\s\S]{0,180}adminOnly:\s*true/,
+    /path:\s*['"]\/system\/users['"][\s\S]{0,150}permission:\s*['"]system:user:query['"]/,
+    /path:\s*['"]\/system\/roles['"][\s\S]{0,150}permission:\s*['"]system:role:query['"]/,
+    /path:\s*['"]\/system\/permissions['"][\s\S]{0,150}permission:\s*['"]system:menu:query['"]/,
+    /path:\s*['"]\/system\/dict['"][\s\S]{0,150}permission:\s*['"]system:dict:list['"]/,
+    /path:\s*['"]\/system\/audit['"][\s\S]{0,150}permission:\s*['"]audit:query['"]/,
+    /path:\s*['"]\/system\/data['"][\s\S]{0,150}superAdminOnly:\s*true/,
+  ]
+  if (
+    routerChecks.some((check) => !check.test(routerSource)) ||
+    catalogChecks.some((check) => !check.test(catalogSource))
+  )
+    throw new Error('M7 system V2 acceptance mapping is missing or stale')
+}
+
 async function buildLedger() {
   const [source, v2RouterSource, navigationCatalogSource] = await Promise.all([
     readFile(routerPath, 'utf8'),
@@ -695,6 +746,7 @@ async function buildLedger() {
   assertM7MasterDataV2Acceptance(v2RouterSource, navigationCatalogSource)
   assertM7CostSubjectV2Acceptance(v2RouterSource, navigationCatalogSource)
   assertM7WorkflowV2Acceptance(v2RouterSource, navigationCatalogSource)
+  assertM7SystemV2Acceptance(v2RouterSource, navigationCatalogSource)
   const sourceFile = ts.createSourceFile(
     routerPath,
     source,

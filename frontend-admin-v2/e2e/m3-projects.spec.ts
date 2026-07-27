@@ -119,7 +119,7 @@ test.describe('M3 live project object', () => {
     await expect(approving.getByRole('button', { name: /提交|归档/ })).toHaveCount(0)
 
     const rejected = page.getByRole('row').filter({ hasText: '已驳回演示项目' })
-    await rejected.locator('summary').click()
+    await rejected.locator('summary').press('Enter')
     await expect(rejected.getByRole('button', { name: '提交' })).toBeVisible()
     await expect(rejected.getByRole('button', { name: '归档' })).toHaveCount(0)
 
@@ -201,7 +201,7 @@ test.describe('M3 live project object', () => {
       } else await route.continue()
     })
     await page.goto('/v2/project/list')
-    await expect(page.locator('.project-page > .v2-alert').getByText('受控故障')).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: '受控故障' }).first()).toBeVisible()
     await page.getByRole('button', { name: '刷新' }).click()
     await expect(page.locator('.project-page__table tbody tr').first()).toBeVisible()
     await consumeExpectedHttpError(page, '503 (Service Unavailable)')
@@ -286,7 +286,7 @@ test.describe('M3 live project object', () => {
     await dialog.locator('[role="option"]:not(:disabled)').first().click()
     const before = rereads
     await dialog.getByRole('button', { name: '创建' }).click()
-    await expect(page.locator('.project-page > .v2-alert').getByText('受控冲突')).toBeAttached()
+    await expect(page.getByRole('alert').filter({ hasText: '受控冲突' }).first()).toBeAttached()
     await expect.poll(() => rereads).toBeGreaterThan(before)
     await consumeExpectedHttpError(page, '409 (Conflict)')
   })
@@ -300,7 +300,16 @@ test.describe('M3 live project object', () => {
     await dialog.getByLabel('项目名称').fill(name)
     await dialog.getByRole('button', { name: /^项目类型：/ }).click()
     await dialog.locator('[role="option"]:not(:disabled)').first().click()
+    const created = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return url.pathname === '/api/projects' && response.request().method() === 'POST'
+    })
     await dialog.getByRole('button', { name: '创建' }).click()
+    const createdResponse = await created
+    expect(createdResponse.ok()).toBe(true)
+    const createdEnvelope = (await createdResponse.json()) as { data: string }
+    const createdId = createdEnvelope.data
+    await page.goto(`/v2/project/list?keyword=${encodeURIComponent(name)}`)
     const row = page.getByRole('row').filter({ hasText: name })
     await expect(row).toBeVisible()
     await row.locator('summary').click()
@@ -313,7 +322,20 @@ test.describe('M3 live project object', () => {
 
     await row.locator('summary').click()
     await row.getByRole('button', { name: '删除' }).click()
+    const deleted = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return (
+        url.pathname === `/api/projects/${createdId}` && response.request().method() === 'DELETE'
+      )
+    })
     await confirmDialog.getByRole('button', { name: '永久删除' }).click()
+    expect((await deleted).ok()).toBe(true)
     await expect(row).toHaveCount(0)
+    const authoritative = await page.request.get(
+      `/api/projects?pageNo=1&pageSize=10&keyword=${encodeURIComponent(name)}`,
+    )
+    expect(authoritative.ok()).toBe(true)
+    const authoritativeBody = (await authoritative.json()) as { data: { total: string | number } }
+    expect(Number(authoritativeBody.data.total)).toBe(0)
   })
 })

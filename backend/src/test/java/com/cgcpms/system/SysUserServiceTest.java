@@ -65,6 +65,7 @@ class SysUserServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_0)
+                .add("roleCodes", List.of("SUPER_ADMIN"))
                 .build());
         // 确保 admin 用户存在（测试间可能存在软删除交叉污染）
         jdbcTemplate.update(
@@ -207,7 +208,7 @@ class SysUserServiceTest {
     @Test
     @Order(6)
     @Transactional
-    @DisplayName("更新用户 — 传入新密码时加密更新")
+    @DisplayName("更新用户 — 管理更新忽略请求密码")
     void testUpdate_ChangePassword() {
         SysUser user = new SysUser();
         user.setUsername("pwuser");
@@ -224,9 +225,9 @@ class SysUserServiceTest {
         userService.update(update);
 
         SysUser saved = userMapper.selectById(id);
-        assertNotEquals(oldHash, saved.getPassword(), "密码哈希应已改变");
-        assertTrue(passwordEncoder.matches("newpass", saved.getPassword()),
-                "新密码应能匹配");
+        assertEquals(oldHash, saved.getPassword(), "通用管理更新不得改写密码");
+        assertTrue(passwordEncoder.matches("oldpass", saved.getPassword()),
+                "密码只能由专用改密路径变更");
 
         System.out.println("✅ testUpdate_ChangePassword 通过");
     }
@@ -313,7 +314,7 @@ class SysUserServiceTest {
         // 手动添加一条用户角色关联
         SysUserRole ur = new SysUserRole();
         ur.setUserId(userId);
-        ur.setRoleId(1L); // SUPER_ADMIN
+        ur.setRoleId(3L); // COMMON_USER
         userRoleMapper.insert(ur);
 
         // 确认关联存在
@@ -365,6 +366,25 @@ class SysUserServiceTest {
         assertEquals("USER_NOT_FOUND", ex.getCode());
 
         System.out.println("✅ testDelete_NotFound 通过");
+    }
+
+    @Test
+    @Order(25)
+    @Transactional
+    @DisplayName("删除管理员 — 已停用管理员不能作为连续性保障")
+    void testDelete_AdminRequiresEnabledReplacement() {
+        SysUser user = new SysUser();
+        user.setUsername("last_enabled_admin");
+        user.setPassword("pass");
+        Long userId = userService.create(user);
+        userService.assignRoles(userId, List.of(1L));
+        jdbcTemplate.update("UPDATE sys_user SET status = 'DISABLE' WHERE id = ?", USER_ADMIN);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> userService.delete(userId));
+
+        assertEquals("LAST_ADMIN", ex.getCode());
+        assertNotNull(userMapper.selectById(userId), "校验失败后不得删除目标管理员");
     }
 
     // ═══════════════════════════════════════════════════════════

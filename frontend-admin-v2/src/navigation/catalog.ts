@@ -3,6 +3,7 @@ import { hasAdminRole } from '@/stores/session'
 export interface NavigationAccess {
   permission?: string
   adminOnly?: boolean
+  superAdminOnly?: boolean
 }
 
 export interface WorkspaceTab extends NavigationAccess {
@@ -482,24 +483,22 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'access-control',
         label: '访问控制',
         defaultPath: '/system/users',
+        adminOnly: true,
         tabs: [
           {
             path: '/system/users',
             label: '用户管理',
             permission: 'system:user:query',
-            migration: 'pending',
           },
           {
             path: '/system/roles',
             label: '角色管理',
             permission: 'system:role:query',
-            migration: 'pending',
           },
           {
             path: '/system/permissions',
             label: '权限清单',
-            permission: 'system:permission:query',
-            migration: 'pending',
+            permission: 'system:menu:query',
           },
         ],
       },
@@ -507,18 +506,17 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'configuration',
         label: '系统配置',
         defaultPath: '/system/dict',
+        adminOnly: true,
         tabs: [
           {
             path: '/system/dict',
             label: '字典管理',
-            permission: 'system:dict:query',
-            migration: 'pending',
+            permission: 'system:dict:list',
           },
           {
             path: '/system/document-templates',
             label: '业务单据模板',
             permission: 'document:template:query',
-            migration: 'pending',
           },
         ],
       },
@@ -531,7 +529,6 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/system/audit',
             label: '操作审计',
             permission: 'audit:query',
-            migration: 'pending',
           },
         ],
       },
@@ -539,12 +536,12 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'data',
         label: '数据维护',
         defaultPath: '/system/data',
+        superAdminOnly: true,
         tabs: [
           {
             path: '/system/data',
             label: '数据维护',
-            permission: 'system:data:query',
-            migration: 'pending',
+            superAdminOnly: true,
           },
         ],
       },
@@ -565,6 +562,7 @@ export function hasAccess(
   permissions: readonly string[],
   access: NavigationAccess,
 ): boolean {
+  if (access.superAdminOnly && !roles.includes('SUPER_ADMIN')) return false
   if (access.adminOnly && !hasAdminRole(roles)) return false
   return !access.permission || permissions.includes('*') || permissions.includes(access.permission)
 }

@@ -2,7 +2,7 @@ package com.cgcpms.system;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.common.ratelimit.FallbackRateLimitCounterStore;
 import com.cgcpms.system.entity.SysRole;
 import com.cgcpms.system.entity.SysRoleMenu;
@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("SysRoleController integration tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SysRoleControllerTest {
-    @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
+    @Autowired private MockMvc mockMvc; @Autowired private JwtHttpTestTokenFactory jwtUtils;
     @Autowired private FallbackRateLimitCounterStore counterStore;
     @Autowired private SysRoleMapper roleMapper; @Autowired private SysRoleMenuMapper roleMenuMapper;
     @Autowired private ObjectMapper objectMapper;

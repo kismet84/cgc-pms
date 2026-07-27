@@ -17,6 +17,7 @@ import org.springframework.util.StringUtils;
 
 import com.cgcpms.common.util.DateTimeUtils;
 import java.util.Collections;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -26,6 +27,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SysUserService {
+
+    private static final Set<String> ALLOWED_STATUSES = Set.of("ENABLE", "DISABLE");
+    private static final Set<String> ADMIN_ROLE_CODES = Set.of("ADMIN", "SUPER_ADMIN");
 
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
@@ -99,8 +103,9 @@ public class SysUserService {
             throw new BusinessException("USERNAME_EXISTS", "用户名已存在");
         }
         user.setPassword(passwordEncoder.encode(user.getPassword()));
-        if (user.getStatus() == null) user.setStatus("ENABLE");
+        user.setStatus(normalizeStatus(user.getStatus()));
         user.setTenantId(UserContext.getCurrentTenantId());
+        user.setIsAdmin(null); // role assignment is authoritative
         sysUserMapper.insert(user);
         log.info("Creating user: {}", user.getUsername());
         if (user.getRoleIds() != null && !user.getRoleIds().isEmpty()) {
@@ -114,12 +119,13 @@ public class SysUserService {
         SysUser existing = sysUserMapper.selectById(user.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
-        if (user.getPassword() == null || user.getPassword().isBlank()) {
-            user.setPassword(null); // don't update password
-        } else {
-            user.setPassword(passwordEncoder.encode(user.getPassword()));
-        }
-        sysUserMapper.updateById(user);
+        // Request body never controls tenant, login identity, privilege, status, password or audit fields.
+        existing.setRealName(user.getRealName());
+        existing.setPhone(user.getPhone());
+        existing.setEmail(user.getEmail());
+        existing.setAvatar(user.getAvatar());
+        existing.setOrgId(user.getOrgId());
+        sysUserMapper.updateById(existing);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -127,6 +133,13 @@ public class SysUserService {
         SysUser user = sysUserMapper.selectById(id);
         if (user == null || !user.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
+        status = normalizeStatus(status);
+        if (id.equals(UserContext.getCurrentUserId()) && "DISABLE".equals(status)) {
+            throw new BusinessException("SELF_DISABLE_FORBIDDEN", "不能停用当前登录用户");
+        }
+        if ("DISABLE".equals(status) && hasAdministratorRole(id, user.getTenantId())) {
+            requireAdministratorContinuity(id, user.getTenantId());
+        }
         user.setStatus(status);
         sysUserMapper.updateById(user);
     }
@@ -137,32 +150,12 @@ public class SysUserService {
         if (user == null || !user.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("USER_NOT_FOUND", "用户不存在");
 
-        // 检查是否是 ADMIN 用户，如果是则检查是否还有其他 ADMIN（不能删除最后一个管理员）
+        if (id.equals(UserContext.getCurrentUserId())) {
+            throw new BusinessException("SELF_DELETE_FORBIDDEN", "不能删除当前登录用户");
+        }
         Long currentTenantId = UserContext.getCurrentTenantId();
-        List<SysUserRole> userRoles = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getTenantId, currentTenantId)
-                        .eq(SysUserRole::getUserId, id));
-        boolean isAdmin = userRoles.stream().anyMatch(ur -> {
-            SysRole role = sysRoleMapper.selectById(ur.getRoleId());
-            return role != null && "ADMIN".equals(role.getRoleCode());
-        });
-        if (isAdmin) {
-            // 统计当前租户下还有多少 ADMIN 用户
-            List<SysUserRole> allUserRoles = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>().in(SysUserRole::getUserId,
-                            sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
-                                    .eq(SysUser::getTenantId, currentTenantId)
-                                    .ne(SysUser::getId, id))
-                                    .stream().map(SysUser::getId).toList())
-                        .eq(SysUserRole::getTenantId, currentTenantId));
-            long adminCount = allUserRoles.stream().filter(ur -> {
-                SysRole role = sysRoleMapper.selectById(ur.getRoleId());
-                return role != null && "ADMIN".equals(role.getRoleCode());
-            }).count();
-            if (adminCount == 0) {
-                throw new BusinessException("LAST_ADMIN", "不能删除最后一个管理员用户");
-            }
+        if (hasAdministratorRole(id, currentTenantId)) {
+            requireAdministratorContinuity(id, currentTenantId);
         }
 
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
@@ -205,6 +198,10 @@ public class SysUserService {
             }
         }
 
+        boolean currentlyAdmin = hasAdministratorRole(userId, user.getTenantId());
+        boolean willRemainAdmin = roleIds != null && roleIds.stream().anyMatch(roleId -> isAdministratorRole(roleId, user.getTenantId()));
+        if (currentlyAdmin && !willRemainAdmin) requireAdministratorContinuity(userId, user.getTenantId());
+
         sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
                 .eq(SysUserRole::getTenantId, user.getTenantId())
                 .eq(SysUserRole::getUserId, userId));
@@ -222,14 +219,13 @@ public class SysUserService {
     /**
      * 获取当前用户的最高角色等级（数字越小等级越高）。
      * SUPER_ADMIN=0, ADMIN=1, 普通角色=2。
-     * 当无法确定角色（如 JWT 无 roleCodes）时返回 0（最高权限），
-     * 此时依赖控制器层的 @PreAuthorize 确保调用方已认证。
+     * 当无法确定角色（如 JWT 无 roleCodes）时拒绝角色授予。
      */
     private int getCurrentUserMaxRoleLevel() {
         List<String> currentRoles = UserContext.getCurrentRoles();
         if (currentRoles.isEmpty()) {
-            // 无法确定角色等级时返回最高权限（依赖 @PreAuthorize 门禁）
-            return 0;
+            // Never infer privilege from an incomplete JWT context.
+            return Integer.MAX_VALUE;
         }
 
         Long tenantId = UserContext.getCurrentTenantId();
@@ -243,6 +239,33 @@ public class SysUserService {
                 .mapToInt(r -> r.getRoleLevel() != null ? r.getRoleLevel() : 2)
                 .min()
                 .orElse(Integer.MAX_VALUE);
+    }
+
+    private String normalizeStatus(String status) {
+        String normalized = status == null || status.isBlank() ? "ENABLE" : status.trim().toUpperCase();
+        if (!ALLOWED_STATUSES.contains(normalized)) {
+            throw new BusinessException("USER_STATUS_INVALID", "用户状态仅支持 ENABLE 或 DISABLE");
+        }
+        return normalized;
+    }
+
+    private boolean hasAdministratorRole(Long userId, Long tenantId) {
+        return sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getTenantId, tenantId).eq(SysUserRole::getUserId, userId))
+                .stream().anyMatch(binding -> isAdministratorRole(binding.getRoleId(), tenantId));
+    }
+
+    private boolean isAdministratorRole(Long roleId, Long tenantId) {
+        SysRole role = sysRoleMapper.selectById(roleId);
+        return role != null && tenantId.equals(role.getTenantId()) && ADMIN_ROLE_CODES.contains(role.getRoleCode());
+    }
+
+    private void requireAdministratorContinuity(Long excludedUserId, Long tenantId) {
+        List<SysUser> users = sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getTenantId, tenantId).eq(SysUser::getStatus, "ENABLE")
+                .ne(SysUser::getId, excludedUserId).last("FOR UPDATE"));
+        boolean replacement = users.stream().anyMatch(candidate -> hasAdministratorRole(candidate.getId(), tenantId));
+        if (!replacement) throw new BusinessException("LAST_ADMIN", "不能移除最后一个管理员用户");
     }
 
     private Map<Long, List<String>> bulkLoadRoleNames(List<Long> userIds) {

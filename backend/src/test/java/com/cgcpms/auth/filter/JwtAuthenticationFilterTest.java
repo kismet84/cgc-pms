@@ -2,6 +2,7 @@ package com.cgcpms.auth.filter;
 
 import com.cgcpms.auth.config.JwtProperties;
 import com.cgcpms.auth.service.TokenBlacklistService;
+import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -180,7 +181,7 @@ class JwtAuthenticationFilterTest {
 
     private static class ExposedJwtAuthenticationFilter extends JwtAuthenticationFilter {
         ExposedJwtAuthenticationFilter() {
-            super(null, null, null, null, null, new MockEnvironment());
+            super(null, null, null, null, null, null, new MockEnvironment());
         }
 
         ExposedJwtAuthenticationFilter(JwtUtils jwtUtils,
@@ -189,7 +190,12 @@ class JwtAuthenticationFilterTest {
                                        ObjectMapper objectMapper,
                                        ObjectProvider<TokenBlacklistService> tokenBlacklistServiceProvider,
                                        MockEnvironment environment) {
-            super(jwtUtils, jwtProperties, cookieUtils, objectMapper, tokenBlacklistServiceProvider, environment);
+            super(jwtUtils, jwtProperties, cookieUtils, objectMapper, tokenBlacklistServiceProvider,
+                    permissiveUserMapper(), environment);
+        }
+
+        private static SysUserMapper permissiveUserMapper() {
+            return mock(SysUserMapper.class);
         }
 
         boolean shouldSkip(HttpServletRequest request) {
@@ -198,6 +204,11 @@ class JwtAuthenticationFilterTest {
 
         boolean shouldSkipAsyncDispatch() {
             return shouldNotFilterAsyncDispatch();
+        }
+
+        @Override
+        protected boolean isCurrentCredential(io.jsonwebtoken.Claims claims) {
+            return true;
         }
     }
 

@@ -23,7 +23,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("233", flyway.info().current().getVersion().getVersion());
+        assertEquals("234", flyway.info().current().getVersion().getVersion());
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
         assertEquals(12, count(flyway, "sys_role"));
@@ -36,6 +36,8 @@ class BaselineFlywayCompatibilityTest {
         assertEquals(1, count(flyway, "sys_menu", "perms='payment:direct'"));
         assertEquals(1, count(flyway, "sys_role_menu",
                 "role_id=1 AND menu_id=(SELECT id FROM sys_menu WHERE perms='payment:direct')"));
+        assertEquals(1, count(flyway, "sys_role_menu",
+                "role_id=1 AND menu_id=(SELECT id FROM sys_menu WHERE perms='audit:query')"));
         assertEquals(0, count(flyway, "sys_role_menu",
                 "role_id=6 AND menu_id=(SELECT id FROM sys_menu WHERE perms='payment:direct')"));
         assertEquals(1, count(flyway, "sys_role", "role_code='COST_MANAGER'"));
@@ -93,7 +95,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("233", current.info().current().getVersion().getVersion());
+        assertEquals("234", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
                     ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))
@@ -102,6 +104,10 @@ class BaselineFlywayCompatibilityTest {
         assertEquals(1, count(current, "sys_role_menu", """
                 role_id=(SELECT id FROM sys_role WHERE role_code='PROJECT_MANAGER')
                 AND menu_id=(SELECT id FROM sys_menu WHERE perms='workflow:resubmit')
+                """));
+        assertEquals(1, count(current, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='SUPER_ADMIN')
+                AND menu_id=(SELECT id FROM sys_menu WHERE perms='audit:query')
                 """));
         assertFalse(Arrays.stream(current.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));

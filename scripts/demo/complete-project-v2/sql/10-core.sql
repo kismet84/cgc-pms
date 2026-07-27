@@ -9,7 +9,8 @@ INSERT INTO md_partner
 VALUES
   (520000000000000101,0,'M52-CUSTOMER','演示建设单位','CUSTOMER','M52-CUSTOMER-CREDIT','ENABLE',@demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1'),
   (520000000000000102,0,'M52-SUPPLIER','演示材料供应商','SUPPLIER','M52-SUPPLIER-CREDIT','ENABLE',@demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1'),
-  (520000000000000103,0,'M52-SUBCONTRACTOR','演示分包单位','SUBCONTRACTOR','M52-SUB-CREDIT','ENABLE',@demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1');
+  (520000000000000103,0,'M52-SUBCONTRACTOR','演示分包单位','SUBCONTRACTOR','M52-SUB-CREDIT','ENABLE',@demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1'),
+  (520000000000009101,0,'M52-CONTRACTOR','演示总承包单位','SERVICE_PROVIDER','91110000M52DEMA06L','ENABLE',@demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1');
 
 INSERT INTO pm_project
   (id,tenant_id,project_code,project_name,project_type,owner_unit,contract_amount,target_cost,
@@ -34,9 +35,9 @@ VALUES
    @demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1');
 
 INSERT INTO bid_cost
-  (id,tenant_id,project_id,bid_project_name,bid_status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+  (id,tenant_id,project_id,bid_code,bid_project_name,bid_status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000000401,0,520000000000000001,'CGC-PMS 全业务闭环演示项目','WON',
+  (520000000000000401,0,520000000000000001,'M52-BID-001','CGC-PMS 全业务闭环演示项目','WON',
    @demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1');
 
 INSERT INTO cost_item
@@ -92,21 +93,21 @@ INSERT INTO ct_contract
    paid_amount,signed_date,start_date,end_date,contract_status,approval_status,created_by,created_at,updated_by,updated_at,
    deleted_flag,remark,settlement_amount,version)
 VALUES
-  (520000000000000701,0,520000000000000001,'M52-OWNER-C','演示业主总包合同','MAIN',520000000000000101,520000000000000101,
+  (520000000000000701,0,520000000000000001,'M52-OWNER-C','演示业主总包合同','MAIN',520000000000000101,520000000000009101,
    10000000,10000000,0,'2025-01-01','2025-01-01','2026-06-30','COMPLETED','APPROVED',@demo_user,NOW(),@demo_user,NOW(),0,
    'CGC-COMPLETE-PROJECT:v1',1900000,0),
-  (520000000000000702,0,520000000000000001,'M52-PURCHASE-C','演示材料采购合同','PURCHASE',520000000000000102,520000000000000102,
+  (520000000000000702,0,520000000000000001,'M52-PURCHASE-C','演示材料采购合同','PURCHASE',520000000000009101,520000000000000102,
    1000000,1000000,100000,'2025-02-01','2025-02-01','2025-12-31','COMPLETED','APPROVED',@demo_user,NOW(),@demo_user,NOW(),0,
    'CGC-COMPLETE-PROJECT:v1',100000,0),
-  (520000000000000703,0,520000000000000001,'M52-SUB-C','演示施工分包合同','SUBCONTRACT',520000000000000103,520000000000000103,
+  (520000000000000703,0,520000000000000001,'M52-SUB-C','演示施工分包合同','SUBCONTRACT',520000000000009101,520000000000000103,
    2000000,2000000,100000,'2025-02-01','2025-02-01','2026-05-31','COMPLETED','APPROVED',@demo_user,NOW(),@demo_user,NOW(),0,
    'CGC-COMPLETE-PROJECT:v1',190000,0);
 
 INSERT INTO project_budget
-  (id,tenant_id,project_id,version_no,budget_name,total_amount,approval_status,status,active_flag,effective_at,version,
+  (id,tenant_id,project_id,budget_code,version_no,budget_name,total_amount,approval_status,status,active_flag,effective_at,version,
    created_by,created_at,updated_by,updated_at,deleted_flag,remark)
 VALUES
-  (520000000000000801,0,520000000000000001,'V1','演示项目预算 V1',8000000,'APPROVED','ACTIVE',1,NOW(),0,
+  (520000000000000801,0,520000000000000001,'M52-BUDGET-001','V1','演示项目预算 V1',8000000,'APPROVED','ACTIVE',1,NOW(),0,
    @demo_user,NOW(),@demo_user,NOW(),0,'CGC-COMPLETE-PROJECT:v1');
 
 INSERT INTO project_budget_line

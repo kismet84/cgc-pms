@@ -31,6 +31,33 @@ VALUES
   (520000000000013006,0,520000000000009002,520000000000013002,'SCHEDULE_VIEWER','计划只读',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3计划分权验收：复用在建项目')
 ON DUPLICATE KEY UPDATE project_id=VALUES(project_id),user_id=VALUES(user_id),role_code=VALUES(role_code),position_name=VALUES(position_name),status='ACTIVE',end_date=NULL,updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
 
+-- ISSUE-053-044: stable project-member query-only identity for the live authorization gate.
+INSERT INTO sys_role
+  (id,tenant_id,role_code,role_name,role_type,status,data_scope,created_by,created_at,updated_by,updated_at,deleted_flag,remark,role_level)
+VALUES
+  (520000000000013007,0,'M3_PROJECT_MEMBER_QUERY','M3项目成员只读','BUSINESS','ENABLE','SELF',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目成员分权验收',3)
+ON DUPLICATE KEY UPDATE role_name=VALUES(role_name),status='ENABLE',data_scope='SELF',updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
+
+INSERT INTO sys_user
+  (id,tenant_id,username,password,real_name,phone,email,org_id,avatar,status,is_admin,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000013008,0,'demo.member-readonly',@demo_password_hash,'项目成员只读验收',NULL,'demo.member-readonly@example.invalid',@demo_org,NULL,'ENABLE',0,@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目成员分权验收')
+ON DUPLICATE KEY UPDATE real_name=VALUES(real_name),email=VALUES(email),org_id=VALUES(org_id),status='ENABLE',updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
+
+INSERT INTO sys_user_role (id,tenant_id,user_id,role_id) VALUES
+  (520000000000013009,0,520000000000013008,520000000000013007)
+ON DUPLICATE KEY UPDATE role_id=VALUES(role_id);
+
+INSERT IGNORE INTO sys_role_menu (id,tenant_id,role_id,menu_id) VALUES
+  (520000000000013010,0,520000000000013007,803),
+  (520000000000013011,0,520000000000013007,711);
+
+INSERT INTO pm_project_member
+  (id,tenant_id,project_id,user_id,role_code,position_name,start_date,end_date,status,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+VALUES
+  (520000000000013012,0,520000000000009002,520000000000013008,'PROJECT_VIEWER','项目成员只读',CURDATE(),NULL,'ACTIVE',@demo_admin,NOW(),@demo_admin,NOW(),0,'M3项目成员分权验收：复用在建项目')
+ON DUPLICATE KEY UPDATE project_id=VALUES(project_id),user_id=VALUES(user_id),role_code=VALUES(role_code),position_name=VALUES(position_name),status='ACTIVE',end_date=NULL,updated_by=VALUES(updated_by),updated_at=NOW(),deleted_flag=0;
+
 INSERT INTO sys_role
   (id,tenant_id,role_code,role_name,role_type,status,data_scope,created_by,created_at,updated_by,updated_at,deleted_flag,remark,role_level)
 VALUES

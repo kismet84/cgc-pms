@@ -77,7 +77,7 @@ $stages = @(
     [pscustomobject]@{ Id = 'DATA_QUALITY_NORMALIZATION'; Files = @('scripts/demo/complete-project-v2/sql/140-data-quality-normalization.sql') },
     [pscustomobject]@{ Id = 'ROLE_TEST_ACCOUNTS'; Files = @('scripts/demo/complete-project-v2/sql/150-role-test-accounts.sql') },
     [pscustomobject]@{ Id = 'ROLE_DASHBOARD_DATA'; Version = 4; Files = @('scripts/demo/complete-project-v2/sql/160-role-dashboard-data.sql') },
-    [pscustomobject]@{ Id = 'DASHBOARD_RISK_LEVELS'; Files = @('scripts/demo/complete-project-v2/sql/170-dashboard-risk-levels.sql') },
+    [pscustomobject]@{ Id = 'DASHBOARD_RISK_LEVELS'; AlwaysApply = $true; Files = @('scripts/demo/complete-project-v2/sql/170-dashboard-risk-levels.sql') },
     [pscustomobject]@{ Id = 'COST_BREAKDOWN_DATA'; Files = @('scripts/demo/complete-project-v2/sql/180-cost-breakdown-data.sql') },
     [pscustomobject]@{ Id = 'STANDARDIZE_BUSINESS_CODES'; Files = @('scripts/demo/complete-project-v2/sql/190-standardize-business-codes.sql') },
     [pscustomobject]@{ Id = 'ROLE_WORKFLOW_STATUS_DATA'; Files = @('scripts/demo/complete-project-v2/sql/200-role-workflow-status-data.sql') },

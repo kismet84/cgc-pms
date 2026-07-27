@@ -1,7 +1,7 @@
 package com.cgcpms.system;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.system.service.SysUserService;
 import com.cgcpms.system.vo.SysUserVO;
 import jakarta.servlet.http.Cookie;
@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SysUserDetailControllerTest {
 
     @Autowired private MockMvc mockMvc;
-    @Autowired private JwtUtils jwtUtils;
+    @Autowired private JwtHttpTestTokenFactory jwtUtils;
     @MockitoBean private SysUserService service;
 
     @BeforeEach

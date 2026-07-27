@@ -1305,7 +1305,8 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
 
   .app-shell__context-controls :deep(.v2-field__label),
   .app-shell__account-copy,
-  .app-shell__account .v2-button {
+  .app-shell__account .v2-button,
+  .app-shell__account > .app-shell__account-link {
     display: none;
   }
 

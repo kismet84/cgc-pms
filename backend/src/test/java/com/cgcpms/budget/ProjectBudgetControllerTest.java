@@ -1,7 +1,7 @@
 package com.cgcpms.budget;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.budget.controller.ProjectBudgetController;
 import com.cgcpms.budget.entity.ProjectBudget;
 import com.cgcpms.budget.entity.ProjectBudgetLine;
@@ -33,7 +33,7 @@ class ProjectBudgetControllerTest {
     private static final long USER=99193001L, OTHER=99193002L, PROJECT=99193003L, OUTSIDE=99193004L;
     private static final long BUDGET=99193005L, OUTSIDE_BUDGET=99193006L, SUBJECT=99193007L, LINE=99193008L;
     @Autowired MockMvc mockMvc;
-    @Autowired JwtUtils jwtUtils;
+    @Autowired JwtHttpTestTokenFactory jwtUtils;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper objectMapper;
 

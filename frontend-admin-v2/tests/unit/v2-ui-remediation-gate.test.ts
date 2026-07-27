@@ -224,6 +224,7 @@ describe('全 V2 UI 整改门禁', () => {
       'v2-dialog-standard',
       'v2-detail-dialog',
       'v2-dialog-wide',
+      'v2-dialog-overflow',
       'v2-dialog-bottom-sheet',
     ])
 

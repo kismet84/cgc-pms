@@ -67,7 +67,7 @@ beforeEach(() => {
   document.body.innerHTML = ''
   vi.mocked(processService.loadWorkflowTemplates).mockResolvedValue({
     pageNo: 1,
-    pageSize: 20,
+    pageSize: 10,
     total: 1,
     records: [summary],
   })
@@ -81,6 +81,10 @@ describe('M7 workflow process page', () => {
     const wrapper = mount(WorkflowProcessPage, { attachTo: document.body })
     await flushPromises()
     expect(wrapper.text()).toContain('合同审批')
+    expect(processService.loadWorkflowTemplates).toHaveBeenCalledWith(
+      expect.objectContaining({ pageNo: 1, pageSize: 10 }),
+      expect.any(AbortSignal),
+    )
 
     button('管理').click()
     await flushPromises()

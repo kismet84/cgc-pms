@@ -37,7 +37,7 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("233", current.info().current().getVersion().getVersion());
+        assertEquals("234", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, """
                 SELECT COUNT(*) FROM sys_role_menu rm
                 JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
@@ -52,6 +52,13 @@ class BaselineMySqlUpgradeTest {
                 JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
                 WHERE r.role_code='PROJECT_MANAGER' AND r.deleted_flag=0
                   AND m.deleted_flag=0 AND m.perms='workflow:resubmit'
+                """));
+        assertEquals(1, count(current, """
+                SELECT COUNT(*) FROM sys_role_menu rm
+                JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id
+                JOIN sys_menu m ON m.tenant_id=rm.tenant_id AND m.id=rm.menu_id
+                WHERE r.role_code='SUPER_ADMIN' AND r.deleted_flag=0
+                  AND m.deleted_flag=0 AND m.perms='audit:query'
                 """));
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));

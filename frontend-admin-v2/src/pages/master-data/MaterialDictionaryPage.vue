@@ -35,7 +35,7 @@ const records = ref<MaterialRecord[]>([])
 const categories = ref<MaterialCategory[]>([])
 const total = ref(0)
 const pageNo = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(10)
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const statusTarget = ref<MaterialRecord | null>(null)
@@ -253,26 +253,40 @@ onBeforeUnmount(() => loadController?.abort())
   <V2Stack class="material-page" :gap="4">
     <V2Card title="材料字典" :heading-level="1">
       <template #actions>
+        <form class="v2-page-heading__filters" @submit.prevent="search">
+          <V2Input
+            v-model="filters.materialCode"
+            label="材料编码"
+            hide-label
+            placeholder="材料编码"
+          />
+          <V2Input
+            v-model="filters.materialName"
+            label="材料名称"
+            hide-label
+            placeholder="材料名称"
+          />
+          <V2Select
+            v-model="filters.categoryId"
+            :options="categoryOptions"
+            label="材料分类"
+            hide-label
+            placeholder="材料分类"
+            allow-empty
+          />
+          <V2Select
+            v-model="filters.status"
+            :options="statusOptions"
+            label="状态"
+            hide-label
+            placeholder="全部状态"
+            allow-empty
+          />
+          <V2Button type="submit" size="small">查询</V2Button>
+          <V2Button variant="secondary" type="button" size="small" @click="reset">重置</V2Button>
+        </form>
         <V2Button v-if="canAdd" size="small" @click="openCreate">新增材料</V2Button>
       </template>
-    </V2Card>
-
-    <V2Card title="查询条件">
-      <form class="material-page__filters" @submit.prevent="search">
-        <V2Input v-model="filters.materialCode" label="材料编码" />
-        <V2Input v-model="filters.materialName" label="材料名称" />
-        <V2Select
-          v-model="filters.categoryId"
-          :options="categoryOptions"
-          label="材料分类"
-          allow-empty
-        />
-        <V2Select v-model="filters.status" :options="statusOptions" label="状态" allow-empty />
-        <V2Cluster>
-          <V2Button type="submit">查询</V2Button>
-          <V2Button variant="secondary" type="button" @click="reset">重置</V2Button>
-        </V2Cluster>
-      </form>
     </V2Card>
 
     <V2PageState v-if="loading" kind="loading" title="正在读取材料字典" description="请稍候。" />
@@ -399,7 +413,6 @@ onBeforeUnmount(() => loadController?.abort())
 </template>
 
 <style scoped>
-.material-page__filters,
 .material-page__form {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -411,7 +424,6 @@ onBeforeUnmount(() => loadController?.abort())
 }
 
 @media (max-width: 48rem) {
-  .material-page__filters,
   .material-page__form {
     grid-template-columns: 1fr;
   }

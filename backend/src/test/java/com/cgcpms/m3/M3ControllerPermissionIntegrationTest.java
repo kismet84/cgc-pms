@@ -1,7 +1,7 @@
 package com.cgcpms.m3;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,7 +50,7 @@ class M3ControllerPermissionIntegrationTest {
              "transferScope":"M3","actualCompletionDate":"2026-07-22","reason":"M3"}
             """;
     @Autowired MockMvc mockMvc;
-    @Autowired JwtUtils jwtUtils;
+    @Autowired JwtHttpTestTokenFactory jwtUtils;
 
     @Test
     void queryOnlyIdentityCannotInvokeAnyM3MutationEndpoint() throws Exception {

@@ -302,6 +302,8 @@ describe('M2 dashboard page', () => {
     expect(wrapper.get('.dashboard-activity-list').text()).toContain('结算项目')
     expect(wrapper.get('.dashboard-activity-list').text()).toContain('PJ-002')
     expect(wrapper.get('.dashboard-activity-list').text()).toContain('SETTLING')
+    expect(wrapper.text()).not.toContain('不构成历史快照')
+    expect(wrapper.find('.utility-panel').exists()).toBe(false)
   })
 
   it('requests and renders only the permitted role with real service data', async () => {
@@ -322,9 +324,7 @@ describe('M2 dashboard page', () => {
     expect(wrapper.get('.health-score').attributes('aria-label')).toContain('分数越高越健康')
     expect(wrapper.text()).toContain('经营动态')
     expect(wrapper.text()).not.toContain('当前角色暂无趋势数据')
-    expect(wrapper.text()).toContain(
-      '事件型数据按所选报告期的对应时间字段筛选；实时指标和记录状态取当前值，不构成历史快照。',
-    )
+    expect(wrapper.text()).not.toContain('不构成历史快照')
     expect(wrapper.text()).toContain('预警列表')
     expect(wrapper.get('.command-panel__title .v2-button--secondary').text()).toBe('查看最高风险')
     expect(wrapper.find('.highest-risk .v2-button').exists()).toBe(false)
@@ -644,7 +644,7 @@ describe('M2 dashboard page', () => {
 
     expect(wrapper.text()).toContain('目标成本')
     expect(wrapper.text()).toContain('100.00 万元')
-    expect(wrapper.findAll('.quick-actions a')).toHaveLength(7)
+    expect(wrapper.findAll('.quick-actions a')).toHaveLength(0)
     expect(wrapper.findAll('.health-metric')[3]?.classes()).toContain('is-danger')
     expect(toastItems.at(-1)).toMatchObject({
       type: 'warn',

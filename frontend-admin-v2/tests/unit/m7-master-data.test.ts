@@ -56,7 +56,7 @@ beforeEach(() => {
     ],
     total: 1,
     pageNo: 1,
-    pageSize: 20,
+    pageSize: 10,
   })
   vi.mocked(masterData.loadPartner).mockResolvedValue({
     id: '101',
@@ -117,7 +117,7 @@ beforeEach(() => {
     ],
     total: 1,
     pageNo: 1,
-    pageSize: 20,
+    pageSize: 10,
   })
   vi.mocked(masterData.loadMaterial).mockResolvedValue({
     id: '8',
@@ -140,6 +140,8 @@ describe('M7 master-data pages', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('服务端合作方')
+    expect(wrapper.find('.v2-card--page-heading .v2-page-heading__filters').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('查询条件')
     expect(wrapper.text()).not.toContain('13800000000')
     expect(wrapper.text()).not.toContain('6222000000000000')
     expect(masterData.loadPartner).not.toHaveBeenCalled()
@@ -220,9 +222,11 @@ describe('M7 master-data pages', () => {
     await flushPromises()
 
     expect(masterData.loadMaterials).toHaveBeenCalledWith(
-      expect.objectContaining({ pageNo: 1, pageSize: 20 }),
+      expect.objectContaining({ pageNo: 1, pageSize: 10 }),
       expect.any(AbortSignal),
     )
+    expect(wrapper.find('.v2-card--page-heading .v2-page-heading__filters').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('查询条件')
     expect(wrapper.text()).toContain('共 1 项')
     expect(wrapper.text()).toContain('13.00')
     expect(wrapper.text()).not.toMatch(/单位分布|启用材料|已维护税率/)

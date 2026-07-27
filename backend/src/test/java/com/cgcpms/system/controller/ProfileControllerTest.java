@@ -52,10 +52,12 @@ class ProfileControllerTest {
     }
 
     private Cookie userCookie(long userId, long tenantId) {
+        String passwordHash = jdbcTemplate.queryForObject(
+                "SELECT password FROM sys_user WHERE id = ?", String.class, userId);
         String token = jwtUtils.generateToken(
                 userId, ADMIN_USERNAME, tenantId,
                 List.of("ADMIN"),
-                List.of());
+                List.of(), jwtUtils.credentialVersion(passwordHash));
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
@@ -363,8 +365,7 @@ class ProfileControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"realName":"跨租户修改"}"""))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("USER_NOT_FOUND"));
+                .andExpect(status().isUnauthorized());
     }
 
     // ---- helpers ----

@@ -1,0 +1,516 @@
+import { apiRequest } from './request'
+
+export interface PageResult<T> {
+  pageNo: number
+  pageSize: number
+  total: number
+  records: T[]
+}
+
+export interface UserRecord {
+  id: string
+  username: string
+  realName?: string
+  phone?: string
+  email?: string
+  orgId?: string
+  status: string
+  roleNames: string[]
+  roleIds: string[]
+  createdAt?: string
+}
+
+export interface UserCommand {
+  username?: string
+  password?: string
+  realName?: string
+  phone?: string
+  email?: string
+  orgId?: string | null
+  roleIds?: string[]
+}
+
+export interface RoleRecord {
+  id: string
+  roleCode: string
+  roleName: string
+  roleType?: string
+  status: string
+  dataScope: string
+  roleLevel?: number
+  menuIds: string[]
+}
+
+export interface RoleCommand {
+  roleCode: string
+  roleName: string
+  status: string
+  dataScope: string
+}
+
+export interface MenuRecord {
+  id: string
+  parentId: string
+  menuName: string
+  menuType: 'DIR' | 'MENU' | 'BUTTON'
+  path?: string
+  component?: string
+  perms?: string
+  icon?: string
+  orderNum: number
+  status: string
+  visible: number
+}
+
+export interface MenuCommand {
+  parentId: string
+  menuName: string
+  menuType: MenuRecord['menuType']
+  path: string
+  component: string
+  perms: string
+  icon: string
+  orderNum: number
+  status: string
+  visible: number
+}
+
+export interface DictTypeRecord {
+  id: string
+  dictCode: string
+  dictName: string
+  status: string
+  createdAt?: string
+}
+
+export interface DictDataRecord {
+  id: string
+  dictTypeId: string
+  dictLabel: string
+  dictValue: string
+  cssClass?: string
+  listClass?: string
+  orderNum: number
+  status: string
+}
+
+export interface AuditRecord {
+  id: string
+  userId?: string
+  operationType?: string
+  businessType?: string
+  businessId?: string
+  httpMethod?: string
+  requestPath?: string
+  successFlag?: number
+  errorCode?: string
+  sourceIp?: string
+  durationMs?: number
+  createdAt?: string
+}
+
+export type DocumentBusinessType = 'PAYMENT' | 'SETTLEMENT'
+export type DocumentVersionStatus = 'DRAFT' | 'PUBLISHED' | 'DISABLED'
+
+export interface DocumentTemplateSummary {
+  id: string
+  templateCode: string
+  templateName: string
+  businessType: DocumentBusinessType
+  enabled: number
+  defaultVersionId?: string
+  defaultLockVersion?: number
+  updatedAt?: string
+}
+
+export interface DocumentTemplateVersion {
+  id: string
+  templateId: string
+  versionNo: number
+  status: DocumentVersionStatus
+  schemaVersion: string
+  templateContent: string
+  fieldManifest: string
+  contentHash: string
+  remark?: string
+  publishedAt?: string
+}
+
+export interface DocumentTemplateDetail {
+  template: DocumentTemplateSummary
+  versions: DocumentTemplateVersion[]
+  defaultBinding?: {
+    templateId: string
+    templateVersionId: string
+    lockVersion: number
+  }
+}
+
+export interface DocumentDraft {
+  schemaVersion: string
+  templateContent: string
+  fieldManifest: string
+  remark?: string
+}
+
+export interface DocumentCreateCommand extends DocumentDraft {
+  templateCode: string
+  templateName: string
+  businessType: DocumentBusinessType
+}
+
+export async function loadUsers(
+  query: {
+    pageNo: number
+    pageSize: number
+    username?: string
+    realName?: string
+    status?: string
+  },
+  signal?: AbortSignal,
+): Promise<PageResult<UserRecord>> {
+  const page = await apiRequest<PageResult<UserRecord>>(`/system/users?${params(query)}`, {
+    signal,
+  })
+  return normalizePage(page, normalizeUser)
+}
+
+export function loadUser(id: string): Promise<UserRecord> {
+  return apiRequest<UserRecord>(`/system/users/${requiredId(id)}`).then(normalizeUser)
+}
+
+export function createUser(command: UserCommand): Promise<string> {
+  return apiRequest<string, UserCommand>('/system/users', { method: 'POST', body: command }).then(
+    String,
+  )
+}
+
+export function updateUser(id: string, command: UserCommand): Promise<void> {
+  return apiRequest<void, UserCommand>(`/system/users/${requiredId(id)}`, {
+    method: 'PUT',
+    body: command,
+  })
+}
+
+export function updateUserStatus(id: string, status: string): Promise<void> {
+  return apiRequest<void, { status: string }>(`/system/users/${requiredId(id)}/status`, {
+    method: 'PATCH',
+    body: { status },
+  })
+}
+
+export function deleteUser(id: string): Promise<void> {
+  return apiRequest<void>(`/system/users/${requiredId(id)}`, { method: 'DELETE' })
+}
+
+export function assignUserRoles(id: string, roleIds: string[]): Promise<void> {
+  return apiRequest<void, { roleIds: string[] }>(`/system/users/${requiredId(id)}/roles`, {
+    method: 'PUT',
+    body: { roleIds },
+  })
+}
+
+export function loadRoles(): Promise<RoleRecord[]> {
+  return apiRequest<RoleRecord[]>('/system/roles').then((rows) => rows.map(normalizeRole))
+}
+
+export function loadRole(id: string): Promise<RoleRecord> {
+  return apiRequest<RoleRecord>(`/system/roles/${requiredId(id)}`).then(normalizeRole)
+}
+
+export function createRole(command: RoleCommand): Promise<string> {
+  return apiRequest<string, RoleCommand>('/system/roles', {
+    method: 'POST',
+    body: command,
+  }).then(String)
+}
+
+export function updateRole(id: string, command: RoleCommand): Promise<void> {
+  return apiRequest<void, RoleCommand>(`/system/roles/${requiredId(id)}`, {
+    method: 'PUT',
+    body: command,
+  })
+}
+
+export function deleteRole(id: string): Promise<void> {
+  return apiRequest<void>(`/system/roles/${requiredId(id)}`, { method: 'DELETE' })
+}
+
+export function assignRoleMenus(id: string, menuIds: string[]): Promise<void> {
+  return apiRequest<void, { menuIds: string[] }>(`/system/roles/${requiredId(id)}/menus`, {
+    method: 'PUT',
+    body: { menuIds },
+  })
+}
+
+export function loadMenus(): Promise<MenuRecord[]> {
+  return apiRequest<MenuRecord[]>('/system/menus').then((rows) => rows.map(normalizeMenu))
+}
+
+export function loadMenu(id: string): Promise<MenuRecord> {
+  return apiRequest<MenuRecord>(`/system/menus/${requiredId(id)}`).then(normalizeMenu)
+}
+
+export function createMenu(command: MenuCommand): Promise<string> {
+  return apiRequest<string, MenuCommand>('/system/menus', {
+    method: 'POST',
+    body: command,
+  }).then(String)
+}
+
+export function updateMenu(id: string, command: MenuCommand): Promise<void> {
+  return apiRequest<void, MenuCommand>(`/system/menus/${requiredId(id)}`, {
+    method: 'PUT',
+    body: command,
+  })
+}
+
+export function deleteMenu(id: string): Promise<void> {
+  return apiRequest<void>(`/system/menus/${requiredId(id)}`, { method: 'DELETE' })
+}
+
+export async function loadDictTypes(
+  query: {
+    pageNo: number
+    pageSize: number
+    dictCode?: string
+    dictName?: string
+    status?: string
+  },
+  signal?: AbortSignal,
+): Promise<PageResult<DictTypeRecord>> {
+  const page = await apiRequest<PageResult<DictTypeRecord>>(`/system/dict/types?${params(query)}`, {
+    signal,
+  })
+  return normalizePage(page, (row) => ({ ...row, id: String(row.id) }))
+}
+
+export function createDictType(command: Omit<DictTypeRecord, 'id' | 'createdAt'>): Promise<string> {
+  return apiRequest<string, Omit<DictTypeRecord, 'id' | 'createdAt'>>('/system/dict/types', {
+    method: 'POST',
+    body: command,
+  }).then(String)
+}
+
+export function updateDictType(
+  id: string,
+  command: Omit<DictTypeRecord, 'id' | 'createdAt'>,
+): Promise<void> {
+  return apiRequest<void, Omit<DictTypeRecord, 'id' | 'createdAt'>>(
+    `/system/dict/types/${requiredId(id)}`,
+    { method: 'PUT', body: command },
+  )
+}
+
+export function deleteDictType(id: string): Promise<void> {
+  return apiRequest<void>(`/system/dict/types/${requiredId(id)}`, { method: 'DELETE' })
+}
+
+export async function loadDictData(
+  query: { pageNo: number; pageSize: number; typeId?: string; dictLabel?: string; status?: string },
+  signal?: AbortSignal,
+): Promise<PageResult<DictDataRecord>> {
+  const page = await apiRequest<PageResult<DictDataRecord>>(`/system/dict/data?${params(query)}`, {
+    signal,
+  })
+  return normalizePage(page, normalizeDictData)
+}
+
+export function createDictData(command: Omit<DictDataRecord, 'id'>): Promise<string> {
+  return apiRequest<string, Omit<DictDataRecord, 'id'>>('/system/dict/data', {
+    method: 'POST',
+    body: command,
+  }).then(String)
+}
+
+export function updateDictData(id: string, command: Omit<DictDataRecord, 'id'>): Promise<void> {
+  return apiRequest<void, Omit<DictDataRecord, 'id'>>(`/system/dict/data/${requiredId(id)}`, {
+    method: 'PUT',
+    body: command,
+  })
+}
+
+export function deleteDictData(id: string): Promise<void> {
+  return apiRequest<void>(`/system/dict/data/${requiredId(id)}`, { method: 'DELETE' })
+}
+
+export async function loadAuditLogs(
+  query: {
+    pageNo: number
+    pageSize: number
+    businessType?: string
+    businessId?: string
+    userId?: string
+    startTime?: string
+    endTime?: string
+  },
+  signal?: AbortSignal,
+): Promise<PageResult<AuditRecord>> {
+  const page = await apiRequest<PageResult<AuditRecord>>(`/audit-logs?${params(query)}`, { signal })
+  return normalizePage(page, (row) => ({
+    ...row,
+    id: String(row.id),
+    userId: row.userId == null ? undefined : String(row.userId),
+  }))
+}
+
+export function loadDocumentTemplates(
+  businessType: DocumentBusinessType,
+  signal?: AbortSignal,
+): Promise<DocumentTemplateSummary[]> {
+  return apiRequest<DocumentTemplateSummary[]>(`/document-templates?${params({ businessType })}`, {
+    signal,
+  }).then((rows) => rows.map(normalizeTemplate))
+}
+
+export function loadDocumentTemplate(id: string): Promise<DocumentTemplateDetail> {
+  return apiRequest<DocumentTemplateDetail>(`/document-templates/${requiredId(id)}`).then(
+    normalizeDocumentDetail,
+  )
+}
+
+export function createDocumentTemplate(
+  command: DocumentCreateCommand,
+): Promise<DocumentTemplateVersion> {
+  return apiRequest<DocumentTemplateVersion, DocumentCreateCommand>('/document-templates', {
+    method: 'POST',
+    body: command,
+  }).then(normalizeDocumentVersion)
+}
+
+export function createDocumentVersion(
+  templateId: string,
+  command: DocumentDraft,
+): Promise<DocumentTemplateVersion> {
+  return apiRequest<DocumentTemplateVersion, DocumentDraft>(
+    `/document-templates/${requiredId(templateId)}/versions`,
+    { method: 'POST', body: command },
+  ).then(normalizeDocumentVersion)
+}
+
+export function updateDocumentVersion(id: string, command: DocumentDraft): Promise<void> {
+  return apiRequest<void, DocumentDraft>(`/document-templates/versions/${requiredId(id)}`, {
+    method: 'PUT',
+    body: command,
+  })
+}
+
+export function publishDocumentVersion(id: string): Promise<DocumentTemplateVersion> {
+  return apiRequest<DocumentTemplateVersion>(
+    `/document-templates/versions/${requiredId(id)}/publish`,
+    {
+      method: 'POST',
+    },
+  ).then(normalizeDocumentVersion)
+}
+
+export function disableDocumentVersion(id: string): Promise<void> {
+  return apiRequest<void>(`/document-templates/versions/${requiredId(id)}/disable`, {
+    method: 'POST',
+  })
+}
+
+export function bindDefaultDocumentVersion(id: string, expectedLockVersion: number): Promise<void> {
+  return apiRequest<void>(
+    `/document-templates/versions/${requiredId(id)}/default?${params({ expectedLockVersion })}`,
+    { method: 'PUT' },
+  )
+}
+
+export function clearNonProductionDatabase(): Promise<string> {
+  return apiRequest<string>(
+    `/system/clear-database?${params({ confirm: 'CLEAR_NON_PROD_DATABASE' })}`,
+    { method: 'DELETE' },
+  )
+}
+
+function normalizeUser(row: UserRecord): UserRecord {
+  return {
+    ...row,
+    id: String(row.id),
+    orgId: row.orgId == null ? undefined : String(row.orgId),
+    roleNames: row.roleNames ?? [],
+    roleIds: (row.roleIds ?? []).map(String),
+  }
+}
+
+function normalizeRole(row: RoleRecord): RoleRecord {
+  return {
+    ...row,
+    id: String(row.id),
+    menuIds: (row.menuIds ?? []).map(String),
+  }
+}
+
+function normalizeMenu(row: MenuRecord): MenuRecord {
+  return {
+    ...row,
+    id: String(row.id),
+    parentId: String(row.parentId ?? 0),
+    orderNum: Number(row.orderNum ?? 0),
+    visible: Number(row.visible ?? 1),
+  }
+}
+
+function normalizeDictData(row: DictDataRecord): DictDataRecord {
+  return {
+    ...row,
+    id: String(row.id),
+    dictTypeId: String(row.dictTypeId),
+    orderNum: Number(row.orderNum ?? 0),
+  }
+}
+
+function normalizeTemplate(row: DocumentTemplateSummary): DocumentTemplateSummary {
+  return {
+    ...row,
+    id: String(row.id),
+    defaultVersionId: row.defaultVersionId == null ? undefined : String(row.defaultVersionId),
+    defaultLockVersion: row.defaultLockVersion == null ? undefined : Number(row.defaultLockVersion),
+  }
+}
+
+function normalizeDocumentVersion(row: DocumentTemplateVersion): DocumentTemplateVersion {
+  return { ...row, id: String(row.id), templateId: String(row.templateId) }
+}
+
+function normalizeDocumentDetail(row: DocumentTemplateDetail): DocumentTemplateDetail {
+  return {
+    ...row,
+    template: normalizeTemplate(row.template),
+    versions: (row.versions ?? []).map(normalizeDocumentVersion),
+    defaultBinding: row.defaultBinding
+      ? {
+          ...row.defaultBinding,
+          templateId: String(row.defaultBinding.templateId),
+          templateVersionId: String(row.defaultBinding.templateVersionId),
+          lockVersion: Number(row.defaultBinding.lockVersion),
+        }
+      : undefined,
+  }
+}
+
+function normalizePage<T, R>(page: PageResult<T>, mapper: (row: T) => R): PageResult<R> {
+  return {
+    pageNo: Number(page.pageNo),
+    pageSize: Number(page.pageSize),
+    total: Number(page.total),
+    records: (page.records ?? []).map(mapper),
+  }
+}
+
+function params(values: Record<string, string | number | undefined | null>): URLSearchParams {
+  const query = new URLSearchParams()
+  for (const [key, value] of Object.entries(values)) {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      query.set(key, String(value))
+    }
+  }
+  return query
+}
+
+function requiredId(id: string): string {
+  const value = id.trim()
+  if (!value) throw new Error('业务标识不能为空')
+  return encodeURIComponent(value)
+}

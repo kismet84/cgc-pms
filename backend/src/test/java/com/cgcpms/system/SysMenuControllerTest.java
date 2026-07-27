@@ -1,7 +1,7 @@
 package com.cgcpms.system;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.common.ratelimit.FallbackRateLimitCounterStore;
 import com.cgcpms.system.entity.SysMenu;
 import com.cgcpms.system.mapper.SysMenuMapper;
@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional
 class SysMenuControllerTest {
-    @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
+    @Autowired private MockMvc mockMvc; @Autowired private JwtHttpTestTokenFactory jwtUtils;
     @Autowired private ObjectMapper objectMapper;
     @Autowired private FallbackRateLimitCounterStore counterStore;
     @Autowired private SysMenuMapper menuMapper;

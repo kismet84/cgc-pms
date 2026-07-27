@@ -14,6 +14,17 @@ public interface SysUserMapper extends BaseMapper<SysUser> {
 
     @InterceptorIgnore(tenantLine = "true")
     @Select("""
+            SELECT id, tenant_id, password, status
+            FROM sys_user
+            WHERE id = #{userId}
+              AND tenant_id = #{tenantId}
+              AND deleted_flag = 0
+            """)
+    SysUser selectCredentialByTenantAndId(@Param("tenantId") Long tenantId,
+                                          @Param("userId") Long userId);
+
+    @InterceptorIgnore(tenantLine = "true")
+    @Select("""
             SELECT DISTINCT u.id
             FROM sys_user u
             JOIN sys_user_role ur ON ur.tenant_id = u.tenant_id AND ur.user_id = u.id
