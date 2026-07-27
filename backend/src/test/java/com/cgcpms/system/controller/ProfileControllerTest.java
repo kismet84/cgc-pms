@@ -79,7 +79,8 @@ class ProfileControllerTest {
                     "ENABLE", 1, ADMIN_ID, "测试种子数据");
         } else {
             jdbcTemplate.update(
-                    "UPDATE sys_user SET password = ?, real_name = ?, phone = ?, email = ?, status = ?, is_admin = ? WHERE id = ?",
+                    "UPDATE sys_user SET username = ?, password = ?, real_name = ?, phone = ?, email = ?, status = ?, is_admin = ? WHERE id = ?",
+                    "admin",
                     "$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2",
                     "系统管理员", "13800000000", "admin@cgc-pms.com", "ENABLE", 1, ADMIN_ID);
         }
