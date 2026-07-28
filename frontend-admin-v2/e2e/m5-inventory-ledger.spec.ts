@@ -109,7 +109,7 @@ async function install(page: Page, granted = permissions, rejectTransfer = false
       warehouses.push({
         ...warehouses[0]!,
         id: 'W2',
-        warehouseCode: String(body?.warehouseCode),
+        warehouseCode: 'WH-002',
         warehouseName: String(body?.warehouseName),
       })
       return fulfill(route, 'W2')
@@ -250,13 +250,16 @@ test.describe('M5 inventory workspace V2', () => {
     await install(page, ['inventory:warehouse:list'])
     await page.goto('/v2/inventory/warehouse?projectId=P1')
     await expect(page.getByRole('button', { name: '新建仓库' })).toHaveCount(0)
-    await install(page, ['inventory:warehouse:list', 'inventory:warehouse:add'])
+    const writes = await install(page, ['inventory:warehouse:list', 'inventory:warehouse:add'])
     await page.reload()
     await page.getByRole('button', { name: '新建仓库' }).click()
-    await page.getByLabel('仓库编码').fill('WH-002')
+    await expect(page.getByLabel('仓库编码')).toBeDisabled()
     await page.getByLabel('仓库名称').fill('辅材仓')
     await page.getByRole('button', { name: '保存', exact: true }).click()
     await expect(page.getByText('WH-002', { exact: true })).toBeVisible()
+    expect(
+      writes.find((item) => item.path === 'POST /inventory/warehouses')?.body,
+    ).not.toHaveProperty('warehouseCode')
   })
 
   test('reads quantity, value, incoming and historical facts', async ({ page }) => {
