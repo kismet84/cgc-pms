@@ -513,7 +513,7 @@ export interface CostForecastItemCommand {
 
 export interface CostForecastCommand {
   projectId: string;
-  forecastCode: string;
+  forecastCode?: string;
   forecastName: string;
   forecastDate: string;
   items: CostForecastItemCommand[];
@@ -523,7 +523,7 @@ export interface CostForecastCommand {
 
 export interface CostCorrectiveCommand {
   forecastId: string;
-  actionCode: string;
+  actionCode?: string;
   actionTitle: string;
   rootCause: string;
   actionPlan: string;

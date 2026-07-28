@@ -130,7 +130,7 @@ export interface ScheduleTraceRecord {
 
 export interface ScheduleCommand {
   projectId: string;
-  planCode: string;
+  planCode?: string;
   planName: string;
   plannedStartDate: string;
   plannedEndDate: string;
@@ -156,7 +156,7 @@ export interface PeriodPlanCommand {
   schedulePlanId: string;
   periodType: PeriodType;
   parentPeriodPlanId?: string;
-  periodCode: string;
+  periodCode?: string;
   periodName: string;
   startDate: string;
   endDate: string;
@@ -178,7 +178,7 @@ export interface DailyProgressCommand {
 
 export interface CorrectiveActionCommand {
   snapshotId: string;
-  actionCode: string;
+  actionCode?: string;
   reason: string;
   actionPlan: string;
   responsibleUserId: string;

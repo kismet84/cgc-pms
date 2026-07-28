@@ -213,7 +213,7 @@ export interface SourcingTraceRecord {
 export interface SourcingEventCommand {
   projectId: string;
   purchaseRequestId: string;
-  sourcingCode: string;
+  sourcingCode?: string;
   sourcingTitle: string;
   sourcingType: "INQUIRY" | "TENDER";
   deadline: string;
@@ -244,7 +244,7 @@ export interface BidEvaluationCommand {
 
 export interface SupplierReturnCommand {
   receiptId: string;
-  returnCode: string;
+  returnCode?: string;
   returnDate: string;
   returnQuantity: SupplyChainDecimalString;
   returnAmount: SupplyChainDecimalString;
@@ -308,7 +308,7 @@ export interface WarehouseRecord {
 
 export interface WarehouseCommand {
   projectId: string;
-  warehouseCode: string;
+  warehouseCode?: string;
   warehouseName: string;
   status: "ENABLE" | "DISABLE";
   remark?: string;

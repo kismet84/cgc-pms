@@ -141,8 +141,12 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         assertEquals("PROJECT_CLOSEOUT_ACTION_REQUIRED", directClose.getCode());
 
         long closeoutId = id(service.initiate(new InitiateCommand(PROJECT, "PC-001", LocalDate.now(), "启动收尾")));
+        assertTrue(jdbc.queryForObject("SELECT closeout_code FROM project_closeout WHERE id=?", String.class, closeoutId)
+                .matches("PC-\\d{8}-\\d{3}"));
         long sectionId = id(service.createSectionAcceptance(closeoutId, new SectionAcceptanceCommand(
                 WBS, QUALITY_INSPECTION, "SA-001", "单位工程分部分项验收", LocalDate.now(), "PASS", null)));
+        assertTrue(jdbc.queryForObject("SELECT acceptance_code FROM closeout_section_acceptance WHERE id=?", String.class, sectionId)
+                .matches("SA-\\d{8}-\\d{3}"));
         assertEquals("CLOSEOUT_ATTACHMENT_REQUIRED", assertThrows(BusinessException.class,
                 () -> service.confirmSectionAcceptance(sectionId)).getCode());
         evidence("CLOSEOUT_SECTION_ACCEPTANCE", sectionId, "SECTION_ACCEPTANCE_RECORD");
@@ -151,6 +155,8 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         long finalId = id(service.createFinalAcceptance(closeoutId, new FinalAcceptanceCommand(
                 "FA-001", LocalDate.now(), "建设单位", "建设、监理、设计、施工单位",
                 "PASS", "工程实体、资料和功能验收通过", null)));
+        assertTrue(jdbc.queryForObject("SELECT acceptance_code FROM closeout_final_acceptance WHERE id=?", String.class, finalId)
+                .matches("FA-\\d{8}-\\d{3}"));
         evidence("CLOSEOUT_FINAL_ACCEPTANCE", finalId, "FINAL_ACCEPTANCE_CERTIFICATE");
         service.submitFinalAcceptance(finalId);
         approveAll("PROJECT_FINAL_ACCEPTANCE", finalId);
@@ -170,12 +176,16 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         long warrantyId = id(service.registerWarranty(closeoutId, new WarrantyCommand(
                 CONTRACT, RETENTION_RECEIVABLE, "W-001", new BigDecimal("100.00"),
                 LocalDate.now().minusMonths(12), LocalDate.now(), RESPONSIBLE_USER, null)));
+        assertTrue(jdbc.queryForObject("SELECT warranty_code FROM closeout_warranty WHERE id=?", String.class, warrantyId)
+                .matches("WAR-\\d{8}-\\d{3}"));
         assertEquals("CLOSEOUT_RESPONSIBLE_PROJECT_MEMBER_INVALID", assertThrows(BusinessException.class,
                 () -> service.createDefect(warrantyId, new DefectCommand(
                         "DF-OUTSIDE", "非成员缺陷", "责任人不属于项目", OUTSIDE_USER,
                         LocalDate.now().plusDays(7), null))).getCode());
         long defectId = id(service.createDefect(warrantyId, new DefectCommand(
                 "DF-001", "屋面局部渗水", "雨后屋面局部出现渗水", RESPONSIBLE_USER, LocalDate.now().plusDays(7), null)));
+        assertTrue(jdbc.queryForObject("SELECT defect_code FROM closeout_defect WHERE id=?", String.class, defectId)
+                .matches("DEF-\\d{8}-\\d{3}"));
         evidence("CLOSEOUT_DEFECT", defectId, "DEFECT_RECTIFICATION_EVIDENCE");
         service.rectifyDefect(defectId, new RectificationCommand("完成防水层修补并通过淋水试验"));
         assertEquals("CLOSEOUT_DEFECT_REVIEWER_CONFLICT", assertThrows(BusinessException.class,
@@ -193,6 +203,8 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         long archiveId = id(service.createArchiveTransfer(closeoutId, new ArchiveTransferCommand(
                 "AT-001", LocalDate.now(), "建设单位档案室", "档案管理员", "城建档案馆A区",
                 "竣工图、验收记录、结算资料、质保与缺陷责任资料", null)));
+        assertTrue(jdbc.queryForObject("SELECT transfer_code FROM closeout_archive_transfer WHERE id=?", String.class, archiveId)
+                .matches("ATR-\\d{8}-\\d{3}"));
         evidence("CLOSEOUT_ARCHIVE_TRANSFER", archiveId, "ARCHIVE_TRANSFER_LIST");
         service.acceptArchiveTransfer(archiveId);
 

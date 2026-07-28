@@ -3,6 +3,7 @@ package com.cgcpms.cost.service;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.BusinessCodeGenerator;
 import com.cgcpms.cost.dto.CostControlModels.CorrectiveActionRequest;
 import com.cgcpms.cost.dto.CostControlModels.CorrectiveCloseRequest;
 import com.cgcpms.cost.dto.CostControlModels.ForecastItemRequest;
@@ -35,6 +36,8 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class CostControlService {
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
+
     private static final Set<String> MONEY_KEYS = Set.of(
             "amount", "contract_amount", "target_cost", "total_target_amount", "total_bid_cost_amount", "total_responsibility_amount",
             "target_amount", "bid_cost_amount", "responsibility_amount", "committed_amount", "actual_amount", "recommended_remaining_amount",
@@ -49,6 +52,7 @@ public class CostControlService {
     );
 
     private final JdbcTemplate jdbc;
+    private final BusinessCodeGenerator businessCodeGenerator;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
     private final CostSummaryService costSummaryService;
@@ -154,8 +158,17 @@ public class CostControlService {
         ensureNoOpenPriorVariance(request.projectId(), null);
         Integer versionNo = jdbc.queryForObject("SELECT COALESCE(MAX(version_no),0)+1 FROM cost_forecast WHERE tenant_id=? AND project_id=? AND deleted_flag=0", Integer.class, tenant(), request.projectId());
         long forecastId = IdWorker.getId();
-        persistForecast(forecastId, activeTarget, versionNo == null ? 1 : versionNo, request, true);
-        return moneyPayload(requireForecast(forecastId, false));
+        int firstVersion = versionNo == null ? 1 : versionNo;
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            try {
+                persistForecast(forecastId, activeTarget, firstVersion + attempt, request, true, null,
+                        businessCodeGenerator.next(BusinessCodeGenerator.Rule.COST_FORECAST, request.projectId(), attempt));
+                return moneyPayload(requireForecast(forecastId, false));
+            } catch (DuplicateKeyException ignored) {
+                // 编号或版本并发冲突时换号重试。
+            }
+        }
+        throw error("COST_FORECAST_CODE_DUPLICATE", "完工预测编号或版本生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -167,7 +180,8 @@ public class CostControlService {
         requireProject(request.projectId(), true);
         Map<String, Object> activeTarget = requireActiveTarget(request.projectId(), false);
         if (!Objects.equals(idValue(existing.get("cost_target_id")), id(activeTarget))) throw error("COST_FORECAST_TARGET_CHANGED", "目标成本版本已切换，请重新创建预测");
-        persistForecast(forecastId, activeTarget, intValue(existing.get("version_no")), request, false, version);
+        persistForecast(forecastId, activeTarget, intValue(existing.get("version_no")), request, false, version,
+                string(existing.get("forecast_code")));
         return moneyPayload(requireForecast(forecastId, false));
     }
 
@@ -186,7 +200,8 @@ public class CostControlService {
                 localDate(forecast.get("forecast_date")), forecastItems(forecastId).stream().map(row -> new ForecastItemRequest(
                         idValue(row.get("cost_subject_id")), money(row.get("estimated_remaining_amount")), stringNullable(row.get("remark")))).toList(),
                 stringNullable(forecast.get("remark")));
-        persistForecast(forecastId, activeTarget, intValue(forecast.get("version_no")), refreshed, false, version);
+        persistForecast(forecastId, activeTarget, intValue(forecast.get("version_no")), refreshed, false, version,
+                string(forecast.get("forecast_code")));
         forecast = requireForecast(forecastId, true);
         String status = money(forecast.get("cost_variance_amount")).compareTo(BigDecimal.ZERO) > 0 ? "ACTION_REQUIRED" : "CONTROLLED";
         jdbc.update("UPDATE cost_forecast SET status='SUPERSEDED',updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND project_id=? AND id<>? AND status IN('ACTION_REQUIRED','CONTROLLED') AND deleted_flag=0", user(), tenant(), projectId, forecastId);
@@ -213,17 +228,22 @@ public class CostControlService {
         }
         requireActiveProjectMember(projectId, request.responsibleUserId());
         long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO cost_corrective_action(id,tenant_id,project_id,forecast_id,action_code,action_title,root_cause,action_plan,
-                    expected_saving_amount,responsible_user_id,due_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), projectId, request.forecastId(), request.actionCode().trim(), request.actionTitle().trim(),
-                    request.rootCause().trim(), request.actionPlan().trim(), expected, request.responsibleUserId(), request.dueDate(), user(), user(), request.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("COST_CORRECTIVE_CODE_DUPLICATE", "纠偏措施编号已存在");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            try {
+                jdbc.update("""
+                        INSERT INTO cost_corrective_action(id,tenant_id,project_id,forecast_id,action_code,action_title,root_cause,action_plan,
+                        expected_saving_amount,responsible_user_id,due_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), projectId, request.forecastId(),
+                        businessCodeGenerator.next(BusinessCodeGenerator.Rule.COST_CORRECTIVE, projectId, attempt),
+                        request.actionTitle().trim(), request.rootCause().trim(), request.actionPlan().trim(), expected,
+                        request.responsibleUserId(), request.dueDate(), user(), user(), request.remark());
+                return moneyPayload(requireCorrection(id, false));
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突时换号重试。
+            }
         }
-        return moneyPayload(requireCorrection(id, false));
+        throw error("COST_CORRECTIVE_CODE_DUPLICATE", "纠偏措施编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -242,7 +262,7 @@ public class CostControlService {
         if (money(allocated).add(money(request.expectedSavingAmount())).compareTo(variance) > 0) throw error("COST_CORRECTIVE_SAVING_EXCEEDS_VARIANCE", "纠偏预计节约金额合计不能超过预测成本偏差");
         try {
             int updated = jdbc.update("UPDATE cost_corrective_action SET action_code=?,action_title=?,root_cause=?,action_plan=?,expected_saving_amount=?,responsible_user_id=?,due_date=?,remark=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND version=?",
-                    request.actionCode().trim(), request.actionTitle().trim(), request.rootCause().trim(), request.actionPlan().trim(), money(request.expectedSavingAmount()), request.responsibleUserId(), request.dueDate(), request.remark(), user(), id, tenant(), version);
+                    string(action.get("action_code")), request.actionTitle().trim(), request.rootCause().trim(), request.actionPlan().trim(), money(request.expectedSavingAmount()), request.responsibleUserId(), request.dueDate(), request.remark(), user(), id, tenant(), version);
             if (updated != 1) throw error("COST_CORRECTIVE_CONCURRENT_UPDATE", "成本纠偏措施版本冲突，请刷新后重试");
         } catch (DuplicateKeyException e) {
             throw error("COST_CORRECTIVE_CODE_DUPLICATE", "纠偏措施编号已存在");
@@ -299,10 +319,11 @@ public class CostControlService {
     }
 
     private void persistForecast(long forecastId, Map<String, Object> target, int versionNo, ForecastRequest request, boolean insert) {
-        persistForecast(forecastId, target, versionNo, request, insert, null);
+        persistForecast(forecastId, target, versionNo, request, insert, null, request.forecastCode());
     }
 
-    private void persistForecast(long forecastId, Map<String, Object> target, int versionNo, ForecastRequest request, boolean insert, Integer expectedVersion) {
+    private void persistForecast(long forecastId, Map<String, Object> target, int versionNo, ForecastRequest request,
+                                 boolean insert, Integer expectedVersion, String forecastCode) {
         List<Map<String, Object>> targetItems = targetItems(id(target));
         if (targetItems.isEmpty()) throw error("COST_FORECAST_TARGET_ITEMS_REQUIRED", "生效目标成本缺少科目责任预算");
         Map<Long, ForecastItemRequest> requested = new LinkedHashMap<>();
@@ -351,11 +372,11 @@ public class CostControlService {
                         forecast_at_completion_amount,contract_income_amount,forecast_profit_amount,cost_variance_amount,profit_margin,status,formula_version,
                         version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'DRAFT','COST_EAC_V1',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                        """, forecastId, tenant(), request.projectId(), id(target), request.forecastCode().trim(), request.forecastName().trim(), versionNo,
+                        """, forecastId, tenant(), request.projectId(), id(target), forecastCode, request.forecastName().trim(), versionNo,
                         request.forecastDate(), totalBid, totalTarget, totalResponsibility, totalCommitted, totalActual, totalRemaining, completion, income, profit, variance, margin, user(), user(), request.remark());
             } else {
                 int updated = jdbc.update("UPDATE cost_forecast SET forecast_code=?,forecast_name=?,forecast_date=?,bid_cost_amount=?,target_cost_amount=?,responsibility_amount=?,committed_cost_amount=?,actual_cost_amount=?,estimated_remaining_amount=?,forecast_at_completion_amount=?,contract_income_amount=?,forecast_profit_amount=?,cost_variance_amount=?,profit_margin=?,remark=?,version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='DRAFT' AND version=?",
-                        request.forecastCode().trim(), request.forecastName().trim(), request.forecastDate(), totalBid, totalTarget, totalResponsibility, totalCommitted, totalActual, totalRemaining, completion, income, profit, variance, margin, request.remark(), user(), forecastId, tenant(), expectedVersion);
+                        forecastCode, request.forecastName().trim(), request.forecastDate(), totalBid, totalTarget, totalResponsibility, totalCommitted, totalActual, totalRemaining, completion, income, profit, variance, margin, request.remark(), user(), forecastId, tenant(), expectedVersion);
                 if (updated != 1) throw error("COST_FORECAST_CONCURRENT_UPDATE", "完工预测版本冲突，请刷新后重试");
                 jdbc.update("DELETE FROM cost_forecast_item WHERE tenant_id=? AND forecast_id=?", tenant(), forecastId);
             }
@@ -368,6 +389,7 @@ public class CostControlService {
                         """, IdWorker.getId(), tenant(), forecastId, request.projectId(), row.get("subjectId"), row.get("bid"), row.get("target"), row.get("responsibility"), row.get("committed"), row.get("actual"), row.get("remaining"), row.get("completion"), row.get("variance"), row.get("responsibleUserId"), row.get("responsibilityUnit"), user(), row.get("remark"));
             }
         } catch (DuplicateKeyException e) {
+            if (insert) throw e;
             throw error("COST_FORECAST_CODE_DUPLICATE", "完工预测编号或版本已存在");
         }
     }

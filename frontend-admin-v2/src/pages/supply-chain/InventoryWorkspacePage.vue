@@ -391,7 +391,7 @@ async function saveWarehouse(): Promise<void> {
   try {
     const body: WarehouseCommand = {
       projectId: required(warehouseForm.projectId, '项目ID'),
-      warehouseCode: required(warehouseForm.warehouseCode, '仓库编码'),
+      warehouseCode: editingWarehouseId.value ? warehouseForm.warehouseCode : undefined,
       warehouseName: required(warehouseForm.warehouseName, '仓库名称'),
       status: warehouseForm.status,
       remark: warehouseForm.remark?.trim() || undefined,
@@ -908,7 +908,12 @@ onBeforeUnmount(() => {
           :disabled="Boolean(editingWarehouseId)"
           required
         />
-        <V2Input v-model="warehouseForm.warehouseCode" label="仓库编码" required />
+        <V2Input
+          v-model="warehouseForm.warehouseCode"
+          label="仓库编码"
+          disabled
+          placeholder="创建后由服务端自动生成"
+        />
         <V2Input v-model="warehouseForm.warehouseName" label="仓库名称" required />
         <V2Select
           v-model="warehouseForm.status"

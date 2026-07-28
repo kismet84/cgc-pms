@@ -23,7 +23,17 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("234", flyway.info().current().getVersion().getVersion());
+        assertEquals("235", flyway.info().current().getVersion().getVersion());
+        execute(flyway, """
+                INSERT INTO mat_warehouse
+                    (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
+                VALUES (235001, 1, 235010, 'WH-20260728-001', '仓库一', 'ENABLE', 0)
+                """);
+        assertThrows(IllegalStateException.class, () -> execute(flyway, """
+                INSERT INTO mat_warehouse
+                    (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
+                VALUES (235002, 1, 235010, 'WH-20260728-001', '仓库二', 'ENABLE', 0)
+                """));
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
         assertEquals(12, count(flyway, "sys_role"));
@@ -95,7 +105,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("234", current.info().current().getVersion().getVersion());
+        assertEquals("235", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
                     ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))

@@ -155,7 +155,7 @@ export interface DrawingTrace {
 
 export interface SchemeCommand {
   projectId: string;
-  schemeCode: string;
+  schemeCode?: string;
   schemeName: string;
   schemeType: TechnicalScheme["schemeType"];
   responsibleUserId: string;
@@ -182,7 +182,7 @@ export interface DrawingVersionCommand {
   remark?: string;
 }
 export interface ReviewCommand {
-  reviewCode: string;
+  reviewCode?: string;
   reviewDate: string;
   chairUserId: string;
   participantSummary: string;
@@ -192,7 +192,7 @@ export interface ReviewCommand {
   remark?: string;
 }
 export interface RfiCommand {
-  rfiCode: string;
+  rfiCode?: string;
   subject: string;
   question: string;
   priority: TechnicalRfi["priority"];
@@ -211,7 +211,7 @@ export interface ResponseReviewCommand {
 export interface DisclosureCommand {
   drawingVersionId: string;
   schemeId?: string | null;
-  disclosureCode: string;
+  disclosureCode?: string;
   disclosureTitle: string;
   disclosureDate: string;
   presenterUserId: string;
@@ -231,7 +231,7 @@ export interface ConstructionReferenceCommand {
 export interface ArchiveCommand {
   constructionReferenceId: string;
   qualityInspectionId: string;
-  archiveCode: string;
+  archiveCode?: string;
   acceptanceDate: string;
   acceptanceConclusion: AcceptanceArchive["acceptanceConclusion"];
   archiveLocation: string;

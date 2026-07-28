@@ -6,6 +6,7 @@ import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.alert.service.AlertLifecycleService;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.BusinessCodeGenerator;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.schedule.dto.ProjectScheduleModels.*;
 import com.cgcpms.site.entity.SiteDailyLog;
@@ -31,6 +32,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class ProjectScheduleService {
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
     private static final BigDecimal HUNDRED = new BigDecimal("100");
     private static final String ACTIVE = "ACTIVE";
 
@@ -39,6 +41,7 @@ public class ProjectScheduleService {
     private final ProjectAccessChecker projectAccessChecker;
     private final AlertLogMapper alertLogMapper;
     private final AlertLifecycleService alertLifecycleService;
+    private final BusinessCodeGenerator businessCodeGenerator;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createSchedule(ScheduleRequest request) {
@@ -46,18 +49,22 @@ public class ProjectScheduleService {
         requireExecutableProject(request.projectId());
         requireDates(request.plannedStartDate(), request.plannedEndDate(), "PROJECT_SCHEDULE_DATE_INVALID", "项目计划起止日期不合法");
         Integer versionNo = jdbc.queryForObject("SELECT COALESCE(MAX(version_no),0)+1 FROM project_schedule_plan WHERE tenant_id=? AND project_id=? AND deleted_flag=0", Integer.class, tenant(), request.projectId());
-        Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
-                     planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,'BASELINE',?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), request.projectId(), request.planCode().trim(), request.planName().trim(), versionNo,
-                    request.plannedStartDate(), request.plannedEndDate(), user(), user(), request.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("PROJECT_SCHEDULE_DUPLICATE", "同一项目的计划编码或版本不能重复");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            Long id = IdWorker.getId();
+            String planCode = businessCodeGenerator.next(BusinessCodeGenerator.Rule.SCHEDULE, request.projectId(), attempt);
+            try {
+                jdbc.update("""
+                        INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
+                         planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,'BASELINE',?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), request.projectId(), planCode, request.planName().trim(), versionNo,
+                        request.plannedStartDate(), request.plannedEndDate(), user(), user(), request.remark());
+                return schedule(id);
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突或版本竞争时继续尝试下一序号。
+            }
         }
-        return schedule(id);
+        throw error("PROJECT_SCHEDULE_DUPLICATE", "同一项目计划版本冲突或计划编号生成失败，请重试");
     }
 
     public List<Map<String, Object>> schedules(Long projectId) {
@@ -172,18 +179,22 @@ public class ProjectScheduleService {
         if (request.startDate().isBefore(localDate(schedule.get("planned_start_date"))) || request.endDate().isAfter(localDate(schedule.get("planned_end_date"))))
             throw error("PROJECT_PERIOD_OUTSIDE_SCHEDULE", "月周计划日期必须位于项目计划周期内");
         validatePeriodParent(request, schedule);
-        Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO project_period_plan(id,tenant_id,project_id,schedule_plan_id,parent_period_plan_id,period_type,
-                     period_code,period_name,start_date,end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), projectId, request.schedulePlanId(), request.parentPeriodPlanId(), request.periodType(),
-                    request.periodCode().trim(), request.periodName().trim(), request.startDate(), request.endDate(), user(), user(), request.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("PROJECT_PERIOD_DUPLICATE", "同一项目月周计划编码不能重复");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            Long id = IdWorker.getId();
+            String periodCode = businessCodeGenerator.next(BusinessCodeGenerator.Rule.SCHEDULE_PERIOD, projectId, attempt);
+            try {
+                jdbc.update("""
+                        INSERT INTO project_period_plan(id,tenant_id,project_id,schedule_plan_id,parent_period_plan_id,period_type,
+                         period_code,period_name,start_date,end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), projectId, request.schedulePlanId(), request.parentPeriodPlanId(), request.periodType(),
+                        periodCode, request.periodName().trim(), request.startDate(), request.endDate(), user(), user(), request.remark());
+                return periodPlan(id);
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突时继续尝试下一序号。
+            }
         }
-        return periodPlan(id);
+        throw error("PROJECT_PERIOD_DUPLICATE", "月周计划编号生成冲突，请重试");
     }
 
     public List<Map<String, Object>> periodPlans(Long scheduleId) {
@@ -369,19 +380,23 @@ public class ProjectScheduleService {
             throw error("PROJECT_CORRECTIVE_LAG_REQUIRED", "只有延期或逾期快照可以发起纠偏");
         if (request.dueDate().isBefore(LocalDate.now())) throw error("PROJECT_CORRECTIVE_DUE_DATE_INVALID", "纠偏完成期限不能早于当前日期");
         Long alertId = findAlertId(request.snapshotId());
-        Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO project_corrective_action(id,tenant_id,project_id,schedule_plan_id,snapshot_id,alert_id,action_code,
-                     reason,action_plan,responsible_user_id,due_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), projectId, snapshot.get("schedule_plan_id"), request.snapshotId(), alertId,
-                    request.actionCode().trim(), request.reason().trim(), request.actionPlan().trim(), request.responsibleUserId(),
-                    request.dueDate(), user(), user(), request.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("PROJECT_CORRECTIVE_DUPLICATE", "该偏差快照已有纠偏单或纠偏编码重复");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            Long id = IdWorker.getId();
+            String actionCode = businessCodeGenerator.next(BusinessCodeGenerator.Rule.SCHEDULE_CORRECTIVE, projectId, attempt);
+            try {
+                jdbc.update("""
+                        INSERT INTO project_corrective_action(id,tenant_id,project_id,schedule_plan_id,snapshot_id,alert_id,action_code,
+                         reason,action_plan,responsible_user_id,due_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), projectId, snapshot.get("schedule_plan_id"), request.snapshotId(), alertId,
+                        actionCode, request.reason().trim(), request.actionPlan().trim(), request.responsibleUserId(),
+                        request.dueDate(), user(), user(), request.remark());
+                return correctiveAction(id);
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突或快照已有纠偏单时统一重试后返回业务错误。
+            }
         }
-        return correctiveAction(id);
+        throw error("PROJECT_CORRECTIVE_DUPLICATE", "该偏差快照已有纠偏单或纠偏编号生成冲突");
     }
 
     @Transactional(rollbackFor = Exception.class)

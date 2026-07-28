@@ -86,7 +86,7 @@ class WarehouseServiceTest {
 
         // GREEN: verify persisted
         MatWarehouseVO vo = warehouseService.getById(id);
-        assertEquals("WH-001", vo.getWarehouseCode());
+        assertTrue(vo.getWarehouseCode().matches("WH-\\d{8}-\\d{3}"));
         assertEquals("一号仓库", vo.getWarehouseName());
         assertEquals("ENABLE", vo.getStatus());
         assertEquals(String.valueOf(PROJECT_ID), vo.getProjectId());
@@ -120,11 +120,13 @@ class WarehouseServiceTest {
         // Query with project filter
         PageResult<MatWarehouseVO> page1 = warehouseService.getPage(1, 20, PROJECT_ID, null, null, null);
         assertEquals(1, page1.getTotal(), "项目100应只有1个仓库");
-        assertEquals("WH-P100-A", page1.getRecords().get(0).getWarehouseCode());
+        assertTrue(page1.getRecords().get(0).getWarehouseCode().startsWith("WH-"));
 
         // Query without project filter (all tenant warehouses)
-        PageResult<MatWarehouseVO> page2 = warehouseService.getPage(1, 20, null, "WH-P", null, null);
-        assertEquals(2, page2.getTotal(), "应返回租户下所有2个仓库");
+        PageResult<MatWarehouseVO> page2 = warehouseService.getPage(1, 20, null, "WH-", null, null);
+        assertTrue(page2.getTotal() >= 2, "应返回本次创建的两个仓库");
+        assertTrue(page2.getRecords().stream().anyMatch(row -> "项目100仓库A".equals(row.getWarehouseName())));
+        assertTrue(page2.getRecords().stream().anyMatch(row -> "项目200仓库A".equals(row.getWarehouseName())));
     }
 
     @Test
@@ -168,13 +170,13 @@ class WarehouseServiceTest {
         w2.setStatus("DISABLE");
         warehouseService.create(w2);
 
-        PageResult<MatWarehouseVO> enabled = warehouseService.getPage(1, 20, null, "WH-ENB", null, "ENABLE");
+        PageResult<MatWarehouseVO> enabled = warehouseService.getPage(1, 20, null, null, "启用仓库", "ENABLE");
         assertEquals(1, enabled.getTotal(), "应只有1个启用仓库");
-        assertEquals("WH-ENB", enabled.getRecords().get(0).getWarehouseCode());
+        assertEquals("启用仓库", enabled.getRecords().get(0).getWarehouseName());
 
-        PageResult<MatWarehouseVO> disabled = warehouseService.getPage(1, 20, null, "WH-DIS", null, "DISABLE");
+        PageResult<MatWarehouseVO> disabled = warehouseService.getPage(1, 20, null, null, "禁用仓库", "DISABLE");
         assertEquals(1, disabled.getTotal(), "应只有1个禁用仓库");
-        assertEquals("WH-DIS", disabled.getRecords().get(0).getWarehouseCode());
+        assertEquals("禁用仓库", disabled.getRecords().get(0).getWarehouseName());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -190,18 +192,60 @@ class WarehouseServiceTest {
         warehouse.setWarehouseName("待更新仓库");
         warehouse.setStatus("ENABLE");
         Long id = warehouseService.create(warehouse);
+        String generatedCode = warehouseService.getById(id).getWarehouseCode();
 
         MatWarehouse update = new MatWarehouse();
         update.setId(id);
+        update.setTenantId(999L);
+        update.setProjectId(SECOND_PROJECT_ID);
         update.setWarehouseCode("WH-UPD-002");
         update.setWarehouseName("已更新仓库");
         update.setStatus("DISABLE");
         warehouseService.update(update);
 
         MatWarehouseVO vo = warehouseService.getById(id);
-        assertEquals("WH-UPD-002", vo.getWarehouseCode());
+        assertEquals(generatedCode, vo.getWarehouseCode());
+        assertEquals(String.valueOf(TENANT_ID), vo.getTenantId());
+        assertEquals(String.valueOf(PROJECT_ID), vo.getProjectId());
         assertEquals("已更新仓库", vo.getWarehouseName());
         assertEquals("DISABLE", vo.getStatus());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("仓库详情和写入口对无项目访问权用户 fail-close")
+    void testWarehouseEntriesFailClosedWithoutProjectAccess() {
+        MatWarehouse warehouse = new MatWarehouse();
+        warehouse.setProjectId(PROJECT_ID);
+        warehouse.setWarehouseName("项目范围仓库");
+        warehouse.setStatus("ENABLE");
+        Long id = warehouseService.create(warehouse);
+
+        UserContext.set(Jwts.claims()
+                .add("userId", 99999L)
+                .add("username", "no-project-access")
+                .add("tenantId", TENANT_ID)
+                .build());
+
+        MatWarehouse create = new MatWarehouse();
+        create.setProjectId(PROJECT_ID);
+        create.setWarehouseName("越权创建");
+        create.setStatus("ENABLE");
+        assertEquals("PROJECT_ACCESS_DENIED",
+                assertThrows(BusinessException.class, () -> warehouseService.create(create)).getCode());
+        assertEquals("PROJECT_ACCESS_DENIED",
+                assertThrows(BusinessException.class, () -> warehouseService.getById(id)).getCode());
+
+        MatWarehouse update = new MatWarehouse();
+        update.setId(id);
+        update.setWarehouseName("越权更新");
+        update.setStatus("DISABLE");
+        assertEquals("PROJECT_ACCESS_DENIED",
+                assertThrows(BusinessException.class, () -> warehouseService.update(update)).getCode());
+        assertEquals("PROJECT_ACCESS_DENIED",
+                assertThrows(BusinessException.class, () -> warehouseService.updateStatus(id, "DISABLE")).getCode());
+        assertEquals("PROJECT_ACCESS_DENIED",
+                assertThrows(BusinessException.class, () -> warehouseService.delete(id)).getCode());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -317,8 +361,9 @@ class WarehouseServiceTest {
         w2.setStatus("ENABLE");
         warehouseService.create(w2);
 
-        // Search by code fragment
-        PageResult<MatWarehouseVO> byCode = warehouseService.getPage(1, 20, null, "MAIN", null, null);
+        // Search by generated code
+        String generatedCode = warehouseService.getById(w1.getId()).getWarehouseCode();
+        PageResult<MatWarehouseVO> byCode = warehouseService.getPage(1, 20, null, generatedCode, null, null);
         assertEquals(1, byCode.getTotal());
         assertEquals("主仓库一号", byCode.getRecords().get(0).getWarehouseName());
 
@@ -350,12 +395,12 @@ class WarehouseServiceTest {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // EDGE: 同名仓库编码在当前无 UNIQUE 约束下可共存
+    // EDGE: 服务层单元测试可隔离构造同编码仓库；数据库唯一约束由 Flyway 兼容测试验证
     // ═══════════════════════════════════════════════════════════
     @Test
     @Transactional
-    @DisplayName("EDGE: 同编码仓库可创建（当前无UNIQUE约束）")
-    void testDuplicateWarehouseCodeAccepted() {
+    @DisplayName("EDGE: 客户端重复编码被忽略并生成不同编号")
+    void testClientWarehouseCodeIgnored() {
         MatWarehouse w1 = new MatWarehouse();
         w1.setProjectId(PROJECT_ID);
         w1.setWarehouseCode("WH-DUP");
@@ -370,12 +415,9 @@ class WarehouseServiceTest {
         w2.setWarehouseName("仓库B");
         w2.setStatus("ENABLE");
 
-        // 当前无 UNIQUE(warehouse_code) 约束，同名编码可共存
-        assertDoesNotThrow(() -> {
-            Long id2 = warehouseService.create(w2);
-            assertNotNull(id2);
-            assertNotEquals(id1, id2, "两个仓库 ID 应不同");
-        }, "同编码仓库在当前无唯一约束时不应冲突");
+        Long id2 = warehouseService.create(w2);
+        assertNotEquals(warehouseService.getById(id1).getWarehouseCode(),
+                warehouseService.getById(id2).getWarehouseCode());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -395,7 +437,7 @@ class WarehouseServiceTest {
 
         MatWarehouseVO vo = warehouseService.getById(id);
         assertEquals("", vo.getWarehouseName(), "仓库名称应为空字符串");
-        assertEquals("WH-EMPTY-NAME", vo.getWarehouseCode());
+        assertTrue(vo.getWarehouseCode().matches("WH-\\d{8}-\\d{3}"));
     }
 
     // ═══════════════════════════════════════════════════════════

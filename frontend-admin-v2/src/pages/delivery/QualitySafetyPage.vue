@@ -322,7 +322,7 @@ async function show(
   if (kind === 'plan')
     Object.assign(planForm, {
       projectId: projectId.value,
-      planCode: `QS-${today().replaceAll('-', '')}`,
+      planCode: '',
       planName: '质量安全检查计划',
       inspectionType: 'QUALITY',
       frequencyType: 'SINGLE',
@@ -334,7 +334,7 @@ async function show(
   if (kind === 'inspection')
     Object.assign(inspectionForm, {
       planId: selectedPlanId.value,
-      inspectionCode: `CHK-${today().replaceAll('-', '')}`,
+      inspectionCode: '',
       inspectionDate: today(),
       location: '',
       inspectorUserId: session.userInfo?.userId ?? '',
@@ -372,7 +372,7 @@ async function show(
       issueId: target.id,
       partnerId: (target as QualityIssueRecord).responsiblePartnerId ?? '',
       contractId: '',
-      consequenceCode: `QS-C-${today().replaceAll('-', '')}`,
+      consequenceCode: '',
       decisionType: 'NONE',
       fineAmount: '0',
       reworkCostAmount: '0',
@@ -945,11 +945,8 @@ onBeforeUnmount(() => {
         }
       "
       ><form id="quality-plan-form" class="quality-page__form" @submit.prevent="savePlan">
-        <V2Input v-model="planForm.planCode" label="计划编码" required /><V2Input
-          v-model="planForm.planName"
-          label="计划名称"
-          required
-        /><V2Select
+        <p class="quality-page__wide">计划编码由服务端自动生成</p>
+        <V2Input v-model="planForm.planName" label="计划名称" required /><V2Select
           v-model="planForm.inspectionType"
           label="检查类型"
           :options="[
@@ -993,8 +990,8 @@ onBeforeUnmount(() => {
         class="quality-page__form"
         @submit.prevent="saveInspection"
       >
-        <V2Input v-model="inspectionForm.inspectionCode" label="检查编码" required /><label
-          >检查日期<input v-model="inspectionForm.inspectionDate" type="date" required /></label
+        <p class="quality-page__wide">检查编码由服务端自动生成</p>
+        <label>检查日期<input v-model="inspectionForm.inspectionDate" type="date" required /></label
         ><V2Input v-model="inspectionForm.location" label="检查地点" required /><V2Select
           v-model="inspectionForm.inspectorUserId"
           label="检查人"
@@ -1162,7 +1159,9 @@ onBeforeUnmount(() => {
           :options="contractOptions"
           required
           placeholder="请选择合同"
-        /><V2Input v-model="consequenceForm.consequenceCode" label="后果编码" required /><V2Select
+        />
+        <p class="quality-page__wide">后果编码由服务端自动生成</p>
+        <V2Select
           v-model="consequenceForm.decisionType"
           label="处置类型"
           :options="

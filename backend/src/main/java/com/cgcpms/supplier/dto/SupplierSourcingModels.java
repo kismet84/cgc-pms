@@ -20,7 +20,7 @@ public final class SupplierSourcingModels {
     public record EventCommand(
             @NotNull Long projectId,
             @NotNull Long purchaseRequestId,
-            @NotBlank @Size(max = 64) String sourcingCode,
+            @Size(max = 64) String sourcingCode,
             @NotBlank @Size(max = 200) String sourcingTitle,
             @NotBlank String sourcingType,
             @NotNull LocalDateTime deadline,
@@ -60,7 +60,7 @@ public final class SupplierSourcingModels {
 
     public record SupplierReturnCommand(
             @NotNull Long receiptId,
-            @NotBlank @Size(max = 64) String returnCode,
+            @Size(max = 64) String returnCode,
             @NotNull LocalDate returnDate,
             @NotNull @DecimalMin(value = "0.0001") BigDecimal returnQuantity,
             @NotNull @DecimalMin("0") BigDecimal returnAmount,
