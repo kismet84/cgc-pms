@@ -37,8 +37,26 @@ public class SysUserService {
     private final PasswordEncoder passwordEncoder;
 
     public IPage<SysUserVO> getPage(long pageNo, long pageSize, String username, String realName, String status) {
+        return getPage(pageNo, pageSize, username, realName, status, null);
+    }
+
+    public IPage<SysUserVO> getPage(long pageNo, long pageSize, String username, String realName,
+                                    String status, Long roleId) {
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(SysUser::getTenantId, UserContext.getCurrentTenantId());
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new BusinessException("TENANT_CONTEXT_REQUIRED", "缺少租户上下文");
+        }
+        wrapper.eq(SysUser::getTenantId, tenantId);
+        if (roleId != null) {
+            wrapper.exists("""
+                    SELECT 1
+                    FROM sys_user_role ur
+                    WHERE ur.tenant_id = {0}
+                      AND ur.user_id = sys_user.id
+                      AND ur.role_id = {1}
+                    """, tenantId, roleId);
+        }
         if (StringUtils.hasText(username)) {
             wrapper.like(SysUser::getUsername, username);
         }

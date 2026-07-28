@@ -172,6 +172,30 @@ class BusinessObjectAuthorizerTest {
     }
 
     @Test
+    void procurementEvidenceUsesBusinessAuthorityProjectScopeAndDraftImmutability() {
+        setAuthentication("purchase:request:edit");
+        when(jdbcTemplate.queryForList(anyString(), eq(61001L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                        "project_id", 11001L,
+                        "approval_status", "DRAFT")));
+
+        authorizer.checkUploadAccess("PURCHASE_REQUEST", 61001L);
+
+        verify(jdbcTemplate).queryForList(
+                argThat(sql -> sql.contains("mat_purchase_request") && sql.contains("FOR UPDATE")),
+                eq(61001L), eq(TestUserContext.TENANT_0));
+        verify(projectAccessChecker).checkAccess(11001L, "写入采购单据文件");
+
+        when(jdbcTemplate.queryForList(anyString(), eq(61002L), eq(TestUserContext.TENANT_0)))
+                .thenReturn(List.of(Map.of(
+                        "project_id", 11001L,
+                        "approval_status", "APPROVING")));
+        BusinessException immutable = assertThrows(BusinessException.class,
+                () -> authorizer.checkUploadAccess("PURCHASE_REQUEST", 61002L));
+        assertEquals("PROCUREMENT_DOCUMENT_IMMUTABLE", immutable.getCode());
+    }
+
+    @Test
     void invoiceFileAccessChecksProjectFromPayRecord() {
         PayInvoice invoice = new PayInvoice();
         invoice.setTenantId(TestUserContext.TENANT_0);

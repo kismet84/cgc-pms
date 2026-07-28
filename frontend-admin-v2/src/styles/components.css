@@ -293,6 +293,11 @@
   box-shadow: var(--v2-shadow-panel);
 }
 
+.v2-select.is-drop-up .v2-select__menu {
+  inset-block-start: auto;
+  inset-block-end: calc(100% + 0.25rem);
+}
+
 .v2-select__menu::-webkit-scrollbar {
   display: none;
   width: 0;
@@ -525,6 +530,17 @@
 }
 
 :where(nav, [role='navigation'])[aria-label$='分页'] {
+  font-size: var(--v2-font-size-12);
+  line-height: var(--v2-line-height-ui);
+}
+
+.v2-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--v2-space-2);
+  min-height: var(--v2-control-height-sm);
   font-size: var(--v2-font-size-12);
   line-height: var(--v2-line-height-ui);
 }
@@ -877,6 +893,10 @@
   overflow: visible;
 }
 
+.v2-dialog__panel:has(.v2-select[open]) .v2-dialog__body {
+  z-index: 3;
+}
+
 .v2-dialog__panel.v2-dialog-bottom-sheet {
   position: fixed;
   inset: auto var(--v2-space-4) var(--v2-space-4);
@@ -951,7 +971,7 @@
   grid-template-columns: 7.5rem minmax(0, 1fr);
   gap: var(--v2-space-4);
   align-items: center;
-  min-height: 3.875rem;
+  min-height: var(--v2-control-height-touch);
   border-bottom: var(--v2-border-width) solid var(--v2-dialog-divider);
 }
 
@@ -1112,7 +1132,7 @@
 
   .v2-detail-dialog__facts > div {
     display: block;
-    min-height: 5.25rem;
+    min-height: calc(var(--v2-space-12) + var(--v2-space-4));
     padding: var(--v2-space-3) 0;
   }
 

@@ -162,6 +162,8 @@ export interface PaymentApplicationCommand {
   projectId: string;
   contractId: string;
   partnerId: string;
+  costSubjectId: string;
+  budgetLineId: string;
   payType: string;
   applyAmount: FinanceDecimalString;
   applyReason?: string;

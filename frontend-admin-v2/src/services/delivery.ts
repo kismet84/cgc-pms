@@ -231,11 +231,12 @@ export function deleteSiteFile(id: string): Promise<void> {
 }
 
 function normalizeScheduleDetail(row: Record<string, unknown>): ScheduleDetail {
+  const snapshot = object(row.latestSnapshot) ? row.latestSnapshot : null
   return {
     ...normalizeSchedule(row),
     tasks: array(row.tasks).map(normalizeTask),
     periodPlans: array(row.periodPlans).map(normalizePeriodPlan),
-    latestSnapshot: object(row.latestSnapshot) ? normalizeSnapshot(row.latestSnapshot) : null,
+    latestSnapshot: snapshot && optionalString(snapshot, 'id') ? normalizeSnapshot(snapshot) : null,
     correctiveActions: array(row.correctiveActions).map(normalizeCorrectiveAction),
   }
 }

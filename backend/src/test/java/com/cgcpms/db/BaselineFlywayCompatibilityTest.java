@@ -6,6 +6,8 @@ import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -23,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("235", flyway.info().current().getVersion().getVersion());
+        assertEquals("250", flyway.info().current().getVersion().getVersion());
         execute(flyway, """
                 INSERT INTO mat_warehouse
                     (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
@@ -54,7 +56,9 @@ class BaselineFlywayCompatibilityTest {
         assertEquals(1, count(flyway, "sys_role", "role_code='DEPARTMENT_MANAGER'"));
         assertEquals(1, count(flyway, "sys_role", "role_code='GENERAL_MANAGER'"));
         assertEquals(1, count(flyway, "wf_template_node",
-                "id=50501 AND approver_config LIKE '%PROJECT_MANAGER%'"));
+                "id=50501 AND approver_config LIKE '%PROJECT_ROLE%' AND approver_config LIKE '%PM%'"));
+        assertEquals(1, count(flyway, "wf_template_node",
+                "id=53001 AND approver_config LIKE '%GENERAL_MANAGER%' AND approve_mode='OR_SIGN'"));
         assertEquals(9, count(flyway, "wf_template_node",
                 "id IN (50501,50502,50503,52001,52002,52003,52101,52102,52103)"
                         + " AND approve_mode='OR_SIGN'"));
@@ -105,7 +109,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("235", current.info().current().getVersion().getVersion());
+        assertEquals("250", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
                     ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))
@@ -145,6 +149,50 @@ class BaselineFlywayCompatibilityTest {
         assertThrows(FlywayException.class, current::migrate);
     }
 
+    @Test
+    void v236AlignsNavigationWithoutChangingRolePermissions() {
+        Flyway old = Flyway.configure()
+                .dataSource(url("menu_alignment"), "sa", "")
+                .locations(ACTIVE, LEGACY, JAVA)
+                .target(MigrationVersion.fromVersion("235"))
+                .cleanDisabled(false)
+                .load();
+        old.migrate();
+        List<String> roleMenus = rows(old, """
+                SELECT CONCAT(tenant_id, ':', role_id, ':', menu_id)
+                FROM sys_role_menu ORDER BY tenant_id, role_id, menu_id
+                """);
+        List<String> rolePermissions = rows(old, """
+                SELECT DISTINCT CONCAT(rm.tenant_id, ':', rm.role_id, ':', m.perms)
+                FROM sys_role_menu rm
+                JOIN sys_menu m ON m.tenant_id = rm.tenant_id AND m.id = rm.menu_id
+                WHERE m.perms IS NOT NULL AND m.perms <> ''
+                ORDER BY 1
+                """);
+
+        Flyway current = flyway("menu_alignment", ACTIVE, LEGACY, JAVA);
+        current.migrate();
+
+        assertEquals(roleMenus, rows(current, """
+                SELECT CONCAT(tenant_id, ':', role_id, ':', menu_id)
+                FROM sys_role_menu ORDER BY tenant_id, role_id, menu_id
+                """));
+        assertEquals(rolePermissions, rows(current, """
+                SELECT DISTINCT CONCAT(rm.tenant_id, ':', rm.role_id, ':', m.perms)
+                FROM sys_role_menu rm
+                JOIN sys_menu m ON m.tenant_id = rm.tenant_id AND m.id = rm.menu_id
+                WHERE m.perms IS NOT NULL AND m.perms <> ''
+                ORDER BY 1
+                """));
+        assertEquals(2, count(current, "sys_menu",
+                "id IN (23601,23602) AND perms IS NULL AND menu_type='MENU'"));
+        assertEquals(0, count(current, "sys_role_menu", "menu_id IN (23601,23602)"));
+        assertEquals(1, count(current, "sys_menu",
+                "id=503 AND parent_id=909 AND path='/system/permissions'"));
+        assertEquals(3, count(current, "sys_menu",
+                "id IN (2134,2138,2139) AND menu_type='MENU' AND path IS NOT NULL"));
+    }
+
     private static Flyway flyway(String name, String... locations) {
         return Flyway.configure()
                 .dataSource(url(name), "sa", "")
@@ -171,6 +219,18 @@ class BaselineFlywayCompatibilityTest {
             return result.getInt(1);
         } catch (Exception exception) {
             throw new IllegalStateException("Failed to count " + table, exception);
+        }
+    }
+
+    private static List<String> rows(Flyway flyway, String sql) {
+        try (var connection = flyway.getConfiguration().getDataSource().getConnection();
+             var statement = connection.createStatement();
+             var result = statement.executeQuery(sql)) {
+            var rows = new ArrayList<String>();
+            while (result.next()) rows.add(result.getString(1));
+            return rows;
+        } catch (Exception exception) {
+            throw new IllegalStateException("Failed to query migration facts", exception);
         }
     }
 

@@ -219,6 +219,28 @@ describe('M3 delivery request and service contracts', () => {
     })
   })
 
+  it('treats an empty latest snapshot object as no snapshot', async () => {
+    fetchMock.mockResolvedValueOnce(
+      apiResponse({
+        id: '11',
+        project_id: '22',
+        plan_code: 'BASE-01',
+        plan_name: '基线计划',
+        plan_type: 'BASELINE',
+        version_no: 1,
+        planned_start_date: '2026-01-08',
+        planned_end_date: '2026-07-28',
+        status: 'DRAFT',
+        tasks: [],
+        periodPlans: [],
+        latestSnapshot: {},
+        correctiveActions: [],
+      }),
+    )
+
+    await expect(loadSchedule('11')).resolves.toMatchObject({ latestSnapshot: null })
+  })
+
   it('supports raw FormData through apiRequest without JSON serialization', async () => {
     fetchMock.mockResolvedValueOnce(apiResponse({ ok: true }))
     const formData = new FormData()

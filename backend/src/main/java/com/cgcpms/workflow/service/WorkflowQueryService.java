@@ -385,8 +385,9 @@ public class WorkflowQueryService {
                 .eq(WfInstance::getId, instanceId));
         if (instance == null) return null;
 
-        if (!isAuthorized(instance, tenantId, instanceId, currentUserId)) return null;
-        requireProjectAccess(instance);
+        boolean taskParticipant = isTaskParticipant(tenantId, instanceId, currentUserId);
+        if (!isAuthorized(instance, tenantId, instanceId, currentUserId, taskParticipant)) return null;
+        if (!taskParticipant) requireProjectAccess(instance);
 
         WfInstanceVO vo = voAssembler.toInstanceVO(instance);
         vo.setBusinessCode(businessCodeResolver.resolveByInstanceId(
@@ -596,13 +597,10 @@ public class WorkflowQueryService {
                 .collect(Collectors.groupingBy(WfInstance::getInstanceStatus, LinkedHashMap::new, Collectors.counting()));
     }
 
-    private boolean isAuthorized(WfInstance instance, Long tenantId, Long instanceId, Long currentUserId) {
+    private boolean isAuthorized(WfInstance instance, Long tenantId, Long instanceId,
+                                 Long currentUserId, boolean taskParticipant) {
         if (instance.getInitiatorId().equals(currentUserId)) return true;
-        Long count = wfTaskMapper.selectCount(new LambdaQueryWrapper<WfTask>()
-                .eq(WfTask::getTenantId, tenantId)
-                .eq(WfTask::getInstanceId, instanceId)
-                .eq(WfTask::getApproverId, currentUserId));
-        if (count > 0) return true;
+        if (taskParticipant) return true;
         Long ccCount = wfCcMapper.selectCount(new LambdaQueryWrapper<WfCc>()
                 .eq(WfCc::getTenantId, tenantId)
                 .eq(WfCc::getInstanceId, instanceId)
@@ -612,6 +610,13 @@ public class WorkflowQueryService {
         // with the caller's tenantId; this fallback only exempts the participant check for admins within
         // their own tenant, not across tenants.
         return UserContext.hasAnyRole("ADMIN", "SUPER_ADMIN");
+    }
+
+    private boolean isTaskParticipant(Long tenantId, Long instanceId, Long currentUserId) {
+        return wfTaskMapper.selectCount(new LambdaQueryWrapper<WfTask>()
+                .eq(WfTask::getTenantId, tenantId)
+                .eq(WfTask::getInstanceId, instanceId)
+                .eq(WfTask::getApproverId, currentUserId)) > 0;
     }
 
     private void requireProjectAccess(WfInstance instance) {

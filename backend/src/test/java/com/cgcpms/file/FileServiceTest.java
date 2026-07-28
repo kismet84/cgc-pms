@@ -317,6 +317,22 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("upload accepts subcontract measure supporting evidence")
+    void testUploadAcceptsSubcontractMeasureSupportingEvidence() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "measure.pdf", "application/pdf", "%PDF-1.4 measure support".getBytes());
+        String businessType = "SUBCONTRACT";
+        long businessId = Math.abs(System.nanoTime());
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/SUBCONTRACT/file.pdf?X-Amz-Expires=300&X-Amz-Signature=test");
+
+        assertDoesNotThrow(() -> fileService.upload(file, businessType, businessId, "MEASURE_SUPPORT"));
+
+        assertEquals(1L, fileCountFor(businessType, businessId));
+        verify(authorizer).checkUploadAccess(businessType, businessId, "MEASURE_SUPPORT");
+    }
+
+    @Test
     @DisplayName("upload rejects duplicate content for same business object after auth and without second object write")
     void testUploadRejectsDuplicateContentForSameBusinessObject() throws Exception {
         MockMultipartFile first = new MockMultipartFile(

@@ -187,12 +187,26 @@ class MatPurchaseOrderServiceTest {
         order.setProjectId(PROJECT_ID);
         order.setOrderType("PURCHASE");
         Long id = service.create(order);
+        MatPurchaseOrderItem item = new MatPurchaseOrderItem();
+        item.setTenantId(TENANT_ID);
+        item.setOrderId(id);
+        item.setProjectId(PROJECT_ID);
+        item.setMaterialId(1L);
+        item.setQuantity(BigDecimal.ONE);
+        item.setUnitPrice(new BigDecimal("123.00"));
+        item.setAmount(new BigDecimal("123.00"));
+        item.setTaxRate(BigDecimal.ZERO);
+        item.setTaxAmount(BigDecimal.ZERO);
+        item.setAmountWithoutTax(new BigDecimal("123.00"));
+        item.setReceivedQuantity(BigDecimal.ZERO);
+        itemMapper.insert(item);
 
         MatPurchaseOrder upd = new MatPurchaseOrder();
         upd.setId(id);
         upd.setProjectId(PROJECT_ID);
         upd.setOrderType("PURCHASE");
         service.update(upd);
+        assertEquals(0, new BigDecimal("123.00").compareTo(orderMapper.selectById(id).getTotalAmount()));
     }
 
     @Test @Transactional @DisplayName("update → guard: cannot update when APPROVING")

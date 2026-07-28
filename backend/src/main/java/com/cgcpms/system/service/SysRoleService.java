@@ -12,6 +12,7 @@ import com.cgcpms.system.mapper.SysRoleMapper;
 import com.cgcpms.system.mapper.SysUserRoleMapper;
 import com.cgcpms.system.mapper.SysRoleMenuMapper;
 import com.cgcpms.system.vo.SysRoleVO;
+import com.cgcpms.system.vo.RoleUserCountVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,17 +43,20 @@ public class SysRoleService {
     private final SysRoleMenuAuditService roleMenuAuditService;
 
     public List<SysRoleVO> getList() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        Map<Long, Long> userCounts = sysUserRoleMapper.countUsersByRole(tenantId).stream()
+                .collect(Collectors.toMap(RoleUserCountVO::getRoleId, RoleUserCountVO::getUserCount));
         return sysRoleMapper.selectList(
-                new LambdaQueryWrapper<SysRole>()
-                        .eq(SysRole::getTenantId, UserContext.getCurrentTenantId()))
-                .stream().map(this::toVO).collect(Collectors.toList());
+                        new LambdaQueryWrapper<SysRole>().eq(SysRole::getTenantId, tenantId))
+                .stream().map(role -> toVO(role, userCounts.getOrDefault(role.getId(), 0L)))
+                .collect(Collectors.toList());
     }
 
     public SysRoleVO getById(Long id) {
         SysRole role = sysRoleMapper.selectById(id);
         if (role == null || !role.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("ROLE_NOT_FOUND", "角色不存在");
-        return toVO(role);
+        return toVO(role, sysUserRoleMapper.countUsersForRole(role.getTenantId(), role.getId()));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -292,7 +296,7 @@ public class SysRoleService {
         }
     }
 
-    private SysRoleVO toVO(SysRole role) {
+    private SysRoleVO toVO(SysRole role, Long userCount) {
         SysRoleVO vo = new SysRoleVO();
         vo.setId(role.getId());
         vo.setRoleCode(role.getRoleCode());
@@ -300,6 +304,7 @@ public class SysRoleService {
         vo.setRoleType(role.getRoleType());
         vo.setStatus(role.getStatus());
         vo.setDataScope(role.getDataScope());
+        vo.setUserCount(userCount == null ? 0L : userCount);
         List<SysRoleMenu> roleMenus = sysRoleMenuMapper.selectList(
                 new LambdaQueryWrapper<SysRoleMenu>()
                         .eq(SysRoleMenu::getTenantId, role.getTenantId())

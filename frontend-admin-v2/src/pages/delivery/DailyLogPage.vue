@@ -361,8 +361,8 @@ async function saveProgress(): Promise<boolean> {
     .filter((row) => row.included)
     .map((row) => ({
       wbsTaskId: row.wbsTaskId,
-      currentProgress: row.currentProgress.trim(),
-      completedQuantity: row.completedQuantity.trim(),
+      currentProgress: String(row.currentProgress).trim(),
+      completedQuantity: String(row.completedQuantity).trim(),
       workDescription: row.workDescription.trim(),
     }))
   if (!items.length) {
@@ -719,39 +719,42 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
         </dl>
       </div>
 
-      <form v-else class="daily-log-page__form" @submit.prevent="saveRecord">
-        <V2Select
-          v-model="form.projectId"
-          label="项目"
-          :options="projectOptions"
-          required
-          placeholder="请选择项目"
-        />
-        <label>
-          日报日期
-          <input v-model="form.reportDate" type="date" required />
-        </label>
-        <label class="daily-log-page__span-2">
-          施工内容
-          <textarea v-model="form.constructionContent" rows="4" required />
-        </label>
-        <label class="daily-log-page__span-2">
-          问题与延误
-          <textarea v-model="form.issuesDelays" rows="3" />
-        </label>
-        <label class="daily-log-page__span-2">
-          次日计划
-          <textarea v-model="form.nextDayPlan" rows="3" />
-        </label>
-        <label class="daily-log-page__span-2">
-          天气摘要
-          <textarea v-model="form.weatherSummary" rows="2" />
-        </label>
-        <label>
-          在场人数
-          <input v-model.number="form.onSiteHeadcount" type="number" min="0" step="1" />
-        </label>
-      </form>
+      <section v-else class="v2-detail-dialog__section">
+        <h3>日报信息</h3>
+        <form class="daily-log-page__form" @submit.prevent="saveRecord">
+          <V2Select
+            v-model="form.projectId"
+            label="项目"
+            :options="projectOptions"
+            required
+            placeholder="请选择项目"
+          />
+          <label>
+            日报日期
+            <input v-model="form.reportDate" type="date" required />
+          </label>
+          <label class="daily-log-page__span-2">
+            施工内容
+            <textarea v-model="form.constructionContent" rows="4" required />
+          </label>
+          <label class="daily-log-page__span-2">
+            问题与延误
+            <textarea v-model="form.issuesDelays" rows="3" />
+          </label>
+          <label class="daily-log-page__span-2">
+            次日计划
+            <textarea v-model="form.nextDayPlan" rows="3" />
+          </label>
+          <label class="daily-log-page__span-2">
+            天气摘要
+            <textarea v-model="form.weatherSummary" rows="2" />
+          </label>
+          <label>
+            在场人数
+            <input v-model.number="form.onSiteHeadcount" type="number" min="0" step="1" />
+          </label>
+        </form>
+      </section>
 
       <template v-if="activeRecord">
         <section class="v2-detail-dialog__section">

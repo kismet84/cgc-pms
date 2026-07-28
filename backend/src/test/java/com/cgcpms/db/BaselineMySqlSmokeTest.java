@@ -40,7 +40,7 @@ class BaselineMySqlSmokeTest {
 
     @Test
     void freshMySqlUsesBaselineAndBootstrapsWithoutBusinessFacts() {
-        assertEquals("235", flyway.info().current().getVersion().getVersion());
+        assertEquals("244", flyway.info().current().getVersion().getVersion());
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
         assertEquals(197, count("SELECT COUNT(*) FROM information_schema.tables "

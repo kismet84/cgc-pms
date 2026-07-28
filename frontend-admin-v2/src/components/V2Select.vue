@@ -41,6 +41,7 @@ const describedBy = computed(() =>
 const dropdown = ref<HTMLDetailsElement | null>(null)
 const trigger = ref<HTMLElement | null>(null)
 const open = ref(false)
+const dropUp = ref(false)
 const renderedOptions = computed(() => {
   if (!props.allowEmpty)
     return [{ value: '', label: props.placeholder, disabled: true }, ...props.options]
@@ -74,6 +75,28 @@ function select(option: V2SelectOption): void {
 
 function onToggle(event: Event): void {
   open.value = (event.currentTarget as HTMLDetailsElement).open
+  if (!open.value) {
+    dropUp.value = false
+    return
+  }
+  void nextTick(() => {
+    const triggerRect = trigger.value?.getBoundingClientRect()
+    const menu = dropdown.value?.querySelector<HTMLElement>('.v2-select__menu')
+    if (!triggerRect || !menu) return
+    const menuHeight = Math.min(
+      Math.max(menu.scrollHeight, renderedOptions.value.length * 36 + 8),
+      320,
+    )
+    const dialogRect = dropdown.value
+      ?.closest<HTMLElement>('.v2-dialog__panel')
+      ?.getBoundingClientRect()
+    const boundaryTop = Math.max(0, dialogRect?.top ?? 0)
+    const boundaryBottom = Math.min(window.innerHeight, dialogRect?.bottom ?? window.innerHeight)
+    dropUp.value =
+      (Boolean(dialogRect) && triggerRect.top > boundaryTop + (boundaryBottom - boundaryTop) / 2) ||
+      (boundaryBottom - triggerRect.bottom < menuHeight + 8 &&
+        triggerRect.top - boundaryTop > menuHeight)
+  })
 }
 
 function enabledOptionButtons(): HTMLButtonElement[] {
@@ -124,7 +147,7 @@ function onOptionKeydown(event: KeyboardEvent): void {
     <details
       ref="dropdown"
       class="v2-select"
-      :class="{ 'is-disabled': disabled }"
+      :class="{ 'is-disabled': disabled, 'is-drop-up': dropUp }"
       @toggle="onToggle"
       @focusout="close"
       @keydown.esc.prevent="closeAndFocusTrigger"

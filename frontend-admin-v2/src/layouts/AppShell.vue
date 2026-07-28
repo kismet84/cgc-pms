@@ -67,14 +67,14 @@ const accountName = computed(
 )
 const showDemoRoleSwitcher = import.meta.env.DEV
 const demoRoleAccounts = [
-  { role: 'pm', username: 'demo.manager', label: '项目经理' },
-  { role: 'bm', username: 'demo.business', label: '商务经理' },
-  { role: 'cost', username: 'demo.cost', label: '成本经理' },
-  { role: 'purchase', username: 'demo.purchase', label: '采购经理' },
-  { role: 'production', username: 'demo.production', label: '生产经理' },
-  { role: 'chiefEngineer', username: 'demo.chief', label: '总工程师' },
-  { role: 'finance', username: 'demo.finance', label: '财务经理' },
-  { role: 'mgmt', username: 'admin', label: '管理层' },
+  { role: 'pm', username: 'ui26.pm01', label: '项目经理' },
+  { role: 'bm', username: 'ui26.bm01', label: '商务经理' },
+  { role: 'cost', username: 'ui26.cost01', label: '成本经理' },
+  { role: 'purchase', username: 'ui26.pur01', label: '采购经理' },
+  { role: 'production', username: 'ui26.prod01', label: '生产经理' },
+  { role: 'chiefEngineer', username: 'ui26.chief01', label: '总工程师' },
+  { role: 'finance', username: 'ui26.fin01', label: '财务经理' },
+  { role: 'mgmt', username: 'ui26.gm01', label: '管理层' },
 ] as const
 
 watch(

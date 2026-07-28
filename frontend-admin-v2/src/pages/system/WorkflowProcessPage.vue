@@ -381,7 +381,7 @@ onBeforeUnmount(() => controller?.abort())
           </table>
         </div>
         <template #footer>
-          <div class="workflow-process-page__pagination">
+          <nav class="workflow-process-page__pagination v2-pagination" aria-label="系统流程分页">
             <span>共 {{ total }} 条</span>
             <V2Button
               size="small"
@@ -400,7 +400,7 @@ onBeforeUnmount(() => controller?.abort())
             >
               下一页
             </V2Button>
-          </div>
+          </nav>
         </template>
       </V2Card>
 

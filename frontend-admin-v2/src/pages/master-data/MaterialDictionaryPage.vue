@@ -300,9 +300,6 @@ onBeforeUnmount(() => loadController?.abort())
       description="调整筛选条件后重试。"
     />
     <V2Card v-else title="查询结果">
-      <template #title-extra>
-        <V2Badge tone="neutral">共 {{ total }} 项</V2Badge>
-      </template>
       <div class="material-page__table-wrap">
         <table class="v2-table--top">
           <thead>
@@ -344,12 +341,13 @@ onBeforeUnmount(() => loadController?.abort())
           </tbody>
         </table>
       </div>
-      <V2Cluster justify="between">
-        <span>第 {{ pageNo }} 页</span>
-        <V2Cluster>
+      <template #footer>
+        <nav class="v2-pagination" aria-label="材料字典分页">
+          <span>共 {{ total }} 项</span>
           <V2Button variant="secondary" size="small" :disabled="pageNo <= 1" @click="previousPage"
             >上一页</V2Button
           >
+          <span>第 {{ pageNo }} 页</span>
           <V2Button
             variant="secondary"
             size="small"
@@ -357,8 +355,8 @@ onBeforeUnmount(() => loadController?.abort())
             @click="nextPage"
             >下一页</V2Button
           >
-        </V2Cluster>
-      </V2Cluster>
+        </nav>
+      </template>
     </V2Card>
 
     <V2Dialog

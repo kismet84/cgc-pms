@@ -41,6 +41,44 @@ describe('M3 project request baseline', () => {
     )
   })
 
+  it('renders project details as single-column cards with every create-form field', () => {
+    const source = readFileSync(resolve('src/pages/projects/ProjectPage.vue'), 'utf-8')
+    const components = readFileSync(resolve('src/styles/components.css'), 'utf-8')
+
+    expect(source).toContain('class="project-page__overview-stack"')
+    expect(source).toMatch(
+      /\.project-page__overview-stack\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)/,
+    )
+    expect(source).toContain('class="v2-detail-dialog__section project-page__overview-intro"')
+    expect(source).toMatch(
+      /\.project-page__overview-intro\s*\{[^}]*padding-block: var\(--v2-space-4\)/,
+    )
+    expect(components).toMatch(
+      /\.v2-detail-dialog__facts > div\s*\{[^}]*min-height: var\(--v2-control-height-touch\)/,
+    )
+    expect(components).toMatch(
+      /@media \(max-width: 30rem\)[\s\S]*\.v2-detail-dialog__facts > div\s*\{[^}]*min-height: calc\(var\(--v2-space-12\) \+ var\(--v2-space-4\)\)/,
+    )
+    expect(source).toContain('class="v2-detail-dialog__facts project-page__overview-cost-facts"')
+    expect(source).toMatch(
+      /\.project-page__overview-cost-facts\s*\{[^}]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/,
+    )
+    for (const label of [
+      '项目名称',
+      '项目类型',
+      '项目地址',
+      '建设单位',
+      '监理单位',
+      '设计单位',
+      '合同金额（元）',
+      '目标成本（元）',
+      '计划开工',
+      '计划完工',
+    ]) {
+      expect(source).toContain(`<dt>${label}</dt>`)
+    }
+  })
+
   it('snapshots the selected schedule directly and keeps daily actions behind confirmation', () => {
     const schedule = readFileSync(resolve('src/pages/delivery/SchedulePage.vue'), 'utf-8')
     const dailyLog = readFileSync(resolve('src/pages/delivery/DailyLogPage.vue'), 'utf-8')

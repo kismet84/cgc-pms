@@ -27,8 +27,10 @@ public class SysUserController {
             @RequestParam(defaultValue = "20") long pageSize,
             @RequestParam(required = false) String username,
             @RequestParam(required = false) String realName,
-            @RequestParam(required = false) String status) {
-        IPage<SysUserVO> page = sysUserService.getPage(pageNo, pageSize, username, realName, status);
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long roleId) {
+        IPage<SysUserVO> page = sysUserService.getPage(
+                pageNo, pageSize, username, realName, status, roleId);
         return ApiResponse.success(PageResult.of(page));
     }
 

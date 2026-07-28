@@ -13,6 +13,7 @@ public class SysRoleVO {
     private String roleType;
     private String status;
     private String dataScope;
+    private Long userCount;
     private List<Long> menuIds;
     private String createdAt;
 }

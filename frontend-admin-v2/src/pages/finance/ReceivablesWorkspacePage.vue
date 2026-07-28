@@ -35,6 +35,7 @@ import {
   loadExpenseApplications,
   loadInvoices,
   loadPaymentApplications,
+  loadPaymentSourceOptions,
   loadPayRecordOptions,
   loadReceivables,
   loadRevenueSettlements,
@@ -47,7 +48,10 @@ import {
   updateInvoice,
   updatePayment,
   verifyInvoice,
+  savePaymentSources,
+  type PaymentSourceOptionRecord,
 } from '@/services/finance'
+import { uploadSiteFile } from '@/services/delivery'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import type {
@@ -90,6 +94,8 @@ interface FinanceEditor {
   expenseCategory: string
   costSubjectId: string
   budgetLineId: string
+  sourceType: string
+  sourceRefId: string
   payeePartnerId: string
   expenseDate: string
   amount: string
@@ -120,12 +126,14 @@ const emptyEditor = (): FinanceEditor => ({
   projectId: '',
   contractId: '',
   partnerId: '',
-  payType: 'CONTRACT',
+  payType: 'FINAL',
   applyAmount: '',
   applyReason: '',
   expenseCategory: 'CONTRACT',
   costSubjectId: '',
   budgetLineId: '',
+  sourceType: '',
+  sourceRefId: '',
   payeePartnerId: '',
   expenseDate: today(),
   amount: '',
@@ -224,6 +232,8 @@ const partners = ref<PartnerRecord[]>([])
 const costSubjects = ref<CostSubjectOption[]>([])
 const budgetLines = ref<BudgetLineRecord[]>([])
 const payRecords = ref<PayRecordOption[]>([])
+const paymentSources = ref<PaymentSourceOptionRecord[]>([])
+const paymentAttachment = ref<File | null>(null)
 let controller: AbortController | null = null
 
 const text = (row: Row) =>
@@ -342,11 +352,20 @@ const costSubjectOptions = computed(() =>
 )
 const budgetLineOptions = computed(() =>
   budgetLines.value
+    .filter(
+      (item) => !editor.value?.costSubjectId || item.costSubjectId === editor.value.costSubjectId,
+    )
     .filter((item): item is BudgetLineRecord & { id: string } => Boolean(item.id))
     .map((item) => ({
       value: item.id,
       label: `${item.costSubjectName || item.costSubjectId} · 可用 ${formatAmount(item.availableAmount)}`,
     })),
+)
+const paymentSourceOptions = computed(() =>
+  paymentSources.value.map((item) => ({
+    value: `${item.sourceType}:${item.sourceRefId}`,
+    label: `${item.documentCode} · 可付 ${formatAmount(item.availableAmount)}`,
+  })),
 )
 const payRecordOptions = computed(() =>
   payRecords.value.map((item) => ({
@@ -355,9 +374,8 @@ const payRecordOptions = computed(() =>
   })),
 )
 const payTypeOptions = [
-  { value: 'CONTRACT', label: '合同付款' },
-  { value: 'EXPENSE', label: '费用付款' },
-  { value: 'SETTLEMENT', label: '结算付款' },
+  { value: 'FINAL', label: '结算付款' },
+  { value: 'PROGRESS', label: '进度付款' },
 ]
 const expenseCategoryOptions = [
   { value: 'CONTRACT', label: '合同费用' },
@@ -399,10 +417,42 @@ async function changeProject(value: string): Promise<void> {
   editor.value.projectId = value
   editor.value.contractId = ''
   editor.value.budgetLineId = ''
+  editor.value.sourceType = ''
+  editor.value.sourceRefId = ''
+  paymentSources.value = []
   await Promise.all([
     loadContracts(value),
-    editorKind.value === 'expense' ? loadBudgetLines(value) : Promise.resolve(),
+    editorKind.value === 'payment' || editorKind.value === 'expense'
+      ? loadBudgetLines(value)
+      : Promise.resolve(),
   ])
+}
+
+async function loadPaymentSources(): Promise<void> {
+  paymentSources.value = []
+  if (!editor.value || editorKind.value !== 'payment') return
+  editor.value.sourceType = ''
+  editor.value.sourceRefId = ''
+  const { projectId, contractId, partnerId, payType, expenseCategory } = editor.value
+  if (!projectId || !contractId || !partnerId || !payType) return
+  paymentSources.value = await loadPaymentSourceOptions({
+    projectId,
+    contractId,
+    partnerId,
+    payType,
+    expenseCategory,
+  })
+}
+
+function choosePaymentSource(value: string): void {
+  if (!editor.value) return
+  const [sourceType, sourceRefId] = value.split(':', 2)
+  editor.value.sourceType = sourceType || ''
+  editor.value.sourceRefId = sourceRefId || ''
+}
+
+function onPaymentAttachment(event: Event): void {
+  paymentAttachment.value = (event.target as HTMLInputElement).files?.[0] ?? null
 }
 
 async function loadCandidates(kind: EditorKind): Promise<void> {
@@ -410,7 +460,7 @@ async function loadCandidates(kind: EditorKind): Promise<void> {
   if (!partners.value.length && kind !== 'invoice') {
     jobs.push(loadPartners().then((page) => (partners.value = page.records)))
   }
-  if (kind === 'expense' && !costSubjects.value.length) {
+  if ((kind === 'payment' || kind === 'expense') && !costSubjects.value.length) {
     jobs.push(loadCostSubjectOptions().then((items) => (costSubjects.value = items)))
   }
   if (kind === 'invoice' && !payRecords.value.length) {
@@ -422,7 +472,10 @@ async function loadCandidates(kind: EditorKind): Promise<void> {
 async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
   const value = emptyEditor()
   editorKind.value = kind
+  paymentAttachment.value = null
+  paymentSources.value = []
   value.projectId = row?.projectId || projectId.value
+  if (kind === 'payment') value.expenseCategory = 'SUBCONTRACT'
   if (row) {
     value.id = row.id
     value.contractId = row.contractId || ''
@@ -459,7 +512,9 @@ async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
     if (value.projectId && kind !== 'invoice') {
       await Promise.all([
         loadContracts(value.projectId),
-        kind === 'expense' ? loadBudgetLines(value.projectId) : Promise.resolve(),
+        kind === 'payment' || kind === 'expense'
+          ? loadBudgetLines(value.projectId)
+          : Promise.resolve(),
       ])
     }
   } catch (cause) {
@@ -489,6 +544,8 @@ function paymentCommand(value: FinanceEditor): PaymentApplicationCommand {
     projectId: required(value.projectId, '项目'),
     contractId: required(value.contractId, '合同'),
     partnerId: required(value.partnerId, '往来单位'),
+    costSubjectId: required(value.costSubjectId, '成本科目'),
+    budgetLineId: required(value.budgetLineId, '预算明细'),
     payType: required(value.payType, '付款类型'),
     applyAmount: required(value.applyAmount, '申请金额'),
     applyReason: value.applyReason.trim() || undefined,
@@ -563,8 +620,17 @@ async function save(): Promise<void> {
     const value = editor.value
     if (editorKind.value === 'payment') {
       const command = paymentCommand(value)
+      const sourceType = required(value.sourceType, '付款来源类型')
+      const sourceRefId = required(value.sourceRefId, '付款来源')
+      if (!value.id && !paymentAttachment.value) throw new TypeError('付款附件不能为空')
+      const paymentId = value.id || (await createPayment(command))
       if (value.id) await updatePayment(value.id, command)
-      else await createPayment(command)
+      await savePaymentSources(paymentId, [
+        { sourceType, sourceRefId, sourceAmount: command.applyAmount },
+      ])
+      if (paymentAttachment.value) {
+        await uploadSiteFile(paymentAttachment.value, 'PAYMENT', paymentId, 'PAYMENT_PROOF')
+      }
     } else if (editorKind.value === 'expense') {
       const command = expenseCommand(value)
       if (value.id) await updateExpense(value.id, command)
@@ -882,15 +948,46 @@ onBeforeUnmount(() => controller?.abort())
               label="往来单位"
               :options="partnerOptions"
               required
+              @update:model-value="loadPaymentSources"
             />
             <V2Select
               v-model="editor.payType"
               label="付款类型"
               :options="payTypeOptions"
               required
+              @update:model-value="loadPaymentSources"
+            />
+            <V2Select
+              v-model="editor.costSubjectId"
+              label="成本科目"
+              :options="costSubjectOptions"
+              required
+              @update:model-value="editor.budgetLineId = ''"
+            />
+            <V2Select
+              v-model="editor.budgetLineId"
+              label="预算明细"
+              :options="budgetLineOptions"
+              required
+            />
+            <V2Select
+              :model-value="
+                editor.sourceType && editor.sourceRefId
+                  ? `${editor.sourceType}:${editor.sourceRefId}`
+                  : ''
+              "
+              label="付款来源"
+              :options="paymentSourceOptions"
+              required
+              :disabled="!paymentSourceOptions.length"
+              @update:model-value="choosePaymentSource"
             />
             <V2Input v-model="editor.applyAmount" label="申请金额" required hint="按字符串提交" />
             <V2Input v-model="editor.applyReason" label="申请事由" required />
+            <label class="v2-field">
+              <span class="v2-field__label">付款附件*</span>
+              <input type="file" required @change="onPaymentAttachment" />
+            </label>
           </template>
 
           <template v-else-if="editorKind === 'expense'">

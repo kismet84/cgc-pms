@@ -120,7 +120,7 @@ describe('WorkflowWorkbenchPage', () => {
     const heading = headingCard.get('h1')
     expect(heading.text()).toBe('审批工作台')
     expect(heading.classes()).not.toContain('v2-visually-hidden')
-    expect(wrapper.text()).toContain(
+    expect(wrapper.text()).not.toContain(
       '各标签按所选报告期的对应事件时间筛选；记录状态取当前值，不构成历史快照。',
     )
     const keywordInput = headingCard.get('.workflow-filter__keyword input')
@@ -195,6 +195,23 @@ describe('WorkflowWorkbenchPage', () => {
 
   it('gates actions by server availability and permission, then blocks duplicate submission', async () => {
     let finish!: () => void
+    vi.mocked(loadWorkflowInstance).mockResolvedValue({
+      ...detail,
+      nodes: [
+        {
+          ...detail.nodes[0]!,
+          tasks: [
+            {
+              ...detail.nodes[0]!.tasks[0]!,
+              id: '90',
+              approverId: '2',
+              approverName: '同节点其他审批人',
+            },
+            detail.nodes[0]!.tasks[0]!,
+          ],
+        },
+      ],
+    })
     vi.mocked(approveWorkflowTask).mockImplementation(
       () => new Promise<void>((resolve) => (finish = resolve)),
     )

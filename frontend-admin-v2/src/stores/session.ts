@@ -95,6 +95,10 @@ export const useSessionStore = defineStore('v2-session', () => {
     return permissions.value.includes('*') || permissions.value.includes(code)
   }
 
+  function hasAdminOrPermission(code: string): boolean {
+    return hasAdminRole(roles.value) || hasPermission(code)
+  }
+
   return {
     userInfo,
     status,
@@ -110,5 +114,6 @@ export const useSessionStore = defineStore('v2-session', () => {
     setRequestNotice,
     replaceUserInfo,
     hasPermission,
+    hasAdminOrPermission,
   }
 })

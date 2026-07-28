@@ -787,8 +787,8 @@ class WorkflowQueryServiceTest {
     }
 
     @Test
-    @DisplayName("getInstanceDetail 参与人无项目访问权限时拒绝")
-    void getInstanceDetailParticipantWithoutProjectAccessDenied() {
+    @DisplayName("getInstanceDetail 任务审批人无需项目成员关系即可查看")
+    void getInstanceDetailTaskParticipantWithoutProjectAccessCanView() {
         insertParticipantTask(USER_SECOND_APPROVER);
         UserContext.clear();
         UserContext.set(io.jsonwebtoken.Jwts.claims()
@@ -798,8 +798,36 @@ class WorkflowQueryServiceTest {
                 .add("roleCodes", List.of())
                 .build());
         try {
+            WfInstanceVO detail = queryService.getInstanceDetail(
+                    TENANT_0, submittedInstanceId, USER_SECOND_APPROVER);
+            assertNotNull(detail, "明确指派的审批人应能打开待办详情");
+        } finally {
+            UserContext.clear();
+            UserContext.set(io.jsonwebtoken.Jwts.claims()
+                    .add("userId", USER_ADMIN)
+                    .add("username", "admin")
+                    .add("tenantId", TENANT_0)
+                    .add("roleCodes", List.of("ADMIN"))
+                    .build());
+        }
+    }
+
+    @Test
+    @DisplayName("getInstanceDetail 抄送人仍受项目访问范围限制")
+    void getInstanceDetailCcParticipantWithoutProjectAccessDenied() {
+        insertCc(submittedInstanceId, 33333001L, BUSINESS_TYPE,
+                USER_SECOND_APPROVER, "项目审批抄送", LocalDateTime.now());
+        UserContext.clear();
+        UserContext.set(io.jsonwebtoken.Jwts.claims()
+                .add("userId", USER_SECOND_APPROVER)
+                .add("username", "workflow-second-approver")
+                .add("tenantId", TENANT_0)
+                .add("roleCodes", List.of())
+                .build());
+        try {
             BusinessException ex = assertThrows(BusinessException.class,
-                    () -> queryService.getInstanceDetail(TENANT_0, submittedInstanceId, USER_SECOND_APPROVER));
+                    () -> queryService.getInstanceDetail(
+                            TENANT_0, submittedInstanceId, USER_SECOND_APPROVER));
             assertEquals("PROJECT_ACCESS_DENIED", ex.getCode());
         } finally {
             UserContext.clear();

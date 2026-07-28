@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import type {
+  BudgetLineRecord,
+  ContractPage,
   MaterialRecord,
   PartnerRecord,
   PurchaseOrderCommand,
@@ -11,6 +13,7 @@ import type {
   ReceiptCommand,
   ReceiptItemRecord,
   ReceiptRecord,
+  SiteFileRecord,
   WarehouseRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
@@ -50,8 +53,11 @@ import {
   submitPurchaseOrder,
   submitPurchaseRequest,
   submitReceipt,
+  updatePurchaseOrder,
+  updateReceipt,
 } from '@/services/supply-chain'
-import { loadPartners } from '@/services/commercial'
+import { loadBudget, loadBudgetPage, loadContractPage, loadPartners } from '@/services/commercial'
+import { getSiteFileUrl, listSiteFiles, uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -69,19 +75,25 @@ const pageNo = ref(1)
 const pageSize = 10
 const selected = ref<ListRecord | null>(null)
 const detailItems = ref<DetailItem[]>([])
+const attachments = ref<SiteFileRecord[]>([])
 const loading = ref(false)
 const detailLoading = ref(false)
 const busy = ref(false)
 const errorMessage = ref('')
 const dialogOpen = ref(false)
+const orderEditOpen = ref(false)
+const editingReceiptId = ref('')
 const receiptCandidates = ref<ReceiptItemRecord[]>([])
 const materials = ref<MaterialRecord[]>([])
 const partners = ref<PartnerRecord[]>([])
+const contracts = ref<ContractPage['records']>([])
+const budgetLines = ref<BudgetLineRecord[]>([])
 const warehouses = ref<WarehouseRecord[]>([])
 const requestCandidates = ref<PurchaseRequestRecord[]>([])
 const requestItemCandidates = ref<PurchaseRequestItemRecord[]>([])
 const orderCandidates = ref<PurchaseOrderRecord[]>([])
 const form = reactive<Record<string, string>>({})
+const orderEditForm = reactive<Record<string, string>>({})
 let listController: AbortController | null = null
 let detailController: AbortController | null = null
 let listGeneration = 0
@@ -123,14 +135,27 @@ const permissions = computed(
 )
 const canAdd = computed(
   () =>
-    session.hasPermission(permissions.value.add) &&
-    session.hasPermission(permissions.value.edit) &&
-    session.hasPermission(permissions.value.delete),
+    session.hasAdminOrPermission(permissions.value.add) &&
+    session.hasAdminOrPermission(permissions.value.edit) &&
+    session.hasAdminOrPermission(permissions.value.delete),
 )
-const canSubmit = computed(() => session.hasPermission(permissions.value.submit))
-const canSaveItems = computed(() => session.hasPermission(permissions.value.edit))
+const canSubmit = computed(() => session.hasAdminOrPermission(permissions.value.submit))
+const canSaveItems = computed(() => session.hasAdminOrPermission(permissions.value.edit))
 const canSubmitSelected = computed(
   () => canSubmit.value && selected.value?.approvalStatus === 'DRAFT',
+)
+const canEditSelectedOrder = computed(
+  () => mode.value === 'order' && canSaveItems.value && selected.value?.approvalStatus === 'DRAFT',
+)
+const canEditSelectedReceipt = computed(
+  () =>
+    mode.value === 'receipt' && canSaveItems.value && selected.value?.approvalStatus === 'DRAFT',
+)
+const attachmentBusinessType = computed(
+  () =>
+    ({ request: 'PURCHASE_REQUEST', order: 'PURCHASE_ORDER', receipt: 'MATERIAL_RECEIPT' })[
+      mode.value
+    ],
 )
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
 const receiptCandidateOptions = computed(() =>
@@ -144,6 +169,20 @@ const materialOptions = computed(() =>
     value: item.id,
     label: [item.materialCode, item.materialName, item.specification].filter(Boolean).join(' · '),
   })),
+)
+const contractOptions = computed(() =>
+  contracts.value.map((item) => ({
+    value: item.id,
+    label: [item.contractCode, item.contractName].filter(Boolean).join(' · '),
+  })),
+)
+const budgetLineOptions = computed(() =>
+  budgetLines.value
+    .filter((item): item is BudgetLineRecord & { id: string } => Boolean(item.id))
+    .map((item) => ({
+      value: item.id,
+      label: item.costSubjectName || item.costSubjectId,
+    })),
 )
 const partnerOptions = computed(() => [
   { value: '', label: '不指定供应商' },
@@ -205,11 +244,11 @@ function decimal(name: string, label: string): string {
 function recordCode(record: ListRecord): string {
   const businessCode = (value: string | null | undefined, label: string) =>
     value && !/^\d{15,}$/.test(value) ? value : `未生成${label}号`
-  return 'requestCode' in record
-    ? businessCode(record.requestCode, '采购申请')
-    : 'receiptCode' in record
-      ? businessCode(record.receiptCode, '验收单')
-      : businessCode(record.orderCode, '采购订单')
+  return 'receiptCode' in record
+    ? businessCode(record.receiptCode, '验收单')
+    : 'orderCode' in record
+      ? businessCode(record.orderCode, '采购订单')
+      : businessCode(record.requestCode, '采购申请')
 }
 
 function statusLabel(status?: string | null): string {
@@ -218,6 +257,7 @@ function statusLabel(status?: string | null): string {
     PENDING: '待处理',
     APPROVING: '审批中',
     APPROVED: '已通过',
+    CONVERTED: '已转订单',
     REJECTED: '已驳回',
     IN_PROGRESS: '进行中',
     PARTIAL_RECEIVED: '部分到货',
@@ -225,23 +265,157 @@ function statusLabel(status?: string | null): string {
     COMPLETED: '已完成',
     CANCELLED: '已取消',
     QUALIFIED: '合格',
+    PARTIAL: '部分合格',
     PARTIAL_QUALIFIED: '部分合格',
     PARTIALLY_QUALIFIED: '部分合格',
     UNQUALIFIED: '不合格',
+    RETURN: '退货',
+    REPLACE: '换货',
+    CONCESSION: '让步接收',
   }
   return status ? (labels[status] ?? '未知状态') : '未知状态'
 }
 
 function recordBusinessStatus(record: ListRecord): string {
-  if ('status' in record) return statusLabel(record.status)
+  if ('receiptCode' in record) return statusLabel(record.qualityStatus || record.approvalStatus)
   if ('orderStatus' in record) return statusLabel(record.orderStatus)
-  return statusLabel(record.qualityStatus)
+  return statusLabel(record.status)
 }
 
 function clearDetail(): void {
   detailController?.abort()
   selected.value = null
   detailItems.value = []
+  attachments.value = []
+}
+
+async function uploadAttachment(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file || !selected.value || busy.value) return
+  await uploadSelectedAttachment(file)
+  input.value = ''
+}
+
+async function generateBusinessAttachment(): Promise<void> {
+  if (!selected.value || busy.value) return
+  const content = [
+    `${title.value}业务说明`,
+    `单据编号：${recordCode(selected.value)}`,
+    `项目：${selected.value.projectName || '项目名称缺失'}`,
+    `来源：${recordSource(selected.value)}`,
+    `金额：${recordAmount(selected.value)}`,
+    `明细数量：${detailItems.value.length}条`,
+  ].join('\n')
+  await uploadSelectedAttachment(
+    new File([content], `${recordCode(selected.value)}-业务说明.txt`, { type: 'text/plain' }),
+  )
+}
+
+async function uploadSelectedAttachment(file: File): Promise<void> {
+  if (!selected.value || busy.value) return
+  const record = selected.value
+  const businessType = attachmentBusinessType.value
+  busy.value = true
+  errorMessage.value = ''
+  try {
+    await uploadSiteFile(file, businessType, record.id, 'OTHER')
+    const next = await listSiteFiles(businessType, record.id)
+    if (selected.value?.id === record.id) attachments.value = next
+    showToast('success', '附件上传成功', `${file.name} 已通过安全检查，附件列表已更新`)
+  } catch (error) {
+    errorMessage.value = errorText(error, '附件上传失败')
+    showToast('error', '附件上传失败', errorMessage.value)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function downloadAttachment(file: SiteFileRecord): Promise<void> {
+  try {
+    window.open(await getSiteFileUrl(file.id), '_blank', 'noopener,noreferrer')
+  } catch (error) {
+    showToast('error', '附件下载失败', errorText(error, '下载链接获取失败'))
+  }
+}
+
+function requiredOrderEdit(name: string, label: string): string {
+  const value = orderEditForm[name]?.trim() ?? ''
+  if (!value) throw new TypeError(`${label}不能为空`)
+  return value
+}
+
+function optionalOrderEdit(name: string): string | undefined {
+  return orderEditForm[name]?.trim() || undefined
+}
+
+async function openOrderEdit(): Promise<void> {
+  if (!selected.value || mode.value !== 'order') return
+  const order = selected.value as PurchaseOrderRecord & {
+    deliveryTerms?: string | null
+    exceptionPurchaseFlag?: number | null
+    exceptionReason?: string | null
+  }
+  for (const key of Object.keys(orderEditForm)) delete orderEditForm[key]
+  Object.assign(orderEditForm, {
+    projectId: order.projectId,
+    requestId: order.requestId || '',
+    contractId: order.contractId || '',
+    partnerId: order.partnerId || '',
+    orderCode: order.orderCode,
+    orderType: order.orderType || '',
+    orderDate: order.orderDate || '',
+    deliveryDate: order.deliveryDate || '',
+    deliveryTerms: order.deliveryTerms || '',
+    exceptionPurchaseFlag: String(order.exceptionPurchaseFlag || 0),
+    exceptionReason: order.exceptionReason || '',
+    remark: order.remark || '',
+  })
+  orderEditOpen.value = true
+  busy.value = true
+  try {
+    partners.value = (
+      await loadPartners({ pageNo: 1, pageSize: 200, partnerType: 'SUPPLIER', status: 'ENABLE' })
+    ).records
+  } catch (error) {
+    errorMessage.value = errorText(error, '供应商读取失败')
+    showToast('error', '供应商读取失败', errorMessage.value)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function saveOrderEdit(): Promise<void> {
+  if (!selected.value || busy.value) return
+  busy.value = true
+  errorMessage.value = ''
+  const id = selected.value.id
+  try {
+    await updatePurchaseOrder(id, {
+      projectId: requiredOrderEdit('projectId', '项目'),
+      requestId: optionalOrderEdit('requestId'),
+      contractId: optionalOrderEdit('contractId'),
+      partnerId: requiredOrderEdit('partnerId', '供应商'),
+      orderCode: requiredOrderEdit('orderCode', '采购订单号'),
+      orderType: optionalOrderEdit('orderType'),
+      orderDate: requiredOrderEdit('orderDate', '订单日期'),
+      deliveryDate: requiredOrderEdit('deliveryDate', '交付日期'),
+      deliveryTerms: requiredOrderEdit('deliveryTerms', '交付条件'),
+      exceptionPurchaseFlag: Number(orderEditForm.exceptionPurchaseFlag || '0'),
+      exceptionReason: optionalOrderEdit('exceptionReason'),
+      remark: optionalOrderEdit('remark'),
+    })
+    orderEditOpen.value = false
+    await loadPage()
+    const refreshed = records.value.find((record) => record.id === id)
+    if (refreshed) await selectRecord(refreshed)
+    showToast('success', '采购订单已更新', '商业条件已刷新')
+  } catch (error) {
+    errorMessage.value = errorText(error, '采购订单更新失败')
+    showToast('error', '采购订单更新失败', errorMessage.value)
+  } finally {
+    busy.value = false
+  }
 }
 
 function recordSource(record: ListRecord): string {
@@ -314,6 +488,8 @@ const detailTable = computed(() => {
       '单价',
       '金额',
       '使用部位',
+      '不合格处置',
+      '处置原因',
     ],
     rows: detailItems.value.map((item, index) => {
       const receiptItem = item as ReceiptItemRecord
@@ -332,6 +508,8 @@ const detailTable = computed(() => {
           receiptItem.unitPrice ?? '-',
           receiptItem.amount ?? '-',
           receiptItem.useLocation || '-',
+          receiptItem.dispositionType ? statusLabel(receiptItem.dispositionType) : '-',
+          receiptItem.dispositionReason || '-',
         ],
       }
     }),
@@ -383,6 +561,7 @@ async function selectRecord(record: ListRecord): Promise<void> {
   const generation = ++detailGeneration
   selected.value = record
   detailItems.value = []
+  attachments.value = []
   detailLoading.value = true
   try {
     const [detail, items] =
@@ -403,6 +582,14 @@ async function selectRecord(record: ListRecord): Promise<void> {
     if (generation !== detailGeneration) return
     selected.value = detail
     detailItems.value = items
+    try {
+      const next = await listSiteFiles(attachmentBusinessType.value, record.id, controller.signal)
+      if (generation === detailGeneration) attachments.value = next
+    } catch (error) {
+      if (!controller.signal.aborted && generation === detailGeneration) {
+        showToast('warning', '附件读取失败', errorText(error, '附件列表加载失败'))
+      }
+    }
   } catch (error) {
     if (!controller.signal.aborted && generation === detailGeneration) {
       showToast('error', '详情读取失败', errorText(error, '详情加载失败'))
@@ -413,6 +600,7 @@ async function selectRecord(record: ListRecord): Promise<void> {
 }
 
 async function openCreate(): Promise<void> {
+  editingReceiptId.value = ''
   for (const key of Object.keys(form)) delete form[key]
   form.projectId = projectId.value
   receiptCandidates.value = []
@@ -432,9 +620,26 @@ async function openCreate(): Promise<void> {
   try {
     const candidateProjectId = form.projectId || undefined
     if (mode.value === 'request') {
-      materials.value = (
-        await loadMaterials({ pageNo: 1, pageSize: 200, status: 'ENABLE' })
-      ).records
+      const [materialPage, contractPage, budgetPage] = await Promise.all([
+        loadMaterials({ pageNo: 1, pageSize: 200, status: 'ENABLE' }),
+        loadContractPage({
+          pageNo: 1,
+          pageSize: 200,
+          projectId: candidateProjectId,
+          contractType: 'PURCHASE',
+          approvalStatus: 'APPROVED',
+        }),
+        loadBudgetPage({
+          pageNo: 1,
+          pageSize: 100,
+          projectId: candidateProjectId,
+          status: 'ACTIVE',
+        }),
+      ])
+      materials.value = materialPage.records
+      contracts.value = contractPage.records
+      const activeBudget = budgetPage.records.find((item) => item.active)
+      budgetLines.value = activeBudget ? ((await loadBudget(activeBudget.id)).lines ?? []) : []
     } else if (mode.value === 'order') {
       const [requestPage, partnerPage, materialPage] = await Promise.all([
         loadPurchaseRequests({ pageNum: 1, pageSize: 200, projectId: candidateProjectId }),
@@ -463,6 +668,42 @@ async function openCreate(): Promise<void> {
   } finally {
     busy.value = false
   }
+}
+
+async function openReceiptEdit(): Promise<void> {
+  if (!canEditSelectedReceipt.value || !selected.value || !detailItems.value.length) return
+  const receipt = selected.value as ReceiptRecord
+  const item = detailItems.value[0] as ReceiptItemRecord
+  await openCreate()
+  editingReceiptId.value = receipt.id
+  Object.assign(form, {
+    projectId: receipt.projectId,
+    orderId: receipt.orderId || '',
+    contractId: receipt.contractId || '',
+    partnerId: receipt.partnerId || '',
+    receiptDate: receipt.receiptDate || '',
+    warehouseId: receipt.warehouseId || '',
+    receiverId: receipt.receiverId || '',
+    receiptMode: receipt.receiptMode || 'INVENTORY',
+    qualityStatus: receipt.qualityStatus || '',
+    remark: receipt.remark || '',
+  })
+  await changeReceiptOrder(form.orderId)
+  Object.assign(form, {
+    orderItemId: item.orderItemId || '',
+    materialId: item.materialId || '',
+    wbsTaskId: item.wbsTaskId || '',
+    budgetLineId: item.budgetLineId || '',
+    actualQuantity: item.actualQuantity,
+    qualifiedQuantity: item.qualifiedQuantity,
+    unqualifiedQuantity: item.unqualifiedQuantity,
+    batchNo: item.batchNo || '',
+    useLocation: item.useLocation || '',
+    dispositionType: item.dispositionType || '',
+    dispositionStatus: item.dispositionStatus || '',
+    dispositionReason: item.dispositionReason || '',
+  })
+  selected.value = null
 }
 
 function changeMaterial(value: string): void {
@@ -549,6 +790,7 @@ async function save(): Promise<void> {
     if (mode.value === 'request') {
       const command: PurchaseRequestCommand = {
         projectId: required('projectId', '项目'),
+        contractId: required('contractId', '采购合同'),
         purpose: optional('purpose'),
         remark: optional('remark'),
       }
@@ -561,6 +803,7 @@ async function save(): Promise<void> {
             materialId: required('materialId', '物料'),
             materialName: optional('materialName'),
             quantity: decimal('quantity', '申请数量'),
+            budgetLineId: required('budgetLineId', '预算科目'),
             estimatedUnitPrice: decimal('estimatedUnitPrice', '预计单价'),
             unit: optional('unit'),
             plannedDate: optional('plannedDate'),
@@ -614,8 +857,9 @@ async function save(): Promise<void> {
         qualityStatus: optional('qualityStatus'),
         remark: optional('remark'),
       }
-      id = await createReceipt(command)
-      createdId = id
+      id = editingReceiptId.value || (await createReceipt(command))
+      if (editingReceiptId.value) await updateReceipt(id, command)
+      else createdId = id
       if (canSaveItems.value) {
         await saveReceiptItems(id, [
           {
@@ -629,11 +873,15 @@ async function save(): Promise<void> {
             unqualifiedQuantity: decimal('unqualifiedQuantity', '不合格数量'),
             batchNo: optional('batchNo'),
             useLocation: optional('useLocation'),
+            dispositionType: optional('dispositionType'),
+            dispositionStatus: optional('dispositionStatus'),
+            dispositionReason: optional('dispositionReason'),
           },
         ])
       }
     }
     createdId = ''
+    editingReceiptId.value = ''
     dialogOpen.value = false
     await loadPage()
     const created = records.value.find((record) => record.id === id)
@@ -784,11 +1032,11 @@ onBeforeUnmount(() => {
       </V2Card>
 
       <V2Dialog
-        :open="Boolean(selected)"
+        :open="Boolean(selected) && !orderEditOpen"
         :title="`${title}详情`"
         :description="selected ? recordCode(selected) : ''"
         panel-class="v2-detail-dialog"
-        :close-on-backdrop="true"
+        :close-on-backdrop="false"
         @close="clearDetail"
       >
         <template v-if="selected"
@@ -862,9 +1110,62 @@ onBeforeUnmount(() => {
                 </table>
               </div>
             </section>
+            <section class="v2-detail-dialog__section" aria-labelledby="purchase-attachment-title">
+              <div class="v2-detail-dialog__section-heading">
+                <h3 id="purchase-attachment-title">审批附件</h3>
+                <V2Badge tone="info">{{ attachments.length }} 个</V2Badge>
+              </div>
+              <ul v-if="attachments.length" class="purchase-execution-page__attachments">
+                <li v-for="file in attachments" :key="file.id">
+                  <V2Button
+                    type="button"
+                    size="small"
+                    variant="ghost"
+                    @click="downloadAttachment(file)"
+                  >
+                    {{ file.originalName }}
+                  </V2Button>
+                </li>
+              </ul>
+              <p v-else class="purchase-execution-page__attachment-empty">暂无附件</p>
+              <template v-if="selected.approvalStatus === 'DRAFT'">
+                <label class="purchase-execution-page__attachment">
+                  <span>选择已签认的业务附件</span>
+                  <input
+                    type="file"
+                    :disabled="busy"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.txt"
+                    @change="uploadAttachment"
+                  />
+                </label>
+                <V2Button
+                  type="button"
+                  variant="secondary"
+                  :loading="busy"
+                  @click="generateBusinessAttachment"
+                  >生成并上传单据说明</V2Button
+                >
+              </template>
+            </section>
           </template></template
         >
         <template #footer>
+          <V2Button
+            v-if="canEditSelectedOrder"
+            type="button"
+            variant="secondary"
+            :disabled="busy"
+            @click="openOrderEdit"
+            >编辑商业条件</V2Button
+          >
+          <V2Button
+            v-if="canEditSelectedReceipt"
+            type="button"
+            variant="secondary"
+            :disabled="busy"
+            @click="openReceiptEdit"
+            >编辑验收明细</V2Button
+          >
           <V2Button v-if="canSubmitSelected" type="button" :loading="busy" @click="submitSelected"
             >提交审批</V2Button
           >
@@ -873,8 +1174,53 @@ onBeforeUnmount(() => {
     </section>
 
     <V2Dialog
+      v-model:open="orderEditOpen"
+      title="编辑采购订单商业条件"
+      description="自动转单后补齐供应商、日期与交付条件。"
+      :close-disabled="busy"
+      :close-on-backdrop="false"
+    >
+      <form
+        id="purchase-order-commercial-form"
+        class="purchase-execution-page__form"
+        @submit.prevent="saveOrderEdit"
+      >
+        <V2Input v-model="orderEditForm.orderCode" label="采购订单号" disabled required />
+        <V2Select
+          v-model="orderEditForm.partnerId"
+          label="供应商"
+          :options="partnerOptions"
+          :disabled="busy"
+          required
+        />
+        <V2Input
+          v-model="orderEditForm.orderDate"
+          label="订单日期"
+          placeholder="YYYY-MM-DD"
+          required
+        />
+        <V2Input
+          v-model="orderEditForm.deliveryDate"
+          label="交付日期"
+          placeholder="YYYY-MM-DD"
+          required
+        />
+        <V2Input v-model="orderEditForm.deliveryTerms" label="交付条件" required />
+        <V2Input v-model="orderEditForm.remark" label="备注" />
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" :disabled="busy" @click="orderEditOpen = false"
+          >取消</V2Button
+        >
+        <V2Button type="submit" form="purchase-order-commercial-form" :loading="busy"
+          >保存</V2Button
+        >
+      </template>
+    </V2Dialog>
+
+    <V2Dialog
       v-model:open="dialogOpen"
-      :title="`新建${title}`"
+      :title="editingReceiptId ? `编辑${title}` : `新建${title}`"
       description="保存后刷新数量、金额与状态。"
       :close-disabled="busy"
       :close-on-backdrop="false"
@@ -892,7 +1238,14 @@ onBeforeUnmount(() => {
           required
         />
         <template v-if="mode === 'request'">
-          <V2Input v-model="form.purpose" label="采购用途" />
+          <V2Select
+            v-model="form.contractId"
+            label="采购合同"
+            :options="contractOptions"
+            :disabled="busy"
+            required
+          />
+          <V2Input v-model="form.purpose" label="采购用途" required />
           <V2Select
             v-model="form.materialId"
             label="物料"
@@ -906,10 +1259,18 @@ onBeforeUnmount(() => {
             label="预计单价"
             required
           />
+          <V2Select
+            v-model="form.budgetLineId"
+            label="预算科目"
+            :options="budgetLineOptions"
+            :disabled="busy"
+            required
+          />
           <V2Input v-model="form.unit" label="单位" /><V2Input
             v-model="form.plannedDate"
             label="计划日期"
             placeholder="YYYY-MM-DD"
+            required
           />
         </template>
         <template v-else-if="mode === 'order'">
@@ -1006,6 +1367,23 @@ onBeforeUnmount(() => {
             v-model="form.batchNo"
             label="批次号"
           />
+          <V2Select
+            v-if="Number(form.unqualifiedQuantity || 0) > 0"
+            v-model="form.dispositionType"
+            label="不合格处置"
+            :options="[
+              { value: 'RETURN', label: '退货' },
+              { value: 'REPLACE', label: '换货' },
+              { value: 'CONCESSION', label: '让步接收' },
+            ]"
+            required
+          />
+          <V2Input
+            v-if="Number(form.unqualifiedQuantity || 0) > 0"
+            v-model="form.dispositionReason"
+            label="处置原因"
+            required
+          />
         </template>
         <V2Input v-model="form.remark" label="备注" />
       </form>
@@ -1070,6 +1448,24 @@ tr.selected {
 .purchase-execution-page__form > :last-child,
 .purchase-execution-page__form > .purchase-execution-page__actions {
   grid-column: 1 / -1;
+}
+.purchase-execution-page__attachment {
+  display: grid;
+  gap: var(--v2-space-2);
+}
+.purchase-execution-page__attachments {
+  display: grid;
+  gap: var(--v2-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.purchase-execution-page__attachments li {
+  display: flex;
+}
+.purchase-execution-page__attachment-empty {
+  margin: 0;
+  color: var(--v2-color-text-secondary);
 }
 .purchase-execution-page__pagination,
 .purchase-execution-page__pagination div {
