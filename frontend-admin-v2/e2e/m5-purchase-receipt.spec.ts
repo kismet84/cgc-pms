@@ -162,6 +162,38 @@ async function install(page: Page, granted = permissions, rejectReceiptItems = f
       pageSize: 200,
     }),
   )
+  await page.route('**/api/contracts**', (route) =>
+    fulfill(route, {
+      records: [
+        {
+          id: 'C1',
+          contractCode: 'CT-001',
+          contractName: '钢材采购合同',
+          contractType: 'PURCHASE',
+          approvalStatus: 'APPROVED',
+        },
+      ],
+      total: 1,
+      pageNo: 1,
+      pageSize: 200,
+    }),
+  )
+  await page.route('**/api/project-budgets**', (route) => {
+    const path = new URL(route.request().url()).pathname
+    return path === '/api/project-budgets/B1'
+      ? fulfill(route, {
+          id: 'B1',
+          active: true,
+          status: 'ACTIVE',
+          lines: [{ id: 'BL1', costSubjectName: '钢材采购' }],
+        })
+      : fulfill(route, {
+          records: [{ id: 'B1', active: true, status: 'ACTIVE' }],
+          total: 1,
+          pageNo: 1,
+          pageSize: 100,
+        })
+  })
   await page.route('**/api/partners**', (route) =>
     fulfill(route, {
       records: [
@@ -192,6 +224,7 @@ async function install(page: Page, granted = permissions, rejectReceiptItems = f
       pageSize: 200,
     }),
   )
+  await page.route('**/api/files**', (route) => fulfill(route, []))
   await page.route('**/api/{purchase-requests,purchase-orders,receipts}**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -393,10 +426,13 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     await page.goto('/v2/inventory/purchase-request?projectId=P1')
     await page.getByRole('button', { name: '新建采购申请' }).click()
     const dialog = page.getByRole('dialog', { name: '新建采购申请' })
+    await selectBusinessOption(dialog, /^采购合同：/, /CT-001 · 钢材采购合同/)
     await selectBusinessOption(dialog, /^物料：/, /MAT-001 · 钢筋/)
+    await selectBusinessOption(dialog, /^预算科目：/, /钢材采购/)
     await dialog.getByLabel('采购用途').fill('地下室钢材')
     await dialog.getByLabel('申请数量').fill('9007199254740993.1234')
     await dialog.getByLabel('预计单价').fill('3.25')
+    await dialog.getByLabel('计划日期').fill('2026-06-18')
     await dialog.getByRole('button', { name: '保存', exact: true }).dblclick()
     await expect(page.getByText('PR-002', { exact: true }).first()).toBeVisible()
     await page.getByRole('button', { name: '提交审批' }).dblclick()
@@ -440,7 +476,13 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     const writes = await install(page)
     await page.goto('/v2/purchase/receipt?projectId=P1')
     for (const sample of [
-      { actual: '3.0000', qualified: '2.5000', unqualified: '0.5000', code: 'RC-002' },
+      {
+        actual: '3.0000',
+        qualified: '2.5000',
+        unqualified: '0.5000',
+        code: 'RC-002',
+        disposition: '退货',
+      },
       { actual: '5.0000', qualified: '5.0000', unqualified: '0.0000', code: 'RC-003' },
     ]) {
       await page.getByRole('button', { name: '新建材料验收' }).click()
@@ -451,6 +493,10 @@ test.describe('M5 purchase request, order and receipt V2', () => {
       await dialog.getByLabel('实收数量').fill(sample.actual)
       await dialog.getByLabel('合格数量', { exact: true }).fill(sample.qualified)
       await dialog.getByLabel('不合格数量', { exact: true }).fill(sample.unqualified)
+      if (sample.disposition) {
+        await selectBusinessOption(dialog, /^不合格处置：/, new RegExp(sample.disposition))
+        await dialog.getByLabel('处置原因').fill('外观检验不合格')
+      }
       await dialog.getByRole('button', { name: '保存', exact: true }).click()
       await expect(page.getByText(sample.code, { exact: true }).first()).toBeVisible()
       const detailDialog = page.getByRole('dialog', { name: '材料验收详情' })

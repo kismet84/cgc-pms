@@ -73,14 +73,26 @@ async function installMocks(page: Page, identity: Identity) {
         },
       ])
     }
+    if (path === '/api/system/roles/3') {
+      return success(route, {
+        id: '3',
+        roleCode: 'PROJECT_MEMBER',
+        roleName: '服务端角色',
+        roleType: 'CUSTOM',
+        status: 'ENABLE',
+        dataScope: 'SELF',
+        menuIds: ['9'],
+      })
+    }
     if (path === '/api/system/menus') {
       return success(route, [
         {
           id: '9',
           parentId: '0',
           menuName: '服务端权限项',
-          menuType: 'BUTTON',
-          perms: 'project:query',
+          menuType: 'MENU',
+          path: '/system/permissions',
+          perms: 'system:menu:query',
           orderNum: 1,
           status: 'ENABLE',
           visible: 1,
@@ -238,7 +250,7 @@ test('super administrator reads all server facts while destructive traffic stays
   const routes = [
     ['/v2/system/users', '用户管理', '服务端用户'],
     ['/v2/system/roles', '角色管理', '服务端角色'],
-    ['/v2/system/permissions', '权限清单', '服务端权限项'],
+    ['/v2/system/permissions', '权限清单', 'system:menu:query'],
     ['/v2/system/dict', '字典管理', '服务端字典项'],
     ['/v2/system/audit', '操作审计', '/auth/login'],
     ['/v2/system/document-templates', '业务单据模板', '服务端付款模板'],
