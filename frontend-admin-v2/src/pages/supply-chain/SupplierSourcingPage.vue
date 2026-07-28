@@ -53,6 +53,7 @@ import {
   submitSupplierQuote,
 } from '@/services/supply-chain'
 import { loadContractPage, loadPartners } from '@/services/commercial'
+import { uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -88,6 +89,8 @@ const detailLoading = ref(false)
 const busy = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
+const sourcingRequirementFile = ref<File | null>(null)
+const quoteAttachmentFiles = reactive<Record<string, File | null>>({})
 const action = ref<Action>(null)
 const targetId = ref('')
 const partnerId = ref('')
@@ -336,6 +339,34 @@ async function act(task: () => Promise<unknown>, message: string): Promise<void>
   }
 }
 
+function selectSourcingRequirement(event: Event): void {
+  sourcingRequirementFile.value = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function uploadSourcingRequirement(): Promise<void> {
+  if (!selected.value || !sourcingRequirementFile.value) return
+  const file = sourcingRequirementFile.value
+  await act(
+    () => uploadSiteFile(file, 'SUPPLIER_SOURCING', selected.value!.id, 'SOURCING_REQUIREMENT'),
+    '招采文件已上传。',
+  )
+  sourcingRequirementFile.value = null
+}
+
+function selectQuoteAttachment(quoteId: string, event: Event): void {
+  quoteAttachmentFiles[quoteId] = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+
+async function uploadQuoteAttachment(quoteId: string): Promise<void> {
+  const file = quoteAttachmentFiles[quoteId]
+  if (!file) return
+  await act(
+    () => uploadSiteFile(file, 'SUPPLIER_QUOTE', quoteId, 'QUOTE_ATTACHMENT'),
+    '报价附件已上传。',
+  )
+  quoteAttachmentFiles[quoteId] = null
+}
+
 async function save(): Promise<void> {
   if (!action.value || busy.value) return
   const current = action.value
@@ -538,7 +569,7 @@ onBeforeUnmount(() => {
         title="招采闭环追溯"
         :description="selected ? `${selected.sourcingCode} · ${selected.sourcingTitle}` : ''"
         panel-class="v2-detail-dialog"
-        :close-on-backdrop="true"
+        :close-on-backdrop="false"
         @close="closeTrace"
       >
         <V2PageState
@@ -549,6 +580,19 @@ onBeforeUnmount(() => {
         />
         <div v-else-if="selected && trace" class="supplier-page__trace">
           <div class="v2-detail-dialog__quick-actions">
+            <label v-if="canMaintain && selected.status === 'DRAFT'">
+              采购需求或招标文件
+              <input type="file" @change="selectSourcingRequirement" />
+            </label>
+            <V2Button
+              v-if="canMaintain && selected.status === 'DRAFT'"
+              type="button"
+              size="small"
+              :disabled="!sourcingRequirementFile"
+              :loading="busy"
+              @click="uploadSourcingRequirement"
+              >上传招采文件</V2Button
+            >
             <V2Button
               v-if="canMaintain && selected.status === 'DRAFT'"
               type="button"
@@ -658,6 +702,20 @@ onBeforeUnmount(() => {
                     <td>{{ selected.currencyCode }}</td>
                     <td>{{ label(item.status) }}</td>
                     <td>
+                      <label v-if="canQuote && item.status === 'DRAFT'">
+                        报价附件
+                        <input type="file" @change="selectQuoteAttachment(item.id, $event)" />
+                      </label>
+                      <V2Button
+                        v-if="canQuote && item.status === 'DRAFT'"
+                        type="button"
+                        size="small"
+                        variant="ghost"
+                        :disabled="!quoteAttachmentFiles[item.id]"
+                        :loading="busy"
+                        @click="uploadQuoteAttachment(item.id)"
+                        >上传附件</V2Button
+                      >
                       <V2Button
                         v-if="canQuote && item.status === 'DRAFT'"
                         type="button"

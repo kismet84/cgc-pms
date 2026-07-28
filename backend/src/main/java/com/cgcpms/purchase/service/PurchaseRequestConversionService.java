@@ -69,7 +69,10 @@ public class PurchaseRequestConversionService {
         order.setOrderStatus("DRAFT");
         order.setContractId(request.getContractId());
         order.setExceptionPurchaseFlag(0);
-        order.setTotalAmount(BigDecimal.ZERO);
+        order.setTotalAmount(requestItems.stream()
+                .map(MatPurchaseRequestItem::getEstimatedAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
         String prefix = "PO-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         boolean inserted = false;
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {

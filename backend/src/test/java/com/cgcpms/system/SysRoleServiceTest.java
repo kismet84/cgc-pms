@@ -220,8 +220,20 @@ class SysRoleServiceTest {
         assertNotNull(vo, "应能查到刚创建的角色");
         assertEquals("DETAIL_ROLE", vo.getRoleCode());
         assertEquals("详情角色", vo.getRoleName());
+        assertEquals(0L, vo.getUserCount(), "新角色用户数应以服务端绑定事实为准");
         assertNotNull(vo.getMenuIds(), "menuIds不应为null");
         assertTrue(vo.getMenuIds().isEmpty(), "未分配菜单的角色menuIds应为空列表");
+
+        SysUserRole binding = new SysUserRole();
+        binding.setTenantId(TENANT_0);
+        binding.setUserId(USER_ADMIN);
+        binding.setRoleId(id);
+        userRoleMapper.insert(binding);
+        assertEquals(1L, roleService.getById(id).getUserCount());
+        assertEquals(1L, roleService.getList().stream()
+                .filter(item -> id.equals(item.getId()))
+                .findFirst().orElseThrow().getUserCount(),
+                "角色列表人数必须来自服务端聚合");
 
         System.out.println("testGetById_Success 通过: roleCode=" + vo.getRoleCode());
     }

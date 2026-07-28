@@ -415,7 +415,8 @@ public class MatReceiptService {
                 throw new BusinessException("RECEIPT_UNQUALIFIED_QUANTITY_MISMATCH", "不合格数量必须等于实收数量减合格数量");
             }
             if (unqualified.signum() > 0) {
-                if (!List.of("RETURN", "REPLACE", "CONCESSION").contains(item.getDispositionType())
+                if (item.getDispositionType() == null
+                        || !List.of("RETURN", "REPLACE", "CONCESSION").contains(item.getDispositionType())
                         || !StringUtils.hasText(item.getDispositionReason())) {
                     throw new BusinessException("RECEIPT_DISPOSITION_REQUIRED", "存在不合格材料时必须填写退货、换货或让步接收处置及原因");
                 }

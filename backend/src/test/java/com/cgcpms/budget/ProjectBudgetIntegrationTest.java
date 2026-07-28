@@ -71,6 +71,7 @@ class ProjectBudgetIntegrationTest {
         project.setProjectCode("BUDGET-IT-PROJECT");
         project.setProjectName("预算集成测试项目");
         project.setStatus("DRAFT");
+        project.setApprovalStatus("APPROVED");
         projectMapper.insert(project);
 
         CostSubject subject = new CostSubject();
@@ -145,6 +146,20 @@ class ProjectBudgetIntegrationTest {
                 () -> projectService.transitionStatus(PROJECT_ID, "CLOSED", "项目完成"));
         assertEquals("PROJECT_CLOSEOUT_ACTION_REQUIRED", closeDirectly.getCode());
         assertEquals("ACTIVE", projectMapper.selectById(PROJECT_ID).getStatus());
+    }
+
+    @Test
+    @DisplayName("项目未审批通过时即使预算已生效也不得进入在建")
+    void projectApprovalIsRequiredBeforeActivation() {
+        projectMapper.update(null, new LambdaUpdateWrapper<PmProject>()
+                .eq(PmProject::getId, PROJECT_ID)
+                .set(PmProject::getApprovalStatus, "DRAFT"));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> projectService.transitionStatus(PROJECT_ID, "ACTIVE", "尝试绕过项目审批"));
+
+        assertEquals("PROJECT_APPROVAL_REQUIRED", error.getCode());
+        assertEquals("DRAFT", projectMapper.selectById(PROJECT_ID).getStatus());
     }
 
     @Test

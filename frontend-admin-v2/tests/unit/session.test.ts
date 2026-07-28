@@ -50,6 +50,18 @@ describe('V2 in-memory session store', () => {
     expect(second).toEqual(currentUser)
   })
 
+  it('offers an explicit administrator bypass without weakening permission-only checks', async () => {
+    vi.mocked(login).mockResolvedValue({
+      userInfo: { ...currentUser, permissions: [] },
+    })
+    const session = useSessionStore()
+
+    await session.login({ username: 'admin', password: 'local-password' })
+
+    expect(session.hasPermission('system:user:add')).toBe(false)
+    expect(session.hasAdminOrPermission('system:user:add')).toBe(true)
+  })
+
   it('clears protected caches even when remote logout fails', async () => {
     vi.mocked(login).mockResolvedValue({ userInfo: currentUser })
     vi.mocked(logout).mockRejectedValue(new Error('network'))

@@ -704,7 +704,7 @@ public class ProjectScheduleService {
 
     private Map<String, Object> latestSnapshot(Long scheduleId) {
         try { return jdbc.queryForMap("SELECT * FROM project_progress_snapshot WHERE tenant_id=? AND schedule_plan_id=? ORDER BY snapshot_date DESC,id DESC LIMIT 1", tenant(), scheduleId); }
-        catch (EmptyResultDataAccessException e) { return Map.of(); }
+        catch (EmptyResultDataAccessException e) { return null; }
     }
 
     private List<Map<String, Object>> correctiveActionsBySchedule(Long scheduleId) {

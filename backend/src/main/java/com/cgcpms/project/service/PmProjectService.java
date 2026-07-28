@@ -138,6 +138,7 @@ public class PmProjectService {
         }
 
         project.setStatus(ProjectStatusConstants.DRAFT);
+        project.setApprovalStatus("DRAFT");
         project.setTenantId(tenantId);
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
@@ -239,6 +240,9 @@ public class PmProjectService {
                     "不允许从 " + current + " 变更为 " + target);
         }
         if (ProjectStatusConstants.ACTIVE.equals(target)) {
+            if (!"APPROVED".equals(project.getApprovalStatus())) {
+                throw new BusinessException("PROJECT_APPROVAL_REQUIRED", "项目审批通过后才能进入在建状态");
+            }
             Long activeBudgetCount = projectBudgetMapper.selectCount(new LambdaQueryWrapper<ProjectBudget>()
                     .eq(ProjectBudget::getTenantId, project.getTenantId())
                     .eq(ProjectBudget::getProjectId, project.getId())

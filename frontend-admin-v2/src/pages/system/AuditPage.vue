@@ -133,7 +133,7 @@ onBeforeUnmount(() => controller?.abort())
         </table>
       </div>
       <template #footer>
-        <div class="audit-page__pagination">
+        <nav class="audit-page__pagination v2-pagination" aria-label="操作审计分页">
           <span>共 {{ total }} 条</span>
           <V2Button
             size="small"
@@ -152,7 +152,7 @@ onBeforeUnmount(() => controller?.abort())
           >
             下一页
           </V2Button>
-        </div>
+        </nav>
       </template>
     </V2Card>
   </V2Stack>

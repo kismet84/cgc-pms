@@ -650,6 +650,12 @@ function validateForm(command: ContractSaveCommand): string | null {
   if (!command.contract.partyAId || !command.contract.partyBId) return '甲乙方不能为空'
   if (!command.contract.contractAmount) return '合同金额不能为空'
   if (command.items.some((item) => !item.itemName?.trim())) return '合同清单名称不能为空'
+  if (
+    command.items.some(
+      (item) => !item.amount || !item.taxAmount || !item.amountWithoutTax || !item.taxRate,
+    )
+  )
+    return '合同清单金额、税率、税额和不含税金额不能为空'
   if (command.paymentTerms.some((term) => !term.termName?.trim())) return '付款条款名称不能为空'
   return null
 }
@@ -1366,6 +1372,24 @@ onBeforeUnmount(() => {
                   :disabled="formLocked"
                   @update:model-value="updateItem(index, 'amount', $event)"
                 />
+                <V2Input
+                  :model-value="item.taxRate || ''"
+                  label="税率"
+                  :disabled="formLocked"
+                  @update:model-value="updateItem(index, 'taxRate', $event)"
+                />
+                <V2Input
+                  :model-value="item.taxAmount || ''"
+                  label="税额"
+                  :disabled="formLocked"
+                  @update:model-value="updateItem(index, 'taxAmount', $event)"
+                />
+                <V2Input
+                  :model-value="item.amountWithoutTax || ''"
+                  label="不含税金额"
+                  :disabled="formLocked"
+                  @update:model-value="updateItem(index, 'amountWithoutTax', $event)"
+                />
               </div>
               <div class="contract-page__actions">
                 <V2Button
@@ -1529,7 +1553,7 @@ onBeforeUnmount(() => {
 
 .contract-page__detail-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--v2-space-3);
 }
 
@@ -1644,13 +1668,6 @@ onBeforeUnmount(() => {
   grid-column: 1 / -1;
 }
 
-.contract-page__detail-grid dl {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--v2-space-2) var(--v2-space-4);
-  margin: 0;
-}
-
 dt {
   color: var(--v2-color-text-secondary);
 }
@@ -1662,8 +1679,7 @@ dd {
 
 @media (max-width: 64rem) {
   .contract-page__form-grid,
-  .contract-page__editor-list .contract-page__form-grid,
-  .contract-page__detail-grid {
+  .contract-page__editor-list .contract-page__form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1674,8 +1690,7 @@ dd {
 
 @media (max-width: 48rem) {
   .contract-page__form-grid,
-  .contract-page__editor-list .contract-page__form-grid,
-  .contract-page__detail-grid {
+  .contract-page__editor-list .contract-page__form-grid {
     grid-template-columns: 1fr;
   }
 }

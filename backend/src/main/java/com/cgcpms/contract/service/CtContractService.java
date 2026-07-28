@@ -700,6 +700,7 @@ public class CtContractService {
         contract.setTenantId(UserContext.getCurrentTenantId());
         contract.setApprovalStatus(ContractStatusConstants.APPROVAL_DRAFT);
         contract.setContractStatus(ContractStatusConstants.STATUS_DRAFT);
+        contract.setCurrentAmount(contract.getContractAmount());
         contract.setPaidAmount(BigDecimal.ZERO);
         contract.setSettlementAmount(BigDecimal.ZERO);
         contract.setCostGeneratedFlag(0);
@@ -722,7 +723,7 @@ public class CtContractService {
                         .set(CtContract::getPartyAId, contract.getPartyAId())
                         .set(CtContract::getPartyBId, contract.getPartyBId())
                         .set(CtContract::getContractAmount, contract.getContractAmount())
-                        .set(CtContract::getCurrentAmount, contract.getCurrentAmount())
+                        .set(CtContract::getCurrentAmount, contract.getContractAmount())
                         .set(CtContract::getTaxRate, contract.getTaxRate())
                         .set(CtContract::getTaxAmount, contract.getTaxAmount())
                         .set(CtContract::getAmountWithoutTax, contract.getAmountWithoutTax())

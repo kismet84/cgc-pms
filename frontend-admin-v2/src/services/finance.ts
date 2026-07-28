@@ -191,6 +191,35 @@ export const reverseCollection = (id: string, reason: string, idempotencyKey: st
   })
 export const createPayment = (body: PaymentApplicationCommand) =>
   apiRequest<string>('/pay-applications', { method: 'POST', body })
+export interface PaymentSourceOptionRecord {
+  sourceType: string
+  sourceRefId: string
+  documentCode: string
+  sourceTotalAmount: string
+  committedAmount: string
+  availableAmount: string
+}
+export const loadPaymentSourceOptions = (
+  query: {
+    projectId: string
+    contractId: string
+    partnerId: string
+    payType: string
+    expenseCategory?: string
+  },
+  signal?: AbortSignal,
+) =>
+  apiRequest<PaymentSourceOptionRecord[]>(withQuery('/pay-applications/source-options', query), {
+    signal,
+  })
+export const savePaymentSources = (
+  id: string,
+  body: Array<{ sourceType: string; sourceRefId: string; sourceAmount: string }>,
+) =>
+  apiRequest<void>(`/pay-applications/${requiredId(id)}/sources/batch`, {
+    method: 'POST',
+    body,
+  })
 export const updatePayment = (id: string, body: PaymentApplicationCommand) =>
   apiRequest<void>(`/pay-applications/${requiredId(id)}`, { method: 'PUT', body })
 export const deletePayment = (id: string) =>

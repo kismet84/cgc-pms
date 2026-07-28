@@ -26,6 +26,7 @@ import {
   submitPurchaseOrder,
   submitPurchaseRequest,
   submitReceipt,
+  updatePurchaseOrder,
 } from '@/services/supply-chain'
 
 const fetchMock = vi.fn<typeof fetch>()
@@ -76,8 +77,26 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('loadOrderItemsForReceipt')
     expect(source).toContain('loadMaterials')
     expect(source).toContain('loadPartners')
+    expect(source).toContain('loadContractPage')
+    expect(source).toContain('loadBudgetPage')
+    expect(source).toContain("contractId: required('contractId', '采购合同')")
+    expect(source).toContain("budgetLineId: required('budgetLineId', '预算科目')")
     expect(source).toContain('loadWarehouses')
+    expect(source).toContain('uploadSiteFile')
+    expect(source).toContain('listSiteFiles')
+    expect(source).toContain('getSiteFileUrl')
+    expect(source).toContain('attachments.length')
+    expect(source).toContain('附件列表已更新')
+    expect(source).toContain('生成并上传单据说明')
+    expect(source).toContain('updatePurchaseOrder')
+    expect(source).toContain('编辑商业条件')
     expect(source).toContain('remainingQuantity')
+    expect(source).toContain("'orderCode' in record")
+    expect(source).toContain("CONVERTED: '已转订单'")
+    expect(source).toContain("PARTIAL: '部分合格'")
+    expect(source).toContain(
+      "if ('receiptCode' in record) return statusLabel(record.qualityStatus || record.approvalStatus)",
+    )
     expect(source).toContain("selected.value?.approvalStatus === 'DRAFT'")
     expect(source).not.toMatch(
       /frontend-admin\/src|Legacy|totalAmount\s*[+]=|receivedQuantity\s*[+]=|label="[^"]*ID/,
@@ -117,6 +136,14 @@ describe('M5 purchase request, order and receipt contract', () => {
     await loadPurchaseOrder('O/1', signal)
     await loadPurchaseOrderItems('O/1', signal)
     const orderId = await createPurchaseOrder({ projectId: 'P1', requestId: 'R1', partnerId: 'S1' })
+    await updatePurchaseOrder('O/1', {
+      projectId: 'P1',
+      orderCode: 'PO-001',
+      partnerId: 'S1',
+      orderDate: '2026-07-01',
+      deliveryDate: '2026-07-10',
+      deliveryTerms: '送达项目仓库并完成联合验收',
+    })
     await savePurchaseOrderItems(orderId, [
       { orderId, requestItemId: 'RI1', quantity: '2.0000', unitPrice: '10.25', taxRate: '13' },
     ])
@@ -150,6 +177,11 @@ describe('M5 purchase request, order and receipt contract', () => {
     const calls = fetchMock.mock.calls
     expect(calls.map(([url]) => String(url))).toContain('/api/purchase-requests/R%2F1/items')
     expect(calls.map(([url]) => String(url))).toContain('/api/purchase-orders/O%2F1/submit')
+    expect(
+      calls.find(
+        ([url, init]) => String(url).endsWith('/purchase-orders/O%2F1') && init?.method === 'PUT',
+      ),
+    ).toBeDefined()
     expect(calls.map(([url]) => String(url))).toContain('/api/receipts/RC%2F1/items')
     expect(
       calls.find(

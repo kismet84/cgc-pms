@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.5",
-  "updatedAt": "2026-07-28T01:15:57+08:00",
+  "updatedAt": "2026-07-28T13:30:20+08:00",
   "issues": [
     {
       "issueKey": "A-02",
@@ -26,7 +26,8 @@
         "docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md",
         "docs/quality/ISSUE-048-003-采购前已审批在途余量提示验收报告.md",
         "docs/quality/ISSUE-048-007-同项目跨仓库存调拨过账验收报告.md",
-        "docs/quality/ISSUE-048-008-库存历史净领料基线验收报告.md"
+        "docs/quality/ISSUE-048-008-库存历史净领料基线验收报告.md",
+        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -48,7 +49,8 @@
         "readyPreconditions": "单一用户价值、权威数据源、权限与隐私边界、真实使用样本、最小验收和回滚方式明确。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md"
+        "docs/backlog/v1.0-historical-issue-classification.md",
+        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -70,7 +72,8 @@
         "readyPreconditions": "至少一个无法由现有模型表达的项目样本、最小数据模型、环检测、迁移、性能和回滚方案明确。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md"
+        "docs/backlog/v1.0-historical-issue-classification.md",
+        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -92,7 +95,8 @@
         "readyPreconditions": "提供同步路径失败或超时证据、单一报表样本、口径签认、权限矩阵、性能门槛和回滚方式。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md"
+        "docs/backlog/v1.0-historical-issue-classification.md",
+        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -114,7 +118,8 @@
         "readyPreconditions": "渠道/事件被业务选定，测试账号和Secret就绪，脱敏模板、重试上限、审计与回滚方式明确。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md"
+        "docs/backlog/v1.0-historical-issue-classification.md",
+        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -138,7 +143,8 @@
       "sourceRefs": [
         "docs/backlog/v1.0-historical-issue-classification.md",
         "docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md",
-        "docs/quality/第55条主线-M4-Frozen与Observation复核验收报告.md"
+        "docs/quality/第55条主线-M4-Frozen与Observation复核验收报告.md",
+        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {

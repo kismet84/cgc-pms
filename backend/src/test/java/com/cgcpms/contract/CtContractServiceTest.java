@@ -733,7 +733,7 @@ class CtContractServiceTest {
         toUpdate.setPartyAId(PARTY_A_ID);
         toUpdate.setPartyBId(PARTY_B_ID);
         toUpdate.setContractAmount(new BigDecimal("999000.00"));
-        toUpdate.setCurrentAmount(new BigDecimal("999000.00"));
+        toUpdate.setCurrentAmount(new BigDecimal("1.00"));
         toUpdate.setTaxRate(new BigDecimal("6.00"));
         toUpdate.setTaxAmount(new BigDecimal("56509.43"));
         toUpdate.setAmountWithoutTax(new BigDecimal("942490.57"));
@@ -751,6 +751,7 @@ class CtContractServiceTest {
         assertEquals("更新后合同名称", updated.getContractName());
         assertEquals("SERVICE", updated.getContractType());
         assertEquals(0, new BigDecimal("999000.00").compareTo(updated.getContractAmount()));
+        assertEquals(0, new BigDecimal("999000.00").compareTo(updated.getCurrentAmount()));
         assertEquals("测试备注", updated.getRemark());
         // 受保护字段不应被覆盖
         assertNotNull(updated.getContractCode(), "合同编号不应被覆盖");
@@ -902,7 +903,7 @@ class CtContractServiceTest {
     void testCompositeSaveCreateAllThreePersist() {
         CtContract contract = buildDraftContract("复合保存创建测试");
         contract.setContractAmount(new BigDecimal("45000.00"));
-        contract.setCurrentAmount(new BigDecimal("45000.00"));
+        contract.setCurrentAmount(BigDecimal.ZERO);
         contract.setTaxAmount(new BigDecimal("5850.00"));
         contract.setAmountWithoutTax(new BigDecimal("39150.00"));
         CtContractItem item = buildItem("CI-CMP-001", "测试清单项",
@@ -923,6 +924,7 @@ class CtContractServiceTest {
         assertNotNull(saved);
         assertEquals("DRAFT", saved.getApprovalStatus());
         assertNotNull(saved.getContractCode());
+        assertEquals(0, contract.getContractAmount().compareTo(saved.getCurrentAmount()));
 
         // 验证 items
         List<CtContractItem> items = itemMapper.selectList(
@@ -1409,14 +1411,16 @@ class CtContractServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("创建 — 当前金额为负数抛 CONTRACT_CURRENT_AMOUNT_INVALID")
-    void testCreateRejectsNegativeCurrentAmount() {
-        CtContract contract = buildDraftContract("负当前金额合同");
+    @DisplayName("创建 — 当前金额由服务端按合同金额初始化")
+    void testCreateInitializesCurrentAmountFromContractAmount() {
+        CtContract contract = buildDraftContract("当前金额初始化合同");
         contract.setCurrentAmount(new BigDecimal("-1.00"));
 
-        BusinessException error = assertThrows(BusinessException.class,
-                () -> contractService.create(contract));
-        assertEquals("CONTRACT_CURRENT_AMOUNT_INVALID", error.getCode());
+        Long id = contractService.create(contract);
+
+        CtContract saved = contractMapper.selectById(id);
+        assertNotNull(saved);
+        assertEquals(0, contract.getContractAmount().compareTo(saved.getCurrentAmount()));
     }
 
     @Test

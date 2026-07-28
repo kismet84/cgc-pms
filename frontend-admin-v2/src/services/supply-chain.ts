@@ -301,6 +301,16 @@ export function createPurchaseOrder(body: PurchaseOrderCommand): Promise<string>
   return createId(SUPPLY_CHAIN_API.purchaseOrders, body)
 }
 
+export function updatePurchaseOrder(
+  id: string,
+  body: PurchaseOrderCommand & { orderCode: string },
+): Promise<void> {
+  return apiRequest<void, PurchaseOrderCommand & { orderCode: string }>(
+    resourcePath(SUPPLY_CHAIN_API.purchaseOrders, id),
+    { method: PUT_METHOD, body },
+  )
+}
+
 export function deletePurchaseOrder(id: string) {
   return deleteResource(SUPPLY_CHAIN_API.purchaseOrders, id)
 }
@@ -340,6 +350,13 @@ export function loadOrderItemsForReceipt(id: string, signal?: AbortSignal) {
 
 export function createReceipt(body: ReceiptCommand): Promise<string> {
   return createId(SUPPLY_CHAIN_API.receipts, body)
+}
+
+export function updateReceipt(id: string, body: ReceiptCommand) {
+  return apiRequest<void, ReceiptCommand>(resourcePath(SUPPLY_CHAIN_API.receipts, id), {
+    method: PUT_METHOD,
+    body,
+  })
 }
 
 export function deleteReceipt(id: string) {

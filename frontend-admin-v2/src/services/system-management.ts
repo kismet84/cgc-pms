@@ -38,6 +38,7 @@ export interface RoleRecord {
   status: string
   dataScope: string
   roleLevel?: number
+  userCount?: number
   menuIds: string[]
 }
 
@@ -166,6 +167,7 @@ export async function loadUsers(
     username?: string
     realName?: string
     status?: string
+    roleId?: string
   },
   signal?: AbortSignal,
 ): Promise<PageResult<UserRecord>> {
@@ -438,6 +440,7 @@ function normalizeRole(row: RoleRecord): RoleRecord {
   return {
     ...row,
     id: String(row.id),
+    userCount: Number(row.userCount ?? 0),
     menuIds: (row.menuIds ?? []).map(String),
   }
 }

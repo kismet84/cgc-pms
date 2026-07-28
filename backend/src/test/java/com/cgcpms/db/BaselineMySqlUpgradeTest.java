@@ -37,7 +37,7 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("235", current.info().current().getVersion().getVersion());
+        assertEquals("250", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, """
                 SELECT COUNT(*) FROM sys_role_menu rm
                 JOIN sys_role r ON r.tenant_id=rm.tenant_id AND r.id=rm.role_id

@@ -233,6 +233,14 @@ public class MatPurchaseOrderService {
         // 驳回后编辑即恢复草稿，允许修正商业条件后重新提交；审批历史由工作流保留。
         order.setApprovalStatus("REJECTED".equals(existing.getApprovalStatus())
                 ? "DRAFT" : existing.getApprovalStatus());
+        order.setTotalAmount(matPurchaseOrderItemMapper.selectList(
+                        new LambdaQueryWrapper<MatPurchaseOrderItem>()
+                                .eq(MatPurchaseOrderItem::getOrderId, order.getId())
+                                .eq(MatPurchaseOrderItem::getTenantId, existing.getTenantId()))
+                .stream()
+                .map(MatPurchaseOrderItem::getAmount)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
 
         matPurchaseOrderMapper.updateById(order);
     }

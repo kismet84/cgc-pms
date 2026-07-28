@@ -1348,6 +1348,7 @@ describe('Clean-room V2 design system', () => {
         'utf-8',
       )
       const components = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+      const select = readFileSync(resolve(sourceRoot, 'components/V2Select.vue'), 'utf-8')
       const deliveryPages = [
         'pages/delivery/SchedulePage.vue',
         'pages/delivery/QualitySafetyPage.vue',
@@ -1485,7 +1486,12 @@ describe('Clean-room V2 design system', () => {
       expect(components).toContain('scrollbar-width: none;')
       expect(components).toContain('.v2-dialog__panel::-webkit-scrollbar')
       expect(components).toContain('.v2-select__menu::-webkit-scrollbar')
-      expect(components).not.toContain('.v2-dialog__panel:has(.v2-select[open])')
+      expect(select).toContain("'is-drop-up': dropUp")
+      expect(select).toContain('boundaryBottom - triggerRect.bottom')
+      expect(components).toContain('.v2-select.is-drop-up .v2-select__menu')
+      expect(components).toMatch(
+        /\.v2-dialog__panel:has\(\.v2-select\[open\]\) \.v2-dialog__body \{[\s\S]*?z-index: 3;/,
+      )
       expect(dailyLog).toContain('class="daily-log-page__table v2-table--top"')
       expect(components).toMatch(
         /#shell-main-content table \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,

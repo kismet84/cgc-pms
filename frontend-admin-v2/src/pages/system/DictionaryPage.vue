@@ -360,7 +360,7 @@ onBeforeUnmount(() => controller?.abort())
           </table>
         </div>
         <template #footer>
-          <div class="dictionary-page__pagination">
+          <nav class="dictionary-page__pagination v2-pagination" aria-label="字典类型分页">
             <span>共 {{ typeTotal }} 条</span>
             <V2Button
               size="small"
@@ -379,7 +379,7 @@ onBeforeUnmount(() => controller?.abort())
             >
               下一页
             </V2Button>
-          </div>
+          </nav>
         </template>
       </V2Card>
 
@@ -455,7 +455,7 @@ onBeforeUnmount(() => controller?.abort())
           </table>
         </div>
         <template #footer>
-          <div class="dictionary-page__pagination">
+          <nav class="dictionary-page__pagination v2-pagination" aria-label="字典数据分页">
             <span>共 {{ dataTotal }} 条</span>
             <V2Button
               size="small"
@@ -474,7 +474,7 @@ onBeforeUnmount(() => controller?.abort())
             >
               下一页
             </V2Button>
-          </div>
+          </nav>
         </template>
       </V2Card>
     </div>

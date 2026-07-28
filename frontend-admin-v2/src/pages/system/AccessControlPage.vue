@@ -13,23 +13,20 @@ import {
   V2Stack,
   showToast,
 } from '@/components'
+import { navigationDomains } from '@/navigation/catalog'
 import { isApiClientError } from '@/services/request'
 import {
   assignRoleMenus,
   assignUserRoles,
-  createMenu,
   createRole,
   createUser,
-  deleteMenu,
   deleteRole,
   deleteUser,
-  loadMenu,
   loadMenus,
   loadRole,
   loadRoles,
   loadUser,
   loadUsers,
-  updateMenu,
   updateRole,
   updateUser,
   updateUserStatus,
@@ -41,10 +38,22 @@ import { useSessionStore } from '@/stores/session'
 
 type Mode = 'users' | 'roles' | 'permissions'
 type DeleteTarget =
-  | { kind: 'user'; id: string; label: string }
-  | { kind: 'role'; id: string; label: string }
-  | { kind: 'menu'; id: string; label: string }
-
+  { kind: 'user'; id: string; label: string } | { kind: 'role'; id: string; label: string }
+type PermissionNode = {
+  id: string
+  label: string
+  menuType: MenuRecord['menuType']
+  path?: string
+  perms?: string
+  status: string
+  menuIds: string[]
+  children: PermissionNode[]
+}
+type PermissionRow = {
+  node: PermissionNode
+  depth: number
+  hasChildren: boolean
+}
 const route = useRoute()
 const session = useSessionStore()
 const mode = computed<Mode>(() =>
@@ -67,7 +76,6 @@ const total = ref(0)
 const pageNo = ref(1)
 const pageSize = 10
 const rolePageNo = ref(1)
-const menuPageNo = ref(1)
 let controller: AbortController | null = null
 
 const userFilter = reactive({ username: '', realName: '', status: '' })
@@ -90,64 +98,311 @@ const roleForm = reactive({
   roleName: '',
   status: 'ENABLE',
   dataScope: 'SELF',
-  menuIds: [] as string[],
-})
-
-const menuDialog = ref(false)
-const editingMenu = ref<MenuRecord | null>(null)
-const menuForm = reactive({
-  parentId: '0',
-  menuName: '',
-  menuType: 'BUTTON' as MenuRecord['menuType'],
-  path: '',
-  component: '',
-  perms: '',
-  icon: '',
-  orderNum: '0',
-  status: 'ENABLE',
-  visible: '1',
 })
 
 const deleteTarget = ref<DeleteTarget | null>(null)
 const statusTarget = ref<UserRecord | null>(null)
+const userRoleSearch = ref('')
+const selectedUserRoleId = ref('')
+const roleSearch = ref('')
+const selectedRoleId = ref('')
+const selectedMenuIds = ref<Set<string>>(new Set())
+const savedMenuIds = ref<Set<string>>(new Set())
+const expandedMenuIds = ref<Set<string>>(new Set())
+const roleLoading = ref(false)
+let roleLoadVersion = 0
 const statusOptions = [
   { value: '', label: '全部状态' },
   { value: 'ENABLE', label: '启用' },
   { value: 'DISABLE', label: '停用' },
 ]
-const dataScopeOptions = [
-  { value: 'ALL', label: '全部数据' },
-  { value: 'DEPT', label: '本部门' },
-  { value: 'DEPT_AND_CHILD', label: '本部门及下级' },
-  { value: 'SELF', label: '仅本人' },
-  { value: 'CUSTOM', label: '自定义' },
-]
-const menuTypeOptions = [
-  { value: 'DIR', label: '目录' },
-  { value: 'MENU', label: '菜单' },
-  { value: 'BUTTON', label: '按钮权限' },
-]
-const visibleOptions = [
-  { value: '1', label: '可见' },
-  { value: '0', label: '隐藏' },
-]
-
-const canUserAdd = computed(() => session.hasPermission('system:user:add'))
-const canUserEdit = computed(() => session.hasPermission('system:user:edit'))
-const canUserDelete = computed(() => session.hasPermission('system:user:delete'))
-const canUserAssign = computed(() => session.hasPermission('system:user:assign'))
-const canRoleAdd = computed(() => session.hasPermission('system:role:add'))
-const canRoleEdit = computed(() => session.hasPermission('system:role:edit'))
-const canRoleDelete = computed(() => session.hasPermission('system:role:delete'))
-const canRoleAssign = computed(() => session.hasPermission('system:role:assign'))
-const canMenuAdd = computed(() => session.hasPermission('system:menu:add'))
-const canMenuEdit = computed(() => session.hasPermission('system:menu:edit'))
-const canMenuDelete = computed(() => session.hasPermission('system:menu:delete'))
+const canUserAdd = computed(() => session.hasAdminOrPermission('system:user:add'))
+const canUserEdit = computed(() => session.hasAdminOrPermission('system:user:edit'))
+const canUserDelete = computed(() => session.hasAdminOrPermission('system:user:delete'))
+const canUserAssign = computed(() => session.hasAdminOrPermission('system:user:assign'))
+const canRoleAdd = computed(() => session.hasAdminOrPermission('system:role:add'))
+const canRoleEdit = computed(() => session.hasAdminOrPermission('system:role:edit'))
+const canRoleDelete = computed(() => session.hasAdminOrPermission('system:role:delete'))
+const canRoleAssign = computed(() => session.hasAdminOrPermission('system:role:assign'))
 const visibleRoles = computed(() =>
   roles.value.slice((rolePageNo.value - 1) * pageSize, rolePageNo.value * pageSize),
 )
-const visibleMenus = computed(() =>
-  menus.value.slice((menuPageNo.value - 1) * pageSize, menuPageNo.value * pageSize),
+const menuTypeOrder: Record<MenuRecord['menuType'], number> = { DIR: 0, MENU: 1, BUTTON: 2 }
+
+function compareMenus(left: MenuRecord, right: MenuRecord): number {
+  return (
+    menuTypeOrder[left.menuType] - menuTypeOrder[right.menuType] ||
+    left.orderNum - right.orderNum ||
+    left.menuName.localeCompare(right.menuName)
+  )
+}
+
+const filteredRoles = computed(() => {
+  const query = roleSearch.value.trim().toLocaleLowerCase()
+  if (!query) return roles.value
+  return roles.value.filter(
+    (role) =>
+      role.roleName.toLocaleLowerCase().includes(query) ||
+      role.roleCode.toLocaleLowerCase().includes(query),
+  )
+})
+const selectedRole = computed(
+  () => roles.value.find((role) => role.id === selectedRoleId.value) ?? null,
+)
+const filteredUserRoles = computed(() => {
+  const query = userRoleSearch.value.trim().toLocaleLowerCase()
+  return query
+    ? roles.value.filter(
+        (role) =>
+          role.roleName.toLocaleLowerCase().includes(query) ||
+          role.roleCode.toLocaleLowerCase().includes(query),
+      )
+    : roles.value
+})
+const selectedUserRole = computed(
+  () => roles.value.find((role) => role.id === selectedUserRoleId.value) ?? roles.value[0] ?? null,
+)
+const actualChildrenByParent = computed(() => {
+  const result = new Map<string, MenuRecord[]>()
+  for (const menu of menus.value) {
+    const children = result.get(menu.parentId) ?? []
+    children.push(menu)
+    result.set(menu.parentId, children)
+  }
+  for (const children of result.values()) {
+    children.sort(compareMenus)
+  }
+  return result
+})
+const permissionTree = computed<PermissionNode[]>(() => {
+  const claimed = new Set<string>()
+  const roots: PermissionNode[] = []
+  const tabNodes = new Map<string, PermissionNode>()
+  const containerNodes = new Map<string, PermissionNode>()
+  const normalizePath = (value?: string): string =>
+    (value ?? '').replace(/^\/v2(?=\/|$)/, '').replace(/\/+$/, '')
+  const navigationTabs = navigationDomains.flatMap((domain) =>
+    domain.workspaces.flatMap((workspace) => workspace.tabs),
+  )
+  const navigationRecordIds = new Set(
+    menus.value
+      .filter(
+        (menu) =>
+          menu.menuType !== 'BUTTON' &&
+          navigationTabs.some(
+            (tab) =>
+              (Boolean(tab.permission) && menu.perms === tab.permission) ||
+              normalizePath(menu.path) === normalizePath(tab.path),
+          ),
+      )
+      .map((menu) => menu.id),
+  )
+  const take = (predicate: (menu: MenuRecord) => boolean): MenuRecord | undefined =>
+    menus.value.find((menu) => !claimed.has(menu.id) && predicate(menu))
+  const actualNode = (menu: MenuRecord, label = menu.menuName): PermissionNode => {
+    claimed.add(menu.id)
+    return {
+      id: menu.id,
+      label,
+      menuType: menu.menuType,
+      path: menu.path,
+      perms: menu.perms,
+      status: menu.status,
+      menuIds: [menu.id],
+      children: (actualChildrenByParent.value.get(menu.id) ?? [])
+        .filter((child) => !claimed.has(child.id) && !navigationRecordIds.has(child.id))
+        .map((child) => actualNode(child)),
+    }
+  }
+
+  navigationDomains.forEach((domain, domainIndex) => {
+    const domainRecord = take((menu) => menu.menuType === 'DIR' && menu.menuName === domain.label)
+    if (domainRecord) claimed.add(domainRecord.id)
+    const domainNode: PermissionNode = {
+      id: `navigation:domain:${domain.id}`,
+      label: domain.label,
+      menuType: 'DIR',
+      status: domainRecord?.status ?? 'ENABLE',
+      menuIds: domainRecord ? [domainRecord.id] : [],
+      children: [],
+    }
+    containerNodes.set(`domain:${domain.id}`, domainNode)
+
+    domain.workspaces.forEach((workspace, workspaceIndex) => {
+      const workspaceRecord = take(
+        (menu) => menu.menuType === 'DIR' && menu.menuName === workspace.label,
+      )
+      if (workspaceRecord) claimed.add(workspaceRecord.id)
+      const workspaceNode: PermissionNode = {
+        id: `navigation:workspace:${domain.id}:${workspace.id}`,
+        label: workspace.label,
+        menuType: 'DIR',
+        status: workspaceRecord?.status ?? 'ENABLE',
+        menuIds: workspaceRecord ? [workspaceRecord.id] : [],
+        children: [],
+      }
+      containerNodes.set(`workspace:${domain.id}:${workspace.id}`, workspaceNode)
+
+      workspace.tabs.forEach((tab) => {
+        const tabRecord = take(
+          (menu) =>
+            menu.menuType !== 'BUTTON' &&
+            ((Boolean(tab.permission) && menu.perms === tab.permission) ||
+              normalizePath(menu.path) === normalizePath(tab.path)),
+        )
+        const tabNode = tabRecord
+          ? actualNode(tabRecord, tab.label)
+          : {
+              id: `navigation:tab:${domain.id}:${workspace.id}:${normalizePath(tab.path)}`,
+              label: tab.label,
+              menuType: 'MENU' as const,
+              path: tab.path,
+              perms: tab.permission,
+              status: 'MISSING',
+              menuIds: [],
+              children: [],
+            }
+        tabNodes.set(normalizePath(tab.path), tabNode)
+        workspaceNode.children.push(tabNode)
+      })
+      if (
+        workspaceNode.menuIds.length ||
+        workspaceNode.children.some((node) => node.menuIds.length || node.children.length)
+      ) {
+        workspaceNode.id += `:${workspaceIndex}`
+        domainNode.children.push(workspaceNode)
+      }
+    })
+    if (domainNode.menuIds.length || domainNode.children.length) {
+      domainNode.id += `:${domainIndex}`
+      roots.push(domainNode)
+    }
+  })
+
+  const legacyContainerTargets: Record<string, string> = {
+    '/master-data': 'domain:master-data',
+    '/contract': 'domain:commercial',
+    '/contract-domain': 'domain:commercial',
+    '/cost-domain': 'domain:commercial',
+    '/procurement-inventory': 'domain:supply',
+    '/system': 'domain:system-management',
+    '/subcontract-domain': 'domain:subcontract-settlement',
+    '/payment-invoice': 'domain:finance',
+    '/inventory': 'workspace:supply:inventory',
+    '/invoice': 'workspace:finance:receivables-payables',
+    '/approval-center': 'workspace:system-management:workflow',
+    '/alert': 'workspace:workbench:cockpit',
+  }
+  for (const menu of menus.value) {
+    if (claimed.has(menu.id) || menu.menuType !== 'DIR') continue
+    const target = containerNodes.get(legacyContainerTargets[normalizePath(menu.path)])
+    if (!target) continue
+    target.menuIds.push(menu.id)
+    claimed.add(menu.id)
+  }
+
+  const contextualTargets: Record<string, string> = {
+    'contract:submit': '/contract/ledger',
+    'contract:change:submit': '/contract/ledger',
+    'variation:order:submit': '/variation/order',
+    'purchase:order:submit': '/purchase/order',
+    'receipt:submit': '/purchase/receipt',
+    'subcontract:measure:submit': '/subcontract/measure',
+    'settlement:submit': '/settlement/list',
+    'payment:app:submit': '/payment/application',
+    'workflow:approve': '/approval/todo',
+    'workflow:reject': '/approval/todo',
+    'workflow:transfer': '/approval/todo',
+    'workflow:add-sign': '/approval/todo',
+    'workflow:withdraw': '/approval/mine',
+    'workflow:resubmit': '/approval/mine',
+    'project:member:list': '/project/list',
+    'project:member:add': '/project/list',
+    'project:member:edit': '/project/list',
+    'project:member:delete': '/project/list',
+    'inventory:transaction:list': '/inventory/stock',
+    'inventory:transaction:add': '/inventory/stock',
+    'alert:view': '/dashboard',
+    'alert:edit': '/dashboard',
+    'alert:evaluate': '/dashboard',
+    'payment:record:query': '/finance-operations',
+    'payment:record:reverse': '/finance-operations',
+    'payment:record:writeback': '/finance-operations',
+    'payment:trace:query': '/finance-operations',
+    'system:user:query': '/system/users',
+    'system:role:query': '/system/roles',
+    'system:menu:query': '/system/permissions',
+    'project:query': '/project/list',
+    'contract:query': '/contract/ledger',
+    'partner:query': '/partner',
+    'org:query': '/org',
+  }
+  for (const menu of [...menus.value].sort(compareMenus)) {
+    if (claimed.has(menu.id) || !menu.perms) continue
+    const target = tabNodes.get(contextualTargets[menu.perms])
+    if (target) target.children.push(actualNode(menu))
+  }
+
+  const notificationDirectory = take((menu) => menu.id === '730')
+  if (notificationDirectory) claimed.add(notificationDirectory.id)
+  const notificationMenu = take(
+    (menu) =>
+      menu.id === '761' || menu.perms === 'notification:view' || menu.perms === 'notification:edit',
+  )
+  if (notificationDirectory || notificationMenu) {
+    roots.push({
+      id: 'navigation:global',
+      label: '全局功能',
+      menuType: 'DIR',
+      status: 'ENABLE',
+      menuIds: notificationDirectory ? [notificationDirectory.id] : [],
+      children: notificationMenu ? [actualNode(notificationMenu, '顶栏通知中心')] : [],
+    })
+  }
+
+  const unclaimed = new Set(
+    menus.value.filter((menu) => !claimed.has(menu.id)).map((menu) => menu.id),
+  )
+  const unmatched = menus.value
+    .filter((menu) => unclaimed.has(menu.id) && !unclaimed.has(menu.parentId))
+    .sort(compareMenus)
+    .map((menu) => actualNode(menu))
+  if (unmatched.length) {
+    roots.push({
+      id: 'navigation:unmatched',
+      label: '待治理配置（非导航入口）',
+      menuType: 'DIR',
+      status: 'REVIEW',
+      menuIds: [],
+      children: unmatched,
+    })
+  }
+  return roots
+})
+const permissionNodeMap = computed(() => {
+  const result = new Map<string, PermissionNode>()
+  const visit = (node: PermissionNode): void => {
+    result.set(node.id, node)
+    node.children.forEach(visit)
+  }
+  permissionTree.value.forEach(visit)
+  return result
+})
+const permissionRows = computed<PermissionRow[]>(() => {
+  const rows: PermissionRow[] = []
+  const visit = (node: PermissionNode, depth: number): void => {
+    rows.push({ node, depth, hasChildren: node.children.length > 0 })
+    if (expandedMenuIds.value.has(node.id)) {
+      node.children.forEach((child) => visit(child, depth + 1))
+    }
+  }
+  permissionTree.value.forEach((node) => visit(node, 0))
+  return rows
+})
+const permissionsDirty = computed(
+  () =>
+    selectedMenuIds.value.size !== savedMenuIds.value.size ||
+    [...selectedMenuIds.value].some((id) => !savedMenuIds.value.has(id)),
 )
 
 async function refresh(): Promise<void> {
@@ -159,7 +414,7 @@ async function refresh(): Promise<void> {
   try {
     if (mode.value === 'users') await refreshUsers(current.signal)
     else if (mode.value === 'roles') await refreshRoles()
-    else await refreshMenus()
+    else await refreshPermissions()
   } catch (value) {
     if (!current.signal.aborted) {
       error.value = messageOf(value)
@@ -176,30 +431,50 @@ async function refreshPage(): Promise<void> {
 }
 
 async function refreshUsers(signal?: AbortSignal): Promise<void> {
-  const [page, currentRoles] = await Promise.all([
-    loadUsers(
-      {
-        pageNo: pageNo.value,
-        pageSize,
-        username: userFilter.username.trim() || undefined,
-        realName: userFilter.realName.trim() || undefined,
-        status: userFilter.status || undefined,
-      },
-      signal,
-    ),
-    loadRoles(),
-  ])
+  const currentRoles = await loadRoles()
+  roles.value = currentRoles
+  const nextRoleId =
+    currentRoles.find((role) => role.id === selectedUserRoleId.value)?.id ??
+    currentRoles[0]?.id ??
+    ''
+  selectedUserRoleId.value = nextRoleId
+  if (!nextRoleId) {
+    users.value = []
+    total.value = 0
+    return
+  }
+  const page = await loadUsers(
+    {
+      pageNo: pageNo.value,
+      pageSize,
+      username: userFilter.username.trim() || undefined,
+      realName: userFilter.realName.trim() || undefined,
+      status: userFilter.status || undefined,
+      roleId: nextRoleId,
+    },
+    signal,
+  )
   users.value = page.records
   total.value = page.total
-  roles.value = currentRoles
 }
 
 async function refreshRoles(): Promise<void> {
-  ;[roles.value, menus.value] = await Promise.all([loadRoles(), loadMenus()])
+  roles.value = await loadRoles()
 }
 
-async function refreshMenus(): Promise<void> {
-  menus.value = await loadMenus()
+async function refreshPermissions(): Promise<void> {
+  const [currentRoles, currentMenus] = await Promise.all([loadRoles(), loadMenus()])
+  roles.value = currentRoles
+  menus.value = currentMenus
+  expandedMenuIds.value = new Set(
+    [...permissionNodeMap.value.values()]
+      .filter((node) => node.children.length > 0)
+      .map((node) => node.id),
+  )
+  const nextRoleId =
+    currentRoles.find((role) => role.id === selectedRoleId.value)?.id ?? currentRoles[0]?.id ?? ''
+  if (nextRoleId) await selectRole(nextRoleId, true)
+  else applyRoleMenus([])
 }
 
 function clearRows(): void {
@@ -207,9 +482,120 @@ function clearRows(): void {
   roles.value = []
   menus.value = []
   total.value = 0
+  selectedUserRoleId.value = ''
+  selectedRoleId.value = ''
+  applyRoleMenus([])
+}
+
+function applyRoleMenus(menuIds: string[]): void {
+  selectedMenuIds.value = new Set(menuIds)
+  savedMenuIds.value = new Set(menuIds)
+}
+
+async function selectRole(roleId: string, throwOnError = false): Promise<void> {
+  if (
+    !roleId ||
+    (!throwOnError && roleId === selectedRoleId.value && savedMenuIds.value.size > 0)
+  ) {
+    return
+  }
+  const requestVersion = ++roleLoadVersion
+  roleLoading.value = true
+  try {
+    const detail = await loadRole(roleId)
+    if (requestVersion !== roleLoadVersion) return
+    selectedRoleId.value = detail.id
+    applyRoleMenus(detail.menuIds)
+    const index = roles.value.findIndex((role) => role.id === detail.id)
+    if (index >= 0) roles.value.splice(index, 1, detail)
+  } catch (value) {
+    if (throwOnError) throw value
+    showToast('error', '角色权限加载失败', messageOf(value))
+  } finally {
+    if (requestVersion === roleLoadVersion) roleLoading.value = false
+  }
+}
+
+function subtreeMenuIds(nodeId: string): string[] {
+  const result = new Set<string>()
+  const visit = (node: PermissionNode): void => {
+    node.menuIds.forEach((id) => result.add(id))
+    node.children.forEach(visit)
+  }
+  const node = permissionNodeMap.value.get(nodeId)
+  if (node) visit(node)
+  return [...result]
+}
+
+function menuChecked(nodeId: string): boolean {
+  const ids = subtreeMenuIds(nodeId)
+  return ids.length > 0 && ids.every((id) => selectedMenuIds.value.has(id))
+}
+
+function menuIndeterminate(nodeId: string): boolean {
+  const ids = subtreeMenuIds(nodeId)
+  const selected = ids.filter((id) => selectedMenuIds.value.has(id)).length
+  return selected > 0 && selected < ids.length
+}
+
+function toggleMenu(nodeId: string, checked: boolean): void {
+  const next = new Set(selectedMenuIds.value)
+  subtreeMenuIds(nodeId).forEach((id) => (checked ? next.add(id) : next.delete(id)))
+  selectedMenuIds.value = next
+}
+
+function toggleExpanded(menuId: string): void {
+  const next = new Set(expandedMenuIds.value)
+  if (next.has(menuId)) next.delete(menuId)
+  else next.add(menuId)
+  expandedMenuIds.value = next
+}
+
+function expandAllMenus(): void {
+  expandedMenuIds.value = new Set(
+    [...permissionNodeMap.value.values()]
+      .filter((node) => node.children.length > 0)
+      .map((node) => node.id),
+  )
+}
+
+function collapseAllMenus(): void {
+  expandedMenuIds.value = new Set()
+}
+
+function selectAllMenus(): void {
+  selectedMenuIds.value = new Set(menus.value.map((menu) => menu.id))
+}
+
+function clearAllMenus(): void {
+  selectedMenuIds.value = new Set()
+}
+
+async function savePermissions(): Promise<void> {
+  if (!selectedRole.value || !canRoleAssign.value || !permissionsDirty.value) return
+  saving.value = true
+  try {
+    await assignRoleMenus(selectedRole.value.id, [...selectedMenuIds.value])
+    const detail = await loadRole(selectedRole.value.id)
+    applyRoleMenus(detail.menuIds)
+    const index = roles.value.findIndex((role) => role.id === detail.id)
+    if (index >= 0) roles.value.splice(index, 1, detail)
+    showToast('success', '角色权限已保存', '已按服务端最新授权结果刷新。')
+  } catch (value) {
+    showToast('error', '角色权限保存失败', messageOf(value))
+  } finally {
+    saving.value = false
+  }
 }
 
 function searchUsers(): void {
+  pageNo.value = 1
+  void refresh()
+}
+
+function selectUserRole(roleId: string): void {
+  if (roleId === selectedUserRoleId.value) return
+  selectedUserRoleId.value = roleId
   pageNo.value = 1
   void refresh()
 }
@@ -223,11 +609,6 @@ function changePage(next: number): void {
 function changeRolePage(next: number): void {
   if (next < 1 || (next - 1) * pageSize >= roles.value.length) return
   rolePageNo.value = next
-}
-
-function changeMenuPage(next: number): void {
-  if (next < 1 || (next - 1) * pageSize >= menus.value.length) return
-  menuPageNo.value = next
 }
 
 async function openUserEditor(item?: UserRecord): Promise<void> {
@@ -283,7 +664,6 @@ async function openRoleEditor(item?: RoleRecord): Promise<void> {
     roleName: editingRole.value?.roleName ?? '',
     status: editingRole.value?.status ?? 'ENABLE',
     dataScope: editingRole.value?.dataScope ?? 'SELF',
-    menuIds: [...(editingRole.value?.menuIds ?? [])],
   })
   roleDialog.value = true
 }
@@ -301,63 +681,13 @@ async function saveRole(): Promise<void> {
       status: roleForm.status,
       dataScope: roleForm.dataScope,
     }
-    let roleId = editingRole.value?.id
-    if (roleId) await updateRole(roleId, command)
-    else roleId = await createRole(command)
-    if (canRoleAssign.value) await assignRoleMenus(roleId, roleForm.menuIds)
+    if (editingRole.value) await updateRole(editingRole.value.id, command)
+    else await createRole(command)
     roleDialog.value = false
     await refreshRoles()
-    showToast('success', '角色已保存', '最新角色与菜单授权已载入。')
+    showToast('success', '角色已保存', '最新角色事实已载入。')
   } catch (value) {
     showToast('error', '角色保存失败', messageOf(value))
-  } finally {
-    saving.value = false
-  }
-}
-
-async function openMenuEditor(item?: MenuRecord): Promise<void> {
-  editingMenu.value = item ? await loadMenu(item.id) : null
-  Object.assign(menuForm, {
-    parentId: editingMenu.value?.parentId ?? '0',
-    menuName: editingMenu.value?.menuName ?? '',
-    menuType: editingMenu.value?.menuType ?? 'BUTTON',
-    path: editingMenu.value?.path ?? '',
-    component: editingMenu.value?.component ?? '',
-    perms: editingMenu.value?.perms ?? '',
-    icon: editingMenu.value?.icon ?? '',
-    orderNum: String(editingMenu.value?.orderNum ?? 0),
-    status: editingMenu.value?.status ?? 'ENABLE',
-    visible: String(editingMenu.value?.visible ?? 1),
-  })
-  menuDialog.value = true
-}
-
-async function saveMenu(): Promise<void> {
-  if (!menuForm.menuName.trim()) {
-    showToast('warning', '信息不完整', '权限名称不能为空。')
-    return
-  }
-  saving.value = true
-  try {
-    const command = {
-      parentId: menuForm.parentId.trim() || '0',
-      menuName: menuForm.menuName.trim(),
-      menuType: menuForm.menuType,
-      path: menuForm.path.trim(),
-      component: menuForm.component.trim(),
-      perms: menuForm.perms.trim(),
-      icon: menuForm.icon.trim(),
-      orderNum: Number(menuForm.orderNum) || 0,
-      status: menuForm.status,
-      visible: Number(menuForm.visible),
-    }
-    if (editingMenu.value) await updateMenu(editingMenu.value.id, command)
-    else await createMenu(command)
-    menuDialog.value = false
-    await refreshMenus()
-    showToast('success', '权限项已保存', '最新菜单事实已载入。')
-  } catch (value) {
-    showToast('error', '权限项保存失败', messageOf(value))
   } finally {
     saving.value = false
   }
@@ -395,9 +725,6 @@ async function confirmDelete(): Promise<void> {
     } else if (deleteTarget.value.kind === 'role') {
       await deleteRole(deleteTarget.value.id)
       await refreshRoles()
-    } else {
-      await deleteMenu(deleteTarget.value.id)
-      await refreshMenus()
     }
     deleteTarget.value = null
     showToast('success', '已删除', '当前清单已刷新。')
@@ -410,11 +737,6 @@ async function confirmDelete(): Promise<void> {
 
 function isProtectedRole(role: RoleRecord): boolean {
   return role.roleType === 'SYSTEM' || ['ADMIN', 'SUPER_ADMIN'].includes(role.roleCode)
-}
-
-function parentMenuName(parentId: string): string {
-  if (parentId === '0') return '顶级'
-  return menus.value.find((item) => item.id === parentId)?.menuName ?? '上级菜单不可用'
 }
 
 function roleTypeLabel(value?: string): string {
@@ -447,7 +769,6 @@ watch(
   () => {
     pageNo.value = 1
     rolePageNo.value = 1
-    menuPageNo.value = 1
     clearRows()
     void refresh()
   },
@@ -484,106 +805,139 @@ onBeforeUnmount(() => controller?.abort())
         <V2Button v-if="mode === 'roles' && canRoleAdd" size="small" @click="openRoleEditor()">
           新增角色
         </V2Button>
-        <V2Button
-          v-if="mode === 'permissions' && canMenuAdd"
-          size="small"
-          @click="openMenuEditor()"
-        >
-          新增权限项
-        </V2Button>
       </template>
     </V2Card>
-
     <V2PageState v-if="loading" kind="loading" :title="`正在读取${title}`" description="请稍候。" />
     <V2PageState v-else-if="error" kind="error" :title="`${title}加载失败`" :description="error">
       <template #actions><V2Button @click="refresh">重试</V2Button></template>
     </V2PageState>
 
-    <V2Card v-else-if="mode === 'users'" title="用户清单">
+    <div v-else-if="mode === 'users'" class="permission-workspace user-workspace">
       <V2PageState
-        v-if="!users.length"
+        v-if="!roles.length"
         kind="empty"
-        title="暂无用户"
-        description="当前筛选条件没有用户。"
+        title="暂无角色"
+        description="当前租户没有可查询用户的角色。"
       />
-      <div v-else class="access-control-page__table-wrap">
-        <table data-table-identity="contextual">
-          <thead>
-            <tr>
-              <th>用户名</th>
-              <th>姓名</th>
-              <th>角色</th>
-              <th>联系方式</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in users" :key="item.id">
-              <th scope="row">{{ item.username }}</th>
-              <td>{{ item.realName || '—' }}</td>
-              <td>{{ item.roleNames.join('、') || '未分配' }}</td>
-              <td>{{ item.phone || item.email || '—' }}</td>
-              <td>
-                <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
-                  {{ item.status === 'ENABLE' ? '启用' : '停用' }}
-                </V2Badge>
-              </td>
-              <td>
-                <div class="access-control-page__actions">
-                  <V2Button
-                    v-if="canUserEdit"
-                    size="small"
-                    variant="ghost"
-                    @click="openUserEditor(item)"
-                  >
-                    编辑
-                  </V2Button>
-                  <V2Button
-                    v-if="canUserEdit"
-                    size="small"
-                    variant="secondary"
-                    @click="statusTarget = item"
-                  >
-                    {{ item.status === 'ENABLE' ? '停用' : '启用' }}
-                  </V2Button>
-                  <V2Button
-                    v-if="canUserDelete"
-                    size="small"
-                    variant="danger"
-                    @click="deleteTarget = { kind: 'user', id: item.id, label: item.username }"
-                  >
-                    删除
-                  </V2Button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <template #footer>
-        <div class="access-control-page__pagination">
-          <span>共 {{ total }} 条</span>
-          <V2Button
-            size="small"
-            variant="secondary"
-            :disabled="pageNo === 1"
-            @click="changePage(pageNo - 1)"
-          >
-            上一页
-          </V2Button>
-          <span>第 {{ pageNo }} 页</span>
-          <V2Button
-            size="small"
-            variant="secondary"
-            :disabled="pageNo * pageSize >= total"
-            @click="changePage(pageNo + 1)"
-          >
-            下一页
-          </V2Button>
-        </div>
+      <template v-else>
+        <V2Card title="角色" :heading-level="2" class="permission-workspace__roles">
+          <V2Input
+            v-model="userRoleSearch"
+            label="搜索角色名称或编码"
+            hide-label
+            placeholder="搜索角色名称或编码"
+          />
+          <div class="permission-role-list" role="group" aria-label="角色">
+            <V2Button
+              v-for="role in filteredUserRoles"
+              :key="role.id"
+              class="permission-role-list__item user-role-list__item"
+              :class="{
+                'permission-role-list__item--active': role.id === selectedUserRole?.id,
+              }"
+              size="small"
+              variant="ghost"
+              :aria-pressed="role.id === selectedUserRole?.id"
+              @click="selectUserRole(role.id)"
+            >
+              <strong>{{ role.roleName }}</strong>
+              <span class="permission-role-list__count">{{ role.userCount ?? 0 }} 人</span>
+            </V2Button>
+            <p v-if="!filteredUserRoles.length" class="permission-role-list__empty">
+              未找到匹配角色
+            </p>
+          </div>
+        </V2Card>
+
+        <V2Card
+          :title="selectedUserRole?.roleName || '请选择角色'"
+          :heading-level="2"
+          class="permission-workspace__matrix"
+        >
+          <V2PageState
+            v-if="!users.length"
+            kind="empty"
+            title="当前角色暂无用户"
+            description="当前筛选条件没有匹配用户。"
+          />
+          <div v-else class="access-control-page__table-wrap">
+            <table class="v2-table--compact user-workspace__table" data-table-identity="contextual">
+              <thead>
+                <tr>
+                  <th>用户名</th>
+                  <th>姓名</th>
+                  <th>联系方式</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="item in users" :key="item.id">
+                  <th scope="row">{{ item.username }}</th>
+                  <td>{{ item.realName || '—' }}</td>
+                  <td>{{ item.phone || item.email || '—' }}</td>
+                  <td>
+                    <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
+                      {{ item.status === 'ENABLE' ? '启用' : '停用' }}
+                    </V2Badge>
+                  </td>
+                  <td>
+                    <div class="access-control-page__actions">
+                      <V2Button
+                        v-if="canUserEdit"
+                        size="small"
+                        variant="ghost"
+                        @click="openUserEditor(item)"
+                      >
+                        编辑
+                      </V2Button>
+                      <V2Button
+                        v-if="canUserEdit"
+                        size="small"
+                        variant="secondary"
+                        @click="statusTarget = item"
+                      >
+                        {{ item.status === 'ENABLE' ? '停用' : '启用' }}
+                      </V2Button>
+                      <V2Button
+                        v-if="canUserDelete"
+                        size="small"
+                        variant="danger"
+                        @click="deleteTarget = { kind: 'user', id: item.id, label: item.username }"
+                      >
+                        删除
+                      </V2Button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <template #footer>
+            <nav class="access-control-page__pagination v2-pagination" aria-label="用户分页">
+              <span>共 {{ total }} 条</span>
+              <V2Button
+                size="small"
+                variant="secondary"
+                :disabled="pageNo === 1"
+                @click="changePage(pageNo - 1)"
+              >
+                上一页
+              </V2Button>
+              <span>第 {{ pageNo }} 页</span>
+              <V2Button
+                size="small"
+                variant="secondary"
+                :disabled="pageNo * pageSize >= total"
+                @click="changePage(pageNo + 1)"
+              >
+                下一页
+              </V2Button>
+            </nav>
+          </template>
+        </V2Card>
       </template>
-    </V2Card>
+    </div>
 
     <V2Card v-else-if="mode === 'roles'" title="角色清单">
       <V2PageState
@@ -637,7 +991,7 @@ onBeforeUnmount(() => controller?.abort())
         </table>
       </div>
       <template #footer>
-        <div class="access-control-page__pagination">
+        <nav class="access-control-page__pagination v2-pagination" aria-label="角色分页">
           <span>共 {{ roles.length }} 条</span>
           <V2Button
             size="small"
@@ -656,87 +1010,180 @@ onBeforeUnmount(() => controller?.abort())
           >
             下一页
           </V2Button>
-        </div>
+        </nav>
       </template>
     </V2Card>
 
-    <V2Card v-else title="菜单与权限码">
+    <div v-else class="permission-workspace">
       <V2PageState
-        v-if="!menus.length"
+        v-if="!roles.length || !menus.length"
         kind="empty"
-        title="暂无权限项"
-        description="当前租户没有菜单权限数据。"
+        title="暂无可配置权限"
+        description="当前租户缺少角色或菜单权限数据。"
       />
-      <div v-else class="access-control-page__table-wrap">
-        <table data-table-identity="contextual">
-          <thead>
-            <tr>
-              <th>名称</th>
-              <th>类型</th>
-              <th>上级菜单</th>
-              <th>路径</th>
-              <th>权限码</th>
-              <th>状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in visibleMenus" :key="item.id">
-              <th scope="row">{{ item.menuName }}</th>
-              <td>{{ menuTypeLabel(item.menuType) }}</td>
-              <td>{{ parentMenuName(item.parentId) }}</td>
-              <td>{{ item.path || '—' }}</td>
-              <td>
-                <code>{{ item.perms || '—' }}</code>
-              </td>
-              <td>{{ item.status === 'ENABLE' ? '启用' : '停用' }}</td>
-              <td>
-                <div class="access-control-page__actions">
-                  <V2Button
-                    v-if="canMenuEdit"
-                    size="small"
-                    variant="ghost"
-                    @click="openMenuEditor(item)"
-                  >
-                    编辑
-                  </V2Button>
-                  <V2Button
-                    v-if="canMenuDelete"
-                    size="small"
-                    variant="danger"
-                    @click="deleteTarget = { kind: 'menu', id: item.id, label: item.menuName }"
-                  >
-                    删除
-                  </V2Button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <template #footer>
-        <div class="access-control-page__pagination">
-          <span>共 {{ menus.length }} 条</span>
-          <V2Button
-            size="small"
-            variant="secondary"
-            :disabled="menuPageNo === 1"
-            @click="changeMenuPage(menuPageNo - 1)"
+      <template v-else>
+        <V2Card title="角色" :heading-level="2" class="permission-workspace__roles">
+          <V2Input
+            v-model="roleSearch"
+            label="搜索角色名称或编码"
+            hide-label
+            placeholder="搜索角色名称或编码"
+          />
+          <div class="permission-role-list" role="group" aria-label="角色">
+            <V2Button
+              v-for="role in filteredRoles"
+              :key="role.id"
+              class="permission-role-list__item"
+              :class="{ 'permission-role-list__item--active': role.id === selectedRoleId }"
+              size="small"
+              variant="ghost"
+              :aria-pressed="role.id === selectedRoleId"
+              :disabled="roleLoading"
+              @click="selectRole(role.id)"
+            >
+              <strong>{{ role.roleName }}</strong>
+              <span class="permission-role-list__count">{{ role.menuIds.length }} 项</span>
+            </V2Button>
+            <p v-if="!filteredRoles.length" class="permission-role-list__empty">未找到匹配角色</p>
+          </div>
+        </V2Card>
+
+        <V2Card
+          :title="selectedRole?.roleName || '请选择角色'"
+          :heading-level="2"
+          class="permission-workspace__matrix"
+        >
+          <template #actions>
+            <span class="permission-workspace__count">已选 {{ selectedMenuIds.size }} 项</span>
+            <V2Button size="small" variant="secondary" @click="expandAllMenus">全部展开</V2Button>
+            <V2Button size="small" variant="secondary" @click="collapseAllMenus">
+              全部收起
+            </V2Button>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="!canRoleAssign || roleLoading"
+              @click="selectAllMenus"
+            >
+              全选
+            </V2Button>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="!canRoleAssign || roleLoading"
+              @click="clearAllMenus"
+            >
+              清空
+            </V2Button>
+            <V2Button
+              v-if="canRoleAssign"
+              size="small"
+              :loading="saving"
+              :disabled="roleLoading || !selectedRole || !permissionsDirty"
+              @click="savePermissions"
+            >
+              保存权限
+            </V2Button>
+          </template>
+
+          <V2PageState
+            v-if="roleLoading"
+            kind="loading"
+            title="正在读取角色权限"
+            description="请稍候。"
+          />
+          <div
+            v-else
+            class="access-control-page__table-wrap permission-tree-region"
+            role="region"
+            aria-label="目录、菜单与按钮权限"
+            tabindex="0"
           >
-            上一页
-          </V2Button>
-          <span>第 {{ menuPageNo }} 页</span>
-          <V2Button
-            size="small"
-            variant="secondary"
-            :disabled="menuPageNo * pageSize >= menus.length"
-            @click="changeMenuPage(menuPageNo + 1)"
-          >
-            下一页
-          </V2Button>
-        </div>
+            <table class="v2-table--compact" data-table-identity="contextual">
+              <thead>
+                <tr>
+                  <th>权限名称</th>
+                  <th>类型</th>
+                  <th>权限标识</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="{ node, depth, hasChildren } in permissionRows" :key="node.id">
+                  <th scope="row" :style="{ paddingInlineStart: `${depth * 24 + 12}px` }">
+                    <span class="permission-tree-table__name">
+                      <V2Button
+                        v-if="hasChildren"
+                        class="permission-tree-table__toggle"
+                        size="small"
+                        variant="ghost"
+                        :aria-label="
+                          expandedMenuIds.has(node.id) ? `收起${node.label}` : `展开${node.label}`
+                        "
+                        :aria-expanded="expandedMenuIds.has(node.id)"
+                        @click="toggleExpanded(node.id)"
+                      >
+                        {{ expandedMenuIds.has(node.id) ? '⌄' : '›' }}
+                      </V2Button>
+                      <span v-else class="permission-tree-table__spacer" aria-hidden="true" />
+                      <input
+                        type="checkbox"
+                        :aria-label="`${node.label}权限`"
+                        :checked="menuChecked(node.id)"
+                        :indeterminate="menuIndeterminate(node.id)"
+                        :disabled="!canRoleAssign || !subtreeMenuIds(node.id).length"
+                        @change="toggleMenu(node.id, ($event.target as HTMLInputElement).checked)"
+                      />
+                      <span>{{ node.label }}</span>
+                    </span>
+                  </th>
+                  <td>
+                    <span
+                      class="permission-tree-table__type"
+                      :class="`permission-tree-table__type--${node.menuType.toLowerCase()}`"
+                    >
+                      {{ menuTypeLabel(node.menuType) }}
+                    </span>
+                  </td>
+                  <td>
+                    <code :title="node.perms || node.path || undefined">
+                      {{ node.perms || node.path || '—' }}
+                    </code>
+                  </td>
+                  <td>
+                    <span
+                      :class="
+                        node.status !== 'ENABLE'
+                          ? 'permission-tree-table__status--disabled'
+                          : menuIndeterminate(node.id)
+                            ? 'permission-tree-table__status--partial'
+                            : menuChecked(node.id)
+                              ? 'permission-tree-table__status--active'
+                              : 'permission-tree-table__status--inactive'
+                      "
+                    >
+                      {{
+                        node.status === 'MISSING'
+                          ? '缺少菜单记录'
+                          : node.status === 'REVIEW'
+                            ? '需治理'
+                            : node.status !== 'ENABLE'
+                              ? '停用项'
+                              : menuIndeterminate(node.id)
+                                ? '部分分配'
+                                : menuChecked(node.id)
+                                  ? '已分配'
+                                  : '未分配'
+                      }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </V2Card>
       </template>
-    </V2Card>
+    </div>
 
     <V2Dialog
       v-model:open="userDialog"
@@ -798,57 +1245,10 @@ onBeforeUnmount(() => controller?.abort())
         />
         <V2Input v-model="roleForm.roleName" label="角色名称" required />
         <V2Select v-model="roleForm.status" label="状态" :options="statusOptions.slice(1)" />
-        <V2Select v-model="roleForm.dataScope" label="数据范围" :options="dataScopeOptions" />
       </div>
-      <fieldset v-if="canRoleAssign" class="access-control-page__choices">
-        <legend>菜单与权限</legend>
-        <label v-for="menu in menus" :key="menu.id">
-          <input
-            type="checkbox"
-            :checked="roleForm.menuIds.includes(menu.id)"
-            @change="
-              toggleValue(roleForm.menuIds, menu.id, ($event.target as HTMLInputElement).checked)
-            "
-          />
-          <span
-            >{{ menu.menuName }}<small>{{ menu.perms || menu.path || '目录' }}</small></span
-          >
-        </label>
-      </fieldset>
       <template #footer>
         <V2Button variant="secondary" :disabled="saving" @click="roleDialog = false">取消</V2Button>
         <V2Button :loading="saving" @click="saveRole">保存</V2Button>
-      </template>
-    </V2Dialog>
-
-    <V2Dialog
-      v-model:open="menuDialog"
-      :title="editingMenu ? '编辑权限项' : '新增权限项'"
-      :close-disabled="saving"
-      :close-on-backdrop="false"
-    >
-      <div class="access-control-page__form">
-        <V2Input v-model="menuForm.menuName" label="名称" required />
-        <V2Select v-model="menuForm.menuType" label="类型" :options="menuTypeOptions" />
-        <V2Select
-          v-model="menuForm.parentId"
-          label="上级菜单"
-          :options="[
-            { value: '0', label: '顶级' },
-            ...menus.map((item) => ({ value: item.id, label: item.menuName })),
-          ]"
-        />
-        <V2Input v-model="menuForm.perms" label="权限码" />
-        <V2Input v-model="menuForm.path" label="路由路径" />
-        <V2Input v-model="menuForm.component" label="组件标识" />
-        <V2Input v-model="menuForm.icon" label="图标" />
-        <V2Input v-model="menuForm.orderNum" label="排序" />
-        <V2Select v-model="menuForm.status" label="状态" :options="statusOptions.slice(1)" />
-        <V2Select v-model="menuForm.visible" label="可见性" :options="visibleOptions" />
-      </div>
-      <template #footer>
-        <V2Button variant="secondary" :disabled="saving" @click="menuDialog = false">取消</V2Button>
-        <V2Button :loading="saving" @click="saveMenu">保存</V2Button>
       </template>
     </V2Dialog>
 
@@ -932,9 +1332,250 @@ onBeforeUnmount(() => controller?.abort())
   color: var(--v2-color-text-muted);
 }
 
+.permission-workspace {
+  display: grid;
+  grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr);
+  gap: var(--v2-space-4);
+  align-items: start;
+}
+
+.permission-workspace__roles,
+.permission-workspace__matrix {
+  min-width: 0;
+}
+
+.permission-workspace__matrix :deep(.v2-card__header) {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.permission-workspace__matrix :deep(.v2-card__actions) {
+  width: 100%;
+  min-width: 0;
+  justify-content: flex-start;
+}
+
+.permission-workspace__matrix :deep(.v2-card__body) {
+  min-width: 0;
+}
+
+.permission-workspace__count {
+  color: var(--v2-color-primary);
+  font-size: var(--v2-font-size-13);
+  font-weight: var(--v2-font-weight-semibold);
+  white-space: nowrap;
+}
+
+.permission-role-list {
+  display: grid;
+  max-height: calc(var(--v2-space-12) * 13);
+  margin-top: var(--v2-space-3);
+  overflow-y: auto;
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+}
+
+.permission-role-list__item {
+  display: flex;
+  width: 100%;
+  min-height: var(--v2-space-12);
+  padding: var(--v2-space-3);
+  gap: var(--v2-space-3);
+  align-items: center;
+  justify-content: space-between;
+  border: 0;
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+  background: var(--v2-color-surface);
+  color: var(--v2-color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.permission-role-list__item:last-of-type {
+  border-bottom: 0;
+}
+
+.permission-role-list__item:hover {
+  background: var(--v2-color-surface-subtle);
+}
+
+.permission-role-list__item:focus-visible {
+  outline: 2px solid var(--v2-color-primary);
+  outline-offset: -2px;
+}
+
+.permission-role-list__item--active {
+  box-shadow: inset 3px 0 0 var(--v2-color-primary);
+  background: var(--v2-color-primary-soft);
+}
+
+.permission-role-list__item > span {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-3);
+}
+
+.permission-role-list__item strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permission-role-list__empty {
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-13);
+}
+
+.permission-role-list__count {
+  flex: 0 0 auto;
+  padding: 0 var(--v2-space-1);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-color-surface-subtle);
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-11);
+}
+
+.permission-role-list__empty {
+  margin: 0;
+  padding: var(--v2-space-5) var(--v2-space-3);
+  text-align: center;
+}
+
+.permission-tree-region {
+  max-height: calc(var(--v2-space-12) * 14);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+}
+
+.permission-tree-region table {
+  width: 100%;
+  min-width: 38rem;
+  table-layout: fixed;
+}
+
+.permission-tree-region thead {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  background: var(--v2-color-surface-subtle);
+}
+
+.permission-tree-region th:first-child {
+  width: 40%;
+}
+
+.permission-tree-region th:nth-child(2) {
+  width: 12%;
+}
+
+.permission-tree-region th:nth-child(3) {
+  width: 33%;
+}
+
+.permission-tree-region th:nth-child(4) {
+  width: 15%;
+}
+
+.permission-tree-region code {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.permission-tree-table__name {
+  display: inline-flex;
+  gap: var(--v2-space-2);
+  align-items: center;
+  font-weight: var(--v2-font-weight-medium);
+}
+
+.permission-tree-table__name input {
+  width: var(--v2-space-4);
+  height: var(--v2-space-4);
+  margin: 0;
+  accent-color: var(--v2-color-primary);
+}
+
+.permission-tree-table__toggle,
+.permission-tree-table__spacer {
+  display: inline-grid;
+  width: var(--v2-space-5);
+  height: var(--v2-space-5);
+  flex: 0 0 var(--v2-space-5);
+  place-items: center;
+}
+
+.permission-tree-table__toggle {
+  padding: 0;
+  border: 0;
+  border-radius: var(--v2-radius-sm);
+  background: transparent;
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-21);
+  line-height: var(--v2-line-height-icon);
+  cursor: pointer;
+}
+
+.permission-tree-table__toggle:hover,
+.permission-tree-table__toggle:focus-visible {
+  background: var(--v2-color-surface-subtle);
+  color: var(--v2-color-primary);
+}
+
+.permission-tree-table__type {
+  display: inline-block;
+  padding: var(--v2-space-0) var(--v2-space-1);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-sm);
+  color: var(--v2-color-text-muted);
+  font-size: var(--v2-font-size-12);
+}
+
+.permission-tree-table__type--menu {
+  border-color: var(--v2-color-primary);
+  color: var(--v2-color-primary);
+}
+
+.permission-tree-table__type--button,
+.permission-tree-table__status--active {
+  color: var(--v2-color-success);
+}
+
+.permission-tree-table__status--partial {
+  color: var(--v2-color-warning-text);
+}
+
+.permission-tree-table__status--inactive,
+.permission-tree-table__status--disabled {
+  color: var(--v2-color-text-muted);
+}
+
+.permission-tree-table__status--disabled {
+  text-decoration: line-through;
+}
+
+@media (max-width: 980px) {
+  .permission-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .permission-role-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: calc(var(--v2-space-12) * 6);
+  }
+}
+
 @media (max-width: 760px) {
   .access-control-page__form,
   .access-control-page__choices {
+    grid-template-columns: 1fr;
+  }
+
+  .permission-role-list {
     grid-template-columns: 1fr;
   }
 }

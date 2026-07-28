@@ -1,7 +1,7 @@
 package com.cgcpms.subcontract;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("SubTaskController integration tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SubTaskControllerTest {
-    @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
+    @Autowired private MockMvc mockMvc; @Autowired private JwtHttpTestTokenFactory tokenFactory;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
     private Long taskId;
     private Long predecessorTaskId;
@@ -29,7 +29,7 @@ class SubTaskControllerTest {
 
     private Cookie adminCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
-                jwtUtils.generateToken(ADMIN_ID, "admin", TENANT_ID, List.of("ADMIN"), List.of()));
+                tokenFactory.generateToken(ADMIN_ID, "admin", TENANT_ID, List.of("ADMIN"), List.of()));
     }
 
     @Test @Order(1) @DisplayName("GET /sub-tasks without JWT -> 401")

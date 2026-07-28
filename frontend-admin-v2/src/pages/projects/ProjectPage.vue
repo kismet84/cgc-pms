@@ -142,7 +142,8 @@ const approvalStatusLabels: Record<string, string> = {
   REJECTED: '已驳回',
   WITHDRAWN: '已撤回',
 }
-const approvalStatusLabel = (value: string) => approvalStatusLabels[value] ?? '未知状态'
+const approvalStatus = (value?: string | null) => value || 'DRAFT'
+const approvalStatusLabel = (value?: string | null) => approvalStatusLabels[approvalStatus(value)]
 const approvalStatusTone = (value: string) =>
   value === 'APPROVED'
     ? 'success'
@@ -152,7 +153,7 @@ const approvalStatusTone = (value: string) =>
         ? 'info'
         : 'neutral'
 const canSubmitProject = (item: ProjectRecord) =>
-  can('project:submit') && ['DRAFT', 'REJECTED'].includes(item.approvalStatus)
+  can('project:submit') && ['DRAFT', 'REJECTED'].includes(approvalStatus(item.approvalStatus))
 const canArchiveProject = (item: ProjectRecord) => can('project:edit') && item.status === 'CLOSED'
 const hasMoreActions = (item: ProjectRecord) =>
   can('project:member:list') ||
@@ -663,10 +664,55 @@ onBeforeUnmount(() => {
       panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-wide"
       @close="go('/project/list')"
     >
-      <div v-if="mode === 'overview' && overview" class="project-page__grid">
+      <div v-if="mode === 'overview' && overview" class="project-page__overview-stack">
+        <section class="v2-detail-dialog__section project-page__overview-intro">
+          <div class="v2-detail-dialog__section-heading"><h3>项目简介</h3></div>
+          <dl class="v2-detail-dialog__facts">
+            <div>
+              <dt>项目名称</dt>
+              <dd>{{ project.projectName || '—' }}</dd>
+            </div>
+            <div>
+              <dt>项目类型</dt>
+              <dd>{{ dictLabel(projectTypes, project.projectType) || '—' }}</dd>
+            </div>
+            <div>
+              <dt>项目地址</dt>
+              <dd>{{ project.projectAddress || '—' }}</dd>
+            </div>
+            <div>
+              <dt>建设单位</dt>
+              <dd>{{ project.ownerUnit || '—' }}</dd>
+            </div>
+            <div>
+              <dt>监理单位</dt>
+              <dd>{{ project.supervisorUnit || '—' }}</dd>
+            </div>
+            <div>
+              <dt>设计单位</dt>
+              <dd>{{ project.designUnit || '—' }}</dd>
+            </div>
+            <div>
+              <dt>合同金额（元）</dt>
+              <dd>{{ project.contractAmount || '—' }}</dd>
+            </div>
+            <div>
+              <dt>目标成本（元）</dt>
+              <dd>{{ project.targetCost || '—' }}</dd>
+            </div>
+            <div>
+              <dt>计划开工</dt>
+              <dd>{{ project.plannedStartDate || '—' }}</dd>
+            </div>
+            <div>
+              <dt>计划完工</dt>
+              <dd>{{ project.plannedEndDate || '—' }}</dd>
+            </div>
+          </dl>
+        </section>
         <section class="v2-detail-dialog__section">
           <div class="v2-detail-dialog__section-heading"><h3>合同与成本</h3></div>
-          <dl class="v2-detail-dialog__facts">
+          <dl class="v2-detail-dialog__facts project-page__overview-cost-facts">
             <div>
               <dt>合同数</dt>
               <dd>{{ overview.contractCount }}</dd>
@@ -695,14 +741,6 @@ onBeforeUnmount(() => {
             <div>
               <dt>成员数</dt>
               <dd>{{ overview.memberCount }}</dd>
-            </div>
-            <div>
-              <dt>计划周期</dt>
-              <dd>{{ project.plannedStartDate || '—' }} 至 {{ project.plannedEndDate || '—' }}</dd>
-            </div>
-            <div>
-              <dt>地址</dt>
-              <dd>{{ project.projectAddress || '—' }}</dd>
             </div>
           </dl>
         </section>
@@ -938,10 +976,26 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(14rem, 2fr) repeat(2, minmax(10rem, 1fr)) repeat(3, auto);
   align-items: center;
 }
-.project-page__grid {
+.project-page__overview-stack {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--v2-space-3);
+}
+.project-page__overview-intro {
+  gap: var(--v2-space-2);
+  padding-block: var(--v2-space-4);
+}
+.project-page__overview-cost-facts {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0 var(--v2-space-4);
+}
+.project-page__overview-cost-facts > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--v2-space-2);
+  min-height: calc(var(--v2-space-12) + var(--v2-space-4));
+  align-content: center;
+  border-bottom: 0;
 }
 .project-page__actions {
   display: flex;
@@ -1011,6 +1065,9 @@ dd {
   .project-page__form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .project-page__overview-cost-facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 @media (max-width: 48rem) {
   .project-page__detail-card :deep(.v2-card__header) {
@@ -1026,10 +1083,12 @@ dd {
     min-height: var(--v2-control-height-touch);
     white-space: nowrap;
   }
-  .project-page__grid,
   .project-page__filters,
   .project-page__toolbar-card .project-page__filters,
   .project-page__form {
+    grid-template-columns: 1fr;
+  }
+  .project-page__overview-cost-facts {
     grid-template-columns: 1fr;
   }
   .project-page__members article {

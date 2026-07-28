@@ -650,35 +650,89 @@ class SysUserServiceTest {
     @Test
     @Order(25)
     @Transactional
-    @DisplayName("分页查询 — 返回的VO包含roleNames（admin有SUPER_ADMIN角色）")
+    @DisplayName("分页查询 — 返回的VO包含roleNames")
     void testGetPage_IncludesRoleNames() {
-        // V85 删除了默认 admin，需要种子数据
-        jdbcTemplate.update(
-            "INSERT INTO sys_user (id, tenant_id, username, password, real_name, phone, email, status, is_admin, created_by, remark) " +
-            "SELECT 1, 0, 'admin', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '系统管理员', '13800000000', 'admin@cgc-pms.com', 'ENABLE', 1, 1, 'test-seed' " +
-            "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 1)");
-        jdbcTemplate.update(
-            "INSERT INTO sys_role (id, tenant_id, role_code, role_name, role_type, status, data_scope, created_by, remark) " +
-            "SELECT 1, 0, 'SUPER_ADMIN', '超级管理员', 'SYSTEM', 'ENABLE', 'ALL', 1, 'test-seed' " +
-            "WHERE NOT EXISTS (SELECT 1 FROM sys_role WHERE id = 1)");
-        jdbcTemplate.update(
-            "INSERT INTO sys_user_role (id, user_id, role_id) " +
-            "SELECT 1, 1, 1 " +
-            "WHERE NOT EXISTS (SELECT 1 FROM sys_user_role WHERE user_id = 1 AND role_id = 1)");
+        SysRole role = roleMapper.selectOne(new LambdaQueryWrapper<SysRole>()
+                .eq(SysRole::getTenantId, TENANT_0)
+                .eq(SysRole::getRoleCode, "SUPER_ADMIN"));
+        assertNotNull(role, "测试租户应存在超级管理员角色");
+        String username = "role_names_" + System.nanoTime();
+        SysUser user = new SysUser();
+        user.setUsername(username);
+        user.setPassword("pass");
+        Long userId = userService.create(user);
+        userService.assignRoles(userId, List.of(role.getId()));
 
-        // admin (id=1) 已分配 SUPER_ADMIN 角色
-        IPage<SysUserVO> page = userService.getPage(1, 10, "admin", null, null);
-        assertTrue(page.getTotal() >= 1);
+        IPage<SysUserVO> page = userService.getPage(1, 10, username, null, null);
+        assertEquals(1L, page.getTotal());
 
         SysUserVO adminVO = page.getRecords().stream()
-                .filter(v -> "admin".equals(v.getUsername()))
+                .filter(v -> username.equals(v.getUsername()))
                 .findFirst()
                 .orElse(null);
-        assertNotNull(adminVO, "应能在分页结果中找到admin");
+        assertNotNull(adminVO, "应能在分页结果中找到新建用户");
         assertNotNull(adminVO.getRoleNames());
         assertTrue(adminVO.getRoleNames().contains("超级管理员"),
-                "admin应包含超级管理员角色");
+                "用户应包含超级管理员角色");
 
         System.out.println("✅ testGetPage_IncludesRoleNames 通过: admin roles=" + adminVO.getRoleNames());
+    }
+
+    @Test
+    @Order(26)
+    @Transactional
+    @DisplayName("分页查询 — 按当前租户角色筛选并返回角色内总数")
+    void testGetPage_FilterByRole() {
+        List<SysRole> roles = roleMapper.selectList(new LambdaQueryWrapper<SysRole>()
+                .eq(SysRole::getTenantId, TENANT_0));
+        assertTrue(roles.size() >= 2, "角色筛选测试至少需要两个角色");
+        SysRole targetRole = roles.get(0);
+        SysRole otherRole = roles.get(1);
+        String prefix = "role_filter_" + System.nanoTime();
+
+        SysUser enabled = new SysUser();
+        enabled.setUsername(prefix + "_enabled");
+        enabled.setPassword("pass");
+        enabled.setStatus("ENABLE");
+        Long enabledId = userService.create(enabled);
+        userService.assignRoles(enabledId, List.of(targetRole.getId()));
+
+        SysUser disabled = new SysUser();
+        disabled.setUsername(prefix + "_disabled");
+        disabled.setPassword("pass");
+        disabled.setStatus("DISABLE");
+        Long disabledId = userService.create(disabled);
+        userService.assignRoles(disabledId, List.of(targetRole.getId()));
+
+        SysUser other = new SysUser();
+        other.setUsername(prefix + "_other");
+        other.setPassword("pass");
+        Long otherId = userService.create(other);
+        userService.assignRoles(otherId, List.of(otherRole.getId()));
+
+        IPage<SysUserVO> firstPage = userService.getPage(
+                1, 1, prefix, null, null, targetRole.getId());
+        assertEquals(2L, firstPage.getTotal(), "角色筛选必须先于分页统计");
+        assertEquals(1, firstPage.getRecords().size());
+        assertTrue(firstPage.getRecords().getFirst().getRoleIds().contains(targetRole.getId()));
+
+        IPage<SysUserVO> enabledPage = userService.getPage(
+                1, 10, prefix, null, "ENABLE", targetRole.getId());
+        assertEquals(1L, enabledPage.getTotal(), "状态条件必须与角色条件叠加");
+        assertEquals(enabledId, enabledPage.getRecords().getFirst().getId());
+        assertEquals(0L, userService.getPage(
+                1, 10, prefix + "_other", null, null, targetRole.getId()).getTotal(),
+                "其他角色用户不得进入结果");
+        assertEquals(0L, userService.getPage(
+                1, 10, prefix, null, null, Long.MAX_VALUE).getTotal());
+
+        UserContext.set(Jwts.claims()
+                .add("userId", USER_ADMIN)
+                .add("username", "admin")
+                .add("tenantId", 999L)
+                .build());
+        assertEquals(0L, userService.getPage(
+                1, 10, prefix, null, null, targetRole.getId()).getTotal(),
+                "其他租户不得读取当前租户角色用户");
     }
 }

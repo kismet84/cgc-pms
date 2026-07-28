@@ -1,0 +1,13 @@
+services:
+  backend:
+    environment:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/cgc_pms_demo_ui_20260728?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=true&requireSSL=true&allowPublicKeyRetrieval=true"
+      DB_USERNAME: cgc_demo_ui
+      DB_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      SPRING_DATA_REDIS_DATABASE: "7"
+      MINIO_BUCKET: cgc-pms-demo-ui-20260728
+      CGCPMS_BOOTSTRAP_ENABLED: ${CGCPMS_DEMO_UI_BOOTSTRAP_ENABLED:-false}
+      CGCPMS_BOOTSTRAP_ADMIN_USERNAME: admin
+      CGCPMS_BOOTSTRAP_ADMIN_REAL_NAME: 平台管理员
+      CGCPMS_BOOTSTRAP_ADMIN_PASSWORD: ${CGCPMS_DEMO_UI_BOOTSTRAP_ADMIN_PASSWORD:-}
+      CGCPMS_DEV_LOGIN_USERNAME: admin

@@ -76,6 +76,7 @@ public class BusinessObjectAuthorizer {
 
     private static final Set<String> KNOWN_BUSINESS_TYPES = Set.of(
             "PROJECT", "CONTRACT", "INVOICE", "RECEIPT",
+            "PURCHASE_REQUEST", "PURCHASE_ORDER", "MATERIAL_RECEIPT",
             "PAYMENT", "SUBCONTRACT", "SETTLEMENT", "VARIATION",
             "BID_COST", "PARTNER", "MATERIAL", "CASH_JOURNAL", "SITE_DAILY_LOG", "EXPENSE",
             "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD",
@@ -215,6 +216,9 @@ public class BusinessObjectAuthorizer {
             case "EXPENSE" -> write ? "expense:edit" : "expense:query";
             case "PAYMENT" -> write ? "payment:app:edit" : "payment:app:query";
             case "INVOICE" -> write ? "invoice:edit" : "invoice:query";
+            case "PURCHASE_REQUEST" -> write ? "purchase:request:edit" : "purchase:request:list";
+            case "PURCHASE_ORDER" -> write ? "purchase:order:edit" : "purchase:order:query";
+            case "MATERIAL_RECEIPT" -> write ? "receipt:edit" : "receipt:query";
             case "PRODUCTION_MEASUREMENT" -> write ? measurementFileAuthority(documentType) : "measurement:query";
             case "OWNER_MEASUREMENT_SUBMISSION" -> write ? "measurement:owner:review" : "measurement:query";
             default -> genericAuthority;
@@ -263,7 +267,7 @@ public class BusinessObjectAuthorizer {
                 checkProjectAccess(resolveInvoiceProjectId(invoice), action + "发票文件");
                 break;
             }
-            case "RECEIPT": {
+            case "RECEIPT", "MATERIAL_RECEIPT": {
                 MatReceipt receipt = receiptMapper.selectById(businessId);
                 if (receipt == null) {
                     throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
@@ -273,7 +277,24 @@ public class BusinessObjectAuthorizer {
                     throw new BusinessException("FILE_ACCESS_DENIED",
                             "无权访问该收货单文件");
                 }
+                if (write && !"DRAFT".equals(receipt.getApprovalStatus())) {
+                    throw new BusinessException("PROCUREMENT_DOCUMENT_IMMUTABLE",
+                            "材料验收提交后附件不可变更");
+                }
                 checkProjectAccess(receipt.getProjectId(), action + "收货单文件");
+                break;
+            }
+            case "PURCHASE_REQUEST", "PURCHASE_ORDER": {
+                ProcurementFileObject object = findProcurementFileObject(upperType, businessId, write);
+                if (object == null) {
+                    throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
+                            "采购业务对象不存在: " + businessId);
+                }
+                if (write && !"DRAFT".equals(object.approvalStatus())) {
+                    throw new BusinessException("PROCUREMENT_DOCUMENT_IMMUTABLE",
+                            "采购单据提交后附件不可变更");
+                }
+                checkProjectAccess(object.projectId(), action + "采购单据文件");
                 break;
             }
             case "PAYMENT": {
@@ -591,6 +612,24 @@ public class BusinessObjectAuthorizer {
 
     private record RevenueFileObject(Long tenantId, Long projectId, String status,
                                      String verificationStatus) {}
+
+    private ProcurementFileObject findProcurementFileObject(
+            String businessType, Long businessId, boolean write) {
+        String table = "PURCHASE_REQUEST".equals(businessType)
+                ? "mat_purchase_request" : "mat_purchase_order";
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT project_id,approval_status FROM " + table
+                        + " WHERE id=? AND tenant_id=? AND deleted_flag=0"
+                        + (write ? " FOR UPDATE" : ""),
+                businessId, UserContext.getCurrentTenantId());
+        if (rows.isEmpty()) return null;
+        Map<String, Object> row = rows.get(0);
+        return new ProcurementFileObject(
+                ((Number) row.get("project_id")).longValue(),
+                String.valueOf(row.get("approval_status")));
+    }
+
+    private record ProcurementFileObject(Long projectId, String approvalStatus) {}
 
     private void checkQualityDocumentStage(String businessType, Long businessId, String documentType) {
         QualityFileObject object = findQualityFileObject(businessType, businessId);

@@ -121,7 +121,7 @@ const availableActions = computed(() =>
 const pendingTask = computed(() =>
   detail.value?.nodes
     ?.flatMap((node) => node.tasks ?? [])
-    .find((task) => task.taskStatus === 'PENDING'),
+    .find((task) => task.taskStatus === 'PENDING' && task.approverId === session.userInfo?.userId),
 )
 
 function statusTone(status: string): 'neutral' | 'info' | 'success' | 'warning' | 'danger' {
@@ -428,10 +428,6 @@ onBeforeUnmount(() => {
         </form>
       </template>
     </V2Card>
-    <p class="workflow-page__period-note">
-      口径：各标签按所选报告期的对应事件时间筛选；记录状态取当前值，不构成历史快照。
-    </p>
-
     <V2PageState
       v-if="listLoading && !hasLoadedList"
       kind="loading"
@@ -703,11 +699,6 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(12rem, 2fr) repeat(2, minmax(10rem, 1fr)) auto;
   gap: var(--v2-space-3);
   align-items: end;
-}
-.workflow-page__period-note {
-  margin: 0;
-  color: var(--v2-color-text-secondary);
-  font-size: var(--v2-font-size-12);
 }
 .workflow-action-form label {
   display: grid;
