@@ -58,6 +58,10 @@ $e2e = Get-JobBlock $workflow 'e2e'
 $sqlSafety = Get-JobBlock $workflow 'sql-safety-scan'
 
 Assert-Contains $workflow @('branches-ignore: [master, main]','pull_request:','branches: [master, main]','workflow_dispatch:') 'workflow triggers'
+Assert-Contains $workflow @(
+  'trivyColdCache:','description: Run supply-chain scan with an isolated empty Trivy cache',
+  'required: false','default: false','type: boolean'
+) 'workflow_dispatch Trivy cold-cache input'
 if ($workflow.Contains("branches: ['**']")) { throw 'full CI must not rerun after protected default-branch merges' }
 Assert-Contains $postMergeWorkflow @(
   'name: Post-merge verification','branches: [master, main]','contents: read','checks: read','pull-requests: read',
@@ -100,6 +104,8 @@ Assert-Contains $frontendV2 @(
 Assert-Contains $supplyChain @(
   'needs: [backend-test, backend-dependency-scan, frontend-build]',
   'contents: read','id-token: write','attestations: write',
+  'run: echo "TRIVY_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"',
+  'run: |','mkdir -p .trivy-cache',
   'name: ${{ env.BACKEND_JAR_ARTIFACT }}','path: artifacts/backend',
   'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: artifacts/frontend-dist',
   'subject-path: artifacts/backend/cgc-pms-backend.jar',
@@ -108,6 +114,19 @@ Assert-Contains $supplyChain @(
   'sbom-path: artifacts/frontend-dist.spdx.json',
   'aquasec/trivy:0.65.0','artifacts/backend:/workspace:ro'
 ) 'supply-chain-security'
+$trivyCacheStep = [regex]::Match(
+  $supplyChain,
+  '(?ms)^      - name: Restore Trivy vulnerability databases\r?\n(?<body>.*?)(?=^      - (?:name|uses):|\z)'
+)
+if (!$trivyCacheStep.Success) { throw 'Trivy shared-cache restore step is missing' }
+Assert-Contains $trivyCacheStep.Value @(
+  'if: ${{ github.event_name != ''workflow_dispatch'' || inputs.trivyColdCache != true }}',
+  'uses: actions/cache@v6','path: .trivy-cache',
+  'key: trivy-java-db-${{ runner.os }}-${{ env.TRIVY_CACHE_DATE }}','restore-keys:'
+) 'conditional Trivy shared-cache restore'
+if ([regex]::Matches($supplyChain,'uses: actions/cache@v6').Count -ne 1) {
+  throw 'supply-chain-security must have exactly one conditional shared-cache restore'
+}
 Assert-Contains $e2e @(
   'needs: [backend-test-mysql, frontend-build]','image: mysql:8.0','image: redis:7-alpine',
   'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin/dist',

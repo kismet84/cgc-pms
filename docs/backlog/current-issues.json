@@ -170,20 +170,21 @@
       "classification": "OPERATIONAL_RISK",
       "priority": "P2",
       "blocking": false,
-      "summary": "国内网络下首次冷缓存下载仍可能延迟，已有UTC日期缓存和历史缓存回退。",
-      "acceptanceCriteria": "一次受控CI冷缓存运行在job时限内完成Java DB下载与HIGH/CRITICAL扫描，或在下载不可用时可靠命中历史缓存且扫描不被跳过。",
-      "deferReason": "当前只有按UTC日期缓存与历史缓存回退配置和既往热缓存成功证据，没有本主线同SHA冷缓存运行；不得为缩短时延跳过或降级扫描。",
+      "summary": "国内网络下首次冷缓存下载仍可能延迟；当前已具备不修改共享缓存的隔离冷缓存触发能力。",
+      "acceptanceCriteria": "一次受控CI冷缓存运行在job时限内完成Java DB下载与HIGH/CRITICAL扫描；默认路径仍能可靠命中历史缓存且扫描不被跳过。",
+      "deferReason": "本地工作流与契约门已通过，但尚未提交、推送并取得本主线同SHA远端冷缓存运行；不得为缩短时延跳过或降级扫描。",
       "candidate": {
         "userValue": "避免首次或缓存失效时供应链扫描因大体积Java DB下载而超时。",
-        "minimalLoop": "保留官方数据库与当前扫描阈值，只采集一次受控冷缓存job的下载、回退和扫描完成证据。",
+        "minimalLoop": "保留官方数据库与当前扫描阈值，在新job工作区跳过共享缓存恢复，采集受控冷缓存job的下载和扫描完成证据。",
         "nonGoals": "不使用未经验证的第三方镜像，不跳过Java DB，不降低HIGH/CRITICAL门禁。",
-        "dependencies": "可清空该job缓存的CI授权、明确job时限和一次受控同SHA运行。",
-        "risk": "主动清缓存会增加CI时长和外部下载失败概率，但不应影响业务代码。",
-        "readyPreconditions": "取得CI缓存治理授权，准备运行标识、超时分类和失败后恢复缓存方案。"
+        "dependencies": "提交与推送授权、手工workflow dispatch权限、明确job时限和一次受控同SHA运行。",
+        "risk": "隔离冷缓存会增加单次CI时长和外部下载失败概率，但不影响共享缓存或业务代码。",
+        "readyPreconditions": "目标SHA可被手工触发，准备运行标识、超时分类和失败后复读方案。"
       },
       "sourceRefs": [
         "docs/backlog/current-focus.md",
-        "docs/quality/第54条主线-M5-P2候选与运维观察收口验收报告.md"
+        "docs/quality/第54条主线-M5-P2候选与运维观察收口验收报告.md",
+        "docs/quality/第55条主线-支线-候选与工程观察授权实施-S1验收报告-2026-07-28.md"
       ]
     },
     {
