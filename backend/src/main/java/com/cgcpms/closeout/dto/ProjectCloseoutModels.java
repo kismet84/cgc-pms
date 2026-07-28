@@ -14,21 +14,21 @@ public final class ProjectCloseoutModels {
 
     public record InitiateCommand(
             @NotNull Long projectId,
-            @NotBlank @Size(max = 64) String closeoutCode,
+            @Size(max = 64) String closeoutCode,
             @NotNull LocalDate plannedCompletionDate,
             @Size(max = 500) String remark) {}
 
     public record SectionAcceptanceCommand(
             @NotNull Long wbsTaskId,
             @NotNull Long qualityInspectionId,
-            @NotBlank @Size(max = 64) String acceptanceCode,
+            @Size(max = 64) String acceptanceCode,
             @NotBlank @Size(max = 200) String acceptanceName,
             @NotNull LocalDate acceptanceDate,
             @NotBlank @Pattern(regexp = "PASS|CONDITIONAL_PASS") String conclusion,
             @Size(max = 500) String remark) {}
 
     public record FinalAcceptanceCommand(
-            @NotBlank @Size(max = 64) String acceptanceCode,
+            @Size(max = 64) String acceptanceCode,
             @NotNull LocalDate acceptanceDate,
             @NotBlank @Size(max = 200) String organizer,
             @NotBlank @Size(max = 1000) String participantSummary,
@@ -41,7 +41,7 @@ public final class ProjectCloseoutModels {
     public record WarrantyCommand(
             @NotNull Long contractId,
             @NotNull Long receivableId,
-            @NotBlank @Size(max = 64) String warrantyCode,
+            @Size(max = 64) String warrantyCode,
             @NotNull @DecimalMin("0.01") BigDecimal warrantyAmount,
             @NotNull LocalDate warrantyStartDate,
             @NotNull LocalDate warrantyEndDate,
@@ -49,7 +49,7 @@ public final class ProjectCloseoutModels {
             @Size(max = 500) String remark) {}
 
     public record DefectCommand(
-            @NotBlank @Size(max = 64) String defectCode,
+            @Size(max = 64) String defectCode,
             @NotBlank @Size(max = 200) String defectTitle,
             @NotBlank @Size(max = 2000) String defectDescription,
             @NotNull Long responsibleUserId,
@@ -63,7 +63,7 @@ public final class ProjectCloseoutModels {
             @NotBlank @Size(max = 1000) String verificationComment) {}
 
     public record ArchiveTransferCommand(
-            @NotBlank @Size(max = 64) String transferCode,
+            @Size(max = 64) String transferCode,
             @NotNull LocalDate transferDate,
             @NotBlank @Size(max = 200) String recipientOrganization,
             @NotBlank @Size(max = 100) String recipientName,

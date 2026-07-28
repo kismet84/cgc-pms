@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.BusinessCodeGenerator;
 import com.cgcpms.contract.constant.ContractStatusConstants;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -47,6 +48,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class SupplierSourcingService {
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
     private static final Set<String> SOURCING_TYPES = Set.of("INQUIRY", "TENDER");
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
@@ -69,6 +71,7 @@ public class SupplierSourcingService {
     private final StlSettlementMapper settlementMapper;
     private final QualityPartnerEvaluationMapper qualityPartnerEvaluationMapper;
     private final SysFileMapper fileMapper;
+    private final BusinessCodeGenerator businessCodeGenerator;
 
     public List<SourcingEvent> listEvents(Long projectId) {
         projectAccessChecker.checkAccess(projectId, "查询供应商招采事件");
@@ -98,7 +101,6 @@ public class SupplierSourcingService {
         event.setTenantId(tenantId());
         event.setProjectId(command.projectId());
         event.setPurchaseRequestId(command.purchaseRequestId());
-        event.setSourcingCode(command.sourcingCode().trim());
         event.setSourcingTitle(command.sourcingTitle().trim());
         event.setSourcingType(type);
         event.setDeadline(command.deadline());
@@ -106,12 +108,17 @@ public class SupplierSourcingService {
         event.setStatus("DRAFT");
         event.setVersion(0);
         event.setRemark(command.remark());
-        try {
-            eventMapper.insert(event);
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException("SP_SOURCING_DUPLICATE", "招采编号重复或该采购需求已有招采事件");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            event.setId(null);
+            event.setSourcingCode(businessCodeGenerator.next(BusinessCodeGenerator.Rule.SOURCING, null, attempt));
+            try {
+                eventMapper.insert(event);
+                return requireEvent(event.getId());
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突或采购需求已有招采事件，统一重试后按原业务错误返回。
+            }
         }
-        return requireEvent(event.getId());
+        throw new BusinessException("SP_SOURCING_DUPLICATE", "该采购需求已有招采事件或招采编号生成冲突");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -411,19 +418,23 @@ public class SupplierSourcingService {
         row.setContractId(receipt.getContractId());
         row.setPurchaseOrderId(receipt.getOrderId());
         row.setReceiptId(receipt.getId());
-        row.setReturnCode(command.returnCode().trim());
         row.setReturnDate(command.returnDate());
         row.setReturnQuantity(command.returnQuantity());
         row.setReturnAmount(money(command.returnAmount()));
         row.setReason(command.reason().trim());
         row.setStatus("DRAFT");
         row.setVersion(0);
-        try {
-            supplierReturnMapper.insert(row);
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException("SP_RETURN_DUPLICATE", "供应商退货编号重复");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            row.setId(null);
+            row.setReturnCode(businessCodeGenerator.next(BusinessCodeGenerator.Rule.SUPPLIER_RETURN, null, attempt));
+            try {
+                supplierReturnMapper.insert(row);
+                return requireSupplierReturn(row.getId());
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突时使用下一序号重试。
+            }
         }
-        return requireSupplierReturn(row.getId());
+        throw new BusinessException("SP_RETURN_DUPLICATE", "供应商退货编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)

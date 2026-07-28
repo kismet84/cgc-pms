@@ -213,7 +213,7 @@ export interface CloseoutTrace {
 
 export interface InitiateCloseoutCommand {
   projectId: string
-  closeoutCode: string
+  closeoutCode?: string
   plannedCompletionDate: string
   remark?: string
 }
@@ -221,7 +221,7 @@ export interface InitiateCloseoutCommand {
 export interface SectionAcceptanceCommand {
   wbsTaskId: string
   qualityInspectionId: string
-  acceptanceCode: string
+  acceptanceCode?: string
   acceptanceName: string
   acceptanceDate: string
   conclusion: CloseoutConclusion
@@ -229,7 +229,7 @@ export interface SectionAcceptanceCommand {
 }
 
 export interface FinalAcceptanceCommand {
-  acceptanceCode: string
+  acceptanceCode?: string
   acceptanceDate: string
   organizer: string
   participantSummary: string
@@ -245,7 +245,7 @@ export interface SettlementBindingCommand {
 export interface WarrantyCommand {
   contractId: string
   receivableId: string
-  warrantyCode: string
+  warrantyCode?: string
   warrantyAmount: string
   warrantyStartDate: string
   warrantyEndDate: string
@@ -254,7 +254,7 @@ export interface WarrantyCommand {
 }
 
 export interface DefectCommand {
-  defectCode: string
+  defectCode?: string
   defectTitle: string
   defectDescription: string
   responsibleUserId: string
@@ -272,7 +272,7 @@ export interface DefectVerificationCommand {
 }
 
 export interface ArchiveTransferCommand {
-  transferCode: string
+  transferCode?: string
   transferDate: string
   recipientOrganization: string
   recipientName: string

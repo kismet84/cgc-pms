@@ -12,7 +12,7 @@ public final class ProjectScheduleModels {
 
     public record ScheduleRequest(
             @NotNull Long projectId,
-            @NotBlank @Size(max = 64) String planCode,
+            @Size(max = 64) String planCode,
             @NotBlank @Size(max = 200) String planName,
             @NotNull LocalDate plannedStartDate,
             @NotNull LocalDate plannedEndDate,
@@ -40,7 +40,7 @@ public final class ProjectScheduleModels {
             @NotNull Long schedulePlanId,
             @Pattern(regexp = "MONTHLY|WEEKLY") String periodType,
             Long parentPeriodPlanId,
-            @NotBlank @Size(max = 64) String periodCode,
+            @Size(max = 64) String periodCode,
             @NotBlank @Size(max = 200) String periodName,
             @NotNull LocalDate startDate,
             @NotNull LocalDate endDate,
@@ -65,7 +65,7 @@ public final class ProjectScheduleModels {
 
     public record CorrectiveActionRequest(
             @NotNull Long snapshotId,
-            @NotBlank @Size(max = 64) String actionCode,
+            @Size(max = 64) String actionCode,
             @NotBlank @Size(max = 500) String reason,
             @NotBlank @Size(max = 1000) String actionPlan,
             @NotNull Long responsibleUserId,

@@ -218,7 +218,6 @@ function validDecimal(value: string, positive = false) {
 async function saveForecast() {
   if (actionBusy.value) return
   if (
-    !forecast.forecastCode.trim() ||
     !forecast.forecastName.trim() ||
     !forecast.forecastDate ||
     !forecast.items.length ||
@@ -291,7 +290,6 @@ async function saveCorrective() {
   if (actionBusy.value) return
   if (
     !corrective.forecastId ||
-    !corrective.actionCode.trim() ||
     !corrective.actionTitle.trim() ||
     !corrective.rootCause.trim() ||
     !corrective.actionPlan.trim() ||
@@ -629,11 +627,17 @@ onBeforeUnmount(() => {
       :close-disabled="actionBusy"
       @close="forecastOpen = false"
       ><form id="cost-forecast-form" class="form" @submit.prevent="saveForecast">
-        <V2Input v-model="forecast.forecastCode" label="预测编号" required /><V2Input
-          v-model="forecast.forecastName"
-          label="预测名称"
+        <V2Input
+          v-model="forecast.forecastCode"
+          label="预测编号（自动生成）"
+          placeholder="保存后由服务端生成"
+          disabled
+        /><V2Input v-model="forecast.forecastName" label="预测名称" required /><V2Input
+          v-model="forecast.forecastDate"
+          label="预测日期"
+          type="date"
           required
-        /><V2Input v-model="forecast.forecastDate" label="预测日期" type="date" required />
+        />
         <div v-for="(item, index) in forecast.items" :key="item.costSubjectId" class="item">
           <span>{{ costSubjectLabel(item.costSubjectId, index) }}</span
           ><V2Input v-model="item.estimatedRemainingAmount" label="预计剩余成本" required />
@@ -658,15 +662,16 @@ onBeforeUnmount(() => {
       :close-disabled="actionBusy"
       @close="correctiveOpen = false"
       ><form id="cost-corrective-form" class="form" @submit.prevent="saveCorrective">
-        <V2Input v-model="corrective.actionCode" label="措施编号" required /><V2Input
-          v-model="corrective.actionTitle"
-          label="措施标题"
+        <V2Input
+          v-model="corrective.actionCode"
+          label="措施编号（自动生成）"
+          placeholder="保存后由服务端生成"
+          disabled
+        /><V2Input v-model="corrective.actionTitle" label="措施标题" required /><V2Input
+          v-model="corrective.rootCause"
+          label="根因"
           required
-        /><V2Input v-model="corrective.rootCause" label="根因" required /><V2Input
-          v-model="corrective.actionPlan"
-          label="行动计划"
-          required
-        /><V2Input
+        /><V2Input v-model="corrective.actionPlan" label="行动计划" required /><V2Input
           v-model="corrective.expectedSavingAmount"
           label="预计节约金额"
           required

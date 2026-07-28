@@ -290,7 +290,7 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
   if (kind === 'initiate') {
     Object.assign(initiateForm, {
       projectId: projectId.value,
-      closeoutCode: `PC-${today().replaceAll('-', '')}`,
+      closeoutCode: '',
       plannedCompletionDate: today(),
       remark: '',
     })
@@ -299,7 +299,7 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
     Object.assign(sectionForm, {
       wbsTaskId: overview.value?.wbsTasks[0]?.id ?? '',
       qualityInspectionId: overview.value?.qualityInspections[0]?.id ?? '',
-      acceptanceCode: `SA-${today().replaceAll('-', '')}`,
+      acceptanceCode: '',
       acceptanceName: '分部分项验收',
       acceptanceDate: today(),
       conclusion: 'PASS',
@@ -308,7 +308,7 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
   }
   if (kind === 'finalAcceptance') {
     Object.assign(finalAcceptanceForm, {
-      acceptanceCode: `FA-${today().replaceAll('-', '')}`,
+      acceptanceCode: '',
       acceptanceDate: today(),
       organizer: '建设单位',
       participantSummary: '',
@@ -323,7 +323,7 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
     Object.assign(warrantyForm, {
       contractId: overview.value?.settlements[0]?.contractId ?? '',
       receivableId: retention?.id ?? '',
-      warrantyCode: `W-${today().replaceAll('-', '')}`,
+      warrantyCode: '',
       warrantyAmount: retention?.originalAmount ?? '',
       warrantyStartDate: today(),
       warrantyEndDate: today(),
@@ -333,7 +333,7 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
   }
   if (kind === 'defect') {
     Object.assign(defectForm, {
-      defectCode: `DF-${today().replaceAll('-', '')}`,
+      defectCode: '',
       defectTitle: '',
       defectDescription: '',
       responsibleUserId:
@@ -349,7 +349,7 @@ function show(kind: Exclude<DialogKind, null>, target?: CloseoutWarranty | Close
   if (kind === 'release') uploadFile.value = null
   if (kind === 'archive') {
     Object.assign(archiveForm, {
-      transferCode: `AT-${today().replaceAll('-', '')}`,
+      transferCode: '',
       transferDate: today(),
       recipientOrganization: '',
       recipientName: '',
@@ -1219,7 +1219,12 @@ onBeforeUnmount(() => {
     >
       <form id="closeout-dialog-form" class="closeout-page__form" @submit.prevent="saveDialog">
         <template v-if="dialog === 'initiate'">
-          <V2Input v-model="initiateForm.closeoutCode" label="收尾编号" required />
+          <V2Input
+            v-model="initiateForm.closeoutCode"
+            label="收尾编号（自动生成）"
+            placeholder="保存后由服务端生成"
+            disabled
+          />
           <label
             >计划完成日期<input v-model="initiateForm.plannedCompletionDate" type="date" required
           /></label>
@@ -1232,7 +1237,12 @@ onBeforeUnmount(() => {
             label="质量验收记录"
             :options="sectionQualityOptions"
           />
-          <V2Input v-model="sectionForm.acceptanceCode" label="验收编号" required />
+          <V2Input
+            v-model="sectionForm.acceptanceCode"
+            label="验收编号（自动生成）"
+            placeholder="保存后由服务端生成"
+            disabled
+          />
           <V2Input v-model="sectionForm.acceptanceName" label="验收名称" required />
           <label>验收日期<input v-model="sectionForm.acceptanceDate" type="date" required /></label>
           <V2Select
@@ -1248,7 +1258,12 @@ onBeforeUnmount(() => {
           /></label>
         </template>
         <template v-else-if="dialog === 'finalAcceptance'">
-          <V2Input v-model="finalAcceptanceForm.acceptanceCode" label="竣工验收编号" required />
+          <V2Input
+            v-model="finalAcceptanceForm.acceptanceCode"
+            label="竣工验收编号（自动生成）"
+            placeholder="保存后由服务端生成"
+            disabled
+          />
           <label
             >验收日期<input v-model="finalAcceptanceForm.acceptanceDate" type="date" required
           /></label>
@@ -1296,7 +1311,12 @@ onBeforeUnmount(() => {
               }))
             "
           />
-          <V2Input v-model="warrantyForm.warrantyCode" label="质保编号" required />
+          <V2Input
+            v-model="warrantyForm.warrantyCode"
+            label="质保编号（自动生成）"
+            placeholder="保存后由服务端生成"
+            disabled
+          />
           <V2Input v-model="warrantyForm.warrantyAmount" label="质保金额" required />
           <label
             >开始日期<input v-model="warrantyForm.warrantyStartDate" type="date" required
@@ -1312,7 +1332,12 @@ onBeforeUnmount(() => {
           />
         </template>
         <template v-else-if="dialog === 'defect'">
-          <V2Input v-model="defectForm.defectCode" label="缺陷编号" required />
+          <V2Input
+            v-model="defectForm.defectCode"
+            label="缺陷编号（自动生成）"
+            placeholder="保存后由服务端生成"
+            disabled
+          />
           <V2Input v-model="defectForm.defectTitle" label="缺陷标题" required />
           <V2Select
             v-model="defectForm.responsibleUserId"
@@ -1355,7 +1380,12 @@ onBeforeUnmount(() => {
           /></label>
         </template>
         <template v-else-if="dialog === 'archive'">
-          <V2Input v-model="archiveForm.transferCode" label="移交编号" required />
+          <V2Input
+            v-model="archiveForm.transferCode"
+            label="移交编号（自动生成）"
+            placeholder="保存后由服务端生成"
+            disabled
+          />
           <label>移交日期<input v-model="archiveForm.transferDate" type="date" required /></label>
           <V2Input v-model="archiveForm.recipientOrganization" label="接收单位" required />
           <V2Input v-model="archiveForm.recipientName" label="接收人" required />

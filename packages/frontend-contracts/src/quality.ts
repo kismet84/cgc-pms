@@ -99,7 +99,7 @@ export interface QualityTraceRecord {
 
 export interface QualityPlanCommand {
   projectId: string;
-  planCode: string;
+  planCode?: string;
   planName: string;
   inspectionType: QualityPlanRecord["inspectionType"];
   frequencyType: QualityPlanRecord["frequencyType"];
@@ -111,7 +111,7 @@ export interface QualityPlanCommand {
 
 export interface QualityInspectionCommand {
   planId: string;
-  inspectionCode: string;
+  inspectionCode?: string;
   inspectionDate: string;
   location: string;
   inspectorUserId: string;
@@ -149,7 +149,7 @@ export interface QualityConsequenceCommand {
   issueId: string;
   partnerId: string;
   contractId: string;
-  consequenceCode: string;
+  consequenceCode?: string;
   decisionType: QualityConsequenceRecord["decisionType"];
   fineAmount: string;
   reworkCostAmount: string;

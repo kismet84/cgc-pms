@@ -22,7 +22,7 @@ public final class CostControlModels {
 
     public record ForecastRequest(
             @NotNull Long projectId,
-            @NotBlank @Size(max = 64) String forecastCode,
+            @Size(max = 64) String forecastCode,
             @NotBlank @Size(max = 200) String forecastName,
             @NotNull LocalDate forecastDate,
             @NotEmpty @Size(max = 300) List<@Valid ForecastItemRequest> items,
@@ -30,7 +30,7 @@ public final class CostControlModels {
 
     public record CorrectiveActionRequest(
             @NotNull Long forecastId,
-            @NotBlank @Size(max = 64) String actionCode,
+            @Size(max = 64) String actionCode,
             @NotBlank @Size(max = 200) String actionTitle,
             @NotBlank @Size(max = 500) String rootCause,
             @NotBlank @Size(max = 1000) String actionPlan,

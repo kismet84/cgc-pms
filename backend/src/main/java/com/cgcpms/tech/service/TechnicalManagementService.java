@@ -3,6 +3,7 @@ package com.cgcpms.tech.service;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.BusinessCodeGenerator;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.tech.dto.TechnicalManagementModels.*;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
@@ -30,9 +31,12 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class TechnicalManagementService {
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
+
     private final JdbcTemplate jdbc;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
+    private final BusinessCodeGenerator businessCodeGenerator;
 
     public Map<String, Object> overview(Long projectId) {
         projectAccessChecker.checkAccess(projectId, "查看技术管理工作台");
@@ -118,18 +122,24 @@ public class TechnicalManagementService {
         requireActiveProject(command.projectId());
         requireActiveProjectMember(command.projectId(), command.responsibleUserId());
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO technical_scheme(id,tenant_id,project_id,scheme_code,scheme_name,scheme_type,
-                     responsible_user_id,planned_effective_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), command.projectId(), command.schemeCode().trim(), command.schemeName().trim(),
-                    command.schemeType(), command.responsibleUserId(), command.plannedEffectiveDate(), user(), user(), command.remark());
-            insertTechItem("TECHNICAL_SCHEME", id, command.projectId(), "TECH_PLAN", command.schemeCode(),
-                    command.schemeName(), "HIGH", "OPEN", command.responsibleUserId(), command.plannedEffectiveDate());
-        } catch (DuplicateKeyException e) {
-            throw error("TECH_SCHEME_DUPLICATE", "同一项目的技术方案编码不能重复");
+        String code = null;
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            code = businessCodeGenerator.next(BusinessCodeGenerator.Rule.TECH_SCHEME, command.projectId(), attempt);
+            try {
+                jdbc.update("""
+                        INSERT INTO technical_scheme(id,tenant_id,project_id,scheme_code,scheme_name,scheme_type,
+                         responsible_user_id,planned_effective_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), command.projectId(), code, command.schemeName().trim(),
+                        command.schemeType(), command.responsibleUserId(), command.plannedEffectiveDate(), user(), user(), command.remark());
+                break;
+            } catch (DuplicateKeyException ignored) {
+                code = null;
+            }
         }
+        if (code == null) throw error("TECH_SCHEME_CODE_CONFLICT", "技术方案编号生成冲突，请重试");
+        insertTechItem("TECHNICAL_SCHEME", id, command.projectId(), "TECH_PLAN", code,
+                command.schemeName(), "HIGH", "OPEN", command.responsibleUserId(), command.plannedEffectiveDate());
         return scheme(id);
     }
 
@@ -248,22 +258,29 @@ public class TechnicalManagementService {
         if (!command.requiresRfi() && !"PASS".equals(command.conclusion()))
             throw error("TECH_DRAWING_REVIEW_RFI_REQUIRED", "条件通过或退回的会审必须标记需要RFI");
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO tech_drawing_review(id,tenant_id,project_id,drawing_version_id,review_code,review_date,
-                     chair_user_id,participant_summary,conclusion,review_summary,requires_rfi,status,version,
-                     created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), projectId, versionId, command.reviewCode().trim(), command.reviewDate(),
-                    command.chairUserId(), command.participantSummary().trim(), command.conclusion(),
-                    command.reviewSummary().trim(), command.requiresRfi() ? 1 : 0, user(), user(), command.remark());
-            if (jdbc.update("""
-                    UPDATE tech_drawing_version SET status='UNDER_REVIEW',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
-                    WHERE id=? AND tenant_id=? AND status='RECEIVED'
-                    """, user(), versionId, tenant()) != 1) throw concurrent();
-        } catch (DuplicateKeyException e) {
-            throw error("TECH_DRAWING_REVIEW_DUPLICATE", "图纸版本只能建立一份会审记录且会审编号不能重复");
+        boolean inserted = false;
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            String code = businessCodeGenerator.next(BusinessCodeGenerator.Rule.TECH_REVIEW, projectId, attempt);
+            try {
+                jdbc.update("""
+                        INSERT INTO tech_drawing_review(id,tenant_id,project_id,drawing_version_id,review_code,review_date,
+                         chair_user_id,participant_summary,conclusion,review_summary,requires_rfi,status,version,
+                         created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), projectId, versionId, code, command.reviewDate(),
+                        command.chairUserId(), command.participantSummary().trim(), command.conclusion(),
+                        command.reviewSummary().trim(), command.requiresRfi() ? 1 : 0, user(), user(), command.remark());
+                inserted = true;
+                break;
+            } catch (DuplicateKeyException ignored) {
+                // 编码并发冲突，按下一个序号重试。
+            }
         }
+        if (!inserted) throw error("TECH_DRAWING_REVIEW_DUPLICATE", "图纸版本已有会审记录或编号生成冲突");
+        if (jdbc.update("""
+                UPDATE tech_drawing_version SET status='UNDER_REVIEW',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP
+                WHERE id=? AND tenant_id=? AND status='RECEIVED'
+                """, user(), versionId, tenant()) != 1) throw concurrent();
         return review(id);
     }
 
@@ -295,19 +312,25 @@ public class TechnicalManagementService {
         if (!"CONFIRMED".equals(string(review.get("status"))) || !booleanValue(review.get("requires_rfi")))
             throw error("TECH_RFI_REVIEW_REQUIRED", "只有已确认且存在问题的图纸会审可以发起RFI");
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO tech_rfi(id,tenant_id,project_id,drawing_version_id,review_id,rfi_code,subject,question,
-                     priority,raised_by,raised_at,response_due_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), projectId, review.get("drawing_version_id"), reviewId, command.rfiCode().trim(),
-                    command.subject().trim(), command.question().trim(), command.priority(), user(), command.responseDueDate(),
-                    user(), user(), command.remark());
-            insertTechItem("TECH_RFI", id, projectId, "TECH_ISSUE", command.rfiCode(), command.subject(),
-                    command.priority(), "OPEN", user(), command.responseDueDate());
-        } catch (DuplicateKeyException e) {
-            throw error("TECH_RFI_DUPLICATE", "同一项目的RFI编号不能重复");
+        String code = null;
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            code = businessCodeGenerator.next(BusinessCodeGenerator.Rule.TECH_RFI, projectId, attempt);
+            try {
+                jdbc.update("""
+                        INSERT INTO tech_rfi(id,tenant_id,project_id,drawing_version_id,review_id,rfi_code,subject,question,
+                         priority,raised_by,raised_at,response_due_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), projectId, review.get("drawing_version_id"), reviewId, code,
+                        command.subject().trim(), command.question().trim(), command.priority(), user(), command.responseDueDate(),
+                        user(), user(), command.remark());
+                break;
+            } catch (DuplicateKeyException ignored) {
+                code = null;
+            }
         }
+        if (code == null) throw error("TECH_RFI_CODE_CONFLICT", "RFI编号生成冲突，请重试");
+        insertTechItem("TECH_RFI", id, projectId, "TECH_ISSUE", code, command.subject(),
+                command.priority(), "OPEN", user(), command.responseDueDate());
         return rfi(id);
     }
 
@@ -393,18 +416,25 @@ public class TechnicalManagementService {
                 throw error("TECH_DISCLOSURE_SCHEME_INVALID", "技术交底关联的技术方案必须属于同一项目且已审批");
         }
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO tech_disclosure(id,tenant_id,project_id,drawing_version_id,scheme_id,disclosure_code,
-                     disclosure_title,disclosure_date,presenter_user_id,recipient_summary,disclosure_content,status,version,
-                     created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), projectId, command.drawingVersionId(), command.schemeId(), command.disclosureCode().trim(),
-                    command.disclosureTitle().trim(), command.disclosureDate(), command.presenterUserId(),
-                    command.recipientSummary().trim(), command.disclosureContent().trim(), user(), user(), command.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("TECH_DISCLOSURE_DUPLICATE", "同一项目的技术交底编号不能重复");
+        boolean inserted = false;
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            String code = businessCodeGenerator.next(BusinessCodeGenerator.Rule.TECH_DISCLOSURE, projectId, attempt);
+            try {
+                jdbc.update("""
+                        INSERT INTO tech_disclosure(id,tenant_id,project_id,drawing_version_id,scheme_id,disclosure_code,
+                         disclosure_title,disclosure_date,presenter_user_id,recipient_summary,disclosure_content,status,version,
+                         created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), projectId, command.drawingVersionId(), command.schemeId(), code,
+                        command.disclosureTitle().trim(), command.disclosureDate(), command.presenterUserId(),
+                        command.recipientSummary().trim(), command.disclosureContent().trim(), user(), user(), command.remark());
+                inserted = true;
+                break;
+            } catch (DuplicateKeyException ignored) {
+                // 编码并发冲突，按下一个序号重试。
+            }
         }
+        if (!inserted) throw error("TECH_DISCLOSURE_CODE_CONFLICT", "技术交底编号生成冲突，请重试");
         return disclosure(id);
     }
 
@@ -475,18 +505,25 @@ public class TechnicalManagementService {
         Map<String, Object> version = requireVersion(versionId, false);
         requireAllRfisClosed(longValue(version.get("drawing_id")));
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO tech_acceptance_archive(id,tenant_id,project_id,drawing_version_id,construction_reference_id,
-                     quality_inspection_id,archive_code,acceptance_date,acceptance_conclusion,archive_location,status,
-                     created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), projectId, versionId, command.constructionReferenceId(), command.qualityInspectionId(),
-                    command.archiveCode().trim(), command.acceptanceDate(), command.acceptanceConclusion(),
-                    command.archiveLocation().trim(), user(), user(), command.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("TECH_ARCHIVE_DUPLICATE", "归档编号重复或该施工引用已经归档");
+        boolean inserted = false;
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            String code = businessCodeGenerator.next(BusinessCodeGenerator.Rule.TECH_ARCHIVE, projectId, attempt);
+            try {
+                jdbc.update("""
+                        INSERT INTO tech_acceptance_archive(id,tenant_id,project_id,drawing_version_id,construction_reference_id,
+                         quality_inspection_id,archive_code,acceptance_date,acceptance_conclusion,archive_location,status,
+                         created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), projectId, versionId, command.constructionReferenceId(), command.qualityInspectionId(),
+                        code, command.acceptanceDate(), command.acceptanceConclusion(),
+                        command.archiveLocation().trim(), user(), user(), command.remark());
+                inserted = true;
+                break;
+            } catch (DuplicateKeyException ignored) {
+                // 编码并发冲突，按下一个序号重试。
+            }
         }
+        if (!inserted) throw error("TECH_ARCHIVE_DUPLICATE", "施工引用已有归档或编号生成冲突");
         return archive(id);
     }
 

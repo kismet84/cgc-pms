@@ -344,7 +344,6 @@ async function save(): Promise<void> {
       const payload: SourcingEventCommand = {
         projectId: required('projectId', '项目'),
         purchaseRequestId: required('purchaseRequestId', '采购需求'),
-        sourcingCode: required('sourcingCode', '招采编号'),
         sourcingTitle: required('sourcingTitle', '招采主题'),
         sourcingType: form.sourcingType as 'INQUIRY' | 'TENDER',
         deadline: required('deadline', '报价截止时间'),
@@ -402,7 +401,6 @@ async function save(): Promise<void> {
     } else if (current === 'return') {
       const payload: SupplierReturnCommand = {
         receiptId: required('receiptId', '验收单'),
-        returnCode: required('returnCode', '退货编号'),
         returnDate: required('returnDate', '退货日期'),
         returnQuantity: decimal('returnQuantity', '退货数量'),
         returnAmount: decimal('returnAmount', '退货金额'),
@@ -895,7 +893,12 @@ onBeforeUnmount(() => {
             placeholder="选择采购需求"
             required
           />
-          <V2Input v-model="form.sourcingCode" label="招采编号" required />
+          <V2Input
+            v-model="form.sourcingCode"
+            label="招采编号"
+            disabled
+            placeholder="创建后由服务端自动生成"
+          />
           <V2Input v-model="form.sourcingTitle" label="招采主题" required />
           <V2Select
             v-model="form.sourcingType"
@@ -991,7 +994,12 @@ onBeforeUnmount(() => {
             :options="receiptOptions"
             placeholder="选择验收单"
             required
-          /><V2Input v-model="form.returnCode" label="退货编号" required />
+          /><V2Input
+            v-model="form.returnCode"
+            label="退货编号"
+            disabled
+            placeholder="创建后由服务端自动生成"
+          />
           <label>退货日期<input v-model="form.returnDate" type="date" required /></label
           ><V2Input v-model="form.returnQuantity" label="退货数量" required />
           <V2Input v-model="form.returnAmount" label="退货金额" required /><label

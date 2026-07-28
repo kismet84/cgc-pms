@@ -87,6 +87,8 @@ class ProjectScheduleClosedLoopIntegrationTest {
 
         Map<String,Object> corrective = service.createCorrectiveAction(baseline, correctiveRequest);
         long correctiveId = id(corrective);
+        assertTrue(jdbc.queryForObject("SELECT action_code FROM project_corrective_action WHERE id=?",
+                String.class, correctiveId).matches("SCA-\\d{8}-\\d{3}"));
         service.submitCorrectiveAction(correctiveId);
         approveAll("PROJECT_CORRECTIVE_ACTION", correctiveId);
         long revision = jdbc.queryForObject("SELECT generated_revision_plan_id FROM project_corrective_action WHERE id=?", Long.class, correctiveId);
@@ -237,6 +239,8 @@ class ProjectScheduleClosedLoopIntegrationTest {
     private long createAndActivateBaseline() {
         long id = id(service.createSchedule(new ScheduleRequest(PROJECT, "BASE-2099-01", "项目基线计划",
                 LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), "首版基线")));
+        assertTrue(jdbc.queryForObject("SELECT plan_code FROM project_schedule_plan WHERE id=?",
+                String.class, id).matches("SCH-\\d{8}-\\d{3}"));
         service.replaceTasks(id, new WbsTaskBatch(0, List.of(task("WBS-001", new BigDecimal("100")))));
         service.submitSchedule(id);
         approveAll("PROJECT_SCHEDULE", id);
@@ -288,6 +292,8 @@ class ProjectScheduleClosedLoopIntegrationTest {
     private long createAndApprovePeriod(long schedule, Long parent, String type, String code,
                                         LocalDate start, LocalDate end, long task, BigDecimal target) {
         long id = id(service.createPeriodPlan(new PeriodPlanRequest(schedule, type, parent, code, code, start, end, null)));
+        assertTrue(jdbc.queryForObject("SELECT period_code FROM project_period_plan WHERE id=?",
+                String.class, id).matches("SPD-\\d{8}-\\d{3}"));
         service.replacePeriodItems(id, new PeriodItemBatch(0, List.of(new PeriodItemRequest(task, target, target))));
         service.submitPeriodPlan(id);
         approveAll("PROJECT_PERIOD_PLAN", id);

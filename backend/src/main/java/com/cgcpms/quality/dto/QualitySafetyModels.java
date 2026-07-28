@@ -13,7 +13,7 @@ public final class QualitySafetyModels {
 
     public record PlanCommand(
             @NotNull Long projectId,
-            @NotBlank @Size(max = 64) String planCode,
+            @Size(max = 64) String planCode,
             @NotBlank @Size(max = 200) String planName,
             @NotBlank String inspectionType,
             @NotBlank String frequencyType,
@@ -24,7 +24,7 @@ public final class QualitySafetyModels {
 
     public record InspectionCommand(
             @NotNull Long planId,
-            @NotBlank @Size(max = 64) String inspectionCode,
+            @Size(max = 64) String inspectionCode,
             @NotNull LocalDate inspectionDate,
             @NotBlank @Size(max = 200) String location,
             @NotNull Long inspectorUserId,
@@ -58,7 +58,7 @@ public final class QualitySafetyModels {
             @NotNull Long issueId,
             @NotNull Long partnerId,
             @NotNull(message = "关联合同不能为空") Long contractId,
-            @NotBlank @Size(max = 64) String consequenceCode,
+            @Size(max = 64) String consequenceCode,
             @NotBlank String decisionType,
             @NotNull @DecimalMin("0.00") BigDecimal fineAmount,
             @NotNull @DecimalMin("0.00") BigDecimal reworkCostAmount,

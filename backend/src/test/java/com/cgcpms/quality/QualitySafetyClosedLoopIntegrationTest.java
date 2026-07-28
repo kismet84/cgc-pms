@@ -87,10 +87,14 @@ class QualitySafetyClosedLoopIntegrationTest {
     @Test
     void closesPlanInspectionIssueRectificationReinspectionCostAndPartnerEvaluation() {
         QualityInspectionPlan plan = service.createPlan(planCommand("QS-PLAN-001"));
+        assertTrue(plan.getPlanCode().matches("QPL-\\d{8}-\\d{3}"));
+        assertNotEquals("QS-PLAN-001", plan.getPlanCode());
         assertEquals("ACTIVE", service.activatePlan(plan.getId()).getStatus());
 
         QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
                 plan.getId(), "QS-CHK-001", LocalDate.now(), "A区主体结构", 1L, "模板支撑专项检查", null));
+        assertTrue(inspection.getInspectionCode().matches("QIN-\\d{8}-\\d{3}"));
+        assertNotEquals("QS-CHK-001", inspection.getInspectionCode());
         QualitySafetyIssue issue = service.createIssue(inspection.getId(), new IssueCommand(
                 inspection.getId(), "模板支撑", "HIGH", "立杆间距超标", "局部立杆间距超过方案要求",
                 "PARTNER", PARTNER, 1L, LocalDate.now().plusDays(7), null));
@@ -134,6 +138,8 @@ class QualitySafetyClosedLoopIntegrationTest {
                 issue.getId(), PARTNER, CONTRACT, "QS-C-001", "BOTH",
                 new BigDecimal("100.00"), new BigDecimal("500.00"), new BigDecimal("60.00"),
                 "本次高等级质量问题扣减履约评分", null));
+        assertTrue(consequence.getConsequenceCode().matches("QCO-\\d{8}-\\d{3}"));
+        assertNotEquals("QS-C-001", consequence.getConsequenceCode());
         consequence = service.postConsequence(consequence.getId());
         assertEquals("POSTED", consequence.getStatus());
         assertNotNull(consequence.getCostItemId());

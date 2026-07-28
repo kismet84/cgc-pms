@@ -14,7 +14,7 @@ public final class TechnicalManagementModels {
 
     public record SchemeCommand(
             @NotNull Long projectId,
-            @NotBlank @Size(max = 64) String schemeCode,
+            @Size(max = 64) String schemeCode,
             @NotBlank @Size(max = 200) String schemeName,
             @NotBlank @Pattern(regexp = "GENERAL|SPECIAL|CONSTRUCTION_ORGANIZATION|METHOD_STATEMENT") String schemeType,
             @NotNull Long responsibleUserId,
@@ -41,7 +41,7 @@ public final class TechnicalManagementModels {
             @Size(max = 500) String remark) {}
 
     public record ReviewCommand(
-            @NotBlank @Size(max = 64) String reviewCode,
+            @Size(max = 64) String reviewCode,
             @NotNull LocalDate reviewDate,
             @NotNull Long chairUserId,
             @NotBlank @Size(max = 500) String participantSummary,
@@ -51,7 +51,7 @@ public final class TechnicalManagementModels {
             @Size(max = 500) String remark) {}
 
     public record RfiCommand(
-            @NotBlank @Size(max = 64) String rfiCode,
+            @Size(max = 64) String rfiCode,
             @NotBlank @Size(max = 200) String subject,
             @NotBlank @Size(max = 2000) String question,
             @NotBlank @Pattern(regexp = "NORMAL|HIGH|URGENT") String priority,
@@ -70,7 +70,7 @@ public final class TechnicalManagementModels {
     public record DisclosureCommand(
             @NotNull Long drawingVersionId,
             Long schemeId,
-            @NotBlank @Size(max = 64) String disclosureCode,
+            @Size(max = 64) String disclosureCode,
             @NotBlank @Size(max = 200) String disclosureTitle,
             @NotNull LocalDate disclosureDate,
             @NotNull Long presenterUserId,
@@ -90,7 +90,7 @@ public final class TechnicalManagementModels {
     public record ArchiveCommand(
             @NotNull Long constructionReferenceId,
             @NotNull Long qualityInspectionId,
-            @NotBlank @Size(max = 64) String archiveCode,
+            @Size(max = 64) String archiveCode,
             @NotNull LocalDate acceptanceDate,
             @NotBlank @Pattern(regexp = "PASS|CONDITIONAL_PASS") String acceptanceConclusion,
             @NotBlank @Size(max = 300) String archiveLocation,

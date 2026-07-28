@@ -75,6 +75,7 @@ class SupplierSourcingClosedLoopIntegrationTest {
     void closesRequirementSourcingQuoteEvaluationAwardContractPerformanceAndBlacklist() {
         SourcingEvent event = service.createEvent(new EventCommand(PROJECT, REQUEST, "SP-SRC-001", "钢材采购询价",
                 "INQUIRY", LocalDateTime.now().plusDays(1), "CNY", null));
+        assertTrue(event.getSourcingCode().matches("SRC-\\d{8}-\\d{3}"));
         service.addSuppliers(event.getId(), new InvitationCommand(List.of(SUPPLIER_A, SUPPLIER_B, SUPPLIER_C)));
         evidence("SUPPLIER_SOURCING", event.getId(), "SOURCING_REQUIREMENT");
         assertEquals("PUBLISHED", service.publish(event.getId()).getStatus());
@@ -96,6 +97,7 @@ class SupplierSourcingClosedLoopIntegrationTest {
         SupplierReturn supplierReturn = service.createSupplierReturn(new SupplierReturnCommand(
                 RECEIPT, "SRT-SP-001", LocalDate.now(), new BigDecimal("2"), new BigDecimal("2000"),
                 "到货质量不合格，退回供应商"));
+        assertTrue(supplierReturn.getReturnCode().matches("SRT-\\d{8}-\\d{3}"));
         supplierReturn = service.confirmSupplierReturn(supplierReturn.getId());
         assertEquals("CONFIRMED", supplierReturn.getStatus());
 

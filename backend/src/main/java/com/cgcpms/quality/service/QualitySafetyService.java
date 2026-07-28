@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.BusinessCodeGenerator;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
@@ -35,6 +36,7 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class QualitySafetyService {
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
     private static final Set<String> INSPECTION_TYPES = Set.of("QUALITY", "SAFETY");
     private static final Set<String> FREQUENCIES = Set.of("SINGLE", "WEEKLY", "MONTHLY");
     private static final Set<String> SEVERITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
@@ -56,6 +58,7 @@ public class QualitySafetyService {
     private final SysFileMapper fileMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectV2Service costSubjectV2Service;
+    private final BusinessCodeGenerator businessCodeGenerator;
     private final JdbcTemplate jdbc;
 
     public List<QualityInspectionPlan> listPlans(Long projectId) {
@@ -78,12 +81,18 @@ public class QualitySafetyService {
         plan.setTenantId(tenantId());
         plan.setStatus("DRAFT");
         plan.setVersion(0);
-        try {
-            planMapper.insert(plan);
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException("QS_PLAN_CODE_DUPLICATE", "同一项目下检查计划编号不能重复");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            plan.setId(null);
+            plan.setPlanCode(businessCodeGenerator.next(
+                    BusinessCodeGenerator.Rule.QUALITY_PLAN, command.projectId(), attempt));
+            try {
+                planMapper.insert(plan);
+                return requirePlan(plan.getId());
+            } catch (DuplicateKeyException ignored) {
+                // 编码并发冲突，按下一个序号重试。
+            }
         }
-        return requirePlan(plan.getId());
+        throw new BusinessException("QS_PLAN_CODE_CONFLICT", "检查计划编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -171,7 +180,6 @@ public class QualitySafetyService {
         record.setTenantId(tenantId());
         record.setPlanId(plan.getId());
         record.setProjectId(plan.getProjectId());
-        record.setInspectionCode(normalizeCode(command.inspectionCode()));
         record.setInspectionDate(command.inspectionDate());
         record.setLocation(command.location().trim());
         record.setInspectorUserId(command.inspectorUserId());
@@ -180,12 +188,18 @@ public class QualitySafetyService {
         record.setStatus("DRAFT");
         record.setVersion(0);
         record.setRemark(command.remark());
-        try {
-            inspectionMapper.insert(record);
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException("QS_INSPECTION_CODE_DUPLICATE", "同一项目下检查记录编号不能重复");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            record.setId(null);
+            record.setInspectionCode(businessCodeGenerator.next(
+                    BusinessCodeGenerator.Rule.QUALITY_INSPECTION, plan.getProjectId(), attempt));
+            try {
+                inspectionMapper.insert(record);
+                return requireInspection(record.getId());
+            } catch (DuplicateKeyException ignored) {
+                // 编码并发冲突，按下一个序号重试。
+            }
         }
-        return requireInspection(record.getId());
+        throw new BusinessException("QS_INSPECTION_CODE_CONFLICT", "检查记录编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -395,7 +409,6 @@ public class QualitySafetyService {
         consequence.setProjectId(issue.getProjectId());
         consequence.setPartnerId(command.partnerId());
         consequence.setContractId(command.contractId());
-        consequence.setConsequenceCode(normalizeCode(command.consequenceCode()));
         consequence.setDecisionType(upper(command.decisionType()));
         consequence.setFineAmount(command.fineAmount());
         consequence.setReworkCostAmount(command.reworkCostAmount());
@@ -404,12 +417,18 @@ public class QualitySafetyService {
         consequence.setStatus("DRAFT");
         consequence.setVersion(0);
         consequence.setRemark(command.remark());
-        try {
-            consequenceMapper.insert(consequence);
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException("QS_CONSEQUENCE_CONFLICT", "处罚成本记录编号或问题关系冲突");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            consequence.setId(null);
+            consequence.setConsequenceCode(businessCodeGenerator.next(
+                    BusinessCodeGenerator.Rule.QUALITY_CONSEQUENCE, issue.getProjectId(), attempt));
+            try {
+                consequenceMapper.insert(consequence);
+                return requireConsequence(consequence.getId());
+            } catch (DuplicateKeyException ignored) {
+                // 编码并发冲突，按下一个序号重试。
+            }
         }
-        return requireConsequence(consequence.getId());
+        throw new BusinessException("QS_CONSEQUENCE_CONFLICT", "处罚成本记录编号或问题关系冲突");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -480,7 +499,6 @@ public class QualitySafetyService {
 
     private void applyPlan(QualityInspectionPlan plan, PlanCommand command) {
         plan.setProjectId(command.projectId());
-        plan.setPlanCode(normalizeCode(command.planCode()));
         plan.setPlanName(command.planName().trim());
         plan.setInspectionType(upper(command.inspectionType()));
         plan.setFrequencyType(upper(command.frequencyType()));

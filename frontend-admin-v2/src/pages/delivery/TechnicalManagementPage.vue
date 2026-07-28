@@ -1017,10 +1017,8 @@ onBeforeUnmount(() => {
     >
       <form id="technical-dialog-form" class="technical-page__form" @submit.prevent="save">
         <template v-if="dialog === 'scheme'"
-          ><V2Input v-model="form.code" label="方案编码" required /><V2Input
-            v-model="form.name"
-            label="方案名称"
-            required /><V2Select
+          ><p class="technical-page__wide">方案编码由服务端自动生成</p>
+          <V2Input v-model="form.name" label="方案名称" required /><V2Select
             v-model="form.type"
             label="方案类型"
             :options="
@@ -1061,7 +1059,8 @@ onBeforeUnmount(() => {
             >变更摘要<textarea v-model="form.changeSummary" required /></label
         ></template>
         <template v-if="dialog === 'review'"
-          ><V2Input v-model="form.code" label="会审编码" required /><V2Select
+          ><p class="technical-page__wide">会审编码由服务端自动生成</p>
+          <V2Select
             v-model="form.chairUserId"
             label="主持人"
             :options="userOptions(form.chairUserId)"
@@ -1078,10 +1077,8 @@ onBeforeUnmount(() => {
             >会审摘要<textarea v-model="form.summary" required /></label
         ></template>
         <template v-if="dialog === 'rfi'"
-          ><V2Input v-model="form.code" label="RFI 编码" required /><V2Input
-            v-model="form.subject"
-            label="主题"
-            required /><V2Select
+          ><p class="technical-page__wide">RFI 编码由服务端自动生成</p>
+          <V2Input v-model="form.subject" label="主题" required /><V2Select
             v-model="form.priority"
             label="优先级"
             :options="
@@ -1117,10 +1114,9 @@ onBeforeUnmount(() => {
             label="批准方案"
             :options="
               approvedSchemes.map((item) => ({ value: item.id, label: item.schemeName }))
-            " /><V2Input v-model="form.code" label="交底编码" required /><V2Input
-            v-model="form.name"
-            label="交底标题"
-            required /><V2Select
+            " />
+          <p class="technical-page__wide">交底编码由服务端自动生成</p>
+          <V2Input v-model="form.name" label="交底标题" required /><V2Select
             v-model="form.presenterUserId"
             label="交底人"
             :options="userOptions(form.presenterUserId)"
@@ -1150,7 +1146,9 @@ onBeforeUnmount(() => {
                 value: item.id,
                 label: `${item.inspectionCode} · ${item.inspectionDate}`,
               }))
-            " /><V2Input v-model="form.code" label="档案编码" required /><V2Select
+            " />
+          <p class="technical-page__wide">档案编码由服务端自动生成</p>
+          <V2Select
             v-model="form.conclusion"
             label="验收结论"
             :options="[

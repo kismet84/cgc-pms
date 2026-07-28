@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.closeout.dto.ProjectCloseoutModels.*;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.common.util.BusinessCodeGenerator;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -26,7 +27,10 @@ import java.util.Set;
 @Service
 @RequiredArgsConstructor
 public class ProjectCloseoutService {
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
+
     private final JdbcTemplate jdbc;
+    private final BusinessCodeGenerator businessCodeGenerator;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
 
@@ -111,17 +115,21 @@ public class ProjectCloseoutService {
         if (!Set.of("ACTIVE", "SUSPENDED").contains(string(project.get("status"))))
             throw error("CLOSEOUT_PROJECT_STATE_INVALID", "只有进行中或暂停中的项目可以发起收尾");
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO project_closeout(id,tenant_id,project_id,closeout_code,planned_completion_date,status,
-                     version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,'INITIATED',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), command.projectId(), command.closeoutCode().trim(),
-                    command.plannedCompletionDate(), user(), user(), command.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("CLOSEOUT_DUPLICATE", "同一项目只能存在一条收尾主线，且收尾编号不可重复");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            try {
+                jdbc.update("""
+                        INSERT INTO project_closeout(id,tenant_id,project_id,closeout_code,planned_completion_date,status,
+                         version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,'INITIATED',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), command.projectId(),
+                        businessCodeGenerator.next(BusinessCodeGenerator.Rule.PROJECT_CLOSEOUT, null, attempt),
+                        command.plannedCompletionDate(), user(), user(), command.remark());
+                return closeout(id);
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突时换号重试；其他唯一关系最终按原业务错误返回。
+            }
         }
-        return closeout(id);
+        throw error("CLOSEOUT_DUPLICATE", "同一项目只能存在一条收尾主线，且收尾编号不可重复");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -139,19 +147,23 @@ public class ProjectCloseoutService {
         if (!projectId.equals(longValue(inspection.get("project_id"))))
             throw error("CLOSEOUT_PROJECT_MISMATCH", "质量验收记录不属于当前项目");
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO closeout_section_acceptance(id,tenant_id,closeout_id,project_id,wbs_task_id,quality_inspection_id,
-                     acceptance_code,acceptance_name,acceptance_date,conclusion,status,version,
-                     created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), closeoutId, projectId, command.wbsTaskId(), command.qualityInspectionId(),
-                    command.acceptanceCode().trim(), command.acceptanceName().trim(), command.acceptanceDate(), command.conclusion(),
-                    user(), user(), command.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("CLOSEOUT_SECTION_DUPLICATE", "验收编号重复或该WBS任务已登记验收");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            try {
+                jdbc.update("""
+                        INSERT INTO closeout_section_acceptance(id,tenant_id,closeout_id,project_id,wbs_task_id,quality_inspection_id,
+                         acceptance_code,acceptance_name,acceptance_date,conclusion,status,version,
+                         created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), closeoutId, projectId, command.wbsTaskId(), command.qualityInspectionId(),
+                        businessCodeGenerator.next(BusinessCodeGenerator.Rule.SECTION_ACCEPTANCE, null, attempt),
+                        command.acceptanceName().trim(), command.acceptanceDate(), command.conclusion(),
+                        user(), user(), command.remark());
+                return sectionAcceptance(id);
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突时换号重试。
+            }
         }
-        return sectionAcceptance(id);
+        throw error("CLOSEOUT_SECTION_DUPLICATE", "验收编号重复或该WBS任务已登记验收");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -187,19 +199,23 @@ public class ProjectCloseoutService {
         projectAccessChecker.checkAccess(projectId, "登记竣工验收");
         validateFinalAcceptanceReadiness(closeoutId, projectId);
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO closeout_final_acceptance(id,tenant_id,closeout_id,project_id,acceptance_code,acceptance_date,
-                     organizer,participant_summary,conclusion,acceptance_summary,status,version,
-                     created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), closeoutId, projectId, command.acceptanceCode().trim(), command.acceptanceDate(),
-                    command.organizer().trim(), command.participantSummary().trim(), command.conclusion(),
-                    command.acceptanceSummary().trim(), user(), user(), command.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("CLOSEOUT_FINAL_ACCEPTANCE_DUPLICATE", "同一收尾主线只能存在一张竣工验收单，且验收编号不可重复");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            try {
+                jdbc.update("""
+                        INSERT INTO closeout_final_acceptance(id,tenant_id,closeout_id,project_id,acceptance_code,acceptance_date,
+                         organizer,participant_summary,conclusion,acceptance_summary,status,version,
+                         created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), closeoutId, projectId,
+                        businessCodeGenerator.next(BusinessCodeGenerator.Rule.FINAL_ACCEPTANCE, null, attempt),
+                        command.acceptanceDate(), command.organizer().trim(), command.participantSummary().trim(), command.conclusion(),
+                        command.acceptanceSummary().trim(), user(), user(), command.remark());
+                return finalAcceptance(id);
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突时换号重试。
+            }
         }
-        return finalAcceptance(id);
+        throw error("CLOSEOUT_FINAL_ACCEPTANCE_DUPLICATE", "同一收尾主线只能存在一张竣工验收单，且验收编号不可重复");
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -332,18 +348,24 @@ public class ProjectCloseoutService {
             throw error("CLOSEOUT_WARRANTY_AMOUNT_MISMATCH", "质保金额必须等于结算形成的质保金应收原值");
         requireActiveProjectMember(projectId, command.responsibleUserId());
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO closeout_warranty(id,tenant_id,closeout_id,project_id,contract_id,receivable_id,warranty_code,
-                     warranty_amount,warranty_start_date,warranty_end_date,responsible_user_id,status,version,
-                     created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), closeoutId, projectId, command.contractId(), command.receivableId(),
-                    command.warrantyCode().trim(), command.warrantyAmount(), command.warrantyStartDate(), command.warrantyEndDate(),
-                    command.responsibleUserId(), user(), user(), command.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("CLOSEOUT_WARRANTY_DUPLICATE", "质保编号重复或该质保金应收已登记责任期");
+        boolean inserted = false;
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES && !inserted; attempt++) {
+            try {
+                jdbc.update("""
+                        INSERT INTO closeout_warranty(id,tenant_id,closeout_id,project_id,contract_id,receivable_id,warranty_code,
+                         warranty_amount,warranty_start_date,warranty_end_date,responsible_user_id,status,version,
+                         created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), closeoutId, projectId, command.contractId(), command.receivableId(),
+                        businessCodeGenerator.next(BusinessCodeGenerator.Rule.WARRANTY, null, attempt),
+                        command.warrantyAmount(), command.warrantyStartDate(), command.warrantyEndDate(),
+                        command.responsibleUserId(), user(), user(), command.remark());
+                inserted = true;
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突时换号重试。
+            }
         }
+        if (!inserted) throw error("CLOSEOUT_WARRANTY_DUPLICATE", "质保编号重复或该质保金应收已登记责任期");
         jdbc.update("UPDATE project_closeout SET status='WARRANTY_ACTIVE',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                 user(), closeoutId, tenant());
         return warranty(id);
@@ -358,18 +380,24 @@ public class ProjectCloseoutService {
             throw error("CLOSEOUT_WARRANTY_STATE_INVALID", "当前质保责任状态不允许新增缺陷");
         requireActiveProjectMember(projectId, command.responsibleUserId());
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO closeout_defect(id,tenant_id,closeout_id,project_id,warranty_id,defect_code,defect_title,
-                     defect_description,responsible_user_id,rectification_deadline,status,version,
-                     created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,'OPEN',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), warranty.get("closeout_id"), warranty.get("project_id"), warrantyId,
-                    command.defectCode().trim(), command.defectTitle().trim(), command.defectDescription().trim(),
-                    command.responsibleUserId(), command.rectificationDeadline(), user(), user(), command.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("CLOSEOUT_DEFECT_DUPLICATE", "缺陷编号不可重复");
+        boolean inserted = false;
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES && !inserted; attempt++) {
+            try {
+                jdbc.update("""
+                        INSERT INTO closeout_defect(id,tenant_id,closeout_id,project_id,warranty_id,defect_code,defect_title,
+                         defect_description,responsible_user_id,rectification_deadline,status,version,
+                         created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,'OPEN',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), warranty.get("closeout_id"), warranty.get("project_id"), warrantyId,
+                        businessCodeGenerator.next(BusinessCodeGenerator.Rule.DEFECT, null, attempt),
+                        command.defectTitle().trim(), command.defectDescription().trim(),
+                        command.responsibleUserId(), command.rectificationDeadline(), user(), user(), command.remark());
+                inserted = true;
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突时换号重试。
+            }
         }
+        if (!inserted) throw error("CLOSEOUT_DEFECT_DUPLICATE", "缺陷编号不可重复");
         jdbc.update("UPDATE closeout_warranty SET status='DEFECT_LIABILITY',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                 user(), warrantyId, tenant());
         jdbc.update("UPDATE project_closeout SET status='DEFECT_LIABILITY',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
@@ -453,19 +481,23 @@ public class ProjectCloseoutService {
         projectAccessChecker.checkAccess(longValue(closeout.get("project_id")), "登记竣工档案移交");
         requireStage(closeout, Set.of("WARRANTY_RELEASED"), "全部质保责任解除后才能移交竣工档案");
         Long id = IdWorker.getId();
-        try {
-            jdbc.update("""
-                    INSERT INTO closeout_archive_transfer(id,tenant_id,closeout_id,project_id,transfer_code,transfer_date,
-                     recipient_organization,recipient_name,archive_location,transfer_scope,status,version,
-                     created_by,created_at,updated_by,updated_at,deleted_flag,remark)
-                    VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
-                    """, id, tenant(), closeoutId, closeout.get("project_id"), command.transferCode().trim(),
-                    command.transferDate(), command.recipientOrganization().trim(), command.recipientName().trim(),
-                    command.archiveLocation().trim(), command.transferScope().trim(), user(), user(), command.remark());
-        } catch (DuplicateKeyException e) {
-            throw error("CLOSEOUT_ARCHIVE_DUPLICATE", "同一收尾主线只能存在一张档案移交单，且移交编号不可重复");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            try {
+                jdbc.update("""
+                        INSERT INTO closeout_archive_transfer(id,tenant_id,closeout_id,project_id,transfer_code,transfer_date,
+                         recipient_organization,recipient_name,archive_location,transfer_scope,status,version,
+                         created_by,created_at,updated_by,updated_at,deleted_flag,remark)
+                        VALUES(?,?,?,?,?,?,?,?,?,?,'DRAFT',0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
+                        """, id, tenant(), closeoutId, closeout.get("project_id"),
+                        businessCodeGenerator.next(BusinessCodeGenerator.Rule.ARCHIVE_TRANSFER, null, attempt),
+                        command.transferDate(), command.recipientOrganization().trim(), command.recipientName().trim(),
+                        command.archiveLocation().trim(), command.transferScope().trim(), user(), user(), command.remark());
+                return archiveTransfer(id);
+            } catch (DuplicateKeyException ignored) {
+                // 编号并发冲突时换号重试。
+            }
         }
-        return archiveTransfer(id);
+        throw error("CLOSEOUT_ARCHIVE_DUPLICATE", "同一收尾主线只能存在一张档案移交单，且移交编号不可重复");
     }
 
     @Transactional(rollbackFor = Exception.class)

@@ -126,6 +126,7 @@ class TechnicalManagementClosedLoopIntegrationTest {
         assertEquals("TECH_RESPONSIBLE_PROJECT_MEMBER_INVALID", outsider.getCode());
         long schemeId = id(service.createScheme(new SchemeCommand(PROJECT, "TS-001", "主体结构专项施工方案",
                 "SPECIAL", 1L, LocalDate.now().plusDays(2), "专项方案")));
+        assertGeneratedCode("technical_scheme", "scheme_code", schemeId, "TSC", "TS-001");
         evidence("TECH_SCHEME", schemeId, "SCHEME_FILE");
         service.submitScheme(schemeId);
         approveAll("TECHNICAL_SCHEME", schemeId);
@@ -142,11 +143,13 @@ class TechnicalManagementClosedLoopIntegrationTest {
         assertEquals("TECH_RESPONSIBLE_PROJECT_MEMBER_INVALID", disabled.getCode());
         long reviewA = id(service.createReview(versionA, new ReviewCommand("RV-001", LocalDate.now(), 1L,
                 "项目总工、工程部、施工班组", "CONDITIONAL", "节点详图标注不明确", true, null)));
+        assertGeneratedCode("tech_drawing_review", "review_code", reviewA, "TRV", "RV-001");
         evidence("TECH_DRAWING_REVIEW", reviewA, "REVIEW_MINUTES");
         service.confirmReview(reviewA);
 
         long rfiId = id(service.createRfi(reviewA, new RfiCommand("RFI-001", "节点详图标高确认",
                 "请设计单位确认节点标高及钢筋锚固做法", "HIGH", LocalDate.now().plusDays(3), null)));
+        assertGeneratedCode("tech_rfi", "rfi_code", rfiId, "RFI", "RFI-001");
         evidence("TECH_RFI", rfiId, "RFI_EVIDENCE");
         service.submitRfi(rfiId);
         long responseId = id(service.respondRfi(rfiId, new RfiResponseCommand(
@@ -175,12 +178,14 @@ class TechnicalManagementClosedLoopIntegrationTest {
         long disclosureId = id(service.createDisclosure(PROJECT, new DisclosureCommand(versionB, schemeId,
                 "TD-001", "主体结构B版图纸技术交底", LocalDate.now(), 2L,
                 "工程部及主体结构施工班组", "按B版图纸、专项方案和RFI回复组织施工", null)));
+        assertGeneratedCode("tech_disclosure", "disclosure_code", disclosureId, "TDS", "TD-001");
         evidence("TECH_DISCLOSURE", disclosureId, "DISCLOSURE_RECORD");
         service.confirmDisclosure(disclosureId);
         long referenceId = id(service.createConstructionReference(PROJECT, new ConstructionReferenceCommand(
                 disclosureId, DAILY_LOG, WBS, LocalDate.now(), "1号楼", "主体结构施工引用B版图纸", null)));
         long archiveId = id(service.createArchive(PROJECT, new ArchiveCommand(referenceId, QUALITY_INSPECTION,
                 "TA-001", LocalDate.now(), "PASS", "项目技术档案/主体结构", null)));
+        assertGeneratedCode("tech_acceptance_archive", "archive_code", archiveId, "TAR", "TA-001");
         evidence("TECH_ARCHIVE", archiveId, "ACCEPTANCE_ARCHIVE");
         service.confirmArchive(archiveId);
 
@@ -233,6 +238,14 @@ class TechnicalManagementClosedLoopIntegrationTest {
 
     private long id(Map<?, ?> row) {
         return ((Number) row.get("id")).longValue();
+    }
+
+    private void assertGeneratedCode(String table, String column, long id, String prefix, String clientValue) {
+        String code = jdbc.queryForObject(
+                "SELECT " + column + " FROM " + table + " WHERE id=?", String.class, id);
+        assertNotNull(code);
+        assertTrue(code.matches(prefix + "-\\d{8}-\\d{3}"));
+        assertNotEquals(clientValue, code);
     }
 
     private void evidence(String businessType, long businessId, String documentType) {

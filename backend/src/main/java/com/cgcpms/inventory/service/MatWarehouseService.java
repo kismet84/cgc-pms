@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
+import com.cgcpms.common.util.BusinessCodeGenerator;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.inventory.entity.MatStock;
 import com.cgcpms.inventory.entity.MatWarehouse;
@@ -17,6 +18,7 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -27,6 +29,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class MatWarehouseService {
+    private static final int CODE_GENERATION_MAX_RETRIES = 3;
 
     private final MatWarehouseMapper matWarehouseMapper;
 
@@ -35,6 +38,8 @@ public class MatWarehouseService {
     private final PmProjectMapper pmProjectMapper;
 
     private final ProjectAccessChecker projectAccessChecker;
+
+    private final BusinessCodeGenerator businessCodeGenerator;
 
     public PageResult<MatWarehouseVO> getPage(long pageNo, long pageSize, Long projectId, String warehouseCode, String warehouseName, String status) {
         List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
@@ -59,58 +64,48 @@ public class MatWarehouseService {
     }
 
     public MatWarehouseVO getById(Long id) {
-        MatWarehouse warehouse = matWarehouseMapper.selectById(id);
-        if (warehouse == null) {
-            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
-        }
-        if (!warehouse.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
-        }
+        MatWarehouse warehouse = requireAccessibleWarehouse(id, "查询仓库");
         return toVO(warehouse);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(MatWarehouse warehouse) {
+        projectAccessChecker.checkAccess(warehouse.getProjectId(), "创建仓库");
         warehouse.setTenantId(UserContext.getCurrentTenantId());
-        matWarehouseMapper.insert(warehouse);
-        log.info("Creating warehouse: {}", warehouse.getWarehouseName());
-        return warehouse.getId();
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            warehouse.setId(null);
+            warehouse.setWarehouseCode(businessCodeGenerator.next(
+                    BusinessCodeGenerator.Rule.WAREHOUSE, warehouse.getProjectId(), attempt));
+            try {
+                matWarehouseMapper.insert(warehouse);
+                log.info("Creating warehouse: {}", warehouse.getWarehouseName());
+                return warehouse.getId();
+            } catch (DuplicateKeyException ignored) {
+                log.info("仓库编号冲突，重试生成 warehouseCode={}", warehouse.getWarehouseCode());
+            }
+        }
+        throw new BusinessException("WAREHOUSE_CODE_CONFLICT", "仓库编号生成冲突，请重试");
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void update(MatWarehouse warehouse) {
-        MatWarehouse existing = matWarehouseMapper.selectById(warehouse.getId());
-        if (existing == null) {
-            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
-        }
-        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
-        }
-        matWarehouseMapper.updateById(warehouse);
+        MatWarehouse existing = requireAccessibleWarehouse(warehouse.getId(), "更新仓库");
+        existing.setWarehouseName(warehouse.getWarehouseName());
+        existing.setStatus(warehouse.getStatus());
+        existing.setRemark(warehouse.getRemark());
+        matWarehouseMapper.updateById(existing);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void updateStatus(Long id, String status) {
-        MatWarehouse existing = matWarehouseMapper.selectById(id);
-        if (existing == null) {
-            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
-        }
-        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
-        }
+        MatWarehouse existing = requireAccessibleWarehouse(id, "更新仓库状态");
         existing.setStatus(status);
         matWarehouseMapper.updateById(existing);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        MatWarehouse existing = matWarehouseMapper.selectById(id);
-        if (existing == null) {
-            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
-        }
-        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
-        }
+        requireAccessibleWarehouse(id, "删除仓库");
 
         // Check if warehouse has related stock entries
         long stockCount = matStockMapper.selectCount(
@@ -122,6 +117,15 @@ public class MatWarehouseService {
 
         // Soft delete via MyBatis-Plus @TableLogic — deleteById converts to UPDATE deleted_flag=1
         matWarehouseMapper.deleteById(id);
+    }
+
+    private MatWarehouse requireAccessibleWarehouse(Long id, String action) {
+        MatWarehouse warehouse = matWarehouseMapper.selectById(id);
+        if (warehouse == null || !warehouse.getTenantId().equals(UserContext.getCurrentTenantId())) {
+            throw new BusinessException("WAREHOUSE_NOT_FOUND", "仓库不存在");
+        }
+        projectAccessChecker.checkAccess(warehouse.getProjectId(), action);
+        return warehouse;
     }
 
     private MatWarehouseVO toVO(MatWarehouse w) {

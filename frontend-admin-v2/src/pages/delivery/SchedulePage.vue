@@ -227,7 +227,7 @@ function backToList(): void {
 function openCreate(): void {
   Object.assign(scheduleForm, {
     projectId: projectId.value,
-    planCode: `BASE-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}`,
+    planCode: '',
     planName: '项目基线计划',
     plannedStartDate: new Date().toISOString().slice(0, 10),
     plannedEndDate: '',
@@ -241,7 +241,6 @@ async function saveSchedule(): Promise<void> {
   const command = cleanScheduleCommand(scheduleForm)
   if (
     !command.projectId ||
-    !command.planCode ||
     !command.planName ||
     !command.plannedStartDate ||
     !command.plannedEndDate
@@ -331,7 +330,7 @@ function openPeriod(periodType: 'MONTHLY' | 'WEEKLY'): void {
     schedulePlanId: detail.value.id,
     periodType,
     parentPeriodPlanId: '',
-    periodCode: `${periodType === 'MONTHLY' ? 'M' : 'W'}-${today.replaceAll('-', '')}`,
+    periodCode: '',
     periodName: periodType === 'MONTHLY' ? '月计划' : '周计划',
     startDate: today,
     endDate: today,
@@ -423,7 +422,7 @@ function openCorrective(): void {
   if (!detail.value?.latestSnapshot) return
   Object.assign(correctiveForm, {
     snapshotId: detail.value.latestSnapshot.id,
-    actionCode: `COR-${new Date().toISOString().slice(0, 10).replaceAll('-', '')}`,
+    actionCode: '',
     reason: '',
     actionPlan: '',
     responsibleUserId: currentUserOptions.value[0]?.value ?? '',
@@ -439,7 +438,6 @@ async function saveCorrective(): Promise<void> {
   const command = cleanCorrectiveCommand(correctiveForm)
   if (
     !command.snapshotId ||
-    !command.actionCode ||
     !command.reason ||
     !command.actionPlan ||
     !command.responsibleUserId ||
@@ -548,7 +546,7 @@ function cleanTaskCommand(task: EditableWbsTask): WbsTaskCommand {
 function cleanScheduleCommand(form: ScheduleCommand): ScheduleCommand {
   return {
     projectId: form.projectId.trim(),
-    planCode: form.planCode.trim(),
+    planCode: form.planCode?.trim() || undefined,
     planName: form.planName.trim(),
     plannedStartDate: form.plannedStartDate,
     plannedEndDate: form.plannedEndDate,
@@ -563,7 +561,7 @@ function cleanPeriodCommand(
     schedulePlanId: form.schedulePlanId.trim(),
     periodType: form.periodType,
     parentPeriodPlanId: form.parentPeriodPlanId?.trim() || undefined,
-    periodCode: form.periodCode.trim(),
+    periodCode: form.periodCode?.trim() || undefined,
     periodName: form.periodName.trim(),
     startDate: form.startDate,
     endDate: form.endDate,
@@ -574,7 +572,7 @@ function cleanPeriodCommand(
 function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveActionCommand {
   return {
     snapshotId: form.snapshotId.trim(),
-    actionCode: form.actionCode.trim(),
+    actionCode: form.actionCode?.trim() || undefined,
     reason: form.reason.trim(),
     actionPlan: form.actionPlan.trim(),
     responsibleUserId: form.responsibleUserId.trim(),
@@ -922,7 +920,12 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
           required
           placeholder="请选择项目"
         />
-        <V2Input v-model="scheduleForm.planCode" label="计划编号" required />
+        <V2Input
+          v-model="scheduleForm.planCode"
+          label="计划编号"
+          disabled
+          placeholder="创建后由服务端自动生成"
+        />
         <V2Input v-model="scheduleForm.planName" label="计划名称" required />
         <label>
           计划开始
@@ -1008,7 +1011,12 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
           "
           required
         />
-        <V2Input v-model="periodForm.periodCode" label="计划编码" required />
+        <V2Input
+          v-model="periodForm.periodCode"
+          label="计划编码"
+          disabled
+          placeholder="创建后由服务端自动生成"
+        />
         <V2Input v-model="periodForm.periodName" label="计划名称" required />
         <label>
           开始日期
@@ -1049,7 +1057,12 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
         class="schedule-page__form"
         @submit.prevent="saveCorrective"
       >
-        <V2Input v-model="correctiveForm.actionCode" label="纠偏编码" required />
+        <V2Input
+          v-model="correctiveForm.actionCode"
+          label="纠偏编码"
+          disabled
+          placeholder="创建后由服务端自动生成"
+        />
         <V2Select
           v-model="correctiveForm.responsibleUserId"
           label="责任人"

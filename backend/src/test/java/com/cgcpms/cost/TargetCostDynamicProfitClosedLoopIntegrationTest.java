@@ -43,6 +43,7 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -102,10 +103,15 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         Map<String, Object> createdForecast = controlService.createForecast(forecastRequest);
         assertTrue(createdForecast.get("id") instanceof String);
         assertTrue(createdForecast.get("project_id") instanceof String);
+        String generatedForecastCode = String.valueOf(createdForecast.get("forecast_code"));
+        assertTrue(generatedForecastCode.matches("CFT-\\d{8}-\\d{3}"));
+        assertNotEquals(forecastRequest.forecastCode(), generatedForecastCode);
         long forecastId = id(createdForecast);
         ForecastRequest renamedForecast = new ForecastRequest(PROJECT, "FC-IT-001", "首期完工预测-已复核", LocalDate.now(),
                 forecastRequest.items(), "月度滚动预测");
         controlService.updateForecast(forecastId, 0, renamedForecast);
+        assertEquals(generatedForecastCode,
+                jdbc.queryForObject("SELECT forecast_code FROM cost_forecast WHERE id=?", String.class, forecastId));
         BusinessException staleForecast = assertThrows(BusinessException.class,
                 () -> controlService.updateForecast(forecastId, 0, forecastRequest));
         assertEquals("COST_FORECAST_CONCURRENT_UPDATE", staleForecast.getCode());
@@ -133,6 +139,10 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         long actionId = id(controlService.createCorrectiveAction(new CorrectiveActionRequest(
                 forecastId, "CA-IT-001", "压降措施成本", "措施投入超出责任预算", "优化租赁周期并复核现场签证",
                 new BigDecimal("1000.00"), 1L, LocalDate.now().plusDays(10), "正偏差纠偏")));
+        String generatedActionCode = jdbc.queryForObject(
+                "SELECT action_code FROM cost_corrective_action WHERE id=?", String.class, actionId);
+        assertTrue(generatedActionCode.matches("CCA-\\d{8}-\\d{3}"));
+        assertNotEquals("CA-IT-001", generatedActionCode);
         UserContext.set(Jwts.claims().subject("reader").add("userId", 2L).add("username", "reader")
                 .add("tenantId", 0L).add("roleCodes", List.of()).build());
         BusinessException crossProjectUpdate = assertThrows(BusinessException.class, () -> controlService.updateCorrectiveAction(actionId, 0,
@@ -146,6 +156,8 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
                 forecastId, "CA-IT-001", "压降措施成本-已复核", "措施投入超出责任预算", "优化租赁周期并复核现场签证",
                 new BigDecimal("1000.00"), 1L, LocalDate.now().plusDays(10), "正偏差纠偏");
         controlService.updateCorrectiveAction(actionId, 0, revisedAction);
+        assertEquals(generatedActionCode,
+                jdbc.queryForObject("SELECT action_code FROM cost_corrective_action WHERE id=?", String.class, actionId));
         BusinessException staleCorrective = assertThrows(BusinessException.class,
                 () -> controlService.updateCorrectiveAction(actionId, 0, revisedAction));
         assertEquals("COST_CORRECTIVE_CONCURRENT_UPDATE", staleCorrective.getCode());

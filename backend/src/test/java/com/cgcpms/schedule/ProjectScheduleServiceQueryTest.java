@@ -3,6 +3,7 @@ package com.cgcpms.schedule;
 import com.cgcpms.alert.mapper.AlertLogMapper;
 import com.cgcpms.alert.service.AlertLifecycleService;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.util.BusinessCodeGenerator;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.schedule.service.ProjectScheduleService;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -27,7 +28,8 @@ class ProjectScheduleServiceQueryTest {
             mock(WorkflowEngine.class),
             projectAccessChecker,
             mock(AlertLogMapper.class),
-            mock(AlertLifecycleService.class));
+            mock(AlertLifecycleService.class),
+            mock(BusinessCodeGenerator.class));
 
     @AfterEach
     void clearContext() {
