@@ -25,7 +25,7 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 优先级：P1
 任务性质：运维治理
 类型：第55条主线 / CI供应链安全 / AutoPilot控制面指纹金丝雀
-状态：Ready
+状态：Done
 来源锚点：`docs/backlog/current-issues.json`的`OPS-TRIVY-COLD-CACHE`；`docs/plans/第55条主线-支线-候选与工程观察授权实施任务计划书-2026-07-28.md`；candidateEvidenceHead=a8c3c0c1fb1b0d20e0024c460c407623ef7b53d9
 存量问题键：[OPS-TRIVY-COLD-CACHE]
 Migration：不需要
