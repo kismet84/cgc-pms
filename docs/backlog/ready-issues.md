@@ -20,6 +20,76 @@ v1.0 队列已封存到 [backlog 快照](../archive/v1.0/backlog-snapshot/ready-
 
 2026-07-27 第53条主线M7的`ISSUE-053-036～042`与M8的`ISSUE-053-043～046`已全部通过并正式收口；当前无M7/M8 Ready。正式入口、Legacy退役、Git交付和生产操作仍需分别授权。
 
+### ISSUE-055-001：Trivy 隔离冷缓存手工 CI 金丝雀
+
+优先级：P1
+任务性质：运维治理
+类型：第55条主线 / CI供应链安全 / AutoPilot控制面指纹金丝雀
+状态：Done
+来源锚点：`docs/backlog/current-issues.json`的`OPS-TRIVY-COLD-CACHE`；`docs/plans/第55条主线-支线-候选与工程观察授权实施任务计划书-2026-07-28.md`；candidateEvidenceHead=a8c3c0c1fb1b0d20e0024c460c407623ef7b53d9
+存量问题键：[OPS-TRIVY-COLD-CACHE]
+Migration：不需要
+依赖：用户已明确发送`启动迭代-1`并授权创建金丝雀分支、提交、推送、触发手工CI和合并；复用现有CI、Trivy官方数据库和AutoPilot收口链。
+风险等级：高
+运行态要求：仅GitHub托管CI；禁止删除共享Actions缓存、降低扫描阈值、连接生产或操作生产。
+Reviewer要求：独立复核workflow_dispatch输入、唯一缓存恢复步骤的条件、默认缓存路径、Trivy版本/严重级别/失败退出/超时、同SHA CI、手工冷缓存job及治理收口。
+归档报告：`docs/quality/第55条主线-支线-候选与工程观察授权实施-S1验收报告-2026-07-28.md`
+最小回滚：回退`trivyColdCache`输入、缓存恢复条件及其契约断言；共享缓存与业务代码不变。
+目标：
+
+- 为`supply-chain-security`提供一次性隔离冷缓存手工触发能力，以真实同SHA远端运行证明官方Java DB下载与`HIGH/CRITICAL`扫描门。
+- 完成新控制面指纹的单Issue金丝雀、两阶段提交、Closeout Record v2、图谱游标和登记读回。
+
+非目标：
+
+- 不删除、覆盖或新建共享Actions缓存，不改Trivy版本、数据库来源、严重级别、失败退出或超时。
+- 不修改业务代码、数据库、AutoPilot评分/权重/调度/状态机，不部署或操作生产。
+
+允许修改：
+
+- `.github/workflows/ci.yml`
+- `scripts/ci/test-workflow-contract.ps1`
+- `docs/backlog/ready-issues.md`
+- `docs/backlog/done-issues.md`
+- `docs/backlog/current-focus.md`
+- `docs/backlog/current-issues.json`
+- `docs/plans/README.md`
+- `docs/plans/第55条主线-全量审计整改与生产就绪收口任务计划书.md`
+- `docs/plans/第55条主线-支线-候选与工程观察证据化收口任务计划书-2026-07-28.md`
+- `docs/plans/第55条主线-支线-候选与工程观察授权实施任务计划书-2026-07-28.md`
+- `docs/product-intelligence/project-map.md`
+- `docs/quality/README.md`
+- `docs/quality/第55条主线-支线-候选与工程观察授权实施-S1验收报告-2026-07-28.md`
+
+禁止修改：
+
+- `backend/**`
+- `frontend-admin/**`
+- `frontend-admin-v2/**`
+- `packages/**`
+- `deploy/**`
+- `scripts/codex-autopilot/**`
+- `plugins/**`
+- `.agents/**`
+- `AGENTS.md`
+
+验收标准：
+
+- 本地workflow契约、控制面指纹、Codex执行策略、主线计划Standard门与`git diff --check`通过。
+- 功能分支最终提交的push事件完整CI在同一HEAD SHA全绿，`verify-pre-pr-ci.ps1`通过。
+- `workflow_dispatch`以`trivyColdCache=true`绑定同一SHA；唯一共享缓存恢复被跳过，官方Java DB下载与`HIGH/CRITICAL`扫描成功，未降低门禁。
+- 独立Reviewer通过；实施与收口提交不同，Closeout Record v2、知识图谱Git游标和`lastCanaryFingerprint`读回一致。
+- 新增后续项、关闭后续项、净变化与悬空项明确。
+
+验证命令：
+
+- `pwsh -NoProfile -File scripts/codex-autopilot/ready-lint.ps1 -RepoRoot . -ReadyPath docs/backlog/ready-issues.md -IssueTitle ISSUE-055-001`
+- `pwsh -NoProfile -File scripts/ci/test-workflow-contract.ps1`
+- `pwsh -NoProfile -File scripts/codex-autopilot/test-control-plane-fingerprint.ps1`
+- `pwsh -NoProfile -File scripts/codex-autopilot/test-codex-task-execution-policy.ps1`
+- `pwsh -NoProfile -File scripts/codex-autopilot/test-mainline-owner-flow.ps1 -Profile Standard -PlanPath docs/plans/第55条主线-支线-候选与工程观察授权实施任务计划书-2026-07-28.md`
+- `git diff --check`
+
 ### ISSUE-053-035：M6全量回归与正式收口
 
 优先级：P0

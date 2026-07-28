@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [master, main]
   workflow_dispatch:
+    inputs:
+      trivyColdCache:
+        description: Run supply-chain scan with an isolated empty Trivy cache
+        required: false
+        default: false
+        type: boolean
 
 env:
   BACKEND_JAR_ARTIFACT: backend-jar-${{ github.run_number }}-${{ github.sha }}
@@ -225,6 +231,7 @@ jobs:
       - name: Set daily Trivy cache key
         run: echo "TRIVY_CACHE_DATE=$(date -u +%Y-%m-%d)" >> "$GITHUB_ENV"
       - name: Restore Trivy vulnerability databases
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.trivyColdCache != true }}
         uses: actions/cache@v6
         with:
           path: .trivy-cache
