@@ -113,6 +113,8 @@ describe('M7 cost-subject center', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('服务端成本域')
+    expect(wrapper.text()).toContain('根科目')
+    expect(wrapper.text()).not.toContain('ROOT')
     expect(wrapper.text()).not.toContain('新增根科目')
     expect(costSubject.loadCostSubjectTree).toHaveBeenCalledOnce()
     expect(costSubject.loadMappingVersions).not.toHaveBeenCalled()

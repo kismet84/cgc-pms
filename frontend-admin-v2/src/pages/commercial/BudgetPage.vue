@@ -322,12 +322,7 @@ onBeforeUnmount(() => {
               allow-empty
               placeholder="全部状态"
               @update:model-value="query"
-            /><V2Button
-              class="budget-query"
-              size="small"
-              variant="secondary"
-              :loading="loading"
-              @click="query"
+            /><V2Button size="small" variant="secondary" :loading="loading" @click="query"
               >查询</V2Button
             >
           </div>
@@ -600,9 +595,6 @@ onBeforeUnmount(() => {
   display: flex;
   gap: var(--v2-space-2);
   flex-wrap: wrap;
-}
-.budget-query {
-  color: var(--v2-color-text-strong);
 }
 dl {
   display: grid;

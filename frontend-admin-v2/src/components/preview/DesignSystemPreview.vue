@@ -556,7 +556,7 @@ function confirmApprovalPreview() {
 .preview-header h1 {
   margin-top: var(--v2-space-2);
   color: var(--v2-color-text-strong);
-  font-size: clamp(var(--v2-font-size-21), 3vw, var(--v2-font-size-28));
+  font-size: var(--v2-font-size-28);
   line-height: var(--v2-line-height-tight);
 }
 
@@ -740,6 +740,10 @@ function confirmApprovalPreview() {
 @media (max-width: 30rem) {
   .preview-header {
     align-items: flex-start;
+  }
+
+  .preview-header h1 {
+    font-size: var(--v2-font-size-21);
   }
 
   .preview-swatches,

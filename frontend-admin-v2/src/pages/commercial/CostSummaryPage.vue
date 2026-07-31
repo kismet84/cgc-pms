@@ -100,19 +100,21 @@ onBeforeUnmount(() => controller?.abort())
       title="无权访问成本核对"
       description="请联系管理员开通访问权限。"
       kind="forbidden"
-    /><template v-else
-      ><V2Card title="成本核对" :heading-level="1"
-        ><template #actions
-          ><V2Button
+    />
+    <template v-else>
+      <V2Card title="成本核对" :heading-level="1">
+        <template #actions>
+          <V2Button
             v-if="canRefresh && projectId"
             size="small"
             variant="secondary"
             :loading="actionBusy"
             @click="refresh"
             >刷新汇总</V2Button
-          ></template
-        ></V2Card
-      ><V2PageState
+          >
+        </template>
+      </V2Card>
+      <V2PageState
         v-if="loading"
         title="正在加载成本核对"
         description="正在读取项目成本汇总及历史记录。"
@@ -122,10 +124,7 @@ onBeforeUnmount(() => controller?.abort())
         title="暂无成本汇总"
         description="当前账号可访问项目尚未生成可核对的成本汇总。"
         kind="empty"
-      /><V2Card
-        v-else-if="!projectId && accessible"
-        :title="`全部项目成本汇总（${accessible.accessibleProjectCount}）`"
-      >
+      /><V2Card v-else-if="!projectId && accessible">
         <div class="table-wrap" role="region" aria-label="全部项目成本汇总表格" tabindex="0">
           <table>
             <thead>

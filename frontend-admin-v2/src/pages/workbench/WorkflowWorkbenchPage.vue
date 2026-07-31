@@ -40,7 +40,6 @@ import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import {
   WORKFLOW_ACTION_LABELS,
-  WORKFLOW_TABS,
   workflowApproveModeLabel,
   workflowBusinessTypeLabel,
   workflowDate,
@@ -447,14 +446,7 @@ onBeforeUnmount(() => {
       description="当前筛选范围内没有可显示记录。"
       :heading-level="2"
     />
-    <V2Card
-      v-else
-      :title="WORKFLOW_TABS.find((tab) => tab.value === activeTab)?.label"
-      :aria-busy="listLoading"
-    >
-      <template #title-extra
-        ><V2Badge>{{ total }} 条</V2Badge></template
-      >
+    <V2Card v-else :aria-busy="listLoading">
       <div class="workflow-table-wrap" role="region" aria-label="审批任务表格" tabindex="0">
         <table class="workflow-table">
           <caption class="v2-visually-hidden">
@@ -502,11 +494,15 @@ onBeforeUnmount(() => {
       <template #footer>
         <nav class="workflow-pagination" aria-label="审批任务分页">
           <span>共 {{ total }} 条</span>
-          <V2Button variant="ghost" :disabled="pageNo <= 1" @click="changePage(-1)"
+          <V2Button size="small" variant="ghost" :disabled="pageNo <= 1" @click="changePage(-1)"
             >上一页</V2Button
           >
           <span>第 {{ pageNo }} 页</span>
-          <V2Button variant="ghost" :disabled="pageNo >= pageCount" @click="changePage(1)"
+          <V2Button
+            size="small"
+            variant="ghost"
+            :disabled="pageNo >= pageCount"
+            @click="changePage(1)"
             >下一页</V2Button
           >
         </nav>

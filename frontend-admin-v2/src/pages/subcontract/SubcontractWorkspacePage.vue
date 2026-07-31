@@ -740,13 +740,9 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <nav
-          v-if="total > pageSize"
-          class="subcontract-workspace__pagination"
-          aria-label="分包业务分页"
-        >
-          <span>共 {{ total }} 条</span>
-          <div>
+        <template v-if="total > pageSize" #footer>
+          <nav class="subcontract-workspace__pagination" aria-label="分包业务分页">
+            <span>共 {{ total }} 条</span>
             <V2Button
               size="small"
               variant="secondary"
@@ -754,7 +750,7 @@ onBeforeUnmount(() => {
               @click="changePage(pageNo - 1)"
               >上一页</V2Button
             >
-            <span>第 {{ pageNo }} / {{ pageCount }} 页</span>
+            <span>第 {{ pageNo }} 页</span>
             <V2Button
               size="small"
               variant="secondary"
@@ -762,8 +758,8 @@ onBeforeUnmount(() => {
               @click="changePage(pageNo + 1)"
               >下一页</V2Button
             >
-          </div>
-        </nav>
+          </nav>
+        </template>
       </V2Card>
 
       <V2Dialog
@@ -1135,8 +1131,7 @@ onBeforeUnmount(() => {
 .subcontract-workspace__filters,
 .subcontract-workspace__actions,
 .subcontract-workspace__upload,
-.subcontract-workspace__pagination,
-.subcontract-workspace__pagination > div {
+.subcontract-workspace__pagination {
   display: flex;
   align-items: center;
   gap: var(--v2-space-2);
@@ -1146,8 +1141,7 @@ onBeforeUnmount(() => {
   overflow-x: auto;
 }
 .subcontract-workspace__pagination {
-  justify-content: space-between;
-  padding-top: var(--v2-space-3);
+  justify-content: flex-end;
 }
 .subcontract-workspace__facts {
   display: grid;

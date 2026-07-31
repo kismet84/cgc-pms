@@ -179,6 +179,22 @@ const statusOptions = [
   { value: 'ENABLE', label: '启用' },
   { value: 'DISABLE', label: '停用' },
 ]
+const subjectTypeLabels: Record<string, string> = {
+  ROOT: '根科目',
+  BID: '投标成本',
+  PURCHASE: '采购成本',
+  MATERIAL: '材料费',
+  TESTING: '试验检测费',
+  CONSTRUCTION: '施工成本',
+  LABOR: '人工费',
+  MACHINERY: '机械费',
+  UTILITY: '水电费',
+  SUBCONTRACT: '分包费',
+  MEASURES: '措施费',
+  OTHER: '其他成本',
+  OVERHEAD: '间接费用',
+}
+const subjectTypeLabel = (value?: string) => subjectTypeLabels[value ?? ''] ?? '其他成本'
 const enabledOptions = [
   { value: 'true', label: '启用' },
   { value: 'false', label: '停用' },
@@ -798,7 +814,7 @@ onBeforeUnmount(() => controller?.abort())
                       </V2Button>
                     </th>
                     <td>{{ subject.subjectName }}</td>
-                    <td>{{ subject.subjectType }}</td>
+                    <td>{{ subjectTypeLabel(subject.subjectType) }}</td>
                     <td>
                       <V2Badge :tone="subject.status === 'ENABLE' ? 'success' : 'neutral'">
                         {{ subject.status === 'ENABLE' ? '启用' : '停用' }}
@@ -852,7 +868,7 @@ onBeforeUnmount(() => controller?.abort())
             </div>
             <div>
               <dt>类型</dt>
-              <dd>{{ selectedSubject.subjectType }}</dd>
+              <dd>{{ subjectTypeLabel(selectedSubject.subjectType) }}</dd>
             </div>
             <div>
               <dt>层级</dt>
@@ -1446,11 +1462,7 @@ onBeforeUnmount(() => controller?.abort())
 
 .cost-subject-page__subject {
   width: 100%;
-  border: 0;
-  background: transparent;
-  color: inherit;
   text-align: left;
-  cursor: pointer;
 }
 
 tr.is-selected {

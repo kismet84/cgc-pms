@@ -96,10 +96,7 @@ function onToggle(event: Event): void {
     const margin = 8
     const gap = 4
     const width = Math.min(triggerRect.width, window.innerWidth - margin * 2)
-    const left = Math.min(
-      Math.max(margin, triggerRect.left),
-      window.innerWidth - width - margin,
-    )
+    const left = Math.min(Math.max(margin, triggerRect.left), window.innerWidth - width - margin)
     const spaceBelow = Math.max(0, window.innerHeight - triggerRect.bottom - margin)
     const spaceAbove = Math.max(0, triggerRect.top - margin)
     dropUp.value = spaceBelow < menuHeight && spaceAbove > spaceBelow
@@ -110,9 +107,7 @@ function onToggle(event: Event): void {
       width: `${width}px`,
       maxHeight: `${Math.max(72, Math.min(menuHeight, availableHeight - gap))}px`,
       insetBlockStart: dropUp.value ? 'auto' : `${triggerRect.bottom + gap}px`,
-      insetBlockEnd: dropUp.value
-        ? `${window.innerHeight - triggerRect.top + gap}px`
-        : 'auto',
+      insetBlockEnd: dropUp.value ? `${window.innerHeight - triggerRect.top + gap}px` : 'auto',
     }
   })
 }

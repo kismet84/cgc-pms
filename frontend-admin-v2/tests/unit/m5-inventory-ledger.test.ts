@@ -56,7 +56,8 @@ describe('M5 inventory workspace contract', () => {
     expect(source).toContain("route.path === '/inventory/warehouse' ? 'warehouse' : 'stock'")
     expect(source).not.toContain("route.path === '/inventory/transaction'")
     expect(source).toContain('loadStocks')
-    expect(source).toContain('title="全部库存余额"')
+    expect(source).not.toContain('title="全部库存余额"')
+    expect(source).not.toContain('loadStockKpi')
     expect(source).toContain('title="库存明细与流水"')
     expect(source).toContain(
       'panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-bottom-sheet"',
@@ -86,7 +87,6 @@ describe('M5 inventory workspace contract', () => {
     expect(source).toContain("MATERIAL_RETURN_REVERSAL: '退料冲销'")
     expect(source).toContain("STOCK_TRANSFER: '库存调拨'")
     expect(source).not.toMatch(/PURCHASE_RECEIPT|\\bREQUISITION:|\\bTRANSFER:/)
-    expect(source).toContain('loadStockKpi(')
     expect(source).toContain("session.hasPermission('material:dict:list')")
     expect(source).toContain('canReadMaterials.value')
     expect(source).toContain('canReadStock.value')

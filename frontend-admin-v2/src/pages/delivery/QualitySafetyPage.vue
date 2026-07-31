@@ -87,7 +87,6 @@ const inspections = ref<QualityInspectionRecord[]>([])
 const issues = ref<QualityIssueRecord[]>([])
 const selectedPlanId = ref('')
 const activeTab = ref<QualityTab>('plan')
-const inspectionTypeFilter = ref('ALL')
 const activeInspection = ref<QualityInspectionRecord | null>(null)
 const activeIssue = ref<QualityIssueRecord | null>(null)
 const activeRectification = ref<QualityRectificationRecord | null>(null)
@@ -111,11 +110,6 @@ const scopeProjectIds = computed(() =>
 const selectedPlan = computed(
   () => plans.value.find((item) => item.id === selectedPlanId.value) ?? null,
 )
-const filteredPlans = computed(() =>
-  inspectionTypeFilter.value === 'ALL'
-    ? plans.value
-    : plans.value.filter((item) => item.inspectionType === inspectionTypeFilter.value),
-)
 const rectificationIssues = computed(() =>
   issues.value.filter(
     (item) =>
@@ -130,7 +124,7 @@ const consequenceIssues = computed(() =>
   issues.value.filter((item) => item.status === 'CLOSED' && item.responsiblePartnerId),
 )
 const visibleTabs = computed(() => [
-  { value: 'plan', label: '检查计划', count: filteredPlans.value.length },
+  { value: 'plan', label: '检查计划', count: plans.value.length },
   { value: 'inspection', label: '检查记录', count: inspections.value.length },
   { value: 'rectification', label: '问题整改', count: rectificationIssues.value.length },
   { value: 'reinspection', label: '复检闭环', count: reinspectionIssues.value.length },
@@ -648,15 +642,6 @@ onBeforeUnmount(() => {
       <V2Card title="质量安全整改闭环" :heading-level="1">
         <template #actions>
           <div class="quality-page__actions">
-            <V2Select
-              v-model="inspectionTypeFilter"
-              label="检查类型"
-              :options="[
-                { value: 'ALL', label: '全部类型' },
-                { value: 'QUALITY', label: '质量' },
-                { value: 'SAFETY', label: '安全' },
-              ]"
-            />
             <V2Button
               v-if="activeTab === 'plan' && canPlan && projectId"
               size="small"
@@ -688,7 +673,7 @@ onBeforeUnmount(() => {
           class="quality-page__record-sections"
         >
           <div v-if="activeTab === 'plan'">
-            <div v-if="filteredPlans.length" class="quality-page__table-wrap">
+            <div v-if="plans.length" class="quality-page__table-wrap">
               <table class="quality-page__table v2-table--top" aria-label="检查计划">
                 <thead>
                   <tr>
@@ -700,7 +685,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(plan, index) in filteredPlans" :key="plan.id">
+                  <tr v-for="(plan, index) in plans" :key="plan.id">
                     <th scope="row">{{ plan.planCode }}</th>
                     <td>
                       <V2Button
@@ -721,7 +706,7 @@ onBeforeUnmount(() => {
                     <td class="v2-table-cell--actions">
                       <V2ActionMenu
                         :label="`${plan.planCode}更多操作`"
-                        :placement="index >= filteredPlans.length - 3 ? 'top-end' : 'bottom-end'"
+                        :placement="index >= plans.length - 3 ? 'top-end' : 'bottom-end'"
                       >
                         <V2Button
                           v-if="canPlan && plan.status === 'DRAFT'"

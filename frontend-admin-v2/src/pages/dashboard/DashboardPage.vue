@@ -1331,8 +1331,6 @@ function isAbort(errorValue: unknown): boolean {
 }
 .risk-filter {
   width: 112px;
-  font-size: var(--v2-font-size-11);
-  font-weight: var(--v2-font-weight-regular);
 }
 .risk-panel__actions {
   display: flex;

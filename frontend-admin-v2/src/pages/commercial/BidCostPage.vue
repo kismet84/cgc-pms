@@ -477,24 +477,27 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
+        <template v-if="records.length" #footer>
+          <nav class="bid-cost-page__pagination" aria-label="投标成本分页">
+            <span>共 {{ total }} 条</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="filter.pageNo <= 1"
+              @click="changePage(filter.pageNo - 1)"
+              >上一页</V2Button
+            >
+            <span>第 {{ filter.pageNo }} 页</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="filter.pageNo >= pageCount"
+              @click="changePage(filter.pageNo + 1)"
+              >下一页</V2Button
+            >
+          </nav>
+        </template>
       </V2Card>
-
-      <nav v-if="records.length" class="bid-cost-page__pagination" aria-label="投标成本分页">
-        <span>共 {{ total }} 条</span>
-        <V2Button
-          variant="secondary"
-          :disabled="filter.pageNo <= 1"
-          @click="changePage(filter.pageNo - 1)"
-          >上一页</V2Button
-        >
-        <span>第 {{ filter.pageNo }} 页</span>
-        <V2Button
-          variant="secondary"
-          :disabled="filter.pageNo >= pageCount"
-          @click="changePage(filter.pageNo + 1)"
-          >下一页</V2Button
-        >
-      </nav>
 
       <V2Dialog
         :open="detailLoading || panelMode !== 'closed'"

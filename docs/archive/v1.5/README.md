@@ -13,12 +13,13 @@ v1.5 为开发版本收口，不代表稳定版本发布、Tag、GitHub Release 
 - [试点培训与确认过程](training/)
 - [UI V2 历史基线与冻结矩阵](ui-v2/)
 - [产品情报、研究与迭代决策](product-intelligence/)
-- [数据库审计报告](database/)
+- [历史数据库证据](database/)
+- [历史运行手册](runbook/)
 - [能力确认单](manuals/)
 - [未来开发计划快照](未来开发计划.md)
 - [历史开发记录快照](历史开发记录.md)
 - [归档清单](MANIFEST.md)
 
-当前规范、计划、质量报告、迭代记录、Backlog 和培训入口分别位于 `docs/standards/`、`docs/plans/`、`docs/quality/`、`docs/iterations/`、`docs/backlog/`、`docs/training/`。
+当前规范、计划、质量报告、迭代记录、Backlog 和培训入口分别位于 `docs/standards/`、`docs/plans/`、`docs/quality/`、`docs/iterations/`、`docs/backlog/`、`docs/training/`；CI 失败分类以 `.agents/skills/cgc-pms-ci-gate-triage/SKILL.md` 为准。
 
 生产仍受 `REL-CREDENTIAL-ROTATION`、`REL-FILE-RESCAN`、`REL-TARGET-SHA-REVALIDATION` 三项发布门阻塞。正式入口切换和 Legacy 退役未执行。

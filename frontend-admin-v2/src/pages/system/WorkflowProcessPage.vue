@@ -25,6 +25,7 @@ import {
   type WorkflowTemplateRecord,
 } from '@/services/workflow-process'
 import { isApiClientError } from '@/services/request'
+import { workflowBusinessTypeLabel } from '@/pages/workbench/model'
 
 const loading = ref(false)
 const detailLoading = ref(false)
@@ -341,7 +342,7 @@ onBeforeUnmount(() => controller?.abort())
           <V2Input
             v-model="filter.businessType"
             label="业务类型"
-            placeholder="例如 CONTRACT_APPROVAL"
+            placeholder="输入业务类型编码"
             hide-label
           />
           <V2Select
@@ -366,7 +367,7 @@ onBeforeUnmount(() => controller?.abort())
     </V2PageState>
 
     <div v-else>
-      <V2Card title="流程模板">
+      <V2Card>
         <V2PageState
           v-if="!templates.length"
           kind="empty"
@@ -398,7 +399,7 @@ onBeforeUnmount(() => controller?.abort())
                   </V2Button>
                 </th>
                 <td>{{ template.templateName }}</td>
-                <td>{{ template.businessType }}</td>
+                <td>{{ workflowBusinessTypeLabel(template.businessType) }}</td>
                 <td>{{ template.nodeCount }}</td>
                 <td>
                   <V2Badge :tone="template.enabled === 1 ? 'success' : 'neutral'">

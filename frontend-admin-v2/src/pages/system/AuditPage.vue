@@ -97,7 +97,7 @@ onBeforeUnmount(() => controller?.abort())
     <V2PageState v-else-if="error" kind="error" title="审计日志加载失败" :description="error">
       <template #actions><V2Button @click="refresh">重试</V2Button></template>
     </V2PageState>
-    <V2Card v-else title="审计记录">
+    <V2Card v-else>
       <V2PageState
         v-if="!records.length"
         kind="empty"

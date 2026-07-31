@@ -35,7 +35,7 @@
 
 - [用户手册](manuals/README.md)
 - [培训材料](training/README.md)
-- [CI 失败排障手册](runbook/ci-failure-triage.md)
+- [CI 失败分类与门禁排障规范](../.agents/skills/cgc-pms-ci-gate-triage/SKILL.md)
 - [Prompt 索引](prompt/README.md)
 - [当前 backlog](backlog/current-focus.md)
 - [产品情报：项目地图、竞品分析与迭代决策](product-intelligence/README.md)

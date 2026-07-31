@@ -300,10 +300,7 @@ describe('M4 variation page', () => {
     await wrapper.get('#variation-editor-form').trigger('submit')
     await flushPromises()
 
-    expect(updateVariation).toHaveBeenCalledWith(
-      '9',
-      expect.objectContaining({ version: '3' }),
-    )
+    expect(updateVariation).toHaveBeenCalledWith('9', expect.objectContaining({ version: '3' }))
   })
 
   it('keeps item editing behind its dedicated permission', async () => {

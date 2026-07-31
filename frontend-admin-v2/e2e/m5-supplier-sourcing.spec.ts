@@ -250,7 +250,13 @@ test.describe('M5 supplier sourcing V2', () => {
     await install(page)
     await page.goto('/supplier-sourcing')
     await expect(page).toHaveURL(/\/supplier-sourcing$/)
-    await expect(page.getByText('事件 1', { exact: true })).toBeVisible()
+    const eventTable = page.getByRole('table', { name: '招采事件列表' })
+    await expect(eventTable).toBeVisible()
+    await expect(
+      eventTable
+        .locator('xpath=ancestor::section[contains(@class,"v2-card")]')
+        .locator(':scope > .v2-card__header'),
+    ).toHaveCount(0)
     await expect(page.getByText('评价 0', { exact: true })).toBeVisible()
     await expect(page.getByText('退货 0', { exact: true })).toBeVisible()
     await expect(page.getByText('SRC-001', { exact: true })).toBeVisible()

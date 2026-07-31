@@ -13,7 +13,7 @@ dev/prod 同时扫描 MySQL active + legacy；local/test 同时扫描 H2 active 
 
 测试边界：专用基线测试直接扫描 H2 active + legacy + Java，证明空库选择 B215、V180 继续 legacy。历史全量业务回归的测试 classpath 只扫描冻结的 H2 legacy + Java fixture 链，以保留 V90 等既有测试专用数据；该测试夹具不代表新环境默认数据，也不能作为 B215 空库证据。
 
-历史完整性清单：[flyway-v215-manifest.csv](flyway-v215-manifest.csv)，共 425 行：MySQL SQL 212、H2 SQL 204、H2 Java 9。清单保存冻结前 SHA-256；移动只改变路径，不改变内容。
+历史完整性清单：[flyway-v215-manifest.csv](../archive/v1.5/database/flyway-v215-manifest.csv)，共 425 行：MySQL SQL 212、H2 SQL 204、H2 Java 9。清单保存冻结前 SHA-256；移动只改变路径，不改变内容。
 
 ## Schema 生成与等价证据
 

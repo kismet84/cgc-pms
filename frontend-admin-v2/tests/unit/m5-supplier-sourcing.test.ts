@@ -67,9 +67,9 @@ describe('M5 supplier sourcing closed-loop contract', () => {
     expect(headingCard).toContain('新建招采事件')
     expect(headingCard).toContain('登记履约评价')
     expect(headingCard).toContain('登记退货')
-    const eventCard = source.match(/<V2Card v-else title="招采事件"[\s\S]*?<\/V2Card>/)?.[0] ?? ''
-    expect(eventCard).toMatch(/<template #title-extra\b/)
-    expect(eventCard).toContain('事件 {{ events.length }}')
+    const eventCard = source.match(/<V2Card v-else>[\s\S]*?<\/V2Card>/)?.[0] ?? ''
+    expect(eventCard).toContain('aria-label="招采事件列表"')
+    expect(eventCard).not.toMatch(/<template #title-extra\b/)
     const performanceCard =
       source.match(/<V2Card title="履约评价、退货与黑名单"[\s\S]*?<\/V2Card>/)?.[0] ?? ''
     expect(performanceCard).toMatch(/<template #title-extra\b/)

@@ -4,7 +4,6 @@ import type {
   ContractBudgetAllocationRecord,
   ContractCompositeRecord,
   ContractItemRecord,
-  ContractKpi,
   ContractPage,
   ContractPaymentTermRecord,
   ContractQuery,
@@ -34,7 +33,6 @@ import {
   deleteContract,
   loadContractComposite,
   loadContractBudgetAllocations,
-  loadContractKpi,
   loadContractPage,
   loadBudget,
   loadBudgetPage,
@@ -120,7 +118,6 @@ watch(errorMessage, (message) => {
 })
 const contracts = ref<ContractPage['records']>([])
 const total = ref(0)
-const kpi = ref<ContractKpi | null>(null)
 const detail = ref<ContractCompositeRecord | null>(null)
 const budgetAllocations = ref<ContractBudgetAllocationRecord[]>([])
 const allocationDrafts = ref<ContractBudgetAllocationRecord[]>([])
@@ -400,29 +397,14 @@ async function loadLedger(preserveNotice = false): Promise<void> {
   loading.value = true
   if (!preserveNotice) resetNotices()
   try {
-    const [page, summary] = await Promise.all([
-      loadContractPage(filter, controller.signal),
-      loadContractKpi(
-        {
-          projectId: filter.projectId,
-          contractType: filter.contractType,
-          contractStatus: filter.contractStatus,
-          approvalStatus: filter.approvalStatus,
-          startDate: filter.startDate,
-          endDate: filter.endDate,
-        },
-        controller.signal,
-      ),
-    ])
+    const page = await loadContractPage(filter, controller.signal)
     if (generation !== listGeneration) return
     contracts.value = page.records
     total.value = page.total
-    kpi.value = summary
   } catch (error) {
     if (!controller.signal.aborted && generation === listGeneration) {
       contracts.value = []
       total.value = 0
-      kpi.value = null
       errorMessage.value = errorText(error, '合同台账加载失败')
     }
   } finally {
@@ -704,10 +686,7 @@ async function submitCurrentContract(): Promise<void> {
   submitting.value = true
   resetNotices()
   try {
-    await submitContract(
-      id,
-      currentContract.value?.version ?? form.value.contract.version,
-    )
+    await submitContract(id, currentContract.value?.version ?? form.value.contract.version)
     await loadDetail(true)
     await backToLedger()
     successMessage.value = '合同已提交审批。'
@@ -827,31 +806,6 @@ onBeforeUnmount(() => {
         <template #actions>
           <V2Button v-if="canCreate" size="small" @click="openCreate">新建合同</V2Button>
         </template>
-      </V2Card>
-
-      <V2Card v-if="kpi" class="contract-page__kpi-card">
-        <dl class="v2-ledger-kpis v2-ledger-kpis--five">
-          <div>
-            <dt>合同总数</dt>
-            <dd>{{ kpi.totalCount }}</dd>
-          </div>
-          <div>
-            <dt>合同总额</dt>
-            <dd>{{ formatAmount(kpi.totalAmount) }}</dd>
-          </div>
-          <div>
-            <dt>累计已付</dt>
-            <dd>{{ formatAmount(kpi.paidAmount) }}</dd>
-          </div>
-          <div>
-            <dt>未付金额</dt>
-            <dd>{{ formatAmount(kpi.unpaidAmount) }}</dd>
-          </div>
-          <div>
-            <dt>逾期合同</dt>
-            <dd>{{ kpi.overdueCount }}</dd>
-          </div>
-        </dl>
       </V2Card>
 
       <V2Card class="contract-page__ledger-card">

@@ -301,7 +301,7 @@ onBeforeUnmount(() => loadController?.abort())
       title="暂无材料"
       description="调整筛选条件后重试。"
     />
-    <V2Card v-else title="查询结果">
+    <V2Card v-else>
       <div class="material-page__table-wrap">
         <table class="v2-table--top">
           <thead>

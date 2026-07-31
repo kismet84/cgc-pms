@@ -3,7 +3,6 @@ import type {
   MaterialRecord,
   StockConsumptionBaselineRecord,
   StockIncomingSupplyRecord,
-  StockKpiRecord,
   StockLedger,
   StockRecord,
   StockTransferCandidateRecord,
@@ -32,7 +31,6 @@ import {
   loadMaterials,
   loadStockConsumptionBaseline,
   loadStockIncomingSupplies,
-  loadStockKpi,
   loadStockLedger,
   loadStocks,
   loadStockTransferCandidates,
@@ -57,7 +55,6 @@ const materials = ref<MaterialRecord[]>([])
 const stocks = ref<StockRecord[]>([])
 const warehouseTotal = ref(0)
 const stockTotal = ref(0)
-const kpi = ref<StockKpiRecord | null>(null)
 const selectedStock = ref<StockRecord | null>(null)
 const ledger = ref<StockLedger | null>(null)
 const candidates = ref<StockTransferCandidateRecord[]>([])
@@ -205,7 +202,7 @@ async function loadPage(): Promise<void> {
       return
     }
 
-    const [warehousePage, materialPage, stockPage, nextKpi] = await Promise.all([
+    const [warehousePage, materialPage, stockPage] = await Promise.all([
       loadWarehouses(
         { pageNo: 1, pageSize: 200, projectId: projectId.value || undefined, status: 'ENABLE' },
         current.signal,
@@ -224,22 +221,12 @@ async function loadPage(): Promise<void> {
         },
         current.signal,
       ),
-      canReadStock.value
-        ? loadStockKpi(
-            {
-              warehouseId: filter.warehouseId || undefined,
-              projectId: projectId.value || undefined,
-            },
-            current.signal,
-          )
-        : Promise.resolve(null),
     ])
     if (currentGeneration !== generation) return
     warehouses.value = warehousePage.records
     materials.value = materialPage.records
     stocks.value = stockPage.records
     stockTotal.value = Number(stockPage.total ?? 0)
-    kpi.value = nextKpi
     if (selectedStock.value) {
       const refreshed = stockPage.records.find((item) => item.id === selectedStock.value?.id)
       if (refreshed) {
@@ -553,24 +540,6 @@ onBeforeUnmount(() => {
           >
         </div>
       </template>
-      <dl v-if="mode === 'stock' && kpi" class="v2-ledger-kpis" aria-label="库存指标">
-        <div>
-          <dt>启用仓库</dt>
-          <dd>{{ kpi.warehouseCount }}</dd>
-        </div>
-        <div>
-          <dt>低库存项</dt>
-          <dd>{{ kpi.lowStockCount }}</dd>
-        </div>
-        <div>
-          <dt>库存物料</dt>
-          <dd>{{ kpi.materialTypeCount }}</dd>
-        </div>
-        <div>
-          <dt>入库 / 出库流水</dt>
-          <dd>{{ kpi.txnInCount }} / {{ kpi.txnOutCount }}</dd>
-        </div>
-      </dl>
     </V2Card>
 
     <V2PageState
@@ -648,18 +617,25 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <nav v-if="pageCount > 1" class="inventory-workspace-page__pager" aria-label="仓库分页">
-          <V2Button variant="secondary" :disabled="pageNo <= 1" @click="changePage(pageNo - 1)"
-            >上一页</V2Button
-          >
-          <span>第 {{ pageNo }} / {{ pageCount }} 页</span>
-          <V2Button
-            variant="secondary"
-            :disabled="pageNo >= pageCount"
-            @click="changePage(pageNo + 1)"
-            >下一页</V2Button
-          >
-        </nav>
+        <template v-if="pageCount > 1" #footer>
+          <nav class="inventory-workspace-page__pager" aria-label="仓库分页">
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo <= 1"
+              @click="changePage(pageNo - 1)"
+              >上一页</V2Button
+            >
+            <span>第 {{ pageNo }} 页</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo >= pageCount"
+              @click="changePage(pageNo + 1)"
+              >下一页</V2Button
+            >
+          </nav>
+        </template>
       </V2Card>
     </template>
 
@@ -669,10 +645,7 @@ onBeforeUnmount(() => {
         title="暂无库存台账"
         description="当前项目和筛选范围没有库存余额记录。"
       />
-      <V2Card v-else title="全部库存余额">
-        <template #title-extra>
-          <V2Badge tone="neutral">共 {{ stockTotal }} 条</V2Badge>
-        </template>
+      <V2Card v-else>
         <div
           class="inventory-workspace-page__table-wrap"
           role="region"
@@ -727,18 +700,25 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <nav v-if="pageCount > 1" class="inventory-workspace-page__pager" aria-label="库存台账分页">
-          <V2Button variant="secondary" :disabled="pageNo <= 1" @click="changePage(pageNo - 1)"
-            >上一页</V2Button
-          >
-          <span>第 {{ pageNo }} / {{ pageCount }} 页</span>
-          <V2Button
-            variant="secondary"
-            :disabled="pageNo >= pageCount"
-            @click="changePage(pageNo + 1)"
-            >下一页</V2Button
-          >
-        </nav>
+        <template v-if="pageCount > 1" #footer>
+          <nav class="inventory-workspace-page__pager" aria-label="库存台账分页">
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo <= 1"
+              @click="changePage(pageNo - 1)"
+              >上一页</V2Button
+            >
+            <span>第 {{ pageNo }} 页</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo >= pageCount"
+              @click="changePage(pageNo + 1)"
+              >下一页</V2Button
+            >
+          </nav>
+        </template>
       </V2Card>
     </template>
 
@@ -877,7 +857,7 @@ onBeforeUnmount(() => {
               @click="changeTransactionPage(transactionPageNo - 1)"
               >上一页</V2Button
             >
-            <span>第 {{ transactionPageNo }} / {{ transactionPageCount }} 页</span>
+            <span>第 {{ transactionPageNo }} 页</span>
             <V2Button
               type="button"
               variant="secondary"
@@ -1036,7 +1016,6 @@ onBeforeUnmount(() => {
 }
 .inventory-workspace-page__pager {
   justify-content: flex-end;
-  margin-top: var(--v2-space-4);
 }
 .inventory-workspace-page__drawer-summary {
   display: flex;

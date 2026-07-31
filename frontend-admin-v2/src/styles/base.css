@@ -30,6 +30,8 @@ body {
   margin: 0;
   color: var(--v2-color-text);
   background: var(--v2-color-canvas);
+  font-size: var(--v2-font-size-13);
+  line-height: var(--v2-line-height-body);
 }
 
 #app,

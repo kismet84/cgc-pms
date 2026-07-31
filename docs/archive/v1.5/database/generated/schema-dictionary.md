@@ -1,10 +1,10 @@
 # CGC-PMS 数据库结构字典（自动生成）
 
-> 生成时间：2026-07-31 19:28:36 +08:00；来源：MySQL information_schema / 数据库 `cgc_pms`。请勿手工修改。
+> 生成时间：2026-07-17 12:51:59 +08:00；来源：MySQL information_schema / 数据库 `cgc_pms_merge_v210`。请勿手工修改。
 
-- 业务表数量：197
-- 字段数量：3409
-- 外键列数量：428
+- 业务表数量：181
+- 字段数量：3193
+- 外键列数量：366
 
 ## account_receivable
 
@@ -38,7 +38,7 @@
 ## accounting_entry
 
 - 表注释：会计凭证主表
-- information_schema 估算行数：6
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -62,27 +62,26 @@
 |18|`contract_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
 |19|`pay_application_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
 |20|`pay_record_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
-|21|`cash_journal_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
-|22|`posted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
-|23|`reversed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
-|24|`reversed_entry_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
-|25|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
-|26|`external_sync_status`|`varchar(32)`|YES|`∅`|||未定义（需要人工确认）|
-|27|`external_sync_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
-|28|`collection_record_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
-|29|`review_status`|`varchar(32)`|NO|`PENDING`|||PENDING/APPROVED/REJECTED|
-|30|`reviewed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
-|31|`reviewed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
-|32|`review_comment`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
-|33|`posted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
-|34|`period_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
-|35|`adjustment_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
-|36|`original_entry_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|21|`posted_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|22|`reversed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|23|`reversed_entry_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|24|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|25|`external_sync_status`|`varchar(32)`|YES|`∅`|||未定义（需要人工确认）|
+|26|`external_sync_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|27|`collection_record_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|28|`review_status`|`varchar(32)`|NO|`PENDING`|||PENDING/APPROVED/REJECTED|
+|29|`reviewed_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|30|`reviewed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|31|`review_comment`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|32|`posted_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|33|`period_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|34|`adjustment_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|35|`original_entry_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
 
 ## accounting_entry_line
 
 - 表注释：会计凭证明细表
-- information_schema 估算行数：12
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -106,7 +105,7 @@
 ## alert_lifecycle_event
 
 - 表注释：预警不可变生命周期事件
-- information_schema 估算行数：13
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -125,7 +124,7 @@
 ## alert_log
 
 - 表注释：预警记录表
-- information_schema 估算行数：13
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -168,7 +167,7 @@
 ## alert_notification_send_record
 
 - 表注释：预警通知渠道发送记录
-- information_schema 估算行数：20
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -187,7 +186,7 @@
 ## alert_rule_config
 
 - 表注释：预警规则配置表
-- information_schema 估算行数：0
+- information_schema 估算行数：10
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -273,56 +272,16 @@
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
 |1|`id`|`bigint`|NO|`∅`|PRI||投标项目ID|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
+|2|`tenant_id`|`bigint`|NO|`0`|||未定义（需要人工确认）|
 |3|`project_id`|`bigint`|YES|`∅`|MUL||中标后关联的项目ID，未中标时为NULL|
-|4|`bid_code`|`varchar(50)`|NO|`∅`|||投标成本业务编号|
-|5|`bid_project_name`|`varchar(200)`|NO|`∅`|||投标项目名称|
-|6|`bid_status`|`varchar(50)`|NO|`BIDDING`|MUL||BIDDING投标中/WON已中标/LOST未中标|
-|7|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
-|8|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
-|9|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
-|10|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
-|11|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
-|12|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
-
-## bid_cost_target_transfer
-
-- 表注释：投标成本转入目标成本不可变事实
-- information_schema 估算行数：1
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||ä¸»é”®|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||ç§Ÿæˆ·ID|
-|3|`bid_cost_id`|`bigint`|NO|`∅`|MUL||æŠ•æ ‡æˆæœ¬ID|
-|4|`project_id`|`bigint`|NO|`∅`|MUL||é¡¹ç›®ID|
-|5|`target_id`|`bigint`|NO|`∅`|MUL||ç›®æ ‡æˆæœ¬ç‰ˆæœ¬ID|
-|6|`mapping_version_id`|`bigint`|NO|`∅`|MUL||æ˜ å°„ç‰ˆæœ¬ID|
-|7|`transfer_code`|`varchar(64)`|NO|`∅`|||è½¬å…¥å•å·|
-|8|`idempotency_key`|`varchar(128)`|NO|`∅`|||å¹‚ç­‰é”®|
-|9|`total_amount`|`decimal(18,2)`|NO|`∅`|||è½¬å…¥æ€»é¢|
-|10|`status`|`varchar(16)`|NO|`POSTED`|||äº‹å®žçŠ¶æ€|
-|11|`approval_instance_id`|`bigint`|NO|`∅`|MUL||å®¡æ‰¹å®žä¾‹ID|
-|12|`reversal_of_id`|`bigint`|YES|`∅`|MUL||è¢«å†²é”€äº‹å®žID|
-|13|`posted_by`|`bigint`|NO|`∅`|||è®°è´¦äººID|
-|14|`posted_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|è®°è´¦æ—¶é—´|
-|15|`remark`|`varchar(500)`|YES|`∅`|||å¤‡æ³¨|
-
-## bid_cost_target_transfer_line
-
-- 表注释：投标成本转入明细
-- information_schema 估算行数：1
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||ä¸»é”®|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||ç§Ÿæˆ·ID|
-|3|`transfer_id`|`bigint`|NO|`∅`|MUL||è½¬å…¥äº‹å®žID|
-|4|`source_cost_item_id`|`bigint`|NO|`∅`|MUL||æ¥æºæˆæœ¬æ˜Žç»†ID|
-|5|`source_subject_id`|`bigint`|NO|`∅`|MUL||æ¥æºæˆæœ¬ç§‘ç›®ID|
-|6|`target_subject_id`|`bigint`|NO|`∅`|MUL||ç›®æ ‡æˆæœ¬ç§‘ç›®ID|
-|7|`amount`|`decimal(18,2)`|NO|`∅`|||è½¬å…¥é‡‘é¢|
-|8|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|åˆ›å»ºæ—¶é—´|
+|4|`bid_project_name`|`varchar(200)`|NO|`∅`|||投标项目名称|
+|5|`bid_status`|`varchar(50)`|NO|`BIDDING`|MUL||BIDDING投标中/WON已中标/LOST未中标|
+|6|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|7|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|8|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|9|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|10|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|11|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 
 ## bid_deposit
 
@@ -347,108 +306,10 @@
 |14|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
 |15|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 
-## biz_document_default_binding
-
-- 表注释：租户业务类型默认模板版本
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`tenant_id`|`bigint`|NO|`∅`|PRI||租户ID|
-|2|`business_type`|`varchar(50)`|NO|`∅`|PRI||PAYMENT或SETTLEMENT|
-|3|`template_id`|`bigint`|NO|`∅`|||默认模板ID|
-|4|`template_version_id`|`bigint`|NO|`∅`|||默认已发布版本ID|
-|5|`lock_version`|`int`|NO|`0`|||默认绑定CAS版本|
-|6|`created_by`|`bigint`|YES|`∅`|||创建人|
-|7|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|8|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|9|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-
-## biz_document_generation
-
-- 表注释：可审计PDF生成事实
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||生成事实ID，雪花ID|
-|2|`tenant_id`|`bigint`|NO|`∅`|MUL||租户ID|
-|3|`generation_no`|`varchar(50)`|NO|`∅`|||人类可读生成编号|
-|4|`business_type`|`varchar(50)`|NO|`∅`|||PAYMENT或SETTLEMENT|
-|5|`business_id`|`bigint`|NO|`∅`|||源业务ID|
-|6|`template_id`|`bigint`|NO|`∅`|||实际模板ID|
-|7|`template_version_id`|`bigint`|NO|`∅`|||实际不可变版本ID|
-|8|`schema_version`|`varchar(30)`|NO|`∅`|||数据契约版本快照|
-|9|`source_digest`|`char(64)`|NO|`∅`|||规范化源数据SHA-256|
-|10|`output_sha256`|`char(64)`|YES|`∅`|||归档PDF SHA-256|
-|11|`renderer_id`|`varchar(50)`|NO|`∅`|||渲染器标识|
-|12|`renderer_version`|`varchar(50)`|NO|`∅`|||渲染器版本|
-|13|`status`|`varchar(20)`|NO|`PENDING`|||PENDING/RENDERING/SUCCEEDED/FAILED|
-|14|`file_id`|`bigint`|YES|`∅`|MUL||成功归档的sys_file.id|
-|15|`idempotency_key`|`varchar(120)`|NO|`∅`|||租户内生成幂等键|
-|16|`retry_of_generation_id`|`bigint`|YES|`∅`|MUL||失败重试来源生成事实ID|
-|17|`failure_code`|`varchar(80)`|YES|`∅`|||稳定失败码，不存堆栈|
-|18|`requested_by`|`bigint`|NO|`∅`|||请求用户|
-|19|`requested_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|请求时间|
-|20|`completed_at`|`datetime`|YES|`∅`|||生成完成时间|
-|21|`created_by`|`bigint`|YES|`∅`|||创建人|
-|22|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|23|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|24|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|25|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|26|`remark`|`varchar(500)`|YES|`∅`|||备注|
-
-## biz_document_template
-
-- 表注释：业务单据模板定义
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||模板ID，雪花ID|
-|2|`tenant_id`|`bigint`|NO|`∅`|MUL||租户ID|
-|3|`template_code`|`varchar(80)`|NO|`∅`|||租户内稳定模板编码|
-|4|`template_name`|`varchar(200)`|NO|`∅`|||模板名称|
-|5|`business_type`|`varchar(50)`|NO|`∅`|||PAYMENT或SETTLEMENT|
-|6|`engine_type`|`varchar(20)`|NO|`HTML_PDF`|||受限HTML/CSS转PDF|
-|7|`enabled`|`tinyint`|NO|`1`|||是否允许继续维护和发布|
-|8|`created_by`|`bigint`|YES|`∅`|||创建人|
-|9|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|10|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|11|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|12|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|13|`remark`|`varchar(500)`|YES|`∅`|||备注|
-|14|`active_unique_token`|`bigint`|YES|`∅`||STORED GENERATED|活动模板唯一键辅助列|
-
-## biz_document_template_version
-
-- 表注释：不可变发布的业务单据模板版本
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||模板版本ID，雪花ID|
-|2|`tenant_id`|`bigint`|NO|`∅`|MUL||租户ID|
-|3|`template_id`|`bigint`|NO|`∅`|||模板ID|
-|4|`version_no`|`int`|NO|`∅`|||从1递增的版本号|
-|5|`status`|`varchar(20)`|NO|`DRAFT`|||DRAFT/PUBLISHED/DISABLED|
-|6|`schema_version`|`varchar(30)`|NO|`∅`|||数据契约版本|
-|7|`template_content`|`mediumtext`|NO|`∅`|||受限HTML/CSS模板正文|
-|8|`content_hash`|`char(64)`|NO|`∅`|||模板正文SHA-256|
-|9|`field_manifest`|`json`|NO|`∅`|||允许字段清单快照|
-|10|`published_by`|`bigint`|YES|`∅`|||发布人|
-|11|`published_at`|`datetime`|YES|`∅`|||发布时间|
-|12|`created_by`|`bigint`|YES|`∅`|||创建人|
-|13|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|14|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|15|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|16|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|17|`remark`|`varchar(500)`|YES|`∅`|||备注|
-
 ## budget_ledger
 
 - 表注释：不可变预算占用与消耗台账
-- information_schema 估算行数：7
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -519,7 +380,7 @@
 ## cash_forecast
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -542,7 +403,7 @@
 ## cash_forecast_cycle
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -574,7 +435,7 @@
 ## cash_forecast_line
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：4
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -597,7 +458,7 @@
 ## cash_funding_action
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -645,7 +506,7 @@
 ## cash_journal_entry
 
 - 表注释：资金日记账流水
-- information_schema 估算行数：4
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -845,7 +706,7 @@
 ## collection_forecast
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -939,7 +800,7 @@
 ## contract_budget_allocation
 
 - 表注释：合同预算科目分配
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1090,7 +951,7 @@
 ## cost_item
 
 - 表注释：成本明细表
-- information_schema 估算行数：7
+- information_schema 估算行数：1
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1122,7 +983,7 @@
 ## cost_subject
 
 - 表注释：成本科目表
-- information_schema 估算行数：104
+- information_schema 估算行数：114
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1143,91 +1004,6 @@
 |15|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
 |16|`account_category`|`varchar(20)`|NO|`COST`|||科目大类：COST成本，REVENUE收入，SETTLEMENT结算，RECEIVABLE应收|
 |17|`active_unique_token`|`bigint`|YES|`∅`||STORED GENERATED|活动行唯一键辅助列：活动行=0，删除行=id|
-
-## cost_subject_assignment_rule
-
-- 表注释：显式成本归集规则
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||ä¸»é”®|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||ç§Ÿæˆ·ID|
-|3|`mapping_version_id`|`bigint`|NO|`∅`|MUL||æ˜ å°„ç‰ˆæœ¬ID|
-|4|`rule_code`|`varchar(64)`|NO|`∅`|||è§„åˆ™ç¼–ç |
-|5|`source_type`|`varchar(64)`|NO|`∅`|||ä¸šåŠ¡æ¥æºç±»åž‹|
-|6|`business_category`|`varchar(64)`|NO|`*`|||ä¸šåŠ¡åˆ†ç±»|
-|7|`project_id`|`bigint`|YES|`∅`|MUL||é¡¹ç›®ID|
-|8|`cost_subject_id`|`bigint`|NO|`∅`|MUL||æˆæœ¬ç§‘ç›®ID|
-|9|`priority`|`int`|NO|`100`|||åŒ¹é…ä¼˜å…ˆçº§|
-|10|`status`|`varchar(16)`|NO|`DRAFT`|||è§„åˆ™çŠ¶æ€|
-|11|`effective_from`|`date`|NO|`∅`|||ç”Ÿæ•ˆå¼€å§‹æ—¥æœŸ|
-|12|`effective_to`|`date`|YES|`∅`|||ç”Ÿæ•ˆç»“æŸæ—¥æœŸ|
-|13|`version`|`int`|NO|`0`|||ä¹è§‚é”ç‰ˆæœ¬|
-|14|`created_by`|`bigint`|YES|`∅`|||åˆ›å»ºäººID|
-|15|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|åˆ›å»ºæ—¶é—´|
-|16|`updated_by`|`bigint`|YES|`∅`|||æ›´æ–°äººID|
-|17|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|æ›´æ–°æ—¶é—´|
-|18|`remark`|`varchar(500)`|YES|`∅`|||å¤‡æ³¨|
-
-## cost_subject_legacy_cleanup_audit
-
-- 表注释：旧成本科目删除与替代审计
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||ä¸»é”®|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||ç§Ÿæˆ·ID|
-|3|`legacy_subject_id`|`bigint`|NO|`∅`|||æ—§æˆæœ¬ç§‘ç›®ID|
-|4|`legacy_subject_code`|`varchar(64)`|NO|`∅`|||æ—§æˆæœ¬ç§‘ç›®ç¼–ç |
-|5|`legacy_subject_name`|`varchar(200)`|NO|`∅`|||æ—§æˆæœ¬ç§‘ç›®åç§°|
-|6|`replacement_subject_id`|`bigint`|NO|`∅`|||æ›¿ä»£æˆæœ¬ç§‘ç›®ID|
-|7|`replacement_subject_code`|`varchar(64)`|NO|`∅`|||æ›¿ä»£æˆæœ¬ç§‘ç›®ç¼–ç |
-|8|`replacement_subject_name`|`varchar(200)`|NO|`∅`|||æ›¿ä»£æˆæœ¬ç§‘ç›®åç§°|
-|9|`migration_reason`|`varchar(500)`|NO|`∅`|||è¿ç§»åŽŸå› |
-|10|`migrated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|è¿ç§»æ—¶é—´|
-
-## cost_subject_mapping_item
-
-- 表注释：历史成本科目到V2口径映射
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||ä¸»é”®|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||ç§Ÿæˆ·ID|
-|3|`mapping_version_id`|`bigint`|NO|`∅`|MUL||æ˜ å°„ç‰ˆæœ¬ID|
-|4|`source_subject_id`|`bigint`|NO|`∅`|MUL||åŽ†å²æ¥æºç§‘ç›®ID|
-|5|`target_group_code`|`varchar(64)`|NO|`∅`|||ç›®æ ‡ç§‘ç›®ç»„ç¼–ç |
-|6|`target_subject_id`|`bigint`|YES|`∅`|MUL||ç›®æ ‡ç§‘ç›®ID|
-|7|`historical_display_name`|`varchar(200)`|NO|`∅`|||åŽ†å²æ˜¾ç¤ºåç§°|
-|8|`mapping_reason`|`varchar(500)`|YES|`∅`|||æ˜ å°„åŽŸå› |
-|9|`created_by`|`bigint`|YES|`∅`|||åˆ›å»ºäººID|
-|10|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|åˆ›å»ºæ—¶é—´|
-
-## cost_subject_mapping_version
-
-- 表注释：成本科目V2映射版本
-- information_schema 估算行数：1
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||ä¸»é”®|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||ç§Ÿæˆ·ID|
-|3|`version_code`|`varchar(64)`|NO|`∅`|||æ˜ å°„ç‰ˆæœ¬ç¼–ç |
-|4|`version_name`|`varchar(200)`|NO|`∅`|||æ˜ å°„ç‰ˆæœ¬åç§°|
-|5|`status`|`varchar(16)`|NO|`DRAFT`|||ç‰ˆæœ¬çŠ¶æ€|
-|6|`effective_date`|`date`|YES|`∅`|||ç”Ÿæ•ˆæ—¥æœŸ|
-|7|`approval_instance_id`|`bigint`|YES|`∅`|MUL||å®¡æ‰¹å®žä¾‹ID|
-|8|`activated_by`|`bigint`|YES|`∅`|||å¯ç”¨äººID|
-|9|`activated_at`|`datetime`|YES|`∅`|||å¯ç”¨æ—¶é—´|
-|10|`version`|`int`|NO|`0`|||ä¹è§‚é”ç‰ˆæœ¬|
-|11|`created_by`|`bigint`|YES|`∅`|||åˆ›å»ºäººID|
-|12|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|åˆ›å»ºæ—¶é—´|
-|13|`updated_by`|`bigint`|YES|`∅`|||æ›´æ–°äººID|
-|14|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|æ›´æ–°æ—¶é—´|
-|15|`remark`|`varchar(500)`|YES|`∅`|||å¤‡æ³¨|
 
 ## cost_summary
 
@@ -1295,7 +1071,7 @@
 ## cost_target_item
 
 - 表注释：目标成本明细表
-- information_schema 估算行数：1
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1320,7 +1096,7 @@
 ## ct_contract
 
 - 表注释：合同主表
-- information_schema 估算行数：6
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1331,8 +1107,8 @@
 |5|`contract_code`|`varchar(64)`|NO|`∅`|||合同编号|
 |6|`contract_name`|`varchar(200)`|NO|`∅`|||合同名称|
 |7|`contract_type`|`varchar(50)`|NO|`∅`|MUL||总包/分包/采购/租赁/服务等|
-|8|`party_a_id`|`bigint`|NO|`∅`|||甲方合作方ID|
-|9|`party_b_id`|`bigint`|NO|`∅`|||乙方合作方ID|
+|8|`party_a_id`|`bigint`|YES|`∅`|||甲方合作方ID|
+|9|`party_b_id`|`bigint`|YES|`∅`|||乙方合作方ID|
 |10|`contract_amount`|`decimal(18,2)`|NO|`0.00`|||原合同金额|
 |11|`current_amount`|`decimal(18,2)`|NO|`0.00`|||当前合同金额=原合同金额+已生效变更|
 |12|`paid_amount`|`decimal(18,2)`|NO|`0.00`|||累计已付金额|
@@ -1391,7 +1167,7 @@
 ## ct_contract_item
 
 - 表注释：合同明细表
-- information_schema 估算行数：6
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1419,7 +1195,7 @@
 ## ct_contract_payment_term
 
 - 表注释：合同付款条款表
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1487,7 +1263,7 @@
 ## expense_application
 
 - 表注释：费用申请
-- information_schema 估算行数：6
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1536,7 +1312,7 @@
 ## finance_alert
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1599,46 +1375,6 @@
 |15|`resolved_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
 |16|`resolution_note`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 |17|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
-
-## finance_cost_allocation_batch
-
-- 表注释：项目财务费用分摊批次
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||ä¸»é”®|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||ç§Ÿæˆ·ID|
-|3|`batch_code`|`varchar(64)`|NO|`∅`|||åˆ†æ‘Šæ‰¹æ¬¡å·|
-|4|`source_type`|`varchar(32)`|NO|`∅`|||æ¥æºç±»åž‹|
-|5|`source_id`|`bigint`|NO|`∅`|||æ¥æºå•æ®ID|
-|6|`source_amount`|`decimal(18,2)`|NO|`∅`|||å¾…åˆ†æ‘Šé‡‘é¢|
-|7|`allocation_basis`|`varchar(32)`|NO|`∅`|||åˆ†æ‘Šä¾æ®|
-|8|`accounting_period`|`char(7)`|NO|`∅`|||ä¼šè®¡æœŸé—´|
-|9|`cost_subject_id`|`bigint`|NO|`∅`|MUL||è´¢åŠ¡è´¹ç”¨æˆæœ¬ç§‘ç›®ID|
-|10|`idempotency_key`|`varchar(128)`|NO|`∅`|||å¹‚ç­‰é”®|
-|11|`status`|`varchar(16)`|NO|`POSTED`|||äº‹å®žçŠ¶æ€|
-|12|`approval_instance_id`|`bigint`|NO|`∅`|MUL||å®¡æ‰¹å®žä¾‹ID|
-|13|`reversal_of_id`|`bigint`|YES|`∅`|MUL||è¢«å†²é”€æ‰¹æ¬¡ID|
-|14|`posted_by`|`bigint`|NO|`∅`|||è®°è´¦äººID|
-|15|`posted_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|è®°è´¦æ—¶é—´|
-|16|`remark`|`varchar(500)`|YES|`∅`|||å¤‡æ³¨|
-
-## finance_cost_allocation_line
-
-- 表注释：项目财务费用分摊明细
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||ä¸»é”®|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||ç§Ÿæˆ·ID|
-|3|`batch_id`|`bigint`|NO|`∅`|MUL||åˆ†æ‘Šæ‰¹æ¬¡ID|
-|4|`project_id`|`bigint`|NO|`∅`|MUL||é¡¹ç›®ID|
-|5|`basis_value`|`decimal(18,6)`|NO|`∅`|||åˆ†æ‘ŠåŸºæ•°|
-|6|`allocated_amount`|`decimal(18,2)`|NO|`∅`|||åˆ†æ‘Šé‡‘é¢|
-|7|`cost_item_id`|`bigint`|YES|`∅`|MUL||ç”Ÿæˆæˆæœ¬æ˜Žç»†ID|
-|8|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|åˆ›å»ºæ—¶é—´|
 
 ## finance_import_batch
 
@@ -1727,7 +1463,7 @@
 ## finance_period
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1756,7 +1492,7 @@
 ## finance_period_check
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1773,7 +1509,7 @@
 ## finance_reconciliation_issue
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：12
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1792,7 +1528,7 @@
 ## finance_reconciliation_run
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1810,7 +1546,7 @@
 ## fund_account
 
 - 表注释：企业资金账户
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1910,7 +1646,7 @@
 ## invoice_payment_allocation
 
 - 表注释：发票付款金额分配
-- information_schema 估算行数：4
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -1982,7 +1718,7 @@
 ## mat_purchase_order
 
 - 表注释：采购订单表
-- information_schema 估算行数：4
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2013,7 +1749,7 @@
 ## mat_purchase_order_item
 
 - 表注释：采购订单明细表
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2046,7 +1782,7 @@
 ## mat_purchase_request
 
 - 表注释：采购申请表
-- information_schema 估算行数：5
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2068,7 +1804,7 @@
 ## mat_purchase_request_item
 
 - 表注释：采购申请明细表
-- information_schema 估算行数：5
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2180,7 +1916,7 @@
 ## mat_requisition
 
 - 表注释：领料申请主表
-- information_schema 估算行数：0
+- information_schema 估算行数：1
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2208,7 +1944,7 @@
 ## mat_requisition_item
 
 - 表注释：领料申请明细表
-- information_schema 估算行数：0
+- information_schema 估算行数：1
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2254,38 +1990,10 @@
 |17|`remark`|`text`|YES|`∅`|||备注|
 |18|`active_unique_token`|`bigint`|YES|`∅`||STORED GENERATED|库存活动行唯一键辅助列：活动行=0，删除行=id|
 
-## mat_stock_transfer
-
-- 表注释：同项目跨仓库存调拨事实表
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||调拨事实ID，雪花ID|
-|2|`tenant_id`|`bigint`|NO|`∅`|MUL||租户ID|
-|3|`project_id`|`bigint`|NO|`∅`|||两端仓库所属项目ID|
-|4|`source_stock_id`|`bigint`|NO|`∅`|MUL||来源库存ID|
-|5|`target_stock_id`|`bigint`|NO|`∅`|MUL||目标库存ID|
-|6|`source_warehouse_id`|`bigint`|NO|`∅`|||来源仓库ID|
-|7|`target_warehouse_id`|`bigint`|NO|`∅`|||目标仓库ID|
-|8|`material_id`|`bigint`|NO|`∅`|||物料ID|
-|9|`quantity`|`decimal(18,4)`|NO|`∅`|||调拨数量|
-|10|`unit_cost`|`decimal(18,6)`|NO|`0.000000`|||来源移动加权平均单位成本|
-|11|`amount`|`decimal(18,2)`|NO|`0.00`|||调拨库存价值|
-|12|`idempotency_key`|`varchar(100)`|NO|`∅`|||租户内幂等键|
-|13|`status`|`varchar(20)`|NO|`PENDING`|||PENDING处理中；COMPLETED已完成|
-|14|`completed_at`|`datetime`|YES|`∅`|||原子过账完成时间|
-|15|`created_by`|`bigint`|YES|`∅`|||创建人|
-|16|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|17|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|18|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|19|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|20|`remark`|`varchar(500)`|YES|`∅`|||调拨原因|
-
 ## mat_stock_txn
 
 - 表注释：库存流水表
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2311,7 +2019,7 @@
 ## mat_warehouse
 
 - 表注释：仓库表
-- information_schema 估算行数：1
+- information_schema 估算行数：3
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2331,7 +2039,7 @@
 ## md_material
 
 - 表注释：材料字典表
-- information_schema 估算行数：1
+- information_schema 估算行数：17
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2356,7 +2064,7 @@
 ## md_material_category
 
 - 表注释：材料分类主数据
-- information_schema 估算行数：0
+- information_schema 估算行数：1
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2378,7 +2086,7 @@
 ## md_partner
 
 - 表注释：合作方表
-- information_schema 估算行数：10
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2409,7 +2117,7 @@
 ## measurement_period
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2584,7 +2292,7 @@
 ## owner_measurement_review_line
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2606,7 +2314,7 @@
 ## owner_measurement_submission
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2676,7 +2384,7 @@
 ## pay_application
 
 - 表注释：付款申请表
-- information_schema 估算行数：10
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2701,12 +2409,11 @@
 |19|`remark`|`varchar(500)`|YES|`∅`|||备注|
 |20|`cost_subject_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
 |21|`budget_line_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
-|22|`contract_budget_allocation_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
-|23|`expense_category`|`varchar(64)`|YES|`∅`|||未定义（需要人工确认）|
-|24|`approval_instance_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
-|25|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
-|26|`integrity_version`|`varchar(32)`|NO|`LEGACY_UNVERIFIED`|||未定义（需要人工确认）|
-|27|`active_unique_token`|`bigint`|YES|`∅`||STORED GENERATED|活动行唯一键辅助列：活动行=0，删除行=id|
+|22|`expense_category`|`varchar(64)`|YES|`∅`|||未定义（需要人工确认）|
+|23|`approval_instance_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|24|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|25|`integrity_version`|`varchar(32)`|NO|`LEGACY_UNVERIFIED`|||未定义（需要人工确认）|
+|26|`active_unique_token`|`bigint`|YES|`∅`||STORED GENERATED|活动行唯一键辅助列：活动行=0，删除行=id|
 
 ## pay_application_basis
 
@@ -2731,7 +2438,7 @@
 ## pay_invoice
 
 - 表注释：发票表
-- information_schema 估算行数：5
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2768,7 +2475,7 @@
 ## pay_record
 
 - 表注释：付款记录表
-- information_schema 估算行数：13
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2778,31 +2485,30 @@
 |4|`pay_application_id`|`bigint`|NO|`∅`|MUL||付款申请ID|
 |5|`contract_id`|`bigint`|YES|`∅`|MUL||合同ID|
 |6|`partner_id`|`bigint`|YES|`∅`|MUL||合作方ID|
-|7|`record_code`|`varchar(32)`|YES|`∅`|||内部付款记录编号|
-|8|`pay_amount`|`decimal(18,2)`|NO|`0.00`|||付款金额|
-|9|`pay_date`|`date`|NO|`∅`|MUL||付款日期|
-|10|`pay_method`|`varchar(50)`|YES|`∅`|||付款方式：银行转账/承兑汇票/现金等|
-|11|`voucher_no`|`varchar(100)`|YES|`∅`|||付款凭证号|
-|12|`pay_status`|`varchar(50)`|NO|`SUCCESS`|||付款状态：SUCCESS成功，FAILED失败，PROCESSING处理中|
-|13|`created_by`|`bigint`|YES|`∅`|||创建人|
-|14|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
-|15|`updated_by`|`bigint`|YES|`∅`|||更新人|
-|16|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
-|17|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
-|18|`remark`|`varchar(500)`|YES|`∅`|||备注|
-|19|`external_txn_no`|`varchar(128)`|YES|`∅`|||外部交易流水号|
-|20|`fund_account_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
-|21|`paid_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
-|22|`failure_reason`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
-|23|`reversed_record_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
-|24|`reversed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
-|25|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
-|26|`reversal_type`|`varchar(32)`|YES|`∅`|||REVERSAL/REFUND|
+|7|`pay_amount`|`decimal(18,2)`|NO|`0.00`|||付款金额|
+|8|`pay_date`|`date`|NO|`∅`|MUL||付款日期|
+|9|`pay_method`|`varchar(50)`|YES|`∅`|||付款方式：银行转账/承兑汇票/现金等|
+|10|`voucher_no`|`varchar(100)`|YES|`∅`|||付款凭证号|
+|11|`pay_status`|`varchar(50)`|NO|`SUCCESS`|||付款状态：SUCCESS成功，FAILED失败，PROCESSING处理中|
+|12|`created_by`|`bigint`|YES|`∅`|||创建人|
+|13|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|创建时间|
+|14|`updated_by`|`bigint`|YES|`∅`|||更新人|
+|15|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
+|16|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
+|17|`remark`|`varchar(500)`|YES|`∅`|||备注|
+|18|`external_txn_no`|`varchar(128)`|YES|`∅`|||外部交易流水号|
+|19|`fund_account_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|20|`paid_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|21|`failure_reason`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|22|`reversed_record_id`|`bigint`|YES|`∅`|MUL||未定义（需要人工确认）|
+|23|`reversed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|24|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|25|`reversal_type`|`varchar(32)`|YES|`∅`|||REVERSAL/REFUND|
 
 ## payment_application_source
 
 - 表注释：付款申请统一来源
-- information_schema 估算行数：5
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2824,25 +2530,10 @@
 |16|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 |17|`paid_amount`|`decimal(18,2)`|NO|`0.00`|||未定义（需要人工确认）|
 
-## payment_document_link
-
-- 表注释：付款现金日记不可变证据关系
-- information_schema 估算行数：4
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
-|2|`tenant_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
-|3|`cash_journal_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
-|4|`file_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
-|5|`document_type`|`varchar(32)`|NO|`∅`|||未定义（需要人工确认）|
-|6|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
-|7|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
-
 ## payment_record_source_allocation
 
 - 表注释：付款记录来源金额分配
-- information_schema 估算行数：4
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2883,7 +2574,7 @@
 ## pm_project
 
 - 表注释：项目表
-- information_schema 估算行数：17
+- information_schema 估算行数：1
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2917,7 +2608,7 @@
 ## pm_project_member
 
 - 表注释：项目成员表
-- information_schema 估算行数：8
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2940,7 +2631,7 @@
 ## production_measurement
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2969,7 +2660,7 @@
 ## production_measurement_line
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -2998,34 +2689,33 @@
 ## project_budget
 
 - 表注释：项目预算版本
-- information_schema 估算行数：4
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
 |1|`id`|`bigint`|NO|`∅`|PRI||未定义（需要人工确认）|
 |2|`tenant_id`|`bigint`|NO|`0`|MUL||未定义（需要人工确认）|
 |3|`project_id`|`bigint`|NO|`∅`|MUL||未定义（需要人工确认）|
-|4|`budget_code`|`varchar(50)`|NO|`∅`|||项目预算业务编号|
-|5|`version_no`|`varchar(32)`|NO|`∅`|||未定义（需要人工确认）|
-|6|`budget_name`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
-|7|`total_amount`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
-|8|`approval_status`|`varchar(32)`|NO|`DRAFT`|||未定义（需要人工确认）|
-|9|`status`|`varchar(32)`|NO|`DRAFT`|||未定义（需要人工确认）|
-|10|`active_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
-|11|`active_token`|`bigint`|YES|`∅`|||激活时等于project_id，用于数据库保证单项目唯一生效版本|
-|12|`effective_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
-|13|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
-|14|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
-|15|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
-|16|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
-|17|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
-|18|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
-|19|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
+|4|`version_no`|`varchar(32)`|NO|`∅`|||未定义（需要人工确认）|
+|5|`budget_name`|`varchar(200)`|NO|`∅`|||未定义（需要人工确认）|
+|6|`total_amount`|`decimal(18,2)`|NO|`∅`|||未定义（需要人工确认）|
+|7|`approval_status`|`varchar(32)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|8|`status`|`varchar(32)`|NO|`DRAFT`|||未定义（需要人工确认）|
+|9|`active_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|10|`active_token`|`bigint`|YES|`∅`|||激活时等于project_id，用于数据库保证单项目唯一生效版本|
+|11|`effective_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
+|12|`version`|`int`|NO|`0`|||未定义（需要人工确认）|
+|13|`created_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|14|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|未定义（需要人工确认）|
+|15|`updated_by`|`bigint`|YES|`∅`|||未定义（需要人工确认）|
+|16|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
+|17|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
+|18|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 
 ## project_budget_line
 
 - 表注释：项目预算科目
-- information_schema 估算行数：8
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3101,31 +2791,10 @@
 |21|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
 |22|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
 
-## project_cost_subject_scope
-
-- 表注释：项目可用成本科目范围
-- information_schema 估算行数：0
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`id`|`bigint`|NO|`∅`|PRI||ä¸»é”®|
-|2|`tenant_id`|`bigint`|NO|`0`|MUL||ç§Ÿæˆ·ID|
-|3|`project_id`|`bigint`|NO|`∅`|MUL||é¡¹ç›®ID|
-|4|`cost_subject_id`|`bigint`|NO|`∅`|MUL||æˆæœ¬ç§‘ç›®ID|
-|5|`enabled`|`tinyint`|NO|`1`|||æ˜¯å¦å¯ç”¨|
-|6|`effective_from`|`date`|NO|`∅`|||ç”Ÿæ•ˆå¼€å§‹æ—¥æœŸ|
-|7|`effective_to`|`date`|YES|`∅`|||ç”Ÿæ•ˆç»“æŸæ—¥æœŸ|
-|8|`version`|`int`|NO|`0`|||ä¹è§‚é”ç‰ˆæœ¬|
-|9|`created_by`|`bigint`|YES|`∅`|||åˆ›å»ºäººID|
-|10|`created_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED|åˆ›å»ºæ—¶é—´|
-|11|`updated_by`|`bigint`|YES|`∅`|||æ›´æ–°äººID|
-|12|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|æ›´æ–°æ—¶é—´|
-|13|`remark`|`varchar(500)`|YES|`∅`|||å¤‡æ³¨|
-
 ## project_period_plan
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3152,7 +2821,7 @@
 ## project_period_plan_item
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3285,7 +2954,6 @@
 |22|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|未定义（需要人工确认）|
 |23|`deleted_flag`|`tinyint`|NO|`0`|||未定义（需要人工确认）|
 |24|`remark`|`varchar(500)`|YES|`∅`|||未定义（需要人工确认）|
-|25|`cost_subject_id`|`bigint`|YES|`∅`|MUL||V2质量安全成本末级科目|
 
 ## qs_inspection_plan
 
@@ -3586,7 +3254,7 @@
 ## sales_invoice
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3632,7 +3300,7 @@
 ## sales_invoice_review
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3669,7 +3337,7 @@
 ## site_daily_log
 
 - 表注释：项目现场日报
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3695,7 +3363,7 @@
 ## site_daily_progress
 
 - 表注释：未定义（需要人工确认）
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3718,7 +3386,7 @@
 ## sp_bid_evaluation
 
 - 表注释：供应商比价评审
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3815,7 +3483,7 @@
 ## sp_sourcing_event
 
 - 表注释：供应商询价招标事件
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3850,7 +3518,7 @@
 ## sp_sourcing_supplier
 
 - 表注释：招采受邀供应商
-- information_schema 估算行数：3
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -3872,7 +3540,7 @@
 ## sp_supplier_quote
 
 - 表注释：供应商报价
-- information_schema 估算行数：2
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4047,7 +3715,6 @@
 |20|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
 |21|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
 |22|`remark`|`varchar(500)`|YES|`∅`|||备注|
-
 ## sub_measure_item
 
 - 表注释：分包计量明细表
@@ -4102,22 +3769,10 @@
 |20|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
 |21|`remark`|`varchar(500)`|YES|`∅`|||备注|
 
-## sys_bootstrap_state
-
-- 表注释：平台初始化状态
-- information_schema 估算行数：7
-
-|序号|字段|类型|可空|默认值|键|附加属性|注释|
-|---:|---|---|---|---|---|---|---|
-|1|`bootstrap_key`|`varchar(64)`|NO|`∅`|PRI||未定义（需要人工确认）|
-|2|`bootstrap_version`|`int`|NO|`∅`|||未定义（需要人工确认）|
-|3|`status`|`varchar(20)`|NO|`∅`|||未定义（需要人工确认）|
-|4|`completed_at`|`datetime`|YES|`∅`|||未定义（需要人工确认）|
-
 ## sys_dict_data
 
 - 表注释：字典数据表
-- information_schema 估算行数：121
+- information_schema 估算行数：92
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4136,7 +3791,7 @@
 ## sys_dict_type
 
 - 表注释：字典类型表
-- information_schema 估算行数：20
+- information_schema 估算行数：22
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4151,7 +3806,7 @@
 ## sys_file
 
 - 表注释：系统文件表
-- information_schema 估算行数：17
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4179,7 +3834,7 @@
 ## sys_menu
 
 - 表注释：系统菜单权限表
-- information_schema 估算行数：252
+- information_schema 估算行数：235
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4205,7 +3860,7 @@
 ## sys_notification
 
 - 表注释：站内消息通知表
-- information_schema 估算行数：92
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4224,7 +3879,7 @@
 ## sys_operation_audit_log
 
 - 表注释：操作审计日志
-- information_schema 估算行数：607
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4268,7 +3923,7 @@
 ## sys_role_menu
 
 - 表注释：角色菜单关联表
-- information_schema 估算行数：573
+- information_schema 估算行数：472
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4314,7 +3969,7 @@
 ## sys_user
 
 - 表注释：系统用户表
-- information_schema 估算行数：26
+- information_schema 估算行数：8
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4358,7 +4013,7 @@
 ## sys_user_role
 
 - 表注释：用户角色关联表
-- information_schema 估算行数：26
+- information_schema 估算行数：10
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4530,7 +4185,7 @@
 ## tech_item
 
 - 表注释：总工程师技术事项表
-- information_schema 估算行数：0
+- information_schema 估算行数：2
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4779,7 +4434,7 @@
 ## wf_idempotency
 
 - 表注释：审批幂等表
-- information_schema 估算行数：42
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4797,7 +4452,7 @@
 ## wf_instance
 
 - 表注释：审批实例表
-- information_schema 估算行数：14
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4829,7 +4484,7 @@
 ## wf_node_instance
 
 - 表注释：审批节点实例表
-- information_schema 估算行数：45
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4857,7 +4512,7 @@
 ## wf_record
 
 - 表注释：审批记录表
-- information_schema 估算行数：69
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4883,11 +4538,10 @@
 |20|`updated_at`|`datetime`|NO|`CURRENT_TIMESTAMP`||DEFAULT_GENERATED on update CURRENT_TIMESTAMP|更新时间|
 |21|`deleted_flag`|`tinyint`|NO|`0`|||逻辑删除：0否，1是|
 |22|`remark`|`varchar(500)`|YES|`∅`|||备注|
-
 ## wf_task
 
 - 表注释：审批任务表
-- information_schema 估算行数：141
+- information_schema 估算行数：0
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4916,7 +4570,7 @@
 ## wf_template
 
 - 表注释：审批模板表
-- information_schema 估算行数：27
+- information_schema 估算行数：23
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|
@@ -4940,7 +4594,7 @@
 ## wf_template_node
 
 - 表注释：审批模板节点表
-- information_schema 估算行数：71
+- information_schema 估算行数：65
 
 |序号|字段|类型|可空|默认值|键|附加属性|注释|
 |---:|---|---|---|---|---|---|---|

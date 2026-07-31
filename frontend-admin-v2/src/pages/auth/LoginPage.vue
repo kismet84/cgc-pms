@@ -163,7 +163,7 @@ function readErrorCode(error: unknown): string | null {
 .auth-intro h1 {
   max-width: 12em;
   color: var(--v2-color-text-strong);
-  font-size: clamp(var(--v2-font-size-28), 4vw, var(--v2-font-size-42));
+  font-size: var(--v2-font-size-42);
   line-height: var(--v2-line-height-tight);
 }
 
@@ -207,12 +207,6 @@ function readErrorCode(error: unknown): string | null {
 .auth-card {
   width: min(100%, 28rem);
   justify-self: end;
-  box-shadow: var(--v2-shadow-float);
-}
-
-.auth-card :deep(.v2-card__header),
-.auth-card :deep(.v2-card__body) {
-  padding: var(--v2-space-6);
 }
 
 .auth-card :deep(.v2-button) {
@@ -260,11 +254,6 @@ function readErrorCode(error: unknown): string | null {
   .auth-card {
     width: 100%;
     justify-self: stretch;
-  }
-
-  .auth-card :deep(.v2-card__header),
-  .auth-card :deep(.v2-card__body) {
-    padding: var(--v2-space-5);
   }
 }
 </style>

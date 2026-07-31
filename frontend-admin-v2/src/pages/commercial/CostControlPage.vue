@@ -381,35 +381,7 @@ onBeforeUnmount(() => {
         title="正在加载动态利润控制"
         description="正在读取完工预测、利润指标和纠偏措施。"
         kind="loading" /><template v-else-if="!projectId && accessible"
-        ><V2Card :title="`全部项目动态利润（${accessible.accessibleProjectCount}）`">
-          <dl class="v2-ledger-kpis v2-ledger-kpis--five" aria-label="全部项目动态利润汇总">
-            <div>
-              <dt>可访问项目</dt>
-              <dd>{{ accessible.accessibleProjectCount }}</dd>
-            </div>
-            <div>
-              <dt>已有预测</dt>
-              <dd>
-                {{ accessible.forecastProjectCount }}
-                <small>{{ accessible.noForecastProjectCount }} 个项目未生成预测</small>
-              </dd>
-            </div>
-            <div>
-              <dt>合同收入</dt>
-              <dd>{{ accessible.contractIncome }}</dd>
-            </div>
-            <div>
-              <dt>完工成本</dt>
-              <dd>{{ accessible.forecastAtCompletionCost }}</dd>
-            </div>
-            <div>
-              <dt>预测利润</dt>
-              <dd>
-                {{ accessible.forecastProfit }}
-                <small>整体利润率 {{ accessible.profitMargin }}</small>
-              </dd>
-            </div>
-          </dl>
+        ><V2Card>
           <div
             class="cost-page__table-wrap"
             role="region"
@@ -755,18 +727,6 @@ dd {
   min-width: 0;
   overflow-x: auto;
 }
-.cost-page .v2-ledger-kpis {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0;
-  margin-bottom: var(--v2-space-4);
-}
-.cost-page .v2-ledger-kpis small {
-  display: block;
-  margin-top: var(--v2-space-1);
-  color: var(--v2-color-text-secondary);
-  font-size: var(--v2-font-size-12);
-  font-weight: var(--v2-font-weight-regular);
-}
 .cost-page__table {
   min-width: 40rem;
 }
@@ -776,16 +736,6 @@ dd {
 .cost-page__table .actions {
   align-items: center;
   flex-wrap: nowrap;
-}
-@media (max-width: 64rem) {
-  .cost-page .v2-ledger-kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (max-width: 48rem) {
-  .cost-page .v2-ledger-kpis {
-    grid-template-columns: 1fr;
-  }
 }
 .item {
   display: grid;

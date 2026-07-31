@@ -138,8 +138,7 @@ describe('WorkflowWorkbenchPage', () => {
       headingCard.findAll('.workflow-filter__actions button').map((button) => button.text()),
     ).toEqual(['查询', '重置'])
     const listCard = wrapper.get('.workflow-table-wrap').element.closest('.v2-card')
-    expect(listCard?.querySelector('h2')?.textContent).toBe('待我处理')
-    expect(listCard?.querySelector('.v2-card__title-row .v2-badge')?.textContent).toBe('1 条')
+    expect(listCard?.querySelector('.v2-card__header')).toBeNull()
     expect(wrapper.findAll('.workflow-table th').map((item) => item.text())[0]).toBe('业务编号')
     const rowAction = wrapper.get('.v2-table__record-link')
     expect(rowAction.text()).toBe('PAY-2026-001')

@@ -1190,12 +1190,7 @@ onBeforeUnmount(() => controller?.abort())
           />
           <V2Input v-model="accountEditor.bankName" label="开户行" />
           <V2Input v-model="accountEditor.bankAccountNo" label="银行账号" />
-          <V2Input
-            v-model="accountEditor.openingDate"
-            type="date"
-            label="开户日期"
-            required
-          />
+          <V2Input v-model="accountEditor.openingDate" type="date" label="开户日期" required />
           <V2Input
             v-model="accountEditor.openingBalance"
             label="期初余额"
