@@ -6,7 +6,7 @@
 
 ## 当前统一编排入口
 
-- [第57条主线：CGC-PMS V1.5遗留完成与开发版本收口任务计划书](CGC-PMS-V1.5-主线与支线计划书-2026-07-29/第57条主线-CGC-PMS-V1.5遗留完成与开发版本收口任务计划书-2026-07-29.md)状态为`IN_PROGRESS / M0-M5_ACCEPTED / M6_LOCAL_ACCEPTED / M7_G0-G2_LOCAL_ACCEPTED / G3-G4_WAITING_FOR_GIT_CI_AUTHORIZATION`，执行键为`V15-REMAINDER-COMPLETION-AND-CLOSEOUT`：第56条正式验收、第55条证据回写、联合回归及本地根切换演练已通过；剩余唯一门为任务分支、提交、推送、PR和同SHA CI授权与执行，生产门保持阻塞。
+- [第57条主线：CGC-PMS V1.5遗留完成与开发版本收口任务计划书](CGC-PMS-V1.5-主线与支线计划书-2026-07-29/第57条主线-CGC-PMS-V1.5遗留完成与开发版本收口任务计划书-2026-07-29.md)状态为`IN_PROGRESS / M0-M5_ACCEPTED / M6_LOCAL_ACCEPTED / M7_G0-G2_LOCAL_ACCEPTED / G3_FINAL_SAME_HEAD_CI_PENDING / G4_PENDING`，执行键为`V15-REMAINDER-COMPLETION-AND-CLOSEOUT`：第56条正式验收、第55条证据回写、联合回归及本地根切换演练已通过；首个候选push CI 13/13通过但已被本次容器安全补丁候选取代，剩余门为最终同SHA push/PR CI、Pre-PR verifier和正式报告，生产门保持阻塞。
 - [第56条主线：全新项目业务数据 UI 录入任务计划书](第56条主线-全新项目业务数据UI录入任务计划书-2026-07-28.md)状态为`COMPLETED / M0-M7_ACCEPTED / FOUR_CANARIES_ACCEPTED / D1-D4_ACCEPTED`：9类角色、27个目标单角色用户、15个项目及全部冻结业务对象完成正式验收。
 - [第55条主线：全量审计整改与生产就绪收口任务计划书](第55条主线-全量审计整改与生产就绪收口任务计划书.md)非生产事项已完成最终证据回写，状态为`NON_PRODUCTION_ITEMS_DECIDED / 0_READY / 0_BUSINESS_IMPLEMENTED / PRODUCTION_BLOCKED`；三项生产`RELEASE_GATE`保持阻塞。
 - [第55条主线 M0：事实刷新与治理唯一化任务计划书](第55条主线-M0-事实刷新与治理唯一化任务计划书-2026-07-26.md)已完成当前事实刷新与首项有据关闭。

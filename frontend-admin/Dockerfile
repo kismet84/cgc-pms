@@ -22,7 +22,7 @@ COPY public/ ./public/
 RUN pnpm build
 
 # Stage 2: Runtime
-FROM nginx:1.27-alpine@sha256:8b1e78743a03dbb2c95171cc58639fef29abc8816598e27fb910ed2e621e589a
+FROM nginx:1.30-alpine@sha256:97d490c12ba55b4946b01546d1c3ed324e8d41ab1c9fcb2a616aa470620e5b46
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist/ /usr/share/nginx/html/
@@ -35,7 +35,14 @@ COPY nginx.conf /etc/nginx/templates/default.conf.template
 # For prod: mount CA-signed certs (e.g., Let's Encrypt) at the same paths
 #   /etc/nginx/ssl/server.crt — certificate file
 #   /etc/nginx/ssl/server.key — private key file
-RUN mkdir -p /etc/nginx/ssl
+RUN mkdir -p /etc/nginx/ssl \
+    && apk add --no-cache --virtual .setcap-deps libcap-setcap \
+    && setcap 'cap_net_bind_service=+ep' /usr/sbin/nginx \
+    && apk del .setcap-deps \
+    && touch /run/nginx.pid \
+    && chown -R nginx:nginx /etc/nginx/conf.d /etc/nginx/templates /etc/nginx/ssl /var/cache/nginx /run/nginx.pid
+
+USER nginx
 
 EXPOSE 80
 EXPOSE 443

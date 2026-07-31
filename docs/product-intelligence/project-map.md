@@ -1,11 +1,11 @@
 # CGC-PMS 项目地图
 
-## 2026-07-31 主线57：M6本地通过，M7等待同SHA CI
+## 2026-07-31 主线57：M6本地通过，M7等待最终同SHA CI
 
 - 第57条A～E已完成本地验收：第55条非生产候选全部唯一决策，第56条D0～D4正式验收通过；生产发布门保持阻塞。
 - 联合回归本地通过：后端2352项、Legacy 743项、V2 432项、Design System 81项；路由台账`0/87/0`，P0/P1、非法引用、金额/库存差异、重复与悬空均为0。
-- G0～G2本地通过：候选构建、Trivy扫描和`V2_ROOT→LEGACY_ROLLBACK→V2_RESTORE`演练成立；G3～G4仍等待分支、提交、推送、PR及13项同SHA CI授权与证据。
-- 当前状态为`IN_PROGRESS / M6_LOCAL_ACCEPTED / M7_G0-G2_LOCAL_ACCEPTED / G3-G4_WAITING_FOR_GIT_CI_AUTHORIZATION`；新增后续项0、关闭后续项0、净变化0。
+- G0～G2本地通过：候选构建、Trivy扫描和`V2_ROOT→LEGACY_ROLLBACK→V2_RESTORE`演练成立；分支、首个提交和首个push已形成，本次候选纳入最终容器安全补丁，G3等待最终同SHA push/PR CI及Pre-PR verifier，G4等待正式报告。
+- 当前状态为`IN_PROGRESS / M6_LOCAL_ACCEPTED / M7_G0-G2_LOCAL_ACCEPTED / G3_FINAL_SAME_HEAD_CI_PENDING / G4_PENDING`；首个候选`171ff689...`push CI 13/13通过但已被本次容器安全补丁候选取代；新增后续项0、关闭后续项0、净变化0。
 - 证据：`docs/quality/第57条主线-支线F-第55与56条联合回归验收报告-2026-07-31.md`、`docs/quality/第57条主线-支线G-V1.5开发版本本地收口检查点报告-2026-07-31.md`。
 
 ## 2026-07-29 主线57 M3：施工总承包金丝雀执行中

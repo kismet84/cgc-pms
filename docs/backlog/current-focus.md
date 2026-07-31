@@ -4,7 +4,7 @@
 
 - 支线D D0～D4、第56条正式验收和支线E均已通过；第55条非生产事项唯一裁决完成，生产门保持阻塞。
 - 支线F本地联合回归通过：后端2352项、Legacy 743项、V2 432项、Design System 81项、V2 E2E 97项及MySQL、Trivy、Legacy页面E2E和本地根切换门均通过；P0/P1、未分类失败、重复和悬空为0。
-- 支线G G0～G2本地通过；G3～G4等待创建任务分支、提交、推送、PR和同SHA CI授权。当前保持`V1.5_DEVELOPMENT_IN_PROGRESS`。
+- 支线G G0～G2本地通过；首个候选`171ff689...`push CI 13/13通过，但已被本次容器安全补丁候选取代。安全补丁Git交付已获授权；G3等待最终同SHA push/PR CI与Pre-PR verifier，G4待正式报告。当前保持`V1.5_DEVELOPMENT_IN_PROGRESS`。
 - 证据：`docs/quality/第57条主线-支线F-第55与56条联合回归验收报告-2026-07-31.md`、`docs/quality/第57条主线-支线G-V1.5开发版本本地收口检查点报告-2026-07-31.md`。
 - 新增后续项0、关闭后续项0、后续项净变化0；当前无悬空事项。
 
