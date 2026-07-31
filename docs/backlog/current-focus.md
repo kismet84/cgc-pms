@@ -1,11 +1,12 @@
 # Current Focus
 
-## 2026-07-31 第57条主线 M6本地通过、M7等待同SHA CI
+## 2026-07-31 第57条主线 V1.5开发版本正式收口
 
 - 支线D D0～D4、第56条正式验收和支线E均已通过；第55条非生产事项唯一裁决完成，生产门保持阻塞。
 - 支线F本地联合回归通过：后端2352项、Legacy 743项、V2 432项、Design System 81项、V2 E2E 97项及MySQL、Trivy、Legacy页面E2E和本地根切换门均通过；P0/P1、未分类失败、重复和悬空为0。
-- 支线G G0～G2本地通过；首个候选`171ff689...`push CI 13/13通过，但已被本次容器安全补丁候选取代。安全补丁Git交付已获授权；G3等待最终同SHA push/PR CI与Pre-PR verifier，G4待正式报告。当前保持`V1.5_DEVELOPMENT_IN_PROGRESS`。
-- 证据：`docs/quality/第57条主线-支线F-第55与56条联合回归验收报告-2026-07-31.md`、`docs/quality/第57条主线-支线G-V1.5开发版本本地收口检查点报告-2026-07-31.md`。
+- 代码与安全候选`c3cfcf942491f810d1c79b2cd326298524e8a1e7`的push CI运行`30604473043`和PR #379 CI运行`30605238524`均13/13通过；Pre-PR verifier绑定同一SHA通过。
+- 当前状态：`V1.5_DEVELOPMENT_CLOSED / SAME_HEAD_CI_PASSED / LOCAL_RC_ACCEPTED`。生产、目标环境、正式入口切换和Legacy退役仍不在本计划。
+- 证据：`docs/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md`、`docs/V1.5-开发版本说明-2026-07-31.md`。
 - 新增后续项0、关闭后续项0、后续项净变化0；当前无悬空事项。
 
 ## 2026-07-30 第57条主线 M4：支线D D1通过

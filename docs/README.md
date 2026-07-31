@@ -2,12 +2,13 @@
 
 本目录是 cgc-pms v1.5 当前知识入口。历史测试数量、覆盖率和上线结论均不得替代当前验证。
 
+当前状态：V1.5开发版本已收口；生产发布、目标环境复验、正式入口切换和Legacy退役未授权且未完成。权威结论见[V1.5开发版本说明](V1.5-开发版本说明-2026-07-31.md)和[第57条主线正式收口验收报告](quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)。
+
 ## 规则优先级
 
-1. [AGENTS.override.md](../AGENTS.override.md)
-2. [AGENTS.md](../AGENTS.md)
-3. [现行规范](standards/)
-4. [v1.0 文档归档](archive/v1.0/)
+1. [AGENTS.md](../AGENTS.md)
+2. [现行规范](standards/)
+3. [v1.0 文档归档](archive/v1.0/)
 
 ## 现行规范
 
@@ -39,6 +40,7 @@
 - [产品情报：项目地图、竞品分析与迭代决策](product-intelligence/README.md)
 - [v1.5 计划书](plans/README.md)
 - [v1.5 质量报告](quality/README.md)
+- [V1.5 开发版本说明](V1.5-开发版本说明-2026-07-31.md)
 - [业务闭环标准](business/)
 - [项目计划与施工履约闭环业务标准](business/project-schedule-construction-performance-closed-loop.md)
 - [项目变更、签证与索赔闭环业务标准](business/project-variation-claim-closed-loop.md)

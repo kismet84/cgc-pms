@@ -8,7 +8,7 @@
 
 计划日期：2026-07-29
 适用版本：V1.5
-计划状态：`IN_PROGRESS / M0-M5_ACCEPTED / M6_LOCAL_ACCEPTED / M7_G0-G2_LOCAL_ACCEPTED / G3_FINAL_SAME_HEAD_CI_PENDING / G4_PENDING`
+计划状态：`COMPLETED / M0-M7_ACCEPTED / V1.5_DEVELOPMENT_CLOSED / SAME_HEAD_CI_PASSED / LOCAL_RC_ACCEPTED`
 建议执行键：`V15-REMAINDER-COMPLETION-AND-CLOSEOUT`
 编制参考基线：`master@f984c162d30f49a076d9411d83e366e7481f1fb9`
 
@@ -260,7 +260,7 @@ A-07和A-10因依赖真实外部渠道或系统，原则上保持冻结，不进
 - 安全扫描。
 - 金额、库存、权限、状态和审计对账。
 
-2026-07-31结果：本地联合回归通过，后端2352项、Legacy 743项、V2 432项、Design System 81项及MySQL、E2E、供应链和本地根切换门均通过；P0/P1、未分类失败、重复和悬空为0。首个候选`171ff689...`push CI 13/13通过，但候选审查随后发现并本地修复容器默认root和旧Nginx基线问题；本次候选纳入安全补丁，最终同SHA证据待push/PR CI与Pre-PR verifier。证据见[支线F联合回归验收报告](../../quality/第57条主线-支线F-第55与56条联合回归验收报告-2026-07-31.md)。
+2026-07-31结果：联合回归通过，后端2352项、Legacy 743项、V2 432项、Design System 81项及MySQL、E2E、供应链和本地根切换门均通过；P0/P1、未分类失败、重复和悬空为0。容器安全补丁已纳入最终代码与安全候选`c3cfcf942491f810d1c79b2cd326298524e8a1e7`；push/PR同SHA CI及Pre-PR verifier通过。证据见[支线F联合回归验收报告](../../quality/第57条主线-支线F-第55与56条联合回归验收报告-2026-07-31.md)。
 
 ---
 
@@ -277,7 +277,7 @@ A-07和A-10因依赖真实外部渠道或系统，原则上保持冻结，不进
 - 无未分类失败。
 - 无重复和悬空问题。
 
-2026-07-31检查点：G0～G2本地核验、制品和`V2_ROOT → LEGACY_ROLLBACK → V2_RESTORE`演练通过；首个候选`171ff689...`push CI 13/13通过。本次候选纳入最终容器安全补丁，G3等待最终同SHA push/PR CI与Pre-PR verifier，G4等待正式报告。当前合法状态为`V1.5_DEVELOPMENT_IN_PROGRESS / FINAL_SAME_HEAD_CI_PENDING`，不得提前写入`SAME_HEAD_CI_PASSED`或`V1.5_DEVELOPMENT_CLOSED`。证据见[支线G本地收口检查点报告](../../quality/第57条主线-支线G-V1.5开发版本本地收口检查点报告-2026-07-31.md)。
+2026-07-31终态：G0～G4通过；代码与安全候选`c3cfcf942491f810d1c79b2cd326298524e8a1e7`的push CI运行`30604473043`、PR #379 CI运行`30605238524`均13/13通过，Pre-PR verifier绑定同一SHA通过；制品和`V2_ROOT → LEGACY_ROLLBACK → V2_RESTORE`演练通过。当前状态为`V1.5_DEVELOPMENT_CLOSED / SAME_HEAD_CI_PASSED / LOCAL_RC_ACCEPTED`。证据见[正式收口报告](../../quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)。
 
 ---
 

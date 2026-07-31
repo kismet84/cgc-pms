@@ -13,19 +13,19 @@
 
 执行顺序：A → B → C → D → E → F → G。
 
-计划状态：`IN_PROGRESS / M0-M5_ACCEPTED / M6_LOCAL_ACCEPTED / M7_G0-G2_LOCAL_ACCEPTED / G3_FINAL_SAME_HEAD_CI_PENDING / G4_PENDING`。
+计划状态：`COMPLETED / V1.5_DEVELOPMENT_CLOSED / SAME_HEAD_CI_PASSED / LOCAL_RC_ACCEPTED`。
 唯一编排入口：第57条主线总计划；第55、56条原稳定键和原状态源继续有效，不复制全局Issue，不解除生产门。
 
 | 计划 | 当前状态（2026-07-31） |
 | --- | --- |
-| 总计划 | `IN_PROGRESS / FINAL_SAME_HEAD_CI_PENDING` |
+| 总计划 | `COMPLETED / V1.5_DEVELOPMENT_CLOSED` |
 | 支线A | `ACCEPTED / 0_READY` |
 | 支线B | `ACCEPTED` |
 | 支线C | `ACCEPTED / C0-C5_ACCEPTED` |
 | 支线D | `COMPLETED / D0-D4_ACCEPTED` |
 | 支线E | `COMPLETED / REVIEW_PASS / 0_IMPLEMENTED / 0_READY` |
-| 支线F | `LOCAL_REGRESSION_ACCEPTED / FINAL_CANDIDATE_SAME_HEAD_CI_PENDING` |
-| 支线G | `G0-G2_LOCAL_ACCEPTED / G3_FINAL_SAME_HEAD_CI_PENDING / G4_PENDING` |
+| 支线F | `ACCEPTED / SAME_HEAD_CI_PASSED` |
+| 支线G | `G0-G4_ACCEPTED / LOCAL_RC_ACCEPTED` |
 
 M0证据：[当前事实重新绑定验收报告](../../quality/第57条主线-M0-当前事实重新绑定验收报告-2026-07-29.md)。当前禁止按第56条旧状态重复创建用户、项目或业务数据。
 
@@ -35,4 +35,4 @@ M2证据：[第56条计划修订与基础数据验收报告](../../quality/第57
 
 M3证据：[四类业务金丝雀阶段报告](../../quality/第57条主线-支线C-四类业务金丝雀阶段报告-2026-07-29.md)、[C4材料采购闭环验收报告](../../quality/第57条主线-支线C-C4材料采购闭环验收报告-2026-07-30.md)、[C5跨链验收报告](../../quality/第57条主线-支线C-C5跨链验收报告-2026-07-30.md)。C0～C5通过；四类金丝雀的真实V2写入、服务端回读、实际审批、金额/库存守恒和恢复路径成立。下一阶段仅允许支线D补齐其余十一条业务链。
 
-M4～M5已完成：第56条15项目正式验收通过；第55条非生产事项完成唯一裁决且`0_IMPLEMENTED / 0_READY`。M6本地联合回归通过；M7本地制品和根切换演练通过。首个候选`171ff689...`push CI 13/13通过但已被本次容器安全补丁候选取代；剩余门为最终同SHA push/PR CI、Pre-PR verifier和正式报告，生产门保持阻塞。证据见[D4正式验收报告](../../quality/第57条主线-支线D-D4全量数据对账与第56条正式验收报告-2026-07-31.md)、[支线E验收报告](../../quality/第57条主线-支线E-第55条证据回写与最小实施验收报告-2026-07-31.md)、[支线F验收报告](../../quality/第57条主线-支线F-第55与56条联合回归验收报告-2026-07-31.md)和[支线G本地检查点](../../quality/第57条主线-支线G-V1.5开发版本本地收口检查点报告-2026-07-31.md)。
+M4～M7已完成：第56条15项目正式验收通过；第55条非生产事项完成唯一裁决且`0_IMPLEMENTED / 0_READY`；联合回归、制品、根切换演练、代码与安全候选`c3cfcf942491f810d1c79b2cd326298524e8a1e7`的push/PR同SHA CI 13/13及Pre-PR verifier均通过。生产门保持阻塞。证据见[D4正式验收报告](../../quality/第57条主线-支线D-D4全量数据对账与第56条正式验收报告-2026-07-31.md)、[支线E验收报告](../../quality/第57条主线-支线E-第55条证据回写与最小实施验收报告-2026-07-31.md)、[支线F验收报告](../../quality/第57条主线-支线F-第55与56条联合回归验收报告-2026-07-31.md)和[正式收口报告](../../quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)。
