@@ -325,8 +325,8 @@ test.describe('M5 purchase request, order and receipt V2', () => {
           traffic.push(request.url())
       })
       await install(page, [])
-      await page.goto(`/v2${path}?projectId=P1`)
-      await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+      await page.goto(`${path}?projectId=P1`)
+      await expect(page).toHaveURL(/\/forbidden\?from=/)
       expect(traffic).toEqual([])
       await page.unrouteAll({ behavior: 'wait' })
     }
@@ -335,8 +335,8 @@ test.describe('M5 purchase request, order and receipt V2', () => {
   test('renders all routes, redirect, viewports and accessibility', async ({ page }) => {
     await install(page)
     const errors = captureRuntimeErrors(page)
-    await page.goto('/v2/purchase?projectId=P1')
-    await expect(page).toHaveURL(/\/v2\/purchase\/order\?projectId=P1/)
+    await page.goto('/purchase?projectId=P1')
+    await expect(page).toHaveURL(/\/purchase\/order\?projectId=P1/)
     for (const sample of [
       { path: '/inventory/purchase-request', text: 'PR-001' },
       { path: '/purchase/order', text: 'PO-001' },
@@ -348,7 +348,7 @@ test.describe('M5 purchase request, order and receipt V2', () => {
         { width: 390, height: 844 },
       ]) {
         await page.setViewportSize(viewport)
-        await page.goto(`/v2${sample.path}?projectId=P1`)
+        await page.goto(`${sample.path}?projectId=P1`)
         const surface = page.locator('.purchase-execution-page__table-wrap')
         await expect(surface.getByText(sample.text, { exact: true })).toBeVisible()
         expect(
@@ -375,7 +375,7 @@ test.describe('M5 purchase request, order and receipt V2', () => {
       { path: '/purchase/order', text: 'PO-001' },
       { path: '/purchase/receipt', text: 'RC-001' },
     ]) {
-      await page.goto(`/v2${sample.path}`)
+      await page.goto(`${sample.path}`)
       await expect(page.getByText(sample.text, { exact: true }).first()).toBeVisible()
       await expect(page.getByText(/请(?:先)?选择项目/)).toHaveCount(0)
     }
@@ -411,7 +411,7 @@ test.describe('M5 purchase request, order and receipt V2', () => {
   ]) {
     test(`${sample.add}, ${sample.edit} and ${sample.delete} fail closed`, async ({ page }) => {
       await install(page, [sample.query, sample.add])
-      await page.goto(`/v2${sample.path}?projectId=P1`)
+      await page.goto(`${sample.path}?projectId=P1`)
       await expect(page.getByRole('button', { name: `新建${sample.label}` })).toHaveCount(0)
       await install(page, [sample.query, sample.add, sample.edit])
       await page.reload()
@@ -424,7 +424,7 @@ test.describe('M5 purchase request, order and receipt V2', () => {
 
   test('creates one request with decimal strings and submits once', async ({ page }) => {
     const writes = await install(page)
-    await page.goto('/v2/inventory/purchase-request?projectId=P1')
+    await page.goto('/inventory/purchase-request?projectId=P1')
     await page.getByRole('button', { name: '新建采购申请' }).click()
     const dialog = page.getByRole('dialog', { name: '新建采购申请' })
     await selectBusinessOption(page, dialog, /^采购合同：/, /CT-001 · 钢材采购合同/)
@@ -452,7 +452,7 @@ test.describe('M5 purchase request, order and receipt V2', () => {
 
   test('creates an order from request source and submits once', async ({ page }) => {
     const writes = await install(page)
-    await page.goto('/v2/purchase/order?projectId=P1')
+    await page.goto('/purchase/order?projectId=P1')
     await page.getByRole('button', { name: '新建采购订单' }).click()
     const dialog = page.getByRole('dialog', { name: '新建采购订单' })
     await selectBusinessOption(page, dialog, /^采购申请：/, /PR-001 · 主体结构/)
@@ -475,7 +475,7 @@ test.describe('M5 purchase request, order and receipt V2', () => {
 
   test('creates partial and complete receipts without client quantity totals', async ({ page }) => {
     const writes = await install(page)
-    await page.goto('/v2/purchase/receipt?projectId=P1')
+    await page.goto('/purchase/receipt?projectId=P1')
     for (const sample of [
       {
         actual: '3.0000',
@@ -513,7 +513,7 @@ test.describe('M5 purchase request, order and receipt V2', () => {
 
   test('shows over-receipt 409 and does not retry', async ({ page }) => {
     const writes = await install(page, permissions, true)
-    await page.goto('/v2/purchase/receipt?projectId=P1')
+    await page.goto('/purchase/receipt?projectId=P1')
     await page.getByRole('button', { name: '新建材料验收' }).click()
     const dialog = page.getByRole('dialog', { name: '新建材料验收' })
     await selectBusinessOption(page, dialog, /^采购订单：/, /PO-001 · 供应商甲/)

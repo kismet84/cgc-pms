@@ -107,12 +107,12 @@ function Get-ConflictKey {
     return ($parts[0..([Math]::Min(2, $parts.Count - 1))] -join "/")
   }
 
-  if ($parts[0] -eq "frontend-admin") {
+  if ($parts[0] -eq "frontend-admin-v2") {
     if ($parts.Count -ge 4 -and $parts[2] -eq "pages") {
-      return "frontend-admin/pages/$($parts[3])"
+      return "frontend-admin-v2/pages/$($parts[3])"
     }
     if ($parts.Count -ge 5 -and $parts[2] -eq "api" -and $parts[3] -eq "modules") {
-      return "frontend-admin/api/modules/$($parts[4])"
+      return "frontend-admin-v2/api/modules/$($parts[4])"
     }
     return ($parts[0..([Math]::Min(3, $parts.Count - 1))] -join "/")
   }
@@ -128,7 +128,7 @@ function Get-ParallelIssueInfo {
   $paths = @()
   $paths += Get-BacktickValues ((Get-SectionLines $body "允许修改") -join "`n")
   $paths += Get-BacktickValues ((Get-SectionLines $body "归档报告") -join "`n")
-  $paths = @($paths | Where-Object { $_ -match "^(backend|frontend-admin|docs|scripts)/|^(backend|frontend-admin|docs|scripts)\\" } | Select-Object -Unique)
+  $paths = @($paths | Where-Object { $_ -match "^(backend|frontend-admin-v2|docs|scripts)/|^(backend|frontend-admin-v2|docs|scripts)\\" } | Select-Object -Unique)
   $concretePaths = @($paths | Where-Object { $_ -notmatch "[*?]" })
   $keys = @($concretePaths | ForEach-Object { Get-ConflictKey $_ } | Where-Object { $_ } | Select-Object -Unique)
   $hasBroadScope = @($paths | Where-Object { $_ -match "[*?]" }).Count -gt 0

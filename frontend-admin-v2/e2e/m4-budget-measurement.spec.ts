@@ -257,8 +257,8 @@ test.describe('M4 budget and measurement routes', () => {
     const writes: string[] = []
     await install(page, writes, denied)
     for (const path of ['/budget', '/production-measurement']) {
-      await page.goto(`/v2${path}?projectId=P1&period=2026-07`)
-      await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+      await page.goto(`${path}?projectId=P1&period=2026-07`)
+      await expect(page).toHaveURL(/\/forbidden\?from=/)
       await expect(page.getByText('403', { exact: true })).toBeVisible()
     }
     expect(writes).toEqual([])
@@ -269,7 +269,7 @@ test.describe('M4 budget and measurement routes', () => {
     const writes: string[] = []
     await install(page, writes)
     const errors = captureRuntimeErrors(page)
-    await audit(page, '/v2/budget?projectId=P1&period=2026-07', '项目预算')
+    await audit(page, '/budget?projectId=P1&period=2026-07', '项目预算')
     await page.getByRole('button', { name: 'BUD-001' }).click()
     await expect(page.getByRole('dialog')).toContainText('9007199254740993')
     await expect(page.getByRole('dialog')).toContainText('9007199254740993.13')
@@ -293,7 +293,7 @@ test.describe('M4 budget and measurement routes', () => {
     const operations: BudgetOperation[] = []
     await install(page, writes)
     await installBudgetCrud(page, operations)
-    await page.goto('/v2/budget?projectId=P1&period=2026-07')
+    await page.goto('/budget?projectId=P1&period=2026-07')
     await page.getByRole('button', { name: '新建预算' }).click()
     await page.getByLabel('预算版本号').fill('V-E2E')
     await page.getByLabel('预算名称').fill('E2E新增预算')
@@ -352,7 +352,7 @@ test.describe('M4 budget and measurement routes', () => {
     const writes: string[] = []
     const traffic: string[] = []
     await install(page, writes, business, traffic)
-    await page.goto('/v2/budget')
+    await page.goto('/budget')
     await expect(
       page.getByRole('heading', { name: '项目预算', level: 1, exact: true }),
     ).toBeVisible()
@@ -433,7 +433,7 @@ test.describe('M4 budget and measurement routes', () => {
     await install(page, writes)
     await audit(
       page,
-      '/v2/production-measurement?projectId=P1&contractId=C1&period=2026-07',
+      '/production-measurement?projectId=P1&contractId=C1&period=2026-07',
       '9007199254740993.12',
     )
     await page.getByRole('button', { name: '新建计量' }).click()

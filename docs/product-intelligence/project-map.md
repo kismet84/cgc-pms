@@ -1,11 +1,19 @@
 # CGC-PMS 项目地图
 
-## 2026-07-31 v1.6 开发版本启动
+## 2026-07-31 主线58：新版前端正式切换完成
+
+- `frontend-admin-v2` 成为仓库与本地唯一正式前端，接管根路径、`5173`、Compose `frontend`、CI 制品和 E2E；保留目录名避免无价值全仓改名。
+- Legacy 应用源码归档到 `archive/v1.6/frontend-admin-legacy/`，仅用于只读追溯与回滚构建；受保护工具状态和本机忽略产物未归档、未清理。
+- 87 条路由迁移门无 Legacy 页面回落；真实浏览器 `/v2/dashboard→/dashboard`、登录、项目台账和 API 通过。
+- 新版根路径镜像完成 `V2_ROOT→LEGACY_ROLLBACK→V2_RESTORE`；生产发布与三项既有 `RELEASE_GATE` 不变。
+- AutoPilot 控制面路径已同步，新指纹进入 N>1 或无界执行前强制单 Issue 金丝雀。
+
+## 2026-07-31 v1.6 开发版本启动（历史基线）
 
 - v1.5 开发版本资料已封存到 `docs/archive/v1.5/`；PR #379 已合并到 `master`。
 - 后端切换为 `1.6.0-SNAPSHOT`，Legacy 前端切换为 `1.6.0-dev.0`；V2 与共享契约包保持独立版本线。
 - 当前 Ready 为0；候选、冻结项和三项生产 `RELEASE_GATE` 继续由 `docs/backlog/current-issues.json` 承接。
-- 未创建 Tag/GitHub Release，未发布生产，未切正式入口，未退役 Legacy。
+- 当时未创建 Tag/GitHub Release、未发布生产、未切正式入口、未退役 Legacy；现状以上方主线58为准。
 
 ## 2026-07-31 主线57：V1.5开发版本正式收口
 
@@ -136,7 +144,7 @@
 ## 2026-07-26 主线55支线：视觉组件治理关闭
 
 - 视觉组件治理已完成唯一标准、唯一预览、V3共享详情、弹窗关闭契约、V2 Token与全页门禁，复审阻塞项3/5/6/7/8全部通过。
-- 当前验证：设计门`77/77`、V2 unit `359/359`、迁移E2E `81/81`、类型、构建、Clean-room、route ledger、bundle-size和真实5174浏览器通过。
+- 该历史阶段验证：设计门`77/77`、V2 unit `359/359`、迁移E2E `81/81`、类型、构建、Clean-room、route ledger、bundle-size和当时的5174浏览器通过。
 - Legacy已由唯一标准定义为兼容冻结；旧 `VCG-B01-QA-01` 双端高阶视觉证据不再验证现行设计目标，按无明确现行价值关闭并保留历史不通过记录。
 - 支线状态`CLOSED_BY_USER / CURRENT_V2_SCOPE_PASSED`；历史双端完整验收保持未通过。新增0、关闭1、净变化-1、悬空0。第55条其他活动事项和三项生产发布门不变，生产仍禁止上线。
 - 计划：`docs/archive/v1.5/plans/第55条主线-支线-视觉组件治理任务计划书-2026-07-26.md`；报告：`docs/archive/v1.5/quality/第55条主线-支线-视觉组件治理收口验收报告.md`。
@@ -366,7 +374,7 @@
 
 - 新建 `frontend-admin-v2`，与 `frontend-admin` 分离入口、依赖、路由、状态、样式、测试、构建和容器；V2 只允许引用无 Vue、无 DOM、无 CSS 的 `frontend-contracts`。
 - 当前 Legacy 基线为 87 个命名路由、73 个路由视图引用、65 个独立页面模块；自动迁移台账将 86 个路由标记为 `LEGACY_ONLY`，驾驶舱标记为 `V2_SOURCE_AVAILABLE`。
-- 本地运行态保持同一后端与数据事实：Legacy 5173、V2 5174；V2 仅提供 `/v2/health` 和只读后端健康代理，不提供业务写入口。
+- 该历史阶段运行态保持同一后端与数据事实：Legacy 5173、V2 5174；此状态已被主线58的新版唯一5173入口取代。
 - M0 已通过 V2 门禁、Legacy 727 项回归、180 秒运行态稳定观察、实浏览器和本地 Nginx 镜像烟测。M1 设计系统切片已完成，认证与应用壳待实施；M2 驾驶舱迁移未启动。
 - 权威载体：[第53条主线计划书](../archive/v1.5/plans/第53条主线-CGC-PMS全量UI%20Clean-room%20V2重构任务计划书.md)、[M0验收报告](../archive/v1.5/quality/第53条主线-M0-Clean-room隔离底座验收报告.md)、[路由迁移台账](../ui-v2/route-migration-ledger.md)。
 
@@ -998,17 +1006,17 @@ MySQL/H2 + Redis + MinIO
 Docker Compose + Nginx + Actuator + Prometheus
 ```
 
-| 层级            | 现行入口                                                   |
-| --------------- | ---------------------------------------------------------- |
-| 前端入口        | `frontend-admin/src/main.ts`、`frontend-admin/src/App.vue` |
-| 前端路由        | `frontend-admin/src/router/`                               |
-| 页面            | `frontend-admin/src/pages/`                                |
-| API 封装        | `frontend-admin/src/api/modules/`                          |
-| 后端入口        | `backend/src/main/java/com/cgcpms/CgcPmsApplication.java`  |
-| 后端业务域      | `backend/src/main/java/com/cgcpms/`                        |
-| MySQL migration | `backend/src/main/resources/db/migration/`                 |
-| H2 migration    | `backend/src/main/resources/db/migration-h2/`              |
-| 部署            | `deploy/`、`docker-compose*.yml`                           |
+| 层级            | 现行入口                                                         |
+| --------------- | ---------------------------------------------------------------- |
+| 前端入口        | `frontend-admin-v2/src/main.ts`、`frontend-admin-v2/src/App.vue` |
+| 前端路由        | `frontend-admin-v2/src/router.ts`                               |
+| 页面            | `frontend-admin-v2/src/pages/`                                  |
+| API 封装        | `frontend-admin-v2/src/services/`                               |
+| 后端入口        | `backend/src/main/java/com/cgcpms/CgcPmsApplication.java`        |
+| 后端业务域      | `backend/src/main/java/com/cgcpms/`                              |
+| MySQL migration | `backend/src/main/resources/db/migration/`                       |
+| H2 migration    | `backend/src/main/resources/db/migration-h2/`                    |
+| 部署            | `deploy/`、`docker-compose*.yml`                                 |
 
 ## 当前规模快照
 

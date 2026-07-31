@@ -25,9 +25,9 @@ test('ordinary role stays forbidden even with workflow process permission', asyn
     return success(route, null)
   })
 
-  await page.goto('/v2/approval/process?source=e2e#nodes')
+  await page.goto('/approval/process?source=e2e#nodes')
 
-  await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+  await expect(page).toHaveURL(/\/forbidden\?from=/)
   await expect(page.getByRole('heading', { name: '无权访问此页面' })).toBeVisible()
   expect(templateRequests).toBe(0)
 })
@@ -48,9 +48,9 @@ test('administrator uses the documented admin permission override', async ({ pag
     return success(route, null)
   })
 
-  await page.goto('/v2/approval/process')
+  await page.goto('/approval/process')
 
-  await expect(page).toHaveURL(/\/v2\/approval\/process$/)
+  await expect(page).toHaveURL(/\/approval\/process$/)
   await expect.poll(() => templateRequests).toBe(1)
 })
 
@@ -96,9 +96,9 @@ test('administrator with exact permission reads server workflow facts', async ({
     })
   })
 
-  await page.goto('/v2/approval/process?source=e2e#nodes')
+  await page.goto('/approval/process?source=e2e#nodes')
 
-  await expect(page).toHaveURL(/\/v2\/approval\/process\?source=e2e#nodes$/)
+  await expect(page).toHaveURL(/\/approval\/process\?source=e2e#nodes$/)
   await expect(page.getByRole('heading', { level: 1, name: '审批流程配置' })).toBeVisible()
   await expect(page.getByText('服务端合同审批')).toBeVisible()
 })

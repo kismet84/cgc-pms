@@ -306,11 +306,11 @@ test('five finance-control routes render real-shaped facts and write then reread
   })
 
   const routes = [
-    ['/v2/finance-operations?projectId=P1', '资金运营'],
-    ['/v2/cash-journal?projectId=P1', '资金日记账'],
-    ['/v2/cash-forecast?projectId=P1', '资金预测'],
-    ['/v2/accounting-entry?projectId=P1', '会计凭证'],
-    ['/v2/financial-close?projectId=P1', '财务月结'],
+    ['/finance-operations?projectId=P1', '资金运营'],
+    ['/cash-journal?projectId=P1', '资金日记账'],
+    ['/cash-forecast?projectId=P1', '资金预测'],
+    ['/accounting-entry?projectId=P1', '会计凭证'],
+    ['/financial-close?projectId=P1', '财务月结'],
   ] as const
   for (const viewport of [
     { width: 1440, height: 900 },
@@ -329,7 +329,7 @@ test('five finance-control routes render real-shaped facts and write then reread
   }
 
   await page.setViewportSize({ width: 1440, height: 900 })
-  await page.goto('/v2/finance-operations?projectId=P1')
+  await page.goto('/finance-operations?projectId=P1')
   page.once('dialog', (dialog) => dialog.accept('已核实付款计划'))
   await page
     .getByRole('row')

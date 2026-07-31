@@ -201,8 +201,8 @@ test('system admin routes fail closed before business requests', async ({ page }
     roles: ['USER'],
     permissions: ['system:user:query'],
   })
-  await page.goto('/v2/system/users?source=e2e#list')
-  await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+  await page.goto('/system/users?source=e2e#list')
+  await expect(page).toHaveURL(/\/forbidden\?from=/)
   expect(ordinaryTraffic.system).toBe(0)
 
   const adminPage = await page.context().newPage()
@@ -212,8 +212,8 @@ test('system admin routes fail closed before business requests', async ({ page }
     roles: ['ADMIN'],
     permissions: [],
   })
-  await adminPage.goto('/v2/system/users')
-  await expect(adminPage).toHaveURL(/\/v2\/forbidden\?from=/)
+  await adminPage.goto('/system/users')
+  await expect(adminPage).toHaveURL(/\/forbidden\?from=/)
   expect(adminTraffic.system).toBe(0)
 })
 
@@ -224,8 +224,8 @@ test('audit stays read-only and requires only its exact permission', async ({ pa
     roles: ['USER'],
     permissions: ['audit:query'],
   })
-  await page.goto('/v2/system/audit?source=e2e#history')
-  await expect(page).toHaveURL(/\/v2\/system\/audit\?source=e2e#history$/)
+  await page.goto('/system/audit?source=e2e#history')
+  await expect(page).toHaveURL(/\/system\/audit\?source=e2e#history$/)
   await expect(page.getByRole('heading', { level: 1, name: '操作审计' })).toBeVisible()
   await expect(page.getByText('/auth/login')).toBeVisible()
   expect(traffic.audit).toBe(1)
@@ -238,8 +238,8 @@ test('audit stays read-only and requires only its exact permission', async ({ pa
     roles: ['USER'],
     permissions: [],
   })
-  await denied.goto('/v2/system/audit')
-  await expect(denied).toHaveURL(/\/v2\/forbidden\?from=/)
+  await denied.goto('/system/audit')
+  await expect(denied).toHaveURL(/\/forbidden\?from=/)
   expect(deniedTraffic.audit).toBe(0)
 })
 
@@ -248,13 +248,13 @@ test('super administrator reads all server facts while destructive traffic stays
 }) => {
   const traffic = await installMocks(page, superAdmin)
   const routes = [
-    ['/v2/system/users', '用户管理', '服务端用户'],
-    ['/v2/system/roles', '角色管理', '服务端角色'],
-    ['/v2/system/permissions', '权限清单', 'system:menu:query'],
-    ['/v2/system/dict', '字典管理', '服务端字典项'],
-    ['/v2/system/audit', '操作审计', '/auth/login'],
-    ['/v2/system/document-templates', '业务单据模板', '服务端付款模板'],
-    ['/v2/system/data', '数据维护', '清空非生产业务数据'],
+    ['/system/users', '用户管理', '服务端用户'],
+    ['/system/roles', '角色管理', '服务端角色'],
+    ['/system/permissions', '权限清单', 'system:menu:query'],
+    ['/system/dict', '字典管理', '服务端字典项'],
+    ['/system/audit', '操作审计', '/auth/login'],
+    ['/system/document-templates', '业务单据模板', '服务端付款模板'],
+    ['/system/data', '数据维护', '清空非生产业务数据'],
   ] as const
 
   for (const [path, heading, fact] of routes) {
@@ -264,8 +264,8 @@ test('super administrator reads all server facts while destructive traffic stays
   }
   expect(traffic.clear).toBe(0)
 
-  await page.goto('/v2/system?source=e2e#root')
-  await expect(page).toHaveURL(/\/v2\/system\/dict\?source=e2e#root$/)
+  await page.goto('/system?source=e2e#root')
+  await expect(page).toHaveURL(/\/system\/dict\?source=e2e#root$/)
 })
 
 test('data maintenance rejects ADMIN and remains accessible at three viewports for SUPER_ADMIN', async ({
@@ -277,8 +277,8 @@ test('data maintenance rejects ADMIN and remains accessible at three viewports f
     roles: ['ADMIN'],
     permissions: ['*'],
   })
-  await page.goto('/v2/system/data')
-  await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+  await page.goto('/system/data')
+  await expect(page).toHaveURL(/\/forbidden\?from=/)
   expect(adminTraffic.clear).toBe(0)
 
   const superPage = await page.context().newPage()
@@ -289,7 +289,7 @@ test('data maintenance rejects ADMIN and remains accessible at three viewports f
     { width: 390, height: 844 },
   ]) {
     await superPage.setViewportSize(viewport)
-    await superPage.goto('/v2/system/data')
+    await superPage.goto('/system/data')
     await expect(superPage.getByRole('heading', { level: 1, name: '数据维护' })).toBeVisible()
     expect(
       await superPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),

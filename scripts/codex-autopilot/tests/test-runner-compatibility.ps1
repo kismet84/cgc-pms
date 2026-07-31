@@ -44,7 +44,7 @@ function New-Fixture {
   $BacklogDir = Join-Path $Root "docs\backlog"
   $ScriptDir = Join-Path $Root "scripts\codex-autopilot"
   $BackendDir = Join-Path $Root "backend"
-  $FrontendDir = Join-Path $Root "frontend-admin"
+  $FrontendDir = Join-Path $Root "frontend-admin-v2"
   $QualityDir = Join-Path $Root "docs\quality"
   $PolicyDir = Join-Path $Root "plugins\cgc-pms-autopilot\references"
   New-Item -ItemType Directory -Path $AutoDir, $BacklogDir, $ScriptDir, $BackendDir, $FrontendDir, $QualityDir, $PolicyDir -Force | Out-Null
@@ -463,7 +463,7 @@ try {
 目标：
 - Update one isolated frontend page.
 允许修改：
-- ``frontend-admin/src/pages/rules/RulePage.vue``
+- ``frontend-admin-v2/src/pages/rules/RulePage.vue``
 禁止修改：
 - 生产发布
 验收标准：
@@ -471,7 +471,7 @@ try {
 状态：Ready
 来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.2 规则治理中心`` 节
 验证命令：
-- ``cd frontend-admin; pnpm type-check``
+- ``cd frontend-admin-v2; pnpm type-check``
 归档报告：``docs/quality/issue-b.md``
 
 ### ISSUE-100-003：Backend independent
@@ -522,7 +522,7 @@ try {
 目标：
 - Two.
 允许修改：
-- ``frontend-admin/src/pages/two/TwoPage.vue``
+- ``frontend-admin-v2/src/pages/two/TwoPage.vue``
 禁止修改：
 - 生产发布
 验收标准：
@@ -530,7 +530,7 @@ try {
 状态：Ready
 来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.2 Two`` 节
 验证命令：
-- ``cd frontend-admin; pnpm type-check``
+- ``cd frontend-admin-v2; pnpm type-check``
 归档报告：``docs/quality/two.md``
 
 ### ISSUE-100-003：Three
@@ -554,7 +554,7 @@ try {
 目标：
 - Four.
 允许修改：
-- ``frontend-admin/src/api/modules/four.ts``
+- ``frontend-admin-v2/src/api/modules/four.ts``
 禁止修改：
 - 生产发布
 验收标准：
@@ -562,7 +562,7 @@ try {
 状态：Ready
 来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.4 Four`` 节
 验证命令：
-- ``cd frontend-admin; pnpm type-check``
+- ``cd frontend-admin-v2; pnpm type-check``
 归档报告：``docs/quality/four.md``
 "@ -Plan "# Plan`n"
   $ParallelLimitOutput = Invoke-Runner $ParallelLimitRoot -Explain
@@ -578,7 +578,7 @@ try {
 目标：
 - Update report page A.
 允许修改：
-- ``frontend-admin/src/pages/report/A.vue``
+- ``frontend-admin-v2/src/pages/report/A.vue``
 禁止修改：
 - 生产发布
 验收标准：
@@ -586,7 +586,7 @@ try {
 状态：Ready
 来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 A`` 节
 验证命令：
-- ``cd frontend-admin; pnpm type-check``
+- ``cd frontend-admin-v2; pnpm type-check``
 归档报告：``docs/quality/a.md``
 
 ### ISSUE-100-002：Report page B
@@ -594,7 +594,7 @@ try {
 目标：
 - Update report page B.
 允许修改：
-- ``frontend-admin/src/pages/report/B.vue``
+- ``frontend-admin-v2/src/pages/report/B.vue``
 禁止修改：
 - 生产发布
 验收标准：
@@ -602,7 +602,7 @@ try {
 状态：Ready
 来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.1 B`` 节
 验证命令：
-- ``cd frontend-admin; pnpm type-check``
+- ``cd frontend-admin-v2; pnpm type-check``
 归档报告：``docs/quality/b.md``
 "@ -Plan "# Plan`n"
   $SharedModuleOutput = Invoke-Runner $SharedModuleRoot -Explain
@@ -634,7 +634,7 @@ try {
 目标：
 - Other.
 允许修改：
-- ``frontend-admin/src/pages/other/Other.vue``
+- ``frontend-admin-v2/src/pages/other/Other.vue``
 禁止修改：
 - 生产发布
 验收标准：
@@ -642,7 +642,7 @@ try {
 状态：Ready
 来源锚点：``docs/backlog/cgc-pms-production-enhancement-plan.md`` 第 ``8.2 Other`` 节
 验证命令：
-- ``cd frontend-admin; pnpm type-check``
+- ``cd frontend-admin-v2; pnpm type-check``
 归档报告：``docs/quality/other.md``
 "@ -Plan "# Plan`n"
   $UncertainOutput = Invoke-Runner $UncertainRoot -Explain

@@ -1,4 +1,4 @@
-﻿param()
+param()
 
 $ErrorActionPreference = 'Stop'
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -106,9 +106,9 @@ try {
   $roleUpgrade = Get-AutopilotRoute -Issue $low -ChangedPaths @('backend/src/main/java/com/cgcpms/system/service/SysRoleService.java')
   if (!$roleUpgrade.highRisk -or !$roleUpgrade.reviewRequired) { throw 'actual permission-role diff did not upgrade review route' }
 
-  New-ReadyText -Nature '运维治理' -Risk '高' -Allowed '`backend/src/main/java/com/cgcpms/auth/**`, `frontend-admin/src/**`' | Set-Content -LiteralPath $readyPath -Encoding UTF8
+  New-ReadyText -Nature '运维治理' -Risk '高' -Allowed '`backend/src/main/java/com/cgcpms/auth/**`, `frontend-admin-v2/src/**`' | Set-Content -LiteralPath $readyPath -Encoding UTF8
   $high = @(Get-AutopilotReadyIssues -Path $readyPath -RepoRoot $root)[0]
-  $route = Get-AutopilotRoute -Issue $high -ChangedPaths @('backend/src/main/java/com/cgcpms/auth/X.java','frontend-admin/src/X.vue')
+  $route = Get-AutopilotRoute -Issue $high -ChangedPaths @('backend/src/main/java/com/cgcpms/auth/X.java','frontend-admin-v2/src/X.vue')
   if (!$route.reviewRequired -or !$route.serialRequired -or $route.modelBaseline -ne 'gpt-5.6-sol' -or $route.executorRole -ne 'ops') { throw 'high-risk route is not strict enough' }
 
   Write-Host 'ready routing self-test passed'

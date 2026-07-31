@@ -1,6 +1,6 @@
 {
-  "name": "cgc-pms-frontend-admin-v2",
-  "version": "0.1.0-dev.0",
+  "name": "cgc-pms-frontend-admin",
+  "version": "1.6.0-dev.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,6 +11,7 @@
     "type-check:contracts": "tsc -p ../packages/frontend-contracts/tsconfig.json --noEmit",
     "lint:check": "eslint src tests e2e scripts eslint.config.js playwright.config.ts vite.config.ts vitest.config.ts --ext .vue,.js,.mjs,.ts,.jsx,.tsx",
     "test:unit": "vitest run --dir tests/unit",
+    "test:ci": "vitest run --dir tests/unit --reporter=json --outputFile=test-results/unit.json",
     "check:design-system": "vitest run tests/unit/design-system.test.ts tests/unit/v2-ui-remediation-gate.test.ts tests/unit/global-context-contract.test.ts",
     "test:e2e:health": "playwright test e2e/health.spec.ts",
     "test:e2e:migration-gate": "node scripts/run-migration-ui-gate.mjs",

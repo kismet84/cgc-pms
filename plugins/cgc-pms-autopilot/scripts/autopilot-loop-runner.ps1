@@ -231,7 +231,7 @@ if ($selectedIssue.ready) {
                 failure_category = "$($classification.category)/$($classification.subcategory)"
                 required_change = $classification.suggestedNextAction
                 allowed_files = 'plugins/cgc-pms-autopilot/**'
-                forbidden_files = 'backend/**, frontend-admin/**, deploy/**'
+                forbidden_files = 'backend/**, frontend-admin-v2/**, deploy/**'
                 reverify_command = 'pwsh -NoProfile -ExecutionPolicy Bypass -File plugins\cgc-pms-autopilot\scripts\autopilot-loop-runner.ps1 -DryRun -Scenario classify -AllowSyntheticIssue'
                 stop_condition = 'Stop when the same classified failure repeats after the allowed retry policy is exhausted.'
             } | ConvertTo-Json -Depth 5 -Compress

@@ -30,13 +30,13 @@ test.describe('M3 live delivery workspace', () => {
     await login(page, 'admin')
     const projectId = await firstProjectId(page)
 
-    await page.goto(`/v2/project-schedule?projectId=${projectId}#delivery`)
+    await page.goto(`/project-schedule?projectId=${projectId}#delivery`)
     await expect(page.locator('.shell-placeholder')).toHaveCount(0)
     await expect(page.getByRole('main')).toContainText('项目计划与施工履约')
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
     await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
 
-    await page.goto(`/v2/site/daily-log?projectId=${projectId}#delivery`)
+    await page.goto(`/site/daily-log?projectId=${projectId}#delivery`)
     await expect(page.locator('.shell-placeholder')).toHaveCount(0)
     await expect(page.getByRole('main')).toContainText('现场日报')
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
@@ -51,11 +51,11 @@ test.describe('M3 live delivery workspace', () => {
 
   test('schedule detail uses a deep link and returns to the list', async ({ page }) => {
     await login(page, 'admin')
-    await page.goto(`/v2/project-schedule?projectId=${scheduleProjectId}`)
+    await page.goto(`/project-schedule?projectId=${scheduleProjectId}`)
 
     await page.locator('.schedule-page__table .v2-table__record-link').first().click()
     await expect(page).toHaveURL(
-      new RegExp(`/v2/project-schedule/[^?]+\\?projectId=${scheduleProjectId}`),
+      new RegExp(`/project-schedule/[^?]+\\?projectId=${scheduleProjectId}`),
     )
     await expect(page.getByRole('button', { name: '返回计划列表' })).toBeVisible()
     await expect(page.locator('.schedule-page__table .v2-table__record-link')).toHaveCount(0)
@@ -65,14 +65,14 @@ test.describe('M3 live delivery workspace', () => {
     await expect(page.getByRole('button', { name: '返回计划列表' })).toBeVisible()
 
     await page.getByRole('button', { name: '返回计划列表' }).click()
-    await expect(page).toHaveURL(`/v2/project-schedule?projectId=${scheduleProjectId}`)
+    await expect(page).toHaveURL(`/project-schedule?projectId=${scheduleProjectId}`)
   })
 
   test('schedule loads all accessible projects when the shell selects all projects', async ({
     page,
   }) => {
     await login(page, 'admin')
-    await page.goto(`/v2/project-schedule?projectId=${scheduleProjectId}`)
+    await page.goto(`/project-schedule?projectId=${scheduleProjectId}`)
 
     const projectControl = page.locator('#global-project')
     await projectControl.click()
@@ -83,14 +83,14 @@ test.describe('M3 live delivery workspace', () => {
     await projectControl.locator('..').locator('[role="option"][data-value=""]').click()
 
     expect((await allProjectsResponse).ok()).toBe(true)
-    await expect(page).toHaveURL('/v2/project-schedule')
+    await expect(page).toHaveURL('/project-schedule')
     await expect(page.getByRole('columnheader', { name: '项目' })).toBeVisible()
     await expect(page.locator('.schedule-page__table .v2-table__record-link').first()).toBeVisible()
   })
 
   test('unavailable schedule detail keeps a return path', async ({ page }) => {
     await login(page, 'admin')
-    await page.goto(`/v2/project-schedule/not-found?projectId=${scheduleProjectId}`)
+    await page.goto(`/project-schedule/not-found?projectId=${scheduleProjectId}`)
 
     await expect(page.getByRole('heading', { name: '计划详情不可用' })).toBeVisible()
     runtimeErrors.set(
@@ -100,13 +100,13 @@ test.describe('M3 live delivery workspace', () => {
       ),
     )
     await page.getByRole('button', { name: '返回计划列表' }).click()
-    await expect(page).toHaveURL(`/v2/project-schedule?projectId=${scheduleProjectId}`)
+    await expect(page).toHaveURL(`/project-schedule?projectId=${scheduleProjectId}`)
   })
 
   test('daily-log report period reaches the server as calendar-month bounds', async ({ page }) => {
     await login(page, 'admin')
     const projectId = await firstProjectId(page)
-    await page.goto(`/v2/site/daily-log?projectId=${projectId}`)
+    await page.goto(`/site/daily-log?projectId=${projectId}`)
     const periodControl = page.locator('#global-report-period')
     await periodControl.click()
     const option = periodControl
@@ -168,9 +168,9 @@ test.describe('M3 live delivery workspace', () => {
         !url.searchParams.has('endDate')
       )
     })
-    await page.goto('/v2/site/daily-log?startDate=2025-05-01&endDate=2025-05-31')
+    await page.goto('/site/daily-log?startDate=2025-05-01&endDate=2025-05-31')
     expect((await unfiltered).ok()).toBe(true)
-    await expect(page).toHaveURL('/v2/site/daily-log')
+    await expect(page).toHaveURL('/site/daily-log')
   })
 
   test('delivery routes keep layout stable in three viewports with no serious accessibility issue', async ({
@@ -185,7 +185,7 @@ test.describe('M3 live delivery workspace', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto(`/v2/project-schedule?projectId=${projectId}`)
+      await page.goto(`/project-schedule?projectId=${projectId}`)
       await expect(
         page.getByRole('heading', { level: 1, name: '项目计划与施工履约' }),
       ).toBeVisible()
@@ -199,7 +199,7 @@ test.describe('M3 live delivery workspace', () => {
         ),
       ).toEqual([])
 
-      await page.goto(`/v2/site/daily-log?projectId=${projectId}`)
+      await page.goto(`/site/daily-log?projectId=${projectId}`)
       await expect(page.getByRole('heading', { level: 1, name: '现场日报' })).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -215,9 +215,9 @@ test.describe('M3 live delivery workspace', () => {
     await login(page, 'admin')
 
     for (const [route, selector] of [
-      ['/v2/quality-safety', '.quality-page__record-sections h3'],
-      ['/v2/technical-management', '.technical-page__record-sections h3'],
-      ['/v2/project-closeout', '.closeout-page__record-sections h3'],
+      ['/quality-safety', '.quality-page__record-sections h3'],
+      ['/technical-management', '.technical-page__record-sections h3'],
+      ['/project-closeout', '.closeout-page__record-sections h3'],
     ]) {
       await page.goto(`${route}?projectId=${scheduleProjectId}`)
       const headings = page.locator(selector)
@@ -240,19 +240,19 @@ test.describe('M3 live delivery workspace', () => {
     await login(page, 'admin')
     const routes = [
       {
-        path: '/v2/quality-safety',
+        path: '/quality-safety',
         root: '.quality-page',
         heading: '质量安全整改闭环',
         dialog: '闭环追溯',
       },
       {
-        path: '/v2/technical-management',
+        path: '/technical-management',
         root: '.technical-page',
         heading: '图纸 RFI 技术闭环',
         dialog: '图纸闭环追溯',
       },
       {
-        path: '/v2/project-closeout',
+        path: '/project-closeout',
         root: '.closeout-page',
         heading: '竣工收尾闭环',
         dialog: '收尾追溯',
@@ -289,12 +289,12 @@ test.describe('M3 live delivery workspace', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     for (const route of routes) {
       await page.goto(`${route.path}?projectId=${scheduleProjectId}`)
-      if (route.path === '/v2/project-closeout') {
+      if (route.path === '/project-closeout') {
         await page.getByRole('button', { name: '追溯', exact: true }).click()
       } else {
         await page
           .getByRole('tab', {
-            name: route.path === '/v2/quality-safety' ? /问题整改/ : /图纸管理/,
+            name: route.path === '/quality-safety' ? /问题整改/ : /图纸管理/,
           })
           .click()
         await page.locator(`${route.root} .v2-table__record-link`).first().click()
@@ -309,14 +309,14 @@ test.describe('M3 live delivery workspace', () => {
     await login(page, 'admin')
     for (const flow of [
       {
-        path: '/v2/technical-management',
+        path: '/technical-management',
         initial: /技术方案/,
         next: /图纸管理/,
         initialTab: 'scheme',
         nextTab: 'drawing',
       },
       {
-        path: '/v2/quality-safety',
+        path: '/quality-safety',
         initial: /检查计划/,
         next: /问题整改/,
         initialTab: 'plan',
@@ -351,7 +351,7 @@ test.describe('M3 live delivery workspace', () => {
     })
 
     await login(page, splitRoleUser)
-    await page.goto(`/v2/project-schedule?projectId=${controlledProjectId}`)
+    await page.goto(`/project-schedule?projectId=${controlledProjectId}`)
     await expect(page.getByRole('heading', { level: 1, name: '项目计划与施工履约' })).toBeVisible()
     await expect(page.getByRole('button', { name: '新建基线计划' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '维护 WBS' })).toHaveCount(0)
@@ -361,7 +361,7 @@ test.describe('M3 live delivery workspace', () => {
     expect(mutatingRequests).toEqual([])
 
     await login(page, 'demo.production')
-    await page.goto(`/v2/site/daily-log?projectId=${controlledProjectId}`)
+    await page.goto(`/site/daily-log?projectId=${controlledProjectId}`)
     await expect(page.getByRole('heading', { level: 1, name: '现场日报' })).toBeVisible()
     await expect(page.getByRole('button', { name: '新建日报' })).toBeVisible()
   })

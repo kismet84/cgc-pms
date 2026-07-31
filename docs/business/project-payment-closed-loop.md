@@ -807,7 +807,7 @@ erDiagram
 | 并发集成 | ProjectPaymentConcurrencyTest | 预算占用、合同余额、重复付款和日记唯一性 |
 | Controller | 各域 MockMvc 测试 | 权限、参数、错误码、租户和数据范围 |
 | 前端组件 | 各页面 Vitest | 表单必填、错误展示、状态动作和禁止编辑 |
-| E2E | frontend-admin/e2e/project-payment-closed-loop.spec.ts | 真实角色从项目到驾驶舱的闭环 |
+| E2E | frontend-admin-v2/e2e/m6-payment-revenue-invoice.spec.ts | 真实角色从项目到驾驶舱的闭环 |
 | 对账 | ProjectPaymentReconciliationTest | 预算、付款、日记、凭证和驾驶舱事实守恒 |
 
 ### 8.2 正常流程脚本 FLOW-001
@@ -1090,6 +1090,6 @@ P0-1 历史金额处置必须遵循以下顺序：
 | 数据库 | 新增V224—V233 MySQL/H2迁移；本地MySQL十个版本均`success=1` |
 | 自动化 | 后端272类2282项通过；Legacy 131文件734项通过；V2 48文件351项通过；真实角色Chromium FLOW-001 1/1通过 |
 
-本地运行态：后端`http://localhost:8080/api/actuator/health`返回`UP`，Legacy入口`http://localhost:5173/`，V2入口`http://localhost:5174/`。这些证据只证明本地工作区，不替代同HEAD CI或目标环境。
+该历史验收时的本地运行态：后端`http://localhost:8080/api/actuator/health`返回`UP`，Legacy入口为`5173`，V2候选入口为`5174`；此状态已被主线58的新版唯一`5173`入口取代。历史证据不替代当前HEAD CI或目标环境。
 
 正式证据见[`第55条主线-支线-资金支出闭环收口验收报告`](../archive/v1.5/quality/第55条主线-支线-资金支出闭环收口验收报告.md)。

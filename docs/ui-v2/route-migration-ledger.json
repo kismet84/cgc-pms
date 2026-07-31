@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "source": "frontend-admin/src/router/index.ts",
+  "source": "archive/v1.6/frontend-admin-legacy/src/router/index.ts",
   "summary": {
     "namedRoutes": 87,
     "legacyRouteViewEntries": 73,

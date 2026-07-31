@@ -34,7 +34,7 @@ test.describe('V2 live application shell', () => {
       { name: 'mobile', width: 390, height: 844 },
     ]) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height })
-      await page.goto('/v2/dashboard?role=mgmt')
+      await page.goto('/dashboard?role=mgmt')
       await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
       await expect(page.getByText('仅作辅助判断，非财务/结算口径', { exact: false })).toBeVisible()
       expect(
@@ -80,7 +80,7 @@ test.describe('V2 live application shell', () => {
       runtimeErrors.filter(
         (message) =>
           message !==
-          'error http://127.0.0.1:5174/favicon.ico: Failed to load resource: the server responded with a status of 404 (Not Found)',
+          'error http://127.0.0.1:5173/favicon.ico: Failed to load resource: the server responded with a status of 404 (Not Found)',
       ),
     ).toEqual([])
   })

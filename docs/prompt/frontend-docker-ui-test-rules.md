@@ -1,6 +1,6 @@
 # 前端 Docker 与 UI 测试规则
 
-适用范围：`frontend-admin`、`frontend-admin-v2` 页面重构、UI 对齐、交互修复、Codex 内置浏览器验收和 Playwright 回归。
+适用范围：`frontend-admin-v2` 页面重构、UI 对齐、交互修复、Codex 内置浏览器验收和 Playwright 回归。
 
 ## 基准环境
 

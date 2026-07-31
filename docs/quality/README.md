@@ -5,5 +5,6 @@
 - v1.5 质量与验收报告：[归档入口](../archive/v1.5/quality/)
 - v1.0 质量与验收报告：[归档入口](../archive/v1.0/quality/)
 - 当前工作焦点：[Backlog](../backlog/current-focus.md)
+- [第58条主线：新版前端正式切换与 Legacy 归档验收报告](第58条主线-新版前端正式切换与Legacy归档验收报告.md)
 
-当前无 v1.6 正式质量报告。
+当前 v1.6 正式质量报告：1 份。

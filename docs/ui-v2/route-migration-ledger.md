@@ -1,6 +1,6 @@
 # 第53条主线 UI V2 路由迁移台账
 
-> 自动生成文件。源：`frontend-admin/src/router/index.ts`。修改路由后运行 `pnpm generate:route-ledger`；CI 使用 `pnpm check:route-ledger` 防漂移。
+> 自动生成文件。Legacy 冻结源：`archive/v1.6/frontend-admin-legacy/src/router/index.ts`。修改路由后运行 `pnpm generate:route-ledger`；CI 使用 `pnpm check:route-ledger` 防漂移。
 
 - 命名路由：87
 - Legacy 路由视图引用：73

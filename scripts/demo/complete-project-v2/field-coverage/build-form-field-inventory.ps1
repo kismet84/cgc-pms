@@ -9,7 +9,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $packageRoot = Split-Path $PSScriptRoot -Parent
 $repoRoot = [System.IO.Path]::GetFullPath((Join-Path $packageRoot '../../..'))
-$pagesRoot = Join-Path $repoRoot 'frontend-admin/src/pages'
+$pagesRoot = Join-Path $repoRoot 'archive/v1.6/frontend-admin-legacy/src/pages'
 $mapPath = Join-Path $PSScriptRoot 'page-table-map.json'
 $apiMapPath = Join-Path $PSScriptRoot 'api-readback-map.json'
 

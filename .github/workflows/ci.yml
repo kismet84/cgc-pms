@@ -17,7 +17,7 @@ env:
   BACKEND_JAR_ARTIFACT: backend-jar-${{ github.run_number }}-${{ github.sha }}
   BACKEND_COVERAGE_ARTIFACT: backend-coverage-${{ github.run_number }}-${{ github.sha }}
   FRONTEND_DIST_ARTIFACT: frontend-dist-${{ github.run_number }}-${{ github.sha }}
-  FRONTEND_COVERAGE_ARTIFACT: frontend-coverage-${{ github.run_number }}-${{ github.sha }}
+  FRONTEND_TEST_ARTIFACT: frontend-test-${{ github.run_number }}-${{ github.sha }}
   SBOM_ARTIFACT: sbom-artifacts-${{ github.run_number }}-${{ github.sha }}
 
 jobs:
@@ -120,7 +120,7 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-frontend
         with:
-          working-directory: frontend-admin
+          working-directory: frontend-admin-v2
       - name: Lint frontend
         shell: bash
         run: bash ./scripts/ci/run-frontend-lint.sh
@@ -129,7 +129,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: frontend-lint-report-${{ github.run_number }}-${{ github.sha }}
-          path: frontend-admin/.ci-artifacts/lint-check.txt
+          path: frontend-admin-v2/.ci-artifacts/lint-check.txt
           if-no-files-found: ignore
 
   type-check:
@@ -138,9 +138,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-frontend
         with:
-          working-directory: frontend-admin
+          working-directory: frontend-admin-v2
       - name: TypeScript type check
-        run: cd frontend-admin && pnpm type-check
+        run: cd frontend-admin-v2 && pnpm type-check
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -148,17 +148,17 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-frontend
         with:
-          working-directory: frontend-admin
+          working-directory: frontend-admin-v2
       - name: Install & Build
-        run: cd frontend-admin && pnpm build
+        run: cd frontend-admin-v2 && pnpm build
       - name: Check frontend bundle size
-        run: cd frontend-admin && pnpm check:bundle-size
+        run: cd frontend-admin-v2 && pnpm check:bundle-size
       - name: Upload build artifacts
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
-          path: frontend-admin/dist
+          path: frontend-admin-v2/dist
 
   frontend-test:
     runs-on: ubuntu-latest
@@ -166,17 +166,16 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-frontend
         with:
-          working-directory: frontend-admin
-      - name: Install & Test with coverage
-        run: cd frontend-admin && pnpm test:coverage
-        env:
-          COVERAGE_DIR: coverage-ci
-      - name: Upload frontend coverage
+          working-directory: frontend-admin-v2
+      - name: Run frontend unit tests
+        run: cd frontend-admin-v2 && pnpm test:ci
+      - name: Upload frontend test evidence
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.FRONTEND_COVERAGE_ARTIFACT }}
-          path: frontend-admin/coverage-ci
+          name: ${{ env.FRONTEND_TEST_ARTIFACT }}
+          path: frontend-admin-v2/test-results
+          if-no-files-found: ignore
 
   frontend-dependency-audit:
     runs-on: ubuntu-latest
@@ -184,9 +183,9 @@ jobs:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-frontend
         with:
-          working-directory: frontend-admin
+          working-directory: frontend-admin-v2
       - name: Audit frontend dependencies with official registry
-        run: cd frontend-admin && pnpm audit --audit-level high --registry=https://registry.npmjs.org
+        run: cd frontend-admin-v2 && pnpm audit --audit-level high --registry=https://registry.npmjs.org
 
   frontend-v2-gate:
     runs-on: ubuntu-latest
@@ -199,26 +198,6 @@ jobs:
         run: cd frontend-admin-v2 && pnpm check:boundary && pnpm check:route-ledger
       - name: Enforce unique design system standard
         run: cd frontend-admin-v2 && pnpm check:design-system
-      - name: Lint, test, type-check and build V2
-        run: cd frontend-admin-v2 && pnpm lint:check && pnpm test:unit && pnpm type-check:contracts && pnpm type-check && pnpm build && pnpm check:bundle-size
-      - name: Install V2 browser
-        run: cd frontend-admin-v2 && pnpm exec playwright install chromium
-      - name: Run deterministic V2 migration browser gate
-        run: cd frontend-admin-v2 && pnpm test:e2e:migration-gate
-        env:
-          PLAYWRIGHT_BASE_URL: http://127.0.0.1:4174
-          PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4174
-      - name: Upload V2 browser failure evidence
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: frontend-v2-gate-failure-${{ github.run_number }}-${{ github.sha }}
-          path: |
-            frontend-admin-v2/playwright-report
-            frontend-admin-v2/test-results
-          if-no-files-found: ignore
-      - name: Audit V2 dependencies with official registry
-        run: cd frontend-admin-v2 && pnpm audit --audit-level high --registry=https://registry.npmjs.org
 
   supply-chain-security:
     runs-on: ubuntu-latest
@@ -338,12 +317,12 @@ jobs:
       - uses: ./.github/actions/setup-backend
       - uses: ./.github/actions/setup-frontend
         with:
-          working-directory: frontend-admin
+          working-directory: frontend-admin-v2
       - name: Download frontend build
         uses: actions/download-artifact@v8
         with:
           name: ${{ env.FRONTEND_DIST_ARTIFACT }}
-          path: frontend-admin/dist
+          path: frontend-admin-v2/dist
       - name: Start MinIO
         run: bash ./scripts/ci/start-e2e-minio.sh
       - name: Start backend
@@ -351,9 +330,9 @@ jobs:
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
       - name: Install Playwright dependencies
-        run: cd frontend-admin && pnpm exec playwright install chromium
+        run: cd frontend-admin-v2 && pnpm exec playwright install chromium
       - name: Run E2E tests
-        run: cd frontend-admin && pnpm test:e2e:ui
+        run: cd frontend-admin-v2 && pnpm test:e2e:migration-gate
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173
           PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4173
@@ -365,8 +344,8 @@ jobs:
         with:
           name: e2e-failure-evidence-${{ github.run_number }}-${{ github.sha }}
           path: |
-            frontend-admin/playwright-report
-            frontend-admin/test-results
+            frontend-admin-v2/playwright-report
+            frontend-admin-v2/test-results
             backend.log
           if-no-files-found: ignore
 
@@ -406,7 +385,7 @@ jobs:
             echo "- Run number: ${{ github.run_number }}"
             echo "- Commit SHA: ${{ github.sha }}"
             echo "- Core gate jobs: frontend-lint, backend-dependency-scan, backend-test, backend-test-mysql, type-check, frontend-build, frontend-test, frontend-dependency-audit, frontend-v2-gate, e2e, sql-safety-scan, supply-chain-security"
-            echo "- Artifacts: ${{ env.BACKEND_JAR_ARTIFACT }}, ${{ env.BACKEND_COVERAGE_ARTIFACT }}, ${{ env.FRONTEND_DIST_ARTIFACT }}, ${{ env.FRONTEND_COVERAGE_ARTIFACT }}, ${{ env.SBOM_ARTIFACT }}"
+            echo "- Artifacts: ${{ env.BACKEND_JAR_ARTIFACT }}, ${{ env.BACKEND_COVERAGE_ARTIFACT }}, ${{ env.FRONTEND_DIST_ARTIFACT }}, ${{ env.FRONTEND_TEST_ARTIFACT }}, ${{ env.SBOM_ARTIFACT }}"
             echo ""
             echo "### Job Results"
             echo "- backend-test: ${{ needs.backend-test.result }}"

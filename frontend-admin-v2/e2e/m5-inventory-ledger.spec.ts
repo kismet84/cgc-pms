@@ -202,16 +202,16 @@ test.describe('M5 inventory workspace V2', () => {
         (request) => request.url().includes('/api/inventory/') && traffic.push(request.url()),
       )
       await install(page, [])
-      await page.goto(`/v2${path}`)
-      await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+      await page.goto(`${path}`)
+      await expect(page).toHaveURL(/\/forbidden\?from=/)
       expect(traffic).toEqual([])
     })
   }
 
   test('redirects inventory root and renders warehouse scope', async ({ page }) => {
     await install(page)
-    await page.goto('/v2/inventory?projectId=P1')
-    await expect(page).toHaveURL(/\/v2\/inventory\/warehouse\?projectId=P1/)
+    await page.goto('/inventory?projectId=P1')
+    await expect(page).toHaveURL(/\/inventory\/warehouse\?projectId=P1/)
     await expect(page.getByText('WH-001', { exact: true })).toBeVisible()
   })
 
@@ -224,7 +224,7 @@ test.describe('M5 inventory workspace V2', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/inventory/warehouse?projectId=P1')
+      await page.goto('/inventory/warehouse?projectId=P1')
       await expect(page.getByText('WH-001', { exact: true })).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -248,7 +248,7 @@ test.describe('M5 inventory workspace V2', () => {
 
   test('warehouse write actions use exact permissions and re-read', async ({ page }) => {
     await install(page, ['inventory:warehouse:list'])
-    await page.goto('/v2/inventory/warehouse?projectId=P1')
+    await page.goto('/inventory/warehouse?projectId=P1')
     await expect(page.getByRole('button', { name: '新建仓库' })).toHaveCount(0)
     const writes = await install(page, ['inventory:warehouse:list', 'inventory:warehouse:add'])
     await page.reload()
@@ -264,7 +264,7 @@ test.describe('M5 inventory workspace V2', () => {
 
   test('reads quantity, value, incoming and historical facts', async ({ page }) => {
     await install(page)
-    await page.goto('/v2/inventory/stock?projectId=P1')
+    await page.goto('/inventory/stock?projectId=P1')
     await openStockDrawer(page)
     const drawer = page.getByRole('dialog', { name: '库存明细与流水' })
     await expect(drawer.getByText('¥260.00', { exact: true })).toBeVisible()
@@ -281,7 +281,7 @@ test.describe('M5 inventory workspace V2', () => {
         stockRequests.push(request.url())
     })
     await install(page)
-    await page.goto('/v2/inventory/stock')
+    await page.goto('/inventory/stock')
     await expect(
       page.getByRole('region', { name: '库存台账列表' }).getByText('示范项目', { exact: true }),
     ).toBeVisible()
@@ -294,14 +294,14 @@ test.describe('M5 inventory workspace V2', () => {
       if (new URL(request.url()).pathname === '/api/materials') materialRequests.push(request.url())
     })
     await install(page, ['inventory:stock:list'])
-    await page.goto('/v2/inventory/stock?projectId=P1')
+    await page.goto('/inventory/stock?projectId=P1')
     await expect(page.getByRole('button', { name: 'MAT-001', exact: true })).toBeVisible()
     expect(materialRequests).toEqual([])
   })
 
   test('updates threshold with decimal strings then re-reads', async ({ page }) => {
     const writes = await install(page)
-    await page.goto('/v2/inventory/stock?projectId=P1')
+    await page.goto('/inventory/stock?projectId=P1')
     await openStockDrawer(page)
     await page.getByRole('button', { name: '维护阈值' }).click()
     await page.getByLabel('安全库存').fill('12.5000')
@@ -315,7 +315,7 @@ test.describe('M5 inventory workspace V2', () => {
     page,
   }) => {
     const writes = await install(page, permissions, true)
-    await page.goto('/v2/inventory/stock?projectId=P1')
+    await page.goto('/inventory/stock?projectId=P1')
     await openStockDrawer(page)
     await page.getByRole('button', { name: '库存调拨' }).click()
     const dialog = page.getByRole('dialog', { name: '库存调拨' })
@@ -345,8 +345,8 @@ test.describe('M5 inventory workspace V2', () => {
         stockOnlyRequests.push(request.url())
     })
     await install(page, ['inventory:transaction:list'])
-    await page.goto('/v2/inventory/transaction?projectId=P1')
-    await expect(page).toHaveURL(/\/v2\/inventory\/stock\?projectId=P1#transactions/)
+    await page.goto('/inventory/transaction?projectId=P1')
+    await expect(page).toHaveURL(/\/inventory\/stock\?projectId=P1#transactions/)
     await openStockDrawer(page)
     await expect(page.getByText('入库', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: /入库|出库/ })).toHaveCount(0)

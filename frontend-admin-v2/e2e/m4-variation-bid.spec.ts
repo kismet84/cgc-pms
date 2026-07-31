@@ -142,18 +142,18 @@ test.describe('M4 variation and bid routes', () => {
     await installCommercialMock(page, () => identity)
     const runtimeErrors = captureRuntimeErrors(page)
 
-    await page.goto('/v2/variation?projectId=P1#claim')
-    await expect(page).toHaveURL(/\/v2\/variation\/order\?projectId=P1#claim$/)
+    await page.goto('/variation?projectId=P1#claim')
+    await expect(page).toHaveURL(/\/variation\/order\?projectId=P1#claim$/)
 
     for (const target of [
       {
-        path: '/v2/variation/order',
+        path: '/variation/order',
         heading: '签证变更',
         selector: '.variation-page',
         record: '基坑设计变更',
       },
       {
-        path: '/v2/bid-cost',
+        path: '/bid-cost',
         heading: '投标成本',
         selector: '.bid-cost-page',
         record: '市民中心投标',
@@ -169,7 +169,7 @@ test.describe('M4 variation and bid routes', () => {
         await expect(page.locator('.shell-placeholder')).toHaveCount(0)
         await expect(page.getByRole('heading', { name: target.heading, exact: true })).toBeVisible()
         await expect(page.getByText(target.record, { exact: true })).toBeVisible()
-        if (target.path === '/v2/variation/order' && viewport.width === 1440) {
+        if (target.path === '/variation/order' && viewport.width === 1440) {
           await expect(page.locator('.variation-page table thead th')).toHaveCount(8)
           await expect(
             page.locator('.variation-page table tbody tr').first().locator('td'),
@@ -193,7 +193,7 @@ test.describe('M4 variation and bid routes', () => {
     }
 
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('/v2/bid-cost')
+    await page.goto('/bid-cost')
     await page.getByRole('button', { name: 'BID-071' }).click()
     const detailDialog = page.getByRole('dialog', { name: '投标成本预览' })
     await expect(detailDialog).toHaveClass(/v2-detail-dialog/)
@@ -210,11 +210,11 @@ test.describe('M4 variation and bid routes', () => {
     let identity: Identity = 'readonly'
     await installCommercialMock(page, () => identity)
 
-    await page.goto('/v2/variation/order')
+    await page.goto('/variation/order')
     await expect(page.getByRole('button', { name: '新建变更' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '编辑' })).toHaveCount(0)
 
-    await page.goto('/v2/bid-cost')
+    await page.goto('/bid-cost')
     await expect(page.getByRole('button', { name: '新建投标成本' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '编辑' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '标记中标' })).toHaveCount(0)
@@ -224,10 +224,10 @@ test.describe('M4 variation and bid routes', () => {
     const denied = await browser.newPage()
     identity = 'denied'
     await installCommercialMock(denied, () => identity)
-    await denied.goto('/v2/variation/order')
-    await expect(denied).toHaveURL(/\/v2\/forbidden\?from=/)
-    await denied.goto('/v2/bid-cost')
-    await expect(denied).toHaveURL(/\/v2\/forbidden\?from=/)
+    await denied.goto('/variation/order')
+    await expect(denied).toHaveURL(/\/forbidden\?from=/)
+    await denied.goto('/bid-cost')
+    await expect(denied).toHaveURL(/\/forbidden\?from=/)
     await denied.close()
   })
 })

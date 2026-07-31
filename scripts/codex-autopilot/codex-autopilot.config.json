@@ -250,13 +250,13 @@
     "cd backend && mvn test"
   ],
   "frontendValidation": [
-    "cd frontend-admin && pnpm type-check",
-    "cd frontend-admin && pnpm build"
+    "cd frontend-admin-v2 && pnpm type-check",
+    "cd frontend-admin-v2 && pnpm build"
   ],
   "fullValidation": [
     "cd backend && mvn test",
-    "cd frontend-admin && pnpm type-check",
-    "cd frontend-admin && pnpm build"
+    "cd frontend-admin-v2 && pnpm type-check",
+    "cd frontend-admin-v2 && pnpm build"
   ],
   "mergeGateValidation": [
     "git diff --check"

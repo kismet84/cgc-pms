@@ -5,7 +5,7 @@ import ts from 'typescript'
 
 const scriptRoot = resolve(fileURLToPath(new URL('.', import.meta.url)))
 const repositoryRoot = resolve(scriptRoot, '../..')
-const routerPath = resolve(repositoryRoot, 'frontend-admin/src/router/index.ts')
+const routerPath = resolve(repositoryRoot, 'archive/v1.6/frontend-admin-legacy/src/router/index.ts')
 const v2RouterPath = resolve(repositoryRoot, 'frontend-admin-v2/src/router.ts')
 const navigationCatalogPath = resolve(repositoryRoot, 'frontend-admin-v2/src/navigation/catalog.ts')
 const jsonPath = resolve(repositoryRoot, 'docs/ui-v2/route-migration-ledger.json')
@@ -417,7 +417,7 @@ function renderMarkdown(ledger) {
   const lines = [
     '# 第53条主线 UI V2 路由迁移台账',
     '',
-    '> 自动生成文件。源：`frontend-admin/src/router/index.ts`。修改路由后运行 `pnpm generate:route-ledger`；CI 使用 `pnpm check:route-ledger` 防漂移。',
+    '> 自动生成文件。Legacy 冻结源：`archive/v1.6/frontend-admin-legacy/src/router/index.ts`。修改路由后运行 `pnpm generate:route-ledger`；CI 使用 `pnpm check:route-ledger` 防漂移。',
     '',
     `- 命名路由：${ledger.summary.namedRoutes}`,
     `- Legacy 路由视图引用：${ledger.summary.legacyRouteViewEntries}`,
@@ -774,7 +774,7 @@ async function buildLedger() {
   if (names.size !== routes.length) throw new Error('Duplicate route names found')
   return {
     schemaVersion: 1,
-    source: 'frontend-admin/src/router/index.ts',
+    source: 'archive/v1.6/frontend-admin-legacy/src/router/index.ts',
     summary: {
       namedRoutes: routes.length,
       legacyRouteViewEntries: routes.filter((route) => route.legacyView?.startsWith('@/pages/'))

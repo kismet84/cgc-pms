@@ -50,7 +50,7 @@ async function select(page: Page, controlId: string, value: string) {
 
 test('keeps the M4 public context contract in the shared V2 shell', async ({ page }) => {
   await install(page)
-  await page.goto('/v2/dashboard')
+  await page.goto('/dashboard')
   await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
 
   await select(page, '#global-project', 'P1')
@@ -66,7 +66,7 @@ test('keeps the M4 public context contract in the shared V2 shell', async ({ pag
   await expect
     .poll(() => Object.fromEntries(new URL(page.url()).searchParams))
     .toMatchObject({ projectId: 'P1', period })
-  await page.goto(`/v2/dashboard?projectId=P1&period=${period}`)
+  await page.goto(`/dashboard?projectId=P1&period=${period}`)
   await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
   await select(page, '#global-project', '')
   await select(page, '#global-report-period', '')
@@ -76,7 +76,7 @@ test('keeps the M4 public context contract in the shared V2 shell', async ({ pag
 
 test('removes unavailable context values from the URL after options load', async ({ page }) => {
   await install(page)
-  await page.goto('/v2/dashboard?projectId=missing&period=1900-01')
+  await page.goto('/dashboard?projectId=missing&period=1900-01')
 
   await expect.poll(() => new URL(page.url()).search).toBe('')
   await expect(page.locator('#global-project')).toHaveAttribute('aria-label', '当前项目：全部项目')

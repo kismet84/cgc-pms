@@ -29,7 +29,7 @@ test.describe('M2 live eight-role dashboard', () => {
     const projectId = '520000000000009002'
     const period = '2026-07'
     expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
-    await page.goto('/v2/project/list')
+    await page.goto('/project/list')
     await selectOption(page.locator('#global-project'), projectId)
     await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
 
@@ -61,7 +61,7 @@ test.describe('M2 live eight-role dashboard', () => {
       if (url.pathname === '/api/alerts') alertUrls.push(url)
     })
     expect((await page.goto('/api/auth/dev-login?username=admin'))?.ok()).toBe(true)
-    await page.goto(`/v2/dashboard?role=mgmt&projectId=${projectId}&period=${period}`, {
+    await page.goto(`/dashboard?role=mgmt&projectId=${projectId}&period=${period}`, {
       waitUntil: 'networkidle',
     })
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
@@ -78,7 +78,7 @@ test.describe('M2 live eight-role dashboard', () => {
     ).toBe(true)
 
     alertUrls.length = 0
-    await page.goto(`/v2/dashboard?role=bm&projectId=${projectId}&period=${period}`, {
+    await page.goto(`/dashboard?role=bm&projectId=${projectId}&period=${period}`, {
       waitUntil: 'networkidle',
     })
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
@@ -94,7 +94,7 @@ test.describe('M2 live eight-role dashboard', () => {
     ).toBe(true)
 
     alertUrls.length = 0
-    await page.goto(`/v2/dashboard?role=finance&projectId=${projectId}&period=${period}`, {
+    await page.goto(`/dashboard?role=finance&projectId=${projectId}&period=${period}`, {
       waitUntil: 'networkidle',
     })
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
@@ -114,7 +114,7 @@ test.describe('M2 live eight-role dashboard', () => {
   }) => {
     const login = await page.goto('/api/auth/dev-login?username=demo.cost')
     expect(login?.ok()).toBe(true)
-    await page.goto('/v2/dashboard?role=cost')
+    await page.goto('/dashboard?role=cost')
 
     const trendRows = page.locator('.trend-chart tbody tr')
     await expect(page.locator('.trend-chart canvas')).toBeVisible()
@@ -152,7 +152,7 @@ test.describe('M2 live eight-role dashboard', () => {
       return url.pathname === `/api/dashboard/project/${projectId}/cost-breakdown`
     })
 
-    await page.goto(`/v2/dashboard?role=cost&projectId=${projectId}`)
+    await page.goto(`/dashboard?role=cost&projectId=${projectId}`)
     const response = await breakdownResponse
     expect(response.ok()).toBe(true)
     const envelope = (await response.json()) as {
@@ -186,7 +186,7 @@ test.describe('M2 live eight-role dashboard', () => {
   }) => {
     const login = await page.goto('/api/auth/dev-login?username=demo.finance')
     expect(login?.ok()).toBe(true)
-    await page.goto('/v2/dashboard?role=finance')
+    await page.goto('/dashboard?role=finance')
 
     const projectSelect = page.locator('#global-project')
     const projectId = '520000000000009002'
@@ -278,7 +278,7 @@ test.describe('M2 live eight-role dashboard', () => {
         url.pathname === '/api/dashboard/business-manager' && !url.searchParams.has('projectId')
       )
     })
-    await page.goto('/v2/dashboard?role=bm')
+    await page.goto('/dashboard?role=bm')
     expect((await aggregateResponse).ok()).toBe(true)
 
     const projectSelect = page.locator('#global-project')
@@ -392,7 +392,7 @@ test.describe('M2 live eight-role dashboard', () => {
       role.assert(body.data)
     }
 
-    await page.goto('/v2/dashboard?role=chiefEngineer')
+    await page.goto('/dashboard?role=chiefEngineer')
     await selectOption(page.locator('#global-project'), projectId)
     await expect(page.getByText('经营动态', { exact: true })).toBeVisible()
     await expect(page.locator('#cost-trend').getByText('楼梯节点做法逾期未闭环')).toBeVisible()
@@ -403,7 +403,7 @@ test.describe('M2 live eight-role dashboard', () => {
     ).toBe(true)
 
     expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
-    await page.goto('/v2/dashboard?role=pm')
+    await page.goto('/dashboard?role=pm')
     await page.getByRole('button', { name: '查看最高风险', exact: true }).click()
     await expect(page.locator('.risk-filter summary')).toHaveText('高')
     await expect(page.locator('#risk-list .risk-level').first()).toHaveText('高')
@@ -440,7 +440,7 @@ test.describe('M2 live eight-role dashboard', () => {
         const url = new URL(response.url())
         return url.pathname === '/api/alerts' && url.searchParams.get('projectId') === projectId
       })
-      await page.goto(`/v2/dashboard?role=${roleCase.role}&projectId=${projectId}`)
+      await page.goto(`/dashboard?role=${roleCase.role}&projectId=${projectId}`)
       const response = await alertResponse
       expect(response.ok()).toBe(true)
       const body = (await response.json()) as {
@@ -457,7 +457,7 @@ test.describe('M2 live eight-role dashboard', () => {
   test('opens the alert status menu downward without dialog clipping', async ({ page }) => {
     expect((await page.goto('/api/auth/dev-login?username=admin'))?.ok()).toBe(true)
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('/v2/dashboard?role=mgmt')
+    await page.goto('/dashboard?role=mgmt')
     await page.locator('#risk-list tbody tr').first().click()
 
     const dialog = page.getByRole('dialog')
@@ -498,7 +498,7 @@ test.describe('M2 live eight-role dashboard', () => {
     const login = await page.goto('/api/auth/dev-login?username=admin')
     expect(login?.ok()).toBe(true)
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('/v2/dashboard?role=pm')
+    await page.goto('/dashboard?role=pm')
     await expect(page.getByText('项目经营健康评分')).toBeVisible()
     await expect(page.locator('#global-project')).toContainText('全部项目')
     await expect(
@@ -535,7 +535,7 @@ test.describe('M2 live eight-role dashboard', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/dashboard?role=mgmt')
+      await page.goto('/dashboard?role=mgmt')
       await expect(page.getByText('项目经营健康评分')).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),

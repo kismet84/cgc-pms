@@ -218,8 +218,8 @@ test.describe('M5 supplier sourcing V2', () => {
       if (request.url().includes('/api/supplier-sourcing/')) traffic.push(request.url())
     })
     await install(page, [])
-    await page.goto('/v2/supplier-sourcing?projectId=P1')
-    await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+    await page.goto('/supplier-sourcing?projectId=P1')
+    await expect(page).toHaveURL(/\/forbidden\?from=/)
     await expect(page.getByText('403', { exact: true })).toBeVisible()
     expect(traffic).toEqual([])
   })
@@ -233,7 +233,7 @@ test.describe('M5 supplier sourcing V2', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/supplier-sourcing?projectId=P1')
+      await page.goto('/supplier-sourcing?projectId=P1')
       await expect(page.getByText('SRC-001', { exact: true })).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -248,8 +248,8 @@ test.describe('M5 supplier sourcing V2', () => {
 
   test('loads authorized sourcing facts for all projects', async ({ page }) => {
     await install(page)
-    await page.goto('/v2/supplier-sourcing')
-    await expect(page).toHaveURL(/\/v2\/supplier-sourcing$/)
+    await page.goto('/supplier-sourcing')
+    await expect(page).toHaveURL(/\/supplier-sourcing$/)
     await expect(page.getByText('事件 1', { exact: true })).toBeVisible()
     await expect(page.getByText('评价 0', { exact: true })).toBeVisible()
     await expect(page.getByText('退货 0', { exact: true })).toBeVisible()
@@ -298,7 +298,7 @@ test.describe('M5 supplier sourcing V2', () => {
     test(`${sample.permission} exposes only its ordinary-user action`, async ({ page }) => {
       event.status = sample.status
       await install(page, ['supplier:sourcing:query', sample.permission])
-      await page.goto('/v2/supplier-sourcing?projectId=P1')
+      await page.goto('/supplier-sourcing?projectId=P1')
       if (sample.trace)
         await page.getByRole('button', { name: event.sourcingCode, exact: true }).click()
       await expect(
@@ -311,7 +311,7 @@ test.describe('M5 supplier sourcing V2', () => {
 
   test('runs event, quote, evaluation, award and contract actions once', async ({ page }) => {
     const writes = await install(page)
-    await page.goto('/v2/supplier-sourcing?projectId=P1')
+    await page.goto('/supplier-sourcing?projectId=P1')
     await page.getByRole('button', { name: event.sourcingCode, exact: true }).click()
     await page.getByRole('button', { name: '发布', exact: true }).dblclick()
     await expect(page.getByText('已发布', { exact: true }).first()).toBeVisible()
@@ -352,7 +352,7 @@ test.describe('M5 supplier sourcing V2', () => {
     page,
   }) => {
     const writes = await install(page)
-    await page.goto('/v2/supplier-sourcing?projectId=P1')
+    await page.goto('/supplier-sourcing?projectId=P1')
     await page.getByRole('button', { name: event.sourcingCode, exact: true }).click()
     await page.getByRole('button', { name: '邀请供应商' }).click()
     const inviteDialog = page.getByRole('dialog', { name: '邀请供应商' })

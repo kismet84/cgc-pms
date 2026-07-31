@@ -142,7 +142,7 @@ test.describe('M4-1 approval workbench', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/approval/todo')
+      await page.goto('/approval/todo')
       await expect(page.getByRole('heading', { level: 1, name: '审批工作台' })).toBeVisible()
       const filterLabels = page.locator('.workflow-filter .v2-field__label')
       await expect(filterLabels).toHaveCount(3)
@@ -161,7 +161,7 @@ test.describe('M4-1 approval workbench', () => {
       }
 
       await page.getByRole('button', { name: 'PAY-2026-001', exact: true }).click()
-      await expect(page).toHaveURL(/\/v2\/approval\/instances\/81\?returnTab=todo$/)
+      await expect(page).toHaveURL(/\/approval\/instances\/81\?returnTab=todo$/)
       const detailDialog = page.getByRole('dialog', { name: '审批详情' })
       await expect(detailDialog).toBeVisible()
       await expect(detailDialog).toHaveClass(/v2-detail-dialog/)
@@ -178,7 +178,7 @@ test.describe('M4-1 approval workbench', () => {
         axe.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? '')),
       ).toEqual([])
       await page.getByRole('button', { name: '关闭审批详情', exact: true }).click()
-      await expect(page).toHaveURL(/\/v2\/approval\/todo$/)
+      await expect(page).toHaveURL(/\/approval\/todo$/)
     }
 
     expect(runtimeErrors).toEqual([])
@@ -192,7 +192,7 @@ test.describe('M4-1 approval workbench', () => {
       return fulfill(route, null)
     })
 
-    await page.goto('/v2/approval/instances/81?returnTab=todo')
+    await page.goto('/approval/instances/81?returnTab=todo')
     await page.getByRole('button', { name: '驳回', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: '驳回' })
     await dialog.getByRole('button', { name: '确认提交', exact: true }).click()
