@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "source": "frontend-admin/src/router/index.ts",
+  "source": "archive/v1.6/frontend-admin-legacy/src/router/index.ts",
   "summary": {
     "namedRoutes": 87,
     "legacyRouteViewEntries": 73,
@@ -23,7 +23,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-036-M7登录与错误深链V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-036-M7登录与错误深链V2验收报告.md"
     },
     {
       "name": "Dashboard",
@@ -38,7 +38,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": "用户已选新版经营驾驶舱视觉概念；M2 已验收",
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
     },
     {
       "name": "Forbidden",
@@ -53,7 +53,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-036-M7登录与错误深链V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-036-M7登录与错误深链V2验收报告.md"
     },
     {
       "name": "ReportCatalog",
@@ -68,7 +68,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
     },
     {
       "name": "Contract",
@@ -83,7 +83,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md"
     },
     {
       "name": "ContractLedger",
@@ -98,7 +98,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md"
     },
     {
       "name": "ContractCreate",
@@ -113,7 +113,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md"
     },
     {
       "name": "ContractDetail",
@@ -128,7 +128,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md"
     },
     {
       "name": "ContractEdit",
@@ -143,7 +143,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md"
     },
     {
       "name": "Cost",
@@ -158,7 +158,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md"
     },
     {
       "name": "CostLedger",
@@ -173,7 +173,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md"
     },
     {
       "name": "CostSummary",
@@ -188,7 +188,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md"
     },
     {
       "name": "CostControl",
@@ -203,7 +203,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md"
     },
     {
       "name": "CostSubject",
@@ -218,7 +218,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md"
     },
     {
       "name": "CostSubjectTaxonomy",
@@ -233,7 +233,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md"
     },
     {
       "name": "CostSubjectRules",
@@ -248,7 +248,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md"
     },
     {
       "name": "CostSubjectScope",
@@ -263,7 +263,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md"
     },
     {
       "name": "CostSubjectTrace",
@@ -278,7 +278,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md"
     },
     {
       "name": "CostTarget",
@@ -293,7 +293,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md"
     },
     {
       "name": "CostTargetList",
@@ -308,7 +308,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md"
     },
     {
       "name": "CostTargetCreate",
@@ -323,7 +323,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md"
     },
     {
       "name": "CostTargetEdit",
@@ -338,7 +338,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md"
     },
     {
       "name": "Variation",
@@ -353,7 +353,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md"
     },
     {
       "name": "VariationOrder",
@@ -368,7 +368,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md"
     },
     {
       "name": "Settlement",
@@ -383,7 +383,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md"
     },
     {
       "name": "SettlementList",
@@ -398,7 +398,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md"
     },
     {
       "name": "SettlementDetail",
@@ -413,7 +413,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md"
     },
     {
       "name": "Project",
@@ -428,7 +428,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-011-M3项目对象工作区验收报告.md"
     },
     {
       "name": "ProjectList",
@@ -443,7 +443,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-011-M3项目对象工作区验收报告.md"
     },
     {
       "name": "ProjectOverview",
@@ -458,7 +458,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-011-M3项目对象工作区验收报告.md"
     },
     {
       "name": "ProjectMembers",
@@ -473,7 +473,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-011-M3项目对象工作区验收报告.md"
     },
     {
       "name": "ProjectEdit",
@@ -488,7 +488,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-011-M3项目对象工作区验收报告.md"
     },
     {
       "name": "Partner",
@@ -503,7 +503,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-038-M7基础资料V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-038-M7基础资料V2验收报告.md"
     },
     {
       "name": "SiteDailyLog",
@@ -518,7 +518,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md"
     },
     {
       "name": "ProjectSchedule",
@@ -533,7 +533,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md"
     },
     {
       "name": "QualitySafety",
@@ -548,7 +548,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-013-M3质量安全整改闭环验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-013-M3质量安全整改闭环验收报告.md"
     },
     {
       "name": "TechnicalManagement",
@@ -563,7 +563,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md"
     },
     {
       "name": "ProjectCloseout",
@@ -578,7 +578,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md"
     },
     {
       "name": "SupplierSourcing",
@@ -593,7 +593,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-025-M5供应商招采与履约V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-025-M5供应商招采与履约V2验收报告.md"
     },
     {
       "name": "BidCost",
@@ -608,7 +608,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md"
     },
     {
       "name": "Org",
@@ -623,7 +623,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-038-M7基础资料V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-038-M7基础资料V2验收报告.md"
     },
     {
       "name": "Subcontract",
@@ -638,7 +638,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md"
     },
     {
       "name": "SubcontractTask",
@@ -653,7 +653,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md"
     },
     {
       "name": "SubcontractMeasure",
@@ -668,7 +668,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md"
     },
     {
       "name": "Purchase",
@@ -683,7 +683,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md"
     },
     {
       "name": "PurchaseOrder",
@@ -698,7 +698,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md"
     },
     {
       "name": "PurchaseReceipt",
@@ -713,7 +713,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md"
     },
     {
       "name": "Payment",
@@ -728,7 +728,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md"
     },
     {
       "name": "PaymentApplication",
@@ -743,7 +743,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md"
     },
     {
       "name": "ExpenseApplication",
@@ -758,7 +758,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md"
     },
     {
       "name": "ProjectBudget",
@@ -773,7 +773,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md"
     },
     {
       "name": "FinanceOperations",
@@ -788,7 +788,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md"
     },
     {
       "name": "RevenueOperations",
@@ -803,7 +803,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md"
     },
     {
       "name": "ProductionMeasurement",
@@ -818,7 +818,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md"
     },
     {
       "name": "CashJournal",
@@ -833,7 +833,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md"
     },
     {
       "name": "AccountingEntry",
@@ -848,7 +848,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md"
     },
     {
       "name": "CashForecast",
@@ -863,7 +863,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md"
     },
     {
       "name": "FinancialClose",
@@ -878,7 +878,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md"
     },
     {
       "name": "Inventory",
@@ -893,7 +893,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md"
     },
     {
       "name": "InventoryWarehouse",
@@ -908,7 +908,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md"
     },
     {
       "name": "InventoryStock",
@@ -923,7 +923,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md"
     },
     {
       "name": "InventoryTransaction",
@@ -938,7 +938,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md"
     },
     {
       "name": "InventoryPurchaseRequest",
@@ -953,7 +953,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md"
     },
     {
       "name": "InventoryMaterialRequisition",
@@ -968,7 +968,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-028-M5领料出库与退料V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-028-M5领料出库与退料V2验收报告.md"
     },
     {
       "name": "Invoice",
@@ -983,7 +983,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md"
     },
     {
       "name": "Material",
@@ -998,7 +998,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-038-M7基础资料V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-038-M7基础资料V2验收报告.md"
     },
     {
       "name": "MaterialDictionary",
@@ -1013,7 +1013,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-038-M7基础资料V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-038-M7基础资料V2验收报告.md"
     },
     {
       "name": "Alert",
@@ -1028,7 +1028,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
     },
     {
       "name": "Approval",
@@ -1043,7 +1043,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
     },
     {
       "name": "ApprovalTodo",
@@ -1058,7 +1058,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
     },
     {
       "name": "ApprovalDone",
@@ -1073,7 +1073,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
     },
     {
       "name": "ApprovalCc",
@@ -1088,7 +1088,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
     },
     {
       "name": "ApprovalMine",
@@ -1103,7 +1103,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
     },
     {
       "name": "ApprovalProcess",
@@ -1118,7 +1118,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-040-M7流程配置与adminOnly门V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-040-M7流程配置与adminOnly门V2验收报告.md"
     },
     {
       "name": "ApprovalDetail",
@@ -1133,7 +1133,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md"
     },
     {
       "name": "System",
@@ -1148,7 +1148,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
     },
     {
       "name": "SystemDict",
@@ -1163,7 +1163,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
     },
     {
       "name": "SystemUsers",
@@ -1178,7 +1178,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
     },
     {
       "name": "SystemData",
@@ -1193,7 +1193,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
     },
     {
       "name": "RoleManagement",
@@ -1208,7 +1208,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
     },
     {
       "name": "SystemPermissions",
@@ -1223,7 +1223,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
     },
     {
       "name": "SystemAudit",
@@ -1238,7 +1238,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
     },
     {
       "name": "DocumentTemplateManagement",
@@ -1253,7 +1253,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-041-M7系统管理V2验收报告.md"
     },
     {
       "name": "Profile",
@@ -1268,7 +1268,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md"
     },
     {
       "name": "Settings",
@@ -1283,7 +1283,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md"
     },
     {
       "name": "Help",
@@ -1298,7 +1298,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md"
     },
     {
       "name": "NotFound",
@@ -1313,7 +1313,7 @@
       "status": "V2_ACCEPTED",
       "stitchDesign": null,
       "testEvidence": "frontend-admin-v2/tests/unit；frontend-admin-v2/e2e",
-      "acceptanceEvidence": "docs/quality/ISSUE-053-036-M7登录与错误深链V2验收报告.md"
+      "acceptanceEvidence": "docs/archive/v1.5/quality/ISSUE-053-036-M7登录与错误深链V2验收报告.md"
     }
   ]
 }

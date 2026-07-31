@@ -34,13 +34,13 @@ test.describe('M3 live project object', () => {
     page,
   }) => {
     await login(page, 'admin')
-    await page.goto('/v2/project?keyword=演示#ledger')
-    await expect(page).toHaveURL(/\/v2\/project\/list\?keyword=.*#ledger$/)
+    await page.goto('/project?keyword=演示#ledger')
+    await expect(page).toHaveURL(/\/project\/list\?keyword=.*#ledger$/)
     const projectId = '520000000000000001'
     for (const path of [
-      `/v2/project/${projectId}/overview`,
-      `/v2/project/${projectId}/members`,
-      `/v2/project/${projectId}/edit`,
+      `/project/${projectId}/overview`,
+      `/project/${projectId}/members`,
+      `/project/${projectId}/edit`,
     ]) {
       expect((await page.goto(path))?.ok()).toBe(true)
       await expect(page.locator('.shell-placeholder')).toHaveCount(0)
@@ -60,7 +60,7 @@ test.describe('M3 live project object', () => {
         return body.data.records[0]!.id
       })
 
-    await page.goto('/v2/project/list')
+    await page.goto('/project/list')
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
     await expect(page.locator('#global-report-period')).toHaveAttribute('aria-disabled', 'false')
     const detailResponse = page.waitForResponse(
@@ -75,7 +75,7 @@ test.describe('M3 live project object', () => {
     expect((await detailResponse).ok()).toBe(true)
     await expect(page.locator('.project-page__table tbody tr')).toHaveCount(1)
 
-    await page.goto(`/v2/project/${projectId}/overview`)
+    await page.goto(`/project/${projectId}/overview`)
     await expect(page.locator('.app-shell__object-context')).toHaveCount(0)
     await expect(page.getByText(`对象 project / ${projectId}`)).toHaveCount(0)
     await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
@@ -93,7 +93,7 @@ test.describe('M3 live project object', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/project/list?keyword=演示#ledger')
+      await page.goto('/project/list?keyword=演示#ledger')
       await expect(page.locator('.project-page__toolbar-card')).toBeVisible({ timeout: 15_000 })
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -109,7 +109,7 @@ test.describe('M3 live project object', () => {
     page,
   }) => {
     await login(page, 'admin')
-    await page.goto('/v2/project/list')
+    await page.goto('/project/list')
     await expect(page.getByRole('columnheader', { name: '审批状态' })).toBeVisible()
     await expect(page.locator('.project-page__table tbody tr')).toHaveCount(10)
 
@@ -136,16 +136,16 @@ test.describe('M3 live project object', () => {
 
   test('real query-only identity cannot see writes or member route', async ({ page }) => {
     await login(page, 'demo.business')
-    await page.goto('/v2/project/list')
+    await page.goto('/project/list')
     await expect(page.getByRole('button', { name: '新建项目' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: /删除|归档|提交/ })).toHaveCount(0)
-    await page.goto('/v2/project/520000000000009002/members')
-    await expect(page).toHaveURL(/\/v2\/forbidden/)
+    await page.goto('/project/520000000000009002/members')
+    await expect(page).toHaveURL(/\/forbidden/)
   })
 
   test('real member-readonly identity can read but cannot mutate members', async ({ page }) => {
     await login(page, 'demo.member-readonly')
-    await page.goto('/v2/project/520000000000009002/members')
+    await page.goto('/project/520000000000009002/members')
     await expect(page.getByRole('heading', { name: '项目成员' })).toBeVisible()
     await expect(page.getByRole('button', { name: /添加成员|编辑|移除/ })).toHaveCount(0)
     const denied = await page.evaluate(async () => {
@@ -175,15 +175,15 @@ test.describe('M3 live project object', () => {
 
   test('anonymous and permissionless deep links fail closed', async ({ browser }) => {
     const anonymous = await browser.newPage()
-    await anonymous.goto('/v2/project/520000000000009002/overview')
-    await expect(anonymous).toHaveURL(/\/v2\/login\?redirect=/)
+    await anonymous.goto('/project/520000000000009002/overview')
+    await expect(anonymous).toHaveURL(/\/login\?redirect=/)
     await anonymous.close()
 
     const denied = await browser.newPage()
     await login(denied, 'demo.business')
     await rewritePermissions(denied, [])
-    await denied.goto('/v2/project/list')
-    await expect(denied).toHaveURL(/\/v2\/forbidden/)
+    await denied.goto('/project/list')
+    await expect(denied).toHaveURL(/\/forbidden/)
     await denied.close()
   })
 
@@ -200,7 +200,7 @@ test.describe('M3 live project object', () => {
         })
       } else await route.continue()
     })
-    await page.goto('/v2/project/list')
+    await page.goto('/project/list')
     await expect(page.getByRole('alert').filter({ hasText: '受控故障' }).first()).toBeVisible()
     await page.getByRole('button', { name: '刷新' }).click()
     await expect(page.locator('.project-page__table tbody tr').first()).toBeVisible()
@@ -209,7 +209,7 @@ test.describe('M3 live project object', () => {
 
   test('rapid query changes keep only the newest response', async ({ page }) => {
     await login(page, 'admin')
-    await page.goto('/v2/project/list')
+    await page.goto('/project/list')
     await page.route('**/api/projects?*', async (route) => {
       const keyword = new URL(route.request().url()).searchParams.get('keyword')
       if (!['slow', 'fast'].includes(keyword ?? '')) return route.continue()
@@ -261,7 +261,7 @@ test.describe('M3 live project object', () => {
 
   test('write conflict is shown and followed by authoritative reread', async ({ page }) => {
     await login(page, 'admin')
-    await page.goto('/v2/project/list')
+    await page.goto('/project/list')
     let rereads = 0
     page.on('response', (response) => {
       if (
@@ -294,7 +294,7 @@ test.describe('M3 live project object', () => {
   test('SUPER_ADMIN creates then deletes a controlled demo project', async ({ page }) => {
     await login(page, 'admin')
     const name = `M3验收项目-${Date.now()}`
-    await page.goto('/v2/project/list')
+    await page.goto('/project/list')
     await page.getByRole('button', { name: '新建项目' }).click()
     const dialog = page.getByRole('dialog', { name: '新建项目' })
     await dialog.getByLabel('项目名称').fill(name)
@@ -309,7 +309,7 @@ test.describe('M3 live project object', () => {
     expect(createdResponse.ok()).toBe(true)
     const createdEnvelope = (await createdResponse.json()) as { data: string }
     const createdId = createdEnvelope.data
-    await page.goto(`/v2/project/list?keyword=${encodeURIComponent(name)}`)
+    await page.goto(`/project/list?keyword=${encodeURIComponent(name)}`)
     const row = page.getByRole('row').filter({ hasText: name })
     await expect(row).toBeVisible()
     await row.locator('summary').click()

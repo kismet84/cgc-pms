@@ -147,7 +147,7 @@
     "approvalStatus": "APPROVED",
     "approvedAt": "2026-07-13T22:39:03.5213305+08:00",
     "effectiveFrom": "NEXT_NEW_IMPLEMENTATION_READY",
-    "approvalSource": "docs/iterations/AutoPilot任务评分v2批准决策-2026-07-13.md",
+    "approvalSource": "docs/archive/v1.5/iterations/AutoPilot任务评分v2批准决策-2026-07-13.md",
     "weights": {
       "deliveryCorrectness": 35,
       "zeroDanglingIssues": 25,
@@ -250,13 +250,13 @@
     "cd backend && mvn test"
   ],
   "frontendValidation": [
-    "cd frontend-admin && pnpm type-check",
-    "cd frontend-admin && pnpm build"
+    "cd frontend-admin-v2 && pnpm type-check",
+    "cd frontend-admin-v2 && pnpm build"
   ],
   "fullValidation": [
     "cd backend && mvn test",
-    "cd frontend-admin && pnpm type-check",
-    "cd frontend-admin && pnpm build"
+    "cd frontend-admin-v2 && pnpm type-check",
+    "cd frontend-admin-v2 && pnpm build"
   ],
   "mergeGateValidation": [
     "git diff --check"

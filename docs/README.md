@@ -1,14 +1,15 @@
 # 文档中心
 
-本目录是 cgc-pms v1.5 当前知识入口。历史测试数量、覆盖率和上线结论均不得替代当前验证。
+本目录是 cgc-pms v1.6 当前知识入口。历史测试数量、覆盖率和上线结论均不得替代当前验证。
 
-当前状态：V1.5开发版本已收口；生产发布、目标环境复验、正式入口切换和Legacy退役未授权且未完成。权威结论见[V1.5开发版本说明](V1.5-开发版本说明-2026-07-31.md)和[第57条主线正式收口验收报告](quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)。
+当前状态：V1.5 开发版本已封存，V1.6 开发已启动；第58条主线已将新版切为仓库和本地正式前端，Legacy 源码已归档。生产发布和目标环境复验仍未执行。V1.5 权威结论见[开发版本归档](archive/v1.5/README.md)和[第57条主线正式收口验收报告](archive/v1.5/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)。
 
 ## 规则优先级
 
 1. [AGENTS.md](../AGENTS.md)
 2. [现行规范](standards/)
-3. [v1.0 文档归档](archive/v1.0/)
+3. [v1.5 文档归档](archive/v1.5/)
+4. [v1.0 文档归档](archive/v1.0/)
 
 ## 现行规范
 
@@ -38,9 +39,9 @@
 - [Prompt 索引](prompt/README.md)
 - [当前 backlog](backlog/current-focus.md)
 - [产品情报：项目地图、竞品分析与迭代决策](product-intelligence/README.md)
-- [v1.5 计划书](plans/README.md)
-- [v1.5 质量报告](quality/README.md)
-- [V1.5 开发版本说明](V1.5-开发版本说明-2026-07-31.md)
+- [v1.6 计划书](plans/README.md)
+- [v1.6 质量报告](quality/README.md)
+- [V1.5 开发版本归档](archive/v1.5/README.md)
 - [业务闭环标准](business/)
 - [项目计划与施工履约闭环业务标准](business/project-schedule-construction-performance-closed-loop.md)
 - [项目变更、签证与索赔闭环业务标准](business/project-variation-claim-closed-loop.md)
@@ -52,13 +53,13 @@
 - [财务核算与月结闭环业务标准](business/financial-accounting-month-end-closed-loop.md)
 - [项目资金计划与现金预测闭环业务标准](business/project-cash-plan-forecast-closed-loop.md)
 - [项目预警与通知闭环业务标准](business/project-alert-notification-closed-loop.md)
-- [v1.5 迭代记录](iterations/README.md)
+- [v1.6 迭代记录](iterations/README.md)
 - [未来开发计划](未来开发计划.md)
 - [历史开发记录](历史开发记录.md)
 - [项目知识图谱工具](../tools/knowledge-graph/README.md)
 - [数据库最终基线 B215 与平台初始化](database/database-baseline-v215.md)
-- [第52条主线数据库基线平台初始化与演示项目重建验收报告](quality/第52条主线-数据库基线平台初始化与演示项目重建验收报告.md)
+- [第52条主线数据库基线平台初始化与演示项目重建验收报告](archive/v1.5/quality/第52条主线-数据库基线平台初始化与演示项目重建验收报告.md)
 
 ## 历史边界
 
-v1.0 及更早的计划、质量报告、迭代报告、问题报告和 backlog 快照统一从 [v1.0 文档归档](archive/v1.0/README.md) 查阅。Git 忽略的本地私有封存不属于项目运行依赖，也不得作为当前规范引用。
+v1.5 的计划、质量报告、迭代记录、培训确认、专题研究、UI 基线、审计报告、过程文件和 Backlog 快照从 [v1.5 文档归档](archive/v1.5/README.md) 查阅；v1.0 及更早记录从 [v1.0 文档归档](archive/v1.0/README.md) 查阅。Git 忽略的本地私有封存不属于项目运行依赖，也不得作为当前规范引用。

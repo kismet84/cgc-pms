@@ -206,7 +206,7 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
     { name: 'mobile', width: 390, height: 844 },
   ]) {
     await page.setViewportSize(viewport)
-    await page.goto('/v2/dashboard')
+    await page.goto('/dashboard')
     await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
     await expect(page.getByRole('main')).toBeVisible()
     await expect(page.getByLabel('当前位置')).toContainText('工作台经营驾驶舱')
@@ -263,7 +263,7 @@ test('keeps authenticated shell accessible at 1440, 1024 and 390', async ({ page
       await expect(menu).toBeFocused()
       await menu.click()
       await page.getByRole('link', { name: '供应链与物资' }).click()
-      await expect(page).toHaveURL(/\/v2\/supplier-sourcing$/)
+      await expect(page).toHaveURL(/\/supplier-sourcing$/)
       await expect(page.getByRole('main')).toBeFocused()
       await expect(page.getByRole('main')).not.toHaveCSS('outline-style', 'none')
     }
@@ -279,29 +279,29 @@ test('honors reduced motion and distinguishes identity, 403 and 404 states', asy
   await installIdentity(page, () => identity)
   await page.emulateMedia({ reducedMotion: 'reduce' })
   await page.setViewportSize({ width: 390, height: 844 })
-  await page.goto('/v2/dashboard')
+  await page.goto('/dashboard')
   await expect(page.locator('.app-shell__sidebar')).toHaveCSS('transition-duration', '0.001s')
 
   identity = 'ordinary'
-  await page.goto('/v2/project/list')
+  await page.goto('/project/list')
   await expect(page.getByRole('heading', { level: 1, name: '项目台账' })).toBeVisible()
   await expect(page.locator('[data-domain]')).toHaveCount(2)
 
   identity = 'denied'
-  await page.goto('/v2/contract/ledger')
-  await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+  await page.goto('/contract/ledger')
+  await expect(page).toHaveURL(/\/forbidden\?from=/)
   await expect(page.getByRole('heading', { level: 1, name: '无权访问此页面' })).toBeVisible()
   await expectNoSeriousAxeViolations(page)
 
   identity = 'admin'
-  await page.goto('/v2/not-a-real-route')
-  await expect(page).toHaveURL(/\/v2\/not-a-real-route$/)
+  await page.goto('/not-a-real-route')
+  await expect(page).toHaveURL(/\/not-a-real-route$/)
   await expect(page.getByRole('heading', { level: 1, name: '页面不存在' })).toBeVisible()
   await expectNoSeriousAxeViolations(page)
 
   identity = 'anonymous'
-  await page.goto('/v2/project/list')
-  await expect(page).toHaveURL(/\/v2\/login\?redirect=/)
+  await page.goto('/project/list')
+  await expect(page).toHaveURL(/\/login\?redirect=/)
   await expect(page.getByRole('heading', { name: '登录新版工作台' })).toBeVisible()
   await expectNoHorizontalOverflow(page)
   await expectNoSeriousAxeViolations(page)

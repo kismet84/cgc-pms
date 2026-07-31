@@ -4,9 +4,9 @@
 
 状态：现行、唯一权威
 
-适用范围：`frontend-admin-v2` 全部页面；`frontend-admin` 仅作兼容维护
+适用范围：`frontend-admin-v2` 全部页面；Legacy 只读归档不再维护
 
-唯一可视入口：`http://127.0.0.1:5174/v2/src/components/preview/index.html`
+唯一可视入口：`http://127.0.0.1:5173/src/components/preview/index.html`
 
 ## 1. 权威边界
 
@@ -20,20 +20,20 @@
 4. `frontend-admin-v2/src/styles/components.css`、`frontend-admin-v2/src/components/index.ts` 与 `V2*.vue` 定义共享组件外观和行为。
 5. 业务页面只定义业务布局、列宽、换行和字段语义，不复制公共组件材质。
 
-`design-qa.md`、`docs/plans/`、`docs/quality/` 与 `docs/ui-v2/m1-design-system-baseline.md` 均为历史或验收记录，不是规范源。发生冲突时以本文和当前实现门禁为准。
+`design-qa.md`、V1.5 计划/质量归档与 `docs/archive/v1.5/ui-v2/m1-design-system-baseline.md` 均为历史或验收记录，不是规范源。发生冲突时以本文和当前实现门禁为准。
 
 ## 2. 双前端边界
 
 | 目录 | 状态 | 允许 |
 | --- | --- | --- |
 | `frontend-admin-v2` | 现行设计系统 | 只使用 `--v2-*` token、V2共享组件和本文规则 |
-| `frontend-admin` | Legacy兼容冻结 | 保留既有 Ant Design Vue、`tokens.ts` 与样式护栏；只做缺陷和可用性维护，不产生新标准 |
+| `archive/v1.6/frontend-admin-legacy` | Legacy 只读归档 | 仅供历史回滚和迁移取证，不参与现行开发 |
 
 禁止跨端复制组件、CSS、DOM适配层或 token。禁止把 Legacy 的 `lg-*`、`pt-*`、`app-*`、Ant Modal 或颜色值用于 V2；也禁止为统一外观反向改写 Legacy 业务页。
 
 ## 3. 唯一视觉基线
 
-- 设计系统只保留一个预览地址：`/v2/src/components/preview/index.html`。
+- 设计系统只保留一个预览地址：`/src/components/preview/index.html`。
 - 预览页集中展示基础令牌、页面与数据、操作与导航、表单与反馈、弹窗规格。
 - “审批详情”是唯一 V3 详情弹窗视觉基线，使用 `V2Dialog + v2-dialog-standard + v2-detail-dialog`。
 - 标准表单、宽详情、底部抽屉和确认框只展示共享规格，不形成第二套详情视觉。
@@ -135,7 +135,7 @@ git diff --check
 - `design-system-preview.spec.ts`：唯一预览页、V3弹窗、关闭策略、桌面/移动溢出和控制台。
 - `check-clean-room-boundary.mjs`：只负责V2与Legacy隔离，不替代设计门。
 
-CI的 `frontend-v2-gate` 必须显式执行 `pnpm check:design-system`，并继续执行完整 unit、类型、构建、迁移E2E和依赖审计。PR证据仍由同一 `frontend-v2-gate` job绑定HEAD SHA。
+CI 保留 `frontend-v2-gate` job id 以兼容现有分支保护，该 job 执行 Clean-room、路由台账和设计系统门；正式 unit、类型、构建、E2E 和依赖审计由同一 workflow 的独立必需 job 绑定 HEAD SHA。
 
 ## 8. 变更与回滚
 

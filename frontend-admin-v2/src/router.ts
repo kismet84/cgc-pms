@@ -11,7 +11,6 @@ import type { WorkflowTab } from '@cgc-pms/frontend-contracts'
 
 const ForbiddenPage = () => import('./pages/errors/ForbiddenPage.vue')
 const NotFoundPage = () => import('./pages/errors/NotFoundPage.vue')
-const ShellPlaceholderPage = () => import('./pages/shell/ShellPlaceholderPage.vue')
 const DashboardPage = () => import('./pages/dashboard/DashboardPage.vue')
 const WorkflowWorkbenchPage = () => import('./pages/workbench/WorkflowWorkbenchPage.vue')
 const ReportCatalogPage = () => import('./pages/workbench/ReportCatalogPage.vue')
@@ -77,6 +76,10 @@ function routeName(path: string): string {
 function workflowTab(path: string): WorkflowTab | undefined {
   const value = path.match(/^\/approval\/(todo|done|cc|mine)$/)?.[1]
   return value as WorkflowTab | undefined
+}
+
+function missingRouteComponent(path: string): never {
+  throw new Error(`Accepted navigation route has no component: ${path}`)
 }
 
 const registeredPaths = new Set<string>()
@@ -197,7 +200,9 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
                                                                                   : tab.path ===
                                                                                       '/system/data'
                                                                                     ? DataMaintenancePage
-                                                                                    : ShellPlaceholderPage,
+                                                                                    : missingRouteComponent(
+                                                                                        tab.path,
+                                                                                      ),
           meta: {
             shell: true,
             permission: tab.permission,
@@ -427,6 +432,17 @@ const contextRoutes: RouteRecordRaw[] = [
 
 export const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/session' },
+  { path: '/v2', redirect: '/' },
+  {
+    path: '/v2/:pathMatch(.*)*',
+    name: 'RetiredV2BaseRedirect',
+    redirect: (to) => {
+      const path = Array.isArray(to.params.pathMatch)
+        ? to.params.pathMatch.join('/')
+        : String(to.params.pathMatch ?? '')
+      return { path: `/${path}`, query: to.query, hash: to.hash }
+    },
+  },
   {
     path: '/health',
     name: 'V2Health',

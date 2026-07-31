@@ -302,7 +302,7 @@ test.describe('M4 contract routes', () => {
     await installContractMock(page, () => identity)
     const runtimeErrors = captureRuntimeErrors(page)
 
-    await page.goto('/v2/contract/ledger?projectId=P1#ledger')
+    await page.goto('/contract/ledger?projectId=P1#ledger')
     await expect(page.locator('.shell-placeholder')).toHaveCount(0)
     await expect(page.getByRole('heading', { name: '合同台账', exact: true })).toBeVisible()
     await expect(page.locator('.contract-page__kpi-grid')).toHaveCount(0)
@@ -312,7 +312,7 @@ test.describe('M4 contract routes', () => {
     ).toBeVisible()
     await expect(page.getByRole('searchbox', { name: '关键词' })).toHaveCount(0)
 
-    for (const path of ['/v2/contract/create', '/v2/contract/9', '/v2/contract/9/edit']) {
+    for (const path of ['/contract/create', '/contract/9', '/contract/9/edit']) {
       await page.goto(path)
       await expect(page.locator('.shell-placeholder')).toHaveCount(0)
       await expect(page.getByRole('main')).toBeVisible()
@@ -324,7 +324,7 @@ test.describe('M4 contract routes', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/contract/ledger')
+      await page.goto('/contract/ledger')
       await expect(page.locator('.contract-page')).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -345,7 +345,7 @@ test.describe('M4 contract routes', () => {
     let identity: Identity = 'readonly'
     await installContractMock(page, () => identity)
 
-    await page.goto('/v2/contract/9')
+    await page.goto('/contract/9')
     await expect(page.getByRole('button', { name: '编辑' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '提交审批' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '删除' })).toHaveCount(0)
@@ -353,8 +353,8 @@ test.describe('M4 contract routes', () => {
     const denied = await browser.newPage()
     identity = 'denied'
     await installContractMock(denied, () => identity)
-    await denied.goto('/v2/contract/ledger')
-    await expect(denied).toHaveURL(/\/v2\/forbidden\?from=/)
+    await denied.goto('/contract/ledger')
+    await expect(denied).toHaveURL(/\/forbidden\?from=/)
     await denied.close()
   })
 })

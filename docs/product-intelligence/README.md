@@ -5,13 +5,14 @@
 ## 当前入口
 
 - [项目地图](project-map.md)
-- [竞品分析](competitor-analysis.md)
-- [迭代决策](evolution-decision.md)
+- [V1.6 迭代决策](evolution-decision.md)
+
+V1.5 的[竞品分析](../archive/v1.5/product-intelligence/competitor-analysis.md)、[文档生成研究](../archive/v1.5/product-intelligence/docugenius-document-generation-analysis.md)和[迭代决策](../archive/v1.5/product-intelligence/evolution-decision.md)仅作历史回溯。
 
 ## 边界
 
-- 当前事实以 `develop/1.5` 的代码、配置、现行规范和本轮验证为准。
-- `docs/archive/v1.0/` 只用于历史回溯，不替代当前验证。
+- 当前事实以 v1.6 当前分支的代码、配置、现行规范和本轮验证为准。
+- `docs/archive/v1.5/` 与 `docs/archive/v1.0/` 只用于历史回溯，不替代当前验证。
 - 禁止读取、扫描或依赖 `archive/v1.0/private/`。
 - 竞品能力不是需求；只有通过迭代决策门的方向才能进入 Ad-hoc Candidate。
 - Candidate 不是 Ready，不能直接实施。
@@ -60,4 +61,3 @@ docs/backlog/ready-issues.md
       ↓
 现有 AutoPilot / 正常开发流程
 ```
-

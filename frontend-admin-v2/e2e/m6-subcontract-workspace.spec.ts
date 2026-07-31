@@ -269,16 +269,16 @@ test.describe('M6 subcontract task and measure V2', () => {
       if (/sub-tasks|sub-measures/.test(request.url())) traffic.push(request.url())
     })
     await install(page, [])
-    await page.goto('/v2/subcontract/task?projectId=P1')
-    await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+    await page.goto('/subcontract/task?projectId=P1')
+    await expect(page).toHaveURL(/\/forbidden\?from=/)
     expect(traffic).toEqual([])
   })
 
   test('redirects, renders both routes at three viewports and passes axe', async ({ page }) => {
     await install(page)
     const errors = captureRuntimeErrors(page)
-    await page.goto('/v2/subcontract?projectId=P1#records')
-    await expect(page).toHaveURL(/\/v2\/subcontract\/task\?projectId=P1#records/)
+    await page.goto('/subcontract?projectId=P1#records')
+    await expect(page).toHaveURL(/\/subcontract\/task\?projectId=P1#records/)
     for (const sample of [
       { path: '/subcontract/task', code: 'ST-001' },
       { path: '/subcontract/measure', code: 'SM-001' },
@@ -289,7 +289,7 @@ test.describe('M6 subcontract task and measure V2', () => {
         { width: 390, height: 844 },
       ]) {
         await page.setViewportSize(viewport)
-        await page.goto(`/v2${sample.path}?projectId=P1`)
+        await page.goto(`${sample.path}?projectId=P1`)
         await expect(page.getByText(sample.code, { exact: true }).first()).toBeVisible()
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
           true,
@@ -304,7 +304,7 @@ test.describe('M6 subcontract task and measure V2', () => {
 
   test('creates task and re-reads server facts', async ({ page }) => {
     const state = await install(page)
-    await page.goto('/v2/subcontract/task?projectId=P1')
+    await page.goto('/subcontract/task?projectId=P1')
     await page.getByRole('button', { name: '新建分包任务' }).click()
     const dialog = page.getByRole('dialog', { name: '新建分包任务' })
     await selectOption(page, dialog, /^分包合同：/, /SUB-001 · 主体劳务分包合同/)
@@ -319,7 +319,7 @@ test.describe('M6 subcontract task and measure V2', () => {
     page,
   }) => {
     const state = await install(page)
-    await page.goto('/v2/subcontract/measure?projectId=P1')
+    await page.goto('/subcontract/measure?projectId=P1')
     await page.getByRole('button', { name: '状态：全部状态' }).press('ArrowDown')
     await page.getByRole('option', { name: '草稿' }).click()
     await page.getByRole('button', { name: '新建分包计量' }).click()
@@ -369,7 +369,7 @@ test.describe('M6 subcontract task and measure V2', () => {
     page,
   }) => {
     const state = await install(page)
-    await page.goto('/v2/subcontract/measure?projectId=P1')
+    await page.goto('/subcontract/measure?projectId=P1')
     await page.getByRole('button', { name: 'SM-001' }).click()
     await expect(page.getByRole('dialog', { name: '分包计量详情' })).toBeVisible()
     state.controls.failMeasureDetail = true

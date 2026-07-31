@@ -212,10 +212,10 @@ test('five finance routes render at desktop and mobile without runtime or axe er
   })
 
   const routes = [
-    ['/v2/payment/application', '付款申请'],
-    ['/v2/payment/expense', '费用申请'],
-    ['/v2/revenue', '收入与回款'],
-    ['/v2/invoice', '发票管理'],
+    ['/payment/application', '付款申请'],
+    ['/payment/expense', '费用申请'],
+    ['/revenue', '收入与回款'],
+    ['/invoice', '发票管理'],
   ] as const
   for (const viewport of [
     { width: 1440, height: 900 },
@@ -231,8 +231,8 @@ test('five finance routes render at desktop and mobile without runtime or axe er
     }
   }
 
-  await page.goto('/v2/payment')
-  await expect(page).toHaveURL(/\/v2\/payment\/application$/)
+  await page.goto('/payment')
+  await expect(page).toHaveURL(/\/payment\/application$/)
   await expect(page.locator('.finance-workspace')).toBeVisible()
   const axe = await new AxeBuilder({ page }).include('.finance-workspace').analyze()
   expect(

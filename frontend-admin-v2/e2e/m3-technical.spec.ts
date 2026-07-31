@@ -11,7 +11,7 @@ async function login(page: Page, username: string) {
 }
 
 async function openTechnical(page: Page) {
-  await page.goto(`/v2/technical-management?projectId=${controlledProjectId}`)
+  await page.goto(`/technical-management?projectId=${controlledProjectId}`)
   await expect(page.getByRole('region', { name: '图纸 RFI 技术闭环' })).toBeVisible()
   await expect(page.locator('.shell-placeholder')).toHaveCount(0)
   await expect(page.locator('.v2-page-state--loading')).toHaveCount(0)

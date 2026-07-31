@@ -91,15 +91,10 @@ Assert-Contains $backendMySql @(
   '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest','CGCPMS_M52_MYSQL_BASELINE: ''true'''
 ) 'backend-test-mysql'
 Assert-Contains $backendDependency @('permissions:','contents: read','bash ./scripts/ci/scan-backend-dependencies.sh') 'backend-dependency-scan'
-Assert-Contains $frontendBuild @('name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin/dist','if: always()') 'frontend-build'
+Assert-Contains $frontendBuild @('name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist','if: always()') 'frontend-build'
 Assert-Contains $frontendV2 @(
-  'pnpm check:boundary','pnpm check:route-ledger','pnpm check:design-system','pnpm lint:check','pnpm test:unit',
-  'pnpm type-check:contracts','pnpm type-check','pnpm build','pnpm check:bundle-size',
-  'pnpm exec playwright install chromium','pnpm test:e2e:migration-gate',
-  'PLAYWRIGHT_BASE_URL: http://127.0.0.1:4174',
-  'PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4174',
-  'frontend-admin-v2/playwright-report','frontend-admin-v2/test-results',
-  'pnpm audit --audit-level high'
+  'working-directory: frontend-admin-v2',
+  'pnpm check:boundary','pnpm check:route-ledger','pnpm check:design-system'
 ) 'frontend-v2-gate'
 Assert-Contains $supplyChain @(
   'needs: [backend-test, backend-dependency-scan, frontend-build]',
@@ -129,13 +124,14 @@ if ([regex]::Matches($supplyChain,'uses: actions/cache@v6').Count -ne 1) {
 }
 Assert-Contains $e2e @(
   'needs: [backend-test-mysql, frontend-build]','image: mysql:8.0','image: redis:7-alpine',
-  'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin/dist',
+  'name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist',
   'bash ./scripts/ci/start-e2e-minio.sh','bash ./scripts/ci/start-e2e-backend.sh',
-  'pnpm test:e2e:ui','if: failure()'
+  'pnpm test:e2e:migration-gate','PLAYWRIGHT_BASE_URL: http://127.0.0.1:4173',
+  'PLAYWRIGHT_WEB_SERVER_COMMAND: pnpm preview --host 127.0.0.1 --port 4173','if: failure()'
 ) 'e2e'
 Assert-Contains $sqlSafety @('./scripts/ci/test-workflow-contract.ps1','./scripts/check-sql-safety.ps1') 'sql-safety-scan'
 
-if ([regex]::Matches($workflow,'uses: actions/upload-artifact@v7').Count -ne 10) { throw 'artifact upload count changed' }
+if ([regex]::Matches($workflow,'uses: actions/upload-artifact@v7').Count -ne 9) { throw 'artifact upload count changed' }
 if ([regex]::Matches($workflow,'uses: actions/download-artifact@v8').Count -ne 3) { throw 'artifact download count changed' }
 if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-backend').Count -ne 3) { throw 'backend setup composite usage count changed' }
 if ([regex]::Matches($workflow,'uses: \./\.github/actions/setup-frontend').Count -ne 7) { throw 'frontend setup composite usage count changed' }
@@ -158,20 +154,16 @@ Assert-Contains (Read-RepoText 'scripts\ci\scan-backend-dependencies.sh') @('MSY
 
 $backendPom = Read-RepoText 'backend\pom.xml'
 Assert-Contains $backendPom @('<id>test-order-independence</id>') 'backend test order profile'
-$frontendPackage = Read-RepoText 'frontend-admin\package.json' | ConvertFrom-Json
-$v2Package = Read-RepoText 'frontend-admin-v2\package.json' | ConvertFrom-Json
-foreach ($name in @('lint:check','type-check','build','test:coverage','test:e2e:ui','check:bundle-size')) {
-  if ($frontendPackage.scripts.PSObject.Properties.Name -notcontains $name) { throw "frontend-admin script is missing: $name" }
-}
-foreach ($name in @('check:boundary','check:route-ledger','check:design-system','lint:check','test:unit','type-check:contracts','type-check','build','check:bundle-size')) {
-  if ($v2Package.scripts.PSObject.Properties.Name -notcontains $name) { throw "frontend-admin-v2 script is missing: $name" }
+$frontendPackage = Read-RepoText 'frontend-admin-v2\package.json' | ConvertFrom-Json
+foreach ($name in @('check:boundary','check:route-ledger','check:design-system','lint:check','test:unit','test:ci','type-check:contracts','type-check','build','check:bundle-size','test:e2e:migration-gate')) {
+  if ($frontendPackage.scripts.PSObject.Properties.Name -notcontains $name) { throw "frontend-admin-v2 script is missing: $name" }
 }
 
 [pscustomobject]@{
   ok = $true
   jobs = @($actualJobs)
   requiredJobCount = $requiredJobs.Count
-  artifactUploads = 10
+  artifactUploads = 9
   artifactDownloads = 3
   permissionBlocks = 2
   postMergeJobs = $postMergeJobs.Count

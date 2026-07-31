@@ -293,8 +293,8 @@ test.describe('M5 requisition, stock-out and return V2', () => {
         /requisitions|material-returns/.test(request.url()) && traffic.push(request.url()),
     )
     await install(page, [])
-    await page.goto('/v2/inventory/material-requisition')
-    await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+    await page.goto('/inventory/material-requisition')
+    await expect(page).toHaveURL(/\/forbidden\?from=/)
     expect(traffic).toEqual([])
   })
 
@@ -307,7 +307,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/inventory/material-requisition?projectId=P1')
+      await page.goto('/inventory/material-requisition?projectId=P1')
       await expect(page.getByRole('button', { name: 'REQ-001', exact: true })).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -331,7 +331,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
 
   test('requires add and edit before showing create action', async ({ page }) => {
     await install(page, ['requisition:query', 'requisition:add'])
-    await page.goto('/v2/inventory/material-requisition?projectId=P1')
+    await page.goto('/inventory/material-requisition?projectId=P1')
     await expect(page.getByRole('button', { name: '发起领料申请' })).toHaveCount(0)
     await install(page, ['requisition:query', 'requisition:add', 'requisition:edit'])
     await page.reload()
@@ -346,7 +346,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
       if (new URL(request.url()).pathname === '/api/requisitions') listRequests.push(request.url())
     })
     await install(page)
-    await page.goto('/v2/inventory/material-requisition?period=2026-07')
+    await page.goto('/inventory/material-requisition?period=2026-07')
     await expect(
       page.getByRole('region', { name: '领料申请列表' }).getByText('示范项目', { exact: true }),
     ).toBeVisible()
@@ -364,7 +364,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
       if (request.url().includes('/procurement-traces/')) traceRequests.push(request.url())
     })
     await install(page, ['requisition:query'])
-    await page.goto('/v2/inventory/material-requisition?projectId=P1')
+    await page.goto('/inventory/material-requisition?projectId=P1')
     await openDetail(page)
     await expect(page.getByText('无追溯权限').first()).toBeVisible()
     await expect(page.getByRole('button', { name: '发起退料' })).toHaveCount(0)
@@ -398,7 +398,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
         page,
         permissions.filter((permission) => permission !== sample.permission),
       )
-      await page.goto('/v2/inventory/material-requisition?projectId=P1')
+      await page.goto('/inventory/material-requisition?projectId=P1')
       await openDetail(page)
       await expect(page.getByRole('button', { name: sample.action, exact: true })).toHaveCount(0)
     })
@@ -406,7 +406,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
 
   test('creates decimal-string requisition and submits once', async ({ page }) => {
     const writes = await install(page)
-    await page.goto('/v2/inventory/material-requisition?projectId=P1')
+    await page.goto('/inventory/material-requisition?projectId=P1')
     await page.getByRole('button', { name: '发起领料申请' }).click()
     const editor = page.getByRole('dialog', { name: '发起领料申请' })
     await selectBusinessOption(page, editor, /^合同：/, /CT-001 · 示范项目材料合同/)
@@ -424,7 +424,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
   test('stock-out follows approved server state and re-reads trace', async ({ page }) => {
     requisitions[0]!.approvalStatus = 'APPROVED'
     const writes = await install(page)
-    await page.goto('/v2/inventory/material-requisition?projectId=P1')
+    await page.goto('/inventory/material-requisition?projectId=P1')
     await openDetail(page)
     await page.getByRole('button', { name: '执行出库' }).dblclick()
     await expect(page.getByText(/TX1|库存流水/).first()).toBeVisible()
@@ -435,7 +435,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     requisitions[0]!.approvalStatus = 'APPROVED'
     requisitions[0]!.stockOutFlag = '1'
     const writes = await install(page)
-    await page.goto('/v2/inventory/material-requisition?projectId=P1')
+    await page.goto('/inventory/material-requisition?projectId=P1')
     await openDetail(page)
     await page.getByRole('button', { name: '发起退料' }).click()
     const dialog = page.getByRole('dialog', { name: '发起退料' })
@@ -462,7 +462,7 @@ test.describe('M5 requisition, stock-out and return V2', () => {
   test('propagates duplicate stock-out conflict without retry', async ({ page }) => {
     requisitions[0]!.approvalStatus = 'APPROVED'
     const writes = await install(page, permissions, true)
-    await page.goto('/v2/inventory/material-requisition?projectId=P1')
+    await page.goto('/inventory/material-requisition?projectId=P1')
     await openDetail(page)
     await page.getByRole('button', { name: '执行出库' }).dblclick()
     await expect(page.getByText('领退料状态已变化', { exact: true }).first()).toBeVisible()

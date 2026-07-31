@@ -30,7 +30,10 @@ const uiStandardPath = resolve(
   repositoryRoot,
   'docs/standards/00-UI-Design-Baselines-and-Code-Specifications.md',
 )
-const historicalUiBaselinePath = resolve(repositoryRoot, 'docs/ui-v2/m1-design-system-baseline.md')
+const historicalUiBaselinePath = resolve(
+  repositoryRoot,
+  'docs/archive/v1.5/ui-v2/m1-design-system-baseline.md',
+)
 
 function migratedPageSources() {
   const pagesRoot = resolve(sourceRoot, 'pages')
@@ -730,7 +733,7 @@ describe('Clean-room V2 design system', () => {
       expect(designAuthorities).toEqual([uiStandardPath])
       expect(standard).toContain('状态：现行、唯一权威')
       expect(standard).toContain(
-        '唯一可视入口：`http://127.0.0.1:5174/v2/src/components/preview/index.html`',
+        '唯一可视入口：`http://127.0.0.1:5173/src/components/preview/index.html`',
       )
       expect(historicalBaseline).toContain('状态：已完成、非现行规范')
       expect(historicalBaseline).not.toMatch(/^\| S\d{2} \|/m)

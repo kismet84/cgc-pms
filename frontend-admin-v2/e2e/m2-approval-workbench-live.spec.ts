@@ -42,27 +42,27 @@ test.describe('M2 live approval workbench', () => {
   })
 
   test('legacy approval entry and detail deep links reach the V2 workbench', async ({ page }) => {
-    await page.goto('/v2/approval?projectId=520000000000009001')
-    await expect(page).toHaveURL(/\/v2\/approval\/todo\?projectId=520000000000009001$/)
+    await page.goto('/approval?projectId=520000000000009001')
+    await expect(page).toHaveURL(/\/approval\/todo\?projectId=520000000000009001$/)
 
-    await page.goto(`/v2/approval/${controlledInstanceId}?returnTab=todo`)
+    await page.goto(`/approval/${controlledInstanceId}?returnTab=todo`)
     await expect(page).toHaveURL(
-      new RegExp(`/v2/approval/instances/${controlledInstanceId}\\?returnTab=todo$`),
+      new RegExp(`/approval/instances/${controlledInstanceId}\\?returnTab=todo$`),
     )
     await expect(page.getByRole('dialog')).toHaveClass(/v2-dialog-standard/)
   })
 
   test('all nine M2 ledger routes resolve to accepted V2 pages or redirects', async ({ page }) => {
     const routes = [
-      '/v2/dashboard',
-      '/v2/dashboard/reports',
-      '/v2/alert',
-      '/v2/approval',
-      '/v2/approval/todo',
-      '/v2/approval/done',
-      '/v2/approval/cc',
-      '/v2/approval/mine',
-      `/v2/approval/${controlledInstanceId}`,
+      '/dashboard',
+      '/dashboard/reports',
+      '/alert',
+      '/approval',
+      '/approval/todo',
+      '/approval/done',
+      '/approval/cc',
+      '/approval/mine',
+      `/approval/${controlledInstanceId}`,
     ]
 
     for (const path of routes) {
@@ -72,7 +72,7 @@ test.describe('M2 live approval workbench', () => {
     }
 
     await expect(page).toHaveURL(
-      new RegExp(`/v2/approval/instances/${controlledInstanceId}(?:\\?.*)?$`),
+      new RegExp(`/approval/instances/${controlledInstanceId}(?:\\?.*)?$`),
     )
   })
 
@@ -86,7 +86,7 @@ test.describe('M2 live approval workbench', () => {
       const response = page.waitForResponse((item) =>
         item.url().includes('/api/workflow/tasks/todo?pageNo=1&pageSize=10'),
       )
-      await page.goto('/v2/approval/todo')
+      await page.goto('/approval/todo')
       expect((await response).ok()).toBe(true)
       await expect(page.getByRole('heading', { level: 1, name: '审批工作台' })).toBeAttached()
       await expect(page.getByRole('heading', { level: 1, name: '审批工作台' })).toBeVisible()
@@ -138,7 +138,7 @@ test.describe('M2 live approval workbench', () => {
         expect((await filtered).ok()).toBe(true)
       }
       await shellTabs.getByRole('link', { name: '我发起', exact: true }).click()
-      await expect(page).toHaveURL(/\/v2\/approval\/mine$/)
+      await expect(page).toHaveURL(/\/approval\/mine$/)
       await expect(page.getByText('审批场景：已驳回', { exact: true })).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -168,12 +168,12 @@ test.describe('M2 live approval workbench', () => {
         expect(Number.parseFloat(titleSize)).toBeGreaterThanOrEqual(Number.parseFloat(titleToken))
       }
       await page.keyboard.press('Escape')
-      await expect(page).toHaveURL(/\/v2\/approval\/mine$/)
+      await expect(page).toHaveURL(/\/approval\/mine$/)
     })
   }
 
   test('uses sidebar role switcher and Chinese business type filter', async ({ page }) => {
-    await page.goto('/v2/approval/todo')
+    await page.goto('/approval/todo')
     await expect(page.getByRole('cell', { name: '合同审批', exact: true })).toBeVisible()
     const headers = page.getByRole('columnheader')
     await expect(headers.nth(0)).toHaveText('审批事项')
@@ -186,12 +186,12 @@ test.describe('M2 live approval workbench', () => {
       .filter({ hasText: '在建项目临期材料采购合同审批' })
       .locator('.v2-table__record-link')
       .click()
-    await expect(page).toHaveURL(/\/v2\/approval\/instances\/520000000000009541/)
+    await expect(page).toHaveURL(/\/approval\/instances\/520000000000009541/)
     const detailDialog = page.getByRole('dialog', { name: '审批详情' })
     await expect(detailDialog).toBeVisible()
     await expect(detailDialog).toHaveCSS('backdrop-filter', /blur\([^)]+\)/)
     await page.locator('.v2-dialog__backdrop').click({ position: { x: 4, y: 4 } })
-    await expect(page).toHaveURL(/\/v2\/approval\/todo$/)
+    await expect(page).toHaveURL(/\/approval\/todo$/)
     await expect(detailDialog).toHaveCount(0)
     await expect(page.getByRole('cell', { name: '合同审批', exact: true })).toBeVisible()
 
@@ -257,14 +257,14 @@ test.describe('M2 live approval workbench', () => {
     )
     await sidebar.getByRole('button', { name: /成本经理/ }).click()
     expect((await switched).ok()).toBe(true)
-    await expect(page).toHaveURL(/\/v2\/approval\/todo/)
+    await expect(page).toHaveURL(/\/approval\/todo/)
     await expect(page.getByRole('banner').getByText('演示成本经理', { exact: true })).toBeVisible()
   })
 
   test('eight roles expose all five instance states and scoped lists', async ({ page }) => {
     for (const username of roleAccounts) {
       expect((await page.goto(`/api/auth/dev-login?username=${username}`))?.ok()).toBe(true)
-      await page.goto('/v2/approval/todo')
+      await page.goto('/approval/todo')
       await page.locator('.v2-table__record-link').first().click()
       await expect(page.getByRole('dialog', { name: '审批详情' })).toBeVisible()
       for (const status of instanceStatuses) {
@@ -285,7 +285,7 @@ test.describe('M2 live approval workbench', () => {
   })
 
   test('shows completed action statuses in Chinese', async ({ page }) => {
-    await page.goto('/v2/approval/done')
+    await page.goto('/approval/done')
     await expect(page.getByRole('cell', { name: '已同意', exact: true }).first()).toBeVisible()
     await expect(page.getByRole('cell', { name: '已驳回', exact: true }).first()).toBeVisible()
     await expect(page.getByRole('cell', { name: /APPROVE|REJECT/ })).toHaveCount(0)
@@ -297,7 +297,7 @@ test.describe('M2 live approval workbench', () => {
     const responsePromise = page.waitForResponse((item) =>
       item.url().endsWith(`/api/workflow/instances/${controlledInstanceId}`),
     )
-    await page.goto(`/v2/approval/instances/${controlledInstanceId}?returnTab=todo`)
+    await page.goto(`/approval/instances/${controlledInstanceId}?returnTab=todo`)
     const response = await responsePromise
     expect(response.ok()).toBe(true)
     const envelope = (await response.json()) as {
@@ -317,15 +317,15 @@ test.describe('M2 live approval workbench', () => {
   })
 
   test('unknown instance fails closed', async ({ page }) => {
-    await page.goto('/v2/approval/instances/999999999999999999?returnTab=todo')
+    await page.goto('/approval/instances/999999999999999999?returnTab=todo')
     await expect(page.getByRole('heading', { name: '无法显示审批详情' })).toBeVisible()
   })
 
   test('process management remains admin-only for ordinary workflow users', async ({ page }) => {
     expect((await page.goto('/api/auth/dev-login?username=demo.manager'))?.ok()).toBe(true)
     await rewritePermissions(page, (permissions) => [...permissions, 'workflow:process:query'])
-    await page.goto('/v2/approval/process')
-    await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+    await page.goto('/approval/process')
+    await expect(page).toHaveURL(/\/forbidden\?from=/)
     await expect(page.getByRole('heading', { name: '无权访问此页面' })).toBeVisible()
   })
 
@@ -333,7 +333,7 @@ test.describe('M2 live approval workbench', () => {
     await rewritePermissions(page, (permissions) =>
       permissions.filter((permission) => !permission.startsWith('workflow:')),
     )
-    await page.goto(`/v2/approval/instances/${controlledInstanceId}`)
+    await page.goto(`/approval/instances/${controlledInstanceId}`)
     await expect(
       page
         .getByRole('dialog', { name: '审批详情' })

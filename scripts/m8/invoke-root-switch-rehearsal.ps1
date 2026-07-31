@@ -194,8 +194,8 @@ try {
     Wait-HttpOk -Uri 'http://127.0.0.1:8080/api/actuator/health' | Out-Null
     Wait-HttpOk -Uri 'http://127.0.0.1:5173/' | Out-Null
 
-    Invoke-Compose -Command @('build', 'frontend-v2-root')
-    Invoke-Compose -Command @('up', '-d', '--no-deps', 'frontend-v2-root')
+    Invoke-Compose -Command @('build', 'frontend-v2-root', 'frontend-legacy-rollback')
+    Invoke-Compose -Command @('up', '-d', '--no-deps', 'frontend-v2-root', 'frontend-legacy-rollback')
 
     Set-Edge -Upstream 'frontend-v2-root:80'
     $v2Root = Assert-Frontend -Name 'V2_ROOT' -ExpectedTitle 'CGC-PMS V2' `
@@ -204,7 +204,7 @@ try {
     $v2Root['browser'] = '1/1'
     $phases.Add($v2Root)
 
-    Set-Edge -Upstream 'frontend:5173'
+    Set-Edge -Upstream 'frontend-legacy-rollback:80'
     $phases.Add((Assert-Frontend -Name 'LEGACY_ROLLBACK' `
         -ExpectedTitle '建筑工程总包项目管理系统' -Paths @('/dashboard')))
 

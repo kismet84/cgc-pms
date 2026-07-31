@@ -27,4 +27,4 @@ if [ "$NEED_INSTALL" -eq 1 ]; then
   cp "$LOCK_HASH_FILE" "$STAMP_FILE"
 fi
 
-exec pnpm dev --host 0.0.0.0 --port 5174
+exec pnpm dev --host 0.0.0.0 --port 5173

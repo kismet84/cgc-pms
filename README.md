@@ -6,13 +6,13 @@ CGC-PMS 是面向建筑工程总包项目全过程管理的前后端分离系统
 
 | 项目 | 当前基线 |
 | --- | --- |
-| 发布线 | v1.5 开发版本已收口（不代表生产发布） |
-| 后端 | `1.5.0-SNAPSHOT`（Java 21、Spring Boot 3.5.16） |
-| Legacy 前端 | `1.5.0-dev.0`（`frontend-admin`） |
-| Clean-room V2 | `0.1.0-dev.0`（`frontend-admin-v2`，共享 `packages/frontend-contracts`） |
+| 发布线 | v1.6 开发版本已启动（不代表生产发布） |
+| 后端 | `1.6.0-SNAPSHOT`（Java 21、Spring Boot 3.5.16） |
+| 正式前端 | `1.6.0-dev.0`（`frontend-admin-v2`，共享 `packages/frontend-contracts`） |
+| Legacy 归档 | `archive/v1.6/frontend-admin-legacy`（仅历史回滚与迁移取证） |
 | 数据库迁移 | MySQL Flyway 脚本已包含至 V250；H2 迁移用于本地兼容与测试 |
-| V2 迁移状态 | 截至 2026-07-29：87 条命名路由中 `V2_ACCEPTED=87`、`LEGACY_ONLY=0`、`V2_SOURCE_AVAILABLE=0` |
-| 切换边界 | V2 当前用于独立开发和验收；正式入口尚未切换，Legacy 尚未退役 |
+| 迁移结果 | 87 条命名路由全部由新版承接；台账 `V2_ACCEPTED=87`、`LEGACY_ONLY=0`、`V2_SOURCE_AVAILABLE=0` |
+| 切换边界 | 仓库、本地入口和 CI 已切换到新版；不代表目标环境或生产已发布 |
 | 交付原则 | 历史测试、审计和上线结论不替代当前分支的验证结果 |
 
 ## 核心能力范围
@@ -25,13 +25,13 @@ CGC-PMS 是面向建筑工程总包项目全过程管理的前后端分离系统
 | 资金与核算 | 付款、现金日记账、资金计划与预测、会计凭证、期间控制与月结 |
 | 过程治理 | 审批、RBAC 权限、通知与预警、审计留痕、驾驶舱、文件与对象存储 |
 
-具体业务边界、已交付闭环与非目标以[业务标准](docs/README.md)、[V1.5开发版本说明](docs/V1.5-开发版本说明-2026-07-31.md)、[第57条正式收口报告](docs/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)和[项目地图](docs/product-intelligence/project-map.md)为准。
+具体业务边界、已交付闭环与非目标以[业务标准](docs/README.md)、[V1.5开发版本归档](docs/archive/v1.5/README.md)、[第57条正式收口报告](docs/archive/v1.5/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)和[项目地图](docs/product-intelligence/project-map.md)为准。
 
 ## 技术栈
 
 | 层级 | 当前使用 |
 | --- | --- |
-| 前端 | Legacy：Vue 3、TypeScript、Vite、Ant Design Vue、Pinia；V2：Vue 3、TypeScript、Vite、Pinia、共享契约包 |
+| 前端 | Vue 3、TypeScript、Vite、Pinia、共享契约包 |
 | 后端 | Java 21、Spring Boot 3、Spring Security、MyBatis-Plus、Flyway |
 | 数据与中间件 | MySQL 8、H2、Redis、MinIO |
 | 部署与运维 | Docker Compose、Nginx、Spring Actuator、Prometheus 指标 |
@@ -44,7 +44,7 @@ CGC-PMS 是面向建筑工程总包项目全过程管理的前后端分离系统
 scripts\start-dev.bat
 ```
 
-脚本会在缺少后端 JAR 时构建后端，并启动后端、Legacy 前端、V2 前端及开发环境所需容器。手动启动、运行态刷新、环境变量和故障排查见：
+脚本会在缺少后端 JAR 时构建后端，并启动后端、正式前端及开发环境所需容器。手动启动、运行态刷新、环境变量和故障排查见：
 
 - [快速开始](docs/standards/01-快速开始.md)
 - [部署运维手册](docs/standards/10-部署运维手册.md)
@@ -53,8 +53,7 @@ scripts\start-dev.bat
 
 | 服务 | 地址 |
 | --- | --- |
-| Legacy 前端 | http://localhost:5173 |
-| Clean-room V2 | http://localhost:5174/v2/ |
+| 正式前端 | http://localhost:5173/ |
 | 后端 API | http://localhost:8080/api |
 | Swagger | http://localhost:8080/api/swagger-ui.html |
 | MinIO 控制台 | http://localhost:9001 |
@@ -83,4 +82,4 @@ scripts\start-dev.bat
 
 - 不复用历史测试数量、覆盖率、审计结论或上线状态作为当前交付证据
 - 前后端运行态刷新后，以 Docker 健康状态及真实接口、页面可达性作为验收前提，不使用固定等待时间代替验真
-- Legacy 与 V2 分别从 `http://localhost:5173`、`http://localhost:5174/v2/` 验收；不要把 V2 独立入口视为正式切换完成
+- 前端唯一验收入口为 `http://localhost:5173/`；历史 `/v2/` 链接仅作兼容重定向

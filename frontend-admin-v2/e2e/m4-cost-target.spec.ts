@@ -147,8 +147,8 @@ test.describe('M4 cost target routes', () => {
     await installCostTargetMock(page, () => 'business')
     const runtimeErrors = captureRuntimeErrors(page)
 
-    await page.goto('/v2/cost-target?projectId=P1#versions')
-    await expect(page).toHaveURL(/\/v2\/cost-target\/index\?projectId=P1#versions$/)
+    await page.goto('/cost-target?projectId=P1#versions')
+    await expect(page).toHaveURL(/\/cost-target\/index\?projectId=P1#versions$/)
 
     for (const viewport of [
       { width: 1440, height: 900 },
@@ -156,7 +156,7 @@ test.describe('M4 cost target routes', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/cost-target/index?projectId=P1')
+      await page.goto('/cost-target/index?projectId=P1')
       await expect(page.locator('.shell-placeholder')).toHaveCount(0)
       await expect(page.getByRole('heading', { name: '目标成本版本', exact: true })).toBeVisible()
       await expect(page.getByText('首版目标成本', { exact: true })).toBeVisible()
@@ -172,7 +172,7 @@ test.describe('M4 cost target routes', () => {
       ).toEqual([])
     }
 
-    await page.goto('/v2/cost-target/81/edit?projectId=P1')
+    await page.goto('/cost-target/81/edit?projectId=P1')
     await expect(page.getByRole('heading', { name: '编辑目标成本版本' })).toBeVisible()
     await expect(page.locator('input[aria-label="目标成本总额"]')).toHaveValue(
       '9007199254740993.12',
@@ -186,7 +186,7 @@ test.describe('M4 cost target routes', () => {
     browser,
   }) => {
     await installCostTargetMock(page, () => 'readonly')
-    await page.goto('/v2/cost-target/index')
+    await page.goto('/cost-target/index')
     await expect(page.getByRole('button', { name: '新建版本' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '编辑' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '提交' })).toHaveCount(0)
@@ -194,8 +194,8 @@ test.describe('M4 cost target routes', () => {
 
     const denied = await browser.newPage()
     await installCostTargetMock(denied, () => 'denied')
-    await denied.goto('/v2/cost-target/index')
-    await expect(denied).toHaveURL(/\/v2\/forbidden\?from=/)
+    await denied.goto('/cost-target/index')
+    await expect(denied).toHaveURL(/\/forbidden\?from=/)
     await denied.close()
   })
 
@@ -225,7 +225,7 @@ test.describe('M4 cost target routes', () => {
       },
     })
 
-    await page.goto('/v2/cost-target/81/edit?projectId=P1')
+    await page.goto('/cost-target/81/edit?projectId=P1')
     await expect(page.getByRole('button', { name: '激活版本' })).toBeVisible()
     await page.getByRole('button', { name: '激活版本' }).click()
     await page.getByRole('button', { name: '确认激活' }).click()

@@ -23,7 +23,7 @@ test('ordinary user completes profile, password, preferences and help self-servi
 
   await page
     .context()
-    .addCookies([{ name: 'XSRF-TOKEN', value: 'e2e-csrf', url: 'http://127.0.0.1:5174' }])
+    .addCookies([{ name: 'XSRF-TOKEN', value: 'e2e-csrf', url: 'http://127.0.0.1:5173' }])
   await page.route('**/api/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -72,8 +72,8 @@ test('ordinary user completes profile, password, preferences and help self-servi
     })
   })
 
-  await page.goto('/v2/profile?source=deep-link#details')
-  await expect(page).toHaveURL(/\/v2\/profile\?source=deep-link#details$/)
+  await page.goto('/profile?source=deep-link#details')
+  await expect(page).toHaveURL(/\/profile\?source=deep-link#details$/)
   await expect(page.getByRole('heading', { level: 1, name: '个人资料' })).toBeVisible()
   await page.getByLabel('姓名').fill('资料已回读')
   await page.getByRole('button', { name: '保存资料' }).click()
@@ -88,7 +88,7 @@ test('ordinary user completes profile, password, preferences and help self-servi
   await expect(page.getByLabel('确认新密码')).toHaveValue('')
 
   await page.getByRole('link', { name: '偏好设置' }).click()
-  await expect(page).toHaveURL(/\/v2\/settings$/)
+  await expect(page).toHaveURL(/\/settings$/)
   await page.getByLabel('默认收起侧栏').check()
   await page.getByRole('button', { name: '保存偏好' }).click()
   await expect(page.getByText('偏好设置已刷新。')).toBeVisible()

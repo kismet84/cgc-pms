@@ -276,9 +276,9 @@ describe('M7 system management contracts', () => {
     })
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/v2/system/permissions', component: AccessControlPage }],
+      routes: [{ path: '/system/permissions', component: AccessControlPage }],
     })
-    await router.push('/v2/system/permissions')
+    await router.push('/system/permissions')
     await router.isReady()
     const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
     await flushPromises()
@@ -416,9 +416,9 @@ describe('M7 system management contracts', () => {
     })
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/v2/system/users', component: AccessControlPage }],
+      routes: [{ path: '/system/users', component: AccessControlPage }],
     })
-    await router.push('/v2/system/users')
+    await router.push('/system/users')
     await router.isReady()
     const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
     await flushPromises()
@@ -491,9 +491,9 @@ describe('M7 system management contracts', () => {
     })
     const router = createRouter({
       history: createMemoryHistory(),
-      routes: [{ path: '/v2/system/roles', component: AccessControlPage }],
+      routes: [{ path: '/system/roles', component: AccessControlPage }],
     })
-    await router.push('/v2/system/roles')
+    await router.push('/system/roles')
     await router.isReady()
     const wrapper = mount(AccessControlPage, {
       attachTo: document.body,

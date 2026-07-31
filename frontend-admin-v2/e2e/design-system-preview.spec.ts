@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-const previewUrl = '/v2/src/components/preview/index.html'
+const previewUrl = '/src/components/preview/index.html'
 
 async function openGallery(page: Page) {
   await page.goto(previewUrl)

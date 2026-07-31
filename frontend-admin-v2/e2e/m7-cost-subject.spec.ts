@@ -97,20 +97,20 @@ test('cost-subject deep links render server facts and preserve root redirect sta
     })
   })
 
-  await page.goto('/v2/cost/subject?source=e2e#mapping')
-  await expect(page).toHaveURL(/\/v2\/cost\/subject\/taxonomy\?source=e2e#mapping$/)
+  await page.goto('/cost/subject?source=e2e#mapping')
+  await expect(page).toHaveURL(/\/cost\/subject\/taxonomy\?source=e2e#mapping$/)
   await expect(page.getByRole('heading', { level: 1, name: '成本科目体系' })).toBeVisible()
   await expect(page.getByText('服务端成本域')).toBeVisible()
 
-  await page.goto('/v2/cost/subject/rules')
+  await page.goto('/cost/subject/rules')
   await expect(page.getByRole('heading', { level: 1, name: '归集规则与映射版本' })).toBeVisible()
   await expect(page.getByText('服务端映射版本')).toBeVisible()
   await expect(page.getByText('RULE-001')).toBeVisible()
 
-  await page.goto('/v2/cost/subject/scope')
+  await page.goto('/cost/subject/scope')
   await expect(page.getByRole('heading', { level: 1, name: '项目适用与目标成本' })).toBeVisible()
 
-  await page.goto('/v2/cost/subject/trace')
+  await page.goto('/cost/subject/trace')
   await expect(page.getByRole('heading', { level: 1, name: '影响与转入追踪' })).toBeVisible()
   await expect(page.getByText('125.2300')).toBeVisible()
   await expect(page.getByText('投标成本转入', { exact: true })).toHaveCount(0)

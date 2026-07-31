@@ -129,7 +129,7 @@ class DatabaseGovernanceStaticTest {
                 workspace.resolve("docs/archive/database/legacy-h2-bootstrap/README.md"));
         assertTrue(archiveReadme.contains("不参与任何运行时加载"));
 
-        String frontend = Files.readString(workspace.resolve("frontend-admin/src/pages/system/dict/index.vue"));
+        String frontend = Files.readString(workspace.resolve("frontend-admin-v2/src/pages/system/DictionaryPage.vue"));
         assertTrue(frontend.contains("cssClass"), "css_class 当前仍有真实管理端消费者，不得按过期审计结论删除");
         try (var files = Files.walk(ROOT.resolve("main/java"))) {
             assertTrue(files.filter(p -> p.toString().endsWith(".java"))

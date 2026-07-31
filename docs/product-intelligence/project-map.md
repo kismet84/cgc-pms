@@ -1,12 +1,27 @@
 # CGC-PMS 项目地图
 
+## 2026-07-31 主线58：新版前端正式切换完成
+
+- `frontend-admin-v2` 成为仓库与本地唯一正式前端，接管根路径、`5173`、Compose `frontend`、CI 制品和 E2E；保留目录名避免无价值全仓改名。
+- Legacy 应用源码归档到 `archive/v1.6/frontend-admin-legacy/`，仅用于只读追溯与回滚构建；受保护工具状态和本机忽略产物未归档、未清理。
+- 87 条路由迁移门无 Legacy 页面回落；真实浏览器 `/v2/dashboard→/dashboard`、登录、项目台账和 API 通过。
+- 新版根路径镜像完成 `V2_ROOT→LEGACY_ROLLBACK→V2_RESTORE`；生产发布与三项既有 `RELEASE_GATE` 不变。
+- AutoPilot 控制面路径已同步，新指纹进入 N>1 或无界执行前强制单 Issue 金丝雀。
+
+## 2026-07-31 v1.6 开发版本启动（历史基线）
+
+- v1.5 开发版本资料已封存到 `docs/archive/v1.5/`；PR #379 已合并到 `master`。
+- 后端切换为 `1.6.0-SNAPSHOT`，Legacy 前端切换为 `1.6.0-dev.0`；V2 与共享契约包保持独立版本线。
+- 当前 Ready 为0；候选、冻结项和三项生产 `RELEASE_GATE` 继续由 `docs/backlog/current-issues.json` 承接。
+- 当时未创建 Tag/GitHub Release、未发布生产、未切正式入口、未退役 Legacy；现状以上方主线58为准。
+
 ## 2026-07-31 主线57：V1.5开发版本正式收口
 
 - 第57条A～G全部通过：第55条非生产候选全部唯一决策，第56条D0～D4正式验收通过；生产发布门保持阻塞。
 - 联合回归通过：后端2352项、Legacy 743项、V2 432项、Design System 81项；路由台账`0/87/0`，P0/P1、非法引用、金额/库存差异、重复与悬空均为0。
 - 候选构建、Trivy扫描、`V2_ROOT→LEGACY_ROLLBACK→V2_RESTORE`演练及G3/G4正式门均通过。
 - 当前状态为`COMPLETED / V1.5_DEVELOPMENT_CLOSED / SAME_HEAD_CI_PASSED / LOCAL_RC_ACCEPTED`；代码与安全候选`c3cfcf942491f810d1c79b2cd326298524e8a1e7`的push/PR同SHA CI 13/13及Pre-PR verifier通过；新增后续项0、关闭后续项0、净变化0。
-- 证据：`docs/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md`、`docs/V1.5-开发版本说明-2026-07-31.md`。
+- 证据：`docs/archive/v1.5/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md`、`docs/archive/v1.5/V1.5-开发版本说明-2026-07-31.md`。
 
 ## 2026-07-29 主线57 M3：施工总承包金丝雀执行中
 
@@ -38,7 +53,7 @@
 
 - `A-02/A-03/A-04/A-09/A-06/A-07`完成当前HEAD事实复核：六项既有业务底座成立，但均无可替代真实样本、量化收益或外部前置，0 Ready、0业务实施；A-04既有回归的测试身份隔离已修复。
 - A-02保持`NEEDS_CONFIRMATION`；A-03/A-04/A-09/A-06/A-07保持`FROZEN`。每项解冻只允许一个真实样本、一个权威对象和一个最小闭环，不平台先行。
-- 新增0、关闭0、净变化0、重复0、悬空0；A-10明确排除且未修改。报告：`docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md`。
+- 新增0、关闭0、净变化0、重复0、悬空0；A-10明确排除且未修改。报告：`docs/archive/v1.5/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md`。
 
 ## 2026-07-28 主线55：候选与工程观察授权实施金丝雀通过
 
@@ -59,21 +74,21 @@
 - `DATA-001`、Prometheus机器认证及3项生产发布门均缺各自外部证据；当前无可识别且获授权的目标环境。
 - `codex/mainline-55-m8-release-gates`当前HEAD已冻结、推送并通过同SHA CI；目标环境未识别，生产裁决保持不通过。
 - 目标环境执行前必须明确环境性质与访问入口、Secret责任、脱敏副本与消费者签认、对象复扫责任和回滚窗口；PR与合并仍须单独授权。
-- 报告：`docs/quality/第55条主线-M5-M6外部前置核查报告.md`。
+- 报告：`docs/archive/v1.5/quality/第55条主线-M5-M6外部前置核查报告.md`。
 
 ## 2026-07-27 主线55 M4：产品候选与工程观察复核通过
 
 - 7项产品候选、2项AutoPilot效率观察和Trivy冷缓存观察均无新增解锁证据；A-09已确认M3覆盖主要技术闭环，剩余Submittal/独立重大技术问题无真实样本；0解锁、0关闭。
 - 状态继续为`NEEDS_CONFIRMATION/FROZEN/OBSERVATION`，不得直接进入Ready；行为性控制面修改仍须新指纹和用户明确启动单Issue金丝雀。
 - 当前活动事项15项；M5等待数据与目标环境前置，生产继续禁止上线。
-- 报告：`docs/quality/第55条主线-M4-Frozen与Observation复核验收报告.md`。
+- 报告：`docs/archive/v1.5/quality/第55条主线-M4-Frozen与Observation复核验收报告.md`。
 
 ## 2026-07-27 主线55 DEV-001：MySQL开发TLS冗余配置关闭
 
 - 固定MySQL 8.0.46摘要的有/无`ssl.cnf`对照均证明TLS REQUIRED成功、DISABLED被安全传输门拒绝；该文件在现有挂载中为`777`并被MySQL明确忽略。
 - 已删除冗余文件、目录说明和三套Compose挂载；未修改数据库卷、旧migration或现有数据。三套Compose静态配置通过，临时容器残留0。
 - `DEV-001`为`VerifiedResolved`；第55条活动事项15项。目标环境与3项`RELEASE_GATE`不变，生产继续禁止上线。
-- 报告：`docs/quality/第55条主线-DEV-001-MySQL开发TLS冗余配置验收报告.md`。
+- 报告：`docs/archive/v1.5/quality/第55条主线-DEV-001-MySQL开发TLS冗余配置验收报告.md`。
 
 ## 2026-07-27 第53条主线M8：本地正式验收通过
 
@@ -82,7 +97,7 @@
 - 真实页面E2E 78/78和23阶段Demo通过；库存、金额、审批、会计和只读成员权限均以服务端回读为准。
 - 同一V2根路径镜像完成`V2_ROOT→LEGACY_ROLLBACK→V2_RESTORE`；健康、登录、API、SSE、静态资源和深链通过，演练容器已清理。
 - M8无剩余Ready；新增后续项0、关闭后续项0、净变化0、悬空0。正式入口、Legacy退役、目标环境和生产操作未授权，三项`RELEASE_GATE`继续阻塞生产。
-- 计划：`docs/plans/第53条主线-M8-全量对等切换与回滚演练任务计划书-2026-07-27.md`；报告：`docs/quality/第53条主线-M8-全量对等切换与回滚演练正式验收报告.md`。
+- 计划：`docs/archive/v1.5/plans/第53条主线-M8-全量对等切换与回滚演练任务计划书-2026-07-27.md`；报告：`docs/archive/v1.5/quality/第53条主线-M8-全量对等切换与回滚演练正式验收报告.md`。
 
 ## 2026-07-27 第53条主线M7：基础资料、系统管理与全局工具通过
 
@@ -90,7 +105,7 @@
 - 用户、角色、权限、租户、项目范围、金额字符串、改密全会话撤销、管理员连续性、审计只读、文档模板和数据维护三重门跨切片成立；V234补齐`audit:query`并仅绑定`SUPER_ADMIN`。
 - 后端全量2324项、H2/MySQL迁移、V2 unit 397项、design 77项、M7 E2E 17/17、全站migration gate 91/91和23阶段Demo通过；未执行真实清库。
 - 新增0、关闭0、净变化0、悬空0。M8尚未启动且须另行授权；正式入口、Legacy退役、Git交付、目标环境和生产发布保持禁止。
-- 计划：`docs/plans/第53条主线-M7-基础资料系统管理与全局工具任务计划书-2026-07-27.md`；报告：`docs/quality/ISSUE-053-042-M7全量退出门验收报告.md`。
+- 计划：`docs/archive/v1.5/plans/第53条主线-M7-基础资料系统管理与全局工具任务计划书-2026-07-27.md`；报告：`docs/archive/v1.5/quality/ISSUE-053-042-M7全量退出门验收报告.md`。
 
 ## 2026-07-27 主线55支线：资金支出闭环本地收口
 
@@ -99,7 +114,7 @@
 - 本地MySQL V224—V233、后端272类2282项、Legacy 131文件734项、V2 48文件351项和真实角色FLOW-001均通过。
 - 同HEAD SHA CI已取得；目标环境发布证据未取得，生产继续禁止上线。
 - 新增后续项0、净变化0、重复0、悬空0。同HEAD CI沿用既有PR门，3项生产发布门保持唯一载体。
-- 计划：`docs/plans/第55条主线-支线-资金支出闭环任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-支线-资金支出闭环收口验收报告.md`。
+- 计划：`docs/archive/v1.5/plans/第55条主线-支线-资金支出闭环任务计划书-2026-07-26.md`；报告：`docs/archive/v1.5/quality/第55条主线-支线-资金支出闭环收口验收报告.md`。
 
 ## 2026-07-26 主线55支线：资金支出闭环S0标准冻结通过
 
@@ -107,7 +122,7 @@
 - EXPENSE沿用费用申请原预算占用，其他来源由PAY_REQUEST占用；PayRecord SUCCESS不消费，CashJournal ARCHIVED才转消耗。
 - 付款证据固定为 `payment_document_link(cash_journal_id, file_id)` 单事实锚点；发票继续复用 `invoice_payment_allocation`，不建立第二套多态关系。
 - `PROJECT-PAYMENT-CLOSED-LOOP` 状态为 `S0_PASSED / P0_BLOCKED`；S1未启动。新增0、关闭0、净变化0、悬空0，生产继续禁止上线。
-- 计划：`docs/plans/第55条主线-支线-资金支出闭环任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-支线-资金支出闭环-S0标准冻结验收报告.md`。
+- 计划：`docs/archive/v1.5/plans/第55条主线-支线-资金支出闭环任务计划书-2026-07-26.md`；报告：`docs/archive/v1.5/quality/第55条主线-支线-资金支出闭环-S0标准冻结验收报告.md`。
 
 ## 2026-07-26 主线55 M2：待确认维护项裁决通过
 
@@ -115,7 +130,7 @@
 - `OBS-002` 缺目标网络、Secret与轮换责任人；`DEV-001` 缺一次性MySQL 8 TLS对照证据。两项保持 `NEEDS_CONFIRMATION`，禁止用匿名指标、长期用户JWT或静态推断绕过。
 - 后端定向28项、集成全量274类2298项和补充renderer 2项通过；Compose静态检查、diff检查及独立安全/维护复核通过。
 - 新增0、关闭2、净变化-2、悬空0；当前活动事项18项。资金支出闭环P0和3项生产发布门未解除，生产继续禁止上线。
-- 计划：`docs/plans/第55条主线-M2-待确认维护项裁决任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-M2-待确认维护项裁决验收报告.md`。
+- 计划：`docs/archive/v1.5/plans/第55条主线-M2-待确认维护项裁决任务计划书-2026-07-26.md`；报告：`docs/archive/v1.5/quality/第55条主线-M2-待确认维护项裁决验收报告.md`。
 
 ## 2026-07-26 主线55 M1：五项本地问题整改通过
 
@@ -124,15 +139,15 @@
 - JaCoCo branch floor 提升至60%；集成全量实测 instruction `81.00%`、branch `60.53%`。Blocked冲突归一，Legacy 26条格式warning归零。
 - 集成后端274类2298项、Legacy 743项、V2 364项及静态门/构建/包体通过；独立安全复核无剩余阻塞。
 - 新增0、关闭5、净变化-5、悬空0；活动事项降至19。`OBS-002`与3项生产发布门未解除，生产继续禁止上线。
-- 计划：`docs/plans/第55条主线-M1-已确认本地问题整改任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-M1-已确认本地问题整改验收报告.md`。
+- 计划：`docs/archive/v1.5/plans/第55条主线-M1-已确认本地问题整改任务计划书-2026-07-26.md`；报告：`docs/archive/v1.5/quality/第55条主线-M1-已确认本地问题整改验收报告.md`。
 
 ## 2026-07-26 主线55支线：视觉组件治理关闭
 
 - 视觉组件治理已完成唯一标准、唯一预览、V3共享详情、弹窗关闭契约、V2 Token与全页门禁，复审阻塞项3/5/6/7/8全部通过。
-- 当前验证：设计门`77/77`、V2 unit `359/359`、迁移E2E `81/81`、类型、构建、Clean-room、route ledger、bundle-size和真实5174浏览器通过。
+- 该历史阶段验证：设计门`77/77`、V2 unit `359/359`、迁移E2E `81/81`、类型、构建、Clean-room、route ledger、bundle-size和当时的5174浏览器通过。
 - Legacy已由唯一标准定义为兼容冻结；旧 `VCG-B01-QA-01` 双端高阶视觉证据不再验证现行设计目标，按无明确现行价值关闭并保留历史不通过记录。
 - 支线状态`CLOSED_BY_USER / CURRENT_V2_SCOPE_PASSED`；历史双端完整验收保持未通过。新增0、关闭1、净变化-1、悬空0。第55条其他活动事项和三项生产发布门不变，生产仍禁止上线。
-- 计划：`docs/plans/第55条主线-支线-视觉组件治理任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-支线-视觉组件治理收口验收报告.md`。
+- 计划：`docs/archive/v1.5/plans/第55条主线-支线-视觉组件治理任务计划书-2026-07-26.md`；报告：`docs/archive/v1.5/quality/第55条主线-支线-视觉组件治理收口验收报告.md`。
 
 ## 2026-07-26 主线55 M0：事实刷新与治理唯一化通过
 
@@ -140,7 +155,7 @@
 - 现行问题源由16项降为15项，第55条另承接9项，当前活动事项24项；新增0、关闭1、净变化-1、重复0、悬空0。
 - 财务定时对账仅剩失败可观测和故障注入证据缺口；V2仍为`24/63/0`；3项生产发布门未解除。
 - M0通过不启动M1、M7/M8、正式入口、Legacy退役、Git交付或生产发布；当前生产裁决仍为不通过、禁止上线。
-- 计划：`docs/plans/第55条主线-M0-事实刷新与治理唯一化任务计划书-2026-07-26.md`；报告：`docs/quality/第55条主线-M0-事实刷新与治理唯一化验收报告.md`。
+- 计划：`docs/archive/v1.5/plans/第55条主线-M0-事实刷新与治理唯一化任务计划书-2026-07-26.md`；报告：`docs/archive/v1.5/quality/第55条主线-M0-事实刷新与治理唯一化验收报告.md`。
 
 ## 2026-07-26 主线53 M6：全量退出门通过
 
@@ -149,8 +164,8 @@
 - `ISSUE-053-030～035`全部Done；稳定DTO、日记账对象锁、凭证CAS、统一期间锁序、月结锁内重检与跨切片追溯成立。
 - 后端全量273类2263项、V2全量351项、四组M6 E2E 12/12、静态门、23阶段demo verify和真实内置浏览器通过；项目选择器启用并真实过滤。
 - 当前无M6 Ready，M7未启动；正式入口、Legacy退役、Git交付和生产操作仍未授权。
-- 权威计划：`docs/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`。
-- 正式报告：`docs/quality/第53条主线-M6-分包结算与资金财务全量退出门验收报告.md`。
+- 权威计划：`docs/archive/v1.5/plans/第53条主线-M6-分包结算与资金财务任务计划书-2026-07-25.md`。
+- 正式报告：`docs/archive/v1.5/quality/第53条主线-M6-分包结算与资金财务全量退出门验收报告.md`。
 
 ## 2026-07-25 主线53 M5：供应链与物资全量退出门复核通过
 
@@ -359,9 +374,9 @@
 
 - 新建 `frontend-admin-v2`，与 `frontend-admin` 分离入口、依赖、路由、状态、样式、测试、构建和容器；V2 只允许引用无 Vue、无 DOM、无 CSS 的 `frontend-contracts`。
 - 当前 Legacy 基线为 87 个命名路由、73 个路由视图引用、65 个独立页面模块；自动迁移台账将 86 个路由标记为 `LEGACY_ONLY`，驾驶舱标记为 `V2_SOURCE_AVAILABLE`。
-- 本地运行态保持同一后端与数据事实：Legacy 5173、V2 5174；V2 仅提供 `/v2/health` 和只读后端健康代理，不提供业务写入口。
+- 该历史阶段运行态保持同一后端与数据事实：Legacy 5173、V2 5174；此状态已被主线58的新版唯一5173入口取代。
 - M0 已通过 V2 门禁、Legacy 727 项回归、180 秒运行态稳定观察、实浏览器和本地 Nginx 镜像烟测。M1 设计系统切片已完成，认证与应用壳待实施；M2 驾驶舱迁移未启动。
-- 权威载体：[第53条主线计划书](../plans/第53条主线-CGC-PMS全量UI%20Clean-room%20V2重构任务计划书.md)、[M0验收报告](../quality/第53条主线-M0-Clean-room隔离底座验收报告.md)、[路由迁移台账](../ui-v2/route-migration-ledger.md)。
+- 权威载体：[第53条主线计划书](../archive/v1.5/plans/第53条主线-CGC-PMS全量UI%20Clean-room%20V2重构任务计划书.md)、[M0验收报告](../archive/v1.5/quality/第53条主线-M0-Clean-room隔离底座验收报告.md)、[路由迁移台账](../ui-v2/route-migration-ledger.md)。
 
 ## 2026-07-18 主线：数据库最终基线、平台初始化与完整演示项目完成
 
@@ -369,7 +384,7 @@
 - B215 只保留最终 schema 与系统白名单种子，不再默认写入用户、项目、物资实例、库存、合同、单据、工作流实例或其他业务事实；平台首个组织、部门和超级管理员改由默认关闭、外部 Secret、事务锁定且幂等的 bootstrap 创建。
 - 独立完整演示包以四阶段事务、checkpoint 和 manifest 显式加载单一项目，覆盖项目、商务、供应链、分包结算、资金收入、质量安全、工作流预警和收尾闭环；43 项指标与重复加载守恒通过。
 - MySQL 新库/升级、H2 新库/升级、schema 等价、bootstrap、安全扫描和 2031 项后端全量测试均通过；用户明确授权后，当前本地 dev Docker 卷已重建为单条 B215 baseline、业务事实为零，真实浏览器以 bootstrap 管理员登录并显示暂无项目数据。生产重建、清库、发布未授权且未执行，legacy 物理退役继续受环境盘点与人工批准约束。
-- 权威载体：[第52条主线计划书](../plans/第52条主线-数据库基线平台初始化与演示项目重建任务计划书.md)、[数据库 B215 说明](../database/database-baseline-v215.md)、[正式验收报告](../quality/第52条主线-数据库基线平台初始化与演示项目重建验收报告.md)。
+- 权威载体：[第52条主线计划书](../archive/v1.5/plans/第52条主线-数据库基线平台初始化与演示项目重建任务计划书.md)、[数据库 B215 说明](../database/database-baseline-v215.md)、[正式验收报告](../archive/v1.5/quality/第52条主线-数据库基线平台初始化与演示项目重建验收报告.md)。
 
 ## 2026-07-18 主线：成本科目 V2 重整本地实施完成
 
@@ -378,7 +393,7 @@
 - 质量安全后果的返工成本已强制命中显式末级科目规则；项目财务费用以独立批次支持直接归属、受益额、占用天数和合同额例外四种受控分摊依据，不复用间接费分摊事实。
 - 基础资料下“成本科目中心”已收敛为科目体系、归集规则、项目适用与目标成本、影响与转入追踪 4 个独立 URL/Tab；旧路由兼容、不硬编码角色菜单。
 - 本地回归覆盖 V213/V214 双方言、旧引用归零与金额守恒、规则决策、引用保护、投标正反向转入、财务正反向分摊、质量安全归集和四工作区深链接。生产切换仍受目标环境扫描、完整映射签认、财务口径签认、备份和脱敏演练阻塞。
-- 权威载体：[第51条主线计划书](../plans/第51条主线-成本科目V2重整任务计划书.md)。
+- 权威载体：[第51条主线计划书](../archive/v1.5/plans/第51条主线-成本科目V2重整任务计划书.md)。
 
 ## 2026-07-18 主线：业务单据模板与可审计PDF生成M4通过，M5保持候选门
 
@@ -389,7 +404,7 @@
 - M2实施回写：付款生产Provider、受控系统模板、单层有界明细、审批中水印预览及付款页生成/历史/下载入口已落地。零/单/多来源、零/多发票、80/25长明细、金额、幂等、权限负向、真实dev角色和PDF文本/视觉验收均通过；付款列表项目范围、无权参考请求和页脚中文字体缺口已修复。
 - M3实施回写：结算Provider复用权威金额、明细、付款、成本、附件与审批服务；系统结算模板和真实FINANCE入口已通过生成、历史、下载审计和PDF哈希/文本/页数核对。生成附件不会反写入下一次输出模型；浏览器签名下载改用显式公开对象地址和region，Docker内部地址继续用于服务端对象I/O。
 - M4实施回写：付款与结算字段目录直接复用 Provider schema，服务端对 schema、字段清单、占位符和单层循环上下文执行统一校验；模板管理页覆盖版本、校验、复制、导入/导出、发布/停用和默认绑定。模板查询、编辑、发布、生成与业务对象访问分层授权，已保存版本预览不写生成/归档。租户/业务类型默认绑定使用 CAS，陈旧切换被拒绝且唯一有效版本保持不变；后端回归、前端48项、类型检查和管理员浏览器 PDF 预览通过。M5仍须以同步生成不足的真实证据重新决策。
-- 权威载体：[第48条主线计划书](../plans/第48条主线-业务单据模板与可审计PDF生成任务计划书.md)、[DocuGenius研究](docugenius-document-generation-analysis.md)、[Ad-hoc Candidate](../backlog/ad-hoc-plan.md)。
+- 权威载体：[第48条主线计划书](../archive/v1.5/plans/第48条主线-业务单据模板与可审计PDF生成任务计划书.md)、[DocuGenius研究（V1.5 历史）](../archive/v1.5/product-intelligence/docugenius-document-generation-analysis.md)、[Ad-hoc Candidate](../backlog/ad-hoc-plan.md)。
 
 ## 2026-07-17 增量：会计凭证生成策略现状复核完成
 
@@ -464,7 +479,7 @@
 - 数据基线由 V180/V194 升级到 MySQL/H2 V210：181 张业务表、3193 个基础表物理字段、24 个视图字段（合计 3217）、991 个独立字段名、366 个外键列、2 个共享治理视图，Flyway 失败记录 0。
 - 权限与正确性边界：RBAC 关系、用户岗位、退料来源、银行回单—回款均升级为 tenant-aware 或显式权威关系；活动软删除唯一键、成本幂等、审批路由、材料分类、JSON 合法性和双预警中心完成治理。
 - 采购/库存闭环新增 WBS/预算、质量处置、供应商退货和退料冲销；供应商退货统一复用 `sp_supplier_return` 头表并增加 `sp_supplier_return_item`，未保留重复头表；收入资金闭环支持银行回单到回款的事务内唯一转换和双向 Trace。
-- 工程资产新增数据库设计规范、部署 preflight/postflight、发布回滚手册、自动结构字典和 ER；完整验收见 `docs/quality/database-model-remediation-acceptance.md`。
+- 工程资产新增数据库设计规范、部署 preflight/postflight、发布回滚手册、自动结构字典和 ER；完整验收见 `docs/archive/v1.5/quality/database-model-remediation-acceptance.md`。
 - V210 精确退役 14 个已经 V195/V131 替代的 `deleted_token`，保留 15 个现行 `active_unique_token`；没有合并语义不同的同名字段。
 - 生产边界：历史 `overhead_allocation_record` 本地 0 行且无仓库运行时引用，但物理删除等待生产外部消费者确认，由 `ISSUE-049-001` 唯一承接。
 
@@ -806,7 +821,7 @@
 
 ## 2026-07-13 增量：全部历史任务专项复盘
 
-- 已按正式台账与验收报告完成 131 个历史任务单元的一次性复盘：v1.0 归档 88 项、v1.5 当前 43 项；私有禁止区未纳入范围。
+- 已按正式台账与验收报告完成 131 个历史任务单元的一次性复盘：v1.0 归档 88 项、v1.5 当时 43 项；私有禁止区未纳入范围。
 - v1.5 完成台账原漏记 30 项且 3 项字段不完整，现已按 Issue、日期、提交、报告、验证和风险格式补齐；历史任务与正式报告、Git 提交可双向定位。
 - 历史重复成本集中在真实质量/安全缺陷、Ready/工具/环境配置噪声和旧全量测试无关红灯；前两类已有现行失败分类与契约门禁，旧红灯已由第38条和第40条新鲜证据取代。
 - 本次专项复盘不回算 `autopilot-task-score/v1`、不增加 20 项计数；A-01 与 3 个生产发布前置继续由现有唯一问题载体承接，未新增悬空后续项。
@@ -869,7 +884,7 @@
 ## 2026-07-13 增量：v1.0 历史问题四态分类
 
 - 254 个 v1.0 正式历史 Markdown 已纳入可追溯历史索引；历史节点统一标记，不参与默认 current 搜索。
-- 92 个唯一历史 Issue 保留“v1.0 已解决”语义，但不得替代 v1.5 当前验证。
+- 92 个唯一历史 Issue 保留“v1.0 已解决”语义，但不得替代 v1.6 当前验证。
 - 当前仍适用的产品问题归并为 10 个 Candidate/Frozen 域；权限、租户、数据一致性、真实角色、外部集成与工具链共 8 个风险域保持“需要复验”。
 - 旧 SHA/PR、旧工作区、旧测试选择器、旧浏览器能力和旧批次时间窗等 6 类记录判为已过期，不再进入当前优先级排序。
 
@@ -943,19 +958,19 @@
 - 材料验收已具备项目、验收日期、审批状态、供应商和物料数量；审批通过后原子触发库存与成本，日报不得复制或改写该事实。
 - `ISSUE-037-011` 已完成：日报详情只读聚合同项目同日已审批验收明细，作为现场到货证据；设备、消耗、安装量和生产率继续后置。
 
-## 地图基线
+## v1.5 地图基线（历史）
 
-| 项目       | 当前值                                        |
+| 项目       | 历史值                                        |
 | ---------- | --------------------------------------------- |
 | 产品版本   | `1.5.0-dev.0`                                 |
 | 分支       | `develop/1.5`                                 |
-| Commit     | 当前 `develop/1.5` 工作区                     |
+| Commit     | 当时 `develop/1.5` 工作区                     |
 | 生成时间   | 2026-07-12                                    |
 | 证据类型   | 当前代码、配置、现行规范、测试入口静态核对    |
 | 验证新鲜度 | 业务测试和真实角色运行态待本轮后续复验        |
 | 下次刷新   | 下一条产品 Candidate 完成后，或当前事实变化时 |
 
-> 本地图中的 `Partial` 不等于功能不存在，表示真实代码链路已经存在，但尚未取得 v1.5 当前周期的完整运行或业务验收证据。v1.0 历史测试结论不用于升级状态。
+> 本地图中的 `Partial` 不等于功能不存在，表示真实代码链路已经存在，但在 v1.5 历史周期尚未取得完整运行或业务验收证据。v1.0 历史测试结论不用于升级状态。
 
 ## 产品定位
 
@@ -991,17 +1006,17 @@ MySQL/H2 + Redis + MinIO
 Docker Compose + Nginx + Actuator + Prometheus
 ```
 
-| 层级            | 现行入口                                                   |
-| --------------- | ---------------------------------------------------------- |
-| 前端入口        | `frontend-admin/src/main.ts`、`frontend-admin/src/App.vue` |
-| 前端路由        | `frontend-admin/src/router/`                               |
-| 页面            | `frontend-admin/src/pages/`                                |
-| API 封装        | `frontend-admin/src/api/modules/`                          |
-| 后端入口        | `backend/src/main/java/com/cgcpms/CgcPmsApplication.java`  |
-| 后端业务域      | `backend/src/main/java/com/cgcpms/`                        |
-| MySQL migration | `backend/src/main/resources/db/migration/`                 |
-| H2 migration    | `backend/src/main/resources/db/migration-h2/`              |
-| 部署            | `deploy/`、`docker-compose*.yml`                           |
+| 层级            | 现行入口                                                         |
+| --------------- | ---------------------------------------------------------------- |
+| 前端入口        | `frontend-admin-v2/src/main.ts`、`frontend-admin-v2/src/App.vue` |
+| 前端路由        | `frontend-admin-v2/src/router.ts`                               |
+| 页面            | `frontend-admin-v2/src/pages/`                                  |
+| API 封装        | `frontend-admin-v2/src/services/`                               |
+| 后端入口        | `backend/src/main/java/com/cgcpms/CgcPmsApplication.java`        |
+| 后端业务域      | `backend/src/main/java/com/cgcpms/`                              |
+| MySQL migration | `backend/src/main/resources/db/migration/`                       |
+| H2 migration    | `backend/src/main/resources/db/migration-h2/`                    |
+| 部署            | `deploy/`、`docker-compose*.yml`                                 |
 
 ## 当前规模快照
 
@@ -1073,7 +1088,7 @@ Docker Compose + Nginx + Actuator + Prometheus
 | Ready 准入                           | `docs/backlog/ready-issues.md`、`autopilot-ready.ps1`、插件 loop runner        | Implemented         | 当前 Ready 可被严格解析器和插件预演识别；插件标题多行匹配已有回归保护                                                                                                     |
 | 候选补货                             | `autopilot-refill.ps1`、知识图谱 `issues` CLI                                  | Implemented         | 先过图谱健康与 HEAD 游标门禁，再有界拉取并核实存量候选；图谱异常 fail-close，不回退文件或长期计划凑任务                                                                   |
 | 连续执行                             | `autopilot-run-continuous.ps1`                                                 | Implemented         | 已具备隔离执行、本地提交、上限停止、300/600 秒停滞处置、一次有限重派、第二次 blocked 和有界长命令声明                                                                     |
-| 质量归档                             | `docs/quality/`                                                                | Implemented         | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-021 正式验收报告                                                                                                            |
+| 质量归档                             | `docs/archive/v1.5/quality/`                                                   | Implemented         | 已归档第37条主线与 ISSUE-037-001 至 ISSUE-037-021 正式验收报告                                                                                                            |
 | Windows MySQL 备份恢复与本机凭据轮换 | `scripts/mysql-backup.ps1`、`scripts/mysql-restore.ps1`、`deploy/.env`（忽略） | Implemented（本地） | ISSUE-040-006 已修复二进制安全问题，隔离恢复与轮换后均保留 74 表；MySQL/Redis/MinIO/JWT/Jasypt 注入、旧 JWT 失效和新登录通过。未来生产轮换由上线门禁重新验收              |
 
 ## 当前明确缺口

@@ -5,8 +5,21 @@ services:
       dockerfile: frontend-admin-v2/Dockerfile
       args:
         VITE_BASE_PATH: /
+    environment:
+      BACKEND_URL: backend:8080
     volumes:
-      - ./m8/nginx.v2-root.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./m8/nginx.v2-root.conf:/etc/nginx/templates/default.conf.template:ro
+    networks:
+      - dev
+
+  frontend-legacy-rollback:
+    build:
+      context: ../archive/v1.6/frontend-admin-legacy
+      dockerfile: Dockerfile
+    environment:
+      BACKEND_URL: backend:8080
+    volumes:
+      - ./m8/nginx.v2-root.conf:/etc/nginx/templates/default.conf.template:ro
     networks:
       - dev
 

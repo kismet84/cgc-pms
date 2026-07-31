@@ -365,7 +365,7 @@ erDiagram
 - 现金关系：`cash_journal_entry.collection_record_id`；凭证关系：`accounting_entry.collection_record_id`。
 - API：`RevenueOperationsController`，所有读写接口均带权限控制，关键写操作带操作审计。
 - 附件：通用文件服务支持 `CONTRACT_REVENUE`、`OWNER_SETTLEMENT`、`SALES_INVOICE`、`COLLECTION_RECORD`，执行租户、项目和状态校验。
-- 前端：`frontend-admin/src/pages/revenue/index.vue`、`revenueOperations.ts`、`/revenue` 路由和“结算收付/收入与回款”菜单。
+- 前端：`frontend-admin-v2/src/pages/finance/ReceivablesWorkspacePage.vue`、`src/services/finance.ts`、`/revenue` 路由和“结算收付/收入与回款”菜单。
 - 自动化：`RevenueCollectionClosedLoopIntegrationTest` 覆盖正常、异常、冲销、P1–P3、重复回调和并发幂等；前端 API、路由和菜单有契约测试。
 
 ## 12. 验收证据

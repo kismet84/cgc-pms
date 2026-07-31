@@ -27,9 +27,9 @@ test.describe('V2 live local authentication', () => {
 
   test('redirects an unauthenticated browser to login', async ({ page }) => {
     await page.context().setExtraHTTPHeaders({ 'X-Forwarded-For': liveClientIp(0) })
-    await page.goto('/v2/session')
+    await page.goto('/session')
 
-    await expect(page).toHaveURL(/\/v2\/login\?redirect=/)
+    await expect(page).toHaveURL(/\/login\?redirect=/)
     await expect(page.getByRole('heading', { name: '登录新版工作台' })).toBeVisible()
   })
 
@@ -48,8 +48,8 @@ test.describe('V2 live local authentication', () => {
       )
       expect(loginResponse?.ok()).toBe(true)
 
-      await page.goto('/v2/session')
-      await expect(page).not.toHaveURL(/\/v2\/(?:login|session)/)
+      await page.goto('/session')
+      await expect(page).not.toHaveURL(/\/(?:login|session)/)
       await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
       await expect(
         page.getByRole('banner').getByText(identity.visibleName, { exact: true }),
@@ -59,20 +59,20 @@ test.describe('V2 live local authentication', () => {
       await expect(page.getByRole('heading', { level: 1, name: '经营驾驶舱' })).toBeVisible()
 
       if (identity.username === 'admin') {
-        await page.goto('/v2/system/users')
+        await page.goto('/system/users')
         await expect(page.getByRole('heading', { level: 1, name: '用户管理' })).toBeVisible()
       } else {
-        await page.goto('/v2/system/users')
-        await expect(page).toHaveURL(/\/v2\/no-access\?from=/)
+        await page.goto('/system/users')
+        await expect(page).toHaveURL(/\/no-access\?from=/)
         await expect(page.getByText('访问已阻断')).toBeVisible()
       }
 
       await page.getByRole('button', { name: '退出' }).click()
-      await expect(page).toHaveURL(/\/v2\/login$/)
+      await expect(page).toHaveURL(/\/login$/)
       expect(logoutHadCsrfHeader).toBe(true)
 
-      await page.goto('/v2/session')
-      await expect(page).toHaveURL(/\/v2\/login\?redirect=/)
+      await page.goto('/session')
+      await expect(page).toHaveURL(/\/login\?redirect=/)
     })
   }
 
@@ -84,7 +84,7 @@ test.describe('V2 live local authentication', () => {
         loginHadCsrfHeader = request.headers()['x-xsrf-token'] !== undefined
       }
     })
-    await page.goto('/v2/login')
+    await page.goto('/login')
     await page.getByLabel('用户名').fill('__v2_denied_identity__')
     await page.getByLabel('密码').fill('invalid-credential-053002')
     await page.getByRole('button', { name: '登录' }).click()
@@ -92,7 +92,7 @@ test.describe('V2 live local authentication', () => {
     expect(loginHadCsrfHeader).toBe(true)
     await expect(page.getByText('用户名或密码错误')).toBeVisible()
     await expect(page.getByLabel('密码')).toHaveValue('')
-    await expect(page).toHaveURL(/\/v2\/login$/)
+    await expect(page).toHaveURL(/\/login$/)
   })
 
   test('keeps the login shell usable at desktop and mobile widths', async ({ page }) => {
@@ -118,7 +118,7 @@ test.describe('V2 live local authentication', () => {
     page.on('pageerror', (error) => runtimeErrors.push(`pageerror: ${error.message}`))
 
     await page.setViewportSize({ width: 1440, height: 900 })
-    await page.goto('/v2/login')
+    await page.goto('/login')
     await expect(page.getByRole('heading', { name: '登录新版工作台' })).toBeVisible()
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -148,7 +148,7 @@ test.describe('V2 live local authentication', () => {
             )
           ) &&
           message !==
-            'error http://127.0.0.1:5174/favicon.ico: Failed to load resource: the server responded with a status of 404 (Not Found)',
+            'error http://127.0.0.1:5173/favicon.ico: Failed to load resource: the server responded with a status of 404 (Not Found)',
       ),
     ).toEqual([])
   })

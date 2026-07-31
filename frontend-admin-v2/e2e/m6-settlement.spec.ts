@@ -333,22 +333,22 @@ test.describe('M6 settlement V2', () => {
   test('redirects root and passes desktop, tablet, mobile and axe checks', async ({ page }) => {
     await install(page)
     const errors = captureRuntimeErrors(page)
-    await page.goto('/v2/settlement?projectId=P1')
-    await expect(page).toHaveURL(/\/v2\/settlement\/list\?projectId=P1/)
+    await page.goto('/settlement?projectId=P1')
+    await expect(page).toHaveURL(/\/settlement\/list\?projectId=P1/)
     for (const viewport of [
       { width: 1440, height: 900 },
       { width: 1024, height: 768 },
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/settlement/list?projectId=P1')
+      await page.goto('/settlement/list?projectId=P1')
       await expect(page.getByRole('button', { name: 'STL-2026-001' })).toBeVisible()
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       )
     }
     await page.getByRole('button', { name: 'STL-2026-001' }).click()
-    await expect(page).toHaveURL(/\/v2\/settlement\/S1/)
+    await expect(page).toHaveURL(/\/settlement\/S1/)
     await expect(page.getByText('金额快照', { exact: true })).toBeVisible()
     await expect(page.getByText('项目商务复核', { exact: false })).toBeVisible()
     const axe = await new AxeBuilder({ page }).include('.settlement-workspace').analyze()
@@ -360,16 +360,16 @@ test.describe('M6 settlement V2', () => {
 
   test('creates, edits items, uploads and submits with one write each', async ({ page }) => {
     const state = await install(page)
-    await page.goto('/v2/settlement/list?projectId=P1')
+    await page.goto('/settlement/list?projectId=P1')
     await page.getByRole('button', { name: '新建结算' }).click()
     const form = page.getByRole('dialog', { name: '新建结算' })
     await selectOption(page, form, /^分包合同：/, /SUB-2026-001 · 主体结构劳务分包合同/)
     await form.getByLabel('终期扣款').fill('0.00')
     await form.getByRole('button', { name: '保存', exact: true }).dblclick()
-    await expect(page).toHaveURL(/\/v2\/settlement\/list\?projectId=P1/)
+    await expect(page).toHaveURL(/\/settlement\/list\?projectId=P1/)
     await expect(page.getByText('STL-2026-002', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: 'STL-2026-002' }).click()
-    await expect(page).toHaveURL(/\/v2\/settlement\/S2/)
+    await expect(page).toHaveURL(/\/settlement\/S2/)
 
     await page.getByRole('button', { name: '维护明细' }).click()
     const items = page.getByRole('dialog', { name: '维护结算明细' })
@@ -405,7 +405,7 @@ test.describe('M6 settlement V2', () => {
 
   test('hides mutations without permissions', async ({ page }) => {
     const readOnly = await install(page, ['settlement:query'])
-    await page.goto('/v2/settlement/S1?projectId=P1')
+    await page.goto('/settlement/S1?projectId=P1')
     await expect(page.getByRole('button', { name: '编辑' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '维护明细' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '提交审批' })).toHaveCount(0)
@@ -417,7 +417,7 @@ test.describe('M6 settlement V2', () => {
     page,
   }) => {
     const writable = await install(page, ['settlement:query', 'settlement:delete'])
-    await page.goto('/v2/settlement/S1?projectId=P1')
+    await page.goto('/settlement/S1?projectId=P1')
     await expect(page.getByRole('button', { name: '编辑' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '删除', exact: true })).toBeVisible()
     await page.getByRole('button', { name: '删除', exact: true }).click()
@@ -425,14 +425,14 @@ test.describe('M6 settlement V2', () => {
       .getByRole('dialog', { name: '删除结算草稿' })
       .getByRole('button', { name: '确认删除' })
       .click()
-    await expect(page).toHaveURL(/\/v2\/settlement\/list/)
+    await expect(page).toHaveURL(/\/settlement\/list/)
     expect(writable.writes.filter((item) => item === 'DELETE /settlements/S1')).toHaveLength(1)
   })
 
   test('shows a recoverable error state for failed detail reads', async ({ page }) => {
     const state = await install(page)
     state.controls.failDetail = true
-    await page.goto('/v2/settlement/S1?projectId=P1')
+    await page.goto('/settlement/S1?projectId=P1')
     await expect(page.getByText('详情加载失败', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: '重试' })).toBeVisible()
   })

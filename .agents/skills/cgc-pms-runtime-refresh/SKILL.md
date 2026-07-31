@@ -10,8 +10,7 @@ description: 用于 cgc-pms 本地运行态刷新与验真：处理 Docker、bac
 1. 先把环境前置与业务失败分开；分类名称及处理原则引用 `../cgc-pms-ci-gate-triage/SKILL.md`，不在此复制。
 2. 按目标页面选择入口：
    - 后端健康：`http://localhost:8080/api/actuator/health`
-   - Legacy 前端：`http://localhost:5173/`
-   - Clean-room V2：`http://localhost:5174/v2/`
+   - 正式前端：`http://localhost:5173/`
    - dev-login：`http://localhost:5173/api/auth/dev-login?redirect=/dashboard`
 3. 首次浏览器验收只初始化一次能力和页面状态；不猜 API/参数，同一参数错误不得原样重试。
 4. 服务刷新后读取 `scripts/codex-autopilot/codex-autopilot.config.json` 的 `runtimeRefresh.waitSeconds`，稳定等待后再检查 health、端口、最终路由和关键接口。

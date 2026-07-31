@@ -156,8 +156,8 @@ test.describe('M4 costs routes', () => {
     const requests: string[] = []
     await install(page, writes, requests, deniedUser)
     for (const path of ['/cost/ledger', '/cost/summary', '/cost/control']) {
-      await page.goto(`/v2${path}?projectId=P1&period=2026-07`)
-      await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
+      await page.goto(`${path}?projectId=P1&period=2026-07`)
+      await expect(page).toHaveURL(/\/forbidden\?from=/)
       await expect(page.getByText('403', { exact: true })).toBeVisible()
       await expect(page.getByRole('heading', { name: '无权访问此页面' })).toBeVisible()
     }
@@ -171,15 +171,15 @@ test.describe('M4 costs routes', () => {
     const writes: string[] = []
     await install(page, writes)
     const errors = captureRuntimeErrors(page)
-    await page.goto('/v2/cost?projectId=P1&period=2026-07#items')
-    await expect(page).toHaveURL(/\/v2\/cost\/ledger\?projectId=P1&period=2026-07#items$/)
+    await page.goto('/cost?projectId=P1&period=2026-07#items')
+    await expect(page).toHaveURL(/\/cost\/ledger\?projectId=P1&period=2026-07#items$/)
     for (const viewport of [
       { width: 1440, height: 900 },
       { width: 1024, height: 768 },
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/cost/ledger?projectId=P1&period=2026-07')
+      await page.goto('/cost/ledger?projectId=P1&period=2026-07')
       await expect(page.getByRole('heading', { name: '成本台账', exact: true })).toBeVisible()
       await expect(page.getByText('9007199254740993.12').first()).toBeVisible()
       await expect(page.getByRole('button', { name: '查询' })).toHaveAttribute('aria-busy', 'false')
@@ -219,7 +219,7 @@ test.describe('M4 costs routes', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/cost/summary?projectId=P1&period=2026-07')
+      await page.goto('/cost/summary?projectId=P1&period=2026-07')
       await expect(page.getByText('-0.01').first()).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
@@ -251,7 +251,7 @@ test.describe('M4 costs routes', () => {
       { width: 390, height: 844 },
     ]) {
       await page.setViewportSize(viewport)
-      await page.goto('/v2/cost/control?projectId=P1&period=2026-07')
+      await page.goto('/cost/control?projectId=P1&period=2026-07')
       await expect(page.getByText('9007199254740993.12').first()).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),

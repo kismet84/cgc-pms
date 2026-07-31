@@ -35,7 +35,7 @@ beforeEach(() => {
 })
 
 describe('V2 application-shell routes', () => {
-  it('keeps Legacy as ledger universe and locks current V2 acceptance counts', () => {
+  it('keeps retired Legacy as frozen ledger universe and locks acceptance counts', () => {
     const ledger = JSON.parse(
       readFileSync(resolve(process.cwd(), '../docs/ui-v2/route-migration-ledger.json'), 'utf8'),
     ) as {
@@ -54,7 +54,9 @@ describe('V2 application-shell routes', () => {
       route.path.startsWith('/cost/subject'),
     )
 
-    expect(ledger.source).toBe(['frontend-admin', 'src', 'router', 'index.ts'].join('/'))
+    expect(ledger.source).toBe(
+      ['archive', 'v1.6', 'frontend-admin-legacy', 'src', 'router', 'index.ts'].join('/'),
+    )
     expect(ledger.summary).toMatchObject({
       legacyOnly: 0,
       v2Accepted: 87,
@@ -670,9 +672,7 @@ describe('V2 application-shell routes', () => {
     expect(normalizeRedirect('https://evil.example')).toBe('/session')
     expect(normalizeRedirect('//evil.example')).toBe('/session')
     expect(normalizeRedirect('/login?redirect=/session')).toBe('/session')
-    vi.stubEnv('BASE_URL', '/v2/')
-    expect(normalizeRedirect('/v2')).toBe('/session')
-    expect(normalizeRedirect('/v2/project/list')).toBe('/project/list')
-    vi.unstubAllEnvs()
+    expect(normalizeRedirect('/v2')).toBe('/v2')
+    expect(normalizeRedirect('/project/list')).toBe('/project/list')
   })
 })
