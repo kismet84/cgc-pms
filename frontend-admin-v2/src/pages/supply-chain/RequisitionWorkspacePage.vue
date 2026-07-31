@@ -708,10 +708,7 @@ onBeforeUnmount(() => {
     </V2Card>
 
     <section class="requisition-page__workspace" aria-label="领用与退料工作台">
-      <V2Card class="requisition-page__master" title="领料申请">
-        <template #title-extra>
-          <V2Badge tone="neutral">共 {{ total }} 条</V2Badge>
-        </template>
+      <V2Card class="requisition-page__master">
         <V2PageState
           v-if="loading"
           kind="loading"
@@ -778,18 +775,25 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <nav v-if="pageCount > 1" class="requisition-page__pager" aria-label="领料单分页">
-          <V2Button variant="secondary" :disabled="pageNo <= 1" @click="changePage(pageNo - 1)"
-            >上一页</V2Button
-          >
-          <span>第 {{ pageNo }} / {{ pageCount }} 页</span>
-          <V2Button
-            variant="secondary"
-            :disabled="pageNo >= pageCount"
-            @click="changePage(pageNo + 1)"
-            >下一页</V2Button
-          >
-        </nav>
+        <template v-if="pageCount > 1" #footer>
+          <nav class="requisition-page__pager" aria-label="领料单分页">
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo <= 1"
+              @click="changePage(pageNo - 1)"
+              >上一页</V2Button
+            >
+            <span>第 {{ pageNo }} 页</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo >= pageCount"
+              @click="changePage(pageNo + 1)"
+              >下一页</V2Button
+            >
+          </nav>
+        </template>
       </V2Card>
     </section>
 
@@ -1189,7 +1193,6 @@ onBeforeUnmount(() => {
 }
 .requisition-page__pager {
   justify-content: flex-end;
-  margin-top: var(--v2-space-4);
 }
 .requisition-page__detail-head,
 .requisition-page__line-head,

@@ -795,23 +795,25 @@ onBeforeUnmount(() => {
           </tbody>
         </table>
       </div>
-      <nav class="variation-page__pager" aria-label="签证变更分页">
-        <span>共 {{ total }} 条</span
-        ><V2Button
-          size="small"
-          variant="secondary"
-          :disabled="(filter.pageNo ?? 1) <= 1 || loading"
-          @click="changePage((filter.pageNo ?? 1) - 1)"
-          >上一页</V2Button
-        ><span>第 {{ filter.pageNo }} 页</span
-        ><V2Button
-          size="small"
-          variant="secondary"
-          :disabled="(filter.pageNo ?? 1) >= pageCount || loading"
-          @click="changePage((filter.pageNo ?? 1) + 1)"
-          >下一页</V2Button
-        >
-      </nav>
+      <template #footer>
+        <nav class="variation-page__pager" aria-label="签证变更分页">
+          <span>共 {{ total }} 条</span
+          ><V2Button
+            size="small"
+            variant="secondary"
+            :disabled="(filter.pageNo ?? 1) <= 1 || loading"
+            @click="changePage((filter.pageNo ?? 1) - 1)"
+            >上一页</V2Button
+          ><span>第 {{ filter.pageNo }} 页</span
+          ><V2Button
+            size="small"
+            variant="secondary"
+            :disabled="(filter.pageNo ?? 1) >= pageCount || loading"
+            @click="changePage((filter.pageNo ?? 1) + 1)"
+            >下一页</V2Button
+          >
+        </nav>
+      </template>
     </V2Card>
 
     <V2Dialog
@@ -1285,7 +1287,6 @@ onBeforeUnmount(() => {
 }
 .variation-page__pager {
   justify-content: flex-end;
-  margin-top: var(--v2-space-4);
   font-size: var(--v2-font-size-12);
   line-height: var(--v2-line-height-ui);
 }

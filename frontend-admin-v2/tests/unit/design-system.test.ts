@@ -71,6 +71,36 @@ function paginationBlocks(source: string) {
   }))
 }
 
+function paginationNavsOutsideCardFooters(source: string) {
+  const violations: number[] = []
+  const stack: Array<{ tag: string; footer: boolean }> = []
+  const relevantTag = /<\/?(?:V2Card|V2Dialog|template|nav)\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g
+
+  for (const match of source.matchAll(relevantTag)) {
+    const tag = match[0]
+    const name = tag.match(/^<\/?([^\s>]+)/)?.[1]
+    if (!name) continue
+    if (tag.startsWith('</')) {
+      const index = stack.findLastIndex((entry) => entry.tag === name)
+      if (index >= 0) stack.splice(index)
+      continue
+    }
+
+    if (name === 'nav' && /aria-label=(['"])(?:`)?[^'"]*分页(?:`)?\1/.test(tag)) {
+      const inDialog = stack.some((entry) => entry.tag === 'V2Dialog')
+      const inCard = stack.some((entry) => entry.tag === 'V2Card')
+      const inFooter = stack.some((entry) => entry.tag === 'template' && entry.footer)
+      if (!inDialog && (!inCard || !inFooter)) {
+        violations.push(source.slice(0, match.index).split('\n').length)
+      }
+    }
+
+    stack.push({ tag: name, footer: name === 'template' && /(?:#|v-slot:)footer\b/.test(tag) })
+  }
+
+  return violations
+}
+
 function listTablesOutsideCards(source: string) {
   const templateStart = source.indexOf('<template')
   const templateEnd = source.lastIndexOf('</template>')
@@ -124,6 +154,36 @@ function styleRules(source: string) {
     selector,
     declarations,
   }))
+}
+
+function privateSharedComponentClasses(source: string) {
+  const classes = new Set<string>()
+  const sharedComponent =
+    /<V2(?:ActionMenu|Alert|Badge|Button|Card|ConfirmDialog|Dialog|ErrorBoundary|GlassButton|Input|PageState|Select|Skeleton|Tabs|ToastHost)\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g
+
+  for (const [tag] of source.matchAll(sharedComponent)) {
+    for (const [, , value] of tag.matchAll(/(?:^|\s)(?::class|class)\s*=\s*(["'])(.*?)\1/g)) {
+      for (const [className] of value.matchAll(/[A-Za-z][\w-]*(?:__|--|-)[\w-]*/g)) {
+        if (!className.startsWith('v2-')) classes.add(className)
+      }
+    }
+  }
+
+  return [...classes]
+}
+
+function selectorTargetsClass(selector: string, className: string) {
+  const escapedClassName = className.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const targetClass = new RegExp(`\\.${escapedClassName}(?=[:.#\\[]|$)`)
+
+  return selector.split(',').some((part) => {
+    const target = part
+      .trim()
+      .split(/\s+|[>+~]/)
+      .filter(Boolean)
+      .at(-1)
+    return target ? targetClass.test(target) : false
+  })
 }
 
 afterEach(() => {
@@ -841,6 +901,7 @@ describe('Clean-room V2 design system', () => {
       expect(unknownTokens).toEqual([])
       expect(implementationSources).not.toMatch(/#[0-9a-f]{3,8}\b|rgba?\(|hsla?\(/i)
       expect(implementationSources).not.toMatch(/font-size:\s*[^;{}]*\b[0-9.]+(?:px|rem)\b/i)
+      expect(implementationSources).not.toMatch(/font-size:\s*clamp\(/i)
       expect(implementationSources).not.toMatch(/font-weight:\s*[0-9]+\b/i)
       expect(implementationSources).not.toMatch(/line-height:\s*[0-9.]+(?:px|rem)?\b/i)
       expect(implementationSources).not.toMatch(/font:\s*[^;{}]*\/\s*[0-9.]+(?:px|rem)?\b/i)
@@ -858,6 +919,9 @@ describe('Clean-room V2 design system', () => {
       )
       expect(baseCss).toMatch(
         /h2,\s*h3 \{[\s\S]*?font-size: var\(--v2-font-size-14\);[\s\S]*?font-weight: var\(--v2-font-weight-semibold\);/,
+      )
+      expect(baseCss).toMatch(
+        /body \{[\s\S]*?font-size: var\(--v2-font-size-13\);[\s\S]*?line-height: var\(--v2-line-height-body\);/,
       )
       expect(tokenCss).toMatch(/--v2-control-height-sm:\s*2rem;/)
       expect(componentCss).toMatch(
@@ -1024,7 +1088,8 @@ describe('Clean-room V2 design system', () => {
         resolve(sourceRoot, 'pages/commercial/ContractPage.vue'),
         'utf-8',
       )
-      expect(contract.indexOf('title="合同台账"')).toBeLessThan(contract.indexOf('v2-ledger-kpis'))
+      expect(contract).toContain('title="合同台账"')
+      expect(contract).not.toContain('v2-ledger-kpis')
     })
 
     it('keeps every search and filter control label hidden with an in-control prompt', () => {
@@ -1321,8 +1386,9 @@ describe('Clean-room V2 design system', () => {
       expect(technical).toContain('<caption class="v2-visually-hidden">')
       expect(quality).not.toContain(':subtitle="`计划 ${plans.length}')
       expect(quality).toMatch(
-        /<V2Card title="质量安全整改闭环"[\s\S]*?<template #actions>[\s\S]*?quality-page__actions[\s\S]*?<V2Select[\s\S]*?<\/V2Card>[\s\S]*?<V2Tabs/,
+        /<V2Card title="质量安全整改闭环"[\s\S]*?<template #actions>[\s\S]*?quality-page__actions[\s\S]*?<\/V2Card>[\s\S]*?<V2Tabs/,
       )
+      expect(quality).not.toContain('v-model="inspectionTypeFilter"')
       expect(quality).not.toContain('quality-page__facts')
       expect(quality).not.toContain('质量安全闭环概览')
       expect(quality).not.toContain('当前项目 {{ currentProjectLabel }}')
@@ -1374,6 +1440,10 @@ describe('Clean-room V2 design system', () => {
           ...source.matchAll(/<nav\b[^>]*:?aria-label=(['"])(?:`)?[^'"]*分页(?:`)?\1[^>]*>/g),
         ]
         expect(blocks, `${name} pagination parser coverage`).toHaveLength(landmarks.length)
+        expect(
+          paginationNavsOutsideCardFooters(source),
+          `${name} list pagination must use its V2Card footer`,
+        ).toEqual([])
         if (blocks.length > 0) {
           const firstPageSize = source.match(/\bpageSize\s*(?::|=)[^\d]*(\d+)/)?.[1]
           expect(firstPageSize, `${name} paginated list pageSize`).toBe('10')
@@ -1381,6 +1451,9 @@ describe('Clean-room V2 design system', () => {
         for (const [index, { body }] of blocks.entries()) {
           if (!body.includes('上一页') && !body.includes('下一页')) continue
           const evidence = `${name} pagination #${index + 1}`
+          for (const [button] of body.matchAll(/<V2Button\b[^>]*>/g)) {
+            expect(button, `${evidence} button size`).toContain('size="small"')
+          }
           const previous = body.indexOf('上一页')
           const current = body.search(/第\s+\{\{[^}]+\}\}\s+页/)
           const next = body.indexOf('下一页')
@@ -1407,15 +1480,33 @@ describe('Clean-room V2 design system', () => {
       const nativeFieldSelector = /\b(?:input|textarea|select)\b/
       const sharedMaterialProperty =
         /(?:^|;)\s*(?:color|background(?:-color)?|border(?:-color|-radius)?|box-shadow|backdrop-filter|font(?:-family|-size|-weight)?)\s*:/i
+      const privateComponentProperty =
+        /(?:^|;)\s*(?:color|background(?:-color)?|border(?:-color|-radius)?|box-shadow|backdrop-filter|font(?:-family|-size|-weight)?|(?:min-|max-)?height|padding(?:-block|-inline|-block-start|-block-end|-inline-start|-inline-end)?|cursor|outline(?:-offset)?|transition|transform)\s*:/i
+
+      expect(privateSharedComponentClasses('<V2Button class="page-action" />')).toEqual([
+        'page-action',
+      ])
+      expect(selectorTargetsClass('.page-action:hover', 'page-action')).toBe(true)
+      expect(selectorTargetsClass('.page-shell .v2-button', 'page-shell')).toBe(false)
 
       for (const { name, source } of migratedSurfaces) {
+        const privateComponentClasses = privateSharedComponentClasses(source)
         for (const { selector, declarations } of styleRules(source)) {
-          if (!sharedMaterialSelector.test(selector) && !nativeFieldSelector.test(selector))
-            continue
+          if (sharedMaterialSelector.test(selector) || nativeFieldSelector.test(selector)) {
+            expect(
+              declarations,
+              `${name} overrides shared material in ${selector.trim()}`,
+            ).not.toMatch(sharedMaterialProperty)
+          }
+
+          const privateComponentClass = privateComponentClasses.find((className) =>
+            selectorTargetsClass(selector, className),
+          )
+          if (!privateComponentClass) continue
           expect(
             declarations,
-            `${name} overrides shared material in ${selector.trim()}`,
-          ).not.toMatch(sharedMaterialProperty)
+            `${name} overrides shared component .${privateComponentClass} in ${selector.trim()}`,
+          ).not.toMatch(privateComponentProperty)
         }
       }
     })

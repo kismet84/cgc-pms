@@ -1,13 +1,9 @@
 <script setup lang="ts">
-import type {
-  CostLedgerQuery,
-  CostLedgerRecord,
-  CostLedgerSummary,
-} from '@cgc-pms/frontend-contracts'
+import type { CostLedgerQuery, CostLedgerRecord } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { V2Button, V2Card, V2Dialog, V2Input, V2PageState, showToast } from '@/components'
-import { loadCostLedger, loadCostLedgerPage, loadCostLedgerSummary } from '@/services/commercial'
+import { loadCostLedger, loadCostLedgerPage } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
@@ -17,7 +13,6 @@ const router = useRouter()
 const session = useSessionStore()
 const filter = reactive<CostLedgerQuery>({ pageNo: 1, pageSize: 10 })
 const records = ref<CostLedgerRecord[]>([])
-const summary = ref<CostLedgerSummary | null>(null)
 const detail = ref<CostLedgerRecord | null>(null)
 const total = ref(0)
 const loading = ref(false)
@@ -89,18 +84,13 @@ async function load() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [page, totals] = await Promise.all([
-      loadCostLedgerPage({ ...filter }, current.signal),
-      loadCostLedgerSummary({ ...filter }, current.signal),
-    ])
+    const page = await loadCostLedgerPage({ ...filter }, current.signal)
     if (token !== generation) return
     records.value = page.records
     total.value = page.total
-    summary.value = totals
   } catch (e) {
     if (!current.signal.aborted && token === generation) {
       records.value = []
-      summary.value = null
       errorMessage.value = errorText(e, '成本台账加载失败')
     }
   } finally {
@@ -180,15 +170,7 @@ onBeforeUnmount(() => {
             >
           </div></template
         ></V2Card
-      ><V2Card title="成本明细"
-        ><template v-if="summary" #actions>
-          <dl class="cost-page__summary">
-            <dt>成本总额</dt>
-            <dd>{{ summary.totalAmount }}</dd>
-            <dt>税额</dt>
-            <dd>{{ summary.totalTaxAmount }}</dd>
-          </dl>
-        </template>
+      ><V2Card>
         <V2PageState
           v-if="loading && !records.length"
           title="正在加载成本台账"
@@ -328,19 +310,6 @@ dl {
   gap: var(--v2-space-2) var(--v2-space-4);
   margin: 0;
 }
-.cost-page__summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--v2-space-2) var(--v2-space-3);
-  align-items: baseline;
-  justify-content: flex-end;
-  color: var(--v2-color-text-secondary);
-  font-size: var(--v2-font-size-12);
-}
-.cost-page__summary dd {
-  color: var(--v2-color-text);
-  font-weight: var(--v2-font-weight-semibold);
-}
 dd {
   margin: 0;
   overflow-wrap: anywhere;
@@ -361,9 +330,6 @@ nav {
 @media (max-width: 48rem) {
   .filters {
     grid-template-columns: 1fr;
-  }
-  .cost-page__summary {
-    justify-content: flex-start;
   }
 }
 </style>

@@ -7,7 +7,6 @@ import type {
   SettlementCompute,
   SettlementCostRecord,
   SettlementItemCommand,
-  SettlementKpi,
   SettlementPaymentRecord,
   SettlementRecord,
   SettlementSources,
@@ -38,7 +37,6 @@ import {
   loadSettlementApprovalRecords,
   loadSettlementAttachments,
   loadSettlementCosts,
-  loadSettlementKpi,
   loadSettlementPayments,
   loadSettlements,
   loadSettlementSources,
@@ -52,16 +50,6 @@ import { useWorkspaceStore } from '@/stores/workspace'
 
 type PendingAction = 'delete' | 'submit' | 'delete-file'
 
-const emptyKpi: SettlementKpi = {
-  totalCount: 0,
-  totalContractAmount: '0',
-  totalFinalAmount: '0',
-  totalChangeAmount: '0',
-  totalPaidAmount: '0',
-  totalUnpaidAmount: '0',
-  draftCount: 0,
-  finalizedCount: 0,
-}
 const emptySources: SettlementSources = {
   contractItems: [],
   varOrders: [],
@@ -75,7 +63,6 @@ const session = useSessionStore()
 const workspace = useWorkspaceStore()
 const records = ref<SettlementRecord[]>([])
 const selected = ref<SettlementRecord | null>(null)
-const kpi = ref<SettlementKpi>({ ...emptyKpi })
 const sources = ref<SettlementSources>({ ...emptySources })
 const variations = ref<SettlementVariationRecord[]>([])
 const payments = ref<SettlementPaymentRecord[]>([])
@@ -221,19 +208,14 @@ async function loadPage(): Promise<void> {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [page, summary] = await Promise.all([
-      loadSettlements(query(), controller.signal),
-      loadSettlementKpi(query(), controller.signal),
-    ])
+    const page = await loadSettlements(query(), controller.signal)
     if (generation !== listGeneration) return
     records.value = page.records
     total.value = page.total
-    kpi.value = summary
   } catch (error) {
     if (!controller.signal.aborted && generation === listGeneration) {
       records.value = []
       total.value = 0
-      kpi.value = { ...emptyKpi }
       errorMessage.value = errorText(error, '结算台账加载失败')
       showToast('error', '结算台账读取失败', errorMessage.value)
     }
@@ -545,24 +527,6 @@ onBeforeUnmount(() => {
             <V2Button v-if="canAdd" size="small" @click="openForm(false)">新建结算</V2Button>
           </div>
         </template>
-        <dl class="v2-ledger-kpis" aria-label="结算汇总">
-          <div>
-            <dt>结算单</dt>
-            <dd>{{ kpi.totalCount }} <small>共计</small></dd>
-          </div>
-          <div>
-            <dt>合同金额</dt>
-            <dd>{{ money(kpi.totalContractAmount) }} <small>当前快照</small></dd>
-          </div>
-          <div>
-            <dt>结算金额</dt>
-            <dd>{{ money(kpi.totalFinalAmount) }} <small>当前汇总</small></dd>
-          </div>
-          <div>
-            <dt>未付金额</dt>
-            <dd>{{ money(kpi.totalUnpaidAmount) }} <small>含质保金口径</small></dd>
-          </div>
-        </dl>
       </V2Card>
 
       <V2PageState
@@ -628,23 +592,25 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <nav class="settlement-workspace__pager" aria-label="结算分页">
-          <V2Button
-            size="small"
-            variant="secondary"
-            :disabled="pageNo <= 1"
-            @click="changePage(pageNo - 1)"
-            >上一页</V2Button
-          >
-          <span>第 {{ pageNo }} 页，共 {{ pageCount }} 页</span>
-          <V2Button
-            size="small"
-            variant="secondary"
-            :disabled="pageNo >= pageCount"
-            @click="changePage(pageNo + 1)"
-            >下一页</V2Button
-          >
-        </nav>
+        <template #footer>
+          <nav class="settlement-workspace__pager" aria-label="结算分页">
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo <= 1"
+              @click="changePage(pageNo - 1)"
+              >上一页</V2Button
+            >
+            <span>第 {{ pageNo }} 页</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo >= pageCount"
+              @click="changePage(pageNo + 1)"
+              >下一页</V2Button
+            >
+          </nav>
+        </template>
       </V2Card>
     </template>
 
@@ -1037,13 +1003,6 @@ onBeforeUnmount(() => {
 .settlement-workspace__trace {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.settlement-workspace .v2-ledger-kpis small {
-  display: block;
-  margin-top: var(--v2-space-1);
-  color: var(--v2-color-text-secondary);
-  font-size: var(--v2-font-size-11);
-  font-weight: var(--v2-font-weight-regular);
-}
 .settlement-workspace__table-wrap {
   max-width: 100%;
   overflow-x: auto;
@@ -1053,17 +1012,12 @@ onBeforeUnmount(() => {
 }
 .settlement-workspace__pager {
   justify-content: flex-end;
-  margin-top: var(--v2-space-3);
 }
 .settlement-workspace dl {
   display: grid;
   grid-template-columns: max-content 1fr;
   gap: var(--v2-space-2) var(--v2-space-3);
   margin: 0;
-}
-.settlement-workspace dl.v2-ledger-kpis {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
 }
 .settlement-workspace dt {
   color: var(--v2-color-text-secondary);
@@ -1094,7 +1048,6 @@ onBeforeUnmount(() => {
   border-radius: var(--v2-radius-sm);
 }
 @media (max-width: 56.25rem) {
-  .settlement-workspace dl.v2-ledger-kpis,
   .settlement-workspace__summary,
   .settlement-workspace__trace {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1105,7 +1058,6 @@ onBeforeUnmount(() => {
   .settlement-workspace__actions > * {
     flex: 1 1 100%;
   }
-  .settlement-workspace dl.v2-ledger-kpis,
   .settlement-workspace__summary,
   .settlement-workspace__trace {
     grid-template-columns: minmax(0, 1fr);

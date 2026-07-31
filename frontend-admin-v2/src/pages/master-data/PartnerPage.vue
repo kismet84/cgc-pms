@@ -332,7 +332,7 @@ onBeforeUnmount(() => loadController?.abort())
       title="暂无合作方"
       description="调整筛选条件后重试。"
     />
-    <V2Card v-else title="查询结果">
+    <V2Card v-else>
       <div class="master-page__table-wrap">
         <table class="v2-table--top">
           <thead>

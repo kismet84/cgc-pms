@@ -998,7 +998,7 @@
 }
 
 .v2-detail-dialog .v2-dialog__title {
-  font-size: clamp(var(--v2-font-size-28), 3vw, var(--v2-font-size-42));
+  font-size: var(--v2-font-size-42);
 }
 
 .v2-detail-dialog .v2-dialog__body {
@@ -1356,7 +1356,7 @@
 .v2-page-state :is(h1, h2, h3) {
   margin: var(--v2-space-1) 0 var(--v2-space-3);
   color: var(--v2-color-text-strong);
-  font-size: clamp(var(--v2-font-size-21), 4vw, var(--v2-font-size-28));
+  font-size: var(--v2-font-size-28);
   line-height: var(--v2-line-height-tight);
 }
 
@@ -1400,6 +1400,10 @@
 }
 
 @media (max-width: 48rem) {
+  .v2-page-state :is(h1, h2, h3) {
+    font-size: var(--v2-font-size-21);
+  }
+
   .v2-ledger-kpis,
   .v2-ledger-kpis--five {
     grid-template-columns: 1fr;

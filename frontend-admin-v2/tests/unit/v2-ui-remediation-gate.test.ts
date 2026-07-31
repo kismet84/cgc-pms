@@ -124,7 +124,7 @@ describe('全 V2 UI 整改门禁', () => {
         }
       }
       for (const match of template.matchAll(
-        /<V2Card\b(?=[^>]*:?heading-level="1")[^>]*>([\s\S]{0,1600}?)<\/V2Card>/g,
+        /<V2Card\b(?=[^>]*:?heading-level="1")[^>]*>([\s\S]{0,1600}?)<\/V2Card\s*>/g,
       )) {
         if (/<template\s+#title-extra\b[^>]*>/.test(match[1])) {
           violations.push(`${name}: summary badges must follow H2, not H1`)
@@ -327,6 +327,14 @@ describe('全 V2 UI 整改门禁', () => {
       if (path === resolve(pageRoot, 'auth/LoginPage.vue')) continue
       const source = read(path)
       expect(source, `${path} touch-sized page action`).not.toContain('size="touch"')
+      for (const table of source.match(/<table\b[\s\S]*?<\/table>/g) ?? []) {
+        const inlineTable = table.replace(/<V2ActionMenu\b[\s\S]*?<\/V2ActionMenu>/g, '')
+        for (const [button] of inlineTable.matchAll(
+          /<V2Button\b(?:(?:"[^"]*"|'[^']*')|[^'">])*>/g,
+        )) {
+          expect(button, `${path} inline table button size`).toContain('size="small"')
+        }
+      }
     }
 
     const components = read(resolve(sourceRoot, 'styles/components.css'))
@@ -381,9 +389,7 @@ describe('全 V2 UI 整改门禁', () => {
     expect(inventory).not.toContain('仓库主数据不按报告期裁剪')
     expect(inventory).not.toContain('title="仓库列表"')
     expect(inventory).not.toContain('<V2Card class="inventory-workspace-page__filters">')
-    const kpis = inventory.match(/<dl[^>]*class="v2-ledger-kpis"[\s\S]*?<\/dl>/)?.[0]
-    expect(kpis).toBeTruthy()
-    expect(kpis).not.toContain('<V2Card')
+    expect(inventory).not.toContain('aria-label="库存指标"')
   })
 
   it('keeps supply-chain workspace titles in H1 cards and warehouse filters optional', () => {

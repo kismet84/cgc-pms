@@ -18,6 +18,9 @@
 | `docs/ui-v2/` 的 V1.5 基线与冻结矩阵 | `docs/archive/v1.5/ui-v2/` | Git 跟踪移动 | 3 |
 | `docs/product-intelligence/` 的 V1.5 分析、研究与决策 | `docs/archive/v1.5/product-intelligence/` | Git 跟踪移动 | 3 |
 | `docs/database/database-structure-audit.md` | `docs/archive/v1.5/database/` | Git 跟踪移动 | 1 |
+| `docs/database/database-remediation-deployment-runbook.md`、`flyway-v215-manifest.csv` | `docs/archive/v1.5/database/` | Git 跟踪移动 | 2 |
+| `docs/database/generated/` 的 v1.5 结构快照 | `docs/archive/v1.5/database/generated/` | Git 跟踪快照复制 | 2 |
+| `docs/runbook/` | `docs/archive/v1.5/runbook/` | Git 跟踪移动 | 2 |
 | `docs/manuals/production-manager-capability-boundary.md` | `docs/archive/v1.5/manuals/` | Git 跟踪移动 | 1 |
 | `docs/V1.5-开发版本说明-2026-07-31.md` | `docs/archive/v1.5/` | Git 跟踪移动 | 1 |
 | `docs/未来开发计划.md` | `docs/archive/v1.5/` | Git 跟踪移动 | 1 |
@@ -27,7 +30,7 @@
 
 - `docs/plans/`、`docs/quality/`、`docs/iterations/`、`docs/training/` 已重建为 v1.6 当前入口。
 - `docs/backlog/` 保留现行状态源；历史全文以本归档快照为准。
-- `docs/standards/`、`docs/business/`、`docs/database/`、`docs/manuals/`、`docs/training/`、`docs/runbook/`、`docs/prompt/`、`docs/product-intelligence/` 保持现行。
+- `docs/standards/`、`docs/business/`、`docs/database/`、`docs/manuals/`、`docs/training/`、`docs/prompt/`、`docs/product-intelligence/` 保持现行；数据库生成文档已按当前本地开发库重建。
 - `docs/archive/v1.0/` 及其私有禁止区未读取、未修改。
 
 ## 验收边界

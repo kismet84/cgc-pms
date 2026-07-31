@@ -81,7 +81,7 @@ const domain = computed(() => match.value?.domain.label ?? '全局')
 
 .shell-placeholder h1 {
   margin: 0;
-  font-size: clamp(var(--v2-font-size-21), 2vw, var(--v2-font-size-28));
+  font-size: var(--v2-font-size-21);
 }
 
 .shell-placeholder__description {

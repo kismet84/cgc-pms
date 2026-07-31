@@ -172,7 +172,7 @@ describe('M3 quality safety closed loop', () => {
     expect(pageSource).toContain('plan.id === previousSelectedPlanId')
     expect(pageSource).toContain('@click="selectPlan(plan.id)"')
     expect(pageSource).toContain('query: { ...route.query, planId }')
-    expect(pageSource).toContain('v-model="inspectionTypeFilter"')
+    expect(pageSource).not.toContain('v-model="inspectionTypeFilter"')
     expect(pageSource).not.toContain('class="quality-page__facts"')
     expect(pageSource).not.toContain('质量安全闭环概览')
     expect(pageSource).not.toContain('当前项目 {{ currentProjectLabel }}')

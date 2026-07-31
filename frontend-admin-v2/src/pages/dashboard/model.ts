@@ -58,23 +58,33 @@ export function formatAmount(value: string | null | undefined): string {
 
 const DASHBOARD_STATUS_LABELS: Record<string, string> = {
   ACTIVE: '进行中',
+  ABNORMAL: '异常',
   APPROVED: '已通过',
   ARCHIVED: '已归档',
   BLOCKED: '已阻塞',
   CLOSED: '已关闭',
   COMPLETED: '已完成',
+  COLLECTED: '已回款',
   CONFIRMED: '已确认',
+  CREDITED: '已冲减',
   DRAFT: '草稿',
   FAILED: '失败',
+  FULLY_ALLOCATED: '已全额分配',
   INVALID: '已失效',
   OPEN: '待处理',
   OVERDUE: '已逾期',
+  PARTIALLY_COLLECTED: '部分回款',
   PENDING: '待处理',
   PROCESSED: '已处理',
   PROCESSING: '处理中',
+  RECEIVABLE_CREATED: '已生成应收',
   REJECTED: '已驳回',
+  REVERSED: '已冲销',
   RUNNING: '进行中',
   SUCCESS: '已完成',
+  UNVERIFIED: '待核验',
+  VERIFIED: '已核验',
+  VOIDED: '已作废',
 }
 
 export function dashboardStatusLabel(value: string | null | undefined): string {

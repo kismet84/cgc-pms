@@ -834,11 +834,8 @@ onBeforeUnmount(() => controller?.abort())
               v-for="role in filteredUserRoles"
               :key="role.id"
               class="permission-role-list__item user-role-list__item"
-              :class="{
-                'permission-role-list__item--active': role.id === selectedUserRole?.id,
-              }"
-              size="small"
-              variant="ghost"
+              size="medium"
+              :variant="role.id === selectedUserRole?.id ? 'secondary' : 'ghost'"
               :aria-pressed="role.id === selectedUserRole?.id"
               @click="selectUserRole(role.id)"
             >
@@ -1050,9 +1047,8 @@ onBeforeUnmount(() => controller?.abort())
               v-for="role in filteredRoles"
               :key="role.id"
               class="permission-role-list__item"
-              :class="{ 'permission-role-list__item--active': role.id === selectedRoleId }"
-              size="small"
-              variant="ghost"
+              size="medium"
+              :variant="role.id === selectedRoleId ? 'secondary' : 'ghost'"
               :aria-pressed="role.id === selectedRoleId"
               :disabled="roleLoading"
               @click="selectRole(role.id)"
@@ -1130,7 +1126,6 @@ onBeforeUnmount(() => controller?.abort())
                     <span class="permission-tree-table__name">
                       <V2Button
                         v-if="hasChildren"
-                        class="permission-tree-table__toggle"
                         size="small"
                         variant="ghost"
                         :aria-label="
@@ -1392,37 +1387,8 @@ onBeforeUnmount(() => controller?.abort())
 }
 
 .permission-role-list__item {
-  display: flex;
   width: 100%;
-  min-height: var(--v2-space-12);
-  padding: var(--v2-space-3);
-  gap: var(--v2-space-3);
-  align-items: center;
-  justify-content: space-between;
-  border: 0;
-  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
-  background: var(--v2-color-surface);
-  color: var(--v2-color-text);
   text-align: left;
-  cursor: pointer;
-}
-
-.permission-role-list__item:last-of-type {
-  border-bottom: 0;
-}
-
-.permission-role-list__item:hover {
-  background: var(--v2-color-surface-subtle);
-}
-
-.permission-role-list__item:focus-visible {
-  outline: 2px solid var(--v2-color-primary);
-  outline-offset: -2px;
-}
-
-.permission-role-list__item--active {
-  box-shadow: inset 3px 0 0 var(--v2-color-primary);
-  background: var(--v2-color-primary-soft);
 }
 
 .permission-role-list__item > span {
@@ -1516,30 +1482,12 @@ onBeforeUnmount(() => controller?.abort())
   accent-color: var(--v2-color-primary);
 }
 
-.permission-tree-table__toggle,
 .permission-tree-table__spacer {
   display: inline-grid;
   width: var(--v2-space-5);
   height: var(--v2-space-5);
   flex: 0 0 var(--v2-space-5);
   place-items: center;
-}
-
-.permission-tree-table__toggle {
-  padding: 0;
-  border: 0;
-  border-radius: var(--v2-radius-sm);
-  background: transparent;
-  color: var(--v2-color-text-muted);
-  font-size: var(--v2-font-size-21);
-  line-height: var(--v2-line-height-icon);
-  cursor: pointer;
-}
-
-.permission-tree-table__toggle:hover,
-.permission-tree-table__toggle:focus-visible {
-  background: var(--v2-color-surface-subtle);
-  color: var(--v2-color-primary);
 }
 
 .permission-tree-table__type {

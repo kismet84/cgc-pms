@@ -421,12 +421,7 @@ async function uploadMeasurementEvidence(
   if (lines.length !== lineFiles.length) throw new Error('计量明细附件数量与服务端不一致')
   await uploadSiteFile(generalFile, 'PRODUCTION_MEASUREMENT', id, 'MEASUREMENT_GENERAL')
   for (const [index, line] of lines.entries()) {
-    await uploadSiteFile(
-      lineFiles[index]!,
-      'PRODUCTION_MEASUREMENT',
-      id,
-      `ML_${text(line, 'id')}`,
-    )
+    await uploadSiteFile(lineFiles[index]!, 'PRODUCTION_MEASUREMENT', id, `ML_${text(line, 'id')}`)
   }
 }
 async function openEvidence(row: MeasurementAmountRow) {
@@ -449,8 +444,7 @@ async function openEvidence(row: MeasurementAmountRow) {
   }
 }
 function selectEvidenceLineFile(index: number, event: Event) {
-  evidenceLines.value[index]!.file =
-    (event.target as HTMLInputElement).files?.[0] ?? null
+  evidenceLines.value[index]!.file = (event.target as HTMLInputElement).files?.[0] ?? null
 }
 async function saveEvidence() {
   if (
@@ -607,7 +601,9 @@ onBeforeUnmount(() => {
               >新建计量</V2Button
             >
           </div></template
-        >
+        ></V2Card
+      >
+      <V2Card>
         <V2PageState
           v-if="loading && !periods.length && !measurements.length && !submissions.length"
           title="正在加载产值计量"
@@ -941,9 +937,7 @@ onBeforeUnmount(() => {
         kind="loading"
       />
       <form v-else id="measurement-evidence-form" class="form" @submit.prevent="saveEvidence">
-        <label
-          >总体计量依据<input aria-label="计量依据" type="file" @change="selectFile"
-        /></label>
+        <label>总体计量依据<input aria-label="计量依据" type="file" @change="selectFile" /></label>
         <label v-for="(line, index) in evidenceLines" :key="line.id"
           >{{ line.name }}现场完成依据<input
             :aria-label="`${line.name}现场完成依据`"
@@ -1003,8 +997,7 @@ onBeforeUnmount(() => {
           ><V2Input v-model="reviewForm.settlementDate" type="date" label="结算日期" /><V2Input
             v-model="reviewForm.dueDate"
             type="date"
-            label="应收到期日"
-          /><V2Input v-model="reviewForm.taxAmount" label="税额" /><V2Input
+            label="应收到期日" /><V2Input v-model="reviewForm.taxAmount" label="税额" /><V2Input
             v-model="reviewForm.retentionAmount"
             label="保留金" /><label
             >业主核定依据<input aria-label="业主核定依据" type="file" @change="selectFile"

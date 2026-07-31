@@ -12,7 +12,7 @@ import {
   V2Select,
 } from '@/components'
 import { showToast } from '@/components/toast'
-import { formatAmount } from '@/pages/dashboard/model'
+import { dashboardStatusLabel, formatAmount } from '@/pages/dashboard/model'
 import {
   loadBudget,
   loadBudgetPage,
@@ -317,11 +317,13 @@ const project = (row: Row) => {
   return workspace.projects.find((option) => option.value === value)?.label || '项目名称缺失'
 }
 const status = (row: Row) =>
-  'approvalStatus' in row
-    ? row.approvalStatus
-    : 'verifyStatus' in row
-      ? row.verifyStatus
-      : row.status || '—'
+  dashboardStatusLabel(
+    'approvalStatus' in row
+      ? row.approvalStatus
+      : 'verifyStatus' in row
+        ? row.verifyStatus
+        : row.status,
+  )
 const money = (row: Row) =>
   formatAmount(
     'applyAmount' in row
@@ -1141,7 +1143,10 @@ onBeforeUnmount(() => controller?.abort())
 
       <section v-else-if="mode === 'revenue'" class="finance-workspace__revenue-sections">
         <section v-for="section in revenueSections" :key="section.key">
-          <V2Card :title="section.title" :heading-level="2">
+          <V2Card
+            :title="section.key === 'settlement' ? undefined : section.title"
+            :heading-level="2"
+          >
             <V2PageState
               v-if="!section.rows.length"
               :title="`暂无${section.title}记录`"
@@ -1575,12 +1580,7 @@ onBeforeUnmount(() => controller?.abort())
               required
             />
             <V2Input v-model="editor.externalTxnNo" label="外部流水号" required />
-            <V2Input
-              v-model="editor.collectedAt"
-              type="datetime-local"
-              label="到账时间"
-              required
-            />
+            <V2Input v-model="editor.collectedAt" type="datetime-local" label="到账时间" required />
             <V2Input v-model="editor.collectionAmount" label="回款金额" required />
             <V2Input v-model="editor.payerName" label="付款单位" required />
             <V2Select

@@ -525,10 +525,7 @@ onBeforeUnmount(() => {
         title="暂无招采事件"
         description="当前项目范围尚无可访问招采事件。"
       />
-      <V2Card v-else title="招采事件">
-        <template #title-extra
-          ><V2Badge>事件 {{ events.length }}</V2Badge></template
-        >
+      <V2Card v-else>
         <div class="supplier-page__table-wrap">
           <table class="v2-table--top" aria-label="招采事件列表">
             <thead>

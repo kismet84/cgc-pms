@@ -89,6 +89,7 @@ describe('M7 workflow process page', () => {
     const wrapper = mount(WorkflowProcessPage, { attachTo: document.body })
     await flushPromises()
     expect(wrapper.text()).toContain('合同审批')
+    expect(wrapper.text()).not.toContain('CONTRACT_APPROVAL')
     expect(processService.loadWorkflowTemplates).toHaveBeenCalledWith(
       expect.objectContaining({ pageNo: 1, pageSize: 10 }),
       expect.any(AbortSignal),

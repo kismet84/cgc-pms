@@ -175,9 +175,7 @@ const returnableReceiptItems = computed(() =>
   (detailItems.value as ReceiptItemRecord[])
     .filter(
       (item) =>
-        item.id &&
-        item.dispositionType === 'RETURN' &&
-        item.dispositionStatus !== 'COMPLETED',
+        item.id && item.dispositionType === 'RETURN' && item.dispositionStatus !== 'COMPLETED',
     )
     .map((item) => ({
       value: item.id as string,
@@ -311,7 +309,9 @@ function clearDetail(): void {
 }
 
 function changeSupplierReturnItem(value: string): void {
-  const item = (detailItems.value as ReceiptItemRecord[]).find((candidate) => candidate.id === value)
+  const item = (detailItems.value as ReceiptItemRecord[]).find(
+    (candidate) => candidate.id === value,
+  )
   supplierReturnForm.quantity = item?.unqualifiedQuantity || ''
   supplierReturnForm.reason = item?.dispositionReason || ''
 }
@@ -1077,13 +1077,9 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <nav
-          v-if="total > pageSize"
-          class="purchase-execution-page__pagination"
-          aria-label="采购执行分页"
-        >
-          <span>共 {{ total }} 条</span>
-          <div>
+        <template v-if="total > pageSize" #footer>
+          <nav class="purchase-execution-page__pagination" aria-label="采购执行分页">
+            <span>共 {{ total }} 条</span>
             <V2Button
               variant="secondary"
               size="small"
@@ -1099,8 +1095,8 @@ onBeforeUnmount(() => {
               @click="changePage(pageNo + 1)"
               >下一页</V2Button
             >
-          </div>
-        </nav>
+          </nav>
+        </template>
       </V2Card>
 
       <V2Dialog
@@ -1274,12 +1270,7 @@ onBeforeUnmount(() => {
           @update:model-value="changeSupplierReturnItem"
         />
         <V2Input v-model="supplierReturnForm.quantity" label="退货数量" required />
-        <V2Input
-          v-model="supplierReturnForm.returnDate"
-          type="date"
-          label="退货日期"
-          required
-        />
+        <V2Input v-model="supplierReturnForm.returnDate" type="date" label="退货日期" required />
         <V2Input v-model="supplierReturnForm.reason" label="退货原因" required />
       </form>
       <template #footer>
@@ -1592,15 +1583,11 @@ tr.selected {
   margin: 0;
   color: var(--v2-color-text-secondary);
 }
-.purchase-execution-page__pagination,
-.purchase-execution-page__pagination div {
+.purchase-execution-page__pagination {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: var(--v2-space-2);
-}
-.purchase-execution-page__pagination {
-  margin-top: var(--v2-space-3);
   color: var(--v2-color-text-secondary);
 }
 @media (max-width: 640px) {

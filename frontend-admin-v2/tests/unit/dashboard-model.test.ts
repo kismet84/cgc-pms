@@ -6,6 +6,7 @@ import {
   dashboardActivityItems,
   dashboardHealth,
   dashboardMetrics,
+  dashboardStatusLabel,
   deriveDashboardHealth,
   formatAmount,
   formatRatio,
@@ -35,6 +36,15 @@ describe('dashboard display model', () => {
     expect(formatRatio('12.50')).toBe('12.50%')
     expect(formatRatio('7%')).toBe('7%')
     expect(formatRatio(null)).toBe('—')
+  })
+
+  it.each([
+    ['VERIFIED', '已核验'],
+    ['RECEIVABLE_CREATED', '已生成应收'],
+    ['PARTIALLY_COLLECTED', '部分回款'],
+    ['FULLY_ALLOCATED', '已全额分配'],
+  ])('localizes finance status %s', (input, expected) => {
+    expect(dashboardStatusLabel(input)).toBe(expected)
   })
 
   it('compacts monetary dashboard metrics to ten-thousands', () => {

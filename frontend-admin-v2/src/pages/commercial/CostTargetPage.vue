@@ -637,12 +637,14 @@ onBeforeUnmount(() => {
             <nav class="cost-target-page__pager" aria-label="目标成本分页">
               <span>共 {{ total }} 条</span
               ><V2Button
+                size="small"
                 variant="secondary"
                 :disabled="(filter.pageNo ?? 1) <= 1"
                 @click="changePage((filter.pageNo ?? 1) - 1)"
                 >上一页</V2Button
               ><span>第 {{ filter.pageNo }} 页</span
               ><V2Button
+                size="small"
                 variant="secondary"
                 :disabled="(filter.pageNo ?? 1) >= pageCount"
                 @click="changePage((filter.pageNo ?? 1) + 1)"

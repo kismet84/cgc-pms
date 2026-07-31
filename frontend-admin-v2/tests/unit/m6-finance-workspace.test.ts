@@ -40,6 +40,7 @@ describe('M6 finance workspace contract', () => {
     expect(source).toContain('const request = new AbortController()')
     expect(source).toContain('if (!request.signal.aborted)')
     expect(source).not.toContain('if (!controller.signal.aborted)')
+    expect(source).toContain('dashboardStatusLabel(')
   })
   it('keeps payment writeback server-authoritative and string-valued', async () => {
     const fetchMock = vi.fn(
@@ -142,7 +143,9 @@ describe('M6 finance workspace contract', () => {
       'utf8',
     )
     expect(source).toContain("throw new TypeError('费用附件不能为空')")
-    expect(source).toContain("await uploadSiteFile(expenseAttachment.value, 'EXPENSE', expenseId, 'OTHER')")
+    expect(source).toContain(
+      "await uploadSiteFile(expenseAttachment.value, 'EXPENSE', expenseId, 'OTHER')",
+    )
     expect(source).toContain('@change="onExpenseAttachment"')
   })
   it('retains created draft ids before fallible follow-up writes', () => {

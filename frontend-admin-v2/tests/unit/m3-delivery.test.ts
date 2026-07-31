@@ -50,6 +50,8 @@ describe('M3 delivery request and service contracts', () => {
         'CONSTRUCTION_ORGANIZATION',
         'CONDITIONAL_PASS',
         'RFI_PENDING',
+        'ON_TRACK',
+        'SUPERSEDED',
       ].map(deliveryLabel),
     ).toEqual([
       '已接受',
@@ -60,6 +62,8 @@ describe('M3 delivery request and service contracts', () => {
       '施工组织设计',
       '有条件通过',
       '待发起 RFI',
+      '正常',
+      '已替代',
     ])
   })
 

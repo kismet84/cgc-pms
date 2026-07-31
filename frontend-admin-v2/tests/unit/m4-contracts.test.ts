@@ -1,8 +1,4 @@
-import type {
-  ContractCompositeRecord,
-  ContractKpi,
-  ContractPage,
-} from '@cgc-pms/frontend-contracts'
+import type { ContractCompositeRecord, ContractPage } from '@cgc-pms/frontend-contracts'
 import { createPinia, setActivePinia } from 'pinia'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -12,7 +8,6 @@ import {
   createContractComposite,
   deleteContract,
   loadContractComposite,
-  loadContractKpi,
   loadContractPage,
   loadPartners,
   loadProjectContextOptions,
@@ -43,7 +38,6 @@ vi.mock('@/services/commercial', () => ({
   createContractComposite: vi.fn(),
   deleteContract: vi.fn(),
   loadContractComposite: vi.fn(),
-  loadContractKpi: vi.fn(),
   loadContractPage: vi.fn(),
   loadPartners: vi.fn(),
   loadProjectContextOptions: vi.fn(),
@@ -90,14 +84,6 @@ const contractPage: ContractPage = {
   total: 1,
   pageNo: 1,
   pageSize: 10,
-}
-
-const contractKpi: ContractKpi = {
-  totalCount: '1',
-  totalAmount: '1200000.00',
-  paidAmount: '100000.00',
-  unpaidAmount: '1100000.00',
-  overdueCount: '0',
 }
 
 const contractDetail: ContractCompositeRecord = {
@@ -182,7 +168,6 @@ beforeEach(() => {
       records: [{ id: 'A1', partnerCode: 'A1', partnerName: '甲方一', status: 'ENABLE' }],
     })
   vi.mocked(loadContractPage).mockReset().mockResolvedValue(contractPage)
-  vi.mocked(loadContractKpi).mockReset().mockResolvedValue(contractKpi)
   vi.mocked(loadContractComposite).mockReset().mockResolvedValue(contractDetail)
   vi.mocked(createContractComposite).mockReset()
   vi.mocked(updateContractComposite).mockReset()
@@ -191,7 +176,7 @@ beforeEach(() => {
 })
 
 describe('M4 contracts page', () => {
-  it('renders ledger with server page and KPI', async () => {
+  it('renders ledger with server page', async () => {
     const { wrapper } = await mountPage('/contract/ledger', ['contract:query', 'contract:add'])
 
     expect(loadContractPage).toHaveBeenCalledTimes(1)
@@ -199,7 +184,6 @@ describe('M4 contracts page', () => {
       expect.objectContaining({ pageNo: 1, pageSize: 10 }),
       expect.any(AbortSignal),
     )
-    expect(loadContractKpi).toHaveBeenCalledTimes(1)
     expect(loadPartners).not.toHaveBeenCalled()
     expect(wrapper.findAll('h1')).toHaveLength(1)
     expect(wrapper.get('h1').text()).toContain('合同台账')
@@ -218,7 +202,7 @@ describe('M4 contracts page', () => {
     expect(wrapper.findAll('button').some((button) => button.text().includes('查询'))).toBe(false)
     expect(wrapper.get('.contract-page__list-card > .v2-card__header').text()).toContain('新建合同')
     expect(wrapper.find('.contract-page__list-card .v2-card__subtitle').exists()).toBe(false)
-    expect(wrapper.get('.v2-ledger-kpis').findAll(':scope > div')).toHaveLength(5)
+    expect(wrapper.find('.v2-ledger-kpis').exists()).toBe(false)
   })
 
   it('applies a preset view through visible server filters and clears previous search', async () => {
@@ -251,10 +235,6 @@ describe('M4 contracts page', () => {
       }),
       expect.any(AbortSignal),
     )
-    expect(loadContractKpi).toHaveBeenLastCalledWith(
-      expect.objectContaining({ startDate: '2026-07-01', endDate: '2026-07-31' }),
-      expect.any(AbortSignal),
-    )
     expect(wrapper.get('button[aria-pressed="true"]').text()).toContain('履约中')
   })
 
@@ -282,10 +262,7 @@ describe('M4 contracts page', () => {
   it('aborts stale ledger request and keeps newest response only', async () => {
     const firstPage = deferred<ContractPage>()
     const secondPage = deferred<ContractPage>()
-    const firstKpi = deferred<ContractKpi>()
-    const secondKpi = deferred<ContractKpi>()
     const pageSignals: AbortSignal[] = []
-    const kpiSignals: AbortSignal[] = []
 
     vi.mocked(loadContractPage)
       .mockImplementationOnce(async (_query, signal) => {
@@ -296,16 +273,6 @@ describe('M4 contracts page', () => {
         pageSignals.push(signal!)
         return secondPage.promise
       })
-    vi.mocked(loadContractKpi)
-      .mockImplementationOnce(async (_query, signal) => {
-        kpiSignals.push(signal!)
-        return firstKpi.promise
-      })
-      .mockImplementationOnce(async (_query, signal) => {
-        kpiSignals.push(signal!)
-        return secondKpi.promise
-      })
-
     const { wrapper, router } = await mountPage('/contract/ledger', ['contract:query'])
     await router.push('/contract/ledger?keyword=new')
     await flushPromises()
@@ -314,21 +281,16 @@ describe('M4 contracts page', () => {
       ...contractPage,
       records: [{ ...contractPage.records[0]!, contractName: '最新合同', contractCode: 'HT-NEW' }],
     })
-    secondKpi.resolve({ ...contractKpi, totalCount: '2' })
     await flushPromises()
     firstPage.resolve({
       ...contractPage,
       records: [{ ...contractPage.records[0]!, contractName: '旧合同', contractCode: 'HT-OLD' }],
     })
-    firstKpi.resolve({ ...contractKpi, totalCount: '99' })
     await flushPromises()
 
     expect(pageSignals[0]?.aborted).toBe(true)
-    expect(kpiSignals[0]?.aborted).toBe(true)
     expect(wrapper.text()).toContain('最新合同')
     expect(wrapper.text()).not.toContain('旧合同')
-    expect(wrapper.text()).toContain('2')
-    expect(wrapper.text()).not.toContain('99')
   })
 
   it('silently ignores an AbortError from the superseded ledger request', async () => {
@@ -342,17 +304,6 @@ describe('M4 contracts page', () => {
           }),
       )
       .mockResolvedValueOnce(contractPage)
-    vi.mocked(loadContractKpi)
-      .mockImplementationOnce(
-        (_query, signal) =>
-          new Promise<ContractKpi>((_resolve, reject) => {
-            signal?.addEventListener('abort', () =>
-              reject(Object.assign(new Error('aborted'), { name: 'AbortError' })),
-            )
-          }),
-      )
-      .mockResolvedValueOnce(contractKpi)
-
     const { wrapper, router } = await mountPage('/contract/ledger', ['contract:query'])
     await router.push('/contract/ledger?keyword=new')
     await flushPromises()
