@@ -628,7 +628,9 @@ public class TechnicalManagementService {
         if (open != null && open == 0) {
             Map<String, Object> review = queryOne("SELECT * FROM tech_drawing_review WHERE tenant_id=? AND drawing_version_id=? AND deleted_flag=0",
                     "TECH_DRAWING_REVIEW_NOT_FOUND", "图纸会审不存在", tenant(), versionId);
-            if (!"REJECTED".equals(string(review.get("conclusion")))) approveVersion(versionId);
+            Map<String, Object> version = requireVersion(versionId, false);
+            if (!"REJECTED".equals(string(review.get("conclusion")))
+                    && !"APPROVED".equals(string(version.get("status")))) approveVersion(versionId);
         }
     }
 

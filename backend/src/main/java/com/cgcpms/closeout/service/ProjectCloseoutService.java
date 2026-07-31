@@ -93,12 +93,19 @@ public class ProjectCloseoutService {
                 """, tenant(), projectId));
         result.put("wbsReadiness", jdbc.queryForMap("""
                 SELECT COUNT(*) totalTasks,
-                 COALESCE(SUM(CASE WHEN status='COMPLETED' THEN 0 ELSE 1 END),0) incompleteTasks
-                FROM project_wbs_task WHERE tenant_id=? AND project_id=? AND deleted_flag=0
+                 COALESCE(SUM(CASE WHEN w.status='COMPLETED' THEN 0 ELSE 1 END),0) incompleteTasks
+                FROM project_wbs_task w
+                JOIN project_schedule_plan p ON p.id=w.schedule_plan_id AND p.tenant_id=w.tenant_id
+                WHERE w.tenant_id=? AND w.project_id=? AND w.deleted_flag=0
+                 AND p.status='ACTIVE' AND p.deleted_flag=0
                 """, tenant(), projectId));
         result.put("wbsTasks", jdbc.queryForList("""
-                SELECT id,task_code taskCode,task_name taskName,work_area workArea,status,actual_progress actualProgress
-                FROM project_wbs_task WHERE tenant_id=? AND project_id=? AND deleted_flag=0 ORDER BY sort_order,id
+                SELECT w.id,w.task_code taskCode,w.task_name taskName,w.work_area workArea,w.status,w.actual_progress actualProgress
+                FROM project_wbs_task w
+                JOIN project_schedule_plan p ON p.id=w.schedule_plan_id AND p.tenant_id=w.tenant_id
+                WHERE w.tenant_id=? AND w.project_id=? AND w.deleted_flag=0
+                 AND p.status='ACTIVE' AND p.deleted_flag=0
+                ORDER BY w.sort_order,w.id
                 """, tenant(), projectId));
         result.put("qualityInspections", jdbc.queryForList("""
                 SELECT id,inspection_code inspectionCode,inspection_date inspectionDate,location,conclusion,status
@@ -587,12 +594,25 @@ public class ProjectCloseoutService {
     }
 
     private void validateFinalAcceptanceReadiness(Long closeoutId, Long projectId) {
-        Integer total = jdbc.queryForObject("SELECT COUNT(*) FROM project_wbs_task WHERE tenant_id=? AND project_id=? AND deleted_flag=0", Integer.class, tenant(), projectId);
+        Integer total = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM project_wbs_task w
+                JOIN project_schedule_plan p ON p.id=w.schedule_plan_id AND p.tenant_id=w.tenant_id
+                WHERE w.tenant_id=? AND w.project_id=? AND w.deleted_flag=0
+                 AND p.status='ACTIVE' AND p.deleted_flag=0
+                """, Integer.class, tenant(), projectId);
         if (total == null || total == 0) throw error("CLOSEOUT_WBS_REQUIRED", "项目必须建立WBS并完成分部分项验收");
-        Integer incomplete = jdbc.queryForObject("SELECT COUNT(*) FROM project_wbs_task WHERE tenant_id=? AND project_id=? AND status<>'COMPLETED' AND deleted_flag=0", Integer.class, tenant(), projectId);
+        Integer incomplete = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM project_wbs_task w
+                JOIN project_schedule_plan p ON p.id=w.schedule_plan_id AND p.tenant_id=w.tenant_id
+                WHERE w.tenant_id=? AND w.project_id=? AND w.status<>'COMPLETED' AND w.deleted_flag=0
+                 AND p.status='ACTIVE' AND p.deleted_flag=0
+                """, Integer.class, tenant(), projectId);
         if (incomplete != null && incomplete > 0) throw error("CLOSEOUT_WBS_INCOMPLETE", "仍有未完工WBS任务，不能发起竣工验收");
         Integer missing = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM project_wbs_task w WHERE w.tenant_id=? AND w.project_id=? AND w.deleted_flag=0
+                SELECT COUNT(*) FROM project_wbs_task w
+                JOIN project_schedule_plan p ON p.id=w.schedule_plan_id AND p.tenant_id=w.tenant_id
+                WHERE w.tenant_id=? AND w.project_id=? AND w.deleted_flag=0
+                 AND p.status='ACTIVE' AND p.deleted_flag=0
                  AND NOT EXISTS(SELECT 1 FROM closeout_section_acceptance a WHERE a.tenant_id=w.tenant_id
                    AND a.closeout_id=? AND a.wbs_task_id=w.id AND a.status='ACCEPTED' AND a.deleted_flag=0)
                 """, Integer.class, tenant(), projectId, closeoutId);

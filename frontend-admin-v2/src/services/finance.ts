@@ -10,6 +10,8 @@ import {
   type InvoiceQuery,
   type PaymentApplicationPage,
   type PaymentApplicationQuery,
+  type PaymentApplicationBasisRecord,
+  type PaymentApplicationSourceRecord,
   type PayRecordOptionPage,
   type RevenueQuery,
   type RevenueRecord,
@@ -21,10 +23,12 @@ import {
   type SalesInvoiceCommand,
   type CollectionCommand,
   type PaymentApplicationCommand,
+  type PayRecordWritebackCommand,
   type ExpenseApplicationCommand,
   type InvoiceCommand,
   type FinanceOperationsWorkspace,
   type FundAccountRecord,
+  type FundAccountCommand,
   type CashForecastCycleRecord,
   type CashForecastTrace,
   type AccountingEntryDetail,
@@ -58,6 +62,24 @@ export const loadPayRecordOptions = (signal?: AbortSignal) =>
   apiRequest<PayRecordOptionPage>('/pay-records?pageNo=1&pageSize=200&payStatus=SUCCESS', {
     signal,
   })
+export const writebackPayment = (body: PayRecordWritebackCommand) =>
+  apiRequest<PayRecordOptionPage['records'][number]>('/pay-records/writeback', {
+    method: 'POST',
+    body,
+  })
+export const reversePaymentRecord = (
+  id: string,
+  body: {
+    reversalType: 'REVERSAL' | 'REFUND'
+    externalTxnNo: string
+    reversedAt: string
+    reason: string
+  },
+) =>
+  apiRequest<PayRecordOptionPage['records'][number]>(`/pay-records/${requiredId(id)}/reverse`, {
+    method: 'POST',
+    body,
+  })
 
 export const loadCashJournal = (query: CashJournalQuery = {}, signal?: AbortSignal) =>
   apiRequest<CashJournalPage>(withQuery(FINANCE_API.journal, query), { signal })
@@ -86,6 +108,8 @@ export const handleFinanceAlert = (id: string, status: 'RESOLVED' | 'IGNORED', n
 
 export const loadFundAccounts = (signal?: AbortSignal) =>
   apiRequest<FundAccountRecord[]>('/fund-accounts', { signal })
+export const createFundAccount = (body: FundAccountCommand) =>
+  apiRequest<FundAccountRecord>('/fund-accounts', { method: 'POST', body })
 export const archiveCashJournal = (id: string) =>
   apiRequest<CashJournalPage['records'][number]>(
     `/cash-journal-entries/${requiredId(id)}/archive`,
@@ -217,6 +241,22 @@ export const savePaymentSources = (
   body: Array<{ sourceType: string; sourceRefId: string; sourceAmount: string }>,
 ) =>
   apiRequest<void>(`/pay-applications/${requiredId(id)}/sources/batch`, {
+    method: 'POST',
+    body,
+  })
+export const loadPaymentSources = (id: string, signal?: AbortSignal) =>
+  apiRequest<PaymentApplicationSourceRecord[]>(`/pay-applications/${requiredId(id)}/sources`, {
+    signal,
+  })
+export const loadPaymentBasis = (id: string, signal?: AbortSignal) =>
+  apiRequest<PaymentApplicationBasisRecord[]>(`/pay-applications/${requiredId(id)}/basis`, {
+    signal,
+  })
+export const savePaymentBasis = (
+  id: string,
+  body: Array<{ basisType: string; basisId: string; basisAmount: string }>,
+) =>
+  apiRequest<void>(`/pay-applications/${requiredId(id)}/basis/batch`, {
     method: 'POST',
     body,
   })

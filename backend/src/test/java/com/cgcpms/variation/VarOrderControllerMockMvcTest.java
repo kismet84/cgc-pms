@@ -2,7 +2,7 @@ package com.cgcpms.variation;
 
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.variation.entity.VarOrder;
@@ -42,7 +42,7 @@ class VarOrderControllerMockMvcTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private JwtUtils jwtUtils;
+    private JwtHttpTestTokenFactory jwtUtils;
 
     @Autowired
     private VarOrderService varOrderService;
@@ -170,6 +170,39 @@ class VarOrderControllerMockMvcTest {
                         .content("[]")
                         .cookie(userCookie(List.of("variation:order:edit"))))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @Order(4)
+    @DisplayName("PUT /var-orders/{id} reads optimistic-lock version from query")
+    void testUpdateReadsVersionFromQuery() throws Exception {
+        Integer version = jdbcTemplate.queryForObject(
+                "SELECT version FROM var_order WHERE id = ?", Integer.class, orderId);
+        mockMvc.perform(put("/api/var-orders/" + orderId)
+                        .contextPath("/api")
+                        .queryParam("version", String.valueOf(version))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "projectId": 10001,
+                                  "contractId": 30019,
+                                  "varName": "Updated Variation Order",
+                                  "eventDate": "2026-07-30",
+                                  "claimDeadline": "2026-08-10",
+                                  "eventDescription": "控制器乐观锁契约回归验证",
+                                  "causeCategory": "TEST",
+                                  "varType": "FIELD",
+                                  "direction": "COST",
+                                  "impactDays": 0
+                                }
+                                """)
+                        .cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"));
+
+        Integer updatedVersion = jdbcTemplate.queryForObject(
+                "SELECT version FROM var_order WHERE id = ?", Integer.class, orderId);
+        Assertions.assertEquals(version + 1, updatedVersion);
     }
 
     // ---- helpers ----

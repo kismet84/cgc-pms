@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -795,6 +796,7 @@ onBeforeUnmount(() => controller?.abort())
             placeholder="全部状态"
             :options="statusOptions"
             allow-empty
+            @update:model-value="searchUsers"
           />
           <V2Button type="submit" size="small">查询</V2Button>
         </form>
@@ -868,11 +870,11 @@ onBeforeUnmount(() => controller?.abort())
                   <th>姓名</th>
                   <th>联系方式</th>
                   <th>状态</th>
-                  <th>操作</th>
+                  <th class="v2-table-cell--actions">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in users" :key="item.id">
+                <tr v-for="(item, index) in users" :key="item.id">
                   <th scope="row">{{ item.username }}</th>
                   <td>{{ item.realName || '—' }}</td>
                   <td>{{ item.phone || item.email || '—' }}</td>
@@ -881,32 +883,40 @@ onBeforeUnmount(() => controller?.abort())
                       {{ item.status === 'ENABLE' ? '启用' : '停用' }}
                     </V2Badge>
                   </td>
-                  <td>
+                  <td class="v2-table-cell--actions">
                     <div class="access-control-page__actions">
-                      <V2Button
-                        v-if="canUserEdit"
-                        size="small"
-                        variant="ghost"
-                        @click="openUserEditor(item)"
+                      <V2ActionMenu
+                        v-if="canUserEdit || canUserDelete"
+                        :label="`${item.username}更多操作`"
+                        :placement="index >= users.length - 3 ? 'top-end' : 'bottom-end'"
                       >
-                        编辑
-                      </V2Button>
-                      <V2Button
-                        v-if="canUserEdit"
-                        size="small"
-                        variant="secondary"
-                        @click="statusTarget = item"
-                      >
-                        {{ item.status === 'ENABLE' ? '停用' : '启用' }}
-                      </V2Button>
-                      <V2Button
-                        v-if="canUserDelete"
-                        size="small"
-                        variant="danger"
-                        @click="deleteTarget = { kind: 'user', id: item.id, label: item.username }"
-                      >
-                        删除
-                      </V2Button>
+                        <V2Button
+                          v-if="canUserEdit"
+                          size="small"
+                          variant="ghost"
+                          @click="openUserEditor(item)"
+                        >
+                          编辑
+                        </V2Button>
+                        <V2Button
+                          v-if="canUserEdit"
+                          size="small"
+                          variant="secondary"
+                          @click="statusTarget = item"
+                        >
+                          {{ item.status === 'ENABLE' ? '停用' : '启用' }}
+                        </V2Button>
+                        <V2Button
+                          v-if="canUserDelete"
+                          size="small"
+                          variant="danger"
+                          @click="
+                            deleteTarget = { kind: 'user', id: item.id, label: item.username }
+                          "
+                        >
+                          删除
+                        </V2Button>
+                      </V2ActionMenu>
                     </div>
                   </td>
                 </tr>
@@ -955,34 +965,40 @@ onBeforeUnmount(() => controller?.abort())
               <th>类型</th>
               <th>数据范围</th>
               <th>状态</th>
-              <th>操作</th>
+              <th class="v2-table-cell--actions">操作</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in visibleRoles" :key="item.id">
+            <tr v-for="(item, index) in visibleRoles" :key="item.id">
               <th scope="row">{{ item.roleCode }}</th>
               <td>{{ item.roleName }}</td>
               <td>{{ roleTypeLabel(item.roleType) }}</td>
               <td>{{ dataScopeLabel(item.dataScope) }}</td>
               <td>{{ item.status === 'ENABLE' ? '启用' : '停用' }}</td>
-              <td>
+              <td class="v2-table-cell--actions">
                 <div class="access-control-page__actions">
-                  <V2Button
-                    v-if="canRoleEdit && !isProtectedRole(item)"
-                    size="small"
-                    variant="ghost"
-                    @click="openRoleEditor(item)"
+                  <V2ActionMenu
+                    v-if="!isProtectedRole(item) && (canRoleEdit || canRoleDelete)"
+                    :label="`${item.roleCode || item.roleName}更多操作`"
+                    :placement="index >= visibleRoles.length - 3 ? 'top-end' : 'bottom-end'"
                   >
-                    编辑
-                  </V2Button>
-                  <V2Button
-                    v-if="canRoleDelete && !isProtectedRole(item)"
-                    size="small"
-                    variant="danger"
-                    @click="deleteTarget = { kind: 'role', id: item.id, label: item.roleName }"
-                  >
-                    删除
-                  </V2Button>
+                    <V2Button
+                      v-if="canRoleEdit && !isProtectedRole(item)"
+                      size="small"
+                      variant="ghost"
+                      @click="openRoleEditor(item)"
+                    >
+                      编辑
+                    </V2Button>
+                    <V2Button
+                      v-if="canRoleDelete && !isProtectedRole(item)"
+                      size="small"
+                      variant="danger"
+                      @click="deleteTarget = { kind: 'role', id: item.id, label: item.roleName }"
+                    >
+                      删除
+                    </V2Button>
+                  </V2ActionMenu>
                   <V2Badge v-if="isProtectedRole(item)" tone="warning">受保护</V2Badge>
                 </div>
               </td>

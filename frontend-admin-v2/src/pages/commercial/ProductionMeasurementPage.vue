@@ -10,6 +10,7 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -26,6 +27,7 @@ import {
   createMeasurement,
   createMeasurementPeriod,
   loadContractPage,
+  loadMeasurement,
   loadMeasurementPeriods,
   loadMeasurementSettlementTrace,
   loadMeasurementSources,
@@ -40,8 +42,13 @@ import { isApiClientError } from '@/services/request'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
-type SourceLine = { source: MeasurementAmountRow; selected: boolean; currentQuantity: string }
-type Dialog = 'closed' | 'period' | 'measurement' | 'owner' | 'review' | 'trace'
+type SourceLine = {
+  source: MeasurementAmountRow
+  selected: boolean
+  currentQuantity: string
+  evidenceFile: File | null
+}
+type Dialog = 'closed' | 'period' | 'measurement' | 'evidence' | 'owner' | 'review' | 'trace'
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
@@ -102,11 +109,13 @@ const reviewForm = reactive({
 const reviewLines = ref<
   Array<{ measurementLineId: string; confirmedQuantity: string; deductionReason: string }>
 >([])
+const evidenceLines = ref<Array<{ id: string; name: string; file: File | null }>>([])
 const canQuery = computed(() => session.hasPermission('measurement:query'))
 const canMaintain = computed(() => session.hasPermission('measurement:maintain'))
 const canSubmit = computed(() => session.hasPermission('measurement:submit'))
 const canOwnerSubmit = computed(() => session.hasPermission('measurement:owner:submit'))
 const canOwnerReview = computed(() => session.hasPermission('measurement:owner:review'))
+const canUpload = computed(() => session.hasPermission('file:upload'))
 const contractOptions = computed(() =>
   contracts.value.map((c) => ({ value: c.id, label: c.contractName })),
 )
@@ -281,6 +290,9 @@ async function loadCreationContracts(selectedProjectId: string) {
             pageNo: 1,
             pageSize: 100,
             projectId: selectedProjectId,
+            contractType: 'MAIN',
+            approvalStatus: 'APPROVED',
+            contractStatus: 'PERFORMING',
           })
         ).records
       : []
@@ -335,6 +347,7 @@ async function changeMeasurementContract(value: string) {
       source,
       selected: false,
       currentQuantity: '',
+      evidenceFile: null,
     }))
   } catch (e) {
     errorMessage.value = errorText(e, '计量期间和来源加载失败')
@@ -356,6 +369,9 @@ async function openMeasurement() {
   evidenceFile.value = null
   dialog.value = 'measurement'
 }
+function selectSourceFile(row: SourceLine, event: Event) {
+  row.evidenceFile = (event.target as HTMLInputElement).files?.[0] ?? null
+}
 async function saveMeasurement() {
   const chosen = sourceLines.value.filter((row) => row.selected)
   if (
@@ -364,7 +380,7 @@ async function saveMeasurement() {
     !measurementForm.contractId ||
     !evidenceFile.value ||
     !chosen.length ||
-    chosen.some((row) => !decimal(row.currentQuantity))
+    chosen.some((row) => !decimal(row.currentQuantity) || !row.evidenceFile)
   ) {
     errorMessage.value = '请选择期间、真实附件和至少一条正数计量来源'
     return
@@ -387,13 +403,74 @@ async function saveMeasurement() {
   }
   await run(async () => {
     const created = await createMeasurement(command)
-    await uploadSiteFile(
+    await uploadMeasurementEvidence(
+      created,
       evidenceFile.value!,
-      'PRODUCTION_MEASUREMENT',
-      text(created, 'id'),
-      'MEASUREMENT_EVIDENCE',
+      chosen.map((row) => row.evidenceFile!),
     )
   }, '产值计量草稿已创建')
+}
+async function uploadMeasurementEvidence(
+  row: MeasurementAmountRow,
+  generalFile: File,
+  lineFiles: File[],
+) {
+  const detail = Array.isArray(row.lines) ? row : await loadMeasurement(text(row, 'id'))
+  const id = text(detail, 'id')
+  const lines = Array.isArray(detail.lines) ? detail.lines : []
+  if (lines.length !== lineFiles.length) throw new Error('计量明细附件数量与服务端不一致')
+  await uploadSiteFile(generalFile, 'PRODUCTION_MEASUREMENT', id, 'MEASUREMENT_GENERAL')
+  for (const [index, line] of lines.entries()) {
+    await uploadSiteFile(
+      lineFiles[index]!,
+      'PRODUCTION_MEASUREMENT',
+      id,
+      `ML_${text(line, 'id')}`,
+    )
+  }
+}
+async function openEvidence(row: MeasurementAmountRow) {
+  selected.value = row
+  evidenceFile.value = null
+  evidenceLines.value = []
+  dialog.value = 'evidence'
+  detailLoading.value = true
+  try {
+    const detail = await loadMeasurement(text(row, 'id'))
+    evidenceLines.value = (Array.isArray(detail.lines) ? detail.lines : []).map((line) => ({
+      id: text(line, 'id'),
+      name: text(line, 'item_name', 'itemName') || '计量明细',
+      file: null,
+    }))
+  } catch (e) {
+    errorMessage.value = errorText(e, '计量明细加载失败')
+  } finally {
+    detailLoading.value = false
+  }
+}
+function selectEvidenceLineFile(index: number, event: Event) {
+  evidenceLines.value[index]!.file =
+    (event.target as HTMLInputElement).files?.[0] ?? null
+}
+async function saveEvidence() {
+  if (
+    !selected.value ||
+    !evidenceFile.value ||
+    !evidenceLines.value.length ||
+    evidenceLines.value.some((line) => !line.file)
+  ) {
+    errorMessage.value = '请选择总体依据和每条计量明细的真实依据'
+    return
+  }
+  await run(
+    () =>
+      uploadMeasurementEvidence(
+        selected.value!,
+        evidenceFile.value!,
+        evidenceLines.value.map((line) => line.file!),
+      ),
+    '计量依据已补传',
+  )
 }
 function openOwner(row: MeasurementAmountRow) {
   selected.value = row
@@ -412,13 +489,13 @@ async function saveOwner() {
     version: text(selected.value, 'version'),
   }
   await run(async () => {
-    const created = await submitOwnerMeasurement(text(selected.value!, 'id'), command)
     await uploadSiteFile(
       evidenceFile.value!,
-      'OWNER_MEASUREMENT_SUBMISSION',
-      text(created, 'id'),
-      'OWNER_MEASUREMENT_REPORT',
+      'PRODUCTION_MEASUREMENT',
+      text(selected.value!, 'id'),
+      'OWNER_SUBMISSION',
     )
+    await submitOwnerMeasurement(text(selected.value!, 'id'), command)
   }, '业主报量已登记')
 }
 async function openReview(row: MeasurementAmountRow) {
@@ -522,7 +599,11 @@ onBeforeUnmount(() => {
               @update:model-value="changeStatus"
             /><V2Button v-if="canMaintain" size="small" variant="secondary" @click="openPeriod"
               >新建期间</V2Button
-            ><V2Button v-if="canMaintain" size="small" variant="secondary" @click="openMeasurement"
+            ><V2Button
+              v-if="canMaintain && canUpload"
+              size="small"
+              variant="secondary"
+              @click="openMeasurement"
               >新建计量</V2Button
             >
           </div></template
@@ -552,23 +633,21 @@ onBeforeUnmount(() => {
             </caption>
             <thead>
               <tr>
+                <th scope="col">计量编号</th>
                 <th scope="col">所属项目</th>
                 <th scope="col">计量期间</th>
-                <th scope="col">计量编号</th>
                 <th scope="col">计量日期</th>
                 <th scope="col">本期申报</th>
                 <th scope="col">累计申报</th>
                 <th scope="col">内部状态</th>
                 <th scope="col">业主状态</th>
                 <th scope="col">时间窗口</th>
-                <th scope="col">操作</th>
+                <th scope="col" class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
-              <template v-for="row in visibleMeasurements" :key="text(row, 'id')">
+              <template v-for="(row, index) in visibleMeasurements" :key="text(row, 'id')">
                 <tr>
-                  <td>{{ projectLabel(row) }}</td>
-                  <td>{{ text(row, 'period_name', 'period_code') || '—' }}</td>
                   <td>
                     <V2Button
                       size="small"
@@ -581,6 +660,8 @@ onBeforeUnmount(() => {
                       {{ text(row, 'measure_code') || '计量单' }}
                     </V2Button>
                   </td>
+                  <td>{{ projectLabel(row) }}</td>
+                  <td>{{ text(row, 'period_name', 'period_code') || '—' }}</td>
                   <td>{{ dateText(row, 'measure_date') }}</td>
                   <td>{{ text(row, 'current_reported_amount') || '—' }}</td>
                   <td>{{ text(row, 'cumulative_reported_amount') || '—' }}</td>
@@ -599,9 +680,25 @@ onBeforeUnmount(() => {
                       statusLabel(text(periodFor(row), 'status'))
                     }}</V2Badge>
                   </td>
-                  <td>
-                    <div class="actions">
+                  <td class="v2-table-cell--actions">
+                    <V2ActionMenu
+                      :label="`${text(row, 'measure_code') || '计量单'}更多操作`"
+                      :placement="
+                        index >= visibleMeasurements.length - 3 ? 'top-end' : 'bottom-end'
+                      "
+                    >
                       <V2Button
+                        v-if="
+                          canMaintain &&
+                          canUpload &&
+                          ['DRAFT', 'REJECTED'].includes(text(row, 'status'))
+                        "
+                        size="small"
+                        variant="secondary"
+                        :disabled="actionBusy"
+                        @click="openEvidence(row)"
+                        >补传/更新计量依据</V2Button
+                      ><V2Button
                         v-if="canSubmit && ['DRAFT', 'REJECTED'].includes(text(row, 'status'))"
                         size="small"
                         variant="secondary"
@@ -616,6 +713,7 @@ onBeforeUnmount(() => {
                       ><V2Button
                         v-if="
                           canOwnerSubmit &&
+                          canUpload &&
                           ['INTERNAL_APPROVED', 'OWNER_RETURNED'].includes(text(row, 'status'))
                         "
                         size="small"
@@ -645,7 +743,7 @@ onBeforeUnmount(() => {
                         "
                         >关闭期间</V2Button
                       >
-                    </div>
+                    </V2ActionMenu>
                   </td>
                 </tr>
                 <tr
@@ -816,12 +914,48 @@ onBeforeUnmount(() => {
               text(row.source, 'itemName', 'item_name', 'sourceId')
             }}</label
           ><span>剩余 {{ text(row.source, 'remainingQuantity') }}</span
-          ><V2Input v-model="row.currentQuantity" label="本次计量量" />
+          ><V2Input v-model="row.currentQuantity" label="本次计量量" /><label
+            >现场完成依据<input
+              :aria-label="`${text(row.source, 'itemName', 'item_name', 'sourceId')}现场完成依据`"
+              type="file"
+              @change="selectSourceFile(row, $event)"
+          /></label>
         </div>
       </form>
       <template #footer>
         <V2Button variant="ghost" :disabled="actionBusy" @click="dialog = 'closed'">取消</V2Button>
         <V2Button type="submit" form="measurement-form" :loading="actionBusy">创建计量</V2Button>
+      </template></V2Dialog
+    >
+    <V2Dialog
+      :open="dialog === 'evidence'"
+      title="补传计量依据"
+      description="分别上传总体计量依据和每条计量明细的现场完成依据。"
+      :close-on-backdrop="false"
+      :close-disabled="actionBusy"
+      @close="dialog = 'closed'"
+      ><V2PageState
+        v-if="detailLoading"
+        title="正在加载计量明细"
+        description="正在读取服务端计量明细。"
+        kind="loading"
+      />
+      <form v-else id="measurement-evidence-form" class="form" @submit.prevent="saveEvidence">
+        <label
+          >总体计量依据<input aria-label="计量依据" type="file" @change="selectFile"
+        /></label>
+        <label v-for="(line, index) in evidenceLines" :key="line.id"
+          >{{ line.name }}现场完成依据<input
+            :aria-label="`${line.name}现场完成依据`"
+            type="file"
+            @change="selectEvidenceLineFile(index, $event)"
+        /></label>
+      </form>
+      <template v-if="!detailLoading" #footer>
+        <V2Button variant="ghost" :disabled="actionBusy" @click="dialog = 'closed'">取消</V2Button>
+        <V2Button type="submit" form="measurement-evidence-form" :loading="actionBusy"
+          >上传依据</V2Button
+        >
       </template></V2Dialog
     >
     <V2Dialog
@@ -866,7 +1000,11 @@ onBeforeUnmount(() => {
           v-model="reviewForm.reviewComment"
           label="核定意见"
         /><template v-if="reviewForm.decision === 'CONFIRMED'"
-          ><V2Input v-model="reviewForm.taxAmount" label="税额" /><V2Input
+          ><V2Input v-model="reviewForm.settlementDate" type="date" label="结算日期" /><V2Input
+            v-model="reviewForm.dueDate"
+            type="date"
+            label="应收到期日"
+          /><V2Input v-model="reviewForm.taxAmount" label="税额" /><V2Input
             v-model="reviewForm.retentionAmount"
             label="保留金" /><label
             >业主核定依据<input aria-label="业主核定依据" type="file" @change="selectFile"

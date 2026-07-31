@@ -32,7 +32,7 @@ test('ordinary role stays forbidden even with workflow process permission', asyn
   expect(templateRequests).toBe(0)
 })
 
-test('administrator stays forbidden without workflow process permission', async ({ page }) => {
+test('administrator uses the documented admin permission override', async ({ page }) => {
   let templateRequests = 0
   await page.route('**/api/**', (route) => {
     const path = new URL(route.request().url()).pathname
@@ -50,8 +50,8 @@ test('administrator stays forbidden without workflow process permission', async 
 
   await page.goto('/v2/approval/process')
 
-  await expect(page).toHaveURL(/\/v2\/forbidden\?from=/)
-  expect(templateRequests).toBe(0)
+  await expect(page).toHaveURL(/\/v2\/approval\/process$/)
+  await expect.poll(() => templateRequests).toBe(1)
 })
 
 test('administrator with exact permission reads server workflow facts', async ({ page }) => {

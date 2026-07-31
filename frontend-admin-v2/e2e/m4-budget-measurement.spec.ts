@@ -18,6 +18,7 @@ const business = {
     'measurement:owner:submit',
     'measurement:owner:review',
     'contract:query',
+    'file:upload',
   ],
 }
 const denied = { ...business, userId: '2', username: 'denied', permissions: [] }
@@ -147,7 +148,11 @@ async function measurementRoute(route: Route, writes: string[], traffic: string[
     ])
   if (path.endsWith('/owner-submissions/list')) return fulfill(route, [])
   if (path === '/api/production-measurements' && request.method() === 'POST')
-    return fulfill(route, { id: '9007199254740996', version: '0' })
+    return fulfill(route, {
+      id: '9007199254740996',
+      version: '0',
+      lines: [{ id: 'ML-NEW-1' }],
+    })
   if (path === '/api/production-measurements')
     return fulfill(route, [
       url.searchParams.get('projectId') === 'P2'
@@ -269,6 +274,11 @@ test.describe('M4 budget and measurement routes', () => {
     await expect(page.getByRole('dialog')).toContainText('9007199254740993')
     await expect(page.getByRole('dialog')).toContainText('9007199254740993.13')
     await page.getByRole('button', { name: '关闭' }).click()
+    await page
+      .getByRole('row')
+      .filter({ hasText: 'BUD-001' })
+      .locator('summary[aria-label="BUD-001更多操作"]')
+      .click()
     await page.getByRole('button', { name: '提交' }).dblclick()
     await expect(page.getByText('预算已提交')).toBeVisible()
     expect(
@@ -292,6 +302,7 @@ test.describe('M4 budget and measurement routes', () => {
     await expect(page.getByText('预算已创建')).toBeVisible()
 
     let row = page.getByRole('row').filter({ hasText: 'E2E新增预算' })
+    await row.locator('summary[aria-label="BUD-NEW-1更多操作"]').click()
     await row.getByRole('button', { name: '编辑' }).click()
     await page.getByLabel('预算名称').fill('E2E编辑预算')
     await page.getByRole('button', { name: '保存预算' }).click()
@@ -309,6 +320,7 @@ test.describe('M4 budget and measurement routes', () => {
     await page.getByRole('dialog').getByRole('button', { name: '关闭对话框' }).click()
 
     row = page.getByRole('row').filter({ hasText: 'E2E编辑预算' })
+    await row.locator('summary[aria-label="BUD-NEW-1更多操作"]').click()
     await row.getByRole('button', { name: '删除' }).click()
     await expect(page.getByText('预算已删除')).toBeVisible()
     await expect(page.getByRole('row').filter({ hasText: 'E2E编辑预算' })).toHaveCount(0)
@@ -347,13 +359,16 @@ test.describe('M4 budget and measurement routes', () => {
 
     const projectControl = page.locator('#global-project')
     await projectControl.click()
-    await projectControl.locator('..').locator('[role="option"][data-value="P2"]').click()
+    await page
+      .getByRole('listbox', { name: '当前项目' })
+      .locator('[role="option"][data-value="P2"]')
+      .click()
     await expect(page.getByRole('row').filter({ hasText: '项目二预算-全部' })).toBeVisible()
 
     const periodControl = page.locator('#global-report-period')
     await periodControl.click()
-    const periodOptions = periodControl
-      .locator('..')
+    const periodOptions = page
+      .getByRole('listbox', { name: '报告期' })
       .locator('[role="option"][data-value]:not([data-value=""])')
     const firstPeriod = (await periodOptions.nth(0).getAttribute('data-value'))!
     const secondPeriod = (await periodOptions.nth(1).getAttribute('data-value'))!
@@ -365,11 +380,14 @@ test.describe('M4 budget and measurement routes', () => {
     await page.getByRole('link', { name: '产值计量' }).click()
     await expect(page.getByText(`ME-P2-${firstPeriod}`, { exact: true })).toBeVisible()
     await projectControl.click()
-    await projectControl.locator('..').locator('[role="option"][data-value="P1"]').click()
+    await page
+      .getByRole('listbox', { name: '当前项目' })
+      .locator('[role="option"][data-value="P1"]')
+      .click()
     await expect(page.getByText('ME-1', { exact: true })).toBeVisible()
     await periodControl.click()
-    await periodControl
-      .locator('..')
+    await page
+      .getByRole('listbox', { name: '报告期' })
       .locator(`[role="option"][data-value="${secondPeriod}"]`)
       .click()
     await expect(page).toHaveURL(new RegExp(`projectId=P1.*period=${secondPeriod}`))
@@ -422,7 +440,7 @@ test.describe('M4 budget and measurement routes', () => {
     const dialog = page.getByRole('dialog', { name: '新建产值计量' })
     const contract = dialog.getByRole('button', { name: /^业主合同：/ })
     await contract.press('ArrowDown')
-    const contractOption = contract.locator('..').getByRole('option', { name: '业主合同' })
+    const contractOption = page.getByRole('option', { name: '业主合同' })
     await expect(contractOption).toBeFocused()
     await contractOption.press('Enter')
     await expect(dialog.getByRole('button', { name: '计量期间：2026-07' })).toBeVisible()
@@ -434,11 +452,16 @@ test.describe('M4 budget and measurement routes', () => {
       mimeType: 'application/pdf',
       buffer: Buffer.from('controlled evidence'),
     })
-    await dialog.getByRole('button', { name: '创建计量' }).dblclick()
+    await dialog.getByLabel('清单一现场完成依据').setInputFiles({
+      name: 'measurement-line.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('controlled line evidence'),
+    })
+    await dialog.getByRole('button', { name: '创建计量' }).click()
     await expect(page.getByText('产值计量草稿已创建')).toBeVisible()
     expect(
       writes.filter((url) => new URL(url).pathname === '/api/production-measurements'),
     ).toHaveLength(1)
-    expect(writes.filter((url) => new URL(url).pathname === '/api/files/upload')).toHaveLength(1)
+    expect(writes.filter((url) => new URL(url).pathname === '/api/files/upload')).toHaveLength(2)
   })
 })

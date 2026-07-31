@@ -269,7 +269,7 @@ public class WorkflowTemplateService {
         String type = node.get("type").asText().toUpperCase();
         String required = switch (type) {
             case "USER" -> "userId";
-            case "ROLE" -> "roleId";
+            case "ROLE" -> node.hasNonNull("roleId") ? "roleId" : "roleCode";
             case "POSITION" -> "positionId";
             case "PROJECT_ROLE" -> "roleCode";
             default -> throw new BusinessException("UNSUPPORTED_APPROVER_TYPE", "不支持的审批人类型: " + type);

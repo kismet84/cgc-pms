@@ -19,7 +19,7 @@ public class CtContractPaymentTermController {
     private final CtContractPaymentTermService ctContractPaymentTermService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:term:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:query') or hasAuthority('contract:term:query')")
     public ApiResponse<List<CtContractPaymentTerm>> getByContractId(@PathVariable Long contractId) {
         return ApiResponse.success(ctContractPaymentTermService.getByContractId(contractId));
     }

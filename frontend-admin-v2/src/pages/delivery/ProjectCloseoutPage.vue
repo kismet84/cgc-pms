@@ -18,6 +18,7 @@ import type {
   WarrantyCommand,
 } from '@cgc-pms/frontend-contracts'
 import {
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -656,10 +657,7 @@ onBeforeUnmount(() => {
       description="当前身份没有收尾查询权限。"
     />
     <template v-else>
-      <V2Card v-if="!projectId && scopedOverviews.length" title="全部项目收尾概览">
-        <template #title-extra>
-          <V2Badge>{{ scopedOverviews.length }} 个项目</V2Badge>
-        </template>
+      <V2Card v-if="!projectId && scopedOverviews.length">
         <div
           class="closeout-page__table-wrap"
           role="region"
@@ -813,7 +811,7 @@ onBeforeUnmount(() => {
                     <th scope="col">状态</th>
                     <th scope="col">关联任务 / 结论</th>
                     <th scope="col">日期</th>
-                    <th scope="col">操作</th>
+                    <th scope="col" class="v2-table-cell--actions">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -828,7 +826,7 @@ onBeforeUnmount(() => {
                     </td>
                     <td>{{ section.taskCode }}</td>
                     <td>{{ section.acceptanceDate }}</td>
-                    <td>
+                    <td class="v2-table-cell--actions">
                       <V2Button
                         v-if="canSection && section.status === 'DRAFT'"
                         size="small"
@@ -942,11 +940,11 @@ onBeforeUnmount(() => {
                     <th scope="col">标题</th>
                     <th scope="col">状态</th>
                     <th scope="col">金额 / 期限</th>
-                    <th scope="col">操作</th>
+                    <th scope="col" class="v2-table-cell--actions">操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="item in overview?.warranties ?? []" :key="item.id">
+                  <tr v-for="(item, index) in overview?.warranties ?? []" :key="item.id">
                     <td>质保</td>
                     <th scope="row">{{ item.warrantyCode }}</th>
                     <td>—</td>
@@ -959,8 +957,13 @@ onBeforeUnmount(() => {
                       {{ formatAmount(item.warrantyAmount) }} / {{ item.warrantyStartDate }} 至
                       {{ item.warrantyEndDate }}
                     </td>
-                    <td>
-                      <div class="closeout-page__actions">
+                    <td class="v2-table-cell--actions">
+                      <V2ActionMenu
+                        :label="`${item.warrantyCode}更多操作`"
+                        :placement="
+                          index >= (overview?.warranties.length ?? 0) - 3 ? 'top-end' : 'bottom-end'
+                        "
+                      >
                         <V2Button
                           v-if="canDefect && ['ACTIVE', 'DEFECT_LIABILITY'].includes(item.status)"
                           size="small"
@@ -983,7 +986,7 @@ onBeforeUnmount(() => {
                           "
                           >—</span
                         >
-                      </div>
+                      </V2ActionMenu>
                     </td>
                   </tr>
                   <tr v-for="item in overview?.defects ?? []" :key="item.id">
@@ -996,7 +999,7 @@ onBeforeUnmount(() => {
                       }}</V2Badge>
                     </td>
                     <td>期限 {{ item.rectificationDeadline }}</td>
-                    <td>
+                    <td class="v2-table-cell--actions">
                       <div class="closeout-page__actions">
                         <V2Button
                           v-if="canDefect && item.status === 'OPEN'"

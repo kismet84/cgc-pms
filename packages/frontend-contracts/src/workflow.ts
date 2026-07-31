@@ -126,6 +126,13 @@ export interface WorkflowActionBody {
   idempotencyKey: string;
 }
 
+export interface WorkflowActionUser {
+  id: string;
+  username: string;
+  realName?: string | null;
+  status: string;
+}
+
 export type WorkflowListResult =
   | PageResult<WorkflowTask>
   | PageResult<WorkflowRecord>
@@ -149,6 +156,7 @@ export const WORKFLOW_API = {
     `/workflow/instances/${instanceId}/resubmit`,
   transfer: (taskId: string) => `/workflow/tasks/${taskId}/transfer`,
   addSign: (taskId: string) => `/workflow/tasks/${taskId}/add-sign`,
+  actionUsers: (taskId: string) => `/workflow/tasks/${taskId}/action-users`,
 } as const;
 
 export const WORKFLOW_ACTION_PERMISSIONS: Record<WorkflowUiAction, string> = {

@@ -15,6 +15,9 @@ describe('V2 示例环境入口', () => {
 
   it('将账号切换明确呈现为演示角色', () => {
     expect(appShell).toContain('const showDemoRoleSwitcher = import.meta.env.DEV')
+    expect(appShell).toContain("{ role: 'mgmt', prefix: 'mgmt', label: '管理层' }")
+    expect(appShell).toContain("{ role: 'legacyMgmt', prefix: 'gm', label: '管理层支持' }")
+    expect(appShell).toContain('[1, 2, 3].map((index)')
     expect(appShell).toContain('aria-label="切换演示角色"')
     expect(appShell).toContain('<strong>演示角色</strong>')
     expect(appShell).not.toContain('角色测试账号')

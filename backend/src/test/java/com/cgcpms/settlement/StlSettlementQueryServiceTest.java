@@ -140,6 +140,8 @@ class StlSettlementQueryServiceTest {
     private void cleanupPayments() {
         String ownApplications = "SELECT id FROM pay_application WHERE tenant_id = ? "
                 + "AND apply_code LIKE 'PAY-SETTLEMENT-QUERY-%'";
+        jdbcTemplate.update("DELETE FROM payment_application_source WHERE pay_application_id IN ("
+                + ownApplications + ")", TENANT_ID);
         jdbcTemplate.update("DELETE FROM invoice_payment_allocation WHERE pay_record_id IN "
                 + "(SELECT id FROM pay_record WHERE pay_application_id IN (" + ownApplications + "))", TENANT_ID);
         jdbcTemplate.update("DELETE FROM pay_record WHERE pay_application_id IN (" + ownApplications + ")", TENANT_ID);
@@ -385,6 +387,36 @@ class StlSettlementQueryServiceTest {
         assertNotNull(vo.getItems(), "items 不应为 null");
         assertNotNull(vo.getProjectName());
         assertNotNull(vo.getContractName());
+    }
+
+    @Test @DisplayName("getById — 付款金额使用结算来源实时事实")
+    void testGetById_UsesCurrentSettlementSourcePayment() {
+        Long applicationId = jdbcTemplate.queryForObject(
+                "SELECT id FROM pay_application WHERE tenant_id=? "
+                        + "AND apply_code='PAY-SETTLEMENT-QUERY-PAID'",
+                Long.class, TENANT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO payment_application_source
+                    (id, tenant_id, pay_application_id, source_type, source_ref_id,
+                     settlement_id, source_amount, paid_amount, version)
+                VALUES (?, ?, ?, 'SETTLEMENT', ?, ?, 2000.00, 1500.00, 0)
+                """, applicationId, TENANT_ID, applicationId, settlementId, settlementId);
+
+        StlSettlementVO detail = queryService.getById(settlementId);
+        assertEquals("1500.00", detail.getPaidAmount());
+        assertEquals("104900.00", detail.getUnpaidAmount());
+
+        StlSettlementVO pageItem = queryService.getPage(
+                        1, 10, PROJECT_ID, CONTRACT_ID, null,
+                        "STL-20260520-001", null, null)
+                .getRecords().get(0);
+        assertEquals("1500.00", pageItem.getPaidAmount());
+        assertEquals("104900.00", pageItem.getUnpaidAmount());
+
+        Map<String, Object> kpi = queryService.getKpi(
+                PROJECT_ID, CONTRACT_ID, null, "STL-20260520-001", null);
+        assertEquals("1500.00", kpi.get("totalPaidAmount"));
+        assertEquals("104900.00", kpi.get("totalUnpaidAmount"));
     }
 
     @Test @DisplayName("getById — 不存在抛异常")

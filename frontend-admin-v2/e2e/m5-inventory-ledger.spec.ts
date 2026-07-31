@@ -322,7 +322,7 @@ test.describe('M5 inventory workspace V2', () => {
     await expect(dialog).toBeVisible()
     await page.waitForTimeout(300)
     await dialog.getByRole('button', { name: '来源库存：请选择' }).click()
-    await dialog.getByRole('option', { name: /备用仓/ }).click()
+    await page.getByRole('option', { name: /备用仓/ }).click()
     await page.getByLabel('调拨数量').fill('1.2500')
     await page.getByLabel('调拨原因').fill('平衡库存')
     await page.getByRole('button', { name: '提交并读取' }).dblclick()

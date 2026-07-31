@@ -219,6 +219,8 @@ public class BusinessObjectAuthorizer {
             case "PURCHASE_REQUEST" -> write ? "purchase:request:edit" : "purchase:request:list";
             case "PURCHASE_ORDER" -> write ? "purchase:order:edit" : "purchase:order:query";
             case "MATERIAL_RECEIPT" -> write ? "receipt:edit" : "receipt:query";
+            case "CONTRACT_REVENUE", "OWNER_SETTLEMENT", "SALES_INVOICE", "COLLECTION_RECORD" ->
+                    write ? "revenue:operations:maintain" : "revenue:operations:query";
             case "PRODUCTION_MEASUREMENT" -> write ? measurementFileAuthority(documentType) : "measurement:query";
             case "OWNER_MEASUREMENT_SUBMISSION" -> write ? "measurement:owner:review" : "measurement:query";
             default -> genericAuthority;
@@ -637,6 +639,12 @@ public class BusinessObjectAuthorizer {
             throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND", "质量安全业务对象不存在: " + businessId);
         String type = documentType == null ? "" : documentType.trim().toUpperCase();
         requireQualityDocumentAuthority(businessType, type);
+        if ("QS_RECTIFICATION".equals(businessType)
+                && "REINSPECTION_EVIDENCE".equals(type)
+                && object.responsibleUserId().equals(UserContext.getCurrentUserId())) {
+            throw new BusinessException("QS_REINSPECTION_SEGREGATION_REQUIRED",
+                    "整改责任人不能复验本人提交的整改");
+        }
         boolean allowed = switch (businessType) {
             case "QS_INSPECTION" -> "DRAFT".equals(object.status()) && "INSPECTION_EVIDENCE".equals(type);
             case "QS_ISSUE" -> "DRAFT".equals(object.status()) && "ISSUE_EVIDENCE".equals(type);
@@ -662,21 +670,26 @@ public class BusinessObjectAuthorizer {
 
     private QualityFileObject findQualityFileObject(String businessType, Long businessId) {
         String sql = switch (businessType) {
-            case "QS_INSPECTION" -> "SELECT tenant_id,project_id,status FROM qs_inspection_record WHERE id=? AND deleted_flag=0";
-            case "QS_ISSUE" -> "SELECT i.tenant_id,i.project_id,r.status FROM qs_issue i JOIN qs_inspection_record r ON r.id=i.inspection_id WHERE i.id=? AND i.deleted_flag=0 AND r.deleted_flag=0";
-            case "QS_RECTIFICATION" -> "SELECT tenant_id,project_id,status FROM qs_rectification WHERE id=? AND deleted_flag=0";
+            case "QS_INSPECTION" -> "SELECT tenant_id,project_id,status,NULL AS responsible_user_id FROM qs_inspection_record WHERE id=? AND deleted_flag=0";
+            case "QS_ISSUE" -> "SELECT i.tenant_id,i.project_id,r.status,NULL AS responsible_user_id FROM qs_issue i JOIN qs_inspection_record r ON r.id=i.inspection_id WHERE i.id=? AND i.deleted_flag=0 AND r.deleted_flag=0";
+            case "QS_RECTIFICATION" -> "SELECT tenant_id,project_id,status,responsible_user_id FROM qs_rectification WHERE id=? AND deleted_flag=0";
             default -> throw new IllegalArgumentException("Unsupported quality file type");
         };
         try {
             return jdbcTemplate.queryForObject(sql,
-                    (rs, rowNum) -> new QualityFileObject(rs.getLong("tenant_id"), rs.getLong("project_id"), rs.getString("status")),
+                    (rs, rowNum) -> new QualityFileObject(
+                            rs.getLong("tenant_id"),
+                            rs.getLong("project_id"),
+                            rs.getString("status"),
+                            rs.getObject("responsible_user_id", Long.class)),
                     businessId);
         } catch (EmptyResultDataAccessException e) {
             return null;
         }
     }
 
-    private record QualityFileObject(Long tenantId, Long projectId, String status) {}
+    private record QualityFileObject(Long tenantId, Long projectId, String status,
+                                     Long responsibleUserId) {}
 
     private void checkSupplierDocumentStage(String businessType, Long businessId, String documentType) {
         SupplierFileObject object = findSupplierFileObject(businessType, businessId);

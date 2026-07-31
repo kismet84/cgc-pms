@@ -122,6 +122,17 @@ public class MatSupplierReturnService {
         }
 
         BigDecimal returned = nvl(returnItemMapper.sumConfirmedQuantity(tenantId, receiptItem.getId(), source));
+        if (REJECTED.equals(source)
+                && "RESOLVED".equals(disposition.getStatus())
+                && returned.compareTo(limit) == 0
+                && request.quantity().compareTo(returned) == 0) {
+            MatSupplierReturn confirmed = findConfirmedRejectedReturn(
+                    tenantId, receiptItem.getId(), request.quantity());
+            if (confirmed != null) {
+                syncReceiptItemDispositionStatus(receiptItem, disposition);
+                return confirmed.getId();
+            }
+        }
         if (returned.add(request.quantity()).compareTo(nvl(limit)) > 0) {
             throw new BusinessException("SUPPLIER_RETURN_EXCEEDS_RECEIPT", "累计供应商退货数量超过原验收可退数量");
         }
@@ -165,6 +176,7 @@ public class MatSupplierReturnService {
 
         if (REJECTED.equals(source)) {
             applyDispositionQuantity(disposition, request.quantity(), true);
+            syncReceiptItemDispositionStatus(receiptItem, disposition);
         } else {
             MatPurchaseOrderItem orderItem = lockOrderItem(receiptItem.getOrderItemId(), tenantId);
             BigDecimal nextReceived = nvl(orderItem.getReceivedQuantity()).subtract(request.quantity());
@@ -215,6 +227,11 @@ public class MatSupplierReturnService {
                     throw new BusinessException("QUALITY_DISPOSITION_INVALID", "不合格处置不存在");
                 }
                 applyDispositionQuantity(disposition, item.getQuantity(), false);
+                MatReceiptItem receiptItem = receiptItemMapper.selectForUpdate(item.getReceiptItemId(), tenantId);
+                if (receiptItem == null) {
+                    throw new BusinessException("SUPPLIER_RETURN_RECEIPT_ITEM_NOT_FOUND", "原验收明细不存在");
+                }
+                syncReceiptItemDispositionStatus(receiptItem, disposition);
                 continue;
             }
             MatPurchaseOrderItem orderItem = lockOrderItem(item.getOrderItemId(), tenantId);
@@ -270,6 +287,22 @@ public class MatSupplierReturnService {
                 .eq(MatSupplierReturnItem::getReturnId, returnId));
     }
 
+    private MatSupplierReturn findConfirmedRejectedReturn(Long tenantId, Long receiptItemId,
+                                                          BigDecimal quantity) {
+        return returnItemMapper.selectList(new LambdaQueryWrapper<MatSupplierReturnItem>()
+                        .eq(MatSupplierReturnItem::getTenantId, tenantId)
+                        .eq(MatSupplierReturnItem::getReceiptItemId, receiptItemId)
+                        .eq(MatSupplierReturnItem::getReturnSource, REJECTED)
+                        .eq(MatSupplierReturnItem::getQuantity, quantity))
+                .stream()
+                .map(item -> returnMapper.selectById(item.getReturnId()))
+                .filter(item -> item != null
+                        && tenantId.equals(item.getTenantId())
+                        && "CONFIRMED".equals(item.getStatus()))
+                .findFirst()
+                .orElse(null);
+    }
+
     private MatPurchaseOrderItem lockOrderItem(Long id, Long tenantId) {
         MatPurchaseOrderItem item = orderItemMapper.selectForUpdate(id, tenantId);
         if (item == null) {
@@ -289,6 +322,11 @@ public class MatSupplierReturnService {
         disposition.setStatus(next.compareTo(disposition.getRejectedQuantity()) == 0 ? "RESOLVED" : "OPEN");
         disposition.setResolvedAt("RESOLVED".equals(disposition.getStatus()) ? LocalDateTime.now() : null);
         dispositionMapper.updateById(disposition);
+    }
+
+    private void syncReceiptItemDispositionStatus(MatReceiptItem receiptItem, MatQualityDisposition disposition) {
+        receiptItem.setDispositionStatus("RESOLVED".equals(disposition.getStatus()) ? "COMPLETED" : "PENDING");
+        receiptItemMapper.updateById(receiptItem);
     }
 
     private void insertCostFact(MatReceipt receipt, CostItem original, Long sourceId, Long sourceItemId,

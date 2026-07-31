@@ -163,7 +163,8 @@ function resetFilters(): void {
 
 async function loadList(preserveNotice = false): Promise<boolean> {
   listController?.abort()
-  listController = new AbortController()
+  const controller = new AbortController()
+  listController = controller
   loading.value = true
   if (!preserveNotice) resetNotices()
   try {
@@ -177,20 +178,21 @@ async function loadList(preserveNotice = false): Promise<boolean> {
         endDate: periodBounds?.endDate,
         status: (filter.status || undefined) as SiteDailyLogStatus | undefined,
       },
-      listController.signal,
+      controller.signal,
     )
+    if (listController !== controller) return false
     records.value = page.records
     total.value = page.total
     return true
   } catch (error) {
-    if (!listController.signal.aborted) {
+    if (!controller.signal.aborted && listController === controller) {
       records.value = []
       total.value = 0
       errorMessage.value = message(error, '现场日报加载失败')
     }
     return false
   } finally {
-    if (!listController.signal.aborted) loading.value = false
+    if (listController === controller) loading.value = false
   }
 }
 

@@ -40,6 +40,7 @@ const ReceivablesWorkspacePage = () => import('./pages/finance/ReceivablesWorksp
 const FinanceControlWorkspacePage = () => import('./pages/finance/FinanceControlWorkspacePage.vue')
 const AccountPage = () => import('./pages/account/AccountPage.vue')
 const PartnerPage = () => import('./pages/master-data/PartnerPage.vue')
+const PartnerDetailPage = () => import('./pages/master-data/PartnerDetailPage.vue')
 const OrganizationPage = () => import('./pages/master-data/OrganizationPage.vue')
 const MaterialDictionaryPage = () => import('./pages/master-data/MaterialDictionaryPage.vue')
 const CostSubjectPage = () => import('./pages/master-data/CostSubjectPage.vue')
@@ -59,6 +60,7 @@ declare module 'vue-router' {
     permission?: string
     adminOnly?: boolean
     superAdminOnly?: boolean
+    adminBypassesPermission?: boolean
     workflowTab?: WorkflowTab
     migration?: 'pending'
   }
@@ -201,6 +203,8 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
             permission: tab.permission,
             adminOnly: workspace.adminOnly || tab.adminOnly,
             superAdminOnly: workspace.superAdminOnly || tab.superAdminOnly,
+            adminBypassesPermission:
+              workspace.adminBypassesPermission || tab.adminBypassesPermission,
             workflowTab: approvalTab,
             migration: tab.migration,
           },
@@ -336,6 +340,12 @@ const contextRoutes: RouteRecordRaw[] = [
     name: 'V2ShellProjectEdit',
     component: ProjectPage,
     meta: { shell: true, permission: 'project:edit' },
+  },
+  {
+    path: '/partner/:id',
+    name: 'V2ShellPartnerDetail',
+    component: PartnerDetailPage,
+    meta: { shell: true, permission: 'partner:query' },
   },
   {
     path: '/contract',
@@ -504,7 +514,11 @@ export function installSessionGuard(targetRouter: Router): void {
       to.path === '/inventory/stock' && to.redirectedFrom?.path === '/inventory/transaction'
         ? 'inventory:transaction:list'
         : to.meta.permission
-    if (requiredPermission && !session.hasPermission(requiredPermission)) {
+    const hasRequiredPermission =
+      to.meta.adminBypassesPermission && session.isAdmin
+        ? true
+        : !requiredPermission || session.hasPermission(requiredPermission)
+    if (!hasRequiredPermission) {
       return { path: '/forbidden', query: { from: to.fullPath } }
     }
 

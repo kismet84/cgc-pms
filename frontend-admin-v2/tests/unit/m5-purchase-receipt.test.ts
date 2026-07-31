@@ -6,6 +6,7 @@ import {
   createPurchaseOrder,
   createPurchaseRequest,
   createReceipt,
+  confirmReceiptSupplierReturn,
   deletePurchaseOrder,
   deletePurchaseRequest,
   deleteReceipt,
@@ -62,6 +63,7 @@ describe('M5 purchase request, order and receipt contract', () => {
       'receipt:edit',
       'receipt:delete',
       'receipt:submit',
+      'receipt:return',
     ])
   })
 
@@ -90,7 +92,12 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('生成并上传单据说明')
     expect(source).toContain('updatePurchaseOrder')
     expect(source).toContain('编辑商业条件')
+    expect(source).toContain('登记不合格退货')
+    expect(source).toContain('confirmReceiptSupplierReturn')
     expect(source).toContain('remainingQuantity')
+    expect(source).toContain("form.receiptMode === 'DIRECT_CONSUMPTION'")
+    expect(source).toContain('v-model="form.useLocation"')
+    expect(source).toContain('label="使用部位"')
     expect(source).toContain("'orderCode' in record")
     expect(source).toContain("CONVERTED: '已转订单'")
     expect(source).toContain("PARTIAL: '部分合格'")
@@ -169,6 +176,14 @@ describe('M5 purchase request, order and receipt contract', () => {
       },
     ])
     await submitReceipt('RC/1')
+    await confirmReceiptSupplierReturn({
+      receiptItemId: 'RI/1',
+      returnKind: 'UNQUALIFIED',
+      quantity: '0.2500',
+      returnDate: '2026-07-01',
+      reason: '不合格品退回供应商',
+      idempotencyKey: 'SRT-RI-1',
+    })
     await deleteReceipt('RC/1')
 
     expect(requestId).toBe('9007199254740993')
@@ -183,6 +198,7 @@ describe('M5 purchase request, order and receipt contract', () => {
       ),
     ).toBeDefined()
     expect(calls.map(([url]) => String(url))).toContain('/api/receipts/RC%2F1/items')
+    expect(calls.map(([url]) => String(url))).toContain('/api/supplier-returns')
     expect(
       calls.find(
         ([url, init]) =>
@@ -197,6 +213,13 @@ describe('M5 purchase request, order and receipt contract', () => {
       String(url).endsWith('/purchase-requests/9007199254740993/items/batch'),
     )
     expect(JSON.parse(String(requestItems?.[1]?.body))[0].quantity).toBe('9007199254740993.1234')
+    const supplierReturn = calls.find(([url]) => String(url).endsWith('/supplier-returns'))
+    expect(JSON.parse(String(supplierReturn?.[1]?.body))).toMatchObject({
+      receiptItemId: 'RI/1',
+      returnKind: 'UNQUALIFIED',
+      quantity: '0.2500',
+      idempotencyKey: 'SRT-RI-1',
+    })
   })
 
   it('propagates over-receipt 409 without client retry', async () => {

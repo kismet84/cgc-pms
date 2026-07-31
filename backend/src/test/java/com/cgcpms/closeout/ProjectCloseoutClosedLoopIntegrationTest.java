@@ -50,6 +50,8 @@ class ProjectCloseoutClosedLoopIntegrationTest {
     private static final long RESPONSIBLE_USER = 99191012L;
     private static final long OUTSIDE_USER = 99191013L;
     private static final long PROJECT_MEMBER = 99191014L;
+    private static final long SUPERSEDED_SCHEDULE = 99191015L;
+    private static final long SUPERSEDED_WBS = 99191016L;
     private static final AtomicLong IDS = new AtomicLong(99191100L);
 
     @Autowired ProjectCloseoutService service;
@@ -245,6 +247,34 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         assertEquals("CLOSEOUT_STAGE_INVALID", premature.getCode());
     }
 
+    @Test
+    void ignoresSupersededScheduleTasksInCloseoutReadiness() {
+        long closeoutId = id(service.initiate(new InitiateCommand(PROJECT, "PC-SUPERSEDED", LocalDate.now(), null)));
+        long sectionId = id(service.createSectionAcceptance(closeoutId, new SectionAcceptanceCommand(
+                WBS, QUALITY_INSPECTION, "SA-SUPERSEDED", "当前计划验收", LocalDate.now(), "PASS", null)));
+        evidence("CLOSEOUT_SECTION_ACCEPTANCE", sectionId, "SECTION_ACCEPTANCE_RECORD");
+        service.confirmSectionAcceptance(sectionId);
+        jdbc.update("""
+                INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
+                 planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,'CLOSEOUT-SUPERSEDED','被取代计划','BASELINE',0,?,?,'SUPERSEDED',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, SUPERSEDED_SCHEDULE, PROJECT, LocalDate.now().minusMonths(4), LocalDate.now().minusMonths(1));
+        jdbc.update("""
+                INSERT INTO project_wbs_task(id,tenant_id,project_id,schedule_plan_id,task_code,task_name,work_area,
+                 responsible_user_id,planned_start_date,planned_end_date,weight_percent,actual_progress,status,sort_order,version,
+                 created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,'WBS-SUPERSEDED','被取代历史任务','全场',1,?,?,100,0,'NOT_STARTED',1,0,
+                 1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, SUPERSEDED_WBS, PROJECT, SUPERSEDED_SCHEDULE,
+                LocalDate.now().minusMonths(4), LocalDate.now().minusMonths(1));
+
+        Map<String, Object> overview = service.overview(PROJECT);
+        assertEquals(1L, ((Number) ((Map<?, ?>) overview.get("wbsReadiness")).get("totalTasks")).longValue());
+        assertEquals(1, ((List<?>) overview.get("wbsTasks")).size());
+        assertDoesNotThrow(() -> service.createFinalAcceptance(closeoutId, new FinalAcceptanceCommand(
+                "FA-SUPERSEDED", LocalDate.now(), "建设单位", "参建单位", "PASS", "当前计划验收完成", null)));
+    }
+
     private void collect(long receivableId, BigDecimal amount, String suffix) {
         long collectionId = IDS.incrementAndGet();
         jdbc.update("""
@@ -321,8 +351,8 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM qs_issue WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM qs_inspection_record WHERE id=?", QUALITY_INSPECTION);
         jdbc.update("DELETE FROM qs_inspection_plan WHERE id=?", QUALITY_PLAN);
-        jdbc.update("DELETE FROM project_wbs_task WHERE id=?", WBS);
-        jdbc.update("DELETE FROM project_schedule_plan WHERE id=?", SCHEDULE);
+        jdbc.update("DELETE FROM project_wbs_task WHERE id IN(?,?)", WBS, SUPERSEDED_WBS);
+        jdbc.update("DELETE FROM project_schedule_plan WHERE id IN(?,?)", SCHEDULE, SUPERSEDED_SCHEDULE);
         jdbc.update("DELETE FROM ct_contract WHERE id=?", CONTRACT);
         jdbc.update("DELETE FROM md_partner WHERE id=?", PARTNER);
         jdbc.update("DELETE FROM pm_project_member WHERE id=?", PROJECT_MEMBER);

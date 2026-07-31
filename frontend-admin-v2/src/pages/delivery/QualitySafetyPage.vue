@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import type {
   ContractRecord,
   PartnerRecord,
@@ -17,6 +18,7 @@ import type {
   SiteFileRecord,
 } from '@cgc-pms/frontend-contracts'
 import {
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -49,8 +51,10 @@ import {
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
+import V2Tabs from '@/components/V2Tabs.vue'
 import { deliveryLabel } from './labels'
 
+type QualityTab = 'plan' | 'inspection' | 'rectification' | 'reinspection' | 'consequence'
 type DialogKind =
   | 'plan'
   | 'inspection'
@@ -69,6 +73,8 @@ interface EvidenceTarget {
 }
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
+const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
@@ -80,6 +86,8 @@ const plans = ref<QualityPlanRecord[]>([])
 const inspections = ref<QualityInspectionRecord[]>([])
 const issues = ref<QualityIssueRecord[]>([])
 const selectedPlanId = ref('')
+const activeTab = ref<QualityTab>('plan')
+const inspectionTypeFilter = ref('ALL')
 const activeInspection = ref<QualityInspectionRecord | null>(null)
 const activeIssue = ref<QualityIssueRecord | null>(null)
 const activeRectification = ref<QualityRectificationRecord | null>(null)
@@ -103,6 +111,31 @@ const scopeProjectIds = computed(() =>
 const selectedPlan = computed(
   () => plans.value.find((item) => item.id === selectedPlanId.value) ?? null,
 )
+const filteredPlans = computed(() =>
+  inspectionTypeFilter.value === 'ALL'
+    ? plans.value
+    : plans.value.filter((item) => item.inspectionType === inspectionTypeFilter.value),
+)
+const rectificationIssues = computed(() =>
+  issues.value.filter(
+    (item) =>
+      item.status !== 'PENDING_REINSPECTION' &&
+      !(item.status === 'CLOSED' && item.responsiblePartnerId),
+  ),
+)
+const reinspectionIssues = computed(() =>
+  issues.value.filter((item) => item.status === 'PENDING_REINSPECTION'),
+)
+const consequenceIssues = computed(() =>
+  issues.value.filter((item) => item.status === 'CLOSED' && item.responsiblePartnerId),
+)
+const visibleTabs = computed(() => [
+  { value: 'plan', label: '检查计划', count: filteredPlans.value.length },
+  { value: 'inspection', label: '检查记录', count: inspections.value.length },
+  { value: 'rectification', label: '问题整改', count: rectificationIssues.value.length },
+  { value: 'reinspection', label: '复检闭环', count: reinspectionIssues.value.length },
+  { value: 'consequence', label: '后果追踪', count: consequenceIssues.value.length },
+])
 const currentUserId = computed(() => String(session.userInfo?.userId ?? ''))
 const userOptions = (value = '') => {
   const options = currentUserId.value
@@ -130,6 +163,8 @@ const contractOptions = computed(() =>
       label: `${item.contractCode} · ${item.contractName}`,
     })),
 )
+const partnerLabel = (partnerId?: string) =>
+  partnerOptions.value.find((item) => item.value === partnerId)?.label || '已关联合作方'
 const canPlan = computed(() => Boolean(projectId.value) && can('quality:safety:plan:maintain'))
 const canInspect = computed(
   () => Boolean(projectId.value) && can('quality:safety:inspection:maintain'),
@@ -191,6 +226,11 @@ const consequenceForm = reactive<QualityConsequenceCommand>({
   remark: '',
 })
 
+function planQueryValue(): string {
+  const value = route.query.planId
+  return typeof value === 'string' ? value : ''
+}
+
 function can(permission: string): boolean {
   return (
     session.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN') ||
@@ -216,13 +256,16 @@ async function loadProject(preserveNotice = false): Promise<void> {
   inspectionController?.abort()
   traceController?.abort()
   const requestGeneration = ++generation
+  const previousSelectedPlanId = selectedPlanId.value
   plans.value = []
   inspections.value = []
   issues.value = []
-  selectedPlanId.value = ''
   trace.value = null
   traceFiles.value = []
-  if (!scopeProjectIds.value.length) return
+  if (!scopeProjectIds.value.length) {
+    selectedPlanId.value = ''
+    return
+  }
   const controller = new AbortController()
   projectController = controller
   loading.value = true
@@ -240,7 +283,17 @@ async function loadProject(preserveNotice = false): Promise<void> {
     if (requestGeneration !== generation) return
     plans.value = loaded.flatMap(([projectPlans]) => projectPlans)
     issues.value = loaded.flatMap(([, projectIssues]) => projectIssues)
-    selectedPlanId.value = plans.value[0]?.id ?? ''
+    const requestedPlanId = planQueryValue()
+    selectedPlanId.value = plans.value.some((plan) => plan.id === requestedPlanId)
+      ? requestedPlanId
+      : plans.value.some((plan) => plan.id === previousSelectedPlanId)
+        ? previousSelectedPlanId
+        : (plans.value[0]?.id ?? '')
+    if (requestedPlanId && requestedPlanId !== selectedPlanId.value) {
+      const query = { ...route.query }
+      delete query.planId
+      await router.replace({ query, hash: route.hash })
+    }
     await loadInspections()
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '质量安全事实加载失败')
@@ -260,6 +313,14 @@ async function loadInspections(): Promise<void> {
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '检查记录加载失败')
   }
+}
+
+function selectPlan(planId: string): void {
+  if (planId === selectedPlanId.value) return
+  void router.replace({
+    query: { ...route.query, planId },
+    hash: route.hash,
+  })
 }
 
 async function openTrace(issue: QualityIssueRecord, preserveNotice = false): Promise<void> {
@@ -542,8 +603,25 @@ const submitDraftRectification = (item: QualityRectificationRecord) => {
   )
 }
 
-watch(scopeProjectIds, () => void loadProject(), { immediate: true })
-watch(selectedPlanId, () => void loadInspections())
+watch(
+  () => scopeProjectIds.value.join('|'),
+  () => void loadProject(),
+  { immediate: true },
+)
+watch(
+  () => route.query.planId,
+  () => {
+    const planId = planQueryValue()
+    if (
+      !planId ||
+      planId === selectedPlanId.value ||
+      !plans.value.some((plan) => plan.id === planId)
+    )
+      return
+    selectedPlanId.value = planId
+    void loadInspections()
+  },
+)
 onBeforeUnmount(() => {
   generation += 1
   projectController?.abort()
@@ -554,8 +632,6 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="quality-page" aria-label="质量安全整改闭环">
-    <V2Card title="质量安全整改闭环" :heading-level="1" />
-
     <V2PageState
       v-if="loading"
       kind="loading"
@@ -569,21 +645,26 @@ onBeforeUnmount(() => {
       description="当前账号没有可查看的项目。"
     />
     <template v-else>
-      <V2Card title="质量安全闭环台账">
-        <template #title-extra>
-          <div class="quality-page__facts" aria-label="质量安全闭环概览">
-            <V2Badge>计划 {{ plans.length }}</V2Badge>
-            <V2Badge>检查 {{ inspections.length }}</V2Badge>
-            <V2Badge tone="warning">问题 {{ issues.length }}</V2Badge>
-          </div>
-        </template>
+      <V2Card title="质量安全整改闭环" :heading-level="1">
         <template #actions>
           <div class="quality-page__actions">
-            <V2Button v-if="canPlan && projectId" size="small" @click="show('plan')"
+            <V2Select
+              v-model="inspectionTypeFilter"
+              label="检查类型"
+              :options="[
+                { value: 'ALL', label: '全部类型' },
+                { value: 'QUALITY', label: '质量' },
+                { value: 'SAFETY', label: '安全' },
+              ]"
+            />
+            <V2Button
+              v-if="activeTab === 'plan' && canPlan && projectId"
+              size="small"
+              @click="show('plan')"
               >新建检查计划</V2Button
             >
             <V2Button
-              v-if="canInspect && selectedPlan?.status === 'ACTIVE'"
+              v-if="activeTab === 'inspection' && canInspect && selectedPlan?.status === 'ACTIVE'"
               size="small"
               variant="secondary"
               @click="show('inspection')"
@@ -591,29 +672,42 @@ onBeforeUnmount(() => {
             >
           </div>
         </template>
-        <div class="quality-page__record-sections">
-          <section aria-labelledby="quality-plan-title">
-            <h3 id="quality-plan-title">检查计划</h3>
-            <div v-if="plans.length" class="quality-page__table-wrap">
-              <table class="quality-page__table v2-table--top" aria-labelledby="quality-plan-title">
+      </V2Card>
+      <V2Tabs
+        v-model="activeTab"
+        :tabs="visibleTabs"
+        id-prefix="quality"
+        aria-label="质量安全业务分区"
+      />
+      <V2Card>
+        <section
+          v-if="visibleTabs.length"
+          role="tabpanel"
+          :id="`quality-panel-${activeTab}`"
+          :aria-labelledby="`quality-tab-${activeTab}`"
+          class="quality-page__record-sections"
+        >
+          <div v-if="activeTab === 'plan'">
+            <div v-if="filteredPlans.length" class="quality-page__table-wrap">
+              <table class="quality-page__table v2-table--top" aria-label="检查计划">
                 <thead>
                   <tr>
                     <th scope="col">计划编号</th>
                     <th scope="col">计划名称</th>
                     <th scope="col">状态</th>
                     <th scope="col">周期</th>
-                    <th scope="col">操作</th>
+                    <th scope="col" class="v2-table-cell--actions">操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="plan in plans" :key="plan.id">
+                  <tr v-for="(plan, index) in filteredPlans" :key="plan.id">
                     <th scope="row">{{ plan.planCode }}</th>
                     <td>
                       <V2Button
                         size="small"
                         variant="ghost"
                         :aria-pressed="selectedPlanId === plan.id"
-                        @click="selectedPlanId = plan.id"
+                        @click="selectPlan(plan.id)"
                       >
                         {{ plan.planName }}
                       </V2Button>
@@ -624,8 +718,11 @@ onBeforeUnmount(() => {
                       }}</V2Badge>
                     </td>
                     <td>{{ plan.startDate }} 至 {{ plan.endDate }}</td>
-                    <td>
-                      <div class="quality-page__actions">
+                    <td class="v2-table-cell--actions">
+                      <V2ActionMenu
+                        :label="`${plan.planCode}更多操作`"
+                        :placement="index >= filteredPlans.length - 3 ? 'top-end' : 'bottom-end'"
+                      >
                         <V2Button
                           v-if="canPlan && plan.status === 'DRAFT'"
                           size="small"
@@ -643,35 +740,34 @@ onBeforeUnmount(() => {
                           >完成</V2Button
                         >
                         <span v-if="!canPlan || !['DRAFT', 'ACTIVE'].includes(plan.status)">—</span>
-                      </div>
+                      </V2ActionMenu>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p v-else>暂无检查计划。</p>
-          </section>
+            <V2PageState
+              v-else-if="!errorMessage"
+              kind="empty"
+              title="暂无检查计划"
+              description="当前检查类型下没有计划。"
+            />
+          </div>
 
-          <section aria-labelledby="quality-inspection-title">
-            <h3 id="quality-inspection-title">
-              检查记录{{ selectedPlan ? ` · ${selectedPlan.planName}` : '' }}
-            </h3>
+          <div v-else-if="activeTab === 'inspection'">
             <div v-if="inspections.length" class="quality-page__table-wrap">
-              <table
-                class="quality-page__table v2-table--top"
-                aria-labelledby="quality-inspection-title"
-              >
+              <table class="quality-page__table v2-table--top" aria-label="检查记录">
                 <thead>
                   <tr>
                     <th scope="col">检查编号</th>
                     <th scope="col">位置 / 摘要</th>
                     <th scope="col">状态</th>
                     <th scope="col">日期</th>
-                    <th scope="col">操作</th>
+                    <th scope="col" class="v2-table-cell--actions">操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="inspection in inspections" :key="inspection.id">
+                  <tr v-for="(inspection, index) in inspections" :key="inspection.id">
                     <th scope="row">{{ inspection.inspectionCode }}</th>
                     <td>{{ inspection.location }} · {{ inspection.summary }}</td>
                     <td>
@@ -680,8 +776,11 @@ onBeforeUnmount(() => {
                       }}</V2Badge>
                     </td>
                     <td>{{ inspection.inspectionDate }}</td>
-                    <td>
-                      <div class="quality-page__actions">
+                    <td class="v2-table-cell--actions">
+                      <V2ActionMenu
+                        :label="`${inspection.inspectionCode}更多操作`"
+                        :placement="index >= inspections.length - 3 ? 'top-end' : 'bottom-end'"
+                      >
                         <V2Button
                           v-if="canInspect && inspection.status === 'DRAFT'"
                           size="small"
@@ -712,35 +811,35 @@ onBeforeUnmount(() => {
                           >提交检查</V2Button
                         >
                         <span v-if="!canInspect || inspection.status !== 'DRAFT'">—</span>
-                      </div>
+                      </V2ActionMenu>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p v-else>暂无检查记录。</p>
-          </section>
+            <V2PageState
+              v-else-if="!errorMessage"
+              kind="empty"
+              title="暂无检查记录"
+              description="当前计划下没有检查记录。"
+            />
+          </div>
 
-          <section aria-labelledby="quality-issue-title">
-            <h3 id="quality-issue-title">问题、整改与后果</h3>
-            <div v-if="issues.length" class="quality-page__table-wrap">
-              <table
-                class="quality-page__table v2-table--top"
-                aria-labelledby="quality-issue-title"
-              >
+          <div v-else-if="activeTab === 'rectification'">
+            <div v-if="rectificationIssues.length" class="quality-page__table-wrap">
+              <table class="quality-page__table v2-table--top" aria-label="问题整改">
                 <thead>
                   <tr>
                     <th scope="col">问题编号</th>
                     <th scope="col">标题</th>
-                    <th scope="col">描述</th>
                     <th scope="col">严重度</th>
                     <th scope="col">状态</th>
                     <th scope="col">整改期限</th>
-                    <th scope="col">操作</th>
+                    <th scope="col" class="v2-table-cell--actions">操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="issue in issues" :key="issue.id">
+                  <tr v-for="(issue, index) in rectificationIssues" :key="issue.id">
                     <th scope="row">
                       <V2Button
                         size="small"
@@ -752,7 +851,6 @@ onBeforeUnmount(() => {
                       </V2Button>
                     </th>
                     <td>{{ issue.title }}</td>
-                    <td>{{ issue.description }}</td>
                     <td>
                       <V2Badge :tone="statusTone(issue.severity)">{{
                         deliveryLabel(issue.severity)
@@ -764,8 +862,13 @@ onBeforeUnmount(() => {
                       }}</V2Badge>
                     </td>
                     <td>{{ issue.dueDate }}</td>
-                    <td>
-                      <div class="quality-page__actions">
+                    <td class="v2-table-cell--actions">
+                      <V2ActionMenu
+                        :label="`${issue.issueCode}更多操作`"
+                        :placement="
+                          index >= rectificationIssues.length - 3 ? 'top-end' : 'bottom-end'
+                        "
+                      >
                         <V2Button
                           v-if="canInspect && issue.status === 'OPEN'"
                           size="small"
@@ -787,32 +890,126 @@ onBeforeUnmount(() => {
                           @click="show('rectification', issue)"
                           >提交整改</V2Button
                         >
-                        <V2Button
-                          v-if="canReinspect && issue.status === 'PENDING_REINSPECTION'"
-                          size="small"
-                          @click="showReinspection(issue)"
-                          >复检</V2Button
-                        >
-                        <V2Button
-                          v-if="
-                            canConsequence &&
-                            issue.status === 'CLOSED' &&
-                            issue.responsiblePartnerId
-                          "
-                          size="small"
-                          variant="ghost"
-                          @click="show('consequence', issue)"
-                          >登记后果</V2Button
-                        >
-                      </div>
+                      </V2ActionMenu>
                     </td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p v-else>暂无质量安全问题。</p>
-          </section>
-        </div>
+            <V2PageState
+              v-else-if="!errorMessage"
+              kind="empty"
+              title="暂无待处理问题"
+              description="当前没有需要登记证据或整改的问题。"
+            />
+          </div>
+
+          <div v-else-if="activeTab === 'reinspection'">
+            <div v-if="reinspectionIssues.length" class="quality-page__table-wrap">
+              <table class="quality-page__table v2-table--top" aria-label="复检闭环">
+                <thead>
+                  <tr>
+                    <th scope="col">问题编号</th>
+                    <th scope="col">标题</th>
+                    <th scope="col">严重度</th>
+                    <th scope="col">整改期限</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="issue in reinspectionIssues" :key="issue.id">
+                    <th scope="row">
+                      <V2Button
+                        size="small"
+                        variant="ghost"
+                        class="v2-table__record-link"
+                        @click="openTrace(issue)"
+                      >
+                        {{ issue.issueCode }}
+                      </V2Button>
+                    </th>
+                    <td>{{ issue.title }}</td>
+                    <td>
+                      <V2Badge :tone="statusTone(issue.severity)">{{
+                        deliveryLabel(issue.severity)
+                      }}</V2Badge>
+                    </td>
+                    <td>{{ issue.dueDate }}</td>
+                    <td>
+                      <V2Button v-if="canReinspect" size="small" @click="showReinspection(issue)"
+                        >复检</V2Button
+                      >
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <V2PageState
+              v-else-if="!errorMessage"
+              kind="empty"
+              title="暂无待复检问题"
+              description="当前没有已提交整改、等待复检的问题。"
+            />
+          </div>
+
+          <div v-else-if="activeTab === 'consequence'">
+            <div v-if="consequenceIssues.length" class="quality-page__table-wrap">
+              <table class="v2-table--top" aria-label="后果追踪">
+                <thead>
+                  <tr>
+                    <th scope="col">问题编号</th>
+                    <th scope="col">标题</th>
+                    <th scope="col">责任合作方</th>
+                    <th scope="col">状态</th>
+                    <th scope="col">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="issue in consequenceIssues" :key="issue.id">
+                    <th scope="row">
+                      <V2Button
+                        size="small"
+                        variant="ghost"
+                        class="v2-table__record-link"
+                        @click="openTrace(issue)"
+                      >
+                        {{ issue.issueCode }}
+                      </V2Button>
+                    </th>
+                    <td>{{ issue.title }}</td>
+                    <td>{{ partnerLabel(issue.responsiblePartnerId) }}</td>
+                    <td>
+                      <V2Badge :tone="statusTone(issue.status)">{{
+                        deliveryLabel(issue.status)
+                      }}</V2Badge>
+                    </td>
+                    <td>
+                      <V2Button
+                        v-if="canConsequence"
+                        size="small"
+                        variant="ghost"
+                        @click="show('consequence', issue)"
+                        >登记后果</V2Button
+                      >
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <V2PageState
+              v-else-if="!errorMessage"
+              kind="empty"
+              title="暂无后果追踪事项"
+              description="当前没有已闭环且归属合作方的问题。"
+            />
+          </div>
+        </section>
+        <V2PageState
+          v-else-if="!errorMessage"
+          kind="empty"
+          title="暂无可访问分区"
+          description="当前账号没有质量安全业务分区权限。"
+        />
       </V2Card>
     </template>
 
@@ -1204,7 +1401,6 @@ onBeforeUnmount(() => {
 .quality-page__notice:empty {
   display: none;
 }
-.quality-page__facts,
 .quality-page__actions {
   display: flex;
   flex-wrap: wrap;

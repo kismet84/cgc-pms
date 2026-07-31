@@ -238,7 +238,7 @@ export function createVariation(command: VariationSaveCommand): Promise<string> 
 
 export function updateVariation(id: string, command: VariationSaveCommand): Promise<void> {
   return apiRequest<void, VariationSaveCommand>(
-    COMMERCIAL_API.variation(requiredId(id, '变更ID')),
+    withVersion(COMMERCIAL_API.variation(requiredId(id, '变更ID')), command.version),
     {
       method: WRITE_METHOD.update,
       body: command,

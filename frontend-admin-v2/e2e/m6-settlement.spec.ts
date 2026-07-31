@@ -58,10 +58,10 @@ async function fulfill(route: Route, data: unknown, status = 200, code = '0') {
   })
 }
 
-async function selectOption(scope: Locator, label: RegExp, option: RegExp) {
+async function selectOption(page: Page, scope: Locator, label: RegExp, option: RegExp) {
   await expect(scope).toHaveCSS('transform', 'none')
   await scope.getByRole('button', { name: label }).press('ArrowDown')
-  const choice = scope.getByRole('option', { name: option })
+  const choice = page.getByRole('option', { name: option })
   await expect(choice).toBeVisible()
   await choice.click()
 }
@@ -363,7 +363,7 @@ test.describe('M6 settlement V2', () => {
     await page.goto('/v2/settlement/list?projectId=P1')
     await page.getByRole('button', { name: '新建结算' }).click()
     const form = page.getByRole('dialog', { name: '新建结算' })
-    await selectOption(form, /^分包合同：/, /SUB-2026-001 · 主体结构劳务分包合同/)
+    await selectOption(page, form, /^分包合同：/, /SUB-2026-001 · 主体结构劳务分包合同/)
     await form.getByLabel('终期扣款').fill('0.00')
     await form.getByRole('button', { name: '保存', exact: true }).dblclick()
     await expect(page).toHaveURL(/\/v2\/settlement\/list\?projectId=P1/)

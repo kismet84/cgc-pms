@@ -4,6 +4,7 @@ export interface NavigationAccess {
   permission?: string
   adminOnly?: boolean
   superAdminOnly?: boolean
+  adminBypassesPermission?: boolean
 }
 
 export interface WorkspaceTab extends NavigationAccess {
@@ -404,6 +405,7 @@ export const navigationDomains: NavigationDomain[] = [
         id: 'partners',
         label: '合作方管理',
         defaultPath: '/partner',
+        matchPrefixes: ['/partner'],
         tabs: [
           {
             path: '/partner',
@@ -470,12 +472,14 @@ export const navigationDomains: NavigationDomain[] = [
         label: '流程配置',
         defaultPath: '/approval/process',
         adminOnly: true,
+        adminBypassesPermission: true,
         tabs: [
           {
             path: '/approval/process',
             label: '审批流程',
             permission: 'workflow:process:query',
             adminOnly: true,
+            adminBypassesPermission: true,
           },
         ],
       },
@@ -564,6 +568,7 @@ export function hasAccess(
 ): boolean {
   if (access.superAdminOnly && !roles.includes('SUPER_ADMIN')) return false
   if (access.adminOnly && !hasAdminRole(roles)) return false
+  if (access.adminBypassesPermission && hasAdminRole(roles)) return true
   return !access.permission || permissions.includes('*') || permissions.includes(access.permission)
 }
 

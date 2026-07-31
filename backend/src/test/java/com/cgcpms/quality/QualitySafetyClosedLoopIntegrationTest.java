@@ -278,6 +278,14 @@ class QualitySafetyClosedLoopIntegrationTest {
         authenticate("quality:safety:rectify");
         evidence("QS_RECTIFICATION", rectification.getId(), "RECTIFICATION_EVIDENCE");
         service.submitRectification(rectification.getId());
+
+        asUser(1L);
+        authenticate("quality:safety:reinspect");
+        assertEquals("QS_REINSPECTION_SEGREGATION_REQUIRED", assertThrows(BusinessException.class,
+                () -> fileAuthorizer.checkVariationDocumentStage(
+                        "QS_RECTIFICATION", rectification.getId(), "REINSPECTION_EVIDENCE")).getCode());
+
+        asUser(2L);
         authenticate("quality:safety:reinspect");
         assertDoesNotThrow(() -> fileAuthorizer.checkVariationDocumentStage(
                 "QS_RECTIFICATION", rectification.getId(), "REINSPECTION_EVIDENCE"));

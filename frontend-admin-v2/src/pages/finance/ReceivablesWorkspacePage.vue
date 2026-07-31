@@ -24,6 +24,7 @@ import {
 import {
   createExpense,
   createInvoice,
+  createCollection,
   createOwnerSettlement,
   createPayment,
   createSalesInvoice,
@@ -34,13 +35,19 @@ import {
   loadCollections,
   loadExpenseApplications,
   loadInvoices,
+  loadFundAccounts,
   loadPaymentApplications,
+  loadPaymentBasis,
   loadPaymentSourceOptions,
+  loadPaymentSources as loadStoredPaymentSources,
   loadPayRecordOptions,
   loadReceivables,
   loadRevenueSettlements,
   loadSalesInvoices,
   reverseCollection,
+  reversePaymentRecord,
+  saveInvoiceAllocations,
+  savePaymentBasis,
   submitExpense,
   submitOwnerSettlement,
   submitPayment,
@@ -48,17 +55,21 @@ import {
   updateInvoice,
   updatePayment,
   verifyInvoice,
+  writebackPayment,
   savePaymentSources,
   type PaymentSourceOptionRecord,
 } from '@/services/finance'
 import { uploadSiteFile } from '@/services/delivery'
+import { loadReceiptItems, loadReceipts } from '@/services/supply-chain'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import type {
   BudgetLineRecord,
   CollectionRecord,
+  CollectionCommand,
   ExpenseApplicationCommand,
   ExpenseApplicationRecord,
+  FundAccountRecord,
   InvoiceCommand,
   InvoiceRecord,
   OwnerSettlementCommand,
@@ -66,6 +77,7 @@ import type {
   PartnerRecord,
   PaymentApplicationCommand,
   PaymentApplicationRecord,
+  PayRecordWritebackCommand,
   PayRecordOption,
   ReceivableRecord,
   SalesInvoiceCommand,
@@ -73,7 +85,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 
 type Mode = 'payment' | 'expense' | 'revenue' | 'invoice'
-type EditorKind = Exclude<Mode, 'revenue'> | 'settlement' | 'salesInvoice'
+type EditorKind = Exclude<Mode, 'revenue'> | 'settlement' | 'salesInvoice' | 'collection'
 type RecordRow = PaymentApplicationRecord | ExpenseApplicationRecord | InvoiceRecord
 type RevenueRow =
   | (OwnerSettlementRecord & { kind: 'settlement' })
@@ -96,6 +108,7 @@ interface FinanceEditor {
   budgetLineId: string
   sourceType: string
   sourceRefId: string
+  basisId: string
   payeePartnerId: string
   expenseDate: string
   amount: string
@@ -116,8 +129,32 @@ interface FinanceEditor {
   retentionAmount: string
   dueDate: string
   amountWithoutTax: string
+  receivableId: string
+  allocationAmount: string
+  fundAccountId: string
+  externalTxnNo: string
+  collectedAt: string
+  collectionAmount: string
+  payerName: string
   attachmentCount: string
   remark: string
+}
+
+interface WritebackEditor {
+  payAmount: string
+  paidAt: string
+  fundAccountId: string
+  payMethod: string
+  voucherNo: string
+  externalTxnNo: string
+  remark: string
+}
+
+interface ReversalEditor {
+  reversalType: 'REVERSAL' | 'REFUND'
+  externalTxnNo: string
+  reversedAt: string
+  reason: string
 }
 
 const today = () => new Date().toISOString().slice(0, 10)
@@ -134,6 +171,7 @@ const emptyEditor = (): FinanceEditor => ({
   budgetLineId: '',
   sourceType: '',
   sourceRefId: '',
+  basisId: '',
   payeePartnerId: '',
   expenseDate: today(),
   amount: '',
@@ -154,6 +192,13 @@ const emptyEditor = (): FinanceEditor => ({
   retentionAmount: '0',
   dueDate: today(),
   amountWithoutTax: '',
+  receivableId: '',
+  allocationAmount: '',
+  fundAccountId: '',
+  externalTxnNo: '',
+  collectedAt: `${today()}T12:00`,
+  collectionAmount: '',
+  payerName: '',
   attachmentCount: '0',
   remark: '',
 })
@@ -188,12 +233,17 @@ const permission = computed(
 const canQuery = computed(() => session.hasPermission(permission.value))
 const projectId = computed(() => workspace.selectedProjectId || '')
 const can = (action: string) =>
-  session.hasPermission(`${mode.value === 'payment' ? 'payment:app' : mode.value}:${action}`) ||
+  session.hasAdminOrPermission(
+    `${mode.value === 'payment' ? 'payment:app' : mode.value}:${action}`,
+  ) ||
   (mode.value === 'revenue' &&
-    session.hasPermission(
+    session.hasAdminOrPermission(
       action === 'reverse' ? 'revenue:collection:reverse' : 'revenue:operations:maintain',
     ))
 const canAdd = computed(() => (mode.value === 'revenue' ? can('maintain') : can('add')))
+const canWriteback = computed(() => session.hasPermission('payment:record:writeback'))
+const canReversePayment = computed(() => session.hasPermission('payment:record:reverse'))
+const canDirectPayment = computed(() => session.hasPermission('payment:direct'))
 
 const rows = ref<RecordRow[]>([])
 const revenueRows = ref<RevenueRow[]>([])
@@ -232,8 +282,21 @@ const partners = ref<PartnerRecord[]>([])
 const costSubjects = ref<CostSubjectOption[]>([])
 const budgetLines = ref<BudgetLineRecord[]>([])
 const payRecords = ref<PayRecordOption[]>([])
+const fundAccounts = ref<FundAccountRecord[]>([])
 const paymentSources = ref<PaymentSourceOptionRecord[]>([])
+const receiptBasisOptions = ref<Array<{ value: string; label: string }>>([])
 const paymentAttachment = ref<File | null>(null)
+const expenseAttachment = ref<File | null>(null)
+const invoiceAttachment = ref<File | null>(null)
+const settlementAttachment = ref<File | null>(null)
+const salesInvoiceAttachment = ref<File | null>(null)
+const collectionAttachment = ref<File | null>(null)
+const settlementAttachmentInput = ref<HTMLInputElement | null>(null)
+const settlementAttachmentTarget = ref<OwnerSettlementRecord | null>(null)
+const writebackTarget = ref<PaymentApplicationRecord | null>(null)
+const writebackEditor = ref<WritebackEditor | null>(null)
+const reversalTarget = ref<PayRecordOption | null>(null)
+const reversalEditor = ref<ReversalEditor | null>(null)
 let controller: AbortController | null = null
 
 const text = (row: Row) =>
@@ -277,6 +340,8 @@ const isDraft = (row: RecordRow) =>
   'approvalStatus' in row ? row.approvalStatus === 'DRAFT' : row.verifyStatus !== 'VERIFIED'
 const canVerify = (row: RecordRow) =>
   'verifyStatus' in row && row.verifyStatus !== 'VERIFIED' && can('verify')
+const paymentRecord = (row: PaymentApplicationRecord) =>
+  payRecords.value.find((record) => record.payApplicationId === row.id)
 
 async function load(): Promise<void> {
   if (!canQuery.value) return
@@ -290,7 +355,14 @@ async function load(): Promise<void> {
     rows.value = []
     revenueRows.value = []
     if (mode.value === 'payment') {
-      rows.value = (await loadPaymentApplications(query, request.signal)).records
+      const [applications, records] = await Promise.all([
+        loadPaymentApplications(query, request.signal),
+        canReversePayment.value
+          ? loadPayRecordOptions(request.signal)
+          : Promise.resolve({ records: [], total: 0 }),
+      ])
+      rows.value = applications.records
+      payRecords.value = records.records
     } else if (mode.value === 'expense') {
       rows.value = (await loadExpenseApplications(query, request.signal)).records
     } else if (mode.value === 'invoice') {
@@ -361,17 +433,43 @@ const budgetLineOptions = computed(() =>
       label: `${item.costSubjectName || item.costSubjectId} · 可用 ${formatAmount(item.availableAmount)}`,
     })),
 )
-const paymentSourceOptions = computed(() =>
-  paymentSources.value.map((item) => ({
+const paymentSourceOptions = computed(() => [
+  ...paymentSources.value.map((item) => ({
     value: `${item.sourceType}:${item.sourceRefId}`,
     label: `${item.documentCode} · 可付 ${formatAmount(item.availableAmount)}`,
   })),
-)
+  ...(canDirectPayment.value
+    ? [{ value: 'DIRECT:self', label: '直接付款（保存后绑定本申请）' }]
+    : []),
+])
 const payRecordOptions = computed(() =>
   payRecords.value.map((item) => ({
     value: item.id,
     label: `${item.voucherNo || `付款记录 ${item.id}`} · ${formatAmount(item.payAmount)}`,
   })),
+)
+const fundAccountOptions = computed(() =>
+  fundAccounts.value
+    .filter((item) => item.enabledFlag === 1)
+    .map((item) => ({
+      value: item.id,
+      label: `${item.accountCode} · ${item.accountName}`,
+    })),
+)
+const receivableOptions = computed(() =>
+  revenueRows.value
+    .filter(
+      (item): item is ReceivableRecord & { kind: 'receivable' } =>
+        item.kind === 'receivable' &&
+        item.status === 'OPEN' &&
+        (!editor.value?.projectId || item.projectId === editor.value.projectId) &&
+        (!editor.value?.contractId || item.contractId === editor.value.contractId) &&
+        (!editor.value?.customerId || item.customerId === editor.value.customerId),
+    )
+    .map((item) => ({
+      value: item.id,
+      label: `${item.receivableCode} · 可分配 ${formatAmount(item.outstandingAmount)}`,
+    })),
 )
 const payTypeOptions = [
   { value: 'FINAL', label: '结算付款' },
@@ -419,7 +517,9 @@ async function changeProject(value: string): Promise<void> {
   editor.value.budgetLineId = ''
   editor.value.sourceType = ''
   editor.value.sourceRefId = ''
+  editor.value.basisId = ''
   paymentSources.value = []
+  receiptBasisOptions.value = []
   await Promise.all([
     loadContracts(value),
     editorKind.value === 'payment' || editorKind.value === 'expense'
@@ -430,18 +530,43 @@ async function changeProject(value: string): Promise<void> {
 
 async function loadPaymentSources(): Promise<void> {
   paymentSources.value = []
+  receiptBasisOptions.value = []
   if (!editor.value || editorKind.value !== 'payment') return
   editor.value.sourceType = ''
   editor.value.sourceRefId = ''
+  editor.value.basisId = ''
   const { projectId, contractId, partnerId, payType, expenseCategory } = editor.value
   if (!projectId || !contractId || !partnerId || !payType) return
-  paymentSources.value = await loadPaymentSourceOptions({
-    projectId,
-    contractId,
-    partnerId,
-    payType,
-    expenseCategory,
-  })
+  const [sources, receipts] = await Promise.all([
+    loadPaymentSourceOptions({
+      projectId,
+      contractId,
+      partnerId,
+      payType,
+      expenseCategory,
+    }),
+    expenseCategory === 'MATERIAL'
+      ? loadReceipts({ pageNum: 1, pageSize: 200, projectId, contractId, partnerId })
+      : Promise.resolve({ records: [], total: 0 }),
+  ])
+  paymentSources.value = sources
+  const approvedReceipts = receipts.records.filter(
+    (receipt) => receipt.approvalStatus === 'APPROVED' && receipt.qualityStatus === 'QUALIFIED',
+  )
+  const itemGroups = await Promise.all(
+    approvedReceipts.map(async (receipt) => ({
+      receipt,
+      items: await loadReceiptItems(receipt.id),
+    })),
+  )
+  receiptBasisOptions.value = itemGroups.flatMap(({ receipt, items }) =>
+    items
+      .filter((item): item is typeof item & { id: string } => Boolean(item.id))
+      .map((item) => ({
+        value: item.id,
+        label: `${receipt.receiptCode} · ${item.materialName || item.id} · ${formatAmount(item.amount || '0')}`,
+      })),
+  )
 }
 
 function choosePaymentSource(value: string): void {
@@ -453,6 +578,21 @@ function choosePaymentSource(value: string): void {
 
 function onPaymentAttachment(event: Event): void {
   paymentAttachment.value = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+function onExpenseAttachment(event: Event): void {
+  expenseAttachment.value = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+function onInvoiceAttachment(event: Event): void {
+  invoiceAttachment.value = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+function onSettlementAttachment(event: Event): void {
+  settlementAttachment.value = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+function onSalesInvoiceAttachment(event: Event): void {
+  salesInvoiceAttachment.value = (event.target as HTMLInputElement).files?.[0] ?? null
+}
+function onCollectionAttachment(event: Event): void {
+  collectionAttachment.value = (event.target as HTMLInputElement).files?.[0] ?? null
 }
 
 async function loadCandidates(kind: EditorKind): Promise<void> {
@@ -466,6 +606,9 @@ async function loadCandidates(kind: EditorKind): Promise<void> {
   if (kind === 'invoice' && !payRecords.value.length) {
     jobs.push(loadPayRecordOptions().then((page) => (payRecords.value = page.records)))
   }
+  if (kind === 'collection' && !fundAccounts.value.length) {
+    jobs.push(loadFundAccounts().then((items) => (fundAccounts.value = items)))
+  }
   await Promise.all(jobs)
 }
 
@@ -473,7 +616,13 @@ async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
   const value = emptyEditor()
   editorKind.value = kind
   paymentAttachment.value = null
+  expenseAttachment.value = null
+  invoiceAttachment.value = null
+  settlementAttachment.value = null
+  salesInvoiceAttachment.value = null
+  collectionAttachment.value = null
   paymentSources.value = []
+  receiptBasisOptions.value = []
   value.projectId = row?.projectId || projectId.value
   if (kind === 'payment') value.expenseCategory = 'SUBCONTRACT'
   if (row) {
@@ -517,6 +666,18 @@ async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
           : Promise.resolve(),
       ])
     }
+    if (kind === 'payment' && row) {
+      await loadPaymentSources()
+      const [sources, basis] = await Promise.all([
+        loadStoredPaymentSources(row.id),
+        loadPaymentBasis(row.id),
+      ])
+      const source = sources[0]
+      const basisItem = basis.find((item) => item.basisType === 'MAT_RECEIPT')
+      value.sourceType = source?.sourceType || ''
+      value.sourceRefId = source?.sourceRefId || ''
+      value.basisId = basisItem?.basisId || ''
+    }
   } catch (cause) {
     dialog.value = false
     showToast('error', '候选项加载失败', cause instanceof Error ? cause.message : '请稍后重试。')
@@ -533,8 +694,104 @@ function openEdit(row: RecordRow): void {
   void openForm(kind, row)
 }
 
-function required(value: string, label: string): string {
-  const normalized = value.trim()
+async function openWriteback(row: PaymentApplicationRecord): Promise<void> {
+  busy.value = true
+  try {
+    fundAccounts.value = await loadFundAccounts()
+    writebackTarget.value = row
+    writebackEditor.value = {
+      payAmount: row.approvedAmount,
+      paidAt: '',
+      fundAccountId: '',
+      payMethod: 'BANK_TRANSFER',
+      voucherNo: '',
+      externalTxnNo: '',
+      remark: '',
+    }
+  } catch (cause) {
+    showToast('error', '资金账户加载失败', cause instanceof Error ? cause.message : '请稍后重试。')
+  } finally {
+    busy.value = false
+  }
+}
+
+async function submitWriteback(): Promise<void> {
+  const target = writebackTarget.value
+  const value = writebackEditor.value
+  if (!target || !value) return
+  busy.value = true
+  try {
+    const command: PayRecordWritebackCommand = {
+      payApplicationId: target.id,
+      payAmount: required(value.payAmount, '付款金额'),
+      paidAt: `${required(value.paidAt, '付款时间').replace('T', ' ')}:00`,
+      fundAccountId: required(value.fundAccountId, '资金账户'),
+      payMethod: required(value.payMethod, '付款方式'),
+      voucherNo: value.voucherNo.trim() || undefined,
+      externalTxnNo: required(value.externalTxnNo, '外部流水号'),
+      remark: value.remark.trim() || undefined,
+    }
+    await writebackPayment(command)
+    writebackTarget.value = null
+    writebackEditor.value = null
+    await load()
+    showToast('success', '付款回写成功', '支付记录与资金日记账已刷新。')
+  } catch (cause) {
+    showToast('error', '付款回写失败', cause instanceof Error ? cause.message : '请稍后重试。')
+  } finally {
+    busy.value = false
+  }
+}
+
+function closeWriteback(): void {
+  if (busy.value) return
+  writebackTarget.value = null
+  writebackEditor.value = null
+}
+
+function openPaymentReversal(row: PaymentApplicationRecord): void {
+  const record = paymentRecord(row)
+  if (!record) return
+  reversalTarget.value = record
+  reversalEditor.value = {
+    reversalType: 'REVERSAL',
+    externalTxnNo: '',
+    reversedAt: '',
+    reason: '',
+  }
+}
+
+async function submitPaymentReversal(): Promise<void> {
+  const target = reversalTarget.value
+  const value = reversalEditor.value
+  if (!target || !value) return
+  busy.value = true
+  try {
+    await reversePaymentRecord(target.id, {
+      reversalType: value.reversalType,
+      externalTxnNo: required(value.externalTxnNo, '冲销流水号'),
+      reversedAt: `${required(value.reversedAt, '冲销时间').replace('T', ' ')}:00`,
+      reason: required(value.reason, '冲销原因'),
+    })
+    reversalTarget.value = null
+    reversalEditor.value = null
+    await load()
+    showToast('success', '支付冲销成功', '支付记录与资金台账已刷新。')
+  } catch (cause) {
+    showToast('error', '支付冲销失败', cause instanceof Error ? cause.message : '请稍后重试。')
+  } finally {
+    busy.value = false
+  }
+}
+
+function closePaymentReversal(): void {
+  if (busy.value) return
+  reversalTarget.value = null
+  reversalEditor.value = null
+}
+
+function required(value: string | number | null | undefined, label: string): string {
+  const normalized = value == null ? '' : String(value).trim()
   if (!normalized) throw new TypeError(`${label}不能为空`)
   return normalized
 }
@@ -607,8 +864,34 @@ function salesInvoiceCommand(value: FinanceEditor): SalesInvoiceCommand {
     invoiceDate: required(value.invoiceDate, '开票日期'),
     amountWithoutTax: required(value.amountWithoutTax, '不含税金额'),
     taxAmount: required(value.taxAmount, '税额'),
-    attachmentCount: Number(value.attachmentCount || '0'),
-    allocations: [],
+    attachmentCount: salesInvoiceAttachment.value ? 1 : 0,
+    allocations: [
+      {
+        receivableId: required(value.receivableId, '应收款'),
+        amount: required(value.allocationAmount, '分配金额'),
+      },
+    ],
+    remark: value.remark.trim() || undefined,
+  }
+}
+
+function collectionCommand(value: FinanceEditor): CollectionCommand {
+  return {
+    projectId: required(value.projectId, '项目'),
+    contractId: required(value.contractId, '合同'),
+    customerId: required(value.customerId, '建设单位'),
+    fundAccountId: required(value.fundAccountId, '资金账户'),
+    externalTxnNo: required(value.externalTxnNo, '外部流水号'),
+    collectedAt: required(value.collectedAt, '到账时间'),
+    amount: required(value.collectionAmount, '回款金额'),
+    payerName: required(value.payerName, '付款单位'),
+    attachmentCount: collectionAttachment.value ? 1 : 0,
+    allocations: [
+      {
+        receivableId: required(value.receivableId, '应收款'),
+        amount: required(value.allocationAmount, '分配金额'),
+      },
+    ],
     remark: value.remark.trim() || undefined,
   }
 }
@@ -621,34 +904,110 @@ async function save(): Promise<void> {
     if (editorKind.value === 'payment') {
       const command = paymentCommand(value)
       const sourceType = required(value.sourceType, '付款来源类型')
-      const sourceRefId = required(value.sourceRefId, '付款来源')
+      const basisId =
+        sourceType === 'DIRECT' && value.expenseCategory === 'MATERIAL'
+          ? required(value.basisId, '材料验收明细')
+          : value.basisId
       if (!value.id && !paymentAttachment.value) throw new TypeError('付款附件不能为空')
       const paymentId = value.id || (await createPayment(command))
       if (value.id) await updatePayment(value.id, command)
+      value.id = paymentId
       await savePaymentSources(paymentId, [
-        { sourceType, sourceRefId, sourceAmount: command.applyAmount },
+        {
+          sourceType,
+          sourceRefId:
+            sourceType === 'DIRECT' ? paymentId : required(value.sourceRefId, '付款来源'),
+          sourceAmount: command.applyAmount,
+        },
       ])
+      if (basisId) {
+        await savePaymentBasis(paymentId, [
+          { basisType: 'MAT_RECEIPT', basisId, basisAmount: command.applyAmount },
+        ])
+      }
       if (paymentAttachment.value) {
         await uploadSiteFile(paymentAttachment.value, 'PAYMENT', paymentId, 'PAYMENT_PROOF')
       }
     } else if (editorKind.value === 'expense') {
       const command = expenseCommand(value)
+      if (!value.id && !expenseAttachment.value) throw new TypeError('费用附件不能为空')
+      const expenseId = value.id || (await createExpense(command))
       if (value.id) await updateExpense(value.id, command)
-      else await createExpense(command)
+      value.id = expenseId
+      if (expenseAttachment.value) {
+        await uploadSiteFile(expenseAttachment.value, 'EXPENSE', expenseId, 'OTHER')
+      }
     } else if (editorKind.value === 'invoice') {
       const command = invoiceCommand(value)
-      if (value.id) await updateInvoice(value.id, command)
-      else await createInvoice(command)
+      if (!value.id && !invoiceAttachment.value) throw new TypeError('发票附件不能为空')
+      if (value.id) {
+        await updateInvoice(value.id, command)
+      } else {
+        const invoiceId = await createInvoice(command)
+        await saveInvoiceAllocations(invoiceId, [
+          { payRecordId: command.payRecordId, allocatedAmount: command.invoiceAmount },
+        ])
+        if (invoiceAttachment.value) {
+          await uploadSiteFile(invoiceAttachment.value, 'INVOICE', invoiceId, 'ELECTRONIC_INVOICE')
+        }
+      }
     } else if (editorKind.value === 'settlement') {
-      await createOwnerSettlement(settlementCommand(value))
+      if (!settlementAttachment.value) throw new TypeError('业主结算附件不能为空')
+      const settlement = await createOwnerSettlement(settlementCommand(value))
+      await uploadSiteFile(
+        settlementAttachment.value,
+        'OWNER_SETTLEMENT',
+        settlement.id,
+        'OWNER_CONFIRMATION',
+      )
+    } else if (editorKind.value === 'salesInvoice') {
+      if (!salesInvoiceAttachment.value) throw new TypeError('销项发票附件不能为空')
+      const salesInvoice = await createSalesInvoice(salesInvoiceCommand(value))
+      await uploadSiteFile(
+        salesInvoiceAttachment.value,
+        'SALES_INVOICE',
+        salesInvoice.id,
+        'ELECTRONIC_INVOICE',
+      )
     } else {
-      await createSalesInvoice(salesInvoiceCommand(value))
+      if (!collectionAttachment.value) throw new TypeError('银行回单不能为空')
+      const collection = await createCollection(collectionCommand(value))
+      await uploadSiteFile(
+        collectionAttachment.value,
+        'COLLECTION_RECORD',
+        collection.id,
+        'BANK_RECEIPT',
+      )
     }
     dialog.value = false
     await load()
     showToast('success', '保存成功', '已按服务端最新数据刷新。')
   } catch (cause) {
     showToast('error', '保存失败', cause instanceof Error ? cause.message : '请稍后重试。')
+  } finally {
+    busy.value = false
+  }
+}
+
+function requestSettlementAttachment(row: RevenueRow): void {
+  if (row.kind !== 'settlement') return
+  settlementAttachmentTarget.value = row
+  settlementAttachmentInput.value?.click()
+}
+
+async function uploadSettlementAttachment(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  const target = settlementAttachmentTarget.value
+  input.value = ''
+  settlementAttachmentTarget.value = null
+  if (!file || !target || busy.value) return
+  busy.value = true
+  try {
+    await uploadSiteFile(file, 'OWNER_SETTLEMENT', target.id, 'OWNER_CONFIRMATION')
+    showToast('success', '附件已上传', '业主结算可提交审批。')
+  } catch (cause) {
+    showToast('error', '附件上传失败', cause instanceof Error ? cause.message : '请稍后重试。')
   } finally {
     busy.value = false
   }
@@ -745,6 +1104,14 @@ onBeforeUnmount(() => controller?.abort())
             >
               新建销项发票
             </V2Button>
+            <V2Button
+              v-if="mode === 'revenue' && canAdd"
+              size="small"
+              variant="secondary"
+              @click="openForm('collection')"
+            >
+              新建回款
+            </V2Button>
             <V2Button size="small" variant="secondary" :loading="loading" @click="refreshWorkspace">
               刷新
             </V2Button>
@@ -794,17 +1161,20 @@ onBeforeUnmount(() => controller?.abort())
                     <th>项目</th>
                     <th>状态</th>
                     <th>金额</th>
-                    <th>操作</th>
+                    <th class="v2-table-cell--actions">操作</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="row in section.rows" :key="`${row.kind}-${row.id}`">
+                  <tr v-for="(row, index) in section.rows" :key="`${row.kind}-${row.id}`">
                     <td>{{ text(row) }}</td>
                     <td>{{ project(row) }}</td>
                     <td>{{ status(row) }}</td>
                     <td>{{ money(row) }}</td>
-                    <td>
-                      <V2ActionMenu label="记录操作">
+                    <td class="v2-table-cell--actions">
+                      <V2ActionMenu
+                        :label="`${text(row)}更多操作`"
+                        :placement="index >= section.rows.length - 3 ? 'top-end' : 'bottom-end'"
+                      >
                         <V2Button
                           v-if="
                             row.kind === 'settlement' && row.status === 'DRAFT' && can('submit')
@@ -814,6 +1184,16 @@ onBeforeUnmount(() => controller?.abort())
                           @click="requestAction(row, 'submit')"
                         >
                           提交
+                        </V2Button>
+                        <V2Button
+                          v-if="
+                            row.kind === 'settlement' && row.status === 'DRAFT' && can('maintain')
+                          "
+                          size="small"
+                          variant="ghost"
+                          @click="requestSettlementAttachment(row)"
+                        >
+                          上传附件
                         </V2Button>
                         <V2Button
                           v-if="
@@ -861,17 +1241,41 @@ onBeforeUnmount(() => controller?.abort())
                 <th>项目</th>
                 <th>状态</th>
                 <th>金额</th>
-                <th>操作</th>
+                <th class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in rows" :key="row.id">
+              <tr v-for="(row, index) in rows" :key="row.id">
                 <td>{{ text(row) }}</td>
                 <td>{{ project(row) }}</td>
                 <td>{{ status(row) }}</td>
                 <td>{{ money(row) }}</td>
-                <td>
-                  <V2ActionMenu label="记录操作">
+                <td class="v2-table-cell--actions">
+                  <V2ActionMenu
+                    :label="`${text(row)}更多操作`"
+                    :placement="index >= rows.length - 3 ? 'top-end' : 'bottom-end'"
+                  >
+                    <V2Button
+                      v-if="
+                        'applyCode' in row &&
+                        row.approvalStatus === 'APPROVED' &&
+                        row.payStatus === 'APPROVED' &&
+                        canWriteback
+                      "
+                      size="small"
+                      variant="ghost"
+                      @click="openWriteback(row)"
+                    >
+                      付款回写
+                    </V2Button>
+                    <V2Button
+                      v-if="'applyCode' in row && canReversePayment && Boolean(paymentRecord(row))"
+                      size="small"
+                      variant="ghost"
+                      @click="openPaymentReversal(row)"
+                    >
+                      支付冲销
+                    </V2Button>
                     <V2Button
                       v-if="isDraft(row) && can('edit')"
                       size="small"
@@ -938,6 +1342,7 @@ onBeforeUnmount(() => controller?.abort())
               :options="contractOptions"
               required
               :disabled="!contractOptions.length"
+              @update:model-value="editorKind === 'payment' && loadPaymentSources()"
             />
             <p v-if="!contractOptions.length">当前项目无可用合同，不能提交。</p>
           </template>
@@ -958,6 +1363,13 @@ onBeforeUnmount(() => controller?.abort())
               @update:model-value="loadPaymentSources"
             />
             <V2Select
+              v-model="editor.expenseCategory"
+              label="费用类别"
+              :options="expenseCategoryOptions"
+              required
+              @update:model-value="loadPaymentSources"
+            />
+            <V2Select
               v-model="editor.costSubjectId"
               label="成本科目"
               :options="costSubjectOptions"
@@ -972,15 +1384,25 @@ onBeforeUnmount(() => controller?.abort())
             />
             <V2Select
               :model-value="
-                editor.sourceType && editor.sourceRefId
-                  ? `${editor.sourceType}:${editor.sourceRefId}`
-                  : ''
+                editor.sourceType === 'DIRECT'
+                  ? 'DIRECT:self'
+                  : editor.sourceType && editor.sourceRefId
+                    ? `${editor.sourceType}:${editor.sourceRefId}`
+                    : ''
               "
               label="付款来源"
               :options="paymentSourceOptions"
               required
               :disabled="!paymentSourceOptions.length"
               @update:model-value="choosePaymentSource"
+            />
+            <V2Select
+              v-if="editor.sourceType === 'DIRECT' && editor.expenseCategory === 'MATERIAL'"
+              v-model="editor.basisId"
+              label="材料验收明细"
+              :options="receiptBasisOptions"
+              required
+              :disabled="!receiptBasisOptions.length"
             />
             <V2Input v-model="editor.applyAmount" label="申请金额" required hint="按字符串提交" />
             <V2Input v-model="editor.applyReason" label="申请事由" required />
@@ -1023,6 +1445,15 @@ onBeforeUnmount(() => controller?.abort())
             />
             <V2Input v-model="editor.amount" label="费用金额" required hint="按字符串提交" />
             <V2Input v-model="editor.description" label="费用说明" required />
+            <label class="v2-field">
+              <span class="v2-field__label">费用附件<span v-if="!editor.id">*</span></span>
+              <input
+                class="v2-file-input"
+                type="file"
+                :required="!editor.id"
+                @change="onExpenseAttachment"
+              />
+            </label>
           </template>
 
           <template v-else-if="editorKind === 'invoice'">
@@ -1050,6 +1481,15 @@ onBeforeUnmount(() => controller?.abort())
             <V2Input v-model="editor.taxAmount" label="税额" hint="按服务端字符串口径提交" />
             <V2Input v-model="editor.sellerName" label="销售方" />
             <V2Input v-model="editor.buyerName" label="购买方" />
+            <label>
+              发票附件<span v-if="!editor.id">*</span>
+              <input
+                type="file"
+                accept=".pdf,image/*"
+                :required="!editor.id"
+                @change="onInvoiceAttachment"
+              />
+            </label>
           </template>
 
           <template v-else-if="editorKind === 'settlement'">
@@ -1075,9 +1515,13 @@ onBeforeUnmount(() => controller?.abort())
             <V2Input v-model="editor.taxAmount" label="税额" required />
             <V2Input v-model="editor.retentionAmount" label="质保金" required />
             <V2Input v-model="editor.dueDate" label="到期日期" placeholder="YYYY-MM-DD" required />
+            <label class="v2-field">
+              <span class="v2-field__label">业主结算附件*</span>
+              <input type="file" required @change="onSettlementAttachment" />
+            </label>
           </template>
 
-          <template v-else>
+          <template v-else-if="editorKind === 'salesInvoice'">
             <V2Select
               v-model="editor.customerId"
               label="建设单位"
@@ -1099,6 +1543,57 @@ onBeforeUnmount(() => controller?.abort())
             />
             <V2Input v-model="editor.amountWithoutTax" label="不含税金额" required />
             <V2Input v-model="editor.taxAmount" label="税额" required />
+            <V2Select
+              v-model="editor.receivableId"
+              label="应收款"
+              :options="receivableOptions"
+              required
+            />
+            <V2Input v-model="editor.allocationAmount" label="分配金额" required />
+            <label class="v2-field">
+              <span class="v2-field__label">销项发票附件*</span>
+              <input
+                type="file"
+                accept=".pdf,image/*"
+                required
+                @change="onSalesInvoiceAttachment"
+              />
+            </label>
+          </template>
+
+          <template v-else>
+            <V2Select
+              v-model="editor.customerId"
+              label="建设单位"
+              :options="customerOptions"
+              required
+            />
+            <V2Select
+              v-model="editor.fundAccountId"
+              label="资金账户"
+              :options="fundAccountOptions"
+              required
+            />
+            <V2Input v-model="editor.externalTxnNo" label="外部流水号" required />
+            <V2Input
+              v-model="editor.collectedAt"
+              type="datetime-local"
+              label="到账时间"
+              required
+            />
+            <V2Input v-model="editor.collectionAmount" label="回款金额" required />
+            <V2Input v-model="editor.payerName" label="付款单位" required />
+            <V2Select
+              v-model="editor.receivableId"
+              label="应收款"
+              :options="receivableOptions"
+              required
+            />
+            <V2Input v-model="editor.allocationAmount" label="分配金额" required />
+            <label class="v2-field">
+              <span class="v2-field__label">银行回单*</span>
+              <input type="file" required @change="onCollectionAttachment" />
+            </label>
           </template>
 
           <V2Input v-model="editor.remark" label="备注" />
@@ -1112,6 +1607,113 @@ onBeforeUnmount(() => controller?.abort())
           </V2Button>
         </template>
       </V2Dialog>
+
+      <V2Dialog
+        :open="Boolean(writebackTarget)"
+        title="付款回写"
+        :close-disabled="busy"
+        :close-on-backdrop="false"
+        @update:open="(open) => !open && closeWriteback()"
+      >
+        <form
+          v-if="writebackEditor"
+          id="payment-writeback-form"
+          class="finance-workspace__form"
+          @submit.prevent="submitWriteback"
+        >
+          <V2Input
+            v-model="writebackEditor.payAmount"
+            label="付款金额"
+            required
+            hint="使用服务端批准金额，服务端负责余额校验"
+          />
+          <V2Input
+            v-model="writebackEditor.paidAt"
+            type="datetime-local"
+            label="付款时间"
+            required
+          />
+          <V2Select
+            v-model="writebackEditor.fundAccountId"
+            label="资金账户"
+            :options="fundAccountOptions"
+            required
+          />
+          <V2Select
+            v-model="writebackEditor.payMethod"
+            label="付款方式"
+            :options="[
+              { value: 'BANK_TRANSFER', label: '银行转账' },
+              { value: 'OTHER', label: '其他' },
+            ]"
+            required
+          />
+          <V2Input v-model="writebackEditor.voucherNo" label="凭证号" />
+          <V2Input v-model="writebackEditor.externalTxnNo" label="外部流水号" required />
+          <V2Input v-model="writebackEditor.remark" label="备注" />
+        </form>
+        <template #footer>
+          <V2Button type="button" variant="secondary" :disabled="busy" @click="closeWriteback">
+            取消
+          </V2Button>
+          <V2Button type="submit" form="payment-writeback-form" :loading="busy">
+            确认回写
+          </V2Button>
+        </template>
+      </V2Dialog>
+
+      <V2Dialog
+        :open="Boolean(reversalTarget)"
+        title="支付冲销"
+        description="生成反向支付事实，不删除原支付记录。"
+        :close-disabled="busy"
+        :close-on-backdrop="false"
+        @close="closePaymentReversal"
+      >
+        <form
+          v-if="reversalEditor"
+          id="payment-reversal-form"
+          class="finance-workspace__form"
+          @submit.prevent="submitPaymentReversal"
+        >
+          <V2Select
+            v-model="reversalEditor.reversalType"
+            label="冲销类型"
+            :options="[
+              { value: 'REVERSAL', label: '会计冲销' },
+              { value: 'REFUND', label: '银行退款' },
+            ]"
+            required
+          />
+          <V2Input v-model="reversalEditor.externalTxnNo" label="冲销流水号" required />
+          <V2Input
+            v-model="reversalEditor.reversedAt"
+            type="datetime-local"
+            label="冲销时间"
+            required
+          />
+          <V2Input v-model="reversalEditor.reason" label="冲销原因" required />
+        </form>
+        <template #footer>
+          <V2Button
+            type="button"
+            variant="secondary"
+            :disabled="busy"
+            @click="closePaymentReversal"
+          >
+            取消
+          </V2Button>
+          <V2Button type="submit" form="payment-reversal-form" :loading="busy"> 确认冲销 </V2Button>
+        </template>
+      </V2Dialog>
+
+      <input
+        ref="settlementAttachmentInput"
+        class="v2-visually-hidden"
+        type="file"
+        aria-label="业主结算补传附件"
+        @change="uploadSettlementAttachment"
+      />
 
       <V2ConfirmDialog
         :open="Boolean(pending)"

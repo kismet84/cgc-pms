@@ -45,7 +45,7 @@ async function install(page: Page) {
 async function select(page: Page, controlId: string, value: string) {
   const control = page.locator(controlId)
   await control.click()
-  await control.locator('..').locator(`[role="option"][data-value="${value}"]`).click()
+  await page.locator(`[role="option"][data-value="${value}"]:visible`).click()
 }
 
 test('keeps the M4 public context contract in the shared V2 shell', async ({ page }) => {
@@ -56,8 +56,7 @@ test('keeps the M4 public context contract in the shared V2 shell', async ({ pag
   await select(page, '#global-project', 'P1')
   await page.locator('#global-report-period').click()
   const periodOption = page
-    .locator('#global-report-period')
-    .locator('..')
+    .getByRole('listbox', { name: '报告期' })
     .locator('[role="option"][data-value]:not([data-value=""])')
     .first()
   const period = await periodOption.getAttribute('data-value')

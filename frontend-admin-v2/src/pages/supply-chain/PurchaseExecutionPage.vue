@@ -13,6 +13,7 @@ import type {
   ReceiptCommand,
   ReceiptItemRecord,
   ReceiptRecord,
+  ReceiptSupplierReturnCommand,
   SiteFileRecord,
   WarehouseRecord,
 } from '@cgc-pms/frontend-contracts'
@@ -32,6 +33,7 @@ import {
   createPurchaseOrder,
   createPurchaseRequest,
   createReceipt,
+  confirmReceiptSupplierReturn,
   deletePurchaseOrder,
   deletePurchaseRequest,
   deleteReceipt,
@@ -82,6 +84,7 @@ const busy = ref(false)
 const errorMessage = ref('')
 const dialogOpen = ref(false)
 const orderEditOpen = ref(false)
+const supplierReturnOpen = ref(false)
 const editingReceiptId = ref('')
 const receiptCandidates = ref<ReceiptItemRecord[]>([])
 const materials = ref<MaterialRecord[]>([])
@@ -94,6 +97,7 @@ const requestItemCandidates = ref<PurchaseRequestItemRecord[]>([])
 const orderCandidates = ref<PurchaseOrderRecord[]>([])
 const form = reactive<Record<string, string>>({})
 const orderEditForm = reactive<Record<string, string>>({})
+const supplierReturnForm = reactive<Record<string, string>>({})
 let listController: AbortController | null = null
 let detailController: AbortController | null = null
 let listGeneration = 0
@@ -151,6 +155,9 @@ const canEditSelectedReceipt = computed(
   () =>
     mode.value === 'receipt' && canSaveItems.value && selected.value?.approvalStatus === 'DRAFT',
 )
+const canReturnReceipt = computed(
+  () => mode.value === 'receipt' && session.hasAdminOrPermission('receipt:return'),
+)
 const attachmentBusinessType = computed(
   () =>
     ({ request: 'PURCHASE_REQUEST', order: 'PURCHASE_ORDER', receipt: 'MATERIAL_RECEIPT' })[
@@ -163,6 +170,19 @@ const receiptCandidateOptions = computed(() =>
     value: item.orderItemId || '',
     label: `${item.materialName || '物料名称缺失'} · 剩余 ${item.remainingQuantity ?? '-'}`,
   })),
+)
+const returnableReceiptItems = computed(() =>
+  (detailItems.value as ReceiptItemRecord[])
+    .filter(
+      (item) =>
+        item.id &&
+        item.dispositionType === 'RETURN' &&
+        item.dispositionStatus !== 'COMPLETED',
+    )
+    .map((item) => ({
+      value: item.id as string,
+      label: `${item.materialName || '物料名称缺失'} · 不合格 ${item.unqualifiedQuantity}`,
+    })),
 )
 const materialOptions = computed(() =>
   materials.value.map((item) => ({
@@ -284,9 +304,61 @@ function recordBusinessStatus(record: ListRecord): string {
 
 function clearDetail(): void {
   detailController?.abort()
+  supplierReturnOpen.value = false
   selected.value = null
   detailItems.value = []
   attachments.value = []
+}
+
+function changeSupplierReturnItem(value: string): void {
+  const item = (detailItems.value as ReceiptItemRecord[]).find((candidate) => candidate.id === value)
+  supplierReturnForm.quantity = item?.unqualifiedQuantity || ''
+  supplierReturnForm.reason = item?.dispositionReason || ''
+}
+
+function openSupplierReturn(): void {
+  const first = returnableReceiptItems.value[0]
+  if (!first || !selected.value) return
+  for (const key of Object.keys(supplierReturnForm)) delete supplierReturnForm[key]
+  supplierReturnForm.receiptItemId = first.value
+  supplierReturnForm.returnDate =
+    ('receiptDate' in selected.value && selected.value.receiptDate) || ''
+  changeSupplierReturnItem(first.value)
+  supplierReturnOpen.value = true
+}
+
+async function saveSupplierReturn(): Promise<void> {
+  if (!selected.value || busy.value) return
+  const recordId = selected.value.id
+  const command: ReceiptSupplierReturnCommand = {
+    receiptItemId: requiredSupplierReturn('receiptItemId', '验收明细'),
+    returnKind: 'UNQUALIFIED',
+    quantity: requiredSupplierReturn('quantity', '退货数量'),
+    returnDate: requiredSupplierReturn('returnDate', '退货日期'),
+    reason: requiredSupplierReturn('reason', '退货原因'),
+    idempotencyKey: crypto.randomUUID(),
+  }
+  busy.value = true
+  errorMessage.value = ''
+  try {
+    await confirmReceiptSupplierReturn(command)
+    supplierReturnOpen.value = false
+    await loadPage()
+    const refreshed = records.value.find((record) => record.id === recordId)
+    if (refreshed) await selectRecord(refreshed)
+    showToast('success', '退货确认成功', '不合格处置状态已重新读取')
+  } catch (error) {
+    errorMessage.value = errorText(error, '供应商退货失败')
+    showToast('error', '供应商退货失败', errorMessage.value)
+  } finally {
+    busy.value = false
+  }
+}
+
+function requiredSupplierReturn(key: string, label: string): string {
+  const value = supplierReturnForm[key]?.trim()
+  if (!value) throw new Error(`${label}不能为空`)
+  return value
 }
 
 async function uploadAttachment(event: Event): Promise<void> {
@@ -1032,7 +1104,7 @@ onBeforeUnmount(() => {
       </V2Card>
 
       <V2Dialog
-        :open="Boolean(selected) && !orderEditOpen"
+        :open="Boolean(selected) && !orderEditOpen && !supplierReturnOpen"
         :title="`${title}详情`"
         :description="selected ? recordCode(selected) : ''"
         panel-class="v2-detail-dialog"
@@ -1166,12 +1238,59 @@ onBeforeUnmount(() => {
             @click="openReceiptEdit"
             >编辑验收明细</V2Button
           >
+          <V2Button
+            v-if="canReturnReceipt && returnableReceiptItems.length"
+            type="button"
+            variant="secondary"
+            :disabled="busy"
+            @click="openSupplierReturn"
+            >登记不合格退货</V2Button
+          >
           <V2Button v-if="canSubmitSelected" type="button" :loading="busy" @click="submitSelected"
             >提交审批</V2Button
           >
         </template>
       </V2Dialog>
     </section>
+
+    <V2Dialog
+      v-model:open="supplierReturnOpen"
+      title="登记不合格供应商退货"
+      description="确认后更新不合格处置状态。"
+      :close-disabled="busy"
+      :close-on-backdrop="false"
+    >
+      <form
+        id="receipt-supplier-return-form"
+        class="purchase-execution-page__form"
+        @submit.prevent="saveSupplierReturn"
+      >
+        <V2Select
+          v-model="supplierReturnForm.receiptItemId"
+          label="验收明细"
+          :options="returnableReceiptItems"
+          :disabled="busy"
+          required
+          @update:model-value="changeSupplierReturnItem"
+        />
+        <V2Input v-model="supplierReturnForm.quantity" label="退货数量" required />
+        <V2Input
+          v-model="supplierReturnForm.returnDate"
+          type="date"
+          label="退货日期"
+          required
+        />
+        <V2Input v-model="supplierReturnForm.reason" label="退货原因" required />
+      </form>
+      <template #footer>
+        <V2Button variant="secondary" :disabled="busy" @click="supplierReturnOpen = false"
+          >取消</V2Button
+        >
+        <V2Button type="submit" form="receipt-supplier-return-form" :loading="busy"
+          >确认退货</V2Button
+        >
+      </template>
+    </V2Dialog>
 
     <V2Dialog
       v-model:open="orderEditOpen"
@@ -1366,6 +1485,12 @@ onBeforeUnmount(() => {
           <V2Input v-model="form.unqualifiedQuantity" label="不合格数量" required /><V2Input
             v-model="form.batchNo"
             label="批次号"
+          />
+          <V2Input
+            v-if="form.receiptMode === 'DIRECT_CONSUMPTION'"
+            v-model="form.useLocation"
+            label="使用部位"
+            required
           />
           <V2Select
             v-if="Number(form.unqualifiedQuantity || 0) > 0"

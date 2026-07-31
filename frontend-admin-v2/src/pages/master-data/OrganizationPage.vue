@@ -2,9 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import {
   V2Badge,
+  V2ActionMenu,
   V2Button,
   V2Card,
-  V2Cluster,
   V2ConfirmDialog,
   V2Dialog,
   V2Input,
@@ -325,11 +325,11 @@ onBeforeUnmount(() => loadController?.abort())
                 <th>编码</th>
                 <th>名称</th>
                 <th>状态</th>
-                <th>操作</th>
+                <th class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in companies" :key="item.id">
+              <tr v-for="(item, index) in companies" :key="item.id">
                 <td>{{ item.companyCode }}</td>
                 <td>{{ item.companyName }}</td>
                 <td>
@@ -337,8 +337,11 @@ onBeforeUnmount(() => loadController?.abort())
                     {{ statusLabel(item.status) }}
                   </V2Badge>
                 </td>
-                <td>
-                  <V2Cluster>
+                <td class="v2-table-cell--actions">
+                  <V2ActionMenu
+                    :label="`${item.companyCode || item.companyName}更多操作`"
+                    :placement="index >= companies.length - 3 ? 'top-end' : 'bottom-end'"
+                  >
                     <V2Button
                       v-if="canEdit"
                       size="small"
@@ -355,7 +358,7 @@ onBeforeUnmount(() => loadController?.abort())
                       "
                       >删除</V2Button
                     >
-                  </V2Cluster>
+                  </V2ActionMenu>
                 </td>
               </tr>
             </tbody>
@@ -378,11 +381,11 @@ onBeforeUnmount(() => loadController?.abort())
                 <th>编码</th>
                 <th>名称</th>
                 <th>状态</th>
-                <th>操作</th>
+                <th class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in flatDepartments" :key="item.id">
+              <tr v-for="(item, index) in flatDepartments" :key="item.id">
                 <td>{{ companyName(item.companyId) }}</td>
                 <td>{{ item.deptCode }}</td>
                 <td>{{ item.deptName }}</td>
@@ -391,8 +394,11 @@ onBeforeUnmount(() => loadController?.abort())
                     {{ statusLabel(item.status) }}
                   </V2Badge>
                 </td>
-                <td>
-                  <V2Cluster>
+                <td class="v2-table-cell--actions">
+                  <V2ActionMenu
+                    :label="`${item.deptCode || item.deptName}更多操作`"
+                    :placement="index >= flatDepartments.length - 3 ? 'top-end' : 'bottom-end'"
+                  >
                     <V2Button
                       v-if="canEdit"
                       size="small"
@@ -409,7 +415,7 @@ onBeforeUnmount(() => loadController?.abort())
                       "
                       >删除</V2Button
                     >
-                  </V2Cluster>
+                  </V2ActionMenu>
                 </td>
               </tr>
             </tbody>
@@ -433,11 +439,11 @@ onBeforeUnmount(() => loadController?.abort())
                 <th>编码</th>
                 <th>名称</th>
                 <th>状态</th>
-                <th>操作</th>
+                <th class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in positions" :key="item.id">
+              <tr v-for="(item, index) in positions" :key="item.id">
                 <td>{{ companyName(item.companyId) }}</td>
                 <td>{{ departmentName(item.departmentId) }}</td>
                 <td>{{ item.positionCode }}</td>
@@ -447,8 +453,11 @@ onBeforeUnmount(() => loadController?.abort())
                     {{ statusLabel(item.status) }}
                   </V2Badge>
                 </td>
-                <td>
-                  <V2Cluster>
+                <td class="v2-table-cell--actions">
+                  <V2ActionMenu
+                    :label="`${item.positionCode || item.positionName}更多操作`"
+                    :placement="index >= positions.length - 3 ? 'top-end' : 'bottom-end'"
+                  >
                     <V2Button
                       v-if="canEdit"
                       size="small"
@@ -465,7 +474,7 @@ onBeforeUnmount(() => loadController?.abort())
                       "
                       >删除</V2Button
                     >
-                  </V2Cluster>
+                  </V2ActionMenu>
                 </td>
               </tr>
             </tbody>

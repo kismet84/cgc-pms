@@ -119,6 +119,36 @@ describe('M7 cost-subject center', () => {
     expect(costSubject.loadBidTransfers).not.toHaveBeenCalled()
   })
 
+  it('shows taxonomy writes to administrators without explicit permissions', async () => {
+    route.path = '/cost/subject/taxonomy'
+    useSessionStore().replaceUserInfo({
+      ...user([]),
+      roles: ['SUPER_ADMIN'],
+    })
+    const wrapper = mount(CostSubjectPage)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('新增根科目')
+  })
+
+  it('collapses the subject tree while keeping the root action and releasing the detail layout', async () => {
+    route.path = '/cost/subject/taxonomy'
+    useSessionStore().replaceUserInfo(user(['cost:query', 'cost:add']))
+    const wrapper = mount(CostSubjectPage)
+    await flushPromises()
+
+    const toggle = wrapper.findAll('button').find((button) => button.text() === '收起科目树')!
+    expect(toggle.attributes('aria-expanded')).toBe('true')
+    expect(toggle.attributes('aria-controls')).toBe('cost-subject-tree-content')
+
+    await toggle.trigger('click')
+
+    expect(wrapper.find('#cost-subject-tree-content').exists()).toBe(false)
+    expect(wrapper.find('.cost-subject-page__columns').classes()).toContain('is-tree-collapsed')
+    expect(wrapper.text()).toContain('新增根科目')
+    expect(wrapper.text()).toContain('展开科目树')
+  })
+
   it('loads mapping and rule facts without touching other tabs', async () => {
     route.path = '/cost/subject/rules'
     useSessionStore().replaceUserInfo(

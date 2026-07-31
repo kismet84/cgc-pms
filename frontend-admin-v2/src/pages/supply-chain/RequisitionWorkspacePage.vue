@@ -694,6 +694,7 @@ onBeforeUnmount(() => {
               { value: 'APPROVED', label: '已通过' },
               { value: 'REJECTED', label: '已驳回' },
             ]"
+            @update:model-value="search"
           />
           <V2Button size="small" variant="secondary" :loading="loading" @click="search"
             >查询</V2Button

@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import {
   V2Badge,
+  V2ActionMenu,
   V2Button,
   V2Card,
-  V2Cluster,
   V2ConfirmDialog,
   V2Dialog,
   V2Input,
@@ -28,6 +29,7 @@ import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
+const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
@@ -179,6 +181,10 @@ function openCreate(): void {
   dialogOpen.value = true
 }
 
+function openDetail(record: PartnerRecord): void {
+  void router.push({ name: 'V2ShellPartnerDetail', params: { id: record.id } })
+}
+
 async function openEdit(record: PartnerRecord): Promise<void> {
   try {
     const detail = await loadPartner(record.id)
@@ -298,6 +304,7 @@ onBeforeUnmount(() => loadController?.abort())
             hide-label
             placeholder="合作方类型"
             allow-empty
+            @update:model-value="search"
           />
           <V2Select
             v-model="filters.status"
@@ -306,6 +313,7 @@ onBeforeUnmount(() => loadController?.abort())
             hide-label
             placeholder="全部状态"
             allow-empty
+            @update:model-value="search"
           />
           <V2Button type="submit" size="small">查询</V2Button>
           <V2Button variant="secondary" type="button" size="small" @click="reset">重置</V2Button>
@@ -335,12 +343,22 @@ onBeforeUnmount(() => loadController?.abort())
               <th>联系人</th>
               <th>风险</th>
               <th>状态</th>
-              <th>操作</th>
+              <th class="v2-table-cell--actions">操作</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="record in records" :key="record.id">
-              <td>{{ record.partnerCode }}</td>
+            <tr v-for="(record, index) in records" :key="record.id">
+              <th scope="row">
+                <V2Button
+                  size="small"
+                  variant="ghost"
+                  class="v2-table__record-link"
+                  :aria-label="`打开合作方 ${record.partnerCode}`"
+                  @click="openDetail(record)"
+                >
+                  {{ record.partnerCode }}
+                </V2Button>
+              </th>
               <td>{{ record.partnerName }}</td>
               <td>{{ typeLabel(record.partnerType) }}</td>
               <td>{{ record.contactName || '—' }}</td>
@@ -356,8 +374,11 @@ onBeforeUnmount(() => loadController?.abort())
                   {{ record.status === 'ENABLE' ? '启用' : '停用' }}
                 </V2Badge>
               </td>
-              <td>
-                <V2Cluster>
+              <td class="v2-table-cell--actions">
+                <V2ActionMenu
+                  :label="`${record.partnerCode || record.partnerName}更多操作`"
+                  :placement="index >= records.length - 3 ? 'top-end' : 'bottom-end'"
+                >
                   <V2Button
                     v-if="canEdit"
                     size="small"
@@ -374,7 +395,7 @@ onBeforeUnmount(() => loadController?.abort())
                   >
                     删除
                   </V2Button>
-                </V2Cluster>
+                </V2ActionMenu>
               </td>
             </tr>
           </tbody>

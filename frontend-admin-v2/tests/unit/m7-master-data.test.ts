@@ -5,9 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { V2Input, V2Select } from '@/components'
 import MaterialDictionaryPage from '@/pages/master-data/MaterialDictionaryPage.vue'
 import OrganizationPage from '@/pages/master-data/OrganizationPage.vue'
+import PartnerDetailPage from '@/pages/master-data/PartnerDetailPage.vue'
 import PartnerPage from '@/pages/master-data/PartnerPage.vue'
 import * as masterData from '@/services/master-data'
 import { useSessionStore } from '@/stores/session'
+
+const routerPush = vi.hoisted(() => vi.fn())
+
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ params: { id: '101' } }),
+  useRouter: () => ({ push: routerPush }),
+}))
 
 vi.mock('@/services/master-data', () => ({
   loadPartnerTypes: vi.fn(),
@@ -153,6 +161,33 @@ describe('M7 master-data pages', () => {
 
     expect(masterData.loadPartner).toHaveBeenCalledWith('101')
     expect(document.body.textContent).toContain('联系电话')
+  })
+
+  it('navigates from the record code to the partner detail page', async () => {
+    useSessionStore().replaceUserInfo(user(['partner:query']))
+    const wrapper = mount(PartnerPage, { attachTo: document.body })
+    await flushPromises()
+
+    const recordLink = wrapper.findAll('button').find((button) => button.text() === 'PTN-101')!
+    expect(recordLink.classes()).toContain('v2-table__record-link')
+    await recordLink.trigger('click')
+    await flushPromises()
+
+    expect(routerPush).toHaveBeenCalledWith({
+      name: 'V2ShellPartnerDetail',
+      params: { id: '101' },
+    })
+    expect(masterData.loadPartner).not.toHaveBeenCalled()
+  })
+
+  it('loads server facts on the partner detail page', async () => {
+    const wrapper = mount(PartnerDetailPage)
+    await flushPromises()
+
+    expect(masterData.loadPartner).toHaveBeenCalledWith('101')
+    expect(wrapper.text()).toContain('合作方详情')
+    expect(wrapper.text()).toContain('PTN-101')
+    expect(wrapper.text()).toContain('13800000000')
   })
 
   it('normalizes a numeric partner id before the required post-create read', async () => {

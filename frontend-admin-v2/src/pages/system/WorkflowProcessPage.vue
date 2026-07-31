@@ -38,6 +38,7 @@ const current = ref<WorkflowTemplateRecord | null>(null)
 let controller: AbortController | null = null
 
 const filter = reactive({ businessType: '', enabled: '', keyword: '' })
+const detailDialog = ref(false)
 const templateDialog = ref(false)
 const nodeDialog = ref(false)
 const editingNode = ref<WorkflowTemplateNodeRecord | null>(null)
@@ -100,7 +101,7 @@ async function refresh(): Promise<void> {
   error.value = ''
   try {
     await loadList(currentController.signal)
-    if (current.value) await selectTemplate(current.value.id)
+    if (current.value) await selectTemplate(current.value.id, false)
   } catch (value) {
     if (!currentController.signal.aborted) {
       templates.value = []
@@ -112,7 +113,8 @@ async function refresh(): Promise<void> {
   }
 }
 
-async function selectTemplate(id: string): Promise<void> {
+async function selectTemplate(id: string, openDialog = true): Promise<void> {
+  if (openDialog) detailDialog.value = true
   detailLoading.value = true
   try {
     current.value = await loadWorkflowTemplate(id)
@@ -149,7 +151,13 @@ function openTemplateEditor(): void {
     amountMax: current.value.amountMax ?? '',
     remark: current.value.remark ?? '',
   })
+  detailDialog.value = false
   templateDialog.value = true
+}
+
+function closeTemplateEditor(): void {
+  templateDialog.value = false
+  detailDialog.value = true
 }
 
 async function saveTemplate(): Promise<void> {
@@ -189,7 +197,23 @@ function openNodeEditor(node?: WorkflowTemplateNodeRecord): void {
     timeoutHours: node?.timeoutHours == null ? '' : String(node.timeoutHours),
     remark: node?.remark ?? '',
   })
+  detailDialog.value = false
   nodeDialog.value = true
+}
+
+function closeNodeEditor(): void {
+  nodeDialog.value = false
+  detailDialog.value = true
+}
+
+function openDeleteNode(node: WorkflowTemplateNodeRecord): void {
+  detailDialog.value = false
+  deleteTarget.value = node
+}
+
+function closeDeleteNode(): void {
+  deleteTarget.value = null
+  detailDialog.value = true
 }
 
 async function saveNode(): Promise<void> {
@@ -307,32 +331,33 @@ onBeforeUnmount(() => controller?.abort())
   <V2Stack class="workflow-process-page" :gap="4">
     <V2Card title="审批流程配置" :heading-level="1">
       <template #actions>
+        <div class="workflow-process-page__filters">
+          <V2Input
+            v-model="filter.keyword"
+            label="关键词"
+            placeholder="流程名称或编码"
+            hide-label
+          />
+          <V2Input
+            v-model="filter.businessType"
+            label="业务类型"
+            placeholder="例如 CONTRACT_APPROVAL"
+            hide-label
+          />
+          <V2Select
+            v-model="filter.enabled"
+            label="状态"
+            :options="statusOptions"
+            allow-empty
+            placeholder="全部状态"
+            hide-label
+            @update:model-value="search"
+          />
+          <V2Button size="small" @click="search">查询</V2Button>
+          <V2Button size="small" variant="secondary" @click="reset">重置</V2Button>
+        </div>
         <V2Button size="small" variant="secondary" @click="refresh">刷新</V2Button>
       </template>
-    </V2Card>
-
-    <V2Card title="筛选流程">
-      <div class="workflow-process-page__filters">
-        <V2Input v-model="filter.keyword" label="关键词" placeholder="流程名称或编码" hide-label />
-        <V2Input
-          v-model="filter.businessType"
-          label="业务类型"
-          placeholder="例如 CONTRACT_APPROVAL"
-          hide-label
-        />
-        <V2Select
-          v-model="filter.enabled"
-          label="状态"
-          :options="statusOptions"
-          allow-empty
-          placeholder="全部状态"
-          hide-label
-        />
-        <div class="workflow-process-page__filter-actions">
-          <V2Button @click="search">查询</V2Button>
-          <V2Button variant="secondary" @click="reset">重置</V2Button>
-        </div>
-      </div>
     </V2Card>
 
     <V2PageState v-if="loading" kind="loading" title="正在读取审批流程" description="请稍候。" />
@@ -340,7 +365,7 @@ onBeforeUnmount(() => controller?.abort())
       <template #actions><V2Button @click="refresh">重试</V2Button></template>
     </V2PageState>
 
-    <div v-else class="workflow-process-page__columns">
+    <div v-else>
       <V2Card title="流程模板">
         <V2PageState
           v-if="!templates.length"
@@ -357,12 +382,21 @@ onBeforeUnmount(() => controller?.abort())
                 <th>业务类型</th>
                 <th>节点</th>
                 <th>状态</th>
-                <th>操作</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="template in templates" :key="template.id">
-                <th scope="row">{{ template.templateCode }}</th>
+                <th scope="row">
+                  <V2Button
+                    type="button"
+                    size="small"
+                    variant="ghost"
+                    class="v2-table__record-link"
+                    @click="selectTemplate(template.id)"
+                  >
+                    {{ template.templateCode }}
+                  </V2Button>
+                </th>
                 <td>{{ template.templateName }}</td>
                 <td>{{ template.businessType }}</td>
                 <td>{{ template.nodeCount }}</td>
@@ -370,11 +404,6 @@ onBeforeUnmount(() => controller?.abort())
                   <V2Badge :tone="template.enabled === 1 ? 'success' : 'neutral'">
                     {{ statusLabel(template.enabled) }}
                   </V2Badge>
-                </td>
-                <td>
-                  <V2Button size="small" variant="ghost" @click="selectTemplate(template.id)">
-                    管理
-                  </V2Button>
                 </td>
               </tr>
             </tbody>
@@ -404,7 +433,16 @@ onBeforeUnmount(() => controller?.abort())
         </template>
       </V2Card>
 
-      <V2Card title="模板详情">
+      <V2Dialog
+        v-model:open="detailDialog"
+        title="审批流程详情"
+        :description="
+          current ? `${current.templateCode} · ${amountRange(current)}` : '读取流程模板详情。'
+        "
+        :close-disabled="detailLoading"
+        :close-on-backdrop="!detailLoading"
+        panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-wide"
+      >
         <V2PageState
           v-if="detailLoading"
           kind="loading"
@@ -424,13 +462,18 @@ onBeforeUnmount(() => controller?.abort())
               <span>{{ current.templateCode }} · {{ amountRange(current) }}</span>
             </div>
             <div>
-              <V2Button size="small" variant="secondary" @click="openTemplateEditor">
+              <V2Button type="button" size="small" variant="secondary" @click="openTemplateEditor">
                 编辑模板
               </V2Button>
-              <V2Button size="small" @click="openNodeEditor()">新增节点</V2Button>
+              <V2Button type="button" size="small" @click="openNodeEditor()">新增节点</V2Button>
             </div>
           </div>
-          <div class="workflow-process-page__table-wrap">
+          <div
+            class="workflow-process-page__table-wrap"
+            role="region"
+            aria-label="审批节点表格"
+            tabindex="0"
+          >
             <table>
               <thead>
                 <tr>
@@ -455,6 +498,7 @@ onBeforeUnmount(() => controller?.abort())
                   <td>
                     <div class="workflow-process-page__actions">
                       <V2Button
+                        type="button"
                         size="small"
                         variant="ghost"
                         :disabled="saving || index === 0"
@@ -463,6 +507,7 @@ onBeforeUnmount(() => controller?.abort())
                         上移
                       </V2Button>
                       <V2Button
+                        type="button"
                         size="small"
                         variant="ghost"
                         :disabled="saving || index === (current.nodes?.length ?? 0) - 1"
@@ -470,10 +515,20 @@ onBeforeUnmount(() => controller?.abort())
                       >
                         下移
                       </V2Button>
-                      <V2Button size="small" variant="ghost" @click="openNodeEditor(node)">
+                      <V2Button
+                        type="button"
+                        size="small"
+                        variant="ghost"
+                        @click="openNodeEditor(node)"
+                      >
                         编辑
                       </V2Button>
-                      <V2Button size="small" variant="danger" @click="deleteTarget = node">
+                      <V2Button
+                        type="button"
+                        size="small"
+                        variant="danger"
+                        @click="openDeleteNode(node)"
+                      >
                         删除
                       </V2Button>
                     </div>
@@ -483,7 +538,7 @@ onBeforeUnmount(() => controller?.abort())
             </table>
           </div>
         </template>
-      </V2Card>
+      </V2Dialog>
     </div>
 
     <V2Dialog
@@ -493,6 +548,7 @@ onBeforeUnmount(() => controller?.abort())
       :close-disabled="saving"
       :close-on-backdrop="!saving"
       panel-class="v2-dialog-standard"
+      @close="closeTemplateEditor"
     >
       <div class="workflow-process-page__form-grid">
         <V2Input v-model="templateForm.templateName" label="流程名称" required />
@@ -502,20 +558,21 @@ onBeforeUnmount(() => controller?.abort())
         <V2Input v-model="templateForm.remark" label="备注" />
       </div>
       <template #footer>
-        <V2Button variant="secondary" :disabled="saving" @click="templateDialog = false">
+        <V2Button type="button" variant="secondary" :disabled="saving" @click="closeTemplateEditor">
           取消
         </V2Button>
-        <V2Button :loading="saving" @click="saveTemplate">保存流程</V2Button>
+        <V2Button type="button" :loading="saving" @click="saveTemplate">保存流程</V2Button>
       </template>
     </V2Dialog>
 
     <V2Dialog
       v-model:open="nodeDialog"
       :title="editingNode ? '编辑审批节点' : '新增审批节点'"
-      description="审批人配置只接受后端已支持的 USER、ROLE、POSITION 或 PROJECT_ROLE JSON。"
+      description="审批人配置支持 USER、ROLE、POSITION 或 PROJECT_ROLE JSON。"
       :close-disabled="saving"
       :close-on-backdrop="!saving"
       panel-class="v2-dialog-standard"
+      @close="closeNodeEditor"
     >
       <div class="workflow-process-page__form-grid">
         <V2Input v-model="nodeForm.nodeCode" label="节点编码" placeholder="留空自动生成" />
@@ -528,10 +585,10 @@ onBeforeUnmount(() => controller?.abort())
         <V2Input v-model="nodeForm.remark" label="备注" />
       </div>
       <template #footer>
-        <V2Button variant="secondary" :disabled="saving" @click="nodeDialog = false">
+        <V2Button type="button" variant="secondary" :disabled="saving" @click="closeNodeEditor">
           取消
         </V2Button>
-        <V2Button :loading="saving" @click="saveNode">保存节点</V2Button>
+        <V2Button type="button" :loading="saving" @click="saveNode">保存节点</V2Button>
       </template>
     </V2Dialog>
 
@@ -542,21 +599,20 @@ onBeforeUnmount(() => controller?.abort())
       confirm-text="删除节点"
       danger
       :loading="saving"
-      @close="deleteTarget = null"
+      @close="closeDeleteNode"
       @confirm="deleteNode"
     />
   </V2Stack>
 </template>
 
 <style scoped>
-.workflow-process-page__filters,
 .workflow-process-page__form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--v2-space-4);
 }
 
-.workflow-process-page__filter-actions,
+.workflow-process-page__filters,
 .workflow-process-page__detail-head,
 .workflow-process-page__pagination,
 .workflow-process-page__actions {
@@ -565,14 +621,8 @@ onBeforeUnmount(() => controller?.abort())
   gap: var(--v2-space-2);
 }
 
-.workflow-process-page__filter-actions {
-  align-self: end;
-}
-
-.workflow-process-page__columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
-  gap: var(--v2-space-4);
+.workflow-process-page__filters {
+  flex-wrap: wrap;
 }
 
 .workflow-process-page__table-wrap {
@@ -612,8 +662,6 @@ onBeforeUnmount(() => controller?.abort())
 }
 
 @media (max-width: 900px) {
-  .workflow-process-page__columns,
-  .workflow-process-page__filters,
   .workflow-process-page__form-grid {
     grid-template-columns: 1fr;
   }

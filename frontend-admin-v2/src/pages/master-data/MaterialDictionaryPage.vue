@@ -2,9 +2,9 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import {
   V2Badge,
+  V2ActionMenu,
   V2Button,
   V2Card,
-  V2Cluster,
   V2ConfirmDialog,
   V2Dialog,
   V2Input,
@@ -273,6 +273,7 @@ onBeforeUnmount(() => loadController?.abort())
             hide-label
             placeholder="材料分类"
             allow-empty
+            @update:model-value="search"
           />
           <V2Select
             v-model="filters.status"
@@ -281,6 +282,7 @@ onBeforeUnmount(() => loadController?.abort())
             hide-label
             placeholder="全部状态"
             allow-empty
+            @update:model-value="search"
           />
           <V2Button type="submit" size="small">查询</V2Button>
           <V2Button variant="secondary" type="button" size="small" @click="reset">重置</V2Button>
@@ -311,11 +313,11 @@ onBeforeUnmount(() => loadController?.abort())
               <th>单位</th>
               <th>默认税率</th>
               <th>状态</th>
-              <th>操作</th>
+              <th class="v2-table-cell--actions">操作</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="record in records" :key="record.id">
+            <tr v-for="(record, index) in records" :key="record.id">
               <td>{{ record.materialCode }}</td>
               <td>{{ record.materialName }}</td>
               <td>{{ categoryName(record.categoryId) }}</td>
@@ -327,15 +329,19 @@ onBeforeUnmount(() => loadController?.abort())
                   {{ record.status === 'ENABLE' ? '启用' : '停用' }}
                 </V2Badge>
               </td>
-              <td>
-                <V2Cluster v-if="canEdit">
+              <td class="v2-table-cell--actions">
+                <V2ActionMenu
+                  v-if="canEdit"
+                  :label="`${record.materialCode || record.materialName}更多操作`"
+                  :placement="index >= records.length - 3 ? 'top-end' : 'bottom-end'"
+                >
                   <V2Button size="small" variant="secondary" @click="openEdit(record)"
                     >编辑</V2Button
                   >
                   <V2Button size="small" variant="secondary" @click="statusTarget = record">
                     {{ record.status === 'ENABLE' ? '停用' : '启用' }}
                   </V2Button>
-                </V2Cluster>
+                </V2ActionMenu>
               </td>
             </tr>
           </tbody>

@@ -217,6 +217,23 @@ class WorkflowTemplateManagementTest {
     }
 
     @Test
+    @DisplayName("角色审批人配置可使用执行引擎支持的roleCode")
+    void roleApproverConfigAcceptsRoleCode() {
+        WorkflowTemplateNodeRequest request = new WorkflowTemplateNodeRequest();
+        request.setNodeName("总经理审批");
+        request.setNodeType("APPROVAL");
+        request.setApproveMode("SEQUENTIAL");
+        request.setApproverConfig("{\"type\":\"ROLE\",\"roleCode\":\"GENERAL_MANAGER\"}");
+        request.setAllowTransfer(1);
+        request.setAllowAddSign(1);
+
+        String nodeId = workflowTemplateService.createNode(TEMPLATE_ID, request).getId();
+
+        assertEquals("{\"type\":\"ROLE\",\"roleCode\":\"GENERAL_MANAGER\"}",
+                nodeMapper.selectById(Long.valueOf(nodeId)).getApproverConfig());
+    }
+
+    @Test
     @DisplayName("节点排序等待同模板写锁")
     void reorderWaitsForTemplateWriteLock() throws Exception {
         WorkflowTemplateNodeReorderRequest request = new WorkflowTemplateNodeReorderRequest();

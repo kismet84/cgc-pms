@@ -7,6 +7,8 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.system.entity.SysUser;
+import com.cgcpms.system.mapper.SysUserMapper;
 import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.*;
 import com.cgcpms.workflow.mapper.*;
@@ -36,6 +38,7 @@ public class WorkflowQueryService {
     private final WorkflowVOAssembler voAssembler;
     private final WorkflowBusinessCodeResolver businessCodeResolver;
     private final ProjectAccessChecker projectAccessChecker;
+    private final SysUserMapper sysUserMapper;
 
     private static final Pattern BUSINESS_TYPE_PATTERN = Pattern.compile("[A-Z][A-Z0-9_]{0,63}");
 
@@ -46,6 +49,32 @@ public class WorkflowQueryService {
             WorkflowConstants.INSTANCE_WITHDRAWN,
             WorkflowConstants.INSTANCE_VOIDED
     );
+
+    public List<Map<String, String>> getActionUsers(Long taskId, Long tenantId, Long userId) {
+        WfTask task = wfTaskMapper.selectOne(new LambdaQueryWrapper<WfTask>()
+                .eq(WfTask::getId, taskId)
+                .eq(WfTask::getTenantId, tenantId)
+                .eq(WfTask::getApproverId, userId)
+                .eq(WfTask::getTaskStatus, WorkflowConstants.TASK_PENDING));
+        if (task == null) {
+            throw new BusinessException("WORKFLOW_TASK_NOT_AVAILABLE", "当前任务不可操作");
+        }
+        return sysUserMapper.selectList(new LambdaQueryWrapper<SysUser>()
+                        .eq(SysUser::getTenantId, tenantId)
+                        .eq(SysUser::getStatus, "ENABLE")
+                        .ne(SysUser::getId, userId)
+                        .orderByAsc(SysUser::getRealName, SysUser::getUsername))
+                .stream()
+                .map(candidate -> {
+                    Map<String, String> option = new LinkedHashMap<>();
+                    option.put("id", String.valueOf(candidate.getId()));
+                    option.put("username", candidate.getUsername());
+                    option.put("realName", candidate.getRealName());
+                    option.put("status", candidate.getStatus());
+                    return option;
+                })
+                .toList();
+    }
 
     // ── 我的待办 ──
 

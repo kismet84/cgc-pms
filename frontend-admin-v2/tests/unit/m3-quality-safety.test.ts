@@ -148,4 +148,54 @@ describe('M3 quality safety closed loop', () => {
     expect(pageSource).toContain(':options="contractOptions"')
     expect(pageSource).toContain(':options="userOptions(issueForm.responsibleUserId)"')
   })
+
+  it('splits the ledger into five permission-aware tabs without resetting page state', () => {
+    for (const tab of ['plan', 'inspection', 'rectification', 'reinspection', 'consequence'])
+      expect(pageSource).toContain(`value: '${tab}'`)
+    for (const label of ['检查计划', '检查记录', '问题整改', '复检闭环', '后果追踪'])
+      expect(pageSource).toContain(`label: '${label}'`)
+
+    expect(pageSource).toContain('v-model="activeTab"')
+    expect(pageSource).toContain(':tabs="visibleTabs"')
+    expect(pageSource).toContain('id-prefix="quality"')
+    expect(pageSource).toContain('aria-label="质量安全业务分区"')
+    expect(pageSource).toContain('role="tabpanel"')
+    expect(pageSource).toContain(':id="`quality-panel-${activeTab}`"')
+    expect(pageSource).toContain(':aria-labelledby="`quality-tab-${activeTab}`"')
+    expect(pageSource).toContain('v-if="activeTab === \'plan\'"')
+    expect(pageSource).toContain('v-else-if="activeTab === \'inspection\'"')
+    expect(pageSource).toContain('v-else-if="activeTab === \'rectification\'"')
+    expect(pageSource).toContain('v-else-if="activeTab === \'reinspection\'"')
+    expect(pageSource).toContain('v-else-if="activeTab === \'consequence\'"')
+    expect(pageSource).not.toMatch(/watch\(activeTab[\s\S]{0,200}selectedPlanId\.value\s*=/)
+    expect(pageSource).toContain("() => scopeProjectIds.value.join('|')")
+    expect(pageSource).toContain('plan.id === previousSelectedPlanId')
+    expect(pageSource).toContain('@click="selectPlan(plan.id)"')
+    expect(pageSource).toContain('query: { ...route.query, planId }')
+    expect(pageSource).toContain('v-model="inspectionTypeFilter"')
+    expect(pageSource).not.toContain('class="quality-page__facts"')
+    expect(pageSource).not.toContain('质量安全闭环概览')
+    expect(pageSource).not.toContain('当前项目 {{ currentProjectLabel }}')
+    expect(pageSource).not.toContain("当前计划 {{ selectedPlan?.planName || '未选择' }}")
+    expect(pageSource).toContain('partnerLabel(issue.responsiblePartnerId)')
+    expect(pageSource.match(/v-else-if="!errorMessage"/g)).toHaveLength(6)
+  })
+
+  it('keeps existing business actions in their matching active panels', () => {
+    for (const action of [
+      "show('plan')",
+      "show('inspection')",
+      "show('issue', inspection)",
+      "show('rectification', issue)",
+      'showReinspection(issue)',
+      "show('consequence', issue)",
+      'openTrace(issue)',
+    ])
+      expect(pageSource).toContain(action)
+    expect(pageSource).toContain('v-if="activeTab === \'plan\' && canPlan && projectId"')
+    expect(pageSource).toContain("activeTab === 'inspection'")
+    expect(pageSource).toContain('v-if="rectificationIssues.length"')
+    expect(pageSource).toContain('v-if="reinspectionIssues.length"')
+    expect(pageSource).toContain('v-if="consequenceIssues.length"')
+  })
 })

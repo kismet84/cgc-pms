@@ -333,6 +333,27 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("upload accepts production measurement header and line evidence types")
+    void testUploadAcceptsProductionMeasurementEvidenceTypes() throws Exception {
+        long businessId = Math.abs(System.nanoTime());
+        when(minioClient.getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class)))
+                .thenReturn("http://minio.local/test-bucket/PRODUCTION_MEASUREMENT/file.pdf?X-Amz-Expires=300&X-Amz-Signature=test");
+
+        fileService.upload(new MockMultipartFile(
+                "file", "general.pdf", "application/pdf", "%PDF-1.4 general".getBytes()),
+                "PRODUCTION_MEASUREMENT", businessId, "MEASUREMENT_GENERAL");
+        fileService.upload(new MockMultipartFile(
+                "file", "line.pdf", "application/pdf", "%PDF-1.4 line".getBytes()),
+                "PRODUCTION_MEASUREMENT", businessId, "ML_2082376415585800194");
+
+        assertEquals(2L, fileCountFor("PRODUCTION_MEASUREMENT", businessId));
+        verify(authorizer).checkUploadAccess(
+                "PRODUCTION_MEASUREMENT", businessId, "MEASUREMENT_GENERAL");
+        verify(authorizer).checkUploadAccess(
+                "PRODUCTION_MEASUREMENT", businessId, "ML_2082376415585800194");
+    }
+
+    @Test
     @DisplayName("upload rejects duplicate content for same business object after auth and without second object write")
     void testUploadRejectsDuplicateContentForSameBusinessObject() throws Exception {
         MockMultipartFile first = new MockMultipartFile(

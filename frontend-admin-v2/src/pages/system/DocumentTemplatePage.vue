@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import {
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -333,11 +334,11 @@ onBeforeUnmount(() => controller?.abort())
                 <th>契约</th>
                 <th>默认</th>
                 <th>发布时间</th>
-                <th>操作</th>
+                <th class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="version in detail.versions" :key="version.id">
+              <tr v-for="(version, index) in detail.versions" :key="version.id">
                 <th scope="row">V{{ version.versionNo }}</th>
                 <td>
                   <V2Badge :tone="statusTone(version.status)">
@@ -347,39 +348,45 @@ onBeforeUnmount(() => controller?.abort())
                 <td>{{ version.schemaVersion }}</td>
                 <td>{{ detail.defaultBinding?.templateVersionId === version.id ? '是' : '否' }}</td>
                 <td>{{ version.publishedAt ?? '—' }}</td>
-                <td>
+                <td class="v2-table-cell--actions">
                   <div class="document-template-page__actions">
-                    <V2Button
-                      v-if="canEdit && version.status === 'DRAFT'"
-                      size="small"
-                      variant="ghost"
-                      @click="openEdit(version)"
+                    <V2ActionMenu
+                      v-if="(canEdit && version.status === 'DRAFT') || canPublish"
+                      :label="`${detail.templateCode} V${version.versionNo}更多操作`"
+                      :placement="index >= detail.versions.length - 3 ? 'top-end' : 'bottom-end'"
                     >
-                      编辑
-                    </V2Button>
-                    <V2Button
-                      v-if="canPublish && version.status === 'DRAFT'"
-                      size="small"
-                      @click="versionAction = { kind: 'publish', version }"
-                    >
-                      发布
-                    </V2Button>
-                    <V2Button
-                      v-if="canPublish && version.status === 'PUBLISHED'"
-                      size="small"
-                      variant="secondary"
-                      @click="versionAction = { kind: 'default', version }"
-                    >
-                      设为默认
-                    </V2Button>
-                    <V2Button
-                      v-if="canPublish && version.status === 'PUBLISHED'"
-                      size="small"
-                      variant="danger"
-                      @click="versionAction = { kind: 'disable', version }"
-                    >
-                      停用
-                    </V2Button>
+                      <V2Button
+                        v-if="canEdit && version.status === 'DRAFT'"
+                        size="small"
+                        variant="ghost"
+                        @click="openEdit(version)"
+                      >
+                        编辑
+                      </V2Button>
+                      <V2Button
+                        v-if="canPublish && version.status === 'DRAFT'"
+                        size="small"
+                        @click="versionAction = { kind: 'publish', version }"
+                      >
+                        发布
+                      </V2Button>
+                      <V2Button
+                        v-if="canPublish && version.status === 'PUBLISHED'"
+                        size="small"
+                        variant="secondary"
+                        @click="versionAction = { kind: 'default', version }"
+                      >
+                        设为默认
+                      </V2Button>
+                      <V2Button
+                        v-if="canPublish && version.status === 'PUBLISHED'"
+                        size="small"
+                        variant="danger"
+                        @click="versionAction = { kind: 'disable', version }"
+                      >
+                        停用
+                      </V2Button>
+                    </V2ActionMenu>
                   </div>
                 </td>
               </tr>

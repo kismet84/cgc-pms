@@ -48,6 +48,9 @@ public class ContractBudgetAllocationService {
     @Transactional(rollbackFor = Exception.class)
     public void save(Long contractId, List<ContractBudgetAllocation> input) {
         CtContract contract = requireEditableContract(contractId);
+        if ("MAIN".equals(contract.getContractType())) {
+            throw new BusinessException("CONTRACT_BUDGET_NOT_APPLICABLE", "MAIN业主合同不占用项目成本预算");
+        }
         List<ContractBudgetAllocation> rows = input == null ? List.of() : input;
         if (rows.isEmpty()) {
             throw new BusinessException("CONTRACT_BUDGET_ALLOCATIONS_REQUIRED", "合同预算分配至少需要一条");
@@ -106,6 +109,7 @@ public class ContractBudgetAllocationService {
 
     public void validateForContractSubmit(Long contractId) {
         CtContract contract = requireContract(contractId, "提交合同预算校验");
+        if ("MAIN".equals(contract.getContractType())) return;
         List<ContractBudgetAllocation> rows = allocations(contractId);
         if (rows.isEmpty()) {
             throw new BusinessException("CONTRACT_BUDGET_ALLOCATIONS_REQUIRED", "合同提交前必须完成预算科目分配");

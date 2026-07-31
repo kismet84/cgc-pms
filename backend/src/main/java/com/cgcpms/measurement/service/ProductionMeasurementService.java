@@ -183,7 +183,14 @@ public class ProductionMeasurementService {
         projectAccessChecker.checkAccess(longValue(header.get("project_id")), "查看产值计量");
         Map<String, Object> result = new LinkedHashMap<>(header);
         result.put("lines", jdbc.queryForList("SELECT * FROM production_measurement_line WHERE tenant_id=? AND measurement_id=? ORDER BY sort_order,id", tenant(), id));
-        result.put("submissions", jdbc.queryForList("SELECT * FROM owner_measurement_submission WHERE tenant_id=? AND measurement_id=? AND deleted_flag=0 ORDER BY revision_no", tenant(), id));
+        result.put("submissions", jdbc.queryForList("""
+                SELECT s.*,os.id settlement_id,os.settlement_code
+                  FROM owner_measurement_submission s
+                  LEFT JOIN owner_settlement os ON os.tenant_id=s.tenant_id
+                   AND os.owner_submission_id=s.id AND os.deleted_flag=0
+                 WHERE s.tenant_id=? AND s.measurement_id=? AND s.deleted_flag=0
+                 ORDER BY s.revision_no
+                """, tenant(), id));
         return moneyPayload(result);
     }
 
@@ -282,9 +289,11 @@ public class ProductionMeasurementService {
         params.add(tenant());
         params.addAll(projectIds);
         Collections.addAll(params, status, status, startDate, startDate, endDate, endDate);
-        String sql = "SELECT s.*,m.measure_code,p.period_code FROM owner_measurement_submission s "
+        String sql = "SELECT s.*,m.measure_code,p.period_code,os.id settlement_id,os.settlement_code FROM owner_measurement_submission s "
                 + "JOIN production_measurement m ON m.id=s.measurement_id "
                 + "JOIN measurement_period p ON p.id=m.period_id "
+                + "LEFT JOIN owner_settlement os ON os.tenant_id=s.tenant_id "
+                + "AND os.owner_submission_id=s.id AND os.deleted_flag=0 "
                 + "WHERE s.tenant_id=? AND s.deleted_flag=0 AND s.project_id IN (" + placeholders(projectIds.size()) + ") "
                 + "AND (? IS NULL OR s.status=?) AND (? IS NULL OR m.measure_date>=?) "
                 + "AND (? IS NULL OR m.measure_date<=?) ORDER BY s.submitted_at DESC,s.id DESC";

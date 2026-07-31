@@ -331,6 +331,11 @@ test('five finance-control routes render real-shaped facts and write then reread
   await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/v2/finance-operations?projectId=P1')
   page.once('dialog', (dialog) => dialog.accept('已核实付款计划'))
+  await page
+    .getByRole('row')
+    .filter({ hasText: '主体结构进度款即将到期' })
+    .locator('summary[aria-label="主体结构进度款即将到期更多操作"]')
+    .click()
   await page.getByRole('button', { name: '处理', exact: true }).click()
   await expect.poll(() => writes).toContain('POST /api/finance-operations/alerts/A1/handle')
   await expect(page.getByText('主体结构进度款即将到期')).toBeVisible()

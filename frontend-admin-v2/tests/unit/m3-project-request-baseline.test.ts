@@ -86,8 +86,14 @@ describe('M3 project request baseline', () => {
     expect(schedule).toContain('@click="requestScheduleSubmit(item)"')
     expect(schedule).not.toContain('openDetail(item.id).then(() => requestScheduleSubmit())')
     expect(schedule).not.toContain('集中管理基线计划、WBS、月周计划、进度偏差与纠偏。')
+    expect(schedule).toContain('const controller = new AbortController()')
+    expect(schedule).toContain('if (listController !== controller) return false')
+    expect(schedule).toContain('!controller.signal.aborted && listController === controller')
     expect(dailyLog).toContain('@click="requestDailySubmit"')
     expect(dailyLog).toContain('@click="requestFileRemoval(file.id, file.originalName)"')
+    expect(dailyLog).toContain('const controller = new AbortController()')
+    expect(dailyLog).toContain('if (listController !== controller) return false')
+    expect(dailyLog).toContain('!controller.signal.aborted && listController === controller')
   })
 
   it('uses the validated public-shell project context and keeps aggregate routes on all projects', () => {

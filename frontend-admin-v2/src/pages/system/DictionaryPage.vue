@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import {
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -286,6 +287,7 @@ onBeforeUnmount(() => controller?.abort())
             placeholder="全部状态"
             :options="statusOptions"
             allow-empty
+            @update:model-value="searchTypes"
           />
           <V2Button type="submit" size="small">查询</V2Button>
         </form>
@@ -315,12 +317,12 @@ onBeforeUnmount(() => controller?.abort())
                 <th>编码</th>
                 <th>名称</th>
                 <th>状态</th>
-                <th>操作</th>
+                <th class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="item in types"
+                v-for="(item, index) in types"
                 :key="item.id"
                 :class="{ 'is-selected': item.id === selectedTypeId }"
               >
@@ -335,24 +337,30 @@ onBeforeUnmount(() => controller?.abort())
                     {{ item.status === 'ENABLE' ? '启用' : '停用' }}
                   </V2Badge>
                 </td>
-                <td>
+                <td class="v2-table-cell--actions">
                   <div class="dictionary-page__actions">
-                    <V2Button
-                      v-if="canEdit"
-                      size="small"
-                      variant="ghost"
-                      @click="openTypeEditor(item)"
+                    <V2ActionMenu
+                      v-if="canEdit || canDelete"
+                      :label="`${item.dictCode || item.dictName}更多操作`"
+                      :placement="index >= types.length - 3 ? 'top-end' : 'bottom-end'"
                     >
-                      编辑
-                    </V2Button>
-                    <V2Button
-                      v-if="canDelete"
-                      size="small"
-                      variant="danger"
-                      @click="deleteTarget = { kind: 'type', id: item.id, label: item.dictName }"
-                    >
-                      删除
-                    </V2Button>
+                      <V2Button
+                        v-if="canEdit"
+                        size="small"
+                        variant="ghost"
+                        @click="openTypeEditor(item)"
+                      >
+                        编辑
+                      </V2Button>
+                      <V2Button
+                        v-if="canDelete"
+                        size="small"
+                        variant="danger"
+                        @click="deleteTarget = { kind: 'type', id: item.id, label: item.dictName }"
+                      >
+                        删除
+                      </V2Button>
+                    </V2ActionMenu>
                   </div>
                 </td>
               </tr>
@@ -398,6 +406,7 @@ onBeforeUnmount(() => controller?.abort())
             placeholder="全部状态"
             :options="statusOptions"
             allow-empty
+            @update:model-value="searchData"
           />
           <V2Button size="small" variant="secondary" @click="searchData">筛选</V2Button>
         </div>
@@ -421,33 +430,39 @@ onBeforeUnmount(() => controller?.abort())
                 <th>值</th>
                 <th>排序</th>
                 <th>状态</th>
-                <th>操作</th>
+                <th class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in data" :key="item.id">
+              <tr v-for="(item, index) in data" :key="item.id">
                 <th scope="row">{{ item.dictLabel }}</th>
                 <td>{{ item.dictValue }}</td>
                 <td>{{ item.orderNum }}</td>
                 <td>{{ item.status === 'ENABLE' ? '启用' : '停用' }}</td>
-                <td>
+                <td class="v2-table-cell--actions">
                   <div class="dictionary-page__actions">
-                    <V2Button
-                      v-if="canEdit"
-                      size="small"
-                      variant="ghost"
-                      @click="openDataEditor(item)"
+                    <V2ActionMenu
+                      v-if="canEdit || canDelete"
+                      :label="`${item.dictLabel || item.dictValue}更多操作`"
+                      :placement="index >= data.length - 3 ? 'top-end' : 'bottom-end'"
                     >
-                      编辑
-                    </V2Button>
-                    <V2Button
-                      v-if="canDelete"
-                      size="small"
-                      variant="danger"
-                      @click="deleteTarget = { kind: 'data', id: item.id, label: item.dictLabel }"
-                    >
-                      删除
-                    </V2Button>
+                      <V2Button
+                        v-if="canEdit"
+                        size="small"
+                        variant="ghost"
+                        @click="openDataEditor(item)"
+                      >
+                        编辑
+                      </V2Button>
+                      <V2Button
+                        v-if="canDelete"
+                        size="small"
+                        variant="danger"
+                        @click="deleteTarget = { kind: 'data', id: item.id, label: item.dictLabel }"
+                      >
+                        删除
+                      </V2Button>
+                    </V2ActionMenu>
                   </div>
                 </td>
               </tr>
