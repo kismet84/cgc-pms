@@ -1,5 +1,24 @@
 # 更新日志
 
+## Unreleased - v1.6
+
+- 后端版本切换为 `1.6.0-SNAPSHOT`，Legacy 前端切换为 `1.6.0-dev.0`。
+- 重建 v1.6 当前计划、质量、迭代和 Backlog 入口；历史事项不自动恢复为 Ready。
+- 不创建 Tag/GitHub Release，不发布生产。
+
+## 1.5.0-dev.0 - 2026-07-31
+
+### 开发版本收口
+
+- 完成第57条主线及其 A～G 支线，取得同 HEAD push/PR CI 与 Pre-PR verifier 证据。
+- 通过 PR #379 合并 v1.5 开发收口成果，合并提交为 `5c7af1578cec2f8665b4682e2fb5957e75a4e8b1`。
+- 将 v1.5 计划、质量报告、迭代记录、过程文档和 Backlog 快照封存到 `docs/archive/v1.5/`。
+
+### 发布边界
+
+- v1.5 为开发版本收口，不是稳定版本发布；未创建 Tag/GitHub Release，未发布生产。
+- 三项生产 `RELEASE_GATE` 保持阻塞；正式入口切换和 Legacy 退役未执行。
+
 ## 1.0.0 - 2026-07-11
 
 ### 核心能力

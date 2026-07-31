@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "versionScope": "v1.5",
-  "updatedAt": "2026-07-31T13:10:00+08:00",
+  "versionScope": "v1.6",
+  "updatedAt": "2026-07-31T14:00:00+08:00",
   "issues": [
     {
       "issueKey": "A-02",
@@ -22,12 +22,12 @@
         "readyPreconditions": "明确权威日历、需求对象、可回放样本、量化收益、误差阈值、权限和回滚方式。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md",
-        "docs/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md",
-        "docs/quality/ISSUE-048-003-采购前已审批在途余量提示验收报告.md",
-        "docs/quality/ISSUE-048-007-同项目跨仓库存调拨过账验收报告.md",
-        "docs/quality/ISSUE-048-008-库存历史净领料基线验收报告.md",
-        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
+        "docs/archive/v1.5/backlog-snapshot/v1.0-historical-issue-classification.md",
+        "docs/archive/v1.5/quality/ISSUE-040-051-供应商默认提前期与采购订单交货日期预填验收报告.md",
+        "docs/archive/v1.5/quality/ISSUE-048-003-采购前已审批在途余量提示验收报告.md",
+        "docs/archive/v1.5/quality/ISSUE-048-007-同项目跨仓库存调拨过账验收报告.md",
+        "docs/archive/v1.5/quality/ISSUE-048-008-库存历史净领料基线验收报告.md",
+        "docs/archive/v1.5/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -49,8 +49,8 @@
         "readyPreconditions": "单一用户价值、权威数据源、权限与隐私边界、真实使用样本、最小验收和回滚方式明确。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md",
-        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
+        "docs/archive/v1.5/backlog-snapshot/v1.0-historical-issue-classification.md",
+        "docs/archive/v1.5/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -72,8 +72,8 @@
         "readyPreconditions": "至少一个无法由现有模型表达的项目样本、最小数据模型、环检测、迁移、性能和回滚方案明确。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md",
-        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
+        "docs/archive/v1.5/backlog-snapshot/v1.0-historical-issue-classification.md",
+        "docs/archive/v1.5/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -95,8 +95,8 @@
         "readyPreconditions": "提供同步路径失败或超时证据、单一报表样本、口径签认、权限矩阵、性能门槛和回滚方式。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md",
-        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
+        "docs/archive/v1.5/backlog-snapshot/v1.0-historical-issue-classification.md",
+        "docs/archive/v1.5/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -118,8 +118,8 @@
         "readyPreconditions": "渠道/事件被业务选定，测试账号和Secret就绪，脱敏模板、重试上限、审计与回滚方式明确。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md",
-        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
+        "docs/archive/v1.5/backlog-snapshot/v1.0-historical-issue-classification.md",
+        "docs/archive/v1.5/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -141,10 +141,10 @@
         "readyPreconditions": "提供真实Submittal或非RFI重大技术问题样本，完成与M3技术管理域的对象映射、状态与权限评审。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md",
-        "docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md",
-        "docs/quality/第55条主线-M4-Frozen与Observation复核验收报告.md",
-        "docs/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
+        "docs/archive/v1.5/backlog-snapshot/v1.0-historical-issue-classification.md",
+        "docs/archive/v1.5/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md",
+        "docs/archive/v1.5/quality/第55条主线-M4-Frozen与Observation复核验收报告.md",
+        "docs/archive/v1.5/quality/第55条主线-支线-六项产品候选事实复核与决策门治理验收报告-2026-07-28.md"
       ]
     },
     {
@@ -166,7 +166,7 @@
         "readyPreconditions": "单一目标获业务批准，沙箱与接口契约可用，数据所有权、权限、安全、对账和回滚明确。"
       },
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md"
+        "docs/archive/v1.5/backlog-snapshot/v1.0-historical-issue-classification.md"
       ]
     },
     {
@@ -181,7 +181,7 @@
       "deferReason": "当前无可识别生产环境。",
       "sourceRefs": [
         "docs/backlog/current-focus.md",
-        "docs/未来开发计划.md"
+        "docs/archive/v1.5/未来开发计划.md"
       ]
     },
     {
@@ -196,7 +196,7 @@
       "deferReason": "当前不连接生产环境。",
       "sourceRefs": [
         "docs/backlog/current-focus.md",
-        "docs/未来开发计划.md"
+        "docs/archive/v1.5/未来开发计划.md"
       ]
     },
     {
@@ -210,8 +210,8 @@
       "acceptanceCriteria": "同一SHA通过全部required checks、目标环境Flyway、真实角色正负样本及回滚清单复核。",
       "deferReason": "尚未进入生产发布流程。",
       "sourceRefs": [
-        "docs/backlog/v1.0-historical-issue-classification.md",
-        "docs/未来开发计划.md"
+        "docs/archive/v1.5/backlog-snapshot/v1.0-historical-issue-classification.md",
+        "docs/archive/v1.5/未来开发计划.md"
       ]
     },
     {
@@ -233,8 +233,8 @@
         "readyPreconditions": "存在可复现根因、最小改动范围、量化验收标准和回滚方式。"
       },
       "sourceRefs": [
-        "docs/quality/AutoPilot-任务周期回顾-review-b8c59c337f3e49b8a81e770e3a3d85a4-2026-07-16.md",
-        "docs/quality/第55条主线-支线-候选与工程观察证据化收口验收报告-2026-07-28.md"
+        "docs/archive/v1.5/quality/AutoPilot-任务周期回顾-review-b8c59c337f3e49b8a81e770e3a3d85a4-2026-07-16.md",
+        "docs/archive/v1.5/quality/第55条主线-支线-候选与工程观察证据化收口验收报告-2026-07-28.md"
       ]
     },
     {
@@ -258,8 +258,8 @@
       "sourceRefs": [
         "deploy/monitoring/prometheus.yml",
         "backend/src/test/java/com/cgcpms/config/ActuatorMetricsTest.java",
-        "docs/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md",
-        "docs/quality/第55条主线-M2-待确认维护项裁决验收报告.md"
+        "docs/archive/v1.5/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md",
+        "docs/archive/v1.5/quality/第55条主线-M2-待确认维护项裁决验收报告.md"
       ]
     }
   ]

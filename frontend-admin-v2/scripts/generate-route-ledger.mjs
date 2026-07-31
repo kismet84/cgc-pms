@@ -125,41 +125,54 @@ const acceptedRoutePermissions = {
 
 const sourceAvailableRoutes = {}
 
-const m2AcceptanceEvidence = 'docs/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md'
-const m3ProjectAcceptanceEvidence = 'docs/quality/ISSUE-053-011-M3项目对象工作区验收报告.md'
-const m3DeliveryAcceptanceEvidence = 'docs/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md'
-const m3QualityAcceptanceEvidence = 'docs/quality/ISSUE-053-013-M3质量安全整改闭环验收报告.md'
+const m2AcceptanceEvidence = 'docs/archive/v1.5/quality/第53条主线-M2-工作台与新版驾驶舱验收报告.md'
+const m3ProjectAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-011-M3项目对象工作区验收报告.md'
+const m3DeliveryAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-012-M3项目计划与现场日报验收报告.md'
+const m3QualityAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-013-M3质量安全整改闭环验收报告.md'
 const m3TechnicalAcceptanceEvidence =
-  'docs/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md'
-const m3CloseoutAcceptanceEvidence = 'docs/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md'
+  'docs/archive/v1.5/quality/ISSUE-053-014-M3技术管理图纸与RFI闭环验收报告.md'
+const m3CloseoutAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-015-M3竣工收尾闭环验收报告.md'
 const m4ContractAcceptanceEvidence =
-  'docs/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md'
+  'docs/archive/v1.5/quality/ISSUE-053-018-M4合同台账与全生命周期V2验收报告.md'
 const m4VariationBidAcceptanceEvidence =
-  'docs/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md'
-const m4CostTargetAcceptanceEvidence = 'docs/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md'
-const m4CostsAcceptanceEvidence = 'docs/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md'
+  'docs/archive/v1.5/quality/ISSUE-053-019-M4变更签证与投标成本V2验收报告.md'
+const m4CostTargetAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-020-M4目标成本版本V2验收报告.md'
+const m4CostsAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-021-M4成本台账核对与动态利润V2验收报告.md'
 const m4BudgetMeasurementAcceptanceEvidence =
-  'docs/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md'
+  'docs/archive/v1.5/quality/ISSUE-053-022-M4项目预算与产值计量V2验收报告.md'
 const m5SupplierSourcingAcceptanceEvidence =
-  'docs/quality/ISSUE-053-025-M5供应商招采与履约V2验收报告.md'
+  'docs/archive/v1.5/quality/ISSUE-053-025-M5供应商招采与履约V2验收报告.md'
 const m5PurchaseReceiptAcceptanceEvidence =
-  'docs/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md'
-const m5InventoryAcceptanceEvidence = 'docs/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md'
-const m5RequisitionAcceptanceEvidence = 'docs/quality/ISSUE-053-028-M5领料出库与退料V2验收报告.md'
-const m6SubcontractAcceptanceEvidence = 'docs/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md'
+  'docs/archive/v1.5/quality/ISSUE-053-026-M5采购申请订单与验收V2验收报告.md'
+const m5InventoryAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-027-M5仓库库存与来源流水V2验收报告.md'
+const m5RequisitionAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-028-M5领料出库与退料V2验收报告.md'
+const m6SubcontractAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-031-M6分包任务与计量V2验收报告.md'
 const m6SettlementAcceptanceEvidence =
-  'docs/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md'
+  'docs/archive/v1.5/quality/ISSUE-053-032-M6结算台账详情与追溯V2验收报告.md'
 const m6FinanceAcceptanceEvidence =
-  'docs/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md'
+  'docs/archive/v1.5/quality/ISSUE-053-033-M6付款费用收入回款与发票V2验收报告.md'
 const m6FinanceControlAcceptanceEvidence =
-  'docs/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md'
-const m7GlobalAcceptanceEvidence = 'docs/quality/ISSUE-053-036-M7登录与错误深链V2验收报告.md'
+  'docs/archive/v1.5/quality/ISSUE-053-034-M6资金运营日记账预测凭证与月结V2验收报告.md'
+const m7GlobalAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-036-M7登录与错误深链V2验收报告.md'
 const m7GlobalRoutes = new Set(['Login', 'Forbidden', 'NotFound'])
-const m7AccountAcceptanceEvidence = 'docs/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md'
+const m7AccountAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-037-M7个人设置与帮助V2验收报告.md'
 const m7AccountRoutes = new Set(['Profile', 'Settings', 'Help'])
-const m7MasterDataAcceptanceEvidence = 'docs/quality/ISSUE-053-038-M7基础资料V2验收报告.md'
+const m7MasterDataAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-038-M7基础资料V2验收报告.md'
 const m7MasterDataRoutes = new Set(['Partner', 'Org', 'Material', 'MaterialDictionary'])
-const m7CostSubjectAcceptanceEvidence = 'docs/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md'
+const m7CostSubjectAcceptanceEvidence =
+  'docs/archive/v1.5/quality/ISSUE-053-039-M7成本科目中心V2验收报告.md'
 const m7CostSubjectRoutes = new Set([
   'CostSubject',
   'CostSubjectTaxonomy',
@@ -168,9 +181,9 @@ const m7CostSubjectRoutes = new Set([
   'CostSubjectTrace',
 ])
 const m7WorkflowAcceptanceEvidence =
-  'docs/quality/ISSUE-053-040-M7流程配置与adminOnly门V2验收报告.md'
+  'docs/archive/v1.5/quality/ISSUE-053-040-M7流程配置与adminOnly门V2验收报告.md'
 const m7WorkflowRoutes = new Set(['ApprovalProcess'])
-const m7SystemAcceptanceEvidence = 'docs/quality/ISSUE-053-041-M7系统管理V2验收报告.md'
+const m7SystemAcceptanceEvidence = 'docs/archive/v1.5/quality/ISSUE-053-041-M7系统管理V2验收报告.md'
 const m7SystemRoutes = new Set([
   'System',
   'SystemDict',

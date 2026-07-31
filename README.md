@@ -6,9 +6,9 @@ CGC-PMS 是面向建筑工程总包项目全过程管理的前后端分离系统
 
 | 项目 | 当前基线 |
 | --- | --- |
-| 发布线 | v1.5 开发版本已收口（不代表生产发布） |
-| 后端 | `1.5.0-SNAPSHOT`（Java 21、Spring Boot 3.5.16） |
-| Legacy 前端 | `1.5.0-dev.0`（`frontend-admin`） |
+| 发布线 | v1.6 开发版本已启动（不代表生产发布） |
+| 后端 | `1.6.0-SNAPSHOT`（Java 21、Spring Boot 3.5.16） |
+| Legacy 前端 | `1.6.0-dev.0`（`frontend-admin`） |
 | Clean-room V2 | `0.1.0-dev.0`（`frontend-admin-v2`，共享 `packages/frontend-contracts`） |
 | 数据库迁移 | MySQL Flyway 脚本已包含至 V250；H2 迁移用于本地兼容与测试 |
 | V2 迁移状态 | 截至 2026-07-29：87 条命名路由中 `V2_ACCEPTED=87`、`LEGACY_ONLY=0`、`V2_SOURCE_AVAILABLE=0` |
@@ -25,7 +25,7 @@ CGC-PMS 是面向建筑工程总包项目全过程管理的前后端分离系统
 | 资金与核算 | 付款、现金日记账、资金计划与预测、会计凭证、期间控制与月结 |
 | 过程治理 | 审批、RBAC 权限、通知与预警、审计留痕、驾驶舱、文件与对象存储 |
 
-具体业务边界、已交付闭环与非目标以[业务标准](docs/README.md)、[V1.5开发版本说明](docs/V1.5-开发版本说明-2026-07-31.md)、[第57条正式收口报告](docs/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)和[项目地图](docs/product-intelligence/project-map.md)为准。
+具体业务边界、已交付闭环与非目标以[业务标准](docs/README.md)、[V1.5开发版本归档](docs/archive/v1.5/README.md)、[第57条正式收口报告](docs/archive/v1.5/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md)和[项目地图](docs/product-intelligence/project-map.md)为准。
 
 ## 技术栈
 

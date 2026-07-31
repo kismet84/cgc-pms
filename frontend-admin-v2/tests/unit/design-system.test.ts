@@ -30,7 +30,10 @@ const uiStandardPath = resolve(
   repositoryRoot,
   'docs/standards/00-UI-Design-Baselines-and-Code-Specifications.md',
 )
-const historicalUiBaselinePath = resolve(repositoryRoot, 'docs/ui-v2/m1-design-system-baseline.md')
+const historicalUiBaselinePath = resolve(
+  repositoryRoot,
+  'docs/archive/v1.5/ui-v2/m1-design-system-baseline.md',
+)
 
 function migratedPageSources() {
   const pagesRoot = resolve(sourceRoot, 'pages')
