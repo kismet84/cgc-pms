@@ -19,9 +19,12 @@ import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayApplication;
+import com.cgcpms.payment.entity.PaymentApplicationSource;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
+import com.cgcpms.payment.mapper.PaymentApplicationSourceMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
+import com.cgcpms.payment.constant.PaymentIntegrityConstants;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
@@ -86,6 +89,7 @@ public class StlSettlementQueryService {
     private final SubMeasureMapper subMeasureMapper;
     private final SubMeasureItemMapper subMeasureItemMapper;
     private final PayApplicationMapper payApplicationMapper;
+    private final PaymentApplicationSourceMapper paymentApplicationSourceMapper;
     private final PayRecordMapper payRecordMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectMapper costSubjectMapper;
@@ -131,7 +135,9 @@ public class StlSettlementQueryService {
         wrapper.orderByDesc(StlSettlement::getCreatedAt);
 
         Page<StlSettlement> page = stlSettlementMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
-        return page.convert(m -> assembler.toVO(m, resolveNameMaps(page.getRecords())));
+        StlSettlementAssembler.NameMaps nameMaps = resolveNameMaps(page.getRecords());
+        Map<Long, BigDecimal> currentPaidAmounts = currentPaidAmounts(page.getRecords());
+        return page.convert(m -> toCurrentVO(m, nameMaps, currentPaidAmounts));
     }
 
     public Map<String, Object> getKpi(Long projectId, Long contractId, Long partnerId,
@@ -158,6 +164,7 @@ public class StlSettlementQueryService {
         }
 
         List<StlSettlement> settlements = stlSettlementMapper.selectList(wrapper);
+        Map<Long, BigDecimal> currentPaidAmounts = currentPaidAmounts(settlements);
         // Single-pass accumulation: 5 fields + 2 counters in one loop
         BigDecimal totalContractAmount = BigDecimal.ZERO;
         BigDecimal totalFinalAmount = BigDecimal.ZERO;
@@ -168,11 +175,16 @@ public class StlSettlementQueryService {
         long finalizedCount = 0;
 
         for (StlSettlement settlement : settlements) {
+            BigDecimal paidAmount = currentPaidAmounts.getOrDefault(
+                    settlement.getId(), StlSettlementAssembler.nullToZero(settlement.getPaidAmount()));
+            BigDecimal unpaidAmount = currentPaidAmounts.containsKey(settlement.getId())
+                    ? currentUnpaidAmount(settlement, paidAmount)
+                    : StlSettlementAssembler.nullToZero(settlement.getUnpaidAmount());
             totalContractAmount = totalContractAmount.add(StlSettlementAssembler.nullToZero(settlement.getContractAmount()));
             totalFinalAmount = totalFinalAmount.add(StlSettlementAssembler.nullToZero(settlement.getFinalAmount()));
             totalChangeAmount = totalChangeAmount.add(StlSettlementAssembler.nullToZero(settlement.getChangeAmount()));
-            totalPaidAmount = totalPaidAmount.add(StlSettlementAssembler.nullToZero(settlement.getPaidAmount()));
-            totalUnpaidAmount = totalUnpaidAmount.add(StlSettlementAssembler.nullToZero(settlement.getUnpaidAmount()));
+            totalPaidAmount = totalPaidAmount.add(paidAmount);
+            totalUnpaidAmount = totalUnpaidAmount.add(unpaidAmount);
             if (SETTLEMENT_DRAFT.equals(settlement.getSettlementStatus())) {
                 draftCount++;
             } else if (SETTLEMENT_FINALIZED.equals(settlement.getSettlementStatus())) {
@@ -195,7 +207,10 @@ public class StlSettlementQueryService {
         Long tenantId = UserContext.getCurrentTenantId();
         StlSettlement settlement = validateAndGetSettlement(id);
 
-        StlSettlementVO vo = assembler.toVO(settlement, resolveNameMaps(List.of(settlement)));
+        StlSettlementVO vo = toCurrentVO(
+                settlement,
+                resolveNameMaps(List.of(settlement)),
+                currentPaidAmounts(List.of(settlement)));
 
         // Load items
         List<StlSettlementItem> items = stlSettlementItemMapper.selectList(
@@ -205,6 +220,51 @@ public class StlSettlementQueryService {
         vo.setItems(items.stream().map(assembler::toItemVO).collect(Collectors.toList()));
 
         return vo;
+    }
+
+    private StlSettlementVO toCurrentVO(
+            StlSettlement settlement,
+            StlSettlementAssembler.NameMaps nameMaps,
+            Map<Long, BigDecimal> currentPaidAmounts) {
+        StlSettlementVO vo = assembler.toVO(settlement, nameMaps);
+        BigDecimal paidAmount = currentPaidAmounts.get(settlement.getId());
+        if (paidAmount != null) {
+            vo.setPaidAmount(paidAmount.toPlainString());
+            vo.setUnpaidAmount(currentUnpaidAmount(settlement, paidAmount).toPlainString());
+        }
+        return vo;
+    }
+
+    private Map<Long, BigDecimal> currentPaidAmounts(List<StlSettlement> settlements) {
+        if (settlements.isEmpty()) {
+            return Map.of();
+        }
+        Set<Long> settlementIds = settlements.stream()
+                .map(StlSettlement::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (settlementIds.isEmpty()) {
+            return Map.of();
+        }
+        return paymentApplicationSourceMapper.selectList(
+                        new LambdaQueryWrapper<PaymentApplicationSource>()
+                                .eq(PaymentApplicationSource::getTenantId, UserContext.getCurrentTenantId())
+                                .eq(PaymentApplicationSource::getSourceType,
+                                        PaymentIntegrityConstants.SOURCE_SETTLEMENT)
+                                .in(PaymentApplicationSource::getSourceRefId, settlementIds))
+                .stream()
+                .collect(Collectors.groupingBy(
+                        PaymentApplicationSource::getSourceRefId,
+                        Collectors.reducing(
+                                BigDecimal.ZERO,
+                                source -> SettlementAmountPolicy.money(source.getPaidAmount()),
+                                BigDecimal::add)));
+    }
+
+    private BigDecimal currentUnpaidAmount(StlSettlement settlement, BigDecimal paidAmount) {
+        return SettlementAmountPolicy.money(settlement.getFinalAmount())
+                .subtract(SettlementAmountPolicy.money(paidAmount))
+                .subtract(SettlementAmountPolicy.money(settlement.getWarrantyAmount()));
     }
 
     private void applyProjectScope(LambdaQueryWrapper<StlSettlement> wrapper, Long projectId) {

@@ -265,6 +265,7 @@ describe('V2 application-shell routes', () => {
       shell?.children?.find((route) => route.path === path),
     )
     const partner = shell?.children?.find((route) => route.path === '/partner')
+    const partnerDetail = shell?.children?.find((route) => route.path === '/partner/:id')
     const org = shell?.children?.find((route) => route.path === '/org')
     const materialRoot = shell?.children?.find((route) => route.path === '/material')
     const materialDictionary = shell?.children?.find(
@@ -345,6 +346,8 @@ describe('V2 application-shell routes', () => {
       expect(String(route?.component)).not.toContain('ShellPlaceholderPage')
     }
     expect(partner?.meta?.permission).toBe('partner:query')
+    expect(partnerDetail?.meta?.permission).toBe('partner:query')
+    expect(String(partnerDetail?.component)).not.toContain('ShellPlaceholderPage')
     expect(org?.meta?.permission).toBe('org:list')
     expect(materialRoot?.meta?.permission).toBe('material:dict:list')
     expect(materialRoot?.redirect).toBeTypeOf('function')
@@ -568,12 +571,12 @@ describe('V2 application-shell routes', () => {
     expect(router.currentRoute.value.path).toBe('/dashboard')
   })
 
-  it('fails closed workflow configuration unless role and permission both match', async () => {
+  it('aligns workflow configuration routing with the API admin gate', async () => {
     for (const [roles, permissions, allowed] of [
       [['USER'], ['workflow:process:query'], false],
-      [['ADMIN'], [], false],
+      [['ADMIN'], [], true],
       [['ADMIN'], ['workflow:process:query'], true],
-      [['SUPER_ADMIN'], ['workflow:process:query'], true],
+      [['SUPER_ADMIN'], [], true],
     ] as const) {
       setActivePinia(createPinia())
       vi.mocked(getCurrentUser).mockResolvedValue(user([...permissions], [...roles]))

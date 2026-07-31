@@ -988,6 +988,21 @@ class WorkflowQueryServiceTest {
         assertEquals(0, noHit.getTotal());
     }
 
+    @Test
+    @DisplayName("动作候选只返回当前租户启用用户的最小字段并排除本人")
+    void getActionUsersReturnsMinimalEnabledTenantUsers() {
+        List<java.util.Map<String, String>> users =
+                queryService.getActionUsers(submittedTaskId, TENANT_0, USER_ADMIN);
+
+        assertTrue(users.stream().noneMatch(user -> String.valueOf(USER_ADMIN).equals(user.get("id"))));
+        assertTrue(users.stream().anyMatch(user ->
+                String.valueOf(USER_SECOND_APPROVER).equals(user.get("id"))));
+        assertTrue(users.stream().allMatch(user ->
+                user.keySet().equals(java.util.Set.of("id", "username", "realName", "status"))));
+        assertThrows(BusinessException.class,
+                () -> queryService.getActionUsers(submittedTaskId, TENANT_0, USER_OTHER));
+    }
+
     // ── Seed data ──
 
     private void seedAdminUser() {

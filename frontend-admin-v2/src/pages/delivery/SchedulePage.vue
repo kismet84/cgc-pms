@@ -161,21 +161,24 @@ function statusTone(status: string): 'info' | 'success' | 'warning' | 'danger' |
 
 async function reloadList(preserveNotice = false): Promise<boolean> {
   listController?.abort()
-  listController = new AbortController()
+  const controller = new AbortController()
+  listController = controller
   loading.value = true
   if (!preserveNotice) resetNotices()
   try {
-    schedules.value = await loadSchedules(projectId.value || undefined, listController.signal)
+    const nextSchedules = await loadSchedules(projectId.value || undefined, controller.signal)
+    if (listController !== controller) return false
+    schedules.value = nextSchedules
     return true
   } catch (error) {
-    if (!listController.signal.aborted) {
+    if (!controller.signal.aborted && listController === controller) {
       schedules.value = []
       detail.value = null
       errorMessage.value = message(error, '项目计划加载失败')
     }
     return false
   } finally {
-    if (!listController.signal.aborted) loading.value = false
+    if (listController === controller) loading.value = false
   }
 }
 
@@ -611,7 +614,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
       description="具备维护权限的账号可以创建基线计划。"
       :heading-level="2"
     />
-    <V2Card v-else-if="!isDetailRoute" title="主计划台账">
+    <V2Card v-else-if="!isDetailRoute">
       <div class="schedule-page__table-wrap">
         <table class="schedule-page__table">
           <caption class="v2-visually-hidden">

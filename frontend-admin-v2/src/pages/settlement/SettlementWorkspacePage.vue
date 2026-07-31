@@ -530,6 +530,7 @@ onBeforeUnmount(() => {
               allow-empty
               :options="settlementStatusOptions"
               placeholder="全部结算状态"
+              @update:model-value="search"
             />
             <V2Select
               v-model="approvalStatus"
@@ -538,6 +539,7 @@ onBeforeUnmount(() => {
               allow-empty
               :options="approvalStatusOptions"
               placeholder="全部审批状态"
+              @update:model-value="search"
             />
             <V2Button size="small" variant="secondary" @click="search">查询</V2Button>
             <V2Button v-if="canAdd" size="small" @click="openForm(false)">新建结算</V2Button>
@@ -833,8 +835,13 @@ onBeforeUnmount(() => {
         <section class="v2-detail-dialog__section">
           <div class="v2-detail-dialog__section-heading"><h3>结算附件</h3></div>
           <div v-if="editable" class="settlement-workspace__upload">
-            <label for="settlement-file">选择附件</label>
-            <input id="settlement-file" type="file" @change="chooseFile" />
+            <input
+              id="settlement-file"
+              class="v2-file-input"
+              type="file"
+              aria-label="选择结算附件"
+              @change="chooseFile"
+            />
             <V2Button
               type="button"
               size="small"

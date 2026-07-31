@@ -421,7 +421,7 @@ async function saveForm(): Promise<void> {
       successMessage.value = '签证变更已创建。'
       return
     }
-    await updateVariation(variationId.value, command)
+    await updateVariation(variationId.value, { ...command, version: versionOf() })
     await loadDetail(true)
     await backToList()
     successMessage.value = '签证变更已保存并刷新。'
@@ -515,7 +515,13 @@ async function submitOwner(): Promise<void> {
 function prepareReview(submission: VariationOwnerSubmissionRecord | null): void {
   reviewLines.value = (submission?.items ?? []).map((item) => ({
     submissionItemId: item.id,
-    confirmedAmount: item.confirmed_amount ?? item.claimed_amount ?? '',
+    confirmedAmount: String(
+      item.confirmedAmount ??
+        item.confirmed_amount ??
+        item.claimedAmount ??
+        item.claimed_amount ??
+        '',
+    ),
     reductionReason: item.reduction_reason ?? null,
   }))
 }
@@ -637,6 +643,7 @@ async function search(): Promise<void> {
   filter.pageNo = 1
   if (!(await replaceListQuery())) await loadList()
 }
+const query = search
 
 async function changePage(pageNo: number): Promise<void> {
   filter.pageNo = pageNo
@@ -699,6 +706,7 @@ onBeforeUnmount(() => {
                 { value: 'SITE', label: '现场签证' },
                 { value: 'OTHER', label: '其他' },
               ]"
+              @update:model-value="query"
             />
             <V2Select
               v-model="filter.direction"
@@ -711,6 +719,7 @@ onBeforeUnmount(() => {
                 { value: 'COST', label: '成本' },
                 { value: 'INCOME', label: '收入' },
               ]"
+              @update:model-value="query"
             />
             <V2Button type="submit" size="small" :loading="loading">查询</V2Button>
           </form>
@@ -719,6 +728,9 @@ onBeforeUnmount(() => {
           >
         </div>
       </template>
+    </V2Card>
+
+    <V2Card>
       <V2PageState
         v-if="loading && !records.length"
         kind="loading"

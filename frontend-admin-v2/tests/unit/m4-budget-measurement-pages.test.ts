@@ -11,6 +11,7 @@ import BudgetPageView from '@/pages/commercial/BudgetPage.vue'
 import MeasurementPageView from '@/pages/commercial/ProductionMeasurementPage.vue'
 import { dismissToast, toastItems } from '@/components/toast'
 import * as commercial from '@/services/commercial'
+import { uploadSiteFile } from '@/services/delivery'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 vi.mock('@/services/commercial', () => ({
@@ -21,6 +22,7 @@ vi.mock('@/services/commercial', () => ({
   loadBudgetPage: vi.fn(),
   loadCostSubjectOptions: vi.fn(),
   loadContractPage: vi.fn(),
+  loadMeasurement: vi.fn(),
   loadMeasurementPeriods: vi.fn(),
   loadMeasurementSettlementTrace: vi.fn(),
   loadMeasurementSources: vi.fn(),
@@ -185,6 +187,9 @@ beforeEach(() => {
       },
     ])
   vi.mocked(commercial.loadMeasurements).mockReset().mockResolvedValue([measurement])
+  vi.mocked(commercial.loadMeasurement)
+    .mockReset()
+    .mockResolvedValue({ ...measurement, lines: [{ id: 'ML1', item_name: '主体结构' }] })
   vi.mocked(commercial.loadOwnerMeasurementSubmissions).mockReset().mockResolvedValue([])
   vi.mocked(commercial.loadMeasurementSources).mockReset().mockResolvedValue([])
   vi.mocked(commercial.createBudget).mockReset().mockResolvedValue('NEW-1')
@@ -193,6 +198,7 @@ beforeEach(() => {
   vi.mocked(commercial.deleteBudget).mockReset().mockResolvedValue()
   vi.mocked(commercial.submitBudget).mockReset()
   vi.mocked(commercial.submitMeasurement).mockReset().mockResolvedValue({})
+  vi.mocked(uploadSiteFile).mockReset().mockResolvedValue({ id: 'F1' })
 })
 describe('M4 budget and measurement pages', () => {
   it('keeps project budget on the standard table and 10-row pagination contract', async () => {
@@ -252,9 +258,9 @@ describe('M4 budget and measurement pages', () => {
 
     const table = wrapper.get('[aria-label="产值计量列表"]')
     expect(table.findAll('th').map((item) => item.text())).toEqual([
+      '计量编号',
       '所属项目',
       '计量期间',
-      '计量编号',
       '计量日期',
       '本期申报',
       '累计申报',
@@ -295,12 +301,20 @@ describe('M4 budget and measurement pages', () => {
     const { wrapper } = await mountPage(
       MeasurementPageView,
       '/production-measurement?projectId=P1',
-      ['measurement:query', 'measurement:maintain'],
+      ['measurement:query', 'measurement:maintain', 'file:upload'],
     )
 
     expect(wrapper.find('[aria-label="业主合同"]').exists()).toBe(false)
     await button(wrapper, '新建期间')!.trigger('click')
     await flushPromises()
+    expect(commercial.loadContractPage).toHaveBeenCalledWith({
+      pageNo: 1,
+      pageSize: 100,
+      projectId: 'P1',
+      contractType: 'MAIN',
+      approvalStatus: 'APPROVED',
+      contractStatus: 'PERFORMING',
+    })
     expect(wrapper.get('[role="dialog"]').text()).toContain('项目')
     expect(wrapper.get('[role="dialog"]').text()).toContain('业主合同')
     expect(wrapper.get('.measurement-page__period-form').attributes('id')).toBe(
@@ -314,6 +328,43 @@ describe('M4 budget and measurement pages', () => {
     await flushPromises()
     expect(wrapper.get('[role="dialog"]').text()).toContain('项目')
     expect(wrapper.get('[role="dialog"]').text()).toContain('业主合同')
+  })
+
+  it('recovers draft evidence using server document types for header and every line', async () => {
+    const { wrapper } = await mountPage(
+      MeasurementPageView,
+      '/production-measurement?projectId=P1',
+      ['measurement:query', 'measurement:maintain', 'file:upload'],
+    )
+
+    await button(wrapper, '补传/更新计量依据')!.trigger('click')
+    const file = new File(['evidence'], 'measurement.pdf', { type: 'application/pdf' })
+    const lineFile = new File(['line evidence'], 'measurement-line.pdf', {
+      type: 'application/pdf',
+    })
+    const input = wrapper.get('input[aria-label="计量依据"]')
+    Object.defineProperty(input.element, 'files', { configurable: true, value: [file] })
+    await input.trigger('change')
+    const lineInput = wrapper.get('input[aria-label="主体结构现场完成依据"]')
+    Object.defineProperty(lineInput.element, 'files', { configurable: true, value: [lineFile] })
+    await lineInput.trigger('change')
+    await wrapper.get('#measurement-evidence-form').trigger('submit')
+    await flushPromises()
+
+    expect(uploadSiteFile).toHaveBeenNthCalledWith(
+      1,
+      file,
+      'PRODUCTION_MEASUREMENT',
+      'M1',
+      'MEASUREMENT_GENERAL',
+    )
+    expect(uploadSiteFile).toHaveBeenNthCalledWith(
+      2,
+      lineFile,
+      'PRODUCTION_MEASUREMENT',
+      'M1',
+      'ML_ML1',
+    )
   })
 
   it('puts status before create actions and applies it immediately', async () => {

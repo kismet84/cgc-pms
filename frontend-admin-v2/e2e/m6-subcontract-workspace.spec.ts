@@ -59,10 +59,10 @@ async function fulfill(route: Route, data: unknown, status = 200, code = '0') {
   })
 }
 
-async function selectOption(scope: Locator, label: RegExp, option: RegExp) {
+async function selectOption(page: Page, scope: Locator, label: RegExp, option: RegExp) {
   await expect(scope).toHaveCSS('transform', 'none')
   await scope.getByRole('button', { name: label }).press('ArrowDown')
-  const choice = scope.getByRole('option', { name: option })
+  const choice = page.getByRole('option', { name: option })
   await expect(choice).toBeVisible()
   await choice.click()
 }
@@ -307,7 +307,7 @@ test.describe('M6 subcontract task and measure V2', () => {
     await page.goto('/v2/subcontract/task?projectId=P1')
     await page.getByRole('button', { name: '新建分包任务' }).click()
     const dialog = page.getByRole('dialog', { name: '新建分包任务' })
-    await selectOption(dialog, /^分包合同：/, /SUB-001 · 主体劳务分包合同/)
+    await selectOption(page, dialog, /^分包合同：/, /SUB-001 · 主体劳务分包合同/)
     await expect(dialog.getByLabel('分包单位')).toHaveValue('劳务公司甲')
     await dialog.getByLabel('任务名称').fill('二次结构劳务')
     await dialog.getByRole('button', { name: '保存', exact: true }).dblclick()
@@ -324,8 +324,8 @@ test.describe('M6 subcontract task and measure V2', () => {
     await page.getByRole('option', { name: '草稿' }).click()
     await page.getByRole('button', { name: '新建分包计量' }).click()
     const create = page.getByRole('dialog', { name: '新建分包计量' })
-    await selectOption(create, /^分包合同：/, /SUB-001 · 主体劳务分包合同/)
-    await selectOption(create, /^关联任务：/, /ST-001 · 地下室劳务/)
+    await selectOption(page, create, /^分包合同：/, /SUB-001 · 主体劳务分包合同/)
+    await selectOption(page, create, /^关联任务：/, /ST-001 · 地下室劳务/)
     await create.getByRole('button', { name: '保存', exact: true }).dblclick()
     await expect(page.getByText('SM-002', { exact: true }).first()).toBeVisible()
 

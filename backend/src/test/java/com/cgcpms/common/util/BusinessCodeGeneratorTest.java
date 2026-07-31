@@ -76,6 +76,27 @@ class BusinessCodeGeneratorTest {
     }
 
     @Test
+    void keepsTechItemMirroredCodesUniqueAcrossProjects() {
+        TestUserContext.setAdmin(1L, 9L);
+        String date = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);
+        var dataSource = new DriverManagerDataSource(
+                "jdbc:h2:mem:technical_codes_" + UUID.randomUUID()
+                        + ";MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+                "sa", "");
+        JdbcTemplate realJdbc = new JdbcTemplate(dataSource);
+        realJdbc.execute("CREATE TABLE technical_scheme (tenant_id BIGINT, project_id BIGINT, scheme_code VARCHAR(50))");
+        realJdbc.execute("CREATE TABLE tech_rfi (tenant_id BIGINT, project_id BIGINT, rfi_code VARCHAR(50))");
+        realJdbc.update("INSERT INTO technical_scheme VALUES (1, 88, ?)", "TSC-" + date + "-007");
+        realJdbc.update("INSERT INTO tech_rfi VALUES (1, 88, ?)", "RFI-" + date + "-011");
+
+        BusinessCodeGenerator technicalGenerator = new BusinessCodeGenerator(realJdbc);
+        assertEquals("TSC-" + date + "-008",
+                technicalGenerator.next(BusinessCodeGenerator.Rule.TECH_SCHEME, 89L, 0));
+        assertEquals("RFI-" + date + "-012",
+                technicalGenerator.next(BusinessCodeGenerator.Rule.TECH_RFI, 89L, 0));
+    }
+
+    @Test
     void failsClosedWhenDailySequenceIsExhausted() {
         TestUserContext.setAdmin(1L, 9L);
         String date = LocalDate.now().format(DateTimeUtils.DATE_COMPACT);

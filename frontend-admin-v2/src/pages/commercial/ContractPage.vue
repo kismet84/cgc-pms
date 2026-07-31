@@ -131,6 +131,7 @@ const projects = ref<ProjectContextOption[]>([])
 const partners = ref<PartnerRecord[]>([])
 const form = ref<ContractSaveCommand>(emptyCommand())
 const pendingDelete = ref(false)
+const pendingSubmit = ref(false)
 
 const filter = reactive<ContractQuery>({
   pageNo: 1,
@@ -170,6 +171,7 @@ const currentContractIsDraft = computed(() => currentContract.value?.approvalSta
 const currentContractBudgetEditable = computed(
   () =>
     canEditBudget.value &&
+    currentContract.value?.contractType !== 'MAIN' &&
     ['DRAFT', 'REJECTED'].includes(currentContract.value?.approvalStatus ?? ''),
 )
 const budgetLineOptions = computed(() =>
@@ -697,12 +699,13 @@ async function saveContract(): Promise<void> {
 }
 
 async function submitCurrentContract(): Promise<void> {
-  if (!contractId.value || submitting.value) return
+  const id = contractId.value || currentContract.value?.id || ''
+  if (!id || submitting.value) return
   submitting.value = true
   resetNotices()
   try {
     await submitContract(
-      contractId.value,
+      id,
       currentContract.value?.version ?? form.value.contract.version,
     )
     await loadDetail(true)
@@ -716,6 +719,7 @@ async function submitCurrentContract(): Promise<void> {
     }
   } finally {
     submitting.value = false
+    pendingSubmit.value = false
   }
 }
 
@@ -815,7 +819,7 @@ onBeforeUnmount(() => {
 
     <template v-else>
       <V2Card
-        class="contract-page__list-card"
+        class="contract-page__list-card contract-page__header-card"
         title="合同台账"
         title-id="contract-title"
         :heading-level="1"
@@ -823,7 +827,10 @@ onBeforeUnmount(() => {
         <template #actions>
           <V2Button v-if="canCreate" size="small" @click="openCreate">新建合同</V2Button>
         </template>
-        <dl v-if="kpi" class="v2-ledger-kpis v2-ledger-kpis--five">
+      </V2Card>
+
+      <V2Card v-if="kpi" class="contract-page__kpi-card">
+        <dl class="v2-ledger-kpis v2-ledger-kpis--five">
           <div>
             <dt>合同总数</dt>
             <dd>{{ kpi.totalCount }}</dd>
@@ -845,6 +852,9 @@ onBeforeUnmount(() => {
             <dd>{{ kpi.overdueCount }}</dd>
           </div>
         </dl>
+      </V2Card>
+
+      <V2Card class="contract-page__ledger-card">
         <nav class="contract-page__preset-views" aria-label="合同预设视图">
           <V2Button
             v-for="preset in CONTRACT_PRESET_VIEWS"
@@ -1008,7 +1018,10 @@ onBeforeUnmount(() => {
             </div>
           </dl>
         </section>
-        <section v-if="canQueryBudget" class="v2-detail-dialog__section">
+        <section
+          v-if="canQueryBudget && currentContract?.contractType !== 'MAIN'"
+          class="v2-detail-dialog__section"
+        >
           <div class="v2-detail-dialog__section-heading">
             <h3>合同预算</h3>
             <div class="contract-page__inline-actions">
@@ -1489,7 +1502,7 @@ onBeforeUnmount(() => {
           type="button"
           v-if="mode === 'detail' && canSubmit && currentContractIsDraft"
           :loading="submitting"
-          @click="submitCurrentContract"
+          @click="pendingSubmit = true"
           >提交审批</V2Button
         >
         <V2Button
@@ -1523,6 +1536,16 @@ onBeforeUnmount(() => {
         <V2Button variant="secondary" @click="backToLedger">返回台账</V2Button>
       </template>
     </V2PageState>
+
+    <V2ConfirmDialog
+      :open="pendingSubmit"
+      title="提交合同审批"
+      description="提交后合同进入审批流程，草稿内容将锁定。"
+      confirm-text="确认提交"
+      :loading="submitting"
+      @close="pendingSubmit = false"
+      @confirm="submitCurrentContract"
+    />
 
     <V2ConfirmDialog
       :open="pendingDelete"

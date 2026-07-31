@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createMemoryHistory, createRouter } from 'vue-router'
 import {
   V2Alert,
   V2ActionMenu,
@@ -20,6 +21,7 @@ import {
   V2Skeleton,
   V2Stack,
 } from '@/components'
+import V2Tabs from '@/components/V2Tabs.vue'
 
 const currentDir = dirname(fileURLToPath(import.meta.url))
 const sourceRoot = resolve(currentDir, '../../src')
@@ -141,6 +143,70 @@ describe('Clean-room V2 design system', () => {
 
     await wrapper.setProps({ loading: false, disabled: true })
     expect(button.attributes()).toHaveProperty('disabled')
+    expect(readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')).toMatch(
+      /\.v2-button,[\s\S]*?white-space: nowrap;/,
+    )
+  })
+
+  it('keeps tabs route-aware, single-line and keyboard accessible', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/tabs', component: { template: '<div />' } }],
+    })
+    await router.push('/tabs?projectId=2082047083709931522&tab=invalid')
+    await router.isReady()
+
+    const wrapper = mount(V2Tabs, {
+      props: {
+        modelValue: 'scheme',
+        idPrefix: 'technical',
+        tabs: [
+          { value: 'scheme', label: '技术方案', count: 3 },
+          { value: 'rfi', label: 'RFI', count: 2 },
+          { value: 'archive', label: '验收归档', count: 1 },
+        ],
+      },
+      global: { plugins: [router] },
+    })
+    await flushPromises()
+
+    const tabs = wrapper.findAll('[role="tab"]')
+    expect(wrapper.get('[role="tablist"]').attributes('aria-label')).toBe('页面分区')
+    expect(tabs).toHaveLength(3)
+    expect(tabs[0]?.attributes('aria-selected')).toBe('true')
+    expect(tabs[0]?.attributes('aria-controls')).toBe('technical-panel-scheme')
+    expect(router.currentRoute.value.query).toMatchObject({
+      projectId: '2082047083709931522',
+      tab: 'scheme',
+    })
+
+    await tabs[1]!.trigger('click')
+    await flushPromises()
+    expect(wrapper.emitted('update:modelValue')).toContainEqual(['rfi'])
+    expect(router.currentRoute.value.query).toMatchObject({
+      projectId: '2082047083709931522',
+      tab: 'rfi',
+    })
+
+    await tabs[1]!.trigger('keydown', { key: 'End' })
+    await flushPromises()
+    expect(wrapper.emitted('update:modelValue')).toContainEqual(['archive'])
+    expect(router.currentRoute.value.query.tab).toBe('archive')
+
+    const source = readFileSync(resolve(sourceRoot, 'components/V2Tabs.vue'), 'utf-8')
+    expect(source).toContain('overflow-x: auto;')
+    expect(source).toContain('white-space: nowrap;')
+  })
+
+  it('keeps standard dialogs centered on narrow screens while preserving explicit bottom sheets', () => {
+    const componentCss = readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')
+    expect(componentCss).toMatch(
+      /@media \(max-width: 48rem\)[\s\S]*?\.v2-dialog__backdrop \{[\s\S]*?place-items: center;[\s\S]*?padding: var\(--v2-space-4\);/,
+    )
+    expect(componentCss).toMatch(
+      /@media \(max-width: 48rem\)[\s\S]*?\.v2-dialog__panel \{[\s\S]*?max-height: calc\(100dvh - var\(--v2-space-8\)\);[\s\S]*?border-radius: var\(--v2-radius-lg\);/,
+    )
+    expect(componentCss).toContain('.v2-dialog__panel.v2-dialog-bottom-sheet')
   })
 
   it('forwards native form association from a footer button', async () => {
@@ -211,6 +277,18 @@ describe('Clean-room V2 design system', () => {
     document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
     await flushPromises()
     expect((details.element as HTMLDetailsElement).open).toBe(false)
+    expect(readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')).toMatch(
+      /#shell-main-content :is\(div, section\):has\(\.v2-action-menu\[open\]\) \{[\s\S]*?overflow: visible;/,
+    )
+    expect(readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')).toMatch(
+      /\.v2-action-menu__content \.v2-button \{[^}]*color: var\(--v2-color-text-secondary\);[^}]*background: transparent;[^}]*border-color: transparent;/,
+    )
+    expect(readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')).toMatch(
+      /\.v2-action-menu__content \.v2-button--danger \{[^}]*color: var\(--v2-color-danger-text\);/,
+    )
+    expect(readFileSync(resolve(sourceRoot, 'styles/components.css'), 'utf-8')).toMatch(
+      /\.v2-action-menu__content :is\(\.v2-button, \.v2-action-menu__item\) \{[^}]*font-size: var\(--v2-font-size-12\);/,
+    )
     wrapper.unmount()
   })
 
@@ -817,7 +895,7 @@ describe('Clean-room V2 design system', () => {
         /#shell-main-content table \{[\s\S]*?border-collapse: collapse;[\s\S]*?font-size: var\(--v2-font-size-12\);[\s\S]*?line-height: var\(--v2-line-height-ui\);/,
       )
       expect(componentCss).toMatch(
-        /#shell-main-content table :where\(th, td\) \{[\s\S]*?padding: var\(--v2-space-3\);[\s\S]*?border-bottom: var\(--v2-border-width\) solid var\(--v2-color-border-subtle\);[\s\S]*?white-space: nowrap;/,
+        /#shell-main-content table :where\(th, td\) \{[\s\S]*?height: var\(--v2-table-row-height\);[\s\S]*?padding: 0 var\(--v2-space-3\);[\s\S]*?border-bottom: var\(--v2-border-width\) solid var\(--v2-color-border-subtle\);[\s\S]*?white-space: nowrap;/,
       )
 
       for (const { name, source } of migratedPages) {
@@ -992,12 +1070,7 @@ describe('Clean-room V2 design system', () => {
       expect(standard).toContain('跨项目子记录不得在概览下失去项目归属后直接铺开')
 
       const lifecyclePages = {
-        'pages/delivery/QualitySafetyPage.vue': ['质量安全闭环台账'],
-        'pages/delivery/TechnicalManagementPage.vue': [
-          '方案、图纸、会审与 RFI',
-          '交底、施工依据与验收归档',
-        ],
-        'pages/delivery/ProjectCloseoutPage.vue': ['全部项目收尾概览', '收尾主线', '收尾阶段台账'],
+        'pages/delivery/ProjectCloseoutPage.vue': ['收尾主线', '收尾阶段台账'],
       }
 
       for (const [name, titles] of Object.entries(lifecyclePages)) {
@@ -1007,6 +1080,18 @@ describe('Clean-room V2 design system', () => {
           /<article\b(?:(?:"[^"]*"|'[^']*')|[^'">])*\bv-for=/,
         )
         for (const title of titles) expect(pageBody).toContain(`title="${title}"`)
+        expect(pageBody).not.toContain('title="全部项目收尾概览"')
+      }
+
+      for (const name of [
+        'pages/delivery/QualitySafetyPage.vue',
+        'pages/delivery/TechnicalManagementPage.vue',
+      ]) {
+        const source = readFileSync(resolve(sourceRoot, name), 'utf-8')
+        const pageBody = source.split('<V2Dialog', 1)[0] ?? ''
+        expect(pageBody).toContain('<V2Tabs')
+        expect(pageBody).toContain('role="tabpanel"')
+        expect(pageBody).toMatch(/\bv-if="activeTab ===/)
       }
 
       const closeout = readFileSync(
@@ -1217,7 +1302,7 @@ describe('Clean-room V2 design system', () => {
       )
       expect(dailyLog).toMatch(/<td class="v2-table-cell--wrap">\s*\{\{ record\.weatherSummary/)
       expect(componentCss).toMatch(
-        /#shell-main-content table \.v2-table-cell--wrap \{[\s\S]*?white-space: normal;[\s\S]*?overflow-wrap: anywhere;[\s\S]*?word-break: break-word;/,
+        /#shell-main-content table \.v2-table-cell--wrap,[\s\S]*?\.v2-dialog__body table \.v2-table-cell--wrap \{[\s\S]*?white-space: normal;[\s\S]*?overflow-wrap: anywhere;[\s\S]*?word-break: break-word;/,
       )
       expect(technical).toContain('<th scope="col">图纸编码</th>')
       expect(technical).toContain('<th scope="col">图纸名称</th>')
@@ -1225,12 +1310,21 @@ describe('Clean-room V2 design system', () => {
       expect(technical).not.toContain('technical-page__toolbar')
       expect(technical).not.toContain('subtitle="按技术闭环阶段集中核对与处理"')
       expect(technical).toMatch(
-        /<V2Card title="方案、图纸、会审与 RFI"[\s\S]*?<template #title-extra>[\s\S]*?technical-page__facts[\s\S]*?<template #actions>[\s\S]*?technical-page__actions/,
+        /<V2Card title="图纸 RFI 技术闭环"[\s\S]*?<template #actions>[\s\S]*?technical-page__actions[\s\S]*?<\/V2Card>[\s\S]*?<V2Tabs/,
       )
+      expect(technical).not.toContain('技术闭环概览')
+      expect(technical).not.toContain('title="技术方案"')
+      expect(technical).not.toContain('technical-scheme-title')
+      expect(technical).toContain('<caption class="v2-visually-hidden">')
       expect(quality).not.toContain(':subtitle="`计划 ${plans.length}')
       expect(quality).toMatch(
-        /<V2Card title="质量安全闭环台账">[\s\S]*?<template #title-extra>[\s\S]*?quality-page__facts[\s\S]*?计划 \{\{ plans\.length \}\}[\s\S]*?检查 \{\{ inspections\.length \}\}[\s\S]*?问题 \{\{ issues\.length \}\}/,
+        /<V2Card title="质量安全整改闭环"[\s\S]*?<template #actions>[\s\S]*?quality-page__actions[\s\S]*?<V2Select[\s\S]*?<\/V2Card>[\s\S]*?<V2Tabs/,
       )
+      expect(quality).not.toContain('quality-page__facts')
+      expect(quality).not.toContain('质量安全闭环概览')
+      expect(quality).not.toContain('当前项目 {{ currentProjectLabel }}')
+      expect(quality).not.toContain("当前计划 {{ selectedPlan?.planName || '未选择' }}")
+      expect(quality).not.toContain('待整改 {{ pendingRectificationCount }}')
       expect(closeout).toContain('deliveryLabel(item.receivableType)')
       expect(closeout).toContain('formatAmount(item.allocatedAmount)')
       for (const [tableWrap] of closeout.matchAll(
@@ -1335,6 +1429,77 @@ describe('Clean-room V2 design system', () => {
         'utf-8',
       )
       expect(projectPage).toContain('<V2ActionMenu')
+    })
+
+    it('keeps multi-action table columns on identity-labelled shared menus', () => {
+      const actionMenuPages = [
+        'pages/projects/ProjectPage.vue',
+        'pages/commercial/BidCostPage.vue',
+        'pages/commercial/BudgetPage.vue',
+        'pages/commercial/CostControlPage.vue',
+        'pages/commercial/CostTargetPage.vue',
+        'pages/commercial/ProductionMeasurementPage.vue',
+        'pages/delivery/ProjectCloseoutPage.vue',
+        'pages/delivery/QualitySafetyPage.vue',
+        'pages/delivery/TechnicalManagementPage.vue',
+        'pages/finance/FinanceControlWorkspacePage.vue',
+        'pages/finance/ReceivablesWorkspacePage.vue',
+        'pages/master-data/MaterialDictionaryPage.vue',
+        'pages/master-data/OrganizationPage.vue',
+        'pages/master-data/PartnerPage.vue',
+        'pages/supply-chain/InventoryWorkspacePage.vue',
+        'pages/system/AccessControlPage.vue',
+        'pages/system/DictionaryPage.vue',
+        'pages/system/DocumentTemplatePage.vue',
+      ]
+
+      for (const name of actionMenuPages) {
+        const source = readFileSync(resolve(sourceRoot, name), 'utf-8')
+        const menuCount = source.match(/<V2ActionMenu\b/g)?.length ?? 0
+        expect(menuCount, `${name} has no shared action menu`).toBeGreaterThan(0)
+        expect(source, `${name} does not mark its action cells`).toContain('v2-table-cell--actions')
+        expect(source.match(/:placement=/g)?.length ?? 0, `${name} misses menu placement`).toBe(
+          menuCount,
+        )
+        expect(source, `${name} uses a generic action-menu label`).not.toMatch(
+          /<V2ActionMenu[\s\S]*?label="(?:记录|流水|凭证|期间)操作"/,
+        )
+      }
+
+      const finance = readFileSync(
+        resolve(sourceRoot, 'pages/finance/FinanceControlWorkspacePage.vue'),
+        'utf-8',
+      )
+      const journalMenu = finance.slice(
+        finance.indexOf(':label="`${row.entryNo}更多操作`"'),
+        finance.indexOf('</V2ActionMenu>', finance.indexOf(':label="`${row.entryNo}更多操作`"')),
+      )
+      expect(journalMenu).toContain('type="file"')
+    })
+
+    it('applies list-filter selects immediately while keeping text search submit controls', () => {
+      const contracts: Array<[string, string, number]> = [
+        ['pages/commercial/BudgetPage.vue', '@update:model-value="query"', 1],
+        ['pages/commercial/CostTargetPage.vue', '@update:model-value="query"', 2],
+        ['pages/commercial/VariationPage.vue', '@update:model-value="query"', 2],
+        ['pages/master-data/MaterialDictionaryPage.vue', '@update:model-value="search"', 2],
+        ['pages/master-data/PartnerPage.vue', '@update:model-value="search"', 2],
+        ['pages/settlement/SettlementWorkspacePage.vue', '@update:model-value="search"', 2],
+        ['pages/supply-chain/InventoryWorkspacePage.vue', '@update:model-value="search"', 2],
+        ['pages/supply-chain/RequisitionWorkspacePage.vue', '@update:model-value="search"', 1],
+        ['pages/system/AccessControlPage.vue', '@update:model-value="searchUsers"', 1],
+        ['pages/system/DictionaryPage.vue', '@update:model-value="searchTypes"', 1],
+        ['pages/system/DictionaryPage.vue', '@update:model-value="searchData"', 1],
+        ['pages/system/WorkflowProcessPage.vue', '@update:model-value="search"', 1],
+      ]
+
+      for (const [name, marker, minimum] of contracts) {
+        const source = readFileSync(resolve(sourceRoot, name), 'utf-8')
+        expect(
+          source.split(marker).length - 1,
+          `${name} does not apply its select filter immediately`,
+        ).toBeGreaterThanOrEqual(minimum)
+      }
     })
 
     it('keeps migrated page-specific interaction contracts', () => {
@@ -1487,11 +1652,32 @@ describe('Clean-room V2 design system', () => {
       expect(components).toContain('.v2-dialog__panel::-webkit-scrollbar')
       expect(components).toContain('.v2-select__menu::-webkit-scrollbar')
       expect(select).toContain("'is-drop-up': dropUp")
-      expect(select).toContain('boundaryBottom - triggerRect.bottom')
-      expect(components).toContain('.v2-select.is-drop-up .v2-select__menu')
+      expect(select).toContain("position: 'fixed'")
+      expect(select).toContain('window.innerHeight')
+      expect(select).toContain('window.innerWidth')
+      expect(select).toContain(':style="menuStyle"')
+      expect(select).toContain('<Teleport to="body" :disabled="!open">')
+      expect(select).toContain('menu.value?.contains(next)')
       expect(components).toMatch(
-        /\.v2-dialog__panel:has\(\.v2-select\[open\]\) \.v2-dialog__body \{[\s\S]*?z-index: 3;/,
+        /\.v2-select__menu \{[\s\S]*?z-index: calc\(var\(--v2-z-dialog\) \+ 1\);/,
       )
+      expect(components).toMatch(
+        /#shell-main-content input\[type='file'\],[\s\S]*?\.v2-dialog__body input\[type='file'\][\s\S]*?\)::file-selector-button \{[^}]*border:[^}]*var\(--v2-color-primary\);[^}]*cursor:\s*pointer;/,
+      )
+      expect(components).toMatch(
+        /#shell-main-content table :where\(th, td\) \{[^}]*height: var\(--v2-table-row-height\);[^}]*padding: 0 var\(--v2-space-3\);/,
+      )
+      expect(components).toMatch(
+        /\.v2-detail-dialog table td \{[^}]*height: var\(--v2-table-row-height\);[^}]*padding: 0 var\(--v2-space-3\);/,
+      )
+      expect(components).toMatch(
+        /\.v2-dialog__body table :where\(th, td\) \{[^}]*height: var\(--v2-table-row-height\);[^}]*padding-block: 0;[^}]*vertical-align: middle;/,
+      )
+      expect(components).toMatch(
+        /#shell-main-content table \.v2-table-cell--wrap,[\s\S]*?\.v2-dialog__body table \.v2-table-cell--wrap \{[^}]*padding-block: var\(--v2-space-2\);[^}]*line-height: var\(--v2-table-wrap-line-height\);[^}]*vertical-align: middle;/,
+      )
+      expect(components).not.toContain('vertical-align: top;')
+      expect(components).not.toContain(':has(.v2-select[open])')
       expect(dailyLog).toContain('class="daily-log-page__table v2-table--top"')
       expect(components).toMatch(
         /#shell-main-content table \{[\s\S]*?font-size: var\(--v2-font-size-12\);/,

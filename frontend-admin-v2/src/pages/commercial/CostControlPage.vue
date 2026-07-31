@@ -10,6 +10,7 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
+  V2ActionMenu,
   V2Button,
   V2Card,
   V2Dialog,
@@ -497,17 +498,20 @@ onBeforeUnmount(() => {
                   <th scope="col">措施</th>
                   <th scope="col">预计节约</th>
                   <th scope="col">状态</th>
-                  <th scope="col">操作</th>
+                  <th scope="col" class="v2-table-cell--actions">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in actions" :key="text(row, 'id')">
+                <tr v-for="(row, index) in actions" :key="text(row, 'id')">
                   <th scope="row">{{ text(row, 'action_code') || '措施编号缺失' }}</th>
                   <td>{{ text(row, 'action_title') }}</td>
                   <td>{{ text(row, 'expected_saving_amount') }}</td>
                   <td>{{ statusLabel(text(row, 'status')) }}</td>
-                  <td>
-                    <div class="actions">
+                  <td class="v2-table-cell--actions">
+                    <V2ActionMenu
+                      :label="`${text(row, 'action_code') || text(row, 'action_title')}更多操作`"
+                      :placement="index >= actions.length - 3 ? 'top-end' : 'bottom-end'"
+                    >
                       <V2Button
                         v-if="canCorrective && ['DRAFT', 'REJECTED'].includes(text(row, 'status'))"
                         variant="secondary"
@@ -524,7 +528,7 @@ onBeforeUnmount(() => {
                         @click="openClose(row)"
                         >关闭</V2Button
                       >
-                    </div>
+                    </V2ActionMenu>
                   </td>
                 </tr>
               </tbody>

@@ -60,6 +60,7 @@ describe('V2 eight-domain navigation contract', () => {
     ])
     expect(findWorkspace('/contract/C-100/edit')?.workspace.label).toBe('合同与变更')
     expect(findWorkspace('/cost-target/81/edit')?.workspace.label).toBe('投标与成本目标')
+    expect(findWorkspace('/partner/101')?.workspace.label).toBe('合作方管理')
     expect(permissionForPath('/supplier-sourcing')).toBe('supplier:sourcing:query')
     expect(findWorkspace('/supplier-sourcing')?.workspace.label).toBe('供应商管理')
     expect(permissionForPath('/inventory/purchase-request')).toBe('purchase:request:list')
@@ -68,16 +69,16 @@ describe('V2 eight-domain navigation contract', () => {
     expect(findWorkspace('/purchase/order')?.workspace.label).toBe('采购执行')
   })
 
-  it('requires admin role and exact permission for workflow configuration navigation', () => {
+  it('uses the API-aligned admin gate for workflow configuration navigation', () => {
     const workflowVisible = (roles: string[], permissions: string[]) =>
       visibleNavigation(roles, permissions)
         .flatMap((domain) => domain.workspaces)
         .some((workspace) => workspace.id === 'workflow')
 
     expect(workflowVisible(['USER'], ['workflow:process:query'])).toBe(false)
-    expect(workflowVisible(['ADMIN'], [])).toBe(false)
+    expect(workflowVisible(['ADMIN'], [])).toBe(true)
     expect(workflowVisible(['ADMIN'], ['workflow:process:query'])).toBe(true)
-    expect(workflowVisible(['SUPER_ADMIN'], ['workflow:process:query'])).toBe(true)
+    expect(workflowVisible(['SUPER_ADMIN'], [])).toBe(true)
   })
 
   it('freezes system route and API permission layers', () => {

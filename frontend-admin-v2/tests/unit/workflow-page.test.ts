@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WorkflowWorkbenchPage from '@/pages/workbench/WorkflowWorkbenchPage.vue'
 import {
   approveWorkflowTask,
+  loadWorkflowActionUsers,
   loadWorkflowBusinessTypes,
   loadWorkflowInstance,
   loadWorkflowList,
@@ -17,6 +18,7 @@ vi.mock('@/services/workflow', () => ({
   loadWorkflowList: vi.fn(),
   loadWorkflowBusinessTypes: vi.fn(),
   loadWorkflowInstance: vi.fn(),
+  loadWorkflowActionUsers: vi.fn(),
   approveWorkflowTask: vi.fn(),
   rejectWorkflowTask: vi.fn(),
   withdrawWorkflowInstance: vi.fn(),
@@ -78,6 +80,7 @@ beforeEach(() => {
   vi.mocked(loadWorkflowList).mockReset()
   vi.mocked(loadWorkflowBusinessTypes).mockReset().mockResolvedValue(['PAYMENT'])
   vi.mocked(loadWorkflowInstance).mockReset().mockResolvedValue(detail)
+  vi.mocked(loadWorkflowActionUsers).mockReset().mockResolvedValue([])
   vi.mocked(approveWorkflowTask).mockReset()
   document.body.innerHTML = ''
 })
@@ -137,6 +140,7 @@ describe('WorkflowWorkbenchPage', () => {
     const listCard = wrapper.get('.workflow-table-wrap').element.closest('.v2-card')
     expect(listCard?.querySelector('h2')?.textContent).toBe('待我处理')
     expect(listCard?.querySelector('.v2-card__title-row .v2-badge')?.textContent).toBe('1 条')
+    expect(wrapper.findAll('.workflow-table th').map((item) => item.text())[0]).toBe('业务编号')
     const rowAction = wrapper.get('.v2-table__record-link')
     expect(rowAction.text()).toBe('PAY-2026-001')
     expect(rowAction.classes()).toContain('v2-button--ghost')
@@ -319,6 +323,52 @@ describe('WorkflowWorkbenchPage', () => {
 
     expect(document.body.textContent).toContain('驳回必须填写原因')
     expect(document.body.querySelector('textarea')?.getAttribute('aria-invalid')).toBe('true')
+    wrapper.unmount()
+  })
+
+  it('loads transfer candidates from workflow scope', async () => {
+    vi.mocked(loadWorkflowInstance).mockResolvedValue({
+      ...detail,
+      availableActions: ['transfer'],
+    })
+    vi.mocked(loadWorkflowActionUsers).mockResolvedValue([
+      { id: '2', username: 'target', realName: '转办人', status: 'ENABLE' },
+    ])
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        {
+          path: '/approval/instances/:instanceId',
+          component: WorkflowWorkbenchPage,
+          meta: { workflowTab: 'todo' },
+        },
+        { path: '/approval/todo', component: { template: '<div />' } },
+      ],
+    })
+    await router.push('/approval/instances/81')
+    await router.isReady()
+    const session = useSessionStore()
+    session.userInfo = {
+      userId: '1',
+      username: 'approver',
+      roles: ['USER'],
+      permissions: ['workflow:instance:query', 'workflow:transfer'],
+    }
+    session.status = 'authenticated'
+    const wrapper = mount(WorkflowWorkbenchPage, {
+      attachTo: document.body,
+      global: { plugins: [router] },
+    })
+    await flushPromises()
+
+    const transfer = [...document.body.querySelectorAll('button')].find(
+      (button) => button.textContent?.trim() === '转办',
+    ) as HTMLButtonElement
+    transfer.click()
+    await flushPromises()
+
+    expect(loadWorkflowActionUsers).toHaveBeenCalledWith('91', expect.any(AbortSignal))
+    expect(document.body.textContent).toContain('转办人（target）')
     wrapper.unmount()
   })
 })

@@ -529,6 +529,7 @@ onBeforeUnmount(() => {
             placeholder="全部仓库"
             allow-empty
             :options="warehouseOptions"
+            @update:model-value="search"
           />
           <V2Select
             v-model="filter.materialId"
@@ -537,6 +538,7 @@ onBeforeUnmount(() => {
             placeholder="全部物料"
             allow-empty
             :options="materialOptions"
+            @update:model-value="search"
           />
           <V2Input
             v-model="filter.keyword"
@@ -603,7 +605,7 @@ onBeforeUnmount(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in warehouses" :key="item.id">
+              <tr v-for="(item, index) in warehouses" :key="item.id">
                 <th scope="row">{{ item.warehouseCode }}</th>
                 <td>{{ item.warehouseName }}</td>
                 <td>{{ item.projectName || '项目信息缺失' }}</td>
@@ -614,7 +616,10 @@ onBeforeUnmount(() => {
                 </td>
                 <td>{{ dateTimeLabel(item.updatedAt) }}</td>
                 <td class="v2-table-cell--actions">
-                  <V2ActionMenu :label="`${item.warehouseName}操作`">
+                  <V2ActionMenu
+                    :label="`${item.warehouseCode || item.warehouseName}更多操作`"
+                    :placement="index >= warehouses.length - 3 ? 'top-end' : 'bottom-end'"
+                  >
                     <V2Button
                       v-if="canWarehouseEdit"
                       variant="ghost"

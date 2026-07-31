@@ -201,11 +201,19 @@ class MaterialReceiptWorkflowHandlerTest {
                 "不合格品退回供应商", "SRT-R-" + receiptItem.getId()));
         MatQualityDisposition resolved = qualityDispositionMapper.selectById(disposition.getId());
         assertEquals("RESOLVED", resolved.getStatus());
+        assertEquals("COMPLETED", receiptItemMapper.selectById(receiptItem.getId()).getDispositionStatus());
+        receiptItem.setDispositionStatus("PENDING");
+        receiptItemMapper.updateById(receiptItem);
+        assertEquals(rejectedReturnId, supplierReturnService.confirm(new SupplierReturnRequest(
+                receiptItem.getId(), disposition.getId(), new BigDecimal("1.0000"), LocalDate.now(),
+                "旧版本状态修复重试", "SRT-R-RETRY-" + receiptItem.getId())));
+        assertEquals("COMPLETED", receiptItemMapper.selectById(receiptItem.getId()).getDispositionStatus());
         assertEquals(0L, stockTxnMapper.selectCount(new LambdaQueryWrapper<MatStockTxn>()
                 .eq(MatStockTxn::getSourceId, rejectedReturnId)
                 .in(MatStockTxn::getSourceType, "SUPPLIER_RETURN", "SUPPLIER_RETURN_REVERSAL")));
         supplierReturnService.reverse(rejectedReturnId, "撤销不合格品退货");
         assertEquals("OPEN", qualityDispositionMapper.selectById(disposition.getId()).getStatus());
+        assertEquals("PENDING", receiptItemMapper.selectById(receiptItem.getId()).getDispositionStatus());
 
         handler.onApproved(ctx);
         assertEquals(0, new BigDecimal("2.0000")

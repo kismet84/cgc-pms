@@ -10,6 +10,8 @@ import com.cgcpms.workflow.handler.WorkflowContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 @RequiredArgsConstructor
 public class ProjectApprovalWorkflowHandler implements WorkflowBusinessHandler {
@@ -26,25 +28,36 @@ public class ProjectApprovalWorkflowHandler implements WorkflowBusinessHandler {
     }
 
     @Override
+    public void beforeSubmit(WorkflowContext context) {
+        update(context.getInstance(), List.of("DRAFT", "REJECTED", "WITHDRAWN", "APPROVING"), "APPROVING");
+    }
+
+    @Override
     public void onApproved(WorkflowContext context) {
-        update(context.getInstance(), "APPROVING", "APPROVED");
+        update(context.getInstance(), approvalStates(context.getInstance()), "APPROVED");
     }
 
     @Override
     public void onRejected(WorkflowContext context) {
-        update(context.getInstance(), "APPROVING", "REJECTED");
+        update(context.getInstance(), approvalStates(context.getInstance()), "REJECTED");
     }
 
     @Override
     public void onWithdrawn(WorkflowContext context) {
-        update(context.getInstance(), "APPROVING", "DRAFT");
+        update(context.getInstance(), approvalStates(context.getInstance()), "DRAFT");
     }
 
-    private void update(WfInstance instance, String expected, String target) {
+    private List<String> approvalStates(WfInstance instance) {
+        return instance.getCurrentRound() != null && instance.getCurrentRound() > 1
+                ? List.of("APPROVING", "REJECTED", "WITHDRAWN")
+                : List.of("APPROVING");
+    }
+
+    private void update(WfInstance instance, List<String> expected, String target) {
         int rows = projectMapper.update(null, new LambdaUpdateWrapper<PmProject>()
                 .eq(PmProject::getId, instance.getBusinessId())
                 .eq(PmProject::getTenantId, instance.getTenantId())
-                .eq(PmProject::getApprovalStatus, expected)
+                .in(PmProject::getApprovalStatus, expected)
                 .set(PmProject::getApprovalStatus, target));
         if (rows != 1) {
             throw new IllegalStateException("项目审批状态冲突，projectId=" + instance.getBusinessId());

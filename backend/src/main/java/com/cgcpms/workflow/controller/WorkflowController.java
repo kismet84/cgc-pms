@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -120,6 +121,13 @@ public class WorkflowController {
         workflowEngine.addSign(taskId, request.getAdditionalUserIds(),
                 userId, username, request.getComment());
         return ApiResponse.success();
+    }
+
+    @GetMapping("/tasks/{taskId}/action-users")
+    @PreAuthorize("hasAnyAuthority('workflow:transfer','workflow:add-sign') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<Map<String, String>>> actionUsers(@PathVariable Long taskId) {
+        return ApiResponse.success(workflowQueryService.getActionUsers(
+                taskId, UserContext.getCurrentTenantId(), UserContext.getCurrentUserId()));
     }
 
     @GetMapping("/tasks/todo")

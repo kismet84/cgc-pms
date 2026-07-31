@@ -10,6 +10,7 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -320,6 +321,7 @@ onBeforeUnmount(() => {
               :options="statusOptions"
               allow-empty
               placeholder="全部状态"
+              @update:model-value="query"
             /><V2Button
               class="budget-query"
               size="small"
@@ -363,11 +365,11 @@ onBeforeUnmount(() => {
                 <th scope="col">预算总额</th>
                 <th scope="col">审批状态</th>
                 <th scope="col">业务状态</th>
-                <th scope="col">操作</th>
+                <th scope="col" class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in records" :key="row.id">
+              <tr v-for="(row, index) in records" :key="row.id">
                 <th scope="row">
                   <V2Button
                     size="small"
@@ -391,8 +393,11 @@ onBeforeUnmount(() => {
                     budgetStatusLabel(row.status)
                   }}</V2Badge>
                 </td>
-                <td>
-                  <div class="actions">
+                <td class="v2-table-cell--actions">
+                  <V2ActionMenu
+                    :label="`${row.budgetCode}更多操作`"
+                    :placement="index >= records.length - 3 ? 'top-end' : 'bottom-end'"
+                  >
                     <V2Button
                       v-if="canEdit && ['DRAFT', 'REJECTED'].includes(row.approvalStatus)"
                       size="small"
@@ -414,7 +419,7 @@ onBeforeUnmount(() => {
                       @click="run(() => deleteBudget(row.id, row.version ?? ''), '预算已删除')"
                       >删除</V2Button
                     >
-                  </div>
+                  </V2ActionMenu>
                 </td>
               </tr>
             </tbody>

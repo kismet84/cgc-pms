@@ -1,13 +1,23 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { V2ActionMenu, V2Button, V2Card, V2PageState } from '@/components'
+import {
+  V2ActionMenu,
+  V2Button,
+  V2Card,
+  V2Dialog,
+  V2Input,
+  V2PageState,
+  V2Select,
+} from '@/components'
 import { showToast } from '@/components/toast'
 import { formatAmount } from '@/pages/dashboard/model'
+import { uploadSiteFile } from '@/services/delivery'
 import {
   approveCashForecast,
   archiveCashJournal,
   closeFinancePeriod,
+  createFundAccount,
   generateFinanceAlerts,
   handleFinanceAlert,
   loadAccountingEntries,
@@ -47,12 +57,24 @@ import type {
   FinancialCloseTrace,
   FinancialStatement,
   FundAccountRecord,
+  FundAccountCommand,
 } from '@cgc-pms/frontend-contracts'
 
 type Mode = 'operations' | 'journal' | 'forecast' | 'accounting' | 'close'
 type JournalAction = 'archive' | 'reverse' | 'reopen'
 type EntryAction = 'approve' | 'reject' | 'post' | 'resubmit' | 'reverse'
 type PeriodAction = 'check' | 'close' | 'reopen'
+
+interface FundAccountEditor {
+  accountCode: string
+  accountName: string
+  accountType: 'CASH' | 'BANK'
+  bankName: string
+  bankAccountNo: string
+  openingDate: string
+  openingBalance: string
+  remark: string
+}
 
 const route = useRoute()
 const session = useSessionStore()
@@ -88,6 +110,11 @@ const projectId = computed(() => workspace.selectedProjectId || '')
 const needsProject = computed(() => mode.value === 'operations' || mode.value === 'forecast')
 const can = (permission: string) => session.hasPermission(permission)
 const isSuperAdmin = computed(() => session.roles.includes('SUPER_ADMIN'))
+const canManageAccounts = computed(
+  () =>
+    session.hasPermission('cashbook:account:manage') ||
+    session.roles.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'),
+)
 
 const operations = ref<FinanceOperationsWorkspace | null>(null)
 const accounts = ref<FundAccountRecord[]>([])
@@ -104,6 +131,8 @@ const statement = ref<FinancialStatement | null>(null)
 const loading = ref(false)
 const busy = ref(false)
 const errorMessage = ref('')
+const accountDialog = ref(false)
+const accountEditor = ref<FundAccountEditor | null>(null)
 let controller: AbortController | null = null
 
 const hasRows = computed(() => {
@@ -173,6 +202,63 @@ const projectRequired = () => {
 const askReason = (message: string) => {
   const value = window.prompt(message, 'V2工作台人工操作')
   return value?.trim() || ''
+}
+
+function openFundAccount(): void {
+  accountEditor.value = {
+    accountCode: '',
+    accountName: '',
+    accountType: 'BANK',
+    bankName: '',
+    bankAccountNo: '',
+    openingDate: new Date().toISOString().slice(0, 10),
+    openingBalance: '0.00',
+    remark: '',
+  }
+  accountDialog.value = true
+}
+
+function closeFundAccount(): void {
+  if (busy.value) return
+  accountDialog.value = false
+  accountEditor.value = null
+}
+
+async function saveFundAccount(): Promise<void> {
+  const value = accountEditor.value
+  if (!value) return
+  const required = [
+    ['账户编码', value.accountCode],
+    ['账户名称', value.accountName],
+    ['开户日期', value.openingDate],
+    ['期初余额', value.openingBalance],
+  ].find(([, field]) => !field?.trim())
+  if (required) {
+    showToast('error', '资金账户保存失败', `${required[0]}不能为空。`)
+    return
+  }
+  const command: FundAccountCommand = {
+    accountCode: value.accountCode.trim(),
+    accountName: value.accountName.trim(),
+    accountType: value.accountType,
+    bankName: value.bankName.trim() || undefined,
+    bankAccountNo: value.bankAccountNo.trim() || undefined,
+    openingDate: value.openingDate,
+    openingBalance: value.openingBalance.trim(),
+    remark: value.remark.trim() || undefined,
+  }
+  busy.value = true
+  try {
+    await createFundAccount(command)
+    accountDialog.value = false
+    accountEditor.value = null
+    await load()
+    showToast('success', '资金账户已创建', '资金账户列表已刷新。')
+  } catch (cause) {
+    showToast('error', '资金账户保存失败', cause instanceof Error ? cause.message : '请稍后重试。')
+  } finally {
+    busy.value = false
+  }
 }
 
 async function load(): Promise<void> {
@@ -292,6 +378,24 @@ async function actJournal(row: CashJournalPage['records'][number], action: Journ
     action === 'reverse' ? '流水已冲销' : '流水已重开',
   )
 }
+async function uploadJournalEvidence(
+  row: CashJournalPage['records'][number],
+  event: Event,
+): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  busy.value = true
+  try {
+    await uploadSiteFile(file, 'CASH_JOURNAL', row.id, 'BANK_RECEIPT')
+    showToast('success', '银行回单已上传', '病毒扫描通过后可归档资金流水。')
+  } catch (cause) {
+    showToast('error', '银行回单上传失败', cause instanceof Error ? cause.message : '请稍后重试。')
+  } finally {
+    input.value = ''
+    busy.value = false
+  }
+}
 async function actForecast(action: 'regenerate' | 'submit' | 'approve' | 'reject' | 'refresh') {
   const id = forecastTrace.value?.cycle.id
   if (!id) return
@@ -397,7 +501,7 @@ onBeforeUnmount(() => controller?.abort())
         <template #actions><V2Button @click="load">重试</V2Button></template>
       </V2PageState>
       <V2PageState
-        v-else-if="!errorMessage && !hasRows"
+        v-else-if="!errorMessage && !hasRows && mode !== 'journal'"
         :title="`暂无${title}记录`"
         description="当前范围暂无可访问记录。"
       />
@@ -475,23 +579,28 @@ onBeforeUnmount(() => controller?.abort())
                   <th>等级</th>
                   <th>到期日期</th>
                   <th>状态</th>
-                  <th>操作</th>
+                  <th class="v2-table-cell--actions">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in operations.alerts" :key="row.id">
+                <tr v-for="(row, index) in operations.alerts" :key="row.id">
                   <td>{{ row.message }}</td>
                   <td>{{ label(row.severity) }}</td>
                   <td>{{ row.dueAt || '—' }}</td>
                   <td>{{ label(row.status) }}</td>
-                  <td>
-                    <V2Button
-                      v-if="row.status === 'OPEN' && can('finance:operations:maintain')"
-                      size="small"
-                      variant="ghost"
-                      @click="resolveAlert(row.id)"
-                      >处理</V2Button
+                  <td class="v2-table-cell--actions">
+                    <V2ActionMenu
+                      :label="`${row.message}更多操作`"
+                      :placement="index >= operations.alerts.length - 3 ? 'top-end' : 'bottom-end'"
                     >
+                      <V2Button
+                        v-if="row.status === 'OPEN' && can('finance:operations:maintain')"
+                        size="small"
+                        variant="ghost"
+                        @click="resolveAlert(row.id)"
+                        >处理</V2Button
+                      >
+                    </V2ActionMenu>
                   </td>
                 </tr>
               </tbody>
@@ -502,6 +611,11 @@ onBeforeUnmount(() => controller?.abort())
 
       <template v-else-if="mode === 'journal'">
         <V2Card title="资金账户" :heading-level="2">
+          <template #actions>
+            <V2Button v-if="canManageAccounts" size="small" @click="openFundAccount">
+              新建资金账户
+            </V2Button>
+          </template>
           <div
             class="finance-control__table-wrap"
             role="region"
@@ -546,19 +660,38 @@ onBeforeUnmount(() => controller?.abort())
                   <th>金额</th>
                   <th>余额</th>
                   <th>状态</th>
-                  <th>操作</th>
+                  <th class="v2-table-cell--actions">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in journal.records" :key="row.id">
+                <tr v-for="(row, index) in journal.records" :key="row.id">
                   <td>{{ row.entryNo }}</td>
                   <td>{{ row.businessDate }}</td>
                   <td>{{ label(row.direction) }}</td>
                   <td>{{ amount(row.amount) }}</td>
                   <td>{{ amount(row.runningBalance) }}</td>
                   <td>{{ label(row.status) }}</td>
-                  <td>
-                    <V2ActionMenu label="流水操作">
+                  <td class="v2-table-cell--actions">
+                    <V2ActionMenu
+                      :label="`${row.entryNo}更多操作`"
+                      :placement="index >= journal.records.length - 3 ? 'top-end' : 'bottom-end'"
+                    >
+                      <label
+                        v-if="
+                          ['DRAFT', 'PENDING_ARCHIVE'].includes(row.status) &&
+                          (can('file:upload') || can('cashbook:journal:maintain'))
+                        "
+                        class="v2-action-menu__item"
+                      >
+                        <span>上传银行回单</span>
+                        <input
+                          class="v2-visually-hidden"
+                          type="file"
+                          accept=".pdf,image/*"
+                          :disabled="busy"
+                          @change="uploadJournalEvidence(row, $event)"
+                        />
+                      </label>
                       <V2Button
                         v-if="
                           ['DRAFT', 'PENDING_ARCHIVE'].includes(row.status) &&
@@ -770,11 +903,11 @@ onBeforeUnmount(() => controller?.abort())
                   <th>贷方</th>
                   <th>复核</th>
                   <th>状态</th>
-                  <th>操作</th>
+                  <th class="v2-table-cell--actions">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in entries.records" :key="row.id">
+                <tr v-for="(row, index) in entries.records" :key="row.id">
                   <td>
                     <V2Button size="small" variant="ghost" @click="selectEntry(row.id)">{{
                       row.entryCode
@@ -785,8 +918,11 @@ onBeforeUnmount(() => controller?.abort())
                   <td>{{ amount(row.totalCredit) }}</td>
                   <td>{{ label(row.reviewStatus) }}</td>
                   <td>{{ label(row.entryStatus) }}</td>
-                  <td>
-                    <V2ActionMenu label="凭证操作">
+                  <td class="v2-table-cell--actions">
+                    <V2ActionMenu
+                      :label="`${row.entryCode}更多操作`"
+                      :placement="index >= entries.records.length - 3 ? 'top-end' : 'bottom-end'"
+                    >
                       <V2Button
                         v-if="
                           row.entryStatus === 'DRAFT' &&
@@ -919,11 +1055,11 @@ onBeforeUnmount(() => controller?.abort())
                   <th>起止日期</th>
                   <th>问题数</th>
                   <th>状态</th>
-                  <th>操作</th>
+                  <th class="v2-table-cell--actions">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in periods" :key="row.id">
+                <tr v-for="(row, index) in periods" :key="row.id">
                   <td>
                     <V2Button size="small" variant="ghost" @click="selectPeriod(row)">{{
                       row.periodCode
@@ -932,8 +1068,11 @@ onBeforeUnmount(() => controller?.abort())
                   <td>{{ row.startDate }} 至 {{ row.endDate }}</td>
                   <td>{{ row.issueCount }}</td>
                   <td>{{ label(row.status) }}</td>
-                  <td>
-                    <V2ActionMenu label="期间操作">
+                  <td class="v2-table-cell--actions">
+                    <V2ActionMenu
+                      :label="`${row.periodCode}更多操作`"
+                      :placement="index >= periods.length - 3 ? 'top-end' : 'bottom-end'"
+                    >
                       <V2Button
                         v-if="row.status !== 'CLOSED' && can('finance:close:check')"
                         size="small"
@@ -1025,6 +1164,53 @@ onBeforeUnmount(() => controller?.abort())
           </div>
         </V2Card>
       </template>
+      <V2Dialog
+        v-model:open="accountDialog"
+        title="新建资金账户"
+        :close-disabled="busy"
+        :close-on-backdrop="false"
+        @update:open="(open) => !open && closeFundAccount()"
+      >
+        <form
+          v-if="accountEditor"
+          id="fund-account-form"
+          class="finance-control__form"
+          @submit.prevent="saveFundAccount"
+        >
+          <V2Input v-model="accountEditor.accountCode" label="账户编码" required />
+          <V2Input v-model="accountEditor.accountName" label="账户名称" required />
+          <V2Select
+            v-model="accountEditor.accountType"
+            label="账户类型"
+            :options="[
+              { value: 'BANK', label: '银行账户' },
+              { value: 'CASH', label: '现金账户' },
+            ]"
+            required
+          />
+          <V2Input v-model="accountEditor.bankName" label="开户行" />
+          <V2Input v-model="accountEditor.bankAccountNo" label="银行账号" />
+          <V2Input
+            v-model="accountEditor.openingDate"
+            type="date"
+            label="开户日期"
+            required
+          />
+          <V2Input
+            v-model="accountEditor.openingBalance"
+            label="期初余额"
+            required
+            hint="金额按服务端十进制字符串提交"
+          />
+          <V2Input v-model="accountEditor.remark" label="备注" />
+        </form>
+        <template #footer>
+          <V2Button type="button" variant="secondary" :disabled="busy" @click="closeFundAccount">
+            取消
+          </V2Button>
+          <V2Button type="submit" form="fund-account-form" :loading="busy">保存</V2Button>
+        </template>
+      </V2Dialog>
     </template>
   </section>
 </template>
@@ -1039,6 +1225,10 @@ onBeforeUnmount(() => controller?.abort())
   display: flex;
   flex-wrap: wrap;
   gap: var(--v2-space-2);
+}
+.finance-control__form {
+  display: grid;
+  gap: var(--v2-space-3);
 }
 .finance-control__pagination {
   display: flex;

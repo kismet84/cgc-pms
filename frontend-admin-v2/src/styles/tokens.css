@@ -112,6 +112,8 @@
   --v2-control-height-md: 2.5rem;
   --v2-control-height-touch: 2.75rem;
   --v2-control-height-textarea: 6rem;
+  --v2-table-row-height: 2.5rem;
+  --v2-table-wrap-line-height: 1.125rem;
   --v2-page-gutter: clamp(1rem, 2vw, 2rem);
   --v2-page-max-width: 90rem;
   --v2-grid-gap: var(--v2-space-3);

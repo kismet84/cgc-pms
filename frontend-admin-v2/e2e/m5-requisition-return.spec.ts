@@ -3,6 +3,7 @@ import { expect, test, type Locator, type Page, type Route } from '@playwright/t
 import { captureRuntimeErrors } from './runtime-errors'
 
 async function selectBusinessOption(
+  page: Page,
   scope: Locator,
   triggerName: RegExp,
   optionName: RegExp,
@@ -16,7 +17,7 @@ async function selectBusinessOption(
   })
   const trigger = scope.getByRole('button', { name: triggerName })
   await trigger.click()
-  const option = scope.getByRole('option', { name: optionName })
+  const option = page.getByRole('option', { name: optionName })
   await expect(option).toBeVisible()
   await option.focus()
   await option.press('Enter')
@@ -408,9 +409,9 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     await page.goto('/v2/inventory/material-requisition?projectId=P1')
     await page.getByRole('button', { name: '发起领料申请' }).click()
     const editor = page.getByRole('dialog', { name: '发起领料申请' })
-    await selectBusinessOption(editor, /^合同：/, /CT-001 · 示范项目材料合同/)
-    await selectBusinessOption(editor, /^领用仓库：/, /WH-001 · 主仓/)
-    await selectBusinessOption(editor, /^物料：/, /MAT-001 · 钢筋/)
+    await selectBusinessOption(page, editor, /^合同：/, /CT-001 · 示范项目材料合同/)
+    await selectBusinessOption(page, editor, /^领用仓库：/, /WH-001 · 主仓/)
+    await selectBusinessOption(page, editor, /^物料：/, /MAT-001 · 钢筋/)
     await editor.getByLabel('领用数量').fill('9007199254740993.1234')
     await editor.getByLabel('参考单价').fill('3.25')
     await editor.getByRole('button', { name: '保存并提交审批' }).dblclick()
@@ -441,9 +442,9 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     await expect(dialog).toBeVisible()
     await page.waitForTimeout(300)
     await dialog.getByRole('button', { name: /领料明细/ }).click()
-    await dialog.getByRole('option', { name: /钢筋/ }).click()
+    await page.getByRole('option', { name: /钢筋/ }).click()
     await dialog.getByRole('button', { name: /原出库流水/ }).click()
-    await dialog.getByRole('option', { name: /出库/ }).click()
+    await page.getByRole('option', { name: /出库/ }).click()
     await page.getByLabel('退料数量').fill('1.0000')
     await page.getByLabel('退料原因').fill('现场余料')
     await page.getByRole('button', { name: '确认退料' }).dblclick()

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useId } from 'vue'
+import type { CSSProperties } from 'vue'
 import type { V2SelectOption } from './types'
 
 const props = withDefaults(
@@ -40,8 +41,10 @@ const describedBy = computed(() =>
 )
 const dropdown = ref<HTMLDetailsElement | null>(null)
 const trigger = ref<HTMLElement | null>(null)
+const menu = ref<HTMLElement | null>(null)
 const open = ref(false)
 const dropUp = ref(false)
+const menuStyle = ref<CSSProperties>({})
 const renderedOptions = computed(() => {
   if (!props.allowEmpty)
     return [{ value: '', label: props.placeholder, disabled: true }, ...props.options]
@@ -57,9 +60,11 @@ const selectedLabel = computed(
 
 function close(event?: FocusEvent): void {
   const next = event?.relatedTarget as Node | null
-  if (next && dropdown.value?.contains(next)) return
+  if (next && (dropdown.value?.contains(next) || menu.value?.contains(next))) return
   if (dropdown.value) dropdown.value.open = false
   open.value = false
+  dropUp.value = false
+  menuStyle.value = {}
 }
 
 function closeAndFocusTrigger(): void {
@@ -77,31 +82,44 @@ function onToggle(event: Event): void {
   open.value = (event.currentTarget as HTMLDetailsElement).open
   if (!open.value) {
     dropUp.value = false
+    menuStyle.value = {}
     return
   }
   void nextTick(() => {
     const triggerRect = trigger.value?.getBoundingClientRect()
-    const menu = dropdown.value?.querySelector<HTMLElement>('.v2-select__menu')
-    if (!triggerRect || !menu) return
+    const menuElement = menu.value
+    if (!triggerRect || !menuElement) return
     const menuHeight = Math.min(
-      Math.max(menu.scrollHeight, renderedOptions.value.length * 36 + 8),
+      Math.max(menuElement.scrollHeight, renderedOptions.value.length * 36 + 8),
       320,
     )
-    const dialogRect = dropdown.value
-      ?.closest<HTMLElement>('.v2-dialog__panel')
-      ?.getBoundingClientRect()
-    const boundaryTop = Math.max(0, dialogRect?.top ?? 0)
-    const boundaryBottom = Math.min(window.innerHeight, dialogRect?.bottom ?? window.innerHeight)
-    dropUp.value =
-      (Boolean(dialogRect) && triggerRect.top > boundaryTop + (boundaryBottom - boundaryTop) / 2) ||
-      (boundaryBottom - triggerRect.bottom < menuHeight + 8 &&
-        triggerRect.top - boundaryTop > menuHeight)
+    const margin = 8
+    const gap = 4
+    const width = Math.min(triggerRect.width, window.innerWidth - margin * 2)
+    const left = Math.min(
+      Math.max(margin, triggerRect.left),
+      window.innerWidth - width - margin,
+    )
+    const spaceBelow = Math.max(0, window.innerHeight - triggerRect.bottom - margin)
+    const spaceAbove = Math.max(0, triggerRect.top - margin)
+    dropUp.value = spaceBelow < menuHeight && spaceAbove > spaceBelow
+    const availableHeight = dropUp.value ? spaceAbove : spaceBelow
+    menuStyle.value = {
+      position: 'fixed',
+      insetInlineStart: `${left}px`,
+      width: `${width}px`,
+      maxHeight: `${Math.max(72, Math.min(menuHeight, availableHeight - gap))}px`,
+      insetBlockStart: dropUp.value ? 'auto' : `${triggerRect.bottom + gap}px`,
+      insetBlockEnd: dropUp.value
+        ? `${window.innerHeight - triggerRect.top + gap}px`
+        : 'auto',
+    }
   })
 }
 
 function enabledOptionButtons(): HTMLButtonElement[] {
   return Array.from(
-    dropdown.value?.querySelectorAll<HTMLButtonElement>('[role="option"]:not(:disabled)') ?? [],
+    menu.value?.querySelectorAll<HTMLButtonElement>('[role="option"]:not(:disabled)') ?? [],
   )
 }
 
@@ -168,25 +186,31 @@ function onOptionKeydown(event: KeyboardEvent): void {
       >
         {{ selectedLabel }}
       </summary>
-      <div
-        class="v2-select__menu"
-        role="listbox"
-        :aria-label="label || placeholder"
-        @keydown="onOptionKeydown"
-      >
-        <button
-          v-for="option in renderedOptions"
-          :key="option.value"
-          type="button"
-          role="option"
-          :data-value="option.value"
-          :disabled="option.disabled"
-          :aria-selected="modelValue === option.value"
-          @click="select(option)"
+      <Teleport to="body" :disabled="!open">
+        <div
+          v-show="open"
+          ref="menu"
+          class="v2-select__menu"
+          role="listbox"
+          :style="menuStyle"
+          :aria-label="label || placeholder"
+          @keydown="onOptionKeydown"
+          @keydown.esc.prevent="closeAndFocusTrigger"
         >
-          {{ option.label }}
-        </button>
-      </div>
+          <button
+            v-for="option in renderedOptions"
+            :key="option.value"
+            type="button"
+            role="option"
+            :data-value="option.value"
+            :disabled="option.disabled"
+            :aria-selected="modelValue === option.value"
+            @click="select(option)"
+          >
+            {{ option.label }}
+          </button>
+        </div>
+      </Teleport>
     </details>
     <span v-if="error" :id="errorId" class="v2-field__error">{{ error }}</span>
     <span v-else-if="hint" :id="hintId" class="v2-field__hint">{{ hint }}</span>

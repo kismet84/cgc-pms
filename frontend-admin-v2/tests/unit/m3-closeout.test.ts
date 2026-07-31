@@ -171,9 +171,9 @@ describe('M3 closeout closed loop', () => {
     expect(pageSource).toContain('await loadProject(true)')
     expect(pageSource).toContain('loaded.filter((item) => hasCloseoutData(item.overview))')
     expect(pageSource).toContain('aria-label="竣工收尾闭环"')
-    expect(pageSource).toMatch(
-      /title="全部项目收尾概览"[\s\S]*?<template #title-extra>[\s\S]*?<V2Badge>\{\{ scopedOverviews\.length \}\} 个项目<\/V2Badge>/,
-    )
+    expect(pageSource).toContain('<V2Card v-if="!projectId && scopedOverviews.length">')
+    expect(pageSource).not.toContain('title="全部项目收尾概览"')
+    expect(pageSource).not.toContain('<V2Badge>{{ scopedOverviews.length }} 个项目</V2Badge>')
     expect(pageSource).not.toContain(':subtitle="`共 ${scopedOverviews.length} 个项目`"')
     expect(pageSource).not.toMatch(/(?:label|placeholder)="[^"]*(?:\bID\b|\w+Id\b)[^"]*"/)
     expect(pageSource).toContain(':options="userOptions(warrantyForm.responsibleUserId)"')

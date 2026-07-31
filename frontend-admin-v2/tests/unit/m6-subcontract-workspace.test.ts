@@ -137,11 +137,18 @@ describe('M6 subcontract task and measure V2', () => {
     expect(page).toContain('暂未取得最新结果，请刷新重试。')
     expect(page).toContain("listSiteFiles('SUBCONTRACT'")
     expect(page).toContain("uploadSiteFile(uploadFile.value, 'SUBCONTRACT'")
+    expect(page).not.toContain('<label>选择附件')
+    expect(page).toContain('aria-label="选择计量附件"')
+    expect(page).toContain('class="v2-file-input"')
     expect(page).toContain('loadContractItems')
     expect(page).toContain("contractType: 'SUB'")
     expect(page).toContain('form.partnerId = contract?.partyBId')
     expect(page).toContain('let listGeneration = 0')
     expect(page).toContain('listController?.abort()')
+    expect(page).not.toMatch(/\.subcontract-workspace__facts div\s*\{[^}]*background:/)
+    expect(page).toMatch(
+      /\.subcontract-workspace__facts\s*\{[^}]*background:\s*transparent;[^}]*border:\s*0;[^}]*box-shadow:\s*none;/,
+    )
     expect(page).not.toMatch(
       /frontend-admin\/src|Legacy|label="[^"]*ID|\b(?:Number|parseFloat|parseInt)\s*\(|(?:reportedAmount|approvedAmount|netAmount|amount)\s*[+\-*/]=/,
     )

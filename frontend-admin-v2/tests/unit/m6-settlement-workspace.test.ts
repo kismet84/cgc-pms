@@ -103,6 +103,9 @@ describe('M6 settlement V2', () => {
     expect(page).toContain(
       "uploadSiteFile(uploadFile.value, 'SETTLEMENT', selected.value.id, 'OTHER')",
     )
+    expect(page).toContain('aria-label="选择结算附件"')
+    expect(page).toContain('class="v2-file-input"')
+    expect(page).not.toContain('<label for="settlement-file">选择附件</label>')
     expect(page).toContain("contractType: 'SUB'")
     expect(page).toContain('v-if="deletable"')
     expect(page).not.toContain('v-if="canDelete && editable"')

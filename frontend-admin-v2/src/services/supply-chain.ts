@@ -17,6 +17,7 @@ import {
   type ReceiptPage,
   type ReceiptQuery,
   type ReceiptRecord,
+  type ReceiptSupplierReturnCommand,
   type RequisitionCommand,
   type RequisitionItemRecord,
   type RequisitionPage,
@@ -350,6 +351,10 @@ export function loadOrderItemsForReceipt(id: string, signal?: AbortSignal) {
 
 export function createReceipt(body: ReceiptCommand): Promise<string> {
   return createId(SUPPLY_CHAIN_API.receipts, body)
+}
+
+export function confirmReceiptSupplierReturn(body: ReceiptSupplierReturnCommand): Promise<string> {
+  return createId(SUPPLY_CHAIN_API.receiptSupplierReturns, body)
 }
 
 export function updateReceipt(id: string, body: ReceiptCommand) {

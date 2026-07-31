@@ -292,11 +292,55 @@ test.describe('M3 live delivery workspace', () => {
       if (route.path === '/v2/project-closeout') {
         await page.getByRole('button', { name: '追溯', exact: true }).click()
       } else {
+        await page
+          .getByRole('tab', {
+            name: route.path === '/v2/quality-safety' ? /问题整改/ : /图纸管理/,
+          })
+          .click()
         await page.locator(`${route.root} .v2-table__record-link`).first().click()
       }
       await expect(page.getByRole('dialog', { name: route.dialog })).toBeVisible()
       await page.keyboard.press('Escape')
       await expect(page.getByRole('dialog', { name: route.dialog })).toHaveCount(0)
+    }
+  })
+
+  test('tab URLs survive reload and browser history navigation', async ({ page }) => {
+    await login(page, 'admin')
+    for (const flow of [
+      {
+        path: '/v2/technical-management',
+        initial: /技术方案/,
+        next: /图纸管理/,
+        initialTab: 'scheme',
+        nextTab: 'drawing',
+      },
+      {
+        path: '/v2/quality-safety',
+        initial: /检查计划/,
+        next: /问题整改/,
+        initialTab: 'plan',
+        nextTab: 'rectification',
+      },
+    ]) {
+      await page.goto(`${flow.path}?tab=${flow.initialTab}&projectId=${scheduleProjectId}`)
+      await page.getByRole('tab', { name: flow.next }).click()
+      await expect(page).toHaveURL(new RegExp(`tab=${flow.nextTab}`))
+      await page.reload()
+      await expect(page.getByRole('tab', { name: flow.next })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      )
+      await page.goBack()
+      await expect(page.getByRole('tab', { name: flow.initial })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      )
+      await page.goForward()
+      await expect(page.getByRole('tab', { name: flow.next })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      )
     }
   })
 

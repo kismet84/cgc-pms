@@ -63,8 +63,11 @@ public class VarOrderController {
     @PutMapping("/{id}")
     @AuditedOperation(type="UPDATE", businessType="VAR_ORDER", businessIdExpression="#id")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('variation:order:edit')")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody VarOrder order) {
+    public ApiResponse<Void> update(@PathVariable Long id,
+                                    @RequestParam Integer version,
+                                    @Valid @RequestBody VarOrder order) {
         order.setId(id);
+        order.setVersion(version);
         varOrderService.update(order);
         return ApiResponse.success();
     }

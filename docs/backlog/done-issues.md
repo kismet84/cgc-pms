@@ -1,5 +1,7 @@
 # Done Issues
 
+- `V15-REMAINDER-COMPLETION-AND-CLOSEOUT`（2026-07-31）：第57条主线完成第55条非生产遗留唯一裁决、第56条15项目正式验收、联合回归、候选制品、本地根切换与回滚演练，并取得代码与安全候选`c3cfcf942491f810d1c79b2cd326298524e8a1e7`的push/PR同SHA CI 13/13及Pre-PR verifier证据。状态`V1.5_DEVELOPMENT_CLOSED / LOCAL_RC_ACCEPTED / SAME_HEAD_CI_PASSED`；新增后续项0、关闭后续项0、净变化0、重复0、悬空0。报告：`docs/quality/第57条主线-CGC-PMS-V1.5开发版本正式收口验收报告-2026-07-29.md`。生产发布、目标环境、正式入口切换和Legacy退役未执行。
+
 - `ISSUE-055-001`（2026-07-28）：Trivy隔离冷缓存手工CI金丝雀通过。实施提交`b19d954c0d6434878025508c60c75e3970d39e09`的push CI 13/13全绿；同SHA手工CI以`trivyColdCache=true`运行，唯一共享缓存恢复步骤为`skipped`，官方漏洞库与Java DB重新下载，`HIGH/CRITICAL`扫描及全部13项job通过。新增后续项0、关闭后续项1、净变化-1、悬空0。报告：`docs/quality/第55条主线-支线-候选与工程观察授权实施-S1验收报告-2026-07-28.md`。不部署或操作生产。
 
 - `ISSUE-053-046`（2026-07-27）：M8正式验收与第53条主线本地收口通过；043～045证据、上线决策清单、计划/Backlog/索引/项目地图和第53/55条主线已一致回写，新增后续项0、关闭后续项0、净变化0、悬空0。正式报告`docs/quality/第53条主线-M8-全量对等切换与回滚演练正式验收报告.md`。生产仍被三项`RELEASE_GATE`阻塞；未提交、push、切正式入口、退役Legacy或操作生产。

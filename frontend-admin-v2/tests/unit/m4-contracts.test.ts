@@ -500,10 +500,31 @@ describe('M4 contracts page', () => {
       .find((button) => button.text().includes('提交审批'))!
       .trigger('click')
     await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('确认提交'))!
+      .trigger('click')
+    await flushPromises()
 
     expect(wrapper.find('section.v2-alert--danger').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('合同已提交审批。')
     expect(wrapper.text()).not.toContain('操作完成')
+  })
+
+  it('submits the authoritative current contract id and version', async () => {
+    const { wrapper } = await mountPage('/contract/9', ['contract:query', 'contract:submit'])
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('提交审批'))!
+      .trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('确认提交'))!
+      .trigger('click')
+    await flushPromises()
+
+    expect(submitContract).toHaveBeenCalledWith('9', '1')
   })
 
   it('fails closed on submit 403 and keeps authoritative draft state', async () => {
@@ -515,6 +536,11 @@ describe('M4 contracts page', () => {
     await wrapper
       .findAll('button')
       .find((button) => button.text().includes('提交审批'))!
+      .trigger('click')
+    await flushPromises()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('确认提交'))!
       .trigger('click')
     await flushPromises()
 

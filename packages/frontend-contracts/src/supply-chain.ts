@@ -19,6 +19,7 @@ export const SUPPLY_CHAIN_API = {
   supplierSourcingEvaluations: "/supplier-sourcing/evaluations",
   supplierPerformance: "/supplier-sourcing/performance",
   supplierReturns: "/supplier-sourcing/returns",
+  receiptSupplierReturns: "/supplier-returns",
   supplierBlacklists: "/supplier-sourcing/blacklists",
   purchaseRequests: "/purchase-requests",
   purchaseOrders: "/purchase-orders",
@@ -57,6 +58,7 @@ export const PURCHASE_EXECUTION_PERMISSIONS = {
   receiptEdit: "receipt:edit",
   receiptDelete: "receipt:delete",
   receiptSubmit: "receipt:submit",
+  receiptReturn: "receipt:return",
 } as const;
 
 export const INVENTORY_WORKSPACE_PERMISSIONS = {
@@ -745,6 +747,15 @@ export interface ReceiptCommand {
   receiptMode?: "INVENTORY" | "DIRECT_CONSUMPTION";
   qualityStatus?: string;
   remark?: string;
+}
+
+export interface ReceiptSupplierReturnCommand {
+  receiptItemId: string;
+  returnKind: "UNQUALIFIED" | "ACCEPTED";
+  quantity: SupplyChainDecimalString;
+  returnDate: string;
+  reason: string;
+  idempotencyKey: string;
 }
 
 export interface ReceiptItemRecord {

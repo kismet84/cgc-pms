@@ -99,9 +99,17 @@ class ProductionMeasurementClosedLoopIntegrationTest {
         assertEquals(new BigDecimal("280.00"), jdbc.queryForObject("SELECT gross_amount FROM owner_settlement WHERE id=?", BigDecimal.class, settlementId));
         assertEquals(new BigDecimal("20.00"), jdbc.queryForObject("SELECT deducted_amount FROM owner_settlement WHERE id=?", BigDecimal.class, settlementId));
         assertEquals(submissionId, jdbc.queryForObject("SELECT owner_submission_id FROM owner_settlement WHERE id=?", Long.class, settlementId));
+        @SuppressWarnings("unchecked") List<java.util.Map<String,Object>> measurementSubmissions =
+                (List<java.util.Map<String,Object>>) service.measurement(measurementId).get("submissions");
+        assertEquals(settlementId, ((Number) measurementSubmissions.get(0).get("settlement_id")).longValue());
+        assertEquals(settlement.get("settlement_code"), measurementSubmissions.get(0).get("settlement_code"));
+        var listedSubmission = service.submissions(PROJECT, null, null, null).stream()
+                .filter(row -> submissionId == id(row)).findFirst().orElseThrow();
+        assertEquals(settlementId, ((Number) listedSubmission.get("settlement_id")).longValue());
+        assertEquals(settlement.get("settlement_code"), listedSubmission.get("settlement_code"));
 
-        addCleanFile("OWNER_SETTLEMENT", settlementId, "OWNER_CONFIRMATION");
         revenueService.submitSettlement(settlementId);
+        assertEquals(1, jdbc.queryForObject("SELECT attachment_count FROM owner_settlement WHERE id=?", Integer.class, settlementId));
         approveAll("OWNER_SETTLEMENT", settlementId);
         assertEquals("RECEIVABLE_CREATED", jdbc.queryForObject("SELECT status FROM owner_settlement WHERE id=?", String.class, settlementId));
         assertEquals(new BigDecimal("280.00"), jdbc.queryForObject("SELECT SUM(original_amount) FROM account_receivable WHERE settlement_id=?", BigDecimal.class, settlementId));

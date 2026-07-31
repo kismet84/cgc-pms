@@ -225,6 +225,26 @@ class CtContractServiceTest {
         assertEquals("CONTRACT_BUDGET_NOT_EDITABLE", approved.getCode());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("MAIN业主合同不占用项目成本预算")
+    void mainContractDoesNotConsumeCostBudget() {
+        Long contractId = insertDraftContract("业主主合同");
+        CtContract contract = contractMapper.selectById(contractId);
+        contract.setContractType("MAIN");
+        contractMapper.updateById(contract);
+
+        assertDoesNotThrow(() -> contractBudgetAllocationService.validateForContractSubmit(contractId));
+
+        ContractBudgetAllocation allocation = new ContractBudgetAllocation();
+        allocation.setContractId(contractId);
+        allocation.setBudgetLineId(BUDGET_LINE_ID);
+        allocation.setAllocatedAmount(new BigDecimal("100.00"));
+        BusinessException rejected = assertThrows(BusinessException.class,
+                () -> contractBudgetAllocationService.save(contractId, List.of(allocation)));
+        assertEquals("CONTRACT_BUDGET_NOT_APPLICABLE", rejected.getCode());
+    }
+
     /** Ensure project 10001 + partners 20001/20002 + admin user exist for foreign-key references. */
     private void seedReferenceData() {
         if (projectMapper.selectById(PROJECT_ID) == null) {

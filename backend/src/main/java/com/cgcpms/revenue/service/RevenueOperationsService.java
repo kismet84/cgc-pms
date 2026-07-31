@@ -86,7 +86,7 @@ public class RevenueOperationsService {
                 longValue(settlement.get("contract_id")), longValue(settlement.get("customer_id")));
         ensureSettlementWithinContract(longValue(settlement.get("contract_id")), id,
                 decimal(settlement.get("gross_amount")), decimal(contract.get("current_amount")));
-        int cleanAttachmentCount = cleanAttachmentCount("OWNER_SETTLEMENT", id);
+        int cleanAttachmentCount = cleanOwnerSettlementAttachmentCount(id);
         if (cleanAttachmentCount < 1) {
             throw error("OWNER_SETTLEMENT_ATTACHMENT_REQUIRED", "业主结算提交前必须上传病毒扫描通过的确认单或结算附件");
         }
@@ -538,13 +538,18 @@ public class RevenueOperationsService {
         }
     }
 
-    private int cleanAttachmentCount(String businessType, Long businessId) {
+    private int cleanOwnerSettlementAttachmentCount(Long settlementId) {
         Integer count = jdbc.queryForObject("""
                 SELECT COUNT(*)
-                  FROM sys_file
-                 WHERE tenant_id=? AND business_type=? AND business_id=?
-                   AND virus_scan_status='CLEAN' AND document_type<>'GENERATED_DOCUMENT'
-                """, Integer.class, tenant(), businessType, businessId);
+                  FROM sys_file f
+                 WHERE f.tenant_id=? AND f.deleted_flag=0 AND f.virus_scan_status='CLEAN'
+                   AND f.document_type<>'GENERATED_DOCUMENT'
+                   AND ((f.business_type='OWNER_SETTLEMENT' AND f.business_id=?)
+                     OR (f.business_type='OWNER_MEASUREMENT_SUBMISSION'
+                       AND f.document_type='OWNER_CONFIRMATION'
+                       AND f.business_id=(SELECT s.owner_submission_id FROM owner_settlement s
+                                          WHERE s.id=? AND s.tenant_id=? AND s.deleted_flag=0)))
+                """, Integer.class, tenant(), settlementId, settlementId, tenant());
         return count == null ? 0 : count;
     }
 

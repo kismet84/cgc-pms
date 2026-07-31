@@ -138,6 +138,62 @@ describe('M3 technical management closed loop', () => {
     expect(pageSource).toContain('@media (max-width: 40rem)')
   })
 
+  it('partitions the closed loop into six lazy-rendered business tabs with existing actions', () => {
+    expect(pageSource).toContain("const activeTab = ref<TechnicalTab>('scheme')")
+    expect(pageSource).toContain('const visibleTabs = computed(() => [')
+    for (const tab of [
+      "{ value: 'scheme', label: '技术方案'",
+      "{ value: 'drawing', label: '图纸管理'",
+      "{ value: 'review', label: '图纸会审'",
+      "{ value: 'rfi', label: 'RFI'",
+      "{ value: 'disclosure', label: '技术交底'",
+      "{ value: 'archive', label: '验收归档'",
+    ])
+      expect(pageSource).toContain(tab)
+    expect(pageSource).toContain('aria-label="技术闭环业务分区"')
+    expect(pageSource).toContain('const prioritizedRfis = computed(() =>')
+    expect(pageSource).toContain('v-for="(rfi, index) in prioritizedRfis"')
+    expect(pageSource).toContain(':id="`technical-panel-${activeTab}`"')
+    expect(pageSource).toContain(':aria-labelledby="`technical-tab-${activeTab}`"')
+    expect(pageSource).toContain("() => scopeProjectIds.value.join('|')")
+    expect(pageSource.match(/v-if="activeTab === '[a-z]+'"/g)).toHaveLength(6)
+
+    const headingCard = pageSource.slice(
+      pageSource.indexOf('<V2Card title="图纸 RFI 技术闭环"'),
+      pageSource.indexOf('<V2Tabs'),
+    )
+    expect(headingCard).not.toContain('technical-page__facts')
+    expect(headingCard).not.toContain('<V2Badge')
+    expect(headingCard).not.toContain('全部可访问项目')
+    expect(headingCard).not.toContain('待处理 RFI')
+
+    const schemePanel = pageSource.slice(
+      pageSource.indexOf('v-if="activeTab === \'scheme\'"'),
+      pageSource.indexOf('v-if="activeTab === \'drawing\'"'),
+    )
+    expect(schemePanel).toContain('role="tabpanel"')
+    expect(schemePanel).toContain('<table class="technical-page__table">')
+    expect(schemePanel).not.toContain('title="技术方案"')
+    expect(schemePanel).not.toMatch(/<h3[^>]*>技术方案<\/h3>/)
+
+    for (const action of [
+      '新建技术方案',
+      '接收图纸',
+      '接收变更版本',
+      '登记图纸会审',
+      '发起 RFI',
+      '登记技术交底',
+      '登记验收归档',
+    ])
+      expect(pageSource).toContain(`>${action}</V2Button`)
+
+    expect(pageSource).toContain('@click="openTrace(drawing)"')
+    expect(pageSource).toContain('submitTechnicalScheme(item.id)')
+    expect(pageSource).toContain('submitTechnicalRfi(rfi.id)')
+    expect(pageSource).toContain('title="图纸闭环追溯"')
+    expect(pageSource).toContain('id="technical-dialog-form"')
+  })
+
   it('retries a failed evidence upload without repeating the business write', () => {
     expect(pageSource).toContain('const pendingEvidence = ref<PendingEvidence | null>(null)')
     expect(pageSource).toContain('if (pendingEvidence.value) {')

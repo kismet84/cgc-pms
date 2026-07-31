@@ -169,6 +169,16 @@ export interface PaymentApplicationCommand {
   applyReason?: string;
   expenseCategory?: string;
 }
+export interface PayRecordWritebackCommand {
+  payApplicationId: string;
+  payAmount: FinanceDecimalString;
+  paidAt: string;
+  fundAccountId: string;
+  payMethod: string;
+  voucherNo?: string;
+  externalTxnNo: string;
+  remark?: string;
+}
 export interface ExpenseApplicationCommand {
   projectId: string;
   contractId: string;
@@ -230,6 +240,25 @@ export interface PaymentApplicationRecord {
 }
 
 export type PaymentApplicationPage = PageResult<PaymentApplicationRecord>;
+
+export interface PaymentApplicationBasisRecord {
+  id?: string | null;
+  payApplicationId?: string | null;
+  basisType: string;
+  basisId: string;
+  basisAmount: FinanceDecimalString;
+  remark?: string | null;
+}
+
+export interface PaymentApplicationSourceRecord {
+  id?: string | null;
+  payApplicationId?: string | null;
+  sourceType: string;
+  sourceRefId: string;
+  sourceAmount: FinanceDecimalString;
+  paidAmount?: FinanceDecimalString | null;
+  remark?: string | null;
+}
 
 export interface ExpenseApplicationQuery {
   pageNo?: number;
@@ -425,6 +454,16 @@ export interface FundAccountRecord {
   openingBalance: FinanceDecimalString;
   enabledFlag: number;
   version: number;
+}
+export interface FundAccountCommand {
+  accountCode: string;
+  accountName: string;
+  accountType: "CASH" | "BANK";
+  bankName?: string;
+  bankAccountNo?: string;
+  openingDate: string;
+  openingBalance: FinanceDecimalString;
+  remark?: string;
 }
 export interface CashForecastCycleRecord {
   id: string;

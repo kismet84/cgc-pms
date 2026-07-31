@@ -62,6 +62,14 @@ function button(text: string): HTMLButtonElement {
   return target
 }
 
+function recordLink(text: string): HTMLButtonElement {
+  const target = [
+    ...document.body.querySelectorAll<HTMLButtonElement>('.v2-table__record-link'),
+  ].find((item) => item.textContent?.trim() === text)
+  if (!target) throw new Error(`missing record link: ${text}`)
+  return target
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   document.body.innerHTML = ''
@@ -85,21 +93,29 @@ describe('M7 workflow process page', () => {
       expect.objectContaining({ pageNo: 1, pageSize: 10 }),
       expect.any(AbortSignal),
     )
+    expect(wrapper.text()).not.toContain('筛选流程')
+    expect(
+      wrapper.find('.workflow-process-page__filters').element.closest('.v2-card__header'),
+    ).not.toBeNull()
 
-    button('管理').click()
+    recordLink('FLOW-CONTRACT').click()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('项目经理审批')
-    expect(wrapper.text()).toContain('100.2300 ～ 900.4500')
+    expect(document.body.textContent).toContain('审批流程详情')
+    expect(document.body.textContent).toContain('项目经理审批')
+    expect(document.body.textContent).toContain('100.2300 ～ 900.4500')
   })
 
   it('updates a template then rereads detail and list facts', async () => {
     mount(WorkflowProcessPage, { attachTo: document.body })
     await flushPromises()
-    button('管理').click()
+    recordLink('FLOW-CONTRACT').click()
     await flushPromises()
     button('编辑模板').click()
     await flushPromises()
+
+    expect(document.body.querySelectorAll('.v2-dialog__backdrop')).toHaveLength(1)
+    expect(document.body.querySelector('[role="dialog"] h2')?.textContent).toContain('编辑审批流程')
 
     const name = document.body.querySelector<HTMLInputElement>('[aria-label="流程名称"]')!
     name.value = '合同审批-调整'
@@ -117,12 +133,14 @@ describe('M7 workflow process page', () => {
     )
     expect(processService.loadWorkflowTemplate).toHaveBeenCalledTimes(2)
     expect(processService.loadWorkflowTemplates).toHaveBeenCalledTimes(2)
+    expect(document.body.querySelectorAll('.v2-dialog__backdrop')).toHaveLength(1)
+    expect(document.body.querySelector('[role="dialog"] h2')?.textContent).toContain('审批流程详情')
   })
 
   it('reorders complete node ids then rereads server detail', async () => {
     mount(WorkflowProcessPage, { attachTo: document.body })
     await flushPromises()
-    button('管理').click()
+    recordLink('FLOW-CONTRACT').click()
     await flushPromises()
 
     button('下移').click()

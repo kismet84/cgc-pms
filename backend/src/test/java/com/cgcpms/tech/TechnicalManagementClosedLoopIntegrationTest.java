@@ -230,6 +230,26 @@ class TechnicalManagementClosedLoopIntegrationTest {
                 new ResponseReviewCommand("ACCEPTED", "同意")));
         assertEquals("TECH_RFI_RESPONSE_REVIEWER_CONFLICT", selfReview.getCode());
 
+        asUser(2L);
+        service.reviewResponse(response, new ResponseReviewCommand("ACCEPTED", "首次澄清通过"));
+        assertEquals("APPROVED", jdbc.queryForObject(
+                "SELECT status FROM tech_drawing_version WHERE id=?", String.class, version));
+
+        asUser(1L);
+        long repeatedRfi = id(service.createRfi(review, new RfiCommand("RFI-EDGE-REPEAT",
+                "批准图纸补充澄清", "请补充确认已批准图纸节点", "NORMAL", LocalDate.now().plusDays(2), null)));
+        evidence("TECH_RFI", repeatedRfi, "RFI_EVIDENCE");
+        service.submitRfi(repeatedRfi);
+        long repeatedResponse = id(service.respondRfi(repeatedRfi,
+                new RfiResponseCommand("批准图纸维持不变", false, "设计院")));
+        evidence("TECH_RFI_RESPONSE", repeatedResponse, "DESIGN_RESPONSE");
+        asUser(2L);
+        assertDoesNotThrow(() -> service.reviewResponse(repeatedResponse,
+                new ResponseReviewCommand("ACCEPTED", "补充澄清通过")));
+        assertEquals("CLOSED", jdbc.queryForObject("SELECT status FROM tech_rfi WHERE id=?", String.class, repeatedRfi));
+        assertEquals("APPROVED", jdbc.queryForObject(
+                "SELECT status FROM tech_drawing_version WHERE id=?", String.class, version));
+
         authenticate("technical:drawing:receive");
         assertDoesNotThrow(() -> fileAuthorizer.checkUploadAccess("TECH_DRAWING_VERSION", version));
         assertEquals("TECH_DOCUMENT_STAGE_INVALID", assertThrows(BusinessException.class,

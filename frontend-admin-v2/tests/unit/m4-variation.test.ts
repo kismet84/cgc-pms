@@ -291,6 +291,21 @@ describe('M4 variation page', () => {
     expect(wrapper.text()).toContain('4')
   })
 
+  it('updates the variation with the authoritative version', async () => {
+    const { wrapper } = await mountPage('/variation/order?mode=edit&id=9&projectId=P1', [
+      'variation:order:query',
+      'variation:order:edit',
+    ])
+
+    await wrapper.get('#variation-editor-form').trigger('submit')
+    await flushPromises()
+
+    expect(updateVariation).toHaveBeenCalledWith(
+      '9',
+      expect.objectContaining({ version: '3' }),
+    )
+  })
+
   it('keeps item editing behind its dedicated permission', async () => {
     const { wrapper } = await mountPage('/variation/order?mode=detail&id=9', [
       'variation:order:query',
@@ -410,6 +425,45 @@ describe('M4 variation page', () => {
       '3',
     )
     expect(toastItems.at(-1)?.message).toContain('合同金额以系统结果为准')
+  })
+
+  it('normalizes numeric owner amounts before an unchanged confirmation is submitted', async () => {
+    vi.mocked(loadVariation).mockResolvedValue({
+      ...baseRecord,
+      ownerStatus: 'OWNER_SUBMITTED',
+      ownerSubmissions: [
+        {
+          id: 'S1',
+          status: 'SUBMITTED',
+          items: [
+            {
+              id: 'SI1',
+              item_name: '钢筋调整',
+              confirmedAmount: 50000.25 as unknown as string,
+            },
+          ],
+        },
+      ],
+    })
+    const { wrapper } = await mountPage('/variation/order?mode=detail&id=9', [
+      'variation:order:query',
+      'variation:owner:review',
+    ])
+    await wrapper.get('input[aria-label="业主回复文号"]').setValue('REPLY-002')
+    await chooseFile(wrapper)
+    await button(wrapper, '登记业主回复').trigger('click')
+    await flushPromises()
+
+    expect(reviewVariationOwner).toHaveBeenCalledWith(
+      '9',
+      'S1',
+      expect.objectContaining({
+        conclusion: 'CONFIRMED',
+        items: [{ submissionItemId: 'SI1', confirmedAmount: '50000.25', reductionReason: null }],
+      }),
+      '3',
+    )
+    expect(toastItems.some((toast) => toast.tone === 'error')).toBe(false)
   })
 
   it('fails closed on submit conflict and keeps authoritative state', async () => {

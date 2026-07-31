@@ -25,6 +25,7 @@ import {
 import {
   addSignWorkflowTask,
   approveWorkflowTask,
+  loadWorkflowActionUsers,
   loadWorkflowBusinessTypes,
   loadWorkflowInstance,
   loadWorkflowList,
@@ -34,7 +35,6 @@ import {
   withdrawWorkflowInstance,
 } from '@/services/workflow'
 import { isApiClientError } from '@/services/request'
-import { loadProjectUsers } from '@/services/projects'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -263,14 +263,20 @@ function openAction(nextAction: WorkflowUiAction) {
 }
 
 async function loadActionUsers() {
+  const taskId = pendingTask.value?.id
+  if (!taskId) {
+    actionUserOptions.value = []
+    actionErrorMessage.value = '当前没有可处理任务'
+    return
+  }
   actionUsersController?.abort()
   const controller = new AbortController()
   actionUsersController = controller
   actionUsersLoading.value = true
   try {
-    const users = await loadProjectUsers(controller.signal)
+    const users = await loadWorkflowActionUsers(taskId, controller.signal)
     if (actionUsersController !== controller) return
-    actionUserOptions.value = users.records
+    actionUserOptions.value = users
       .filter((item) => ['ACTIVE', 'ENABLE'].includes(item.status))
       .map((item) => ({
         value: item.id,
@@ -456,8 +462,8 @@ onBeforeUnmount(() => {
           </caption>
           <thead>
             <tr>
-              <th scope="col">审批事项</th>
               <th scope="col">业务编号</th>
+              <th scope="col">审批事项</th>
               <th scope="col">业务类型</th>
               <th scope="col">状态</th>
               <th scope="col">处理人/节点</th>
@@ -468,9 +474,6 @@ onBeforeUnmount(() => {
           <tbody>
             <tr v-for="row in rows" :key="row.key">
               <td>
-                <strong>{{ row.title }}</strong>
-              </td>
-              <td>
                 <V2Button
                   class="v2-table__record-link"
                   variant="ghost"
@@ -479,6 +482,9 @@ onBeforeUnmount(() => {
                 >
                   {{ row.businessCode }}
                 </V2Button>
+              </td>
+              <td>
+                <strong>{{ row.title }}</strong>
               </td>
               <td>{{ workflowBusinessTypeLabel(row.businessType) }}</td>
               <td>

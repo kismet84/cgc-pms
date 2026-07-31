@@ -66,16 +66,26 @@ const accountName = computed(
   () => session.userInfo?.realName || session.userInfo?.username || '当前用户',
 )
 const showDemoRoleSwitcher = import.meta.env.DEV
-const demoRoleAccounts = [
-  { role: 'pm', username: 'ui26.pm01', label: '项目经理' },
-  { role: 'bm', username: 'ui26.bm01', label: '商务经理' },
-  { role: 'cost', username: 'ui26.cost01', label: '成本经理' },
-  { role: 'purchase', username: 'ui26.pur01', label: '采购经理' },
-  { role: 'production', username: 'ui26.prod01', label: '生产经理' },
-  { role: 'chiefEngineer', username: 'ui26.chief01', label: '总工程师' },
-  { role: 'finance', username: 'ui26.fin01', label: '财务经理' },
-  { role: 'mgmt', username: 'ui26.gm01', label: '管理层' },
+const demoRoleGroups = [
+  { role: 'pm', prefix: 'pm', label: '项目经理' },
+  { role: 'bm', prefix: 'bm', label: '商务经理' },
+  { role: 'cost', prefix: 'cost', label: '成本经理' },
+  { role: 'purchase', prefix: 'pur', label: '采购经理' },
+  { role: 'production', prefix: 'prod', label: '生产经理' },
+  { role: 'chiefEngineer', prefix: 'chief', label: '总工程师' },
+  { role: 'finance', prefix: 'fin', label: '财务经理' },
+  { role: 'mgmt', prefix: 'mgmt', label: '管理层' },
+  { role: 'staff', prefix: 'staff', label: '普通员工' },
+  { role: 'legacyMgmt', prefix: 'gm', label: '管理层支持' },
+  { role: 'material', prefix: 'mat', label: '物资支持' },
 ] as const
+const demoRoleAccounts = demoRoleGroups.flatMap((group) =>
+  [1, 2, 3].map((index) => ({
+    role: group.role,
+    username: `ui26.${group.prefix}${String(index).padStart(2, '0')}`,
+    label: `${group.label}${index}`,
+  })),
+)
 
 watch(
   () => route.fullPath,

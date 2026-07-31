@@ -932,7 +932,12 @@ onBeforeUnmount(() => {
               :heading-level="3"
             />
             <div v-if="selectedEditable" class="subcontract-workspace__upload">
-              <label>选择附件<input type="file" @change="chooseFile" /></label>
+              <input
+                class="v2-file-input"
+                type="file"
+                aria-label="选择计量附件"
+                @change="chooseFile"
+              />
               <V2Button
                 size="small"
                 type="button"
@@ -1147,19 +1152,12 @@ onBeforeUnmount(() => {
 .subcontract-workspace__facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--v2-space-3);
-}
-.subcontract-workspace__facts div {
-  padding: var(--v2-space-3);
-  background: var(--v2-color-surface-subtle);
-  border-radius: var(--v2-radius-md);
-}
-.subcontract-workspace__facts dt {
-  color: var(--v2-color-text-muted);
-  font-size: var(--v2-font-size-12);
-}
-.subcontract-workspace__facts dd {
-  margin: var(--v2-space-1) 0 0;
+  gap: 0 var(--v2-space-8);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
 }
 .subcontract-workspace__form {
   display: grid;
@@ -1182,10 +1180,6 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--v2-space-2);
-}
-.subcontract-workspace__upload label {
-  display: grid;
-  gap: var(--v2-space-1);
 }
 @media (max-width: 720px) {
   .subcontract-workspace__facts {

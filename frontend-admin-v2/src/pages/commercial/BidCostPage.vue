@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   V2Alert,
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -419,11 +420,11 @@ onBeforeUnmount(() => {
                 <th scope="col">状态</th>
                 <th scope="col">备注</th>
                 <th scope="col">更新时间</th>
-                <th scope="col">操作</th>
+                <th scope="col" class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="record in records" :key="record.id">
+              <tr v-for="(record, index) in records" :key="record.id">
                 <td>
                   <V2Button
                     size="small"
@@ -442,8 +443,11 @@ onBeforeUnmount(() => {
                 </td>
                 <td>{{ record.remark || '—' }}</td>
                 <td>{{ record.updatedAt || '—' }}</td>
-                <td>
-                  <div class="bid-cost-page__actions">
+                <td class="v2-table-cell--actions">
+                  <V2ActionMenu
+                    :label="`${record.bidCode}更多操作`"
+                    :placement="index >= records.length - 3 ? 'top-end' : 'bottom-end'"
+                  >
                     <V2Button
                       v-if="canEdit && record.bidStatus === 'BIDDING'"
                       variant="ghost"
@@ -467,7 +471,7 @@ onBeforeUnmount(() => {
                       @click="requestDelete(record)"
                       >删除</V2Button
                     >
-                  </div>
+                  </V2ActionMenu>
                 </td>
               </tr>
             </tbody>

@@ -2,6 +2,7 @@ import {
   WORKFLOW_API,
   type PageResult,
   type WorkflowActionBody,
+  type WorkflowActionUser,
   type WorkflowCc,
   type WorkflowInstance,
   type WorkflowMine,
@@ -38,6 +39,10 @@ export function loadWorkflowBusinessTypes(tab: WorkflowTab, signal?: AbortSignal
 
 export function loadWorkflowInstance(instanceId: string, signal?: AbortSignal) {
   return apiRequest<WorkflowInstance>(WORKFLOW_API.detail(instanceId), { signal })
+}
+
+export function loadWorkflowActionUsers(taskId: string, signal?: AbortSignal) {
+  return apiRequest<WorkflowActionUser[]>(WORKFLOW_API.actionUsers(taskId), { signal })
 }
 
 export function approveWorkflowTask(taskId: string, body: WorkflowActionBody) {

@@ -554,7 +554,7 @@ onBeforeUnmount(() => {
                 <th>项目状态</th>
                 <th>审批状态</th>
                 <th>合同额</th>
-                <th>操作</th>
+                <th class="v2-table-cell--actions">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -580,7 +580,7 @@ onBeforeUnmount(() => {
                   </V2Badge>
                 </td>
                 <td>{{ item.contractAmount || '0' }} 元</td>
-                <td>
+                <td class="v2-table-cell--actions">
                   <div class="project-page__actions">
                     <V2ActionMenu
                       v-if="hasMoreActions(item)"

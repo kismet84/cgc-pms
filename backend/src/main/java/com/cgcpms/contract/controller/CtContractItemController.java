@@ -19,7 +19,7 @@ public class CtContractItemController {
     private final CtContractItemService ctContractItemService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:item:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('contract:query') or hasAuthority('contract:item:query')")
     public ApiResponse<List<CtContractItem>> getByContractId(@PathVariable Long contractId) {
         return ApiResponse.success(ctContractItemService.getByContractId(contractId));
     }

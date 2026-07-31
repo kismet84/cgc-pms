@@ -27,7 +27,7 @@ public class CostSubjectController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:query')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAnyAuthority('cost:query','cost:target:query','budget:query')")
     public ApiResponse<List<CostSubjectVO>> getList(
             @RequestParam(required = false) String category) {
         return ApiResponse.success(costSubjectService.getList(category));

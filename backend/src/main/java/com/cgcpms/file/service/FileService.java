@@ -603,7 +603,9 @@ public class FileService {
                 default -> "OTHER";
             };
         }
-        if (!Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE", "BANK_RECEIPT",
+        boolean productionMeasurementEvidence = "PRODUCTION_MEASUREMENT".equals(business)
+                && ("MEASUREMENT_GENERAL".equals(type) || type.matches("ML_\\d+"));
+        if (!productionMeasurementEvidence && !Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE", "BANK_RECEIPT",
                 "CONTRACT_ATTACHMENT", "PAYMENT_PROOF", "OTHER", "SITE_EVIDENCE",
                 "COST_ESTIMATE", "OWNER_SUBMISSION", "OWNER_CONFIRMATION",
                 "INSPECTION_EVIDENCE", "ISSUE_EVIDENCE", "RECTIFICATION_EVIDENCE",

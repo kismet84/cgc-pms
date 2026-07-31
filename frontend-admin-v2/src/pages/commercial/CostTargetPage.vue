@@ -9,6 +9,7 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  V2ActionMenu,
   V2Badge,
   V2Button,
   V2Card,
@@ -502,6 +503,7 @@ onBeforeUnmount(() => {
                 :options="APPROVAL_OPTIONS"
                 allow-empty
                 placeholder="全部审批状态"
+                @update:model-value="query"
               />
               <V2Select
                 v-model="filter.isActive"
@@ -510,6 +512,7 @@ onBeforeUnmount(() => {
                 :options="ACTIVE_OPTIONS"
                 allow-empty
                 placeholder="全部版本"
+                @update:model-value="query"
               />
               <V2Button type="submit" size="small" variant="secondary" :loading="loading">
                 查询
@@ -546,11 +549,11 @@ onBeforeUnmount(() => {
                   <th>投标成本</th>
                   <th>责任成本</th>
                   <th>状态</th>
-                  <th>操作</th>
+                  <th class="v2-table-cell--actions">操作</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="record in records" :key="record.id">
+                <tr v-for="(record, index) in records" :key="record.id">
                   <td>
                     <V2Button
                       size="small"
@@ -572,8 +575,11 @@ onBeforeUnmount(() => {
                     }}</V2Badge
                     ><V2Badge v-if="record.isActive === 1" tone="success">活动版本</V2Badge>
                   </td>
-                  <td>
-                    <div class="cost-target-page__actions">
+                  <td class="v2-table-cell--actions">
+                    <V2ActionMenu
+                      :label="`${record.versionNo}更多操作`"
+                      :placement="index >= records.length - 3 ? 'top-end' : 'bottom-end'"
+                    >
                       <V2Button
                         v-if="
                           canEdit &&
@@ -621,7 +627,7 @@ onBeforeUnmount(() => {
                         @click="requestAction('delete', record)"
                         >删除</V2Button
                       >
-                    </div>
+                    </V2ActionMenu>
                   </td>
                 </tr>
               </tbody>

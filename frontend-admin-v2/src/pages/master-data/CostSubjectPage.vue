@@ -71,7 +71,7 @@ const title = computed(
     })[section.value],
 )
 
-const can = (permission: string) => session.hasPermission(permission)
+const can = (permission: string) => session.hasAdminOrPermission(permission)
 const canSubjectAdd = computed(() => can('cost:add'))
 const canSubjectEdit = computed(() => can('cost:edit'))
 const canSubjectDelete = computed(() => can('cost:delete'))
@@ -83,6 +83,7 @@ const canBidTransfer = computed(() => can('cost:subject:bid-transfer'))
 const canFinanceAllocate = computed(() => can('cost:subject:finance-allocate'))
 
 const subjects = ref<CostSubjectRecord[]>([])
+const treeExpanded = ref(true)
 const selectedSubjectId = ref('')
 const selectedSubject = computed(
   () => flatSubjects.value.find((item) => item.id === selectedSubjectId.value) ?? null,
@@ -743,57 +744,70 @@ onBeforeUnmount(() => controller?.abort())
     </V2PageState>
 
     <template v-else-if="section === 'taxonomy'">
-      <div class="cost-subject-page__columns">
+      <div class="cost-subject-page__columns" :class="{ 'is-tree-collapsed': !treeExpanded }">
         <V2Card title="成本域科目树">
           <template #actions>
-            <V2Button v-if="canSubjectAdd" size="small" @click="openSubjectCreate()">
-              新增根科目
-            </V2Button>
+            <V2Cluster>
+              <V2Button v-if="canSubjectAdd" size="small" @click="openSubjectCreate()">
+                新增根科目
+              </V2Button>
+              <V2Button
+                size="small"
+                variant="secondary"
+                aria-controls="cost-subject-tree-content"
+                :aria-expanded="treeExpanded"
+                @click="treeExpanded = !treeExpanded"
+              >
+                {{ treeExpanded ? '收起科目树' : '展开科目树' }}
+              </V2Button>
+            </V2Cluster>
           </template>
-          <V2PageState
-            v-if="!flatSubjects.length"
-            kind="empty"
-            title="暂无成本科目"
-            description="可新增根科目，层级与租户由系统校验。"
-          />
-          <div v-else class="cost-subject-page__table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>科目编码</th>
-                  <th>科目名称</th>
-                  <th>类型</th>
-                  <th>状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="subject in flatSubjects"
-                  :key="subject.id"
-                  :class="{ 'is-selected': selectedSubjectId === subject.id }"
-                  @click="selectedSubjectId = subject.id"
-                >
-                  <th scope="row">
-                    <V2Button
-                      size="small"
-                      variant="ghost"
-                      class="cost-subject-page__subject"
-                      :style="{ paddingInlineStart: `${subject.depth * 1.25}rem` }"
-                      @click="selectedSubjectId = subject.id"
-                    >
-                      {{ subject.subjectCode }}
-                    </V2Button>
-                  </th>
-                  <td>{{ subject.subjectName }}</td>
-                  <td>{{ subject.subjectType }}</td>
-                  <td>
-                    <V2Badge :tone="subject.status === 'ENABLE' ? 'success' : 'neutral'">
-                      {{ subject.status === 'ENABLE' ? '启用' : '停用' }}
-                    </V2Badge>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div v-if="treeExpanded" id="cost-subject-tree-content">
+            <V2PageState
+              v-if="!flatSubjects.length"
+              kind="empty"
+              title="暂无成本科目"
+              description="可新增根科目，层级与租户由系统校验。"
+            />
+            <div v-else class="cost-subject-page__table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>科目编码</th>
+                    <th>科目名称</th>
+                    <th>类型</th>
+                    <th>状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="subject in flatSubjects"
+                    :key="subject.id"
+                    :class="{ 'is-selected': selectedSubjectId === subject.id }"
+                    @click="selectedSubjectId = subject.id"
+                  >
+                    <th scope="row">
+                      <V2Button
+                        size="small"
+                        variant="ghost"
+                        class="cost-subject-page__subject"
+                        :style="{ paddingInlineStart: `${subject.depth * 1.25}rem` }"
+                        @click="selectedSubjectId = subject.id"
+                      >
+                        {{ subject.subjectCode }}
+                      </V2Button>
+                    </th>
+                    <td>{{ subject.subjectName }}</td>
+                    <td>{{ subject.subjectType }}</td>
+                    <td>
+                      <V2Badge :tone="subject.status === 'ENABLE' ? 'success' : 'neutral'">
+                        {{ subject.status === 'ENABLE' ? '启用' : '停用' }}
+                      </V2Badge>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </V2Card>
 
@@ -1399,6 +1413,10 @@ onBeforeUnmount(() => controller?.abort())
   display: grid;
   grid-template-columns: minmax(20rem, 0.9fr) minmax(0, 1.1fr);
   gap: var(--v2-space-4);
+}
+
+.cost-subject-page__columns.is-tree-collapsed {
+  grid-template-columns: 1fr;
 }
 
 .cost-subject-page__query,
