@@ -43,7 +43,7 @@ class BaselineMySqlSmokeTest {
         assertEquals("255", flyway.info().current().getVersion().getVersion());
         assertTrue(Arrays.stream(flyway.info().applied())
                 .anyMatch(info -> info.getType().name().contains("BASELINE")));
-        assertEquals(197, count("SELECT COUNT(*) FROM information_schema.tables "
+        assertEquals(198, count("SELECT COUNT(*) FROM information_schema.tables "
                 + "WHERE table_schema=DATABASE() AND table_type='BASE TABLE' "
                 + "AND table_name<>'flyway_schema_history'"));
         assertEquals(0, count("SELECT COUNT(*) FROM information_schema.columns "
