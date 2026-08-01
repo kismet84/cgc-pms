@@ -12,7 +12,6 @@ import {
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  V2Alert,
   V2Badge,
   V2Button,
   V2Card,
@@ -35,6 +34,7 @@ import {
   withdrawWorkflowInstance,
 } from '@/services/workflow'
 import { isApiClientError } from '@/services/request'
+import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -48,14 +48,6 @@ import {
 } from './model'
 
 type WorkflowRecordSet = WorkflowTask[] | WorkflowRecord[] | WorkflowCc[] | WorkflowMine[]
-const workflowInstanceStatusOptions = [
-  { value: '', label: '全部状态' },
-  { value: 'RUNNING', label: '审批中' },
-  { value: 'APPROVED', label: '已通过' },
-  { value: 'REJECTED', label: '已驳回' },
-  { value: 'WITHDRAWN', label: '已撤回' },
-  { value: 'VOIDED', label: '已作废' },
-]
 
 const route = useRoute()
 const router = useRouter()
@@ -80,6 +72,7 @@ const pageSize = 10
 const total = ref(0)
 const records = ref<WorkflowRecordSet>([])
 const visibleBusinessTypes = ref<string[]>([])
+const workflowInstanceStatuses = ref<DictDataRecord[]>([])
 const listLoading = ref(false)
 const hasLoadedList = ref(false)
 const detailLoading = ref(false)
@@ -102,6 +95,7 @@ let listController: AbortController | null = null
 let businessTypesController: AbortController | null = null
 let detailController: AbortController | null = null
 let actionUsersController: AbortController | null = null
+let workflowInstanceStatusesLoaded = false
 
 const rows = computed(() => workflowRows(activeTab.value, records.value))
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
@@ -112,6 +106,12 @@ const workflowBusinessTypeOptions = computed(() => [
     label: workflowBusinessTypeLabel(value),
   })),
 ])
+const workflowInstanceStatusOptions = computed(() =>
+  workflowInstanceStatuses.value.map((item) => ({
+    value: item.dictValue,
+    label: item.dictLabel,
+  })),
+)
 const availableActions = computed(() =>
   (detail.value?.availableActions ?? []).filter((candidate) =>
     canPerformWorkflowAction(candidate, detail.value?.availableActions ?? [], session.permissions),
@@ -135,6 +135,18 @@ function errorText(error: unknown, fallback: string): string {
   return isApiClientError(error) ? error.message : fallback
 }
 
+async function loadWorkflowInstanceStatuses(signal?: AbortSignal): Promise<void> {
+  if (workflowInstanceStatusesLoaded) return
+  try {
+    workflowInstanceStatuses.value = await loadEnabledDictDataByCode('wf_instance_status', signal)
+    workflowInstanceStatusesLoaded = true
+  } catch (error) {
+    if (signal?.aborted) return
+    workflowInstanceStatuses.value = []
+    showToast('error', '实例状态字典加载失败', errorText(error, '请稍后重试。'))
+  }
+}
+
 function listQuery() {
   const periodBounds = reportPeriodBounds(workspace.selectedReportPeriod)
   return {
@@ -154,7 +166,10 @@ async function loadList() {
   listLoading.value = true
   errorMessage.value = ''
   try {
-    const result = await loadWorkflowList(activeTab.value, listQuery(), listController.signal)
+    const [, result] = await Promise.all([
+      loadWorkflowInstanceStatuses(listController.signal),
+      loadWorkflowList(activeTab.value, listQuery(), listController.signal),
+    ])
     records.value = result.records as WorkflowRecordSet
     total.value = result.total
   } catch (error) {
@@ -195,6 +210,7 @@ async function loadDetail() {
   errorMessage.value = ''
   detail.value = null
   try {
+    await loadWorkflowInstanceStatuses(detailController.signal)
     detail.value = await loadWorkflowInstance(instanceId.value, detailController.signal)
   } catch (error) {
     if (detailController.signal.aborted) return

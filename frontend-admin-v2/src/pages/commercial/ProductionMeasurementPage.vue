@@ -17,6 +17,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
   showToast,
   useToastMessage,
@@ -70,6 +71,8 @@ const detailLoading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
+const pageSize = 10
+const pageNo = ref(1)
 
 watch(errorMessage, (message) => {
   if (message) showToast('error', '产值计量操作未完成', message)
@@ -159,7 +162,9 @@ const text = (row: MeasurementAmountRow | undefined, ...keys: string[]) => {
   }
   return ''
 }
-const visibleMeasurements = computed(() => measurements.value)
+const visibleMeasurements = computed(() =>
+  measurements.value.slice((pageNo.value - 1) * pageSize, pageNo.value * pageSize),
+)
 const periodFor = (row: MeasurementAmountRow) =>
   periods.value.find((period) => text(period, 'id') === text(row, 'period_id'))
 const projectLabel = (row: MeasurementAmountRow) =>
@@ -212,6 +217,7 @@ function bounds() {
 }
 async function load() {
   if (!canQuery.value) return
+  pageNo.value = 1
   projectId.value = typeof route.query.projectId === 'string' ? route.query.projectId : ''
   status.value = typeof route.query.status === 'string' ? route.query.status : ''
   controller?.abort()
@@ -829,8 +835,14 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-      </V2Card></template
-    >
+        <template #footer>
+          <V2Pagination
+            v-model:page-no="pageNo"
+            :total="measurements.length"
+            label="产值计量分页"
+          />
+        </template> </V2Card
+    ></template>
     <V2Dialog
       :open="dialog === 'period'"
       title="新建计量期间"

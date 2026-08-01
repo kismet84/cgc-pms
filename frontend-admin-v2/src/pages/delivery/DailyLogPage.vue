@@ -649,6 +649,7 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
       <template #footer>
         <nav class="daily-log-page__pagination" aria-label="现场日报分页">
           <div class="daily-log-page__actions">
+            <span>共 {{ total }} 条</span>
             <V2Button
               size="small"
               variant="secondary"

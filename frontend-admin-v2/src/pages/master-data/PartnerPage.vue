@@ -26,6 +26,7 @@ import {
   type PartnerRecord,
 } from '@/services/master-data'
 import { isApiClientError } from '@/services/request'
+import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
 
 const session = useSessionStore()
@@ -34,8 +35,10 @@ const loading = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 const error = ref('')
+const riskError = ref('')
 const records = ref<PartnerRecord[]>([])
 const partnerTypes = ref<DictOption[]>([])
+const riskLevels = ref<DictDataRecord[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(10)
@@ -43,6 +46,7 @@ const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<PartnerRecord | null>(null)
 let loadController: AbortController | null = null
+let riskLevelsLoaded = false
 
 const filters = reactive({ partnerCode: '', partnerName: '', partnerType: '', status: '' })
 const form = reactive({
@@ -77,12 +81,9 @@ const statusOptions = [
   { value: 'ENABLE', label: '启用' },
   { value: 'DISABLE', label: '停用' },
 ]
-const riskOptions = [
-  { value: '', label: '未设置' },
-  { value: 'LOW', label: '低' },
-  { value: 'MEDIUM', label: '中' },
-  { value: 'HIGH', label: '高' },
-]
+const riskOptions = computed(() =>
+  riskLevels.value.map((item) => ({ value: item.dictValue, label: item.dictLabel })),
+)
 
 function messageOf(value: unknown): string {
   return isApiClientError(value) ? value.message : '请求失败，请稍后重试'
@@ -90,6 +91,24 @@ function messageOf(value: unknown): string {
 
 function typeLabel(value: string): string {
   return partnerTypes.value.find((item) => item.dictValue === value)?.dictLabel ?? value
+}
+
+function riskLabel(value?: string | null): string {
+  if (!value) return '未设置'
+  return riskLevels.value.find((item) => item.dictValue === value)?.dictLabel ?? value
+}
+
+async function loadRiskLevels(signal: AbortSignal): Promise<void> {
+  if (riskLevelsLoaded) return
+  riskError.value = ''
+  try {
+    riskLevels.value = await loadEnabledDictDataByCode('partner_risk_level', signal)
+    riskLevelsLoaded = true
+  } catch (value) {
+    if (signal.aborted) return
+    riskLevels.value = []
+    riskError.value = messageOf(value)
+  }
 }
 
 function clearForm(): void {
@@ -139,6 +158,7 @@ async function load(): Promise<void> {
       partnerTypes.value.length
         ? Promise.resolve(partnerTypes.value)
         : loadPartnerTypes(controller.signal),
+      loadRiskLevels(controller.signal),
     ])
     records.value = page.records
     total.value = page.total
@@ -322,6 +342,15 @@ onBeforeUnmount(() => loadController?.abort())
       </template>
     </V2Card>
 
+    <V2PageState
+      v-if="riskError"
+      kind="error"
+      title="风险等级字典加载失败"
+      :description="riskError"
+    >
+      <template #actions><V2Button @click="load">重试</V2Button></template>
+    </V2PageState>
+
     <V2PageState v-if="loading" kind="loading" title="正在读取合作方" description="请稍候。" />
     <V2PageState v-else-if="error" kind="error" title="合作方加载失败" :description="error">
       <template #actions><V2Button @click="load">重试</V2Button></template>
@@ -366,7 +395,7 @@ onBeforeUnmount(() => loadController?.abort())
                 <V2Badge
                   :tone="record.blacklistFlag || record.riskLevel === 'HIGH' ? 'danger' : 'neutral'"
                 >
-                  {{ record.blacklistFlag ? '黑名单' : record.riskLevel || '未设置' }}
+                  {{ record.blacklistFlag ? '黑名单' : riskLabel(record.riskLevel) }}
                 </V2Badge>
               </td>
               <td>

@@ -420,7 +420,7 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <template v-if="records.length" #footer>
+        <template #footer>
           <nav aria-label="项目预算分页">
             <span>共 {{ total }} 条</span>
             <V2Button

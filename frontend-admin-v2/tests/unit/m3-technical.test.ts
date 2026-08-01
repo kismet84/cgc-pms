@@ -152,7 +152,7 @@ describe('M3 technical management closed loop', () => {
       expect(pageSource).toContain(tab)
     expect(pageSource).toContain('aria-label="技术闭环业务分区"')
     expect(pageSource).toContain('const prioritizedRfis = computed(() =>')
-    expect(pageSource).toContain('v-for="(rfi, index) in prioritizedRfis"')
+    expect(pageSource).toContain('v-for="(rfi, index) in pagedRfis"')
     expect(pageSource).toContain(':id="`technical-panel-${activeTab}`"')
     expect(pageSource).toContain(':aria-labelledby="`technical-tab-${activeTab}`"')
     expect(pageSource).toContain("() => scopeProjectIds.value.join('|')")

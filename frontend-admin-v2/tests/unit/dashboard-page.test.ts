@@ -392,23 +392,19 @@ describe('M2 dashboard page', () => {
     const filter = wrapper.get('.risk-filter')
     const riskList = wrapper.get('#risk-list')
 
-    await filter
-      .findAll('button')
-      .find((button) => button.text() === '中')!
-      .trigger('click')
+    await filter.get('select').setValue('medium')
     expect(riskList.text()).toContain('一般关注事项')
     expect(riskList.text()).not.toContain('最高风险事项')
     expect(wrapper.get('.risk-level').text()).toBe('中')
 
     await wrapper.get('.command-panel__title .v2-button--secondary').trigger('click')
-    expect(filter.get('summary').attributes('role')).toBe('button')
-    expect(filter.get('summary').text()).toBe('高')
+    expect((filter.get('select').element as HTMLSelectElement).value).toBe('high')
     expect(riskList.text()).toContain('最高风险事项')
     expect(riskList.text()).not.toContain('一般关注事项')
     expect(wrapper.get('.risk-level').text()).toBe('高')
 
     await wrapper.get('.command-panel__title .v2-button--secondary').trigger('click')
-    expect(filter.get('summary').text()).toBe('全部预警')
+    expect((filter.get('select').element as HTMLSelectElement).value).toBe('all')
     expect(riskList.text()).toContain('最高风险事项')
     expect(riskList.text()).toContain('一般关注事项')
   })

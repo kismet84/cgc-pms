@@ -206,8 +206,8 @@ describe('M7 master-data pages', () => {
     await wrapper
       .findAllComponents(V2Select)
       .find((select) => select.props('label') === '合作方类型' && select.props('required'))!
-      .find('button[data-value="SUPPLIER"]')
-      .trigger('click')
+      .find('select')
+      .setValue('SUPPLIER')
     document
       .querySelector('#partner-form')!
       .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))

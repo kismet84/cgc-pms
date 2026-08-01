@@ -68,7 +68,6 @@ describe('全 V2 UI 整改门禁', () => {
         'auth/LoginPage.vue',
         'auth/SessionPage.vue',
         'HealthPage.vue',
-        'shell/ShellPlaceholderPage.vue',
       ])
 
       if (/<h1\b[^>]*\bv2-visually-hidden\b/.test(template)) {
@@ -413,8 +412,7 @@ describe('全 V2 UI 整改门禁', () => {
     for (const path of vuePages()) {
       if (
         path === resolve(pageRoot, 'auth/LoginPage.vue') ||
-        path === resolve(pageRoot, 'HealthPage.vue') ||
-        path === resolve(pageRoot, 'shell/ShellPlaceholderPage.vue')
+        path === resolve(pageRoot, 'HealthPage.vue')
       ) {
         continue
       }

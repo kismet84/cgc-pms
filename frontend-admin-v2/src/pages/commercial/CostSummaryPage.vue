@@ -6,7 +6,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { V2Button, V2Card, V2PageState, showToast } from '@/components'
+import { V2Button, V2Card, V2PageState, V2Pagination, showToast } from '@/components'
 import {
   loadAccessibleCostSummary,
   loadCostSummary,
@@ -24,6 +24,18 @@ const history = ref<CostSummaryHistoryRecord[]>([])
 const loading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
+const pageSize = 10
+const projectPageNo = ref(1)
+const historyPageNo = ref(1)
+const pagedProjects = computed(() =>
+  (accessible.value?.projects ?? []).slice(
+    (projectPageNo.value - 1) * pageSize,
+    projectPageNo.value * pageSize,
+  ),
+)
+const pagedHistory = computed(() =>
+  history.value.slice((historyPageNo.value - 1) * pageSize, historyPageNo.value * pageSize),
+)
 
 watch(errorMessage, (message) => {
   if (message) showToast('error', '成本核对请求未完成', message)
@@ -38,6 +50,8 @@ const needsAuthoritativeReload = (e: unknown) =>
   isApiClientError(e) && (e.status === 409 || e.status === 422)
 async function load() {
   if (!canQuery.value) return
+  projectPageNo.value = 1
+  historyPageNo.value = 1
   projectId.value = typeof route.query.projectId === 'string' ? route.query.projectId : ''
   controller?.abort()
   const current = new AbortController()
@@ -118,13 +132,11 @@ onBeforeUnmount(() => controller?.abort())
         v-if="loading"
         title="正在加载成本核对"
         description="正在读取项目成本汇总及历史记录。"
-        kind="loading"
-      /><V2PageState
+        kind="loading" /><V2PageState
         v-else-if="!projectId && !accessible?.projects.length && !errorMessage"
         title="暂无成本汇总"
         description="当前账号可访问项目尚未生成可核对的成本汇总。"
-        kind="empty"
-      /><V2Card v-else-if="!projectId && accessible">
+        kind="empty" /><V2Card v-else-if="!projectId && accessible">
         <div class="table-wrap" role="region" aria-label="全部项目成本汇总表格" tabindex="0">
           <table>
             <thead>
@@ -138,7 +150,7 @@ onBeforeUnmount(() => controller?.abort())
               </tr>
             </thead>
             <tbody>
-              <tr v-for="row in accessible.projects" :key="row.projectId">
+              <tr v-for="row in pagedProjects" :key="row.projectId">
                 <th scope="row">{{ row.projectName }}</th>
                 <td>{{ row.targetCost }}</td>
                 <td>{{ row.actualCost }}</td>
@@ -149,13 +161,19 @@ onBeforeUnmount(() => controller?.abort())
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            v-model:page-no="projectPageNo"
+            :total="accessible.projects.length"
+            label="全部项目成本汇总分页"
+          />
+        </template>
       </V2Card>
       <V2PageState
         v-else-if="!latest && !errorMessage"
         title="暂无成本汇总"
         description="当前项目尚未生成可核对的成本汇总。"
-        kind="empty"
-      /><template v-else-if="latest"
+        kind="empty" /><template v-else-if="latest"
         ><V2Card :title="latest.projectName || '项目汇总'"
           ><dl>
             <dt>目标成本</dt>
@@ -174,8 +192,7 @@ onBeforeUnmount(() => controller?.abort())
             v-if="!history.length && !errorMessage"
             title="暂无历史记录"
             description="当前项目尚无成本汇总快照历史。"
-            kind="empty"
-          />
+            kind="empty" />
           <div
             v-else-if="history.length"
             class="table-wrap"
@@ -194,7 +211,7 @@ onBeforeUnmount(() => controller?.abort())
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in history" :key="row.id">
+                <tr v-for="row in pagedHistory" :key="row.id">
                   <td>{{ row.summaryDate }}</td>
                   <td>{{ row.costSubjectName }}</td>
                   <td>{{ row.targetCost }}</td>
@@ -203,10 +220,14 @@ onBeforeUnmount(() => controller?.abort())
                 </tr>
               </tbody>
             </table>
-          </div></V2Card
-        ></template
-      ></template
-    >
+          </div>
+          <template #footer>
+            <V2Pagination
+              v-model:page-no="historyPageNo"
+              :total="history.length"
+              label="成本汇总历史分页"
+            /> </template></V2Card></template
+    ></template>
   </div>
 </template>
 <style scoped>

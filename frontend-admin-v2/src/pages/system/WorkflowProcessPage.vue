@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import {
   V2Badge,
   V2Button,
@@ -25,7 +25,16 @@ import {
   type WorkflowTemplateRecord,
 } from '@/services/workflow-process'
 import { isApiClientError } from '@/services/request'
+import { loadPositions, type OrgPositionRecord } from '@/services/master-data'
+import {
+  loadRoles,
+  loadUsers,
+  type RoleRecord,
+  type UserRecord,
+} from '@/services/system-management'
 import { workflowBusinessTypeLabel } from '@/pages/workbench/model'
+
+type ApproverType = 'USER' | 'ROLE' | 'POSITION' | 'PROJECT_ROLE'
 
 const loading = ref(false)
 const detailLoading = ref(false)
@@ -44,6 +53,11 @@ const templateDialog = ref(false)
 const nodeDialog = ref(false)
 const editingNode = ref<WorkflowTemplateNodeRecord | null>(null)
 const deleteTarget = ref<WorkflowTemplateNodeRecord | null>(null)
+const approverOptionsLoading = ref(false)
+const approverOptionsLoaded = ref(false)
+const users = ref<UserRecord[]>([])
+const roles = ref<RoleRecord[]>([])
+const positions = ref<OrgPositionRecord[]>([])
 
 const templateForm = reactive({
   templateName: '',
@@ -57,7 +71,8 @@ const nodeForm = reactive({
   nodeCode: '',
   nodeName: '',
   approveMode: 'SEQUENTIAL',
-  approverConfig: '{"type":"USER","userId":1}',
+  approverType: 'USER' as ApproverType,
+  approverValue: '',
   allowTransfer: '1',
   allowAddSign: '1',
   timeoutHours: '',
@@ -78,6 +93,41 @@ const switchOptions = [
   { value: '1', label: '允许' },
   { value: '0', label: '禁止' },
 ]
+const approverTypeOptions = [
+  { value: 'USER', label: '指定人员' },
+  { value: 'ROLE', label: '系统角色' },
+  { value: 'POSITION', label: '组织岗位' },
+  { value: 'PROJECT_ROLE', label: '项目角色' },
+]
+const projectRoleOptions = [
+  { value: 'PM', label: '项目经理' },
+  { value: 'CM', label: '商务经理' },
+  { value: 'CSTM', label: '成本经理' },
+  { value: 'FIN', label: '财务负责人' },
+  { value: 'MAT', label: '物资负责人' },
+  { value: 'OTH', label: '其他项目成员' },
+]
+const approverOptions = computed(() => {
+  if (nodeForm.approverType === 'USER') {
+    return users.value.map((item) => ({
+      value: item.id,
+      label: `${item.realName || item.username}（${item.username}）`,
+    }))
+  }
+  if (nodeForm.approverType === 'ROLE') {
+    return roles.value.map((item) => ({ value: item.id, label: item.roleName }))
+  }
+  if (nodeForm.approverType === 'POSITION') {
+    return positions.value.map((item) => ({ value: item.id, label: item.positionName }))
+  }
+  return projectRoleOptions
+})
+const approverLabel = computed(() => {
+  if (nodeForm.approverType === 'USER') return '审批人员'
+  if (nodeForm.approverType === 'ROLE') return '审批角色'
+  if (nodeForm.approverType === 'POSITION') return '审批岗位'
+  return '项目角色'
+})
 
 async function loadList(signal?: AbortSignal): Promise<void> {
   const page = await loadWorkflowTemplates(
@@ -188,11 +238,13 @@ async function saveTemplate(): Promise<void> {
 
 function openNodeEditor(node?: WorkflowTemplateNodeRecord): void {
   editingNode.value = node ?? null
+  const approver = parseApproverConfig(node?.approverConfig)
   Object.assign(nodeForm, {
     nodeCode: node?.nodeCode ?? '',
     nodeName: node?.nodeName ?? '',
     approveMode: node?.approveMode ?? 'SEQUENTIAL',
-    approverConfig: node?.approverConfig ?? '{"type":"USER","userId":1}',
+    approverType: approver.type,
+    approverValue: approver.value,
     allowTransfer: String(node?.allowTransfer ?? 1),
     allowAddSign: String(node?.allowAddSign ?? 1),
     timeoutHours: node?.timeoutHours == null ? '' : String(node.timeoutHours),
@@ -200,6 +252,7 @@ function openNodeEditor(node?: WorkflowTemplateNodeRecord): void {
   })
   detailDialog.value = false
   nodeDialog.value = true
+  void loadApproverOptions()
 }
 
 function closeNodeEditor(): void {
@@ -218,8 +271,8 @@ function closeDeleteNode(): void {
 }
 
 async function saveNode(): Promise<void> {
-  if (!current.value || !nodeForm.nodeName.trim() || !validJson(nodeForm.approverConfig)) {
-    showToast('warning', '节点配置无效', '节点名称和合法审批人 JSON 不能为空。')
+  if (!current.value || !nodeForm.nodeName.trim() || !nodeForm.approverValue) {
+    showToast('warning', '节点配置无效', '节点名称和审批人不能为空。')
     return
   }
   const command: WorkflowTemplateNodeCommand = {
@@ -227,7 +280,7 @@ async function saveNode(): Promise<void> {
     nodeName: nodeForm.nodeName.trim(),
     nodeType: 'APPROVAL',
     approveMode: nodeForm.approveMode as WorkflowTemplateNodeCommand['approveMode'],
-    approverConfig: nodeForm.approverConfig.trim(),
+    approverConfig: serializeApproverConfig(),
     allowTransfer: Number(nodeForm.allowTransfer),
     allowAddSign: Number(nodeForm.allowAddSign),
     timeoutHours: optionalPositiveInteger(nodeForm.timeoutHours),
@@ -300,12 +353,67 @@ function optionalPositiveInteger(value: string): number | undefined {
   return Number(normalized)
 }
 
-function validJson(value: string): boolean {
+function parseApproverConfig(value?: string): { type: ApproverType; value: string } {
   try {
-    return Boolean(JSON.parse(value))
+    const config = JSON.parse(value ?? '{}') as Record<string, unknown>
+    const type = config.type as ApproverType
+    if (type === 'USER') return { type, value: String(config.userId ?? '') }
+    if (type === 'ROLE') {
+      return {
+        type,
+        value:
+          config.roleId == null ? `code:${String(config.roleCode ?? '')}` : String(config.roleId),
+      }
+    }
+    if (type === 'POSITION') return { type, value: String(config.positionId ?? '') }
+    if (type === 'PROJECT_ROLE') return { type, value: String(config.roleCode ?? '') }
   } catch {
-    return false
+    // Invalid legacy value becomes an explicit required selection.
   }
+  return { type: 'USER', value: '' }
+}
+
+function serializeApproverConfig(): string {
+  const type = nodeForm.approverType
+  if (type === 'USER') return JSON.stringify({ type, userId: nodeForm.approverValue })
+  if (type === 'ROLE') return JSON.stringify({ type, roleId: nodeForm.approverValue })
+  if (type === 'POSITION') return JSON.stringify({ type, positionId: nodeForm.approverValue })
+  return JSON.stringify({ type, roleCode: nodeForm.approverValue })
+}
+
+function changeApproverType(value: string): void {
+  nodeForm.approverType = value as ApproverType
+  nodeForm.approverValue = ''
+}
+
+async function loadApproverOptions(): Promise<void> {
+  if (approverOptionsLoaded.value || approverOptionsLoading.value) {
+    normalizeRoleSelection()
+    return
+  }
+  approverOptionsLoading.value = true
+  try {
+    const [userPage, roleRows, positionPage] = await Promise.all([
+      loadUsers({ pageNo: 1, pageSize: 1000 }),
+      loadRoles(),
+      loadPositions({ pageNo: 1, pageSize: 1000 }),
+    ])
+    users.value = userPage.records
+    roles.value = roleRows.filter((item) => item.status === 'ENABLE')
+    positions.value = positionPage.records.filter((item) => item.status === 'ENABLE')
+    approverOptionsLoaded.value = true
+    normalizeRoleSelection()
+  } catch (value) {
+    showToast('error', '审批人选项加载失败', messageOf(value))
+  } finally {
+    approverOptionsLoading.value = false
+  }
+}
+
+function normalizeRoleSelection(): void {
+  if (nodeForm.approverType !== 'ROLE' || !nodeForm.approverValue.startsWith('code:')) return
+  const roleCode = nodeForm.approverValue.slice(5)
+  nodeForm.approverValue = roles.value.find((item) => item.roleCode === roleCode)?.id ?? ''
 }
 
 function messageOf(value: unknown): string {
@@ -569,7 +677,7 @@ onBeforeUnmount(() => controller?.abort())
     <V2Dialog
       v-model:open="nodeDialog"
       :title="editingNode ? '编辑审批节点' : '新增审批节点'"
-      description="审批人配置支持 USER、ROLE、POSITION 或 PROJECT_ROLE JSON。"
+      description="选择审批人员、系统角色、组织岗位或项目角色。"
       :close-disabled="saving"
       :close-on-backdrop="!saving"
       panel-class="v2-dialog-standard"
@@ -579,7 +687,21 @@ onBeforeUnmount(() => controller?.abort())
         <V2Input v-model="nodeForm.nodeCode" label="节点编码" placeholder="留空自动生成" />
         <V2Input v-model="nodeForm.nodeName" label="节点名称" required />
         <V2Select v-model="nodeForm.approveMode" label="审批模式" :options="approveModeOptions" />
-        <V2Input v-model="nodeForm.approverConfig" label="审批人配置 JSON" required />
+        <V2Select
+          :model-value="nodeForm.approverType"
+          label="审批人类型"
+          :options="approverTypeOptions"
+          required
+          @update:model-value="changeApproverType"
+        />
+        <V2Select
+          v-model="nodeForm.approverValue"
+          :label="approverLabel"
+          :options="approverOptions"
+          :disabled="approverOptionsLoading"
+          :placeholder="approverOptionsLoading ? '正在加载' : '请选择'"
+          required
+        />
         <V2Select v-model="nodeForm.allowTransfer" label="允许转办" :options="switchOptions" />
         <V2Select v-model="nodeForm.allowAddSign" label="允许加签" :options="switchOptions" />
         <V2Input v-model="nodeForm.timeoutHours" label="超时小时" placeholder="不限" />

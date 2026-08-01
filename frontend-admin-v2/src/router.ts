@@ -82,6 +82,70 @@ function missingRouteComponent(path: string): never {
   throw new Error(`Accepted navigation route has no component: ${path}`)
 }
 
+const navigationComponents = {
+  '/dashboard': DashboardPage,
+  '/dashboard/reports': ReportCatalogPage,
+  '/approval/todo': WorkflowWorkbenchPage,
+  '/approval/done': WorkflowWorkbenchPage,
+  '/approval/cc': WorkflowWorkbenchPage,
+  '/approval/mine': WorkflowWorkbenchPage,
+  '/project/list': ProjectPage,
+  '/contract/ledger': ContractPage,
+  '/variation/order': VariationPage,
+  '/bid-cost': BidCostPage,
+  '/cost-target/index': CostTargetPage,
+  '/cost/ledger': CostLedgerPage,
+  '/cost/summary': CostSummaryPage,
+  '/cost/control': CostControlPage,
+  '/budget': BudgetPage,
+  '/production-measurement': ProductionMeasurementPage,
+  '/project-schedule': SchedulePage,
+  '/site/daily-log': DailyLogPage,
+  '/quality-safety': QualitySafetyPage,
+  '/technical-management': TechnicalManagementPage,
+  '/project-closeout': ProjectCloseoutPage,
+  '/supplier-sourcing': SupplierSourcingPage,
+  '/inventory/purchase-request': PurchaseExecutionPage,
+  '/purchase/order': PurchaseExecutionPage,
+  '/purchase/receipt': PurchaseExecutionPage,
+  '/inventory/warehouse': InventoryWorkspacePage,
+  '/inventory/stock': InventoryWorkspacePage,
+  '/inventory/material-requisition': RequisitionWorkspacePage,
+  '/subcontract/task': SubcontractWorkspacePage,
+  '/subcontract/measure': SubcontractWorkspacePage,
+  '/settlement/list': SettlementWorkspacePage,
+  '/payment/application': ReceivablesWorkspacePage,
+  '/payment/expense': ReceivablesWorkspacePage,
+  '/revenue': ReceivablesWorkspacePage,
+  '/invoice': ReceivablesWorkspacePage,
+  '/finance-operations': FinanceControlWorkspacePage,
+  '/cash-journal': FinanceControlWorkspacePage,
+  '/cash-forecast': FinanceControlWorkspacePage,
+  '/accounting-entry': FinanceControlWorkspacePage,
+  '/financial-close': FinanceControlWorkspacePage,
+  '/partner': PartnerPage,
+  '/org': OrganizationPage,
+  '/material/dictionary': MaterialDictionaryPage,
+  '/cost/subject/taxonomy': CostSubjectPage,
+  '/cost/subject/rules': CostSubjectPage,
+  '/cost/subject/scope': CostSubjectPage,
+  '/cost/subject/trace': CostSubjectPage,
+  '/approval/process': WorkflowProcessPage,
+  '/system/users': AccessControlPage,
+  '/system/roles': AccessControlPage,
+  '/system/permissions': AccessControlPage,
+  '/system/dict': DictionaryPage,
+  '/system/audit': AuditPage,
+  '/system/document-templates': DocumentTemplatePage,
+  '/system/data': DataMaintenancePage,
+} as const
+
+function componentForNavigationPath(path: string) {
+  return (
+    navigationComponents[path as keyof typeof navigationComponents] ?? missingRouteComponent(path)
+  )
+}
+
 const registeredPaths = new Set<string>()
 const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
   domain.workspaces.flatMap((workspace) =>
@@ -93,116 +157,7 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
         {
           path: tab.path,
           name: routeName(tab.path),
-          component:
-            tab.path === '/dashboard'
-              ? DashboardPage
-              : tab.path === '/dashboard/reports'
-                ? ReportCatalogPage
-                : approvalTab
-                  ? WorkflowWorkbenchPage
-                  : tab.path === '/project/list'
-                    ? ProjectPage
-                    : tab.path === '/contract/ledger'
-                      ? ContractPage
-                      : tab.path === '/variation/order'
-                        ? VariationPage
-                        : tab.path === '/bid-cost'
-                          ? BidCostPage
-                          : tab.path === '/cost-target/index'
-                            ? CostTargetPage
-                            : tab.path === '/cost/ledger'
-                              ? CostLedgerPage
-                              : tab.path === '/cost/summary'
-                                ? CostSummaryPage
-                                : tab.path === '/cost/control'
-                                  ? CostControlPage
-                                  : tab.path === '/budget'
-                                    ? BudgetPage
-                                    : tab.path === '/production-measurement'
-                                      ? ProductionMeasurementPage
-                                      : tab.path === '/project-schedule'
-                                        ? SchedulePage
-                                        : tab.path === '/site/daily-log'
-                                          ? DailyLogPage
-                                          : tab.path === '/quality-safety'
-                                            ? QualitySafetyPage
-                                            : tab.path === '/technical-management'
-                                              ? TechnicalManagementPage
-                                              : tab.path === '/project-closeout'
-                                                ? ProjectCloseoutPage
-                                                : tab.path === '/supplier-sourcing'
-                                                  ? SupplierSourcingPage
-                                                  : [
-                                                        '/inventory/purchase-request',
-                                                        '/purchase/order',
-                                                        '/purchase/receipt',
-                                                      ].includes(tab.path)
-                                                    ? PurchaseExecutionPage
-                                                    : [
-                                                          '/inventory/warehouse',
-                                                          '/inventory/stock',
-                                                        ].includes(tab.path)
-                                                      ? InventoryWorkspacePage
-                                                      : tab.path ===
-                                                          '/inventory/material-requisition'
-                                                        ? RequisitionWorkspacePage
-                                                        : [
-                                                              '/subcontract/task',
-                                                              '/subcontract/measure',
-                                                            ].includes(tab.path)
-                                                          ? SubcontractWorkspacePage
-                                                          : [
-                                                                '/payment/application',
-                                                                '/payment/expense',
-                                                                '/revenue',
-                                                                '/invoice',
-                                                              ].includes(tab.path)
-                                                            ? ReceivablesWorkspacePage
-                                                            : [
-                                                                  '/finance-operations',
-                                                                  '/cash-journal',
-                                                                  '/cash-forecast',
-                                                                  '/accounting-entry',
-                                                                  '/financial-close',
-                                                                ].includes(tab.path)
-                                                              ? FinanceControlWorkspacePage
-                                                              : tab.path === '/settlement/list'
-                                                                ? SettlementWorkspacePage
-                                                                : tab.path === '/partner'
-                                                                  ? PartnerPage
-                                                                  : tab.path === '/org'
-                                                                    ? OrganizationPage
-                                                                    : tab.path ===
-                                                                        '/material/dictionary'
-                                                                      ? MaterialDictionaryPage
-                                                                      : tab.path.startsWith(
-                                                                            '/cost/subject/',
-                                                                          )
-                                                                        ? CostSubjectPage
-                                                                        : tab.path ===
-                                                                            '/approval/process'
-                                                                          ? WorkflowProcessPage
-                                                                          : [
-                                                                                '/system/users',
-                                                                                '/system/roles',
-                                                                                '/system/permissions',
-                                                                              ].includes(tab.path)
-                                                                            ? AccessControlPage
-                                                                            : tab.path ===
-                                                                                '/system/dict'
-                                                                              ? DictionaryPage
-                                                                              : tab.path ===
-                                                                                  '/system/audit'
-                                                                                ? AuditPage
-                                                                                : tab.path ===
-                                                                                    '/system/document-templates'
-                                                                                  ? DocumentTemplatePage
-                                                                                  : tab.path ===
-                                                                                      '/system/data'
-                                                                                    ? DataMaintenancePage
-                                                                                    : missingRouteComponent(
-                                                                                        tab.path,
-                                                                                      ),
+          component: componentForNavigationPath(tab.path),
           meta: {
             shell: true,
             permission: tab.permission,

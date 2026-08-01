@@ -9,6 +9,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
   V2Stack,
   showToast,
@@ -43,6 +44,8 @@ const templates = ref<DocumentTemplateSummary[]>([])
 const detail = ref<DocumentTemplateDetail | null>(null)
 const selectedTemplateId = ref('')
 const selectedVersionId = ref('')
+const pageNo = ref(1)
+const pageSize = 10
 const editorOpen = ref(false)
 const editorMode = ref<EditorMode>('create')
 const versionAction = ref<VersionAction | null>(null)
@@ -65,8 +68,12 @@ const canPublish = computed(() => session.hasPermission('document:template:publi
 const selectedVersion = computed(
   () => detail.value?.versions.find((item) => item.id === selectedVersionId.value) ?? null,
 )
+const pagedTemplates = computed(() =>
+  templates.value.slice((pageNo.value - 1) * pageSize, pageNo.value * pageSize),
+)
 
 async function refresh(preferredTemplateId?: string, preferredVersionId?: string): Promise<void> {
+  pageNo.value = 1
   controller?.abort()
   const current = new AbortController()
   controller = current
@@ -292,7 +299,7 @@ onBeforeUnmount(() => controller?.abort())
         />
         <div v-else class="document-template-page__list">
           <V2Button
-            v-for="item in templates"
+            v-for="item in pagedTemplates"
             :key="item.id"
             variant="ghost"
             :class="{ 'is-selected': item.id === selectedTemplateId }"
@@ -305,6 +312,15 @@ onBeforeUnmount(() => controller?.abort())
             </V2Badge>
           </V2Button>
         </div>
+        <template #footer>
+          <V2Pagination
+            :total="templates.length"
+            :page-no="pageNo"
+            :page-size="pageSize"
+            label="业务模板分页"
+            @update:page-no="pageNo = $event"
+          />
+        </template>
       </V2Card>
 
       <V2Card title="版本">

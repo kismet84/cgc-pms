@@ -16,6 +16,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
   showToast,
   useToastMessage,
@@ -49,6 +50,9 @@ const loading = ref(false)
 const actionBusy = ref(false)
 const errorMessage = ref('')
 const successMessage = useToastMessage()
+const pageSize = 10
+const projectPageNo = ref(1)
+const actionPageNo = ref(1)
 
 watch(errorMessage, (message) => {
   if (message) showToast('error', '动态利润操作未完成', message)
@@ -95,6 +99,15 @@ const canCorrective = computed(() => session.hasPermission('cost:corrective:main
 const canSubmit = computed(() => session.hasPermission('cost:corrective:submit'))
 const latest = computed(() => overview.value?.latestForecast ?? {})
 const actions = computed(() => overview.value?.correctiveActions ?? [])
+const pagedProjects = computed(() =>
+  (accessible.value?.projects ?? []).slice(
+    (projectPageNo.value - 1) * pageSize,
+    projectPageNo.value * pageSize,
+  ),
+)
+const pagedActions = computed(() =>
+  actions.value.slice((actionPageNo.value - 1) * pageSize, actionPageNo.value * pageSize),
+)
 const inputItems = computed(() => overview.value?.forecastInputItems ?? [])
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: '草稿',
@@ -137,6 +150,8 @@ async function handleActionError(e: unknown, fallback: string) {
 }
 async function load() {
   if (!canQuery.value) return
+  projectPageNo.value = 1
+  actionPageNo.value = 1
   projectId.value = typeof route.query.projectId === 'string' ? route.query.projectId : ''
   controller?.abort()
   const current = new AbortController()
@@ -400,7 +415,7 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in accessible.projects" :key="row.projectId">
+                <tr v-for="row in pagedProjects" :key="row.projectId">
                   <th scope="row">{{ row.projectName }}</th>
                   <td>{{ row.dynamicCost }}</td>
                   <td>{{ row.forecastAtCompletionCost }}</td>
@@ -411,7 +426,13 @@ onBeforeUnmount(() => {
               </tbody>
             </table>
           </div>
-        </V2Card></template
+          <template #footer>
+            <V2Pagination
+              v-model:page-no="projectPageNo"
+              :total="accessible.projects.length"
+              label="全部项目动态利润分页"
+            />
+          </template> </V2Card></template
       ><template v-else-if="overview"
         ><V2Card title="最新完工预测"
           ><dl>
@@ -454,8 +475,7 @@ onBeforeUnmount(() => {
             v-if="!actions.length && !errorMessage"
             title="暂无纠偏措施"
             description="当前项目尚未登记可执行的成本纠偏措施。"
-            kind="empty"
-          />
+            kind="empty" />
           <div
             v-else-if="actions.length"
             class="cost-page__table-wrap"
@@ -474,7 +494,7 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(row, index) in actions" :key="text(row, 'id')">
+                <tr v-for="(row, index) in pagedActions" :key="text(row, 'id')">
                   <th scope="row">{{ text(row, 'action_code') || '措施编号缺失' }}</th>
                   <td>{{ text(row, 'action_title') }}</td>
                   <td>{{ text(row, 'expected_saving_amount') }}</td>
@@ -482,7 +502,7 @@ onBeforeUnmount(() => {
                   <td class="v2-table-cell--actions">
                     <V2ActionMenu
                       :label="`${text(row, 'action_code') || text(row, 'action_title')}更多操作`"
-                      :placement="index >= actions.length - 3 ? 'top-end' : 'bottom-end'"
+                      :placement="index >= pagedActions.length - 3 ? 'top-end' : 'bottom-end'"
                     >
                       <V2Button
                         v-if="canCorrective && ['DRAFT', 'REJECTED'].includes(text(row, 'status'))"
@@ -505,7 +525,13 @@ onBeforeUnmount(() => {
                 </tr>
               </tbody>
             </table>
-          </div></V2Card
+          </div>
+          <template #footer>
+            <V2Pagination
+              v-model:page-no="actionPageNo"
+              :total="actions.length"
+              label="纠偏措施分页"
+            /> </template></V2Card
         ><V2Dialog
           :open="!!trace"
           title="预测追溯"

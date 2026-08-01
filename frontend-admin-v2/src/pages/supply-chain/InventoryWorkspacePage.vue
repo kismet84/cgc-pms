@@ -617,8 +617,9 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <template v-if="pageCount > 1" #footer>
+        <template #footer>
           <nav class="inventory-workspace-page__pager" aria-label="仓库分页">
+            <span>共 {{ warehouseTotal }} 条</span>
             <V2Button
               size="small"
               variant="secondary"
@@ -700,8 +701,9 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <template v-if="pageCount > 1" #footer>
+        <template #footer>
           <nav class="inventory-workspace-page__pager" aria-label="库存台账分页">
+            <span>共 {{ stockTotal }} 条</span>
             <V2Button
               size="small"
               variant="secondary"
@@ -850,6 +852,7 @@ onBeforeUnmount(() => {
             class="inventory-workspace-page__pager"
             aria-label="库存流水分页"
           >
+            <span>共 {{ ledger.txns.total }} 条</span>
             <V2Button
               type="button"
               variant="secondary"

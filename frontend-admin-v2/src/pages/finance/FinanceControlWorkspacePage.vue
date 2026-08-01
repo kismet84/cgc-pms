@@ -8,6 +8,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
 } from '@/components'
 import { showToast } from '@/components/toast'
@@ -107,7 +108,6 @@ const permissions: Record<Mode, string> = {
 const title = computed(() => titles[mode.value])
 const canQuery = computed(() => session.hasPermission(permissions[mode.value]))
 const projectId = computed(() => workspace.selectedProjectId || '')
-const needsProject = computed(() => mode.value === 'operations' || mode.value === 'forecast')
 const can = (permission: string) => session.hasPermission(permission)
 const isSuperAdmin = computed(() => session.roles.includes('SUPER_ADMIN'))
 const canManageAccounts = computed(
@@ -117,15 +117,22 @@ const canManageAccounts = computed(
 )
 
 const operations = ref<FinanceOperationsWorkspace | null>(null)
+const pageSize = 10
+const schedulePageNo = ref(1)
+const alertPageNo = ref(1)
+const snapshotPageNo = ref(1)
 const accounts = ref<FundAccountRecord[]>([])
+const accountPageNo = ref(1)
 const journalPageNo = ref(1)
 const journal = ref<CashJournalPage>({ pageNo: 1, pageSize: 10, total: 0, records: [] })
 const cycles = ref<CashForecastCycleRecord[]>([])
+const cyclePageNo = ref(1)
 const forecastTrace = ref<CashForecastTrace | null>(null)
 const entryPageNo = ref(1)
 const entries = ref<AccountingEntryPage>({ pageNo: 1, pageSize: 10, total: 0, records: [] })
 const entryDetail = ref<AccountingEntryDetail | null>(null)
 const periods = ref<FinancePeriodRecord[]>([])
+const periodPageNo = ref(1)
 const closeTrace = ref<FinancialCloseTrace | null>(null)
 const statement = ref<FinancialStatement | null>(null)
 const loading = ref(false)
@@ -135,14 +142,23 @@ const accountDialog = ref(false)
 const accountEditor = ref<FundAccountEditor | null>(null)
 let controller: AbortController | null = null
 
+function pageSlice<T>(items: T[], pageNo: number): T[] {
+  return items.slice((pageNo - 1) * pageSize, pageNo * pageSize)
+}
+
+const pagedSchedules = computed(() =>
+  pageSlice(operations.value?.schedules ?? [], schedulePageNo.value),
+)
+const pagedAlerts = computed(() => pageSlice(operations.value?.alerts ?? [], alertPageNo.value))
+const pagedSnapshots = computed(() =>
+  pageSlice(operations.value?.snapshots ?? [], snapshotPageNo.value),
+)
+const pagedAccounts = computed(() => pageSlice(accounts.value, accountPageNo.value))
+const pagedCycles = computed(() => pageSlice(cycles.value, cyclePageNo.value))
+const pagedPeriods = computed(() => pageSlice(periods.value, periodPageNo.value))
+
 const hasRows = computed(() => {
-  if (mode.value === 'operations')
-    return Boolean(
-      operations.value &&
-      (operations.value.schedules.length ||
-        operations.value.alerts.length ||
-        operations.value.snapshots.length),
-    )
+  if (mode.value === 'operations') return operations.value !== null
   if (mode.value === 'journal') return accounts.value.length > 0 || journal.value.records.length > 0
   if (mode.value === 'forecast') return cycles.value.length > 0
   if (mode.value === 'accounting') return entries.value.records.length > 0
@@ -194,7 +210,7 @@ const label = (value?: string | null) => (value ? statusLabels[value] || '状态
 const amount = (value?: string | null) => (value == null ? '—' : formatAmount(value))
 const projectRequired = () => {
   if (!projectId.value) {
-    showToast('error', '请选择项目', '该工作台仅支持单项目范围。')
+    showToast('error', '请选择项目', '项目明细和项目写操作需要切换至具体项目。')
     return false
   }
   return true
@@ -261,36 +277,52 @@ async function saveFundAccount(): Promise<void> {
   }
 }
 
-async function load(): Promise<void> {
+async function load(preserveServerPage = false): Promise<void> {
+  if (!preserveServerPage) {
+    journalPageNo.value = 1
+    entryPageNo.value = 1
+  }
+  schedulePageNo.value = 1
+  alertPageNo.value = 1
+  snapshotPageNo.value = 1
+  accountPageNo.value = 1
+  cyclePageNo.value = 1
+  periodPageNo.value = 1
   controller?.abort()
   const request = new AbortController()
   controller = request
   loading.value = true
   errorMessage.value = ''
   try {
-    if (needsProject.value && !projectId.value) return
     if (mode.value === 'operations') {
-      operations.value = await loadFinanceOperationsWorkspace(projectId.value, request.signal)
+      operations.value = await loadFinanceOperationsWorkspace(
+        projectId.value || undefined,
+        request.signal,
+      )
     } else if (mode.value === 'journal') {
       const [accountRows, journalPage] = await Promise.all([
         loadFundAccounts(request.signal),
         loadCashJournal(
-          { pageNo: journalPageNo.value, pageSize: 10, projectId: projectId.value },
+          { pageNo: journalPageNo.value, pageSize, projectId: projectId.value },
           request.signal,
         ),
       ])
       accounts.value = accountRows
       journal.value = journalPage
     } else if (mode.value === 'forecast') {
-      cycles.value = await loadCashForecastCycles(projectId.value, request.signal)
-      const selected =
-        cycles.value.find((row) => row.id === forecastTrace.value?.cycle.id) || cycles.value[0]
-      forecastTrace.value = selected
-        ? await loadCashForecastTrace(selected.id, request.signal)
-        : null
+      cycles.value = await loadCashForecastCycles(projectId.value || undefined, request.signal)
+      if (projectId.value) {
+        const selected =
+          cycles.value.find((row) => row.id === forecastTrace.value?.cycle.id) || cycles.value[0]
+        forecastTrace.value = selected
+          ? await loadCashForecastTrace(selected.id, request.signal)
+          : null
+      } else {
+        forecastTrace.value = null
+      }
     } else if (mode.value === 'accounting') {
       entries.value = await loadAccountingEntries(
-        { pageNo: entryPageNo.value, pageSize: 10, projectId: projectId.value },
+        { pageNo: entryPageNo.value, pageSize, projectId: projectId.value },
         request.signal,
       )
       const selected =
@@ -322,6 +354,7 @@ async function load(): Promise<void> {
 }
 
 async function selectForecast(id: string): Promise<void> {
+  if (!projectRequired()) return
   forecastTrace.value = await loadCashForecastTrace(id)
 }
 async function selectEntry(id: string): Promise<void> {
@@ -336,10 +369,10 @@ async function selectPeriod(row: FinancePeriodRecord): Promise<void> {
 
 function changePage(kind: 'journal' | 'accounting', next: number): void {
   const page = kind === 'journal' ? journal.value : entries.value
-  if (next < 1 || (next - 1) * 10 >= page.total) return
+  if (next < 1 || (next - 1) * pageSize >= page.total) return
   if (kind === 'journal') journalPageNo.value = next
   else entryPageNo.value = next
-  void load()
+  void load(true)
 }
 
 async function run(action: () => Promise<unknown>, success: string): Promise<void> {
@@ -358,6 +391,8 @@ async function refreshSnapshot(): Promise<void> {
   if (projectRequired()) await run(() => rebuildFinanceSnapshot(projectId.value), '财务快照已刷新')
 }
 async function refreshWorkspace(): Promise<void> {
+  journalPageNo.value = 1
+  entryPageNo.value = 1
   await load()
   if (!errorMessage.value) showToast('success', '刷新完成', '已读取最新数据。')
 }
@@ -397,6 +432,7 @@ async function uploadJournalEvidence(
   }
 }
 async function actForecast(action: 'regenerate' | 'submit' | 'approve' | 'reject' | 'refresh') {
+  if (!projectRequired()) return
   const id = forecastTrace.value?.cycle.id
   if (!id) return
   if (action === 'regenerate') return run(() => regenerateCashForecast(id), '预测已重算')
@@ -460,7 +496,7 @@ onBeforeUnmount(() => controller?.abort())
         <template #actions>
           <div class="finance-control__actions">
             <V2Button
-              v-if="mode === 'operations' && can('finance:analytics:maintain')"
+              v-if="mode === 'operations' && projectId && can('finance:analytics:maintain')"
               size="small"
               @click="refreshSnapshot"
             >
@@ -482,12 +518,7 @@ onBeforeUnmount(() => controller?.abort())
       </V2Card>
 
       <V2PageState
-        v-if="needsProject && !projectId"
-        title="需切换至单项目"
-        description="资金运营和预测必须按单项目范围读取。"
-      />
-      <V2PageState
-        v-else-if="loading && !hasRows"
+        v-if="loading && !hasRows"
         kind="loading"
         title="正在加载"
         :description="`正在读取${title}。`"
@@ -507,7 +538,30 @@ onBeforeUnmount(() => controller?.abort())
       />
 
       <template v-else-if="mode === 'operations' && operations">
-        <V2Card title="资金快照" :heading-level="2">
+        <V2Card v-if="!projectId" title="企业资金概览" :heading-level="2">
+          <div class="finance-control__metrics">
+            <div>
+              <span>企业资金余额</span><strong>{{ amount(operations.summary.fundBalance) }}</strong>
+            </div>
+            <div>
+              <span>预测流入</span><strong>{{ amount(operations.summary.forecastInflow) }}</strong>
+            </div>
+            <div>
+              <span>预测流出</span><strong>{{ amount(operations.summary.forecastOutflow) }}</strong>
+            </div>
+            <div>
+              <span>非项目融资</span
+              ><strong>{{ amount(operations.summary.financingAmount) }}</strong>
+            </div>
+            <div>
+              <span>资金缺口</span><strong>{{ amount(operations.summary.fundingGap) }}</strong>
+            </div>
+            <div>
+              <span>可访问项目</span><strong>{{ operations.summary.projectCount }}</strong>
+            </div>
+          </div>
+        </V2Card>
+        <V2Card v-else title="资金快照" :heading-level="2">
           <div class="finance-control__metrics" v-if="operations.snapshots[0]">
             <div>
               <span>合同额</span
@@ -536,7 +590,53 @@ onBeforeUnmount(() => controller?.abort())
             description="可使用重建快照动作生成最新快照。"
           />
         </V2Card>
-        <V2Card title="付款计划" :heading-level="2">
+        <V2Card v-if="!projectId" title="项目资金对比" :heading-level="2">
+          <div
+            v-if="operations.snapshots.length"
+            class="finance-control__table-wrap"
+            role="region"
+            aria-label="项目资金对比表格"
+            tabindex="0"
+          >
+            <table class="v2-table finance-control__table">
+              <thead>
+                <tr>
+                  <th>项目</th>
+                  <th>快照日期</th>
+                  <th>合同额</th>
+                  <th>现金流入</th>
+                  <th>现金流出</th>
+                  <th>现金利润</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in pagedSnapshots" :key="row.id">
+                  <td>{{ row.projectName || '项目信息缺失' }}</td>
+                  <td>{{ row.snapshotDate }}</td>
+                  <td>{{ amount(row.contractAmount) }}</td>
+                  <td>{{ amount(row.cashInflow) }}</td>
+                  <td>{{ amount(row.cashOutflow) }}</td>
+                  <td>{{ amount(row.profitAmount) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <V2PageState
+            v-else-if="!errorMessage"
+            title="暂无项目快照"
+            description="切换至具体项目后可刷新项目快照。"
+          />
+          <template #footer>
+            <V2Pagination
+              :total="operations.snapshots.length"
+              :page-no="snapshotPageNo"
+              :page-size="pageSize"
+              label="项目资金对比分页"
+              @update:page-no="snapshotPageNo = $event"
+            />
+          </template>
+        </V2Card>
+        <V2Card title="付款预测" :heading-level="2">
           <div
             class="finance-control__table-wrap"
             role="region"
@@ -554,7 +654,7 @@ onBeforeUnmount(() => controller?.abort())
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in operations.schedules" :key="row.id">
+                <tr v-for="row in pagedSchedules" :key="row.id">
                   <td>{{ row.scheduleName }}</td>
                   <td>{{ row.plannedDate }}</td>
                   <td>{{ amount(row.plannedAmount) }}</td>
@@ -564,6 +664,15 @@ onBeforeUnmount(() => controller?.abort())
               </tbody>
             </table>
           </div>
+          <template #footer>
+            <V2Pagination
+              :total="operations.schedules.length"
+              :page-no="schedulePageNo"
+              :page-size="pageSize"
+              label="付款计划分页"
+              @update:page-no="schedulePageNo = $event"
+            />
+          </template>
         </V2Card>
         <V2Card title="资金预警" :heading-level="2">
           <div
@@ -583,7 +692,7 @@ onBeforeUnmount(() => controller?.abort())
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(row, index) in operations.alerts" :key="row.id">
+                <tr v-for="(row, index) in pagedAlerts" :key="row.id">
                   <td>{{ row.message }}</td>
                   <td>{{ label(row.severity) }}</td>
                   <td>{{ row.dueAt || '—' }}</td>
@@ -591,7 +700,7 @@ onBeforeUnmount(() => controller?.abort())
                   <td class="v2-table-cell--actions">
                     <V2ActionMenu
                       :label="`${row.message}更多操作`"
-                      :placement="index >= operations.alerts.length - 3 ? 'top-end' : 'bottom-end'"
+                      :placement="index >= pagedAlerts.length - 3 ? 'top-end' : 'bottom-end'"
                     >
                       <V2Button
                         v-if="row.status === 'OPEN' && can('finance:operations:maintain')"
@@ -606,6 +715,15 @@ onBeforeUnmount(() => controller?.abort())
               </tbody>
             </table>
           </div>
+          <template #footer>
+            <V2Pagination
+              :total="operations.alerts.length"
+              :page-no="alertPageNo"
+              :page-size="pageSize"
+              label="资金预警分页"
+              @update:page-no="alertPageNo = $event"
+            />
+          </template>
         </V2Card>
       </template>
 
@@ -633,7 +751,7 @@ onBeforeUnmount(() => controller?.abort())
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in accounts" :key="row.id">
+                <tr v-for="row in pagedAccounts" :key="row.id">
                   <td>{{ row.accountCode }}</td>
                   <td>{{ row.accountName }}</td>
                   <td>{{ row.bankName || '—' }}</td>
@@ -643,6 +761,15 @@ onBeforeUnmount(() => controller?.abort())
               </tbody>
             </table>
           </div>
+          <template #footer>
+            <V2Pagination
+              :total="accounts.length"
+              :page-no="accountPageNo"
+              :page-size="pageSize"
+              label="资金账户分页"
+              @update:page-no="accountPageNo = $event"
+            />
+          </template>
         </V2Card>
         <V2Card title="资金流水" :heading-level="2">
           <div
@@ -723,26 +850,13 @@ onBeforeUnmount(() => controller?.abort())
             </table>
           </div>
           <template #footer>
-            <div class="finance-control__pagination">
-              <span>共 {{ journal.total }} 条</span>
-              <V2Button
-                size="small"
-                variant="secondary"
-                :disabled="journalPageNo === 1"
-                @click="changePage('journal', journalPageNo - 1)"
-              >
-                上一页
-              </V2Button>
-              <span>第 {{ journalPageNo }} 页</span>
-              <V2Button
-                size="small"
-                variant="secondary"
-                :disabled="journalPageNo * 10 >= journal.total"
-                @click="changePage('journal', journalPageNo + 1)"
-              >
-                下一页
-              </V2Button>
-            </div>
+            <V2Pagination
+              :total="journal.total"
+              :page-no="journalPageNo"
+              :page-size="pageSize"
+              label="资金流水分页"
+              @update:page-no="changePage('journal', $event)"
+            />
           </template>
         </V2Card>
       </template>
@@ -758,6 +872,7 @@ onBeforeUnmount(() => controller?.abort())
             <table class="v2-table finance-control__table">
               <thead>
                 <tr>
+                  <th>项目</th>
                   <th>版本编号</th>
                   <th>场景</th>
                   <th>区间</th>
@@ -766,7 +881,8 @@ onBeforeUnmount(() => controller?.abort())
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="row in cycles" :key="row.id">
+                <tr v-for="row in pagedCycles" :key="row.id">
+                  <td>{{ row.projectName || '项目信息缺失' }}</td>
                   <td>
                     <V2Button size="small" variant="ghost" @click="selectForecast(row.id)">{{
                       row.cycleCode
@@ -780,6 +896,15 @@ onBeforeUnmount(() => controller?.abort())
               </tbody>
             </table>
           </div>
+          <template #footer>
+            <V2Pagination
+              :total="cycles.length"
+              :page-no="cyclePageNo"
+              :page-size="pageSize"
+              label="预测版本分页"
+              @update:page-no="cyclePageNo = $event"
+            />
+          </template>
         </V2Card>
         <V2Card
           v-if="forecastTrace"
@@ -981,26 +1106,13 @@ onBeforeUnmount(() => controller?.abort())
             </table>
           </div>
           <template #footer>
-            <div class="finance-control__pagination">
-              <span>共 {{ entries.total }} 条</span>
-              <V2Button
-                size="small"
-                variant="secondary"
-                :disabled="entryPageNo === 1"
-                @click="changePage('accounting', entryPageNo - 1)"
-              >
-                上一页
-              </V2Button>
-              <span>第 {{ entryPageNo }} 页</span>
-              <V2Button
-                size="small"
-                variant="secondary"
-                :disabled="entryPageNo * 10 >= entries.total"
-                @click="changePage('accounting', entryPageNo + 1)"
-              >
-                下一页
-              </V2Button>
-            </div>
+            <V2Pagination
+              :total="entries.total"
+              :page-no="entryPageNo"
+              :page-size="pageSize"
+              label="会计凭证分页"
+              @update:page-no="changePage('accounting', $event)"
+            />
           </template>
         </V2Card>
         <V2Card
@@ -1059,7 +1171,7 @@ onBeforeUnmount(() => controller?.abort())
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(row, index) in periods" :key="row.id">
+                <tr v-for="(row, index) in pagedPeriods" :key="row.id">
                   <td>
                     <V2Button size="small" variant="ghost" @click="selectPeriod(row)">{{
                       row.periodCode
@@ -1071,7 +1183,7 @@ onBeforeUnmount(() => controller?.abort())
                   <td class="v2-table-cell--actions">
                     <V2ActionMenu
                       :label="`${row.periodCode}更多操作`"
-                      :placement="index >= periods.length - 3 ? 'top-end' : 'bottom-end'"
+                      :placement="index >= pagedPeriods.length - 3 ? 'top-end' : 'bottom-end'"
                     >
                       <V2Button
                         v-if="row.status !== 'CLOSED' && can('finance:close:check')"
@@ -1104,6 +1216,15 @@ onBeforeUnmount(() => controller?.abort())
               </tbody>
             </table>
           </div>
+          <template #footer>
+            <V2Pagination
+              :total="periods.length"
+              :page-no="periodPageNo"
+              :page-size="pageSize"
+              label="会计期间分页"
+              @update:page-no="periodPageNo = $event"
+            />
+          </template>
         </V2Card>
         <V2Card
           v-if="closeTrace && statement"

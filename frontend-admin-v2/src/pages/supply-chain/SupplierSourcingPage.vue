@@ -22,6 +22,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
   showToast,
   useToastMessage,
@@ -84,6 +85,10 @@ const purchaseOrders = ref<PurchaseOrderRecord[]>([])
 const receipts = ref<ReceiptRecord[]>([])
 const contracts = ref<ContractRecord[]>([])
 const selectedId = ref('')
+const pageNo = ref(1)
+const pageSize = 10
+const performancePageNo = ref(1)
+const returnPageNo = ref(1)
 const loading = ref(false)
 const detailLoading = ref(false)
 const busy = ref(false)
@@ -109,6 +114,18 @@ const canAward = computed(() => session.hasPermission('supplier:sourcing:award')
 const canPerformance = computed(() => session.hasPermission('supplier:performance:evaluate'))
 const canReview = computed(() => session.hasPermission('supplier:blacklist:review'))
 const selected = computed(() => events.value.find((item) => item.id === selectedId.value) ?? null)
+const pagedEvents = computed(() =>
+  events.value.slice((pageNo.value - 1) * pageSize, pageNo.value * pageSize),
+)
+const pagedPerformance = computed(() =>
+  performance.value.slice(
+    (performancePageNo.value - 1) * pageSize,
+    performancePageNo.value * pageSize,
+  ),
+)
+const pagedReturns = computed(() =>
+  returns.value.slice((returnPageNo.value - 1) * pageSize, returnPageNo.value * pageSize),
+)
 const partnerOptions = computed(() =>
   partners.value.map((item) => ({
     value: item.id,
@@ -248,6 +265,9 @@ async function show(next: Exclude<Action, null>, id = '', supplier = ''): Promis
 }
 
 async function loadPage(): Promise<void> {
+  pageNo.value = 1
+  performancePageNo.value = 1
+  returnPageNo.value = 1
   listController?.abort()
   traceController?.abort()
   trace.value = null
@@ -538,7 +558,7 @@ onBeforeUnmount(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in events" :key="item.id">
+              <tr v-for="item in pagedEvents" :key="item.id">
                 <th scope="row">
                   <V2Button
                     size="small"
@@ -559,6 +579,15 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            :total="events.length"
+            :page-no="pageNo"
+            :page-size="pageSize"
+            label="招采事件分页"
+            @update:page-no="pageNo = $event"
+          />
+        </template>
       </V2Card>
 
       <V2Dialog
@@ -826,7 +855,7 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in performance" :key="item.id">
+                <tr v-for="item in pagedPerformance" :key="item.id">
                   <th scope="row">{{ item.evaluationCode }}</th>
                   <td>{{ partnerLabel(item.partnerId) }}</td>
                   <td>{{ item.totalScore }}</td>
@@ -854,6 +883,13 @@ onBeforeUnmount(() => {
                 </tr>
               </tbody>
             </table>
+            <V2Pagination
+              :total="performance.length"
+              :page-no="performancePageNo"
+              :page-size="pageSize"
+              label="履约评价分页"
+              @update:page-no="performancePageNo = $event"
+            />
           </section>
           <section>
             <h3>退货</h3>
@@ -869,7 +905,7 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in returns" :key="item.id">
+                <tr v-for="item in pagedReturns" :key="item.id">
                   <th scope="row">{{ item.returnCode }}</th>
                   <td>{{ partnerLabel(item.partnerId) }}</td>
                   <td>{{ item.returnQuantity }}</td>
@@ -886,6 +922,13 @@ onBeforeUnmount(() => {
                 </tr>
               </tbody>
             </table>
+            <V2Pagination
+              :total="returns.length"
+              :page-no="returnPageNo"
+              :page-size="pageSize"
+              label="供应商退货分页"
+              @update:page-no="returnPageNo = $event"
+            />
           </section>
         </div>
         <section v-if="trace?.blacklistRecords.length">
@@ -1116,6 +1159,11 @@ onBeforeUnmount(() => {
 .supplier-page__grid section {
   min-width: 0;
   overflow-x: auto;
+}
+.supplier-page__grid .v2-pagination {
+  margin-top: var(--v2-space-3);
+  padding-top: var(--v2-space-3);
+  border-top: var(--v2-border-width) solid var(--v2-color-border-subtle);
 }
 .supplier-page table {
   width: 100%;

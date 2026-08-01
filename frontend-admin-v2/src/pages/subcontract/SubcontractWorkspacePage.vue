@@ -740,7 +740,7 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <template v-if="total > pageSize" #footer>
+        <template #footer>
           <nav class="subcontract-workspace__pagination" aria-label="分包业务分页">
             <span>共 {{ total }} 条</span>
             <V2Button

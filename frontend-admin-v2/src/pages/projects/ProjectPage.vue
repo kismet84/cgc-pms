@@ -632,7 +632,7 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <template v-if="!contextProjectId" #footer>
+        <template #footer>
           <nav class="project-page__pagination" aria-label="项目台账分页">
             <span>共 {{ total }} 条</span>
             <V2Button

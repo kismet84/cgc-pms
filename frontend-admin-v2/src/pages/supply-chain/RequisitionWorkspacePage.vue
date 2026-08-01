@@ -504,7 +504,6 @@ async function saveEditor(submitAfter = false): Promise<void> {
         (() => {
           throw new TypeError(`第${index + 1}条明细物料不能为空`)
         })(),
-      materialName: item.materialName.trim() || undefined,
       quantity: positiveDecimal(item.quantity, `第${index + 1}条领料数量`),
       unitPrice: item.unitPrice.trim()
         ? nonNegativeDecimal(item.unitPrice, `第${index + 1}条单价`)
@@ -775,8 +774,9 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <template v-if="pageCount > 1" #footer>
+        <template #footer>
           <nav class="requisition-page__pager" aria-label="领料单分页">
+            <span>共 {{ total }} 条</span>
             <V2Button
               size="small"
               variant="secondary"

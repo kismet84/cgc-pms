@@ -477,7 +477,7 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <template v-if="records.length" #footer>
+        <template #footer>
           <nav class="bid-cost-page__pagination" aria-label="投标成本分页">
             <span>共 {{ total }} 条</span>
             <V2Button
