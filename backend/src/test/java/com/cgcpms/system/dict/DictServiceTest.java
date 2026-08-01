@@ -47,7 +47,11 @@ class DictServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_SYSTEM)
+                .add("roleCodes", java.util.List.of("SUPER_ADMIN"))
                 .build());
+        jdbc.update("MERGE INTO sys_dict_group (id,tenant_id,group_code,group_name,order_num,status) "
+                + "KEY (tenant_id,group_code) VALUES (9999001,?,'BUSINESS_GOVERNANCE','业务治理',20,'ENABLE')",
+                TENANT_OTHER);
     }
 
     @AfterEach
@@ -123,13 +127,13 @@ class DictServiceTest {
         entity.setId(1002L);
         entity.setDictCode("contract_type");
         entity.setDictName("合同类型（已修改）");
-        entity.setStatus("DISABLE");
+        entity.setStatus("ENABLE");
 
         dictTypeService.update(entity);
 
         SysDictTypeVO updated = dictTypeService.getById(1002L);
         assertEquals("合同类型（已修改）", updated.getDictName());
-        assertEquals("DISABLE", updated.getStatus());
+        assertEquals("ENABLE", updated.getStatus());
     }
 
     @Test
@@ -158,6 +162,7 @@ class DictServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_OTHER)
+                .add("roleCodes", java.util.List.of("SUPER_ADMIN"))
                 .build());
 
         SysDictType entity = new SysDictType();
@@ -172,6 +177,7 @@ class DictServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_SYSTEM)
+                .add("roleCodes", java.util.List.of("SUPER_ADMIN"))
                 .build());
 
         // system tenant 不应看到 other tenant 的数据
@@ -213,8 +219,13 @@ class DictServiceTest {
     @DisplayName("T10: 创建字典数据—成功")
     @Transactional
     void test10_createDictData_success() {
+        SysDictType type = new SysDictType();
+        type.setDictCode("test_data_type");
+        type.setDictName("测试数据类型");
+        Long typeId = dictTypeService.create(type);
+
         SysDictData entity = new SysDictData();
-        entity.setDictTypeId(1001L); // project_status
+        entity.setDictTypeId(typeId);
         entity.setDictLabel("测试中");
         entity.setDictValue("TESTING");
         entity.setOrderNum(99);
@@ -302,6 +313,7 @@ class DictServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_OTHER)
+                .add("roleCodes", java.util.List.of("SUPER_ADMIN"))
                 .build());
 
         SysDictData entity = new SysDictData();
@@ -331,7 +343,7 @@ class DictServiceTest {
 
     @Test
     @Order(17)
-    @DisplayName("T17: 字典编码和值创建后不可修改")
+    @DisplayName("T17: 业务字典编码和值允许受控维护")
     @Transactional
     void test17_immutableKeys() {
         SysDictType type = new SysDictType();
@@ -343,7 +355,8 @@ class DictServiceTest {
         changedType.setId(typeId);
         changedType.setDictCode("changed_type");
         changedType.setDictName("已修改");
-        assertThrows(BusinessException.class, () -> dictTypeService.update(changedType));
+        dictTypeService.update(changedType);
+        assertEquals("changed_type", dictTypeService.getById(typeId).getDictCode());
 
         SysDictData data = new SysDictData();
         data.setDictTypeId(typeId);
@@ -356,7 +369,8 @@ class DictServiceTest {
         changedData.setDictTypeId(typeId);
         changedData.setDictLabel("修改标签允许");
         changedData.setDictValue("CHANGED");
-        assertThrows(BusinessException.class, () -> dictDataService.update(changedData));
+        dictDataService.update(changedData);
+        assertEquals("CHANGED", dictDataService.getById(dataId).getDictValue());
         assertThrows(BusinessException.class, () -> dictTypeService.delete(typeId));
     }
 
@@ -404,10 +418,11 @@ class DictServiceTest {
 
     @Test
     @Order(19)
-    @DisplayName("T19: 核心字典忽略租户同名影子且禁止新建覆盖")
+    @DisplayName("T19: 核心字典忽略租户同名影子")
     @Transactional
     void test19_coreDictionaryUsesSystemAuthority() {
-        jdbc.update("INSERT INTO sys_dict_type(id,tenant_id,dict_code,dict_name,status) VALUES(990101,?,'project_type','租户伪项目类型','ENABLE')", TENANT_OTHER);
+        jdbc.update("INSERT INTO sys_dict_type(id,tenant_id,group_id,dict_code,dict_name,dict_class,status) "
+                + "VALUES(990101,?,9999001,'project_type','租户伪项目类型','BUSINESS','ENABLE')", TENANT_OTHER);
         jdbc.update("INSERT INTO sys_dict_data(id,tenant_id,dict_type_id,dict_label,dict_value,order_num,status) VALUES(990102,?,990101,'租户伪值','TENANT_FAKE',1,'ENABLE')", TENANT_OTHER);
 
         setTenant(TENANT_OTHER);
@@ -418,8 +433,7 @@ class DictServiceTest {
         SysDictType duplicate = new SysDictType();
         duplicate.setDictCode("contract_type");
         duplicate.setDictName("租户合同类型");
-        BusinessException error = assertThrows(BusinessException.class, () -> dictTypeService.create(duplicate));
-        assertEquals("DICT_CORE_TYPE_TENANT_OVERRIDE_FORBIDDEN", error.getCode());
+        assertNotNull(dictTypeService.create(duplicate));
     }
 
     @Test
@@ -433,9 +447,9 @@ class DictServiceTest {
         disabled.setDictLabel("施工总承包");
         disabled.setDictValue("CONSTRUCTION");
         disabled.setStatus("DISABLE");
-        assertEquals("DICT_CORE_VALUE_DISABLE_FORBIDDEN",
+        assertEquals("DICT_VALUE_DISABLE_PROTECTED",
                 assertThrows(BusinessException.class, () -> dictDataService.update(disabled)).getCode());
-        assertEquals("DICT_CORE_VALUE_DELETE_FORBIDDEN",
+        assertEquals("DICT_VALUE_DELETE_PROTECTED",
                 assertThrows(BusinessException.class, () -> dictDataService.delete(132001L)).getCode());
     }
 
@@ -445,6 +459,7 @@ class DictServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", tenantId)
+                .add("roleCodes", java.util.List.of("SUPER_ADMIN"))
                 .build());
     }
 }

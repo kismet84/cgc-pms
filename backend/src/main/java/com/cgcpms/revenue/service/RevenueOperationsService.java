@@ -8,6 +8,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.*;
 import com.cgcpms.revenue.vo.RevenueOperationsVOs.*;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -32,6 +33,7 @@ public class RevenueOperationsService {
     private final EntryGenerator entryGenerator;
     private final ProjectAccessChecker projectAccessChecker;
     private final AccountingPeriodGuard periodGuard;
+    private final SysDictDataService sysDictDataService;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createSettlement(OwnerSettlementRequest request) {
@@ -144,6 +146,8 @@ public class RevenueOperationsService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createSalesInvoice(SalesInvoiceRequest request) {
         requireRevenueContract(request.projectId(), request.contractId(), request.customerId());
+        String invoiceType = sysDictDataService.requireEnabledValue(
+                "invoice_type", request.invoiceType(), "INVOICE_TYPE_INVALID", "发票类型不合法");
         BigDecimal total = money(request.amountWithoutTax()).add(money(request.taxAmount()));
         BigDecimal allocationTotal = allocationTotal(request.allocations());
         if (total.signum() <= 0 || allocationTotal.compareTo(total) != 0) {
@@ -158,7 +162,7 @@ public class RevenueOperationsService {
                      attachment_count,version,created_by,created_at,updated_by,updated_at,deleted_flag,remark)
                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'FULLY_ALLOCATED','UNVERIFIED',?,0,?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,?)
                     """, id, tenant(), request.projectId(), request.contractId(), request.customerId(), request.invoiceCode(),
-                    request.invoiceNo().trim(), request.invoiceType().trim().toUpperCase(), request.invoiceDate(),
+                    request.invoiceNo().trim(), invoiceType, request.invoiceDate(),
                     money(request.amountWithoutTax()), money(request.taxAmount()), total, total,
                     request.attachmentCount() == null ? 0 : request.attachmentCount(), user(), user(), request.remark());
             for (AmountAllocation allocation : request.allocations()) {

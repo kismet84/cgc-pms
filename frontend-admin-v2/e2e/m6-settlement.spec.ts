@@ -58,12 +58,13 @@ async function fulfill(route: Route, data: unknown, status = 200, code = '0') {
   })
 }
 
-async function selectOption(page: Page, scope: Locator, label: RegExp, option: RegExp) {
+async function selectOption(_page: Page, scope: Locator, label: RegExp, option: RegExp) {
   await expect(scope).toHaveCSS('transform', 'none')
-  await scope.getByRole('button', { name: label }).press('ArrowDown')
-  const choice = page.getByRole('option', { name: option })
-  await expect(choice).toBeVisible()
-  await choice.click()
+  const control = scope.getByRole('combobox', { name: label })
+  const choice = control.locator('option').filter({ hasText: option }).first()
+  const value = await choice.getAttribute('value')
+  expect(value).not.toBeNull()
+  await control.selectOption(value!)
 }
 
 async function install(page: Page, granted = permissions) {
@@ -86,6 +87,62 @@ async function install(page: Page, granted = permissions) {
     }),
   )
   await page.route('**/api/auth/refresh', (route) => fulfill(route, null, 401))
+  await page.route('**/api/system/dict/data/by-code/settlement_final_status', (route) =>
+    fulfill(route, [
+      {
+        id: '1',
+        dictTypeId: '1',
+        dictLabel: '草稿',
+        dictValue: 'DRAFT',
+        orderNum: 1,
+        status: 'ENABLE',
+      },
+      {
+        id: '2',
+        dictTypeId: '1',
+        dictLabel: '已定案',
+        dictValue: 'FINALIZED',
+        orderNum: 2,
+        status: 'ENABLE',
+      },
+    ]),
+  )
+  await page.route('**/api/system/dict/data/by-code/approval_status', (route) =>
+    fulfill(route, [
+      {
+        id: '3',
+        dictTypeId: '2',
+        dictLabel: '草稿',
+        dictValue: 'DRAFT',
+        orderNum: 1,
+        status: 'ENABLE',
+      },
+      {
+        id: '4',
+        dictTypeId: '2',
+        dictLabel: '审批中',
+        dictValue: 'APPROVING',
+        orderNum: 2,
+        status: 'ENABLE',
+      },
+      {
+        id: '5',
+        dictTypeId: '2',
+        dictLabel: '已通过',
+        dictValue: 'APPROVED',
+        orderNum: 3,
+        status: 'ENABLE',
+      },
+      {
+        id: '6',
+        dictTypeId: '2',
+        dictLabel: '已驳回',
+        dictValue: 'REJECTED',
+        orderNum: 4,
+        status: 'ENABLE',
+      },
+    ]),
+  )
   await page.route('**/api/project-context/options', (route) =>
     fulfill(route, [
       {
@@ -363,7 +420,7 @@ test.describe('M6 settlement V2', () => {
     await page.goto('/settlement/list?projectId=P1')
     await page.getByRole('button', { name: '新建结算' }).click()
     const form = page.getByRole('dialog', { name: '新建结算' })
-    await selectOption(page, form, /^分包合同：/, /SUB-2026-001 · 主体结构劳务分包合同/)
+    await selectOption(page, form, /^分包合同$/, /SUB-2026-001 · 主体结构劳务分包合同/)
     await form.getByLabel('终期扣款').fill('0.00')
     await form.getByRole('button', { name: '保存', exact: true }).dblclick()
     await expect(page).toHaveURL(/\/settlement\/list\?projectId=P1/)

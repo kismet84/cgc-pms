@@ -177,29 +177,6 @@ public class CodeGenerationService {
     // 内部逻辑
     // ---------------------------------------------------------------------
 
-    /**
-     * 核心生成逻辑（Lambda 路径）。
-     * <p>
-     * 使用 {@code Page(0, 1)} 取排序后的第一条记录，兼容 MySQL 和 H2。
-     * 当 {@code includeDeleted = true} 时，因 {@code @TableLogic} 拦截器
-     * 无法通过 Wrapper API 绕过，使用 {@code selectList} 兜底并记录警告。
-     * </p>
-     */
-    private <T> String generateNextCode(BaseMapper<T> mapper,
-                                        LambdaQueryWrapper<T> wrapper,
-                                        String fullPrefix,
-                                        Long tenantId,
-                                        boolean includeDeleted,
-                                        SFunction<T, String> codeGetter) {
-        if (includeDeleted) {
-            return generateWithDeleted(mapper, wrapper, fullPrefix, tenantId, codeGetter);
-        }
-
-        Page<T> page = new Page<>(0, 1);
-        Page<T> result = mapper.selectPage(page, wrapper);
-        return parseSeq(result.getRecords(), fullPrefix, codeGetter);
-    }
-
     private <T> String generateNextCodeStr(BaseMapper<T> mapper,
                                            QueryWrapper<T> wrapper,
                                            String fullPrefix,

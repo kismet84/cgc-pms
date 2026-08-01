@@ -58,7 +58,7 @@
 | S11 | 分页 | 分页列表固定 `pageSize=10`，顺序为“上一页 — 第 N 页 — 下一页”。 | P0 |
 | S12 | 筛选 | 搜索与筛选进入标题栏，保留可访问名称；页面不得复制公共壳筛选或自建下拉层。 | P1 |
 | S13 | 表单控件 | 文本、搜索和下拉复用 `V2Input`、`V2Select`；日期、数字、文件、复选、单选和多行文本可使用原生语义控件。 | P0 |
-| S14 | 按钮与菜单 | 页面操作复用 `V2Button`；标题与行内操作使用 `size="small"`；超过两个动作使用 `V2ActionMenu`；业务弹窗页脚禁止 `V2GlassButton`。 | P0 |
+| S14 | 按钮与菜单 | 页面操作复用 `V2Button`；标题与行内操作使用 `size="small"`；超过两个动作使用 `V2ActionMenu`。 | P0 |
 | S15 | 标准弹窗 | 新建、编辑、只读详情复用 `V2Dialog`；确认复用 `V2ConfirmDialog`；禁止 `window.confirm` 和私有弹窗壳。 | P0 |
 | S16 | 弹窗安全 | 只读查看允许点击遮罩、Escape或关闭按钮退出；新建、编辑和写入态禁止遮罩与Escape关闭，只能由关闭、取消、保存或提交等明确按钮结束。 | P0 |
 | S17 | 详情形态 | 完整对象查看统一使用 `v2-detail-dialog` 覆盖原台账；详情路由继续提供深链和刷新恢复，关闭后返回原列表状态；禁止列表下方内联完整详情。 | P0 |
@@ -76,13 +76,13 @@
 
 现行公共出口：
 
-`V2ActionMenu`、`V2Alert`、`V2Badge`、`V2Button`、`V2Card`、`V2Cluster`、`V2ConfirmDialog`、`V2Dialog`、`V2ErrorBoundary`、`V2GlassButton`、`V2Grid`、`V2Input`、`V2PageState`、`V2Select`、`V2Skeleton`、`V2Stack`、`V2ToastHost`、`showToast`、`useToastMessage`。
+`V2ActionMenu`、`V2Alert`、`V2Badge`、`V2Button`、`V2Card`、`V2Cluster`、`V2ConfirmDialog`、`V2Dialog`、`V2ErrorBoundary`、`V2Input`、`V2PageState`、`V2Pagination`、`V2Select`、`V2Skeleton`、`V2Stack`、`V2ToastHost`、`showToast`、`useToastMessage`。
 
 使用边界：
 
-- `V2GlassButton` 只允许设计预览和明确批准的只读上下文次操作；业务页面标题区、筛选区、表格、正文和弹窗页脚均使用 `V2Button`。
 - `V2ConfirmDialog` 使用普通或危险语义按钮，不改成玻璃材质。
 - `V2Dialog` 自动提供标准壳；页面只追加已登记的 `v2-dialog-standard`、`v2-detail-dialog`、`v2-dialog-wide`、`v2-dialog-bottom-sheet`。
+- 顶层列表分页复用 `V2Pagination`，默认且固定每页 10 条；即使只有一页，也保留总数和禁用态翻页控件。
 - 详情统一复用 `v2-detail-dialog__section`、`__facts`、`__table`、`__actions`、`__form-row`；禁止嵌套 `V2Card`。
 - 弹窗页脚次操作在左、主操作在右，同尺寸、同基线，使用共享半透明液态背景且只保留顶部分隔线。
 

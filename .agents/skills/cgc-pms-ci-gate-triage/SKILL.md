@@ -23,6 +23,13 @@ description: 用于 cgc-pms 的统一失败分类、GitHub Actions、PR 与 CI �
 
 先分类，再决定重试、修复或阻塞；相同前置和参数下禁止原样重试。历史旧值只读兼容，不得继续写入。
 
+### PowerShell 与 ripgrep 调用
+
+1. PowerShell 中禁止使用 Bash/C 风格的反斜杠转义双引号；`\"` 不会转义 PowerShell 双引号。包含双引号的检索表达式必须使用 PowerShell 单引号字面量。
+2. 精确文本检索使用 `rg -F`，每个目标通过独立 `-e 'literal'` 传入；只有确需正则语义时才使用正则，不把多个含引号目标拼成双引号包裹的 alternation。
+3. 构建/测试与证据检索分开执行，避免后置检索的退出码覆盖已成功门禁；需要顺序短路时显式检查 `$LASTEXITCODE`。
+4. `regex parse error`、`Unexpected token`、`string is missing the terminator` 归类 `tool_invocation`。保留此前已成功步骤的客观证据，改用单引号或 `rg -F -e` 后只做一次最小复验，同时核对退出码与命中结果。
+
 ## CI 分诊
 
 1. 收集 workflow、job、step、分支、HEAD SHA、失败关键词和本地/远端差异。

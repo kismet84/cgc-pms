@@ -111,6 +111,34 @@ async function installApprovalMock(page: Page): Promise<void> {
   )
   await page.route('**/api/auth/refresh', (route) => fulfill(route, null, 401))
   await page.route('**/api/project-context/options', (route) => fulfill(route, []))
+  await page.route('**/api/system/dict/data/by-code/wf_instance_status', (route) =>
+    fulfill(route, [
+      {
+        id: '1',
+        dictTypeId: '1',
+        dictLabel: '审批中',
+        dictValue: 'RUNNING',
+        orderNum: 1,
+        status: 'ENABLE',
+      },
+      {
+        id: '2',
+        dictTypeId: '1',
+        dictLabel: '已通过',
+        dictValue: 'APPROVED',
+        orderNum: 2,
+        status: 'ENABLE',
+      },
+      {
+        id: '3',
+        dictTypeId: '1',
+        dictLabel: '已驳回',
+        dictValue: 'REJECTED',
+        orderNum: 3,
+        status: 'ENABLE',
+      },
+    ]),
+  )
   await page.route(/\/api\/workflow\/business-types(?:\?.*)?$/, (route) =>
     fulfill(route, ['PAY_REQUEST']),
   )

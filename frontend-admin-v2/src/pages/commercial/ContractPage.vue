@@ -208,8 +208,6 @@ function emptyCommand(): ContractSaveCommand {
       partyAId: '',
       partyBId: '',
       contractAmount: '',
-      currentAmount: '',
-      paidAmount: '',
       taxRate: '',
       taxAmount: '',
       amountWithoutTax: '',
@@ -218,7 +216,6 @@ function emptyCommand(): ContractSaveCommand {
       endDate: '',
       paymentMethod: '',
       settlementMethod: '',
-      settlementAmount: '',
       version: '',
       remark: '',
     },
@@ -268,8 +265,6 @@ function cloneCommandFromDetail(value: ContractCompositeRecord): ContractSaveCom
       partyAId: value.contract.partyAId,
       partyBId: value.contract.partyBId,
       contractAmount: value.contract.contractAmount ?? '',
-      currentAmount: value.contract.currentAmount ?? '',
-      paidAmount: value.contract.paidAmount ?? '',
       taxRate: value.contract.taxRate ?? '',
       taxAmount: value.contract.taxAmount ?? '',
       amountWithoutTax: value.contract.amountWithoutTax ?? '',
@@ -278,7 +273,6 @@ function cloneCommandFromDetail(value: ContractCompositeRecord): ContractSaveCom
       endDate: value.contract.endDate ?? '',
       paymentMethod: value.contract.paymentMethod ?? '',
       settlementMethod: value.contract.settlementMethod ?? '',
-      settlementAmount: value.contract.settlementAmount ?? '',
       version: value.contract.version ?? '',
       remark: value.contract.remark ?? '',
     },
@@ -580,8 +574,6 @@ function sanitizeCommand(value: ContractSaveCommand): ContractSaveCommand {
       partyAId: cleaned(value.contract.partyAId),
       partyBId: cleaned(value.contract.partyBId),
       contractAmount: cleaned(value.contract.contractAmount),
-      currentAmount: cleaned(value.contract.currentAmount),
-      paidAmount: cleaned(value.contract.paidAmount),
       taxRate: cleaned(value.contract.taxRate),
       taxAmount: cleaned(value.contract.taxAmount),
       amountWithoutTax: cleaned(value.contract.amountWithoutTax),
@@ -590,7 +582,6 @@ function sanitizeCommand(value: ContractSaveCommand): ContractSaveCommand {
       endDate: cleaned(value.contract.endDate),
       paymentMethod: cleaned(value.contract.paymentMethod),
       settlementMethod: cleaned(value.contract.settlementMethod),
-      settlementAmount: cleaned(value.contract.settlementAmount),
       version: cleaned(String(value.contract.version ?? '')),
       remark: cleaned(value.contract.remark),
     },
@@ -894,7 +885,7 @@ onBeforeUnmount(() => {
           </table>
         </div>
 
-        <template v-if="contracts.length" #footer>
+        <template #footer>
           <nav class="contract-page__pagination" aria-label="合同分页">
             <span>共 {{ total }} 条</span>
             <V2Button

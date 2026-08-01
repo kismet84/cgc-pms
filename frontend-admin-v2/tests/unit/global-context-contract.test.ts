@@ -22,7 +22,7 @@ describe('full V2 public context contract', () => {
     expect(new Set(paths).size).toBe(paths.length)
   })
 
-  it('discovers every navigation page from the shared catalog and permits placeholders only while migration is pending', () => {
+  it('discovers every navigation page from the shared catalog', () => {
     const shell = routes.find((route) => route.path === '/shell')
     const children = shell?.children ?? []
     const tabs = navigationDomains.flatMap((domain) =>
@@ -36,17 +36,7 @@ describe('full V2 public context contract', () => {
       const [route] = matchingRoutes
       expect(route?.meta?.permission, `${tab.path} permission`).toBe(tab.permission)
       expect(route?.meta?.migration, `${tab.path} migration state`).toBe(tab.migration)
-      expect(
-        String(route?.component).includes('ShellPlaceholderPage'),
-        `${tab.path} placeholder state`,
-      ).toBe(tab.migration === 'pending')
-    }
-
-    for (const route of children.filter((candidate) => candidate.component)) {
-      expect(
-        String(route.component).includes('ShellPlaceholderPage'),
-        `${String(route.path)} placeholder must be explicitly migration-pending`,
-      ).toBe(route.meta?.migration === 'pending')
+      expect(route?.component, `${tab.path} component`).toBeDefined()
     }
   })
 

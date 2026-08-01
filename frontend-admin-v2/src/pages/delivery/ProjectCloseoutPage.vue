@@ -25,6 +25,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
   showToast,
   useToastMessage,
@@ -101,6 +102,11 @@ const successMessage = useToastMessage()
 const dialog = ref<DialogKind>(null)
 const overview = ref<CloseoutOverview | null>(null)
 const scopedOverviews = ref<ScopedCloseoutOverview[]>([])
+const pageSize = 10
+const pageNo = ref(1)
+const pagedScopedOverviews = computed(() =>
+  scopedOverviews.value.slice((pageNo.value - 1) * pageSize, pageNo.value * pageSize),
+)
 const trace = ref<CloseoutTrace | null>(null)
 const traceFiles = ref<EvidenceGroup[]>([])
 const pendingEvidence = ref<PendingEvidence | null>(null)
@@ -378,6 +384,7 @@ function hasCloseoutData(item: CloseoutOverview): boolean {
 }
 
 async function loadProject(preserveNotice = false): Promise<void> {
+  pageNo.value = 1
   projectController?.abort()
   traceController?.abort()
   const requestGeneration = ++generation
@@ -680,7 +687,7 @@ onBeforeUnmount(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in scopedOverviews" :key="item.projectId">
+              <tr v-for="item in pagedScopedOverviews" :key="item.projectId">
                 <th scope="row">
                   <V2Button
                     v-if="item.overview.closeout"
@@ -711,6 +718,13 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            v-model:page-no="pageNo"
+            :total="scopedOverviews.length"
+            label="全部项目收尾概览分页"
+          />
+        </template>
       </V2Card>
 
       <V2Card

@@ -9,6 +9,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
 } from '@/components'
 import { showToast } from '@/components/toast'
@@ -61,6 +62,7 @@ import {
 } from '@/services/finance'
 import { uploadSiteFile } from '@/services/delivery'
 import { loadReceiptItems, loadReceipts } from '@/services/supply-chain'
+import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 import type {
@@ -92,6 +94,7 @@ type RevenueRow =
   | (ReceivableRecord & { kind: 'receivable' })
   | (SalesInvoiceRecord & { kind: 'salesInvoice' })
   | (CollectionRecord & { kind: 'collection' })
+type RevenueKind = RevenueRow['kind']
 type Row = RecordRow | RevenueRow
 type Action = 'delete' | 'submit' | 'verify' | 'credit' | 'reverse'
 
@@ -163,10 +166,10 @@ const emptyEditor = (): FinanceEditor => ({
   projectId: '',
   contractId: '',
   partnerId: '',
-  payType: 'FINAL',
+  payType: '',
   applyAmount: '',
   applyReason: '',
-  expenseCategory: 'CONTRACT',
+  expenseCategory: '',
   costSubjectId: '',
   budgetLineId: '',
   sourceType: '',
@@ -178,7 +181,7 @@ const emptyEditor = (): FinanceEditor => ({
   description: '',
   payRecordId: '',
   invoiceNo: '',
-  invoiceType: 'VAT_SPECIAL',
+  invoiceType: '',
   invoiceAmount: '',
   taxRate: '',
   taxAmount: '',
@@ -247,28 +250,35 @@ const canDirectPayment = computed(() => session.hasPermission('payment:direct'))
 
 const rows = ref<RecordRow[]>([])
 const revenueRows = ref<RevenueRow[]>([])
-const revenueSections = computed(() => [
-  {
-    key: 'settlement',
-    title: '业主结算',
-    rows: revenueRows.value.filter((row) => row.kind === 'settlement'),
-  },
-  {
-    key: 'receivable',
-    title: '应收款',
-    rows: revenueRows.value.filter((row) => row.kind === 'receivable'),
-  },
-  {
-    key: 'salesInvoice',
-    title: '销项发票',
-    rows: revenueRows.value.filter((row) => row.kind === 'salesInvoice'),
-  },
-  {
-    key: 'collection',
-    title: '回款',
-    rows: revenueRows.value.filter((row) => row.kind === 'collection'),
-  },
-])
+const pageSize = 10
+const pageNo = ref(1)
+const total = ref(0)
+const revenuePageNo = ref<Record<RevenueKind, number>>({
+  settlement: 1,
+  receivable: 1,
+  salesInvoice: 1,
+  collection: 1,
+})
+const revenueSections = computed(() =>
+  (
+    [
+      ['settlement', '业主结算'],
+      ['receivable', '应收款'],
+      ['salesInvoice', '销项发票'],
+      ['collection', '回款'],
+    ] as const
+  ).map(([key, title]) => {
+    const allRows = revenueRows.value.filter((row) => row.kind === key)
+    const currentPage = revenuePageNo.value[key]
+    return {
+      key,
+      title,
+      total: allRows.length,
+      pageNo: currentPage,
+      rows: allRows.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    }
+  }),
+)
 const hasRows = computed(() => rows.value.length > 0 || revenueRows.value.length > 0)
 const loading = ref(false)
 const errorMessage = ref('')
@@ -285,6 +295,10 @@ const payRecords = ref<PayRecordOption[]>([])
 const fundAccounts = ref<FundAccountRecord[]>([])
 const paymentSources = ref<PaymentSourceOptionRecord[]>([])
 const receiptBasisOptions = ref<Array<{ value: string; label: string }>>([])
+const payTypes = ref<DictDataRecord[]>([])
+const expenseCategories = ref<DictDataRecord[]>([])
+const invoiceTypes = ref<DictDataRecord[]>([])
+const payMethods = ref<DictDataRecord[]>([])
 const paymentAttachment = ref<File | null>(null)
 const expenseAttachment = ref<File | null>(null)
 const invoiceAttachment = ref<File | null>(null)
@@ -298,6 +312,7 @@ const writebackEditor = ref<WritebackEditor | null>(null)
 const reversalTarget = ref<PayRecordOption | null>(null)
 const reversalEditor = ref<ReversalEditor | null>(null)
 let controller: AbortController | null = null
+let dictionariesLoaded = false
 
 const text = (row: Row) =>
   'applyCode' in row
@@ -345,17 +360,26 @@ const canVerify = (row: RecordRow) =>
 const paymentRecord = (row: PaymentApplicationRecord) =>
   payRecords.value.find((record) => record.payApplicationId === row.id)
 
-async function load(): Promise<void> {
+async function load(preservePage = false): Promise<void> {
   if (!canQuery.value) return
+  if (!preservePage) pageNo.value = 1
+  revenuePageNo.value = { settlement: 1, receivable: 1, salesInvoice: 1, collection: 1 }
   controller?.abort()
   const request = new AbortController()
   controller = request
   loading.value = true
   errorMessage.value = ''
   try {
-    const query = { projectId: projectId.value || undefined }
+    await loadDictionaries(request.signal)
+    const query = {
+      projectId: projectId.value || undefined,
+      pageNo: pageNo.value,
+      pageSize,
+    }
+    const revenueQuery = { projectId: projectId.value || undefined }
     rows.value = []
     revenueRows.value = []
+    total.value = 0
     if (mode.value === 'payment') {
       const [applications, records] = await Promise.all([
         loadPaymentApplications(query, request.signal),
@@ -363,18 +387,41 @@ async function load(): Promise<void> {
           ? loadPayRecordOptions(request.signal)
           : Promise.resolve({ records: [], total: 0 }),
       ])
+      const maxPage = Math.max(1, Math.ceil(applications.total / pageSize))
+      if (pageNo.value > maxPage) {
+        pageNo.value = maxPage
+        await load(true)
+        return
+      }
       rows.value = applications.records
+      total.value = applications.total
       payRecords.value = records.records
     } else if (mode.value === 'expense') {
-      rows.value = (await loadExpenseApplications(query, request.signal)).records
+      const page = await loadExpenseApplications(query, request.signal)
+      const maxPage = Math.max(1, Math.ceil(page.total / pageSize))
+      if (pageNo.value > maxPage) {
+        pageNo.value = maxPage
+        await load(true)
+        return
+      }
+      rows.value = page.records
+      total.value = page.total
     } else if (mode.value === 'invoice') {
-      rows.value = (await loadInvoices(query, request.signal)).records
+      const page = await loadInvoices(query, request.signal)
+      const maxPage = Math.max(1, Math.ceil(page.total / pageSize))
+      if (pageNo.value > maxPage) {
+        pageNo.value = maxPage
+        await load(true)
+        return
+      }
+      rows.value = page.records
+      total.value = page.total
     } else {
       const [settlements, receivables, salesInvoices, collections] = await Promise.all([
-        loadRevenueSettlements(query, request.signal),
-        loadReceivables(query, request.signal),
-        loadSalesInvoices(query, request.signal),
-        loadCollections(query, request.signal),
+        loadRevenueSettlements(revenueQuery, request.signal),
+        loadReceivables(revenueQuery, request.signal),
+        loadSalesInvoices(revenueQuery, request.signal),
+        loadCollections(revenueQuery, request.signal),
       ])
       revenueRows.value = [
         ...settlements.map((item) => ({ ...item, kind: 'settlement' as const })),
@@ -395,6 +442,16 @@ async function load(): Promise<void> {
 async function refreshWorkspace(): Promise<void> {
   await load()
   if (!errorMessage.value) showToast('success', '刷新完成', '已读取最新数据。')
+}
+
+function setRevenuePage(kind: RevenueKind, next: number): void {
+  revenuePageNo.value[kind] = next
+}
+
+function changePage(next: number): void {
+  if (next < 1 || (next - 1) * pageSize >= total.value) return
+  pageNo.value = next
+  void load(true)
 }
 
 const projectOptions = computed(() => workspace.projects)
@@ -473,21 +530,33 @@ const receivableOptions = computed(() =>
       label: `${item.receivableCode} · 可分配 ${formatAmount(item.outstandingAmount)}`,
     })),
 )
-const payTypeOptions = [
-  { value: 'FINAL', label: '结算付款' },
-  { value: 'PROGRESS', label: '进度付款' },
-]
-const expenseCategoryOptions = [
-  { value: 'CONTRACT', label: '合同费用' },
-  { value: 'MATERIAL', label: '材料费用' },
-  { value: 'LABOR', label: '人工费用' },
-  { value: 'OTHER', label: '其他费用' },
-]
-const invoiceTypeOptions = [
-  { value: 'VAT_SPECIAL', label: '增值税专用发票' },
-  { value: 'VAT_NORMAL', label: '增值税普通发票' },
-  { value: 'OTHER', label: '其他票据' },
-]
+const dictionaryOptions = (rows: DictDataRecord[]) =>
+  rows.map((item) => ({ value: item.dictValue, label: item.dictLabel }))
+const payTypeOptions = computed(() => dictionaryOptions(payTypes.value))
+const expenseCategoryOptions = computed(() => dictionaryOptions(expenseCategories.value))
+const invoiceTypeOptions = computed(() => dictionaryOptions(invoiceTypes.value))
+const payMethodOptions = computed(() => dictionaryOptions(payMethods.value))
+
+async function loadDictionaries(signal?: AbortSignal): Promise<void> {
+  if (dictionariesLoaded) return
+  const [nextPayTypes, nextExpenseCategories, nextInvoiceTypes, nextPayMethods] = await Promise.all(
+    [
+      loadEnabledDictDataByCode('pay_type', signal),
+      loadEnabledDictDataByCode('expense_category', signal),
+      loadEnabledDictDataByCode('invoice_type', signal),
+      loadEnabledDictDataByCode('pay_method', signal),
+    ],
+  )
+  payTypes.value = nextPayTypes
+  expenseCategories.value = nextExpenseCategories
+  invoiceTypes.value = nextInvoiceTypes
+  payMethods.value = nextPayMethods
+  dictionariesLoaded = true
+}
+
+function defaultOption(options: Array<{ value: string }>, preferred: string): string {
+  return options.some((item) => item.value === preferred) ? preferred : (options[0]?.value ?? '')
+}
 
 async function loadContracts(value: string): Promise<void> {
   contracts.value = []
@@ -615,6 +684,14 @@ async function loadCandidates(kind: EditorKind): Promise<void> {
 }
 
 async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
+  try {
+    await loadDictionaries()
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : '请稍后重试。'
+    errorMessage.value = message
+    showToast('error', '业务字典加载失败', message)
+    return
+  }
   const value = emptyEditor()
   editorKind.value = kind
   paymentAttachment.value = null
@@ -626,7 +703,12 @@ async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
   paymentSources.value = []
   receiptBasisOptions.value = []
   value.projectId = row?.projectId || projectId.value
-  if (kind === 'payment') value.expenseCategory = 'SUBCONTRACT'
+  value.payType = defaultOption(payTypeOptions.value, 'FINAL')
+  value.expenseCategory = defaultOption(
+    expenseCategoryOptions.value,
+    kind === 'payment' ? 'SUBCONTRACT' : 'CONTRACT',
+  )
+  value.invoiceType = defaultOption(invoiceTypeOptions.value, 'VAT_SPECIAL')
   if (row) {
     value.id = row.id
     value.contractId = row.contractId || ''
@@ -635,7 +717,8 @@ async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
       value.payType = row.payType
       value.applyAmount = row.applyAmount
       value.applyReason = row.applyReason || ''
-      value.expenseCategory = row.expenseCategory || 'CONTRACT'
+      value.expenseCategory =
+        row.expenseCategory || defaultOption(expenseCategoryOptions.value, 'CONTRACT')
     } else if ('expenseCode' in row) {
       value.costSubjectId = row.costSubjectId || ''
       value.budgetLineId = row.budgetLineId || ''
@@ -647,7 +730,7 @@ async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
     } else {
       value.payRecordId = row.payRecordId || ''
       value.invoiceNo = row.invoiceNo
-      value.invoiceType = row.invoiceType || 'VAT_SPECIAL'
+      value.invoiceType = row.invoiceType || defaultOption(invoiceTypeOptions.value, 'VAT_SPECIAL')
       value.invoiceAmount = row.invoiceAmount
       value.taxRate = row.taxRate || ''
       value.taxAmount = row.taxAmount || ''
@@ -699,19 +782,24 @@ function openEdit(row: RecordRow): void {
 async function openWriteback(row: PaymentApplicationRecord): Promise<void> {
   busy.value = true
   try {
-    fundAccounts.value = await loadFundAccounts()
+    const [accounts] = await Promise.all([loadFundAccounts(), loadDictionaries()])
+    fundAccounts.value = accounts
     writebackTarget.value = row
     writebackEditor.value = {
       payAmount: row.approvedAmount,
       paidAt: '',
       fundAccountId: '',
-      payMethod: 'BANK_TRANSFER',
+      payMethod: defaultOption(payMethodOptions.value, 'BANK_TRANSFER'),
       voucherNo: '',
       externalTxnNo: '',
       remark: '',
     }
   } catch (cause) {
-    showToast('error', '资金账户加载失败', cause instanceof Error ? cause.message : '请稍后重试。')
+    showToast(
+      'error',
+      '付款候选项加载失败',
+      cause instanceof Error ? cause.message : '请稍后重试。',
+    )
   } finally {
     busy.value = false
   }
@@ -1228,6 +1316,15 @@ onBeforeUnmount(() => controller?.abort())
                 </tbody>
               </table>
             </div>
+            <template #footer>
+              <V2Pagination
+                :total="section.total"
+                :page-no="section.pageNo"
+                :page-size="pageSize"
+                :label="`${section.title}分页`"
+                @update:page-no="setRevenuePage(section.key, $event)"
+              />
+            </template>
           </V2Card>
         </section>
       </section>
@@ -1319,6 +1416,16 @@ onBeforeUnmount(() => controller?.abort())
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            :total="total"
+            :page-no="pageNo"
+            :page-size="pageSize"
+            :label="`${title}分页`"
+            :disabled="loading"
+            @update:page-no="changePage"
+          />
+        </template>
       </V2Card>
 
       <V2Dialog
@@ -1642,10 +1749,7 @@ onBeforeUnmount(() => controller?.abort())
           <V2Select
             v-model="writebackEditor.payMethod"
             label="付款方式"
-            :options="[
-              { value: 'BANK_TRANSFER', label: '银行转账' },
-              { value: 'OTHER', label: '其他' },
-            ]"
+            :options="payMethodOptions"
             required
           />
           <V2Input v-model="writebackEditor.voucherNo" label="凭证号" />

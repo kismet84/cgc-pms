@@ -2,6 +2,7 @@ package com.cgcpms.payment;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -20,6 +21,7 @@ import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
@@ -32,6 +34,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -61,22 +64,10 @@ class PayApplicationCodeRetryTest {
         contract.setTenantId(0L);
         contract.setProjectId(10001L);
         when(contractMapper.selectById(30001L)).thenReturn(contract);
-        PayApplicationService service = new PayApplicationService(
-                mapper,
-                mock(PayApplicationBasisMapper.class),
-                mock(PmProjectMapper.class),
-                contractMapper,
-                mock(MdPartnerMapper.class),
-                mock(MatReceiptItemMapper.class),
-                mock(SubMeasureItemMapper.class),
-                mock(MatReceiptMapper.class),
-                mock(SubMeasureMapper.class),
-                mock(CtContractPaymentTermMapper.class),
-                mock(PayRecordMapper.class),
-                mock(ProjectAccessChecker.class),
-                mock(PaymentApplicationIntegrityService.class),
-                mock(PaymentApplicationSourceService.class),
-                mock(WorkflowEngine.class));
+        SysDictDataService dictDataService = mock(SysDictDataService.class);
+        when(dictDataService.requireEnabledValue(any(), any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        PayApplicationService service = newService(mapper, contractMapper, dictDataService);
 
         String prefix = "PAY-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         PayApplication last = new PayApplication();
@@ -95,9 +86,74 @@ class PayApplicationCodeRetryTest {
         PayApplication app = new PayApplication();
         app.setProjectId(10001L);
         app.setContractId(30001L);
+        app.setPayType("PROGRESS");
         Long id = service.create(app);
 
         assertEquals(42L, id);
         assertEquals(prefix + "003", app.getApplyCode());
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void submitRejectsPayTypeDisabledAfterDraftCreation() {
+        UserContext.set(Jwts.claims()
+                .add("userId", 1L)
+                .add("username", "admin")
+                .add("tenantId", 0L)
+                .build());
+
+        PayApplicationMapper mapper = mock(PayApplicationMapper.class);
+        CtContractMapper contractMapper = mock(CtContractMapper.class);
+        CtContract contract = new CtContract();
+        contract.setTenantId(0L);
+        contract.setProjectId(10001L);
+        when(contractMapper.selectById(30001L)).thenReturn(contract);
+        SysDictDataService dictDataService = mock(SysDictDataService.class);
+        when(dictDataService.requireEnabledValue(any(), any(), any(), any()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        PayApplicationService service = newService(mapper, contractMapper, dictDataService);
+
+        Page<PayApplication> emptyPage = new Page<>(0, 1);
+        emptyPage.setRecords(List.of());
+        when(mapper.selectPage(any(Page.class), any())).thenReturn(emptyPage);
+        doAnswer(invocation -> {
+            PayApplication app = invocation.getArgument(0);
+            app.setId(43L);
+            return 1;
+        }).when(mapper).insert(any(PayApplication.class));
+
+        PayApplication app = new PayApplication();
+        app.setProjectId(10001L);
+        app.setContractId(30001L);
+        app.setPayType("PROGRESS");
+        assertEquals(43L, service.create(app));
+        when(mapper.selectById(43L)).thenReturn(app);
+        when(dictDataService.requireEnabledValue(any(), any(), any(), any()))
+                .thenThrow(new BusinessException("PAY_TYPE_INVALID", "付款类型不合法"));
+
+        assertEquals("PAY_TYPE_INVALID",
+                assertThrows(BusinessException.class, () -> service.submitForApproval(43L)).getCode());
+    }
+
+    private PayApplicationService newService(PayApplicationMapper mapper,
+                                             CtContractMapper contractMapper,
+                                             SysDictDataService dictDataService) {
+        return new PayApplicationService(
+                mapper,
+                mock(PayApplicationBasisMapper.class),
+                mock(PmProjectMapper.class),
+                contractMapper,
+                mock(MdPartnerMapper.class),
+                mock(MatReceiptItemMapper.class),
+                mock(SubMeasureItemMapper.class),
+                mock(MatReceiptMapper.class),
+                mock(SubMeasureMapper.class),
+                mock(CtContractPaymentTermMapper.class),
+                mock(PayRecordMapper.class),
+                mock(ProjectAccessChecker.class),
+                mock(PaymentApplicationIntegrityService.class),
+                mock(PaymentApplicationSourceService.class),
+                dictDataService,
+                mock(WorkflowEngine.class));
     }
 }

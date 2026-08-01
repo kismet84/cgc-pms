@@ -8,6 +8,7 @@ import com.cgcpms.revenue.service.RevenueOperationsService;
 import com.cgcpms.revenue.service.RevenueAdvancedService;
 import com.cgcpms.financeops.dto.FinanceOperationsModels.BankReceiptRequest;
 import com.cgcpms.financeops.service.FinanceIntegrationService;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -29,6 +30,7 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = "spring.main.allow-circular-references=true")
 @ActiveProfiles("local")
@@ -46,9 +48,18 @@ class RevenueCollectionClosedLoopIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired WfInstanceMapper wfInstanceMapper;
     @MockitoBean WorkflowEngine workflowEngine;
+    @MockitoBean SysDictDataService sysDictDataService;
 
     @BeforeEach
     void setup() {
+        when(sysDictDataService.requireEnabledValue(anyString(), any(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    String value = invocation.getArgument(1);
+                    if (value == null || value.isBlank() || "SPECIAL".equalsIgnoreCase(value)) {
+                        throw new BusinessException(invocation.getArgument(2), invocation.getArgument(3));
+                    }
+                    return value.trim().toUpperCase(java.util.Locale.ROOT);
+                });
         UserContext.set(Jwts.claims().subject("admin").add("userId",1L).add("username","admin")
                 .add("tenantId",0L).add("roleCodes", List.of("ADMIN")).build());
         cleanup();
@@ -104,7 +115,7 @@ class RevenueCollectionClosedLoopIntegrationTest {
         long progressReceivable = receivables.stream().filter(r -> "PROGRESS".equals(r.get("receivable_type")))
                 .map(r -> ((Number)r.get("id")).longValue()).findFirst().orElseThrow();
 
-        service.createSalesInvoice(new SalesInvoiceRequest(PROJECT,CONTRACT,CUSTOMER,"INV-CODE","INV-REV-001","SPECIAL",
+        service.createSalesInvoice(new SalesInvoiceRequest(PROJECT,CONTRACT,CUSTOMER,"INV-CODE","INV-REV-001","VAT_SPECIAL",
                 LocalDate.now(),new BigDecimal("600"),BigDecimal.ZERO,1,
                 List.of(new AmountAllocation(progressReceivable,new BigDecimal("600"))),"销项发票"));
 
@@ -148,11 +159,22 @@ class RevenueCollectionClosedLoopIntegrationTest {
     }
 
     @Test
+    void rejectsInvalidSalesInvoiceType() {
+        BusinessException exception = assertThrows(BusinessException.class, () ->
+                service.createSalesInvoice(new SalesInvoiceRequest(PROJECT, CONTRACT, CUSTOMER, null,
+                        "INV-REV-INVALID-TYPE", "SPECIAL", LocalDate.now(), new BigDecimal("100"),
+                        BigDecimal.ZERO, 1, List.of(), null)));
+        assertEquals("INVOICE_TYPE_INVALID", exception.getCode());
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sales_invoice WHERE invoice_no='INV-REV-INVALID-TYPE'", Integer.class));
+    }
+
+    @Test
     void p1ToP3OperationsAreAuditableAndIdempotent() {
         long ar=createReceivable("2026-09",new BigDecimal("500"));
         advanced.creditReceivable(ar,new ReceivableCreditRequest(new BigDecimal("50"),"业主核减","CREDIT-REV-1"));
         advanced.createSchedule(new CollectionScheduleRequest(PROJECT,CONTRACT,ar,LocalDate.now().plusDays(7),new BigDecimal("200"),3,"催收计划"));
-        var invoice=service.createSalesInvoice(new SalesInvoiceRequest(PROJECT,CONTRACT,CUSTOMER,null,"INV-REV-P2","SPECIAL",LocalDate.now(),new BigDecimal("200"),BigDecimal.ZERO,1,List.of(new AmountAllocation(ar,new BigDecimal("200"))),null));
+        var invoice=service.createSalesInvoice(new SalesInvoiceRequest(PROJECT,CONTRACT,CUSTOMER,null,"INV-REV-P2","VAT_SPECIAL",LocalDate.now(),new BigDecimal("200"),BigDecimal.ZERO,1,List.of(new AmountAllocation(ar,new BigDecimal("200"))),null));
         long invoiceId=((Number)invoice.get("id")).longValue();
         var collection=service.createCollection(new CollectionRequest(PROJECT,CONTRACT,CUSTOMER,ACCOUNT,"BANK-REV-P1",LocalDateTime.now(),new BigDecimal("200"),"测试业主",1,List.of(new AmountAllocation(ar,new BigDecimal("200"))),null));
         long collectionId=((Number)collection.get("id")).longValue();

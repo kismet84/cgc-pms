@@ -20,6 +20,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
   showToast,
   useToastMessage,
@@ -107,6 +108,20 @@ const target = ref<Target | null>(null)
 const evidence = ref<File | null>(null)
 const pendingEvidence = ref<PendingEvidence | null>(null)
 const activeTab = ref<TechnicalTab>('scheme')
+const pageSize = 10
+const pages = reactive({
+  schemes: 1,
+  drawings: 1,
+  versions: 1,
+  reviews: 1,
+  rfis: 1,
+  responses: 1,
+  disclosures: 1,
+  references: 1,
+  archives: 1,
+})
+const pageSlice = <T,>(rows: T[], pageNo: number) =>
+  rows.slice((pageNo - 1) * pageSize, pageNo * pageSize)
 let projectController: AbortController | null = null
 let traceController: AbortController | null = null
 let generation = 0
@@ -154,6 +169,18 @@ const prioritizedRfis = computed(() =>
       Number(['CLOSED', 'CANCELLED'].includes(right.status)),
   ),
 )
+const pagedSchemes = computed(() => pageSlice(overview.value.schemes, pages.schemes))
+const pagedDrawings = computed(() => pageSlice(overview.value.drawings, pages.drawings))
+const pagedVersions = computed(() => pageSlice(overview.value.versions, pages.versions))
+const pagedReviews = computed(() => pageSlice(overview.value.reviews, pages.reviews))
+const pagedRfis = computed(() => pageSlice(prioritizedRfis.value, pages.rfis))
+const pagedResponses = computed(() => pageSlice(overview.value.responses, pages.responses))
+const pagedDisclosures = computed(() => pageSlice(overview.value.disclosures, pages.disclosures))
+const pagedReferences = computed(() => pageSlice(availableReferences.value, pages.references))
+const pagedArchives = computed(() => pageSlice(overview.value.archives, pages.archives))
+function resetPages(): void {
+  for (const key of Object.keys(pages) as Array<keyof typeof pages>) pages[key] = 1
+}
 const visibleTabs = computed(() => [
   { value: 'scheme', label: '技术方案', count: overview.value.schemes.length },
   { value: 'drawing', label: '图纸管理', count: overview.value.drawings.length },
@@ -271,6 +298,7 @@ function versionLabel(id?: string | null): string {
 }
 
 async function loadProject(preserveNotice = false): Promise<void> {
+  resetPages()
   projectController?.abort()
   traceController?.abort()
   const requestGeneration = ++generation
@@ -555,6 +583,7 @@ watch(
   () => void loadProject(),
   { immediate: true },
 )
+watch(activeTab, resetPages)
 onBeforeUnmount(() => {
   projectController?.abort()
   traceController?.abort()
@@ -679,7 +708,7 @@ onBeforeUnmount(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in overview.schemes" :key="item.id">
+              <tr v-for="item in pagedSchemes" :key="item.id">
                 <th scope="row">{{ item.schemeCode }}</th>
                 <td>{{ item.schemeName }}</td>
                 <td>
@@ -699,6 +728,13 @@ onBeforeUnmount(() => {
           </table>
         </div>
         <p v-else>暂无技术方案。</p>
+        <template #footer>
+          <V2Pagination
+            v-model:page-no="pages.schemes"
+            :total="overview.schemes.length"
+            label="技术方案分页"
+          />
+        </template>
       </V2Card>
 
       <V2Card
@@ -723,7 +759,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="drawing in overview.drawings" :key="drawing.id">
+                  <tr v-for="drawing in pagedDrawings" :key="drawing.id">
                     <th scope="row">
                       <V2Button
                         size="small"
@@ -752,6 +788,11 @@ onBeforeUnmount(() => {
               </table>
             </div>
             <p v-else>暂无图纸。</p>
+            <V2Pagination
+              v-model:page-no="pages.drawings"
+              :total="overview.drawings.length"
+              label="图纸分页"
+            />
           </section>
 
           <section aria-labelledby="technical-version-title">
@@ -766,7 +807,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="version in overview.versions" :key="version.id">
+                  <tr v-for="version in pagedVersions" :key="version.id">
                     <td>{{ versionLabel(version.id) }}</td>
                     <td>
                       <V2Badge :tone="tone(version.status)">{{
@@ -787,6 +828,11 @@ onBeforeUnmount(() => {
               </table>
             </div>
             <p v-else>暂无图纸版本。</p>
+            <V2Pagination
+              v-model:page-no="pages.versions"
+              :total="overview.versions.length"
+              label="图纸版本分页"
+            />
           </section>
         </div>
       </V2Card>
@@ -811,7 +857,7 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(review, index) in overview.reviews" :key="review.id">
+                <tr v-for="(review, index) in pagedReviews" :key="review.id">
                   <th scope="row">{{ review.reviewCode }}</th>
                   <td>{{ deliveryLabel(review.conclusion) }}</td>
                   <td>
@@ -822,7 +868,7 @@ onBeforeUnmount(() => {
                   <td class="v2-table-cell--actions">
                     <V2ActionMenu
                       :label="`${review.reviewCode}更多操作`"
-                      :placement="index >= overview.reviews.length - 3 ? 'top-end' : 'bottom-end'"
+                      :placement="index >= pagedReviews.length - 3 ? 'top-end' : 'bottom-end'"
                     >
                       <V2Button
                         v-if="canDrawingReview && review.status === 'DRAFT'"
@@ -857,6 +903,13 @@ onBeforeUnmount(() => {
           </div>
           <p v-else>暂无会审记录。</p>
         </section>
+        <template #footer>
+          <V2Pagination
+            v-model:page-no="pages.reviews"
+            :total="overview.reviews.length"
+            label="图纸会审分页"
+          />
+        </template>
       </V2Card>
 
       <V2Card
@@ -880,7 +933,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(rfi, index) in prioritizedRfis" :key="rfi.id">
+                  <tr v-for="(rfi, index) in pagedRfis" :key="rfi.id">
                     <th scope="row">{{ rfi.rfiCode }}</th>
                     <td>{{ rfi.subject }}</td>
                     <td>
@@ -889,7 +942,7 @@ onBeforeUnmount(() => {
                     <td class="v2-table-cell--actions">
                       <V2ActionMenu
                         :label="`${rfi.rfiCode}更多操作`"
-                        :placement="index >= prioritizedRfis.length - 3 ? 'top-end' : 'bottom-end'"
+                        :placement="index >= pagedRfis.length - 3 ? 'top-end' : 'bottom-end'"
                       >
                         <V2Button
                           v-if="canRfiRaise && rfi.status === 'DRAFT'"
@@ -917,6 +970,11 @@ onBeforeUnmount(() => {
               </table>
             </div>
             <p v-else>暂无 RFI 记录。</p>
+            <V2Pagination
+              v-model:page-no="pages.rfis"
+              :total="overview.rfis.length"
+              label="RFI 分页"
+            />
           </section>
 
           <section aria-labelledby="technical-response-title">
@@ -935,7 +993,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="response in overview.responses" :key="response.id">
+                  <tr v-for="response in pagedResponses" :key="response.id">
                     <td>
                       {{ response.responderName }} ·
                       {{ response.changeRequired ? '要求改版' : '无需改版' }}
@@ -961,6 +1019,11 @@ onBeforeUnmount(() => {
               </table>
             </div>
             <p v-else>暂无设计回复。</p>
+            <V2Pagination
+              v-model:page-no="pages.responses"
+              :total="overview.responses.length"
+              label="设计回复分页"
+            />
           </section>
         </div>
       </V2Card>
@@ -985,7 +1048,7 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(item, index) in overview.disclosures" :key="item.id">
+                <tr v-for="(item, index) in pagedDisclosures" :key="item.id">
                   <th scope="row">{{ item.disclosureCode }}</th>
                   <td>{{ item.disclosureTitle }}</td>
                   <td>
@@ -994,9 +1057,7 @@ onBeforeUnmount(() => {
                   <td class="v2-table-cell--actions">
                     <V2ActionMenu
                       :label="`${item.disclosureCode}更多操作`"
-                      :placement="
-                        index >= overview.disclosures.length - 3 ? 'top-end' : 'bottom-end'
-                      "
+                      :placement="index >= pagedDisclosures.length - 3 ? 'top-end' : 'bottom-end'"
                     >
                       <V2Button
                         v-if="canDisclosure && item.status === 'DRAFT'"
@@ -1019,6 +1080,13 @@ onBeforeUnmount(() => {
           </div>
           <p v-else>暂无技术交底。</p>
         </section>
+        <template #footer>
+          <V2Pagination
+            v-model:page-no="pages.disclosures"
+            :total="overview.disclosures.length"
+            label="技术交底分页"
+          />
+        </template>
       </V2Card>
 
       <V2Card
@@ -1042,7 +1110,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="item in availableReferences" :key="item.id">
+                  <tr v-for="item in pagedReferences" :key="item.id">
                     <td>{{ item.workArea }} · {{ item.referenceDate }}</td>
                     <td>
                       <V2Badge :tone="tone(item.status)">{{ deliveryLabel(item.status) }}</V2Badge>
@@ -1061,6 +1129,11 @@ onBeforeUnmount(() => {
               </table>
             </div>
             <p v-else>暂无待归档施工依据。</p>
+            <V2Pagination
+              v-model:page-no="pages.references"
+              :total="availableReferences.length"
+              label="施工依据分页"
+            />
           </section>
 
           <section aria-labelledby="technical-archive-title">
@@ -1076,7 +1149,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="item in overview.archives" :key="item.id">
+                  <tr v-for="item in pagedArchives" :key="item.id">
                     <th scope="row">{{ item.archiveCode }}</th>
                     <td>{{ item.archiveLocation }}</td>
                     <td>
@@ -1096,6 +1169,11 @@ onBeforeUnmount(() => {
               </table>
             </div>
             <p v-else>暂无验收归档。</p>
+            <V2Pagination
+              v-model:page-no="pages.archives"
+              :total="overview.archives.length"
+              label="验收归档分页"
+            />
           </section>
         </div>
       </V2Card>
@@ -1344,6 +1422,11 @@ onBeforeUnmount(() => {
 }
 .technical-page__record-sections section {
   min-width: 0;
+}
+.technical-page__record-sections .v2-pagination {
+  margin-top: var(--v2-space-3);
+  padding-top: var(--v2-space-3);
+  border-top: var(--v2-border-width) solid var(--v2-color-border-subtle);
 }
 .technical-page__record-sections h3 {
   margin: 0 0 var(--v2-space-2);

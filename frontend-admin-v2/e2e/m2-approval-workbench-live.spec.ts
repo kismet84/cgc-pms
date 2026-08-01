@@ -133,8 +133,7 @@ test.describe('M2 live approval workbench', () => {
             url.searchParams.get('instanceStatus') === 'RUNNING'
           )
         })
-        await status.getByRole('button', { name: /^实例状态：/ }).click()
-        await status.getByRole('option', { name: '审批中' }).click()
+        await status.getByRole('combobox', { name: '实例状态' }).selectOption({ label: '审批中' })
         expect((await filtered).ok()).toBe(true)
       }
       await shellTabs.getByRole('link', { name: '我发起', exact: true }).click()
@@ -195,17 +194,10 @@ test.describe('M2 live approval workbench', () => {
     await expect(detailDialog).toHaveCount(0)
     await expect(page.getByRole('cell', { name: '合同审批', exact: true })).toBeVisible()
 
-    await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
+    await expect(page.locator('#global-project')).toBeEnabled()
     const periodControl = page.locator('#global-report-period')
-    await periodControl.click()
-    const periodMenu = page.getByRole('listbox', { name: '报告期' })
-    const periodControlBox = await periodControl.boundingBox()
-    const periodMenuBox = await periodMenu.boundingBox()
-    expect(periodMenuBox?.x).toBeCloseTo(periodControlBox?.x ?? 0, 0)
-    const period = await periodMenu
-      .locator('[role="option"][data-value]:not([data-value=""])')
-      .first()
-    const periodValue = await period.getAttribute('data-value')
+    const period = periodControl.locator('option:not([value=""])').first()
+    const periodValue = await period.getAttribute('value')
     expect(periodValue).toMatch(/^\d{4}-\d{2}$/)
     const [, year, month] = /^(\d{4})-(\d{2})$/.exec(periodValue!)!
     const lastDay = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate()
@@ -218,27 +210,16 @@ test.describe('M2 live approval workbench', () => {
           `${periodValue}-${String(lastDay).padStart(2, '0')} 23:59:59`
       )
     })
-    await period.click()
+    await periodControl.selectOption(periodValue!)
     expect((await filteredByPeriod).ok()).toBe(true)
 
-    const businessType = page.getByRole('button', { name: /^业务类型：/ })
-    await businessType.click()
-    const businessTypeOptions = page.getByRole('listbox', { name: '业务类型' })
-    const controlBox = await businessType.boundingBox()
-    const menuBox = await businessTypeOptions.boundingBox()
-    expect(menuBox?.x).toBeCloseTo(controlBox?.x ?? 0, 0)
-    await expect(businessTypeOptions.getByRole('option').first()).toHaveCSS('font-size', '12px')
-    await businessTypeOptions.getByRole('option', { name: '合同审批' }).click()
-    await expect(businessType).toContainText('合同审批')
+    const businessType = page.getByRole('combobox', { name: '业务类型' })
+    await businessType.selectOption({ label: '合同审批' })
+    await expect(businessType).toHaveValue('CONTRACT_APPROVAL')
 
-    const instanceStatus = page.getByRole('button', { name: /^实例状态：/ })
-    await instanceStatus.click()
-    const statusOptions = page.getByRole('listbox', { name: '实例状态' })
-    const statusControlBox = await instanceStatus.boundingBox()
-    const statusMenuBox = await statusOptions.boundingBox()
-    expect(statusMenuBox?.x).toBeCloseTo(statusControlBox?.x ?? 0, 0)
-    await expect(statusOptions.getByRole('option', { name: '已作废' })).toBeVisible()
-    await statusOptions.getByRole('option', { name: '审批中' }).click()
+    const instanceStatus = page.getByRole('combobox', { name: '实例状态' })
+    await expect(instanceStatus.locator('option', { hasText: '已作废' })).toHaveCount(1)
+    await instanceStatus.selectOption({ label: '审批中' })
     const filtered = page.waitForResponse((item) => {
       const url = new URL(item.url())
       return (

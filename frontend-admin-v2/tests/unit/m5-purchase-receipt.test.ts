@@ -91,6 +91,13 @@ describe('M5 purchase request, order and receipt contract', () => {
     expect(source).toContain('附件列表已更新')
     expect(source).toContain('生成并上传单据说明')
     expect(source).toContain('updatePurchaseOrder')
+    expect(source).toContain('orderItemEdits.value.map')
+    expect(source).toContain('来源行不可修改')
+    expect(source).toContain("contractId: requiredOrderEdit('contractId', '采购合同')")
+    expect(source).toContain('v-model="orderEditForm.contractId"')
+    expect(source).toContain('@update:model-value="changeEditorProject"')
+    expect(source).not.toContain('convertPurchaseRequest')
+    expect(source).not.toContain('v-model="form.requestId"')
     expect(source).toContain('编辑商业条件')
     expect(source).toContain('登记不合格退货')
     expect(source).toContain('confirmReceiptSupplierReturn')
@@ -142,7 +149,13 @@ describe('M5 purchase request, order and receipt contract', () => {
     await loadPurchaseOrders({ projectId: 'P/1' }, signal)
     await loadPurchaseOrder('O/1', signal)
     await loadPurchaseOrderItems('O/1', signal)
-    const orderId = await createPurchaseOrder({ projectId: 'P1', requestId: 'R1', partnerId: 'S1' })
+    const orderId = await createPurchaseOrder({
+      projectId: 'P1',
+      contractId: 'C1',
+      partnerId: 'S1',
+      exceptionPurchaseFlag: 1,
+      exceptionReason: '紧急补采',
+    })
     await updatePurchaseOrder('O/1', {
       projectId: 'P1',
       orderCode: 'PO-001',

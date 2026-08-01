@@ -270,7 +270,7 @@ describe('M4 bid cost page', () => {
   it('queries immediately when status changes', async () => {
     const { wrapper } = await mountPage(['bid:query'])
 
-    await wrapper.get('button[data-value="WON"]').trigger('click')
+    await wrapper.get('.bid-cost-page__filters select').setValue('WON')
     await flushPromises()
 
     expect(loadBidCostPage).toHaveBeenCalledTimes(2)
@@ -293,8 +293,8 @@ describe('M4 bid cost page', () => {
     expect(loadProjectContextOptions).toHaveBeenCalledTimes(1)
     await button(wrapper, '确认更新')!.trigger('click')
     expect(wrapper.get('[role="dialog"]').text()).toContain('中标项目不能为空')
-    expect(wrapper.get('[role="dialog"] [role="button"]').attributes('aria-invalid')).toBe('true')
-    await wrapper.get('button[data-value="P1"]').trigger('click')
+    expect(wrapper.get('[role="dialog"] select').attributes('aria-invalid')).toBe('true')
+    await wrapper.get('[role="dialog"] select').setValue('P1')
     await button(wrapper, '确认更新')!.trigger('click')
     await flushPromises()
 

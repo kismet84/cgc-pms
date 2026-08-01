@@ -22,6 +22,7 @@ import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
@@ -37,6 +38,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.ByteArrayOutputStream;
@@ -54,6 +56,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
 @ActiveProfiles("local")
@@ -92,8 +97,19 @@ class InvoiceServiceTest {
     @Autowired
     private TransactionTemplate transactionTemplate;
 
+    @MockitoBean
+    private SysDictDataService sysDictDataService;
+
     @BeforeEach
     void setUp() {
+        when(sysDictDataService.requireEnabledValue(anyString(), any(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    String value = invocation.getArgument(1);
+                    if (value == null || value.isBlank() || value.startsWith("ARBITRARY")) {
+                        throw new BusinessException(invocation.getArgument(2), invocation.getArgument(3));
+                    }
+                    return value.trim().toUpperCase(java.util.Locale.ROOT);
+                });
         Claims claims = Jwts.claims()
                 .subject("admin")
                 .add("userId", USER_ADMIN)
@@ -520,6 +536,32 @@ class InvoiceServiceTest {
         assertEquals(String.valueOf(SEED_PAY_RECORD_ID), vo.getPayRecordId());
         assertEquals("2600.00", vo.getInvoiceAmount());
         assertEquals("2026-06-18", vo.getInvoiceDate());
+    }
+
+    @Test
+    @Order(19)
+    @DisplayName("INVOICE TYPE: 创建和更新拒绝未启用字典值")
+    void shouldRejectInvalidInvoiceTypeOnCreateAndUpdate() {
+        PayInvoice invalid = new PayInvoice();
+        invalid.setInvoiceNo("INV-TYPE-INVALID-CREATE");
+        invalid.setInvoiceType("ARBITRARY_TYPE");
+        invalid.setInvoiceAmount(new BigDecimal("100.00"));
+        invalid.setPayRecordId(SEED_PAY_RECORD_ID);
+        assertEquals("INVOICE_TYPE_INVALID",
+                assertThrows(BusinessException.class, () -> invoiceService.create(invalid)).getCode());
+
+        PayInvoice valid = new PayInvoice();
+        valid.setInvoiceNo("INV-TYPE-INVALID-UPDATE");
+        valid.setInvoiceType("VAT_SPECIAL");
+        valid.setInvoiceAmount(new BigDecimal("100.00"));
+        valid.setPayRecordId(SEED_PAY_RECORD_ID);
+        Long id = invoiceService.create(valid);
+
+        PayInvoice update = new PayInvoice();
+        update.setId(id);
+        update.setInvoiceType("ARBITRARY_TYPE");
+        assertEquals("INVOICE_TYPE_INVALID",
+                assertThrows(BusinessException.class, () -> invoiceService.update(update)).getCode());
     }
 
     private void prepareVerification(Long invoiceId, String amount) {

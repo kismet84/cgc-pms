@@ -13,10 +13,12 @@ import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.service.PayApplicationService;
 import com.cgcpms.payment.service.PayRecordService;
 import com.cgcpms.payment.vo.PayApplicationVO;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -25,6 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 /**
  * PayApplicationService 单元测试 -- 覆盖 core write path、query、approval、basis、payStatus。
@@ -50,12 +55,22 @@ class PayApplicationServiceTest {
     private PayRecordMapper payRecordMapper;
     @Autowired
     private PayRecordService payRecordService;
+    @MockitoBean
+    private SysDictDataService sysDictDataService;
 
     private Long testAppId;
     private PayApplication testApp;
 
     @BeforeEach
     void setup() {
+        when(sysDictDataService.requireEnabledValue(anyString(), any(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    String value = invocation.getArgument(1);
+                    if (value == null || value.isBlank() || value.startsWith("ARBITRARY")) {
+                        throw new BusinessException(invocation.getArgument(2), invocation.getArgument(3));
+                    }
+                    return value.trim().toUpperCase(java.util.Locale.ROOT);
+                });
         TestUserContext.setAdmin(TENANT_ID, USER_ADMIN);
 
         // 使用 create() 方法创建 DRAFT 状态的付款申请，自动生成 applyCode 和默认状态
@@ -64,7 +79,7 @@ class PayApplicationServiceTest {
         testApp.setContractId(30001L);
         testApp.setPartnerId(20002L);
         testApp.setApplyAmount(new BigDecimal("500000.00"));
-        testApp.setPayType("进度款");
+        testApp.setPayType("PROGRESS");
         testApp.setApplyReason("集成测试");
 
         testAppId = payApplicationService.create(testApp);
@@ -97,7 +112,7 @@ class PayApplicationServiceTest {
         app.setContractId(30001L);
         app.setPartnerId(20002L);
         app.setApplyAmount(new BigDecimal("100000.00"));
-        app.setPayType("进度款");
+        app.setPayType("PROGRESS");
 
         Long id = payApplicationService.create(app);
         assertNotNull(id, "create 应返回 ID");
@@ -120,7 +135,7 @@ class PayApplicationServiceTest {
         app.setPartnerId(20002L);
         app.setApplyCode("CUSTOM-APPLY-001");
         app.setApplyAmount(new BigDecimal("100000.00"));
-        app.setPayType("进度款");
+        app.setPayType("PROGRESS");
 
         Long id = payApplicationService.create(app);
 
@@ -140,7 +155,7 @@ class PayApplicationServiceTest {
             app.setProjectId(10001L);
             app.setContractId(30001L);
             app.setApplyAmount(new BigDecimal("10000.00"));
-            app.setPayType("进度款");
+            app.setPayType("PROGRESS");
             Long id = payApplicationService.create(app);
 
             PayApplication saved = payApplicationMapper.selectById(id);
@@ -155,6 +170,35 @@ class PayApplicationServiceTest {
             }
             lastSuffix = suffix;
         }
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("create/update -- 付款类型和非空费用类别必须为启用字典值")
+    void businessDictionaryFieldsMustBeEnabled() {
+        PayApplication invalidPayType = new PayApplication();
+        invalidPayType.setPayType("ARBITRARY_PAY_TYPE");
+        assertEquals("PAY_TYPE_INVALID",
+                assertThrows(BusinessException.class,
+                        () -> payApplicationService.create(invalidPayType)).getCode());
+
+        PayApplication invalidCategory = new PayApplication();
+        invalidCategory.setPayType("PROGRESS");
+        invalidCategory.setExpenseCategory("ARBITRARY_CATEGORY");
+        assertEquals("EXPENSE_CATEGORY_INVALID",
+                assertThrows(BusinessException.class,
+                        () -> payApplicationService.create(invalidCategory)).getCode());
+
+        testApp.setPayType("ARBITRARY_PAY_TYPE");
+        assertEquals("PAY_TYPE_INVALID",
+                assertThrows(BusinessException.class,
+                        () -> payApplicationService.update(testApp)).getCode());
+
+        testApp.setPayType("PROGRESS");
+        testApp.setExpenseCategory("ARBITRARY_CATEGORY");
+        assertEquals("EXPENSE_CATEGORY_INVALID",
+                assertThrows(BusinessException.class,
+                        () -> payApplicationService.update(testApp)).getCode());
     }
 
     // ═══════════════════════════════════════════════════════════════

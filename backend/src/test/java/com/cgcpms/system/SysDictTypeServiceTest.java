@@ -42,6 +42,7 @@ class SysDictTypeServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_0)
+                .add("roleCodes", java.util.List.of("SUPER_ADMIN"))
                 .build());
     }
 
@@ -165,6 +166,7 @@ class SysDictTypeServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 555L)
+                .add("roleCodes", java.util.List.of("SUPER_ADMIN"))
                 .build());
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -286,6 +288,7 @@ class SysDictTypeServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 777L)
+                .add("roleCodes", java.util.List.of("SUPER_ADMIN"))
                 .build());
 
         IPage<SysDictTypeVO> page = dictTypeService.getPage(1, 10, "xtnt_page", null, null);
@@ -334,6 +337,7 @@ class SysDictTypeServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 888L)
+                .add("roleCodes", java.util.List.of("SUPER_ADMIN"))
                 .build());
 
         SysDictType update = new SysDictType();
@@ -401,6 +405,7 @@ class SysDictTypeServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 999L)
+                .add("roleCodes", java.util.List.of("SUPER_ADMIN"))
                 .build());
 
         BusinessException ex = assertThrows(BusinessException.class,

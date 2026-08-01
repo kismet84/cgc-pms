@@ -29,6 +29,7 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.constant.ProjectStatusConstants;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
@@ -59,6 +60,7 @@ public class ExpenseApplicationService {
     private final ProjectAccessChecker projectAccessChecker;
     private final BudgetLedgerService ledgerService;
     private final WorkflowEngine workflowEngine;
+    private final SysDictDataService sysDictDataService;
 
     public IPage<ExpenseApplicationVO> getPage(long pageNo, long pageSize, Long projectId,
                                                 Long contractId, String approvalStatus) {
@@ -87,6 +89,7 @@ public class ExpenseApplicationService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(ExpenseApplication expense) {
+        normalizeExpenseCategory(expense);
         validateBusinessContext(expense);
         expense.setTenantId(UserContext.getCurrentTenantId());
         expense.setAmount(money(expense.getAmount()));
@@ -120,10 +123,17 @@ public class ExpenseApplicationService {
         input.setPaidAmount(existing.getPaidAmount());
         input.setApprovalStatus("DRAFT");
         input.setVersion(existing.getVersion());
+        normalizeExpenseCategory(input);
         validateBusinessContext(input);
         if (expenseMapper.updateById(input) != 1) {
             throw new BusinessException("EXPENSE_CONCURRENT_UPDATE", "费用申请已被其他用户修改，请刷新后重试");
         }
+    }
+
+    private void normalizeExpenseCategory(ExpenseApplication expense) {
+        expense.setExpenseCategory(sysDictDataService.requireEnabledValue(
+                "expense_category", expense.getExpenseCategory(),
+                "EXPENSE_CATEGORY_INVALID", "费用类别不合法"));
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -143,6 +153,8 @@ public class ExpenseApplicationService {
         if (!"DRAFT".equals(expense.getApprovalStatus())) {
             throw new BusinessException("EXPENSE_INVALID_STATUS", "只有草稿费用申请可以提交");
         }
+        // 字典项可能在草稿创建后停用；提交前按当前权威值重新校验。
+        normalizeExpenseCategory(expense);
         validateBusinessContext(expense);
         long attachmentCount = fileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
                 .eq(SysFile::getTenantId, expense.getTenantId())

@@ -9,6 +9,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
   V2Stack,
   showToast,
@@ -39,11 +40,18 @@ const saving = ref(false)
 const deleting = ref(false)
 const error = ref('')
 const companies = ref<OrgCompanyRecord[]>([])
+const companyDirectory = ref<OrgCompanyRecord[]>([])
+const companyTotal = ref(0)
 const departmentTree = ref<OrgDepartmentRecord[]>([])
 const positions = ref<OrgPositionRecord[]>([])
+const positionTotal = ref(0)
 const dialogKind = ref<Kind | null>(null)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<DeleteTarget | null>(null)
+const pageSize = 10
+const companyPageNo = ref(1)
+const departmentPageNo = ref(1)
+const positionPageNo = ref(1)
 let loadController: AbortController | null = null
 
 const companyForm = reactive({ companyCode: '', companyName: '', status: 'ENABLE', remark: '' })
@@ -72,8 +80,14 @@ const canAdd = computed(() => can('org:add'))
 const canEdit = computed(() => can('org:edit'))
 const canDelete = computed(() => can('org:delete'))
 const flatDepartments = computed(() => flattenDepartments(departmentTree.value))
+const pagedDepartments = computed(() =>
+  flatDepartments.value.slice(
+    (departmentPageNo.value - 1) * pageSize,
+    departmentPageNo.value * pageSize,
+  ),
+)
 const companyOptions = computed(() =>
-  companies.value.map((item) => ({ value: item.id, label: item.companyName })),
+  companyDirectory.value.map((item) => ({ value: item.id, label: item.companyName })),
 )
 const parentOptions = computed(() => [
   { value: '0', label: '根部门' },
@@ -104,14 +118,37 @@ function statusLabel(status: string): string {
 }
 
 function companyName(id: string): string {
-  return companies.value.find((item) => item.id === id)?.companyName ?? id
+  return companyDirectory.value.find((item) => item.id === id)?.companyName ?? id
 }
 
 function departmentName(id: string): string {
   return flatDepartments.value.find((item) => item.id === id)?.deptName ?? id
 }
 
-async function load(): Promise<void> {
+async function loadCompanyDirectory(
+  currentPage: { records: OrgCompanyRecord[]; total: number },
+  signal: AbortSignal,
+): Promise<OrgCompanyRecord[]> {
+  const directoryPageSize = 200
+  if (companyPageNo.value === 1 && currentPage.total <= pageSize) return currentPage.records
+  const records: OrgCompanyRecord[] = []
+  for (let pageNo = 1; records.length < currentPage.total; pageNo += 1) {
+    const page =
+      pageNo === companyPageNo.value && pageSize === directoryPageSize
+        ? currentPage
+        : await loadCompanies({ pageNo, pageSize: directoryPageSize }, signal)
+    if (!page.records.length) break
+    records.push(...page.records)
+  }
+  return records
+}
+
+async function load(resetPages = true): Promise<void> {
+  if (resetPages) {
+    companyPageNo.value = 1
+    departmentPageNo.value = 1
+    positionPageNo.value = 1
+  }
   loadController?.abort()
   const controller = new AbortController()
   loadController = controller
@@ -119,22 +156,39 @@ async function load(): Promise<void> {
   error.value = ''
   try {
     const [companyPage, departments, positionPage] = await Promise.all([
-      loadCompanies(controller.signal),
+      loadCompanies({ pageNo: companyPageNo.value, pageSize }, controller.signal),
       loadDepartmentTree(controller.signal),
-      loadPositions(controller.signal),
+      loadPositions({ pageNo: positionPageNo.value, pageSize }, controller.signal),
     ])
+    const directory = await loadCompanyDirectory(companyPage, controller.signal)
     companies.value = companyPage.records
+    companyDirectory.value = directory
+    companyTotal.value = companyPage.total
     departmentTree.value = departments
     positions.value = positionPage.records
+    positionTotal.value = positionPage.total
   } catch (value) {
     if (controller.signal.aborted) return
     companies.value = []
+    companyDirectory.value = []
+    companyTotal.value = 0
     departmentTree.value = []
     positions.value = []
+    positionTotal.value = 0
     error.value = messageOf(value)
   } finally {
     if (loadController === controller) loading.value = false
   }
+}
+
+function changeCompanyPage(next: number): void {
+  companyPageNo.value = next
+  void load(false)
+}
+
+function changePositionPage(next: number): void {
+  positionPageNo.value = next
+  void load(false)
 }
 
 async function refresh(): Promise<void> {
@@ -153,7 +207,7 @@ function openCreate(kind: Kind): void {
     Object.assign(companyForm, { companyCode: '', companyName: '', status: 'ENABLE', remark: '' })
   } else if (kind === 'department') {
     Object.assign(departmentForm, {
-      companyId: companies.value[0]?.id ?? '',
+      companyId: companyDirectory.value[0]?.id ?? '',
       parentId: '0',
       deptCode: '',
       deptName: '',
@@ -162,7 +216,7 @@ function openCreate(kind: Kind): void {
       remark: '',
     })
   } else {
-    const companyId = companies.value[0]?.id ?? ''
+    const companyId = companyDirectory.value[0]?.id ?? ''
     Object.assign(positionForm, {
       companyId,
       departmentId: flatDepartments.value.find((item) => item.companyId === companyId)?.id ?? '',
@@ -364,6 +418,17 @@ onBeforeUnmount(() => loadController?.abort())
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            :total="companyTotal"
+            :page-no="companyPageNo"
+            :page-size="pageSize"
+            label="公司分页"
+            unit="家"
+            :disabled="loading"
+            @update:page-no="changeCompanyPage"
+          />
+        </template>
       </V2Card>
 
       <V2Card title="部门">
@@ -385,7 +450,7 @@ onBeforeUnmount(() => loadController?.abort())
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, index) in flatDepartments" :key="item.id">
+              <tr v-for="(item, index) in pagedDepartments" :key="item.id">
                 <td>{{ companyName(item.companyId) }}</td>
                 <td>{{ item.deptCode }}</td>
                 <td>{{ item.deptName }}</td>
@@ -397,7 +462,7 @@ onBeforeUnmount(() => loadController?.abort())
                 <td class="v2-table-cell--actions">
                   <V2ActionMenu
                     :label="`${item.deptCode || item.deptName}更多操作`"
-                    :placement="index >= flatDepartments.length - 3 ? 'top-end' : 'bottom-end'"
+                    :placement="index >= pagedDepartments.length - 3 ? 'top-end' : 'bottom-end'"
                   >
                     <V2Button
                       v-if="canEdit"
@@ -421,6 +486,15 @@ onBeforeUnmount(() => loadController?.abort())
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            v-model:page-no="departmentPageNo"
+            :total="flatDepartments.length"
+            :page-size="pageSize"
+            label="部门分页"
+            unit="个"
+          />
+        </template>
       </V2Card>
 
       <V2Card title="岗位">
@@ -480,6 +554,17 @@ onBeforeUnmount(() => loadController?.abort())
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            :total="positionTotal"
+            :page-no="positionPageNo"
+            :page-size="pageSize"
+            label="岗位分页"
+            unit="个"
+            :disabled="loading"
+            @update:page-no="changePositionPage"
+          />
+        </template>
       </V2Card>
     </template>
 

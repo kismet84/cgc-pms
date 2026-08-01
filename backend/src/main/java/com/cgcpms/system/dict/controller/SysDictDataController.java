@@ -5,6 +5,7 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.system.dict.entity.SysDictData;
+import com.cgcpms.system.dict.dto.SysDictDataRequest;
 import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.system.dict.vo.SysDictDataVO;
 import java.util.List;
@@ -40,15 +41,16 @@ public class SysDictDataController {
 
     @PostMapping
     @AuditedOperation(type = "CREATE", businessType = "DICT_DATA")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:add')")
-    public ApiResponse<Long> create(@Valid @RequestBody SysDictData entity) {
-        return ApiResponse.success(sysDictDataService.create(entity));
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Long> create(@Valid @RequestBody SysDictDataRequest request) {
+        return ApiResponse.success(sysDictDataService.create(toEntity(request)));
     }
 
     @PutMapping("/{id}")
     @AuditedOperation(type = "UPDATE", businessType = "DICT_DATA", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:edit')")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SysDictData entity) {
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SysDictDataRequest request) {
+        SysDictData entity = toEntity(request);
         entity.setId(id);
         sysDictDataService.update(entity);
         return ApiResponse.success();
@@ -56,7 +58,7 @@ public class SysDictDataController {
 
     @DeleteMapping("/{id}")
     @AuditedOperation(type = "DELETE", businessType = "DICT_DATA", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         sysDictDataService.delete(id);
         return ApiResponse.success();
@@ -65,5 +67,17 @@ public class SysDictDataController {
     @PreAuthorize("isAuthenticated()")
     public ApiResponse<List<SysDictDataVO>> getByDictCode(@PathVariable String dictCode) {
         return ApiResponse.success(sysDictDataService.getByDictCode(dictCode));
+    }
+
+    private SysDictData toEntity(SysDictDataRequest request) {
+        SysDictData data = new SysDictData();
+        data.setDictTypeId(request.getDictTypeId());
+        data.setDictLabel(request.getDictLabel());
+        data.setDictValue(request.getDictValue());
+        data.setCssClass(request.getCssClass());
+        data.setListClass(request.getListClass());
+        data.setOrderNum(request.getOrderNum());
+        data.setStatus(request.getStatus());
+        return data;
     }
 }

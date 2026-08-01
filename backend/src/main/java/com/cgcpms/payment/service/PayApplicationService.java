@@ -29,6 +29,7 @@ import com.cgcpms.payment.constant.PaymentIntegrityConstants;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
@@ -77,6 +78,7 @@ public class PayApplicationService {
     private final ProjectAccessChecker projectAccessChecker;
     private final PaymentApplicationIntegrityService integrityService;
     private final PaymentApplicationSourceService sourceService;
+    private final SysDictDataService sysDictDataService;
 
     public PayApplicationService(
             PayApplicationMapper payApplicationMapper,
@@ -93,6 +95,7 @@ public class PayApplicationService {
             ProjectAccessChecker projectAccessChecker,
             PaymentApplicationIntegrityService integrityService,
             PaymentApplicationSourceService sourceService,
+            SysDictDataService sysDictDataService,
             @org.springframework.context.annotation.Lazy WorkflowEngine workflowEngine) {
         this.payApplicationMapper = payApplicationMapper;
         this.payApplicationBasisMapper = payApplicationBasisMapper;
@@ -108,6 +111,7 @@ public class PayApplicationService {
         this.projectAccessChecker = projectAccessChecker;
         this.integrityService = integrityService;
         this.sourceService = sourceService;
+        this.sysDictDataService = sysDictDataService;
         this.workflowEngine = workflowEngine;
     }
 
@@ -209,6 +213,7 @@ public class PayApplicationService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(PayApplication app) {
+        normalizeBusinessDictionaryFields(app, null);
         validateProjectAndContract(app.getProjectId(), app.getContractId(), "创建付款申请");
         boolean autoGenerateCode = !StringUtils.hasText(app.getApplyCode());
         String prefix = "PAY-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
@@ -281,11 +286,25 @@ public class PayApplicationService {
         app.setActualPayAmount(existing.getActualPayAmount());
         app.setApprovedAmount(existing.getApprovedAmount());
         app.setVersion(existing.getVersion());
+        normalizeBusinessDictionaryFields(app, existing);
         validateProjectAndContract(
                 app.getProjectId() != null ? app.getProjectId() : existing.getProjectId(),
                 app.getContractId() != null ? app.getContractId() : existing.getContractId(),
                 "编辑付款申请");
         payApplicationMapper.updateById(app);
+    }
+
+    private void normalizeBusinessDictionaryFields(PayApplication app, PayApplication existing) {
+        String effectivePayType = app.getPayType() == null && existing != null
+                ? existing.getPayType() : app.getPayType();
+        app.setPayType(sysDictDataService.requireEnabledValue(
+                "pay_type", effectivePayType,
+                "PAY_TYPE_INVALID", "付款类型不合法"));
+        if (StringUtils.hasText(app.getExpenseCategory())) {
+            app.setExpenseCategory(sysDictDataService.requireEnabledValue(
+                    "expense_category", app.getExpenseCategory(),
+                    "EXPENSE_CATEGORY_INVALID", "费用类别不合法"));
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -449,6 +468,9 @@ public class PayApplicationService {
 
         if (!"DRAFT".equals(payApp.getApprovalStatus()))
             throw new BusinessException("INVALID_STATUS", "仅草稿状态的付款申请可提交审批");
+
+        // 字典项可能在草稿创建后停用；提交前必须按当前权威值重新校验。
+        normalizeBusinessDictionaryFields(payApp, null);
 
         // Pessimistic lock on contract row to prevent concurrent bypass
         if (payApp.getContractId() != null) {
@@ -713,28 +735,6 @@ public class PayApplicationService {
     }
 
     // ---- VO conversion helpers ----
-
-    /**
-     * @deprecated 此单参数重载每次调用会产生 N+1 查询（逐个查询 project/contract/partner），
-     *             请优先使用 {@link #toVO(PayApplication, Map, Map, Map)} 批量预取版本。
-     */
-    @Deprecated
-    private PayApplicationVO toVO(PayApplication app) {
-        PayApplicationVO vo = buildBaseVO(app);
-        if (app.getProjectId() != null) {
-            PmProject project = pmProjectMapper.selectById(app.getProjectId());
-            if (project != null) vo.setProjectName(project.getProjectName());
-        }
-        if (app.getContractId() != null) {
-            CtContract contract = ctContractMapper.selectById(app.getContractId());
-            if (contract != null) vo.setContractName(contract.getContractName());
-        }
-        if (app.getPartnerId() != null) {
-            MdPartner partner = mdPartnerMapper.selectById(app.getPartnerId());
-            if (partner != null) vo.setPartnerName(partner.getPartnerName());
-        }
-        return vo;
-    }
 
     private PayApplicationVO toVO(PayApplication app, Map<Long, String> projectNames,
                                    Map<Long, String> contractNames, Map<Long, String> partnerNames) {

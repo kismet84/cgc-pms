@@ -377,7 +377,7 @@ describe('M4 budget and measurement pages', () => {
     const actions = wrapper.get('.v2-card__actions > .actions')
     expect(actions.text().indexOf('全部状态')).toBeLessThan(actions.text().indexOf('新建期间'))
     expect(button(wrapper, '查询')).toBeUndefined()
-    await wrapper.get('button[data-value="DRAFT"]').trigger('click')
+    await actions.get('select').setValue('DRAFT')
     await flushPromises()
     expect(router.currentRoute.value.query.status).toBe('DRAFT')
   })

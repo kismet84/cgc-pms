@@ -428,6 +428,7 @@ export interface FinanceAlertRecord {
 export interface FinanceSnapshotRecord {
   id: string;
   projectId: string;
+  projectName?: string | null;
   snapshotDate: string;
   contractAmount: FinanceDecimalString;
   approvedUnpaidAmount: FinanceDecimalString;
@@ -438,7 +439,16 @@ export interface FinanceSnapshotRecord {
   actualCost: FinanceDecimalString;
   profitAmount: FinanceDecimalString;
 }
+export interface FinanceOperationsSummary {
+  projectCount: number;
+  fundBalance: FinanceDecimalString;
+  forecastInflow: FinanceDecimalString;
+  forecastOutflow: FinanceDecimalString;
+  financingAmount: FinanceDecimalString;
+  fundingGap: FinanceDecimalString;
+}
 export interface FinanceOperationsWorkspace {
+  summary: FinanceOperationsSummary;
   schedules: PaymentScheduleRecord[];
   alerts: FinanceAlertRecord[];
   snapshots: FinanceSnapshotRecord[];
@@ -468,6 +478,7 @@ export interface FundAccountCommand {
 export interface CashForecastCycleRecord {
   id: string;
   projectId: string;
+  projectName?: string | null;
   cycleCode: string;
   forecastName: string;
   asOfDate: string;

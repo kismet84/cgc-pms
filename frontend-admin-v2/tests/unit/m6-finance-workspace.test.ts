@@ -4,6 +4,8 @@ import { resolve } from 'node:path'
 import { FINANCE_DECIMAL_FIELDS, FINANCE_API } from '@cgc-pms/frontend-contracts'
 import {
   createFundAccount,
+  loadCashForecastCycles,
+  loadFinanceOperationsWorkspace,
   loadPaymentApplications,
   reversePaymentRecord,
   savePaymentBasis,
@@ -31,6 +33,30 @@ describe('M6 finance workspace contract', () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toContain('projectId=P%2F1')
     expect(result.records[0]?.applyAmount).toBe('9007199254740993.01')
     vi.unstubAllGlobals()
+  })
+  it('loads enterprise finance workspaces without forcing a project query', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: '0', data: [] })))
+    vi.stubGlobal('fetch', fetchMock)
+    await loadFinanceOperationsWorkspace()
+    await loadCashForecastCycles()
+    expect(String(fetchMock.mock.calls[0]?.[0])).toMatch(/\/finance-operations\/workspace$/)
+    expect(String(fetchMock.mock.calls[1]?.[0])).toMatch(/\/cash-forecasts\/workspace$/)
+    vi.unstubAllGlobals()
+  })
+  it('keeps enterprise reads separate from project detail writes', () => {
+    const source = readFileSync(
+      resolve(process.cwd(), 'src/pages/finance/FinanceControlWorkspacePage.vue'),
+      'utf8',
+    )
+    expect(source).toContain('企业资金概览')
+    expect(source).toContain('项目资金对比')
+    expect(source).toMatch(/loadFinanceOperationsWorkspace\(\s*projectId\.value \|\| undefined,/)
+    expect(source).toMatch(/loadCashForecastCycles\(\s*projectId\.value \|\| undefined,/)
+    expect(source).toContain('if (!projectRequired()) return')
+    expect(source).toContain(
+      "mode === 'operations' && projectId && can('finance:analytics:maintain')",
+    )
+    expect(source).not.toContain('资金运营和预测必须按单项目范围读取')
   })
   it('keeps abort state scoped to each finance request', () => {
     const source = readFileSync(

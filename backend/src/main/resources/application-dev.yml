@@ -65,12 +65,16 @@ jwt:
   header: Authorization
   token-prefix: "Bearer "
 
-# Actuator — 暴露 health/info/metrics，本地监控仍受鉴权保护
+# Actuator — 暴露 health/info/metrics/prometheus，本地监控仍受鉴权保护
 management:
   endpoints:
     web:
       exposure:
-        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,metrics}
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,metrics,prometheus}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoint:
     health:
       show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:when-authorized}

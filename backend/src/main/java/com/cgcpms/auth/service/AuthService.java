@@ -266,16 +266,6 @@ public class AuthService {
                 .eq(SysUser::getUsername, normalizedUsername));
     }
 
-    private SysUser findUserByTenantIdAndUsername(Long tenantId, String username) {
-        String normalizedUsername = normalizeUsername(username);
-        if (tenantId == null || !StringUtils.hasText(normalizedUsername)) {
-            return null;
-        }
-        return sysUserMapper.selectOne(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getTenantId, tenantId)
-                .eq(SysUser::getUsername, normalizedUsername));
-    }
-
     private String normalizeUsername(String username) {
         if (!StringUtils.hasText(username)) {
             return null;

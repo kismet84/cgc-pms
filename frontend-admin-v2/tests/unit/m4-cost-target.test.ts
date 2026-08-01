@@ -219,7 +219,7 @@ describe('M4 cost target page', () => {
     const pending = deferred<string>()
     vi.mocked(createCostTarget).mockReturnValueOnce(pending.promise)
     const { wrapper } = await mountPage(['cost:target:add'], '/cost-target/create?projectId=P1')
-    await wrapper.get('button[data-value="P1"]').trigger('click')
+    await wrapper.get('select').setValue('P1')
     await wrapper.get('input[aria-label="版本号"]').setValue(' V2 ')
     await wrapper.get('input[aria-label="版本名称"]').setValue(' 控制版 ')
     await wrapper.get('input[aria-label="目标成本总额"]').setValue('9007199254740993.12')

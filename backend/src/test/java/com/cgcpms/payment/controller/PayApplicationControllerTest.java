@@ -6,8 +6,10 @@ import com.cgcpms.audit.entity.OperationAuditLog;
 import com.cgcpms.audit.mapper.OperationAuditLogMapper;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
@@ -18,11 +20,13 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,6 +34,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -61,9 +68,21 @@ class PayApplicationControllerTest {
     @Autowired
     private OperationAuditLogMapper operationAuditLogMapper;
 
+    @MockitoBean
+    private SysDictDataService sysDictDataService;
+
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
+
+    @BeforeEach
+    void allowConfiguredDictionaryValues() {
+        doAnswer(invocation -> {
+            String value = invocation.getArgument(1);
+            return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
+        }).when(sysDictDataService).requireEnabledValue(
+                anyString(), nullable(String.class), anyString(), anyString());
+    }
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
@@ -232,7 +251,7 @@ class PayApplicationControllerTest {
                   "contractId": %d,
                   "partnerId": %d,
                   "applyAmount": 1000.00,
-                  "payType": "MATERIAL",
+                  "payType": "PROGRESS",
                   "applyReason": "%s"
                 }
                 """.formatted(PROJECT_ID, CONTRACT_ID, PARTNER_ID, reason);
@@ -246,7 +265,7 @@ class PayApplicationControllerTest {
                   "partnerId": %d,
                   "applyCode": "CLIENT-UPDATE",
                   "applyAmount": 1200.00,
-                  "payType": "MATERIAL",
+                  "payType": "PROGRESS",
                   "applyReason": "%s"
                 }
                 """.formatted(PROJECT_ID, CONTRACT_ID, PARTNER_ID, reason);

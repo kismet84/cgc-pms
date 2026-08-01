@@ -21,14 +21,6 @@ public class WfIdempotency {
 
     private String idempotencyKey;
 
-    private String businessType;
-
-    private Long businessId;
-
-    private String requestHash;
-
-    private String responseJson;
-
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;
 

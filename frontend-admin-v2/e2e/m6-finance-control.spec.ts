@@ -46,6 +46,14 @@ async function install(page: Page, writes: string[]) {
       ])
     if (path === '/api/finance-operations/workspace')
       return fulfill(route, {
+        summary: {
+          fundBalance: '6200000.00',
+          forecastInflow: '800000.00',
+          forecastOutflow: '680000.00',
+          financingAmount: '0.00',
+          fundingGap: '0.00',
+          projectCount: 1,
+        },
         schedules: [
           {
             id: 'S1',

@@ -645,8 +645,7 @@ export interface PurchaseRequestCommand {
 
 export interface PurchaseOrderCommand {
   projectId: string;
-  requestId?: string;
-  contractId?: string;
+  contractId: string;
   partnerId?: string;
   orderType?: string;
   orderDate?: string;

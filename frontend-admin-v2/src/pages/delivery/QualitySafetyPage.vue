@@ -25,6 +25,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
   showToast,
   useToastMessage,
@@ -87,6 +88,8 @@ const inspections = ref<QualityInspectionRecord[]>([])
 const issues = ref<QualityIssueRecord[]>([])
 const selectedPlanId = ref('')
 const activeTab = ref<QualityTab>('plan')
+const pageSize = 10
+const pageNo = ref(1)
 const activeInspection = ref<QualityInspectionRecord | null>(null)
 const activeIssue = ref<QualityIssueRecord | null>(null)
 const activeRectification = ref<QualityRectificationRecord | null>(null)
@@ -123,6 +126,23 @@ const reinspectionIssues = computed(() =>
 const consequenceIssues = computed(() =>
   issues.value.filter((item) => item.status === 'CLOSED' && item.responsiblePartnerId),
 )
+const pageSlice = <T,>(rows: T[]) =>
+  rows.slice((pageNo.value - 1) * pageSize, pageNo.value * pageSize)
+const pagedPlans = computed(() => pageSlice(plans.value))
+const pagedInspections = computed(() => pageSlice(inspections.value))
+const pagedRectificationIssues = computed(() => pageSlice(rectificationIssues.value))
+const pagedReinspectionIssues = computed(() => pageSlice(reinspectionIssues.value))
+const pagedConsequenceIssues = computed(() => pageSlice(consequenceIssues.value))
+const activeTotal = computed(
+  () =>
+    ({
+      plan: plans.value.length,
+      inspection: inspections.value.length,
+      rectification: rectificationIssues.value.length,
+      reinspection: reinspectionIssues.value.length,
+      consequence: consequenceIssues.value.length,
+    })[activeTab.value],
+)
 const visibleTabs = computed(() => [
   { value: 'plan', label: '检查计划', count: plans.value.length },
   { value: 'inspection', label: '检查记录', count: inspections.value.length },
@@ -130,6 +150,10 @@ const visibleTabs = computed(() => [
   { value: 'reinspection', label: '复检闭环', count: reinspectionIssues.value.length },
   { value: 'consequence', label: '后果追踪', count: consequenceIssues.value.length },
 ])
+const activePaginationLabel = computed(
+  () =>
+    `${visibleTabs.value.find((tab) => tab.value === activeTab.value)?.label ?? '质量安全'}分页`,
+)
 const currentUserId = computed(() => String(session.userInfo?.userId ?? ''))
 const userOptions = (value = '') => {
   const options = currentUserId.value
@@ -246,6 +270,7 @@ function statusTone(status: string): 'success' | 'warning' | 'danger' | 'info' |
 }
 
 async function loadProject(preserveNotice = false): Promise<void> {
+  pageNo.value = 1
   projectController?.abort()
   inspectionController?.abort()
   traceController?.abort()
@@ -297,6 +322,7 @@ async function loadProject(preserveNotice = false): Promise<void> {
 }
 
 async function loadInspections(): Promise<void> {
+  pageNo.value = 1
   inspectionController?.abort()
   inspections.value = []
   if (!selectedPlanId.value) return
@@ -616,6 +642,9 @@ watch(
     void loadInspections()
   },
 )
+watch(activeTab, () => {
+  pageNo.value = 1
+})
 onBeforeUnmount(() => {
   generation += 1
   projectController?.abort()
@@ -685,7 +714,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(plan, index) in plans" :key="plan.id">
+                  <tr v-for="(plan, index) in pagedPlans" :key="plan.id">
                     <th scope="row">{{ plan.planCode }}</th>
                     <td>
                       <V2Button
@@ -706,7 +735,7 @@ onBeforeUnmount(() => {
                     <td class="v2-table-cell--actions">
                       <V2ActionMenu
                         :label="`${plan.planCode}更多操作`"
-                        :placement="index >= plans.length - 3 ? 'top-end' : 'bottom-end'"
+                        :placement="index >= pagedPlans.length - 3 ? 'top-end' : 'bottom-end'"
                       >
                         <V2Button
                           v-if="canPlan && plan.status === 'DRAFT'"
@@ -752,7 +781,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(inspection, index) in inspections" :key="inspection.id">
+                  <tr v-for="(inspection, index) in pagedInspections" :key="inspection.id">
                     <th scope="row">{{ inspection.inspectionCode }}</th>
                     <td>{{ inspection.location }} · {{ inspection.summary }}</td>
                     <td>
@@ -764,7 +793,7 @@ onBeforeUnmount(() => {
                     <td class="v2-table-cell--actions">
                       <V2ActionMenu
                         :label="`${inspection.inspectionCode}更多操作`"
-                        :placement="index >= inspections.length - 3 ? 'top-end' : 'bottom-end'"
+                        :placement="index >= pagedInspections.length - 3 ? 'top-end' : 'bottom-end'"
                       >
                         <V2Button
                           v-if="canInspect && inspection.status === 'DRAFT'"
@@ -824,7 +853,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(issue, index) in rectificationIssues" :key="issue.id">
+                  <tr v-for="(issue, index) in pagedRectificationIssues" :key="issue.id">
                     <th scope="row">
                       <V2Button
                         size="small"
@@ -851,7 +880,7 @@ onBeforeUnmount(() => {
                       <V2ActionMenu
                         :label="`${issue.issueCode}更多操作`"
                         :placement="
-                          index >= rectificationIssues.length - 3 ? 'top-end' : 'bottom-end'
+                          index >= pagedRectificationIssues.length - 3 ? 'top-end' : 'bottom-end'
                         "
                       >
                         <V2Button
@@ -902,7 +931,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="issue in reinspectionIssues" :key="issue.id">
+                  <tr v-for="issue in pagedReinspectionIssues" :key="issue.id">
                     <th scope="row">
                       <V2Button
                         size="small"
@@ -950,7 +979,7 @@ onBeforeUnmount(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="issue in consequenceIssues" :key="issue.id">
+                  <tr v-for="issue in pagedConsequenceIssues" :key="issue.id">
                     <th scope="row">
                       <V2Button
                         size="small"
@@ -995,6 +1024,13 @@ onBeforeUnmount(() => {
           title="暂无可访问分区"
           description="当前账号没有质量安全业务分区权限。"
         />
+        <template #footer>
+          <V2Pagination
+            v-model:page-no="pageNo"
+            :total="activeTotal"
+            :label="activePaginationLabel"
+          />
+        </template>
       </V2Card>
     </template>
 

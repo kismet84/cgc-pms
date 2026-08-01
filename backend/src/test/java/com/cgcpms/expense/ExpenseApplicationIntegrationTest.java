@@ -25,6 +25,7 @@ import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowContext;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -44,6 +45,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = "spring.main.allow-circular-references=true")
 @ActiveProfiles("local")
@@ -68,15 +72,28 @@ class ExpenseApplicationIntegrationTest {
     @Autowired private SysFileMapper fileMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
     @MockitoBean private WorkflowEngine workflowEngine;
+    @MockitoBean private SysDictDataService sysDictDataService;
 
     private Long budgetId;
     private Long budgetLineId;
 
     @BeforeEach
     void setUp() {
+        stubDictionaryValidation();
         setContext();
         hardCleanup();
         seedBusinessContext();
+    }
+
+    private void stubDictionaryValidation() {
+        when(sysDictDataService.requireEnabledValue(anyString(), any(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    String value = invocation.getArgument(1);
+                    if (value == null || value.isBlank() || value.startsWith("ARBITRARY")) {
+                        throw new BusinessException(invocation.getArgument(2), invocation.getArgument(3));
+                    }
+                    return value.trim().toUpperCase(java.util.Locale.ROOT);
+                });
     }
 
     @AfterEach
@@ -132,6 +149,21 @@ class ExpenseApplicationIntegrationTest {
         BusinessException projectSuspended = assertThrows(BusinessException.class,
                 () -> expenseService.create(suspended));
         assertEquals("PROJECT_NOT_ACTIVE", projectSuspended.getCode());
+    }
+
+    @Test
+    @DisplayName("费用类别字典约束覆盖创建和可编辑更新")
+    void expenseCategoryMustBeEnabledDictionaryValue() {
+        ExpenseApplication invalid = buildExpense(new BigDecimal("10.00"));
+        invalid.setExpenseCategory("ARBITRARY_CATEGORY");
+        assertEquals("EXPENSE_CATEGORY_INVALID",
+                assertThrows(BusinessException.class, () -> expenseService.create(invalid)).getCode());
+
+        Long id = createExpense(new BigDecimal("20.00"));
+        ExpenseApplication update = expenseMapper.selectById(id);
+        update.setExpenseCategory("ARBITRARY_CATEGORY");
+        assertEquals("EXPENSE_CATEGORY_INVALID",
+                assertThrows(BusinessException.class, () -> expenseService.update(update)).getCode());
     }
 
     private void seedBusinessContext() {

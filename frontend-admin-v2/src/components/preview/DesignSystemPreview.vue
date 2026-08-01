@@ -11,8 +11,6 @@ import {
   V2ConfirmDialog,
   V2Dialog,
   V2ErrorBoundary,
-  V2GlassButton,
-  V2Grid,
   V2Input,
   V2PageState,
   V2Select,
@@ -90,7 +88,7 @@ function confirmApprovalPreview() {
           subtitle="排版、颜色、间距和圆角均来自 tokens.css，不在业务页面重新定义"
           title-id="preview-foundations-title"
         >
-          <V2Grid min-item-width="19rem" :gap="4">
+          <div class="preview-grid preview-grid--foundations">
             <section aria-labelledby="preview-type-title">
               <h3 id="preview-type-title" class="preview-subtitle">文字层级</h3>
               <div class="preview-type-scale">
@@ -112,7 +110,7 @@ function confirmApprovalPreview() {
                 <li><span class="preview-swatch preview-swatch--danger"></span>危险</li>
               </ul>
             </section>
-          </V2Grid>
+          </div>
         </V2Card>
       </div>
 
@@ -252,7 +250,7 @@ function confirmApprovalPreview() {
       </V2Card>
 
       <div id="forms-feedback" class="preview-anchor">
-        <V2Grid min-item-width="20rem" :gap="3">
+        <div class="preview-grid preview-grid--forms">
           <V2Card title="表单控件" subtitle="标签、提示、校验、空值、加载和禁用状态">
             <V2Stack :gap="4">
               <V2Input v-model="keyword" label="当前项目" hint="支持项目名称或编号" />
@@ -308,11 +306,11 @@ function confirmApprovalPreview() {
               </V2Cluster>
             </V2Stack>
           </V2Card>
-        </V2Grid>
+        </div>
       </div>
 
       <V2ErrorBoundary>
-        <V2Grid min-item-width="18rem" :gap="3">
+        <div class="preview-grid preview-grid--states">
           <V2PageState
             kind="empty"
             title="暂无组件数据"
@@ -336,7 +334,7 @@ function confirmApprovalPreview() {
           >
             <template #actions><V2Button variant="secondary">重新加载</V2Button></template>
           </V2PageState>
-        </V2Grid>
+        </div>
       </V2ErrorBoundary>
 
       <div id="dialogs" class="preview-anchor">
@@ -350,7 +348,6 @@ function confirmApprovalPreview() {
             <V2Button variant="secondary" @click="wideOpen = true">宽详情</V2Button>
             <V2Button variant="secondary" @click="sheetOpen = true">底部抽屉</V2Button>
             <V2Button variant="danger" @click="confirmOpen = true">危险确认</V2Button>
-            <V2GlassButton text="玻璃操作" />
           </V2Cluster>
         </V2Card>
       </div>
@@ -567,6 +564,25 @@ function confirmApprovalPreview() {
 
 .preview-anchor {
   scroll-margin-top: calc(var(--v2-space-10) + var(--v2-control-height-md));
+}
+
+.preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--preview-grid-min)), 1fr));
+  gap: var(--v2-space-3);
+}
+
+.preview-grid--foundations {
+  --preview-grid-min: 19rem;
+  gap: var(--v2-space-4);
+}
+
+.preview-grid--forms {
+  --preview-grid-min: 20rem;
+}
+
+.preview-grid--states {
+  --preview-grid-min: 18rem;
 }
 
 .preview-nav {

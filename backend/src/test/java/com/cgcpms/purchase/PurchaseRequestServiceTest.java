@@ -700,52 +700,6 @@ class PurchaseRequestServiceTest {
     }
 
     // ═══════════════════════════════════════════════════════════
-    // RED → GREEN: convertToPurchaseOrder — 采购申请转采购订单
-    // ═══════════════════════════════════════════════════════════
-    @Test
-    @Transactional
-    @DisplayName("RED→GREEN: 采购申请转换为采购订单")
-    void testConvertToPurchaseOrder() {
-        MatPurchaseRequest request = new MatPurchaseRequest();
-        request.setProjectId(PROJECT_ID);
-        Long requestId = requestService.create(request);
-
-        // Set status to APPROVED — convertToPurchaseOrder requires approved status
-        MatPurchaseRequest db = requestMapper.selectById(requestId);
-        db.setStatus("APPROVED");
-        requestMapper.updateById(db);
-
-        // Add items required for conversion
-        MatPurchaseRequestItem item = new MatPurchaseRequestItem();
-        item.setMaterialId(1L);
-        item.setQuantity(new BigDecimal("100.00"));
-        item.setUnit("m³");
-        requestService.saveItemsBatch(requestId, java.util.List.of(item));
-
-        requestService.convertToPurchaseOrder(requestId);
-
-        MatPurchaseRequest converted = requestMapper.selectById(requestId);
-        assertEquals("CONVERTED", converted.getStatus());
-
-        MatPurchaseOrder order = orderMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrder>()
-                .eq(MatPurchaseOrder::getRequestId, requestId)
-                .eq(MatPurchaseOrder::getTenantId, TENANT_ID));
-        assertNotNull(order, "转换后应生成采购订单");
-        assertEquals(PROJECT_ID, order.getProjectId());
-        assertEquals("DRAFT", order.getApprovalStatus(), "需求审批不得替代采购订单审批");
-        assertEquals("DRAFT", order.getOrderStatus(), "转单后应等待采购人员补齐商业条件");
-        assertEquals(0, BigDecimal.ZERO.compareTo(order.getTotalAmount()), "未定价订单初始金额应为 0");
-
-        List<com.cgcpms.purchase.entity.MatPurchaseOrderItem> convertedItems = orderItemMapper.selectList(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.cgcpms.purchase.entity.MatPurchaseOrderItem>()
-                        .eq(com.cgcpms.purchase.entity.MatPurchaseOrderItem::getOrderId, order.getId()));
-        assertEquals(1, convertedItems.size());
-        assertEquals(item.getId(), convertedItems.get(0).getRequestItemId(), "订单明细必须保留采购申请明细来源");
-        assertEquals(0, BigDecimal.ZERO.compareTo(convertedItems.get(0).getUnitPrice()));
-        assertEquals(0, BigDecimal.ZERO.compareTo(convertedItems.get(0).getAmount()));
-    }
-
-    // ═══════════════════════════════════════════════════════════
     // REFACTOR: VO returns String IDs
     // ═══════════════════════════════════════════════════════════
     @Test

@@ -107,6 +107,32 @@ class MatPurchaseOrderServiceTest {
         assertEquals("DRAFT", vo.getOrderStatus());
     }
 
+    @Test @Transactional @DisplayName("create → ignores tenant, identity, amount, and state injection")
+    void createIgnoresProtectedFields() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setId(Long.MAX_VALUE - 1000);
+        order.setTenantId(999L);
+        order.setProjectId(PROJECT_ID);
+        order.setOrderCode("PO-INJECTED");
+        order.setRequestId(null);
+        order.setTotalAmount(new BigDecimal("999999.99"));
+        order.setApprovalStatus("APPROVED");
+        order.setOrderStatus("COMPLETED");
+        order.setDeletedFlag(1);
+
+        Long id = service.create(order);
+        MatPurchaseOrder stored = orderMapper.selectById(id);
+
+        assertNotEquals(order.getId(), id);
+        assertEquals(TENANT_ID, stored.getTenantId());
+        assertTrue(stored.getOrderCode().startsWith("PO-"));
+        assertNotEquals("PO-INJECTED", stored.getOrderCode());
+        assertEquals(0, BigDecimal.ZERO.compareTo(stored.getTotalAmount()));
+        assertEquals("DRAFT", stored.getApprovalStatus());
+        assertEquals("DRAFT", stored.getOrderStatus());
+        assertEquals(0, stored.getDeletedFlag());
+    }
+
     @Test @Transactional @DisplayName("订单详情与列表返回采购申请业务编号")
     void orderReturnsPurchaseRequestBusinessCode() {
         long requestId = Math.abs(System.nanoTime());
@@ -119,10 +145,15 @@ class MatPurchaseOrderServiceTest {
                 """, requestId, TENANT_ID, PROJECT_ID, requestCode, USER_ADMIN, USER_ADMIN);
 
         MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setTenantId(TENANT_ID);
         order.setProjectId(PROJECT_ID);
         order.setRequestId(requestId);
+        order.setOrderCode("PO-SOURCE-" + requestId);
         order.setOrderType("PURCHASE");
-        Long id = service.create(order);
+        order.setApprovalStatus("DRAFT");
+        order.setOrderStatus("DRAFT");
+        orderMapper.insert(order);
+        Long id = order.getId();
 
         assertEquals(requestCode, service.getById(id).getRequestCode());
         MatPurchaseOrderVO row = service.getPage(1, 20, PROJECT_ID, null, null, null, null, null)
@@ -131,6 +162,16 @@ class MatPurchaseOrderServiceTest {
                 .findFirst()
                 .orElseThrow();
         assertEquals(requestCode, row.getRequestCode());
+    }
+
+    @Test @Transactional @DisplayName("create → 采购申请必须通过转换流程")
+    void createRejectsDirectPurchaseRequestLinkage() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setRequestId(Math.abs(System.nanoTime()));
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> service.create(order));
+        assertEquals("PURCHASE_REQUEST_CONVERSION_REQUIRED", ex.getCode());
     }
 
     @Test @Transactional @DisplayName("create → contract validation with PERFORMING contract")
@@ -207,6 +248,37 @@ class MatPurchaseOrderServiceTest {
         upd.setOrderType("PURCHASE");
         service.update(upd);
         assertEquals(0, new BigDecimal("123.00").compareTo(orderMapper.selectById(id).getTotalAmount()));
+    }
+
+    @Test @Transactional @DisplayName("update → 仅允许修改商业字段")
+    void updateIgnoresProtectedFields() {
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setOrderType("PURCHASE");
+        Long id = service.create(order);
+        MatPurchaseOrder original = orderMapper.selectById(id);
+
+        MatPurchaseOrder update = new MatPurchaseOrder();
+        update.setId(id);
+        update.setTenantId(999L);
+        update.setProjectId(999L);
+        update.setRequestId(999L);
+        update.setOrderCode("PO-TAMPERED");
+        update.setOrderType("TAMPERED");
+        update.setOrderStatus("APPROVED");
+        update.setApprovalStatus("APPROVED");
+        update.setTotalAmount(new BigDecimal("999"));
+        service.update(update);
+
+        MatPurchaseOrder stored = orderMapper.selectById(id);
+        assertEquals(original.getTenantId(), stored.getTenantId());
+        assertEquals(original.getProjectId(), stored.getProjectId());
+        assertEquals(original.getRequestId(), stored.getRequestId());
+        assertEquals(original.getOrderCode(), stored.getOrderCode());
+        assertEquals(original.getOrderType(), stored.getOrderType());
+        assertEquals(original.getOrderStatus(), stored.getOrderStatus());
+        assertEquals(original.getApprovalStatus(), stored.getApprovalStatus());
+        assertEquals(0, BigDecimal.ZERO.compareTo(stored.getTotalAmount()));
     }
 
     @Test @Transactional @DisplayName("update → guard: cannot update when APPROVING")
@@ -317,6 +389,115 @@ class MatPurchaseOrderServiceTest {
 
         List<MatPurchaseOrderItemVO> items = service.getItems(id);
         assertEquals(1, items.size());
+    }
+
+    @Test @Transactional @DisplayName("来源申请订单仅允许补录价格税率，不得改来源字段")
+    void linkedOrderItemsPreserveRequestSource() {
+        long requestId = Math.abs(System.nanoTime());
+        long requestItemId = requestId + 1;
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request (
+                    id, tenant_id, project_id, request_code, approval_status, status,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, ?, 'APPROVED', 'CONVERTED', ?, ?, 0)
+                """, requestId, TENANT_ID, PROJECT_ID, "PR-LINKED-" + requestId, USER_ADMIN, USER_ADMIN);
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request_item (
+                    id, tenant_id, request_id, material_id, budget_line_id, quantity,
+                    estimated_unit_price, estimated_amount, unit, created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, 1, ?, 2, 50, 100, '个', ?, ?, 0)
+                """, requestItemId, TENANT_ID, requestId, BUDGET_LINE_ID, USER_ADMIN, USER_ADMIN);
+
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setTenantId(TENANT_ID);
+        order.setProjectId(PROJECT_ID);
+        order.setRequestId(requestId);
+        order.setOrderCode("PO-LINKED-" + requestId);
+        order.setOrderType("PURCHASE");
+        order.setOrderStatus("DRAFT");
+        order.setApprovalStatus("DRAFT");
+        orderMapper.insert(order);
+
+        MatPurchaseOrderItem item = new MatPurchaseOrderItem();
+        item.setRequestItemId(requestItemId);
+        item.setMaterialId(1L);
+        item.setBudgetLineId(BUDGET_LINE_ID);
+        item.setQuantity(new BigDecimal("2"));
+        item.setUnit("个");
+        item.setUnitPrice(new BigDecimal("10"));
+        item.setTaxRate(new BigDecimal("13"));
+        service.saveItemsBatch(order.getId(), List.of(item));
+
+        assertEquals(0, new BigDecimal("20").compareTo(orderMapper.selectById(order.getId()).getTotalAmount()));
+        assertEquals(0, new BigDecimal("13").compareTo(itemMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrderItem>()
+                        .eq(MatPurchaseOrderItem::getOrderId, order.getId())).getTaxRate()));
+
+        item.setQuantity(new BigDecimal("3"));
+        assertEquals("PURCHASE_ORDER_REQUEST_ITEM_MISMATCH",
+                assertThrows(BusinessException.class,
+                        () -> service.saveItemsBatch(order.getId(), List.of(item))).getCode());
+
+        long otherRequestId = requestId + 2;
+        long otherItemId = requestId + 3;
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request (
+                    id, tenant_id, project_id, request_code, approval_status, status,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, ?, 'APPROVED', 'CONVERTED', ?, ?, 0)
+                """, otherRequestId, TENANT_ID, PROJECT_ID, "PR-OTHER-" + otherRequestId, USER_ADMIN, USER_ADMIN);
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request_item (
+                    id, tenant_id, request_id, material_id, budget_line_id, quantity,
+                    estimated_unit_price, estimated_amount, unit, created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, 1, ?, 2, 50, 100, '个', ?, ?, 0)
+                """, otherItemId, TENANT_ID, otherRequestId, BUDGET_LINE_ID, USER_ADMIN, USER_ADMIN);
+        item.setRequestItemId(otherItemId);
+        item.setQuantity(new BigDecimal("2"));
+        assertEquals("PURCHASE_ORDER_REQUEST_ITEM_MISMATCH",
+                assertThrows(BusinessException.class,
+                        () -> service.saveItemsBatch(order.getId(), List.of(item))).getCode());
+
+    }
+
+    @Test @Transactional @DisplayName("来源申请订单不得删减明细")
+    void linkedOrderRejectsRequestItemSubset() {
+        long requestId = Math.abs(System.nanoTime());
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request (
+                    id, tenant_id, project_id, request_code, approval_status, status,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, ?, 'APPROVED', 'CONVERTED', ?, ?, 0)
+                """, requestId, TENANT_ID, PROJECT_ID, "PR-SUBSET-" + requestId, USER_ADMIN, USER_ADMIN);
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request_item (
+                    id, tenant_id, request_id, material_id, budget_line_id, quantity,
+                    estimated_unit_price, estimated_amount, unit, created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, 1, ?, 2, 50, 100, '个', ?, ?, 0),
+                       (?, ?, ?, 1, ?, 1, 50, 50, '个', ?, ?, 0)
+                """, requestId + 1, TENANT_ID, requestId, BUDGET_LINE_ID, USER_ADMIN, USER_ADMIN,
+                requestId + 2, TENANT_ID, requestId, BUDGET_LINE_ID, USER_ADMIN, USER_ADMIN);
+
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setTenantId(TENANT_ID);
+        order.setProjectId(PROJECT_ID);
+        order.setRequestId(requestId);
+        order.setOrderCode("PO-SUBSET-" + requestId);
+        order.setOrderType("PURCHASE");
+        order.setOrderStatus("DRAFT");
+        order.setApprovalStatus("DRAFT");
+        orderMapper.insert(order);
+
+        MatPurchaseOrderItem item = new MatPurchaseOrderItem();
+        item.setRequestItemId(requestId + 1);
+        item.setMaterialId(1L);
+        item.setBudgetLineId(BUDGET_LINE_ID);
+        item.setQuantity(new BigDecimal("2"));
+        item.setUnit("个");
+        item.setUnitPrice(BigDecimal.ONE);
+        assertEquals("PURCHASE_ORDER_REQUEST_ITEM_MISMATCH",
+                assertThrows(BusinessException.class,
+                        () -> service.saveItemsBatch(order.getId(), List.of(item))).getCode());
     }
 
     @Test @Transactional @DisplayName("saveItemsBatch → rejects disabled and cross-tenant materials")

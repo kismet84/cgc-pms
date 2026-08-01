@@ -18,6 +18,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
   showToast,
 } from '@/components'
@@ -56,6 +57,11 @@ watch(errorMessage, (value) => {
   if (value) showToast('error', '操作未完成', value)
 })
 const schedules = ref<ScheduleRecord[]>([])
+const pageSize = 10
+const pageNo = ref(1)
+const pagedSchedules = computed(() =>
+  schedules.value.slice((pageNo.value - 1) * pageSize, pageNo.value * pageSize),
+)
 const detail = ref<ScheduleDetail | null>(null)
 const traceSummary = ref<string[]>([])
 const traceLoaded = ref(false)
@@ -160,6 +166,7 @@ function statusTone(status: string): 'info' | 'success' | 'warning' | 'danger' |
 }
 
 async function reloadList(preserveNotice = false): Promise<boolean> {
+  pageNo.value = 1
   listController?.abort()
   const controller = new AbortController()
   listController = controller
@@ -633,7 +640,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
             </tr>
           </thead>
           <tbody>
-            <tr v-for="item in schedules" :key="item.id">
+            <tr v-for="item in pagedSchedules" :key="item.id">
               <th scope="row">
                 <V2Button
                   size="small"
@@ -673,6 +680,9 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
           </tbody>
         </table>
       </div>
+      <template #footer>
+        <V2Pagination v-model:page-no="pageNo" :total="schedules.length" label="项目计划分页" />
+      </template>
     </V2Card>
 
     <V2PageState

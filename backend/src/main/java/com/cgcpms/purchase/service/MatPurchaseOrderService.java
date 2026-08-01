@@ -159,29 +159,46 @@ public class MatPurchaseOrderService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(MatPurchaseOrder order) {
         checkProjectAccess(order.getProjectId(), "创建采购订单");
+        if (order.getRequestId() != null) {
+            throw new BusinessException("PURCHASE_REQUEST_CONVERSION_REQUIRED",
+                    "采购申请必须通过转换接口生成采购订单");
+        }
+        MatPurchaseOrder toInsert = new MatPurchaseOrder();
+        toInsert.setTenantId(UserContext.getCurrentTenantId());
+        toInsert.setProjectId(order.getProjectId());
+        toInsert.setContractId(order.getContractId());
+        toInsert.setPartnerId(order.getPartnerId());
+        toInsert.setOrderType(order.getOrderType());
+        toInsert.setOrderDate(order.getOrderDate());
+        toInsert.setDeliveryDate(order.getDeliveryDate());
+        toInsert.setDeliveryTerms(order.getDeliveryTerms());
+        toInsert.setExceptionPurchaseFlag(order.getExceptionPurchaseFlag());
+        toInsert.setExceptionReason(order.getExceptionReason());
+        toInsert.setRemark(order.getRemark());
+        toInsert.setTotalAmount(BigDecimal.ZERO);
         // Auto-generate order code: PO-yyyyMMdd-XXX
         String prefix = "PO-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
-        order.setOrderStatus("DRAFT");
-        order.setApprovalStatus("DRAFT");
+        toInsert.setOrderStatus("DRAFT");
+        toInsert.setApprovalStatus("DRAFT");
 
         // Contract validation: if contractId is set, validate contract exists and is PERFORMING
-        if (order.getContractId() != null) {
-            CtContract contract = ctContractMapper.selectById(order.getContractId());
+        if (toInsert.getContractId() != null) {
+            CtContract contract = ctContractMapper.selectById(toInsert.getContractId());
             if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
                 throw new BusinessException("CONTRACT_NOT_FOUND", "关联合同不存在");
-            if (!java.util.Objects.equals(contract.getProjectId(), order.getProjectId()))
+            if (!java.util.Objects.equals(contract.getProjectId(), toInsert.getProjectId()))
                 throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "关联合同不属于当前项目");
             if (!ContractStatusConstants.STATUS_PERFORMING.equals(contract.getContractStatus()))
                 throw new BusinessException("CONTRACT_NOT_PERFORMING", "关联合同非执行中状态，无法创建采购订单");
         }
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            order.setOrderCode(nextOrderCode(prefix, attempt));
+            toInsert.setOrderCode(nextOrderCode(prefix, attempt));
             try {
-                matPurchaseOrderMapper.insert(order);
-                return order.getId();
+                matPurchaseOrderMapper.insert(toInsert);
+                return toInsert.getId();
             } catch (DuplicateKeyException e) {
-                log.warn("采购订单编号冲突，重试生成 orderCode={}", order.getOrderCode());
+                log.warn("采购订单编号冲突，重试生成 orderCode={}", toInsert.getOrderCode());
             }
         }
         throw new BusinessException("PURCHASE_ORDER_CODE_CONFLICT", "采购订单编号生成冲突，请重试");
@@ -223,26 +240,39 @@ public class MatPurchaseOrderService {
             CtContract contract = ctContractMapper.selectById(order.getContractId());
             if (contract == null || !contract.getTenantId().equals(UserContext.getCurrentTenantId()))
                 throw new BusinessException("CONTRACT_NOT_FOUND", "关联合同不存在");
-            Long projectId = order.getProjectId() != null ? order.getProjectId() : existing.getProjectId();
-            if (!java.util.Objects.equals(contract.getProjectId(), projectId))
+            if (!java.util.Objects.equals(contract.getProjectId(), existing.getProjectId()))
                 throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "关联合同不属于当前项目");
             if (!ContractStatusConstants.STATUS_PERFORMING.equals(contract.getContractStatus()))
                 throw new BusinessException("CONTRACT_NOT_PERFORMING", "关联合同非执行中状态，无法关联");
         }
 
+        MatPurchaseOrder changes = new MatPurchaseOrder();
+        changes.setId(existing.getId());
+        changes.setContractId(order.getContractId());
+        changes.setPartnerId(order.getPartnerId());
+        changes.setOrderDate(order.getOrderDate());
+        changes.setDeliveryDate(order.getDeliveryDate());
+        changes.setDeliveryTerms(order.getDeliveryTerms());
+        changes.setRemark(order.getRemark());
+        if (existing.getRequestId() == null) {
+            changes.setExceptionPurchaseFlag(order.getExceptionPurchaseFlag());
+            changes.setExceptionReason(order.getExceptionReason());
+        } else {
+            changes.setExceptionPurchaseFlag(0);
+        }
         // 驳回后编辑即恢复草稿，允许修正商业条件后重新提交；审批历史由工作流保留。
-        order.setApprovalStatus("REJECTED".equals(existing.getApprovalStatus())
+        changes.setApprovalStatus("REJECTED".equals(existing.getApprovalStatus())
                 ? "DRAFT" : existing.getApprovalStatus());
-        order.setTotalAmount(matPurchaseOrderItemMapper.selectList(
+        changes.setTotalAmount(matPurchaseOrderItemMapper.selectList(
                         new LambdaQueryWrapper<MatPurchaseOrderItem>()
-                                .eq(MatPurchaseOrderItem::getOrderId, order.getId())
+                                .eq(MatPurchaseOrderItem::getOrderId, existing.getId())
                                 .eq(MatPurchaseOrderItem::getTenantId, existing.getTenantId()))
                 .stream()
                 .map(MatPurchaseOrderItem::getAmount)
                 .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add));
 
-        matPurchaseOrderMapper.updateById(order);
+        matPurchaseOrderMapper.updateById(changes);
     }
 
     /**
@@ -353,6 +383,7 @@ public class MatPurchaseOrderService {
         if (items.isEmpty()) {
             throw new BusinessException("PURCHASE_ORDER_NO_ITEMS", "采购订单没有明细，无法提交审批");
         }
+        Map<Long, MatPurchaseRequestItem> requestItemsById = validateRequestSources(order, items);
 
         BigDecimal itemTotal = BigDecimal.ZERO;
         for (MatPurchaseOrderItem item : items) {
@@ -366,18 +397,13 @@ public class MatPurchaseOrderService {
                 throw new BusinessException("PURCHASE_ORDER_ITEM_PRICE_INVALID", "采购订单明细单价必须大于 0");
             }
             integrityService.requireActiveBudgetLine(order.getProjectId(), item.getBudgetLineId());
-            if (item.getRequestItemId() != null) {
-                MatPurchaseRequestItem requestItem = purchaseRequestItemMapper.selectById(item.getRequestItemId());
-                if (requestItem == null || !java.util.Objects.equals(requestItem.getTenantId(), order.getTenantId())
-                        || !java.util.Objects.equals(requestItem.getBudgetLineId(), item.getBudgetLineId())) {
-                    throw new BusinessException("PURCHASE_ORDER_REQUEST_ITEM_MISMATCH", "订单明细与采购申请预算来源不一致");
-                }
+            MatPurchaseRequestItem requestItem = item.getRequestItemId() == null
+                    ? null : requestItemsById.get(item.getRequestItemId());
+            if (requestItem != null) {
                 if (item.getAmount() != null && requestItem.getEstimatedAmount() != null
                         && item.getAmount().compareTo(requestItem.getEstimatedAmount()) > 0) {
                     throw new BusinessException("PURCHASE_ORDER_EXCEEDS_REQUEST_BUDGET", "订单明细金额超过采购申请已占用预算");
                 }
-            } else if (!exceptionPurchase) {
-                throw new BusinessException("PURCHASE_ORDER_REQUEST_ITEM_REQUIRED", "非例外采购订单明细必须关联采购申请明细");
             }
             if (item.getTaxRate() == null || item.getTaxRate().signum() < 0
                     || item.getTaxRate().compareTo(new BigDecimal("100")) > 0) {
@@ -423,6 +449,8 @@ public class MatPurchaseOrderService {
 
         if (!"DRAFT".equals(order.getApprovalStatus()))
             throw new BusinessException("ORDER_IN_APPROVAL", "采购订单审批中或已审批，不可编辑明细");
+
+        validateRequestSources(order, items);
 
         // Delete old items (tenant isolation)
         LambdaQueryWrapper<MatPurchaseOrderItem> deleteWrapper = new LambdaQueryWrapper<>();
@@ -474,6 +502,44 @@ public class MatPurchaseOrderService {
         updateWrapper.eq(MatPurchaseOrder::getId, orderId)
                 .set(MatPurchaseOrder::getTotalAmount, totalAmount);
         matPurchaseOrderMapper.update(null, updateWrapper);
+    }
+
+    private Map<Long, MatPurchaseRequestItem> validateRequestSources(
+            MatPurchaseOrder order, List<MatPurchaseOrderItem> items) {
+        if (order.getRequestId() == null) {
+            if (items.stream().anyMatch(item -> item.getRequestItemId() != null)) {
+                throw new BusinessException("PURCHASE_ORDER_SOURCE_CONFLICT", "例外采购订单不得关联采购申请明细");
+            }
+            return Map.of();
+        }
+
+        Set<Long> sourceIds = items.stream()
+                .map(MatPurchaseOrderItem::getRequestItemId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet());
+        List<MatPurchaseRequestItem> requestItems = purchaseRequestItemMapper.selectList(
+                new LambdaQueryWrapper<MatPurchaseRequestItem>()
+                        .eq(MatPurchaseRequestItem::getTenantId, order.getTenantId())
+                        .eq(MatPurchaseRequestItem::getRequestId, order.getRequestId()));
+        if (sourceIds.size() != items.size() || requestItems.size() != items.size()) {
+            throw new BusinessException("PURCHASE_ORDER_REQUEST_ITEM_MISMATCH", "订单明细必须完整对应来源采购申请");
+        }
+
+        Map<Long, MatPurchaseRequestItem> byId = requestItems.stream()
+                .collect(Collectors.toMap(MatPurchaseRequestItem::getId, item -> item));
+        for (MatPurchaseOrderItem item : items) {
+            MatPurchaseRequestItem source = byId.get(item.getRequestItemId());
+            if (source == null
+                    || !java.util.Objects.equals(source.getMaterialId(), item.getMaterialId())
+                    || !java.util.Objects.equals(source.getWbsTaskId(), item.getWbsTaskId())
+                    || !java.util.Objects.equals(source.getBudgetLineId(), item.getBudgetLineId())
+                    || !java.util.Objects.equals(source.getUnit(), item.getUnit())
+                    || source.getQuantity() == null || item.getQuantity() == null
+                    || source.getQuantity().compareTo(item.getQuantity()) != 0) {
+                throw new BusinessException("PURCHASE_ORDER_REQUEST_ITEM_MISMATCH", "订单明细来源字段不得变更");
+            }
+        }
+        return byId;
     }
 
     private List<MatPurchaseOrderItem> getOrderEntities(MatPurchaseOrder order) {

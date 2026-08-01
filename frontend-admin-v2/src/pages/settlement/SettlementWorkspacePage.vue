@@ -29,6 +29,7 @@ import { formatAmount } from '@/pages/dashboard/model'
 import { loadContractPage } from '@/services/commercial'
 import { deleteSiteFile, uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
+import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
 import {
   computeSettlement,
   createSettlement,
@@ -70,6 +71,8 @@ const costs = ref<SettlementCostRecord[]>([])
 const attachments = ref<SettlementAttachmentRecord[]>([])
 const approvals = ref<SettlementApprovalRecord[]>([])
 const contracts = ref<ContractRecord[]>([])
+const settlementStatuses = ref<DictDataRecord[]>([])
+const approvalStatuses = ref<DictDataRecord[]>([])
 const checkedSourceIds = ref<string[]>([])
 const preview = ref<SettlementCompute | null>(null)
 const pageNo = ref(1)
@@ -95,6 +98,7 @@ let candidateController: AbortController | null = null
 let listGeneration = 0
 let detailGeneration = 0
 let candidateGeneration = 0
+let settlementDictionariesLoaded = false
 
 const detailId = computed(() => String(route.params.id || '').trim())
 const isDetail = computed(() => Boolean(detailId.value))
@@ -142,18 +146,12 @@ const confirmationDescription = computed(() => {
     return pendingFile.value ? `确认删除附件“${pendingFile.value.originalName}”？` : ''
   return selected.value ? `确认操作结算“${selected.value.settlementCode}”？` : ''
 })
-const settlementStatusOptions = [
-  { value: 'DRAFT', label: '草稿' },
-  { value: 'FINALIZED', label: '已定案' },
-  { value: 'CANCELLED', label: '已作废' },
-]
-const approvalStatusOptions = [
-  { value: 'DRAFT', label: '草稿' },
-  { value: 'APPROVING', label: '审批中' },
-  { value: 'APPROVED', label: '已通过' },
-  { value: 'REJECTED', label: '已驳回' },
-  { value: 'WITHDRAWN', label: '已撤回' },
-]
+const settlementStatusOptions = computed(() =>
+  settlementStatuses.value.map((item) => ({ value: item.dictValue, label: item.dictLabel })),
+)
+const approvalStatusOptions = computed(() =>
+  approvalStatuses.value.map((item) => ({ value: item.dictValue, label: item.dictLabel })),
+)
 
 function errorText(error: unknown, fallback: string): string {
   if (isApiClientError(error)) return error.message
@@ -163,13 +161,6 @@ function errorText(error: unknown, fallback: string): string {
 function statusLabel(value: string | null | undefined): string {
   return (
     {
-      DRAFT: '草稿',
-      FINALIZED: '已定案',
-      CANCELLED: '已作废',
-      APPROVING: '审批中',
-      APPROVED: '已通过',
-      REJECTED: '已驳回',
-      WITHDRAWN: '已撤回',
       FINAL: '终期结算',
       SUBCONTRACT: '分包结算',
       SETTLEMENT_V2: '服务端结算快照 V2',
@@ -182,6 +173,27 @@ function statusLabel(value: string | null | undefined): string {
     value ||
     '—'
   )
+}
+
+function settlementStatusLabel(value: string | null | undefined): string {
+  if (!value) return '—'
+  return settlementStatuses.value.find((item) => item.dictValue === value)?.dictLabel ?? value
+}
+
+function approvalStatusLabel(value: string | null | undefined): string {
+  if (!value) return '—'
+  return approvalStatuses.value.find((item) => item.dictValue === value)?.dictLabel ?? value
+}
+
+async function loadSettlementDictionaries(signal?: AbortSignal): Promise<void> {
+  if (settlementDictionariesLoaded) return
+  const [nextSettlementStatuses, nextApprovalStatuses] = await Promise.all([
+    loadEnabledDictDataByCode('settlement_final_status', signal),
+    loadEnabledDictDataByCode('approval_status', signal),
+  ])
+  settlementStatuses.value = nextSettlementStatuses
+  approvalStatuses.value = nextApprovalStatuses
+  settlementDictionariesLoaded = true
 }
 
 function money(value: string | null | undefined): string {
@@ -208,7 +220,10 @@ async function loadPage(): Promise<void> {
   loading.value = true
   errorMessage.value = ''
   try {
-    const page = await loadSettlements(query(), controller.signal)
+    const [, page] = await Promise.all([
+      loadSettlementDictionaries(controller.signal),
+      loadSettlements(query(), controller.signal),
+    ])
     if (generation !== listGeneration) return
     records.value = page.records
     total.value = page.total
@@ -232,6 +247,7 @@ async function loadDetail(id: string): Promise<boolean> {
   detailLoading.value = true
   detailErrorMessage.value = ''
   try {
+    await loadSettlementDictionaries(controller.signal)
     const [
       record,
       nextSources,
@@ -583,10 +599,10 @@ onBeforeUnmount(() => {
                 <td>{{ money(record.finalAmount) }}</td>
                 <td>{{ money(record.paidAmount) }}</td>
                 <td>
-                  <V2Badge>{{ statusLabel(record.settlementStatus) }}</V2Badge>
+                  <V2Badge>{{ settlementStatusLabel(record.settlementStatus) }}</V2Badge>
                 </td>
                 <td>
-                  <V2Badge>{{ statusLabel(record.approvalStatus) }}</V2Badge>
+                  <V2Badge>{{ approvalStatusLabel(record.approvalStatus) }}</V2Badge>
                 </td>
               </tr>
             </tbody>
@@ -594,6 +610,7 @@ onBeforeUnmount(() => {
         </div>
         <template #footer>
           <nav class="settlement-workspace__pager" aria-label="结算分页">
+            <span>共 {{ total }} 条</span>
             <V2Button
               size="small"
               variant="secondary"
@@ -696,11 +713,11 @@ onBeforeUnmount(() => {
             <dl class="v2-detail-dialog__facts">
               <div>
                 <dt>审批</dt>
-                <dd>{{ statusLabel(selected.approvalStatus) }}</dd>
+                <dd>{{ approvalStatusLabel(selected.approvalStatus) }}</dd>
               </div>
               <div>
                 <dt>结算</dt>
-                <dd>{{ statusLabel(selected.settlementStatus) }}</dd>
+                <dd>{{ settlementStatusLabel(selected.settlementStatus) }}</dd>
               </div>
               <div>
                 <dt>累计付款</dt>
@@ -758,7 +775,7 @@ onBeforeUnmount(() => {
             <ul>
               <li v-for="item in sources.subMeasures" :key="item.id">
                 {{ item.measureCode }} · {{ money(item.approvedAmount) }} ·
-                {{ statusLabel(item.approvalStatus) }}
+                {{ approvalStatusLabel(item.approvalStatus) }}
               </li>
               <li v-for="item in sources.varOrders" :key="item.id">
                 {{ item.varCode }} · {{ item.varName }} · {{ money(item.confirmedAmount) }}

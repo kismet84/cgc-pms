@@ -60,6 +60,17 @@ Assert-Contains 'mainline skill' $mainline @('**Goal:**','**Architecture:**','�
 
 $canonicalCategories = @('tool_config','tool_invocation','environment_prerequisite','ready_issue_config','retrieval_gap','quality_or_security','unknown')
 Assert-Contains 'CI skill categories' $ci $canonicalCategories
+Assert-Contains 'PowerShell ripgrep invocation' $ci @(
+  'PowerShell 中禁止使用 Bash/C 风格的反斜杠转义双引号',
+  '包含双引号的检索表达式必须使用 PowerShell 单引号字面量',
+  '精确文本检索使用 `rg -F`',
+  '每个目标通过独立 `-e ''literal''` 传入',
+  '构建/测试与证据检索分开执行',
+  '`regex parse error`',
+  '归类 `tool_invocation`',
+  '只做一次最小复验',
+  '核对退出码与命中结果'
+)
 Assert-Contains 'backend full test monitoring' $ci @(
   '最近 10 次成功 GitHub Actions `backend-test`',
   '`Run backend tests with coverage`',

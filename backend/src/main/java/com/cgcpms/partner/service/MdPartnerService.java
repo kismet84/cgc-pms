@@ -69,6 +69,7 @@ public class MdPartnerService {
         partner.setPartnerType(sysDictDataService.requireEnabledValue(
                 "partner_type", partner.getPartnerType(),
                 "PARTNER_TYPE_INVALID", "合作方类型不合法"));
+        normalizeRiskLevel(partner);
         normalizeDefaultLeadDays(partner, partner.getPartnerType());
         // Auto-generate partner code: PTN-yyyyMMdd-NNN
         boolean autoGenerateCode = !StringUtils.hasText(partner.getPartnerCode());
@@ -144,11 +145,19 @@ public class MdPartnerService {
         if (StringUtils.hasText(partner.getPartnerType())) {
             partner.setPartnerType(effectivePartnerType);
         }
+        normalizeRiskLevel(partner);
         if (!partner.isDefaultLeadDaysSpecified()) {
             partner.preserveDefaultLeadDays(existing.getDefaultLeadDays());
         }
         normalizeDefaultLeadDays(partner, effectivePartnerType);
         mdPartnerMapper.updateById(partner);
+    }
+
+    private void normalizeRiskLevel(MdPartner partner) {
+        if (!StringUtils.hasText(partner.getRiskLevel())) return;
+        partner.setRiskLevel(sysDictDataService.requireEnabledValue(
+                "partner_risk_level", partner.getRiskLevel(),
+                "PARTNER_RISK_LEVEL_INVALID", "合作方风险等级不合法"));
     }
 
     private void normalizeDefaultLeadDays(MdPartner partner, String effectivePartnerType) {

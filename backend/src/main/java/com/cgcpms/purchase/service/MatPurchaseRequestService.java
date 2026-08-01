@@ -53,7 +53,6 @@ public class MatPurchaseRequestService {
     private final MdMaterialMapper mdMaterialMapper;
     private final CtContractMapper ctContractMapper;
     private final WorkflowEngine workflowEngine;
-    private final PurchaseRequestConversionService conversionService;
     private final ProjectAccessChecker projectAccessChecker;
     private final JdbcTemplate jdbcTemplate;
     private final ProcurementIntegrityService integrityService;
@@ -396,25 +395,6 @@ public class MatPurchaseRequestService {
                 throw new BusinessException("PURCHASE_BUDGET_MISMATCH", "预算行不存在、未生效或不属于当前项目");
             }
         }
-    }
-
-    // ================================================================
-    // 转采购订单（手动触发）
-    // ================================================================
-
-    @Transactional(rollbackFor = Exception.class)
-    public void convertToPurchaseOrder(Long requestId) {
-        MatPurchaseRequest request = requestMapper.selectById(requestId);
-        if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
-            throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
-
-        if (!"APPROVED".equals(request.getStatus()))
-            throw new BusinessException("REQUEST_NOT_APPROVED", "采购申请未审批通过，无法转换");
-
-        if ("CONVERTED".equals(request.getStatus()))
-            throw new BusinessException("REQUEST_ALREADY_CONVERTED", "采购申请已转换，不可重复转换");
-
-        conversionService.convertApprovedRequest(request);
     }
 
     private void validateProjectRequired(Long projectId) {

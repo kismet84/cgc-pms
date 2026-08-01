@@ -264,7 +264,7 @@ abstract class DashboardServiceTestSupport {
         purchaseOrder.setPartnerId(partnerId);
         purchaseOrder.setOrderCode("PO-" + suffix);
         purchaseOrder.setOrderDate(currentMonthDate);
-        purchaseOrder.setDeliveryDate(currentMonthDate.minusDays(1));
+        purchaseOrder.setDeliveryDate(today.minusDays(1));
         purchaseOrder.setTotalAmount(new BigDecimal("120000.00"));
         purchaseOrder.setApprovalStatus("APPROVED");
         purchaseOrder.setOrderStatus("APPROVED");

@@ -10,6 +10,7 @@ import {
   V2Dialog,
   V2Input,
   V2PageState,
+  V2Pagination,
   V2Select,
   V2Stack,
   showToast,
@@ -104,6 +105,9 @@ const subjectForm = reactive({
 
 const versions = ref<MappingVersionRecord[]>([])
 const rules = ref<AssignmentRuleRecord[]>([])
+const pageSize = 10
+const versionPageNo = ref(1)
+const rulePageNo = ref(1)
 const mappingDialog = ref(false)
 const activationTarget = ref<MappingVersionRecord | null>(null)
 const activationApprovalId = ref('')
@@ -134,6 +138,7 @@ const ruleForm = reactive({
 
 const scopeProjectId = ref('')
 const scopes = ref<ProjectScopeRecord[]>([])
+const scopePageNo = ref(1)
 const scopeDialog = ref(false)
 const scopeForm = reactive({
   costSubjectId: '',
@@ -149,6 +154,8 @@ const impact = ref<SubjectImpactRecord | null>(null)
 const reconciliation = ref<CostSubjectAuditRow | null>(null)
 const transfers = ref<CostSubjectAuditRow[]>([])
 const allocations = ref<CostSubjectAuditRow[]>([])
+const transferPageNo = ref(1)
+const allocationPageNo = ref(1)
 const transferDialog = ref(false)
 const allocationDialog = ref(false)
 const reverseTarget = ref<CostSubjectAuditRow | null>(null)
@@ -221,6 +228,15 @@ const impactLabels: Array<[keyof SubjectImpactRecord, string]> = [
   ['assignmentRules', '归集规则'],
   ['projectScopes', '项目范围'],
 ]
+const pagedVersions = computed(() => pageSlice(versions.value, versionPageNo.value))
+const pagedRules = computed(() => pageSlice(rules.value, rulePageNo.value))
+const pagedScopes = computed(() => pageSlice(scopes.value, scopePageNo.value))
+const pagedTransfers = computed(() => pageSlice(transfers.value, transferPageNo.value))
+const pagedAllocations = computed(() => pageSlice(allocations.value, allocationPageNo.value))
+
+function pageSlice<T>(items: T[], pageNo: number): T[] {
+  return items.slice((pageNo - 1) * pageSize, pageNo * pageSize)
+}
 
 function messageOf(value: unknown): string {
   return isApiClientError(value) ? value.message : '请求失败，请稍后重试'
@@ -353,6 +369,8 @@ async function loadTaxonomy(signal?: AbortSignal): Promise<void> {
 }
 
 async function loadRules(signal?: AbortSignal): Promise<void> {
+  versionPageNo.value = 1
+  rulePageNo.value = 1
   ;[versions.value, rules.value] = await Promise.all([
     loadMappingVersions(signal),
     loadAssignmentRules(signal),
@@ -471,6 +489,7 @@ async function queryScopes(): Promise<void> {
     return
   }
   loading.value = true
+  scopePageNo.value = 1
   error.value = ''
   try {
     scopes.value = await loadProjectScopes(scopeProjectId.value)
@@ -510,6 +529,7 @@ async function submitScope(): Promise<void> {
     })
     scopeDialog.value = false
     scopes.value = await loadProjectScopes(scopeProjectId.value)
+    scopePageNo.value = 1
     showToast('success', '项目范围已保存', '适用范围已刷新。')
   } catch (value) {
     showToast('error', '保存范围失败', messageOf(value))
@@ -519,6 +539,8 @@ async function submitScope(): Promise<void> {
 }
 
 async function loadTrace(signal?: AbortSignal): Promise<void> {
+  transferPageNo.value = 1
+  allocationPageNo.value = 1
   ;[transfers.value, allocations.value] = await Promise.all([
     loadBidTransfers(signal),
     loadFinanceAllocations(signal),
@@ -914,7 +936,7 @@ onBeforeUnmount(() => controller?.abort())
               </tr>
             </thead>
             <tbody>
-              <tr v-for="record in versions" :key="record.id">
+              <tr v-for="record in pagedVersions" :key="record.id">
                 <th scope="row">{{ record.versionCode }}</th>
                 <td>{{ record.versionName }}</td>
                 <td>{{ record.itemCount }}</td>
@@ -937,6 +959,15 @@ onBeforeUnmount(() => controller?.abort())
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            :total="versions.length"
+            :page-no="versionPageNo"
+            :page-size="pageSize"
+            label="映射版本分页"
+            @update:page-no="versionPageNo = $event"
+          />
+        </template>
       </V2Card>
 
       <V2Card title="显式归集规则">
@@ -964,7 +995,7 @@ onBeforeUnmount(() => controller?.abort())
               </tr>
             </thead>
             <tbody>
-              <tr v-for="record in rules" :key="record.id">
+              <tr v-for="record in pagedRules" :key="record.id">
                 <th scope="row">{{ record.ruleCode }}</th>
                 <td>{{ record.sourceType }}</td>
                 <td>{{ record.businessCategory }}</td>
@@ -979,6 +1010,15 @@ onBeforeUnmount(() => controller?.abort())
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            :total="rules.length"
+            :page-no="rulePageNo"
+            :page-size="pageSize"
+            label="归集规则分页"
+            @update:page-no="rulePageNo = $event"
+          />
+        </template>
       </V2Card>
     </template>
 
@@ -1003,7 +1043,7 @@ onBeforeUnmount(() => controller?.abort())
               </tr>
             </thead>
             <tbody>
-              <tr v-for="record in scopes" :key="record.id">
+              <tr v-for="record in pagedScopes" :key="record.id">
                 <th scope="row">{{ record.subjectCode }}</th>
                 <td>{{ record.subjectName }}</td>
                 <td>{{ record.enabled === 1 ? '启用' : '停用' }}</td>
@@ -1024,6 +1064,15 @@ onBeforeUnmount(() => controller?.abort())
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            :total="scopes.length"
+            :page-no="scopePageNo"
+            :page-size="pageSize"
+            label="项目范围分页"
+            @update:page-no="scopePageNo = $event"
+          />
+        </template>
       </V2Card>
     </template>
 
@@ -1093,7 +1142,7 @@ onBeforeUnmount(() => controller?.abort())
               </tr>
             </thead>
             <tbody>
-              <tr v-for="record in transfers" :key="String(record.id)">
+              <tr v-for="record in pagedTransfers" :key="String(record.id)">
                 <th scope="row">{{ rowText(record, 'transferCode') }}</th>
                 <td>{{ rowText(record, 'bidProjectName') }}</td>
                 <td>{{ rowText(record, 'versionNo') }}</td>
@@ -1115,6 +1164,15 @@ onBeforeUnmount(() => controller?.abort())
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            :total="transfers.length"
+            :page-no="transferPageNo"
+            :page-size="pageSize"
+            label="投标成本转入记录分页"
+            @update:page-no="transferPageNo = $event"
+          />
+        </template>
       </V2Card>
 
       <V2Card title="项目财务费用分摊记录">
@@ -1139,7 +1197,7 @@ onBeforeUnmount(() => controller?.abort())
               </tr>
             </thead>
             <tbody>
-              <tr v-for="record in allocations" :key="String(record.id)">
+              <tr v-for="record in pagedAllocations" :key="String(record.id)">
                 <th scope="row">{{ rowText(record, 'batchCode') }}</th>
                 <td>{{ rowText(record, 'sourceType') }}</td>
                 <td>{{ rowText(record, 'allocationBasis') }}</td>
@@ -1162,6 +1220,15 @@ onBeforeUnmount(() => controller?.abort())
             </tbody>
           </table>
         </div>
+        <template #footer>
+          <V2Pagination
+            :total="allocations.length"
+            :page-no="allocationPageNo"
+            :page-size="pageSize"
+            label="财务费用分摊记录分页"
+            @update:page-no="allocationPageNo = $event"
+          />
+        </template>
       </V2Card>
     </template>
 

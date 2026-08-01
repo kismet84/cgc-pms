@@ -110,20 +110,22 @@ export function deletePartner(id: string): Promise<void> {
   return apiRequest<void>(`/partners/${requiredId(id)}`, { method: 'DELETE' })
 }
 
-export function loadCompanies(signal?: AbortSignal): Promise<PageResult<OrgCompanyRecord>> {
-  return apiRequest<PageResult<OrgCompanyRecord>>('/org/companies?pageNo=1&pageSize=200', {
-    signal,
-  })
+export function loadCompanies(
+  query: { pageNo: number; pageSize: number },
+  signal?: AbortSignal,
+): Promise<PageResult<OrgCompanyRecord>> {
+  return apiRequest<PageResult<OrgCompanyRecord>>(withQuery('/org/companies', query), { signal })
 }
 
 export function loadDepartmentTree(signal?: AbortSignal): Promise<OrgDepartmentRecord[]> {
   return apiRequest<OrgDepartmentRecord[]>('/org/departments/tree', { signal })
 }
 
-export function loadPositions(signal?: AbortSignal): Promise<PageResult<OrgPositionRecord>> {
-  return apiRequest<PageResult<OrgPositionRecord>>('/org/positions?pageNo=1&pageSize=200', {
-    signal,
-  })
+export function loadPositions(
+  query: { pageNo: number; pageSize: number },
+  signal?: AbortSignal,
+): Promise<PageResult<OrgPositionRecord>> {
+  return apiRequest<PageResult<OrgPositionRecord>>(withQuery('/org/positions', query), { signal })
 }
 
 export function saveCompany(

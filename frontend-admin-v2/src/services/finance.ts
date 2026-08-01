@@ -89,7 +89,7 @@ export const loadAccountingEntries = (query: AccountingEntryQuery = {}, signal?:
 export const loadAccountingEntryDetail = (id: string, signal?: AbortSignal) =>
   apiRequest<AccountingEntryDetail>(`/accounting-entry/workspace/${requiredId(id)}`, { signal })
 
-export const loadFinanceOperationsWorkspace = (projectId: string, signal?: AbortSignal) =>
+export const loadFinanceOperationsWorkspace = (projectId?: string, signal?: AbortSignal) =>
   apiRequest<FinanceOperationsWorkspace>(
     withQuery('/finance-operations/workspace', { projectId }),
     { signal },
@@ -126,7 +126,7 @@ export const reverseCashJournal = (id: string, reason: string) =>
     { method: 'POST', body: { reason } },
   )
 
-export const loadCashForecastCycles = (projectId: string, signal?: AbortSignal) =>
+export const loadCashForecastCycles = (projectId?: string, signal?: AbortSignal) =>
   apiRequest<CashForecastCycleRecord[]>(withQuery('/cash-forecasts/workspace', { projectId }), {
     signal,
   })

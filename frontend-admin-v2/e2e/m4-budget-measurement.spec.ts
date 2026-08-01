@@ -311,8 +311,9 @@ test.describe('M4 budget and measurement routes', () => {
     row = page.getByRole('row').filter({ hasText: 'E2E编辑预算' })
     await row.getByRole('button', { name: 'BUD-NEW-1' }).click()
     await page.getByRole('button', { name: '添加明细' }).click()
-    await page.getByRole('button', { name: '成本科目：请选择' }).click()
-    await page.getByRole('option', { name: 'COST-001 · 直接成本' }).click()
+    await page.getByRole('combobox', { name: '成本科目' }).selectOption({
+      label: 'COST-001 · 直接成本',
+    })
     await page.getByLabel('预算金额').fill('100.00')
     await page.getByRole('button', { name: '保存明细' }).click()
     await expect(page.getByText('预算明细已保存')).toBeVisible()
@@ -358,38 +359,23 @@ test.describe('M4 budget and measurement routes', () => {
     ).toBeVisible()
 
     const projectControl = page.locator('#global-project')
-    await projectControl.click()
-    await page
-      .getByRole('listbox', { name: '当前项目' })
-      .locator('[role="option"][data-value="P2"]')
-      .click()
+    await projectControl.selectOption('P2')
     await expect(page.getByRole('row').filter({ hasText: '项目二预算-全部' })).toBeVisible()
 
     const periodControl = page.locator('#global-report-period')
-    await periodControl.click()
-    const periodOptions = page
-      .getByRole('listbox', { name: '报告期' })
-      .locator('[role="option"][data-value]:not([data-value=""])')
-    const firstPeriod = (await periodOptions.nth(0).getAttribute('data-value'))!
-    const secondPeriod = (await periodOptions.nth(1).getAttribute('data-value'))!
-    await periodOptions.nth(0).click()
+    const periodOptions = periodControl.locator('option:not([value=""])')
+    const firstPeriod = (await periodOptions.nth(0).getAttribute('value'))!
+    const secondPeriod = (await periodOptions.nth(1).getAttribute('value'))!
+    await periodControl.selectOption(firstPeriod)
     await expect(
       page.getByRole('row').filter({ hasText: `项目二预算-${firstPeriod}` }),
     ).toBeVisible()
 
     await page.getByRole('link', { name: '产值计量' }).click()
     await expect(page.getByText(`ME-P2-${firstPeriod}`, { exact: true })).toBeVisible()
-    await projectControl.click()
-    await page
-      .getByRole('listbox', { name: '当前项目' })
-      .locator('[role="option"][data-value="P1"]')
-      .click()
+    await projectControl.selectOption('P1')
     await expect(page.getByText('ME-1', { exact: true })).toBeVisible()
-    await periodControl.click()
-    await page
-      .getByRole('listbox', { name: '报告期' })
-      .locator(`[role="option"][data-value="${secondPeriod}"]`)
-      .click()
+    await periodControl.selectOption(secondPeriod)
     await expect(page).toHaveURL(new RegExp(`projectId=P1.*period=${secondPeriod}`))
 
     const [firstYear, firstMonth] = firstPeriod.split('-').map(Number)
@@ -438,12 +424,8 @@ test.describe('M4 budget and measurement routes', () => {
     )
     await page.getByRole('button', { name: '新建计量' }).click()
     const dialog = page.getByRole('dialog', { name: '新建产值计量' })
-    const contract = dialog.getByRole('button', { name: /^业主合同：/ })
-    await contract.press('ArrowDown')
-    const contractOption = page.getByRole('option', { name: '业主合同' })
-    await expect(contractOption).toBeFocused()
-    await contractOption.press('Enter')
-    await expect(dialog.getByRole('button', { name: '计量期间：2026-07' })).toBeVisible()
+    await dialog.getByRole('combobox', { name: '业主合同' }).selectOption({ label: '业主合同' })
+    await expect(dialog.getByRole('combobox', { name: '计量期间' })).toHaveValue('PR1')
     await expect(dialog.getByRole('checkbox')).toBeVisible()
     await dialog.getByRole('checkbox').check()
     await dialog.getByLabel('本次计量量').fill('9999999999999999.9999')

@@ -368,7 +368,7 @@ class Phase2FullChainIntegrationTest {
         app.setContractId(CONTRACT_ID);
         app.setPartnerId(PARTNER_ID);
         app.setApplyAmount(new BigDecimal("50000.00"));
-        app.setPayType("MATERIAL");
+        app.setPayType("PROGRESS");
         app.setApplyReason("Phase2全链路集成测试-材料款付款");
         app.setRemark("测试付款申请");
 
@@ -436,7 +436,7 @@ class Phase2FullChainIntegrationTest {
         app.setContractId(CONTRACT_ID);
         app.setPartnerId(PARTNER_ID);
         app.setApplyAmount(new BigDecimal("50000.00"));
-        app.setPayType("MATERIAL");
+        app.setPayType("PROGRESS");
         app.setApplyReason("超金额测试");
 
         Long appId = payApplicationService.create(app);
@@ -462,7 +462,7 @@ class Phase2FullChainIntegrationTest {
         zeroApp.setContractId(CONTRACT_ID);
         zeroApp.setPartnerId(PARTNER_ID);
         zeroApp.setApplyAmount(BigDecimal.ZERO);
-        zeroApp.setPayType("MATERIAL");
+        zeroApp.setPayType("PROGRESS");
         zeroApp.setApplyReason("零金额测试");
 
         Long zeroAppId = payApplicationService.create(zeroApp);
@@ -494,7 +494,7 @@ class Phase2FullChainIntegrationTest {
         app1.setContractId(CONTRACT_ID);
         app1.setPartnerId(PARTNER_ID);
         app1.setApplyAmount(new BigDecimal("50000"));
-        app1.setPayType("MATERIAL");
+        app1.setPayType("PROGRESS");
         app1.setApplyReason("boundary test 1");
         payApplicationService.create(app1);
         app1.setApprovalStatus("APPROVED");
@@ -506,7 +506,7 @@ class Phase2FullChainIntegrationTest {
         app2.setContractId(CONTRACT_ID);
         app2.setPartnerId(PARTNER_ID);
         app2.setApplyAmount(new BigDecimal("50000"));
-        app2.setPayType("MATERIAL");
+        app2.setPayType("PROGRESS");
         app2.setApplyReason("boundary test 2");
 
         assertDoesNotThrow(() -> {
@@ -538,7 +538,7 @@ class Phase2FullChainIntegrationTest {
         app1.setContractId(CONTRACT_ID);
         app1.setPartnerId(PARTNER_ID);
         app1.setApplyAmount(new BigDecimal("50000"));
-        app1.setPayType("MATERIAL");
+        app1.setPayType("PROGRESS");
         app1.setApplyReason("boundary test");
         payApplicationService.create(app1);
         app1.setApprovalStatus("APPROVED");
@@ -549,7 +549,7 @@ class Phase2FullChainIntegrationTest {
         app2.setContractId(CONTRACT_ID);
         app2.setPartnerId(PARTNER_ID);
         app2.setApplyAmount(new BigDecimal("50000.01"));
-        app2.setPayType("MATERIAL");
+        app2.setPayType("PROGRESS");
         app2.setApplyReason("exceed by 1 cent");
 
         BusinessException ex = assertThrows(BusinessException.class, () -> {
@@ -595,7 +595,7 @@ class Phase2FullChainIntegrationTest {
         app.setContractId(CONTRACT_ID);
         app.setPartnerId(PARTNER_ID);
         app.setApplyAmount(new BigDecimal("150000.00"));
-        app.setPayType("MATERIAL");
+        app.setPayType("PROGRESS");
         app.setApplyReason("Phase2全链路集成测试-回写测试");
 
         Long appId = payApplicationService.create(app);

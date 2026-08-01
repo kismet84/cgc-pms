@@ -12,6 +12,7 @@ import com.cgcpms.partner.service.MdPartnerService;
 import com.cgcpms.partner.vo.MdPartnerVO;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,12 +24,16 @@ import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {"spring.main.allow-circular-references=true", "spring.main.lazy-initialization=true"})
 @ActiveProfiles("local")
@@ -50,10 +55,21 @@ class MdPartnerServiceTest {
     @Autowired
     private PmProjectMapper projectMapper;
 
+    @MockitoBean
+    private SysDictDataService sysDictDataService;
+
     private Long createdPartnerId;
 
     @BeforeEach
     void setupContext() {
+        when(sysDictDataService.requireEnabledValue(anyString(), any(), anyString(), anyString()))
+                .thenAnswer(invocation -> {
+                    String value = invocation.getArgument(1);
+                    if (value == null || value.isBlank() || value.startsWith("ARBITRARY")) {
+                        throw new BusinessException(invocation.getArgument(2), invocation.getArgument(3));
+                    }
+                    return value.trim().toUpperCase(java.util.Locale.ROOT);
+                });
         UserContext.set(Jwts.claims()
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
@@ -584,5 +600,32 @@ class MdPartnerServiceTest {
         BusinessException error = assertThrows(BusinessException.class,
                 () -> partnerService.create(partner));
         assertEquals("PARTNER_TYPE_INVALID", error.getCode());
+    }
+
+    @Test
+    @Order(20)
+    @Transactional
+    @DisplayName("字典约束 — 创建和更新拒绝未启用风险等级")
+    void createAndUpdateRejectInvalidRiskLevel() {
+        MdPartner invalid = new MdPartner();
+        invalid.setPartnerName("非法风险等级合作方");
+        invalid.setPartnerType("SUPPLIER");
+        invalid.setRiskLevel("ARBITRARY_RISK");
+        assertEquals("PARTNER_RISK_LEVEL_INVALID",
+                assertThrows(BusinessException.class, () -> partnerService.create(invalid)).getCode());
+
+        MdPartner valid = new MdPartner();
+        valid.setPartnerName("风险等级更新合作方");
+        valid.setPartnerType("SUPPLIER");
+        valid.setRiskLevel(" low ");
+        Long id = partnerService.create(valid);
+        assertEquals("LOW", partnerMapper.selectById(id).getRiskLevel());
+
+        MdPartner update = new MdPartner();
+        update.setId(id);
+        update.setPartnerType("SUPPLIER");
+        update.setRiskLevel("ARBITRARY_RISK");
+        assertEquals("PARTNER_RISK_LEVEL_INVALID",
+                assertThrows(BusinessException.class, () -> partnerService.update(update)).getCode());
     }
 }

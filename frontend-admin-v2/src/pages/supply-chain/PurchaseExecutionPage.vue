@@ -92,11 +92,12 @@ const partners = ref<PartnerRecord[]>([])
 const contracts = ref<ContractPage['records']>([])
 const budgetLines = ref<BudgetLineRecord[]>([])
 const warehouses = ref<WarehouseRecord[]>([])
-const requestCandidates = ref<PurchaseRequestRecord[]>([])
-const requestItemCandidates = ref<PurchaseRequestItemRecord[]>([])
 const orderCandidates = ref<PurchaseOrderRecord[]>([])
 const form = reactive<Record<string, string>>({})
 const orderEditForm = reactive<Record<string, string>>({})
+const orderItemEdits = ref<
+  Array<{ source: PurchaseOrderItemRecord; unitPrice: string; taxRate: string }>
+>([])
 const supplierReturnForm = reactive<Record<string, string>>({})
 let listController: AbortController | null = null
 let detailController: AbortController | null = null
@@ -216,21 +217,6 @@ const warehouseOptions = computed(() => [
     label: [item.warehouseCode, item.warehouseName].filter(Boolean).join(' · '),
   })),
 ])
-const requestOptions = computed(() => [
-  { value: '', label: '例外采购（无申请来源）' },
-  ...requestCandidates.value.map((item) => ({
-    value: item.id,
-    label: [recordCode(item), item.purpose].filter(Boolean).join(' · '),
-  })),
-])
-const requestItemOptions = computed(() =>
-  requestItemCandidates.value
-    .filter((item) => item.id)
-    .map((item) => ({
-      value: item.id || '',
-      label: `${item.materialName || '物料名称缺失'} · ${item.quantity}`,
-    })),
-)
 const orderOptions = computed(() =>
   orderCandidates.value.map((item) => ({
     value: item.id,
@@ -257,6 +243,28 @@ function decimal(name: string, label: string): string {
   const value = required(name, label)
   if (!/^\d+(?:\.\d+)?$/.test(value)) throw new TypeError(`${label}必须为非负十进制数`)
   return value
+}
+
+function positiveValue(value: string, label: string): string {
+  const normalized = value.trim()
+  if (!/^\d+(?:\.\d+)?$/.test(normalized) || /^0+(?:\.0+)?$/.test(normalized)) {
+    throw new TypeError(`${label}必须大于0`)
+  }
+  return normalized
+}
+
+function taxRateValue(value: string, label: string): string {
+  const normalized = value.trim()
+  if (!/^(?:100(?:\.0+)?|\d{1,2}(?:\.\d+)?)$/.test(normalized)) {
+    throw new TypeError(`${label}必须在0到100之间`)
+  }
+  return normalized
+}
+
+function requiredSourceId(value: string | null | undefined, label: string): string {
+  const normalized = value?.trim() || ''
+  if (!normalized) throw new TypeError(`${label}缺失，请刷新后重试`)
+  return normalized
 }
 
 function recordCode(record: ListRecord): string {
@@ -431,7 +439,6 @@ async function openOrderEdit(): Promise<void> {
   for (const key of Object.keys(orderEditForm)) delete orderEditForm[key]
   Object.assign(orderEditForm, {
     projectId: order.projectId,
-    requestId: order.requestId || '',
     contractId: order.contractId || '',
     partnerId: order.partnerId || '',
     orderCode: order.orderCode,
@@ -443,12 +450,26 @@ async function openOrderEdit(): Promise<void> {
     exceptionReason: order.exceptionReason || '',
     remark: order.remark || '',
   })
+  orderItemEdits.value = (detailItems.value as PurchaseOrderItemRecord[]).map((item) => ({
+    source: item,
+    unitPrice: item.unitPrice || '',
+    taxRate: item.taxRate || '0',
+  }))
   orderEditOpen.value = true
   busy.value = true
   try {
-    partners.value = (
-      await loadPartners({ pageNo: 1, pageSize: 200, partnerType: 'SUPPLIER', status: 'ENABLE' })
-    ).records
+    const [partnerPage, contractPage] = await Promise.all([
+      loadPartners({ pageNo: 1, pageSize: 200, partnerType: 'SUPPLIER', status: 'ENABLE' }),
+      loadContractPage({
+        pageNo: 1,
+        pageSize: 200,
+        projectId: order.projectId,
+        contractType: 'PURCHASE',
+        approvalStatus: 'APPROVED',
+      }),
+    ])
+    partners.value = partnerPage.records
+    contracts.value = contractPage.records
   } catch (error) {
     errorMessage.value = errorText(error, '供应商读取失败')
     showToast('error', '供应商读取失败', errorMessage.value)
@@ -463,10 +484,10 @@ async function saveOrderEdit(): Promise<void> {
   errorMessage.value = ''
   const id = selected.value.id
   try {
+    if (!orderItemEdits.value.length) throw new TypeError('采购订单至少需要一条明细')
     await updatePurchaseOrder(id, {
       projectId: requiredOrderEdit('projectId', '项目'),
-      requestId: optionalOrderEdit('requestId'),
-      contractId: optionalOrderEdit('contractId'),
+      contractId: requiredOrderEdit('contractId', '采购合同'),
       partnerId: requiredOrderEdit('partnerId', '供应商'),
       orderCode: requiredOrderEdit('orderCode', '采购订单号'),
       orderType: optionalOrderEdit('orderType'),
@@ -477,6 +498,23 @@ async function saveOrderEdit(): Promise<void> {
       exceptionReason: optionalOrderEdit('exceptionReason'),
       remark: optionalOrderEdit('remark'),
     })
+    await savePurchaseOrderItems(
+      id,
+      orderItemEdits.value.map(({ source, unitPrice, taxRate }, index) => ({
+        orderId: id,
+        requestItemId: source.requestItemId,
+        wbsTaskId: source.wbsTaskId,
+        budgetLineId: source.budgetLineId,
+        projectId: source.projectId,
+        materialId: requiredSourceId(source.materialId, `第${index + 1}条物料`),
+        unit: source.unit,
+        quantity: source.quantity,
+        unitPrice: positiveValue(unitPrice, `第${index + 1}条单价`),
+        taxRate: taxRateValue(taxRate, `第${index + 1}条税率`),
+        receivedQuantity: source.receivedQuantity,
+        remark: source.remark,
+      })),
+    )
     orderEditOpen.value = false
     await loadPage()
     const refreshed = records.value.find((record) => record.id === id)
@@ -676,10 +714,8 @@ async function openCreate(): Promise<void> {
   for (const key of Object.keys(form)) delete form[key]
   form.projectId = projectId.value
   receiptCandidates.value = []
-  requestItemCandidates.value = []
   if (mode.value === 'request') Object.assign(form, { quantity: '1', estimatedUnitPrice: '0' })
-  if (mode.value === 'order')
-    Object.assign(form, { quantity: '1', unitPrice: '0', taxRate: '0', exceptionPurchaseFlag: '0' })
+  if (mode.value === 'order') Object.assign(form, { quantity: '1', unitPrice: '0', taxRate: '0' })
   if (mode.value === 'receipt')
     Object.assign(form, {
       receiptMode: 'INVENTORY',
@@ -713,14 +749,20 @@ async function openCreate(): Promise<void> {
       const activeBudget = budgetPage.records.find((item) => item.active)
       budgetLines.value = activeBudget ? ((await loadBudget(activeBudget.id)).lines ?? []) : []
     } else if (mode.value === 'order') {
-      const [requestPage, partnerPage, materialPage] = await Promise.all([
-        loadPurchaseRequests({ pageNum: 1, pageSize: 200, projectId: candidateProjectId }),
+      const [partnerPage, materialPage, contractPage] = await Promise.all([
         loadPartners({ pageNo: 1, pageSize: 200, partnerType: 'SUPPLIER', status: 'ENABLE' }),
         loadMaterials({ pageNo: 1, pageSize: 200, status: 'ENABLE' }),
+        loadContractPage({
+          pageNo: 1,
+          pageSize: 200,
+          projectId: candidateProjectId,
+          contractType: 'PURCHASE',
+          approvalStatus: 'APPROVED',
+        }),
       ])
-      requestCandidates.value = requestPage.records
       partners.value = partnerPage.records
       materials.value = materialPage.records
+      contracts.value = contractPage.records
     } else {
       const [orderPage, warehousePage] = await Promise.all([
         loadPurchaseOrders({ pageNum: 1, pageSize: 200, projectId: candidateProjectId }),
@@ -785,29 +827,25 @@ function changeMaterial(value: string): void {
   form.unit = material?.unit || ''
 }
 
-function changeRequestItem(value: string): void {
-  form.requestItemId = value
-  const item = requestItemCandidates.value.find((candidate) => candidate.id === value)
-  if (!item) return
-  form.materialId = item.materialId || ''
-  form.materialName = item.materialName || ''
-  form.unit = item.unit || ''
-  form.quantity = item.quantity
-  form.unitPrice = item.estimatedUnitPrice || form.unitPrice
-}
-
-async function changeRequest(value: string): Promise<void> {
-  form.requestId = value
-  form.requestItemId = ''
-  requestItemCandidates.value = []
-  if (!value || busy.value) return
+async function changeEditorProject(value: string): Promise<void> {
+  form.projectId = value
+  form.contractId = ''
+  if (!value || mode.value === 'receipt' || busy.value) return
   busy.value = true
   try {
-    requestItemCandidates.value = await loadPurchaseRequestItems(value)
-    changeRequestItem(requestItemCandidates.value[0]?.id || '')
+    contracts.value = (
+      await loadContractPage({
+        pageNo: 1,
+        pageSize: 200,
+        projectId: value,
+        contractType: 'PURCHASE',
+        approvalStatus: 'APPROVED',
+      })
+    ).records
   } catch (error) {
-    errorMessage.value = errorText(error, '采购申请明细读取失败')
-    showToast('error', '采购申请明细读取失败', errorMessage.value)
+    contracts.value = []
+    errorMessage.value = errorText(error, '采购合同候选读取失败')
+    showToast('error', '采购合同候选读取失败', errorMessage.value)
   } finally {
     busy.value = false
   }
@@ -873,7 +911,6 @@ async function save(): Promise<void> {
           {
             requestId: id,
             materialId: required('materialId', '物料'),
-            materialName: optional('materialName'),
             quantity: decimal('quantity', '申请数量'),
             budgetLineId: required('budgetLineId', '预算科目'),
             estimatedUnitPrice: decimal('estimatedUnitPrice', '预计单价'),
@@ -883,17 +920,16 @@ async function save(): Promise<void> {
         ])
       }
     } else if (mode.value === 'order') {
-      const requestId = optional('requestId')
       const command: PurchaseOrderCommand = {
         projectId: required('projectId', '项目'),
-        requestId,
+        contractId: required('contractId', '采购合同'),
         partnerId: optional('partnerId'),
         orderType: optional('orderType'),
         orderDate: optional('orderDate'),
         deliveryDate: optional('deliveryDate'),
         deliveryTerms: optional('deliveryTerms'),
-        exceptionPurchaseFlag: requestId ? 0 : Number(form.exceptionPurchaseFlag || '0'),
-        exceptionReason: optional('exceptionReason'),
+        exceptionPurchaseFlag: 1,
+        exceptionReason: required('exceptionReason', '例外原因'),
         remark: optional('remark'),
       }
       id = await createPurchaseOrder(command)
@@ -902,13 +938,11 @@ async function save(): Promise<void> {
         await savePurchaseOrderItems(id, [
           {
             orderId: id,
-            requestItemId: optional('requestItemId'),
             projectId: command.projectId,
             materialId: required('materialId', '物料'),
-            materialName: optional('materialName'),
             quantity: decimal('quantity', '订单数量'),
-            unitPrice: decimal('unitPrice', '订单单价'),
-            taxRate: decimal('taxRate', '税率'),
+            unitPrice: positiveValue(required('unitPrice', '订单单价'), '订单单价'),
+            taxRate: taxRateValue(required('taxRate', '税率'), '税率'),
             unit: optional('unit'),
           },
         ])
@@ -1077,7 +1111,7 @@ onBeforeUnmount(() => {
             </tbody>
           </table>
         </div>
-        <template v-if="total > pageSize" #footer>
+        <template #footer>
           <nav class="purchase-execution-page__pagination" aria-label="采购执行分页">
             <span>共 {{ total }} 条</span>
             <V2Button
@@ -1297,6 +1331,13 @@ onBeforeUnmount(() => {
       >
         <V2Input v-model="orderEditForm.orderCode" label="采购订单号" disabled required />
         <V2Select
+          v-model="orderEditForm.contractId"
+          label="采购合同"
+          :options="contractOptions"
+          :disabled="busy"
+          required
+        />
+        <V2Select
           v-model="orderEditForm.partnerId"
           label="供应商"
           :options="partnerOptions"
@@ -1317,6 +1358,17 @@ onBeforeUnmount(() => {
         />
         <V2Input v-model="orderEditForm.deliveryTerms" label="交付条件" required />
         <V2Input v-model="orderEditForm.remark" label="备注" />
+        <section aria-labelledby="purchase-order-item-price-title">
+          <h3 id="purchase-order-item-price-title">明细价格与税率</h3>
+          <div v-for="(item, index) in orderItemEdits" :key="item.source.id || index">
+            <p>
+              {{ item.source.materialName || '物料名称缺失' }} · 数量 {{ item.source.quantity }} ·
+              来源行不可修改
+            </p>
+            <V2Input v-model="item.unitPrice" :label="`第${index + 1}条单价`" required />
+            <V2Input v-model="item.taxRate" :label="`第${index + 1}条税率`" required />
+          </div>
+        </section>
       </form>
       <template #footer>
         <V2Button variant="secondary" :disabled="busy" @click="orderEditOpen = false"
@@ -1346,6 +1398,7 @@ onBeforeUnmount(() => {
           :options="workspace.projects"
           :disabled="busy"
           required
+          @update:model-value="changeEditorProject"
         />
         <template v-if="mode === 'request'">
           <V2Select
@@ -1385,22 +1438,11 @@ onBeforeUnmount(() => {
         </template>
         <template v-else-if="mode === 'order'">
           <V2Select
-            v-model="form.requestId"
-            label="采购申请"
-            :options="requestOptions"
-            allow-empty
-            :disabled="busy"
-            hint="无来源时后端按例外采购门禁校验"
-            @update:model-value="changeRequest"
-          />
-          <V2Select
-            v-if="form.requestId"
-            v-model="form.requestItemId"
-            label="申请明细"
-            :options="requestItemOptions"
+            v-model="form.contractId"
+            label="采购合同"
+            :options="contractOptions"
             :disabled="busy"
             required
-            @update:model-value="changeRequestItem"
           />
           <V2Select
             v-model="form.partnerId"
@@ -1428,11 +1470,7 @@ onBeforeUnmount(() => {
             label="交付日期"
             placeholder="YYYY-MM-DD"
           />
-          <V2Input
-            v-model="form.exceptionPurchaseFlag"
-            label="例外采购标记"
-            hint="仅无申请来源时使用：0或1"
-          /><V2Input v-model="form.exceptionReason" label="例外原因" />
+          <V2Input v-model="form.exceptionReason" label="例外原因" required />
         </template>
         <template v-else>
           <V2Select

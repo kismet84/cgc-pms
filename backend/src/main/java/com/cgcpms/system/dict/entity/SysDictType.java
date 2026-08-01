@@ -26,11 +26,15 @@ public class SysDictType implements Serializable {
 
     private Long tenantId;
 
+    private Long groupId;
+
     @NotBlank
     private String dictCode;
 
     @NotBlank
     private String dictName;
+
+    private String dictClass;
 
     private String status;
 

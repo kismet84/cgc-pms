@@ -2,6 +2,8 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import WorkflowProcessPage from '@/pages/system/WorkflowProcessPage.vue'
 import * as processService from '@/services/workflow-process'
+import * as systemService from '@/services/system-management'
+import * as masterDataService from '@/services/master-data'
 
 vi.mock('@/services/workflow-process', () => ({
   createWorkflowTemplateNode: vi.fn(),
@@ -11,6 +13,15 @@ vi.mock('@/services/workflow-process', () => ({
   reorderWorkflowTemplateNodes: vi.fn(),
   updateWorkflowTemplate: vi.fn(),
   updateWorkflowTemplateNode: vi.fn(),
+}))
+
+vi.mock('@/services/system-management', () => ({
+  loadRoles: vi.fn(),
+  loadUsers: vi.fn(),
+}))
+
+vi.mock('@/services/master-data', () => ({
+  loadPositions: vi.fn(),
 }))
 
 const summary = {
@@ -70,6 +81,15 @@ function recordLink(text: string): HTMLButtonElement {
   return target
 }
 
+function selectByLabel(text: string): HTMLSelectElement {
+  const label = [...document.body.querySelectorAll<HTMLLabelElement>('label')].find(
+    (item) => item.textContent?.replace('*', '').trim() === text,
+  )
+  const target = label?.htmlFor ? document.getElementById(label.htmlFor) : null
+  if (!(target instanceof HTMLSelectElement)) throw new Error(`missing select: ${text}`)
+  return target
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   document.body.innerHTML = ''
@@ -81,7 +101,48 @@ beforeEach(() => {
   })
   vi.mocked(processService.loadWorkflowTemplate).mockResolvedValue(detail)
   vi.mocked(processService.updateWorkflowTemplate).mockResolvedValue()
+  vi.mocked(processService.updateWorkflowTemplateNode).mockResolvedValue()
   vi.mocked(processService.reorderWorkflowTemplateNodes).mockResolvedValue()
+  vi.mocked(systemService.loadUsers).mockResolvedValue({
+    pageNo: 1,
+    pageSize: 1000,
+    total: 1,
+    records: [
+      {
+        id: '1',
+        username: 'manager',
+        realName: '工程经理',
+        status: 'ENABLE',
+        roleNames: [],
+        roleIds: [],
+      },
+    ],
+  })
+  vi.mocked(systemService.loadRoles).mockResolvedValue([
+    {
+      id: '2',
+      roleCode: 'GENERAL_MANAGER',
+      roleName: '总经理',
+      status: 'ENABLE',
+      dataScope: 'ALL',
+      menuIds: [],
+    },
+  ])
+  vi.mocked(masterDataService.loadPositions).mockResolvedValue({
+    pageNo: 1,
+    pageSize: 1000,
+    total: 1,
+    records: [
+      {
+        id: '3',
+        companyId: '1',
+        departmentId: '1',
+        positionCode: 'PM',
+        positionName: '项目经理岗',
+        status: 'ENABLE',
+      },
+    ],
+  })
 })
 
 describe('M7 workflow process page', () => {
@@ -149,5 +210,26 @@ describe('M7 workflow process page', () => {
 
     expect(processService.reorderWorkflowTemplateNodes).toHaveBeenCalledWith('10', ['22', '21'])
     expect(processService.loadWorkflowTemplate).toHaveBeenCalledTimes(2)
+  })
+
+  it('edits approvers through business selects without exposing JSON', async () => {
+    mount(WorkflowProcessPage, { attachTo: document.body })
+    await flushPromises()
+    recordLink('FLOW-CONTRACT').click()
+    await flushPromises()
+    button('编辑').click()
+    await flushPromises()
+
+    expect(document.body.textContent).not.toContain('审批人配置 JSON')
+    expect(selectByLabel('审批人类型').value).toBe('USER')
+    expect(selectByLabel('审批人员').value).toBe('1')
+
+    button('保存节点').click()
+    await flushPromises()
+    expect(processService.updateWorkflowTemplateNode).toHaveBeenCalledWith(
+      '10',
+      '21',
+      expect.objectContaining({ approverConfig: '{"type":"USER","userId":"1"}' }),
+    )
   })
 })

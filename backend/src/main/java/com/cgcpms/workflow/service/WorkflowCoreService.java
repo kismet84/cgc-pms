@@ -313,7 +313,7 @@ class WorkflowCoreService {
     }
 
     // ── Idempotency ──
-    void checkIdempotency(Long tenantId, Long userId, String idempotencyKey, String actionType) {
+    void checkIdempotency(Long tenantId, Long userId, String idempotencyKey) {
         WfIdempotency idem = new WfIdempotency();
         idem.setTenantId(tenantId != null ? tenantId : 0L);
         idem.setUserId(userId);
