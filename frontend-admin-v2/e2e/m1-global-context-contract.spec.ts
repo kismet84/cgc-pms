@@ -43,31 +43,25 @@ async function install(page: Page) {
 }
 
 async function select(page: Page, controlId: string, value: string) {
-  const control = page.locator(controlId)
-  await control.click()
-  await page.locator(`[role="option"][data-value="${value}"]:visible`).click()
+  await page.locator(controlId).selectOption(value)
 }
 
 test('keeps the M4 public context contract in the shared V2 shell', async ({ page }) => {
   await install(page)
   await page.goto('/dashboard')
-  await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
+  await expect(page.locator('#global-project')).toBeEnabled()
 
   await select(page, '#global-project', 'P1')
-  await page.locator('#global-report-period').click()
-  const periodOption = page
-    .getByRole('listbox', { name: '报告期' })
-    .locator('[role="option"][data-value]:not([data-value=""])')
-    .first()
-  const period = await periodOption.getAttribute('data-value')
+  const periodOption = page.locator('#global-report-period option:not([value=""])').first()
+  const period = await periodOption.getAttribute('value')
   expect(period, 'concrete report period').toMatch(/^\d{4}-\d{2}$/)
-  await periodOption.click()
+  await page.locator('#global-report-period').selectOption(period!)
   await page.locator('[data-domain="delivery"] .app-shell__domain-link').click()
   await expect
     .poll(() => Object.fromEntries(new URL(page.url()).searchParams))
     .toMatchObject({ projectId: 'P1', period })
   await page.goto(`/dashboard?projectId=P1&period=${period}`)
-  await expect(page.locator('#global-project')).toHaveAttribute('aria-disabled', 'false')
+  await expect(page.locator('#global-project')).toBeEnabled()
   await select(page, '#global-project', '')
   await select(page, '#global-report-period', '')
   await expect.poll(() => new URL(page.url()).search).toBe('')
@@ -79,9 +73,6 @@ test('removes unavailable context values from the URL after options load', async
   await page.goto('/dashboard?projectId=missing&period=1900-01')
 
   await expect.poll(() => new URL(page.url()).search).toBe('')
-  await expect(page.locator('#global-project')).toHaveAttribute('aria-label', '当前项目：全部项目')
-  await expect(page.locator('#global-report-period')).toHaveAttribute(
-    'aria-label',
-    '报告期：全部报告期',
-  )
+  await expect(page.locator('#global-project')).toHaveAttribute('aria-label', '当前项目')
+  await expect(page.locator('#global-report-period')).toHaveAttribute('aria-label', '报告期')
 })

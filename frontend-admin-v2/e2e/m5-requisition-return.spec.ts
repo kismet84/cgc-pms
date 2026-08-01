@@ -3,7 +3,7 @@ import { expect, test, type Locator, type Page, type Route } from '@playwright/t
 import { captureRuntimeErrors } from './runtime-errors'
 
 async function selectBusinessOption(
-  page: Page,
+  _page: Page,
   scope: Locator,
   triggerName: RegExp,
   optionName: RegExp,
@@ -15,13 +15,12 @@ async function selectBusinessOption(
         .map((animation) => animation.finished.catch(() => undefined)),
     )
   })
-  const trigger = scope.getByRole('button', { name: triggerName })
-  await trigger.click()
-  const option = page.getByRole('option', { name: optionName })
-  await expect(option).toBeVisible()
-  await option.focus()
-  await option.press('Enter')
-  await expect(trigger).toHaveAccessibleName(optionName)
+  const trigger = scope.getByRole('combobox', { name: triggerName })
+  const option = trigger.locator('option').filter({ hasText: optionName }).first()
+  const value = await option.getAttribute('value')
+  expect(value).not.toBeNull()
+  await trigger.selectOption(value!)
+  await expect(trigger).toHaveValue(value!)
 }
 
 const permissions = [
@@ -409,9 +408,9 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     await page.goto('/inventory/material-requisition?projectId=P1')
     await page.getByRole('button', { name: '发起领料申请' }).click()
     const editor = page.getByRole('dialog', { name: '发起领料申请' })
-    await selectBusinessOption(page, editor, /^合同：/, /CT-001 · 示范项目材料合同/)
-    await selectBusinessOption(page, editor, /^领用仓库：/, /WH-001 · 主仓/)
-    await selectBusinessOption(page, editor, /^物料：/, /MAT-001 · 钢筋/)
+    await selectBusinessOption(page, editor, /^合同$/, /CT-001 · 示范项目材料合同/)
+    await selectBusinessOption(page, editor, /^领用仓库$/, /WH-001 · 主仓/)
+    await selectBusinessOption(page, editor, /^物料$/, /MAT-001 · 钢筋/)
     await editor.getByLabel('领用数量').fill('9007199254740993.1234')
     await editor.getByLabel('参考单价').fill('3.25')
     await editor.getByRole('button', { name: '保存并提交审批' }).dblclick()
@@ -441,10 +440,18 @@ test.describe('M5 requisition, stock-out and return V2', () => {
     const dialog = page.getByRole('dialog', { name: '发起退料' })
     await expect(dialog).toBeVisible()
     await page.waitForTimeout(300)
-    await dialog.getByRole('button', { name: /领料明细/ }).click()
-    await page.getByRole('option', { name: /钢筋/ }).click()
-    await dialog.getByRole('button', { name: /原出库流水/ }).click()
-    await page.getByRole('option', { name: /出库/ }).click()
+    const requisitionLine = dialog.getByRole('combobox', { name: '领料明细' })
+    const requisitionValue = await requisitionLine
+      .locator('option')
+      .filter({ hasText: /钢筋/ })
+      .getAttribute('value')
+    await requisitionLine.selectOption(requisitionValue!)
+    const stockTransaction = dialog.getByRole('combobox', { name: '原出库流水' })
+    const transactionValue = await stockTransaction
+      .locator('option')
+      .filter({ hasText: /出库/ })
+      .getAttribute('value')
+    await stockTransaction.selectOption(transactionValue!)
     await page.getByLabel('退料数量').fill('1.0000')
     await page.getByLabel('退料原因').fill('现场余料')
     await page.getByRole('button', { name: '确认退料' }).dblclick()

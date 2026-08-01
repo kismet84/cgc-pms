@@ -454,24 +454,16 @@ test.describe('M2 live eight-role dashboard', () => {
     }
   })
 
-  test('opens the alert status menu downward without dialog clipping', async ({ page }) => {
+  test('keeps alert status as an accessible native select', async ({ page }) => {
     expect((await page.goto('/api/auth/dev-login?username=admin'))?.ok()).toBe(true)
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/dashboard?role=mgmt')
     await page.locator('#risk-list tbody tr').first().click()
 
     const dialog = page.getByRole('dialog')
-    const status = dialog.getByRole('button', { name: /^目标状态：/ })
-    await status.click()
-    const menu = status.locator('..').locator('.v2-select__menu')
-    await expect(menu).toBeVisible()
-
-    const statusBounds = await status.boundingBox()
-    const menuBounds = await menu.boundingBox()
-    expect(menuBounds?.y).toBeGreaterThanOrEqual(
-      (statusBounds?.y ?? Number.POSITIVE_INFINITY) + (statusBounds?.height ?? 0),
-    )
-    await expect(dialog).toHaveCSS('overflow', 'visible')
+    const status = dialog.getByRole('combobox', { name: '目标状态' })
+    await expect(status).toBeVisible()
+    await expect(status.locator('option')).not.toHaveCount(0)
   })
 
   test('defaults to aggregate context and loads the real management view in three viewports', async ({

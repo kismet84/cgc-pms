@@ -343,8 +343,9 @@ test.describe('M5 supplier sourcing V2', () => {
     await page.getByRole('button', { name: '确认提交' }).dblclick()
     await page.getByRole('button', { name: '关联合同' }).click()
     const contractDialog = page.getByRole('dialog', { name: '关联合同' })
-    await contractDialog.getByRole('button', { name: /^合同：/ }).click()
-    await page.getByRole('option', { name: 'CT-001 · 采购合同' }).click()
+    await contractDialog
+      .getByRole('combobox', { name: '合同' })
+      .selectOption({ label: 'CT-001 · 采购合同' })
     await page.getByRole('button', { name: '确认提交' }).dblclick()
     await expect(page.getByText('采购合同', { exact: true })).toBeVisible()
 
@@ -362,8 +363,9 @@ test.describe('M5 supplier sourcing V2', () => {
     await page.getByRole('button', { name: event.sourcingCode, exact: true }).click()
     await page.getByRole('button', { name: '邀请供应商' }).click()
     const inviteDialog = page.getByRole('dialog', { name: '邀请供应商' })
-    await inviteDialog.getByRole('button', { name: /^供应商：/ }).click()
-    await page.getByRole('option', { name: 'SUP-200 · 供应商乙' }).click()
+    await inviteDialog
+      .getByRole('combobox', { name: '供应商' })
+      .selectOption({ label: 'SUP-200 · 供应商乙' })
     await page.getByRole('button', { name: '确认提交' }).click()
 
     const invitation = writes.find((entry) => entry.path.endsWith('/events/E1/suppliers'))

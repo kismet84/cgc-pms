@@ -154,21 +154,23 @@ async function refreshPage(): Promise<void> {
 }
 
 function reconcileSelection(locate: boolean): void {
-  if (locate) {
-    const group = groups.value[0]
-    const type = group?.types.find((item) => matchesStatus(item.status))
-    const item = type?.data.find((entry) => matchesStatus(entry.status))
-    selectedGroupId.value = group?.id ?? ''
-    selectedTypeId.value = type?.id ?? ''
-    selectedDataId.value = item?.id ?? ''
+  if (locate || !groups.value.some((item) => item.id === selectedGroupId.value)) {
+    selectFirstAvailable(groups.value[0])
     pageNo.value = 1
     return
   }
-  if (!groups.value.some((item) => item.id === selectedGroupId.value)) clearSelection()
-  else if (!types.value.some((item) => item.id === selectedTypeId.value)) clearTypeSelection()
-  else if (!selectedData.value || !matchesStatus(selectedData.value.status))
-    selectedDataId.value = ''
+  if (!types.value.some((item) => item.id === selectedTypeId.value)) {
+    selectFirstAvailable(selectedGroup.value)
+  } else if (!selectedData.value || !matchesStatus(selectedData.value.status))
+    selectedDataId.value = data.value[0]?.id ?? ''
   clampPage()
+}
+
+function selectFirstAvailable(group?: DictGroupTreeRecord): void {
+  const type = group?.types.find(typeMatchesStatus)
+  selectedGroupId.value = group?.id ?? ''
+  selectedTypeId.value = type?.id ?? ''
+  selectedDataId.value = type?.data.find((entry) => matchesStatus(entry.status))?.id ?? ''
 }
 
 function clearSelection(): void {
@@ -192,12 +194,12 @@ function search(): void {
 }
 
 function changeStatus(): void {
-  clearSelection()
+  reconcileSelection(false)
 }
 
 function selectGroup(id: string): void {
-  selectedGroupId.value = id
-  clearTypeSelection()
+  selectFirstAvailable(groups.value.find((item) => item.id === id))
+  pageNo.value = 1
 }
 
 function selectType(id: string): void {

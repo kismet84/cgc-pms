@@ -83,7 +83,7 @@ describe('系统字典三级管理', () => {
     expect(result).toEqual([{ ...data[0], id: '100', dictTypeId: '20', orderNum: 2 }])
   })
 
-  it('默认逐级展开，当前级固定十条且整卡只有一个分页页脚', async () => {
+  it('默认常驻首个分组和类型，当前级固定十条且整卡只有一个分页页脚', async () => {
     const wrapper = mount(DictionaryPage)
     await flushPromises()
     const groupItems = () =>
@@ -97,25 +97,18 @@ describe('系统字典三级管理', () => {
 
     expect(wrapper.text()).toContain('项目管理')
     expect(wrapper.text()).not.toContain('PROJECT')
-    expect(wrapper.text()).toContain('请选择分组')
-    expect(wrapper.text()).not.toContain('项目状态1')
-    expect(wrapper.findAll('.v2-pagination')).toHaveLength(1)
-
-    await groupItems()[0]?.trigger('click')
     expect(wrapper.text()).toContain('项目状态')
     expect(wrapper.text()).not.toContain('project_status')
-    expect(wrapper.text()).toContain('请选择字典类型')
     expect(groupItems()).toHaveLength(1)
     expect(groupItems()[0]?.classes()).toContain('is-selected')
     expect(wrapper.text()).not.toContain('更换分组')
-
-    await typeItems()[0]?.trigger('click')
     expect(typeItems()).toHaveLength(1)
     expect(typeItems()[0]?.classes()).toContain('is-selected')
     expect(wrapper.text()).not.toContain('更换类型')
     expect(wrapper.findAll('tbody tr')).toHaveLength(10)
     expect(wrapper.text()).toContain('共 12 条')
     expect(wrapper.text()).toContain('第 1 页')
+    expect(wrapper.findAll('.v2-pagination')).toHaveLength(1)
   })
 
   it('非管理员即使持有字典写权限也不显示维护入口', async () => {

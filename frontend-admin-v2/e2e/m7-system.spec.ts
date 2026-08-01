@@ -99,30 +99,36 @@ async function installMocks(page: Page, identity: Identity) {
         },
       ])
     }
-    if (path === '/api/system/dict/types') {
-      return success(route, {
-        pageNo: 1,
-        pageSize: 200,
-        total: 1,
-        records: [{ id: '21', dictCode: 'server_dict', dictName: '服务端字典', status: 'ENABLE' }],
-      })
-    }
-    if (path === '/api/system/dict/data') {
-      return success(route, {
-        pageNo: 1,
-        pageSize: 200,
-        total: 1,
-        records: [
-          {
-            id: '22',
-            dictTypeId: '21',
-            dictLabel: '服务端字典项',
-            dictValue: 'SERVER',
-            orderNum: 1,
-            status: 'ENABLE',
-          },
-        ],
-      })
+    if (path === '/api/system/dict/tree') {
+      return success(route, [
+        {
+          id: '20',
+          groupCode: 'SYSTEM_GOVERNANCE',
+          groupName: '系统治理',
+          orderNum: 1,
+          status: 'ENABLE',
+          types: [
+            {
+              id: '21',
+              groupId: '20',
+              dictCode: 'server_dict',
+              dictName: '服务端字典',
+              dictClass: 'SYSTEM',
+              status: 'ENABLE',
+              data: [
+                {
+                  id: '22',
+                  dictTypeId: '21',
+                  dictLabel: '服务端字典项',
+                  dictValue: 'SERVER',
+                  orderNum: 1,
+                  status: 'ENABLE',
+                },
+              ],
+            },
+          ],
+        },
+      ])
     }
     if (path === '/api/audit-logs') {
       return success(route, {

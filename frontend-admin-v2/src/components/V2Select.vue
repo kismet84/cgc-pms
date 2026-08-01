@@ -67,7 +67,7 @@ function updateValue(event: Event): void {
       :value="modelValue"
       :disabled="disabled"
       :required="required"
-      :aria-label="label ? undefined : placeholder"
+      :aria-label="label || placeholder"
       :aria-invalid="Boolean(error)"
       :aria-describedby="describedBy"
       @change="updateValue"

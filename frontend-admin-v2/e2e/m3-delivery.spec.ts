@@ -128,8 +128,7 @@ test.describe('M3 live delivery workspace', () => {
     await option.click()
     expect((await filtered).ok()).toBe(true)
 
-    const statusControl = page.getByRole('button', { name: '日报状态：全部状态' })
-    await statusControl.click()
+    const statusControl = page.getByRole('combobox', { name: '日报状态' })
     const statusFiltered = page.waitForResponse((response) => {
       const url = new URL(response.url())
       return (
@@ -140,7 +139,7 @@ test.describe('M3 live delivery workspace', () => {
         url.searchParams.get('status') === 'DRAFT'
       )
     })
-    await page.getByRole('option', { name: '草稿', exact: true }).click()
+    await statusControl.selectOption({ label: '草稿' })
     expect((await statusFiltered).ok()).toBe(true)
     await expect(page).toHaveURL(/projectId=.*period=\d{4}-\d{2}.*status=DRAFT/)
     expect(new URL(page.url()).searchParams.has('startDate')).toBe(false)
@@ -150,8 +149,7 @@ test.describe('M3 live delivery workspace', () => {
       const url = new URL(response.url())
       return url.pathname === '/api/site-daily-logs' && !url.searchParams.has('status')
     })
-    await page.getByRole('button', { name: '日报状态：草稿' }).click()
-    await page.getByRole('option', { name: '全部状态', exact: true }).click()
+    await statusControl.selectOption({ label: '全部状态' })
     expect((await clearStatus).ok()).toBe(true)
     expect(new URL(page.url()).searchParams.has('status')).toBe(false)
   })

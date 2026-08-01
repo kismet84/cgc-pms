@@ -282,8 +282,10 @@ test.describe('M3 live project object', () => {
     await page.getByRole('button', { name: '新建项目' }).click()
     const dialog = page.getByRole('dialog', { name: '新建项目' })
     await dialog.getByLabel('项目名称').fill('冲突项目')
-    await dialog.getByRole('button', { name: /^项目类型：/ }).click()
-    await dialog.locator('[role="option"]:not(:disabled)').first().click()
+    const projectType = dialog.getByRole('combobox', { name: '项目类型' })
+    await projectType.selectOption(
+      (await projectType.locator('option:not(:disabled)').nth(1).getAttribute('value')) as string,
+    )
     const before = rereads
     await dialog.getByRole('button', { name: '创建' }).click()
     await expect(page.getByRole('alert').filter({ hasText: '受控冲突' }).first()).toBeAttached()
@@ -298,8 +300,10 @@ test.describe('M3 live project object', () => {
     await page.getByRole('button', { name: '新建项目' }).click()
     const dialog = page.getByRole('dialog', { name: '新建项目' })
     await dialog.getByLabel('项目名称').fill(name)
-    await dialog.getByRole('button', { name: /^项目类型：/ }).click()
-    await dialog.locator('[role="option"]:not(:disabled)').first().click()
+    const projectType = dialog.getByRole('combobox', { name: '项目类型' })
+    await projectType.selectOption(
+      (await projectType.locator('option:not(:disabled)').nth(1).getAttribute('value')) as string,
+    )
     const created = page.waitForResponse((response) => {
       const url = new URL(response.url())
       return url.pathname === '/api/projects' && response.request().method() === 'POST'

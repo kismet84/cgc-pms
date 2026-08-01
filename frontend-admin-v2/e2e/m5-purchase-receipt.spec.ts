@@ -3,7 +3,7 @@ import { expect, test, type Locator, type Page, type Route } from '@playwright/t
 import { captureRuntimeErrors } from './runtime-errors'
 
 async function selectBusinessOption(
-  page: Page,
+  _page: Page,
   scope: Locator,
   triggerName: RegExp,
   optionName: RegExp,
@@ -15,13 +15,12 @@ async function selectBusinessOption(
         .map((animation) => animation.finished.catch(() => undefined)),
     )
   })
-  const trigger = scope.getByRole('button', { name: triggerName })
-  await trigger.click()
-  const option = page.getByRole('option', { name: optionName })
-  await expect(option).toBeVisible()
-  await option.focus()
-  await option.press('Enter')
-  await expect(trigger).toHaveAccessibleName(optionName)
+  const trigger = scope.getByRole('combobox', { name: triggerName })
+  const option = trigger.locator('option').filter({ hasText: optionName }).first()
+  const value = await option.getAttribute('value')
+  expect(value).not.toBeNull()
+  await trigger.selectOption(value!)
+  await expect(trigger).toHaveValue(value!)
 }
 
 const permissions = [
@@ -427,9 +426,9 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     await page.goto('/inventory/purchase-request?projectId=P1')
     await page.getByRole('button', { name: '新建采购申请' }).click()
     const dialog = page.getByRole('dialog', { name: '新建采购申请' })
-    await selectBusinessOption(page, dialog, /^采购合同：/, /CT-001 · 钢材采购合同/)
-    await selectBusinessOption(page, dialog, /^物料：/, /MAT-001 · 钢筋/)
-    await selectBusinessOption(page, dialog, /^预算科目：/, /钢材采购/)
+    await selectBusinessOption(page, dialog, /^采购合同$/, /CT-001 · 钢材采购合同/)
+    await selectBusinessOption(page, dialog, /^物料$/, /MAT-001 · 钢筋/)
+    await selectBusinessOption(page, dialog, /^预算科目$/, /钢材采购/)
     await dialog.getByLabel('采购用途').fill('地下室钢材')
     await dialog.getByLabel('申请数量').fill('9007199254740993.1234')
     await dialog.getByLabel('预计单价').fill('3.25')
@@ -450,26 +449,33 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     expect(writes.filter((item) => item.path.endsWith('/submit'))).toHaveLength(1)
   })
 
-  test('creates an order from request source and submits once', async ({ page }) => {
+  test('creates one exceptional order and submits once', async ({ page }) => {
     const writes = await install(page)
     await page.goto('/purchase/order?projectId=P1')
     await page.getByRole('button', { name: '新建采购订单' }).click()
     const dialog = page.getByRole('dialog', { name: '新建采购订单' })
-    await selectBusinessOption(page, dialog, /^采购申请：/, /PR-001 · 主体结构/)
-    await selectBusinessOption(page, dialog, /^供应商：/, /SUP-001 · 供应商甲/)
+    await selectBusinessOption(page, dialog, /^采购合同$/, /CT-001 · 钢材采购合同/)
+    await selectBusinessOption(page, dialog, /^供应商$/, /SUP-001 · 供应商甲/)
+    await selectBusinessOption(page, dialog, /^物料$/, /MAT-001 · 钢筋/)
     await dialog.getByLabel('订单数量').fill('10.0000')
     await dialog.getByLabel('订单单价').fill('3.25')
     await dialog.getByLabel('税率').fill('13')
+    await dialog.getByLabel('例外原因').fill('紧急直采')
     await dialog.getByRole('button', { name: '保存', exact: true }).dblclick()
     await expect(page.getByText('PO-002', { exact: true }).first()).toBeVisible()
     await page.getByRole('button', { name: '提交审批' }).dblclick()
     const create = writes.find((item) => item.path === 'POST /purchase-orders')
-    expect(create?.body).toMatchObject({ requestId: 'PR1', partnerId: 'S1' })
+    expect(create?.body).toMatchObject({
+      contractId: 'C1',
+      partnerId: 'S1',
+      exceptionPurchaseFlag: 1,
+      exceptionReason: '紧急直采',
+    })
     const items = writes.find((item) => item.path.endsWith('/items/batch'))?.body as Array<{
-      requestItemId: string
+      materialId: string
       quantity: string
     }>
-    expect(items[0]).toMatchObject({ requestItemId: 'PRI1', quantity: '10.0000' })
+    expect(items[0]).toMatchObject({ materialId: 'M1', quantity: '10.0000' })
     expect(writes.filter((item) => item.path.endsWith('/submit'))).toHaveLength(1)
   })
 
@@ -488,14 +494,14 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     ]) {
       await page.getByRole('button', { name: '新建材料验收' }).click()
       const dialog = page.getByRole('dialog', { name: '新建材料验收' })
-      await selectBusinessOption(page, dialog, /^采购订单：/, /PO-001 · 供应商甲/)
-      await expect(dialog.getByLabel(/订单明细：钢筋 · 剩余 8.0000/)).toBeVisible()
-      await selectBusinessOption(page, dialog, /^入库仓库：/, /WH-001 · 主仓/)
+      await selectBusinessOption(page, dialog, /^采购订单$/, /PO-001 · 供应商甲/)
+      await expect(dialog.getByRole('combobox', { name: '订单明细' })).toHaveValue('POI1')
+      await selectBusinessOption(page, dialog, /^入库仓库$/, /WH-001 · 主仓/)
       await dialog.getByLabel('实收数量').fill(sample.actual)
       await dialog.getByLabel('合格数量', { exact: true }).fill(sample.qualified)
       await dialog.getByLabel('不合格数量', { exact: true }).fill(sample.unqualified)
       if (sample.disposition) {
-        await selectBusinessOption(page, dialog, /^不合格处置：/, new RegExp(sample.disposition))
+        await selectBusinessOption(page, dialog, /^不合格处置$/, new RegExp(sample.disposition))
         await dialog.getByLabel('处置原因').fill('外观检验不合格')
       }
       await dialog.getByRole('button', { name: '保存', exact: true }).click()
@@ -516,8 +522,8 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     await page.goto('/purchase/receipt?projectId=P1')
     await page.getByRole('button', { name: '新建材料验收' }).click()
     const dialog = page.getByRole('dialog', { name: '新建材料验收' })
-    await selectBusinessOption(page, dialog, /^采购订单：/, /PO-001 · 供应商甲/)
-    await selectBusinessOption(page, dialog, /^入库仓库：/, /WH-001 · 主仓/)
+    await selectBusinessOption(page, dialog, /^采购订单$/, /PO-001 · 供应商甲/)
+    await selectBusinessOption(page, dialog, /^入库仓库$/, /WH-001 · 主仓/)
     await dialog.getByLabel('实收数量').fill('99')
     await dialog.getByLabel('合格数量', { exact: true }).fill('99')
     await dialog.getByLabel('不合格数量', { exact: true }).fill('0')
