@@ -5,6 +5,7 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.audit.annotation.AuditedOperation;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.system.dict.entity.SysDictType;
+import com.cgcpms.system.dict.dto.SysDictTypeRequest;
 import com.cgcpms.system.dict.service.SysDictTypeService;
 import com.cgcpms.system.dict.vo.SysDictTypeVO;
 import jakarta.validation.Valid;
@@ -24,10 +25,13 @@ public class SysDictTypeController {
     public ApiResponse<PageResult<SysDictTypeVO>> list(
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
+            @RequestParam(required = false) Long groupId,
             @RequestParam(required = false) String dictCode,
             @RequestParam(required = false) String dictName,
-            @RequestParam(required = false) String status) {
-        IPage<SysDictTypeVO> page = sysDictTypeService.getPage(pageNo, pageSize, dictCode, dictName, status);
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String dictClass) {
+        IPage<SysDictTypeVO> page = sysDictTypeService.getPage(
+                pageNo, pageSize, groupId, dictCode, dictName, status, dictClass);
         return ApiResponse.success(PageResult.of(page));
     }
 
@@ -39,15 +43,16 @@ public class SysDictTypeController {
 
     @PostMapping
     @AuditedOperation(type = "CREATE", businessType = "DICT_TYPE")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:add')")
-    public ApiResponse<Long> create(@Valid @RequestBody SysDictType entity) {
-        return ApiResponse.success(sysDictTypeService.create(entity));
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Long> create(@Valid @RequestBody SysDictTypeRequest request) {
+        return ApiResponse.success(sysDictTypeService.create(toEntity(request)));
     }
 
     @PutMapping("/{id}")
     @AuditedOperation(type = "UPDATE", businessType = "DICT_TYPE", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:edit')")
-    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SysDictType entity) {
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody SysDictTypeRequest request) {
+        SysDictType entity = toEntity(request);
         entity.setId(id);
         sysDictTypeService.update(entity);
         return ApiResponse.success();
@@ -55,9 +60,19 @@ public class SysDictTypeController {
 
     @DeleteMapping("/{id}")
     @AuditedOperation(type = "DELETE", businessType = "DICT_TYPE", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('system:dict:delete')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         sysDictTypeService.delete(id);
         return ApiResponse.success();
+    }
+
+    private SysDictType toEntity(SysDictTypeRequest request) {
+        SysDictType type = new SysDictType();
+        type.setGroupId(request.getGroupId());
+        type.setDictCode(request.getDictCode());
+        type.setDictName(request.getDictName());
+        type.setDictClass(request.getDictClass());
+        type.setStatus(request.getStatus());
+        return type;
     }
 }

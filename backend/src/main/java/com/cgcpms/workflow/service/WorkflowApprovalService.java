@@ -163,7 +163,7 @@ public class WorkflowApprovalService {
         if (!task.getApproverId().equals(userId)) {
             throw new BusinessException("NOT_TASK_OWNER", "非当前任务审批人");
         }
-        core.checkIdempotency(task.getTenantId(), userId, idempotencyKey, actionType);
+        core.checkIdempotency(task.getTenantId(), userId, idempotencyKey);
 
         // CAS update: atomically check PENDING + version, bump version
         int updated = wfTaskMapper.updateTaskStatusWithCas(

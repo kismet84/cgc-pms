@@ -15,6 +15,50 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 class DictionaryMigrationH2Test {
 
     @Test
+    void v255RemovesRetiredSettlementStatusDictionary() throws Exception {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource(
+                "jdbc:h2:mem:dict_migration_v255;MODE=MySQL;DATABASE_TO_LOWER=TRUE;"
+                        + "DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
+                "sa",
+                "");
+        try (Connection connection = dataSource.getConnection()) {
+            run(connection, "db/migration-h2/B215__cgc_pms_baseline.sql");
+            run(connection, "db/migration-h2/V216__normalize_core_dictionary_codes.sql");
+            connection.createStatement().executeUpdate(
+                    "INSERT INTO sys_dict_type(id,tenant_id,dict_code,dict_name,status) "
+                            + "VALUES(990013,99,'settlement_status','租户历史状态','DISABLE')");
+            connection.createStatement().executeUpdate(
+                    "INSERT INTO sys_dict_data(id,tenant_id,dict_type_id,dict_label,dict_value,order_num,status) "
+                            + "VALUES(99001301,99,990013,'租户旧值','LEGACY',1,'ENABLE')");
+            run(connection, "db/migration-h2/V254__group_and_govern_system_dictionaries.sql");
+            run(connection, "db/migration-h2/V255__remove_retired_settlement_status_dictionary.sql");
+        }
+
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        assertEquals(8, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_dict_group WHERE tenant_id=0", Integer.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_dict_type WHERE group_id IS NULL", Integer.class));
+        assertEquals("SYSTEM", dictClass(jdbc, "project_type"));
+        assertEquals("STATE_MACHINE", dictClass(jdbc, "project_status"));
+        assertEquals("BUSINESS", dictClass(jdbc, "invoice_type"));
+        assertEquals("SYSTEM", dictClass(jdbc, "partner_risk_level"));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_dict_type WHERE dict_code='settlement_status'", Integer.class));
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_dict_data WHERE dict_type_id IN (1013,990013)", Integer.class));
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_dict_type t JOIN sys_dict_group g ON g.id=t.group_id "
+                        + "WHERE g.group_code='SETTLEMENT'", Integer.class));
+        assertEquals(3, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_dict_data d JOIN sys_dict_type t ON t.id=d.dict_type_id "
+                        + "WHERE t.dict_code='settlement_final_status'", Integer.class));
+        assertEquals(5, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_dict_data d JOIN sys_dict_type t ON t.id=d.dict_type_id "
+                        + "WHERE t.dict_code='approval_status'", Integer.class));
+    }
+
+    @Test
     void v216NormalizesCoreDictionaryCodes() throws Exception {
         DriverManagerDataSource dataSource = new DriverManagerDataSource(
                 "jdbc:h2:mem:dict_migration_v216;MODE=MySQL;DATABASE_TO_LOWER=TRUE;"
@@ -57,5 +101,12 @@ class DictionaryMigrationH2Test {
 
     private String value(JdbcTemplate jdbc, long id) {
         return jdbc.queryForObject("SELECT dict_value FROM sys_dict_data WHERE id=?", String.class, id);
+    }
+
+    private String dictClass(JdbcTemplate jdbc, String dictCode) {
+        return jdbc.queryForObject(
+                "SELECT dict_class FROM sys_dict_type WHERE tenant_id=0 AND dict_code=?",
+                String.class,
+                dictCode);
     }
 }

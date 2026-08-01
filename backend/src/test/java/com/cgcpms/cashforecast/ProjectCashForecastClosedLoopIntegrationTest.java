@@ -110,6 +110,8 @@ class ProjectCashForecastClosedLoopIntegrationTest {
         assertEquals("SUPERSEDED", jdbc.queryForObject("SELECT status FROM cash_forecast_cycle WHERE id=?", String.class, cycleId));
         assertEquals("APPROVED", jdbc.queryForObject("SELECT status FROM cash_forecast_cycle WHERE id=?", String.class, rolledId));
         assertEquals(2, service.cycles(PROJECT).size());
+        assertEquals(2, service.cycles(null).stream()
+                .filter(row -> PROJECT == ((Number) row.get("project_id")).longValue()).count());
     }
 
     @Test

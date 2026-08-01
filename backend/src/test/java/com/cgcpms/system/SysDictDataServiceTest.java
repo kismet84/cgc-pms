@@ -8,6 +8,7 @@ import com.cgcpms.system.dict.entity.SysDictType;
 import com.cgcpms.system.dict.mapper.SysDictDataMapper;
 import com.cgcpms.system.dict.mapper.SysDictTypeMapper;
 import com.cgcpms.system.dict.service.SysDictDataService;
+import com.cgcpms.system.dict.service.SysDictTypeService;
 import com.cgcpms.system.dict.vo.SysDictDataVO;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
@@ -38,6 +39,9 @@ class SysDictDataServiceTest {
     private SysDictDataService dictDataService;
 
     @Autowired
+    private SysDictTypeService dictTypeService;
+
+    @Autowired
     private SysDictDataMapper dictDataMapper;
 
     @Autowired
@@ -54,6 +58,7 @@ class SysDictDataServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", TENANT_0)
+                .add("roleCodes", List.of("SUPER_ADMIN"))
                 .build());
 
         // 创建字典类型供字典数据关联
@@ -62,8 +67,7 @@ class SysDictDataServiceTest {
         dictType.setDictName("测试字典类型");
         dictType.setStatus("ENABLE");
         dictType.setTenantId(TENANT_0);
-        dictTypeMapper.insert(dictType);
-        dictTypeId = dictType.getId();
+        dictTypeId = dictTypeService.create(dictType);
     }
 
     @AfterEach
@@ -216,6 +220,7 @@ class SysDictDataServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 555L)
+                .add("roleCodes", List.of("SUPER_ADMIN"))
                 .build());
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -296,7 +301,7 @@ class SysDictDataServiceTest {
         otherType.setDictName("其他字典类型");
         otherType.setTenantId(TENANT_0);
         otherType.setStatus("ENABLE");
-        dictTypeMapper.insert(otherType);
+        dictTypeService.create(otherType);
 
         SysDictData data1 = new SysDictData();
         data1.setDictTypeId(dictTypeId);
@@ -370,6 +375,7 @@ class SysDictDataServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 777L)
+                .add("roleCodes", List.of("SUPER_ADMIN"))
                 .build());
 
         IPage<SysDictDataVO> page = dictDataService.getPage(1, 10, dictTypeId, null, null);
@@ -423,6 +429,7 @@ class SysDictDataServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 888L)
+                .add("roleCodes", List.of("SUPER_ADMIN"))
                 .build());
 
         SysDictData update = new SysDictData();
@@ -493,6 +500,7 @@ class SysDictDataServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 999L)
+                .add("roleCodes", List.of("SUPER_ADMIN"))
                 .build());
 
         BusinessException ex = assertThrows(BusinessException.class,
@@ -607,6 +615,7 @@ class SysDictDataServiceTest {
                 .add("userId", USER_ADMIN)
                 .add("username", "admin")
                 .add("tenantId", 666L)
+                .add("roleCodes", List.of("SUPER_ADMIN"))
                 .build());
 
         List<SysDictDataVO> list = dictDataService.getByDictCode(dictCode);

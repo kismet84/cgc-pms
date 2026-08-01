@@ -93,6 +93,8 @@ class PurchaseRequestWorkflowHandlerTest {
         item.setRequestId(req.getId());
         item.setMaterialId(1L);
         item.setQuantity(new BigDecimal("5.00"));
+        item.setEstimatedUnitPrice(new BigDecimal("20.00"));
+        item.setEstimatedAmount(new BigDecimal("100.00"));
         item.setUnit("m");
         requestItemMapper.insert(item);
 
@@ -119,6 +121,10 @@ class PurchaseRequestWorkflowHandlerTest {
                         .eq(MatPurchaseOrderItem::getOrderId, order.getId()));
         assertNotNull(convertedItem);
         assertEquals(item.getId(), convertedItem.getRequestItemId());
+        assertEquals(0, BigDecimal.ZERO.compareTo(convertedItem.getUnitPrice()),
+                "估算价不得直接成为采购订单商业价格");
+        assertEquals(0, BigDecimal.ZERO.compareTo(order.getTotalAmount()),
+                "采购员确认价格前订单金额必须为零");
     }
 
     @Test

@@ -137,8 +137,6 @@ export interface ContractSaveCommand {
     partyAId?: string | null;
     partyBId?: string | null;
     contractAmount?: DecimalString | null;
-    currentAmount?: DecimalString | null;
-    paidAmount?: DecimalString | null;
     taxRate?: DecimalString | null;
     taxAmount?: DecimalString | null;
     amountWithoutTax?: DecimalString | null;
@@ -147,7 +145,6 @@ export interface ContractSaveCommand {
     endDate?: string | null;
     paymentMethod?: string | null;
     settlementMethod?: string | null;
-    settlementAmount?: DecimalString | null;
     version?: string | number | null;
     remark?: string | null;
   };

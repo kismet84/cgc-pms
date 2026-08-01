@@ -51,6 +51,7 @@ public class PurchaseRequestConversionService {
         int marked = requestMapper.update(null, new LambdaUpdateWrapper<MatPurchaseRequest>()
                 .eq(MatPurchaseRequest::getId, requestId)
                 .eq(MatPurchaseRequest::getTenantId, tenantId)
+                .eq(MatPurchaseRequest::getApprovalStatus, "APPROVED")
                 .eq(MatPurchaseRequest::getStatus, "APPROVED")
                 .set(MatPurchaseRequest::getStatus, "CONVERTED"));
         if (marked == 0) {
@@ -69,10 +70,7 @@ public class PurchaseRequestConversionService {
         order.setOrderStatus("DRAFT");
         order.setContractId(request.getContractId());
         order.setExceptionPurchaseFlag(0);
-        order.setTotalAmount(requestItems.stream()
-                .map(MatPurchaseRequestItem::getEstimatedAmount)
-                .filter(java.util.Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        order.setTotalAmount(BigDecimal.ZERO);
         String prefix = "PO-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
         boolean inserted = false;
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
@@ -131,11 +129,11 @@ public class PurchaseRequestConversionService {
         orderItem.setMaterialId(requestItem.getMaterialId());
         orderItem.setUnit(requestItem.getUnit());
         orderItem.setQuantity(requestItem.getQuantity());
-        orderItem.setUnitPrice(requestItem.getEstimatedUnitPrice() == null ? BigDecimal.ZERO : requestItem.getEstimatedUnitPrice());
-        orderItem.setAmount(requestItem.getEstimatedAmount() == null ? BigDecimal.ZERO : requestItem.getEstimatedAmount());
+        orderItem.setUnitPrice(BigDecimal.ZERO);
+        orderItem.setAmount(BigDecimal.ZERO);
         orderItem.setTaxRate(BigDecimal.ZERO);
         orderItem.setTaxAmount(BigDecimal.ZERO);
-        orderItem.setAmountWithoutTax(requestItem.getEstimatedAmount() == null ? BigDecimal.ZERO : requestItem.getEstimatedAmount());
+        orderItem.setAmountWithoutTax(BigDecimal.ZERO);
         orderItem.setReceivedQuantity(BigDecimal.ZERO);
         orderItem.setCreatedBy(userId);
         orderItem.setUpdatedBy(userId);

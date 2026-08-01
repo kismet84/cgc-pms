@@ -73,6 +73,85 @@ public class FinanceAnalyticsService {
         return jdbc.queryForList("SELECT * FROM dashboard_finance_snapshot WHERE tenant_id=? AND project_id=? ORDER BY snapshot_date DESC", tenant(), projectId);
     }
 
+    public List<Map<String,Object>> latestSnapshots(Long projectId) {
+        List<Long> projectIds;
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查看项目财务快照");
+            projectIds = List.of(projectId);
+        } else {
+            projectIds = projectAccessChecker.accessibleProjectIds();
+        }
+        if (projectIds.isEmpty()) return List.of();
+        String placeholders = String.join(",", Collections.nCopies(projectIds.size(), "?"));
+        List<Object> args = new ArrayList<>();
+        args.add(tenant());
+        args.addAll(projectIds);
+        return jdbc.queryForList("""
+                SELECT s.*,p.project_name
+                  FROM dashboard_finance_snapshot s
+                  JOIN pm_project p ON p.id=s.project_id AND p.tenant_id=s.tenant_id AND p.deleted_flag=0
+                 WHERE s.tenant_id=? AND s.project_id IN (%s)
+                   AND s.snapshot_date=(SELECT MAX(s2.snapshot_date) FROM dashboard_finance_snapshot s2
+                                         WHERE s2.tenant_id=s.tenant_id AND s2.project_id=s.project_id)
+                 ORDER BY p.project_name,s.project_id
+                """.formatted(placeholders), args.toArray());
+    }
+
+    public Map<String,Object> enterpriseSummary() {
+        Long tenant = tenant();
+        BigDecimal fundBalance = decimal(jdbc.queryForObject("""
+                SELECT COALESCE(SUM(a.opening_balance + COALESCE((
+                    SELECT SUM(CASE WHEN e.direction='IN' THEN e.amount ELSE -e.amount END)
+                      FROM cash_journal_entry e
+                     WHERE e.tenant_id=a.tenant_id AND e.account_id=a.id AND e.deleted_flag=0
+                       AND e.status IN ('ARCHIVED','REVERSED') AND e.business_date>=a.opening_date
+                ),0)),0)
+                  FROM fund_account a
+                 WHERE a.tenant_id=? AND a.deleted_flag=0
+                """, BigDecimal.class, tenant));
+        List<Long> projectIds = projectAccessChecker.accessibleProjectIds();
+        BigDecimal projectInflow = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal projectOutflow = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        if (!projectIds.isEmpty()) {
+            String placeholders = String.join(",", Collections.nCopies(projectIds.size(), "?"));
+            List<Object> args = new ArrayList<>();
+            args.add(tenant);
+            args.addAll(projectIds);
+            projectInflow = decimal(jdbc.queryForObject("""
+                    SELECT COALESCE(SUM(planned_amount-collected_amount),0)
+                      FROM collection_schedule
+                     WHERE tenant_id=? AND status IN ('PLANNED','PARTIALLY_COLLECTED')
+                       AND planned_date>=CURRENT_DATE AND project_id IN (%s)
+                    """.formatted(placeholders), BigDecimal.class, args.toArray()));
+            projectOutflow = decimal(jdbc.queryForObject("""
+                    SELECT COALESCE(SUM(planned_amount-paid_amount),0)
+                      FROM payment_schedule
+                     WHERE tenant_id=? AND status IN ('PLANNED','PARTIALLY_PAID')
+                       AND planned_date>=CURRENT_DATE AND project_id IN (%s)
+                    """.formatted(placeholders), BigDecimal.class, args.toArray()));
+        }
+        Map<String,Object> enterpriseForecast = jdbc.queryForMap("""
+                SELECT COALESCE(SUM(inflow_amount),0) inflow,
+                       COALESCE(SUM(outflow_amount),0) outflow,
+                       COALESCE(SUM(financing_amount),0) financing
+                  FROM cash_forecast
+                 WHERE tenant_id=? AND project_id IS NULL AND status='ACTIVE'
+                   AND scenario='BASE' AND forecast_date>=CURRENT_DATE
+                """, tenant);
+        BigDecimal forecastInflow = money(projectInflow.add(decimal(enterpriseForecast.get("inflow"))));
+        BigDecimal forecastOutflow = money(projectOutflow.add(decimal(enterpriseForecast.get("outflow"))));
+        BigDecimal financing = decimal(enterpriseForecast.get("financing"));
+        BigDecimal gap = money(forecastOutflow.subtract(fundBalance).subtract(forecastInflow).subtract(financing).max(BigDecimal.ZERO));
+        Map<String,Object> result = new LinkedHashMap<>();
+        result.put("projectCount", projectIds.size());
+        result.put("fundBalance", fundBalance);
+        result.put("forecastInflow", forecastInflow);
+        result.put("forecastOutflow", forecastOutflow);
+        result.put("financingAmount", financing);
+        result.put("fundingGap", gap);
+        return result;
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public Map<String,Object> createOcrReview(OcrReviewCreateRequest request) {
         if (one("SELECT id FROM pay_invoice WHERE id=? AND tenant_id=? AND deleted_flag=0", request.invoiceId(), tenant()) == null) {

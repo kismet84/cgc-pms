@@ -1,7 +1,7 @@
 package com.cgcpms.config;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import io.micrometer.core.instrument.Meter;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.Cookie;
@@ -21,8 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -34,7 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest(properties = {
         "spring.main.allow-circular-references=true",
-        "management.endpoints.web.exposure.include=health,info,metrics,prometheus"
+        "management.endpoints.web.exposure.include=health,info,metrics,prometheus",
+        "management.prometheus.metrics.export.enabled=true"
 })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
@@ -52,7 +53,7 @@ class ActuatorMetricsTest {
     private MeterRegistry meterRegistry;
 
     @Autowired
-    private JwtUtils jwtUtils;
+    private JwtHttpTestTokenFactory tokenFactory;
 
     @Autowired
     private HealthEndpoint healthEndpoint;
@@ -205,7 +206,7 @@ class ActuatorMetricsTest {
     }
 
     private Cookie adminCookie() {
-        String token = jwtUtils.generateToken(1L, "admin", 0L, List.of("ADMIN"), List.of());
+        String token = tokenFactory.generateToken(1L, "admin", 0L, List.of("ADMIN"), List.of());
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 

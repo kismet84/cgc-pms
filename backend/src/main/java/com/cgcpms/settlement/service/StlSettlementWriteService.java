@@ -48,7 +48,6 @@ import org.springframework.transaction.annotation.Transactional;
 import static com.cgcpms.settlement.constant.SettlementStatusConstants.APPROVAL_APPROVING;
 import static com.cgcpms.settlement.constant.SettlementStatusConstants.APPROVAL_DRAFT;
 import static com.cgcpms.settlement.constant.SettlementStatusConstants.SETTLEMENT_DRAFT;
-import static com.cgcpms.settlement.constant.SettlementStatusConstants.STATUS_DRAFT;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;

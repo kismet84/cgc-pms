@@ -81,7 +81,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info}
+        include: ${MANAGEMENT_ENDPOINTS_INCLUDE:health,info,prometheus}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
   endpoint:
     health:
       show-details: ${MANAGEMENT_HEALTH_SHOW_DETAILS:never}

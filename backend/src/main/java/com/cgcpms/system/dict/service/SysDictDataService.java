@@ -7,10 +7,11 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.system.dict.entity.SysDictData;
 import com.cgcpms.system.dict.entity.SysDictType;
+import com.cgcpms.system.dict.entity.SysDictGroup;
+import com.cgcpms.system.dict.mapper.SysDictGroupMapper;
 import com.cgcpms.system.dict.mapper.SysDictDataMapper;
 import com.cgcpms.system.dict.mapper.SysDictTypeMapper;
 import com.cgcpms.system.dict.vo.SysDictDataVO;
-import com.google.common.cache.LoadingCache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 @Slf4j
@@ -28,16 +30,18 @@ public class SysDictDataService {
 
     private static final long SYSTEM_TENANT_ID = 0L;
     private static final Set<String> VALID_STATUSES = Set.of("ENABLE", "DISABLE");
-    private static final Set<String> SYSTEM_GOVERNED_CODES = Set.of(
-            "project_type", "project_status", "approval_status", "partner_type",
-            "contract_type", "contract_status", "cost_type", "cost_source_type", "cost_status");
+    private static final Map<String, Set<String>> RESERVED_VALUES = Map.of(
+            "invoice_type", Set.of("VAT_SPECIAL", "VAT_NORMAL", "OTHER"));
 
     private final SysDictDataMapper sysDictDataMapper;
     private final SysDictTypeMapper sysDictTypeMapper;
+    private final SysDictGroupMapper sysDictGroupMapper;
 
-    public SysDictDataService(SysDictDataMapper sysDictDataMapper, SysDictTypeMapper sysDictTypeMapper) {
+    public SysDictDataService(SysDictDataMapper sysDictDataMapper, SysDictTypeMapper sysDictTypeMapper,
+                              SysDictGroupMapper sysDictGroupMapper) {
         this.sysDictDataMapper = sysDictDataMapper;
         this.sysDictTypeMapper = sysDictTypeMapper;
+        this.sysDictGroupMapper = sysDictGroupMapper;
     }
 
     public IPage<SysDictDataVO> getPage(long pageNo, long pageSize, Long dictTypeId, String dictLabel, String status) {
@@ -63,7 +67,12 @@ public class SysDictDataService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(SysDictData entity) {
+        DictWriteAuthorizer.requireSystemAdmin();
         SysDictType dictType = requireOwnedType(entity.getDictTypeId());
+        requireWritableGroup(dictType);
+        if (SysDictTypeService.isProtected(dictType)) {
+            throw new BusinessException("DICT_VALUE_CREATE_PROTECTED", "系统或状态机字典不能新增允许值");
+        }
         normalizeAndValidate(entity);
         if (sysDictDataMapper.selectCount(new LambdaQueryWrapper<SysDictData>()
                 .eq(SysDictData::getDictTypeId, entity.getDictTypeId())
@@ -83,6 +92,7 @@ public class SysDictDataService {
 
     @Transactional(rollbackFor = Exception.class)
     public void update(SysDictData entity) {
+        DictWriteAuthorizer.requireSystemAdmin();
         SysDictData existing = sysDictDataMapper.selectById(entity.getId());
         if (existing == null) throw new BusinessException("DICT_DATA_NOT_FOUND", "字典数据不存在");
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
@@ -91,15 +101,24 @@ public class SysDictDataService {
         if (!existing.getDictTypeId().equals(entity.getDictTypeId())) {
             throw new BusinessException("DICT_TYPE_IMMUTABLE", "标签所属字典类型创建后不可修改");
         }
-        if (!existing.getDictValue().equals(entity.getDictValue())) {
-            throw new BusinessException("DICT_VALUE_IMMUTABLE", "标签键值创建后不可修改");
-        }
-        requireOwnedType(existing.getDictTypeId());
         normalizeAndValidate(entity);
-        SysDictType dictType = sysDictTypeMapper.selectById(existing.getDictTypeId());
-        if (existing.getTenantId() == SYSTEM_TENANT_ID && dictType != null
-                && isSystemGoverned(dictType.getDictCode()) && "DISABLE".equals(entity.getStatus())) {
-            throw new BusinessException("DICT_CORE_VALUE_DISABLE_FORBIDDEN", "核心业务字典值不能停用");
+        SysDictType dictType = requireOwnedType(existing.getDictTypeId());
+        requireWritableGroup(dictType);
+        boolean reserved = isReserved(dictType, existing.getDictValue());
+        if ((SysDictTypeService.isProtected(dictType) || reserved)
+                && !existing.getDictValue().equals(entity.getDictValue())) {
+            throw new BusinessException("DICT_VALUE_IMMUTABLE", "系统、状态机或保留字典值不可修改");
+        }
+        if ((SysDictTypeService.isProtected(dictType) || reserved) && "DISABLE".equals(entity.getStatus())) {
+            throw new BusinessException("DICT_VALUE_DISABLE_PROTECTED", "系统、状态机或保留字典值不能停用");
+        }
+        if (!existing.getDictValue().equals(entity.getDictValue())
+                && sysDictDataMapper.selectCount(new LambdaQueryWrapper<SysDictData>()
+                        .eq(SysDictData::getTenantId, existing.getTenantId())
+                        .eq(SysDictData::getDictTypeId, existing.getDictTypeId())
+                        .eq(SysDictData::getDictValue, entity.getDictValue())
+                        .ne(SysDictData::getId, existing.getId())) > 0) {
+            throw new BusinessException("DICT_VALUE_EXISTS", "该字典类型下键值已存在");
         }
         entity.setTenantId(existing.getTenantId());
         sysDictDataMapper.updateById(entity);
@@ -110,15 +129,16 @@ public class SysDictDataService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        DictWriteAuthorizer.requireSystemAdmin();
         SysDictData existing = sysDictDataMapper.selectById(id);
         if (existing == null) throw new BusinessException("DICT_DATA_NOT_FOUND", "字典数据不存在");
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("DICT_DATA_NOT_FOUND", "字典数据不存在");
         }
-        SysDictType dictType = sysDictTypeMapper.selectById(existing.getDictTypeId());
-        if (existing.getTenantId() == SYSTEM_TENANT_ID && dictType != null
-                && isSystemGoverned(dictType.getDictCode())) {
-            throw new BusinessException("DICT_CORE_VALUE_DELETE_FORBIDDEN", "核心业务字典值不能删除");
+        SysDictType dictType = requireOwnedType(existing.getDictTypeId());
+        requireWritableGroup(dictType);
+        if (SysDictTypeService.isProtected(dictType) || isReserved(dictType, existing.getDictValue())) {
+            throw new BusinessException("DICT_VALUE_DELETE_PROTECTED", "系统、状态机或保留字典值不能删除");
         }
         
         // 清除相关字典缓存
@@ -127,7 +147,7 @@ public class SysDictDataService {
         sysDictDataMapper.deleteById(id);
     }
 
-    private SysDictDataVO toVO(SysDictData entity) {
+    SysDictDataVO toVO(SysDictData entity) {
         SysDictDataVO vo = new SysDictDataVO();
         vo.setId(entity.getId() == null ? null : String.valueOf(entity.getId()));
         vo.setDictTypeId(entity.getDictTypeId() == null ? null : String.valueOf(entity.getDictTypeId()));
@@ -196,8 +216,9 @@ public class SysDictDataService {
      */
     private List<SysDictDataVO> fetchByDictCode(String dictCode, Long tenantId) {
         // 1. 查字典类型
-        SysDictType dictType = isSystemGoverned(dictCode)
-                ? findEnabledType(dictCode, SYSTEM_TENANT_ID)
+        SysDictType systemType = findEnabledType(dictCode, SYSTEM_TENANT_ID);
+        SysDictType dictType = SysDictTypeService.isProtected(systemType)
+                ? systemType
                 : findEnabledType(dictCode, tenantId);
         if (dictType == null && tenantId != null && tenantId != SYSTEM_TENANT_ID) {
             dictType = findEnabledType(dictCode, SYSTEM_TENANT_ID);
@@ -215,10 +236,6 @@ public class SysDictDataService {
         return sysDictTypeMapper.selectEnabledByCodeAndTenant(dictCode, tenantId);
     }
 
-    static boolean isSystemGoverned(String dictCode) {
-        return dictCode != null && SYSTEM_GOVERNED_CODES.contains(dictCode.trim().toLowerCase(Locale.ROOT));
-    }
-
     private Long currentTenantIdOrSystem() {
         Long tenantId = UserContext.getCurrentTenantId();
         return tenantId != null ? tenantId : SYSTEM_TENANT_ID;
@@ -231,6 +248,20 @@ public class SysDictDataService {
             throw new BusinessException("DICT_TYPE_NOT_FOUND", "字典类型不存在");
         }
         return dictType;
+    }
+
+    private void requireWritableGroup(SysDictType dictType) {
+        SysDictGroup group = sysDictGroupMapper.selectById(dictType.getGroupId());
+        if (group == null || !group.getTenantId().equals(dictType.getTenantId())
+                || !"ENABLE".equals(group.getStatus())) {
+            throw new BusinessException("DICT_GROUP_DISABLED", "停用分组不能写入字典类型或字典项");
+        }
+    }
+
+    private boolean isReserved(SysDictType type, String value) {
+        if (type == null || value == null) return false;
+        return RESERVED_VALUES.getOrDefault(type.getDictCode(), Set.of())
+                .contains(value.trim().toUpperCase(Locale.ROOT));
     }
 
     private void normalizeAndValidate(SysDictData entity) {

@@ -321,25 +321,22 @@ class WorkflowConcurrencyTest {
         jdbcTemplate.update("DELETE FROM sys_notification WHERE biz_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
         jdbcTemplate.update("DELETE FROM sys_notification WHERE biz_id IN (SELECT id FROM wf_instance WHERE business_id BETWEEN ? AND ?)", BID_FIRST, BID_LAST);
 
-        // 3. wf_idempotency
-        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
-
-        // 4. wf_record
+        // 3. wf_record
         jdbcTemplate.update("DELETE FROM wf_record WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
 
-        // 5. wf_task
+        // 4. wf_task
         jdbcTemplate.update("DELETE FROM wf_task WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
 
-        // 6. wf_node_instance
+        // 5. wf_node_instance
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id BETWEEN ? AND ?)", BID_FIRST, BID_LAST);
 
-        // 7. wf_instance
+        // 6. wf_instance
         jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
 
-        // 8. ct_contract fixtures for submit validation
+        // 7. ct_contract fixtures for submit validation
         jdbcTemplate.update("DELETE FROM ct_contract WHERE id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
 
-        // 9. Remove test-seeded users (undo what seedTestUsers() created)
+        // 8. Remove test-seeded users (undo what seedTestUsers() created)
         jdbcTemplate.update("DELETE FROM sys_user WHERE id BETWEEN 1 AND 5 AND remark = 'test-seed'");
     }
 

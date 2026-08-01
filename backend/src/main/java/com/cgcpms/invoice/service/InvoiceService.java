@@ -24,6 +24,7 @@ import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -62,6 +63,7 @@ public class InvoiceService {
     private final InvoicePaymentAllocationMapper allocationMapper;
     private final SysFileMapper sysFileMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final SysDictDataService sysDictDataService;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     // ── Query ──
@@ -106,6 +108,9 @@ public class InvoiceService {
         if (invoice.getInvoiceType() == null || invoice.getInvoiceType().isBlank()) {
             invoice.setInvoiceType("VAT_SPECIAL");
         }
+        invoice.setInvoiceType(sysDictDataService.requireEnabledValue(
+                "invoice_type", invoice.getInvoiceType(),
+                "INVOICE_TYPE_INVALID", "发票类型不合法"));
         if (invoice.getVerifyStatus() == null || invoice.getVerifyStatus().isBlank()) {
             invoice.setVerifyStatus("PENDING");
         }
@@ -169,6 +174,11 @@ public class InvoiceService {
         invoice.setVerifyStatus(existing.getVerifyStatus());
         invoice.setIntegrityVersion(existing.getIntegrityVersion());
         invoice.setVersion(existing.getVersion());
+        String effectiveInvoiceType = invoice.getInvoiceType() == null
+                ? existing.getInvoiceType() : invoice.getInvoiceType();
+        invoice.setInvoiceType(sysDictDataService.requireEnabledValue(
+                "invoice_type", effectiveInvoiceType,
+                "INVOICE_TYPE_INVALID", "发票类型不合法"));
 
         if (invoice.getPayRecordId() != null) {
             PayRecord payRecord = payRecordMapper.selectById(invoice.getPayRecordId());

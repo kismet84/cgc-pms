@@ -49,6 +49,7 @@ import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
 import com.cgcpms.subcontract.mapper.SubTaskMapper;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowContext;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -77,6 +78,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -129,9 +131,15 @@ class PaymentApplicationClosedLoopIntegrationTest {
     @Autowired private WorkflowSubmitService workflowSubmitService;
     @Autowired private JdbcTemplate jdbcTemplate;
     @MockitoBean private WorkflowEngine workflowEngine;
+    @MockitoBean private SysDictDataService sysDictDataService;
 
     @BeforeEach
     void setUp() {
+        doAnswer(invocation -> {
+            String value = invocation.getArgument(1);
+            return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
+        }).when(sysDictDataService).requireEnabledValue(
+                anyString(), nullable(String.class), anyString(), anyString());
         setContext();
         hardCleanup();
         seedBusinessContext();
@@ -954,7 +962,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
         app.setBudgetLineId(BUDGET_LINE_ID);
         app.setExpenseCategory("LABOR");
         app.setApplyAmount(amount);
-        app.setPayType("BANK_TRANSFER");
+        app.setPayType("PROGRESS");
         app.setApplyReason("付款闭环集成测试");
         return applicationService.create(app);
     }

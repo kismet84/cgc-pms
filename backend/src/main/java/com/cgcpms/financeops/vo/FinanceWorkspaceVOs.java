@@ -32,12 +32,12 @@ public final class FinanceWorkspaceVOs {
         }
     }
 
-    public record FinanceSnapshotVO(String id, String projectId, LocalDate snapshotDate,
-                                    String contractAmount, String approvedUnpaidAmount, String paidAmount,
-                                    String budgetAmount, String cashInflow, String cashOutflow,
-                                    String actualCost, String profitAmount) {
+    public record FinanceSnapshotVO(String id, String projectId, String projectName, LocalDate snapshotDate,
+                                     String contractAmount, String approvedUnpaidAmount, String paidAmount,
+                                     String budgetAmount, String cashInflow, String cashOutflow,
+                                     String actualCost, String profitAmount) {
         public static FinanceSnapshotVO from(Map<String,Object> row) {
-            return new FinanceSnapshotVO(idString(row.get("id")), idString(row.get("project_id")),
+            return new FinanceSnapshotVO(idString(row.get("id")), idString(row.get("project_id")), text(row.get("project_name")),
                     date(row.get("snapshot_date")), money(row.get("contract_amount")),
                     money(row.get("approved_unpaid_amount")), money(row.get("paid_amount")),
                     money(row.get("budget_amount")), money(row.get("cash_inflow")),
@@ -45,16 +45,27 @@ public final class FinanceWorkspaceVOs {
         }
     }
 
-    public record FinanceOperationsWorkspaceVO(List<PaymentScheduleVO> schedules,
+    public record FinanceOperationsSummaryVO(Integer projectCount, String fundBalance,
+                                             String forecastInflow, String forecastOutflow,
+                                             String financingAmount, String fundingGap) {
+        public static FinanceOperationsSummaryVO from(Map<String,Object> row) {
+            return new FinanceOperationsSummaryVO(integer(row.get("projectCount")), money(row.get("fundBalance")),
+                    money(row.get("forecastInflow")), money(row.get("forecastOutflow")),
+                    money(row.get("financingAmount")), money(row.get("fundingGap")));
+        }
+    }
+
+    public record FinanceOperationsWorkspaceVO(FinanceOperationsSummaryVO summary,
+                                               List<PaymentScheduleVO> schedules,
                                                List<FinanceAlertVO> alerts,
                                                List<FinanceSnapshotVO> snapshots) {}
 
-    public record CashForecastCycleVO(String id, String projectId, String cycleCode, String forecastName,
-                                      LocalDate asOfDate, LocalDate horizonStart, LocalDate horizonEnd,
+    public record CashForecastCycleVO(String id, String projectId, String projectName, String cycleCode, String forecastName,
+                                       LocalDate asOfDate, LocalDate horizonStart, LocalDate horizonEnd,
                                       String scenario, String openingBalance, String status,
                                       Integer versionNo, String previousCycleId, LocalDateTime sourceCutoffAt) {
         public static CashForecastCycleVO from(Map<String,Object> row) {
-            return new CashForecastCycleVO(idString(row.get("id")), idString(row.get("project_id")),
+            return new CashForecastCycleVO(idString(row.get("id")), idString(row.get("project_id")), text(row.get("project_name")),
                     text(row.get("cycle_code")), text(row.get("forecast_name")), date(row.get("as_of_date")),
                     date(row.get("horizon_start")), date(row.get("horizon_end")), text(row.get("scenario")),
                     money(row.get("opening_balance")), text(row.get("status")), integer(row.get("version_no")),

@@ -1,7 +1,7 @@
 package com.cgcpms.system.dict;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.List;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -23,18 +24,26 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @DisplayName("SysDictDataController integration tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class SysDictDataControllerTest {
-    @Autowired private MockMvc mockMvc; @Autowired private JwtUtils jwtUtils;
+    @Autowired private MockMvc mockMvc; @Autowired private JwtHttpTestTokenFactory tokenFactory;
+    @Autowired private JdbcTemplate jdbcTemplate;
     private static final long ADMIN_ID = 1L; private static final long TENANT_ID = 0L;
-    private Long dictDataId;
+    private Long dictDataId; private Long writableDictTypeId;
+
+    @BeforeAll
+    void resolveWritableDictType() {
+        writableDictTypeId = jdbcTemplate.queryForObject(
+                "SELECT id FROM sys_dict_type WHERE tenant_id = ? AND dict_code = ?",
+                Long.class, TENANT_ID, "invoice_type");
+    }
 
     private Cookie adminCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
-                jwtUtils.generateToken(ADMIN_ID, "admin", TENANT_ID, List.of("ADMIN"), List.of()));
+                tokenFactory.generateToken(ADMIN_ID, "admin", TENANT_ID, List.of("SUPER_ADMIN"), List.of()));
     }
 
     private Cookie projectManagerCookie() {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE,
-                jwtUtils.generateToken(ADMIN_ID, "project-manager", TENANT_ID,
+                tokenFactory.generateToken(ADMIN_ID, "project-manager", TENANT_ID,
                         List.of("PROJECT_MANAGER"), List.of()));
     }
 
@@ -61,7 +70,7 @@ class SysDictDataControllerTest {
 
     @Test @Order(5) @DisplayName("POST /system/dict/data -> 200 creates dict data")
     void testCreate() throws Exception {
-        String body = "{\"dictTypeId\":1008,\"dictLabel\":\"TEST-" + System.nanoTime() + "\",\"dictValue\":\"TEST_VAL\",\"sortOrder\":999}";
+        String body = "{\"dictTypeId\":" + writableDictTypeId + ",\"dictLabel\":\"TEST-" + System.nanoTime() + "\",\"dictValue\":\"TEST_VAL\",\"sortOrder\":999}";
         String resp = mockMvc.perform(p("/system/dict/data").cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0")).andExpect(jsonPath("$.data").isString())
                 .andReturn().getResponse().getContentAsString();
@@ -85,7 +94,7 @@ class SysDictDataControllerTest {
     @Test @Order(8) @DisplayName("PUT /system/dict/data/{id} -> 200")
     void testUpdate() throws Exception {
         Assertions.assertNotNull(dictDataId);
-        String body = "{\"dictTypeId\":1008,\"dictLabel\":\"TEST-UPD-" + System.nanoTime() + "\",\"dictValue\":\"TEST_VAL\"}";
+        String body = "{\"dictTypeId\":" + writableDictTypeId + ",\"dictLabel\":\"TEST-UPD-" + System.nanoTime() + "\",\"dictValue\":\"TEST_VAL\"}";
         mockMvc.perform(u("/system/dict/data/" + dictDataId).cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"));
     }

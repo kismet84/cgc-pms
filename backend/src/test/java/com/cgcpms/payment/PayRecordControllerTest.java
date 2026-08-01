@@ -15,6 +15,7 @@ import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PayRecordMapper;
 import com.cgcpms.payment.service.PayApplicationService;
 import com.cgcpms.payment.service.PayRecordService;
+import com.cgcpms.system.dict.service.SysDictDataService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.Cookie;
@@ -25,6 +26,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
@@ -32,9 +34,13 @@ import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Locale;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.nullable;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -76,6 +82,9 @@ class PayRecordControllerTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    @MockitoBean
+    private SysDictDataService sysDictDataService;
+
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
@@ -111,6 +120,11 @@ class PayRecordControllerTest {
 
     @BeforeAll
     void initData() {
+        doAnswer(invocation -> {
+            String value = invocation.getArgument(1);
+            return value == null ? null : value.trim().toUpperCase(Locale.ROOT);
+        }).when(sysDictDataService).requireEnabledValue(
+                anyString(), nullable(String.class), anyString(), anyString());
         setUserContext();
         try {
             // Create a pay application first (prerequisite for pay_record)
@@ -119,7 +133,7 @@ class PayRecordControllerTest {
             app.setContractId(CONTRACT_ID);
             app.setPartnerId(PARTNER_ID);
             app.setApplyAmount(new BigDecimal("10000.00"));
-            app.setPayType("MATERIAL");
+            app.setPayType("PROGRESS");
             app.setApplyReason("集成测试-付款申请");
             payApplicationId = payApplicationService.create(app);
             PayApplication approvedApp = payApplicationMapper.selectById(payApplicationId);

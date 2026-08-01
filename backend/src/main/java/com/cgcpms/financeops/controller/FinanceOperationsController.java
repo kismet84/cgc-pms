@@ -28,11 +28,12 @@ public class FinanceOperationsController {
 
     @GetMapping("/workspace")
     @PreAuthorize("hasAuthority('finance:operations:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public ApiResponse<FinanceOperationsWorkspaceVO> workspace(@RequestParam Long projectId) {
+    public ApiResponse<FinanceOperationsWorkspaceVO> workspace(@RequestParam(required=false) Long projectId) {
         return ApiResponse.success(new FinanceOperationsWorkspaceVO(
+                FinanceOperationsSummaryVO.from(analytics.enterpriseSummary()),
                 operations.schedules(projectId, null).stream().map(PaymentScheduleVO::from).toList(),
                 operations.alerts(projectId, null).stream().map(FinanceAlertVO::from).toList(),
-                analytics.snapshots(projectId).stream().map(FinanceSnapshotVO::from).toList()));
+                analytics.latestSnapshots(projectId).stream().map(FinanceSnapshotVO::from).toList()));
     }
 
     @PostMapping("/budgets/adjust") @PreAuthorize("hasAuthority('finance:operations:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")

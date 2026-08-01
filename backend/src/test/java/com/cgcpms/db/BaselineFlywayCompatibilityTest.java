@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("250", flyway.info().current().getVersion().getVersion());
+        assertEquals("255", flyway.info().current().getVersion().getVersion());
         execute(flyway, """
                 INSERT INTO mat_warehouse
                     (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
@@ -109,7 +109,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("250", current.info().current().getVersion().getVersion());
+        assertEquals("255", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
                     ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))
@@ -147,6 +147,55 @@ class BaselineFlywayCompatibilityTest {
         Flyway current = flyway("payment_orphan", ACTIVE, LEGACY, JAVA);
 
         assertThrows(FlywayException.class, current::migrate);
+    }
+
+    @Test
+    void v251AndV252RemoveUnusedIdempotencyColumnsAndReconcileContractCaches() {
+        Flyway old = Flyway.configure()
+                .dataSource(url("field_cleanup"), "sa", "")
+                .locations(ACTIVE, LEGACY, JAVA)
+                .target(MigrationVersion.fromVersion("250"))
+                .cleanDisabled(false)
+                .load();
+        old.migrate();
+        execute(old, "SET REFERENTIAL_INTEGRITY FALSE");
+        execute(old, """
+                INSERT INTO ct_contract
+                    (id, tenant_id, project_id, contract_code, contract_name, contract_type,
+                     party_a_id, party_b_id, contract_amount, current_amount, paid_amount, deleted_flag)
+                VALUES (251001, 7, 251010, 'CT-V252', 'V252合同', 'PURCHASE',
+                        251011, 251012, 100, 1, 99, 0)
+                """);
+        execute(old, """
+                INSERT INTO ct_contract_change
+                    (id, tenant_id, project_id, contract_id, change_code, change_name, change_type,
+                     before_amount, change_amount, after_amount, approval_status, effective_flag, deleted_flag)
+                VALUES (251002, 7, 251010, 251001, 'CH-V252', 'V252变更', 'AMOUNT',
+                        100, 20, 120, 'APPROVED', 1, 0)
+                """);
+        execute(old, """
+                INSERT INTO ct_contract_change
+                    (id, tenant_id, project_id, contract_id, change_code, change_name, change_type,
+                     before_amount, change_amount, after_amount, approval_status, effective_flag, deleted_flag)
+                VALUES (251004, 7, 251010, 251001, 'CH-V252-PENDING', '未生效变更', 'AMOUNT',
+                        120, 10, 130, 'APPROVED', 0, 0)
+                """);
+        execute(old, """
+                INSERT INTO pay_record
+                    (id, tenant_id, project_id, pay_application_id, contract_id,
+                     pay_amount, pay_date, pay_status, deleted_flag)
+                VALUES (251003, 7, 251010, 251020, 251001, 30, CURRENT_DATE, 'SUCCESS', 0)
+                """);
+        execute(old, "SET REFERENTIAL_INTEGRITY TRUE");
+
+        Flyway current = flyway("field_cleanup", ACTIVE, LEGACY, JAVA);
+        current.migrate();
+
+        assertEquals(1, count(current, "ct_contract", "id=251001 AND current_amount=120 AND paid_amount=30"));
+        assertEquals(0, count(current, "information_schema.columns", "table_name='wf_idempotency'"
+                + " AND column_name IN ('business_type','business_id','request_hash','response_json')"));
+        assertEquals(1, count(current, "information_schema.indexes", "table_name='mat_purchase_order'"
+                + " AND index_name='idx_purchase_order_request_source'"));
     }
 
     @Test

@@ -92,7 +92,7 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         newestOrder.setProjectId(sr.projectId);
         newestOrder.setPartnerId(sr.partnerId);
         newestOrder.setOrderCode("PO-PUR_DASH-NEWEST");
-        newestOrder.setOrderDate(LocalDate.now());
+        newestOrder.setOrderDate(LocalDate.now().plusDays(2));
         newestOrder.setDeliveryDate(LocalDate.now().plusDays(7));
         newestOrder.setTotalAmount(new BigDecimal("140000.00"));
         newestOrder.setApprovalStatus("APPROVED");
@@ -360,7 +360,7 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         noSummaryReceipt.setProjectId(sr.projectId);
         noSummaryReceipt.setPartnerId(sr.partnerId);
         noSummaryReceipt.setReceiptCode("RC-PROD_DASH-NO-SUMMARY");
-        noSummaryReceipt.setReceiptDate(LocalDate.now());
+        noSummaryReceipt.setReceiptDate(LocalDate.now().minusDays(1));
         noSummaryReceipt.setWarehouseId(sr.warehouseId);
         noSummaryReceipt.setReceiverId(sr.signalUserId);
         noSummaryReceipt.setQualityStatus("PENDING");
@@ -388,7 +388,6 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         assertEquals("钢筋-PROD_DASH", receipt.getItemSummary());
         assertEquals("供应商-PROD_DASH", receipt.getPartnerName());
         assertNotNull(receipt.getOwnerName());
-        assertTrue(receipt.getPendingDays() >= 1L);
 
         DashboardBusinessItemVO receiptWithoutSummary = vo.getRecentReceipts().stream()
                 .filter(i -> "RC-PROD_DASH-NO-SUMMARY".equals(i.getCode()))
@@ -396,6 +395,7 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
                 .orElseThrow();
         assertNull(receiptWithoutSummary.getTitle());
         assertNull(receiptWithoutSummary.getItemSummary());
+        assertTrue(receiptWithoutSummary.getPendingDays() >= 1L);
 
         DashboardBusinessItemVO requisition = vo.getRecentRequisitions().get(0);
         assertEquals("RQ-PROD_DASH", requisition.getCode());
@@ -486,17 +486,17 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
     @DisplayName("8.2b Purchase view: overdueOrders uses deliveryDate scope NOT orderDate pre-filter")
     void testPurchaseView_OverdueUsesDeliveryDateScope() {
         SeedResult sr = seed("PUR_OVERDUE_DLV");
-        String currentMonth = LocalDate.now().toString().substring(0, 7);
-        String lastMonth = LocalDate.now().minusMonths(1).toString().substring(0, 7);
+        YearMonth deliveryMonth = YearMonth.now().minusMonths(1);
+        String orderMonth = deliveryMonth.minusMonths(1).toString();
 
-        // Order with orderDate=lastMonth, deliveryDate=currentMonth (overdue)
+        // Order and delivery belong to different completed months.
         MatPurchaseOrder crossOrder = new MatPurchaseOrder();
         crossOrder.setTenantId(TENANT_ID);
         crossOrder.setProjectId(sr.projectId);
         crossOrder.setPartnerId(sr.partnerId);
         crossOrder.setOrderCode("PO-CROSS-DLV");
-        crossOrder.setOrderDate(LocalDate.now().minusMonths(1));         // last month
-        crossOrder.setDeliveryDate(LocalDate.now().minusDays(1));        // current month, overdue
+        crossOrder.setOrderDate(deliveryMonth.minusMonths(1).atDay(1));
+        crossOrder.setDeliveryDate(deliveryMonth.atEndOfMonth());
         crossOrder.setTotalAmount(new BigDecimal("50000.00"));
         crossOrder.setApprovalStatus("APPROVED");
         crossOrder.setOrderStatus("APPROVED");
@@ -514,24 +514,25 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         crossOrderItem.setAmount(new BigDecimal("50000.00"));
         purchaseOrderItemMapper.insert(crossOrderItem);
 
-        // Query by lastMonth: only cross-order matches by orderDate
-        PurchaseManagerDashboardVO lastMonthVo = dashboardService.getPurchaseManagerView(sr.projectId, lastMonth);
-        assertTrue(lastMonthVo.getActiveOrderCount() >= 1, "Last month should include cross order by orderDate");
-        assertTrue(lastMonthVo.getPurchaseOrders().stream()
+        // Query by order month: only cross-order matches by orderDate
+        PurchaseManagerDashboardVO orderMonthVo = dashboardService.getPurchaseManagerView(sr.projectId, orderMonth);
+        assertTrue(orderMonthVo.getActiveOrderCount() >= 1, "Order month should include cross order by orderDate");
+        assertTrue(orderMonthVo.getPurchaseOrders().stream()
                 .anyMatch(o -> "PO-CROSS-DLV".equals(o.getCode())),
-                "Cross order should appear in purchaseOrders when filtered by lastMonth");
+                "Cross order should appear in purchaseOrders when filtered by order month");
 
-        // Query by currentMonth: orderDate does NOT match → NOT in purchaseOrders
-        PurchaseManagerDashboardVO currentMonthVo = dashboardService.getPurchaseManagerView(sr.projectId, currentMonth);
-        assertTrue(currentMonthVo.getPurchaseOrders().stream()
+        // Query by delivery month: orderDate does NOT match → NOT in purchaseOrders
+        PurchaseManagerDashboardVO deliveryMonthVo = dashboardService.getPurchaseManagerView(
+                sr.projectId, deliveryMonth.toString());
+        assertTrue(deliveryMonthVo.getPurchaseOrders().stream()
                 .noneMatch(o -> "PO-CROSS-DLV".equals(o.getCode())),
-                "Cross order should NOT appear in purchaseOrders (orderDate not in current month)");
+                "Cross order should NOT appear in purchaseOrders (orderDate not in delivery month)");
 
-        // CRITICAL: deliveryDate IS in current month → MUST appear in overdueOrders
-        assertTrue(currentMonthVo.getOverdueOrders().stream()
+        // deliveryDate IS in selected delivery month → MUST appear in overdueOrders
+        assertTrue(deliveryMonthVo.getOverdueOrders().stream()
                 .anyMatch(o -> "PO-CROSS-DLV".equals(o.getCode())),
-                "Cross order MUST appear in overdueOrders because deliveryDate is in current month");
-        assertTrue(currentMonthVo.getOverdueDeliveryCount() >= 1,
+                "Cross order MUST appear in overdueOrders because deliveryDate is in delivery month");
+        assertTrue(deliveryMonthVo.getOverdueDeliveryCount() >= 1,
                 "overdueDeliveryCount should count orders with deliveryDate in selected month");
     }
 

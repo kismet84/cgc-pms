@@ -1147,28 +1147,25 @@ class WorkflowEngineIntegrationTest {
         // 3. sys_notification — workflow notifications (submit/approve/reject/withdraw/transfer/addSign) use instance ID as biz_id
         jdbcTemplate.update("DELETE FROM sys_notification WHERE biz_id IN (SELECT id FROM wf_instance WHERE business_id BETWEEN ? AND ?)", BID_FIRST, BID_LAST);
 
-        // 4. wf_idempotency — records created with specific key patterns (business_id is NOT set during creation)
+        // 4. wf_idempotency — records created with specific key patterns
         jdbcTemplate.update("DELETE FROM wf_idempotency WHERE idempotency_key LIKE 'tenant-idem-%' OR idempotency_key LIKE 'test13-%' OR idempotency_key LIKE 'test14-%' OR idempotency_key LIKE 'test15-%' OR idempotency_key LIKE 'test17-%'");
 
-        // 5. wf_idempotency — fallback by business_id range (for records where business_id IS set)
-        jdbcTemplate.update("DELETE FROM wf_idempotency WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
-
-        // 6. wf_record — child of wf_instance (via business_id)
+        // 5. wf_record — child of wf_instance (via business_id)
         jdbcTemplate.update("DELETE FROM wf_record WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
 
-        // 7. wf_task — child of wf_instance + wf_node_instance (via business_id)
+        // 6. wf_task — child of wf_instance + wf_node_instance (via business_id)
         jdbcTemplate.update("DELETE FROM wf_task WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
 
-        // 8. wf_node_instance — child of wf_instance (via instance_id)
+        // 7. wf_node_instance — child of wf_instance (via instance_id)
         jdbcTemplate.update("DELETE FROM wf_node_instance WHERE instance_id IN (SELECT id FROM wf_instance WHERE business_id BETWEEN ? AND ?)", BID_FIRST, BID_LAST);
 
-        // 9. wf_instance — parent table, deleted last
+        // 8. wf_instance — parent table, deleted last
         jdbcTemplate.update("DELETE FROM wf_instance WHERE business_id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
 
-        // 10. ct_contract — business fixtures for submit validation
+        // 9. ct_contract — business fixtures for submit validation
         jdbcTemplate.update("DELETE FROM ct_contract WHERE id BETWEEN ? AND ?", BID_FIRST, BID_LAST);
 
-        // 11. Do NOT delete test-seeded users — other test classes (WorkflowApproverResolverTest,
+        // 10. Do NOT delete test-seeded users — other test classes (WorkflowApproverResolverTest,
         // WorkflowConcurrencyTest) also need them. Each class seeds via WHERE NOT EXISTS;
         // removing them creates cross-class data pollution.
     }
