@@ -23,7 +23,7 @@ public class DocumentGenerationAutoRetryService {
     private final DocumentGenerationMapper generationMapper;
     private final DocumentGenerationService generationService;
 
-    @Scheduled(fixedDelayString = "${document.generation.auto-retry-delay-ms:60000}")
+    @Scheduled(fixedDelayString = "${document.generation.auto-retry-delay-ms:60000}") // SQL-SAFETY: fixed-sql-fragment — Spring configuration placeholder, not SQL
     public void retryFailedProcurementDocuments() {
         for (DocumentGeneration failed : generationMapper.selectAutoRetryCandidates(LocalDateTime.now().minusMinutes(1))) {
             int attempt = attempt(failed);
