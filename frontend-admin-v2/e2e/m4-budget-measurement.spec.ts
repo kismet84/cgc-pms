@@ -355,7 +355,7 @@ test.describe('M4 budget and measurement routes', () => {
     await install(page, writes, business, traffic)
     await page.goto('/budget')
     await expect(
-      page.getByRole('heading', { name: '项目预算', level: 1, exact: true }),
+      page.getByRole('heading', { name: '成本预算', level: 1, exact: true }),
     ).toBeVisible()
 
     const projectControl = page.locator('#global-project')

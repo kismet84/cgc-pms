@@ -2,6 +2,7 @@ import { hasAdminRole } from '@/stores/session'
 
 export interface NavigationAccess {
   permission?: string
+  permissions?: string[]
   adminOnly?: boolean
   superAdminOnly?: boolean
   adminBypassesPermission?: boolean
@@ -97,33 +98,10 @@ export const navigationDomains: NavigationDomain[] = [
         ],
       },
       {
-        id: 'execution',
-        label: '计划与现场',
-        defaultPath: '/project-schedule',
-        matchPrefixes: ['/project-schedule'],
-        tabs: [
-          {
-            path: '/project-schedule',
-            label: '项目计划',
-            permission: 'schedule:query',
-          },
-          {
-            path: '/site/daily-log',
-            label: '现场日报',
-            permission: 'site:daily:query',
-          },
-        ],
-      },
-      {
         id: 'control',
-        label: '质量与技术',
-        defaultPath: '/quality-safety',
+        label: '技术管理',
+        defaultPath: '/technical-management',
         tabs: [
-          {
-            path: '/quality-safety',
-            label: '质量安全整改',
-            permission: 'quality:safety:query',
-          },
           {
             path: '/technical-management',
             label: '图纸 RFI 技术闭环',
@@ -140,6 +118,43 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/project-closeout',
             label: '竣工收尾',
             permission: 'closeout:query',
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'construction',
+    label: '施工管理',
+    badge: '施',
+    workspaces: [
+      {
+        id: 'construction-execution',
+        label: '项目计划与施工履约',
+        defaultPath: '/project-schedule',
+        matchPrefixes: ['/project-schedule'],
+        tabs: [
+          {
+            path: '/project-schedule',
+            label: '项目计划',
+            permission: 'schedule:query',
+          },
+          {
+            path: '/site/daily-log',
+            label: '施工履约',
+            permission: 'site:daily:query',
+          },
+        ],
+      },
+      {
+        id: 'construction-quality',
+        label: '质量安全整改闭环',
+        defaultPath: '/quality-safety',
+        tabs: [
+          {
+            path: '/quality-safety',
+            label: '质量安全整改闭环',
+            permission: 'quality:safety:query',
           },
         ],
       },
@@ -170,19 +185,32 @@ export const navigationDomains: NavigationDomain[] = [
       },
       {
         id: 'target-cost',
-        label: '投标与成本目标',
+        label: '投标成本',
         defaultPath: '/bid-cost',
-        matchPrefixes: ['/bid-cost', '/cost-target'],
+        matchPrefixes: ['/bid-cost'],
         tabs: [
           {
             path: '/bid-cost',
             label: '投标成本',
             permission: 'bid:query',
           },
+        ],
+      },
+      {
+        id: 'cost-budget',
+        label: '成本预算与产值',
+        defaultPath: '/cost-budget',
+        matchPrefixes: ['/cost-budget', '/cost-target', '/budget'],
+        tabs: [
           {
-            path: '/cost-target/index',
-            label: '成本目标',
+            path: '/cost-budget',
+            label: '项目成本预算',
             permission: 'cost:target:query',
+          },
+          {
+            path: '/production-measurement',
+            label: '产值计量',
+            permission: 'measurement:query',
           },
         ],
       },
@@ -206,23 +234,6 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/cost/control',
             label: '动态利润控制',
             permission: 'cost:control:query',
-          },
-        ],
-      },
-      {
-        id: 'value',
-        label: '预算与产值',
-        defaultPath: '/budget',
-        tabs: [
-          {
-            path: '/budget',
-            label: '项目预算',
-            permission: 'budget:query',
-          },
-          {
-            path: '/production-measurement',
-            label: '产值计量',
-            permission: 'measurement:query',
           },
         ],
       },
@@ -569,6 +580,11 @@ export function hasAccess(
   if (access.superAdminOnly && !roles.includes('SUPER_ADMIN')) return false
   if (access.adminOnly && !hasAdminRole(roles)) return false
   if (access.adminBypassesPermission && hasAdminRole(roles)) return true
+  if (access.permissions?.length) {
+    return (
+      permissions.includes('*') || access.permissions.some((item) => permissions.includes(item))
+    )
+  }
   return !access.permission || permissions.includes('*') || permissions.includes(access.permission)
 }
 

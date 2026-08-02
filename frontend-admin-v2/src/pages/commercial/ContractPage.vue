@@ -9,6 +9,7 @@ import type {
   ContractQuery,
   ContractSaveCommand,
   ContractType,
+  MaterialRecord,
   PartnerRecord,
   ProjectContextOption,
 } from '@cgc-pms/frontend-contracts'
@@ -42,6 +43,7 @@ import {
   saveContractBudgetAllocations,
   updateContractComposite,
 } from '@/services/commercial'
+import { loadMaterials } from '@/services/supply-chain'
 import { isApiClientError } from '@/services/request'
 import { reportPeriodBounds } from '@/services/workspace-context'
 import { useSessionStore } from '@/stores/session'
@@ -126,6 +128,7 @@ const allocationEditing = ref(false)
 const allocationSaving = ref(false)
 const projects = ref<ProjectContextOption[]>([])
 const partners = ref<PartnerRecord[]>([])
+const materials = ref<MaterialRecord[]>([])
 const form = ref<ContractSaveCommand>(emptyCommand())
 const pendingDelete = ref(false)
 const pendingSubmit = ref(false)
@@ -179,6 +182,12 @@ const budgetLineOptions = computed(() =>
       label: line.costSubjectName || line.costSubjectId,
     })),
 )
+const materialOptions = computed(() =>
+  materials.value.map((item) => ({
+    value: item.id,
+    label: `${item.materialCode} · ${item.materialName}`,
+  })),
+)
 const pageCount = computed(() => {
   const pageSize = filter.pageSize ?? 10
   return Math.max(1, Math.ceil(total.value / pageSize))
@@ -198,6 +207,12 @@ const formLocked = computed(
     deleting.value ||
     (mode.value === 'edit' && !currentContractIsDraft.value),
 )
+const contractAmountLocked = computed(
+  () =>
+    mode.value === 'edit' &&
+    projects.value.find((project) => project.id === form.value.contract.projectId)?.status ===
+      'ACTIVE',
+)
 
 function emptyCommand(): ContractSaveCommand {
   return {
@@ -216,6 +231,7 @@ function emptyCommand(): ContractSaveCommand {
       endDate: '',
       paymentMethod: '',
       settlementMethod: '',
+      pricingMode: null,
       version: '',
       remark: '',
     },
@@ -226,6 +242,7 @@ function emptyCommand(): ContractSaveCommand {
 
 function blankItem(index = form.value.items.length): ContractItemRecord {
   return {
+    materialId: '',
     itemCode: '',
     itemName: '',
     itemSpec: '',
@@ -273,12 +290,14 @@ function cloneCommandFromDetail(value: ContractCompositeRecord): ContractSaveCom
       endDate: value.contract.endDate ?? '',
       paymentMethod: value.contract.paymentMethod ?? '',
       settlementMethod: value.contract.settlementMethod ?? '',
+      pricingMode: value.contract.pricingMode ?? null,
       version: value.contract.version ?? '',
       remark: value.contract.remark ?? '',
     },
     items: value.items.map((item) => ({
       id: item.id ?? '',
       contractId: item.contractId ?? value.contract.id,
+      materialId: item.materialId ?? '',
       itemCode: item.itemCode ?? '',
       itemName: item.itemName,
       itemSpec: item.itemSpec ?? '',
@@ -369,11 +388,16 @@ async function loadReferenceData(): Promise<void> {
     if (refController !== controller) return
     projects.value = projectOptions
     if (mode.value === 'create' || mode.value === 'edit') {
-      const partnerPage = await loadPartners(undefined, controller.signal)
+      const [partnerPage, materialPage] = await Promise.all([
+        loadPartners(undefined, controller.signal),
+        loadMaterials({ pageNo: 1, pageSize: 200, status: 'ENABLE' }, controller.signal),
+      ])
       if (refController !== controller) return
       partners.value = partnerPage.records
+      materials.value = materialPage.records
     } else {
       partners.value = []
+      materials.value = []
     }
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '合同候选数据加载失败')
@@ -509,14 +533,53 @@ function updateContractField(
   key: keyof ContractSaveCommand['contract'],
   value: string | ContractType,
 ): void {
+  const contract = { ...form.value.contract, [key]: value }
+  if (key === 'contractAmount' || key === 'taxRate') {
+    const breakdown = previewTaxBreakdown(contract.contractAmount, contract.taxRate)
+    contract.taxAmount = breakdown.taxAmount
+    contract.amountWithoutTax = breakdown.amountWithoutTax
+  }
   form.value = {
     ...form.value,
-    contract: { ...form.value.contract, [key]: value },
+    contract,
+  }
+}
+
+function previewTaxBreakdown(
+  amountValue?: string | null,
+  taxRateValue?: string | null,
+): { taxAmount: string; amountWithoutTax: string } {
+  if (!amountValue?.trim() || !taxRateValue?.trim()) {
+    return { taxAmount: '', amountWithoutTax: '' }
+  }
+  const amount = Number(amountValue)
+  const taxRate = Number(taxRateValue)
+  if (
+    !Number.isFinite(amount) ||
+    !Number.isFinite(taxRate) ||
+    amount < 0 ||
+    taxRate < 0 ||
+    taxRate > 100
+  ) {
+    return { taxAmount: '', amountWithoutTax: '' }
+  }
+  const amountWithoutTax = taxRate === 0 ? amount : (amount * 100) / (100 + taxRate)
+  const roundedWithoutTax = Number(amountWithoutTax.toFixed(2))
+  return {
+    taxAmount: (amount - roundedWithoutTax).toFixed(2),
+    amountWithoutTax: roundedWithoutTax.toFixed(2),
   }
 }
 
 function updateContractType(value: string): void {
-  updateContractField('contractType', value as ContractType)
+  form.value = {
+    ...form.value,
+    contract: {
+      ...form.value.contract,
+      contractType: value as ContractType,
+      pricingMode: value === 'PURCHASE' ? form.value.contract.pricingMode || 'FIXED' : null,
+    },
+  }
 }
 
 function updateItem(index: number, key: keyof ContractItemRecord, value: string): void {
@@ -524,6 +587,25 @@ function updateItem(index: number, key: keyof ContractItemRecord, value: string)
     ...form.value,
     items: form.value.items.map((item, itemIndex) =>
       itemIndex === index ? { ...item, [key]: value } : item,
+    ),
+  }
+}
+
+function updateItemMaterial(index: number, materialId: string): void {
+  const material = materials.value.find((item) => item.id === materialId)
+  form.value = {
+    ...form.value,
+    items: form.value.items.map((item, itemIndex) =>
+      itemIndex === index
+        ? {
+            ...item,
+            materialId,
+            itemCode: material?.materialCode ?? item.itemCode,
+            itemName: material?.materialName ?? item.itemName,
+            itemSpec: material?.specification ?? item.itemSpec,
+            unit: material?.unit ?? item.unit,
+          }
+        : item,
     ),
   }
 }
@@ -575,13 +657,14 @@ function sanitizeCommand(value: ContractSaveCommand): ContractSaveCommand {
       partyBId: cleaned(value.contract.partyBId),
       contractAmount: cleaned(value.contract.contractAmount),
       taxRate: cleaned(value.contract.taxRate),
-      taxAmount: cleaned(value.contract.taxAmount),
-      amountWithoutTax: cleaned(value.contract.amountWithoutTax),
+      taxAmount: null,
+      amountWithoutTax: null,
       signedDate: cleaned(value.contract.signedDate),
       startDate: cleaned(value.contract.startDate),
       endDate: cleaned(value.contract.endDate),
       paymentMethod: cleaned(value.contract.paymentMethod),
       settlementMethod: cleaned(value.contract.settlementMethod),
+      pricingMode: cleaned(value.contract.pricingMode) as 'FIXED' | 'ACTUAL' | null,
       version: cleaned(String(value.contract.version ?? '')),
       remark: cleaned(value.contract.remark),
     },
@@ -589,16 +672,17 @@ function sanitizeCommand(value: ContractSaveCommand): ContractSaveCommand {
       ...item,
       id: cleaned(item.id ?? ''),
       contractId: cleaned(item.contractId ?? ''),
+      materialId: cleaned(item.materialId ?? ''),
       itemCode: cleaned(item.itemCode ?? ''),
       itemName: item.itemName.trim(),
       itemSpec: cleaned(item.itemSpec ?? ''),
       unit: cleaned(item.unit ?? ''),
       quantity: cleaned(item.quantity ?? ''),
       unitPrice: cleaned(item.unitPrice ?? ''),
-      amount: cleaned(item.amount ?? ''),
-      taxRate: cleaned(item.taxRate ?? ''),
-      taxAmount: cleaned(item.taxAmount ?? ''),
-      amountWithoutTax: cleaned(item.amountWithoutTax ?? ''),
+      amount: null,
+      taxRate: null,
+      taxAmount: null,
+      amountWithoutTax: null,
       sortOrder: cleaned(String(item.sortOrder ?? index + 1)),
       remark: cleaned(item.remark ?? ''),
     })),
@@ -624,13 +708,10 @@ function validateForm(command: ContractSaveCommand): string | null {
   if (!command.contract.contractName) return '合同名称不能为空'
   if (!command.contract.partyAId || !command.contract.partyBId) return '甲乙方不能为空'
   if (!command.contract.contractAmount) return '合同金额不能为空'
+  if (!command.contract.taxRate) return '合同税率不能为空'
   if (command.items.some((item) => !item.itemName?.trim())) return '合同清单名称不能为空'
-  if (
-    command.items.some(
-      (item) => !item.amount || !item.taxAmount || !item.amountWithoutTax || !item.taxRate,
-    )
-  )
-    return '合同清单金额、税率、税额和不含税金额不能为空'
+  if (command.items.some((item) => !item.quantity || !item.unitPrice))
+    return '合同清单数量和单价不能为空'
   if (command.paymentTerms.some((term) => !term.termName?.trim())) return '付款条款名称不能为空'
   return null
 }
@@ -945,6 +1026,10 @@ onBeforeUnmount(() => {
               <dt>已付额</dt>
               <dd>{{ formatAmount(currentContract.paidAmount) }}</dd>
             </div>
+            <div v-if="currentContract.contractType === 'PURCHASE'">
+              <dt>采购净应付</dt>
+              <dd>{{ formatAmount(currentContract.payableAmount) }}</dd>
+            </div>
             <div>
               <dt>结算额</dt>
               <dd>{{ formatAmount(currentContract.settlementAmount) }}</dd>
@@ -1213,6 +1298,17 @@ onBeforeUnmount(() => {
               @update:model-value="updateContractType"
             />
             <V2Select
+              v-if="form.contract.contractType === 'PURCHASE'"
+              :model-value="form.contract.pricingMode || 'FIXED'"
+              label="采购计价模式"
+              :options="[
+                { value: 'FIXED', label: '合同固定价' },
+                { value: 'ACTUAL', label: '实际采购价' },
+              ]"
+              :disabled="formLocked"
+              @update:model-value="updateContractField('pricingMode', $event)"
+            />
+            <V2Select
               :model-value="form.contract.partyAId || ''"
               label="甲方"
               :options="partners.map((item) => ({ value: item.id, label: item.partnerName }))"
@@ -1229,7 +1325,8 @@ onBeforeUnmount(() => {
             <V2Input
               :model-value="form.contract.contractAmount || ''"
               label="合同金额"
-              :disabled="formLocked"
+              :disabled="formLocked || contractAmountLocked"
+              :hint="contractAmountLocked ? '项目已在建，合同总价调整请发起合同变更。' : undefined"
               @update:model-value="updateContractField('contractAmount', $event)"
             />
             <V2Input
@@ -1240,15 +1337,13 @@ onBeforeUnmount(() => {
             />
             <V2Input
               :model-value="form.contract.taxAmount || ''"
-              label="税额"
-              :disabled="formLocked"
-              @update:model-value="updateContractField('taxAmount', $event)"
+              label="税额（自动计算）"
+              disabled
             />
             <V2Input
               :model-value="form.contract.amountWithoutTax || ''"
-              label="不含税额"
-              :disabled="formLocked"
-              @update:model-value="updateContractField('amountWithoutTax', $event)"
+              label="不含税金额（自动计算）"
+              disabled
             />
             <V2Input
               :model-value="form.contract.paymentMethod || ''"
@@ -1294,6 +1389,14 @@ onBeforeUnmount(() => {
               :key="item.id || `${index}-${item.itemName}`"
             >
               <div class="contract-page__form-grid">
+                <V2Select
+                  v-if="form.contract.contractType === 'PURCHASE'"
+                  :model-value="item.materialId || ''"
+                  label="物料"
+                  :options="materialOptions"
+                  :disabled="formLocked"
+                  @update:model-value="updateItemMaterial(index, $event)"
+                />
                 <V2Input
                   :model-value="item.itemName"
                   label="名称"
@@ -1323,30 +1426,6 @@ onBeforeUnmount(() => {
                   label="单价"
                   :disabled="formLocked"
                   @update:model-value="updateItem(index, 'unitPrice', $event)"
-                />
-                <V2Input
-                  :model-value="item.amount || ''"
-                  label="金额"
-                  :disabled="formLocked"
-                  @update:model-value="updateItem(index, 'amount', $event)"
-                />
-                <V2Input
-                  :model-value="item.taxRate || ''"
-                  label="税率"
-                  :disabled="formLocked"
-                  @update:model-value="updateItem(index, 'taxRate', $event)"
-                />
-                <V2Input
-                  :model-value="item.taxAmount || ''"
-                  label="税额"
-                  :disabled="formLocked"
-                  @update:model-value="updateItem(index, 'taxAmount', $event)"
-                />
-                <V2Input
-                  :model-value="item.amountWithoutTax || ''"
-                  label="不含税金额"
-                  :disabled="formLocked"
-                  @update:model-value="updateItem(index, 'amountWithoutTax', $event)"
                 />
               </div>
               <div class="contract-page__actions">

@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -66,14 +67,42 @@ class CostTargetWorkflowHandlerTest {
     @Transactional
     @DisplayName("onApproved -> DRAFT→APPROVED, activates version")
     void testOnApproved_Success() {
+        long projectId = 93000001L;
+        jdbc.update("""
+                INSERT INTO pm_project
+                  (id,tenant_id,project_code,project_name,status,approval_status,deleted_flag)
+                VALUES (?,0,?,'项目成本预算审批测试','PREPARING','APPROVED',0)
+                """, projectId, "CT-HDLR-PROJECT-" + System.nanoTime());
+        jdbc.update("""
+                INSERT INTO pm_project_member
+                  (id,tenant_id,project_id,user_id,role_code,status,deleted_flag)
+                VALUES (?,0,?,1,'CSTM','ACTIVE',0)
+                """, projectId + 1, projectId);
         CostTarget target = new CostTarget();
-        target.setProjectId(10001L);
+        target.setProjectId(projectId);
         target.setVersionNo("V1.0");
         target.setVersionName("CT-HDLR-TEST-" + System.nanoTime());
         target.setApprovalStatus("APPROVING");
         target.setStatus("APPROVING");
         target.setTenantId(0L);
+        target.setTotalTargetAmount(new BigDecimal("100.00"));
+        target.setTotalBidCostAmount(new BigDecimal("100.00"));
+        target.setTotalResponsibilityAmount(new BigDecimal("100.00"));
         costTargetMapper.insert(target);
+        Long subjectId = jdbc.queryForObject("""
+                SELECT s.id FROM cost_subject s
+                 WHERE s.tenant_id=0 AND s.deleted_flag=0 AND s.status='ENABLE'
+                   AND NOT EXISTS (SELECT 1 FROM cost_subject c
+                                    WHERE c.tenant_id=s.tenant_id AND c.parent_id=s.id AND c.deleted_flag=0)
+                 LIMIT 1
+                """, Long.class);
+        jdbc.update("""
+                INSERT INTO cost_target_item
+                  (id,tenant_id,target_id,project_id,cost_subject_id,target_amount,bid_cost_amount,
+                   responsibility_amount,responsible_user_id,responsibility_unit,sort_order,deleted_flag)
+                VALUES (?,0,?,?,?,?,?,?,1,'项目部',1,0)
+                """, target.getId() + 1, target.getId(), target.getProjectId(), subjectId,
+                new BigDecimal("100.00"), new BigDecimal("100.00"), new BigDecimal("100.00"));
         attachWorkflow(target, 2200001L);
 
         WfInstance instance = new WfInstance();
@@ -88,6 +117,11 @@ class CostTargetWorkflowHandlerTest {
         CostTarget updated = costTargetMapper.selectById(target.getId());
         assertNotNull(updated, "目标成本应仍然存在");
         assertEquals("APPROVED", updated.getApprovalStatus(), "审批状态应变为 APPROVED");
+        assertEquals(1, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM project_budget
+                 WHERE tenant_id=0 AND project_id=? AND source_cost_target_id=?
+                   AND approval_status='APPROVED' AND status='ACTIVE' AND active_flag=1
+                """, Integer.class, target.getProjectId(), target.getId()));
     }
 
     @Test

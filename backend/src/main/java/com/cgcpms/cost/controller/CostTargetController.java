@@ -62,6 +62,23 @@ public class CostTargetController {
         return ApiResponse.success(String.valueOf(costTargetService.create(target)));
     }
 
+    @PostMapping("/drafts")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or (hasAuthority('cost:target:add') and hasAuthority('cost:target:edit'))")
+    public ApiResponse<String> createDraft(@Valid @RequestBody CostBudgetDraftRequest request) {
+        return ApiResponse.success(String.valueOf(costTargetService.saveDraft(
+                request.toEntity(), request.items(), request.projectManagerId())));
+    }
+
+    @PutMapping("/{id}/draft")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:edit')")
+    public ApiResponse<String> updateDraft(@PathVariable Long id,
+                                           @Valid @RequestBody CostBudgetDraftRequest request) {
+        CostTarget target = request.toEntity();
+        target.setId(id);
+        return ApiResponse.success(String.valueOf(costTargetService.saveDraft(
+                target, request.items(), request.projectManagerId())));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CostTargetUpdateRequest request) {
@@ -176,6 +193,30 @@ public class CostTargetController {
             target.setTotalTargetAmount(totalTargetAmount);
             target.setTotalBidCostAmount(totalBidCostAmount);
             target.setTotalResponsibilityAmount(totalResponsibilityAmount);
+            target.setEffectiveDate(effectiveDate);
+            target.setVersion(version);
+            target.setRemark(remark);
+            return target;
+        }
+    }
+
+    public record CostBudgetDraftRequest(
+            @NotNull(message = "所属项目不能为空") Long projectId,
+            @NotNull(message = "项目经理不能为空") Long projectManagerId,
+            @NotBlank(message = "版本号不能为空") String versionNo,
+            @NotBlank(message = "版本名称不能为空") String versionName,
+            LocalDate effectiveDate,
+            Integer version,
+            String remark,
+            @NotNull(message = "项目成本预算明细不能为空")
+            @Size(min = 1, max = 200, message = "项目成本预算明细必须为1至200条")
+            List<@Valid CostTargetItem> items) {
+
+        CostTarget toEntity() {
+            CostTarget target = new CostTarget();
+            target.setProjectId(projectId);
+            target.setVersionNo(versionNo);
+            target.setVersionName(versionName);
             target.setEffectiveDate(effectiveDate);
             target.setVersion(version);
             target.setRemark(remark);

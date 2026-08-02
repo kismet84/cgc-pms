@@ -4,11 +4,12 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.document.service.PurchaseRequestDocumentEventPublisher;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
 import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseRequestMapper;
-import com.cgcpms.purchase.service.PurchaseRequestConversionService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -20,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Business handler for purchase request approval workflows.
- * On approval: updates status to APPROVED, then converts to purchase order.
+ * On approval: updates request status to APPROVED. Order creation is explicit from the order page.
  * Critical handler: callback failures roll back the entire approval transaction.
  */
 @Slf4j
@@ -29,9 +30,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
 
     private final MatPurchaseRequestMapper requestMapper;
-    private final PurchaseRequestConversionService conversionService;
     private final MatPurchaseRequestItemMapper requestItemMapper;
     private final BudgetLedgerService budgetLedgerService;
+    private final PurchaseRequestDocumentEventPublisher documentEvents;
 
     @Override
     public String supportBusinessType() {
@@ -60,8 +61,8 @@ public class PurchaseRequestWorkflowHandler implements WorkflowBusinessHandler {
                 .set(MatPurchaseRequest::getApprovalStatus, "APPROVED")
                 .set(MatPurchaseRequest::getStatus, "APPROVED"));
 
-        request.setStatus("APPROVED");
-        conversionService.convertApprovedRequest(request);
+        documentEvents.approved(request.getTenantId(), UserContext.getCurrentUserId(), requestId,
+                context.getInstance().getId());
     }
 
     @Override

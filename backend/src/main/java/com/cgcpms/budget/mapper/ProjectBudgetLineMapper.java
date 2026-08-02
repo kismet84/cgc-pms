@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Mapper
 public interface ProjectBudgetLineMapper extends BaseMapper<ProjectBudgetLine> {
@@ -17,6 +18,11 @@ public interface ProjectBudgetLineMapper extends BaseMapper<ProjectBudgetLine> {
 
     @Select("SELECT * FROM project_budget_line WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
     ProjectBudgetLine selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
+    @Select("SELECT * FROM project_budget_line WHERE budget_id = #{budgetId} AND tenant_id = #{tenantId} "
+            + "AND deleted_flag = 0 ORDER BY cost_subject_id FOR UPDATE")
+    List<ProjectBudgetLine> selectByBudgetForUpdate(@Param("budgetId") Long budgetId,
+                                                    @Param("tenantId") Long tenantId);
 
     @Update("""
             UPDATE project_budget_line

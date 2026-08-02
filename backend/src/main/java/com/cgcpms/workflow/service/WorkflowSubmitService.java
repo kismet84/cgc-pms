@@ -95,6 +95,51 @@ public class WorkflowSubmitService {
                 com.cgcpms.workflow.WorkflowBusinessTypes.PRODUCTION_MEASUREMENT);
     }
 
+    public WfInstance submitPurchaseRequest(Long userId, String username, Long tenantId,
+                                             String businessType, Long businessId,
+                                             String title, java.math.BigDecimal amount,
+                                             Long projectId, Long contractId,
+                                             String businessSummary, String variables,
+                                             List<Long> ccUserIds) {
+        return submitProcurement(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_REQUEST);
+    }
+
+    public WfInstance submitPurchaseOrder(Long userId, String username, Long tenantId,
+                                           String businessType, Long businessId,
+                                           String title, java.math.BigDecimal amount,
+                                           Long projectId, Long contractId,
+                                           String businessSummary, String variables,
+                                           List<Long> ccUserIds) {
+        return submitProcurement(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_ORDER);
+    }
+
+    public WfInstance submitMaterialReceipt(Long userId, String username, Long tenantId,
+                                             String businessType, Long businessId,
+                                             String title, java.math.BigDecimal amount,
+                                             Long projectId, Long contractId,
+                                             String businessSummary, String variables,
+                                             List<Long> ccUserIds) {
+        return submitProcurement(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds,
+                com.cgcpms.workflow.WorkflowBusinessTypes.MATERIAL_RECEIPT);
+    }
+
+    private WfInstance submitProcurement(Long userId, String username, Long tenantId,
+                                          String businessType, Long businessId, String title,
+                                          java.math.BigDecimal amount, Long projectId, Long contractId,
+                                          String businessSummary, String variables, List<Long> ccUserIds,
+                                          String dedicatedBusinessType) {
+        if (!dedicatedBusinessType.equals(businessType)) {
+            throw new BusinessException("WORKFLOW_BUSINESS_INVALID", "采购专用提交业务类型不匹配");
+        }
+        return submit(userId, username, tenantId, businessType, businessId, title, amount,
+                projectId, contractId, businessSummary, variables, ccUserIds, dedicatedBusinessType);
+    }
+
     private WfInstance submit(Long userId, String username, Long tenantId,
                               String businessType, Long businessId,
                               String title, java.math.BigDecimal amount,
@@ -195,6 +240,21 @@ public class WorkflowSubmitService {
                 com.cgcpms.workflow.WorkflowBusinessTypes.PRODUCTION_MEASUREMENT);
     }
 
+    public WfInstance resubmitPurchaseRequest(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username,
+                com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_REQUEST);
+    }
+
+    public WfInstance resubmitPurchaseOrder(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username,
+                com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_ORDER);
+    }
+
+    public WfInstance resubmitMaterialReceipt(Long instanceId, Long userId, String username) {
+        return resubmit(instanceId, userId, username,
+                com.cgcpms.workflow.WorkflowBusinessTypes.MATERIAL_RECEIPT);
+    }
+
     private WfInstance resubmit(Long instanceId, Long userId, String username,
                                 String dedicatedBusinessType) {
 
@@ -208,6 +268,9 @@ public class WorkflowSubmitService {
             throw new BusinessException("INSTANCE_NOT_FOUND", "审批实例不存在");
         }
         rejectGenericProtectedRoute(instance.getBusinessType(), dedicatedBusinessType);
+        if (dedicatedBusinessType != null && !dedicatedBusinessType.equals(instance.getBusinessType())) {
+            throw new BusinessException("WORKFLOW_BUSINESS_INVALID", "专用重提业务类型不匹配");
+        }
         if (!WorkflowConstants.INSTANCE_REJECTED.equals(instance.getInstanceStatus())
                 && !WorkflowConstants.INSTANCE_WITHDRAWN.equals(instance.getInstanceStatus())) {
             throw new BusinessException("INSTANCE_NOT_RESUBMITTABLE", "只能重新提交已驳回或已撤回的审批");
@@ -250,6 +313,12 @@ public class WorkflowSubmitService {
     }
 
     private void rejectGenericProtectedRoute(String businessType, String dedicatedBusinessType) {
+        if ((com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_REQUEST.equals(businessType)
+                || com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_ORDER.equals(businessType)
+                || com.cgcpms.workflow.WorkflowBusinessTypes.MATERIAL_RECEIPT.equals(businessType))
+                && !businessType.equals(dedicatedBusinessType)) {
+            throw new BusinessException("PROCUREMENT_DEDICATED_WORKFLOW_REQUIRED", "采购业务必须通过专用业务入口提交或重提");
+        }
         if (com.cgcpms.workflow.WorkflowBusinessTypes.COST_TARGET.equals(businessType)
                 && !businessType.equals(dedicatedBusinessType)) {
             throw new BusinessException("COST_TARGET_DEDICATED_SUBMIT_REQUIRED",

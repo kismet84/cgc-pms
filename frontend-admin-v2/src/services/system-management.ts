@@ -128,7 +128,8 @@ export interface AuditRecord {
   createdAt?: string
 }
 
-export type DocumentBusinessType = 'PAYMENT' | 'SETTLEMENT'
+export type DocumentBusinessType =
+  'PAYMENT' | 'SETTLEMENT' | 'PURCHASE_REQUEST' | 'PURCHASE_ORDER' | 'MATERIAL_RECEIPT'
 export type DocumentVersionStatus = 'DRAFT' | 'PUBLISHED' | 'DISABLED'
 
 export interface DocumentTemplateSummary {
@@ -176,6 +177,69 @@ export interface DocumentCreateCommand extends DocumentDraft {
   templateCode: string
   templateName: string
   businessType: DocumentBusinessType
+}
+
+export interface DocumentGenerationRecord {
+  id: string
+  businessType: DocumentBusinessType
+  businessId: string
+  status: 'PENDING' | 'RENDERING' | 'SUCCEEDED' | 'FAILED'
+  fileId?: string | null
+  failureCode?: string | null
+  requestedAt?: string
+  completedAt?: string | null
+}
+
+export function generateDocument(command: {
+  businessType: DocumentBusinessType
+  businessId: string
+  idempotencyKey: string
+  retryOfGenerationId?: string | null
+}): Promise<DocumentGenerationRecord> {
+  return apiRequest<DocumentGenerationRecord, typeof command>('/documents/generations', {
+    method: 'POST',
+    body: command,
+  }).then(normalizeGeneration)
+}
+
+export function previewDocument(
+  businessType: DocumentBusinessType,
+  businessId: string,
+): Promise<Blob> {
+  return apiRequest<
+    Blob,
+    {
+      businessType: DocumentBusinessType
+      businessId: string
+    }
+  >('/documents/generations/preview', { method: 'POST', body: { businessType, businessId } })
+}
+
+export function loadDocumentGenerationHistory(
+  businessType: DocumentBusinessType,
+  businessId: string,
+  pageNo = 1,
+  pageSize = 20,
+): Promise<PageResult<DocumentGenerationRecord>> {
+  return apiRequest<PageResult<DocumentGenerationRecord>>(
+    `/documents/generations?${params({ businessType, businessId, pageNo, pageSize })}`,
+  ).then((page) => normalizePage(page, normalizeGeneration))
+}
+
+export function downloadDocumentGeneration(id: string): Promise<string> {
+  return apiRequest<string>(`/documents/generations/${requiredId(id)}/download`)
+}
+
+export function retryDocumentGeneration(
+  generation: DocumentGenerationRecord,
+  idempotencyKey: string,
+): Promise<DocumentGenerationRecord> {
+  return generateDocument({
+    businessType: generation.businessType,
+    businessId: generation.businessId,
+    idempotencyKey,
+    retryOfGenerationId: generation.id,
+  })
 }
 
 export async function loadUsers(
@@ -566,6 +630,15 @@ function normalizeTemplate(row: DocumentTemplateSummary): DocumentTemplateSummar
 
 function normalizeDocumentVersion(row: DocumentTemplateVersion): DocumentTemplateVersion {
   return { ...row, id: String(row.id), templateId: String(row.templateId) }
+}
+
+function normalizeGeneration(row: DocumentGenerationRecord): DocumentGenerationRecord {
+  return {
+    ...row,
+    id: String(row.id),
+    businessId: String(row.businessId),
+    fileId: row.fileId == null ? row.fileId : String(row.fileId),
+  }
 }
 
 function normalizeDocumentDetail(row: DocumentTemplateDetail): DocumentTemplateDetail {

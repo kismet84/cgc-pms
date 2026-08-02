@@ -814,15 +814,19 @@ onBeforeUnmount(() => controller?.abort())
       <template #actions><V2Button @click="refresh">重试</V2Button></template>
     </V2PageState>
 
-    <div v-else-if="mode === 'users'" class="permission-workspace user-workspace">
+    <V2Card v-else-if="mode === 'users'">
       <V2PageState
         v-if="!roles.length"
         kind="empty"
         title="暂无角色"
         description="当前租户没有可查询用户的角色。"
       />
-      <template v-else>
-        <V2Card title="角色" :heading-level="2" class="permission-workspace__roles">
+      <div v-else class="user-workspace">
+        <section aria-labelledby="user-workspace-roles-title">
+          <div class="user-workspace__section-heading">
+            <h3 id="user-workspace-roles-title">1. 角色</h3>
+            <span>共 {{ filteredUserRoles.length }} 个</span>
+          </div>
           <V2Input
             v-model="userRoleSearch"
             label="搜索角色名称或编码"
@@ -846,13 +850,13 @@ onBeforeUnmount(() => controller?.abort())
               未找到匹配角色
             </p>
           </div>
-        </V2Card>
+        </section>
 
-        <V2Card
-          :title="selectedUserRole?.roleName || '请选择角色'"
-          :heading-level="2"
-          class="permission-workspace__matrix"
-        >
+        <section aria-labelledby="user-workspace-users-title">
+          <div class="user-workspace__section-heading">
+            <h3 id="user-workspace-users-title">2. 用户</h3>
+            <span>{{ selectedUserRole?.roleName || '请选择角色' }} · 共 {{ total }} 人</span>
+          </div>
           <V2PageState
             v-if="!users.length"
             kind="empty"
@@ -920,31 +924,29 @@ onBeforeUnmount(() => controller?.abort())
               </tbody>
             </table>
           </div>
-          <template #footer>
-            <nav class="access-control-page__pagination v2-pagination" aria-label="用户分页">
-              <span>共 {{ total }} 条</span>
-              <V2Button
-                size="small"
-                variant="secondary"
-                :disabled="pageNo === 1"
-                @click="changePage(pageNo - 1)"
-              >
-                上一页
-              </V2Button>
-              <span>第 {{ pageNo }} 页</span>
-              <V2Button
-                size="small"
-                variant="secondary"
-                :disabled="pageNo * pageSize >= total"
-                @click="changePage(pageNo + 1)"
-              >
-                下一页
-              </V2Button>
-            </nav>
-          </template>
-        </V2Card>
-      </template>
-    </div>
+          <nav class="access-control-page__pagination v2-pagination" aria-label="用户分页">
+            <span>共 {{ total }} 条</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo === 1"
+              @click="changePage(pageNo - 1)"
+            >
+              上一页
+            </V2Button>
+            <span>第 {{ pageNo }} 页</span>
+            <V2Button
+              size="small"
+              variant="secondary"
+              :disabled="pageNo * pageSize >= total"
+              @click="changePage(pageNo + 1)"
+            >
+              下一页
+            </V2Button>
+          </nav>
+        </section>
+      </div>
+    </V2Card>
 
     <V2Card v-else-if="mode === 'roles'" title="角色清单">
       <V2PageState
@@ -1377,6 +1379,33 @@ onBeforeUnmount(() => controller?.abort())
   white-space: nowrap;
 }
 
+.user-workspace {
+  display: grid;
+  grid-template-columns: minmax(14rem, 0.65fr) minmax(36rem, 1.35fr);
+  gap: var(--v2-space-4);
+}
+
+.user-workspace > section {
+  min-width: 0;
+}
+
+.user-workspace__section-heading {
+  display: flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+  margin-bottom: var(--v2-space-3);
+}
+
+.user-workspace__section-heading h3 {
+  margin: 0;
+}
+
+.user-workspace__section-heading > span {
+  color: var(--v2-color-text-muted);
+}
+
 .permission-role-list {
   display: grid;
   max-height: calc(var(--v2-space-12) * 13);
@@ -1523,7 +1552,8 @@ onBeforeUnmount(() => controller?.abort())
 }
 
 @media (max-width: 980px) {
-  .permission-workspace {
+  .permission-workspace,
+  .user-workspace {
     grid-template-columns: 1fr;
   }
 

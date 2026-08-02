@@ -25,10 +25,16 @@ const permissions = [
 ]
 
 async function fulfill(route: Route, data: unknown, status = 200) {
+  const request = route.request()
   await route.fulfill({
     status,
     contentType: 'application/json',
-    body: JSON.stringify({ code: status === 200 ? '0' : 'TEST_ERROR', data }),
+    body: JSON.stringify({
+      code: status === 200 ? '0' : 'E2E_API_UNSTUBBED',
+      message:
+        status === 200 ? 'success' : `${request.method()} ${new URL(request.url()).pathname}`,
+      data,
+    }),
   })
 }
 
@@ -37,6 +43,8 @@ async function install(page: Page, writes: string[]) {
     const request = route.request()
     const path = new URL(request.url()).pathname
     if (request.method() !== 'GET') {
+      if (request.method() !== 'POST' || path !== '/api/finance-operations/alerts/A1/handle')
+        return fulfill(route, null, 500)
       writes.push(`${request.method()} ${path}`)
       return fulfill(route, null)
     }
@@ -293,7 +301,7 @@ async function install(page: Page, writes: string[]) {
         payableOutstanding: '480000.00',
         cashFlow: { inflow: '1200000.00', outflow: '680000.00' },
       })
-    return fulfill(route, null)
+    return fulfill(route, null, 500)
   })
   await page.route('**/api/auth/userinfo', (route) =>
     fulfill(route, { userId: '1', username: 'finance-user', roles: ['SUPER_ADMIN'], permissions }),

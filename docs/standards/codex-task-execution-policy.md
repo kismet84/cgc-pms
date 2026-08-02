@@ -18,6 +18,8 @@
 | AutoPilot 触发、Ready 来源和事实入口 | `plugins/cgc-pms-autopilot/skills/cgc-pms-autopilot-owner/SKILL.md` |
 | AutoPilot 调度、checkpoint、fencing、恢复、Reviewer、评分、回顾与金丝雀 | `plugins/cgc-pms-autopilot/references/control-plane-policy.md`、配置和 Schema |
 
+主线 G0～G5 门禁、进入/退出条件和停线规则唯一维护于 `cgc-pms-mainline-owner-flow/SKILL.md`；运行态 G4 证据维护于 `cgc-pms-runtime-refresh/SKILL.md`；失败分类和复验维护于 `cgc-pms-ci-gate-triage/SKILL.md`。
+
 ## 按需原则
 
 1. 普通任务不读取本索引，也不读取专项 Skill。

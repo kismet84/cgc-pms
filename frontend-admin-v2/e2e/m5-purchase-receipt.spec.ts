@@ -103,6 +103,7 @@ const state = {
       orderId: 'PO1',
       orderCode: 'PO-001',
       receiptCode: 'RC-001',
+      deliveryNoteNo: 'DN-001',
       totalAmount: '6.50',
       approvalStatus: 'DRAFT',
       qualityStatus: 'PARTIAL',
@@ -114,9 +115,8 @@ const state = {
       receiptId: 'RC1',
       orderItemId: 'POI1',
       materialName: '钢筋',
-      actualQuantity: '2.0000',
-      qualifiedQuantity: '2.0000',
-      unqualifiedQuantity: '0.0000',
+      acceptedQuantity: '2.0000',
+      systemBatchNo: 'SYS-20260801-001',
       orderedQuantity: '10.0000',
       receivedQuantity: '2.0000',
       remainingQuantity: '8.0000',
@@ -225,6 +225,9 @@ async function install(page: Page, granted = permissions, rejectReceiptItems = f
     }),
   )
   await page.route('**/api/files**', (route) => fulfill(route, []))
+  await page.route('**/api/documents/generations**', (route) =>
+    fulfill(route, { records: [], total: 0, pageNo: 1, pageSize: 20 }),
+  )
   await page.route('**/api/{purchase-requests,purchase-orders,receipts}**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
@@ -426,12 +429,9 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     await page.goto('/inventory/purchase-request?projectId=P1')
     await page.getByRole('button', { name: '新建采购申请' }).click()
     const dialog = page.getByRole('dialog', { name: '新建采购申请' })
-    await selectBusinessOption(page, dialog, /^采购合同$/, /CT-001 · 钢材采购合同/)
     await selectBusinessOption(page, dialog, /^物料$/, /MAT-001 · 钢筋/)
-    await selectBusinessOption(page, dialog, /^预算科目$/, /钢材采购/)
     await dialog.getByLabel('采购用途').fill('地下室钢材')
     await dialog.getByLabel('申请数量').fill('9007199254740993.1234')
-    await dialog.getByLabel('预计单价').fill('3.25')
     await dialog.getByLabel('计划日期').fill('2026-06-18')
     await dialog.getByRole('button', { name: '保存', exact: true }).dblclick()
     await expect(page.getByText('PR-002', { exact: true }).first()).toBeVisible()
@@ -479,31 +479,22 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     expect(writes.filter((item) => item.path.endsWith('/submit'))).toHaveLength(1)
   })
 
-  test('creates partial and complete receipts without client quantity totals', async ({ page }) => {
+  test('creates receipts with server-authoritative accepted quantity', async ({ page }) => {
     const writes = await install(page)
     await page.goto('/purchase/receipt?projectId=P1')
     for (const sample of [
       {
-        actual: '3.0000',
-        qualified: '2.5000',
-        unqualified: '0.5000',
+        accepted: '3.0000',
         code: 'RC-002',
-        disposition: '退货',
       },
-      { actual: '5.0000', qualified: '5.0000', unqualified: '0.0000', code: 'RC-003' },
+      { accepted: '5.0000', code: 'RC-003' },
     ]) {
       await page.getByRole('button', { name: '新建材料验收' }).click()
       const dialog = page.getByRole('dialog', { name: '新建材料验收' })
       await selectBusinessOption(page, dialog, /^采购订单$/, /PO-001 · 供应商甲/)
       await expect(dialog.getByRole('combobox', { name: '订单明细' })).toHaveValue('POI1')
       await selectBusinessOption(page, dialog, /^入库仓库$/, /WH-001 · 主仓/)
-      await dialog.getByLabel('实收数量').fill(sample.actual)
-      await dialog.getByLabel('合格数量', { exact: true }).fill(sample.qualified)
-      await dialog.getByLabel('不合格数量', { exact: true }).fill(sample.unqualified)
-      if (sample.disposition) {
-        await selectBusinessOption(page, dialog, /^不合格处置$/, new RegExp(sample.disposition))
-        await dialog.getByLabel('处置原因').fill('外观检验不合格')
-      }
+      await dialog.getByLabel('本次合格数量').fill(sample.accepted)
       await dialog.getByRole('button', { name: '保存', exact: true }).click()
       await expect(page.getByText(sample.code, { exact: true }).first()).toBeVisible()
       const detailDialog = page.getByRole('dialog', { name: '材料验收详情' })
@@ -513,7 +504,7 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     const itemWrites = writes.filter((item) => item.path.endsWith('/items/batch'))
     expect(itemWrites).toHaveLength(2)
     expect(
-      itemWrites.map((item) => (item.body as Array<{ actualQuantity: string }>)[0]?.actualQuantity),
+      itemWrites.map((item) => (item.body as Array<{ acceptedQuantity: string }>)[0]?.acceptedQuantity),
     ).toEqual(['3.0000', '5.0000'])
   })
 
@@ -524,9 +515,7 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     const dialog = page.getByRole('dialog', { name: '新建材料验收' })
     await selectBusinessOption(page, dialog, /^采购订单$/, /PO-001 · 供应商甲/)
     await selectBusinessOption(page, dialog, /^入库仓库$/, /WH-001 · 主仓/)
-    await dialog.getByLabel('实收数量').fill('99')
-    await dialog.getByLabel('合格数量', { exact: true }).fill('99')
-    await dialog.getByLabel('不合格数量', { exact: true }).fill('0')
+    await dialog.getByLabel('本次合格数量').fill('99')
     await dialog.getByRole('button', { name: '保存', exact: true }).dblclick()
     await expect(
       page.getByText('验收数量超过订单剩余数量；本次新建草稿已回滚', { exact: true }),

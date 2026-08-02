@@ -21,8 +21,16 @@ test('ordinary role stays forbidden even with workflow process permission', asyn
         permissions: ['workflow:process:query'],
       })
     }
-    if (path.endsWith('/api/workflow/templates')) templateRequests += 1
-    return success(route, null)
+    if (path.endsWith('/api/project-context/options')) return success(route, [])
+    if (path.endsWith('/api/workflow/templates')) {
+      templateRequests += 1
+      return success(route, { pageNo: 1, pageSize: 20, total: 0, records: [] })
+    }
+    return route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'E2E_API_UNSTUBBED', message: path, data: null }),
+    })
   })
 
   await page.goto('/approval/process?source=e2e#nodes')
@@ -44,8 +52,16 @@ test('administrator uses the documented admin permission override', async ({ pag
         permissions: [],
       })
     }
-    if (path.endsWith('/api/workflow/templates')) templateRequests += 1
-    return success(route, null)
+    if (path.endsWith('/api/project-context/options')) return success(route, [])
+    if (path.endsWith('/api/workflow/templates')) {
+      templateRequests += 1
+      return success(route, { pageNo: 1, pageSize: 20, total: 0, records: [] })
+    }
+    return route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'E2E_API_UNSTUBBED', message: path, data: null }),
+    })
   })
 
   await page.goto('/approval/process')

@@ -23,6 +23,11 @@ import {
   showToast,
 } from '@/components'
 import {
+  approvePurchaseRequest,
+  loadPurchaseRequestApprovalItems,
+  type PurchaseRequestApprovalCommand,
+} from '@/services/supply-chain'
+import {
   addSignWorkflowTask,
   approveWorkflowTask,
   loadWorkflowActionUsers,
@@ -92,6 +97,7 @@ const additionalUserId = ref('')
 const actionUserOptions = ref<Array<{ value: string; label: string }>>([])
 const actionUsersLoading = ref(false)
 const idempotencyKey = ref('')
+const purchaseApprovalItems = ref<PurchaseRequestApprovalCommand['items']>([])
 let listController: AbortController | null = null
 let businessTypesController: AbortController | null = null
 let detailController: AbortController | null = null
@@ -275,7 +281,26 @@ function openAction(nextAction: WorkflowUiAction) {
   additionalUserId.value = ''
   idempotencyKey.value = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${instanceId.value}`
   actionOpen.value = true
+  purchaseApprovalItems.value = []
+  if (nextAction === 'approve' && detail.value?.businessType === 'PURCHASE_REQUEST') {
+    void loadPurchaseApprovalItems(detail.value.businessId)
+  }
   if (nextAction === 'transfer' || nextAction === 'addSign') void loadActionUsers()
+}
+
+async function loadPurchaseApprovalItems(requestId: string): Promise<void> {
+  try {
+    const taskId = pendingTask.value?.id
+    if (!taskId) throw new TypeError('当前没有可处理任务')
+    purchaseApprovalItems.value = (await loadPurchaseRequestApprovalItems(requestId, taskId)).map((item) => ({
+      itemId: item.id || '',
+      approvedQuantity: item.approvedQuantity || item.quantity,
+      approvalVersion: item.approvalVersion ?? 0,
+      changeReason: '',
+    }))
+  } catch (error) {
+    actionErrorMessage.value = errorText(error, '采购申请明细读取失败')
+  }
 }
 
 async function loadActionUsers() {
@@ -350,11 +375,20 @@ async function submitAction() {
   additionalUsersError.value = ''
   try {
     if (action.value === 'approve') {
-      await approveWorkflowTask(taskId!, {
-        action: 'APPROVE',
-        comment: comment.value.trim() || undefined,
-        idempotencyKey: idempotencyKey.value,
-      })
+      if (detail.value.businessType === 'PURCHASE_REQUEST') {
+        if (!purchaseApprovalItems.value.length) throw new TypeError('采购申请明细未加载完成')
+        await approvePurchaseRequest(detail.value.businessId, taskId!, {
+          comment: comment.value.trim() || undefined,
+          idempotencyKey: idempotencyKey.value,
+          items: purchaseApprovalItems.value,
+        })
+      } else {
+        await approveWorkflowTask(taskId!, {
+          action: 'APPROVE',
+          comment: comment.value.trim() || undefined,
+          idempotencyKey: idempotencyKey.value,
+        })
+      }
     } else if (action.value === 'reject') {
       await rejectWorkflowTask(taskId!, {
         action: 'REJECT',
@@ -667,6 +701,18 @@ onBeforeUnmount(() => {
           :disabled="actionUsersLoading || !actionUserOptions.length"
           :error="additionalUsersError"
         />
+        <section
+          v-if="action === 'approve' && detail?.businessType === 'PURCHASE_REQUEST'"
+          class="workflow-action-form__purchase-items"
+          aria-label="采购申请审批明细"
+        >
+          <h3>审批数量</h3>
+          <p v-if="!purchaseApprovalItems.length">正在读取采购申请明细…</p>
+          <div v-for="(item, index) in purchaseApprovalItems" :key="item.itemId">
+            <V2Input v-model="item.approvedQuantity" :label="`第${index + 1}行批准数量`" required />
+            <V2Input v-model="item.changeReason" :label="`第${index + 1}行调整原因`" />
+          </div>
+        </section>
         <label>
           处理意见
           <textarea

@@ -164,6 +164,9 @@ async function performRefresh(): Promise<void> {
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
+  if (response.ok && response.headers.get('content-type')?.includes('application/pdf')) {
+    return (await response.blob()) as T
+  }
   let parsed: ParsedResponse<T>['envelope']
   try {
     parsed = (await response.json()) as ApiResponse<T>

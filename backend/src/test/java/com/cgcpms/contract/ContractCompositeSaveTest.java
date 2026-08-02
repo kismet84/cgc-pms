@@ -219,6 +219,54 @@ class ContractCompositeSaveTest {
         assertEquals("预付款", terms.get(0).getTermName());
     }
 
+    @Test
+    @DisplayName("复合保存由服务端派生合同头和清单金额事实")
+    void testCompositeSaveDerivesFinancialFacts() {
+        CtContractItem item = buildItem("CI-DERIVED-001", "服务端派生清单",
+                new BigDecimal("100.00"), new BigDecimal("6400.00"));
+        item.setAmount(null);
+        item.setTaxRate(null);
+        item.setTaxAmount(null);
+        item.setAmountWithoutTax(null);
+        ContractSaveRequest request = buildRequest("服务端派生金额合同", List.of(item), List.of(), false);
+        request.getContract().setTaxAmount(null);
+        request.getContract().setAmountWithoutTax(null);
+
+        Long contractId = contractService.compositeSave(request);
+
+        CtContract savedContract = contractMapper.selectById(contractId);
+        CtContractItem savedItem = contractItemMapper.selectOne(new LambdaQueryWrapper<CtContractItem>()
+                .eq(CtContractItem::getContractId, contractId));
+        assertMoneyEquals("640000.00", savedItem.getAmount());
+        assertMoneyEquals("13.00", savedItem.getTaxRate());
+        assertMoneyEquals("73628.32", savedItem.getTaxAmount());
+        assertMoneyEquals("566371.68", savedItem.getAmountWithoutTax());
+        assertMoneyEquals("73628.32", savedContract.getTaxAmount());
+        assertMoneyEquals("566371.68", savedContract.getAmountWithoutTax());
+    }
+
+    @Test
+    @DisplayName("复合保存按清单逐行舍入汇总合同头税额")
+    void testCompositeSaveUsesItemRoundingTotals() {
+        CtContract contract = buildContract(null, "逐行舍入汇总合同");
+        contract.setContractAmount(new BigDecimal("3.00"));
+        contract.setCurrentAmount(new BigDecimal("3.00"));
+        List<CtContractItem> items = List.of(
+                buildItem("CI-ROUND-001", "舍入清单1", BigDecimal.ONE, BigDecimal.ONE),
+                buildItem("CI-ROUND-002", "舍入清单2", BigDecimal.ONE, BigDecimal.ONE),
+                buildItem("CI-ROUND-003", "舍入清单3", BigDecimal.ONE, BigDecimal.ONE));
+        ContractSaveRequest request = new ContractSaveRequest();
+        request.setContract(contract);
+        request.setItems(items);
+        request.setPaymentTerms(List.of());
+
+        Long contractId = contractService.compositeSave(request);
+
+        CtContract savedContract = contractMapper.selectById(contractId);
+        assertMoneyEquals("0.36", savedContract.getTaxAmount());
+        assertMoneyEquals("2.64", savedContract.getAmountWithoutTax());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // GREEN-2: 事务回滚 — 付款条款保存失败时整体回滚
     // 构造 termName 超过 VARCHAR(200) 触发 SQL 错误 → 整个事务回滚

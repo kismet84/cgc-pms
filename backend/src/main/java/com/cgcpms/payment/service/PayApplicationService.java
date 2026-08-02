@@ -340,6 +340,9 @@ public class PayApplicationService {
 
         Long tenantId = UserContext.getCurrentTenantId();
         CtContract contract = ctContractMapper.selectByIdForUpdate(contractId, tenantId);
+        if (contract == null || !Objects.equals(contract.getTenantId(), tenantId)) {
+            throw new BusinessException("CONTRACT_NOT_FOUND", "付款申请关联合同不存在");
+        }
 
         BigDecimal currentAmount = contract.getCurrentAmount() != null
                 ? contract.getCurrentAmount() : BigDecimal.ZERO;
@@ -361,6 +364,14 @@ public class PayApplicationService {
                     "合同(" + contract.getContractName() + ")累计付款(" + totalPaid
                     + ") + 本次付款(" + (pendingAmount != null ? pendingAmount : BigDecimal.ZERO)
                     + ")超过当前合同金额(" + currentAmount + ")");
+        }
+        if ("PURCHASE".equals(contract.getContractType())) {
+            BigDecimal payableAmount = contract.getPayableAmount() == null
+                    ? BigDecimal.ZERO : contract.getPayableAmount();
+            if (effectiveTotal.compareTo(payableAmount) > 0) {
+                throw new BusinessException("EXCEED_PURCHASE_PAYABLE",
+                        "采购合同累计付款与本次付款超过已确认净应付(" + payableAmount + ")");
+            }
         }
     }
 
@@ -550,7 +561,10 @@ public class PayApplicationService {
         BigDecimal currentAmount = contract.getCurrentAmount() != null ? contract.getCurrentAmount() : BigDecimal.ZERO;
 
         BigDecimal alreadyApprovedSum = getApprovedSumForContract(contractId, payApp.getId());
-        BigDecimal availableBalance = currentAmount.subtract(alreadyApprovedSum);
+        BigDecimal controlLimit = "PURCHASE".equals(contract.getContractType())
+                ? currentAmount.min(contract.getPayableAmount() == null ? BigDecimal.ZERO : contract.getPayableAmount())
+                : currentAmount;
+        BigDecimal availableBalance = controlLimit.subtract(alreadyApprovedSum);
         if (applyAmount.compareTo(availableBalance) > 0) {
             throw new BusinessException("EXCEED_CONTRACT_BALANCE",
                     "本次申请金额(" + applyAmount + ")超过合同可用余额(" + availableBalance + ")");
@@ -594,7 +608,7 @@ public class PayApplicationService {
         LambdaQueryWrapper<PayApplication> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(PayApplication::getContractId, contractId)
                 .eq(PayApplication::getTenantId, UserContext.getCurrentTenantId())
-                .eq(PayApplication::getApprovalStatus, "APPROVED");
+                .in(PayApplication::getApprovalStatus, "APPROVING", "APPROVED");
         if (excludePayAppId != null) {
             wrapper.ne(PayApplication::getId, excludePayAppId);
         }

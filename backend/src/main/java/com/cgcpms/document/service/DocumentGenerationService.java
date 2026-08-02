@@ -47,13 +47,43 @@ public class DocumentGenerationService {
     private final ObjectMapper objectMapper;
     private final ObjectProvider<FileService> fileServiceProvider;
     private final DocumentGenerationProperties properties;
+    private final ProcurementSystemTemplateService procurementSystemTemplateService;
 
     public DocumentGeneration generate(String businessType, Long businessId, String idempotencyKey,
                                        Long retryOfGenerationId) {
+        return generateInternal(businessType, businessId, idempotencyKey, retryOfGenerationId, false);
+    }
+
+    /** Trusted internal entry for post-commit business events. Never exposed by a controller. */
+    public DocumentGeneration generateSystem(String businessType, Long businessId, String idempotencyKey,
+                                             Long tenantId, Long requestedBy) {
+        return generateSystem(businessType, businessId, idempotencyKey, tenantId, requestedBy, null);
+    }
+
+    /** Trusted internal retry entry; retry source remains persisted in generation facts. */
+    public DocumentGeneration generateSystem(String businessType, Long businessId, String idempotencyKey,
+                                             Long tenantId, Long requestedBy, Long retryOfGenerationId) {
+        if (tenantId == null || requestedBy == null) {
+            throw new BusinessException("DOCUMENT_SYSTEM_CONTEXT_INVALID", "系统文档生成缺少租户或请求人");
+        }
+        UserContext.Snapshot previous = UserContext.capture();
+        try {
+            UserContext.restore(new UserContext.Snapshot(requestedBy, "document-system", tenantId, List.of()));
+            String normalizedType = normalizeBusinessType(businessType);
+            if (List.of("PURCHASE_REQUEST", "PURCHASE_ORDER", "MATERIAL_RECEIPT").contains(normalizedType)) {
+                procurementSystemTemplateService.ensureCurrentTenantTemplate(normalizedType);
+            }
+            return generateInternal(businessType, businessId, idempotencyKey, retryOfGenerationId, true);
+        } finally {
+            UserContext.restore(previous);
+        }
+    }
+
+    private DocumentGeneration generateInternal(String businessType, Long businessId, String idempotencyKey,
+                                                Long retryOfGenerationId, boolean trustedSystemRequest) {
         Long tenantId = requireTenant();
         Long userId = requireUser();
         String normalizedType = normalizeBusinessType(businessType);
-        requireGenerationEnabled(normalizedType);
         if (businessId == null) throw new BusinessException("DOCUMENT_BUSINESS_ID_REQUIRED", "业务ID不能为空");
         if (idempotencyKey == null || !idempotencyKey.matches("[A-Za-z0-9._:-]{8,120}")) {
             throw new BusinessException("DOCUMENT_IDEMPOTENCY_KEY_INVALID", "文档生成幂等键格式非法");
@@ -63,14 +93,10 @@ public class DocumentGenerationService {
         if (existing != null) return existing;
         validateRetrySource(retryOfGenerationId, tenantId, normalizedType, businessId);
 
-        businessObjectAuthorizer.checkGeneratedDocumentAccess(normalizedType, businessId);
-        DocumentDataSnapshot snapshot = providerRegistry.require(normalizedType).load(businessId);
+        if (!trustedSystemRequest) businessObjectAuthorizer.checkGeneratedDocumentAccess(normalizedType, businessId);
+        if (!trustedSystemRequest) requireGenerationEnabled(normalizedType);
         DocumentTemplateVersion version = templateService.requireDefaultVersion(normalizedType);
-        if (!version.getSchemaVersion().equals(snapshot.schemaVersion())) {
-            throw new BusinessException("DOCUMENT_SCHEMA_VERSION_MISMATCH", "模板与业务数据契约版本不一致");
-        }
 
-        String sourceDigest = sha256(canonicalJson(snapshot.values()));
         long generationId = IdWorker.getId();
         DocumentGeneration generation = new DocumentGeneration();
         generation.setId(generationId);
@@ -81,7 +107,7 @@ public class DocumentGenerationService {
         generation.setTemplateId(version.getTemplateId());
         generation.setTemplateVersionId(version.getId());
         generation.setSchemaVersion(version.getSchemaVersion());
-        generation.setSourceDigest(sourceDigest);
+        generation.setSourceDigest(sha256("PREFLIGHT:" + normalizedType + ":" + businessId));
         generation.setRendererId(renderer.rendererId());
         generation.setRendererVersion(renderer.rendererVersion());
         generation.setStatus("PENDING");
@@ -99,7 +125,15 @@ public class DocumentGenerationService {
         }
 
         try {
-            persistenceService.markRendering(generationId, tenantId);
+            if (trustedSystemRequest) requireGenerationEnabled(normalizedType);
+            DocumentDataSnapshot snapshot = providerRegistry.require(normalizedType).load(businessId);
+            if (!version.getSchemaVersion().equals(snapshot.schemaVersion())) {
+                throw new BusinessException("DOCUMENT_SCHEMA_VERSION_MISMATCH", "模板与业务数据契约版本不一致");
+            }
+            String sourceDigest = sha256(canonicalJson(snapshot.values()));
+            generation.setOutputFileName(outputFileName(snapshot, normalizedType));
+            generation.setSourceDigest(sourceDigest);
+            persistenceService.markRendering(generationId, tenantId, sourceDigest);
             String html = templateEngine.render(version.getTemplateContent(), snapshot.values());
             RenderedDocument rendered = renderer.render(html);
             persistenceService.succeed(generation, rendered);
@@ -246,8 +280,8 @@ public class DocumentGenerationService {
 
     private String normalizeBusinessType(String value) {
         String normalized = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
-        if (!List.of("PAYMENT", "SETTLEMENT").contains(normalized)) {
-            throw new BusinessException("DOCUMENT_BUSINESS_TYPE_INVALID", "仅支持PAYMENT或SETTLEMENT业务单据");
+        if (!List.of("PAYMENT", "SETTLEMENT", "PURCHASE_REQUEST", "PURCHASE_ORDER", "MATERIAL_RECEIPT").contains(normalized)) {
+            throw new BusinessException("DOCUMENT_BUSINESS_TYPE_INVALID", "不支持该业务单据类型");
         }
         return normalized;
     }
@@ -262,6 +296,15 @@ public class DocumentGenerationService {
         if ("SETTLEMENT".equals(businessType) && !properties.isSettlementEnabled()) {
             throw new BusinessException("DOCUMENT_SETTLEMENT_GENERATION_DISABLED", "结算单据生成能力尚未启用");
         }
+        if ("PURCHASE_REQUEST".equals(businessType) && !properties.isPurchaseRequestEnabled()) {
+            throw new BusinessException("DOCUMENT_PURCHASE_REQUEST_GENERATION_DISABLED", "采购申请单据生成能力尚未启用");
+        }
+        if ("PURCHASE_ORDER".equals(businessType) && !properties.isPurchaseOrderEnabled()) {
+            throw new BusinessException("DOCUMENT_PURCHASE_ORDER_GENERATION_DISABLED", "采购订单文档生成能力尚未启用");
+        }
+        if ("MATERIAL_RECEIPT".equals(businessType) && !properties.isMaterialReceiptEnabled()) {
+            throw new BusinessException("DOCUMENT_MATERIAL_RECEIPT_GENERATION_DISABLED", "材料验收单据生成能力尚未启用");
+        }
     }
 
     private String addPreviewWatermark(String html) {
@@ -270,6 +313,23 @@ public class DocumentGenerationService {
                 + "预览件 非正式文件</div>";
         int bodyEnd = html.toLowerCase(Locale.ROOT).lastIndexOf("</body>");
         return bodyEnd < 0 ? html + watermark : html.substring(0, bodyEnd) + watermark + html.substring(bodyEnd);
+    }
+
+    private String outputFileName(DocumentDataSnapshot snapshot, String businessType) {
+        String rootName = switch (businessType) {
+            case "PURCHASE_REQUEST" -> "purchaseRequest";
+            case "PURCHASE_ORDER" -> "purchaseOrder";
+            case "MATERIAL_RECEIPT" -> "receipt";
+            default -> null;
+        };
+        if (rootName == null) return null;
+        Object root = snapshot.values().get(rootName);
+        if (!(root instanceof Map<?, ?> map)) return null;
+        Object code = map.get("requestCode");
+        if (code == null) code = map.get("orderCode");
+        if (code == null) code = map.get("receiptCode");
+        String value = code == null ? null : String.valueOf(code).trim();
+        return value != null && value.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,79}") ? value : null;
     }
 
     private Long requireTenant() {

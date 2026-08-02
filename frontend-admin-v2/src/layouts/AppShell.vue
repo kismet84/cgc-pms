@@ -15,6 +15,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '@/services/alerts'
+import { loadPreferences, type UserPreferences } from '@/services/account'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
 
@@ -120,6 +121,8 @@ watch(mobileNavigationOpen, async (open) => {
 
 onMounted(() => {
   void initializeWorkspaceContext()
+  window.addEventListener('v2-preferences-updated', onPreferencesUpdated)
+  void loadShellPreferences()
   mobileMedia = window.matchMedia('(max-width: 48rem)')
   syncMobileMode(mobileMedia)
   mobileMedia.addEventListener('change', syncMobileMode)
@@ -131,6 +134,25 @@ onMounted(() => {
     })
   })
 })
+
+function applyPreferences(value: Pick<UserPreferences, 'sidebarCollapsed'>): void {
+  sidebarCollapsed.value = Boolean(value.sidebarCollapsed)
+}
+
+function onPreferencesUpdated(event: Event): void {
+  const detail = (event as CustomEvent<Partial<UserPreferences>>).detail
+  if (detail && typeof detail.sidebarCollapsed === 'boolean') {
+    applyPreferences(detail as Pick<UserPreferences, 'sidebarCollapsed'>)
+  }
+}
+
+async function loadShellPreferences(): Promise<void> {
+  try {
+    applyPreferences(await loadPreferences())
+  } catch {
+    // 偏好读取失败时保持默认展开，不能阻塞主工作区。
+  }
+}
 
 async function initializeWorkspaceContext(): Promise<void> {
   try {
@@ -153,6 +175,7 @@ async function initializeWorkspaceContext(): Promise<void> {
 
 onBeforeUnmount(() => {
   notificationController?.abort()
+  window.removeEventListener('v2-preferences-updated', onPreferencesUpdated)
   mobileMedia?.removeEventListener('change', syncMobileMode)
   removeAfterEach?.()
   document.body.classList.remove('v2-mobile-nav-open')
@@ -294,16 +317,21 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
       `/api/auth/dev-login?username=${encodeURIComponent(account.username)}`,
       { credentials: 'same-origin' },
     )
-    const payload = (await response.json()) as { code?: string }
-    if (!response.ok || payload.code !== '0') throw new Error('DEV_ROLE_SWITCH_FAILED')
+    const payload = (await response.json()) as { code?: string; message?: string }
+    if (!response.ok || payload.code !== '0') {
+      throw new Error(payload.message || payload.code || '演示角色切换失败')
+    }
     const query = { ...route.query }
     if (route.path === '/dashboard') query.role = account.role
     else delete query.role
     const target = router.resolve({ path: route.path, query }).href
     window.location.assign(target)
-  } catch {
+  } catch (error) {
     switchingDemoUser.value = null
-    session.setRequestNotice({ code: 'DEV_ROLE_SWITCH_FAILED', message: '演示角色切换失败' })
+    session.setRequestNotice({
+      code: 'DEV_ROLE_SWITCH_FAILED',
+      message: error instanceof Error ? error.message : '演示角色切换失败',
+    })
   }
 }
 </script>
@@ -353,7 +381,7 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
         </button>
       </div>
 
-      <nav class="app-shell__navigation" aria-label="八域主导航">
+      <nav class="app-shell__navigation" aria-label="主导航">
         <section
           v-for="domain in navigation"
           :key="domain.id"

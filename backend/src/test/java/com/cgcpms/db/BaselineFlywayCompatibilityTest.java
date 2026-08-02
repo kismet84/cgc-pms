@@ -25,7 +25,7 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("255", flyway.info().current().getVersion().getVersion());
+        assertEquals("262", flyway.info().current().getVersion().getVersion());
         execute(flyway, """
                 INSERT INTO mat_warehouse
                     (id, tenant_id, project_id, warehouse_code, warehouse_name, status, deleted_flag)
@@ -59,6 +59,10 @@ class BaselineFlywayCompatibilityTest {
                 "id=50501 AND approver_config LIKE '%PROJECT_ROLE%' AND approver_config LIKE '%PM%'"));
         assertEquals(1, count(flyway, "wf_template_node",
                 "id=53001 AND approver_config LIKE '%GENERAL_MANAGER%' AND approve_mode='OR_SIGN'"));
+        assertEquals(4, count(flyway, "wf_template_node",
+                "id IN (50102,50402,50502,50802) AND approver_config LIKE '%DEPARTMENT_MANAGER%'"));
+        assertEquals(0, count(flyway, "wf_template_node",
+                "approver_config LIKE '%MANAGEMENT_EXECUTIVE%'"));
         assertEquals(9, count(flyway, "wf_template_node",
                 "id IN (50501,50502,50503,52001,52002,52003,52101,52102,52103)"
                         + " AND approve_mode='OR_SIGN'"));
@@ -68,6 +72,10 @@ class BaselineFlywayCompatibilityTest {
         assertEquals(1, count(flyway, "sys_role_menu", """
                 role_id=(SELECT id FROM sys_role WHERE role_code='COST_MANAGER')
                 AND menu_id=(SELECT id FROM sys_menu WHERE perms='workflow:approve')
+                """));
+        assertEquals(2, count(flyway, "sys_role_menu", """
+                role_id=(SELECT id FROM sys_role WHERE role_code='DEPARTMENT_MANAGER')
+                AND menu_id IN (SELECT id FROM sys_menu WHERE perms IN ('workflow:approve','workflow:reject'))
                 """));
         assertEquals(1, count(flyway, "sys_role_menu", """
                 role_id=(SELECT id FROM sys_role WHERE role_code='PROJECT_MANAGER')
@@ -109,7 +117,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("255", current.info().current().getVersion().getVersion());
+        assertEquals("262", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
                     ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))

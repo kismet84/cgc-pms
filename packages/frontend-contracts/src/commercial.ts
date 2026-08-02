@@ -55,6 +55,8 @@ export interface ContractRecord {
   settlementMethod: string;
   paidAmount: DecimalString;
   settlementAmount: DecimalString;
+  payableAmount?: DecimalString | null;
+  pricingMode?: "FIXED" | "ACTUAL" | null;
   contractStatus: ContractStatus;
   approvalStatus: ApprovalStatus;
   projectName: string;
@@ -70,6 +72,7 @@ export interface ContractItemRecord {
   id?: string | null;
   tenantId?: string | null;
   contractId?: string | null;
+  materialId?: string | null;
   itemCode?: string | null;
   itemName: string;
   itemSpec?: string | null;
@@ -145,6 +148,7 @@ export interface ContractSaveCommand {
     endDate?: string | null;
     paymentMethod?: string | null;
     settlementMethod?: string | null;
+    pricingMode?: "FIXED" | "ACTUAL" | null;
     version?: string | number | null;
     remark?: string | null;
   };
@@ -393,6 +397,17 @@ export interface CostTargetSaveCommand {
   remark?: string | null;
 }
 
+export interface CostBudgetDraftSaveCommand {
+  projectId: string;
+  projectManagerId: string;
+  versionNo: string;
+  versionName: string;
+  effectiveDate?: string | null;
+  version?: string | number | null;
+  remark?: string | null;
+  items: CostTargetItemRecord[];
+}
+
 export type CostTargetPage = PageResult<CostTargetRecord>;
 
 export interface CostLedgerRecord {
@@ -553,6 +568,7 @@ export interface CostControlOverview extends Record<string, unknown> {
 export interface ProjectBudgetRecord {
   id: string;
   projectId: string;
+  sourceCostTargetId?: string | null;
   budgetCode: string;
   versionNo: string;
   budgetName: string;

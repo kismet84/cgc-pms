@@ -923,7 +923,7 @@
 }
 
 .v2-detail-dialog .v2-dialog__title {
-  font-size: var(--v2-font-size-42);
+  font-size: var(--v2-font-size-21);
 }
 
 .v2-detail-dialog .v2-dialog__body {
@@ -1381,7 +1381,7 @@
   }
 
   .v2-detail-dialog .v2-dialog__title {
-    font-size: var(--v2-font-size-28);
+    font-size: var(--v2-font-size-21);
   }
 
   .v2-detail-dialog .v2-dialog__body,

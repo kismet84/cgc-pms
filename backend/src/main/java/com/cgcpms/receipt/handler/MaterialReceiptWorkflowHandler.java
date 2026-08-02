@@ -3,6 +3,7 @@ package com.cgcpms.receipt.handler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.cost.service.CostGenerationService;
+import com.cgcpms.contract.service.ContractProcurementPayableService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.inventory.entity.MatWarehouse;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
@@ -15,8 +16,7 @@ import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
-import com.cgcpms.supplierreturn.entity.MatQualityDisposition;
-import com.cgcpms.supplierreturn.mapper.MatQualityDispositionMapper;
+import com.cgcpms.receipt.service.PurchaseOrderReceiptStateService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -47,7 +47,8 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
     private final MatWarehouseMapper warehouseMapper;
     private final CostGenerationService costGenerationService;
     private final MatStockService matStockService;
-    private final MatQualityDispositionMapper qualityDispositionMapper;
+    private final ContractProcurementPayableService payableService;
+    private final PurchaseOrderReceiptStateService orderReceiptStateService;
 
     @Override
     public String supportBusinessType() {
@@ -103,7 +104,6 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
         for (MatReceiptItem item : items) {
             MatPurchaseOrderItem orderItem = validateOrderItem(receipt, item);
             BigDecimal qualified = nvl(item.getQualifiedQuantity());
-            createQualityDisposition(receipt, item);
             if (qualified.signum() <= 0) {
                 continue;
             }
@@ -116,36 +116,11 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
             }
         }
 
-        updateOrderCompletion(order);
+        orderReceiptStateService.sync(order.getId(), receipt.getTenantId());
+        payableService.recalculate(receipt.getContractId(), receipt.getTenantId());
         if (isDirectConsumption(receipt)) {
             costGenerationService.generateCost("MAT_RECEIPT", receiptId);
         }
-    }
-
-    private void createQualityDisposition(MatReceipt receipt, MatReceiptItem item) {
-        BigDecimal rejected = nvl(item.getActualQuantity()).subtract(nvl(item.getQualifiedQuantity()));
-        if (rejected.signum() <= 0) {
-            return;
-        }
-        Long existing = qualityDispositionMapper.selectCount(
-                new LambdaQueryWrapper<MatQualityDisposition>()
-                        .eq(MatQualityDisposition::getTenantId, receipt.getTenantId())
-                        .eq(MatQualityDisposition::getReceiptItemId, item.getId()));
-        if (existing != null && existing > 0) {
-            return;
-        }
-        MatQualityDisposition disposition = new MatQualityDisposition();
-        disposition.setTenantId(receipt.getTenantId());
-        disposition.setProjectId(receipt.getProjectId());
-        disposition.setReceiptId(receipt.getId());
-        disposition.setReceiptItemId(item.getId());
-        disposition.setRejectedQuantity(rejected);
-        disposition.setDispositionAction("RETURN_TO_SUPPLIER");
-        disposition.setStatus("OPEN");
-        disposition.setResolvedQuantity(BigDecimal.ZERO);
-        disposition.setVersion(0);
-        disposition.setRemark("验收审批自动生成不合格处置任务");
-        qualityDispositionMapper.insert(disposition);
     }
 
     @Override
@@ -190,7 +165,9 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
                 || !Objects.equals(receipt.getPartnerId(), order.getPartnerId())) {
             throw new BusinessException("RECEIPT_ORDER_MISMATCH", "验收单与采购订单的项目、合同或供应商不一致");
         }
-        if (!"APPROVED".equals(order.getApprovalStatus()) || !"APPROVED".equals(order.getOrderStatus())) {
+        if (!"APPROVED".equals(order.getApprovalStatus())
+                || !("PERFORMING".equals(order.getOrderStatus())
+                || "PARTIAL_RECEIVED".equals(order.getOrderStatus()))) {
             throw new BusinessException("ORDER_NOT_APPROVED", "采购订单未审批通过或已结束");
         }
         if (isDirectConsumption(receipt)) {
@@ -218,10 +195,8 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
                 || !Objects.equals(item.getMaterialId(), orderItem.getMaterialId())) {
             throw new BusinessException("ORDER_ITEM_MISMATCH", "验收明细与采购订单明细不一致");
         }
-        BigDecimal actual = item.getActualQuantity();
         BigDecimal qualified = item.getQualifiedQuantity();
-        if (actual == null || actual.signum() <= 0 || qualified == null || qualified.signum() < 0
-                || qualified.compareTo(actual) > 0) {
+        if (qualified == null || qualified.signum() <= 0) {
             throw new BusinessException("RECEIPT_QUANTITY_INVALID", "验收明细数量非法");
         }
         if (isDirectConsumption(receipt)
@@ -248,21 +223,6 @@ public class MaterialReceiptWorkflowHandler implements WorkflowBusinessHandler {
             }
         }
         throw new BusinessException("ORDER_ITEM_CONCURRENT_CONFLICT", "采购订单明细并发更新冲突，请稍后重试");
-    }
-
-    private void updateOrderCompletion(MatPurchaseOrder order) {
-        List<MatPurchaseOrderItem> orderItems = purchaseOrderItemMapper.selectList(
-                new LambdaQueryWrapper<MatPurchaseOrderItem>()
-                        .eq(MatPurchaseOrderItem::getOrderId, order.getId())
-                        .eq(MatPurchaseOrderItem::getTenantId, order.getTenantId()));
-        boolean completed = !orderItems.isEmpty() && orderItems.stream().allMatch(item ->
-                nvl(item.getReceivedQuantity()).compareTo(nvl(item.getQuantity())) >= 0);
-        if (completed) {
-            purchaseOrderMapper.update(null, new LambdaUpdateWrapper<MatPurchaseOrder>()
-                    .eq(MatPurchaseOrder::getId, order.getId())
-                    .eq(MatPurchaseOrder::getOrderStatus, "APPROVED")
-                    .set(MatPurchaseOrder::getOrderStatus, "COMPLETED"));
-        }
     }
 
     private BigDecimal nvl(BigDecimal value) {

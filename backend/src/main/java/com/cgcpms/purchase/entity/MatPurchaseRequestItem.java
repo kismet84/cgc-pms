@@ -44,12 +44,18 @@ public class MatPurchaseRequestItem extends BaseEntity {
     /** 可选分包任务，用于采购与分包履约追溯。 */
     private Long subTaskId;
 
-    /** 自定义物料名称（非表字段，仅用于接收前端输入，后端据此创建 MdMaterial） */
-    @TableField(exist = false)
+    /** 材料名称审批快照；无 materialId 时也作为自定义物料输入。 */
     private String materialName;
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal quantity;
+
+    /** 当前审批轮次批准数量；原申请数量 quantity 始终保留。 */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal approvedQuantity;
+
+    /** 审批数量 CAS 版本。 */
+    private Integer approvalVersion;
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal estimatedUnitPrice;
@@ -58,6 +64,11 @@ public class MatPurchaseRequestItem extends BaseEntity {
     private BigDecimal estimatedAmount;
 
     private String unit;
+
+    /** 申请时材料规格快照。 */
+    private String specification;
+
+    private String useLocation;
 
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate plannedDate;

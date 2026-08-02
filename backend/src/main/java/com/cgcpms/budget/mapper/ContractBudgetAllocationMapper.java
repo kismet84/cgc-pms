@@ -13,6 +13,14 @@ import java.math.BigDecimal;
 @Mapper
 public interface ContractBudgetAllocationMapper extends BaseMapper<ContractBudgetAllocation> {
     @Select("""
+            SELECT COALESCE(SUM(allocated_amount), 0)
+              FROM contract_budget_allocation
+             WHERE budget_line_id = #{budgetLineId} AND tenant_id = #{tenantId} AND deleted_flag = 0
+            """)
+    BigDecimal sumAllocatedByBudgetLine(@Param("budgetLineId") Long budgetLineId,
+                                        @Param("tenantId") Long tenantId);
+
+    @Select("""
             SELECT id, tenant_id, project_id, contract_id, budget_line_id,
                    allocated_amount, reserved_amount, consumed_amount, version,
                    created_by, created_at, updated_by, updated_at, deleted_flag, remark

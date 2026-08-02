@@ -65,19 +65,52 @@ const detail = {
   ],
 }
 
+const projectSummary = {
+  id: '11',
+  templateCode: 'FLOW-PROJECT',
+  templateName: '项目立项审批',
+  businessType: 'PROJECT_APPROVAL',
+  enabled: 1,
+  nodeCount: 1,
+}
+
+const projectDetail = {
+  ...projectSummary,
+  nodes: [
+    {
+      id: '31',
+      templateId: '11',
+      nodeCode: 'N1',
+      nodeName: '项目立项审批',
+      nodeOrder: 1,
+      nodeType: 'APPROVAL',
+      approveMode: 'SEQUENTIAL',
+      approverConfig: '{"type":"ROLE","roleId":2}',
+      allowTransfer: 1,
+      allowAddSign: 1,
+    },
+  ],
+}
+
+const scheduleSummary = {
+  id: '12',
+  templateCode: 'FLOW-PROJECT-SCHEDULE',
+  templateName: '项目计划审批',
+  businessType: 'PROJECT_SCHEDULE',
+  enabled: 1,
+  nodeCount: 1,
+}
+
+const scheduleDetail = {
+  ...scheduleSummary,
+  nodes: [],
+}
+
 function button(text: string): HTMLButtonElement {
   const target = [...document.body.querySelectorAll<HTMLButtonElement>('button')].find(
     (item) => item.textContent?.trim() === text,
   )
   if (!target) throw new Error(`missing button: ${text}`)
-  return target
-}
-
-function recordLink(text: string): HTMLButtonElement {
-  const target = [
-    ...document.body.querySelectorAll<HTMLButtonElement>('.v2-table__record-link'),
-  ].find((item) => item.textContent?.trim() === text)
-  if (!target) throw new Error(`missing record link: ${text}`)
   return target
 }
 
@@ -95,11 +128,15 @@ beforeEach(() => {
   document.body.innerHTML = ''
   vi.mocked(processService.loadWorkflowTemplates).mockResolvedValue({
     pageNo: 1,
-    pageSize: 10,
-    total: 1,
-    records: [summary],
+    pageSize: 200,
+    total: 3,
+    records: [summary, projectSummary, scheduleSummary],
   })
-  vi.mocked(processService.loadWorkflowTemplate).mockResolvedValue(detail)
+  vi.mocked(processService.loadWorkflowTemplate).mockImplementation(async (id) => {
+    if (id === '11') return projectDetail
+    if (id === '12') return scheduleDetail
+    return detail
+  })
   vi.mocked(processService.updateWorkflowTemplate).mockResolvedValue()
   vi.mocked(processService.updateWorkflowTemplateNode).mockResolvedValue()
   vi.mocked(processService.reorderWorkflowTemplateNodes).mockResolvedValue()
@@ -152,7 +189,7 @@ describe('M7 workflow process page', () => {
     expect(wrapper.text()).toContain('合同审批')
     expect(wrapper.text()).not.toContain('CONTRACT_APPROVAL')
     expect(processService.loadWorkflowTemplates).toHaveBeenCalledWith(
-      expect.objectContaining({ pageNo: 1, pageSize: 10 }),
+      expect.objectContaining({ pageNo: 1, pageSize: 200 }),
       expect.any(AbortSignal),
     )
     expect(wrapper.text()).not.toContain('筛选流程')
@@ -160,18 +197,34 @@ describe('M7 workflow process page', () => {
       wrapper.find('.workflow-process-page__filters').element.closest('.v2-card__header'),
     ).not.toBeNull()
 
-    recordLink('FLOW-CONTRACT').click()
-    await flushPromises()
-
-    expect(document.body.textContent).toContain('审批流程详情')
+    expect(wrapper.text()).toContain('1. 业务模块')
+    expect(wrapper.text()).toContain('2. 流程模板')
+    expect(wrapper.text()).toContain('3. 流程配置')
+    expect(wrapper.text()).toContain('基本设置')
+    expect(wrapper.text()).toContain('审批节点')
     expect(document.body.textContent).toContain('项目经理审批')
     expect(document.body.textContent).toContain('100.2300 ～ 900.4500')
+    expect(document.body.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  it('groups business types by module and filters templates by the selected module', async () => {
+    const wrapper = mount(WorkflowProcessPage, { attachTo: document.body })
+    await flushPromises()
+
+    const module = wrapper.findAll('button').find((item) => item.text().includes('项目履约'))
+    expect(module).toBeDefined()
+    await module!.trigger('click')
+    await flushPromises()
+
+    expect(processService.loadWorkflowTemplate).toHaveBeenLastCalledWith('11')
+    const templateColumn = wrapper.find('[aria-labelledby="workflow-templates-title"]')
+    expect(templateColumn.text()).toContain('项目立项审批')
+    expect(templateColumn.text()).toContain('项目计划审批')
+    expect(templateColumn.text()).not.toContain('合同审批')
   })
 
   it('updates a template then rereads detail and list facts', async () => {
     mount(WorkflowProcessPage, { attachTo: document.body })
-    await flushPromises()
-    recordLink('FLOW-CONTRACT').click()
     await flushPromises()
     button('编辑模板').click()
     await flushPromises()
@@ -195,16 +248,13 @@ describe('M7 workflow process page', () => {
     )
     expect(processService.loadWorkflowTemplate).toHaveBeenCalledTimes(2)
     expect(processService.loadWorkflowTemplates).toHaveBeenCalledTimes(2)
-    expect(document.body.querySelectorAll('.v2-dialog__backdrop')).toHaveLength(1)
-    expect(document.body.querySelector('[role="dialog"] h2')?.textContent).toContain('审批流程详情')
+    expect(document.body.querySelectorAll('.v2-dialog__backdrop')).toHaveLength(0)
+    expect(document.body.textContent).toContain('3. 流程配置')
   })
 
   it('reorders complete node ids then rereads server detail', async () => {
     mount(WorkflowProcessPage, { attachTo: document.body })
     await flushPromises()
-    recordLink('FLOW-CONTRACT').click()
-    await flushPromises()
-
     button('下移').click()
     await flushPromises()
 
@@ -214,8 +264,6 @@ describe('M7 workflow process page', () => {
 
   it('edits approvers through business selects without exposing JSON', async () => {
     mount(WorkflowProcessPage, { attachTo: document.body })
-    await flushPromises()
-    recordLink('FLOW-CONTRACT').click()
     await flushPromises()
     button('编辑').click()
     await flushPromises()

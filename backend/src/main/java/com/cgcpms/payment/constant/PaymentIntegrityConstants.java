@@ -11,4 +11,5 @@ public final class PaymentIntegrityConstants {
     public static final String SOURCE_SETTLEMENT = "SETTLEMENT";
     public static final String SOURCE_SUB_MEASURE = "SUB_MEASURE";
     public static final String SOURCE_DIRECT = "DIRECT";
+    public static final String SOURCE_MAT_RECEIPT = "MAT_RECEIPT";
 }

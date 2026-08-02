@@ -267,7 +267,7 @@ describe('V2 application-shell routes', () => {
     expect(router.currentRoute.value.fullPath).toBe('/material/dictionary?source=legacy#dictionary')
   })
 
-  it('keeps cost target root redirect and edit deep link compatible', async () => {
+  it('merges cost target and budget routes while keeping legacy deep links compatible', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(
       user(['cost:target:query', 'cost:target:add', 'cost:target:edit']),
     )
@@ -275,10 +275,16 @@ describe('V2 application-shell routes', () => {
 
     await router.push('/cost-target?projectId=P1#versions')
     await router.isReady()
-    expect(router.currentRoute.value.fullPath).toBe('/cost-target/index?projectId=P1#versions')
+    expect(router.currentRoute.value.fullPath).toBe('/cost-budget?projectId=P1#versions')
 
     await router.push('/cost-target/81/edit?projectId=P1')
     expect(router.currentRoute.value.fullPath).toBe('/cost-target/81/edit?projectId=P1')
+
+    vi.mocked(getCurrentUser).mockResolvedValue(user(['cost:target:query']))
+    const budgetRouter = guardedRouter()
+    await budgetRouter.push('/budget?projectId=P1')
+    await budgetRouter.isReady()
+    expect(budgetRouter.currentRoute.value.fullPath).toBe('/cost-budget?projectId=P1')
   })
 
   it('keeps cost root query and hash on the ledger redirect', async () => {

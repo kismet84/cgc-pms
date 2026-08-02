@@ -56,6 +56,9 @@ document:
     enabled: ${DOCUMENT_GENERATION_ENABLED:false}
     payment-enabled: ${DOCUMENT_PAYMENT_GENERATION_ENABLED:false}
     settlement-enabled: ${DOCUMENT_SETTLEMENT_GENERATION_ENABLED:false}
+    purchase-request-enabled: ${DOCUMENT_PURCHASE_REQUEST_GENERATION_ENABLED:false}
+    purchase-order-enabled: ${DOCUMENT_PURCHASE_ORDER_GENERATION_ENABLED:false}
+    material-receipt-enabled: ${DOCUMENT_MATERIAL_RECEIPT_GENERATION_ENABLED:false}
     max-template-bytes: ${DOCUMENT_MAX_TEMPLATE_BYTES:524288}
     max-collection-items: ${DOCUMENT_MAX_COLLECTION_ITEMS:200}
     max-image-bytes: ${DOCUMENT_MAX_IMAGE_BYTES:1048576}

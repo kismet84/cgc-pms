@@ -218,6 +218,14 @@ public class FileService {
     @Transactional(rollbackFor = Exception.class)
     public GeneratedFileArchive archiveGeneratedPdf(byte[] content, String businessType, Long businessId,
                                                      String generationNo, String expectedSha256) {
+        return archiveGeneratedPdf(content, businessType, businessId, generationNo, expectedSha256, null);
+    }
+
+    /** Archive PDF and expose the business number as the reader/download filename. */
+    @Transactional(rollbackFor = Exception.class)
+    public GeneratedFileArchive archiveGeneratedPdf(byte[] content, String businessType, Long businessId,
+                                                     String generationNo, String expectedSha256,
+                                                     String outputFileName) {
         validateBusinessBindingParams(businessType, businessId);
         if (content == null || content.length < 5
                 || !"%PDF-".equals(new String(content, 0, 5, java.nio.charset.StandardCharsets.US_ASCII))) {
@@ -252,7 +260,9 @@ public class FileService {
             sysFile.setDocumentType("GENERATED_DOCUMENT");
             sysFile.setBusinessId(businessId);
             sysFile.setFileName(fileName);
-            sysFile.setOriginalName(generationNo + ".pdf");
+            String safeOutputName = outputFileName != null && outputFileName.matches("[A-Za-z0-9][A-Za-z0-9._-]{0,79}")
+                    ? outputFileName : generationNo;
+            sysFile.setOriginalName(safeOutputName + ".pdf");
             sysFile.setFileSize((long) content.length);
             sysFile.setContentType("application/pdf");
             sysFile.setStoragePath(storagePath);
@@ -510,7 +520,10 @@ public class FileService {
     private String genPresignedUrl(String bucket, String object, SysFile file) {
         try {
             Map<String, String> extraQueryParams = new HashMap<>();
-            if (file != null && isTextFile(file)) {
+            if (file != null && "GENERATED_DOCUMENT".equals(file.getDocumentType())) {
+                extraQueryParams.put("response-content-type", "application/pdf");
+                extraQueryParams.put("response-content-disposition", "inline; filename=\"" + file.getOriginalName() + "\"");
+            } else if (file != null && isTextFile(file)) {
                 extraQueryParams.put("response-content-type", "text/plain; charset=utf-8");
                 extraQueryParams.put("response-content-disposition", "attachment; filename=\"" + file.getFileName() + "\"");
             }
@@ -612,6 +625,7 @@ public class FileService {
                 "REINSPECTION_EVIDENCE", "SOURCING_REQUIREMENT", "QUOTE_ATTACHMENT",
                 "SCHEME_FILE", "DRAWING_FILE", "REVIEW_MINUTES", "RFI_EVIDENCE",
                 "DESIGN_RESPONSE", "DISCLOSURE_RECORD", "ACCEPTANCE_ARCHIVE",
+                "DELIVERY_NOTE", "MATERIAL_ACCEPTANCE_FORM",
                 "MEASURE_SUPPORT",
                 "SECTION_ACCEPTANCE_RECORD", "FINAL_ACCEPTANCE_CERTIFICATE",
                 "DEFECT_RECTIFICATION_EVIDENCE", "WARRANTY_RELEASE_VOUCHER",
@@ -620,6 +634,10 @@ public class FileService {
         }
         if (Set.of("INVOICE", "SALES_INVOICE").contains(business) && !Set.of("ELECTRONIC_INVOICE", "SCANNED_INVOICE").contains(type)) {
             throw new BusinessException("DOCUMENT_TYPE_MISMATCH", "发票只能上传电子发票或扫描件");
+        }
+        if ("MATERIAL_RECEIPT".equals(business)
+                && !Set.of("DELIVERY_NOTE", "MATERIAL_ACCEPTANCE_FORM").contains(type)) {
+            throw new BusinessException("DOCUMENT_TYPE_MISMATCH", "材料验收仅允许送货单或签字验收单");
         }
         return type;
     }

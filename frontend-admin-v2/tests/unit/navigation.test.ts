@@ -7,11 +7,12 @@ import {
   visibleNavigation,
 } from '@/navigation/catalog'
 
-describe('V2 eight-domain navigation contract', () => {
-  it('defines exactly eight domains and unique tab paths', () => {
+describe('V2 navigation contract', () => {
+  it('defines the expected domains and unique tab paths', () => {
     expect(navigationDomains.map((domain) => domain.label)).toEqual([
       '工作台',
       '项目履约',
+      '施工管理',
       '商务合约',
       '供应链与物资',
       '分包与结算',
@@ -26,7 +27,7 @@ describe('V2 eight-domain navigation contract', () => {
   })
 
   it('shows all domains to wildcard permission and only matching domains to ordinary users', () => {
-    expect(visibleNavigation(['ADMIN'], ['*'])).toHaveLength(8)
+    expect(visibleNavigation(['ADMIN'], ['*'])).toHaveLength(9)
     expect(
       visibleNavigation(['USER'], ['dashboard:view', 'project:query']).map(
         (domain) => domain.label,
@@ -47,7 +48,9 @@ describe('V2 eight-domain navigation contract', () => {
       )?.tabs,
     ).toMatchObject([{ path: '/dashboard', label: '驾驶舱' }])
     expect(findWorkspace('/project/42/overview')?.workspace.label).toBe('项目管理')
-    expect(findWorkspace('/project-schedule/11')?.workspace.label).toBe('计划与现场')
+    expect(findWorkspace('/project-schedule/11')?.domain.label).toBe('施工管理')
+    expect(findWorkspace('/project-schedule/11')?.workspace.label).toBe('项目计划与施工履约')
+    expect(findWorkspace('/quality-safety')?.workspace.label).toBe('质量安全整改闭环')
     expect(
       ['/contract/ledger', '/variation/order', '/bid-cost'].map((path) => ({
         path,
@@ -59,7 +62,13 @@ describe('V2 eight-domain navigation contract', () => {
       { path: '/bid-cost', label: '投标成本' },
     ])
     expect(findWorkspace('/contract/C-100/edit')?.workspace.label).toBe('合同与变更')
-    expect(findWorkspace('/cost-target/81/edit')?.workspace.label).toBe('投标与成本目标')
+    expect(findWorkspace('/cost-target/81/edit')?.workspace.label).toBe('成本预算与产值')
+    expect(findWorkspace('/cost-budget')?.workspace.label).toBe('成本预算与产值')
+    expect(
+      visibleNavigation(['USER'], ['cost:target:query'])
+        .flatMap((domain) => domain.workspaces)
+        .some((workspace) => workspace.id === 'cost-budget'),
+    ).toBe(true)
     expect(findWorkspace('/partner/101')?.workspace.label).toBe('合作方管理')
     expect(permissionForPath('/supplier-sourcing')).toBe('supplier:sourcing:query')
     expect(findWorkspace('/supplier-sourcing')?.workspace.label).toBe('供应商管理')

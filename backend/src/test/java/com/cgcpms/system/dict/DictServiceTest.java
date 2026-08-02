@@ -196,9 +196,9 @@ class DictServiceTest {
     @Order(8)
     @DisplayName("T8: 按字典类型分页查询字典数据—验证种子数据")
     void test08_listDictData_byDictType() {
-        // 项目状态 dict_type_id=1001，种子数据应有5条
+        // 项目状态 dict_type_id=1001，种子数据应有6条
         IPage<SysDictDataVO> page = dictDataService.getPage(1, 20, 1001L, null, null);
-        assertEquals(5, page.getTotal(), "project_status 应有5条种子数据");
+        assertEquals(6, page.getTotal(), "project_status 应有6条种子数据");
         // local profile uses baseline fixtures; V216 normalization is covered by Flyway smoke tests.
         assertEquals("草稿", page.getRecords().get(0).getDictLabel());
     }

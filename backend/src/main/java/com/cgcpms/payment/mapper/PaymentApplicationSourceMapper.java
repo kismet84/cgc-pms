@@ -16,6 +16,44 @@ import java.util.List;
 public interface PaymentApplicationSourceMapper extends BaseMapper<PaymentApplicationSource> {
 
     @Select("""
+            SELECT 'MAT_RECEIPT' AS source_type,
+                   CONCAT('', ri.id) AS source_ref_id,
+                   CONCAT(r.receipt_code, '-', ri.id) AS document_code,
+                   ri.amount - COALESCE(ret.returned_amount, 0) AS source_total_amount,
+                   COALESCE(pay.committed_amount, 0) AS committed_amount,
+                   ri.amount - COALESCE(ret.returned_amount, 0)
+                     - COALESCE(pay.committed_amount, 0) AS available_amount
+              FROM mat_receipt_item ri
+              JOIN mat_receipt r ON r.id=ri.receipt_id AND r.tenant_id=ri.tenant_id AND r.deleted_flag=0
+              LEFT JOIN (
+                   SELECT sri.tenant_id, sri.receipt_item_id, SUM(sri.amount) AS returned_amount
+                     FROM sp_supplier_return_item sri
+                     JOIN sp_supplier_return sr ON sr.id=sri.return_id AND sr.tenant_id=sri.tenant_id
+                    WHERE sri.deleted_flag=0 AND sr.deleted_flag=0
+                      AND sri.return_source='QUALIFIED' AND sr.status='CONFIRMED'
+                    GROUP BY sri.tenant_id, sri.receipt_item_id
+              ) ret ON ret.tenant_id=ri.tenant_id AND ret.receipt_item_id=ri.id
+              LEFT JOIN (
+                   SELECT s.tenant_id, s.receipt_item_id, SUM(s.source_amount) AS committed_amount
+                     FROM payment_application_source s
+                     JOIN pay_application p ON p.id=s.pay_application_id AND p.tenant_id=s.tenant_id
+                    WHERE s.deleted_flag=0 AND p.deleted_flag=0
+                      AND s.source_type='MAT_RECEIPT'
+                      AND p.approval_status IN ('APPROVING','APPROVED')
+                    GROUP BY s.tenant_id, s.receipt_item_id
+              ) pay ON pay.tenant_id=ri.tenant_id AND pay.receipt_item_id=ri.id
+             WHERE ri.tenant_id=#{tenantId} AND r.project_id=#{projectId} AND r.contract_id=#{contractId} AND r.partner_id=#{partnerId}
+               AND r.approval_status='APPROVED' AND ri.deleted_flag=0
+               AND ri.amount - COALESCE(ret.returned_amount, 0) - COALESCE(pay.committed_amount, 0) > 0
+             ORDER BY r.receipt_date DESC, ri.id DESC LIMIT 200
+            """)
+    List<PaymentSourceOptionVO> selectMaterialReceiptOptions(
+            @Param("tenantId") Long tenantId,
+            @Param("projectId") Long projectId,
+            @Param("contractId") Long contractId,
+            @Param("partnerId") Long partnerId);
+
+    @Select("""
             SELECT 'SUB_MEASURE' AS source_type,
                    CONCAT('', sm.id) AS source_ref_id,
                    sm.measure_code AS document_code,
@@ -133,6 +171,31 @@ public interface PaymentApplicationSourceMapper extends BaseMapper<PaymentApplic
     BigDecimal sumCommittedSubMeasure(@Param("tenantId") Long tenantId,
                                       @Param("subMeasureId") Long subMeasureId,
                                       @Param("excludeApplicationId") Long excludeApplicationId);
+
+    @Select("""
+            SELECT COALESCE(SUM(s.source_amount), 0)
+              FROM payment_application_source s
+              JOIN pay_application p ON p.id=s.pay_application_id AND p.tenant_id=s.tenant_id
+             WHERE s.tenant_id=#{tenantId} AND s.source_type='MAT_RECEIPT'
+               AND s.receipt_item_id=#{receiptItemId}
+               AND s.deleted_flag=0 AND p.deleted_flag=0
+               AND p.approval_status IN ('APPROVING','APPROVED')
+               AND p.id <> #{excludeApplicationId}
+            """)
+    BigDecimal sumCommittedMaterialReceipt(@Param("tenantId") Long tenantId,
+                                           @Param("receiptItemId") Long receiptItemId,
+                                           @Param("excludeApplicationId") Long excludeApplicationId);
+
+    @Select("""
+            SELECT COALESCE(SUM(sri.amount), 0)
+              FROM sp_supplier_return_item sri
+              JOIN sp_supplier_return sr ON sr.id=sri.return_id AND sr.tenant_id=sri.tenant_id
+             WHERE sri.tenant_id=#{tenantId} AND sri.receipt_item_id=#{receiptItemId}
+               AND sri.return_source='QUALIFIED' AND sri.deleted_flag=0
+               AND sr.status='CONFIRMED' AND sr.deleted_flag=0
+            """)
+    BigDecimal sumConfirmedQualifiedReturns(@Param("tenantId") Long tenantId,
+                                            @Param("receiptItemId") Long receiptItemId);
 
     @Update("""
             UPDATE payment_application_source

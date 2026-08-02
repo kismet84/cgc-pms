@@ -17,6 +17,8 @@ public class MatReceiptVO {
     private String partnerId;
     private String partnerName;
     private String receiptCode;
+    private String systemBatchNo;
+    private String deliveryNoteNo;
     private String receiptDate;
     private String warehouseId;
     private String receiverId;

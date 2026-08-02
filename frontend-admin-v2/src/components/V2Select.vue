@@ -11,6 +11,7 @@ const props = withDefaults(
     placeholder?: string
     hint?: string
     error?: string
+    ariaLabelledby?: string
     disabled?: boolean
     required?: boolean
     allowEmpty?: boolean
@@ -23,6 +24,7 @@ const props = withDefaults(
     placeholder: '请选择',
     hint: undefined,
     error: undefined,
+    ariaLabelledby: undefined,
     disabled: false,
     required: false,
     allowEmpty: false,
@@ -68,6 +70,7 @@ function updateValue(event: Event): void {
       :disabled="disabled"
       :required="required"
       :aria-label="label || placeholder"
+      :aria-labelledby="ariaLabelledby"
       :aria-invalid="Boolean(error)"
       :aria-describedby="describedBy"
       @change="updateValue"

@@ -56,7 +56,7 @@ class MatReceiptControllerTest {
                     (id, tenant_id, project_id, contract_id, partner_id, order_code, order_type,
                      order_date, delivery_date, total_amount, approval_status, order_status,
                      created_by, updated_by, deleted_flag)
-                SELECT ?, ?, ?, ?, ?, ?, 'PURCHASE', ?, ?, 35000.00, 'APPROVED', 'APPROVED', ?, ?, 0
+                SELECT ?, ?, ?, ?, ?, ?, 'PURCHASE', ?, ?, 35000.00, 'APPROVED', 'PERFORMING', ?, ?, 0
                 WHERE NOT EXISTS (SELECT 1 FROM mat_purchase_order WHERE id = ?)
                 """, ORDER_ID, TENANT_ID, PROJECT_ID, CONTRACT_ID, PARTNER_ID,
                 "PO-RECEIPT-CTRL-" + System.nanoTime(), LocalDate.now(), LocalDate.now().plusDays(7),
@@ -69,6 +69,8 @@ class MatReceiptControllerTest {
                 WHERE NOT EXISTS (SELECT 1 FROM mat_purchase_order_item WHERE id = ?)
                 """, ORDER_ITEM_ID, TENANT_ID, ORDER_ID, PROJECT_ID,
                 ADMIN_ID, ADMIN_ID, ORDER_ITEM_ID);
+        jdbcTemplate.update("UPDATE mat_purchase_order SET approval_status='APPROVED', order_status='PERFORMING' "
+                + "WHERE id=? AND tenant_id=?", ORDER_ID, TENANT_ID);
     }
 
     private Cookie adminCookie() {
@@ -137,19 +139,27 @@ class MatReceiptControllerTest {
     @Test @Order(9) @DisplayName("POST /receipts/{id}/items/batch -> 2xx (before submit)")
     void testSaveItemsBatch() throws Exception {
         Assertions.assertNotNull(receiptId);
+        mockMvc.perform(po("/receipts/"+receiptId+"/items/batch").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("[{\"orderItemId\":" + ORDER_ITEM_ID
+                                + ",\"acceptedQuantity\":10.00,\"unitPrice\":0.01}]"))
+                .andExpect(status().is4xxClientError());
         String body = String.format("""
-                [{"receiptId":%d,"orderItemId":%d,"materialId":1,"actualQuantity":10.00,"qualifiedQuantity":10.00,"unitPrice":1.00,"amount":1.00}]
-                """, receiptId, ORDER_ITEM_ID);
+                [{"orderItemId":%d,"acceptedQuantity":10.00}]
+                """, ORDER_ITEM_ID);
         mockMvc.perform(po("/receipts/"+receiptId+"/items/batch").cookie(adminCookie())
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().is2xxSuccessful());
         jdbcTemplate.update("""
                 INSERT INTO sys_file (
                     id, tenant_id, business_type, business_id, file_name, original_name,
-                    file_size, storage_path, bucket_name, virus_scan_status, created_by, deleted_flag
-                ) VALUES (?, ?, 'MATERIAL_RECEIPT', ?, 'receipt.pdf', 'receipt.pdf', 10,
-                    '/test/receipt.pdf', 'test', 'CLEAN', ?, 0)
-                """, Math.abs(System.nanoTime()), TENANT_ID, receiptId, ADMIN_ID);
+                    document_type, file_size, storage_path, bucket_name, virus_scan_status, created_by, deleted_flag
+                ) VALUES (?, ?, 'MATERIAL_RECEIPT', ?, 'delivery.pdf', 'delivery.pdf',
+                    'DELIVERY_NOTE', 10, '/test/delivery.pdf', 'test', 'CLEAN', ?, 0),
+                  (?, ?, 'MATERIAL_RECEIPT', ?, 'acceptance.pdf', 'acceptance.pdf',
+                    'MATERIAL_ACCEPTANCE_FORM', 10, '/test/acceptance.pdf', 'test', 'CLEAN', ?, 0)
+                """, Math.abs(System.nanoTime()), TENANT_ID, receiptId, ADMIN_ID,
+                Math.abs(System.nanoTime() + 1), TENANT_ID, receiptId, ADMIN_ID);
     }
 
     @Test @Order(10) @DisplayName("POST /receipts/{id}/submit -> 2xx")

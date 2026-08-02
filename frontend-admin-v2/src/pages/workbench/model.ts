@@ -41,6 +41,8 @@ export const WORKFLOW_BUSINESS_TYPES = [
   ['MATERIAL_REQUISITION', '材料领用'],
   ['TECH_ITEM', '技术事项'],
   ['PROJECT_BUDGET', '项目预算'],
+  ['FINANCE_COST_ALLOCATION', '项目财务费用分摊'],
+  ['FINANCE_COST_ALLOCATION_REVERSAL', '项目财务费用分摊冲销'],
   ['EXPENSE', '费用申请'],
   ['OWNER_SETTLEMENT', '业主结算'],
   ['PRODUCTION_MEASUREMENT', '产值计量'],

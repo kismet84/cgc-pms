@@ -148,7 +148,9 @@ async function saveSettings(): Promise<void> {
   preferencesSaving.value = true
   try {
     await savePreferences({ ...preferences })
-    fillPreferences(await loadPreferences())
+    const current = await loadPreferences()
+    fillPreferences(current)
+    window.dispatchEvent(new CustomEvent('v2-preferences-updated', { detail: current }))
     showToast('success', '偏好已保存', '偏好设置已刷新。')
   } catch (value) {
     showToast('error', '请求未完成', messageOf(value))

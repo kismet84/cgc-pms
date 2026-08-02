@@ -62,6 +62,9 @@ const form = reactive({
 const businessOptions = [
   { value: 'PAYMENT', label: '付款申请单' },
   { value: 'SETTLEMENT', label: '结算单' },
+  { value: 'PURCHASE_REQUEST', label: '采购申请单' },
+  { value: 'PURCHASE_ORDER', label: '采购订单' },
+  { value: 'MATERIAL_RECEIPT', label: '材料验收单' },
 ]
 const canEdit = computed(() => session.hasPermission('document:template:edit'))
 const canPublish = computed(() => session.hasPermission('document:template:publish'))
@@ -123,13 +126,20 @@ async function selectTemplate(id: string, preferredVersionId?: string): Promise<
 }
 
 function blankDraft(): void {
-  const defaultField = businessType.value === 'PAYMENT' ? 'payment.applyCode' : 'settlement.code'
+  const defaults: Record<DocumentBusinessType, { field: string; schema: string }> = {
+    PAYMENT: { field: 'payment.applyCode', schema: 'payment.v1' },
+    SETTLEMENT: { field: 'settlement.code', schema: 'settlement.v1' },
+    PURCHASE_REQUEST: { field: 'purchaseRequest.requestCode', schema: 'purchase-request.v2' },
+    PURCHASE_ORDER: { field: 'purchaseOrder.orderCode', schema: 'purchase-order.v1' },
+    MATERIAL_RECEIPT: { field: 'receipt.receiptCode', schema: 'material-receipt.v1' },
+  }
+  const defaultValue = defaults[businessType.value]
   Object.assign(form, {
     templateCode: '',
     templateName: '',
-    schemaVersion: businessType.value === 'PAYMENT' ? 'payment.v1' : 'settlement.v1',
-    templateContent: `<html><body><h1>业务单据</h1><p>{{${defaultField}}}</p></body></html>`,
-    fieldManifest: JSON.stringify([defaultField], null, 2),
+    schemaVersion: defaultValue.schema,
+    templateContent: `<html><body><h1>业务单据</h1><p>{{${defaultValue.field}}}</p></body></html>`,
+    fieldManifest: JSON.stringify([defaultValue.field], null, 2),
     remark: '',
   })
 }

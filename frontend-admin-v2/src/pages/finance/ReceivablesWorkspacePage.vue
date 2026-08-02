@@ -38,7 +38,6 @@ import {
   loadInvoices,
   loadFundAccounts,
   loadPaymentApplications,
-  loadPaymentBasis,
   loadPaymentSourceOptions,
   loadPaymentSources as loadStoredPaymentSources,
   loadPayRecordOptions,
@@ -48,7 +47,6 @@ import {
   reverseCollection,
   reversePaymentRecord,
   saveInvoiceAllocations,
-  savePaymentBasis,
   submitExpense,
   submitOwnerSettlement,
   submitPayment,
@@ -61,7 +59,6 @@ import {
   type PaymentSourceOptionRecord,
 } from '@/services/finance'
 import { uploadSiteFile } from '@/services/delivery'
-import { loadReceiptItems, loadReceipts } from '@/services/supply-chain'
 import { loadEnabledDictDataByCode, type DictDataRecord } from '@/services/system-management'
 import { useSessionStore } from '@/stores/session'
 import { useWorkspaceStore } from '@/stores/workspace'
@@ -111,7 +108,6 @@ interface FinanceEditor {
   budgetLineId: string
   sourceType: string
   sourceRefId: string
-  basisId: string
   payeePartnerId: string
   expenseDate: string
   amount: string
@@ -174,7 +170,6 @@ const emptyEditor = (): FinanceEditor => ({
   budgetLineId: '',
   sourceType: '',
   sourceRefId: '',
-  basisId: '',
   payeePartnerId: '',
   expenseDate: today(),
   amount: '',
@@ -294,7 +289,6 @@ const budgetLines = ref<BudgetLineRecord[]>([])
 const payRecords = ref<PayRecordOption[]>([])
 const fundAccounts = ref<FundAccountRecord[]>([])
 const paymentSources = ref<PaymentSourceOptionRecord[]>([])
-const receiptBasisOptions = ref<Array<{ value: string; label: string }>>([])
 const payTypes = ref<DictDataRecord[]>([])
 const expenseCategories = ref<DictDataRecord[]>([])
 const invoiceTypes = ref<DictDataRecord[]>([])
@@ -333,7 +327,9 @@ const project = (row: Row) => {
 }
 const status = (row: Row) =>
   dashboardStatusLabel(
-    'approvalStatus' in row
+    'applyCode' in row && ['PAID', 'PARTIALLY_PAID'].includes(row.payStatus || '')
+      ? row.payStatus
+      : 'approvalStatus' in row
       ? row.approvalStatus
       : 'verifyStatus' in row
         ? row.verifyStatus
@@ -497,7 +493,7 @@ const paymentSourceOptions = computed(() => [
     value: `${item.sourceType}:${item.sourceRefId}`,
     label: `${item.documentCode} · 可付 ${formatAmount(item.availableAmount)}`,
   })),
-  ...(canDirectPayment.value
+  ...(canDirectPayment.value && editor.value?.expenseCategory !== 'MATERIAL'
     ? [{ value: 'DIRECT:self', label: '直接付款（保存后绑定本申请）' }]
     : []),
 ])
@@ -588,9 +584,7 @@ async function changeProject(value: string): Promise<void> {
   editor.value.budgetLineId = ''
   editor.value.sourceType = ''
   editor.value.sourceRefId = ''
-  editor.value.basisId = ''
   paymentSources.value = []
-  receiptBasisOptions.value = []
   await Promise.all([
     loadContracts(value),
     editorKind.value === 'payment' || editorKind.value === 'expense'
@@ -601,43 +595,19 @@ async function changeProject(value: string): Promise<void> {
 
 async function loadPaymentSources(): Promise<void> {
   paymentSources.value = []
-  receiptBasisOptions.value = []
   if (!editor.value || editorKind.value !== 'payment') return
   editor.value.sourceType = ''
   editor.value.sourceRefId = ''
-  editor.value.basisId = ''
   const { projectId, contractId, partnerId, payType, expenseCategory } = editor.value
   if (!projectId || !contractId || !partnerId || !payType) return
-  const [sources, receipts] = await Promise.all([
-    loadPaymentSourceOptions({
-      projectId,
-      contractId,
-      partnerId,
-      payType,
-      expenseCategory,
-    }),
-    expenseCategory === 'MATERIAL'
-      ? loadReceipts({ pageNum: 1, pageSize: 200, projectId, contractId, partnerId })
-      : Promise.resolve({ records: [], total: 0 }),
-  ])
+  const sources = await loadPaymentSourceOptions({
+    projectId,
+    contractId,
+    partnerId,
+    payType,
+    expenseCategory,
+  })
   paymentSources.value = sources
-  const approvedReceipts = receipts.records.filter(
-    (receipt) => receipt.approvalStatus === 'APPROVED' && receipt.qualityStatus === 'QUALIFIED',
-  )
-  const itemGroups = await Promise.all(
-    approvedReceipts.map(async (receipt) => ({
-      receipt,
-      items: await loadReceiptItems(receipt.id),
-    })),
-  )
-  receiptBasisOptions.value = itemGroups.flatMap(({ receipt, items }) =>
-    items
-      .filter((item): item is typeof item & { id: string } => Boolean(item.id))
-      .map((item) => ({
-        value: item.id,
-        label: `${receipt.receiptCode} · ${item.materialName || item.id} · ${formatAmount(item.amount || '0')}`,
-      })),
-  )
 }
 
 function choosePaymentSource(value: string): void {
@@ -701,7 +671,6 @@ async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
   salesInvoiceAttachment.value = null
   collectionAttachment.value = null
   paymentSources.value = []
-  receiptBasisOptions.value = []
   value.projectId = row?.projectId || projectId.value
   value.payType = defaultOption(payTypeOptions.value, 'FINAL')
   value.expenseCategory = defaultOption(
@@ -753,15 +722,10 @@ async function openForm(kind: EditorKind, row?: RecordRow): Promise<void> {
     }
     if (kind === 'payment' && row) {
       await loadPaymentSources()
-      const [sources, basis] = await Promise.all([
-        loadStoredPaymentSources(row.id),
-        loadPaymentBasis(row.id),
-      ])
+      const sources = await loadStoredPaymentSources(row.id)
       const source = sources[0]
-      const basisItem = basis.find((item) => item.basisType === 'MAT_RECEIPT')
       value.sourceType = source?.sourceType || ''
       value.sourceRefId = source?.sourceRefId || ''
-      value.basisId = basisItem?.basisId || ''
     }
   } catch (cause) {
     dialog.value = false
@@ -989,17 +953,18 @@ function collectionCommand(value: FinanceEditor): CollectionCommand {
 async function save(): Promise<void> {
   if (!editor.value || busy.value) return
   busy.value = true
+  let createdPaymentId = ''
   try {
     const value = editor.value
     if (editorKind.value === 'payment') {
       const command = paymentCommand(value)
       const sourceType = required(value.sourceType, '付款来源类型')
-      const basisId =
-        sourceType === 'DIRECT' && value.expenseCategory === 'MATERIAL'
-          ? required(value.basisId, '材料验收明细')
-          : value.basisId
+      if (value.expenseCategory === 'MATERIAL' && sourceType !== 'MAT_RECEIPT') {
+        throw new TypeError('材料付款必须选择材料验收来源')
+      }
       if (!value.id && !paymentAttachment.value) throw new TypeError('付款附件不能为空')
       const paymentId = value.id || (await createPayment(command))
+      if (!value.id) createdPaymentId = paymentId
       if (value.id) await updatePayment(value.id, command)
       value.id = paymentId
       await savePaymentSources(paymentId, [
@@ -1010,11 +975,6 @@ async function save(): Promise<void> {
           sourceAmount: command.applyAmount,
         },
       ])
-      if (basisId) {
-        await savePaymentBasis(paymentId, [
-          { basisType: 'MAT_RECEIPT', basisId, basisAmount: command.applyAmount },
-        ])
-      }
       if (paymentAttachment.value) {
         await uploadSiteFile(paymentAttachment.value, 'PAYMENT', paymentId, 'PAYMENT_PROOF')
       }
@@ -1070,10 +1030,21 @@ async function save(): Promise<void> {
       )
     }
     dialog.value = false
+    createdPaymentId = ''
     await load()
     showToast('success', '保存成功', '已按服务端最新数据刷新。')
   } catch (cause) {
-    showToast('error', '保存失败', cause instanceof Error ? cause.message : '请稍后重试。')
+    let message = cause instanceof Error ? cause.message : '请稍后重试。'
+    if (createdPaymentId) {
+      try {
+        await deletePayment(createdPaymentId)
+        if (editor.value?.id === createdPaymentId) editor.value.id = ''
+        message += '；本次新建草稿已回滚'
+      } catch (rollbackCause) {
+        message += `；草稿回滚失败：${rollbackCause instanceof Error ? rollbackCause.message : '需要人工核对'}`
+      }
+    }
+    showToast('error', '保存失败', message)
   } finally {
     busy.value = false
   }
@@ -1507,14 +1478,6 @@ onBeforeUnmount(() => controller?.abort())
               required
               :disabled="!paymentSourceOptions.length"
               @update:model-value="choosePaymentSource"
-            />
-            <V2Select
-              v-if="editor.sourceType === 'DIRECT' && editor.expenseCategory === 'MATERIAL'"
-              v-model="editor.basisId"
-              label="材料验收明细"
-              :options="receiptBasisOptions"
-              required
-              :disabled="!receiptBasisOptions.length"
             />
             <V2Input v-model="editor.applyAmount" label="申请金额" required hint="按字符串提交" />
             <V2Input v-model="editor.applyReason" label="申请事由" required />

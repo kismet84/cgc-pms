@@ -15,7 +15,7 @@ defineProps<{ domainId: string }>()
       />
     </template>
 
-    <template v-else-if="domainId === 'delivery'">
+    <template v-else-if="domainId === 'delivery' || domainId === 'construction'">
       <rect x="5" y="4" width="14" height="17" rx="2.5" stroke="currentColor" stroke-width="1.8" />
       <path
         d="M9 4.5V3.8C9 3.36 9.36 3 9.8 3H14.2C14.64 3 15 3.36 15 3.8V4.5"

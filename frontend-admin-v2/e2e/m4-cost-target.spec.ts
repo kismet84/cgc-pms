@@ -148,7 +148,7 @@ test.describe('M4 cost target routes', () => {
     const runtimeErrors = captureRuntimeErrors(page)
 
     await page.goto('/cost-target?projectId=P1#versions')
-    await expect(page).toHaveURL(/\/cost-target\/index\?projectId=P1#versions$/)
+    await expect(page).toHaveURL(/\/cost-budget\?projectId=P1&view=target#versions$/)
 
     for (const viewport of [
       { width: 1440, height: 900 },

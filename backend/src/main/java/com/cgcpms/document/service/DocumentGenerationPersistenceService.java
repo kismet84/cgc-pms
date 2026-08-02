@@ -26,11 +26,12 @@ public class DocumentGenerationPersistenceService {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
-    public void markRendering(Long id, Long tenantId) {
+    public void markRendering(Long id, Long tenantId, String sourceDigest) {
         int changed = generationMapper.update(null, new LambdaUpdateWrapper<DocumentGeneration>()
                 .eq(DocumentGeneration::getId, id)
                 .eq(DocumentGeneration::getTenantId, tenantId)
                 .eq(DocumentGeneration::getStatus, "PENDING")
+                .set(DocumentGeneration::getSourceDigest, sourceDigest)
                 .set(DocumentGeneration::getStatus, "RENDERING"));
         if (changed != 1) {
             throw new BusinessException("DOCUMENT_GENERATION_STATE_CONFLICT", "文档生成状态已变化");
@@ -45,7 +46,7 @@ public class DocumentGenerationPersistenceService {
         }
         FileService.GeneratedFileArchive archive = fileService.archiveGeneratedPdf(
                 rendered.content(), generation.getBusinessType(), generation.getBusinessId(),
-                generation.getGenerationNo(), rendered.sha256());
+                generation.getGenerationNo(), rendered.sha256(), generation.getOutputFileName());
         int changed = generationMapper.update(null, new LambdaUpdateWrapper<DocumentGeneration>()
                 .eq(DocumentGeneration::getId, generation.getId())
                 .eq(DocumentGeneration::getTenantId, generation.getTenantId())

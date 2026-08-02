@@ -3,8 +3,10 @@ import {
   type BidEvaluationCommand,
   type BidEvaluationRecord,
   type PurchaseOrderCommand,
+  type PurchaseOrderFromRequestCommand,
   type PurchaseOrderItemRecord,
   type PurchaseOrderPage,
+  type PurchaseOrderPricingSuggestionRecord,
   type PurchaseOrderQuery,
   type PurchaseRequestCommand,
   type PurchaseRequestItemRecord,
@@ -269,7 +271,7 @@ export function loadPurchaseRequestItems(id: string, signal?: AbortSignal) {
 }
 
 export function createPurchaseRequest(body: PurchaseRequestCommand): Promise<string> {
-  return createId(SUPPLY_CHAIN_API.purchaseRequests, body)
+  return createId(`${SUPPLY_CHAIN_API.purchaseRequests}/with-items`, body)
 }
 
 export function deletePurchaseRequest(id: string) {
@@ -282,6 +284,38 @@ export function savePurchaseRequestItems(id: string, items: PurchaseRequestItemR
 
 export function submitPurchaseRequest(id: string) {
   return post<void>(`${resourcePath(SUPPLY_CHAIN_API.purchaseRequests, id)}/submit`)
+}
+
+export interface PurchaseRequestApprovalCommand {
+  comment?: string
+  idempotencyKey: string
+  items: Array<{
+    itemId: string
+    approvedQuantity: string
+    approvalVersion: number
+    changeReason?: string
+  }>
+}
+
+export function approvePurchaseRequest(
+  requestId: string,
+  taskId: string,
+  body: PurchaseRequestApprovalCommand,
+) {
+  return apiRequest<void, PurchaseRequestApprovalCommand>(
+    `${resourcePath(SUPPLY_CHAIN_API.purchaseRequests, requestId)}/approval-tasks/${encodeURIComponent(taskId)}/approve`,
+    { method: POST_METHOD, body },
+  )
+}
+
+export function loadPurchaseRequestApprovalItems(
+  requestId: string,
+  taskId: string,
+): Promise<PurchaseRequestItemRecord[]> {
+  return apiRequest<PurchaseRequestItemRecord[]>(
+    `${resourcePath(SUPPLY_CHAIN_API.purchaseRequests, requestId)}/approval-tasks/${encodeURIComponent(taskId)}/items`,
+    { notifyError: false },
+  )
 }
 
 export function loadPurchaseOrder(id: string, signal?: AbortSignal) {
@@ -298,8 +332,24 @@ export function loadPurchaseOrderItems(id: string, signal?: AbortSignal) {
   )
 }
 
+export function loadPurchaseOrderPricingSuggestion(
+  contractId: string,
+  materialId: string,
+): Promise<PurchaseOrderPricingSuggestionRecord> {
+  return apiRequest<PurchaseOrderPricingSuggestionRecord>(
+    withQuery(`${SUPPLY_CHAIN_API.purchaseOrders}/pricing-suggestion`, { contractId, materialId }),
+    { notifyError: false },
+  )
+}
+
 export function createPurchaseOrder(body: PurchaseOrderCommand): Promise<string> {
   return createId(SUPPLY_CHAIN_API.purchaseOrders, body)
+}
+
+export function createPurchaseOrderFromRequest(
+  body: PurchaseOrderFromRequestCommand,
+): Promise<string> {
+  return createId(`${SUPPLY_CHAIN_API.purchaseOrders}/from-request`, body)
 }
 
 export function updatePurchaseOrder(
@@ -369,7 +419,15 @@ export function deleteReceipt(id: string) {
 }
 
 export function saveReceiptItems(id: string, items: ReceiptItemRecord[]) {
-  return saveItems(SUPPLY_CHAIN_API.receipts, id, items)
+  return saveItems(
+    SUPPLY_CHAIN_API.receipts,
+    id,
+    items.map((item) => ({
+      orderItemId: item.orderItemId,
+      acceptedQuantity: item.acceptedQuantity,
+      useLocation: item.useLocation,
+    })),
+  )
 }
 
 export function submitReceipt(id: string) {

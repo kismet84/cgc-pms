@@ -24,10 +24,16 @@ const permissions = [
 ]
 
 async function fulfill(route: Route, data: unknown, status = 200) {
+  const request = route.request()
   await route.fulfill({
     status,
     contentType: 'application/json',
-    body: JSON.stringify({ code: status === 200 ? '0' : 'TEST_ERROR', data }),
+    body: JSON.stringify({
+      code: status === 200 ? '0' : 'E2E_API_UNSTUBBED',
+      message:
+        status === 200 ? 'success' : `${request.method()} ${new URL(request.url()).pathname}`,
+      data,
+    }),
   })
 }
 
@@ -39,6 +45,18 @@ async function install(page: Page) {
         { id: 'P1', projectCode: 'PRJ-001', projectName: '示范工程项目', status: 'ACTIVE' },
       ])
     }
+    if (path === '/api/system/dict/data/by-code/pay_type')
+      return fulfill(route, [{ dictLabel: '合同付款', dictValue: 'CONTRACT', status: 'ENABLE' }])
+    if (path === '/api/system/dict/data/by-code/expense_category')
+      return fulfill(route, [{ dictLabel: '其他', dictValue: 'OTHER', status: 'ENABLE' }])
+    if (path === '/api/system/dict/data/by-code/invoice_type')
+      return fulfill(route, [
+        { dictLabel: '增值税专用发票', dictValue: 'VAT_SPECIAL', status: 'ENABLE' },
+      ])
+    if (path === '/api/system/dict/data/by-code/pay_method')
+      return fulfill(route, [
+        { dictLabel: '银行转账', dictValue: 'BANK_TRANSFER', status: 'ENABLE' },
+      ])
     if (path === '/api/revenue-operations/settlements') {
       return fulfill(route, [
         {
@@ -191,7 +209,7 @@ async function install(page: Page) {
         pageSize: 20,
       })
     }
-    return fulfill(route, { records: [], total: 0, pageNo: 1, pageSize: 20 })
+    return fulfill(route, null, 500)
   })
   await page.route('**/api/auth/userinfo', (route) =>
     fulfill(route, { userId: '1', username: 'finance-user', roles: ['USER'], permissions }),

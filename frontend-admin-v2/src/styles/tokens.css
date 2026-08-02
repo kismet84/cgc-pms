@@ -9,7 +9,7 @@
   --v2-color-text-strong: #121b2e;
   --v2-color-text-secondary: #53627a;
   --v2-color-text-muted: #64748b;
-  --v2-color-text-disabled: #94a3b8;
+  --v2-color-text-disabled: var(--v2-color-text-secondary);
   --v2-color-border: #e1e8f2;
   --v2-color-border-subtle: #edf1f6;
   --v2-color-primary: #2563eb;
