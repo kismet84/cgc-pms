@@ -92,7 +92,8 @@ test('ordinary user completes profile, password, preferences and help self-servi
   await page.getByLabel('默认收起侧栏').check()
   await page.getByRole('button', { name: '保存偏好' }).click()
   await expect(page.getByText('偏好设置已刷新。')).toBeVisible()
-  expect(preferenceCalls).toEqual(['GET', 'PUT', 'GET'])
+  expect(preferenceCalls.filter((method) => method === 'PUT')).toHaveLength(1)
+  expect(preferenceCalls.slice(-2)).toEqual(['PUT', 'GET'])
 
   await page.getByRole('link', { name: '使用帮助' }).click()
   await expect(page.getByRole('heading', { level: 1, name: '使用帮助' })).toBeVisible()

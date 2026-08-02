@@ -155,9 +155,24 @@ Assert-Contains (Read-RepoText 'scripts\ci\scan-backend-dependencies.sh') @('MSY
 $backendPom = Read-RepoText 'backend\pom.xml'
 Assert-Contains $backendPom @('<id>test-order-independence</id>') 'backend test order profile'
 $frontendPackage = Read-RepoText 'frontend-admin-v2\package.json' | ConvertFrom-Json
-foreach ($name in @('check:boundary','check:route-ledger','check:design-system','lint:check','test:unit','test:ci','type-check:contracts','type-check','build','check:bundle-size','test:e2e:migration-gate')) {
+foreach ($name in @('check:boundary','check:route-ledger','check:design-system','lint:check','test:unit','test:ci','type-check:contracts','type-check','build','check:bundle-size','test:e2e:migration-gate','check:pre-push')) {
   if ($frontendPackage.scripts.PSObject.Properties.Name -notcontains $name) { throw "frontend-admin-v2 script is missing: $name" }
 }
+
+$pushGate = Read-RepoText 'frontend-admin-v2\scripts\run-push-quality-gate.mjs'
+Assert-Contains $pushGate @(
+  "git', ['diff', '--check']",
+  "'lint:check'",
+  "'type-check'",
+  "'test:unit'",
+  "'build'",
+  "'test:e2e:migration-gate'",
+  "startsWith('frontend-admin-v2/src/components/')",
+  "startsWith('frontend-admin-v2/src/styles/')",
+  "startsWith('frontend-admin-v2/e2e/')"
+) 'frontend pre-push quality gate'
+$prePushHook = Read-RepoText '.githooks\pre-push'
+Assert-Contains $prePushHook @('set -eu','pnpm --dir frontend-admin-v2 check:pre-push') 'versioned pre-push hook'
 
 [pscustomobject]@{
   ok = $true

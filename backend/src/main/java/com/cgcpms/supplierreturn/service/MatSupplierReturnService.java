@@ -3,6 +3,7 @@ package com.cgcpms.supplierreturn.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.service.ContractProcurementPayableService;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.inventory.entity.MatStockTxn;
@@ -15,6 +16,7 @@ import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
+import com.cgcpms.receipt.service.PurchaseOrderReceiptStateService;
 import com.cgcpms.supplierreturn.dto.SupplierReturnRequest;
 import com.cgcpms.supplierreturn.entity.MatQualityDisposition;
 import com.cgcpms.supplierreturn.entity.MatSupplierReturn;
@@ -51,6 +53,8 @@ public class MatSupplierReturnService {
     private final CostItemMapper costItemMapper;
     private final MatStockService stockService;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ContractProcurementPayableService payableService;
+    private final PurchaseOrderReceiptStateService orderReceiptStateService;
 
     @Transactional(rollbackFor = Exception.class)
     public Long confirm(SupplierReturnRequest request) {
@@ -193,6 +197,8 @@ public class MatSupplierReturnService {
                         request.returnDate(), "SUPPLIER_RETURN", "供应商退货冲销原直耗验收成本");
             }
         }
+        orderReceiptStateService.sync(receipt.getOrderId(), tenantId);
+        payableService.recalculate(receipt.getContractId(), tenantId);
         return supplierReturn.getId();
     }
 
@@ -235,7 +241,12 @@ public class MatSupplierReturnService {
                 continue;
             }
             MatPurchaseOrderItem orderItem = lockOrderItem(item.getOrderItemId(), tenantId);
-            orderItem.setReceivedQuantity(nvl(orderItem.getReceivedQuantity()).add(item.getQuantity()));
+            BigDecimal nextReceived = nvl(orderItem.getReceivedQuantity()).add(item.getQuantity());
+            if (nextReceived.compareTo(nvl(orderItem.getQuantity())) > 0) {
+                throw new BusinessException("SUPPLIER_RETURN_REVERSAL_EXCEEDS_ORDER",
+                        "冲销后累计已收数量将超过采购订单数量");
+            }
+            orderItem.setReceivedQuantity(nextReceived);
             orderItemMapper.updateById(orderItem);
             if (item.getOriginalStockTxnId() != null) {
                 MatStockTxn original = stockTxnMapper.selectForUpdate(item.getOriginalStockTxnId(), tenantId);
@@ -258,6 +269,8 @@ public class MatSupplierReturnService {
         supplierReturn.setReversedAt(LocalDateTime.now());
         supplierReturn.setReversalReason(reason.trim());
         returnMapper.updateById(supplierReturn);
+        orderReceiptStateService.sync(receipt.getOrderId(), tenantId);
+        payableService.recalculate(receipt.getContractId(), tenantId);
         return returnId;
     }
 

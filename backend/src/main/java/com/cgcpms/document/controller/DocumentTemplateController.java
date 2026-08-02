@@ -11,6 +11,7 @@ import com.cgcpms.document.service.DocumentGenerationService;
 import com.cgcpms.document.service.DocumentTemplateService;
 import com.cgcpms.document.service.PaymentSystemTemplateService;
 import com.cgcpms.document.service.SettlementSystemTemplateService;
+import com.cgcpms.document.service.ProcurementSystemTemplateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -35,6 +36,7 @@ public class DocumentTemplateController {
     private final DocumentGenerationService generationService;
     private final PaymentSystemTemplateService paymentSystemTemplateService;
     private final SettlementSystemTemplateService settlementSystemTemplateService;
+    private final ProcurementSystemTemplateService procurementSystemTemplateService;
 
     @PostMapping
     @AuditedOperation(type = "CREATE", businessType = "DOCUMENT_TEMPLATE", businessIdExpression = "0")
@@ -162,6 +164,27 @@ public class DocumentTemplateController {
     @PreAuthorize("hasAuthority('document:template:publish') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<DocumentTemplateVersion> provisionSettlementSystemTemplate() {
         return ApiResponse.success(settlementSystemTemplateService.ensureCurrentTenantTemplate());
+    }
+
+    @PostMapping("/system/purchase-request")
+    @AuditedOperation(type = "PROVISION_SYSTEM_PURCHASE_REQUEST", businessType = "DOCUMENT_TEMPLATE", businessIdExpression = "0")
+    @PreAuthorize("hasAuthority('document:template:publish') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<DocumentTemplateVersion> provisionPurchaseRequestSystemTemplate() {
+        return ApiResponse.success(procurementSystemTemplateService.ensureCurrentTenantTemplate("PURCHASE_REQUEST"));
+    }
+
+    @PostMapping("/system/purchase-order")
+    @AuditedOperation(type = "PROVISION_SYSTEM_PURCHASE_ORDER", businessType = "DOCUMENT_TEMPLATE", businessIdExpression = "0")
+    @PreAuthorize("hasAuthority('document:template:publish') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<DocumentTemplateVersion> provisionPurchaseOrderSystemTemplate() {
+        return ApiResponse.success(procurementSystemTemplateService.ensureCurrentTenantTemplate("PURCHASE_ORDER"));
+    }
+
+    @PostMapping("/system/material-receipt")
+    @AuditedOperation(type = "PROVISION_SYSTEM_MATERIAL_RECEIPT", businessType = "DOCUMENT_TEMPLATE", businessIdExpression = "0")
+    @PreAuthorize("hasAuthority('document:template:publish') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<DocumentTemplateVersion> provisionMaterialReceiptSystemTemplate() {
+        return ApiResponse.success(procurementSystemTemplateService.ensureCurrentTenantTemplate("MATERIAL_RECEIPT"));
     }
 
     private DocumentTemplateService.DraftCommand draft(DocumentTemplateDraftRequest request) {

@@ -16,6 +16,7 @@ public class MatReceiptItemVO {
     private String unit;
     private String actualQuantity;
     private String qualifiedQuantity;
+    private String acceptedQuantity;
     private String unqualifiedQuantity;
     private String unitPrice;
     private String amount;

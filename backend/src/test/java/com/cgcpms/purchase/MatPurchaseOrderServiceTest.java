@@ -42,6 +42,7 @@ class MatPurchaseOrderServiceTest {
         TestUserContext.setAdmin(TENANT_ID, USER_ADMIN);
         ensureWorkflowApprover();
         ensureActiveBudget();
+        ensurePurchasePricingFixture();
     }
     @AfterEach void clearContext() {
         jdbcTemplate.update("DELETE FROM sys_user WHERE id = ? AND username = ?", USER_ADMIN, "test_purchase_approver");
@@ -83,6 +84,20 @@ class MatPurchaseOrderServiceTest {
                 USER_ADMIN, BUDGET_LINE_ID);
     }
 
+    private void ensurePurchasePricingFixture() {
+        jdbcTemplate.update("UPDATE ct_contract SET contract_type='PURCHASE', pricing_mode='FIXED' WHERE id=30001");
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract_item
+                    (id,tenant_id,contract_id,material_id,item_code,item_name,item_spec,unit,
+                     quantity,unit_price,amount,sort_order,created_by,deleted_flag)
+                SELECT 49994,0,30001,1,'PO-TEST-MAT','测试材料','测试规格','m',
+                       1000,3500,3500000,1,1,0
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ct_contract_item
+                    WHERE tenant_id=0 AND contract_id=30001 AND material_id=1 AND deleted_flag=0)
+                """);
+    }
+
     private void attachCleanFile(Long orderId) {
         jdbcTemplate.update("""
                 INSERT INTO sys_file (
@@ -105,6 +120,7 @@ class MatPurchaseOrderServiceTest {
         assertTrue(vo.getOrderCode().startsWith("PO-"), "编码应以 PO- 开头");
         assertEquals("DRAFT", vo.getApprovalStatus());
         assertEquals("DRAFT", vo.getOrderStatus());
+        assertEquals(0, vo.getExceptionPurchaseFlag());
     }
 
     @Test @Transactional @DisplayName("create → ignores tenant, identity, amount, and state injection")
@@ -118,6 +134,8 @@ class MatPurchaseOrderServiceTest {
         order.setTotalAmount(new BigDecimal("999999.99"));
         order.setApprovalStatus("APPROVED");
         order.setOrderStatus("COMPLETED");
+        order.setExceptionPurchaseFlag(2);
+        order.setExceptionReason("无有效例外标记时不得保存原因");
         order.setDeletedFlag(1);
 
         Long id = service.create(order);
@@ -130,6 +148,8 @@ class MatPurchaseOrderServiceTest {
         assertEquals(0, BigDecimal.ZERO.compareTo(stored.getTotalAmount()));
         assertEquals("DRAFT", stored.getApprovalStatus());
         assertEquals("DRAFT", stored.getOrderStatus());
+        assertEquals(0, stored.getExceptionPurchaseFlag());
+        assertNull(stored.getExceptionReason());
         assertEquals(0, stored.getDeletedFlag());
     }
 
@@ -178,7 +198,7 @@ class MatPurchaseOrderServiceTest {
     void testCreate_WithContract() {
         MatPurchaseOrder order = new MatPurchaseOrder();
         order.setProjectId(PROJECT_ID);
-        order.setContractId(30001L); // CT-2026-001 is SUB with PERFORMING status
+        order.setContractId(30001L);
         Long id = service.create(order);
         assertNotNull(id);
     }
@@ -285,6 +305,7 @@ class MatPurchaseOrderServiceTest {
     void testUpdate_WhenApproving() {
         MatPurchaseOrder order = new MatPurchaseOrder();
         order.setProjectId(PROJECT_ID); order.setOrderType("PURCHASE");
+        order.setContractId(30001L);
         Long id = service.create(order);
         MatPurchaseOrder db = orderMapper.selectById(id);
         db.setApprovalStatus("APPROVING"); orderMapper.updateById(db);
@@ -378,17 +399,24 @@ class MatPurchaseOrderServiceTest {
     void testSaveItemsBatch() {
         MatPurchaseOrder order = new MatPurchaseOrder();
         order.setProjectId(PROJECT_ID); order.setOrderType("PURCHASE");
+        order.setContractId(30001L);
         Long id = service.create(order);
 
         MatPurchaseOrderItem item = new MatPurchaseOrderItem();
         item.setMaterialId(1L); item.setOrderId(id);
         item.setQuantity(new BigDecimal("10.00"));
-        item.setUnitPrice(new BigDecimal("3500.00"));
-        item.setAmount(new BigDecimal("35000.00"));
+        item.setUnitPrice(BigDecimal.ONE);
+        item.setAmount(BigDecimal.TEN);
         service.saveItemsBatch(id, List.of(item));
 
         List<MatPurchaseOrderItemVO> items = service.getItems(id);
+        Long expectedContractItemId = jdbcTemplate.queryForObject("""
+                SELECT id FROM ct_contract_item
+                WHERE tenant_id=0 AND contract_id=30001 AND material_id=1 AND deleted_flag=0
+                """, Long.class);
         assertEquals(1, items.size());
+        assertEquals("3500.0000", items.getFirst().getUnitPrice());
+        assertEquals(expectedContractItemId.toString(), items.getFirst().getContractItemId());
     }
 
     @Test @Transactional @DisplayName("来源申请订单仅允许补录价格税率，不得改来源字段")
@@ -412,6 +440,9 @@ class MatPurchaseOrderServiceTest {
         order.setTenantId(TENANT_ID);
         order.setProjectId(PROJECT_ID);
         order.setRequestId(requestId);
+        order.setContractId(30001L);
+        order.setPartnerId(20002L);
+        order.setPricingMode("FIXED");
         order.setOrderCode("PO-LINKED-" + requestId);
         order.setOrderType("PURCHASE");
         order.setOrderStatus("DRAFT");
@@ -428,13 +459,21 @@ class MatPurchaseOrderServiceTest {
         item.setTaxRate(new BigDecimal("13"));
         service.saveItemsBatch(order.getId(), List.of(item));
 
-        assertEquals(0, new BigDecimal("20").compareTo(orderMapper.selectById(order.getId()).getTotalAmount()));
+        assertEquals(0, new BigDecimal("7000").compareTo(orderMapper.selectById(order.getId()).getTotalAmount()));
         assertEquals(0, new BigDecimal("13").compareTo(itemMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrderItem>()
                         .eq(MatPurchaseOrderItem::getOrderId, order.getId())).getTaxRate()));
 
+        jdbcTemplate.update("UPDATE mat_purchase_request_item SET budget_line_id=NULL WHERE id=?", requestItemId);
+        item.setId(null);
+        item.setBudgetLineId(BUDGET_LINE_ID);
+        service.saveItemsBatch(order.getId(), List.of(item));
+        assertEquals(BUDGET_LINE_ID, itemMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrderItem>()
+                        .eq(MatPurchaseOrderItem::getOrderId, order.getId())).getBudgetLineId());
+
         item.setQuantity(new BigDecimal("3"));
-        assertEquals("PURCHASE_ORDER_REQUEST_ITEM_MISMATCH",
+        assertEquals("PURCHASE_ORDER_QUANTITY_ADJUST_REASON_REQUIRED",
                 assertThrows(BusinessException.class,
                         () -> service.saveItemsBatch(order.getId(), List.of(item))).getCode());
 
@@ -482,6 +521,9 @@ class MatPurchaseOrderServiceTest {
         order.setTenantId(TENANT_ID);
         order.setProjectId(PROJECT_ID);
         order.setRequestId(requestId);
+        order.setContractId(30001L);
+        order.setPartnerId(20002L);
+        order.setPricingMode("FIXED");
         order.setOrderCode("PO-SUBSET-" + requestId);
         order.setOrderType("PURCHASE");
         order.setOrderStatus("DRAFT");
@@ -505,6 +547,7 @@ class MatPurchaseOrderServiceTest {
         MatPurchaseOrder order = new MatPurchaseOrder();
         order.setProjectId(PROJECT_ID);
         order.setOrderType("PURCHASE");
+        order.setContractId(30001L);
         Long orderId = service.create(order);
 
         long disabledId = Math.abs(System.nanoTime());
@@ -536,6 +579,61 @@ class MatPurchaseOrderServiceTest {
         assertEquals("MATERIAL_INVALID",
                 assertThrows(BusinessException.class,
                         () -> service.saveItemsBatch(orderId, List.of(foreign))).getCode());
+    }
+
+    @Test @Transactional @DisplayName("saveItemsBatch → persists verified ACTUAL price provenance")
+    void saveItemsBatchPersistsVerifiedActualPriceProvenance() {
+        jdbcTemplate.update("UPDATE ct_contract SET pricing_mode='ACTUAL' WHERE id=30001");
+        long receiptId = Math.abs(System.nanoTime());
+        long receiptItemId = receiptId + 1;
+        jdbcTemplate.update("""
+                INSERT INTO mat_receipt (
+                    id,tenant_id,project_id,contract_id,partner_id,receipt_code,receipt_date,
+                    receipt_mode,total_amount,approval_status,created_by,deleted_flag)
+                VALUES (?,0,10001,30001,20002,?,CURRENT_DATE,'INVENTORY',3500,'APPROVED',1,0)
+                """, receiptId, "RC-PRICE-" + receiptId);
+        jdbcTemplate.update("""
+                INSERT INTO mat_receipt_item (
+                    id,tenant_id,receipt_id,material_id,actual_quantity,qualified_quantity,
+                    unqualified_quantity,unit_price,amount,created_by,deleted_flag)
+                VALUES (?,0,?,1,1,1,0,3500,3500,1,0)
+                """, receiptItemId, receiptId);
+
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(30001L);
+        order.setPartnerId(20002L);
+        order.setOrderType("PURCHASE");
+        Long orderId = service.create(order);
+
+        MatPurchaseOrderItem suggested = new MatPurchaseOrderItem();
+        suggested.setMaterialId(1L);
+        suggested.setBudgetLineId(BUDGET_LINE_ID);
+        suggested.setQuantity(BigDecimal.ONE);
+        suggested.setUnitPrice(new BigDecimal("3500"));
+        suggested.setPriceSource("RECENT_RECEIPT");
+        suggested.setPriceSourceReceiptItemId(receiptItemId);
+        service.saveItemsBatch(orderId, List.of(suggested));
+
+        MatPurchaseOrderItemVO verified = service.getItems(orderId).getFirst();
+        assertEquals("ACTUAL", verified.getPricingMode());
+        assertEquals("RECENT_RECEIPT", verified.getPriceSource());
+        assertEquals(String.valueOf(receiptItemId), verified.getPriceSourceReceiptItemId());
+        assertNotNull(verified.getMaterialName());
+        assertNotNull(verified.getSpecification());
+
+        MatPurchaseOrderItem manual = new MatPurchaseOrderItem();
+        manual.setMaterialId(1L);
+        manual.setBudgetLineId(BUDGET_LINE_ID);
+        manual.setQuantity(BigDecimal.ONE);
+        manual.setUnitPrice(new BigDecimal("3600"));
+        manual.setPriceSource("RECENT_RECEIPT");
+        manual.setPriceSourceReceiptItemId(receiptItemId);
+        service.saveItemsBatch(orderId, List.of(manual));
+
+        MatPurchaseOrderItemVO downgraded = service.getItems(orderId).getFirst();
+        assertEquals("MANUAL", downgraded.getPriceSource());
+        assertNull(downgraded.getPriceSourceReceiptItemId());
     }
 
     @Test @Transactional @DisplayName("getItems → throws on non-existent")

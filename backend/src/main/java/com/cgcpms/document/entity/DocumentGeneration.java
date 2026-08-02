@@ -3,6 +3,7 @@ package com.cgcpms.document.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.cgcpms.common.entity.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -34,4 +35,8 @@ public class DocumentGeneration extends BaseEntity {
     private Long requestedBy;
     private LocalDateTime requestedAt;
     private LocalDateTime completedAt;
+
+    /** Human-facing business number used only for the archived file download name. */
+    @TableField(exist = false)
+    private String outputFileName;
 }

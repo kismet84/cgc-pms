@@ -17,6 +17,7 @@ import com.cgcpms.document.render.RestrictedTemplateEngine;
 import com.cgcpms.document.service.DocumentGenerationPersistenceService;
 import com.cgcpms.document.service.DocumentGenerationService;
 import com.cgcpms.document.service.DocumentTemplateService;
+import com.cgcpms.document.service.ProcurementSystemTemplateService;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.service.FileService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -52,6 +53,7 @@ class DocumentGenerationServiceTest {
     @Mock private BusinessObjectAuthorizer authorizer;
     @Mock private ObjectProvider<FileService> fileServiceProvider;
     @Mock private DocumentDataProvider provider;
+    @Mock private ProcurementSystemTemplateService procurementSystemTemplateService;
 
     private DocumentGenerationService service;
 
@@ -62,22 +64,27 @@ class DocumentGenerationServiceTest {
         properties.setEnabled(true);
         properties.setPaymentEnabled(true);
         service = new DocumentGenerationService(mapper, templateService, registry, templateEngine, renderer,
-                persistence, authorizer, new ObjectMapper(), fileServiceProvider, properties);
-        when(registry.require("PAYMENT")).thenReturn(provider);
+                persistence, authorizer, new ObjectMapper(), fileServiceProvider, properties,
+                procurementSystemTemplateService);
     }
 
     private void stubFormalGeneration() {
+        when(registry.require("PAYMENT")).thenReturn(provider);
         when(provider.load(88L)).thenReturn(new DocumentDataSnapshot("payment.v1",
                 Map.of("payment", Map.of("applyCode", "PAY-88"))));
+        stubDefaultPaymentVersion();
+        when(templateEngine.render(any(), any())).thenReturn("<html>PAY-88</html>");
+        when(renderer.rendererId()).thenReturn("openhtmltopdf");
+        when(renderer.rendererVersion()).thenReturn("1.1.40/pdfbox-3.0.8");
+    }
+
+    private void stubDefaultPaymentVersion() {
         DocumentTemplateVersion version = new DocumentTemplateVersion();
         version.setId(701L);
         version.setTemplateId(700L);
         version.setSchemaVersion("payment.v1");
         version.setTemplateContent("<html>{{payment.applyCode}}</html>");
         when(templateService.requireDefaultVersion("PAYMENT")).thenReturn(version);
-        when(templateEngine.render(any(), any())).thenReturn("<html>PAY-88</html>");
-        when(renderer.rendererId()).thenReturn("openhtmltopdf");
-        when(renderer.rendererVersion()).thenReturn("1.1.40/pdfbox-3.0.8");
     }
 
     @AfterEach
@@ -100,7 +107,7 @@ class DocumentGenerationServiceTest {
         assertEquals("SUCCEEDED", result.getStatus());
         verify(authorizer).checkGeneratedDocumentAccess("PAYMENT", 88L);
         verify(persistence).start(any(DocumentGeneration.class));
-        verify(persistence).markRendering(anyLong(), eq(TestUserContext.TENANT_0));
+        verify(persistence).markRendering(anyLong(), eq(TestUserContext.TENANT_0), any());
         verify(persistence).succeed(any(DocumentGeneration.class), eq(rendered));
         verify(persistence, never()).fail(anyLong(), anyLong(), any());
     }
@@ -120,7 +127,50 @@ class DocumentGenerationServiceTest {
     }
 
     @Test
+    void persistsFailureWhenProviderPreflightFails() {
+        when(registry.require("PAYMENT")).thenReturn(provider);
+        stubDefaultPaymentVersion();
+        when(mapper.selectOne(any(Wrapper.class))).thenReturn(null);
+        when(provider.load(88L)).thenThrow(new BusinessException("DOCUMENT_SOURCE_INVALID", "source invalid"));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> service.generate("PAYMENT", 88L, "payment:88:approved:v3", null));
+
+        assertEquals("DOCUMENT_SOURCE_INVALID", error.getCode());
+        verify(persistence).start(any(DocumentGeneration.class));
+        verify(persistence).fail(anyLong(), eq(TestUserContext.TENANT_0), eq("DOCUMENT_SOURCE_INVALID"));
+        verify(persistence, never()).markRendering(anyLong(), anyLong(), any());
+    }
+
+    @Test
+    void systemGenerationPersistsDisabledFeatureAsRetryableFailure() {
+        DocumentGenerationProperties disabledOrder = new DocumentGenerationProperties();
+        disabledOrder.setEnabled(true);
+        disabledOrder.setPurchaseOrderEnabled(false);
+        DocumentGenerationService systemService = new DocumentGenerationService(
+                mapper, templateService, registry, templateEngine, renderer, persistence, authorizer,
+                new ObjectMapper(), fileServiceProvider, disabledOrder, procurementSystemTemplateService);
+        DocumentTemplateVersion version = new DocumentTemplateVersion();
+        version.setId(801L);
+        version.setTemplateId(800L);
+        version.setSchemaVersion("purchase-order.v1");
+        when(templateService.requireDefaultVersion("PURCHASE_ORDER")).thenReturn(version);
+        when(mapper.selectOne(any(Wrapper.class))).thenReturn(null);
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> systemService.generateSystem("PURCHASE_ORDER", 301L,
+                        "PURCHASE_ORDER:301:INSTANCE:401", TestUserContext.TENANT_0, TestUserContext.USER_ADMIN));
+
+        assertEquals("DOCUMENT_PURCHASE_ORDER_GENERATION_DISABLED", error.getCode());
+        verify(procurementSystemTemplateService).ensureCurrentTenantTemplate("PURCHASE_ORDER");
+        verify(persistence).start(any(DocumentGeneration.class));
+        verify(persistence).fail(anyLong(), eq(TestUserContext.TENANT_0),
+                eq("DOCUMENT_PURCHASE_ORDER_GENERATION_DISABLED"));
+    }
+
+    @Test
     void previewingSavedDraftUsesBusinessAuthorizationAndDoesNotPersistGeneration() {
+        when(registry.require("PAYMENT")).thenReturn(provider);
         DocumentTemplate template = new DocumentTemplate();
         template.setBusinessType("PAYMENT");
         DocumentTemplateVersion version = new DocumentTemplateVersion();

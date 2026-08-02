@@ -37,4 +37,21 @@ public interface DocumentGenerationMapper extends BaseMapper<DocumentGeneration>
              ORDER BY f.created_at LIMIT 100
             """)
     List<Long> selectOrphanGeneratedFileIds(@Param("tenantId") Long tenantId);
+
+    @Select("""
+            SELECT g.* FROM biz_document_generation g
+             WHERE g.deleted_flag = 0 AND g.status = 'FAILED'
+               AND g.requested_at < #{cutoff}
+               AND (g.idempotency_key LIKE 'PURCHASE_REQUEST:%:INSTANCE:%'
+                    OR g.idempotency_key LIKE 'PURCHASE_ORDER:%:INSTANCE:%'
+                    OR g.idempotency_key LIKE 'AUTO_RETRY:%')
+               AND NOT EXISTS (
+                   SELECT 1 FROM biz_document_generation child
+                    WHERE child.tenant_id = g.tenant_id
+                      AND child.retry_of_generation_id = g.id
+                      AND child.deleted_flag = 0
+               )
+             ORDER BY g.requested_at LIMIT 100
+            """)
+    List<DocumentGeneration> selectAutoRetryCandidates(@Param("cutoff") LocalDateTime cutoff);
 }

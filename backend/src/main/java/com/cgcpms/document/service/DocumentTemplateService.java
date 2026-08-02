@@ -35,7 +35,7 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class DocumentTemplateService {
-    private static final Set<String> BUSINESS_TYPES = Set.of("PAYMENT", "SETTLEMENT");
+    private static final Set<String> BUSINESS_TYPES = Set.of("PAYMENT", "SETTLEMENT", "PURCHASE_REQUEST", "PURCHASE_ORDER", "MATERIAL_RECEIPT");
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{\\{\\s*([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)*)\\s*}}");
     private static final Pattern LOOP = Pattern.compile(
             "\\{\\{#each\\s+([A-Za-z][A-Za-z0-9_]*(?:\\.[A-Za-z0-9_]+)*)\\s*}}(.*?)\\{\\{/each}}",
@@ -471,7 +471,7 @@ public class DocumentTemplateService {
     private String normalizeBusinessType(String value) {
         String normalized = value == null ? "" : value.trim().toUpperCase();
         if (!BUSINESS_TYPES.contains(normalized)) {
-            throw new BusinessException("DOCUMENT_BUSINESS_TYPE_INVALID", "仅支持PAYMENT或SETTLEMENT业务单据");
+            throw new BusinessException("DOCUMENT_BUSINESS_TYPE_INVALID", "不支持该业务单据类型");
         }
         return normalized;
     }

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type {
   CostTargetItemRecord,
+  CostBudgetDraftSaveCommand,
   CostTargetQuery,
   CostTargetRecord,
   CostTargetSaveCommand,
+  ProjectBudgetRecord,
+  BudgetAvailabilityRecord,
   ProjectContextOption,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
@@ -22,23 +25,24 @@ import {
   useToastMessage,
 } from '@/components'
 import {
-  activateCostTarget,
-  createCostTarget,
   deleteCostTarget,
   loadCostSubjectOptions,
   loadCostTarget,
   loadCostTargetItems,
   loadCostTargetPage,
+  loadBudgetAvailability,
+  loadBudgetPage,
   loadProjectContextOptions,
-  saveCostTargetItems,
+  saveCostBudgetDraft,
   submitCostTarget,
-  updateCostTarget,
 } from '@/services/commercial'
 import type { CostSubjectOption } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
+import { loadProjectUsers } from '@/services/projects'
 import { useSessionStore } from '@/stores/session'
 
-type PendingAction = 'delete' | 'submit' | 'activate' | null
+type PendingAction = 'delete' | 'submit' | null
+type CostBudgetEditorForm = CostTargetSaveCommand & { projectManagerId: string }
 
 const APPROVAL_OPTIONS = [
   { value: '', label: '全部审批状态' },
@@ -57,15 +61,19 @@ const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
+const { embedded = false } = defineProps<{ embedded?: boolean }>()
 
 const filter = reactive<CostTargetQuery>({ pageNo: 1, pageSize: 10 })
 const records = ref<CostTargetRecord[]>([])
 const total = ref(0)
 const projects = ref<ProjectContextOption[]>([])
 const costSubjects = ref<CostSubjectOption[]>([])
+const responsibleUsers = ref<Array<{ value: string; label: string }>>([])
 const detail = ref<CostTargetRecord | null>(null)
 const items = ref<CostTargetItemRecord[]>([])
-const form = reactive<CostTargetSaveCommand>(emptyForm())
+const executionBudget = ref<ProjectBudgetRecord | null>(null)
+const budgetAvailability = ref<BudgetAvailabilityRecord[]>([])
+const form = reactive<CostBudgetEditorForm>(emptyForm())
 const loading = ref(false)
 const detailLoading = ref(false)
 const actionBusy = ref(false)
@@ -73,7 +81,7 @@ const errorMessage = ref('')
 const successMessage = useToastMessage()
 
 watch(errorMessage, (message) => {
-  if (message) showToast('error', '目标成本操作未完成', message)
+  if (message) showToast('error', '项目成本预算操作未完成', message)
 })
 const detailOpen = ref(false)
 const pendingAction = ref<PendingAction>(null)
@@ -95,7 +103,7 @@ const canAdd = computed(() => session.hasPermission('cost:target:add'))
 const canEdit = computed(() => session.hasPermission('cost:target:edit'))
 const canDelete = computed(() => session.hasPermission('cost:target:delete'))
 const canSubmit = computed(() => session.hasPermission('cost:target:submit'))
-const canActivate = computed(() => session.hasPermission('cost:target:activate'))
+const canSaveDraft = computed(() => (mode.value === 'create' ? canAdd.value : canEdit.value))
 const editable = computed(
   () =>
     mode.value === 'create' ||
@@ -128,14 +136,18 @@ const costSubjectLabel = (id: string, index: number) => {
     ? `${subject.subjectCode} · ${subject.subjectName}`
     : `成本科目名称缺失（第 ${index + 1} 行）`
 }
+const availabilityBySubject = computed(
+  () => new Map(budgetAvailability.value.map((row) => [row.costSubjectId, row])),
+)
 
 function projectLabel(projectId?: string | null): string {
   return projects.value.find((project) => project.id === projectId)?.projectName ?? '项目名称缺失'
 }
 
-function emptyForm(): CostTargetSaveCommand {
+function emptyForm(): CostBudgetEditorForm {
   return {
     projectId: '',
+    projectManagerId: '',
     versionNo: '',
     versionName: '',
     totalTargetAmount: '',
@@ -182,9 +194,10 @@ function hydrateFilter(): void {
 
 async function replaceQuery(): Promise<boolean> {
   const location = {
-    path: '/cost-target/index',
+    path: route.path === '/cost-budget' ? '/cost-budget' : '/cost-target/index',
     query: {
       ...route.query,
+      view: undefined,
       versionNo: filter.versionNo?.trim() || undefined,
       approvalStatus: filter.approvalStatus || undefined,
       isActive:
@@ -212,6 +225,19 @@ async function loadProjects(): Promise<void> {
     if (projectController !== controller) return
     projects.value = value
     costSubjects.value = subjects
+    if (mode.value === 'list') {
+      responsibleUsers.value = []
+      return
+    }
+    const users = await loadProjectUsers(controller.signal)
+    if (projectController !== controller) return
+    responsibleUsers.value = users.records
+      .filter((user) => user.status === 'ENABLE')
+      .map((user) => ({ value: user.id, label: user.realName || user.username }))
+    if (form.projectId && !form.projectManagerId) {
+      form.projectManagerId =
+        projects.value.find((project) => project.id === form.projectId)?.projectManagerId ?? ''
+    }
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '可见项目加载失败')
   }
@@ -235,7 +261,7 @@ async function loadList(preserveNotice = false): Promise<void> {
     if (!controller.signal.aborted && generation === listGeneration) {
       records.value = []
       total.value = 0
-      errorMessage.value = errorText(error, '目标成本加载失败')
+      errorMessage.value = errorText(error, '项目成本预算加载失败')
     }
   } finally {
     if (generation === listGeneration) loading.value = false
@@ -257,8 +283,22 @@ async function loadDetail(id: string, preserveNotice = false): Promise<void> {
     if (generation !== detailGeneration) return
     detail.value = target
     items.value = targetItems.map((item) => ({ ...item }))
+    executionBudget.value = null
+    budgetAvailability.value = []
+    if (target.isActive === 1 && session.hasPermission('budget:query')) {
+      const page = await loadBudgetPage(
+        { pageNo: 1, pageSize: 100, projectId: target.projectId, status: 'ACTIVE' },
+        controller.signal,
+      )
+      const budget = page.records.find((row) => row.sourceCostTargetId === target.id) ?? null
+      executionBudget.value = budget
+      if (budget)
+        budgetAvailability.value = await loadBudgetAvailability(budget.id, controller.signal)
+    }
     Object.assign(form, {
       projectId: target.projectId,
+      projectManagerId:
+        projects.value.find((project) => project.id === target.projectId)?.projectManagerId ?? '',
       versionNo: target.versionNo,
       versionName: target.versionName,
       totalTargetAmount: target.totalTargetAmount,
@@ -272,7 +312,9 @@ async function loadDetail(id: string, preserveNotice = false): Promise<void> {
     if (!controller.signal.aborted && generation === detailGeneration) {
       detail.value = null
       items.value = []
-      errorMessage.value = errorText(error, '目标成本详情加载失败')
+      executionBudget.value = null
+      budgetAvailability.value = []
+      errorMessage.value = errorText(error, '项目成本预算详情加载失败')
     }
   } finally {
     if (generation === detailGeneration) detailLoading.value = false
@@ -301,6 +343,8 @@ function closeDetail(): void {
   detailOpen.value = false
   detail.value = null
   items.value = []
+  executionBudget.value = null
+  budgetAvailability.value = []
 }
 
 function requireDecimal(value: string | null | undefined, label: string): string {
@@ -310,29 +354,31 @@ function requireDecimal(value: string | null | undefined, label: string): string
   return normalized
 }
 
-function command(): CostTargetSaveCommand {
-  if (!form.projectId.trim() || !form.versionNo.trim() || !form.versionName.trim()) {
-    throw new TypeError('项目、版本号和版本名称不能为空')
+function command(): CostBudgetDraftSaveCommand {
+  if (
+    !form.projectId.trim() ||
+    !form.projectManagerId.trim() ||
+    !form.versionNo.trim() ||
+    !form.versionName.trim()
+  ) {
+    throw new TypeError('项目、项目经理、版本号和版本名称不能为空')
   }
   return {
     projectId: form.projectId.trim(),
+    projectManagerId: form.projectManagerId.trim(),
     versionNo: form.versionNo.trim(),
     versionName: form.versionName.trim(),
-    totalTargetAmount: requireDecimal(form.totalTargetAmount, '目标成本总额'),
-    totalBidCostAmount: requireDecimal(form.totalBidCostAmount, '投标成本总额'),
-    totalResponsibilityAmount: requireDecimal(form.totalResponsibilityAmount, '责任成本总额'),
     effectiveDate: form.effectiveDate || null,
     version: form.version ?? null,
     remark: form.remark?.trim() || null,
+    items: cleanItems(),
   }
 }
 
-function versionOf(): string | number {
-  const version = detail.value?.version
-  if (version === null || version === undefined || String(version).trim() === '') {
-    throw new TypeError('缺少最新版本，请刷新后重试')
-  }
-  return version
+function selectProject(projectId: string): void {
+  form.projectId = projectId
+  form.projectManagerId =
+    projects.value.find((project) => project.id === projectId)?.projectManagerId ?? ''
 }
 
 async function saveHeader(): Promise<void> {
@@ -340,22 +386,31 @@ async function saveHeader(): Promise<void> {
   actionBusy.value = true
   resetNotices()
   try {
-    const payload = command()
+    await saveCostBudgetDraft(mode.value === 'create' ? null : routeId.value, command())
     if (mode.value === 'create') {
-      const id = await createCostTarget(payload)
-      successMessage.value = '目标成本版本已创建。'
-      await router.replace({ path: `/cost-target/${id}/edit`, query: route.query })
+      successMessage.value = '项目成本预算已创建。'
+      await router.replace({
+        path: '/cost-target/index',
+        query: { ...route.query, projectId: form.projectId },
+      })
       return
     }
-    await updateCostTarget(routeId.value, payload)
     await loadDetail(routeId.value, true)
-    successMessage.value = '目标成本已保存，并已刷新最新数据。'
+    successMessage.value = '项目成本预算已保存，并已刷新服务端合计。'
   } catch (error) {
-    errorMessage.value = errorText(error, '目标成本保存失败')
+    errorMessage.value = errorText(error, '项目成本预算保存失败')
     if (mode.value === 'edit' && routeId.value) await loadDetail(routeId.value, true)
   } finally {
     actionBusy.value = false
   }
+}
+
+function closeEditor(): void {
+  if (actionBusy.value) return
+  void router.push({
+    path: '/cost-target/index',
+    query: { ...route.query, projectId: form.projectId || undefined },
+  })
 }
 
 function cleanItems(): CostTargetItemRecord[] {
@@ -374,24 +429,6 @@ function cleanItems(): CostTargetItemRecord[] {
   }))
 }
 
-async function saveItems(): Promise<void> {
-  if (actionBusy.value || !editable.value || !canEdit.value) return
-  actionBusy.value = true
-  resetNotices()
-  try {
-    const payload = cleanItems()
-    if (payload.some((item) => !item.costSubjectId)) throw new TypeError('成本科目不能为空')
-    await saveCostTargetItems(routeId.value, payload, versionOf())
-    await loadDetail(routeId.value, true)
-    successMessage.value = '目标成本明细已保存。'
-  } catch (error) {
-    errorMessage.value = errorText(error, '目标成本明细保存失败')
-    await loadDetail(routeId.value, true)
-  } finally {
-    actionBusy.value = false
-  }
-}
-
 function requestAction(action: Exclude<PendingAction, null>, record?: CostTargetRecord): void {
   if (record) detail.value = record
   pendingAction.value = action
@@ -408,7 +445,6 @@ async function confirmAction(): Promise<void> {
     if (version === null || version === undefined) throw new TypeError('缺少最新版本，请刷新后重试')
     if (action === 'delete') await deleteCostTarget(record.id, version)
     if (action === 'submit') await submitCostTarget(record.id, version)
-    if (action === 'activate') await activateCostTarget(record.id, version)
     pendingAction.value = null
     if (mode.value === 'list') {
       closeDetail()
@@ -418,14 +454,9 @@ async function confirmAction(): Promise<void> {
     } else {
       await loadDetail(record.id, true)
     }
-    successMessage.value =
-      action === 'delete'
-        ? '目标成本已删除。'
-        : action === 'submit'
-          ? '目标成本已提交审批。'
-          : '目标成本已激活。'
+    successMessage.value = action === 'delete' ? '项目成本预算已删除。' : '项目成本预算已提交审批。'
   } catch (error) {
-    errorMessage.value = errorText(error, '目标成本操作失败')
+    errorMessage.value = errorText(error, '项目成本预算操作失败')
     pendingAction.value = null
     if (mode.value === 'list') await loadList(true)
     else await loadDetail(record.id, true)
@@ -442,6 +473,13 @@ function updateItem(index: number, key: keyof CostTargetItemRecord, value: strin
 
 function approvalLabel(status: string): string {
   return APPROVAL_OPTIONS.find((option) => option.value === status)?.label ?? status
+}
+
+function budgetStatusLabel(status: string): string {
+  return (
+    { DRAFT: '草稿', ACTIVE: '已启用', SUPERSEDED: '已替代', CLOSED: '已关闭' }[status] ??
+    '未知状态'
+  )
 }
 
 function approvalTone(status: string): 'neutral' | 'info' | 'success' | 'warning' {
@@ -461,8 +499,9 @@ watch(
         projectId: typeof route.query.projectId === 'string' ? route.query.projectId : '',
       })
       detail.value = null
-      items.value = []
+      items.value = [blankItem()]
       resetNotices()
+      if (canQuery.value) void loadList()
     } else void loadDetail(routeId.value)
   },
   { immediate: true },
@@ -478,15 +517,15 @@ onBeforeUnmount(() => {
 <template>
   <div class="cost-target-page">
     <V2PageState
-      v-if="mode === 'list' && !canQuery"
+      v-if="(mode === 'list' && !canQuery) || (mode === 'create' && !canAdd)"
       code="403"
-      title="无权访问目标成本"
+      title="无权访问项目成本预算"
       description="当前账号没有访问权限，页面未加载业务数据。"
       kind="error"
     />
     <template v-else>
-      <template v-if="mode === 'list'">
-        <V2Card title="目标成本版本" :heading-level="1">
+      <template v-if="mode === 'list' || (mode === 'create' && canQuery)">
+        <V2Card title="项目成本预算版本" :heading-level="embedded ? 2 : 1">
           <template #actions>
             <form class="cost-target-page__filters" @submit.prevent="query">
               <V2Input
@@ -529,18 +568,18 @@ onBeforeUnmount(() => {
         </V2Card>
         <V2PageState
           v-if="loading && !records.length"
-          title="正在加载目标成本"
-          description="正在读取当前项目的目标成本版本。"
+          title="正在加载项目成本预算"
+          description="正在读取当前项目的成本预算版本。"
           kind="loading"
         />
         <V2PageState
           v-else-if="!records.length && !errorMessage"
-          title="暂无目标成本"
+          title="暂无项目成本预算"
           description="当前筛选条件下没有可访问版本。"
         />
         <V2Card v-else-if="records.length">
           <div class="cost-target-page__table-wrap" :aria-busy="loading">
-            <table class="v2-table--top" aria-label="目标成本版本列表">
+            <table class="v2-table--top" aria-label="项目成本预算版本列表">
               <thead>
                 <tr>
                   <th>版本</th>
@@ -608,16 +647,6 @@ onBeforeUnmount(() => {
                       >
                       <V2Button
                         v-if="
-                          canActivate &&
-                          record.approvalStatus === 'APPROVED' &&
-                          record.isActive !== 1
-                        "
-                        size="small"
-                        @click="requestAction('activate', record)"
-                        >激活</V2Button
-                      >
-                      <V2Button
-                        v-if="
                           canDelete &&
                           record.isActive !== 1 &&
                           ['DRAFT', 'REJECTED'].includes(record.approvalStatus)
@@ -634,7 +663,7 @@ onBeforeUnmount(() => {
             </table>
           </div>
           <template #footer>
-            <nav class="cost-target-page__pager" aria-label="目标成本分页">
+            <nav class="cost-target-page__pager" aria-label="项目成本预算分页">
               <span>共 {{ total }} 条</span
               ><V2Button
                 size="small"
@@ -655,204 +684,249 @@ onBeforeUnmount(() => {
         </V2Card>
       </template>
 
-      <template v-else>
+      <component
+        :is="mode === 'create' ? V2Dialog : 'div'"
+        v-if="mode === 'create' || mode === 'edit'"
+        v-bind="
+          mode === 'create'
+            ? {
+                open: true,
+                title: '新建项目成本预算',
+                panelClass: 'v2-dialog-wide cost-target-page__editor-dialog',
+                closeOnBackdrop: true,
+              }
+            : {}
+        "
+        @close="closeEditor"
+      >
         <V2PageState
           v-if="detailLoading"
-          title="正在加载目标成本详情"
-          description="正在读取目标成本版本和科目明细。"
+          title="正在加载项目成本预算详情"
+          description="正在读取项目成本预算版本和科目明细。"
           kind="loading"
         />
-        <template v-else-if="mode === 'create' || detail">
-          <V2Card
-            :title="mode === 'create' ? '新建目标成本版本' : '编辑目标成本版本'"
-            :heading-level="1"
-          />
-          <V2Card title="版本信息">
-            <form class="cost-target-page__form" @submit.prevent="saveHeader">
-              <V2Select
-                v-model="form.projectId"
-                label="项目"
-                :options="projectOptions"
-                required
-                :disabled="actionBusy || mode === 'edit'"
-              />
-              <V2Input
-                v-model="form.versionNo"
-                label="版本号"
-                required
-                :disabled="actionBusy || !editable"
-              />
-              <V2Input
-                v-model="form.versionName"
-                label="版本名称"
-                required
-                :disabled="actionBusy || !editable"
-              />
-              <V2Input
-                v-model="form.totalTargetAmount"
-                label="目标成本总额"
-                required
-                :disabled="actionBusy || !editable"
-              />
-              <V2Input
-                v-model="form.totalBidCostAmount"
-                label="投标成本总额"
-                required
-                :disabled="actionBusy || !editable"
-              />
-              <V2Input
-                v-model="form.totalResponsibilityAmount"
-                label="责任成本总额"
-                required
-                :disabled="actionBusy || !editable"
-              />
-              <label class="cost-target-page__native-field"
-                ><span>生效日期</span
-                ><input
-                  v-model="form.effectiveDate"
-                  type="date"
-                  :disabled="actionBusy || !editable"
-              /></label>
-              <label class="cost-target-page__native-field"
-                ><span>备注</span
-                ><textarea
-                  v-model="form.remark"
-                  maxlength="500"
-                  :disabled="actionBusy || !editable"
-                ></textarea>
-              </label>
-              <div class="cost-target-page__actions">
-                <V2Button v-if="editable" type="submit" :loading="actionBusy">{{
-                  mode === 'create' ? '创建' : '保存版本'
-                }}</V2Button>
+        <V2Card
+          v-else-if="mode === 'create' || detail"
+          :title="mode === 'create' ? '成本预算信息' : '编辑项目成本预算'"
+          :heading-level="mode === 'create' ? 2 : 1"
+        >
+          <form class="cost-target-page__editor" @submit.prevent="saveHeader">
+            <section class="cost-target-page__editor-section" aria-labelledby="cost-budget-version">
+              <h3 id="cost-budget-version">版本信息</h3>
+              <div class="cost-target-page__form">
+                <V2Select
+                  :model-value="form.projectId"
+                  label="项目"
+                  :options="projectOptions"
+                  required
+                  :disabled="actionBusy || mode === 'edit' || !canSaveDraft"
+                  @update:model-value="selectProject"
+                />
+                <V2Select
+                  v-model="form.projectManagerId"
+                  label="项目经理"
+                  :options="responsibleUsers"
+                  required
+                  :disabled="actionBusy || !editable || !canSaveDraft"
+                />
+                <V2Input
+                  v-model="form.versionNo"
+                  label="版本号"
+                  required
+                  :disabled="actionBusy || !editable || !canSaveDraft"
+                />
+                <V2Input
+                  v-model="form.versionName"
+                  label="版本名称"
+                  required
+                  :disabled="actionBusy || !editable || !canSaveDraft"
+                />
+                <V2Input
+                  v-if="mode === 'edit'"
+                  v-model="form.totalTargetAmount"
+                  label="目标成本合计（服务端）"
+                  disabled
+                />
+                <V2Input
+                  v-if="mode === 'edit'"
+                  v-model="form.totalBidCostAmount"
+                  label="投标成本合计（服务端）"
+                  disabled
+                />
+                <V2Input
+                  v-if="mode === 'edit'"
+                  v-model="form.totalResponsibilityAmount"
+                  label="责任预算合计（服务端）"
+                  disabled
+                />
+                <label class="cost-target-page__native-field"
+                  ><span>生效日期</span
+                  ><input
+                    v-model="form.effectiveDate"
+                    type="date"
+                    :disabled="actionBusy || !editable || !canSaveDraft"
+                /></label>
+              </div>
+            </section>
+
+            <section class="cost-target-page__editor-section" aria-labelledby="cost-budget-lines">
+              <header class="cost-target-page__section-heading">
+                <div>
+                  <h3 id="cost-budget-lines">成本预算明细</h3>
+                  <p>填写科目金额和责任预算；合计由服务端事务计算并回读。</p>
+                </div>
                 <V2Button
+                  v-if="canSaveDraft && editable"
+                  size="small"
                   variant="secondary"
                   :disabled="actionBusy"
-                  @click="
-                    router.push({
-                      path: '/cost-target/index',
-                      query: { projectId: form.projectId },
-                    })
-                  "
-                  >返回列表</V2Button
+                  @click="items = [...items, blankItem()]"
+                  >添加明细</V2Button
                 >
-                <V2Button
-                  v-if="mode === 'edit' && canSubmit && editable"
-                  :disabled="actionBusy"
-                  @click="requestAction('submit')"
-                  >提交审批</V2Button
-                >
-                <V2Button
-                  v-if="
-                    mode === 'edit' &&
-                    canActivate &&
-                    detail?.approvalStatus === 'APPROVED' &&
-                    detail.isActive !== 1
-                  "
-                  :disabled="actionBusy"
-                  @click="requestAction('activate')"
-                  >激活版本</V2Button
-                >
-                <V2Button
-                  v-if="mode === 'edit' && canDelete && editable"
-                  variant="danger"
-                  :disabled="actionBusy"
-                  @click="requestAction('delete')"
-                  >删除版本</V2Button
-                >
-              </div>
-            </form>
-          </V2Card>
-
-          <V2Card
-            v-if="mode === 'edit'"
-            title="目标成本明细"
-            subtitle="金额均按服务端十进制字符串保存，页面不计算业务合计。"
-          >
-            <template #actions
-              ><V2Button
-                v-if="canEdit && editable"
-                size="small"
-                variant="secondary"
-                :disabled="actionBusy"
-                @click="items = [...items, blankItem()]"
-                >添加明细</V2Button
-              ></template
-            >
-            <V2PageState
-              v-if="!items.length && !errorMessage"
-              title="暂无明细"
-              description="草稿或驳回版本可添加明细。"
-            />
-            <div v-else-if="items.length" class="cost-target-page__items">
+              </header>
+              <V2PageState
+                v-if="!items.length && !errorMessage"
+                title="暂无明细"
+                description="草稿或驳回版本可添加明细。"
+              />
               <div
-                v-for="(item, index) in items"
-                :key="item.id || index"
-                class="cost-target-page__item"
+                v-else-if="items.length"
+                class="cost-target-page__table-wrap"
+                role="region"
+                aria-label="成本预算明细编辑表格"
+                tabindex="0"
               >
-                <V2Select
-                  :model-value="item.costSubjectId"
-                  label="成本科目"
-                  :options="costSubjectOptions"
-                  required
-                  :disabled="!canEdit || !editable"
-                  @update:model-value="updateItem(index, 'costSubjectId', $event)"
-                />
-                <V2Input
-                  :model-value="item.targetAmount"
-                  label="目标金额"
-                  required
-                  :disabled="!canEdit || !editable"
-                  @update:model-value="updateItem(index, 'targetAmount', $event)"
-                />
-                <V2Input
-                  :model-value="item.bidCostAmount ?? ''"
-                  label="投标金额"
-                  required
-                  :disabled="!canEdit || !editable"
-                  @update:model-value="updateItem(index, 'bidCostAmount', $event)"
-                />
-                <V2Input
-                  :model-value="item.responsibilityAmount ?? ''"
-                  label="责任金额"
-                  required
-                  :disabled="!canEdit || !editable"
-                  @update:model-value="updateItem(index, 'responsibilityAmount', $event)"
-                />
-                <V2Input
-                  :model-value="item.responsibilityUnit ?? ''"
-                  label="责任单位"
-                  :disabled="!canEdit || !editable"
-                  @update:model-value="updateItem(index, 'responsibilityUnit', $event)"
-                />
-                <V2Button
-                  v-if="canEdit && editable"
-                  size="small"
-                  variant="danger"
-                  :disabled="actionBusy"
-                  @click="items = items.filter((_, itemIndex) => itemIndex !== index)"
-                  >移除</V2Button
-                >
+                <table class="v2-table--top cost-target-page__editor-table">
+                  <thead>
+                    <tr>
+                      <th>成本科目编码/名称<span aria-hidden="true">*</span></th>
+                      <th>目标金额<span aria-hidden="true">*</span></th>
+                      <th>投标金额<span aria-hidden="true">*</span></th>
+                      <th>责任金额<span aria-hidden="true">*</span></th>
+                      <th>责任单位</th>
+                      <th>责任人<span aria-hidden="true">*</span></th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(item, index) in items" :key="item.id || index">
+                      <td>
+                        <V2Select
+                          :model-value="item.costSubjectId"
+                          label="成本科目"
+                          hide-label
+                          :options="costSubjectOptions"
+                          required
+                          :disabled="!canSaveDraft || !editable"
+                          @update:model-value="updateItem(index, 'costSubjectId', $event)"
+                        />
+                      </td>
+                      <td>
+                        <V2Input
+                          :model-value="item.targetAmount"
+                          label="目标金额"
+                          hide-label
+                          required
+                          :disabled="!canSaveDraft || !editable"
+                          @update:model-value="updateItem(index, 'targetAmount', $event)"
+                        />
+                      </td>
+                      <td>
+                        <V2Input
+                          :model-value="item.bidCostAmount ?? ''"
+                          label="投标金额"
+                          hide-label
+                          required
+                          :disabled="!canSaveDraft || !editable"
+                          @update:model-value="updateItem(index, 'bidCostAmount', $event)"
+                        />
+                      </td>
+                      <td>
+                        <V2Input
+                          :model-value="item.responsibilityAmount ?? ''"
+                          label="责任金额"
+                          hide-label
+                          required
+                          :disabled="!canSaveDraft || !editable"
+                          @update:model-value="updateItem(index, 'responsibilityAmount', $event)"
+                        />
+                      </td>
+                      <td>
+                        <V2Input
+                          :model-value="item.responsibilityUnit ?? ''"
+                          label="责任单位"
+                          hide-label
+                          :disabled="!canSaveDraft || !editable"
+                          @update:model-value="updateItem(index, 'responsibilityUnit', $event)"
+                        />
+                      </td>
+                      <td>
+                        <V2Select
+                          :model-value="item.responsibleUserId ?? ''"
+                          label="责任人"
+                          hide-label
+                          :options="responsibleUsers"
+                          required
+                          :disabled="!canSaveDraft || !editable"
+                          @update:model-value="updateItem(index, 'responsibleUserId', $event)"
+                        />
+                      </td>
+                      <td>
+                        <V2Button
+                          v-if="canSaveDraft && editable"
+                          size="small"
+                          variant="danger"
+                          :disabled="actionBusy"
+                          @click="items = items.filter((_, itemIndex) => itemIndex !== index)"
+                          >移除</V2Button
+                        >
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
+            </section>
+
+            <div class="cost-target-page__editor-actions">
+              <V2Button variant="secondary" :disabled="actionBusy" @click="closeEditor">
+                {{ mode === 'create' ? '取消' : '返回列表' }}
+              </V2Button>
+              <V2Button
+                v-if="mode === 'edit' && canSubmit && editable"
+                :disabled="actionBusy"
+                @click="requestAction('submit')"
+                >提交审批</V2Button
+              >
+              <V2Button
+                v-if="mode === 'edit' && canDelete && editable"
+                variant="danger"
+                :disabled="actionBusy"
+                @click="requestAction('delete')"
+                >删除版本</V2Button
+              >
+              <V2Button
+                v-if="items.length && editable && canSaveDraft"
+                type="submit"
+                :loading="actionBusy"
+              >
+                {{ mode === 'create' ? '创建项目成本预算' : '保存项目成本预算' }}
+              </V2Button>
             </div>
-            <template v-if="items.length && canEdit && editable" #footer
-              ><V2Button :loading="actionBusy" @click="saveItems">保存明细</V2Button></template
-            >
-          </V2Card>
-        </template>
-      </template>
+          </form>
+        </V2Card>
+      </component>
 
       <V2Dialog
         :open="detailOpen"
-        title="目标成本详情"
+        title="项目成本预算详情"
         panel-class="v2-detail-dialog"
         :close-on-backdrop="true"
         @close="closeDetail"
       >
         <V2PageState
           v-if="detailLoading"
-          title="正在加载目标成本详情"
-          description="正在读取目标成本版本和科目明细。"
+          title="正在加载项目成本预算详情"
+          description="正在读取项目成本预算版本和科目明细。"
           kind="loading"
         />
         <div v-else-if="detail" class="cost-target-page__detail">
@@ -885,6 +959,12 @@ onBeforeUnmount(() => {
               <dt>活动版本</dt>
               <dd>{{ detail.isActive === 1 ? '是' : '否' }}</dd>
             </div>
+            <div v-if="executionBudget">
+              <dt>执行预算</dt>
+              <dd>
+                {{ executionBudget.budgetCode }} / {{ budgetStatusLabel(executionBudget.status) }}
+              </dd>
+            </div>
             <div>
               <dt>备注</dt>
               <dd>{{ detail.remark || '—' }}</dd>
@@ -894,13 +974,13 @@ onBeforeUnmount(() => {
           <V2PageState
             v-if="!items.length && !errorMessage"
             title="暂无明细"
-            description="当前目标成本版本尚未录入科目明细。"
+            description="当前项目成本预算版本尚未录入科目明细。"
           />
           <div
             v-else-if="items.length"
             class="cost-target-page__table-wrap"
             role="region"
-            aria-label="目标成本明细表格"
+            aria-label="项目成本预算明细表格"
             tabindex="0"
           >
             <table class="v2-table--top">
@@ -910,6 +990,9 @@ onBeforeUnmount(() => {
                   <th>目标金额</th>
                   <th>投标金额</th>
                   <th>责任金额</th>
+                  <th v-if="executionBudget">已占用</th>
+                  <th v-if="executionBudget">已消耗</th>
+                  <th v-if="executionBudget">可用额</th>
                 </tr>
               </thead>
               <tbody>
@@ -918,6 +1001,15 @@ onBeforeUnmount(() => {
                   <td>{{ item.targetAmount }}</td>
                   <td>{{ item.bidCostAmount }}</td>
                   <td>{{ item.responsibilityAmount }}</td>
+                  <td v-if="executionBudget">
+                    {{ availabilityBySubject.get(item.costSubjectId)?.reservedAmount ?? '0.00' }}
+                  </td>
+                  <td v-if="executionBudget">
+                    {{ availabilityBySubject.get(item.costSubjectId)?.consumedAmount ?? '0.00' }}
+                  </td>
+                  <td v-if="executionBudget">
+                    {{ availabilityBySubject.get(item.costSubjectId)?.availableAmount ?? '0.00' }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -927,25 +1019,13 @@ onBeforeUnmount(() => {
 
       <V2ConfirmDialog
         :open="pendingAction !== null"
-        :title="
-          pendingAction === 'delete'
-            ? '删除目标成本'
-            : pendingAction === 'submit'
-              ? '提交目标成本'
-              : '激活目标成本'
-        "
+        :title="pendingAction === 'delete' ? '删除项目成本预算' : '提交项目成本预算'"
         :description="
           pendingAction === 'delete'
             ? '只能删除未激活的草稿或驳回版本，此操作不可撤销。'
             : '操作将使用当前服务端版本做并发校验。'
         "
-        :confirm-text="
-          pendingAction === 'delete'
-            ? '确认删除'
-            : pendingAction === 'submit'
-              ? '确认提交'
-              : '确认激活'
-        "
+        :confirm-text="pendingAction === 'delete' ? '确认删除' : '确认提交'"
         :danger="pendingAction === 'delete'"
         :loading="actionBusy"
         @close="pendingAction = null"
@@ -957,24 +1037,71 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .cost-target-page,
-.cost-target-page__detail,
-.cost-target-page__items {
+.cost-target-page__detail {
   display: grid;
   gap: var(--v2-space-4);
 }
 .cost-target-page__filters,
 .cost-target-page__form {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--v2-space-3);
   align-items: end;
 }
 .cost-target-page__filters {
   grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
 }
+.cost-target-page__editor,
+.cost-target-page__editor-section {
+  display: grid;
+  gap: var(--v2-space-4);
+}
+.cost-target-page__editor-section + .cost-target-page__editor-section {
+  padding-top: var(--v2-space-5);
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
+.cost-target-page__editor-section h3,
+.cost-target-page__editor-section p {
+  margin: 0;
+}
+.cost-target-page__section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-3);
+}
+.cost-target-page__section-heading p {
+  margin-top: var(--v2-space-1);
+  color: var(--v2-color-text-secondary);
+}
+.cost-target-page__editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--v2-space-2);
+  padding-top: var(--v2-space-4);
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
 .cost-target-page__table-wrap {
   max-width: 100%;
   overflow-x: auto;
+}
+.cost-target-page__editor-table {
+  width: 100%;
+  min-width: 56rem;
+  table-layout: fixed;
+}
+.cost-target-page__editor-table th:first-child {
+  width: 22%;
+}
+.cost-target-page__editor-table th:last-child {
+  width: 6%;
+}
+.cost-target-page__editor-table th span {
+  color: var(--v2-color-danger);
+}
+.cost-target-page__editor-table .v2-field {
+  min-width: 0;
 }
 table {
   min-width: 52rem;
@@ -993,28 +1120,14 @@ td small {
 .cost-target-page__pager {
   justify-content: flex-end;
 }
-.cost-target-page__item {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--v2-space-3);
-  align-items: end;
-  padding: var(--v2-space-3);
-  border: var(--v2-border-width) solid var(--v2-color-border);
-  border-radius: var(--v2-radius-md);
-}
 .cost-target-page__native-field {
   display: grid;
   gap: var(--v2-space-1);
   color: var(--v2-color-text-secondary);
 }
-.cost-target-page__native-field input,
-.cost-target-page__native-field textarea {
+.cost-target-page__native-field input {
   min-height: var(--v2-control-height-md);
   padding: var(--v2-space-2) var(--v2-space-3);
-}
-.cost-target-page__native-field textarea {
-  min-height: var(--v2-control-height-textarea);
-  resize: vertical;
 }
 dl {
   display: grid;
@@ -1028,15 +1141,13 @@ dd {
 }
 @media (max-width: 64rem) {
   .cost-target-page__filters,
-  .cost-target-page__form,
-  .cost-target-page__item {
+  .cost-target-page__form {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 40rem) {
   .cost-target-page__filters,
-  .cost-target-page__form,
-  .cost-target-page__item {
+  .cost-target-page__form {
     grid-template-columns: 1fr;
   }
 }

@@ -40,6 +40,7 @@ class ProjectApprovalWorkflowHandlerTest {
         context.getInstance().setInstanceStatus("APPROVED");
         handler.onApproved(context);
         assertEquals("APPROVED", projectMapper.selectById(project.getId()).getApprovalStatus());
+        assertEquals("PREPARING", projectMapper.selectById(project.getId()).getStatus());
     }
 
     @Test
@@ -54,6 +55,7 @@ class ProjectApprovalWorkflowHandlerTest {
         handler.onApproved(context);
 
         assertEquals("APPROVED", projectMapper.selectById(project.getId()).getApprovalStatus());
+        assertEquals("PREPARING", projectMapper.selectById(project.getId()).getStatus());
     }
 
     private PmProject project(String approvalStatus) {

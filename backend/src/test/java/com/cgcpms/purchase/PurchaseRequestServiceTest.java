@@ -171,6 +171,7 @@ class PurchaseRequestServiceTest {
         item.setEstimatedUnitPrice(new BigDecimal("10.00"));
         item.setEstimatedAmount(new BigDecimal("1000.00"));
         item.setPlannedDate(LocalDate.now().plusDays(7));
+        item.setUseLocation("主体结构");
         item.setUnit("m³");
         return item;
     }
@@ -199,19 +200,64 @@ class PurchaseRequestServiceTest {
     }
 
     @Test
+    @DisplayName("创建采购申请时申请头与多明细同事务保存")
+    void createRequestWithItemsIsAtomic() {
+        MatPurchaseRequest request = completeRequestHeader();
+        request.setRemark("atomic-" + System.nanoTime());
+        MatPurchaseRequestItem invalid = completeRequestItem();
+        invalid.setQuantity(BigDecimal.ZERO);
+
+        assertThrows(BusinessException.class,
+                () -> requestService.create(request, List.of(completeRequestItem(), invalid)));
+
+        assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mat_purchase_request WHERE tenant_id=? AND remark=? AND deleted_flag=0",
+                Integer.class, TENANT_ID, request.getRemark()));
+    }
+
+    @Test
     @Transactional
-    @DisplayName("采购申请列表与详情返回明细汇总金额")
-    void purchaseRequestReturnsAggregatedItemAmount() {
+    @DisplayName("创建采购申请忽略新写采购用途")
+    void createIgnoresPurpose() {
+        MatPurchaseRequest request = completeRequestHeader();
+        Long id = requestService.create(request, List.of(completeRequestItem()));
+
+        assertNull(requestService.getById(id).getPurpose());
+        assertEquals(1, requestService.getItems(id).size());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("编辑采购申请忽略新用途且保留历史用途可读")
+    void updatePreservesHistoricalPurpose() {
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setProjectId(PROJECT_ID);
+        Long id = requestService.create(request);
+        jdbcTemplate.update("UPDATE mat_purchase_request SET purpose='历史用途' WHERE id=?", id);
+
+        MatPurchaseRequest update = new MatPurchaseRequest();
+        update.setId(id);
+        update.setProjectId(PROJECT_ID);
+        update.setPurpose("新用途应忽略");
+        requestService.update(update);
+
+        assertEquals("历史用途", requestService.getById(id).getPurpose());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("采购申请新流程不返回估算金额")
+    void purchaseRequestDoesNotExposeEstimatedAmount() {
         Long id = requestService.create(completeRequestHeader());
         requestService.saveItemsBatch(id, List.of(completeRequestItem()));
 
-        assertEquals("1000.00", requestService.getById(id).getTotalAmount());
+        assertEquals("0", requestService.getById(id).getTotalAmount());
         MatPurchaseRequestVO row = requestService.getPage(1, 20, PROJECT_ID, null, null, null)
                 .getRecords().stream()
                 .filter(item -> id.toString().equals(item.getId()))
                 .findFirst()
                 .orElseThrow();
-        assertEquals("1000.00", row.getTotalAmount());
+        assertEquals("0", row.getTotalAmount());
     }
 
     @Test
@@ -258,15 +304,14 @@ class PurchaseRequestServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("RED→GREEN: 创建采购申请时合同必须属于同一项目")
-    void createRejectsContractFromDifferentProject() {
+    @DisplayName("创建采购申请忽略客户端合同字段")
+    void createIgnoresContract() {
         MatPurchaseRequest request = new MatPurchaseRequest();
         request.setProjectId(200L);
         request.setContractId(30001L);
 
-        BusinessException ex = assertThrows(BusinessException.class,
-                () -> requestService.create(request));
-        assertEquals("CONTRACT_PROJECT_MISMATCH", ex.getCode());
+        Long id = requestService.create(request);
+        assertNull(requestService.getById(id).getContractId());
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -627,6 +672,23 @@ class PurchaseRequestServiceTest {
             requestService.submitForApproval(requestId);
         }, "无明细时应抛异常");
         assertEquals("PURCHASE_REQUEST_NO_ITEMS", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("提交审批逐行要求使用部位且不再要求采购用途")
+    void submitRequiresUseLocationInsteadOfPurpose() {
+        MatPurchaseRequest request = new MatPurchaseRequest();
+        request.setProjectId(PROJECT_ID);
+        Long requestId = requestService.create(request);
+        attachCleanFile("PURCHASE_REQUEST", requestId);
+        MatPurchaseRequestItem item = completeRequestItem();
+        item.setUseLocation(" ");
+        requestService.saveItemsBatch(requestId, List.of(item));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> requestService.submitForApproval(requestId));
+        assertEquals("PURCHASE_REQUEST_USE_LOCATION_REQUIRED", ex.getCode());
     }
 
     // ═══════════════════════════════════════════════════════════

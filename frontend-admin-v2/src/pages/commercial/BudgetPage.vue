@@ -40,6 +40,7 @@ import { useSessionStore } from '@/stores/session'
 const route = useRoute()
 const router = useRouter()
 const session = useSessionStore()
+const { embedded = false } = defineProps<{ embedded?: boolean }>()
 const filter = reactive<BudgetQuery>({ pageNo: 1, pageSize: 10 })
 const records = ref<ProjectBudgetRecord[]>([])
 const total = ref(0)
@@ -173,10 +174,12 @@ async function load() {
 }
 async function query() {
   filter.pageNo = 1
+  const unified = route.path === '/cost-budget'
   await router.replace({
-    path: '/budget',
+    path: unified ? '/cost-budget' : '/budget',
     query: {
       ...route.query,
+      view: unified ? 'budget' : route.query.view,
       status: filter.status || undefined,
       pageNo: undefined,
     },
@@ -311,7 +314,7 @@ onBeforeUnmount(() => {
       description="系统未加载预算业务数据。"
       kind="forbidden"
     /><template v-else
-      ><V2Card title="项目预算" :heading-level="1"
+      ><V2Card title="项目预算" :heading-level="embedded ? 2 : 1"
         ><template #actions
           ><div class="filters">
             <V2Select

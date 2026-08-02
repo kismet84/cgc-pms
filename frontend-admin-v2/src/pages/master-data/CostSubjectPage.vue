@@ -49,7 +49,6 @@ import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
 
 type Section = 'taxonomy' | 'rules' | 'scope' | 'trace'
-type FlatSubject = CostSubjectRecord & { depth: number }
 
 const route = useRoute()
 const session = useSessionStore()
@@ -84,12 +83,19 @@ const canBidTransfer = computed(() => can('cost:subject:bid-transfer'))
 const canFinanceAllocate = computed(() => can('cost:subject:finance-allocate'))
 
 const subjects = ref<CostSubjectRecord[]>([])
-const treeExpanded = ref(true)
+const selectedFirstLevelId = ref('')
 const selectedSubjectId = ref('')
-const selectedSubject = computed(
-  () => flatSubjects.value.find((item) => item.id === selectedSubjectId.value) ?? null,
+const standardCostRoot = computed(
+  () => subjects.value.find((item) => item.subjectCode === '5401') ?? null,
 )
-const flatSubjects = computed(() => flattenSubjects(subjects.value))
+const firstLevelSubjects = computed(() => standardCostRoot.value?.children ?? [])
+const selectedFirstLevel = computed(
+  () => firstLevelSubjects.value.find((item) => item.id === selectedFirstLevelId.value) ?? null,
+)
+const secondLevelSubjects = computed(() => selectedFirstLevel.value?.children ?? [])
+const selectedSubject = computed(
+  () => secondLevelSubjects.value.find((item) => item.id === selectedSubjectId.value) ?? null,
+)
 const subjectDialog = ref(false)
 const subjectMode = ref<'create' | 'edit'>('create')
 const subjectDeleteTarget = ref<CostSubjectRecord | null>(null)
@@ -242,11 +248,18 @@ function messageOf(value: unknown): string {
   return isApiClientError(value) ? value.message : '请求失败，请稍后重试'
 }
 
-function flattenSubjects(nodes: CostSubjectRecord[], depth = 0): FlatSubject[] {
-  return nodes.flatMap((node) => [
-    { ...node, depth },
-    ...flattenSubjects(node.children ?? [], depth + 1),
-  ])
+function normalizeTaxonomySelection(): void {
+  if (!firstLevelSubjects.value.some((item) => item.id === selectedFirstLevelId.value)) {
+    selectedFirstLevelId.value = firstLevelSubjects.value[0]?.id ?? ''
+  }
+  if (!secondLevelSubjects.value.some((item) => item.id === selectedSubjectId.value)) {
+    selectedSubjectId.value = secondLevelSubjects.value[0]?.id ?? ''
+  }
+}
+
+function selectFirstLevel(subject: CostSubjectRecord): void {
+  selectedFirstLevelId.value = subject.id
+  selectedSubjectId.value = subject.children?.[0]?.id ?? ''
 }
 
 function clearSubjectForm(): void {
@@ -360,12 +373,7 @@ async function confirmSubjectDelete(): Promise<void> {
 
 async function loadTaxonomy(signal?: AbortSignal): Promise<void> {
   subjects.value = await loadCostSubjectTree(signal)
-  if (
-    selectedSubjectId.value &&
-    !flattenSubjects(subjects.value).some((item) => item.id === selectedSubjectId.value)
-  ) {
-    selectedSubjectId.value = ''
-  }
+  normalizeTaxonomySelection()
 }
 
 async function loadRules(signal?: AbortSignal): Promise<void> {
@@ -782,132 +790,168 @@ onBeforeUnmount(() => controller?.abort())
     </V2PageState>
 
     <template v-else-if="section === 'taxonomy'">
-      <div class="cost-subject-page__columns" :class="{ 'is-tree-collapsed': !treeExpanded }">
-        <V2Card title="成本域科目树">
-          <template #actions>
-            <V2Cluster>
-              <V2Button v-if="canSubjectAdd" size="small" @click="openSubjectCreate()">
-                新增根科目
-              </V2Button>
+      <V2Card>
+        <div class="cost-subject-page__columns cost-subject-page__taxonomy">
+          <section aria-labelledby="cost-subject-first-level-title">
+            <div class="cost-subject-page__section-heading">
+              <span>
+                <h3 id="cost-subject-first-level-title">1. 一级科目</h3>
+                <small>5401.xx · 共 {{ firstLevelSubjects.length }} 个</small>
+              </span>
               <V2Button
+                v-if="canSubjectAdd && standardCostRoot"
                 size="small"
-                variant="secondary"
-                aria-controls="cost-subject-tree-content"
-                :aria-expanded="treeExpanded"
-                @click="treeExpanded = !treeExpanded"
+                @click="openSubjectCreate(standardCostRoot)"
               >
-                {{ treeExpanded ? '收起科目树' : '展开科目树' }}
+                新增一级科目
               </V2Button>
-            </V2Cluster>
-          </template>
-          <div v-if="treeExpanded" id="cost-subject-tree-content">
+            </div>
             <V2PageState
-              v-if="!flatSubjects.length"
+              v-if="!standardCostRoot"
               kind="empty"
-              title="暂无成本科目"
-              description="可新增根科目，层级与租户由系统校验。"
+              title="缺少标准成本根科目"
+              description="未读取到 5401 标准成本体系。"
             />
-            <div v-else class="cost-subject-page__table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>科目编码</th>
-                    <th>科目名称</th>
-                    <th>类型</th>
-                    <th>状态</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="subject in flatSubjects"
-                    :key="subject.id"
-                    :class="{ 'is-selected': selectedSubjectId === subject.id }"
-                    @click="selectedSubjectId = subject.id"
-                  >
-                    <th scope="row">
-                      <V2Button
-                        size="small"
-                        variant="ghost"
-                        class="cost-subject-page__subject"
-                        :style="{ paddingInlineStart: `${subject.depth * 1.25}rem` }"
-                        @click="selectedSubjectId = subject.id"
-                      >
-                        {{ subject.subjectCode }}
-                      </V2Button>
-                    </th>
-                    <td>{{ subject.subjectName }}</td>
-                    <td>{{ subjectTypeLabel(subject.subjectType) }}</td>
-                    <td>
-                      <V2Badge :tone="subject.status === 'ENABLE' ? 'success' : 'neutral'">
-                        {{ subject.status === 'ENABLE' ? '启用' : '停用' }}
-                      </V2Badge>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div class="cost-subject-page__list">
+              <button
+                v-for="subject in firstLevelSubjects"
+                :key="subject.id"
+                type="button"
+                class="cost-subject-page__list-item"
+                :class="{ 'is-selected': selectedFirstLevelId === subject.id }"
+                :aria-pressed="selectedFirstLevelId === subject.id"
+                @click="selectFirstLevel(subject)"
+              >
+                <span>
+                  <strong>{{ subject.subjectName }}</strong>
+                  <small>{{ subject.subjectCode }}</small>
+                </span>
+                <V2Badge :tone="subject.status === 'ENABLE' ? 'success' : 'neutral'">
+                  {{ subject.status === 'ENABLE' ? '启用' : '停用' }}
+                </V2Badge>
+              </button>
             </div>
-          </div>
-        </V2Card>
+          </section>
 
-        <V2Card title="科目详情">
-          <template #actions>
-            <V2Cluster v-if="selectedSubject">
+          <section aria-labelledby="cost-subject-second-level-title">
+            <div class="cost-subject-page__section-heading">
+              <span>
+                <h3 id="cost-subject-second-level-title">2. 二级科目</h3>
+                <small>5401.xx.xx · 共 {{ secondLevelSubjects.length }} 个</small>
+              </span>
               <V2Button
-                v-if="canSubjectAdd"
+                v-if="canSubjectAdd && selectedFirstLevel"
                 size="small"
-                variant="secondary"
-                @click="openSubjectCreate(selectedSubject)"
+                @click="openSubjectCreate(selectedFirstLevel)"
               >
-                新增子科目
+                新增二级科目
               </V2Button>
-              <V2Button v-if="canSubjectEdit" size="small" @click="openSubjectEdit">编辑</V2Button>
-              <V2Button
-                v-if="canSubjectEdit"
-                size="small"
-                variant="secondary"
-                @click="subjectStatusTarget = selectedSubject"
+            </div>
+            <V2PageState
+              v-if="!selectedFirstLevel"
+              kind="empty"
+              title="请选择一级科目"
+              description="选择后读取所属二级科目。"
+            />
+            <V2PageState
+              v-else-if="!secondLevelSubjects.length"
+              kind="empty"
+              title="暂无二级科目"
+              description="可在当前一级科目下新增。"
+            />
+            <div v-else class="cost-subject-page__list">
+              <button
+                v-for="subject in secondLevelSubjects"
+                :key="subject.id"
+                type="button"
+                class="cost-subject-page__list-item"
+                :class="{ 'is-selected': selectedSubjectId === subject.id }"
+                :aria-pressed="selectedSubjectId === subject.id"
+                @click="selectedSubjectId = subject.id"
               >
-                {{ selectedSubject.status === 'ENABLE' ? '停用' : '启用' }}
-              </V2Button>
-              <V2Button
-                v-if="canSubjectDelete"
-                size="small"
-                variant="danger"
-                @click="subjectDeleteTarget = selectedSubject"
-              >
-                删除
-              </V2Button>
-            </V2Cluster>
-          </template>
-          <dl v-if="selectedSubject" class="cost-subject-page__facts">
-            <div>
-              <dt>编码</dt>
-              <dd>{{ selectedSubject.subjectCode }}</dd>
+                <span>
+                  <strong>{{ subject.subjectName }}</strong>
+                  <small
+                    >{{ subject.subjectCode }} · {{ subjectTypeLabel(subject.subjectType) }}</small
+                  >
+                </span>
+                <V2Badge :tone="subject.status === 'ENABLE' ? 'success' : 'neutral'">
+                  {{ subject.status === 'ENABLE' ? '启用' : '停用' }}
+                </V2Badge>
+              </button>
             </div>
-            <div>
-              <dt>名称</dt>
-              <dd>{{ selectedSubject.subjectName }}</dd>
+          </section>
+
+          <section aria-labelledby="cost-subject-detail-title">
+            <div class="cost-subject-page__section-heading">
+              <h3 id="cost-subject-detail-title">3. 科目详情</h3>
+              <V2Cluster v-if="selectedSubject">
+                <V2Button
+                  v-if="canSubjectAdd"
+                  size="small"
+                  variant="secondary"
+                  @click="openSubjectCreate(selectedSubject)"
+                >
+                  新增子科目
+                </V2Button>
+                <V2Button v-if="canSubjectEdit" size="small" @click="openSubjectEdit"
+                  >编辑</V2Button
+                >
+                <V2Button
+                  v-if="canSubjectEdit"
+                  size="small"
+                  variant="secondary"
+                  @click="subjectStatusTarget = selectedSubject"
+                >
+                  {{ selectedSubject.status === 'ENABLE' ? '停用' : '启用' }}
+                </V2Button>
+                <V2Button
+                  v-if="canSubjectDelete"
+                  size="small"
+                  variant="danger"
+                  @click="subjectDeleteTarget = selectedSubject"
+                >
+                  删除
+                </V2Button>
+              </V2Cluster>
             </div>
-            <div>
-              <dt>类型</dt>
-              <dd>{{ subjectTypeLabel(selectedSubject.subjectType) }}</dd>
-            </div>
-            <div>
-              <dt>层级</dt>
-              <dd>{{ selectedSubject.level }}</dd>
-            </div>
-            <div>
-              <dt>排序</dt>
-              <dd>{{ selectedSubject.sortOrder }}</dd>
-            </div>
-            <div>
-              <dt>末级</dt>
-              <dd>{{ selectedSubject.children?.length ? '否' : '是' }}</dd>
-            </div>
-          </dl>
-          <V2PageState v-else kind="empty" title="请选择科目" description="选择科目后查看详情。" />
-        </V2Card>
-      </div>
+            <template v-if="selectedSubject">
+              <dl class="cost-subject-page__facts">
+                <div>
+                  <dt>编码</dt>
+                  <dd>{{ selectedSubject.subjectCode }}</dd>
+                </div>
+                <div>
+                  <dt>名称</dt>
+                  <dd>{{ selectedSubject.subjectName }}</dd>
+                </div>
+                <div>
+                  <dt>类型</dt>
+                  <dd>{{ subjectTypeLabel(selectedSubject.subjectType) }}</dd>
+                </div>
+                <div>
+                  <dt>层级</dt>
+                  <dd>{{ selectedSubject.level }}</dd>
+                </div>
+                <div>
+                  <dt>排序</dt>
+                  <dd>{{ selectedSubject.sortOrder }}</dd>
+                </div>
+                <div>
+                  <dt>末级</dt>
+                  <dd>{{ selectedSubject.children?.length ? '否' : '是' }}</dd>
+                </div>
+              </dl>
+            </template>
+            <V2PageState
+              v-else
+              kind="empty"
+              title="请选择科目"
+              description="选择科目后查看详情。"
+            />
+          </section>
+        </div>
+      </V2Card>
     </template>
 
     <template v-else-if="section === 'rules'">
@@ -1494,12 +1538,69 @@ onBeforeUnmount(() => controller?.abort())
 
 .cost-subject-page__columns {
   display: grid;
-  grid-template-columns: minmax(20rem, 0.9fr) minmax(0, 1.1fr);
+  grid-template-columns: minmax(13rem, 0.55fr) minmax(20rem, 0.85fr) minmax(24rem, 1.2fr);
   gap: var(--v2-space-4);
 }
 
-.cost-subject-page__columns.is-tree-collapsed {
-  grid-template-columns: 1fr;
+.cost-subject-page__columns > section {
+  min-width: 0;
+}
+
+.cost-subject-page__section-heading,
+.cost-subject-page__list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+}
+
+.cost-subject-page__section-heading {
+  min-height: 2.5rem;
+  margin-bottom: var(--v2-space-3);
+}
+
+.cost-subject-page__section-heading h3 {
+  margin: 0;
+}
+
+.cost-subject-page__section-heading > span,
+.cost-subject-page__list-item small {
+  color: var(--v2-color-text-muted);
+}
+
+.cost-subject-page__list {
+  display: grid;
+  gap: var(--v2-space-2);
+}
+
+.cost-subject-page__list-item {
+  width: 100%;
+  padding: var(--v2-space-3);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+  background: var(--v2-color-surface);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cost-subject-page__list-item:hover,
+.cost-subject-page__list-item.is-selected {
+  border-color: var(--v2-color-primary);
+  background: var(--v2-color-primary-soft);
+}
+
+.cost-subject-page__list-item > span {
+  display: grid;
+  min-width: 0;
+  gap: var(--v2-space-1);
+}
+
+.cost-subject-page__list-item strong,
+.cost-subject-page__list-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cost-subject-page__query,
@@ -1525,15 +1626,6 @@ onBeforeUnmount(() => controller?.abort())
 
 .cost-subject-page__table-wrap table {
   min-width: 46rem;
-}
-
-.cost-subject-page__subject {
-  width: 100%;
-  text-align: left;
-}
-
-tr.is-selected {
-  background: var(--v2-color-primary-soft);
 }
 
 .cost-subject-page__facts {

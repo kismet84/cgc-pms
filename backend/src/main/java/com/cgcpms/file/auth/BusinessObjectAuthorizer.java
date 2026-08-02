@@ -103,8 +103,11 @@ public class BusinessObjectAuthorizer {
         String authority = switch (upper) {
             case "PAYMENT" -> "payment:app:query";
             case "SETTLEMENT" -> "settlement:query";
+            case "PURCHASE_REQUEST" -> "purchase:request:list";
+            case "PURCHASE_ORDER" -> "purchase:order:query";
+            case "MATERIAL_RECEIPT" -> "receipt:query";
             default -> throw new BusinessException("DOCUMENT_BUSINESS_TYPE_INVALID",
-                    "仅支持付款申请或结算单文档");
+                    "不支持该业务单据类型");
         };
         checkAccess(upper, businessId, "读取生成文档", false, authority, authority);
     }

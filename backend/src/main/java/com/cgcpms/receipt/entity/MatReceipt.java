@@ -38,6 +38,11 @@ public class MatReceipt extends BaseEntity {
 
     private String receiptCode;
 
+    /** 系统生成批次号；供应商批次号不进入正式业务模型。 */
+    private String systemBatchNo;
+
+    private String deliveryNoteNo;
+
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate receiptDate;
 

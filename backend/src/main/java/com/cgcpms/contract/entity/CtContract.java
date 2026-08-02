@@ -61,6 +61,12 @@ public class CtContract extends BaseEntity {
     // paidAmount 表示已付累计金额，允许为负以处理退款/冲销业务场景
     private BigDecimal paidAmount;
 
+    /** 已审批合格验收减有效合格品退货的净应付缓存。 */
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal payableAmount;
+
+    private String pricingMode;
+
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal taxRate;
 

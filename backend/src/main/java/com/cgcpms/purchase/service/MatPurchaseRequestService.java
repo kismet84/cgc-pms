@@ -6,7 +6,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
-import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.common.util.DateTimeUtils;
@@ -25,6 +24,8 @@ import com.cgcpms.purchase.vo.MatPurchaseRequestVO;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
+import com.cgcpms.workflow.entity.WfInstance;
+import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -35,7 +36,6 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,10 +53,10 @@ public class MatPurchaseRequestService {
     private final MdMaterialMapper mdMaterialMapper;
     private final CtContractMapper ctContractMapper;
     private final WorkflowEngine workflowEngine;
+    private final WfInstanceMapper wfInstanceMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final JdbcTemplate jdbcTemplate;
     private final ProcurementIntegrityService integrityService;
-    private final BudgetLedgerService budgetLedgerService;
 
     // ================================================================
     // 分页查询
@@ -137,7 +137,8 @@ public class MatPurchaseRequestService {
     public Long create(MatPurchaseRequest request) {
         validateProjectRequired(request.getProjectId());
         projectAccessChecker.checkAccess(request.getProjectId(), "创建采购申请");
-        validateContractProject(request.getContractId(), request.getProjectId());
+        request.setContractId(null);
+        request.setPurpose(null);
 
         Long tenantId = UserContext.getCurrentTenantId();
         request.setApprovalStatus("DRAFT");
@@ -157,6 +158,16 @@ public class MatPurchaseRequestService {
         throw new BusinessException("REQUEST_CODE_CONFLICT", "采购申请编号生成冲突，请重试");
     }
 
+    @Transactional(rollbackFor = Exception.class)
+    public Long create(MatPurchaseRequest request, List<MatPurchaseRequestItem> items) {
+        if (items == null || items.isEmpty() || items.size() > 200) {
+            throw new BusinessException("PURCHASE_REQUEST_ITEMS_INVALID", "采购申请明细必须为1到200条");
+        }
+        Long requestId = create(request);
+        saveItemsBatch(requestId, items);
+        return requestId;
+    }
+
     // ================================================================
     // 更新
     // ================================================================
@@ -168,16 +179,18 @@ public class MatPurchaseRequestService {
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
 
         // Only DRAFT can be updated
-        if (!"DRAFT".equals(existing.getApprovalStatus()))
+        if (!List.of("DRAFT", "REJECTED").contains(existing.getApprovalStatus()))
             throw new BusinessException("REQUEST_IN_APPROVAL", "采购申请审批中或已审批，不可编辑");
 
         // Prevent overwriting approval status via update
-        request.setApprovalStatus(existing.getApprovalStatus());
-        request.setStatus(existing.getStatus());
+        request.setApprovalStatus("DRAFT");
+        request.setStatus("DRAFT");
         Long projectId = request.getProjectId() != null ? request.getProjectId() : existing.getProjectId();
         validateProjectRequired(projectId);
         projectAccessChecker.checkAccess(projectId, "编辑采购申请");
-        validateContractProject(request.getContractId(), projectId);
+        request.setContractId(null);
+        // purpose 已退出新流程；置空使 MyBatis 不更新历史列。
+        request.setPurpose(null);
 
         requestMapper.updateById(request);
     }
@@ -202,13 +215,6 @@ public class MatPurchaseRequestService {
 
         projectAccessChecker.checkAccess(request.getProjectId(), "提交采购申请审批");
         integrityService.requireActiveProject(request.getProjectId(), "提交采购申请");
-        if (request.getContractId() == null) {
-            throw new BusinessException("PURCHASE_REQUEST_CONTRACT_REQUIRED", "采购申请必须绑定采购合同");
-        }
-        validateContractProject(request.getContractId(), request.getProjectId());
-        if (!StringUtils.hasText(request.getPurpose())) {
-            throw new BusinessException("PURCHASE_REQUEST_PURPOSE_REQUIRED", "采购申请必须填写采购用途或施工部位");
-        }
         integrityService.requireCleanAttachment("PURCHASE_REQUEST", requestId);
 
         List<MatPurchaseRequestItem> items = requestItemMapper.selectList(
@@ -220,8 +226,9 @@ public class MatPurchaseRequestService {
 
         for (MatPurchaseRequestItem item : items) {
             validateRequestItemForSubmission(request, item);
-            budgetLedgerService.reserve(item.getBudgetLineId(), "PURCHASE_REQUEST", requestId,
-                    item.getEstimatedAmount(), "PURCHASE_REQUEST:" + requestId + ":ITEM:" + item.getId() + ":RESERVE");
+            item.setApprovedQuantity(item.getQuantity());
+            item.setApprovalVersion(0);
+            requestItemMapper.updateById(item);
         }
 
         // 更新审批状态为审批中
@@ -234,7 +241,7 @@ public class MatPurchaseRequestService {
         Long userId = UserContext.getCurrentUserId();
         String username = UserContext.getCurrentUsername();
         Long tenantId = UserContext.getCurrentTenantId();
-        workflowEngine.submit(userId, username, tenantId,
+        workflowEngine.submitPurchaseRequest(userId, username, tenantId,
                 "PURCHASE_REQUEST",
                 requestId,
                 request.getRequestCode(),
@@ -242,6 +249,32 @@ public class MatPurchaseRequestService {
                 request.getProjectId(),
                 null,
                 null, null, null);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void resubmitForApproval(Long requestId, Long instanceId) {
+        MatPurchaseRequest request = requestMapper.selectById(requestId);
+        WfInstance instance = wfInstanceMapper.selectById(instanceId);
+        if (request == null || !Objects.equals(request.getTenantId(), UserContext.getCurrentTenantId())
+                || instance == null || !Objects.equals(instance.getBusinessId(), requestId)
+                || !"PURCHASE_REQUEST".equals(instance.getBusinessType())) {
+            throw new BusinessException("PURCHASE_REQUEST_RESUBMIT_MISMATCH", "采购申请与审批实例不匹配");
+        }
+        List<MatPurchaseRequestItem> items = requestItemMapper.selectList(
+                new LambdaQueryWrapper<MatPurchaseRequestItem>()
+                        .eq(MatPurchaseRequestItem::getRequestId, requestId)
+                        .eq(MatPurchaseRequestItem::getTenantId, request.getTenantId()));
+        if (items.isEmpty()) throw new BusinessException("PURCHASE_REQUEST_NO_ITEMS", "采购申请没有明细");
+        for (MatPurchaseRequestItem item : items) {
+            validateRequestItemForSubmission(request, item);
+            item.setApprovedQuantity(item.getQuantity());
+            item.setApprovalVersion((item.getApprovalVersion() == null ? 0 : item.getApprovalVersion()) + 1);
+            requestItemMapper.updateById(item);
+        }
+        workflowEngine.resubmitPurchaseRequest(instanceId, UserContext.getCurrentUserId(), UserContext.getCurrentUsername());
+        requestMapper.update(null, new LambdaUpdateWrapper<MatPurchaseRequest>()
+                .eq(MatPurchaseRequest::getId, requestId)
+                .set(MatPurchaseRequest::getApprovalStatus, "APPROVING"));
     }
 
     // ================================================================
@@ -276,7 +309,7 @@ public class MatPurchaseRequestService {
         if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
 
-        if (!"DRAFT".equals(request.getApprovalStatus()))
+        if (!List.of("DRAFT", "REJECTED").contains(request.getApprovalStatus()))
             throw new BusinessException("REQUEST_IN_APPROVAL", "采购申请审批中或已审批，不可编辑明细");
 
         projectAccessChecker.checkAccess(request.getProjectId(), "编辑采购申请明细");
@@ -298,18 +331,23 @@ public class MatPurchaseRequestService {
             // Auto-create material if name provided but no existing materialId
             resolveMaterial(item, tenantId);
             validatePlanningReferences(item, request.getProjectId(), tenantId);
-            if (item.getEstimatedUnitPrice() != null) {
-                if (item.getEstimatedUnitPrice().signum() <= 0) {
-                    throw new BusinessException("PURCHASE_ESTIMATED_PRICE_INVALID", "采购申请估算单价必须大于0");
-                }
-                item.setEstimatedAmount(item.getQuantity().multiply(item.getEstimatedUnitPrice())
-                        .setScale(2, RoundingMode.HALF_UP));
-            }
+            item.setBudgetLineId(null);
+            item.setEstimatedUnitPrice(null);
+            item.setEstimatedAmount(null);
+            MdMaterial material = mdMaterialMapper.selectById(item.getMaterialId());
+            item.setMaterialName(material.getMaterialName());
+            item.setSpecification(material.getSpecification());
             item.setCreatedBy(UserContext.getCurrentUserId());
             item.setUpdatedBy(UserContext.getCurrentUserId());
         }
-        if (!items.isEmpty()) {
-            requestItemMapper.insertBatch(items);
+        for (MatPurchaseRequestItem item : items) {
+            requestItemMapper.insert(item);
+        }
+        if ("REJECTED".equals(request.getApprovalStatus())) {
+            requestMapper.update(null, new LambdaUpdateWrapper<MatPurchaseRequest>()
+                    .eq(MatPurchaseRequest::getId, requestId)
+                    .set(MatPurchaseRequest::getApprovalStatus, "DRAFT")
+                    .set(MatPurchaseRequest::getStatus, "DRAFT"));
         }
     }
 
@@ -320,17 +358,10 @@ public class MatPurchaseRequestService {
         if (item.getPlannedDate() == null) {
             throw new BusinessException("PURCHASE_REQUEST_PLANNED_DATE_REQUIRED", "采购申请明细必须填写计划到货日期");
         }
-        integrityService.requireActiveBudgetLine(request.getProjectId(), item.getBudgetLineId());
+        if (!StringUtils.hasText(item.getUseLocation())) {
+            throw new BusinessException("PURCHASE_REQUEST_USE_LOCATION_REQUIRED", "采购申请每条明细必须填写使用部位");
+        }
         integrityService.validateSubTask(request.getProjectId(), item.getSubTaskId());
-        if (item.getEstimatedUnitPrice() == null || item.getEstimatedUnitPrice().signum() <= 0) {
-            throw new BusinessException("PURCHASE_ESTIMATED_PRICE_REQUIRED", "采购申请明细必须填写大于0的估算单价");
-        }
-        BigDecimal expected = item.getQuantity().multiply(item.getEstimatedUnitPrice())
-                .setScale(2, RoundingMode.HALF_UP);
-        if (item.getEstimatedAmount() == null
-                || expected.compareTo(item.getEstimatedAmount().setScale(2, RoundingMode.HALF_UP)) != 0) {
-            throw new BusinessException("PURCHASE_ESTIMATED_AMOUNT_MISMATCH", "采购申请估算金额必须等于数量乘以估算单价");
-        }
     }
 
     /**
@@ -384,35 +415,11 @@ public class MatPurchaseRequestService {
                 throw new BusinessException("PURCHASE_WBS_MISMATCH", "WBS任务不存在或不属于当前项目");
             }
         }
-        if (item.getBudgetLineId() != null) {
-            Integer count = jdbcTemplate.queryForObject("""
-                    SELECT COUNT(*) FROM project_budget_line l
-                    JOIN project_budget b ON b.id=l.budget_id AND b.tenant_id=l.tenant_id
-                    WHERE l.id=? AND l.tenant_id=? AND l.project_id=? AND l.deleted_flag=0
-                      AND b.deleted_flag=0 AND b.status='ACTIVE'
-                    """, Integer.class, item.getBudgetLineId(), tenantId, projectId);
-            if (count == null || count != 1) {
-                throw new BusinessException("PURCHASE_BUDGET_MISMATCH", "预算行不存在、未生效或不属于当前项目");
-            }
-        }
     }
 
     private void validateProjectRequired(Long projectId) {
         if (projectId == null) {
             throw new BusinessException("PROJECT_REQUIRED", "项目不能为空");
-        }
-    }
-
-    private void validateContractProject(Long contractId, Long projectId) {
-        if (contractId == null) {
-            return;
-        }
-        CtContract contract = ctContractMapper.selectById(contractId);
-        if (contract == null || !Objects.equals(contract.getTenantId(), UserContext.getCurrentTenantId())) {
-            throw new BusinessException("CONTRACT_NOT_FOUND", "关联合同不存在");
-        }
-        if (!Objects.equals(contract.getProjectId(), projectId)) {
-            throw new BusinessException("CONTRACT_PROJECT_MISMATCH", "关联合同不属于当前项目");
         }
     }
 
@@ -510,6 +517,10 @@ public class MatPurchaseRequestService {
         vo.setBudgetLineId(item.getBudgetLineId() != null ? String.valueOf(item.getBudgetLineId()) : null);
         vo.setSubTaskId(item.getSubTaskId() != null ? String.valueOf(item.getSubTaskId()) : null);
         vo.setQuantity(String.valueOf(item.getQuantity()));
+        vo.setApprovedQuantity(item.getApprovedQuantity() != null ? item.getApprovedQuantity().toPlainString() : null);
+        vo.setApprovalVersion(item.getApprovalVersion());
+        vo.setSpecification(item.getSpecification());
+        vo.setUseLocation(item.getUseLocation());
         vo.setEstimatedUnitPrice(item.getEstimatedUnitPrice() != null ? item.getEstimatedUnitPrice().toPlainString() : null);
         vo.setEstimatedAmount(item.getEstimatedAmount() != null ? item.getEstimatedAmount().toPlainString() : null);
         vo.setUnit(item.getUnit());

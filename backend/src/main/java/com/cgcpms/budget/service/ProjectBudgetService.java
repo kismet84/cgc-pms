@@ -8,16 +8,24 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.budget.constant.BudgetStatusConstants;
 import com.cgcpms.budget.entity.ProjectBudget;
 import com.cgcpms.budget.entity.ProjectBudgetLine;
+import com.cgcpms.budget.entity.BudgetLedger;
+import com.cgcpms.budget.mapper.BudgetLedgerMapper;
 import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
 import com.cgcpms.budget.mapper.ProjectBudgetMapper;
+import com.cgcpms.budget.mapper.ContractBudgetAllocationMapper;
 import com.cgcpms.budget.vo.BudgetAvailabilityVO;
 import com.cgcpms.budget.vo.ProjectBudgetVO;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.CodeGenerationService;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.cost.entity.CostSubject;
+import com.cgcpms.cost.entity.CostTarget;
+import com.cgcpms.cost.entity.CostTargetItem;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
+import com.cgcpms.cost.mapper.CostTargetItemMapper;
+import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.constant.ProjectStatusConstants;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
@@ -34,6 +42,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,12 +57,207 @@ public class ProjectBudgetService {
 
     private final ProjectBudgetMapper budgetMapper;
     private final ProjectBudgetLineMapper lineMapper;
+    private final ContractBudgetAllocationMapper contractBudgetAllocationMapper;
+    private final BudgetLedgerMapper budgetLedgerMapper;
     private final PmProjectMapper projectMapper;
     private final CostSubjectMapper costSubjectMapper;
+    private final CostTargetMapper costTargetMapper;
+    private final CostTargetItemMapper costTargetItemMapper;
     private final ProjectAccessChecker projectAccessChecker;
     private final WorkflowEngine workflowEngine;
     private final WfInstanceMapper wfInstanceMapper;
     private final CodeGenerationService codeGenerationService;
+
+    /**
+     * 将已审批目标成本投影为唯一生效执行预算。预算行按科目原位更新，保留占用、消耗和业务引用。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public ProjectBudget syncFromApprovedCostTarget(Long targetId, Long tenantId) {
+        CostTarget target = costTargetMapper.selectById(targetId);
+        if (target == null || !Objects.equals(target.getTenantId(), tenantId)) {
+            throw new BusinessException("COST_TARGET_NOT_FOUND", "项目成本预算来源不存在");
+        }
+        if (!"APPROVED".equals(target.getApprovalStatus()) || !"ACTIVE".equals(target.getStatus())
+                || !Integer.valueOf(1).equals(target.getIsActive())) {
+            throw new BusinessException("COST_TARGET_NOT_ACTIVE", "项目成本预算审批生效后才能生成执行预算");
+        }
+
+        PmProject project = projectMapper.selectOne(new LambdaQueryWrapper<PmProject>()
+                .eq(PmProject::getId, target.getProjectId())
+                .eq(PmProject::getTenantId, tenantId)
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+        if (project == null) throw new BusinessException("PROJECT_NOT_FOUND", "项目成本预算所属项目不存在");
+
+        List<CostTargetItem> targetItems = costTargetItemMapper.selectList(
+                new LambdaQueryWrapper<CostTargetItem>()
+                        .eq(CostTargetItem::getTargetId, targetId)
+                        .eq(CostTargetItem::getTenantId, tenantId)
+                        .orderByAsc(CostTargetItem::getSortOrder));
+        Map<Long, CostTargetItem> positiveItems = new LinkedHashMap<>();
+        BigDecimal total = BigDecimal.ZERO.setScale(2);
+        for (CostTargetItem item : targetItems) {
+            if (item.getCostSubjectId() == null) {
+                throw new BusinessException("BUDGET_SUBJECT_REQUIRED", "项目成本预算科目不能为空");
+            }
+            BigDecimal amount = money(item.getResponsibilityAmount());
+            if (amount.compareTo(BigDecimal.ZERO) < 0) {
+                throw new BusinessException("BUDGET_AMOUNT_INVALID", "责任预算金额不能为负数");
+            }
+            total = total.add(amount);
+            if (amount.signum() > 0 && positiveItems.put(item.getCostSubjectId(), item) != null) {
+                throw new BusinessException("BUDGET_SUBJECT_DUPLICATE", "项目成本预算科目不能重复");
+            }
+        }
+        if (total.signum() <= 0 || total.compareTo(money(target.getTotalResponsibilityAmount())) != 0) {
+            throw new BusinessException("BUDGET_TOTAL_MISMATCH", "责任预算明细合计必须等于责任预算总额且大于零");
+        }
+
+        ProjectBudget budget = budgetMapper.selectActiveByProjectForUpdate(target.getProjectId(), tenantId);
+        if (budget == null) budget = createProjectionBudget(target, total);
+        else if (Objects.equals(budget.getSourceCostTargetId(), targetId)) return budget;
+        else updateProjectionBudget(budget, target, total);
+        reconcileProjectionLines(budget, positiveItems, tenantId);
+        return budgetMapper.selectById(budget.getId());
+    }
+
+    private ProjectBudget createProjectionBudget(CostTarget target, BigDecimal total) {
+        ProjectBudget budget = new ProjectBudget();
+        budget.setTenantId(target.getTenantId());
+        budget.setProjectId(target.getProjectId());
+        budget.setSourceCostTargetId(target.getId());
+        budget.setVersionNo("CT-" + target.getId());
+        budget.setBudgetName(target.getVersionName());
+        budget.setTotalAmount(total);
+        budget.setApprovalStatus(BudgetStatusConstants.APPROVAL_APPROVED);
+        budget.setStatus(BudgetStatusConstants.STATUS_ACTIVE);
+        budget.setActiveFlag(1);
+        budget.setActiveToken(target.getProjectId());
+        budget.setEffectiveAt(LocalDateTime.now());
+        budget.setVersion(0);
+        budget.setRemark("由项目成本预算审批自动生成");
+        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
+            budget.setId(null);
+            budget.setBudgetCode(codeGenerationService.nextCode(
+                    budgetMapper, ProjectBudget::getBudgetCode, "BUD-", target.getTenantId(), true, attempt));
+            try {
+                budgetMapper.insert(budget);
+                return budget;
+            } catch (DuplicateKeyException ignored) {
+                ProjectBudget existing = budgetMapper.selectActiveByProjectForUpdate(
+                        target.getProjectId(), target.getTenantId());
+                if (existing != null) {
+                    updateProjectionBudget(existing, target, total);
+                    return existing;
+                }
+            }
+        }
+        throw new BusinessException("BUDGET_CODE_CONFLICT", "执行预算编号生成冲突，请重试");
+    }
+
+    private void updateProjectionBudget(ProjectBudget budget, CostTarget target, BigDecimal total) {
+        budget.setSourceCostTargetId(target.getId());
+        budget.setBudgetName(target.getVersionName());
+        budget.setTotalAmount(total);
+        budget.setApprovalStatus(BudgetStatusConstants.APPROVAL_APPROVED);
+        budget.setStatus(BudgetStatusConstants.STATUS_ACTIVE);
+        budget.setActiveFlag(1);
+        budget.setActiveToken(target.getProjectId());
+        budget.setEffectiveAt(LocalDateTime.now());
+        budget.setRemark("由项目成本预算审批自动更新");
+        if (budgetMapper.updateById(budget) != 1) throw concurrentUpdate();
+    }
+
+    private void reconcileProjectionLines(ProjectBudget budget, Map<Long, CostTargetItem> targetItems,
+                                          Long tenantId) {
+        Map<Long, ProjectBudgetLine> existing = lineMapper
+                .selectByBudgetForUpdate(budget.getId(), tenantId).stream()
+                .collect(Collectors.toMap(ProjectBudgetLine::getCostSubjectId, Function.identity()));
+        for (CostTargetItem targetItem : targetItems.values()) {
+            BigDecimal amount = money(targetItem.getResponsibilityAmount());
+            ProjectBudgetLine line = existing.remove(targetItem.getCostSubjectId());
+            if (line == null) {
+                line = new ProjectBudgetLine();
+                line.setTenantId(tenantId);
+                line.setBudgetId(budget.getId());
+                line.setProjectId(budget.getProjectId());
+                line.setCostSubjectId(targetItem.getCostSubjectId());
+                line.setBudgetAmount(amount);
+                line.setReservedAmount(BigDecimal.ZERO.setScale(2));
+                line.setConsumedAmount(BigDecimal.ZERO.setScale(2));
+                line.setVersion(0);
+                line.setRemark(targetItem.getRemark());
+                lineMapper.insert(line);
+                recordAdjustment(budget, line, targetItem.getTargetId(), amount);
+                continue;
+            }
+            BigDecimal previousAmount = money(line.getBudgetAmount());
+            BigDecimal floor = requiredBudgetFloor(line, tenantId);
+            if (amount.compareTo(floor) < 0) {
+                throw new BusinessException("BUDGET_BELOW_OCCUPIED",
+                        "责任预算不能低于已占用、已消耗或合同已分配金额，costSubjectId=" + line.getCostSubjectId());
+            }
+            line.setBudgetAmount(amount);
+            line.setRemark(targetItem.getRemark());
+            if (lineMapper.updateById(line) != 1) {
+                throw new BusinessException("BUDGET_LINE_CONCURRENT_UPDATE", "执行预算科目已被并发修改");
+            }
+            recordAdjustment(budget, line, targetItem.getTargetId(), amount.subtract(previousAmount));
+        }
+        for (ProjectBudgetLine obsolete : existing.values()) {
+            BigDecimal previousAmount = money(obsolete.getBudgetAmount());
+            if (requiredBudgetFloor(obsolete, tenantId).signum() > 0) {
+                throw new BusinessException("BUDGET_OCCUPIED_SUBJECT_REMOVED",
+                        "存在占用、消耗或合同分配的预算科目不能从项目成本预算中删除，costSubjectId="
+                                + obsolete.getCostSubjectId());
+            }
+            obsolete.setBudgetAmount(BigDecimal.ZERO.setScale(2));
+            obsolete.setRemark("已从最新项目成本预算移除，保留历史引用");
+            if (lineMapper.updateById(obsolete) != 1) {
+                throw new BusinessException("BUDGET_LINE_CONCURRENT_UPDATE", "执行预算科目已被并发修改");
+            }
+            recordAdjustment(budget, obsolete, budget.getSourceCostTargetId(),
+                    previousAmount.negate());
+        }
+    }
+
+    private void recordAdjustment(ProjectBudget budget, ProjectBudgetLine line, Long targetId,
+                                  BigDecimal rawDelta) {
+        BigDecimal delta = money(rawDelta);
+        if (delta.signum() == 0) return;
+        String key = "COST_TARGET:" + targetId + ":LINE:" + line.getId();
+        BudgetLedger existing = budgetLedgerMapper.selectOne(new LambdaQueryWrapper<BudgetLedger>()
+                .eq(BudgetLedger::getTenantId, budget.getTenantId())
+                .eq(BudgetLedger::getIdempotencyKey, key));
+        if (existing != null) {
+            if (existing.getAmount().compareTo(delta) != 0) {
+                throw new BusinessException("BUDGET_IDEMPOTENCY_CONFLICT", "项目成本预算调整幂等键冲突");
+            }
+            return;
+        }
+        BudgetLedger ledger = new BudgetLedger();
+        ledger.setTenantId(budget.getTenantId());
+        ledger.setBudgetId(budget.getId());
+        ledger.setBudgetLineId(line.getId());
+        ledger.setProjectId(budget.getProjectId());
+        ledger.setBusinessType("COST_TARGET");
+        ledger.setBusinessId(targetId);
+        ledger.setEntryType(BudgetStatusConstants.ENTRY_ADJUST);
+        ledger.setAmount(delta);
+        ledger.setReservedBalance(money(line.getReservedAmount()));
+        ledger.setConsumedBalance(money(line.getConsumedAmount()));
+        ledger.setIdempotencyKey(key);
+        ledger.setCreatedBy(UserContext.getCurrentUserId());
+        ledger.setCreatedAt(LocalDateTime.now());
+        ledger.setRemark("项目成本预算审批调整");
+        budgetLedgerMapper.insert(ledger);
+    }
+
+    private BigDecimal requiredBudgetFloor(ProjectBudgetLine line, Long tenantId) {
+        BigDecimal occupied = money(line.getReservedAmount()).add(money(line.getConsumedAmount()));
+        BigDecimal allocated = money(contractBudgetAllocationMapper
+                .sumAllocatedByBudgetLine(line.getId(), tenantId));
+        return occupied.max(allocated);
+    }
 
     public IPage<ProjectBudgetVO> getPage(long pageNo, long pageSize, Long projectId, String status,
                                           LocalDate startDate, LocalDate endDate) {
@@ -94,101 +298,17 @@ public class ProjectBudgetService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(ProjectBudget budget) {
-        PmProject project = requireWritableProject(budget.getProjectId(), "创建项目预算");
-        Long tenantId = UserContext.getCurrentTenantId();
-        budget.setTenantId(tenantId);
-        budget.setProjectId(project.getId());
-        budget.setTotalAmount(money(budget.getTotalAmount()));
-        budget.setApprovalStatus(BudgetStatusConstants.APPROVAL_DRAFT);
-        budget.setStatus(BudgetStatusConstants.STATUS_DRAFT);
-        budget.setActiveFlag(0);
-        budget.setActiveToken(null);
-        budget.setVersion(0);
-        for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
-            budget.setId(null);
-            budget.setBudgetCode(codeGenerationService.nextCode(
-                    budgetMapper, ProjectBudget::getBudgetCode, "BUD-", tenantId, true, attempt));
-            try {
-                budgetMapper.insert(budget);
-                return budget.getId();
-            } catch (DuplicateKeyException ignored) {
-                if (budgetVersionExists(tenantId, project.getId(), budget.getVersionNo())) {
-                    throw new BusinessException("BUDGET_VERSION_DUPLICATE", "该项目预算版本号已存在");
-                }
-            }
-        }
-        throw new BusinessException("BUDGET_CODE_CONFLICT", "项目预算编号生成冲突，请重试");
+        throw standaloneBudgetDisabled();
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void update(ProjectBudget input, Integer expectedVersion) {
-        ProjectBudget existing = requireEditableBudget(input.getId());
-        requireVersion(expectedVersion, existing);
-        requireWritableProject(existing.getProjectId(), "编辑项目预算");
-        existing.setVersionNo(input.getVersionNo());
-        existing.setBudgetName(input.getBudgetName());
-        existing.setTotalAmount(money(input.getTotalAmount()));
-        existing.setRemark(input.getRemark());
-        try {
-            if (budgetMapper.updateById(existing) != 1) {
-                throw new BusinessException("BUDGET_CONCURRENT_UPDATE", "预算已被其他用户修改，请刷新后重试");
-            }
-        } catch (DuplicateKeyException e) {
-            throw new BusinessException("BUDGET_VERSION_DUPLICATE", "该项目预算版本号已存在");
-        }
+        throw standaloneBudgetDisabled();
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void saveLines(Long budgetId, Integer expectedVersion, List<ProjectBudgetLine> lines) {
-        ProjectBudget budget = requireEditableBudget(budgetId);
-        requireVersion(expectedVersion, budget);
-        requireWritableProject(budget.getProjectId(), "编辑项目预算科目");
-        if (lines == null || lines.isEmpty()) {
-            throw new BusinessException("BUDGET_LINES_REQUIRED", "项目预算至少需要一条科目明细");
-        }
-
-        Long tenantId = UserContext.getCurrentTenantId();
-        Set<Long> subjectIds = new HashSet<>();
-        BigDecimal total = BigDecimal.ZERO;
-        for (ProjectBudgetLine line : lines) {
-            if (line == null || line.getCostSubjectId() == null) {
-                throw new BusinessException("BUDGET_SUBJECT_REQUIRED", "预算明细成本科目不能为空");
-            }
-            if (!subjectIds.add(line.getCostSubjectId())) {
-                throw new BusinessException("BUDGET_SUBJECT_DUPLICATE", "同一预算版本内成本科目不能重复");
-            }
-            BigDecimal amount = money(line.getBudgetAmount());
-            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new BusinessException("BUDGET_AMOUNT_INVALID", "预算科目金额必须大于0");
-            }
-            line.setBudgetAmount(amount);
-            total = total.add(amount);
-        }
-        if (total.compareTo(money(budget.getTotalAmount())) != 0) {
-            throw new BusinessException("BUDGET_TOTAL_MISMATCH", "预算科目合计必须等于预算总额");
-        }
-
-        Map<Long, CostSubject> subjects = costSubjectMapper.selectByIds(subjectIds).stream()
-                .filter(subject -> Objects.equals(subject.getTenantId(), tenantId))
-                .collect(Collectors.toMap(CostSubject::getId, Function.identity()));
-        if (subjects.size() != subjectIds.size()
-                || subjects.values().stream().anyMatch(subject -> !"ENABLE".equals(subject.getStatus()))) {
-            throw new BusinessException("BUDGET_SUBJECT_INVALID", "预算包含不存在、跨租户或已停用的成本科目");
-        }
-
-        // Reserve parent version before replacing children; loser fails before any unique-key side effect.
-        bumpVersion(budgetId, expectedVersion);
-        lineMapper.hardDeleteDraftLines(budgetId, tenantId);
-        for (ProjectBudgetLine line : lines) {
-            line.setId(null);
-            line.setTenantId(tenantId);
-            line.setBudgetId(budgetId);
-            line.setProjectId(budget.getProjectId());
-            line.setReservedAmount(BigDecimal.ZERO.setScale(2));
-            line.setConsumedAmount(BigDecimal.ZERO.setScale(2));
-            line.setVersion(0);
-            lineMapper.insert(line);
-        }
+        throw standaloneBudgetDisabled();
     }
 
     /** Internal compatibility path; HTTP writes always provide an explicit version. */
@@ -212,31 +332,7 @@ public class ProjectBudgetService {
 
     @Transactional(rollbackFor = Exception.class)
     public void submit(Long id, Integer expectedVersion) {
-        ProjectBudget budget = requireEditableBudget(id);
-        requireVersion(expectedVersion, budget);
-        validateForSubmit(budget);
-        // Claim this business revision before creating workflow children.
-        bumpVersion(id, expectedVersion);
-        WfInstance instance = BudgetStatusConstants.APPROVAL_REJECTED.equals(budget.getApprovalStatus())
-                ? workflowEngine.resubmitProjectBudget(findWorkflowInstance(id), UserContext.getCurrentUserId(), UserContext.getCurrentUsername())
-                : workflowEngine.submitProjectBudget(
-                UserContext.getCurrentUserId(),
-                UserContext.getCurrentUsername(),
-                UserContext.getCurrentTenantId(),
-                WorkflowBusinessTypes.PROJECT_BUDGET,
-                budget.getId(),
-                budget.getBudgetName(),
-                budget.getTotalAmount(),
-                budget.getProjectId(),
-                null,
-                null, null, null);
-        int submitted = budgetMapper.update(null, new LambdaUpdateWrapper<ProjectBudget>()
-                .eq(ProjectBudget::getId, id)
-                .eq(ProjectBudget::getTenantId, UserContext.getCurrentTenantId())
-                .eq(ProjectBudget::getApprovalStatus, budget.getApprovalStatus())
-                .eq(ProjectBudget::getVersion, expectedVersion + 1)
-                .set(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_APPROVING));
-        if (submitted != 1) throw concurrentUpdate();
+        throw standaloneBudgetDisabled();
     }
 
     public void validateForSubmit(ProjectBudget budget) {
@@ -304,6 +400,11 @@ public class ProjectBudgetService {
         return new BusinessException("BUDGET_CONCURRENT_UPDATE", "预算已被其他用户修改，请刷新后重试");
     }
 
+    private static BusinessException standaloneBudgetDisabled() {
+        return new BusinessException("PROJECT_BUDGET_MANAGED_BY_COST_TARGET",
+                "项目预算由项目成本预算审批自动生成，禁止独立新增、编辑或提交");
+    }
+
     private ProjectBudget requireBudget(Long id) {
         ProjectBudget budget = budgetMapper.selectById(id);
         if (budget == null || !Objects.equals(budget.getTenantId(), UserContext.getCurrentTenantId())) {
@@ -315,8 +416,8 @@ public class ProjectBudgetService {
     private PmProject requireWritableProject(Long projectId, String action) {
         PmProject project = projectMapper.selectById(projectId);
         projectAccessChecker.checkAccess(project, action);
-        if ("CLOSED".equals(project.getStatus()) || "ARCHIVED".equals(project.getStatus())) {
-            throw new BusinessException("PROJECT_STATUS_INVALID", "已关闭或已归档项目不可执行预算操作");
+        if (!Set.of(ProjectStatusConstants.PREPARING, ProjectStatusConstants.ACTIVE).contains(project.getStatus())) {
+            throw new BusinessException("PROJECT_STATUS_INVALID", "仅筹备或在建项目可执行预算操作");
         }
         return project;
     }
@@ -332,6 +433,8 @@ public class ProjectBudgetService {
         ProjectBudgetVO vo = new ProjectBudgetVO();
         vo.setId(String.valueOf(budget.getId()));
         vo.setProjectId(String.valueOf(budget.getProjectId()));
+        vo.setSourceCostTargetId(budget.getSourceCostTargetId() == null
+                ? null : String.valueOf(budget.getSourceCostTargetId()));
         vo.setBudgetCode(budget.getBudgetCode());
         vo.setVersionNo(budget.getVersionNo());
         vo.setBudgetName(budget.getBudgetName());

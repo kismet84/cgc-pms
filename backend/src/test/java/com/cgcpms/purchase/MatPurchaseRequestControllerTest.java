@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -35,6 +36,9 @@ class MatPurchaseRequestControllerTest {
     @Autowired
     private JwtUtils jwtUtils;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private static final long ADMIN_ID = 1L;
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
@@ -42,6 +46,17 @@ class MatPurchaseRequestControllerTest {
     private static final long CONTRACT_ID = 30001L;
 
     private Long requestId;
+
+    @BeforeAll
+    void ensureAdminUser() {
+        jdbcTemplate.update("""
+                INSERT INTO sys_user (
+                    id, tenant_id, username, password, real_name, status, is_admin,
+                    created_by, updated_by, deleted_flag
+                ) SELECT ?, ?, ?, '{noop}test', '采购申请接口测试管理员', 'ENABLE', 1, ?, ?, 0
+                WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = ?)
+                """, ADMIN_ID, TENANT_ID, ADMIN_USERNAME, ADMIN_ID, ADMIN_ID, ADMIN_ID);
+    }
 
     private Cookie adminCookie() {
         String token = jwtUtils.generateToken(
@@ -82,6 +97,20 @@ class MatPurchaseRequestControllerTest {
                 .andReturn().getResponse().getContentAsString();
         requestId = Long.parseLong(response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
         Assertions.assertNotNull(requestId);
+    }
+
+    @Test
+    @Order(3) @DisplayName("POST /purchase-requests/with-items -> 200 原子创建头和多明细")
+    void testCreateWithItems() throws Exception {
+        String response = mockMvc.perform(postWithApi("/purchase-requests/with-items").cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON).content(createBody("接口多明细创建")))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andReturn().getResponse().getContentAsString();
+        Long id = Long.parseLong(response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+        mockMvc.perform(getWithApi("/purchase-requests/" + id).cookie(adminCookie()))
+                .andExpect(jsonPath("$.data.purpose").doesNotExist());
+        mockMvc.perform(getWithApi("/purchase-requests/" + id + "/items").cookie(adminCookie()))
+                .andExpect(jsonPath("$.data.length()").value(2));
     }
 
     @Test
@@ -157,4 +186,13 @@ class MatPurchaseRequestControllerTest {
     private MockHttpServletRequestBuilder postWithApi(String p) { return post("/api" + p).contextPath("/api"); }
     private MockHttpServletRequestBuilder putWithApi(String p) { return put("/api" + p).contextPath("/api"); }
     private MockHttpServletRequestBuilder deleteWithApi(String p) { return delete("/api" + p).contextPath("/api"); }
+
+    private String createBody(String remark) {
+        return """
+                {"header":{"projectId":%d,"purpose":"应被忽略","remark":"%s"},"items":[
+                  {"materialId":1,"quantity":2,"plannedDate":"2026-08-15","useLocation":"一层主体"},
+                  {"materialId":1,"quantity":3,"plannedDate":"2026-08-16","useLocation":"二层主体"}
+                ]}
+                """.formatted(PROJECT_ID, remark);
+    }
 }

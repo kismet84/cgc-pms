@@ -21,6 +21,7 @@ import {
   type CostTargetQuery,
   type CostTargetRecord,
   type CostTargetSaveCommand,
+  type CostBudgetDraftSaveCommand,
   type CostSummaryHistoryRecord,
   type CostProjectSummary,
   type CostLedgerPage,
@@ -526,6 +527,18 @@ export function createCostTarget(command: CostTargetSaveCommand): Promise<string
     method: WRITE_METHOD.create,
     body: command,
   })
+}
+
+export function saveCostBudgetDraft(
+  id: string | null,
+  command: CostBudgetDraftSaveCommand,
+): Promise<string> {
+  return apiRequest<string, CostBudgetDraftSaveCommand>(
+    id
+      ? `${COMMERCIAL_API.costTarget(requiredId(id, '项目成本预算ID'))}/draft`
+      : `${COMMERCIAL_API.costTargets}/drafts`,
+    { method: id ? WRITE_METHOD.update : WRITE_METHOD.create, body: command },
+  )
 }
 
 export function updateCostTarget(id: string, command: CostTargetSaveCommand): Promise<void> {

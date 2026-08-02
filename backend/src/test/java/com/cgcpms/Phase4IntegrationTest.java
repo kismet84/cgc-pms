@@ -362,7 +362,7 @@ class Phase4IntegrationTest {
         long businessId = createDraftPurchaseRequest();
 
         // 1. 提交流程（携带 ccUserIds）
-        WfInstance instance = workflowEngine.submit(
+        WfInstance instance = workflowEngine.submitPurchaseRequest(
                 USER_ADMIN, "admin", 0L,
                 WorkflowBusinessTypes.PURCHASE_REQUEST, businessId,
                 "Phase4-CC测试-" + businessId,
@@ -713,7 +713,7 @@ class Phase4IntegrationTest {
         long businessId = createDraftPurchaseRequest();
 
         // tenant 0 提交流程（带 ccUserIds）
-        WfInstance instance = workflowEngine.submit(
+        WfInstance instance = workflowEngine.submitPurchaseRequest(
                 USER_ADMIN, "admin", 0L,
                 WorkflowBusinessTypes.PURCHASE_REQUEST, businessId,
                 "Phase4-隔离CC测试-" + businessId,

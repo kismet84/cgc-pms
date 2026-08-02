@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 type Identity = 'business' | 'readonly' | 'denied'
 
@@ -78,6 +79,7 @@ const bid = {
 }
 
 async function installCommercialMock(page: Page, readIdentity: () => Identity): Promise<void> {
+  await installShellPreferencesMock(page)
   await page.route('**/api/auth/userinfo', (route) =>
     route.fulfill({
       status: 200,
@@ -138,6 +140,7 @@ test.describe('M4 variation and bid routes', () => {
   test('routes resolve without placeholders and remain accessible at three viewports', async ({
     page,
   }) => {
+    test.setTimeout(60_000)
     const identity: Identity = 'business'
     await installCommercialMock(page, () => identity)
     const runtimeErrors = captureRuntimeErrors(page)

@@ -120,6 +120,10 @@ describe('workflow contract and service', () => {
     expect(workflowStatusLabel('CUSTOM')).toBe('其他状态')
     expect(workflowBusinessTypeLabel('CONTRACT_APPROVAL')).toBe('合同审批')
     expect(workflowBusinessTypeLabel('DEMO_APPROVAL_SCENARIO')).toBe('演示审批场景')
+    expect(workflowBusinessTypeLabel('FINANCE_COST_ALLOCATION')).toBe('项目财务费用分摊')
+    expect(workflowBusinessTypeLabel('FINANCE_COST_ALLOCATION_REVERSAL')).toBe(
+      '项目财务费用分摊冲销',
+    )
     expect(workflowBusinessTypeLabel('UNREGISTERED')).toBe('其他业务审批')
     expect(WORKFLOW_BUSINESS_TYPES).toContainEqual(['PAY_REQUEST', '付款申请'])
     expect(workflowStatusLabel('ACTIVE')).toBe('处理中')

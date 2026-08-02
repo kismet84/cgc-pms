@@ -2,6 +2,7 @@ package com.cgcpms.receipt.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -38,6 +39,11 @@ public class MatReceiptItem extends BaseEntity {
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal qualifiedQuantity;
+
+    /** 新流程命令字段；持久化时归一化到 qualified_quantity。 */
+    @TableField(exist = false)
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal acceptedQuantity;
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal unqualifiedQuantity;

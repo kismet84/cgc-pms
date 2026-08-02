@@ -211,8 +211,8 @@ class CtContractItemServiceTest {
     }
 
     @Test
-    @DisplayName("创建 — 所有金额字段正确持久化")
-    void testCreateAllFieldsPersisted() {
+    @DisplayName("创建 — 金额和税额由服务端按合同税率派生")
+    void testCreateDerivesFinancialFields() {
         CtContractItem item = new CtContractItem();
         item.setContractId(draftContractId);
         item.setItemCode("CI-FULL-001");
@@ -221,10 +221,10 @@ class CtContractItemServiceTest {
         item.setUnit("m³");
         item.setQuantity(new BigDecimal("100.0000"));
         item.setUnitPrice(new BigDecimal("450.0000"));
-        item.setAmount(new BigDecimal("45000.00"));
-        item.setTaxRate(new BigDecimal("13.00"));
-        item.setTaxAmount(new BigDecimal("5850.00"));
-        item.setAmountWithoutTax(new BigDecimal("39150.00"));
+        item.setAmount(new BigDecimal("1.00"));
+        item.setTaxRate(new BigDecimal("1.00"));
+        item.setTaxAmount(new BigDecimal("1.00"));
+        item.setAmountWithoutTax(new BigDecimal("1.00"));
         item.setSortOrder(5);
 
         Long id = itemService.create(item);
@@ -237,8 +237,8 @@ class CtContractItemServiceTest {
         assertEquals(0, new BigDecimal("450.0000").compareTo(saved.getUnitPrice()));
         assertEquals(0, new BigDecimal("45000.00").compareTo(saved.getAmount()));
         assertEquals(0, new BigDecimal("13.00").compareTo(saved.getTaxRate()));
-        assertEquals(0, new BigDecimal("5850.00").compareTo(saved.getTaxAmount()));
-        assertEquals(0, new BigDecimal("39150.00").compareTo(saved.getAmountWithoutTax()));
+        assertEquals(0, new BigDecimal("5176.99").compareTo(saved.getTaxAmount()));
+        assertEquals(0, new BigDecimal("39823.01").compareTo(saved.getAmountWithoutTax()));
         assertEquals(5, saved.getSortOrder());
     }
 

@@ -23,6 +23,14 @@ description: 用于 cgc-pms 的统一失败分类、GitHub Actions、PR 与 CI �
 
 先分类，再决定重试、修复或阻塞；相同前置和参数下禁止原样重试。历史旧值只读兼容，不得继续写入。
 
+### 门禁判定
+
+- 每次失败必须同时记录失败分类、当前证据、责任动作和最小复验命令；缺任一项不得复跑。
+- `tool_config`、`tool_invocation`、`environment_prerequisite` 和 `ready_issue_config` 只修前置或契约，不得改写为业务缺陷。
+- `quality_or_security` 必须整改或正式阻塞；`unknown` 必须补证据，不能以“暂不影响”放行。
+- 本地测试、mock E2E、真实浏览器、同 SHA CI 和目标环境证据分别裁决，不得互相替代。
+- 只有分类、修复或恢复、一次等价复验均完成，才能更新门禁状态；失败记录不得被后续重跑覆盖。
+
 ### PowerShell 与 ripgrep 调用
 
 1. PowerShell 中禁止使用 Bash/C 风格的反斜杠转义双引号；`\"` 不会转义 PowerShell 双引号。包含双引号的检索表达式必须使用 PowerShell 单引号字面量。

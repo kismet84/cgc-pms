@@ -5,7 +5,6 @@ import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.budget.controller.ProjectBudgetController;
 import com.cgcpms.budget.entity.ProjectBudget;
 import com.cgcpms.budget.entity.ProjectBudgetLine;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,7 +34,6 @@ class ProjectBudgetControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired JwtHttpTestTokenFactory jwtUtils;
     @Autowired JdbcTemplate jdbc;
-    @Autowired ObjectMapper objectMapper;
 
     @BeforeEach void setup() {
         cleanup();
@@ -57,13 +55,14 @@ class ProjectBudgetControllerTest {
         assertWrite("submit", "budget:submit", Long.class, Integer.class);
     }
 
-    @Test void ordinaryBudgetRoleAllowedButReadOnlyCannotWrite() throws Exception {
+    @Test void ordinaryBudgetRoleReadsButStandaloneUpdateIsManagedByCostTarget() throws Exception {
         Cookie editor=cookie(USER,"BUDGET_USER","budget:query","budget:edit");
         mockMvc.perform(get("/project-budgets").param("projectId",String.valueOf(PROJECT)).cookie(editor))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.total").value(1));
         mockMvc.perform(put("/project-budgets/"+BUDGET).param("version","0").cookie(editor)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"projectId\":"+PROJECT+",\"versionNo\":\"HTTP-V1\",\"budgetName\":\"已更新\",\"totalAmount\":\"1000.00\"}"))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_BUDGET_MANAGED_BY_COST_TARGET"));
         mockMvc.perform(put("/project-budgets/"+BUDGET).param("version","1")
                         .cookie(cookie(USER,"BUDGET_READER","budget:query"))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"projectId\":"+PROJECT+",\"versionNo\":\"HTTP-V1\",\"budgetName\":\"拒绝\",\"totalAmount\":\"1000.00\"}"))
@@ -87,9 +86,9 @@ class ProjectBudgetControllerTest {
         mockMvc.perform(get("/project-budgets").param("projectId",String.valueOf(OUTSIDE)).cookie(scoped)).andExpect(status().isForbidden());
         mockMvc.perform(get("/project-budgets/"+OUTSIDE_BUDGET).cookie(scoped)).andExpect(status().isForbidden());
         mockMvc.perform(get("/project-budgets/"+OUTSIDE_BUDGET+"/availability").cookie(scoped)).andExpect(status().isForbidden());
-        mockMvc.perform(put("/project-budgets/"+OUTSIDE_BUDGET).param("version","0").cookie(scoped)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"projectId\":"+OUTSIDE+",\"versionNo\":\"HTTP-OUT\",\"budgetName\":\"越权\",\"totalAmount\":\"1000.00\"}"))
-                .andExpect(status().isForbidden());
+        expectManaged(put("/project-budgets/"+OUTSIDE_BUDGET).param("version","0")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"projectId\":"+OUTSIDE+",\"versionNo\":\"HTTP-OUT\",\"budgetName\":\"越权\",\"totalAmount\":\"1000.00\"}"),
+                scoped);
     }
 
     @Test void everyEndpointTraversesSpringSecurityWithItsExactAuthority() throws Exception {
@@ -98,16 +97,14 @@ class ProjectBudgetControllerTest {
         expectAllowed(get("/project-budgets/"+BUDGET),query);
         expectAllowed(get("/project-budgets/"+BUDGET+"/availability"),query);
 
-        String created=mockMvc.perform(post("/project-budgets").cookie(cookie(USER,"BUDGET_USER","budget:add"))
-                        .contentType(MediaType.APPLICATION_JSON).content(budgetBody(PROJECT,"HTTP-CREATE","新建预算")))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-        long createdId=Long.parseLong(objectMapper.readTree(created).path("data").asText());
-        expectAllowed(put("/project-budgets/"+BUDGET).param("version","0").contentType(MediaType.APPLICATION_JSON)
+        expectManaged(post("/project-budgets").contentType(MediaType.APPLICATION_JSON)
+                .content(budgetBody(PROJECT,"HTTP-CREATE","新建预算")),cookie(USER,"BUDGET_USER","budget:add"));
+        expectManaged(put("/project-budgets/"+BUDGET).param("version","0").contentType(MediaType.APPLICATION_JSON)
                 .content(budgetBody(PROJECT,"HTTP-V1","更新预算")),cookie(USER,"BUDGET_USER","budget:edit"));
-        expectAllowed(post("/project-budgets/"+BUDGET+"/lines").param("version","1").contentType(MediaType.APPLICATION_JSON)
+        expectManaged(post("/project-budgets/"+BUDGET+"/lines").param("version","0").contentType(MediaType.APPLICATION_JSON)
                 .content(lineBody()),cookie(USER,"BUDGET_USER","budget:edit"));
-        expectAllowed(post("/project-budgets/"+BUDGET+"/submit").param("version","2"),cookie(USER,"BUDGET_USER","budget:submit"));
-        expectAllowed(delete("/project-budgets/"+createdId).param("version","0"),cookie(USER,"BUDGET_USER","budget:delete"));
+        expectManaged(post("/project-budgets/"+BUDGET+"/submit").param("version","0"),cookie(USER,"BUDGET_USER","budget:submit"));
+        expectAllowed(delete("/project-budgets/"+BUDGET).param("version","0"),cookie(USER,"BUDGET_USER","budget:delete"));
     }
 
     @Test void queryOnlyAuthorityRejectsEveryWriteBeforeDatabaseMutation() throws Exception {
@@ -129,11 +126,11 @@ class ProjectBudgetControllerTest {
         expectForbidden(get("/project-budgets").param("projectId",String.valueOf(OUTSIDE)),all);
         expectForbidden(get("/project-budgets/"+OUTSIDE_BUDGET),all);
         expectForbidden(get("/project-budgets/"+OUTSIDE_BUDGET+"/availability"),all);
-        expectForbidden(post("/project-budgets").contentType(MediaType.APPLICATION_JSON).content(budgetBody(OUTSIDE,"HTTP-OUT-CREATE","越权新建")),all);
-        expectForbidden(put("/project-budgets/"+OUTSIDE_BUDGET).param("version","0").contentType(MediaType.APPLICATION_JSON).content(budgetBody(OUTSIDE,"HTTP-OUT","越权更新")),all);
-        expectForbidden(post("/project-budgets/"+OUTSIDE_BUDGET+"/lines").param("version","0").contentType(MediaType.APPLICATION_JSON).content(lineBody()),all);
+        expectManaged(post("/project-budgets").contentType(MediaType.APPLICATION_JSON).content(budgetBody(OUTSIDE,"HTTP-OUT-CREATE","越权新建")),all);
+        expectManaged(put("/project-budgets/"+OUTSIDE_BUDGET).param("version","0").contentType(MediaType.APPLICATION_JSON).content(budgetBody(OUTSIDE,"HTTP-OUT","越权更新")),all);
+        expectManaged(post("/project-budgets/"+OUTSIDE_BUDGET+"/lines").param("version","0").contentType(MediaType.APPLICATION_JSON).content(lineBody()),all);
         expectForbidden(delete("/project-budgets/"+OUTSIDE_BUDGET).param("version","0"),all);
-        expectForbidden(post("/project-budgets/"+OUTSIDE_BUDGET+"/submit").param("version","0"),all);
+        expectManaged(post("/project-budgets/"+OUTSIDE_BUDGET+"/submit").param("version","0"),all);
         assertEquals(beforeCount,jdbc.queryForObject("SELECT COUNT(*) FROM project_budget WHERE project_id=? AND deleted_flag=0",Integer.class,OUTSIDE));
         assertEquals(0,jdbc.queryForObject("SELECT version FROM project_budget WHERE id=?",Integer.class,OUTSIDE_BUDGET));
         assertEquals("DRAFT",jdbc.queryForObject("SELECT approval_status FROM project_budget WHERE id=?",String.class,OUTSIDE_BUDGET));
@@ -149,6 +146,10 @@ class ProjectBudgetControllerTest {
     }
     private void expectAllowed(MockHttpServletRequestBuilder request,Cookie cookie)throws Exception{mockMvc.perform(request.cookie(cookie)).andExpect(result->assertNotEquals(403,result.getResponse().getStatus()));}
     private void expectForbidden(MockHttpServletRequestBuilder request,Cookie cookie)throws Exception{mockMvc.perform(request.cookie(cookie)).andExpect(status().isForbidden());}
+    private void expectManaged(MockHttpServletRequestBuilder request,Cookie cookie)throws Exception{
+        mockMvc.perform(request.cookie(cookie)).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("PROJECT_BUDGET_MANAGED_BY_COST_TARGET"));
+    }
     private String budgetBody(long project,String version,String name){return "{\"projectId\":"+project+",\"versionNo\":\""+version+"\",\"budgetName\":\""+name+"\",\"totalAmount\":\"1000.00\"}";}
     private String lineBody(){return "[{\"costSubjectId\":"+SUBJECT+",\"budgetAmount\":\"1000.00\"}]";}
     private void insertBudget(long id,long project,String version,String created){

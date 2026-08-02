@@ -12,6 +12,11 @@ public class MatPurchaseOrderItemVO {
     private String budgetLineId;
     private String projectId;
     private String materialId;
+    private String contractItemId;
+    private String quantityAdjustReason;
+    private String pricingMode;
+    private String priceSource;
+    private String priceSourceReceiptItemId;
     private String materialName;
     private String specification;
     private String unit;

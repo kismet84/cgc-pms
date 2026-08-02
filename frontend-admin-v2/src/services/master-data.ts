@@ -117,12 +117,18 @@ export function loadCompanies(
   return apiRequest<PageResult<OrgCompanyRecord>>(withQuery('/org/companies', query), { signal })
 }
 
-export function loadDepartmentTree(signal?: AbortSignal): Promise<OrgDepartmentRecord[]> {
-  return apiRequest<OrgDepartmentRecord[]>('/org/departments/tree', { signal })
+export function loadDepartmentTree(
+  companyId?: string,
+  signal?: AbortSignal,
+): Promise<OrgDepartmentRecord[]> {
+  return apiRequest<OrgDepartmentRecord[]>(
+    withQuery('/org/departments/tree', { companyId: companyId || undefined }),
+    { signal },
+  )
 }
 
 export function loadPositions(
-  query: { pageNo: number; pageSize: number },
+  query: { pageNo: number; pageSize: number; companyId?: string; departmentId?: string },
   signal?: AbortSignal,
 ): Promise<PageResult<OrgPositionRecord>> {
   return apiRequest<PageResult<OrgPositionRecord>>(withQuery('/org/positions', query), { signal })

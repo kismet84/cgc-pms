@@ -42,13 +42,11 @@ const saving = ref(false)
 const error = ref('')
 const templates = ref<WorkflowTemplateRecord[]>([])
 const total = ref(0)
-const pageNo = ref(1)
-const pageSize = 10
+const selectedModule = ref('')
 const current = ref<WorkflowTemplateRecord | null>(null)
 let controller: AbortController | null = null
 
-const filter = reactive({ businessType: '', enabled: '', keyword: '' })
-const detailDialog = ref(false)
+const filter = reactive({ enabled: '', keyword: '' })
 const templateDialog = ref(false)
 const nodeDialog = ref(false)
 const editingNode = ref<WorkflowTemplateNodeRecord | null>(null)
@@ -107,6 +105,40 @@ const projectRoleOptions = [
   { value: 'MAT', label: '物资负责人' },
   { value: 'OTH', label: '其他项目成员' },
 ]
+const workflowModules: Record<string, { key: string; label: string }> = {
+  PROJECT_APPROVAL: { key: 'delivery', label: '项目履约' },
+  PROJECT_SCHEDULE: { key: 'delivery', label: '项目履约' },
+  PROJECT_PERIOD_PLAN: { key: 'delivery', label: '项目履约' },
+  PROJECT_CORRECTIVE_ACTION: { key: 'delivery', label: '项目履约' },
+  TECH_ITEM: { key: 'delivery', label: '项目履约' },
+  TECHNICAL_SCHEME: { key: 'delivery', label: '项目履约' },
+  PROJECT_FINAL_ACCEPTANCE: { key: 'delivery', label: '项目履约' },
+  CONTRACT_APPROVAL: { key: 'commercial', label: '商务合约' },
+  VAR_ORDER: { key: 'commercial', label: '商务合约' },
+  CT_CHANGE: { key: 'commercial', label: '商务合约' },
+  COST_TARGET: { key: 'commercial', label: '商务合约' },
+  PROJECT_BUDGET: { key: 'commercial', label: '商务合约' },
+  PRODUCTION_MEASUREMENT: { key: 'commercial', label: '商务合约' },
+  COST_CORRECTIVE_ACTION: { key: 'commercial', label: '商务合约' },
+  BID_COST_TARGET_TRANSFER: { key: 'commercial', label: '商务合约' },
+  BID_COST_TARGET_TRANSFER_REVERSAL: { key: 'commercial', label: '商务合约' },
+  PURCHASE_REQUEST: { key: 'supply', label: '供应链与物资' },
+  PURCHASE_ORDER: { key: 'supply', label: '供应链与物资' },
+  MATERIAL_RECEIPT: { key: 'supply', label: '供应链与物资' },
+  MATERIAL_REQUISITION: { key: 'supply', label: '供应链与物资' },
+  SUB_MEASURE: { key: 'subcontract-settlement', label: '分包与结算' },
+  SETTLEMENT: { key: 'subcontract-settlement', label: '分包与结算' },
+  PAY_REQUEST: { key: 'finance', label: '资金财务' },
+  EXPENSE: { key: 'finance', label: '资金财务' },
+  CONTRACT_REVENUE: { key: 'finance', label: '资金财务' },
+  OWNER_SETTLEMENT: { key: 'finance', label: '资金财务' },
+  FINANCE_COST_ALLOCATION: { key: 'finance', label: '资金财务' },
+  FINANCE_COST_ALLOCATION_REVERSAL: { key: 'finance', label: '资金财务' },
+  COST_SUBJECT_MAPPING: { key: 'master-data', label: '基础资料' },
+  DEMO_APPROVAL_SCENARIO: { key: 'system-management', label: '系统管理' },
+}
+const fallbackModule = { key: 'other', label: '其他' }
+const workflowModule = (businessType: string) => workflowModules[businessType] ?? fallbackModule
 const approverOptions = computed(() => {
   if (nodeForm.approverType === 'USER') {
     return users.value.map((item) => ({
@@ -128,13 +160,29 @@ const approverLabel = computed(() => {
   if (nodeForm.approverType === 'POSITION') return '审批岗位'
   return '项目角色'
 })
+const modules = computed(() => {
+  const counts = new Map<string, { label: string; count: number }>()
+  for (const template of templates.value) {
+    const module = workflowModule(template.businessType)
+    const currentCount = counts.get(module.key)?.count ?? 0
+    counts.set(module.key, { label: module.label, count: currentCount + 1 })
+  }
+  return [...counts].map(([key, module]) => ({
+    key,
+    ...module,
+  }))
+})
+const moduleTemplates = computed(() =>
+  templates.value.filter(
+    (template) => workflowModule(template.businessType).key === selectedModule.value,
+  ),
+)
 
 async function loadList(signal?: AbortSignal): Promise<void> {
   const page = await loadWorkflowTemplates(
     {
-      pageNo: pageNo.value,
-      pageSize,
-      businessType: filter.businessType.trim() || undefined,
+      pageNo: 1,
+      pageSize: 200,
       enabled: filter.enabled,
       keyword: filter.keyword.trim() || undefined,
     },
@@ -152,7 +200,14 @@ async function refresh(): Promise<void> {
   error.value = ''
   try {
     await loadList(currentController.signal)
-    if (current.value) await selectTemplate(current.value.id, false)
+    if (!modules.value.some((item) => item.key === selectedModule.value)) {
+      selectedModule.value = modules.value[0]?.key ?? ''
+    }
+    const selectedId = moduleTemplates.value.some((item) => item.id === current.value?.id)
+      ? current.value!.id
+      : moduleTemplates.value[0]?.id
+    if (selectedId) await selectTemplate(selectedId)
+    else current.value = null
   } catch (value) {
     if (!currentController.signal.aborted) {
       templates.value = []
@@ -164,8 +219,20 @@ async function refresh(): Promise<void> {
   }
 }
 
-async function selectTemplate(id: string, openDialog = true): Promise<void> {
-  if (openDialog) detailDialog.value = true
+async function refreshNow(): Promise<void> {
+  await refresh()
+  if (!error.value) showToast('success', '流程已刷新', '审批流程配置已重新读取。')
+}
+
+async function selectModule(module: string): Promise<void> {
+  if (selectedModule.value === module) return
+  selectedModule.value = module
+  const template = moduleTemplates.value[0]
+  if (template) await selectTemplate(template.id)
+  else current.value = null
+}
+
+async function selectTemplate(id: string): Promise<void> {
   detailLoading.value = true
   try {
     current.value = await loadWorkflowTemplate(id)
@@ -178,19 +245,12 @@ async function selectTemplate(id: string, openDialog = true): Promise<void> {
 }
 
 function search(): void {
-  pageNo.value = 1
   void refresh()
 }
 
 function reset(): void {
-  Object.assign(filter, { businessType: '', enabled: '', keyword: '' })
+  Object.assign(filter, { enabled: '', keyword: '' })
   search()
-}
-
-function changePage(next: number): void {
-  if (next < 1 || (next - 1) * pageSize >= total.value) return
-  pageNo.value = next
-  void refresh()
 }
 
 function openTemplateEditor(): void {
@@ -202,13 +262,11 @@ function openTemplateEditor(): void {
     amountMax: current.value.amountMax ?? '',
     remark: current.value.remark ?? '',
   })
-  detailDialog.value = false
   templateDialog.value = true
 }
 
 function closeTemplateEditor(): void {
   templateDialog.value = false
-  detailDialog.value = true
 }
 
 async function saveTemplate(): Promise<void> {
@@ -250,24 +308,20 @@ function openNodeEditor(node?: WorkflowTemplateNodeRecord): void {
     timeoutHours: node?.timeoutHours == null ? '' : String(node.timeoutHours),
     remark: node?.remark ?? '',
   })
-  detailDialog.value = false
   nodeDialog.value = true
   void loadApproverOptions()
 }
 
 function closeNodeEditor(): void {
   nodeDialog.value = false
-  detailDialog.value = true
 }
 
 function openDeleteNode(node: WorkflowTemplateNodeRecord): void {
-  detailDialog.value = false
   deleteTarget.value = node
 }
 
 function closeDeleteNode(): void {
   deleteTarget.value = null
-  detailDialog.value = true
 }
 
 async function saveNode(): Promise<void> {
@@ -447,12 +501,6 @@ onBeforeUnmount(() => controller?.abort())
             placeholder="流程名称或编码"
             hide-label
           />
-          <V2Input
-            v-model="filter.businessType"
-            label="业务类型"
-            placeholder="输入业务类型编码"
-            hide-label
-          />
           <V2Select
             v-model="filter.enabled"
             label="状态"
@@ -465,7 +513,7 @@ onBeforeUnmount(() => controller?.abort())
           <V2Button size="small" @click="search">查询</V2Button>
           <V2Button size="small" variant="secondary" @click="reset">重置</V2Button>
         </div>
-        <V2Button size="small" variant="secondary" @click="refresh">刷新</V2Button>
+        <V2Button size="small" variant="secondary" @click="refreshNow">刷新</V2Button>
       </template>
     </V2Card>
 
@@ -474,181 +522,193 @@ onBeforeUnmount(() => controller?.abort())
       <template #actions><V2Button @click="refresh">重试</V2Button></template>
     </V2PageState>
 
-    <div v-else>
-      <V2Card>
-        <V2PageState
-          v-if="!templates.length"
-          kind="empty"
-          title="暂无流程模板"
-          description="当前筛选条件没有流程模板。"
-        />
-        <div v-else class="workflow-process-page__table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>模板编码</th>
-                <th>流程名称</th>
-                <th>业务类型</th>
-                <th>节点</th>
-                <th>状态</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="template in templates" :key="template.id">
-                <th scope="row">
-                  <V2Button
-                    type="button"
-                    size="small"
-                    variant="ghost"
-                    class="v2-table__record-link"
-                    @click="selectTemplate(template.id)"
-                  >
-                    {{ template.templateCode }}
-                  </V2Button>
-                </th>
-                <td>{{ template.templateName }}</td>
-                <td>{{ workflowBusinessTypeLabel(template.businessType) }}</td>
-                <td>{{ template.nodeCount }}</td>
-                <td>
-                  <V2Badge :tone="template.enabled === 1 ? 'success' : 'neutral'">
-                    {{ statusLabel(template.enabled) }}
-                  </V2Badge>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <template #footer>
-          <nav class="workflow-process-page__pagination v2-pagination" aria-label="系统流程分页">
-            <span>共 {{ total }} 条</span>
-            <V2Button
-              size="small"
-              variant="secondary"
-              :disabled="pageNo === 1"
-              @click="changePage(pageNo - 1)"
+    <V2Card v-else>
+      <V2PageState
+        v-if="!templates.length"
+        kind="empty"
+        title="暂无流程模板"
+        description="当前筛选条件没有流程模板。"
+      />
+      <div v-else class="workflow-process-page__columns">
+        <section aria-labelledby="workflow-categories-title">
+          <div class="workflow-process-page__section-heading">
+            <h3 id="workflow-categories-title">1. 业务模块</h3>
+            <span>共 {{ modules.length }} 个</span>
+          </div>
+          <div class="workflow-process-page__list">
+            <button
+              v-for="module in modules"
+              :key="module.key"
+              type="button"
+              class="workflow-process-page__list-item"
+              :class="{ 'is-selected': selectedModule === module.key }"
+              :aria-pressed="selectedModule === module.key"
+              @click="selectModule(module.key)"
             >
-              上一页
-            </V2Button>
-            <span>第 {{ pageNo }} 页</span>
-            <V2Button
-              size="small"
-              variant="secondary"
-              :disabled="pageNo * pageSize >= total"
-              @click="changePage(pageNo + 1)"
-            >
-              下一页
-            </V2Button>
-          </nav>
-        </template>
-      </V2Card>
+              <strong>{{ module.label }}</strong>
+              <V2Badge tone="neutral">{{ module.count }}</V2Badge>
+            </button>
+          </div>
+        </section>
 
-      <V2Dialog
-        v-model:open="detailDialog"
-        title="审批流程详情"
-        :description="
-          current ? `${current.templateCode} · ${amountRange(current)}` : '读取流程模板详情。'
-        "
-        :close-disabled="detailLoading"
-        :close-on-backdrop="!detailLoading"
-        panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-wide"
-      >
-        <V2PageState
-          v-if="detailLoading"
-          kind="loading"
-          title="正在读取模板详情"
-          description="请稍候。"
-        />
-        <V2PageState
-          v-else-if="!current"
-          kind="empty"
-          title="请选择流程模板"
-          description="选择模板后可查看详情、维护节点和调整顺序。"
-        />
-        <template v-else>
-          <div class="workflow-process-page__detail-head">
-            <div>
-              <strong>{{ current.templateName }}</strong>
-              <span>{{ current.templateCode }} · {{ amountRange(current) }}</span>
-            </div>
-            <div>
-              <V2Button type="button" size="small" variant="secondary" @click="openTemplateEditor">
-                编辑模板
-              </V2Button>
-              <V2Button type="button" size="small" @click="openNodeEditor()">新增节点</V2Button>
-            </div>
+        <section aria-labelledby="workflow-templates-title">
+          <div class="workflow-process-page__section-heading">
+            <h3 id="workflow-templates-title">2. 流程模板</h3>
+            <span>共 {{ moduleTemplates.length }} 条</span>
           </div>
-          <div
-            class="workflow-process-page__table-wrap"
-            role="region"
-            aria-label="审批节点表格"
-            tabindex="0"
-          >
-            <table>
-              <thead>
-                <tr>
-                  <th>顺序</th>
-                  <th>节点编码</th>
-                  <th>节点名称</th>
-                  <th>审批模式</th>
-                  <th>转办/加签</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(node, index) in current.nodes" :key="node.id">
-                  <td>{{ node.nodeOrder }}</td>
-                  <th scope="row">{{ node.nodeCode }}</th>
-                  <td>{{ node.nodeName }}</td>
-                  <td>{{ modeLabel(node.approveMode) }}</td>
-                  <td>
-                    {{ node.allowTransfer === 1 ? '可' : '否' }} /
-                    {{ node.allowAddSign === 1 ? '可' : '否' }}
-                  </td>
-                  <td>
-                    <div class="workflow-process-page__actions">
-                      <V2Button
-                        type="button"
-                        size="small"
-                        variant="ghost"
-                        :disabled="saving || index === 0"
-                        @click="moveNode(node, -1)"
-                      >
-                        上移
-                      </V2Button>
-                      <V2Button
-                        type="button"
-                        size="small"
-                        variant="ghost"
-                        :disabled="saving || index === (current.nodes?.length ?? 0) - 1"
-                        @click="moveNode(node, 1)"
-                      >
-                        下移
-                      </V2Button>
-                      <V2Button
-                        type="button"
-                        size="small"
-                        variant="ghost"
-                        @click="openNodeEditor(node)"
-                      >
-                        编辑
-                      </V2Button>
-                      <V2Button
-                        type="button"
-                        size="small"
-                        variant="danger"
-                        @click="openDeleteNode(node)"
-                      >
-                        删除
-                      </V2Button>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div class="workflow-process-page__list">
+            <button
+              v-for="template in moduleTemplates"
+              :key="template.id"
+              type="button"
+              class="workflow-process-page__list-item"
+              :class="{ 'is-selected': current?.id === template.id }"
+              :aria-pressed="current?.id === template.id"
+              @click="selectTemplate(template.id)"
+            >
+              <span>
+                <strong>{{ template.templateName }}</strong>
+                <small>{{ template.templateCode }}</small>
+              </span>
+              <V2Badge :tone="template.enabled === 1 ? 'success' : 'neutral'">
+                {{ statusLabel(template.enabled) }}
+              </V2Badge>
+            </button>
           </div>
-        </template>
-      </V2Dialog>
-    </div>
+        </section>
+
+        <section aria-labelledby="workflow-configuration-title">
+          <div class="workflow-process-page__section-heading">
+            <h3 id="workflow-configuration-title">3. 流程配置</h3>
+          </div>
+          <V2PageState
+            v-if="detailLoading"
+            kind="loading"
+            title="正在读取模板详情"
+            description="请稍候。"
+          />
+          <V2PageState
+            v-else-if="!current"
+            kind="empty"
+            title="请选择流程模板"
+            description="选择模板后可维护设置和节点。"
+          />
+          <div v-else class="workflow-process-page__configuration">
+            <section aria-labelledby="workflow-settings-title">
+              <div class="workflow-process-page__section-heading">
+                <h4 id="workflow-settings-title">基本设置</h4>
+                <V2Button
+                  type="button"
+                  size="small"
+                  variant="secondary"
+                  @click="openTemplateEditor"
+                >
+                  编辑模板
+                </V2Button>
+              </div>
+              <dl class="workflow-process-page__facts">
+                <div>
+                  <dt>模板编码</dt>
+                  <dd>{{ current.templateCode }}</dd>
+                </div>
+                <div>
+                  <dt>业务类型</dt>
+                  <dd>{{ workflowBusinessTypeLabel(current.businessType) }}</dd>
+                </div>
+                <div>
+                  <dt>金额范围</dt>
+                  <dd>{{ amountRange(current) }}</dd>
+                </div>
+                <div>
+                  <dt>节点数量</dt>
+                  <dd>{{ current.nodes?.length ?? 0 }}</dd>
+                </div>
+                <div>
+                  <dt>状态</dt>
+                  <dd>{{ statusLabel(current.enabled) }}</dd>
+                </div>
+                <div>
+                  <dt>备注</dt>
+                  <dd>{{ current.remark || '-' }}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <section aria-labelledby="workflow-nodes-title">
+              <div class="workflow-process-page__section-heading">
+                <h4 id="workflow-nodes-title">审批节点</h4>
+                <V2Button type="button" size="small" @click="openNodeEditor()">新增节点</V2Button>
+              </div>
+              <V2PageState
+                v-if="!current.nodes?.length"
+                kind="empty"
+                title="暂无审批节点"
+                description="新增节点后可配置审批人与顺序。"
+              />
+              <div
+                v-else
+                class="workflow-process-page__table-wrap"
+                role="region"
+                aria-label="审批节点表格"
+                tabindex="0"
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th>顺序</th>
+                      <th>节点编码/名称</th>
+                      <th>模式</th>
+                      <th>操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(node, index) in current.nodes" :key="node.id">
+                      <td>{{ node.nodeOrder }}</td>
+                      <th scope="row">{{ node.nodeCode }} · {{ node.nodeName }}</th>
+                      <td>{{ modeLabel(node.approveMode) }}</td>
+                      <td>
+                        <div class="workflow-process-page__actions">
+                          <V2Button
+                            type="button"
+                            size="small"
+                            variant="ghost"
+                            :disabled="saving || index === 0"
+                            @click="moveNode(node, -1)"
+                            >上移</V2Button
+                          >
+                          <V2Button
+                            type="button"
+                            size="small"
+                            variant="ghost"
+                            :disabled="saving || index === (current.nodes?.length ?? 0) - 1"
+                            @click="moveNode(node, 1)"
+                            >下移</V2Button
+                          >
+                          <V2Button
+                            type="button"
+                            size="small"
+                            variant="ghost"
+                            @click="openNodeEditor(node)"
+                            >编辑</V2Button
+                          >
+                          <V2Button
+                            type="button"
+                            size="small"
+                            variant="danger"
+                            @click="openDeleteNode(node)"
+                            >删除</V2Button
+                          >
+                        </div>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </V2Card>
 
     <V2Dialog
       v-model:open="templateDialog"
@@ -735,9 +795,102 @@ onBeforeUnmount(() => controller?.abort())
   gap: var(--v2-space-4);
 }
 
+.workflow-process-page__columns {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.6fr) minmax(18rem, 0.85fr) minmax(34rem, 1.55fr);
+  gap: var(--v2-space-4);
+}
+
+.workflow-process-page__columns > section {
+  min-width: 0;
+}
+
+.workflow-process-page__section-heading,
+.workflow-process-page__list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+}
+
+.workflow-process-page__section-heading {
+  min-height: 2.5rem;
+  margin-bottom: var(--v2-space-3);
+}
+
+.workflow-process-page__section-heading h3 {
+  margin: 0;
+}
+
+.workflow-process-page__section-heading h4 {
+  margin: 0;
+}
+
+.workflow-process-page__configuration {
+  display: grid;
+  gap: var(--v2-space-5);
+}
+
+.workflow-process-page__configuration > section + section {
+  padding-top: var(--v2-space-4);
+  border-top: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.workflow-process-page__list {
+  display: grid;
+  gap: var(--v2-space-2);
+}
+
+.workflow-process-page__list-item {
+  width: 100%;
+  padding: var(--v2-space-3);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+  background: var(--v2-color-surface);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workflow-process-page__list-item:hover,
+.workflow-process-page__list-item.is-selected {
+  border-color: var(--v2-color-primary);
+  background: var(--v2-color-primary-soft);
+}
+
+.workflow-process-page__list-item span,
+.workflow-process-page__facts div {
+  display: grid;
+  gap: var(--v2-space-1);
+}
+
+.workflow-process-page__list-item small,
+.workflow-process-page__section-heading > span {
+  color: var(--v2-color-text-muted);
+}
+
+.workflow-process-page__facts {
+  display: grid;
+  gap: var(--v2-space-2);
+  margin: 0;
+}
+
+.workflow-process-page__facts div {
+  grid-template-columns: minmax(5rem, auto) minmax(0, 1fr);
+  padding-bottom: var(--v2-space-2);
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
+}
+
+.workflow-process-page__facts dt,
+.workflow-process-page__facts dd {
+  margin: 0;
+}
+
+.workflow-process-page__facts dt {
+  color: var(--v2-color-text-muted);
+}
+
 .workflow-process-page__filters,
-.workflow-process-page__detail-head,
-.workflow-process-page__pagination,
 .workflow-process-page__actions {
   display: flex;
   align-items: center;
@@ -765,33 +918,10 @@ onBeforeUnmount(() => controller?.abort())
   white-space: nowrap;
 }
 
-.workflow-process-page__detail-head {
-  justify-content: space-between;
-  margin-bottom: var(--v2-space-4);
-}
-
-.workflow-process-page__detail-head > div {
-  display: flex;
-  flex-direction: column;
-  gap: var(--v2-space-1);
-}
-
-.workflow-process-page__detail-head > div:last-child {
-  flex-direction: row;
-}
-
-.workflow-process-page__pagination {
-  justify-content: flex-end;
-}
-
 @media (max-width: 900px) {
-  .workflow-process-page__form-grid {
+  .workflow-process-page__form-grid,
+  .workflow-process-page__columns {
     grid-template-columns: 1fr;
-  }
-
-  .workflow-process-page__detail-head {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }
 </style>

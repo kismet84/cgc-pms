@@ -4,7 +4,10 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.purchase.entity.MatPurchaseRequest;
 import com.cgcpms.purchase.entity.MatPurchaseRequestItem;
+import com.cgcpms.purchase.dto.PurchaseRequestCreateCommand;
+import com.cgcpms.purchase.dto.PurchaseRequestApprovalCommand;
 import com.cgcpms.purchase.service.MatPurchaseRequestService;
+import com.cgcpms.purchase.service.PurchaseRequestApprovalService;
 import com.cgcpms.purchase.vo.MatPurchaseRequestItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseRequestVO;
 import jakarta.validation.Valid;
@@ -23,6 +26,7 @@ public class MatPurchaseRequestController {
 
     private final MatPurchaseRequestService requestService;
     private final Validator validator;
+    private final PurchaseRequestApprovalService approvalService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:list')")
@@ -50,6 +54,12 @@ public class MatPurchaseRequestController {
         return ApiResponse.success(String.valueOf(requestService.create(request)));
     }
 
+    @PostMapping("/with-items")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:add')")
+    public ApiResponse<String> createWithItems(@Valid @RequestBody PurchaseRequestCreateCommand command) {
+        return ApiResponse.success(String.valueOf(requestService.create(command.header(), command.items())));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:request:edit')")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody MatPurchaseRequest request) {
@@ -70,6 +80,28 @@ public class MatPurchaseRequestController {
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         requestService.submitForApproval(id);
         return ApiResponse.success();
+    }
+
+    @PostMapping("/{id}/resubmit")
+    @PreAuthorize("hasAuthority('purchase:request:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> resubmitForApproval(@PathVariable Long id, @RequestParam Long instanceId) {
+        requestService.resubmitForApproval(id, instanceId);
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/{requestId}/approval-tasks/{taskId}/approve")
+    @PreAuthorize("hasAuthority('workflow:approve') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> approve(@PathVariable Long requestId, @PathVariable Long taskId,
+                                     @Valid @RequestBody PurchaseRequestApprovalCommand command) {
+        approvalService.approve(requestId, taskId, command);
+        return ApiResponse.success();
+    }
+
+    @GetMapping("/{requestId}/approval-tasks/{taskId}/items")
+    @PreAuthorize("hasAuthority('workflow:approve') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<List<MatPurchaseRequestItemVO>> getApprovalItems(
+            @PathVariable Long requestId, @PathVariable Long taskId) {
+        return ApiResponse.success(approvalService.getItemsForApproval(requestId, taskId));
     }
 
     @GetMapping("/{id}/items")

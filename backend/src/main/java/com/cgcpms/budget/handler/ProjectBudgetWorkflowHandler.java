@@ -36,7 +36,9 @@ public class ProjectBudgetWorkflowHandler implements WorkflowBusinessHandler {
         ProjectBudget budget = budgetMapper.selectByIdForUpdate(budgetId, context.getInstance().getTenantId());
         if (budget == null) throw new IllegalStateException("项目预算不存在，budgetId=" + budgetId);
         if (BudgetStatusConstants.STATUS_ACTIVE.equals(budget.getStatus())
-                && Integer.valueOf(1).equals(budget.getActiveFlag())) return;
+                && Integer.valueOf(1).equals(budget.getActiveFlag())) {
+            return;
+        }
         jdbc.queryForObject("SELECT id FROM pm_project WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE",
                 Long.class, budget.getProjectId(), budget.getTenantId());
 

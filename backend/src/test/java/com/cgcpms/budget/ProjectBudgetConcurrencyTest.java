@@ -39,36 +39,19 @@ class ProjectBudgetConcurrencyTest {
     }
     @AfterEach void teardown() { cleanup(); UserContext.clear(); }
 
-    @Test void concurrentUpdatesHaveOneSuccessAndOneStableConflict() throws Exception {
-        CountDownLatch ready = new CountDownLatch(2), start = new CountDownLatch(1);
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-        AtomicInteger successes = new AtomicInteger();
-        List<String> codes = Collections.synchronizedList(new ArrayList<>());
-        for (String name : List.of("版本A", "版本B")) pool.submit(() -> {
-            try {
-                context(); ready.countDown(); start.await();
-                ProjectBudget input = new ProjectBudget(); input.setId(BUDGET); input.setVersionNo("V1");
-                input.setBudgetName(name); input.setTotalAmount(new BigDecimal("1000"));
-                service.update(input, 0); successes.incrementAndGet();
-            } catch (BusinessException e) { codes.add(e.getCode()); }
-            catch (Exception e) { codes.add(e.getClass().getSimpleName()); }
-            finally { UserContext.clear(); }
-        });
-        assertTrue(ready.await(10, TimeUnit.SECONDS)); start.countDown(); pool.shutdown();
-        assertTrue(pool.awaitTermination(30, TimeUnit.SECONDS));
-        assertEquals(1, successes.get());
-        assertEquals(List.of("BUDGET_CONCURRENT_UPDATE"), codes);
-        assertEquals(1, jdbc.queryForObject("SELECT version FROM project_budget WHERE id=?", Integer.class, BUDGET));
+    @Test void standaloneUpdateIsManagedByCostTarget() {
+        ProjectBudget input = new ProjectBudget(); input.setId(BUDGET); input.setVersionNo("V1");
+        input.setBudgetName("禁止独立更新"); input.setTotalAmount(new BigDecimal("1000"));
+        assertManaged(() -> service.update(input, 0));
+        assertEquals(0, jdbc.queryForObject("SELECT version FROM project_budget WHERE id=?", Integer.class, BUDGET));
+        assertEquals("并发预算", jdbc.queryForObject("SELECT budget_name FROM project_budget WHERE id=?", String.class, BUDGET));
     }
 
-    @Test void concurrentSaveLinesHasOneSuccessAndOneStableConflict() throws Exception {
-        RaceResult result=race(() -> {
-            ProjectBudgetLine line=new ProjectBudgetLine(); line.setCostSubjectId(SUBJECT); line.setBudgetAmount(new java.math.BigDecimal("1000"));
-            service.saveLines(BUDGET,0,List.of(line));
-        });
-        assertRace(result,"BUDGET_CONCURRENT_UPDATE");
+    @Test void standaloneSaveLinesIsManagedByCostTarget() {
+        ProjectBudgetLine line=new ProjectBudgetLine(); line.setCostSubjectId(SUBJECT); line.setBudgetAmount(new BigDecimal("1000"));
+        assertManaged(() -> service.saveLines(BUDGET,0,List.of(line)));
         assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM project_budget_line WHERE budget_id=? AND deleted_flag=0",Integer.class,BUDGET));
-        assertEquals(1,jdbc.queryForObject("SELECT version FROM project_budget WHERE id=?",Integer.class,BUDGET));
+        assertEquals(0,jdbc.queryForObject("SELECT version FROM project_budget WHERE id=?",Integer.class,BUDGET));
     }
 
     @Test void concurrentDeleteHasOneSuccessAndOneStableConflict() throws Exception {
@@ -78,11 +61,10 @@ class ProjectBudgetConcurrencyTest {
         assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM project_budget_line WHERE budget_id=? AND deleted_flag=0",Integer.class,BUDGET));
     }
 
-    @Test void concurrentSubmitHasOneSuccessOneConflictAndOneWorkflow() throws Exception {
-        RaceResult result=race(() -> service.submit(BUDGET,0));
-        assertRace(result,"BUDGET_CONCURRENT_UPDATE");
-        assertEquals("APPROVING",jdbc.queryForObject("SELECT approval_status FROM project_budget WHERE id=?",String.class,BUDGET));
-        assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM wf_instance WHERE tenant_id=0 AND business_type='PROJECT_BUDGET' AND business_id=? AND deleted_flag=0",Integer.class,BUDGET));
+    @Test void standaloneSubmitIsManagedByCostTarget() {
+        assertManaged(() -> service.submit(BUDGET,0));
+        assertEquals("DRAFT",jdbc.queryForObject("SELECT approval_status FROM project_budget WHERE id=?",String.class,BUDGET));
+        assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM wf_instance WHERE tenant_id=0 AND business_type='PROJECT_BUDGET' AND business_id=? AND deleted_flag=0",Integer.class,BUDGET));
     }
 
     private RaceResult race(ThrowingWork work)throws Exception{
@@ -94,6 +76,10 @@ class ProjectBudgetConcurrencyTest {
         return new RaceResult(successes.get(),codes);
     }
     private void assertRace(RaceResult result,String code){assertEquals(1,result.successes(),result.toString());assertEquals(List.of(code),result.codes(),result.toString());}
+    private void assertManaged(ThrowingWork work) {
+        BusinessException error = assertThrows(BusinessException.class, work::run);
+        assertEquals("PROJECT_BUDGET_MANAGED_BY_COST_TARGET", error.getCode());
+    }
     @FunctionalInterface private interface ThrowingWork{void run()throws Exception;}
     private record RaceResult(int successes,List<String> codes){}
 

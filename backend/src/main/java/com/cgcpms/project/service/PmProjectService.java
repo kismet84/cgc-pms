@@ -4,9 +4,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.common.exception.BusinessException;
-import com.cgcpms.budget.constant.BudgetStatusConstants;
-import com.cgcpms.budget.entity.ProjectBudget;
-import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
@@ -67,7 +64,7 @@ public class PmProjectService {
     private final WfInstanceMapper wfInstanceMapper;
     private final WorkflowEngine workflowEngine;
     private final SysUserMapper sysUserMapper;
-    private final ProjectBudgetMapper projectBudgetMapper;
+    private final ProjectLifecycleService projectLifecycleService;
     private final com.cgcpms.project.auth.ProjectAccessChecker projectAccessChecker;
     private final SysDictDataService sysDictDataService;
 
@@ -106,7 +103,8 @@ public class PmProjectService {
         return projectAccessChecker.accessibleProjects().stream()
                 .map(project -> new ProjectContextOptionVO(
                         project.getId().toString(), project.getProjectCode(),
-                        project.getProjectName(), project.getStatus()))
+                        project.getProjectName(), project.getStatus(),
+                        project.getProjectManagerId() == null ? null : project.getProjectManagerId().toString()))
                 .toList();
     }
 
@@ -227,7 +225,8 @@ public class PmProjectService {
         String current = project.getStatus();
         String target = targetStatus == null ? null : targetStatus.trim().toUpperCase();
         Map<String, Set<String>> transitions = Map.of(
-                ProjectStatusConstants.DRAFT, Set.of(ProjectStatusConstants.ACTIVE),
+                ProjectStatusConstants.DRAFT, Set.of(),
+                ProjectStatusConstants.PREPARING, Set.of(ProjectStatusConstants.ACTIVE),
                 ProjectStatusConstants.ACTIVE, Set.of(ProjectStatusConstants.SUSPENDED),
                 ProjectStatusConstants.SUSPENDED, Set.of(ProjectStatusConstants.ACTIVE),
                 ProjectStatusConstants.CLOSED, Set.of(),
@@ -235,22 +234,17 @@ public class PmProjectService {
         if (ProjectStatusConstants.CLOSED.equals(target)) {
             throw new BusinessException("PROJECT_CLOSEOUT_ACTION_REQUIRED", "项目只能通过竣工收尾闭环关闭");
         }
+        if (ProjectStatusConstants.ACTIVE.equals(target)
+                && !"APPROVED".equals(project.getApprovalStatus())) {
+            throw new BusinessException("PROJECT_APPROVAL_REQUIRED", "项目审批通过后才能进入在建状态");
+        }
         if (!transitions.getOrDefault(current, Set.of()).contains(target)) {
             throw new BusinessException("PROJECT_STATUS_TRANSITION_INVALID",
                     "不允许从 " + current + " 变更为 " + target);
         }
         if (ProjectStatusConstants.ACTIVE.equals(target)) {
-            if (!"APPROVED".equals(project.getApprovalStatus())) {
-                throw new BusinessException("PROJECT_APPROVAL_REQUIRED", "项目审批通过后才能进入在建状态");
-            }
-            Long activeBudgetCount = projectBudgetMapper.selectCount(new LambdaQueryWrapper<ProjectBudget>()
-                    .eq(ProjectBudget::getTenantId, project.getTenantId())
-                    .eq(ProjectBudget::getProjectId, project.getId())
-                    .eq(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_APPROVED)
-                    .eq(ProjectBudget::getStatus, BudgetStatusConstants.STATUS_ACTIVE)
-                    .eq(ProjectBudget::getActiveFlag, 1));
-            if (activeBudgetCount != 1) {
-                throw new BusinessException("PROJECT_ACTIVE_BUDGET_REQUIRED", "项目启用前必须存在唯一已审批生效预算");
+            if (!projectLifecycleService.isCostBudgetReady(project.getId(), project.getTenantId())) {
+                throw new BusinessException("PROJECT_ACTIVE_BUDGET_REQUIRED", "项目启用前必须存在唯一已审批生效的成本目标和预算");
             }
         }
         project.setStatus(target);

@@ -14,11 +14,15 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtContractItem> {
+
+    private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     private final CtContractItemMapper mapper;
     private final CtContractMapper ctContractMapper;
@@ -58,7 +62,8 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(CtContractItem item) {
-        requireDraftParentContract(item.getContractId(), "编辑合同清单");
+        CtContract contract = requireDraftParentContract(item.getContractId(), "编辑合同清单");
+        deriveFinancials(contract, List.of(item));
         item.setTenantId(UserContext.getCurrentTenantId());
         mapper.insert(item);
         return item.getId();
@@ -66,7 +71,8 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
 
     @Transactional(rollbackFor = Exception.class)
     public void batchSave(Long contractId, List<CtContractItem> items) {
-        requireDraftParentContract(contractId, "编辑合同清单");
+        CtContract contract = requireDraftParentContract(contractId, "编辑合同清单");
+        deriveFinancials(contract, items);
         LambdaQueryWrapper<CtContractItem> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(CtContractItem::getContractId, contractId);
         mapper.delete(wrapper);
@@ -83,11 +89,12 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
 
     @Transactional(rollbackFor = Exception.class)
     public void update(CtContractItem item) {
-        requireDraftParentContract(item.getContractId(), "编辑合同清单");
+        CtContract contract = requireDraftParentContract(item.getContractId(), "编辑合同清单");
         CtContractItem existing = mapper.selectById(item.getId());
         if (existing == null || !existing.getContractId().equals(item.getContractId())) {
             throw new BusinessException("ITEM_NOT_FOUND", "合同清单项不存在");
         }
+        deriveFinancials(contract, List.of(item));
         item.setTenantId(UserContext.getCurrentTenantId());
         mapper.updateById(item);
     }
@@ -100,5 +107,34 @@ public class CtContractItemService extends ServiceImpl<CtContractItemMapper, CtC
             throw new BusinessException("ITEM_NOT_FOUND", "合同清单项不存在");
         }
         mapper.deleteById(id);
+    }
+
+    void deriveFinancials(CtContract contract, List<CtContractItem> items) {
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+        BigDecimal taxRate = contract.getTaxRate();
+        if (taxRate == null || taxRate.compareTo(BigDecimal.ZERO) < 0 || taxRate.compareTo(HUNDRED) > 0) {
+            throw new BusinessException("CONTRACT_TAX_RATE_INVALID", "合同税率必须在0到100之间");
+        }
+        for (CtContractItem item : items) {
+            if (item.getQuantity() == null) {
+                throw new BusinessException("CONTRACT_ITEM_QUANTITY_REQUIRED", "合同清单数量不能为空");
+            }
+            if (item.getUnitPrice() == null) {
+                throw new BusinessException("CONTRACT_ITEM_UNIT_PRICE_REQUIRED", "合同清单单价不能为空");
+            }
+            if (item.getQuantity().compareTo(BigDecimal.ZERO) < 0 || item.getUnitPrice().compareTo(BigDecimal.ZERO) < 0) {
+                throw new BusinessException("CONTRACT_ITEM_PRICE_INVALID", "合同清单数量和单价不能为负数");
+            }
+            BigDecimal amount = item.getQuantity().multiply(item.getUnitPrice()).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal amountWithoutTax = taxRate.signum() == 0
+                    ? amount
+                    : amount.multiply(HUNDRED).divide(HUNDRED.add(taxRate), 2, RoundingMode.HALF_UP);
+            item.setAmount(amount);
+            item.setTaxRate(taxRate);
+            item.setAmountWithoutTax(amountWithoutTax);
+            item.setTaxAmount(amount.subtract(amountWithoutTax));
+        }
     }
 }

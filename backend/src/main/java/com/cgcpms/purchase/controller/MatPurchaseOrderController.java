@@ -5,9 +5,13 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
+import com.cgcpms.purchase.dto.PurchaseOrderFromRequestCommand;
 import com.cgcpms.purchase.service.MatPurchaseOrderService;
+import com.cgcpms.purchase.service.PurchaseOrderPricingService;
+import com.cgcpms.purchase.service.PurchaseRequestConversionService;
 import com.cgcpms.purchase.vo.MatPurchaseOrderItemVO;
 import com.cgcpms.purchase.vo.MatPurchaseOrderVO;
+import com.cgcpms.purchase.vo.PurchaseOrderPricingSuggestionVO;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.validation.constraints.Size;
@@ -26,6 +30,8 @@ public class MatPurchaseOrderController {
 
     private final MatPurchaseOrderService matPurchaseOrderService;
     private final Validator validator;
+    private final PurchaseOrderPricingService pricingService;
+    private final PurchaseRequestConversionService conversionService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:query')")
@@ -55,6 +61,13 @@ public class MatPurchaseOrderController {
         return ApiResponse.success(matPurchaseOrderService.create(order));
     }
 
+    @PostMapping("/from-request")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:add')")
+    public ApiResponse<Long> createFromRequest(
+            @Valid @RequestBody PurchaseOrderFromRequestCommand command) {
+        return ApiResponse.success(conversionService.createFromApprovedRequest(command));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:edit')")
     public ApiResponse<Void> update(@PathVariable Long id,
@@ -76,6 +89,20 @@ public class MatPurchaseOrderController {
     @PreAuthorize("hasAuthority('purchase:order:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<Void> submitForApproval(@PathVariable Long id) {
         matPurchaseOrderService.submitForApproval(id);
+        return ApiResponse.success();
+    }
+
+    @GetMapping("/pricing-suggestion")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('purchase:order:query')")
+    public ApiResponse<PurchaseOrderPricingSuggestionVO> pricingSuggestion(
+            @RequestParam Long contractId, @RequestParam Long materialId) {
+        return ApiResponse.success(pricingService.suggest(contractId, materialId));
+    }
+
+    @PostMapping("/{id}/resubmit")
+    @PreAuthorize("hasAuthority('purchase:order:submit') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    public ApiResponse<Void> resubmitForApproval(@PathVariable Long id, @RequestParam Long instanceId) {
+        matPurchaseOrderService.resubmitForApproval(id, instanceId);
         return ApiResponse.success();
     }
 

@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+set -eu
+
+pnpm --dir frontend-admin-v2 check:pre-push

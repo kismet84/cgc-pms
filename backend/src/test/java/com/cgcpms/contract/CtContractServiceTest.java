@@ -624,6 +624,19 @@ class CtContractServiceTest {
 
     @Test
     @Transactional
+    @DisplayName("按ID查询 — 返回服务端采购净应付")
+    void testGetByIdReturnsPurchasePayableAmount() {
+        CtContract contract = contractMapper.selectById(SEED_CONTRACT_30001);
+        contract.setPayableAmount(new BigDecimal("600.00"));
+        contractMapper.updateById(contract);
+
+        CtContractVO vo = contractService.getById(SEED_CONTRACT_30001);
+
+        assertEquals("600.00", vo.getPayableAmount());
+    }
+
+    @Test
+    @Transactional
     @DisplayName("按ID查询 — 不存在时抛 CONTRACT_NOT_FOUND")
     void testGetByIdNotFound() {
         BusinessException ex = assertThrows(BusinessException.class,
@@ -752,7 +765,7 @@ class CtContractServiceTest {
         toUpdate.setProjectId(PROJECT_ID);
         toUpdate.setPartyAId(PARTY_A_ID);
         toUpdate.setPartyBId(PARTY_B_ID);
-        toUpdate.setContractAmount(new BigDecimal("999000.00"));
+        toUpdate.setContractAmount(new BigDecimal("640000.00"));
         toUpdate.setCurrentAmount(new BigDecimal("1.00"));
         toUpdate.setTaxRate(new BigDecimal("6.00"));
         toUpdate.setTaxAmount(new BigDecimal("56509.43"));
@@ -770,12 +783,32 @@ class CtContractServiceTest {
         CtContract updated = contractMapper.selectById(id);
         assertEquals("更新后合同名称", updated.getContractName());
         assertEquals("SERVICE", updated.getContractType());
-        assertEquals(0, new BigDecimal("999000.00").compareTo(updated.getContractAmount()));
-        assertEquals(0, new BigDecimal("999000.00").compareTo(updated.getCurrentAmount()));
+        assertEquals(0, new BigDecimal("640000.00").compareTo(updated.getContractAmount()));
+        assertEquals(0, new BigDecimal("640000.00").compareTo(updated.getCurrentAmount()));
         assertEquals("测试备注", updated.getRemark());
         // 受保护字段不应被覆盖
         assertNotNull(updated.getContractCode(), "合同编号不应被覆盖");
         assertEquals(ContractStatusConstants.APPROVAL_DRAFT, updated.getApprovalStatus());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("更新 — 在建项目锁定合同总价")
+    void testUpdateActiveProjectContractAmountLocked() {
+        Long id = insertDraftContract("在建项目合同总价锁定");
+        CtContract existing = contractMapper.selectById(id);
+        CtContract toUpdate = buildDraftContract("尝试直接改价");
+        toUpdate.setId(id);
+        toUpdate.setVersion(existing.getVersion());
+        toUpdate.setContractAmount(new BigDecimal("999000.00"));
+
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> contractService.update(toUpdate));
+
+        assertEquals("CONTRACT_AMOUNT_LOCKED", error.getCode());
+        CtContract unchanged = contractMapper.selectById(id);
+        assertEquals(0, existing.getContractAmount().compareTo(unchanged.getContractAmount()));
+        assertEquals(existing.getVersion(), unchanged.getVersion());
     }
 
     @Test
@@ -913,6 +946,45 @@ class CtContractServiceTest {
         assertEquals("PURCHASE_SUPPLIER_BLACKLISTED", ex.getCode());
     }
 
+    @Test
+    @Transactional
+    @DisplayName("创建合同 — 采购合同拒绝非法服务端计价模式")
+    void testCreatePurchaseContractRejectsInvalidPricingMode() {
+        enablePurchaseSupplier();
+        CtContract contract = buildDraftContract("非法计价模式采购合同");
+        contract.setContractType("PURCHASE");
+        contract.setPricingMode("UNKNOWN");
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> contractService.create(contract));
+        assertEquals("PURCHASE_CONTRACT_PRICING_MODE_INVALID", ex.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("提交审批 — 采购合同必须存在物料清单")
+    void testSubmitPurchaseContractRequiresMaterialItem() {
+        enablePurchaseSupplier();
+        CtContract contract = buildDraftContract("缺少物料清单采购合同");
+        contract.setContractType("PURCHASE");
+        contract.setPricingMode("FIXED");
+        contract.setContractCode("CT-TEST-ITEM-" + System.nanoTime());
+        contract.setTenantId(TENANT_ID);
+        contractMapper.insert(contract);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> contractService.submitForApproval(contract.getId(), currentVersion(contract.getId())));
+        assertEquals("PURCHASE_CONTRACT_ITEM_REQUIRED", ex.getCode());
+    }
+
+    private void enablePurchaseSupplier() {
+        MdPartner supplier = partnerMapper.selectById(PARTY_B_ID);
+        supplier.setPartnerType("SUPPLIER");
+        supplier.setStatus("ENABLE");
+        supplier.setBlacklistFlag(0);
+        partnerMapper.updateById(supplier);
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // 复合原子保存
     // ═══════════════════════════════════════════════════════════════
@@ -969,7 +1041,7 @@ class CtContractServiceTest {
         CtContract existing = contractMapper.selectById(id);
 
         CtContractItem item = buildItem("CI-CMP-UPD-001", "新清单项",
-                new BigDecimal("50.00"), new BigDecimal("200.00"));
+                new BigDecimal("50.00"), new BigDecimal("12800.00"));
         CtContractPaymentTerm term = buildTerm("进度款", new BigDecimal("50.00"), 1);
 
         CtContract updateContract = new CtContract();
@@ -980,8 +1052,8 @@ class CtContractServiceTest {
         updateContract.setProjectId(PROJECT_ID);
         updateContract.setPartyAId(PARTY_A_ID);
         updateContract.setPartyBId(PARTY_B_ID);
-        updateContract.setContractAmount(new BigDecimal("10000.00"));
-        updateContract.setCurrentAmount(new BigDecimal("10000.00"));
+        updateContract.setContractAmount(new BigDecimal("640000.00"));
+        updateContract.setCurrentAmount(new BigDecimal("640000.00"));
         updateContract.setPaidAmount(BigDecimal.ZERO);
         updateContract.setTaxRate(new BigDecimal("13.00"));
         updateContract.setTaxAmount(new BigDecimal("1300.00"));
@@ -994,7 +1066,7 @@ class CtContractServiceTest {
         request.setContract(updateContract);
         request.setItems(List.of(item));
         term.setPaymentRatio(new BigDecimal("100.00"));
-        term.setPaymentAmount(new BigDecimal("10000.00"));
+        term.setPaymentAmount(new BigDecimal("640000.00"));
         request.setPaymentTerms(List.of(term));
 
         Long resultId = contractService.compositeSave(request);
@@ -1445,15 +1517,31 @@ class CtContractServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("创建 — 头部税额拆分不一致抛 CONTRACT_AMOUNT_BREAKDOWN_MISMATCH")
-    void testCreateRejectsMismatchedAmountBreakdown() {
-        CtContract contract = buildDraftContract("头部拆分不一致合同");
+    @DisplayName("创建 — 头部税额由服务端按金额和税率覆盖客户端事实")
+    void testCreateDerivesAmountBreakdown() {
+        CtContract contract = buildDraftContract("头部税额服务端派生合同");
+        contract.setContractAmount(new BigDecimal("113.00"));
+        contract.setTaxRate(new BigDecimal("13.00"));
         contract.setTaxAmount(new BigDecimal("1.00"));
         contract.setAmountWithoutTax(new BigDecimal("2.00"));
 
+        Long id = contractService.create(contract);
+        CtContract saved = contractMapper.selectById(id);
+
+        assertEquals(0, new BigDecimal("13.00").compareTo(saved.getTaxAmount()));
+        assertEquals(0, new BigDecimal("100.00").compareTo(saved.getAmountWithoutTax()));
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("创建 — 税率超过100拒绝")
+    void testCreateRejectsTaxRateAboveHundred() {
+        CtContract contract = buildDraftContract("非法税率合同");
+        contract.setTaxRate(new BigDecimal("100.01"));
+
         BusinessException error = assertThrows(BusinessException.class,
                 () -> contractService.create(contract));
-        assertEquals("CONTRACT_AMOUNT_BREAKDOWN_MISMATCH", error.getCode());
+        assertEquals("CONTRACT_TAX_RATE_INVALID", error.getCode());
     }
 
     @Test

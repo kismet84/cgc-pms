@@ -91,6 +91,33 @@ class DictionaryMigrationH2Test {
                 "SELECT status FROM sys_dict_type WHERE id=990001", String.class));
     }
 
+    @Test
+    void v261AddsPreparingProjectStatusAndReordersLifecycle() throws Exception {
+        DriverManagerDataSource dataSource = new DriverManagerDataSource(
+                "jdbc:h2:mem:dict_migration_v261;MODE=MySQL;DATABASE_TO_LOWER=TRUE;"
+                        + "DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1",
+                "sa",
+                "");
+        try (Connection connection = dataSource.getConnection()) {
+            run(connection, "db/migration-h2/B215__cgc_pms_baseline.sql");
+            run(connection, "db/migration-h2/V216__normalize_core_dictionary_codes.sql");
+            run(connection, "db/migration-h2/V261__add_project_preparing_status.sql");
+        }
+
+        JdbcTemplate jdbc = new JdbcTemplate(dataSource);
+        assertEquals(6, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_dict_data WHERE tenant_id=0 AND dict_type_id=1001", Integer.class));
+        assertEquals("前期", jdbc.queryForObject(
+                "SELECT dict_label FROM sys_dict_data WHERE id=100101", String.class));
+        assertEquals("PREPARING", value(jdbc, 2610101L));
+        assertEquals("筹备", jdbc.queryForObject(
+                "SELECT dict_label FROM sys_dict_data WHERE id=2610101", String.class));
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT order_num FROM sys_dict_data WHERE id=2610101", Integer.class));
+        assertEquals(3, jdbc.queryForObject(
+                "SELECT order_num FROM sys_dict_data WHERE id=100102", Integer.class));
+    }
+
     private void run(Connection connection, String resource) throws Exception {
         var stream = Thread.currentThread().getContextClassLoader().getResourceAsStream(resource);
         assertNotNull(stream, resource);

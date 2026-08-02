@@ -92,6 +92,7 @@ class Phase3IntegrationTest {
     private long materialSubjectId;
     private long subcontractSubjectId;
     private long earthworkSubjectId;
+    private long constructionSubjectId;
 
     // ── CT_CHANGE ──
     @Autowired private CtContractChangeService changeService;
@@ -166,6 +167,7 @@ class Phase3IntegrationTest {
                 "SELECT 5, 0, 'cost', '$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2', '成本人员', '13800000004', 'cost@cgc-pms.com', 'ENABLE', 0, 1, 'test-seed' " +
                 "WHERE NOT EXISTS (SELECT 1 FROM sys_user WHERE id = 5)");
 
+        constructionSubjectId = ensureCostSubject("5401.03", "施工阶段成本", "CONSTRUCTION", 2);
         materialSubjectId = ensureCostSubject("5401.03.02", "材料费", "MATERIAL", 3);
         subcontractSubjectId = ensureCostSubject("5401.03.05", "专业分包费", "SUBCONTRACT", 3);
         earthworkSubjectId = ensureCostSubject("5401.03.05.01", "土方分包", "SUBCONTRACT", 4);
@@ -511,9 +513,9 @@ class Phase3IntegrationTest {
         targetItem.setTargetId(targetId);
         targetItem.setProjectId(PROJECT_ID);
         targetItem.setCostSubjectId(materialSubjectId); // V2 标准科目：5401.03.02 材料费
-        targetItem.setTargetAmount(new BigDecimal("300000000.00"));
-        targetItem.setBidCostAmount(new BigDecimal("300000000.00"));
-        targetItem.setResponsibilityAmount(new BigDecimal("300000000.00"));
+        targetItem.setTargetAmount(new BigDecimal("210000000.00"));
+        targetItem.setBidCostAmount(new BigDecimal("210000000.00"));
+        targetItem.setResponsibilityAmount(new BigDecimal("210000000.00"));
         targetItem.setResponsibleUserId(USER_ADMIN);
         targetItem.setResponsibilityUnit("项目成本组");
         targetItem.setCreatedBy(USER_ADMIN);
@@ -539,6 +541,23 @@ class Phase3IntegrationTest {
         targetItem2.setUpdatedTime(LocalDateTime.now());
         targetItem2.setDeletedFlag(0);
         costTargetItemMapper.insert(targetItem2);
+
+        CostTargetItem occupiedItem = new CostTargetItem();
+        occupiedItem.setTenantId(0L);
+        occupiedItem.setTargetId(targetId);
+        occupiedItem.setProjectId(PROJECT_ID);
+        occupiedItem.setCostSubjectId(constructionSubjectId); // 测试夹具已有9000万合同分配，版本切换必须保留
+        occupiedItem.setTargetAmount(new BigDecimal("90000000.00"));
+        occupiedItem.setBidCostAmount(new BigDecimal("90000000.00"));
+        occupiedItem.setResponsibilityAmount(new BigDecimal("90000000.00"));
+        occupiedItem.setResponsibleUserId(USER_ADMIN);
+        occupiedItem.setResponsibilityUnit("项目成本组");
+        occupiedItem.setCreatedBy(USER_ADMIN);
+        occupiedItem.setCreatedTime(LocalDateTime.now());
+        occupiedItem.setUpdatedBy(USER_ADMIN);
+        occupiedItem.setUpdatedTime(LocalDateTime.now());
+        occupiedItem.setDeletedFlag(0);
+        costTargetItemMapper.insert(occupiedItem);
 
         // 3. 提交目标成本审批（目标成本必须通过专用服务入口）
         assertDoesNotThrow(() -> costTargetService.submitForApproval(targetId, saved.getVersion()),

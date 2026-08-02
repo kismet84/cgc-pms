@@ -534,14 +534,10 @@ describe('全 V2 UI 整改门禁', () => {
     expect(purchase).toContain('class="v2-detail-dialog__section-heading"')
     expect(purchase).toContain('class="v2-detail-dialog__table"')
     expect(purchase).toContain(':aria-label="`${title}明细表格`"')
-    expect(purchase).toContain(
-      "['物料', '规格', '单位', '数量', '预计单价', '预计金额', '计划日期']",
-    )
+    expect(purchase).toContain("['物料', '规格', '单位', '数量', '使用部位', '计划日期']")
     expect(purchase).toContain("['物料', '规格', '单位', '数量', '单价', '金额', '已收数量']")
     for (const heading of [
-      '实收数量',
-      '合格数量',
-      '不合格数量',
+      '本次合格数量',
       '订单数量',
       '累计收货',
       '剩余数量',

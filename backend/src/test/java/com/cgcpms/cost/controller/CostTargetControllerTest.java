@@ -51,6 +51,9 @@ class CostTargetControllerTest {
 
     /** ID of the cost target created for tests. */
     private static Long testTargetId;
+    private static Long compositeDraftId;
+    private static Long previousCompositeManagerId;
+    private static boolean compositeManagerCaptured;
 
     @BeforeAll
     void seedCostSubjects() {
@@ -67,6 +70,16 @@ class CostTargetControllerTest {
         if (testTargetId != null) {
             jdbcTemplate.update("DELETE FROM cost_target_item WHERE target_id=?", testTargetId);
             jdbcTemplate.update("DELETE FROM cost_target WHERE id=?", testTargetId);
+        }
+        if (compositeDraftId != null) {
+            jdbcTemplate.update("DELETE FROM cost_target_item WHERE target_id=?", compositeDraftId);
+            jdbcTemplate.update("DELETE FROM cost_target WHERE id=?", compositeDraftId);
+        }
+        if (compositeManagerCaptured) {
+            jdbcTemplate.update("UPDATE pm_project SET project_manager_id=? WHERE id=?",
+                    previousCompositeManagerId, PROJECT_ID);
+            jdbcTemplate.update("DELETE FROM pm_project_member WHERE project_id=? AND user_id=?",
+                    PROJECT_ID, OUTSIDER_USER_ID);
         }
         for (long subjectId : SUBJECT_IDS) {
             jdbcTemplate.update("DELETE FROM cost_subject WHERE id=? AND subject_code=?", subjectId, "TEST-" + subjectId);
@@ -561,6 +574,54 @@ class CostTargetControllerTest {
         } finally {
             jdbcTemplate.update("DELETE FROM cost_target WHERE id IN (?,?)", firstId, secondId);
         }
+    }
+
+    @Test
+    @Order(17)
+    @DisplayName("composite draft saves header and items with server-computed totals")
+    void testCompositeDraftComputesTotals() throws Exception {
+        previousCompositeManagerId = jdbcTemplate.queryForObject(
+                "SELECT project_manager_id FROM pm_project WHERE id=?", Long.class, PROJECT_ID);
+        compositeManagerCaptured = true;
+        String body = """
+                {
+                  "projectId": %d,
+                  "projectManagerId": %d,
+                  "versionNo": "V-COMPOSITE-%d",
+                  "versionName": "项目成本预算复合草稿",
+                  "items": [{
+                    "costSubjectId": 101,
+                    "targetAmount": 120.50,
+                    "bidCostAmount": 110.25,
+                    "responsibilityAmount": 120.50,
+                    "responsibleUserId": 1
+                  }]
+                }
+                """.formatted(PROJECT_ID, OUTSIDER_USER_ID, System.nanoTime());
+
+        String response = mockMvc.perform(postWithApiContext("/cost-targets/drafts")
+                        .cookie(adminCookie())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0"))
+                .andReturn().getResponse().getContentAsString();
+        compositeDraftId = Long.parseLong(response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
+
+        mockMvc.perform(getWithApiContext("/cost-targets/" + compositeDraftId).cookie(adminCookie()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalTargetAmount").value("120.50"))
+                .andExpect(jsonPath("$.data.totalBidCostAmount").value("110.25"))
+                .andExpect(jsonPath("$.data.totalResponsibilityAmount").value("120.50"));
+        Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM cost_target_item WHERE target_id=? AND deleted_flag=0",
+                Integer.class, compositeDraftId));
+        Assertions.assertEquals(OUTSIDER_USER_ID, jdbcTemplate.queryForObject(
+                "SELECT project_manager_id FROM pm_project WHERE id=?", Long.class, PROJECT_ID));
+        Assertions.assertEquals(1, jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM pm_project_member
+                WHERE project_id=? AND user_id=? AND role_code='PM' AND status='ACTIVE' AND deleted_flag=0
+                """, Integer.class, PROJECT_ID, OUTSIDER_USER_ID));
     }
 
     private void assertActionPassesSecurity(String authority, MockHttpServletRequestBuilder request) throws Exception {

@@ -6,6 +6,7 @@ import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.contract.service.ContractProcurementPayableService;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.service.CostGenerationService;
@@ -26,6 +27,7 @@ import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import com.cgcpms.purchase.service.MatPurchaseOrderService;
+import com.cgcpms.receipt.dto.MatReceiptItemCommand;
 import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
@@ -47,6 +49,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,7 +72,7 @@ class Phase2FullChainIntegrationTest {
     /** Demo data: ONGOING project PRJ-2026-001 */
     private static final long PROJECT_ID = 10001L;
     /** Demo data: supplier partner */
-    private static final long PARTNER_ID = 20001L;
+    private static final long PARTNER_ID = 20002L;
 
     @Autowired private MatPurchaseOrderService purchaseOrderService;
     @Autowired private MatReceiptService receiptService;
@@ -93,11 +96,41 @@ class Phase2FullChainIntegrationTest {
     @Autowired private SysUserMapper sysUserMapper;
     @Autowired private WfInstanceMapper wfInstanceMapper;
     @Autowired private WfTaskMapper wfTaskMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private ContractProcurementPayableService contractProcurementPayableService;
 
     @BeforeEach
     void setupContext() {
         seedAdminUser();
         TestUserContext.setAdmin(TestUserContext.TENANT_0, USER_ADMIN);
+        ensurePurchaseContractFixture();
+    }
+
+    private void ensurePurchaseContractFixture() {
+        jdbcTemplate.update("UPDATE md_partner SET partner_type='SUPPLIER', blacklist_flag=0, status='ENABLE' WHERE id=?",
+                PARTNER_ID);
+        jdbcTemplate.update("""
+                UPDATE ct_contract
+                SET contract_type='PURCHASE', party_b_id=?, contract_status='PERFORMING',
+                    approval_status='APPROVED', pricing_mode='FIXED'
+                WHERE id=?
+                """, PARTNER_ID, CONTRACT_ID);
+        ensureContractItem(6200101L, 1L, "C30商品砼", new BigDecimal("450"));
+        ensureContractItem(6200102L, 2L, "HRB400螺纹钢", new BigDecimal("3800"));
+    }
+
+    private void ensureContractItem(long id, long materialId, String name, BigDecimal unitPrice) {
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract_item (
+                    id, tenant_id, contract_id, material_id, item_code, item_name,
+                    quantity, unit_price, amount, created_by, deleted_flag
+                ) SELECT ?, 0, ?, ?, ?, ?, 1000, ?, 0, ?, 0
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ct_contract_item
+                    WHERE tenant_id=0 AND contract_id=? AND material_id=? AND deleted_flag=0
+                )
+                """, id, CONTRACT_ID, materialId, "PHASE2-" + materialId, name,
+                unitPrice, USER_ADMIN, CONTRACT_ID, materialId);
     }
 
     @AfterEach
@@ -203,9 +236,9 @@ class Phase2FullChainIntegrationTest {
                         .eq(MatPurchaseOrderItem::getOrderId, orderId));
         assertEquals(2, orderItems.size(), "应有2条订单明细");
 
-        MatReceiptItem ri1 = buildReceiptItem(orderItems.get(0).getId(),
+        MatReceiptItemCommand ri1 = buildReceiptItem(orderItems.get(0).getId(),
                 new BigDecimal("80"), new BigDecimal("80"), new BigDecimal("450"), new BigDecimal("36000.00"));
-        MatReceiptItem ri2 = buildReceiptItem(orderItems.get(1).getId(),
+        MatReceiptItemCommand ri2 = buildReceiptItem(orderItems.get(1).getId(),
                 new BigDecimal("30"), new BigDecimal("30"), new BigDecimal("3800"), new BigDecimal("114000.00"));
         receiptService.saveItemsBatch(receiptId, List.of(ri1, ri2));
 
@@ -242,7 +275,7 @@ class Phase2FullChainIntegrationTest {
         Long orderId = createOrderWithItems();
         MatPurchaseOrder approvedOrder = purchaseOrderMapper.selectById(orderId);
         approvedOrder.setApprovalStatus("APPROVED");
-        approvedOrder.setOrderStatus("APPROVED");
+        approvedOrder.setOrderStatus("PERFORMING");
         purchaseOrderMapper.updateById(approvedOrder);
         Long receiptId = createReceiptWithItems(orderId);
 
@@ -424,6 +457,7 @@ class Phase2FullChainIntegrationTest {
         // 1. 创建验收单（明细金额36000和114000）
         Long orderId = createOrderWithItems();
         Long receiptId = createReceiptWithItems(orderId);
+        approveReceiptFact(receiptId);
 
         List<MatReceiptItem> receiptItems = receiptItemMapper.selectList(
                 new LambdaQueryWrapper<MatReceiptItem>()
@@ -479,33 +513,28 @@ class Phase2FullChainIntegrationTest {
     @Test
     @Order(18)
     @Transactional
-    @DisplayName("场景6c: 付款金额边界——累计付款精确等于合同金额")
+    @DisplayName("场景6c: 付款金额边界——累计付款精确等于合同净应付")
     void test06c_balanceBoundaryExactMatch() {
-        // 在已有审批申请基线上再留出 100000，避免共享种子数据影响边界语义。
-        BigDecimal existingApproved = approvedApplicationAmount(CONTRACT_ID);
-        CtContract contract = contractMapper.selectById(CONTRACT_ID);
-        contract.setContractAmount(existingApproved.add(new BigDecimal("100000")));
-        contract.setCurrentAmount(existingApproved.add(new BigDecimal("100000")));
-        contractMapper.updateById(contract);
+        clearExistingPaymentCommitments();
+        approveReceiptFact(createReceiptWithItems(createOrderWithItems()));
 
-        // Create and approve first payment of 50000
+        // 已验收净应付150000；首笔75000审批后，第二笔75000应精确通过。
         PayApplication app1 = new PayApplication();
         app1.setProjectId(PROJECT_ID);
         app1.setContractId(CONTRACT_ID);
         app1.setPartnerId(PARTNER_ID);
-        app1.setApplyAmount(new BigDecimal("50000"));
+        app1.setApplyAmount(new BigDecimal("75000"));
         app1.setPayType("PROGRESS");
         app1.setApplyReason("boundary test 1");
         payApplicationService.create(app1);
         app1.setApprovalStatus("APPROVED");
         payApplicationMapper.updateById(app1);
 
-        // Second payment of 50000 should pass (total = 100000 = contract amount)
         PayApplication app2 = new PayApplication();
         app2.setProjectId(PROJECT_ID);
         app2.setContractId(CONTRACT_ID);
         app2.setPartnerId(PARTNER_ID);
-        app2.setApplyAmount(new BigDecimal("50000"));
+        app2.setApplyAmount(new BigDecimal("75000"));
         app2.setPayType("PROGRESS");
         app2.setApplyReason("boundary test 2");
 
@@ -514,7 +543,7 @@ class Phase2FullChainIntegrationTest {
             payApplicationService.validatePaymentAmount(app2);
         });
 
-        System.out.println("✅ 场景6c 通过: 精确等于合同余额通过校验");
+        System.out.println("✅ 场景6c 通过: 精确等于合同净应付通过校验");
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -525,19 +554,14 @@ class Phase2FullChainIntegrationTest {
     @Transactional
     @DisplayName("场景6d: 付款金额边界——超出合同余额1分钱应拒止")
     void test06d_balanceBoundaryExceedByOneCent() {
-        // Contract amount = 100000, first payment = 50000 (approved)
-        // Second payment = 50000.01 → should be REJECTED (exceeds by 1 cent)
-        BigDecimal existingApproved = approvedApplicationAmount(CONTRACT_ID);
-        CtContract contract = contractMapper.selectById(CONTRACT_ID);
-        contract.setContractAmount(existingApproved.add(new BigDecimal("100000")));
-        contract.setCurrentAmount(existingApproved.add(new BigDecimal("100000")));
-        contractMapper.updateById(contract);
+        clearExistingPaymentCommitments();
+        approveReceiptFact(createReceiptWithItems(createOrderWithItems()));
 
         PayApplication app1 = new PayApplication();
         app1.setProjectId(PROJECT_ID);
         app1.setContractId(CONTRACT_ID);
         app1.setPartnerId(PARTNER_ID);
-        app1.setApplyAmount(new BigDecimal("50000"));
+        app1.setApplyAmount(new BigDecimal("75000"));
         app1.setPayType("PROGRESS");
         app1.setApplyReason("boundary test");
         payApplicationService.create(app1);
@@ -548,7 +572,7 @@ class Phase2FullChainIntegrationTest {
         app2.setProjectId(PROJECT_ID);
         app2.setContractId(CONTRACT_ID);
         app2.setPartnerId(PARTNER_ID);
-        app2.setApplyAmount(new BigDecimal("50000.01"));
+        app2.setApplyAmount(new BigDecimal("75000.01"));
         app2.setPayType("PROGRESS");
         app2.setApplyReason("exceed by 1 cent");
 
@@ -563,15 +587,6 @@ class Phase2FullChainIntegrationTest {
         System.out.println("✅ 场景6d 通过: 超出合同余额1分钱被拒止, code=" + ex.getCode());
     }
 
-    private BigDecimal approvedApplicationAmount(Long contractId) {
-        return payApplicationMapper.selectList(new LambdaQueryWrapper<PayApplication>()
-                        .eq(PayApplication::getContractId, contractId)
-                        .eq(PayApplication::getApprovalStatus, "APPROVED"))
-                .stream()
-                .map(item -> item.getApplyAmount() == null ? BigDecimal.ZERO : item.getApplyAmount())
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
     // ═══════════════════════════════════════════════════════════
     // 场景7: 付款回写与联动
     // ═══════════════════════════════════════════════════════════
@@ -583,6 +598,8 @@ class Phase2FullChainIntegrationTest {
         // 1. 创建采购订单+明细 → 验收单+明细
         Long orderId = createOrderWithItems();
         Long receiptId = createReceiptWithItems(orderId);
+        approveReceiptFact(receiptId);
+        clearExistingPaymentCommitments();
 
         List<MatReceiptItem> receiptItems = receiptItemMapper.selectList(
                 new LambdaQueryWrapper<MatReceiptItem>()
@@ -696,7 +713,7 @@ class Phase2FullChainIntegrationTest {
         BusinessException overEx = assertThrows(BusinessException.class, () -> {
             payRecordService.writeback(overpay);
         }, "超付应抛出异常");
-        assertEquals("PAY_OVERPAYMENT", overEx.getCode(), "错误码应为PAY_OVERPAYMENT");
+        assertEquals("EXCEED_PURCHASE_PAYABLE", overEx.getCode(), "采购净应付超限应优先拒止");
 
         System.out.println("✅ 场景7 通过: 回写2笔(80000+70000), "
                 + "payStatus=" + afterFullPay.getPayStatus()
@@ -745,9 +762,9 @@ class Phase2FullChainIntegrationTest {
                 new LambdaQueryWrapper<MatPurchaseOrderItem>()
                         .eq(MatPurchaseOrderItem::getOrderId, orderId));
 
-        MatReceiptItem ri1 = buildReceiptItem(orderItems.get(0).getId(),
+        MatReceiptItemCommand ri1 = buildReceiptItem(orderItems.get(0).getId(),
                 new BigDecimal("80"), new BigDecimal("80"), new BigDecimal("450"), new BigDecimal("36000.00"));
-        MatReceiptItem ri2 = buildReceiptItem(orderItems.get(1).getId(),
+        MatReceiptItemCommand ri2 = buildReceiptItem(orderItems.get(1).getId(),
                 new BigDecimal("30"), new BigDecimal("30"), new BigDecimal("3800"), new BigDecimal("114000.00"));
         receiptService.saveItemsBatch(receiptId, List.of(ri1, ri2));
         attachReceiptProof(receiptId);
@@ -756,18 +773,33 @@ class Phase2FullChainIntegrationTest {
     }
 
     private void attachReceiptProof(Long receiptId) {
+        insertReceiptProof(receiptId, "DELIVERY_NOTE", "供应商送货单");
+        insertReceiptProof(receiptId, "MATERIAL_ACCEPTANCE_FORM", "签字材料验收单");
+    }
+
+    private void insertReceiptProof(Long receiptId, String documentType, String originalName) {
         SysFile file = new SysFile();
         file.setTenantId(TestUserContext.TENANT_0);
         file.setBusinessType("MATERIAL_RECEIPT");
+        file.setDocumentType(documentType);
         file.setBusinessId(receiptId);
-        file.setFileName("receipt-" + receiptId + ".pdf");
-        file.setOriginalName("Phase2验收凭证.pdf");
+        file.setFileName(documentType.toLowerCase() + "-" + receiptId + ".pdf");
+        file.setOriginalName(originalName + ".pdf");
         file.setFileSize(100L);
         file.setContentType("application/pdf");
-        file.setStoragePath("MATERIAL_RECEIPT/" + receiptId + "/proof.pdf");
+        file.setStoragePath("MATERIAL_RECEIPT/" + receiptId + "/" + documentType.toLowerCase() + ".pdf");
         file.setBucketName("test");
         file.setVirusScanStatus("CLEAN");
         sysFileMapper.insert(file);
+    }
+
+    private void approveReceiptFact(Long receiptId) {
+        jdbcTemplate.update("UPDATE mat_receipt SET approval_status='APPROVED' WHERE id=?", receiptId);
+        contractProcurementPayableService.recalculate(CONTRACT_ID, TestUserContext.TENANT_0);
+    }
+
+    private void clearExistingPaymentCommitments() {
+        jdbcTemplate.update("UPDATE pay_application SET approval_status='REJECTED' WHERE contract_id=?", CONTRACT_ID);
     }
 
     /** 构建采购订单明细 */
@@ -785,15 +817,12 @@ class Phase2FullChainIntegrationTest {
     }
 
     /** 构建验收单明细 */
-    private MatReceiptItem buildReceiptItem(Long orderItemId,
+    private MatReceiptItemCommand buildReceiptItem(Long orderItemId,
                                              BigDecimal actualQty, BigDecimal qualifiedQty,
                                              BigDecimal unitPrice, BigDecimal amount) {
-        MatReceiptItem item = new MatReceiptItem();
+        MatReceiptItemCommand item = new MatReceiptItemCommand();
         item.setOrderItemId(orderItemId);
-        item.setActualQuantity(actualQty);
-        item.setQualifiedQuantity(qualifiedQty);
-        item.setUnitPrice(unitPrice);
-        item.setAmount(amount);
+        item.setAcceptedQuantity(qualifiedQty);
         item.setUseLocation("Phase2直耗测试部位");
         return item;
     }

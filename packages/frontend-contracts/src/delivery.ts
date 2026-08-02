@@ -285,6 +285,9 @@ export interface SiteFileRecord {
   originalName: string;
   businessType?: string | null;
   businessId?: string | null;
+  documentType?: string | null;
+  virusScanStatus?: string | null;
+  virusScanPassed?: boolean | null;
   createdAt?: string | null;
 }
 

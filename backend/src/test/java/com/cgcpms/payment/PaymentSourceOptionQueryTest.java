@@ -7,10 +7,24 @@ import com.cgcpms.payment.mapper.PayApplicationMapper;
 import com.cgcpms.payment.mapper.PaymentApplicationSourceMapper;
 import com.cgcpms.payment.service.PaymentApplicationSourceService;
 import com.cgcpms.payment.vo.PaymentSourceOptionVO;
+import com.cgcpms.inventory.entity.MatStockTxn;
+import com.cgcpms.inventory.mapper.MatStockTxnMapper;
+import com.cgcpms.purchase.entity.MatPurchaseOrder;
+import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
+import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
+import com.cgcpms.receipt.entity.MatReceipt;
+import com.cgcpms.receipt.entity.MatReceiptItem;
+import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
+import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.supplierreturn.entity.MatSupplierReturn;
+import com.cgcpms.supplierreturn.entity.MatSupplierReturnItem;
+import com.cgcpms.supplierreturn.mapper.MatSupplierReturnItemMapper;
+import com.cgcpms.supplierreturn.mapper.MatSupplierReturnMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +65,13 @@ class PaymentSourceOptionQueryTest {
     private SubMeasureMapper subMeasureMapper;
     @Autowired
     private StlSettlementMapper settlementMapper;
+    @Autowired private MatReceiptMapper receiptMapper;
+    @Autowired private MatReceiptItemMapper receiptItemMapper;
+    @Autowired private MatSupplierReturnMapper supplierReturnMapper;
+    @Autowired private MatSupplierReturnItemMapper supplierReturnItemMapper;
+    @Autowired private MatPurchaseOrderMapper purchaseOrderMapper;
+    @Autowired private MatPurchaseOrderItemMapper purchaseOrderItemMapper;
+    @Autowired private MatStockTxnMapper stockTxnMapper;
 
     @BeforeEach
     void setUp() {
@@ -112,6 +133,75 @@ class PaymentSourceOptionQueryTest {
 
     }
 
+    @Test
+    void materialReceiptOptionsDoNotMultiplyReturnsByPaymentSources() {
+        long receiptId = 948001000101L;
+        long receiptItemId = 948001000102L;
+        long orderId = 948001000103L;
+        long orderItemId = 948001000104L;
+        MatPurchaseOrder order = new MatPurchaseOrder();
+        order.setId(orderId);
+        order.setTenantId(TENANT_ID);
+        order.setProjectId(PROJECT_ID);
+        order.setContractId(CONTRACT_ID);
+        order.setPartnerId(PARTNER_ID);
+        order.setOrderCode("PO-OPTION-001");
+        order.setOrderType("PURCHASE");
+        order.setOrderDate(LocalDate.now());
+        order.setApprovalStatus("APPROVED");
+        order.setOrderStatus("PERFORMING");
+        purchaseOrderMapper.insert(order);
+        MatPurchaseOrderItem orderItem = new MatPurchaseOrderItem();
+        orderItem.setId(orderItemId);
+        orderItem.setTenantId(TENANT_ID);
+        orderItem.setOrderId(orderId);
+        orderItem.setProjectId(PROJECT_ID);
+        orderItem.setMaterialId(1L);
+        orderItem.setQuantity(BigDecimal.ONE);
+        orderItem.setUnitPrice(new BigDecimal("100.00"));
+        orderItem.setAmount(new BigDecimal("100.00"));
+        orderItem.setReceivedQuantity(BigDecimal.ONE);
+        orderItem.setVersion(0);
+        purchaseOrderItemMapper.insert(orderItem);
+        MatReceipt receipt = new MatReceipt();
+        receipt.setId(receiptId);
+        receipt.setTenantId(TENANT_ID);
+        receipt.setProjectId(PROJECT_ID);
+        receipt.setOrderId(orderId);
+        receipt.setContractId(CONTRACT_ID);
+        receipt.setPartnerId(PARTNER_ID);
+        receipt.setReceiptCode("MR-OPTION-001");
+        receipt.setReceiptDate(LocalDate.now());
+        receipt.setApprovalStatus("APPROVED");
+        receiptMapper.insert(receipt);
+        MatReceiptItem item = new MatReceiptItem();
+        item.setId(receiptItemId);
+        item.setTenantId(TENANT_ID);
+        item.setReceiptId(receiptId);
+        item.setOrderItemId(orderItemId);
+        item.setMaterialId(1L);
+        item.setQualifiedQuantity(BigDecimal.ONE);
+        item.setUnitPrice(new BigDecimal("100.00"));
+        item.setAmount(new BigDecimal("100.00"));
+        receiptItemMapper.insert(item);
+
+        insertQualifiedReturn(948001000111L, 948001000112L, orderId, orderItemId,
+                receiptId, receiptItemId, "10.00");
+        insertQualifiedReturn(948001000121L, 948001000122L, orderId, orderItemId,
+                receiptId, receiptItemId, "20.00");
+        insertApplication(948001000131L, "APPROVING", "PROGRESS", "MATERIAL");
+        insertSource(948001000132L, 948001000131L, "MAT_RECEIPT", receiptItemId, "15.00");
+        insertApplication(948001000141L, "APPROVED", "PROGRESS", "MATERIAL");
+        insertSource(948001000142L, 948001000141L, "MAT_RECEIPT", receiptItemId, "5.00");
+
+        PaymentSourceOptionVO option = find(sourceService.listOptions(
+                PROJECT_ID, CONTRACT_ID, PARTNER_ID, "PROGRESS", "MATERIAL"),
+                String.valueOf(receiptItemId));
+        assertMoney("70.00", option.getSourceTotalAmount());
+        assertMoney("20.00", option.getCommittedAmount());
+        assertMoney("50.00", option.getAvailableAmount());
+    }
+
     private void insertSubMeasure(long id, long tenantId, String code, String approval, String status, String netAmount) {
         SubMeasure measure = new SubMeasure();
         measure.setId(id);
@@ -160,10 +250,59 @@ class PaymentSourceOptionQueryTest {
         source.setSourceRefId(sourceId);
         if ("SUB_MEASURE".equals(sourceType)) source.setSubMeasureId(sourceId);
         if ("SETTLEMENT".equals(sourceType)) source.setSettlementId(sourceId);
+        if ("MAT_RECEIPT".equals(sourceType)) source.setReceiptItemId(sourceId);
         source.setSourceAmount(new BigDecimal(amount));
         source.setPaidAmount(BigDecimal.ZERO);
         source.setVersion(0);
         sourceMapper.insert(source);
+    }
+
+    private void insertQualifiedReturn(long returnId, long itemId, long orderId, long orderItemId,
+                                       long receiptId, long receiptItemId, String amount) {
+        MatSupplierReturn supplierReturn = new MatSupplierReturn();
+        supplierReturn.setId(returnId);
+        supplierReturn.setTenantId(TENANT_ID);
+        supplierReturn.setProjectId(PROJECT_ID);
+        supplierReturn.setContractId(CONTRACT_ID);
+        supplierReturn.setPartnerId(PARTNER_ID);
+        supplierReturn.setPurchaseOrderId(orderId);
+        supplierReturn.setReceiptId(receiptId);
+        supplierReturn.setReturnCode("SRT-OPTION-" + returnId);
+        supplierReturn.setReturnDate(LocalDate.now());
+        supplierReturn.setReturnQuantity(BigDecimal.ONE);
+        supplierReturn.setTotalAmount(new BigDecimal(amount));
+        supplierReturn.setReason("付款来源净额测试退货");
+        supplierReturn.setStatus("CONFIRMED");
+        supplierReturn.setIdempotencyKey("SRT-OPTION-" + returnId);
+        supplierReturn.setVersion(0);
+        supplierReturnMapper.insert(supplierReturn);
+        MatStockTxn originalStockTxn = new MatStockTxn();
+        originalStockTxn.setId(itemId);
+        originalStockTxn.setTenantId(TENANT_ID);
+        originalStockTxn.setWarehouseId(1L);
+        originalStockTxn.setMaterialId(1L);
+        originalStockTxn.setTxnType("IN");
+        originalStockTxn.setQuantity(BigDecimal.ONE);
+        originalStockTxn.setAvailableAfter(BigDecimal.ONE);
+        originalStockTxn.setUnitCost(new BigDecimal(amount));
+        originalStockTxn.setAmount(new BigDecimal(amount));
+        originalStockTxn.setSourceType("TEST_PAYMENT_SOURCE_RETURN");
+        originalStockTxn.setSourceId(returnId);
+        originalStockTxn.setSourceLineId(itemId);
+        stockTxnMapper.insert(originalStockTxn);
+        MatSupplierReturnItem item = new MatSupplierReturnItem();
+        item.setId(itemId);
+        item.setTenantId(TENANT_ID);
+        item.setReturnId(returnId);
+        item.setReceiptItemId(receiptItemId);
+        item.setOrderItemId(orderItemId);
+        item.setOriginalStockTxnId(itemId);
+        item.setMaterialId(1L);
+        item.setReturnSource("QUALIFIED");
+        item.setQuantity(BigDecimal.ONE);
+        item.setUnitCost(new BigDecimal(amount));
+        item.setAmount(new BigDecimal(amount));
+        supplierReturnItemMapper.insert(item);
     }
 
     private PaymentSourceOptionVO find(List<PaymentSourceOptionVO> options, String sourceRefId) {

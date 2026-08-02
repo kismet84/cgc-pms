@@ -16,4 +16,9 @@ public interface ProjectBudgetMapper extends BaseMapper<ProjectBudget>, DeletedC
 
     @Select("SELECT * FROM project_budget WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted_flag = 0 FOR UPDATE")
     ProjectBudget selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
+    @Select("SELECT * FROM project_budget WHERE project_id = #{projectId} AND tenant_id = #{tenantId} "
+            + "AND active_flag = 1 AND deleted_flag = 0 FOR UPDATE")
+    ProjectBudget selectActiveByProjectForUpdate(@Param("projectId") Long projectId,
+                                                  @Param("tenantId") Long tenantId);
 }

@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 async function selectBusinessOption(
   _page: Page,
@@ -88,6 +89,7 @@ async function fulfill(route: Route, data: unknown, status = 200, code = '0') {
 }
 
 async function install(page: Page, granted = permissions, rejectStockOut = false) {
+  await installShellPreferencesMock(page)
   const writes: Array<{ path: string; body: unknown }> = []
   await page.route('**/api/auth/userinfo', (route) =>
     fulfill(route, { userId: '1', username: 'keeper', roles: ['USER'], permissions: granted }),

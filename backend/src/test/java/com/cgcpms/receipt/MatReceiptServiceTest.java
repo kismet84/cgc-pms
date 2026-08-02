@@ -4,14 +4,18 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.entity.CtContractItem;
+import com.cgcpms.contract.mapper.CtContractItemMapper;
+import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
 import com.cgcpms.purchase.service.MatPurchaseOrderService;
+import com.cgcpms.receipt.dto.MatReceiptItemCommand;
 import com.cgcpms.receipt.entity.MatReceipt;
-import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.receipt.service.MatReceiptService;
 import com.cgcpms.receipt.vo.MatReceiptVO;
@@ -53,6 +57,12 @@ class MatReceiptServiceTest {
 
     @Autowired
     private MdMaterialMapper materialMapper;
+
+    @Autowired
+    private CtContractMapper contractMapper;
+
+    @Autowired
+    private CtContractItemMapper contractItemMapper;
 
     private static final long PROJECT_ID = 10001L;
 
@@ -146,7 +156,9 @@ class MatReceiptServiceTest {
     @Transactional
     @DisplayName("R-2c: 草稿验收明细不提前占用采购已验收数量")
     void testSaveItemsBatchDoesNotConfirmPurchaseReceivedQuantity() {
+        preparePurchaseContract();
         Long materialId = createActiveMaterial("RECEIPT-NO-CONFIRM");
+        addContractItem(materialId);
         MatPurchaseOrder order = new MatPurchaseOrder();
         order.setProjectId(PROJECT_ID);
         order.setContractId(30001L);
@@ -173,27 +185,17 @@ class MatReceiptServiceTest {
         receipt.setOrderId(orderId);
         Long receiptId = receiptService.create(receipt);
 
-        MatReceiptItem first = new MatReceiptItem();
-        first.setOrderItemId(orderItemId);
-        first.setMaterialId(materialId);
-        first.setActualQuantity(new BigDecimal("4.0000"));
-        first.setQualifiedQuantity(new BigDecimal("3.0000"));
-        first.setUnitPrice(new BigDecimal("2.0000"));
-        first.setAmount(new BigDecimal("8.0000"));
-        receiptService.saveItemsBatch(receiptId, List.of(first));
+        receiptService.saveItemsBatch(receiptId, List.of(receiptItem(orderItemId, "3.0000")));
         assertEquals(0, BigDecimal.ZERO
                 .compareTo(orderItemMapper.selectById(orderItemId).getReceivedQuantity()));
 
-        MatReceiptItem replacement = new MatReceiptItem();
-        replacement.setOrderItemId(orderItemId);
-        replacement.setMaterialId(materialId);
-        replacement.setActualQuantity(new BigDecimal("2.0000"));
-        replacement.setQualifiedQuantity(new BigDecimal("2.0000"));
-        replacement.setUnitPrice(new BigDecimal("2.0000"));
-        replacement.setAmount(new BigDecimal("4.0000"));
-        receiptService.saveItemsBatch(receiptId, List.of(replacement));
+        receiptService.saveItemsBatch(receiptId, List.of(receiptItem(orderItemId, "2.0000")));
         assertEquals(0, BigDecimal.ZERO
                 .compareTo(orderItemMapper.selectById(orderItemId).getReceivedQuantity()));
+        var detail = receiptService.getItems(receiptId).get(0);
+        assertEquals("10.0000", detail.getOrderedQuantity());
+        assertEquals("0.0000", detail.getReceivedQuantity());
+        assertEquals("10.0000", detail.getRemainingQuantity());
 
         receiptService.saveItemsBatch(receiptId, List.of());
         assertEquals(0, BigDecimal.ZERO
@@ -204,7 +206,9 @@ class MatReceiptServiceTest {
     @Transactional
     @DisplayName("R-2d: 保存收货明细拒绝跨订单引用与非法数量")
     void testSaveItemsBatchRejectsInvalidOrderItemAndQuantities() {
+        preparePurchaseContract();
         Long materialId = createActiveMaterial("RECEIPT-VALIDATION");
+        addContractItem(materialId);
         MatPurchaseOrder firstOrder = new MatPurchaseOrder();
         firstOrder.setProjectId(PROJECT_ID);
         firstOrder.setContractId(30001L);
@@ -234,38 +238,53 @@ class MatReceiptServiceTest {
         receipt.setOrderId(secondOrderId);
         Long receiptId = receiptService.create(receipt);
 
-        MatReceiptItem crossOrder = new MatReceiptItem();
-        crossOrder.setOrderItemId(firstOrderItemId);
-        crossOrder.setActualQuantity(BigDecimal.ONE);
-        crossOrder.setQualifiedQuantity(BigDecimal.ONE);
         BusinessException mismatch = assertThrows(BusinessException.class,
-                () -> receiptService.saveItemsBatch(receiptId, List.of(crossOrder)));
+                () -> receiptService.saveItemsBatch(receiptId, List.of(receiptItem(firstOrderItemId, "1"))));
         assertEquals("ORDER_ITEM_MISMATCH", mismatch.getCode());
 
-        MatReceiptItem zeroActual = new MatReceiptItem();
-        zeroActual.setActualQuantity(BigDecimal.ZERO);
-        zeroActual.setQualifiedQuantity(BigDecimal.ZERO);
         BusinessException zero = assertThrows(BusinessException.class,
-                () -> receiptService.saveItemsBatch(receiptId, List.of(zeroActual)));
+                () -> receiptService.saveItemsBatch(receiptId, List.of(receiptItem(null, "0"))));
         assertEquals("RECEIPT_QUANTITY_INVALID", zero.getCode());
 
-        MatReceiptItem excessiveQualified = new MatReceiptItem();
-        excessiveQualified.setActualQuantity(BigDecimal.ONE);
-        excessiveQualified.setQualifiedQuantity(new BigDecimal("2"));
-        BusinessException excessive = assertThrows(BusinessException.class,
-                () -> receiptService.saveItemsBatch(receiptId, List.of(excessiveQualified)));
-        assertEquals("RECEIPT_QUANTITY_INVALID", excessive.getCode());
+        BusinessException missingOrderItem = assertThrows(BusinessException.class,
+                () -> receiptService.saveItemsBatch(receiptId, List.of(receiptItem(null, "2"))));
+        assertEquals("ORDER_ITEM_REQUIRED", missingOrderItem.getCode());
 
         MatReceipt overReceipt = buildReceipt("PENDING");
         overReceipt.setOrderId(firstOrderId);
         Long overReceiptId = receiptService.create(overReceipt);
-        MatReceiptItem excessiveActual = new MatReceiptItem();
-        excessiveActual.setOrderItemId(firstOrderItemId);
-        excessiveActual.setActualQuantity(new BigDecimal("11"));
-        excessiveActual.setQualifiedQuantity(BigDecimal.TEN);
         BusinessException over = assertThrows(BusinessException.class,
-                () -> receiptService.saveItemsBatch(overReceiptId, List.of(excessiveActual)));
+                () -> receiptService.saveItemsBatch(overReceiptId, List.of(receiptItem(firstOrderItemId, "11"))));
         assertEquals("RECEIPT_EXCEEDS_ORDER", over.getCode());
+    }
+
+    private MatReceiptItemCommand receiptItem(Long orderItemId, String acceptedQuantity) {
+        MatReceiptItemCommand command = new MatReceiptItemCommand();
+        command.setOrderItemId(orderItemId);
+        command.setAcceptedQuantity(new BigDecimal(acceptedQuantity));
+        return command;
+    }
+
+    private void preparePurchaseContract() {
+        CtContract contract = contractMapper.selectById(30001L);
+        contract.setContractType("PURCHASE");
+        contract.setContractStatus("PERFORMING");
+        contract.setPricingMode("ACTUAL");
+        contract.setPartyBId(20002L);
+        contractMapper.updateById(contract);
+    }
+
+    private void addContractItem(Long materialId) {
+        CtContractItem item = new CtContractItem();
+        item.setTenantId(TestUserContext.TENANT_0);
+        item.setContractId(30001L);
+        item.setMaterialId(materialId);
+        item.setItemName("验收测试材料");
+        item.setUnit("件");
+        item.setQuantity(new BigDecimal("100"));
+        item.setUnitPrice(BigDecimal.ONE);
+        item.setAmount(new BigDecimal("100"));
+        contractItemMapper.insert(item);
     }
 
     private Long createActiveMaterial(String codePrefix) {

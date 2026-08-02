@@ -50,6 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.common.util.CodeGenerationService;
@@ -66,6 +67,7 @@ public class CtContractService {
 
     private static final int CODE_GENERATION_MAX_RETRIES = 3;
     private static final BigDecimal HUNDRED = new BigDecimal("100");
+    private static final Set<String> PURCHASE_PRICING_MODES = Set.of("FIXED", "ACTUAL");
 
     private final CtContractMapper ctContractMapper;
     private final CtContractChangeMapper ctContractChangeMapper;
@@ -246,6 +248,8 @@ public class CtContractService {
     public Long create(CtContract contract) {
         sanitizeContractForCreate(contract);
         normalizeContractType(contract);
+        validatePurchasePricingMode(contract);
+        deriveContractFinancials(contract);
         validateContractReferences(contract, "创建合同");
         validateContractCoreFinancials(contract);
         validateProjectBudgetGate(contract);
@@ -267,6 +271,8 @@ public class CtContractService {
         CtContract existing = requireEditableContract(contract.getId(), "编辑合同");
         ensureClientVersionMatches(contract.getVersion(), existing.getVersion());
         normalizeContractType(contract);
+        validatePurchasePricingMode(contract);
+        deriveContractFinancials(contract);
         validateContractReferences(contract, "编辑合同");
         validateContractCoreFinancials(contract);
 
@@ -313,6 +319,7 @@ public class CtContractService {
         validateContractReferences(contract, "提交合同审批");
         validateContractCoreFinancials(contract);
         validateProjectBudgetGate(contract);
+        validatePurchasePricingConfiguration(contract);
         contractBudgetAllocationService.validateForContractSubmit(contractId);
 
         // 更新审批状态为审批中（携带版本号乐观锁）
@@ -411,6 +418,8 @@ public class CtContractService {
             // ── 新建 ──
             sanitizeContractForCreate(contract);
             normalizeContractType(contract);
+            validatePurchasePricingMode(contract);
+            deriveCompositeFinancials(contract, items);
             validateContractReferences(contract, "创建合同");
             validateCompositeFinancials(contract, items, terms);
             validateProjectBudgetGate(contract);
@@ -432,6 +441,8 @@ public class CtContractService {
             CtContract existing = requireEditableContract(contract.getId(), "编辑合同");
             ensureClientVersionMatches(contract.getVersion(), existing.getVersion());
             normalizeContractType(contract);
+            validatePurchasePricingMode(contract);
+            deriveCompositeFinancials(contract, items);
             validateContractReferences(contract, "编辑合同");
             validateCompositeFinancials(contract, items, terms);
             updateEditableContract(contract, existing);
@@ -627,6 +638,7 @@ public class CtContractService {
         vo.setPaymentMethod(c.getPaymentMethod());
         vo.setSettlementMethod(c.getSettlementMethod());
         vo.setPaidAmount(c.getPaidAmount() != null ? c.getPaidAmount().toPlainString() : null);
+        vo.setPayableAmount(c.getPayableAmount() != null ? c.getPayableAmount().toPlainString() : null);
         vo.setSettlementAmount(c.getSettlementAmount() != null ? c.getSettlementAmount().toPlainString() : null);
         vo.setContractStatus(c.getContractStatus());
         vo.setApprovalStatus(c.getApprovalStatus());
@@ -711,6 +723,7 @@ public class CtContractService {
     }
 
     private void updateEditableContract(CtContract contract, CtContract existing) {
+        validateActiveProjectContractAmount(existing, contract);
         Integer currentVersion = existing.getVersion();
         int updated = ctContractMapper.update(null,
                 new LambdaUpdateWrapper<CtContract>()
@@ -738,6 +751,22 @@ public class CtContractService {
                         .set(CtContract::getVersion, currentVersion + 1));
         if (updated != 1) {
             throw new BusinessException("CONTRACT_VERSION_CONFLICT", "合同已被其他用户修改，请刷新后重试");
+        }
+    }
+
+    private void validateActiveProjectContractAmount(CtContract existing, CtContract requested) {
+        BigDecimal persistedAmount = existing.getContractAmount();
+        BigDecimal requestedAmount = requested.getContractAmount();
+        if (persistedAmount != null && requestedAmount != null
+                && persistedAmount.compareTo(requestedAmount) == 0) {
+            return;
+        }
+        PmProject project = pmProjectMapper.selectById(existing.getProjectId());
+        if (project != null
+                && Objects.equals(project.getTenantId(), UserContext.getCurrentTenantId())
+                && ProjectStatusConstants.ACTIVE.equals(project.getStatus())) {
+            throw new BusinessException("CONTRACT_AMOUNT_LOCKED",
+                    "项目已在建，合同总价不可直接修改，请发起合同变更");
         }
     }
 
@@ -793,12 +822,82 @@ public class CtContractService {
     private void validateContractCoreFinancials(CtContract contract) {
         requireMoneyField(contract.getContractAmount(), "CONTRACT_AMOUNT_REQUIRED", "合同金额不能为空");
         requireNonNegative(contract.getCurrentAmount(), "CONTRACT_CURRENT_AMOUNT_INVALID", "合同当前金额不能为负数");
-        requireNonNegative(contract.getTaxRate(), "CONTRACT_TAX_RATE_INVALID", "合同税率不能为负数");
+        validateTaxRate(contract.getTaxRate());
         requireMoneyField(contract.getTaxAmount(), "CONTRACT_TAX_AMOUNT_REQUIRED", "合同税额不能为空");
         requireMoneyField(contract.getAmountWithoutTax(), "CONTRACT_AMOUNT_WITHOUT_TAX_REQUIRED", "合同不含税金额不能为空");
         validateAmountBreakdown(contract.getContractAmount(), contract.getTaxAmount(), contract.getAmountWithoutTax(),
                 "CONTRACT_AMOUNT_BREAKDOWN_MISMATCH", "合同含税金额必须等于税额加不含税金额");
         validateContractDates(contract);
+    }
+
+    private void deriveCompositeFinancials(CtContract contract, List<CtContractItem> items) {
+        deriveContractFinancials(contract);
+        itemService.deriveFinancials(contract, items);
+        if (items == null || items.isEmpty()) {
+            return;
+        }
+        BigDecimal itemAmountTotal = items.stream()
+                .map(CtContractItem::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (itemAmountTotal.compareTo(contract.getContractAmount()) != 0) {
+            return;
+        }
+        contract.setTaxAmount(items.stream()
+                .map(CtContractItem::getTaxAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+        contract.setAmountWithoutTax(items.stream()
+                .map(CtContractItem::getAmountWithoutTax)
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
+    }
+
+    private void deriveContractFinancials(CtContract contract) {
+        requireMoneyField(contract.getContractAmount(), "CONTRACT_AMOUNT_REQUIRED", "合同金额不能为空");
+        validateTaxRate(contract.getTaxRate());
+        BigDecimal amount = contract.getContractAmount().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal amountWithoutTax = contract.getTaxRate().signum() == 0
+                ? amount
+                : amount.multiply(HUNDRED).divide(HUNDRED.add(contract.getTaxRate()), 2, RoundingMode.HALF_UP);
+        contract.setContractAmount(amount);
+        contract.setCurrentAmount(amount);
+        contract.setAmountWithoutTax(amountWithoutTax);
+        contract.setTaxAmount(amount.subtract(amountWithoutTax));
+    }
+
+    private void validateTaxRate(BigDecimal taxRate) {
+        if (taxRate == null || taxRate.compareTo(BigDecimal.ZERO) < 0 || taxRate.compareTo(HUNDRED) > 0) {
+            throw new BusinessException("CONTRACT_TAX_RATE_INVALID", "合同税率必须在0到100之间");
+        }
+    }
+
+    private void validatePurchasePricingConfiguration(CtContract contract) {
+        if (!"PURCHASE".equals(contract.getContractType())) {
+            return;
+        }
+        validatePurchasePricingMode(contract);
+        List<CtContractItem> items = itemService.getByContractId(contract.getId());
+        if (items.isEmpty()) {
+            throw new BusinessException("PURCHASE_CONTRACT_ITEM_REQUIRED", "采购合同至少需要一条物料清单");
+        }
+        Set<Long> materialIds = new java.util.HashSet<>();
+        for (CtContractItem item : items) {
+            if (item.getMaterialId() == null) {
+                throw new BusinessException("PURCHASE_CONTRACT_MATERIAL_REQUIRED", "采购合同清单必须绑定物料");
+            }
+            if (!materialIds.add(item.getMaterialId())) {
+                throw new BusinessException("PURCHASE_CONTRACT_MATERIAL_DUPLICATED", "同一采购合同内每种物料只能有一条清单");
+            }
+            if ("FIXED".equals(contract.getPricingMode()) && item.getUnitPrice() == null) {
+                throw new BusinessException("PURCHASE_CONTRACT_UNIT_PRICE_REQUIRED", "固定价采购合同清单必须填写单价");
+            }
+        }
+    }
+
+    private void validatePurchasePricingMode(CtContract contract) {
+        if ("PURCHASE".equals(contract.getContractType())
+                && contract.getPricingMode() != null
+                && !PURCHASE_PRICING_MODES.contains(contract.getPricingMode())) {
+            throw new BusinessException("PURCHASE_CONTRACT_PRICING_MODE_INVALID", "采购合同计价模式不合法");
+        }
     }
 
     private void validateContractDates(CtContract contract) {

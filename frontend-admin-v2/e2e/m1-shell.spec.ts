@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
+import { installShellPreferencesMock } from './shell-session'
 
 type Identity = 'admin' | 'ordinary' | 'denied' | 'anonymous'
 
@@ -35,6 +36,7 @@ const anonymousEnvelope = {
 }
 
 async function installIdentity(page: Page, readIdentity: () => Identity): Promise<void> {
+  await installShellPreferencesMock(page)
   await page.route('**/api/auth/userinfo', (route) => {
     const identity = readIdentity()
     if (identity === 'anonymous') {

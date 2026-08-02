@@ -13,6 +13,10 @@ public class MatPurchaseRequestItemVO {
     private String budgetLineId;
     private String subTaskId;
     private String quantity;
+    private String approvedQuantity;
+    private Integer approvalVersion;
+    private String specification;
+    private String useLocation;
     private String estimatedUnitPrice;
     private String estimatedAmount;
     private String unit;

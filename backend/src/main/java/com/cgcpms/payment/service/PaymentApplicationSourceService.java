@@ -20,6 +20,10 @@ import com.cgcpms.payment.mapper.PaymentRecordSourceAllocationMapper;
 import com.cgcpms.payment.vo.PaymentApplicationSourceVO;
 import com.cgcpms.payment.vo.PaymentSourceOptionVO;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.receipt.entity.MatReceipt;
+import com.cgcpms.receipt.entity.MatReceiptItem;
+import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
+import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.settlement.constant.SettlementStatusConstants;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.SettlementSubMeasure;
@@ -54,6 +58,8 @@ public class PaymentApplicationSourceService {
     private final ProjectAccessChecker projectAccessChecker;
     private final BudgetLedgerService ledgerService;
     private final PaymentRecordSourceAllocationMapper allocationMapper;
+    private final MatReceiptItemMapper receiptItemMapper;
+    private final MatReceiptMapper receiptMapper;
 
     public List<PaymentApplicationSourceVO> list(Long applicationId) {
         PayApplication app = requireApplication(applicationId, "查看付款申请来源");
@@ -66,6 +72,9 @@ public class PaymentApplicationSourceService {
         Long tenantId = UserContext.getCurrentTenantId();
         String normalizedPayType = payType == null ? "" : payType.trim().toUpperCase();
         String normalizedCategory = expenseCategory == null ? "" : expenseCategory.trim().toUpperCase();
+        if ("MATERIAL".equals(normalizedCategory)) {
+            return sourceMapper.selectMaterialReceiptOptions(tenantId, projectId, contractId, partnerId);
+        }
         if ("PROGRESS".equals(normalizedPayType) && "SUBCONTRACT".equals(normalizedCategory)) {
             return sourceMapper.selectSubMeasureOptions(tenantId, projectId, contractId, partnerId);
         }
@@ -277,16 +286,19 @@ public class PaymentApplicationSourceService {
                     source.setExpenseId(source.getSourceRefId());
                     source.setSettlementId(null);
                     source.setSubMeasureId(null);
+                    source.setReceiptItemId(null);
                 }
                 case PaymentIntegrityConstants.SOURCE_SETTLEMENT -> {
                     source.setSettlementId(source.getSourceRefId());
                     source.setExpenseId(null);
                     source.setSubMeasureId(null);
+                    source.setReceiptItemId(null);
                 }
                 case PaymentIntegrityConstants.SOURCE_SUB_MEASURE -> {
                     source.setSubMeasureId(source.getSourceRefId());
                     source.setExpenseId(null);
                     source.setSettlementId(null);
+                    source.setReceiptItemId(null);
                 }
                 case PaymentIntegrityConstants.SOURCE_DIRECT -> {
                     if (!Objects.equals(source.getSourceRefId(), app.getId())) {
@@ -295,8 +307,19 @@ public class PaymentApplicationSourceService {
                     source.setExpenseId(null);
                     source.setSettlementId(null);
                     source.setSubMeasureId(null);
+                    source.setReceiptItemId(null);
                 }
-                default -> throw new BusinessException("PAYMENT_SOURCE_TYPE_INVALID", "付款来源类型仅支持 EXPENSE、SUB_MEASURE、SETTLEMENT、DIRECT");
+                case PaymentIntegrityConstants.SOURCE_MAT_RECEIPT -> {
+                    if (source.getReceiptItemId() != null
+                            && !Objects.equals(source.getReceiptItemId(), source.getSourceRefId())) {
+                        throw new BusinessException("MAT_RECEIPT_SOURCE_INVALID", "验收来源ID必须与验收明细ID一致");
+                    }
+                    source.setReceiptItemId(source.getSourceRefId());
+                    source.setExpenseId(null);
+                    source.setSettlementId(null);
+                    source.setSubMeasureId(null);
+                }
+                default -> throw new BusinessException("PAYMENT_SOURCE_TYPE_INVALID", "付款来源类型仅支持 EXPENSE、SUB_MEASURE、SETTLEMENT、MAT_RECEIPT、DIRECT");
             }
             String key = source.getSourceType() + ":" + source.getSourceRefId();
             if (!keys.add(key)) throw new BusinessException("PAYMENT_SOURCE_DUPLICATE", "付款来源重复: " + key);
@@ -400,6 +423,28 @@ public class PaymentApplicationSourceService {
                 if (source.getSourceAmount().compareTo(available) > 0) {
                     throw new BusinessException("SUB_MEASURE_AVAILABLE_AMOUNT_INSUFFICIENT", "分包计量可申请付款金额不足");
                 }
+            } else if (PaymentIntegrityConstants.SOURCE_MAT_RECEIPT.equals(source.getSourceType())) {
+                MatReceiptItem receiptItem = receiptItemMapper.selectForUpdate(
+                        source.getReceiptItemId(), app.getTenantId());
+                MatReceipt receipt = receiptItem == null ? null : receiptMapper.selectById(receiptItem.getReceiptId());
+                if (receipt == null || !Objects.equals(receipt.getTenantId(), app.getTenantId())
+                        || !"APPROVED".equals(receipt.getApprovalStatus())) {
+                    throw new BusinessException("MAT_RECEIPT_SOURCE_NOT_APPROVED", "验收来源不存在、跨租户或未审批通过");
+                }
+                if (!Objects.equals(receipt.getProjectId(), app.getProjectId())
+                        || !Objects.equals(receipt.getContractId(), app.getContractId())
+                        || !Objects.equals(receipt.getPartnerId(), app.getPartnerId())) {
+                    throw new BusinessException("MAT_RECEIPT_SOURCE_CONTEXT_MISMATCH", "验收来源与付款申请的项目、合同或付款对象不一致");
+                }
+                BigDecimal committed = sourceMapper.sumCommittedMaterialReceipt(
+                        app.getTenantId(), receiptItem.getId(), app.getId());
+                BigDecimal returned = sourceMapper.sumConfirmedQualifiedReturns(
+                        app.getTenantId(), receiptItem.getId());
+                BigDecimal available = money(receiptItem.getAmount())
+                        .subtract(money(returned)).subtract(money(committed));
+                if (source.getSourceAmount().compareTo(available) > 0) {
+                    throw new BusinessException("MAT_RECEIPT_AVAILABLE_AMOUNT_INSUFFICIENT", "验收来源净可申请付款金额不足");
+                }
             }
         }
     }
@@ -452,6 +497,7 @@ public class PaymentApplicationSourceService {
         vo.setExpenseId(source.getExpenseId() == null ? null : String.valueOf(source.getExpenseId()));
         vo.setSettlementId(source.getSettlementId() == null ? null : String.valueOf(source.getSettlementId()));
         vo.setSubMeasureId(source.getSubMeasureId() == null ? null : String.valueOf(source.getSubMeasureId()));
+        vo.setReceiptItemId(source.getReceiptItemId() == null ? null : String.valueOf(source.getReceiptItemId()));
         vo.setSourceAmount(money(source.getSourceAmount()).toPlainString());
         vo.setPaidAmount(money(source.getPaidAmount()).toPlainString());
         vo.setRemark(source.getRemark());

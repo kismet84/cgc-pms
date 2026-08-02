@@ -77,8 +77,11 @@ beforeEach(() => {
     status: 'ENABLE',
   })
   vi.mocked(masterData.loadCompanies).mockResolvedValue({
-    records: [{ id: '1', companyCode: 'C1', companyName: '一公司', status: 'ENABLE' }],
-    total: 1,
+    records: [
+      { id: '1', companyCode: 'C1', companyName: '一公司', status: 'ENABLE' },
+      { id: '10', companyCode: 'C2', companyName: '二公司', status: 'ENABLE' },
+    ],
+    total: 2,
     pageNo: 1,
     pageSize: 200,
   })
@@ -93,22 +96,44 @@ beforeEach(() => {
       status: 'ENABLE',
       children: [],
     },
+    {
+      id: '4',
+      companyId: '10',
+      parentId: '0',
+      deptCode: 'D2',
+      deptName: '财务部',
+      orderNum: 0,
+      status: 'ENABLE',
+      children: [],
+    },
   ])
-  vi.mocked(masterData.loadPositions).mockResolvedValue({
-    records: [
-      {
-        id: '3',
-        companyId: '1',
-        departmentId: '2',
-        positionCode: 'P1',
-        positionName: '经理',
-        status: 'ENABLE',
-      },
-    ],
+  vi.mocked(masterData.loadPositions).mockImplementation(async (query) => ({
+    records:
+      query.departmentId === '4'
+        ? [
+            {
+              id: '5',
+              companyId: '10',
+              departmentId: '4',
+              positionCode: 'P2',
+              positionName: '会计',
+              status: 'ENABLE',
+            },
+          ]
+        : [
+            {
+              id: '3',
+              companyId: '1',
+              departmentId: '2',
+              positionCode: 'P1',
+              positionName: '经理',
+              status: 'ENABLE',
+            },
+          ],
     total: 1,
-    pageNo: 1,
-    pageSize: 200,
-  })
+    pageNo: query.pageNo,
+    pageSize: query.pageSize,
+  }))
   vi.mocked(masterData.loadMaterialCategories).mockResolvedValue([
     { id: '9', categoryCode: 'STEEL', categoryName: '钢材', status: 'ENABLE' },
   ])
@@ -243,12 +268,36 @@ describe('M7 master-data pages', () => {
 
     expect(masterData.loadCompanies).toHaveBeenCalledOnce()
     expect(masterData.loadDepartmentTree).toHaveBeenCalledOnce()
-    expect(masterData.loadPositions).toHaveBeenCalledOnce()
+    expect(masterData.loadPositions).toHaveBeenCalledWith(
+      expect.objectContaining({ companyId: '1', departmentId: '2' }),
+      expect.any(AbortSignal),
+    )
+    expect(wrapper.findAll('.v2-card')).toHaveLength(2)
+    expect(wrapper.findAll('.org-page__columns > section')).toHaveLength(3)
+    expect(wrapper.get('#org-companies-title').text()).toBe('1. 公司')
+    expect(wrapper.get('#org-departments-title').text()).toBe('2. 部门')
+    expect(wrapper.get('#org-positions-title').text()).toBe('3. 岗位')
     expect(wrapper.text()).toContain('一公司')
     expect(wrapper.text()).toContain('工程部')
     expect(wrapper.text()).toContain('经理')
+    expect(wrapper.text()).not.toContain('财务部')
     expect(wrapper.text()).not.toContain('新增公司')
     expect(wrapper.text()).not.toContain('删除')
+
+    const secondCompany = wrapper
+      .findAll('.org-page__select')
+      .find((button) => button.text().includes('二公司'))!
+    await secondCompany.trigger('click')
+    await flushPromises()
+
+    expect(secondCompany.attributes('aria-pressed')).toBe('true')
+    expect(wrapper.text()).toContain('财务部')
+    expect(wrapper.text()).toContain('会计')
+    expect(wrapper.text()).not.toContain('工程部')
+    expect(masterData.loadPositions).toHaveBeenLastCalledWith(
+      expect.objectContaining({ companyId: '10', departmentId: '4' }),
+      undefined,
+    )
   })
 
   it('uses server material totals and strings, without local KPI calculations', async () => {

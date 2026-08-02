@@ -27,6 +27,7 @@ public class CtContractVO {
     private String paymentMethod;
     private String settlementMethod;
     private String paidAmount;
+    private String payableAmount;
     private String settlementAmount;
     private String contractStatus;
     private String approvalStatus;

@@ -8,6 +8,7 @@ import java.util.List;
 public class ProjectBudgetVO {
     private String id;
     private String projectId;
+    private String sourceCostTargetId;
     private String budgetCode;
     private String versionNo;
     private String budgetName;

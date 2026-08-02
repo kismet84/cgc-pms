@@ -7,6 +7,9 @@ public class DocumentGenerationProperties {
     private boolean enabled = false;
     private boolean paymentEnabled = false;
     private boolean settlementEnabled = false;
+    private boolean purchaseRequestEnabled = false;
+    private boolean purchaseOrderEnabled = false;
+    private boolean materialReceiptEnabled = false;
     private int maxTemplateBytes = 512 * 1024;
     private int maxCollectionItems = 200;
     private int maxImageBytes = 1024 * 1024;
@@ -23,6 +26,12 @@ public class DocumentGenerationProperties {
     public void setPaymentEnabled(boolean value) { this.paymentEnabled = value; }
     public boolean isSettlementEnabled() { return settlementEnabled; }
     public void setSettlementEnabled(boolean value) { this.settlementEnabled = value; }
+    public boolean isPurchaseRequestEnabled() { return purchaseRequestEnabled; }
+    public void setPurchaseRequestEnabled(boolean value) { this.purchaseRequestEnabled = value; }
+    public boolean isPurchaseOrderEnabled() { return purchaseOrderEnabled; }
+    public void setPurchaseOrderEnabled(boolean value) { this.purchaseOrderEnabled = value; }
+    public boolean isMaterialReceiptEnabled() { return materialReceiptEnabled; }
+    public void setMaterialReceiptEnabled(boolean value) { this.materialReceiptEnabled = value; }
     public int getMaxTemplateBytes() { return maxTemplateBytes; }
     public void setMaxTemplateBytes(int value) { this.maxTemplateBytes = value; }
     public int getMaxCollectionItems() { return maxCollectionItems; }

@@ -54,6 +54,8 @@ class MatPurchaseOrderControllerTest {
     private static final long PARTNER_ID = 20002L;
     private static final long BUDGET_ID = 9901101L;
     private static final long BUDGET_LINE_ID = 9901102L;
+    private static final long CONTRACT_ITEM_ID = 9901103L;
+    private static final long CONTRACT_BUDGET_LINE_ID = 99100003L;
     private static final Pattern DATA_ID_PATTERN = Pattern.compile("\"data\":\"(\\d+)\"");
     private static final Pattern ORDER_CODE_PATTERN = Pattern.compile("\"orderCode\":\"([^\"]+)\"");
 
@@ -63,7 +65,23 @@ class MatPurchaseOrderControllerTest {
     void ensureWorkflowApprover() {
         // 控制器提交用例使用真实采购语义，避免复用 V90 的分包合同夹具。
         jdbcTemplate.update("UPDATE md_partner SET partner_type='SUPPLIER',blacklist_flag=0,status='ENABLE' WHERE id=?", PARTNER_ID);
-        jdbcTemplate.update("UPDATE ct_contract SET contract_type='PURCHASE' WHERE id=?", CONTRACT_ID);
+        jdbcTemplate.update("""
+                UPDATE ct_contract
+                SET contract_type='PURCHASE', party_b_id=?, contract_status='PERFORMING',
+                    approval_status='APPROVED', pricing_mode='FIXED'
+                WHERE id=?
+                """, PARTNER_ID, CONTRACT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract_item (
+                    id, tenant_id, contract_id, material_id, item_code, item_name,
+                    quantity, unit_price, amount, created_by, deleted_flag
+                ) SELECT ?, ?, ?, 1, 'PO-CONTROLLER-1', '采购订单接口测试材料',
+                    1000, 3500, 3500000, ?, 0
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ct_contract_item
+                    WHERE tenant_id=? AND contract_id=? AND material_id=1 AND deleted_flag=0
+                )
+                """, CONTRACT_ITEM_ID, TENANT_ID, CONTRACT_ID, ADMIN_ID, TENANT_ID, CONTRACT_ID);
         ensureActiveBudget();
         Integer count = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM sys_user WHERE id = ?", Integer.class, ADMIN_ID);
@@ -184,6 +202,100 @@ class MatPurchaseOrderControllerTest {
     // ═══════════════════════════════════════════════════════════════
     // POST create
     // ═══════════════════════════════════════════════════════════════
+
+    @Test
+    @Order(3)
+    @DisplayName("POST /purchase-orders/from-request -> 从已审批采购申请按合同固定价显式建单")
+    void testCreateFromApprovedRequest() throws Exception {
+        long requestId = Math.abs(System.nanoTime());
+        long requestItemId = requestId + 1;
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request (
+                    id, tenant_id, project_id, request_code, approval_status, status,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, ?, 'APPROVED', 'APPROVED', ?, ?, 0)
+                """, requestId, TENANT_ID, PROJECT_ID, "PR-FROM-" + requestId, ADMIN_ID, ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request_item (
+                    id, tenant_id, request_id, material_id, wbs_task_id, budget_line_id,
+                    quantity, approved_quantity, approval_version, unit, planned_date,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, 1, NULL, NULL, 5, 4, 0, '吨', CURRENT_DATE, ?, ?, 0)
+                """, requestItemId, TENANT_ID, requestId, ADMIN_ID, ADMIN_ID);
+
+        String body = """
+                {"projectId":%d,"contractId":%d,"requestId":%d,
+                 "orderDate":"%s","deliveryDate":"%s","deliveryTerms":"送达并验收"}
+                """.formatted(PROJECT_ID, CONTRACT_ID, requestId,
+                LocalDate.now(), LocalDate.now().plusDays(7));
+        String response = mockMvc.perform(postWithApi("/purchase-orders/from-request")
+                        .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.code").value("0"))
+                .andReturn().getResponse().getContentAsString();
+        Long createdId = Long.parseLong(response.replaceAll(".*\"data\":\"?(\\d+)\"?.*", "$1"));
+        Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mat_purchase_order WHERE id=? AND request_id=? AND exception_purchase_flag=0",
+                Integer.class, createdId, requestId));
+        Assertions.assertEquals("CONVERTED", jdbcTemplate.queryForObject(
+                "SELECT status FROM mat_purchase_request WHERE id=?", String.class, requestId));
+        Assertions.assertEquals(0, new BigDecimal("4").compareTo(jdbcTemplate.queryForObject(
+                "SELECT quantity FROM mat_purchase_order_item WHERE order_id=? AND request_item_id=?",
+                BigDecimal.class, createdId, requestItemId)));
+        Assertions.assertEquals(0, new BigDecimal("3500").compareTo(jdbcTemplate.queryForObject(
+                "SELECT unit_price FROM mat_purchase_order_item WHERE order_id=? AND request_item_id=?",
+                BigDecimal.class, createdId, requestItemId)));
+        Assertions.assertEquals("CONTRACT_ITEM", jdbcTemplate.queryForObject(
+                "SELECT price_source FROM mat_purchase_order_item WHERE order_id=? AND request_item_id=?",
+                String.class, createdId, requestItemId));
+        Assertions.assertEquals(CONTRACT_BUDGET_LINE_ID, jdbcTemplate.queryForObject(
+                "SELECT budget_line_id FROM mat_purchase_order_item WHERE order_id=? AND request_item_id=?",
+                Long.class, createdId, requestItemId));
+        mockMvc.perform(postWithApi("/purchase-orders/from-request")
+                        .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @Order(3)
+    @DisplayName("POST /purchase-orders/from-request -> 缺合同预算分摊时拒绝生成订单")
+    void testCreateFromApprovedRequestRequiresContractBudgetAllocation() throws Exception {
+        long requestId = Math.abs(System.nanoTime());
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request (
+                    id, tenant_id, project_id, request_code, approval_status, status,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, ?, 'APPROVED', 'APPROVED', ?, ?, 0)
+                """, requestId, TENANT_ID, PROJECT_ID, "PR-NO-BUDGET-" + requestId, ADMIN_ID, ADMIN_ID);
+        jdbcTemplate.update("""
+                INSERT INTO mat_purchase_request_item (
+                    id, tenant_id, request_id, material_id, wbs_task_id, budget_line_id,
+                    quantity, approved_quantity, approval_version, unit, planned_date,
+                    created_by, updated_by, deleted_flag
+                ) VALUES (?, ?, ?, 1, NULL, NULL, 5, 4, 0, '吨', CURRENT_DATE, ?, ?, 0)
+                """, requestId + 1, TENANT_ID, requestId, ADMIN_ID, ADMIN_ID);
+
+        String body = """
+                {"projectId":%d,"contractId":%d,"requestId":%d,
+                 "orderDate":"%s","deliveryDate":"%s","deliveryTerms":"送达并验收"}
+                """.formatted(PROJECT_ID, CONTRACT_ID, requestId,
+                LocalDate.now(), LocalDate.now().plusDays(7));
+        jdbcTemplate.update("UPDATE contract_budget_allocation SET deleted_flag=1 WHERE tenant_id=? AND contract_id=? AND deleted_flag=0",
+                TENANT_ID, CONTRACT_ID);
+        try {
+            mockMvc.perform(postWithApi("/purchase-orders/from-request")
+                            .cookie(adminCookie()).contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").value("采购合同必须先完成预算分摊"));
+        } finally {
+            jdbcTemplate.update("UPDATE contract_budget_allocation SET deleted_flag=0 WHERE tenant_id=? AND contract_id=?",
+                    TENANT_ID, CONTRACT_ID);
+        }
+        Assertions.assertEquals("APPROVED", jdbcTemplate.queryForObject(
+                "SELECT status FROM mat_purchase_request WHERE id=?", String.class, requestId));
+        Assertions.assertEquals(0, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM mat_purchase_order WHERE request_id=? AND deleted_flag=0",
+                Integer.class, requestId));
+    }
 
     @Test
     @Order(3)

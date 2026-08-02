@@ -10,6 +10,7 @@ import com.cgcpms.document.render.RestrictedTemplateEngine;
 import com.cgcpms.document.service.DocumentGenerationPersistenceService;
 import com.cgcpms.document.service.DocumentGenerationService;
 import com.cgcpms.document.service.DocumentTemplateService;
+import com.cgcpms.document.service.ProcurementSystemTemplateService;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.service.FileService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -24,6 +25,32 @@ import static org.mockito.Mockito.verify;
 
 class DocumentGenerationFeatureFlagTest {
     @Test
+    void rejectsPurchaseOrderWhenItsFeatureFlagIsOff() {
+        DocumentGenerationMapper mapper = mock(DocumentGenerationMapper.class);
+        DocumentTemplateService templateService = mock(DocumentTemplateService.class);
+        DocumentDataProviderRegistry registry = mock(DocumentDataProviderRegistry.class);
+        RestrictedTemplateEngine templateEngine = mock(RestrictedTemplateEngine.class);
+        DocumentRenderer renderer = mock(DocumentRenderer.class);
+        DocumentGenerationPersistenceService persistence = mock(DocumentGenerationPersistenceService.class);
+        BusinessObjectAuthorizer authorizer = mock(BusinessObjectAuthorizer.class);
+        @SuppressWarnings("unchecked") ObjectProvider<FileService> files = mock(ObjectProvider.class);
+        DocumentGenerationProperties properties = new DocumentGenerationProperties();
+        properties.setEnabled(true);
+        DocumentGenerationService service = new DocumentGenerationService(mapper, templateService, registry,
+                templateEngine, renderer, persistence, authorizer, new ObjectMapper(), files, properties,
+                mock(ProcurementSystemTemplateService.class));
+        TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
+        try {
+            BusinessException error = assertThrows(BusinessException.class,
+                    () -> service.generate("PURCHASE_ORDER", 301L, "purchase-order:301:disabled", null));
+            assertEquals("DOCUMENT_PURCHASE_ORDER_GENERATION_DISABLED", error.getCode());
+            verify(registry, never()).require("PURCHASE_ORDER");
+        } finally {
+            TestUserContext.clear();
+        }
+    }
+
+    @Test
     void rejectsGenerationBeforeDataReadWhenGlobalFeatureFlagIsOff() {
         DocumentGenerationMapper mapper = mock(DocumentGenerationMapper.class);
         DocumentTemplateService templateService = mock(DocumentTemplateService.class);
@@ -36,7 +63,7 @@ class DocumentGenerationFeatureFlagTest {
         ObjectProvider<FileService> fileServiceProvider = mock(ObjectProvider.class);
         DocumentGenerationService service = new DocumentGenerationService(mapper, templateService, registry,
                 templateEngine, renderer, persistence, authorizer, new ObjectMapper(), fileServiceProvider,
-                new DocumentGenerationProperties());
+                new DocumentGenerationProperties(), mock(ProcurementSystemTemplateService.class));
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         try {
             BusinessException error = assertThrows(BusinessException.class,
@@ -64,7 +91,8 @@ class DocumentGenerationFeatureFlagTest {
         DocumentGenerationProperties properties = new DocumentGenerationProperties();
         properties.setEnabled(true);
         DocumentGenerationService service = new DocumentGenerationService(mapper, templateService, registry,
-                templateEngine, renderer, persistence, authorizer, new ObjectMapper(), fileServiceProvider, properties);
+                templateEngine, renderer, persistence, authorizer, new ObjectMapper(), fileServiceProvider, properties,
+                mock(ProcurementSystemTemplateService.class));
         TestUserContext.setAdmin(TestUserContext.TENANT_0, TestUserContext.USER_ADMIN);
         try {
             BusinessException error = assertThrows(BusinessException.class,

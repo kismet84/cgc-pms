@@ -6,13 +6,12 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.cost.service.CostSummaryService;
-import com.cgcpms.material.entity.MdMaterial;
-import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.purchase.entity.MatPurchaseOrder;
 import com.cgcpms.purchase.entity.MatPurchaseOrderItem;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderItemMapper;
 import com.cgcpms.purchase.mapper.MatPurchaseOrderMapper;
 import com.cgcpms.purchase.service.MatPurchaseOrderService;
+import com.cgcpms.receipt.dto.MatReceiptItemCommand;
 import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
@@ -47,14 +46,13 @@ class RegressionFixVerificationTest {
 
     private static final long PROJECT_ID = 10001L;
     private static final long CONTRACT_ID = 30001L;
-    private static final long PARTNER_ID = 20001L;
+    private static final long PARTNER_ID = 20002L;
 
     @Autowired private MatPurchaseOrderService purchaseOrderService;
     @Autowired private MatReceiptService receiptService;
 
     @Autowired private MatPurchaseOrderMapper purchaseOrderMapper;
     @Autowired private MatPurchaseOrderItemMapper purchaseOrderItemMapper;
-    @Autowired private MdMaterialMapper materialMapper;
     @Autowired private MatReceiptMapper receiptMapper;
     @Autowired private MatReceiptItemMapper receiptItemMapper;
     @Autowired private CostSummaryService costSummaryService;
@@ -68,6 +66,25 @@ class RegressionFixVerificationTest {
                 .add("username", "admin")
                 .add("tenantId", 0L)
                 .build());
+        jdbcTemplate.update("UPDATE md_partner SET partner_type='SUPPLIER', blacklist_flag=0, status='ENABLE' WHERE id=?",
+                PARTNER_ID);
+        jdbcTemplate.update("""
+                UPDATE ct_contract
+                SET contract_type='PURCHASE', party_b_id=?, contract_status='PERFORMING',
+                    approval_status='APPROVED', pricing_mode='FIXED'
+                WHERE id=?
+                """, PARTNER_ID, CONTRACT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract_item (
+                    id, tenant_id, contract_id, material_id, item_code, item_name,
+                    quantity, unit_price, amount, created_by, deleted_flag
+                ) SELECT 6200201, 0, ?, 1, 'REG-F10-1', 'F10采购材料',
+                    1000, 450, 450000, ?, 0
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM ct_contract_item
+                    WHERE tenant_id=0 AND contract_id=? AND material_id=1 AND deleted_flag=0
+                )
+                """, CONTRACT_ID, USER_ADMIN, CONTRACT_ID);
     }
 
     @AfterEach
@@ -101,16 +118,8 @@ class RegressionFixVerificationTest {
             orderId = purchaseOrderService.create(order);
             assertNotNull(orderId);
 
-            MdMaterial material = new MdMaterial();
-            material.setTenantId(0L);
-            material.setMaterialCode("REG-F10-" + System.nanoTime());
-            material.setMaterialName("C30商品砼");
-            material.setUnit("m³");
-            material.setStatus("ENABLE");
-            materialMapper.insert(material);
-
             MatPurchaseOrderItem item = buildOrderItem("C30商品砼", "C30", "m³", 100, 450);
-            item.setMaterialId(material.getId());
+            item.setMaterialId(1L);
             purchaseOrderService.saveItemsBatch(orderId, List.of(item));
 
             List<MatPurchaseOrderItem> orderItems = purchaseOrderItemMapper.selectList(
@@ -131,7 +140,7 @@ class RegressionFixVerificationTest {
             assertNotNull(receiptId);
 
             // 3. First saveItemsBatch with actualQuantity=10
-            MatReceiptItem ri1 = buildReceiptItem(orderItemId, 10, 10, 450, 10 * 450);
+            MatReceiptItemCommand ri1 = buildReceiptItem(orderItemId, 10, 10, 450, 10 * 450);
             receiptService.saveItemsBatch(receiptId, List.of(ri1));
 
             MatPurchaseOrderItem oi = purchaseOrderItemMapper.selectById(orderItemId);
@@ -139,7 +148,7 @@ class RegressionFixVerificationTest {
                     "草稿第一次保存后receivedQuantity仍应为0");
 
             // 4. Second saveItemsBatch with same quantity → should NOT double-count
-            MatReceiptItem ri2 = buildReceiptItem(orderItemId, 10, 10, 450, 10 * 450);
+            MatReceiptItemCommand ri2 = buildReceiptItem(orderItemId, 10, 10, 450, 10 * 450);
             receiptService.saveItemsBatch(receiptId, List.of(ri2));
 
             oi = purchaseOrderItemMapper.selectById(orderItemId);
@@ -273,7 +282,7 @@ class RegressionFixVerificationTest {
             assertEquals("RECEIPT_IN_APPROVAL", receiptDeleteEx.getCode());
 
             // receiptService.saveItemsBatch() should throw
-            MatReceiptItem dummyItem = buildReceiptItem(999L, 1, 1, 0, 0);
+            MatReceiptItemCommand dummyItem = buildReceiptItem(999L, 1, 1, 0, 0);
             Long receiptIdForBatch = receiptId;
             BusinessException receiptBatchEx = assertThrows(BusinessException.class,
                     () -> receiptService.saveItemsBatch(receiptIdForBatch, List.of(dummyItem)),
@@ -380,15 +389,12 @@ class RegressionFixVerificationTest {
         return item;
     }
 
-    private MatReceiptItem buildReceiptItem(Long orderItemId,
+    private MatReceiptItemCommand buildReceiptItem(Long orderItemId,
                                              int actualQty, int qualifiedQty,
                                              int unitPrice, int amount) {
-        MatReceiptItem item = new MatReceiptItem();
+        MatReceiptItemCommand item = new MatReceiptItemCommand();
         item.setOrderItemId(orderItemId);
-        item.setActualQuantity(new BigDecimal(actualQty));
-        item.setQualifiedQuantity(new BigDecimal(qualifiedQty));
-        item.setUnitPrice(new BigDecimal(unitPrice));
-        item.setAmount(new BigDecimal(amount));
+        item.setAcceptedQuantity(new BigDecimal(qualifiedQty));
         return item;
     }
 }

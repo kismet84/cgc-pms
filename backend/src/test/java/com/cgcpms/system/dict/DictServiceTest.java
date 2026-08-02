@@ -196,11 +196,13 @@ class DictServiceTest {
     @Order(8)
     @DisplayName("T8: 按字典类型分页查询字典数据—验证种子数据")
     void test08_listDictData_byDictType() {
-        // 项目状态 dict_type_id=1001，种子数据应有5条
-        IPage<SysDictDataVO> page = dictDataService.getPage(1, 20, 1001L, null, null);
-        assertEquals(5, page.getTotal(), "project_status 应有5条种子数据");
-        // local profile uses baseline fixtures; V216 normalization is covered by Flyway smoke tests.
-        assertEquals("草稿", page.getRecords().get(0).getDictLabel());
+        var projectStatuses = dictDataService.getByDictCode("project_status");
+        assertEquals(6, projectStatuses.size(), "project_status 应有6条种子数据");
+        SysDictDataVO preliminary = projectStatuses.stream()
+                .filter(row -> "DRAFT".equals(row.getDictValue()))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("project_status 应包含 DRAFT 状态"));
+        assertEquals("前期", preliminary.getDictLabel(), "DRAFT 的当前项目阶段标签应为前期");
     }
 
     @Test
@@ -210,7 +212,7 @@ class DictServiceTest {
         // local profile seed data id=100101
         SysDictDataVO vo = dictDataService.getById(100101L);
         assertNotNull(vo);
-        assertEquals("草稿", vo.getDictLabel());
+        assertEquals("前期", vo.getDictLabel());
         assertEquals("DRAFT", vo.getDictValue());
     }
 

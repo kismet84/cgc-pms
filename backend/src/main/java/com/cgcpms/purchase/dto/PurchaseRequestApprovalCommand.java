@@ -1,0 +1,14 @@
+package com.cgcpms.purchase.dto;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.Size;
+
+import java.util.List;
+
+public record PurchaseRequestApprovalCommand(
+        String comment,
+        @NotBlank @Size(max = 128) String idempotencyKey,
+        @NotEmpty @Valid List<PurchaseRequestApprovalItemCommand> items) {
+}

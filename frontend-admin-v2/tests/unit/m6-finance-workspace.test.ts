@@ -8,7 +8,6 @@ import {
   loadFinanceOperationsWorkspace,
   loadPaymentApplications,
   reversePaymentRecord,
-  savePaymentBasis,
   writebackPayment,
 } from '@/services/finance'
 
@@ -67,6 +66,7 @@ describe('M6 finance workspace contract', () => {
     expect(source).toContain('if (!request.signal.aborted)')
     expect(source).not.toContain('if (!controller.signal.aborted)')
     expect(source).toContain('dashboardStatusLabel(')
+    expect(source).toContain("['PAID', 'PARTIALLY_PAID'].includes(row.payStatus || '')")
   })
   it('keeps payment writeback server-authoritative and string-valued', async () => {
     const fetchMock = vi.fn(
@@ -95,44 +95,19 @@ describe('M6 finance workspace contract', () => {
     })
     vi.unstubAllGlobals()
   })
-  it('saves material receipt basis without converting money', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ code: '0', data: null })))
-    vi.stubGlobal('fetch', fetchMock)
-    await savePaymentBasis('PA-1', [
-      {
-        basisType: 'MAT_RECEIPT',
-        basisId: 'RI-1',
-        basisAmount: '9007199254740993.01',
-      },
-    ])
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/pay-applications/PA-1/basis/batch')
-    const request = fetchMock.mock.calls[0]?.[1] as RequestInit
-    expect(request.method).toBe('POST')
-    expect(JSON.parse(String(request.body))).toEqual([
-      {
-        basisType: 'MAT_RECEIPT',
-        basisId: 'RI-1',
-        basisAmount: '9007199254740993.01',
-      },
-    ])
-    vi.unstubAllGlobals()
-  })
-  it('binds authorized direct payment to itself and an approved receipt item', () => {
+  it('binds material payment to an authoritative receipt source', () => {
     const source = readFileSync(
       resolve(process.cwd(), 'src/pages/finance/ReceivablesWorkspacePage.vue'),
       'utf8',
     )
-    expect(source).toContain("session.hasPermission('payment:direct')")
-    expect(source).toContain("value: 'DIRECT:self'")
+    expect(source).toContain("sourceType !== 'MAT_RECEIPT'")
+    expect(source).toContain('材料付款必须选择材料验收来源')
     expect(source).toContain("sourceType === 'DIRECT' ? paymentId")
-    expect(source).toContain("basisType: 'MAT_RECEIPT'")
     expect(source).toContain('await savePaymentSources(paymentId')
-    expect(source).toContain('await savePaymentBasis(paymentId')
-    expect(source).toContain('loadReceipts({ pageNum: 1, pageSize: 200')
-    expect(source).toContain('await loadReceiptItems(receipt.id)')
-    expect(source).toContain("receipt.approvalStatus === 'APPROVED'")
-    expect(source).toContain("receipt.qualityStatus === 'QUALIFIED'")
-    expect(source).toContain("editor.sourceType === 'DIRECT'")
+    expect(source).toContain('await deletePayment(createdPaymentId)')
+    expect(source).toContain('本次新建草稿已回滚')
+    expect(source).not.toContain('await savePaymentBasis(paymentId')
+    expect(source).not.toContain("editor.sourceType === 'DIRECT' && editor.expenseCategory === 'MATERIAL'")
     expect(source).not.toContain('Number(value.applyAmount)')
   })
   it('exposes writeback only through the authoritative payment endpoint', () => {

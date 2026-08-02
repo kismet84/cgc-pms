@@ -110,6 +110,33 @@ describe('V2 design system', () => {
     expect(wrapper.emitted('update:modelValue')).toEqual([['2026-07']])
   })
 
+  it('keeps native select state and accessible naming when label is visually hidden', () => {
+    const wrapper = mount(V2Select, {
+      props: {
+        label: '项目状态',
+        hideLabel: true,
+        disabled: true,
+        required: true,
+        error: '请选择项目状态',
+        ariaLabelledby: 'project-status-heading',
+        options: [{ value: 'ACTIVE', label: '在建' }],
+      },
+    })
+    const select = wrapper.get('select')
+
+    expect(select.attributes()).toMatchObject({
+      disabled: '',
+      required: '',
+      'aria-label': '项目状态',
+      'aria-labelledby': 'project-status-heading',
+      'aria-invalid': 'true',
+    })
+    expect(select.attributes('aria-describedby')).toBe(
+      wrapper.get('.v2-field__error').attributes('id'),
+    )
+    expect(wrapper.get('.v2-field__label').classes()).toContain('v2-visually-hidden')
+  })
+
   it('supports explicit and inferred empty select options without duplicates', () => {
     const explicit = mount(V2Select, {
       props: {

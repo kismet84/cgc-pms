@@ -19,10 +19,10 @@ const ContractPage = () => import('./pages/commercial/ContractPage.vue')
 const VariationPage = () => import('./pages/commercial/VariationPage.vue')
 const BidCostPage = () => import('./pages/commercial/BidCostPage.vue')
 const CostTargetPage = () => import('./pages/commercial/CostTargetPage.vue')
+const CostBudgetPage = () => import('./pages/commercial/CostBudgetPage.vue')
 const CostLedgerPage = () => import('./pages/commercial/CostLedgerPage.vue')
 const CostSummaryPage = () => import('./pages/commercial/CostSummaryPage.vue')
 const CostControlPage = () => import('./pages/commercial/CostControlPage.vue')
-const BudgetPage = () => import('./pages/commercial/BudgetPage.vue')
 const ProductionMeasurementPage = () => import('./pages/commercial/ProductionMeasurementPage.vue')
 const SchedulePage = () => import('./pages/delivery/SchedulePage.vue')
 const DailyLogPage = () => import('./pages/delivery/DailyLogPage.vue')
@@ -57,6 +57,7 @@ declare module 'vue-router' {
     technical?: boolean
     shell?: boolean
     permission?: string
+    permissions?: string[]
     adminOnly?: boolean
     superAdminOnly?: boolean
     adminBypassesPermission?: boolean
@@ -93,11 +94,10 @@ const navigationComponents = {
   '/contract/ledger': ContractPage,
   '/variation/order': VariationPage,
   '/bid-cost': BidCostPage,
-  '/cost-target/index': CostTargetPage,
+  '/cost-budget': CostBudgetPage,
   '/cost/ledger': CostLedgerPage,
   '/cost/summary': CostSummaryPage,
   '/cost/control': CostControlPage,
-  '/budget': BudgetPage,
   '/production-measurement': ProductionMeasurementPage,
   '/project-schedule': SchedulePage,
   '/site/daily-log': DailyLogPage,
@@ -161,6 +161,7 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
           meta: {
             shell: true,
             permission: tab.permission,
+            permissions: tab.permissions,
             adminOnly: workspace.adminOnly || tab.adminOnly,
             superAdminOnly: workspace.superAdminOnly || tab.superAdminOnly,
             adminBypassesPermission:
@@ -338,7 +339,31 @@ const contextRoutes: RouteRecordRaw[] = [
   {
     path: '/cost-target',
     name: 'V2CostTargetRootRedirect',
-    redirect: (to) => ({ path: '/cost-target/index', query: to.query, hash: to.hash }),
+    redirect: (to) => ({
+      path: '/cost-budget',
+      query: to.query,
+      hash: to.hash,
+    }),
+    meta: { shell: true, permission: 'cost:target:query' },
+  },
+  {
+    path: '/cost-target/index',
+    name: 'V2CostTargetIndexRedirect',
+    redirect: (to) => ({
+      path: '/cost-budget',
+      query: to.query,
+      hash: to.hash,
+    }),
+    meta: { shell: true, permission: 'cost:target:query' },
+  },
+  {
+    path: '/budget',
+    name: 'V2BudgetRedirect',
+    redirect: (to) => ({
+      path: '/cost-budget',
+      query: to.query,
+      hash: to.hash,
+    }),
     meta: { shell: true, permission: 'cost:target:query' },
   },
   {
@@ -485,10 +510,13 @@ export function installSessionGuard(targetRouter: Router): void {
       to.path === '/inventory/stock' && to.redirectedFrom?.path === '/inventory/transaction'
         ? 'inventory:transaction:list'
         : to.meta.permission
+    const requiredPermissions = to.meta.permissions
     const hasRequiredPermission =
       to.meta.adminBypassesPermission && session.isAdmin
         ? true
-        : !requiredPermission || session.hasPermission(requiredPermission)
+        : requiredPermissions?.length
+          ? requiredPermissions.some((permission) => session.hasPermission(permission))
+          : !requiredPermission || session.hasPermission(requiredPermission)
     if (!hasRequiredPermission) {
       return { path: '/forbidden', query: { from: to.fullPath } }
     }

@@ -26,6 +26,23 @@ public class WorkflowApprovalService {
     @Transactional(rollbackFor = Exception.class)
     public void approve(Long taskId, Long userId, String username,
                         String comment, String idempotencyKey) {
+        approve(taskId, userId, username, comment, idempotencyKey, false);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void approvePurchaseRequest(Long taskId, Long userId, String username,
+                                       String comment, String idempotencyKey) {
+        approve(taskId, userId, username, comment, idempotencyKey, true);
+    }
+
+    private void approve(Long taskId, Long userId, String username,
+                         String comment, String idempotencyKey, boolean purchaseRequestDedicated) {
+        WfTask routeTask = wfTaskMapper.selectById(taskId);
+        if (routeTask != null && com.cgcpms.workflow.WorkflowBusinessTypes.PURCHASE_REQUEST
+                .equals(routeTask.getBusinessType()) && !purchaseRequestDedicated) {
+            throw new BusinessException("PURCHASE_REQUEST_DEDICATED_APPROVAL_REQUIRED",
+                    "采购申请同意必须通过采购申请专用审批入口");
+        }
         WfTask task = validateAndCasUpdateTask(taskId, userId, idempotencyKey,
                 WorkflowConstants.ACTION_APPROVE, WorkflowConstants.TASK_APPROVED, comment);
 

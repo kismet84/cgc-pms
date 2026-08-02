@@ -25,6 +25,8 @@ public class CtContractItem extends BaseEntity {
 
     private Long contractId;
 
+    private Long materialId;
+
     private String itemCode;
 
     @NotBlank

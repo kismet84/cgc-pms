@@ -40,6 +40,10 @@ describe('dashboard display model', () => {
 
   it.each([
     ['VERIFIED', '已核验'],
+    ['APPROVING', '审批中'],
+    ['PREPARING', '筹备'],
+    ['PAID', '已付款'],
+    ['PARTIALLY_PAID', '部分付款'],
     ['RECEIVABLE_CREATED', '已生成应收'],
     ['PARTIALLY_COLLECTED', '部分回款'],
     ['FULLY_ALLOCATED', '已全额分配'],

@@ -77,7 +77,7 @@ class PurchaseRequestWorkflowHandlerTest {
 
     @Test
     @Transactional
-    @DisplayName("onApproved -> 批准需求并转换为待补充商业条件的草稿采购订单")
+    @DisplayName("onApproved -> 仅批准采购申请，不自动创建采购订单")
     void testOnApproved_Success() {
         MatPurchaseRequest req = new MatPurchaseRequest();
         req.setProjectId(10001L);
@@ -93,6 +93,8 @@ class PurchaseRequestWorkflowHandlerTest {
         item.setRequestId(req.getId());
         item.setMaterialId(1L);
         item.setQuantity(new BigDecimal("5.00"));
+        item.setApprovedQuantity(new BigDecimal("4.00"));
+        item.setApprovalVersion(0);
         item.setEstimatedUnitPrice(new BigDecimal("20.00"));
         item.setEstimatedAmount(new BigDecimal("100.00"));
         item.setUnit("m");
@@ -109,22 +111,11 @@ class PurchaseRequestWorkflowHandlerTest {
         MatPurchaseRequest updated = requestMapper.selectById(req.getId());
         assertNotNull(updated, "采购申请应仍然存在");
         assertEquals("APPROVED", updated.getApprovalStatus(), "审批状态应变为 APPROVED");
-        assertEquals("CONVERTED", updated.getStatus(), "业务状态应变为 CONVERTED");
+        assertEquals("APPROVED", updated.getStatus(), "审批回调不得自动标记已转订单");
         MatPurchaseOrder order = orderMapper.selectOne(
                 new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrder>()
                         .eq(MatPurchaseOrder::getRequestId, req.getId()));
-        assertNotNull(order);
-        assertEquals("DRAFT", order.getApprovalStatus(), "采购申请审批不得替代订单审批");
-        assertEquals("DRAFT", order.getOrderStatus());
-        MatPurchaseOrderItem convertedItem = orderItemMapper.selectOne(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<MatPurchaseOrderItem>()
-                        .eq(MatPurchaseOrderItem::getOrderId, order.getId()));
-        assertNotNull(convertedItem);
-        assertEquals(item.getId(), convertedItem.getRequestItemId());
-        assertEquals(0, BigDecimal.ZERO.compareTo(convertedItem.getUnitPrice()),
-                "估算价不得直接成为采购订单商业价格");
-        assertEquals(0, BigDecimal.ZERO.compareTo(order.getTotalAmount()),
-                "采购员确认价格前订单金额必须为零");
+        assertNull(order, "审批回调不得自动创建采购订单");
     }
 
     @Test

@@ -10,6 +10,7 @@ export interface ProjectContextOption {
   projectCode: string;
   projectName: string;
   status: string;
+  projectManagerId?: string | null;
 }
 
 export interface ProjectRecord extends ProjectListItem {

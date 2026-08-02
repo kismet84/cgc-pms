@@ -296,7 +296,7 @@ describe('M7 system management contracts', () => {
     const list = wrapper.get('input[aria-label="项目列表权限"]')
     const create = wrapper.get('input[aria-label="新建项目权限"]')
     const projectQuery = wrapper.get('input[aria-label="项目查询权限"]')
-    const dailyLog = wrapper.get('input[aria-label="现场日报权限"]')
+    const dailyLog = wrapper.get('input[aria-label="施工履约权限"]')
     expect((domain.element as HTMLInputElement).indeterminate).toBe(true)
     expect((directory.element as HTMLInputElement).indeterminate).toBe(true)
     expect((list.element as HTMLInputElement).indeterminate).toBe(true)
@@ -327,7 +327,7 @@ describe('M7 system management contracts', () => {
       .find((button) => button.text() === '全部收起')!
       .trigger('click')
     await flushPromises()
-    expect(wrapper.findAll('tbody tr')).toHaveLength(3)
+    expect(wrapper.findAll('tbody tr')).toHaveLength(4)
 
     await wrapper
       .findAll('.permission-role-list__item')
@@ -343,7 +343,7 @@ describe('M7 system management contracts', () => {
     ).toBe(false)
   })
 
-  it('uses the permission-workspace pattern to select role users without losing memberships', async () => {
+  it('uses one role-user workspace without losing memberships', async () => {
     vi.mocked(apiRequest).mockImplementation(async (path) => {
       if (path.startsWith('/system/users?')) {
         const roleId = new URLSearchParams(path.split('?')[1]).get('roleId')
@@ -423,6 +423,10 @@ describe('M7 system management contracts', () => {
     const wrapper = mount(AccessControlPage, { global: { plugins: [router] } })
     await flushPromises()
 
+    expect(wrapper.findAll('.v2-card')).toHaveLength(2)
+    expect(wrapper.findAll('.user-workspace > section')).toHaveLength(2)
+    expect(wrapper.get('#user-workspace-roles-title').text()).toBe('1. 角色')
+    expect(wrapper.get('#user-workspace-users-title').text()).toBe('2. 用户')
     const roleButtons = wrapper.findAll('.user-role-list__item')
     expect(roleButtons).toHaveLength(2)
     expect(roleButtons[0]!.text()).toContain('超级管理员2 人')

@@ -45,6 +45,8 @@ const companyTotal = ref(0)
 const departmentTree = ref<OrgDepartmentRecord[]>([])
 const positions = ref<OrgPositionRecord[]>([])
 const positionTotal = ref(0)
+const selectedCompanyId = ref('')
+const selectedDepartmentId = ref('')
 const dialogKind = ref<Kind | null>(null)
 const editingId = ref<string | null>(null)
 const deleteTarget = ref<DeleteTarget | null>(null)
@@ -80,11 +82,20 @@ const canAdd = computed(() => can('org:add'))
 const canEdit = computed(() => can('org:edit'))
 const canDelete = computed(() => can('org:delete'))
 const flatDepartments = computed(() => flattenDepartments(departmentTree.value))
+const selectedDepartments = computed(() =>
+  flatDepartments.value.filter((item) => item.companyId === selectedCompanyId.value),
+)
 const pagedDepartments = computed(() =>
-  flatDepartments.value.slice(
+  selectedDepartments.value.slice(
     (departmentPageNo.value - 1) * pageSize,
     departmentPageNo.value * pageSize,
   ),
+)
+const selectedCompany = computed(
+  () => companies.value.find((item) => item.id === selectedCompanyId.value) ?? null,
+)
+const selectedDepartment = computed(
+  () => selectedDepartments.value.find((item) => item.id === selectedDepartmentId.value) ?? null,
 )
 const companyOptions = computed(() =>
   companyDirectory.value.map((item) => ({ value: item.id, label: item.companyName })),
@@ -125,6 +136,40 @@ function departmentName(id: string): string {
   return flatDepartments.value.find((item) => item.id === id)?.deptName ?? id
 }
 
+function normalizeSelection(): void {
+  if (!companies.value.some((item) => item.id === selectedCompanyId.value)) {
+    selectedCompanyId.value = companies.value[0]?.id ?? ''
+  }
+  if (!selectedDepartments.value.some((item) => item.id === selectedDepartmentId.value)) {
+    selectedDepartmentId.value = selectedDepartments.value[0]?.id ?? ''
+  }
+}
+
+async function loadSelectedPositions(signal?: AbortSignal): Promise<void> {
+  if (!selectedCompanyId.value || !selectedDepartmentId.value) {
+    positions.value = []
+    positionTotal.value = 0
+    return
+  }
+  const page = await loadPositions(
+    {
+      pageNo: positionPageNo.value,
+      pageSize,
+      companyId: selectedCompanyId.value,
+      departmentId: selectedDepartmentId.value,
+    },
+    signal,
+  )
+  positions.value = page.records
+  positionTotal.value = page.total
+}
+
+function refreshSelectedPositions(): void {
+  void loadSelectedPositions().catch((value) =>
+    showToast('error', '岗位加载失败', messageOf(value)),
+  )
+}
+
 async function loadCompanyDirectory(
   currentPage: { records: OrgCompanyRecord[]; total: number },
   signal: AbortSignal,
@@ -155,18 +200,17 @@ async function load(resetPages = true): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const [companyPage, departments, positionPage] = await Promise.all([
+    const [companyPage, departments] = await Promise.all([
       loadCompanies({ pageNo: companyPageNo.value, pageSize }, controller.signal),
-      loadDepartmentTree(controller.signal),
-      loadPositions({ pageNo: positionPageNo.value, pageSize }, controller.signal),
+      loadDepartmentTree(undefined, controller.signal),
     ])
     const directory = await loadCompanyDirectory(companyPage, controller.signal)
     companies.value = companyPage.records
     companyDirectory.value = directory
     companyTotal.value = companyPage.total
     departmentTree.value = departments
-    positions.value = positionPage.records
-    positionTotal.value = positionPage.total
+    normalizeSelection()
+    await loadSelectedPositions(controller.signal)
   } catch (value) {
     if (controller.signal.aborted) return
     companies.value = []
@@ -183,12 +227,38 @@ async function load(resetPages = true): Promise<void> {
 
 function changeCompanyPage(next: number): void {
   companyPageNo.value = next
+  departmentPageNo.value = 1
+  positionPageNo.value = 1
   void load(false)
 }
 
 function changePositionPage(next: number): void {
   positionPageNo.value = next
-  void load(false)
+  refreshSelectedPositions()
+}
+
+function changeDepartmentPage(next: number): void {
+  departmentPageNo.value = next
+  const nextDepartment = selectedDepartments.value[(next - 1) * pageSize]
+  selectedDepartmentId.value = nextDepartment?.id ?? ''
+  positionPageNo.value = 1
+  refreshSelectedPositions()
+}
+
+function selectCompany(id: string): void {
+  if (selectedCompanyId.value === id) return
+  selectedCompanyId.value = id
+  departmentPageNo.value = 1
+  positionPageNo.value = 1
+  selectedDepartmentId.value = selectedDepartments.value[0]?.id ?? ''
+  refreshSelectedPositions()
+}
+
+function selectDepartment(id: string): void {
+  if (selectedDepartmentId.value === id) return
+  selectedDepartmentId.value = id
+  positionPageNo.value = 1
+  refreshSelectedPositions()
 }
 
 async function refresh(): Promise<void> {
@@ -207,7 +277,7 @@ function openCreate(kind: Kind): void {
     Object.assign(companyForm, { companyCode: '', companyName: '', status: 'ENABLE', remark: '' })
   } else if (kind === 'department') {
     Object.assign(departmentForm, {
-      companyId: companyDirectory.value[0]?.id ?? '',
+      companyId: selectedCompanyId.value || companyDirectory.value[0]?.id || '',
       parentId: '0',
       deptCode: '',
       deptName: '',
@@ -216,10 +286,13 @@ function openCreate(kind: Kind): void {
       remark: '',
     })
   } else {
-    const companyId = companyDirectory.value[0]?.id ?? ''
+    const companyId = selectedCompanyId.value || companyDirectory.value[0]?.id || ''
     Object.assign(positionForm, {
       companyId,
-      departmentId: flatDepartments.value.find((item) => item.companyId === companyId)?.id ?? '',
+      departmentId:
+        selectedDepartmentId.value ||
+        flatDepartments.value.find((item) => item.companyId === companyId)?.id ||
+        '',
       positionCode: '',
       positionName: '',
       status: 'ENABLE',
@@ -320,7 +393,7 @@ async function save(): Promise<void> {
       return
     }
     closeDialog()
-    await load()
+    await load(false)
     showToast('success', '组织资料已保存', '公司、部门和岗位已重新读取。')
   } catch (value) {
     showToast('error', '保存失败', value instanceof TypeError ? value.message : messageOf(value))
@@ -338,7 +411,7 @@ async function confirmDelete(): Promise<void> {
     else if (target.kind === 'department') await deleteDepartment(target.id)
     else await deletePosition(target.id)
     deleteTarget.value = null
-    await load()
+    await load(false)
     showToast('success', '组织资料已删除', '列表已刷新。')
   } catch (value) {
     showToast('error', '删除失败', messageOf(value))
@@ -364,61 +437,60 @@ onBeforeUnmount(() => loadController?.abort())
       <template #actions><V2Button @click="load">重试</V2Button></template>
     </V2PageState>
 
-    <template v-else>
-      <V2Card title="公司">
-        <template #title-extra>
-          <V2Badge tone="neutral">{{ companies.length }} 家</V2Badge>
-        </template>
-        <template #actions>
-          <V2Button v-if="canAdd" size="small" @click="openCreate('company')">新增公司</V2Button>
-        </template>
-        <div class="org-page__table-wrap">
-          <table class="v2-table--top">
-            <thead>
-              <tr>
-                <th>编码</th>
-                <th>名称</th>
-                <th>状态</th>
-                <th class="v2-table-cell--actions">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in companies" :key="item.id">
-                <td>{{ item.companyCode }}</td>
-                <td>{{ item.companyName }}</td>
-                <td>
-                  <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
-                    {{ statusLabel(item.status) }}
-                  </V2Badge>
-                </td>
-                <td class="v2-table-cell--actions">
-                  <V2ActionMenu
-                    :label="`${item.companyCode || item.companyName}更多操作`"
-                    :placement="index >= companies.length - 3 ? 'top-end' : 'bottom-end'"
-                  >
-                    <V2Button
-                      v-if="canEdit"
-                      size="small"
-                      variant="secondary"
-                      @click="openCompany(item)"
-                      >编辑</V2Button
-                    >
-                    <V2Button
-                      v-if="canDelete"
-                      size="small"
-                      variant="danger"
-                      @click="
-                        deleteTarget = { kind: 'company', id: item.id, label: item.companyName }
-                      "
-                      >删除</V2Button
-                    >
-                  </V2ActionMenu>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <template #footer>
+    <V2Card v-else>
+      <div class="org-page__columns">
+        <section aria-labelledby="org-companies-title">
+          <div class="org-page__section-heading">
+            <span>
+              <h3 id="org-companies-title">1. 公司</h3>
+              <small>共 {{ companyTotal }} 家</small>
+            </span>
+            <V2Button v-if="canAdd" size="small" @click="openCreate('company')">新增公司</V2Button>
+          </div>
+          <div class="org-page__list">
+            <div
+              v-for="(item, index) in companies"
+              :key="item.id"
+              class="org-page__list-item"
+              :class="{ 'is-selected': selectedCompanyId === item.id }"
+            >
+              <button
+                type="button"
+                class="org-page__select"
+                :aria-pressed="selectedCompanyId === item.id"
+                @click="selectCompany(item.id)"
+              >
+                <span>
+                  <strong>{{ item.companyName }}</strong>
+                  <small>{{ item.companyCode }}</small>
+                </span>
+                <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
+                  {{ statusLabel(item.status) }}
+                </V2Badge>
+              </button>
+              <V2ActionMenu
+                :label="`${item.companyCode || item.companyName}更多操作`"
+                :placement="index >= companies.length - 3 ? 'top-end' : 'bottom-end'"
+              >
+                <V2Button
+                  v-if="canEdit"
+                  size="small"
+                  variant="secondary"
+                  @click="openCompany(item)"
+                >
+                  编辑
+                </V2Button>
+                <V2Button
+                  v-if="canDelete"
+                  size="small"
+                  variant="danger"
+                  @click="deleteTarget = { kind: 'company', id: item.id, label: item.companyName }"
+                >
+                  删除
+                </V2Button>
+              </V2ActionMenu>
+            </div>
+          </div>
           <V2Pagination
             :total="companyTotal"
             :page-no="companyPageNo"
@@ -428,133 +500,146 @@ onBeforeUnmount(() => loadController?.abort())
             :disabled="loading"
             @update:page-no="changeCompanyPage"
           />
-        </template>
-      </V2Card>
+        </section>
 
-      <V2Card title="部门">
-        <template #title-extra>
-          <V2Badge tone="neutral">{{ flatDepartments.length }} 个</V2Badge>
-        </template>
-        <template #actions>
-          <V2Button v-if="canAdd" size="small" @click="openCreate('department')">新增部门</V2Button>
-        </template>
-        <div class="org-page__table-wrap">
-          <table class="v2-table--top">
-            <thead>
-              <tr>
-                <th>公司</th>
-                <th>编码</th>
-                <th>名称</th>
-                <th>状态</th>
-                <th class="v2-table-cell--actions">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in pagedDepartments" :key="item.id">
-                <td>{{ companyName(item.companyId) }}</td>
-                <td>{{ item.deptCode }}</td>
-                <td>{{ item.deptName }}</td>
-                <td>
-                  <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
-                    {{ statusLabel(item.status) }}
-                  </V2Badge>
-                </td>
-                <td class="v2-table-cell--actions">
-                  <V2ActionMenu
-                    :label="`${item.deptCode || item.deptName}更多操作`"
-                    :placement="index >= pagedDepartments.length - 3 ? 'top-end' : 'bottom-end'"
-                  >
-                    <V2Button
-                      v-if="canEdit"
-                      size="small"
-                      variant="secondary"
-                      @click="openDepartment(item)"
-                      >编辑</V2Button
-                    >
-                    <V2Button
-                      v-if="canDelete"
-                      size="small"
-                      variant="danger"
-                      @click="
-                        deleteTarget = { kind: 'department', id: item.id, label: item.deptName }
-                      "
-                      >删除</V2Button
-                    >
-                  </V2ActionMenu>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <template #footer>
+        <section aria-labelledby="org-departments-title">
+          <div class="org-page__section-heading">
+            <span>
+              <h3 id="org-departments-title">2. 部门</h3>
+              <small>
+                {{ selectedCompany?.companyName ?? '未选择公司' }} · 共
+                {{ selectedDepartments.length }} 个
+              </small>
+            </span>
+            <V2Button v-if="canAdd" size="small" @click="openCreate('department')">
+              新增部门
+            </V2Button>
+          </div>
+          <V2PageState
+            v-if="!selectedCompany"
+            kind="empty"
+            title="请选择公司"
+            description="选择公司后显示所属部门。"
+          />
+          <V2PageState
+            v-else-if="!selectedDepartments.length"
+            kind="empty"
+            title="当前公司暂无部门"
+            description="可新增部门。"
+          />
+          <div class="org-page__list">
+            <div
+              v-for="(item, index) in pagedDepartments"
+              :key="item.id"
+              class="org-page__list-item"
+              :class="{ 'is-selected': selectedDepartmentId === item.id }"
+            >
+              <button
+                type="button"
+                class="org-page__select"
+                :aria-pressed="selectedDepartmentId === item.id"
+                @click="selectDepartment(item.id)"
+              >
+                <span>
+                  <strong>{{ item.deptName }}</strong>
+                  <small>{{ item.deptCode }}</small>
+                </span>
+                <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
+                  {{ statusLabel(item.status) }}
+                </V2Badge>
+              </button>
+              <V2ActionMenu
+                :label="`${item.deptCode || item.deptName}更多操作`"
+                :placement="index >= pagedDepartments.length - 3 ? 'top-end' : 'bottom-end'"
+              >
+                <V2Button
+                  v-if="canEdit"
+                  size="small"
+                  variant="secondary"
+                  @click="openDepartment(item)"
+                >
+                  编辑
+                </V2Button>
+                <V2Button
+                  v-if="canDelete"
+                  size="small"
+                  variant="danger"
+                  @click="deleteTarget = { kind: 'department', id: item.id, label: item.deptName }"
+                >
+                  删除
+                </V2Button>
+              </V2ActionMenu>
+            </div>
+          </div>
           <V2Pagination
-            v-model:page-no="departmentPageNo"
-            :total="flatDepartments.length"
+            :page-no="departmentPageNo"
+            :total="selectedDepartments.length"
             :page-size="pageSize"
             label="部门分页"
             unit="个"
+            @update:page-no="changeDepartmentPage"
           />
-        </template>
-      </V2Card>
+        </section>
 
-      <V2Card title="岗位">
-        <template #title-extra>
-          <V2Badge tone="neutral">{{ positions.length }} 个</V2Badge>
-        </template>
-        <template #actions>
-          <V2Button v-if="canAdd" size="small" @click="openCreate('position')">新增岗位</V2Button>
-        </template>
-        <div class="org-page__table-wrap">
-          <table class="v2-table--top">
-            <thead>
-              <tr>
-                <th>公司</th>
-                <th>部门</th>
-                <th>编码</th>
-                <th>名称</th>
-                <th>状态</th>
-                <th class="v2-table-cell--actions">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in positions" :key="item.id">
-                <td>{{ companyName(item.companyId) }}</td>
-                <td>{{ departmentName(item.departmentId) }}</td>
-                <td>{{ item.positionCode }}</td>
-                <td>{{ item.positionName }}</td>
-                <td>
-                  <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
-                    {{ statusLabel(item.status) }}
-                  </V2Badge>
-                </td>
-                <td class="v2-table-cell--actions">
-                  <V2ActionMenu
-                    :label="`${item.positionCode || item.positionName}更多操作`"
-                    :placement="index >= positions.length - 3 ? 'top-end' : 'bottom-end'"
-                  >
-                    <V2Button
-                      v-if="canEdit"
-                      size="small"
-                      variant="secondary"
-                      @click="openPosition(item)"
-                      >编辑</V2Button
-                    >
-                    <V2Button
-                      v-if="canDelete"
-                      size="small"
-                      variant="danger"
-                      @click="
-                        deleteTarget = { kind: 'position', id: item.id, label: item.positionName }
-                      "
-                      >删除</V2Button
-                    >
-                  </V2ActionMenu>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <template #footer>
+        <section aria-labelledby="org-positions-title">
+          <div class="org-page__section-heading">
+            <span>
+              <h3 id="org-positions-title">3. 岗位</h3>
+              <small>
+                {{ selectedDepartment?.deptName ?? '未选择部门' }} · 共 {{ positionTotal }} 个
+              </small>
+            </span>
+            <V2Button v-if="canAdd" size="small" @click="openCreate('position')">新增岗位</V2Button>
+          </div>
+          <V2PageState
+            v-if="!selectedDepartment"
+            kind="empty"
+            title="请选择部门"
+            description="选择部门后显示所属岗位。"
+          />
+          <V2PageState
+            v-else-if="!positions.length"
+            kind="empty"
+            title="当前部门暂无岗位"
+            description="可新增岗位。"
+          />
+          <div class="org-page__list">
+            <div v-for="(item, index) in positions" :key="item.id" class="org-page__list-item">
+              <span>
+                <strong>{{ item.positionName }}</strong>
+                <small>
+                  {{ companyName(item.companyId) }} / {{ departmentName(item.departmentId) }} ·
+                  {{ item.positionCode }}
+                </small>
+              </span>
+              <V2Badge :tone="item.status === 'ENABLE' ? 'success' : 'neutral'">
+                {{ statusLabel(item.status) }}
+              </V2Badge>
+              <V2ActionMenu
+                :label="`${item.positionCode || item.positionName}更多操作`"
+                :placement="index >= positions.length - 3 ? 'top-end' : 'bottom-end'"
+              >
+                <V2Button
+                  v-if="canEdit"
+                  size="small"
+                  variant="secondary"
+                  @click="openPosition(item)"
+                >
+                  编辑
+                </V2Button>
+                <V2Button
+                  v-if="canDelete"
+                  size="small"
+                  variant="danger"
+                  @click="
+                    deleteTarget = { kind: 'position', id: item.id, label: item.positionName }
+                  "
+                >
+                  删除
+                </V2Button>
+              </V2ActionMenu>
+            </div>
+          </div>
           <V2Pagination
             :total="positionTotal"
             :page-no="positionPageNo"
@@ -564,9 +649,9 @@ onBeforeUnmount(() => loadController?.abort())
             :disabled="loading"
             @update:page-no="changePositionPage"
           />
-        </template>
-      </V2Card>
-    </template>
+        </section>
+      </div>
+    </V2Card>
 
     <V2Dialog
       :open="Boolean(dialogKind)"
@@ -641,8 +726,83 @@ onBeforeUnmount(() => loadController?.abort())
 </template>
 
 <style scoped>
-.org-page__table-wrap {
-  overflow-x: auto;
+.org-page__columns {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--v2-space-4);
+}
+
+.org-page__columns > section,
+.org-page__section-heading > span,
+.org-page__list-item > span,
+.org-page__select > span {
+  min-width: 0;
+}
+
+.org-page__section-heading,
+.org-page__select {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+}
+
+.org-page__section-heading {
+  min-height: 2.5rem;
+  margin-bottom: var(--v2-space-3);
+}
+
+.org-page__section-heading h3,
+.org-page__section-heading small,
+.org-page__list-item strong,
+.org-page__list-item small {
+  display: block;
+}
+
+.org-page__section-heading h3 {
+  margin: 0;
+}
+
+.org-page__section-heading small,
+.org-page__list-item small,
+.org-page__select small {
+  overflow: hidden;
+  color: var(--v2-color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.org-page__list {
+  display: grid;
+  gap: var(--v2-space-2);
+  margin-bottom: var(--v2-space-3);
+}
+
+.org-page__list-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--v2-space-2);
+  min-height: var(--v2-control-height-lg);
+  padding: var(--v2-space-3);
+  border: var(--v2-border-width) solid var(--v2-color-border);
+  border-radius: var(--v2-radius-md);
+}
+
+.org-page__list-item.is-selected {
+  border-color: var(--v2-color-primary);
+  background: var(--v2-color-primary-soft);
+}
+
+.org-page__select {
+  grid-column: 1 / 3;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .org-page__form {
@@ -651,7 +811,11 @@ onBeforeUnmount(() => loadController?.abort())
   gap: var(--v2-space-4);
 }
 
-@media (max-width: 48rem) {
+@media (max-width: 64rem) {
+  .org-page__columns {
+    grid-template-columns: 1fr;
+  }
+
   .org-page__form {
     grid-template-columns: 1fr;
   }

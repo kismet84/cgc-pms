@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 const task = {
   id: '91',
@@ -100,6 +101,7 @@ function fulfill(route: Route, data: unknown, status = 200) {
 }
 
 async function installApprovalMock(page: Page): Promise<void> {
+  await installShellPreferencesMock(page)
   await page.route('**/api/auth/userinfo', (route) =>
     fulfill(route, {
       userId: '1',

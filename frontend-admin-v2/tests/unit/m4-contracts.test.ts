@@ -15,6 +15,7 @@ import {
   updateContractComposite,
 } from '@/services/commercial'
 import { useSessionStore } from '@/stores/session'
+import { loadMaterials } from '@/services/supply-chain'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -43,6 +44,10 @@ vi.mock('@/services/commercial', () => ({
   loadProjectContextOptions: vi.fn(),
   submitContract: vi.fn(),
   updateContractComposite: vi.fn(),
+}))
+
+vi.mock('@/services/supply-chain', () => ({
+  loadMaterials: vi.fn(),
 }))
 
 const contractPage: ContractPage = {
@@ -167,6 +172,12 @@ beforeEach(() => {
     .mockResolvedValue({
       records: [{ id: 'A1', partnerCode: 'A1', partnerName: '甲方一', status: 'ENABLE' }],
     })
+  vi.mocked(loadMaterials).mockReset().mockResolvedValue({
+    records: [],
+    total: 0,
+    pageNo: 1,
+    pageSize: 200,
+  })
   vi.mocked(loadContractPage).mockReset().mockResolvedValue(contractPage)
   vi.mocked(loadContractComposite).mockReset().mockResolvedValue(contractDetail)
   vi.mocked(createContractComposite).mockReset()
@@ -176,6 +187,43 @@ beforeEach(() => {
 })
 
 describe('M4 contracts page', () => {
+  it('derives header tax preview and exposes only quantity and unit price for item finance inputs', async () => {
+    const { wrapper } = await mountPage('/contract/create', ['contract:add'])
+    const amountInput = wrapper.get('input[aria-label="合同金额"]')
+    const taxRateInput = wrapper.get('input[aria-label="税率"]')
+
+    await amountInput.setValue('113')
+    await taxRateInput.setValue('13')
+
+    const taxAmountInput = wrapper.get('input[aria-label="税额（自动计算）"]')
+    const amountWithoutTaxInput = wrapper.get('input[aria-label="不含税金额（自动计算）"]')
+    expect((taxAmountInput.element as HTMLInputElement).disabled).toBe(true)
+    expect((taxAmountInput.element as HTMLInputElement).value).toBe('13.00')
+    expect((amountWithoutTaxInput.element as HTMLInputElement).disabled).toBe(true)
+    expect((amountWithoutTaxInput.element as HTMLInputElement).value).toBe('100.00')
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('新增清单'))!
+      .trigger('click')
+    const itemEditor = wrapper.get('.contract-page__editor-list article')
+    expect(itemEditor.find('input[aria-label="数量"]').exists()).toBe(true)
+    expect(itemEditor.find('input[aria-label="单价"]').exists()).toBe(true)
+    expect(itemEditor.find('input[aria-label="金额"]').exists()).toBe(false)
+    expect(itemEditor.find('input[aria-label="税率"]').exists()).toBe(false)
+    expect(itemEditor.find('input[aria-label="税额"]').exists()).toBe(false)
+    expect(itemEditor.find('input[aria-label="不含税金额"]').exists()).toBe(false)
+  })
+
+  it('locks contract amount when editing a contract under an active project', async () => {
+    const { wrapper } = await mountPage('/contract/9/edit', ['contract:query', 'contract:edit'])
+
+    expect((wrapper.get('input[aria-label="合同金额"]').element as HTMLInputElement).disabled).toBe(
+      true,
+    )
+    expect(wrapper.text()).toContain('项目已在建，合同总价调整请发起合同变更。')
+  })
+
   it('renders ledger with server page', async () => {
     const { wrapper } = await mountPage('/contract/ledger', ['contract:query', 'contract:add'])
 
@@ -203,6 +251,22 @@ describe('M4 contracts page', () => {
     expect(wrapper.get('.contract-page__list-card > .v2-card__header').text()).toContain('新建合同')
     expect(wrapper.find('.contract-page__list-card .v2-card__subtitle').exists()).toBe(false)
     expect(wrapper.find('.v2-ledger-kpis').exists()).toBe(false)
+  })
+
+  it('shows server-calculated net payable for purchase contracts', async () => {
+    vi.mocked(loadContractComposite).mockResolvedValueOnce({
+      ...contractDetail,
+      contract: {
+        ...contractDetail.contract,
+        contractType: 'PURCHASE',
+        payableAmount: '600.00',
+      },
+    })
+
+    const { wrapper } = await mountPage('/contract/9', ['contract:query'])
+
+    expect(wrapper.text()).toContain('采购净应付')
+    expect(wrapper.text()).toContain('¥600.00')
   })
 
   it('applies a preset view through visible server filters and clears previous search', async () => {

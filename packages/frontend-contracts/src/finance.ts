@@ -255,6 +255,7 @@ export interface PaymentApplicationSourceRecord {
   payApplicationId?: string | null;
   sourceType: string;
   sourceRefId: string;
+  receiptItemId?: string | null;
   sourceAmount: FinanceDecimalString;
   paidAmount?: FinanceDecimalString | null;
   remark?: string | null;

@@ -156,6 +156,30 @@ public class WorkflowEngine {
                 projectId, contractId, businessSummary, variables, ccUserIds);
     }
 
+    public WfInstance submitPurchaseRequest(Long userId, String username, Long tenantId,
+                                             String businessType, Long businessId, String title,
+                                             java.math.BigDecimal amount, Long projectId, Long contractId,
+                                             String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitService.submitPurchaseRequest(userId, username, tenantId, businessType, businessId,
+                title, amount, projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
+    public WfInstance submitPurchaseOrder(Long userId, String username, Long tenantId,
+                                           String businessType, Long businessId, String title,
+                                           java.math.BigDecimal amount, Long projectId, Long contractId,
+                                           String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitService.submitPurchaseOrder(userId, username, tenantId, businessType, businessId,
+                title, amount, projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
+    public WfInstance submitMaterialReceipt(Long userId, String username, Long tenantId,
+                                             String businessType, Long businessId, String title,
+                                             java.math.BigDecimal amount, Long projectId, Long contractId,
+                                             String businessSummary, String variables, List<Long> ccUserIds) {
+        return submitService.submitMaterialReceipt(userId, username, tenantId, businessType, businessId,
+                title, amount, projectId, contractId, businessSummary, variables, ccUserIds);
+    }
+
     // ───────────────────── RESUBMIT ─────────────────────
 
     public WfInstance resubmit(Long instanceId, Long userId, String username) {
@@ -178,11 +202,28 @@ public class WorkflowEngine {
         return submitService.resubmitProductionMeasurement(instanceId, userId, username);
     }
 
+    public WfInstance resubmitPurchaseRequest(Long instanceId, Long userId, String username) {
+        return submitService.resubmitPurchaseRequest(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitPurchaseOrder(Long instanceId, Long userId, String username) {
+        return submitService.resubmitPurchaseOrder(instanceId, userId, username);
+    }
+
+    public WfInstance resubmitMaterialReceipt(Long instanceId, Long userId, String username) {
+        return submitService.resubmitMaterialReceipt(instanceId, userId, username);
+    }
+
     // ───────────────────── APPROVE ─────────────────────
 
     public void approve(Long taskId, Long userId, String username,
                         String comment, String idempotencyKey) {
         approvalService.approve(taskId, userId, username, comment, idempotencyKey);
+    }
+
+    public void approvePurchaseRequest(Long taskId, Long userId, String username,
+                                       String comment, String idempotencyKey) {
+        approvalService.approvePurchaseRequest(taskId, userId, username, comment, idempotencyKey);
     }
 
     // ───────────────────── REJECT ─────────────────────

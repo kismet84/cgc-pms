@@ -60,4 +60,10 @@ public class MatPurchaseOrder extends BaseEntity {
     private String approvalStatus;
 
     private String orderStatus;
+
+    /** 预算审批轮次；进入新审批轮次时递增。 */
+    private Integer budgetRevision;
+
+    /** 合同计价模式快照：FIXED/ACTUAL。 */
+    private String pricingMode;
 }

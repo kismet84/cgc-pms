@@ -1,25 +1,23 @@
 package com.cgcpms.budget;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.budget.constant.BudgetStatusConstants;
 import com.cgcpms.budget.entity.BudgetLedger;
 import com.cgcpms.budget.entity.ProjectBudget;
 import com.cgcpms.budget.entity.ProjectBudgetLine;
-import com.cgcpms.budget.handler.ProjectBudgetWorkflowHandler;
 import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
 import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.budget.service.ProjectBudgetService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cost.entity.CostSubject;
+import com.cgcpms.cost.entity.CostTarget;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
+import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.service.PmProjectService;
-import com.cgcpms.workflow.entity.WfInstance;
-import com.cgcpms.workflow.handler.WorkflowContext;
 import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,10 +47,10 @@ class ProjectBudgetIntegrationTest {
 
     @Autowired private ProjectBudgetService budgetService;
     @Autowired private BudgetLedgerService ledgerService;
-    @Autowired private ProjectBudgetWorkflowHandler budgetHandler;
     @Autowired private PmProjectService projectService;
     @Autowired private PmProjectMapper projectMapper;
     @Autowired private CostSubjectMapper subjectMapper;
+    @Autowired private CostTargetMapper targetMapper;
     @Autowired private ProjectBudgetMapper budgetMapper;
     @Autowired private ProjectBudgetLineMapper lineMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
@@ -70,7 +68,7 @@ class ProjectBudgetIntegrationTest {
         project.setTenantId(TENANT_ID);
         project.setProjectCode("BUDGET-IT-PROJECT");
         project.setProjectName("预算集成测试项目");
-        project.setStatus("DRAFT");
+        project.setStatus("PREPARING");
         project.setApprovalStatus("APPROVED");
         projectMapper.insert(project);
 
@@ -87,24 +85,44 @@ class ProjectBudgetIntegrationTest {
         subject.setStatus("ENABLE");
         subjectMapper.insert(subject);
 
+        CostTarget target = new CostTarget();
+        target.setProjectId(PROJECT_ID);
+        target.setVersionNo("V1");
+        target.setVersionName("基准目标成本");
+        target.setTotalTargetAmount(new BigDecimal("1000.00"));
+        target.setTotalBidCostAmount(new BigDecimal("1000.00"));
+        target.setTotalResponsibilityAmount(new BigDecimal("1000.00"));
+        target.setApprovalStatus("APPROVED");
+        target.setStatus("ACTIVE");
+        target.setIsActive(1);
+        targetMapper.insert(target);
+
         ProjectBudget budget = new ProjectBudget();
+        budget.setTenantId(TENANT_ID);
         budget.setProjectId(PROJECT_ID);
+        budget.setBudgetCode("BUD-20260802-001");
         budget.setVersionNo("V1");
         budget.setBudgetName("基准预算");
         budget.setTotalAmount(new BigDecimal("1000.00"));
-        budgetId = budgetService.create(budget);
+        budget.setSourceCostTargetId(target.getId());
+        budget.setApprovalStatus(BudgetStatusConstants.APPROVAL_APPROVED);
+        budget.setStatus(BudgetStatusConstants.STATUS_ACTIVE);
+        budget.setActiveFlag(1);
+        budgetMapper.insert(budget);
+        budgetId = budget.getId();
 
         ProjectBudgetLine line = new ProjectBudgetLine();
+        line.setTenantId(TENANT_ID);
+        line.setProjectId(PROJECT_ID);
+        line.setBudgetId(budgetId);
         line.setCostSubjectId(SUBJECT_ID);
         line.setBudgetAmount(new BigDecimal("1000.00"));
-        budgetService.saveLines(budgetId, List.of(line));
-        lineId = lineMapper.selectOne(new LambdaQueryWrapper<ProjectBudgetLine>()
-                .eq(ProjectBudgetLine::getBudgetId, budgetId)).getId();
+        line.setReservedAmount(BigDecimal.ZERO);
+        line.setConsumedAmount(BigDecimal.ZERO);
+        lineMapper.insert(line);
+        lineId = line.getId();
 
-        budgetMapper.update(null, new LambdaUpdateWrapper<ProjectBudget>()
-                .eq(ProjectBudget::getId, budgetId)
-                .set(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_APPROVING));
-        approveBudget(budgetId);
+        projectService.transitionStatus(PROJECT_ID, "ACTIVE", "项目成本预算已审批通过");
     }
 
     @AfterEach
@@ -120,6 +138,8 @@ class ProjectBudgetIntegrationTest {
         ProjectBudget active = budgetMapper.selectById(budgetId);
         assertEquals(BudgetStatusConstants.STATUS_ACTIVE, active.getStatus());
         assertEquals(1, active.getActiveFlag());
+        assertEquals("ACTIVE", projectMapper.selectById(PROJECT_ID).getStatus(),
+                "预算与目标成本均已生效后项目应自动进入在建");
         assertTrue(active.getBudgetCode().matches("BUD-\\d{8}-\\d{3}"));
 
         BudgetLedger reserved = ledgerService.reserve(lineId, "PAY_REQUEST", 1001L,
@@ -139,7 +159,6 @@ class ProjectBudgetIntegrationTest {
         assertEquals(0, new BigDecimal("400.00").compareTo(line.getConsumedAmount()));
         assertEquals(4, ledgerService.getBusinessLedger("PAY_REQUEST", 1001L).size());
 
-        projectService.transitionStatus(PROJECT_ID, "ACTIVE", "预算已批准");
         projectService.transitionStatus(PROJECT_ID, "SUSPENDED", "现场暂停");
         projectService.transitionStatus(PROJECT_ID, "ACTIVE", "恢复施工");
         BusinessException closeDirectly = assertThrows(BusinessException.class,
@@ -153,13 +172,14 @@ class ProjectBudgetIntegrationTest {
     void projectApprovalIsRequiredBeforeActivation() {
         projectMapper.update(null, new LambdaUpdateWrapper<PmProject>()
                 .eq(PmProject::getId, PROJECT_ID)
+                .set(PmProject::getStatus, "PREPARING")
                 .set(PmProject::getApprovalStatus, "DRAFT"));
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> projectService.transitionStatus(PROJECT_ID, "ACTIVE", "尝试绕过项目审批"));
 
         assertEquals("PROJECT_APPROVAL_REQUIRED", error.getCode());
-        assertEquals("DRAFT", projectMapper.selectById(PROJECT_ID).getStatus());
+        assertEquals("PREPARING", projectMapper.selectById(PROJECT_ID).getStatus());
     }
 
     @Test
@@ -233,15 +253,6 @@ class ProjectBudgetIntegrationTest {
         }
     }
 
-    private void approveBudget(Long id) {
-        WfInstance instance = new WfInstance();
-        instance.setTenantId(TENANT_ID);
-        instance.setBusinessId(id);
-        WorkflowContext context = new WorkflowContext();
-        context.setInstance(instance);
-        budgetHandler.onApproved(context);
-    }
-
     private void setUserContext() {
         UserContext.set(Jwts.claims()
                 .add("userId", 1L)
@@ -256,6 +267,8 @@ class ProjectBudgetIntegrationTest {
         jdbcTemplate.update("DELETE FROM contract_budget_allocation WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM project_budget_line WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM project_budget WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM cost_target_item WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM cost_target WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM pm_project WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM cost_subject WHERE tenant_id = ?", TENANT_ID);
     }

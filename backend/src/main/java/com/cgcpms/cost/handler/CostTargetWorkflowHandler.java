@@ -3,6 +3,7 @@ package com.cgcpms.cost.handler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.budget.service.ProjectBudgetService;
 import com.cgcpms.cost.entity.CostSummary;
 import com.cgcpms.cost.entity.CostTarget;
 import com.cgcpms.cost.entity.CostTargetItem;
@@ -13,6 +14,7 @@ import com.cgcpms.cost.service.CostTargetService;
 import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.service.ProjectLifecycleService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowBusinessHandler;
@@ -20,6 +22,7 @@ import com.cgcpms.workflow.handler.WorkflowContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -41,6 +44,8 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
     private final CostTargetService costTargetService;
     private final CostSummaryService costSummaryService;
     private final PmProjectMapper projectMapper;
+    private final ProjectLifecycleService projectLifecycleService;
+    private final ObjectProvider<ProjectBudgetService> projectBudgetServiceProvider;
 
     @Override
     public String supportBusinessType() {
@@ -85,7 +90,11 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
         if (target == null || !java.util.Objects.equals(target.getTenantId(), instance.getTenantId())) {
             throw new IllegalStateException("目标成本不存在，targetId=" + targetId);
         }
-        if ("APPROVED".equals(target.getApprovalStatus()) && Integer.valueOf(1).equals(target.getIsActive())) return;
+        if ("APPROVED".equals(target.getApprovalStatus()) && Integer.valueOf(1).equals(target.getIsActive())) {
+            projectBudgetServiceProvider.getObject().syncFromApprovedCostTarget(targetId, target.getTenantId());
+            projectLifecycleService.activateIfReady(target.getProjectId(), target.getTenantId());
+            return;
+        }
         requireMatchingRunningInstance(target, instance);
 
         int updated = costTargetMapper.update(null, new LambdaUpdateWrapper<CostTarget>()
@@ -101,7 +110,10 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
         // 2. 版本切换：旧版本 is_active=0，新版本 is_active=1 + status=ACTIVE
         costTargetService.activate(targetId, target.getVersion() + 1);
 
-        // 3. 更新 cost_summary.cost_target_id 指向新激活的版本
+        // 3. 以责任预算为服务端事实，同事务更新稳定执行预算及其余额行。
+        projectBudgetServiceProvider.getObject().syncFromApprovedCostTarget(targetId, target.getTenantId());
+
+        // 4. 更新 cost_summary.cost_target_id 指向新激活的版本
         costSummaryMapper.update(null, new LambdaUpdateWrapper<CostSummary>()
                 .eq(CostSummary::getProjectId, target.getProjectId())
                 .eq(CostSummary::getTenantId, target.getTenantId())
@@ -116,6 +128,7 @@ public class CostTargetWorkflowHandler implements WorkflowBusinessHandler {
             projectMapper.updateById(project);
         }
         costSummaryService.refreshSummary(target.getTenantId(), target.getProjectId());
+        projectLifecycleService.activateIfReady(target.getProjectId(), target.getTenantId());
     }
 
     @Override

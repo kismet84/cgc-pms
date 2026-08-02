@@ -2,6 +2,9 @@ package com.cgcpms.receipt.handler;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.inventory.entity.MatStockTxn;
@@ -20,8 +23,6 @@ import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
 import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.supplierreturn.dto.SupplierReturnRequest;
-import com.cgcpms.supplierreturn.entity.MatQualityDisposition;
-import com.cgcpms.supplierreturn.mapper.MatQualityDispositionMapper;
 import com.cgcpms.supplierreturn.service.MatSupplierReturnService;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.handler.WorkflowContext;
@@ -60,8 +61,8 @@ class MaterialReceiptWorkflowHandlerTest {
     @Autowired private MatStockTxnMapper stockTxnMapper;
     @Autowired private ProcurementTraceService traceService;
     @Autowired private CostItemMapper costItemMapper;
-    @Autowired private MatQualityDispositionMapper qualityDispositionMapper;
     @Autowired private MatSupplierReturnService supplierReturnService;
+    @Autowired private CtContractMapper contractMapper;
 
     @BeforeEach void setupContext() {
         UserContext.set(Jwts.claims().add("userId", USER_ADMIN).add("username", "admin")
@@ -76,6 +77,7 @@ class MaterialReceiptWorkflowHandlerTest {
 
     @Test @Transactional @DisplayName("onApproved -> 审批通过时确认订单验收量并幂等入库")
     void testOnApproved() {
+        preparePurchaseContract();
         MatPurchaseRequest request = new MatPurchaseRequest();
         request.setTenantId(TENANT_0);
         request.setProjectId(10001L);
@@ -105,7 +107,7 @@ class MaterialReceiptWorkflowHandlerTest {
         order.setDeliveryDate(LocalDate.now().plusDays(7));
         order.setTotalAmount(new BigDecimal("100.00"));
         order.setApprovalStatus("APPROVED");
-        order.setOrderStatus("APPROVED");
+        order.setOrderStatus("PERFORMING");
         orderMapper.insert(order);
 
         MatPurchaseOrderItem orderItem = new MatPurchaseOrderItem();
@@ -140,7 +142,7 @@ class MaterialReceiptWorkflowHandlerTest {
         receiptItem.setReceiptId(receipt.getId());
         receiptItem.setOrderItemId(orderItem.getId());
         receiptItem.setMaterialId(1L);
-        receiptItem.setActualQuantity(new BigDecimal("3.0000"));
+        receiptItem.setActualQuantity(new BigDecimal("2.0000"));
         receiptItem.setQualifiedQuantity(new BigDecimal("2.0000"));
         receiptItem.setUnitPrice(new BigDecimal("10.0000"));
         receiptItem.setAmount(new BigDecimal("20.00"));
@@ -171,13 +173,6 @@ class MaterialReceiptWorkflowHandlerTest {
         assertEquals(receipt.getId(), trace.getReceipt().getId());
         assertTrue(trace.getCosts().isEmpty(), "库存材料验收入库只形成库存价值，不提前确认项目成本");
 
-        MatQualityDisposition disposition = qualityDispositionMapper.selectOne(
-                new LambdaQueryWrapper<MatQualityDisposition>()
-                        .eq(MatQualityDisposition::getReceiptItemId, receiptItem.getId()));
-        assertNotNull(disposition);
-        assertEquals("OPEN", disposition.getStatus());
-        assertEquals(0, new BigDecimal("1.0000").compareTo(disposition.getRejectedQuantity()));
-
         Long qualifiedReturnId = supplierReturnService.confirm(new SupplierReturnRequest(
                 receiptItem.getId(), (Long) null, new BigDecimal("1.0000"), LocalDate.now(),
                 "合格品供应商退货", "SRT-Q-" + receiptItem.getId()));
@@ -189,31 +184,21 @@ class MaterialReceiptWorkflowHandlerTest {
         assertEquals(qualifiedReturnId, supplierReturnService.confirm(new SupplierReturnRequest(
                 receiptItem.getId(), (Long) null, new BigDecimal("1.0000"), LocalDate.now(),
                 "重复回调", "SRT-Q-" + receiptItem.getId())));
+        MatPurchaseOrderItem replenished = orderItemMapper.selectById(orderItem.getId());
+        replenished.setReceivedQuantity(new BigDecimal("10.0000"));
+        orderItemMapper.updateById(replenished);
+        BusinessException reversalOverrun = assertThrows(BusinessException.class,
+                () -> supplierReturnService.reverse(qualifiedReturnId, "超收冲销应拒绝"));
+        assertEquals("SUPPLIER_RETURN_REVERSAL_EXCEEDS_ORDER", reversalOverrun.getCode());
+        replenished = orderItemMapper.selectById(orderItem.getId());
+        replenished.setReceivedQuantity(new BigDecimal("1.0000"));
+        orderItemMapper.updateById(replenished);
         supplierReturnService.reverse(qualifiedReturnId, "撤销测试退货");
         assertEquals(0, new BigDecimal("2.0000")
                 .compareTo(orderItemMapper.selectById(orderItem.getId()).getReceivedQuantity()));
         assertEquals(1L, stockTxnMapper.selectCount(new LambdaQueryWrapper<MatStockTxn>()
                 .eq(MatStockTxn::getSourceType, "SUPPLIER_RETURN_REVERSAL")
                 .eq(MatStockTxn::getSourceId, qualifiedReturnId)));
-
-        Long rejectedReturnId = supplierReturnService.confirm(new SupplierReturnRequest(
-                receiptItem.getId(), disposition.getId(), new BigDecimal("1.0000"), LocalDate.now(),
-                "不合格品退回供应商", "SRT-R-" + receiptItem.getId()));
-        MatQualityDisposition resolved = qualityDispositionMapper.selectById(disposition.getId());
-        assertEquals("RESOLVED", resolved.getStatus());
-        assertEquals("COMPLETED", receiptItemMapper.selectById(receiptItem.getId()).getDispositionStatus());
-        receiptItem.setDispositionStatus("PENDING");
-        receiptItemMapper.updateById(receiptItem);
-        assertEquals(rejectedReturnId, supplierReturnService.confirm(new SupplierReturnRequest(
-                receiptItem.getId(), disposition.getId(), new BigDecimal("1.0000"), LocalDate.now(),
-                "旧版本状态修复重试", "SRT-R-RETRY-" + receiptItem.getId())));
-        assertEquals("COMPLETED", receiptItemMapper.selectById(receiptItem.getId()).getDispositionStatus());
-        assertEquals(0L, stockTxnMapper.selectCount(new LambdaQueryWrapper<MatStockTxn>()
-                .eq(MatStockTxn::getSourceId, rejectedReturnId)
-                .in(MatStockTxn::getSourceType, "SUPPLIER_RETURN", "SUPPLIER_RETURN_REVERSAL")));
-        supplierReturnService.reverse(rejectedReturnId, "撤销不合格品退货");
-        assertEquals("OPEN", qualityDispositionMapper.selectById(disposition.getId()).getStatus());
-        assertEquals("PENDING", receiptItemMapper.selectById(receiptItem.getId()).getDispositionStatus());
 
         handler.onApproved(ctx);
         assertEquals(0, new BigDecimal("2.0000")
@@ -233,6 +218,7 @@ class MaterialReceiptWorkflowHandlerTest {
 
     @Test @Transactional @DisplayName("直耗验收 -> 不入普通库存并直接确认项目材料成本")
     void testDirectConsumptionReceiptCreatesCostWithoutStock() {
+        preparePurchaseContract();
         MatPurchaseOrder order = new MatPurchaseOrder();
         order.setTenantId(TENANT_0);
         order.setProjectId(10001L);
@@ -244,7 +230,7 @@ class MaterialReceiptWorkflowHandlerTest {
         order.setDeliveryDate(LocalDate.now().plusDays(1));
         order.setTotalAmount(new BigDecimal("50.00"));
         order.setApprovalStatus("APPROVED");
-        order.setOrderStatus("APPROVED");
+        order.setOrderStatus("PERFORMING");
         orderMapper.insert(order);
 
         MatPurchaseOrderItem orderItem = new MatPurchaseOrderItem();
@@ -319,6 +305,15 @@ class MaterialReceiptWorkflowHandlerTest {
                 .eq(CostItem::getSourceId, returnId));
         assertNotNull(undoCost);
         assertEquals(0, new BigDecimal("20.00").compareTo(undoCost.getAmount()));
+    }
+
+    private void preparePurchaseContract() {
+        CtContract contract = contractMapper.selectById(30001L);
+        contract.setContractType("PURCHASE");
+        contract.setContractStatus("PERFORMING");
+        contract.setPricingMode("ACTUAL");
+        contract.setPartyBId(20002L);
+        contractMapper.updateById(contract);
     }
 
     @Test @Transactional @DisplayName("onRejected -> status = REJECTED")

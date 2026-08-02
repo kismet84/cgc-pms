@@ -3,6 +3,7 @@ package com.cgcpms.cost.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
@@ -13,6 +14,7 @@ import com.cgcpms.cost.mapper.CostSummaryMapper;
 import com.cgcpms.cost.mapper.CostTargetItemMapper;
 import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.constant.ProjectStatusConstants;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.workflow.entity.WfInstance;
@@ -107,6 +109,10 @@ public class CostTargetService {
 
     @Transactional(rollbackFor = Exception.class)
     public void update(CostTarget target) {
+        updateHeader(target, true);
+    }
+
+    private void updateHeader(CostTarget target, boolean validateStoredItems) {
         CostTarget existing = getOwnedTarget(target.getId());
         if (existing == null) {
             throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
@@ -126,12 +132,45 @@ public class CostTargetService {
         target.setApprovalInstanceId(existing.getApprovalInstanceId());
         target.setVersion(existing.getVersion());
         normalizeHeaderAmounts(target);
-        validateExistingItemsTotal(target.getId(), target);
+        if (validateStoredItems) validateExistingItemsTotal(target.getId(), target);
         try {
             if (costTargetMapper.updateById(target) != 1) throw new BusinessException("COST_TARGET_CONCURRENT_UPDATE", "目标成本已被其他用户修改，请刷新后重试");
         } catch (DuplicateKeyException e) {
             throw new BusinessException("COST_TARGET_VERSION_DUPLICATE", "该项目目标成本版本号已存在");
         }
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Long saveDraft(CostTarget target, List<CostTargetItem> items, Long projectManagerId) {
+        if (items == null || items.isEmpty()) {
+            throw new BusinessException("COST_TARGET_NO_ITEMS", "项目成本预算至少需要一条科目明细");
+        }
+        requireEnabledProjectManager(projectManagerId);
+        Long projectId = target.getProjectId();
+        if (target.getId() != null) {
+            CostTarget existing = getOwnedTarget(target.getId());
+            if (existing == null) throw new BusinessException("COST_TARGET_NOT_FOUND", "目标成本不存在");
+            projectId = existing.getProjectId();
+        }
+        lockWritableProject(projectId, "保存项目成本预算");
+        normalizeItems(items);
+        target.setTotalTargetAmount(sum(items, CostTargetItem::getTargetAmount));
+        target.setTotalBidCostAmount(sum(items, CostTargetItem::getBidCostAmount));
+        target.setTotalResponsibilityAmount(sum(items, CostTargetItem::getResponsibilityAmount));
+        if (target.getTotalResponsibilityAmount().compareTo(target.getTotalTargetAmount()) != 0) {
+            throw new BusinessException("COST_TARGET_RESPONSIBILITY_MISMATCH", "责任预算必须完整分解且与目标成本总额一致");
+        }
+        if (target.getId() == null) {
+            Long id = create(target);
+            batchSaveItems(id, 0, items);
+            syncProjectManager(projectId, projectManagerId);
+            return id;
+        }
+        int expectedVersion = requireVersion(target.getVersion());
+        updateHeader(target, false);
+        batchSaveItems(target.getId(), expectedVersion + 1, items);
+        syncProjectManager(projectId, projectManagerId);
+        return target.getId();
     }
 
     // ── Delete ──
@@ -365,7 +404,9 @@ public class CostTargetService {
     private PmProject requireWritableProject(Long projectId, String action) {
         PmProject project = projectMapper.selectById(projectId);
         projectAccessChecker.checkAccess(project, action);
-        if (!"ACTIVE".equals(project.getStatus())) throw new BusinessException("PROJECT_NOT_ACTIVE", "只有进行中的项目可以维护目标成本");
+        if (!Set.of(ProjectStatusConstants.PREPARING, ProjectStatusConstants.ACTIVE).contains(project.getStatus())) {
+            throw new BusinessException("PROJECT_NOT_ACTIVE", "只有筹备或在建项目可以维护目标成本");
+        }
         return project;
     }
 
@@ -375,8 +416,8 @@ public class CostTargetService {
                 .eq(PmProject::getTenantId, UserContext.getCurrentTenantId())
                 .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
         projectAccessChecker.checkAccess(project, action);
-        if (!"ACTIVE".equals(project.getStatus())) {
-            throw new BusinessException("PROJECT_NOT_ACTIVE", "只有进行中的项目可以维护目标成本");
+        if (!Set.of(ProjectStatusConstants.PREPARING, ProjectStatusConstants.ACTIVE).contains(project.getStatus())) {
+            throw new BusinessException("PROJECT_NOT_ACTIVE", "只有筹备或在建项目可以维护目标成本");
         }
         return project;
     }
@@ -384,6 +425,50 @@ public class CostTargetService {
     private void requireEnabledUser(Long userId) {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM sys_user WHERE id=? AND tenant_id=? AND status='ENABLE' AND deleted_flag=0", Integer.class, userId, UserContext.getCurrentTenantId());
         if (count == null || count != 1) throw new BusinessException("COST_TARGET_RESPONSIBLE_INVALID", "责任人不存在、跨租户或已停用");
+    }
+
+    private void requireEnabledProjectManager(Long userId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys_user WHERE id=? AND tenant_id=? AND status='ENABLE' AND deleted_flag=0",
+                Integer.class, userId, UserContext.getCurrentTenantId());
+        if (count == null || count != 1) {
+            throw new BusinessException("PROJECT_MANAGER_INVALID", "项目经理不存在、跨租户或已停用");
+        }
+    }
+
+    private void syncProjectManager(Long projectId, Long projectManagerId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        Long operatorId = UserContext.getCurrentUserId();
+        if (jdbc.update("""
+                UPDATE pm_project
+                SET project_manager_id=?, updated_by=?, updated_at=CURRENT_TIMESTAMP
+                WHERE id=? AND tenant_id=? AND deleted_flag=0
+                """, projectManagerId, operatorId, projectId, tenantId) != 1) {
+            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        int restored = jdbc.update("""
+                UPDATE pm_project_member
+                SET role_code='PM', position_name='项目经理', start_date=COALESCE(start_date,CURRENT_DATE),
+                    end_date=NULL, status='ACTIVE', updated_by=?, updated_at=CURRENT_TIMESTAMP, deleted_flag=0
+                WHERE tenant_id=? AND project_id=? AND user_id=?
+                """, operatorId, tenantId, projectId, projectManagerId);
+        if (restored == 0) {
+            jdbc.update("""
+                    INSERT INTO pm_project_member
+                      (id,tenant_id,project_id,user_id,role_code,position_name,start_date,status,
+                       created_by,created_at,updated_by,updated_at,deleted_flag)
+                    VALUES (?, ?, ?, ?, 'PM', '项目经理', CURRENT_DATE, 'ACTIVE',
+                            ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, 0)
+                    """, IdWorker.getId(), tenantId, projectId, projectManagerId, operatorId, operatorId);
+        }
+        Integer memberCount = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM pm_project_member
+                WHERE tenant_id=? AND project_id=? AND user_id=? AND role_code='PM'
+                  AND status='ACTIVE' AND deleted_flag=0
+                """, Integer.class, tenantId, projectId, projectManagerId);
+        if (memberCount == null || memberCount != 1) {
+            throw new BusinessException("PROJECT_MANAGER_SYNC_FAILED", "项目经理回填项目成员失败");
+        }
     }
 
     private static void normalizeHeaderAmounts(CostTarget target) {

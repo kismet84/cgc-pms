@@ -87,4 +87,20 @@ public class ProcurementIntegrityService {
             throw new BusinessException("PROCUREMENT_ATTACHMENT_REQUIRED", "至少上传一份已通过安全扫描的业务附件");
         }
     }
+
+    public void requireReceiptAttachments(Long receiptId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        for (String type : new String[]{"DELIVERY_NOTE", "MATERIAL_ACCEPTANCE_FORM"}) {
+            Long count = fileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
+                    .eq(SysFile::getTenantId, tenantId)
+                    .eq(SysFile::getBusinessType, "MATERIAL_RECEIPT")
+                    .eq(SysFile::getBusinessId, receiptId)
+                    .eq(SysFile::getDocumentType, type)
+                    .eq(SysFile::getVirusScanStatus, "CLEAN"));
+            if (count == null || count == 0) {
+                throw new BusinessException("PROCUREMENT_RECEIPT_ATTACHMENT_REQUIRED",
+                        "缺少已通过安全扫描的" + ("DELIVERY_NOTE".equals(type) ? "供应商送货单" : "签字材料验收单"));
+            }
+        }
+    }
 }

@@ -1,10 +1,16 @@
 import { expect, test, type Page, type Route } from '@playwright/test'
 
-async function fulfill(route: Route, data: unknown) {
+async function fulfill(route: Route, data: unknown, status = 200) {
+  const request = route.request()
   await route.fulfill({
-    status: 200,
+    status,
     contentType: 'application/json',
-    body: JSON.stringify({ code: '0', message: 'success', data }),
+    body: JSON.stringify({
+      code: status === 200 ? '0' : 'E2E_API_UNSTUBBED',
+      message:
+        status === 200 ? 'success' : `${request.method()} ${new URL(request.url()).pathname}`,
+      data,
+    }),
   })
 }
 
@@ -38,7 +44,7 @@ async function install(page: Page) {
       })
     }
     if (path === '/api/auth/refresh') return route.abort()
-    return fulfill(route, { records: [], total: 0, pageNo: 1, pageSize: 20 })
+    return fulfill(route, null, 500)
   })
 }
 

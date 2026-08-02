@@ -3,6 +3,8 @@ package com.cgcpms.purchase.handler;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.document.service.PurchaseOrderDocumentEventPublisher;
 import com.cgcpms.budget.service.BudgetLedgerService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -38,6 +40,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
     private final MatPurchaseOrderItemMapper orderItemMapper;
     private final MatPurchaseRequestItemMapper requestItemMapper;
     private final BudgetLedgerService budgetLedgerService;
+    private final PurchaseOrderDocumentEventPublisher documentEvents;
 
     @Override
     public String supportBusinessType() {
@@ -74,7 +77,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
                 List<MatPurchaseOrder> approvedOrders = orderMapper.selectList(
                         new LambdaQueryWrapper<MatPurchaseOrder>()
                                 .eq(MatPurchaseOrder::getContractId, order.getContractId())
-                                .eq(MatPurchaseOrder::getOrderStatus, "APPROVED")
+                                .eq(MatPurchaseOrder::getApprovalStatus, "APPROVED")
                                 .ne(MatPurchaseOrder::getId, order.getId()));
                 BigDecimal totalApproved = approvedOrders.stream()
                         .map(o -> o.getTotalAmount() != null ? o.getTotalAmount() : BigDecimal.ZERO)
@@ -92,7 +95,9 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
         orderMapper.update(null, new LambdaUpdateWrapper<MatPurchaseOrder>()
                 .eq(MatPurchaseOrder::getId, orderId)
                 .set(MatPurchaseOrder::getApprovalStatus, "APPROVED")
-                .set(MatPurchaseOrder::getOrderStatus, "APPROVED"));
+                .set(MatPurchaseOrder::getOrderStatus, "PERFORMING"));
+        documentEvents.approved(order.getTenantId(), UserContext.getCurrentUserId(), orderId,
+                context.getInstance().getId());
     }
 
     @Override
@@ -103,7 +108,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
         orderMapper.update(null, new LambdaUpdateWrapper<MatPurchaseOrder>()
                 .eq(MatPurchaseOrder::getId, orderId)
                 .set(MatPurchaseOrder::getApprovalStatus, "REJECTED"));
-        releaseExceptionBudget(orderId, "REJECT");
+        releaseOrderBudget(orderId, "REJECT");
     }
 
     @Override
@@ -114,7 +119,7 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
         orderMapper.update(null, new LambdaUpdateWrapper<MatPurchaseOrder>()
                 .eq(MatPurchaseOrder::getId, orderId)
                 .set(MatPurchaseOrder::getApprovalStatus, "DRAFT"));
-        releaseExceptionBudget(orderId, "WITHDRAW");
+        releaseOrderBudget(orderId, "WITHDRAW");
     }
 
     private void consumeBudget(MatPurchaseOrder order) {
@@ -123,28 +128,26 @@ public class PurchaseOrderWorkflowHandler implements WorkflowBusinessHandler {
                         .eq(MatPurchaseOrderItem::getTenantId, order.getTenantId())
                         .eq(MatPurchaseOrderItem::getOrderId, order.getId()));
         for (MatPurchaseOrderItem item : items) {
+            int revision = order.getBudgetRevision() == null ? 0 : order.getBudgetRevision();
             budgetLedgerService.consume(item.getBudgetLineId(), "PURCHASE_ORDER", order.getId(), item.getAmount(),
-                    "PURCHASE_ORDER:" + order.getId() + ":ITEM:" + item.getId() + ":CONSUME");
-            if (item.getRequestItemId() != null) {
-                MatPurchaseRequestItem requestItem = requestItemMapper.selectById(item.getRequestItemId());
-                BigDecimal remaining = requestItem.getEstimatedAmount().subtract(item.getAmount());
-                if (remaining.signum() > 0) {
-                    budgetLedgerService.release(item.getBudgetLineId(), "PURCHASE_REQUEST", order.getRequestId(), remaining,
-                            "PURCHASE_ORDER:" + order.getId() + ":ITEM:" + item.getId() + ":RELEASE_VARIANCE");
-                }
-            }
+                    budgetKey(order, item, revision, "CONSUME"));
         }
     }
 
-    private void releaseExceptionBudget(Long orderId, String action) {
+    private void releaseOrderBudget(Long orderId, String action) {
         MatPurchaseOrder order = orderMapper.selectById(orderId);
-        if (order == null || order.getRequestId() != null) return;
+        if (order == null) return;
+        int revision = order.getBudgetRevision() == null ? 0 : order.getBudgetRevision();
         orderItemMapper.selectList(new LambdaQueryWrapper<MatPurchaseOrderItem>()
                         .eq(MatPurchaseOrderItem::getTenantId, order.getTenantId())
                         .eq(MatPurchaseOrderItem::getOrderId, orderId))
                 .forEach(item -> budgetLedgerService.release(item.getBudgetLineId(), "PURCHASE_ORDER", orderId,
-                        item.getAmount(), "PURCHASE_ORDER:" + orderId + ":ITEM:" + item.getId()
-                                + ":" + action + ":RELEASE"));
+                        item.getAmount(), budgetKey(order, item, revision, action + ":RELEASE")));
+    }
+
+    private String budgetKey(MatPurchaseOrder order, MatPurchaseOrderItem item, int revision, String action) {
+        return "ORDER:" + order.getId() + ":ITEM:" + item.getId()
+                + ":REV:" + revision + ":" + action;
     }
 
     private Long resolveOrderId(WfInstance instance) {

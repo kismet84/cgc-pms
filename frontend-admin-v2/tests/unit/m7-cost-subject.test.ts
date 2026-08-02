@@ -45,14 +45,78 @@ beforeEach(() => {
     {
       id: '1',
       parentId: '0',
-      subjectCode: 'COST',
-      subjectName: '服务端成本域',
+      subjectCode: '5401',
+      subjectName: '合同履约成本',
       subjectType: 'ROOT',
       accountCategory: 'COST',
       level: 1,
       sortOrder: 1,
       status: 'ENABLE',
-      children: [],
+      children: [
+        {
+          id: '11',
+          parentId: '1',
+          subjectCode: '5401.01',
+          subjectName: '招投标及前期费用',
+          subjectType: 'BID',
+          accountCategory: 'COST',
+          level: 2,
+          sortOrder: 1,
+          status: 'ENABLE',
+          children: [
+            {
+              id: '111',
+              parentId: '11',
+              subjectCode: '5401.01.01',
+              subjectName: '投标费用',
+              subjectType: 'BID',
+              accountCategory: 'COST',
+              level: 3,
+              sortOrder: 1,
+              status: 'ENABLE',
+              children: [
+                {
+                  id: '1111',
+                  parentId: '111',
+                  subjectCode: '5401.01.01.01',
+                  subjectName: '下级测试科目',
+                  subjectType: 'BID',
+                  accountCategory: 'COST',
+                  level: 4,
+                  sortOrder: 1,
+                  status: 'ENABLE',
+                  children: [],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          id: '12',
+          parentId: '1',
+          subjectCode: '5401.02',
+          subjectName: '采购阶段成本',
+          subjectType: 'PURCHASE',
+          accountCategory: 'COST',
+          level: 2,
+          sortOrder: 2,
+          status: 'ENABLE',
+          children: [
+            {
+              id: '121',
+              parentId: '12',
+              subjectCode: '5401.02.01',
+              subjectName: '材料采购价差',
+              subjectType: 'PURCHASE',
+              accountCategory: 'COST',
+              level: 3,
+              sortOrder: 1,
+              status: 'ENABLE',
+              children: [],
+            },
+          ],
+        },
+      ],
     },
   ])
   vi.mocked(costSubject.loadMappingVersions).mockResolvedValue([
@@ -112,10 +176,18 @@ describe('M7 cost-subject center', () => {
     const wrapper = mount(CostSubjectPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('服务端成本域')
-    expect(wrapper.text()).toContain('根科目')
+    expect(wrapper.findAll('.v2-card')).toHaveLength(2)
+    expect(wrapper.findAll('.cost-subject-page__taxonomy > section')).toHaveLength(3)
+    expect(wrapper.get('#cost-subject-first-level-title').text()).toBe('1. 一级科目')
+    expect(wrapper.get('#cost-subject-second-level-title').text()).toBe('2. 二级科目')
+    expect(wrapper.get('#cost-subject-detail-title').text()).toBe('3. 科目详情')
+    expect(wrapper.text()).toContain('招投标及前期费用')
+    expect(wrapper.text()).toContain('投标费用')
+    expect(wrapper.text()).not.toContain('下级末级科目')
+    expect(wrapper.text()).not.toContain('下级测试科目')
+    expect(wrapper.text()).not.toContain('请选择科目')
     expect(wrapper.text()).not.toContain('ROOT')
-    expect(wrapper.text()).not.toContain('新增根科目')
+    expect(wrapper.text()).not.toContain('新增一级科目')
     expect(costSubject.loadCostSubjectTree).toHaveBeenCalledOnce()
     expect(costSubject.loadMappingVersions).not.toHaveBeenCalled()
     expect(costSubject.loadBidTransfers).not.toHaveBeenCalled()
@@ -130,25 +202,23 @@ describe('M7 cost-subject center', () => {
     const wrapper = mount(CostSubjectPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('新增根科目')
+    expect(wrapper.text()).toContain('新增一级科目')
   })
 
-  it('collapses the subject tree while keeping the root action and releasing the detail layout', async () => {
+  it('links first-level selection to second-level subjects and detail', async () => {
     route.path = '/cost/subject/taxonomy'
-    useSessionStore().replaceUserInfo(user(['cost:query', 'cost:add']))
+    useSessionStore().replaceUserInfo(user(['cost:query']))
     const wrapper = mount(CostSubjectPage)
     await flushPromises()
 
-    const toggle = wrapper.findAll('button').find((button) => button.text() === '收起科目树')!
-    expect(toggle.attributes('aria-expanded')).toBe('true')
-    expect(toggle.attributes('aria-controls')).toBe('cost-subject-tree-content')
-
-    await toggle.trigger('click')
-
-    expect(wrapper.find('#cost-subject-tree-content').exists()).toBe(false)
-    expect(wrapper.find('.cost-subject-page__columns').classes()).toContain('is-tree-collapsed')
-    expect(wrapper.text()).toContain('新增根科目')
-    expect(wrapper.text()).toContain('展开科目树')
+    expect(wrapper.text()).toContain('5401.01.01')
+    const purchase = wrapper
+      .findAll('.cost-subject-page__list-item')
+      .find((item) => item.text().includes('5401.02'))!
+    await purchase.trigger('click')
+    expect(purchase.classes()).toContain('is-selected')
+    expect(wrapper.text()).toContain('5401.02.01')
+    expect(wrapper.text()).not.toContain('5401.01.01')
   })
 
   it('loads mapping and rule facts without touching other tabs', async () => {
@@ -190,7 +260,7 @@ describe('M7 cost-subject center', () => {
 
     await wrapper
       .findAll('button')
-      .find((button) => button.text() === '新增根科目')!
+      .find((button) => button.text() === '新增一级科目')!
       .trigger('click')
     const inputs = wrapper.findAllComponents(V2Input)
     await inputs

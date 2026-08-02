@@ -79,7 +79,26 @@ public class MatReceiptAssembler {
         Set<Long> materialIds = ids(items, MatReceiptItem::getMaterialId);
         Map<Long, String> materialNames = resolveNames(materialIds, mdMaterialMapper,
                 MdMaterial::getId, MdMaterial::getMaterialName);
-        return items.stream().map(i -> toItemVO(i, materialNames)).toList();
+        Map<Long, MdMaterial> materials = resolveEntities(materialIds, mdMaterialMapper);
+        Set<Long> orderItemIds = ids(items, MatReceiptItem::getOrderItemId);
+        Map<Long, MatPurchaseOrderItem> orderItems = resolveEntities(orderItemIds, matPurchaseOrderItemMapper);
+        return items.stream().map(i -> {
+            MatReceiptItemVO vo = toItemVO(i, materialNames);
+            MdMaterial material = materials.get(i.getMaterialId());
+            if (material != null) {
+                vo.setSpecification(material.getSpecification());
+                vo.setUnit(material.getUnit());
+            }
+            MatPurchaseOrderItem orderItem = orderItems.get(i.getOrderItemId());
+            if (orderItem != null) {
+                BigDecimal ordered = Optional.ofNullable(orderItem.getQuantity()).orElse(BigDecimal.ZERO);
+                BigDecimal received = Optional.ofNullable(orderItem.getReceivedQuantity()).orElse(BigDecimal.ZERO);
+                vo.setOrderedQuantity(ordered.toPlainString());
+                vo.setReceivedQuantity(received.toPlainString());
+                vo.setRemainingQuantity(ordered.subtract(received).toPlainString());
+            }
+            return vo;
+        }).toList();
     }
 
     /**
@@ -153,6 +172,8 @@ public class MatReceiptAssembler {
         vo.setContractId(r.getContractId() != null ? r.getContractId().toString() : null);
         vo.setPartnerId(r.getPartnerId() != null ? r.getPartnerId().toString() : null);
         vo.setReceiptCode(r.getReceiptCode());
+        vo.setSystemBatchNo(r.getSystemBatchNo());
+        vo.setDeliveryNoteNo(r.getDeliveryNoteNo());
         vo.setReceiptDate(r.getReceiptDate() != null ? DateTimeUtils.DATE_FMT.format(r.getReceiptDate()) : null);
         vo.setWarehouseId(r.getWarehouseId() != null ? r.getWarehouseId().toString() : null);
         vo.setReceiverId(r.getReceiverId() != null ? r.getReceiverId().toString() : null);
@@ -184,6 +205,7 @@ public class MatReceiptAssembler {
         vo.setBudgetLineId(i.getBudgetLineId() != null ? i.getBudgetLineId().toString() : null);
         vo.setActualQuantity(i.getActualQuantity() != null ? i.getActualQuantity().toPlainString() : null);
         vo.setQualifiedQuantity(i.getQualifiedQuantity() != null ? i.getQualifiedQuantity().toPlainString() : null);
+        vo.setAcceptedQuantity(i.getQualifiedQuantity() != null ? i.getQualifiedQuantity().toPlainString() : null);
         vo.setUnqualifiedQuantity(i.getUnqualifiedQuantity() != null ? i.getUnqualifiedQuantity().toPlainString() : "0");
         vo.setUnitPrice(i.getUnitPrice() != null ? i.getUnitPrice().toPlainString() : null);
         vo.setAmount(i.getAmount() != null ? i.getAmount().toPlainString() : null);
