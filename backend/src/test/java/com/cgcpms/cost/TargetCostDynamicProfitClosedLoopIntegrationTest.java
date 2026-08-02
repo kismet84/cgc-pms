@@ -355,6 +355,9 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM cost_corrective_action WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM cost_forecast_item WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM cost_forecast WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM budget_ledger WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM project_budget_line WHERE project_id=?", PROJECT);
+        jdbc.update("DELETE FROM project_budget WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM cost_target_item WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM cost_target WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM cost_item WHERE project_id=?", PROJECT);

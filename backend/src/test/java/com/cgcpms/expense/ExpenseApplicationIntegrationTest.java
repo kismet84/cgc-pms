@@ -3,18 +3,18 @@ package com.cgcpms.expense;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.cgcpms.auth.context.UserContext;
-import com.cgcpms.budget.constant.BudgetStatusConstants;
-import com.cgcpms.budget.entity.ProjectBudget;
 import com.cgcpms.budget.entity.ProjectBudgetLine;
-import com.cgcpms.budget.handler.ProjectBudgetWorkflowHandler;
 import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
-import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.budget.service.ProjectBudgetService;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.cost.entity.CostSubject;
+import com.cgcpms.cost.entity.CostTarget;
+import com.cgcpms.cost.entity.CostTargetItem;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
+import com.cgcpms.cost.mapper.CostTargetItemMapper;
+import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.expense.entity.ExpenseApplication;
 import com.cgcpms.expense.handler.ExpenseWorkflowHandler;
 import com.cgcpms.expense.mapper.ExpenseApplicationMapper;
@@ -57,16 +57,18 @@ class ExpenseApplicationIntegrationTest {
     private static final long SUBJECT_ID = 98200102L;
     private static final long PARTNER_ID = 98200103L;
     private static final long CONTRACT_ID = 98200104L;
+    private static final long TARGET_ID = 98200105L;
+    private static final long TARGET_ITEM_ID = 98200106L;
 
     @Autowired private ExpenseApplicationService expenseService;
     @Autowired private ExpenseWorkflowHandler expenseHandler;
     @Autowired private ProjectBudgetService budgetService;
-    @Autowired private ProjectBudgetWorkflowHandler budgetHandler;
     @Autowired private ExpenseApplicationMapper expenseMapper;
-    @Autowired private ProjectBudgetMapper budgetMapper;
     @Autowired private ProjectBudgetLineMapper lineMapper;
     @Autowired private PmProjectMapper projectMapper;
     @Autowired private CostSubjectMapper subjectMapper;
+    @Autowired private CostTargetMapper targetMapper;
+    @Autowired private CostTargetItemMapper targetItemMapper;
     @Autowired private MdPartnerMapper partnerMapper;
     @Autowired private CtContractMapper contractMapper;
     @Autowired private SysFileMapper fileMapper;
@@ -214,24 +216,36 @@ class ExpenseApplicationIntegrationTest {
         contract.setVersion(0);
         contractMapper.insert(contract);
 
-        ProjectBudget budget = new ProjectBudget();
-        budget.setProjectId(PROJECT_ID);
-        budget.setVersionNo("V1");
-        budget.setBudgetName("费用测试预算");
-        budget.setTotalAmount(new BigDecimal("1000.00"));
-        budgetId = budgetService.create(budget);
-        ProjectBudgetLine line = new ProjectBudgetLine();
-        line.setCostSubjectId(SUBJECT_ID);
-        line.setBudgetAmount(new BigDecimal("1000.00"));
-        budgetService.saveLines(budgetId, List.of(line));
+        CostTarget target = new CostTarget();
+        target.setId(TARGET_ID);
+        target.setTenantId(TENANT_ID);
+        target.setProjectId(PROJECT_ID);
+        target.setVersionNo("EXPENSE-CT-V1");
+        target.setVersionName("费用测试成本预算");
+        target.setTotalBidCostAmount(new BigDecimal("1000.00"));
+        target.setTotalTargetAmount(new BigDecimal("1000.00"));
+        target.setTotalResponsibilityAmount(new BigDecimal("1000.00"));
+        target.setIsActive(1);
+        target.setApprovalStatus("APPROVED");
+        target.setStatus("ACTIVE");
+        target.setVersion(0);
+        targetMapper.insert(target);
+
+        CostTargetItem item = new CostTargetItem();
+        item.setId(TARGET_ITEM_ID);
+        item.setTenantId(TENANT_ID);
+        item.setTargetId(TARGET_ID);
+        item.setProjectId(PROJECT_ID);
+        item.setCostSubjectId(SUBJECT_ID);
+        item.setTargetAmount(new BigDecimal("1000.00"));
+        item.setBidCostAmount(new BigDecimal("1000.00"));
+        item.setResponsibilityAmount(new BigDecimal("1000.00"));
+        item.setSortOrder(1);
+        targetItemMapper.insert(item);
+
+        budgetId = budgetService.syncFromApprovedCostTarget(TARGET_ID, TENANT_ID).getId();
         budgetLineId = lineMapper.selectOne(new LambdaQueryWrapper<ProjectBudgetLine>()
                 .eq(ProjectBudgetLine::getBudgetId, budgetId)).getId();
-        budgetMapper.update(null, new LambdaUpdateWrapper<ProjectBudget>()
-                .eq(ProjectBudget::getId, budgetId)
-                .set(ProjectBudget::getApprovalStatus, BudgetStatusConstants.APPROVAL_APPROVING));
-        WorkflowContext context = new WorkflowContext();
-        context.setInstance(instance(budgetId, 1));
-        budgetHandler.onApproved(context);
     }
 
     private Long createExpense(BigDecimal amount) {
@@ -291,6 +305,8 @@ class ExpenseApplicationIntegrationTest {
         jdbcTemplate.update("DELETE FROM contract_budget_allocation WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM project_budget_line WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM project_budget WHERE project_id = ?", PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM cost_target_item WHERE project_id = ?", PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM cost_target WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM ct_contract WHERE id = ?", CONTRACT_ID);
         jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM md_partner WHERE id = ?", PARTNER_ID);

@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.budget.entity.ProjectBudget;
-import com.cgcpms.budget.entity.ProjectBudgetLine;
 import com.cgcpms.budget.service.ProjectBudgetService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
@@ -276,40 +275,19 @@ class WorkflowSubmitServiceTest {
 
     @Test
     @Transactional
-    @DisplayName("PROJECT_BUDGET rejected edit keeps state and resubmits same instance")
-    void projectBudgetRejectedEditUsesDedicatedSameInstanceResubmit() {
-        PmProject project = projectMapper.selectById(PROJECT_ID);
-        project.setStatus("ACTIVE");
-        projectMapper.updateById(project);
-        jdbcTemplate.update("""
-                INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,level,sort_order,status,account_category,created_at,updated_at,deleted_flag)
-                SELECT 31991,0,0,'WF-BUDGET-31991','工作流预算科目','DIRECT',1,0,'ENABLE','COST',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0
-                WHERE NOT EXISTS (SELECT 1 FROM cost_subject WHERE id=31991)
-                """);
+    @DisplayName("PROJECT_BUDGET standalone create and submit are managed by COST_TARGET")
+    void projectBudgetStandaloneMutationIsManagedByCostTarget() {
         ProjectBudget budget = new ProjectBudget();
         budget.setProjectId(PROJECT_ID); budget.setVersionNo("WF-BUDGET-" + System.nanoTime());
-        budget.setBudgetName("预算工作流重提"); budget.setTotalAmount(new BigDecimal("100.00"));
-        Long budgetId = projectBudgetService.create(budget);
-        ProjectBudgetLine line = new ProjectBudgetLine(); line.setCostSubjectId(31991L); line.setBudgetAmount(new BigDecimal("100.00"));
-        projectBudgetService.saveLines(budgetId, 0, List.of(line));
-        projectBudgetService.submit(budgetId, 1);
-        WfInstance instance = wfInstanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
-                .eq(WfInstance::getBusinessType, WorkflowBusinessTypes.PROJECT_BUDGET)
-                .eq(WfInstance::getBusinessId, budgetId));
-        Long taskId = jdbcTemplate.queryForObject("SELECT id FROM wf_task WHERE instance_id=? AND task_status='PENDING' ORDER BY id LIMIT 1", Long.class, instance.getId());
-        workflowEngine.reject(taskId, TestUserContext.USER_ADMIN, "admin", "退回修改", "budget-reject-1");
-        ProjectBudget edit = new ProjectBudget(); edit.setId(budgetId); edit.setVersionNo(budget.getVersionNo());
-        edit.setBudgetName("驳回后编辑"); edit.setTotalAmount(new BigDecimal("100.00"));
-        projectBudgetService.update(edit, 3);
-        assertEquals("REJECTED", jdbcTemplate.queryForObject("SELECT approval_status FROM project_budget WHERE id=?", String.class, budgetId));
-        BusinessException generic = assertThrows(BusinessException.class,
-                () -> workflowEngine.resubmit(instance.getId(), TestUserContext.USER_ADMIN, "admin"));
-        assertEquals("PROJECT_BUDGET_DEDICATED_SUBMIT_REQUIRED", generic.getCode());
-        projectBudgetService.submit(budgetId, 4);
-        assertEquals(instance.getId(), wfInstanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
-                .eq(WfInstance::getBusinessType, WorkflowBusinessTypes.PROJECT_BUDGET)
-                .eq(WfInstance::getBusinessId, budgetId)).getId());
-        assertEquals(2, wfInstanceMapper.selectById(instance.getId()).getCurrentRound());
+        budget.setBudgetName("禁止独立预算"); budget.setTotalAmount(new BigDecimal("100.00"));
+        long budgetsBefore = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM project_budget WHERE project_id=?", Long.class, PROJECT_ID);
+        BusinessException create = assertThrows(BusinessException.class, () -> projectBudgetService.create(budget));
+        assertEquals("PROJECT_BUDGET_MANAGED_BY_COST_TARGET", create.getCode());
+        BusinessException submit = assertThrows(BusinessException.class, () -> projectBudgetService.submit(999991L, 0));
+        assertEquals("PROJECT_BUDGET_MANAGED_BY_COST_TARGET", submit.getCode());
+        assertEquals(budgetsBefore, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM project_budget WHERE project_id=?", Long.class, PROJECT_ID));
+        assertEquals(0L, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM wf_instance WHERE business_type='PROJECT_BUDGET'", Long.class));
     }
 
     @Test
