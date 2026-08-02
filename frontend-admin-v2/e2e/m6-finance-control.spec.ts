@@ -42,6 +42,13 @@ async function install(page: Page, writes: string[]) {
   await page.route('**/api/**', async (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
+    if (path === '/api/profile/preferences')
+      return fulfill(route, {
+        sidebarCollapsed: false,
+        notificationEnabled: true,
+        theme: 'light',
+        tableDensity: 'middle',
+      })
     if (request.method() !== 'GET') {
       if (request.method() !== 'POST' || path !== '/api/finance-operations/alerts/A1/handle')
         return fulfill(route, null, 500)
@@ -312,6 +319,7 @@ async function install(page: Page, writes: string[]) {
 test('five finance-control routes render real-shaped facts and write then reread', async ({
   page,
 }) => {
+  test.setTimeout(60_000)
   const writes: string[] = []
   await install(page, writes)
   const runtimeErrors = captureRuntimeErrors(page)

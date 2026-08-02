@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 const permissions = [
   'inventory:warehouse:list',
@@ -66,6 +67,7 @@ async function fulfill(route: Route, data: unknown, status = 200, code = '0') {
 }
 
 async function install(page: Page, granted = permissions, rejectTransfer = false) {
+  await installShellPreferencesMock(page)
   const writes: Array<{ path: string; body: unknown }> = []
   await page.route('**/api/auth/userinfo', (route) =>
     fulfill(route, { userId: '1', username: 'keeper', roles: ['USER'], permissions: granted }),

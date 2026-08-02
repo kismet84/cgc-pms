@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 type Identity = 'admin' | 'readonly' | 'denied'
 
@@ -35,6 +36,7 @@ const users = {
 } as const
 
 async function installContractMock(page: Page, readIdentity: () => Identity): Promise<void> {
+  await installShellPreferencesMock(page)
   await page.route('**/api/auth/userinfo', (route) =>
     route.fulfill({
       status: 200,
@@ -88,6 +90,31 @@ async function installContractMock(page: Page, readIdentity: () => Identity): Pr
               status: 'ENABLE',
             },
           ],
+        },
+      }),
+    }),
+  )
+  await page.route(/\/api\/materials(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '0',
+        message: 'success',
+        data: {
+          records: [
+            {
+              id: 'M1',
+              materialCode: 'MAT-001',
+              materialName: '商品混凝土',
+              specification: 'C30',
+              unit: '立方米',
+              status: 'ENABLE',
+            },
+          ],
+          total: 1,
+          pageNo: 1,
+          pageSize: 200,
         },
       }),
     }),

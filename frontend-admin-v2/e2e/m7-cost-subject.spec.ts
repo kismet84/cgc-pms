@@ -27,19 +27,53 @@ test('cost-subject deep links render server facts and preserve root redirect sta
         ],
       })
     }
+    if (path.endsWith('/api/profile/preferences')) {
+      return success(route, {
+        sidebarCollapsed: false,
+        notificationEnabled: true,
+        theme: 'light',
+        tableDensity: 'middle',
+      })
+    }
     if (path.endsWith('/api/cost-subjects/tree')) {
       return success(route, [
         {
           id: '1',
           parentId: '0',
-          subjectCode: 'COST',
-          subjectName: '服务端成本域',
+          subjectCode: '5401',
+          subjectName: '工程成本',
           subjectType: 'ROOT',
           accountCategory: 'COST',
           level: 1,
           sortOrder: 1,
           status: 'ENABLE',
-          children: [],
+          children: [
+            {
+              id: '11',
+              parentId: '1',
+              subjectCode: '5401.01',
+              subjectName: '直接工程费',
+              subjectType: 'GROUP',
+              accountCategory: 'COST',
+              level: 2,
+              sortOrder: 1,
+              status: 'ENABLE',
+              children: [
+                {
+                  id: '111',
+                  parentId: '11',
+                  subjectCode: '5401.01.01',
+                  subjectName: '人工费',
+                  subjectType: 'DETAIL',
+                  accountCategory: 'COST',
+                  level: 3,
+                  sortOrder: 1,
+                  status: 'ENABLE',
+                  children: [],
+                },
+              ],
+            },
+          ],
         },
       ])
     }
@@ -100,7 +134,9 @@ test('cost-subject deep links render server facts and preserve root redirect sta
   await page.goto('/cost/subject?source=e2e#mapping')
   await expect(page).toHaveURL(/\/cost\/subject\/taxonomy\?source=e2e#mapping$/)
   await expect(page.getByRole('heading', { level: 1, name: '成本科目体系' })).toBeVisible()
-  await expect(page.getByText('服务端成本域')).toBeVisible()
+  await expect(page.getByRole('region', { name: '1. 一级科目' })).toContainText('5401.01')
+  await expect(page.getByRole('region', { name: '2. 二级科目' })).toContainText('5401.01.01')
+  await expect(page.getByRole('region', { name: '3. 科目详情' })).toContainText('人工费')
 
   await page.goto('/cost/subject/rules')
   await expect(page.getByRole('heading', { level: 1, name: '归集规则与映射版本' })).toBeVisible()

@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 const user = {
   userId: '1',
@@ -86,6 +87,7 @@ async function install(
   requests: string[] = [],
   identity: typeof user | typeof deniedUser = user,
 ) {
+  await installShellPreferencesMock(page)
   await page.route('**/api/auth/userinfo', (route) => fulfill(route, identity))
   await page.route('**/api/auth/refresh', (route) => fulfill(route, null, 401))
   await page.route('**/api/project-context/options', (route) =>

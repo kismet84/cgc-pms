@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Route } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 const allPermissions = [
   'supplier:sourcing:query',
@@ -42,6 +43,7 @@ async function fulfill(route: Route, data: unknown, status = 200) {
 }
 
 async function install(page: Page, permissions = allPermissions) {
+  await installShellPreferencesMock(page)
   const writes: Array<{ method: string; path: string; body: unknown }> = []
   const quotes: Array<Record<string, unknown>> = []
   const evaluations: Array<Record<string, unknown>> = []

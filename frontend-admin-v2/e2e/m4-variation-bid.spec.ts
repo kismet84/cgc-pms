@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 type Identity = 'business' | 'readonly' | 'denied'
 
@@ -78,6 +79,7 @@ const bid = {
 }
 
 async function installCommercialMock(page: Page, readIdentity: () => Identity): Promise<void> {
+  await installShellPreferencesMock(page)
   await page.route('**/api/auth/userinfo', (route) =>
     route.fulfill({
       status: 200,

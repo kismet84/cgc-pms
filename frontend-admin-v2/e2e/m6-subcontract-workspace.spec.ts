@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 const permissions = [
   'subtask:query',
@@ -69,6 +70,7 @@ async function selectOption(_page: Page, scope: Locator, label: RegExp, option: 
 }
 
 async function install(page: Page, granted = permissions) {
+  await installShellPreferencesMock(page)
   const tasks = [{ ...task }]
   const measures = [{ ...measure }]
   const items: Record<string, unknown[]> = { M1: [] }

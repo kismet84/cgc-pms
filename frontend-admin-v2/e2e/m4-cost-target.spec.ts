@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page, type Request } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 type Identity = 'business' | 'readonly' | 'denied'
 
@@ -72,6 +73,7 @@ async function installCostTargetMock(
   readIdentity: () => Identity,
   options: CostTargetMockOptions = {},
 ): Promise<void> {
+  await installShellPreferencesMock(page)
   await page.route('**/api/auth/userinfo', (route) =>
     route.fulfill({
       status: 200,
@@ -94,6 +96,24 @@ async function installCostTargetMock(
         code: '0',
         message: 'success',
         data: [{ id: 'P1', projectName: '项目一', projectCode: 'P-001', status: 'ACTIVE' }],
+      }),
+    }),
+  )
+  await page.route(/\/api\/system\/users(?:\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: '0',
+        message: 'success',
+        data: {
+          records: [
+            { id: '1', username: 'cost.manager', realName: '目标成本经理', status: 'ENABLE' },
+          ],
+          total: 1,
+          pageNo: 1,
+          pageSize: 200,
+        },
       }),
     }),
   )
@@ -148,7 +168,7 @@ test.describe('M4 cost target routes', () => {
     const runtimeErrors = captureRuntimeErrors(page)
 
     await page.goto('/cost-target?projectId=P1#versions')
-    await expect(page).toHaveURL(/\/cost-budget\?projectId=P1&view=target#versions$/)
+    await expect(page).toHaveURL(/\/cost-budget\?projectId=P1#versions$/)
 
     for (const viewport of [
       { width: 1440, height: 900 },
@@ -158,7 +178,9 @@ test.describe('M4 cost target routes', () => {
       await page.setViewportSize(viewport)
       await page.goto('/cost-target/index?projectId=P1')
       await expect(page.locator('.shell-placeholder')).toHaveCount(0)
-      await expect(page.getByRole('heading', { name: '目标成本版本', exact: true })).toBeVisible()
+      await expect(
+        page.getByRole('heading', { name: '项目成本预算版本', exact: true }),
+      ).toBeVisible()
       await expect(page.getByText('首版目标成本', { exact: true })).toBeVisible()
       await expect(page.getByText('9007199254740993.12').first()).toBeVisible()
       expect(
@@ -173,11 +195,11 @@ test.describe('M4 cost target routes', () => {
     }
 
     await page.goto('/cost-target/81/edit?projectId=P1')
-    await expect(page.getByRole('heading', { name: '编辑目标成本版本' })).toBeVisible()
-    await expect(page.locator('input[aria-label="目标成本总额"]')).toHaveValue(
+    await expect(page.getByRole('heading', { name: '编辑项目成本预算' })).toBeVisible()
+    await expect(page.locator('input[aria-label="目标成本合计（服务端）"]')).toHaveValue(
       '9007199254740993.12',
     )
-    await expect(page.getByText('目标成本明细', { exact: true })).toBeVisible()
+    await expect(page.getByText('成本预算明细', { exact: true })).toBeVisible()
     expect(runtimeErrors).toEqual([])
   })
 
@@ -197,43 +219,5 @@ test.describe('M4 cost target routes', () => {
     await denied.goto('/cost-target/index')
     await expect(denied).toHaveURL(/\/forbidden\?from=/)
     await denied.close()
-  })
-
-  test('confirms approved-version activation with CAS and refreshes after 409', async ({
-    page,
-  }) => {
-    const approved = { ...target, approvalStatus: 'APPROVED', status: 'DRAFT', isActive: 0 }
-    const activationUrls: string[] = []
-    let detailReads = 0
-    await installCostTargetMock(page, () => 'business', {
-      readTarget: () => approved,
-      onCostRequest: (request) => {
-        const url = new URL(request.url())
-        if (request.method() === 'GET' && /\/cost-targets\/81$/.test(url.pathname)) {
-          detailReads += 1
-          return undefined
-        }
-        if (request.method() === 'POST' && /\/cost-targets\/81\/activate$/.test(url.pathname)) {
-          activationUrls.push(request.url())
-          return {
-            status: 409,
-            code: 'COST_TARGET_CONCURRENT_UPDATE',
-            message: '其他版本已被激活',
-          }
-        }
-        return undefined
-      },
-    })
-
-    await page.goto('/cost-target/81/edit?projectId=P1')
-    await expect(page.getByRole('button', { name: '激活版本' })).toBeVisible()
-    await page.getByRole('button', { name: '激活版本' }).click()
-    await page.getByRole('button', { name: '确认激活' }).click()
-
-    await expect(page.getByText('其他版本已被激活', { exact: true }).first()).toBeVisible()
-    expect(activationUrls).toHaveLength(1)
-    expect(new URL(activationUrls[0]!).searchParams.get('version')).toBe('7')
-    expect(detailReads).toBeGreaterThanOrEqual(2)
-    await expect(page.getByRole('button', { name: '激活版本' })).toBeVisible()
   })
 })

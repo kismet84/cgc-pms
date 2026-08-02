@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Locator, type Page, type Route } from '@playwright/test'
 import { captureRuntimeErrors } from './runtime-errors'
+import { installShellPreferencesMock } from './shell-session'
 
 async function selectBusinessOption(
   _page: Page,
@@ -137,6 +138,7 @@ async function fulfill(route: Route, data: unknown, status = 200, code = '0') {
 }
 
 async function install(page: Page, granted = permissions, rejectReceiptItems = false) {
+  await installShellPreferencesMock(page)
   const writes: Array<{ path: string; body: unknown }> = []
   await page.route('**/api/auth/userinfo', (route) =>
     fulfill(route, { userId: '1', username: 'buyer', roles: ['USER'], permissions: granted }),
@@ -269,7 +271,10 @@ async function install(page: Page, granted = permissions, rejectReceiptItems = f
         route,
         collection.find((item) => path === `${base}/${item.id}`),
       )
-    if (method === 'POST' && path === base) {
+    if (
+      method === 'POST' &&
+      (path === base || path === `${base}/with-items` || path === `${base}/from-request`)
+    ) {
       const sequence = collection.length + 1
       const id = `${domain === 'request' ? 'PR' : domain === 'order' ? 'PO' : 'RC'}${sequence}`
       const next = {
@@ -429,53 +434,46 @@ test.describe('M5 purchase request, order and receipt V2', () => {
     await page.goto('/inventory/purchase-request?projectId=P1')
     await page.getByRole('button', { name: '新建采购申请' }).click()
     const dialog = page.getByRole('dialog', { name: '新建采购申请' })
-    await selectBusinessOption(page, dialog, /^物料$/, /MAT-001 · 钢筋/)
-    await dialog.getByLabel('采购用途').fill('地下室钢材')
-    await dialog.getByLabel('申请数量').fill('9007199254740993.1234')
-    await dialog.getByLabel('计划日期').fill('2026-06-18')
+    await selectBusinessOption(page, dialog, /^第1条物料$/, /MAT-001 · 钢筋/)
+    await dialog.getByLabel('第1条申请数量').fill('9007199254740993.1234')
+    await dialog.getByLabel('第1条计划日期').fill('2026-06-18')
+    await dialog.getByLabel('第1条使用部位').fill('地下室')
     await dialog.getByRole('button', { name: '保存', exact: true }).dblclick()
     await expect(page.getByText('PR-002', { exact: true }).first()).toBeVisible()
     await page.getByRole('button', { name: '提交审批' }).dblclick()
     await expect(page.getByText('审批中', { exact: true }).first()).toBeVisible()
-    expect(writes.filter((item) => item.path === 'POST /purchase-requests')).toHaveLength(1)
-    expect(writes.filter((item) => item.path.endsWith('/items/batch'))).toHaveLength(1)
+    const create = writes.find((item) => item.path === 'POST /purchase-requests/with-items')
+    expect(create).toBeDefined()
     expect(
       (
-        writes.find((item) => item.path.endsWith('/items/batch'))?.body as Array<{
-          quantity: string
-        }>
-      )[0]?.quantity,
+        create?.body as {
+          items: Array<{ quantity: string }>
+        }
+      ).items[0]?.quantity,
     ).toBe('9007199254740993.1234')
+    expect(writes.filter((item) => item.path.endsWith('/items/batch'))).toHaveLength(0)
     expect(writes.filter((item) => item.path.endsWith('/submit'))).toHaveLength(1)
   })
 
-  test('creates one exceptional order and submits once', async ({ page }) => {
+  test('creates one order from an approved request and submits once', async ({ page }) => {
     const writes = await install(page)
     await page.goto('/purchase/order?projectId=P1')
     await page.getByRole('button', { name: '新建采购订单' }).click()
     const dialog = page.getByRole('dialog', { name: '新建采购订单' })
+    await selectBusinessOption(page, dialog, /^已审批采购申请$/, /PR-001/)
     await selectBusinessOption(page, dialog, /^采购合同$/, /CT-001 · 钢材采购合同/)
-    await selectBusinessOption(page, dialog, /^供应商$/, /SUP-001 · 供应商甲/)
-    await selectBusinessOption(page, dialog, /^物料$/, /MAT-001 · 钢筋/)
-    await dialog.getByLabel('订单数量').fill('10.0000')
-    await dialog.getByLabel('订单单价').fill('3.25')
-    await dialog.getByLabel('税率').fill('13')
-    await dialog.getByLabel('例外原因').fill('紧急直采')
+    await dialog.getByLabel('交付条件').fill('按合同交付')
     await dialog.getByRole('button', { name: '保存', exact: true }).dblclick()
     await expect(page.getByText('PO-002', { exact: true }).first()).toBeVisible()
     await page.getByRole('button', { name: '提交审批' }).dblclick()
-    const create = writes.find((item) => item.path === 'POST /purchase-orders')
+    const create = writes.find((item) => item.path === 'POST /purchase-orders/from-request')
     expect(create?.body).toMatchObject({
+      projectId: 'P1',
       contractId: 'C1',
-      partnerId: 'S1',
-      exceptionPurchaseFlag: 1,
-      exceptionReason: '紧急直采',
+      requestId: 'PR1',
+      deliveryTerms: '按合同交付',
     })
-    const items = writes.find((item) => item.path.endsWith('/items/batch'))?.body as Array<{
-      materialId: string
-      quantity: string
-    }>
-    expect(items[0]).toMatchObject({ materialId: 'M1', quantity: '10.0000' })
+    expect(writes.filter((item) => item.path.endsWith('/items/batch'))).toHaveLength(0)
     expect(writes.filter((item) => item.path.endsWith('/submit'))).toHaveLength(1)
   })
 
@@ -492,19 +490,21 @@ test.describe('M5 purchase request, order and receipt V2', () => {
       await page.getByRole('button', { name: '新建材料验收' }).click()
       const dialog = page.getByRole('dialog', { name: '新建材料验收' })
       await selectBusinessOption(page, dialog, /^采购订单$/, /PO-001 · 供应商甲/)
-      await expect(dialog.getByRole('combobox', { name: '订单明细' })).toHaveValue('POI1')
+      await dialog.getByRole('radio', { name: '选择钢筋' }).check()
       await selectBusinessOption(page, dialog, /^入库仓库$/, /WH-001 · 主仓/)
       await dialog.getByLabel('本次合格数量').fill(sample.accepted)
       await dialog.getByRole('button', { name: '保存', exact: true }).click()
       await expect(page.getByText(sample.code, { exact: true }).first()).toBeVisible()
       const detailDialog = page.getByRole('dialog', { name: '材料验收详情' })
-      await detailDialog.getByRole('button', { name: '关闭' }).click()
+      await detailDialog.getByRole('button', { name: '关闭', exact: true }).click()
       await expect(detailDialog).toBeHidden()
     }
     const itemWrites = writes.filter((item) => item.path.endsWith('/items/batch'))
     expect(itemWrites).toHaveLength(2)
     expect(
-      itemWrites.map((item) => (item.body as Array<{ acceptedQuantity: string }>)[0]?.acceptedQuantity),
+      itemWrites.map(
+        (item) => (item.body as Array<{ acceptedQuantity: string }>)[0]?.acceptedQuantity,
+      ),
     ).toEqual(['3.0000', '5.0000'])
   })
 

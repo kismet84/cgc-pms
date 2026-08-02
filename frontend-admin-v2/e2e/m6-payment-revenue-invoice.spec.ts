@@ -40,6 +40,13 @@ async function fulfill(route: Route, data: unknown, status = 200) {
 async function install(page: Page) {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname
+    if (path === '/api/profile/preferences')
+      return fulfill(route, {
+        sidebarCollapsed: false,
+        notificationEnabled: true,
+        theme: 'light',
+        tableDensity: 'middle',
+      })
     if (path === '/api/project-context/options') {
       return fulfill(route, [
         { id: 'P1', projectCode: 'PRJ-001', projectName: '示范工程项目', status: 'ACTIVE' },
