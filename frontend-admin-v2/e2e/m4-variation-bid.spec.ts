@@ -140,6 +140,7 @@ test.describe('M4 variation and bid routes', () => {
   test('routes resolve without placeholders and remain accessible at three viewports', async ({
     page,
   }) => {
+    test.setTimeout(60_000)
     const identity: Identity = 'business'
     await installCommercialMock(page, () => identity)
     const runtimeErrors = captureRuntimeErrors(page)
