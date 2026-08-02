@@ -219,6 +219,11 @@ async function refresh(): Promise<void> {
   }
 }
 
+async function refreshNow(): Promise<void> {
+  await refresh()
+  if (!error.value) showToast('success', '流程已刷新', '审批流程配置已重新读取。')
+}
+
 async function selectModule(module: string): Promise<void> {
   if (selectedModule.value === module) return
   selectedModule.value = module
@@ -508,7 +513,7 @@ onBeforeUnmount(() => controller?.abort())
           <V2Button size="small" @click="search">查询</V2Button>
           <V2Button size="small" variant="secondary" @click="reset">重置</V2Button>
         </div>
-        <V2Button size="small" variant="secondary" @click="refresh">刷新</V2Button>
+        <V2Button size="small" variant="secondary" @click="refreshNow">刷新</V2Button>
       </template>
     </V2Card>
 
@@ -651,7 +656,7 @@ onBeforeUnmount(() => controller?.abort())
                   <thead>
                     <tr>
                       <th>顺序</th>
-                      <th>节点名称</th>
+                      <th>节点编码/名称</th>
                       <th>模式</th>
                       <th>操作</th>
                     </tr>
@@ -659,7 +664,7 @@ onBeforeUnmount(() => controller?.abort())
                   <tbody>
                     <tr v-for="(node, index) in current.nodes" :key="node.id">
                       <td>{{ node.nodeOrder }}</td>
-                      <th scope="row">{{ node.nodeName }}</th>
+                      <th scope="row">{{ node.nodeCode }} · {{ node.nodeName }}</th>
                       <td>{{ modeLabel(node.approveMode) }}</td>
                       <td>
                         <div class="workflow-process-page__actions">

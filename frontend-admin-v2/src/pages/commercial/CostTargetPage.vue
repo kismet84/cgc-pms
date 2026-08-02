@@ -475,6 +475,13 @@ function approvalLabel(status: string): string {
   return APPROVAL_OPTIONS.find((option) => option.value === status)?.label ?? status
 }
 
+function budgetStatusLabel(status: string): string {
+  return (
+    { DRAFT: '草稿', ACTIVE: '已启用', SUPERSEDED: '已替代', CLOSED: '已关闭' }[status] ??
+    '未知状态'
+  )
+}
+
 function approvalTone(status: string): 'neutral' | 'info' | 'success' | 'warning' {
   if (status === 'APPROVED') return 'success'
   if (status === 'APPROVING') return 'info'
@@ -792,7 +799,7 @@ onBeforeUnmount(() => {
                 <table class="v2-table--top cost-target-page__editor-table">
                   <thead>
                     <tr>
-                      <th>成本科目<span aria-hidden="true">*</span></th>
+                      <th>成本科目编码/名称<span aria-hidden="true">*</span></th>
                       <th>目标金额<span aria-hidden="true">*</span></th>
                       <th>投标金额<span aria-hidden="true">*</span></th>
                       <th>责任金额<span aria-hidden="true">*</span></th>
@@ -954,7 +961,9 @@ onBeforeUnmount(() => {
             </div>
             <div v-if="executionBudget">
               <dt>执行预算</dt>
-              <dd>{{ executionBudget.budgetCode }} / {{ executionBudget.status }}</dd>
+              <dd>
+                {{ executionBudget.budgetCode }} / {{ budgetStatusLabel(executionBudget.status) }}
+              </dd>
             </div>
             <div>
               <dt>备注</dt>

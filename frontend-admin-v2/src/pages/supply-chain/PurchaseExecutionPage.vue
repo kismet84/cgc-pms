@@ -1987,7 +1987,7 @@ onBeforeUnmount(() => {
               <table class="purchase-execution-page__draft-table">
                 <thead>
                   <tr>
-                    <th scope="col">物料<span aria-hidden="true">*</span></th>
+                    <th scope="col">物料编码/名称<span aria-hidden="true">*</span></th>
                     <th scope="col">申请数量<span aria-hidden="true">*</span></th>
                     <th scope="col">单位<span aria-hidden="true">*</span></th>
                     <th scope="col">计划日期<span aria-hidden="true">*</span></th>
@@ -2092,7 +2092,7 @@ onBeforeUnmount(() => {
               <table class="purchase-execution-page__draft-table">
                 <thead>
                   <tr>
-                    <th scope="col">物料<span aria-hidden="true">*</span></th>
+                    <th scope="col">物料编码/名称<span aria-hidden="true">*</span></th>
                     <th scope="col">预算科目<span aria-hidden="true">*</span></th>
                     <th scope="col">订单数量<span aria-hidden="true">*</span></th>
                     <th scope="col">单位<span aria-hidden="true">*</span></th>
