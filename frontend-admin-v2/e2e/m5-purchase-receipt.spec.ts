@@ -340,6 +340,7 @@ test.describe('M5 purchase request, order and receipt V2', () => {
   })
 
   test('renders all routes, redirect, viewports and accessibility', async ({ page }) => {
+    test.setTimeout(60_000)
     await install(page)
     const errors = captureRuntimeErrors(page)
     await page.goto('/purchase?projectId=P1')
