@@ -188,13 +188,13 @@ async function openDetail(
   const controller = new AbortController()
   detailController = controller
   const generation = ++detailGeneration
+  panelMode.value = mode
   detailLoading.value = true
   if (!preserveNotice) errorMessage.value = ''
   try {
     const value = await loadBidCost(id, controller.signal)
     if (generation !== detailGeneration) return
     selected.value = value
-    panelMode.value = mode
     form.bidProjectName = value.bidProjectName
     form.remark = value.remark ?? ''
     panelErrorMessage.value = ''
