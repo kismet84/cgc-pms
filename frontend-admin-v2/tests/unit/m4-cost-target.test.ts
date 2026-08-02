@@ -174,7 +174,15 @@ describe('M4 cost target page', () => {
     expect(dialog.get('[aria-label="成本预算明细编辑表格"]')).toBeTruthy()
     expect(
       dialog.findAll('.cost-target-page__editor-table thead th').map((header) => header.text()),
-    ).toEqual(['成本科目*', '目标金额*', '投标金额*', '责任金额*', '责任单位', '责任人*', '操作'])
+    ).toEqual([
+      '成本科目编码/名称*',
+      '目标金额*',
+      '投标金额*',
+      '责任金额*',
+      '责任单位',
+      '责任人*',
+      '操作',
+    ])
   })
 
   it('loads header and items for detail with abort signals', async () => {
