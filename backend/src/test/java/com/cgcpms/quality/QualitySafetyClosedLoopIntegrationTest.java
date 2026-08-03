@@ -50,6 +50,10 @@ class QualitySafetyClosedLoopIntegrationTest {
     private static final long MEMBER_ONE = 99188020L;
     private static final long MEMBER_TWO = 99188021L;
     private static final long MEMBER_DISABLED = 99188022L;
+    private static final long SCHEDULE = 99188023L;
+    private static final long WBS = 99188024L;
+    private static final long OTHER_SCHEDULE = 99188025L;
+    private static final long OTHER_WBS = 99188026L;
     private static final AtomicLong FILE_ID = new AtomicLong(99188100L);
 
     @Autowired QualitySafetyService service;
@@ -66,6 +70,9 @@ class QualitySafetyClosedLoopIntegrationTest {
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,0,'qs-disabled','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','停用项目成员','DISABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", DISABLED_USER);
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) VALUES(?,1,'qs-cross-tenant','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','跨租户用户','ENABLE',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CROSS_TENANT_USER);
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,contract_amount,target_cost,project_manager_id,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'QS-IT','质量安全闭环测试项目',100000,80000,1,'ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
+        jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,contract_amount,target_cost,project_manager_id,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'QS-OTHER','其他项目',100000,80000,1,'ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", OTHER_PROJECT);
+        insertWbs(SCHEDULE, WBS, PROJECT, "QS-WBS");
+        insertWbs(OTHER_SCHEDULE, OTHER_WBS, OTHER_PROJECT, "QS-OTHER-WBS");
         jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(?,0,?,1,'PROJECT_MANAGER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", MEMBER_ONE, PROJECT);
         jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(?,0,?,2,'QUALITY_REVIEWER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", MEMBER_TWO, PROJECT);
         jdbc.update("INSERT INTO pm_project_member(id,tenant_id,project_id,user_id,role_code,status,created_at,updated_at,created_by,updated_by,deleted_flag) VALUES(?,0,?,?,'QUALITY_OWNER','ACTIVE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,1,1,0)", MEMBER_DISABLED, PROJECT, DISABLED_USER);
@@ -92,7 +99,7 @@ class QualitySafetyClosedLoopIntegrationTest {
         assertEquals("ACTIVE", service.activatePlan(plan.getId()).getStatus());
 
         QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
-                plan.getId(), "QS-CHK-001", LocalDate.now(), "A区主体结构", 1L, "模板支撑专项检查", null));
+                plan.getId(), WBS, "QS-CHK-001", LocalDate.now(), "A区主体结构", 1L, "模板支撑专项检查", null));
         assertTrue(inspection.getInspectionCode().matches("QIN-\\d{8}-\\d{3}"));
         assertNotEquals("QS-CHK-001", inspection.getInspectionCode());
         QualitySafetyIssue issue = service.createIssue(inspection.getId(), new IssueCommand(
@@ -147,6 +154,8 @@ class QualitySafetyClosedLoopIntegrationTest {
         assertNotNull(consequence.getEvaluationId());
         assertEquals(0, new BigDecimal("500.00").compareTo(jdbc.queryForObject(
                 "SELECT amount FROM cost_item WHERE id=?", BigDecimal.class, consequence.getCostItemId())));
+        assertEquals(WBS, jdbc.queryForObject(
+                "SELECT wbs_task_id FROM cost_item WHERE id=?", Long.class, consequence.getCostItemId()));
         assertEquals(0, new BigDecimal("60.00").compareTo(jdbc.queryForObject(
                 "SELECT score FROM qs_partner_evaluation WHERE id=?", BigDecimal.class, consequence.getEvaluationId())));
 
@@ -164,7 +173,7 @@ class QualitySafetyClosedLoopIntegrationTest {
     void rejectsMissingEvidenceDuplicateSubmitAndSelfReinspectionThenSupportsRejectResubmit() {
         QualityInspectionPlan plan = service.activatePlan(service.createPlan(planCommand("QS-PLAN-EDGE")).getId());
         QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
-                plan.getId(), "QS-CHK-EDGE", LocalDate.now(), "B区", 1L, "临边防护检查", null));
+                plan.getId(), null, "QS-CHK-EDGE", LocalDate.now(), "B区", 1L, "临边防护检查", null));
         BusinessException missing = assertThrows(BusinessException.class, () -> service.submitInspection(inspection.getId()));
         assertEquals("QS_EVIDENCE_REQUIRED", missing.getCode());
 
@@ -195,6 +204,26 @@ class QualitySafetyClosedLoopIntegrationTest {
     }
 
     @Test
+    void qualityInspectionRequiresSameProjectWbsWhileSafetyMayOmitIt() {
+        QualityInspectionPlan quality = service.activatePlan(service.createPlan(new PlanCommand(
+                PROJECT, null, "质量WBS检查", "QUALITY", "SINGLE", LocalDate.now(),
+                LocalDate.now().plusDays(3), 1L, null)).getId());
+        BusinessException missing = assertThrows(BusinessException.class, () -> service.createInspection(
+                new InspectionCommand(quality.getId(), null, null, LocalDate.now(), "质量区", 1L, "缺少WBS", null)));
+        assertEquals("PROJECT_WBS_REQUIRED", missing.getCode());
+        BusinessException foreign = assertThrows(BusinessException.class, () -> service.createInspection(
+                new InspectionCommand(quality.getId(), OTHER_WBS, null, LocalDate.now(), "质量区", 1L, "跨项目WBS", null)));
+        assertEquals("PROJECT_WBS_MISMATCH", foreign.getCode());
+
+        QualityInspectionRecord valid = service.createInspection(new InspectionCommand(
+                quality.getId(), WBS, null, LocalDate.now(), "质量区", 1L, "同项目WBS", null));
+        assertEquals(WBS, valid.getWbsTaskId());
+        jdbc.update("UPDATE project_schedule_plan SET status='SUPERSEDED' WHERE id=?", SCHEDULE);
+        assertEquals("PROJECT_WBS_MISMATCH", assertThrows(BusinessException.class,
+                () -> service.submitInspection(valid.getId())).getCode());
+    }
+
+    @Test
     void rejectsNewPlanWhenProjectIsSuspended() {
         jdbc.update("UPDATE pm_project SET status='SUSPENDED' WHERE id=?", PROJECT);
         BusinessException suspended = assertThrows(BusinessException.class,
@@ -211,11 +240,11 @@ class QualitySafetyClosedLoopIntegrationTest {
 
         QualityInspectionPlan plan = service.activatePlan(service.createPlan(planCommand("QS-PLAN-MEMBER-BOUNDARY")).getId());
         BusinessException disabled = assertThrows(BusinessException.class, () -> service.createInspection(new InspectionCommand(
-                plan.getId(), "QS-CHK-DISABLED", LocalDate.now(), "边界区", DISABLED_USER, "停用成员边界", null)));
+                plan.getId(), null, "QS-CHK-DISABLED", LocalDate.now(), "边界区", DISABLED_USER, "停用成员边界", null)));
         assertEquals("QS_RESPONSIBLE_PROJECT_MEMBER_INVALID", disabled.getCode());
 
         QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
-                plan.getId(), "QS-CHK-MEMBER-BOUNDARY", LocalDate.now(), "边界区", 1L, "跨租户责任人边界", null));
+                plan.getId(), null, "QS-CHK-MEMBER-BOUNDARY", LocalDate.now(), "边界区", 1L, "跨租户责任人边界", null));
         BusinessException crossTenant = assertThrows(BusinessException.class, () -> service.createIssue(
                 inspection.getId(), new IssueCommand(inspection.getId(), "边界", "HIGH", "责任人越界", "跨租户责任人",
                         "PARTNER", PARTNER, CROSS_TENANT_USER, LocalDate.now().plusDays(2), null)));
@@ -226,7 +255,7 @@ class QualitySafetyClosedLoopIntegrationTest {
     void enforcesQualityEvidencePermissionAndImmutableDocumentStages() {
         QualityInspectionPlan plan = service.activatePlan(service.createPlan(planCommand("QS-PLAN-FILE")).getId());
         QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
-                plan.getId(), "QS-CHK-FILE", LocalDate.now(), "C区", 1L, "文件阶段检查", null));
+                plan.getId(), null, "QS-CHK-FILE", LocalDate.now(), "C区", 1L, "文件阶段检查", null));
         QualitySafetyIssue issue = service.createIssue(inspection.getId(), new IssueCommand(
                 inspection.getId(), "脚手架", "HIGH", "连墙件缺失", "局部连墙件未设置",
                 "PARTNER", PARTNER, 1L, LocalDate.now().plusDays(3), null));
@@ -253,7 +282,7 @@ class QualitySafetyClosedLoopIntegrationTest {
     void separatesRectificationAndReinspectionEvidenceAuthorities() {
         QualityInspectionPlan plan = service.activatePlan(service.createPlan(planCommand("QS-PLAN-SPLIT-FILE")).getId());
         QualityInspectionRecord inspection = service.createInspection(new InspectionCommand(
-                plan.getId(), "QS-CHK-SPLIT-FILE", LocalDate.now(), "D区", 1L, "整改复检分权", null));
+                plan.getId(), null, "QS-CHK-SPLIT-FILE", LocalDate.now(), "D区", 1L, "整改复检分权", null));
         QualitySafetyIssue issue = service.createIssue(inspection.getId(), new IssueCommand(
                 inspection.getId(), "临电", "HIGH", "接地缺失", "配电箱接地缺失",
                 "PARTNER", PARTNER, 1L, LocalDate.now().plusDays(3), null));
@@ -303,7 +332,6 @@ class QualitySafetyClosedLoopIntegrationTest {
     }
 
     private void insertContractValidationFixtures() {
-        jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,contract_amount,target_cost,project_manager_id,status,approval_status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'QS-OTHER','其他项目',100000,80000,1,'ACTIVE','APPROVED',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", OTHER_PROJECT);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'QS-OTHER-A','无关甲方','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OTHER_PARTNER_A);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'QS-OTHER-B','无关乙方','SUPPLIER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OTHER_PARTNER_B);
         jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'QS-OTHER-PROJECT-CT','其他项目合同','PURCHASE',?,?,10000,10000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", OTHER_PROJECT_CONTRACT, OTHER_PROJECT, CONTRACT_COUNTERPARTY, PARTNER);
@@ -319,6 +347,11 @@ class QualitySafetyClosedLoopIntegrationTest {
         long id = FILE_ID.incrementAndGet();
         jdbc.update("INSERT INTO sys_file(id,tenant_id,business_type,document_type,business_id,file_name,original_name,file_size,content_type,storage_path,bucket_name,virus_scan_status,virus_scanned_at,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(0+?,0,?,?,?,'evidence.pdf','evidence.pdf',100,'application/pdf',?,'test','CLEAN',CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)",
                 id, businessType, documentType, businessId, businessType + "/" + businessId + "/" + id + ".pdf");
+    }
+
+    private void insertWbs(long scheduleId, long wbsId, long projectId, String code) {
+        jdbc.update("INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,'BASELINE',1,CURRENT_DATE,DATEADD('DAY',30,CURRENT_DATE),'ACTIVE',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", scheduleId, projectId, code + "-SP", code + "基线");
+        jdbc.update("INSERT INTO project_wbs_task(id,tenant_id,project_id,schedule_plan_id,task_code,task_name,planned_start_date,planned_end_date,weight_percent,actual_quantity,actual_progress,status,sort_order,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,?,?,CURRENT_DATE,DATEADD('DAY',30,CURRENT_DATE),100,0,0,'NOT_STARTED',1,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", wbsId, projectId, scheduleId, code, code + "任务");
     }
 
     private void asUser(long userId) {
@@ -347,6 +380,8 @@ class QualitySafetyClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM cost_subject_assignment_rule WHERE id=?", ASSIGNMENT_RULE);
         jdbc.update("DELETE FROM cost_subject_mapping_version WHERE id=?", MAPPING_VERSION);
         jdbc.update("DELETE FROM cost_subject WHERE id=?", SUBJECT);
+        jdbc.update("DELETE FROM project_wbs_task WHERE id IN (?,?)", WBS, OTHER_WBS);
+        jdbc.update("DELETE FROM project_schedule_plan WHERE id IN (?,?)", SCHEDULE, OTHER_SCHEDULE);
         jdbc.update("DELETE FROM pm_project WHERE id IN (?,?,?)", PROJECT, OTHER_PROJECT, CROSS_TENANT_PROJECT);
         jdbc.update("DELETE FROM sys_user WHERE id IN (?,?,?)", OUTSIDE_USER, DISABLED_USER, CROSS_TENANT_USER);
     }

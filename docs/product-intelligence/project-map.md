@@ -1,11 +1,11 @@
 # CGC-PMS 项目地图
 
-## 2026-08-03 主线68：施工阶段主线闭环整改计划已编制
+## 2026-08-04 主线67～68：工程投标与施工阶段主线本地闭环
 
-- 当前模块覆盖进度、日报、质量、材料、分包、计量、成本、资金和竣工，但跨模块只在项目/合同层部分关联，尚未形成WBS任务级施工闭环。
-- 第68条以现有项目、WBS和原业务单据为唯一骨架，整改施工准入、日报绕过、质量错配、关闭漏检、成本科目付款重复和尾款现金未归档六项P0。
-- 目标状态为`PREPARING→ACTIVE→COMPLETION→WARRANTY→CLOSED→ARCHIVED`；收尾内部状态继续由`project_closeout`表达，不新建平行施工台账。
-- 状态：`PLAN_READY / IMPLEMENTATION_NOT_AUTHORIZED`；唯一事项`ISSUE-068-001`，计划见[`第68条主线`](../plans/第68条主线-施工阶段主线闭环整改任务计划书.md)。
+- 工程投标现以`bid_cost`、不可覆盖文件版本和`cash_journal_entry`为唯一事实；有效中标通知书幂等创建免立项审批的`PREPARING`项目。
+- 施工主线以项目状态、WBS和原业务单据贯穿进度、质量、材料、分包、产值、成本、资金及收尾；不建立平行台账。
+- 状态链为`PREPARING→ACTIVE→COMPLETION→WARRANTY→CLOSED→ARCHIVED`；阶段门和阻塞清单由服务端集中计算。
+- 状态：`LOCAL_ACCEPTANCE_PASSED / GIT_DELIVERY_IN_PROGRESS`；`ISSUE-068-001`关闭。计划见[`第67条`](../plans/第67条主线-工程投标资料与成本日记账闭环任务计划书.md)、[`第68条`](../plans/第68条主线-施工阶段主线闭环整改任务计划书.md)。
 
 ## 2026-07-31 主线58：新版前端正式切换完成
 

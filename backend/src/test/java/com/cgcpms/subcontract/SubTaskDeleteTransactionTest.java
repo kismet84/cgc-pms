@@ -39,6 +39,8 @@ class SubTaskDeleteTransactionTest {
     private static final long CONTEXT_TASK_ID = 947003L;
     private static final long CONTEXT_SUCCESSOR_ID = 947004L;
     private static final long MEASURE_ID = 947101L;
+    private static final long SCHEDULE_ID = 947201L;
+    private static final long WBS_ID = 947202L;
     private static final String ORIGINAL_CODE = "WBS-TXN-ROLLBACK-947001";
 
     @Autowired
@@ -55,6 +57,7 @@ class SubTaskDeleteTransactionTest {
         reset(subTaskMapper);
         cleanupFixture();
         TestUserContext.setAdmin(TENANT_ID, USER_ID);
+        insertWbsFixture();
         insertTask(TASK_ID, ORIGINAL_CODE, "墓碑事务故障注入任务");
     }
 
@@ -141,6 +144,7 @@ class SubTaskDeleteTransactionTest {
         insertContextTask(CONTEXT_TASK_ID, null, 30001L, 20002L);
         SubTask dependent = new SubTask();
         dependent.setProjectId(PROJECT_ID);
+        dependent.setWbsTaskId(WBS_ID);
         dependent.setPredecessorTaskId(CONTEXT_TASK_ID);
         dependent.setTaskName("跨合同依赖");
         dependent.setProgressPercent(BigDecimal.ZERO);
@@ -159,6 +163,7 @@ class SubTaskDeleteTransactionTest {
         SubTask update = new SubTask();
         update.setId(TASK_ID);
         update.setProjectId(PROJECT_ID);
+        update.setWbsTaskId(WBS_ID);
         update.setTaskName("保持空合同上下文");
         update.setProgressPercent(BigDecimal.ZERO);
         update.setStatus("NOT_STARTED");
@@ -178,6 +183,41 @@ class SubTaskDeleteTransactionTest {
                 """, id, TENANT_ID, PROJECT_ID, taskCode, taskName, USER_ID, USER_ID);
     }
 
+    @Test
+    @DisplayName("新施工任务必须关联生效WBS")
+    void createRequiresActiveWbs() {
+        SubTask task = new SubTask();
+        task.setProjectId(PROJECT_ID);
+        task.setTaskName("缺少WBS");
+        task.setProgressPercent(BigDecimal.ZERO);
+        task.setStatus("NOT_STARTED");
+
+        BusinessException failure = assertThrows(BusinessException.class, () -> subTaskService.create(task));
+
+        assertEquals("PROJECT_WBS_REQUIRED", failure.getCode());
+    }
+
+    private void insertWbsFixture() {
+        jdbcTemplate.update("""
+                INSERT INTO project_schedule_plan
+                    (id, tenant_id, project_id, plan_code, plan_name, plan_type, version_no,
+                     planned_start_date, planned_end_date, status, version, created_by, created_at,
+                     updated_by, updated_at, deleted_flag)
+                VALUES (?, ?, ?, 'SUB-TASK-TEST-SP', '分包任务测试基线', 'BASELINE', 947,
+                        '2026-01-01', '2026-12-31', 'ACTIVE', 0, ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, 0)
+                """, SCHEDULE_ID, TENANT_ID, PROJECT_ID, USER_ID, USER_ID);
+        jdbcTemplate.update("""
+                INSERT INTO project_wbs_task
+                    (id, tenant_id, project_id, schedule_plan_id, task_code, task_name,
+                     planned_start_date, planned_end_date, weight_percent, actual_quantity,
+                     actual_progress, status, sort_order, version, created_by, created_at,
+                     updated_by, updated_at, deleted_flag)
+                VALUES (?, ?, ?, ?, 'SUB-TASK-TEST-WBS', '分包任务测试WBS',
+                        '2026-01-01', '2026-12-31', 100, 0, 0, 'NOT_STARTED', 1, 0, ?,
+                        CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP, 0)
+                """, WBS_ID, TENANT_ID, PROJECT_ID, SCHEDULE_ID, USER_ID, USER_ID);
+    }
+
     private void insertContextTask(long id, Long predecessorId, Long contractId, Long partnerId) {
         jdbcTemplate.update("""
                 INSERT INTO sub_task
@@ -195,5 +235,7 @@ class SubTaskDeleteTransactionTest {
         jdbcTemplate.update("DELETE FROM sub_task WHERE id IN (?, ?)",
                 CONTEXT_SUCCESSOR_ID, CONTEXT_TASK_ID);
         jdbcTemplate.update("DELETE FROM sub_task WHERE id IN (?, ?)", TASK_ID, REUSED_TASK_ID);
+        jdbcTemplate.update("DELETE FROM project_wbs_task WHERE id = ?", WBS_ID);
+        jdbcTemplate.update("DELETE FROM project_schedule_plan WHERE id = ?", SCHEDULE_ID);
     }
 }

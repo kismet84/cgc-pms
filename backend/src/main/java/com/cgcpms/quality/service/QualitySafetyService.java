@@ -17,6 +17,7 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.quality.dto.QualitySafetyModels.*;
 import com.cgcpms.quality.entity.*;
 import com.cgcpms.quality.mapper.*;
@@ -52,6 +53,7 @@ public class QualitySafetyService {
     private final QualityConsequenceMapper consequenceMapper;
     private final QualityPartnerEvaluationMapper evaluationMapper;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ProjectExecutionGuard projectExecutionGuard;
     private final PmProjectMapper projectMapper;
     private final MdPartnerMapper partnerMapper;
     private final CtContractMapper contractMapper;
@@ -172,6 +174,7 @@ public class QualitySafetyService {
         projectAccessChecker.checkAccess(plan.getProjectId(), "创建质量安全检查记录");
         requireProjectActive(plan.getProjectId());
         requireActiveProjectMember(plan.getProjectId(), command.inspectorUserId());
+        requireInspectionWbs(plan, command.wbsTaskId(), "创建质量安全检查记录");
         if (!"ACTIVE".equals(plan.getStatus())) throw new BusinessException("QS_PLAN_NOT_ACTIVE", "只有执行中的检查计划可以录入检查记录");
         if (command.inspectionDate().isBefore(plan.getStartDate()) || command.inspectionDate().isAfter(plan.getEndDate())) {
             throw new BusinessException("QS_INSPECTION_DATE_OUT_OF_PLAN", "检查日期必须在计划起止日期内");
@@ -180,6 +183,7 @@ public class QualitySafetyService {
         record.setTenantId(tenantId());
         record.setPlanId(plan.getId());
         record.setProjectId(plan.getProjectId());
+        record.setWbsTaskId(command.wbsTaskId());
         record.setInspectionDate(command.inspectionDate());
         record.setLocation(command.location().trim());
         record.setInspectorUserId(command.inspectorUserId());
@@ -254,6 +258,7 @@ public class QualitySafetyService {
     public QualityInspectionRecord submitInspection(Long id) {
         QualityInspectionRecord inspection = requireInspection(id);
         projectAccessChecker.checkAccess(inspection.getProjectId(), "提交质量安全检查记录");
+        requireInspectionWbs(requirePlan(inspection.getPlanId()), inspection.getWbsTaskId(), "提交质量安全检查记录");
         if (!"DRAFT".equals(inspection.getStatus())) throw immutable("检查记录已提交，禁止重复提交");
         requireFile("QS_INSPECTION", inspection.getId(), "INSPECTION_EVIDENCE", "检查记录至少需要一份现场证据");
         List<QualitySafetyIssue> issues = issueMapper.selectList(new LambdaQueryWrapper<QualitySafetyIssue>()
@@ -497,6 +502,12 @@ public class QualitySafetyService {
             throw new BusinessException("QS_PLAN_DATE_INVALID", "计划结束日期不能早于开始日期");
     }
 
+    private void requireInspectionWbs(QualityInspectionPlan plan, Long wbsTaskId, String action) {
+        if ("QUALITY".equals(plan.getInspectionType()) || wbsTaskId != null) {
+            projectExecutionGuard.requireActiveWbs(plan.getProjectId(), wbsTaskId, action);
+        }
+    }
+
     private void applyPlan(QualityInspectionPlan plan, PlanCommand command) {
         plan.setProjectId(command.projectId());
         plan.setPlanName(command.planName().trim());
@@ -534,6 +545,7 @@ public class QualitySafetyService {
         cost.setContractId(consequence.getContractId());
         cost.setPartnerId(consequence.getPartnerId());
         QualitySafetyIssue issue = requireIssue(consequence.getIssueId());
+        cost.setWbsTaskId(requireInspection(issue.getInspectionId()).getWbsTaskId());
         cost.setCostSubjectId(costSubjectV2Service.resolveRule(SOURCE_TYPE, issue.getIssueType(), consequence.getProjectId()));
         cost.setCostType(COST_TYPE);
         cost.setAmount(consequence.getReworkCostAmount());

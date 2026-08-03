@@ -103,6 +103,20 @@ public class CostSubjectService {
         return subjects.stream().map(this::toVO).collect(Collectors.toList());
     }
 
+    public List<CostSubjectVO> getBidOptions() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        CostSubject parent = costSubjectMapper.selectOne(new LambdaQueryWrapper<CostSubject>()
+                .eq(CostSubject::getTenantId, tenantId)
+                .eq(CostSubject::getSubjectCode, "5401.01"));
+        if (parent == null) return List.of();
+        return costSubjectMapper.selectList(new LambdaQueryWrapper<CostSubject>()
+                        .eq(CostSubject::getTenantId, tenantId)
+                        .eq(CostSubject::getParentId, parent.getId())
+                        .eq(CostSubject::getStatus, "ENABLE")
+                        .orderByAsc(CostSubject::getSortOrder, CostSubject::getId))
+                .stream().map(this::toVO).toList();
+    }
+
     public CostSubjectVO getById(Long id) {
         CostSubject subject = costSubjectMapper.selectById(id);
         if (subject == null) {

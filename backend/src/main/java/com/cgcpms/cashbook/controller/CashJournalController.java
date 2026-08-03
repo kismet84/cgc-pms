@@ -37,21 +37,21 @@ public class CashJournalController {
     private final CashJournalService cashJournalService;
 
     @GetMapping
-    @PreAuthorize("hasAuthority('cashbook:journal:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('cashbook:journal:query') or hasAuthority('bid:cost:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<PageResult<CashJournalEntryVO>> page(@ModelAttribute CashJournalQuery query) {
         IPage<CashJournalEntryVO> page = cashJournalService.page(query);
         return ApiResponse.success(PageResult.of(page));
     }
 
     @GetMapping("/summary")
-    @PreAuthorize("hasAuthority('cashbook:journal:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('cashbook:journal:query') or hasAuthority('bid:cost:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CashJournalSummaryVO> summary(@ModelAttribute CashJournalQuery query) {
         return ApiResponse.success(cashJournalService.summary(query));
     }
 
     @GetMapping("/export")
     @AuditedOperation(type = "DOWNLOAD", businessType = "CASH_JOURNAL_EXPORT")
-    @PreAuthorize("hasAuthority('cashbook:journal:export') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('cashbook:journal:export') or hasAuthority('bid:cost:export') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<byte[]> export(@ModelAttribute CashJournalQuery query) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(new MediaType("text", "csv", StandardCharsets.UTF_8));
@@ -60,21 +60,21 @@ public class CashJournalController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('cashbook:journal:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('cashbook:journal:query') or hasAuthority('bid:cost:query') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CashJournalEntryVO> getById(@PathVariable Long id) {
         return ApiResponse.success(cashJournalService.getById(id));
     }
 
     @PostMapping
     @AuditedOperation(type = "CREATE", businessType = "CASH_JOURNAL")
-    @PreAuthorize("hasAuthority('cashbook:journal:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('cashbook:journal:maintain') or hasAuthority('bid:cost:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CashJournalEntryVO> create(@Valid @RequestBody CashJournalCreateRequest request) {
         return ApiResponse.success(cashJournalService.createManual(request));
     }
 
     @PutMapping("/{id}")
     @AuditedOperation(type = "UPDATE", businessType = "CASH_JOURNAL", businessIdExpression = "#id")
-    @PreAuthorize("hasAuthority('cashbook:journal:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('cashbook:journal:maintain') or hasAuthority('bid:cost:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CashJournalEntryVO> update(@PathVariable Long id,
                                                   @Valid @RequestBody CashJournalUpdateRequest request) {
         return ApiResponse.success(cashJournalService.updateDraft(id, request));
@@ -82,14 +82,14 @@ public class CashJournalController {
 
     @PostMapping("/{id}/archive")
     @AuditedOperation(type = "UPDATE", businessType = "CASH_JOURNAL_ARCHIVE", businessIdExpression = "#id")
-    @PreAuthorize("hasAuthority('cashbook:journal:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('cashbook:journal:maintain') or hasAuthority('bid:cost:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CashJournalEntryVO> archive(@PathVariable Long id) {
         return ApiResponse.success(cashJournalService.archive(id));
     }
 
     @PostMapping("/{id}/reverse")
     @AuditedOperation(type = "UPDATE", businessType = "CASH_JOURNAL_REVERSE", businessIdExpression = "#id")
-    @PreAuthorize("hasAuthority('cashbook:journal:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAuthority('cashbook:journal:maintain') or hasAuthority('bid:cost:maintain') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<CashJournalEntryVO> reverse(@PathVariable Long id,
                                                    @Valid @RequestBody CashJournalActionRequest request) {
         return ApiResponse.success(cashJournalService.reverse(id, request.getReason()));

@@ -97,12 +97,12 @@ class ProjectCloseoutClosedLoopIntegrationTest {
                 VALUES(?,0,?,'QP-CLOSEOUT','单位工程验收计划','QUALITY','SINGLE',?,?,1,'COMPLETED',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
                 """, QUALITY_PLAN, PROJECT, LocalDate.now().minusDays(2), LocalDate.now());
         jdbc.update("""
-                INSERT INTO qs_inspection_record(id,tenant_id,plan_id,project_id,inspection_code,inspection_date,location,
+                INSERT INTO qs_inspection_record(id,tenant_id,plan_id,project_id,wbs_task_id,inspection_code,inspection_date,location,
                  inspector_user_id,conclusion,summary,status,submitted_by,submitted_at,version,
                  created_by,created_at,updated_by,updated_at,deleted_flag)
-                VALUES(?,0,?,?,'QI-CLOSEOUT',?,'全场',1,'PASS','单位工程质量验收通过','SUBMITTED',1,CURRENT_TIMESTAMP,0,
+                VALUES(?,0,?,?,?,'QI-CLOSEOUT',?,'全场',1,'PASS','单位工程质量验收通过','SUBMITTED',1,CURRENT_TIMESTAMP,0,
                  1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
-                """, QUALITY_INSPECTION, QUALITY_PLAN, PROJECT, LocalDate.now());
+                """, QUALITY_INSPECTION, QUALITY_PLAN, PROJECT, WBS, LocalDate.now());
         jdbc.update("""
                 INSERT INTO owner_settlement(id,tenant_id,project_id,contract_id,settlement_code,settlement_period,
                  settlement_date,gross_amount,tax_amount,retention_amount,net_receivable_amount,due_date,customer_id,status,
@@ -193,7 +193,13 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         assertEquals("CLOSEOUT_DEFECT_REVIEWER_CONFLICT", assertThrows(BusinessException.class,
                 () -> service.verifyDefect(defectId, new DefectVerificationCommand("ACCEPTED", "复验通过"))).getCode());
         asUser(2L);
-        service.verifyDefect(defectId, new DefectVerificationCommand("ACCEPTED", "复验通过，无渗漏"));
+        int versionBeforeVerification = jdbc.queryForObject(
+                "SELECT version FROM closeout_defect WHERE id=?", Integer.class, defectId);
+        Map<String, Object> verifiedDefect = service.verifyDefect(
+                defectId, new DefectVerificationCommand("ACCEPTED", "复验通过，无渗漏"));
+        assertEquals(versionBeforeVerification + 1, ((Number) verifiedDefect.get("version")).intValue());
+        assertEquals(versionBeforeVerification + 1, jdbc.queryForObject(
+                "SELECT version FROM closeout_defect WHERE id=?", Integer.class, defectId));
         assertEquals("CLOSED", jdbc.queryForObject("SELECT status FROM closeout_defect WHERE id=?", String.class, defectId));
 
         assertEquals("CLOSEOUT_RETENTION_COLLECTION_INCOMPLETE", assertThrows(BusinessException.class,
@@ -286,6 +292,14 @@ class ProjectCloseoutClosedLoopIntegrationTest {
                 "COL-" + suffix, "TXN-" + suffix, amount, amount, user(), user());
         jdbc.update("INSERT INTO collection_allocation(id,tenant_id,collection_id,receivable_id,allocated_amount,allocation_type,created_by,created_at) VALUES(?,0,?,?,?,'COLLECTION',?,CURRENT_TIMESTAMP)",
                 IDS.incrementAndGet(), collectionId, receivableId, amount, user());
+        jdbc.update("""
+                INSERT INTO cash_journal_entry(id,tenant_id,entry_no,account_id,direction,amount,business_date,summary,
+                 project_id,contract_id,source_type,source_id,collection_record_id,status,closure_due_at,archived_by,archived_at,version,
+                 created_by,created_at,updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?, 'IN',?,CURRENT_DATE,'收尾回款归档',?,?,'COLLECTION_RECORD',?,?,'ARCHIVED',CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0,
+                 ?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)
+                """, IDS.incrementAndGet(), "CJ-CLOSEOUT-" + suffix, FUND_ACCOUNT, amount, PROJECT, CONTRACT,
+                collectionId, collectionId, user(), user(), user());
         jdbc.update("UPDATE account_receivable SET collected_amount=collected_amount+?,outstanding_amount=outstanding_amount-?,status='COLLECTED',version=version+1 WHERE id=?",
                 amount, amount, receivableId);
     }
@@ -343,6 +357,7 @@ class ProjectCloseoutClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM wf_node_instance WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type='PROJECT_FINAL_ACCEPTANCE')", PROJECT);
         jdbc.update("DELETE FROM wf_cc WHERE instance_id IN(SELECT id FROM wf_instance WHERE project_id=? AND business_type='PROJECT_FINAL_ACCEPTANCE')", PROJECT);
         jdbc.update("DELETE FROM wf_instance WHERE project_id=? AND business_type='PROJECT_FINAL_ACCEPTANCE'", PROJECT);
+        jdbc.update("DELETE FROM cash_journal_entry WHERE project_id=? AND source_type='COLLECTION_RECORD'", PROJECT);
         jdbc.update("DELETE FROM collection_allocation WHERE receivable_id IN(?,?)", REGULAR_RECEIVABLE, RETENTION_RECEIVABLE);
         jdbc.update("DELETE FROM collection_record WHERE project_id=?", PROJECT);
         jdbc.update("DELETE FROM account_receivable WHERE settlement_id=?", SETTLEMENT);

@@ -201,7 +201,10 @@ class CashJournalConcurrencyTest {
                 org.mockito.Mockito.mock(com.cgcpms.payment.mapper.PayApplicationMapper.class),
                 org.mockito.Mockito.mock(com.cgcpms.payment.service.PaymentApplicationSourceService.class),
                 org.mockito.Mockito.mock(com.cgcpms.budget.service.ContractBudgetAllocationService.class),
-                org.mockito.Mockito.mock(PaymentArchiveEvidenceService.class));
+                org.mockito.Mockito.mock(PaymentArchiveEvidenceService.class),
+                org.mockito.Mockito.mock(com.cgcpms.bid.mapper.BidCostMapper.class),
+                org.mockito.Mockito.mock(com.cgcpms.bid.mapper.BidDepositMapper.class),
+                org.mockito.Mockito.mock(com.cgcpms.cost.mapper.CostSubjectMapper.class));
     }
 
     private long createAccount(String code, String openingBalance) {

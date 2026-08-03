@@ -2,14 +2,19 @@ package com.cgcpms.bid.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
 /**
- * 招投标前期费用头表实体。
- * 金额完全由 cost_item 聚合 (source_type=BID_COST)，不在此表冗余存储。
+ * 工程投标记录根实体。
+ * 投标费用仍由现金日记账/成本事实聚合，不在此表冗余存储。
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -28,6 +33,31 @@ public class BidCost extends BaseEntity {
 
     private String bidProjectName;
 
-    /** BIDDING 投标中 / WON 已中标 / LOST 未中标 */
+    /** PREPARING/SUBMITTED/EVALUATING/WON/LOST/CLOSED/WITHDRAWN/TERMINATED */
     private String bidStatus;
+
+    private String bidSectionName;
+    private String tendereeName;
+    private String agencyName;
+    private String projectLocation;
+    private String tenderMethod;
+    private String sourcePlatform;
+    private String externalBidNo;
+    private String sourceUrl;
+    private Long ownerId;
+    @TableField(exist = false)
+    private String ownerName;
+    private LocalDate documentReceivedDate;
+    private LocalDateTime bidDeadlineAt;
+    private LocalDateTime openingAt;
+    private LocalDate bidValidUntil;
+    private LocalDate plannedStartDate;
+    private LocalDate plannedEndDate;
+    private BigDecimal ceilingPrice;
+    private BigDecimal finalBidPrice;
+    private LocalDate resultAt;
+    private String resultReason;
+    /** 服务端按归档现金日记账和成本类科目计算，不落库。 */
+    @TableField(exist = false)
+    private BigDecimal bidExpense;
 }

@@ -32,6 +32,15 @@ public class FundAccountController {
         return ApiResponse.success(fundAccountService.list());
     }
 
+    @GetMapping("/bid-options")
+    @PreAuthorize("hasAuthority('bid:cost:query') or hasRole('SUPER_ADMIN')")
+    public ApiResponse<List<BidFundAccountOption>> listBidOptions() {
+        return ApiResponse.success(fundAccountService.list().stream()
+                .map(account -> new BidFundAccountOption(
+                        account.getId(), account.getAccountName(), account.getAccountType(), account.getEnabledFlag()))
+                .toList());
+    }
+
     @GetMapping("/manage")
     @PreAuthorize("hasAuthority('cashbook:account:manage') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<List<FundAccountVO>> listForManagement() {
@@ -58,5 +67,8 @@ public class FundAccountController {
     @PreAuthorize("hasAuthority('cashbook:account:manage') or hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ApiResponse<FundAccountVO> setEnabled(@PathVariable Long id, @RequestParam boolean enabled) {
         return ApiResponse.success(fundAccountService.setEnabled(id, enabled));
+    }
+
+    public record BidFundAccountOption(String id, String accountName, String accountType, Integer enabledFlag) {
     }
 }

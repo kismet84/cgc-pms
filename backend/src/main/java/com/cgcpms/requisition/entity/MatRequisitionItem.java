@@ -32,6 +32,9 @@ public class MatRequisitionItem extends BaseEntity {
     @NotNull
     private Long requisitionId;
 
+    @NotNull(message = "WBS任务不能为空")
+    private Long wbsTaskId;
+
     @NotNull(message = "物料不能为空")
     private Long materialId;
 

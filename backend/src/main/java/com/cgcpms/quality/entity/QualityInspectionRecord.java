@@ -21,6 +21,7 @@ public class QualityInspectionRecord extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class) private Long tenantId;
     @JsonSerialize(using = ToStringSerializer.class) private Long planId;
     @JsonSerialize(using = ToStringSerializer.class) private Long projectId;
+    @JsonSerialize(using = ToStringSerializer.class) private Long wbsTaskId;
     private String inspectionCode;
     private LocalDate inspectionDate;
     private String location;

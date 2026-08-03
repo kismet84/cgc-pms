@@ -148,6 +148,7 @@ public class MatRequisitionAssembler {
         vo.setId(i.getId() != null ? i.getId().toString() : null);
         vo.setTenantId(i.getTenantId() != null ? i.getTenantId().toString() : null);
         vo.setRequisitionId(i.getRequisitionId() != null ? i.getRequisitionId().toString() : null);
+        vo.setWbsTaskId(i.getWbsTaskId() != null ? i.getWbsTaskId().toString() : null);
         vo.setMaterialId(i.getMaterialId() != null ? i.getMaterialId().toString() : null);
         vo.setMaterialName(i.getMaterialId() != null ? materialNames.get(i.getMaterialId()) : null);
         if (i.getMaterialId() != null) {

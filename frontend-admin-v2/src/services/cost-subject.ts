@@ -305,8 +305,7 @@ function normalizeSubject(row: CostSubjectRecord): CostSubjectRecord {
     ...row,
     id: String(row.id),
     parentId: row.parentId == null ? '0' : String(row.parentId),
-    defaultTargetRatio:
-      row.defaultTargetRatio == null ? null : String(row.defaultTargetRatio),
+    defaultTargetRatio: row.defaultTargetRatio == null ? null : String(row.defaultTargetRatio),
     children: row.children?.map(normalizeSubject) ?? [],
   }
 }

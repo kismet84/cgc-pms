@@ -41,6 +41,11 @@ public class CashJournalEntry extends BaseEntity {
     private String summary;
     private Long projectId;
     private Long contractId;
+    private Long bidCostId;
+    private Long costSubjectId;
+    private Long bidDepositId;
+    private String costSubjectCodeSnapshot;
+    private String costSubjectNameSnapshot;
     private String sourceType;
     private Long sourceId;
     private Long payApplicationId;

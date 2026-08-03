@@ -18,6 +18,7 @@ import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.requisition.entity.MatRequisition;
 import com.cgcpms.requisition.entity.MatRequisitionItem;
 import com.cgcpms.requisition.mapper.MatRequisitionItemMapper;
@@ -60,6 +61,7 @@ public class MatRequisitionService {
     private final MatStockService stockService;
     private final CostGenerationService costGenerationService;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ProjectExecutionGuard projectExecutionGuard;
     private final WorkflowEngine workflowEngine;
     private final MatRequisitionAssembler assembler;
 
@@ -312,6 +314,7 @@ public class MatRequisitionService {
         for (MatRequisitionItem item : items) {
             item.setRequisitionId(requisitionId);
             item.setTenantId(tenantId);
+            projectExecutionGuard.requireActiveWbs(requisition.getProjectId(), item.getWbsTaskId(), "保存领料申请明细");
             if (item.getMaterialId() == null)
                 throw new BusinessException("REQUISITION_ITEM_NO_MATERIAL", "领料申请明细物料不能为空");
             if (item.getQuantity() == null || item.getQuantity().signum() <= 0)
@@ -383,7 +386,7 @@ public class MatRequisitionService {
             }
             MatStockService.StockMovementResult movement = stockService.stockOutValued(
                     requisition.getWarehouseId(), item.getMaterialId(), item.getQuantity(),
-                    "MAT_REQUISITION", requisitionId, item.getId());
+                    "MAT_REQUISITION", requisitionId, item.getId(), item.getWbsTaskId());
             item.setUnitPrice(movement.unitCost());
             item.setAmount(movement.amount());
             requisitionItemMapper.updateById(item);

@@ -144,7 +144,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         jdbc.update("UPDATE pm_project SET status='SUSPENDED' WHERE id=?", PROJECT);
         BusinessException suspended = assertThrows(BusinessException.class, () -> service.createSchedule(new ScheduleRequest(
                 PROJECT, "BASE-SUSPENDED", "暂停项目计划", LocalDate.of(2099, 8, 1), LocalDate.of(2099, 8, 31), null)));
-        assertEquals("PROJECT_NOT_ACTIVE", suspended.getCode());
+        assertEquals("PROJECT_STAGE_WRITE_FORBIDDEN", suspended.getCode());
     }
 
     @Test
@@ -173,6 +173,31 @@ class ProjectScheduleClosedLoopIntegrationTest {
         assertEquals("PROJECT_PERIOD_VERSION_CONFLICT", periodConflict.getCode());
         assertEquals(new BigDecimal("50.00"), jdbc.queryForObject(
                 "SELECT target_progress FROM project_period_plan_item WHERE period_plan_id=?", BigDecimal.class, periodId));
+    }
+
+    @Test
+    void completionAndWarrantyProjectsCannotRewritePendingWbs() {
+        long schedule = id(service.createSchedule(new ScheduleRequest(PROJECT, "BASE-STAGE", "阶段门禁基线",
+                LocalDate.of(2099, 7, 1), LocalDate.of(2099, 7, 31), null)));
+        service.replaceTasks(schedule, new WbsTaskBatch(0, List.of(task("T1", new BigDecimal("100")))));
+
+        jdbc.update("UPDATE pm_project SET status='COMPLETION' WHERE id=?", PROJECT);
+        BusinessException replace = assertThrows(BusinessException.class, () ->
+                service.replaceTasks(schedule, new WbsTaskBatch(1, List.of(task("T2", new BigDecimal("100"))))));
+        assertEquals("PROJECT_STAGE_WRITE_FORBIDDEN", replace.getCode());
+        BusinessException submit = assertThrows(BusinessException.class, () -> service.submitSchedule(schedule));
+        assertEquals("PROJECT_STAGE_WRITE_FORBIDDEN", submit.getCode());
+        assertEquals("T1", jdbc.queryForObject(
+                "SELECT task_code FROM project_wbs_task WHERE schedule_plan_id=?", String.class, schedule));
+
+        jdbc.update("UPDATE pm_project SET status='ACTIVE' WHERE id=?", PROJECT);
+        service.submitSchedule(schedule);
+        jdbc.update("UPDATE pm_project SET status='WARRANTY' WHERE id=?", PROJECT);
+        BusinessException approve = assertThrows(BusinessException.class, () -> service.onScheduleApproved(schedule));
+
+        assertEquals("PROJECT_STAGE_WRITE_FORBIDDEN", approve.getCode());
+        assertEquals("PENDING", jdbc.queryForObject(
+                "SELECT status FROM project_schedule_plan WHERE id=?", String.class, schedule));
     }
 
     @Test

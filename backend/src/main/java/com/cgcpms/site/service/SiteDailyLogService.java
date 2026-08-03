@@ -10,6 +10,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.partner.entity.MdPartner;
@@ -66,6 +67,7 @@ public class SiteDailyLogService {
     private final SubTaskMapper subTaskMapper;
     private final OperationAuditLogMapper auditLogMapper;
     private final ProjectScheduleService projectScheduleService;
+    private final ProjectExecutionGuard projectExecutionGuard;
 
     public IPage<SiteDailyLogVO> getPage(long pageNo, long pageSize, Long projectId,
                                          LocalDate startDate, LocalDate endDate, String status) {
@@ -114,6 +116,7 @@ public class SiteDailyLogService {
     @Transactional(rollbackFor = Exception.class)
     public Long create(SiteDailyLog log) {
         projectAccessChecker.checkAccess(log.getProjectId(), "创建现场日报");
+        projectExecutionGuard.requireActiveSchedule(log.getProjectId(), "创建现场日报");
         log.setTenantId(UserContext.getCurrentTenantId());
         log.setStatus(DRAFT);
         log.setSubmittedBy(null);
@@ -132,6 +135,7 @@ public class SiteDailyLogService {
         SiteDailyLog existing = requireLogForUpdate(command.getId());
         projectAccessChecker.checkAccess(existing.getProjectId(), "修改现场日报");
         projectAccessChecker.checkAccess(command.getProjectId(), "修改现场日报");
+        projectExecutionGuard.requireActiveSchedule(command.getProjectId(), "修改现场日报");
         requireDraft(existing);
         if (command.getExpectedUpdatedAt() == null)
             throw new BusinessException("SITE_DAILY_LOG_PRECONDITION_REQUIRED", "修改现场日报必须携带最新更新时间");
@@ -164,6 +168,7 @@ public class SiteDailyLogService {
     public void submit(Long id) {
         SiteDailyLog log = requireLogForUpdate(id);
         projectAccessChecker.checkAccess(log.getProjectId(), "提交现场日报");
+        projectExecutionGuard.requireActiveSchedule(log.getProjectId(), "提交现场日报");
         requireDraft(log);
         projectScheduleService.onDailyLogSubmitted(log);
         int updated = mapper.update(null, new LambdaUpdateWrapper<SiteDailyLog>()

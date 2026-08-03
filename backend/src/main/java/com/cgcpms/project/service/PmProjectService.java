@@ -229,6 +229,8 @@ public class PmProjectService {
                 ProjectStatusConstants.PREPARING, Set.of(ProjectStatusConstants.ACTIVE),
                 ProjectStatusConstants.ACTIVE, Set.of(ProjectStatusConstants.SUSPENDED),
                 ProjectStatusConstants.SUSPENDED, Set.of(ProjectStatusConstants.ACTIVE),
+                ProjectStatusConstants.COMPLETION, Set.of(),
+                ProjectStatusConstants.WARRANTY, Set.of(),
                 ProjectStatusConstants.CLOSED, Set.of(),
                 ProjectStatusConstants.ARCHIVED, Set.of());
         if (ProjectStatusConstants.CLOSED.equals(target)) {
@@ -243,8 +245,8 @@ public class PmProjectService {
                     "不允许从 " + current + " 变更为 " + target);
         }
         if (ProjectStatusConstants.ACTIVE.equals(target)) {
-            if (!projectLifecycleService.isCostBudgetReady(project.getId(), project.getTenantId())) {
-                throw new BusinessException("PROJECT_ACTIVE_BUDGET_REQUIRED", "项目启用前必须存在唯一已审批生效的成本目标和预算");
+            if (!projectLifecycleService.isActivationReady(project.getId(), project.getTenantId())) {
+                throw new BusinessException("PROJECT_ACTIVE_GATE_REQUIRED", "项目启用前必须存在唯一已审批生效的成本目标、预算和WBS基线");
             }
         }
         project.setStatus(target);
@@ -393,6 +395,8 @@ public class PmProjectService {
         vo.setActualStartDate(p.getActualStartDate() != null ? p.getActualStartDate().toString() : null);
         vo.setActualEndDate(p.getActualEndDate() != null ? p.getActualEndDate().toString() : null);
         vo.setProjectManagerId(p.getProjectManagerId() != null ? p.getProjectManagerId().toString() : null);
+        vo.setSourceBidCostId(p.getSourceBidCostId() != null ? p.getSourceBidCostId().toString() : null);
+        vo.setInitiationBasis(p.getInitiationBasis());
         vo.setStatus(p.getStatus());
         vo.setApprovalStatus(p.getApprovalStatus());
         vo.setCreatedBy(p.getCreatedBy() != null ? p.getCreatedBy().toString() : null);

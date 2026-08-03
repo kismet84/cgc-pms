@@ -7,6 +7,7 @@ public class MatRequisitionItemVO {
     private String id;
     private String tenantId;
     private String requisitionId;
+    private String wbsTaskId;
     private String materialId;
     private String materialName;
     private String specification;

@@ -21,6 +21,7 @@ import io.jsonwebtoken.Jwts;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -49,6 +50,7 @@ class SubMeasureWorkflowHandlerTest {
     @Autowired private SubTaskMapper subTaskMapper;
     @Autowired private CtContractItemMapper contractItemMapper;
     @Autowired private SysFileMapper fileMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setupContext() {
@@ -214,6 +216,27 @@ class SubMeasureWorkflowHandlerTest {
     }
 
     private SubMeasure createApprovalReadyMeasure(List<BigDecimal> amounts) {
+        long scheduleId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        long wbsId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbcTemplate.update("""
+                INSERT INTO project_schedule_plan
+                    (id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
+                     planned_start_date,planned_end_date,status,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,0,10001,?,'审批回调测试基线','BASELINE',?,
+                       '2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,
+                       1,CURRENT_TIMESTAMP,0)
+                """, scheduleId, "HDLR-SP-" + scheduleId, Math.toIntExact(scheduleId % 1_000_000_000));
+        jdbcTemplate.update("""
+                INSERT INTO project_wbs_task
+                    (id,tenant_id,project_id,schedule_plan_id,task_code,task_name,
+                     planned_start_date,planned_end_date,weight_percent,actual_quantity,
+                     actual_progress,status,sort_order,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,0,10001,?,?,'审批回调测试WBS',
+                       '2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,
+                       CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, wbsId, scheduleId, "HDLR-WBS-" + wbsId);
         SubTask task = new SubTask();
         task.setTenantId(TENANT_0);
         task.setProjectId(10001L);
@@ -221,6 +244,7 @@ class SubMeasureWorkflowHandlerTest {
         task.setPartnerId(20002L);
         task.setTaskCode("HDLR-TASK-" + System.nanoTime());
         task.setTaskName("审批回调测试任务");
+        task.setWbsTaskId(wbsId);
         task.setStatus("IN_PROGRESS");
         subTaskMapper.insert(task);
 

@@ -9,4 +9,9 @@ public class CashJournalSummaryVO {
     private String income;
     private String expense;
     private long pendingCount;
+    private String cumulativeCashOut;
+    private String cumulativeCashIn;
+    private String outstandingDeposit;
+    private String actualBidExpense;
+    private String cashNetOutflow;
 }

@@ -3,6 +3,7 @@ package com.cgcpms.sitedaily;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.partner.entity.MdPartner;
@@ -146,7 +147,7 @@ class SiteDailyLogServiceTest {
                 mapper, mock(PmProjectMapper.class), checker, mock(MatReceiptMapper.class),
                 mock(MatReceiptItemMapper.class), mock(MdMaterialMapper.class), mock(MdPartnerMapper.class),
                 mock(MatRequisitionMapper.class), mock(MatRequisitionItemMapper.class), mock(SubTaskMapper.class),
-                mock(OperationAuditLogMapper.class), scheduleService);
+                mock(OperationAuditLogMapper.class), scheduleService, mock(ProjectExecutionGuard.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
         SiteDailyLog submitted = new SiteDailyLog();
         submitted.setId(34L); submitted.setTenantId(11L); submitted.setProjectId(21L); submitted.setStatus("SUBMITTED");
@@ -170,7 +171,8 @@ class SiteDailyLogServiceTest {
         SiteDailyLogService service = new SiteDailyLogService(
                 mapper, projectMapper, checker, receiptMapper, itemMapper, materialMapper, partnerMapper,
                 mock(MatRequisitionMapper.class), mock(MatRequisitionItemMapper.class),
-                mock(SubTaskMapper.class), mock(OperationAuditLogMapper.class), mock(ProjectScheduleService.class));
+                mock(SubTaskMapper.class), mock(OperationAuditLogMapper.class), mock(ProjectScheduleService.class),
+                mock(ProjectExecutionGuard.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -229,7 +231,7 @@ class SiteDailyLogServiceTest {
                 mapper, mock(PmProjectMapper.class), checker, mock(MatReceiptMapper.class),
                 mock(MatReceiptItemMapper.class), materialMapper, mock(MdPartnerMapper.class),
                 requisitionMapper, itemMapper, mock(SubTaskMapper.class), mock(OperationAuditLogMapper.class),
-                mock(ProjectScheduleService.class));
+                mock(ProjectScheduleService.class), mock(ProjectExecutionGuard.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -292,7 +294,8 @@ class SiteDailyLogServiceTest {
                 mapper, projectMapper, checker, mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
                 mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(MatRequisitionMapper.class),
                 mock(MatRequisitionItemMapper.class), taskMapper,
-                mock(OperationAuditLogMapper.class), mock(ProjectScheduleService.class));
+                mock(OperationAuditLogMapper.class), mock(ProjectScheduleService.class),
+                mock(ProjectExecutionGuard.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -343,7 +346,7 @@ class SiteDailyLogServiceTest {
                 mapper, projectMapper, checker, mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
                 mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(MatRequisitionMapper.class),
                 mock(MatRequisitionItemMapper.class), mock(SubTaskMapper.class), auditMapper,
-                mock(ProjectScheduleService.class));
+                mock(ProjectScheduleService.class), mock(ProjectExecutionGuard.class));
         UserContext.set(Jwts.claims().add("userId", 7L).add("tenantId", 11L).build());
 
         SiteDailyLog log = new SiteDailyLog();
@@ -394,6 +397,7 @@ class SiteDailyLogServiceTest {
                 mock(MatReceiptMapper.class), mock(MatReceiptItemMapper.class),
                 mock(MdMaterialMapper.class), mock(MdPartnerMapper.class), mock(MatRequisitionMapper.class),
                 mock(MatRequisitionItemMapper.class), mock(SubTaskMapper.class),
-                mock(OperationAuditLogMapper.class), mock(ProjectScheduleService.class));
+                mock(OperationAuditLogMapper.class), mock(ProjectScheduleService.class),
+                mock(ProjectExecutionGuard.class));
     }
 }

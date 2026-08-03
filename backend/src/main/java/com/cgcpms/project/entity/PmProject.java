@@ -68,6 +68,12 @@ public class PmProject extends BaseEntity {
     private Long projectManagerId;
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long sourceBidCostId;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String initiationBasis;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String status;
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)

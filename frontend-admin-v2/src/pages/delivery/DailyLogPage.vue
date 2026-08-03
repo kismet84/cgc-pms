@@ -114,7 +114,8 @@ const canSubmitCurrent = computed(
     Boolean(activeRecord.value) &&
     activeRecord.value?.status === 'DRAFT' &&
     canEdit.value &&
-    (!activeRecord.value.scheduleManaged || canReportProgress.value),
+    activeRecord.value.scheduleManaged &&
+    canReportProgress.value,
 )
 
 function hasPermission(code: string): boolean {
@@ -359,7 +360,11 @@ async function saveRecord(): Promise<void> {
 }
 
 async function saveProgress(): Promise<boolean> {
-  if (!activeRecord.value?.scheduleManaged || !canReportProgress.value) return true
+  if (!activeRecord.value?.scheduleManaged) {
+    errorMessage.value = '项目缺少生效进度计划或已批准周计划，现场日报禁止提交'
+    return false
+  }
+  if (!canReportProgress.value) return false
   const items = progressRows.value
     .filter((row) => row.included)
     .map((row) => ({
@@ -907,6 +912,9 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
             </V2Button>
           </div>
         </section>
+        <V2Alert v-else tone="danger" title="日报提交已阻断">
+          项目缺少生效进度计划或已批准周计划。请先完成计划基线和周计划，再提交现场日报。
+        </V2Alert>
 
         <section class="v2-detail-dialog__section">
           <h3>质量安全摘要</h3>

@@ -167,7 +167,9 @@ async function parseResponse<T>(response: Response): Promise<T> {
   const contentType = response.headers.get('content-type') ?? ''
   if (
     response.ok &&
-    (contentType.includes('application/pdf') || contentType.includes('spreadsheetml.sheet'))
+    (contentType.includes('application/pdf') ||
+      contentType.includes('spreadsheetml.sheet') ||
+      contentType.includes('text/csv'))
   ) {
     return (await response.blob()) as T
   }

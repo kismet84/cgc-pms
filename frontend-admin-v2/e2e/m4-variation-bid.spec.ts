@@ -71,7 +71,7 @@ const bid = {
   tenantId: '1',
   bidCode: 'BID-071',
   bidProjectName: '市民中心投标',
-  bidStatus: 'BIDDING',
+  bidStatus: 'PREPARING',
   projectId: null,
   remark: '投标阶段成本',
   createdAt: '2026-07-22 10:00:00',
@@ -127,11 +127,25 @@ async function installCommercialMock(page: Page, readIdentity: () => Identity): 
       }),
     }),
   )
+  await page.route('**/api/bid-cost/owners', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: '0', message: 'success', data: [] }),
+    }),
+  )
   await page.route('**/api/bid-cost/71', (route) =>
     route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ code: '0', message: 'success', data: bid }),
+    }),
+  )
+  await page.route('**/api/bid-cost/71/documents', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: '0', message: 'success', data: [] }),
     }),
   )
 }
@@ -157,7 +171,7 @@ test.describe('M4 variation and bid routes', () => {
       },
       {
         path: '/bid-cost',
-        heading: '投标成本',
+        heading: '投标记录',
         selector: '.bid-cost-page',
         record: '市民中心投标',
       },
@@ -198,10 +212,8 @@ test.describe('M4 variation and bid routes', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/bid-cost')
     await page.getByRole('button', { name: 'BID-071' }).click()
-    const detailDialog = page.getByRole('dialog', { name: '投标成本预览' })
-    await expect(detailDialog).toHaveClass(/v2-detail-dialog/)
-    await expect(detailDialog.locator('.v2-detail-dialog__facts')).toHaveCSS('font-size', '12px')
-    await expect(detailDialog.locator('.v2-glass-button')).toHaveCount(0)
+    await expect(page).toHaveURL(/\/engineering-tender\/records\/71\?tab=basic$/)
+    await expect(page.getByRole('tab', { name: /基本信息/ })).toBeVisible()
 
     expect(runtimeErrors).toEqual([])
   })
@@ -218,7 +230,7 @@ test.describe('M4 variation and bid routes', () => {
     await expect(page.getByRole('button', { name: '编辑' })).toHaveCount(0)
 
     await page.goto('/bid-cost')
-    await expect(page.getByRole('button', { name: '新建投标成本' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: '新建投标记录' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '编辑' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '标记中标' })).toHaveCount(0)
     await expect(page.getByRole('button', { name: '标记未中标' })).toHaveCount(0)

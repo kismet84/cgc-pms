@@ -29,6 +29,8 @@ export interface ProjectRecord extends ProjectListItem {
   actualEndDate?: string | null;
   projectManagerId: string;
   approvalStatus: string;
+  sourceBidCostId?: string | null;
+  initiationBasis?: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;

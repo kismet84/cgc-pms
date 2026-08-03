@@ -296,6 +296,28 @@ class Phase3IntegrationTest {
     void test02_settlementFullChain() {
         final long settlementContractId = 30002L;
         final long settlementPartnerId = 20002L;
+        final long scheduleId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        final long wbsId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+        jdbcTemplate.update("""
+                INSERT INTO project_schedule_plan
+                    (id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
+                     planned_start_date,planned_end_date,status,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,'BASELINE',?,
+                       '2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,
+                       1,CURRENT_TIMESTAMP,0)
+                """, scheduleId, PROJECT_ID, "PHASE3-SP-" + scheduleId,
+                "Phase3分包计量基线", Math.toIntExact(scheduleId % 1_000_000_000));
+        jdbcTemplate.update("""
+                INSERT INTO project_wbs_task
+                    (id,tenant_id,project_id,schedule_plan_id,task_code,task_name,
+                     planned_start_date,planned_end_date,weight_percent,actual_quantity,
+                     actual_progress,status,sort_order,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,?,'Phase3分包计量WBS',
+                       '2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,
+                       CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, wbsId, PROJECT_ID, scheduleId, "PHASE3-WBS-" + wbsId);
 
         // 1. 创建分包计量并提交审批
         SubTask task = new SubTask();
@@ -305,6 +327,7 @@ class Phase3IntegrationTest {
         task.setPartnerId(settlementPartnerId);
         task.setTaskCode("PHASE3-SUB-TASK-" + System.nanoTime());
         task.setTaskName("Phase3分包计量任务");
+        task.setWbsTaskId(wbsId);
         task.setStatus("IN_PROGRESS");
         subTaskMapper.insert(task);
 

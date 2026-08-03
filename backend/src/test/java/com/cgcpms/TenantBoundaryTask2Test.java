@@ -34,6 +34,7 @@ import com.cgcpms.system.service.SysUserService;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
 import java.math.BigDecimal;
@@ -77,6 +78,7 @@ class TenantBoundaryTask2Test {
     @Autowired private PmProjectService projectService;
     @Autowired private CtContractService contractService;
     @Autowired private MdPartnerMapper partnerMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     // ── seeded cross-tenant IDs ──
     private Long tenantBMenuId;
@@ -259,16 +261,43 @@ class TenantBoundaryTask2Test {
     @DisplayName("T-BOUND-6: SubTask create ignores client tenantId and rejects cross-tenant project")
     void testSubTaskCreateIgnoresClientTenantId() {
         TestUserContext.setAdmin(TENANT_A, USER_A);
+        long projectId = 99192001L;
+        long scheduleId = 99192002L;
+        long wbsTaskId = 99192003L;
+        PmProject project = new PmProject();
+        project.setId(projectId);
+        project.setProjectCode("XM-TA-SUBTASK");
+        project.setProjectName("租户A分包边界测试项目");
+        project.setProjectType("CONSTRUCTION");
+        project.setContractAmount(BigDecimal.valueOf(1000000));
+        project.setTargetCost(BigDecimal.valueOf(800000));
+        project.setStatus("ACTIVE");
+        project.setApprovalStatus("APPROVED");
+        project.setTenantId(TENANT_A);
+        projectMapper.insert(project);
+        jdbcTemplate.update("""
+                INSERT INTO project_schedule_plan
+                 (id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,planned_start_date,planned_end_date,status)
+                VALUES (?,?,?,?,?,'BASELINE',1,CURRENT_DATE,CURRENT_DATE,'ACTIVE')
+                """, scheduleId, TENANT_A, projectId, "TA-SUBTASK-BASE", "分包边界测试基线");
+        jdbcTemplate.update("""
+                INSERT INTO project_wbs_task
+                 (id,tenant_id,project_id,schedule_plan_id,task_code,task_name,planned_start_date,planned_end_date,weight_percent)
+                VALUES (?,?,?,?,?,?,CURRENT_DATE,CURRENT_DATE,100)
+                """, wbsTaskId, TENANT_A, projectId, scheduleId, "TA-SUBTASK-WBS", "分包边界测试WBS");
+
         SubTask crossTenantTask = new SubTask();
         crossTenantTask.setTaskName("跨租户项目分包任务");
         crossTenantTask.setProjectId(tenantBProjectId);
+        crossTenantTask.setWbsTaskId(wbsTaskId);
         crossTenantTask.setStatus("NOT_STARTED");
         crossTenantTask.setTenantId(TENANT_B);
         assertThrows(BusinessException.class, () -> subTaskService.create(crossTenantTask));
 
         SubTask task = new SubTask();
         task.setTaskName("租户A分包任务");
-        task.setProjectId(10001L);
+        task.setProjectId(projectId);
+        task.setWbsTaskId(wbsTaskId);
         task.setStatus("NOT_STARTED");
         // Client tries to inject tenant B
         task.setTenantId(TENANT_B);
@@ -282,6 +311,10 @@ class TenantBoundaryTask2Test {
         // Clean up
         TestUserContext.setAdmin(TENANT_A, USER_A);
         subTaskService.delete(id);
+        jdbcTemplate.update("DELETE FROM sub_task WHERE id=? AND tenant_id=?", id, TENANT_A);
+        jdbcTemplate.update("DELETE FROM project_wbs_task WHERE id=? AND tenant_id=?", wbsTaskId, TENANT_A);
+        jdbcTemplate.update("DELETE FROM project_schedule_plan WHERE id=? AND tenant_id=?", scheduleId, TENANT_A);
+        jdbcTemplate.update("DELETE FROM pm_project WHERE id=? AND tenant_id=?", projectId, TENANT_A);
     }
 
     @Test

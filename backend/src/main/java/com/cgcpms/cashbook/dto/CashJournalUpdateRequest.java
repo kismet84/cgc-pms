@@ -24,4 +24,7 @@ public class CashJournalUpdateRequest {
     private String summary;
     private Long projectId;
     private Long contractId;
+    private Long bidCostId;
+    private Long costSubjectId;
+    private Long bidDepositId;
 }

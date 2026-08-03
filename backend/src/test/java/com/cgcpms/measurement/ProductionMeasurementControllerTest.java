@@ -145,7 +145,7 @@ class ProductionMeasurementControllerTest {
     private void expectForbidden(MockHttpServletRequestBuilder request,Cookie cookie)throws Exception{mockMvc.perform(request.cookie(cookie)).andExpect(status().isForbidden());}
     private String periodBody(String code){return periodBody(PROJECT,CONTRACT,code);}
     private String periodBody(long project,long contract,String code){return "{\"projectId\":"+project+",\"contractId\":"+contract+",\"periodCode\":\""+code+"\",\"periodName\":\"新增期间\",\"startDate\":\"2026-08-01\",\"endDate\":\"2026-08-20\",\"cutoffDate\":\"2026-08-25\"}";}
-    private String measurementBody(long project,long contract,long period){return "{\"projectId\":"+project+",\"contractId\":"+contract+",\"periodId\":"+period+",\"measureDate\":\"2026-07-16\",\"attachmentCount\":1,\"lines\":[{\"contractItemId\":999999,\"currentQuantity\":1,\"evidenceCount\":1}]}";}
+    private String measurementBody(long project,long contract,long period){return "{\"projectId\":"+project+",\"contractId\":"+contract+",\"periodId\":"+period+",\"measureDate\":\"2026-07-16\",\"attachmentCount\":1,\"lines\":[{\"wbsTaskId\":999998,\"contractItemId\":999999,\"currentQuantity\":1,\"evidenceCount\":1}]}";}
     private String ownerSubmissionBody(){return "{\"externalDocumentNo\":\"HTTP-OWNER\",\"attachmentCount\":1}";}
     private String returnReviewBody(){return "{\"decision\":\"RETURNED\",\"reviewerName\":\"HTTP业主\",\"reviewComment\":\"退回\"}";}
     private void project(long id,String code,long owner){jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'计量HTTP项目','ACTIVE',?,CURRENT_TIMESTAMP,?,CURRENT_TIMESTAMP,0)",id,code,owner,owner);}

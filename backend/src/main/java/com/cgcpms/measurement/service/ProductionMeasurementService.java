@@ -5,6 +5,7 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.measurement.dto.MeasurementModels.*;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.revenue.dto.RevenueOperationsModels.OwnerSettlementRequest;
 import com.cgcpms.revenue.service.RevenueOperationsService;
 import com.cgcpms.workflow.WorkflowBusinessTypes;
@@ -36,6 +37,7 @@ public class ProductionMeasurementService {
     private final WorkflowEngine workflowEngine;
     private final RevenueOperationsService revenueOperationsService;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ProjectExecutionGuard projectExecutionGuard;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createPeriod(PeriodRequest request) {
@@ -122,11 +124,15 @@ public class ProductionMeasurementService {
         BigDecimal currentTotal = money(BigDecimal.ZERO);
         int sort = 0;
         Set<String> sources = new HashSet<>();
+        Map<String, BigDecimal> pendingQuantities = new HashMap<>();
         List<ResolvedLine> resolved = new ArrayList<>();
         for (MeasurementLineRequest line : request.lines()) {
-            ResolvedLine value = resolveLine(request.contractId(), line);
-            String key = value.sourceType() + ":" + value.sourceId();
-            if (!sources.add(key)) throw error("MEASUREMENT_SOURCE_DUPLICATE", "同一清单项或变更不能在计量单中重复");
+            ResolvedLine value = resolveLine(request.projectId(), request.contractId(), line);
+            String sourceKey = value.sourceType() + ":" + value.sourceId();
+            String wbsSourceKey = sourceKey + ":" + value.wbsTaskId();
+            if (!sources.add(wbsSourceKey)) throw error("MEASUREMENT_SOURCE_DUPLICATE", "同一WBS下的清单项或变更不能在计量单中重复");
+            BigDecimal pending = pendingQuantities.merge(sourceKey, value.currentQuantity(), BigDecimal::add);
+            validateQuantity(value.contractQuantity(), value.priorQuantity(), pending);
             resolved.add(value);
             currentTotal = currentTotal.add(value.currentAmount());
         }
@@ -143,11 +149,11 @@ public class ProductionMeasurementService {
                         currentTotal, priorTotal.add(currentTotal), 0, user(), user(), request.remark());
                 for (ResolvedLine line : resolved) {
                     jdbc.update("""
-                            INSERT INTO production_measurement_line(id,tenant_id,measurement_id,source_type,contract_item_id,contract_change_id,
+                            INSERT INTO production_measurement_line(id,tenant_id,measurement_id,wbs_task_id,source_type,contract_item_id,contract_change_id,
                              item_code,item_name,item_spec,unit,contract_quantity,prior_approved_quantity,current_reported_quantity,
                              cumulative_reported_quantity,unit_price,current_reported_amount,cumulative_reported_amount,evidence_count,sort_order,created_by,created_at)
-                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
-                            """, IdWorker.getId(), tenant(), id, line.sourceType(), line.contractItemId(), line.contractChangeId(),
+                            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+                            """, IdWorker.getId(), tenant(), id, line.wbsTaskId(), line.sourceType(), line.contractItemId(), line.contractChangeId(),
                             line.itemCode(), line.itemName(), line.itemSpec(), line.unit(), line.contractQuantity(), line.priorQuantity(),
                             line.currentQuantity(), line.priorQuantity().add(line.currentQuantity()), line.unitPrice(), line.currentAmount(),
                             money(line.priorQuantity().multiply(line.unitPrice())).add(line.currentAmount()), 0, sort++, user());
@@ -239,6 +245,10 @@ public class ProductionMeasurementService {
     public void onApproved(Long id) {
         Map<String, Object> row = requireMeasurement(id, true);
         if (INTERNALLY_APPROVED_STATUSES.contains(string(row.get("status")))) return;
+        if (!"PENDING".equals(string(row.get("status")))) {
+            throw error("PRODUCTION_MEASUREMENT_APPROVAL_STATE_INVALID", "产值计量审批状态不正确");
+        }
+        revalidateApprovalCapacity(id);
         if (jdbc.update("UPDATE production_measurement SET status='INTERNAL_APPROVED',approval_status='APPROVED',version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='PENDING'", id, tenant()) != 1) {
             throw error("PRODUCTION_MEASUREMENT_APPROVAL_STATE_INVALID", "产值计量审批状态不正确");
         }
@@ -402,7 +412,8 @@ public class ProductionMeasurementService {
         return moneyPayload(trace);
     }
 
-    private ResolvedLine resolveLine(Long contractId, MeasurementLineRequest request) {
+    private ResolvedLine resolveLine(Long projectId, Long contractId, MeasurementLineRequest request) {
+        projectExecutionGuard.requireActiveWbs(projectId, request.wbsTaskId(), "创建产值计量明细");
         boolean item = request.contractItemId() != null;
         boolean change = request.contractChangeId() != null;
         if (item == change) throw error("MEASUREMENT_SOURCE_INVALID", "计量明细必须且只能选择合同清单项或已批准变更之一");
@@ -413,14 +424,14 @@ public class ProductionMeasurementService {
             BigDecimal prior = approvedQuantity("CONTRACT_ITEM", request.contractItemId(), null);
             validateQuantity(contractQty, prior, request.currentQuantity());
             BigDecimal unitPrice = price(row.get("unit_price"));
-            return new ResolvedLine("CONTRACT_ITEM", request.contractItemId(), null, request.contractItemId(), string(row.get("item_code")), string(row.get("item_name")), string(row.get("item_spec")), string(row.get("unit")), contractQty, prior, quantity(request.currentQuantity()), unitPrice, money(request.currentQuantity().multiply(unitPrice)), request.evidenceCount());
+            return new ResolvedLine(request.wbsTaskId(), "CONTRACT_ITEM", request.contractItemId(), null, request.contractItemId(), string(row.get("item_code")), string(row.get("item_name")), string(row.get("item_spec")), string(row.get("unit")), contractQty, prior, quantity(request.currentQuantity()), unitPrice, money(request.currentQuantity().multiply(unitPrice)), request.evidenceCount());
         }
         Map<String, Object> row = one("SELECT * FROM ct_contract_change WHERE id=? AND tenant_id=? AND contract_id=? AND deleted_flag=0 AND approval_status='APPROVED' AND effective_flag=1 AND change_amount>0 FOR UPDATE", request.contractChangeId(), tenant(), contractId);
         if (row == null) throw error("CONTRACT_CHANGE_NOT_MEASURABLE", "合同变更不存在、未生效、为负变更或不属于所选合同");
         BigDecimal prior = approvedQuantity("CONTRACT_CHANGE", null, request.contractChangeId());
         validateQuantity(quantity(BigDecimal.ONE), prior, request.currentQuantity());
         BigDecimal unitPrice = price(row.get("change_amount"));
-        return new ResolvedLine("CONTRACT_CHANGE", null, request.contractChangeId(), request.contractChangeId(), string(row.get("change_code")), string(row.get("change_name")), null, "项", quantity(BigDecimal.ONE), prior, quantity(request.currentQuantity()), unitPrice, money(request.currentQuantity().multiply(unitPrice)), request.evidenceCount());
+        return new ResolvedLine(request.wbsTaskId(), "CONTRACT_CHANGE", null, request.contractChangeId(), request.contractChangeId(), string(row.get("change_code")), string(row.get("change_name")), null, "项", quantity(BigDecimal.ONE), prior, quantity(request.currentQuantity()), unitPrice, money(request.currentQuantity().multiply(unitPrice)), request.evidenceCount());
     }
 
     private void validateQuantity(BigDecimal contractQty, BigDecimal prior, BigDecimal current) {
@@ -430,21 +441,51 @@ public class ProductionMeasurementService {
         }
     }
 
+    private void revalidateApprovalCapacity(Long measurementId) {
+        List<Map<String, Object>> lines = jdbc.queryForList("""
+                SELECT id,source_type,contract_item_id,contract_change_id,current_reported_quantity
+                FROM production_measurement_line
+                WHERE tenant_id=? AND measurement_id=?
+                ORDER BY source_type,contract_item_id,contract_change_id,id FOR UPDATE
+                """, tenant(), measurementId);
+        if (lines.isEmpty()) throw error("PRODUCTION_MEASUREMENT_LINE_REQUIRED", "计量单至少包含一条明细");
+        Map<String, Map<String, Object>> sources = new LinkedHashMap<>();
+        Map<String, BigDecimal> quantities = new LinkedHashMap<>();
+        for (Map<String, Object> line : lines) {
+            String key = line.get("contract_item_id") != null
+                    ? "CONTRACT_ITEM:" + line.get("contract_item_id")
+                    : "CONTRACT_CHANGE:" + line.get("contract_change_id");
+            sources.putIfAbsent(key, line);
+            quantities.merge(key, decimal(line.get("current_reported_quantity")), BigDecimal::add);
+        }
+        for (String key : sources.keySet()) {
+            revalidateCapacity(measurementId, sources.get(key), quantities.get(key), true);
+        }
+    }
+
     private void revalidateCapacity(Long measurementId, Map<String, Object> line) {
+        revalidateCapacity(measurementId, line, decimal(line.get("current_reported_quantity")), false);
+    }
+
+    private void revalidateCapacity(Long measurementId, Map<String, Object> line, BigDecimal currentQuantity, boolean lockApproved) {
         BigDecimal limit;
         BigDecimal prior;
         if (line.get("contract_item_id") != null) {
             Map<String, Object> source = one("SELECT quantity FROM ct_contract_item WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE", line.get("contract_item_id"), tenant());
             if (source == null) throw error("CONTRACT_ITEM_NOT_MEASURABLE", "合同清单项已不存在");
             limit = quantity(source.get("quantity"));
-            prior = approvedQuantityExcluding("CONTRACT_ITEM", longValue(line.get("contract_item_id")), null, measurementId);
+            prior = lockApproved
+                    ? approvedQuantityExcludingLocked("CONTRACT_ITEM", longValue(line.get("contract_item_id")), null, measurementId)
+                    : approvedQuantityExcluding("CONTRACT_ITEM", longValue(line.get("contract_item_id")), null, measurementId);
         } else {
             Map<String, Object> source = one("SELECT change_amount FROM ct_contract_change WHERE id=? AND tenant_id=? AND deleted_flag=0 AND approval_status='APPROVED' AND effective_flag=1 AND change_amount>0 FOR UPDATE", line.get("contract_change_id"), tenant());
             if (source == null) throw error("CONTRACT_CHANGE_NOT_MEASURABLE", "合同变更已失效或不可计量");
             limit = quantity(BigDecimal.ONE);
-            prior = approvedQuantityExcluding("CONTRACT_CHANGE", null, longValue(line.get("contract_change_id")), measurementId);
+            prior = lockApproved
+                    ? approvedQuantityExcludingLocked("CONTRACT_CHANGE", null, longValue(line.get("contract_change_id")), measurementId)
+                    : approvedQuantityExcluding("CONTRACT_CHANGE", null, longValue(line.get("contract_change_id")), measurementId);
         }
-        validateQuantity(limit, prior, decimal(line.get("current_reported_quantity")));
+        validateQuantity(limit, prior, currentQuantity);
     }
 
     private BigDecimal approvedQuantity(String type, Long itemId, Long changeId) { return approvedQuantityExcluding(type, itemId, changeId, null); }
@@ -455,6 +496,21 @@ public class ProductionMeasurementService {
         List<Object> values = new ArrayList<>(List.of(tenant(), sourceId));
         if (excludedMeasurementId != null) values.add(excludedMeasurementId);
         return quantity(jdbc.queryForObject("SELECT COALESCE(SUM(l.current_reported_quantity),0) FROM production_measurement_line l JOIN production_measurement m ON m.id=l.measurement_id WHERE l.tenant_id=? AND " + column + "=? AND m.deleted_flag=0 AND m.status IN('INTERNAL_APPROVED','OWNER_SUBMITTED','OWNER_RETURNED','OWNER_CONFIRMED','SETTLEMENT_CREATED')" + excluded, BigDecimal.class, values.toArray()));
+    }
+
+    private BigDecimal approvedQuantityExcludingLocked(String type, Long itemId, Long changeId, Long excludedMeasurementId) {
+        String column = "CONTRACT_ITEM".equals(type) ? "l.contract_item_id" : "l.contract_change_id";
+        Long sourceId = "CONTRACT_ITEM".equals(type) ? itemId : changeId;
+        List<BigDecimal> approved = jdbc.queryForList("""
+                SELECT l.current_reported_quantity
+                FROM production_measurement_line l
+                JOIN production_measurement m ON m.id=l.measurement_id
+                WHERE l.tenant_id=? AND %s=? AND m.deleted_flag=0
+                  AND m.status IN('INTERNAL_APPROVED','OWNER_SUBMITTED','OWNER_RETURNED','OWNER_CONFIRMED','SETTLEMENT_CREATED')
+                  AND m.id<>?
+                ORDER BY m.id,l.id FOR UPDATE
+                """.formatted(column), BigDecimal.class, tenant(), sourceId, excludedMeasurementId);
+        return quantity(approved.stream().reduce(BigDecimal.ZERO, BigDecimal::add));
     }
 
     private Map<String, Object> requireMainContract(Long projectId, Long contractId) {
@@ -566,7 +622,7 @@ public class ProductionMeasurementService {
         return moneyPayload(value);
     }
 
-    private record ResolvedLine(String sourceType, Long contractItemId, Long contractChangeId, Long sourceId,
+    private record ResolvedLine(Long wbsTaskId, String sourceType, Long contractItemId, Long contractChangeId, Long sourceId,
                                 String itemCode, String itemName, String itemSpec, String unit,
                                 BigDecimal contractQuantity, BigDecimal priorQuantity, BigDecimal currentQuantity,
                                 BigDecimal unitPrice, BigDecimal currentAmount, Integer evidenceCount) {}

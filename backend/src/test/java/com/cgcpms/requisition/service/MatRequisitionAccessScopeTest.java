@@ -11,8 +11,11 @@ import com.cgcpms.cost.service.CostGenerationService;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.inventory.service.MatStockService;
 import com.cgcpms.material.mapper.MdMaterialMapper;
+import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.requisition.entity.MatRequisition;
+import com.cgcpms.requisition.entity.MatRequisitionItem;
 import com.cgcpms.requisition.mapper.MatRequisitionItemMapper;
 import com.cgcpms.requisition.mapper.MatRequisitionMapper;
 import com.cgcpms.workflow.service.WorkflowEngine;
@@ -25,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,17 +38,21 @@ import static org.mockito.Mockito.*;
 class MatRequisitionAccessScopeTest {
 
     private final MatRequisitionMapper requisitionMapper = mock(MatRequisitionMapper.class);
+    private final MatRequisitionItemMapper itemMapper = mock(MatRequisitionItemMapper.class);
+    private final MdMaterialMapper materialMapper = mock(MdMaterialMapper.class);
     private final ProjectAccessChecker projectAccessChecker = mock(ProjectAccessChecker.class);
+    private final ProjectExecutionGuard projectExecutionGuard = mock(ProjectExecutionGuard.class);
     private final MatRequisitionAssembler assembler = mock(MatRequisitionAssembler.class);
     private final MatRequisitionService service = new MatRequisitionService(
             requisitionMapper,
-            mock(MatRequisitionItemMapper.class),
+            itemMapper,
             mock(CtContractMapper.class),
             mock(MatWarehouseMapper.class),
-            mock(MdMaterialMapper.class),
+            materialMapper,
             mock(MatStockService.class),
             mock(CostGenerationService.class),
             projectAccessChecker,
+            projectExecutionGuard,
             mock(WorkflowEngine.class),
             assembler);
 
@@ -149,5 +157,31 @@ class MatRequisitionAccessScopeTest {
         verify(projectAccessChecker).checkAccess(11L, "编辑领料申请");
         verify(projectAccessChecker).checkAccess(12L, "编辑领料申请");
         verify(requisitionMapper, never()).updateById(any(MatRequisition.class));
+    }
+
+    @Test
+    void itemWriteValidatesAndPersistsWbs() {
+        MatRequisition requisition = new MatRequisition();
+        requisition.setId(201L);
+        requisition.setTenantId(7L);
+        requisition.setProjectId(11L);
+        requisition.setApprovalStatus("DRAFT");
+        when(requisitionMapper.selectById(201L)).thenReturn(requisition);
+        MdMaterial material = new MdMaterial();
+        material.setTenantId(7L);
+        material.setStatus("ENABLE");
+        when(materialMapper.selectById(301L)).thenReturn(material);
+        MatRequisitionItem item = new MatRequisitionItem();
+        item.setWbsTaskId(401L);
+        item.setMaterialId(301L);
+        item.setQuantity(BigDecimal.ONE);
+        item.setUnitPrice(BigDecimal.ZERO);
+
+        service.saveItemsBatch(201L, List.of(item));
+
+        verify(projectExecutionGuard).requireActiveWbs(11L, 401L, "保存领料申请明细");
+        ArgumentCaptor<MatRequisitionItem> captor = ArgumentCaptor.forClass(MatRequisitionItem.class);
+        verify(itemMapper).insert(captor.capture());
+        assertEquals(401L, captor.getValue().getWbsTaskId());
     }
 }

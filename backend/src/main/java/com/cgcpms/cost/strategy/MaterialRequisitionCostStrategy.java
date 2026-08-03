@@ -49,9 +49,13 @@ public class MaterialRequisitionCostStrategy implements CostGenerationStrategy {
                 ? requisition.getRequisitionDate() : LocalDate.now();
         for (MatRequisitionItem item : items) {
             if (nvl(item.getAmount()).signum() <= 0) continue;
+            if (item.getWbsTaskId() == null) {
+                throw new IllegalStateException("领料明细未关联WBS任务，禁止生成成本 itemId=" + item.getId());
+            }
             CostItem cost = new CostItem();
             cost.setTenantId(requisition.getTenantId());
             cost.setProjectId(requisition.getProjectId());
+            cost.setWbsTaskId(item.getWbsTaskId());
             cost.setContractId(requisition.getContractId());
             cost.setPartnerId(requisition.getPartnerId());
             cost.setCostType("MATERIAL");

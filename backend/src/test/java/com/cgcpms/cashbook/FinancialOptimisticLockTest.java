@@ -61,7 +61,10 @@ class FinancialOptimisticLockTest {
                 mock(com.cgcpms.payment.mapper.PayApplicationMapper.class),
                 mock(com.cgcpms.payment.service.PaymentApplicationSourceService.class),
                 mock(com.cgcpms.budget.service.ContractBudgetAllocationService.class),
-                mock(PaymentArchiveEvidenceService.class));
+                mock(PaymentArchiveEvidenceService.class),
+                mock(com.cgcpms.bid.mapper.BidCostMapper.class),
+                mock(com.cgcpms.bid.mapper.BidDepositMapper.class),
+                mock(com.cgcpms.cost.mapper.CostSubjectMapper.class));
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.updateDraft(1L, new CashJournalUpdateRequest()));

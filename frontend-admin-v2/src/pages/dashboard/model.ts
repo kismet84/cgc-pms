@@ -41,8 +41,8 @@ export const DASHBOARD_ROLE_LABELS: Record<DashboardRole, string> = {
   mgmt: '管理层',
 }
 
-export function formatAmount(value: string | null | undefined): string {
-  const normalized = value?.trim()
+export function formatAmount(value: string | number | null | undefined): string {
+  const normalized = value == null ? '' : String(value).trim()
   if (!normalized) return '—'
   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(normalized)
   if (!match) return normalized

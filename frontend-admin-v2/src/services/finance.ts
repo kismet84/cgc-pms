@@ -4,6 +4,8 @@ import {
   type AccountingEntryQuery,
   type CashJournalPage,
   type CashJournalQuery,
+  type CashJournalSummary,
+  type CashJournalCreateCommand,
   type ExpenseApplicationPage,
   type ExpenseApplicationQuery,
   type InvoicePage,
@@ -83,6 +85,15 @@ export const reversePaymentRecord = (
 
 export const loadCashJournal = (query: CashJournalQuery = {}, signal?: AbortSignal) =>
   apiRequest<CashJournalPage>(withQuery(FINANCE_API.journal, query), { signal })
+export const loadCashJournalSummary = (query: CashJournalQuery = {}, signal?: AbortSignal) =>
+  apiRequest<CashJournalSummary>(withQuery(`${FINANCE_API.journal}/summary`, query), { signal })
+export const exportCashJournal = (query: CashJournalQuery = {}) =>
+  apiRequest<Blob>(withQuery(`${FINANCE_API.journal}/export`, query))
+export const createCashJournal = (command: CashJournalCreateCommand) =>
+  apiRequest<CashJournalPage['records'][number]>(FINANCE_API.journal, {
+    method: 'POST',
+    body: command,
+  })
 
 export const loadAccountingEntries = (query: AccountingEntryQuery = {}, signal?: AbortSignal) =>
   apiRequest<AccountingEntryPage>(withQuery('/accounting-entry/workspace', query), { signal })
@@ -108,6 +119,14 @@ export const handleFinanceAlert = (id: string, status: 'RESOLVED' | 'IGNORED', n
 
 export const loadFundAccounts = (signal?: AbortSignal) =>
   apiRequest<FundAccountRecord[]>('/fund-accounts', { signal })
+export interface BidFundAccountOption {
+  id: string
+  accountName: string
+  accountType: string
+  enabledFlag: number
+}
+export const loadBidFundAccountOptions = (signal?: AbortSignal) =>
+  apiRequest<BidFundAccountOption[]>('/fund-accounts/bid-options', { signal })
 export const createFundAccount = (body: FundAccountCommand) =>
   apiRequest<FundAccountRecord>('/fund-accounts', { method: 'POST', body })
 export const archiveCashJournal = (id: string) =>

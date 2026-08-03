@@ -24,6 +24,7 @@ public final class QualitySafetyModels {
 
     public record InspectionCommand(
             @NotNull Long planId,
+            Long wbsTaskId,
             @Size(max = 64) String inspectionCode,
             @NotNull LocalDate inspectionDate,
             @NotBlank @Size(max = 200) String location,

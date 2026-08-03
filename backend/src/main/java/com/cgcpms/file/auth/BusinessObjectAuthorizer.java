@@ -4,11 +4,11 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.cashbook.constant.CashbookConstants;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
 import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
+import com.cgcpms.bid.entity.BidCost;
+import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
-import com.cgcpms.cost.entity.CostTarget;
-import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.expense.entity.ExpenseApplication;
 import com.cgcpms.expense.mapper.ExpenseApplicationMapper;
 import com.cgcpms.invoice.entity.PayInvoice;
@@ -66,7 +66,7 @@ public class BusinessObjectAuthorizer {
     private final SubMeasureMapper subcontractMapper;
     private final StlSettlementMapper settlementMapper;
     private final VarOrderMapper variationMapper;
-    private final CostTargetMapper bidCostMapper;
+    private final BidCostMapper bidCostMapper;
     private final MdPartnerMapper partnerMapper;
     private final MdMaterialMapper materialMapper;
     private final CashJournalEntryMapper cashJournalEntryMapper;
@@ -213,6 +213,7 @@ public class BusinessObjectAuthorizer {
         String upperType = businessType.toUpperCase();
         String requiredAuthority = switch (upperType) {
             case "CASH_JOURNAL" -> cashJournalAuthority;
+            case "BID_COST" -> write ? "bid:file:manage" : "bid:query";
             case "SITE_DAILY_LOG" -> write ? "site:daily:edit" : "site:daily:query";
             case "SUBCONTRACT" -> write ? "subcontract:measure:edit" : "subcontract:measure:query";
             case "SETTLEMENT" -> write ? "settlement:edit" : "settlement:query";
@@ -230,7 +231,8 @@ public class BusinessObjectAuthorizer {
         };
         if ("VARIATION".equals(upperType)) {
             if (!write) requireAnyAuthority(Set.of("variation:order:query", "variation:trace"));
-        } else if (upperType.startsWith("QS_")) requireQualityAuthority(upperType, write);
+        } else if ("BID_COST".equals(upperType)) requireBidFileAuthority(requiredAuthority);
+        else if (upperType.startsWith("QS_")) requireQualityAuthority(upperType, write);
         else if (upperType.startsWith("SUPPLIER_")) requireSupplierAuthority(upperType, write);
         else if (upperType.startsWith("TECH_")) requireTechnicalAuthority(upperType, write);
         else if (upperType.startsWith("CLOSEOUT_")) requireCloseoutAuthority(upperType, write);
@@ -401,16 +403,18 @@ public class BusinessObjectAuthorizer {
                 break;
             }
             case "BID_COST": {
-                CostTarget bidCost = bidCostMapper.selectById(businessId);
+                BidCost bidCost = bidCostMapper.selectById(businessId);
                 if (bidCost == null) {
                     throw new BusinessException("FILE_BIZ_OBJ_NOT_FOUND",
-                            "目标成本不存在: " + businessId);
+                            "投标记录不存在: " + businessId);
                 }
                 if (!bidCost.getTenantId().equals(UserContext.getCurrentTenantId())) {
                     throw new BusinessException("FILE_ACCESS_DENIED",
-                            "无权访问该目标成本文件");
+                            "无权访问该投标文件");
                 }
-                checkProjectAccess(bidCost.getProjectId(), action + "目标成本文件");
+                if (bidCost.getProjectId() != null) {
+                    checkProjectAccess(bidCost.getProjectId(), action + "投标文件");
+                }
                 break;
             }
             case "PARTNER": {
@@ -880,6 +884,15 @@ public class BusinessObjectAuthorizer {
         if (!allowed) {
             throw new BusinessException("FILE_ACCESS_DENIED", "无权执行该文件操作");
         }
+    }
+
+    private void requireBidFileAuthority(String requiredAuthority) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        boolean allowed = authentication != null && authentication.getAuthorities().stream()
+                .map(authority -> authority.getAuthority())
+                .anyMatch(authority -> requiredAuthority.equals(authority)
+                        || "ROLE_SUPER_ADMIN".equals(authority));
+        if (!allowed) throw new BusinessException("FILE_ACCESS_DENIED", "无权执行投标文件操作");
     }
 
     private void requireAnyAuthority(Set<String> requiredAuthorities) {

@@ -197,7 +197,9 @@ class DictServiceTest {
     @DisplayName("T8: 按字典类型分页查询字典数据—验证种子数据")
     void test08_listDictData_byDictType() {
         var projectStatuses = dictDataService.getByDictCode("project_status");
-        assertEquals(6, projectStatuses.size(), "project_status 应有6条种子数据");
+        assertEquals(8, projectStatuses.size(), "project_status 应包含完工收尾和质保阶段共8条种子数据");
+        assertTrue(projectStatuses.stream().anyMatch(row -> "COMPLETION".equals(row.getDictValue())));
+        assertTrue(projectStatuses.stream().anyMatch(row -> "WARRANTY".equals(row.getDictValue())));
         SysDictDataVO preliminary = projectStatuses.stream()
                 .filter(row -> "DRAFT".equals(row.getDictValue()))
                 .findFirst()

@@ -37,4 +37,7 @@ public class CashJournalCreateRequest {
 
     private Long projectId;
     private Long contractId;
+    private Long bidCostId;
+    private Long costSubjectId;
+    private Long bidDepositId;
 }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type {
+  CloseoutOverview,
   DictionaryItem,
   ProjectMember,
   ProjectMemberCommand,
@@ -9,7 +10,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { formatAmount } from '@/pages/dashboard/model'
+import { dashboardStatusLabel, formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
   V2ActionMenu,
   V2Badge,
@@ -24,6 +25,7 @@ import {
   useToastMessage,
 } from '@/components'
 import { isApiClientError } from '@/services/request'
+import { loadCloseoutOverview } from '@/services/closeout'
 import {
   addProjectMember,
   archiveProject,
@@ -66,6 +68,7 @@ const projects = ref<ProjectRecord[]>([])
 const total = ref(0)
 const project = ref<ProjectRecord | null>(null)
 const overview = ref<ProjectOverview | null>(null)
+const constructionOverview = ref<CloseoutOverview | null>(null)
 const members = ref<ProjectMember[]>([])
 const projectTypes = ref<DictionaryItem[]>([])
 const projectStatuses = ref<DictionaryItem[]>([])
@@ -153,6 +156,17 @@ const approvalStatusTone = (value: string) =>
       : value === 'APPROVING'
         ? 'info'
         : 'neutral'
+const currentStageGate = computed(() => {
+  if (!project.value || !constructionOverview.value) return null
+  const gates = constructionOverview.value.stageGates
+  if (project.value.status === 'ACTIVE')
+    return { label: '施工完成门', blockers: gates.constructionCompletion }
+  if (project.value.status === 'COMPLETION')
+    return { label: '进入质保门', blockers: gates.warrantyEntry }
+  if (project.value.status === 'WARRANTY')
+    return { label: '最终关闭门', blockers: gates.finalClose }
+  return null
+})
 const canSubmitProject = (item: ProjectRecord) =>
   can('project:submit') && ['DRAFT', 'REJECTED'].includes(approvalStatus(item.approvalStatus))
 const canArchiveProject = (item: ProjectRecord) => can('project:edit') && item.status === 'CLOSED'
@@ -273,8 +287,16 @@ async function load(preserveNotice = false): Promise<boolean> {
         projects.value = [current]
         total.value = 1
       }
-      if (mode.value === 'overview')
-        overview.value = await loadProjectOverview(projectId.value, controller.signal)
+      if (mode.value === 'overview') {
+        const [projectOverview, closeoutOverview] = await Promise.all([
+          loadProjectOverview(projectId.value, controller.signal),
+          can('closeout:query')
+            ? loadCloseoutOverview(projectId.value, controller.signal)
+            : Promise.resolve(null),
+        ])
+        overview.value = projectOverview
+        constructionOverview.value = closeoutOverview
+      }
       if (mode.value === 'members') {
         const page = await loadProjectMembers(
           projectId.value,
@@ -304,6 +326,7 @@ async function load(preserveNotice = false): Promise<boolean> {
     if (!controller.signal.aborted && active === requestId) {
       project.value = null
       overview.value = null
+      constructionOverview.value = null
       members.value = []
       errorMessage.value = message(error, '项目数据加载失败')
     }
@@ -467,6 +490,9 @@ async function changePage(next: number) {
 }
 function go(path: string) {
   void router.push({ path, query: route.query, hash: route.hash })
+}
+function goConstruction(path: string, bizId?: string) {
+  void router.push({ path, query: { projectId: projectId.value, ...(bizId ? { bizId } : {}) } })
 }
 
 watch(
@@ -665,7 +691,7 @@ onBeforeUnmount(() => {
       panel-class="v2-dialog-standard v2-detail-dialog v2-dialog-wide"
       @close="go('/project/list')"
     >
-      <div v-if="mode === 'overview' && overview" class="project-page__overview-stack">
+      <div v-if="mode === 'overview' && overview && project" class="project-page__overview-stack">
         <section class="v2-detail-dialog__section project-page__overview-intro">
           <div class="v2-detail-dialog__section-heading"><h3>项目简介</h3></div>
           <dl class="v2-detail-dialog__facts">
@@ -744,6 +770,89 @@ onBeforeUnmount(() => {
               <dd>{{ overview.memberCount }}</dd>
             </div>
           </dl>
+        </section>
+        <section class="v2-detail-dialog__section">
+          <div class="v2-detail-dialog__section-heading">
+            <h3>施工主线</h3>
+            <V2Badge tone="info">{{
+              dictLabel(projectStatuses, project.status) || project.status
+            }}</V2Badge>
+          </div>
+          <p>
+            WBS {{ constructionOverview?.wbsReadiness.totalTasks ?? 0 }} 项，未完成
+            {{ constructionOverview?.wbsReadiness.incompleteTasks ?? 0 }} 项。
+          </p>
+          <V2PageState
+            v-if="!constructionOverview && !errorMessage"
+            kind="empty"
+            title="施工事实不可见"
+            description="当前账号无收尾查询权限，不能判定阶段门禁。"
+            :heading-level="3"
+          />
+          <div v-else-if="currentStageGate" class="project-page__stage-gate">
+            <strong>{{ currentStageGate.label }}</strong>
+            <V2Badge :tone="currentStageGate.blockers.length ? 'danger' : 'success'">
+              {{
+                currentStageGate.blockers.length
+                  ? `${currentStageGate.blockers.length} 项阻塞`
+                  : '通过'
+              }}
+            </V2Badge>
+            <ul v-if="currentStageGate.blockers.length">
+              <li
+                v-for="item in currentStageGate.blockers"
+                :key="`${item.gateCode}-${item.bizId ?? ''}`"
+              >
+                {{ item.reason }}
+              </li>
+            </ul>
+          </div>
+          <div v-if="constructionOverview?.wbsTasks.length" class="project-page__wbs-list">
+            <article v-for="task in constructionOverview.wbsTasks" :key="task.id">
+              <span
+                ><strong>{{ task.taskCode }}</strong> {{ task.taskName }} ·
+                {{ dashboardStatusLabel(task.status) }} ·
+                {{ formatDecimal(task.actualProgress) }}%</span
+              >
+              <V2Button
+                size="small"
+                variant="ghost"
+                @click="goConstruction('/project-schedule', task.id)"
+              >
+                打开WBS
+              </V2Button>
+            </article>
+          </div>
+          <div class="project-page__detail-actions">
+            <V2Button size="small" variant="secondary" @click="goConstruction('/project-schedule')"
+              >WBS计划</V2Button
+            >
+            <V2Button size="small" variant="secondary" @click="goConstruction('/site/daily-log')"
+              >施工日报</V2Button
+            >
+            <V2Button size="small" variant="secondary" @click="goConstruction('/quality-safety')"
+              >质量</V2Button
+            >
+            <V2Button
+              size="small"
+              variant="secondary"
+              @click="goConstruction('/inventory/material-requisition')"
+              >材料领用</V2Button
+            >
+            <V2Button size="small" variant="secondary" @click="goConstruction('/subcontract/task')"
+              >分包</V2Button
+            >
+            <V2Button
+              size="small"
+              variant="secondary"
+              @click="goConstruction('/production-measurement')"
+              >产值</V2Button
+            >
+            <V2Button size="small" variant="secondary" @click="goConstruction('/cost/summary')"
+              >成本</V2Button
+            >
+            <V2Button size="small" @click="goConstruction('/project-closeout')">阶段门禁</V2Button>
+          </div>
         </section>
       </div>
 
@@ -997,6 +1106,22 @@ onBeforeUnmount(() => {
   min-height: calc(var(--v2-space-12) + var(--v2-space-4));
   align-content: center;
   border-bottom: 0;
+}
+.project-page__stage-gate,
+.project-page__wbs-list {
+  display: grid;
+  gap: var(--v2-space-2);
+}
+.project-page__stage-gate ul {
+  margin: 0;
+}
+.project-page__wbs-list article {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--v2-space-2);
+  align-items: center;
+  padding: var(--v2-space-2) 0;
+  border-bottom: var(--v2-border-width) solid var(--v2-color-border);
 }
 .project-page__actions {
   display: flex;
