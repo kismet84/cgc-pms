@@ -1,59 +1,52 @@
 package com.cgcpms.system.controller;
 
-import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.system.service.DataMaintenancePreviewService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 
-@DisplayName("SystemController profile gating")
+@DisplayName("SystemController data maintenance endpoints")
 class SystemControllerProfileTest {
 
     @Test
-    @DisplayName("clear database controller is not registered in prod profile")
-    void shouldNotRegisterSystemControllerInProdProfile() {
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            context.getEnvironment().setActiveProfiles("prod");
-            context.registerBean(JdbcTemplate.class, () -> mock(JdbcTemplate.class));
-            context.register(SystemController.class);
-
-            context.refresh();
-
-            assertFalse(context.containsBeanDefinition("systemController"),
-                    "SystemController must not expose clear-database endpoints in prod");
-        }
+    @DisplayName("destructive clear endpoint is absent in every profile")
+    void shouldNotExposeClearEndpointInAnyProfile() {
+        assertFalse(Arrays.stream(SystemController.class.getDeclaredMethods())
+                .anyMatch(method -> method.isAnnotationPresent(DeleteMapping.class)));
+        assertRegistersInProfile("prod");
+        assertRegistersInProfile("local");
     }
 
     @Test
-    @DisplayName("clear database controller remains available outside prod profile")
-    void shouldRegisterSystemControllerOutsideProdProfile() {
-        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
-            context.getEnvironment().setActiveProfiles("local");
-            context.registerBean(JdbcTemplate.class, () -> mock(JdbcTemplate.class));
-            context.register(SystemController.class);
+    @DisplayName("preview is a SUPER_ADMIN read-only endpoint")
+    void shouldExposeSuperAdminPreview() throws NoSuchMethodException {
+        Method method = SystemController.class.getDeclaredMethod("previewDataMaintenance");
 
-            context.refresh();
-
-            assertTrue(context.containsBeanDefinition("systemController"),
-                    "SystemController should remain available for non-prod reset workflows");
-        }
+        GetMapping mapping = method.getAnnotation(GetMapping.class);
+        assertNotNull(mapping);
+        assertEquals("/data-maintenance/preview", mapping.value()[0]);
+        assertEquals("hasRole('SUPER_ADMIN')", method.getAnnotation(PreAuthorize.class).value());
     }
 
-    @Test
-    @DisplayName("clear database requires explicit non-prod confirmation code")
-    void shouldRequireExplicitConfirmationCodeBeforeClearingDatabase() {
-        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
-        SystemController controller = new SystemController(jdbcTemplate);
-
-        assertThrows(BusinessException.class, () -> controller.clearDatabase("WRONG_CONFIRMATION"));
-
-        verify(jdbcTemplate, never()).execute("SET FOREIGN_KEY_CHECKS = 0");
+    private static void assertRegistersInProfile(String profile) {
+        try (AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext()) {
+            context.getEnvironment().setActiveProfiles(profile);
+            context.registerBean(DataMaintenancePreviewService.class, () -> mock(DataMaintenancePreviewService.class));
+            context.register(SystemController.class);
+            context.refresh();
+            assertTrue(context.containsBeanDefinition("systemController"));
+        }
     }
 }

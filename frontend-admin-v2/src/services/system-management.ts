@@ -128,6 +128,24 @@ export interface AuditRecord {
   createdAt?: string
 }
 
+export interface DataMaintenanceRetainedGroup {
+  code: string
+  tableCount: number
+  rowCount: number
+}
+
+export interface DataMaintenancePreview {
+  database: string
+  policyFingerprint: string
+  eligible: boolean
+  blockers: string[]
+  retainedGroups: DataMaintenanceRetainedGroup[]
+  clearTableCount: number
+  clearRowCount: number
+  sysFileCount: number
+  ignoredViews: string[]
+}
+
 export type DocumentBusinessType =
   'PAYMENT' | 'SETTLEMENT' | 'PURCHASE_REQUEST' | 'PURCHASE_ORDER' | 'MATERIAL_RECEIPT'
 export type DocumentVersionStatus = 'DRAFT' | 'PUBLISHED' | 'DISABLED'
@@ -552,11 +570,8 @@ export function bindDefaultDocumentVersion(id: string, expectedLockVersion: numb
   )
 }
 
-export function clearNonProductionDatabase(): Promise<string> {
-  return apiRequest<string>(
-    `/system/clear-database?${params({ confirm: 'CLEAR_NON_PROD_DATABASE' })}`,
-    { method: 'DELETE' },
-  )
+export function loadDataMaintenancePreview(): Promise<DataMaintenancePreview> {
+  return apiRequest<DataMaintenancePreview>('/system/data-maintenance/preview')
 }
 
 function normalizeUser(row: UserRecord): UserRecord {

@@ -24,7 +24,7 @@ function success(route: Route, data: unknown) {
 }
 
 async function installMocks(page: Page, identity: Identity) {
-  const traffic = { system: 0, audit: 0, clear: 0 }
+  const traffic = { system: 0, audit: 0, preview: 0, clear: 0 }
   await page.route('**/api/**', (route) => {
     const request = route.request()
     const path = new URL(request.url()).pathname
@@ -40,6 +40,20 @@ async function installMocks(page: Page, identity: Identity) {
     if (path === '/api/system/clear-database') {
       traffic.clear += 1
       return route.fulfill({ status: 500, body: 'destructive endpoint must stay unused' })
+    }
+    if (path === '/api/system/data-maintenance/preview') {
+      traffic.preview += 1
+      return success(route, {
+        database: 'cgc_pms_e2e',
+        policyFingerprint: 'sha256:e2e-policy',
+        eligible: true,
+        blockers: [],
+        retainedGroups: [{ code: 'IDENTITY_ACCESS', tableCount: 4, rowCount: 28 }],
+        clearTableCount: 12,
+        clearRowCount: 345,
+        sysFileCount: 6,
+        ignoredViews: ['v_project_summary'],
+      })
     }
     if (path.startsWith('/api/system/')) traffic.system += 1
     if (path === '/api/audit-logs') traffic.audit += 1
@@ -260,7 +274,7 @@ test('super administrator reads all server facts while destructive traffic stays
     ['/system/dict', '字典管理', '服务端字典项'],
     ['/system/audit', '操作审计', '/auth/login'],
     ['/system/document-templates', '业务单据模板', '服务端付款模板'],
-    ['/system/data', '数据维护', '清空非生产业务数据'],
+    ['/system/data', '数据维护', 'cgc_pms_e2e'],
   ] as const
 
   for (const [path, heading, fact] of routes) {
@@ -297,6 +311,11 @@ test('data maintenance rejects ADMIN and remains accessible at three viewports f
     await superPage.setViewportSize(viewport)
     await superPage.goto('/system/data')
     await expect(superPage.getByRole('heading', { level: 1, name: '数据维护' })).toBeVisible()
+    await expect(superPage.getByText('12 张表 / 345 行 / 6 个文件')).toBeVisible()
+    await expect(superPage.getByText('IDENTITY_ACCESS')).toBeVisible()
+    await expect(superPage.getByText('v_project_summary')).toBeVisible()
+    await expect(superPage.getByText('复制命令')).toBeVisible()
+    await expect(superPage.getByText('清空非生产业务数据')).toHaveCount(0)
     expect(
       await superPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true)
@@ -307,5 +326,6 @@ test('data maintenance rejects ADMIN and remains accessible at three viewports f
       axe.violations.filter((item) => ['serious', 'critical'].includes(item.impact ?? '')),
     ).toEqual([])
   }
+  expect(superTraffic.preview).toBe(3)
   expect(superTraffic.clear).toBe(0)
 })

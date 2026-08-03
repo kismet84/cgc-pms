@@ -2,13 +2,12 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { V2ConfirmDialog, V2Input } from '@/components'
 import AccessControlPage from '@/pages/system/AccessControlPage.vue'
 import DataMaintenancePage from '@/pages/system/DataMaintenancePage.vue'
 import {
   bindDefaultDocumentVersion,
-  clearNonProductionDatabase,
   loadAuditLogs,
+  loadDataMaintenancePreview,
   loadUsers,
 } from '@/services/system-management'
 import { apiRequest } from '@/services/request'
@@ -77,34 +76,47 @@ describe('M7 system management contracts', () => {
     )
   })
 
-  it('requires typed acknowledgement and final confirmation before mocked database clear', async () => {
-    vi.mocked(apiRequest).mockResolvedValue('已清空 0 张业务数据表')
+  it('renders the server data-maintenance preview without exposing a destructive action', async () => {
+    vi.mocked(apiRequest).mockResolvedValue({
+      database: 'cgc_pms_dev',
+      policyFingerprint: 'sha256:test-policy',
+      eligible: false,
+      blockers: ['检测到生产环境标记'],
+      retainedGroups: [{ code: 'IDENTITY_ACCESS', tableCount: 4, rowCount: 28 }],
+      clearTableCount: 12,
+      clearRowCount: 345,
+      sysFileCount: 6,
+      ignoredViews: ['v_project_summary'],
+    })
     const wrapper = mount(DataMaintenancePage)
-    const action = wrapper
-      .findAll('button')
-      .find((button) => button.text() === '清空非生产业务数据')!
-
-    expect(action.attributes('disabled')).toBeDefined()
-    expect(apiRequest).not.toHaveBeenCalled()
-    await wrapper.findComponent(V2Input).find('input').setValue('CLEAR_NON_PROD_DATABASE')
-    await wrapper.get('input[type="checkbox"]').setValue(true)
-    await action.trigger('click')
-    expect(wrapper.findComponent(V2ConfirmDialog).props('open')).toBe(true)
-    expect(apiRequest).not.toHaveBeenCalled()
-
-    wrapper.findComponent(V2ConfirmDialog).vm.$emit('confirm')
     await flushPromises()
 
-    expect(apiRequest).toHaveBeenCalledWith(
-      '/system/clear-database?confirm=CLEAR_NON_PROD_DATABASE',
-      { method: 'DELETE' },
+    expect(apiRequest).toHaveBeenCalledOnce()
+    expect(apiRequest).toHaveBeenCalledWith('/system/data-maintenance/preview')
+    expect(wrapper.text()).toContain('cgc_pms_dev')
+    expect(wrapper.text()).toContain('检测到生产环境标记')
+    expect(wrapper.text()).toContain('IDENTITY_ACCESS')
+    expect(wrapper.text()).toContain('sha256:test-policy')
+    expect(wrapper.text()).toContain('12 张表 / 345 行 / 6 个文件')
+    expect(wrapper.text()).toContain('4 张表 / 28 行')
+    expect(wrapper.text()).toContain('v_project_summary')
+    expect(wrapper.text()).toContain(
+      'pwsh -NoProfile -File scripts/database/clear-business-data.ps1 -Database cgc_pms_dev',
     )
+    expect(wrapper.text()).not.toContain('确认清空')
+    expect(
+      vi
+        .mocked(apiRequest)
+        .mock.calls.some(
+          ([path, options]) => path.includes('clear-database') || options?.method === 'DELETE',
+        ),
+    ).toBe(false)
   })
 
-  it('keeps the destructive service callable only through the exact backend contract', async () => {
-    vi.mocked(apiRequest).mockResolvedValue('ok')
-    await expect(clearNonProductionDatabase()).resolves.toBe('ok')
-    expect(apiRequest).toHaveBeenCalledOnce()
+  it('uses only the read-only data-maintenance preview contract', async () => {
+    vi.mocked(apiRequest).mockResolvedValue({})
+    await loadDataMaintenancePreview()
+    expect(apiRequest).toHaveBeenCalledWith('/system/data-maintenance/preview')
   })
 
   it('configures role permissions through the collapsible directory-menu-button tree', async () => {
