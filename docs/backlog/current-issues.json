@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-08-03T11:35:00+08:00",
+  "updatedAt": "2026-08-03T22:31:41+08:00",
   "issues": [
     {
       "issueKey": "A-02",
@@ -260,6 +260,30 @@
         "backend/src/test/java/com/cgcpms/config/ActuatorMetricsTest.java",
         "docs/archive/v1.5/quality/第54条主线-M0-25项事实冻结与审计发现收口验收报告.md",
         "docs/archive/v1.5/quality/第55条主线-M2-待确认维护项裁决验收报告.md"
+      ]
+    },
+    {
+      "issueKey": "ISSUE-068-001",
+      "title": "施工阶段主线跨模块闭环整改",
+      "status": "NEEDS_CONFIRMATION",
+      "classification": "NEEDS_CONFIRMATION",
+      "priority": "P0",
+      "blocking": false,
+      "summary": "当前施工模块基本齐全，但项目启用缺WBS基线门、日报可绕过状态、质量验收未直接绑定WBS、项目关闭漏检施工未结事项、成本科目付款重复、尾款关闭不要求现金日记账归档，且材料领用、分包、产值和成本的WBS关系不完整。",
+      "acceptanceCriteria": "按第68条计划完成SC-01至SC-09；PREPARING、ACTIVE、COMPLETION、WARRANTY、CLOSED、ARCHIVED状态转换唯一；WBS贯穿进度、质量、材料、分包、产值和成本；分科目付款及项目总额守恒；施工完成、现金归档和最终关闭门全部通过真实角色、MySQL/API与浏览器验收。",
+      "deferReason": "整改计划已编制，但用户尚未授权业务代码、数据库迁移和运行态实施。",
+      "candidate": {
+        "userValue": "让管理层能够从一个WBS任务追溯进度、质量、材料、分包、产值、成本和资金，并防止未完施工或未归档资金的项目错误关闭。",
+        "minimalLoop": "复用现有项目、WBS和原业务单据，只补缺失WBS关系、集中阶段守卫、关闭清单和金额口径；不建设第二套施工台账。",
+        "nonGoals": "不建设人员设备、天气定位、离线、BIM、自动排程、资源平衡、通用BPM或平行库存成本资金台账。",
+        "dependencies": "用户明确实施授权；实施时重新锁定分支、数据库、迁移和运行态基线；活动历史数据WBS缺口画像。",
+        "risk": "阶段和金额口径跨多个模块；若猜测历史WBS或重复保存事实，会产生错误验收、金额差异和跨租户风险。",
+        "readyPreconditions": "用户授权实施第68条主线，G0锁定状态矩阵、历史数据处理、文件范围、恢复点和真实验收样例。"
+      },
+      "sourceRefs": [
+        "docs/plans/第68条主线-施工阶段主线闭环整改任务计划书.md",
+        "docs/product-intelligence/project-map.md",
+        "docs/backlog/current-focus.md"
       ]
     }
   ]
