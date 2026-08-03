@@ -39,5 +39,24 @@ public class MdMaterial extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal defaultTaxRate;
 
+    @JsonSerialize(using = ToStringSerializer.class)
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private BigDecimal taxInclusiveInfoPrice;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String infoPricePeriod;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String infoPriceSource;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String infoPriceVerificationStatus;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String infoPriceExternalRowKey;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Integer infoPriceReviewRequired;
+
     private String status;
 }

@@ -68,9 +68,28 @@ export interface MaterialRecord {
   unit?: string
   brand?: string
   defaultTaxRate?: string
+  taxInclusiveInfoPrice?: string
+  infoPricePeriod?: string
+  infoPriceSource?: string
+  infoPriceVerificationStatus?: string
+  infoPriceExternalRowKey?: string
+  infoPriceReviewRequired?: number
+  purchasePrice?: string
+  purchasePriceReceiptItemId?: string
+  purchasePriceDate?: string
   status: string
   createdAt?: string
   remark?: string
+}
+
+export interface MaterialImportResult {
+  total: number
+  created: number
+  priceUpdated: number
+  conflictsCreated: number
+  skipped: number
+  failed: number
+  errors: Array<{ row: number; code: string; message: string }>
 }
 
 export interface MaterialCategory {
@@ -226,6 +245,21 @@ export function updateMaterial(
 export function updateMaterialStatus(id: string, status: 'ENABLE' | 'DISABLE'): Promise<void> {
   return apiRequest<void>(`/materials/${requiredId(id)}/status?status=${status}`, {
     method: 'PUT',
+  })
+}
+
+export function downloadMaterialImportTemplate(): Promise<Blob> {
+  return apiRequest<Blob>('/materials/import-template', {
+    headers: { Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' },
+  })
+}
+
+export function importMaterials(file: File): Promise<MaterialImportResult> {
+  const body = new FormData()
+  body.append('file', file)
+  return apiRequest<MaterialImportResult, FormData>('/materials/import', {
+    method: 'POST',
+    body,
   })
 }
 

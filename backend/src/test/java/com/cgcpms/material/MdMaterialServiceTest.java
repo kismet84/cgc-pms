@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
@@ -37,6 +38,8 @@ class MdMaterialServiceTest {
     private MdMaterialMapper mdMaterialMapper;
     @Autowired
     private MdMaterialCategoryMapper categoryMapper;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @BeforeEach
     void setUp() {
@@ -114,6 +117,43 @@ class MdMaterialServiceTest {
         assertEquals(1, page.getRecords().size());
         assertEquals("FILTER-CODE-001", page.getRecords().get(0).getMaterialCode());
         assertEquals("过滤目标材料", page.getRecords().get(0).getMaterialName());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("采购价批量派生只取最近已审批验收明细")
+    void latestApprovedReceiptPriceIsServerDerived() {
+        MdMaterial material = new MdMaterial();
+        material.setMaterialCode("PRICE-MAT-001");
+        material.setMaterialName("采购价材料");
+        material.setCategoryId(100L);
+        material.setStatus("ENABLE");
+        Long materialId = mdMaterialService.create(material);
+
+        jdbcTemplate.update("""
+                INSERT INTO mat_receipt
+                  (id,tenant_id,project_id,receipt_code,receipt_date,receipt_mode,approval_status,deleted_flag)
+                VALUES
+                  (870001,0,10001,'PRICE-R-1','2026-07-01','INVENTORY','APPROVED',0),
+                  (870002,0,10001,'PRICE-R-2','2026-07-01','DIRECT_CONSUMPTION','APPROVED',0),
+                  (870003,0,10001,'PRICE-R-3','2026-07-02','INVENTORY','DRAFT',0)
+                """);
+        jdbcTemplate.update("""
+                INSERT INTO mat_receipt_item
+                  (id,tenant_id,receipt_id,material_id,actual_quantity,qualified_quantity,unqualified_quantity,unit_price,deleted_flag)
+                VALUES
+                  (870101,0,870001,?,1,1,0,10.0000,0),
+                  (870102,0,870002,?,1,1,0,12.3456,0),
+                  (870103,0,870003,?,1,1,0,99.0000,0)
+                """, materialId, materialId, materialId);
+
+        MdMaterialVO detail = mdMaterialService.getById(materialId);
+        assertEquals("12.3456", detail.getPurchasePrice());
+        assertEquals("870102", detail.getPurchasePriceReceiptItemId());
+        assertEquals("2026-07-01", detail.getPurchasePriceDate());
+
+        var page = mdMaterialService.getPage(1, 10, "PRICE-MAT-001", null, null, null);
+        assertEquals("12.3456", page.getRecords().getFirst().getPurchasePrice());
     }
 
     @Test

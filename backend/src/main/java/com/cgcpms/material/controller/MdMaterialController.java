@@ -4,12 +4,20 @@ import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.common.result.PageResult;
 import com.cgcpms.material.entity.MdMaterial;
 import com.cgcpms.material.service.MdMaterialService;
+import com.cgcpms.material.service.MdMaterialImportService;
 import com.cgcpms.material.vo.MdMaterialVO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/materials")
@@ -17,6 +25,24 @@ import org.springframework.web.bind.annotation.*;
 public class MdMaterialController {
 
     private final MdMaterialService mdMaterialService;
+    private final MdMaterialImportService mdMaterialImportService;
+
+    @GetMapping("/import-template")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:list')")
+    public ResponseEntity<byte[]> importTemplate() {
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(MdMaterialImportService.MIME))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(MdMaterialImportService.FILE_NAME, StandardCharsets.UTF_8).build().toString())
+                .body(mdMaterialImportService.template());
+    }
+
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or (hasAuthority('material:dict:add') and hasAuthority('material:dict:edit'))")
+    public ApiResponse<MdMaterialImportService.ImportResult> importMaterials(
+            @RequestPart("file") MultipartFile file) {
+        return ApiResponse.success(mdMaterialImportService.importFile(file));
+    }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('material:dict:list')")

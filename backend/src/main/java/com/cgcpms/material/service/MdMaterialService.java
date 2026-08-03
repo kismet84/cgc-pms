@@ -12,6 +12,7 @@ import com.cgcpms.material.entity.MdMaterialCategory;
 import com.cgcpms.material.mapper.MdMaterialMapper;
 import com.cgcpms.material.mapper.MdMaterialCategoryMapper;
 import com.cgcpms.material.vo.MdMaterialVO;
+import com.cgcpms.material.vo.MdMaterialPurchasePriceRow;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,10 @@ import com.cgcpms.common.util.DateTimeUtils;
 
 import java.math.BigDecimal;
 import java.util.Set;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -41,7 +46,9 @@ public class MdMaterialService {
         wrapper.orderByDesc(MdMaterial::getCreatedAt);
 
         Page<MdMaterial> page = mdMaterialMapper.selectPage(new Page<>(pageNo, pageSize), wrapper);
+        List<MdMaterial> materials = List.copyOf(page.getRecords());
         IPage<MdMaterialVO> voPage = page.convert(this::toVO);
+        attachPurchasePrices(voPage.getRecords(), materials);
         return PageResult.of(voPage);
     }
 
@@ -51,7 +58,9 @@ public class MdMaterialService {
         if (!material.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("MATERIAL_NOT_FOUND", "材料不存在");
         }
-        return toVO(material);
+        MdMaterialVO vo = toVO(material);
+        attachPurchasePrices(List.of(vo), List.of(material));
+        return vo;
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -182,11 +191,34 @@ public class MdMaterialService {
         vo.setUnit(m.getUnit());
         vo.setBrand(m.getBrand());
         vo.setDefaultTaxRate(m.getDefaultTaxRate() != null ? m.getDefaultTaxRate().toPlainString() : null);
+        vo.setTaxInclusiveInfoPrice(m.getTaxInclusiveInfoPrice() != null
+                ? m.getTaxInclusiveInfoPrice().toPlainString() : null);
+        vo.setInfoPricePeriod(m.getInfoPricePeriod());
+        vo.setInfoPriceSource(m.getInfoPriceSource());
+        vo.setInfoPriceVerificationStatus(m.getInfoPriceVerificationStatus());
+        vo.setInfoPriceExternalRowKey(m.getInfoPriceExternalRowKey());
+        vo.setInfoPriceReviewRequired(m.getInfoPriceReviewRequired());
         vo.setStatus(m.getStatus());
         vo.setCreatedBy(m.getCreatedBy() != null ? m.getCreatedBy().toString() : null);
         vo.setCreatedAt(m.getCreatedAt() != null ? DateTimeUtils.DTF.format(m.getCreatedAt()) : null);
         vo.setUpdatedAt(m.getUpdatedAt() != null ? DateTimeUtils.DTF.format(m.getUpdatedAt()) : null);
         vo.setRemark(m.getRemark());
         return vo;
+    }
+
+    private void attachPurchasePrices(List<MdMaterialVO> values, List<MdMaterial> materials) {
+        if (materials.isEmpty()) return;
+        List<Long> ids = materials.stream().map(MdMaterial::getId).toList();
+        Map<Long, MdMaterialPurchasePriceRow> prices = mdMaterialMapper
+                .selectLatestApprovedPurchasePrices(UserContext.getCurrentTenantId(), ids).stream()
+                .collect(Collectors.toMap(MdMaterialPurchasePriceRow::getMaterialId, Function.identity()));
+        for (int index = 0; index < materials.size(); index++) {
+            MdMaterialPurchasePriceRow price = prices.get(materials.get(index).getId());
+            if (price == null) continue;
+            MdMaterialVO vo = values.get(index);
+            vo.setPurchasePrice(price.getPurchasePrice().toPlainString());
+            vo.setPurchasePriceReceiptItemId(price.getReceiptItemId().toString());
+            vo.setPurchasePriceDate(price.getReceiptDate() != null ? price.getReceiptDate().toString() : null);
+        }
     }
 }

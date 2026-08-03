@@ -6,11 +6,17 @@ import com.cgcpms.cost.service.CostSubjectService;
 import com.cgcpms.cost.vo.CostSubjectTreeNodeVO;
 import com.cgcpms.cost.vo.CostSubjectVO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/cost-subjects")
@@ -31,6 +37,15 @@ public class CostSubjectController {
     public ApiResponse<List<CostSubjectVO>> getList(
             @RequestParam(required = false) String category) {
         return ApiResponse.success(costSubjectService.getList(category));
+    }
+
+    @PutMapping("/target-ratios")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:edit')")
+    public ApiResponse<List<CostSubjectVO>> updateTargetRatios(
+            @Valid @RequestBody @Size(min = 10, max = 10) List<@Valid TargetRatioRequest> requests) {
+        return ApiResponse.success(costSubjectService.updateTargetRatios(requests.stream()
+                .map(request -> new CostSubjectService.TargetRatio(request.subjectCode(), request.ratio()))
+                .toList()));
     }
 
     @GetMapping("/{id}")
@@ -65,5 +80,10 @@ public class CostSubjectController {
     public ApiResponse<Void> delete(@PathVariable Long id) {
         costSubjectService.delete(id);
         return ApiResponse.success();
+    }
+
+    public record TargetRatioRequest(
+            @NotBlank String subjectCode,
+            @NotNull @DecimalMin("0.0000") @DecimalMax("100.0000") BigDecimal ratio) {
     }
 }

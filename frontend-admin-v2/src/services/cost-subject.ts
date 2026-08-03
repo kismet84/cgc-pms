@@ -10,6 +10,7 @@ export interface CostSubjectRecord {
   level: number
   sortOrder: number
   status: string
+  defaultTargetRatio?: string | null
   children?: CostSubjectRecord[]
 }
 
@@ -167,6 +168,15 @@ export function deleteCostSubject(id: string): Promise<void> {
   return apiRequest<void>(`/cost-subjects/${requiredId(id)}`, { method: 'DELETE' })
 }
 
+export function updateTargetCostRatios(
+  ratios: Array<{ subjectCode: string; ratio: string }>,
+): Promise<CostSubjectRecord[]> {
+  return apiRequest<CostSubjectRecord[], Array<{ subjectCode: string; ratio: string }>>(
+    '/cost-subjects/target-ratios',
+    { method: 'PUT', body: ratios },
+  ).then((rows) => rows.map(normalizeSubject))
+}
+
 export function loadMappingVersions(signal?: AbortSignal): Promise<MappingVersionRecord[]> {
   return apiRequest<Record<string, unknown>[]>('/cost-subject-v2/mapping-versions', {
     signal,
@@ -295,6 +305,8 @@ function normalizeSubject(row: CostSubjectRecord): CostSubjectRecord {
     ...row,
     id: String(row.id),
     parentId: row.parentId == null ? '0' : String(row.parentId),
+    defaultTargetRatio:
+      row.defaultTargetRatio == null ? null : String(row.defaultTargetRatio),
     children: row.children?.map(normalizeSubject) ?? [],
   }
 }

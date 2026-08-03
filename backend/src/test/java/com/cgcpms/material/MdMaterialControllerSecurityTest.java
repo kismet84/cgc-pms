@@ -3,6 +3,7 @@ package com.cgcpms.material;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.common.JwtHttpTestTokenFactory;
 import com.cgcpms.material.service.MdMaterialService;
+import com.cgcpms.material.service.MdMaterialImportService;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
@@ -38,6 +40,7 @@ class MdMaterialControllerSecurityTest {
     @Autowired private MockMvc mockMvc;
     @Autowired private JwtHttpTestTokenFactory jwtUtils;
     @MockitoBean private MdMaterialService service;
+    @MockitoBean private MdMaterialImportService importService;
 
     @BeforeEach
     void stubCreate() {
@@ -49,6 +52,7 @@ class MdMaterialControllerSecurityTest {
         Cookie reader = authCookie(List.of("material:dict:list"), List.of("USER"));
         mockMvc.perform(getApi("/materials").cookie(reader)).andExpect(status().isOk());
         mockMvc.perform(getApi("/materials/101").cookie(reader)).andExpect(status().isOk());
+        mockMvc.perform(getApi("/materials/import-template").cookie(reader)).andExpect(status().isOk());
     }
 
     @Test
@@ -67,6 +71,21 @@ class MdMaterialControllerSecurityTest {
                 .andExpect(status().isForbidden());
         mockMvc.perform(withCsrf(putApi("/materials/101/status").cookie(reader).param("status", "DISABLE")))
                 .andExpect(status().isForbidden());
+        mockMvc.perform(withCsrf(multipart("/api/materials/import").file(
+                                "file", new byte[]{1}).contextPath("/api").cookie(reader)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void importRequiresBothAddAndEditForOrdinaryUser() throws Exception {
+        Cookie addOnly = authCookie(List.of("material:dict:add"), List.of("USER"));
+        Cookie both = authCookie(List.of("material:dict:add", "material:dict:edit"), List.of("USER"));
+        mockMvc.perform(withCsrf(multipart("/api/materials/import").file(
+                                "file", new byte[]{1}).contextPath("/api").cookie(addOnly)))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(withCsrf(multipart("/api/materials/import").file(
+                                "file", new byte[]{1}).contextPath("/api").cookie(both)))
+                .andExpect(status().isOk());
     }
 
     @Test

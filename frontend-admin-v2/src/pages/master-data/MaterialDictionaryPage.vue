@@ -15,6 +15,8 @@ import {
 } from '@/components'
 import {
   createMaterial,
+  downloadMaterialImportTemplate,
+  importMaterials,
   loadMaterial,
   loadMaterialCategories,
   loadMaterials,
@@ -22,6 +24,7 @@ import {
   updateMaterialStatus,
   type MaterialCategory,
   type MaterialRecord,
+  type MaterialImportResult,
 } from '@/services/master-data'
 import { isApiClientError } from '@/services/request'
 import { useSessionStore } from '@/stores/session'
@@ -39,6 +42,11 @@ const pageSize = ref(10)
 const dialogOpen = ref(false)
 const editingId = ref<string | null>(null)
 const statusTarget = ref<MaterialRecord | null>(null)
+const editingDetail = ref<MaterialRecord | null>(null)
+const importOpen = ref(false)
+const importFile = ref<File | null>(null)
+const importing = ref(false)
+const importResult = ref<MaterialImportResult | null>(null)
 let loadController: AbortController | null = null
 
 const filters = reactive({ materialCode: '', materialName: '', categoryId: '', status: '' })
@@ -59,6 +67,7 @@ const can = (permission: string) =>
   session.hasPermission(permission)
 const canAdd = computed(() => can('material:dict:add'))
 const canEdit = computed(() => can('material:dict:edit'))
+const canImport = computed(() => canAdd.value && canEdit.value)
 const categoryOptions = computed(() =>
   categories.value
     .filter((item) => item.status === 'ENABLE')
@@ -95,6 +104,7 @@ function clearForm(): void {
 function closeDialog(): void {
   dialogOpen.value = false
   editingId.value = null
+  editingDetail.value = null
   clearForm()
 }
 
@@ -165,6 +175,7 @@ async function openEdit(record: MaterialRecord): Promise<void> {
   try {
     const detail = await loadMaterial(record.id)
     editingId.value = detail.id
+    editingDetail.value = detail
     Object.assign(form, {
       materialCode: detail.materialCode,
       materialName: detail.materialName,
@@ -180,6 +191,54 @@ async function openEdit(record: MaterialRecord): Promise<void> {
   } catch (value) {
     clearForm()
     showToast('error', '无法打开材料', messageOf(value))
+  }
+}
+
+async function downloadTemplate(): Promise<void> {
+  try {
+    const blob = await downloadMaterialImportTemplate()
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = '材料字典导入模板.xlsx'
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (value) {
+    showToast('error', '模板下载失败', messageOf(value))
+  }
+}
+
+function selectImportFile(event: Event): void {
+  importFile.value = (event.target as HTMLInputElement).files?.[0] ?? null
+  importResult.value = null
+}
+
+function closeImport(): void {
+  if (importing.value) return
+  importOpen.value = false
+  importFile.value = null
+  importResult.value = null
+}
+
+async function runImport(): Promise<void> {
+  if (!importFile.value) {
+    showToast('warning', '请选择文件', '仅支持系统标准.xlsx模板。')
+    return
+  }
+  importing.value = true
+  try {
+    importResult.value = await importMaterials(importFile.value)
+    await load()
+    const result = importResult.value
+    showToast(
+      result.failed ? 'warning' : 'success',
+      result.failed ? '材料资料部分导入' : '材料资料导入完成',
+      `新建${result.created}，更新${result.priceUpdated}，失败${result.failed}。`,
+    )
+  } catch (value) {
+    showToast('error', '导入失败', messageOf(value))
+  } finally {
+    importing.value = false
   }
 }
 
@@ -287,6 +346,10 @@ onBeforeUnmount(() => loadController?.abort())
           <V2Button type="submit" size="small">查询</V2Button>
           <V2Button variant="secondary" type="button" size="small" @click="reset">重置</V2Button>
         </form>
+        <V2Button size="small" variant="secondary" @click="downloadTemplate">导出模板</V2Button>
+        <V2Button v-if="canImport" size="small" variant="secondary" @click="importOpen = true"
+          >导入资料</V2Button
+        >
         <V2Button v-if="canAdd" size="small" @click="openCreate">新增材料</V2Button>
       </template>
     </V2Card>
@@ -306,11 +369,13 @@ onBeforeUnmount(() => loadController?.abort())
         <table class="v2-table--top">
           <thead>
             <tr>
-              <th>编码</th>
-              <th>名称</th>
-              <th>分类</th>
-              <th>规格</th>
-              <th>单位</th>
+              <th>材料编码</th>
+              <th>材料名称</th>
+              <th>材料分类</th>
+              <th>规格型号</th>
+              <th>计量单位</th>
+              <th>含税信息价</th>
+              <th>采购价</th>
               <th>默认税率</th>
               <th>状态</th>
               <th class="v2-table-cell--actions">操作</th>
@@ -323,6 +388,8 @@ onBeforeUnmount(() => loadController?.abort())
               <td>{{ categoryName(record.categoryId) }}</td>
               <td>{{ record.specification || '—' }}</td>
               <td>{{ record.unit || '—' }}</td>
+              <td>{{ record.taxInclusiveInfoPrice ?? '—' }}</td>
+              <td>{{ record.purchasePrice ?? '—' }}</td>
               <td>{{ record.defaultTaxRate ?? '—' }}</td>
               <td>
                 <V2Badge :tone="record.status === 'ENABLE' ? 'success' : 'neutral'">
@@ -393,10 +460,61 @@ onBeforeUnmount(() => loadController?.abort())
         <V2Input v-model="form.defaultTaxRate" label="默认税率（%）" />
         <V2Select v-model="form.status" :options="statusOptions" label="状态" required />
         <V2Input v-model="form.remark" label="备注" />
+        <section v-if="editingDetail" class="material-page__price-facts" aria-label="价格来源">
+          <h3>价格来源</h3>
+          <p>含税信息价：{{ editingDetail.taxInclusiveInfoPrice ?? '—' }}</p>
+          <p>月份：{{ editingDetail.infoPricePeriod ?? '—' }}</p>
+          <p>来源：{{ editingDetail.infoPriceSource ?? '—' }}</p>
+          <p>校核：{{ editingDetail.infoPriceVerificationStatus ?? '—' }}</p>
+          <p>待复核：{{ editingDetail.infoPriceReviewRequired === 1 ? '是' : '否' }}</p>
+          <p>采购价：{{ editingDetail.purchasePrice ?? '—' }}</p>
+          <p>
+            采购价来源：{{ editingDetail.purchasePriceDate ?? '—' }} / 验收明细
+            {{ editingDetail.purchasePriceReceiptItemId ?? '—' }}
+          </p>
+        </section>
       </form>
       <template #footer>
         <V2Button variant="secondary" :disabled="saving" @click="closeDialog">取消</V2Button>
         <V2Button type="submit" form="material-form" :loading="saving">保存</V2Button>
+      </template>
+    </V2Dialog>
+
+    <V2Dialog
+      :open="importOpen"
+      title="导入材料资料"
+      description="仅接受系统空白模板整理后的.xlsx；合法行独立提交，失败行完整返回。"
+      :close-disabled="importing"
+      :close-on-backdrop="false"
+      @close="closeImport"
+    >
+      <div class="material-page__import">
+        <label class="v2-field">
+          <span class="v2-field__label">标准模板文件</span>
+          <input type="file" accept=".xlsx" :disabled="importing" @change="selectImportFile" />
+        </label>
+        <p v-if="importFile">已选择：{{ importFile.name }}</p>
+        <section v-if="importResult" aria-label="导入结果">
+          <p>
+            总计 {{ importResult.total }}；新建 {{ importResult.created }}；更新
+            {{ importResult.priceUpdated }}；冲突新建 {{ importResult.conflictsCreated }}；跳过
+            {{ importResult.skipped }}；失败 {{ importResult.failed }}。
+          </p>
+          <div v-if="importResult.errors.length" class="material-page__table-wrap">
+            <table class="v2-table--top">
+              <thead><tr><th>行号</th><th>错误码</th><th>说明</th></tr></thead>
+              <tbody>
+                <tr v-for="item in importResult.errors" :key="`${item.row}-${item.code}`">
+                  <td>{{ item.row }}</td><td>{{ item.code }}</td><td>{{ item.message }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+      <template #footer>
+        <V2Button variant="secondary" :disabled="importing" @click="closeImport">关闭</V2Button>
+        <V2Button :loading="importing" :disabled="!importFile" @click="runImport">开始导入</V2Button>
       </template>
     </V2Dialog>
 
@@ -425,6 +543,18 @@ onBeforeUnmount(() => loadController?.abort())
 
 .material-page__table-wrap {
   overflow-x: auto;
+}
+
+.material-page__price-facts,
+.material-page__import {
+  display: grid;
+  gap: var(--v2-space-2);
+  grid-column: 1 / -1;
+}
+
+.material-page__price-facts p,
+.material-page__import p {
+  margin: 0;
 }
 
 @media (max-width: 48rem) {

@@ -13,6 +13,7 @@ import {
   deleteCostTarget,
   loadCostSubjectOptions,
   loadCostTarget,
+  loadCostTargetDefaultAllocation,
   loadCostTargetItems,
   loadCostTargetPage,
   loadProjectContextOptions,
@@ -26,6 +27,7 @@ vi.mock('@/services/commercial', () => ({
   deleteCostTarget: vi.fn(),
   loadCostSubjectOptions: vi.fn(),
   loadCostTarget: vi.fn(),
+  loadCostTargetDefaultAllocation: vi.fn(),
   loadCostTargetItems: vi.fn(),
   loadCostTargetPage: vi.fn(),
   loadProjectContextOptions: vi.fn(),
@@ -106,6 +108,29 @@ beforeEach(() => {
     .mockResolvedValue([{ id: 'S1', subjectCode: '6001', subjectName: '材料费', status: 'ACTIVE' }])
   vi.mocked(loadCostTargetPage).mockReset().mockResolvedValue(page)
   vi.mocked(loadCostTarget).mockReset().mockResolvedValue(target)
+  vi.mocked(loadCostTargetDefaultAllocation)
+    .mockReset()
+    .mockResolvedValue({
+      projectId: 'P1',
+      projectManagerId: 'U1',
+      sourceContractAmount: '10596697064401168.38',
+      targetCostRate: '0.850000',
+      totalTargetAmount: '9007199254740993.12',
+      items: Array.from({ length: 10 }, (_, index) => ({
+        id: String(index + 1),
+        targetId: '',
+        projectId: 'P1',
+        costSubjectId: `S${index + 1}`,
+        subjectCode: `5401.03.${String(index + 1).padStart(2, '0')}`,
+        subjectName: `目标成本${index + 1}`,
+        subjectType: 'TARGET',
+        defaultTargetRatio: index === 0 ? '100.0000' : '0.0000',
+        targetAmount: index === 0 ? '9007199254740993.12' : '0.00',
+        bidCostAmount: '0.00',
+        responsibilityAmount: index === 0 ? '9007199254740993.12' : '0.00',
+        responsibleUserId: 'U1',
+      })),
+    })
   vi.mocked(loadCostTargetItems).mockReset().mockResolvedValue([item])
   vi.mocked(loadProjectContextOptions)
     .mockReset()
@@ -259,11 +284,7 @@ describe('M4 cost target page', () => {
     await wrapper.get('select[aria-label="项目"]').setValue('P1')
     await wrapper.get('input[aria-label="版本号"]').setValue(' V2 ')
     await wrapper.get('input[aria-label="版本名称"]').setValue(' 控制版 ')
-    await wrapper.get('select[aria-label="成本科目"]').setValue('S1')
-    await wrapper.get('input[aria-label="目标金额"]').setValue('9007199254740993.12')
-    await wrapper.get('input[aria-label="投标金额"]').setValue('8800.10')
-    await wrapper.get('input[aria-label="责任金额"]').setValue('9007199254740993.12')
-    await wrapper.get('select[aria-label="责任人"]').setValue('U1')
+    await wrapper.findAll('input[aria-label="投标金额"]')[0]!.setValue('8800.10')
     await wrapper.get('form').trigger('submit')
     await wrapper.get('form').trigger('submit')
 
@@ -275,13 +296,14 @@ describe('M4 cost target page', () => {
         projectManagerId: 'U1',
         versionNo: 'V2',
         versionName: '控制版',
-        items: [
+        items: expect.arrayContaining([
           expect.objectContaining({
+            costSubjectId: 'S1',
             targetAmount: '9007199254740993.12',
             bidCostAmount: '8800.10',
             responsibleUserId: 'U1',
           }),
-        ],
+        ]),
       }),
     )
     pending.resolve('81')

@@ -61,6 +61,14 @@ public class CostTarget extends BaseEntity {
     @DecimalMin(value = "0.00", message = "责任预算总额不能为负数")
     private BigDecimal totalResponsibilityAmount;
 
+    /** 新建版本时的项目合同金额快照。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private BigDecimal sourceContractAmount;
+
+    /** 新建版本固定目标成本率快照。 */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private BigDecimal targetCostRate;
+
     /** 是否生效版本：0否，1是。同一项目仅允许一个生效版本 */
     private Integer isActive;
 

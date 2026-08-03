@@ -27,11 +27,48 @@ class ProcurementMigrationH2Test {
                     (id, tenant_id, group_id, dict_code, dict_name, dict_class, status)
                 VALUES (9262010, 9, 9262002, 'purchase_order_status', '采购订单状态', 'STATE_MACHINE', 'ENABLE')
                 """);
+        execute(before, """
+                INSERT INTO cost_subject
+                    (id, tenant_id, parent_id, subject_code, subject_name, subject_type,
+                     account_category, level, sort_order, status, deleted_flag)
+                VALUES (9262030, 9, 0, '5401.01', '租户人工成本', 'LABOR', 'COST', 2, 1, 'ENABLE', 0),
+                       (9262031, 9, 0, '5401.03', '租户目标成本', 'OTHER', 'COST', 2, 9, 'DISABLE', 0),
+                       (9262032, 9, 9262031, '5401.03.99', '租户旧目标科目', 'OTHER', 'COST', 3, 99, 'ENABLE', 0),
+                       (9262033, 9, 0, '5401.04', '租户现场管理成本', 'OVERHEAD', 'COST', 2, 4, 'ENABLE', 0)
+                """);
 
         Flyway current = current("multi_tenant");
         current.migrate();
 
-        assertEquals("262", current.info().current().getVersion().getVersion());
+        assertEquals("266", current.info().current().getVersion().getVersion());
+        assertEquals(32, count(current, """
+                SELECT COUNT(*) FROM cost_subject
+                WHERE tenant_id=0 AND (subject_code='5401.01' OR subject_code LIKE '5401.01.%'
+                   OR subject_code='5401.04' OR subject_code LIKE '5401.04.%')
+                """));
+        assertEquals(1, count(current, """
+                SELECT COUNT(*) FROM cost_subject
+                WHERE tenant_id=9 AND subject_code='5401.01' AND subject_name='租户人工成本'
+                """));
+        assertEquals(10, count(current, """
+                SELECT COUNT(*) FROM cost_subject child
+                JOIN cost_subject parent ON parent.id=child.parent_id AND parent.tenant_id=child.tenant_id
+                WHERE parent.tenant_id=9 AND parent.subject_code='5401.03'
+                  AND child.subject_code LIKE '5401.03.%' AND child.deleted_flag=0
+                """));
+        assertEquals(1, count(current, """
+                SELECT COUNT(*) FROM cost_subject
+                WHERE tenant_id=9 AND subject_code='5401.03' AND subject_name='项目目标成本'
+                  AND subject_type='TARGET_COST' AND status='ENABLE'
+                """));
+        assertEquals(9, count(current, """
+                SELECT COUNT(*) FROM cost_subject child
+                JOIN cost_subject parent ON parent.id=child.parent_id AND parent.tenant_id=child.tenant_id
+                WHERE parent.tenant_id=9 AND parent.subject_code='5401.04'
+                  AND child.subject_code IN ('5401.04.06','5401.04.10','5401.04.11','5401.04.12',
+                                             '5401.04.13','5401.04.15','5401.04.16','5401.04.17','5401.04.18')
+                  AND child.deleted_flag=0
+                """));
         assertEquals(2, count(current, """
                 SELECT COUNT(*) FROM sys_dict_data d
                 JOIN sys_dict_type t ON t.id=d.dict_type_id
