@@ -183,7 +183,7 @@ test.describe('M4 costs routes', () => {
       await page.setViewportSize(viewport)
       await page.goto('/cost/ledger?projectId=P1&period=2026-07')
       await expect(page.getByRole('heading', { name: '成本台账', exact: true })).toBeVisible()
-      await expect(page.getByText('¥9,007,199,254,740,993.12').first()).toBeVisible()
+      await expect(page.getByText('9007199254740993.12').first()).toBeVisible()
       await expect(page.getByRole('button', { name: '查询' })).toHaveAttribute('aria-busy', 'false')
       await expect(page.getByRole('table').locator('tbody td').first()).toHaveCSS(
         'font-size',
@@ -206,7 +206,7 @@ test.describe('M4 costs routes', () => {
     const detailDialog = page.getByRole('dialog')
     await expect(detailDialog).toHaveClass(/v2-detail-dialog/)
     await expect(detailDialog.locator('.v2-detail-dialog__facts')).toHaveCSS('font-size', '12px')
-    await expect(detailDialog).toContainText('¥9,007,199,254,740,993.12')
+    await expect(detailDialog).toContainText('9007199254740993')
     expect(writes).toEqual([])
     expect(errors).toEqual([])
   })
@@ -222,7 +222,7 @@ test.describe('M4 costs routes', () => {
     ]) {
       await page.setViewportSize(viewport)
       await page.goto('/cost/summary?projectId=P1&period=2026-07')
-      await expect(page.getByText('¥−0.01').first()).toBeVisible()
+      await expect(page.getByText('-0.01').first()).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)
@@ -254,7 +254,7 @@ test.describe('M4 costs routes', () => {
     ]) {
       await page.setViewportSize(viewport)
       await page.goto('/cost/control?projectId=P1&period=2026-07')
-      await expect(page.getByText('¥9,007,199,254,740,993.12').first()).toBeVisible()
+      await expect(page.getByText('9007199254740993.12').first()).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)

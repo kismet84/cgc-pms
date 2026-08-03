@@ -148,6 +148,6 @@ test('cost-subject deep links render server facts and preserve root redirect sta
 
   await page.goto('/cost/subject/trace')
   await expect(page.getByRole('heading', { level: 1, name: '影响与转入追踪' })).toBeVisible()
-  await expect(page.getByText('¥125.23')).toBeVisible()
+  await expect(page.getByText('125.2300')).toBeVisible()
   await expect(page.getByText('投标成本转入', { exact: true })).toHaveCount(0)
 })

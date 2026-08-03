@@ -336,7 +336,7 @@ test.describe('M6 subcontract task and measure V2', () => {
     await items.getByRole('button', { name: '添加清单项' }).click()
     await items.getByLabel('本期数量').fill('10.0000')
     await items.getByRole('button', { name: '保存清单' }).click()
-    await expect(page.getByText('¥8,000.00', { exact: true }).last()).toBeVisible()
+    await expect(page.getByText('8000.00', { exact: true }).last()).toBeVisible()
 
     await page.locator('input[type=file]').setInputFiles({
       name: '计量依据.pdf',

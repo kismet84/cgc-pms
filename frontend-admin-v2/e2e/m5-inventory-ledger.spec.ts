@@ -270,7 +270,7 @@ test.describe('M5 inventory workspace V2', () => {
     await openStockDrawer(page)
     const drawer = page.getByRole('dialog', { name: '库存明细与流水' })
     await expect(drawer.getByText('¥260.00', { exact: true })).toBeVisible()
-    await expect(page.getByText(/PO-001 · 20.00/)).toBeVisible()
+    await expect(page.getByText(/PO-001 · 20.0000/)).toBeVisible()
     await expect(page.getByText(/30日 4.0000；90日 10.0000/)).toBeVisible()
   })
 

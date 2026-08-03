@@ -258,7 +258,7 @@ test.describe('M4 budget and measurement routes', () => {
     await audit(
       page,
       '/production-measurement?projectId=P1&contractId=C1&period=2026-07',
-      '¥9,007,199,254,740,993.12',
+      '9007199254740993.12',
     )
     await page.getByRole('button', { name: '新建计量' }).click()
     const dialog = page.getByRole('dialog', { name: '新建产值计量' })
