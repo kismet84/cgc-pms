@@ -32,6 +32,7 @@ vi.mock('@/services/cost-subject', () => ({
   saveProjectScope: vi.fn(),
   toggleCostSubjectStatus: vi.fn(),
   updateCostSubject: vi.fn(),
+  updateTargetCostRatios: vi.fn(),
 }))
 
 function user(permissions: string[]): UserInfo {
@@ -203,6 +204,60 @@ describe('M7 cost-subject center', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('新增一级科目')
+  })
+
+  it('accepts four-decimal ratios whose numeric sum only differs by floating-point noise', async () => {
+    route.path = '/cost/subject/taxonomy'
+    useSessionStore().replaceUserInfo(user(['cost:query', 'cost:edit']))
+    const ratios = [...Array(9).fill('10.1'), '9.1']
+    vi.mocked(costSubject.loadCostSubjectTree).mockResolvedValue([
+      {
+        id: '1',
+        parentId: '0',
+        subjectCode: '5401',
+        subjectName: '合同履约成本',
+        subjectType: 'ROOT',
+        accountCategory: 'COST',
+        level: 1,
+        sortOrder: 1,
+        status: 'ENABLE',
+        children: [
+          {
+            id: '13',
+            parentId: '1',
+            subjectCode: '5401.03',
+            subjectName: '项目目标成本',
+            subjectType: 'TARGET_COST',
+            accountCategory: 'COST',
+            level: 2,
+            sortOrder: 3,
+            status: 'ENABLE',
+            children: ratios.map((ratio, index) => ({
+              id: String(901001 + index),
+              parentId: '13',
+              subjectCode: `5401.03.${String(index + 1).padStart(2, '0')}`,
+              subjectName: `目标成本${index + 1}`,
+              subjectType: 'TARGET_COST',
+              accountCategory: 'COST',
+              level: 3,
+              sortOrder: index + 1,
+              status: 'ENABLE',
+              defaultTargetRatio: ratio,
+              children: [],
+            })),
+          },
+        ],
+      },
+    ])
+
+    const wrapper = mount(CostSubjectPage)
+    await flushPromises()
+    const saveButton = wrapper.findAll('button').find((button) => button.text() === '保存10类比例')!
+
+    expect(saveButton.attributes('disabled')).toBeUndefined()
+    await saveButton.trigger('click')
+    await flushPromises()
+    expect(costSubject.updateTargetCostRatios).toHaveBeenCalledOnce()
   })
 
   it('links first-level selection to second-level subjects and detail', async () => {

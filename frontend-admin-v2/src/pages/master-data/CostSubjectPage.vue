@@ -37,6 +37,7 @@ import {
   saveProjectScope,
   toggleCostSubjectStatus,
   updateCostSubject,
+  updateTargetCostRatios,
   type AssignmentRuleRecord,
   type CostSubjectAuditRow,
   type CostSubjectCommand,
@@ -96,6 +97,17 @@ const secondLevelSubjects = computed(() => selectedFirstLevel.value?.children ??
 const selectedSubject = computed(
   () => secondLevelSubjects.value.find((item) => item.id === selectedSubjectId.value) ?? null,
 )
+const targetCostSubjects = computed(
+  () => firstLevelSubjects.value.find((item) => item.subjectCode === '5401.03')?.children ?? [],
+)
+const ratioDraft = reactive<Record<string, string>>({})
+const ratioTotal = computed(() =>
+  targetCostSubjects.value.reduce(
+    (sum, subject) => sum + Number(ratioDraft[subject.subjectCode] || 0),
+    0,
+  ),
+)
+const ratioTotalIsValid = computed(() => Math.abs(ratioTotal.value - 100) < 1e-9)
 const subjectDialog = ref(false)
 const subjectMode = ref<'create' | 'edit'>('create')
 const subjectDeleteTarget = ref<CostSubjectRecord | null>(null)
@@ -206,8 +218,18 @@ const subjectTypeLabels: Record<string, string> = {
   MEASURES: '措施费',
   OTHER: '其他成本',
   OVERHEAD: '间接费用',
+  TARGET_COST: '项目目标成本',
+  SITE_MANAGEMENT: '现场管理费',
+  SPECIAL: '其他专项成本',
+  FINANCE_TAX: '财务及税费',
+  RISK_RESERVE: '风险准备',
 }
 const subjectTypeLabel = (value?: string) => subjectTypeLabels[value ?? ''] ?? '其他成本'
+const isGovernedSubject = (subject?: CostSubjectRecord | null) =>
+  Boolean(
+    subject &&
+      (subject.subjectCode === '5401.03' || subject.subjectCode.startsWith('5401.03.')),
+  )
 const enabledOptions = [
   { value: 'true', label: '启用' },
   { value: 'false', label: '停用' },
@@ -373,7 +395,31 @@ async function confirmSubjectDelete(): Promise<void> {
 
 async function loadTaxonomy(signal?: AbortSignal): Promise<void> {
   subjects.value = await loadCostSubjectTree(signal)
+  for (const subject of targetCostSubjects.value)
+    ratioDraft[subject.subjectCode] = subject.defaultTargetRatio ?? ''
   normalizeTaxonomySelection()
+}
+
+async function saveTargetRatios(): Promise<void> {
+  if (targetCostSubjects.value.length !== 10 || !ratioTotalIsValid.value) {
+    showToast('warning', '比例无效', '必须完整包含10类科目且合计100%。')
+    return
+  }
+  saving.value = true
+  try {
+    await updateTargetCostRatios(
+      targetCostSubjects.value.map((subject) => ({
+        subjectCode: subject.subjectCode,
+        ratio: ratioDraft[subject.subjectCode] || '',
+      })),
+    )
+    await loadTaxonomy()
+    showToast('success', '默认比例已保存', '10类比例已由服务端原子校验并回读。')
+  } catch (value) {
+    showToast('error', '默认比例保存失败', messageOf(value))
+  } finally {
+    saving.value = false
+  }
 }
 
 async function loadRules(signal?: AbortSignal): Promise<void> {
@@ -840,7 +886,7 @@ onBeforeUnmount(() => controller?.abort())
                 <small>5401.xx.xx · 共 {{ secondLevelSubjects.length }} 个</small>
               </span>
               <V2Button
-                v-if="canSubjectAdd && selectedFirstLevel"
+                v-if="canSubjectAdd && selectedFirstLevel && selectedFirstLevel.subjectCode !== '5401.03'"
                 size="small"
                 @click="openSubjectCreate(selectedFirstLevel)"
               >
@@ -871,9 +917,11 @@ onBeforeUnmount(() => controller?.abort())
               >
                 <span>
                   <strong>{{ subject.subjectName }}</strong>
-                  <small
-                    >{{ subject.subjectCode }} · {{ subjectTypeLabel(subject.subjectType) }}</small
-                  >
+                  <small>
+                    {{ subject.subjectCode }} · {{ subjectTypeLabel(subject.subjectType) }}<template
+                      v-if="subject.defaultTargetRatio != null"
+                    > · {{ subject.defaultTargetRatio }}%</template>
+                  </small>
                 </span>
                 <V2Badge :tone="subject.status === 'ENABLE' ? 'success' : 'neutral'">
                   {{ subject.status === 'ENABLE' ? '启用' : '停用' }}
@@ -887,18 +935,18 @@ onBeforeUnmount(() => controller?.abort())
               <h3 id="cost-subject-detail-title">3. 科目详情</h3>
               <V2Cluster v-if="selectedSubject">
                 <V2Button
-                  v-if="canSubjectAdd"
+                  v-if="canSubjectAdd && !isGovernedSubject(selectedSubject)"
                   size="small"
                   variant="secondary"
                   @click="openSubjectCreate(selectedSubject)"
                 >
                   新增子科目
                 </V2Button>
-                <V2Button v-if="canSubjectEdit" size="small" @click="openSubjectEdit"
+                <V2Button v-if="canSubjectEdit && !isGovernedSubject(selectedSubject)" size="small" @click="openSubjectEdit"
                   >编辑</V2Button
                 >
                 <V2Button
-                  v-if="canSubjectEdit"
+                  v-if="canSubjectEdit && !isGovernedSubject(selectedSubject)"
                   size="small"
                   variant="secondary"
                   @click="subjectStatusTarget = selectedSubject"
@@ -906,7 +954,7 @@ onBeforeUnmount(() => controller?.abort())
                   {{ selectedSubject.status === 'ENABLE' ? '停用' : '启用' }}
                 </V2Button>
                 <V2Button
-                  v-if="canSubjectDelete"
+                  v-if="canSubjectDelete && !isGovernedSubject(selectedSubject)"
                   size="small"
                   variant="danger"
                   @click="subjectDeleteTarget = selectedSubject"
@@ -941,6 +989,10 @@ onBeforeUnmount(() => controller?.abort())
                   <dt>末级</dt>
                   <dd>{{ selectedSubject.children?.length ? '否' : '是' }}</dd>
                 </div>
+                <div v-if="selectedSubject.defaultTargetRatio != null">
+                  <dt>默认目标成本比例</dt>
+                  <dd>{{ selectedSubject.defaultTargetRatio }}%</dd>
+                </div>
               </dl>
             </template>
             <V2PageState
@@ -950,6 +1002,36 @@ onBeforeUnmount(() => controller?.abort())
               description="选择科目后查看详情。"
             />
           </section>
+        </div>
+      </V2Card>
+      <V2Card v-if="targetCostSubjects.length" title="项目目标成本默认比例">
+        <template #actions>
+          <span>合计 {{ ratioTotal }}%</span>
+          <V2Button
+            v-if="canSubjectEdit"
+            size="small"
+            :disabled="saving || !ratioTotalIsValid"
+            @click="saveTargetRatios"
+          >保存10类比例</V2Button>
+        </template>
+        <div class="cost-subject-page__table-wrap">
+          <table aria-label="项目目标成本默认比例">
+            <thead><tr><th>编码</th><th>科目</th><th>默认比例（%）</th></tr></thead>
+            <tbody>
+              <tr v-for="subject in targetCostSubjects" :key="subject.id">
+                <td>{{ subject.subjectCode }}</td>
+                <td>{{ subject.subjectName }}</td>
+                <td>
+                  <V2Input
+                    v-model="ratioDraft[subject.subjectCode]"
+                    label="默认比例"
+                    hide-label
+                    :disabled="!canSubjectEdit || saving"
+                  />
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </V2Card>
     </template>

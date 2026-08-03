@@ -2,6 +2,8 @@ package com.cgcpms.cost.vo;
 
 import lombok.Data;
 
+import java.math.BigDecimal;
+
 @Data
 public class CostSubjectVO {
     private String id;
@@ -14,6 +16,7 @@ public class CostSubjectVO {
     private Integer level;
     private Integer sortOrder;
     private String status;
+    private BigDecimal defaultTargetRatio;
     private String createdBy;
     private String createdAt;
     private String updatedAt;

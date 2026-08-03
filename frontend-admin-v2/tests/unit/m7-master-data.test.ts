@@ -39,6 +39,8 @@ vi.mock('@/services/master-data', () => ({
   createMaterial: vi.fn(),
   updateMaterial: vi.fn(),
   updateMaterialStatus: vi.fn(),
+  downloadMaterialImportTemplate: vi.fn(),
+  importMaterials: vi.fn(),
 }))
 
 function user(permissions: string[], roles = ['USER']): UserInfo {
@@ -145,6 +147,8 @@ beforeEach(() => {
         materialName: '钢筋',
         categoryId: '9',
         defaultTaxRate: '13.00',
+        taxInclusiveInfoPrice: '43.000000',
+        purchasePrice: '41.5000',
         status: 'ENABLE',
       },
     ],
@@ -158,7 +162,25 @@ beforeEach(() => {
     materialName: '钢筋',
     categoryId: '9',
     defaultTaxRate: '13.00',
+    taxInclusiveInfoPrice: '43.000000',
+    infoPricePeriod: '2026-07',
+    infoPriceSource: '武汉市建设工程综合价格信息',
+    infoPriceVerificationStatus: '已人工校正',
+    infoPriceReviewRequired: 1,
+    purchasePrice: '41.5000',
+    purchasePriceReceiptItemId: '9001',
+    purchasePriceDate: '2026-07-20',
     status: 'ENABLE',
+  })
+  vi.mocked(masterData.downloadMaterialImportTemplate).mockResolvedValue(new Blob(['xlsx']))
+  vi.mocked(masterData.importMaterials).mockResolvedValue({
+    total: 3,
+    created: 1,
+    priceUpdated: 1,
+    conflictsCreated: 0,
+    skipped: 0,
+    failed: 1,
+    errors: [{ row: 4, code: 'ROW_INVALID', message: '价格无效' }],
   })
 })
 
@@ -313,7 +335,37 @@ describe('M7 master-data pages', () => {
     expect(wrapper.text()).not.toContain('查询条件')
     expect(wrapper.text()).toContain('共 1 项')
     expect(wrapper.text()).toContain('13.00')
+    expect(wrapper.text()).toContain('43.000000')
+    expect(wrapper.text()).toContain('41.5000')
+    expect(wrapper.text()).toContain('导出模板')
+    expect(wrapper.text()).not.toContain('导入资料')
     expect(wrapper.text()).not.toMatch(/单位分布|启用材料|已维护税率/)
     expect(wrapper.text()).not.toContain('新增材料')
+  })
+
+  it('imports a standard workbook with FormData service and shows all row errors', async () => {
+    useSessionStore().replaceUserInfo(user(['material:dict:list', 'material:dict:add', 'material:dict:edit']))
+    const wrapper = mount(MaterialDictionaryPage, { attachTo: document.body })
+    await flushPromises()
+
+    await wrapper.findAll('button').find((item) => item.text() === '导入资料')!.trigger('click')
+    const input = document.body.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(['xlsx'], 'materials.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] })
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    await flushPromises()
+    const start = Array.from(document.body.querySelectorAll('button')).find(
+      (item) => item.textContent === '开始导入',
+    )!
+    start.click()
+    await flushPromises()
+
+    expect(masterData.importMaterials).toHaveBeenCalledWith(file)
+    expect(masterData.loadMaterials).toHaveBeenCalledTimes(2)
+    expect(document.body.textContent).toContain('失败 1')
+    expect(document.body.textContent).toContain('ROW_INVALID')
+    expect(document.body.textContent).toContain('价格无效')
   })
 })

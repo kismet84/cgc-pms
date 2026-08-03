@@ -295,14 +295,19 @@ class WorkflowSubmitServiceTest {
     @DisplayName("COST_TARGET rejected edit resubmits same instance only through dedicated service")
     void costTargetRejectedEditUsesRealResubmitChain() {
         CostTarget target = createCostTarget("WF-REAL-RESUBMIT");
-        CostTargetItem item = new CostTargetItem();
-        item.setCostSubjectId(31991L);
-        item.setTargetAmount(new BigDecimal("100.00"));
-        item.setBidCostAmount(new BigDecimal("100.00"));
-        item.setResponsibilityAmount(new BigDecimal("100.00"));
-        item.setResponsibleUserId(TestUserContext.USER_ADMIN);
-        item.setResponsibilityUnit("成本组");
-        costTargetService.batchSaveItems(target.getId(), target.getVersion(), List.of(item));
+        List<CostTargetItem> items = costTargetService.getDefaultAllocation(PROJECT_ID).items().stream()
+                .map(value -> {
+                    CostTargetItem item = new CostTargetItem();
+                    item.setCostSubjectId(Long.parseLong(value.costSubjectId()));
+                    item.setTargetAmount(value.targetAmount());
+                    item.setBidCostAmount(BigDecimal.ZERO);
+                    item.setResponsibilityAmount(value.responsibilityAmount());
+                    item.setResponsibleUserId(TestUserContext.USER_ADMIN);
+                    item.setResponsibilityUnit("成本组");
+                    return item;
+                })
+                .toList();
+        costTargetService.batchSaveItems(target.getId(), target.getVersion(), items);
         costTargetService.submitForApproval(target.getId(), jdbcTarget(target.getId()).getVersion());
 
         CostTarget approving = jdbcTarget(target.getId());
@@ -344,12 +349,6 @@ class WorkflowSubmitServiceTest {
         PmProject project = projectMapper.selectById(PROJECT_ID);
         project.setStatus("ACTIVE");
         projectMapper.updateById(project);
-        jdbcTemplate.update("""
-                INSERT INTO cost_subject
-                  (id,tenant_id,parent_id,subject_code,subject_name,subject_type,level,sort_order,status,account_category,created_at,updated_at,deleted_flag)
-                SELECT 31991,0,0,'WF-CT-31991','工作流目标成本科目','DIRECT',1,0,'ENABLE','COST',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0
-                WHERE NOT EXISTS (SELECT 1 FROM cost_subject WHERE id=31991)
-                """);
         CostTarget target = new CostTarget();
         target.setProjectId(PROJECT_ID);
         target.setVersionNo(versionNo);

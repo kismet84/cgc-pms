@@ -345,6 +345,8 @@ export interface CostTargetRecord {
   totalTargetAmount: DecimalString;
   totalBidCostAmount: DecimalString;
   totalResponsibilityAmount: DecimalString;
+  sourceContractAmount?: DecimalString | null;
+  targetCostRate?: DecimalString | null;
   isActive: number;
   approvalStatus: CostTargetApprovalStatus;
   status: CostTargetStatus;
@@ -382,6 +384,22 @@ export interface CostTargetItemRecord {
   responsibilityUnit?: string | null;
   sortOrder?: string | number | null;
   remark?: string | null;
+}
+
+export interface CostTargetDefaultAllocationItem extends CostTargetItemRecord {
+  subjectCode: string;
+  subjectName: string;
+  subjectType: string;
+  defaultTargetRatio: DecimalString;
+}
+
+export interface CostTargetDefaultAllocation {
+  projectId: string;
+  projectManagerId?: string | null;
+  sourceContractAmount: DecimalString;
+  targetCostRate: DecimalString;
+  totalTargetAmount: DecimalString;
+  items: CostTargetDefaultAllocationItem[];
 }
 
 export interface CostTargetSaveCommand {
@@ -779,6 +797,7 @@ export const COMMERCIAL_API = {
   bidWon: (id: string) => `/bid-cost/${encodeURIComponent(id)}/won`,
   bidLost: (id: string) => `/bid-cost/${encodeURIComponent(id)}/lost`,
   costTargets: "/cost-targets",
+  costTargetDefaultAllocation: "/cost-targets/default-allocation",
   costTarget: (id: string) => `/cost-targets/${encodeURIComponent(id)}`,
   costTargetItems: (id: string) =>
     `/cost-targets/${encodeURIComponent(id)}/items`,

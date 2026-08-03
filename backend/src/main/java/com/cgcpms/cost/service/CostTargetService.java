@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.constant.TargetCostSubjectCatalog;
 import com.cgcpms.cost.entity.CostSummary;
 import com.cgcpms.cost.entity.CostTarget;
 import com.cgcpms.cost.entity.CostTargetItem;
@@ -19,6 +20,8 @@ import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.service.WorkflowEngine;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -29,15 +32,19 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.ArrayList;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CostTargetService {
+
+    private static final BigDecimal TARGET_COST_RATE = new BigDecimal("0.850000");
 
     private final CostTargetMapper costTargetMapper;
     private final CostSummaryMapper costSummaryMapper;
@@ -83,6 +90,38 @@ public class CostTargetService {
         return target;
     }
 
+    public DefaultAllocation getDefaultAllocation(Long projectId) {
+        PmProject project = requireWritableProject(projectId, "生成目标成本默认分配");
+        BigDecimal contractAmount = money(project.getContractAmount());
+        if (project.getContractAmount() == null || contractAmount.signum() <= 0) {
+            throw new BusinessException("PROJECT_CONTRACT_AMOUNT_INVALID", "项目合同金额必须大于0才能生成目标成本");
+        }
+        List<TargetSubject> subjects = getTargetSubjects(false);
+        BigDecimal total = money(contractAmount.multiply(TARGET_COST_RATE));
+        List<DefaultAllocationItem> items = new ArrayList<>();
+        BigDecimal allocated = BigDecimal.ZERO.setScale(2);
+        for (TargetSubject subject : subjects) {
+            BigDecimal amount = money(total.multiply(subject.ratio()).divide(new BigDecimal("100")));
+            allocated = allocated.add(amount);
+            items.add(new DefaultAllocationItem(String.valueOf(subject.id()), subject.code(), subject.name(), subject.type(),
+                    subject.ratio(), amount, BigDecimal.ZERO.setScale(2), amount,
+                    project.getProjectManagerId() == null ? null : String.valueOf(project.getProjectManagerId())));
+        }
+        BigDecimal residual = total.subtract(allocated);
+        for (int i = 0; residual.signum() != 0 && i < items.size(); i++) {
+            DefaultAllocationItem item = items.get(i);
+            if ("5401.03.02".equals(item.subjectCode())) {
+                BigDecimal adjusted = item.targetAmount().add(residual);
+                items.set(i, new DefaultAllocationItem(item.costSubjectId(), item.subjectCode(), item.subjectName(),
+                        item.subjectType(), item.defaultTargetRatio(), adjusted, item.bidCostAmount(), adjusted,
+                        item.responsibleUserId()));
+            }
+        }
+        return new DefaultAllocation(String.valueOf(project.getId()),
+                project.getProjectManagerId() == null ? null : String.valueOf(project.getProjectManagerId()), contractAmount,
+                TARGET_COST_RATE, total, items);
+    }
+
     // ── Create ──
 
     @Transactional(rollbackFor = Exception.class)
@@ -95,6 +134,7 @@ public class CostTargetService {
         target.setIsActive(0);
         target.setApprovalInstanceId(null);
         target.setVersion(0);
+        applyContractSnapshot(target, project);
         normalizeHeaderAmounts(target);
         try {
             costTargetMapper.insert(target);
@@ -131,6 +171,15 @@ public class CostTargetService {
         target.setIsActive(0);
         target.setApprovalInstanceId(existing.getApprovalInstanceId());
         target.setVersion(existing.getVersion());
+        target.setSourceContractAmount(existing.getSourceContractAmount());
+        target.setTargetCostRate(existing.getTargetCostRate());
+        if (existing.getSourceContractAmount() != null) {
+            target.setTotalTargetAmount(existing.getTotalTargetAmount());
+            if (target.getTotalBidCostAmount() == null) {
+                target.setTotalBidCostAmount(existing.getTotalBidCostAmount());
+            }
+            target.setTotalResponsibilityAmount(existing.getTotalTargetAmount());
+        }
         normalizeHeaderAmounts(target);
         if (validateStoredItems) validateExistingItemsTotal(target.getId(), target);
         try {
@@ -307,6 +356,11 @@ public class CostTargetService {
             }
         }
 
+        List<CostTargetItem> savedItems = costTargetItemMapper.selectList(new LambdaQueryWrapper<CostTargetItem>()
+                .eq(CostTargetItem::getTargetId, targetId)
+                .eq(CostTargetItem::getTenantId, UserContext.getCurrentTenantId()));
+        validateItemsTotal(target, savedItems);
+
         LambdaUpdateWrapper<CostTarget> touchWrapper = new LambdaUpdateWrapper<>();
         touchWrapper.eq(CostTarget::getId, targetId)
                 .eq(CostTarget::getTenantId, UserContext.getCurrentTenantId())
@@ -328,6 +382,14 @@ public class CostTargetService {
     }
 
     private void validateItemsTotal(CostTarget target, List<CostTargetItem> items) {
+        if (target.getSourceContractAmount() != null) {
+            validateTargetSubjectSet(items);
+            BigDecimal expected = money(target.getSourceContractAmount().multiply(TARGET_COST_RATE));
+            if (target.getTargetCostRate() == null || target.getTargetCostRate().compareTo(TARGET_COST_RATE) != 0
+                    || money(target.getTotalTargetAmount()).compareTo(expected) != 0) {
+                throw new BusinessException("COST_TARGET_SNAPSHOT_INVALID", "目标成本合同金额与85%快照不一致");
+            }
+        }
         BigDecimal bid = sum(items, CostTargetItem::getBidCostAmount);
         BigDecimal targetAmount = sum(items, CostTargetItem::getTargetAmount);
         BigDecimal responsibility = sum(items, CostTargetItem::getResponsibilityAmount);
@@ -399,6 +461,42 @@ public class CostTargetService {
         if (valid == null || valid != 1) {
             throw new BusinessException("COST_TARGET_SUBJECT_INVALID", "目标成本必须使用项目适用范围内的启用末级成本科目");
         }
+    }
+
+    private void validateTargetSubjectSet(List<CostTargetItem> items) {
+        Set<Long> required = getTargetSubjects(true).stream().map(TargetSubject::id).collect(java.util.stream.Collectors.toSet());
+        Set<Long> actual = items == null ? Set.of() : items.stream()
+                .map(CostTargetItem::getCostSubjectId)
+                .filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        if (items == null || items.size() != required.size() || !actual.equals(required)) {
+            throw new BusinessException("COST_TARGET_SUBJECT_SET_INVALID", "目标成本必须完整包含固定10类科目且不得重复");
+        }
+    }
+
+    private List<TargetSubject> getTargetSubjects(boolean allowMissingRatio) {
+        List<TargetSubject> subjects = jdbc.query("""
+                SELECT s.id, s.subject_code, s.subject_name, s.subject_type, s.default_target_ratio
+                FROM cost_subject s
+                JOIN cost_subject p ON p.id=s.parent_id AND p.tenant_id=s.tenant_id AND p.deleted_flag=0
+                WHERE s.tenant_id=? AND p.subject_code=? AND s.deleted_flag=0 AND s.status='ENABLE'
+                ORDER BY s.subject_code
+                """, (rs, rowNum) -> new TargetSubject(rs.getLong("id"), rs.getString("subject_code"),
+                rs.getString("subject_name"), rs.getString("subject_type"), rs.getBigDecimal("default_target_ratio")),
+                UserContext.getCurrentTenantId(), TargetCostSubjectCatalog.PARENT_CODE);
+        Set<String> codes = subjects.stream().map(TargetSubject::code).collect(java.util.stream.Collectors.toSet());
+        if (subjects.size() != TargetCostSubjectCatalog.ITEMS.size() || !codes.equals(TargetCostSubjectCatalog.CODES)) {
+            throw new BusinessException("TARGET_COST_SUBJECT_SET_INVALID", "项目目标成本固定10类科目不完整");
+        }
+        if (!allowMissingRatio) {
+            BigDecimal sum = subjects.stream().map(TargetSubject::ratio)
+                    .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
+            if (subjects.stream().anyMatch(subject -> subject.ratio() == null)
+                    || sum.compareTo(new BigDecimal("100.0000")) != 0) {
+                throw new BusinessException("TARGET_COST_RATIO_SUM_INVALID", "10类目标成本默认比例必须完整且合计100%");
+            }
+        }
+        return subjects;
     }
 
     private PmProject requireWritableProject(Long projectId, String action) {
@@ -478,6 +576,19 @@ public class CostTargetService {
         if (target.getTotalResponsibilityAmount().compareTo(target.getTotalTargetAmount()) != 0) throw new BusinessException("COST_TARGET_RESPONSIBILITY_MISMATCH", "责任预算总额必须等于目标成本总额");
     }
 
+    private static void applyContractSnapshot(CostTarget target, PmProject project) {
+        BigDecimal contractAmount = money(project.getContractAmount());
+        if (project.getContractAmount() == null || contractAmount.signum() <= 0) {
+            throw new BusinessException("PROJECT_CONTRACT_AMOUNT_INVALID", "项目合同金额必须大于0才能创建目标成本");
+        }
+        BigDecimal total = money(contractAmount.multiply(TARGET_COST_RATE));
+        target.setSourceContractAmount(contractAmount);
+        target.setTargetCostRate(TARGET_COST_RATE);
+        target.setTotalTargetAmount(total);
+        target.setTotalBidCostAmount(BigDecimal.ZERO.setScale(2));
+        target.setTotalResponsibilityAmount(total);
+    }
+
     private void normalizeItems(List<CostTargetItem> items) {
         if (items == null) return;
         for (CostTargetItem item : items) {
@@ -496,7 +607,7 @@ public class CostTargetService {
     }
 
     private static BigDecimal money(BigDecimal amount) {
-        return (amount == null ? BigDecimal.ZERO : amount).setScale(2, java.math.RoundingMode.HALF_UP);
+        return (amount == null ? BigDecimal.ZERO : amount).setScale(2, RoundingMode.HALF_UP);
     }
 
     private CostTarget getOwnedTarget(Long id) {
@@ -530,5 +641,24 @@ public class CostTargetService {
         if (!Objects.equals(expectedVersion, actualVersion)) {
             throw new BusinessException("COST_TARGET_CONCURRENT_UPDATE", "目标成本已被其他用户修改，请刷新后重试");
         }
+    }
+
+    private record TargetSubject(Long id, String code, String name, String type, BigDecimal ratio) {
+    }
+
+    public record DefaultAllocation(String projectId, String projectManagerId,
+                                    @JsonSerialize(using = ToStringSerializer.class) BigDecimal sourceContractAmount,
+                                    @JsonSerialize(using = ToStringSerializer.class) BigDecimal targetCostRate,
+                                    @JsonSerialize(using = ToStringSerializer.class) BigDecimal totalTargetAmount,
+                                    List<DefaultAllocationItem> items) {
+    }
+
+    public record DefaultAllocationItem(String costSubjectId, String subjectCode, String subjectName,
+                                        String subjectType,
+                                        @JsonSerialize(using = ToStringSerializer.class) BigDecimal defaultTargetRatio,
+                                        @JsonSerialize(using = ToStringSerializer.class) BigDecimal targetAmount,
+                                        @JsonSerialize(using = ToStringSerializer.class) BigDecimal bidCostAmount,
+                                        @JsonSerialize(using = ToStringSerializer.class) BigDecimal responsibilityAmount,
+                                        String responsibleUserId) {
     }
 }

@@ -61,7 +61,17 @@ public class MatReceiptService {
     public IPage<MatReceiptVO> getPage(long pageNum, long pageSize, Long projectId, Long orderId,
                                         Long contractId, Long partnerId, String receiptCode, String qualityStatus) {
         LambdaQueryWrapper<MatReceipt> wrapper = new LambdaQueryWrapper<>();
-        if (projectId != null) wrapper.eq(MatReceipt::getProjectId, projectId);
+        if (projectId != null) {
+            checkProjectAccess(projectId, "查询材料验收单");
+            wrapper.eq(MatReceipt::getProjectId, projectId);
+        } else {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            if (accessibleProjectIds.isEmpty()) {
+                wrapper.eq(MatReceipt::getProjectId, -1L);
+            } else {
+                wrapper.in(MatReceipt::getProjectId, accessibleProjectIds);
+            }
+        }
         if (orderId != null) wrapper.eq(MatReceipt::getOrderId, orderId);
         if (contractId != null) wrapper.eq(MatReceipt::getContractId, contractId);
         if (partnerId != null) wrapper.eq(MatReceipt::getPartnerId, partnerId);
@@ -207,6 +217,9 @@ public class MatReceiptService {
         if (!StringUtils.hasText(receipt.getReceiptMode())) receipt.setReceiptMode(existing.getReceiptMode());
 
         Long effectiveProjectId = receipt.getProjectId() != null ? receipt.getProjectId() : existing.getProjectId();
+        if (!Objects.equals(effectiveProjectId, existing.getProjectId())) {
+            checkProjectAccess(effectiveProjectId, "编辑材料验收单");
+        }
         Long effectiveOrderId = receipt.getOrderId() != null ? receipt.getOrderId() : existing.getOrderId();
         if (effectiveOrderId != null) {
             MatPurchaseOrder order = matPurchaseOrderMapper.selectById(effectiveOrderId);

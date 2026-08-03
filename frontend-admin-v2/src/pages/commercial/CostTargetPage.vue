@@ -5,6 +5,7 @@ import type {
   CostTargetQuery,
   CostTargetRecord,
   CostTargetSaveCommand,
+  CostTargetDefaultAllocation,
   ProjectBudgetRecord,
   BudgetAvailabilityRecord,
   ProjectContextOption,
@@ -29,6 +30,7 @@ import {
   loadCostSubjectOptions,
   loadCostTarget,
   loadCostTargetItems,
+  loadCostTargetDefaultAllocation,
   loadCostTargetPage,
   loadBudgetAvailability,
   loadBudgetPage,
@@ -42,7 +44,11 @@ import { loadProjectUsers } from '@/services/projects'
 import { useSessionStore } from '@/stores/session'
 
 type PendingAction = 'delete' | 'submit' | null
-type CostBudgetEditorForm = CostTargetSaveCommand & { projectManagerId: string }
+type CostBudgetEditorForm = CostTargetSaveCommand & {
+  projectManagerId: string
+  sourceContractAmount: string
+  targetCostRate: string
+}
 
 const APPROVAL_OPTIONS = [
   { value: '', label: '全部审批状态' },
@@ -91,6 +97,7 @@ let detailGeneration = 0
 let listController: AbortController | null = null
 let detailController: AbortController | null = null
 let projectController: AbortController | null = null
+let allocationController: AbortController | null = null
 
 const mode = computed<'list' | 'create' | 'edit'>(() => {
   if (route.path.endsWith('/create')) return 'create'
@@ -111,6 +118,11 @@ const editable = computed(
       detail.value.isActive !== 1 &&
       ['DRAFT', 'REJECTED'].includes(detail.value.approvalStatus)),
 )
+const fixedTargetVersion = computed(
+  () => mode.value === 'create' || Boolean(detail.value?.sourceContractAmount),
+)
+const targetDifference = computed(() => amountDifference('targetAmount'))
+const responsibilityDifference = computed(() => amountDifference('responsibilityAmount'))
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / (filter.pageSize ?? 10))))
 const projectOptions = computed(() =>
   projects.value.map((project) => ({ value: project.id, label: project.projectName })),
@@ -156,6 +168,8 @@ function emptyForm(): CostBudgetEditorForm {
     effectiveDate: null,
     version: null,
     remark: null,
+    sourceContractAmount: '',
+    targetCostRate: '',
   }
 }
 
@@ -234,10 +248,10 @@ async function loadProjects(): Promise<void> {
     responsibleUsers.value = users.records
       .filter((user) => user.status === 'ENABLE')
       .map((user) => ({ value: user.id, label: user.realName || user.username }))
-    if (form.projectId && !form.projectManagerId) {
+    if (form.projectId && mode.value === 'create') await selectProject(form.projectId)
+    else if (form.projectId && !form.projectManagerId)
       form.projectManagerId =
         projects.value.find((project) => project.id === form.projectId)?.projectManagerId ?? ''
-    }
   } catch (error) {
     if (!controller.signal.aborted) errorMessage.value = errorText(error, '可见项目加载失败')
   }
@@ -304,6 +318,8 @@ async function loadDetail(id: string, preserveNotice = false): Promise<void> {
       totalTargetAmount: target.totalTargetAmount,
       totalBidCostAmount: target.totalBidCostAmount,
       totalResponsibilityAmount: target.totalResponsibilityAmount,
+      sourceContractAmount: target.sourceContractAmount ?? '',
+      targetCostRate: target.targetCostRate ?? '',
       effectiveDate: target.effectiveDate ?? null,
       version: target.version ?? null,
       remark: target.remark ?? null,
@@ -375,10 +391,54 @@ function command(): CostBudgetDraftSaveCommand {
   }
 }
 
-function selectProject(projectId: string): void {
+async function selectProject(projectId: string): Promise<void> {
   form.projectId = projectId
   form.projectManagerId =
     projects.value.find((project) => project.id === projectId)?.projectManagerId ?? ''
+  form.sourceContractAmount = ''
+  form.targetCostRate = ''
+  form.totalTargetAmount = ''
+  form.totalBidCostAmount = ''
+  form.totalResponsibilityAmount = ''
+  items.value = []
+  if (!projectId || mode.value !== 'create') return
+  allocationController?.abort()
+  const controller = new AbortController()
+  allocationController = controller
+  actionBusy.value = true
+  resetNotices()
+  try {
+    const allocation = await loadCostTargetDefaultAllocation(projectId, controller.signal)
+    if (allocationController !== controller || form.projectId !== projectId) return
+    applyDefaultAllocation(allocation)
+  } catch (error) {
+    if (!controller.signal.aborted)
+      errorMessage.value = errorText(error, '目标成本默认分配生成失败')
+  } finally {
+    if (allocationController === controller) actionBusy.value = false
+  }
+}
+
+function applyDefaultAllocation(allocation: CostTargetDefaultAllocation): void {
+  const managerId = allocation.projectManagerId || form.projectManagerId
+  form.projectManagerId = managerId || ''
+  form.sourceContractAmount = allocation.sourceContractAmount
+  form.targetCostRate = allocation.targetCostRate
+  form.totalTargetAmount = allocation.totalTargetAmount
+  form.totalBidCostAmount = '0.00'
+  form.totalResponsibilityAmount = allocation.totalTargetAmount
+  items.value = allocation.items.map((item, index) => ({
+    ...item,
+    responsibleUserId: item.responsibleUserId || managerId || null,
+    responsibilityUnit: item.responsibilityUnit || '项目成本责任人',
+    sortOrder: index + 1,
+  }))
+}
+
+function amountDifference(key: 'targetAmount' | 'responsibilityAmount'): string {
+  const expected = Number(form.totalTargetAmount || 0)
+  const actual = items.value.reduce((sum, item) => sum + Number(item[key] || 0), 0)
+  return (expected - actual).toFixed(2)
 }
 
 async function saveHeader(): Promise<void> {
@@ -490,6 +550,14 @@ function approvalTone(status: string): 'neutral' | 'info' | 'success' | 'warning
 }
 
 watch(
+  () => form.projectManagerId,
+  (managerId) => {
+    if (mode.value !== 'create' || !managerId) return
+    items.value = items.value.map((item) => ({ ...item, responsibleUserId: managerId }))
+  },
+)
+
+watch(
   () => route.fullPath,
   () => {
     if (mode.value !== 'list' || canQuery.value) void loadProjects()
@@ -511,6 +579,7 @@ onBeforeUnmount(() => {
   listController?.abort()
   detailController?.abort()
   projectController?.abort()
+  allocationController?.abort()
 })
 </script>
 
@@ -742,19 +811,31 @@ onBeforeUnmount(() => {
                   :disabled="actionBusy || !editable || !canSaveDraft"
                 />
                 <V2Input
-                  v-if="mode === 'edit'"
+                  v-if="form.sourceContractAmount"
+                  v-model="form.sourceContractAmount"
+                  label="合同金额快照"
+                  disabled
+                />
+                <V2Input
+                  v-if="form.targetCostRate"
+                  v-model="form.targetCostRate"
+                  label="目标成本率"
+                  disabled
+                />
+                <V2Input
+                  v-if="form.totalTargetAmount"
                   v-model="form.totalTargetAmount"
                   label="目标成本合计（服务端）"
                   disabled
                 />
                 <V2Input
-                  v-if="mode === 'edit'"
+                  v-if="form.totalBidCostAmount"
                   v-model="form.totalBidCostAmount"
                   label="投标成本合计（服务端）"
                   disabled
                 />
                 <V2Input
-                  v-if="mode === 'edit'"
+                  v-if="form.totalResponsibilityAmount"
                   v-model="form.totalResponsibilityAmount"
                   label="责任预算合计（服务端）"
                   disabled
@@ -773,10 +854,13 @@ onBeforeUnmount(() => {
               <header class="cost-target-page__section-heading">
                 <div>
                   <h3 id="cost-budget-lines">成本预算明细</h3>
-                  <p>填写科目金额和责任预算；合计由服务端事务计算并回读。</p>
+                  <p>
+                    固定10类科目；目标差额 {{ targetDifference }}，责任差额
+                    {{ responsibilityDifference }}。服务端最终校验。
+                  </p>
                 </div>
                 <V2Button
-                  v-if="canSaveDraft && editable"
+                  v-if="canSaveDraft && editable && !fixedTargetVersion"
                   size="small"
                   variant="secondary"
                   :disabled="actionBusy"
@@ -817,7 +901,7 @@ onBeforeUnmount(() => {
                           hide-label
                           :options="costSubjectOptions"
                           required
-                          :disabled="!canSaveDraft || !editable"
+                          :disabled="!canSaveDraft || !editable || fixedTargetVersion"
                           @update:model-value="updateItem(index, 'costSubjectId', $event)"
                         />
                       </td>
@@ -873,13 +957,13 @@ onBeforeUnmount(() => {
                       </td>
                       <td>
                         <V2Button
-                          v-if="canSaveDraft && editable"
+                          v-if="canSaveDraft && editable && !fixedTargetVersion"
                           size="small"
                           variant="danger"
                           :disabled="actionBusy"
                           @click="items = items.filter((_, itemIndex) => itemIndex !== index)"
-                          >移除</V2Button
-                        >
+                          >移除</V2Button>
+                        <span v-else>—</span>
                       </td>
                     </tr>
                   </tbody>

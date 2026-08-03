@@ -507,60 +507,25 @@ class Phase3IntegrationTest {
         assertEquals("DRAFT", saved.getApprovalStatus(), "初始审批状态应为DRAFT");
         assertEquals(0, saved.getIsActive(), "初始isActive应为0");
 
-        // 2. 添加目标成本明细（需要关联cost_subject）
-        CostTargetItem targetItem = new CostTargetItem();
-        targetItem.setTenantId(0L);
-        targetItem.setTargetId(targetId);
-        targetItem.setProjectId(PROJECT_ID);
-        targetItem.setCostSubjectId(materialSubjectId); // V2 标准科目：5401.03.02 材料费
-        targetItem.setTargetAmount(new BigDecimal("210000000.00"));
-        targetItem.setBidCostAmount(new BigDecimal("210000000.00"));
-        targetItem.setResponsibilityAmount(new BigDecimal("210000000.00"));
-        targetItem.setResponsibleUserId(USER_ADMIN);
-        targetItem.setResponsibilityUnit("项目成本组");
-        targetItem.setCreatedBy(USER_ADMIN);
-        targetItem.setCreatedTime(LocalDateTime.now());
-        targetItem.setUpdatedBy(USER_ADMIN);
-        targetItem.setUpdatedTime(LocalDateTime.now());
-        targetItem.setDeletedFlag(0);
-        costTargetItemMapper.insert(targetItem);
-
-        CostTargetItem targetItem2 = new CostTargetItem();
-        targetItem2.setTenantId(0L);
-        targetItem2.setTargetId(targetId);
-        targetItem2.setProjectId(PROJECT_ID);
-        targetItem2.setCostSubjectId(subcontractSubjectId); // V2 标准科目：5401.03.05 专业分包费
-        targetItem2.setTargetAmount(new BigDecimal("220000000.00"));
-        targetItem2.setBidCostAmount(new BigDecimal("220000000.00"));
-        targetItem2.setResponsibilityAmount(new BigDecimal("220000000.00"));
-        targetItem2.setResponsibleUserId(USER_ADMIN);
-        targetItem2.setResponsibilityUnit("项目成本组");
-        targetItem2.setCreatedBy(USER_ADMIN);
-        targetItem2.setCreatedTime(LocalDateTime.now());
-        targetItem2.setUpdatedBy(USER_ADMIN);
-        targetItem2.setUpdatedTime(LocalDateTime.now());
-        targetItem2.setDeletedFlag(0);
-        costTargetItemMapper.insert(targetItem2);
-
-        CostTargetItem occupiedItem = new CostTargetItem();
-        occupiedItem.setTenantId(0L);
-        occupiedItem.setTargetId(targetId);
-        occupiedItem.setProjectId(PROJECT_ID);
-        occupiedItem.setCostSubjectId(constructionSubjectId); // 测试夹具已有9000万合同分配，版本切换必须保留
-        occupiedItem.setTargetAmount(new BigDecimal("90000000.00"));
-        occupiedItem.setBidCostAmount(new BigDecimal("90000000.00"));
-        occupiedItem.setResponsibilityAmount(new BigDecimal("90000000.00"));
-        occupiedItem.setResponsibleUserId(USER_ADMIN);
-        occupiedItem.setResponsibilityUnit("项目成本组");
-        occupiedItem.setCreatedBy(USER_ADMIN);
-        occupiedItem.setCreatedTime(LocalDateTime.now());
-        occupiedItem.setUpdatedBy(USER_ADMIN);
-        occupiedItem.setUpdatedTime(LocalDateTime.now());
-        occupiedItem.setDeletedFlag(0);
-        costTargetItemMapper.insert(occupiedItem);
+        // 2. 按服务端固定十类默认分配保存目标成本明细
+        List<CostTargetItem> targetItems = costTargetService.getDefaultAllocation(PROJECT_ID).items().stream()
+                .map(value -> {
+                    CostTargetItem item = new CostTargetItem();
+                    item.setCostSubjectId(Long.parseLong(value.costSubjectId()));
+                    item.setTargetAmount(value.targetAmount());
+                    item.setBidCostAmount(BigDecimal.ZERO);
+                    item.setResponsibilityAmount(value.responsibilityAmount());
+                    item.setResponsibleUserId(USER_ADMIN);
+                    item.setResponsibilityUnit("项目成本组");
+                    return item;
+                })
+                .toList();
+        costTargetService.batchSaveItems(targetId, saved.getVersion(), targetItems);
+        saved = costTargetMapper.selectById(targetId);
+        int submitVersion = saved.getVersion();
 
         // 3. 提交目标成本审批（目标成本必须通过专用服务入口）
-        assertDoesNotThrow(() -> costTargetService.submitForApproval(targetId, saved.getVersion()),
+        assertDoesNotThrow(() -> costTargetService.submitForApproval(targetId, submitVersion),
                 "提交目标成本审批不应抛异常");
 
         // 4. 查找审批实例并全部通过

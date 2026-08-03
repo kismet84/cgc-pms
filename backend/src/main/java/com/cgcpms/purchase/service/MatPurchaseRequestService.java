@@ -65,7 +65,17 @@ public class MatPurchaseRequestService {
     public PageResult<MatPurchaseRequestVO> getPage(long pageNum, long pageSize, Long projectId,
                                                 String approvalStatus, String status, String requestCode) {
         LambdaQueryWrapper<MatPurchaseRequest> wrapper = new LambdaQueryWrapper<>();
-        if (projectId != null) wrapper.eq(MatPurchaseRequest::getProjectId, projectId);
+        if (projectId != null) {
+            projectAccessChecker.checkAccess(projectId, "查询采购申请");
+            wrapper.eq(MatPurchaseRequest::getProjectId, projectId);
+        } else {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            if (accessibleProjectIds.isEmpty()) {
+                wrapper.eq(MatPurchaseRequest::getProjectId, -1L);
+            } else {
+                wrapper.in(MatPurchaseRequest::getProjectId, accessibleProjectIds);
+            }
+        }
         if (StringUtils.hasText(approvalStatus)) wrapper.eq(MatPurchaseRequest::getApprovalStatus, approvalStatus);
         if (StringUtils.hasText(status)) wrapper.eq(MatPurchaseRequest::getStatus, status);
         if (StringUtils.hasText(requestCode)) wrapper.like(MatPurchaseRequest::getRequestCode, requestCode);
@@ -105,6 +115,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest r = requestMapper.selectById(id);
         if (r == null || !r.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        projectAccessChecker.checkAccess(r.getProjectId(), "查看采购申请");
         return toVO(r, requestTotals(r.getTenantId(), Set.of(r.getId())).getOrDefault(r.getId(), BigDecimal.ZERO));
     }
 
@@ -116,6 +127,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest request = requestMapper.selectById(requestId);
         if (request == null || !request.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        projectAccessChecker.checkAccess(request.getProjectId(), "查看采购申请明细");
 
         List<MatPurchaseRequestItem> items = requestItemMapper.selectList(
                 new LambdaQueryWrapper<MatPurchaseRequestItem>()
@@ -177,6 +189,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest existing = requestMapper.selectById(request.getId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        projectAccessChecker.checkAccess(existing.getProjectId(), "编辑采购申请");
 
         // Only DRAFT can be updated
         if (!List.of("DRAFT", "REJECTED").contains(existing.getApprovalStatus()))
@@ -187,7 +200,9 @@ public class MatPurchaseRequestService {
         request.setStatus("DRAFT");
         Long projectId = request.getProjectId() != null ? request.getProjectId() : existing.getProjectId();
         validateProjectRequired(projectId);
-        projectAccessChecker.checkAccess(projectId, "编辑采购申请");
+        if (!Objects.equals(projectId, existing.getProjectId())) {
+            projectAccessChecker.checkAccess(projectId, "编辑采购申请");
+        }
         request.setContractId(null);
         // purpose 已退出新流程；置空使 MyBatis 不更新历史列。
         request.setPurpose(null);
@@ -260,6 +275,7 @@ public class MatPurchaseRequestService {
                 || !"PURCHASE_REQUEST".equals(instance.getBusinessType())) {
             throw new BusinessException("PURCHASE_REQUEST_RESUBMIT_MISMATCH", "采购申请与审批实例不匹配");
         }
+        projectAccessChecker.checkAccess(request.getProjectId(), "重新提交采购申请审批");
         List<MatPurchaseRequestItem> items = requestItemMapper.selectList(
                 new LambdaQueryWrapper<MatPurchaseRequestItem>()
                         .eq(MatPurchaseRequestItem::getRequestId, requestId)
@@ -286,6 +302,7 @@ public class MatPurchaseRequestService {
         MatPurchaseRequest existing = requestMapper.selectById(id);
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PURCHASE_REQUEST_NOT_FOUND", "采购申请不存在");
+        projectAccessChecker.checkAccess(existing.getProjectId(), "删除采购申请");
 
         if (!"DRAFT".equals(existing.getApprovalStatus()))
             throw new BusinessException("REQUEST_IN_APPROVAL", "采购申请审批中或已审批，不可删除");

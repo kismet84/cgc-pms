@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -753,6 +754,40 @@ class CostSubjectServiceTest {
                 "租户0 不应看到租户999的科目");
     }
 
+    @Test
+    @Transactional
+    @DisplayName("目标成本默认比例必须按固定10类原子保存并合计100%")
+    void updateTargetRatiosAtomically() {
+        List<CostSubjectService.TargetRatio> ratios = List.of(
+                ratio("5401.03.01", "25"), ratio("5401.03.02", "40"),
+                ratio("5401.03.03", "5"), ratio("5401.03.04", "5"),
+                ratio("5401.03.05", "5"), ratio("5401.03.06", "3"),
+                ratio("5401.03.07", "5"), ratio("5401.03.08", "1"),
+                ratio("5401.03.09", "8"), ratio("5401.03.10", "3"));
+
+        List<CostSubjectVO> saved = costSubjectService.updateTargetRatios(ratios);
+        assertEquals(10, saved.size());
+        assertEquals(0, saved.stream().map(CostSubjectVO::getDefaultTargetRatio)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).compareTo(new BigDecimal("100.0000")));
+
+        List<CostSubjectService.TargetRatio> invalid = new java.util.ArrayList<>(ratios);
+        invalid.set(0, ratio("5401.03.01", "24"));
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.updateTargetRatios(invalid));
+        assertEquals("TARGET_COST_RATIO_SUM_INVALID", error.getCode());
+    }
+
+    @Test
+    @Transactional
+    @DisplayName("固定目标成本科目禁止通过通用CRUD改结构")
+    void governedTargetSubjectRejectsGenericUpdate() {
+        CostSubject subject = findSubjectByCode("5401.03.01");
+        assertNotNull(subject);
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> costSubjectService.update(subject));
+        assertEquals("TARGET_COST_SUBJECT_GOVERNED", error.getCode());
+    }
+
     // ═══════════════════════════════════════════════════════════════
     // 辅助方法
     // ═══════════════════════════════════════════════════════════════
@@ -768,6 +803,10 @@ class CostSubjectServiceTest {
                 .expiration(new Date(System.currentTimeMillis() + 3600000))
                 .build();
         UserContext.set(claims);
+    }
+
+    private CostSubjectService.TargetRatio ratio(String code, String value) {
+        return new CostSubjectService.TargetRatio(code, new BigDecimal(value));
     }
 
     private CostSubject createSubject(String code, String name, Long parentId,

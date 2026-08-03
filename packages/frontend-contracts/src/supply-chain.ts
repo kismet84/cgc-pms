@@ -330,6 +330,14 @@ export interface MaterialRecord {
   materialName: string;
   specification?: string | null;
   unit?: string | null;
+  taxInclusiveInfoPrice?: SupplyChainDecimalString | null;
+  infoPricePeriod?: string | null;
+  infoPriceSource?: string | null;
+  infoPriceVerificationStatus?: string | null;
+  infoPriceReviewRequired?: number | null;
+  purchasePrice?: SupplyChainDecimalString | null;
+  purchasePriceReceiptItemId?: string | null;
+  purchasePriceDate?: string | null;
   status?: string | null;
 }
 

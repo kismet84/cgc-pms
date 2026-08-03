@@ -56,6 +56,24 @@ describe('V2 same-origin request core', () => {
     expect(new Headers(postInit?.headers).get('X-XSRF-TOKEN')).toBe('csrf-value')
   })
 
+  it('returns xlsx responses as Blob without changing JSON behavior', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('xlsx-bytes', {
+        status: 200,
+        headers: {
+          'Content-Type':
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+      }),
+    )
+
+    const result = await apiRequest<Blob>('/materials/import-template', { recover401: false })
+
+    expect(result.type).toContain('spreadsheetml.sheet')
+    expect(result.size).toBe(10)
+    expect(await result.text()).toBe('xlsx-bytes')
+  })
+
   it('coalesces concurrent 401 responses into one refresh and retries each request once', async () => {
     let protectedCalls = 0
     let refreshCalls = 0

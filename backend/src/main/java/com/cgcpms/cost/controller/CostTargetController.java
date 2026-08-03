@@ -56,6 +56,12 @@ public class CostTargetController {
         return ApiResponse.success(toVO(costTargetService.getById(id)));
     }
 
+    @GetMapping("/default-allocation")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:add')")
+    public ApiResponse<CostTargetService.DefaultAllocation> getDefaultAllocation(@RequestParam Long projectId) {
+        return ApiResponse.success(costTargetService.getDefaultAllocation(projectId));
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:target:add')")
     public ApiResponse<String> create(@Valid @RequestBody CostTarget target) {
@@ -143,6 +149,8 @@ public class CostTargetController {
         vo.setTotalTargetAmount(target.getTotalTargetAmount());
         vo.setTotalBidCostAmount(target.getTotalBidCostAmount());
         vo.setTotalResponsibilityAmount(target.getTotalResponsibilityAmount());
+        vo.setSourceContractAmount(target.getSourceContractAmount());
+        vo.setTargetCostRate(target.getTargetCostRate());
         vo.setIsActive(target.getIsActive());
         vo.setApprovalStatus(target.getApprovalStatus());
         vo.setEffectiveDate(target.getEffectiveDate());

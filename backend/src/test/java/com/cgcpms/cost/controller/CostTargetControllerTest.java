@@ -100,6 +100,57 @@ class CostTargetControllerTest {
         return new Cookie(CookieUtils.ACCESS_TOKEN_COOKIE, token);
     }
 
+    @Test
+    @Order(1)
+    @DisplayName("default allocation uses contract amount × 85% and fixed 10 categories")
+    void testDefaultAllocation() throws Exception {
+        BigDecimal original = jdbcTemplate.queryForObject(
+                "SELECT contract_amount FROM pm_project WHERE id=?", BigDecimal.class, PROJECT_ID);
+        try {
+            jdbcTemplate.update("UPDATE pm_project SET contract_amount=1000000.00 WHERE id=?", PROJECT_ID);
+            mockMvc.perform(getWithApiContext("/cost-targets/default-allocation")
+                            .cookie(adminCookie()).param("projectId", String.valueOf(PROJECT_ID)))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.sourceContractAmount").value(1000000.0))
+                    .andExpect(jsonPath("$.data.targetCostRate").value("0.850000"))
+                    .andExpect(jsonPath("$.data.totalTargetAmount").value(850000.0))
+                    .andExpect(jsonPath("$.data.items.length()").value(10))
+                    .andExpect(jsonPath("$.data.items[0].subjectCode").value("5401.03.01"))
+                    .andExpect(jsonPath("$.data.items[0].targetAmount").value("212500.00"))
+                    .andExpect(jsonPath("$.data.items[1].targetAmount").value("340000.00"));
+        } finally {
+            jdbcTemplate.update("UPDATE pm_project SET contract_amount=? WHERE id=?", original, PROJECT_ID);
+        }
+    }
+
+    @Test
+    @Order(1)
+    @DisplayName("default allocation rejects non-positive contract amount")
+    void testDefaultAllocationRejectsZeroContract() throws Exception {
+        BigDecimal original = jdbcTemplate.queryForObject(
+                "SELECT contract_amount FROM pm_project WHERE id=?", BigDecimal.class, PROJECT_ID);
+        try {
+            jdbcTemplate.update("UPDATE pm_project SET contract_amount=0 WHERE id=?", PROJECT_ID);
+            mockMvc.perform(getWithApiContext("/cost-targets/default-allocation")
+                            .cookie(adminCookie()).param("projectId", String.valueOf(PROJECT_ID)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("PROJECT_CONTRACT_AMOUNT_INVALID"));
+        } finally {
+            jdbcTemplate.update("UPDATE pm_project SET contract_amount=? WHERE id=?", original, PROJECT_ID);
+        }
+    }
+
+    @Test
+    @Order(1)
+    @DisplayName("project outsider cannot preview target allocation")
+    void testDefaultAllocationRejectsProjectOutsider() throws Exception {
+        mockMvc.perform(getWithApiContext("/cost-targets/default-allocation")
+                        .cookie(authorityCookie(OUTSIDER_USER_ID, "cost.outsider", "cost:target:add"))
+                        .param("projectId", String.valueOf(PROJECT_ID)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("AUTH_FORBIDDEN"));
+    }
+
     @BeforeEach
     void seedAdminUser() {
         jdbcTemplate.update(
@@ -224,7 +275,9 @@ class CostTargetControllerTest {
                 .andExpect(jsonPath("$.data.projectId").value(String.valueOf(PROJECT_ID)))
                 .andExpect(jsonPath("$.data.versionNo").value(TEST_VERSION))
                 .andExpect(jsonPath("$.data.versionName").value("测试版本"))
-                .andExpect(jsonPath("$.data.totalTargetAmount").value("500000.00"))
+                .andExpect(jsonPath("$.data.totalTargetAmount").value("42500000.00"))
+                .andExpect(jsonPath("$.data.sourceContractAmount").value("50000000.00"))
+                .andExpect(jsonPath("$.data.targetCostRate").value("0.850000"))
                 .andExpect(jsonPath("$.data.isActive").value(0))
                 .andExpect(jsonPath("$.data.approvalStatus").value("DRAFT"))
                 .andExpect(jsonPath("$.data.status").value("DRAFT"))
@@ -280,13 +333,7 @@ class CostTargetControllerTest {
     @DisplayName("T4: POST /cost-targets/{id}/items → 200 batch save")
     void testBatchSaveItems() throws Exception {
         Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
-        String items = """
-                [
-                    {"costSubjectId":101,"targetAmount":"100000.00"},
-                    {"costSubjectId":102,"targetAmount":"200000.00"},
-                    {"costSubjectId":103,"targetAmount":"200000.00"}
-                ]
-                """;
+        String items = defaultItemsJson();
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
                         .cookie(adminCookie())
                         .param("version", currentVersion(testTargetId))
@@ -310,10 +357,10 @@ class CostTargetControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data").isArray())
-                .andExpect(jsonPath("$.data.length()").value(3))
+                .andExpect(jsonPath("$.data.length()").value(10))
                 .andExpect(jsonPath("$.data[0].id").exists())
-                .andExpect(jsonPath("$.data[0].costSubjectId").value("101"))
-                .andExpect(jsonPath("$.data[0].targetAmount").value("100000.00"))
+                .andExpect(jsonPath("$.data[0].costSubjectId").value("901001"))
+                .andExpect(jsonPath("$.data[0].targetAmount").value("10625000.00"))
                 .andExpect(jsonPath("$.data[0].targetId").value(String.valueOf(testTargetId)))
                 .andExpect(jsonPath("$.data[0].projectId").value(String.valueOf(PROJECT_ID)))
                 .andExpect(jsonPath("$.data[0].tenantId").doesNotExist())
@@ -329,12 +376,7 @@ class CostTargetControllerTest {
     @DisplayName("T6: POST /cost-targets/{id}/items → replace with 2 items")
     void testBatchSaveItems_Replace() throws Exception {
         Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
-        String items = """
-                [
-                    {"costSubjectId":201,"targetAmount":"300000.00"},
-                    {"costSubjectId":202,"targetAmount":"200000.00"}
-                ]
-                """;
+        String items = defaultItemsJson();
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
                         .cookie(adminCookie())
                         .param("version", currentVersion(testTargetId))
@@ -343,12 +385,12 @@ class CostTargetControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"));
 
-        // Verify only 2 items now
+        // Verify fixed 10 items remain intact.
         mockMvc.perform(getWithApiContext("/cost-targets/" + testTargetId + "/items")
                         .cookie(adminCookie()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(2))
-                .andExpect(jsonPath("$.data[0].costSubjectId").value(201));
+                .andExpect(jsonPath("$.data.length()").value(10))
+                .andExpect(jsonPath("$.data[0].costSubjectId").value("901001"));
     }
 
     @Test
@@ -356,12 +398,7 @@ class CostTargetControllerTest {
     @DisplayName("T6b: POST /cost-targets/{id}/items → 400 when item sum mismatches target total")
     void testBatchSaveItems_TotalMismatch() throws Exception {
         Assertions.assertNotNull(testTargetId, "Prerequisite: testTargetId must be created by T2");
-        String items = """
-                [
-                    {"costSubjectId":301,"targetAmount":"100000.00"},
-                    {"costSubjectId":302,"targetAmount":"200000.00"}
-                ]
-                """;
+        String items = defaultItemsJson().replace("10625000.00", "10624999.99");
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
                         .cookie(adminCookie())
                         .param("version", currentVersion(testTargetId))
@@ -589,15 +626,9 @@ class CostTargetControllerTest {
                   "projectManagerId": %d,
                   "versionNo": "V-COMPOSITE-%d",
                   "versionName": "项目成本预算复合草稿",
-                  "items": [{
-                    "costSubjectId": 101,
-                    "targetAmount": 120.50,
-                    "bidCostAmount": 110.25,
-                    "responsibilityAmount": 120.50,
-                    "responsibleUserId": 1
-                  }]
+                  "items": %s
                 }
-                """.formatted(PROJECT_ID, OUTSIDER_USER_ID, System.nanoTime());
+                """.formatted(PROJECT_ID, OUTSIDER_USER_ID, System.nanoTime(), defaultItemsJson());
 
         String response = mockMvc.perform(postWithApiContext("/cost-targets/drafts")
                         .cookie(adminCookie())
@@ -610,10 +641,10 @@ class CostTargetControllerTest {
 
         mockMvc.perform(getWithApiContext("/cost-targets/" + compositeDraftId).cookie(adminCookie()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.totalTargetAmount").value("120.50"))
-                .andExpect(jsonPath("$.data.totalBidCostAmount").value("110.25"))
-                .andExpect(jsonPath("$.data.totalResponsibilityAmount").value("120.50"));
-        Assertions.assertEquals(1, jdbcTemplate.queryForObject(
+                .andExpect(jsonPath("$.data.totalTargetAmount").value("42500000.00"))
+                .andExpect(jsonPath("$.data.totalBidCostAmount").value("0.00"))
+                .andExpect(jsonPath("$.data.totalResponsibilityAmount").value("42500000.00"));
+        Assertions.assertEquals(10, jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM cost_target_item WHERE target_id=? AND deleted_flag=0",
                 Integer.class, compositeDraftId));
         Assertions.assertEquals(OUTSIDER_USER_ID, jdbcTemplate.queryForObject(
@@ -676,12 +707,7 @@ class CostTargetControllerTest {
 
         testTargetId = Long.parseLong(response.replaceAll(".*\"data\":\"(\\d+)\".*", "$1"));
 
-        String items = """
-                [
-                    {"costSubjectId":101,"targetAmount":"300000.00"},
-                    {"costSubjectId":102,"targetAmount":"200000.00"}
-                ]
-                """;
+        String items = defaultItemsJson();
         mockMvc.perform(postWithApiContext("/cost-targets/" + testTargetId + "/items")
                         .cookie(adminCookie())
                         .param("version", currentVersion(testTargetId))
@@ -709,5 +735,22 @@ class CostTargetControllerTest {
     private String currentVersion(Long targetId) {
         return String.valueOf(jdbcTemplate.queryForObject(
                 "SELECT version FROM cost_target WHERE id=? AND deleted_flag=0", Integer.class, targetId));
+    }
+
+    private String defaultItemsJson() {
+        return """
+                [
+                  {"costSubjectId":901001,"targetAmount":"10625000.00","bidCostAmount":"0.00","responsibilityAmount":"10625000.00"},
+                  {"costSubjectId":901002,"targetAmount":"17000000.00","bidCostAmount":"0.00","responsibilityAmount":"17000000.00"},
+                  {"costSubjectId":901003,"targetAmount":"2125000.00","bidCostAmount":"0.00","responsibilityAmount":"2125000.00"},
+                  {"costSubjectId":901004,"targetAmount":"2125000.00","bidCostAmount":"0.00","responsibilityAmount":"2125000.00"},
+                  {"costSubjectId":901005,"targetAmount":"2125000.00","bidCostAmount":"0.00","responsibilityAmount":"2125000.00"},
+                  {"costSubjectId":901006,"targetAmount":"1275000.00","bidCostAmount":"0.00","responsibilityAmount":"1275000.00"},
+                  {"costSubjectId":901007,"targetAmount":"2125000.00","bidCostAmount":"0.00","responsibilityAmount":"2125000.00"},
+                  {"costSubjectId":901008,"targetAmount":"425000.00","bidCostAmount":"0.00","responsibilityAmount":"425000.00"},
+                  {"costSubjectId":901009,"targetAmount":"3400000.00","bidCostAmount":"0.00","responsibilityAmount":"3400000.00"},
+                  {"costSubjectId":901010,"targetAmount":"1275000.00","bidCostAmount":"0.00","responsibilityAmount":"1275000.00"}
+                ]
+                """;
     }
 }

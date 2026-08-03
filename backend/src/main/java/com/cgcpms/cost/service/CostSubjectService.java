@@ -3,6 +3,7 @@ package com.cgcpms.cost.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
+import com.cgcpms.cost.constant.TargetCostSubjectCatalog;
 import com.cgcpms.cost.entity.CostSubject;
 import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.vo.CostSubjectTreeNodeVO;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.cgcpms.common.util.DateTimeUtils;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -76,6 +79,7 @@ public class CostSubjectService {
         node.setStatus(subject.getStatus());
         node.setSortOrder(subject.getSortOrder());
         node.setParentId(subject.getParentId() != null ? subject.getParentId().toString() : "0");
+        node.setDefaultTargetRatio(subject.getDefaultTargetRatio());
 
         // Recursively build children
         List<CostSubject> children = parentMap.getOrDefault(subjectId, new ArrayList<>());
@@ -112,6 +116,7 @@ public class CostSubjectService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(CostSubject subject) {
+        assertGenericStructureEditable(subject.getSubjectCode());
         validateParentForSave(subject, null);
         // Validate parent exists if not root
         if (subject.getParentId() != null && subject.getParentId() != 0L) {
@@ -122,6 +127,7 @@ public class CostSubjectService {
             if (!parent.getTenantId().equals(UserContext.getCurrentTenantId())) {
                 throw new BusinessException("PARENT_NOT_FOUND", "父科目不存在");
             }
+            assertGenericStructureEditable(parent.getSubjectCode());
             // Auto-set level and account category from parent
             subject.setLevel(parent.getLevel() + 1);
             if (subject.getAccountCategory() == null || subject.getAccountCategory().isEmpty()) {
@@ -154,6 +160,8 @@ public class CostSubjectService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
         }
+        assertGenericStructureEditable(existing.getSubjectCode());
+        assertGenericStructureEditable(subject.getSubjectCode());
 
         validateParentForSave(subject, existing.getId());
 
@@ -177,6 +185,7 @@ public class CostSubjectService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
         }
+        assertGenericStructureEditable(existing.getSubjectCode());
 
         String newStatus = "ENABLE".equals(existing.getStatus()) ? "DISABLE" : "ENABLE";
         if ("DISABLE".equals(newStatus)) {
@@ -195,6 +204,7 @@ public class CostSubjectService {
         if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
             throw new BusinessException("COST_SUBJECT_NOT_FOUND", "成本科目不存在");
         }
+        assertGenericStructureEditable(existing.getSubjectCode());
 
         // Check no children exist
         LambdaQueryWrapper<CostSubject> wrapper = new LambdaQueryWrapper<>();
@@ -219,6 +229,57 @@ public class CostSubjectService {
             costSubjectMapper.updateById(existing);
         }
         costSubjectMapper.deleteById(id);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public List<CostSubjectVO> updateTargetRatios(List<TargetRatio> ratios) {
+        if (ratios == null || ratios.size() != TargetCostSubjectCatalog.ITEMS.size()) {
+            throw new BusinessException("TARGET_COST_RATIO_SET_INVALID", "必须一次提交全部10类目标成本比例");
+        }
+        Map<String, BigDecimal> requested = new LinkedHashMap<>();
+        for (TargetRatio ratio : ratios) {
+            if (ratio == null || ratio.subjectCode() == null || !TargetCostSubjectCatalog.CODES.contains(ratio.subjectCode())
+                    || requested.putIfAbsent(ratio.subjectCode(), normalizeRatio(ratio.ratio())) != null) {
+                throw new BusinessException("TARGET_COST_RATIO_SET_INVALID", "目标成本科目集合缺失、重复或包含非法编码");
+            }
+        }
+        if (!requested.keySet().equals(TargetCostSubjectCatalog.CODES)
+                || requested.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add).compareTo(new BigDecimal("100.0000")) != 0) {
+            throw new BusinessException("TARGET_COST_RATIO_SUM_INVALID", "10类目标成本比例合计必须为100% ");
+        }
+
+        List<CostSubject> subjects = costSubjectMapper.selectList(new LambdaQueryWrapper<CostSubject>()
+                .eq(CostSubject::getTenantId, UserContext.getCurrentTenantId())
+                .in(CostSubject::getSubjectCode, TargetCostSubjectCatalog.CODES)
+                .eq(CostSubject::getStatus, "ENABLE")
+                .last("FOR UPDATE")); // SQL-SAFETY: fixed-sql-fragment
+        if (subjects.size() != TargetCostSubjectCatalog.ITEMS.size()
+                || !subjects.stream().map(CostSubject::getSubjectCode).collect(Collectors.toSet()).equals(TargetCostSubjectCatalog.CODES)) {
+            throw new BusinessException("TARGET_COST_SUBJECT_SET_INVALID", "10类目标成本科目未完整启用");
+        }
+        subjects.forEach(subject -> {
+            subject.setDefaultTargetRatio(requested.get(subject.getSubjectCode()));
+            costSubjectMapper.updateById(subject);
+        });
+        return subjects.stream().map(this::toVO).toList();
+    }
+
+    private static BigDecimal normalizeRatio(BigDecimal ratio) {
+        if (ratio == null || ratio.signum() < 0 || ratio.compareTo(new BigDecimal("100")) > 0) {
+            throw new BusinessException("TARGET_COST_RATIO_INVALID", "目标成本比例必须在0%至100%之间");
+        }
+        try {
+            return ratio.setScale(4, RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException e) {
+            throw new BusinessException("TARGET_COST_RATIO_INVALID", "目标成本比例最多保留4位小数");
+        }
+    }
+
+    private static void assertGenericStructureEditable(String subjectCode) {
+        if (subjectCode != null && (subjectCode.equals(TargetCostSubjectCatalog.PARENT_CODE)
+                || subjectCode.startsWith(TargetCostSubjectCatalog.PARENT_CODE + "."))) {
+            throw new BusinessException("TARGET_COST_SUBJECT_GOVERNED", "项目目标成本固定科目只能通过专用比例接口维护");
+        }
     }
 
     private void assertNoActiveReferences(Long subjectId, Long tenantId, String action) {
@@ -315,10 +376,14 @@ public class CostSubjectService {
         vo.setLevel(subject.getLevel());
         vo.setSortOrder(subject.getSortOrder());
         vo.setStatus(subject.getStatus());
+        vo.setDefaultTargetRatio(subject.getDefaultTargetRatio());
         vo.setCreatedBy(subject.getCreatedBy() != null ? subject.getCreatedBy().toString() : null);
         vo.setCreatedAt(subject.getCreatedAt() != null ? DateTimeUtils.DTF.format(subject.getCreatedAt()) : null);
         vo.setUpdatedAt(subject.getUpdatedAt() != null ? DateTimeUtils.DTF.format(subject.getUpdatedAt()) : null);
         vo.setRemark(subject.getRemark());
         return vo;
+    }
+
+    public record TargetRatio(String subjectCode, BigDecimal ratio) {
     }
 }

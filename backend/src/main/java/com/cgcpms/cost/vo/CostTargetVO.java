@@ -27,6 +27,10 @@ public class CostTargetVO implements Serializable {
     private BigDecimal totalBidCostAmount;
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal totalResponsibilityAmount;
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal sourceContractAmount;
+    @JsonSerialize(using = ToStringSerializer.class)
+    private BigDecimal targetCostRate;
     private Integer isActive;
     private String approvalStatus;
 

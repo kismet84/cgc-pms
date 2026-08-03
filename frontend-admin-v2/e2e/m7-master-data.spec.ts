@@ -92,6 +92,8 @@ test('master-data deep links render server facts and preserve material redirect 
             materialCode: 'MAT-8',
             materialName: '钢筋',
             categoryId: '9',
+            taxInclusiveInfoPrice: '43.000000',
+            purchasePrice: '41.500000',
             defaultTaxRate: '13.00',
             status: 'ENABLE',
           },
@@ -128,5 +130,11 @@ test('master-data deep links render server facts and preserve material redirect 
   await page.goto('/material?source=legacy#dictionary')
   await expect(page).toHaveURL(/\/material\/dictionary\?source=legacy#dictionary$/)
   await expect(page.getByRole('heading', { level: 1, name: '材料字典' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: '含税信息价' })).toBeVisible()
+  await expect(page.getByRole('columnheader', { name: '采购价' })).toBeVisible()
+  await expect(page.getByText('43.000000')).toBeVisible()
+  await expect(page.getByText('41.500000')).toBeVisible()
   await expect(page.getByText('13.00')).toBeVisible()
+  await expect(page.getByRole('button', { name: '导出模板' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '导入资料' })).toHaveCount(0)
 })

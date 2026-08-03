@@ -164,7 +164,11 @@ async function performRefresh(): Promise<void> {
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
-  if (response.ok && response.headers.get('content-type')?.includes('application/pdf')) {
+  const contentType = response.headers.get('content-type') ?? ''
+  if (
+    response.ok &&
+    (contentType.includes('application/pdf') || contentType.includes('spreadsheetml.sheet'))
+  ) {
     return (await response.blob()) as T
   }
   let parsed: ParsedResponse<T>['envelope']

@@ -10,7 +10,7 @@ CGC-PMS 是面向建筑工程总包项目全过程管理的前后端分离系统
 | 后端 | `1.6.0-SNAPSHOT`（Java 21、Spring Boot 3.5.16） |
 | 正式前端 | `1.6.0-dev.0`（`frontend-admin-v2`，共享 `packages/frontend-contracts`） |
 | Legacy 归档 | `archive/v1.6/frontend-admin-legacy`（仅历史回滚与迁移取证） |
-| 数据库迁移 | MySQL Flyway 脚本已包含至 V250；H2 迁移用于本地兼容与测试 |
+| 数据库迁移 | 以 `backend/src/main/resources/db/migration/` 中最高版本为准；H2 迁移用于本地兼容与测试 |
 | 迁移结果 | 87 条命名路由全部由新版承接；台账 `V2_ACCEPTED=87`、`LEGACY_ONLY=0`、`V2_SOURCE_AVAILABLE=0` |
 | 切换边界 | 仓库、本地入口和 CI 已切换到新版；不代表目标环境或生产已发布 |
 | 交付原则 | 历史测试、审计和上线结论不替代当前分支的验证结果 |

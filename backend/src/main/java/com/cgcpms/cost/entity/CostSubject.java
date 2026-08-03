@@ -9,6 +9,8 @@ import com.cgcpms.common.entity.BaseEntity;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.math.BigDecimal;
+
 @Data
 @EqualsAndHashCode(callSuper = true)
 @TableName("cost_subject")
@@ -35,6 +37,8 @@ public class CostSubject extends BaseEntity {
     private Integer sortOrder;
 
     private String status;
+
+    private BigDecimal defaultTargetRatio;
 
     @TableField(insertStrategy = FieldStrategy.ALWAYS, updateStrategy = FieldStrategy.ALWAYS)
     private Long createdBy;

@@ -21,6 +21,7 @@ import {
   type CostTargetQuery,
   type CostTargetRecord,
   type CostTargetSaveCommand,
+  type CostTargetDefaultAllocation,
   type CostBudgetDraftSaveCommand,
   type CostSummaryHistoryRecord,
   type CostProjectSummary,
@@ -518,6 +519,16 @@ export function loadCostTargetItems(
 ): Promise<CostTargetItemRecord[]> {
   return apiRequest<CostTargetItemRecord[]>(
     COMMERCIAL_API.costTargetItems(requiredId(id, '目标成本ID')),
+    { signal },
+  )
+}
+
+export function loadCostTargetDefaultAllocation(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<CostTargetDefaultAllocation> {
+  return apiRequest<CostTargetDefaultAllocation>(
+    `${COMMERCIAL_API.costTargetDefaultAllocation}?projectId=${encodeURIComponent(requiredId(projectId, '项目ID'))}`,
     { signal },
   )
 }

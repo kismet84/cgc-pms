@@ -73,7 +73,17 @@ public class MatPurchaseOrderService {
     public IPage<MatPurchaseOrderVO> getPage(long pageNum, long pageSize, Long projectId, Long contractId,
                                               Long partnerId, String orderStatus, String orderType, String orderCode) {
         LambdaQueryWrapper<MatPurchaseOrder> wrapper = new LambdaQueryWrapper<>();
-        if (projectId != null) wrapper.eq(MatPurchaseOrder::getProjectId, projectId);
+        if (projectId != null) {
+            checkProjectAccess(projectId, "查询采购订单");
+            wrapper.eq(MatPurchaseOrder::getProjectId, projectId);
+        } else {
+            List<Long> accessibleProjectIds = projectAccessChecker.accessibleProjectIds();
+            if (accessibleProjectIds.isEmpty()) {
+                wrapper.eq(MatPurchaseOrder::getProjectId, -1L);
+            } else {
+                wrapper.in(MatPurchaseOrder::getProjectId, accessibleProjectIds);
+            }
+        }
         if (contractId != null) wrapper.eq(MatPurchaseOrder::getContractId, contractId);
         if (partnerId != null) wrapper.eq(MatPurchaseOrder::getPartnerId, partnerId);
         if (StringUtils.hasText(orderStatus)) wrapper.eq(MatPurchaseOrder::getOrderStatus, orderStatus);
@@ -355,6 +365,7 @@ public class MatPurchaseOrderService {
                 || !"PURCHASE_ORDER".equals(instance.getBusinessType())) {
             throw new BusinessException("PURCHASE_ORDER_RESUBMIT_MISMATCH", "采购订单与审批实例不匹配");
         }
+        checkProjectAccess(order.getProjectId(), "重新提交采购订单审批");
         validateOrderForSubmission(order);
         if (order.getRequestId() != null) {
             pricingService.requirePurchaseRequestDocument(order.getRequestId(), order.getTenantId());

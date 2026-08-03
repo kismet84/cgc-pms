@@ -34,6 +34,7 @@
         <okhttp.version>5.1.0</okhttp.version>
         <pdfbox.version>3.0.8</pdfbox.version>
         <openhtmltopdf.version>1.1.40</openhtmltopdf.version>
+        <poi.version>5.5.1</poi.version>
         <noto-sans-sc-font.version>6.1.0</noto-sans-sc-font.version>
         <!-- Keep test class scheduling deterministic across Windows and Linux. -->
         <surefire.runOrder>alphabetical</surefire.runOrder>
@@ -68,6 +69,13 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Standard .xlsx material import/export; do not hand-roll OOXML parsing. -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${poi.version}</version>
         </dependency>
 
         <!-- Actuator (health checks, metrics) -->
