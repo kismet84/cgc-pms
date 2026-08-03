@@ -28,6 +28,11 @@ async function loadPreview(): Promise<void> {
   }
 }
 
+async function refreshPreview(): Promise<void> {
+  await loadPreview()
+  if (!errorMessage.value) showToast('success', '预检已刷新', '已读取最新数据库统计。')
+}
+
 async function copyCommand(): Promise<void> {
   try {
     await navigator.clipboard.writeText(hostScriptCommand.value)
@@ -62,7 +67,7 @@ onMounted(loadPreview)
       :description="errorMessage"
     >
       <template #actions>
-        <V2Button variant="secondary" @click="loadPreview">重新加载</V2Button>
+        <V2Button size="small" variant="secondary" @click="loadPreview">重新加载</V2Button>
       </template>
     </V2PageState>
 
@@ -73,7 +78,12 @@ onMounted(loadPreview)
 
       <V2Card title="预检结果">
         <template #actions>
-          <V2Button size="small" variant="secondary" :loading="loading" @click="loadPreview">
+          <V2Button
+            size="small"
+            variant="secondary"
+            :loading="loading"
+            @click="refreshPreview"
+          >
             刷新
           </V2Button>
         </template>
