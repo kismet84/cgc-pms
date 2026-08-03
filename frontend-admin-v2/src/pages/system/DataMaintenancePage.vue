@@ -78,12 +78,7 @@ onMounted(loadPreview)
 
       <V2Card title="预检结果">
         <template #actions>
-          <V2Button
-            size="small"
-            variant="secondary"
-            :loading="loading"
-            @click="refreshPreview"
-          >
+          <V2Button size="small" variant="secondary" :loading="loading" @click="refreshPreview">
             刷新
           </V2Button>
         </template>
