@@ -25,10 +25,10 @@ class BaselineFlywayCompatibilityTest {
         Flyway flyway = flyway("fresh", ACTIVE, LEGACY, JAVA);
         flyway.migrate();
 
-        assertEquals("266", flyway.info().current().getVersion().getVersion());
+        assertEquals("268", flyway.info().current().getVersion().getVersion());
         assertEquals(10, count(flyway, "cost_subject", "parent_id=(SELECT id FROM cost_subject WHERE subject_code='5401.03')"));
         assertEquals(0, count(flyway, "cost_subject", "subject_code='5401.02' OR subject_code LIKE '5401.02.%'"));
-        assertEquals(32, count(flyway, "cost_subject", """
+        assertEquals(21, count(flyway, "cost_subject", """
                 subject_code='5401.01' OR subject_code LIKE '5401.01.%'
                 OR subject_code='5401.04' OR subject_code LIKE '5401.04.%'
                 """));
@@ -123,7 +123,7 @@ class BaselineFlywayCompatibilityTest {
         var validation = current.validateWithResult();
         assertTrue(validation.validationSuccessful, String.join("\n", validation.getAllErrorMessages()));
 
-        assertEquals("266", current.info().current().getVersion().getVersion());
+        assertEquals("268", current.info().current().getVersion().getVersion());
         assertEquals(5, count(current, "sys_role_menu", """
                 role_id IN (SELECT id FROM sys_role WHERE role_code IN
                     ('PROJECT_MANAGER','COST_MANAGER','DEPARTMENT_MANAGER','GENERAL_MANAGER','FINANCE'))
