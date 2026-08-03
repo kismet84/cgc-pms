@@ -221,7 +221,7 @@ class AlertRuleEvaluator {
             if (contract == null) continue;
             BigDecimal contractAmount = nvl(contract.getContractAmount());
             if (contractAmount.compareTo(BigDecimal.ZERO) <= 0) continue;
-            BigDecimal ratioValue = entry.getValue().divide(contractAmount, 4, RoundingMode.HALF_UP);
+            BigDecimal ratioValue = entry.getValue().divide(contractAmount, 2, RoundingMode.HALF_UP);
             String dedupKey = contractRuleDedupKey(entry.getKey(), "PAYMENT_EXCEEDS_RATIO");
             if (isDuplicate(tenantId, dedupKey, dedupHours(config))) continue;
             if (ratioValue.compareTo(thresholdRatio(config)) > 0) {
@@ -489,7 +489,7 @@ class AlertRuleEvaluator {
         if (base == null || base.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-        return nvl(actual).divide(base, 4, RoundingMode.HALF_UP);
+        return nvl(actual).divide(base, 2, RoundingMode.HALF_UP);
     }
 
     private String projectRuleDedupKey(Long projectId, String ruleType) {

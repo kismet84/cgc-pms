@@ -7,6 +7,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -51,14 +52,17 @@ public class CostTarget extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     @NotNull(message = "成本目标总额不能为空")
     @DecimalMin(value = "0.00", message = "成本目标总额不能为负数")
+    @Digits(integer = 16, fraction = 2)
     private BigDecimal totalTargetAmount;
 
     /** 投标成本基准总额，由科目投标成本快照汇总。 */
     @DecimalMin(value = "0.00", message = "投标成本总额不能为负数")
+    @Digits(integer = 16, fraction = 2)
     private BigDecimal totalBidCostAmount;
 
     /** 责任预算总额，必须与目标成本总额一致并完整分解到责任人。 */
     @DecimalMin(value = "0.00", message = "责任预算总额不能为负数")
+    @Digits(integer = 16, fraction = 2)
     private BigDecimal totalResponsibilityAmount;
 
     /** 新建版本时的项目合同金额快照。 */

@@ -290,9 +290,9 @@ public class VarOrderService {
             item.setVarOrderId(varOrderId);
             item.setTenantId(UserContext.getCurrentTenantId());
             item.setId(null);
-            BigDecimal costPrice = nvl(item.getUnitPrice()).setScale(4, RoundingMode.HALF_UP);
+            BigDecimal costPrice = nvl(item.getUnitPrice()).setScale(2, RoundingMode.HALF_UP);
             BigDecimal claimPrice = item.getClaimUnitPrice() == null ? costPrice
-                    : item.getClaimUnitPrice().setScale(4, RoundingMode.HALF_UP);
+                    : item.getClaimUnitPrice().setScale(2, RoundingMode.HALF_UP);
             if (costPrice.signum() < 0 || claimPrice.signum() < 0)
                 throw new BusinessException("VAR_ORDER_ITEM_PRICE_INVALID", "成本单价和申报单价不得小于0");
             item.setUnitPrice(costPrice);

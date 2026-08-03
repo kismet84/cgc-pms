@@ -44,7 +44,7 @@ import java.util.ArrayList;
 @RequiredArgsConstructor
 public class CostTargetService {
 
-    private static final BigDecimal TARGET_COST_RATE = new BigDecimal("0.850000");
+    private static final BigDecimal TARGET_COST_RATE = new BigDecimal("0.85");
 
     private final CostTargetMapper costTargetMapper;
     private final CostSummaryMapper costSummaryMapper;
@@ -492,7 +492,7 @@ public class CostTargetService {
             BigDecimal sum = subjects.stream().map(TargetSubject::ratio)
                     .filter(Objects::nonNull).reduce(BigDecimal.ZERO, BigDecimal::add);
             if (subjects.stream().anyMatch(subject -> subject.ratio() == null)
-                    || sum.compareTo(new BigDecimal("100.0000")) != 0) {
+                    || sum.compareTo(new BigDecimal("100.00")) != 0) {
                 throw new BusinessException("TARGET_COST_RATIO_SUM_INVALID", "10类目标成本默认比例必须完整且合计100%");
             }
         }

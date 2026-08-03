@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
+import jakarta.validation.constraints.Digits;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -45,6 +46,8 @@ public class MatRequisition extends BaseEntity {
 
     private String approvalStatus;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal totalAmount;
 

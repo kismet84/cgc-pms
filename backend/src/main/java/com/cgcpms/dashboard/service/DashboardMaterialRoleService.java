@@ -319,7 +319,7 @@ public class DashboardMaterialRoleService extends DashboardSharedSupport {
                     score.setLateCompletedCount(lateCompletedCount);
                     score.setOverdueIncompleteCount(overdueIncompleteCount);
                     score.setOnTimeDeliveryRate(onTimeRate.toPlainString());
-                    score.setPerformanceScore(onTimeRate.setScale(0, RoundingMode.HALF_UP).toPlainString());
+                    score.setPerformanceScore(onTimeRate.setScale(2, RoundingMode.HALF_UP).toPlainString());
                     return score;
                 })
                 .sorted(Comparator

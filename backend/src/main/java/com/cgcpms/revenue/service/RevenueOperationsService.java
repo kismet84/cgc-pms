@@ -269,7 +269,7 @@ public class RevenueOperationsService {
         result.put("collectedAmount", collected);
         result.put("overdueAmount", scalar("SELECT COALESCE(SUM(outstanding_amount),0) FROM account_receivable WHERE tenant_id=? AND project_id=? AND outstanding_amount>0 AND due_date<CURRENT_DATE AND deleted_flag=0", projectId));
         result.put("invoicedAmount", scalar("SELECT COALESCE(SUM(total_amount),0) FROM sales_invoice WHERE tenant_id=? AND project_id=? AND status<>'VOIDED' AND deleted_flag=0", projectId));
-        result.put("collectionRate", receivable.signum() == 0 ? BigDecimal.ZERO : receivable.subtract(outstanding).divide(receivable, 4, RoundingMode.HALF_UP));
+        result.put("collectionRate", receivable.signum() == 0 ? BigDecimal.ZERO.setScale(2) : receivable.subtract(outstanding).divide(receivable, 2, RoundingMode.HALF_UP));
         return result;
     }
 

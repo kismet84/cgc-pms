@@ -143,6 +143,7 @@ public class MatRequisitionService {
         requisition.setApprovalStatus("DRAFT");
         requisition.setStockOutFlag(0);
         requisition.setTenantId(UserContext.getCurrentTenantId());
+        requisition.setTotalAmount(BigDecimal.ZERO.setScale(2));
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             requisition.setRequisitionCode(nextRequisitionCode(prefix, attempt));
@@ -197,6 +198,7 @@ public class MatRequisitionService {
         requisition.setApprovalStatus("DRAFT");
         requisition.setRequisitionCode(existing.getRequisitionCode());
         requisition.setStockOutFlag(existing.getStockOutFlag());
+        requisition.setTotalAmount(existing.getTotalAmount());
         checkProjectAccess(requisition.getProjectId(), "编辑领料申请");
         validateRelations(requisition);
 
@@ -329,7 +331,8 @@ public class MatRequisitionService {
         BigDecimal totalAmount = items.stream()
                 .map(MatRequisitionItem::getAmount)
                 .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
 
         LambdaUpdateWrapper<MatRequisition> updateWrapper = new LambdaUpdateWrapper<>();
         updateWrapper.eq(MatRequisition::getId, requisitionId)
@@ -389,7 +392,7 @@ public class MatRequisitionService {
 
         requisitionMapper.update(null, new LambdaUpdateWrapper<MatRequisition>()
                 .eq(MatRequisition::getId, requisitionId)
-                .set(MatRequisition::getTotalAmount, totalIssuedAmount));
+                .set(MatRequisition::getTotalAmount, totalIssuedAmount.setScale(2, RoundingMode.HALF_UP)));
         costGenerationService.generateCost("MAT_REQUISITION", requisitionId);
 
         requisitionMapper.update(null, new LambdaUpdateWrapper<MatRequisition>()

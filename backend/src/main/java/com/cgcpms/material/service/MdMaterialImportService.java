@@ -72,7 +72,7 @@ public class MdMaterialImportService {
             Sheet instructions = workbook.createSheet("填写说明");
             String[] lines = {
                     "仅填写“材料导入”工作表，不得修改表头。",
-                    "必填：材料名称、含税信息价；含税信息价必须为正数且最多6位小数。",
+                    "必填：材料名称、含税信息价；含税信息价必须为正数且最多2位小数。",
                     "信息价月份格式为YYYY-MM；状态为空时默认ENABLE。",
                     "材料编码为空时系统确定性生成；已有编码只更新当前信息价及来源。",
                     "只有二级分类没有一级分类时该行失败；一级、二级分类可自动创建。",
@@ -197,15 +197,15 @@ public class MdMaterialImportService {
         String specification = optional(v.get(4), 200, "规格型号");
         String unit = optional(v.get(5), 20, "计量单位");
         String brand = optional(v.get(6), 100, "品牌");
-        BigDecimal infoPrice = decimal(v.get(7), 6, true,
-                "MATERIAL_IMPORT_INFO_PRICE_INVALID", "含税信息价必须为正数且最多6位小数");
+        BigDecimal infoPrice = decimal(v.get(7), 19, true,
+                "MATERIAL_IMPORT_INFO_PRICE_INVALID", "含税信息价必须为正数且最多2位小数");
         String period = optional(v.get(8), 7, "信息价月份");
         if (period != null && !period.matches("^[0-9]{4}-(0[1-9]|1[0-2])$")) {
             throw new BusinessException("MATERIAL_IMPORT_PERIOD_INVALID", "信息价月份必须为YYYY-MM");
         }
         String source = optional(v.get(9), 255, "信息价来源");
         String verification = optional(v.get(10), 32, "校核状态");
-        BigDecimal taxRate = decimal(v.get(11), 2, false,
+        BigDecimal taxRate = decimal(v.get(11), 6, false,
                 "MATERIAL_IMPORT_TAX_RATE_INVALID", "默认税率必须为0到100且最多2位小数");
         if (taxRate != null && taxRate.compareTo(new BigDecimal("100")) > 0) {
             throw new BusinessException("MATERIAL_IMPORT_TAX_RATE_INVALID", "默认税率必须为0到100且最多2位小数");
@@ -378,19 +378,18 @@ public class MdMaterialImportService {
         }
     }
 
-    private BigDecimal decimal(String value, int scale, boolean positive, String code, String message) {
+    private BigDecimal decimal(String value, int maxPrecision, boolean positive, String code, String message) {
         if (!StringUtils.hasText(value)) {
             if (positive) throw new BusinessException(code, message);
             return null;
         }
         try {
             BigDecimal parsed = new BigDecimal(value.trim());
-            int maxPrecision = scale == 6 ? 19 : 6;
-            if (parsed.scale() > scale || parsed.precision() > maxPrecision
+            if (parsed.stripTrailingZeros().scale() > 2 || parsed.precision() > maxPrecision
                     || parsed.compareTo(BigDecimal.ZERO) < (positive ? 1 : 0)) {
                 throw new BusinessException(code, message);
             }
-            return parsed.setScale(Math.max(0, parsed.scale()), RoundingMode.UNNECESSARY);
+            return parsed.setScale(2, RoundingMode.UNNECESSARY);
         } catch (NumberFormatException error) {
             throw new BusinessException(code, message);
         }

@@ -474,7 +474,7 @@ public class ProjectScheduleService {
             BigDecimal taskActual = decimal(task.get("actual_progress"));
             planned = planned.add(weight.multiply(taskPlanned));
             actual = actual.add(weight.multiply(taskActual));
-            if (taskActual.add(new BigDecimal("0.0001")).compareTo(taskPlanned) < 0) lagging++;
+            if (taskActual.add(new BigDecimal("0.01")).compareTo(taskPlanned) < 0) lagging++;
         }
         planned = scale(planned); actual = scale(actual);
         BigDecimal deviation = scale(actual.subtract(planned));
@@ -723,7 +723,7 @@ public class ProjectScheduleService {
         if (!date.isBefore(end)) return HUNDRED;
         long total = ChronoUnit.DAYS.between(start, end) + 1;
         long elapsed = ChronoUnit.DAYS.between(start, date) + 1;
-        return BigDecimal.valueOf(elapsed).multiply(HUNDRED).divide(BigDecimal.valueOf(total), 4, RoundingMode.HALF_UP);
+        return BigDecimal.valueOf(elapsed).multiply(HUNDRED).divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
     }
 
     private SiteDailyPlannedTaskVO toPlannedTask(Map<String, Object> task) {
@@ -741,7 +741,7 @@ public class ProjectScheduleService {
 
     private Long tenant() { return UserContext.getCurrentTenantId(); }
     private Long user() { return UserContext.getCurrentUserId(); }
-    private BigDecimal scale(BigDecimal value) { return value.setScale(4, RoundingMode.HALF_UP); }
+    private BigDecimal scale(BigDecimal value) { return value.setScale(2, RoundingMode.HALF_UP); }
     private BigDecimal decimal(Object value) { return value == null ? BigDecimal.ZERO : value instanceof BigDecimal b ? b : new BigDecimal(value.toString()); }
     private BigDecimal decimalNullable(Object value) { return value == null ? null : decimal(value); }
     private Long longValue(Object value) { return value instanceof Number n ? n.longValue() : Long.valueOf(value.toString()); }

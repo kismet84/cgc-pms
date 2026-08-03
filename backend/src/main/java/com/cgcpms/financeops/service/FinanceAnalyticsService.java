@@ -158,7 +158,7 @@ public class FinanceAnalyticsService {
             throw error("INVOICE_NOT_FOUND", "发票不存在");
         }
         Long id = IdWorker.getId();
-        String status = request.confidence().compareTo(new BigDecimal("0.9000")) >= 0 ? "AUTO_ACCEPTABLE" : "PENDING";
+        String status = request.confidence().compareTo(new BigDecimal("0.90")) >= 0 ? "AUTO_ACCEPTABLE" : "PENDING";
         jdbc.update("INSERT INTO invoice_ocr_review(id,tenant_id,invoice_id,raw_result_json,confidence,comparison_json,review_status,created_at) VALUES(?,?,?,?,?,?,?,CURRENT_TIMESTAMP)",
                 id, tenant(), request.invoiceId(), json(request.rawResult()), request.confidence(), json(request.comparison()), status);
         return one("SELECT * FROM invoice_ocr_review WHERE id=? AND tenant_id=?", id, tenant());

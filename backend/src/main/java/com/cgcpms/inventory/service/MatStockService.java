@@ -59,7 +59,7 @@ import java.util.stream.Collectors;
 public class MatStockService {
 
     private static final int MAX_RETRIES = 3;
-    private static final BigDecimal DEFAULT_SAFETY_STOCK_QTY = new BigDecimal("10.0000");
+    private static final BigDecimal DEFAULT_SAFETY_STOCK_QTY = new BigDecimal("10.00");
 
     private final MatStockMapper matStockMapper;
     private final MatStockTransferMapper matStockTransferMapper;
@@ -108,7 +108,7 @@ public class MatStockService {
     public MatStock stockInValued(Long warehouseId, Long materialId, BigDecimal quantity,
                                   BigDecimal unitCost, String sourceType, Long sourceId,
                                   Long sourceLineId) {
-        validatePositiveQuantity(quantity);
+        quantity = normalizeQuantity(quantity);
         if (unitCost == null || unitCost.signum() < 0) {
             throw new BusinessException("STOCK_UNIT_COST_INVALID", "入库单位成本不能为负或为空");
         }
@@ -135,7 +135,7 @@ public class MatStockService {
                 BigDecimal movementValue = quantity.multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
                 stock.setInventoryValue(movementValue);
                 stock.setAverageUnitCost(quantity.signum() == 0 ? BigDecimal.ZERO
-                        : movementValue.divide(quantity, 6, RoundingMode.HALF_UP));
+                        : movementValue.divide(quantity, 2, RoundingMode.HALF_UP));
                 stock.setSafetyStockQty(DEFAULT_SAFETY_STOCK_QTY);
                 stock.setVersion(0);
                 matStockMapper.insert(stock);
@@ -191,7 +191,7 @@ public class MatStockService {
             stock.setAvailableQty(nextAvailableQty);
             stock.setInventoryValue(nextValue);
             stock.setAverageUnitCost(nextAvailableQty.signum() == 0 ? BigDecimal.ZERO
-                    : nextValue.divide(nextAvailableQty, 6, RoundingMode.HALF_UP));
+                    : nextValue.divide(nextAvailableQty, 2, RoundingMode.HALF_UP));
             // @Version 乐观锁：若版本冲突则 updateById 返回 0
             int updated = matStockMapper.updateById(stock);
             if (updated > 0) return stock;
@@ -262,7 +262,7 @@ public class MatStockService {
                                                         BigDecimal quantity, BigDecimal fixedUnitCost,
                                                         String sourceType, Long sourceId,
                                                         Long sourceLineId) {
-        validatePositiveQuantity(quantity);
+        quantity = normalizeQuantity(quantity);
         Long tenantId = UserContext.getCurrentTenantId();
 
         MatStockTxn processed = findProcessedSourceLine(tenantId, "OUT", sourceType, sourceId, sourceLineId);
@@ -308,7 +308,7 @@ public class MatStockService {
             stock.setAvailableQty(nextQuantity);
             stock.setInventoryValue(nextValue);
             stock.setAverageUnitCost(nextQuantity.signum() == 0 ? BigDecimal.ZERO
-                    : nextValue.divide(nextQuantity, 6, RoundingMode.HALF_UP));
+                    : nextValue.divide(nextQuantity, 2, RoundingMode.HALF_UP));
             int updated = matStockMapper.updateById(stock);
             if (updated > 0) break;
             if (++retries >= MAX_RETRIES) {
@@ -331,12 +331,16 @@ public class MatStockService {
         return new StockMovementResult(stock, issuedUnitCost, issuedAmount);
     }
 
-    private void validatePositiveQuantity(BigDecimal quantity) {
+    private BigDecimal normalizeQuantity(BigDecimal quantity) {
         // 0 被视为合法的占位调整（MatStockServiceTest 边界保留），仅在 null 或负值时报错。
         // 终态非负防御在 doUpdateIncrement / stockOut 内部由"变更后≥0"保证。
         if (quantity == null || quantity.compareTo(BigDecimal.ZERO) < 0) {
             throw new BusinessException("STOCK_QUANTITY_INVALID", "库存数量不能为负或为空");
         }
+        if (quantity.stripTrailingZeros().scale() > 2) {
+            throw new BusinessException("STOCK_QUANTITY_INVALID", "库存数量最多保留2位小数");
+        }
+        return quantity.setScale(2, RoundingMode.UNNECESSARY);
     }
 
     /**
@@ -514,8 +518,8 @@ public class MatStockService {
         aggregate.setAvailableQty(availableQty);
         aggregate.setInventoryValue(inventoryValue);
         aggregate.setAverageUnitCost(availableQty.signum() == 0
-                ? BigDecimal.ZERO.setScale(4, RoundingMode.HALF_UP)
-                : inventoryValue.divide(availableQty, 4, RoundingMode.HALF_UP));
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : inventoryValue.divide(availableQty, 2, RoundingMode.HALF_UP));
         aggregate.setSafetyStockQty(safetyStockQty);
         aggregate.setReplenishmentTargetQty(replenishmentTargets.isEmpty()
                 ? null
@@ -661,8 +665,8 @@ public class MatStockService {
     @Transactional(rollbackFor = Exception.class)
     public StockTransferVO transfer(StockTransferDTO dto) {
         if (dto == null || dto.getQuantity() == null || dto.getQuantity().signum() <= 0
-                || dto.getQuantity().scale() > 4) {
-            throw new BusinessException("STOCK_TRANSFER_QUANTITY_INVALID", "调拨数量必须大于0且最多4位小数");
+                || dto.getQuantity().stripTrailingZeros().scale() > 2) {
+            throw new BusinessException("STOCK_TRANSFER_QUANTITY_INVALID", "调拨数量必须大于0且最多2位小数");
         }
         if (dto.getSourceStockId() == null || dto.getTargetStockId() == null) {
             throw new BusinessException("STOCK_TRANSFER_ROUTE_INVALID", "调拨两端库存不能为空");
@@ -674,7 +678,7 @@ public class MatStockService {
             throw new BusinessException("STOCK_TRANSFER_REASON_INVALID", "调拨原因不能为空且不能超过500个字符");
         }
         Long tenantId = UserContext.getCurrentTenantId();
-        BigDecimal quantity = dto.getQuantity().setScale(4, RoundingMode.UNNECESSARY);
+        BigDecimal quantity = dto.getQuantity().setScale(2, RoundingMode.UNNECESSARY);
         String idempotencyKey = dto.getIdempotencyKey().trim();
         String reason = dto.getReason().trim();
 
@@ -688,7 +692,7 @@ public class MatStockService {
         transfer.setSourceStockId(dto.getSourceStockId());
         transfer.setTargetStockId(dto.getTargetStockId());
         transfer.setQuantity(quantity);
-        transfer.setUnitCost(BigDecimal.ZERO.setScale(6));
+        transfer.setUnitCost(BigDecimal.ZERO.setScale(2));
         transfer.setAmount(BigDecimal.ZERO.setScale(2));
         transfer.setIdempotencyKey(idempotencyKey);
         transfer.setStatus("PENDING");
@@ -805,7 +809,7 @@ public class MatStockService {
     public MatStock updateSafetyStockThreshold(Long stockId, BigDecimal safetyStockQty) {
         validateQuantity(safetyStockQty, "INVALID_SAFETY_STOCK_THRESHOLD", "安全库存阈值");
         MatStock stock = loadAuthorizedStock(stockId, "维护安全库存阈值");
-        BigDecimal normalizedSafety = safetyStockQty.setScale(4);
+        BigDecimal normalizedSafety = safetyStockQty.setScale(2);
         if (stock.getReplenishmentTargetQty() != null
                 && normalizedSafety.compareTo(stock.getReplenishmentTargetQty()) > 0) {
             throw new BusinessException("INVALID_REPLENISHMENT_SETTINGS", "安全库存阈值不能高于人工补货目标量");
@@ -832,8 +836,8 @@ public class MatStockService {
         if (replenishmentTargetQty != null) {
             validateQuantity(replenishmentTargetQty, "INVALID_REPLENISHMENT_TARGET", "人工补货目标量");
         }
-        BigDecimal normalizedSafety = safetyStockQty.setScale(4);
-        BigDecimal normalizedTarget = replenishmentTargetQty == null ? null : replenishmentTargetQty.setScale(4);
+        BigDecimal normalizedSafety = safetyStockQty.setScale(2);
+        BigDecimal normalizedTarget = replenishmentTargetQty == null ? null : replenishmentTargetQty.setScale(2);
         if (normalizedTarget != null && normalizedTarget.compareTo(normalizedSafety) < 0) {
             throw new BusinessException("INVALID_REPLENISHMENT_SETTINGS", "人工补货目标量不能低于安全库存阈值");
         }
@@ -876,7 +880,7 @@ public class MatStockService {
     private StockTransferCandidateVO toTransferCandidate(MatStock stock, MatWarehouse warehouse) {
         BigDecimal available = stock.getAvailableQty() == null ? BigDecimal.ZERO : stock.getAvailableQty();
         BigDecimal safety = stock.getSafetyStockQty() == null ? BigDecimal.ZERO : stock.getSafetyStockQty();
-        BigDecimal transferable = available.subtract(safety).setScale(4, RoundingMode.HALF_UP);
+        BigDecimal transferable = available.subtract(safety).setScale(2, RoundingMode.HALF_UP);
         if (warehouse == null || transferable.signum() <= 0) {
             return null;
         }
@@ -884,14 +888,14 @@ public class MatStockService {
         candidate.setStockId(stock.getId());
         candidate.setWarehouseId(warehouse.getId());
         candidate.setWarehouseName(warehouse.getWarehouseName());
-        candidate.setAvailableQty(available.setScale(4, RoundingMode.HALF_UP));
-        candidate.setSafetyStockQty(safety.setScale(4, RoundingMode.HALF_UP));
+        candidate.setAvailableQty(available.setScale(2, RoundingMode.HALF_UP));
+        candidate.setSafetyStockQty(safety.setScale(2, RoundingMode.HALF_UP));
         candidate.setTransferableQty(transferable);
         return candidate;
     }
 
     private BigDecimal scaleQuantity(BigDecimal value) {
-        return nvl(value).setScale(4, RoundingMode.HALF_UP);
+        return nvl(value).setScale(2, RoundingMode.HALF_UP);
     }
 
     private MatWarehouse loadTransferWarehouse(Long warehouseId, Long tenantId) {
@@ -951,7 +955,7 @@ public class MatStockService {
         supply.setOrderId(order.getId());
         supply.setOrderCode(order.getOrderCode());
         supply.setDeliveryDate(order.getDeliveryDate());
-        supply.setRemainingQty(remainingQty.setScale(4, RoundingMode.HALF_UP));
+        supply.setRemainingQty(remainingQty.setScale(2, RoundingMode.HALF_UP));
         return supply;
     }
 
@@ -1100,8 +1104,8 @@ public class MatStockService {
     }
 
     private void validateQuantity(BigDecimal value, String code, String label) {
-        if (value == null || value.signum() < 0 || value.scale() > 4) {
-            throw new BusinessException(code, label + "必须为非负数且最多 4 位小数");
+        if (value == null || value.signum() < 0 || value.stripTrailingZeros().scale() > 2) {
+            throw new BusinessException(code, label + "必须为非负数且最多 2 位小数");
         }
     }
 

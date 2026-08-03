@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Digits;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -62,12 +63,15 @@ public class CtContractChange implements Serializable {
     @NotBlank
     private String changeType;
 
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal beforeAmount;
 
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal changeAmount;
 
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal afterAmount;
 

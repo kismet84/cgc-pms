@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -45,14 +46,17 @@ public class CostTargetItem extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     @NotNull(message = "目标金额不能为空")
     @DecimalMin(value = "0.00", message = "目标金额不能为负数")
+    @Digits(integer = 16, fraction = 2)
     private BigDecimal targetAmount;
 
     /** 投标阶段该科目成本基准快照。 */
     @DecimalMin(value = "0.00", message = "投标成本金额不能为负数")
+    @Digits(integer = 16, fraction = 2)
     private BigDecimal bidCostAmount;
 
     /** 下达给责任主体的预算金额。 */
     @DecimalMin(value = "0.00", message = "责任预算金额不能为负数")
+    @Digits(integer = 16, fraction = 2)
     private BigDecimal responsibilityAmount;
 
     private Long responsibleUserId;
