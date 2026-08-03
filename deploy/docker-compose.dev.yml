@@ -151,8 +151,8 @@ services:
       # Presigned URLs are consumed by host browsers, not Docker service DNS.
       MINIO_PUBLIC_ENDPOINT: "http://localhost:9000"
       MINIO_REGION: "${MINIO_REGION:-us-east-1}"
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY is required}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:?MINIO_SECRET_KEY is required}
       VIRUS_SCAN_ENABLED: "true"
       VIRUS_SCAN_HOST: clamav
       VIRUS_SCAN_PORT: "3310"

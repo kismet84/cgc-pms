@@ -60,6 +60,12 @@ services:
         check_not_change_me "MINIO_ROOT_USER"
         check_not_empty   "MINIO_ROOT_PASSWORD"
         check_not_change_me "MINIO_ROOT_PASSWORD"
+        check_not_empty   "MINIO_ACCESS_KEY"
+        check_not_change_me "MINIO_ACCESS_KEY"
+        check_not_empty   "MINIO_SECRET_KEY"
+        check_not_change_me "MINIO_SECRET_KEY"
+        if [ "$$MINIO_ACCESS_KEY" = "$$MINIO_ROOT_USER" ]; then fail "MINIO_ACCESS_KEY must not reuse MINIO_ROOT_USER"; else pass "MinIO application account is isolated"; fi
+        if [ "$$MINIO_SECRET_KEY" = "$$MINIO_ROOT_PASSWORD" ]; then fail "MINIO_SECRET_KEY must not reuse MINIO_ROOT_PASSWORD"; else pass "MinIO application secret is isolated"; fi
         check_not_empty   "JASYPT_ENCRYPTOR_PASSWORD"
         check_not_change_me "JASYPT_ENCRYPTOR_PASSWORD"
         echo ""
@@ -82,6 +88,8 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set in .env}
       - MINIO_ROOT_USER=${MINIO_ROOT_USER:?MINIO_ROOT_USER must be set in .env}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD must be set in .env}
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set in .env}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set in .env}
       - JASYPT_ENCRYPTOR_PASSWORD=${JASYPT_ENCRYPTOR_PASSWORD:?JASYPT_ENCRYPTOR_PASSWORD must be set in .env}
       - BACKEND_TAG=${BACKEND_TAG:?BACKEND_TAG must be set (e.g. git SHA)}
       - FRONTEND_TAG=${FRONTEND_TAG:?FRONTEND_TAG must be set (e.g. git SHA)}
@@ -241,8 +249,8 @@ services:
       # Browser-reachable origin; must not expose Docker-only service hostname.
       MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:?MINIO_PUBLIC_ENDPOINT is required}
       MINIO_REGION: ${MINIO_REGION:-us-east-1}
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       # ---- Malware scan (fail closed) ----
       VIRUS_SCAN_ENABLED: ${VIRUS_SCAN_ENABLED:-true}
       VIRUS_SCAN_HOST: ${VIRUS_SCAN_HOST:-clamav}

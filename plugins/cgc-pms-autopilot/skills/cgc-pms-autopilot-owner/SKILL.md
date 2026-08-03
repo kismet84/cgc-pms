@@ -13,7 +13,6 @@ description: Owns cgc-pms AutoPilot triggers, non-bypassable boundaries, and aut
 - `启动迭代`：进入连续迭代；仍受 Ready、checkpoint、fencing、指纹、验证、Reviewer、收口和 no-push 门禁。
 - `启动迭代-N`：`N=1..50`；最多完成 N 个实施型 Ready Issue。
 - `停止迭代`：安全停止，不强杀当前任务；完成安全 checkpoint 后不再启动下一任务。
-- 兼容短语：`启动自动迭代系统`、`启动连续自动迭代系统`、`启动连续自动迭代系统-N`、`停止自动迭代系统`。
 
 ## 不可绕过边界
 

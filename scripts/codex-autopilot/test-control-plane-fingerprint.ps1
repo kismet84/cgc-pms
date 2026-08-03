@@ -8,6 +8,7 @@ $realConfig = Get-Content -LiteralPath (Join-Path $scriptDir 'codex-autopilot.co
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'scripts/codex-autopilot/codex-autopilot.config.json') { throw 'control-plane fingerprint does not cover its behavior configuration' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/control-plane-policy.md') { throw 'control-plane fingerprint does not cover its behavior policy' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/desktop-execution-policy.md') { throw 'control-plane fingerprint does not cover the desktop execution policy' }
+if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'plugins/cgc-pms-autopilot/references/loop-budget-policy.md') { throw 'control-plane fingerprint does not cover the loop budget policy' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'docs/standards/codex-task-execution-policy.md') { throw 'control-plane fingerprint does not cover the shared Codex execution policy' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -notcontains 'AGENTS.md') { throw 'control-plane fingerprint does not cover the root hard gates' }
 if (@($realConfig.controlPlaneCanary.fingerprintPaths) -contains 'AGENTS.override.md') { throw 'control-plane fingerprint still references removed AGENTS.override.md' }
