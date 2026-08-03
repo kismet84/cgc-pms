@@ -1,7 +1,9 @@
 package com.cgcpms.accounting;
 
+import com.cgcpms.accounting.entity.AccountingEntryLine;
 import com.cgcpms.auth.util.CookieUtils;
 import com.cgcpms.common.JwtHttpTestTokenFactory;
+import com.cgcpms.financeops.vo.FinanceWorkspaceVOs.AccountingEntryLineVO;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,9 +16,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -74,6 +78,17 @@ class AccountingEntryControllerTest {
     @Test @Order(3) @DisplayName("GET /accounting-entry/{id} -> 400 for non-existent")
     void testGetById_NotFound() throws Exception {
         mockMvc.perform(getWith("/accounting-entry/999999").cookie(adminCookie())).andExpect(status().isBadRequest());
+    }
+
+    @Test @Order(3) @DisplayName("workspace detail supports lines without cost subjects")
+    void testWorkspaceLineWithoutCostSubject() {
+        AccountingEntryLine line = new AccountingEntryLine();
+        line.setId(1L);
+        line.setLineNo(1);
+        AccountingEntryLineVO result = AccountingEntryLineVO.from(line, Map.of());
+
+        assertNull(result.costSubjectId());
+        assertNull(result.costSubjectName());
     }
 
     @Test @Order(4) @DisplayName("POST /accounting-entry/generate rejects unsupported source explicitly")

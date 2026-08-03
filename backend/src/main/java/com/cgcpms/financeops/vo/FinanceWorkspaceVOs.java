@@ -138,7 +138,7 @@ public final class FinanceWorkspaceVOs {
                                         String amount, String summary) {
         public static AccountingEntryLineVO from(AccountingEntryLine line, Map<Long,String> subjectNames) {
             return new AccountingEntryLineVO(idString(line.getId()), line.getLineNo(), line.getDirection(),
-                    idString(line.getCostSubjectId()), subjectNames.get(line.getCostSubjectId()), line.getAccountCode(),
+                    idString(line.getCostSubjectId()), line.getCostSubjectId() == null ? null : subjectNames.get(line.getCostSubjectId()), line.getAccountCode(),
                     line.getAccountName(), money(line.getAmount()), line.getSummary());
         }
     }
