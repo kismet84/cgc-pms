@@ -50,7 +50,7 @@ class BaselineMySqlSmokeTest {
                 + "WHERE table_schema=DATABASE() AND table_name='wf_idempotency' "
                 + "AND column_name IN ('business_type','business_id','request_hash','response_json')"));
 
-        assertEquals(12, count("SELECT COUNT(*) FROM sys_role WHERE deleted_flag=0"));
+        assertEquals(13, count("SELECT COUNT(*) FROM sys_role WHERE deleted_flag=0"));
         assertTrue(count("SELECT COUNT(*) FROM sys_menu WHERE deleted_flag=0") > 0);
         assertTrue(count("SELECT COUNT(*) FROM sys_dict_type") > 0);
         assertTrue(count("SELECT COUNT(*) FROM cost_subject WHERE deleted_flag=0") > 0);
