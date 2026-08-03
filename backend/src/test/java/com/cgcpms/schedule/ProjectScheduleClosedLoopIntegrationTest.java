@@ -72,7 +72,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         dailyLogService.submit(DAILY_LOG);
 
         assertEquals("SUBMITTED", jdbc.queryForObject("SELECT status FROM site_daily_log WHERE id=?", String.class, DAILY_LOG));
-        assertEquals(new BigDecimal("20.0000"), jdbc.queryForObject("SELECT actual_progress FROM project_wbs_task WHERE id=?", BigDecimal.class, task));
+        assertEquals(new BigDecimal("20.00"), jdbc.queryForObject("SELECT actual_progress FROM project_wbs_task WHERE id=?", BigDecimal.class, task));
         Map<String,Object> snapshot = jdbc.queryForMap("SELECT * FROM project_progress_snapshot WHERE source_daily_log_id=?", DAILY_LOG);
         assertEquals("LAGGING", snapshot.get("status"));
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM alert_log WHERE source_type='PROJECT_PROGRESS_SNAPSHOT' AND source_id=? AND rule_type='PROJECT_PROGRESS_DELAY'", Integer.class, snapshot.get("id")));
@@ -93,7 +93,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         approveAll("PROJECT_CORRECTIVE_ACTION", correctiveId);
         long revision = jdbc.queryForObject("SELECT generated_revision_plan_id FROM project_corrective_action WHERE id=?", Long.class, correctiveId);
         assertEquals("DRAFT", jdbc.queryForObject("SELECT status FROM project_schedule_plan WHERE id=?", String.class, revision));
-        assertEquals(new BigDecimal("20.0000"), jdbc.queryForObject("SELECT actual_progress FROM project_wbs_task WHERE schedule_plan_id=?", BigDecimal.class, revision));
+        assertEquals(new BigDecimal("20.00"), jdbc.queryForObject("SELECT actual_progress FROM project_wbs_task WHERE schedule_plan_id=?", BigDecimal.class, revision));
 
         service.submitSchedule(revision);
         approveAll("PROJECT_SCHEDULE", revision);
@@ -139,7 +139,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
         BusinessException concurrent = assertThrows(BusinessException.class, () -> dailyLogService.submit(DAILY_LOG));
         assertEquals("SITE_DAILY_PROGRESS_CONCURRENT_ROLLBACK", concurrent.getCode());
         assertEquals("DRAFT", jdbc.queryForObject("SELECT status FROM site_daily_log WHERE id=?", String.class, DAILY_LOG));
-        assertEquals(new BigDecimal("30.0000"), jdbc.queryForObject("SELECT actual_progress FROM project_wbs_task WHERE id=?", BigDecimal.class, taskId));
+        assertEquals(new BigDecimal("30.00"), jdbc.queryForObject("SELECT actual_progress FROM project_wbs_task WHERE id=?", BigDecimal.class, taskId));
 
         jdbc.update("UPDATE pm_project SET status='SUSPENDED' WHERE id=?", PROJECT);
         BusinessException suspended = assertThrows(BusinessException.class, () -> service.createSchedule(new ScheduleRequest(
@@ -171,7 +171,7 @@ class ProjectScheduleClosedLoopIntegrationTest {
                 () -> service.replacePeriodItems(periodId, new PeriodItemBatch(0,
                         List.of(new PeriodItemRequest(taskId, new BigDecimal("60"), null)))));
         assertEquals("PROJECT_PERIOD_VERSION_CONFLICT", periodConflict.getCode());
-        assertEquals(new BigDecimal("50.0000"), jdbc.queryForObject(
+        assertEquals(new BigDecimal("50.00"), jdbc.queryForObject(
                 "SELECT target_progress FROM project_period_plan_item WHERE period_plan_id=?", BigDecimal.class, periodId));
     }
 

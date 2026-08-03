@@ -1,7 +1,8 @@
 package com.cgcpms.inventory.dto;
 
-import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -24,7 +25,6 @@ public class ReplenishmentSettingsDTO {
 
     @DecimalMin(value = "0", message = "人工补货提前期不能为负数")
     @DecimalMax(value = "3650", message = "人工补货提前期不能超过 3650 天")
-    @Digits(integer = 4, fraction = 0, message = "人工补货提前期必须为整数")
     private BigDecimal replenishmentLeadDays;
 
     @JsonIgnore
@@ -34,5 +34,11 @@ public class ReplenishmentSettingsDTO {
     public void setReplenishmentLeadDays(BigDecimal replenishmentLeadDays) {
         this.replenishmentLeadDays = replenishmentLeadDays;
         this.replenishmentLeadDaysSpecified = true;
+    }
+
+    @JsonIgnore
+    @AssertTrue(message = "人工补货提前期必须为整数")
+    public boolean isReplenishmentLeadDaysIntegral() {
+        return replenishmentLeadDays == null || replenishmentLeadDays.stripTrailingZeros().scale() <= 0;
     }
 }

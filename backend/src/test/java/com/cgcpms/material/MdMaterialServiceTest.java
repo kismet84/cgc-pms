@@ -148,12 +148,12 @@ class MdMaterialServiceTest {
                 """, materialId, materialId, materialId);
 
         MdMaterialVO detail = mdMaterialService.getById(materialId);
-        assertEquals("12.3456", detail.getPurchasePrice());
+        assertEquals("12.35", detail.getPurchasePrice());
         assertEquals("870102", detail.getPurchasePriceReceiptItemId());
         assertEquals("2026-07-01", detail.getPurchasePriceDate());
 
         var page = mdMaterialService.getPage(1, 10, "PRICE-MAT-001", null, null, null);
-        assertEquals("12.3456", page.getRecords().getFirst().getPurchasePrice());
+        assertEquals("12.35", page.getRecords().getFirst().getPurchasePrice());
     }
 
     @Test

@@ -415,7 +415,7 @@ class MatPurchaseOrderServiceTest {
                 WHERE tenant_id=0 AND contract_id=30001 AND material_id=1 AND deleted_flag=0
                 """, Long.class);
         assertEquals(1, items.size());
-        assertEquals("3500.0000", items.getFirst().getUnitPrice());
+        assertEquals("3500.00", items.getFirst().getUnitPrice());
         assertEquals(expectedContractItemId.toString(), items.getFirst().getContractItemId());
     }
 

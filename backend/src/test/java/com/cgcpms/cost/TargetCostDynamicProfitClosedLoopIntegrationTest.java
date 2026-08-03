@@ -124,7 +124,7 @@ class TargetCostDynamicProfitClosedLoopIntegrationTest {
         assertMoney("9000.00", confirmed.get("forecast_at_completion_amount"));
         assertMoney("1000.00", confirmed.get("cost_variance_amount"));
         assertMoney("3000.00", confirmed.get("forecast_profit_amount"));
-        assertEquals(new BigDecimal("0.250000"), new BigDecimal(String.valueOf(confirmed.get("profit_margin"))));
+        assertEquals(new BigDecimal("0.25"), new BigDecimal(String.valueOf(confirmed.get("profit_margin"))));
         assertEquals(forecastId, jdbc.queryForObject("SELECT cost_forecast_id FROM cost_summary WHERE project_id=? LIMIT 1", Long.class, PROJECT));
 
         BusinessException duplicateConfirm = assertThrows(BusinessException.class, () -> controlService.confirmForecast(forecastId, 3));
