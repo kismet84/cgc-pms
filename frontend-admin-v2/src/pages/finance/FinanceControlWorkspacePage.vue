@@ -1315,6 +1315,7 @@ onBeforeUnmount(() => controller?.abort())
           <V2Input
             v-model="accountEditor.openingBalance"
             label="期初余额"
+            :decimal-scale="2"
             required
             hint="金额按服务端十进制字符串提交"
           />

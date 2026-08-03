@@ -9,7 +9,6 @@ import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { V2Alert, V2Button, V2Dialog, V2PageState, V2Select } from '@/components'
 import DomainNavigationIcon from '@/components/DomainNavigationIcon.vue'
 import { findWorkspace, visibleNavigation } from '@/navigation/catalog'
-import ShellLoadingPage from '@/pages/shell/ShellLoadingPage.vue'
 import {
   loadNotificationSummary,
   markAllNotificationsRead,
@@ -80,13 +79,11 @@ const demoRoleGroups = [
   { role: 'legacyMgmt', prefix: 'gm', label: '管理层支持' },
   { role: 'material', prefix: 'mat', label: '物资支持' },
 ] as const
-const demoRoleAccounts = demoRoleGroups.flatMap((group) =>
-  [1, 2, 3].map((index) => ({
-    role: group.role,
-    username: `ui26.${group.prefix}${String(index).padStart(2, '0')}`,
-    label: `${group.label}${index}`,
-  })),
-)
+const demoRoleAccounts = demoRoleGroups.map((group) => ({
+  role: group.role,
+  username: `ui26.${group.prefix}01`,
+  label: group.label,
+}))
 
 watch(
   () => route.fullPath,
@@ -584,10 +581,7 @@ async function switchDemoAccount(account: (typeof demoRoleAccounts)[number]): Pr
         tabindex="-1"
       >
         <RouterView v-slot="{ Component }">
-          <Suspense>
-            <component :is="Component" />
-            <template #fallback><ShellLoadingPage /></template>
-          </Suspense>
+          <component :is="Component" />
         </RouterView>
       </main>
     </div>

@@ -1048,6 +1048,7 @@ onBeforeUnmount(() => {
               <V2Input
                 :model-value="item.quantity"
                 label="数量"
+                :decimal-scale="2"
                 :disabled="!canEditItems || !isDraft"
                 @update:model-value="updateItem(index, 'quantity', $event)"
               />
@@ -1060,12 +1061,14 @@ onBeforeUnmount(() => {
               <V2Input
                 :model-value="item.unitPrice ?? ''"
                 label="单价"
+                :decimal-scale="2"
                 :disabled="!canEditItems || !isDraft"
                 @update:model-value="updateItem(index, 'unitPrice', $event)"
               />
               <V2Input
                 :model-value="item.claimUnitPrice ?? ''"
                 label="申报单价"
+                :decimal-scale="2"
                 :disabled="!canEditItems || !isDraft"
                 @update:model-value="updateItem(index, 'claimUnitPrice', $event)"
               />
@@ -1156,6 +1159,7 @@ onBeforeUnmount(() => {
               ><V2Input
                 :model-value="line.confirmedAmount"
                 label="核定金额"
+                :decimal-scale="2"
                 required
                 @update:model-value="updateReviewLine(index, 'confirmedAmount', $event)"
               /><V2Input

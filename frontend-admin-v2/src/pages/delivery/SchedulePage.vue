@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { formatDecimal } from '@/pages/dashboard/model'
 import { useRoute, useRouter } from 'vue-router'
 import type {
   CorrectiveActionCommand,
@@ -778,12 +779,12 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
               <dt>快照日期</dt>
               <dd>{{ detail.latestSnapshot.snapshotDate }}</dd>
               <dt>计划进度</dt>
-              <dd>{{ detail.latestSnapshot.plannedProgress }}%</dd>
+              <dd>{{ formatDecimal(detail.latestSnapshot.plannedProgress) }}%</dd>
               <dt>实际进度</dt>
-              <dd>{{ detail.latestSnapshot.actualProgress }}%</dd>
+              <dd>{{ formatDecimal(detail.latestSnapshot.actualProgress) }}%</dd>
               <dt>偏差状态</dt>
               <dd>
-                {{ detail.latestSnapshot.deviationPercent }}% /
+                {{ formatDecimal(detail.latestSnapshot.deviationPercent) }}% /
                 {{ deliveryLabel(detail.latestSnapshot.status) }}
               </dd>
             </dl>
@@ -814,8 +815,8 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
                   <td>{{ task.taskName }}</td>
                   <td>{{ task.predecessorTaskCode || '—' }}</td>
                   <td>{{ task.plannedStartDate }} 至 {{ task.plannedEndDate }}</td>
-                  <td>{{ task.weightPercent }}%</td>
-                  <td>{{ task.actualProgress }}%</td>
+                  <td>{{ formatDecimal(task.weightPercent) }}%</td>
+                  <td>{{ formatDecimal(task.actualProgress) }}%</td>
                   <td>{{ deliveryLabel(task.status) }}</td>
                 </tr>
               </tbody>
@@ -989,7 +990,7 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
               <input v-model="task.plannedEndDate" type="date" />
             </label>
             <V2Input v-model="task.weightPercent" label="权重%" required />
-            <V2Input v-model="task.plannedQuantity" label="计划量" />
+            <V2Input v-model="task.plannedQuantity" label="计划量" :decimal-scale="2" />
             <V2Input v-model="task.unit" label="单位" />
             <label class="schedule-page__span-2">
               备注
@@ -1039,8 +1040,13 @@ function cleanCorrectiveCommand(form: CorrectiveActionCommand): CorrectiveAction
           结束日期
           <input v-model="periodForm.endDate" type="date" required />
         </label>
-        <V2Input v-model="periodForm.targetProgress" label="目标进度%" required />
-        <V2Input v-model="periodForm.plannedQuantity" label="周期计划量" />
+        <V2Input
+          v-model="periodForm.targetProgress"
+          label="目标进度%"
+          :decimal-scale="2"
+          required
+        />
+        <V2Input v-model="periodForm.plannedQuantity" label="周期计划量" :decimal-scale="2" />
         <label class="schedule-page__span-2">
           备注
           <textarea v-model="periodForm.remark" rows="2" />

@@ -182,7 +182,7 @@ test.describe('M4 cost target routes', () => {
         page.getByRole('heading', { name: '项目成本预算版本', exact: true }),
       ).toBeVisible()
       await expect(page.getByText('首版目标成本', { exact: true })).toBeVisible()
-      await expect(page.getByText('9007199254740993.12').first()).toBeVisible()
+      await expect(page.getByText('¥9,007,199,254,740,993.12').first()).toBeVisible()
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
       ).toBe(true)

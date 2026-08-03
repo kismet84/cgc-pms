@@ -9,6 +9,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { formatAmount } from '@/pages/dashboard/model'
 import {
   V2ActionMenu,
   V2Badge,
@@ -380,7 +381,7 @@ onBeforeUnmount(() => {
                 </th>
                 <td>{{ row.budgetName }}</td>
                 <td>{{ row.versionNo }}</td>
-                <td>{{ row.totalAmount }}</td>
+                <td>{{ formatAmount(row.totalAmount) }}</td>
                 <td>
                   <V2Badge :tone="approvalStatusTone(row.approvalStatus)">{{
                     approvalStatusLabel(row.approvalStatus)
@@ -471,14 +472,14 @@ onBeforeUnmount(() => {
             v-model="form.budgetName"
             label="预算名称"
             required
-          /><V2Input v-model="form.totalAmount" label="预算总额" required />
+          /><V2Input v-model="form.totalAmount" label="预算总额" :decimal-scale="2" required />
           <div v-if="dialog === 'create'" class="lines">
             <div v-for="(line, index) in lines" :key="index" class="line">
               <V2Select
                 v-model="line.costSubjectId"
                 label="成本科目"
                 :options="costSubjectOptions"
-              /><V2Input v-model="line.budgetAmount" label="预算金额" />
+              /><V2Input v-model="line.budgetAmount" label="预算金额" :decimal-scale="2" />
             </div>
             <V2Button type="button" size="small" variant="secondary" @click="addLine">
               添加明细
@@ -505,7 +506,7 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <dt>预算总额</dt>
-              <dd>{{ detail.totalAmount }}</dd>
+              <dd>{{ formatAmount(detail.totalAmount) }}</dd>
             </div>
             <div>
               <dt>审批状态</dt>
@@ -525,7 +526,7 @@ onBeforeUnmount(() => {
                 v-model="line.costSubjectId"
                 label="成本科目"
                 :options="costSubjectOptions"
-              /><V2Input v-model="line.budgetAmount" label="预算金额" />
+              /><V2Input v-model="line.budgetAmount" label="预算金额" :decimal-scale="2" />
             </div>
             <V2Button type="button" size="small" variant="secondary" @click="addLine">
               添加明细
@@ -553,10 +554,10 @@ onBeforeUnmount(() => {
               <tbody>
                 <tr v-for="row in availability" :key="row.budgetLineId">
                   <td>{{ costSubjectLabel(row.costSubjectId) }}</td>
-                  <td>{{ row.budgetAmount }}</td>
-                  <td>{{ row.reservedAmount }}</td>
-                  <td>{{ row.consumedAmount }}</td>
-                  <td>{{ row.availableAmount }}</td>
+                  <td>{{ formatAmount(row.budgetAmount) }}</td>
+                  <td>{{ formatAmount(row.reservedAmount) }}</td>
+                  <td>{{ formatAmount(row.consumedAmount) }}</td>
+                  <td>{{ formatAmount(row.availableAmount) }}</td>
                 </tr>
               </tbody>
             </table>

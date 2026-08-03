@@ -16,6 +16,7 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  MaterialSearchPicker,
   V2Alert,
   V2Badge,
   V2Button,
@@ -28,7 +29,7 @@ import {
   showToast,
   useToastMessage,
 } from '@/components'
-import { formatAmount } from '@/pages/dashboard/model'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
   createContractComposite,
   deleteContract,
@@ -623,6 +624,25 @@ function addItem(): void {
   form.value = { ...form.value, items: [...form.value.items, blankItem()] }
 }
 
+function addMaterialItem(material: MaterialRecord): void {
+  if (!materials.value.some((item) => item.id === material.id)) materials.value.push(material)
+  const item = {
+    ...blankItem(),
+    materialId: material.id,
+    itemCode: material.materialCode,
+    itemName: material.materialName,
+    itemSpec: material.specification ?? '',
+    unit: material.unit ?? '',
+  }
+  const emptyIndex = form.value.items.findIndex(
+    (current) => !current.id && !current.materialId && !current.itemCode && !current.itemName,
+  )
+  const items = [...form.value.items]
+  if (emptyIndex >= 0) items[emptyIndex] = item
+  else items.push(item)
+  form.value = { ...form.value, items }
+}
+
 function removeItem(index: number): void {
   form.value = {
     ...form.value,
@@ -1118,12 +1138,13 @@ onBeforeUnmount(() => {
                     <V2Input
                       v-model="row.allocatedAmount"
                       label="分配金额"
+                      :decimal-scale="2"
                       hide-label
                       autocomplete="off"
                     />
                   </td>
-                  <td>{{ row.reservedAmount || '0.00' }}</td>
-                  <td>{{ row.consumedAmount || '0.00' }}</td>
+                  <td>{{ formatAmount(row.reservedAmount) }}</td>
+                  <td>{{ formatAmount(row.consumedAmount) }}</td>
                   <td>
                     <V2Button
                       type="button"
@@ -1138,9 +1159,9 @@ onBeforeUnmount(() => {
               <tbody v-else>
                 <tr v-for="row in budgetAllocations" :key="row.id || row.budgetLineId">
                   <td>{{ budgetLineLabel(row.budgetLineId) }}</td>
-                  <td>{{ row.allocatedAmount }}</td>
-                  <td>{{ row.reservedAmount || '0.00' }}</td>
-                  <td>{{ row.consumedAmount || '0.00' }}</td>
+                  <td>{{ formatAmount(row.allocatedAmount) }}</td>
+                  <td>{{ formatAmount(row.reservedAmount) }}</td>
+                  <td>{{ formatAmount(row.consumedAmount) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1183,7 +1204,7 @@ onBeforeUnmount(() => {
                   <td>{{ item.itemCode || '未编号' }}</td>
                   <td>{{ item.itemSpec || '—' }}</td>
                   <td>{{ item.unit || '—' }}</td>
-                  <td>{{ item.quantity || '—' }}</td>
+                  <td>{{ formatDecimal(item.quantity) }}</td>
                   <td>{{ formatAmount(item.unitPrice || null) }}</td>
                   <td>{{ formatAmount(item.amount || null) }}</td>
                 </tr>
@@ -1225,7 +1246,7 @@ onBeforeUnmount(() => {
               <tbody>
                 <tr v-for="term in detail?.paymentTerms" :key="term.id || term.termName">
                   <td>{{ term.termName }}</td>
-                  <td>{{ term.paymentRatio || '—' }}</td>
+                  <td>{{ formatDecimal(term.paymentRatio) }}</td>
                   <td>{{ formatAmount(term.paymentAmount || null) }}</td>
                   <td>{{ term.paymentCondition || '—' }}</td>
                   <td>{{ term.plannedDate || '—' }}</td>
@@ -1325,6 +1346,7 @@ onBeforeUnmount(() => {
             <V2Input
               :model-value="form.contract.contractAmount || ''"
               label="合同金额"
+              :decimal-scale="2"
               :disabled="formLocked || contractAmountLocked"
               :hint="contractAmountLocked ? '项目已在建，合同总价调整请发起合同变更。' : undefined"
               @update:model-value="updateContractField('contractAmount', $event)"
@@ -1332,17 +1354,20 @@ onBeforeUnmount(() => {
             <V2Input
               :model-value="form.contract.taxRate || ''"
               label="税率"
+              :decimal-scale="2"
               :disabled="formLocked"
               @update:model-value="updateContractField('taxRate', $event)"
             />
             <V2Input
               :model-value="form.contract.taxAmount || ''"
               label="税额（自动计算）"
+              :decimal-scale="2"
               disabled
             />
             <V2Input
               :model-value="form.contract.amountWithoutTax || ''"
               label="不含税金额（自动计算）"
+              :decimal-scale="2"
               disabled
             />
             <V2Input
@@ -1379,9 +1404,16 @@ onBeforeUnmount(() => {
         <section class="v2-detail-dialog__section">
           <div class="v2-detail-dialog__section-heading">
             <h3>合同清单</h3>
-            <V2Button type="button" size="small" :disabled="formLocked" @click="addItem"
-              >新增清单</V2Button
-            >
+            <div class="contract-page__section-actions">
+              <MaterialSearchPicker
+                v-if="form.contract.contractType === 'PURCHASE'"
+                :disabled="formLocked"
+                @select="addMaterialItem"
+              />
+              <V2Button type="button" size="small" :disabled="formLocked" @click="addItem"
+                >新增清单</V2Button
+              >
+            </div>
           </div>
           <div v-if="form.items.length" class="contract-page__editor-list">
             <article
@@ -1410,6 +1442,12 @@ onBeforeUnmount(() => {
                   @update:model-value="updateItem(index, 'itemCode', $event)"
                 />
                 <V2Input
+                  :model-value="item.itemSpec || ''"
+                  label="规格"
+                  :disabled="formLocked"
+                  @update:model-value="updateItem(index, 'itemSpec', $event)"
+                />
+                <V2Input
                   :model-value="item.unit || ''"
                   label="单位"
                   :disabled="formLocked"
@@ -1418,12 +1456,14 @@ onBeforeUnmount(() => {
                 <V2Input
                   :model-value="item.quantity || ''"
                   label="数量"
+                  :decimal-scale="2"
                   :disabled="formLocked"
                   @update:model-value="updateItem(index, 'quantity', $event)"
                 />
                 <V2Input
                   :model-value="item.unitPrice || ''"
                   label="单价"
+                  :decimal-scale="2"
                   :disabled="formLocked"
                   @update:model-value="updateItem(index, 'unitPrice', $event)"
                 />
@@ -1471,12 +1511,14 @@ onBeforeUnmount(() => {
                 <V2Input
                   :model-value="term.paymentRatio || ''"
                   label="付款比例"
+                  :decimal-scale="2"
                   :disabled="formLocked"
                   @update:model-value="updateTerm(index, 'paymentRatio', $event)"
                 />
                 <V2Input
                   :model-value="term.paymentAmount || ''"
                   label="付款金额"
+                  :decimal-scale="2"
                   :disabled="formLocked"
                   @update:model-value="updateTerm(index, 'paymentAmount', $event)"
                 />
@@ -1611,11 +1653,17 @@ onBeforeUnmount(() => {
 }
 
 .contract-page__actions,
-.contract-page__pagination {
+.contract-page__pagination,
+.contract-page__section-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--v2-space-2);
   align-items: center;
+}
+
+.contract-page__section-actions {
+  flex: 1 1 30rem;
+  justify-content: flex-end;
 }
 
 .contract-page__pagination,

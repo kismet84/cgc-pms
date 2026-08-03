@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { formatDecimal } from '@/pages/dashboard/model'
 import { useRoute, useRouter } from 'vue-router'
 import type {
   DailyProgressCommand,
@@ -849,27 +850,31 @@ function cleanLogCommand(command: SiteDailyLogCommand): SiteDailyLogCommand {
                   <td>{{ row.taskCode }}</td>
                   <td>{{ row.taskName }}</td>
                   <td>
-                    <span v-if="dialogMode === 'view'">{{ row.currentProgress }}</span>
+                    <span v-if="dialogMode === 'view'">{{
+                      formatDecimal(row.currentProgress)
+                    }}</span>
                     <input
                       v-else
                       v-model="row.currentProgress"
                       type="number"
                       min="0"
                       max="100"
-                      step="0.0001"
+                      step="0.01"
                       :disabled="
                         !canReportProgress || !row.included || activeRecord.status !== 'DRAFT'
                       "
                     />
                   </td>
                   <td>
-                    <span v-if="dialogMode === 'view'">{{ row.completedQuantity }}</span>
+                    <span v-if="dialogMode === 'view'">{{
+                      formatDecimal(row.completedQuantity)
+                    }}</span>
                     <input
                       v-else
                       v-model="row.completedQuantity"
                       type="number"
                       min="0"
-                      step="0.0001"
+                      step="0.01"
                       :disabled="
                         !canReportProgress || !row.included || activeRecord.status !== 'DRAFT'
                       "

@@ -166,14 +166,14 @@ describe('M4 cost target page', () => {
     expect(wrapper.text()).not.toContain('cost:target:query')
   })
 
-  it('renders server decimals unchanged and hides unauthorized writes', async () => {
+  it('renders server decimals as fixed two-place amounts and hides unauthorized writes', async () => {
     const { wrapper } = await mountPage(['cost:target:query'], '/cost-target/index?projectId=P1')
 
     expect(loadCostTargetPage).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: 'P1', pageNo: 1, pageSize: 10 }),
       expect.any(AbortSignal),
     )
-    expect(wrapper.text()).toContain('9007199254740993.12')
+    expect(wrapper.text()).toContain('¥9,007,199,254,740,993.12')
     expect(wrapper.text()).toContain('项目一')
     expect(wrapper.text()).not.toContain('P1')
     expect(button(wrapper, '新建版本')).toBeUndefined()
@@ -221,7 +221,7 @@ describe('M4 cost target page', () => {
     expect(loadCostTarget).toHaveBeenCalledWith('81', expect.any(AbortSignal))
     expect(loadCostTargetItems).toHaveBeenCalledWith('81', expect.any(AbortSignal))
     expect(wrapper.get('[role="dialog"]').text()).toContain('首版目标成本')
-    expect(wrapper.get('[role="dialog"]').text()).toContain('9007199254740993.12')
+    expect(wrapper.get('[role="dialog"]').text()).toContain('¥9,007,199,254,740,993.12')
   })
 
   it('shows a list 500 without inventing records', async () => {

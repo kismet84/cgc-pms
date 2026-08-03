@@ -12,6 +12,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { formatAmount } from '@/pages/dashboard/model'
 import {
   V2ActionMenu,
   V2Badge,
@@ -674,9 +675,9 @@ onBeforeUnmount(() => {
                     <small>{{ record.versionName }}</small>
                   </td>
                   <td>{{ projectLabel(record.projectId) }}</td>
-                  <td>{{ record.totalTargetAmount }}</td>
-                  <td>{{ record.totalBidCostAmount }}</td>
-                  <td>{{ record.totalResponsibilityAmount }}</td>
+                  <td>{{ formatAmount(record.totalTargetAmount) }}</td>
+                  <td>{{ formatAmount(record.totalBidCostAmount) }}</td>
+                  <td>{{ formatAmount(record.totalResponsibilityAmount) }}</td>
                   <td>
                     <V2Badge :tone="approvalTone(record.approvalStatus)">{{
                       approvalLabel(record.approvalStatus)
@@ -814,30 +815,35 @@ onBeforeUnmount(() => {
                   v-if="form.sourceContractAmount"
                   v-model="form.sourceContractAmount"
                   label="合同金额快照"
+                  :decimal-scale="2"
                   disabled
                 />
                 <V2Input
                   v-if="form.targetCostRate"
                   v-model="form.targetCostRate"
                   label="目标成本率"
+                  :decimal-scale="2"
                   disabled
                 />
                 <V2Input
                   v-if="form.totalTargetAmount"
                   v-model="form.totalTargetAmount"
                   label="目标成本合计（服务端）"
+                  :decimal-scale="2"
                   disabled
                 />
                 <V2Input
                   v-if="form.totalBidCostAmount"
                   v-model="form.totalBidCostAmount"
                   label="投标成本合计（服务端）"
+                  :decimal-scale="2"
                   disabled
                 />
                 <V2Input
                   v-if="form.totalResponsibilityAmount"
                   v-model="form.totalResponsibilityAmount"
                   label="责任预算合计（服务端）"
+                  :decimal-scale="2"
                   disabled
                 />
                 <label class="cost-target-page__native-field"
@@ -909,6 +915,7 @@ onBeforeUnmount(() => {
                         <V2Input
                           :model-value="item.targetAmount"
                           label="目标金额"
+                          :decimal-scale="2"
                           hide-label
                           required
                           :disabled="!canSaveDraft || !editable"
@@ -919,6 +926,7 @@ onBeforeUnmount(() => {
                         <V2Input
                           :model-value="item.bidCostAmount ?? ''"
                           label="投标金额"
+                          :decimal-scale="2"
                           hide-label
                           required
                           :disabled="!canSaveDraft || !editable"
@@ -929,6 +937,7 @@ onBeforeUnmount(() => {
                         <V2Input
                           :model-value="item.responsibilityAmount ?? ''"
                           label="责任金额"
+                          :decimal-scale="2"
                           hide-label
                           required
                           :disabled="!canSaveDraft || !editable"
@@ -962,7 +971,8 @@ onBeforeUnmount(() => {
                           variant="danger"
                           :disabled="actionBusy"
                           @click="items = items.filter((_, itemIndex) => itemIndex !== index)"
-                          >移除</V2Button>
+                          >移除</V2Button
+                        >
                         <span v-else>—</span>
                       </td>
                     </tr>
@@ -1025,15 +1035,15 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <dt>目标成本</dt>
-              <dd>{{ detail.totalTargetAmount }}</dd>
+              <dd>{{ formatAmount(detail.totalTargetAmount) }}</dd>
             </div>
             <div>
               <dt>投标成本</dt>
-              <dd>{{ detail.totalBidCostAmount }}</dd>
+              <dd>{{ formatAmount(detail.totalBidCostAmount) }}</dd>
             </div>
             <div>
               <dt>责任成本</dt>
-              <dd>{{ detail.totalResponsibilityAmount }}</dd>
+              <dd>{{ formatAmount(detail.totalResponsibilityAmount) }}</dd>
             </div>
             <div>
               <dt>审批状态</dt>
@@ -1082,17 +1092,23 @@ onBeforeUnmount(() => {
               <tbody>
                 <tr v-for="(item, index) in items" :key="item.id || item.costSubjectId">
                   <td>{{ costSubjectLabel(item.costSubjectId, index) }}</td>
-                  <td>{{ item.targetAmount }}</td>
-                  <td>{{ item.bidCostAmount }}</td>
-                  <td>{{ item.responsibilityAmount }}</td>
+                  <td>{{ formatAmount(item.targetAmount) }}</td>
+                  <td>{{ formatAmount(item.bidCostAmount) }}</td>
+                  <td>{{ formatAmount(item.responsibilityAmount) }}</td>
                   <td v-if="executionBudget">
-                    {{ availabilityBySubject.get(item.costSubjectId)?.reservedAmount ?? '0.00' }}
+                    {{
+                      formatAmount(availabilityBySubject.get(item.costSubjectId)?.reservedAmount)
+                    }}
                   </td>
                   <td v-if="executionBudget">
-                    {{ availabilityBySubject.get(item.costSubjectId)?.consumedAmount ?? '0.00' }}
+                    {{
+                      formatAmount(availabilityBySubject.get(item.costSubjectId)?.consumedAmount)
+                    }}
                   </td>
                   <td v-if="executionBudget">
-                    {{ availabilityBySubject.get(item.costSubjectId)?.availableAmount ?? '0.00' }}
+                    {{
+                      formatAmount(availabilityBySubject.get(item.costSubjectId)?.availableAmount)
+                    }}
                   </td>
                 </tr>
               </tbody>

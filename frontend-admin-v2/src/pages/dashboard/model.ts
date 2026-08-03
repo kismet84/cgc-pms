@@ -46,14 +46,32 @@ export function formatAmount(value: string | null | undefined): string {
   if (!normalized) return '—'
   const match = /^(-?)(\d+)(?:\.(\d+))?$/.exec(normalized)
   if (!match) return normalized
-  const [, rawSign, rawInteger, rawFraction] = match
-  const integer = rawInteger!.replace(/^0+(?=\d)/, '')
-  const paddedFraction = rawFraction ? rawFraction.padEnd(2, '0') : '00'
-  const fraction =
-    paddedFraction.length > 2 ? paddedFraction.replace(/0+$/, '').padEnd(2, '0') : paddedFraction
+  const [, rawSign, rawInteger, rawFraction = ''] = match
+  let digits = `${rawInteger}${rawFraction.padEnd(2, '0').slice(0, 2)}`
+  if ((rawFraction[2] ?? '0') >= '5') {
+    const rounded = digits.split('')
+    for (let index = rounded.length - 1; index >= 0; index -= 1) {
+      if (rounded[index] !== '9') {
+        rounded[index] = String.fromCharCode(rounded[index]!.charCodeAt(0) + 1)
+        digits = rounded.join('')
+        break
+      }
+      rounded[index] = '0'
+      if (index === 0) digits = `1${rounded.join('')}`
+    }
+  }
+  const integer = digits.slice(0, -2).replace(/^0+(?=\d)/, '') || '0'
+  const fraction = digits.slice(-2).padStart(2, '0')
   const isZero = /^0+$/.test(integer) && /^0+$/.test(fraction)
   const sign = rawSign && !isZero ? '−' : ''
   return `¥${sign}${integer.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}.${fraction}`
+}
+
+export function formatDecimal(value: string | null | undefined): string {
+  const formatted = formatAmount(value)
+  return formatted.startsWith('¥')
+    ? formatted.slice(1).replaceAll(',', '').replace('−', '-')
+    : formatted
 }
 
 const DASHBOARD_STATUS_LABELS: Record<string, string> = {
@@ -104,7 +122,8 @@ export function formatDashboardMessage(message: string): string {
 export function formatRatio(value: string | null | undefined): string {
   const normalized = value?.trim()
   if (!normalized) return '—'
-  return normalized.endsWith('%') ? normalized : `${normalized}%`
+  const raw = normalized.endsWith('%') ? normalized.slice(0, -1) : normalized
+  return `${formatDecimal(raw)}%`
 }
 
 export function compactDashboardValue(value: string): { value: string; unit: string } {

@@ -22,7 +22,7 @@ import {
   V2Select,
   showToast,
 } from '@/components'
-import { formatAmount } from '@/pages/dashboard/model'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
   confirmMaterialReturn,
   createRequisition,
@@ -875,8 +875,8 @@ onBeforeUnmount(() => {
               required
               @update:model-value="(value) => changeMaterial(row, value)"
             />
-            <V2Input v-model="row.quantity" label="领用数量" required />
-            <V2Input v-model="row.unitPrice" label="参考单价" />
+            <V2Input v-model="row.quantity" label="领用数量" :decimal-scale="2" required />
+            <V2Input v-model="row.unitPrice" label="参考单价" :decimal-scale="2" />
             <V2Input v-model="row.useLocation" label="使用部位" />
             <V2Input v-model="row.remark" label="明细备注" />
             <V2Button
@@ -981,8 +981,8 @@ onBeforeUnmount(() => {
                   <th scope="row">{{ item.materialName || '物料名称缺失' }}</th>
                   <td>{{ item.specification || '-' }}</td>
                   <td>{{ item.unit || '-' }}</td>
-                  <td>{{ item.quantity }}</td>
-                  <td>{{ item.unitPrice || '-' }}</td>
+                  <td>{{ formatDecimal(item.quantity) }}</td>
+                  <td>{{ formatAmount(item.unitPrice) }}</td>
                   <td>{{ formatAmount(item.amount) }}</td>
                   <td>{{ item.useLocation || '-' }}</td>
                 </tr>
@@ -1044,7 +1044,8 @@ onBeforeUnmount(() => {
             >
           </div>
           <p v-for="item in returnItems" :key="item.id">
-            {{ returnMaterialLabel(item.requisitionItemId) }} · 数量 {{ item.quantity }} · 金额
+            {{ returnMaterialLabel(item.requisitionItemId) }} · 数量
+            {{ formatDecimal(item.quantity) }} · 金额
             {{ formatAmount(item.amount) }}
           </p>
         </section>
@@ -1095,7 +1096,7 @@ onBeforeUnmount(() => {
           :options="transactionOptions"
           required
         />
-        <V2Input v-model="form.returnQuantity" label="退料数量" required />
+        <V2Input v-model="form.returnQuantity" label="退料数量" :decimal-scale="2" required />
         <V2Input v-model="form.returnDate" label="退料日期" placeholder="YYYY-MM-DD" required />
         <V2Input v-model="form.returnReason" label="退料原因" required />
       </div>

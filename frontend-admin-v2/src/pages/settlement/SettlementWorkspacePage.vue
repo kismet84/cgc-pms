@@ -25,7 +25,7 @@ import {
   V2Select,
   showToast,
 } from '@/components'
-import { formatAmount } from '@/pages/dashboard/model'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import { loadContractPage } from '@/services/commercial'
 import { deleteSiteFile, uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
@@ -757,7 +757,7 @@ onBeforeUnmount(() => {
                 <tr v-for="item in selected.items || []" :key="item.id">
                   <td>{{ item.itemName }}</td>
                   <td>{{ item.unit || '—' }}</td>
-                  <td>{{ item.quantity ?? '—' }}</td>
+                  <td>{{ formatDecimal(item.quantity) }}</td>
                   <td>{{ money(item.unitPrice) }}</td>
                   <td>{{ money(item.amount) }}</td>
                 </tr>
@@ -922,6 +922,7 @@ onBeforeUnmount(() => {
         <V2Input
           v-model="form.deductionAmount"
           label="终期扣款"
+          :decimal-scale="2"
           required
           hint="非负金额，最多两位小数"
         />
@@ -959,7 +960,7 @@ onBeforeUnmount(() => {
           />
           <span
             >{{ item.itemCode || '未编号' }} · {{ item.itemName }} · 数量
-            {{ item.measuredQuantity }} · {{ money(item.amount) }}</span
+            {{ formatDecimal(item.measuredQuantity) }} · {{ money(item.amount) }}</span
           >
         </label>
         <p v-if="!sources.contractItems.length">暂无可结算合同清单。</p>

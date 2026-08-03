@@ -9,6 +9,7 @@ import {
   dashboardStatusLabel,
   deriveDashboardHealth,
   formatAmount,
+  formatDecimal,
   formatRatio,
   normalizeGaugeValue,
   primaryRiskItems,
@@ -21,7 +22,13 @@ describe('dashboard display model', () => {
 
   it.each([
     ['12345678901234567890.12', '¥12,345,678,901,234,567,890.12'],
-    ['-12.3456', '¥−12.3456'],
+    ['99999999999999999999.995', '¥100,000,000,000,000,000,000.00'],
+    ['12.3449', '¥12.34'],
+    ['12.345', '¥12.35'],
+    ['-12.3449', '¥−12.34'],
+    ['-12.345', '¥−12.35'],
+    ['0.0049', '¥0.00'],
+    ['-0.005', '¥−0.01'],
     ['32000.0000', '¥32,000.00'],
     ['32.5000', '¥32.50'],
     ['0', '¥0.00'],
@@ -32,9 +39,17 @@ describe('dashboard display model', () => {
     expect(formatAmount(input)).toBe(expected)
   })
 
+  it.each([
+    ['9007199254740993.125', '9007199254740993.13'],
+    ['-0.005', '-0.01'],
+    ['3', '3.00'],
+  ])('formats non-money decimals without floating point conversion', (input, expected) => {
+    expect(formatDecimal(input)).toBe(expected)
+  })
+
   it('preserves percentage strings', () => {
     expect(formatRatio('12.50')).toBe('12.50%')
-    expect(formatRatio('7%')).toBe('7%')
+    expect(formatRatio('7%')).toBe('7.00%')
     expect(formatRatio(null)).toBe('—')
   })
 

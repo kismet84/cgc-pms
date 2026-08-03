@@ -15,6 +15,7 @@ import type {
   SupplierReturnRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
   V2Badge,
   V2Button,
@@ -724,7 +725,7 @@ onBeforeUnmount(() => {
                   <tr v-for="item in trace.quotes" :key="item.id">
                     <th scope="row">{{ item.quoteCode }}</th>
                     <td>{{ partnerLabel(item.partnerId) }}</td>
-                    <td>{{ item.totalAmount }}</td>
+                    <td>{{ formatAmount(item.totalAmount) }}</td>
                     <td>{{ selected.currencyCode }}</td>
                     <td>{{ label(item.status) }}</td>
                     <td>
@@ -800,7 +801,7 @@ onBeforeUnmount(() => {
                   <tr v-for="item in trace.bidEvaluations" :key="item.id">
                     <th scope="row">{{ quoteCode(item.quoteId) }}</th>
                     <td>{{ partnerLabel(item.partnerId) }}</td>
-                    <td>{{ item.totalScore }}</td>
+                    <td>{{ formatDecimal(item.totalScore) }}</td>
                     <td class="v2-table-cell--wrap">{{ item.evaluationComment }}</td>
                   </tr>
                 </tbody>
@@ -858,7 +859,7 @@ onBeforeUnmount(() => {
                 <tr v-for="item in pagedPerformance" :key="item.id">
                   <th scope="row">{{ item.evaluationCode }}</th>
                   <td>{{ partnerLabel(item.partnerId) }}</td>
-                  <td>{{ item.totalScore }}</td>
+                  <td>{{ formatDecimal(item.totalScore) }}</td>
                   <td>{{ item.grade }}</td>
                   <td>{{ label(item.status) }}</td>
                   <td>
@@ -908,8 +909,8 @@ onBeforeUnmount(() => {
                 <tr v-for="item in pagedReturns" :key="item.id">
                   <th scope="row">{{ item.returnCode }}</th>
                   <td>{{ partnerLabel(item.partnerId) }}</td>
-                  <td>{{ item.returnQuantity }}</td>
-                  <td>{{ item.returnAmount }}</td>
+                  <td>{{ formatDecimal(item.returnQuantity) }}</td>
+                  <td>{{ formatAmount(item.returnAmount) }}</td>
                   <td>{{ label(item.status) }}</td>
                   <td>
                     <V2Button
@@ -1035,11 +1036,12 @@ onBeforeUnmount(() => {
             disabled
             required
           /><V2Input v-model="form.quoteCode" label="报价编号" required />
-          <V2Input v-model="form.totalAmount" label="含税总价" required /><V2Input
-            v-model="form.taxRate"
-            label="税率(%)"
+          <V2Input
+            v-model="form.totalAmount"
+            label="含税总价"
+            :decimal-scale="2"
             required
-          />
+          /><V2Input v-model="form.taxRate" label="税率(%)" :decimal-scale="2" required />
           <V2Input v-model="form.deliveryDays" label="交付天数" required /><label
             >报价有效期<input v-model="form.validityDate" type="date" required
           /></label>
@@ -1048,16 +1050,18 @@ onBeforeUnmount(() => {
           </label>
         </template>
         <template v-if="action === 'evaluate'">
-          <V2Input v-model="form.commercialScore" label="商务评分" required /><V2Input
-            v-model="form.technicalScore"
-            label="技术评分"
+          <V2Input
+            v-model="form.commercialScore"
+            label="商务评分"
+            :decimal-scale="2"
             required
-          />
-          <V2Input v-model="form.deliveryScore" label="交付评分" required /><V2Input
-            v-model="form.qualityScore"
-            label="质量评分"
+          /><V2Input v-model="form.technicalScore" label="技术评分" :decimal-scale="2" required />
+          <V2Input
+            v-model="form.deliveryScore"
+            label="交付评分"
+            :decimal-scale="2"
             required
-          />
+          /><V2Input v-model="form.qualityScore" label="质量评分" :decimal-scale="2" required />
           <label class="supplier-page__wide"
             >评审意见<textarea v-model="form.evaluationComment" required />
           </label>
@@ -1080,7 +1084,7 @@ onBeforeUnmount(() => {
             :options="purchaseOrderOptions"
             placeholder="选择采购订单"
             required
-          /><V2Input v-model="form.serviceScore" label="服务协同评分" required />
+          /><V2Input v-model="form.serviceScore" label="服务协同评分" :decimal-scale="2" required />
           <label class="supplier-page__wide"
             >评价意见<textarea v-model="form.evaluationComment" required />
           </label>
@@ -1099,8 +1103,8 @@ onBeforeUnmount(() => {
             placeholder="创建后由服务端自动生成"
           />
           <label>退货日期<input v-model="form.returnDate" type="date" required /></label
-          ><V2Input v-model="form.returnQuantity" label="退货数量" required />
-          <V2Input v-model="form.returnAmount" label="退货金额" required /><label
+          ><V2Input v-model="form.returnQuantity" label="退货数量" :decimal-scale="2" required />
+          <V2Input v-model="form.returnAmount" label="退货金额" :decimal-scale="2" required /><label
             class="supplier-page__wide"
             >退货原因<textarea v-model="form.reason" required />
           </label>

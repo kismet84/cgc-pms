@@ -82,6 +82,22 @@ describe('V2 design system', () => {
     expect(wrapper.get('.v2-field__label').classes()).toContain('v2-visually-hidden')
   })
 
+  it('pads valid two-decimal inputs on blur without changing over-precision values', async () => {
+    const wrapper = mount(V2Input, { props: { modelValue: '', decimalScale: 2 } })
+    const input = wrapper.get('input')
+
+    expect(input.attributes('inputmode')).toBe('decimal')
+    await input.setValue('12.3')
+    await input.trigger('blur')
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['12.30'])
+
+    await input.setValue('12.345')
+    const overPrecisionEventCount = wrapper.emitted('update:modelValue')?.length
+    await input.trigger('blur')
+    expect(wrapper.emitted('update:modelValue')).toHaveLength(overPrecisionEventCount ?? 0)
+    expect(wrapper.emitted('update:modelValue')?.at(-1)).toEqual(['12.345'])
+  })
+
   it('uses native select semantics for labels, options and model updates', async () => {
     const wrapper = mount(V2Select, {
       props: {

@@ -1388,12 +1388,22 @@ onBeforeUnmount(() => {
               label: deliveryLabel(value),
             }))
           "
-        /><V2Input v-model="consequenceForm.fineAmount" label="罚款金额" required /><V2Input
+        /><V2Input
+          v-model="consequenceForm.fineAmount"
+          label="罚款金额"
+          :decimal-scale="2"
+          required
+        /><V2Input
           v-model="consequenceForm.reworkCostAmount"
           label="返工成本"
+          :decimal-scale="2"
           required
-        /><V2Input v-model="consequenceForm.evaluationScore" label="评价得分" required /><label
-          class="quality-page__wide"
+        /><V2Input
+          v-model="consequenceForm.evaluationScore"
+          label="评价得分"
+          :decimal-scale="2"
+          required
+        /><label class="quality-page__wide"
           >评价意见<textarea v-model="consequenceForm.evaluationComment" required />
         </label>
       </form>

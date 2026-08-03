@@ -9,6 +9,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { formatAmount } from '@/pages/dashboard/model'
 import {
   V2ActionMenu,
   V2Badge,
@@ -579,7 +580,7 @@ onBeforeUnmount(() => {
                     {{ approvalStatusLabel(item.approvalStatus) }}
                   </V2Badge>
                 </td>
-                <td>{{ item.contractAmount || '0' }} 元</td>
+                <td>{{ formatAmount(item.contractAmount) }}</td>
                 <td class="v2-table-cell--actions">
                   <div class="project-page__actions">
                     <V2ActionMenu
@@ -694,11 +695,11 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <dt>合同金额（元）</dt>
-              <dd>{{ project.contractAmount || '—' }}</dd>
+              <dd>{{ formatAmount(project.contractAmount) }}</dd>
             </div>
             <div>
               <dt>目标成本（元）</dt>
-              <dd>{{ project.targetCost || '—' }}</dd>
+              <dd>{{ formatAmount(project.targetCost) }}</dd>
             </div>
             <div>
               <dt>计划开工</dt>
@@ -719,15 +720,15 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <dt>合同总额</dt>
-              <dd>{{ overview.totalContractAmount }} 元</dd>
+              <dd>{{ formatAmount(overview.totalContractAmount) }}</dd>
             </div>
             <div>
               <dt>动态成本</dt>
-              <dd>{{ overview.dynamicCost }} 元</dd>
+              <dd>{{ formatAmount(overview.dynamicCost) }}</dd>
             </div>
             <div>
               <dt>已付款</dt>
-              <dd>{{ overview.paidAmount }} 元</dd>
+              <dd>{{ formatAmount(overview.paidAmount) }}</dd>
             </div>
           </dl>
         </section>

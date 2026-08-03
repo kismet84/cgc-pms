@@ -322,6 +322,7 @@ describe('M2 dashboard page', () => {
     expect(wrapper.text()).toContain('2')
     expect(wrapper.text()).toContain('项目经营健康评分')
     expect(wrapper.get('.health-score').attributes('aria-label')).toContain('分数越高越健康')
+    expect(wrapper.get('.health-score__value strong').text()).toMatch(/^\d+$/)
     expect(wrapper.text()).toContain('经营动态')
     expect(wrapper.text()).not.toContain('当前角色暂无趋势数据')
     expect(wrapper.text()).not.toContain('不构成历史快照')

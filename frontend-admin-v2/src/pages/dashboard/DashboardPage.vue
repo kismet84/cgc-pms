@@ -46,6 +46,7 @@ import {
   dashboardMetrics,
   dashboardStatusLabel,
   formatAmount,
+  formatDecimal,
   formatDashboardMessage,
   primaryRiskItems,
 } from './model'
@@ -635,7 +636,7 @@ function isAbort(errorValue: unknown): boolean {
             v-if="health"
             class="health-score"
             role="img"
-            :aria-label="`经营健康评分 ${health.score} 分，${health.label}；分数越高越健康`"
+            :aria-label="`经营健康评分 ${Math.round(health.score)} 分，${health.label}；分数越高越健康`"
           >
             <div class="health-score__chart">
               <DashboardGauge
@@ -643,7 +644,7 @@ function isAbort(errorValue: unknown): boolean {
                 :color-token="health.tone === 'danger' ? '--v2-color-danger' : '--v2-color-primary'"
               />
               <div class="health-score__value">
-                <strong>{{ health.score }}</strong>
+                <strong>{{ Math.round(health.score) }}</strong>
                 <span :class="`is-${health.tone}`">{{ health.label }}</span>
               </div>
             </div>
@@ -936,7 +937,7 @@ function isAbort(errorValue: unknown): boolean {
                   <td>{{ formatAmount(contract.approvingAmount) }}</td>
                   <td>{{ formatAmount(contract.approvedUnpaidAmount) }}</td>
                   <td>{{ formatAmount(contract.remainingAmount) }}</td>
-                  <td>{{ contract.paymentRatio }}%</td>
+                  <td>{{ formatDecimal(contract.paymentRatio) }}%</td>
                 </tr>
                 <tr
                   v-for="payment in expandedFinanceContracts.has(contract.contractId)
@@ -1166,7 +1167,8 @@ function isAbort(errorValue: unknown): boolean {
 }
 .health-score__value strong {
   color: var(--v2-color-danger);
-  font-size: var(--v2-font-size-36);
+  font-family: 'Source Han Serif SC', 'Noto Serif CJK SC', 'Songti SC', SimSun, serif;
+  font-size: 30px;
   line-height: var(--v2-line-height-tight);
 }
 .health-score__value span {

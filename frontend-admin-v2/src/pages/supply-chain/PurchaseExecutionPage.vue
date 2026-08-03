@@ -20,7 +20,9 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
+  MaterialSearchPicker,
   V2Badge,
   V2Button,
   V2Card,
@@ -624,7 +626,12 @@ function optionalOrderEdit(name: string): string | undefined {
 async function loadActiveBudgetLines(project: string): Promise<void> {
   budgetLines.value = []
   if (!project) return
-  const page = await loadBudgetPage({ pageNo: 1, pageSize: 20, projectId: project, status: 'ACTIVE' })
+  const page = await loadBudgetPage({
+    pageNo: 1,
+    pageSize: 20,
+    projectId: project,
+    status: 'ACTIVE',
+  })
   const active = page.records.find((item) => item.active || item.status === 'ACTIVE')
   if (!active) return
   budgetLines.value = (await loadBudget(active.id)).lines ?? []
@@ -781,7 +788,9 @@ async function openSourceRequest(): Promise<void> {
 }
 
 function recordAmount(record: ListRecord): string {
-  return 'totalAmount' in record && record.totalAmount != null ? record.totalAmount : '暂无金额'
+  return 'totalAmount' in record && record.totalAmount != null
+    ? formatAmount(record.totalAmount)
+    : '暂无金额'
 }
 
 function newRequestItemDraft(): RequestItemDraft {
@@ -826,6 +835,18 @@ function budgetLineLabel(budgetLineId: string): string {
 function addRequestItem(): void {
   if (requestItemDrafts.value.length >= 200) return
   requestItemDrafts.value.push(newRequestItemDraft())
+}
+
+function addRequestMaterial(material: MaterialRecord): void {
+  if (!materials.value.some((item) => item.id === material.id)) materials.value.push(material)
+  const emptyIndex = requestItemDrafts.value.findIndex((item) => !item.materialId)
+  const item = {
+    ...(emptyIndex >= 0 ? requestItemDrafts.value[emptyIndex] : newRequestItemDraft()),
+    materialId: material.id,
+    unit: material.unit || '',
+  }
+  if (emptyIndex >= 0) requestItemDrafts.value[emptyIndex] = item
+  else if (requestItemDrafts.value.length < 200) requestItemDrafts.value.push(item)
 }
 
 function removeRequestItem(index: number): void {
@@ -907,7 +928,7 @@ const detailTable = computed(() => {
             itemName(requestItem),
             '-',
             requestItem.unit || '-',
-            requestItem.quantity,
+            formatDecimal(requestItem.quantity),
             requestItem.useLocation || '-',
             requestItem.plannedDate || '-',
           ],
@@ -926,10 +947,10 @@ const detailTable = computed(() => {
             itemName(orderItem),
             orderItem.specification || '-',
             orderItem.unit || '-',
-            orderItem.quantity,
-            orderItem.unitPrice,
-            orderItem.amount ?? '-',
-            orderItem.receivedQuantity ?? '-',
+            formatDecimal(orderItem.quantity),
+            formatAmount(orderItem.unitPrice),
+            formatAmount(orderItem.amount),
+            formatDecimal(orderItem.receivedQuantity),
           ],
         }
       }),
@@ -957,13 +978,13 @@ const detailTable = computed(() => {
           itemName(receiptItem),
           receiptItem.specification || '-',
           receiptItem.unit || '-',
-          receiptItem.acceptedQuantity,
+          formatDecimal(receiptItem.acceptedQuantity),
           receiptItem.systemBatchNo || selected.value?.systemBatchNo || '-',
-          receiptItem.orderedQuantity ?? '-',
-          receiptItem.receivedQuantity ?? '-',
-          receiptItem.remainingQuantity ?? '-',
-          receiptItem.unitPrice ?? '-',
-          receiptItem.amount ?? '-',
+          formatDecimal(receiptItem.orderedQuantity),
+          formatDecimal(receiptItem.receivedQuantity),
+          formatDecimal(receiptItem.remainingQuantity),
+          formatAmount(receiptItem.unitPrice),
+          formatAmount(receiptItem.amount),
           receiptItem.useLocation || '-',
         ],
       }
@@ -1491,9 +1512,7 @@ onBeforeUnmount(() => {
         <V2Button v-if="mode === 'order'" variant="secondary" @click="openCreate('EXCEPTION')">
           新建例外采购订单
         </V2Button>
-        <V2Button v-if="mode !== 'order'" @click="openCreate">
-          新建{{ title }}
-        </V2Button>
+        <V2Button v-if="mode !== 'order'" @click="openCreate"> 新建{{ title }} </V2Button>
       </template>
     </V2PageState>
 
@@ -1654,7 +1673,11 @@ onBeforeUnmount(() => {
               </div>
             </section>
             <section
-              v-if="businessAttachments.length || mode === 'receipt' || selected.approvalStatus === 'DRAFT'"
+              v-if="
+                businessAttachments.length ||
+                mode === 'receipt' ||
+                selected.approvalStatus === 'DRAFT'
+              "
               class="v2-detail-dialog__section"
               aria-labelledby="purchase-attachment-title"
             >
@@ -1847,7 +1870,12 @@ onBeforeUnmount(() => {
           required
           @update:model-value="changeSupplierReturnItem"
         />
-        <V2Input v-model="supplierReturnForm.quantity" label="退货数量" required />
+        <V2Input
+          v-model="supplierReturnForm.quantity"
+          label="退货数量"
+          :decimal-scale="2"
+          required
+        />
         <V2Input v-model="supplierReturnForm.returnDate" type="date" label="退货日期" required />
         <V2Input v-model="supplierReturnForm.reason" label="退货原因" required />
       </form>
@@ -1906,8 +1934,8 @@ onBeforeUnmount(() => {
           <h3 id="purchase-order-item-price-title">明细价格与税率</h3>
           <div v-for="(item, index) in orderItemEdits" :key="item.source.id || index">
             <p>
-              {{ item.source.materialName || '物料名称缺失' }} · 数量 {{ item.source.quantity }} ·
-              来源行不可修改
+              {{ item.source.materialName || '物料名称缺失' }} · 数量
+              {{ formatDecimal(item.source.quantity) }} · 来源行不可修改
             </p>
             <V2Select
               v-model="item.budgetLineId"
@@ -1919,6 +1947,7 @@ onBeforeUnmount(() => {
             <V2Input
               v-model="item.unitPrice"
               :label="`第${index + 1}条单价`"
+              :decimal-scale="2"
               :disabled="item.source.pricingMode === 'FIXED'"
               required
             />
@@ -1926,7 +1955,12 @@ onBeforeUnmount(() => {
             <p v-else-if="item.source.pricingMode === 'ACTUAL'">
               实际单价来源：{{ item.source.priceSource || '服务端合同价格' }}
             </p>
-            <V2Input v-model="item.taxRate" :label="`第${index + 1}条税率`" required />
+            <V2Input
+              v-model="item.taxRate"
+              :label="`第${index + 1}条税率`"
+              :decimal-scale="2"
+              required
+            />
           </div>
         </section>
       </form>
@@ -1976,12 +2010,27 @@ onBeforeUnmount(() => {
           @update:model-value="changeEditorProject"
         />
         <template v-if="mode === 'request'">
-          <section class="purchase-execution-page__draft-lines" aria-labelledby="purchase-request-lines-title">
+          <section
+            class="purchase-execution-page__draft-lines"
+            aria-labelledby="purchase-request-lines-title"
+          >
             <div class="purchase-execution-page__draft-heading">
               <h3 id="purchase-request-lines-title">采购申请明细</h3>
-              <V2Button type="button" size="small" variant="secondary" :disabled="busy || requestItemDrafts.length >= 200" @click="addRequestItem">
-                添加明细
-              </V2Button>
+              <div class="purchase-execution-page__draft-actions">
+                <MaterialSearchPicker
+                  :disabled="busy || requestItemDrafts.length >= 200"
+                  @select="addRequestMaterial"
+                />
+                <V2Button
+                  type="button"
+                  size="small"
+                  variant="secondary"
+                  :disabled="busy || requestItemDrafts.length >= 200"
+                  @click="addRequestItem"
+                >
+                  添加明细
+                </V2Button>
+              </div>
             </div>
             <div class="purchase-execution-page__draft-table-wrap">
               <table class="purchase-execution-page__draft-table">
@@ -2009,11 +2058,47 @@ onBeforeUnmount(() => {
                         @update:model-value="selectRequestMaterial(index, $event)"
                       />
                     </td>
-                    <td><V2Input v-model="item.quantity" :label="`第${index + 1}条申请数量`" :hide-label="true" required /></td>
-                    <td><V2Input v-model="item.unit" :label="`第${index + 1}条单位`" :hide-label="true" required /></td>
-                    <td><V2Input v-model="item.plannedDate" :label="`第${index + 1}条计划日期`" :hide-label="true" placeholder="YYYY-MM-DD" required /></td>
-                    <td><V2Input v-model="item.useLocation" :label="`第${index + 1}条使用部位`" :hide-label="true" required /></td>
-                    <td><V2Input v-model="item.remark" :label="`第${index + 1}条备注`" :hide-label="true" /></td>
+                    <td>
+                      <V2Input
+                        v-model="item.quantity"
+                        :label="`第${index + 1}条申请数量`"
+                        :hide-label="true"
+                        :decimal-scale="2"
+                        required
+                      />
+                    </td>
+                    <td>
+                      <V2Input
+                        v-model="item.unit"
+                        :label="`第${index + 1}条单位`"
+                        :hide-label="true"
+                        required
+                      />
+                    </td>
+                    <td>
+                      <V2Input
+                        v-model="item.plannedDate"
+                        :label="`第${index + 1}条计划日期`"
+                        :hide-label="true"
+                        placeholder="YYYY-MM-DD"
+                        required
+                      />
+                    </td>
+                    <td>
+                      <V2Input
+                        v-model="item.useLocation"
+                        :label="`第${index + 1}条使用部位`"
+                        :hide-label="true"
+                        required
+                      />
+                    </td>
+                    <td>
+                      <V2Input
+                        v-model="item.remark"
+                        :label="`第${index + 1}条备注`"
+                        :hide-label="true"
+                      />
+                    </td>
                     <td>
                       <V2Button
                         type="button"
@@ -2071,7 +2156,10 @@ onBeforeUnmount(() => {
             label="例外原因"
             required
           />
-          <section class="purchase-execution-page__draft-lines" aria-labelledby="purchase-order-lines-title">
+          <section
+            class="purchase-execution-page__draft-lines"
+            aria-labelledby="purchase-order-lines-title"
+          >
             <div class="purchase-execution-page__draft-heading">
               <h3 id="purchase-order-lines-title">采购订单明细</h3>
               <V2Button
@@ -2105,7 +2193,9 @@ onBeforeUnmount(() => {
                 <tbody>
                   <tr v-for="(item, index) in orderItemDrafts" :key="item.requestItemId || index">
                     <td>
-                      <span v-if="orderCreateMode === 'FROM_REQUEST'">{{ materialLabel(item.materialId) }}</span>
+                      <span v-if="orderCreateMode === 'FROM_REQUEST'">{{
+                        materialLabel(item.materialId)
+                      }}</span>
                       <V2Select
                         v-else
                         v-model="item.materialId"
@@ -2118,7 +2208,9 @@ onBeforeUnmount(() => {
                       />
                     </td>
                     <td>
-                      <span v-if="orderCreateMode === 'FROM_REQUEST'">{{ budgetLineLabel(item.budgetLineId) }}</span>
+                      <span v-if="orderCreateMode === 'FROM_REQUEST'">{{
+                        budgetLineLabel(item.budgetLineId)
+                      }}</span>
                       <V2Select
                         v-else
                         v-model="item.budgetLineId"
@@ -2130,12 +2222,15 @@ onBeforeUnmount(() => {
                       />
                     </td>
                     <td>
-                      <span v-if="orderCreateMode === 'FROM_REQUEST'">{{ item.quantity || '-' }}</span>
+                      <span v-if="orderCreateMode === 'FROM_REQUEST'">{{
+                        formatDecimal(item.quantity)
+                      }}</span>
                       <V2Input
                         v-else
                         v-model="item.quantity"
                         :label="`第${index + 1}条订单数量`"
                         :hide-label="true"
+                        :decimal-scale="2"
                         required
                       />
                     </td>
@@ -2150,12 +2245,15 @@ onBeforeUnmount(() => {
                       />
                     </td>
                     <td>
-                      <span v-if="orderCreateMode === 'FROM_REQUEST'">{{ item.unitPrice || '待合同读取' }}</span>
+                      <span v-if="orderCreateMode === 'FROM_REQUEST'">{{
+                        formatAmount(item.unitPrice)
+                      }}</span>
                       <V2Input
                         v-else
                         v-model="item.unitPrice"
                         :label="`第${index + 1}条服务端建议单价`"
                         :hide-label="true"
+                        :decimal-scale="2"
                         :disabled="!item.priceEditable"
                         required
                       />
@@ -2167,6 +2265,7 @@ onBeforeUnmount(() => {
                         v-model="item.taxRate"
                         :label="`第${index + 1}条税率`"
                         :hide-label="true"
+                        :decimal-scale="2"
                         required
                       />
                     </td>
@@ -2212,7 +2311,9 @@ onBeforeUnmount(() => {
               <h3 id="purchase-receipt-lines-title">订单明细</h3>
             </div>
             <div class="purchase-execution-page__draft-table-wrap">
-              <table class="purchase-execution-page__draft-table purchase-execution-page__receipt-table">
+              <table
+                class="purchase-execution-page__draft-table purchase-execution-page__receipt-table"
+              >
                 <thead>
                   <tr>
                     <th scope="col">选择<span aria-hidden="true">*</span></th>
@@ -2247,9 +2348,9 @@ onBeforeUnmount(() => {
                       <td>{{ item.materialName || '-' }}</td>
                       <td>{{ item.specification || '-' }}</td>
                       <td>{{ item.unit || '-' }}</td>
-                      <td>{{ item.orderedQuantity ?? '-' }}</td>
-                      <td>{{ item.receivedQuantity ?? '-' }}</td>
-                      <td>{{ item.remainingQuantity ?? '-' }}</td>
+                      <td>{{ formatDecimal(item.orderedQuantity) }}</td>
+                      <td>{{ formatDecimal(item.receivedQuantity) }}</td>
+                      <td>{{ formatDecimal(item.remainingQuantity) }}</td>
                     </tr>
                   </template>
                 </tbody>
@@ -2274,7 +2375,12 @@ onBeforeUnmount(() => {
               { value: 'DIRECT_CONSUMPTION', label: '直耗' },
             ]"
           />
-          <V2Input v-model="form.acceptedQuantity" label="本次合格数量" required />
+          <V2Input
+            v-model="form.acceptedQuantity"
+            label="本次合格数量"
+            :decimal-scale="2"
+            required
+          />
           <V2Input
             v-if="form.receiptMode === 'DIRECT_CONSUMPTION'"
             v-model="form.useLocation"
@@ -2359,6 +2465,14 @@ tr.selected {
 }
 .purchase-execution-page__draft-heading h3 {
   margin: 0;
+}
+.purchase-execution-page__draft-actions {
+  display: flex;
+  flex: 1 1 30rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--v2-space-2);
 }
 .purchase-execution-page__draft-table-wrap {
   max-width: 100%;

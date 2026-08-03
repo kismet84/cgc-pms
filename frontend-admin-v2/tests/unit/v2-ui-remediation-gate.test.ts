@@ -32,6 +32,25 @@ function buttonTags(source: string): string[] {
 }
 
 describe('全 V2 UI 整改门禁', () => {
+  it('routes decimal business fields through fixed two-decimal formatters', () => {
+    const decimalField =
+      /(?:Amount|Cost|Price|Quantity|Qty|Rate|Ratio|Score|Progress|Percent)\b|_(?:amount|cost|price|quantity|qty|rate|ratio|score|progress|percent)\b/
+    const formatter = /\b(?:formatAmount|formatDecimal|money|amount|recordAmount|amountRange)\s*\(/
+    const violations = vuePages().flatMap((path) =>
+      [...templateOf(read(path)).matchAll(/\{\{([\s\S]*?)\}\}/g)]
+        .map((match) => match[1]?.trim() ?? '')
+        .filter(
+          (expression) =>
+            decimalField.test(expression) &&
+            !formatter.test(expression) &&
+            !/\bcan[A-Z]\w*(?:Progress|Score|Rate)\b/.test(expression),
+        )
+        .map((expression) => `${pageName(path)}: ${expression}`),
+    )
+
+    expect(violations).toEqual([])
+  })
+
   it('documents the latest all-V2 browser-comment contract', () => {
     const baseline = read(
       resolve('../docs/standards/00-UI-Design-Baselines-and-Code-Specifications.md'),
@@ -536,13 +555,7 @@ describe('全 V2 UI 整改门禁', () => {
     expect(purchase).toContain(':aria-label="`${title}明细表格`"')
     expect(purchase).toContain("['物料', '规格', '单位', '数量', '使用部位', '计划日期']")
     expect(purchase).toContain("['物料', '规格', '单位', '数量', '单价', '金额', '已收数量']")
-    for (const heading of [
-      '本次合格数量',
-      '订单数量',
-      '累计收货',
-      '剩余数量',
-      '使用部位',
-    ]) {
+    for (const heading of ['本次合格数量', '订单数量', '累计收货', '剩余数量', '使用部位']) {
       expect(purchase).toContain(`'${heading}'`)
     }
     expect(purchase).not.toContain('purchase-execution-page__items')

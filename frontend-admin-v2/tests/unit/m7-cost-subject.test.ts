@@ -336,13 +336,13 @@ describe('M7 cost-subject center', () => {
     expect(costSubject.loadCostSubjectTree).toHaveBeenCalledTimes(2)
   })
 
-  it('preserves server amount strings and hides transfer actions without write permission', async () => {
+  it('formats server amounts to two decimals and hides transfer actions without write permission', async () => {
     route.path = '/cost/subject/trace'
     useSessionStore().replaceUserInfo(user(['cost:subject:audit:query']))
     const wrapper = mount(CostSubjectPage)
     await flushPromises()
 
-    expect(wrapper.text()).toContain('125.2300')
+    expect(wrapper.text()).toContain('¥125.23')
     expect(wrapper.text()).toContain('服务端投标项目')
     expect(wrapper.findAll('button').map((button) => button.text())).not.toEqual(
       expect.arrayContaining(['投标成本转入', '财务费用分摊', '冲销']),
