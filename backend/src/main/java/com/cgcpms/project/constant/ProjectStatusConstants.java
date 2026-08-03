@@ -8,6 +8,8 @@ public final class ProjectStatusConstants {
     public static final String PREPARING = "PREPARING";
     public static final String ACTIVE = "ACTIVE";
     public static final String SUSPENDED = "SUSPENDED";
+    public static final String COMPLETION = "COMPLETION";
+    public static final String WARRANTY = "WARRANTY";
     public static final String CLOSED = "CLOSED";
     public static final String ARCHIVED = "ARCHIVED";
 }

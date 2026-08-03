@@ -156,7 +156,7 @@ public class MatStockService {
         // 写入流水（带来源追溯）
         BigDecimal movementValue = quantity.multiply(unitCost).setScale(2, RoundingMode.HALF_UP);
         insertTxn(tenantId, warehouseId, materialId, "IN", quantity,
-                stock.getAvailableQty(), unitCost, movementValue, sourceType, sourceId, sourceLineId);
+                stock.getAvailableQty(), unitCost, movementValue, sourceType, sourceId, sourceLineId, null);
 
         return stock;
     }
@@ -243,7 +243,16 @@ public class MatStockService {
     public StockMovementResult stockOutValued(Long warehouseId, Long materialId, BigDecimal quantity,
                                                String sourceType, Long sourceId, Long sourceLineId) {
         return stockOutValuedInternal(warehouseId, materialId, quantity, null,
-                sourceType, sourceId, sourceLineId);
+                sourceType, sourceId, sourceLineId, null);
+    }
+
+    /** 项目领料出库：库存流水继承服务端校验后的WBS任务。 */
+    @Transactional(rollbackFor = Exception.class)
+    public StockMovementResult stockOutValued(Long warehouseId, Long materialId, BigDecimal quantity,
+                                               String sourceType, Long sourceId, Long sourceLineId,
+                                               Long wbsTaskId) {
+        return stockOutValuedInternal(warehouseId, materialId, quantity, null,
+                sourceType, sourceId, sourceLineId, wbsTaskId);
     }
 
     /** 出库并按指定历史单位成本冲减库存价值，用于原事实的精确冲销。 */
@@ -255,13 +264,13 @@ public class MatStockService {
             throw new BusinessException("STOCK_UNIT_COST_INVALID", "冲销单位成本不能为负或为空");
         }
         return stockOutValuedInternal(warehouseId, materialId, quantity, unitCost,
-                sourceType, sourceId, sourceLineId);
+                sourceType, sourceId, sourceLineId, null);
     }
 
     private StockMovementResult stockOutValuedInternal(Long warehouseId, Long materialId,
-                                                        BigDecimal quantity, BigDecimal fixedUnitCost,
-                                                        String sourceType, Long sourceId,
-                                                        Long sourceLineId) {
+                                                         BigDecimal quantity, BigDecimal fixedUnitCost,
+                                                         String sourceType, Long sourceId,
+                                                         Long sourceLineId, Long wbsTaskId) {
         quantity = normalizeQuantity(quantity);
         Long tenantId = UserContext.getCurrentTenantId();
 
@@ -326,7 +335,7 @@ public class MatStockService {
         // 写入流水（带来源追溯）
         insertTxn(tenantId, warehouseId, materialId, "OUT", quantity,
                 stock.getAvailableQty(), issuedUnitCost, issuedAmount,
-                sourceType, sourceId, sourceLineId);
+                sourceType, sourceId, sourceLineId, wbsTaskId);
 
         return new StockMovementResult(stock, issuedUnitCost, issuedAmount);
     }
@@ -986,7 +995,7 @@ public class MatStockService {
     private void insertTxn(Long tenantId, Long warehouseId, Long materialId,
                            String txnType, BigDecimal quantity,
                            BigDecimal availableAfter, BigDecimal unitCost, BigDecimal amount,
-                           String sourceType, Long sourceId, Long sourceLineId) {
+                           String sourceType, Long sourceId, Long sourceLineId, Long wbsTaskId) {
         MatStockTxn txn = new MatStockTxn();
         txn.setTenantId(tenantId);
         txn.setWarehouseId(warehouseId);
@@ -999,6 +1008,7 @@ public class MatStockService {
         txn.setSourceType(sourceType);
         txn.setSourceId(sourceId);
         txn.setSourceLineId(sourceLineId);
+        txn.setWbsTaskId(wbsTaskId);
         matStockTxnMapper.insert(txn);
     }
 

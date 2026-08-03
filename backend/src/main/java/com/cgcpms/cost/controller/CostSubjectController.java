@@ -39,6 +39,12 @@ public class CostSubjectController {
         return ApiResponse.success(costSubjectService.getList(category));
     }
 
+    @GetMapping("/bid-options")
+    @PreAuthorize("hasAuthority('bid:cost:query') or hasRole('SUPER_ADMIN')")
+    public ApiResponse<List<CostSubjectVO>> getBidOptions() {
+        return ApiResponse.success(costSubjectService.getBidOptions());
+    }
+
     @PutMapping("/target-ratios")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('cost:edit')")
     public ApiResponse<List<CostSubjectVO>> updateTargetRatios(

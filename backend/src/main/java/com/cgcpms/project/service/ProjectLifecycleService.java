@@ -11,12 +11,13 @@ import com.cgcpms.project.constant.ProjectStatusConstants;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Project lifecycle gate shared by project, budget and target-cost approvals.
- * Project becomes ACTIVE only after both approved versions are active.
+ * Project lifecycle gate shared by project, budget, target-cost and schedule approvals.
+ * Project becomes ACTIVE only after every required approved baseline is active.
  */
 @Service
 @RequiredArgsConstructor
@@ -24,10 +25,11 @@ public class ProjectLifecycleService {
     private final PmProjectMapper projectMapper;
     private final ProjectBudgetMapper projectBudgetMapper;
     private final CostTargetMapper costTargetMapper;
+    private final JdbcTemplate jdbc;
 
     @Transactional(rollbackFor = Exception.class)
     public boolean activateIfReady(Long projectId, Long tenantId) {
-        if (!isCostBudgetReady(projectId, tenantId)) return false;
+        if (!isActivationReady(projectId, tenantId)) return false;
         int rows = projectMapper.update(null, new LambdaUpdateWrapper<PmProject>()
                 .eq(PmProject::getId, projectId)
                 .eq(PmProject::getTenantId, tenantId)
@@ -54,5 +56,14 @@ public class ProjectLifecycleService {
                 .eq(ProjectBudget::getStatus, BudgetStatusConstants.STATUS_ACTIVE)
                 .eq(ProjectBudget::getActiveFlag, 1));
         return linkedBudgetCount == 1;
+    }
+
+    public boolean isActivationReady(Long projectId, Long tenantId) {
+        if (!isCostBudgetReady(projectId, tenantId)) return false;
+        Integer activeScheduleCount = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM project_schedule_plan
+                WHERE tenant_id=? AND project_id=? AND status='ACTIVE' AND deleted_flag=0
+                """, Integer.class, tenantId, projectId);
+        return activeScheduleCount != null && activeScheduleCount == 1;
     }
 }

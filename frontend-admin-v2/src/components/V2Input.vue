@@ -7,7 +7,16 @@ const props = withDefaults(
     id?: string
     label?: string
     hideLabel?: boolean
-    type?: 'text' | 'email' | 'password' | 'search' | 'tel' | 'url'
+    type?:
+      | 'text'
+      | 'email'
+      | 'password'
+      | 'search'
+      | 'tel'
+      | 'url'
+      | 'date'
+      | 'number'
+      | 'datetime-local'
     placeholder?: string
     hint?: string
     error?: string

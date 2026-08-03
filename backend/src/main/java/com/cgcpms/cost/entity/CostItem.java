@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.cgcpms.common.entity.BaseEntity;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
@@ -26,6 +27,9 @@ public class CostItem extends BaseEntity {
     private Long orgId;
 
     private Long projectId;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long wbsTaskId;
 
     private Long contractId;
 

@@ -525,6 +525,7 @@ class CostSummaryServiceTest {
 
         // 2. 插入 PayApplication 和 2笔付款记录
         PayApplication app = new PayApplication(); app.setId(80001L); app.setProjectId(testProjectId);
+        app.setCostSubjectId(80001L);
         app.setApplyCode("PAY-APP-TC18"); app.setPayType("进度款"); app.setApplyAmount(new BigDecimal("100000.00"));
         app.setPayStatus("APPROVED"); app.setApprovalStatus("APPROVED"); app.setTenantId(TENANT_ID);
         if (payApplicationMapper.selectById(80001L) == null) payApplicationMapper.insert(app);
@@ -541,6 +542,16 @@ class CostSummaryServiceTest {
         pr2.setPayStatus("SUCCESS"); pr2.setTenantId(TENANT_ID);
         if (payRecordMapper.selectById(80002L) == null) payRecordMapper.insert(pr2);
 
+        PayApplication legacyApp = new PayApplication(); legacyApp.setId(80003L); legacyApp.setProjectId(testProjectId);
+        legacyApp.setApplyCode("PAY-APP-TC18-LEGACY"); legacyApp.setPayType("历史付款");
+        legacyApp.setApplyAmount(new BigDecimal("5000.00")); legacyApp.setPayStatus("APPROVED");
+        legacyApp.setApprovalStatus("APPROVED"); legacyApp.setTenantId(TENANT_ID);
+        payApplicationMapper.insert(legacyApp);
+        PayRecord legacyPayment = new PayRecord(); legacyPayment.setId(80003L); legacyPayment.setProjectId(testProjectId);
+        legacyPayment.setPayApplicationId(80003L); legacyPayment.setPayAmount(new BigDecimal("5000.00"));
+        legacyPayment.setPayDate(LocalDate.now()); legacyPayment.setPayStatus("SUCCESS"); legacyPayment.setTenantId(TENANT_ID);
+        payRecordMapper.insert(legacyPayment);
+
         // 3. refresh summary
         CostProjectSummaryVO vo = costSummaryService.refreshSummary(TENANT_ID, testProjectId);
         assertNotNull(vo);
@@ -549,17 +560,20 @@ class CostSummaryServiceTest {
         //    不是 25000 * 2科目 = 50000
         CostProjectSummaryVO result = costSummaryService.getProjectSummary(TENANT_ID, testProjectId);
         BigDecimal paidAmount = new BigDecimal(result.getPaidAmount());
-        assertEquals(0, new BigDecimal("25000.00").compareTo(paidAmount),
-                "项目级 paidAmount 应为 25000 (不随科目数倍增), 实际: " + paidAmount.toPlainString());
+        assertEquals(0, new BigDecimal("30000.00").compareTo(paidAmount),
+                "项目级 paidAmount 应为 30000 (不随科目数倍增), 实际: " + paidAmount.toPlainString());
 
-        // 5. 同时验证 subjects 中每个 subject 的 paidAmount 也正确
+        // 5. 科目金额按付款申请绑定的成本科目归集，不能复制项目总额
         List<CostSummaryVO> subjects = result.getSubjects();
         assertNotNull(subjects);
-        for (CostSummaryVO s : subjects) {
-            BigDecimal subjectPaid = new BigDecimal(s.getPaidAmount());
-            assertEquals(0, new BigDecimal("25000.00").compareTo(subjectPaid),
-                    "每个科目行的 paidAmount 都应为项目级 25000, 实际: " + subjectPaid.toPlainString());
-        }
+        assertEquals("25000.00", subjects.stream().filter(s -> "材料费".equals(s.getCostSubjectName()))
+                .findFirst().orElseThrow().getPaidAmount());
+        assertEquals(0, new BigDecimal(subjects.stream().filter(s -> "人工费".equals(s.getCostSubjectName()))
+                .findFirst().orElseThrow().getPaidAmount()).compareTo(BigDecimal.ZERO));
+        assertEquals("5000.00", subjects.stream().filter(s -> "未归属".equals(s.getCostSubjectName()))
+                .findFirst().orElseThrow().getPaidAmount());
+        assertEquals(0, paidAmount.compareTo(subjects.stream().map(CostSummaryVO::getPaidAmount)
+                .map(BigDecimal::new).reduce(BigDecimal.ZERO, BigDecimal::add)));
     }
 
     @Test

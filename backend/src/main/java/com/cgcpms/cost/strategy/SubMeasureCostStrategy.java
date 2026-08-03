@@ -5,8 +5,10 @@ import com.cgcpms.cost.entity.CostItem;
 import com.cgcpms.cost.mapper.CostItemMapper;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.entity.SubMeasureItem;
+import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.mapper.SubMeasureItemMapper;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
+import com.cgcpms.subcontract.mapper.SubTaskMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -35,6 +37,7 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
 
     private final SubMeasureMapper subMeasureMapper;
     private final SubMeasureItemMapper subMeasureItemMapper;
+    private final SubTaskMapper subTaskMapper;
     private final CostItemMapper costItemMapper;
     private final CostSubjectResolver costSubjectResolver;
 
@@ -62,6 +65,13 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
             return;
         }
 
+        SubTask subTask = measure.getSubTaskId() == null ? null : subTaskMapper.selectById(measure.getSubTaskId());
+        if (subTask == null || subTask.getWbsTaskId() == null
+                || !measure.getTenantId().equals(subTask.getTenantId())
+                || !measure.getProjectId().equals(subTask.getProjectId())) {
+            throw new IllegalStateException("分包计量未关联有效施工任务，禁止生成成本 measureId=" + measureId);
+        }
+
         BigDecimal netAmount = money(measure.getNetAmount());
         BigDecimal grossAmount = items.stream().map(SubMeasureItem::getAmount).map(SubMeasureCostStrategy::money)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -87,6 +97,7 @@ public class SubMeasureCostStrategy implements CostGenerationStrategy {
             cost.setTenantId(measure.getTenantId());
             cost.setOrgId(null);
             cost.setProjectId(measure.getProjectId());
+            cost.setWbsTaskId(subTask.getWbsTaskId());
             cost.setContractId(measure.getContractId());
             cost.setPartnerId(measure.getPartnerId());
             cost.setCostType(COST_TYPE);

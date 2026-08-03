@@ -1,7 +1,7 @@
 package com.cgcpms.cashbook;
 
 import com.cgcpms.auth.util.CookieUtils;
-import com.cgcpms.auth.util.JwtUtils;
+import com.cgcpms.common.JwtHttpTestTokenFactory;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,7 +33,7 @@ class CashJournalControllerTest {
     private MockMvc mockMvc;
 
     @Autowired
-    private JwtUtils jwtUtils;
+    private JwtHttpTestTokenFactory jwtUtils;
 
     @Test
     void endpointsRequireAuthentication() throws Exception {

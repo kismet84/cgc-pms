@@ -13,6 +13,7 @@ import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.service.ProjectExecutionGuard;
 import com.cgcpms.subcontract.entity.SubTask;
 import com.cgcpms.subcontract.entity.SubMeasure;
 import com.cgcpms.subcontract.mapper.SubMeasureMapper;
@@ -47,6 +48,7 @@ public class SubTaskService {
     private final MdPartnerMapper mdPartnerMapper;
     private final SubMeasureMapper subMeasureMapper;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ProjectExecutionGuard projectExecutionGuard;
 
     public IPage<SubTaskVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                      Long partnerId, String status, String taskCode, String taskName) {
@@ -123,6 +125,7 @@ public class SubTaskService {
         // Force tenantId from authenticated context, ignore client-supplied value
         task.setTenantId(UserContext.getCurrentTenantId());
         projectAccessChecker.checkAccess(task.getProjectId(), "创建分包任务");
+        projectExecutionGuard.requireActiveWbs(task.getProjectId(), task.getWbsTaskId(), "创建分包任务");
         validateBusinessContext(task.getProjectId(), task.getContractId(), task.getPartnerId());
         // Auto-generate task code: SUB-yyyyMMdd-XXX
         String prefix = "SUB-" + LocalDate.now().format(DateTimeUtils.DATE_COMPACT) + "-";
@@ -174,11 +177,14 @@ public class SubTaskService {
 
         projectAccessChecker.checkAccess(existing.getProjectId(), "修改分包任务");
         Long effectiveProjectId = task.getProjectId() != null ? task.getProjectId() : existing.getProjectId();
+        Long effectiveWbsTaskId = task.getWbsTaskId() != null ? task.getWbsTaskId() : existing.getWbsTaskId();
         Long effectiveContractId = task.getContractId() != null ? task.getContractId() : existing.getContractId();
         Long effectivePartnerId = task.getPartnerId() != null ? task.getPartnerId() : existing.getPartnerId();
         projectAccessChecker.checkAccess(effectiveProjectId, "修改分包任务");
+        projectExecutionGuard.requireActiveWbs(effectiveProjectId, effectiveWbsTaskId, "修改分包任务");
         validateBusinessContext(effectiveProjectId, effectiveContractId, effectivePartnerId);
         if ((!Objects.equals(effectiveProjectId, existing.getProjectId())
+                || !Objects.equals(effectiveWbsTaskId, existing.getWbsTaskId())
                 || !Objects.equals(effectiveContractId, existing.getContractId())
                 || !Objects.equals(effectivePartnerId, existing.getPartnerId()))
                 && hasMeasureReference(existing.getId(), existing.getTenantId())) {
@@ -411,6 +417,7 @@ public class SubTaskService {
         vo.setId(t.getId() != null ? t.getId().toString() : null);
         vo.setTenantId(t.getTenantId() != null ? t.getTenantId().toString() : null);
         vo.setProjectId(t.getProjectId() != null ? t.getProjectId().toString() : null);
+        vo.setWbsTaskId(t.getWbsTaskId() != null ? t.getWbsTaskId().toString() : null);
         vo.setContractId(t.getContractId() != null ? t.getContractId().toString() : null);
         vo.setPartnerId(t.getPartnerId() != null ? t.getPartnerId().toString() : null);
         vo.setTaskCode(t.getTaskCode());

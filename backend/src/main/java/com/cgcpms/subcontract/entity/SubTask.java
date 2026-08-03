@@ -30,6 +30,9 @@ public class SubTask extends BaseEntity {
     @NotNull
     private Long projectId;
 
+    @NotNull
+    private Long wbsTaskId;
+
     private Long contractId;
 
     private Long partnerId;

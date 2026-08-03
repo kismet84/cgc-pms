@@ -24,6 +24,13 @@ public class CashJournalEntryVO {
     private String summary;
     private String projectId;
     private String contractId;
+    private String bidCostId;
+    private String costSubjectId;
+    private String bidDepositId;
+    private String bidDepositType;
+    private String costSubjectCode;
+    private String costSubjectName;
+    private String costSubjectAccountCategory;
     private String sourceType;
     private String sourceId;
     private String status;
@@ -34,6 +41,7 @@ public class CashJournalEntryVO {
     private String reversalEntryId;
     private Integer version;
     private LocalDateTime createdAt;
+    private String createdBy;
     private long attachmentCount;
     private List<SysFileVO> attachments = new ArrayList<>();
     private List<CashJournalChangeLog> changeLogs = new ArrayList<>();

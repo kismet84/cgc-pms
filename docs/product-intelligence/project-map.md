@@ -1,5 +1,12 @@
 # CGC-PMS 项目地图
 
+## 2026-08-04 主线67～68：工程投标与施工阶段主线本地闭环
+
+- 工程投标现以`bid_cost`、不可覆盖文件版本和`cash_journal_entry`为唯一事实；有效中标通知书幂等创建免立项审批的`PREPARING`项目。
+- 施工主线以项目状态、WBS和原业务单据贯穿进度、质量、材料、分包、产值、成本、资金及收尾；不建立平行台账。
+- 状态链为`PREPARING→ACTIVE→COMPLETION→WARRANTY→CLOSED→ARCHIVED`；阶段门和阻塞清单由服务端集中计算。
+- 状态：`LOCAL_ACCEPTANCE_PASSED / GIT_DELIVERY_IN_PROGRESS`；`ISSUE-068-001`关闭。计划见[`第67条`](../plans/第67条主线-工程投标资料与成本日记账闭环任务计划书.md)、[`第68条`](../plans/第68条主线-施工阶段主线闭环整改任务计划书.md)。
+
 ## 2026-07-31 主线58：新版前端正式切换完成
 
 - `frontend-admin-v2` 成为仓库与本地唯一正式前端，接管根路径、`5173`、Compose `frontend`、CI 制品和 E2E；保留目录名避免无价值全仓改名。

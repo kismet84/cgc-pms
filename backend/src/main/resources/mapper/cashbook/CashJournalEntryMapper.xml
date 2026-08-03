@@ -23,6 +23,18 @@
             )
         </if>
         <if test="query.contractId != null">AND e.contract_id = #{query.contractId}</if>
+        <if test="query.bidCostId != null">AND e.bid_cost_id = #{query.bidCostId}</if>
+        <if test="query.costSubjectId != null">AND e.cost_subject_id = #{query.costSubjectId}</if>
+        <if test="query.bidDepositId != null">AND e.bid_deposit_id = #{query.bidDepositId}</if>
+        <if test="query.costSubjectRootCode != null and query.costSubjectRootCode != ''">
+            AND EXISTS (
+                SELECT 1
+                FROM cost_subject child
+                JOIN cost_subject root ON root.tenant_id=child.tenant_id AND root.id=child.parent_id AND root.deleted_flag=0
+                WHERE child.tenant_id=e.tenant_id AND child.id=e.cost_subject_id AND child.deleted_flag=0
+                  AND root.subject_code=#{query.costSubjectRootCode}
+            )
+        </if>
         <if test="query.businessDateStart != null">AND e.business_date &gt;= #{query.businessDateStart}</if>
         <if test="query.businessDateEnd != null">AND e.business_date &lt;= #{query.businessDateEnd}</if>
         <if test="query.hasAttachment != null and query.hasAttachment">
@@ -77,6 +89,13 @@
             e.summary,
             e.project_id,
             e.contract_id,
+            e.bid_cost_id,
+            e.cost_subject_id,
+            e.bid_deposit_id,
+            d.deposit_type AS bid_deposit_type,
+            e.cost_subject_code_snapshot AS cost_subject_code,
+            e.cost_subject_name_snapshot AS cost_subject_name,
+            cs.account_category AS cost_subject_account_category,
             e.source_type,
             e.source_id,
             e.status,
@@ -87,6 +106,7 @@
             e.reversal_entry_id,
             e.version,
             e.created_at,
+            e.created_by,
             (
                 SELECT COUNT(*) FROM sys_file f
                 WHERE f.tenant_id = e.tenant_id
@@ -99,6 +119,14 @@
           ON a.id = e.account_id
          AND a.tenant_id = e.tenant_id
          AND a.deleted_flag = 0
+        LEFT JOIN cost_subject cs
+          ON cs.id=e.cost_subject_id
+         AND cs.tenant_id=e.tenant_id
+         AND cs.deleted_flag=0
+        LEFT JOIN bid_deposit d
+          ON d.id=e.bid_deposit_id
+         AND d.tenant_id=e.tenant_id
+         AND d.deleted_flag=0
         WHERE <include refid="filters" />
         ORDER BY e.business_date DESC, e.id DESC
     </select>

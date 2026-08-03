@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import type {
   ArchiveTransferCommand,
   CloseProjectCommand,
@@ -92,6 +93,7 @@ interface ScopedCloseoutOverview {
 
 const session = useSessionStore()
 const workspace = useWorkspaceStore()
+const router = useRouter()
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
@@ -118,6 +120,7 @@ let traceController: AbortController | null = null
 let generation = 0
 
 const today = () => new Date().toISOString().slice(0, 10)
+const factLabel = (value: unknown) => deliveryLabel(typeof value === 'string' ? value : undefined)
 const projectId = computed(() => workspace.selectedProjectId || '')
 const scopeProjectIds = computed(() =>
   projectId.value ? [projectId.value] : workspace.projects.map((project) => project.value),
@@ -135,6 +138,29 @@ const canDefect = computed(() => canWrite.value && can('closeout:defect:maintain
 const canDefectVerify = computed(() => canWrite.value && can('closeout:defect:verify'))
 const canArchive = computed(() => canWrite.value && can('closeout:archive:maintain'))
 const canClose = computed(() => canWrite.value && can('closeout:close'))
+const blockerRoutes: Record<string, string> = {
+  WBS: '/project-schedule',
+  QUALITY: '/quality-safety',
+  SUBCONTRACT: '/subcontract/task',
+  PROCUREMENT: '/purchase/order',
+  RECEIPT: '/purchase/receipt',
+  REQUISITION: '/inventory/material-requisition',
+  INVENTORY: '/inventory/stock',
+  WORKFLOW: '/approval/process',
+  ACCEPTANCE: '/project-closeout',
+  SETTLEMENT: '/settlement/list',
+  RECEIVABLE: '/revenue',
+  CASH_JOURNAL: '/cash-journal',
+  WARRANTY: '/project-closeout',
+  DEFECT: '/project-closeout',
+  CONTRACT: '/contract/ledger',
+  ARCHIVE: '/project-closeout',
+}
+const openBlocker = (domain: string, bizId?: string | null) =>
+  router.push({
+    path: blockerRoutes[domain] ?? '/project-closeout',
+    query: { projectId: projectId.value, ...(bizId ? { bizId } : {}) },
+  })
 const sectionQualityOptions = computed(() =>
   (overview.value?.qualityInspections ?? []).map((item) => ({
     value: item.id,
@@ -434,6 +460,13 @@ async function loadProject(preserveNotice = false): Promise<void> {
             },
             wbsTasks: visible.flatMap((item) => item.overview.wbsTasks),
             qualityInspections: visible.flatMap((item) => item.overview.qualityInspections),
+            stageGates: {
+              constructionCompletion: visible.flatMap(
+                (item) => item.overview.stageGates.constructionCompletion,
+              ),
+              warrantyEntry: visible.flatMap((item) => item.overview.stageGates.warrantyEntry),
+              finalClose: visible.flatMap((item) => item.overview.stageGates.finalClose),
+            },
           }
     }
   } catch (error) {
@@ -766,6 +799,7 @@ onBeforeUnmount(() => {
               variant="secondary"
               :loading="saving"
               @click="
+                closeout &&
                 run(() => verifyTailCollection(closeout.id).then(() => undefined), '尾款核验完成')
               "
               >核验尾款回收</V2Button
@@ -799,6 +833,42 @@ onBeforeUnmount(() => {
             >
           </div>
         </template>
+      </V2Card>
+
+      <V2Card
+        v-if="projectId && closeout"
+        title="阶段门禁"
+        subtitle="施工完成、进入质保、最终关闭均以服务端阻塞清单为准"
+      >
+        <div class="closeout-page__record-sections">
+          <section
+            v-for="gate in [
+              ['施工完成门', overview?.stageGates?.constructionCompletion ?? []],
+              ['进入质保门', overview?.stageGates?.warrantyEntry ?? []],
+              ['最终关闭门', overview?.stageGates?.finalClose ?? []],
+            ]"
+            :key="String(gate[0])"
+          >
+            <h3>{{ gate[0] }}</h3>
+            <p v-if="!(gate[1] as unknown[]).length"><V2Badge tone="success">通过</V2Badge></p>
+            <ul v-else class="closeout-page__gate-list">
+              <li
+                v-for="item in gate[1] as CloseoutOverview['stageGates']['finalClose']"
+                :key="`${item.gateCode}-${item.bizId ?? ''}`"
+              >
+                <V2Badge tone="danger">{{ item.domain }}</V2Badge>
+                <span>{{ item.reason }}</span>
+                <V2Button
+                  size="small"
+                  variant="ghost"
+                  @click="openBlocker(item.domain, item.bizId)"
+                >
+                  前往处理
+                </V2Button>
+              </li>
+            </ul>
+          </section>
+        </div>
       </V2Card>
 
       <V2Card
@@ -1170,11 +1240,11 @@ onBeforeUnmount(() => {
           </li>
           <li v-for="item in trace.sectionAcceptances" :key="String(item.id)">
             <strong>分项验收 {{ item.acceptance_code || item.acceptanceCode }}</strong>
-            <span>{{ deliveryLabel(item.status) }}</span>
+            <span>{{ factLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.finalAcceptances" :key="String(item.id)">
             <strong>竣工验收 {{ item.acceptance_code || item.acceptanceCode }}</strong>
-            <span>{{ deliveryLabel(item.status) }}</span>
+            <span>{{ factLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.collectionAllocations" :key="item.id">
             <strong>回款分配 {{ item.collectionCode || '未提供回款编号' }}</strong>
@@ -1185,15 +1255,15 @@ onBeforeUnmount(() => {
           </li>
           <li v-for="item in trace.warranties" :key="String(item.id)">
             <strong>质保 {{ item.warranty_code || item.warrantyCode }}</strong>
-            <span>{{ deliveryLabel(item.status) }}</span>
+            <span>{{ factLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.defects" :key="String(item.id)">
             <strong>缺陷 {{ item.defect_code || item.defectCode }}</strong>
-            <span>{{ deliveryLabel(item.status) }}</span>
+            <span>{{ factLabel(item.status) }}</span>
           </li>
           <li v-for="item in trace.archiveTransfers" :key="String(item.id)">
             <strong>档案 {{ item.transfer_code || item.transferCode }}</strong>
-            <span>{{ deliveryLabel(item.status) }}</span>
+            <span>{{ factLabel(item.status) }}</span>
           </li>
         </ol>
         <div class="closeout-page__evidence" aria-label="阶段证据附件">
@@ -1475,6 +1545,19 @@ onBeforeUnmount(() => {
   font-size: var(--v2-font-size-14);
   font-weight: var(--v2-font-weight-semibold);
   line-height: var(--v2-line-height-tight);
+}
+.closeout-page__gate-list {
+  display: grid;
+  gap: var(--v2-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.closeout-page__gate-list li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+  align-items: center;
 }
 .closeout-page__table-wrap {
   overflow-x: auto;

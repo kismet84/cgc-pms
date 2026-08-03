@@ -161,6 +161,23 @@ export const navigationDomains: NavigationDomain[] = [
     ],
   },
   {
+    id: 'engineering-tender',
+    label: '工程投标',
+    badge: '投',
+    workspaces: [
+      {
+        id: 'engineering-tender-workspace',
+        label: '工程投标',
+        defaultPath: '/engineering-tender/records',
+        matchPrefixes: ['/engineering-tender'],
+        tabs: [
+          { path: '/engineering-tender/records', label: '投标记录', permission: 'bid:query' },
+          { path: '/engineering-tender/costs', label: '投标成本', permission: 'bid:cost:query' },
+        ],
+      },
+    ],
+  },
+  {
     id: 'commercial',
     label: '商务合约',
     badge: '商',
@@ -180,19 +197,6 @@ export const navigationDomains: NavigationDomain[] = [
             path: '/variation/order',
             label: '签证变更',
             permission: 'variation:order:query',
-          },
-        ],
-      },
-      {
-        id: 'target-cost',
-        label: '投标成本',
-        defaultPath: '/bid-cost',
-        matchPrefixes: ['/bid-cost'],
-        tabs: [
-          {
-            path: '/bid-cost',
-            label: '投标成本',
-            permission: 'bid:query',
           },
         ],
       },

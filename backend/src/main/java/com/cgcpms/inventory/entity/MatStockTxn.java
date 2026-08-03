@@ -52,6 +52,9 @@ public class MatStockTxn extends BaseEntity {
     /** 来源业务明细ID，用于逐行追溯与幂等控制 */
     private Long sourceLineId;
 
+    /** 领料等项目消耗来源绑定的活动WBS任务。 */
+    private Long wbsTaskId;
+
     // ── V35 使用 created_time / updated_time 列名 ──
 
     @TableField(value = "created_at", fill = FieldFill.INSERT)

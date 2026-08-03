@@ -13,6 +13,7 @@ describe('V2 navigation contract', () => {
       '工作台',
       '项目履约',
       '施工管理',
+      '工程投标',
       '商务合约',
       '供应链与物资',
       '分包与结算',
@@ -27,7 +28,7 @@ describe('V2 navigation contract', () => {
   })
 
   it('shows all domains to wildcard permission and only matching domains to ordinary users', () => {
-    expect(visibleNavigation(['ADMIN'], ['*'])).toHaveLength(9)
+    expect(visibleNavigation(['ADMIN'], ['*'])).toHaveLength(10)
     expect(
       visibleNavigation(['USER'], ['dashboard:view', 'project:query']).map(
         (domain) => domain.label,
@@ -52,15 +53,22 @@ describe('V2 navigation contract', () => {
     expect(findWorkspace('/project-schedule/11')?.workspace.label).toBe('项目计划与施工履约')
     expect(findWorkspace('/quality-safety')?.workspace.label).toBe('质量安全整改闭环')
     expect(
-      ['/contract/ledger', '/variation/order', '/bid-cost'].map((path) => ({
+      [
+        '/contract/ledger',
+        '/variation/order',
+        '/engineering-tender/records',
+        '/engineering-tender/costs',
+      ].map((path) => ({
         path,
         label: findWorkspace(path)?.workspace.tabs.find((tab) => tab.path === path)?.label,
       })),
     ).toEqual([
       { path: '/contract/ledger', label: '合同台账' },
       { path: '/variation/order', label: '签证变更' },
-      { path: '/bid-cost', label: '投标成本' },
+      { path: '/engineering-tender/records', label: '投标记录' },
+      { path: '/engineering-tender/costs', label: '投标成本' },
     ])
+    expect(findWorkspace('/bid-cost')).toBeUndefined()
     expect(findWorkspace('/contract/C-100/edit')?.workspace.label).toBe('合同与变更')
     expect(findWorkspace('/cost-target/81/edit')?.workspace.label).toBe('成本预算与产值')
     expect(findWorkspace('/cost-budget')?.workspace.label).toBe('成本预算与产值')

@@ -49,6 +49,8 @@ class MaterialReturnConcurrencyTest {
     private static final long CONTRACT_ID = 30001L;
     private static final long WAREHOUSE_ID = 93040001L;
     private static final long MATERIAL_ID = 93040002L;
+    private static final long SCHEDULE_ID = 93040003L;
+    private static final long WBS_ID = 93040004L;
 
     @Autowired private MatWarehouseMapper warehouseMapper;
     @Autowired private MdMaterialMapper materialMapper;
@@ -96,6 +98,26 @@ class MaterialReturnConcurrencyTest {
         stock.setVersion(0);
         stockMapper.insert(stock);
 
+        jdbcTemplate.update("""
+                INSERT INTO project_schedule_plan
+                    (id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
+                     planned_start_date,planned_end_date,status,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,'RETURN-RACE-SP','并发退料测试基线','BASELINE',9304,
+                       '2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,
+                       1,CURRENT_TIMESTAMP,0)
+                """, SCHEDULE_ID, PROJECT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO project_wbs_task
+                    (id,tenant_id,project_id,schedule_plan_id,task_code,task_name,
+                     planned_start_date,planned_end_date,weight_percent,actual_quantity,
+                     actual_progress,status,sort_order,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,0,?,?,'RETURN-RACE-WBS','并发退料测试WBS',
+                       '2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,
+                       CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, WBS_ID, PROJECT_ID, SCHEDULE_ID);
+
         MatRequisition requisition = new MatRequisition();
         requisition.setProjectId(PROJECT_ID);
         requisition.setContractId(CONTRACT_ID);
@@ -104,6 +126,7 @@ class MaterialReturnConcurrencyTest {
         requisitionId = requisitionService.create(requisition);
 
         MatRequisitionItem item = new MatRequisitionItem();
+        item.setWbsTaskId(WBS_ID);
         item.setMaterialId(MATERIAL_ID);
         item.setQuantity(new BigDecimal("10.0000"));
         item.setUnitPrice(new BigDecimal("5.000000"));
@@ -210,5 +233,7 @@ class MaterialReturnConcurrencyTest {
                 TENANT_ID, requisitionId == null ? -1L : requisitionId);
         jdbcTemplate.update("DELETE FROM mat_warehouse WHERE tenant_id=? AND id=?", TENANT_ID, WAREHOUSE_ID);
         jdbcTemplate.update("DELETE FROM md_material WHERE tenant_id=? AND id=?", TENANT_ID, MATERIAL_ID);
+        jdbcTemplate.update("DELETE FROM project_wbs_task WHERE tenant_id=? AND id=?", TENANT_ID, WBS_ID);
+        jdbcTemplate.update("DELETE FROM project_schedule_plan WHERE tenant_id=? AND id=?", TENANT_ID, SCHEDULE_ID);
     }
 }

@@ -8,6 +8,8 @@ import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.BusinessCodeGenerator;
 import com.cgcpms.project.auth.ProjectAccessChecker;
+import com.cgcpms.project.service.ProjectExecutionGuard;
+import com.cgcpms.project.service.ProjectLifecycleService;
 import com.cgcpms.schedule.dto.ProjectScheduleModels.*;
 import com.cgcpms.site.entity.SiteDailyLog;
 import com.cgcpms.site.vo.SiteDailyPlannedTaskVO;
@@ -42,11 +44,13 @@ public class ProjectScheduleService {
     private final AlertLogMapper alertLogMapper;
     private final AlertLifecycleService alertLifecycleService;
     private final BusinessCodeGenerator businessCodeGenerator;
+    private final ProjectExecutionGuard projectExecutionGuard;
+    private final ProjectLifecycleService projectLifecycleService;
 
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> createSchedule(ScheduleRequest request) {
         projectAccessChecker.checkAccess(request.projectId(), "创建项目计划");
-        requireExecutableProject(request.projectId());
+        projectExecutionGuard.requirePlanningProject(request.projectId(), "创建项目计划");
         requireDates(request.plannedStartDate(), request.plannedEndDate(), "PROJECT_SCHEDULE_DATE_INVALID", "项目计划起止日期不合法");
         Integer versionNo = jdbc.queryForObject("SELECT COALESCE(MAX(version_no),0)+1 FROM project_schedule_plan WHERE tenant_id=? AND project_id=? AND deleted_flag=0", Integer.class, tenant(), request.projectId());
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
@@ -108,7 +112,9 @@ public class ProjectScheduleService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> replaceTasks(Long scheduleId, WbsTaskBatch batch) {
         Map<String, Object> schedule = requireEditableSchedule(scheduleId);
-        projectAccessChecker.checkAccess(longValue(schedule.get("project_id")), "维护WBS");
+        Long projectId = longValue(schedule.get("project_id"));
+        projectAccessChecker.checkAccess(projectId, "维护WBS");
+        requirePlanningProjectLocked(projectId, "维护WBS");
         requireVersion(schedule, batch.expectedVersion(), "PROJECT_SCHEDULE_VERSION_CONFLICT", "项目计划已被其他用户修改，请刷新后重试");
         Integer periods = jdbc.queryForObject("SELECT COUNT(*) FROM project_period_plan WHERE tenant_id=? AND schedule_plan_id=? AND deleted_flag=0", Integer.class, tenant(), scheduleId);
         if (periods != null && periods > 0) throw error("PROJECT_WBS_PERIOD_EXISTS", "已生成月周计划后不能替换WBS");
@@ -140,7 +146,9 @@ public class ProjectScheduleService {
     @Transactional(rollbackFor = Exception.class)
     public Map<String, Object> submitSchedule(Long id) {
         Map<String, Object> row = requireEditableSchedule(id);
-        projectAccessChecker.checkAccess(longValue(row.get("project_id")), "提交项目计划");
+        Long projectId = longValue(row.get("project_id"));
+        projectAccessChecker.checkAccess(projectId, "提交项目计划");
+        requirePlanningProjectLocked(projectId, "提交项目计划");
         List<Map<String, Object>> tasks = taskRows(id);
         if (tasks.isEmpty()) throw error("PROJECT_WBS_REQUIRED", "项目计划至少包含一条WBS任务");
         BigDecimal total = tasks.stream().map(t -> decimal(t.get("weight_percent"))).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -159,9 +167,11 @@ public class ProjectScheduleService {
         if (ACTIVE.equals(string(row.get("status")))) return;
         if (!"PENDING".equals(string(row.get("status")))) throw error("PROJECT_SCHEDULE_APPROVAL_STATE_INVALID", "项目计划审批状态不正确");
         Long projectId = longValue(row.get("project_id"));
+        requirePlanningProjectLocked(projectId, "审批项目计划");
         jdbc.update("UPDATE project_schedule_plan SET status='SUPERSEDED',version=version+1,updated_at=CURRENT_TIMESTAMP WHERE tenant_id=? AND project_id=? AND status='ACTIVE' AND id<>?", tenant(), projectId, id);
         int changed = jdbc.update("UPDATE project_schedule_plan SET status='ACTIVE',activated_at=CURRENT_TIMESTAMP,version=version+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status='PENDING'", id, tenant());
         if (changed != 1) throw error("PROJECT_SCHEDULE_APPROVAL_STATE_INVALID", "项目计划审批状态不正确");
+        projectLifecycleService.activateIfReady(projectId, tenant());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -286,6 +296,7 @@ public class ProjectScheduleService {
         Map<String, Object> log = requireDailyLog(dailyLogId);
         Long projectId = longValue(log.get("project_id"));
         projectAccessChecker.checkAccess(projectId, "填报日报实际进度");
+        projectExecutionGuard.requireActiveSchedule(projectId, "填报日报实际进度");
         if (!"DRAFT".equals(string(log.get("status")))) throw error("SITE_DAILY_PROGRESS_IMMUTABLE", "现场日报提交后不能修改实际进度");
         Map<String, Object> schedule = activeSchedule(projectId);
         LocalDate reportDate = localDate(log.get("report_date"));
@@ -319,8 +330,9 @@ public class ProjectScheduleService {
 
     @Transactional(rollbackFor = Exception.class)
     public void onDailyLogSubmitted(SiteDailyLog log) {
+        projectExecutionGuard.requireActiveSchedule(log.getProjectId(), "提交现场日报");
         Optional<Map<String, Object>> active = findActiveSchedule(log.getProjectId());
-        if (active.isEmpty()) return;
+        if (active.isEmpty()) throw error("PROJECT_ACTIVE_SCHEDULE_REQUIRED", "提交现场日报前必须存在生效WBS基线");
         List<Map<String, Object>> progress = jdbc.queryForList("SELECT * FROM site_daily_progress WHERE tenant_id=? AND daily_log_id=? ORDER BY id", tenant(), log.getId());
         if (progress.isEmpty()) throw error("SITE_DAILY_PROGRESS_REQUIRED", "已启用项目计划的项目提交现场日报时必须填报实际进度");
         approvedWeeklyPlan(longValue(active.get().get("id")), log.getReportDate());
@@ -623,6 +635,19 @@ public class ProjectScheduleService {
         return row;
     }
 
+    private void requirePlanningProjectLocked(Long projectId, String action) {
+        String status;
+        try {
+            status = jdbc.queryForObject("SELECT status FROM pm_project WHERE id=? AND tenant_id=? AND deleted_flag=0 FOR UPDATE",
+                    String.class, projectId, tenant());
+        } catch (EmptyResultDataAccessException e) {
+            throw error("PROJECT_NOT_FOUND", "项目不存在");
+        }
+        if (!Set.of("PREPARING", ACTIVE).contains(status)) {
+            throw error("PROJECT_STAGE_WRITE_FORBIDDEN", action + "不允许在项目阶段 " + status + " 执行");
+        }
+    }
+
     private Map<String, Object> requireSchedule(Long id, boolean lock) {
         return queryOne("SELECT * FROM project_schedule_plan WHERE id=? AND tenant_id=? AND deleted_flag=0" + (lock ? " FOR UPDATE" : ""),
                 "PROJECT_SCHEDULE_NOT_FOUND", "项目计划不存在", id, tenant());
@@ -688,18 +713,6 @@ public class ProjectScheduleService {
                 WHERE t.tenant_id=? AND t.schedule_plan_id=? AND t.deleted_flag=0
                 ORDER BY t.sort_order,t.id
                 """, tenant(), scheduleId);
-    }
-
-    private void requireExecutableProject(Long projectId) {
-        String status;
-        try {
-            status = jdbc.queryForObject("SELECT status FROM pm_project WHERE id=? AND tenant_id=? AND deleted_flag=0",
-                    String.class, projectId, tenant());
-        } catch (EmptyResultDataAccessException e) {
-            throw error("PROJECT_NOT_FOUND", "项目不存在");
-        }
-        if (!"ACTIVE".equals(status))
-            throw error("PROJECT_NOT_ACTIVE", "只有进行中的项目可以创建项目计划");
     }
 
     private Map<String, Object> latestSnapshot(Long scheduleId) {

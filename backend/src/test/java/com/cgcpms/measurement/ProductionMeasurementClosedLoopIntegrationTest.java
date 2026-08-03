@@ -39,6 +39,9 @@ class ProductionMeasurementClosedLoopIntegrationTest {
     private static final long CONTRACT = 99175003L;
     private static final long ITEM = 99175004L;
     private static final long CHANGE = 99175005L;
+    private static final long SCHEDULE = 99175006L;
+    private static final long WBS_A = 99175007L;
+    private static final long WBS_B = 99175008L;
 
     @Autowired ProductionMeasurementService service;
     @Autowired RevenueOperationsService revenueService;
@@ -57,6 +60,9 @@ class ProductionMeasurementClosedLoopIntegrationTest {
         cleanup();
         jdbc.update("INSERT INTO sys_user(id,tenant_id,username,password,real_name,status,is_admin,created_at,updated_at,deleted_flag) SELECT 1,0,'admin','$2a$10$7JB720yubVSZvUI0rEqK/.VqGOZTH.ulu33dHOiBE8ByOhJIrdAu2','系统管理员','ENABLE',1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 WHERE NOT EXISTS(SELECT 1 FROM sys_user WHERE id=1)");
         jdbc.update("INSERT INTO pm_project(id,tenant_id,project_code,project_name,status,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,'MEASURE-IT-P','产值计量测试项目','ACTIVE',1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", PROJECT);
+        jdbc.update("INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'MEASURE-IT-SP','计量测试基线','BASELINE',1,'2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", SCHEDULE, PROJECT);
+        jdbc.update("INSERT INTO project_wbs_task(id,tenant_id,project_id,schedule_plan_id,task_code,task_name,planned_start_date,planned_end_date,weight_percent,actual_quantity,actual_progress,status,sort_order,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,'MEASURE-WBS-A','计量WBS-A','2026-01-01','2026-12-31',50,0,0,'NOT_STARTED',1,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", WBS_A, PROJECT, SCHEDULE);
+        jdbc.update("INSERT INTO project_wbs_task(id,tenant_id,project_id,schedule_plan_id,task_code,task_name,planned_start_date,planned_end_date,weight_percent,actual_quantity,actual_progress,status,sort_order,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,'MEASURE-WBS-B','计量WBS-B','2026-01-01','2026-12-31',50,0,0,'NOT_STARTED',2,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", WBS_B, PROJECT, SCHEDULE);
         jdbc.update("INSERT INTO md_partner(id,tenant_id,partner_code,partner_name,partner_type,status,created_at,updated_at,deleted_flag) VALUES(?,0,'MEASURE-IT-CUSTOMER','测试业主','CUSTOMER','ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CUSTOMER);
         jdbc.update("INSERT INTO ct_contract(id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,contract_amount,current_amount,paid_amount,contract_status,approval_status,version,created_at,updated_at,deleted_flag) VALUES(?,0,?,'MEASURE-IT-C','业主总包合同','MAIN',?,?,12000,12000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", CONTRACT, PROJECT, CUSTOMER, CUSTOMER);
         jdbc.update("INSERT INTO ct_contract_item(id,tenant_id,contract_id,item_code,item_name,item_spec,unit,quantity,unit_price,amount,tax_rate,tax_amount,amount_without_tax,sort_order,created_at,updated_at,deleted_flag) VALUES(?,0,?,'BOQ-001','混凝土工程','C30','m3',100,10,1000,0,0,1000,1,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0)", ITEM, CONTRACT);
@@ -70,8 +76,8 @@ class ProductionMeasurementClosedLoopIntegrationTest {
     void fullChainFromBoqAndChangeToOwnerSettlementReceivableAndTrace() {
         long periodId = createPeriod("2026-07");
         var measurement = service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, periodId, LocalDate.of(2026, 7, 15), 1,
-                List.of(new MeasurementLineRequest(ITEM, null, new BigDecimal("20"), 1),
-                        new MeasurementLineRequest(null, CHANGE, new BigDecimal("0.5"), 1)), "本期完成量"));
+                List.of(new MeasurementLineRequest(WBS_A, ITEM, null, new BigDecimal("20"), 1),
+                        new MeasurementLineRequest(WBS_B, null, CHANGE, new BigDecimal("0.5"), 1)), "本期完成量"));
         assertTrue(String.valueOf(measurement.get("measure_code")).matches("PM-202607-\\d{3}"));
         long measurementId = id(measurement);
         addMeasurementEvidence(measurementId);
@@ -135,9 +141,9 @@ class ProductionMeasurementClosedLoopIntegrationTest {
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 20), LocalDate.of(2026, 1, 25), null)));
 
         var first = service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, firstPeriod, LocalDate.of(2026, 1, 10), 1,
-                List.of(new MeasurementLineRequest(ITEM, null, BigDecimal.ONE, 1)), null));
+                List.of(new MeasurementLineRequest(WBS_A, ITEM, null, BigDecimal.ONE, 1)), null));
         var second = service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, secondPeriod, LocalDate.of(2026, 1, 11), 1,
-                List.of(new MeasurementLineRequest(ITEM, null, BigDecimal.ONE, 1)), null));
+                List.of(new MeasurementLineRequest(WBS_A, ITEM, null, BigDecimal.ONE, 1)), null));
 
         assertEquals("PM-202601-001", first.get("measure_code"));
         assertEquals("PM-202601-002", second.get("measure_code"));
@@ -147,9 +153,9 @@ class ProductionMeasurementClosedLoopIntegrationTest {
     void rejectsOverMeasurementAndMissingEvidence() {
         long periodId = createPeriod("2026-08");
         assertThrows(BusinessException.class, () -> service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, periodId,
-                LocalDate.of(2026, 8, 10), 1, List.of(new MeasurementLineRequest(ITEM, null, new BigDecimal("101"), 1)), null)));
+                LocalDate.of(2026, 8, 10), 1, List.of(new MeasurementLineRequest(WBS_A, ITEM, null, new BigDecimal("101"), 1)), null)));
         var draft = service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, periodId, LocalDate.of(2026, 8, 10), 1,
-                List.of(new MeasurementLineRequest(ITEM, null, new BigDecimal("10"), 0)), null));
+                List.of(new MeasurementLineRequest(WBS_A, ITEM, null, new BigDecimal("10"), 0)), null));
         long draftId = id(draft);
         Long lineId = jdbc.queryForObject("SELECT id FROM production_measurement_line WHERE measurement_id=?", Long.class, draftId);
         jdbc.update("UPDATE production_measurement SET attachment_count=99 WHERE id=?", draftId);
@@ -174,6 +180,58 @@ class ProductionMeasurementClosedLoopIntegrationTest {
                 () -> service.submitMeasurement(draftId, version("production_measurement", draftId)));
         assertEquals("PRODUCTION_MEASUREMENT_LINE_EVIDENCE_REQUIRED", missingLine.getCode());
         assertEquals("DRAFT", jdbc.queryForObject("SELECT status FROM production_measurement WHERE id=?", String.class, id(draft)));
+    }
+
+    @Test
+    void sameContractItemAcrossWbsSharesOneCapacity() {
+        long periodId = createPeriod("2026-05");
+        BusinessException emptyWbs = assertThrows(BusinessException.class, () -> service.createMeasurement(
+                new MeasurementRequest(PROJECT, CONTRACT, periodId, LocalDate.of(2026, 5, 10), 1,
+                        List.of(new MeasurementLineRequest(null, ITEM, null, BigDecimal.ONE, 1)), null)));
+        assertEquals("PROJECT_WBS_REQUIRED", emptyWbs.getCode());
+
+        BusinessException exceeded = assertThrows(BusinessException.class, () -> service.createMeasurement(
+                new MeasurementRequest(PROJECT, CONTRACT, periodId, LocalDate.of(2026, 5, 10), 1,
+                        List.of(new MeasurementLineRequest(WBS_A, ITEM, null, new BigDecimal("60"), 1),
+                                new MeasurementLineRequest(WBS_B, ITEM, null, new BigDecimal("50"), 1)), null)));
+        assertEquals("MEASUREMENT_QUANTITY_EXCEEDED", exceeded.getCode());
+
+        long measurementId = id(service.createMeasurement(new MeasurementRequest(
+                PROJECT, CONTRACT, periodId, LocalDate.of(2026, 5, 10), 1,
+                List.of(new MeasurementLineRequest(WBS_A, ITEM, null, new BigDecimal("40"), 1),
+                        new MeasurementLineRequest(WBS_B, ITEM, null, new BigDecimal("50"), 1)), null)));
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM production_measurement_line WHERE measurement_id=?", Integer.class, measurementId));
+        assertEquals(new BigDecimal("90.00"), jdbc.queryForObject(
+                "SELECT SUM(current_reported_quantity) FROM production_measurement_line WHERE measurement_id=?",
+                BigDecimal.class, measurementId));
+    }
+
+    @Test
+    void approvalRevalidatesSharedCapacityAcrossPendingMeasurements() {
+        long firstPeriod = createPeriod("2026-03");
+        long secondPeriod = createPeriod("2026-04");
+        long first = id(service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, firstPeriod,
+                LocalDate.of(2026, 3, 10), 1,
+                List.of(new MeasurementLineRequest(WBS_A, ITEM, null, new BigDecimal("60"), 1)), null)));
+        long second = id(service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, secondPeriod,
+                LocalDate.of(2026, 4, 10), 1,
+                List.of(new MeasurementLineRequest(WBS_B, ITEM, null, new BigDecimal("60"), 1)), null)));
+        addMeasurementEvidence(first);
+        addMeasurementEvidence(second);
+        service.submitMeasurement(first, version("production_measurement", first));
+        service.submitMeasurement(second, version("production_measurement", second));
+        assertEquals(2, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM production_measurement WHERE id IN (?,?) AND status='PENDING'", Integer.class, first, second));
+
+        service.onApproved(first);
+        BusinessException exceeded = assertThrows(BusinessException.class, () -> service.onApproved(second));
+
+        assertEquals("MEASUREMENT_QUANTITY_EXCEEDED", exceeded.getCode());
+        assertEquals("INTERNAL_APPROVED", jdbc.queryForObject(
+                "SELECT status FROM production_measurement WHERE id=?", String.class, first));
+        assertEquals("PENDING", jdbc.queryForObject(
+                "SELECT status FROM production_measurement WHERE id=?", String.class, second));
     }
 
     @Test
@@ -214,7 +272,7 @@ class ProductionMeasurementClosedLoopIntegrationTest {
         long periodId = createPeriod("2026-12");
         long measurementId = id(service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, periodId,
                 LocalDate.of(2026, 12, 10), 999,
-                List.of(new MeasurementLineRequest(ITEM, null, new BigDecimal("10"), 999)), null)));
+                List.of(new MeasurementLineRequest(WBS_A, ITEM, null, new BigDecimal("10"), 999)), null)));
         addMeasurementEvidence(measurementId);
         service.submitMeasurement(measurementId, 0);
         WfInstance instance = instanceMapper.selectOne(new LambdaQueryWrapper<WfInstance>()
@@ -265,7 +323,7 @@ class ProductionMeasurementClosedLoopIntegrationTest {
         long periodId = createPeriod(period);
         int month = Integer.parseInt(period.substring(5));
         long measurementId = id(service.createMeasurement(new MeasurementRequest(PROJECT, CONTRACT, periodId, LocalDate.of(2026, month, 10), 1,
-                List.of(new MeasurementLineRequest(ITEM, null, quantity, 1)), null)));
+                List.of(new MeasurementLineRequest(WBS_A, ITEM, null, quantity, 1)), null)));
         jdbc.update("UPDATE production_measurement SET status='PENDING',approval_status='PENDING' WHERE id=?", measurementId);
         service.onApproved(measurementId);
         return measurementId;
@@ -334,6 +392,8 @@ class ProductionMeasurementClosedLoopIntegrationTest {
         jdbc.update("DELETE FROM ct_contract_item WHERE id=?", ITEM);
         jdbc.update("DELETE FROM ct_contract WHERE id=?", CONTRACT);
         jdbc.update("DELETE FROM md_partner WHERE id=?", CUSTOMER);
+        jdbc.update("DELETE FROM project_wbs_task WHERE id IN (?,?)", WBS_A, WBS_B);
+        jdbc.update("DELETE FROM project_schedule_plan WHERE id=?", SCHEDULE);
         jdbc.update("DELETE FROM pm_project WHERE id=?", PROJECT);
     }
 }

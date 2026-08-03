@@ -15,6 +15,10 @@ public class CashJournalQuery {
     private Long sourceId;
     private Long projectId;
     private Long contractId;
+    private Long bidCostId;
+    private Long costSubjectId;
+    private Long bidDepositId;
+    private String costSubjectRootCode;
     private Boolean hasAttachment;
     private LocalDate businessDateStart;
     private LocalDate businessDateEnd;

@@ -5,14 +5,14 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  brace-expansion: 5.0.8
+  brace-expansion: 5.0.9
   form-data: ^4.0.6
   ini: ^1.3.8
   postcss: 8.5.19
   undici: ^7.28.0
 
 patchedDependencies:
-  brace-expansion@5.0.8: bdbcc12755c1a97aa6f43f7854ad71ad78f0617f0a6575b7bce679b2debcdd94
+  brace-expansion@5.0.9: af16851c19659707a3a399488e82c4d7a47b8b0f6685db7fdf3b4025d2ad758e
 
 importers:
 
@@ -826,8 +826,8 @@ packages:
   boolbase@1.0.0:
     resolution: {integrity: sha512-JZOSA7Mo9sNGB8+UjSgzdLtokWAky1zbztM3WRLCbZ70/3cTANmQmOdR7y2g+J0e2WXywy1yS468tY+IruqEww==}
 
-  brace-expansion@5.0.8:
-    resolution: {integrity: sha512-JZyDyq3D4AUifKTPOB7DELf6XsB3WdPuNxCtob1vFXPsSXhdAiHBWJ/tJ8HAc9aH84BK+5JFZLNkJKx3G9kzQg==}
+  brace-expansion@5.0.9:
+    resolution: {integrity: sha512-ScQ4IuvIEF1TMlP7Zt+vjJ//9zlPb2SDcxWxM3bk8s6t6GGdJ7KO1dCcTidOPJKePW30LE/2cT7wCyPho9/Wxg==}
     engines: {node: 20 || >=22}
 
   braces@3.0.3:
@@ -2364,7 +2364,7 @@ snapshots:
 
   boolbase@1.0.0: {}
 
-  brace-expansion@5.0.8(patch_hash=bdbcc12755c1a97aa6f43f7854ad71ad78f0617f0a6575b7bce679b2debcdd94):
+  brace-expansion@5.0.9(patch_hash=af16851c19659707a3a399488e82c4d7a47b8b0f6685db7fdf3b4025d2ad758e):
     dependencies:
       balanced-match: 4.0.4
 
@@ -2808,15 +2808,15 @@ snapshots:
 
   minimatch@10.2.5:
     dependencies:
-      brace-expansion: 5.0.8(patch_hash=bdbcc12755c1a97aa6f43f7854ad71ad78f0617f0a6575b7bce679b2debcdd94)
+      brace-expansion: 5.0.9(patch_hash=af16851c19659707a3a399488e82c4d7a47b8b0f6685db7fdf3b4025d2ad758e)
 
   minimatch@3.1.5:
     dependencies:
-      brace-expansion: 5.0.8(patch_hash=bdbcc12755c1a97aa6f43f7854ad71ad78f0617f0a6575b7bce679b2debcdd94)
+      brace-expansion: 5.0.9(patch_hash=af16851c19659707a3a399488e82c4d7a47b8b0f6685db7fdf3b4025d2ad758e)
 
   minimatch@9.0.9:
     dependencies:
-      brace-expansion: 5.0.8(patch_hash=bdbcc12755c1a97aa6f43f7854ad71ad78f0617f0a6575b7bce679b2debcdd94)
+      brace-expansion: 5.0.9(patch_hash=af16851c19659707a3a399488e82c4d7a47b8b0f6685db7fdf3b4025d2ad758e)
 
   minipass@7.1.3: {}
 

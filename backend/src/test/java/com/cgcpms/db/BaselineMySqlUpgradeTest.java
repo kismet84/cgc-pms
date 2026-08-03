@@ -70,7 +70,7 @@ class BaselineMySqlUpgradeTest {
                 .load();
         current.migrate();
 
-        assertEquals("268", current.info().current().getVersion().getVersion());
+        assertEquals("272", current.info().current().getVersion().getVersion());
         assertEquals(1, count(current, """
                 SELECT COUNT(*) FROM ct_contract
                 WHERE id=9251001 AND current_amount=120 AND paid_amount=30

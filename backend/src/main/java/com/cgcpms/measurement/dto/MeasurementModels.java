@@ -17,7 +17,7 @@ public final class MeasurementModels {
             @NotNull LocalDate cutoffDate, String remark) {}
 
     public record MeasurementLineRequest(
-            Long contractItemId, Long contractChangeId,
+            @NotNull Long wbsTaskId, Long contractItemId, Long contractChangeId,
             @NotNull @Positive @Digits(integer = 14, fraction = 2) BigDecimal currentQuantity,
             @NotNull @Min(0) Integer evidenceCount) {}
 

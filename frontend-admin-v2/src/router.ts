@@ -18,6 +18,8 @@ const ProjectPage = () => import('./pages/projects/ProjectPage.vue')
 const ContractPage = () => import('./pages/commercial/ContractPage.vue')
 const VariationPage = () => import('./pages/commercial/VariationPage.vue')
 const BidCostPage = () => import('./pages/commercial/BidCostPage.vue')
+const BidTenderDetailPage = () => import('./pages/commercial/BidTenderDetailPage.vue')
+const BidTenderCostPage = () => import('./pages/commercial/BidTenderCostPage.vue')
 const CostTargetPage = () => import('./pages/commercial/CostTargetPage.vue')
 const CostBudgetPage = () => import('./pages/commercial/CostBudgetPage.vue')
 const CostLedgerPage = () => import('./pages/commercial/CostLedgerPage.vue')
@@ -93,7 +95,8 @@ const navigationComponents = {
   '/project/list': ProjectPage,
   '/contract/ledger': ContractPage,
   '/variation/order': VariationPage,
-  '/bid-cost': BidCostPage,
+  '/engineering-tender/records': BidCostPage,
+  '/engineering-tender/costs': BidTenderCostPage,
   '/cost-budget': CostBudgetPage,
   '/cost/ledger': CostLedgerPage,
   '/cost/summary': CostSummaryPage,
@@ -176,6 +179,18 @@ const navigationRoutes: RouteRecordRaw[] = navigationDomains.flatMap((domain) =>
 )
 
 const contextRoutes: RouteRecordRaw[] = [
+  {
+    path: '/bid-cost',
+    name: 'LegacyBidCostRedirect',
+    redirect: (to) => ({ path: '/engineering-tender/records', query: to.query, hash: to.hash }),
+    meta: { shell: true, permission: 'bid:query' },
+  },
+  {
+    path: '/engineering-tender/records/:id',
+    name: 'EngineeringTenderDetail',
+    component: BidTenderDetailPage,
+    meta: { shell: true, permission: 'bid:query' },
+  },
   {
     path: '/system',
     name: 'V2SystemRedirect',

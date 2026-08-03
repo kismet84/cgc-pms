@@ -1,10 +1,15 @@
 package com.cgcpms.cashbook.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.cgcpms.accounting.service.AccountingPeriodGuard;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.bid.entity.BidCost;
+import com.cgcpms.bid.entity.BidDeposit;
+import com.cgcpms.bid.mapper.BidCostMapper;
+import com.cgcpms.bid.mapper.BidDepositMapper;
 import com.cgcpms.cashbook.constant.CashbookConstants;
 import com.cgcpms.cashbook.dto.CashJournalCreateRequest;
 import com.cgcpms.cashbook.dto.CashJournalQuery;
@@ -21,6 +26,8 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.budget.service.ContractBudgetAllocationService;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.cost.entity.CostSubject;
+import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.entity.PayApplication;
@@ -35,6 +42,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
@@ -46,6 +54,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -66,15 +77,21 @@ public class CashJournalService {
     private final PaymentApplicationSourceService paymentSourceService;
     private final ContractBudgetAllocationService contractBudgetAllocationService;
     private final PaymentArchiveEvidenceService paymentArchiveEvidenceService;
+    private final BidCostMapper bidCostMapper;
+    private final BidDepositMapper bidDepositMapper;
+    private final CostSubjectMapper costSubjectMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public CashJournalEntryVO createManual(CashJournalCreateRequest request) {
         validateManual(request);
+        requireBidWriteScope(request.getBidCostId());
         periodGuard.assertWritable(request.getBusinessDate());
         if (request.getAccountId() != null) {
             validateAccountOpeningDate(lockEnabledAccount(request.getAccountId()), request.getBusinessDate());
         }
         validateDimensions(request.getProjectId(), request.getContractId());
+        BidContext bid = validateBidContext(request.getBidCostId(), request.getCostSubjectId(),
+                request.getBidDepositId(), request.getDirection(), request.getAmount());
 
         CashJournalEntry entry = new CashJournalEntry();
         entry.setTenantId(tenantId());
@@ -86,6 +103,7 @@ public class CashJournalService {
         entry.setSummary(request.getSummary().trim());
         entry.setProjectId(request.getProjectId());
         entry.setContractId(request.getContractId());
+        applyBidContext(entry, bid);
         entry.setSourceType(CashbookConstants.SourceType.MANUAL);
         entry.setStatus(CashbookConstants.Status.DRAFT);
         entry.setClosureDueAt(LocalDateTime.now().plusHours(24));
@@ -157,6 +175,7 @@ public class CashJournalService {
     public CashJournalEntryVO updateDraft(Long id, CashJournalUpdateRequest request) {
         validateUpdate(request);
         CashJournalEntry entry = requireEntryForUpdate(id);
+        requireBidWriteScope(entry.getBidCostId());
         if (!List.of(CashbookConstants.Status.DRAFT, CashbookConstants.Status.PENDING_ARCHIVE)
                 .contains(entry.getStatus())) {
             throw new BusinessException("CASH_JOURNAL_ARCHIVED_IMMUTABLE", "已归档或已红冲流水不可修改");
@@ -176,6 +195,12 @@ public class CashJournalService {
         Long projectId = request.getProjectId() != null ? request.getProjectId() : entry.getProjectId();
         Long contractId = request.getContractId() != null ? request.getContractId() : entry.getContractId();
         validateDimensions(projectId, contractId);
+        Long bidCostId = request.getBidCostId() != null ? request.getBidCostId() : entry.getBidCostId();
+        Long costSubjectId = request.getCostSubjectId() != null ? request.getCostSubjectId() : entry.getCostSubjectId();
+        Long bidDepositId = request.getBidDepositId() != null ? request.getBidDepositId() : entry.getBidDepositId();
+        String direction = request.getDirection() != null ? request.getDirection() : entry.getDirection();
+        BigDecimal amount = request.getAmount() != null ? request.getAmount() : entry.getAmount();
+        BidContext bid = validateBidContext(bidCostId, costSubjectId, bidDepositId, direction, amount);
 
         entry.setAccountId(accountId);
         entry.setCounterpartyName(request.getCounterpartyName() != null
@@ -191,6 +216,7 @@ public class CashJournalService {
             if (request.getBusinessDate() != null) entry.setBusinessDate(request.getBusinessDate());
             entry.setProjectId(projectId);
             entry.setContractId(contractId);
+            applyBidContext(entry, bid);
         }
         validateAccountOpeningDate(account, businessDate);
         updateEntry(entry);
@@ -203,6 +229,9 @@ public class CashJournalService {
     @Transactional(rollbackFor = Exception.class)
     public CashJournalEntryVO archive(Long id) {
         CashJournalEntry entry = requireEntryForUpdate(id);
+        requireBidWriteScope(entry.getBidCostId());
+        validateBidContext(entry.getBidCostId(), entry.getCostSubjectId(), entry.getBidDepositId(),
+                entry.getDirection(), entry.getAmount());
         periodGuard.assertWritable(entry.getBusinessDate());
         if (!List.of(CashbookConstants.Status.DRAFT, CashbookConstants.Status.PENDING_ARCHIVE)
                 .contains(entry.getStatus())) {
@@ -242,6 +271,7 @@ public class CashJournalService {
         entry.setArchivedBy(UserContext.getCurrentUserId());
         entry.setArchivedAt(LocalDateTime.now());
         updateEntry(entry);
+        applyDepositArchive(entry);
         if (reopened) {
             appendChange(entry, CashbookConstants.ChangeAction.REARCHIVE, null, before, snapshot(entry));
         }
@@ -267,6 +297,7 @@ public class CashJournalService {
             throw new BusinessException("CASH_JOURNAL_REVERSE_REASON_REQUIRED", "红冲原因不能为空");
         }
         CashJournalEntry original = requireEntryForUpdate(id);
+        requireBidWriteScope(original.getBidCostId());
         periodGuard.assertWritable(original.getBusinessDate());
         if (CashbookConstants.Status.PENDING_ARCHIVE.equals(original.getStatus())
                 && reversalPayRecordId != null
@@ -308,6 +339,11 @@ public class CashJournalService {
         reversal.setSummary("红冲 " + original.getEntryNo() + "：" + reason.trim());
         reversal.setProjectId(original.getProjectId());
         reversal.setContractId(original.getContractId());
+        reversal.setBidCostId(original.getBidCostId());
+        reversal.setCostSubjectId(original.getCostSubjectId());
+        reversal.setBidDepositId(original.getBidDepositId());
+        reversal.setCostSubjectCodeSnapshot(original.getCostSubjectCodeSnapshot());
+        reversal.setCostSubjectNameSnapshot(original.getCostSubjectNameSnapshot());
         reversal.setPayApplicationId(original.getPayApplicationId());
         reversal.setApprovalInstanceId(original.getApprovalInstanceId());
         reversal.setPayRecordId(reversalPayRecordId);
@@ -327,6 +363,7 @@ public class CashJournalService {
         original.setStatus(CashbookConstants.Status.REVERSED);
         original.setReversalEntryId(reversal.getId());
         updateEntry(original);
+        applyDepositArchive(reversal);
         appendChange(original, CashbookConstants.ChangeAction.REVERSE, reason.trim(), before,
                 snapshot(Map.of("original", original, "reversal", reversal)));
         return toVO(reversal);
@@ -369,53 +406,65 @@ public class CashJournalService {
         entry.setArchivedAt(null);
         entry.setClosureDueAt(LocalDateTime.now().plusHours(24));
         updateEntry(entry);
+        revertDepositArchive(entry);
         appendChange(entry, CashbookConstants.ChangeAction.REOPEN, reason.trim(), before, snapshot(entry));
         return toVO(entry);
     }
 
     public IPage<CashJournalEntryVO> page(CashJournalQuery query) {
         normalizeQuery(query);
-        return entryMapper.selectPageWithBalance(
+        boolean bidOnly = requireBidQueryScope(query.getBidCostId());
+        IPage<CashJournalEntryVO> page = entryMapper.selectPageWithBalance(
                 new Page<>(query.getPageNo(), query.getPageSize()), tenantId(), query,
                 query.getProjectId() == null ? projectAccessChecker.accessibleProjectIds() : List.of(query.getProjectId()));
+        if (bidOnly) page.getRecords().forEach(entry -> entry.setRunningBalance(null));
+        return page;
     }
 
     public CashJournalSummaryVO summary(CashJournalQuery query) {
         normalizeQuery(query);
-        LambdaQueryWrapper<FundAccount> accountQuery = new LambdaQueryWrapper<FundAccount>()
-                .eq(FundAccount::getTenantId, tenantId());
-        if (query.getAccountId() != null) accountQuery.eq(FundAccount::getId, query.getAccountId());
-        List<FundAccount> accounts = fundAccountMapper.selectList(accountQuery);
+        boolean bidOnly = requireBidQueryScope(query.getBidCostId());
         List<CashJournalEntry> effective = entryMapper.selectList(baseWrapper(query)
                 .in(CashJournalEntry::getStatus, CashbookConstants.Status.ARCHIVED, CashbookConstants.Status.REVERSED));
-        List<CashJournalEntry> pending = entryMapper.selectList(baseWrapper(query)
-                .in(CashJournalEntry::getStatus, CashbookConstants.Status.DRAFT, CashbookConstants.Status.PENDING_ARCHIVE));
-
-        BigDecimal cash = BigDecimal.ZERO;
-        BigDecimal bank = BigDecimal.ZERO;
-        for (FundAccount account : accounts) {
-            BigDecimal balance = fundAccountMapper.selectCurrentBalance(account.getId(), tenantId());
-            if (CashbookConstants.AccountType.CASH.equals(account.getAccountType())) cash = cash.add(balance);
-            if (CashbookConstants.AccountType.BANK.equals(account.getAccountType())) bank = bank.add(balance);
-        }
-        BigDecimal income = effective.stream()
-                .filter(e -> CashbookConstants.Direction.IN.equals(e.getDirection()))
-                .map(CashJournalEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal expense = effective.stream()
+        BigDecimal cashOut = effective.stream()
                 .filter(e -> CashbookConstants.Direction.OUT.equals(e.getDirection()))
+                .map(CashJournalEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal cashIn = effective.stream()
+                .filter(e -> CashbookConstants.Direction.IN.equals(e.getDirection()))
                 .map(CashJournalEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
 
         CashJournalSummaryVO summary = new CashJournalSummaryVO();
-        summary.setCashBalance(money(cash));
-        summary.setBankBalance(money(bank));
-        summary.setIncome(money(income));
-        summary.setExpense(money(expense));
-        summary.setPendingCount(pending.size());
+        if (!bidOnly) {
+            LambdaQueryWrapper<FundAccount> accountQuery = new LambdaQueryWrapper<FundAccount>()
+                    .eq(FundAccount::getTenantId, tenantId());
+            if (query.getAccountId() != null) accountQuery.eq(FundAccount::getId, query.getAccountId());
+            BigDecimal cash = BigDecimal.ZERO;
+            BigDecimal bank = BigDecimal.ZERO;
+            for (FundAccount account : fundAccountMapper.selectList(accountQuery)) {
+                BigDecimal balance = fundAccountMapper.selectCurrentBalance(account.getId(), tenantId());
+                if (CashbookConstants.AccountType.CASH.equals(account.getAccountType())) cash = cash.add(balance);
+                if (CashbookConstants.AccountType.BANK.equals(account.getAccountType())) bank = bank.add(balance);
+            }
+            List<CashJournalEntry> pending = entryMapper.selectList(baseWrapper(query)
+                    .in(CashJournalEntry::getStatus, CashbookConstants.Status.DRAFT,
+                            CashbookConstants.Status.PENDING_ARCHIVE));
+            summary.setCashBalance(money(cash));
+            summary.setBankBalance(money(bank));
+            summary.setIncome(money(cashIn));
+            summary.setExpense(money(cashOut));
+            summary.setPendingCount(pending.size());
+        }
+        summary.setCumulativeCashOut(money(cashOut));
+        summary.setCumulativeCashIn(money(cashIn));
+        summary.setCashNetOutflow(money(cashOut.subtract(cashIn)));
+        summary.setActualBidExpense(money(actualBidExpense(effective)));
+        summary.setOutstandingDeposit(money(outstandingDeposit(query.getBidCostId())));
         return summary;
     }
 
     public CashJournalEntryVO getById(Long id) {
         CashJournalEntry entry = requireEntry(id);
+        requireBidQueryScope(entry.getBidCostId());
         CashJournalEntryVO vo = toVO(entry);
         if (entry.getAccountId() != null) {
             FundAccount account = fundAccountMapper.selectOne(new LambdaQueryWrapper<FundAccount>()
@@ -441,15 +490,18 @@ public class CashJournalService {
 
     public byte[] exportCsv(CashJournalQuery query) {
         normalizeQuery(query);
+        requireBidExportScope(query.getBidCostId());
         List<CashJournalEntry> entries = entryMapper.selectList(baseWrapper(query)
                 .orderByDesc(CashJournalEntry::getBusinessDate)
                 .orderByDesc(CashJournalEntry::getId));
-        StringBuilder csv = new StringBuilder("\uFEFF流水号,业务日期,方向,金额,状态,来源,摘要,往来单位\r\n");
+        StringBuilder csv = new StringBuilder("\uFEFF流水号,业务日期,方向,金额,投标ID,成本科目,状态,来源,摘要,往来单位\r\n");
         for (CashJournalEntry entry : entries) {
             csv.append(csv(entry.getEntryNo())).append(',')
                     .append(entry.getBusinessDate()).append(',')
                     .append(entry.getDirection()).append(',')
                     .append(money(entry.getAmount())).append(',')
+                    .append(entry.getBidCostId() == null ? "" : entry.getBidCostId()).append(',')
+                    .append(csv(entry.getCostSubjectNameSnapshot())).append(',')
                     .append(entry.getStatus()).append(',')
                     .append(entry.getSourceType()).append(',')
                     .append(csv(entry.getSummary())).append(',')
@@ -492,6 +544,197 @@ public class CashJournalService {
         }
     }
 
+    private BidContext validateBidContext(Long bidCostId, Long costSubjectId, Long bidDepositId,
+                                          String direction, BigDecimal amount) {
+        if (bidCostId == null && costSubjectId == null && bidDepositId == null) return null;
+        if (bidCostId == null || costSubjectId == null) {
+            throw new BusinessException("BID_COST_CONTEXT_REQUIRED", "投标流水必须关联投标记录和成本科目");
+        }
+        BidCost bid = bidCostMapper.selectById(bidCostId);
+        if (bid == null || !Objects.equals(bid.getTenantId(), tenantId())) {
+            throw new BusinessException("BID_COST_NOT_FOUND", "投标记录不存在");
+        }
+        CostSubject subject = costSubjectMapper.selectById(costSubjectId);
+        if (subject == null || !Objects.equals(subject.getTenantId(), tenantId())
+                || !"ENABLE".equals(subject.getStatus()) || subject.getParentId() == null) {
+            throw new BusinessException("BID_COST_SUBJECT_INVALID", "投标成本科目不存在或已停用");
+        }
+        CostSubject root = costSubjectMapper.selectById(subject.getParentId());
+        if (root == null || !Objects.equals(root.getTenantId(), tenantId())
+                || !"5401.01".equals(root.getSubjectCode()) || !"ENABLE".equals(root.getStatus())) {
+            throw new BusinessException("BID_COST_SUBJECT_INVALID", "投标成本只能使用5401.01的启用直接子科目");
+        }
+
+        BidDeposit deposit = null;
+        if (bidDepositId != null) {
+            deposit = bidDepositMapper.selectById(bidDepositId);
+            if (deposit == null || !Objects.equals(deposit.getTenantId(), tenantId())
+                    || !Objects.equals(deposit.getBidCostId(), bidCostId)) {
+                throw new BusinessException("BID_DEPOSIT_NOT_FOUND", "投标保证金不存在");
+            }
+            if (!"RECEIVABLE".equals(subject.getAccountCategory())) {
+                throw new BusinessException("BID_DEPOSIT_SUBJECT_INVALID", "保证金必须使用往来类投标科目");
+            }
+            if (CashbookConstants.Direction.IN.equals(direction)) {
+                BigDecimal returned = deposit.getReturnedAmount() == null ? BigDecimal.ZERO : deposit.getReturnedAmount();
+                BigDecimal total = deposit.getDepositAmount() == null ? BigDecimal.ZERO : deposit.getDepositAmount();
+                if (amount == null || returned.add(amount).compareTo(total) > 0) {
+                    throw new BusinessException("BID_DEPOSIT_RETURN_EXCEEDED", "保证金累计退回不能超过缴纳金额");
+                }
+            }
+        } else if ("RECEIVABLE".equals(subject.getAccountCategory())) {
+            throw new BusinessException("BID_DEPOSIT_REQUIRED", "往来类投标科目必须关联保证金事实");
+        }
+        return new BidContext(bid, subject, deposit);
+    }
+
+    private void applyBidContext(CashJournalEntry entry, BidContext context) {
+        if (context == null) {
+            entry.setBidCostId(null);
+            entry.setCostSubjectId(null);
+            entry.setBidDepositId(null);
+            entry.setCostSubjectCodeSnapshot(null);
+            entry.setCostSubjectNameSnapshot(null);
+            return;
+        }
+        entry.setBidCostId(context.bid().getId());
+        entry.setCostSubjectId(context.subject().getId());
+        entry.setBidDepositId(context.deposit() == null ? null : context.deposit().getId());
+        entry.setCostSubjectCodeSnapshot(context.subject().getSubjectCode());
+        entry.setCostSubjectNameSnapshot(context.subject().getSubjectName());
+    }
+
+    private void applyDepositArchive(CashJournalEntry entry) {
+        if (entry.getBidDepositId() == null) return;
+        BidDeposit deposit = bidDepositMapper.selectById(entry.getBidDepositId());
+        if (deposit == null || !Objects.equals(deposit.getTenantId(), tenantId())) {
+            throw new BusinessException("BID_DEPOSIT_NOT_FOUND", "投标保证金不存在");
+        }
+        if (CashbookConstants.SourceType.REVERSAL.equals(entry.getSourceType())) {
+            if (CashbookConstants.Direction.OUT.equals(entry.getDirection())) {
+                updateDepositReturned(deposit, entry.getAmount().negate());
+            }
+            return;
+        }
+        if (CashbookConstants.Direction.IN.equals(entry.getDirection())) {
+            updateDepositReturned(deposit, entry.getAmount());
+        }
+    }
+
+    private void revertDepositArchive(CashJournalEntry entry) {
+        if (entry.getBidDepositId() == null || !CashbookConstants.Direction.IN.equals(entry.getDirection())) return;
+        BidDeposit deposit = bidDepositMapper.selectById(entry.getBidDepositId());
+        if (deposit == null || !Objects.equals(deposit.getTenantId(), tenantId())) {
+            throw new BusinessException("BID_DEPOSIT_NOT_FOUND", "投标保证金不存在");
+        }
+        updateDepositReturned(deposit, entry.getAmount().negate());
+    }
+
+    private void updateDepositReturned(BidDeposit deposit, BigDecimal delta) {
+        BigDecimal oldReturned = deposit.getReturnedAmount() == null ? BigDecimal.ZERO : deposit.getReturnedAmount();
+        BigDecimal total = deposit.getDepositAmount() == null ? BigDecimal.ZERO : deposit.getDepositAmount();
+        BigDecimal next = oldReturned.add(delta).setScale(2);
+        if (next.signum() < 0 || next.compareTo(total) > 0) {
+            throw new BusinessException("BID_DEPOSIT_RETURN_EXCEEDED", "保证金累计退回金额不合法");
+        }
+        String nextStatus = next.compareTo(total) == 0 ? "RETURNED" : "PAID";
+        int updated = bidDepositMapper.update(null, new LambdaUpdateWrapper<BidDeposit>()
+                .eq(BidDeposit::getId, deposit.getId())
+                .eq(BidDeposit::getTenantId, tenantId())
+                .eq(BidDeposit::getReturnedAmount, oldReturned)
+                .set(BidDeposit::getReturnedAmount, next)
+                .set(BidDeposit::getDepositStatus, nextStatus));
+        if (updated != 1) {
+            throw new BusinessException("BID_DEPOSIT_CONCURRENT_MODIFICATION", "保证金已被并发修改，请刷新后重试");
+        }
+    }
+
+    private BigDecimal actualBidExpense(List<CashJournalEntry> entries) {
+        Set<Long> subjectIds = entries.stream().map(CashJournalEntry::getCostSubjectId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (subjectIds.isEmpty()) return BigDecimal.ZERO;
+        Map<Long, CostSubject> subjects = costSubjectMapper.selectBatchIds(subjectIds).stream()
+                .filter(s -> Objects.equals(s.getTenantId(), tenantId()))
+                .collect(Collectors.toMap(CostSubject::getId, Function.identity()));
+        return entries.stream()
+                .filter(e -> {
+                    CostSubject subject = subjects.get(e.getCostSubjectId());
+                    return subject != null && "COST".equals(subject.getAccountCategory());
+                })
+                .map(e -> CashbookConstants.Direction.OUT.equals(e.getDirection())
+                        ? e.getAmount() : e.getAmount().negate())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal outstandingDeposit(Long bidCostId) {
+        if (bidCostId == null) return BigDecimal.ZERO;
+        return bidDepositMapper.selectList(new LambdaQueryWrapper<BidDeposit>()
+                        .eq(BidDeposit::getTenantId, tenantId())
+                        .eq(BidDeposit::getBidCostId, bidCostId)
+                        .ne(BidDeposit::getDepositStatus, "FORFEITED"))
+                .stream()
+                .map(d -> (d.getDepositAmount() == null ? BigDecimal.ZERO : d.getDepositAmount())
+                        .subtract(d.getReturnedAmount() == null ? BigDecimal.ZERO : d.getReturnedAmount()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private boolean requireBidQueryScope(Long bidCostId) {
+        boolean bidOnly = isLimitedToBid("bid:cost:query", "cashbook:journal:query");
+        if (bidOnly && bidCostId == null) {
+            throw new BusinessException("BID_COST_QUERY_SCOPE_REQUIRED", "投标成本权限只能查询指定投标记录");
+        }
+        if (bidCostId != null) requireBidCost(bidCostId);
+        return bidOnly;
+    }
+
+    private void requireBidExportScope(Long bidCostId) {
+        if (bidCostId != null) {
+            requireBidAuthority("bid:cost:export");
+            requireBidCost(bidCostId);
+        }
+        if (isLimitedToBid("bid:cost:export", "cashbook:journal:export") && bidCostId == null) {
+            throw new BusinessException("BID_COST_QUERY_SCOPE_REQUIRED", "投标成本权限只能导出指定投标记录");
+        }
+    }
+
+    private void requireBidWriteScope(Long bidCostId) {
+        if (bidCostId != null) {
+            requireBidAuthority("bid:cost:maintain");
+            requireBidCost(bidCostId);
+        }
+        if (isLimitedToBid("bid:cost:maintain", "cashbook:journal:maintain") && bidCostId == null) {
+            throw new BusinessException("BID_COST_WRITE_SCOPE_REQUIRED", "投标成本权限只能维护投标关联流水");
+        }
+    }
+
+    private BidCost requireBidCost(Long bidCostId) {
+        BidCost bid = bidCostMapper.selectById(bidCostId);
+        if (bid == null || !Objects.equals(bid.getTenantId(), tenantId())) {
+            throw new BusinessException("BID_COST_NOT_FOUND", "投标记录不存在");
+        }
+        return bid;
+    }
+
+    private boolean isLimitedToBid(String bidAuthority, String cashAuthority) {
+        return hasAuthority(bidAuthority) && !hasAuthority(cashAuthority)
+                && !UserContext.hasRole("ADMIN") && !UserContext.hasRole("SUPER_ADMIN");
+    }
+
+    private void requireBidAuthority(String authority) {
+        if (!hasAuthority(authority) && !UserContext.hasRole("SUPER_ADMIN")) {
+            throw new BusinessException("BID_COST_ACCESS_DENIED", "无权访问投标成本");
+        }
+    }
+
+    private boolean hasAuthority(String authority) {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(granted -> authority.equals(granted.getAuthority()));
+    }
+
+    private record BidContext(BidCost bid, CostSubject subject, BidDeposit deposit) {
+    }
+
     private LambdaQueryWrapper<CashJournalEntry> baseWrapper(CashJournalQuery query) {
         LambdaQueryWrapper<CashJournalEntry> wrapper = new LambdaQueryWrapper<CashJournalEntry>()
                 .eq(CashJournalEntry::getTenantId, tenantId());
@@ -509,6 +752,16 @@ public class CashJournalService {
             });
         }
         if (query.getContractId() != null) wrapper.eq(CashJournalEntry::getContractId, query.getContractId());
+        if (query.getBidCostId() != null) wrapper.eq(CashJournalEntry::getBidCostId, query.getBidCostId());
+        if (query.getCostSubjectId() != null) wrapper.eq(CashJournalEntry::getCostSubjectId, query.getCostSubjectId());
+        if (query.getBidDepositId() != null) wrapper.eq(CashJournalEntry::getBidDepositId, query.getBidDepositId());
+        if (StringUtils.hasText(query.getCostSubjectRootCode())) {
+            wrapper.exists("SELECT 1 FROM cost_subject child JOIN cost_subject root "
+                    + "ON root.tenant_id=child.tenant_id AND root.id=child.parent_id AND root.deleted_flag=0 "
+                    + "WHERE child.tenant_id=cash_journal_entry.tenant_id "
+                    + "AND child.id=cash_journal_entry.cost_subject_id AND child.deleted_flag=0 "
+                    + "AND root.subject_code={0}", query.getCostSubjectRootCode().trim());
+        }
         if (query.getBusinessDateStart() != null) wrapper.ge(CashJournalEntry::getBusinessDate, query.getBusinessDateStart());
         if (query.getBusinessDateEnd() != null) wrapper.le(CashJournalEntry::getBusinessDate, query.getBusinessDateEnd());
         String attachmentExists = "SELECT 1 FROM sys_file f WHERE f.tenant_id = cash_journal_entry.tenant_id "
@@ -530,6 +783,10 @@ public class CashJournalService {
         query.setPageNo(Math.max(1, query.getPageNo()));
         query.setPageSize(Math.min(200, Math.max(1, query.getPageSize())));
         if (query.getProjectId() != null) projectAccessChecker.checkAccess(query.getProjectId(), "查询");
+        if (StringUtils.hasText(query.getCostSubjectRootCode())
+                && !"5401.01".equals(query.getCostSubjectRootCode().trim())) {
+            throw new BusinessException("BID_COST_SUBJECT_ROOT_INVALID", "投标成本只允许查询5401.01直接子科目");
+        }
     }
 
     private String nextEntryNo() {
@@ -631,6 +888,17 @@ public class CashJournalService {
         vo.setSummary(entry.getSummary());
         vo.setProjectId(entry.getProjectId() == null ? null : String.valueOf(entry.getProjectId()));
         vo.setContractId(entry.getContractId() == null ? null : String.valueOf(entry.getContractId()));
+        vo.setBidCostId(entry.getBidCostId() == null ? null : String.valueOf(entry.getBidCostId()));
+        vo.setCostSubjectId(entry.getCostSubjectId() == null ? null : String.valueOf(entry.getCostSubjectId()));
+        vo.setBidDepositId(entry.getBidDepositId() == null ? null : String.valueOf(entry.getBidDepositId()));
+        vo.setCostSubjectCode(entry.getCostSubjectCodeSnapshot());
+        vo.setCostSubjectName(entry.getCostSubjectNameSnapshot());
+        if (entry.getCostSubjectId() != null) {
+            CostSubject subject = costSubjectMapper.selectById(entry.getCostSubjectId());
+            if (subject != null && Objects.equals(subject.getTenantId(), tenantId())) {
+                vo.setCostSubjectAccountCategory(subject.getAccountCategory());
+            }
+        }
         vo.setSourceType(entry.getSourceType());
         vo.setSourceId(entry.getSourceId() == null ? null : String.valueOf(entry.getSourceId()));
         vo.setStatus(entry.getStatus());
@@ -641,6 +909,7 @@ public class CashJournalService {
         vo.setReversalEntryId(entry.getReversalEntryId() == null ? null : String.valueOf(entry.getReversalEntryId()));
         vo.setVersion(entry.getVersion());
         vo.setCreatedAt(entry.getCreatedAt());
+        vo.setCreatedBy(entry.getCreatedBy() == null ? null : String.valueOf(entry.getCreatedBy()));
         return vo;
     }
 

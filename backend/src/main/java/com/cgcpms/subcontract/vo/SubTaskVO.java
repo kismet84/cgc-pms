@@ -7,6 +7,7 @@ public class SubTaskVO {
     private String id;
     private String tenantId;
     private String projectId;
+    private String wbsTaskId;
     private String contractId;
     private String partnerId;
     private String predecessorTaskId;

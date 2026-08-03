@@ -35,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -57,6 +58,8 @@ class MatRequisitionWorkflowSubmitTest {
     private static final long CONTRACT_ID = 30001L;
     private static final long APPROVAL_WAREHOUSE_ID = 93030001L;
     private static final long APPROVAL_MATERIAL_ID = 93030002L;
+    private static final long SCHEDULE_ID = 93030003L;
+    private static final long WBS_ID = 93030004L;
 
     @Autowired
     private MatRequisitionService requisitionService;
@@ -86,6 +89,8 @@ class MatRequisitionWorkflowSubmitTest {
 
     @Autowired
     private CostItemMapper costItemMapper;
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @BeforeEach
     void setupContext() {
@@ -95,6 +100,8 @@ class MatRequisitionWorkflowSubmitTest {
                 .add("tenantId", TENANT_ID)
                 .add("roleCodes", List.of("ADMIN"))
                 .build());
+        jdbc.update("INSERT INTO project_schedule_plan(id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,planned_start_date,planned_end_date,status,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,'REQ-WBS-SP','领料测试基线','BASELINE',9303,'2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", SCHEDULE_ID, PROJECT_ID);
+        jdbc.update("INSERT INTO project_wbs_task(id,tenant_id,project_id,schedule_plan_id,task_code,task_name,planned_start_date,planned_end_date,weight_percent,actual_quantity,actual_progress,status,sort_order,version,created_by,created_at,updated_by,updated_at,deleted_flag) VALUES(?,0,?,?,'REQ-WBS','领料测试WBS','2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)", WBS_ID, PROJECT_ID, SCHEDULE_ID);
     }
 
     @AfterEach
@@ -114,6 +121,7 @@ class MatRequisitionWorkflowSubmitTest {
         Long requisitionId = requisitionService.create(requisition);
 
         MatRequisitionItem item = new MatRequisitionItem();
+        item.setWbsTaskId(WBS_ID);
         item.setMaterialId(1L);
         item.setQuantity(new BigDecimal("8.00"));
         item.setUnitPrice(new BigDecimal("12.50"));
@@ -170,6 +178,7 @@ class MatRequisitionWorkflowSubmitTest {
         Long requisitionId = requisitionService.create(requisition);
 
         MatRequisitionItem item = new MatRequisitionItem();
+        item.setWbsTaskId(WBS_ID);
         item.setMaterialId(APPROVAL_MATERIAL_ID);
         item.setQuantity(new BigDecimal("8.00"));
         item.setUnitPrice(new BigDecimal("12.50"));
@@ -232,6 +241,7 @@ class MatRequisitionWorkflowSubmitTest {
         assertEquals(0, new BigDecimal("12.00").compareTo(txn.getAvailableAfter()));
         assertEquals(0, new BigDecimal("12.500000").compareTo(txn.getUnitCost()));
         assertEquals(0, new BigDecimal("100.00").compareTo(txn.getAmount()));
+        assertEquals(WBS_ID, txn.getWbsTaskId());
 
         CostItem cost = costItemMapper.selectOne(new LambdaQueryWrapper<CostItem>()
                 .eq(CostItem::getSourceType, "MAT_REQUISITION")
@@ -241,6 +251,7 @@ class MatRequisitionWorkflowSubmitTest {
         assertEquals(CONTRACT_ID, cost.getContractId());
         assertEquals("MATERIAL", cost.getCostType());
         assertEquals("CONFIRMED", cost.getCostStatus());
+        assertEquals(WBS_ID, cost.getWbsTaskId());
         assertEquals(0, new BigDecimal("100.00").compareTo(cost.getAmount()));
 
         requisitionService.executeStockOut(requisitionId);

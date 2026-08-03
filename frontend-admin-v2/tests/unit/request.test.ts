@@ -61,8 +61,7 @@ describe('V2 same-origin request core', () => {
       new Response('xlsx-bytes', {
         status: 200,
         headers: {
-          'Content-Type':
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         },
       }),
     )
@@ -72,6 +71,20 @@ describe('V2 same-origin request core', () => {
     expect(result.type).toContain('spreadsheetml.sheet')
     expect(result.size).toBe(10)
     expect(await result.text()).toBe('xlsx-bytes')
+  })
+
+  it('returns csv responses as Blob', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response('code,amount\nBID-001,10.00', {
+        status: 200,
+        headers: { 'Content-Type': 'text/csv;charset=UTF-8' },
+      }),
+    )
+
+    const result = await apiRequest<Blob>('/cash-journal/export', { recover401: false })
+
+    expect(result.type).toContain('text/csv')
+    expect(await result.text()).toContain('BID-001,10.00')
   })
 
   it('coalesces concurrent 401 responses into one refresh and retries each request once', async () => {

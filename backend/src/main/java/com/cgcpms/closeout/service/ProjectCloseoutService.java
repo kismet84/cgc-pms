@@ -33,16 +33,20 @@ public class ProjectCloseoutService {
     private final BusinessCodeGenerator businessCodeGenerator;
     private final WorkflowEngine workflowEngine;
     private final ProjectAccessChecker projectAccessChecker;
+    private final ProjectCloseGateService closeGateService;
 
     public Map<String, Object> overview(Long projectId) {
         projectAccessChecker.checkAccess(projectId, "查看项目竣工收尾工作台");
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("closeout", findOne("""
+        Map<String, Object> closeout = findOne("""
                 SELECT c.id,c.project_id projectId,c.closeout_code closeoutCode,c.planned_completion_date plannedCompletionDate,
                  c.actual_completion_date actualCompletionDate,c.status,c.final_owner_settlement_id finalOwnerSettlementId,
                  c.tail_collection_verified_at tailCollectionVerifiedAt,c.closed_at closedAt,c.remark
                 FROM project_closeout c WHERE c.tenant_id=? AND c.project_id=? AND c.deleted_flag=0
-                """, tenant(), projectId));
+                """, tenant(), projectId);
+        result.put("closeout", closeout);
+        result.put("stageGates", closeout == null ? Map.of()
+                : closeGateService.gates(longValue(closeout.get("id")), projectId));
         result.put("sectionAcceptances", jdbc.queryForList("""
                 SELECT a.id,a.closeout_id closeoutId,a.wbs_task_id wbsTaskId,w.task_code taskCode,w.task_name taskName,
                  a.quality_inspection_id qualityInspectionId,a.acceptance_code acceptanceCode,a.acceptance_name acceptanceName,
@@ -131,6 +135,12 @@ public class ProjectCloseoutService {
                         """, id, tenant(), command.projectId(),
                         businessCodeGenerator.next(BusinessCodeGenerator.Rule.PROJECT_CLOSEOUT, null, attempt),
                         command.plannedCompletionDate(), user(), user(), command.remark());
+                closeGateService.requireConstructionCompletion(id, command.projectId());
+                if (jdbc.update("""
+                        UPDATE pm_project SET status='COMPLETION',updated_by=?,updated_at=CURRENT_TIMESTAMP
+                        WHERE id=? AND tenant_id=? AND status IN('ACTIVE','SUSPENDED') AND deleted_flag=0
+                        """, user(), command.projectId(), tenant()) != 1)
+                    throw error("CLOSEOUT_PROJECT_STATE_INVALID", "项目状态已变化，无法进入竣工阶段");
                 return closeout(id);
             } catch (DuplicateKeyException ignored) {
                 // 编号并发冲突时换号重试；其他唯一关系最终按原业务错误返回。
@@ -149,10 +159,12 @@ public class ProjectCloseoutService {
                 "CLOSEOUT_WBS_NOT_FOUND", "WBS任务不存在", command.wbsTaskId(), tenant());
         if (!projectId.equals(longValue(wbs.get("project_id"))))
             throw error("CLOSEOUT_PROJECT_MISMATCH", "WBS任务不属于当前项目");
-        Map<String, Object> inspection = queryOne("SELECT project_id,status,conclusion FROM qs_inspection_record WHERE id=? AND tenant_id=? AND deleted_flag=0",
+        Map<String, Object> inspection = queryOne("SELECT project_id,wbs_task_id,status,conclusion FROM qs_inspection_record WHERE id=? AND tenant_id=? AND deleted_flag=0",
                 "CLOSEOUT_INSPECTION_NOT_FOUND", "质量验收记录不存在", command.qualityInspectionId(), tenant());
         if (!projectId.equals(longValue(inspection.get("project_id"))))
             throw error("CLOSEOUT_PROJECT_MISMATCH", "质量验收记录不属于当前项目");
+        if (!command.wbsTaskId().equals(longValueNullable(inspection.get("wbs_task_id"))))
+            throw error("CLOSEOUT_WBS_MISMATCH", "质量验收记录不属于当前WBS任务");
         Long id = IdWorker.getId();
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             try {
@@ -184,8 +196,10 @@ public class ProjectCloseoutService {
                 "CLOSEOUT_WBS_NOT_FOUND", "WBS任务不存在", row.get("wbs_task_id"), tenant());
         if (!"COMPLETED".equals(string(wbs.get("status"))))
             throw error("CLOSEOUT_WBS_NOT_COMPLETED", "对应WBS任务尚未完工，不能确认验收");
-        Map<String, Object> inspection = queryOne("SELECT status,conclusion FROM qs_inspection_record WHERE id=? AND tenant_id=? AND deleted_flag=0",
+        Map<String, Object> inspection = queryOne("SELECT wbs_task_id,status,conclusion FROM qs_inspection_record WHERE id=? AND tenant_id=? AND deleted_flag=0",
                 "CLOSEOUT_INSPECTION_NOT_FOUND", "质量验收记录不存在", row.get("quality_inspection_id"), tenant());
+        if (!longValue(row.get("wbs_task_id")).equals(longValueNullable(inspection.get("wbs_task_id"))))
+            throw error("CLOSEOUT_WBS_MISMATCH", "质量验收记录不属于当前WBS任务");
         if (!"SUBMITTED".equals(string(inspection.get("status"))) || !"PASS".equals(string(inspection.get("conclusion"))))
             throw error("CLOSEOUT_QUALITY_NOT_PASSED", "只有已提交且结论通过的质量验收记录可支撑分项验收");
         if (jdbc.update("""
@@ -205,6 +219,9 @@ public class ProjectCloseoutService {
         Long projectId = longValue(closeout.get("project_id"));
         projectAccessChecker.checkAccess(projectId, "登记竣工验收");
         validateFinalAcceptanceReadiness(closeoutId, projectId);
+        closeGateService.requireConstructionCompletion(closeoutId, projectId);
+        if (!"COMPLETION".equals(string(requireProject(projectId, false).get("status"))))
+            throw error("CLOSEOUT_PROJECT_STATE_INVALID", "项目未进入竣工阶段");
         Long id = IdWorker.getId();
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             try {
@@ -234,6 +251,9 @@ public class ProjectCloseoutService {
         if (!"PASS".equals(string(row.get("conclusion"))))
             throw error("CLOSEOUT_FINAL_NOT_PASSED", "竣工验收结论必须为通过才能提交审批");
         validateFinalAcceptanceReadiness(longValue(row.get("closeout_id")), longValue(row.get("project_id")));
+        closeGateService.requireConstructionCompletion(longValue(row.get("closeout_id")), longValue(row.get("project_id")));
+        if (!"COMPLETION".equals(string(requireProject(longValue(row.get("project_id")), false).get("status"))))
+            throw error("CLOSEOUT_PROJECT_STATE_INVALID", "项目未进入竣工阶段");
         requireFile("CLOSEOUT_FINAL_ACCEPTANCE", id, "FINAL_ACCEPTANCE_CERTIFICATE", "提交竣工验收前必须上传竣工验收证明");
         Long existing = longValueNullable(row.get("approval_instance_id"));
         WfInstance instance = "REJECTED".equals(string(row.get("status"))) && existing != null
@@ -328,6 +348,18 @@ public class ProjectCloseoutService {
                 """, BigDecimal.class, tenant(), settlementId);
         if (allocated == null || allocated.compareTo(original) < 0)
             throw error("CLOSEOUT_TAIL_COLLECTION_TRACE_MISSING", "尾款虽已核销，但缺少足额成功回款分配记录");
+        BigDecimal archived = jdbc.queryForObject("""
+                SELECT COALESCE(SUM(a.allocated_amount),0) FROM collection_allocation a
+                JOIN collection_record c ON c.id=a.collection_id AND c.tenant_id=a.tenant_id
+                JOIN account_receivable r ON r.id=a.receivable_id AND r.tenant_id=a.tenant_id
+                WHERE a.tenant_id=? AND r.settlement_id=? AND r.receivable_type='REGULAR'
+                  AND c.status='SUCCESS' AND c.deleted_flag=0 AND r.deleted_flag=0
+                  AND EXISTS (SELECT 1 FROM cash_journal_entry j
+                    WHERE j.tenant_id=c.tenant_id AND j.collection_record_id=c.id
+                      AND j.direction='IN' AND j.status='ARCHIVED' AND j.deleted_flag=0)
+                """, BigDecimal.class, tenant(), settlementId);
+        if (archived == null || archived.compareTo(original) < 0)
+            throw error("CLOSEOUT_TAIL_CASH_NOT_ARCHIVED", "尾款回收缺少足额已归档现金日记账");
         jdbc.update("""
                 UPDATE project_closeout SET status='TAIL_PAYMENT_COLLECTED',tail_collection_verified_at=CURRENT_TIMESTAMP,
                  version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?
@@ -373,6 +405,13 @@ public class ProjectCloseoutService {
             }
         }
         if (!inserted) throw error("CLOSEOUT_WARRANTY_DUPLICATE", "质保编号重复或该质保金应收已登记责任期");
+        closeGateService.requireWarrantyEntry(closeoutId, projectId);
+        int projectUpdated = jdbc.update("""
+                UPDATE pm_project SET status='WARRANTY',updated_by=?,updated_at=CURRENT_TIMESTAMP
+                WHERE id=? AND tenant_id=? AND status='COMPLETION' AND deleted_flag=0
+                """, user(), projectId, tenant());
+        if (projectUpdated != 1 && !"WARRANTY".equals(string(requireProject(projectId, false).get("status"))))
+            throw error("CLOSEOUT_PROJECT_STATE_INVALID", "项目未处于竣工阶段，无法进入质保阶段");
         jdbc.update("UPDATE project_closeout SET status='WARRANTY_ACTIVE',version=version+1,updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",
                 user(), closeoutId, tenant());
         return warranty(id);
@@ -529,25 +568,11 @@ public class ProjectCloseoutService {
         Long projectId = longValue(closeout.get("project_id"));
         projectAccessChecker.checkAccess(projectId, "关闭项目");
         requireStage(closeout, Set.of("READY_TO_CLOSE"), "档案签收完成后才能关闭项目");
-        Integer openReceivables = jdbc.queryForObject("SELECT COUNT(*) FROM account_receivable WHERE tenant_id=? AND settlement_id=? AND outstanding_amount>0 AND deleted_flag=0",
-                Integer.class, tenant(), closeout.get("final_owner_settlement_id"));
-        if (openReceivables != null && openReceivables > 0)
-            throw error("CLOSEOUT_RECEIVABLES_OPEN", "竣工结算仍有未回收应收款");
-        Integer openDefects = jdbc.queryForObject("SELECT COUNT(*) FROM closeout_defect WHERE tenant_id=? AND closeout_id=? AND status<>'CLOSED' AND deleted_flag=0",
-                Integer.class, tenant(), closeoutId);
-        if (openDefects != null && openDefects > 0)
-            throw error("CLOSEOUT_DEFECTS_OPEN", "仍有未关闭缺陷");
-        Integer activeContracts = jdbc.queryForObject("SELECT COUNT(*) FROM ct_contract WHERE tenant_id=? AND project_id=? AND contract_status NOT IN('SETTLED','TERMINATED') AND deleted_flag=0",
-                Integer.class, tenant(), projectId);
-        if (activeContracts != null && activeContracts > 0)
-            throw error("CLOSEOUT_CONTRACTS_OPEN", "项目仍有未结清合同，不能关闭");
-        Integer runningWorkflows = jdbc.queryForObject("SELECT COUNT(*) FROM wf_instance WHERE tenant_id=? AND project_id=? AND instance_status='RUNNING'",
-                Integer.class, tenant(), projectId);
-        if (runningWorkflows != null && runningWorkflows > 0)
-            throw error("CLOSEOUT_WORKFLOWS_RUNNING", "项目仍有运行中的审批流程，不能关闭");
+        closeGateService.requireFinalClose(closeoutId, projectId);
         if (jdbc.update("""
                 UPDATE pm_project SET status='CLOSED',actual_end_date=?,remark=CONCAT(COALESCE(remark,''),?),
-                 updated_by=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=? AND status IN('ACTIVE','SUSPENDED')
+                 updated_by=?,updated_at=CURRENT_TIMESTAMP
+                 WHERE id=? AND tenant_id=? AND status='WARRANTY' AND deleted_flag=0
                 """, command.actualCompletionDate(), "\n项目收尾关闭：" + command.reason().trim(), user(), projectId, tenant()) != 1)
             throw error("CLOSEOUT_PROJECT_STATE_INVALID", "项目状态已变化，无法关闭");
         jdbc.update("""
@@ -590,7 +615,15 @@ public class ProjectCloseoutService {
         result.put("warranties", jdbc.queryForList("SELECT * FROM closeout_warranty WHERE tenant_id=? AND closeout_id=? AND deleted_flag=0 ORDER BY created_at,id", tenant(), closeoutId));
         result.put("defects", jdbc.queryForList("SELECT * FROM closeout_defect WHERE tenant_id=? AND closeout_id=? AND deleted_flag=0 ORDER BY created_at,id", tenant(), closeoutId));
         result.put("archiveTransfers", jdbc.queryForList("SELECT * FROM closeout_archive_transfer WHERE tenant_id=? AND closeout_id=? AND deleted_flag=0 ORDER BY created_at,id", tenant(), closeoutId));
+        result.put("stageGates", closeGateService.gates(closeoutId, longValue(closeout.get("project_id"))));
         return result;
+    }
+
+    public Map<String, Object> gates(Long closeoutId) {
+        Map<String, Object> closeout = requireCloseout(closeoutId, false);
+        Long projectId = longValue(closeout.get("project_id"));
+        projectAccessChecker.checkAccess(projectId, "查看项目阶段门禁");
+        return closeGateService.gates(closeoutId, projectId);
     }
 
     private void validateFinalAcceptanceReadiness(Long closeoutId, Long projectId) {

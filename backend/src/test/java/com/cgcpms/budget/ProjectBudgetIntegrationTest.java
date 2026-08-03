@@ -44,6 +44,8 @@ class ProjectBudgetIntegrationTest {
     private static final long TENANT_ID = 981001L;
     private static final long PROJECT_ID = 98100101L;
     private static final long SUBJECT_ID = 98100102L;
+    private static final long SCHEDULE_ID = 98100103L;
+    private static final long WBS_ID = 98100104L;
 
     @Autowired private ProjectBudgetService budgetService;
     @Autowired private BudgetLedgerService ledgerService;
@@ -121,6 +123,26 @@ class ProjectBudgetIntegrationTest {
         line.setConsumedAmount(BigDecimal.ZERO);
         lineMapper.insert(line);
         lineId = line.getId();
+
+        jdbcTemplate.update("""
+                INSERT INTO project_schedule_plan
+                    (id,tenant_id,project_id,plan_code,plan_name,plan_type,version_no,
+                     planned_start_date,planned_end_date,status,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,?,?,'BUDGET-IT-SP','预算集成测试基线','BASELINE',1,
+                       '2026-01-01','2026-12-31','ACTIVE',0,1,CURRENT_TIMESTAMP,
+                       1,CURRENT_TIMESTAMP,0)
+                """, SCHEDULE_ID, TENANT_ID, PROJECT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO project_wbs_task
+                    (id,tenant_id,project_id,schedule_plan_id,task_code,task_name,
+                     planned_start_date,planned_end_date,weight_percent,actual_quantity,
+                     actual_progress,status,sort_order,version,created_by,created_at,
+                     updated_by,updated_at,deleted_flag)
+                VALUES(?,?,?,?,'BUDGET-IT-WBS','预算集成测试WBS',
+                       '2026-01-01','2026-12-31',100,0,0,'NOT_STARTED',1,0,1,
+                       CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
+                """, WBS_ID, TENANT_ID, PROJECT_ID, SCHEDULE_ID);
 
         projectService.transitionStatus(PROJECT_ID, "ACTIVE", "项目成本预算已审批通过");
     }
@@ -269,6 +291,8 @@ class ProjectBudgetIntegrationTest {
         jdbcTemplate.update("DELETE FROM project_budget WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM cost_target_item WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM cost_target WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM project_wbs_task WHERE tenant_id = ?", TENANT_ID);
+        jdbcTemplate.update("DELETE FROM project_schedule_plan WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM pm_project WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM cost_subject WHERE tenant_id = ?", TENANT_ID);
     }

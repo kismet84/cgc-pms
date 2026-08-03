@@ -142,4 +142,10 @@ public class ProjectCloseoutController {
     public ApiResponse<Map<String, Object>> trace(@PathVariable Long id) {
         return ApiResponse.success(service.trace(id));
     }
+
+    @GetMapping("/{id}/gates")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('closeout:query')")
+    public ApiResponse<Map<String, Object>> gates(@PathVariable Long id) {
+        return ApiResponse.success(service.gates(id));
+    }
 }

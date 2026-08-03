@@ -5,9 +5,10 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.cashbook.constant.CashbookConstants;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
 import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
+import com.cgcpms.bid.entity.BidCost;
+import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
-import com.cgcpms.cost.mapper.CostTargetMapper;
 import com.cgcpms.expense.entity.ExpenseApplication;
 import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.expense.mapper.ExpenseApplicationMapper;
@@ -69,7 +70,7 @@ class BusinessObjectAuthorizerTest {
     @Mock SubMeasureMapper subcontractMapper;
     @Mock StlSettlementMapper settlementMapper;
     @Mock VarOrderMapper variationMapper;
-    @Mock CostTargetMapper bidCostMapper;
+    @Mock BidCostMapper bidCostMapper;
     @Mock MdPartnerMapper partnerMapper;
     @Mock MdMaterialMapper materialMapper;
     @Mock CashJournalEntryMapper cashJournalEntryMapper;
@@ -118,6 +119,27 @@ class BusinessObjectAuthorizerTest {
         authorizer.checkUploadAccess("PAYMENT", 40001L);
 
         verify(projectAccessChecker).checkAccess(10002L, "写入付款申请文件");
+    }
+
+    @Test
+    void ordinaryAdminCannotBypassBidFileAuthority() {
+        BusinessException error = assertThrows(BusinessException.class,
+                () -> authorizer.checkReadAccess("BID_COST", 42L));
+
+        assertEquals("FILE_ACCESS_DENIED", error.getCode());
+        verify(bidCostMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void bidAuthorityCanReadUnboundBidFile() {
+        BidCost bid = new BidCost();
+        bid.setTenantId(TestUserContext.TENANT_0);
+        when(bidCostMapper.selectById(42L)).thenReturn(bid);
+        setAuthentication("bid:query");
+
+        authorizer.checkReadAccess("BID_COST", 42L);
+
+        verify(projectAccessChecker, never()).checkAccess(anyLong(), anyString());
     }
 
     @Test

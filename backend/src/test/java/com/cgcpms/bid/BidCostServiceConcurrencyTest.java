@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.cgcpms.bid.entity.BidCost;
 import com.cgcpms.bid.mapper.BidCostMapper;
 import com.cgcpms.bid.service.BidCostService;
+import com.cgcpms.bid.service.BidDocumentVersionService;
+import com.cgcpms.bid.service.BidAwardProjectCreator;
 import com.cgcpms.common.TestUserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.CodeGenerationService;
@@ -21,6 +23,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,9 +39,10 @@ class BidCostServiceConcurrencyTest {
 
     @Mock BidCostMapper mapper;
     @Mock CostItemMapper costItemMapper;
-    @Mock PmProjectMapper projectMapper;
     @Mock ProjectAccessChecker projectAccessChecker;
     @Mock CodeGenerationService codeGenerationService;
+    @Mock BidDocumentVersionService documentService;
+    @Mock BidAwardProjectCreator awardProjectCreator;
 
     private BidCostService service;
 
@@ -48,8 +54,8 @@ class BidCostServiceConcurrencyTest {
             assistant.setCurrentNamespace("BidCostServiceConcurrencyTest");
             TableInfoHelper.initTableInfo(assistant, BidCost.class);
         }
-        service = new BidCostService(
-                mapper, costItemMapper, projectMapper, projectAccessChecker, codeGenerationService);
+        service = new BidCostService(mapper, costItemMapper, projectAccessChecker, codeGenerationService,
+                documentService, java.util.Optional.of(awardProjectCreator));
     }
 
     @AfterEach
@@ -79,22 +85,25 @@ class BidCostServiceConcurrencyTest {
 
     @Test
     void markWonFailsClosedWhenConditionalWriteLosesRace() {
-        when(mapper.selectById(3L)).thenReturn(bidding(3L));
-        PmProject project = new PmProject();
-        project.setId(10001L);
-        project.setTenantId(TestUserContext.TENANT_0);
-        when(projectMapper.selectById(10001L)).thenReturn(project);
+        BidCost current = bidding(3L);
+        current.setBidStatus("EVALUATING");
+        when(mapper.selectById(3L)).thenReturn(current);
+        when(documentService.hasCurrentFinal(3L, "RESULT", "AWARD_NOTICE")).thenReturn(true);
+        when(awardProjectCreator.createOrGet(any())).thenReturn(10001L);
         when(mapper.update(isNull(), any())).thenReturn(0);
 
-        assertConcurrent(() -> service.markAsWon(3L, 10001L));
+        assertConcurrent(() -> service.changeStatus(3L, "EVALUATING", "WON", null));
     }
 
     @Test
     void markLostFailsBeforeCostWriteWhenConditionalWriteLosesRace() {
-        when(mapper.selectById(4L)).thenReturn(bidding(4L));
+        BidCost current = bidding(4L);
+        current.setBidStatus("EVALUATING");
+        when(mapper.selectById(4L)).thenReturn(current);
+        when(documentService.hasCurrentFinalResult(4L)).thenReturn(true);
         when(mapper.update(isNull(), any())).thenReturn(0);
 
-        assertConcurrent(() -> service.markAsLost(4L));
+        assertConcurrent(() -> service.changeStatus(4L, "EVALUATING", "LOST", "未中标"));
         verify(costItemMapper, never()).update(any(), any());
     }
 
@@ -103,6 +112,12 @@ class BidCostServiceConcurrencyTest {
         bid.setId(id);
         bid.setTenantId(TestUserContext.TENANT_0);
         bid.setBidStatus("BIDDING");
+        bid.setBidProjectName("并发中标项目");
+        bid.setTendereeName("招标人");
+        bid.setProjectLocation("建设地点");
+        bid.setFinalBidPrice(new BigDecimal("100.00"));
+        bid.setPlannedStartDate(LocalDate.of(2026, 8, 1));
+        bid.setPlannedEndDate(LocalDate.of(2027, 7, 31));
         return bid;
     }
 
