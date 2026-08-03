@@ -1,102 +1,198 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
+import { V2Alert, V2Button, V2Card, V2PageState, V2Stack, showToast } from '@/components'
 import {
-  V2Alert,
-  V2Button,
-  V2Card,
-  V2ConfirmDialog,
-  V2Input,
-  V2Stack,
-  showToast,
-} from '@/components'
-import { clearNonProductionDatabase } from '@/services/system-management'
+  loadDataMaintenancePreview,
+  type DataMaintenancePreview,
+} from '@/services/system-management'
 import { isApiClientError } from '@/services/request'
 
-const CONFIRMATION = 'CLEAR_NON_PROD_DATABASE'
-const confirmation = ref('')
-const acknowledged = ref(false)
-const dialogOpen = ref(false)
-const clearing = ref(false)
-const canSubmit = computed(
-  () => acknowledged.value && confirmation.value.trim() === CONFIRMATION && !clearing.value,
+const preview = ref<DataMaintenancePreview>()
+const loading = ref(false)
+const errorMessage = ref('')
+const hostScriptCommand = computed(
+  () =>
+    `pwsh -NoProfile -File scripts/database/clear-business-data.ps1 -Database ${preview.value?.database ?? '<database>'}`,
 )
 
-async function clearDatabase(): Promise<void> {
-  if (!canSubmit.value) return
-  clearing.value = true
+async function loadPreview(): Promise<void> {
+  loading.value = true
+  errorMessage.value = ''
   try {
-    const result = await clearNonProductionDatabase()
-    dialogOpen.value = false
-    confirmation.value = ''
-    acknowledged.value = false
-    showToast('success', '数据维护完成', result)
+    preview.value = await loadDataMaintenancePreview()
   } catch (value) {
-    showToast(
-      'error',
-      '数据维护失败',
-      isApiClientError(value) || value instanceof Error ? value.message : '请求失败',
-    )
+    errorMessage.value =
+      isApiClientError(value) || value instanceof Error ? value.message : '预览加载失败'
   } finally {
-    clearing.value = false
+    loading.value = false
   }
 }
+
+async function copyCommand(): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(hostScriptCommand.value)
+    showToast('success', '命令已复制', '请在应用宿主机按运维流程执行。')
+  } catch {
+    showToast('error', '复制失败', '请手动选择并复制命令。')
+  }
+}
+
+onMounted(loadPreview)
 </script>
 
 <template>
   <V2Stack class="data-maintenance-page" :gap="4">
     <V2Card title="数据维护" :heading-level="1"></V2Card>
 
-    <V2Alert tone="danger" title="不可逆操作">
-      仅非生产环境超级管理员可用。清理会删除项目、合同、审批和财务等业务数据；系统用户、角色、菜单和字典保留，且无法回滚。
+    <V2Alert tone="info" title="只读预览">
+      页面仅展示服务端预检结果，不直接清理数据。实际清理必须由授权运维人员在应用宿主机执行脚本。
     </V2Alert>
 
-    <V2Card title="清空非生产业务数据">
-      <div class="data-maintenance-page__form">
-        <V2Input
-          v-model="confirmation"
-          label="确认码"
-          :placeholder="CONFIRMATION"
-          autocomplete="off"
-          hint="必须完整输入确认码。"
-        />
-        <label class="data-maintenance-page__acknowledge">
-          <input v-model="acknowledged" type="checkbox" />
-          <span>我确认目标是非生产环境，并已接受业务数据不可恢复。</span>
-        </label>
-        <V2Button variant="danger" :disabled="!canSubmit" @click="dialogOpen = true">
-          清空非生产业务数据
-        </V2Button>
-      </div>
-    </V2Card>
-
-    <V2ConfirmDialog
-      :open="dialogOpen"
-      title="最终确认清空"
-      description="确认后立即清空非生产业务数据，且无法恢复。"
-      confirm-text="确认清空"
-      danger
-      :loading="clearing"
-      @close="dialogOpen = false"
-      @confirm="clearDatabase"
+    <V2PageState
+      v-if="loading && !preview"
+      kind="loading"
+      title="正在读取数据维护预览"
+      description="服务端正在核对数据库、保留项和可清理项。"
     />
+
+    <V2PageState
+      v-else-if="errorMessage && !preview"
+      kind="error"
+      title="数据维护预览加载失败"
+      :description="errorMessage"
+    >
+      <template #actions>
+        <V2Button variant="secondary" @click="loadPreview">重新加载</V2Button>
+      </template>
+    </V2PageState>
+
+    <template v-else-if="preview">
+      <V2Alert v-if="errorMessage" tone="warning" title="刷新失败">
+        {{ errorMessage }}；当前仍展示上次成功读取的结果。
+      </V2Alert>
+
+      <V2Card title="预检结果">
+        <template #actions>
+          <V2Button size="small" variant="secondary" :loading="loading" @click="loadPreview">
+            刷新
+          </V2Button>
+        </template>
+        <dl class="data-maintenance-page__facts">
+          <div>
+            <dt>数据库</dt>
+            <dd>{{ preview.database }}</dd>
+          </div>
+          <div>
+            <dt>清理策略指纹</dt>
+            <dd>
+              <code>{{ preview.policyFingerprint }}</code>
+            </dd>
+          </div>
+          <div>
+            <dt>是否允许清理</dt>
+            <dd>{{ preview.eligible ? '允许' : '阻止' }}</dd>
+          </div>
+          <div>
+            <dt>预计清理</dt>
+            <dd>
+              {{ preview.clearTableCount }} 张表 / {{ preview.clearRowCount }} 行 /
+              {{ preview.sysFileCount }} 个文件
+            </dd>
+          </div>
+        </dl>
+        <V2Alert
+          :tone="preview.eligible ? 'success' : 'danger'"
+          :title="preview.eligible ? '预检通过' : '预检阻止清理'"
+        >
+          {{
+            preview.blockers.length > 0
+              ? preview.blockers.join('；')
+              : '未发现阻塞项；仍须在宿主机执行脚本。'
+          }}
+        </V2Alert>
+      </V2Card>
+
+      <V2Card title="保留数据组">
+        <ul v-if="preview.retainedGroups.length" class="data-maintenance-page__list">
+          <li v-for="group in preview.retainedGroups" :key="group.code">
+            <strong>{{ group.code }}</strong>
+            <span>{{ group.tableCount }} 张表 / {{ group.rowCount }} 行</span>
+          </li>
+        </ul>
+        <p v-else class="data-maintenance-page__muted">服务端未返回保留数据组。</p>
+      </V2Card>
+
+      <V2Card title="忽略视图">
+        <p v-if="preview.ignoredViews.length" class="data-maintenance-page__codes">
+          <code v-for="view in preview.ignoredViews" :key="view">{{ view }}</code>
+        </p>
+        <p v-else class="data-maintenance-page__muted">无忽略视图。</p>
+      </V2Card>
+
+      <V2Card title="宿主机执行命令" subtitle="命令不包含数据库账号、密码或连接串。">
+        <div class="data-maintenance-page__command">
+          <code>{{ hostScriptCommand }}</code>
+          <V2Button size="small" variant="secondary" @click="copyCommand"> 复制命令 </V2Button>
+        </div>
+      </V2Card>
+    </template>
   </V2Stack>
 </template>
 
 <style scoped>
-.data-maintenance-page__form {
+.data-maintenance-page__facts {
   display: grid;
-  max-width: 44rem;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: var(--v2-space-4);
+  margin: 0 0 var(--v2-space-4);
 }
 
-.data-maintenance-page__acknowledge {
-  display: flex;
-  gap: var(--v2-space-2);
-  align-items: flex-start;
+.data-maintenance-page__facts div,
+.data-maintenance-page__list li {
+  display: grid;
+  gap: var(--v2-space-1);
+}
+
+.data-maintenance-page__facts dt,
+.data-maintenance-page__muted {
   color: var(--v2-color-text-secondary);
 }
 
-.data-maintenance-page__acknowledge input {
-  accent-color: var(--v2-color-primary);
+.data-maintenance-page__facts dd {
+  margin: 0;
+  font-weight: 650;
+}
+
+.data-maintenance-page__list {
+  display: grid;
+  gap: var(--v2-space-3);
+  margin: 0;
+  padding-left: var(--v2-space-5);
+}
+
+.data-maintenance-page__list span {
+  color: var(--v2-color-text-secondary);
+}
+
+.data-maintenance-page__codes,
+.data-maintenance-page__command {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--v2-space-2);
+  align-items: center;
+  margin: 0;
+}
+
+.data-maintenance-page__codes code,
+.data-maintenance-page__command code {
+  overflow-wrap: anywhere;
+  padding: var(--v2-space-2);
+  border-radius: var(--v2-radius-sm);
+  background: var(--v2-color-surface-subtle);
+}
+
+.data-maintenance-page__command code {
+  flex: 1 1 24rem;
+  user-select: all;
 }
 </style>
