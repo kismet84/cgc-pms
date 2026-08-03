@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Digits;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -44,15 +45,18 @@ public class CtContractItem extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal unitPrice;
 
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal amount;
 
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal taxRate;
 
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal taxAmount;
 
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal amountWithoutTax;
 

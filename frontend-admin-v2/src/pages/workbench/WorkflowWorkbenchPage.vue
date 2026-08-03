@@ -11,6 +11,7 @@ import {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { formatAmount } from '@/pages/dashboard/model'
 import {
   V2Alert,
   V2Badge,
@@ -292,12 +293,14 @@ async function loadPurchaseApprovalItems(requestId: string): Promise<void> {
   try {
     const taskId = pendingTask.value?.id
     if (!taskId) throw new TypeError('当前没有可处理任务')
-    purchaseApprovalItems.value = (await loadPurchaseRequestApprovalItems(requestId, taskId)).map((item) => ({
-      itemId: item.id || '',
-      approvedQuantity: item.approvedQuantity || item.quantity,
-      approvalVersion: item.approvalVersion ?? 0,
-      changeReason: '',
-    }))
+    purchaseApprovalItems.value = (await loadPurchaseRequestApprovalItems(requestId, taskId)).map(
+      (item) => ({
+        itemId: item.id || '',
+        approvedQuantity: item.approvedQuantity || item.quantity,
+        approvalVersion: item.approvalVersion ?? 0,
+        changeReason: '',
+      }),
+    )
   } catch (error) {
     actionErrorMessage.value = errorText(error, '采购申请明细读取失败')
   }
@@ -612,7 +615,7 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <dt>金额</dt>
-              <dd>{{ detail.amount ?? '-' }}</dd>
+              <dd>{{ formatAmount(detail.amount) }}</dd>
             </div>
           </dl>
         </div>
@@ -709,7 +712,12 @@ onBeforeUnmount(() => {
           <h3>审批数量</h3>
           <p v-if="!purchaseApprovalItems.length">正在读取采购申请明细…</p>
           <div v-for="(item, index) in purchaseApprovalItems" :key="item.itemId">
-            <V2Input v-model="item.approvedQuantity" :label="`第${index + 1}行批准数量`" required />
+            <V2Input
+              v-model="item.approvedQuantity"
+              :label="`第${index + 1}行批准数量`"
+              :decimal-scale="2"
+              required
+            />
             <V2Input v-model="item.changeReason" :label="`第${index + 1}行调整原因`" />
           </div>
         </section>

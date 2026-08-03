@@ -330,10 +330,10 @@ const status = (row: Row) =>
     'applyCode' in row && ['PAID', 'PARTIALLY_PAID'].includes(row.payStatus || '')
       ? row.payStatus
       : 'approvalStatus' in row
-      ? row.approvalStatus
-      : 'verifyStatus' in row
-        ? row.verifyStatus
-        : row.status,
+        ? row.approvalStatus
+        : 'verifyStatus' in row
+          ? row.verifyStatus
+          : row.status,
   )
 const money = (row: Row) =>
   formatAmount(
@@ -1479,7 +1479,13 @@ onBeforeUnmount(() => controller?.abort())
               :disabled="!paymentSourceOptions.length"
               @update:model-value="choosePaymentSource"
             />
-            <V2Input v-model="editor.applyAmount" label="申请金额" required hint="按字符串提交" />
+            <V2Input
+              v-model="editor.applyAmount"
+              label="申请金额"
+              :decimal-scale="2"
+              required
+              hint="按字符串提交"
+            />
             <V2Input v-model="editor.applyReason" label="申请事由" required />
             <label class="v2-field">
               <span class="v2-field__label">付款附件*</span>
@@ -1518,7 +1524,13 @@ onBeforeUnmount(() => controller?.abort())
               placeholder="YYYY-MM-DD"
               required
             />
-            <V2Input v-model="editor.amount" label="费用金额" required hint="按字符串提交" />
+            <V2Input
+              v-model="editor.amount"
+              label="费用金额"
+              :decimal-scale="2"
+              required
+              hint="按字符串提交"
+            />
             <V2Input v-model="editor.description" label="费用说明" required />
             <label class="v2-field">
               <span class="v2-field__label">费用附件<span v-if="!editor.id">*</span></span>
@@ -1545,15 +1557,31 @@ onBeforeUnmount(() => controller?.abort())
               :options="invoiceTypeOptions"
               required
             />
-            <V2Input v-model="editor.invoiceAmount" label="发票金额" required hint="按字符串提交" />
+            <V2Input
+              v-model="editor.invoiceAmount"
+              label="发票金额"
+              :decimal-scale="2"
+              required
+              hint="按字符串提交"
+            />
             <V2Input
               v-model="editor.invoiceDate"
               label="开票日期"
               placeholder="YYYY-MM-DD"
               required
             />
-            <V2Input v-model="editor.taxRate" label="税率" hint="按服务端字符串口径提交" />
-            <V2Input v-model="editor.taxAmount" label="税额" hint="按服务端字符串口径提交" />
+            <V2Input
+              v-model="editor.taxRate"
+              label="税率"
+              :decimal-scale="2"
+              hint="按服务端字符串口径提交"
+            />
+            <V2Input
+              v-model="editor.taxAmount"
+              label="税额"
+              :decimal-scale="2"
+              hint="按服务端字符串口径提交"
+            />
             <V2Input v-model="editor.sellerName" label="销售方" />
             <V2Input v-model="editor.buyerName" label="购买方" />
             <label>
@@ -1586,9 +1614,14 @@ onBeforeUnmount(() => controller?.abort())
               placeholder="YYYY-MM-DD"
               required
             />
-            <V2Input v-model="editor.grossAmount" label="含税结算金额" required />
-            <V2Input v-model="editor.taxAmount" label="税额" required />
-            <V2Input v-model="editor.retentionAmount" label="质保金" required />
+            <V2Input
+              v-model="editor.grossAmount"
+              label="含税结算金额"
+              :decimal-scale="2"
+              required
+            />
+            <V2Input v-model="editor.taxAmount" label="税额" :decimal-scale="2" required />
+            <V2Input v-model="editor.retentionAmount" label="质保金" :decimal-scale="2" required />
             <V2Input v-model="editor.dueDate" label="到期日期" placeholder="YYYY-MM-DD" required />
             <label class="v2-field">
               <span class="v2-field__label">业主结算附件*</span>
@@ -1616,15 +1649,25 @@ onBeforeUnmount(() => controller?.abort())
               placeholder="YYYY-MM-DD"
               required
             />
-            <V2Input v-model="editor.amountWithoutTax" label="不含税金额" required />
-            <V2Input v-model="editor.taxAmount" label="税额" required />
+            <V2Input
+              v-model="editor.amountWithoutTax"
+              label="不含税金额"
+              :decimal-scale="2"
+              required
+            />
+            <V2Input v-model="editor.taxAmount" label="税额" :decimal-scale="2" required />
             <V2Select
               v-model="editor.receivableId"
               label="应收款"
               :options="receivableOptions"
               required
             />
-            <V2Input v-model="editor.allocationAmount" label="分配金额" required />
+            <V2Input
+              v-model="editor.allocationAmount"
+              label="分配金额"
+              :decimal-scale="2"
+              required
+            />
             <label class="v2-field">
               <span class="v2-field__label">销项发票附件*</span>
               <input
@@ -1651,7 +1694,12 @@ onBeforeUnmount(() => controller?.abort())
             />
             <V2Input v-model="editor.externalTxnNo" label="外部流水号" required />
             <V2Input v-model="editor.collectedAt" type="datetime-local" label="到账时间" required />
-            <V2Input v-model="editor.collectionAmount" label="回款金额" required />
+            <V2Input
+              v-model="editor.collectionAmount"
+              label="回款金额"
+              :decimal-scale="2"
+              required
+            />
             <V2Input v-model="editor.payerName" label="付款单位" required />
             <V2Select
               v-model="editor.receivableId"
@@ -1659,7 +1707,12 @@ onBeforeUnmount(() => controller?.abort())
               :options="receivableOptions"
               required
             />
-            <V2Input v-model="editor.allocationAmount" label="分配金额" required />
+            <V2Input
+              v-model="editor.allocationAmount"
+              label="分配金额"
+              :decimal-scale="2"
+              required
+            />
             <label class="v2-field">
               <span class="v2-field__label">银行回单*</span>
               <input type="file" required @change="onCollectionAttachment" />
@@ -1694,6 +1747,7 @@ onBeforeUnmount(() => controller?.abort())
           <V2Input
             v-model="writebackEditor.payAmount"
             label="付款金额"
+            :decimal-scale="2"
             required
             hint="使用服务端批准金额，服务端负责余额校验"
           />

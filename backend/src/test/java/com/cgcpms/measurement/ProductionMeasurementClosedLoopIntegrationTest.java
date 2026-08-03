@@ -86,7 +86,7 @@ class ProductionMeasurementClosedLoopIntegrationTest {
         addCleanFile("OWNER_MEASUREMENT_SUBMISSION", submissionId, "OWNER_CONFIRMATION");
         assertEquals("300.00", submission.get("submitted_amount"));
         @SuppressWarnings("unchecked") List<java.util.Map<String,Object>> lines = (List<java.util.Map<String,Object>>) service.submission(submissionId).get("lines");
-        assertEquals("10.0000", String.valueOf(lines.get(0).get("unit_price")));
+        assertEquals("10.00", String.valueOf(lines.get(0).get("unit_price")));
         assertEquals("200.00", String.valueOf(lines.get(0).get("submitted_amount")));
         long itemLine = lines.stream().filter(row -> "BOQ-001".equals(row.get("item_code"))).map(row -> ((Number) row.get("measurement_line_id")).longValue()).findFirst().orElseThrow();
         long changeLine = lines.stream().filter(row -> "CHG-001".equals(row.get("item_code"))).map(row -> ((Number) row.get("measurement_line_id")).longValue()).findFirst().orElseThrow();

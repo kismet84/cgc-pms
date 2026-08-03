@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Digits;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -45,6 +46,7 @@ public class ProjectBudget extends BaseEntity {
 
     @NotNull(message = "预算总额不能为空")
     @Positive(message = "预算总额必须大于0")
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal totalAmount;
 

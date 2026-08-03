@@ -115,7 +115,7 @@ class MatStockServiceTest {
                 .filter(item -> stock.getId().equals(item.getId()))
                 .findFirst()
                 .orElseThrow();
-        assertEquals(new BigDecimal("12.5000"), record.getAvailableQty());
+        assertEquals(new BigDecimal("12.50"), record.getAvailableQty());
         assertEquals("WH-STOCK-TEST", record.getWarehouseName());
     }
 
@@ -291,13 +291,12 @@ class MatStockServiceTest {
     // ═══════════════════════════════════════════════════════════
     @Test
     @Transactional
-    @DisplayName("EDGE: 高精度小数出库（4位小数）")
+    @DisplayName("EDGE: 出库数量拒绝超过2位小数")
     void testStockOutHighPrecisionDecimal() {
         stockService.stockIn(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("100.0000"));
 
-        MatStock stock = stockService.stockOut(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("0.0001"));
-        assertEquals(0, new BigDecimal("99.9999").compareTo(stock.getAvailableQty()),
-                "高精度出库后可用量应为99.9999");
+        assertThrows(BusinessException.class,
+                () -> stockService.stockOut(WAREHOUSE_ID, MATERIAL_ID, new BigDecimal("0.0001")));
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -1310,9 +1309,9 @@ class MatStockServiceTest {
         assertNull(ledger.getStock().getId(), "汇总记录不得伪造单库存 ID");
         assertNull(ledger.getStock().getWarehouseId(), "汇总记录不得伪造单仓库 ID");
         assertEquals("全部仓库", ledger.getStock().getWarehouseName());
-        assertEquals(new BigDecimal("15.0000"), ledger.getStock().getAvailableQty());
+        assertEquals(new BigDecimal("15.00"), ledger.getStock().getAvailableQty());
         assertEquals(new BigDecimal("35.00"), ledger.getStock().getInventoryValue());
-        assertEquals(new BigDecimal("2.3333"), ledger.getStock().getAverageUnitCost());
+        assertEquals(new BigDecimal("2.33"), ledger.getStock().getAverageUnitCost());
         assertEquals(2, ledger.getTxns().getTotal());
     }
 

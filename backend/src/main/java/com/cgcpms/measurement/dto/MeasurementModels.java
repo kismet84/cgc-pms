@@ -18,7 +18,7 @@ public final class MeasurementModels {
 
     public record MeasurementLineRequest(
             Long contractItemId, Long contractChangeId,
-            @NotNull @Positive @Digits(integer = 14, fraction = 4) BigDecimal currentQuantity,
+            @NotNull @Positive @Digits(integer = 14, fraction = 2) BigDecimal currentQuantity,
             @NotNull @Min(0) Integer evidenceCount) {}
 
     public record MeasurementRequest(
@@ -32,7 +32,7 @@ public final class MeasurementModels {
 
     public record OwnerReviewLineRequest(
             @NotNull Long measurementLineId,
-            @NotNull @PositiveOrZero @Digits(integer = 14, fraction = 4) BigDecimal confirmedQuantity,
+            @NotNull @PositiveOrZero @Digits(integer = 14, fraction = 2) BigDecimal confirmedQuantity,
             String deductionReason) {}
 
     public record OwnerReviewRequest(

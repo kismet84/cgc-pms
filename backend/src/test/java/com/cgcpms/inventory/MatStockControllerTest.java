@@ -258,7 +258,7 @@ class MatStockControllerTest {
         mockMvc.perform(putWithApi("/inventory/stock/" + SETTINGS_STOCK_ID + "/safety-threshold")
                         .cookie(reader)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"safetyStockQty\":\"30.0000\"}"))
+                        .content("{\"safetyStockQty\":\"30.00\"}"))
                 .andExpect(status().isForbidden());
     }
 
@@ -286,10 +286,10 @@ class MatStockControllerTest {
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/safety-threshold")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"safetyStockQty\":\"125.5000\"}"))
+                        .content("{\"safetyStockQty\":\"125.50\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.safetyStockQty").value("125.5000"));
+                .andExpect(jsonPath("$.data.safetyStockQty").value("125.50"));
     }
 
     @Test
@@ -301,7 +301,7 @@ class MatStockControllerTest {
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/safety-threshold")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"safetyStockQty\":\"30.0000\"}"))
+                        .content("{\"safetyStockQty\":\"30.00\"}"))
                 .andExpect(status().isForbidden());
     }
 
@@ -314,24 +314,24 @@ class MatStockControllerTest {
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\",\"replenishmentLeadDays\":7}"))
+                        .content("{\"safetyStockQty\":\"100.00\",\"replenishmentTargetQty\":\"150.00\",\"replenishmentLeadDays\":7}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("0"))
-                .andExpect(jsonPath("$.data.safetyStockQty").value("100.0000"))
-                .andExpect(jsonPath("$.data.replenishmentTargetQty").value("150.0000"))
+                .andExpect(jsonPath("$.data.safetyStockQty").value("100.00"))
+                .andExpect(jsonPath("$.data.replenishmentTargetQty").value("150.00"))
                 .andExpect(jsonPath("$.data.replenishmentLeadDays").value(7));
 
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\"}"))
+                        .content("{\"safetyStockQty\":\"100.00\",\"replenishmentTargetQty\":\"150.00\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.replenishmentLeadDays").value(7));
 
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"150.0000\",\"replenishmentLeadDays\":null}"))
+                        .content("{\"safetyStockQty\":\"100.00\",\"replenishmentTargetQty\":\"150.00\",\"replenishmentLeadDays\":null}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.replenishmentLeadDays").doesNotExist());
     }
@@ -345,7 +345,7 @@ class MatStockControllerTest {
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":\"99.9999\"}"))
+                        .content("{\"safetyStockQty\":\"100.00\",\"replenishmentTargetQty\":\"99.99\"}"))
                 .andExpect(status().isBadRequest());
     }
 
@@ -359,7 +359,7 @@ class MatStockControllerTest {
             mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
                             .cookie(purchaseManagerCookie(List.of("inventory:stock:list", "inventory:stock:edit")))
                             .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"safetyStockQty\":\"100.0000\",\"replenishmentTargetQty\":null,\"replenishmentLeadDays\":" + value + "}"))
+                            .content("{\"safetyStockQty\":\"100.00\",\"replenishmentTargetQty\":null,\"replenishmentLeadDays\":" + value + "}"))
                     .andExpect(status().isBadRequest());
         }
     }
@@ -390,7 +390,7 @@ class MatStockControllerTest {
         mockMvc.perform(putWithApi("/inventory/stock/" + stockId + "/replenishment-settings")
                         .cookie(purchaseManagerCookie(List.of("inventory:stock:list")))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"safetyStockQty\":\"1.0000\",\"replenishmentTargetQty\":\"2.0000\",\"replenishmentLeadDays\":99}"))
+                        .content("{\"safetyStockQty\":\"1.00\",\"replenishmentTargetQty\":\"2.00\",\"replenishmentLeadDays\":99}"))
                 .andExpect(status().isForbidden());
 
         Map<String, Object> after = jdbcTemplate.queryForMap("""
@@ -411,7 +411,7 @@ class MatStockControllerTest {
                 .andExpect(jsonPath("$.code").value("0"))
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].warehouseId").value(TRANSFER_WAREHOUSE_ID))
-                .andExpect(jsonPath("$.data[0].transferableQty").value("70.0000"));
+                .andExpect(jsonPath("$.data[0].transferableQty").value("70.00"));
     }
 
     @Test

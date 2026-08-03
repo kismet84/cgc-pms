@@ -23,7 +23,7 @@ import {
   V2Select,
   showToast,
 } from '@/components'
-import { formatAmount } from '@/pages/dashboard/model'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
   createStockTransfer,
   createWarehouse,
@@ -691,10 +691,10 @@ onBeforeUnmount(() => {
                 </td>
                 <td>{{ item.warehouseName || '仓库名称缺失' }}</td>
                 <td>
-                  <strong>{{ item.availableQty }}</strong> {{ item.unit || '' }}
+                  <strong>{{ formatDecimal(item.availableQty) }}</strong> {{ item.unit || '' }}
                 </td>
-                <td>{{ item.safetyStockQty }} {{ item.unit || '' }}</td>
-                <td>{{ item.averageUnitCost }}</td>
+                <td>{{ formatDecimal(item.safetyStockQty) }} {{ item.unit || '' }}</td>
+                <td>{{ formatAmount(item.averageUnitCost) }}</td>
                 <td>{{ formatAmount(item.inventoryValue) }}</td>
                 <td>{{ dateTimeLabel(item.updatedTime) }}</td>
               </tr>
@@ -756,7 +756,7 @@ onBeforeUnmount(() => {
           <dl class="v2-detail-dialog__facts">
             <div>
               <dt>可用数量</dt>
-              <dd>{{ ledger.stock.availableQty }} {{ ledger.stock.unit }}</dd>
+              <dd>{{ formatDecimal(ledger.stock.availableQty) }} {{ ledger.stock.unit }}</dd>
             </div>
             <div>
               <dt>库存价值</dt>
@@ -764,11 +764,11 @@ onBeforeUnmount(() => {
             </div>
             <div>
               <dt>平均成本</dt>
-              <dd>{{ ledger.stock.averageUnitCost }}</dd>
+              <dd>{{ formatAmount(ledger.stock.averageUnitCost) }}</dd>
             </div>
             <div>
               <dt>安全库存</dt>
-              <dd>{{ ledger.stock.safetyStockQty }}</dd>
+              <dd>{{ formatDecimal(ledger.stock.safetyStockQty) }}</dd>
             </div>
           </dl>
         </section>
@@ -778,7 +778,8 @@ onBeforeUnmount(() => {
             <h3 id="inventory-incoming-title">在途供应</h3>
             <p v-if="!incoming.length">无在途供应</p>
             <p v-for="item in incoming" :key="item.orderId">
-              {{ item.orderCode }} · {{ item.remainingQty }} · {{ item.deliveryDate || '-' }}
+              {{ item.orderCode }} · {{ formatDecimal(item.remainingQty) }} ·
+              {{ item.deliveryDate || '-' }}
             </p>
           </section>
           <section class="v2-detail-dialog__section" aria-labelledby="inventory-baseline-title">
@@ -832,7 +833,7 @@ onBeforeUnmount(() => {
                 <tr v-for="item in ledger.txns.records" :key="item.id">
                   <td>{{ item.createdTime || '-' }}</td>
                   <td>{{ transactionTypeLabel(item.txnType) }}</td>
-                  <td>{{ item.quantity }}</td>
+                  <td>{{ formatDecimal(item.quantity) }}</td>
                   <td>{{ item.availableAfter }}</td>
                   <td>{{ formatAmount(item.amount) }}</td>
                   <td>{{ sourceTypeLabel(item.sourceType) }}</td>
@@ -934,8 +935,8 @@ onBeforeUnmount(() => {
       @close="stockDialog = null"
     >
       <div v-if="stockDialog === 'settings'" class="inventory-workspace-page__form">
-        <V2Input v-model="stockForm.safetyStockQty" label="安全库存" required />
-        <V2Input v-model="stockForm.replenishmentTargetQty" label="补货目标量" />
+        <V2Input v-model="stockForm.safetyStockQty" label="安全库存" :decimal-scale="2" required />
+        <V2Input v-model="stockForm.replenishmentTargetQty" label="补货目标量" :decimal-scale="2" />
         <V2Input v-model="stockForm.replenishmentLeadDays" label="补货提前期（天）" />
       </div>
       <div v-else class="inventory-workspace-page__form">
@@ -945,7 +946,7 @@ onBeforeUnmount(() => {
           :options="candidateOptions"
           required
         />
-        <V2Input v-model="stockForm.quantity" label="调拨数量" required />
+        <V2Input v-model="stockForm.quantity" label="调拨数量" :decimal-scale="2" required />
         <V2Input v-model="stockForm.reason" label="调拨原因" required />
       </div>
       <template #footer>

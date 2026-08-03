@@ -12,6 +12,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
   V2Badge,
   V2Button,
@@ -731,8 +732,8 @@ onBeforeUnmount(() => {
                 <td>{{ record.projectName || '项目信息缺失' }}</td>
                 <td>{{ record.contractName || '合同信息缺失' }}</td>
                 <td>{{ record.partnerName || '分包单位信息缺失' }}</td>
-                <td v-if="'taskCode' in record">{{ record.progressPercent }}%</td>
-                <td v-else>{{ record.reportedAmount ?? '—' }}</td>
+                <td v-if="'taskCode' in record">{{ formatDecimal(record.progressPercent) }}%</td>
+                <td v-else>{{ formatAmount(record.reportedAmount) }}</td>
                 <td>
                   <V2Badge>{{ statusLabel(record.status) }}</V2Badge>
                 </td>
@@ -809,7 +810,7 @@ onBeforeUnmount(() => {
               </div>
               <div>
                 <dt>进度</dt>
-                <dd>{{ selected.progressPercent }}%</dd>
+                <dd>{{ formatDecimal(selected.progressPercent) }}%</dd>
               </div>
               <div>
                 <dt>计划周期</dt>
@@ -843,19 +844,19 @@ onBeforeUnmount(() => {
               </div>
               <div>
                 <dt>报量金额</dt>
-                <dd>{{ selected.reportedAmount ?? '—' }}</dd>
+                <dd>{{ formatAmount(selected.reportedAmount) }}</dd>
               </div>
               <div>
                 <dt>审定金额</dt>
-                <dd>{{ selected.approvedAmount ?? '—' }}</dd>
+                <dd>{{ formatAmount(selected.approvedAmount) }}</dd>
               </div>
               <div>
                 <dt>扣款金额</dt>
-                <dd>{{ selected.deductionAmount }}</dd>
+                <dd>{{ formatAmount(selected.deductionAmount) }}</dd>
               </div>
               <div>
                 <dt>净额</dt>
-                <dd>{{ selected.netAmount ?? '—' }}</dd>
+                <dd>{{ formatAmount(selected.netAmount) }}</dd>
               </div>
               <div>
                 <dt>审批状态</dt>
@@ -897,11 +898,11 @@ onBeforeUnmount(() => {
                   >
                     <td>{{ item.itemName }}</td>
                     <td>{{ item.unit || '—' }}</td>
-                    <td>{{ item.contractQuantity ?? '—' }}</td>
-                    <td>{{ item.currentQuantity }}</td>
-                    <td>{{ item.cumulativeQuantity ?? '—' }}</td>
-                    <td>{{ item.unitPrice ?? '—' }}</td>
-                    <td>{{ item.amount ?? '—' }}</td>
+                    <td>{{ formatDecimal(item.contractQuantity) }}</td>
+                    <td>{{ formatDecimal(item.currentQuantity) }}</td>
+                    <td>{{ formatDecimal(item.cumulativeQuantity) }}</td>
+                    <td>{{ formatAmount(item.unitPrice) }}</td>
+                    <td>{{ formatAmount(item.amount) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1021,7 +1022,12 @@ onBeforeUnmount(() => {
             <V2Input v-model="form.plannedEndDate" label="计划结束日期" placeholder="YYYY-MM-DD" />
             <V2Input v-model="form.actualStartDate" label="实际开始日期" placeholder="YYYY-MM-DD" />
             <V2Input v-model="form.actualEndDate" label="实际结束日期" placeholder="YYYY-MM-DD" />
-            <V2Input v-model="form.progressPercent" label="进度百分比" required />
+            <V2Input
+              v-model="form.progressPercent"
+              label="进度百分比"
+              :decimal-scale="2"
+              required
+            />
           </template>
           <template v-else>
             <V2Select
@@ -1078,6 +1084,7 @@ onBeforeUnmount(() => {
             />
             <V2Input
               :model-value="item.currentQuantity"
+              :decimal-scale="2"
               label="本期数量"
               required
               @update:model-value="changeItemQuantity(index, $event)"

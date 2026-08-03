@@ -203,7 +203,7 @@ public class SupplierSourcingService {
         quote.setPartnerId(command.partnerId());
         quote.setQuoteCode(command.quoteCode().trim());
         quote.setTotalAmount(money(command.totalAmount()));
-        quote.setTaxRate(command.taxRate().setScale(4, RoundingMode.HALF_UP));
+        quote.setTaxRate(command.taxRate().setScale(2, RoundingMode.HALF_UP));
         quote.setDeliveryDays(command.deliveryDays());
         quote.setValidityDate(command.validityDate());
         quote.setCommercialTerms(command.commercialTerms().trim());

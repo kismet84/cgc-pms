@@ -16,6 +16,7 @@
       "scripts/codex-autopilot/codex-autopilot.config.json",
       "plugins/cgc-pms-autopilot/references/control-plane-policy.md",
       "plugins/cgc-pms-autopilot/references/desktop-execution-policy.md",
+      "plugins/cgc-pms-autopilot/references/loop-budget-policy.md",
       "plugins/cgc-pms-autopilot/references/owner-boundary.md",
       "plugins/cgc-pms-autopilot/references/role-contracts.md",
       "plugins/cgc-pms-autopilot/references/classifier-rules.md",

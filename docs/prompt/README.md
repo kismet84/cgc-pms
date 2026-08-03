@@ -1,6 +1,6 @@
 # Prompt 文档索引
 
-`docs/prompt/` 存放任务型提示词，不替代主线规范。使用顺序是先读 `AGENTS.override.md`、`AGENTS.md`、相关主线规范，再读对应 prompt。
+`docs/prompt/` 存放任务型提示词，不替代自动加载的 `AGENTS.md` 或按需专项 Skill；仅在任务命中时读取对应 prompt。
 
 | 场景 | Prompt | 使用要求 |
 |------|--------|----------|

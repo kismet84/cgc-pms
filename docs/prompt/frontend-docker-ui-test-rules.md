@@ -14,15 +14,11 @@
 - 严格 `1920x1080` 仅用于外部 Playwright/Chrome 验收，或用户明确要求严格桌面尺寸的场景；不作为 Codex 内置浏览器默认验收尺寸。
 - 若浏览器缩放、窗口大小或宿主窗口状态发生变化，先读取并记录 `window.innerWidth` / `window.innerHeight`，再按实际尺寸验收。
 
-## 前端改动后的服务刷新
+## 前端运行态刷新
 
-前端代码改动后，必须重启 Docker 前端服务：
+只有任务包含浏览器运行态验收且现有 Vite/DOM/控制台证据陈旧时，才按 [运行态刷新 Skill](../../.agents/skills/cgc-pms-runtime-refresh/SKILL.md) 检查并刷新前端服务。纯代码、类型、单测或构建任务不因此重启 Docker。
 
-```powershell
-docker compose -f deploy/docker-compose.dev.yml restart frontend
-```
-
-重启后统一等待 `180秒` 再进行 UI 验收。即使日志很快显示 Vite ready，也要给依赖安装、热更新、页面缓存和浏览器状态留出稳定时间。
+刷新后以日志中的 Vite ready、目标 URL 可达和新 DOM/控制台状态为准；不使用固定等待时长替代就绪检查。
 
 ## Ready 检查
 
@@ -69,11 +65,9 @@ pnpm exec playwright test <目标测试文件> --project=chromium
 ```text
 修改前端代码
 → 运行相关测试或 pnpm build
-→ 重启 Docker frontend
-→ 等待 `180秒`
-→ 查看日志确认 Vite ready
+→ 浏览器验收在范围内时检查运行证据
+→ 证据陈旧才按 runtime Skill 刷新并确认 Vite ready
 → Codex 内置浏览器打开目标页面
-→ 打开目标页面
 → 验证视觉、DOM 尺寸和关键交互
 ```
 
@@ -81,8 +75,8 @@ pnpm exec playwright test <目标测试文件> --project=chromium
 
 如果页面没有变化，先检查：
 
-- Docker 前端服务是否已经重启。
-- 是否等待了 `180秒`。
+- 当前任务是否确实需要浏览器运行态验收。
+- Vite 日志、目标 URL 与 DOM/控制台证据是否来自本轮运行态。
 - Codex 内置浏览器是否访问 `http://localhost:5173/`。
 - 是否命中隐藏文本、旧 DOM 或多个同名元素。
 - Playwright strict mode 是否因为多个匹配元素而点击失败。

@@ -247,7 +247,7 @@ public class FinanceOperationsService {
         Map<String,Object> result = new LinkedHashMap<>(invoice);
         result.put("allocatedAmount", allocated);
         result.put("unallocatedAmount", total.subtract(allocated));
-        result.put("writeOffRate", total.signum() == 0 ? BigDecimal.ZERO : allocated.divide(total, 4, RoundingMode.HALF_UP));
+        result.put("writeOffRate", total.signum() == 0 ? BigDecimal.ZERO.setScale(2) : allocated.divide(total, 2, RoundingMode.HALF_UP));
         result.put("allocations", jdbc.queryForList("SELECT * FROM invoice_payment_allocation WHERE tenant_id=? AND invoice_id=? ORDER BY created_at", tenant(), invoiceId));
         return result;
     }

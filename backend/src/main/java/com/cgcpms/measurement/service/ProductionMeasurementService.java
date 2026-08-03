@@ -532,8 +532,8 @@ public class ProductionMeasurementService {
     }
     private BigDecimal decimal(Object value) { return value == null ? BigDecimal.ZERO : new BigDecimal(value.toString()); }
     private BigDecimal money(Object value) { return decimal(value).setScale(2, RoundingMode.HALF_UP); }
-    private BigDecimal quantity(Object value) { return decimal(value).setScale(4, RoundingMode.HALF_UP); }
-    private BigDecimal price(Object value) { return decimal(value).setScale(4, RoundingMode.HALF_UP); }
+    private BigDecimal quantity(Object value) { return decimal(value).setScale(2, RoundingMode.HALF_UP); }
+    private BigDecimal price(Object value) { return decimal(value).setScale(2, RoundingMode.HALF_UP); }
     private java.time.LocalDate localDate(Object value) { if (value instanceof java.time.LocalDate d) return d; if (value instanceof java.sql.Date d) return d.toLocalDate(); return java.time.LocalDate.parse(value.toString()); }
     private BusinessException error(String code, String message) { return new BusinessException(code, message); }
     private List<Long> projectIdsForQuery(Long projectId, String permission) {

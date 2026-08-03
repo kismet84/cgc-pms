@@ -335,8 +335,8 @@ describe('M7 master-data pages', () => {
     expect(wrapper.text()).not.toContain('查询条件')
     expect(wrapper.text()).toContain('共 1 项')
     expect(wrapper.text()).toContain('13.00')
-    expect(wrapper.text()).toContain('43.000000')
-    expect(wrapper.text()).toContain('41.5000')
+    expect(wrapper.text()).toContain('¥43.00')
+    expect(wrapper.text()).toContain('¥41.50')
     expect(wrapper.text()).toContain('导出模板')
     expect(wrapper.text()).not.toContain('导入资料')
     expect(wrapper.text()).not.toMatch(/单位分布|启用材料|已维护税率/)
@@ -344,11 +344,16 @@ describe('M7 master-data pages', () => {
   })
 
   it('imports a standard workbook with FormData service and shows all row errors', async () => {
-    useSessionStore().replaceUserInfo(user(['material:dict:list', 'material:dict:add', 'material:dict:edit']))
+    useSessionStore().replaceUserInfo(
+      user(['material:dict:list', 'material:dict:add', 'material:dict:edit']),
+    )
     const wrapper = mount(MaterialDictionaryPage, { attachTo: document.body })
     await flushPromises()
 
-    await wrapper.findAll('button').find((item) => item.text() === '导入资料')!.trigger('click')
+    await wrapper
+      .findAll('button')
+      .find((item) => item.text() === '导入资料')!
+      .trigger('click')
     const input = document.body.querySelector('input[type="file"]') as HTMLInputElement
     const file = new File(['xlsx'], 'materials.xlsx', {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

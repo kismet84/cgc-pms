@@ -15,6 +15,7 @@ const props = withDefaults(
     loading?: boolean
     required?: boolean
     autocomplete?: string
+    decimalScale?: 2
   }>(),
   {
     modelValue: '',
@@ -29,6 +30,7 @@ const props = withDefaults(
     loading: false,
     required: false,
     autocomplete: undefined,
+    decimalScale: undefined,
   },
 )
 
@@ -49,6 +51,15 @@ const describedBy = computed(() => {
 function onInput(event: Event) {
   emit('update:modelValue', (event.target as HTMLInputElement).value)
 }
+
+function onBlur(event: FocusEvent) {
+  if (props.decimalScale !== 2) return
+  const value = (event.target as HTMLInputElement).value
+  const match = /^(-?\d+)(?:\.(\d{1,2}))?$/.exec(value)
+  if (!match) return
+  const formatted = `${match[1]}.${(match[2] ?? '').padEnd(2, '0')}`
+  if (formatted !== value) emit('update:modelValue', formatted)
+}
 </script>
 
 <template>
@@ -66,11 +77,13 @@ function onInput(event: Event) {
         :disabled="disabled"
         :required="required"
         :autocomplete="autocomplete"
+        :inputmode="decimalScale === 2 ? 'decimal' : undefined"
         :aria-label="label || placeholder"
         :aria-invalid="Boolean(error)"
         :aria-describedby="describedBy"
         :aria-busy="loading"
         @input="onInput"
+        @blur="onBlur"
       />
       <span v-if="loading" class="v2-field__loading v2-spinner" aria-hidden="true"></span>
     </span>

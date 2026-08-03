@@ -193,9 +193,9 @@ class MatReceiptServiceTest {
         assertEquals(0, BigDecimal.ZERO
                 .compareTo(orderItemMapper.selectById(orderItemId).getReceivedQuantity()));
         var detail = receiptService.getItems(receiptId).get(0);
-        assertEquals("10.0000", detail.getOrderedQuantity());
-        assertEquals("0.0000", detail.getReceivedQuantity());
-        assertEquals("10.0000", detail.getRemainingQuantity());
+        assertEquals("10.00", detail.getOrderedQuantity());
+        assertEquals("0.00", detail.getReceivedQuantity());
+        assertEquals("10.00", detail.getRemainingQuantity());
 
         receiptService.saveItemsBatch(receiptId, List.of());
         assertEquals(0, BigDecimal.ZERO

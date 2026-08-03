@@ -30,7 +30,7 @@ import {
   showToast,
   useToastMessage,
 } from '@/components'
-import { formatAmount } from '@/pages/dashboard/model'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import { listSiteFiles, uploadSiteFile } from '@/services/delivery'
 import {
   acceptArchiveTransfer,
@@ -1075,7 +1075,7 @@ onBeforeUnmount(() => {
                         deliveryLabel(item.status)
                       }}</V2Badge>
                     </td>
-                    <td>进度 {{ item.actualProgress }}</td>
+                    <td>进度 {{ formatDecimal(item.actualProgress) }}</td>
                   </tr>
                   <tr v-for="item in overview?.qualityInspections ?? []" :key="item.id">
                     <td>质量检查</td>
@@ -1334,7 +1334,12 @@ onBeforeUnmount(() => {
             placeholder="保存后由服务端生成"
             disabled
           />
-          <V2Input v-model="warrantyForm.warrantyAmount" label="质保金额" required />
+          <V2Input
+            v-model="warrantyForm.warrantyAmount"
+            label="质保金额"
+            :decimal-scale="2"
+            required
+          />
           <label
             >开始日期<input v-model="warrantyForm.warrantyStartDate" type="date" required
           /></label>

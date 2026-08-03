@@ -17,7 +17,7 @@ public class MatReceiptItemCommand {
 
     @NotNull
     @DecimalMin(value = "0.0001")
-    @Digits(integer = 16, fraction = 4)
+    @Digits(integer = 16, fraction = 2)
     private BigDecimal acceptedQuantity;
 
     @Size(max = 200)

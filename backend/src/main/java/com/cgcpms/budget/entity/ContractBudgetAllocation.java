@@ -10,6 +10,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Digits;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -32,6 +33,7 @@ public class ContractBudgetAllocation extends BaseEntity {
     private Long budgetLineId;
     @NotNull
     @Positive
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal allocatedAmount;
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)

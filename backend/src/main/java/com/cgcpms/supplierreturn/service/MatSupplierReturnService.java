@@ -368,7 +368,7 @@ public class MatSupplierReturnService {
         if (quantity == null || quantity.signum() <= 0) {
             throw new BusinessException("SUPPLIER_RETURN_QUANTITY_INVALID", "原验收合格数量无效");
         }
-        return nvl(amount).divide(quantity, 4, RoundingMode.HALF_UP);
+        return nvl(amount).divide(quantity, 2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal nvl(BigDecimal value) {

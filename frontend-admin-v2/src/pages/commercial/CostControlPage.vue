@@ -9,6 +9,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
   V2ActionMenu,
   V2Button,
@@ -417,10 +418,10 @@ onBeforeUnmount(() => {
               <tbody>
                 <tr v-for="row in pagedProjects" :key="row.projectId">
                   <th scope="row">{{ row.projectName }}</th>
-                  <td>{{ row.dynamicCost }}</td>
-                  <td>{{ row.forecastAtCompletionCost }}</td>
-                  <td>{{ row.forecastProfit }}</td>
-                  <td>{{ row.profitMargin }}</td>
+                  <td>{{ formatAmount(row.dynamicCost) }}</td>
+                  <td>{{ formatAmount(row.forecastAtCompletionCost) }}</td>
+                  <td>{{ formatAmount(row.forecastProfit) }}</td>
+                  <td>{{ formatDecimal(row.profitMargin) }}</td>
                   <td>{{ row.costForecastId ? '已有预测' : '未生成预测' }}</td>
                 </tr>
               </tbody>
@@ -439,11 +440,11 @@ onBeforeUnmount(() => {
             <dt>预测编号</dt>
             <dd>{{ text(latest, 'forecast_code') || '—' }}</dd>
             <dt>完工成本</dt>
-            <dd>{{ text(latest, 'forecast_at_completion_amount') || '—' }}</dd>
+            <dd>{{ formatAmount(text(latest, 'forecast_at_completion_amount')) }}</dd>
             <dt>预测利润</dt>
-            <dd>{{ text(latest, 'forecast_profit_amount') || '—' }}</dd>
+            <dd>{{ formatAmount(text(latest, 'forecast_profit_amount')) }}</dd>
             <dt>成本偏差</dt>
-            <dd>{{ text(latest, 'cost_variance_amount') || '—' }}</dd>
+            <dd>{{ formatAmount(text(latest, 'cost_variance_amount')) }}</dd>
             <dt>状态</dt>
             <dd>{{ statusLabel(text(latest, 'status')) }}</dd>
           </dl>
@@ -497,7 +498,7 @@ onBeforeUnmount(() => {
                 <tr v-for="(row, index) in pagedActions" :key="text(row, 'id')">
                   <th scope="row">{{ text(row, 'action_code') || '措施编号缺失' }}</th>
                   <td>{{ text(row, 'action_title') }}</td>
-                  <td>{{ text(row, 'expected_saving_amount') }}</td>
+                  <td>{{ formatAmount(text(row, 'expected_saving_amount')) }}</td>
                   <td>{{ statusLabel(text(row, 'status')) }}</td>
                   <td class="v2-table-cell--actions">
                     <V2ActionMenu
@@ -554,7 +555,7 @@ onBeforeUnmount(() => {
               </div>
               <div>
                 <dt>预测利润</dt>
-                <dd>{{ text(traceRow('forecast'), 'forecast_profit_amount') || '—' }}</dd>
+                <dd>{{ formatAmount(text(traceRow('forecast'), 'forecast_profit_amount')) }}</dd>
               </div>
               <div>
                 <dt>状态</dt>
@@ -572,7 +573,7 @@ onBeforeUnmount(() => {
               </div>
               <div>
                 <dt>目标成本</dt>
-                <dd>{{ text(traceRow('target'), 'total_target_amount') || '—' }}</dd>
+                <dd>{{ formatAmount(text(traceRow('target'), 'total_target_amount')) }}</dd>
               </div>
             </dl>
             <h3>预测明细</h3>
@@ -598,7 +599,7 @@ onBeforeUnmount(() => {
                 <tbody>
                   <tr v-for="(item, index) in traceRows('forecastItems')" :key="text(item, 'id')">
                     <td>{{ costSubjectLabel(text(item, 'cost_subject_id'), index) }}</td>
-                    <td>{{ text(item, 'estimated_remaining_amount') || '—' }}</td>
+                    <td>{{ formatAmount(text(item, 'estimated_remaining_amount')) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -642,7 +643,12 @@ onBeforeUnmount(() => {
         />
         <div v-for="(item, index) in forecast.items" :key="item.costSubjectId" class="item">
           <span>{{ costSubjectLabel(item.costSubjectId, index) }}</span
-          ><V2Input v-model="item.estimatedRemainingAmount" label="预计剩余成本" required />
+          ><V2Input
+            v-model="item.estimatedRemainingAmount"
+            label="预计剩余成本"
+            :decimal-scale="2"
+            required
+          />
         </div>
       </form>
       <template #footer>
@@ -676,6 +682,7 @@ onBeforeUnmount(() => {
         /><V2Input v-model="corrective.actionPlan" label="行动计划" required /><V2Input
           v-model="corrective.expectedSavingAmount"
           label="预计节约金额"
+          :decimal-scale="2"
           required
         /><V2Select
           v-model="corrective.responsibleUserId"
@@ -705,11 +712,12 @@ onBeforeUnmount(() => {
       :close-disabled="actionBusy"
       @close="closeOpen = false"
       ><form id="cost-corrective-close-form" class="form" @submit.prevent="closeAction">
-        <V2Input v-model="closing.actualSavingAmount" label="实际节约金额" required /><V2Input
-          v-model="closing.resultDescription"
-          label="结果说明"
+        <V2Input
+          v-model="closing.actualSavingAmount"
+          label="实际节约金额"
+          :decimal-scale="2"
           required
-        />
+        /><V2Input v-model="closing.resultDescription" label="结果说明" required />
       </form>
       <template #footer>
         <V2Button

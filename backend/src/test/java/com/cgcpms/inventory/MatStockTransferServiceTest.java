@@ -60,7 +60,7 @@ class MatStockTransferServiceTest {
 
     @Test
     void postsPairedMovementsAndPreservesProjectQuantityAndValue() {
-        var result = service.transfer(request("transfer-service-1", "补充现场用料", "30.0000"));
+        var result = service.transfer(request("transfer-service-1", "补充现场用料", "30.00"));
 
         assertEquals("COMPLETED", result.getStatus());
         assertEquals(0, new BigDecimal("2.500000").compareTo(result.getUnitCost()));
@@ -74,20 +74,20 @@ class MatStockTransferServiceTest {
 
     @Test
     void sameIdempotencyPayloadReturnsOriginalAndDifferentPayloadConflicts() {
-        var first = service.transfer(request("transfer-service-2", "幂等验证", "10.0000"));
-        var repeated = service.transfer(request("transfer-service-2", "幂等验证", "10.0000"));
+        var first = service.transfer(request("transfer-service-2", "幂等验证", "10.00"));
+        var repeated = service.transfer(request("transfer-service-2", "幂等验证", "10.00"));
         assertEquals(first.getId(), repeated.getId());
         assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM mat_stock_txn WHERE source_id=?", Integer.class, first.getId()));
 
         BusinessException conflict = assertThrows(BusinessException.class,
-                () -> service.transfer(request("transfer-service-2", "幂等验证", "11.0000")));
+                () -> service.transfer(request("transfer-service-2", "幂等验证", "11.00")));
         assertEquals("STOCK_TRANSFER_IDEMPOTENCY_CONFLICT", conflict.getCode());
     }
 
     @Test
     void rejectsQuantityThatWouldBreakSourceSafetyStock() {
         BusinessException error = assertThrows(BusinessException.class,
-                () -> service.transfer(request("transfer-service-3", "超量验证", "90.0001")));
+                () -> service.transfer(request("transfer-service-3", "超量验证", "90.01")));
         assertEquals("STOCK_TRANSFER_SAFETY_LIMIT", error.getCode());
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mat_stock_transfer WHERE idempotency_key='transfer-service-3'", Integer.class));
         assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM mat_stock_txn WHERE warehouse_id IN (?,?)", Integer.class, SOURCE_WAREHOUSE, TARGET_WAREHOUSE));
@@ -97,25 +97,25 @@ class MatStockTransferServiceTest {
     void rejectsCrossProjectMaterialDisabledWarehouseAndOtherTenantRoutes() {
         jdbc.update("UPDATE mat_warehouse SET project_id=10002 WHERE id=?", TARGET_WAREHOUSE);
         assertEquals("STOCK_TRANSFER_ROUTE_INVALID", assertThrows(BusinessException.class,
-                () -> service.transfer(request("transfer-route-project", "跨项目", "1.0000"))).getCode());
+                () -> service.transfer(request("transfer-route-project", "跨项目", "1.00"))).getCode());
 
         jdbc.update("UPDATE mat_warehouse SET project_id=?, status='ENABLE' WHERE id=?", PROJECT, TARGET_WAREHOUSE);
         jdbc.update("UPDATE mat_stock SET material_id=1002 WHERE id=?", TARGET_STOCK);
         assertEquals("STOCK_TRANSFER_ROUTE_INVALID", assertThrows(BusinessException.class,
-                () -> service.transfer(request("transfer-route-material", "跨物料", "1.0000"))).getCode());
+                () -> service.transfer(request("transfer-route-material", "跨物料", "1.00"))).getCode());
 
         jdbc.update("UPDATE mat_stock SET material_id=? WHERE id=?", MATERIAL, TARGET_STOCK);
         jdbc.update("UPDATE mat_warehouse SET status='DISABLE' WHERE id=?", TARGET_WAREHOUSE);
         assertEquals("STOCK_TRANSFER_ROUTE_INVALID", assertThrows(BusinessException.class,
-                () -> service.transfer(request("transfer-route-disabled", "停用仓库", "1.0000"))).getCode());
+                () -> service.transfer(request("transfer-route-disabled", "停用仓库", "1.00"))).getCode());
 
         jdbc.update("UPDATE mat_warehouse SET status='ENABLE' WHERE id=?", TARGET_WAREHOUSE);
-        service.transfer(request("tenant-scoped-key", "租户隔离", "1.0000"));
+        service.transfer(request("tenant-scoped-key", "租户隔离", "1.00"));
         UserContext.clear();
         UserContext.set(Jwts.claims().add("userId", 1L).add("username", "admin")
                 .add("tenantId", 1L).add("roles", List.of("ADMIN")).build());
         assertEquals("STOCK_TRANSFER_ROUTE_INVALID", assertThrows(BusinessException.class,
-                () -> service.transfer(request("tenant-scoped-key", "租户隔离", "1.0000"))).getCode());
+                () -> service.transfer(request("tenant-scoped-key", "租户隔离", "1.00"))).getCode());
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM mat_stock_transfer WHERE idempotency_key='tenant-scoped-key' AND tenant_id=0", Integer.class));
     }
 

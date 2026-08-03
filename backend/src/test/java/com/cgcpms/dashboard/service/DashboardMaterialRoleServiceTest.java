@@ -552,7 +552,7 @@ class DashboardMaterialRoleServiceTest extends DashboardServiceTestSupport {
         assertEquals(1L, score.getOrderCount());
         assertEquals(1L, score.getOverdueOrderCount());
         assertEquals("0.00", score.getOnTimeDeliveryRate());
-        assertEquals("0", score.getPerformanceScore());
+        assertEquals("0.00", score.getPerformanceScore());
     }
 
     @Test

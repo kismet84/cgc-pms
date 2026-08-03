@@ -94,7 +94,7 @@ class MdMaterialImportServiceTest {
         assertEquals("既有材料-" + nonce, existing.getMaterialName());
         assertEquals("原规格", existing.getSpecification());
         assertEquals("原单位", existing.getUnit());
-        assertEquals(0, new BigDecimal("88.123456").compareTo(existing.getTaxInclusiveInfoPrice()));
+        assertEquals(0, new BigDecimal("88.12").compareTo(existing.getTaxInclusiveInfoPrice()));
 
         var second = service.importFile(file(content));
         assertEquals(0, second.created());
@@ -128,9 +128,9 @@ class MdMaterialImportServiceTest {
             row(sheet, 2, "", "冲突材料-" + nonce, "一级-" + nonce, "二级-" + nonce,
                     "S1", "吨", "", "45", "2026-07", source, "建议抽检", "13", "ENABLE", "R2", "");
             row(sheet, 3, "", "非法价格-" + nonce, "", "", "", "", "",
-                    "-1", "2026-07", source, "", "", "", "BAD", "");
+                    "88.123", "2026-07", source, "", "", "", "BAD", "");
             row(sheet, 4, existingCode, "不得覆盖名称", "不应创建分类", "不应创建二级",
-                    "不得覆盖规格", "不得覆盖单位", "不得覆盖品牌", "88.123456", "2026-07",
+                    "不得覆盖规格", "不得覆盖单位", "不得覆盖品牌", "88.12", "2026-07",
                     source, "已人工校正", "99", "DISABLE", "EXISTING", "不得覆盖备注");
             workbook.write(output);
             return output.toByteArray();

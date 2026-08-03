@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Digits;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -51,17 +52,21 @@ public class CtContract extends BaseEntity {
 
     @NotNull
     @PositiveOrZero
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal contractAmount;
 
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal currentAmount;
 
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     // paidAmount 表示已付累计金额，允许为负以处理退款/冲销业务场景
     private BigDecimal paidAmount;
 
     /** 已审批合格验收减有效合格品退货的净应付缓存。 */
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal payableAmount;
 
@@ -70,9 +75,11 @@ public class CtContract extends BaseEntity {
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal taxRate;
 
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal taxAmount;
 
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal amountWithoutTax;
 
@@ -94,6 +101,7 @@ public class CtContract extends BaseEntity {
     private String approvalStatus;
 
     @PositiveOrZero
+    @Digits(integer = 16, fraction = 2)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal settlementAmount;
 

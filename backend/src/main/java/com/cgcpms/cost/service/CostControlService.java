@@ -78,7 +78,7 @@ public class CostControlService {
         result.put("forecastProfit", forecastProfit.toPlainString());
         result.put("profitMargin", contractIncome.compareTo(BigDecimal.ZERO) == 0
                 ? "0.000000"
-                : forecastProfit.divide(contractIncome, 6, RoundingMode.HALF_UP).toPlainString());
+                : forecastProfit.divide(contractIncome, 2, RoundingMode.HALF_UP).toPlainString());
         result.put("projects", projects);
         return result;
     }
@@ -363,7 +363,7 @@ public class CostControlService {
         BigDecimal income = contractIncome(request.projectId());
         BigDecimal profit = income.subtract(completion);
         BigDecimal variance = completion.subtract(totalResponsibility);
-        BigDecimal margin = income.compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ZERO.setScale(6) : profit.divide(income, 6, RoundingMode.HALF_UP);
+        BigDecimal margin = income.compareTo(BigDecimal.ZERO) == 0 ? BigDecimal.ZERO.setScale(2) : profit.divide(income, 2, RoundingMode.HALF_UP);
         try {
             if (insert) {
                 jdbc.update("""

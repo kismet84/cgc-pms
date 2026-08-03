@@ -244,7 +244,7 @@ public class CostSubjectService {
             }
         }
         if (!requested.keySet().equals(TargetCostSubjectCatalog.CODES)
-                || requested.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add).compareTo(new BigDecimal("100.0000")) != 0) {
+                || requested.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add).compareTo(new BigDecimal("100.00")) != 0) {
             throw new BusinessException("TARGET_COST_RATIO_SUM_INVALID", "10类目标成本比例合计必须为100% ");
         }
 
@@ -269,9 +269,9 @@ public class CostSubjectService {
             throw new BusinessException("TARGET_COST_RATIO_INVALID", "目标成本比例必须在0%至100%之间");
         }
         try {
-            return ratio.setScale(4, RoundingMode.UNNECESSARY);
+            return ratio.setScale(2, RoundingMode.UNNECESSARY);
         } catch (ArithmeticException e) {
-            throw new BusinessException("TARGET_COST_RATIO_INVALID", "目标成本比例最多保留4位小数");
+            throw new BusinessException("TARGET_COST_RATIO_INVALID", "目标成本比例最多保留2位小数");
         }
     }
 

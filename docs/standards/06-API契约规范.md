@@ -44,20 +44,20 @@
 
 请求：
 ```
-GET /api/cost-targets?pageNo=1&pageSize=20&projectId=10001
+GET /api/cost-targets?pageNo=1&pageSize=10&projectId=10001
 ```
 
 响应：
 ```json
 {
   "pageNo": 1,
-  "pageSize": 20,
+  "pageSize": 10,
   "total": 100,
   "records": []
 }
 ```
 
-页码从 1 开始。查询字段使用业务名称，不用数据库字段名。
+页码从 1 开始。`pageSize` 是调用方参数；新版前端业务列表默认 10 条，选择器等有界批量读取可显式使用更大值。查询字段使用业务名称，不用数据库字段名。
 
 ## ID 契约
 

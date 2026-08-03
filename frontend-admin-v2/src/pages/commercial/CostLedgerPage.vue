@@ -2,6 +2,7 @@
 import type { CostLedgerQuery, CostLedgerRecord } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { formatAmount } from '@/pages/dashboard/model'
 import { V2Button, V2Card, V2Dialog, V2Input, V2PageState, showToast } from '@/components'
 import { loadCostLedger, loadCostLedgerPage } from '@/services/commercial'
 import { isApiClientError } from '@/services/request'
@@ -220,8 +221,8 @@ onBeforeUnmount(() => {
                 <td>{{ row.costSubjectName || costTypeLabel(row.costType) }}</td>
                 <td>{{ row.projectName || '—' }}</td>
                 <td>{{ row.costDate || '—' }}</td>
-                <td>{{ row.amount }}</td>
-                <td>{{ row.taxAmount }}</td>
+                <td>{{ formatAmount(row.amount) }}</td>
+                <td>{{ formatAmount(row.taxAmount) }}</td>
                 <td>{{ sourceTypeLabel(row.sourceType) }}</td>
               </tr>
             </tbody>
@@ -278,11 +279,11 @@ onBeforeUnmount(() => {
           </div>
           <div>
             <dt>含税金额</dt>
-            <dd>{{ detail.amount }}</dd>
+            <dd>{{ formatAmount(detail.amount) }}</dd>
           </div>
           <div>
             <dt>未税金额</dt>
-            <dd>{{ detail.amountWithoutTax }}</dd>
+            <dd>{{ formatAmount(detail.amountWithoutTax) }}</dd>
           </div>
           <div>
             <dt>状态</dt>

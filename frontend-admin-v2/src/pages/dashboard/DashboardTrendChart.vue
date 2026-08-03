@@ -77,7 +77,7 @@ function draw(): void {
     context.moveTo(area.left, lineY)
     context.lineTo(area.right, lineY)
     context.stroke()
-    context.fillText(value.toFixed(0), area.left - 8, lineY)
+    context.fillText(value.toFixed(2), area.left - 8, lineY)
   }
 
   const labelStep = Math.max(1, Math.ceil(props.points.length / 6))

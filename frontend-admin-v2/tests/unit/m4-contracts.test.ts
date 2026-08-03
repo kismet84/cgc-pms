@@ -187,6 +187,55 @@ beforeEach(() => {
 })
 
 describe('M4 contracts page', () => {
+  it('searches material dictionary and adds the selected material to a purchase contract', async () => {
+    const material = {
+      id: 'M1',
+      materialCode: 'GC-STEEL-001',
+      materialName: 'HRB400E螺纹钢',
+      specification: 'Φ20',
+      unit: '吨',
+      status: 'ENABLE',
+    }
+    const { wrapper } = await mountPage('/contract/create', ['contract:add'])
+    await wrapper.get('select[aria-label="合同类型"]').setValue('PURCHASE')
+    vi.mocked(loadMaterials).mockResolvedValueOnce({
+      records: [material],
+      total: 1,
+      pageNo: 1,
+      pageSize: 50,
+    })
+
+    vi.useFakeTimers()
+    try {
+      await wrapper.get('input[aria-label="搜索材料名称"]').setValue('螺纹钢')
+      await vi.advanceTimersByTimeAsync(250)
+      await flushPromises()
+
+      expect(loadMaterials).toHaveBeenLastCalledWith(
+        { pageNo: 1, pageSize: 50, status: 'ENABLE', materialName: '螺纹钢' },
+        expect.any(AbortSignal),
+      )
+      expect(wrapper.get('select[aria-label="选择材料"]').text()).toContain(
+        'HRB400E螺纹钢 · Φ20 · 吨',
+      )
+      await wrapper.get('select[aria-label="选择材料"]').setValue('M1')
+      await flushPromises()
+
+      const item = wrapper.get('.contract-page__editor-list article')
+      expect((item.get('input[aria-label="名称"]').element as HTMLInputElement).value).toBe(
+        'HRB400E螺纹钢',
+      )
+      expect((item.get('input[aria-label="编号"]').element as HTMLInputElement).value).toBe(
+        'GC-STEEL-001',
+      )
+      expect((item.get('input[aria-label="规格"]').element as HTMLInputElement).value).toBe('Φ20')
+      expect((item.get('input[aria-label="单位"]').element as HTMLInputElement).value).toBe('吨')
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
+  })
+
   it('derives header tax preview and exposes only quantity and unit price for item finance inputs', async () => {
     const { wrapper } = await mountPage('/contract/create', ['contract:add'])
     const amountInput = wrapper.get('input[aria-label="合同金额"]')

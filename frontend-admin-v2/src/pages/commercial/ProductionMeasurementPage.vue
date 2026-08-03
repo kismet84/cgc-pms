@@ -9,6 +9,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
   V2ActionMenu,
   V2Badge,
@@ -665,8 +666,8 @@ onBeforeUnmount(() => {
                   <td>{{ projectLabel(row) }}</td>
                   <td>{{ text(row, 'period_name', 'period_code') || '—' }}</td>
                   <td>{{ dateText(row, 'measure_date') }}</td>
-                  <td>{{ text(row, 'current_reported_amount') || '—' }}</td>
-                  <td>{{ text(row, 'cumulative_reported_amount') || '—' }}</td>
+                  <td>{{ formatAmount(text(row, 'current_reported_amount')) }}</td>
+                  <td>{{ formatAmount(text(row, 'cumulative_reported_amount')) }}</td>
                   <td>
                     <V2Badge :tone="statusTone(approvalStatus(row))">{{
                       statusLabel(approvalStatus(row))
@@ -789,8 +790,8 @@ onBeforeUnmount(() => {
                               </td>
                               <td>V{{ text(submission, 'revision_no') || '1' }}</td>
                               <td>{{ dateText(submission, 'submitted_at') }}</td>
-                              <td>{{ text(submission, 'submitted_amount') || '—' }}</td>
-                              <td>{{ text(submission, 'confirmed_amount') || '—' }}</td>
+                              <td>{{ formatAmount(text(submission, 'submitted_amount')) }}</td>
+                              <td>{{ formatAmount(text(submission, 'confirmed_amount')) }}</td>
                               <td>
                                 <V2Badge :tone="statusTone(text(submission, 'status'))">{{
                                   statusLabel(text(submission, 'status'))
@@ -921,8 +922,8 @@ onBeforeUnmount(() => {
             ><input v-model="row.selected" type="checkbox" />{{
               text(row.source, 'itemName', 'item_name', 'sourceId')
             }}</label
-          ><span>剩余 {{ text(row.source, 'remainingQuantity') }}</span
-          ><V2Input v-model="row.currentQuantity" label="本次计量量" /><label
+          ><span>剩余 {{ formatDecimal(text(row.source, 'remainingQuantity')) }}</span
+          ><V2Input v-model="row.currentQuantity" label="本次计量量" :decimal-scale="2" /><label
             >现场完成依据<input
               :aria-label="`${text(row.source, 'itemName', 'item_name', 'sourceId')}现场完成依据`"
               type="file"
@@ -1009,13 +1010,21 @@ onBeforeUnmount(() => {
           ><V2Input v-model="reviewForm.settlementDate" type="date" label="结算日期" /><V2Input
             v-model="reviewForm.dueDate"
             type="date"
-            label="应收到期日" /><V2Input v-model="reviewForm.taxAmount" label="税额" /><V2Input
+            label="应收到期日" /><V2Input
+            v-model="reviewForm.taxAmount"
+            label="税额"
+            :decimal-scale="2" /><V2Input
             v-model="reviewForm.retentionAmount"
-            label="保留金" /><label
+            label="保留金"
+            :decimal-scale="2" /><label
             >业主核定依据<input aria-label="业主核定依据" type="file" @change="selectFile"
           /></label>
           <div v-for="(line, index) in reviewLines" :key="line.measurementLineId">
-            <V2Input v-model="line.confirmedQuantity" :label="`第 ${index + 1} 项核定数量`" /></div
+            <V2Input
+              v-model="line.confirmedQuantity"
+              :label="`第 ${index + 1} 项核定数量`"
+              :decimal-scale="2"
+            /></div
         ></template>
       </form>
       <template v-if="!detailLoading" #footer>
@@ -1047,7 +1056,7 @@ onBeforeUnmount(() => {
           </div>
           <div>
             <dt>结算金额</dt>
-            <dd>{{ text(trace, 'settlement_amount', 'confirmed_amount') || '—' }}</dd>
+            <dd>{{ formatAmount(text(trace, 'settlement_amount', 'confirmed_amount')) }}</dd>
           </div>
           <div>
             <dt>状态</dt>

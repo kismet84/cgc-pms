@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
   V2Badge,
   V2Button,
@@ -227,8 +228,7 @@ const subjectTypeLabels: Record<string, string> = {
 const subjectTypeLabel = (value?: string) => subjectTypeLabels[value ?? ''] ?? '其他成本'
 const isGovernedSubject = (subject?: CostSubjectRecord | null) =>
   Boolean(
-    subject &&
-      (subject.subjectCode === '5401.03' || subject.subjectCode.startsWith('5401.03.')),
+    subject && (subject.subjectCode === '5401.03' || subject.subjectCode.startsWith('5401.03.')),
   )
 const enabledOptions = [
   { value: 'true', label: '启用' },
@@ -886,7 +886,11 @@ onBeforeUnmount(() => controller?.abort())
                 <small>5401.xx.xx · 共 {{ secondLevelSubjects.length }} 个</small>
               </span>
               <V2Button
-                v-if="canSubjectAdd && selectedFirstLevel && selectedFirstLevel.subjectCode !== '5401.03'"
+                v-if="
+                  canSubjectAdd &&
+                  selectedFirstLevel &&
+                  selectedFirstLevel.subjectCode !== '5401.03'
+                "
                 size="small"
                 @click="openSubjectCreate(selectedFirstLevel)"
               >
@@ -918,9 +922,10 @@ onBeforeUnmount(() => controller?.abort())
                 <span>
                   <strong>{{ subject.subjectName }}</strong>
                   <small>
-                    {{ subject.subjectCode }} · {{ subjectTypeLabel(subject.subjectType) }}<template
-                      v-if="subject.defaultTargetRatio != null"
-                    > · {{ subject.defaultTargetRatio }}%</template>
+                    {{ subject.subjectCode }} · {{ subjectTypeLabel(subject.subjectType)
+                    }}<template v-if="subject.defaultTargetRatio != null">
+                      · {{ formatDecimal(subject.defaultTargetRatio) }}%</template
+                    >
                   </small>
                 </span>
                 <V2Badge :tone="subject.status === 'ENABLE' ? 'success' : 'neutral'">
@@ -942,7 +947,10 @@ onBeforeUnmount(() => controller?.abort())
                 >
                   新增子科目
                 </V2Button>
-                <V2Button v-if="canSubjectEdit && !isGovernedSubject(selectedSubject)" size="small" @click="openSubjectEdit"
+                <V2Button
+                  v-if="canSubjectEdit && !isGovernedSubject(selectedSubject)"
+                  size="small"
+                  @click="openSubjectEdit"
                   >编辑</V2Button
                 >
                 <V2Button
@@ -991,7 +999,7 @@ onBeforeUnmount(() => controller?.abort())
                 </div>
                 <div v-if="selectedSubject.defaultTargetRatio != null">
                   <dt>默认目标成本比例</dt>
-                  <dd>{{ selectedSubject.defaultTargetRatio }}%</dd>
+                  <dd>{{ formatDecimal(selectedSubject.defaultTargetRatio) }}%</dd>
                 </div>
               </dl>
             </template>
@@ -1012,11 +1020,18 @@ onBeforeUnmount(() => controller?.abort())
             size="small"
             :disabled="saving || !ratioTotalIsValid"
             @click="saveTargetRatios"
-          >保存10类比例</V2Button>
+            >保存10类比例</V2Button
+          >
         </template>
         <div class="cost-subject-page__table-wrap">
           <table aria-label="项目目标成本默认比例">
-            <thead><tr><th>编码</th><th>科目</th><th>默认比例（%）</th></tr></thead>
+            <thead>
+              <tr>
+                <th>编码</th>
+                <th>科目</th>
+                <th>默认比例（%）</th>
+              </tr>
+            </thead>
             <tbody>
               <tr v-for="subject in targetCostSubjects" :key="subject.id">
                 <td>{{ subject.subjectCode }}</td>
@@ -1025,6 +1040,7 @@ onBeforeUnmount(() => controller?.abort())
                   <V2Input
                     v-model="ratioDraft[subject.subjectCode]"
                     label="默认比例"
+                    :decimal-scale="2"
                     hide-label
                     :disabled="!canSubjectEdit || saving"
                   />
@@ -1272,7 +1288,7 @@ onBeforeUnmount(() => controller?.abort())
                 <th scope="row">{{ rowText(record, 'transferCode') }}</th>
                 <td>{{ rowText(record, 'bidProjectName') }}</td>
                 <td>{{ rowText(record, 'versionNo') }}</td>
-                <td>{{ rowText(record, 'totalAmount') }}</td>
+                <td>{{ formatAmount(rowText(record, 'totalAmount')) }}</td>
                 <td>{{ rowText(record, 'status') }}</td>
                 <td>{{ rowText(record, 'approvalInstanceId') }}</td>
                 <td>
@@ -1328,7 +1344,7 @@ onBeforeUnmount(() => controller?.abort())
                 <td>{{ rowText(record, 'sourceType') }}</td>
                 <td>{{ rowText(record, 'allocationBasis') }}</td>
                 <td>{{ rowText(record, 'accountingPeriod') }}</td>
-                <td>{{ rowText(record, 'sourceAmount') }}</td>
+                <td>{{ formatAmount(rowText(record, 'sourceAmount')) }}</td>
                 <td>{{ rowText(record, 'subjectName') }}</td>
                 <td>{{ rowText(record, 'status') }}</td>
                 <td>

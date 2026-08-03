@@ -6,6 +6,7 @@ import type {
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import { V2Button, V2Card, V2PageState, V2Pagination, showToast } from '@/components'
 import {
   loadAccessibleCostSummary,
@@ -152,11 +153,11 @@ onBeforeUnmount(() => controller?.abort())
             <tbody>
               <tr v-for="row in pagedProjects" :key="row.projectId">
                 <th scope="row">{{ row.projectName }}</th>
-                <td>{{ row.targetCost }}</td>
-                <td>{{ row.actualCost }}</td>
-                <td>{{ row.dynamicCost }}</td>
-                <td>{{ row.forecastProfit }}</td>
-                <td>{{ row.profitMargin }}</td>
+                <td>{{ formatAmount(row.targetCost) }}</td>
+                <td>{{ formatAmount(row.actualCost) }}</td>
+                <td>{{ formatAmount(row.dynamicCost) }}</td>
+                <td>{{ formatAmount(row.forecastProfit) }}</td>
+                <td>{{ formatDecimal(row.profitMargin) }}</td>
               </tr>
             </tbody>
           </table>
@@ -177,15 +178,15 @@ onBeforeUnmount(() => controller?.abort())
         ><V2Card :title="latest.projectName || '项目汇总'"
           ><dl>
             <dt>目标成本</dt>
-            <dd>{{ latest.targetCost }}</dd>
+            <dd>{{ formatAmount(latest.targetCost) }}</dd>
             <dt>实际成本</dt>
-            <dd>{{ latest.actualCost }}</dd>
+            <dd>{{ formatAmount(latest.actualCost) }}</dd>
             <dt>动态成本</dt>
-            <dd>{{ latest.dynamicCost }}</dd>
+            <dd>{{ formatAmount(latest.dynamicCost) }}</dd>
             <dt>预测利润</dt>
-            <dd>{{ latest.forecastProfit }}</dd>
+            <dd>{{ formatAmount(latest.forecastProfit) }}</dd>
             <dt>利润率</dt>
-            <dd>{{ latest.profitMargin }}</dd>
+            <dd>{{ formatDecimal(latest.profitMargin) }}</dd>
           </dl></V2Card
         ><V2Card title="汇总历史"
           ><V2PageState
@@ -214,9 +215,9 @@ onBeforeUnmount(() => controller?.abort())
                 <tr v-for="row in pagedHistory" :key="row.id">
                   <td>{{ row.summaryDate }}</td>
                   <td>{{ row.costSubjectName }}</td>
-                  <td>{{ row.targetCost }}</td>
-                  <td>{{ row.actualCost }}</td>
-                  <td>{{ row.forecastProfit }}</td>
+                  <td>{{ formatAmount(row.targetCost) }}</td>
+                  <td>{{ formatAmount(row.actualCost) }}</td>
+                  <td>{{ formatAmount(row.forecastProfit) }}</td>
                 </tr>
               </tbody>
             </table>

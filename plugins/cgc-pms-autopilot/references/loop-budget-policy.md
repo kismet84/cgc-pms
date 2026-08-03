@@ -1,24 +1,19 @@
 # Loop Budget Policy
 
-本插件只定义默认预算，不接管项目真实事实源。
+本文件只定义预算作用域，不复制动态数值。
 
-## 默认预算
+## 唯一事实入口
 
-- `max_retries_per_command=1`
-- `max_reverify_commands=3`
-- `max_wall_time_minutes=45`
-- `max_repair_rounds=2`
-- `stop_on_repeated_blocker=true`
+- run 总时长读取 `scripts/codex-autopilot/codex-autopilot.config.json` 的 `maxRunMinutes`。
+- Issue 补修次数与超时读取配置的 `repair` 段。
+- command 重试读取分类结果 `retryPolicy`、`rerun-policy.md` 与对应 Schema。
+- validation/review 的命令集合与超时读取各自配置、Schema 和 Ready 契约。
 
-## 执行规则
+command、Issue 与 run 是不同作用域，不得用一个默认分钟数或重试数覆盖其他作用域。
 
-1. 单轮优先最小闭环；未证明完全无关联时按串行处理。
-2. 高风险权限、安全、数据一致性问题可以升档，但不能突破重试和补修轮次上限。
-3. 同一命令首次疑似瞬时失败只允许复跑一次；重复失败直接进入 repair 或 blocked。
-4. 同一问题累计两轮 repair 仍未收敛，默认停止继续自修，写 blocked 或请求人工裁决。
-5. `max_reverify_commands` 用于控制 D 的裁决成本；只复跑本轮结论必需项。
+## 稳定规则
 
-## 使用提示
-
-- 在 loop state 中记录预算是否已触边，不需要新增数据库。
-- 若用户明确提高验收标准，先更新预算判断，再调整执行方案或证据强度。
+1. 首次失败先分类；只有策略允许时做一次有界复验，同一失败重复出现转 repair 或 blocked。
+2. 高风险权限、安全和数据一致性问题可提高证据强度，不能突破配置与授权边界。
+3. 预算触边写入 checkpoint；恢复时读取当前配置和既有证据，不新建第二套计数账本。
+4. 用户提高验收标准只改变证据范围，不静默扩大 Git、生产、数据库或外部写入授权。

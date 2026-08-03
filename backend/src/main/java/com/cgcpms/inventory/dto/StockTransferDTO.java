@@ -21,7 +21,7 @@ public class StockTransferDTO {
 
     @NotNull(message = "调拨数量不能为空")
     @DecimalMin(value = "0", inclusive = false, message = "调拨数量必须大于0")
-    @Digits(integer = 14, fraction = 4, message = "调拨数量最多14位整数和4位小数")
+    @Digits(integer = 14, fraction = 2, message = "调拨数量最多14位整数和2位小数")
     private BigDecimal quantity;
 
     @NotBlank(message = "幂等键不能为空")

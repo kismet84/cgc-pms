@@ -183,7 +183,7 @@ beforeEach(() => {
 })
 
 describe('M7 workflow process page', () => {
-  it('renders server template and stable amount strings', async () => {
+  it('renders server template and two-decimal amount strings', async () => {
     const wrapper = mount(WorkflowProcessPage, { attachTo: document.body })
     await flushPromises()
     expect(wrapper.text()).toContain('合同审批')
@@ -203,7 +203,7 @@ describe('M7 workflow process page', () => {
     expect(wrapper.text()).toContain('基本设置')
     expect(wrapper.text()).toContain('审批节点')
     expect(document.body.textContent).toContain('项目经理审批')
-    expect(document.body.textContent).toContain('100.2300 ～ 900.4500')
+    expect(document.body.textContent).toContain('¥100.23 ～ ¥900.45')
     expect(document.body.querySelector('[role="dialog"]')).toBeNull()
   })
 

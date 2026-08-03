@@ -434,7 +434,7 @@ test.describe('M6 settlement V2', () => {
     const items = page.getByRole('dialog', { name: '维护结算明细' })
     await items.getByRole('checkbox').check()
     await items.getByRole('button', { name: '保存明细' }).click()
-    await expect(page.getByText('1250.0000', { exact: true })).toBeVisible()
+    await expect(page.getByText('1250.00', { exact: true })).toBeVisible()
 
     await page.locator('input[type=file]').setInputFiles({
       name: '终期结算审核表.pdf',

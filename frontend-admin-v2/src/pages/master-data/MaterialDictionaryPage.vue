@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
   V2Badge,
   V2ActionMenu,
@@ -388,9 +389,9 @@ onBeforeUnmount(() => loadController?.abort())
               <td>{{ categoryName(record.categoryId) }}</td>
               <td>{{ record.specification || '—' }}</td>
               <td>{{ record.unit || '—' }}</td>
-              <td>{{ record.taxInclusiveInfoPrice ?? '—' }}</td>
-              <td>{{ record.purchasePrice ?? '—' }}</td>
-              <td>{{ record.defaultTaxRate ?? '—' }}</td>
+              <td>{{ formatAmount(record.taxInclusiveInfoPrice) }}</td>
+              <td>{{ formatAmount(record.purchasePrice) }}</td>
+              <td>{{ formatDecimal(record.defaultTaxRate) }}</td>
               <td>
                 <V2Badge :tone="record.status === 'ENABLE' ? 'success' : 'neutral'">
                   {{ record.status === 'ENABLE' ? '启用' : '停用' }}
@@ -457,17 +458,17 @@ onBeforeUnmount(() => loadController?.abort())
         <V2Input v-model="form.specification" label="规格型号" />
         <V2Input v-model="form.unit" label="计量单位" />
         <V2Input v-model="form.brand" label="品牌" />
-        <V2Input v-model="form.defaultTaxRate" label="默认税率（%）" />
+        <V2Input v-model="form.defaultTaxRate" label="默认税率（%）" :decimal-scale="2" />
         <V2Select v-model="form.status" :options="statusOptions" label="状态" required />
         <V2Input v-model="form.remark" label="备注" />
         <section v-if="editingDetail" class="material-page__price-facts" aria-label="价格来源">
           <h3>价格来源</h3>
-          <p>含税信息价：{{ editingDetail.taxInclusiveInfoPrice ?? '—' }}</p>
+          <p>含税信息价：{{ formatAmount(editingDetail.taxInclusiveInfoPrice) }}</p>
           <p>月份：{{ editingDetail.infoPricePeriod ?? '—' }}</p>
           <p>来源：{{ editingDetail.infoPriceSource ?? '—' }}</p>
           <p>校核：{{ editingDetail.infoPriceVerificationStatus ?? '—' }}</p>
           <p>待复核：{{ editingDetail.infoPriceReviewRequired === 1 ? '是' : '否' }}</p>
-          <p>采购价：{{ editingDetail.purchasePrice ?? '—' }}</p>
+          <p>采购价：{{ formatAmount(editingDetail.purchasePrice) }}</p>
           <p>
             采购价来源：{{ editingDetail.purchasePriceDate ?? '—' }} / 验收明细
             {{ editingDetail.purchasePriceReceiptItemId ?? '—' }}
@@ -502,10 +503,18 @@ onBeforeUnmount(() => loadController?.abort())
           </p>
           <div v-if="importResult.errors.length" class="material-page__table-wrap">
             <table class="v2-table--top">
-              <thead><tr><th>行号</th><th>错误码</th><th>说明</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>行号</th>
+                  <th>错误码</th>
+                  <th>说明</th>
+                </tr>
+              </thead>
               <tbody>
                 <tr v-for="item in importResult.errors" :key="`${item.row}-${item.code}`">
-                  <td>{{ item.row }}</td><td>{{ item.code }}</td><td>{{ item.message }}</td>
+                  <td>{{ item.row }}</td>
+                  <td>{{ item.code }}</td>
+                  <td>{{ item.message }}</td>
                 </tr>
               </tbody>
             </table>
@@ -514,7 +523,9 @@ onBeforeUnmount(() => loadController?.abort())
       </div>
       <template #footer>
         <V2Button variant="secondary" :disabled="importing" @click="closeImport">关闭</V2Button>
-        <V2Button :loading="importing" :disabled="!importFile" @click="runImport">开始导入</V2Button>
+        <V2Button :loading="importing" :disabled="!importFile" @click="runImport"
+          >开始导入</V2Button
+        >
       </template>
     </V2Dialog>
 

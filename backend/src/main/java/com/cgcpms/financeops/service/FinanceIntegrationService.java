@@ -150,7 +150,7 @@ public class FinanceIntegrationService {
             throw error("BANK_RECEIPT_DATE_CHANGED_RETRY","银行回单日期已变化，请重试");
         String direction=String.valueOf(receipt.get("direction"));
         BigDecimal receiptAmount=decimal(receipt.get("amount"));
-        BigDecimal confidence=new BigDecimal("1.0000");
+        BigDecimal confidence=new BigDecimal("1.00");
         LocalDateTime txnTime=dateTime(receipt.get("transaction_time"));
         if("IN".equals(direction) && receipt.get("project_id")!=null){
             List<AmountAllocation> allocations=loadReceiptAllocations(receipt);
@@ -169,14 +169,14 @@ public class FinanceIntegrationService {
             Map<String,Object> pay=one("SELECT id,pay_amount FROM pay_record WHERE tenant_id=? AND external_txn_no=? AND pay_status='SUCCESS' AND pay_amount=? AND deleted_flag=0",tenant(),receipt.get("bank_txn_no"),receiptAmount);
             if(pay==null){
                 List<Map<String,Object>> candidates=jdbc.queryForList("SELECT id,pay_amount FROM pay_record WHERE tenant_id=? AND pay_status='SUCCESS' AND pay_amount=? AND paid_at BETWEEN ? AND ? AND deleted_flag=0",tenant(),receiptAmount,txnTime.minusDays(1),txnTime.plusDays(1));
-                if(candidates.size()==1){pay=candidates.getFirst();confidence=new BigDecimal("0.8000");}
+                if(candidates.size()==1){pay=candidates.getFirst();confidence=new BigDecimal("0.80");}
             }
             if(pay!=null){Map<String,Object>journal=one("SELECT id FROM cash_journal_entry WHERE tenant_id=? AND pay_record_id=? AND deleted_flag=0",tenant(),pay.get("id"));jdbc.update("UPDATE bank_receipt SET match_status='MATCHED',pay_record_id=?,collection_record_id=NULL,cash_journal_id=?,confidence=?,matched_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",pay.get("id"),journal==null?null:journal.get("id"),confidence,receiptId,tenant());}
         }else if("IN".equals(direction)){
             Map<String,Object> collection=one("SELECT id,amount FROM collection_record WHERE tenant_id=? AND external_txn_no=? AND status='SUCCESS' AND amount=? AND deleted_flag=0",tenant(),receipt.get("bank_txn_no"),receiptAmount);
             if(collection==null){
                 List<Map<String,Object>> candidates=jdbc.queryForList("SELECT id,amount FROM collection_record WHERE tenant_id=? AND status='SUCCESS' AND amount=? AND collected_at BETWEEN ? AND ? AND deleted_flag=0",tenant(),receiptAmount,txnTime.minusDays(1),txnTime.plusDays(1));
-                if(candidates.size()==1){collection=candidates.getFirst();confidence=new BigDecimal("0.8000");}
+                if(candidates.size()==1){collection=candidates.getFirst();confidence=new BigDecimal("0.80");}
             }
             if(collection!=null){Map<String,Object>journal=one("SELECT id FROM cash_journal_entry WHERE tenant_id=? AND collection_record_id=? AND deleted_flag=0",tenant(),collection.get("id"));jdbc.update("UPDATE bank_receipt SET match_status='MATCHED',collection_record_id=?,pay_record_id=NULL,cash_journal_id=?,confidence=?,matched_at=CURRENT_TIMESTAMP WHERE id=? AND tenant_id=?",collection.get("id"),journal==null?null:journal.get("id"),confidence,receiptId,tenant());}
         }

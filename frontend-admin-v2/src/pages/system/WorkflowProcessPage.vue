@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { formatAmount } from '@/pages/dashboard/model'
 import {
   V2Badge,
   V2Button,
@@ -483,7 +484,9 @@ function modeLabel(mode: string): string {
 }
 
 function amountRange(template: WorkflowTemplateRecord): string {
-  return `${template.amountMin ?? '不限'} ～ ${template.amountMax ?? '不限'}`
+  const minimum = template.amountMin == null ? '不限' : formatAmount(template.amountMin)
+  const maximum = template.amountMax == null ? '不限' : formatAmount(template.amountMax)
+  return `${minimum} ～ ${maximum}`
 }
 
 onMounted(() => void refresh())
@@ -722,8 +725,18 @@ onBeforeUnmount(() => controller?.abort())
       <div class="workflow-process-page__form-grid">
         <V2Input v-model="templateForm.templateName" label="流程名称" required />
         <V2Select v-model="templateForm.enabled" label="状态" :options="statusOptions.slice(1)" />
-        <V2Input v-model="templateForm.amountMin" label="金额下限" placeholder="不限" />
-        <V2Input v-model="templateForm.amountMax" label="金额上限" placeholder="不限" />
+        <V2Input
+          v-model="templateForm.amountMin"
+          label="金额下限"
+          placeholder="不限"
+          :decimal-scale="2"
+        />
+        <V2Input
+          v-model="templateForm.amountMax"
+          label="金额上限"
+          placeholder="不限"
+          :decimal-scale="2"
+        />
         <V2Input v-model="templateForm.remark" label="备注" />
       </div>
       <template #footer>
