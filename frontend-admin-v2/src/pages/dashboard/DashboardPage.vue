@@ -229,7 +229,9 @@ const financeSummary = computed(() => {
     { label: '预算已消耗', value: formatAmount(item.budgetConsumedAmount) },
     { label: '预算执行率', value: `${item.budgetExecutionRate}%` },
     { label: '现金流出', value: formatAmount(item.cashOutflowAmount) },
-    { label: '公司资金余额', value: formatAmount(item.cashBalance) },
+    ...(item.cashBalanceAvailable !== false && item.cashBalance != null
+      ? [{ label: '公司资金余额', value: formatAmount(item.cashBalance) }]
+      : []),
     { label: '项目利润', value: formatAmount(item.projectProfit) },
   ]
 })

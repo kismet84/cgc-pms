@@ -210,6 +210,10 @@ class PaymentWritebackTest {
         CtContract contract = contractMapper.selectById(testContractId);
         contract.setCurrentAmount(new BigDecimal("500000.00"));
         contractMapper.updateById(contract);
+        PayApplication application = payApplicationMapper.selectById(testPayAppId);
+        application.setApplyAmount(new BigDecimal("500000.00"));
+        application.setApprovedAmount(new BigDecimal("500000.00"));
+        payApplicationMapper.updateById(application);
 
         // 支付 400000（ok）
         PayRecord r1 = buildPayRecord(new BigDecimal("400000.00"), "TXN-BAL-001");

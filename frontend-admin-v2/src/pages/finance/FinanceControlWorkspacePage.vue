@@ -12,6 +12,7 @@ import {
   V2Select,
 } from '@/components'
 import { showToast } from '@/components/toast'
+import PaymentTraceDialog from '@/components/finance/PaymentTraceDialog.vue'
 import { formatAmount } from '@/pages/dashboard/model'
 import { uploadSiteFile } from '@/services/delivery'
 import {
@@ -31,6 +32,8 @@ import {
   loadFinancialCloseTrace,
   loadFinancialStatement,
   loadFundAccounts,
+  loadPaymentTraceByCashJournal,
+  loadPaymentTraceByVoucher,
   postAccountingEntry,
   rebuildFinanceSnapshot,
   regenerateCashForecast,
@@ -59,6 +62,7 @@ import type {
   FinancialStatement,
   FundAccountRecord,
   FundAccountCommand,
+  PaymentTraceRecord,
 } from '@cgc-pms/frontend-contracts'
 
 type Mode = 'operations' | 'journal' | 'accounts' | 'forecast' | 'accounting' | 'close'
@@ -144,6 +148,10 @@ const busy = ref(false)
 const errorMessage = ref('')
 const accountDialog = ref(false)
 const accountEditor = ref<FundAccountEditor | null>(null)
+const traceOpen = ref(false)
+const traceRows = ref<PaymentTraceRecord[]>([])
+const traceLoading = ref(false)
+const traceError = ref('')
 let controller: AbortController | null = null
 
 function pageSlice<T>(items: T[], pageNo: number): T[] {
@@ -367,6 +375,23 @@ async function selectPeriod(row: FinancePeriodRecord): Promise<void> {
     loadFinancialCloseTrace(row.id),
     loadFinancialStatement(row.fiscalYear, row.fiscalMonth),
   ])
+}
+
+async function openTrace(kind: 'journal' | 'voucher', id: string): Promise<void> {
+  traceOpen.value = true
+  traceRows.value = []
+  traceError.value = ''
+  traceLoading.value = true
+  try {
+    traceRows.value =
+      kind === 'journal'
+        ? [await loadPaymentTraceByCashJournal(id)]
+        : await loadPaymentTraceByVoucher(id)
+  } catch (cause) {
+    traceError.value = cause instanceof Error ? cause.message : 'Trace 读取失败'
+  } finally {
+    traceLoading.value = false
+  }
 }
 
 function changePage(kind: 'journal' | 'accounting', next: number): void {
@@ -808,6 +833,13 @@ onBeforeUnmount(() => controller?.abort())
                       :label="`${row.entryNo}更多操作`"
                       :placement="index >= journal.records.length - 3 ? 'top-end' : 'bottom-end'"
                     >
+                      <V2Button
+                        v-if="can('payment:trace:query')"
+                        size="small"
+                        variant="ghost"
+                        @click="openTrace('journal', row.id)"
+                        >查看 Trace</V2Button
+                      >
                       <label
                         v-if="
                           ['DRAFT', 'PENDING_ARCHIVE'].includes(row.status) &&
@@ -1053,6 +1085,13 @@ onBeforeUnmount(() => controller?.abort())
                       :label="`${row.entryCode}更多操作`"
                       :placement="index >= entries.records.length - 3 ? 'top-end' : 'bottom-end'"
                     >
+                      <V2Button
+                        v-if="can('payment:trace:query')"
+                        size="small"
+                        variant="ghost"
+                        @click="openTrace('voucher', row.id)"
+                        >查看 Trace</V2Button
+                      >
                       <V2Button
                         v-if="
                           row.entryStatus === 'DRAFT' &&
@@ -1333,6 +1372,13 @@ onBeforeUnmount(() => controller?.abort())
           <V2Button type="submit" form="fund-account-form" :loading="busy">保存</V2Button>
         </template>
       </V2Dialog>
+      <PaymentTraceDialog
+        :open="traceOpen"
+        :traces="traceRows"
+        :loading="traceLoading"
+        :error="traceError"
+        @close="traceOpen = false"
+      />
     </template>
   </section>
 </template>

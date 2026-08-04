@@ -88,7 +88,8 @@ Assert-Contains $backendTest @(
 Assert-Contains $backendMySql @(
   'mysql:','image: mysql:8.0','redis:','image: redis:7-alpine',
   'bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"',
-  '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest','CGCPMS_M52_MYSQL_BASELINE: ''true'''
+  '-Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,PaymentMySqlConcurrencyTest',
+  'CGCPMS_M52_MYSQL_BASELINE: ''true''','CGCPMS_M70_MYSQL_CONCURRENCY: ''true'''
 ) 'backend-test-mysql'
 Assert-Contains $backendDependency @('permissions:','contents: read','bash ./scripts/ci/scan-backend-dependencies.sh') 'backend-dependency-scan'
 Assert-Contains $frontendBuild @('name: ${{ env.FRONTEND_DIST_ARTIFACT }}','path: frontend-admin-v2/dist','if: always()') 'frontend-build'

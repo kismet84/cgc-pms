@@ -46,6 +46,7 @@ public class PmProject extends BaseEntity {
     private String designUnit;
 
     @PositiveOrZero
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     @JsonSerialize(using = ToStringSerializer.class)
     private BigDecimal contractAmount;
 
@@ -69,6 +70,9 @@ public class PmProject extends BaseEntity {
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private Long sourceBidCostId;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private Long ownerContractId;
 
     @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String initiationBasis;

@@ -347,22 +347,33 @@ public class PayApplicationService {
         BigDecimal currentAmount = contract.getCurrentAmount() != null
                 ? contract.getCurrentAmount() : BigDecimal.ZERO;
 
-        // Sum all SUCCESS pay records for this tenant and contract.
-        List<PayRecord> allPaid = payRecordMapper.selectList(
-                new LambdaQueryWrapper<PayRecord>()
-                        .eq(PayRecord::getContractId, contractId)
-                        .eq(PayRecord::getTenantId, tenantId)
-                        .eq(PayRecord::getPayStatus, "SUCCESS"));
+        // Locking read is intentional: a normal aggregate can keep the snapshot created
+        // before waiting for the contract lock under InnoDB REPEATABLE_READ.
+        List<PayRecord> allPaid = Objects.requireNonNullElse(
+                payRecordMapper.selectSuccessByContractForUpdate(tenantId, contractId), List.of());
         BigDecimal totalPaid = allPaid.stream()
                 .map(r -> r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Include the pending amount in the total to prevent concurrent overpay
-        BigDecimal effectiveTotal = totalPaid.add(pendingAmount != null ? pendingAmount : BigDecimal.ZERO);
+        BigDecimal payment = pendingAmount != null ? pendingAmount : BigDecimal.ZERO;
+        List<PayApplication> activeApps = Objects.requireNonNullElse(
+                payApplicationMapper.selectEffectiveByContractForUpdate(tenantId, contractId, null), List.of());
+        Map<Long, BigDecimal> paidByApplication = allPaid.stream().collect(Collectors.groupingBy(
+                PayRecord::getPayApplicationId, Collectors.reducing(BigDecimal.ZERO,
+                        record -> record.getPayAmount() == null ? BigDecimal.ZERO : record.getPayAmount(),
+                        BigDecimal::add)));
+        BigDecimal unpaid = activeApps.stream().map(active -> {
+                    BigDecimal paidForApp = paidByApplication.getOrDefault(active.getId(), BigDecimal.ZERO);
+                    if (Objects.equals(active.getId(), app.getId())) paidForApp = paidForApp.add(payment);
+                    return (active.getApplyAmount() == null ? BigDecimal.ZERO : active.getApplyAmount())
+                            .subtract(paidForApp).max(BigDecimal.ZERO);
+                })
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal effectiveTotal = totalPaid.add(payment).add(unpaid);
         if (effectiveTotal.compareTo(currentAmount) > 0) {
             throw new BusinessException("EXCEED_CONTRACT_BALANCE",
-                    "合同(" + contract.getContractName() + ")累计付款(" + totalPaid
-                    + ") + 本次付款(" + (pendingAmount != null ? pendingAmount : BigDecimal.ZERO)
+                    "合同(" + contract.getContractName() + ")累计实付(" + totalPaid
+                    + ") + 本次付款(" + payment + ") + 有效申请未付(" + unpaid
                     + ")超过当前合同金额(" + currentAmount + ")");
         }
         if ("PURCHASE".equals(contract.getContractType())) {
@@ -375,19 +386,35 @@ public class PayApplicationService {
         }
     }
 
+    /** Locate the contract without using that value for a financial decision, then lock in canonical order. */
+    public PayApplication lockForAmountGate(Long applicationId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        Long contractId = payApplicationMapper.selectContractId(applicationId, tenantId);
+        if (contractId == null) {
+            throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在或缺少关联合同");
+        }
+        CtContract contract = ctContractMapper.selectByIdForUpdate(contractId, tenantId);
+        if (contract == null) {
+            throw new BusinessException("CONTRACT_NOT_FOUND", "付款申请关联合同不存在");
+        }
+        PayApplication app = payApplicationMapper.selectByIdForUpdate(applicationId, tenantId);
+        if (app == null || !Objects.equals(app.getContractId(), contractId)) {
+            throw new BusinessException("PAY_APP_STATUS_CONFLICT", "付款申请已被并发更新，请刷新后重试");
+        }
+        return app;
+    }
+
     // ---- Pay status update (called by PayRecordService) ----
 
     @Transactional(rollbackFor = Exception.class)
     public void updatePayStatus(Long applicationId) {
-        List<PayRecord> records = payRecordMapper.selectList(
-                new LambdaQueryWrapper<PayRecord>()
-                        .eq(PayRecord::getPayApplicationId, applicationId)
-                        .eq(PayRecord::getPayStatus, "SUCCESS"));
+        Long tenantId = UserContext.getCurrentTenantId();
+        List<PayRecord> records = payRecordMapper.selectSuccessByApplicationForUpdate(tenantId, applicationId);
         BigDecimal totalPaid = records.stream()
                 .map(r -> r.getPayAmount() == null ? BigDecimal.ZERO : r.getPayAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        PayApplication app = payApplicationMapper.selectById(applicationId);
+        PayApplication app = payApplicationMapper.selectByIdForUpdate(applicationId, tenantId);
         if (app == null) return;
 
         String newStatus;
@@ -472,9 +499,7 @@ public class PayApplicationService {
      */
     @Transactional(isolation = Isolation.REPEATABLE_READ, rollbackFor = Exception.class)
     public void submitForApproval(Long id) {
-        PayApplication payApp = payApplicationMapper.selectById(id);
-        if (payApp == null || !payApp.getTenantId().equals(UserContext.getCurrentTenantId()))
-            throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
+        PayApplication payApp = lockForAmountGate(id);
         checkProjectAccess(payApp.getProjectId(), "提交付款申请审批");
 
         if (!"DRAFT".equals(payApp.getApprovalStatus()))
@@ -482,11 +507,6 @@ public class PayApplicationService {
 
         // 字典项可能在草稿创建后停用；提交前必须按当前权威值重新校验。
         normalizeBusinessDictionaryFields(payApp, null);
-
-        // Pessimistic lock on contract row to prevent concurrent bypass
-        if (payApp.getContractId() != null) {
-            ctContractMapper.selectByIdForUpdate(payApp.getContractId(), payApp.getTenantId());
-        }
 
         validatePaymentAmount(payApp);
 
@@ -553,18 +573,18 @@ public class PayApplicationService {
         }
 
         // Rule 1: 本次申请金额 ≤ 合同可用余额
-        CtContract contract = ctContractMapper.selectById(contractId);
+        CtContract contract = ctContractMapper.selectByIdForUpdate(contractId, UserContext.getCurrentTenantId());
         if (contract == null) {
             throw new BusinessException("CONTRACT_NOT_FOUND", "关联合同不存在");
         }
         // M-023: Use currentAmount (post-change-order) instead of contractAmount (original)
         BigDecimal currentAmount = contract.getCurrentAmount() != null ? contract.getCurrentAmount() : BigDecimal.ZERO;
 
-        BigDecimal alreadyApprovedSum = getApprovedSumForContract(contractId, payApp.getId());
+        BigDecimal alreadyCommitted = getCommittedAmountForContract(contractId, payApp.getId());
         BigDecimal controlLimit = "PURCHASE".equals(contract.getContractType())
                 ? currentAmount.min(contract.getPayableAmount() == null ? BigDecimal.ZERO : contract.getPayableAmount())
                 : currentAmount;
-        BigDecimal availableBalance = controlLimit.subtract(alreadyApprovedSum);
+        BigDecimal availableBalance = controlLimit.subtract(alreadyCommitted);
         if (applyAmount.compareTo(availableBalance) > 0) {
             throw new BusinessException("EXCEED_CONTRACT_BALANCE",
                     "本次申请金额(" + applyAmount + ")超过合同可用余额(" + availableBalance + ")");
@@ -580,7 +600,7 @@ public class PayApplicationService {
         if (totalRatio.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal maxByRatio = currentAmount
                     .multiply(totalRatio.divide(new BigDecimal("100"), 10, RoundingMode.HALF_UP))
-                    .subtract(alreadyApprovedSum);
+                    .subtract(alreadyCommitted);
             if (applyAmount.compareTo(maxByRatio) > 0) {
                 throw new BusinessException("PAY_RATIO_EXCEEDED",
                         "本次申请(" + applyAmount + ")超过合同付款比例允许金额(" + maxByRatio + ")");
@@ -604,18 +624,24 @@ public class PayApplicationService {
         }
     }
 
-    private BigDecimal getApprovedSumForContract(Long contractId, Long excludePayAppId) {
-        LambdaQueryWrapper<PayApplication> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(PayApplication::getContractId, contractId)
-                .eq(PayApplication::getTenantId, UserContext.getCurrentTenantId())
-                .in(PayApplication::getApprovalStatus, "APPROVING", "APPROVED");
-        if (excludePayAppId != null) {
-            wrapper.ne(PayApplication::getId, excludePayAppId);
-        }
-        List<PayApplication> approvedApps = payApplicationMapper.selectList(wrapper);
-        return approvedApps.stream()
-                .map(a -> a.getApplyAmount() != null ? a.getApplyAmount() : BigDecimal.ZERO)
+    private BigDecimal getCommittedAmountForContract(Long contractId, Long excludePayAppId) {
+        Long tenantId = UserContext.getCurrentTenantId();
+        List<PayRecord> paidRecords = Objects.requireNonNullElse(
+                payRecordMapper.selectSuccessByContractForUpdate(tenantId, contractId), List.of());
+        BigDecimal paid = paidRecords.stream().map(record -> record.getPayAmount() == null
+                        ? BigDecimal.ZERO : record.getPayAmount())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Map<Long, BigDecimal> paidByApplication = paidRecords.stream().collect(Collectors.groupingBy(
+                PayRecord::getPayApplicationId, Collectors.reducing(BigDecimal.ZERO,
+                        record -> record.getPayAmount() == null ? BigDecimal.ZERO : record.getPayAmount(),
+                        BigDecimal::add)));
+        BigDecimal unpaid = Objects.requireNonNullElse(payApplicationMapper.selectEffectiveByContractForUpdate(
+                        tenantId, contractId, excludePayAppId), List.<PayApplication>of()).stream()
+                .map(app -> (app.getApplyAmount() == null ? BigDecimal.ZERO : app.getApplyAmount())
+                        .subtract(paidByApplication.getOrDefault(app.getId(), BigDecimal.ZERO))
+                        .max(BigDecimal.ZERO))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return paid.add(unpaid);
     }
 
     private void validateBasisAmount(PayApplicationBasis basis, Long payContractId,

@@ -61,6 +61,7 @@ class WorkflowSubmitServiceTest {
     private static final long CONTRACT_ID_DUPLICATE = 31001L;
     private static final long CONTRACT_ID_DELETED = 31002L;
     private static final long CONTRACT_ID_TEMPLATE = 31999L;
+    private static final long OWNER_CONTRACT_ID = 31998L;
     private static final String BUSINESS_TYPE = "CONTRACT_APPROVAL";
 
     @Autowired
@@ -154,6 +155,7 @@ class WorkflowSubmitServiceTest {
         ensureContract(CONTRACT_ID_DUPLICATE, "CT-TEST-WF-DUP", "工作流重复提交测试合同");
         ensureContract(CONTRACT_ID_DELETED, "CT-TEST-WF-DEL", "工作流逻辑删除测试合同");
         ensureContract(CONTRACT_ID_TEMPLATE, "CT-TEST-WF-TPL", "工作流模板存在测试合同");
+        ensureOwnerContract();
     }
 
     private void ensureContract(Long id, String code, String name) {
@@ -172,6 +174,28 @@ class WorkflowSubmitServiceTest {
         contract.setContractStatus("DRAFT");
         contract.setApprovalStatus("DRAFT");
         contractMapper.insert(contract);
+    }
+
+    private void ensureOwnerContract() {
+        PmProject project = projectMapper.selectById(PROJECT_ID);
+        if (contractMapper.selectById(OWNER_CONTRACT_ID) == null) {
+            CtContract contract = new CtContract();
+            contract.setId(OWNER_CONTRACT_ID);
+            contract.setProjectId(PROJECT_ID);
+            contract.setContractCode("CT-TEST-WF-MAIN");
+            contract.setContractName("工作流测试业主主合同");
+            contract.setContractType("MAIN");
+            contract.setPartyAId(PARTNER_A_ID);
+            contract.setPartyBId(PARTNER_B_ID);
+            contract.setContractAmount(project.getContractAmount());
+            contract.setCurrentAmount(project.getContractAmount());
+            contract.setPaidAmount(BigDecimal.ZERO);
+            contract.setContractStatus("PERFORMING");
+            contract.setApprovalStatus("APPROVED");
+            contractMapper.insert(contract);
+        }
+        project.setOwnerContractId(OWNER_CONTRACT_ID);
+        projectMapper.updateById(project);
     }
 
     private void markContractApproving(long contractId) {

@@ -127,7 +127,9 @@ class PayApplicationCodeRetryTest {
         app.setContractId(30001L);
         app.setPayType("PROGRESS");
         assertEquals(43L, service.create(app));
-        when(mapper.selectById(43L)).thenReturn(app);
+        when(mapper.selectContractId(43L, 0L)).thenReturn(30001L);
+        when(contractMapper.selectByIdForUpdate(30001L, 0L)).thenReturn(contract);
+        when(mapper.selectByIdForUpdate(43L, 0L)).thenReturn(app);
         when(dictDataService.requireEnabledValue(any(), any(), any(), any()))
                 .thenThrow(new BusinessException("PAY_TYPE_INVALID", "付款类型不合法"));
 

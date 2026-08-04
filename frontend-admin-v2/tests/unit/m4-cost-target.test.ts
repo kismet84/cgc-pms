@@ -114,6 +114,8 @@ beforeEach(() => {
     .mockResolvedValue({
       projectId: 'P1',
       projectManagerId: 'U1',
+      sourceMainContractId: 'C1',
+      sourceMainContractCode: 'MAIN-001',
       sourceContractAmount: '10596697064401168.38',
       targetCostRate: '0.850000',
       totalTargetAmount: '9007199254740993.12',

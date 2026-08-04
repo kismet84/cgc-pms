@@ -7,12 +7,21 @@ import com.cgcpms.accounting.mapper.AccountingEntryLineMapper;
 import com.cgcpms.accounting.mapper.AccountingEntryMapper;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.budget.entity.BudgetLedger;
+import com.cgcpms.budget.entity.ContractBudgetAllocation;
+import com.cgcpms.budget.entity.ProjectBudget;
+import com.cgcpms.budget.entity.ProjectBudgetLine;
 import com.cgcpms.budget.mapper.BudgetLedgerMapper;
+import com.cgcpms.budget.mapper.ContractBudgetAllocationMapper;
+import com.cgcpms.budget.mapper.ProjectBudgetLineMapper;
+import com.cgcpms.budget.mapper.ProjectBudgetMapper;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
+import com.cgcpms.cashbook.constant.CashbookConstants;
 import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
+import com.cgcpms.cost.entity.CostSubject;
+import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.expense.entity.ExpenseApplication;
 import com.cgcpms.expense.mapper.ExpenseApplicationMapper;
 import com.cgcpms.invoice.entity.InvoicePaymentAllocation;
@@ -31,6 +40,10 @@ import com.cgcpms.payment.vo.PaymentTraceVO;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.receipt.entity.MatReceipt;
+import com.cgcpms.receipt.entity.MatReceiptItem;
+import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
+import com.cgcpms.receipt.mapper.MatReceiptMapper;
 import com.cgcpms.settlement.entity.StlSettlement;
 import com.cgcpms.settlement.entity.SettlementSubMeasure;
 import com.cgcpms.settlement.mapper.StlSettlementMapper;
@@ -75,6 +88,12 @@ public class PaymentTraceService {
     private final PayInvoiceMapper invoiceMapper;
     private final InvoicePaymentAllocationMapper invoiceAllocationMapper;
     private final BudgetLedgerMapper budgetLedgerMapper;
+    private final ContractBudgetAllocationMapper contractBudgetAllocationMapper;
+    private final ProjectBudgetLineMapper projectBudgetLineMapper;
+    private final ProjectBudgetMapper projectBudgetMapper;
+    private final CostSubjectMapper costSubjectMapper;
+    private final MatReceiptItemMapper receiptItemMapper;
+    private final MatReceiptMapper receiptMapper;
     private final AccountingEntryMapper accountingEntryMapper;
     private final AccountingEntryLineMapper accountingLineMapper;
     private final ProjectAccessChecker projectAccessChecker;
@@ -267,10 +286,15 @@ public class PaymentTraceService {
                         .in(CashJournalEntry::getPayRecordId, recordIds)));
         List<Long> journalIds = trace.getCashJournals().stream().map(CashJournalEntry::getId).toList();
         trace.setPaymentDocuments(journalIds.isEmpty() ? List.of() : jdbc.queryForList("""
-                SELECT id,cash_journal_id,file_id,document_type,created_at
-                  FROM payment_document_link
-                 WHERE tenant_id=? AND cash_journal_id IN (%s)
-                 ORDER BY created_at,id
+                SELECT link.id,target.id AS cash_journal_id,
+                       link.cash_journal_id AS evidence_cash_journal_id,
+                       link.file_id,link.document_type,link.created_at
+                  FROM cash_journal_entry target
+                  JOIN payment_document_link link
+                    ON link.tenant_id=target.tenant_id
+                   AND link.cash_journal_id=COALESCE(target.reverse_of_entry_id,target.id)
+                 WHERE target.tenant_id=? AND target.id IN (%s)
+                 ORDER BY target.id,link.created_at,link.id
                 """.formatted("?,".repeat(journalIds.size()).replaceFirst(",$", "")),
                 args(tenantId, journalIds)));
 
@@ -289,6 +313,48 @@ public class PaymentTraceService {
                 .orderByAsc(BudgetLedger::getCreatedAt)).stream()
                 .filter(l -> businessKeys.contains(l.getBusinessType() + ":" + l.getBusinessId())).toList();
         trace.setBudgetLedgers(ledgers);
+
+        ProjectBudgetLine budgetLine = app.getBudgetLineId() == null
+                ? null : projectBudgetLineMapper.selectById(app.getBudgetLineId());
+        ProjectBudget budget = budgetLine == null ? null : projectBudgetMapper.selectById(budgetLine.getBudgetId());
+        CostSubject subject = app.getCostSubjectId() == null
+                ? null : costSubjectMapper.selectById(app.getCostSubjectId());
+        ContractBudgetAllocation contractAllocation = app.getContractBudgetAllocationId() == null
+                ? null : contractBudgetAllocationMapper.selectById(app.getContractBudgetAllocationId());
+        trace.setProjectBudgetLine(budgetLine);
+        trace.setProjectBudget(budget);
+        trace.setCostSubject(subject);
+        trace.setContractBudgetAllocation(contractAllocation);
+
+        List<Long> receiptItemIds = sources.stream().map(PaymentApplicationSource::getReceiptItemId)
+                .filter(Objects::nonNull).distinct().toList();
+        List<MatReceiptItem> receiptItems = receiptItemIds.isEmpty() ? List.of()
+                : receiptItemMapper.selectByIds(receiptItemIds).stream()
+                        .filter(item -> Objects.equals(item.getTenantId(), tenantId)).toList();
+        List<Long> receiptIds = receiptItems.stream().map(MatReceiptItem::getReceiptId)
+                .filter(Objects::nonNull).distinct().toList();
+        List<MatReceipt> receipts = receiptIds.isEmpty() ? List.of()
+                : receiptMapper.selectByIds(receiptIds).stream()
+                        .filter(item -> Objects.equals(item.getTenantId(), tenantId)).toList();
+        trace.setMaterialReceiptItems(receiptItems);
+        trace.setMaterialReceipts(receipts);
+
+        BigDecimal netReserved = ledgerNet(ledgers, "RESERVE", "RESTORE_RESERVATION")
+                .subtract(ledgerNet(ledgers, "RELEASE", "CONSUME"));
+        BigDecimal netConsumed = ledgerNet(ledgers, "CONSUME")
+                .subtract(ledgerNet(ledgers, "RESTORE_RESERVATION", "REVERSE"));
+        BigDecimal netPaid = sources.stream().map(PaymentApplicationSource::getPaidAmount)
+                .map(this::money).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal netCashOutflow = trace.getCashJournals().stream()
+                .filter(item -> item.getArchivedAt() != null || "ARCHIVED".equals(item.getStatus()))
+                .map(item -> "OUT".equals(item.getDirection()) ? money(item.getAmount())
+                        : money(item.getAmount()).negate())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        trace.setBudgetConservation(Map.of(
+                "netReserved", money(netReserved).toPlainString(),
+                "netConsumed", money(netConsumed).toPlainString(),
+                "netPaid", money(netPaid).toPlainString(),
+                "netCashOutflow", money(netCashOutflow).toPlainString()));
 
         List<AccountingEntry> entries = recordIds.isEmpty() ? List.of() : accountingEntryMapper.selectList(
                 new LambdaQueryWrapper<AccountingEntry>().eq(AccountingEntry::getTenantId, tenantId)
@@ -336,6 +402,7 @@ public class PaymentTraceService {
                         && !Objects.equals(source.getSourceRefId(), app.getId())))) {
             throw incomplete("付款来源关系不一致");
         }
+        validateSourceContexts(trace, tenantId, projectId, contractId);
         BigDecimal sourceTotal = trace.getApplicationSources().stream()
                 .map(PaymentApplicationSource::getSourceAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -352,6 +419,7 @@ public class PaymentTraceService {
                         || !budgetKeys.contains(ledger.getBusinessType() + ":" + ledger.getBusinessId()))) {
             throw incomplete("预算台账与付款申请关系不一致");
         }
+        validateBudgetAndReceiptFacts(trace, tenantId, projectId, contractId);
         BigDecimal payRequestSourceTotal = trace.getApplicationSources().stream()
                 .filter(source -> source.getExpenseId() == null)
                 .map(PaymentApplicationSource::getSourceAmount)
@@ -390,19 +458,28 @@ public class PaymentTraceService {
                 || !records.containsKey(item.getPayRecordId()))) {
             throw incomplete("现金日记关系不一致");
         }
+        Map<Long, CashJournalEntry> journals = trace.getCashJournals().stream()
+                .collect(java.util.stream.Collectors.toMap(CashJournalEntry::getId, item -> item));
         for (PayRecord record : records.values()) {
-            if (!Set.of("SUCCESS", "REVERSED").contains(record.getPayStatus())) continue;
-            BigDecimal allocated = trace.getPaymentSourceAllocations().stream()
-                    .filter(item -> Objects.equals(item.getPayRecordId(), record.getId()))
-                    .map(PaymentRecordSourceAllocation::getAllocatedAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
             long journalCount = trace.getCashJournals().stream()
                     .filter(item -> Objects.equals(item.getPayRecordId(), record.getId())).count();
-            long entryCount = trace.getAccountingEntries().stream()
-                    .filter(item -> Objects.equals(item.getPayRecordId(), record.getId())
-                            && "PAYMENT".equals(item.getEntryType())).count();
-            if (allocated.compareTo(record.getPayAmount()) != 0 || journalCount != 1 || entryCount != 1) {
-                throw incomplete("成功付款缺少完整来源分摊、现金日记或付款凭证");
+            if (Set.of("SUCCESS", "REVERSED").contains(record.getPayStatus())) {
+                BigDecimal allocated = trace.getPaymentSourceAllocations().stream()
+                        .filter(item -> Objects.equals(item.getPayRecordId(), record.getId()))
+                        .map(PaymentRecordSourceAllocation::getAllocatedAmount)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                long entryCount = trace.getAccountingEntries().stream()
+                        .filter(item -> Objects.equals(item.getPayRecordId(), record.getId())
+                                && "PAYMENT".equals(item.getEntryType())).count();
+                if (allocated.compareTo(record.getPayAmount()) != 0 || journalCount != 1 || entryCount != 1) {
+                    throw incomplete("成功付款缺少完整来源分摊、现金日记或付款凭证");
+                }
+            } else if ("REVERSAL".equals(record.getPayStatus())) {
+                PayRecord original = records.get(record.getReversedRecordId());
+                if (original == null || !"REVERSED".equals(original.getPayStatus())
+                        || !Objects.equals(original.getReversedRecordId(), record.getId())) {
+                    throw incomplete("冲销付款记录与原付款记录关系不一致");
+                }
             }
         }
         Set<Long> documentedJournalIds = trace.getPaymentDocuments().stream()
@@ -412,6 +489,45 @@ public class PaymentTraceService {
         if (trace.getCashJournals().stream().anyMatch(item -> "ARCHIVED".equals(item.getStatus())
                 && !documentedJournalIds.contains(item.getId()))) {
             throw incomplete("已归档现金日记缺少付款证据");
+        }
+        if (trace.getCashJournals().stream().anyMatch(item -> item.getReverseOfEntryId() != null
+                && (journals.get(item.getReverseOfEntryId()) == null
+                || !Objects.equals(journals.get(item.getReverseOfEntryId()).getReversalEntryId(), item.getId())
+                || !Objects.equals(journals.get(item.getReverseOfEntryId()).getAmount(), item.getAmount())
+                || Objects.equals(journals.get(item.getReverseOfEntryId()).getDirection(), item.getDirection())))) {
+            throw incomplete("反向现金日记与原日记关系不一致");
+        }
+        for (PayRecord original : records.values().stream()
+                .filter(item -> "REVERSED".equals(item.getPayStatus())).toList()) {
+            PayRecord reversal = records.get(original.getReversedRecordId());
+            CashJournalEntry originalJournal = trace.getCashJournals().stream()
+                    .filter(item -> Objects.equals(item.getPayRecordId(), original.getId())).findFirst().orElse(null);
+            CashJournalEntry reversalJournal = reversal == null ? null : trace.getCashJournals().stream()
+                    .filter(item -> Objects.equals(item.getPayRecordId(), reversal.getId())).findFirst().orElse(null);
+            AccountingEntry originalEntry = trace.getAccountingEntries().stream()
+                    .filter(item -> Objects.equals(item.getPayRecordId(), original.getId())
+                            && "PAYMENT".equals(item.getEntryType())).findFirst().orElse(null);
+            AccountingEntry reversalEntry = reversal == null ? null : trace.getAccountingEntries().stream()
+                    .filter(item -> Objects.equals(item.getPayRecordId(), reversal.getId())
+                            && "PAYMENT_REVERSAL".equals(item.getEntryType())).findFirst().orElse(null);
+            if (reversal == null || originalJournal == null || originalEntry == null) {
+                throw incomplete("冲销付款链缺少原始事实或冲销记录");
+            }
+            boolean archivedReversal = originalJournal.getReversalEntryId() != null;
+            if (archivedReversal) {
+                if (reversalJournal == null || reversalEntry == null
+                        || !Objects.equals(reversalJournal.getReverseOfEntryId(), originalJournal.getId())
+                        || !Objects.equals(originalJournal.getReversalEntryId(), reversalJournal.getId())
+                        || !Objects.equals(originalEntry.getReversedEntryId(), reversalEntry.getId())
+                        || !Objects.equals(reversalEntry.getOriginalEntryId(), originalEntry.getId())
+                        || !Objects.equals(reversal.getPaidAt(), reversalJournal.getArchivedAt())) {
+                    throw incomplete("已归档付款冲销链缺少双向现金日记或会计凭证关系");
+                }
+            } else if (reversalJournal != null || reversalEntry != null
+                    || !"REVERSED".equals(originalEntry.getEntryStatus())
+                    || originalEntry.getReversedEntryId() != null) {
+                throw incomplete("归档前付款冲销链状态不一致");
+            }
         }
         Map<Long, PayInvoice> invoices = trace.getInvoices().stream()
                 .collect(java.util.stream.Collectors.toMap(PayInvoice::getId, item -> item));
@@ -446,6 +562,167 @@ public class PaymentTraceService {
                 throw incomplete("会计凭证缺少平衡分录");
             }
         }
+        if (trace.getCashJournals().stream()
+                .noneMatch(item -> CashbookConstants.Status.PENDING_ARCHIVE.equals(item.getStatus()))) {
+            BigDecimal netPaid = new BigDecimal(trace.getBudgetConservation().get("netPaid"));
+            BigDecimal netCashOutflow = new BigDecimal(trace.getBudgetConservation().get("netCashOutflow"));
+            if (netPaid.compareTo(netCashOutflow) != 0) {
+                throw incomplete("归档付款净实付与现金流出不守恒");
+            }
+        }
+    }
+
+    private void validateBudgetAndReceiptFacts(PaymentTraceVO trace, Long tenantId,
+                                               Long projectId, Long contractId) {
+        PayApplication app = trace.getPaymentApplication();
+        if ("DRAFT".equals(app.getApprovalStatus())) return;
+        ProjectBudgetLine line = trace.getProjectBudgetLine();
+        ProjectBudget budget = trace.getProjectBudget();
+        CostSubject subject = trace.getCostSubject();
+        ContractBudgetAllocation allocation = trace.getContractBudgetAllocation();
+        if (line == null || budget == null || subject == null || allocation == null
+                || !Objects.equals(line.getTenantId(), tenantId)
+                || !Objects.equals(line.getProjectId(), projectId)
+                || !Objects.equals(line.getId(), app.getBudgetLineId())
+                || !Objects.equals(budget.getTenantId(), tenantId)
+                || !Objects.equals(budget.getProjectId(), projectId)
+                || !Objects.equals(budget.getId(), line.getBudgetId())
+                || !Objects.equals(subject.getTenantId(), tenantId)
+                || !Objects.equals(subject.getId(), app.getCostSubjectId())
+                || !Objects.equals(subject.getId(), line.getCostSubjectId())
+                || !Objects.equals(allocation.getTenantId(), tenantId)
+                || !Objects.equals(allocation.getProjectId(), projectId)
+                || !Objects.equals(allocation.getContractId(), contractId)
+                || !Objects.equals(allocation.getBudgetLineId(), line.getId())
+                || !Objects.equals(allocation.getId(), app.getContractBudgetAllocationId())) {
+            throw incomplete("付款申请的合同预算、项目预算或成本科目关系不一致");
+        }
+        BigDecimal lineUsed = money(line.getReservedAmount()).add(money(line.getConsumedAmount()));
+        BigDecimal allocationUsed = money(allocation.getReservedAmount()).add(money(allocation.getConsumedAmount()));
+        if (lineUsed.compareTo(money(line.getBudgetAmount())) > 0
+                || allocationUsed.compareTo(money(allocation.getAllocatedAmount())) > 0
+                || allocationUsed.compareTo(money(app.getApplyAmount())) < 0) {
+            throw incomplete("预算净占用与消费不守恒");
+        }
+        List<PaymentApplicationSource> receiptSources = trace.getApplicationSources().stream()
+                .filter(source -> "MAT_RECEIPT".equals(source.getSourceType())).toList();
+        if (receiptSources.size() != trace.getMaterialReceiptItems().size()) {
+            throw incomplete("材料验收付款来源缺少验收明细");
+        }
+        Map<Long, MatReceiptItem> items = trace.getMaterialReceiptItems().stream()
+                .collect(java.util.stream.Collectors.toMap(MatReceiptItem::getId, item -> item));
+        Map<Long, MatReceipt> receipts = trace.getMaterialReceipts().stream()
+                .collect(java.util.stream.Collectors.toMap(MatReceipt::getId, item -> item));
+        if (receiptSources.stream().anyMatch(source -> {
+            MatReceiptItem item = items.get(source.getReceiptItemId());
+            MatReceipt receipt = item == null ? null : receipts.get(item.getReceiptId());
+            return item == null || receipt == null
+                    || !Objects.equals(item.getBudgetLineId(), line.getId())
+                    || !Objects.equals(receipt.getTenantId(), tenantId)
+                    || !Objects.equals(receipt.getProjectId(), projectId)
+                    || !Objects.equals(receipt.getContractId(), contractId);
+        })) {
+            throw incomplete("材料验收付款来源跨预算、项目或合同");
+        }
+        BigDecimal netReserved = new BigDecimal(trace.getBudgetConservation().get("netReserved"));
+        BigDecimal netConsumed = new BigDecimal(trace.getBudgetConservation().get("netConsumed"));
+        BigDecimal sourceTotal = trace.getApplicationSources().stream()
+                .map(PaymentApplicationSource::getSourceAmount).map(this::money)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (netReserved.signum() < 0 || netConsumed.signum() < 0
+                || netReserved.add(netConsumed).compareTo(sourceTotal) < 0) {
+            throw incomplete("预算台账净占用与消费不足以覆盖付款来源");
+        }
+    }
+
+    private void validateSourceContexts(PaymentTraceVO trace, Long tenantId,
+                                        Long projectId, Long contractId) {
+        PayApplication app = trace.getPaymentApplication();
+        Map<Long, ExpenseApplication> expenses = trace.getExpenses().stream()
+                .collect(java.util.stream.Collectors.toMap(ExpenseApplication::getId, item -> item));
+        Map<Long, StlSettlement> settlements = trace.getSettlements().stream()
+                .collect(java.util.stream.Collectors.toMap(StlSettlement::getId, item -> item));
+        Map<Long, SubMeasure> measures = trace.getSubMeasures().stream()
+                .collect(java.util.stream.Collectors.toMap(SubMeasure::getId, item -> item));
+        Map<Long, SubTask> tasks = trace.getSubTasks().stream()
+                .collect(java.util.stream.Collectors.toMap(SubTask::getId, item -> item));
+        Map<Long, MatReceiptItem> receiptItems = trace.getMaterialReceiptItems().stream()
+                .collect(java.util.stream.Collectors.toMap(MatReceiptItem::getId, item -> item));
+        Map<Long, MatReceipt> receipts = trace.getMaterialReceipts().stream()
+                .collect(java.util.stream.Collectors.toMap(MatReceipt::getId, item -> item));
+
+        for (PaymentApplicationSource source : trace.getApplicationSources()) {
+            boolean valid = switch (source.getSourceType()) {
+                case "DIRECT" -> Objects.equals(source.getSourceRefId(), app.getId())
+                        && source.getExpenseId() == null && source.getSettlementId() == null
+                        && source.getSubMeasureId() == null && source.getReceiptItemId() == null;
+                case "EXPENSE" -> {
+                    ExpenseApplication expense = expenses.get(source.getExpenseId());
+                    yield Objects.equals(source.getSourceRefId(), source.getExpenseId())
+                            && source.getSettlementId() == null && source.getSubMeasureId() == null
+                            && source.getReceiptItemId() == null && expense != null
+                            && Objects.equals(expense.getTenantId(), tenantId)
+                            && Objects.equals(expense.getProjectId(), projectId)
+                            && Objects.equals(expense.getContractId(), contractId)
+                            && Objects.equals(expense.getPayeePartnerId(), app.getPartnerId())
+                            && Objects.equals(expense.getCostSubjectId(), app.getCostSubjectId())
+                            && Objects.equals(expense.getBudgetLineId(), app.getBudgetLineId());
+                }
+                case "SETTLEMENT" -> {
+                    StlSettlement settlement = settlements.get(source.getSettlementId());
+                    yield Objects.equals(source.getSourceRefId(), source.getSettlementId())
+                            && source.getExpenseId() == null && source.getSubMeasureId() == null
+                            && source.getReceiptItemId() == null && settlement != null
+                            && Objects.equals(settlement.getTenantId(), tenantId)
+                            && Objects.equals(settlement.getProjectId(), projectId)
+                            && Objects.equals(settlement.getContractId(), contractId)
+                            && Objects.equals(settlement.getPartnerId(), app.getPartnerId());
+                }
+                case "SUB_MEASURE" -> {
+                    SubMeasure measure = measures.get(source.getSubMeasureId());
+                    SubTask task = measure == null || measure.getSubTaskId() == null
+                            ? null : tasks.get(measure.getSubTaskId());
+                    yield Objects.equals(source.getSourceRefId(), source.getSubMeasureId())
+                            && source.getExpenseId() == null && source.getSettlementId() == null
+                            && source.getReceiptItemId() == null && measure != null
+                            && Objects.equals(measure.getTenantId(), tenantId)
+                            && Objects.equals(measure.getProjectId(), projectId)
+                            && Objects.equals(measure.getContractId(), contractId)
+                            && Objects.equals(measure.getPartnerId(), app.getPartnerId())
+                            && (measure.getSubTaskId() == null || task != null
+                            && Objects.equals(task.getTenantId(), tenantId)
+                            && Objects.equals(task.getProjectId(), projectId)
+                            && Objects.equals(task.getContractId(), contractId)
+                            && Objects.equals(task.getPartnerId(), app.getPartnerId()));
+                }
+                case "MAT_RECEIPT" -> {
+                    MatReceiptItem item = receiptItems.get(source.getReceiptItemId());
+                    MatReceipt receipt = item == null ? null : receipts.get(item.getReceiptId());
+                    yield Objects.equals(source.getSourceRefId(), source.getReceiptItemId())
+                            && source.getExpenseId() == null && source.getSettlementId() == null
+                            && source.getSubMeasureId() == null && item != null && receipt != null
+                            && Objects.equals(item.getTenantId(), tenantId)
+                            && Objects.equals(item.getBudgetLineId(), app.getBudgetLineId())
+                            && Objects.equals(receipt.getTenantId(), tenantId)
+                            && Objects.equals(receipt.getProjectId(), projectId)
+                            && Objects.equals(receipt.getContractId(), contractId)
+                            && Objects.equals(receipt.getPartnerId(), app.getPartnerId());
+                }
+                default -> false;
+            };
+            if (!valid) throw incomplete("付款来源与申请业务关系不一致");
+        }
+    }
+
+    private BigDecimal ledgerNet(List<BudgetLedger> ledgers, String... entryTypes) {
+        Set<String> types = Set.of(entryTypes);
+        return ledgers.stream().filter(item -> types.contains(item.getEntryType()))
+                .map(BudgetLedger::getAmount).map(this::money)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private BigDecimal money(BigDecimal value) {
+        return value == null ? BigDecimal.ZERO : value;
     }
 
     private Long cashJournalId(Map<String, Object> document) {

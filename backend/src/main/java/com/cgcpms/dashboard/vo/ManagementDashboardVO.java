@@ -18,6 +18,7 @@ public class ManagementDashboardVO {
     private String totalPaidAmount;
     private Long totalPendingTaskCount;
     private Long totalRiskCount;
+    private List<String> unavailableMetrics;
     /** Detail lists */
     private List<DashboardProjectSummaryVO> projectRankings;
     private List<MetricSourceVO> metricSources;

@@ -41,7 +41,7 @@ describe('M3 project request baseline', () => {
     )
   })
 
-  it('renders project details as single-column cards with every create-form field', () => {
+  it('renders project details as single-column cards with server-authoritative amounts', () => {
     const source = readFileSync(resolve('src/pages/projects/ProjectPage.vue'), 'utf-8')
     const components = readFileSync(resolve('src/styles/components.css'), 'utf-8')
 
@@ -77,6 +77,23 @@ describe('M3 project request baseline', () => {
     ]) {
       expect(source).toContain(`<dt>${label}</dt>`)
     }
+    const form = readFileSync(resolve('src/pages/projects/ProjectForm.vue'), 'utf-8')
+    expect(form).not.toContain('合同金额（元）')
+    expect(form).not.toContain('目标成本（元）')
+    expect(source).toContain('服务端阻塞项')
+    expect(source).toContain('PROJECT_COMMENCEMENT')
+    for (const contract of [
+      "PROJECT_OWNER_CONTRACT_REQUIRED: '缺少已批准业主主合同'",
+      "COST_TARGET_ACTIVE_UNIQUE_REQUIRED: '缺少唯一生效目标成本'",
+      "PROJECT_BUDGET_ACTIVE_UNIQUE_REQUIRED: '缺少唯一生效项目预算'",
+      "PROJECT_WBS_ACTIVE_UNIQUE_REQUIRED: '缺少唯一生效WBS计划'",
+      "PROJECT_COMMENCEMENT_BASIS_FILE_REQUIRED: '缺少已通过扫描的开工依据附件'",
+      "code.startsWith('PROJECT_OWNER_CONTRACT')",
+      "code.startsWith('PROJECT_WBS')",
+    ])
+      expect(source).toContain(contract)
+    expect(source).not.toContain("code.startsWith('OWNER_MAIN_CONTRACT')")
+    expect(source).not.toContain("code.startsWith('PROJECT_SCHEDULE')")
   })
 
   it('snapshots the selected schedule directly and keeps daily actions behind confirmation', () => {

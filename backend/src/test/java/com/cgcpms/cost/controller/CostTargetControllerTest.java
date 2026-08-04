@@ -44,6 +44,7 @@ class CostTargetControllerTest {
     private static final String ADMIN_USERNAME = "admin";
     private static final long TENANT_ID = 0L;
     private static final long PROJECT_ID = 10001L;
+    private static final long OWNER_CONTRACT_ID = 33991L;
     private static final long ACTION_USER_ID = 33001L;
     private static final long OUTSIDER_USER_ID = 33002L;
     private static final long[] SUBJECT_IDS = {101L, 102L, 103L, 201L, 202L, 301L, 302L};
@@ -54,9 +55,26 @@ class CostTargetControllerTest {
     private static Long compositeDraftId;
     private static Long previousCompositeManagerId;
     private static boolean compositeManagerCaptured;
+    private static Long previousOwnerContractId;
+    private static BigDecimal previousProjectContractAmount;
 
     @BeforeAll
     void seedCostSubjects() {
+        previousOwnerContractId = jdbcTemplate.queryForObject(
+                "SELECT owner_contract_id FROM pm_project WHERE id=?", Long.class, PROJECT_ID);
+        previousProjectContractAmount = jdbcTemplate.queryForObject(
+                "SELECT contract_amount FROM pm_project WHERE id=?", BigDecimal.class, PROJECT_ID);
+        jdbcTemplate.update("""
+                INSERT INTO ct_contract
+                  (id,tenant_id,project_id,contract_code,contract_name,contract_type,party_a_id,party_b_id,
+                   contract_amount,current_amount,paid_amount,contract_status,approval_status,version,
+                   created_at,updated_at,deleted_flag)
+                SELECT ?,0,?,'CT-COST-TARGET-OWNER','目标成本测试业主主合同','MAIN',20001,20002,
+                       50000000,50000000,0,'PERFORMING','APPROVED',0,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0
+                WHERE NOT EXISTS (SELECT 1 FROM ct_contract WHERE id=?)
+                """, OWNER_CONTRACT_ID, PROJECT_ID, OWNER_CONTRACT_ID);
+        jdbcTemplate.update("UPDATE pm_project SET owner_contract_id=?, contract_amount=50000000 WHERE id=?",
+                OWNER_CONTRACT_ID, PROJECT_ID);
         for (long subjectId : SUBJECT_IDS) {
             jdbcTemplate.update("INSERT INTO cost_subject(id,tenant_id,parent_id,subject_code,subject_name,subject_type,level,sort_order,status,created_at,updated_at,deleted_flag) " +
                             "SELECT ?,0,0,?,?,'DIRECT',1,0,'ENABLE',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,0 " +
@@ -84,6 +102,12 @@ class CostTargetControllerTest {
         for (long subjectId : SUBJECT_IDS) {
             jdbcTemplate.update("DELETE FROM cost_subject WHERE id=? AND subject_code=?", subjectId, "TEST-" + subjectId);
         }
+        jdbcTemplate.update("DELETE FROM cost_target_item WHERE target_id IN (SELECT id FROM cost_target WHERE source_contract_id=?)",
+                OWNER_CONTRACT_ID);
+        jdbcTemplate.update("DELETE FROM cost_target WHERE source_contract_id=?", OWNER_CONTRACT_ID);
+        jdbcTemplate.update("UPDATE pm_project SET owner_contract_id=?, contract_amount=? WHERE id=?",
+                previousOwnerContractId, previousProjectContractAmount, PROJECT_ID);
+        jdbcTemplate.update("DELETE FROM ct_contract WHERE id=?", OWNER_CONTRACT_ID);
     }
 
     /** Generate a valid JWT token for the admin user and wrap as HttpOnly cookie. */
@@ -105,9 +129,9 @@ class CostTargetControllerTest {
     @DisplayName("default allocation uses contract amount × 85% and fixed 10 categories")
     void testDefaultAllocation() throws Exception {
         BigDecimal original = jdbcTemplate.queryForObject(
-                "SELECT contract_amount FROM pm_project WHERE id=?", BigDecimal.class, PROJECT_ID);
+                "SELECT current_amount FROM ct_contract WHERE id=?", BigDecimal.class, OWNER_CONTRACT_ID);
         try {
-            jdbcTemplate.update("UPDATE pm_project SET contract_amount=1000000.00 WHERE id=?", PROJECT_ID);
+            jdbcTemplate.update("UPDATE ct_contract SET current_amount=1000000.00 WHERE id=?", OWNER_CONTRACT_ID);
             mockMvc.perform(getWithApiContext("/cost-targets/default-allocation")
                             .cookie(adminCookie()).param("projectId", String.valueOf(PROJECT_ID)))
                     .andExpect(status().isOk())
@@ -119,7 +143,7 @@ class CostTargetControllerTest {
                     .andExpect(jsonPath("$.data.items[0].targetAmount").value("212500.00"))
                     .andExpect(jsonPath("$.data.items[1].targetAmount").value("340000.00"));
         } finally {
-            jdbcTemplate.update("UPDATE pm_project SET contract_amount=? WHERE id=?", original, PROJECT_ID);
+            jdbcTemplate.update("UPDATE ct_contract SET current_amount=? WHERE id=?", original, OWNER_CONTRACT_ID);
         }
     }
 
@@ -128,15 +152,15 @@ class CostTargetControllerTest {
     @DisplayName("default allocation rejects non-positive contract amount")
     void testDefaultAllocationRejectsZeroContract() throws Exception {
         BigDecimal original = jdbcTemplate.queryForObject(
-                "SELECT contract_amount FROM pm_project WHERE id=?", BigDecimal.class, PROJECT_ID);
+                "SELECT current_amount FROM ct_contract WHERE id=?", BigDecimal.class, OWNER_CONTRACT_ID);
         try {
-            jdbcTemplate.update("UPDATE pm_project SET contract_amount=0 WHERE id=?", PROJECT_ID);
+            jdbcTemplate.update("UPDATE ct_contract SET current_amount=0 WHERE id=?", OWNER_CONTRACT_ID);
             mockMvc.perform(getWithApiContext("/cost-targets/default-allocation")
                             .cookie(adminCookie()).param("projectId", String.valueOf(PROJECT_ID)))
                     .andExpect(status().isBadRequest())
-                    .andExpect(jsonPath("$.code").value("PROJECT_CONTRACT_AMOUNT_INVALID"));
+                    .andExpect(jsonPath("$.code").value("PROJECT_OWNER_CONTRACT_AMOUNT_INVALID"));
         } finally {
-            jdbcTemplate.update("UPDATE pm_project SET contract_amount=? WHERE id=?", original, PROJECT_ID);
+            jdbcTemplate.update("UPDATE ct_contract SET current_amount=? WHERE id=?", original, OWNER_CONTRACT_ID);
         }
     }
 

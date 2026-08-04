@@ -10,6 +10,9 @@ import {
   type ProjectRecord,
   type ProjectMemberCommand,
   type ProjectStatusCommand,
+  type ProjectActivationReadiness,
+  type ProjectCommencementCommand,
+  type ProjectCommencementRecord,
   type ProjectUpsertCommand,
   type ProjectUserOption,
 } from '@cgc-pms/frontend-contracts'
@@ -31,6 +34,51 @@ export function loadProjectOverview(
   signal?: AbortSignal,
 ): Promise<ProjectOverview> {
   return apiRequest<ProjectOverview>(PROJECT_API.overview(requiredId(projectId)), { signal })
+}
+
+export function loadProjectActivationReadiness(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<ProjectActivationReadiness> {
+  return apiRequest<ProjectActivationReadiness>(
+    PROJECT_API.activationReadiness(requiredId(projectId)),
+    {
+      signal,
+    },
+  )
+}
+
+export function loadProjectCommencement(
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<ProjectCommencementRecord | null> {
+  return apiRequest<ProjectCommencementRecord | null>(
+    PROJECT_API.commencement(requiredId(projectId)),
+    {
+      signal,
+    },
+  )
+}
+
+export function saveProjectCommencement(
+  projectId: string,
+  command: ProjectCommencementCommand,
+): Promise<ProjectCommencementRecord> {
+  return apiRequest<ProjectCommencementRecord, ProjectCommencementCommand>(
+    PROJECT_API.commencement(requiredId(projectId)),
+    { method: 'POST', body: command },
+  )
+}
+
+export function submitProjectCommencement(
+  projectId: string,
+  version: number,
+): Promise<ProjectCommencementRecord> {
+  const params = new URLSearchParams({ version: String(version) })
+  return apiRequest<ProjectCommencementRecord>(
+    `${PROJECT_API.commencementSubmit(requiredId(projectId))}?${params}`,
+    { method: 'POST' },
+  )
 }
 
 export function loadProjectMembers(

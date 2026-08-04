@@ -7,6 +7,8 @@ import com.cgcpms.cashbook.dto.FundAccountCommand;
 import com.cgcpms.cashbook.dto.CashJournalUpdateRequest;
 import com.cgcpms.cashbook.entity.CashJournalEntry;
 import com.cgcpms.cashbook.mapper.CashJournalEntryMapper;
+import com.cgcpms.contract.entity.CtContract;
+import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
@@ -47,6 +49,7 @@ class CashJournalArchiveTest {
     @Autowired PmProjectMapper projectMapper;
     @Autowired PayApplicationMapper applicationMapper;
     @Autowired PayRecordMapper payRecordMapper;
+    @Autowired CtContractMapper contractMapper;
 
     @BeforeEach
     void setUp() {
@@ -102,10 +105,27 @@ class CashJournalArchiveTest {
         project.setContractAmount(new BigDecimal("100.00"));
         project.setTargetCost(new BigDecimal("80.00"));
         projectMapper.insert(project);
+        CtContract contract = new CtContract();
+        contract.setId(93403023L);
+        contract.setTenantId(TENANT_ID);
+        contract.setProjectId(project.getId());
+        contract.setContractCode("CASH-JOURNAL-OPENING-CONTRACT");
+        contract.setContractName("现金日记开户日合同");
+        contract.setContractType("MAIN");
+        contract.setPartyAId(93403024L);
+        contract.setPartyBId(93403025L);
+        contract.setContractAmount(new BigDecimal("100.00"));
+        contract.setCurrentAmount(new BigDecimal("100.00"));
+        contract.setPaidAmount(BigDecimal.ZERO);
+        contract.setContractStatus("PERFORMING");
+        contract.setApprovalStatus("APPROVED");
+        contract.setVersion(0);
+        contractMapper.insert(contract);
         PayApplication application = new PayApplication();
         application.setId(93403022L);
         application.setTenantId(TENANT_ID);
         application.setProjectId(project.getId());
+        application.setContractId(contract.getId());
         application.setApplyCode("PAY-CASH-JOURNAL-OPENING");
         application.setPayType("OTHER");
         application.setApplyAmount(new BigDecimal("10.00"));
@@ -116,6 +136,7 @@ class CashJournalArchiveTest {
         record.setId(93403020L);
         record.setTenantId(TENANT_ID);
         record.setProjectId(project.getId());
+        record.setContractId(contract.getId());
         record.setPayApplicationId(application.getId());
         record.setPayAmount(new BigDecimal("10.00"));
         record.setPayDate(LocalDate.of(2026, 6, 30));

@@ -232,7 +232,9 @@ export function dashboardMetrics(
         { label: '审批中付款', value: formatAmount(item.pendingPaymentAmount) },
         { label: '已批未付', value: formatAmount(item.approvedUnpaidAmount), tone: 'warning' },
         { label: '预算执行率', value: formatRatio(item.budgetExecutionRate), tone: 'blue' },
-        { label: '公司资金余额', value: formatAmount(item.cashBalance) },
+        ...(item.cashBalanceAvailable !== false && item.cashBalance != null
+          ? [{ label: '公司资金余额', value: formatAmount(item.cashBalance) }]
+          : []),
       ]
     }
     case 'mgmt': {

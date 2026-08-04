@@ -35,6 +35,8 @@ public final class WorkflowBusinessTypes {
     public static final String PRODUCTION_MEASUREMENT = "PRODUCTION_MEASUREMENT";
     /** 项目计划履约闭环：基线与修订计划审批 */
     public static final String PROJECT_SCHEDULE = "PROJECT_SCHEDULE";
+    /** 项目开工准入审批 */
+    public static final String PROJECT_COMMENCEMENT = "PROJECT_COMMENCEMENT";
     /** 项目计划履约闭环：月计划与周计划审批 */
     public static final String PROJECT_PERIOD_PLAN = "PROJECT_PERIOD_PLAN";
     /** 项目计划履约闭环：延期纠偏审批 */

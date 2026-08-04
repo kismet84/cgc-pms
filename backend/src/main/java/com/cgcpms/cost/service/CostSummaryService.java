@@ -37,7 +37,12 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
@@ -68,6 +73,7 @@ public class CostSummaryService {
     private final CostSummaryAssembler assembler;
     private final ProjectAccessChecker projectAccessChecker;
     private final JdbcTemplate jdbc;
+    private final PlatformTransactionManager transactionManager;
 
     /**
      * Prevents overlapping executions of the scheduled refresh task.
@@ -624,6 +630,27 @@ public class CostSummaryService {
                 refreshLocks.remove(projectId, lock);
             }
         }
+    }
+
+    /** Refresh the projection from a fresh snapshot after the payment transaction commits. */
+    public void updatePaidAmountAfterCommit(Long tenantId, Long projectId) {
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            updatePaidAmount(tenantId, projectId);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+                transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+                try {
+                    transaction.executeWithoutResult(status -> updatePaidAmount(tenantId, projectId));
+                } catch (RuntimeException error) {
+                    log.error("Failed to refresh paid amount projection after commit: tenantId={}, projectId={}",
+                            tenantId, projectId, error);
+                }
+            }
+        });
     }
 
     private void doUpdatePaidAmount(Long tenantId, Long projectId) {

@@ -98,11 +98,12 @@ jobs:
       - name: Verify MySQL migration user scope
         shell: bash
         run: bash ./scripts/ci/verify-mysql-grants.sh "${{ job.services.mysql.id }}"
-      - name: Run MySQL least-privilege Flyway migration smoke test
-        run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest test -Dspring.profiles.active=test
+      - name: Run MySQL migration and payment concurrency tests
+        run: cd backend && ./mvnw -C -Dtest=FlywayMySqlSmokeTest,BaselineMySqlSmokeTest,PaymentMySqlConcurrencyTest test -Dspring.profiles.active=test
         env:
           TEST_JWT_SECRET: ${{ secrets.CI_TEST_JWT_SECRET || 'test-only-ci-cgc-pms-jwt-secret-key-256bit-minimum-length' }}
           CGCPMS_M52_MYSQL_BASELINE: 'true'
+          CGCPMS_M70_MYSQL_CONCURRENCY: 'true'
           SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/${{ env.CI_MYSQL_DATABASE }}
           SPRING_DATASOURCE_USERNAME: ${{ env.CI_MYSQL_USER }}
           SPRING_DATASOURCE_PASSWORD: ${{ env.CI_MYSQL_PASSWORD }}

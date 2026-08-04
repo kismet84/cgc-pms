@@ -481,6 +481,8 @@ export interface CostTargetDefaultAllocationItem extends CostTargetItemRecord {
 export interface CostTargetDefaultAllocation {
   projectId: string;
   projectManagerId?: string | null;
+  sourceMainContractId: string;
+  sourceMainContractCode: string;
   sourceContractAmount: DecimalString;
   targetCostRate: DecimalString;
   totalTargetAmount: DecimalString;

@@ -1,24 +1,8 @@
 {
   "schemaVersion": 1,
   "versionScope": "v1.6",
-  "updatedAt": "2026-08-04T16:42:53+08:00",
+  "updatedAt": "2026-08-04T19:25:00+08:00",
   "issues": [
-    {
-      "issueKey": "ISSUE-069-001",
-      "title": "项目立项、主合同与开工准入闭环整改",
-      "status": "OPEN",
-      "classification": "STILL_APPLICABLE",
-      "priority": "P0",
-      "blocking": true,
-      "summary": "现有流程允许无已批准 MAIN 主合同和无可审计开工依据的项目进入 ACTIVE，且中标价、项目合同额与正式主合同金额并列成为金额事实源。",
-      "acceptanceCriteria": "中标或直接立项来源可审计；PREPARING 可完成 MAIN 主合同审批并指定一份权威合同；目标成本仅以该合同当前金额生成并保存合同 ID 与金额快照；唯一执行预算、生效 WBS 和已批准开工准入全部成立后才可 CAS 进入 ACTIVE；租户、金额、状态、幂等和写后回读验收通过。",
-      "deferReason": "用户本轮仅授权编制第69条计划，业务代码、migration、数据库和运行态实施未授权。",
-      "sourceRefs": [
-        "docs/plans/第69条主线-项目立项主合同与开工准入闭环整改任务计划书.md",
-        "docs/plans/第67条主线-工程投标资料与成本日记账闭环任务计划书.md",
-        "docs/plans/第68条主线-施工阶段主线闭环整改任务计划书.md"
-      ]
-    },
     {
       "issueKey": "A-02",
       "title": "采购补货深化",

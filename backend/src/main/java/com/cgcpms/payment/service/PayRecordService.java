@@ -100,8 +100,13 @@ public class PayRecordService {
         validateWriteback(input);
         Long payApplicationId = input.getPayApplicationId();
 
-        // Lookup and lock the pay application to prevent concurrent writeback TOCTOU
-        PayApplication app = payApplicationMapper.selectByIdForUpdate(payApplicationId, UserContext.getCurrentTenantId());
+        payRecordMapper.ensureTenantPaymentCodeScope(UserContext.getCurrentTenantId());
+        if (payRecordMapper.lockTenantPaymentCodeScope(UserContext.getCurrentTenantId()) == null) {
+            throw new BusinessException("PAYMENT_CODE_SCOPE_UNAVAILABLE", "付款编号锁定范围不可用");
+        }
+
+        // Canonical financial lock order: contract -> application -> payment/source -> budget.
+        PayApplication app = payApplicationService.lockForAmountGate(payApplicationId);
         if (app == null || !app.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
         projectAccessChecker.checkAccess(app.getProjectId(), "付款回写");
@@ -110,35 +115,32 @@ public class PayRecordService {
         boolean strictClosedLoop = PaymentIntegrityConstants.CLOSED_LOOP_V1.equals(app.getIntegrityVersion());
         normalizeAndValidateFact(input, strictClosedLoop);
 
-        List<PayRecord> existing = payRecordMapper.selectList(
-            new LambdaQueryWrapper<PayRecord>()
-                .eq(PayRecord::getTenantId, UserContext.getCurrentTenantId())
-                .eq(PayRecord::getExternalTxnNo, input.getExternalTxnNo()));
-        if (!existing.isEmpty()) {
-            PayRecord duplicate = existing.get(0);
+        PayRecord duplicate = payRecordMapper.selectByExternalTxnNoForUpdate(
+                UserContext.getCurrentTenantId(), input.getExternalTxnNo());
+        if (duplicate != null) {
             if (!Objects.equals(duplicate.getPayApplicationId(), payApplicationId)
                     || !sameAmount(duplicate.getPayAmount(), input.getPayAmount())
                     || !Objects.equals(duplicate.getPaidAt(), input.getPaidAt())
-                    || !Objects.equals(duplicate.getFundAccountId(), input.getFundAccountId())) {
+                    || !Objects.equals(duplicate.getFundAccountId(), input.getFundAccountId())
+                    || !Objects.equals(duplicate.getPayMethod(), input.getPayMethod())
+                    || !Objects.equals(duplicate.getVoucherNo(), input.getVoucherNo())) {
                 throw new BusinessException("PAY_WRITEBACK_IDEMPOTENCY_CONFLICT",
                         "外部交易流水号已被不同付款数据使用");
             }
             log.info("Idempotent writeback hit: duplicate external transaction detected, returning existing record id={}",
                 duplicate.getId());
+            costSummaryService.updatePaidAmountAfterCommit(app.getTenantId(), app.getProjectId());
             return toVO(duplicate);
         }
-
-        if (strictClosedLoop) validateSecondGate(app, input);
 
         // Check contract balance before payment — include pendingAmount to prevent concurrent overpay
         BigDecimal pendingAmount = input.getPayAmount() != null ? input.getPayAmount() : BigDecimal.ZERO;
         payApplicationService.checkContractBalance(app, pendingAmount);
 
-        // Check overpayment: sum of existing SUCCESS pay_records for this application
-        List<PayRecord> existingRecords = payRecordMapper.selectList(
-            new LambdaQueryWrapper<PayRecord>()
-                .eq(PayRecord::getPayApplicationId, payApplicationId)
-                .eq(PayRecord::getPayStatus, "SUCCESS"));
+        // Current locking read after the contract/application locks; ordinary reads can be stale in RR.
+        List<PayRecord> existingRecords = Objects.requireNonNullElse(
+                payRecordMapper.selectSuccessByApplicationForUpdate(
+                        UserContext.getCurrentTenantId(), payApplicationId), List.of());
         BigDecimal alreadyPaid = existingRecords.stream()
             .map(r -> r.getPayAmount() == null ? BigDecimal.ZERO : r.getPayAmount())
             .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -147,6 +149,9 @@ public class PayRecordService {
             throw new BusinessException("PAY_OVERPAYMENT",
                 "付款金额(" + input.getPayAmount() + ")超过剩余可付金额(" + remaining + ")");
         }
+
+
+        if (strictClosedLoop) validateSecondGate(app, input);
 
         // Build the pay record
         PayRecord record = new PayRecord();
@@ -184,7 +189,7 @@ public class PayRecordService {
         // D4 linkage: cascade updates
         updateContractPaidAmount(app.getContractId());
         payApplicationService.updatePayStatus(payApplicationId);
-        costSummaryService.updatePaidAmount(app.getProjectId());
+        costSummaryService.updatePaidAmountAfterCommit(app.getTenantId(), app.getProjectId());
 
         return toVO(record);
     }
@@ -200,10 +205,8 @@ public class PayRecordService {
         if (contract == null) return;
 
         // Sum all pay_record.pay_amount for this contract with status SUCCESS
-        LambdaQueryWrapper<PayRecord> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(PayRecord::getContractId, contractId)
-                .eq(PayRecord::getPayStatus, "SUCCESS");
-        List<PayRecord> records = payRecordMapper.selectList(wrapper);
+        List<PayRecord> records = payRecordMapper.selectSuccessByContractForUpdate(
+                UserContext.getCurrentTenantId(), contractId);
 
         BigDecimal totalPaid = records.stream()
                 .map(r -> r.getPayAmount() != null ? r.getPayAmount() : BigDecimal.ZERO)
@@ -235,6 +238,7 @@ public class PayRecordService {
         if (input.getExternalTxnNo() == null || input.getExternalTxnNo().isBlank()) {
             throw new BusinessException("EXTERNAL_TXN_NO_REQUIRED", "外部交易流水号不能为空");
         }
+        input.setExternalTxnNo(input.getExternalTxnNo().trim());
         if (input.getPaidAt() == null && input.getPayDate() == null) {
             throw new BusinessException("PAY_DATE_REQUIRED", "付款时间不能为空");
         }
@@ -260,6 +264,8 @@ public class PayRecordService {
         if (strictClosedLoop && !StringUtils.hasText(input.getPayMethod())) {
             throw new BusinessException("PAY_METHOD_REQUIRED", "付款方式不能为空");
         }
+        input.setPayMethod(StringUtils.hasText(input.getPayMethod()) ? input.getPayMethod().trim() : null);
+        input.setVoucherNo(StringUtils.hasText(input.getVoucherNo()) ? input.getVoucherNo().trim() : null);
     }
 
     private void validateSecondGate(PayApplication app, PayRecord input) {
@@ -268,7 +274,7 @@ public class PayRecordService {
                 || !ProjectStatusConstants.ACTIVE.equals(project.getStatus())) {
             throw new BusinessException("PROJECT_NOT_ACTIVE", "项目已暂停、关闭或不存在，禁止付款");
         }
-        CtContract contract = ctContractMapper.selectById(app.getContractId());
+        CtContract contract = ctContractMapper.selectByIdForUpdate(app.getContractId(), app.getTenantId());
         if (contract == null || !Objects.equals(contract.getTenantId(), app.getTenantId())
                 || !Objects.equals(contract.getProjectId(), app.getProjectId())
                 || !ContractStatusConstants.APPROVAL_APPROVED.equals(contract.getApprovalStatus())
@@ -298,7 +304,7 @@ public class PayRecordService {
 
     // ---- VO conversion ----
 
-    private PayRecordVO toVO(PayRecord record) {
+    PayRecordVO toVO(PayRecord record) {
         PayRecordVO vo = new PayRecordVO();
         vo.setId(record.getId() != null ? record.getId().toString() : null);
         vo.setTenantId(record.getTenantId() != null ? record.getTenantId().toString() : null);

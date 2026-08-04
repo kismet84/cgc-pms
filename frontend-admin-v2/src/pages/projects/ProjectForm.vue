@@ -44,18 +44,6 @@ function set(key: keyof ProjectUpsertCommand, value: string) {
       label="设计单位"
       @update:model-value="set('designUnit', $event)"
     />
-    <V2Input
-      :model-value="modelValue.contractAmount"
-      label="合同金额（元）"
-      :decimal-scale="2"
-      @update:model-value="set('contractAmount', $event)"
-    />
-    <V2Input
-      :model-value="modelValue.targetCost"
-      label="目标成本（元）"
-      :decimal-scale="2"
-      @update:model-value="set('targetCost', $event)"
-    />
     <label
       >计划开工<input
         :value="modelValue.plannedStartDate"

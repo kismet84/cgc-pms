@@ -620,6 +620,35 @@ class PaymentApplicationClosedLoopIntegrationTest {
                 sources.stream().map(row -> row.get("amount")).sorted().toList());
         assertEquals(List.of("200.00", "300.00"),
                 invoices.stream().map(row -> row.get("amount")).sorted().toList());
+
+        long wrongContractId = CONTRACT_ID + 100;
+        CtContract wrongContract = new CtContract();
+        wrongContract.setId(wrongContractId);
+        wrongContract.setTenantId(TENANT_ID);
+        wrongContract.setProjectId(PROJECT_ID);
+        wrongContract.setContractCode("PAYMENT-TRACE-WRONG-CONTRACT");
+        wrongContract.setContractName("付款 Trace 错链测试合同");
+        wrongContract.setContractType("SUBCONTRACT");
+        wrongContract.setPartyAId(PARTNER_ID);
+        wrongContract.setPartyBId(PARTNER_ID);
+        wrongContract.setContractAmount(new BigDecimal("5000.00"));
+        wrongContract.setCurrentAmount(new BigDecimal("5000.00"));
+        wrongContract.setPaidAmount(BigDecimal.ZERO);
+        wrongContract.setContractStatus("PERFORMING");
+        wrongContract.setApprovalStatus("APPROVED");
+        wrongContract.setVersion(0);
+        contractMapper.insert(wrongContract);
+        try {
+            jdbcTemplate.update("UPDATE expense_application SET contract_id=? WHERE id=?",
+                    wrongContractId, firstExpenseId);
+            BusinessException wrongLink = assertThrows(BusinessException.class,
+                    () -> traceService.byApplication(applicationId));
+            assertEquals("PAYMENT_TRACE_INCOMPLETE", wrongLink.getCode());
+        } finally {
+            jdbcTemplate.update("UPDATE expense_application SET contract_id=? WHERE id=?",
+                    CONTRACT_ID, firstExpenseId);
+            jdbcTemplate.update("DELETE FROM ct_contract WHERE id=?", wrongContractId);
+        }
     }
 
     @Test
@@ -770,6 +799,35 @@ class PaymentApplicationClosedLoopIntegrationTest {
                 .eq(CashJournalEntry::getPayRecordId, Long.valueOf(reversal.getId())));
         assertNotNull(reversalJournal);
         assertEquals(journal.getId(), reversalJournal.getReverseOfEntryId());
+        var reversalRecord = payRecordService.getById(Long.valueOf(reversal.getId()));
+        assertEquals(reversalRecord.getPaidAt(), reversalJournal.getArchivedAt().toString().replace('T', ' '));
+        var reversalTrace = traceService.byCashJournal(reversalJournal.getId());
+        assertEquals(2, reversalTrace.getCashJournals().size());
+        assertEquals(2, reversalTrace.getPaymentDocuments().size());
+        assertEquals(1L, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM payment_document_link WHERE cash_journal_id = ?",
+                Long.class, journal.getId()));
+
+        PaymentReversalRequest conflicting = new PaymentReversalRequest();
+        conflicting.setReason("同一流水号但不同冲销原因");
+        conflicting.setExternalTxnNo(request.getExternalTxnNo());
+        conflicting.setReversedAt(request.getReversedAt());
+        BusinessException idempotencyConflict = assertThrows(BusinessException.class,
+                () -> reversalService.reverse(paidId, conflicting));
+        assertEquals("PAYMENT_REVERSAL_IDEMPOTENCY_CONFLICT", idempotencyConflict.getCode());
+
+        AccountingEntry originalEntry = accountingEntryMapper.selectOne(new LambdaQueryWrapper<AccountingEntry>()
+                .eq(AccountingEntry::getPayRecordId, paidId)
+                .eq(AccountingEntry::getEntryType, "PAYMENT"));
+        AccountingEntry reversalEntry = accountingEntryMapper.selectOne(new LambdaQueryWrapper<AccountingEntry>()
+                .eq(AccountingEntry::getPayRecordId, Long.valueOf(reversal.getId()))
+                .eq(AccountingEntry::getEntryType, "PAYMENT_REVERSAL"));
+        jdbcTemplate.update("UPDATE accounting_entry SET reversed_entry_id=NULL WHERE id=?", originalEntry.getId());
+        jdbcTemplate.update("DELETE FROM accounting_entry_line WHERE entry_id=?", reversalEntry.getId());
+        jdbcTemplate.update("DELETE FROM accounting_entry WHERE id=?", reversalEntry.getId());
+        BusinessException incomplete = assertThrows(BusinessException.class,
+                () -> traceService.byApplication(applicationId));
+        assertEquals("PAYMENT_TRACE_INCOMPLETE", incomplete.getCode());
     }
 
     @Test
@@ -821,8 +879,8 @@ class PaymentApplicationClosedLoopIntegrationTest {
     }
 
     @Test
-    @DisplayName("核验发票分配到任一付款记录后，该付款均不可冲销")
-    void verifiedInvoiceAllocationBlocksReversalForEveryPayment() {
+    @DisplayName("PENDING 发票分配到任一付款记录后，该付款均不可冲销")
+    void anyInvoiceAllocationBlocksReversalForEveryPayment() {
         Long applicationId = createPayment(new BigDecimal("400.00"));
         saveDirectSource(applicationId, new BigDecimal("400.00"));
         attach("PAYMENT", applicationId);
@@ -862,16 +920,13 @@ class PaymentApplicationClosedLoopIntegrationTest {
         secondAllocation.setPayRecordId(secondId);
         secondAllocation.setAllocatedAmount(new BigDecimal("200.00"));
         invoiceService.saveAllocations(invoiceId, List.of(firstAllocation, secondAllocation));
-        attach("INVOICE", invoiceId);
-        invoiceService.verify(invoiceId, "VERIFIED");
-
         PaymentReversalRequest request = new PaymentReversalRequest();
         request.setReason("尝试冲销发票第二笔分配付款");
         request.setExternalTxnNo("PAYMENT-MULTI-INVOICE-REVERSAL");
         request.setReversedAt(LocalDateTime.now());
         BusinessException blocked = assertThrows(BusinessException.class,
                 () -> reversalService.reverse(secondId, request));
-        assertEquals("PAYMENT_HAS_VERIFIED_INVOICE", blocked.getCode());
+        assertEquals("PAYMENT_HAS_INVOICE_ALLOCATION", blocked.getCode());
         assertEquals("SUCCESS", payRecordService.getById(secondId).getPayStatus());
     }
 
@@ -1226,7 +1281,7 @@ class PaymentApplicationClosedLoopIntegrationTest {
         jdbcTemplate.update("DELETE FROM project_budget_line WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM project_budget WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM fund_account WHERE id = ?", FUND_ACCOUNT_ID);
-        jdbcTemplate.update("DELETE FROM ct_contract WHERE id = ?", CONTRACT_ID);
+        jdbcTemplate.update("DELETE FROM ct_contract WHERE project_id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM pm_project WHERE id = ?", PROJECT_ID);
         jdbcTemplate.update("DELETE FROM md_partner WHERE id = ?", PARTNER_ID);
         jdbcTemplate.update("DELETE FROM cost_subject WHERE id = ?", SUBJECT_ID);

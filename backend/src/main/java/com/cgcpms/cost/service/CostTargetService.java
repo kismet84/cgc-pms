@@ -18,6 +18,7 @@ import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.project.constant.ProjectStatusConstants;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
+import com.cgcpms.project.service.OwnerContractFactService;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.service.WorkflowEngine;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -54,6 +55,7 @@ public class CostTargetService {
     private final JdbcTemplate jdbc;
     // 使用 ObjectProvider + @Lazy 解决 WorkflowEngine → CostTargetService 循环依赖
     private final ObjectProvider<WorkflowEngine> workflowEngineProvider;
+    private final OwnerContractFactService ownerContractFactService;
 
     // ── Query ──
 
@@ -92,10 +94,8 @@ public class CostTargetService {
 
     public DefaultAllocation getDefaultAllocation(Long projectId) {
         PmProject project = requireWritableProject(projectId, "生成目标成本默认分配");
-        BigDecimal contractAmount = money(project.getContractAmount());
-        if (project.getContractAmount() == null || contractAmount.signum() <= 0) {
-            throw new BusinessException("PROJECT_CONTRACT_AMOUNT_INVALID", "项目合同金额必须大于0才能生成目标成本");
-        }
+        OwnerContractFactService.OwnerContractFact contract = ownerContractFactService.requireApprovedMain(project);
+        BigDecimal contractAmount = money(contract.currentAmount());
         List<TargetSubject> subjects = getTargetSubjects(false);
         BigDecimal total = money(contractAmount.multiply(TARGET_COST_RATE));
         List<DefaultAllocationItem> items = new ArrayList<>();
@@ -118,7 +118,8 @@ public class CostTargetService {
             }
         }
         return new DefaultAllocation(String.valueOf(project.getId()),
-                project.getProjectManagerId() == null ? null : String.valueOf(project.getProjectManagerId()), contractAmount,
+                project.getProjectManagerId() == null ? null : String.valueOf(project.getProjectManagerId()),
+                String.valueOf(contract.contractId()), contract.contractCode(), contractAmount,
                 TARGET_COST_RATE, total, items);
     }
 
@@ -126,7 +127,7 @@ public class CostTargetService {
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(CostTarget target) {
-        PmProject project = requireWritableProject(target.getProjectId(), "创建目标成本");
+        PmProject project = lockWritableProject(target.getProjectId(), "创建目标成本");
         target.setTenantId(UserContext.getCurrentTenantId());
         target.setProjectId(project.getId());
         target.setApprovalStatus("DRAFT");
@@ -172,6 +173,7 @@ public class CostTargetService {
         target.setApprovalInstanceId(existing.getApprovalInstanceId());
         target.setVersion(existing.getVersion());
         target.setSourceContractAmount(existing.getSourceContractAmount());
+        target.setSourceContractId(existing.getSourceContractId());
         target.setTargetCostRate(existing.getTargetCostRate());
         if (existing.getSourceContractAmount() != null) {
             target.setTotalTargetAmount(existing.getTotalTargetAmount());
@@ -436,6 +438,8 @@ public class CostTargetService {
     }
 
     public void validateForSubmit(CostTarget target) {
+        PmProject project = requireWritableProject(target.getProjectId(), "提交目标成本审批");
+        validateContractSnapshot(target, project);
         List<CostTargetItem> items = getItems(target.getId());
         if (items.isEmpty()) throw new BusinessException("COST_TARGET_NO_ITEMS", "目标成本至少需要一条科目明细");
         validateItemsTotal(target, items);
@@ -576,17 +580,25 @@ public class CostTargetService {
         if (target.getTotalResponsibilityAmount().compareTo(target.getTotalTargetAmount()) != 0) throw new BusinessException("COST_TARGET_RESPONSIBILITY_MISMATCH", "责任预算总额必须等于目标成本总额");
     }
 
-    private static void applyContractSnapshot(CostTarget target, PmProject project) {
-        BigDecimal contractAmount = money(project.getContractAmount());
-        if (project.getContractAmount() == null || contractAmount.signum() <= 0) {
-            throw new BusinessException("PROJECT_CONTRACT_AMOUNT_INVALID", "项目合同金额必须大于0才能创建目标成本");
-        }
+    private void applyContractSnapshot(CostTarget target, PmProject project) {
+        OwnerContractFactService.OwnerContractFact contract = ownerContractFactService.requireApprovedMain(project);
+        BigDecimal contractAmount = money(contract.currentAmount());
         BigDecimal total = money(contractAmount.multiply(TARGET_COST_RATE));
+        target.setSourceContractId(contract.contractId());
         target.setSourceContractAmount(contractAmount);
         target.setTargetCostRate(TARGET_COST_RATE);
         target.setTotalTargetAmount(total);
         target.setTotalBidCostAmount(BigDecimal.ZERO.setScale(2));
         target.setTotalResponsibilityAmount(total);
+    }
+
+    private void validateContractSnapshot(CostTarget target, PmProject project) {
+        OwnerContractFactService.OwnerContractFact contract = ownerContractFactService.requireApprovedMain(project);
+        if (!Objects.equals(target.getSourceContractId(), contract.contractId())
+                || target.getSourceContractAmount() == null
+                || money(target.getSourceContractAmount()).compareTo(money(contract.currentAmount())) != 0) {
+            throw new BusinessException("COST_TARGET_CONTRACT_SNAPSHOT_DRIFT", "目标成本来源合同或金额快照已变化，请创建新版本");
+        }
     }
 
     private void normalizeItems(List<CostTargetItem> items) {
@@ -647,7 +659,8 @@ public class CostTargetService {
     }
 
     public record DefaultAllocation(String projectId, String projectManagerId,
-                                    @JsonSerialize(using = ToStringSerializer.class) BigDecimal sourceContractAmount,
+                                     String sourceMainContractId, String sourceMainContractCode,
+                                     @JsonSerialize(using = ToStringSerializer.class) BigDecimal sourceContractAmount,
                                     @JsonSerialize(using = ToStringSerializer.class) BigDecimal targetCostRate,
                                     @JsonSerialize(using = ToStringSerializer.class) BigDecimal totalTargetAmount,
                                     List<DefaultAllocationItem> items) {

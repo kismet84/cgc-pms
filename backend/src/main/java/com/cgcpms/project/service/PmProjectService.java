@@ -36,6 +36,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.bid.entity.BidCost;
+import com.cgcpms.bid.mapper.BidCostMapper;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
@@ -67,6 +69,7 @@ public class PmProjectService {
     private final ProjectLifecycleService projectLifecycleService;
     private final com.cgcpms.project.auth.ProjectAccessChecker projectAccessChecker;
     private final SysDictDataService sysDictDataService;
+    private final BidCostMapper bidCostMapper;
 
     public IPage<PmProjectVO> getPage(long pageNo, long pageSize, String keyword, String projectCode, String projectName, String projectType, String status) {
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
@@ -138,6 +141,10 @@ public class PmProjectService {
         project.setStatus(ProjectStatusConstants.DRAFT);
         project.setApprovalStatus("DRAFT");
         project.setTenantId(tenantId);
+        project.setContractAmount(java.math.BigDecimal.ZERO);
+        project.setInitiationBasis(null);
+        project.setSourceBidCostId(null);
+        project.setOwnerContractId(null);
 
         for (int attempt = 0; attempt < CODE_GENERATION_MAX_RETRIES; attempt++) {
             project.setProjectCode(nextProjectCode(tenantId, prefix, attempt));
@@ -212,6 +219,13 @@ public class PmProjectService {
         project.setApprovalStatus(existing.getApprovalStatus());
         project.setTenantId(existing.getTenantId());
         project.setProjectCode(existing.getProjectCode());
+        project.setContractAmount(existing.getContractAmount());
+        project.setTargetCost(existing.getTargetCost());
+        project.setSourceBidCostId(existing.getSourceBidCostId());
+        project.setOwnerContractId(existing.getOwnerContractId());
+        project.setInitiationBasis(existing.getInitiationBasis());
+        project.setActualStartDate(existing.getActualStartDate());
+        project.setActualEndDate(existing.getActualEndDate());
         pmProjectMapper.updateById(project);
     }
 
@@ -245,8 +259,11 @@ public class PmProjectService {
                     "不允许从 " + current + " 变更为 " + target);
         }
         if (ProjectStatusConstants.ACTIVE.equals(target)) {
+            if (ProjectStatusConstants.PREPARING.equals(current)) {
+                throw new BusinessException("PROJECT_COMMENCEMENT_APPROVAL_REQUIRED", "筹备项目只能由开工准入审批通过后进入在建状态");
+            }
             if (!projectLifecycleService.isActivationReady(project.getId(), project.getTenantId())) {
-                throw new BusinessException("PROJECT_ACTIVE_GATE_REQUIRED", "项目启用前必须存在唯一已审批生效的成本目标、预算和WBS基线");
+                throw new BusinessException("PROJECT_ACTIVE_GATE_REQUIRED", "项目恢复在建前必须满足权威主合同、同源成本预算、WBS和开工准入条件");
             }
         }
         project.setStatus(target);
@@ -396,6 +413,14 @@ public class PmProjectService {
         vo.setActualEndDate(p.getActualEndDate() != null ? p.getActualEndDate().toString() : null);
         vo.setProjectManagerId(p.getProjectManagerId() != null ? p.getProjectManagerId().toString() : null);
         vo.setSourceBidCostId(p.getSourceBidCostId() != null ? p.getSourceBidCostId().toString() : null);
+        vo.setOwnerContractId(p.getOwnerContractId() != null ? p.getOwnerContractId().toString() : null);
+        if (p.getSourceBidCostId() != null) {
+            BidCost bid = bidCostMapper.selectById(p.getSourceBidCostId());
+            if (bid != null && java.util.Objects.equals(bid.getTenantId(), p.getTenantId())
+                    && bid.getFinalBidPrice() != null) {
+                vo.setFinalBidPrice(bid.getFinalBidPrice().toPlainString());
+            }
+        }
         vo.setInitiationBasis(p.getInitiationBasis());
         vo.setStatus(p.getStatus());
         vo.setApprovalStatus(p.getApprovalStatus());

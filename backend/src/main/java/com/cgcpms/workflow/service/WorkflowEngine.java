@@ -91,6 +91,7 @@ public class WorkflowEngine {
             case WorkflowBusinessTypes.OWNER_SETTLEMENT -> "revenue:settlement:submit";
             case WorkflowBusinessTypes.PRODUCTION_MEASUREMENT -> "measurement:submit";
             case WorkflowBusinessTypes.PROJECT_SCHEDULE -> "schedule:submit";
+            case WorkflowBusinessTypes.PROJECT_COMMENCEMENT -> "project:commencement:submit";
             case WorkflowBusinessTypes.PROJECT_PERIOD_PLAN -> "schedule:submit";
             case WorkflowBusinessTypes.PROJECT_CORRECTIVE_ACTION -> "schedule:correct";
             case WorkflowBusinessTypes.TECHNICAL_SCHEME -> "technical:scheme:submit";

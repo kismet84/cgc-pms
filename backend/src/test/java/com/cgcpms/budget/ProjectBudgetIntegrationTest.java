@@ -70,7 +70,7 @@ class ProjectBudgetIntegrationTest {
         project.setTenantId(TENANT_ID);
         project.setProjectCode("BUDGET-IT-PROJECT");
         project.setProjectName("预算集成测试项目");
-        project.setStatus("PREPARING");
+        project.setStatus("ACTIVE");
         project.setApprovalStatus("APPROVED");
         projectMapper.insert(project);
 
@@ -144,7 +144,6 @@ class ProjectBudgetIntegrationTest {
                        CURRENT_TIMESTAMP,1,CURRENT_TIMESTAMP,0)
                 """, WBS_ID, TENANT_ID, PROJECT_ID, SCHEDULE_ID);
 
-        projectService.transitionStatus(PROJECT_ID, "ACTIVE", "项目成本预算已审批通过");
     }
 
     @AfterEach
@@ -161,7 +160,7 @@ class ProjectBudgetIntegrationTest {
         assertEquals(BudgetStatusConstants.STATUS_ACTIVE, active.getStatus());
         assertEquals(1, active.getActiveFlag());
         assertEquals("ACTIVE", projectMapper.selectById(PROJECT_ID).getStatus(),
-                "预算与目标成本均已生效后项目应自动进入在建");
+                "预算集成测试使用已通过开工准入的项目夹具");
         assertTrue(active.getBudgetCode().matches("BUD-\\d{8}-\\d{3}"));
 
         BudgetLedger reserved = ledgerService.reserve(lineId, "PAY_REQUEST", 1001L,
@@ -182,11 +181,13 @@ class ProjectBudgetIntegrationTest {
         assertEquals(4, ledgerService.getBusinessLedger("PAY_REQUEST", 1001L).size());
 
         projectService.transitionStatus(PROJECT_ID, "SUSPENDED", "现场暂停");
-        projectService.transitionStatus(PROJECT_ID, "ACTIVE", "恢复施工");
+        BusinessException resumeBlocked = assertThrows(BusinessException.class,
+                () -> projectService.transitionStatus(PROJECT_ID, "ACTIVE", "恢复施工"));
+        assertEquals("PROJECT_ACTIVE_GATE_REQUIRED", resumeBlocked.getCode());
         BusinessException closeDirectly = assertThrows(BusinessException.class,
                 () -> projectService.transitionStatus(PROJECT_ID, "CLOSED", "项目完成"));
         assertEquals("PROJECT_CLOSEOUT_ACTION_REQUIRED", closeDirectly.getCode());
-        assertEquals("ACTIVE", projectMapper.selectById(PROJECT_ID).getStatus());
+        assertEquals("SUSPENDED", projectMapper.selectById(PROJECT_ID).getStatus());
     }
 
     @Test

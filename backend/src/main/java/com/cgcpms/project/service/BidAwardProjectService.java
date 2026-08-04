@@ -48,7 +48,7 @@ public class BidAwardProjectService implements BidAwardProjectCreator {
             project.setProjectName(command.projectName().trim());
             project.setOwnerUnit(blankToNull(command.ownerUnit()));
             project.setProjectAddress(blankToNull(command.projectAddress()));
-            project.setContractAmount(command.contractAmount());
+            project.setContractAmount(BigDecimal.ZERO);
             project.setTargetCost(BigDecimal.ZERO);
             project.setPlannedStartDate(command.plannedStartDate());
             project.setPlannedEndDate(command.plannedEndDate());
