@@ -103,7 +103,7 @@ class BidDocumentVersionServiceTest {
     void firstAppendUsesServerHashAndStartsAtVersionOne() {
         when(bidCostMapper.selectByIdForUpdate(4L, TestUserContext.TENANT_0))
                 .thenReturn(bid(4L, TestUserContext.TENANT_0));
-        when(sysFileMapper.selectById(40L)).thenReturn(cleanFile(40L, 4L));
+        when(sysFileMapper.selectByIdForUpdate(40L, TestUserContext.TENANT_0)).thenReturn(cleanFile(40L, 4L));
 
         BidDocumentVersion version = service.append(4L, request(40L));
 
@@ -117,7 +117,7 @@ class BidDocumentVersionServiceTest {
     void finalVersionCannotBeReplacedByDraft() {
         when(bidCostMapper.selectByIdForUpdate(5L, TestUserContext.TENANT_0))
                 .thenReturn(bid(5L, TestUserContext.TENANT_0));
-        when(sysFileMapper.selectById(50L)).thenReturn(cleanFile(50L, 5L));
+        when(sysFileMapper.selectByIdForUpdate(50L, TestUserContext.TENANT_0)).thenReturn(cleanFile(50L, 5L));
         BidDocumentVersion previous = new BidDocumentVersion();
         previous.setId(500L);
         previous.setVersionNo(2);
@@ -161,7 +161,7 @@ class BidDocumentVersionServiceTest {
                 .thenReturn(bid(8L, TestUserContext.TENANT_0));
         SysFile file = cleanFile(80L, 8L);
         file.setVirusScanStatus("PENDING");
-        when(sysFileMapper.selectById(80L)).thenReturn(file);
+        when(sysFileMapper.selectByIdForUpdate(80L, TestUserContext.TENANT_0)).thenReturn(file);
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.append(8L, request(80L)));
@@ -175,7 +175,7 @@ class BidDocumentVersionServiceTest {
                 .thenReturn(bid(9L, TestUserContext.TENANT_0));
         SysFile file = cleanFile(90L, 9L);
         file.setFileName("award-notice.pdf");
-        when(sysFileMapper.selectById(90L)).thenReturn(file);
+        when(sysFileMapper.selectByIdForUpdate(90L, TestUserContext.TENANT_0)).thenReturn(file);
 
         BusinessException error = assertThrows(BusinessException.class,
                 () -> service.append(9L, request(90L)));
@@ -193,7 +193,7 @@ class BidDocumentVersionServiceTest {
         file.setBusinessType("BID_COST");
         file.setBusinessId(3L);
         file.setVirusScanStatus("CLEAN");
-        when(sysFileMapper.selectById(30L)).thenReturn(file);
+        when(sysFileMapper.selectByIdForUpdate(30L, TestUserContext.TENANT_0)).thenReturn(file);
 
         BidDocumentCreateRequest request = new BidDocumentCreateRequest(
                 "RESULT", "AWARD_NOTICE", "中标通知书", 30L,

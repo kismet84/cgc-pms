@@ -10,9 +10,7 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractItem;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
-import com.cgcpms.file.entity.SysFile;
-import com.cgcpms.file.mapper.SysFileMapper;
-import com.cgcpms.file.service.FileService;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.project.entity.PmProject;
@@ -33,7 +31,6 @@ import com.cgcpms.workflow.service.WorkflowEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -68,8 +65,7 @@ public class SubMeasureService {
     private final WfInstanceMapper wfInstanceMapper;
     private final SubMeasureIntegrityService integrityService;
     private final ProjectAccessChecker projectAccessChecker;
-    private final SysFileMapper sysFileMapper;
-    private final ObjectProvider<FileService> fileServiceProvider;
+    private final FileLifecycleGateway fileLifecycleGateway;
 
     public IPage<SubMeasureVO> getPage(long pageNo, long pageSize, Long projectId, Long contractId,
                                         Long partnerId, String status, String measureCode) {
@@ -390,17 +386,7 @@ public class SubMeasureService {
         if (existing.getCostGeneratedFlag() != null && existing.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可删除，请走冲销");
 
-        List<SysFile> attachments = sysFileMapper.selectList(new LambdaQueryWrapper<SysFile>()
-                .eq(SysFile::getTenantId, tenantId)
-                .eq(SysFile::getBusinessType, "SUBCONTRACT")
-                .eq(SysFile::getBusinessId, id));
-        FileService fileService = fileServiceProvider.getIfAvailable();
-        for (SysFile attachment : attachments) {
-            if (fileService != null)
-                fileService.deleteForBusinessCascade(attachment.getId(), "SUBCONTRACT", id);
-            else if (sysFileMapper.deleteById(attachment.getId()) != 1)
-                throw new BusinessException("SUB_MEASURE_DELETE_FAILED", "分包计量附件清理失败");
-        }
+        fileLifecycleGateway.deleteAllForBusinessCascade("SUBCONTRACT", id);
         subMeasureItemMapper.delete(new LambdaQueryWrapper<SubMeasureItem>()
                 .eq(SubMeasureItem::getTenantId, tenantId)
                 .eq(SubMeasureItem::getMeasureId, id));

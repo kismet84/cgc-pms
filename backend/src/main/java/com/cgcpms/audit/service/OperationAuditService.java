@@ -35,6 +35,7 @@ public class OperationAuditService {
             entity.setOperationType(event.operationType());
             entity.setBusinessType(event.businessType());
             entity.setBusinessId(event.businessId());
+            entity.setFileId(event.fileId());
             entity.setHttpMethod(event.httpMethod());
             entity.setRequestPath(event.requestPath());
             entity.setSuccessFlag(event.successFlag() ? 1 : 0);

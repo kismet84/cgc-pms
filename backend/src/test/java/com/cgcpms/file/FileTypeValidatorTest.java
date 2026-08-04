@@ -6,6 +6,11 @@ import com.cgcpms.file.service.FileTypeValidator.ValidationResult;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -91,7 +96,7 @@ class FileTypeValidatorTest {
     @Test
     @DisplayName("DOCX 合法签名通过（ZIP + Content_Types.xml）")
     void testDocxValid() {
-        byte[] content = officeContent();
+        byte[] content = officeContent("word/document.xml");
         ValidationResult result = validator.validate("doc.docx",
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document", content);
         assertEquals("doc.docx", result.sanitizedName());
@@ -103,7 +108,8 @@ class FileTypeValidatorTest {
     @DisplayName("XLSX 合法签名通过（ZIP + Content_Types.xml）")
     void testXlsxValid() {
         ValidationResult result = validator.validate("sheet.xlsx",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", officeContent());
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                officeContent("xl/workbook.xml"));
         assertEquals("sheet.xlsx", result.sanitizedName());
         assertEquals(".xlsx", result.extension());
         assertTrue(result.detectedMime().startsWith("application/vnd.openxmlformats-officedocument"));
@@ -167,10 +173,10 @@ class FileTypeValidatorTest {
     void testControlCharInFilename() {
         // ASCII 0x01 (SOH) in filename
         byte[] content = "%PDF-1.4 test".getBytes();
-        ValidationResult result = validator.validate("report.pdf", "application/pdf", content);
+        ValidationResult result = validator.validate("rep\t\n\rort.pdf", "application/pdf", content);
         // 控制字符被替换为 _
         assertTrue(result.sanitizedName().contains("_"));
-        assertFalse(result.sanitizedName().chars().anyMatch(c -> c < 0x20 && c != '\t' && c != '\n' && c != '\r'));
+        assertFalse(result.sanitizedName().chars().anyMatch(Character::isISOControl));
         assertEquals(".pdf", result.extension());
         assertEquals("application/pdf", result.detectedMime());
     }
@@ -243,17 +249,35 @@ class FileTypeValidatorTest {
         BusinessException ex = assertThrows(BusinessException.class, () ->
                 validator.validate("doc.docx",
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        officeContent()));
+                        officeContent("word/document.xml")));
         assertEquals("FILE_TYPE_NOT_ALLOWED", ex.getCode());
         assertTrue(ex.getMessage().contains("类型不匹配") || ex.getMessage().contains("不匹配"));
     }
 
-    private byte[] officeContent() {
-        byte[] header = new byte[] {0x50, 0x4B, 0x03, 0x04};
-        byte[] contentTypes = "Content_Types]".getBytes();
-        byte[] content = new byte[header.length + contentTypes.length + 100];
-        System.arraycopy(header, 0, content, 0, header.length);
-        System.arraycopy(contentTypes, 0, content, 60, contentTypes.length);
-        return content;
+    @Test
+    @DisplayName("OOXML 根目录与扩展名不匹配时拒绝")
+    void testOfficeContainerMismatch() {
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                validator.validate("fake.docx",
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        officeContent("xl/workbook.xml")));
+        assertEquals("FILE_TYPE_NOT_ALLOWED", ex.getCode());
+    }
+
+    private byte[] officeContent(String rootEntry) {
+        try {
+            ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+            try (ZipOutputStream zip = new ZipOutputStream(bytes)) {
+                zip.putNextEntry(new ZipEntry("[Content_Types].xml"));
+                zip.write("<Types/>".getBytes());
+                zip.closeEntry();
+                zip.putNextEntry(new ZipEntry(rootEntry));
+                zip.write("content".getBytes());
+                zip.closeEntry();
+            }
+            return bytes.toByteArray();
+        } catch (IOException exception) {
+            throw new AssertionError(exception);
+        }
     }
 }

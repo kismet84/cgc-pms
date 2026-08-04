@@ -11,6 +11,7 @@ public record OperationAuditEvent(
         String operationType,
         String businessType,
         String businessId,
+        Long fileId,
         String httpMethod,
         String requestPath,
         boolean successFlag,
@@ -29,6 +30,7 @@ public record OperationAuditEvent(
         private String operationType;
         private String businessType;
         private String businessId;
+        private Long fileId;
         private String httpMethod;
         private String requestPath;
         private boolean successFlag;
@@ -42,6 +44,7 @@ public record OperationAuditEvent(
         public Builder operationType(String operationType) { this.operationType = operationType; return this; }
         public Builder businessType(String businessType) { this.businessType = businessType; return this; }
         public Builder businessId(String businessId) { this.businessId = businessId; return this; }
+        public Builder fileId(Long fileId) { this.fileId = fileId; return this; }
         public Builder httpMethod(String httpMethod) { this.httpMethod = httpMethod; return this; }
         public Builder requestPath(String requestPath) { this.requestPath = requestPath; return this; }
         public Builder successFlag(boolean successFlag) { this.successFlag = successFlag; return this; }
@@ -51,7 +54,7 @@ public record OperationAuditEvent(
         public Builder createdAt(LocalDateTime createdAt) { this.createdAt = createdAt; return this; }
 
         public OperationAuditEvent build() {
-            return new OperationAuditEvent(tenantId, userId, operationType, businessType, businessId,
+            return new OperationAuditEvent(tenantId, userId, operationType, businessType, businessId, fileId,
                     httpMethod, requestPath, successFlag, errorCode, sourceIp, durationMs, createdAt);
         }
     }

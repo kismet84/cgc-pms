@@ -1,69 +1,43 @@
 package com.cgcpms.file.controller;
 
 import com.cgcpms.audit.annotation.AuditedOperation;
+import com.cgcpms.audit.event.OperationAuditEvent;
+import com.cgcpms.auth.context.UserContext;
+import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.annotation.RateLimit;
 import com.cgcpms.common.annotation.RateLimitKey;
 import com.cgcpms.common.result.ApiResponse;
 import com.cgcpms.file.service.FileService;
+import com.cgcpms.file.service.FileMaintenanceService;
 import com.cgcpms.file.vo.SysFileVO;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import jakarta.servlet.http.HttpServletRequest;
+import java.time.LocalDateTime;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/files")
 @RequiredArgsConstructor
+@Slf4j
 @ConditionalOnProperty(name = "minio.enabled", havingValue = "true", matchIfMissing = true)
 public class FileController {
 
     private final FileService fileService;
+    private final FileMaintenanceService maintenanceService;
+    private final ApplicationEventPublisher auditPublisher;
+    private final HttpServletRequest request;
 
     @PostMapping("/upload")
     @AuditedOperation(type = "UPLOAD", businessType = "FILE", businessIdExpression = "#businessId")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:upload')"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('CASH_JOURNAL')"
-            + " and hasAuthority('cashbook:journal:maintain'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('SITE_DAILY_LOG')"
-            + " and hasAuthority('site:daily:edit'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('SUBCONTRACT')"
-            + " and hasAuthority('subcontract:measure:edit'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('SETTLEMENT')"
-            + " and hasAuthority('settlement:edit'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('EXPENSE')"
-            + " and hasAuthority('expense:edit'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('PAYMENT')"
-            + " and hasAuthority('payment:app:edit'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('INVOICE')"
-            + " and hasAuthority('invoice:edit'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('PURCHASE_REQUEST')"
-            + " and hasAuthority('purchase:request:edit'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('PURCHASE_ORDER')"
-            + " and hasAuthority('purchase:order:edit'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('MATERIAL_RECEIPT')"
-            + " and hasAuthority('receipt:edit'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('OWNER_SETTLEMENT')"
-            + " and hasAuthority('revenue:operations:maintain'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('BID_COST')"
-            + " and hasAuthority('bid:file:manage'))"
-            + " or (#businessType != null and #businessType.toUpperCase().startsWith('TECH_') and ("
-            + " hasAuthority('technical:scheme:maintain') or hasAuthority('technical:scheme:submit')"
-            + " or hasAuthority('technical:drawing:receive') or hasAuthority('technical:drawing:review')"
-            + " or hasAuthority('technical:rfi:raise') or hasAuthority('technical:rfi:respond')"
-            + " or hasAuthority('technical:rfi:accept') or hasAuthority('technical:disclosure:maintain')"
-            + " or hasAuthority('technical:archive:confirm')))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('PRODUCTION_MEASUREMENT') and ("
-            + " ((#documentType.equalsIgnoreCase('MEASUREMENT_GENERAL') or #documentType.toUpperCase().startsWith('ML_')) and hasAuthority('measurement:submit'))"
-            + " or (#documentType.equalsIgnoreCase('OWNER_SUBMISSION') and hasAuthority('measurement:owner:submit'))))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('OWNER_MEASUREMENT_SUBMISSION')"
-            + " and #documentType.equalsIgnoreCase('OWNER_CONFIRMATION') and hasAuthority('measurement:owner:review'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('VARIATION') and ("
-            + " ((#documentType.equalsIgnoreCase('SITE_EVIDENCE') or #documentType.equalsIgnoreCase('COST_ESTIMATE')) and hasAuthority('variation:order:edit'))"
-            + " or (#documentType.equalsIgnoreCase('OWNER_SUBMISSION') and hasAuthority('variation:owner:submit'))"
-            + " or (#documentType.equalsIgnoreCase('OWNER_CONFIRMATION') and hasAuthority('variation:owner:review'))))")
+    @PreAuthorize("isAuthenticated()")
     @RateLimit(maxRequests = 20, windowSeconds = 60, key = RateLimitKey.USER)
     public ApiResponse<SysFileVO> upload(
             @RequestParam MultipartFile file,
@@ -74,83 +48,87 @@ public class FileController {
     }
 
     @GetMapping("/{id}/url")
-    @AuditedOperation(type = "DOWNLOAD", businessType = "FILE", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')"
-            + " or hasAuthority('cashbook:journal:query') or hasAuthority('site:daily:query')"
-            + " or hasAuthority('measurement:query')"
-            + " or hasAuthority('subcontract:measure:query')"
-            + " or hasAuthority('settlement:query')"
-            + " or hasAuthority('expense:query') or hasAuthority('payment:app:query')"
-            + " or hasAuthority('invoice:query')"
-            + " or hasAuthority('purchase:request:list') or hasAuthority('purchase:order:query')"
-            + " or hasAuthority('receipt:query')"
-            + " or hasAuthority('bid:query')"
-            + " or hasAuthority('technical:query')"
-            + " or hasAuthority('variation:order:query') or hasAuthority('variation:trace')")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<String> getUrl(@PathVariable Long id) {
-        return ApiResponse.success(fileService.getPresignedUrl(id));
+        long startedAt = System.currentTimeMillis();
+        try {
+            FileService.PresignedFileUrl result = fileService.getPresignedFileUrl(id);
+            publishDownloadAudit(result.businessType(), String.valueOf(result.businessId()), id,
+                    true, null, startedAt);
+            return ApiResponse.success(result.url());
+        } catch (RuntimeException exception) {
+            String errorCode = exception instanceof BusinessException businessException
+                    ? businessException.getCode() : exception.getClass().getSimpleName();
+            String businessType = "FILE";
+            String businessId = null;
+            try {
+                var binding = fileService.findAuditBinding(id);
+                if (binding.isPresent()) {
+                    businessType = binding.get().businessType();
+                    businessId = String.valueOf(binding.get().businessId());
+                }
+            } catch (RuntimeException bindingFailure) {
+                log.warn("Download audit binding lookup failed: fileId={}, errorType={}",
+                        id, bindingFailure.getClass().getSimpleName());
+            }
+            publishDownloadAudit(businessType, businessId, id, false, errorCode, startedAt);
+            throw exception;
+        }
     }
 
     @DeleteMapping("/{id}")
     @AuditedOperation(type = "DELETE", businessType = "FILE", businessIdExpression = "#id")
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:delete')"
-            + " or hasAuthority('cashbook:journal:maintain') or hasAuthority('site:daily:edit')"
-            + " or hasAuthority('subcontract:measure:edit')"
-            + " or hasAuthority('settlement:edit')"
-            + " or hasAuthority('expense:edit') or hasAuthority('payment:app:edit')"
-            + " or hasAuthority('invoice:edit')"
-            + " or hasAuthority('purchase:request:edit') or hasAuthority('purchase:order:edit')"
-            + " or hasAuthority('receipt:edit')"
-            + " or hasAuthority('bid:file:manage')"
-            + " or hasAuthority('technical:scheme:maintain') or hasAuthority('technical:scheme:submit')"
-            + " or hasAuthority('technical:drawing:receive') or hasAuthority('technical:drawing:review')"
-            + " or hasAuthority('technical:rfi:raise') or hasAuthority('technical:rfi:respond')"
-            + " or hasAuthority('technical:rfi:accept') or hasAuthority('technical:disclosure:maintain')"
-            + " or hasAuthority('technical:archive:confirm')"
-            + " or hasAuthority('variation:order:edit') or hasAuthority('variation:owner:submit')"
-            + " or hasAuthority('variation:owner:review')"
-            + " or hasAuthority('measurement:submit') or hasAuthority('measurement:owner:submit')"
-            + " or hasAuthority('measurement:owner:review')")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         fileService.delete(id);
         return ApiResponse.success();
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN') or hasAuthority('file:query')"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('CASH_JOURNAL')"
-            + " and hasAuthority('cashbook:journal:query'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('SITE_DAILY_LOG')"
-            + " and hasAuthority('site:daily:query'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('SUBCONTRACT')"
-            + " and hasAuthority('subcontract:measure:query'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('SETTLEMENT')"
-            + " and hasAuthority('settlement:query'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('EXPENSE')"
-            + " and hasAuthority('expense:query'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('PAYMENT')"
-            + " and hasAuthority('payment:app:query'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('INVOICE')"
-            + " and hasAuthority('invoice:query'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('PURCHASE_REQUEST')"
-            + " and hasAuthority('purchase:request:list'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('PURCHASE_ORDER')"
-            + " and hasAuthority('purchase:order:query'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('MATERIAL_RECEIPT')"
-            + " and hasAuthority('receipt:query'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('BID_COST')"
-            + " and hasAuthority('bid:query'))"
-            + " or (#businessType != null and #businessType.toUpperCase().startsWith('TECH_')"
-            + " and hasAuthority('technical:query'))"
-            + " or (#businessType != null and (#businessType.equalsIgnoreCase('PRODUCTION_MEASUREMENT')"
-            + " or #businessType.equalsIgnoreCase('OWNER_MEASUREMENT_SUBMISSION')) and hasAuthority('measurement:query'))"
-            + " or (#businessType != null and #businessType.equalsIgnoreCase('VARIATION')"
-            + " and (hasAuthority('variation:order:query') or hasAuthority('variation:trace')))")
+    @PreAuthorize("isAuthenticated()")
     public ApiResponse<List<SysFileVO>> listByBusiness(
             @RequestParam String businessType,
             @RequestParam Long businessId) {
-        // 业务对象读权限校验
-        fileService.checkBizReadPermission(businessType, businessId);
         return ApiResponse.success(fileService.listByBusiness(businessType, businessId));
+    }
+
+    @GetMapping("/maintenance/reconcile")
+    @AuditedOperation(type = "RECONCILE", businessType = "FILE_MAINTENANCE")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ApiResponse<FileMaintenanceService.ReconciliationReport> reconcile() {
+        return ApiResponse.success(maintenanceService.reconcile());
+    }
+
+    @PostMapping("/maintenance/rescan")
+    @AuditedOperation(type = "RESCAN", businessType = "FILE_MAINTENANCE")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ApiResponse<FileMaintenanceService.RescanReport> rescan(
+            @RequestParam(defaultValue = "0") long afterId,
+            @RequestParam(defaultValue = "100") int batchSize) {
+        return ApiResponse.success(maintenanceService.rescan(afterId, batchSize));
+    }
+
+    private void publishDownloadAudit(String businessType, String businessId, Long fileId,
+                                      boolean success, String errorCode, long startedAt) {
+        try {
+            auditPublisher.publishEvent(OperationAuditEvent.builder()
+                    .tenantId(UserContext.getCurrentTenantId())
+                    .userId(UserContext.getCurrentUserId())
+                    .operationType("DOWNLOAD")
+                    .businessType(businessType)
+                    .businessId(businessId)
+                    .fileId(fileId)
+                    .httpMethod(request.getMethod())
+                    .requestPath(request.getRequestURI())
+                    .successFlag(success)
+                    .errorCode(errorCode)
+                    .sourceIp(request.getRemoteAddr())
+                    .durationMs((int) (System.currentTimeMillis() - startedAt))
+                    .createdAt(LocalDateTime.now())
+                    .build());
+        } catch (RuntimeException auditFailure) {
+            log.error("Download audit publish failed: fileId={}, errorType={}",
+                    fileId, auditFailure.getClass().getSimpleName());
+        }
     }
 }

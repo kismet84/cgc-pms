@@ -1,6 +1,7 @@
 package com.cgcpms.file.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.config.MinioConfig;
@@ -16,11 +17,14 @@ import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.StatObjectArgs;
 import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.ContentDisposition;
 import org.springframework.retry.support.RetryTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,18 +35,17 @@ import org.springframework.web.multipart.MultipartFile;
 import java.net.ConnectException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import com.cgcpms.common.util.DateTimeUtils;
-import io.minio.BucketExistsArgs;
-import io.minio.MakeBucketArgs;
-import jakarta.annotation.PostConstruct;
 import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -67,24 +70,8 @@ public class FileService {
     private final RetryTemplate minioRetryTemplate;
     private final ObjectProvider<MeterRegistry> meterRegistryProvider;
     private final VirusScanner virusScanner;
+    private final FileObjectTaskService objectTaskService;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
-
-    /**
-     * Ensure the configured bucket exists on startup.
-     */
-    @PostConstruct
-    public void ensureBucketExists() {
-        try {
-            String bucket = minioConfig.getBucket();
-            boolean exists = minioClient.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
-            if (!exists) {
-                minioClient.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
-                log.info("Created MinIO bucket: {}", bucket);
-            }
-        } catch (Exception e) {
-            log.warn("Could not ensure MinIO bucket exists: {}", e.getMessage());
-        }
-    }
 
     /**
      * Upload a file and associate it with a business entity.
@@ -111,7 +98,12 @@ public class FileService {
             throw new BusinessException("FILE_EMPTY", "上传文件不能为空");
         }
 
-        // 联合类型校验（扩展名 + MIME + 魔术字节）— 在权限校验之前执行
+        String normalizedBusinessType = normalizeBusinessType(businessType, businessId);
+        String normalizedDocumentType = normalizeDocumentType(documentType, normalizedBusinessType);
+        authorizer.checkUploadAccess(normalizedBusinessType, businessId, normalizedDocumentType);
+        authorizer.checkVariationDocumentStage(normalizedBusinessType, businessId, normalizedDocumentType);
+
+        // 权限通过后再读取和扫描不可信内容。
         byte[] content;
         try {
             content = file.getBytes();
@@ -121,27 +113,28 @@ public class FileService {
         FileTypeValidator.ValidationResult vr = fileTypeValidator.validate(
                 file.getOriginalFilename(), file.getContentType(), content);
 
-        validateBusinessBindingParams(businessType, businessId);
-        // 业务对象上传权限校验
-        String normalizedDocumentType = normalizeDocumentType(documentType, businessType);
-        authorizer.checkUploadAccess(businessType, businessId, normalizedDocumentType);
-        authorizer.checkVariationDocumentStage(businessType, businessId, normalizedDocumentType);
         scanOrReject(content);
 
         try {
+            requireFileTransaction();
+            Long tenantId = requireTenantId();
+            Long fileId = IdWorker.getId();
             String originalName = vr.sanitizedName();
-            String fileName = sha256Hex(content) + vr.extension();
-            String storagePath = businessType + "/" + businessId + "/" + fileName;
+            String contentSha256 = sha256Hex(content);
+            String fileName = contentSha256 + vr.extension();
+            String storagePath = buildStoragePath(tenantId, normalizedBusinessType, businessId, fileId, fileName);
             String bucketName = minioConfig.getBucket();
             String contentType = vr.detectedMime();
 
-            rejectDuplicateFile(businessType, businessId, fileName);
+            rejectDuplicateFile(normalizedBusinessType, businessId, contentSha256);
             putObjectWithRetry(bucketName, storagePath, contentType, content);
+            registerRollbackObjectCleanup(tenantId, bucketName, storagePath);
 
             // Persist file record
             SysFile sysFile = new SysFile();
-            sysFile.setTenantId(UserContext.getCurrentTenantId());
-            sysFile.setBusinessType(businessType);
+            sysFile.setId(fileId);
+            sysFile.setTenantId(tenantId);
+            sysFile.setBusinessType(normalizedBusinessType);
             sysFile.setDocumentType(normalizedDocumentType);
             sysFile.setBusinessId(businessId);
             sysFile.setFileName(fileName);
@@ -155,10 +148,10 @@ public class FileService {
             sysFile.setVirusScannedAt(LocalDateTime.now());
             sysFileMapper.insert(sysFile);
 
-            // Generate presigned URL for response
-            String presignedUrl = genPresignedUrl(bucketName, storagePath, sysFile);
-            return toVO(sysFile, presignedUrl);
+            return toVO(sysFile);
 
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("FILE_DUPLICATE", "文件已存在，请勿重复上传");
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
@@ -174,6 +167,10 @@ public class FileService {
      * Get a presigned download URL for an existing file.
      */
     public String getPresignedUrl(Long fileId) {
+        return getPresignedFileUrl(fileId).url();
+    }
+
+    public PresignedFileUrl getPresignedFileUrl(Long fileId) {
         SysFile sysFile = sysFileMapper.selectById(fileId);
         if (sysFile == null) {
             throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
@@ -184,12 +181,23 @@ public class FileService {
         // 业务对象读权限校验
         authorizer.checkReadAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
         ensureDownloadAllowed(sysFile);
+        statObjectOrReject(sysFile);
         try {
-            return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath(), sysFile);
+            return new PresignedFileUrl(
+                    genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath(), sysFile),
+                    sysFile.getBusinessType(), sysFile.getBusinessId(), sysFile.getId());
         } catch (Exception e) {
             log.error("Failed to generate presigned URL for file: {}", fileId, e);
             throw new BusinessException("FILE_URL_ERROR", "获取下载链接失败，请稍后重试");
         }
+    }
+
+    public Optional<FileAuditBinding> findAuditBinding(Long fileId) {
+        SysFile file = sysFileMapper.selectById(fileId);
+        if (file == null || !java.util.Objects.equals(file.getTenantId(), UserContext.getCurrentTenantId())) {
+            return Optional.empty();
+        }
+        return Optional.of(new FileAuditBinding(file.getBusinessType(), file.getBusinessId()));
     }
 
     /** Download contract for immutable generated documents. */
@@ -197,6 +205,7 @@ public class FileService {
         SysFile sysFile = requireGeneratedDocument(fileId);
         authorizer.checkGeneratedDocumentAccess(sysFile.getBusinessType(), sysFile.getBusinessId());
         ensureDownloadAllowed(sysFile);
+        statObjectOrReject(sysFile);
         return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath(), sysFile);
     }
 
@@ -204,6 +213,7 @@ public class FileService {
     public String getGeneratedDocumentAuditPresignedUrl(Long fileId) {
         SysFile sysFile = requireGeneratedDocument(fileId);
         ensureDownloadAllowed(sysFile);
+        statObjectOrReject(sysFile);
         return genPresignedUrl(sysFile.getBucketName(), sysFile.getStoragePath(), sysFile);
     }
 
@@ -231,7 +241,7 @@ public class FileService {
     public GeneratedFileArchive archiveGeneratedPdf(byte[] content, String businessType, Long businessId,
                                                      String generationNo, String expectedSha256,
                                                      String outputFileName) {
-        validateBusinessBindingParams(businessType, businessId);
+        String normalizedBusinessType = normalizeBusinessType(businessType, businessId);
         if (content == null || content.length < 5
                 || !"%PDF-".equals(new String(content, 0, 5, java.nio.charset.StandardCharsets.US_ASCII))) {
             throw new BusinessException("DOCUMENT_OUTPUT_INVALID", "归档内容不是有效PDF");
@@ -247,21 +257,20 @@ public class FileService {
             throw new BusinessException("DOCUMENT_GENERATION_NO_INVALID", "文档生成编号格式非法");
         }
 
-        Long tenantId = UserContext.getCurrentTenantId();
-        if (tenantId == null) {
-            throw new BusinessException("AUTH_CONTEXT_MISSING", "缺少租户上下文");
-        }
+        Long tenantId = requireTenantId();
+        Long fileId = IdWorker.getId();
         String bucketName = minioConfig.getBucket();
         String fileName = generationNo + "-" + actualSha256.substring(0, 16) + ".pdf";
-        String storagePath = businessType.toUpperCase() + "/" + businessId + "/generated/" + fileName;
+        String storagePath = buildStoragePath(tenantId, normalizedBusinessType, businessId, fileId, fileName);
         try {
-            requireArchiveTransaction();
+            requireFileTransaction();
             putObjectWithRetry(bucketName, storagePath, "application/pdf", content);
-            registerRollbackObjectCleanup(bucketName, storagePath);
+            registerRollbackObjectCleanup(tenantId, bucketName, storagePath);
 
             SysFile sysFile = new SysFile();
+            sysFile.setId(fileId);
             sysFile.setTenantId(tenantId);
-            sysFile.setBusinessType(businessType.toUpperCase());
+            sysFile.setBusinessType(normalizedBusinessType);
             sysFile.setDocumentType("GENERATED_DOCUMENT");
             sysFile.setBusinessId(businessId);
             sysFile.setFileName(fileName);
@@ -294,21 +303,39 @@ public class FileService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long fileId) {
-        SysFile sysFile = requireOwnedMutableFile(fileId);
+        SysFile candidate = requireOwnedMutableFile(fileId);
         // 业务对象删除权限校验
-        authorizer.checkDeleteAccess(sysFile.getBusinessType(), sysFile.getBusinessId(), sysFile.getDocumentType());
-        authorizer.checkVariationDocumentStage(sysFile.getBusinessType(), sysFile.getBusinessId(), sysFile.getDocumentType());
+        authorizer.checkDeleteAccess(candidate.getBusinessType(), candidate.getBusinessId(), candidate.getDocumentType());
+        authorizer.checkVariationDocumentStage(candidate.getBusinessType(), candidate.getBusinessId(), candidate.getDocumentType());
+        SysFile sysFile = lockOwnedMutableFileForDelete(candidate);
+        ensureNoImmutableReferences(sysFile);
         deleteStoredFile(sysFile);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public void deleteForBusinessCascade(Long fileId, String businessType, Long businessId) {
-        validateBusinessBindingParams(businessType, businessId);
-        SysFile sysFile = requireOwnedMutableFile(fileId);
-        if (!businessType.equals(sysFile.getBusinessType()) || !businessId.equals(sysFile.getBusinessId())) {
+        String normalizedBusinessType = normalizeBusinessType(businessType, businessId);
+        SysFile candidate = requireOwnedMutableFile(fileId);
+        if (!normalizedBusinessType.equalsIgnoreCase(candidate.getBusinessType()) || !businessId.equals(candidate.getBusinessId())) {
             throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
         }
+        SysFile sysFile = lockOwnedMutableFileForDelete(candidate);
+        ensureNoImmutableReferences(sysFile);
         deleteStoredFile(sysFile);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteAllForBusinessCascade(String businessType, Long businessId) {
+        String normalizedBusinessType = normalizeBusinessType(businessType, businessId);
+        List<SysFile> files = sysFileMapper.selectList(new LambdaQueryWrapper<SysFile>()
+                .apply("UPPER(TRIM(business_type)) = {0}", normalizedBusinessType) // SQL-SAFETY: fixed-sql-fragment — value uses MyBatis parameter binding
+                .eq(SysFile::getBusinessId, businessId)
+                .eq(SysFile::getTenantId, requireTenantId()));
+        for (SysFile file : files) {
+            SysFile locked = lockOwnedMutableFileForDelete(file);
+            ensureNoImmutableReferences(locked);
+            deleteStoredFile(locked);
+        }
     }
 
     private SysFile requireOwnedMutableFile(Long fileId) {
@@ -320,6 +347,24 @@ public class FileService {
             throw new BusinessException("FILE_IMMUTABLE", "已归档生成文档不可删除");
         }
         return sysFile;
+    }
+
+    private SysFile lockOwnedMutableFileForDelete(SysFile candidate) {
+        sysFileMapper.lockActiveByObjectPath(candidate.getBucketName(), candidate.getStoragePath());
+        SysFile locked = sysFileMapper.selectByIdForUpdate(candidate.getId(), candidate.getTenantId());
+        if (locked == null) {
+            throw new BusinessException("FILE_NOT_FOUND", "文件不存在");
+        }
+        if ("GENERATED_DOCUMENT".equals(locked.getDocumentType())) {
+            throw new BusinessException("FILE_IMMUTABLE", "已归档生成文档不可删除");
+        }
+        return locked;
+    }
+
+    private void ensureNoImmutableReferences(SysFile file) {
+        if (sysFileMapper.countImmutableReferences(file.getTenantId(), file.getId()) > 0) {
+            throw new BusinessException("FILE_IMMUTABLE", "文件已被不可变业务事实引用");
+        }
     }
 
     private void deleteStoredFile(SysFile sysFile) {
@@ -336,18 +381,16 @@ public class FileService {
             throw new BusinessException("FILE_DELETE_FAILED", "文件删除失败，请稍后重试");
         }
 
+        if (sysFileMapper.countActiveByObjectPath(sysFile.getBucketName(), sysFile.getStoragePath()) > 0) {
+            return;
+        }
+        long taskId = objectTaskService.enqueueDelete(
+                sysFile.getTenantId(), sysFile.getBucketName(), sysFile.getStoragePath());
+
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                try {
-                    minioClient.removeObject(RemoveObjectArgs.builder()
-                            .bucket(sysFile.getBucketName())
-                            .object(sysFile.getStoragePath())
-                            .build());
-                } catch (Exception e) {
-                    log.error("Post-commit file cleanup failed: fileId={}, storagePath={}, errorType={}",
-                            fileId, sysFile.getStoragePath(), e.getClass().getSimpleName());
-                }
+                objectTaskService.processNow(taskId);
             }
         });
     }
@@ -356,31 +399,19 @@ public class FileService {
      * List files associated with a business entity.
      */
     public List<SysFileVO> listByBusiness(String businessType, Long businessId) {
-        validateBusinessBindingParams(businessType, businessId);
+        String normalizedBusinessType = normalizeBusinessType(businessType, businessId);
         // 业务对象读权限校验
-        authorizer.checkReadAccess(businessType, businessId);
+        authorizer.checkReadAccess(normalizedBusinessType, businessId);
 
         LambdaQueryWrapper<SysFile> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(SysFile::getBusinessType, businessType)
+        wrapper.apply("UPPER(TRIM(business_type)) = {0}", normalizedBusinessType) // SQL-SAFETY: fixed-sql-fragment — value uses MyBatis parameter binding
                 .eq(SysFile::getBusinessId, businessId)
                 .eq(SysFile::getTenantId, UserContext.getCurrentTenantId())
                 .orderByDesc(SysFile::getCreatedAt);
 
         List<SysFile> files = sysFileMapper.selectList(wrapper);
 
-        return files.stream()
-                .map(f -> toVO(f, isScanClean(f)
-                        ? genPresignedUrl(f.getBucketName(), f.getStoragePath(), f)
-                        : null))
-                .toList();
-    }
-
-    /**
-     * 业务对象读权限校验（供控制器调用）。
-     */
-    public void checkBizReadPermission(String businessType, Long businessId) {
-        validateBusinessBindingParams(businessType, businessId);
-        authorizer.checkReadAccess(businessType, businessId);
+        return files.stream().map(this::toVO).toList();
     }
 
     private SysFileVO uploadFallback(MultipartFile file, String businessType, Long businessId, Throwable throwable) {
@@ -410,6 +441,24 @@ public class FileService {
         if (!businessType.matches("[A-Za-z0-9_-]+")) {
             throw new BusinessException("FILE_PARAM_INVALID", "业务类型格式非法");
         }
+    }
+
+    private String normalizeBusinessType(String businessType, Long businessId) {
+        String normalized = businessType == null ? null : businessType.trim().toUpperCase();
+        validateBusinessBindingParams(normalized, businessId);
+        return normalized;
+    }
+
+    private Long requireTenantId() {
+        Long tenantId = UserContext.getCurrentTenantId();
+        if (tenantId == null) throw new BusinessException("AUTH_CONTEXT_MISSING", "缺少租户上下文");
+        return tenantId;
+    }
+
+    private String buildStoragePath(Long tenantId, String businessType, Long businessId,
+                                    Long fileId, String fileName) {
+        return "tenants/" + tenantId + "/" + businessType + "/" + businessId
+                + "/files/" + fileId + "/" + fileName;
     }
 
     private void scanOrReject(byte[] content) {
@@ -447,7 +496,27 @@ public class FileService {
         });
     }
 
-    private void registerRollbackObjectCleanup(String bucketName, String storagePath) {
+    private void statObjectWithRetry(String bucketName, String storagePath) throws Exception {
+        minioRetryTemplate.execute(context -> {
+            minioClient.statObject(StatObjectArgs.builder().bucket(bucketName).object(storagePath).build());
+            return null;
+        });
+    }
+
+    private void statObjectOrReject(SysFile file) {
+        try {
+            statObjectWithRetry(file.getBucketName(), file.getStoragePath());
+        } catch (Exception exception) {
+            log.error("File object missing or unavailable: fileId={}, errorType={}",
+                    file.getId(), exception.getClass().getSimpleName());
+            if (isMissingObject(exception)) {
+                throw new BusinessException("FILE_OBJECT_MISSING", "文件对象缺失，已进入一致性检查");
+            }
+            throw new BusinessException("FILE_STORAGE_UNAVAILABLE", "文件存储服务暂不可用，请稍后重试");
+        }
+    }
+
+    private void registerRollbackObjectCleanup(Long tenantId, String bucketName, String storagePath) {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCompletion(int status) {
@@ -456,26 +525,27 @@ public class FileService {
                     minioClient.removeObject(RemoveObjectArgs.builder()
                             .bucket(bucketName).object(storagePath).build());
                 } catch (Exception cleanupFailure) {
-                    log.error("Rollback cleanup failed for generated PDF: storagePath={}, errorType={}",
+                    objectTaskService.enqueueDeleteRequiresNew(tenantId, bucketName, storagePath);
+                    log.error("Rollback cleanup deferred: storagePath={}, errorType={}",
                             storagePath, cleanupFailure.getClass().getSimpleName());
                 }
             }
         });
     }
 
-    private void requireArchiveTransaction() {
+    private void requireFileTransaction() {
         if (!TransactionSynchronizationManager.isActualTransactionActive()
                 || !TransactionSynchronizationManager.isSynchronizationActive()) {
-            throw new BusinessException("DOCUMENT_ARCHIVE_TRANSACTION_REQUIRED", "生成文档归档需要事务上下文");
+            throw new BusinessException("FILE_TRANSACTION_REQUIRED", "文件写入需要事务上下文");
         }
     }
 
-    private void rejectDuplicateFile(String businessType, Long businessId, String fileName) {
+    private void rejectDuplicateFile(String businessType, Long businessId, String contentSha256) {
         Long duplicates = sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
                 .eq(SysFile::getTenantId, UserContext.getCurrentTenantId())
                 .eq(SysFile::getBusinessType, businessType)
                 .eq(SysFile::getBusinessId, businessId)
-                .eq(SysFile::getFileName, fileName));
+                .apply("SUBSTRING(file_name, 1, 64) = {0}", contentSha256)); // SQL-SAFETY: fixed-sql-fragment — hash uses MyBatis parameter binding
         if (duplicates != null && duplicates > 0) {
             throw new BusinessException("FILE_DUPLICATE", "文件已存在，请勿重复上传");
         }
@@ -497,6 +567,18 @@ public class FileService {
                     || current instanceof SocketTimeoutException
                     || current instanceof UnknownHostException) {
                 return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+
+    private boolean isMissingObject(Throwable throwable) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (current instanceof io.minio.errors.ErrorResponseException response) {
+                String code = response.errorResponse().code();
+                return "NoSuchKey".equals(code) || "NoSuchObject".equals(code);
             }
             current = current.getCause();
         }
@@ -525,12 +607,16 @@ public class FileService {
     private String genPresignedUrl(String bucket, String object, SysFile file) {
         try {
             Map<String, String> extraQueryParams = new HashMap<>();
-            if (file != null && "GENERATED_DOCUMENT".equals(file.getDocumentType())) {
-                extraQueryParams.put("response-content-type", "application/pdf");
-                extraQueryParams.put("response-content-disposition", "inline; filename=\"" + file.getOriginalName() + "\"");
-            } else if (file != null && isTextFile(file)) {
-                extraQueryParams.put("response-content-type", "text/plain; charset=utf-8");
-                extraQueryParams.put("response-content-disposition", "attachment; filename=\"" + file.getFileName() + "\"");
+            if (file != null) {
+                boolean inline = "application/pdf".equalsIgnoreCase(file.getContentType())
+                        || (file.getContentType() != null && file.getContentType().toLowerCase().startsWith("image/"));
+                String disposition = ContentDisposition.builder(inline ? "inline" : "attachment")
+                        .filename(file.getOriginalName(), StandardCharsets.UTF_8)
+                        .build().toString();
+                extraQueryParams.put("response-content-type", isTextFile(file)
+                        ? "text/plain; charset=utf-8"
+                        : java.util.Objects.requireNonNullElse(file.getContentType(), "application/octet-stream"));
+                extraQueryParams.put("response-content-disposition", disposition);
             }
             String url = presignClient().getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
@@ -570,23 +656,23 @@ public class FileService {
                 || (fileName != null && (fileName.endsWith(".txt") || fileName.endsWith(".csv")));
     }
 
-    private SysFileVO toVO(SysFile f, String presignedUrl) {
+    private SysFileVO toVO(SysFile f) {
         SysFileVO vo = new SysFileVO();
         vo.setId(f.getId() == null ? null : String.valueOf(f.getId()));
-        vo.setBusinessType(f.getBusinessType());
+        vo.setBusinessType(f.getBusinessType() == null ? null : f.getBusinessType().trim().toUpperCase());
         vo.setDocumentType(f.getDocumentType());
         vo.setBusinessId(f.getBusinessId() == null ? null : String.valueOf(f.getBusinessId()));
-        vo.setFileName(f.getFileName());
         vo.setOriginalName(f.getOriginalName());
         vo.setFileSize(f.getFileSize());
         vo.setContentType(f.getContentType());
-        vo.setStoragePath(f.getStoragePath());
-        vo.setBucketName(f.getBucketName());
-        vo.setPresignedUrl(presignedUrl);
         applyVirusScanStatus(f, vo);
         if (f.getCreatedAt() != null) vo.setCreatedAt(DateTimeUtils.DTF.format(f.getCreatedAt()));
         return vo;
     }
+
+    public record PresignedFileUrl(String url, String businessType, Long businessId, Long fileId) {}
+
+    public record FileAuditBinding(String businessType, Long businessId) {}
 
     private String normalizeDocumentType(String documentType, String businessType) {
         String type = documentType == null ? "OTHER" : documentType.trim().toUpperCase();
@@ -600,6 +686,7 @@ public class FileService {
                 case "PAYMENT" -> "PAYMENT_PROOF";
                 case "CASH_JOURNAL" -> "BANK_RECEIPT";
                 case "CONTRACT" -> "CONTRACT_ATTACHMENT";
+                case "PROJECT_COMMENCEMENT" -> "COMMENCEMENT_BASIS";
                 case "VARIATION" -> "SITE_EVIDENCE";
                 case "QS_INSPECTION" -> "INSPECTION_EVIDENCE";
                 case "QS_ISSUE" -> "ISSUE_EVIDENCE";
@@ -631,7 +718,7 @@ public class FileService {
                 "REINSPECTION_EVIDENCE", "SOURCING_REQUIREMENT", "QUOTE_ATTACHMENT",
                 "SCHEME_FILE", "DRAWING_FILE", "REVIEW_MINUTES", "RFI_EVIDENCE",
                 "DESIGN_RESPONSE", "DISCLOSURE_RECORD", "ACCEPTANCE_ARCHIVE",
-                "DELIVERY_NOTE", "MATERIAL_ACCEPTANCE_FORM",
+                "DELIVERY_NOTE", "MATERIAL_ACCEPTANCE_FORM", "COMMENCEMENT_BASIS",
                 "MEASURE_SUPPORT",
                 "SECTION_ACCEPTANCE_RECORD", "FINAL_ACCEPTANCE_CERTIFICATE",
                 "DEFECT_RECTIFICATION_EVIDENCE", "WARRANTY_RELEASE_VOUCHER",
@@ -644,6 +731,9 @@ public class FileService {
         if ("MATERIAL_RECEIPT".equals(business)
                 && !Set.of("DELIVERY_NOTE", "MATERIAL_ACCEPTANCE_FORM").contains(type)) {
             throw new BusinessException("DOCUMENT_TYPE_MISMATCH", "材料验收仅允许送货单或签字验收单");
+        }
+        if ("PROJECT_COMMENCEMENT".equals(business) && !"COMMENCEMENT_BASIS".equals(type)) {
+            throw new BusinessException("DOCUMENT_TYPE_MISMATCH", "开工准入仅允许上传开工依据附件");
         }
         if ("BID_COST".equals(business) && !BID_DOCUMENT_TYPES.contains(type)) {
             throw new BusinessException("DOCUMENT_TYPE_MISMATCH", "投标记录仅允许上传投标业务文件");

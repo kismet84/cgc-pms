@@ -7,6 +7,7 @@ import com.cgcpms.common.util.DateTimeUtils;
 import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.mapper.PayApplicationBasisMapper;
@@ -156,6 +157,7 @@ class PayApplicationCodeRetryTest {
                 mock(PaymentApplicationIntegrityService.class),
                 mock(PaymentApplicationSourceService.class),
                 dictDataService,
+                mock(FileLifecycleGateway.class),
                 mock(WorkflowEngine.class));
     }
 }

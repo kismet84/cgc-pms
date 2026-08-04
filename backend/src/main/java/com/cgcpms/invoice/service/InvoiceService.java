@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.auth.context.UserContext;
 import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.file.service.FileTypeValidator;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.invoice.entity.PayInvoice;
 import com.cgcpms.invoice.mapper.PayInvoiceMapper;
 import com.cgcpms.invoice.mapper.InvoicePaymentAllocationMapper;
@@ -65,6 +66,7 @@ public class InvoiceService {
     private final SysFileMapper sysFileMapper;
     private final JdbcTemplate jdbcTemplate;
     private final SysDictDataService sysDictDataService;
+    private final FileLifecycleGateway fileLifecycleGateway;
     private final FileTypeValidator fileTypeValidator = new FileTypeValidator();
 
     // ── Query ──
@@ -214,6 +216,7 @@ public class InvoiceService {
                 .eq(InvoicePaymentAllocation::getInvoiceId, id)) > 0) {
             throw new BusinessException("INVOICE_ALLOCATED_LOCKED", "已分配付款的发票不可删除");
         }
+        fileLifecycleGateway.deleteAllForBusinessCascade("INVOICE", id);
         payInvoiceMapper.deleteById(id);
     }
 

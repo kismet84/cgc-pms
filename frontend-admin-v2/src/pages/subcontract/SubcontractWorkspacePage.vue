@@ -2,7 +2,6 @@
 import type {
   ContractItemRecord,
   ContractRecord,
-  SiteFileRecord,
   SubcontractMeasureCommand,
   SubcontractMeasureItemCommand,
   SubcontractMeasureItemRecord,
@@ -14,6 +13,7 @@ import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
+  BusinessAttachmentPanel,
   V2Badge,
   V2Button,
   V2Card,
@@ -25,7 +25,6 @@ import {
   showToast,
 } from '@/components'
 import { loadContractItems, loadContractPage } from '@/services/commercial'
-import { deleteSiteFile, listSiteFiles, uploadSiteFile } from '@/services/delivery'
 import { isApiClientError } from '@/services/request'
 import {
   createSubcontractMeasure,
@@ -48,7 +47,7 @@ import { useWorkspaceStore } from '@/stores/workspace'
 type Mode = 'task' | 'measure'
 type RecordRow = SubcontractTaskRecord | SubcontractMeasureRecord
 type FormMode = 'create' | 'edit'
-type PendingAction = 'delete-record' | 'submit-measure' | 'delete-file'
+type PendingAction = 'delete-record' | 'submit-measure'
 
 const route = useRoute()
 const session = useSessionStore()
@@ -56,12 +55,10 @@ const workspace = useWorkspaceStore()
 const records = ref<RecordRow[]>([])
 const selected = ref<RecordRow | null>(null)
 const measureItems = ref<SubcontractMeasureItemRecord[]>([])
-const files = ref<SiteFileRecord[]>([])
 const contracts = ref<ContractRecord[]>([])
 const contractItems = ref<ContractItemRecord[]>([])
 const taskCandidates = ref<SubcontractTaskRecord[]>([])
 const itemDrafts = ref<SubcontractMeasureItemCommand[]>([])
-const uploadFile = ref<File | null>(null)
 const projectId = computed(() => workspace.selectedProjectId || '')
 const status = ref('')
 const pageNo = ref(1)
@@ -74,7 +71,6 @@ const errorMessage = ref('')
 const formOpen = ref(false)
 const itemsOpen = ref(false)
 const pendingAction = ref<PendingAction | null>(null)
-const pendingFile = ref<SiteFileRecord | null>(null)
 const formMode = ref<FormMode>('create')
 const form = reactive<Record<string, string>>({})
 let listController: AbortController | null = null
@@ -109,9 +105,6 @@ const confirmationTitle = computed(() => {
   return '删除附件'
 })
 const confirmationDescription = computed(() => {
-  if (pendingAction.value === 'delete-file') {
-    return pendingFile.value ? `确认删除附件“${pendingFile.value.originalName}”？` : ''
-  }
   if (!selected.value) return ''
   return pendingAction.value === 'submit-measure'
     ? `确认提交“${recordCode(selected.value)}”审批？`
@@ -215,8 +208,6 @@ function clearDetail(): void {
   detailController?.abort()
   selected.value = null
   measureItems.value = []
-  files.value = []
-  uploadFile.value = null
 }
 
 async function loadPage(): Promise<void> {
@@ -228,7 +219,6 @@ async function loadPage(): Promise<void> {
   const generation = ++listGeneration
   selected.value = null
   measureItems.value = []
-  files.value = []
   loading.value = true
   errorMessage.value = ''
   try {
@@ -272,22 +262,19 @@ async function selectRecordById(
   const generation = ++detailGeneration
   selected.value = initial
   measureItems.value = []
-  files.value = []
   detailLoading.value = true
   try {
     if (mode.value === 'task') {
       const detail = await loadSubcontractTask(id, controller.signal)
       if (generation === detailGeneration) selected.value = detail
     } else {
-      const [detail, items, nextFiles] = await Promise.all([
+      const [detail, items] = await Promise.all([
         loadSubcontractMeasure(id, controller.signal),
         loadSubcontractMeasureItems(id, controller.signal),
-        listSiteFiles('SUBCONTRACT', id, controller.signal),
       ])
       if (generation !== detailGeneration) return false
       selected.value = detail
       measureItems.value = items
-      files.value = nextFiles
     }
     return generation === detailGeneration
   } catch (error) {
@@ -488,7 +475,6 @@ function removeSelected(): void {
 async function confirmAction(): Promise<void> {
   const action = pendingAction.value
   const record = selected.value
-  const file = pendingFile.value
   if (!action || !record || busy.value) return
   busy.value = true
   try {
@@ -513,24 +499,12 @@ async function confirmAction(): Promise<void> {
       showToast('success', '分包计量已提交', '审批与业务状态已更新。')
       return
     }
-    if (action === 'delete-file' && file) {
-      await deleteSiteFile(file.id)
-      pendingAction.value = null
-      pendingFile.value = null
-      const reread = await selectRecordById(record.id, null, false)
-      if (!reread) {
-        showToast('warning', '附件已删除，结果未确认', '暂未取得最新结果，请刷新重试。')
-        return
-      }
-      showToast('success', '附件已删除', '附件列表已更新。')
-    }
   } catch (error) {
     const fallback = action === 'submit-measure' ? '提交失败' : '删除失败'
     showToast('error', fallback, errorText(error, fallback))
   } finally {
     busy.value = false
     pendingAction.value = null
-    pendingFile.value = null
   }
 }
 
@@ -602,37 +576,6 @@ async function saveItems(): Promise<void> {
 function submitSelected(): void {
   const measure = selectedMeasure.value
   if (measure && !busy.value) pendingAction.value = 'submit-measure'
-}
-
-function chooseFile(event: Event): void {
-  uploadFile.value = (event.target as HTMLInputElement).files?.[0] ?? null
-}
-
-async function uploadAttachment(): Promise<void> {
-  const measure = selectedMeasure.value
-  if (!measure || !uploadFile.value || busy.value) return
-  busy.value = true
-  try {
-    await uploadSiteFile(uploadFile.value, 'SUBCONTRACT', measure.id, 'MEASURE_SUPPORT')
-    uploadFile.value = null
-    const reread = await selectRecordById(measure.id, null, false)
-    if (!reread) {
-      showToast('warning', '附件已上传，结果未确认', '暂未取得最新结果，请刷新重试。')
-      return
-    }
-    showToast('success', '附件已上传', '附件列表已更新。')
-  } catch (error) {
-    showToast('error', '附件上传失败', errorText(error, '上传失败'))
-  } finally {
-    busy.value = false
-  }
-}
-
-function removeFile(file: SiteFileRecord): void {
-  if (selectedMeasure.value) {
-    pendingFile.value = file
-    pendingAction.value = 'delete-file'
-  }
 }
 
 function changePage(next: number): void {
@@ -908,42 +851,14 @@ onBeforeUnmount(() => {
               </table>
             </div>
 
-            <h3>提交附件</h3>
-            <ul v-if="files.length" class="subcontract-workspace__files">
-              <li v-for="file in files" :key="file.id">
-                <span>{{ file.originalName }}</span>
-                <V2Button
-                  v-if="selectedEditable"
-                  type="button"
-                  size="small"
-                  variant="ghost"
-                  @click="removeFile(file)"
-                  >删除</V2Button
-                >
-              </li>
-            </ul>
-            <V2PageState
-              v-else-if="!errorMessage"
-              title="暂无附件"
-              description="提交前需上传通过安全扫描的附件。"
-              :heading-level="3"
+            <BusinessAttachmentPanel
+              title="提交附件"
+              business-type="SUBCONTRACT"
+              :business-id="selectedMeasure.id"
+              document-type="MEASURE_SUPPORT"
+              :can-upload="selectedEditable"
+              :can-delete="selectedEditable"
             />
-            <div v-if="selectedEditable" class="subcontract-workspace__upload">
-              <input
-                class="v2-file-input"
-                type="file"
-                aria-label="选择计量附件"
-                @change="chooseFile"
-              />
-              <V2Button
-                size="small"
-                type="button"
-                :disabled="!uploadFile"
-                :loading="busy"
-                @click="uploadAttachment"
-                >上传附件</V2Button
-              >
-            </div>
           </template>
         </template>
         <template #footer>

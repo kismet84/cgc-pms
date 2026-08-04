@@ -151,6 +151,7 @@ foreach ($scriptName in @(
   $scriptText = Read-RepoText "scripts\ci\$scriptName"
   Assert-Contains $scriptText @('#!/usr/bin/env bash','set -euo pipefail') $scriptName
 }
+Assert-Contains (Read-RepoText 'scripts\ci\start-e2e-minio.sh') @('mc mb --ignore-existing e2e/cgc-pms-e2e') 'MinIO E2E bucket bootstrap'
 Assert-Contains (Read-RepoText 'scripts\ci\verify-mysql-grants.sh') @('normalized_grants','GRANT USAGE ON \*\.\*','MySQL migration user has global privileges') 'MySQL grant script'
 Assert-Contains (Read-RepoText 'scripts\ci\scan-backend-dependencies.sh') @('MSYS_NO_PATHCONV=1','TRIVY_CACHE_DIR','aquasec/trivy:0.65.0','--pkg-types library','--skip-dirs /workspace/backend/target','/workspace/backend') 'backend dependency scan script'
 

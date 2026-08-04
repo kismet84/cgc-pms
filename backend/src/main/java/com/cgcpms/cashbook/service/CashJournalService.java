@@ -1037,7 +1037,6 @@ public class CashJournalService {
         vo.setId(String.valueOf(file.getId()));
         vo.setBusinessType(file.getBusinessType());
         vo.setBusinessId(String.valueOf(file.getBusinessId()));
-        vo.setFileName(file.getFileName());
         vo.setOriginalName(file.getOriginalName());
         vo.setFileSize(file.getFileSize());
         vo.setContentType(file.getContentType());

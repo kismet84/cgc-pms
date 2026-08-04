@@ -11,6 +11,7 @@ import com.cgcpms.contract.entity.CtContract;
 import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.receipt.entity.MatReceipt;
 import com.cgcpms.receipt.entity.MatReceiptItem;
 import com.cgcpms.receipt.mapper.MatReceiptItemMapper;
@@ -79,6 +80,7 @@ public class PayApplicationService {
     private final PaymentApplicationIntegrityService integrityService;
     private final PaymentApplicationSourceService sourceService;
     private final SysDictDataService sysDictDataService;
+    private final FileLifecycleGateway fileLifecycleGateway;
 
     public PayApplicationService(
             PayApplicationMapper payApplicationMapper,
@@ -96,6 +98,7 @@ public class PayApplicationService {
             PaymentApplicationIntegrityService integrityService,
             PaymentApplicationSourceService sourceService,
             SysDictDataService sysDictDataService,
+            FileLifecycleGateway fileLifecycleGateway,
             @org.springframework.context.annotation.Lazy WorkflowEngine workflowEngine) {
         this.payApplicationMapper = payApplicationMapper;
         this.payApplicationBasisMapper = payApplicationBasisMapper;
@@ -112,6 +115,7 @@ public class PayApplicationService {
         this.integrityService = integrityService;
         this.sourceService = sourceService;
         this.sysDictDataService = sysDictDataService;
+        this.fileLifecycleGateway = fileLifecycleGateway;
         this.workflowEngine = workflowEngine;
     }
 
@@ -309,7 +313,7 @@ public class PayApplicationService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        PayApplication existing = payApplicationMapper.selectById(id);
+        PayApplication existing = payApplicationMapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("PAY_APP_NOT_FOUND", "付款申请单不存在");
         checkProjectAccess(existing.getProjectId(), "删除付款申请");
@@ -322,6 +326,7 @@ public class PayApplicationService {
                 .eq(PayApplicationBasis::getPayApplicationId, id));
         sourceService.deleteDraftSources(existing);
 
+        fileLifecycleGateway.deleteAllForBusinessCascade("PAYMENT", id);
         payApplicationMapper.deleteById(id);
     }
 

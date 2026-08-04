@@ -16,6 +16,7 @@ import type {
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  BusinessAttachmentPanel,
   MaterialSearchPicker,
   V2Alert,
   V2Badge,
@@ -167,8 +168,13 @@ const canDelete = computed(() => session.hasPermission('contract:delete'))
 const canQuery = computed(() => session.hasPermission('contract:query'))
 const canQueryBudget = computed(() => session.hasPermission('budget:query'))
 const canEditBudget = computed(() => session.hasPermission('budget:edit'))
+const canUploadFile = computed(() => session.hasPermission('file:upload'))
+const canDeleteFile = computed(() => session.hasPermission('file:delete'))
 const currentContract = computed(() => detail.value?.contract ?? null)
 const currentContractIsDraft = computed(() => currentContract.value?.approvalStatus === 'DRAFT')
+const currentContractAttachmentsEditable = computed(() =>
+  ['DRAFT', 'REJECTED'].includes(currentContract.value?.approvalStatus ?? ''),
+)
 const currentContractBudgetEditable = computed(
   () =>
     canEditBudget.value &&
@@ -1262,6 +1268,16 @@ onBeforeUnmount(() => {
             title="暂无付款条款"
             description="当前合同还没有付款节点。"
             :heading-level="3"
+          />
+        </section>
+        <section class="v2-detail-dialog__section">
+          <BusinessAttachmentPanel
+            title="合同附件"
+            business-type="CONTRACT"
+            :business-id="currentContract.id"
+            document-type="CONTRACT_ATTACHMENT"
+            :can-upload="canUploadFile && currentContractAttachmentsEditable"
+            :can-delete="canDeleteFile && currentContractAttachmentsEditable"
           />
         </section>
         <section class="v2-detail-dialog__section">

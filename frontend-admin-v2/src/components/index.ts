@@ -1,4 +1,5 @@
 export { default as V2Alert } from './V2Alert.vue'
+export { default as BusinessAttachmentPanel } from './BusinessAttachmentPanel.vue'
 export { default as MaterialSearchPicker } from './MaterialSearchPicker.vue'
 export { default as V2ActionMenu } from './V2ActionMenu.vue'
 export { default as V2Badge } from './V2Badge.vue'

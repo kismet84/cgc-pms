@@ -9,12 +9,12 @@ import type {
   ProjectOverview,
   ProjectRecord,
   ProjectUpsertCommand,
-  SiteFileRecord,
 } from '@cgc-pms/frontend-contracts'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { dashboardStatusLabel, formatAmount, formatDecimal } from '@/pages/dashboard/model'
 import {
+  BusinessAttachmentPanel,
   V2ActionMenu,
   V2Badge,
   V2Button,
@@ -29,7 +29,6 @@ import {
 } from '@/components'
 import { isApiClientError } from '@/services/request'
 import { loadCloseoutOverview } from '@/services/closeout'
-import { listSiteFiles, uploadSiteFile } from '@/services/delivery'
 import {
   addProjectMember,
   archiveProject,
@@ -79,7 +78,6 @@ const overview = ref<ProjectOverview | null>(null)
 const constructionOverview = ref<CloseoutOverview | null>(null)
 const activationReadiness = ref<ProjectActivationReadiness | null>(null)
 const commencement = ref<ProjectCommencementRecord | null>(null)
-const commencementFiles = ref<SiteFileRecord[]>([])
 const members = ref<ProjectMember[]>([])
 const projectTypes = ref<DictionaryItem[]>([])
 const projectStatuses = ref<DictionaryItem[]>([])
@@ -88,7 +86,6 @@ const createOpen = ref(false)
 const memberOpen = ref(false)
 const statusOpen = ref(false)
 const commencementOpen = ref(false)
-const commencementFile = ref<File | null>(null)
 const editingMemberId = ref('')
 const filter = reactive({ keyword: '', projectType: '', status: '', pageNo: 1, pageSize: 10 })
 const form = reactive<ProjectUpsertCommand>(emptyProjectCommand())
@@ -340,9 +337,6 @@ async function load(preserveNotice = false): Promise<boolean> {
         constructionOverview.value = closeoutOverview
         activationReadiness.value = readiness
         commencement.value = commencementRecord
-        commencementFiles.value = commencementRecord
-          ? await listSiteFiles('PROJECT_COMMENCEMENT', commencementRecord.id, controller.signal)
-          : []
       }
       if (mode.value === 'members') {
         const page = await loadProjectMembers(
@@ -376,7 +370,6 @@ async function load(preserveNotice = false): Promise<boolean> {
       constructionOverview.value = null
       activationReadiness.value = null
       commencement.value = null
-      commencementFiles.value = []
       members.value = []
       errorMessage.value = message(error, '项目数据加载失败')
     }
@@ -407,12 +400,8 @@ function openCommencement() {
     basisType: commencement.value?.basisType ?? 'COMMENCEMENT_BASIS',
     remark: commencement.value?.remark ?? '',
   })
-  commencementFile.value = null
   commencementOpen.value = true
   resetNotices()
-}
-function selectCommencementFile(event: Event) {
-  commencementFile.value = (event.target as HTMLInputElement).files?.[0] ?? null
 }
 async function saveCommencement() {
   if (!commencementForm.plannedStartDate) {
@@ -422,23 +411,14 @@ async function saveCommencement() {
   saving.value = true
   resetNotices()
   try {
-    const saved = await saveProjectCommencement(projectId.value, {
+    await saveProjectCommencement(projectId.value, {
       ...(commencement.value ? { version: commencement.value.version } : {}),
       plannedStartDate: commencementForm.plannedStartDate,
       basisType: commencementForm.basisType,
       ...(commencementForm.remark.trim() ? { remark: commencementForm.remark.trim() } : {}),
     })
-    if (commencementFile.value)
-      await uploadSiteFile(
-        commencementFile.value,
-        'PROJECT_COMMENCEMENT',
-        saved.id,
-        'COMMENCEMENT_BASIS',
-      )
     commencementOpen.value = false
-    successMessage.value = commencementFile.value
-      ? '开工准入已保存，附件扫描完成后方可提交。'
-      : '开工准入已保存。'
+    successMessage.value = '开工准入已保存，请在附件区上传开工依据。'
     await load(true)
   } catch (error) {
     errorMessage.value = message(error, '开工准入保存失败')
@@ -914,14 +894,24 @@ onBeforeUnmount(() => {
               </li>
             </ul>
           </div>
-          <div v-if="commencementFiles.length" class="project-page__stage-gate">
-            <p>开工依据附件</p>
-            <ul>
-              <li v-for="file in commencementFiles" :key="file.id">
-                {{ file.originalName }} · {{ file.virusScanStatus || '扫描中' }}
-              </li>
-            </ul>
-          </div>
+          <BusinessAttachmentPanel
+            v-if="commencement"
+            title="开工依据附件"
+            business-type="PROJECT_COMMENCEMENT"
+            :business-id="commencement.id"
+            document-type="COMMENCEMENT_BASIS"
+            :can-upload="
+              project.status === 'PREPARING' &&
+              ['DRAFT', 'REJECTED'].includes(commencement.approvalStatus) &&
+              can('project:commencement:edit')
+            "
+            :can-delete="
+              project.status === 'PREPARING' &&
+              ['DRAFT', 'REJECTED'].includes(commencement.approvalStatus) &&
+              can('project:commencement:edit')
+            "
+            @changed="load(true)"
+          />
           <div class="project-page__actions">
             <V2Button
               v-if="can('project:commencement:add') || can('project:commencement:edit')"
@@ -1236,7 +1226,6 @@ onBeforeUnmount(() => {
           >拟开工日期<input v-model="commencementForm.plannedStartDate" type="date" required
         /></label>
         <V2Input v-model="commencementForm.remark" label="备注" />
-        <label>开工依据附件<input type="file" @change="selectCommencementFile" /></label>
       </form>
       <template #footer>
         <V2Button variant="secondary" :disabled="saving" @click="commencementOpen = false"

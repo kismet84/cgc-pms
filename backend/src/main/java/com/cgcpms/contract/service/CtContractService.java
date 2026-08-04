@@ -24,6 +24,7 @@ import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.vo.ContractApprovalRecordVO;
 import com.cgcpms.contract.vo.ContractPerformanceReportVO;
 import com.cgcpms.contract.vo.CtContractVO;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.partner.entity.MdPartner;
 import com.cgcpms.partner.mapper.MdPartnerMapper;
 import com.cgcpms.payment.entity.PayApplication;
@@ -87,6 +88,7 @@ public class CtContractService {
     private final CodeGenerationService codeGenerationService;
     private final ProjectAccessChecker projectAccessChecker;
     private final SysDictDataService sysDictDataService;
+    private final FileLifecycleGateway fileLifecycleGateway;
 
     public IPage<CtContractVO> getPage(long pageNo, long pageSize, String keyword,
                                        String contractCode, String contractName,
@@ -364,7 +366,7 @@ public class CtContractService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        CtContract existing = ctContractMapper.selectById(id);
+        CtContract existing = ctContractMapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
         if (existing == null || !existing.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("CONTRACT_NOT_FOUND", "合同不存在");
         if (existing.getProjectId() != null) {
@@ -395,6 +397,7 @@ public class CtContractService {
             throw new BusinessException("CONTRACT_HAS_DEPENDENCIES", "合同已被预算、付款、结算或审批引用，不可删除");
         }
 
+        fileLifecycleGateway.deleteAllForBusinessCascade("CONTRACT", id);
         ctContractMapper.deleteById(id);
     }
 

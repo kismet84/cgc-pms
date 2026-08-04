@@ -14,6 +14,7 @@ import com.cgcpms.file.auth.BusinessObjectAuthorizer;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
 import com.cgcpms.file.service.FileService;
+import com.cgcpms.file.service.FileObjectTaskService;
 import com.cgcpms.file.scan.VirusScanner;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.minio.MinioClient;
@@ -161,9 +162,13 @@ class CashJournalFileConcurrencyTest {
         config.setBucket("test");
         @SuppressWarnings("unchecked")
         ObjectProvider<MeterRegistry> meterRegistryProvider = mock(ObjectProvider.class);
+        @SuppressWarnings("unchecked")
+        ObjectProvider<FileObjectTaskService> taskServiceProvider = mock(ObjectProvider.class);
         VirusScanner virusScanner = mock(VirusScanner.class);
+        FileObjectTaskService objectTaskService = new FileObjectTaskService(
+                jdbcTemplate, minioClient, taskServiceProvider);
         return new FileService(fileMapper, minioClient, config, authorizer,
-                new RetryTemplate(), meterRegistryProvider, virusScanner);
+                new RetryTemplate(), meterRegistryProvider, virusScanner, objectTaskService);
     }
 
     private void inAdminTransaction(Runnable action) {
@@ -239,6 +244,7 @@ class CashJournalFileConcurrencyTest {
     }
 
     private void cleanup() {
+        jdbcTemplate.update("DELETE FROM sys_file_object_task WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM sys_file WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM cash_journal_change_log WHERE tenant_id = ?", TENANT_ID);
         jdbcTemplate.update("DELETE FROM cash_journal_entry WHERE tenant_id = ?", TENANT_ID);

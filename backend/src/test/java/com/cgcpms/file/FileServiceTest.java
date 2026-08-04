@@ -15,7 +15,10 @@ import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.StatObjectArgs;
+import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
+import io.minio.messages.ErrorResponse;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,6 +32,8 @@ import org.springframework.test.context.ActiveProfiles;
 import java.net.ConnectException;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -312,7 +317,8 @@ class FileServiceTest {
         SysFile stored = onlyFileFor(businessType, businessId);
         assertTrue(stored.getFileName().matches("[a-f0-9]{64}\\.pdf"),
                 "fileName should persist SHA-256 hash plus extension: " + stored.getFileName());
-        assertEquals(businessType + "/" + businessId + "/" + stored.getFileName(), stored.getStoragePath());
+        assertEquals("tenants/" + TestUserContext.TENANT_0 + "/" + businessType + "/" + businessId
+                + "/files/" + stored.getId() + "/" + stored.getFileName(), stored.getStoragePath());
         assertEquals("hash.pdf", stored.getOriginalName());
     }
 
@@ -330,6 +336,47 @@ class FileServiceTest {
 
         assertEquals(1L, fileCountFor(businessType, businessId));
         verify(authorizer).checkUploadAccess(businessType, businessId, "MEASURE_SUPPORT");
+    }
+
+    @Test
+    @DisplayName("commencement upload normalizes business type and accepts only commencement basis")
+    void testCommencementUploadContract() throws Exception {
+        long businessId = Math.abs(System.nanoTime());
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "commencement.pdf", "application/pdf", "%PDF-1.4 commencement".getBytes());
+
+        fileService.upload(file, " project_commencement ", businessId, "commencement_basis");
+
+        SysFile stored = onlyFileFor("PROJECT_COMMENCEMENT", businessId);
+        assertEquals("COMMENCEMENT_BASIS", stored.getDocumentType());
+        verify(authorizer).checkUploadAccess("PROJECT_COMMENCEMENT", businessId, "COMMENCEMENT_BASIS");
+
+        BusinessException mismatch = assertThrows(BusinessException.class, () -> fileService.upload(
+                new MockMultipartFile("file", "other.pdf", "application/pdf", "%PDF-1.4 other".getBytes()),
+                "PROJECT_COMMENCEMENT", businessId, "CONTRACT_ATTACHMENT"));
+        assertEquals("DOCUMENT_TYPE_MISMATCH", mismatch.getCode());
+    }
+
+    @Test
+    @DisplayName("same business id and content use tenant-isolated object keys")
+    void testUploadUsesTenantIsolatedObjectKeys() throws Exception {
+        long businessId = Math.abs(System.nanoTime());
+        byte[] content = "%PDF-1.4 tenant isolation".getBytes();
+        fileService.upload(new MockMultipartFile("file", "a.pdf", "application/pdf", content),
+                "CONTRACT", businessId);
+        SysFile first = onlyFileFor("CONTRACT", businessId);
+
+        TestUserContext.setAdmin(9L, TestUserContext.USER_ADMIN);
+        fileService.upload(new MockMultipartFile("file", "b.pdf", "application/pdf", content),
+                "contract", businessId);
+        SysFile second = sysFileMapper.selectList(new LambdaQueryWrapper<SysFile>()
+                .eq(SysFile::getTenantId, 9L)
+                .eq(SysFile::getBusinessType, "CONTRACT")
+                .eq(SysFile::getBusinessId, businessId)).getFirst();
+
+        assertNotEquals(first.getStoragePath(), second.getStoragePath());
+        assertTrue(first.getStoragePath().startsWith("tenants/0/"));
+        assertTrue(second.getStoragePath().startsWith("tenants/9/"));
     }
 
     @Test
@@ -705,6 +752,20 @@ class FileServiceTest {
     }
 
     @Test
+    @DisplayName("delete rejects any file referenced by immutable business facts")
+    void testDeleteRejectsImmutableBusinessReference() throws Exception {
+        SysFile file = insertFile("BID_COST", 30016L, TestUserContext.TENANT_0,
+                "final-bid.pdf", "application/pdf");
+        doReturn(1L).when(sysFileMapper).countImmutableReferences(file.getTenantId(), file.getId());
+
+        BusinessException ex = assertThrows(BusinessException.class, () -> fileService.delete(file.getId()));
+
+        assertEquals("FILE_IMMUTABLE", ex.getCode());
+        assertNotNull(sysFileMapper.selectById(file.getId()));
+        verify(minioClient, never()).removeObject(any(RemoveObjectArgs.class));
+    }
+
+    @Test
     @DisplayName("archive stores a server-generated PDF with immutable document type and verified hash")
     void testArchiveGeneratedPdf() throws Exception {
         byte[] pdf = "%PDF-1.7\nminimal-generated-pdf".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
@@ -765,6 +826,25 @@ class FileServiceTest {
 
         assertNull(sysFileMapper.selectById(file.getId()));
         verify(minioClient).removeObject(any(RemoveObjectArgs.class));
+        assertEquals("RETRY", jdbcTemplate.queryForObject("""
+                SELECT status FROM sys_file_object_task WHERE tenant_id=? AND source_path=?
+                """, String.class, TestUserContext.TENANT_0, file.getStoragePath()));
+    }
+
+    @Test
+    @DisplayName("database failure after object upload removes the orphan object")
+    void testUploadRollbackRemovesObject() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "rollback.pdf", "application/pdf", "%PDF-1.4 rollback".getBytes());
+        doThrow(new IllegalStateException("database unavailable"))
+                .when(sysFileMapper).insert(any(SysFile.class));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.upload(file, "CONTRACT", Math.abs(System.nanoTime())));
+
+        assertEquals("FILE_UPLOAD_FAILED", ex.getCode());
+        verify(minioClient).putObject(any(PutObjectArgs.class));
+        verify(minioClient).removeObject(any(RemoveObjectArgs.class));
     }
 
     @Test
@@ -787,9 +867,40 @@ class FileServiceTest {
         assertTrue(args.getValue().extraQueryParams()
                 .get("response-content-type")
                 .contains("text/plain; charset=utf-8"));
-        assertTrue(args.getValue().extraQueryParams()
-                .get("response-content-disposition")
-                .contains("attachment; filename=\"notes.txt\""));
+        String disposition = String.join(",",
+                args.getValue().extraQueryParams().get("response-content-disposition"));
+        assertTrue(disposition.contains("attachment"), disposition);
+        assertTrue(disposition.contains("notes.txt"), disposition);
+    }
+
+    @Test
+    @DisplayName("getPresignedUrl reports missing object before generating a dead URL")
+    void testGetPresignedUrlRejectsMissingObject() throws Exception {
+        SysFile file = insertFile("CONTRACT", 30003L, TestUserContext.TENANT_0,
+                "missing.pdf", "application/pdf");
+        when(minioClient.statObject(any(StatObjectArgs.class)))
+                .thenThrow(minioError("NoSuchKey"));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.getPresignedUrl(file.getId()));
+
+        assertEquals("FILE_OBJECT_MISSING", ex.getCode());
+        verify(minioClient, never()).getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class));
+    }
+
+    @Test
+    @DisplayName("getPresignedUrl does not misclassify storage authorization failures as missing objects")
+    void testGetPresignedUrlRejectsUnavailableStorage() throws Exception {
+        SysFile file = insertFile("CONTRACT", 30004L, TestUserContext.TENANT_0,
+                "denied.pdf", "application/pdf");
+        when(minioClient.statObject(any(StatObjectArgs.class)))
+                .thenThrow(minioError("AccessDenied"));
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> fileService.getPresignedUrl(file.getId()));
+
+        assertEquals("FILE_STORAGE_UNAVAILABLE", ex.getCode());
+        verify(minioClient, never()).getPresignedObjectUrl(any(GetPresignedObjectUrlArgs.class));
     }
 
     @Test
@@ -858,6 +969,26 @@ class FileServiceTest {
         verifyNoInteractions(minioClient);
     }
 
+    @Test
+    @DisplayName("list returns public metadata only and never signs object URLs")
+    void testListReturnsPublicMetadataWithoutSigning() {
+        long businessId = Math.abs(System.nanoTime());
+        SysFile file = insertFile("CONTRACT", businessId, TestUserContext.TENANT_0,
+                "contract.pdf", "application/pdf");
+
+        List<SysFileVO> result = fileService.listByBusiness("contract", businessId);
+
+        assertEquals(1, result.size());
+        assertEquals(file.getId().toString(), result.getFirst().getId());
+        assertEquals("CONTRACT", result.getFirst().getBusinessType());
+        assertEquals(Set.of("id", "businessType", "documentType", "businessId", "originalName", "fileSize",
+                        "contentType", "virusScanStatus", "virusScanCode", "virusScanMessage",
+                        "virusScanPassed", "createdAt"),
+                java.util.Arrays.stream(SysFileVO.class.getDeclaredFields())
+                        .map(java.lang.reflect.Field::getName).collect(java.util.stream.Collectors.toSet()));
+        verifyNoInteractions(minioClient);
+    }
+
     private SysFile insertFile(String businessType, Long businessId, Long tenantId,
                                String fileName, String contentType) {
         SysFile file = new SysFile();
@@ -896,6 +1027,12 @@ class FileServiceTest {
         return jdbcTemplate.queryForObject(
                 "select count(*) from sys_file where id = ? and deleted_flag = ?",
                 Integer.class, id, deletedFlag);
+    }
+
+    private ErrorResponseException minioError(String code) {
+        return new ErrorResponseException(
+                new ErrorResponse(code, code, "test-bucket", "object", "/object", "request", "host"),
+                null, null);
     }
 
     private double uploadFailureCount(String code) {

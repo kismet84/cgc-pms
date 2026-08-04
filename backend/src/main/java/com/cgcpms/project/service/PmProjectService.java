@@ -10,8 +10,7 @@ import com.cgcpms.contract.entity.CtContractPaymentTerm;
 import com.cgcpms.contract.mapper.CtContractItemMapper;
 import com.cgcpms.contract.mapper.CtContractMapper;
 import com.cgcpms.contract.mapper.CtContractPaymentTermMapper;
-import com.cgcpms.file.entity.SysFile;
-import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.payment.entity.PayApplication;
 import com.cgcpms.payment.entity.PayRecord;
 import com.cgcpms.payment.mapper.PayApplicationMapper;
@@ -59,7 +58,6 @@ public class PmProjectService {
     private final CtContractMapper ctContractMapper;
     private final CtContractItemMapper ctContractItemMapper;
     private final CtContractPaymentTermMapper ctContractPaymentTermMapper;
-    private final SysFileMapper sysFileMapper;
     private final PayApplicationMapper payApplicationMapper;
     private final PayRecordMapper payRecordMapper;
     private final StlSettlementMapper stlSettlementMapper;
@@ -70,6 +68,7 @@ public class PmProjectService {
     private final com.cgcpms.project.auth.ProjectAccessChecker projectAccessChecker;
     private final SysDictDataService sysDictDataService;
     private final BidCostMapper bidCostMapper;
+    private final FileLifecycleGateway fileLifecycleGateway;
 
     public IPage<PmProjectVO> getPage(long pageNo, long pageSize, String keyword, String projectCode, String projectName, String projectType, String status) {
         LambdaQueryWrapper<PmProject> wrapper = new LambdaQueryWrapper<>();
@@ -350,13 +349,9 @@ public class PmProjectService {
                     "物理删除仅限超级管理员。普通管理员请使用归档功能。");
         }
 
-        PmProject existing = pmProjectMapper.selectById(id);
-        if (existing == null) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
-        if (!existing.getTenantId().equals(UserContext.getCurrentTenantId())) {
-            throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
-        }
-
         Long tenantId = UserContext.getCurrentTenantId();
+        PmProject existing = pmProjectMapper.selectByIdForUpdate(id, tenantId);
+        if (existing == null) throw new BusinessException("PROJECT_NOT_FOUND", "项目不存在");
 
         // SUPER_ADMIN can only physically delete empty projects (no contracts)
         long contractCount = ctContractMapper.selectCount(new LambdaQueryWrapper<CtContract>()
@@ -381,11 +376,7 @@ public class PmProjectService {
                     "项目存在审批流程 (" + workflowCount + " 条)，无法物理删除。请先归档。");
         }
 
-        // Cascade: logical-delete associated files (tenant-scoped)
-        sysFileMapper.delete(new LambdaQueryWrapper<SysFile>()
-                .eq(SysFile::getBusinessType, "PROJECT")
-                .eq(SysFile::getBusinessId, id)
-                .eq(SysFile::getTenantId, tenantId));
+        fileLifecycleGateway.deleteAllForBusinessCascade("PROJECT", id);
 
         if (pmProjectMapper.physicalDelete(id, tenantId) != 1) {
             throw new BusinessException("PROJECT_DELETE_CONFLICT", "项目删除失败，请刷新后重试");

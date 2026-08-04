@@ -9,6 +9,7 @@ import com.cgcpms.common.exception.BusinessException;
 import com.cgcpms.common.util.DateTimeUtils;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.cgcpms.inventory.entity.MatWarehouse;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.inventory.mapper.MatWarehouseMapper;
 import com.cgcpms.project.auth.ProjectAccessChecker;
 import com.cgcpms.procurement.service.ProcurementIntegrityService;
@@ -53,6 +54,7 @@ public class MatReceiptService {
     private final ProjectAccessChecker projectAccessChecker;
     private final ProcurementIntegrityService integrityService;
     private final WfInstanceMapper wfInstanceMapper;
+    private final FileLifecycleGateway fileLifecycleGateway;
 
     private final MatReceiptAssembler assembler;
 
@@ -245,7 +247,7 @@ public class MatReceiptService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
-        MatReceipt receipt = matReceiptMapper.selectById(id);
+        MatReceipt receipt = matReceiptMapper.selectByIdForUpdate(id, UserContext.getCurrentTenantId());
         if (receipt == null || !receipt.getTenantId().equals(UserContext.getCurrentTenantId()))
             throw new BusinessException("RECEIPT_NOT_FOUND", "验收单不存在");
         checkProjectAccess(receipt.getProjectId(), "删除材料验收单");
@@ -255,6 +257,8 @@ public class MatReceiptService {
         if (receipt.getCostGeneratedFlag() != null && receipt.getCostGeneratedFlag() == 1)
             throw new BusinessException("COST_GENERATED", "已生成成本，不可删除");
 
+        fileLifecycleGateway.deleteAllForBusinessCascade("MATERIAL_RECEIPT", id);
+        fileLifecycleGateway.deleteAllForBusinessCascade("RECEIPT", id);
         // @TableLogic on BaseEntity handles soft-delete automatically
         matReceiptMapper.deleteById(id);
     }

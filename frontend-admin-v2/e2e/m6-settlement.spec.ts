@@ -441,7 +441,6 @@ test.describe('M6 settlement V2', () => {
       mimeType: 'application/pdf',
       buffer: Buffer.from('safe settlement evidence'),
     })
-    await page.getByRole('button', { name: '上传', exact: true }).click()
     await expect(page.getByText(/终期结算审核表\.pdf/)).toBeVisible()
 
     await page.getByRole('button', { name: '提交审批' }).click()

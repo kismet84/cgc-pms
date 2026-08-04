@@ -19,6 +19,7 @@ import com.cgcpms.workflow.WorkflowConstants;
 import com.cgcpms.workflow.entity.WfInstance;
 import com.cgcpms.workflow.mapper.WfInstanceMapper;
 import io.jsonwebtoken.Jwts;
+import io.minio.MinioClient;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -26,6 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -36,7 +38,14 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-@SpringBootTest(properties = {"spring.main.allow-circular-references=true"})
+@SpringBootTest(properties = {
+        "spring.main.allow-circular-references=true",
+        "minio.enabled=true",
+        "minio.endpoint=http://127.0.0.1:9000",
+        "minio.access-key=test",
+        "minio.secret-key=test",
+        "minio.bucket=test"
+})
 @ActiveProfiles("local")
 @DisplayName("SubMeasureService — CRUD + guards + net calc")
 class SubMeasureServiceTest {
@@ -55,6 +64,7 @@ class SubMeasureServiceTest {
     @Autowired private WfInstanceMapper wfInstanceMapper;
     @Autowired private CtContractItemMapper contractItemMapper;
     @Autowired private SysFileMapper fileMapper;
+    @MockitoBean private MinioClient minioClient;
 
     @BeforeEach void setupContext() {
         UserContext.set(Jwts.claims().add("userId", USER_ADMIN).add("username", "admin")

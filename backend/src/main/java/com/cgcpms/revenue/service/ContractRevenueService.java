@@ -13,6 +13,7 @@ import com.cgcpms.cost.mapper.CostSubjectMapper;
 import com.cgcpms.cost.service.CostSummaryService;
 import com.cgcpms.file.entity.SysFile;
 import com.cgcpms.file.mapper.SysFileMapper;
+import com.cgcpms.file.service.FileLifecycleGateway;
 import com.cgcpms.project.entity.PmProject;
 import com.cgcpms.project.mapper.PmProjectMapper;
 import com.cgcpms.contract.entity.CtContract;
@@ -67,6 +68,7 @@ public class ContractRevenueService {
     private final CostSummaryService costSummaryService;
     private final CodeGenerationService codeGenerationService;
     private final JdbcTemplate jdbcTemplate;
+    private final FileLifecycleGateway fileLifecycleGateway;
     @Lazy
     private final WorkflowEngine workflowEngine;
 
@@ -207,10 +209,12 @@ public class ContractRevenueService {
 
     @Transactional(rollbackFor = Exception.class)
     public void delete(Long id) {
+        lockRevenue(id);
         ContractRevenue existing = requireExisting(id);
         if (!"DRAFT".equals(existing.getApprovalStatus())) {
             throw new BusinessException("REVENUE_STATUS_NOT_DELETABLE", "仅草稿状态可删除");
         }
+        fileLifecycleGateway.deleteAllForBusinessCascade("CONTRACT_REVENUE", id);
         mapper.deleteById(id);
     }
 

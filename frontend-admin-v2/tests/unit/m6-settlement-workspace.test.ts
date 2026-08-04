@@ -100,12 +100,11 @@ describe('M6 settlement V2', () => {
     expect(catalog).not.toMatch(/path: '\/settlement\/list'[\s\S]{0,160}migration: 'pending'/)
     expect(page).toContain('await loadDetail(id)')
     expect(page).toContain("sourceType: 'CT_CONTRACT'")
-    expect(page).toContain(
-      "uploadSiteFile(uploadFile.value, 'SETTLEMENT', selected.value.id, 'OTHER')",
-    )
-    expect(page).toContain('aria-label="选择结算附件"')
-    expect(page).toContain('class="v2-file-input"')
-    expect(page).not.toContain('<label for="settlement-file">选择附件</label>')
+    expect(page).toContain('<BusinessAttachmentPanel')
+    expect(page).toContain('business-type="SETTLEMENT"')
+    expect(page).toContain('document-type="OTHER"')
+    expect(page).toContain(':can-upload="editable"')
+    expect(page).toContain(':can-delete="editable"')
     expect(page).toContain("contractType: 'SUB'")
     expect(page).toContain('v-if="deletable"')
     expect(page).not.toContain('v-if="canDelete && editable"')
