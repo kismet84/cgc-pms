@@ -29,8 +29,8 @@ jobs:
       - name: Install CJK font for PDF tests
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
-          test -r /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
+          sudo apt-get install -y --no-install-recommends fonts-arphic-gbsn00lp
+          test -r /usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf
       - name: Verify backend test order independence
         run: cd backend && ./mvnw -C -Ptest-order-independence test
         env:

@@ -81,7 +81,7 @@ if ([regex]::Matches($workflow,'(?m)^    permissions:\r?$').Count -ne 2) { throw
 if ([regex]::IsMatch($workflow,'(?m)^    name:')) { throw 'job display names must remain implicit job ids for check-context compatibility' }
 
 Assert-Contains $backendTest @(
-  'Install CJK font for PDF tests','fonts-noto-cjk','test -r /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+  'Install CJK font for PDF tests','fonts-arphic-gbsn00lp','test -r /usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf',
   './mvnw -C -Ptest-order-independence test','./mvnw -C verify',
   'name: ${{ env.BACKEND_JAR_ARTIFACT }}','path: backend/target/cgc-pms-backend.jar',
   'name: ${{ env.BACKEND_COVERAGE_ARTIFACT }}','path: backend/target/site/jacoco'

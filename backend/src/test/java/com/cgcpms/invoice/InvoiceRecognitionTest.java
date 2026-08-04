@@ -457,13 +457,12 @@ class InvoiceRecognitionTest {
      * Returns {@code null} if none found.
      */
     private static File findChineseFont() {
+        String configured = System.getProperty("document.spike.font");
         String[] candidates = {
+                configured == null ? "" : configured,
                 "C:/Windows/Fonts/simhei.ttf",       // Windows — SimHei
-                "C:/Windows/Fonts/simsun.ttc",       // Windows — SimSun
-                "C:/Windows/Fonts/msyh.ttc",         // Windows — Microsoft YaHei
-                "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",  // Linux — WenQuanYi
-                "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc", // Linux — Noto
-                "/System/Library/Fonts/PingFang.ttc", // macOS
+                "C:/Windows/Fonts/Deng.ttf",         // Windows — DengXian
+                "/usr/share/fonts/truetype/arphic-gbsn00lp/gbsn00lp.ttf", // Linux — Arphic TrueType
         };
         for (String path : candidates) {
             File f = new File(path);
