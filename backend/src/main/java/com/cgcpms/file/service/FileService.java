@@ -328,7 +328,7 @@ public class FileService {
     public void deleteAllForBusinessCascade(String businessType, Long businessId) {
         String normalizedBusinessType = normalizeBusinessType(businessType, businessId);
         List<SysFile> files = sysFileMapper.selectList(new LambdaQueryWrapper<SysFile>()
-                .apply("UPPER(TRIM(business_type)) = {0}", normalizedBusinessType)
+                .apply("UPPER(TRIM(business_type)) = {0}", normalizedBusinessType) // SQL-SAFETY: fixed-sql-fragment — value uses MyBatis parameter binding
                 .eq(SysFile::getBusinessId, businessId)
                 .eq(SysFile::getTenantId, requireTenantId()));
         for (SysFile file : files) {
@@ -404,7 +404,7 @@ public class FileService {
         authorizer.checkReadAccess(normalizedBusinessType, businessId);
 
         LambdaQueryWrapper<SysFile> wrapper = new LambdaQueryWrapper<>();
-        wrapper.apply("UPPER(TRIM(business_type)) = {0}", normalizedBusinessType)
+        wrapper.apply("UPPER(TRIM(business_type)) = {0}", normalizedBusinessType) // SQL-SAFETY: fixed-sql-fragment — value uses MyBatis parameter binding
                 .eq(SysFile::getBusinessId, businessId)
                 .eq(SysFile::getTenantId, UserContext.getCurrentTenantId())
                 .orderByDesc(SysFile::getCreatedAt);
@@ -545,7 +545,7 @@ public class FileService {
                 .eq(SysFile::getTenantId, UserContext.getCurrentTenantId())
                 .eq(SysFile::getBusinessType, businessType)
                 .eq(SysFile::getBusinessId, businessId)
-                .apply("SUBSTRING(file_name, 1, 64) = {0}", contentSha256));
+                .apply("SUBSTRING(file_name, 1, 64) = {0}", contentSha256)); // SQL-SAFETY: fixed-sql-fragment — hash uses MyBatis parameter binding
         if (duplicates != null && duplicates > 0) {
             throw new BusinessException("FILE_DUPLICATE", "文件已存在，请勿重复上传");
         }

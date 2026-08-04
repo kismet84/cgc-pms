@@ -117,7 +117,7 @@ public class FileMaintenanceService {
                 .eq(SysFile::getTenantId, tenantId)
                 .gt(SysFile::getId, Math.max(0, afterId))
                 .orderByAsc(SysFile::getId)
-                .last("LIMIT " + batchSize));
+                .last("LIMIT " + batchSize)); // SQL-SAFETY: fixed-sql-fragment — server-bounded integer, no user SQL text
         int clean = 0;
         int infected = 0;
         int failed = 0;

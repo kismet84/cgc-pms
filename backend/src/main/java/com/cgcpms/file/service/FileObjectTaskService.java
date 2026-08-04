@@ -86,7 +86,7 @@ public class FileObjectTaskService {
         }
     }
 
-    @Scheduled(fixedDelayString = "${file.object-task.retry-delay-ms:60000}")
+    @Scheduled(fixedDelayString = "${file.object-task.retry-delay-ms:60000}") // SQL-SAFETY: fixed-sql-fragment — Spring configuration placeholder, not SQL
     public void retryPending() {
         jdbcTemplate.update("""
                 UPDATE sys_file_object_task

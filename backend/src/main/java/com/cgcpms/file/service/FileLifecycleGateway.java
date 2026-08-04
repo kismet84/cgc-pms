@@ -20,7 +20,7 @@ public class FileLifecycleGateway {
         FileService fileService = fileServiceProvider.getIfAvailable();
         if (fileService == null) {
             Long count = sysFileMapper.selectCount(new LambdaQueryWrapper<SysFile>()
-                    .apply("UPPER(TRIM(business_type)) = {0}", businessType.trim().toUpperCase())
+                    .apply("UPPER(TRIM(business_type)) = {0}", businessType.trim().toUpperCase()) // SQL-SAFETY: fixed-sql-fragment — value uses MyBatis parameter binding
                     .eq(SysFile::getBusinessId, businessId)
                     .eq(SysFile::getTenantId, UserContext.getCurrentTenantId()));
             if (count == 0) return;
