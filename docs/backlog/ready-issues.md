@@ -4,6 +4,7 @@
 
 当前 Ready 为 0。
 
+- `ISSUE-069-001` 已完成计划编制，但业务实施未获授权，不进入 AutoPilot Ready。
 - v1.5 Ready 与执行历史：[Backlog 快照](../archive/v1.5/backlog-snapshot/ready-issues.md)
 - 候选、冻结项与发布门：[`current-issues.json`](current-issues.json)
 - 三项生产 `RELEASE_GATE` 不是 Ready，未取得目标环境专项授权和证据前不得实施。
