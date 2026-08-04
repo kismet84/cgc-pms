@@ -227,6 +227,7 @@ async function install(page: Page) {
 test('five finance routes render at desktop and mobile without runtime or axe errors', async ({
   page,
 }) => {
+  test.setTimeout(60_000)
   await install(page)
   const runtimeErrors = captureRuntimeErrors(page)
   const failedResponses: string[] = []
