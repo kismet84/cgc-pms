@@ -26,6 +26,11 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: ./.github/actions/setup-backend
+      - name: Install CJK font for PDF tests
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends fonts-noto-cjk
+          test -r /usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc
       - name: Verify backend test order independence
         run: cd backend && ./mvnw -C -Ptest-order-independence test
         env:
